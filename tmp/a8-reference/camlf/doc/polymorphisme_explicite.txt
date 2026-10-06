@@ -1,0 +1,349 @@
+# Mise en place du polymorphisme explicite dans gMLF
+
+## Constructions syntaxiques
+
+Les deux constructions syntaxiques sont les suivantes :
+  - Λ(αfτ)a, avec f ∈ {≥, =}
+  - a[τ]
+
+Le lexeur reconnaît le mot clé "Fun" et produit le token FFUN pour
+l'abstraction au niveau des types : dans la syntaxe concrète, on peut
+écrire "Fun 'a ('b = ..) ('c > ..) -> " : une suite d'au moins une
+quantification, avec une forme simple sans flag et sans type.
+
+Λα est interprété comme Λ(α≥⊥).
+
+
+## Traduction syntaxique -> graphique
+
+On étend les graphes de trois façons :
+- ajout d'un nouveau noeud de structure
+- enrichissement de la structure de binding
+- enrichissement des flèches de contraintes d'instance
+
+Structure : On ajoute un noeud de structure (∀), qui est binaire : par
+analogie à la forme syntaxique, son fils gauche correspond au type sur
+lequel on quantifie, et son fils droit à l'expression sous la
+quantification.
+
+Bindings : Les flèches de binding sont maintenant définies selon deux
+dimensions : Rigide|Flexible et Implicite|Explicite. Les bindings
+usuels sont tous implicites, seules les constructions de polymorphisme
+explicite traitent des bindings explicites.
+
+Permissions : Un binding explicite ne peut ni être élevé (raise), ni
+être instancié (un noeud dont le chemin à la racine contient un
+explicite n'est pas instantiable). Un binding implicite peut
+s'affaiblir en un binding explicite (utile pour merger un explicite et
+un implicite, par exemple dans Λα.λ(x:α)x).
+
+Instances : Chaque flèche d'instance porte un flag
+Implicite|Explicite. Les instances classiques sont les instances
+implicites. Une instance explicite est construite pendant la
+traduction de l'application de type. Elle ne peut avoir comme source
+qu'un noeud (G) dont le fils est un noeud (∀) ou (⊥). Son comportement
+(algorithmique) est le même qu'une instance implicite, sauf la phase
+de reset pendant l'expansion.
+
+Expansion d'une flèche d'instance explicite : l'expansion est
+similaire à l'instance classique, avec un ajout pendant le rebind. Si
+la source de l'instance est un nœud (∀) vers lequel pointe un binding
+explicite (par construction c'est nécessairement par son fils gauche),
+de flag Ef, la copie de ce binding à la destination de l'instance est
+"dégelé" en If pendant le reset; et c'est la seule différence dans la
+résolution de ces deux types d'instance.
+
+Remarque : les bindings E=, par construction des noeuds (∀), ne sont
+jamais toplevel (le binding entre le noeud (G) et son fils direct). En
+effet ils vont toujours du fils gauche du noeud (∀) vers un noeud au
+dessus du noeud (∀), dont ils ne sont donc jamais le fils direct. La
+question du rebind = → ≥ ne se pose donc pas.
+
+Remarque : par définition de la flèche d'instance classique, sa source
+et sa destination sont unifiables. Il y a donc seulement trois
+possibilités de nœud source:
+
+  1. un nœud (∀) ayant un binding explicite
+  2. un nœud (∀) dégelé (sans instance explicite)
+  3. un nœud (⊥)
+  _. tout autre choix (constructeur de tête non unifiable à (∀))
+     échouerait à l'expansion
+  
+  Un nœud (∀) avec binding explicite est déglé. C'est le cas courant
+  d'expansion.
+
+  Un nœud (⊥) doit être accepté, car il peut à tout instant
+  s'instancier en un (∀) gelé. Dans ce cas, il est transformé par
+  l'expansion en un nœud (∀) dégelé; c'est le comportement suggéré par
+  le comportement classique de l'instance implicite.
+
+  Enfin, un nœud (∀) dégelé est un cas dégénéré : il ne "se passe
+  rien" à l'expansion. Il faut l'autoriser car, en cas de bound
+  aliasing, une construction syntaxique Λ(α≥β) peut donner lieu à un
+  (∀) pré-dégelé. Interdire l'instanciation explicite de ce binding
+  casserait donc les spécifications de Λ (chaque Λ doit pouvoir être
+  appliqué).
+
+  Il paraît curieux d'autoriser l'instantiation des bindings déjà
+  déglés. Mais, en l'état, c'est nécessaire pour assure la commutation
+  des opérations de typage; on pourrait en effet très bien imaginer un
+  nœud (∀) dégelé ayant, d'une flèche d'instance explicite vers un
+  autre nœud, et d'autre part une flèche d'unification avec un nœud
+  (∀) gelé. Si l'on commence par résoudre l'instance, il faut
+  accepter; sinon, on pourrait commencer par unifier, et ensuite
+  l'instance serait acceptée, et on aurait un problème de commutation.
+
+  Il faut bien noter que ça ne veut *pas* dire que toute construction
+  (Λ...)[..] peut être silencieusement ré-unifié avec un (Λ..) non
+  instancié : le résultat d'une élimination ne contient pas le nœud
+  (∀) dégelé, mais seulement son fils droit. Les situations où cette
+  unification silencieuse peut se produire sont seulement celles où on
+  a accès, syntaxiquement, à un graphe commençant par un (∀)
+  dégelé. À ma connaissance, cela n'arrive que dans le cas de bound
+  aliasing Λ(α≥β)...
+
+
+Traductions :
+
+La traduction de Λ(αfτ)a est constituée de :
+- un noeud (G)
+- un noeud (∀) qui est le fils du noeud (G), dont le fils gauche est la
+  traduction du type τ, et le fils de droite (⊥)
+- un noeud traduction de a, dont part une flèche d'instance vers le noeud
+  (⊥) fils droit du noeud (∀)
+- une contrainte d'unification entre le noeud (τ) et les occurences de
+  α dans (a)
+- tous les noeuds sont bindés sur le noeud G, implicitement et
+  flexiblement, sauf le noeud (τ) dont le binding est explicite et
+  dont le statut flexible|rigide correspond à celui du binding
+  syntaxique "f" (= ou ≥)
+
+La traduction de a[τ] est constituée de :
+- un noeud (G)
+- un noeud (∀) dont les deux fils sont des (⊥). C'est son fils droit
+  qui est le fils du noeud G
+- un noeud traduction de a, dont part une flèche d'instance explicite
+  vers le noeud (∀)
+- un noeud traduction de τ qui est une instance du fils gauche de (∀)
+- tous les noeuds sont bindés implicitement sur le noeud G
+
+Dans les deux cas, le noeud (∀) est inerte.
+
+
+## Comparaison avec Paolo
+
+On a repris le noeud structurel (∀) de Paolo, avec une présentation
+différente des bindings explicites. Plutôt que d'avoir trois types de
+bindings Rigide|Flexible|Explicite, on a deux dimensions :
+Rigide|Flexible et Implicite|Explicite.
+
+Cela permet une relative orthogonalité des deux concepts, simplifiant
+la présentation, et une plus grande expressivité, puisque les bindings
+explicites peuvent être soit flexibles, soit rigides.
+
+Contrairement à nos essais précédents, nous avons repris la sémantique
+exacte de "gel" des bindings explicites : ils empêchent de raiser et
+d'instancier. L'idée que nous avions d'utiliser (=) pour geler et (≥)
+pour ne pas geler ne marche pas, car si on met un (=) on ne peut pas
+revenir ensuite à (≥) après l'application explicite. On pourra
+envisager dans un second temps la possibilité d'une construction
+instantiable, identique à l'actuelle mais où on laisse le binding du
+fils gauche de (∀) implicite.
+
+
+## Invariants
+
+La source d'une flèche d'instance explicite est toujours un noeud (G)
+dont le fils est un nœud (∀) ou (⊥) (cf. remarque ci-dessus pour les
+trois cas possible : (⊥), (∀) gelé et (∀) dégelé).
+
+Quand on traduit Λ(αfτ)a, si l'expression a contient au moins une
+occurence de τ, alors le binder de la traduction de a est forcément
+plus bas que le binder de la traduction de τ, pour assurer la bonne
+formation (sinon on parlerait de a dans un contexte où τ n'est pas
+défini).
+
+
+## Traduction graphique -> xMLF
+
+Mon idée générale est de laisser le mécanisme actuel de traduction
+(ordre total sur les noeuds compatible à l'ordre des binders, etc.)
+inférer la position des quantificateurs Λ explicites, comme c'est fait
+pour les implicites : en traduisant les environnements depuis chaque
+noeud. Ainsi, on se contente de demander l'ensemble des noeuds bindés
+sur le noeud courant, et une partie d'entre eux seront des bindings
+explicites (dont on peut colorer les quantificateurs si on le
+souhaite).
+
+Si ce sont les bindings/environnements qui gèrent le placement des
+quantificateurs, les noeuds (∀) n'ont quasiment aucune influence sur
+la traduction. Ils servent uniquement dans le cas de l'application
+a[τ] : c'est le contexte qui mène à leur fils gauche qui indique la
+position du quantificateur sur lequel effectuer l'application de τ.
+
+Remarque : Cette vision est étendue à la construction (λ) (à quand un
+document "ordre_supérieur.txt" ?), avec un détail : quand on génère
+l'environnement pour un noeud (λ), il faut repérer celui des bindings
+qui correspond à la variable du (λ), et générer non pas une forme
+∀(α).., mais λα...
+
+Remarque : Cette conception se retrouve aussi dans le traitement des
+noeuds (∀) dans la traduction graphique->syntaxique des types de
+print_type.ml.
+
+### Traduction des types
+
+Quand on cherche à produire un type xMLF, on ignore les noeuds (∀) :
+la quantification qui leur correspond est déjà présente dans
+l'environnement, depuis qu'on a traduit le noeud destination de la
+flèche de binding du type.
+
+### Traduction des termes
+
+La construction Λ(αfτ)a est simplement traduite par T(a)Φ(a) : la
+quantification se trouve déjà dans le contexte. La construction a[τ]
+est traduite par a[Φ(a)][Φ(τ)]. Ce qu'on note `Φ(n)` est la "type
+computation" traduite à partir de la flèche d'instance partant du
+noeud (n).
+
+La construction Λ(α=τ) n'existant pas pour l'instant en
+xMLF, il faut étendre le langage (cf. section suivante).
+
+### Traduction des instances explicites
+
+Dans le cas des instances explicites, le 'reset' du binding explicite,
+n'est pas explicitement traduit pendant la traduction de l'instance
+normalisée. En effet, sa traduction sera naturellement produite
+pendant la traduction de la relation d'instance sur τ (Φ(τ)) : le
+raisemerge final fera une application et un remplacement par le type
+implicite (car lié flexiblement) fils gauche du noeud (∀)
+d'élimination.
+
+
+### Utilité d'un enrichissement de xMLF
+
+Plutôt que de devoir inliner les bornes de la forme Λ(α=τ), on choisit
+d'étendre xMLF pour pouvoir représenter ces types. Cela a plusieurs
+avantages :
+- plus économe (plus de duplication des types ∀(α=τ)..)
+- plus simple : la traduction ne s'occupe plus d'inlining, on traduit
+  vers un "xMLF enrichi", et on peut avoir une deuxième passe ensuite
+  qui ne fait que de l'inlining et envoie le terme enrichi vers le
+  xMLF classique
+
+D'ailleurs, on a aussi intérêt à pouvoir distinguer les Λ issu de la
+traduction d'une construction explicite MLF et ceux insérés par
+l'inférence de type. En effet, dans le cadre 'langage noyau', on peut
+vouloir typer une partie d'un programme MLF en lui donnant un type
+xMLF, et pouvoir ensuite l'utiliser dans le reste du programme; pour
+cela il faut savoir si les ∀(α..) dans le type xMLF sont issus de
+polymorphisme implicite ou explicite, pour pouvoir forcer la présence
+d'application de type (a[τ]) dans le second cas.
+
+On traduit donc vers un xMLF enrichi, qui mérite une description
+à part entière dans la section suivante.
+
+
+## Notes
+
+La partie sur XMLF enrichi, décrite en fin de ce document, n'est pas
+implémentée. Pour l'instant, la traduction se contente d'échouer quand
+elle rencontre une quantification de la forme Λ(α=τ).
+
+Il faudrait parler de l'introduction de la syntaxe "some Q in .." pour
+la gestion des variables implicites. Bien qu'elle ne concerne pas
+directement le polymorphisme explicite, sa nécessité est apparue quand
+on n'a plus pu se contenter de supposer que les annotations sont
+toujours des types clos (et donc considérer implicitement comme
+existentielles les variables libres qui s'y trouvent).
+
+Détails subtils : où utiliser "some .. in" :
+  - devant les types d'une coercion
+  - dans les expressions : traduction de (some Q in e)
+  - contrairement à ce qu'on pensait, la forme a[∃̱β.β] de Paolo n'est
+    pas la bonne. Il faut se forcer à écrire (some Q in a[τ]).
+
+
+Parler du travail sur l'ordre ω : kinding général des noeuds, doubles
+bindings explicites sur les noeuds (λ) (pour qu'ils soient inertes),
+explication pas-à-pas du processus de réduction (copie du (λ) s'il
+n'est pas local au (@), dé-explicitation des fils de (λ), etc.).
+
+Parler de la discontinuité structure-variable présente dans ∀α.(α →
+β), (x : β), Λ(α≥β), et (au niveau des types) λα.β. C'est un point
+délicat.
+
+
+
+## XMLF enrichi (en progrès)
+
+### Implicite et explicite
+
+On distingue deux 'couleurs' pour les Λ et ∀, selon qu'ils ont été
+inféré ou étaient présents explicitement dans le terme syntaxique de
+départ : on a donc Λe, Λi, ∀e, ∀i.
+
+Cette extension ne pose aucune difficulté conceptuelle, et on peut la
+considérer comme optionnelle/désactivable.
+
+Remarque : il n'est pas nécessaire de marquer aussi les formes
+d'élimitation (a[τ]e et a[τ]i ?) puisque le type de l'expression
+à laquelle on applique un (∀e.. ou ∀i..) permet toujours de faire la
+différence.
+
+### Construction Λ(α=τ)
+
+On ajoute une construction Λ(α=τ) à xMLF. On a en fait une forme
+paramétrée par le binding flag, Λ(αfτ), avec f ∈ {≥, =}.
+
+Il suffit alors d'étendre la règle de typage :
+
+        Γ, α f σ' ⊢ a : σ    α ∉ ftv(Γ)
+       ———————————————————————————————   (TAbs)
+         Γ ⊢ Λ(αfσ') a : ∀(αfσ') σ
+
+Remarque : On a étendu les environnements.
+  Γ ::= ∅ | Γ,x:σ | Γ,αfσ
+
+### Type computations pour (α=τ)
+
+On étend les règles Inst-Hyp, Inst-Elim et Inst-Outer pour accepter
+aussi le flag '=' :
+
+           αfσ ∈ Γ
+       ——————————————   (Inst-Hyp)
+       Γ ⊢ α◃ : σ ≤ α 
+
+Cette règle est sûre car on transforme σ en α, et pas l'inverse.
+
+       —————————————————————————————   (Elim)
+       Γ ⊢ & : ∀(αfσ) σ' ≤ σ'{α ← σ}
+
+
+             Γ, α f σ ⊢ φ : σ₁ ≤ σ₂
+       ——————————————————————————————————   (Inst-Outer)
+       Γ ⊢ ∀(αf)φ : ∀(αfσ) σ₁ ≤ ∀(αfσ) σ2
+
+La règle Inst-Inner n'est *pas* étendue, car elle serait unsafe avec
+∀(α=τ).. :
+
+               Γ ⊢ φ : σ₁ ≤ σ₂
+       —————————————————————————————————   (Inst-Inner)
+       Γ ⊢ ∀(≥φ): ∀(α≥σ₁) σ ≤ ∀(α≥σ₂) σ
+
+
+On ajoute enfin une nouvelle règle 'weaken', notée 'w', avec la règle
+de typage suivante :
+
+       ———————————————————————————   (Weaken)
+       Γ ⊢ w: ∀(α≥τ) σ ≤ ∀(α=τ) σ
+
+
+On étend aussi les règles de réduction correspondantes, en rajoutant
+la règle pour 'weaken' : (Λ(α≥τ)a)[w] —→ (Λ(α=τ)a)
+
+
+
+## Traduction des instances normalisées vers les 'type computation' xMLF enrichies
+
+à rédiger.

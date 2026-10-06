@@ -1,0 +1,137 @@
+  ***************************************************************
+  *  camlf, a prototype implementation of the MLF type system.  *
+  *  Copyright (C) 2010. Gabriel Scherer and Didier Rémy.       *
+  ***************************************************************
+
+# Description
+
+camlf is a prototype for the [MLF] type system. It was first
+developped by Didier Rémy, then extended with various features by
+Gabriel Scherer, during his internship in the INRIA Gallium
+team. Paolo Herms (a former INRIA internet) also contributed a first
+version of explicit polymorphism.
+
+ [MLF] http://pauillac.inria.fr/~remy/mlf/
+
+The MLF type and inference engine used correspond to the gMLF type
+system developped in Boris Yakobowski's [PhD thesis]. Compared to
+Boris's prototype, the present one added an implementation of the
+elaboration of xMLF terms from a solved graph.
+
+ [PhD thesis] http://hal.inria.fr/tel-00357708/
+
+This elaboration step, combined with a (new) implementation of the
+xMLF language, is the final step of a complete toolchain for MLF
+terms :
+- parsing
+- translation to gMLF constraints
+- typing (resolution of the graphical constraints)
+- translation of the solved graph into a xMLF term
+- evaluation by reduction of the xMLF term
+
+The main additional features to the gMLF type system are :
+- explicit polymorphism according to (a variant of) Paolo Herms proposal (see [Paolo's report])
+- a prototype (and yet experimental) implementation of the
+  higher-order (Fω) features
+
+A more complete description of the theoretical aspects and rationale
+of the new developments can be found in [Gabriel's report].
+
+ [Paolo's report] http://gallium.inria.fr/~remy/mlf/herms@master2009.pdf
+ [Gabriel's report] yet to appear
+
+
+# Examples
+
+Some examples of MLF and explicit polymorphism can be found in the
+Examples/ directory.
+
+- `simple.mlf` : various MLF toy examples
+
+- `church_encodings.mlf` : church encodings of boolean and integers
+
+- `explicit.mlf` : toy examples of explicit polymorphism and its
+  interaction with the implicit MLF inference
+
+- `error.mlf` : demonstration of some ill-typed terms
+
+- `recursion.mlf` : typing and xMLF reduction of recursive functions
+
+# Dependencies
+
+Dependencies :
+- ocaml >= 3.11
+- ocamlfind
+- camomile (used for UTF-8 pretty-printing)
+
+The pretty-printer also depends on Francois Pottier's Pprint library,
+but the source code, patched for better UTF-8 support, is included in
+the archive (pprint/ directory).
+
+Optional dependencies :
+- kaputt : required to build tests (gTest.ml / xTest.ml)
+  http://kaputt.x9c.fr/
+- lablgtk and odot : required to build the step-by-step graphical interface
+  (interact.ml). It also depends on the 'odot' library, that can be installed standalone (
+
+# Compilation
+
+The provide Makefile has all the necessary build target
+
+   # camlf, the main entry point (files, toplevel..)
+   make camlf 
+   
+   # compile and run the GTK interactive reducer
+   make interact 
+
+   make clean
+
+
+# Usage
+
+Run `camlf` on files (`./camlf foo.mlf`) or as an
+interactive toplevel (`./camlf -t`).
+
+Usage :
+
+  ./camlf <options> <files>
+
+General options :
+
+  --toplevel            toplevel : Read Eval Print Loop
+  -t                    short for --toplevel
+
+  --xmlf                activate the xmlf translation
+  -x                   short for --xmlf
+
+  --xmlf_reduce         activate evaluation by reduction of translated
+                        xMLF terms
+
+  -                     Read expression from stdin
+
+  -expr <EXPR>	Typecheck expression <EXPR>
+
+
+Result printing options :
+
+  --constraint            show constraint
+  --print_source          print source term.
+  --print_desugared       print desugared source term.
+  --dot Generate some dot files during typing.
+
+  --xmlf_reduce_verbose   print intermediary reduction steps during xmlf
+                          reduction (see 'xmlf_reduce' flag)
+
+  --no-xmlf_utf8          disable UTF8 printing of xMLF terms and type
+
+Predefined examples (examples.ml) :
+
+  -use <NAME>	   typecheck predefined expression registered as <NAME>
+  -all 	           typecheck all filtered predefined expressions
+  -list 	   list predefined expression
+  -filter <STRING> filter predefined definitions whose name matches <STRING>
+
+Debugging options (for development purposes) :
+  --backtrace          print backtraces for all exceptions.
+  --xmlf_backtrace     print xmlf translation backtraces.
+  --gmlf_bactrace      print gMLF translation backtraces.

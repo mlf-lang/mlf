@@ -1,0 +1,9 @@
+-- Figure 12, A8: the MLF column labels choose id auto' as accepted.
+-- These closed implementations have exactly the assumed signatures in Fig. 1.
+-- For this explicit quantifier placement, the regression expects rejection,
+-- consistent with the authors' camlf prototype (docs/figure12-a8-reference.txt):
+--   cannot raise a protected type variable
+let choose = ((\x y -> x) : forall a. a -> a -> a) in
+let id = ((\x -> x) : forall a. a -> a) in
+let auto' = ((\x y -> y) : forall b. (forall a. a -> a) -> b -> b) in
+choose id auto'

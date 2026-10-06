@@ -1,0 +1,159 @@
+    main.ml : point d'entrée global
+
+
+Syntaxe (eMLF) :
+
+    AST.ml : termes eMLF
+  
+    eType.ml (old syntacticTypes.ml) : types syntaxiques
+  
+    eTypeConstructors.ml : constructeurs des types (syntaxiques et
+      graphiques)
+
+    eTypeKinds.ml : higher-order kinds
+  
+    ePrint.ml (old syntacticTypesPrinting.ml) : affichage des
+      termes et types syntaxiques
+
+    eLexer.mll : lexer eMLF
+  
+    eParser.mly : parser eMLF
+    
+    eParse.ml : fonctions haut niveau de lexing+parsing eMLF
+
+    examples.ml : various eMLF code samples
+
+
+Graphes (gMLF) :
+
+    gType.ml (old types.ml) : definitions des graphes gMLF, fonctions
+    de création, vérification, etc.
+
+    gTranslate.ml (old translate.ml) : traduction eMLF -> gMLF (construction des graphes)
+
+    gEnv : graph translation environment 
+    
+    gUnify.ml (old unify.ml) : unification sur les types graphiques
+
+    gSolve.ml (old infer.ml) : inférence, expansion, relation d'instance
+
+    gAst.ml : AST eMLF simplifié, pour faciliter la traduction eMLF->gMLF
+
+    gReduce.ml : β-réduction dans les graphes (partie Fω)
+
+    expr.ml : environnement de lien graphique-syntaxique, type `graphic_constraint`
+
+    dot.ml : sortie dot à partir d'un graphe gMLF
+
+    gPrint.ml (old print.ml) : affichage textuel du graphe gMLF
+        print_gtype : non reentrant
+        draw_gtype  : pour debugger (reentrant)
+
+    print_type.ml : affichage textuel du type eMLF traduit à partir d'un graphe gMLF
+
+
+xMLF :
+
+    xAst.ml : définition et manipulation des termes, types et type computations xMLF
+    
+    xTranslate.ml : traduction gMLF -> xMLF (types, type computations et termes)
+ 
+    xTyper.ml : typeur
+ 
+    xReduce.ml : réduction / évaluation
+ 
+    xSimplify.ml : simplification des termes xMLF après traduction
+      (surtout sur les 'type computations' où on retire les ε par
+      exemple)
+ 
+    xEnv.ml : environnements (pour les termes de De Bruijn de xAst)
+ 
+    xPrint.ml : affichage textuel des termes
+ 
+     gInstance.ml : calcul après inférence des opérations
+       d'instanciation normalisées entre graphes; utilisé pour la
+       production des 'type computations'
+
+
+Error reporting:
+
+    errorsHandling.ml : dispatch des erreurs
+      
+    syntaxErrors.ml : erreurs de syntaxe
+  
+    typingErrors.ml : erreurs de typage
+   
+    toplevelErrors.ml : erreurs issues du toplevel
+
+    featureErrors.ml : error reports for unsupported features
+
+
+Interactive toplevel :
+
+    toploop.ml : toplevel interactif
+  
+    highlight.ml : souligner les erreurs dans le toplevel
+  
+    tophelp.ml : aide interactive
+
+
+Step-by-step graphic reduction :
+
+    interact.ml : entry point for animate.ml
+  
+    animate.ml (old interact.ml) : interface GTK de réduction pas-à-pas
+
+    odot_view.ml : modification par Boris de la fonction d'affichage
+      de graphes Dot dans LablGTK
+
+ 
+Options :
+    
+    options.ml: options de ligne de commande
+  
+    config.ml : options de configuration (ligne de commande et toplevel)
+  
+    debug.ml: options de debugging (affichages dot)
+
+Tests : 
+
+    xTest.ml : lancement des tests xMLF
+
+    gTest.ml : tests spécifiques aux termes syntaxiques eMLF
+
+    gmlf_generators.ml : générateur de termes syntaxiques eMLF
+
+    xmlf_generators.ml : genérateurs de termes, types et type computations xMLF
+
+    common_generators.ml : utilitaires communs de génération
+
+    generator.{ml,mli} : surcouche du module Generator de Kaputt
+
+    xmlf_specifications.ml : définitions des propriétés xMLF à tester
+
+    gmlf_specifications : définitions des propriétés gMLF à tester
+
+
+
+Modules auxiliaires : 
+
+    sig.ml / struct.ml : resolution of the GReduce/GSolve/Gunify
+      cyclic dependency
+
+    locations.ml : locations (position dans le fichier source
+      d'entrée), conservées pendant les traductions eMLF -> gMLF ->
+      xMLF
+
+    symbol.ml : symboles pour l'affichage : sortie UTF8 ou ASCII
+
+    opaque.{ml,mli} : types de données opaques pour les int et string
+
+    utils.ml : librairies stupides
+    utils_boris.ml : utilitaires de Boris, pas encore intégrés à utils.ml
+
+    union_find.{ml,mli} : librairie intelligente (algorithme d'union-find)
+      Union_find.find : représentant de la classe d'un objet
+      Union_find.info : objet lui-même (potentiellement différent,
+        cf. .sync
+      Union_find.sync : remplace l'object par son représentant (après
+        appel, .info et .find renvoient la même chose)

@@ -1,0 +1,2 @@
+-- The existential argument type is inferred; the result remains polymorphic.
+((\x -> \y -> y) : exists a. a -> (forall b. b -> b)) 42

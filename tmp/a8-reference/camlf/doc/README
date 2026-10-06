@@ -1,0 +1,14 @@
+This repository is intended for human-generatod (instead of
+ocamldoc-generated) documentation on the prototype and the underlying
+theory.
+
+It is difficult to keep the code and the theory in sync, as they tend
+to evolve separately (and a theory change may be slow to repercute
+into a clean code change). By including here informal description of
+the theory directly inside the source, it is believed that
+desynchronization may be avoided.
+
+Due to lazyness on my (Gabriel Scherer) part, most of the documents
+are written in french. Please do not hesitate to ask for
+translations/clarifications if you need it ( gabriel dot scherer at
+gmail ).

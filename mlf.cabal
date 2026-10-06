@@ -1,0 +1,52 @@
+cabal-version: 3.0
+name: mlf
+version: 0.1.0.0
+synopsis: Evidence-producing eMLF to xMLF compiler
+description: Graph-based type inference and explicit elaboration following Yakobowski's thesis.
+category: Language
+build-type: Simple
+license: BSD-3-Clause
+extra-source-files: README.md, examples/*.emlf, test/fixtures/*.emlf, docs/*.txt
+
+common settings
+  default-language: Haskell2010
+  ghc-options: -Wall -Wcompat -Wincomplete-uni-patterns -Wincomplete-record-updates
+  build-depends: base >=4.14 && <5, containers >=0.6 && <0.9, mtl >=2.2 && <2.4, parsec >=3.1 && <3.2
+
+library
+  import: settings
+  hs-source-dirs: src
+  exposed-modules:
+    MLF.Compiler
+    MLF.Syntax
+    MLF.Parser
+    MLF.Graph
+    MLF.Constraint
+    MLF.Elaborate
+    MLF.X.Type
+    MLF.X.Syntax
+    MLF.X.Check
+    MLF.X.Pretty
+    MLF.X.Parser
+
+executable emlf
+  import: settings
+  hs-source-dirs: app
+  main-is: Main.hs
+  build-depends: mlf
+
+test-suite mlf-tests
+  import: settings
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Main.hs
+  other-modules: Oracle, Computations
+  build-depends: mlf, directory
+
+test-suite figure12-tests
+  import: settings
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Figure12Main.hs
+  other-modules: Figure12
+  build-depends: mlf

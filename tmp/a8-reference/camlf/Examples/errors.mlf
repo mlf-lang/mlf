@@ -1,0 +1,50 @@
+#global +fail;;
+
+(** Typing errors *)
+val unbound_type_variable (x : 'foo) = x
+val unbound_type_constructor (x : bar) = x
+
+(** Graph errors *)
+val bound_alias x =
+  some 'a in
+  (x : ('b != 'a) . 'b -> 'b)
+
+#+experimental_fomega
+  (* should fail ! *)
+  val blocked_redex =
+    Fun 'a -> fun x ->
+      (x : ('c = (lam 'b . 'b) @ 'a) . 'c -> 'c )
+;;
+
+(** Unification errors *)
+val cycle = fun x -> x x
+
+#local -fail
+  val unify x y = if True then x else y
+;;
+
+val grafing_error =
+  fun (x : ('a = _) . 'a -> 'a)
+      (y : int -> int)
+    -> unify x y
+
+val raise_error =
+  fun (x : ('a = ('b > _) . 'b -> 'b) . 'a -> 'a)
+      (y : 'b . ('b -> 'b) -> ('b -> 'b))
+    -> unify x y
+        
+val weaken_error =
+  fun (x : ('a = ('b > _) . 'b -> 'b) . 'a -> 'a)
+      (y : ('a = ('b = _) . 'b -> 'b) . 'a -> 'a)
+    -> unify x y
+
+val cobound_error =
+  fun (x : ('a = 'a 'b . 'a -> 'b) . 'a -> 'a)
+      (y : ('a = 'a . 'a -> 'a) . 'a -> 'a)
+    -> unify x y
+  
+
+#global -fail;;
+
+(* less obvious errors *)
+val missing_polymorphism = (fun (x:'a. 'a -> 'a) -> x) (fun x y -> x)

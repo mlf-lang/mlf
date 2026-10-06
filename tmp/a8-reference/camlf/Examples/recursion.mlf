@@ -1,0 +1,9 @@
+#global +xmlf_reduce;;
+#global +xmlf_utf8;;
+
+val rec magic x = magic x ;;
+
+let rec double i =
+  if i = 0 then 0
+  else 2 + double (i - 1)
+in double 3

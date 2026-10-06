@@ -1,0 +1,3 @@
+let id = \x -> x in
+let number = id 42 in
+id true
