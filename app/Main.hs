@@ -8,10 +8,17 @@ import MLF.Compiler
 import MLF.X.Pretty
 import qualified MLF.X.Parser as X
 import qualified MLF.X.Check as X
+import qualified MLF.Runtime as R
 
 main :: IO ()
 main = do
   args <- getArgs
+  case args of
+    "--no-prelude":rest -> runArgs NoImplicitPrelude rest
+    _ -> runArgs ImplicitPrelude args
+
+runArgs :: PreludeMode -> [String] -> IO ()
+runArgs mode args =
   case args of
     ["--help"] -> putStrLn usage
     ["--expr",source] -> run "<expression>" source False
@@ -20,6 +27,12 @@ main = do
     ["-"] -> getContents >>= \s -> run "<stdin>" s False
     ["--type"] -> getContents >>= \s -> run "<stdin>" s True
     ["--type",file] -> readSource file True
+    ["--run","--expr",source] -> execute "<expression>" source
+    ["--run"] -> getContents >>= execute "<stdin>"
+    ["--run","-"] -> getContents >>= execute "<stdin>"
+    ["--run",file] -> load file >>= execute file
+    ["--run-xmlf"] -> getContents >>= executeTarget "<stdin>"
+    ["--run-xmlf",file] -> load file >>= executeTarget file
     ["--check"] -> getContents >>= check "<stdin>"
     ["--check",file] -> load file >>= check file
     [file] | take 2 file /= "--" -> readSource file False
@@ -34,20 +47,32 @@ main = do
     check file source = case X.parseTerm file source >>= X.checkClosed of
       Left err -> die err
       Right ty -> putStrLn (prettyType ty)
-    run file source onlyType = case compile file source of
+    run file source onlyType = case compileWithPrelude mode file source of
       Left err -> die (show err)
       Right result -> do
-        putStrLn ((if onlyType then "" else "-- type: ") ++ prettyType (inferredType result))
+        putStrLn ((if onlyType then "" else "-- type: ") ++ sourceType result)
         if onlyType then pure () else putStrLn (prettyTerm (compiledTerm result))
+    execute file source = case compileWithPrelude mode file source of
+      Left err -> die (show err)
+      Right result -> executeTerm (compiledTerm result)
+    executeTarget file source = either die executeTerm (X.parseTerm file source)
+    executeTerm term = do
+      outcome <- R.runTerm R.consoleBackend term
+      either (die . ("Runtime: " ++) . show) pure outcome
 
 die :: String -> IO a
 die message = hPutStrLn stderr message >> exitFailure
 
 usage :: String
 usage = unlines
-  [ "Usage: emlf [--type] [FILE | --expr SOURCE]"
+  [ "Usage: emlf [--no-prelude] [--type] [FILE | --expr SOURCE]"
   , "       emlf --check [XMLF_FILE]"
+  , "       emlf [--no-prelude] --run [FILE | --expr SOURCE]"
+  , "       emlf --run-xmlf [XMLF_FILE]"
   , "With no FILE, read eMLF from standard input."
-  , "Compile lambda, application, let, and annotated expressions to checked xMLF."
+  , "Compile expressions, algebraic data types, and type classes to checked xMLF."
+  , "The standard prelude supplies Monad and Monad IO; --no-prelude disables it."
   , "--check reads emitted xMLF and checks it independently of type inference."
+  , "--run executes a checked IO action; program output goes to standard output."
+  , "For interactive input, use --run FILE or --run --expr SOURCE."
   ]

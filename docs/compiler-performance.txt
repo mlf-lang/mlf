@@ -1,0 +1,101 @@
+Compiler performance: 2026-10-07 (Asia/Shanghai)
+==============================================
+
+Historical optimization report. The current Snake/GHC comparison and the
+5x compilation target are documented in snake-compilation-performance.txt.
+
+Measured from: 2026-10-06T20:28:24.600206+00:00
+Host: macOS-26.6.2-arm64-arm-64bit-Mach-O
+Compiler: GHC 9.14.1; both emlf executables built with Cabal default -O1.
+The timed executables are not profiling builds.
+
+This is the snapshot before the implicit standard prelude was added. The
+recorded source hashes identify the measured inputs; current examples now
+omit some declarations that older compilers require. Reproduction requires
+matching source and prelude configurations as well as build settings.
+
+Scope and method
+----------------
+Three fresh serial processes per executable per input. Execution order is
+before/after, after/before, before/after. No untimed warmup. Report medians.
+Timing includes process startup, source parsing, inference, elaboration,
+independent verification, and captured xMLF output. It excludes building
+the compiler and running the compiled program. This compares two versions
+of emlf, not emlf with GHC native code generation.
+
+All 16 examples produced byte-identical xMLF in all six runs. Each emitted
+output was also parsed and checked with --check outside the timed region.
+
+Example                       Before (s)   After (s)   Speedup
+----------------------------  ----------   ---------   -------
+choose-id.emlf                    0.0241      0.0244     0.99x
+contextual-instance.emlf          0.4207      0.1364     3.08x
+identity.emlf                     0.0208      0.0203     1.02x
+impredicative.emlf                0.0207      0.0200     1.03x
+io-hello.emlf                     0.0440      0.0208     2.12x
+let-polymorphism.emlf             0.0195      0.0211     0.93x
+maybe.emlf                        0.0196      0.0201     0.98x
+monad-io.emlf                     0.8033      0.2793     2.88x
+monad-maybe.emlf                  4.6578      1.3512     3.45x
+monad-state-do.emlf               4.8382      1.4253     3.39x
+multiparameter.emlf               0.4267      0.1291     3.30x
+partial-annotation.emlf           0.0201      0.0204     0.99x
+polymorphic-data.emlf             0.0300      0.0205     1.46x
+recursive-data.emlf               0.0702      0.0331     2.12x
+self-application.emlf             0.0207      0.0202     1.02x
+snake.emlf                       74.5069     19.1555     3.89x
+
+The smallest examples remain near 20 ms including process startup; their
+small timing differences should not be interpreted as reliable speedups.
+
+Snake raw samples (seconds, chronological within each executable)
+----------------------------------------------------------------
+before: 74.506880, 76.443687, 72.761959
+after: 19.155540, 19.848778, 18.829264
+Snake source SHA-256: fc011ddac5b0ff330c4fcfb66f19cc4e80a27a7b94a70b19300781d354bfa320
+Snake xMLF SHA-256:   020370aeaf6d45453a3725de71cef4b5b4cca6a7d24395cb8234ca89cc259312
+Before binary SHA-256: 492fa273a9777a0cb5ec5ca6b250c366b1692c88f32a392bc3de4627e3511a82
+After binary SHA-256:  7dc121e1cf1f933004bbd994ac3f8629a74d8e463dc44760b957520586792452
+
+Changes
+-------
+- Share completed kind results across one validation pass. This same walk
+  detects missing structural nodes and cycles.
+- Traverse the binding tree once and use DFS intervals for ancestry tests.
+  Missing binders, extra roots, and disconnected binding cycles still fail.
+- Stop structural containment searches at the requested descendant.
+- Use independently checked Inst-Refl for alpha-equivalent instance types.
+  Other edges retain final-presolution expansion and identity-based proofs.
+- Skip an empty frontier unification; the following unification still
+  validates the expansion before merging anything.
+
+An initial -fprof-auto profile attributed about 66% of measured time to
+graph validation, including 566,982,192 binding-path visits. Profiling was
+used to locate bottlenecks; the table above uses ordinary executables.
+
+Validation
+----------
+cabal build exe:emlf -j1: passed.
+cabal test -j1 --test-show-details=direct: passed.
+343 main checks; 0 failures. These include:
+  - 12,000 graphs compared with an uncached validator (78 valid);
+  - deep binding scopes and shared higher-kinded types;
+  - 6,712 terms checked against the independent ML typability oracle;
+  - 126 annotation programs;
+  - seven Snake transcripts and eleven rule outcomes matching Haskell.
+Figure 12: 43/43 regression expectations and 36 supplementary checks pass.
+A8 continues to reject the explicit signature, as required by the regression.
+Target typing, computation checking, and source erasure checks remain enabled.
+
+Reproduction
+------------
+Preserve the earlier executable before rebuilding the compiler, then use:
+python3 scripts/benchmark-compiler.py \
+  --before dist-newstyle/compiler-performance/emlf-before \
+  --after "$(cabal list-bin exe:emlf)" \
+  --runs 3 --output dist-newstyle/compiler-performance/comparison.json \
+  examples/*.emlf
+
+The local comparison.json contains all raw samples, input and binary hashes,
+output hashes, and independently checked types. It is a build artifact;
+the benchmark script and this summary are included in the source package.

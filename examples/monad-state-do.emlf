@@ -1,0 +1,36 @@
+-- Extend the prelude's Monad with state operations and a user-defined instance.
+data Pair a b = Pair a b;
+data State s a = State (s -> Pair a s);
+
+class Monad m => MonadState s (m : * -> *) where {
+  get : m s;
+  put : s -> m Unit
+};
+
+instance Monad (State s) where {
+  return = \value -> State (\state -> Pair value state);
+  bind = \action next -> State (\state ->
+    case action of {
+      State run -> case run state of {
+        Pair value state' -> case next value of {
+          State continue -> continue state'
+        }
+      }
+    })
+};
+
+instance MonadState s (State s) where {
+  get = State (\state -> Pair state state);
+  put = \state -> State (\ignored -> Pair Unit state)
+};
+
+-- bind and return come from the Monad superclass of MonadState.
+let replace : forall s (m : * -> *). MonadState s m => s -> m s =
+  \new -> do {
+    previous <- get;
+    put new;
+    return previous
+  }
+in case (replace 42 : State Int Int) of {
+  State run -> run 0
+}

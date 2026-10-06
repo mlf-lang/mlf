@@ -1,0 +1,8 @@
+data Maybe a = Nothing | Just a;
+
+let fromMaybe = \default value ->
+  case value of {
+    Nothing -> default;
+    Just x -> x
+  }
+in fromMaybe 0 (Just 42)

@@ -2,6 +2,10 @@ module MLF.X.Pretty (prettyType, prettyTerm, prettyComputation) where
 
 import MLF.X.Syntax
 import MLF.X.Type
+import MLF.Data (prettyDeclaration)
+import Data.List (intercalate)
+import MLF.Kind (prettyKind)
+import MLF.Primitive (primitiveName)
 
 variable :: TyVar -> String
 variable (TyVar n) | n < 0 = "z" ++ show (-n)
@@ -20,9 +24,11 @@ prettyType = ty (0 :: Int)
     ty p t = case t of
       Var a -> variable a
       Bot -> "bot"
+      BotKind k -> "bot[" ++ prettyKind k ++ "]"
       Arrow a b -> parenthesize (p > 1) (ty 2 a ++ " -> " ++ ty 1 b)
       Con c [] -> c
       Con c ts -> parenthesize (p > 2) (unwords (c : map (ty 3) ts))
+      Apply f a -> parenthesize (p > 2) (ty 2 f ++ " " ++ ty 3 a)
       Forall a Bot b -> parenthesize (p > 0) ("forall " ++ variable a ++ ". " ++ ty 0 b)
       Forall a bound b -> parenthesize (p > 0)
         ("forall (" ++ variable a ++ " >= " ++ ty 0 bound ++ "). " ++ ty 0 b)
@@ -36,6 +42,7 @@ prettyComputation p = case p of
   Outer a q -> "outer(" ++ variable a ++ ", " ++ prettyComputation q ++ ")"
   Elim -> "elim"
   Intro a -> "intro(" ++ variable a ++ ")"
+  IntroKind a k -> "intro(" ++ variable a ++ " : " ++ prettyKind k ++ ")"
   Then a b -> prettyComputation a ++ "; " ++ prettyComputation b
 
 prettyTerm :: Term -> String
@@ -49,6 +56,17 @@ prettyTerm = term (0 :: Int)
         ("/\\(" ++ variable a ++ " >= " ++ prettyType bound ++ ") -> " ++ term 0 b)
       TypeApp a phi -> term 2 a ++ "[" ++ prettyComputation phi ++ "]"
       Let n a b -> parenthesize (p > 0) ("let " ++ name n ++ " = " ++ term 0 a ++ " in " ++ term 0 b)
+      LetRec ds b -> parenthesize (p > 0) ("letrec { " ++
+        intercalate "; " [name n ++ " : " ++ prettyType ty ++ " = " ++ term 0 a | (n,ty,a) <- ds] ++
+        " } in " ++ term 0 b)
       IntTerm n -> show n
       BoolTerm b -> if b then "true" else "false"
-
+      StringTerm s -> show s
+      Primitive primitive ts -> "primitive " ++ primitiveName primitive ++ "(" ++ intercalate ", " (map prettyType ts) ++ ")"
+      Constructor c ts -> "construct " ++ c ++ "(" ++ intercalate ", " (map prettyType ts) ++ ")"
+      Case a result bs -> parenthesize (p > 0)
+        ("case " ++ term 0 a ++ " return " ++ prettyType result ++ " of { " ++
+         intercalate "; " [patternP pat ++ " -> " ++ term 0 b | Alternative pat b <- bs] ++ " }")
+      WithData ds b -> unlines (map prettyDeclaration ds) ++ term 0 b
+    patternP (ConstructorPattern c ns) = unwords (c : map (maybe "_" name) ns)
+    patternP (DefaultPattern n) = maybe "_" name n

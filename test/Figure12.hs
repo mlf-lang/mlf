@@ -9,6 +9,7 @@ module Figure12 (Case (..), cases, program, assumptions) where
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import MLF.Parser (parseExpr)
+import MLF.Desugar (desugarDo)
 import qualified MLF.Syntax as S
 
 data Case = Case
@@ -113,12 +114,25 @@ cases =
 freeNames :: S.Expr -> Set.Set String
 freeNames e = case e of
   S.Var x -> Set.singleton x
+  S.Constructor _ -> Set.empty
   S.Lam x _ b -> Set.delete x (freeNames b)
   S.App a b -> freeNames a `Set.union` freeNames b
   S.Let x a b -> freeNames a `Set.union` Set.delete x (freeNames b)
   S.Ann a _ -> freeNames a
   S.IntLit _ -> Set.empty
   S.BoolLit _ -> Set.empty
+  S.StringLit _ -> Set.empty
+  S.Primitive _ -> Set.empty
+  S.Wanted _ candidates -> Set.fromList (map snd candidates)
+  S.Checked _ a -> freeNames a
+  S.Do _ _ -> freeNames (desugarDo e)
+  S.LetRec ds b -> Set.unions (freeNames b : [freeNames a | (_,_,a) <- ds])
+    `Set.difference` Set.fromList [n | (n,_,_) <- ds]
+  S.Case a bs -> freeNames a `Set.union` Set.unions
+    [freeNames b `Set.difference` Set.fromList (bound p) | S.Alternative p b <- bs]
+    where
+      bound (S.ConstructorPattern _ ns) = [n | Just n <- ns]
+      bound (S.DefaultPattern n) = [x | Just x <- [n]]
 
 assumptions :: Case -> Either String [(String, String)]
 assumptions c = do

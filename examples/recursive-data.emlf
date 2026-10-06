@@ -1,0 +1,12 @@
+data List a = Nil | Cons a (List a);
+data Tree a = Leaf a | Branch (Tree a) (Tree a);
+
+let firstTwo = \xs ->
+  case xs of {
+    Nil -> Leaf 0;
+    Cons x rest -> case rest of {
+      Nil -> Leaf x;
+      Cons y _ -> Branch (Leaf x) (Leaf y)
+    }
+  }
+in firstTwo (Cons 10 (Cons 20 Nil))

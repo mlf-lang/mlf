@@ -1,28 +1,37 @@
+{-# LANGUAGE MonoLocalBinds #-}
 module MLF.Graph
   ( NodeId, Tag (..), Node (..), Graph (..), Build, emptyGraph
   , freshId, newNode, setNode, nodeAt, resolve, children, runBuild
   , reachable, underBinder, inert, Permission (..), permission
-  , unify, expand, normalize, validateGraph, orderedBelow, genRoot
+  , unify, expand, normalize, validateGraph, orderedBelow, genRoot, kindAt, bottomTag
   ) where
 
-import Control.Monad (foldM, forM_, unless, when)
+import Control.Monad (foldM, forM, forM_, unless, when)
 import Control.Monad.State.Strict
+import Control.Monad.Except (runExceptT, throwError)
+import Control.Monad.ST (ST, runST)
+import qualified Data.Array as A
+import Data.Array.ST (STArray, STUArray, newArray, readArray, writeArray)
 import Data.List (find)
+import qualified Data.List as List
 import Data.Maybe (mapMaybe)
 import qualified Data.IntMap.Strict as IM
+import qualified Data.IntMap.Lazy as Lazy
 import qualified Data.IntSet as IS
 import MLF.Syntax (Flag (..))
+import MLF.Kind
 
 type NodeId = Int
 
-data Tag = Bot | Arr NodeId NodeId | Con String [NodeId] | Gen NodeId
+data Tag = Bot | BotK Kind | Arr !NodeId !NodeId | Con String [NodeId]
+         | TyCon String Kind | Skolem Int Kind | TyApp !NodeId !NodeId | Gen !NodeId
   deriving (Eq, Show)
-data Node = Node { tag :: Tag, binder :: Maybe NodeId, flag :: Flag }
+data Node = Node { tag :: !Tag, binder :: !(Maybe NodeId), flag :: !Flag }
   deriving (Eq, Show)
 data Graph = Graph
-  { nodes :: IM.IntMap Node
-  , links :: IM.IntMap NodeId
-  , nextId :: Int
+  { nodes :: !(IM.IntMap Node)
+  , links :: !(IM.IntMap NodeId)
+  , nextId :: !Int
   } deriving (Eq, Show)
 
 type Build = StateT Graph (Either String)
@@ -57,15 +66,72 @@ nodeAt g n = nodes g IM.! resolve g n
 
 children :: Tag -> [NodeId]
 children Bot = []
+children (BotK _) = []
 children (Arr a b) = [a,b]
 children (Con _ ns) = ns
 children (Gen n) = [n]
+children (TyCon _ _) = []
+children (Skolem _ _) = []
+children (TyApp f a) = [f,a]
 
 mapTag :: (NodeId -> NodeId) -> Tag -> Tag
 mapTag _ Bot = Bot
+mapTag _ (BotK k) = BotK k
 mapTag f (Arr a b) = Arr (f a) (f b)
 mapTag f (Con c ns) = Con c (map f ns)
 mapTag f (Gen n) = Gen (f n)
+mapTag _ (TyCon c k) = TyCon c k
+mapTag _ (Skolem n k) = Skolem n k
+mapTag f (TyApp a b) = TyApp (f a) (f b)
+
+bottomTag :: Kind -> Tag
+bottomTag Star = Bot
+bottomTag k = BotK k
+
+isBottom :: Tag -> Bool
+isBottom Bot = True
+isBottom (BotK _) = True
+isBottom _ = False
+
+kindAt :: Graph -> NodeId -> Either String Kind
+kindAt g start = (IM.! resolve g start) <$> kindsAt g [start]
+
+-- Share results across all requested roots of one immutable structural DAG.
+-- The active path still detects cycles; only completed nodes enter the cache.
+kindsAt :: Graph -> [NodeId] -> Either String (IM.IntMap Kind)
+kindsAt g starts = execStateT (mapM_ (go IS.empty) starts) IM.empty
+  where
+    go :: IS.IntSet -> NodeId -> StateT (IM.IntMap Kind) (Either String) Kind
+    go path original = do
+      let n = resolve g original
+      cached <- gets (IM.lookup n)
+      case cached of
+        Just k -> pure k
+        Nothing -> do
+          when (IS.member n path) (lift (Left "infinite type (occurs check)"))
+          v <- maybe (lift (Left ("missing graph node " ++ show n))) pure (IM.lookup n (nodes g))
+          let child = go (IS.insert n path)
+          k <- case tag v of
+            Bot -> pure Star
+            BotK kind -> pure kind
+            TyCon _ kind -> pure kind
+            Skolem _ kind -> pure kind
+            Gen s -> child s
+            Arr a b -> do
+              ka <- child a
+              kb <- child b
+              unless (ka == Star && kb == Star) (lift (Left "function types require kind * arguments"))
+              pure Star
+            Con _ ns -> do
+              ks <- mapM child ns
+              unless (all (== Star) ks) (lift (Left "legacy type constructor has a non-* argument"))
+              pure Star
+            TyApp f a -> do
+              kf <- child f
+              ka <- child a
+              lift (applyKind kf ka)
+          modify' (IM.insert n k)
+          pure k
 
 genRoot :: Graph -> NodeId -> NodeId
 genRoot g n = case tag (nodeAt g n) of
@@ -80,6 +146,19 @@ reachable g start = go IS.empty [resolve g start]
       | IS.member n seen = go seen ns
       | otherwise = go (IS.insert n seen) (map (resolve g) (children (tag (nodeAt g n))) ++ ns)
 
+-- Validation asks about one node, so do not materialize every descendant of
+-- its binder. In particular, a direct child of a deep type is found at once.
+structurallyContains :: Graph -> NodeId -> NodeId -> Bool
+structurallyContains g parent wanted = go IS.empty [resolve g parent]
+  where
+    target = resolve g wanted
+    go _ [] = False
+    go seen (n:ns)
+      | n == target = True
+      | IS.member n seen = go seen ns
+      | otherwise = go (IS.insert n seen)
+          (map (resolve g) (children (tag (nodeAt g n))) ++ ns)
+
 -- | Strict membership in a binding-tree interior.
 underBinder :: Graph -> NodeId -> NodeId -> Bool
 underBinder g n ancestor = go (binder (nodeAt g n))
@@ -90,56 +169,178 @@ underBinder g n ancestor = go (binder (nodeAt g n))
                 | otherwise = go (binder (nodeAt g b))
 
 inert :: Graph -> NodeId -> Bool
-inert g n = tag (nodeAt g n) /= Bot && all (inert g) flexChildren
+inert g n = inertNodes g IM.! resolve g n
+
+-- These analyses are shared only within one immutable graph. Binding edges
+-- form a tree after validation, so the lazy tables are well founded.
+inertNodes :: Graph -> IM.IntMap Bool
+inertNodes g = table
   where
-    flexChildren = [m | (m,v) <- IM.toList (nodes g), binder v == Just (resolve g n), flag v == Flexible]
+    flexChildren = IM.fromListWith (++)
+      [(b,[n]) | (n,v) <- IM.toList (nodes g), Just b <- [binder v], flag v == Flexible]
+    table = Lazy.mapWithKey (\n v -> not (isBottom (tag v)) &&
+      all (table IM.!) (IM.findWithDefault [] n flexChildren)) (nodes g)
 
 data Permission = Green | Orange | Red | Inert deriving (Eq, Show)
 
 permission :: Graph -> NodeId -> Permission
-permission g n
-  | inert g n = Inert
-  | flag (nodeAt g n) == Rigid = Orange
-  | flexibleToGen n = Green
-  | otherwise = Red
-  where
-    flexibleToGen m = case tag (nodeAt g m) of
-      Gen _ -> True
-      _ | flag (nodeAt g m) == Rigid -> False
-        | otherwise -> maybe True flexibleToGen (binder (nodeAt g m))
+permission g n = permissions g IM.! resolve g n
 
--- | A topological order of the structural DAG. Gen nodes also own existential
--- nodes through the binding tree; these are checked separately below.
-topological :: Graph -> Either String [NodeId]
-topological g = fmap reverse (snd <$> foldM visit (IS.empty,[]) (IM.keys (nodes g)))
+permissions :: Graph -> IM.IntMap Permission
+permissions g = IM.mapWithKey classify (nodes g)
   where
-    visit (done,order) n | IS.member n done = pure (done,order)
-    visit acc n = dfs IS.empty acc n
-    dfs stack (done,order) n
-      | IS.member n done = pure (done,order)
-      | IS.member n stack = Left "infinite type (occurs check)"
-      | otherwise = do
-          unless (IM.member n (nodes g)) (Left ("missing graph node " ++ show n))
-          (done',order') <- foldM (dfs (IS.insert n stack)) (done,order)
-            (map (resolve g) (children (tag (nodeAt g n))))
-          pure (IS.insert n done', n:order')
+    inertness = inertNodes g
+    flexiblePaths = Lazy.map (\v -> case tag v of
+      Gen _ -> True
+      _ | flag v == Rigid -> False
+        | otherwise -> maybe True (flexiblePaths IM.!) (binder v)) (nodes g)
+    classify n v
+      | inertness IM.! n = Inert
+      | flag v == Rigid = Orange
+      | flexiblePaths IM.! n = Green
+      | otherwise = Red
 
 validateGraph :: Graph -> Either String ()
-validateGraph g = do
-  _ <- topological g
-  let roots = [n | (n,v) <- IM.toList (nodes g), binder v == Nothing]
-  unless (length roots == 1) (Left "graph must have one binding root")
+validateGraph g = case denseBounds g of
+  Just bounds -> validateDense g bounds
+  Nothing -> validateSparse g
+
+-- Source-generated identities are dense, but Graph is also a public API.
+-- Keep storage proportional to the input even for arbitrary sparse IDs.
+denseBounds :: Graph -> Maybe (NodeId,NodeId)
+denseBounds g = do
+  (lo,_) <- IM.lookupMin (nodes g)
+  (hi,_) <- IM.lookupMax (nodes g)
+  if toInteger hi - toInteger lo <= 8 * toInteger (IM.size (nodes g))
+      && IM.disjoint (nodes g) (links g)
+    then Just (lo,hi) else Nothing
+
+newInts :: (Int,Int) -> Int -> ST s (STUArray s Int Int)
+newInts = newArray
+
+newKinds :: (Int,Int) -> ST s (STArray s Int Kind)
+newKinds bounds = newArray bounds Star
+
+newBinders :: (Int,Int) -> ST s (STArray s Int (Maybe NodeId))
+newBinders bounds = newArray bounds Nothing
+
+-- All scratch storage is confined to this validation. Three-colour DFS
+-- checks kinds, scope and structural cycles after numbering the binding tree.
+-- No persistent map is rebuilt for every node visited.
+validateDense :: Graph -> (Int,Int) -> Either String ()
+validateDense g bounds = runST $ runExceptT $ do
+  colours <- lift (newInts bounds 0)
+  kinds <- lift (newKinds bounds)
+  starts <- lift (newInts bounds (-1))
+  ends <- lift (newInts bounds (-1))
+  visited <- lift (newInts bounds (-1))
+  let entries = IM.toAscList (nodes g)
+      table = A.accumArray (\_ v -> Just v) Nothing bounds entries
+      getNode n = if A.inRange bounds n then table A.! n else Nothing
+      require n = maybe (throwError ("missing graph node " ++ show n)) pure (getNode n)
+  root <- case [n | (n,v) <- entries, binder v == Nothing] of
+    [n] -> pure n
+    _ -> throwError "graph must have one binding root"
+  forM_ entries $ \(_,v) -> forM_ (binder v) $ \b ->
+    unless (maybe False (const True) (getNode b)) (throwError "missing binder")
+  let descendants = A.accumArray (flip (:)) [] bounds
+        [(b,n) | (n,v) <- entries, Just b <- [binder v]]
+      visit n position = do
+        lift (writeArray starts n position)
+        end <- foldM (flip visit) (position + 1) (descendants A.! n)
+        lift (writeArray ends n end)
+        pure end
+      contains ancestor n = do
+        a <- lift (readArray starts ancestor)
+        b <- lift (readArray ends ancestor)
+        p <- lift (readArray starts n)
+        pure (a <= p && p < b)
+      structurally _ _ [] = pure False
+      structurally wanted stamp (original:rest) = do
+        let n = resolve g original
+        if n == wanted then pure True else do
+          v <- require n
+          mark <- lift (readArray visited n)
+          if mark == stamp then structurally wanted stamp rest else do
+            lift (writeArray visited n stamp)
+            structurally wanted stamp (children (tag v) ++ rest)
+  count <- visit root 0
+  unless (count == length entries) (throwError "cyclic binding tree")
+  let -- Check domination on every edge, even when its child's kind is cached.
+      -- Passing the already looked-up child to kind avoids a second lookup.
+      child parent original = do
+        let n = resolve g original
+        v <- require n
+        case tag v of
+          Gen _ -> throwError "gen nodes cannot be structural children"
+          _ -> pure ()
+        case binder v of
+          Nothing -> throwError "structural child has no binder"
+          Just b -> do
+            dominated <- contains b parent
+            unless dominated (throwError "ill-dominated type graph")
+        kind n v
+      kind n v = do
+        colour <- lift (readArray colours n)
+        case colour of
+          1 -> throwError "infinite type (occurs check)"
+          2 -> lift (readArray kinds n)
+          _ -> do
+            lift (writeArray colours n 1)
+            case binder v of
+              Nothing -> case tag v of
+                Gen _ -> pure ()
+                _ -> throwError "binding root must be a gen node"
+              Just b -> do
+                parent <- require b
+                case tag parent of
+                  Gen _ -> pure ()
+                  _ -> unless (any ((== n) . resolve g) (children (tag parent))) $ do
+                    stamp <- lift (readArray starts n)
+                    found <- structurally n stamp [b]
+                    unless found (throwError "a type binder must structurally contain its node")
+            k <- case tag v of
+              Bot -> pure Star
+              BotK t -> pure t
+              TyCon _ t -> pure t
+              Skolem _ t -> pure t
+              Gen s -> do
+                unless (flag v == Flexible) (throwError "gen nodes must be flexible")
+                child n s
+              Arr a b -> do
+                ka <- child n a
+                kb <- child n b
+                unless (ka == Star && kb == Star) (throwError "function types require kind * arguments")
+                pure Star
+              Con _ ns -> do
+                ks <- mapM (child n) ns
+                unless (all (== Star) ks) (throwError "legacy type constructor has a non-* argument")
+                pure Star
+              TyApp f a -> do
+                kf <- child n f
+                ka <- child n a
+                either throwError pure (applyKind kf ka)
+            lift (writeArray kinds n k >> writeArray colours n 2)
+            pure k
+  mapM_ (uncurry kind) entries
+
+validateSparse :: Graph -> Either String ()
+validateSparse g = do
+  _ <- kindsAt g (IM.keys (nodes g))
+  intervals <- bindingIntervals g
+  let contains ancestor n =
+        let (start,end) = intervals IM.! ancestor
+            (position,_) = intervals IM.! n
+        in start <= position && position < end
   forM_ (IM.toList (nodes g)) $ \(n,v) -> do
-    checkPath IS.empty n
     case binder v of
       Nothing -> case tag v of
         Gen _ -> pure ()
         _ -> Left "binding root must be a gen node"
       Just b -> do
-        unless (IM.member b (nodes g)) (Left "missing binder")
         case tag (nodeAt g b) of
           Gen _ -> pure ()
-          _ -> unless (IS.member n (reachable g b)) (Left "a type binder must structurally contain its node")
+          _ -> unless (structurallyContains g b n) (Left "a type binder must structurally contain its node")
   -- Every structural edge must respect lexical scope. Together with the
   -- binding tree this is exactly domination for mixed paths (§4.3.3, §9.2.1).
   forM_ (IM.toList (nodes g)) $ \(p,v) -> do
@@ -151,14 +352,29 @@ validateGraph g = do
         Gen _ -> Left "gen nodes cannot be structural children"
         _ -> pure ()
       case binder (nodeAt g c) of
-        Just b -> unless (b == p || underBinder g p b) (Left "ill-dominated type graph")
+        Just b -> unless (contains b p) (Left "ill-dominated type graph")
         Nothing -> Left "structural child has no binder"
-  where
-    checkPath seen n
-      | IS.member n seen = Left "cyclic binding tree"
-      | otherwise = case IM.lookup n (nodes g) of
-          Nothing -> Left "missing binder"
-          Just v -> maybe (pure ()) (checkPath (IS.insert n seen)) (binder v)
+
+-- A DFS interval answers binding ancestry without walking to the root for
+-- every structural edge. With one root, one parent per other node, and no
+-- missing parents, every node outside the root's tree belongs to a component
+-- containing a cycle. Such a component cannot be reached by this traversal.
+bindingIntervals :: Graph -> Either String (IM.IntMap (Int,Int))
+bindingIntervals g = do
+  root <- case [n | (n,v) <- IM.toList (nodes g), binder v == Nothing] of
+    [n] -> pure n
+    _ -> Left "graph must have one binding root"
+  forM_ (IM.elems (nodes g)) $ \v -> forM_ (binder v) $ \b ->
+    unless (IM.member b (nodes g)) (Left "missing binder")
+  let descendants = IM.fromListWith (++)
+        [(b,[n]) | (n,v) <- IM.toList (nodes g), Just b <- [binder v]]
+      visit n (position,known) =
+        let (end,known') = List.foldl' (flip visit) (position + 1,known)
+              (IM.findWithDefault [] n descendants)
+        in (end,IM.insert n (position,end) known')
+      (_,intervals) = visit root (0,IM.empty)
+  unless (IM.size intervals == IM.size (nodes g)) (Left "cyclic binding tree")
+  pure intervals
 
 -- | Figure 7.3.1: first-order unification followed by Rebind. All permission
 -- checks use the immutable input graph, never union-find representatives alone.
@@ -169,9 +385,20 @@ unify equations = do
   mapM_ firstOrder equations
   skeleton <- get
   let canon = resolve skeleton
-      ns = IM.map (\v -> v { tag = mapTag canon (tag v) }) (nodes skeleton)
+      canonical v = case tag v of
+        Arr a b -> pair Arr a b
+        TyApp a b -> pair TyApp a b
+        Gen n -> let n' = canon n in if n == n' then v else v { tag = Gen n' }
+        Con c ns' -> let cs = map canon ns' in if cs == ns' then v else v { tag = Con c cs }
+        _ -> v
+        where
+          pair constructor a b = let a' = canon a; b' = canon b
+            in if a == a' && b == b' then v else v { tag = constructor a' b' }
+      ns = IM.map canonical (nodes skeleton)
       sk = skeleton { nodes = ns }
-  _ <- lift (topological sk)
+  -- Rebind's dependency traversal includes every reverse structural edge,
+  -- so it also performs the occurs check on the unified skeleton. A separate
+  -- structural topological sort would visit the same DAG once more.
   rebuilt <- lift (rebind before sk)
   put rebuilt
   lift (validateGraph rebuilt)
@@ -181,40 +408,156 @@ unify equations = do
       g <- get
       let a = resolve g a0; b = resolve g b0
       when (a /= b) $ do
+        ka <- lift (kindAt g a)
+        kb <- lift (kindAt g b)
+        unless (ka == kb) (lift (Left ("kind mismatch during unification: " ++ show ka ++ " versus " ++ show kb)))
         let av = nodeAt g a; bv = nodeAt g b
             ta = tag av; tb = tag bv
         (t, pairs) <- lift $ case (ta,tb) of
           (Gen _,_) -> Left "cannot unify generalization nodes"
           (_,Gen _) -> Left "cannot unify generalization nodes"
-          (Bot,_) -> pure (tb,[])
-          (_,Bot) -> pure (ta,[])
+          _ | isBottom ta -> pure (tb,[])
+          _ | isBottom tb -> pure (ta,[])
           (Arr x y, Arr z w) -> pure (ta,[(x,z),(y,w)])
           (Con c xs, Con d ys) | c == d && length xs == length ys -> pure (ta,zip xs ys)
+          (TyCon c k, TyCon d l) | c == d && k == l -> pure (ta,[])
+          (Skolem c k, Skolem d l) | c == d && k == l -> pure (ta,[])
+          (TyApp f x, TyApp h y) -> pure (ta,[(f,h),(x,y)])
           _ -> Left ("type constructor mismatch: " ++ show ta ++ " versus " ++ show tb)
         let winner = min a b; loser = max a b
         put g { nodes = IM.insert winner (av { tag = t }) (IM.delete loser (nodes g))
               , links = IM.insert loser winner (links g) }
         mapM_ firstOrder pairs
 
--- | Figure 7.3.2. LCA uses a simple persistent tree, rather than the linear-time
--- data structure discussed in §7.5. This favors auditability over asymptotics.
+-- | Figure 7.3.2. Both implementations check the complete dependency DAG and
+-- the permissions of original identities, then return the same binding LCAs.
 rebind :: Graph -> Graph -> Either String Graph
-rebind old sk = do
-  tree <- buildTree IM.empty (IM.keys (nodes sk))
+rebind old sk = case denseBounds old of
+  Just bounds -> rebindDense old sk bounds
+  Nothing -> rebindSparse old sk
+
+-- The dependency graph determines a unique binding tree. A memoized DFS
+-- computes parents before children directly, instead of constructing and
+-- updating persistent maps for a Kahn queue. LCA walks by cached depth.
+rebindDense :: Graph -> Graph -> (Int,Int) -> Either String Graph
+rebindDense old sk bounds = runST $ runExceptT $ do
+  tree <- lift (newBinders bounds)
+  depths <- lift (newInts bounds 0)
+  colours <- lift (newInts bounds 0)
+  grafted <- lift (newInts bounds 0)
+  let originals = IM.toAscList (nodes old)
+      remaining = IM.toAscList (nodes sk)
+      oldNodes = A.array bounds originals
+      newNodes = A.array bounds remaining
+      images = A.array bounds [(m,resolve sk m) | (m,_) <- originals]
+      image n = images A.! n
+      classes = A.accumArray (flip (:)) [] bounds [(image m,m) | (m,_) <- originals]
+      flags = A.accumArray max Flexible bounds [(image m,flag v) | (m,v) <- originals]
+      parents = A.accumArray (flip (:)) [] bounds
+        [(c,p) | (p,v) <- remaining, c <- children (tag v)]
+      mark n = do
+        seen <- lift (readArray grafted n)
+        when (seen == 0) $ do
+          lift (writeArray grafted n 1)
+          mapM_ mark (children (tag (newNodes A.! n)))
+      common a b | a == b = pure a
+      common a b = do
+        da <- lift (readArray depths a)
+        db <- lift (readArray depths b)
+        let parent n = lift (readArray tree n) >>=
+              maybe (throwError "binders have no common ancestor") pure
+        case compare da db of
+          GT -> parent a >>= \p -> common p b
+          LT -> parent b >>= common a
+          EQ -> do
+            p <- parent a
+            q <- parent b
+            common p q
+      place n = do
+        colour <- lift (readArray colours n)
+        case colour of
+          1 -> throwError "cyclic structure/binding dependencies"
+          2 -> pure ()
+          _ -> do
+            lift (writeArray colours n 1)
+            graft <- lift (readArray grafted n)
+            let ps = parents A.! n
+                cs = [image b | m <- classes A.! n, Just b <- [binder (oldNodes A.! m)]]
+                  ++ if graft == 0 then [] else ps
+            mapM_ place cs
+            mapM_ place ps
+            b <- case cs of
+              [] -> pure Nothing
+              p:rest -> Just <$> foldM common p rest
+            depth <- maybe (pure 0) (\p -> (+1) <$> lift (readArray depths p)) b
+            lift (writeArray tree n b >> writeArray depths n depth >> writeArray colours n 2)
+  -- Mark the union once, even when many old bottom nodes have the same
+  -- representative or their instantiated structures share descendants.
+  forM_ originals $ \(m,v) -> when (isBottom (tag v)) $
+    mapM_ mark (children (tag (newNodes A.! image m)))
+  mapM_ (place . fst) remaining
+  final <- forM remaining $ \(n,v) -> do
+    b <- lift (readArray tree n)
+    let f = flags A.! n
+    pure (n,if b == binder v && f == flag v then v else v { binder = b, flag = f })
+  raised <- forM originals $ \(m,v) -> do
+    wanted <- lift (readArray tree (image m))
+    let climb _ Nothing = throwError "a node's binder cannot be lowered"
+        climb p (Just b)
+          | image b == p = pure (Just b)
+          | otherwise = climb p (binder (oldNodes A.! b))
+    b <- maybe (pure Nothing) (\p -> climb p (binder v)) wanted
+    pure (m,b)
+  let up = A.array bounds raised
+      oldPermissions = permissionTable bounds originals (binder . (oldNodes A.!))
+      raisedPermissions = permissionTable bounds originals (up A.!)
+  forM_ originals $ \(m,v) -> do
+    when (isBottom (tag v) && not (isBottom (tag (newNodes A.! image m))) && oldPermissions A.! m /= Green)
+      (throwError "cannot instantiate a rigid or protected type variable")
+    when (binder v /= up A.! m && oldPermissions A.! m == Red)
+      (throwError "cannot raise a protected type variable")
+    when (flag v /= flags A.! image m && raisedPermissions A.! m == Red)
+      (throwError "cannot weaken a protected type variable")
+  forM_ remaining $ \(n,_) -> do
+    let ms = classes A.! n
+    forM_ [(a,b) | a <- ms, b <- ms, a < b] $ \(a,b) ->
+      when (up A.! a == up A.! b && (raisedPermissions A.! a == Red || raisedPermissions A.! b == Red))
+        (throwError "cannot merge distinct protected type variables")
+  pure sk { nodes = IM.fromDistinctAscList final }
+
+permissionTable :: (Int,Int) -> [(NodeId,Node)] -> (NodeId -> Maybe NodeId) -> A.Array Int Permission
+permissionTable bounds entries binding = table
+  where
+    flexChildren = A.accumArray (flip (:)) [] bounds
+      [(b,n) | (n,v) <- entries, Just b <- [binding n], flag v == Flexible]
+    inertness = A.array bounds
+      [(n,not (isBottom (tag v)) && all (inertness A.!) (flexChildren A.! n)) | (n,v) <- entries]
+    paths = A.array bounds [(n,case tag v of
+      Gen _ -> True
+      _ | flag v == Rigid -> False
+        | otherwise -> maybe True (paths A.!) (binding n)) | (n,v) <- entries]
+    table = A.array bounds [(n,if inertness A.! n then Inert
+      else if flag v == Rigid then Orange else if paths A.! n then Green else Red) | (n,v) <- entries]
+
+rebindSparse :: Graph -> Graph -> Either String Graph
+rebindSparse old sk = do
+  tree <- buildTree IM.empty dependencyCounts initiallyReady
   let finalNodes = IM.mapWithKey (\n v -> v { binder = tree IM.! n, flag = newFlag n }) (nodes sk)
       result = sk { nodes = finalNodes }
   up <- traverseWithKeyEither (raisedBinder tree) (nodes old)
   let raised = old { nodes = IM.mapWithKey (\m v -> v { binder = up IM.! m }) (nodes old) }
+      oldPermissions = permissions old
+      raisedPermissions = permissions raised
   forM_ (IM.toList (nodes old)) $ \(m,v) -> do
-    when (tag v == Bot && tag (nodeAt sk m) /= Bot && permission old m /= Green)
+    when (isBottom (tag v) && not (isBottom (tag (nodeAt sk m))) && oldPermissions IM.! m /= Green)
       (Left "cannot instantiate a rigid or protected type variable")
-    when (permission old m == Red && binder v /= (up IM.! m))
+    when (oldPermissions IM.! m == Red && binder v /= (up IM.! m))
       (Left "cannot raise a protected type variable")
-    when (permission raised m == Red && flag v /= newFlag (image m))
+    when (raisedPermissions IM.! m == Red && flag v /= newFlag (image m))
       (Left "cannot weaken a protected type variable")
   forM_ (IM.elems classes) $ \ms ->
     forM_ [(a,b) | a <- ms, b <- ms, a < b] $ \(a,b) ->
-      when ((permission raised a == Red || permission raised b == Red) && up IM.! a == up IM.! b)
+      when ((raisedPermissions IM.! a == Red || raisedPermissions IM.! b == Red) && up IM.! a == up IM.! b)
         (Left "cannot merge distinct protected type variables")
   pure result
   where
@@ -225,16 +568,27 @@ rebind old sk = do
     parents = IM.fromListWith IS.union
       [(image c, IS.singleton p) | (p,v) <- IM.toList (nodes sk), c <- children (tag v)]
     grafted = IS.unions
-      [IS.delete (image m) (reachable sk (image m)) | (m,v) <- IM.toList (nodes old), tag v == Bot]
+      [IS.delete (image m) (reachable sk (image m)) | (m,v) <- IM.toList (nodes old), isBottom (tag v)]
     candidates n = IS.toList $ IS.fromList (map image (mapMaybe (binder . nodeAt old) (members n)))
       `IS.union` (if IS.member n grafted then IM.findWithDefault IS.empty n parents else IS.empty)
-    dependencies n = IS.fromList (candidates n) `IS.union` IM.findWithDefault IS.empty n parents
-    buildTree tree [] = pure tree
-    buildTree tree todo = case find (\n -> all (`IM.member` tree) (IS.toList (dependencies n))) todo of
-      Nothing -> Left "cyclic structure/binding dependencies"
-      Just n -> do
-        b <- lca tree (candidates n)
-        buildTree (IM.insert n b tree) (filter (/=n) todo)
+    candidateMap = IM.mapWithKey (\n _ -> candidates n) (nodes sk)
+    dependencyMap = IM.mapWithKey (\n cs -> IS.fromList cs `IS.union` IM.findWithDefault IS.empty n parents) candidateMap
+    dependencyCounts = IM.map IS.size dependencyMap
+    initiallyReady = IM.keysSet (IM.filter (== 0) dependencyCounts)
+    dependents = IM.fromListWith (++)
+      [(dependency,[n]) | (n,ds) <- IM.toList dependencyMap, dependency <- IS.toList ds]
+    -- Kahn's traversal chooses the smallest ready identity, exactly as the
+    -- previous scan of the ascending pending list did, without rescanning it.
+    buildTree tree counts ready = case IS.minView ready of
+      Nothing | IM.size tree == IM.size (nodes sk) -> pure tree
+              | otherwise -> Left "cyclic structure/binding dependencies"
+      Just (n,rest) -> do
+        b <- lca tree (candidateMap IM.! n)
+        let release (pending,available) child =
+              let count = pending IM.! child - 1
+              in (IM.insert child count pending, if count == 0 then IS.insert child available else available)
+            (counts',ready') = List.foldl' release (counts,rest) (IM.findWithDefault [] n dependents)
+        buildTree (IM.insert n b tree) counts' ready'
     lca _ [] = pure Nothing
     lca tree (b:bs) =
       let path n = n : maybe [] path (tree IM.! n)
@@ -269,8 +623,9 @@ expand gen destination = do
       root = copy source
       frontier = [n | n <- originals, not (underBinder g n gen)]
   forM_ originals $ \n -> do
+    k <- lift (kindAt g n)
     let v = nodeAt g n
-        new | n `elem` frontier = Node Bot (Just destination) Flexible
+        new | n `elem` frontier = Node (bottomTag k) (Just destination) Flexible
             | n == source = Node (mapTag copy (tag v)) (Just destination) Flexible
             | otherwise = Node (mapTag copy (tag v))
                 (fmap (\b -> if resolve g b == resolve g gen then root else copy b) (binder v)) (flag v)
@@ -282,9 +637,10 @@ expand gen destination = do
 normalize :: Graph -> Graph
 normalize g = g { nodes = IM.mapWithKey norm (nodes g) }
   where
+    inertness = inertNodes g
     norm n v = case tag v of
       Gen _ -> v
-      _ | inert g n || schemeOrExistential n v -> v { flag = Rigid }
+      _ | inertness IM.! n || schemeOrExistential n v -> v { flag = Rigid }
         | otherwise -> v
     schemeOrExistential n v = case binder v of
       Just b -> case tag (nodeAt g b) of

@@ -9,6 +9,9 @@ import qualified Text.Parsec.Token as Tok
 import Text.Parsec.Language (emptyDef)
 import MLF.X.Syntax
 import MLF.X.Type
+import MLF.Data.Parser (declaration, upperIdentifier)
+import MLF.Kind
+import MLF.Primitive (lookupTargetPrimitive)
 
 lexer :: Tok.TokenParser ()
 lexer = Tok.makeTokenParser emptyDef
@@ -16,8 +19,8 @@ lexer = Tok.makeTokenParser emptyDef
   , Tok.commentStart = "{-", Tok.commentEnd = "-}", Tok.nestedComments = True
   , Tok.identStart = letter
   , Tok.identLetter = alphaNum <|> oneOf "_'"
-  , Tok.reservedNames = ["let","in","forall","true","false","bot","id","hyp","inner","outer","elim","intro"]
-  , Tok.reservedOpNames = ["\\", "/\\", "->", ".", ":", "=", ">=", ";"]
+  , Tok.reservedNames = ["data","construct","primitive","case","return","of","let","letrec","in","forall","true","false","True","False","bot","id","hyp","inner","outer","elim","intro"]
+  , Tok.reservedOpNames = ["\\", "/\\", "->", ".", ":", "=", ">=", ";", "|"]
   }
 
 identifier :: Parser String
@@ -34,7 +37,10 @@ parseAll parser file input = either (Left . show) Right
   (parse (Tok.whiteSpace lexer *> parser <* eof) file input)
 
 parseTerm :: FilePath -> String -> Either String Term
-parseTerm = parseAll term
+parseTerm = parseAll $ do
+  ds <- many (declaration lexer <* Tok.semi lexer)
+  body <- term
+  pure (if null ds then body else WithData ds body)
 parseType :: String -> Either String Type
 parseType = parseAll typ "<xMLF type>"
 parseComputation :: String -> Either String Computation
@@ -71,18 +77,22 @@ typ = quantified <|> chainr1 typeApplicationP (Arrow <$ op "->")
         <|> ((\a -> (a,Bot)) <$> typeVariable)
       op "."
       Forall a b <$> typ
-    typeApplicationP = do
-      a <- typeAtom
-      case a of Con c [] -> Con c <$> many typeAtom; _ -> pure a
-    typeAtom = parens typ <|> (Bot <$ reserved "bot") <|> do
+    typeApplicationP = foldl1 apply <$> many1 typeAtom
+    typeAtom = parens typ <|> (reserved "bot" *> option Bot (bottomKind <$> Tok.brackets lexer (kindParser lexer))) <|> do
       s <- lookAhead identifier
       case s of
         c:_ | isUpper c -> (`Con` []) <$> identifier
         _ -> Var <$> typeVariable
 
 term :: Parser Term
-term = letP <|> typeAbsP <|> absP <|> (foldl1 App <$> many1 postfix)
+term = letP <|> recP <|> typeAbsP <|> absP <|> caseP <|> (foldl1 App <$> many1 postfix)
   where
+    recP = do
+      reserved "letrec"
+      bs <- Tok.braces lexer (binding `sepEndBy1` Tok.semi lexer)
+      reserved "in"
+      LetRec bs <$> term
+    binding = (,,) <$> termVariable <*> (op ":" *> typ) <*> (op "=" *> term)
     letP = do
       reserved "let"
       n <- termVariable
@@ -100,6 +110,18 @@ term = letP <|> typeAbsP <|> absP <|> (foldl1 App <$> many1 postfix)
       (n,t) <- parens ((,) <$> termVariable <*> (op ":" *> typ))
       op "->"
       Abs n t <$> term
+    caseP = do
+      reserved "case"
+      scrutinee <- term
+      reserved "return"
+      result <- typ
+      reserved "of"
+      Case scrutinee result <$> Tok.braces lexer (alternative `sepEndBy1` Tok.semi lexer)
+    alternative = Alternative <$> patternP <*> (op "->" *> term)
+    patternP = (ConstructorPattern <$> upperIdentifier lexer <*> many patternField)
+           <|> (DefaultPattern <$> patternField)
+    patternField = (Nothing <$ Tok.lexeme lexer (char '_' <* notFollowedBy (alphaNum <|> oneOf "_'")))
+               <|> (Just <$> termVariable)
     postfix = do
       a <- atom
       ps <- many (Tok.brackets lexer computation)
@@ -108,6 +130,12 @@ term = letP <|> typeAbsP <|> absP <|> (foldl1 App <$> many1 postfix)
       <|> (BoolTerm True <$ reserved "true")
       <|> (BoolTerm False <$ reserved "false")
       <|> (IntTerm <$> Tok.integer lexer)
+      <|> (StringTerm <$> Tok.stringLiteral lexer)
+      <|> (reserved "primitive" *> (do
+        name <- identifier
+        p <- maybe (fail ("unknown primitive: " ++ name)) pure (lookupTargetPrimitive name)
+        Primitive p <$> parens (typ `sepBy` Tok.comma lexer)))
+      <|> (reserved "construct" *> (Constructor <$> upperIdentifier lexer <*> parens (typ `sepBy` Tok.comma lexer)))
       <|> (VarTerm <$> termVariable)
 
 computation :: Parser Computation
@@ -123,5 +151,6 @@ computation = chainl1 primitive (Then <$ op ";")
             void (Tok.comma lexer)
             Outer a <$> computation))
       <|> (Elim <$ reserved "elim")
-      <|> (Intro <$> (reserved "intro" *> parens typeVariable))
-
+      <|> (reserved "intro" *> parens (do
+            a <- typeVariable
+            option (Intro a) (IntroKind a <$> (op ":" *> kindParser lexer))))
