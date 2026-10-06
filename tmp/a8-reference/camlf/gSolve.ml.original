@@ -1,0 +1,273 @@
+(** Generation and simplification of typing constraints *)
+open Utils
+open Locations
+open AST
+open EType
+open GType
+open Expr
+open TypingErrors
+
+module Errors = struct
+  exception Infer of exn * gtype * gtype
+end
+open Errors
+
+let check_instance tg _t tg' =
+  assert (gen_node tg);
+  assert (gen_node tg')
+
+let check_explicit_instance tg t tg_dest =
+  check_instance tg t tg_dest
+
+let check_apply_expansion lambda body father =
+  (** We're expanding a (λ) body under the father of the associated
+      (@) node *)
+  assert (lambda_node lambda);
+  assert (eqrepr body (snd (below_lambda lambda)));
+  (* We don't currently check that 'father' is indeed the father of
+     a (@)-node whom (λ) is the left child : this check involves
+     reverse bindings and is considered too expensive *)
+  ignore father
+
+(** Expansion of a node t1 under a node tg at some other node tg';
+    returns the expansion correspondence table. This isn't useful for
+    the "classic" expansion function below (wich expand the direct son
+    of tg under tg'), but will be used during translation from gMLF to
+    xMLF.
+
+    In that case (expansion is merely used to copy subgraphs) it is
+    possible to disable binding reset by using the parameter
+    ~binding_reset:false.
+*)
+let expansion_image ~binding_reset tg t1 inst_flag tg' =
+  ignore (inst_flag : [< expansion_type ]);
+  let () = (* invariant checks *)
+    assert (non_root t1);
+    match inst_flag with
+    | `Implicit -> check_instance tg t1 tg'
+    | `Explicit -> check_explicit_instance tg t1 tg'
+    | `Apply -> check_apply_expansion tg t1 tg' in
+
+  let interior = in_interior tg in
+
+  let image_table = Table.create 10 in
+  let set_image t t' =
+    Table.init image_table t t' in
+  let get_image t =
+    Table.find image_table t in
+
+  (* The expansion frontier, explained :
+
+     Nodes in the interior of the expanded node should be copied. Nodes
+     outside should be left unchanged. Why that special treatment of
+     frontier nodes (the first nodes outside the interior) ?
+
+     A naive approach would be to share them directly : when
+     encountering a frontier node, just link the copied node to it.
+
+     The problem is that, in doing that, the graph may become
+     ill-formed : after expansion, we usually bind the copied subgraph
+     under a destination (G) node far away from the source (G) node of
+     the subggraph. If frontier nodes were shared, they would still be
+     bound outside the copied interior, on some node ancestor of the
+     initial (G) node. But this bound is generally not an ancestor of
+     the target (G) node : the graph is ill-formed.
+
+     The solution is to create fresh (⊥) node to be used instead of
+     the frontier nodes, and then, after copying and binding on the
+     target (G) node, unifying those fresh nodes with the old,
+     unchanged, unshared frontier nodes. The unification routine will
+     take care of raising the binders of the frontier to a common
+     ancestor of both the source and the destination (G) node.
+
+     Note that this is only possible due to the invariant that (G)
+     nodes forms a *flexible* tree that cover the whole graph.
+   *)
+  let frontier = ref [] in
+  let mk_frontier t =
+    (** the copy of a node of the frontier is a bottom node bound at tg' *)
+    let t' = bot (kind t) in
+    bind t' min_flags tg';
+    (** we keep the mapping for frontier nodes *)
+    frontier := (t, t') :: !frontier;
+    (** we return the copy *)
+    t' in
+
+  (** We visit the interior of tg, making a copy in image_table *)
+  dps
+    (fun visit t ->
+       let t' =
+         if interior t then
+           let edges = edges t in
+           List.iter visit edges;
+           let edges = List.map get_image edges in
+           fresh Undef (node t) edges
+         else
+           mk_frontier t in
+       set_image t t')
+    t1;
+
+  let result =
+    let t' = get_image t1 in
+    (* reset flags *) (* CHECK *)
+    if not (undef_binder t') then
+      (* degenerate case *)
+      None
+    else begin
+      (** the interior is not degenerate *)
+
+      let () = match inst_flag with
+        | `Apply ->
+          (* `Apply is not necessarily under a gen-node,
+             so an existential bind is not an option *)
+          bind t' min_flags tg';
+        | `Implicit | `Explicit ->         
+            (if !Debug.add_existentials then ebind else bind)
+              t' min_flags tg';
+            (* TODO in the ebind case, remove useless existentials
+               a posteriori *)
+      (* Why 'bind' instead of 'ebind' ? The node t' is not
+         structurally under tg' !
+
+         The reason why is that after expansion, we will unify the
+         expansion result with a node under tg' :
+
+         - if the destination node unified with t' is structurally
+         under tg', we would have to remove the existential
+         information of t'
+
+         - if the destination node is itself existential, t' will also
+         become existential after unification.
+
+         It is therefore much simpler not to do anything about
+         exisential nodes during expansion. Elsewhere, we would have
+         to track existentialness during unification, and that would
+         complicate the code (and mandate a datastructure change as
+         existential nodes are currently stocked in (G) nodes as lists
+         and it cost be O(n) to remove a given existential).
+
+         Note that it suffices because of eMLF->gMLF translation
+         invariants : a node that was generated existential will never
+         be unified with anything; it may only be expanded for
+         instantiation (hence the present case).
+      *)
+      in
+
+      (** to implement reset: binding to tg is redirected to t' *)
+      set_image tg (if binding_reset then t' else tg');
+      (** clean up *)
+      List.iter
+        (dps
+           (fun visit t ->
+              (** rebinding must be performed top-down to get levels
+                  correct *)
+             if interior t then
+               begin match binder t with
+                 | Bound (flag, tb) ->
+                   assert (undef_binder (get_image t));
+                   bind (get_image t) flag (get_image tb);
+                   List.iter visit (edges t);
+                 | _ -> assert false
+               end))
+        (edges t1);
+      if binding_reset then begin
+        match inst_flag with
+          | `Implicit -> ()
+          | `Explicit ->
+            (* free the topmost frozen binding *)
+            if forall_node t' then
+              let (t_arg, _) = below_forall t' in
+              reflag_unfrozen t_arg
+          | `Apply ->
+            (* the explicit flag between (λ) and its body has already
+               been unfrozen as (λ)-body is the head of the expanded
+               subgraph. We now unfreeze the (λ)-var copy if :
+               - it actually occurs in the expanded body
+               - it is not also the (λ)-body (in wich case it was already unfrozen)
+            *)
+            let (var, _) = below_lambda tg in
+            if Table.mem image_table var then begin
+              let var' = Table.find image_table var in
+              if not (eqrepr var' t') then
+                reflag_unfrozen var'
+            end
+      end;
+      Some image_table
+    end in
+  List.iter (function t, t' -> GUnify.gunify t t') !frontier;
+  result
+
+(** Classic expansion *)
+let expand tg inst_flag tg' =
+  let t = below_gen tg in
+  match expansion_image ~binding_reset:true tg t inst_flag tg' with
+    | None -> t
+    | Some image -> Table.find image t
+
+let trace_solve = ref false
+
+let gprint = GPrint.draw_gtype ~namer:(Utils.namer())
+let std_out = Format.std_formatter
+
+let trace_expansion =
+  Options.flag false (* true *) "--trace_expansion" "show expansion"
+
+let solve_inst tg (t, inst_flag, inst_meaning) =
+  (** Solves the instantiation edges tg -> t leaving from tg.
+     Note that these will remain solved only if all instantiation edges
+     that depend on tg are already solved *)
+  (** We assume that bounding levels are correct *)
+  assert (gen_node tg && reg_node t);
+  (** assert (flexible (U.find t));  *)
+  assert (non_root t && gen_node (bound t));
+  assert
+    ((root tg) or  (* for free variables *)
+       (List.exists (fun (t', _, _) -> eqrepr t t') (gen_info tg).inst));
+  let tg' = bound t in
+  if !trace_solve then
+    begin
+      print_newline(); print_endline "SOLVE";
+      print_newline(); gprint std_out tg;
+      print_newline(); gprint std_out t;
+    end;
+  let t' = expand tg inst_flag tg' in
+  let () =
+    if !trace_expansion then
+      let pred t = eqrepr t tg || eqrepr t t' in
+      let emph t = if pred t then Some "Yellow" else None in
+      Dot.dump ~emph (find_root t') in
+  GUnify.gunify ~meaning:inst_meaning t t';
+  (**   print_newline(); gprint std_out t; *)
+  ()
+
+let solve tg =
+  assert (gen_node tg);
+  List.iter (solve_inst tg) (gen_info tg).inst
+
+let stepping =
+  Options.flag false "--stepping" "show constraint resolution steps"
+
+let dot_constraint =
+  Options.flag false "--constraint" "show constraint"
+
+let solve_all graph =
+  let step tg = solve tg; if !stepping then Dot.dump tg in
+  List.iter step graph.nodes
+
+let find_all_instances graph =
+  let find_instances tg li =
+    if not (gen_node tg) then li
+    else List.map (fun (t, f, m) -> tg, f, m, t) (gen_info tg).inst @ li in
+  List.fold_right find_instances graph.nodes []
+
+let normalize tg =
+  assert (gen_node tg);
+  let gen = open_gen () in
+  let b = bot ~gen (kind tg) in
+  let tg' = close_gen gen b (gen_info tg).expr in
+  let () = make_root tg' in
+  let t' = expand tg `Implicit tg' in
+  (* we use subst_by directly instead of an unification routine in
+     order not to provoke (@)-node reductions *)
+  GType.subst_by b t';
+  tg'

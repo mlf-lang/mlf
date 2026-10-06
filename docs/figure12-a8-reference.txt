@@ -1,0 +1,63 @@
+A8 comparison with the authors' camlf reference prototype, 2026-10-06
+Source: https://gallium.inria.fr/~remy/mlf/proto/camlf_2011-08-29.zip
+Archive SHA256: 0240835f9c0d2ba9fa4c38240e7ff951caed2b149592d6c1678c61062f4e6743
+Local build: tmp/a8-reference/camlf/main.byte
+Invocation for each source below: ./main.byte -expr SOURCE
+The reference exits 0 on typing errors too; inspect its diagnostic, not just its exit status.
+
+Build compatibility changes (no inference algorithm change):
+- Renamed the old nonrec type identifier, which is now an OCaml keyword.
+- Adapted mutable string/lexing buffers and output to Bytes/string APIs.
+- Replaced Pervasives by Stdlib, Array.create_matrix by Array.make_matrix,
+  and the obsolete Boolean or operator by || in a gSolve assertion.
+- Disabled terminal highlighting and unused GUI/test package build flags.
+- Replaced the Camomile UTF-8 display-length helper with a local counter.
+gUnify.ml, gType.ml, gTranslate.ml, gInstance.ml, eType.ml, and eParser.mly
+are byte-for-byte identical to the original archive.
+
+choose id control
+-----------------
+Input:
+let choose = ((fun x -> fun y -> x) : 'a. 'a -> 'a -> 'a) in let id = fun x -> x in choose id
+Output:
+val _ : ('b ≥ 'a. 'a → 'a). 'b → 'b
+Exit status: 0
+
+auto-prime declaration control
+------------------------------
+Input:
+((fun x -> fun y -> y) : 'b. ('a. 'a -> 'a) -> 'b -> 'b)
+Output:
+val _ : 'b. ('a. 'a → 'a) → 'b → 'b
+Exit status: 0
+
+A8 with the exact explicitly quantified signature
+-------------------------------------------------
+Input:
+let choose = ((fun x -> fun y -> x) : 'a. 'a -> 'a -> 'a) in let id = fun x -> x in let auto = ((fun x -> fun y -> y) : 'b. ('a. 'a -> 'a) -> 'b -> 'b) in choose id auto
+Output:
+Characters 165-169:
+When trying to type the argument side of an application
+Unification error between:
+  'a. 'a → 'a
+and:
+  'c. ('b. 'b → 'b) → 'c → 'c
+The bound of 'b cannot be raised from 'b. 'b → 'b to 'c.
+                                                     ('b. 'b → 'b) → 'c → 'c.
+Exit status: 0
+
+Control using an inferred type (different from the declared signature)
+----------------------------------------------------------------------
+Input:
+let choose = ((fun x -> fun y -> x) : 'a. 'a -> 'a -> 'a) in let id = fun x -> x in let auto = fun (x : 'a. 'a -> 'a) -> x x in choose id auto
+Output:
+val _ : ('b = 'a. 'a → 'a). 'b → 'b
+Exit status: 0
+
+Control with result-local quantification (different from the declared signature)
+--------------------------------------------------------------------------------
+Input:
+let choose = ((fun x -> fun y -> x) : 'a. 'a -> 'a -> 'a) in let id = fun x -> x in let auto = ((fun x -> fun y -> y) : ('a. 'a -> 'a) -> ('b. 'b -> 'b)) in choose id auto
+Output:
+val _ : ('b = 'a. 'a → 'a). 'b → 'b
+Exit status: 0

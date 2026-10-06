@@ -1,0 +1,24 @@
+val id z = z
+
+val apply f x = f x
+
+val choose x y =
+  if True then x else y
+
+(* the now famous 'choose id' example *)
+val choose_id = choose id
+
+(* a pure λ-term for choose *)
+val choose2 x y = 
+  (fun z -> (fun u -> z (u x) (u y)) id) (fun x y -> y)
+
+val omega (x : 'a . 'a -> 'a) = x x
+val omega2 x = (x : 'a . 'a -> 'a) x
+
+(* the output type of omega2 is slightly different from omega's type :
+   both the input and output of the arrow are rigid. This does not
+   change expressiveness, as we can use a coercion function
+   (input:rigid, output:flexible) to regain output flexibility. *)
+val omega3 x = (: 'a . 'a -> 'a) (omega2 x)
+
+val triomega (x : 'a . 'a -> 'a -> 'a) = x x x

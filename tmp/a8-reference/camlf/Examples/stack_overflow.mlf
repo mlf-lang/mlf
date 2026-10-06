@@ -1,0 +1,5 @@
+val id x = x
+val k x y = y
+(* long to type ... *)
+val ch x y = (fun z -> k (z x y) (z y x)) k
+val ch4 = ch (ch ch) ch

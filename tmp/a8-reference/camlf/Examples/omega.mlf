@@ -1,0 +1,16 @@
+#global +backtrace;;
+#global +experimental_fomega;;
+
+(* simple lambda *)
+val id1 = some 'a in fun (x : 'a) -> (x : (lam 'b. 'b) @ 'a)
+
+(* two-args lambda *)
+val id2 = some 'a 'b in ((fun x -> x) : (lam 'a 'b . 'a -> 'b) @ 'a @ 'b)
+
+(* application of an abstract type operator *)
+val id3 =
+  (
+   Fun ('f : * -> * ) ->
+     some 'a in
+     fun (x : 'f @ 'a) -> (x : 'f @ 'a)
+  )[lam 'b . 'b]

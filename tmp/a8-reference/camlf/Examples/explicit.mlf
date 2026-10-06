@@ -1,0 +1,32 @@
+(* Examples of MLF terms using the new explicit polymorphism feature;
+   see Paolo Herms and Gabriel Scherer internship reports. *)
+
+(* The classical System F identity function *)
+val id = Fun 'a -> fun (x : 'a) -> x
+
+val id_use_test =
+  if id[bool] True
+  then id[int] 3
+  else id['a.'a->'a] (fun x -> x) 4
+
+(* converting from explicit to implicit terms *)
+val expl_of_impl =
+  fun (x : ^'a! . 'a -> 'a) -> some 'b in x['b]
+
+val impl_of_expl =
+  fun (x : 'a . 'a -> 'a) -> Fun 'b -> (x : 'b -> 'b)
+  
+
+(* Additional type structure may be given to the bound *)
+val bound_structure_1 =
+  Fun ('a > int -> _) -> fun (f : 'a) -> f 1
+
+val bound_structure_2 =
+  Fun ('a > 'b 'c . 'b -> 'c) -> fun f x -> (f : 'a) x
+
+val bound_structure_3 =
+  some 'b 'c in
+  Fun ('a > 'b -> 'c) -> fun (f : 'a) -> f 1
+
+(* However, explicit bounds may not be aliased bounds *)
+#+fail val alias_bound_failure = some 'b in Fun ('a > 'b) -> fun (x : 'a) -> x;;

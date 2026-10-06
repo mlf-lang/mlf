@@ -1,0 +1,12 @@
+Small scope TODO:
+- work on error reporting
+- change binder syntax (cf. discussion with Didier)
+- alias type definitions
+
+Other tasks:
+- simultaneous bindings : let-and, n-ary G nodes...
+- performance instrumentations and refinements
+- code inspection and cleaning
+- tuple types, anonymous sum types ?
+- user-defined inductive types ?
+- gtk toplevel, with graphical help exploration, types printing and 'interact' integration

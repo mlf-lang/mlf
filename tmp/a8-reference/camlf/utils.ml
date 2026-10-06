@@ -1,0 +1,238 @@
+include Utils_boris
+
+let list_init n f =
+  Array.to_list (Array.init n f)
+
+let flatten_option li =
+  let list_of_option = function
+    | Some x -> [x]
+    | None -> [] in
+  List.flatten (List.map list_of_option li)
+
+let rec print_list f sep ppf = function
+  | [] -> ()
+  | [e] -> Format.fprintf ppf "%a" f e
+  | e :: q ->
+      Format.fprintf ppf "%a" f e;
+      Format.fprintf ppf sep;
+      print_list f sep ppf q
+
+let counter x =
+  let c = ref x in
+  fun () -> incr c; !c;;
+
+let rec iteri f i = function
+  | [] -> ()
+  | e :: q -> f i e; iteri f (i+1) q
+
+let rec ct_list e i =
+  if i <= 0 then [] else e :: ct_list e (i - 1)
+
+
+let read_file ?(skip=0) ch =
+  for i = 0 to skip - 1 do
+    ignore (input_line ch)
+  done;
+  let rec loop accum =
+    let line, eof =
+      try (input_line ch), false
+      with End_of_file -> "", true
+    in
+    if eof = false then
+      loop (line :: accum)
+    else
+      List.rev accum
+  in
+  String.concat "" (loop [])
+
+let format_into_string f e =
+  let buf = Buffer.create 100 in
+  let ppf = Format.formatter_of_buffer buf in
+  Format.fprintf ppf "@[";
+  f ppf e;
+  Format.fprintf ppf "@]";
+  Format.pp_print_flush ppf ();
+  Buffer.contents buf
+let capitalize_variables = 
+   Options.flag false "--capitalize" "Capitablize type variables";;
+
+let namer () =
+  let table = Hashtbl.create 13 in
+  let last = ref 0 in
+  let name_of_int v =
+    let d = v / 27 in
+    let r = v mod 27 in
+    let aA = if !capitalize_variables then 'A' else 'a' in
+    let sr = String.make 1 (Char.chr (r - 1 + Char.code aA)) in
+    let sr' = if !capitalize_variables then sr else "'" ^ sr in
+    if d = 0 then  sr' else sr' ^ string_of_int d  in
+  (* `namer` was formerly polymorphic, and that caused a bug when used
+     on gtypes, which are cyclic data structure and therefore provoke
+     non-termination when used with polymorphic Hashtables instead of the
+     specialized Table/Nodetable structures of GType.
+
+     `namer` is now constrained to work on it, it's the user duty to
+     select a suitable hash method beforehand. *)
+  fun (t1 : int) ->
+    try Hashtbl.find table t1
+    with Not_found ->
+      incr last;
+      let n = name_of_int !last in
+      Hashtbl.add table t1 n; n
+;;
+
+let (@@) f g x = g (f x)
+
+(** Those hashtables have been specialized with common operations :
+    exceptionless find, and list tables with default [] *)
+module MakeTable(T : Hashtbl.HashedType) = struct
+  include Hashtbl.Make(T)
+
+  let init table u =
+    assert (not (mem table u));
+    add table u
+
+  let find_option table u =
+    try Some (find table u)
+    with Not_found -> None
+
+  let find_list table u =
+    try find table u
+    with Not_found -> []
+
+  let add_elem table u t =
+    replace table u
+      (t :: find_list table u)
+end
+
+
+
+let protect
+    ?(before=ignore)
+    f
+    ?(after=ignore)
+    ?(after_exn=ignore)
+    ?(finally=ignore)
+    ()
+    =
+  before ();
+  let result =
+    try f ()
+    with exn ->
+      after_exn exn;
+      finally ();
+      raise exn in
+  after result;
+  finally ();
+  result
+
+(** Edition distance between two strings (dynamic algorithm) *)
+let edit_distance sa sb =
+  let la, lb = String.length sa, String.length sb in
+  let t = Array.make_matrix (la + 1) (lb + 1) (-1) in
+  for i = 0 to la do
+    t.(i).(lb) <- (la - i)
+  done;
+  for j = 0 to lb do
+    t.(la).(j) <- (lb - j)
+  done;
+  for i = la - 1 downto 0 do
+    for j = lb - 1 downto 0 do
+      t.(i).(j) <- min
+	(1 + min t.(i+1).(j) t.(i).(j+1))
+	(t.(i+1).(j+1) + if sa.[i] = sb.[j] then 0 else 1)
+    done
+  done;
+  t.(0).(0)
+
+(** Spell-correcting choice in a string association list
+    
+    If the given key is not found in the assoc list, use edit distance
+    to determine the likely candidate. First, sort the assoc by
+    increasing order of edit distance to the key. Next, we could
+    choose the first candidate (minimal edit distance), but that could
+    lead to absurd choices :
+
+    - if the list is a singleton, we would always choose the first, no
+    matter how big the error is. If it's really not what the user
+    typed, it can be more helpful to report the mistake instead of
+    making a dumb choice.
+
+    - if they are different candidates of nearby edit distances to the
+    key, we cannot make a meaningful choice : any of the first items
+    would be as good.
+
+    Therefore :
+
+    - if the list is a singleton, we only choose its element if the
+    edit distance is inferior to a fixed constant (3).
+
+    - if there are a least two elements, we only choose the first one
+    if its edit distance is twice shorter than the second one
+    (unambiguous choice).
+*)
+let select_nearest key_string get_string list =
+  let list' =
+    let weight elem =
+      (edit_distance key_string (get_string elem), elem) in
+    List.map weight list in
+  let list' = List.sort (fun (k1, _) (k2, _) -> compare k1 k2) list' in
+  match list' with
+    | [] -> None
+    | (key, elem)::[] -> if key <= 3 then Some elem else None
+    | (k1, elem)::(k2, _)::_ -> if 2 * k1 < k2 then Some elem else None
+
+
+
+(** Pretty-printing for a text association list in the style [(item,
+    description)] :
+
+    - if the item are not too long (inferior to the optional parameter
+    `limit', default value 20, the description is printed on the same
+    line, after a 2 spaces break, and additional description line are
+    aligned.
+
+    - if the items are too long or the optional force_long is set,
+    description is printed on a new-line, with an indentation of
+    2 spaces, and items are separated by a blank line.
+
+    Item are rendered with the `Pprint.string' combinator. Description
+    are rendered with `Pprint.words' by default (automatically inserts
+    breaks in long lines, but ignores newlines of the original
+    string). If necessary, another combinator (such as `string', wich
+    respects newlines but do not add additional linebreaks) can be
+    specified with the optional `doc_of_descr' parameter.
+
+    A global indentation can be specified with the optional "indent"
+    parameter.
+*)
+module P = Pprint
+let (^^) = P.(^^)
+let format_assoc ?(limit=20) ?(force_long=false) ?(doc_of_descr=P.words) list =
+  let len = String.length in
+  let force_newline = P.break 1000 in
+  let max_len =
+    List.fold_left max 0
+      (List.map (fun s -> len (fst s)) list) in
+  let format =
+    if max_len > limit || force_long then
+      fun (item, descr) ->
+	P.group (P.string item
+		 ^^ force_newline
+		 ^^ P.indent 2 (doc_of_descr descr)
+		 ^^ force_newline)
+	^^ force_newline
+    else
+      fun (item, descr) ->
+	P.group (P.string item
+		 ^^ P.text (String.make (2 + max_len - len item) ' ')
+		 ^^ P.align (doc_of_descr descr))
+	^^ force_newline in	       
+  List.fold_left (^^) P.empty (List.map format list)
+
+let format_assoc_string
+    ?(width=60) ?(indent=0) ?force_long ?limit ?doc_of_descr assoc =
+  let buf = Buffer.create 1000 in
+  P.Buffer.pretty 1. (width + indent) buf
+    (P.indent indent (format_assoc ?limit ?force_long ?doc_of_descr assoc));
+  Buffer.contents buf

@@ -1,0 +1,348 @@
+# Le problème d'aliasing
+
+On a un problème d'aliasing quand un quantificateur syntaxique utilise
+comme borne la variable d'un quantificateur plus extérieur. Du point
+de vue des graphes, cela se traduit par deux flèches de binding
+différentes qui veulent avoir la même source : ∀α ∀(β=α) σ
+On distingue le binding "extérieur" (ici α) et le binding "intérieur"
+(ici β). 
+
+Les situations où un problème d'alias peut apparaître sont les
+suivantes :
+1. Quand on traduit les constructions syntaxiques ∀e(), ∀i(), λ(),
+  some(), Λ().
+2. Quand on traduit les coercions sur une variable: (:α) produit le
+  type ∀(β=α)∀(γ≥α) β→γ.
+3. Quand on fait une β-réduction dans un quantifieur : exemples
+  caractéristiques ∀(α)∀(β=(λ(γ)γ)α)σ et ∀(α)∀(β=(λ(γ)α)σ₁)σ₂. C'est
+  le seul cas qui ne peut pas être détecté directement pendant la
+  traduction.
+
+Si on reste dans le modèle gMLF (c'est ce que nous faisons), il ne
+peut y avoir qu'un seul binder par nœud. Pour résoudre le problème de
+l'alias il faut donc :
+- soit provquer une erreur de typage
+- soit choisir un binder (déterminé en fonction des deux en conflits)
+  à mettre sur le nœud
+
+La question est alors la suivante : quelle est la justification
+sémantique pour la résolution (par erreur ou par choix d'un binding)
+d'un problème d'aliasing ? La réponse peut dépendre des situations
+considérées, de la destination et des flags des deux binders.
+
+
+## Description des solutions envisagées (indépendamment de la situation)
+
+Solution laxiste : toujours autoriser, et toujours choisir le binder
+extérieur; le binder intérieur disparaît. Cela revient à dire que tout
+binder en situation d'alias est éliminé, et qu'ainsi Q(α)Q(β✧α)t
+devient Q(α)t[β←α].
+
+C'est une solution qui marche très bien en pratique. Justification
+sémantique : le binding Q(β✧α) est inerte (puisque, à son niveau, α ne
+contient pas de polymorphisme) donc il peut être enlevé.
+
+Solution stricte : toujours refuser. Difficile à mettre en œuvre dans
+le cas général puisque la situation (3), l'erreur pendant la
+β-réduction, est difficile à repérer "statiquement" pendant la
+traduction. Le système de kinds N/P proposé donne une garantie
+statique, mais c'est une approximation statique qui limite
+l'expressivité du langage.
+
+Solution par unification des binders : elle consiste à dire qu'on peut
+"confondre" les deux biners en un seul s'ils sont égaux (en
+destination comme en flag). Pour arriver à cette solution, on
+transforme les deux binders pour qu'ils coïncident :
+- on raise le binder intérieur pour arriver au niveau de l'extérieur
+  (échec si l'intérieur est rigide)
+- on affaiblit les flags des deux côtés pour qu'ils coïncident : I→E
+  et ≥→= (échec si on essaie d'affaiblir un explicite; cf. question
+  ouverte suivante : weakening (E≥)→(E=) ?)
+
+L'avantage de cette solution, c'est que, comme la solution stricte,
+elle est clairement correcte (sound) puisqu'on se limite à des
+transformations pas-à-pas correctes.
+Comme la solution stricte, les erreurs ne peuvent pas toutes être
+détectées pendant la traduction (problème de la β-réduction).
+
+Elle n'est cependant pas utilisable en pratique dans toutes les
+situations. L'exemple typique est :
+  Λ(α) λ(x) (:α) x
+
+Dans cet exemple, les quantifications Λ(α) et (la quantification issue
+de la coercion) (:α) sont en conflit. L'extérieure est explicite
+flexible, l'intérieure implicite rigide. D'après le principe
+d'unification des flags il faudrait :
+- Soit échouer parce qu'on refuse le weakening (E≥)→(E=); solution non
+  acceptable, c'est un programme naturel.
+- Soit accepter en affaiblissant (E≥)→(E=), résultat Λ(α=⊥)λ(x) (:α)x.
+  Cette solution n'est pas non plus acceptable car la rigidification
+  α=⊥ empêche d'éliminer le quantificateur : (Λ(α=⊥)...)[int] est
+  invalide.
+
+
+## Lien entre situations (d'aliasing) et solutions
+
+Quand le binder intérieur est implicite, la solution laxiste paraît
+très acceptable. En effet, c'est déjà se qui se passe au dans la thèse
+de boris (cas des coercions (:α)) et il semble naturel que les
+implicites soient transformés selon les besoins du typeur.
+
+La réponse est moins claire dans le cas d'implicites déclarés à la
+main par l'utilisateur dans une coercion : faut-il accepter la
+coercion (:∀i(α)∀i(β≥α)σ) ?
+
+Quand le binding intérieur est explicite, il semble d'autant plus
+gênant de l'oublier comme le propose la situation laxiste.
+
+La situation (2) de coercion est peut-être particulière : autant, dans
+les autres situations d'aliasing (sauf cas d'implicite ajouté
+silencieusement pendant la traduction, pour lesquels on accepte déjà
+la solution laxiste), les quantificateurs ont été placés directement
+par l'utilisateur, autant dans le cas spécifique (:α) la
+quantification rigide associée apparaît de façon indirecte. Il serait
+donc acceptable de dire que (:α) est en fait un cas particulier de
+coercion qui produit directement la fonction monomorphe α→α, sans même
+essayer de mettre la quantification rigide qui crée la situation
+d'aliasing.
+
+Le problème se pose aussi pour les applications (:σ₁ σ₂), qui
+pourraient renvoyer un type localement polymorphe ou un type
+localement inerte. Je pense que la même réponse est acceptable : on
+produit une fonction monomorphe.
+
+L'idée plus générale est que certaines situation sont directes :
+interpréter l'entrée de l'utilisateur donne lieu à un problème (dans
+un quantificateur), alors que les coercions (:α) et (:σ₁ σ₂) sont
+indirectes : on peut choisir de faire un cas particulier pour éviter
+l'aliasing puisque l'utilisateur ne l'a pas directement mentionné.
+
+
+## Avertissements en cas d'aliasing (warnings)
+
+L'idée des avertissements est d'utiliser la solution laxiste, mais de
+différencier des cas "normaux" et des cas "problématiques". Ils
+seraient typés de la même façon, mais les cas problématiques
+donneraient lieu à un avertissement envoyé à l'utilisateur, pour qu'il
+ne soit pas surpris de la disparition d'un quantificateur.
+
+Extrait d'un mail envoyé à Didier :
+
+  J'ai aussi réfléchi à l'utilité du système des kinds N/P. La
+  justification de départ pour ce système, c'est de détecter
+  "statiquement" une erreur d'aliasing, sans avoir à effectuer les
+  réductions le faisant apparaître. Par exemple
+  ∀e(α) ∀e(β ≥ (λ(γ)γ) α) σ est un type qui, puisque la réduction est
+  paresseuse, ne lance pas d'erreur d'aliasing, mais en provoque une si
+  on l'utilise dans un contexte qui force l'unification, et donc la
+  réduction de la borne β. Le système des kinds permet de détecter
+  l'erreur dès la définition des types, au lieu de la reṕerer
+  "dynamiquement", au moment de la réduction (mais donc toujours dans la
+  phase de typage).
+  
+  Elles entrent aussi quand les réductions ne sont pas simplement
+  retardées comme dans l'exemple précédent, mais abstraites : si j'écris
+  ∀e(F:★→★)∀e(β)∀e(α≥Fβ)σ, la "alias kind" inférée pour F sera N→P, et
+  le fait d'utiliser ce type pour le terme `e` dans l'élimination
+  e[λ(α)α] provoquera une erreur de typage dès le traitement de
+  l'élimination : les kinds ∀e(F:N→P) et (λ(α)α : N→N) ne correspondent
+  pas. Cependant, sans le système des kinds, on aurait aussi pu éliminer
+  F, et repérer le problème d'aliasing au moment de la réduction dans la
+  borne (α≥Fβ).
+  
+  Cela suggère la possibilité d'un choix intermédiaire entre "méthode
+  laxiste sans scrupules" et "méthode laxiste avec système de kinds
+  utilisé pour provoquer des warnings". On pourrait utiliser, pour les
+  warnings, non pas le système "statique" de kinds, mais seulement le
+  principe "dynamique" selon lequel on lance un warning pour chaque
+  alias incorrects repérés au moment de la réduction.
+  
+  L'intérêt principal de ce compromis est qu'il semble nettement plus
+  simple à implémenter et décrire que le système de kinds. Je sais que
+  tu décris les kinds N/P comme de la complexité "horizontale", mais ça
+  reste une forme de complexité et, si on a une solution acceptable sans
+  les utiliser, ça peut être un bon choix.
+  
+  Le désavantage du système "dynamique" (on reste dans la phase de
+  typage, mais c'est dynamique du point de vue des opérateurs de type :
+  c'est repéré pendant les β-réductions, et pas dès la définition du
+  terme), c'est qu'il est soumis aux problèmes de "bound alias
+  retardé". On peut avoir un terme qui semble typer parce que la borne
+  n'est pas réduite, mais qui lance un warning plus tard. Ce défaut
+  était inacceptable quand le bound alias était une erreur de typage, il
+  me semble acceptable quand c'est seulement un warning.
+  
+  Il a par contre un avantage, qui est que, alors que le systèmes des
+  kinds est une approximation pessimiste (du moins dans sa version
+  implicite où on infère le caractère N/P au lieu de laisser
+  l'utilisateur le choisir s'il le souhaite; mais je pense que ce serait
+  vrai même dans ce cas). Le système dynamique, lui, est exact : il ne
+  râle que quand il y a effectivement un bound aliasing.
+  
+  Enfin, je vois un dernier désavantage : un système dynamique émet plus
+  de warnings/erreurs qu'un système statique. Par exemple dans le cas
+  suivant, où (:σ) représente la fonction de coercion vers σ :
+  
+    (Λ(F:★→★) (: ∀α ∀e(β=Fα) ∀e(γ=Fα) σ))[λ(α)α]
+  
+  Avec le système statique, la kind inférée pour Λ(F:★→★) est N→P, et
+  l'élimination par λ(α)α provoque une erreur. Avec le système
+  dynamique, on remplace bien F par λ(α)α, et les réductions de β=.. et
+  γ=... vont provoquer deux warnings différents.
+
+Remarque : pour tout avertissement, il me semble important que
+l'utilisateur puisse choisir de dire "je sais que ça te pose problème
+ici, mais arrête de m'avertir pour ce cas précis".
+
+## moment de détection du problème d'aliasing issu de la réduction
+
+Extrait d'un mail envoyé à Didier :
+
+  J'ai aussi réfléchi à l'utilité du système des kinds N/P. La
+  justification de départ pour ce système, c'est de détecter
+  "statiquement" une erreur d'aliasing, sans avoir à effectuer les
+  réductions le faisant apparaître. Par exemple
+  ∀e(α) ∀e(β ≥ (λ(γ)γ) α) σ est un type qui, puisque la réduction est
+  paresseuse, ne lance pas d'erreur d'aliasing, mais en provoque une si
+  on l'utilise dans un contexte qui force l'unification, et donc la
+  réduction de la borne β. Le système des kinds permet de détecter
+  l'erreur dès la définition des types, au lieu de la reṕerer
+  "dynamiquement", au moment de la réduction (mais donc toujours dans la
+
+  [..]
+
+  Enfin, je me pose une dernière question : peut-on se débarasser des
+  warnings à retardement ? Je parle des cas où le β-redex fautif est
+  connu, mais que la réduction n'est pas forcée. Une façon simple
+  d'éviter ça serait de dire que, quand on a fini de typer une phrase,
+  on force ensuite les réductions qui restent (comme on l'a déjà dit, ça
+  pourrait se faire par exemple pendant la phase de normalisation
+  présolution→solution).
+  
+  La raison pour laquelle tu as rejeté cette idée (de forcer la
+  réduction) est liée à une question d'affichage des types : si je
+  définis l'alias
+    prod := λ(α)λ(β) ∀(γ) (α→β→γ)→γ)
+  je préfère que l'utilisateur lise (prod int bool) plutôt que
+    ∀(γ) (int→bool→γ)→γ
+  
+  Deux remarques :
+  
+  - Je ne suis pas profondément convaincu que la question de l'affichage
+    des types soit réglée seulement par des considérations de "quand
+    réduire". Je crois que c'est un problème plus difficile que ça, et
+    qui demandera à terme des solutions d'une autre nature. Par exemple
+    en Caml, si un utilisateur voulait définit "type var = int", le
+    pretty-printer de types doit parfois choisir entre afficher "var" et
+    "int", et ce n'est pas une question de réduction. Je ne connais pas
+    l'algorithme de Caml (je sais simplement que, parfois, ses choix ne
+    sont pas les bons), mais je suppose qu'il y a des règles pour
+    décider, et qu'il incorpore peut-être un peu d'information
+    supplémentaire dans les types pour s'aider (une sorte de métadonnée
+    "façon dont il faut m'afficher dans le contexte actuel" sur les
+    nœuds). Une autre solution dans les langages à types algébriques,
+    proche de ce que fait Haskell, est de se débarasser de la
+    construction d'alias (problématique de ce point de vue) en faveur
+    d'une construction "newtype Var = TagVar Int" pour définir des
+    nouveaux types à un seul constructeur, dont on garantit qu'elle
+    n'aura pas de coût au runtime par rapport à l'utilisation directe du
+    paramètre de type. Bref, peut-être que notre peur de réduire trop
+    est mal placée puisque de toute façon on aura envie à terme d'un
+    vrai système d'affichage de type prenant les égalités/alias en
+    compte, indépendamment de la réduction.
+  
+  - Il y a une astuce redoutable consistant à se contenter de "tester"
+    le risque d'aliasing sur les redexes (λ(α)σ₁) @ σ₂, sans effectuer
+    la réduction. En effet, on sait qu'on aura un aliasing entre le
+    binding du nœud (@) et celui du futur noeud (σ₁[α←σ₂]). On peut
+    vérifier son absence sans effectuer la réduction ! Il suffit de
+    comparer le binding du nœud (@) avec :
+    - dans le cas identité σ₁=α, avec le binding de σ₂
+    - dans le cas constante σ₁=β (toute variable de type autre que α),
+      avec le binding de β
+  
+  Ainsi, on pourrait forcer la détection des erreurs d'aliasing pour
+  chaque phrase (pendant la normalisation), sans forcer la réduction. Ça
+  me paraît être un choix intéressant.
+  
+  Remarque : on peut peut-être voir cette analyse sur les redexes connus
+  comme un cas particulier du système de kinds N/P. Une différence
+  importante est qu'ici on raisonne sur une condition "sémantique", ou
+  au moins "graphique", à savoir le binding du nœud (@), là où le
+  système de kind raisonne de façon "syntaxique", à savoir sur le
+  contexte d'utilisation du redex @ : « est-ce dans une quantification
+  ∀e(α≥@) ou i(α=@) ? »
+
+
+
+# Résolution de la flèche d'instance explicite et traitement du nœud (∀) débloqué
+
+L'ancienne signification de la flèche d'instance explicite (au moment
+de sa réduction) était :
+- Si on n'a pas un nœud (∀) bindé explicitement, échouer.
+- Sinon, en faire une expansion, et "débloquer" le nœud en faisant un
+  "reset" E→I du binding sur sa variable; puis unifier la copie
+  expansée avec la destination
+
+Au moment où j'ai choisi la solution explicite pour les problèmes de
+binding, j'ai changé d'avis et opté pour la stratégie suivante :
+- faire une expansion classique; *si* c'est un nœud (∀) bindé
+  explicitement, "débloquer" le nœud; puis unifier la copie expansée
+  avec la destination
+
+Il n'y a vraiment pas de différence si le constructeur de la source
+est différent de (⊥) et (∀) : au lieu d'échouer avant l'expansion, on
+échoue après, au moment de l'unification; en effet, le seul endroit où
+la flèche d'instance explicite est utilisée est la traduction de
+l'élimination de quantificateur, où la destination est un nœud (∀)
+débloqué.
+
+Par contre, ça change (en réussissant au lieu d'échouer) si la
+destination est :
+1. un nœud (∀) débloqué
+2. un nœud (⊥)
+
+Dans le cas du nœud (∀) débloqué, il n'y a pas d'erreur et l'effet est
+d'unifier les variables et corps des nœuds sources et destination.
+
+Dans le cas du nœud (⊥), on a un cas d'expansion dégénérée (par
+d'intérieur) qui se transforme donc, comme l'expansion classique, en
+unification. Ainsi on fait apparaître un nœud (∀) débloqué à la source
+(puisqu'il y en a un à la destination).
+
+
+## Problèmes de la solution initiale
+
+Je pense que la solution initiale cassait la principalité du
+typage. En effet, il me semble incorrect d'échouer si le nœud source
+est (⊥), puisqu'il pourrait être remplacé par un nœud (∀) bloqué
+valide : le comportement n'est pas monotone.
+
+C'est à vérifier (j'ai une intuition forte mais je ne connais pas les
+techniques de preuves en jeu ici), mais si le problème était avéré il
+rendrait la solution totalement inacceptable.
+
+
+## Questions d'affichage
+
+Dans l'ancien cadre, les nœuds (∀) étaient considérés comme "muets" du
+point de vue de l'affichage: seul le binding explicite correspondant
+était affiché. Cela n'est plus viable quand on se met à manipuler des
+(∀) débloqués, ce qui arrive quand une source d'instance explicite est
+un (⊥); par exemple, λx.x[int] produisait à l'affichage le type
+∀(α)α→α ! Il s'agit en fait de ∀(α)(∀(β)A(β,α))→α, mais le binding ∀β,
+inutilisé dans le corps du A, n'était pas affiché.
+
+La solution est de rendre compte syntaxique du nœud (∀) : on utilise
+directement la syntaxe A(α,σ) dans les types syntaxiques. Un (∀) gelé
+est alors de la forme ∀e(α) A(α,σ), et un dégelé ∀i(α) A(α,σ).
+
+D'un point de vue syntaxique, le rajout du constructeur A est assez
+désagréable. On peut optimiser la syntaxe en allégant le cas courant,
+qui est celui du binder gelé. J'ai rajouté un sucre syntaxique facile
+à implémenter: devant un binder explicite on peut ajouter un ^, qui
+remplace le A suivant :
+
+  ∀e(α) A(α,σ)   ==   ∀^e(α) σ
+
+Au niveau de la syntaxe concrète : (^'a! . foo)

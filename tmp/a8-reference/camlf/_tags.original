@@ -1,0 +1,5 @@
+true: use_str, use_menhir, debug, use_bigarray, use_camomile, warn_Y, warn_Z, warn_error_S, warn_D, use_lablgtk, use_odot, use_unix
+<{odot_view.ml,interact.{ml,byte,opt,native}}>: use_lablgtk, use_odot, use_unix
+<pprint>: include
+<*Test.*> or <*_generators.*> or <*_specifications.*> or <generator.*>: use_kaputt
+<interact.*>: annot

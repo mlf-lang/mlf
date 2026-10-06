@@ -1,0 +1,25 @@
+(** church-encoding for booleans *)
+val true x y = x
+
+val false x y = y
+
+val ifb z x y = z x y
+
+val three = ifb true 3 0
+
+(** church-encoding for integers *)
+val zero = fun f x -> x
+val one = fun f x -> f x
+val two = fun f x -> f (f x)
+
+(* we do not have type declarations in the prototype yet, so the types
+   are a bit redundant here.
+   Note that the correct polymorphic return type is inferred. *)
+val add (a : 'a . ('a -> 'a) -> 'a -> 'a)
+        (b : 'a . ('a -> 'a) -> 'a -> 'a) =
+  fun f x -> a f (b f x)
+
+(* a less redundant version, using a function as annotation *)
+val nat = (: 'a . ('a -> 'a) -> 'a -> 'a)
+val add2 a b =
+  fun f x -> nat a f (nat b f x)

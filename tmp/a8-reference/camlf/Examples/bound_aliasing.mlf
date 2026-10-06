@@ -1,0 +1,32 @@
+#global +experimental_fomega;;
+
+val simple_loop x =
+  if True
+  then (x : 'b . 'b)
+  else (x : _)
+
+val simple_bound_aliasing x =
+  if True
+  then (x : 'a . ('b > 'a) . 'a -> 'b)
+  else (x : 'a . 'a -> 'a);;
+
+val explicit_bound_aliasing x =
+  if True
+  then (x : 'a . ^('b !> 'a) . 'b -> 'b)
+  else (x : 'a . A('a, 'a -> 'a));;
+
+val redex_loop x =
+  if True
+  then (x : 'b . (lam 'a . 'a) @ 'b)
+  else (x : _);;
+
+val redex_bound_aliasing_by_constant x =
+  if True
+  then (x : 'a . ('b > (lam 'c . 'a) @ 'a) . 'b -> 'b)
+  else (x : 'a . 'a -> 'a);;
+
+val redex_bound_aliasing_by_identity x =
+  if True
+  then (x : 'a . ('b > (lam 'c . 'c) @ 'a) . 'b -> 'b)
+  else (x : 'a . 'a -> 'a);;
+

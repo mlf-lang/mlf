@@ -1,0 +1,45 @@
+The type_abstraction rule is used for both type-level and value-level
+quantification. It thus allows to choose either Explicit or Implicit
+bindings. There is a semantic mismatch with "Fun .. -> .." style
+value-level type abstraction, wich can only be Explicit.  Currently,
+the expliciteness type information of the abstraction is ignored by
+the translation into graph (wich considers it Explicit in any case),
+but both ('a > ..) and ('a >! ..) are syntaxically allowed, and in the
+first case an erroneous expliciteness information is carried along.
+
+Output is not consistent : some parts use Format, other plain
+printf/print_string, and yet other Pprint. It would be helpful to
+harmonize it to get consistent pretty-printing, eg. by using Pprint
+everywhere.
+
+printing functions are a mess : print_type, gPrint, ePrint... go
+through all them, eliminate dead code, and cleanly separate code.
+
+The grammar for explicit elimination e[σ] only accept types, while
+accepting (some .. in) forms may be desirable syntaxic sugar.
+
+In gTranslate, the translation of ∀(F:κ) does not create a (∀) node !
+
+Error reporting : the current error reporting is not very
+informative. The Right Way To Do is to reuse Boris's approach :
+annotate each constraint in the generated graph (and more generally
+each step introducing a potential for later failure) with a "meaning"
+that explains the necessity of the constraint in term of the source
+input : "it is the instanciation constraint on the function part <loc>
+of the application <loc>". On error reporting, we could fetch the
+stored meaning to provide a good error explanation.
+
+
+
+There is a defect in the bind_bound_variable subroutine of
+GTranslate.type_of_type_expr : instead of using the correct
+merge_flags function, we always choose to apply the new flags.
+
+The reason why is that the type_of_type_expr algorithm creates
+"fantom" flags that may raise false negatives in the flag merging
+routine : in (∀e(α≥⊥) α→σ), the current implementation will
+optimistically bind α on (→) *before* considering the ∀e
+bound. According to the (→) conventions, α is rigidly bound, therefore
+the further graph merging with e≥ will fail. The correction would be
+to revert to Boris's PhD algorithm, wich binds quantifier variables
+before translating the subterm.

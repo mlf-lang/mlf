@@ -1,0 +1,16 @@
+This is an adaptation of Daan Leijen's [PPrint] library, which itself is based
+on the ideas developed by Philip Wadler in ``A Prettier Printer''.  For more
+information about Wadler's and Leijen's work, consult the following references:
+
+   http://www.cs.uu.nl/~daan/pprint.html
+   http://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf
+
+The present code was written by François Pottier and Nicolas Pouillard. It is
+in a somewhat rough state: although the internals of the renderer are rather
+well documented, the combinators for building documents could be tidied up and
+better explained. The code is provided as is.
+
+[PATCH] the original PPrint source (archive from April 2010) was
+modified by Gabriel Scherer for a better pretty-printing of UTF8
+strings. The applied patch can be found in the
+pprint-fancystring.patch file.

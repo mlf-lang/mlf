@@ -1,0 +1,923 @@
+A Church-Style Intermediate Language for MLF
+Didier Rémy1
+
+Boris Yakobowski2
+
+1
+INRIA Paris - Rocquencourt
+CEA, LIST, Laboratoire Sureté des Logiciels,
+Boı̂te 94, 91191 Gif-sur-Yvette Cedex, France.
+
+2
+
+Abstract MLF is a type system that seamlessly merges ML-style implicit but second-class polymorphism with System-F explicit first-class
+polymorphism. We present x MLF, a Church-style version of MLF with
+full type information that can easily be maintained during reduction. All
+parameters of functions are explicitly typed and both type abstraction
+and type instantiation are explicit. However, type instantiation in x MLF
+is more general than type application in System F. We equip x MLF with
+a small-step reduction semantics that allows reduction in any context
+and show that this relation is confluent and type preserving. We also
+show that both subject reduction and progress hold for weak-reduction
+strategies, including call-by-value with the value-restriction.
+
+Introduction
+MLF (Le Botlan and Rémy 2003, 2007; Rémy and Yakobowski 2008b) is a type
+system that seamlessly merges ML-style implicit but second-class polymorphism with System-F explicit first-class polymorphism. This is done by enriching
+System-F types. Indeed, System F is not well-suited for partial type inference, as
+illustrated by the following example. Assume that a function, say choice, of type
+∀ (α) α → α → α and the identity function id, of type ∀ (β) β → β, have been
+defined. How can the application choice to id be typed in System F? Should
+choice be applied to the type ∀ (β) β → β of the identity that is itself kept
+polymorphic? Or should it be applied to the monomorphic type γ → γ, with
+the identity being applied to γ (where γ is bound in a type abstraction in front
+of the application)? Unfortunately, these alternatives have incompatible types,
+respectively (∀ (α) α → α) → (∀ (α) α → α) and ∀ (γ) (γ → γ) → (γ → γ):
+none is an instance of the other. Hence, in System F, one is forced to irreversibly
+choose between one of the two explicitly typed terms.
+However, a type inference system cannot choose between the two, as this
+would sacrifice completeness and be somehow arbitrary. This is why MLF enriches types with instance-bounded polymorphism, which allows to write more
+expressive types that factor out in a single type all typechecking alternatives in
+such cases as the example of choice. Now, the type ∀ (α⩾τ ) α → α, which should
+be read “α → α where α is any instance of τ ”, can be assigned to choice id, and
+the two previous alternatives can be recovered a posteriori by choosing different
+instances for α.
+
+2
+
+Didier Rémy and Boris Yakobowski
+
+Currently, the language MLF comes with a Curry-style version iMLF where no
+type information is needed and a type-inference version eMLF that requires partial type information (Le Botlan and Rémy 2007). However, eMLF is not quite in
+Church’s style, since a large amount of type information is still implicit and partial type information cannot be easily maintained during reduction. Hence, while
+eMLF is a good surface language, it is not a good candidate for use as an internal
+language during the compilation process, where some program transformations,
+and perhaps some reduction steps, are being performed. This has been a problem
+for the adoption of MLF in the Haskell community (Peyton Jones 2003), as the
+Haskell compilation chain uses an explicitly-typed internal language.
+This is also an obstacle to proving subject reduction, which does not hold
+in eMLF. In a way, this is unavoidable in a language with non-trivial partial
+type inference. Indeed, type annotations cannot be completely dropped, but
+must at least be transformed and reorganized during reduction. Still, one could
+expect that eMLF be equipped with reduction rules for type annotations. This
+has actually been considered in the original presentation of MLF, but only with
+limited success. The reduction kept track of annotation sites during reduction;
+this showed, in particular, that no new annotation site needs to be introduced
+during reduction. Unfortunately, the exact form of annotations could not be
+maintained during reduction, by lack of an appropriate language to describe their
+computation. As a result, it has only been shown that some type derivation can
+be rebuilt after the reduction of a well-typed program, but without exhibiting
+an algorithm to compute them during reduction.
+Independently, Rémy and Yakobowski (2008b) have introduced graphic constraints, both to simplify the presentation of MLF and to improve its type inference algorithm. This also lead to a simpler, more expressive definition of MLF.
+In this paper, we present x MLF, a Church-style version of MLF that contains
+full type information. In fact, type checking becomes a simple and local verification process—by contrast with type inference in eMLF, which is based on
+unification. In x MLF, type abstraction, type instantiation, and all parameters
+of functions are explicit, as in System F. However, type instantiation is more
+general and more atomic than type application in System F: we use explicit type
+instantiation expressions that are proof evidences for the type instance relations.
+In addition to the usual β-reduction, we give a series of reduction rules for
+simplifying type instantiations. These rules are confluent when allowed in any
+context. Moreover, reduction preserves typings, and is sufficient to reduce all
+typable expressions to a value when used in either a call-by-value or call-by-name
+setting. This establishes the soundness of MLF for a call-by-name semantics for
+the first time. Notably, x MLF is a conservative extension of System F.
+The paper is organized as follows. We present x MLF, its syntax and its static
+and dynamic semantics in §1. We study its main properties, including type
+soundness for different evaluations strategies in §2. We discuss possible variations, as well as related and future works in §3. All proofs are omitted, but can
+be found in (Yakobowski 2008, Chapters 14 & 15).
+
+A Church-Style Intermediate Language for MLF
+α, β, γ, δ
+τ ::=
+|
+α
+|
+τ →τ
+|
+∀ (α ⩾ τ ) τ
+|
+⊥
+
+Type variable
+Type
+Type variable
+Arrow type
+Quantification
+Bottom type
+
+φ
+
+Instantiation
+Bottom
+Abstract
+Inside
+Under
+∀-elimination
+∀-introduction
+Composition
+Identity
+
+::=
+|
+|
+|
+|
+|
+|
+|
+|
+
+τ
+!α
+∀ (⩾ φ)
+∀ (α ⩾) φ
+N
+O
+φ; φ
+
+1
+
+3
+
+x, y, z
+a ::=
+| x
+| λ(x : τ ) a
+| aa
+| Λ(α ⩾ τ ) a
+| aφ
+| let x = a in a
+
+Term variable
+Term
+Variable
+Function
+Application
+Type function
+Instantiation
+Let-binding
+
+Γ ::=
+| ∅
+| Γ, α ⩾ τ
+| Γ, x : τ
+
+Environment
+Empty
+Type variable
+Term variable
+
+Figure 1. Grammar of types, instantiations, and terms
+
+1
+
+The calculus
+
+Types, instantiations, terms, and typing environments All the syntactic
+definitions of x MLF can be found in Figure 1. We assume given a countable
+collection of variables ranged over by letters α, β, γ, and δ. As usual, types
+include type variables and arrow types. Other type constructors will be added
+later—straightforwardly, as the arrow constructor receives no special treatment.
+Types also include a bottom type ⊥ that corresponds to the System-F type
+∀α.α. Finally, a type may also be a form of bounded quantification ∀ (α ⩾ τ ) τ ′ ,
+called flexible quantification, that generalizes the ∀α.τ form of System F and,
+intuitively, restricts the variable α to range only over instances of τ . The variable
+α is bound in τ ′ but not in τ . (We may write ∀ (α) τ ′ when the bound τ is ⊥.)
+In Church-style System F, type instantiation inside terms is simply type application, of the form a τ . By contrast, type instantiation a φ in x MLF details
+every intermediate instantiation step, so that it can be checked locally. Intuitively, the instantiation φ transforms a type τ into another type τ ′ that is an
+instance of τ . In a way, φ is a witness for the instance relation that holds between
+τ and τ ′ . It is therefore easier to understand instantiations altogether with their
+static semantics, which will be explained in the next section.
+Terms of x MLF are those of the λ-calculus enriched with let constructs, with
+two small differences. Type instantiation a φ generalizes System-F type application. Type abstractions are extended with an instance bound τ and written
+Λ(α ⩾ τ ) a. The type variable α is bound in a, but not in τ . We abbreviate
+Λ(α ⩾ ⊥) a as Λ(α) a, which simulates the type abstraction Λα. a of System F.
+We write ftv(τ ) and ftv(a) the set of type variables that appear free in τ and a.
+We identify types, instantiations, and terms up to the renaming of bound
+variables. The capture-avoiding substitution of a variable v inside an expression
+s by an expression s′ is written s{v ← s′ }.
+
+4
+
+Didier Rémy and Boris Yakobowski
+Inst-Bot
+Γ ⊢τ :⊥≤τ
+
+Inst-Under
+Γ, α ⩾ τ ⊢ φ : τ1 ≤ τ2
+Γ ⊢ ∀ (α ⩾) φ : ∀ (α ⩾ τ ) τ1 ≤ ∀ (α ⩾ τ ) τ2
+
+Inst-Inside
+Γ ⊢ φ : τ1 ≤ τ2
+Γ ⊢ ∀ (⩾ φ) : ∀ (α ⩾ τ1 ) τ ≤ ∀ (α ⩾ τ2 ) τ
+Inst-Comp
+Γ ⊢ φ 1 : τ1 ≤ τ2
+Γ ⊢ φ 2 : τ2 ≤ τ3
+Γ ⊢ φ 1 ; φ 2 : τ1 ≤ τ3
+
+Inst-Abstr
+α⩾τ ∈Γ
+Γ ⊢ !α : τ ≤ α
+
+Inst-Intro
+α∈
+/ ftv(τ )
+Γ ⊢ O : τ ≤ ∀ (α ⩾ ⊥) τ
+
+Inst-Elim
+
+Inst-Id
+
+Γ ⊢ N : ∀ (α ⩾ τ ) τ ′ ≤ τ ′ {α ← τ }
+
+Γ ⊢1:τ ≤τ
+
+Figure 2. Type instance
+
+As usual, type environments assign types to program variables. However,
+instead of just listing type variables, as is the case in System F, type variables
+are also assigned a bound in a binding of the form α ⩾ τ . We write dom(Γ ) for
+the set of all terms and type variables that are bound by Γ . We also assume
+that typing environments are well-formed, i.e. they do not bind twice the same
+variable and free type variables appearing in a type of the environment Γ must
+be bound earlier in Γ . Formally, the empty environment is well-formed and, given
+a (well-formed) environment Γ , the relations α 6∈ dom(Γ ) and ftv(τ ) ⊆ dom(Γ )
+must hold to form environments Γ, α ⩾ τ and Γ, x : τ .
+
+Instantiations Instantiations φ are defined in Figure 1. Their typing, described
+in Figure 2, are type instance judgments of the form Γ ⊢ φ : τ ≤ τ ′ , stating that
+in environment Γ , the instantiation φ transforms the type τ into the type τ ′ .
+The bottom instantiation τ expresses that (any) type τ is an instance of the
+bottom type. The abstract instantiation !α, which assumes that the hypothesis
+α⩾τ is in the environment, abstracts the bound τ of α as the type variable α. The
+inside instantiation ∀ (⩾ φ) applies φ to the bound τ ′ of a flexible quantification
+∀ (α′ ⩾ τ ′ ) τ . Conversely, the under instantiation ∀ (α ⩾) φ applies φ to the type
+τ under the quantification. The type variable α is bound in φ; the environment
+in the premise of the rule Inst-Under is increased accordingly. The quantifier
+introduction O3 introduces a fresh trivial quantification ∀ (α⩾⊥). Conversely, the
+quantifier elimination N eliminates the bound of a type of the form ∀ (α⩾τ ) τ ′ by
+substituting τ for α in τ ′ . This amounts to definitely choosing the present bound
+τ for α, while the bound before the application could be further instantiated by
+some inside instantiation. The composition φ; φ′ witnesses the transitivity of
+type instance, while the identity instantiation 1 witnesses reflexivity.
+3
+
+The choice of O is only by symmetry with the elimination form N described next,
+and has no connection at all with linear logic.
+
+A Church-Style Intermediate Language for MLF
+τ (!α)
+= α
+⊥ τ
+= τ
+= τ
+τ 1
+τ (φ1 ; φ2 ) = (τ φ1 ) φ2
+
+5
+
+τ O
+= ∀ (α ⩾ ⊥) τ
+α∈
+/ ftv(τ )
+(∀ (α ⩾ τ ) τ ′ ) N
+= τ ′ {α ← τ }
+(∀ (α ⩾ τ ) τ ′ ) (∀ (⩾ φ))
+= ∀ (α ⩾ τ φ) τ ′
+′
+(∀ (α ⩾ τ ) τ ) (∀ (α ⩾) φ) = ∀ (α ⩾ τ ) (τ ′ φ)
+
+Figure 3. Type instantiation (on types)
+
+Example Let τmin , τcmp , and τand be the types of the parametric minimum and
+comparison functions and of the conjunction of boolean formulas:
+τmin
+
+, ∀ (α ⩾ ⊥) α → α → α
+τcmp , ∀ (α ⩾ ⊥) α → α → bool
+τand , bool → bool → bool
+
+Let φ be the instantiation ∀ (⩾ bool); N. Then, ⊢ φ : τmin ≤ τand and ⊢ φ :
+τcmp ≤ τand hold. Let τK be the type ∀ (α ⩾ ⊥) ∀ (β ⩾ ⊥) α → β → α (e.g. of
+the λ-term λ(x) λ(y) x) and φ′ be the instantiation4 ∀ (α ⩾) (∀ (⩾ α); N). Then,
+φ′ : τK ≤ τmin .
+Type application As above, we often instantiate a quantification over ⊥ and
+immediately substitute the result. Moreover, this pattern corresponds to the
+System-F unique instantiation form. Therefore, we define hτ i as syntactic sugar
+for (∀ (⩾ τ ); N). The instantiations φ and φ′ can then be abbreviated as hbooli
+and ∀ (α ⩾) hαi. More generally, we write hφi for the computation (∀ (⩾ φ); N).
+Properties of instantiations Since instantiations make all steps in the instance
+relation explicit, their typing is deterministic.
+Lemma 1. If Γ ⊢ φ : τ ≤ τ1 and Γ ′ ⊢ φ : τ ≤ τ2 , then τ1 = τ2 .
+The use of Γ ′ instead of Γ may be surprising. However, Γ does not contribute
+to the instance relation, except in the side condition of rule Inst-Abstr. Hence,
+the type instance relation defines a partial function, called type instantiation 5
+that, given an instantiation φ and a type τ , returns (if it exists) the unique type
+τ φ such that ⊢ φ : τ ≤ τ φ. An inductive definition of this function is given in
+Figure 3. Type instantiation is complete for type instance:
+Lemma 2. If Γ ⊢ φ : τ ≤ τ ′ , then τ φ = τ ′ .
+However, the fact that τ φ may be defined and equal to τ ′ does not imply that
+Γ ⊢ φ : τ ≤ τ ′ holds for some Γ . Indeed, type instantiation does not check the
+premise of rule Inst-Abstr. This is intentional, as it avoids parametrizing type
+instantiation over the type environment. This means that type instantiation is
+not sound in general. This is never a problem, however, since we only use type
+instantiation originating from well-typed terms for which there always exists
+some context Γ such that Γ ⊢ φ : τ ≤ τ ′ .
+4
+5
+
+The occurrence of α in the inside instantiation is bound by the under instantiation.
+There should never be any ambiguity with the operation a φ on expressions; moreover, both operations have strong similarities.
+
+6
+
+Didier Rémy and Boris Yakobowski
+
+Var
+x:τ ∈Γ
+Γ ⊢x:τ
+
+Let
+Γ ⊢a:τ
+Γ, x : τ ⊢ a′ : τ ′
+Γ ⊢ let x = a in a′ : τ ′
+
+Abs
+Γ, x : τ ⊢ a : τ ′
+Γ ⊢ λ(x : τ ) a : τ → τ ′
+
+App
+Γ ⊢ a 1 : τ2 → τ1
+Γ ⊢ a 2 : τ2
+Γ ⊢ a 1 a 2 : τ1
+
+TAbs
+Γ, α ⩾ τ ′ ⊢ a : τ
+α∈
+/ ftv(Γ )
+′
+Γ ⊢ Λ(α ⩾ τ ) a : ∀ (α ⩾ τ ′ ) τ
+
+TApp
+Γ ⊢a:τ
+Γ ⊢ φ : τ ≤ τ′
+Γ ⊢ a φ : τ′
+
+Figure 4. Typing rules for x MLF
+
+We say that types τ and τ ′ are equivalent in Γ if there exist φ and φ′ such that
+Γ ⊢ φ : τ ≤ τ ′ and Γ ⊢ φ′ : τ ′ ≤ τ . Although types of x MLF are syntactically the
+same as the types of iMLF—the Curry-style version of MLF (Le Botlan and Rémy
+2007)—they are richer, because type equivalence in x MLF is finer than type
+equivalence in iMLF, as will be explained in §3.
+Typing rules for x MLF Typing rules are defined in Figure 4. Compared with
+System F, the novelties are type abstraction and type instantiation, unsurprisingly. The typing of a type abstraction Λ(α ⩾ τ ) a extends the typing environment with the type variable α bound by τ . The typing of a type instantiation
+a φ resembles the typing of a coercion, as it just requires the instantiation φ to
+transform the type of a into the type of the result. Of course, it has the full
+power of the type application rule of System F. For example, the type instantiation a hτ i has type τ ′ {α ← τ } provided the term a has type ∀ (α) τ ′ . As in
+System F, a well-typed closed term has a unique type—in fact, a unique typing
+derivation.
+A let-binding let x = a1 in a2 cannot entirely be treated as an abstraction for
+an immediate application (λ(x : τ1 ) a2 ) a1 because the former does not require a
+type annotation on x whereas the latter does. This is nothing new, and the same
+as in System F extended with let-bindings. (Notice however that τ1 , which is the
+type of a1 , is fully determined by a1 and could be synthesized by a typechecker.)
+Example Let id stand for the identity Λ(α ⩾ ⊥) λ(x : α) x and τid for the
+type ∀ (α ⩾ ⊥) α → α. We have ⊢ id : τid . The function choice mentioned
+in the introduction, may be defined as Λ(β ⩾ ⊥) λ(x : β) λ(y : β) x. It has
+type ∀ (β ⩾ ⊥) β → β → β. The application of choice to id, which we refer to
+below as choice id, may be defined as Λ(β ⩾ τid ) choice hβi (id (!β)) and has type
+∀ (β ⩾ τid ) β → β. The term choice id may also be given weaker types by type
+instantiation. For example, choice id N has type (∀ (α ⩾ ⊥) α → α) → (∀ (α ⩾ ⊥)
+α → α) as in System F, while choice id (O; ∀ (γ ⩾) (∀ (⩾ hγi); N)) has the ML
+type ∀ (γ ⩾ ⊥) (γ → γ) → γ → γ.
+
+Reduction The semantics of the calculus is given by a small-step reduction
+semantics. We let reduction occur in any context, including under abstractions.
+
+A Church-Style Intermediate Language for MLF
+(λ(x : τ ) a1 ) a2
+let x = a2 in a1
+
+−→ a1 {x ← a2 }
+−→ a1 {x ← a2 }
+
+(β)
+(βlet )
+
+a1
+−→ a
+a (φ; φ′ )
+−→ a φ (φ′ )
+aO
+−→ Λ(α ⩾ ⊥) a
+α∈
+/ ftv(a)
+(Λ(α ⩾ τ ) a) N
+−→ a{!α ← 1}{α ← τ }
+(Λ(α ⩾ τ ) a) (∀ (α ⩾) φ) −→ Λ(α ⩾ τ ) (a φ)
+(Λ(α ⩾ τ ) a) (∀ (⩾ φ)) −→ Λ(α ⩾ τ φ) a{!α ← φ; !α}
+E[a] −→ E[a′ ]
+
+if a −→ a′
+
+7
+
+(ι-Id)
+(ι-Seq)
+(ι-Intro)
+(ι-Elim)
+(ι-Under)
+(ι-Inside)
+(Context)
+
+Figure 5. Reduction rules
+That is, the evaluation contexts are single-hole contexts, given by the grammar:
+E ::= [ · ] | E φ | λ(x : τ ) E | Λ(α ⩾ τ ) E
+| E a | a E | let x = E in a | let x = a in E
+The reduction rules are described in Figure 5. As usual, basic reduction steps
+contain β-reduction, with the two variants (β) and (βlet ). Other basic reduction rules, related to the reduction of type instantiations and called ι-steps, are
+described below. The one-step reduction is closed under the context rule. We
+write −→β and −→ι for the two subrelations of −→ that contains only Context and β-steps or ι-step, respectively. Finally, the reduction is the reflexive
+and transitive closure −→
+→ of the one-step reduction relation.
+Reduction of type instantiation Type instantiation redexes are all of the form
+a φ. The first three rules do not constrain the form of a. The identity type
+instantiation is just dropped (Rule ι-Id). A type instantiation composition is
+replaced by the successive corresponding type instantiations (Rule ι-Seq). Rule
+ι-Intro introduces a new type abstraction in front of a; we assume that the
+bound variable α is fresh in a. The other three rules require the type instantiation
+to be applied to a type abstraction Λ(α ⩾ τ ) a. Rule ι-Under propagates the
+type instantiation under the bound, inside the body a. By contrast, Rule ιInside propagates the type instantiation φ inside the bound, replacing τ by τ φ.
+However, as the bound of α has changed, the domain of the type instantiations
+!α is no more τ , but τ φ. Hence, in order to maintain well-typedness, all the
+occurrences of the instantiation !α in a must be simultaneously replaced by
+the instantiation (φ; !α). Here, the instantiation !α is seen as atomic, i.e. all
+occurrences of !α are substituted, but other occurrences of α are left unchanged
+(see the appendix for the formal definition). For instance, if a is the term
+Λ(α ⩾ τ ) λ(x : α → α) λ(y : ⊥) y (α → α) (z (!α))
+then, the type instantiation a (∀ (⩾ φ)) reduces to:
+Λ(α ⩾ τ φ) λ(x : α → α) λ(y : ⊥) y (α → α) (z (φ; !α))
+Rule ι-Elim eliminates the type abstraction, replacing all the occurrences of α
+inside a by the bound τ . All the occurrences of !α inside τ (used to instantiate τ
+
+8
+
+Didier Rémy and Boris Yakobowski
+
+into α) become vacuous and must be replaced by the identity instantiation. For
+example, reusing the term a above, a N reduces to λ(x : τ → τ ) λ(y : ⊥) y (τ →
+τ ) (z 1). Notice that type instantiations a τ and a (!α) are irreducible.
+Examples of reduction Let us reuse the term choice id defined in §1 as Λ(β ⩾
+τid ) choice hβi (id (!β)). Remember that hτ i stands for the System-F type application τ and expands to (∀ (⩾ τ ); N). Therefore, the type instantiation choice hβi
+reduces to the term λ(x : β) λ(y : β) x by ι-Seq, ι-Inside and ι-Elim. Hence,
+the term choice id reduces by these rules, Context, and (β) to the expression
+Λ(β ⩾ τid ) λ(y : β) id (!β).
+Below are three specialized versions of choice id (remember that ∀ (α) τ and
+Λ(α) a are abbreviations for ∀ (α ⩾ ⊥) τ and Λ(α ⩾ ⊥) a). Here, all type instantiations are eliminated by reduction, but this is not always possible in general.
+choice id hhintii : (int → int) → (int → int)
+−→
+→ λ(y : int → int) (λ(x : int) x)
+choice id N
+choice id (O; ∀ (γ ⩾) (∀ (⩾ hγi); N))
+
+: (∀ (α) α → α) → (∀ (α) α → α)
+−→
+→ λ(y : ∀ (α) α → α) (Λ(α) λ(x : α) x)
+: ∀ (γ) (γ → γ) → (γ → γ)
+−→
+→ Λ(γ) λ(y : γ → γ) (λ(x : γ) x)
+
+System F as a subsystem of x MLF System F can be seen as a subset of
+x MLF, using the following syntactic restrictions: all quantifications are of the
+form ∀ (α) τ and ⊥ is not a valid type anymore (however, as in System F, ∀ (α) α
+is); all type abstractions are of the form Λ(α) a; and all type instantiations are
+of the form a hτ i.
+The derived typing rule for Λ(α) a and a hτ i are exactly the System-F typing rules for type abstraction and type application. Hence, typechecking in this
+restriction of x MLF corresponds to typechecking in System F.
+Moreover, the reduction in this restriction also corresponds to reduction
+in System F. Indeed, a reducible type application is necessarily of the form
+(Λ(α) a) hτ i and can always be reduced to a{α ← τ } as follows:
+(Λ(α) a) hτ i = (Λ(α ⩾ ⊥) a) (∀ (⩾ τ ); N)
+−→ (Λ(α ⩾ ⊥) a) (∀ (⩾ τ )) (N)
+−→ (Λ(α ⩾ ⊥τ ) a{!α ← τ ; !α}) (N) = (Λ(α ⩾ τ ) a) (N)
+−→ a{!α ← 1}{α ← τ } = a{α ← τ }
+
+(1)
+(2)
+(3)
+(4)
+
+Step (1) is by definition; step (2) is by ι-Seq; step (3) is by ι-Inside, step (4)
+is by ι-Elim and equality steps (3) and (4) are by type instantiation and by
+assumption as a is a term of System F, thus in which !α does not appear.
+
+2
+
+Properties of reduction
+
+The reduction has been defined so that the type erasure of a reduction sequence
+in x MLF is a reduction sequence in the untyped λ-calculus. Formally, the type
+
+A Church-Style Intermediate Language for MLF
+
+9
+
+erasure of a term a of x MLF is the untyped λ-term ⌈a⌉ defined inductively by
+⌈x⌉ = x
+⌈a φ⌉ = ⌈a⌉
+⌈a1 a2 ⌉ = ⌈a1 ⌉ ⌈a2 ⌉
+
+⌈let x = a1 in a2 ⌉ = let x = ⌈a1 ⌉ in ⌈a2 ⌉
+⌈λ(x : τ ) a⌉ = λ(x) ⌈a⌉
+⌈Λ(α ⩾ τ ) a⌉ = ⌈a⌉
+
+It is immediate to verify that two terms related by ι-reduction have the same
+type erasure. Moreover, if a β-reduces to a′ , then the type erasure of a β-reduces
+to the type erasure of a′ in one step in the untyped λ-calculus.
+2.1
+
+Subject reduction
+
+Reduction of x MLF, which can occur in any context, preserves typings. This relies
+on weakening and substitution lemmas for both instance and typing judgments.
+Lemma 3 (Weakening). Let Γ, Γ ′ , Γ ′′ be a well-formed environment.
+If Γ, Γ ′′ ⊢ φ : τ1 ≤ τ2 , then Γ, Γ ′ , Γ ′′ ⊢ φ : τ1 ≤ τ2 .
+If Γ, Γ ′′ ⊢ a : τ ′ , then Γ, Γ ′ , Γ ′′ ⊢ a : τ ′ .
+Lemma 4 (Term substitution). Assume that Γ ⊢ a′ : τ ′ holds.
+If Γ, x : τ ′ , Γ ′ ⊢ φ : τ1 ≤ τ2 then Γ, Γ ′ ⊢ φ : τ1 ≤ τ2 .
+If Γ, x : τ ′ , Γ ′ ⊢ a : τ , then Γ, Γ ′ ⊢ a{x ← a′ } : τ
+The next lemma, which expresses that we can substitute an instance bound
+inside judgments, ensures the correctness of Rule ι-Elim.
+Lemma 5 (Bound substitution).
+Let ϕ and θ be respectively the substitutions {α ← τ } and {!α ← 1}{α ← τ }.
+If Γ, α ⩾ τ, Γ ′ ⊢ φ : τ1 ≤ τ2 then Γ, Γ ′ ϕ ⊢ φθ : τ1 ϕ ≤ τ2 ϕ.
+If Γ, α ⩾ τ , Γ ′ ⊢ a : τ ′ then Γ, Γ ′ ϕ ⊢ aθ : τ ′ ϕ.
+Finally, the following lemma ensures that an instance bound can be instantiated,
+proving in turn the correctness of the rule ι-Inside.
+Lemma 6 (Narrowing). Assume Γ ⊢ φ : τ ≤ τ ′ . Let θ be {!α ← φ; !α}.
+If Γ, α ⩾ τ , Γ ′ ⊢ φ′ : τ1 ≤ τ2 then Γ, α ⩾ τ ′ , Γ ′ ⊢ φ′ θ : τ1 ≤ τ2 .
+If Γ, α ⩾ τ, Γ ′ ⊢ a : τ ′′ then Γ, α ⩾ τ ′ , Γ ′ ⊢ aθ : τ ′′
+Subject reduction is an easy consequence of all these results.
+Theorem 1 (Subject reduction). If Γ ⊢ a : τ and a −→ a′ then, Γ ⊢ a′ : τ .
+2.2
+
+Confluence
+
+Theorem 2. The relation −→β is confluent. The relations −→ι and −→ are
+confluent on the terms well-typed in some context.
+This result is proved using the standard technique of parallel reductions
+(Barendregt 1984). Thus β-reduction and ι-reduction are independent; this allows for instance to perform ι-reductions under λ-abstractions as far as possible
+while keeping a weak evaluation strategy for β-reduction.
+
+10
+
+Didier Rémy and Boris Yakobowski
+
+The restriction to well-typed terms for the confluence of ι-reduction is due to
+two things. First, the rule ι-Inside is not applicable to ill-typed terms in which
+τ φ cannot be computed (for example (Λ(α ⩾ int) a) (∀ (⩾ N))). Second, τ φ can
+sometimes be computed, even though Γ ⊢ φ : τ ≤ τ ′ never holds (for example
+if φ is !α and τ is not the bound of α in Γ ). Hence, type errors may be either
+revealed or silently reduced and perhaps eliminated, depending on the reduction
+path. As an example, let a be the term
+
+Λ(α ⩾ ∀ (γ) γ) (Λ(β ⩾ int) x) (∀ (⩾ !α)) (∀ (⩾ N))
+
+We have both a −→ Λ(α ⩾
+ ⊥) (Λ(β ⩾ int) x) (∀ (⩾ N; !α)) 6−→, and a −→
+Λ(α ⩾ ∀ (γ) γ) Λ(β ⩾ α) x (∀ (⩾ N)) −→ Λ(α ⩾ ⊥) Λ(β ⩾ α) x 6−→.
+The fact that ill-typed terms may not be confluent is not new: for instance,
+this is already the case with η-reduction in System F. We believe this is not
+a serious issue. In practice, this means that typechecking should be performed
+before any program simplification, which is usually the case anyway.
+2.3
+
+Strong normalization
+
+We conjecture, but have not proved, that all reduction sequences are finite.
+2.4
+
+Accommodating weak reduction strategies and constants
+
+In order to show that the calculus may also be used as the core of a programming
+language, we now introduce constants and restricts the semantics to a weak
+evaluation strategy.
+We let the letter c range over constants. Each constant comes with its arity |c|.
+The dynamic semantics of constants must be provided by primitive reduction
+rules, called δ-rules. However, these are usually of a certain form. To characterize
+δ-rules (and values), we partition constants into constructors and primitives,
+ranged over by letters C and f , respectively. The difference between the two lies
+in their semantics: primitives (such as +) are reduced when fully applied, while
+constructors (such as cons) are irreducible and typically eliminated when passed
+as argument to primitives.
+In order to classify constructed values, we assume given a collection of type
+constructors κ, together with their arities |κ|. We extend types with constructed
+types κ (τ1 , . . . τ|κ| ). We write α for a sequence of variables α1 , . . . αk and ∀ (α) τ
+for the type ∀ (α1 ) . . . ∀ (αk ) τ . The static semantics of constants is given by
+an initial typing environment Γ0 that assigns to every constant c a type τ of
+the form ∀ (α) τ1 → . . . τn → τ0 , where τ0 is a constructed type whenever the
+constant c is a constructor.
+We distinguish a subset of terms, called values and written v. Values are
+term abstractions, type abstractions, full or partial applications of constructors,
+or partial applications of primitives. We use an auxiliary letter w to characterize the arguments of functions, which differ for call-by-value and call-by-name
+strategies. In values, an application of a constant c can involve a series of type
+instantiations, but only evaluated ones and placed before all other arguments.
+
+A Church-Style Intermediate Language for MLF
+
+11
+
+Moreover, the application may only be partial whenever c is a primitive. Evaluated instantiations θ may be quantifier eliminations or either inside or under
+(general) instantiations. In particular, a τ and a (!α) are never values. The grammar for values and evaluated instantiations is as follows:
+v ::= λ(x : τ ) a
+| Λ(α : τ ) a
+| C θ1 . . . θk w1 . . . wn
+| f θ1 . . . θk w1 . . . wn
+θ ::= ∀ (⩾ φ) | ∀ (α ⩾) φ | N
+
+n ≤ |C|
+n < |f |
+
+Finally, we assume that δ-rules are of the form f θ1 . . . θk w1 . . . w|f | −→f a (that
+is, δ-rules may only reduce fully applied primitives).
+In addition to this general setting, we make further assumptions to relate the
+static and dynamic semantics of constants.
+Subject reduction: δ-reduction preserves typings, i.e., for any typing context
+Γ such that Γ ⊢ a : τ and a −→f a′ , the judgment Γ ⊢ a′ : τ holds.
+Progress: Well-typed, full applications of primitives can be reduced, i.e., for
+any term a of the form f θ1 . . . θk w1 . . . wn verifying Γ0 ⊢ a : τ , there
+exists a term a′ such that a −→f a′ .
+Call-by-value reduction We now specialize the previous framework to a
+call-by-value semantics. In this case, arguments of applications in values are
+themselves restricted to values, i.e. w is taken equal to v. Rules (β) and (βlet )
+are limited to the substitution of values, that is, to reductions of the form
+(λ(x : τ ) a) v −→ a{x ← v} and let x = v in a −→ a{x ← v}. Rules ιId, ι-Comp and ι-Intro are also restricted so that they only apply to values
+(e.g. a is textually replaced by v in each of these rules). Finally, we restrict rule
+Context to call-by-value contexts, which are of the form
+Ev ::= [ · ] | Ev a | v Ev | Ev φ | let x = Ev in a
+We write −→
+→v the resulting reduction relation. It follows from the above restrictions that the reduction is deterministic. Moreover, since δ-reduction preserves
+typings, by asumption, the relation −→
+→v also preserves typings by Theorem 1.
+Progress holds for call-by-value. In combination with subject-reduction, this
+ensures that the evaluation of well-typed terms “cannot go wrong”.
+Theorem 3. If Γ0 ⊢ a : τ , then either a is a value or a −→
+→v a′ for some a′ .
+Call-by-value reduction and the value restriction The value-restriction is
+the most standard way to add side effects in a call-by-value language. It is thus
+important to verify that it can be transposed to x MLF.
+Typically, the value restriction amounts to restricting type generalization
+to non-expansive expressions, which contain at least value-forms, i.e. values and
+
+12
+
+Didier Rémy and Boris Yakobowski
+
+term variables, as well as their type-instantiations. Hence, we obtain the following
+revised grammar for expansive expressions b and for non-expansive expressions u.
+b ::= u | b b | let x = u in b
+u ::= x | λ(x : τ ) b | Λ(α : τ ) u | u φ
+| C θ1 . . . θk u 1 . . . u n
+| f θ1 . . . θk u 1 . . . u n
+
+n ≤ |C|
+n < |f |
+
+As usual, we restrict let-bound expressions to be non-expansive, since they implicitly contain a type generalization. Notice that, although type instantiations
+are restricted to non-expansive expressions, this is not a limitation: b φ can always be written as (λ(x : τ ) x φ) b, where τ is the type of a, and similarly for
+applications of constants to expansive expressions.
+Theorem 4. Expansive and non-expansive expressions are closed by call-byvalue reduction.
+Corollary 1. Subject reduction holds with the value restriction.
+It is then routine work to extend the semantics with a global store to model side
+effects and verify type soundness for this extension.
+Call-by-name reduction For call-by-name reduction semantics, we can actually increase the set of values, which may contain applications of constants to
+arbitrary expressions; that is, we take a for w. The ι-reduction is restricted as
+for call-by-value. However, evaluation contexts are now En ::= [ · ] | En a | En φ.
+We write −→
+→n the resulting reduction relation. As for call-by-value, it is deterministic by definition and preserves typings. It may also always progress.
+Theorem 5. If Γ0 ⊢ a : τ , then either a is a value or a −→
+→n a′ for some a′ .
+
+3
+
+Discussion
+
+Elaboration of graphical eMLF into x MLF To verify that, as expected,
+x MLF can be used as an internal language for eMLF, we have exhibited a typepreserving type-erasure-preserving translation from eMLF to x MLF. Technically,
+this translation is based on the presolutions of type inference problems in the
+graphic constraint framework of MLF. An important corollary is the type soundness of eMLF—in its most expressive6 version (Rémy and Yakobowski 2008b).
+By lack of space, this translation is however not presented in this paper, but can
+be found in (Rémy and Yakobowski 2008a). We also expect that x MLF could be
+used as an internal language for HML, another less expressive but simpler surface
+language for iMLF that has been recently proposed (Leijen 2009).
+6
+
+So far, type-soundness has only been proved for the original, but slightly
+weaker variant of MLF (Le Botlan 2004) and for the shallow, recast version of
+MLF (Le Botlan and Rémy 2007).
+
+A Church-Style Intermediate Language for MLF
+
+13
+
+Expressiveness of x MLF The translation of eMLF into x MLF shows that x MLF
+is at least as expressive as eMLF. However, and perhaps surprisingly, the converse
+is not true. That is, there exist programs of x MLF that cannot be typed in MLF.
+While, this is mostly irrelevant when using MLF as an internal language for eMLF,
+the question is still interesting from a theoretical point of view, as understanding
+x MLF on its own, i.e. independently of the type inference constraints of eMLF,
+could perhaps suggest other useful extensions of x MLF.
+For the sake of simplicity, we explain the difference between x MLF and iMLF,
+the Curry-style version of MLF (which has the same expressiveness as eMLF).
+Although syntactically identical, the types of x MLF and of syntactic iMLF differ
+in their interpretation of alias bounds, i.e. quantifications of the form ∀ (β ⩾α) τ .
+Consider, for example, the two types τ0 and τid defined as ∀ (α⩾τ ) ∀ (β ⩾α) β →
+α and ∀ (α⩾ τ ) α → α. In iMLF, alias bounds can be expanded and τ0 and τid are
+equivalent. Roughly, the set of their instances (stripped of toplevel quantifiers)
+is {τ ′ → τ ′ | τ ≤ τ ′ }. In contrast, the set of instances of τ0 is larger in x MLF and
+at least a superset of {τ ′′ → τ ′ | τ ≤ τ ′ ≤ τ ′′ }. This level of generality cannot
+be expressed in iMLF.
+The current treatment of alias bounds in x MLF is quite natural in a Churchstyle presentation. Surprisingly, it is also simpler than treating them as in eMLF.
+A restriction of x MLF without alias bounds that is closed under reduction and in
+closer correspondence with iMLF can still be defined a posteriori, by constraining
+the formation of terms, but the definition is contrived and unnatural. Instead of
+restricting x MLF to match the expressiveness of iMLF, a question worth further
+investigation is whether the treatment of alias bounds could be enhanced in
+iMLF and eMLF to match the one in x MLF without compromising type inference.
+Related works A strong difference between eMLF and x MLF is the use of explicit coercions to trace the derivation of type instantiation judgments. A similar
+approach has already been used in a language with subtyping and intersection
+types, proposed as a target for the compilation of bounded polymorphism (Crary
+2000). In both cases, coercions are used to make typechecking a trivial process.
+In our case, they are also exploited to make subject reduction easy—by introducing the language to describe how type instance derivations must be transformed
+during reduction. (We believe that the use of explicit coercions for simplifying
+subject-reduction proofs has been neglected.) In both approaches, reduction is
+split into a standard notion of β-reduction and a new form of reduction (which
+we call ι-reduction) that only deals with coercions, preserves type-erasures, and
+is (conjectured to be) strongly normalizing. There are also important differences. While both coercion languages have common forms, our coercions intendedly keep the instance-bounded polymorphism form ∀ (α ⩾ τ ) τ ′ . On the opposite, coercions are used to eliminate the subtype-bounded polymorphism form
+∀ (α ≤ τ ) τ ′ in (Crary 2000), using intersection types and contravariant arrow
+coercions instead, which we do not need. It would be worth checking whether
+union types, which are propsoed as an extension in (Crary 2000), could be used
+to encode away our instance-bounded polymorphism form.
+
+14
+
+Didier Rémy and Boris Yakobowski
+
+Besides this work and the several papers that describe variants of MLF, there
+are actually few other related works. Both Leijen and Löh (2005) and Leijen
+(2007) have studied the extension of MLF with qualified types, and as a subcase,
+the translation of MLF without qualified types into System F. However, in order
+to handle type instantiations, a term a of type ∀ (α ⩾ τ ′ ) τ is elaborated as a
+function of type ∀ (α) (τ⋆′ → α) → τ⋆ , where τ⋆ is a runtime representation of τ .
+The first argument is a runtime coercion, which bears strong similarities with
+our instantiations. However, an important difference is that their coercions are at
+the level of terms, while our instantiations are at the level of types. In particular,
+although coercion functions should not change the semantics, this critical result
+has not been proved so far, while in our settings the type-erasure semantics
+comes for free by construction. The impact of coercion functions in a call-byvalue language with side effects is also unclear. Perhaps, a closer connection
+between their coercion functions and our instantiations could be established and
+used to actually prove that their coercions do not alter the semantics. However,
+even if such a result could be proved, coercions should preferably remain at the
+type level, as in our setting, than be intermixed with terms, as in their proposal.
+
+Future works The demand for an internal language for MLF was first made
+in the context of using the eMLF type system for the Haskell language. We
+expect x MLF to better accommodate qualified types than eMLF since no evidence
+function would be needed for flexible polymorphism, but it remains to be verified.
+Type instantiation, which changes the type of an expression without changing
+its meaning, goes far beyond type application in System F and resembles retyping
+functions in System Fη —the closure of F by η-conversion (Mitchell 1988). Those
+functions can be seen either at the level of terms, as expressions of System F
+that βη-reduces to the identity, or at the level of types as a type conversion.
+Some loose parallel can be made between the encoding of MLF in System F
+by Leijen and Löh (2005) which uses term-level coercions, and x MLF which uses
+type-level instantiations. Additionally, perhaps Fη could be extended with a
+form of abstraction over retyping functions, much as type abstraction ∀ (α ⩾ τ )
+in x MLF amounts to abstracting over the instantiation !α of type τ → α. (Or
+perhaps, as suggested by the work of Crary (2000), intersection and union types
+could be added to Fη to avoid the need for abstracting over coercion functions.)
+Regarding type soundness, it is also worth noticing that the proof of subject
+reduction in x MLF does not subsume, but complements, the one in the original
+presentation of MLF. The latter does not explain how to transform type annotations, but shows that annotation sites need not be introduced (only transformed)
+during reduction. Because x MLF has full type information, it cannot say anything
+about type information that could be left implicit and inferred. Given a term in
+x MLF, can we rebuild a term in iMLF with minimal type annotations? While this
+should be easy if we require that corresponding subterms have identical types
+in x MLF and iMLF, the answer is unclear if we allow subterms to have different
+types.
+
+A Church-Style Intermediate Language for MLF
+
+15
+
+The semantics of x MLF allows reduction (and elimination) of type instantiations a φ through ι-reduction but does not operate reduction (and simplification) of instantiations φ alone. It would be possible to define a notion of
+reduction on instantiations φ −→ φ′ (such that, for instance, ∀ (⩾ φ1 ; φ2 ) −→
+∀ (⩾ φ1 ); ∀ (⩾ φ2 ), or conversely?) and extend the reduction of terms with a context rule a φ −→ a φ′ whenever φ −→ φ′ . This might be interesting for more
+economical representations of instantiation. However, it is unclear whether there
+exists an interesting form of reduction that is both Church-Rosser and large
+enough for optimization purposes. Perhaps, one should rather consider instantiation transformations that preserve observational equivalence, which would leave
+more freedom in the way one instantiation could be replaced by another.
+Extending x MLF to allow higher-order polymorphism is another interesting
+research direction for the future. Such an extension is already under investigation
+for the type inference version eMLF (Herms 2009).
+Conclusion We have completed the MLF trilogy by introducing the Church-style
+version x MLF, that was still desperately missing for type-aware compilation and
+from a theoretical point of view. The original type-inference version eMLF, which
+requires partial type annotations but does not tell how to track them during
+reduction, now lies between the Curry-style presentation iMLF that ignores all
+type information and x MLF that maintains it during reduction. We have shown
+that x MLF is well-behaved: reduction preserves well-typedness, and the calculus
+is sound for both call-by-value and call-by-name semantics.
+Hence, x MLF can be used as an internal language for MLF, with either call-byvalue or call-by-name semantics, and also for the many restrictions of MLF that
+have been proposed, including HML. Indeed, the translation of partially typed
+eMLF programs into fully typed x MLF ones, presented in (Rémy and Yakobowski
+2008a), preserves well-typedness and the type erasure of terms, and therefore
+ensures the type soundness of eMLF. Hopefully, this will help the adoption of
+MLF and maintain a powerful form of type inference in modern programming
+languages that will necessarily feature first-class polymorphism.
+Independently, the idea of enriching type applications to richer forms of type
+transformations might also be useful in other contexts.
+
+References
+Henk P. Barendregt. The Lambda Calculus: Its Syntax and Semantics. NorthHolland, 1984. ISBN 0-444-86748-1.
+Karl Crary. Typed compilation of inclusive subtyping. In ICFP ’00: Proceedings
+of the fifth ACM SIGPLAN international conference on Functional programming, pages 68–81, New York, NY, USA, 2000. ACM. ISBN 1-58113-202-6.
+doi: http://doi.acm.org/10.1145/351240.351247.
+⊲ Paolo Herms. Partial Type Inference with Higher-Order Types. Master’s thesis,
+University of Pisa and INRIA, 2009. To appear.
+
+16
+
+Didier Rémy and Boris Yakobowski
+
+⊲ Didier Le Botlan. MLF : An extension of ML with second-order polymorphism
+and implicit instantiation. PhD thesis, Ecole Polytechnique, June 2004. english version.
+
+⊲ Didier Le Botlan and Didier Rémy. MLF: Raising ML to the power of SystemF. In Proceedings of the Eighth ACM SIGPLAN International Conference on
+Functional Programming, pages 27–38, August 2003.
+
+⊲ Didier Le Botlan and Didier Rémy. Recasting MLF. Research Report 6228,
+INRIA, Rocquencourt, BP 105, 78 153 Le Chesnay Cedex, France, June 2007.
+
+⊲ Daan Leijen. A type directed translation of MLF to System F. In The International Conference on Functional Programming (ICFP’07). ACM Press,
+October 2007.
+
+⊲ Daan Leijen. Flexible types: robust type inference for first-class polymorphism.
+In Proceedings of the 36th annual ACM Symposium on Principles of Programming Languages (POPL’09), pages 66–77, New York, NY, USA, 2009. ACM.
+
+⊲ Daan Leijen and Andres Löh. Qualified types for MLF. In ICFP ’05: Proceedings of the tenth ACM SIGPLAN international conference on Functional
+programming, pages 144–155, New York, NY, USA, September 2005. ACM
+Press. ISBN 1-59593-064-7.
+John C. Mitchell. Polymorphic type inference and containment. Information
+and Computation, 2/3(76):211–249, 1988.
+Simon Peyton Jones. Haskell 98 Language and Libraries: The Revised Report.
+Cambridge University Press, May 2003. ISBN 0521826144.
+
+⊲ Didier
+
+Rémy and Boris Yakobowski.
+A church-style intermediate language for MLF (extended version).
+Available at
+http://gallium.inria.fr/~remy/mlf/xmlf.pdf, September 2008a.
+⊲ Didier Rémy and Boris Yakobowski. From ML to MLF: Graphic type constraints
+with efficient type inference. In The 13th ACM SIGPLAN International Conference on Functional Programming (ICFP’08), pages 63–74, Victoria, BC,
+Canada, September 2008b.
+
+⊲ Boris Yakobowski. Graphical types and constraints: second-order polymorphism
+and inference. PhD thesis, University of Paris 7, December 2008.
+
+A
+
+Appendix: definition of a{!α0 ← φ0 }
+
+Formally, a θ where θ is {!α0 ← φ0 } is defined recursively as follows (we assume
+α 6= α0 ). The interesting lines are the two first ones of the second column; other
+lines are just lifting the substitution from the leaves to types, type instantiations,
+
+A Church-Style Intermediate Language for MLF
+
+and terms in the usual way.
+Types
+τθ=τ
+Terms
+xθ = x
+(a1 a1 ) θ = (a1 θ) (a1 θ)
+(a φ) θ = a (φ θ)
+(λ(x : τ ) a) θ = λ(x : τ θ) a θ
+(Λ(α ⩾ τ ) a) θ = Λ(α : τ θ) a θ
+
+Type instantiations
+!α θ = !α
+!α0 θ = φ0
+(τ ) θ = (τ θ)
+(∀ (⩾ φ)) θ = ∀ (⩾ φ θ)
+(∀ (α ⩾) φ) θ = ∀ (α ⩾) (φ θ)
+(φ; φ′ ) θ = (φ θ); (φ′ θ)
+Nθ = N
+Oθ = O
+1θ = 1
+
+17
+
+
