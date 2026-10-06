@@ -1,0 +1,120 @@
+Snake compilation target: 2026-10-07 (Asia/Shanghai)
+==================================================
+
+Result: PASS. All five paired compilation runs are below 5x GHC.
+Median eMLF: 2.826884 seconds.
+Median GHC:  0.745156 seconds.
+Ratio of medians: 3.7937x.
+Worst paired ratio: 4.8313x, including the first launch after rebuilding.
+
+Measured from: 2026-10-06T21:32:36.109123+00:00
+Host: macOS-26.6.2-arm64-arm-64bit-Mach-O
+GHC: 9.14.1
+Build: cabal build exe:emlf -j1; project optimization: 2.
+CLI default RTS option: -A32m. GHCRTS environment: unset.
+The measured executable is an ordinary optimized build, without profiling.
+
+Scope and method
+----------------
+eMLF compiles examples/snake.emlf to verified xMLF, with the implicit
+standard prelude. GHC compiles examples/SnakeBaseline.hs to a linked native
+executable with -O2 -Wall -Werror -fforce-recomp -main-is SnakeBaseline.
+These are different output formats; this comparison measures the requested
+compilation workflows, not equivalent native backends or game execution.
+
+Each sample starts a fresh process. GHC recompiles and links on every run;
+no successful compilation is reused. Order alternates eMLF/GHC, GHC/eMLF.
+There is no untimed compilation warmup. Timing includes process startup,
+source reading and captured compiler output, and excludes building emlf.
+The script rejects any paired ratio above 5, not just a median above 5.
+
+Raw paired samples (seconds)
+----------------------------
+Run          eMLF           GHC     Ratio
+  1      3.572396      0.739430    4.8313x
+  2      2.823350      0.755386    3.7376x
+  3      2.826884      0.738686    3.8269x
+  4      2.829236      0.745156    3.7968x
+  5      2.820165      0.748409    3.7682x
+
+Before this work, the current source and prelude took 19.552724
+seconds with the saved -O1 compiler, against 0.799377 seconds for GHC
+(a single initial pair, 24.4600x). Comparing that initial eMLF sample
+with the final median gives approximately 6.92x faster compilation. This total
+includes algorithm, allocation, -O2 build, and RTS configuration changes;
+it is not a same-build-flags microbenchmark of one change.
+
+Implementation
+--------------
+- Dense source graphs use temporary ST arrays for graph analyses. Public
+  graphs with sparse identities retain the map-based implementation, so
+  scratch space remains proportional to the number of nodes.
+- Number the binding tree once; fuse structural cycle, kind, containment,
+  and domination checks in one memoized traversal. Check every structural
+  edge's scope even when its child's kind is already cached.
+- Rebind uses a memoized dependency DFS and cached depths for binding LCAs.
+  Its dependencies include all reverse structural edges, which also catches
+  structural cycles created by unification. The redundant separate
+  topological traversal is gone; the occurs check remains enforced.
+- Mark the union of grafted descendants once, sharing work across instances.
+- Permission checks continue to refer to original identities and their
+  raised binders. Evaluate permission tables only for relevant changes.
+- Use strict graph fields and reuse unchanged nodes during canonicalization
+  and rebinding, reducing allocation and retaining sharing.
+- Use -O2 and a 32 MiB CLI allocation area to reduce garbage collection.
+  The latter is a nursery size, not a fixed maximum heap, and is overridable
+  with RTS options.
+
+Graph validation still runs before and after every unification. Independent
+target typing, computation checking, inferred-type agreement, and source
+erasure checks remain enabled. No Snake-specific compiler path was added.
+Neither game source was changed for these measurements.
+
+Validation
+----------
+cabal build exe:emlf -j1: passed.
+cabal test -j1 --test-show-details=direct: passed after the final code change.
+376 main checks; 0 failures, including:
+  - 12,000 graphs against the uncached validator (78 valid);
+  - 5,616 unification cases against the previous map-based algorithm
+    (1,433 accepted, 4,183 rejected), with exact resulting graph comparison;
+  - additional sparse, negative, and extreme identities; successive scoped
+    expansions; and a structural cycle introduced by merging;
+  - 6,712 independent ML oracle terms and 126 annotation programs;
+  - seven Snake transcripts and eleven rule outcomes matching Haskell.
+Figure 12: 43/43 regression expectations and 36 supplementary checks pass.
+A8 still rejects the explicit signature.
+
+All 16 example files also produce byte-identical xMLF with the saved old
+compiler and the final compiler, and every output is independently checked.
+The local per-example results are in
+dist-newstyle/compiler-target/example-equivalence.json.
+
+Every timed Snake output is byte-identical to the saved pre-optimization
+output. An independent parse/typecheck reports IO Unit. The benchmark also
+checks an actual game transcript against the freshly linked Haskell game,
+outside the timed region.
+
+SHA-256 fingerprints
+--------------------
+emlf: 89735dca55145677e85e70fc08db638c7ff24a841b05edca208b88975c82fcc6
+ghc: 39fd1ee0cf7eb5739a595d5c238a95a7a062942397cc6d2a16425d6eeb18283e
+snake.emlf: 23e4eda9b8b2e6388cdf9940fa7a011177e48c5cf0d9d193aea5b403fa4a6401
+SnakeBaseline.hs: 58001d2e09d34eaab76c8bc6334761c7907270658f61ecc65e32c1f76cb18d37
+Emitted xMLF: 020370aeaf6d45453a3725de71cef4b5b4cca6a7d24395cb8234ca89cc259312
+
+Reproduction
+------------
+cabal build exe:emlf -j1
+python3 scripts/benchmark-snake.py \
+  --emlf "$(cabal list-bin exe:emlf)" \
+  --runs 5 --output dist-newstyle/compiler-target/ghc-comparison.json
+
+To require byte-identical output against a saved earlier compilation, add
+--reference-xmlf /path/to/snake-before.xmlf. The script uses only Python's
+standard library, saves raw samples and fingerprints in JSON, persists the
+checked xMLF beside that report, and exits unsuccessfully if any pair misses
+the limit. Timings are machine- and load-dependent.
+
+Local raw evidence for this run:
+dist-newstyle/compiler-target/final-ghc-comparison.json

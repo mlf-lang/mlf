@@ -1,5 +1,5 @@
 module MLF.Elaborate
-  ( elaborate, typeAt, reference, schemeType, proveInstance ) where
+  ( elaborate, elaborateResolved, resolveEvidence, typeAt, reference, schemeType, proveInstance ) where
 
 import Control.Monad (unless)
 import qualified Data.IntMap.Strict as IM
@@ -10,6 +10,9 @@ import MLF.Syntax (Flag (..))
 import qualified MLF.X.Type as T
 import qualified MLF.X.Syntax as X
 import qualified MLF.X.Check as Check
+import qualified MLF.Data as D
+import MLF.Kind
+import MLF.Evidence (resolveDictionary)
 
 -- | Figure 15.3.2. Flexible nodes are named; rigid bounds are inlined.
 typeAt :: Graph -> NodeId -> T.Type
@@ -20,8 +23,12 @@ typeAt g n0 = foldr (uncurry T.Forall) structure (boundsAt g n)
             | otherwise = typeAt g c
     structure = case tag (nodeAt g n) of
       Bot -> T.Bot
+      BotK k -> T.bottomKind k
       Arr a b -> T.Arrow (child a) (child b)
       Con c ns -> T.Con c (map child ns)
+      TyCon c _ -> T.Con c []
+      Skolem identity _ -> T.Var (T.TyVar identity)
+      TyApp f a -> T.apply (child f) (child a)
       Gen _ -> error "typeAt: a gen node is not a type"
 
 reference :: Graph -> NodeId -> T.Type
@@ -55,13 +62,15 @@ schemeType g gen = foldr (uncurry T.Forall) (reference g (genRoot g gen)) (bound
 proveInstance :: Graph -> (NodeId -> NodeId) -> Check.TypeEnv -> T.Type -> T.Type -> Either String X.Computation
 proveInstance targetGraph image env source target = do
   phi <- go env source target
-  actual <- Check.checkComputation env phi source
+  actual <- Check.checkComputationIn datatypes env phi source
   unless (T.alphaEq actual target) (Left "instance evidence has the wrong target")
   pure phi
   where
+    datatypes = D.withKinds [(c,k) | Node (TyCon c k) _ _ <- IM.elems (nodes targetGraph)]
     go gamma s t
       | T.alphaEq s t = pure X.Refl
       | s == T.Bot = pure (X.Bottom t)
+      | T.BotKind _ <- s = pure (X.Bottom t)
       | otherwise = case t of
           T.Var a -> case Map.lookup a gamma of
             Nothing -> Left ("missing target abstraction: " ++ show a)
@@ -70,8 +79,9 @@ proveInstance targetGraph image env source target = do
               pure (X.compose p (X.Hyp a))
           T.Forall a bound body -> do
             p <- go (Map.insert a bound gamma) s body
-            let introduction = X.compose (X.Intro a)
-                  (if bound == T.Bot then X.Refl else X.Inner (X.Bottom bound))
+            k <- T.kindOf datatypes gamma bound
+            let introduction = X.compose (if k == Star then X.Intro a else X.IntroKind a k)
+                  (if bound == T.bottomKind k then X.Refl else X.Inner (X.Bottom bound))
             pure (X.compose introduction (X.Outer a p))
           _ -> eliminate gamma s t
     eliminate gamma s t = case s of
@@ -85,21 +95,57 @@ proveInstance targetGraph image env source target = do
         pure (X.compose (X.compose (if p == X.Refl then X.Refl else X.Inner p) X.Elim) q)
       _ -> Left ("no permitted instance from " ++ show s ++ " to " ++ show t)
 
--- | Re-expand each edge of the FINAL presolution (§15.3.10). The frontier is
--- solved first (§15.2.2); only the interior copy's correspondence is translated.
+-- | Reflexive edges need only Inst-Refl, whose proof uses no node image.
+-- Otherwise re-expand the FINAL presolution (§15.3.10), solve the frontier
+-- first (§15.2.2), and translate only the interior copy's correspondence.
 edgeComputation :: Graph -> Check.TypeEnv -> Edge -> Either String X.Computation
-edgeComputation g env edge = do
-  let target = resolve g (toNode edge)
-  destination <- maybe (Left "edge target has no binder") pure (binder (nodeAt g target))
-  ((root,copies,frontier),expanded) <- runBuild g (expand (fromGen edge) destination)
-  (_,withFrontier) <- runBuild expanded (unify frontier)
-  (_,solved) <- runBuild withFrontier (unify [(root,target)])
-  let image n = resolve solved (IM.findWithDefault n n copies)
-  proveInstance g image env (schemeType g (fromGen edge)) (reference g target)
+edgeComputation g env edge
+  | T.alphaEq source targetType = proveInstance g id env source targetType
+  | otherwise = do
+      destination <- maybe (Left "edge target has no binder") pure (binder (nodeAt g target))
+      ((root,copies,frontier),expanded) <- runBuild g (expand (fromGen edge) destination)
+      (_,solved) <- runBuild expanded $ do
+        -- With no frontier, Rebind would leave this canonical expansion
+        -- unchanged. The next unify still validates it before any merge.
+        unless (null frontier) (unify frontier)
+        unify [(root,target)]
+      let image n = resolve solved (IM.findWithDefault n n copies)
+      proveInstance g image env source targetType
+  where
+    target = resolve g (toNode edge)
+    source = schemeType g (fromGen edge)
+    targetType = reference g target
 
 -- | Figure 15.3.5, including the coercion-function translation of §15.3.8.
 elaborate :: Graph -> Typed -> Either String X.Term
-elaborate graph = go Map.empty
+elaborate graph typed = do
+  evidence <- resolveEvidence graph typed
+  elaborateResolved graph evidence typed
+
+resolveEvidence :: Graph -> Typed -> Either String (Map.Map NodeId X.Term)
+resolveEvidence graph = go Map.empty
+  where
+    ds = D.withKinds [(c,k) | Node (TyCon c k) _ _ <- IM.elems (nodes graph)]
+    go outer typed = do
+      let gen = generalization typed
+          env = foldl (\e (a,b) -> Map.insert a b e) outer (boundsAt graph gen)
+          child = go env
+      case form typed of
+        Evidence candidates -> do
+          let candidate (EvidenceBinding role n t polymorphic) =
+                (role,n,if polymorphic then schemeType graph t else reference graph t)
+          term <- resolveDictionary ds env (map candidate candidates) (reference graph (genRoot graph gen))
+          pure (Map.singleton gen term)
+        Lambda _ _ b _ -> child b
+        Apply a b _ _ -> Map.union <$> child a <*> child b
+        Binding _ a b _ -> Map.union <$> child a <*> child b
+        Match a _ bs -> Map.unions <$> mapM child (a : [b | Branch _ b _ <- bs])
+        Recursive definitions b _ -> Map.unions <$> mapM child (b : [a | (_,_,a,_) <- definitions])
+        Checked variables b _ -> go (foldl (\e (a,k) -> Map.insert a (T.bottomKind k) e) env variables) b
+        _ -> pure Map.empty
+
+elaborateResolved :: Graph -> Map.Map NodeId X.Term -> Typed -> Either String X.Term
+elaborateResolved graph evidence = go Map.empty
   where
     go outer typed = do
       let gen = generalization typed
@@ -130,4 +176,23 @@ elaborate graph = go Map.empty
           pure (foldr (uncurry X.TypeAbs) (X.Abs n dom (X.instantiate (X.VarTerm n) phi)) local)
         IntegerLiteral n -> pure (X.IntTerm n)
         BooleanLiteral b -> pure (X.BoolTerm b)
+        StringLiteral s -> pure (X.StringTerm s)
+        Primitive p ns -> pure (X.Primitive p (map (reference graph) ns))
+        Constructor c ns -> pure (X.Constructor c (map (reference graph) ns))
+        Match a ea branches -> do
+          a' <- go env a >>= (`inst` ea)
+          bs' <- mapM (\(Branch p b eb) -> X.Alternative p <$> (go env b >>= (`inst` eb))) branches
+          pure (X.Case a' (reference graph (genRoot graph gen)) bs')
+        Recursive definitions b e -> do
+          ds <- mapM (\(n,g,a,ea) -> do
+            a' <- go env a >>= (`inst` ea)
+            pure (n,schemeType graph g,a')) definitions
+          b' <- go env b >>= (`inst` e)
+          pure (X.LetRec ds b')
+        Evidence _ -> maybe (Left "unresolved dictionary evidence") Right (Map.lookup gen evidence)
+        Checked variables b e -> do
+          let local = foldl (\gamma (a,k) -> Map.insert a (T.bottomKind k) gamma) env variables
+          b' <- go local b
+          phi <- edgeComputation graph local e
+          pure (foldr (\(a,k) -> X.TypeAbs a (T.bottomKind k)) (X.instantiate b' phi) variables)
       pure (foldr (uncurry X.TypeAbs) body bs)

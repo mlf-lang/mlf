@@ -6,6 +6,7 @@ import Data.List (isInfixOf, sort)
 import qualified Data.IntMap.Strict as IM
 import System.Directory (listDirectory)
 import System.Exit (exitFailure)
+import System.IO (BufferMode (LineBuffering), hSetBuffering, stdout)
 import MLF.Compiler
 import MLF.Constraint
 import qualified MLF.Graph as G
@@ -18,12 +19,21 @@ import qualified MLF.X.Parser as XP
 import MLF.X.Pretty
 import Oracle
 import Computations (computationTests, hygieneTests)
+import Datatypes (datatypeTests)
+import Typeclasses (typeclassTests)
+import DoNotation (doTests)
+import IOTests (ioTests)
+import Snake (snakeTests)
+import GraphValidation (graphValidationTests)
+import GraphUnification (graphUnificationTests)
+import PreludeTests (preludeTests)
 
 type Test = (String, IO ())
 
 main :: IO ()
 main = do
-  let suite = compilerTests ++ computationTests ++ hygieneTests ++ graphTests ++
+  hSetBuffering stdout LineBuffering
+  let suite = compilerTests ++ computationTests ++ hygieneTests ++ graphTests ++ graphValidationTests ++ graphUnificationTests ++ datatypeTests ++ typeclassTests ++ doTests ++ ioTests ++ preludeTests ++ snakeTests ++
         [("independent ML typability oracle", oracleTest), ("annotation corpus", annotationCorpus), ("example files", examplesTest)]
   outcomes <- forM suite $ \(label,test) -> do
     outcome <- try test :: IO (Either SomeException ())
@@ -223,4 +233,8 @@ stripComputations t = case t of
   X.App a b -> X.App (stripComputations a) (stripComputations b)
   X.TypeAbs a ty b -> X.TypeAbs a ty (stripComputations b)
   X.Let n a b -> X.Let n (stripComputations a) (stripComputations b)
+  X.LetRec ds b -> X.LetRec [(n,ty,stripComputations a) | (n,ty,a) <- ds] (stripComputations b)
+  X.WithData ds b -> X.WithData ds (stripComputations b)
+  X.Case a ty bs -> X.Case (stripComputations a) ty
+    [X.Alternative p (stripComputations b) | X.Alternative p b <- bs]
   _ -> t

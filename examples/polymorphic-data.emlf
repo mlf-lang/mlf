@@ -1,0 +1,9 @@
+data Box a = Box a;
+
+let boxed = Box (\x -> x) : Box (forall a. a -> a) in
+case boxed of {
+  Box f ->
+    let id = f : forall a. a -> a in
+    let number = id 42 in
+    id true
+}

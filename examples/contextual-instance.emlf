@@ -1,0 +1,20 @@
+data List a = Nil | Cons a (List a);
+
+class Inspect a where {
+  inspect : a -> Bool
+};
+
+instance Inspect Bool where {
+  inspect = \x -> x
+};
+
+-- Method recursion uses the instance dictionary; element calls use the given
+-- Inspect a dictionary. These are distinct constraints on the same class.
+instance Inspect a => Inspect (List a) where {
+  inspect = \xs -> case xs of {
+    Nil -> true;
+    Cons x rest -> (\element -> inspect rest) (inspect x)
+  }
+};
+
+inspect (Cons true (Cons false Nil))

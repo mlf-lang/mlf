@@ -1,0 +1,18 @@
+data Box a = Box a;
+
+class Convert a b where {
+  convert : a -> b
+};
+
+instance Convert Int Bool where {
+  convert = \value -> true
+};
+
+instance Convert a b => Convert (Box a) (Box b) where {
+  convert = \boxed -> case boxed of {
+    Box value -> Box (convert value)
+  }
+};
+
+-- The result annotation determines the second class parameter.
+convert (Box (Box 42)) : Box (Box Bool)

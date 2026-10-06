@@ -1,0 +1,8 @@
+-- Monad and Monad IO are imported from the standard prelude.
+let twice : forall (m : * -> *) a. Monad m => m a -> m a =
+  \action -> do {
+    action;
+    result <- action;
+    return result
+  }
+in twice (putStrLn "Hello from Monad IO!")

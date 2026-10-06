@@ -1,0 +1,180 @@
+-- A turn-based terminal game. Run with:
+--   cabal run emlf -- --run examples/snake.emlf
+-- Type w/a/s/d and Enter to move, Enter alone to continue, or q to quit.
+-- Monad and its IO instance come from the standard prelude.
+
+data List a = Nil | Cons a (List a);
+data Maybe a = Nothing | Just a;
+data Position = Position Int Int;
+data Direction = North | South | West | East;
+data Command = Turn Direction | Forward | Quit | Invalid;
+-- A snake always has a head; its body may be empty.
+data Snake = Snake Position (List Position);
+data Game = Game Snake Direction Position Int;
+data Outcome = Continue Game | Lost String Int | Won Int;
+
+-- The source language has nonrecursive let. A recursive datatype gives us
+-- a typed fixed point, so the list helpers and game loop can recurse.
+data Rec a = Rec (Rec a -> a);
+
+let fix : forall a. (a -> a) -> a = \f ->
+  let go = \r -> case r of { Rec next -> f (next r) }
+  in go (Rec go)
+in
+let width = 12 in
+let height = 8 in
+let and = \a b -> ifThenElse a b false in
+let or = \a b -> ifThenElse a true b in
+
+let samePosition = \a b -> case a of {
+  Position x y -> case b of {
+    Position x' y' -> and (eqInt x x') (eqInt y y')
+  }
+} in
+
+let contains : Position -> List Position -> Bool = fix (\again position positions ->
+  case positions of {
+    Nil -> false;
+    Cons first rest -> or (samePosition position first) (again position rest)
+  })
+in
+let dropLast : forall a. List a -> List a = fix (\again values ->
+  case values of {
+    Nil -> Nil;
+    Cons first rest -> case rest of {
+      Nil -> Nil;
+      Cons next remaining -> Cons first (again rest)
+    }
+  })
+in
+let move = \direction position -> case position of {
+  Position x y -> case direction of {
+    North -> Position x (subInt y 1);
+    South -> Position x (addInt y 1);
+    West -> Position (subInt x 1) y;
+    East -> Position (addInt x 1) y
+  }
+} in
+
+let opposite = \a b -> case a of {
+  North -> case b of { South -> true; _ -> false };
+  South -> case b of { North -> true; _ -> false };
+  West -> case b of { East -> true; _ -> false };
+  East -> case b of { West -> true; _ -> false }
+} in
+
+let outside = \position -> case position of {
+  Position x y -> or (ltInt x 0) (or (ltInt y 0)
+    (or (eqInt x width) (eqInt y height)))
+} in
+
+-- Food is deterministic: scan from the top left for the first free square.
+-- Reaching the bottom means the board is full, so the player has won.
+let findFood : List Position -> Maybe Position = \occupied ->
+  let scan : Int -> Int -> Maybe Position = fix (\again x y ->
+    ifThenElse (eqInt y height) Nothing
+      (ifThenElse (eqInt x width) (again 0 (addInt y 1))
+        (let candidate = Position x y in
+         ifThenElse (contains candidate occupied)
+           (again (addInt x 1) y) (Just candidate))))
+  in scan 0 0
+in
+let step : Direction -> Game -> Outcome = \requested game -> case game of {
+  Game snake heading food score -> case snake of {
+    Snake head body ->
+      -- Reversing is ignored, but the turn still advances one square.
+      let direction = ifThenElse (opposite heading requested) heading requested in
+      let next = move direction head in
+      let eating = samePosition next food in
+      -- On an ordinary move the old tail leaves before collision checking.
+      let remaining = ifThenElse eating (Cons head body) (dropLast (Cons head body)) in
+      let moved = Snake next remaining in
+      ifThenElse (outside next) (Lost "wall" score)
+        (ifThenElse (contains next remaining) (Lost "body" score)
+          (ifThenElse eating
+            (let newScore = addInt score 1 in
+             case findFood (Cons next remaining) of {
+               Nothing -> Won newScore;
+               Just newFood -> Continue (Game moved direction newFood newScore)
+             })
+            (Continue (Game moved direction food score))))
+  }
+} in
+
+let parseCommand = \text ->
+  ifThenElse (eqString text "q") Quit
+    (ifThenElse (eqString text "w") (Turn North)
+      (ifThenElse (eqString text "s") (Turn South)
+        (ifThenElse (eqString text "a") (Turn West)
+          (ifThenElse (eqString text "d") (Turn East)
+            (ifThenElse (eqString text "") Forward Invalid)))))
+in
+let tile = \game position -> case game of {
+  Game snake heading food score -> case snake of {
+    Snake head body ->
+      ifThenElse (samePosition position head) "@"
+        (ifThenElse (contains position body) "o"
+          (ifThenElse (samePosition position food) "*" "."))
+  }
+} in
+
+let row : Game -> Int -> String = \game y ->
+  let cells : Int -> String = fix (\again x ->
+    ifThenElse (eqInt x width) "|\n"
+      (concatString (tile game (Position x y)) (again (addInt x 1))))
+  in concatString "|" (cells 0)
+in
+let rows : Game -> Int -> String = fix (\again game y ->
+  ifThenElse (eqInt y height) ""
+    (concatString (row game y) (again game (addInt y 1))))
+in
+let directionName = \direction -> case direction of {
+  North -> "up";
+  South -> "down";
+  West -> "left";
+  East -> "right"
+} in
+
+let draw : Game -> IO Unit = \game -> case game of {
+  Game snake heading food score -> do {
+    putStrLn (concatString "\nScore: " (concatString (showInt score)
+      (concatString "  Direction: " (directionName heading))));
+    putStrLn "+------------+";
+    putStr (rows game 0);
+    putStrLn "+------------+"
+  }
+} in
+
+let play : Game -> IO Unit = fix (\again game -> do {
+  draw game;
+  putStr "Move [w/a/s/d, Enter, q]: ";
+  input <- getLine;
+  case game of {
+    Game snake heading food score ->
+      let advance = \direction -> case step direction game of {
+        Continue next -> again next;
+        Lost reason finalScore -> putStrLn (concatString "Game over: hit "
+          (concatString reason (concatString ". Score: " (showInt finalScore))));
+        Won finalScore -> putStrLn (concatString "You filled the board! Score: " (showInt finalScore))
+      } in
+      case parseCommand input of {
+        Quit -> putStrLn (concatString "Goodbye. Score: " (showInt score));
+        Invalid -> do {
+          putStrLn "Use w, a, s, d, Enter, or q. No move made.";
+          again game
+        };
+        Forward -> advance heading;
+        Turn direction -> advance direction
+      }
+  }
+}) in
+
+let initial = Game
+  (Snake (Position 4 3) (Cons (Position 3 3) (Cons (Position 2 3) Nil)))
+  East (Position 6 3) 0
+in do {
+  putStrLn "Snake: @ head, o body, * food. The board is 12 by 8.";
+  putStrLn "WASD + Enter moves; Enter continues; q quits. Reverse turns are ignored.";
+  putStrLn "Eat food to grow. Avoid walls and your body. Food uses the first free square.";
+  play initial
+}

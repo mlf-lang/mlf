@@ -1,0 +1,43 @@
+-- A local Monad declaration replaces the minimal prelude class here, so this
+-- example can demonstrate the full Functor / Applicative / Monad hierarchy.
+data Maybe a = Nothing | Just a;
+
+class Functor (f : * -> *) where {
+  fmap : forall a b. (a -> b) -> f a -> f b
+};
+
+class Functor f => Applicative (f : * -> *) where {
+  pure : forall a. a -> f a;
+  apply : forall a b. f (a -> b) -> f a -> f b
+};
+
+class Applicative m => Monad (m : * -> *) where {
+  bind : forall a b. m a -> (a -> m b) -> m b
+};
+
+instance Functor Maybe where {
+  fmap = \f value -> case value of {
+    Nothing -> Nothing;
+    Just x -> Just (f x)
+  }
+};
+
+instance Applicative Maybe where {
+  pure = Just;
+  apply = \mf value -> case mf of {
+    Nothing -> Nothing;
+    Just f -> fmap f value
+  }
+};
+
+instance Monad Maybe where {
+  bind = \value next -> case value of {
+    Nothing -> Nothing;
+    Just x -> next x
+  }
+};
+
+-- The Applicative dictionary needed by pure comes from Monad's superclass.
+let roundTrip : forall (m : * -> *) a. Monad m => m a -> m a =
+  \value -> bind value (\x -> pure x)
+in roundTrip (Just 42)

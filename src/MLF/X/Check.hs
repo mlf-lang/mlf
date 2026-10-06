@@ -1,9 +1,13 @@
 module MLF.X.Check
-  ( TypeEnv, Env (..), emptyEnv, wellFormed, checkComputation, infer, checkClosed ) where
+  ( TypeEnv, Env (..), emptyEnv, wellFormed, checkComputation, checkComputationIn, infer, inferWithData, checkClosed ) where
 
-import Control.Monad (unless, when)
+import Control.Monad (forM_, unless, when)
+import Data.List (nub)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified MLF.Data as D
+import MLF.Kind
+import qualified MLF.Primitive as P
 import MLF.X.Syntax
 import MLF.X.Type
 
@@ -14,20 +18,17 @@ emptyEnv :: Env
 emptyEnv = Env Map.empty Map.empty
 
 wellFormed :: TypeEnv -> Type -> Either String ()
-wellFormed env ty = case ty of
-  Var a -> unless (Map.member a env) (Left ("unbound type variable " ++ show a))
-  Bot -> pure ()
-  Arrow a b -> wellFormed env a >> wellFormed env b
-  Con c args -> do
-    when (c `elem` ["Int", "Bool"] && not (null args)) (Left ("invalid arity for " ++ c))
-    mapM_ (wellFormed env) args
-  Forall a bound body -> do
-    -- Quantifiers inside a TYPE are lexical: a shared graph type can be
-    -- inlined in multiple scopes, including one with the same display ID.
-    -- Only its free variables matter (Figure 14.2.4). This does not relax the
-    -- freshness checks on term abstractions or computation binders.
-    wellFormed env bound
-    wellFormed (Map.insert a bound env) body
+wellFormed = wellFormedIn D.emptyDataEnv
+
+wellFormedIn :: D.DataEnv -> TypeEnv -> Type -> Either String ()
+wellFormedIn ds env ty = kindOf ds env ty >> pure ()
+
+termType :: D.DataEnv -> TypeEnv -> Type -> Either String ()
+termType ds env ty = do
+  k <- kindOf ds env ty
+  unless (k == Star) $ case ty of
+    Con c args -> D.checkArity ds c (length args) >> Left "term type must have kind *"
+    _ -> Left "term type must have kind *"
 
 fresh :: TypeEnv -> TyVar -> Either String ()
 fresh env a = when (Map.member a env) (Left ("type binder already in scope: " ++ show a))
@@ -35,80 +36,152 @@ fresh env a = when (Map.member a env) (Left ("type binder already in scope: " ++
 -- | Figure 14.2.6, including the Inst-Hyp premise deliberately omitted by
 -- the thesis's unchecked type-computation function (Figure 14.2.7).
 checkComputation :: TypeEnv -> Computation -> Type -> Either String Type
-checkComputation env computation source = do
-  validateTypeEnv env
-  wellFormed env source
+checkComputation = checkComputationIn D.emptyDataEnv
+
+checkComputationIn :: D.DataEnv -> TypeEnv -> Computation -> Type -> Either String Type
+checkComputationIn ds env computation source = do
+  validateTypeEnv ds env
+  wellFormedIn ds env source
   result <- go computation source
-  wellFormed env result
+  wellFormedIn ds env result
   pure result
   where
     go p s = case (p,s) of
       (Refl, _) -> pure s
-      (Bottom t, Bot) -> wellFormed env t >> pure t
+      (Bottom t, Bot) -> termType ds env t >> pure t
+      (Bottom t, BotKind k) -> do
+        actual <- kindOf ds env t
+        unless (actual == k) (Left "Inst-Bot kind mismatch")
+        pure t
       (Hyp a, _) -> case Map.lookup a env of
         Just bound | alphaEq bound s -> pure (Var a)
         Just _ -> Left ("Inst-Hyp bound mismatch for " ++ show a)
         Nothing -> Left ("Inst-Hyp unbound variable " ++ show a)
-      (Then p1 p2, _) -> checkComputation env p1 s >>= checkComputation env p2
+      (Then p1 p2, _) -> checkComputationIn ds env p1 s >>= checkComputationIn ds env p2
       (Inner q, Forall a bound body) -> do
-        bound' <- checkComputation env q bound
+        bound' <- checkComputationIn ds env q bound
         pure (Forall a bound' body)
       (Outer a q, Forall b bound body) -> do
         fresh env a
         when (a /= b && a `Set.member` freeVars body) (Left "Inst-Outer would capture a variable")
         let body' = substitute b (Var a) body
-        result <- checkComputation (Map.insert a bound env) q body'
+        result <- checkComputationIn ds (Map.insert a bound env) q body'
         pure (Forall a bound result)
       (Elim, Forall a bound body) -> pure (substitute a bound body)
       (Intro a, _) -> do
         fresh env a
         when (a `Set.member` freeVars s) (Left "Inst-Quant-Intro would capture a variable")
         pure (Forall a Bot s)
+      (IntroKind a k, _) -> do
+        fresh env a
+        when (a `Set.member` freeVars s) (Left "Inst-Quant-Intro would capture a variable")
+        pure (Forall a (bottomKind k) s)
       _ -> Left ("computation " ++ show p ++ " does not apply to " ++ show s)
 
 -- | This checker neither imports nor calls the inference graph or solver.
 infer :: Env -> Term -> Either String Type
-infer env term = do
-  validateTypeEnv (typeEnv env)
-  mapM_ (wellFormed (typeEnv env)) (Map.elems (termEnv env))
-  inferIn env term
+infer env term = case term of
+  WithData declarations body -> do
+    ds <- D.validateDeclarations declarations
+    inferWithData ds env body
+  _ -> inferWithData D.emptyDataEnv env term
 
-inferIn :: Env -> Term -> Either String Type
-inferIn env term = case term of
+inferWithData :: D.DataEnv -> Env -> Term -> Either String Type
+inferWithData ds env body = do
+  validateTypeEnv ds (typeEnv env)
+  mapM_ (termType ds (typeEnv env)) (Map.elems (termEnv env))
+  inferIn ds env body
+
+inferIn :: D.DataEnv -> Env -> Term -> Either String Type
+inferIn ds env term = case term of
   VarTerm x -> maybe (Left ("unbound term variable " ++ nameHint x)) pure (Map.lookup x (termEnv env))
   Abs x t body -> do
-    wellFormed (typeEnv env) t
+    termType ds (typeEnv env) t
     when (Map.member x (termEnv env)) (Left "term binder already in scope")
-    Arrow t <$> inferIn env { termEnv = Map.insert x t (termEnv env) } body
+    Arrow t <$> inferIn ds env { termEnv = Map.insert x t (termEnv env) } body
   App f a -> do
-    ft <- inferIn env f
-    at <- inferIn env a
+    ft <- inferIn ds env f
+    at <- inferIn ds env a
     case ft of
       Arrow domain result | alphaEq domain at -> pure result
                           | otherwise -> Left ("application type mismatch: expected " ++ show domain ++ ", got " ++ show at)
       _ -> Left ("application of a non-function: " ++ show ft)
   TypeAbs a bound body -> do
     fresh (typeEnv env) a
-    wellFormed (typeEnv env) bound
-    Forall a bound <$> inferIn env { typeEnv = Map.insert a bound (typeEnv env) } body
-  TypeApp t p -> inferIn env t >>= checkComputation (typeEnv env) p
+    wellFormedIn ds (typeEnv env) bound
+    Forall a bound <$> inferIn ds env { typeEnv = Map.insert a bound (typeEnv env) } body
+  TypeApp t p -> inferIn ds env t >>= checkComputationIn ds (typeEnv env) p
   Let x a b -> do
     when (Map.member x (termEnv env)) (Left "term binder already in scope")
-    t <- inferIn env a
-    inferIn env { termEnv = Map.insert x t (termEnv env) } b
+    t <- inferIn ds env a
+    inferIn ds env { termEnv = Map.insert x t (termEnv env) } b
+  LetRec bindings body -> do
+    let names = [n | (n,_,_) <- bindings]
+    unless (length names == length (nub names)) (Left "duplicate recursive binder")
+    when (any (`Map.member` termEnv env) names) (Left "recursive binder already in scope")
+    mapM_ (termType ds (typeEnv env)) [t | (_,t,_) <- bindings]
+    let scope = env { termEnv = Map.union (Map.fromList [(n,t) | (n,t,_) <- bindings]) (termEnv env) }
+    forM_ bindings $ \(_,expected,rhs) -> do
+      actual <- inferIn ds scope rhs
+      unless (alphaEq expected actual) (Left "recursive definition does not have its declared type")
+    inferIn ds scope body
   IntTerm _ -> pure (Con "Int" [])
   BoolTerm _ -> pure (Con "Bool" [])
+  StringTerm _ -> pure (Con "String" [])
+  Primitive p arguments -> do
+    let (parameters,signature) = P.primitiveSignature p
+    unless (length arguments == length parameters) (Left "primitive type argument arity mismatch")
+    actualKinds <- mapM (kindOf ds (typeEnv env)) arguments
+    unless (actualKinds == map snd parameters) (Left "primitive type argument kind mismatch")
+    instantiateField (Map.fromList (zip (map fst parameters) arguments)) signature
+  Constructor c arguments -> do
+    (d,ctor) <- D.lookupConstructor ds c
+    unless (length arguments == length (D.datatypeParameters d))
+      (Left ("constructor type argument arity mismatch: " ++ c))
+    actualKinds <- mapM (kindOf ds (typeEnv env)) arguments
+    unless (actualKinds == map snd (D.datatypeBinders d)) (Left "constructor type argument kind mismatch")
+    let parameters = Map.fromList (zip (D.datatypeParameters d) arguments)
+    fields <- mapM (instantiateField parameters) (D.constructorFields ctor)
+    pure (foldr Arrow (Con (D.datatypeName d) arguments) fields)
+  Case scrutinee result alternatives -> do
+    st <- inferIn ds env scrutinee
+    termType ds (typeEnv env) result
+    owner <- D.checkAlternatives ds (map shape alternatives)
+    parameters <- case owner of
+      Nothing -> pure Map.empty
+      Just d -> case st of
+        Con c args | c == D.datatypeName d -> do
+          D.checkArity ds c (length args)
+          pure (Map.fromList (zip (D.datatypeParameters d) args))
+        _ -> Left "case scrutinee has the wrong data type"
+    forM_ alternatives $ \(Alternative p body) -> do
+      let names = patternNames p
+      unless (length names == length (nub names)) (Left "duplicate pattern variable")
+      when (any (`Map.member` termEnv env) names) (Left "pattern binder already in scope")
+      bindings <- case p of
+        DefaultPattern n -> pure [(x,st) | Just x <- [n]]
+        ConstructorPattern c ns -> do
+          (_,ctor) <- D.lookupConstructor ds c
+          fields <- mapM (instantiateField parameters) (D.constructorFields ctor)
+          pure [(n,t) | (Just n,t) <- zip ns fields]
+      bt <- inferIn ds env { termEnv = Map.union (Map.fromList bindings) (termEnv env) } body
+      unless (alphaEq bt result) (Left "case alternative result type mismatch")
+    pure result
+  WithData _ _ -> Left "data declarations must be at the outermost level"
+  where
+    shape (Alternative (ConstructorPattern c ns) _) = (Just c,length ns)
+    shape (Alternative (DefaultPattern _) _) = (Nothing,0)
 
 checkClosed :: Term -> Either String Type
 checkClosed = infer emptyEnv
 
-validateTypeEnv :: TypeEnv -> Either String ()
-validateTypeEnv env = mapM_ (visit Set.empty) (Map.keys env)
+validateTypeEnv :: D.DataEnv -> TypeEnv -> Either String ()
+validateTypeEnv ds env = mapM_ (visit Set.empty) (Map.keys env)
   where
     visit path a
       | a `Set.member` path = Left "cyclic type environment"
       | otherwise = case Map.lookup a env of
           Nothing -> Left ("unbound variable in type environment: " ++ show a)
           Just bound -> do
-            wellFormed (Map.delete a env) bound
+            wellFormedIn ds (Map.delete a env) bound
             mapM_ (visit (Set.insert a path)) (Set.toList (freeVars bound))
