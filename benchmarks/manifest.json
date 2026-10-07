@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "upstream": {
+    "repository": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame.git",
+    "revision": "40296663ed350d5fe4a6ab5e367bab61cb77c219",
+    "license": "benchmarks/LICENSE.BenchmarksGame",
+    "extraction": "HTMLParser with convert_charrefs=True; concatenate text inside the first pre element, retaining whitespace",
+    "fixture_path": "public/download/binarytrees-output.txt"
+  },
+  "pinned_sha256": {
+    "benchmarks/LICENSE.BenchmarksGame": "e5dd0024dd43d92434808c8e1df3c09870a2832744283232aa1dc16c737237b1",
+    "benchmarks/binary-trees/c/adaptation.patch": "f4ac32a07dc7daef25b343aca571596c12a8039cab017e017b5a25ee1d1bd954",
+    "benchmarks/binary-trees/c/main.c": "3149135fbe1c7fbcca7c38d815f024d46bedf48a9f40611e72ad88c83fc62ad2",
+    "benchmarks/binary-trees/c/upstream.c": "0896dbbe8f2026c48a7f681cae56480b44dff6d114092f36f01474e58603c009",
+    "benchmarks/binary-trees/expected-10.txt": "b7f92c56b5d8aeb0a4d698842d1d87a57b4909865c3c84e5e10313e16663c3cb",
+    "benchmarks/binary-trees/haskell/upstream.hs": "0b6aa7815bfe566c3624771c341d9f33c2e9d306565682c380bb9f7d11ed886f",
+    "benchmarks/binary-trees/rust/adaptation.patch": "f18e3c383790bd753d966bef9c7237b3163edf4fda028f892344729c02650dbe",
+    "benchmarks/binary-trees/rust/main.rs": "f5757256cdef36a442424ca39cb12a9a9d618dcb008f77aba4cd772ea97a46e3",
+    "benchmarks/binary-trees/rust/upstream.rs": "c344da05a4bcc7d206528ba3bcbab6e78f09d049e10bf91e0fcceb666d5e99b5"
+  },
+  "workloads": [
+    {
+      "name": "binary-trees",
+      "default_input": 16,
+      "minimum_input": 0,
+      "maximum_input": 20,
+      "check_inputs": [
+        0,
+        7,
+        10
+      ],
+      "fixture": "benchmarks/binary-trees/expected-10.txt",
+      "provenance": {
+        "c": {
+          "implementation": "binarytrees-gcc-1",
+          "authors": "Kevin Carson",
+          "upstream_path": "public/program/binarytrees-gcc-1.html",
+          "upstream_git_blob": "3b3471fd45e64faaf5c46b347b3d647e93904c32",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/binarytrees-gcc-1.html",
+          "original_source": "benchmarks/binary-trees/c/upstream.c",
+          "build_source": "benchmarks/binary-trees/c/main.c"
+        },
+        "rust": {
+          "implementation": "binarytrees-rust-1",
+          "authors": "Rust Project Developers; TeXitoi",
+          "upstream_path": "public/program/binarytrees-rust-1.html",
+          "upstream_git_blob": "02bf10bd3bbc14f07ae5ee315f3cd684fd58be85",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/binarytrees-rust-1.html",
+          "original_source": "benchmarks/binary-trees/rust/upstream.rs",
+          "build_source": "benchmarks/binary-trees/rust/main.rs"
+        },
+        "haskell": {
+          "implementation": "binarytrees-ghc-1",
+          "authors": "Don Stewart",
+          "upstream_path": "public/program/binarytrees-ghc-1.html",
+          "upstream_git_blob": "ae9dd630ab3c74ef9912fe563d3060d0ab3a85c7",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/binarytrees-ghc-1.html",
+          "original_source": "benchmarks/binary-trees/haskell/upstream.hs",
+          "build_source": "benchmarks/binary-trees/haskell/upstream.hs"
+        }
+      },
+      "sources": {
+        "c": "benchmarks/binary-trees/c/main.c",
+        "rust": "benchmarks/binary-trees/rust/main.rs",
+        "haskell": "benchmarks/binary-trees/haskell/upstream.hs",
+        "mlf": "benchmarks/binary-trees/mlf/main.emlf"
+      },
+      "flags": {
+        "c": [
+          "-O3"
+        ],
+        "rust": [
+          "-O"
+        ],
+        "haskell": [
+          "-O2",
+          "-XBangPatterns",
+          "-fno-full-laziness",
+          "-fno-cse",
+          "-fforce-recomp"
+        ],
+        "mlf": [
+          "-O2",
+          "-Wno-override-module"
+        ]
+      }
+    }
+  ]
+}

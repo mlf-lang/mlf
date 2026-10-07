@@ -6,6 +6,9 @@
 #define _POSIX_C_SOURCE 200809L
 #include "mlf_runtime.h"
 #include <gmp.h>
+#include <errno.h>
+#include <inttypes.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,7 +26,8 @@ typedef struct Object {
 
 typedef enum {
     HOLE, BUSY, INDIRECT, THUNK, APPLICATION, CLOSURE,
-    INTEGER, BOOLEAN, STRING, CONSTRUCTOR, PRIMITIVE, ACTION
+    INTEGER, BOOLEAN, STRING, CONSTRUCTOR, PRIMITIVE, ACTION,
+    CONSTRUCTOR_1, CONSTRUCTOR_2
 } Tag;
 
 /* These numbers are shared with primitiveCode in MLF.LLVM. */
@@ -50,6 +54,7 @@ struct MlfValue {
         int boolean;
         struct { size_t length; char *bytes; } string;
         struct { int64_t identity, arity; MlfEnv *fields; } constructor;
+        struct { int64_t identity; MlfValue *fields[2]; } packed;
         struct { Primitive identity; MlfEnv *arguments; } primitive;
         struct { Primitive operation; MlfValue *first, *second; } action;
     } as;
@@ -66,6 +71,39 @@ static Stack *active_stacks;
 static size_t objects;
 static size_t collection_limit = MLF_GC_THRESHOLD;
 static void cleanup(void);
+
+/* The low bits distinguish immediate integers, booleans and nullary data
+ * from aligned heap pointers. Integers outside the signed 63-bit range keep
+ * their arbitrary-precision GMP representation. */
+_Static_assert(sizeof(void *) == 8 && sizeof(long) == 8, "native runtime requires a 64-bit ABI");
+_Static_assert(_Alignof(MlfValue) >= 8, "native tagged pointer alignment");
+_Static_assert(offsetof(MlfValue, as.packed.identity) == 24, "constructor identity ABI");
+_Static_assert(offsetof(MlfValue, as.packed.fields) == 32, "constructor field ABI");
+#define SMALL_MIN (-(INT64_C(1) << 62))
+#define SMALL_MAX ((INT64_C(1) << 62) - 1)
+static int immediate(const void *p) { return ((uintptr_t)p & 7) != 0; }
+static int small_integer(const MlfValue *p) { return ((uintptr_t)p & 1) != 0; }
+static int64_t small_value(const MlfValue *p) { return (int64_t)(intptr_t)p >> 1; }
+static MlfValue *small(int64_t n) { return (MlfValue *)(uintptr_t)(((uint64_t)n << 1) | 1); }
+static int nullary(const MlfValue *p) { return ((uintptr_t)p & 7) == 4; }
+static int boolean_value(const MlfValue *p) { return ((uintptr_t)p & 3) == 2; }
+
+/* Fixed-size managed values share allocation pages. Reclamation still follows
+ * reachability, not benchmark-specific lifetimes or a datatype-specific arena. */
+typedef struct ValuePage {
+    struct ValuePage *next;
+    size_t used;
+    MlfValue values[4096];
+} ValuePage;
+static ValuePage *value_pages;
+static MlfValue *free_values;
+
+#ifdef MLF_ALLOCATION_AUDIT
+extern void mlf_bench_constructed_node(int64_t tag);
+#define CONSTRUCTED(tag) mlf_bench_constructed_node(tag)
+#else
+#define CONSTRUCTED(tag) ((void)0)
+#endif
 
 static _Noreturn void fail(const char *message) {
     fprintf(stderr, "Runtime: %s\n", message);
@@ -111,7 +149,21 @@ static void *object(size_t size, ObjectKind kind) {
 }
 
 static MlfValue *value(Tag tag) {
-    MlfValue *result = object(sizeof(*result), OBJECT_VALUE);
+    MlfValue *result;
+    if (free_values) {
+        result = free_values;
+        free_values = (MlfValue *)result->object.next;
+    } else {
+        if (!value_pages || value_pages->used == 4096) {
+            ValuePage *page = allocate(sizeof(*page));
+            page->next = value_pages;
+            value_pages = page;
+        }
+        result = &value_pages->values[value_pages->used++];
+    }
+    result->object = (Object){heap, OBJECT_VALUE, 0};
+    heap = &result->object;
+    ++objects;
     result->tag = tag;
     return result;
 }
@@ -159,6 +211,10 @@ MlfValue *mlf_application(MlfValue *function, MlfValue *argument) {
 }
 
 MlfValue *mlf_integer(const char *decimal) {
+    char *end;
+    errno = 0;
+    int64_t n = strtoll(decimal, &end, 10);
+    if (!errno && end != decimal && !*end && n >= SMALL_MIN && n <= SMALL_MAX) return small(n);
     MlfValue *result = value(INTEGER);
     mpz_init(result->as.integer);
     if (mpz_set_str(result->as.integer, decimal, 10)) fail("invalid integer literal");
@@ -166,9 +222,7 @@ MlfValue *mlf_integer(const char *decimal) {
 }
 
 MlfValue *mlf_boolean(int64_t boolean) {
-    MlfValue *result = value(BOOLEAN);
-    result->as.boolean = boolean != 0;
-    return result;
+    return (MlfValue *)(uintptr_t)(boolean ? 6 : 2);
 }
 
 MlfValue *mlf_string(const char *bytes, uint64_t length) {
@@ -182,10 +236,31 @@ MlfValue *mlf_string(const char *bytes, uint64_t length) {
 
 MlfValue *mlf_constructor(int64_t identity, int64_t arity) {
     if (identity < 0 || arity < 0) fail("invalid constructor descriptor");
+    if (!arity && identity < (INT64_C(1) << 60)) {
+        CONSTRUCTED(identity);
+        return (MlfValue *)(uintptr_t)(((uint64_t)identity << 3) | 4);
+    }
     MlfValue *result = value(CONSTRUCTOR);
     result->as.constructor.identity = identity;
     result->as.constructor.arity = arity;
     result->as.constructor.fields = mlf_env_new(0);
+    return result;
+}
+
+MlfValue *mlf_constructor1(int64_t identity, MlfValue *a) {
+    MlfValue *result = value(CONSTRUCTOR_1);
+    result->as.packed.identity = identity;
+    result->as.packed.fields[0] = a;
+    CONSTRUCTED(identity);
+    return result;
+}
+
+MlfValue *mlf_constructor2(int64_t identity, MlfValue *a, MlfValue *b) {
+    MlfValue *result = value(CONSTRUCTOR_2);
+    result->as.packed.identity = identity;
+    result->as.packed.fields[0] = a;
+    result->as.packed.fields[1] = b;
+    CONSTRUCTED(identity);
     return result;
 }
 
@@ -209,12 +284,21 @@ MlfValue *mlf_primitive(int64_t identity) {
 static MlfValue *force(MlfValue *entry);
 static MlfValue *expect(MlfValue *entry, Tag tag) {
     MlfValue *result = force(entry);
+    if (immediate(result)) {
+        if ((tag == INTEGER && small_integer(result)) ||
+            (tag == BOOLEAN && boolean_value(result)) ||
+            (tag == CONSTRUCTOR && nullary(result))) return result;
+        fail("invalid value for runtime operation");
+    }
+    if (tag == CONSTRUCTOR && (result->tag == CONSTRUCTOR_1 || result->tag == CONSTRUCTOR_2)) return result;
     if (result->tag != tag) fail("invalid value for runtime operation");
     return result;
 }
 
 int64_t mlf_tag(MlfValue *entry) {
     MlfValue *result = expect(entry, CONSTRUCTOR);
+    if (nullary(result)) return (int64_t)((uintptr_t)result >> 3);
+    if (result->tag == CONSTRUCTOR_1 || result->tag == CONSTRUCTOR_2) return result->as.packed.identity;
     if ((uint64_t)result->as.constructor.arity != result->as.constructor.fields->count)
         fail("case scrutinized a partial constructor");
     return result->as.constructor.identity;
@@ -222,6 +306,11 @@ int64_t mlf_tag(MlfValue *entry) {
 
 MlfValue *mlf_field(MlfValue *entry, uint64_t index) {
     MlfValue *result = expect(entry, CONSTRUCTOR);
+    if (nullary(result)) fail("invalid environment read");
+    if (result->tag == CONSTRUCTOR_1 || result->tag == CONSTRUCTOR_2) {
+        if (index >= (uint64_t)(result->tag == CONSTRUCTOR_1 ? 1 : 2)) fail("invalid environment read");
+        return result->as.packed.fields[index];
+    }
     return mlf_env_get(result->as.constructor.fields, index);
 }
 
@@ -237,6 +326,11 @@ static MlfEnv *append(MlfEnv *env, MlfValue *entry) {
 
 static MlfValue *show_integer(MlfValue *entry) {
     MlfValue *integer = expect(entry, INTEGER);
+    if (small_integer(integer)) {
+        char text[32];
+        int length = snprintf(text, sizeof(text), "%" PRId64, small_value(integer));
+        return mlf_string(text, (uint64_t)length);
+    }
     size_t capacity = mpz_sizeinbase(integer->as.integer, 10) + 3;
     char *buffer = allocate(capacity);
     mpz_get_str(buffer, 10, integer->as.integer);
@@ -245,17 +339,54 @@ static MlfValue *show_integer(MlfValue *entry) {
     return result;
 }
 
-static MlfValue *primitive(Primitive p, MlfEnv *arguments) {
-    static const size_t arities[PRIMITIVE_COUNT] = {1,2,1,1,0,1,2,1,2,2,2,2,2,3};
-    if (arguments->count < arities[p]) {
-        MlfValue *result = value(PRIMITIVE);
-        result->as.primitive.identity = p;
-        result->as.primitive.arguments = arguments;
-        return result;
+static void integer_copy(mpz_t destination, MlfValue *source) {
+    if (small_integer(source)) mpz_set_si(destination, (long)small_value(source));
+    else mpz_set(destination, source->as.integer);
+}
+
+static MlfValue *integer_operation(MlfValue *a, MlfValue *b, int subtract) {
+    a = expect(a, INTEGER); b = expect(b, INTEGER);
+    if (small_integer(a) && small_integer(b)) {
+        int64_t n = subtract ? small_value(a) - small_value(b) : small_value(a) + small_value(b);
+        if (n >= SMALL_MIN && n <= SMALL_MAX) return small(n);
     }
-    if (arguments->count != arities[p]) fail("primitive arity mismatch");
-    MlfValue *a = arguments->count > 0 ? arguments->slots[0] : NULL;
-    MlfValue *b = arguments->count > 1 ? arguments->slots[1] : NULL;
+    MlfValue *result = value(INTEGER);
+    mpz_t other;
+    mpz_init(result->as.integer); mpz_init(other);
+    integer_copy(result->as.integer, a); integer_copy(other, b);
+    if (subtract) mpz_sub(result->as.integer, result->as.integer, other);
+    else mpz_add(result->as.integer, result->as.integer, other);
+    mpz_clear(other);
+    if (mpz_fits_slong_p(result->as.integer)) {
+        int64_t n = mpz_get_si(result->as.integer);
+        if (n >= SMALL_MIN && n <= SMALL_MAX) return small(n);
+    }
+    return result;
+}
+
+MlfValue *mlf_add_int(MlfValue *a, MlfValue *b) { return integer_operation(a, b, 0); }
+MlfValue *mlf_sub_int(MlfValue *a, MlfValue *b) { return integer_operation(a, b, 1); }
+
+static int integer_compare(MlfValue *a, MlfValue *b) {
+    a = expect(a, INTEGER); b = expect(b, INTEGER);
+    if (small_integer(a) && small_integer(b)) return (small_value(a) > small_value(b)) - (small_value(a) < small_value(b));
+    if (small_integer(a)) {
+        int order = mpz_cmp_si(b->as.integer, (long)small_value(a));
+        return (order < 0) - (order > 0);
+    }
+    if (small_integer(b)) return mpz_cmp_si(a->as.integer, (long)small_value(b));
+    return mpz_cmp(a->as.integer, b->as.integer);
+}
+
+MlfValue *mlf_eq_int(MlfValue *a, MlfValue *b) { return mlf_boolean(integer_compare(a,b) == 0); }
+MlfValue *mlf_lt_int(MlfValue *a, MlfValue *b) { return mlf_boolean(integer_compare(a,b) < 0); }
+
+int64_t mlf_truth(MlfValue *entry) {
+    MlfValue *b = expect(entry, BOOLEAN);
+    return boolean_value(b) ? ((uintptr_t)b == 6) : b->as.boolean;
+}
+
+static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValue *c) {
     switch (p) {
     case IO_RETURN: case IO_BIND: case PUT_STR: case PUT_STR_LN: case GET_LINE: case PRINT_INT:
         return action(p, a, b);
@@ -271,31 +402,37 @@ static MlfValue *primitive(Primitive p, MlfEnv *arguments) {
         memcpy(result->as.string.bytes + left, b->as.string.bytes, right);
         return result;
     }
-    case ADD_INT: case SUB_INT: {
-        a = expect(a, INTEGER); b = expect(b, INTEGER);
-        MlfValue *result = value(INTEGER);
-        mpz_init(result->as.integer);
-        if (p == ADD_INT) mpz_add(result->as.integer, a->as.integer, b->as.integer);
-        else mpz_sub(result->as.integer, a->as.integer, b->as.integer);
-        return result;
-    }
-    case EQ_INT: case LT_INT:
-        a = expect(a, INTEGER); b = expect(b, INTEGER);
-        return mlf_boolean(p == EQ_INT ? mpz_cmp(a->as.integer, b->as.integer) == 0 :
-            mpz_cmp(a->as.integer, b->as.integer) < 0);
+    case ADD_INT: return mlf_add_int(a,b);
+    case SUB_INT: return mlf_sub_int(a,b);
+    case EQ_INT: return mlf_eq_int(a,b);
+    case LT_INT: return mlf_lt_int(a,b);
     case EQ_STRING:
         a = expect(a, STRING); b = expect(b, STRING);
         return mlf_boolean(a->as.string.length == b->as.string.length &&
             !memcmp(a->as.string.bytes, b->as.string.bytes, a->as.string.length));
     case IF_THEN_ELSE:
-        a = expect(a, BOOLEAN);
-        return a->as.boolean ? b : arguments->slots[2];
+        return mlf_truth(a) ? b : c;
     default: fail("unknown primitive");
     }
 }
 
+static MlfValue *primitive(Primitive p, MlfEnv *arguments) {
+    static const size_t arities[PRIMITIVE_COUNT] = {1,2,1,1,0,1,2,1,2,2,2,2,2,3};
+    if (arguments->count < arities[p]) {
+        MlfValue *result = value(PRIMITIVE);
+        result->as.primitive.identity = p;
+        result->as.primitive.arguments = arguments;
+        return result;
+    }
+    if (arguments->count != arities[p]) fail("primitive arity mismatch");
+    return primitive_result(p, arguments->count > 0 ? arguments->slots[0] : NULL,
+        arguments->count > 1 ? arguments->slots[1] : NULL,
+        arguments->count > 2 ? arguments->slots[2] : NULL);
+}
+
 static MlfValue *apply(MlfValue *function, MlfValue *argument) {
     function = force(function);
+    if (immediate(function)) fail("application of a non-function");
     switch (function->tag) {
     case CLOSURE: return function->as.closure.code(function->as.closure.env, argument);
     case PRIMITIVE:
@@ -303,9 +440,13 @@ static MlfValue *apply(MlfValue *function, MlfValue *argument) {
     case CONSTRUCTOR: {
         if (function->as.constructor.fields->count >= (uint64_t)function->as.constructor.arity)
             fail("constructor overapplication");
+        if (function->as.constructor.arity == 1) return mlf_constructor1(function->as.constructor.identity, argument);
+        if (function->as.constructor.arity == 2 && function->as.constructor.fields->count == 1)
+            return mlf_constructor2(function->as.constructor.identity, function->as.constructor.fields->slots[0], argument);
         MlfValue *result = value(CONSTRUCTOR);
         result->as.constructor = function->as.constructor;
         result->as.constructor.fields = append(function->as.constructor.fields, argument);
+        if ((uint64_t)result->as.constructor.arity == result->as.constructor.fields->count) CONSTRUCTED(result->as.constructor.identity);
         return result;
     }
     default: fail("application of a non-function");
@@ -319,6 +460,7 @@ static MlfValue *force(MlfValue *entry) {
     Stack updates = {0};
     for (;;) {
         if (!entry) fail("missing runtime value");
+        if (immediate(entry)) break;
         Tag tag = entry->tag;
         if (tag == HOLE || tag == BUSY) fail("cyclic evaluation of a recursive binding");
         if (tag != THUNK && tag != APPLICATION && tag != INDIRECT) break;
@@ -338,11 +480,36 @@ static MlfValue *force(MlfValue *entry) {
     return entry;
 }
 
+MlfValue *mlf_force(MlfValue *entry) {
+    if (entry && (immediate(entry) || entry->tag >= CLOSURE)) return entry;
+    return force(entry);
+}
+
+/* Saturated primitive calls from native workers. Arguments remain lazy for
+ * IO actions; only the ordinary strict primitives demand their operands. */
+MlfValue *mlf_prim1(int64_t p, MlfValue *a) {
+    switch (p) {
+    case IO_RETURN: case PUT_STR: case PUT_STR_LN: case PRINT_INT: case SHOW_INT:
+        return primitive_result((Primitive)p,a,NULL,NULL);
+    default: fail("unary primitive arity mismatch");
+    }
+}
+MlfValue *mlf_prim2(int64_t p, MlfValue *a, MlfValue *b) {
+    switch (p) {
+    case IO_BIND: case CONCAT_STRING: case ADD_INT: case SUB_INT: case EQ_INT: case LT_INT: case EQ_STRING:
+        return primitive_result((Primitive)p,a,b,NULL);
+    default: fail("binary primitive arity mismatch");
+    }
+}
+
 static void release(Object *entry) {
     if (entry->kind == OBJECT_VALUE) {
         MlfValue *v = (MlfValue *)entry;
         if (v->tag == INTEGER) mpz_clear(v->as.integer);
         if (v->tag == STRING) free(v->as.string.bytes);
+        v->object.next = (Object *)free_values;
+        free_values = v;
+        return;
     }
     free(entry);
 }
@@ -358,11 +525,18 @@ static void cleanup(void) {
         release(heap);
         heap = next;
     }
+    while (value_pages) {
+        ValuePage *next = value_pages->next;
+        free(value_pages);
+        value_pages = next;
+    }
+    free_values = NULL;
     objects = 0;
     collection_limit = MLF_GC_THRESHOLD;
 }
 
 static void mark(Stack *pending, void *entry) {
+    if (immediate(entry)) return;
     Object *o = entry;
     if (o && !o->marked) { o->marked = 1; push(pending, o); }
 }
@@ -385,6 +559,9 @@ static void collect(MlfValue *root, const Stack *continuations) {
         case APPLICATION:
             mark(&pending, v->as.application.function); mark(&pending, v->as.application.argument); break;
         case CONSTRUCTOR: mark(&pending, v->as.constructor.fields); break;
+        case CONSTRUCTOR_1: mark(&pending, v->as.packed.fields[0]); break;
+        case CONSTRUCTOR_2:
+            mark(&pending, v->as.packed.fields[0]); mark(&pending, v->as.packed.fields[1]); break;
         case PRIMITIVE: mark(&pending, v->as.primitive.arguments); break;
         case ACTION: mark(&pending, v->as.action.first); mark(&pending, v->as.action.second); break;
         case BUSY: case HOLE: fail("unfinished evaluation at garbage collection");

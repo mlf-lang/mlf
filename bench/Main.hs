@@ -18,9 +18,11 @@ main = do
         "compare-revisions":rest ->
           ("scripts/benchmark-compiler.py",
            ["--after",compiler,"--output","dist-newstyle/benchmarks/revisions.json"],rest)
-        _ ->
+        "snake":rest ->
           ("scripts/benchmark-snake.py",
-           ["--emlf",compiler,"--output","dist-newstyle/benchmarks/snake.json"],arguments)
+           ["--emlf",compiler,"--output","dist-newstyle/benchmarks/snake.json"],rest)
+        _ ->
+          ("scripts/benchmark-languages.py",["--emlf",compiler],arguments)
   exists <- doesFileExist script
   unless exists (die ("Cannot find " ++ script ++ "; run cabal bench in the source package."))
   -- Defaults precede user options, allowing --output and other driver options

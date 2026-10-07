@@ -1,4 +1,5 @@
 /dist-newstyle/
 *.hi
 *.o
-
+/bench-results.json
+__pycache__/

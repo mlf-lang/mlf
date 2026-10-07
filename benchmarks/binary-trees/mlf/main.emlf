@@ -1,0 +1,77 @@
+-- Benchmarks Game binary-trees, translated for this repository.
+-- Read the maximum depth from stdin. See ../PROVENANCE.md.
+-- Every leaf is a full Node with two Nil fields, like an interior node.
+data Tree = Nil | Node Tree Tree;
+data Rec a = Rec (Rec a -> a);
+
+let fix : forall a. (a -> a) -> a = \f ->
+  let go = \r -> case r of { Rec next -> f (next r) }
+  in go (Rec go)
+in
+-- MLF currently has no readInt or command-line argument primitive.
+-- Parse a bounded natural number by comparing its decimal representation.
+let readDepth : String -> Int = \text ->
+  let search : Int -> Int = fix (\again n ->
+    ifThenElse (eqString text (showInt n)) n
+      (ifThenElse (eqInt n 20) 0 (again (addInt n 1))))
+  in search 0
+in
+let power2 : Int -> Int = fix (\again n ->
+  ifThenElse (eqInt n 0) 1
+    (let half = again (subInt n 1) in addInt half half))
+in
+-- Forcing both child roots before returning Node recursively forces the
+-- entire tree. These cases retain the actual children; they do not rebuild
+-- or share subtrees. Nil is only the empty pointer below a leaf.
+let make : Int -> Tree = fix (\again depth ->
+  ifThenElse (eqInt depth 0) (Node Nil Nil)
+    (let left = again (subInt depth 1) in
+     case left of {
+       Nil -> Nil;
+       Node _ _ ->
+         let right = again (subInt depth 1) in
+         case right of { Nil -> Nil; Node _ _ -> Node left right }
+     }))
+in
+let check : Tree -> Int = fix (\again tree -> case tree of {
+  Nil -> 0;
+  Node left right -> addInt 1 (addInt (again left) (again right))
+})
+in
+let line = \label depth count -> putStrLn
+  (concatString label (concatString " of depth " (concatString (showInt depth)
+    (concatString "\t check: " (showInt count)))))
+in
+-- eqInt forces the accumulated check before the next IO action. Each
+-- iteration gives the native collector a safe point, releasing that tree.
+-- Without this strictness, lazy counts retain every completed tree.
+let sumTrees : Int -> Int -> Int -> IO Int = fix (\again depth remaining total ->
+  ifThenElse (eqInt remaining 0) (return total)
+    (let next = addInt total (check (make depth)) in
+     ifThenElse (eqInt next next)
+       (do { forced <- return next; again depth (subInt remaining 1) forced })
+       (return 0)))
+in
+let depths : Int -> Int -> IO Unit = fix (\again maximum depth ->
+  ifThenElse (ltInt maximum depth) (return Unit)
+    (let iterations = power2 (addInt (subInt maximum depth) 4) in do {
+       total <- sumTrees depth iterations 0;
+       line (concatString (showInt iterations) "\t trees") depth total;
+       again maximum (addInt depth 2)
+     }))
+in do {
+  input <- getLine;
+  let requested = readDepth input in
+  let maximum = ifThenElse (ltInt requested 6) 6 requested in
+  do {
+    line "stretch tree" (addInt maximum 1) (check (make (addInt maximum 1)));
+    let long = make maximum in
+    case long of {
+      Nil -> putStrLn "invalid tree";
+      Node _ _ -> do {
+        depths maximum 4;
+        line "long lived tree" maximum (check long)
+      }
+    }
+  }
+}
