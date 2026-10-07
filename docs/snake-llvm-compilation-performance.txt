@@ -1,0 +1,130 @@
+Snake compilation including LLVM: 2026-10-07 (Asia/Shanghai)
+==========================================================
+
+Five rounds compare source compilation to xMLF, LLVM IR, LLVM native code,
+and the Haskell baseline. All three eMLF workflows were below GHC in every
+round. The existing xMLF/GHC <= 1x gate passes; LLVM ratios are informational.
+
+Compilation workflow             Median (s)   vs GHC   Worst paired ratio
+-------------------------------  ----------  -------  ------------------
+eMLF -> verified xMLF               0.221131  0.2696x             0.2803x
+eMLF -> LLVM IR                     0.219582  0.2677x             0.2781x
+eMLF -> LLVM native executable      0.479331  0.5844x             0.6931x
+Haskell -> GHC native executable    0.820278  1.0000x             1.0000x
+
+Measured from: 2026-10-07T12:40:16.556873+00:00
+Host: macOS-26.6.2-arm64-arm-64bit-Mach-O
+GHC: 9.14.1; Homebrew Clang: 23.1.2; GMP: 6.3.0.
+Build: cabal build exe:emlf -j1; project optimization: 2.
+CLI default RTS option: -A32m. GHCRTS environment: unset.
+
+Scope and method
+----------------
+The three eMLF measurements all begin with examples/snake.emlf and use the
+standard prelude. They are complete workflows, not additive stage timings:
+
+  xMLF: emlf examples/snake.emlf, capturing verified xMLF on stdout.
+  LLVM IR: emlf --emit-llvm examples/snake.emlf, capturing LLVM IR on stdout.
+  LLVM native: a fresh --emit-llvm invocation, writing its IR to disk, then
+    clang -O2 snake.ll runtime/mlf_runtime.c $(pkg-config --cflags --libs gmp)
+    -o snake-llvm, including optimization, runtime compilation, and linking.
+  GHC native: ghc -O2 -Wall -Werror -fforce-recomp -main-is SnakeBaseline
+    examples/SnakeBaseline.hs -outputdir <scratch> -o snake-haskell.
+
+Both native workflows produce linked executables. The LLVM native workflow
+recompiles the C runtime in every sample; no cached runtime object is used.
+GMP and the GHC libraries are already installed. The IR-only workflows stop
+before native code generation and linking. The similar xMLF and LLVM IR
+medians do not establish a meaningful speed difference at this sample size.
+
+Runs are serial, and workflow order rotates by one position each round:
+  1: xMLF, LLVM IR, LLVM native, GHC
+  2: LLVM IR, LLVM native, GHC, xMLF
+  3: LLVM native, GHC, xMLF, LLVM IR
+  4: GHC, xMLF, LLVM IR, LLVM native
+  5: xMLF, LLVM IR, LLVM native, GHC
+
+Every compilation uses fresh processes. Timing includes startup, reading
+source, inference, elaboration, target verification, and the selected output
+pipeline. No successful game compilation or emitted IR is reused by a timed
+workflow. Compiler builds, metadata probes, output validation, and game
+execution are outside the measured regions. No source-compilation warmup
+is performed; these are not cold filesystem-cache measurements.
+
+The tools are queried for metadata before timing. Probe durations were
+0.060596 s for GHC, 1.405387 s for emlf RTS information, 0.171138 s for Clang,
+0.004728 s for GMP version, 0.003597 s for GMP flags, and 0.018188 s for the
+runtime path. These results therefore exclude first-launch initialization.
+
+Raw samples (seconds)
+---------------------
+Run       xMLF      LLVM IR    LLVM native   GHC native
+  1     0.221131    0.220626       0.661970     0.955022
+  2     0.215521    0.219582       0.481815     0.820278
+  3     0.227936    0.226202       0.479331     0.813256
+  4     0.215740    0.208242       0.473609     0.783014
+  5     0.221669    0.208737       0.474762     0.824313
+
+The JSON also records per-sample native emission, compile/link, and IR-write
+durations. Reported native totals are measured around the complete workflow,
+not constructed by summing independently measured medians.
+
+Validation
+----------
+All five xMLF outputs match the saved frontend-parity output byte for byte.
+All ten LLVM emissions (five IR-only and five native-build emissions) match
+byte for byte. The saved xMLF independently checks as IO Unit; lowering it
+with --xmlf-to-llvm produces the same LLVM as direct source compilation.
+All five native builds succeed. Outside timing, the freshly built LLVM and
+GHC games and the xMLF interpreter produce identical complete transcripts
+for input d, empty line, w, a, q. Source, tool, benchmark-script, and runtime
+fingerprints are rechecked after measurement to reject changes during a run.
+
+Selected SHA-256 fingerprints (all fingerprints are in the JSON)
+-------------------------------------------------------------
+emlf: a76b79f369ba25f479841f5cf6de52d0bc428b59c5ae2645e2625cf65a0f3c3f
+snake.emlf: 23e4eda9b8b2e6388cdf9940fa7a011177e48c5cf0d9d193aea5b403fa4a6401
+SnakeBaseline.hs: 58001d2e09d34eaab76c8bc6334761c7907270658f61ecc65e32c1f76cb18d37
+runtime C: 20a8109b1d9673dc94f7e960a11f655805f90091064cb874a0f48db36e3cfb53
+Emitted xMLF: 020370aeaf6d45453a3725de71cef4b5b4cca6a7d24395cb8234ca89cc259312
+Emitted LLVM IR: 7042c5b37a69df0f772c8e528416e75c5fa3651a1a41adb192791e840ae72a6b
+
+Reproduction
+------------
+cabal bench -j1
+
+Cabal builds the emlf tool dependency before launching compiler-bench. The
+runner invokes the same process-based timing driver used for the recorded
+samples above. Build time and benchmark startup are outside the measured
+regions. The default is five rounds, with the report and .xmlf/.ll artifacts
+written to dist-newstyle/benchmarks/snake.*.
+
+To choose options or a report location:
+cabal bench compiler-bench -j1 \
+  --benchmark-options='--runs 5 --output dist-newstyle/benchmarks/llvm-comparison.json'
+
+Requires Python 3 (standard library), Clang, pkg-config, and GMP development
+files. Pass --clang and --pkg-config through --benchmark-options to select
+alternate tool paths. Optionally include --reference-xmlf /path/to/saved.xmlf
+to require the earlier xMLF output; the recorded run used
+dist-newstyle/compiler-parity/final-ghc-comparison.xmlf.
+
+The script prints the table and writes raw timings, ratios, commands,
+metadata, and hashes to JSON. It saves .xmlf and .ll beside the JSON. The
+legacy emlf/ghc fields and --max-ratio gate continue to refer to xMLF/GHC;
+new llvm_ir/llvm_native fields expose the additional workflows separately.
+Validation failures and missing tools fail the benchmark.
+
+The optional revision comparison uses the same Cabal entry point:
+cabal bench compiler-bench -j1 \
+  --benchmark-options='compare-revisions --before /path/to/saved-emlf'
+It compares all examples by default and saves
+dist-newstyle/benchmarks/revisions.json. Explicit source paths select a subset.
+
+Local raw evidence:
+dist-newstyle/compiler-parity/llvm-comparison.json
+dist-newstyle/compiler-parity/llvm-comparison.xmlf
+dist-newstyle/compiler-parity/llvm-comparison.ll
+
+Timings depend on the machine and its load. Historical frontend-only
+optimization results remain in snake-compilation-parity.txt.

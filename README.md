@@ -1,4 +1,4 @@
-# eMLF → xMLF in Haskell
+# eMLF → xMLF → LLVM
 
 A standalone compiler for the core eMLF language in Boris Yakobowski's
 *Graphical types and constraints — second-order polymorphism and inference*
@@ -6,15 +6,20 @@ A standalone compiler for the core eMLF language in Boris Yakobowski's
 It performs graph-based MLF inference and emits explicit, independently
 type-checked xMLF.
 An interpreter runs checked `IO` programs with console input and output.
+A Haskell LLVM backend compiles checked xMLF to native functions, with a
+small C runtime for lazy evaluation, algebraic data, and IO.
 
 ## Build and run
 
-Requires GHC and Cabal. Dependencies are `base`, `containers`, `mtl`, and
-`parsec`; no external solver is needed. Tested with GHC 9.14.1.
+The frontend requires GHC and Cabal; no external solver is needed. Tested
+with GHC 9.14.1. Native linking, `backend-tests`, and `cabal bench` additionally
+require Clang/LLVM 15 or later, GMP development files, and `pkg-config` on
+`PATH`. The benchmark drivers also require Python 3.
 
 ```sh
 cabal build all --offline -j1
 cabal test --offline -j1 --test-show-details=direct
+cabal bench --offline -j1
 cabal run emlf -- examples/self-application.emlf
 cabal run emlf -- --type examples/choose-id.emlf
 cabal run emlf -- --type examples/monad-maybe.emlf
@@ -43,6 +48,63 @@ EMLF_BIN="$(cabal list-bin exe:emlf)"
 source inference engine. All identifiers in this output carry explicit IDs,
 for example `x_12` and `a27`. These distinguish source shadowing and graph
 sharing; the numbers have no type-theoretic significance.
+
+## Native compilation with LLVM
+
+Compile a saved xMLF program to LLVM IR, then link it with the runtime:
+
+```sh
+cabal build exe:emlf -j1
+EMLF_BIN="$(cabal list-bin exe:emlf)"
+"$EMLF_BIN" examples/snake.emlf > snake.xmlf
+"$EMLF_BIN" --xmlf-to-llvm snake.xmlf > snake.ll
+MLF_RUNTIME="$("$EMLF_BIN" --llvm-runtime)"
+clang -O2 snake.ll "$MLF_RUNTIME" $(pkg-config --cflags --libs gmp) -o snake
+./snake
+```
+
+`--xmlf-to-llvm` independently checks the input before erasing type evidence;
+it does not rerun source inference. It also accepts standard input. To compile
+eMLF directly through the same checked xMLF boundary, use
+`emlf --emit-llvm examples/snake.emlf` or `emlf --emit-llvm --expr 'printInt 42'`.
+Both commands write only LLVM IR to standard output. `--no-prelude` also
+applies to `--emit-llvm`.
+
+The generated module contains native closure and case functions, `mlf_entry`,
+and `main`. It supports the complete current xMLF term syntax, including
+recursive dictionaries, polymorphism after checked erasure, lazy constructor
+fields, and IO. An `IO a` entry executes the action and discards its result;
+a pure entry evaluates to weak head normal form without printing a value.
+GMP preserves the language's unbounded `Int`; strings use length-delimited
+UTF-8, including embedded NULs. Invalid Unicode scalar literals are rejected.
+
+The runtime memoizes pure thunks and executes shared IO actions afresh on
+each bind. Its collector runs between IO steps, retaining the current action
+and pending continuations. Long pure computations can retain allocations
+until the next IO step or program exit. This is a single-threaded POSIX
+runtime, tested on macOS ARM64 with Clang 23.1.2 and GMP 6.3.0.
+
+`cabal test -j1` runs every backend behavior test through both the xMLF
+interpreter and LLVM native code. The shared matrix compares results, ordered
+read/write events, write boundaries, and unused input. It includes all 16
+examples, IO and Prelude behavior, and all seven Snake sessions and eleven
+rule checks against the independent Haskell game. A coverage audit fails if
+either backend is missing from any execution case.
+Run the shared suite, optionally with sanitizers or LLVM optimization disabled:
+
+```sh
+cabal test backend-tests -j1 --test-show-details=direct
+MLF_LLVM_TEST_CFLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer' \
+  cabal test backend-tests -j1 --test-show-details=direct
+MLF_LLVM_TEST_OPT=-O0 cabal test backend-tests -j1 --test-show-details=direct
+```
+
+The shared suite requires POSIX process support and the native toolchain;
+missing dependencies fail the suite. Frontend
+tests can be run separately with `cabal test mlf-tests figure12-tests -j1`.
+See [`docs/llvm-backend.txt`](docs/llvm-backend.txt) for the lowering and runtime
+boundaries. The [Snake benchmark](docs/snake-llvm-compilation-performance.txt)
+reports xMLF emission, LLVM IR emission, and complete native builds separately.
 
 ## Source language
 
@@ -88,8 +150,7 @@ The source includes lambda, application, nonrecursive let, expression and
 parameter annotations, integer/Boolean/string literals, algebraic data types, and
 type classes with multiple and higher-kinded parameters, and `do` blocks.
 Abstract constructor types are still allowed in annotations for library
-signatures. General recursive source bindings and a native code-generation
-backend are not implemented. Instance methods can
+signatures. General recursive source bindings are not implemented. Instance methods can
 be recursive through their dictionaries. The interpreter evaluates erased
 xMLF with lazy bindings and executes explicit IO actions. xMLF type computations are
 compilation evidence; erasure removes them.
@@ -444,8 +505,11 @@ Without a file, `--run` and `--run-xmlf` consume standard input as source, so
 that input stream is unavailable for subsequent `getLine` actions.
 
 The library entry point is `MLF.Runtime.runTerm`, with an `IOBackend` providing
-`readLine` and `writeText`. Tests use a deterministic backend to observe action
-order and failure behavior. The runtime keeps data fields, arguments, lets,
+`readLine` and `writeText`. It requires an IO entry, as does
+`MLF.LLVM.emitLLVMIO`. `MLF.Runtime.runProgram` and `MLF.LLVM.emitLLVM` also
+accept pure programs, evaluating them to weak head normal form and discarding
+the result. Tests observe action order and failure behavior through both
+backends. The runtime keeps data fields, arguments, lets,
 and recursive dictionaries lazy, while `ioBind` executes actions in order.
 Reusing an action executes it again. There is no pure operation that extracts
 a value from `IO`; file IO, concurrency, and language-level exception handling
@@ -506,13 +570,15 @@ ghc -O2 -Wall -Werror -main-is SnakeBaseline examples/SnakeBaseline.hs \
 ```
 
 For compilation timing, add `-fforce-recomp` to avoid an up-to-date build being
-skipped. GHC produces and links a native executable; `emlf` produces verified
-xMLF, which `--run-xmlf` parses, checks, and interprets on each invocation.
-These are different compilation outputs, so report their timings separately.
+skipped. The default `emlf` command produces verified xMLF, which `--run-xmlf`
+parses, checks, and interprets on each invocation. `--emit-llvm` followed by
+Clang produces a linked native executable. The benchmark below reports each
+output separately alongside the GHC native build.
 
 `cabal test` compares all seven scripted game transcripts byte for byte
-between Haskell and eMLF, and checks the same eleven pure-rule outcomes against
-handwritten expectations, including the departing tail and full-board win.
+between Haskell, the xMLF interpreter, and LLVM native code. It checks the same
+eleven pure-rule outcomes on both backends against Haskell and handwritten
+expectations, including the departing tail and full-board win.
 
 ### Compiler performance
 
@@ -520,8 +586,13 @@ Graph validation uses indexed scratch tables for densely numbered graphs,
 numbers the binding tree once, and checks kinds, scope, and structural cycles
 in one traversal. Rebind uses a memoized dependency traversal and depth-based
 lowest common ancestors. Sparse external identities retain the map-based
-implementation. Graphs remain immutable outside each analysis, and unchanged
-nodes are shared. During elaboration, alpha-equivalent instance
+implementation. `MLF.Graph.Solver` maintains reverse edges and applies this
+checked unifier to the affected type component, preserving structural parents,
+binding descendants, generalization scopes, and original identities. This
+avoids repeatedly traversing unrelated definitions. Each component is checked
+before and after unification; full graph and index checks bracket inference.
+Graphs remain immutable outside each analysis, and unchanged nodes are shared.
+During elaboration, alpha-equivalent instance
 types use independently checked `Inst-Refl` evidence directly; other edges
 retain expansion, frontier solving, and identity-based evidence construction.
 An empty frontier needs no separate unification. The compiler still checks
@@ -531,35 +602,65 @@ The project builds with `-O2`; the CLI uses a 32 MiB allocation area to reduce
 garbage collection during inference. These defaults are in `cabal.project`
 and `mlf.cabal`. The allocation area can be overridden with RTS options.
 
-To check Snake against a freshly compiled Haskell baseline:
+Run the compilation benchmarks through Cabal:
 
 ```sh
-cabal build exe:emlf -j1
-python3 scripts/benchmark-snake.py \
-  --emlf "$(cabal list-bin exe:emlf)" \
-  --runs 5 --output dist-newstyle/compiler-target/ghc-comparison.json
+cabal bench -j1
 ```
 
-Every sample runs GHC with `-O2 -fforce-recomp`, including native linking.
-The eMLF measurement includes verified xMLF emission. The script alternates
-order, checks the emitted type and a Haskell/eMLF game transcript, records
-input and compiler hashes, and fails if **any paired run exceeds 5×**.
-The recorded medians are **2.83 s for eMLF and 0.75 s for GHC (3.79×)**;
-the worst of five pairs is 4.83×. See
-[`docs/snake-compilation-performance.txt`](docs/snake-compilation-performance.txt)
-for raw samples, build settings, and validation details. Timings depend on
-the machine and its load.
+Cabal builds `emlf` as the `compiler-bench` tool dependency, then runs five
+rounds of all four Snake workflows below. It saves the JSON report and
+`.xmlf`/`.ll` outputs under `dist-newstyle/benchmarks/snake.*`. Python 3,
+GHC, Clang, `pkg-config`, and GMP are required. The existing process-based
+timing driver runs after Cabal finishes building, so compiler builds and
+benchmark startup are outside the measured regions.
+
+Override driver options through Cabal, for example:
+
+```sh
+cabal bench compiler-bench -j1 \
+  --benchmark-options='--runs 10 --output dist-newstyle/benchmarks/snake-10.json'
+```
+
+Five serial rounds on macOS ARM64, GHC 9.14.1, Clang 23.1.2, and GMP 6.3.0:
+
+| Compilation workflow | Median (s) | vs GHC | Worst paired ratio |
+| --- | ---: | ---: | ---: |
+| eMLF → verified xMLF | 0.221131 | 0.2696× | 0.2803× |
+| eMLF → LLVM IR | 0.219582 | 0.2677× | 0.2781× |
+| eMLF → LLVM native executable | 0.479331 | 0.5844× | 0.6931× |
+| Haskell → GHC native executable | 0.820278 | 1.0000× | 1.0000× |
+
+The LLVM native timing includes fresh source-to-LLVM emission, writing IR,
+Clang `-O2` compilation of the IR and C runtime, and linking with GMP. GHC
+uses `-O2 -fforce-recomp` and links every time. Each workflow uses fresh
+processes; execution order rotates, with no source-compilation warmup or
+cached game/runtime build. Compiler metadata probes precede timing and are
+recorded separately, so these measurements exclude first-launch checks.
+
+The script checks identical xMLF and LLVM output across samples, independently
+checks the xMLF type, compares standalone xMLF lowering with direct LLVM
+emission, and compares both backend transcripts with Haskell. It records
+compiler, source, and runtime hashes and saves `.xmlf` and `.ll` artifacts
+beside the JSON report. The existing `--max-ratio 1` gate applies to each
+**xMLF/GHC** pair; LLVM ratios are also reported. All three eMLF workflows
+were below GHC in every round of this run. See the
+[LLVM benchmark report](docs/snake-llvm-compilation-performance.txt) for raw
+samples and reproduction details, and the
+[earlier frontend optimization report](docs/snake-compilation-parity.txt)
+for the solver changes. Timings depend on the machine and its load.
 
 To compare compiler revisions, save the earlier executable before rebuilding,
-then run the serial benchmark (Python 3, standard library only):
+then select the revision-comparison mode of the same Cabal benchmark:
 
 ```sh
-python3 scripts/benchmark-compiler.py \
-  --before /path/to/emlf-before \
-  --after "$(cabal list-bin exe:emlf)" \
-  --runs 3 --output dist-newstyle/compiler-performance/comparison.json \
-  examples/*.emlf
+cabal bench compiler-bench -j1 \
+  --benchmark-options='compare-revisions --before /path/to/emlf-before'
 ```
+
+Cabal supplies the current compiler. This mode compares all `examples/*.emlf`
+by default and saves `dist-newstyle/benchmarks/revisions.json`. Append source
+paths to select a subset, or use `--runs` and `--output` to override defaults.
 
 Use the same GHC version, optimization settings, source files, and prelude
 configuration for both builds. The script
@@ -571,7 +672,10 @@ but excludes building the compiler. See
 measurements. The tests also compare graph validation with an uncached
 reference on 12,000 graphs and cover deep scopes and shared higher kinds.
 Unification is compared with the previous map-based algorithm on 5,616
-cases, with additional sparse/negative identity, scope, and occurs checks.
+cases, including both the full-graph and component solvers, with additional
+sparse/negative identity, scope, and occurs checks. Stateful comparisons audit
+the complete graph and reverse indexes after 1,427 inference steps; 189
+instance witnesses also match the full-graph path and its identity maps.
 
 ## Implementation and thesis correspondence
 
@@ -655,7 +759,12 @@ projections that reorder or drop parameters. Do-notation tests check statement
 order, lexical scope, fresh temporary names, local polymorphism, constructor
 patterns, invalid blocks, and integration with `MonadState`.
 
-IO tests run printed-and-reparsed target programs with a deterministic backend.
+All execution tests share `test/Backends.hs` in the `backend-tests` suite;
+fixtures cannot select just one backend. Each matrix row must complete on
+both the interpreter and LLVM, with the same outcome, ordered IO trace, and
+remaining input. Frontend-only type and rejection assertions run once.
+
+IO tests run printed-and-reparsed target programs through both backends.
 They cover console traces, repeated actions, lazy unused actions, recursive
 dictionary methods, polymorphic `Monad IO` functions, EOF and backend errors,
 and representative monad-law traces. Invalid target programs are rejected
@@ -668,7 +777,7 @@ shadowing, explicit opt-out through every compiler API, ambiguity, instance
 overlap, and the unchanged output of programs that do not use the prelude.
 
 Snake tests execute the actual example through both generated and
-printed/reparsed xMLF. Scripted sessions check the rendered boards, WASD input,
+printed/reparsed xMLF on each backend. Scripted sessions check the rendered boards, WASD input,
 quit, invalid commands, growth, reverse turns, and wall/body collisions.
 Additional checks call the example's pure rules to cover all four walls,
 the departing tail, food occupancy, and the full-board win.

@@ -5,6 +5,7 @@ import Control.Monad (unless)
 import qualified Data.IntMap.Strict as IM
 import qualified Data.Map.Strict as Map
 import MLF.Graph
+import qualified MLF.Graph.Solver as Solver
 import MLF.Constraint
 import MLF.Syntax (Flag (..))
 import qualified MLF.X.Type as T
@@ -98,20 +99,16 @@ proveInstance targetGraph image env source target = do
 -- | Reflexive edges need only Inst-Refl, whose proof uses no node image.
 -- Otherwise re-expand the FINAL presolution (§15.3.10), solve the frontier
 -- first (§15.2.2), and translate only the interior copy's correspondence.
-edgeComputation :: Graph -> Check.TypeEnv -> Edge -> Either String X.Computation
-edgeComputation g env edge
+edgeComputation :: Solver.Solver -> Check.TypeEnv -> Edge -> Either String X.Computation
+edgeComputation solver env edge
   | T.alphaEq source targetType = proveInstance g id env source targetType
   | otherwise = do
-      destination <- maybe (Left "edge target has no binder") pure (binder (nodeAt g target))
-      ((root,copies,frontier),expanded) <- runBuild g (expand (fromGen edge) destination)
-      (_,solved) <- runBuild expanded $ do
-        -- With no frontier, Rebind would leave this canonical expansion
-        -- unchanged. The next unify still validates it before any merge.
-        unless (null frontier) (unify frontier)
-        unify [(root,target)]
+      (copies,result) <- Solver.witness (fromGen edge) target solver
+      let solved = Solver.graph result
       let image n = resolve solved (IM.findWithDefault n n copies)
       proveInstance g image env source targetType
   where
+    g = Solver.graph solver
     target = resolve g (toNode edge)
     source = schemeType g (fromGen edge)
     targetType = reference g target
@@ -145,26 +142,29 @@ resolveEvidence graph = go Map.empty
         _ -> pure Map.empty
 
 elaborateResolved :: Graph -> Map.Map NodeId X.Term -> Typed -> Either String X.Term
-elaborateResolved graph evidence = go Map.empty
+elaborateResolved graph evidence typed = do
+  solver <- Solver.prepare graph
+  go solver Map.empty typed
   where
-    go outer typed = do
-      let gen = generalization typed
+    go solver outer term = do
+      let gen = generalization term
           bs = boundsAt graph gen
           env = foldl (\gamma (a,b) -> Map.insert a b gamma) outer bs
-          inst t e = X.instantiate t <$> edgeComputation graph env e
-      body <- case form typed of
+          inst t e = X.instantiate t <$> edgeComputation solver env e
+          child = go solver env
+      body <- case form term of
         Variable n Nothing -> pure (X.VarTerm n)
         Variable n (Just e) -> inst (X.VarTerm n) e
         Lambda n domain b e -> do
-          b' <- go env b >>= (`inst` e)
+          b' <- child b >>= (`inst` e)
           pure (X.Abs n (reference graph domain) b')
         Apply a b ea eb -> do
-          a' <- go env a >>= (`inst` ea)
-          b' <- go env b >>= (`inst` eb)
+          a' <- child a >>= (`inst` ea)
+          b' <- child b >>= (`inst` eb)
           pure (X.App a' b')
         Binding n a b e -> do
-          a' <- go env a
-          b' <- go env b >>= (`inst` e)
+          a' <- child a
+          b' <- child b >>= (`inst` e)
           pure (X.Let n a' b')
         Coercion n domain codomain -> do
           let local = boundsAt graph (genRoot graph gen)
@@ -180,19 +180,19 @@ elaborateResolved graph evidence = go Map.empty
         Primitive p ns -> pure (X.Primitive p (map (reference graph) ns))
         Constructor c ns -> pure (X.Constructor c (map (reference graph) ns))
         Match a ea branches -> do
-          a' <- go env a >>= (`inst` ea)
-          bs' <- mapM (\(Branch p b eb) -> X.Alternative p <$> (go env b >>= (`inst` eb))) branches
+          a' <- child a >>= (`inst` ea)
+          bs' <- mapM (\(Branch p b eb) -> X.Alternative p <$> (child b >>= (`inst` eb))) branches
           pure (X.Case a' (reference graph (genRoot graph gen)) bs')
         Recursive definitions b e -> do
           ds <- mapM (\(n,g,a,ea) -> do
-            a' <- go env a >>= (`inst` ea)
+            a' <- child a >>= (`inst` ea)
             pure (n,schemeType graph g,a')) definitions
-          b' <- go env b >>= (`inst` e)
+          b' <- child b >>= (`inst` e)
           pure (X.LetRec ds b')
         Evidence _ -> maybe (Left "unresolved dictionary evidence") Right (Map.lookup gen evidence)
         Checked variables b e -> do
           let local = foldl (\gamma (a,k) -> Map.insert a (T.bottomKind k) gamma) env variables
-          b' <- go local b
-          phi <- edgeComputation graph local e
+          b' <- go solver local b
+          phi <- edgeComputation solver local e
           pure (foldr (\(a,k) -> X.TypeAbs a (T.bottomKind k)) (X.instantiate b' phi) variables)
       pure (foldr (uncurry X.TypeAbs) body bs)

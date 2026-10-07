@@ -6,7 +6,8 @@ description: Graph-based type inference and explicit elaboration following Yakob
 category: Language
 build-type: Simple
 license: BSD-3-Clause
-extra-source-files: README.md, examples/*.emlf, examples/*.hs, test/fixtures/*.emlf, docs/*.txt, scripts/*.py
+extra-source-files: README.md, examples/*.emlf, examples/*.hs, test/fixtures/*.emlf, test/*.c, docs/*.txt, scripts/*.py
+data-files: runtime/mlf_runtime.c, runtime/mlf_runtime.h
 
 common settings
   default-language: Haskell2010
@@ -22,6 +23,7 @@ library
     MLF.Desugar
     MLF.Primitive
     MLF.Runtime
+    MLF.LLVM
     MLF.Classes
     MLF.Kind
     MLF.Kinding
@@ -30,6 +32,7 @@ library
     MLF.Syntax
     MLF.Parser
     MLF.Graph
+    MLF.Graph.Solver
     MLF.Constraint
     MLF.Elaborate
     MLF.Evidence
@@ -44,14 +47,16 @@ executable emlf
   ghc-options: -rtsopts -with-rtsopts=-A32m
   hs-source-dirs: app
   main-is: Main.hs
-  build-depends: mlf
+  other-modules: Paths_mlf
+  autogen-modules: Paths_mlf
+  build-depends: mlf, directory, filepath
 
 test-suite mlf-tests
   import: settings
   type: exitcode-stdio-1.0
   hs-source-dirs: test, examples
   main-is: Main.hs
-  other-modules: Oracle, Computations, Datatypes, Typeclasses, DoNotation, IOTests, Snake, SnakeBaseline, GraphValidation, GraphUnification, GraphUnificationReference, PreludeTests
+  other-modules: Oracle, Computations, Datatypes, Typeclasses, DoNotation, GraphValidation, GraphUnification, GraphUnificationReference, GraphSolver
   build-depends: mlf, directory
 
 test-suite figure12-tests
@@ -61,3 +66,19 @@ test-suite figure12-tests
   main-is: Figure12Main.hs
   other-modules: Figure12
   build-depends: mlf
+
+test-suite backend-tests
+  import: settings
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test, examples
+  main-is: BackendMain.hs
+  other-modules: Backends, BackendCases, IOTests, PreludeTests, Snake, SnakeBaseline
+  build-depends: mlf, directory, filepath, process, bytestring, text, unix
+
+benchmark compiler-bench
+  import: settings
+  type: exitcode-stdio-1.0
+  hs-source-dirs: bench
+  main-is: Main.hs
+  build-tool-depends: mlf:emlf
+  build-depends: directory, process

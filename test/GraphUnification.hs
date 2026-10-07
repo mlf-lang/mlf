@@ -5,6 +5,7 @@ import Data.Either (isRight)
 import qualified Data.IntMap.Strict as IM
 import MLF.Constraint
 import MLF.Graph
+import qualified MLF.Graph.Solver as Solver
 import MLF.Parser (parseExpr)
 import MLF.Syntax (Flag (..))
 import GraphValidation (smallGraphs)
@@ -54,11 +55,17 @@ compareUnifiers :: Graph -> [(NodeId,NodeId)] -> IO (Either String Graph)
 compareUnifiers g eqs = do
   let actual = snd <$> runBuild g (unify eqs)
       expected = snd <$> runBuild g (referenceUnify eqs)
+      incremental = Solver.prepare g >>= Solver.unify eqs >>= Solver.finish
   case (actual,expected) of
     (Left _,Left _) -> pure ()
     (Right a,Right b) | a == b -> pure ()
     _ -> fail ("unification differs\n" ++ show g ++ "\n" ++ show eqs ++
           "\nactual: " ++ show actual ++ "\nreference: " ++ show expected)
+  case (incremental,expected) of
+    (Left _,Left _) -> pure ()
+    (Right a,Right b) | a == b -> pure ()
+    _ -> fail ("component unification differs\n" ++ show g ++ "\n" ++ show eqs ++
+          "\nactual: " ++ show incremental ++ "\nreference: " ++ show expected)
   pure actual
 
 cases :: [(Graph,[(NodeId,NodeId)])]

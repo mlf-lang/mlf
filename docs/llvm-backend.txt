@@ -1,0 +1,143 @@
+xMLF to LLVM backend
+====================
+
+MLF.LLVM.emitLLVM :: MLF.X.Syntax.Term -> Either String String
+MLF.LLVM.emitLLVMIO :: MLF.X.Syntax.Term -> Either String String
+
+Both public entry points invoke MLF.X.Check.checkClosed before erasure.
+It accepts caller-constructed or parsed target terms independently of source
+inference. Type abstractions, applications, and computation evidence are
+checked and then erased. Invalid unused subterms are still rejected.
+
+The CLI exposes --xmlf-to-llvm for saved xMLF and --emit-llvm for eMLF source.
+Both accept files or stdin; --emit-llvm also accepts --expr and --no-prelude.
+--llvm-runtime locates installed package data or the source checkout when
+the executable is invoked directly from dist-newstyle. Cabal packages the
+runtime C file and header as data files.
+
+Lowering
+--------
+The backend writes textual LLVM IR with opaque pointers. It generates native
+functions for lambda bodies and suspended computations, and native switch
+blocks for constructor cases. It does not embed an xMLF AST or bytecode for
+the runtime to interpret. Runtime calls hide object layout from generated IR.
+
+Closure environments contain free variables ordered by resolved Name IDs.
+Display hints do not determine lookup, capture, or emitted symbols. Every
+generated function/register/string symbol has a compiler-assigned identity.
+Constructor tags come from checked nominal declarations, reserving zero for
+Unit. Primitive codes are an explicit ABI mapping independent of Enum order.
+
+Applications construct lazy application nodes. Nonrecursive lets share their
+RHS; recursive groups allocate all holes before filling their definitions.
+Constructor fields and function arguments remain lazy. A case containing
+constructor alternatives forces the discriminant; a default-only case has
+the interpreter's non-strict behavior. Only the selected alternative builds
+its body. Escaped, length-delimited string bytes cannot become LLVM syntax
+or be truncated at an embedded NUL. Invalid Unicode scalar literals fail.
+
+The module exports mlf_entry and main. For an IO entry, main executes the
+action and discards its result without forcing it. Other entries evaluate to
+weak head normal form and discard the value. Arbitrary polymorphic results
+are not implicitly shown or printed.
+
+emitLLVMIO requires an IO entry, matching MLF.Runtime.runTerm. The general
+emitLLVM entry matches MLF.Runtime.runProgram, which also accepts pure terms.
+This lets both backends test the same entry contracts without changing the
+CLI's existing IO-only --run or general native compilation behavior.
+
+Runtime
+-------
+runtime/mlf_runtime.c provides memoized thunks, closures, application spines,
+curried constructors/primitives, unbounded GMP integers, byte strings, and
+explicit IO actions. Typeclass dictionaries are ordinary recursive data and
+closures; they have no special execution path.
+
+Forcing a thunk updates its indirection to the resulting value. Reentrant
+demand reports a black hole. Tail applications and IO binds use explicit
+stacks, so the tested 10,000-step IO loop does not accumulate native frames
+for the bind chain. Ordinary nested pure evaluation can still use the native
+stack. Memoizing an action does not execute it: the IO driver executes its
+description every time it is sequenced, including repeated getLine actions.
+
+Mark/sweep collection occurs only at the top of the IO driver, after all
+generated functions and force operations have returned. Roots are the current
+action and pending continuations. Native stack scanning is unnecessary.
+Marking handles cyclic recursive data and dictionaries. Dead strings and GMP
+values release their owned storage. All allocations and auxiliary stacks are
+released at normal exit or a reported runtime error. Long pure computations
+retain allocations until the next IO step or exit. The runtime is single
+threaded; it is not an embedding API for concurrent callers.
+
+Input/output uses POSIX getline and stdio. getLine preserves a final partial
+line, fails at EOF with no data, and rejects malformed UTF-8. Output preserves
+embedded NULs and flushes each write. Errors stop the action continuation.
+The initial platform validation is macOS ARM64 with Clang 23.1.2 and GMP 6.3.0;
+other POSIX targets have not been tested. IR does not hardcode an architecture
+triple or C object layout. Clang/LLVM 15 or later is required for opaque pointers.
+
+Validation
+----------
+The backend-tests suite shares one execution matrix across IOTests,
+PreludeTests, Snake, and BackendCases. Every runtime case passes the same
+target AST and scripted input to both the xMLF interpreter and LLVM native
+code. Frontend-only type and source-rejection assertions still run once.
+There is no per-fixture backend selector. A coverage audit checks that both
+backends completed every matrix row; missing executions or toolchain
+dependencies fail the suite. The current suite has 118 fixtures containing
+95 execution rows, each run on both backends. Some fixtures contain multiple
+rows, while others check only parsing or types.
+
+The suite requires POSIX processes, clang, and pkg-config/GMP. It compiles
+the runtime with warnings as errors and a low GC threshold of 32, then
+compiles and links emitted IR with Clang. It includes:
+
+- Rejection of malformed terms, primitive signatures, and computations.
+- Shared execution checks covering all primitives, closures,
+  Unicode and NULs, arbitrary-precision signed arithmetic, lazy branches and
+  fields, currying, source shadowing, polymorphism, recursive dictionaries,
+  cyclic data, mutual recursion, and a 10,000-step IO loop.
+- Same-hint/different-ID and same-ID/different-hint capture checks.
+- Lazy default cases and lazy returned values around a recursive black hole;
+  demand of that hole, EOF, and a final input line without a newline.
+- Execution of every current example (16 files) on both backends.
+- Inspection of the actual Maybe superclass and multiparameter State example
+  results, rather than merely constructing their outer data tag.
+- All seven Snake transcripts compared byte for byte with both xMLF erasure
+  execution and the independent Haskell implementation, plus all eleven
+  pure-rule outcomes checked against Haskell and handwritten expectations.
+- All IO and Prelude execution regressions, including repeated actions,
+  action ordering, laziness, polymorphic dictionaries, IO failures, and
+  both sides of the three monad laws.
+
+Observations include success or failure, ordered read requests, separate
+writes (including empty writes), and unconsumed input. A test-only stdio
+bridge records native events and injects write failures; stdout is checked
+against those events too. The production runtime is unchanged by tracing.
+Only known diagnostic wording differences are normalized; crashes, malformed
+traces, sanitizer reports, and timeouts fail the harness. Expected outputs
+and traces remain independent assertions after backend agreement.
+
+Each interpreter execution runs in a forked process with its timeout in the
+parent. A timer in the interpreter process can prevent GHC from reporting
+NonTermination for a recursive black hole. Forking also preserves the exact
+AST identities and hints used by caller-constructed target tests. Native
+executables are reused for identical IR, but observations are never cached.
+
+MLF_LLVM_TEST_CFLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer'
+instruments the runtime, trace bridge, and native program when running
+cabal test backend-tests -j1. MLF_LLVM_TEST_OPT=-O0 runs the entire same
+matrix with LLVM optimization disabled (the default is -O2).
+The compiler/graph/annotation/oracle/Figure 12 suites remain separate and are
+included in cabal test -j1.
+
+The emitted Snake module has also been verified with llvm-as and compiled
+through the CLI from saved, printed-and-parsed xMLF. This backend does not
+change the source language, graph solver, or xMLF computation rules.
+
+References
+----------
+LLVM IR pointer, function, call, and switch syntax:
+https://llvm.org/docs/LangRef.html
+GMP integer operations:
+https://gmplib.org/manual/Integer-Arithmetic

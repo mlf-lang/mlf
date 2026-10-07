@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Compare two emlf executables, including verification and xMLF emission."""
+"""Compare compiler revisions, including verification and xMLF emission.
+
+Run with cabal bench compiler-bench --benchmark-options='compare-revisions
+--before /path/to/saved-emlf'. Cabal supplies the current compiler and a
+default report path. With no source arguments, compare all examples/*.emlf.
+"""
 
 import argparse
 from datetime import datetime, timezone
@@ -35,10 +40,13 @@ def main():
     parser.add_argument("--after", required=True, type=Path)
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--output", required=True, type=Path)
-    parser.add_argument("sources", nargs="+", type=Path)
+    parser.add_argument("sources", nargs="*", type=Path,
+                        default=sorted(Path("examples").glob("*.emlf")))
     args = parser.parse_args()
     if args.runs < 1:
         parser.error("--runs must be positive")
+    if not args.sources:
+        parser.error("no example sources found; provide source files explicitly")
     binaries = {name: getattr(args, name).resolve(strict=True) for name in ("before", "after")}
     report = {
         "recorded_at_utc": datetime.now(timezone.utc).isoformat(),
