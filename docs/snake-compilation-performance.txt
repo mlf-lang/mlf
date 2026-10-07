@@ -1,6 +1,9 @@
 Snake compilation target: 2026-10-07 (Asia/Shanghai)
 ==================================================
 
+Historical report for the 5x target. The current implementation and 1x
+target are documented in snake-compilation-parity.txt.
+
 Result: PASS. All five paired compilation runs are below 5x GHC.
 Median eMLF: 2.826884 seconds.
 Median GHC:  0.745156 seconds.
@@ -105,16 +108,15 @@ Emitted xMLF: 020370aeaf6d45453a3725de71cef4b5b4cca6a7d24395cb8234ca89cc259312
 
 Reproduction
 ------------
-cabal build exe:emlf -j1
-python3 scripts/benchmark-snake.py \
-  --emlf "$(cabal list-bin exe:emlf)" \
-  --runs 5 --output dist-newstyle/compiler-target/ghc-comparison.json
+cabal bench compiler-bench -j1 \
+  --benchmark-options='--runs 5 --max-ratio 5 --output dist-newstyle/benchmarks/ghc-comparison-5x.json'
 
-To require byte-identical output against a saved earlier compilation, add
---reference-xmlf /path/to/snake-before.xmlf. The script uses only Python's
-standard library, saves raw samples and fingerprints in JSON, persists the
-checked xMLF beside that report, and exits unsuccessfully if any pair misses
-the limit. Timings are machine- and load-dependent.
+The current Cabal entry point also measures the LLVM workflows. To require
+byte-identical output against a saved earlier compilation, add
+--reference-xmlf /path/to/snake-before.xmlf to --benchmark-options. The driver
+uses only Python's standard library, saves raw samples and fingerprints in
+JSON, persists checked xMLF beside that report, and exits unsuccessfully if
+any pair misses the limit. Timings are machine- and load-dependent.
 
 Local raw evidence for this run:
 dist-newstyle/compiler-target/final-ghc-comparison.json

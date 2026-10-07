@@ -18,6 +18,7 @@ import qualified MLF.Syntax as S
 import MLF.Kind
 import qualified MLF.Kinding as K
 import MLF.Graph
+import qualified MLF.Graph.Solver as Solver
 import qualified MLF.X.Syntax as X
 import qualified MLF.X.Type as T
 
@@ -361,14 +362,9 @@ embed ds env ty = do
 -- equalities are solved first, so expansion never generalizes a lambda parameter.
 solve :: Constraints -> Either String Graph
 solve c = do
-  (_,g) <- runBuild (initialGraph c) $ do
-    unify (equalities c)
-    forM_ (instances c) $ \e -> do
-      before <- get
-      let target = resolve before (toNode e)
-      destination <- maybe (lift (Left "instance target has no binder")) pure (binder (nodeAt before target))
-      (root,_,frontier) <- expand (fromGen e) destination
-      unify (frontier ++ [(root,target)])
+  initial <- Solver.prepare (initialGraph c) >>= Solver.unify (equalities c)
+  solved <- foldM (\solver e -> Solver.instantiate (fromGen e) (toNode e) solver) initial (instances c)
+  g <- Solver.finish solved
   let normalized = normalize g
   validateGraph normalized
   pure normalized

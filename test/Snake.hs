@@ -4,6 +4,8 @@ import Control.Monad (unless)
 import Data.IORef
 import Data.List (isInfixOf, isPrefixOf)
 import System.Timeout (timeout)
+import Backends (Backends, Event (..))
+import qualified Backends as B
 import MLF.Compiler
 import MLF.Parser (parseExpr, parseProgram)
 import qualified MLF.Runtime as R
@@ -32,8 +34,11 @@ checked result = do
   pure term
 
 -- Every scenario must consume exactly its scripted input and terminate.
-run :: X.Term -> [String] -> IO String
-run term input = capture input (\backend -> R.runTerm backend term >>= right)
+runOn :: Backends -> X.Term -> [String] -> IO String
+runOn backends term input = do
+  (result,trace) <- B.capture backends term input
+  right result
+  pure (concat [text | Write text <- trace])
 
 capture :: [String] -> (R.IOBackend -> IO ()) -> IO String
 capture input action = do
@@ -55,9 +60,9 @@ capture input action = do
   require (null remaining) ("Snake stopped before consuming " ++ show remaining)
   concat . reverse <$> readIORef output
 
-runBoth :: X.Term -> [String] -> IO String
-runBoth term input = do
-  output <- run term input
+runWithBaseline :: Backends -> X.Term -> [String] -> IO String
+runWithBaseline backends term input = do
+  output <- runOn backends term input
   baseline <- capture input $ \backend -> H.runGame H.Console
     { H.readLine = R.readLine backend
     , H.writeText = R.writeText backend
@@ -89,8 +94,8 @@ frames output = go (lines output)
 initialBoard :: [String]
 initialBoard = board [(3,"..oo@.*.....")]
 
-snakeTests :: [Test]
-snakeTests =
+snakeTests :: Backends -> [Test]
+snakeTests backends =
   [ ("Snake: playable source and xMLF sessions", do
       putStrLn "  Snake: compiling the interactive example"
       source <- readFile "examples/snake.emlf"
@@ -136,7 +141,7 @@ snakeTests =
       bodyFrames <- frames body
       require (length bodyFrames == 14 && "Game over: hit body. Score: 2\n" `isInfixOf` body)
         ("body collision did not end the game: " ++ body)
-      putStrLn "  Snake: all scripted sessions passed; Haskell/eMLF transcripts match")
+      putStrLn "  Snake: all 7 sessions pass on both backends and match Haskell")
   , ("Snake: pure rules, departing tail, food search, and full-board win", do
       putStrLn "  Snake: compiling the pure-rule checks"
       source <- readFile "examples/snake.emlf"
@@ -152,8 +157,11 @@ snakeTests =
         ("unexpected rule outcomes:\n" ++ output)
       let baseline = [label ++ ": " ++ describeOutcome result' | (label,result') <- baselineRuleCases]
       require (lines output == baseline) ("Haskell/eMLF rule mismatch:\n" ++ unlines baseline)
-      putStrLn ("  Snake: " ++ show (length ruleCases) ++ " rule checks passed in both eMLF and Haskell"))
+      putStrLn ("  Snake: " ++ show (length ruleCases) ++ " rule checks pass on both backends and match Haskell"))
   ]
+  where
+    run = runOn backends
+    runBoth = runWithBaseline backends
 
 withRulesEntry :: S.Expr -> S.Program -> Either String S.Program
 withRulesEntry entry program = case program of

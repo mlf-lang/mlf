@@ -22,18 +22,16 @@ import Computations (computationTests, hygieneTests)
 import Datatypes (datatypeTests)
 import Typeclasses (typeclassTests)
 import DoNotation (doTests)
-import IOTests (ioTests)
-import Snake (snakeTests)
 import GraphValidation (graphValidationTests)
 import GraphUnification (graphUnificationTests)
-import PreludeTests (preludeTests)
+import GraphSolver (graphSolverTests)
 
 type Test = (String, IO ())
 
 main :: IO ()
 main = do
   hSetBuffering stdout LineBuffering
-  let suite = compilerTests ++ computationTests ++ hygieneTests ++ graphTests ++ graphValidationTests ++ graphUnificationTests ++ datatypeTests ++ typeclassTests ++ doTests ++ ioTests ++ preludeTests ++ snakeTests ++
+  let suite = compilerTests ++ computationTests ++ hygieneTests ++ graphTests ++ graphValidationTests ++ graphUnificationTests ++ graphSolverTests ++ datatypeTests ++ typeclassTests ++ doTests ++
         [("independent ML typability oracle", oracleTest), ("annotation corpus", annotationCorpus), ("example files", examplesTest)]
   outcomes <- forM suite $ \(label,test) -> do
     outcome <- try test :: IO (Either SomeException ())

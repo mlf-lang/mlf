@@ -1,11 +1,11 @@
 module PreludeTests (preludeTests) where
 
 import Control.Monad (forM_, unless)
-import Data.IORef
 import Data.List (isInfixOf)
+import Backends (Backends, Event (..))
+import qualified Backends as B
 import MLF.Compiler
 import MLF.Parser (parseExpr, parseProgram)
-import qualified MLF.Runtime as R
 import qualified MLF.X.Check as C
 import qualified MLF.X.Parser as XP
 import MLF.X.Pretty (prettyTerm)
@@ -40,24 +40,14 @@ rejects label source expectedPhase reason = ("prelude rejection: " ++ label,
     Left err -> require (phase err == expectedPhase && reason `isInfixOf` diagnostic err) (show err)
     Right result -> fail ("unexpected acceptance: " ++ sourceType result))
 
-runs :: String -> String -> [String] -> String -> Test
-runs label source inputs expected = ("prelude runtime: " ++ label, do
+runsOn :: Backends -> String -> String -> [String] -> String -> Test
+runsOn backends label source inputs expected = ("prelude runtime: " ++ label, do
   result <- checked source
   term <- right (XP.parseTerm "<prelude runtime>" (prettyTerm (compiledTerm result)))
-  pending <- newIORef inputs
-  output <- newIORef []
-  let backend = R.IOBackend
-        { R.readLine = do
-            values <- readIORef pending
-            case values of
-              [] -> fail "unexpected prelude input request"
-              value:rest -> writeIORef pending rest >> pure value
-        , R.writeText = \value -> modifyIORef' output (value:)
-        }
-  R.runTerm backend term >>= right
-  remaining <- readIORef pending
-  actual <- concat . reverse <$> readIORef output
-  require (null remaining && actual == expected) (show (remaining,actual)))
+  (outcome,trace) <- B.capture backends term inputs
+  right outcome
+  let actual = concat [text | Write text <- trace]
+  require (actual == expected) (show actual))
 
 int, bool :: T.Type
 int = T.Con "Int" []
@@ -72,8 +62,8 @@ twice = "let twice : forall (m : * -> *) a. Monad m => m a -> m a = " ++
 explicitMonad = "class Monad (m : * -> *) where { return : forall a. a -> m a; " ++
   "bind : forall a b. m a -> (a -> m b) -> m b }; "
 
-preludeTests :: [Test]
-preludeTests =
+preludeTests :: Backends -> [Test]
+preludeTests backends =
   [ runs "IO sequencing without declarations"
       "do { putStr \"Name: \"; line <- getLine; putStrLn line }" ["Ada"] "Name: Ada\n"
   , runs "qualified generic IO function" (twice ++ "twice (putStrLn \"again\")") [] "again\nagain\n"
@@ -159,3 +149,4 @@ preludeTests =
       , ("unrelated class method", "class Keep a where { return : a -> a }; instance Keep Int where { return = \\x -> x }; return 42")
       ]
   ]
+  where runs = runsOn backends

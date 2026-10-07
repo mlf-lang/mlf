@@ -1,10 +1,11 @@
 -- | A lazy interpreter for checked xMLF erasure. Evaluating a term constructs
 -- IO actions; only the action interpreter below can call the backend.
 module MLF.Runtime
-  ( IOBackend (..), consoleBackend, RuntimeError (..), runTerm
+  ( IOBackend (..), consoleBackend, RuntimeError (..), runTerm, runProgram
   ) where
 
 import Control.Exception (IOException, displayException, try)
+import qualified Control.Exception as Exception
 import Control.Monad (unless)
 import Data.Bifunctor (first)
 import qualified Data.Map.Lazy as Map
@@ -52,17 +53,29 @@ failure = Left . RuntimeError
 -- | Check even caller-constructed target terms before executing any effects.
 -- The result value of the final IO action is discarded, as with a main action.
 runTerm :: IOBackend -> X.Term -> IO (Result ())
-runTerm backend term = case prepare of
+runTerm = runEntry True
+
+-- | The native executable entry convention: execute IO, or evaluate a pure
+-- program to weak head normal form without printing or forcing its fields.
+runProgram :: IOBackend -> X.Term -> IO (Result ())
+runProgram = runEntry False
+
+runEntry :: Bool -> IOBackend -> X.Term -> IO (Result ())
+runEntry requireIO backend term = case prepare of
   Left err -> pure (Left err)
-  Right ds -> do
-    outcome <- try (fmap (fmap (const ())) (runAction ds backend (evaluate ds Map.empty (X.erase term))))
+  Right (ds,action) -> do
+    let value = evaluate ds Map.empty (X.erase term)
+        execute | action = fmap (fmap (const ())) (runAction ds backend value)
+                | otherwise = Exception.evaluate (value >>= \v -> v `seq` Right ())
+    outcome <- try execute
       :: IO (Either IOException (Result ()))
     pure (either (Left . RuntimeError . ("IO error: " ++) . displayException) id outcome)
   where
     prepare = do
       ty <- first (RuntimeError . ("target verification failed: " ++)) (C.checkClosed term)
-      unless (isIO ty) (failure "program must have type IO a to run")
-      first RuntimeError (D.validateDeclarations (case term of X.WithData ds _ -> ds; _ -> []))
+      unless (not requireIO || isIO ty) (failure "program must have type IO a to run")
+      ds <- first RuntimeError (D.validateDeclarations (case term of X.WithData declarations _ -> declarations; _ -> []))
+      pure (ds,isIO ty)
     isIO (T.Forall _ _ body) = isIO body
     isIO (T.Con "IO" [_]) = True
     isIO _ = False

@@ -2,7 +2,7 @@ Compiler performance: 2026-10-07 (Asia/Shanghai)
 ==============================================
 
 Historical optimization report. The current Snake/GHC comparison and the
-5x compilation target are documented in snake-compilation-performance.txt.
+1x compilation target are documented in snake-compilation-parity.txt.
 
 Measured from: 2026-10-06T20:28:24.600206+00:00
 Host: macOS-26.6.2-arm64-arm-64bit-Mach-O
@@ -90,11 +90,12 @@ Target typing, computation checking, and source erasure checks remain enabled.
 Reproduction
 ------------
 Preserve the earlier executable before rebuilding the compiler, then use:
-python3 scripts/benchmark-compiler.py \
-  --before dist-newstyle/compiler-performance/emlf-before \
-  --after "$(cabal list-bin exe:emlf)" \
-  --runs 3 --output dist-newstyle/compiler-performance/comparison.json \
-  examples/*.emlf
+cabal bench compiler-bench -j1 \
+  --benchmark-options='compare-revisions --before dist-newstyle/compiler-performance/emlf-before --runs 3 --output dist-newstyle/benchmarks/comparison.json'
+
+Cabal supplies the newly built compiler, and the driver selects all examples
+when no source paths are given. Match the source/prelude configuration to the
+saved compiler when reproducing this historical comparison.
 
 The local comparison.json contains all raw samples, input and binary hashes,
 output hashes, and independently checked types. It is a build artifact;

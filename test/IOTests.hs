@@ -1,21 +1,19 @@
 module IOTests (ioTests) where
 
 import Control.Monad (unless)
-import Data.IORef
 import Data.List (isInfixOf)
-import System.Timeout (timeout)
+import Backends (Backends, Event (..), Entry (..), Input (..))
+import qualified Backends as B
 import MLF.Compiler
 import qualified MLF.Data as D
 import qualified MLF.Primitive as P
-import qualified MLF.Runtime as R
 import qualified MLF.X.Check as C
 import qualified MLF.X.Parser as XP
-import MLF.X.Pretty (prettyTerm, prettyType)
+import MLF.X.Pretty (prettyTerm)
 import qualified MLF.X.Syntax as X
 import qualified MLF.X.Type as T
 
 type Test = (String, IO ())
-data Event = ReadLine | Write String deriving (Eq, Show)
 
 require :: Bool -> String -> IO ()
 require ok message = unless ok (fail message)
@@ -32,28 +30,11 @@ checked source = do
   require (X.erase term == X.erase (compiledTerm result)) "IO round trip changed erasure"
   pure (result,term)
 
-capture :: X.Term -> [String] -> IO (Either R.RuntimeError (), [Event])
-capture term inputs = do
-  pending <- newIORef inputs
-  events <- newIORef []
-  let backend = R.IOBackend
-        { R.readLine = do
-            modifyIORef' events (ReadLine:)
-            remaining <- readIORef pending
-            case remaining of
-              [] -> ioError (userError "test input exhausted")
-              line:rest -> writeIORef pending rest >> pure line
-        , R.writeText = \s -> modifyIORef' events (Write s:)
-        }
-  outcome <- R.runTerm backend term
-  trace <- reverse <$> readIORef events
-  pure (outcome,trace)
-
-runs :: String -> String -> [String] -> [Event] -> Test
-runs label source inputs expected = ("IO: " ++ label, do
+runsOn :: Backends -> String -> String -> [String] -> [Event] -> Test
+runsOn backends label source inputs expected = ("IO: " ++ label, do
   (_,term) <- checked source
-  (outcome,trace) <- capture term inputs
-  right outcome
+  (result,trace) <- B.capture backends term inputs
+  right result
   require (trace == expected) ("expected " ++ show expected ++ ", got " ++ show trace))
 
 hasType :: String -> String -> T.Type -> Test
@@ -66,10 +47,12 @@ rejects label source reason = ("IO rejection: " ++ label, case compile "<invalid
   Left err -> require (phase err == Inference && reason `isInfixOf` diagnostic err) (show err)
   Right result -> fail ("unexpected acceptance: " ++ sourceType result))
 
-targetRejects :: String -> X.Term -> String -> Test
-targetRejects label term reason = ("IO target: " ++ label, case C.checkClosed term of
-  Left err -> require (reason `isInfixOf` err) err
-  Right ty -> fail ("unexpected acceptance: " ++ prettyType ty))
+targetRejectsOn :: Backends -> String -> X.Term -> String -> Test
+targetRejectsOn backends label term reason = ("IO target: " ++ label, do
+  observed <- B.execute backends IOEntry (Input "" False) term
+  case B.outcome observed of
+    Left err -> require (reason `isInfixOf` show err && null (B.events observed)) (show err)
+    Right () -> fail "invalid target accepted by both backends")
 
 int, string, unit :: T.Type
 int = T.Con "Int" []
@@ -83,8 +66,8 @@ monadIO :: String
 monadIO = "class Monad (m : * -> *) where { return : forall a. a -> m a; bind : forall a b. m a -> (a -> m b) -> m b }; " ++
   "instance Monad IO where { return = ioReturn; bind = ioBind }; "
 
-ioTests :: [Test]
-ioTests =
+ioTests :: Backends -> [Test]
+ioTests backends =
   [ hasType "string literal" "\"hello\"" string
   , hasType "unit literal" "()" unit
   , hasType "unit constructor" "Unit" unit
@@ -127,10 +110,9 @@ ioTests =
       (_,term) <- checked ("data Loop a = Loop (Loop a -> a); " ++
         "let spin : Int = let go = \\r -> case r of { Loop f -> f r } in go (Loop go) in " ++
         "do { printInt (ifThenElse true 1 spin); printInt (ifThenElse false spin 2) }")
-      result <- timeout 2000000 (capture term [])
-      case result of
-        Just (Right (),trace) -> require (trace == [Write "1\n",Write "2\n"]) (show trace)
-        _ -> fail ("conditional forced a divergent branch: " ++ show result))
+      (result,trace) <- capture term []
+      right result
+      require (trace == [Write "1\n",Write "2\n"]) (show trace))
   , runs "string escapes and unicode" "putStrLn \"你好\\n\\\"quoted\\\"\\t\\\\\"" [] [Write "你好\n\"quoted\"\t\\\n"]
   , runs "an action can be executed more than once"
       "let input = getLine in do { a <- input; b <- input; putStrLn (concatString a b) }"
@@ -209,9 +191,9 @@ ioTests =
         Right _ -> fail "EOF did not fail")
   , ("IO: backend output errors are reported", do
       (_,term) <- checked "putStrLn \"hello\""
-      outcome <- R.runTerm (R.IOBackend (pure "") (\_ -> ioError (userError "write failed"))) term
-      case outcome of
-        Left err -> require ("write failed" `isInfixOf` show err) (show err)
+      observed <- B.execute backends IOEntry (Input "" True) term
+      case B.outcome observed of
+        Left err -> require ("write failed" `isInfixOf` show err && B.events observed == [Write "hello\n"]) (show observed)
         Right _ -> fail "output failure was swallowed")
   , ("IO: unknown target primitive is rejected", case XP.parseTerm "<unknown primitive>" "primitive unsafePerformIO()" of
       Left err -> require ("unknown primitive" `isInfixOf` err) err
@@ -222,6 +204,9 @@ ioTests =
       [Write "action\n",Write "7\n",Write "done\n",Write "end\n"]
   ]
   where
+    runs = runsOn backends
+    capture = B.capture backends
+    targetRejects = targetRejectsOn backends
     law label left rightExpression expected = ("IO monad law: " ++ label, do
       let prefix = "let action = do { putStrLn \"action\"; return 7 } in " ++
             "let f = \\n -> do { printInt n; return \"done\" } in " ++

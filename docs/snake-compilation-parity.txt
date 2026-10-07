@@ -1,0 +1,173 @@
+Snake compilation parity: 2026-10-07 (Asia/Shanghai)
+===================================================
+
+Historical xMLF-only report for the 1x target. The current benchmark also
+measures LLVM IR emission and native compilation/linking; see
+snake-llvm-compilation-performance.txt for its table and method. The samples
+below retain the original frontend-only measurement scope.
+
+Result: PASS. All five measured compilation pairs are below 1x GHC.
+Median eMLF: 0.202640 seconds.
+Median GHC:  0.716603 seconds.
+Ratio of medians: 0.2828x.
+Worst paired ratio: 0.2954x.
+
+Measured from: 2026-10-06T22:49:52.279952+00:00
+Host: macOS-26.6.2-arm64-arm-64bit-Mach-O
+GHC: 9.14.1
+Build: cabal build exe:emlf -j1; project optimization: 2.
+CLI default RTS option: -A32m. GHCRTS environment: unset.
+The executable is an ordinary optimized build, without profiling.
+Compiler build flags, RTS defaults, and both game sources are unchanged.
+
+Scope and method
+----------------
+eMLF compiles examples/snake.emlf with the standard prelude to verified,
+captured xMLF. GHC compiles examples/SnakeBaseline.hs to a linked native
+executable with -O2 -Wall -Werror -fforce-recomp -main-is SnakeBaseline.
+These are different output formats. This measures the requested compilation
+workflows, not equivalent native backends or game execution.
+
+Each sample starts a fresh process. GHC recompiles and links every time;
+neither compiler reuses a successful game compilation. Order alternates
+eMLF/GHC, GHC/eMLF. Timing includes ordinary process startup, source reading,
+parsing, inference, elaboration, verification, and captured output. It excludes
+building emlf and running either game. The gate checks every pair, not only
+the median. The default --max-ratio is now 1.
+
+Both compiler executables are queried for metadata before the measured runs:
+GHC --numeric-version, and emlf +RTS --info -RTS. Neither probe compiles a
+source file. The previous script already queried GHC; it now treats emlf
+similarly and records both probe durations. In this run immediately after
+linking emlf, the probes took 0.057779 seconds for GHC and 0.705305 for emlf.
+
+The target therefore covers compilation after executable initialization.
+It does not establish that the first invocation of a newly linked emlf
+binary is faster than GHC. An earlier component-solver build's first launch
+took 0.959051 seconds against GHC's 0.830517 seconds (1.1548x), followed by
+0.215572 and 0.216571 seconds. Similar one-off overhead appeared on a trivial
+source. OS executable initialization is a plausible explanation; its exact
+cause was not established. This cost is disclosed rather than counted as
+an improvement to source compilation.
+
+Raw paired samples (seconds)
+----------------------------
+Run          eMLF           GHC     Ratio
+  1      0.216316      0.732207    0.2954x
+  2      0.202585      0.710364    0.2852x
+  3      0.199188      0.722692    0.2756x
+  4      0.202640      0.715808    0.2831x
+  5      0.203269      0.716603    0.2837x
+
+The final binary also passed five pairs using the original benchmark script
+from b882890, with --max-ratio 1 and no emlf metadata probe in that script.
+This was after the preceding validation and timing runs, so it also does not
+measure first executable initialization:
+
+Run          eMLF           GHC     Ratio
+  1      0.201799      0.715599    0.2820x
+  2      0.199623      0.716983    0.2784x
+  3      0.200001      0.725219    0.2758x
+  4      0.202691      0.719060    0.2819x
+  5      0.203347      0.711705    0.2857x
+
+A separate before/after comparison, using identical compiler build flags
+and current sources, measured Snake at 2.752676 seconds with the saved
+b882890 compiler and 0.202747 seconds with the final compiler (13.58x faster).
+That is a single paired sample, not a median speedup estimate. All 16 examples
+in that comparison produced byte-identical, independently checked xMLF.
+
+Implementation
+--------------
+The earlier unifier visited the whole accumulated graph for every instance
+edge. Profiling identified repeated graph validation, rebinding, resolution,
+and associated allocation as the remaining bottleneck.
+
+MLF.Graph.Solver now maintains structural-parent and binding-child indexes.
+Starting from an equation's endpoints, it closes over structural edges in
+both directions and type binding edges in both directions. Generalization
+nodes stop the type traversal, while their full binding ancestry is retained.
+This includes incoming references, shared types, and protected siblings.
+
+The selected component is projected to compact scratch identities, preserving
+the ascending original order and therefore union representative choices.
+Unrelated generalization roots use private bottom placeholders. The existing
+MLF.Graph.unify runs unchanged, including validation before and after the
+merge, Rebind, occurs/kind checks, and original-identity permission checks.
+The solver verifies placeholders and generalization scopes stay unchanged,
+restores original identities and roots, and updates only affected indexes.
+Placeholder identities cannot escape into the resulting graph.
+
+This boundary preserves the information used by the unifier: type permission
+paths stop at generalization nodes; inertness depends on binding descendants;
+and the complete structural parents and binding ancestry retain relevant
+scope constraints and lowest common ancestors. Generalization nodes cannot
+be merged or be structural children, and their binding parents remain fixed.
+
+The solver constructor and record selectors are private. Its exported graph
+accessor is an ordinary function, so clients cannot replace a graph without
+maintaining its indexes. A full graph validation initializes the solver;
+finish independently reconstructs both indexes and validates the complete
+inference result. Normalization is followed by another full graph validation.
+
+Elaboration reuses the final presolution's indexes. Each non-reflexive edge
+still expands from that final graph, solves its frontier separately, and
+returns the original-to-copy identity map for evidence construction. Checked
+Inst-Refl remains available for alpha-equivalent types. Independent target
+typing, computation checking, inferred-type agreement, and source erasure
+checks remain enabled. No Snake-specific path or compilation cache was added.
+
+Validation
+----------
+cabal test -j1 --test-show-details=direct: passed after the final code change.
+cabal build exe:emlf -j1: passed.
+380 main checks; 0 failures, including:
+  - 12,000 graphs against the uncached validator (78 valid);
+  - 5,616 unification cases comparing the component solver and the full-graph
+    solver with the frozen map-based reference (1,433 accepted);
+  - additional sparse, negative, and extreme identities, protected siblings,
+    incoming references, disconnected invalid input, and occurs checks;
+  - 1,427 inference steps with exact full-graph equality and independent
+    reverse-index audits after every step;
+  - 189 non-reflexive instance witnesses with exact graph and copy-map
+    equality against the original full-graph expansion/unification path;
+  - 6,712 independent ML oracle terms and 126 annotation programs;
+  - seven Snake transcripts and eleven rule outcomes matching Haskell.
+Figure 12: 43/43 regression expectations and 36 supplementary checks pass.
+A8 still rejects the explicit signature with a protected-variable error.
+A separate compile-failure check confirmed external graph record updates
+are rejected, preserving the incremental solver's abstraction boundary.
+
+All 16 example outputs match the saved compiler byte for byte and are parsed
+and checked independently. Every timed Snake output also matches the saved
+pre-optimization output. The benchmark independently checks IO Unit and
+compares a complete game transcript with the freshly linked Haskell game,
+outside the timed region.
+
+SHA-256 fingerprints
+--------------------
+Before emlf: 89735dca55145677e85e70fc08db638c7ff24a841b05edca208b88975c82fcc6
+Final emlf: a39cd45eefd5ac226dfc948c43a5ef8566515f6d16d217e1ca0e624f39bf8d44
+ghc: 39fd1ee0cf7eb5739a595d5c238a95a7a062942397cc6d2a16425d6eeb18283e
+snake.emlf: 23e4eda9b8b2e6388cdf9940fa7a011177e48c5cf0d9d193aea5b403fa4a6401
+SnakeBaseline.hs: 58001d2e09d34eaab76c8bc6334761c7907270658f61ecc65e32c1f76cb18d37
+Emitted xMLF: 020370aeaf6d45453a3725de71cef4b5b4cca6a7d24395cb8234ca89cc259312
+
+Reproduction
+------------
+cabal bench compiler-bench -j1 \
+  --benchmark-options='--runs 5 --output dist-newstyle/benchmarks/ghc-comparison.json'
+
+The current Cabal entry point also measures the LLVM workflows. Optionally
+add --reference-xmlf /path/to/snake-before.xmlf to --benchmark-options to require
+equality with a saved earlier output. The driver uses Python's standard
+library and records raw timings, metadata probe durations, commands, and
+fingerprints.
+It saves checked xMLF beside the JSON report and fails if any pair exceeds 1.
+Timings depend on the machine and its load.
+
+Local raw evidence:
+dist-newstyle/compiler-parity/final-ghc-comparison.json
+dist-newstyle/compiler-parity/original-method-final.json
+dist-newstyle/compiler-parity/example-equivalence.json
+dist-newstyle/compiler-parity/components.json (earlier first-launch result)
