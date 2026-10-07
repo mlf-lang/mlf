@@ -70,6 +70,18 @@ backendTests backends =
       observed <- B.execute backends IOEntry (Input "unused\n" False) term
       right (B.outcome observed)
       require (B.events observed == [Write "no read\n"] && B.remaining observed == "unused\n") (show observed))
+  , ("backend: binary-trees benchmark", do
+      term <- readFile "benchmarks/binary-trees/mlf/main.emlf" >>= checked
+      forM_ [0,7] $ \size -> do
+        let maximumDepth = max 6 size :: Int
+            line label depth count = label ++ " of depth " ++ show depth ++ "\t check: " ++ show count ++ "\n"
+            nodes depth = 2 ^ (depth + 1) - 1 :: Integer
+            expected = line "stretch tree" (maximumDepth + 1) (nodes (maximumDepth + 1)) ++
+              concat [let count = 2 ^ (maximumDepth - depth + 4) :: Integer
+                      in line (show count ++ "\t trees") depth (count * nodes depth)
+                     | depth <- [4,6..maximumDepth]] ++
+              line "long lived tree" maximumDepth (nodes maximumDepth)
+        checkOutput backends term [show size] expected)
   , ("backend: all examples execute", do
       files <- sort . filter (".emlf" `isSuffixOf`) <$> listDirectory "examples"
       require (length files >= 16) "example corpus is unexpectedly small"

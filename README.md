@@ -75,14 +75,19 @@ and `main`. It supports the complete current xMLF term syntax, including
 recursive dictionaries, polymorphism after checked erasure, lazy constructor
 fields, and IO. An `IO a` entry executes the action and discards its result;
 a pure entry evaluates to weak head normal form without printing a value.
+Known saturated functions use native workers, with conservative demand
+analysis to avoid unnecessary thunks. Partial applications and lazy fields
+retain their call-by-need behavior. Small integers and nullary constructors
+use tagged immediate values; unary/binary data has inline fields.
 GMP preserves the language's unbounded `Int`; strings use length-delimited
 UTF-8, including embedded NULs. Invalid Unicode scalar literals are rejected.
 
 The runtime memoizes pure thunks and executes shared IO actions afresh on
 each bind. Its collector runs between IO steps, retaining the current action
-and pending continuations. Long pure computations can retain allocations
+and pending continuations. Managed values use reusable allocation pages,
+with reachability-based reclamation. Long pure computations can retain allocations
 until the next IO step or program exit. This is a single-threaded POSIX
-runtime, tested on macOS ARM64 with Clang 23.1.2 and GMP 6.3.0.
+runtime with a 64-bit ABI, tested on macOS ARM64 with Clang 23.1.2 and GMP 6.3.0.
 
 `cabal test -j1` runs every backend behavior test through both the xMLF
 interpreter and LLVM native code. The shared matrix compares results, ordered
@@ -602,14 +607,38 @@ The project builds with `-O2`; the CLI uses a 32 MiB allocation area to reduce
 garbage collection during inference. These defaults are in `cabal.project`
 and `mlf.cabal`. The allocation area can be overridden with RTS options.
 
-Run the compilation benchmarks through Cabal:
+Run the cross-language compilation and runtime benchmarks through Cabal:
 
 ```sh
 cabal bench -j1
 ```
 
-Cabal builds `emlf` as the `compiler-bench` tool dependency, then runs five
-rounds of all four Snake workflows below. It saves the JSON report and
+The default compares Clang `-O3`, Rust `-O`, GHC `-O2`, and MLF's native LLVM
+pipeline on pinned Benchmarks Game binary-trees sources. Compilation and
+runtime are timed separately, after four-language correctness validation.
+It writes `bench-results.json` with raw samples, medians, ratios, CPU/RSS,
+toolchain identities and source provenance. Rust and Python 3.9+ are required
+in addition to the native build dependencies. The default includes three
+depth-16 runtime samples. The native optimizer brings each MLF execution
+to roughly 0.3 seconds on the development machine; see the measured report.
+See [benchmark methodology, commands and limitations](benchmarks/README.md)
+and [workload selection](benchmarks/INVESTIGATION.md). The
+[measured results](benchmarks/RESULTS.md) include a complete archived JSON run.
+
+```sh
+cabal bench --benchmark-options='--compile-only'
+cabal bench --benchmark-options='--runtime-only'
+cabal bench --benchmark-options='--benchmark binary-trees'
+```
+
+The existing Snake compilation comparison is an explicit mode:
+
+```sh
+cabal bench --benchmark-options='snake'
+```
+
+Cabal builds `emlf` as the `compiler-bench` tool dependency, then this mode runs
+five rounds of all four Snake workflows below. It saves the JSON report and
 `.xmlf`/`.ll` outputs under `dist-newstyle/benchmarks/snake.*`. Python 3,
 GHC, Clang, `pkg-config`, and GMP are required. The existing process-based
 timing driver runs after Cabal finishes building, so compiler builds and
@@ -619,7 +648,7 @@ Override driver options through Cabal, for example:
 
 ```sh
 cabal bench compiler-bench -j1 \
-  --benchmark-options='--runs 10 --output dist-newstyle/benchmarks/snake-10.json'
+  --benchmark-options='snake --runs 10 --output dist-newstyle/benchmarks/snake-10.json'
 ```
 
 Five serial rounds on macOS ARM64, GHC 9.14.1, Clang 23.1.2, and GMP 6.3.0:

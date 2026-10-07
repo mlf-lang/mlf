@@ -1,0 +1,2578 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "recorded_at_utc": "2026-10-07T18:16:24.935705+00:00",
+  "disclaimer": "This benchmark measures practical end-to-end compiler/language implementation performance. It does NOT perfectly isolate backend code-generation quality because C, Rust, Haskell and MLF have different language semantics, runtime systems, allocation models and abstractions.",
+  "host": {
+    "os": "Darwin",
+    "release": "25.6.0",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "architecture": "arm64",
+    "logical_cpus": 10,
+    "python": "3.14.8"
+  },
+  "configuration": {
+    "runs": 7,
+    "size_override": null,
+    "compile_only": false,
+    "runtime_only": false,
+    "timeout_seconds": 600
+  },
+  "results": [
+    {
+      "benchmark": "binary-trees",
+      "input": 16,
+      "languages": {
+        "c": {
+          "source": "benchmarks/binary-trees/c/main.c",
+          "compiler_flags": [
+            "-O3"
+          ],
+          "preparation": {
+            "wall_seconds": 0.1387788339634426,
+            "cpu_seconds": 0.157857,
+            "peak_rss_bytes": 72024064,
+            "stages": [
+              {
+                "command": [
+                  "/opt/homebrew/opt/llvm/bin/clang",
+                  "-O3",
+                  "/Volumes/src/mlf/benchmarks/binary-trees/c/main.c",
+                  "-lm",
+                  "-o",
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/prepared/program"
+                ],
+                "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/prepared",
+                "wall_seconds": 0.13815858302405104,
+                "user_seconds": 0.11490399999999999,
+                "system_seconds": 0.042953,
+                "cpu_seconds": 0.157857,
+                "peak_rss_bytes": 72024064,
+                "stderr": ""
+              }
+            ],
+            "executable_bytes": 33816,
+            "executable_sha256": "3e2c4d1caf6b97ab3532e237f61621e52b3e73cd325507f4572b3688897c45b7"
+          },
+          "correctness": [
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/prepared/program",
+                "0"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.4845712910173461,
+              "user_seconds": 0.000982,
+              "system_seconds": 0.001421,
+              "cpu_seconds": 0.0024029999999999998,
+              "peak_rss_bytes": 1376256,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/prepared/program",
+                "7"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.0033682080102153122,
+              "user_seconds": 0.0009429999999999999,
+              "system_seconds": 0.0011229999999999999,
+              "cpu_seconds": 0.0020659999999999997,
+              "peak_rss_bytes": 1376256,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "3d9a43f3106a474d5f2891d8f02d74ae4bb12795becba68713091f2450c78dda"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/prepared/program",
+                "10"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.0061460419674403965,
+              "user_seconds": 0.003935999999999999,
+              "system_seconds": 0.001078,
+              "cpu_seconds": 0.005013999999999999,
+              "peak_rss_bytes": 1441792,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "b7f92c56b5d8aeb0a4d698842d1d87a57b4909865c3c84e5e10313e16663c3cb"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/prepared/program",
+                "16"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.3565582919982262,
+              "user_seconds": 0.350655,
+              "system_seconds": 0.003277,
+              "cpu_seconds": 0.35393199999999997,
+              "peak_rss_bytes": 5652480,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff"
+            }
+          ],
+          "executable_bytes": 33816,
+          "compilation": {
+            "samples": [
+              {
+                "wall_seconds": 0.14069324999582022,
+                "cpu_seconds": 0.17336,
+                "peak_rss_bytes": 71843840,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O3",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/c/main.c",
+                      "-lm",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/sample-0/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/sample-0",
+                    "wall_seconds": 0.13992212497396395,
+                    "user_seconds": 0.123136,
+                    "system_seconds": 0.050224,
+                    "cpu_seconds": 0.17336,
+                    "peak_rss_bytes": 71843840,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 33816,
+                "executable_sha256": "3e2c4d1caf6b97ab3532e237f61621e52b3e73cd325507f4572b3688897c45b7",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/sample-0/program",
+                    "6"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.18645645899232477,
+                  "user_seconds": 0.000918,
+                  "system_seconds": 0.00134,
+                  "cpu_seconds": 0.002258,
+                  "peak_rss_bytes": 1392640,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 1,
+                "order_in_round": 0
+              },
+              {
+                "wall_seconds": 0.15467149997130036,
+                "cpu_seconds": 0.179339,
+                "peak_rss_bytes": 71892992,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O3",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/c/main.c",
+                      "-lm",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/sample-1/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/sample-1",
+                    "wall_seconds": 0.15390170901082456,
+                    "user_seconds": 0.136094,
+                    "system_seconds": 0.043245,
+                    "cpu_seconds": 0.179339,
+                    "peak_rss_bytes": 71892992,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 33816,
+                "executable_sha256": "3e2c4d1caf6b97ab3532e237f61621e52b3e73cd325507f4572b3688897c45b7",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/sample-1/program",
+                    "6"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.17064670799300075,
+                  "user_seconds": 0.000926,
+                  "system_seconds": 0.0014039999999999999,
+                  "cpu_seconds": 0.0023299999999999996,
+                  "peak_rss_bytes": 1392640,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 2,
+                "order_in_round": 3
+              },
+              {
+                "wall_seconds": 0.15245133300777525,
+                "cpu_seconds": 0.17715299999999998,
+                "peak_rss_bytes": 71925760,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O3",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/c/main.c",
+                      "-lm",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/sample-2/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/sample-2",
+                    "wall_seconds": 0.15173333400161937,
+                    "user_seconds": 0.13061599999999998,
+                    "system_seconds": 0.046536999999999995,
+                    "cpu_seconds": 0.17715299999999998,
+                    "peak_rss_bytes": 71925760,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 33816,
+                "executable_sha256": "3e2c4d1caf6b97ab3532e237f61621e52b3e73cd325507f4572b3688897c45b7",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/sample-2/program",
+                    "6"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.16919454198796302,
+                  "user_seconds": 0.000968,
+                  "system_seconds": 0.001496,
+                  "cpu_seconds": 0.002464,
+                  "peak_rss_bytes": 1376256,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 3,
+                "order_in_round": 2
+              },
+              {
+                "wall_seconds": 0.1576376670273021,
+                "cpu_seconds": 0.199314,
+                "peak_rss_bytes": 72073216,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O3",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/c/main.c",
+                      "-lm",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/sample-3/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/sample-3",
+                    "wall_seconds": 0.15672670799540356,
+                    "user_seconds": 0.151047,
+                    "system_seconds": 0.048267,
+                    "cpu_seconds": 0.199314,
+                    "peak_rss_bytes": 72073216,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 33816,
+                "executable_sha256": "3e2c4d1caf6b97ab3532e237f61621e52b3e73cd325507f4572b3688897c45b7",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/sample-3/program",
+                    "6"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.4334590000216849,
+                  "user_seconds": 0.000945,
+                  "system_seconds": 0.001421,
+                  "cpu_seconds": 0.002366,
+                  "peak_rss_bytes": 1376256,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 4,
+                "order_in_round": 1
+              },
+              {
+                "wall_seconds": 0.1620067089679651,
+                "cpu_seconds": 0.19300599999999998,
+                "peak_rss_bytes": 71942144,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O3",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/c/main.c",
+                      "-lm",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/sample-4/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/sample-4",
+                    "wall_seconds": 0.16091187502024695,
+                    "user_seconds": 0.140279,
+                    "system_seconds": 0.052726999999999996,
+                    "cpu_seconds": 0.19300599999999998,
+                    "peak_rss_bytes": 71942144,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 33816,
+                "executable_sha256": "3e2c4d1caf6b97ab3532e237f61621e52b3e73cd325507f4572b3688897c45b7",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/sample-4/program",
+                    "6"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.17605516698677093,
+                  "user_seconds": 0.000923,
+                  "system_seconds": 0.001434,
+                  "cpu_seconds": 0.0023569999999999997,
+                  "peak_rss_bytes": 1376256,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 5,
+                "order_in_round": 0
+              },
+              {
+                "wall_seconds": 0.15759966697078198,
+                "cpu_seconds": 0.17005399999999998,
+                "peak_rss_bytes": 72040448,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O3",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/c/main.c",
+                      "-lm",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/sample-5/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/sample-5",
+                    "wall_seconds": 0.15689645800739527,
+                    "user_seconds": 0.124375,
+                    "system_seconds": 0.045679,
+                    "cpu_seconds": 0.17005399999999998,
+                    "peak_rss_bytes": 72040448,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 33816,
+                "executable_sha256": "3e2c4d1caf6b97ab3532e237f61621e52b3e73cd325507f4572b3688897c45b7",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/sample-5/program",
+                    "6"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.21557916601886973,
+                  "user_seconds": 0.00091,
+                  "system_seconds": 0.001268,
+                  "cpu_seconds": 0.0021780000000000002,
+                  "peak_rss_bytes": 1376256,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 6,
+                "order_in_round": 3
+              },
+              {
+                "wall_seconds": 0.15272512496449053,
+                "cpu_seconds": 0.183162,
+                "peak_rss_bytes": 72105984,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O3",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/c/main.c",
+                      "-lm",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/sample-6/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/sample-6",
+                    "wall_seconds": 0.1519676250172779,
+                    "user_seconds": 0.133357,
+                    "system_seconds": 0.049804999999999995,
+                    "cpu_seconds": 0.183162,
+                    "peak_rss_bytes": 72105984,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 33816,
+                "executable_sha256": "3e2c4d1caf6b97ab3532e237f61621e52b3e73cd325507f4572b3688897c45b7",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/sample-6/program",
+                    "6"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.17152833397267386,
+                  "user_seconds": 0.0009299999999999999,
+                  "system_seconds": 0.0013959999999999999,
+                  "cpu_seconds": 0.002326,
+                  "peak_rss_bytes": 1376256,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 7,
+                "order_in_round": 2
+              }
+            ],
+            "sample_count": 7,
+            "median_wall_seconds": 0.15467149997130036,
+            "median_cpu_seconds": 0.179339,
+            "max_peak_rss_bytes": 72105984
+          },
+          "runtime": {
+            "samples": [
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/prepared/program",
+                  "16"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.35896566696465015,
+                "user_seconds": 0.348441,
+                "system_seconds": 0.007000999999999999,
+                "cpu_seconds": 0.355442,
+                "peak_rss_bytes": 5603328,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 1,
+                "order_in_round": 0
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/prepared/program",
+                  "16"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.34452820802107453,
+                "user_seconds": 0.337615,
+                "system_seconds": 0.00375,
+                "cpu_seconds": 0.341365,
+                "peak_rss_bytes": 5652480,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 2,
+                "order_in_round": 3
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/prepared/program",
+                  "16"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.3464534169761464,
+                "user_seconds": 0.339727,
+                "system_seconds": 0.003485,
+                "cpu_seconds": 0.343212,
+                "peak_rss_bytes": 5652480,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 3,
+                "order_in_round": 2
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/prepared/program",
+                  "16"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.3461001659743488,
+                "user_seconds": 0.339499,
+                "system_seconds": 0.003926,
+                "cpu_seconds": 0.343425,
+                "peak_rss_bytes": 5586944,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 4,
+                "order_in_round": 1
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/prepared/program",
+                  "16"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.34567283297656104,
+                "user_seconds": 0.338257,
+                "system_seconds": 0.0037809999999999996,
+                "cpu_seconds": 0.34203799999999995,
+                "peak_rss_bytes": 5636096,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 5,
+                "order_in_round": 0
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/prepared/program",
+                  "16"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.3449926659814082,
+                "user_seconds": 0.338078,
+                "system_seconds": 0.003443,
+                "cpu_seconds": 0.34152099999999996,
+                "peak_rss_bytes": 5652480,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 6,
+                "order_in_round": 3
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/c/prepared/program",
+                  "16"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.34878554102033377,
+                "user_seconds": 0.34093399999999996,
+                "system_seconds": 0.0038929999999999998,
+                "cpu_seconds": 0.34482699999999994,
+                "peak_rss_bytes": 5668864,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 7,
+                "order_in_round": 2
+              }
+            ],
+            "sample_count": 7,
+            "median_wall_seconds": 0.3461001659743488,
+            "median_cpu_seconds": 0.343212,
+            "max_peak_rss_bytes": 5668864
+          }
+        },
+        "rust": {
+          "source": "benchmarks/binary-trees/rust/main.rs",
+          "compiler_flags": [
+            "-O"
+          ],
+          "preparation": {
+            "wall_seconds": 0.3640131250140257,
+            "cpu_seconds": 0.262988,
+            "peak_rss_bytes": 111509504,
+            "stages": [
+              {
+                "command": [
+                  "/opt/homebrew/bin/rustc",
+                  "-O",
+                  "/Volumes/src/mlf/benchmarks/binary-trees/rust/main.rs",
+                  "-o",
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/prepared/program"
+                ],
+                "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/prepared",
+                "wall_seconds": 0.3632720420137048,
+                "user_seconds": 0.163785,
+                "system_seconds": 0.099203,
+                "cpu_seconds": 0.262988,
+                "peak_rss_bytes": 111509504,
+                "stderr": ""
+              }
+            ],
+            "executable_bytes": 454568,
+            "executable_sha256": "05606d106fc228904606a7f9a76fe71e448529f17b3f174c371fe13bcd644493"
+          },
+          "correctness": [
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/prepared/program",
+                "0"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.41051966696977615,
+              "user_seconds": 0.001222,
+              "system_seconds": 0.00162,
+              "cpu_seconds": 0.002842,
+              "peak_rss_bytes": 1605632,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/prepared/program",
+                "7"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.005122375034261495,
+              "user_seconds": 0.0013579999999999998,
+              "system_seconds": 0.001602,
+              "cpu_seconds": 0.00296,
+              "peak_rss_bytes": 1622016,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "3d9a43f3106a474d5f2891d8f02d74ae4bb12795becba68713091f2450c78dda"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/prepared/program",
+                "10"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.012150000024121255,
+              "user_seconds": 0.008555,
+              "system_seconds": 0.0014119999999999998,
+              "cpu_seconds": 0.009967,
+              "peak_rss_bytes": 1687552,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "b7f92c56b5d8aeb0a4d698842d1d87a57b4909865c3c84e5e10313e16663c3cb"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/prepared/program",
+                "16"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.41995904105715454,
+              "user_seconds": 0.41323899999999997,
+              "system_seconds": 0.003194,
+              "cpu_seconds": 0.41643299999999994,
+              "peak_rss_bytes": 5881856,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff"
+            }
+          ],
+          "executable_bytes": 454568,
+          "compilation": {
+            "samples": [
+              {
+                "wall_seconds": 0.17330020800000057,
+                "cpu_seconds": 0.227543,
+                "peak_rss_bytes": 110755840,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/bin/rustc",
+                      "-O",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/rust/main.rs",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/sample-0/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/sample-0",
+                    "wall_seconds": 0.17254941700957716,
+                    "user_seconds": 0.16780599999999998,
+                    "system_seconds": 0.059737,
+                    "cpu_seconds": 0.227543,
+                    "peak_rss_bytes": 110755840,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 454568,
+                "executable_sha256": "05606d106fc228904606a7f9a76fe71e448529f17b3f174c371fe13bcd644493",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/sample-0/program",
+                    "6"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.1806646669865586,
+                  "user_seconds": 0.001227,
+                  "system_seconds": 0.0015279999999999998,
+                  "cpu_seconds": 0.0027549999999999996,
+                  "peak_rss_bytes": 1622016,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 1,
+                "order_in_round": 1
+              },
+              {
+                "wall_seconds": 0.1700042499578558,
+                "cpu_seconds": 0.222561,
+                "peak_rss_bytes": 110690304,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/bin/rustc",
+                      "-O",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/rust/main.rs",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/sample-1/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/sample-1",
+                    "wall_seconds": 0.16926262498600408,
+                    "user_seconds": 0.167079,
+                    "system_seconds": 0.055482,
+                    "cpu_seconds": 0.222561,
+                    "peak_rss_bytes": 110690304,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 454568,
+                "executable_sha256": "05606d106fc228904606a7f9a76fe71e448529f17b3f174c371fe13bcd644493",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/sample-1/program",
+                    "6"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.18154116696678102,
+                  "user_seconds": 0.001194,
+                  "system_seconds": 0.001586,
+                  "cpu_seconds": 0.00278,
+                  "peak_rss_bytes": 1622016,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 2,
+                "order_in_round": 0
+              },
+              {
+                "wall_seconds": 0.16698841704055667,
+                "cpu_seconds": 0.226592,
+                "peak_rss_bytes": 110657536,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/bin/rustc",
+                      "-O",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/rust/main.rs",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/sample-2/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/sample-2",
+                    "wall_seconds": 0.16636962501797825,
+                    "user_seconds": 0.16938799999999998,
+                    "system_seconds": 0.057204,
+                    "cpu_seconds": 0.226592,
+                    "peak_rss_bytes": 110657536,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 454568,
+                "executable_sha256": "05606d106fc228904606a7f9a76fe71e448529f17b3f174c371fe13bcd644493",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/sample-2/program",
+                    "6"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.18170266697416082,
+                  "user_seconds": 0.001204,
+                  "system_seconds": 0.001573,
+                  "cpu_seconds": 0.002777,
+                  "peak_rss_bytes": 1622016,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 3,
+                "order_in_round": 3
+              },
+              {
+                "wall_seconds": 0.17264929099474102,
+                "cpu_seconds": 0.228175,
+                "peak_rss_bytes": 110608384,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/bin/rustc",
+                      "-O",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/rust/main.rs",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/sample-3/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/sample-3",
+                    "wall_seconds": 0.1712309590075165,
+                    "user_seconds": 0.164626,
+                    "system_seconds": 0.063549,
+                    "cpu_seconds": 0.228175,
+                    "peak_rss_bytes": 110608384,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 454568,
+                "executable_sha256": "05606d106fc228904606a7f9a76fe71e448529f17b3f174c371fe13bcd644493",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/sample-3/program",
+                    "6"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.21151945798192173,
+                  "user_seconds": 0.001191,
+                  "system_seconds": 0.0014919999999999998,
+                  "cpu_seconds": 0.0026829999999999996,
+                  "peak_rss_bytes": 1605632,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 4,
+                "order_in_round": 2
+              },
+              {
+                "wall_seconds": 0.1699413750320673,
+                "cpu_seconds": 0.226134,
+                "peak_rss_bytes": 110641152,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/bin/rustc",
+                      "-O",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/rust/main.rs",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/sample-4/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/sample-4",
+                    "wall_seconds": 0.1691222499939613,
+                    "user_seconds": 0.167126,
+                    "system_seconds": 0.059008,
+                    "cpu_seconds": 0.226134,
+                    "peak_rss_bytes": 110641152,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 454568,
+                "executable_sha256": "05606d106fc228904606a7f9a76fe71e448529f17b3f174c371fe13bcd644493",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/sample-4/program",
+                    "6"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.18532779201632366,
+                  "user_seconds": 0.00138,
+                  "system_seconds": 0.0017319999999999998,
+                  "cpu_seconds": 0.0031119999999999997,
+                  "peak_rss_bytes": 1605632,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 5,
+                "order_in_round": 1
+              },
+              {
+                "wall_seconds": 0.17318799998611212,
+                "cpu_seconds": 0.233618,
+                "peak_rss_bytes": 110657536,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/bin/rustc",
+                      "-O",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/rust/main.rs",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/sample-5/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/sample-5",
+                    "wall_seconds": 0.17255508300149813,
+                    "user_seconds": 0.171373,
+                    "system_seconds": 0.062244999999999995,
+                    "cpu_seconds": 0.233618,
+                    "peak_rss_bytes": 110657536,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 454568,
+                "executable_sha256": "05606d106fc228904606a7f9a76fe71e448529f17b3f174c371fe13bcd644493",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/sample-5/program",
+                    "6"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.18640904099447653,
+                  "user_seconds": 0.001276,
+                  "system_seconds": 0.0016699999999999998,
+                  "cpu_seconds": 0.002946,
+                  "peak_rss_bytes": 1605632,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 6,
+                "order_in_round": 0
+              },
+              {
+                "wall_seconds": 0.1707104580127634,
+                "cpu_seconds": 0.228461,
+                "peak_rss_bytes": 110641152,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/bin/rustc",
+                      "-O",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/rust/main.rs",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/sample-6/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/sample-6",
+                    "wall_seconds": 0.16996874997857958,
+                    "user_seconds": 0.167298,
+                    "system_seconds": 0.061162999999999995,
+                    "cpu_seconds": 0.228461,
+                    "peak_rss_bytes": 110641152,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 454568,
+                "executable_sha256": "05606d106fc228904606a7f9a76fe71e448529f17b3f174c371fe13bcd644493",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/sample-6/program",
+                    "6"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.20490462495945394,
+                  "user_seconds": 0.001245,
+                  "system_seconds": 0.0015899999999999998,
+                  "cpu_seconds": 0.002835,
+                  "peak_rss_bytes": 1622016,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 7,
+                "order_in_round": 3
+              }
+            ],
+            "sample_count": 7,
+            "median_wall_seconds": 0.1707104580127634,
+            "median_cpu_seconds": 0.227543,
+            "max_peak_rss_bytes": 110755840
+          },
+          "runtime": {
+            "samples": [
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/prepared/program",
+                  "16"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.4867745829978958,
+                "user_seconds": 0.42990399999999995,
+                "system_seconds": 0.004915999999999999,
+                "cpu_seconds": 0.43481999999999993,
+                "peak_rss_bytes": 5881856,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 1,
+                "order_in_round": 1
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/prepared/program",
+                  "16"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.41280870797345415,
+                "user_seconds": 0.404399,
+                "system_seconds": 0.004594,
+                "cpu_seconds": 0.408993,
+                "peak_rss_bytes": 5881856,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 2,
+                "order_in_round": 0
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/prepared/program",
+                  "16"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.4185152919963002,
+                "user_seconds": 0.409391,
+                "system_seconds": 0.004611,
+                "cpu_seconds": 0.414002,
+                "peak_rss_bytes": 5865472,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 3,
+                "order_in_round": 3
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/prepared/program",
+                  "16"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.41560062498319894,
+                "user_seconds": 0.407117,
+                "system_seconds": 0.00377,
+                "cpu_seconds": 0.410887,
+                "peak_rss_bytes": 5865472,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 4,
+                "order_in_round": 2
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/prepared/program",
+                  "16"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.4168898750212975,
+                "user_seconds": 0.409964,
+                "system_seconds": 0.0036929999999999997,
+                "cpu_seconds": 0.413657,
+                "peak_rss_bytes": 5865472,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 5,
+                "order_in_round": 1
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/prepared/program",
+                  "16"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.41382616700138897,
+                "user_seconds": 0.406354,
+                "system_seconds": 0.003743,
+                "cpu_seconds": 0.410097,
+                "peak_rss_bytes": 5865472,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 6,
+                "order_in_round": 0
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/rust/prepared/program",
+                  "16"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.41370712500065565,
+                "user_seconds": 0.40622199999999997,
+                "system_seconds": 0.004397,
+                "cpu_seconds": 0.41061899999999996,
+                "peak_rss_bytes": 5865472,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 7,
+                "order_in_round": 3
+              }
+            ],
+            "sample_count": 7,
+            "median_wall_seconds": 0.41560062498319894,
+            "median_cpu_seconds": 0.410887,
+            "max_peak_rss_bytes": 5881856
+          }
+        },
+        "haskell": {
+          "source": "benchmarks/binary-trees/haskell/upstream.hs",
+          "compiler_flags": [
+            "-O2",
+            "-XBangPatterns",
+            "-fno-full-laziness",
+            "-fno-cse",
+            "-fforce-recomp"
+          ],
+          "preparation": {
+            "wall_seconds": 0.4882865420076996,
+            "cpu_seconds": 0.6316569999999999,
+            "peak_rss_bytes": 185958400,
+            "stages": [
+              {
+                "command": [
+                  "/Users/ares/.ghcup/bin/ghc",
+                  "-O2",
+                  "-XBangPatterns",
+                  "-fno-full-laziness",
+                  "-fno-cse",
+                  "-fforce-recomp",
+                  "/Volumes/src/mlf/benchmarks/binary-trees/haskell/upstream.hs",
+                  "-outputdir",
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/prepared",
+                  "-o",
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/prepared/program"
+                ],
+                "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/prepared",
+                "wall_seconds": 0.48736204201122746,
+                "user_seconds": 0.48373499999999997,
+                "system_seconds": 0.147922,
+                "cpu_seconds": 0.6316569999999999,
+                "peak_rss_bytes": 185958400,
+                "stderr": "/Volumes/src/mlf/benchmarks/binary-trees/haskell/upstream.hs:27:31: warning: [GHC-63394] [-Wx-partial]\n    In the use of \u2018head\u2019\n    (imported from Prelude, but defined in GHC.Internal.List):\n    \"This is a partial function, it throws an error on empty lists. Use pattern matching, 'Data.List.uncons' or 'Data.Maybe.listToMaybe' instead. Consider refactoring to use \"Data.List.NonEmpty\".\"\n   |\n27 |     n <- getArgs >>= readIO . head\n   |                               ^^^^\n\n"
+              }
+            ],
+            "executable_bytes": 13613512,
+            "executable_sha256": "7944f5b4af55f322233181343227654b358b8c5e1933ecbfaaa1ebf8dc87c7a3"
+          },
+          "correctness": [
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/prepared/program",
+                "0"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.5239452919922769,
+              "user_seconds": 0.002806,
+              "system_seconds": 0.009498999999999999,
+              "cpu_seconds": 0.012304999999999998,
+              "peak_rss_bytes": 11796480,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/prepared/program",
+                "7"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.023814541986212134,
+              "user_seconds": 0.00376,
+              "system_seconds": 0.007646999999999999,
+              "cpu_seconds": 0.011406999999999999,
+              "peak_rss_bytes": 11780096,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "3d9a43f3106a474d5f2891d8f02d74ae4bb12795becba68713091f2450c78dda"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/prepared/program",
+                "10"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.021866499970201403,
+              "user_seconds": 0.004393,
+              "system_seconds": 0.00492,
+              "cpu_seconds": 0.009313,
+              "peak_rss_bytes": 11796480,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "b7f92c56b5d8aeb0a4d698842d1d87a57b4909865c3c84e5e10313e16663c3cb"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/prepared/program",
+                "16"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.13250995898852125,
+              "user_seconds": 0.120086,
+              "system_seconds": 0.006986,
+              "cpu_seconds": 0.127072,
+              "peak_rss_bytes": 24428544,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff"
+            }
+          ],
+          "executable_bytes": 13613512,
+          "compilation": {
+            "samples": [
+              {
+                "wall_seconds": 0.4909148750011809,
+                "cpu_seconds": 0.6513869999999999,
+                "peak_rss_bytes": 185729024,
+                "stages": [
+                  {
+                    "command": [
+                      "/Users/ares/.ghcup/bin/ghc",
+                      "-O2",
+                      "-XBangPatterns",
+                      "-fno-full-laziness",
+                      "-fno-cse",
+                      "-fforce-recomp",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/haskell/upstream.hs",
+                      "-outputdir",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-0",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-0/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-0",
+                    "wall_seconds": 0.489675666030962,
+                    "user_seconds": 0.507257,
+                    "system_seconds": 0.14412999999999998,
+                    "cpu_seconds": 0.6513869999999999,
+                    "peak_rss_bytes": 185729024,
+                    "stderr": "/Volumes/src/mlf/benchmarks/binary-trees/haskell/upstream.hs:27:31: warning: [GHC-63394] [-Wx-partial]\n    In the use of \u2018head\u2019\n    (imported from Prelude, but defined in GHC.Internal.List):\n    \"This is a partial function, it throws an error on empty lists. Use pattern matching, 'Data.List.uncons' or 'Data.Maybe.listToMaybe' instead. Consider refactoring to use \"Data.List.NonEmpty\".\"\n   |\n27 |     n <- getArgs >>= readIO . head\n   |                               ^^^^\n\n"
+                  }
+                ],
+                "executable_bytes": 13613512,
+                "executable_sha256": "7944f5b4af55f322233181343227654b358b8c5e1933ecbfaaa1ebf8dc87c7a3",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-0/program",
+                    "6"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.30788104102248326,
+                  "user_seconds": 0.003898,
+                  "system_seconds": 0.011817,
+                  "cpu_seconds": 0.015715,
+                  "peak_rss_bytes": 11780096,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 1,
+                "order_in_round": 2
+              },
+              {
+                "wall_seconds": 0.49058608402265236,
+                "cpu_seconds": 0.6382559999999999,
+                "peak_rss_bytes": 184123392,
+                "stages": [
+                  {
+                    "command": [
+                      "/Users/ares/.ghcup/bin/ghc",
+                      "-O2",
+                      "-XBangPatterns",
+                      "-fno-full-laziness",
+                      "-fno-cse",
+                      "-fforce-recomp",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/haskell/upstream.hs",
+                      "-outputdir",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-1",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-1/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-1",
+                    "wall_seconds": 0.4893036250141449,
+                    "user_seconds": 0.489261,
+                    "system_seconds": 0.148995,
+                    "cpu_seconds": 0.6382559999999999,
+                    "peak_rss_bytes": 184123392,
+                    "stderr": "/Volumes/src/mlf/benchmarks/binary-trees/haskell/upstream.hs:27:31: warning: [GHC-63394] [-Wx-partial]\n    In the use of \u2018head\u2019\n    (imported from Prelude, but defined in GHC.Internal.List):\n    \"This is a partial function, it throws an error on empty lists. Use pattern matching, 'Data.List.uncons' or 'Data.Maybe.listToMaybe' instead. Consider refactoring to use \"Data.List.NonEmpty\".\"\n   |\n27 |     n <- getArgs >>= readIO . head\n   |                               ^^^^\n\n"
+                  }
+                ],
+                "executable_bytes": 13613512,
+                "executable_sha256": "7944f5b4af55f322233181343227654b358b8c5e1933ecbfaaa1ebf8dc87c7a3",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-1/program",
+                    "6"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.30403337499592453,
+                  "user_seconds": 0.002408,
+                  "system_seconds": 0.010714999999999999,
+                  "cpu_seconds": 0.013123,
+                  "peak_rss_bytes": 11780096,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 2,
+                "order_in_round": 1
+              },
+              {
+                "wall_seconds": 0.4911606250097975,
+                "cpu_seconds": 0.639421,
+                "peak_rss_bytes": 184696832,
+                "stages": [
+                  {
+                    "command": [
+                      "/Users/ares/.ghcup/bin/ghc",
+                      "-O2",
+                      "-XBangPatterns",
+                      "-fno-full-laziness",
+                      "-fno-cse",
+                      "-fforce-recomp",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/haskell/upstream.hs",
+                      "-outputdir",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-2",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-2/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-2",
+                    "wall_seconds": 0.49006433301838115,
+                    "user_seconds": 0.49912599999999996,
+                    "system_seconds": 0.140295,
+                    "cpu_seconds": 0.639421,
+                    "peak_rss_bytes": 184696832,
+                    "stderr": "/Volumes/src/mlf/benchmarks/binary-trees/haskell/upstream.hs:27:31: warning: [GHC-63394] [-Wx-partial]\n    In the use of \u2018head\u2019\n    (imported from Prelude, but defined in GHC.Internal.List):\n    \"This is a partial function, it throws an error on empty lists. Use pattern matching, 'Data.List.uncons' or 'Data.Maybe.listToMaybe' instead. Consider refactoring to use \"Data.List.NonEmpty\".\"\n   |\n27 |     n <- getArgs >>= readIO . head\n   |                               ^^^^\n\n"
+                  }
+                ],
+                "executable_bytes": 13613512,
+                "executable_sha256": "7944f5b4af55f322233181343227654b358b8c5e1933ecbfaaa1ebf8dc87c7a3",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-2/program",
+                    "6"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.3251068330137059,
+                  "user_seconds": 0.005814,
+                  "system_seconds": 0.012528,
+                  "cpu_seconds": 0.018341999999999997,
+                  "peak_rss_bytes": 11796480,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 3,
+                "order_in_round": 0
+              },
+              {
+                "wall_seconds": 0.4988844580366276,
+                "cpu_seconds": 0.643346,
+                "peak_rss_bytes": 187449344,
+                "stages": [
+                  {
+                    "command": [
+                      "/Users/ares/.ghcup/bin/ghc",
+                      "-O2",
+                      "-XBangPatterns",
+                      "-fno-full-laziness",
+                      "-fno-cse",
+                      "-fforce-recomp",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/haskell/upstream.hs",
+                      "-outputdir",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-3",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-3/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-3",
+                    "wall_seconds": 0.49767629202688113,
+                    "user_seconds": 0.49865099999999996,
+                    "system_seconds": 0.144695,
+                    "cpu_seconds": 0.643346,
+                    "peak_rss_bytes": 187449344,
+                    "stderr": "/Volumes/src/mlf/benchmarks/binary-trees/haskell/upstream.hs:27:31: warning: [GHC-63394] [-Wx-partial]\n    In the use of \u2018head\u2019\n    (imported from Prelude, but defined in GHC.Internal.List):\n    \"This is a partial function, it throws an error on empty lists. Use pattern matching, 'Data.List.uncons' or 'Data.Maybe.listToMaybe' instead. Consider refactoring to use \"Data.List.NonEmpty\".\"\n   |\n27 |     n <- getArgs >>= readIO . head\n   |                               ^^^^\n\n"
+                  }
+                ],
+                "executable_bytes": 13613512,
+                "executable_sha256": "7944f5b4af55f322233181343227654b358b8c5e1933ecbfaaa1ebf8dc87c7a3",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-3/program",
+                    "6"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.32872108300216496,
+                  "user_seconds": 0.003725,
+                  "system_seconds": 0.009968,
+                  "cpu_seconds": 0.013693,
+                  "peak_rss_bytes": 11780096,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 4,
+                "order_in_round": 3
+              },
+              {
+                "wall_seconds": 0.49556120904162526,
+                "cpu_seconds": 0.638225,
+                "peak_rss_bytes": 183844864,
+                "stages": [
+                  {
+                    "command": [
+                      "/Users/ares/.ghcup/bin/ghc",
+                      "-O2",
+                      "-XBangPatterns",
+                      "-fno-full-laziness",
+                      "-fno-cse",
+                      "-fforce-recomp",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/haskell/upstream.hs",
+                      "-outputdir",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-4",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-4/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-4",
+                    "wall_seconds": 0.4939614160102792,
+                    "user_seconds": 0.500147,
+                    "system_seconds": 0.138078,
+                    "cpu_seconds": 0.638225,
+                    "peak_rss_bytes": 183844864,
+                    "stderr": "/Volumes/src/mlf/benchmarks/binary-trees/haskell/upstream.hs:27:31: warning: [GHC-63394] [-Wx-partial]\n    In the use of \u2018head\u2019\n    (imported from Prelude, but defined in GHC.Internal.List):\n    \"This is a partial function, it throws an error on empty lists. Use pattern matching, 'Data.List.uncons' or 'Data.Maybe.listToMaybe' instead. Consider refactoring to use \"Data.List.NonEmpty\".\"\n   |\n27 |     n <- getArgs >>= readIO . head\n   |                               ^^^^\n\n"
+                  }
+                ],
+                "executable_bytes": 13613512,
+                "executable_sha256": "7944f5b4af55f322233181343227654b358b8c5e1933ecbfaaa1ebf8dc87c7a3",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-4/program",
+                    "6"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.3097790000028908,
+                  "user_seconds": 0.0021869999999999997,
+                  "system_seconds": 0.007723,
+                  "cpu_seconds": 0.009909999999999999,
+                  "peak_rss_bytes": 11780096,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 5,
+                "order_in_round": 2
+              },
+              {
+                "wall_seconds": 0.5204432919854298,
+                "cpu_seconds": 0.649134,
+                "peak_rss_bytes": 184221696,
+                "stages": [
+                  {
+                    "command": [
+                      "/Users/ares/.ghcup/bin/ghc",
+                      "-O2",
+                      "-XBangPatterns",
+                      "-fno-full-laziness",
+                      "-fno-cse",
+                      "-fforce-recomp",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/haskell/upstream.hs",
+                      "-outputdir",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-5",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-5/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-5",
+                    "wall_seconds": 0.5180604169727303,
+                    "user_seconds": 0.503532,
+                    "system_seconds": 0.14560199999999998,
+                    "cpu_seconds": 0.649134,
+                    "peak_rss_bytes": 184221696,
+                    "stderr": "/Volumes/src/mlf/benchmarks/binary-trees/haskell/upstream.hs:27:31: warning: [GHC-63394] [-Wx-partial]\n    In the use of \u2018head\u2019\n    (imported from Prelude, but defined in GHC.Internal.List):\n    \"This is a partial function, it throws an error on empty lists. Use pattern matching, 'Data.List.uncons' or 'Data.Maybe.listToMaybe' instead. Consider refactoring to use \"Data.List.NonEmpty\".\"\n   |\n27 |     n <- getArgs >>= readIO . head\n   |                               ^^^^\n\n"
+                  }
+                ],
+                "executable_bytes": 13613512,
+                "executable_sha256": "7944f5b4af55f322233181343227654b358b8c5e1933ecbfaaa1ebf8dc87c7a3",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-5/program",
+                    "6"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.31928683404112235,
+                  "user_seconds": 0.003652,
+                  "system_seconds": 0.012057,
+                  "cpu_seconds": 0.015709,
+                  "peak_rss_bytes": 11780096,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 6,
+                "order_in_round": 1
+              },
+              {
+                "wall_seconds": 0.49962937500094995,
+                "cpu_seconds": 0.6406529999999999,
+                "peak_rss_bytes": 185450496,
+                "stages": [
+                  {
+                    "command": [
+                      "/Users/ares/.ghcup/bin/ghc",
+                      "-O2",
+                      "-XBangPatterns",
+                      "-fno-full-laziness",
+                      "-fno-cse",
+                      "-fforce-recomp",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/haskell/upstream.hs",
+                      "-outputdir",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-6",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-6/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-6",
+                    "wall_seconds": 0.49860308301867917,
+                    "user_seconds": 0.499401,
+                    "system_seconds": 0.141252,
+                    "cpu_seconds": 0.6406529999999999,
+                    "peak_rss_bytes": 185450496,
+                    "stderr": "/Volumes/src/mlf/benchmarks/binary-trees/haskell/upstream.hs:27:31: warning: [GHC-63394] [-Wx-partial]\n    In the use of \u2018head\u2019\n    (imported from Prelude, but defined in GHC.Internal.List):\n    \"This is a partial function, it throws an error on empty lists. Use pattern matching, 'Data.List.uncons' or 'Data.Maybe.listToMaybe' instead. Consider refactoring to use \"Data.List.NonEmpty\".\"\n   |\n27 |     n <- getArgs >>= readIO . head\n   |                               ^^^^\n\n"
+                  }
+                ],
+                "executable_bytes": 13613512,
+                "executable_sha256": "7944f5b4af55f322233181343227654b358b8c5e1933ecbfaaa1ebf8dc87c7a3",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/sample-6/program",
+                    "6"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.3124562079901807,
+                  "user_seconds": 0.005534,
+                  "system_seconds": 0.012445,
+                  "cpu_seconds": 0.017979,
+                  "peak_rss_bytes": 11780096,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 7,
+                "order_in_round": 0
+              }
+            ],
+            "sample_count": 7,
+            "median_wall_seconds": 0.49556120904162526,
+            "median_cpu_seconds": 0.6406529999999999,
+            "max_peak_rss_bytes": 187449344
+          },
+          "runtime": {
+            "samples": [
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/prepared/program",
+                  "16"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.12931595800910145,
+                "user_seconds": 0.113771,
+                "system_seconds": 0.005608999999999999,
+                "cpu_seconds": 0.11938,
+                "peak_rss_bytes": 24428544,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 1,
+                "order_in_round": 2
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/prepared/program",
+                  "16"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.12616266700206324,
+                "user_seconds": 0.113688,
+                "system_seconds": 0.006613,
+                "cpu_seconds": 0.12030099999999999,
+                "peak_rss_bytes": 24428544,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 2,
+                "order_in_round": 1
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/prepared/program",
+                  "16"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.13399766699876636,
+                "user_seconds": 0.114467,
+                "system_seconds": 0.006436,
+                "cpu_seconds": 0.120903,
+                "peak_rss_bytes": 24428544,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 3,
+                "order_in_round": 0
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/prepared/program",
+                  "16"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.1285321670002304,
+                "user_seconds": 0.113759,
+                "system_seconds": 0.005569,
+                "cpu_seconds": 0.119328,
+                "peak_rss_bytes": 24428544,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 4,
+                "order_in_round": 3
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/prepared/program",
+                  "16"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.12496212497353554,
+                "user_seconds": 0.114905,
+                "system_seconds": 0.005924,
+                "cpu_seconds": 0.12082899999999999,
+                "peak_rss_bytes": 24428544,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 5,
+                "order_in_round": 2
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/prepared/program",
+                  "16"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.12617416703142226,
+                "user_seconds": 0.11415099999999999,
+                "system_seconds": 0.007718,
+                "cpu_seconds": 0.12186899999999999,
+                "peak_rss_bytes": 24428544,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 6,
+                "order_in_round": 1
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/haskell/prepared/program",
+                  "16"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.12706149998120964,
+                "user_seconds": 0.11443299999999999,
+                "system_seconds": 0.005948999999999999,
+                "cpu_seconds": 0.12038199999999999,
+                "peak_rss_bytes": 24444928,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 7,
+                "order_in_round": 0
+              }
+            ],
+            "sample_count": 7,
+            "median_wall_seconds": 0.12706149998120964,
+            "median_cpu_seconds": 0.12038199999999999,
+            "max_peak_rss_bytes": 24444928
+          }
+        },
+        "mlf": {
+          "source": "benchmarks/binary-trees/mlf/main.emlf",
+          "compiler_flags": [
+            "-O2",
+            "-Wno-override-module"
+          ],
+          "preparation": {
+            "wall_seconds": 0.4140655840164982,
+            "cpu_seconds": 0.418474,
+            "peak_rss_bytes": 83542016,
+            "stages": [
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+                  "--emit-llvm",
+                  "/Volumes/src/mlf/benchmarks/binary-trees/mlf/main.emlf"
+                ],
+                "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/prepared",
+                "wall_seconds": 0.11418779200175777,
+                "user_seconds": 0.091097,
+                "system_seconds": 0.007930999999999999,
+                "cpu_seconds": 0.09902799999999999,
+                "peak_rss_bytes": 48283648,
+                "stderr": "",
+                "stdout_file": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/prepared/program.ll"
+              },
+              {
+                "command": [
+                  "/opt/homebrew/opt/llvm/bin/clang",
+                  "-O2",
+                  "-Wno-override-module",
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/prepared/program.ll",
+                  "/Volumes/src/mlf/runtime/mlf_runtime.c",
+                  "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+                  "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+                  "-lgmp",
+                  "-o",
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/prepared/program"
+                ],
+                "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/prepared",
+                "wall_seconds": 0.29722633300116286,
+                "user_seconds": 0.256865,
+                "system_seconds": 0.062581,
+                "cpu_seconds": 0.319446,
+                "peak_rss_bytes": 83542016,
+                "stderr": ""
+              }
+            ],
+            "executable_bytes": 69896,
+            "executable_sha256": "208e00085deb9ef8849bf9da95afeebc4436eb37144c341f93391ad186cffec5"
+          },
+          "correctness": [
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/prepared/program"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.4077609999803826,
+              "user_seconds": 0.001974,
+              "system_seconds": 0.002681,
+              "cpu_seconds": 0.004654999999999999,
+              "peak_rss_bytes": 1769472,
+              "stderr": "",
+              "stdin": "0\n",
+              "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/prepared/program"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.003914875036571175,
+              "user_seconds": 0.001119,
+              "system_seconds": 0.0012959999999999998,
+              "cpu_seconds": 0.0024149999999999996,
+              "peak_rss_bytes": 1835008,
+              "stderr": "",
+              "stdin": "7\n",
+              "output_sha256": "3d9a43f3106a474d5f2891d8f02d74ae4bb12795becba68713091f2450c78dda"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/prepared/program"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.006722416030243039,
+              "user_seconds": 0.0039169999999999995,
+              "system_seconds": 0.001312,
+              "cpu_seconds": 0.005228999999999999,
+              "peak_rss_bytes": 2129920,
+              "stderr": "",
+              "stdin": "10\n",
+              "output_sha256": "b7f92c56b5d8aeb0a4d698842d1d87a57b4909865c3c84e5e10313e16663c3cb"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/prepared/program"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.32327325001824647,
+              "user_seconds": 0.314178,
+              "system_seconds": 0.006083,
+              "cpu_seconds": 0.320261,
+              "peak_rss_bytes": 22495232,
+              "stderr": "",
+              "stdin": "16\n",
+              "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff"
+            }
+          ],
+          "executable_bytes": 69896,
+          "compilation": {
+            "samples": [
+              {
+                "wall_seconds": 0.40906595799606293,
+                "cpu_seconds": 0.42455799999999994,
+                "peak_rss_bytes": 83542016,
+                "stages": [
+                  {
+                    "command": [
+                      "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+                      "--emit-llvm",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/mlf/main.emlf"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-0",
+                    "wall_seconds": 0.11831525003071874,
+                    "user_seconds": 0.098992,
+                    "system_seconds": 0.009179999999999999,
+                    "cpu_seconds": 0.10817199999999999,
+                    "peak_rss_bytes": 48283648,
+                    "stderr": "",
+                    "stdout_file": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-0/program.ll"
+                  },
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O2",
+                      "-Wno-override-module",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-0/program.ll",
+                      "/Volumes/src/mlf/runtime/mlf_runtime.c",
+                      "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+                      "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+                      "-lgmp",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-0/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-0",
+                    "wall_seconds": 0.28842991701094434,
+                    "user_seconds": 0.25615499999999997,
+                    "system_seconds": 0.060231,
+                    "cpu_seconds": 0.31638599999999995,
+                    "peak_rss_bytes": 83542016,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 69896,
+                "executable_sha256": "208e00085deb9ef8849bf9da95afeebc4436eb37144c341f93391ad186cffec5",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-0/program"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.1806820830097422,
+                  "user_seconds": 0.001165,
+                  "system_seconds": 0.001578,
+                  "cpu_seconds": 0.0027429999999999998,
+                  "peak_rss_bytes": 1753088,
+                  "stderr": "",
+                  "stdin": "6\n",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 1,
+                "order_in_round": 3
+              },
+              {
+                "wall_seconds": 0.40978704195003957,
+                "cpu_seconds": 0.436635,
+                "peak_rss_bytes": 83804160,
+                "stages": [
+                  {
+                    "command": [
+                      "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+                      "--emit-llvm",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/mlf/main.emlf"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-1",
+                    "wall_seconds": 0.12083570798859,
+                    "user_seconds": 0.102326,
+                    "system_seconds": 0.00968,
+                    "cpu_seconds": 0.112006,
+                    "peak_rss_bytes": 48283648,
+                    "stderr": "",
+                    "stdout_file": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-1/program.ll"
+                  },
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O2",
+                      "-Wno-override-module",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-1/program.ll",
+                      "/Volumes/src/mlf/runtime/mlf_runtime.c",
+                      "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+                      "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+                      "-lgmp",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-1/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-1",
+                    "wall_seconds": 0.2875332080293447,
+                    "user_seconds": 0.266362,
+                    "system_seconds": 0.058267,
+                    "cpu_seconds": 0.324629,
+                    "peak_rss_bytes": 83804160,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 69896,
+                "executable_sha256": "208e00085deb9ef8849bf9da95afeebc4436eb37144c341f93391ad186cffec5",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-1/program"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.19391845900099725,
+                  "user_seconds": 0.001106,
+                  "system_seconds": 0.001501,
+                  "cpu_seconds": 0.002607,
+                  "peak_rss_bytes": 1769472,
+                  "stderr": "",
+                  "stdin": "6\n",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 2,
+                "order_in_round": 2
+              },
+              {
+                "wall_seconds": 0.40728924999712035,
+                "cpu_seconds": 0.420442,
+                "peak_rss_bytes": 83738624,
+                "stages": [
+                  {
+                    "command": [
+                      "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+                      "--emit-llvm",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/mlf/main.emlf"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-2",
+                    "wall_seconds": 0.12069162499392405,
+                    "user_seconds": 0.10077599999999999,
+                    "system_seconds": 0.010366,
+                    "cpu_seconds": 0.11114199999999999,
+                    "peak_rss_bytes": 48300032,
+                    "stderr": "",
+                    "stdout_file": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-2/program.ll"
+                  },
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O2",
+                      "-Wno-override-module",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-2/program.ll",
+                      "/Volumes/src/mlf/runtime/mlf_runtime.c",
+                      "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+                      "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+                      "-lgmp",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-2/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-2",
+                    "wall_seconds": 0.28411825001239777,
+                    "user_seconds": 0.249938,
+                    "system_seconds": 0.059362,
+                    "cpu_seconds": 0.3093,
+                    "peak_rss_bytes": 83738624,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 69896,
+                "executable_sha256": "208e00085deb9ef8849bf9da95afeebc4436eb37144c341f93391ad186cffec5",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-2/program"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.18769045802764595,
+                  "user_seconds": 0.001122,
+                  "system_seconds": 0.0014839999999999999,
+                  "cpu_seconds": 0.002606,
+                  "peak_rss_bytes": 1769472,
+                  "stderr": "",
+                  "stdin": "6\n",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 3,
+                "order_in_round": 1
+              },
+              {
+                "wall_seconds": 0.4129386249696836,
+                "cpu_seconds": 0.43690999999999997,
+                "peak_rss_bytes": 83247104,
+                "stages": [
+                  {
+                    "command": [
+                      "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+                      "--emit-llvm",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/mlf/main.emlf"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-3",
+                    "wall_seconds": 0.11923291702987626,
+                    "user_seconds": 0.096928,
+                    "system_seconds": 0.0083,
+                    "cpu_seconds": 0.105228,
+                    "peak_rss_bytes": 48283648,
+                    "stderr": "",
+                    "stdout_file": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-3/program.ll"
+                  },
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O2",
+                      "-Wno-override-module",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-3/program.ll",
+                      "/Volumes/src/mlf/runtime/mlf_runtime.c",
+                      "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+                      "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+                      "-lgmp",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-3/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-3",
+                    "wall_seconds": 0.29206445801537484,
+                    "user_seconds": 0.275041,
+                    "system_seconds": 0.056641,
+                    "cpu_seconds": 0.331682,
+                    "peak_rss_bytes": 83247104,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 69896,
+                "executable_sha256": "208e00085deb9ef8849bf9da95afeebc4436eb37144c341f93391ad186cffec5",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-3/program"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.1847406669985503,
+                  "user_seconds": 0.001137,
+                  "system_seconds": 0.0016769999999999999,
+                  "cpu_seconds": 0.0028139999999999997,
+                  "peak_rss_bytes": 1769472,
+                  "stderr": "",
+                  "stdin": "6\n",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 4,
+                "order_in_round": 0
+              },
+              {
+                "wall_seconds": 0.4114762499812059,
+                "cpu_seconds": 0.41847999999999996,
+                "peak_rss_bytes": 83181568,
+                "stages": [
+                  {
+                    "command": [
+                      "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+                      "--emit-llvm",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/mlf/main.emlf"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-4",
+                    "wall_seconds": 0.11935766600072384,
+                    "user_seconds": 0.097147,
+                    "system_seconds": 0.009788,
+                    "cpu_seconds": 0.106935,
+                    "peak_rss_bytes": 48283648,
+                    "stderr": "",
+                    "stdout_file": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-4/program.ll"
+                  },
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O2",
+                      "-Wno-override-module",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-4/program.ll",
+                      "/Volumes/src/mlf/runtime/mlf_runtime.c",
+                      "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+                      "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+                      "-lgmp",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-4/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-4",
+                    "wall_seconds": 0.2903736250009388,
+                    "user_seconds": 0.254275,
+                    "system_seconds": 0.057269999999999995,
+                    "cpu_seconds": 0.31154499999999996,
+                    "peak_rss_bytes": 83181568,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 69896,
+                "executable_sha256": "208e00085deb9ef8849bf9da95afeebc4436eb37144c341f93391ad186cffec5",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-4/program"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.18545587500557303,
+                  "user_seconds": 0.0017729999999999998,
+                  "system_seconds": 0.002316,
+                  "cpu_seconds": 0.004089,
+                  "peak_rss_bytes": 1769472,
+                  "stderr": "",
+                  "stdin": "6\n",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 5,
+                "order_in_round": 3
+              },
+              {
+                "wall_seconds": 0.41893737501231954,
+                "cpu_seconds": 0.42302899999999993,
+                "peak_rss_bytes": 83443712,
+                "stages": [
+                  {
+                    "command": [
+                      "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+                      "--emit-llvm",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/mlf/main.emlf"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-5",
+                    "wall_seconds": 0.12338170799193904,
+                    "user_seconds": 0.100214,
+                    "system_seconds": 0.009755,
+                    "cpu_seconds": 0.109969,
+                    "peak_rss_bytes": 48283648,
+                    "stderr": "",
+                    "stdout_file": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-5/program.ll"
+                  },
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O2",
+                      "-Wno-override-module",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-5/program.ll",
+                      "/Volumes/src/mlf/runtime/mlf_runtime.c",
+                      "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+                      "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+                      "-lgmp",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-5/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-5",
+                    "wall_seconds": 0.2929415000253357,
+                    "user_seconds": 0.252528,
+                    "system_seconds": 0.060531999999999996,
+                    "cpu_seconds": 0.31305999999999995,
+                    "peak_rss_bytes": 83443712,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 69896,
+                "executable_sha256": "208e00085deb9ef8849bf9da95afeebc4436eb37144c341f93391ad186cffec5",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-5/program"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.21783683402463794,
+                  "user_seconds": 0.001142,
+                  "system_seconds": 0.001504,
+                  "cpu_seconds": 0.002646,
+                  "peak_rss_bytes": 1753088,
+                  "stderr": "",
+                  "stdin": "6\n",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 6,
+                "order_in_round": 2
+              },
+              {
+                "wall_seconds": 0.41775862500071526,
+                "cpu_seconds": 0.42928599999999995,
+                "peak_rss_bytes": 83673088,
+                "stages": [
+                  {
+                    "command": [
+                      "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+                      "--emit-llvm",
+                      "/Volumes/src/mlf/benchmarks/binary-trees/mlf/main.emlf"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-6",
+                    "wall_seconds": 0.12634012498892844,
+                    "user_seconds": 0.10062499999999999,
+                    "system_seconds": 0.010964999999999999,
+                    "cpu_seconds": 0.11159,
+                    "peak_rss_bytes": 48283648,
+                    "stderr": "",
+                    "stdout_file": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-6/program.ll"
+                  },
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O2",
+                      "-Wno-override-module",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-6/program.ll",
+                      "/Volumes/src/mlf/runtime/mlf_runtime.c",
+                      "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+                      "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+                      "-lgmp",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-6/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-6",
+                    "wall_seconds": 0.2898440419812687,
+                    "user_seconds": 0.26194,
+                    "system_seconds": 0.055756,
+                    "cpu_seconds": 0.317696,
+                    "peak_rss_bytes": 83673088,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 69896,
+                "executable_sha256": "208e00085deb9ef8849bf9da95afeebc4436eb37144c341f93391ad186cffec5",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/sample-6/program"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.20558970799902454,
+                  "user_seconds": 0.0017159999999999999,
+                  "system_seconds": 0.002057,
+                  "cpu_seconds": 0.0037729999999999994,
+                  "peak_rss_bytes": 1769472,
+                  "stderr": "",
+                  "stdin": "6\n",
+                  "output_sha256": "1e93372ab23c98137fc156de0f57f67fb53ced95d810e56cf784bd18f6c439fd"
+                },
+                "round": 7,
+                "order_in_round": 1
+              }
+            ],
+            "sample_count": 7,
+            "median_wall_seconds": 0.4114762499812059,
+            "median_cpu_seconds": 0.42455799999999994,
+            "max_peak_rss_bytes": 83804160
+          },
+          "runtime": {
+            "samples": [
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/prepared/program"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.3143184590153396,
+                "user_seconds": 0.306429,
+                "system_seconds": 0.004974,
+                "cpu_seconds": 0.311403,
+                "peak_rss_bytes": 22478848,
+                "stderr": "",
+                "stdin": "16\n",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 1,
+                "order_in_round": 3
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/prepared/program"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.3174843750311993,
+                "user_seconds": 0.30766699999999997,
+                "system_seconds": 0.005954,
+                "cpu_seconds": 0.313621,
+                "peak_rss_bytes": 22478848,
+                "stderr": "",
+                "stdin": "16\n",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 2,
+                "order_in_round": 2
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/prepared/program"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.31538200000068173,
+                "user_seconds": 0.306633,
+                "system_seconds": 0.0060349999999999996,
+                "cpu_seconds": 0.312668,
+                "peak_rss_bytes": 22446080,
+                "stderr": "",
+                "stdin": "16\n",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 3,
+                "order_in_round": 1
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/prepared/program"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.32111262500984594,
+                "user_seconds": 0.308743,
+                "system_seconds": 0.007212,
+                "cpu_seconds": 0.315955,
+                "peak_rss_bytes": 22478848,
+                "stderr": "",
+                "stdin": "16\n",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 4,
+                "order_in_round": 0
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/prepared/program"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.31984399998327717,
+                "user_seconds": 0.31032899999999997,
+                "system_seconds": 0.005121,
+                "cpu_seconds": 0.31544999999999995,
+                "peak_rss_bytes": 22478848,
+                "stderr": "",
+                "stdin": "16\n",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 5,
+                "order_in_round": 3
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/prepared/program"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.3183044999605045,
+                "user_seconds": 0.308369,
+                "system_seconds": 0.006046999999999999,
+                "cpu_seconds": 0.31441600000000003,
+                "peak_rss_bytes": 22462464,
+                "stderr": "",
+                "stdin": "16\n",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 6,
+                "order_in_round": 2
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-uypxemid/binary-trees/mlf/prepared/program"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.31653687497600913,
+                "user_seconds": 0.307197,
+                "system_seconds": 0.006131999999999999,
+                "cpu_seconds": 0.313329,
+                "peak_rss_bytes": 22495232,
+                "stderr": "",
+                "stdin": "16\n",
+                "output_sha256": "3b9e63e2b3523d282d08c35b889a2343c0ee7a24a2540ce6a41bc58f782cd7ff",
+                "round": 7,
+                "order_in_round": 1
+              }
+            ],
+            "sample_count": 7,
+            "median_wall_seconds": 0.3174843750311993,
+            "median_cpu_seconds": 0.313621,
+            "max_peak_rss_bytes": 22495232
+          }
+        }
+      },
+      "correctness_inputs": [
+        0,
+        7,
+        10,
+        16
+      ],
+      "compilation_ratios": {
+        "c": 1.0,
+        "rust": 1.1036969192413542,
+        "haskell": 3.20395941808011,
+        "mlf": 2.6603236540510453
+      },
+      "runtime_ratios": {
+        "c": 1.0,
+        "rust": 1.2008102446677278,
+        "haskell": 0.3671234875704359,
+        "mlf": 0.9173193377050552
+      }
+    }
+  ],
+  "warnings": [],
+  "geometric_means": {
+    "compilation": null,
+    "runtime": null
+  },
+  "corpus_compilation": {
+    "program_count": 1,
+    "languages": {
+      "c": {
+        "summed_wall_samples_seconds": [
+          0.14069324999582022,
+          0.15467149997130036,
+          0.15245133300777525,
+          0.1576376670273021,
+          0.1620067089679651,
+          0.15759966697078198,
+          0.15272512496449053
+        ],
+        "median_seconds": 0.15467149997130036,
+        "programs_per_second": 6.465315201478955
+      },
+      "rust": {
+        "summed_wall_samples_seconds": [
+          0.17330020800000057,
+          0.1700042499578558,
+          0.16698841704055667,
+          0.17264929099474102,
+          0.1699413750320673,
+          0.17318799998611212,
+          0.1707104580127634
+        ],
+        "median_seconds": 0.1707104580127634,
+        "programs_per_second": 5.857871929118915
+      },
+      "haskell": {
+        "summed_wall_samples_seconds": [
+          0.4909148750011809,
+          0.49058608402265236,
+          0.4911606250097975,
+          0.4988844580366276,
+          0.49556120904162526,
+          0.5204432919854298,
+          0.49962937500094995
+        ],
+        "median_seconds": 0.49556120904162526,
+        "programs_per_second": 2.0179141985990348
+      },
+      "mlf": {
+        "summed_wall_samples_seconds": [
+          0.40906595799606293,
+          0.40978704195003957,
+          0.40728924999712035,
+          0.4129386249696836,
+          0.4114762499812059,
+          0.41893737501231954,
+          0.41775862500071526
+        ],
+        "median_seconds": 0.4114762499812059,
+        "programs_per_second": 2.4302739223604637
+      }
+    },
+    "scope": "Sum of fresh per-program latencies per round; includes each compiler startup. With one workload this duplicates latency and does not isolate processing throughput."
+  },
+  "controlled_environment": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "GHCRTS": "",
+    "GHC_ENVIRONMENT": "-"
+  },
+  "toolchain": {
+    "clang": {
+      "path": "/opt/homebrew/opt/llvm/bin/clang",
+      "version": "Homebrew clang version 23.1.2\nTarget: arm64-apple-darwin25.6.0\nThread model: posix\nInstalledDir: /opt/homebrew/Cellar/llvm/23.1.2/bin\nConfiguration file: /opt/homebrew/Cellar/llvm/23.1.2/etc/clang/arm64-apple-darwin25.cfg",
+      "sha256": "d64d1ee59d8aff01397eb88adea263e490ac65766faefc8b5323b4a06d0438e5"
+    },
+    "rustc": {
+      "path": "/opt/homebrew/bin/rustc",
+      "version": "rustc 1.99.0 (b940084d7 2026-09-28) (Homebrew)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.2",
+      "sha256": "951efe952b1e70ab89d1b040de27315385ddb1ea8ece7d260655a54c3e52034f"
+    },
+    "ghc": {
+      "path": "/Users/ares/.ghcup/bin/ghc",
+      "version": "The Glorious Glasgow Haskell Compilation System, version 9.14.1",
+      "sha256": "39fd1ee0cf7eb5739a595d5c238a95a7a062942397cc6d2a16425d6eeb18283e"
+    },
+    "emlf": {
+      "path": "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+      "version": "[(\"GHC RTS\", \"YES\")\n ,(\"GHC version\", \"9.14.1\")\n ,(\"RTS way\", \"rts_v\")\n ,(\"Host platform\", \"aarch64-apple-darwin\")\n ,(\"Host architecture\", \"aarch64\")\n ,(\"Host OS\", \"darwin\")\n ,(\"Host vendor\", \"apple\")\n ,(\"Word size\", \"64\")\n ,(\"Compiler unregisterised\", \"NO\")\n ,(\"Tables next to code\", \"YES\")\n ,(\"Flag -with-rtsopts\", \"-A32m\")\n ,(\"I/O manager default\", \"select\")\n ]",
+      "sha256": "245a27cd8900034e042c75a7a99c6fd2fcdf04d427eee7553bb77fe6d546235e"
+    },
+    "pkg_config": {
+      "path": "/opt/homebrew/bin/pkg-config",
+      "version": "3.0.7",
+      "sha256": "39b6b8b701470ebf31a24972bc1fafc7da54a5c32215d972fdadaf21c7cfa91b"
+    },
+    "runtime": {
+      "path": "/Volumes/src/mlf/runtime/mlf_runtime.c",
+      "sha256": "78d4bf343e536e192142f8de1113a8bb1e49e90d5c0a663b6a40fad9e94ba8a4",
+      "header_sha256": "fbe55fcddfe992221cdfda7009745d5629ec9b898d247282e8ff64b965e29646"
+    },
+    "gmp_flags": [
+      "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+      "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+      "-lgmp"
+    ],
+    "gmp_version": "6.3.0"
+  },
+  "manifest": {
+    "schema_version": 1,
+    "upstream": {
+      "repository": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame.git",
+      "revision": "40296663ed350d5fe4a6ab5e367bab61cb77c219",
+      "license": "benchmarks/LICENSE.BenchmarksGame",
+      "extraction": "HTMLParser with convert_charrefs=True; concatenate text inside the first pre element, retaining whitespace",
+      "fixture_path": "public/download/binarytrees-output.txt"
+    },
+    "pinned_sha256": {
+      "benchmarks/LICENSE.BenchmarksGame": "e5dd0024dd43d92434808c8e1df3c09870a2832744283232aa1dc16c737237b1",
+      "benchmarks/binary-trees/c/adaptation.patch": "f4ac32a07dc7daef25b343aca571596c12a8039cab017e017b5a25ee1d1bd954",
+      "benchmarks/binary-trees/c/main.c": "3149135fbe1c7fbcca7c38d815f024d46bedf48a9f40611e72ad88c83fc62ad2",
+      "benchmarks/binary-trees/c/upstream.c": "0896dbbe8f2026c48a7f681cae56480b44dff6d114092f36f01474e58603c009",
+      "benchmarks/binary-trees/expected-10.txt": "b7f92c56b5d8aeb0a4d698842d1d87a57b4909865c3c84e5e10313e16663c3cb",
+      "benchmarks/binary-trees/haskell/upstream.hs": "0b6aa7815bfe566c3624771c341d9f33c2e9d306565682c380bb9f7d11ed886f",
+      "benchmarks/binary-trees/rust/adaptation.patch": "f18e3c383790bd753d966bef9c7237b3163edf4fda028f892344729c02650dbe",
+      "benchmarks/binary-trees/rust/main.rs": "f5757256cdef36a442424ca39cb12a9a9d618dcb008f77aba4cd772ea97a46e3",
+      "benchmarks/binary-trees/rust/upstream.rs": "c344da05a4bcc7d206528ba3bcbab6e78f09d049e10bf91e0fcceb666d5e99b5"
+    },
+    "workloads": [
+      {
+        "name": "binary-trees",
+        "default_input": 16,
+        "minimum_input": 0,
+        "maximum_input": 20,
+        "check_inputs": [
+          0,
+          7,
+          10
+        ],
+        "fixture": "benchmarks/binary-trees/expected-10.txt",
+        "provenance": {
+          "c": {
+            "implementation": "binarytrees-gcc-1",
+            "authors": "Kevin Carson",
+            "upstream_path": "public/program/binarytrees-gcc-1.html",
+            "upstream_git_blob": "3b3471fd45e64faaf5c46b347b3d647e93904c32",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/binarytrees-gcc-1.html",
+            "original_source": "benchmarks/binary-trees/c/upstream.c",
+            "build_source": "benchmarks/binary-trees/c/main.c"
+          },
+          "rust": {
+            "implementation": "binarytrees-rust-1",
+            "authors": "Rust Project Developers; TeXitoi",
+            "upstream_path": "public/program/binarytrees-rust-1.html",
+            "upstream_git_blob": "02bf10bd3bbc14f07ae5ee315f3cd684fd58be85",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/binarytrees-rust-1.html",
+            "original_source": "benchmarks/binary-trees/rust/upstream.rs",
+            "build_source": "benchmarks/binary-trees/rust/main.rs"
+          },
+          "haskell": {
+            "implementation": "binarytrees-ghc-1",
+            "authors": "Don Stewart",
+            "upstream_path": "public/program/binarytrees-ghc-1.html",
+            "upstream_git_blob": "ae9dd630ab3c74ef9912fe563d3060d0ab3a85c7",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/binarytrees-ghc-1.html",
+            "original_source": "benchmarks/binary-trees/haskell/upstream.hs",
+            "build_source": "benchmarks/binary-trees/haskell/upstream.hs"
+          }
+        },
+        "sources": {
+          "c": "benchmarks/binary-trees/c/main.c",
+          "rust": "benchmarks/binary-trees/rust/main.rs",
+          "haskell": "benchmarks/binary-trees/haskell/upstream.hs",
+          "mlf": "benchmarks/binary-trees/mlf/main.emlf"
+        },
+        "flags": {
+          "c": [
+            "-O3"
+          ],
+          "rust": [
+            "-O"
+          ],
+          "haskell": [
+            "-O2",
+            "-XBangPatterns",
+            "-fno-full-laziness",
+            "-fno-cse",
+            "-fforce-recomp"
+          ],
+          "mlf": [
+            "-O2",
+            "-Wno-override-module"
+          ]
+        }
+      }
+    ]
+  },
+  "source_sha256": {
+    "benchmarks/binary-trees/haskell/upstream.hs": "0b6aa7815bfe566c3624771c341d9f33c2e9d306565682c380bb9f7d11ed886f",
+    "benchmarks/binary-trees/c/main.c": "3149135fbe1c7fbcca7c38d815f024d46bedf48a9f40611e72ad88c83fc62ad2",
+    "benchmarks/binary-trees/rust/main.rs": "f5757256cdef36a442424ca39cb12a9a9d618dcb008f77aba4cd772ea97a46e3",
+    "benchmarks/binary-trees/mlf/main.emlf": "3cf2377fcabbac589aff503151828b0d53a3bca0ee9040b2cf29c7930c95a78a"
+  },
+  "harness_sha256": "e33f21ec4d776249f22202ab4c4c5d71891c06cee347bc8b3752dad428809691",
+  "input_sha256": {
+    "benchmarks/binary-trees/haskell/upstream.hs": "0b6aa7815bfe566c3624771c341d9f33c2e9d306565682c380bb9f7d11ed886f",
+    "benchmarks/binary-trees/c/main.c": "3149135fbe1c7fbcca7c38d815f024d46bedf48a9f40611e72ad88c83fc62ad2",
+    "benchmarks/binary-trees/rust/main.rs": "f5757256cdef36a442424ca39cb12a9a9d618dcb008f77aba4cd772ea97a46e3",
+    "benchmarks/binary-trees/mlf/main.emlf": "3cf2377fcabbac589aff503151828b0d53a3bca0ee9040b2cf29c7930c95a78a",
+    "benchmarks/LICENSE.BenchmarksGame": "e5dd0024dd43d92434808c8e1df3c09870a2832744283232aa1dc16c737237b1",
+    "benchmarks/binary-trees/c/adaptation.patch": "f4ac32a07dc7daef25b343aca571596c12a8039cab017e017b5a25ee1d1bd954",
+    "benchmarks/binary-trees/c/upstream.c": "0896dbbe8f2026c48a7f681cae56480b44dff6d114092f36f01474e58603c009",
+    "benchmarks/binary-trees/expected-10.txt": "b7f92c56b5d8aeb0a4d698842d1d87a57b4909865c3c84e5e10313e16663c3cb",
+    "benchmarks/binary-trees/rust/adaptation.patch": "f18e3c383790bd753d966bef9c7237b3163edf4fda028f892344729c02650dbe",
+    "benchmarks/binary-trees/rust/upstream.rs": "c344da05a4bcc7d206528ba3bcbab6e78f09d049e10bf91e0fcceb666d5e99b5",
+    "benchmarks/manifest.json": "52a81813abf4acca09f25bc6c09b10197c2067d2e2fd05101a39c5b71cb50a2d",
+    "/Volumes/src/mlf/scripts/benchmark-languages.py": "e33f21ec4d776249f22202ab4c4c5d71891c06cee347bc8b3752dad428809691",
+    "/opt/homebrew/opt/llvm/bin/clang": "d64d1ee59d8aff01397eb88adea263e490ac65766faefc8b5323b4a06d0438e5",
+    "/opt/homebrew/bin/rustc": "951efe952b1e70ab89d1b040de27315385ddb1ea8ece7d260655a54c3e52034f",
+    "/Users/ares/.ghcup/bin/ghc": "39fd1ee0cf7eb5739a595d5c238a95a7a062942397cc6d2a16425d6eeb18283e",
+    "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf": "245a27cd8900034e042c75a7a99c6fd2fcdf04d427eee7553bb77fe6d546235e",
+    "/opt/homebrew/bin/pkg-config": "39b6b8b701470ebf31a24972bc1fafc7da54a5c32215d972fdadaf21c7cfa91b",
+    "/Volumes/src/mlf/runtime/mlf_runtime.c": "78d4bf343e536e192142f8de1113a8bb1e49e90d5c0a663b6a40fad9e94ba8a4",
+    "/Volumes/src/mlf/runtime/mlf_runtime.h": "fbe55fcddfe992221cdfda7009745d5629ec9b898d247282e8ff64b965e29646"
+  },
+  "repository": {
+    "revision": "1b5f0056fe57144774ce6c7824da80355f34b287",
+    "dirty": true
+  },
+  "methodology": {
+    "compile": "Fresh serial source-to-executable builds, including MLF LLVM emission, IR writes, runtime C compilation and linking. Tool/compiler/harness setup excluded. Fresh output directory per sample; no object cache. Rotating language order.",
+    "runtime": "All binaries built and checked before any timed samples; exact runtime input checked once before timing as warmup. Process startup/IO/GC/exit included. Output checked again after each sample, outside timing. No time subtraction.",
+    "resource_measurement": "wait4 child usage: user+system CPU; Darwin RSS bytes, Linux RSS KiB converted to bytes. Pipeline CPU summed, RSS maximum over stages.",
+    "normalization": "Wall medians divided by C wall median; ratio below 1 is allowed."
+  },
+  "input_integrity": "All recorded source, manifest, harness, compiler and runtime hashes unchanged",
+  "completed_at_utc": "2026-10-07T18:16:53.517278+00:00"
+}

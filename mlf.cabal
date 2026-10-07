@@ -6,7 +6,13 @@ description: Graph-based type inference and explicit elaboration following Yakob
 category: Language
 build-type: Simple
 license: BSD-3-Clause
-extra-source-files: README.md, examples/*.emlf, examples/*.hs, test/fixtures/*.emlf, test/*.c, docs/*.txt, scripts/*.py
+extra-source-files:
+  README.md, examples/*.emlf, examples/*.hs, test/fixtures/*.emlf, test/*.c, test/*.py, docs/*.txt, scripts/*.py,
+  benchmarks/*.md, benchmarks/*.json, benchmarks/results/*.json, benchmarks/LICENSE.BenchmarksGame,
+  benchmarks/binary-trees/*.md, benchmarks/binary-trees/*.txt,
+  benchmarks/binary-trees/c/*.c, benchmarks/binary-trees/c/*.patch,
+  benchmarks/binary-trees/rust/*.rs, benchmarks/binary-trees/rust/*.patch,
+  benchmarks/binary-trees/haskell/*.hs, benchmarks/binary-trees/mlf/*.emlf
 data-files: runtime/mlf_runtime.c, runtime/mlf_runtime.h
 
 common settings
@@ -24,6 +30,9 @@ library
     MLF.Primitive
     MLF.Runtime
     MLF.LLVM
+    MLF.LLVM.Optimize
+    MLF.LLVM.Analysis
+    MLF.LLVM.Codegen
     MLF.Classes
     MLF.Kind
     MLF.Kinding
@@ -72,7 +81,7 @@ test-suite backend-tests
   type: exitcode-stdio-1.0
   hs-source-dirs: test, examples
   main-is: BackendMain.hs
-  other-modules: Backends, BackendCases, IOTests, PreludeTests, Snake, SnakeBaseline
+  other-modules: Backends, BackendCases, IOTests, PreludeTests, Snake, SnakeBaseline, NativeOptimization
   build-depends: mlf, directory, filepath, process, bytestring, text, unix
 
 benchmark compiler-bench
@@ -80,5 +89,13 @@ benchmark compiler-bench
   type: exitcode-stdio-1.0
   hs-source-dirs: bench
   main-is: Main.hs
+  build-tool-depends: mlf:emlf
+  build-depends: directory, process
+
+test-suite benchmark-harness-tests
+  import: settings
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: BenchmarkHarnessMain.hs
   build-tool-depends: mlf:emlf
   build-depends: directory, process

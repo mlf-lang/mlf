@@ -1,0 +1,10 @@
+--- upstream.c
++++ main.c
+@@ -10,7 +10,6 @@
+    *reset*
+ */
+ 
+-#include <malloc.h>
+ #include <math.h>
+ #include <stdio.h>
+ #include <stdlib.h>
