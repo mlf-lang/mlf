@@ -14,19 +14,22 @@ cabal bench --benchmark-options='--benchmark fannkuch-redux --size 7 --runs 2'
 cabal bench --benchmark-options='--benchmark spectral-norm --size 100 --runs 2'
 cabal bench --benchmark-options='--benchmark fasta --size 1000 --runs 2'
 cabal bench --benchmark-options='--benchmark mandelbrot --size 200 --runs 2'
+cabal bench --benchmark-options='--benchmark reverse-complement --size 1000 --runs 2'
+cabal bench --benchmark-options='--benchmark k-nucleotide --size 1000 --runs 2'
 cabal bench -j1 --benchmark-options='--runs 7 --max-compile-ratio 5 --max-runtime-ratio 2'
 ```
 
 Requires Python 3.9+, GHC with its boot `array`, `bytestring` and `text` packages,
 Clang, Rust (`rustc`, no Cargo), `pkg-config`, and
 GMP on macOS or Linux. Git is used only to record repository metadata.
-Dependencies and tools must already be installed.
-Cabal builds the optimized `emlf` compiler and the small benchmark launcher
-before measurement. Baseline sources are vendored: benchmarking never
-downloads code or dependencies. All four toolchains are required; missing
-tools, pin mismatches, failed commands and output mismatches fail the run.
+System tools must already be installed. Cabal resolves/builds the pinned
+Haskell `hashtables` 1.4.2 and `hashable` 1.5.1.0 library dependencies, the
+optimized `emlf` compiler and the small benchmark launcher before measurement. Baseline sources and khash are vendored; the measurement
+driver never downloads code or builds dependencies. Dependency setup is
+outside all measured intervals, as are Cabal and compiler builds. All four
+toolchains are required; missing tools, pin mismatches, failed commands and output mismatches fail the run.
 
-The suite contains seven workloads, all with pinned C/Rust/Haskell
+The suite contains nine workloads, all with pinned C/Rust/Haskell
 baselines and an MLF implementation:
 
 | Workload | Default input | What it exercises | Source selection |
@@ -38,6 +41,8 @@ baselines and an MLF implementation:
 | spectral-norm | n = 2000 | Matrix-vector products, indexed Double arrays | [Provenance](spectral-norm/PROVENANCE.md) |
 | fasta | n = 2,000,000 | LCG, probability selection, buffered byte output | [Provenance](fasta/PROVENANCE.md) |
 | mandelbrot | 4096×4096 pixels | Floating branches, bit packing, binary PBM output | [Provenance](mandelbrot/PROVENANCE.md) |
+| reverse-complement | FASTA n = 10,000,000 | Raw input, growing records, indexed bytes, buffered output | [Provenance](reverse-complement/PROVENANCE.md) |
+| k-nucleotide | FASTA n = 1,000,000 | Integer hash tables, substring counting, sorting | [Provenance](k-nucleotide/PROVENANCE.md) |
 
 See [candidate investigation and remaining work](INVESTIGATION.md). Four source
 languages are necessary to compare practical language/compiler pipelines;
@@ -54,7 +59,8 @@ by startup; the driver flags medians below 100 ms. `--size` requires exactly
 one `--benchmark` selection; without it, each selected workload uses its own
 default. Supported ranges are depths 0–20, digits 1–20,000, steps 0–5,000,000
 and permutation size 1–11, spectral size 1–5500, fasta n=0–25,000,000,
-and Mandelbrot width 1–16,000. Large inputs can need a higher timeout.
+Mandelbrot width 1–16,000, reverse-complement FASTA n=1–25,000,000,
+and k-nucleotide FASTA n=1–2,000,000. Large inputs can need a higher timeout.
 `--timeout 600` bounds each subprocess, kills its process group on timeout,
 and records failure. Change it when deliberately testing larger inputs.
 
@@ -135,15 +141,26 @@ sample. Each sample's output is checked again after stopping the timer.
 | spectral-norm | 1, 2, 3, 100 | Dense Python matrix with `math.fsum`; pinned n=100; exactly one finite value with absolute error ≤ 1e-8 |
 | fasta | 0, 1, 29, 30, 31, 1000, 12288, 12289 | Exact decimal probability oracle; pinned n=1000; exact bytes including headers, 60-column lines and buffer boundaries |
 | mandelbrot | 1, 2, 7, 8, 9, 200 | Python complex recurrence; pinned 200×200 PBM; exact header, pixels and zero padding, including partial bytes |
+| reverse-complement | FASTA n=1, 7, 31, 1000, 12288, 12289 | Python translation/reversal; pinned n=1000 input/output; exact headers, bases and wrapping |
+| k-nucleotide | FASTA n=1, 7, 31, 1000 | Python slices/Counter for all lengths; pinned n=1000 input/output; rational frequency rounding (both neighbours only at exact midpoints), exact tie ordering, separators and query counts |
 
 Reference calculations are cached by input inside the driver and run outside
 all timed intervals. They also validate every exact runtime input. Programs
-receive only their size, never oracle state or results. Non-finite n-body
+receive only their size or input bytes, never oracle state or results.
+For reverse-complement and k-nucleotide, `--size` is the FASTA generator n.
+All languages receive the same bytes without command-line arguments. The
+driver generates FASTA outside measurement and writes it to the input file
+before starting the timer; reading it is timed. The report records input byte
+length and SHA-256 instead of embedding megabytes of input. The generated
+n=1000 bytes must exactly match each workload's pinned upstream input. Non-finite n-body
 values, missing/extra output, bad checksums/digits and mutated pins fail closed.
 Every tree is constructed and traversed; every pi digit is extracted with
 both safety tests; every n-body step and every fannkuch permutation executes.
 Spectral-norm performs all 40 matrix-vector products; fasta updates the LCG
 for every random base; Mandelbrot evaluates each pixel for up to 50 iterations.
+Reverse-complement transforms every record; k-nucleotide builds all seven
+complete frequency tables using library hash tables. An untimed native audit
+counts the actual writes and distinct insertions for every table.
 The driver never supplies precomputed answers to programs. A separate
 untimed allocation probe and both-backend MLF regression cases are included
 in `cabal test`; the measured programs are uninstrumented.
@@ -167,7 +184,11 @@ implemented; they are not a prerequisite on either platform.
 
 The driver controls locale and clears inherited `GHCRTS` and GHC package
 environments. Toolchain identities, runtime hashes and controlled variables
-are recorded. All source, harness, manifest, tool and runtime hashes are
+are recorded. For Haskell k-nucleotide, the selected package IDs and transitive
+Cabal source identities, archive hashes and configuration hashes are recorded.
+Its GHC samples use those preinstalled library units explicitly with
+`-package-db` and `-package-id`, preserving `GHC_ENVIRONMENT=-`.
+All source, harness, manifest, tool and runtime hashes are
 checked again at completion; changes during a run invalidate its results.
 CPU frequency, system load, thermal state and OS filesystem
 caches are not controlled. Run on an otherwise idle machine, repeat runs,

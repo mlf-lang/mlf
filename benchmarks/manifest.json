@@ -55,7 +55,30 @@
     "benchmarks/mandelbrot/haskell/main.hs": "47a7b99460af9c18a1a82dfa00089678e259d1ad828e02ddffc4e845c04fb80d",
     "benchmarks/mandelbrot/haskell/adaptation.patch": "e2d2af9b0455b595b3b7d0f380cdb0d77511131583d536639c82a94495a3be9a",
     "benchmarks/mandelbrot/haskell/upstream.hs": "e56fdab481003f3e6f612dc55afdcbc724fd259e3e6c35e3698164a6d99f215d",
-    "benchmarks/mandelbrot/expected-200.pbm": "97610473750700638fc63d13cfa49d339b67c18e7f26b3f9c9acb61e746472d5"
+    "benchmarks/mandelbrot/expected-200.pbm": "97610473750700638fc63d13cfa49d339b67c18e7f26b3f9c9acb61e746472d5",
+    "benchmarks/reverse-complement/c/upstream.c": "bb4e05c8357b28829e3d0c5b9d5571b45b919cbb18bca7fb41570855fa89bbf6",
+    "benchmarks/reverse-complement/c/main.c": "b4fdef2ea2b77859712c3659e2c9f8105f0335dc443c94e1ad4482061449aecd",
+    "benchmarks/reverse-complement/c/adaptation.patch": "3f391c43f97363a8834e09170e7ba85b36bacf9ae120ae6f4aff5379bf4f4d54",
+    "benchmarks/reverse-complement/rust/upstream.rs": "39d5bbe0a662b862da7e455dcfaa2f8f04bccc9dacddd1e7f19122ec9ef4c231",
+    "benchmarks/reverse-complement/rust/main.rs": "490bdf5b55f3fd56c35642e596a4a1d6df9f25f036726d7273bc7deb77a13f19",
+    "benchmarks/reverse-complement/rust/adaptation.patch": "5a145ceb99892b513556e16a1bbb0796d8992ade8dceefa776446a0add189133",
+    "benchmarks/reverse-complement/haskell/upstream.hs": "55d39729fc23c6e379af8c2f53f5fde19256e3e82525ec194dffd6ca54635002",
+    "benchmarks/reverse-complement/haskell/main.hs": "7a87145fa591b2fe72e010681891e93fe4f9f897bcefd8e8aff33610a177b1b1",
+    "benchmarks/reverse-complement/haskell/adaptation.patch": "9de460ce4ee356e99caa89996061c7d1353b16dcc185292753029f6934c347c5",
+    "benchmarks/reverse-complement/expected-1000.txt": "549dcdcc7df2685145e6cbdfd682469bd9c12ff1beec93c270f8ba447acd4855",
+    "benchmarks/reverse-complement/input-1000.txt": "62d1e8d0df7938d2aefda9a37887e0389231ea72c099c29a51afb6edca1bdc73",
+    "benchmarks/k-nucleotide/c/upstream.c": "fe7a12f17707b148d28773924ee5a8a3246592414ac50f1edad821a0ac8ade65",
+    "benchmarks/k-nucleotide/c/main.c": "33e542fe63c851b40aae6d927325efe57d1c9fbd6efa4d2c1027dbe1758cba6f",
+    "benchmarks/k-nucleotide/c/adaptation.patch": "4fcb10dc8fcf051d5416e416449e69e864e3538b9df8ecc05de9b8883023ad15",
+    "benchmarks/k-nucleotide/rust/upstream.rs": "0649ac36c7a0b190c9606cec240604056d393d6cb7b3bb61965efb64925bcdf9",
+    "benchmarks/k-nucleotide/rust/main.rs": "cb4811abbe5d367b4cfa1f9e7753093a4b044074479837c8eaff8754e34fb3c0",
+    "benchmarks/k-nucleotide/rust/adaptation.patch": "b1229f930ed4797022ed17de1ea3c57f0f4a7794aab034aee4b2b612bd6637a7",
+    "benchmarks/k-nucleotide/haskell/upstream.hs": "845aa974415745dda39bded47175498d2d334f2d6f4cac59e48b6eae1ac48fbc",
+    "benchmarks/k-nucleotide/haskell/main.hs": "7e98b9c09e48eb4b3f27b1a2b84f4da446e654c0dea0a92a06ab38aa54cf570e",
+    "benchmarks/k-nucleotide/haskell/adaptation.patch": "03af6baaed5c83dca7a4a601c7f744cdc8f99f594e328e56551a86b233d1e5aa",
+    "benchmarks/k-nucleotide/expected-1000.txt": "baa63c46addb89c63e68ea0055952847fbccf450e89997b2b62234c90e66f500",
+    "benchmarks/k-nucleotide/input-1000.txt": "62d1e8d0df7938d2aefda9a37887e0389231ea72c099c29a51afb6edca1bdc73",
+    "runtime/khash.h": "4582c7fd4b98f61339ce677bb1daa7a45a53075b112a494a335525c4bda72074"
   },
   "workloads": [
     {
@@ -555,6 +578,168 @@
           "-Wno-override-module"
         ]
       }
+    },
+    {
+      "name": "reverse-complement",
+      "default_input": 10000000,
+      "minimum_input": 1,
+      "maximum_input": 25000000,
+      "check_inputs": [
+        1,
+        7,
+        31,
+        1000,
+        12288,
+        12289
+      ],
+      "fixture_input": 1000,
+      "post_build_input": 31,
+      "fixture": "benchmarks/reverse-complement/expected-1000.txt",
+      "fixture_upstream_path": "public/download/revcomp-output.txt",
+      "input_kind": "fasta",
+      "input_fixture": "benchmarks/reverse-complement/input-1000.txt",
+      "input_fixture_upstream_path": "public/download/revcomp-input.txt",
+      "provenance": {
+        "c": {
+          "implementation": "revcomp-gcc-4",
+          "authors": "Bob W",
+          "upstream_path": "public/program/revcomp-gcc-4.html",
+          "upstream_git_blob": "38da882bb1312b6ce311c0dc2403dcad94e9772a",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/revcomp-gcc-4.html",
+          "original_source": "benchmarks/reverse-complement/c/upstream.c",
+          "build_source": "benchmarks/reverse-complement/c/main.c"
+        },
+        "rust": {
+          "implementation": "revcomp-rust-2",
+          "authors": "Rust Project Developers; Cristi Cobzarenco; TeXitoi; Matt Brubeck",
+          "upstream_path": "public/program/revcomp-rust-2.html",
+          "upstream_git_blob": "a40ead5758e5c3e11abfb4a9a7fa6451e5189b0a",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/revcomp-rust-2.html",
+          "original_source": "benchmarks/reverse-complement/rust/upstream.rs",
+          "build_source": "benchmarks/reverse-complement/rust/main.rs"
+        },
+        "haskell": {
+          "implementation": "revcomp-ghc-4",
+          "authors": "Louis Wasserman; Artem Pelenitsyn",
+          "upstream_path": "public/program/revcomp-ghc-4.html",
+          "upstream_git_blob": "fd04a28c09ce66d92f166723e6d4617e3aa09c52",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/revcomp-ghc-4.html",
+          "original_source": "benchmarks/reverse-complement/haskell/upstream.hs",
+          "build_source": "benchmarks/reverse-complement/haskell/main.hs"
+        }
+      },
+      "sources": {
+        "mlf": "benchmarks/reverse-complement/mlf/main.emlf",
+        "c": "benchmarks/reverse-complement/c/main.c",
+        "rust": "benchmarks/reverse-complement/rust/main.rs",
+        "haskell": "benchmarks/reverse-complement/haskell/main.hs"
+      },
+      "flags": {
+        "c": [
+          "-O3"
+        ],
+        "rust": [
+          "-O",
+          "--edition=2021"
+        ],
+        "haskell": [
+          "-O2",
+          "-XBangPatterns",
+          "-fforce-recomp"
+        ],
+        "mlf": [
+          "-O2",
+          "-Wno-override-module"
+        ]
+      },
+      "output_comparison": "Exact bytes against independent Python oracle and pinned fixture"
+    },
+    {
+      "name": "k-nucleotide",
+      "default_input": 1000000,
+      "minimum_input": 1,
+      "maximum_input": 2000000,
+      "check_inputs": [
+        1,
+        7,
+        31,
+        1000
+      ],
+      "fixture_input": 1000,
+      "post_build_input": 31,
+      "fixture": "benchmarks/k-nucleotide/expected-1000.txt",
+      "fixture_upstream_path": "public/download/knucleotide-output.txt",
+      "input_kind": "fasta",
+      "input_fixture": "benchmarks/k-nucleotide/input-1000.txt",
+      "input_fixture_upstream_path": "public/download/knucleotide-input.txt",
+      "provenance": {
+        "c": {
+          "implementation": "knucleotide-gcc-1",
+          "authors": "Jeremy Zerfas",
+          "upstream_path": "public/program/knucleotide-gcc-1.html",
+          "upstream_git_blob": "6d045655079603e446269edba3abd0894ae92445",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/knucleotide-gcc-1.html",
+          "original_source": "benchmarks/k-nucleotide/c/upstream.c",
+          "build_source": "benchmarks/k-nucleotide/c/main.c"
+        },
+        "rust": {
+          "implementation": "knucleotide-rust-1",
+          "authors": "Renat Galimov",
+          "upstream_path": "public/program/knucleotide-rust-1.html",
+          "upstream_git_blob": "5f9a1d6f6153de85b4af5cd0d87987cfb36da3cb",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/knucleotide-rust-1.html",
+          "original_source": "benchmarks/k-nucleotide/rust/upstream.rs",
+          "build_source": "benchmarks/k-nucleotide/rust/main.rs"
+        },
+        "haskell": {
+          "implementation": "knucleotide-ghc-2",
+          "authors": "cahu ette",
+          "upstream_path": "public/program/knucleotide-ghc-2.html",
+          "upstream_git_blob": "578f9bf536ef2df98f89d8fb3918146be2d62d22",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/knucleotide-ghc-2.html",
+          "original_source": "benchmarks/k-nucleotide/haskell/upstream.hs",
+          "build_source": "benchmarks/k-nucleotide/haskell/main.hs"
+        }
+      },
+      "sources": {
+        "mlf": "benchmarks/k-nucleotide/mlf/main.emlf",
+        "c": "benchmarks/k-nucleotide/c/main.c",
+        "rust": "benchmarks/k-nucleotide/rust/main.rs",
+        "haskell": "benchmarks/k-nucleotide/haskell/main.hs"
+      },
+      "flags": {
+        "c": [
+          "-O3"
+        ],
+        "rust": [
+          "-O",
+          "--edition=2021"
+        ],
+        "haskell": [
+          "-O2",
+          "-XBangPatterns",
+          "-fforce-recomp",
+          "-XScopedTypeVariables"
+        ],
+        "mlf": [
+          "-O2",
+          "-Wno-override-module"
+        ]
+      },
+      "output_comparison": "Exact keys/order/separators/query counts; exact rational three-decimal frequencies, allowing either neighbour only at a mathematical midpoint",
+      "haskell_packages": [
+        "hashtables",
+        "hashable"
+      ]
     }
-  ]
+  ],
+  "libraries": {
+    "khash": {
+      "version": "0.2.8",
+      "revision": "97a0fcb790b43b9e5da8994f4671021fec036f19",
+      "source": "runtime/khash.h",
+      "url": "https://github.com/attractivechaos/klib/blob/97a0fcb790b43b9e5da8994f4671021fec036f19/khash.h",
+      "license": "MIT, included in header"
+    }
+  }
 }

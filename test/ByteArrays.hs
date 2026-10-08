@@ -47,12 +47,43 @@ byteArrayTests backends =
       result <- B.execute backends IOEntry (Input "" False) term
       right (B.outcome result)
       unless (B.outputBytes result == BS.pack [0..255]) (fail (show result)))
+  , ("bytes: bulk copy preserves offsets, empty ranges and forward overlap", do
+      let copy = recursion ++ "let move : ByteArray -> ByteArray -> Int -> Int -> Int -> IO Unit = " ++
+            "fix (\\again source dest end offset index -> ifThenElse (ltInt index end) " ++
+            "(do { b <- readByteArray source index; writeByteArray dest (addInt offset index) b; " ++
+            "again source dest end offset (addInt index 1) }) (return ())) in "
+          cases = [(False,6,2,1,"012bcdef89"),(True,5,1,0,"aaaaaa"),
+                   (True,6,0,0,"abcdef"),(True,6,-2,2,"cdefef"),
+                   (False,2,2^(100::Int),99,"0123456789"),(False,0,0,0,"0123456789")]
+      forM_ cases $ \(alias,end,offset,start,expected) -> do
+        term <- checked (copy ++ "do { a <- byteArrayFromString \"abcdef\"; b <- " ++
+          (if alias then "return a" else "byteArrayFromString \"0123456789\"") ++
+          "; move a b " ++ show (end::Integer) ++ " (" ++ show (offset::Integer) ++ ") (" ++ show (start::Integer) ++
+          "); move a b 0 0 0; n <- lengthByteArray b; putBytes b 0 n }")
+        llvm <- right (emitLLVMIO term)
+        unless ("call void @llvm.memmove" `isInfixOf` llvm) (fail "copy idiom was not exercised")
+        result <- B.execute backends IOEntry (Input "" False) term
+        right (B.outcome result)
+        unless (B.output result == expected) (fail (show result)))
+  , ("bytes: bulk copy fallback retains bounds failures", forM_
+      [(7,0,0),(3,5,0),(3,0,-1),(2^(100::Int),0,0)] $ \(end,offset,start) -> do
+      term <- checked (recursion ++ "let move : ByteArray -> ByteArray -> Int -> Int -> Int -> IO Unit = " ++
+        "fix (\\again source dest end offset index -> ifThenElse (ltInt index end) " ++
+        "(do { b <- readByteArray source index; writeByteArray dest (addInt offset index) b; " ++
+        "again source dest end offset (addInt index 1) }) (return ())) in " ++
+        "do { a <- byteArrayFromString \"abcdef\"; move a a 0 0 0; putStrLn \"before\"; " ++
+        "move a a " ++ show (end::Integer) ++ " (" ++ show (offset::Integer) ++ ") (" ++ show (start::Integer) ++ ") }")
+      result <- B.execute backends IOEntry (Input "" False) term
+      case B.outcome result of
+        Left err | "array index out of bounds" `isInfixOf` show err && B.output result == "before\n" -> pure ()
+        _ -> fail (show result))
   , ("bytes: native stores check bounds before byte range", forM_
       [(0,256,"byte value must be between 0 and 255"),
        (0,-1,"byte value must be between 0 and 255"),
        (0,4611686018427387904,"byte value must be between 0 and 255"),
        (0,-4611686018427387905,"byte value must be between 0 and 255"),
-       (1,256,"array index out of bounds"),
+       (1,256,"array index out of bounds"),(2147483647,256,"array index out of bounds"),
+       (2147483648,256,"array index out of bounds"),
        (4611686018427387904,256,"array index out of bounds")] $ \(index,value,message) -> do
       term <- checked (recursion ++ "let write : ByteArray -> Int -> Int -> Int -> IO Unit = " ++
         "fix (\\again a i x n -> ifThenElse (eqInt n 0) (return ()) " ++

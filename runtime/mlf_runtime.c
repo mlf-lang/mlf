@@ -1,10 +1,11 @@
 /* Runtime support for native xMLF functions, not an AST interpreter.
  * Call-by-need memoizes values; executing an IO action is never memoized.
- * Only the IO driver collects: at those safe points no generated function,
- * force operation, or primitive has live roots on the native stack.
+ * The IO driver and explicitly rooted native IO entries collect. Ordinary
+ * lazy evaluation and scalar primitives never collect on the native stack.
  */
 #define _POSIX_C_SOURCE 200809L
 #include "mlf_runtime.h"
+#include "khash.h"
 #include <gmp.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -34,7 +35,8 @@ typedef enum {
     INTEGER, BOOLEAN, STRING, CONSTRUCTOR, PRIMITIVE, ACTION,
     CONSTRUCTOR_1, CONSTRUCTOR_2, DOUBLE, INT_ARRAY, DOUBLE_ARRAY,
     WRITE_INT_ACTION, WRITE_DOUBLE_ACTION, NATIVE_IO,
-    BYTE_ARRAY, WRITE_BYTE_ACTION, PUT_BYTES_ACTION
+    BYTE_ARRAY, WRITE_BYTE_ACTION, PUT_BYTES_ACTION, INT_TABLE, WRITE_TABLE_ACTION,
+    SMALL_INT_TABLE
 } Tag;
 
 /* These numbers are shared with primitiveCode in MLF.LLVM. */
@@ -47,7 +49,8 @@ typedef enum {
     NEW_INT_ARRAY, READ_INT_ARRAY, WRITE_INT_ARRAY, LENGTH_INT_ARRAY,
     NEW_DOUBLE_ARRAY, READ_DOUBLE_ARRAY, WRITE_DOUBLE_ARRAY, LENGTH_DOUBLE_ARRAY,
     NEW_BYTE_ARRAY, READ_BYTE_ARRAY, WRITE_BYTE_ARRAY, LENGTH_BYTE_ARRAY,
-    BYTE_ARRAY_FROM_STRING, PUT_BYTES,
+    BYTE_ARRAY_FROM_STRING, PUT_BYTES, GET_BYTE_LINE, NEW_INT_TABLE, READ_INT_TABLE, WRITE_INT_TABLE,
+    AND_INT,
     PRIMITIVE_COUNT
 } Primitive;
 
@@ -56,6 +59,15 @@ struct MlfEnv {
     size_t count;
     MlfValue *slots[];
 };
+
+static khint_t integer_hash(MlfValue *key);
+static int integer_equal(MlfValue *a, MlfValue *b);
+KHASH_INIT(mlf_int, MlfValue *, MlfValue *, 1, integer_hash, integer_equal)
+/* Immediate keys need only pointer equality. Upgrade to the fully general
+ * table on the first large key; arbitrary-precision values work in both. */
+#define tagged_hash(key) kh_int64_hash_func((uint64_t)((int64_t)(intptr_t)(key) >> 1))
+#define tagged_equal(a,b) ((a) == (b))
+KHASH_INIT(mlf_tagged, MlfValue *, MlfValue *, 1, tagged_hash, tagged_equal)
 
 struct MlfValue {
     Object object;
@@ -69,6 +81,8 @@ struct MlfValue {
         struct { size_t length; MlfValue **cells; } int_array;
         struct { size_t length; double *cells; } double_array;
         struct { size_t length; unsigned char *cells; } byte_array;
+        khash_t(mlf_int) *int_table;
+        khash_t(mlf_tagged) *small_table;
         struct { MlfValue *array, *index, *entry; } array_write;
         int boolean;
         struct { size_t length; char *bytes; } string;
@@ -87,6 +101,9 @@ typedef struct Stack {
 static Object *heap;
 /* Register auxiliary stacks so fatal IO/black-hole errors also release them. */
 static Stack *active_stacks;
+static MlfRoots *native_roots;
+static MlfValue **io_current;
+static const Stack *io_continuations;
 static size_t objects;
 static size_t collection_limit = MLF_GC_THRESHOLD;
 static size_t integer_bytes;
@@ -108,12 +125,30 @@ _Static_assert(offsetof(MlfValue, as.int_array.cells) == 32 &&
                offsetof(MlfValue, as.double_array.cells) == 32 &&
                offsetof(MlfValue, as.byte_array.cells) == 32, "array storage ABI");
 _Static_assert(sizeof(MlfValue) == 48, "managed value size ABI");
+_Static_assert(sizeof(MlfRoots) == 24, "native roots ABI");
 #define SMALL_MIN (-(INT64_C(1) << 62))
 #define SMALL_MAX ((INT64_C(1) << 62) - 1)
 static int immediate(const void *p) { return ((uintptr_t)p & 7) != 0; }
 static int small_integer(const MlfValue *p) { return ((uintptr_t)p & 1) != 0; }
 static int64_t small_value(const MlfValue *p) { return (int64_t)(intptr_t)p >> 1; }
 static MlfValue *small(int64_t n) { return (MlfValue *)(uintptr_t)(((uint64_t)n << 1) | 1); }
+/* Hash all integer representations by value, including negative/GMP keys. */
+static khint_t integer_hash(MlfValue *key) {
+    if (small_integer(key)) return kh_int64_hash_func((uint64_t)small_value(key));
+    if (mpz_fits_slong_p(key->as.integer))
+        return kh_int64_hash_func((uint64_t)mpz_get_si(key->as.integer));
+    khint_t hash = (khint_t)mpz_sgn(key->as.integer);
+    for (size_t i = 0; i < mpz_size(key->as.integer); ++i)
+        hash = (hash * 16777619u) ^ kh_int64_hash_func(mpz_getlimbn(key->as.integer,(mp_size_t)i));
+    return hash;
+}
+static int integer_equal(MlfValue *a, MlfValue *b) {
+    if (a == b) return 1;
+    if (small_integer(a)) return small_integer(b) ? 0 : mpz_cmp_si(b->as.integer,small_value(a)) == 0;
+    if (small_integer(b)) return mpz_cmp_si(a->as.integer,small_value(b)) == 0;
+    return mpz_cmp(a->as.integer,b->as.integer) == 0;
+}
+
 static int nullary(const MlfValue *p) { return ((uintptr_t)p & 7) == 4; }
 static int boolean_value(const MlfValue *p) { return ((uintptr_t)p & 3) == 2; }
 
@@ -132,6 +167,16 @@ extern void mlf_bench_constructed_node(int64_t tag);
 #define CONSTRUCTED(tag) mlf_bench_constructed_node(tag)
 #else
 #define CONSTRUCTED(tag) ((void)0)
+#endif
+
+#ifdef MLF_TABLE_AUDIT
+extern void mlf_bench_table_created(MlfValue *table);
+extern void mlf_bench_table_written(MlfValue *table, int inserted);
+#define TABLE_CREATED(table) mlf_bench_table_created(table)
+#define TABLE_WRITTEN(table, inserted) mlf_bench_table_written(table, inserted)
+#else
+#define TABLE_CREATED(table) ((void)0)
+#define TABLE_WRITTEN(table, inserted) ((void)0)
 #endif
 
 static _Noreturn void fail(const char *message) {
@@ -311,7 +356,8 @@ static MlfValue *action(Primitive operation, MlfValue *first, MlfValue *second) 
 
 MlfValue *mlf_primitive(int64_t identity) {
     if (identity < 0 || identity >= PRIMITIVE_COUNT) fail("unknown primitive");
-    if (identity == GET_LINE) return action(GET_LINE, NULL, NULL);
+    if (identity == GET_LINE || identity == GET_BYTE_LINE || identity == NEW_INT_TABLE)
+        return action((Primitive)identity, NULL, NULL);
     MlfValue *result = value(PRIMITIVE);
     result->as.primitive.identity = (Primitive)identity;
     result->as.primitive.arguments = mlf_env_new(0);
@@ -320,7 +366,7 @@ MlfValue *mlf_primitive(int64_t identity) {
 
 static MlfValue *force(MlfValue *entry);
 static MlfValue *expect(MlfValue *entry, Tag tag) {
-    MlfValue *result = force(entry);
+    MlfValue *result = mlf_force(entry);
     if (immediate(result)) {
         if ((tag == INTEGER && small_integer(result)) ||
             (tag == BOOLEAN && boolean_value(result)) ||
@@ -328,6 +374,7 @@ static MlfValue *expect(MlfValue *entry, Tag tag) {
         fail("invalid value for runtime operation");
     }
     if (tag == CONSTRUCTOR && (result->tag == CONSTRUCTOR_1 || result->tag == CONSTRUCTOR_2)) return result;
+    if (tag == INT_TABLE && result->tag == SMALL_INT_TABLE) return result;
     if (result->tag != tag) fail("invalid value for runtime operation");
     return result;
 }
@@ -445,10 +492,11 @@ MlfValue *mlf_sub_int(MlfValue *a, MlfValue *b) { return integer_operation(a, b,
 
 static MlfValue *integer_extended(Primitive p, MlfValue *a, MlfValue *b) {
     a = expect(a, INTEGER); b = expect(b, INTEGER);
-    if (p != MUL_INT && (small_integer(b) ? small_value(b) == 0 : mpz_sgn(b->as.integer) == 0))
+    if ((p == QUOT_INT || p == REM_INT) && (small_integer(b) ? small_value(b) == 0 : mpz_sgn(b->as.integer) == 0))
         fail("integer division by zero");
     if (small_integer(a) && small_integer(b)) {
         int64_t x = small_value(a), y = small_value(b), n;
+        if (p == AND_INT) return small(x & y);
         if (p == MUL_INT) {
             if (!__builtin_mul_overflow(x,y,&n) && n >= SMALL_MIN && n <= SMALL_MAX) return small(n);
         } else {
@@ -476,6 +524,7 @@ static MlfValue *integer_extended(Primitive p, MlfValue *a, MlfValue *b) {
         if (small_integer(b)) { mpz_init_set_si(right,small_value(b)); y = right; }
         else y = b->as.integer;
         if (p == MUL_INT) mpz_mul(result->as.integer,x,y);
+        else if (p == AND_INT) mpz_and(result->as.integer,x,y);
         else if (p == QUOT_INT) mpz_tdiv_q(result->as.integer,x,y);
         else mpz_tdiv_r(result->as.integer,x,y);
         if (small_integer(a)) mpz_clear(left);
@@ -573,11 +622,13 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
     case NEW_INT_ARRAY: case READ_INT_ARRAY: case LENGTH_INT_ARRAY:
     case NEW_DOUBLE_ARRAY: case READ_DOUBLE_ARRAY: case LENGTH_DOUBLE_ARRAY:
     case NEW_BYTE_ARRAY: case READ_BYTE_ARRAY: case LENGTH_BYTE_ARRAY: case BYTE_ARRAY_FROM_STRING:
+    case GET_BYTE_LINE: case NEW_INT_TABLE: case READ_INT_TABLE:
         return action(p, a, b);
     case WRITE_INT_ARRAY: return array_write_action(WRITE_INT_ACTION,a,b,c);
     case WRITE_DOUBLE_ARRAY: return array_write_action(WRITE_DOUBLE_ACTION,a,b,c);
     case WRITE_BYTE_ARRAY: return array_write_action(WRITE_BYTE_ACTION,a,b,c);
     case PUT_BYTES: return array_write_action(PUT_BYTES_ACTION,a,b,c);
+    case WRITE_INT_TABLE: return array_write_action(WRITE_TABLE_ACTION,a,b,c);
     case SHOW_INT: return show_integer(a);
     case CONCAT_STRING: {
         a = expect(a, STRING); b = expect(b, STRING);
@@ -592,7 +643,7 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
     }
     case ADD_INT: return mlf_add_int(a,b);
     case SUB_INT: return mlf_sub_int(a,b);
-    case MUL_INT: case QUOT_INT: case REM_INT: return integer_extended(p,a,b);
+    case MUL_INT: case QUOT_INT: case REM_INT: case AND_INT: return integer_extended(p,a,b);
     case READ_INT: return read_integer(a);
     case ADD_DOUBLE: case SUB_DOUBLE: case MUL_DOUBLE: case DIV_DOUBLE: case EQ_DOUBLE: case LT_DOUBLE: {
         double x = unbox_double(a);
@@ -624,7 +675,7 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
 static MlfValue *primitive(Primitive p, MlfEnv *arguments) {
     static const size_t arities[PRIMITIVE_COUNT] = {
         1,2,1,1,0,1,2,1,2,2,2,2,2,3,2,2,2,1,
-        2,2,2,2,1,2,2,1,2,2,2,3,1,2,2,3,1,2,2,3,1,1,3
+        2,2,2,2,1,2,2,1,2,2,2,3,1,2,2,3,1,2,2,3,1,1,3,0,0,2,3,2
     };
     if (arguments->count < arities[p]) {
         MlfValue *result = value(PRIMITIVE);
@@ -707,10 +758,10 @@ MlfValue *mlf_prim1(int64_t p, MlfValue *a) {
 MlfValue *mlf_prim2(int64_t p, MlfValue *a, MlfValue *b) {
     switch (p) {
     case IO_BIND: case CONCAT_STRING: case ADD_INT: case SUB_INT: case EQ_INT: case LT_INT: case EQ_STRING:
-    case MUL_INT: case QUOT_INT: case REM_INT:
+    case MUL_INT: case QUOT_INT: case REM_INT: case AND_INT:
     case ADD_DOUBLE: case SUB_DOUBLE: case MUL_DOUBLE: case DIV_DOUBLE: case EQ_DOUBLE: case LT_DOUBLE:
     case FORMAT_DOUBLE: case NEW_INT_ARRAY: case READ_INT_ARRAY: case NEW_DOUBLE_ARRAY: case READ_DOUBLE_ARRAY:
-    case NEW_BYTE_ARRAY: case READ_BYTE_ARRAY:
+    case NEW_BYTE_ARRAY: case READ_BYTE_ARRAY: case READ_INT_TABLE:
         return primitive_result((Primitive)p,a,b,NULL);
     default: fail("binary primitive arity mismatch");
     }
@@ -718,7 +769,7 @@ MlfValue *mlf_prim2(int64_t p, MlfValue *a, MlfValue *b) {
 
 MlfValue *mlf_prim3(int64_t p, MlfValue *a, MlfValue *b, MlfValue *c) {
     switch (p) {
-    case IF_THEN_ELSE: case WRITE_INT_ARRAY: case WRITE_DOUBLE_ARRAY: case WRITE_BYTE_ARRAY: case PUT_BYTES:
+    case IF_THEN_ELSE: case WRITE_INT_ARRAY: case WRITE_DOUBLE_ARRAY: case WRITE_BYTE_ARRAY: case PUT_BYTES: case WRITE_INT_TABLE:
         return primitive_result((Primitive)p,a,b,c);
     default: fail("ternary primitive arity mismatch");
     }
@@ -735,6 +786,8 @@ static void release(Object *entry) {
         if (v->tag == INT_ARRAY) free(v->as.int_array.cells);
         if (v->tag == DOUBLE_ARRAY) free(v->as.double_array.cells);
         if (v->tag == BYTE_ARRAY) free(v->as.byte_array.cells);
+        if (v->tag == INT_TABLE) kh_destroy(mlf_int,v->as.int_table);
+        if (v->tag == SMALL_INT_TABLE) kh_destroy(mlf_tagged,v->as.small_table);
         v->object.next = (Object *)free_values;
         free_values = v;
         return;
@@ -759,13 +812,18 @@ static void cleanup(void) {
         value_pages = next;
     }
     free_values = NULL;
+    native_roots = NULL;
+    io_current = NULL;
+    io_continuations = NULL;
     objects = 0;
     collection_limit = MLF_GC_THRESHOLD;
     integer_bytes = 0;
     integer_collection_limit = MLF_GC_INTEGER_BYTES;
 }
 
-static void mark(Stack *pending, void *entry) {
+/* The collector visits many distinct field layouts. Sharing this helper
+ * avoids duplicating its growable-stack path at every field of every tag. */
+static __attribute__((noinline)) void mark(Stack *pending, void *entry) {
     if (immediate(entry)) return;
     Object *o = entry;
     if (o && !o->marked) { o->marked = 1; push(pending, o); }
@@ -775,6 +833,8 @@ static void collect(MlfValue *root, const Stack *continuations) {
     Stack pending = {0};
     mark(&pending, root);
     for (size_t i = 0; i < continuations->count; ++i) mark(&pending, continuations->items[i]);
+    for (const MlfRoots *frame = native_roots; frame; frame = frame->previous)
+        for (uint64_t i = 0; i < frame->count; ++i) mark(&pending,frame->values[i]);
     while (pending.count) {
         Object *o = pending.items[--pending.count];
         if (o->kind == OBJECT_ENV) {
@@ -797,7 +857,17 @@ static void collect(MlfValue *root, const Stack *continuations) {
         case INT_ARRAY:
             for (size_t i = 0; i < v->as.int_array.length; ++i) mark(&pending, v->as.int_array.cells[i]);
             break;
-        case WRITE_INT_ACTION: case WRITE_DOUBLE_ACTION: case WRITE_BYTE_ACTION: case PUT_BYTES_ACTION:
+        case INT_TABLE:
+            for (khiter_t i = kh_begin(v->as.int_table); i != kh_end(v->as.int_table); ++i)
+                if (kh_exist(v->as.int_table,i)) {
+                    mark(&pending,kh_key(v->as.int_table,i)); mark(&pending,kh_val(v->as.int_table,i));
+                }
+            break;
+        case SMALL_INT_TABLE:
+            for (khiter_t i = kh_begin(v->as.small_table); i != kh_end(v->as.small_table); ++i)
+                if (kh_exist(v->as.small_table,i)) mark(&pending,kh_val(v->as.small_table,i));
+            break;
+        case WRITE_INT_ACTION: case WRITE_DOUBLE_ACTION: case WRITE_BYTE_ACTION: case PUT_BYTES_ACTION: case WRITE_TABLE_ACTION:
             mark(&pending, v->as.array_write.array); mark(&pending, v->as.array_write.index);
             mark(&pending, v->as.array_write.entry); break;
         case BUSY: case HOLE: fail("unfinished evaluation at garbage collection");
@@ -815,6 +885,21 @@ static void collect(MlfValue *root, const Stack *continuations) {
         objects * 2 + MLF_GC_THRESHOLD;
     integer_collection_limit = integer_bytes > (SIZE_MAX - MLF_GC_INTEGER_BYTES) / 2 ? SIZE_MAX :
         integer_bytes * 2 + MLF_GC_INTEGER_BYTES;
+}
+
+void mlf_roots_enter(MlfRoots *frame, uint64_t count, MlfValue **values) {
+    *frame = (MlfRoots){native_roots,count,values};
+    native_roots = frame;
+}
+
+void mlf_roots_leave(MlfRoots *frame) { native_roots = frame->previous; }
+
+void mlf_gc_check(uint64_t count, MlfValue **values) {
+    if (objects < collection_limit && integer_bytes < integer_collection_limit) return;
+    MlfRoots frame;
+    mlf_roots_enter(&frame,count,values);
+    collect(*io_current,io_continuations);
+    mlf_roots_leave(&frame);
 }
 
 static void write_string(MlfValue *entry, int newline) {
@@ -858,13 +943,130 @@ static MlfValue *read_line(void) {
     return result;
 }
 
+MlfValue *mlf_get_byte_line(void) {
+    char *buffer = NULL;
+    size_t capacity = 0;
+    ssize_t length = getline(&buffer,&capacity,stdin);
+    if (length < 0 && !feof(stdin)) { free(buffer); fail("IO error: byte input failed"); }
+    MlfValue *result = value(BYTE_ARRAY);
+    result->as.byte_array.length = length < 0 ? 0 : (size_t)length;
+    result->as.byte_array.cells = (unsigned char *)buffer;
+    if (!buffer) result->as.byte_array.cells = allocate(1);
+    return result;
+}
+
+static MlfValue *table_key(MlfValue *key) {
+    if (!small_integer(key) && mpz_cmp_si(key->as.integer,SMALL_MIN) >= 0 &&
+        mpz_cmp_si(key->as.integer,SMALL_MAX) <= 0) return small(mpz_get_si(key->as.integer));
+    return key;
+}
+
+static void promote_table(MlfValue *table) {
+    khash_t(mlf_tagged) *old = table->as.small_table;
+    khash_t(mlf_int) *next = kh_init(mlf_int);
+    if (!next) fail("out of memory");
+    if (kh_resize(mlf_int,next,old->n_buckets) < 0) { kh_destroy(mlf_int,next); fail("out of memory"); }
+    for (khiter_t i = kh_begin(old); i != kh_end(old); ++i) if (kh_exist(old,i)) {
+        int inserted;
+        khiter_t j = kh_put(mlf_int,next,kh_key(old,i),&inserted);
+        if (inserted < 0) { kh_destroy(mlf_int,next); fail("out of memory"); }
+        kh_val(next,j) = kh_val(old,i);
+    }
+    kh_destroy(mlf_tagged,old);
+    table->as.int_table = next;
+    table->tag = INT_TABLE;
+}
+
+MlfValue *mlf_read_int_table(MlfValue *table, MlfValue *key) {
+    table = expect(table,INT_TABLE);
+    key = table_key(expect(key,INTEGER));
+    if (table->tag == SMALL_INT_TABLE) {
+        if (!small_integer(key)) return small(0);
+        khash_t(mlf_tagged) *t = table->as.small_table;
+        khiter_t i = kh_get(mlf_tagged,t,key);
+        return i == kh_end(t) ? small(0) : kh_val(t,i);
+    }
+    khash_t(mlf_int) *t = table->as.int_table;
+    khiter_t i = kh_get(mlf_int,t,key);
+    return i == kh_end(t) ? small(0) : kh_val(t,i);
+}
+
+MlfValue *mlf_write_int_table(MlfValue *table, MlfValue *key, MlfValue *entry) {
+    table = expect(table,INT_TABLE);
+    key = table_key(expect(key,INTEGER));
+    entry = expect(entry,INTEGER);
+    if (table->tag == SMALL_INT_TABLE) {
+        if (small_integer(key)) {
+            khash_t(mlf_tagged) *t = table->as.small_table;
+            if (t->n_occupied >= t->upper_bound && t->n_buckets >= (1u << 31)) fail("integer table too large");
+            int inserted;
+            khiter_t i = kh_put(mlf_tagged,t,key,&inserted);
+            if (inserted < 0) fail("out of memory");
+            kh_val(t,i) = entry;
+            TABLE_WRITTEN(table,inserted);
+            return mlf_constructor(0,0);
+        }
+        promote_table(table);
+    }
+    khash_t(mlf_int) *t = table->as.int_table;
+    if (t->n_occupied >= t->upper_bound && t->n_buckets >= (1u << 31)) fail("integer table too large");
+    int inserted;
+    khiter_t i = kh_put(mlf_int,t,key,&inserted);
+    if (inserted < 0) fail("out of memory");
+    kh_val(t,i) = entry;
+    TABLE_WRITTEN(table,inserted);
+    return mlf_constructor(0,0);
+}
+
+static inline MlfValue *add_evaluated_integers(MlfValue *a, MlfValue *b) {
+    intptr_t bits;
+    if (small_integer(a) && small_integer(b) &&
+        !__builtin_add_overflow((intptr_t)a,(intptr_t)b-1,&bits)) return (MlfValue *)bits;
+    return mlf_add_int(a,b);
+}
+
+/* Fused read/add/write from a checked native region. Its operands are
+ * already evaluated, like the compiler's direct array loads. Return the
+ * immutable previous value so later uses retain snapshot semantics. */
+MlfValue *mlf_add_int_table(MlfValue *table, MlfValue *key, MlfValue *delta) {
+    key = table_key(key);
+    if (table->tag == SMALL_INT_TABLE) {
+        if (small_integer(key)) {
+            khash_t(mlf_tagged) *t = table->as.small_table;
+            /* Repeated updates need neither the insertion bookkeeping nor
+             * a resize. Keep the library's full insertion path for misses. */
+            int inserted = 0;
+            khiter_t i = kh_get(mlf_tagged,t,key);
+            if (i == kh_end(t)) {
+                if (t->n_occupied >= t->upper_bound && t->n_buckets >= (1u << 31)) fail("integer table too large");
+                i = kh_put(mlf_tagged,t,key,&inserted);
+                if (inserted < 0) fail("out of memory");
+            }
+            MlfValue *old = inserted ? small(0) : kh_val(t,i);
+            kh_val(t,i) = add_evaluated_integers(old,delta);
+            TABLE_WRITTEN(table,inserted);
+            return old;
+        }
+        promote_table(table);
+    }
+    khash_t(mlf_int) *t = table->as.int_table;
+    if (t->n_occupied >= t->upper_bound && t->n_buckets >= (1u << 31)) fail("integer table too large");
+    int inserted;
+    khiter_t i = kh_put(mlf_int,t,key,&inserted);
+    if (inserted < 0) fail("out of memory");
+    MlfValue *old = inserted ? small(0) : kh_val(t,i);
+    kh_val(t,i) = add_evaluated_integers(old,delta);
+    TABLE_WRITTEN(table,inserted);
+    return old;
+}
+
 static size_t array_index(MlfValue *index, size_t length) {
     index = expect(index,INTEGER);
     if (!length) fail("array index out of bounds");
     return (size_t)bounded_integer(index,length-1,"array index out of bounds");
 }
 
-static MlfValue *new_array(Primitive p, MlfValue *size, MlfValue *initial) {
+MlfValue *mlf_new_array(int64_t p, MlfValue *size, MlfValue *initial) {
     size_t n = (size_t)bounded_integer(size,INT64_MAX / 8,"invalid array length");
     if (p == NEW_BYTE_ARRAY) {
         uint8_t x = mlf_byte(initial);
@@ -913,7 +1115,7 @@ static MlfValue *write_array(MlfValue *operation) {
     return mlf_constructor(0,0);
 }
 
-static MlfValue *bytes_from_string(MlfValue *text) {
+MlfValue *mlf_bytes_from_string(MlfValue *text) {
     text = expect(text,STRING);
     size_t length = text->as.string.length;
     if (length > INT64_MAX / 8) fail("invalid array length");
@@ -925,20 +1127,30 @@ static MlfValue *bytes_from_string(MlfValue *text) {
     return result;
 }
 
-static MlfValue *put_bytes(MlfValue *operation) {
-    MlfValue *a = expect(operation->as.array_write.array,BYTE_ARRAY);
+MlfValue *mlf_put_bytes(MlfValue *array, MlfValue *start, MlfValue *size) {
+    MlfValue *a = expect(array,BYTE_ARRAY);
     size_t length = a->as.byte_array.length;
-    size_t offset = (size_t)bounded_integer(operation->as.array_write.index,length,"byte slice out of bounds");
-    size_t count = (size_t)bounded_integer(operation->as.array_write.entry,length-offset,"byte slice out of bounds");
+    size_t offset = (size_t)bounded_integer(start,length,"byte slice out of bounds");
+    size_t count = (size_t)bounded_integer(size,length-offset,"byte slice out of bounds");
     if (fwrite(a->as.byte_array.cells+offset,1,count,stdout) != count || fflush(stdout) == EOF)
         fail("IO error: output failed");
     return mlf_constructor(0,0);
+}
+
+MlfValue *mlf_new_int_table(void) {
+    MlfValue *result = value(SMALL_INT_TABLE);
+    result->as.small_table = kh_init(mlf_tagged);
+    if (!result->as.small_table) fail("out of memory");
+    TABLE_CREATED(result);
+    return result;
 }
 
 int32_t mlf_run(MlfValue *root, int64_t is_io) {
     if (!is_io) { (void)force(root); cleanup(); return 0; }
     Stack continuations = {0};
     MlfValue *current = root;
+    io_current = &current;
+    io_continuations = &continuations;
     for (;;) {
         if (objects >= collection_limit || integer_bytes >= integer_collection_limit)
             collect(current, &continuations);
@@ -949,7 +1161,11 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
             continue;
         }
         if (!immediate(operation) && operation->tag == PUT_BYTES_ACTION) {
-            result = put_bytes(operation);
+            result = mlf_put_bytes(operation->as.array_write.array,operation->as.array_write.index,
+                                   operation->as.array_write.entry);
+        } else if (!immediate(operation) && operation->tag == WRITE_TABLE_ACTION) {
+            result = mlf_write_int_table(operation->as.array_write.array,operation->as.array_write.index,
+                                         operation->as.array_write.entry);
         } else if (!immediate(operation) && (operation->tag == WRITE_INT_ACTION ||
                    operation->tag == WRITE_DOUBLE_ACTION || operation->tag == WRITE_BYTE_ACTION)) {
             result = write_array(operation);
@@ -962,6 +1178,10 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
             continue;
         case IO_RETURN: result = operation->as.action.first; break;
         case GET_LINE: result = read_line(); break;
+        case GET_BYTE_LINE: result = mlf_get_byte_line(); break;
+        case NEW_INT_TABLE: result = mlf_new_int_table(); break;
+        case READ_INT_TABLE:
+            result = mlf_read_int_table(operation->as.action.first,operation->as.action.second); break;
         case PUT_STR: case PUT_STR_LN:
             write_string(operation->as.action.first, operation->as.action.operation == PUT_STR_LN);
             result = mlf_constructor(0, 0); break;
@@ -969,7 +1189,7 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
             write_string(show_integer(operation->as.action.first), 1);
             result = mlf_constructor(0, 0); break;
         case NEW_INT_ARRAY: case NEW_DOUBLE_ARRAY: case NEW_BYTE_ARRAY:
-            result = new_array(operation->as.action.operation,operation->as.action.first,operation->as.action.second);
+            result = mlf_new_array(operation->as.action.operation,operation->as.action.first,operation->as.action.second);
             break;
         case READ_INT_ARRAY: {
             MlfValue *a = expect(operation->as.action.first,INT_ARRAY);
@@ -987,7 +1207,7 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
             result = small(a->as.byte_array.cells[i]); break;
         }
         case BYTE_ARRAY_FROM_STRING:
-            result = bytes_from_string(operation->as.action.first); break;
+            result = mlf_bytes_from_string(operation->as.action.first); break;
         case LENGTH_BYTE_ARRAY:
             result = small((int64_t)expect(operation->as.action.first,BYTE_ARRAY)->as.byte_array.length); break;
         case LENGTH_INT_ARRAY:

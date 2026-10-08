@@ -1,0 +1,125 @@
+-- Full k-mer frequency tables for lengths 1,2,3,4,6,12,18.
+-- Keys use the permitted base-4 encoding; every overlapping substring is
+-- looked up and updated in a general, library-backed IntTable.
+data Rec a = Rec (Rec a -> a);
+data Buffer = Buffer ByteArray Int Int;
+let fix : forall a. (a -> a) -> a = \f ->
+  let go = \r -> case r of { Rec next -> f (next r) } in go (Rec go) in
+let minimum = \a b -> ifThenElse (ltInt a b) a b in
+-- Read one line at a time. Each record starts small and doubles as needed;
+-- no file-size query or whole-input allocation is used.
+let copy : ByteArray -> ByteArray -> Int -> Int -> Int -> IO Unit =
+  fix (\again source dest n offset i -> ifThenElse (ltInt i n) (do {
+    b <- readByteArray source i; writeByteArray dest (addInt offset i) b;
+    again source dest n offset (addInt i 1)
+  }) (return ())) in
+let capacityFor : Int -> Int -> IO Int = fix (\again capacity needed ->
+  ifThenElse (ltInt capacity needed) (again (mulInt capacity 2) needed) (return capacity)) in
+let trimLine : ByteArray -> Int -> IO Int = fix (\again line n ->
+  ifThenElse (eqInt n 0) (return 0) (do {
+    b <- readByteArray line (subInt n 1);
+    ifThenElse (eqInt b 10) (again line (subInt n 1))
+      (ifThenElse (eqInt b 13) (again line (subInt n 1)) (return n))
+  })) in
+
+let isThree : ByteArray -> Int -> IO Bool = \line length ->
+  ifThenElse (ltInt length 6) (return false) (do {
+    a <- readByteArray line 0; b <- readByteArray line 1; c <- readByteArray line 2;
+    d <- readByteArray line 3; e <- readByteArray line 4; f <- readByteArray line 5;
+    let prefix = ifThenElse (eqInt a 62) (ifThenElse (eqInt b 84) (ifThenElse (eqInt c 72)
+      (ifThenElse (eqInt d 82) (ifThenElse (eqInt e 69) (eqInt f 69) false) false) false) false) false;
+    ifThenElse prefix (ifThenElse (eqInt length 6) (return true) (do {
+      next <- readByteArray line 6;
+      return (ifThenElse (eqInt next 32) true (ifThenElse (eqInt next 9) true
+        (ifThenElse (eqInt next 10) true (eqInt next 13))))
+    })) (return false)
+  }) in
+let code = \b -> ifThenElse (eqInt b 65) 0 (ifThenElse (eqInt b 97) 0
+  (ifThenElse (eqInt b 67) 1 (ifThenElse (eqInt b 99) 1
+  (ifThenElse (eqInt b 71) 2 (ifThenElse (eqInt b 103) 2 3))))) in
+-- Decode each input base once; growth copies preserve these numeric bytes.
+let decodeLine : ByteArray -> ByteArray -> Int -> Int -> Int -> IO Unit =
+  fix (\again line bytes count offset i -> ifThenElse (ltInt i count) (do {
+    b <- readByteArray line i; writeByteArray bytes (addInt offset i) (code b);
+    again line bytes count offset (addInt i 1)
+  }) (return ())) in
+let skip : Unit -> IO Unit = fix (\again unused -> do {
+  line <- getByteLine; n <- lengthByteArray line;
+  ifThenElse (eqInt n 0) (return ()) (do { found <- isThree line n;
+    ifThenElse found (return ()) (again ()) })
+}) in
+let readSequence : ByteArray -> Int -> Int -> IO Buffer = fix (\again bytes used capacity -> do {
+  line <- getByteLine; n <- lengthByteArray line;
+  ifThenElse (eqInt n 0) (return (Buffer bytes used capacity)) (do {
+    first <- readByteArray line 0;
+    ifThenElse (eqInt first 62) (return (Buffer bytes used capacity)) (do {
+      count <- trimLine line n; let needed = addInt used count;
+      ifThenElse (ltInt capacity needed) (do {
+        next <- capacityFor capacity needed;
+        grown <- newByteArray next 0; copy bytes grown used 0 0;
+        decodeLine line grown count used 0; again grown needed next
+      }) (do { decodeLine line bytes count used 0; again bytes needed capacity })
+    })
+  })
+}) in
+let encode : ByteArray -> Int -> Int -> Int -> IO Int = fix (\again bytes i end key ->
+  ifThenElse (ltInt i end) (do { b <- readByteArray bytes i;
+    again bytes (addInt i 1) end (addInt (mulInt key 4) (code b)) }) (return key)) in
+let prefix : ByteArray -> Int -> Int -> Int -> IO Int = fix (\again bytes i end key ->
+  ifThenElse (ltInt i end) (do { b <- readByteArray bytes i;
+    again bytes (addInt i 1) end (addInt (mulInt key 4) b) }) (return key)) in
+let power4 : Int -> Int -> IO Int = fix (\again n value ->
+  ifThenElse (eqInt n 0) (return value) (again (subInt n 1) (mulInt value 4))) in
+-- Maintain a base-4 sliding window, masking off its outgoing digit before
+-- appending the next. Every window updates the complete frequency table.
+let countFrame : ByteArray -> IntTable -> Int -> Int -> Int -> Int -> Int -> IO Unit =
+  fix (\again bytes table length k mask start key -> do {
+    old <- readIntTable table key; writeIntTable table key (addInt old 1);
+    let next = addInt start k;
+    ifThenElse (ltInt next length) (do {
+      incoming <- readByteArray bytes next;
+      let rolled = addInt (andInt (mulInt key 4) mask) incoming;
+      again bytes table length k mask (addInt start 1) rolled
+    }) (return ())
+  }) in
+let count : ByteArray -> Int -> Int -> IO IntTable = \bytes length k -> do {
+  table <- newIntTable;
+  ifThenElse (ltInt length k) (return ()) (do {
+    key <- prefix bytes 0 k 0; limit <- power4 k 1;
+    countFrame bytes table length k (subInt limit 1) 0 key
+  }); return table
+} in
+let letter = \n -> ifThenElse (eqInt n 0) "A" (ifThenElse (eqInt n 1) "C" (ifThenElse (eqInt n 2) "G" "T")) in
+let unpack = \k key -> ifThenElse (eqInt k 1) (letter key)
+  (concatString (letter (quotInt key 4)) (letter (remInt key 4))) in
+-- Only tables of sizes 4 and 16 are sorted; ties retain ascending base-4 key.
+let best : IntTable -> Int -> Int -> Int -> Int -> IO Int =
+  fix (\again table limit i winner maximum -> ifThenElse (ltInt i limit) (do {
+    n <- readIntTable table i;
+    ifThenElse (ltInt maximum n) (again table limit (addInt i 1) i n)
+      (again table limit (addInt i 1) winner maximum)
+  }) (return winner)) in
+let frequencies : IntTable -> Int -> Int -> Int -> Int -> IO Unit =
+  fix (\again table length k limit remaining -> ifThenElse (eqInt remaining 0) (putStrLn "") (do {
+    key <- best table limit 0 0 0; n <- readIntTable table key;
+    ifThenElse (eqInt n 0) (putStrLn "") (do {
+      let frequency = divDouble (mulDouble 100.0 (intToDouble n)) (intToDouble (addInt (subInt length k) 1));
+      putStrLn (concatString (unpack k key) (concatString " " (formatDouble 3 frequency)));
+      writeIntTable table key 0; again table length k limit (subInt remaining 1)
+    })
+  })) in
+let query : ByteArray -> Int -> String -> IO Unit = \bytes length pattern -> do {
+  word <- byteArrayFromString pattern; k <- lengthByteArray word;
+  key <- encode word 0 k 0; table <- count bytes length k;
+  n <- readIntTable table key;
+  putStrLn (concatString (showInt n) (concatString "\t" pattern))
+} in
+do {
+  skip (); initial <- newByteArray 1024 0; buffer <- readSequence initial 0 1024;
+  case buffer of { Buffer bytes length capacity -> do {
+    one <- count bytes length 1; frequencies one length 1 4 4;
+    two <- count bytes length 2; frequencies two length 2 16 16;
+    query bytes length "GGT"; query bytes length "GGTA"; query bytes length "GGTATT";
+    query bytes length "GGTATTTTAATT"; query bytes length "GGTATTTTAATTTATAGT"
+  } }
+}

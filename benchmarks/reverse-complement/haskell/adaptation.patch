@@ -1,0 +1,53 @@
+--- upstream.hs
++++ main.hs
+@@ -8,6 +8,8 @@
+ -}
+ 
+ import Control.Monad
++import qualified Data.ByteString as B
++import Data.ByteString.Unsafe (unsafeUseAsCStringLen)
+ import Foreign
+ import Data.ByteString.Internal
+ import System.IO
+@@ -40,23 +42,28 @@
+ 
+ clearBuf (Buf _ lB pB) = Buf 0 lB pB
+ 
+-main = allocaArray 82 $ \ line ->
+-  let go !buf = do
+-        !m <- hGetBuf stdin line 82
+-        if m == 0 then revcomp buf else do
+-          findChar line m (c2w '>') 
+-            (putBuf line m buf go)
+-            (\ end -> do
+-              putBuf line end buf revcomp
+-              putBuf (line +* end) (m - end) (clearBuf buf)
+-                go)
+-    in withBuf go
++-- Buffered lines handle several short records in one input buffer and
++-- arbitrarily long header lines. Keep the original growing Buf and rc loops.
++main = withBuf go
++  where
++    go buf = do
++      done <- hIsEOF stdin
++      if done then revcomp buf >> freeBuf buf else do
++        raw <- B.hGetLine stdin
++        let line = B.snoc raw 10
++        let header = not (B.null raw) && B.head raw == 62
++        when header (revcomp buf)
++        next <- unsafeUseAsCStringLen line $ \(p,n) ->
++          putBuf (castPtr p) n (if header then clearBuf buf else buf) return
++        go next
++
++freeBuf (Buf _ _ p) = free p
+ 
+ (+*) = advancePtr
+ 
+ {-# INLINE comps #-}
+-comps = Prelude.zipWith (\ a b -> (fromEnum a, c2w b)) "AaCcGgTtUuMmRrYyKkVvHhDdBb" 
+-  "TTGGCCAAAAKKYYRRMMBBDDHHVV"
++comps = Prelude.zipWith (\ a b -> (fromEnum a, c2w b)) "AaCcGgTtUuMmRrYyKkVvHhDdBbWwSsNn" 
++  "TTGGCCAAAAKKYYRRMMBBDDHHVVWWSSNN"
+ 
+ ca :: Ptr Word8
+ ca = unsafeDupablePerformIO $ do

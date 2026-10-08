@@ -1,0 +1,36 @@
+--- upstream.hs
++++ main.hs
+@@ -17,7 +17,6 @@
+ import Data.STRef
+ import Control.Monad
+ import Control.Monad.ST
+-import Control.Parallel.Strategies
+ 
+ 
+ import qualified Data.Map.Strict           as M
+@@ -142,14 +141,13 @@
+     s <- extractSequence "THREE" <$> B.getContents
+ 
+     let keys    = ["GGT","GGTA","GGTATT","GGTATTTTAATT","GGTATTTTAATTTATAGT"]
+-    let threads = [0 .. 63]
++    let threads = [0]
+ 
+     let threadWorkOcc key tid = runST $ do
+             t <- countOccurrences (length threads) (B.length key) (B.drop tid s)
+             getVal t (packKey key)
+ 
+-    let calcOcc key = sum $ runEval $
+-            mapM (rpar . threadWorkOcc (B.pack key)) threads
++    let calcOcc key = sum $ map (threadWorkOcc (B.pack key)) threads
+ 
+     let threadWorkFreq len tid = runST $ do
+             t  <- countOccurrences (length threads) len (B.drop tid s)
+@@ -159,7 +157,7 @@
+             freq v = 100 * fromIntegral v / fromIntegral (B.length s - len + 1)
+ 
+     let calcFreq len =
+-            let l = concat $ runEval $ mapM (rpar . threadWorkFreq len) threads
++            let l = concat $ map (threadWorkFreq len) threads
+                 m = foldr (uncurry $ M.insertWith (+)) M.empty l
+             in
+                 M.toList m

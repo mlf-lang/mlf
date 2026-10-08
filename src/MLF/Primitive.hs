@@ -20,6 +20,8 @@ data Primitive
   | NewDoubleArray | ReadDoubleArray | WriteDoubleArray | LengthDoubleArray
   | NewByteArray | ReadByteArray | WriteByteArray | LengthByteArray
   | ByteArrayFromString | PutBytes
+  | GetByteLine | NewIntTable | ReadIntTable | WriteIntTable
+  | AndInt
   deriving (Eq, Ord, Show, Enum, Bounded)
 
 primitiveName :: Primitive -> String
@@ -65,6 +67,11 @@ primitiveName p = case p of
   LengthByteArray -> "lengthByteArray"
   ByteArrayFromString -> "byteArrayFromString"
   PutBytes -> "putBytes"
+  GetByteLine -> "getByteLine"
+  NewIntTable -> "newIntTable"
+  ReadIntTable -> "readIntTable"
+  WriteIntTable -> "writeIntTable"
+  AndInt -> "andInt"
 
 lookupTargetPrimitive :: String -> Maybe Primitive
 lookupTargetPrimitive name = find ((== name) . primitiveName) [minBound .. maxBound]
@@ -118,6 +125,11 @@ primitiveSignature primitive = case primitive of
   LengthByteArray -> ([],Function byteArray (io int))
   ByteArrayFromString -> ([],Function string (io byteArray))
   PutBytes -> ([],Function byteArray (Function int (Function int (io unit))))
+  GetByteLine -> ([],io byteArray)
+  NewIntTable -> ([],io intTable)
+  ReadIntTable -> ([],Function intTable (Function int (io int)))
+  WriteIntTable -> ([],Function intTable (Function int (Function int (io unit))))
+  AndInt -> ([],Function int (Function int int))
   where
     a = Parameter "a"
     b = Parameter "b"
@@ -128,6 +140,7 @@ primitiveSignature primitive = case primitive of
     intArray = Applied "IntArray" []
     doubleArray = Applied "DoubleArray" []
     byteArray = Applied "ByteArray" []
+    intTable = Applied "IntTable" []
     unit = Applied "Unit" []
     bool = Applied "Bool" []
 
@@ -141,5 +154,5 @@ primitiveArity = arity . snd . primitiveSignature
 -- operands stay lazy until the action executes; conditionals are selective.
 primitiveStrict :: Primitive -> Bool
 primitiveStrict p = p `elem`
-  [ConcatString,ShowInt,AddInt,SubInt,EqInt,LtInt,EqString,MulInt,QuotInt,RemInt,ReadInt,
+  [ConcatString,ShowInt,AddInt,SubInt,EqInt,LtInt,EqString,MulInt,QuotInt,RemInt,AndInt,ReadInt,
    AddDouble,SubDouble,MulDouble,DivDouble,SqrtDouble,EqDouble,LtDouble,IntToDouble,FormatDouble]

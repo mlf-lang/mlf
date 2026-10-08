@@ -3,7 +3,7 @@ module MLF.Graph
   ( NodeId, Tag (..), Node (..), Graph (..), Build, emptyGraph
   , freshId, newNode, setNode, nodeAt, resolve, children, runBuild
   , reachable, underBinder, inert, Permission (..), permission
-  , unify, expand, normalize, validateGraph, orderedBelow, genRoot, kindAt, bottomTag
+  , unify, expand, expandWithScopes, normalize, validateGraph, orderedBelow, genRoot, kindAt, bottomTag
   ) where
 
 import Control.Monad (foldM, forM, forM_, unless, when)
@@ -382,7 +382,11 @@ unify :: [(NodeId,NodeId)] -> Build ()
 unify equations = do
   before <- get
   lift (validateGraph before)
-  mapM_ firstOrder equations
+  -- Every successful merge preserves kind. All following equations refer to
+  -- descendants of these roots, and representatives retain an original
+  -- identity, so one immutable kind table suffices for the whole operation.
+  kinds <- lift (kindsAt before (concatMap (\(a,b) -> [a,b]) equations))
+  mapM_ (firstOrder kinds) equations
   skeleton <- get
   let canon = resolve skeleton
       canonical v = case tag v of
@@ -403,13 +407,12 @@ unify equations = do
   put rebuilt
   lift (validateGraph rebuilt)
   where
-    firstOrder :: (NodeId,NodeId) -> Build ()
-    firstOrder (a0,b0) = do
+    firstOrder :: IM.IntMap Kind -> (NodeId,NodeId) -> Build ()
+    firstOrder kinds (a0,b0) = do
       g <- get
       let a = resolve g a0; b = resolve g b0
       when (a /= b) $ do
-        ka <- lift (kindAt g a)
-        kb <- lift (kindAt g b)
+        let ka = kinds IM.! a; kb = kinds IM.! b
         unless (ka == kb) (lift (Left ("kind mismatch during unification: " ++ show ka ++ " versus " ++ show kb)))
         let av = nodeAt g a; bv = nodeAt g b
             ta = tag av; tb = tag bv
@@ -427,7 +430,7 @@ unify equations = do
         let winner = min a b; loser = max a b
         put g { nodes = IM.insert winner (av { tag = t }) (IM.delete loser (nodes g))
               , links = IM.insert loser winner (links g) }
-        mapM_ firstOrder pairs
+        mapM_ (firstOrder kinds) pairs
 
 -- | Figure 7.3.2. Both implementations check the complete dependency DAG and
 -- the permissions of original identities, then return the same binding LCAs.
@@ -609,23 +612,57 @@ traverseWithKeyEither = IM.traverseWithKey
 -- | §10.1 expansion. The map records original-to-copy identity, including
 -- frontier proxies. Frontier equations must be solved before elaboration.
 expand :: NodeId -> NodeId -> Build (NodeId, IM.IntMap NodeId, [(NodeId,NodeId)])
-expand gen destination = do
+expand = expandWithScopes IM.empty
+
+-- A validated solver may supply DFS intervals for the immutable Gen binding
+-- tree. Type binding edges can change, so only Gen-to-Gen ancestry is cached
+-- across equations. An empty index retains the standalone expansion path.
+expandWithScopes :: IM.IntMap (Int,Int) -> NodeId -> NodeId -> Build (NodeId, IM.IntMap NodeId, [(NodeId,NodeId)])
+expandWithScopes intervals gen destination = do
   g <- get
   let source = genRoot g gen
-      visit seen n0
-        | IS.member n seen = seen
-        | not (underBinder g n gen) = IS.insert n seen
-        | otherwise = foldl visit (IS.insert n seen) (children (tag (nodeAt g n)))
-        where n = resolve g n0
-      originals = IS.toList (visit IS.empty source)
+      -- Scope and kind queries share one immutable input graph. Cache the
+      -- binding ancestry reached by this expansion, rather than repeatedly
+      -- climbing the same deep external scope for each frontier node.
+      inside :: NodeId -> State (IM.IntMap Bool) Bool
+      inside n = do
+        cached <- gets (IM.lookup n)
+        case cached of
+          Just answer -> pure answer
+          Nothing -> do
+            answer <- case binder (nodeAt g n) of
+              Nothing -> pure False
+              Just b | resolve g b == resolve g gen -> pure True
+                     | Just (start,end) <- IM.lookup (resolve g gen) intervals
+                     , Just (position,_) <- IM.lookup (resolve g b) intervals ->
+                         pure (start <= position && position < end)
+                     | otherwise -> inside (resolve g b)
+            modify' (IM.insert n answer)
+            pure answer
+      visit seen [] = pure seen
+      visit seen (x:xs)
+        | IS.member n seen = visit seen xs
+        | otherwise = do
+            local <- inside n
+            visit (IS.insert n seen) ((if local then children (tag (nodeAt g n)) else []) ++ xs)
+        where n = resolve g x
+      (visited,scopes) = runState (visit IS.empty [source]) IM.empty
+      originals = IS.toList visited
+  -- IntMap.size walks the complete map. Check the actual expansion size,
+  -- avoiding a whole-program scan for each small instance while retaining
+  -- the overflow check before any fresh identity is allocated.
+  when (toInteger (nextId g) + toInteger (length originals) > toInteger (maxBound :: Int))
+    (lift (Left "graph identity space exhausted"))
   copies <- IM.fromList <$> mapM (\n -> do c <- freshId; pure (n,c)) originals
+  kinds <- lift (kindsAt g originals)
   let copy n = IM.findWithDefault (resolve g n) (resolve g n) copies
       root = copy source
-      frontier = [n | n <- originals, not (underBinder g n gen)]
+      frontier = [n | n <- originals, not (scopes IM.! n)]
+      frontierSet = IS.fromDistinctAscList frontier
   forM_ originals $ \n -> do
-    k <- lift (kindAt g n)
-    let v = nodeAt g n
-        new | n `elem` frontier = Node (bottomTag k) (Just destination) Flexible
+    let k = kinds IM.! n
+        v = nodeAt g n
+        new | IS.member n frontierSet = Node (bottomTag k) (Just destination) Flexible
             | n == source = Node (mapTag copy (tag v)) (Just destination) Flexible
             | otherwise = Node (mapTag copy (tag v))
                 (fmap (\b -> if resolve g b == resolve g gen then root else copy b) (binder v)) (flag v)

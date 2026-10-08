@@ -1,5 +1,5 @@
 -- Matrix-free power iteration: the same 20 applications of A^T A as the
--- upstream programs. Array accumulators keep numeric state in mutable cells.
+-- upstream programs. Scalar accumulators are carried between loop iterations.
 data Rec a = Rec (Rec a -> a);
 let fix : forall a. (a -> a) -> a = \f ->
   let go = \r -> case r of { Rec next -> f (next r) } in go (Rec go) in
@@ -7,26 +7,24 @@ let evalA = \i j ->
   let x = intToDouble i in let y = intToDouble j in
   let sum = addDouble x y in
   divDouble 1.0 (addDouble (addDouble (divDouble (mulDouble sum (addDouble sum 1.0)) 2.0) x) 1.0) in
-let rowA : Int -> DoubleArray -> DoubleArray -> Int -> Int -> IO Unit =
-  fix (\again n u out i j -> ifThenElse (ltInt j n) (do {
-    x <- readDoubleArray u j; sum <- readDoubleArray out i;
-    writeDoubleArray out i (addDouble sum (mulDouble (evalA i j) x));
-    again n u out i (addInt j 1)
-  }) (return ())) in
-let rowAt : Int -> DoubleArray -> DoubleArray -> Int -> Int -> IO Unit =
-  fix (\again n u out i j -> ifThenElse (ltInt j n) (do {
-    x <- readDoubleArray u j; sum <- readDoubleArray out i;
-    writeDoubleArray out i (addDouble sum (mulDouble (evalA j i) x));
-    again n u out i (addInt j 1)
-  }) (return ())) in
+let rowA : Int -> DoubleArray -> DoubleArray -> Int -> Int -> Double -> IO Unit =
+  fix (\again n u out i j sum -> ifThenElse (ltInt j n) (do {
+    x <- readDoubleArray u j;
+    again n u out i (addInt j 1) (addDouble sum (mulDouble (evalA i j) x))
+  }) (writeDoubleArray out i sum)) in
+let rowAt : Int -> DoubleArray -> DoubleArray -> Int -> Int -> Double -> IO Unit =
+  fix (\again n u out i j sum -> ifThenElse (ltInt j n) (do {
+    x <- readDoubleArray u j;
+    again n u out i (addInt j 1) (addDouble sum (mulDouble (evalA j i) x))
+  }) (writeDoubleArray out i sum)) in
 let evalAv : Int -> DoubleArray -> DoubleArray -> Int -> IO Unit =
   fix (\again n u out i -> ifThenElse (ltInt i n) (do {
-    writeDoubleArray out i 0.0; rowA n u out i 0;
+    rowA n u out i 0 0.0;
     again n u out (addInt i 1)
   }) (return ())) in
 let evalAtv : Int -> DoubleArray -> DoubleArray -> Int -> IO Unit =
   fix (\again n u out i -> ifThenElse (ltInt i n) (do {
-    writeDoubleArray out i 0.0; rowAt n u out i 0;
+    rowAt n u out i 0 0.0;
     again n u out (addInt i 1)
   }) (return ())) in
 let evalAtAv = \n u out tmp -> do { evalAv n u tmp 0; evalAtv n tmp out 0 } in

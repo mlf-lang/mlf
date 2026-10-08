@@ -15,11 +15,13 @@ module MLF.Graph.Solver
   ( Solver, prepare, graph, finish, unify, instantiate, instantiateClosed, witness ) where
 
 import Control.Monad (forM, forM_, unless, when)
+import Control.Monad.State.Strict (State, execState, get, put)
 import qualified Data.Array as A
 import qualified Data.IntMap.Strict as IM
-import qualified Data.IntMap.Lazy as Lazy
 import qualified Data.IntSet as IS
 import qualified Data.List as List
+import Data.List.NonEmpty (NonEmpty (..))
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as Set
 import Data.Maybe (maybeToList)
 import MLF.Graph (Graph (..), Node (..), NodeId, Tag (..), children, resolve)
@@ -35,7 +37,54 @@ data Solver = Solver
   { solverGraph :: !Graph
   , structuralParents :: !Index
   , bindingChildren :: !Index
+  , scopeIndex :: !ScopeIndex
   }
+
+-- Gen binding parents never change during checked component unification or
+-- expansion. Number that tree once and retain binary ancestors. A component
+-- can then connect its boundary scopes with their LCAs without walking every
+-- empty scope between them and the root on every equation.
+data ScopeIndex = ScopeIndex !(IM.IntMap (Int,Int)) !(NonEmpty (IM.IntMap NodeId)) deriving Eq
+
+indexScopes :: Graph -> ScopeIndex
+indexScopes g = ScopeIndex intervals jumps
+  where
+    gens = IM.filter (\v -> case tag v of Gen _ -> True; _ -> False) (nodes g)
+    parents = IM.mapWithKey (\n v -> maybe n (resolve g) (binder v)) gens
+    descendants = IM.fromListWith (++) [(p,[n]) | (n,p) <- IM.toList parents, n /= p]
+    roots = [n | (n,p) <- IM.toList parents, n == p]
+    visit :: NodeId -> State (Int,IM.IntMap (Int,Int)) ()
+    visit n = do
+      (start,table) <- get
+      put (start+1,table)
+      mapM_ visit (IM.findWithDefault [] n descendants)
+      (end,table') <- get
+      put (end,IM.insert n (start,end) table')
+    intervals = snd (execState (mapM_ visit roots) (0,IM.empty))
+    -- The highest jump reaches the root even in a maximally deep tree.
+    levels = 1 + length (takeWhile (>1) (iterate (\n -> n `div` 2 + n `mod` 2) (IM.size gens)))
+    double previous = IM.map (previous IM.!) previous
+    jumps = parents :| take (levels-1) (iterate double (double parents))
+
+projectScopes :: ScopeIndex -> IS.IntSet -> IM.IntMap (Maybe NodeId)
+projectScopes _ seeds | IS.null seeds = IM.empty
+projectScopes (ScopeIndex intervals jumps) seeds = snd (List.foldl' attach ([],IM.empty) ordered)
+  where
+    contains a b = let (start,end) = intervals IM.! a; (position,_) = intervals IM.! b
+                   in start <= position && position < end
+    lca a b | contains a b = a
+            | contains b a = b
+            | otherwise = NE.head jumps IM.! foldr climb a jumps
+      where climb level n = let parent = level IM.! n in if contains parent b then n else parent
+    sortScopes = List.sortOn (fst . (intervals IM.!)) . IS.toList
+    boundary = sortScopes seeds
+    closure = seeds `IS.union` IS.fromList
+      ([lca a b | (a,b) <- zip boundary (drop 1 boundary)] ++
+       [NE.last jumps IM.! n | n <- boundary])
+    ordered = sortScopes closure
+    attach (ancestors,parents) n =
+      let enclosing = dropWhile (\a -> not (contains a n)) ancestors
+      in (n:enclosing,IM.insert n (case enclosing of p:_ -> Just p; [] -> Nothing) parents)
 
 -- Export a function, not the record selector: exporting the selector would
 -- also permit record updates even though the constructor is private.
@@ -49,17 +98,17 @@ prepare input = do
   forM_Keys (nodes input) $ \n -> unless (n < nextId input) (Left "fresh identity counter overlaps graph nodes")
   forM_Keys (links input) $ \n -> unless (n < nextId input) (Left "fresh identity counter overlaps graph aliases")
   let g = input { nodes = IM.map (\v -> v { tag = mapTag (resolve input) (tag v) }) (nodes input) }
-  pure (List.foldl' addNode (Solver g IM.empty IM.empty) (IM.toAscList (nodes g)))
+  pure (List.foldl' addNode (Solver g IM.empty IM.empty (indexScopes g)) (IM.toAscList (nodes g)))
   where forM_Keys ns f = mapM_ f (IM.keys ns)
 
 -- | Independently check the complete result and the maintained reverse edges.
 finish :: Solver -> Either String Graph
 finish solver = do
   G.validateGraph (graph solver)
-  let indexed = List.foldl' addNode (Solver (graph solver) IM.empty IM.empty)
+  let indexed = List.foldl' addNode (Solver (graph solver) IM.empty IM.empty (indexScopes (graph solver)))
         (IM.toAscList (nodes (graph solver)))
   unless (structuralParents solver == structuralParents indexed &&
-          bindingChildren solver == bindingChildren indexed)
+          bindingChildren solver == bindingChildren indexed && scopeIndex solver == scopeIndex indexed)
     (Left "incremental graph index disagrees with the graph")
   pure (graph solver)
 
@@ -96,7 +145,7 @@ component solver = go IS.empty
           v <- maybe (Left ("missing graph node " ++ show n)) pure (IM.lookup n (nodes g))
           let surrounding = maybeToList (binder v)
               connected = case tag v of
-                Gen _ -> surrounding
+                Gen _ -> []
                 _ -> children (tag v) ++ surrounding ++
                   IS.toList (IM.findWithDefault IS.empty n (structuralParents solver)) ++
                   IS.toList (IM.findWithDefault IS.empty n (bindingChildren solver))
@@ -119,34 +168,22 @@ unifyDistinct :: [(NodeId,NodeId)] -> Solver -> Either String Solver
 unifyDistinct equations solver = do
   connected <- component solver (concatMap (\(a,b) -> [a,b]) equations)
   let g = graph solver
-      connectedNodes = IM.restrictKeys (nodes g) connected
-      -- Unary runs of generalization ancestors do not affect a type's
-      -- permissions or an LCA. Retain every type binder, visible Gen root,
-      -- branch point and the root. The projected binding tree then preserves
-      -- all possible type-binding LCAs, without hundreds of empty scope stubs
-      -- for a small equation deep inside a sequence of lets/IO binds.
-      typeBinders = IS.fromList [b | v <- IM.elems connectedNodes,
-        case tag v of Gen _ -> False; _ -> True, Just b <- [binder v]]
-      genChildren = IM.fromListWith (+) [(b,1::Int) | v <- IM.elems connectedNodes,
-        Gen _ <- [tag v], Just b <- [binder v]]
-      keep n v = case tag v of
-        Gen root -> binder v == Nothing || IS.member n typeBinders || IS.member root connected ||
-          IM.findWithDefault 0 n genChildren > 1
-        _ -> True
-      selected = IM.keysSet (IM.filterWithKey keep connectedNodes)
-      nearest = Lazy.mapWithKey (\n v -> if IS.member n selected then n else
-        maybe n (nearest IM.!) (binder v)) connectedNodes
+      boundaries = IS.filter (\n -> case tag (nodes g IM.! n) of Gen _ -> True; _ -> False) connected
+      scopes = projectScopes (scopeIndex solver) boundaries
+      selected = connected `IS.union` IM.keysSet scopes
       originals = [(n,nodes g IM.! n) | n <- IS.toAscList selected]
       count = length originals
       forward = IM.fromDistinctAscList (zip (map fst originals) [0..])
       backward = A.listArray (0,count-1) (map fst originals)
       compact n = forward IM.! resolve g n
-      projectBinder n = compact (nearest IM.! n)
+      projectedBinder n v = case tag v of
+        Gen _ -> fmap compact (scopes IM.! n)
+        _ -> fmap compact (binder v)
       hiddenRoots = [(n,v) | (n,v) <- originals, Gen root <- [tag v], IS.notMember root selected]
       stubs = IM.fromList (zip (map fst hiddenRoots) [count..])
       localNode n v = Node
         (case IM.lookup n stubs of Just stub -> Gen stub; Nothing -> mapTag compact (tag v))
-        (fmap projectBinder (binder v)) (flag v)
+        (projectedBinder n v) (flag v)
       local = Graph (IM.fromDistinctAscList
         ([(compact n,localNode n v) | (n,v) <- originals] ++
          [(stub,Node Bot (Just (compact n)) Flexible) | ((n,_),stub) <- zip hiddenRoots [count..]]))
@@ -158,7 +195,7 @@ unifyDistinct equations solver = do
       (Left "local unification changed a hidden scope root")
   forM_ originals $ \(n,v) -> case tag v of
     Gen _ -> case IM.lookup (compact n) (nodes solved) of
-      Just v' | binder v' == fmap projectBinder (binder v), flag v' == flag v -> pure ()
+      Just v' | binder v' == projectedBinder n v, flag v' == flag v -> pure ()
       _ -> Left "local unification changed a generalization scope"
     _ -> pure ()
   let original n
@@ -198,9 +235,8 @@ expanded source target solver = do
   case tag sourceNode of Gen _ -> pure (); _ -> Left "instance source must be a gen node"
   targetNode <- maybe (Left "missing instance target") pure (IM.lookup (resolve g target) (nodes g))
   destination <- maybe (Left "instance target has no binder") pure (binder targetNode)
-  when (toInteger (nextId g) + toInteger (IM.size (nodes g)) > toInteger (maxBound :: Int))
-    (Left "graph identity space exhausted")
-  ((root,copies,frontier),g') <- G.runBuild g (G.expand source destination)
+  let ScopeIndex intervals _ = scopeIndex solver
+  ((root,copies,frontier),g') <- G.runBuild g (G.expandWithScopes intervals source destination)
   let (_,fresh) = IM.split (nextId g - 1) (nodes g')
       solver' = List.foldl' addNode (solver { solverGraph = g' }) (IM.toAscList fresh)
   pure (root,copies,frontier,solver')
