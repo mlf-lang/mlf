@@ -55,7 +55,7 @@ class HarnessTests(unittest.TestCase):
     def test_all_workloads_have_complete_provenance_and_fixtures(self):
         manifest = B.load_manifest()
         self.assertEqual([w["name"] for w in manifest["workloads"]],
-                         ["binary-trees", "pidigits", "n-body", "fannkuch-redux", "spectral-norm", "fasta", "mandelbrot"])
+                         ["binary-trees", "pidigits", "n-body", "fannkuch-redux", "spectral-norm", "fasta", "mandelbrot", "reverse-complement", "k-nucleotide"])
         for w in manifest["workloads"]:
             with self.subTest(workload=w["name"]):
                 self.assertEqual(set(w["flags"]), set(B.LANGUAGES))
@@ -71,6 +71,65 @@ class HarnessTests(unittest.TestCase):
                     for key in ("build_source", "original_source"):
                         self.assertIn(provenance[key], manifest["pinned_sha256"])
                     self.assertEqual(len(provenance["upstream_git_blob"]), 40)
+
+    def test_dna_inputs_match_pinned_fasta_fixtures(self):
+        for w in B.load_manifest()["workloads"]:
+            if w.get("input_kind") == "fasta":
+                self.assertEqual(B.fasta_output(w["fixture_input"]), (ROOT / w["input_fixture"]).read_bytes())
+                self.assertTrue(w["input_fixture_upstream_path"].startswith("public/download/"))
+
+    def test_reverse_complement_checks_headers_ambiguity_and_line_wrapping(self):
+        source = b">id description\nacgtumrwsykvhdbn\n>empty\n>last\n" + b"a"*61
+        expected = b">id description\nNVHDBMRSWYKAACGT\n>empty\n>last\n" + b"T"*60 + b"\nT\n"
+        self.assertEqual(B.reverse_complement(source), expected)
+        self.assertEqual(B.reverse_complement(b""), b"")
+        w = next(w for w in B.load_manifest()["workloads"] if w["name"] == "reverse-complement")
+        expected = B.expected_output(w, 31)
+        for wrong in (expected[:-1], expected.replace(b">ONE", b">OTHER"),
+                      expected.replace(b"T", b"A", 1), expected.replace(b"\n", b"\r\n")):
+            with self.subTest(wrong=wrong[:40]), self.assertRaises(ValueError):
+                B.validate_output(w, 31, wrong)
+
+    def test_nucleotide_counts_include_overlaps_ties_and_only_record_three(self):
+        zero = b"0\tGGT\n0\tGGTA\n0\tGGTATT\n0\tGGTATTTTAATT\n0\tGGTATTTTAATTTATAGT\n"
+        expected = b"A 25.000\nC 25.000\nG 25.000\nT 25.000\n\nAC 33.333\nCG 33.333\nGT 33.333\n\n" + zero
+        self.assertEqual(B.nucleotide_counts(b">ONE\nGGT\n>THREE description\naCgT\n>FOUR\nGGT\n"), expected)
+        self.assertEqual(B.nucleotide_counts(b">THREE\nAAAA"), b"A 100.000\n\nAA 100.000\n\n" + zero)
+        self.assertEqual(B.nucleotide_counts(b">THREE\n"), b"\n\n" + zero)
+        w = next(w for w in B.load_manifest()["workloads"] if w["name"] == "k-nucleotide")
+        expected = B.expected_output(w, 1000)
+        for wrong in (expected.replace(b"GGT\n", b"GGA\n"), expected[:-1],
+                      expected.replace(b"54\t", b"55\t"), b"\n".join(reversed(expected.splitlines()))):
+            self.assertNotEqual(wrong, expected)
+            with self.assertRaises(ValueError):
+                B.validate_output(w, 1000, wrong)
+
+    def test_nucleotide_rounding_accepts_only_exact_midpoint_neighbours(self):
+        # A=1/320 gives 0.3125 percent: only 0.312 and 0.313 are permitted.
+        lines = B.nucleotide_lines(b">THREE\nA" + b"C"*319)
+        self.assertIn((b"A 0.312\n", b"A 0.313\n"), lines)
+        self.assertNotIn(b"A 0.311\n", next(options for options in lines if options[0].startswith(b"A ")))
+        not_tie = B.nucleotide_lines(b">THREE\nA" + b"C"*318)
+        self.assertEqual(next(options for options in not_tie if options[0].startswith(b"A ")), (b"A 0.313\n",))
+        w = next(w for w in B.load_manifest()["workloads"] if w["name"] == "k-nucleotide")
+        with patch.object(B, "nucleotide_expected_lines", return_value=lines):
+            output = b"".join(options[0] for options in lines)
+            B.validate_output(w, 1, output)
+            B.validate_output(w, 1, output.replace(b"A 0.312", b"A 0.313"))
+            with self.assertRaises(ValueError):
+                B.validate_output(w, 1, output.replace(b"A 0.312", b"A 0.311"))
+
+    def test_stdin_workloads_share_bytes_and_record_hash_without_embedding_input(self):
+        w = next(w for w in B.load_manifest()["workloads"] if w["name"] == "reverse-complement")
+        expected = B.expected_output(w, 31)
+        for language in B.LANGUAGES:
+            with patch.object(B, "run", return_value=({}, expected)) as run:
+                sample = B.execute(w, language, Path("program"), 31, {}, 10)
+            self.assertEqual(run.call_args.args[0], ["program"])
+            self.assertEqual(run.call_args.kwargs["data"], B.fasta_output(31))
+            self.assertEqual(sample["stdin_bytes"], len(B.fasta_output(31)))
+            self.assertEqual(sample["stdin_sha256"], B.hashlib.sha256(B.fasta_output(31)).hexdigest())
+            self.assertNotIn("stdin", sample)
 
     def test_spectral_norm_checks_single_finite_result(self):
         w = next(w for w in B.load_manifest()["workloads"] if w["name"] == "spectral-norm")
@@ -248,6 +307,7 @@ class HarnessTests(unittest.TestCase):
             binary.write_text(f"#!{sys.executable}\nprint('wrong')\n")
             binary.chmod(0o755)
             with patch.object(B, "toolchain", return_value=({}, ROOT / "runtime/mlf_runtime.c", [], {})), \
+                 patch.object(B, "haskell_dependencies", return_value=([], {}, {})), \
                  patch.object(B, "build", return_value=(binary, {})) as build, \
                  contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                 result = B.main(["--emlf", "unused", "--compile-only", "--output", str(output)])
@@ -289,6 +349,58 @@ class HarnessTests(unittest.TestCase):
 
 
 class NativeAllocationTests(unittest.TestCase):
+    def test_real_console_raw_input_matches_native_bytes_and_eof(self):
+        emlf = shutil.which("emlf")
+        self.assertIsNotNone(emlf, "Run using cabal test benchmark-harness-tests")
+        source = ("do { a <- getByteLine; n <- lengthByteArray a; putBytes a 0 n; "
+                  "b <- getByteLine; m <- lengthByteArray b; putBytes b 0 m; "
+                  "end <- getByteLine; size <- lengthByteArray end; printInt size }")
+        data = bytes([0, 255, 128, 10, 129, 65])
+        runtime = Path(subprocess.check_output([emlf, "--llvm-runtime"], text=True).strip())
+        gmp = shlex.split(subprocess.check_output(["pkg-config", "--cflags", "--libs", "gmp"], text=True))
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            program = directory / "console.emlf"
+            program.write_text(source)
+            ir = directory / "console.ll"
+            ir.write_bytes(subprocess.check_output([emlf, "--emit-llvm", "--expr", source]))
+            binary = directory / "console"
+            subprocess.run([B.tool("clang"), "-O2", "-Wno-override-module", str(ir), str(runtime), *gmp,
+                            "-lm", "-o", str(binary)], check=True, capture_output=True)
+            for command in ([emlf, "--run", str(program)], [str(binary)]):
+                _, output = B.run(command, data=data, timeout=30)
+                self.assertEqual(output, data + b"0\n")
+
+    def test_mlf_counts_every_window_and_distinct_key_in_all_seven_tables(self):
+        emlf = shutil.which("emlf")
+        self.assertIsNotNone(emlf, "Run using cabal test benchmark-harness-tests")
+        clang = B.tool("clang")
+        gmp = shlex.split(subprocess.check_output(["pkg-config", "--cflags", "--libs", "gmp"], text=True))
+        runtime = Path(subprocess.check_output([emlf, "--llvm-runtime"], text=True).strip())
+        w = next(w for w in B.load_manifest()["workloads"] if w["name"] == "k-nucleotide")
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            ir = directory / "program.ll"
+            ir.write_bytes(subprocess.check_output([emlf, "--emit-llvm", str(ROOT / w["sources"]["mlf"])]))
+            subprocess.run([clang, "-O2", "-DMLF_TABLE_AUDIT", "-DMLF_GC_THRESHOLD=32",
+                            "-Dmlf_run=mlf_original_run", "-I", str(runtime.parent), *gmp,
+                            "-c", str(runtime), "-o", str(directory / "runtime.o")], check=True, capture_output=True)
+            binary = directory / "program"
+            subprocess.run([clang, "-O2", "-Wno-override-module", str(ir), str(directory / "runtime.o"),
+                            str(ROOT / "test/benchmark_tables.c"), "-I", str(runtime.parent), *gmp,
+                            "-lm", "-o", str(binary)], check=True, capture_output=True)
+            for size in (1, 7, 31, 1000):
+                sequence = B.fasta_records(B.fasta_output(size))[2][1].upper()
+                expected = []
+                for k in (1, 2, 3, 4, 6, 12, 18):
+                    distinct = len({sequence[i:i+k] for i in range(len(sequence)-k+1)})
+                    writes = max(0, len(sequence)-k+1) + (distinct if k <= 2 else 0)
+                    expected.append((writes, distinct))
+                sample = B.execute(w, "mlf", binary, size, None, 60)
+                self.assertTrue(sample["stderr"].startswith("tables=7\n"))
+                observed = [tuple(map(int, pair)) for pair in re.findall(r"writes=(\d+) distinct=(\d+)", sample["stderr"])]
+                self.assertEqual(observed, expected)
+
     def test_mlf_allocates_every_tree_node(self):
         # Untimed allocation probe. The generated LLVM is unchanged; a temporary
         # runtime counts fully applied constructors, not curried descriptors.

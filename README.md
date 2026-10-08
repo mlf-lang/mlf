@@ -473,7 +473,7 @@ and cause a nonzero exit. Console output is flushed before the next action.
 | `printInt` | `Int -> IO Unit` |
 | `concatString` | `String -> String -> String` |
 | `showInt` | `Int -> String` |
-| `addInt`, `subInt`, `mulInt`, `quotInt`, `remInt` | `Int -> Int -> Int` |
+| `addInt`, `subInt`, `mulInt`, `quotInt`, `remInt`, `andInt` | `Int -> Int -> Int` |
 | `readInt` | `String -> Int` |
 | `eqInt`, `ltInt` | `Int -> Int -> Bool` |
 | `addDouble`, `subDouble`, `mulDouble`, `divDouble` | `Double -> Double -> Double` |
@@ -495,12 +495,17 @@ and cause a nonzero exit. Console output is flushed before the next action.
 | `lengthByteArray` | `ByteArray -> IO Int` |
 | `byteArrayFromString` | `String -> IO ByteArray` |
 | `putBytes` | `ByteArray -> Int -> Int -> IO Unit` |
+| `getByteLine` | `IO ByteArray` |
+| `newIntTable` | `IO IntTable` |
+| `readIntTable` | `IntTable -> Int -> IO Int` |
+| `writeIntTable` | `IntTable -> Int -> Int -> IO Unit` |
 | `eqString` | `String -> String -> Bool` |
 | `ifThenElse` | `forall a. Bool -> a -> a -> a` |
 
 Integer arithmetic uses arbitrary-precision signed integers. `ltInt` is strict
 less-than. `quotInt` truncates toward zero, `remInt` has the dividend's sign,
-and division by zero fails at runtime. `readInt` accepts an optional sign and
+and division by zero fails at runtime. `andInt` is strict bitwise AND with
+unbounded two's-complement semantics. `readInt` accepts an optional sign and
 one or more ASCII decimal digits, with no whitespace or trailing characters.
 String equality is case-sensitive. `ifThenElse condition yes no`
 evaluates only the selected branch; it also works with functions, datatypes,
@@ -537,6 +542,13 @@ mutable copy of a string's UTF-8 bytes, including embedded NULs. `putBytes
 buffer offset count` writes and flushes that exact slice without text encoding.
 Offsets and counts are checked before output. This supports reusable output
 buffers and binary formats such as Mandelbrot's PBM bitmap on both backends.
+
+`getByteLine` reads raw bytes through LF, preserving the newline and invalid
+UTF-8; EOF returns an empty fresh array. A blank line contains one LF byte.
+`IntTable` is a mutable library hash table with arbitrary integer keys and
+values. Missing keys read as zero; writes insert or replace. Reads return
+snapshots, and each execution of `newIntTable` creates a fresh table.
+These operations are available in both backends.
 
 The standard prelude connects `return` and `bind` to these operations through
 its `Monad IO` instance. `pure` is an IO-specific alias for `ioReturn` in this
@@ -650,12 +662,20 @@ implementation. `MLF.Graph.Solver` maintains reverse edges and applies this
 checked unifier to the affected type component, preserving structural parents,
 binding descendants, generalization scopes, and original identities. This
 avoids repeatedly traversing unrelated definitions. Local projections compress
-unary runs of empty generalization scopes while retaining every type-binding LCA;
+unary runs of empty generalization scopes while retaining every type-binding LCA.
+The immutable generalization tree is indexed once with DFS intervals and
+binary ancestors; component projection and expansion reuse this index instead
+of walking deep scope chains for each equation. Expansion shares kind queries
+over each structural DAG and checks identity capacity against the actual copy
+size, avoiding a whole-graph count per instance. Unification reuses kinds across
+merges that preserve them. The tests retain an independent uncached expansion;
 updates touch only changed nodes and reverse edges. Closed ground instances
 can graft a fresh ground structure or check an existing ground substitution
 without copying and unifying the surrounding graph. General instances retain
 the full expansion path. Full graph and index checks bracket inference, and
-differential tests compare both paths against the original solver.
+differential tests compare both paths against the original solver. Target
+computation checking validates each public environment once, retaining kind
+checks on every recursive source/result type as it extends that environment.
 
 Elaboration caches datatype metadata and constructs `Inst-Refl` for
 alpha-equivalent edges. For other edges it first tries structural
@@ -671,7 +691,9 @@ arguments. Specialized workers preserve proven integer ranges, while checked
 machine multiplication/division retain GMP fallback. A non-forcing argument
 guard preserves the lazy fallback; actions remain repeatable. GMP
 arithmetic reads immutable operands directly and collection also accounts for
-large-integer limb storage. See [backend design](docs/llvm-backend.txt).
+large-integer limb storage. Allocating byte/array/table IO uses explicitly
+rooted native calls. Adjacent table count updates fuse, and guarded copy loops
+use LLVM memory intrinsics. See [backend design](docs/llvm-backend.txt).
 
 The project builds with `-O2`; the CLI uses a 32 MiB allocation area to reduce
 garbage collection during inference. These defaults are in `cabal.project`
@@ -685,14 +707,16 @@ cabal bench -j1
 
 The default compares Clang `-O3`, Rust `-O`, GHC `-O2`, and MLF's native LLVM
 pipeline on pinned Benchmarks Game **binary-trees, pidigits, n-body,
-fannkuch-redux, spectral-norm, fasta and mandelbrot** sources. Compilation and
+fannkuch-redux, spectral-norm, fasta, mandelbrot, reverse-complement and
+k-nucleotide** sources. Compilation and
 runtime are timed separately, after four-language correctness validation.
 It writes `bench-results.json` with raw samples, medians, ratios, CPU/RSS,
 toolchain identities and source provenance. Rust and Python 3.9+ are required
 in addition to the native build dependencies. The default takes three samples
 per dimension with workload-specific inputs: depth 16, 10,000 digits,
 2,000,000 integration steps, permutation size 10, a 2000-element spectral
-vector, fasta n=2,000,000, and a 4096×4096 Mandelbrot bitmap. `--compile-only` and
+vector, fasta n=2,000,000, a 4096×4096 Mandelbrot bitmap,
+reverse-complement on FASTA n=10,000,000, and k-nucleotide on FASTA n=1,000,000. `--compile-only` and
 small selected inputs provide quicker checks.
 See [benchmark methodology, commands and limitations](benchmarks/README.md)
 and [workload selection](benchmarks/INVESTIGATION.md). The
@@ -706,14 +730,20 @@ cabal bench --benchmark-options='--benchmark n-body --size 1000 --runs 2'
 cabal bench --benchmark-options='--benchmark spectral-norm --size 100 --runs 2'
 cabal bench --benchmark-options='--benchmark fasta --size 1000 --runs 2'
 cabal bench --benchmark-options='--benchmark mandelbrot --size 200 --runs 2'
+cabal bench --benchmark-options='--benchmark reverse-complement --size 1000 --runs 2'
+cabal bench --benchmark-options='--benchmark k-nucleotide --size 1000 --runs 2'
 cabal bench -j1 --benchmark-options='--runs 7 --max-compile-ratio 5 --max-runtime-ratio 2'
 ```
 
 The optional ratio limits check every workload's MLF/C ratio of medians and
 fail the run if any limit is exceeded, preserving all measurements in the
 report. No limit is applied by default.
-The current seven-workload run meets the compile limit throughout; the three
-new workloads still exceed the 2x runtime limit. See the measured results above.
+The measured-results report records the scope and limits of each run; a
+passing run without an explicit performance gate only establishes correctness.
+The two FASTA-input workloads receive identical generated bytes on stdin in
+all four languages. Generation is outside timing; input reading and processing
+are included. Cabal builds the pinned Haskell hash-table dependencies before
+measurement, and the report records their exact package units and hashes.
 
 The existing Snake compilation comparison is an explicit mode:
 

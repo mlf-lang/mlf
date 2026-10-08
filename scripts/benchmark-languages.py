@@ -2,6 +2,7 @@
 """Pinned, single-threaded cross-language benchmarks. Primary entry: cabal bench."""
 
 import argparse
+from collections import Counter
 from datetime import datetime, timezone
 import hashlib
 from functools import lru_cache
@@ -52,8 +53,18 @@ def load_manifest(path=ROOT / "benchmarks/manifest.json"):
 
 
 def expected_output(workload, size):
+    return cached_expected_output(workload["name"], size)
+
+
+@lru_cache(maxsize=64)
+def cached_expected_output(name, size):
+    workload = {"name": name}
     # Independent mathematical oracle, used only in the driver, never in a
     # measured executable. Also checked against the pinned upstream fixture.
+    if workload["name"] == "reverse-complement":
+        return reverse_complement(fasta_output(size))
+    if workload["name"] == "k-nucleotide":
+        return nucleotide_counts(fasta_output(size))
     if workload["name"] == "pidigits":
         digits = pi_digits(size)
         return "\n".join(f"{digits[i:i+10]:<10}\t:{min(i+10,size)}" for i in range(0,size,10)).encode()
@@ -221,6 +232,70 @@ def mandelbrot_output(size):
     return f"P4\n{size} {size}\n".encode()+pixels
 
 
+def fasta_records(data):
+    """Independent record parser; buffers are in the untimed oracle only."""
+    records, header, sequence = [], None, []
+    for line in data.splitlines():
+        if line.startswith(b">"):
+            if header is not None:
+                records.append((header, b"".join(sequence)))
+            header, sequence = line, []
+        else:
+            sequence.append(line)
+    if header is not None:
+        records.append((header, b"".join(sequence)))
+    return records
+
+
+def reverse_complement(data):
+    # Python translation/reversal, independent of the MLF indexed loops.
+    table = bytes.maketrans(b"ACGTUMRWSYKVHDBNacgtumrwsykvhdbn",
+                           b"TGCAAKYWSRMBDHVNTGCAAKYWSRMBDHVN")
+    output = []
+    for header, sequence in fasta_records(data):
+        output.append(header + b"\n")
+        result = sequence.translate(table)[::-1]
+        output.extend(result[i:i+60] + b"\n" for i in range(0, len(result), 60))
+    return b"".join(output)
+
+
+def nucleotide_lines(data):
+    # Byte-string slices and Counter provide a separate representation and
+    # implementation from MLF's base-4 keys and the native khash library.
+    sequence = next((s.upper() for h, s in fasta_records(data)
+                     if h.split(maxsplit=1)[0] == b">THREE"), b"")
+    queries = [b"GGT", b"GGTA", b"GGTATT", b"GGTATTTTAATT", b"GGTATTTTAATTTATAGT"]
+    lines = []
+    for k in (1, 2, 3, 4, 6, 12, 18):
+        counts = Counter(sequence[i:i+k] for i in range(len(sequence)-k+1))
+        if k <= 2:
+            total = sum(counts.values())
+            for key, value in sorted(counts.items(), key=lambda pair: (-pair[1], pair[0])):
+                lower, remainder = divmod(100000 * value, total)
+                nearest = lower + (2 * remainder > total or (2 * remainder == total and lower % 2 == 1))
+                # At an exact decimal midpoint, binary64 evaluation and the
+                # standard C/Haskell formatters can select different neighbours.
+                # Accept only these two neighbours, never a general tolerance.
+                allowed = [nearest]
+                if 2 * remainder == total:
+                    allowed.append(lower if nearest != lower else lower + 1)
+                lines.append(tuple(key + f" {n//1000}.{n%1000:03d}\n".encode() for n in allowed))
+            lines.append((b"\n",))
+        else:
+            key = next(q for q in queries if len(q) == k)
+            lines.append((str(counts[key]).encode() + b"\t" + key + b"\n",))
+    return lines
+
+
+def nucleotide_counts(data):
+    return b"".join(options[0] for options in nucleotide_lines(data))
+
+
+@lru_cache(maxsize=32)
+def nucleotide_expected_lines(size):
+    return nucleotide_lines(fasta_output(size))
+
+
 def validate_output(workload, size, output):
     # Integer workloads normalize whitespace ONLY. The official n-body
     # tolerance is absolute 1e-8; non-finite and missing/extra values fail.
@@ -233,7 +308,12 @@ def validate_output(workload, size, output):
         reference = nbody_energy(size) if workload["name"] == "n-body" else [spectral_norm(size)]
         if len(actual) == len(reference) and all(math.isfinite(a) and abs(a-b) <= 1e-8 for a,b in zip(actual,reference)):
             return
-    elif workload["name"] in ("fasta", "mandelbrot"):
+    elif workload["name"] == "k-nucleotide":
+        allowed = nucleotide_expected_lines(size)
+        actual = output.splitlines(keepends=True)
+        if len(actual) == len(allowed) and all(a in options for a, options in zip(actual, allowed)):
+            return
+    elif workload["name"] in ("fasta", "mandelbrot", "reverse-complement"):
         if output == expected:
             return
     elif output.split() == expected.split():
@@ -322,7 +402,50 @@ def toolchain(args, env):
     return paths, runtime, gmp, metadata
 
 
-def build(workload, language, directory, paths, runtime, gmp, env, timeout):
+def haskell_dependencies(workloads, paths, env):
+    required = sorted({p for w in workloads for p in w.get("haskell_packages", [])})
+    if not required:
+        return [], {}, {}
+    # Cabal installs these normal library dependencies before starting the
+    # benchmark. Resolve the exact units from its build plan, never download or
+    # compile a dependency inside a timed sample, and keep GHC_ENVIRONMENT=-.
+    plan_path = ROOT / "dist-newstyle/cache/plan.json"
+    plan = json.loads(plan_path.read_text())
+    _, version = run([paths["ghc"], "--numeric-version"], env=env)
+    if plan["compiler-id"] != "ghc-" + version.decode().strip():
+        raise ValueError("Haskell benchmark dependencies require the Cabal project's GHC")
+    _, output = run([tool("cabal"), "path", "--with-compiler=" + paths["ghc"]], env=env)
+    locations = dict(line.split(": ", 1) for line in output.decode().splitlines() if ": " in line)
+    store = Path(locations["compiler-store-path"])
+    units = {p["id"]: p for p in plan["install-plan"]}
+    selected = []
+    for name in required:
+        matches = [p for p in units.values() if p["pkg-name"] == name]
+        if len(matches) != 1:
+            raise ValueError("Expected one Cabal library unit for " + name)
+        selected.append(matches[0]["id"])
+    flags = ["-package-db", str(store / "package.db")]
+    for unit in selected:
+        flags.extend(["-package-id", unit])
+    closure, pending = {}, list(selected)
+    fingerprints = {}
+    while pending:
+        unit = pending.pop()
+        if unit in closure:
+            continue
+        package = units[unit]
+        closure[unit] = package
+        pending.extend(package.get("depends", []))
+        if package["type"] != "pre-existing":
+            files = [store / "package.db" / (unit + ".conf")]
+            files += sorted((store / unit / "lib").glob("libHS*.a"))
+            if len(files) < 2:
+                raise ValueError("Missing Cabal library archive for " + unit)
+            fingerprints.update({str(p): digest(p) for p in files})
+    return flags, {"flags": flags, "packages": closure, "files_sha256": fingerprints}, fingerprints
+
+
+def build(workload, language, directory, paths, runtime, gmp, env, timeout, haskell_flags=()):
     directory.mkdir(parents=True)  # Fail if the supposedly fresh directory exists.
     source = str(ROOT / workload["sources"][language])
     binary = directory / "program"
@@ -335,7 +458,7 @@ def build(workload, language, directory, paths, runtime, gmp, env, timeout):
         libraries = ["-Lnative=" + f[2:] for f in gmp if f.startswith("-L")] if language in workload.get("gmp_languages", []) else []
         commands = [([paths["rustc"], *flags, *libraries, source, "-o", str(binary)], None)]
     elif language == "haskell":
-        commands = [([paths["ghc"], *flags, source, "-outputdir", str(directory), "-o", str(binary)], None)]
+        commands = [([paths["ghc"], *flags, *(haskell_flags if workload.get("haskell_packages") else []), source, "-outputdir", str(directory), "-o", str(binary)], None)]
     else:
         commands = [([paths["emlf"], "--emit-llvm", source], ir),
                     ([paths["clang"], *flags, str(ir), str(runtime), *gmp, "-lm", "-o", str(binary)], None)]
@@ -355,11 +478,15 @@ def build(workload, language, directory, paths, runtime, gmp, env, timeout):
 
 
 def execute(workload, language, binary, size, env, timeout):
-    command = [str(binary)] + ([] if language == "mlf" else [str(size)])
-    data = f"{size}\n".encode() if language == "mlf" else b""
+    from_stdin = workload.get("input_kind") == "fasta"
+    command = [str(binary)] + ([] if from_stdin or language == "mlf" else [str(size)])
+    data = fasta_output(size) if from_stdin else (f"{size}\n".encode() if language == "mlf" else b"")
     sample, output = run(command, data=data, env=env, timeout=timeout)
     validate_output(workload, size, output)
-    sample.update(stdin=data.decode(), output_sha256=hashlib.sha256(output).hexdigest())
+    sample.update(stdin_bytes=len(data), stdin_sha256=hashlib.sha256(data).hexdigest(),
+                  output_sha256=hashlib.sha256(output).hexdigest())
+    if not from_stdin:
+        sample["stdin"] = data.decode()
     return sample
 
 
@@ -491,18 +618,24 @@ def main(argv=None):
             if not w["minimum_input"] <= sizes[w["name"]] <= w["maximum_input"]:
                 raise ValueError(f"{w['name']}: input must be {w['minimum_input']}..{w['maximum_input']}")
             validate_output(w, w["fixture_input"], (ROOT / w["fixture"]).read_bytes())
+            if w.get("input_kind") == "fasta" and fasta_output(w["fixture_input"]) != (ROOT / w["input_fixture"]).read_bytes():
+                raise ValueError("Generated FASTA input differs from pinned fixture")
         # Prevent inherited runtime tuning from silently changing the comparison.
         env = dict(os.environ, LC_ALL="C", LANG="C", GHCRTS="", GHC_ENVIRONMENT="-")
         report["controlled_environment"] = {k: env[k] for k in ("LC_ALL", "LANG", "GHCRTS", "GHC_ENVIRONMENT")}
         paths, runtime, gmp, report["toolchain"] = toolchain(args, env)
+        haskell_flags, package_metadata, package_hashes = haskell_dependencies(workloads, paths, env)
+        if package_metadata:
+            report["toolchain"]["haskell_dependencies"] = package_metadata
         report["manifest"] = manifest
         report["source_sha256"] = {name: digest(ROOT / name) for name in
                                     {p for w in workloads for p in w["sources"].values()}}
         report["harness_sha256"] = digest(__file__)
         inputs = [*report["source_sha256"], *manifest["pinned_sha256"],
                   "benchmarks/manifest.json", str(Path(__file__).resolve()),
-                  *paths.values(), str(runtime), str(runtime.with_suffix(".h"))]
+                  *paths.values(), str(runtime), str(runtime.with_suffix(".h")), str(runtime.with_name("khash.h"))]
         report["input_sha256"] = {name: digest(ROOT / name) for name in inputs}
+        report["input_sha256"].update(package_hashes)
         git = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True)
         status = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True)
         report["repository"] = {"revision": git.stdout.strip() if git.returncode == 0 else None,
@@ -530,7 +663,7 @@ def main(argv=None):
                 for language in LANGUAGES:
                     print(f"Prepare and validate {name}/{language}: inputs {row['correctness_inputs']}", flush=True)
                     binary, preparation = build(workload, language, scratch / name / language / "prepared",
-                                               paths, runtime, gmp, env, args.timeout)
+                                               paths, runtime, gmp, env, args.timeout, haskell_flags)
                     checks = [execute(workload, language, binary, size, env, args.timeout)
                               for size in row["correctness_inputs"]]
                     prepared[name, language] = binary
@@ -550,7 +683,7 @@ def main(argv=None):
                             print(f"{dimension} {repetition + 1}/{args.runs}: {name}/{language}", flush=True)
                             if dimension == "compilation":
                                 binary, sample = build(workload, language, scratch / name / language / f"sample-{repetition}",
-                                                       paths, runtime, gmp, env, args.timeout)
+                                                       paths, runtime, gmp, env, args.timeout, haskell_flags)
                                 # The just-timed product must itself work; this run is NOT timed as compilation.
                                 sample["post_build_check"] = execute(workload, language, binary, workload["post_build_input"], env, args.timeout)
                             else:

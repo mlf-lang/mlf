@@ -1,0 +1,33 @@
+--- upstream.rs
++++ main.rs
+@@ -7,7 +7,6 @@
+ // contributed by TeXitoi
+ // contributed by Matt Brubeck
+ 
+-extern crate rayon;
+ 
+ use std::cmp::min;
+ use std::io::{BufRead, Result, Write, stdin, stdout};
+@@ -66,9 +65,8 @@
+     if buf[end - 1] == b'>' {
+         // Found the start of a new sequence. Process this one
+         // and start reading the next one in parallel.
+-        let mut results = rayon::join(
+-            || reverse_complement(&mut buf[start..end - 1], &table),
+-            || get_sequences(table)).1?;
++        reverse_complement(&mut buf[start..end - 1], table);
++        let mut results = get_sequences(table)?;
+         results.push(buf);
+         Ok(results)
+     } else {
+@@ -142,8 +140,8 @@
+ 
+         let left1 = left.split_off_left(mid);
+         let right1 = right.split_off_right(mid);
+-        rayon::join(|| reverse_complement_left_right(left,  right,  trailing_len, table),
+-                    || reverse_complement_left_right(left1, right1, trailing_len, table));
++        reverse_complement_left_right(left, right, trailing_len, table);
++        reverse_complement_left_right(left1, right1, trailing_len, table);
+     }
+ }
+ 

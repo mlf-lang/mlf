@@ -16,24 +16,25 @@ Inspection covered source algorithms and dependencies, not leaderboard ranks.
 | fannkuch-redux | `fannkuchredux-gcc-1`, `fannkuchredux-rust-2`, GHC #1–6 | Implemented with C #1, Rust #2's full range dispatched to one worker, and GHC #4 using an unboxed array storage adapter. MLF has indexed mutable `IntArray`, multiplication and quotient/remainder. All four use incremental array permutations and full prefix flips, rather than a list representation. See [provenance](fannkuch-redux/PROVENANCE.md). |
 | pidigits | `pidigits-gcc-1`, `pidigits-rust-1`, GHC #1–6 | Implemented with C #1, Rust #1 and GHC #6's matching three-integer sequential spigot recurrence. MLF's multiplication and quotient use GMP for large values; both extract(3) and extract(4) are performed. FFI only implements individual arithmetic operations. See [provenance](pidigits/PROVENANCE.md). |
 | fasta | `fasta-gcc-1`, Rust #1, #3–4, `fasta-ghc-1` | Implemented with C #1, Rust #4 and GHC #1 unchanged. MLF uses cumulative Double probabilities, the required fresh LCG update for every base, indexed ByteArray storage and buffered raw output. Rust #1/#3 scale probabilities and were not selected. See [provenance](fasta/PROVENANCE.md). |
-| reverse-complement | `revcomp-rust-1` plus the description | Deferred. Mutable byte indexing and raw output now exist; bulk byte input and practical record parsing remain absent. The inspected Rust version uses Rayon and explicit SIMD, so comparable sequential baselines still need investigation. |
+| reverse-complement | C #4–5, Rust #1–3, GHC #2/#4 | Implemented with scalar C #4, sequential Rust #2, and GHC #4's growing byte buffers with a line-reader correction. MLF uses raw `getByteLine`, growing ByteArray records and buffered output. See [provenance](reverse-complement/PROVENANCE.md). |
+| k-nucleotide | C #1, Rust #1–9, GHC #1–3 | Implemented with serialized C #1, Rust #1 and GHC #2. General IntTable operations use library hash tables in both MLF backends. Every substring of all seven lengths is counted; an independent work audit checks actual writes and distinct keys. See [provenance](k-nucleotide/PROVENANCE.md). |
 
 Capability evidence is the exhaustive primitive set in `src/MLF/Primitive.hs`,
 the parser/ADT examples, and the interpreter/native runtime implementations.
 `Int` is unbounded; `Double` is IEEE binary64; `IntArray`, `DoubleArray` and
 `ByteArray` provide indexed, bounds-checked mutation through IO. Strings can
 be copied into fresh UTF-8 byte arrays; `putBytes` outputs exact checked slices.
+Unbounded `andInt` supports rolling integer keys; native table updates retain
+complete counts while using the library's lookup/insertion operations.
 We have not replaced missing operations with
 unary arithmetic, list indexing in numeric kernels, a foreign helper doing
-the workload, or hardcoded answers. All seven implemented workloads enter
+the workload, or hardcoded answers. All nine implemented workloads enter
 summary ratios. Deferred candidates
 are not treated as zero-time or skipped rows.
 
-Next candidates include reverse-complement and k-nucleotide, after byte input,
-record parsing and suitable indexed lookup structures are available. Sequential
-source selection and independent oracles remain prerequisites for each addition.
-The new workloads exercise integer-to-Double conversion in native regions,
-byte loads/stores, raw output and partial byte packing. Current measurements and the per-workload
-compile/runtime limits are recorded in [RESULTS.md](RESULTS.md); workload
-completion alone is not evidence of performance parity on other inputs or
-machines.
+A remaining candidate is regex-redux, which needs general regular-expression
+support and pinned sequential baselines with their libraries. That work is
+not represented as a skipped or zero-time row. Current measurements and the
+per-workload compile/runtime limits are recorded in [RESULTS.md](RESULTS.md);
+workload completion alone is not evidence of performance parity on other
+inputs or machines.

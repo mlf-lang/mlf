@@ -75,14 +75,14 @@ CLI's existing IO-only --run or general native compilation behavior.
 Native numeric IO regions
 -------------------------
 MLF.LLVM.Kernel recognizes first-order IO functions whose bodies consist of
-bind/return, lets, conditionals, numeric array read/write/length operations,
-and calls to other eligible functions. Each region must ultimately reach a
+bind/return, lets, conditionals, array and table operations, raw byte input
+and output, allocation, and calls to other eligible functions. Each region must ultimately reach a
 concrete IO primitive; an unconstrained recursive pure function is not enough.
 Recognition uses resolved identities and expression structure, without names
 of workloads or source functions.
 
 Pure operands must be total scalar expressions over evaluated inputs:
-integer arithmetic/comparisons, division/remainder by nonzero literal
+integer arithmetic/bitwise AND/comparisons, division/remainder by nonzero literal
 divisors, integer-to-Double conversion, IEEE Double arithmetic/comparisons/sqrt, constructors, and
 nonrecursive pure helpers proved from the same operations. Unknown,
 higher-order, potentially failing or diverging computations use the existing
@@ -105,10 +105,13 @@ escape their branch. Results and general ABI calls still use ordinary values.
 No erased parameter type is guessed and the public lazy guard is unchanged.
 
 Proven nonnegative tagged arguments that the function tests against zero
-carry the interval [0,2^62-1] into a specialized worker. Other integer
-parameters keep the general ABI, avoiding variants for every array offset.
-Equality with a known interval endpoint refines each
-branch, letting a positive countdown decrement without overflow checks.
+carry the interval [0,2^62-1] into a specialized worker. Indexed integer/byte
+loops may also guard all their integer parameters together for [0,2^31-1],
+using one bounded-index variant rather than every combination of parameters.
+Values outside that interval retain the general worker. Floating, allocating
+and table kernels do not request this extra variant. Equality with a known
+interval endpoint and comparisons between bounded operands refine each
+branch, letting proven arithmetic omit overflow checks.
 Other values retain checked tagged arithmetic and GMP fallback. Each function
 has at most eight specialized variants plus its general worker; a new mode
 past that limit boxes its arguments and uses the general ABI.
@@ -118,6 +121,12 @@ range. Native quotient/remainder use truncating signed operations, keeping
 zero and small-minimum / -1 on the runtime path. Interval-proved products can
 omit the checks. All large operands and promoted results keep GMP semantics.
 Array access checks the index before loading or storing a cell.
+IntTable operations call the khash-backed runtime with evaluated arbitrary-
+precision integers. Adjacent read/add/write operations on the identical table
+and key fuse into one call if the increment is total and independent of the
+old value. The call returns that immutable old value for subsequent uses.
+Intervening effects or different keys prevent fusion. No whole counting loop
+or workload is delegated to the runtime.
 ByteArray reads zero-extend i8 cells into Int values, and writes check the
 0–255 range after the index check before storing i8; tagged bytes use an inline
 check and other values retain the runtime check. Integer-to-Double conversion
@@ -126,12 +135,38 @@ A successful check establishes an integer interval; subsequent arithmetic
 uses unchecked machine operations only when its result is proved in range.
 Facts are scoped by control flow and merged conservatively at branch joins.
 
+Native worker bodies preserve tail position through lets, IO binds and
+conditionals, emitting branch-local returns. A final native call uses LLVM
+musttail only when the caller and selected callee have identical parameter
+representations and arities (all workers return ptr and use the same calling
+convention). Different private ABIs use ordinary calls. A stable recursive
+byte/numeric loop therefore does not depend on optimization to bound its
+stack. No argument points into the caller's stack. The reverse-complement
+61,440/61,441-byte regressions exercise this path with LLVM -O0 and sanitizers.
+
 The array length and buffer pointer are immutable for the array's lifetime.
 Codegen reuses their SSA loads only on dominating paths within one native
 function. It does not mark pooled storage globally invariant or reuse cell
 loads across mutations. The array header offsets (length 24, cells 32) are
 guarded by C static assertions. Aliases, read snapshots, bounds failures,
 and write order follow the same IO semantics as the fallback.
+LLVM TBAA distinguishes managed object storage from separately allocated
+array cells. It does not assert that different array references are disjoint.
+
+An exact forward byte-copy loop may lower to llvm.memmove after checking its
+complete source/destination ranges and aliasing. A positive overlapping
+destination can change later source reads in a forward scalar loop, so that
+case retains the original loop. Negative, large and invalid indices also use
+the original loop, preserving error order and partial writes before failure.
+Recognition uses resolved parameters and expression structure, not names.
+
+Functions that reach allocating IO operations, directly or transitively,
+check collection thresholds at entry. Every boxed argument is explicitly
+rooted there. Non-tail callers protect live boxed scope values in stack root
+frames; tail calls need only the callee's entry roots. This includes values
+loaded from mutable cells and results of earlier calls. Numeric-only functions
+do not introduce collection points. The public lazy argument guard remains
+unchanged, and collection never occurs in the middle of a pure operand.
 
 Runtime
 -------
@@ -171,27 +206,39 @@ stack. Memoizing an action does not execute it: the IO driver executes its
 description every time it is sequenced, including repeated getLine and array
 read/write/allocation actions. IntArray stores evaluated integer values (tagged
 or GMP-backed), DoubleArray stores unboxed doubles, and ByteArray stores unsigned
-bytes in contiguous buffers. All indices and lengths are checked before access.
+bytes in contiguous buffers. Raw getByteLine returns a fresh byte array
+including LF, or an empty array at EOF. IntTable stores evaluated keys and
+values in khash. Tagged-key tables use pointer equality and promote all their
+entries to the general integer representation on the first large key. Values
+remain arbitrary integers in either representation. Repeated fused updates
+use khash lookup before its insertion path; no resize is needed for a hit.
+The mark phase retains managed keys/values and releases the library table
+at collection/exit. All indices and lengths are checked before access.
 Three-argument writes and raw slice output use dedicated tags, keeping managed
 values at 48 bytes; the mark phase retains all three operands until execution.
 No mutable read occurs while
 constructing an action, and every write forces its numeric value at execution.
 
-Mark/sweep collection occurs only at the top of the IO driver, after all
-generated functions and force operations have returned. Roots are the current
-action and pending continuations. Native stack scanning is unnecessary.
+Mark/sweep collection occurs at the top of the IO driver and at explicitly
+rooted allocating-native-IO entries. Roots include the current action, pending
+continuations, entry arguments and registered caller frames. Conservative
+native stack scanning is unnecessary; the collector is nonmoving.
 Marking handles cyclic recursive data, dictionaries, and boxed IntArray cells.
 Double and byte buffers contain no managed pointers. Dead strings, arrays and GMP values
 release their owned storage. All allocations and auxiliary stacks are
 released at normal exit or a reported runtime error. Long pure computations
-and native numeric regions retain allocations until returning to the IO
-driver or exit. Besides the object-count threshold, collection considers
+and numeric-only regions retain allocations until the next rooted IO entry,
+return to the driver or exit. Besides the object-count threshold, collection considers
 used GMP limb bytes, with a default budget of 8 MiB above twice the live limb
 bytes at the last collection. This is an allocation-pressure estimate, not
 total reserved GMP capacity or an RSS limit. MLF_GC_INTEGER_BYTES overrides
-the budget for testing. Neither threshold introduces collection inside an
-active generated function. The runtime is single
+the budget for testing. Neither threshold introduces collection outside an
+explicitly rooted safe point. The runtime is single
 threaded; it is not an embedding API for concurrent callers.
+The collector's mark helper remains out of line: duplicating its growable
+work-stack code for every object field caused disproportionate backend
+optimization time. Numeric native workers retain their existing inlining
+policy. Every benchmark build still compiles the complete runtime afresh.
 
 Input/output uses POSIX getline and stdio. getLine preserves a final partial
 line, fails at EOF with no data, and rejects malformed UTF-8. Output preserves
@@ -206,7 +253,7 @@ hardcode an architecture triple. Clang/LLVM 15 or later is required for opaque p
 Validation
 ----------
 The backend-tests suite shares one execution matrix across IOTests,
-PreludeTests, Snake, BackendCases, NativeOptimization, NumericArrays, and ByteArrays. Every runtime case passes the same
+PreludeTests, Snake, BackendCases, NativeOptimization, NumericArrays, ByteArrays, and DNA. Every runtime case passes the same
 target AST and scripted input to both the xMLF interpreter and LLVM native
 code. Frontend-only type and source-rejection assertions still run once.
 There is no per-fixture backend selector. A coverage audit checks that both
@@ -235,7 +282,7 @@ compiles and links emitted IR with Clang. It includes:
   fannkuch-redux (1, 2, 5 and 7) on both backends, with expected outputs/fixtures.
 - Spectral-norm (1, 2, 3, 100), fasta (0, 1, 1000), and Mandelbrot (1, 2, 7, 8,
   9, 200), including pinned upstream fixtures and exact FASTA/PBM bytes.
-- 280 multiplication/quotient/remainder results across the tagged/GMP boundary,
+- Multiplication, quotient, remainder and bitwise AND across the tagged/GMP boundary,
   signed division, strict input parsing, floating literal round trips,
   signed zero, tie rounding, infinities/NaN and generic floating primitives.
 - Typed array allocation, aliasing, repeatable actions, snapshot reads, bounds
@@ -247,13 +294,17 @@ compiles and links emitted IR with Clang. It includes:
 - Specialized scalar workers cover recursive Double captures, IEEE exceptional
   values and signed zero, branch-local payload loads, unused failing arguments,
   the eight-variant limit with a boxed fallback, and integer range transitions
-  through negative values and GMP promotion. A native array loop checks 189
-  multiplication/quotient/remainder results against Haskell Integer, including
+  through negative values and GMP promotion. A native array loop checks
+  multiplication/quotient/remainder/AND results against Haskell Integer, including
   machine overflow and the small-minimum / -1 boundary.
 - All 256 byte values, UTF-8 and embedded NUL copies, fresh/shared byte arrays,
   raw slices, empty output, GC retention, error ordering and write failures.
   Native byte stores also check small/GMP byte range and bounds precedence. Native
   integer-to-Double conversion checks both tagged and GMP rounding/overflow.
+- Bulk byte-copy recognition with distinct buffers, identical buffers, forward
+  overlap, negative offsets, empty ranges and invalid small/GMP indices.
+- Nested allocating IO calls with live caller values across collection, and
+  table promotion preserving existing GMP values and fused-update snapshots.
 - Lazy default cases and lazy returned values around a recursive black hole;
   demand of that hole, EOF, and a final input line without a newline.
 - Execution of every current example (16 files) on both backends.

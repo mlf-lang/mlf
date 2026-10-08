@@ -16,7 +16,8 @@ the shared [BSD license](../LICENSE.BenchmarksGame) applies.
   `array` package's unboxed arrays and scalar matrix entries.
 - MLF: `mlf/main.emlf` implements separate matrix-entry, A-times-vector,
   transpose-times-vector and A-transpose-A functions. All 40 matrix-vector
-  products execute; mutable arrays hold vectors and row accumulators.
+  products execute; mutable arrays hold vectors, and each row's sum is carried
+  in a scalar recursive argument and stored once after its final element.
 
 All programs are sequential, start from ones, perform 20 applications of
 A-transpose-A, and compute the same final norm estimate. Rust divides by the

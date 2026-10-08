@@ -9,13 +9,16 @@ import qualified Control.Exception as Exception
 import Control.Monad (unless)
 import qualified Data.Array.IO as Array
 import Data.Bifunctor (first)
+import Data.Bits ((.&.))
 import qualified Data.ByteString as BS
 import qualified Data.Map.Lazy as Map
+import qualified Data.HashTable.IO as Hash
+import Data.Maybe (fromMaybe)
 import qualified Data.List as List
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Data.Word (Word8)
-import System.IO (hFlush, hPutStr, stdout)
+import System.IO (hFlush, hPutStr, stdin, stdout)
 import qualified MLF.Data as D
 import MLF.Primitive
 import qualified MLF.X.Check as C
@@ -26,11 +29,21 @@ data IOBackend = IOBackend
   { readLine :: IO String
   , writeText :: String -> IO ()
   , writeBytes :: BS.ByteString -> IO ()
+  , readByteLine :: IO BS.ByteString
   }
 
 consoleBackend :: IOBackend
 consoleBackend = IOBackend getLine (\text -> hPutStr stdout text >> hFlush stdout)
-  (\bytes -> BS.hPut stdout bytes >> hFlush stdout)
+  (\bytes -> BS.hPut stdout bytes >> hFlush stdout) (rawLine [])
+  where
+    -- The reference interpreter preserves LF, a final unterminated line and
+    -- arbitrary bytes. An empty result denotes EOF, not a blank line.
+    rawLine bytes = do
+      next <- BS.hGet stdin 1
+      case BS.uncons next of
+        Nothing -> pure (BS.pack (reverse bytes))
+        Just (10,_) -> pure (BS.pack (reverse (10:bytes)))
+        Just (b,_) -> rawLine (b:bytes)
 
 newtype RuntimeError = RuntimeError String deriving Eq
 instance Show RuntimeError where show (RuntimeError message) = message
@@ -45,6 +58,7 @@ data Value
   | IntArrayValue Int (Array.IOArray Int Integer)
   | DoubleArrayValue Int (Array.IOUArray Int Double)
   | ByteArrayValue Int (Array.IOUArray Int Word8)
+  | IntTableValue (Hash.BasicHashTable Integer Integer)
   | BooleanValue Bool
   | StringValue String
   | Closure Env X.Name X.Erased
@@ -143,7 +157,7 @@ primitive p arguments
   | length arguments == primitiveArity p && p `elem`
       [NewIntArray,ReadIntArray,WriteIntArray,LengthIntArray,
        NewDoubleArray,ReadDoubleArray,WriteDoubleArray,LengthDoubleArray,
-       NewByteArray,ReadByteArray,WriteByteArray,LengthByteArray,ByteArrayFromString,PutBytes] =
+       NewByteArray,ReadByteArray,WriteByteArray,LengthByteArray,ByteArrayFromString,PutBytes,GetByteLine,NewIntTable,ReadIntTable,WriteIntTable] =
       pure (ActionValue (ArrayAction p arguments))
   | otherwise = case (p,arguments) of
       (IOReturn,[value]) -> pure (ActionValue (ReturnAction value))
@@ -157,6 +171,7 @@ primitive p arguments
       (AddInt,[a,b]) -> IntegerValue <$> ((+) <$> integer a <*> integer b)
       (SubInt,[a,b]) -> IntegerValue <$> ((-) <$> integer a <*> integer b)
       (MulInt,[a,b]) -> IntegerValue <$> ((*) <$> integer a <*> integer b)
+      (AndInt,[a,b]) -> IntegerValue <$> ((.&.) <$> integer a <*> integer b)
       (QuotInt,[a,b]) -> divide quot a b
       (RemInt,[a,b]) -> divide rem a b
       (ReadInt,[a]) -> string a >>= parseInteger
@@ -257,6 +272,13 @@ byteArray thunk = do
     ByteArrayValue n a -> pure (n,a)
     _ -> failure "runtime primitive expected ByteArray"
 
+intTable :: Thunk -> Result (Hash.BasicHashTable Integer Integer)
+intTable thunk = do
+  value <- thunk
+  case value of
+    IntTableValue t -> pure t
+    _ -> failure "runtime primitive expected IntTable"
+
 byte :: Thunk -> Result Word8
 byte thunk = do
   n <- integer thunk
@@ -309,6 +331,19 @@ runAction ds backend thunk = case thunk of
         writeText backend (show n ++ "\n")
         pure (Right unit)
     perform (ArrayAction p arguments) = case (p,arguments) of
+      (GetByteLine,[]) -> do
+        bytes <- readByteLine backend
+        let n = BS.length bytes
+        a <- Array.newListArray (0,n-1) (BS.unpack bytes)
+        pure (Right (pure (ByteArrayValue n a)))
+      (NewIntTable,[]) -> Right . pure . IntTableValue <$> Hash.new
+      (ReadIntTable,[table,key]) -> checked ((,) <$> intTable table <*> integer key) $ \(t,k) -> do
+        x <- Hash.lookup t k
+        pure (Right (pure (IntegerValue (fromMaybe 0 x))))
+      (WriteIntTable,[table,key,entry]) -> checked (do
+        t <- intTable table; k <- integer key; x <- integer entry; pure (t,k,x)) $ \(t,k,x) -> do
+          k `seq` x `seq` Hash.insert t k x
+          pure (Right unit)
       (NewByteArray,[size,initial]) -> checked ((,) <$> arraySize size <*> byte initial) $ \(n,x) -> do
         a <- x `seq` Array.newArray (0,n-1) x
         pure (Right (pure (ByteArrayValue n a)))

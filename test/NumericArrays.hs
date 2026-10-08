@@ -4,6 +4,7 @@ module NumericArrays (numericArrayTests) where
 
 import Control.Monad (forM_, unless)
 import Data.List (group, isInfixOf, sort)
+import Data.Bits ((.&.))
 import Backends (Backends, Entry (..), Input (..))
 import qualified Backends as B
 import MLF.Compiler (compile, compiledTerm)
@@ -63,22 +64,23 @@ numericArrayTests backends =
           values = [-2^(100 :: Int),-limit-1,-limit,-3,0,3,limit-1,limit,2^(100 :: Int)]
           pairs = [(a,b) | a <- values, b <- [-1,2,limit-1]]
           ops = ["mulInt x y", "quotInt x (-1)", "remInt x (-1)",
-                 "quotInt x 3", "remInt x 3", "quotInt x (-3)", "remInt x (-3)"]
-          expected (a,b) = [a*b,a `quot` (-1),a `rem` (-1),a `quot` 3,a `rem` 3,a `quot` (-3),a `rem` (-3)]
+                 "quotInt x 3", "remInt x 3", "quotInt x (-3)", "remInt x (-3)", "andInt x y"]
+          width = length ops
+          expected (a,b) = [a*b,a `quot` (-1),a `rem` (-1),a `quot` 3,a `rem` 3,a `quot` (-3),a `rem` (-3),a .&. b]
           source = recursion ++
             "let loop : IntArray -> IntArray -> Int -> IO Unit = fix (\\again a b i -> " ++
             "ifThenElse (ltInt i " ++ show (length pairs) ++ ") (do { " ++
             "x <- readIntArray a (mulInt i 2); y <- readIntArray a (addInt (mulInt i 2) 1); " ++
-            concat ["writeIntArray b (addInt (mulInt i 7) " ++ show j ++ ") (" ++ op ++ "); "
+            concat ["writeIntArray b (addInt (mulInt i " ++ show width ++ ") " ++ show j ++ ") (" ++ op ++ "); "
                    | (j,op) <- zip [0::Int ..] ops] ++
             "again a b (addInt i 1) }) (return ())) in " ++
             "let dump : IntArray -> Int -> IO Unit = fix (\\again a i -> " ++
-            "ifThenElse (ltInt i " ++ show (length pairs*7) ++ ") " ++
+            "ifThenElse (ltInt i " ++ show (length pairs*width) ++ ") " ++
             "(do { x <- readIntArray a i; printInt x; again a (addInt i 1) }) (return ())) in " ++
             "do { a <- newIntArray " ++ show (length pairs*2) ++ " 0; " ++
             concat ["writeIntArray a " ++ show i ++ " (" ++ show n ++ "); "
                    | (i,n) <- zip [0::Int ..] (concatMap (\(a,b) -> [a,b]) pairs)] ++
-            "b <- newIntArray " ++ show (length pairs*7) ++ " 0; loop a b 0; dump b 0 }"
+            "b <- newIntArray " ++ show (length pairs*width) ++ " 0; loop a b 0; dump b 0 }"
       term <- checked source
       llvm <- right (emitLLVMIO term)
       unless (all (`isInfixOf` llvm) ["call { i64, i1 } @llvm.smul.with.overflow.i64", "sdiv i64", "srem i64"])
@@ -106,7 +108,7 @@ numericArrayTests backends =
       let limit = 2^(62 :: Int)
           values = [-2^(100 :: Int),-limit-1,-limit,-1,0,1,3,limit-1,limit,2^(100 :: Int)]
           pairs = [(a,b) | a <- values, b <- values]
-          cases = concat [[(P.MulInt,a,b,a*b)] ++
+          cases = concat [[(P.MulInt,a,b,a*b),(P.AndInt,a,b,a .&. b)] ++
             [(p,a,b,op a b) | b /= 0, (p,op) <- [(P.QuotInt,quot),(P.RemInt,rem)]] | (a,b) <- pairs]
           apply p a b = X.App (X.App (X.Primitive p []) (X.IntTerm a)) (X.IntTerm b)
           printNumber x = X.App (X.Primitive P.PrintInt []) x
@@ -116,7 +118,7 @@ numericArrayTests backends =
       observe backends (sequence' (zip [1000..] [printNumber (apply p a b) | (p,a,b,_) <- cases]))
         (unlines [show n | (_,_,_,n) <- cases]))
   , ("numeric: types reject invalid numeric and array programs", forM_
-      [ "addDouble 1 2.0", "sqrtDouble 1", "addInt 1.0 2.0"
+      [ "addDouble 1 2.0", "sqrtDouble 1", "addInt 1.0 2.0", "andInt 1 2.0"
       , "do { a <- newIntArray 2 0; writeIntArray a 0 1.0 }"
       , "do { a <- newDoubleArray 2 0.0; readIntArray a 0 }"
       , "do { a <- newIntArray 2 0; printInt (readIntArray a 0) }"
@@ -251,6 +253,8 @@ programs :: [(String,String,String)]
 programs =
   [ ("read unbounded signed decimals", "do { printInt (readInt \"+00042\"); printInt (readInt \"-123456789012345678901234567890\"); printInt (readInt \"-0\") }", "42\n-123456789012345678901234567890\n0\n")
   , ("curried GMP primitives", "do { mul <- return mulInt; q <- return quotInt; r <- return remInt; printInt (mul 12345678901234567890 10); printInt (q (-19) 3); printInt (r (-19) 3) }", "123456789012345678900\n-6\n-1\n")
+  , ("curried unbounded bitwise AND", "do { mask <- return andInt; printInt (mask (-1) 1267650600228229401496703205377); printInt (mask (-2) (-3)); printInt (mask 1267650600228229401496703205377 3) }", "1267650600228229401496703205377\n-4\n1\n")
+  , ("unused bitwise arguments remain lazy", "do { return (andInt (quotInt 1 0) 0); printInt (ifThenElse true 7 (andInt 0 (quotInt 2 0))) }", "7\n")
   , ("binary64 arithmetic and scientific literals", "do { putStrLn (formatDouble 9 (sqrtDouble (addDouble (mulDouble 3.0 3.0) (mulDouble 4e0 4.0)))); putStrLn (formatDouble 3 (divDouble (subDouble 1.25 (-2.5)) 2.0)); putStrLn (formatDouble 1 (intToDouble (-42))) }", "5.000000000\n1.875\n-42.0\n")
   , ("rounding ties and signed zero", "do { putStrLn (formatDouble 0 2.5); putStrLn (formatDouble 0 3.5); putStrLn (formatDouble 2 1.005); putStrLn (formatDouble 2 (-0.0)); putStrLn (formatDouble 2 (-0.001)) }", "2\n4\n1.00\n-0.00\n-0.00\n")
   , ("generic floating primitives and IEEE comparisons", "do { f <- return mulDouble; root <- return sqrtDouble; equal <- return eqDouble; less <- return ltDouble; putStrLn (formatDouble 2 (root (f 2.0 8.0))); printInt (ifThenElse (equal (-0.0) 0.0) 1 0); printInt (ifThenElse (less (-2.0) 1.0) 1 0); printInt (ifThenElse (equal (divDouble 0.0 0.0) 0.0) 1 0); printInt (ifThenElse (less (sqrtDouble (-1.0)) 0.0) 1 0) }", "4.00\n1\n1\n0\n0\n")
@@ -271,6 +275,9 @@ failures :: [(String,String,String)]
 failures =
   [ ("quotient by zero", "printInt (quotInt 4611686018427387904 0)", "integer division by zero")
   , ("remainder by zero", "printInt (remInt 1 0)", "integer division by zero")
+  , ("bitwise zero mask still demands its argument", "printInt (andInt 0 (quotInt 1 0))", "integer division by zero")
+  , ("direct bitwise arguments are ordered", "printInt (andInt (readInt \"bad\") (quotInt 1 0))", "invalid integer input")
+  , ("curried bitwise arguments are ordered", "do { mask <- return andInt; printInt (mask (readInt \"bad\") (quotInt 1 0)) }", "invalid integer input")
   , ("empty integer input", "printInt (readInt \"\")", "invalid integer input")
   , ("signed empty input", "printInt (readInt \"-\")", "invalid integer input")
   , ("whitespace integer input", "printInt (readInt \" 1\")", "invalid integer input")

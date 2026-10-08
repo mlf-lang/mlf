@@ -1,0 +1,35 @@
+--- upstream.c
++++ main.c
+@@ -41,15 +41,15 @@
+       pj = fgets(jjj, JBFSIZE, stdin);   // get line from stdin
+       if (!pj || (*jjj=='>'))  break;    // EOF or new ID line
+       if (pr <= (pq+61)) {               // need to resize buffer
+-        char *newstop = pqstop + 12777888;
+-        char *newptr  = realloc(qqq, newstop-qqq);
+-        if (!newptr)
+-          return errex("Out of memory", 0);
+-        if (newptr != qqq) {             // new base: adj. pointers
+-          size_t x = newptr-qqq;         // offset for pointer update
+-          pq+=x;  pr+=x;  qqq+=x;
+-          newstop+=x;  pqstop+=x;
+-        }
++        size_t oldsize = pqstop - qqq;
++        size_t used = pq - qqq, reverse_offset = pr - qqq;
++        size_t newsize = oldsize + 12777888;
++        char *newptr = realloc(qqq, newsize);
++        if (!newptr) return errex("Out of memory", 0);
++        qqq = newptr;
++        pq = qqq + used; pr = qqq + reverse_offset;
++        pqstop = qqq + oldsize;
++        char *newstop = qqq + newsize;
+         pr = __builtin_memmove(newstop-(pqstop-pr), pr, pqstop-pr);
+         pqstop = newstop;                // buffer resize complete
+       }
+@@ -67,6 +67,7 @@
+     }
+     fwrite(qqq, 1, pq-qqq, stdout);      // output converted data
+   }
++  free(jjj); free(qqq);
+   return 0;
+ }
+     

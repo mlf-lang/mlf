@@ -42,6 +42,14 @@ checkComputation = checkComputationIn D.emptyDataEnv
 checkComputationIn :: D.DataEnv -> TypeEnv -> Computation -> Type -> Either String Type
 checkComputationIn ds env computation source = do
   validateTypeEnv ds env
+  checkComputationScoped ds env computation source
+
+-- The public boundary validates arbitrary caller-supplied environments.
+-- Recursive computations and inferIn extend a validated environment only
+-- with fresh, well-formed bounds, so rewalking its dependency graph at every
+-- evidence node is redundant. Source/result kind checks remain in place.
+checkComputationScoped :: D.DataEnv -> TypeEnv -> Computation -> Type -> Either String Type
+checkComputationScoped ds env computation source = do
   wellFormedIn ds env source
   result <- go computation source
   wellFormedIn ds env result
@@ -58,15 +66,15 @@ checkComputationIn ds env computation source = do
         Just bound | alphaEq bound s -> pure (Var a)
         Just _ -> Left ("Inst-Hyp bound mismatch for " ++ show a)
         Nothing -> Left ("Inst-Hyp unbound variable " ++ show a)
-      (Then p1 p2, _) -> checkComputationIn ds env p1 s >>= checkComputationIn ds env p2
+      (Then p1 p2, _) -> checkComputationScoped ds env p1 s >>= checkComputationScoped ds env p2
       (Inner q, Forall a bound body) -> do
-        bound' <- checkComputationIn ds env q bound
+        bound' <- checkComputationScoped ds env q bound
         pure (Forall a bound' body)
       (Outer a q, Forall b bound body) -> do
         fresh env a
         when (a /= b && a `Set.member` freeVars body) (Left "Inst-Outer would capture a variable")
         let body' = substitute b (Var a) body
-        result <- checkComputationIn ds (Map.insert a bound env) q body'
+        result <- checkComputationScoped ds (Map.insert a bound env) q body'
         pure (Forall a bound result)
       (Elim, Forall a bound body) -> pure (substitute a bound body)
       (Intro a, _) -> do
@@ -111,7 +119,7 @@ inferIn ds env term = case term of
     fresh (typeEnv env) a
     wellFormedIn ds (typeEnv env) bound
     Forall a bound <$> inferIn ds env { typeEnv = Map.insert a bound (typeEnv env) } body
-  TypeApp t p -> inferIn ds env t >>= checkComputationIn ds (typeEnv env) p
+  TypeApp t p -> inferIn ds env t >>= checkComputationScoped ds (typeEnv env) p
   Let x a b -> do
     when (Map.member x (termEnv env)) (Left "term binder already in scope")
     t <- inferIn ds env a

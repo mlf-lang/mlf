@@ -7,6 +7,7 @@ import Control.Concurrent (threadDelay)
 import Control.Exception (NonTermination, SomeException, bracket, displayException, mask, mask_, onException, try)
 import Control.Monad (forM, unless, when)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as Bytes
 import Data.IORef
 import Data.List (isInfixOf, stripPrefix)
 import qualified Data.Map.Strict as Map
@@ -32,7 +33,18 @@ import qualified MLF.X.Syntax as X
 data Kind = Interpreter | LLVM deriving (Eq, Ord, Show, Enum, Bounded)
 data Entry = IOEntry | ProgramEntry deriving (Eq, Show)
 data Event = ReadLine | Write String | WriteBytes BS.ByteString deriving (Eq, Show, Read)
-data Input = Input { inputText :: String, failWrites :: Bool } deriving Show
+data Input = Input { inputText :: String, failWrites :: Bool }
+           | RawInput { inputBytes :: BS.ByteString, failWrites :: Bool } deriving Show
+
+encodedInput :: Input -> BS.ByteString
+encodedInput (Input text _) = Text.encodeUtf8 (Text.pack text)
+encodedInput (RawInput bytes _) = bytes
+
+-- Keep existing text assertions readable; raw fixtures compare remaining bytes
+-- through a reversible Latin-1 String instead of losing invalid UTF-8.
+decodeInput :: Input -> BS.ByteString -> String
+decodeInput (Input _ _) = Text.unpack . Text.decodeUtf8
+decodeInput (RawInput _ _) = Bytes.unpack
 data Observation = Observation
   { outcome :: Either R.RuntimeError (), events :: [Event], remaining :: String }
   deriving (Eq, Show)
@@ -182,18 +194,22 @@ isolated context index action = mask $ \restore -> do
 
 interpreted :: Entry -> Input -> X.Term -> IO Observation
 interpreted entry input term = do
-  pending <- newIORef (inputText input)
+  pending <- newIORef (encodedInput input)
   trace <- newIORef []
-  let backend = R.IOBackend
+  let rawLine = do
+        modifyIORef' trace (ReadLine:)
+        rest <- readIORef pending
+        let (line,suffix) = BS.break (== 10) rest
+            complete = if BS.null suffix then line else BS.snoc line 10
+        writeIORef pending (BS.drop 1 suffix)
+        pure complete
+      backend = R.IOBackend
         { R.readLine = do
-            modifyIORef' trace (ReadLine:)
-            rest <- readIORef pending
-            case rest of
-              [] -> ioError (userError "test input exhausted")
-              _ -> do
-                let (line,suffix) = break (== '\n') rest
-                writeIORef pending (drop 1 suffix)
-                pure line
+            bytes <- rawLine
+            if BS.null bytes then ioError (userError "test input exhausted") else do
+              let line = if BS.last bytes == 10 then BS.init bytes else bytes
+              either (const (ioError (userError "invalid UTF-8 input"))) (pure . Text.unpack) (Text.decodeUtf8' line)
+        , R.readByteLine = rawLine
         , R.writeText = \text -> do
             modifyIORef' trace (Write text:)
             when (failWrites input) (ioError (userError "write failed"))
@@ -206,13 +222,14 @@ interpreted entry input term = do
   let normalized = case result of
         Left _ -> Left (R.RuntimeError "cyclic evaluation of a recursive binding")
         Right value -> either (Left . normalize) Right value
-  Observation normalized <$> (reverse <$> readIORef trace) <*> readIORef pending
+  Observation normalized <$> (reverse <$> readIORef trace) <*> (decodeInput input <$> readIORef pending)
 
 normalize :: R.RuntimeError -> R.RuntimeError
 normalize error' = R.RuntimeError $ case stripPrefix "LLVM " message of
   Just rest -> rest
   Nothing
     | "test input exhausted" `isInfixOf` message || "getLine reached EOF" `isInfixOf` message -> "IO error: test input exhausted"
+    | "invalid UTF-8 input" `isInfixOf` message -> "IO error: invalid UTF-8 input"
     | "write failed" `isInfixOf` message || "output failed" `isInfixOf` message -> "IO error: write failed"
     | "cyclic evaluation" `isInfixOf` message -> "cyclic evaluation of a recursive binding"
     | otherwise -> message
@@ -220,7 +237,7 @@ normalize error' = R.RuntimeError $ case stripPrefix "LLVM " message of
 
 native :: Backends -> Int -> Entry -> Input -> X.Term -> IO Observation
 native context index entry input term = case emitter term of
-  Left message -> pure (Observation (Left (normalize (R.RuntimeError message))) [] (inputText input))
+  Left message -> pure (Observation (Left (normalize (R.RuntimeError message))) [] (decodeInput input (encodedInput input)))
   Right ir -> do
     known <- readIORef (binaries context)
     executable <- case Map.lookup ir known of
@@ -240,7 +257,7 @@ native context index entry input term = case emitter term of
     let inputFile = traceFile ++ ".stdin"
         outputFile = traceFile ++ ".stdout"
         errorFile = traceFile ++ ".stderr"
-    BS.writeFile inputFile (Text.encodeUtf8 (Text.pack (inputText input)))
+    BS.writeFile inputFile (encodedInput input)
     status <- withBinaryFile inputFile ReadMode $ \hin ->
       withBinaryFile outputFile WriteMode $ \hout ->
       withBinaryFile errorFile WriteMode $ \herr -> bounded $
@@ -250,7 +267,7 @@ native context index entry input term = case emitter term of
     stdoutBytes <- BS.readFile outputFile
     errors <- readFile errorFile
     require (not ("Sanitizer" `isInfixOf` errors || "runtime error:" `isInfixOf` errors)) errors
-    (trace,unused) <- readFile traceFile >>= parseTrace
+    (trace,unused) <- readFile traceFile >>= parseTrace input
     require (stdoutBytes == outputBytes (Observation (Right ()) trace unused)) "native stdout and write trace disagree"
     result <- case status of
       ExitSuccess -> require (null errors) errors >> pure (Right ())
@@ -261,8 +278,8 @@ native context index entry input term = case emitter term of
     pure (Observation result trace unused)
   where emitter = case entry of IOEntry -> emitLLVMIO; ProgramEntry -> emitLLVM
 
-parseTrace :: String -> IO ([Event],String)
-parseTrace text = go [] (lines text)
+parseTrace :: Input -> String -> IO ([Event],String)
+parseTrace input text = go [] (lines text)
   where
     go accumulated [line] | Just unused <- stripPrefix "U " line = do
       remainingText <- decode unused
@@ -274,7 +291,7 @@ parseTrace text = go [] (lines text)
     go _ _ = fail ("malformed native event trace: " ++ text)
     decode encoded = do
       bytes <- hexBytes encoded
-      either (fail . show) (pure . Text.unpack) (Text.decodeUtf8' (BS.pack bytes))
+      pure (decodeInput input (BS.pack bytes))
     hexBytes [] = pure []
     hexBytes (a:b:rest) = case readHex [a,b] of
       [(byte,"")] -> (byte:) <$> hexBytes rest

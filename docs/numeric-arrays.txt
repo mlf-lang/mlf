@@ -9,6 +9,11 @@ operations fail with "integer division by zero" for a zero divisor, including
 on the GMP path. Multiplication checks the tagged 63-bit range and overflow
 before falling back to GMP. Results that fit return to the tagged range.
 
+andInt : Int -> Int -> Int is strict bitwise AND over unbounded signed
+integers, using infinite two's-complement semantics. For example,
+andInt (-1) x == x, andInt (-2) (-3) == -4. Tagged operands use machine AND;
+large operands use GMP. A zero mask still demands both operands in order.
+
 readInt : String -> Int accepts [+-]?[0-9]+ with at least one digit, and consumes
 the entire string. Whitespace, embedded NUL, fractions and trailing characters
 are errors. Leading zeros and signed zero are accepted. This is not Haskell
@@ -84,9 +89,10 @@ their range through countdown branches; multiplication/division/remainder have
 checked machine paths with arbitrary-precision fallback. Its public argument
 guard never forces an unknown thunk; unsuccessful guards use the ordinary
 lazy implementation. Each execution of an action runs the region again.
-Collection occurs after the region returns to the driver, not while its
-native stack contains live values. See docs/llvm-backend.txt for eligibility
-and fallback details.
+Allocating IO regions may collect at worker entry using explicit roots for
+their arguments and live caller values. Other numeric workers do not collect
+on their native stack. See docs/llvm-backend.txt for eligibility, roots and
+fallback details.
 
 NumericArrays in backend-tests checks both backends with the same checked and
 serialized target programs, expected output and errors. It covers generic
@@ -126,11 +132,50 @@ continuation. Programs buffer output by filling reusable arrays before writing.
 
 The interpreter uses IOUArray Int Word8 and IOBackend.writeBytes (ByteString).
 The native runtime uses contiguous unsigned char buffers. Eligible native IO
-regions emit i8 loads/stores with the same bounds and value checks. Raw output
-returns to the ordinary IO driver. Byte buffers contain no collector pointers,
-and all pending slice operands remain rooted until execution.
+regions emit i8 loads/stores with the same bounds and value checks, and may
+execute raw input/output and allocation directly. Byte buffers contain no
+collector pointers, and all pending slice operands remain rooted until execution.
 
 ByteArrays in backend-tests compares exact binary observations on both backends:
 all 256 byte values, UTF-8/NUL copies, aliases, reused actions, curried operations,
 empty slices, collection, validation/error order, and output failures. It also
 runs fasta fixtures and Mandelbrot's packed pixels, odd widths and upstream PBM.
+
+Raw byte input and integer hash tables
+-------------------------------------
+getByteLine : IO ByteArray
+Reads through the next LF, preserving it and all other bytes including NUL,
+CR and invalid UTF-8. A blank line contains LF; EOF returns a fresh empty array.
+A final unterminated line is returned once before EOF. Each execution reads
+again and returns fresh mutable storage. This shares stdin with getLine, which
+retains its text/UTF-8 and EOF-error semantics. The interpreter's IOBackend now
+provides readByteLine as well as readLine, writeText and writeBytes. The native
+runtime uses buffered getline, growing the line buffer without a size query.
+
+IntTable is an opaque mutable integer-to-integer hash table, of kind *:
+newIntTable   : IO IntTable
+readIntTable  : IntTable -> Int -> IO Int
+writeIntTable : IntTable -> Int -> Int -> IO Unit
+A missing key reads as zero. Writes insert or replace one value. Keys and
+values are arbitrary signed Int values, including GMP values. Every operation
+is sequenced by IO; creating/sharing an action never performs it. Reexecuting
+newIntTable creates a distinct empty table; aliases share writes. A previous
+read remains an immutable snapshot. Writes demand the key before the value
+and store evaluated integers. Unused failing IO operands remain lazy.
+
+The interpreter uses hashtables; the native runtime instantiates the pinned
+khash library (runtime/THIRD_PARTY.md). Tables start with a tagged-key
+representation and promote all entries on the first large key; values remain
+arbitrary integers in both representations. The collector traces every live
+managed key and value, and frees table storage at reclamation/exit. Native
+regions fuse adjacent read/add/write operations on the same table and key,
+retaining the old value as a snapshot. Existing-key updates use the library's
+lookup path; misses use insertion. Guard and fallback rules are unchanged.
+There are no FASTA, k-mer, counting, parsing or reverse-complement primitives.
+
+DNA in the shared backend suite covers raw input and EOF, long lines,
+arbitrary bytes, mixed text/byte IO, fresh actions, signed large keys and
+values, growth, collisions, aliases, snapshot reads, laziness, errors and
+collection. Both backends execute the same serialized checked programs and
+both new benchmark fixtures. The benchmark harness separately checks exact
+outputs and instruments full table work outside measurement.

@@ -3,6 +3,7 @@ module GraphSolver (graphSolverTests) where
 import Control.Monad (foldM, forM, forM_, unless)
 import Control.Monad.State.Strict (get, lift)
 import qualified Data.IntMap.Strict as IM
+import qualified Data.IntSet as IS
 import MLF.Classes (lowerClassesWithImports)
 import MLF.Constraint
 import MLF.Elaborate (reference, schemeType)
@@ -60,6 +61,32 @@ graphSolverTests =
       initial <- right (Solver.prepare scopedGraph)
       reject (Solver.unify [(4,99)] initial)
       reject (Solver.unify [(99,99)] initial))
+  , ("component solver preserves deep branching scopes and separate type components", do
+      let parent n | n == 0 = Nothing
+                   | n == 401 = Just 0
+                   | n == 301 = Just 20
+                   | otherwise = Just (n-1)
+          g = G.Graph (IM.fromList (concat
+            [[(2*n,G.Node (G.Gen (2*n+1)) (fmap (*2) (parent n)) Flexible)
+             ,(2*n+1,G.Node G.Bot (Just (2*n)) Flexible)] | n <- [0..500]])) IM.empty 1002
+          points = [0,1,20,31,127,255,300,301,400,401,500]
+      initial <- right (Solver.prepare g)
+      forM_ [(a,b) | a <- points, b <- points, a < b] $ \(a,b) -> do
+        let equations = [(2*a+1,2*b+1)]
+        case (G.runBuild g (G.unify equations),Solver.unify equations initial) of
+          (Left _,Left _) -> pure ()
+          (Right (_,expected),Right actual) -> sameGraph expected actual
+          (Left err,Right _) -> fail ("component accepted a rejected scope merge: " ++ err)
+          (Right _,Left err) -> fail ("component rejected a valid scope merge: " ++ err))
+  , ("expansion checks the exact fresh identity budget before allocation", do
+      let expandFrom next = G.runBuild (scopedGraph { G.nextId = next }) (G.expand 2 0)
+      case expandFrom (maxBound-2) of
+        Left "graph identity space exhausted" -> pure ()
+        other -> fail ("expected identity exhaustion, got " ++ show other)
+      ((_,copies,_),expanded) <- right (expandFrom (maxBound-3))
+      unless (IM.size copies == 3 && G.nextId expanded == maxBound)
+        (fail "expansion did not use exactly its three reserved identities")
+      right (G.validateGraph expanded))
   , ("closed-instance optimization preserves all original schemes", do
       counts <- forM (fixtures ++ ["benchmarks/" ++ name ++ "/mlf/main.emlf" |
           name <- ["binary-trees","pidigits","n-body","fannkuch-redux"]]) $ \file -> do
@@ -116,12 +143,44 @@ expandAndSolve separately edge = do
   g <- get
   let target = G.resolve g (toNode edge)
   destination <- maybe (lift (Left "missing target binder")) pure (G.binder (G.nodeAt g target))
-  (root,copies,frontier) <- G.expand (fromGen edge) destination
+  (root,copies,frontier) <- referenceExpand (fromGen edge) destination
   if separately then do
     unless (null frontier) (G.unify frontier)
     G.unify [(root,target)]
   else G.unify (frontier ++ [(root,target)])
   pure copies
+
+-- The original uncached expansion is an independent oracle for both the
+-- component solver and the shared scope/kind analysis in production expand.
+referenceExpand :: G.NodeId -> G.NodeId -> G.Build (G.NodeId,IM.IntMap G.NodeId,[(G.NodeId,G.NodeId)])
+referenceExpand gen destination = do
+  g <- get
+  let source = G.genRoot g gen
+      visit seen x
+        | IS.member n seen = seen
+        | not (G.underBinder g n gen) = IS.insert n seen
+        | otherwise = foldl visit (IS.insert n seen) (G.children (G.tag (G.nodeAt g n)))
+        where n = G.resolve g x
+      originals = IS.toList (visit IS.empty source)
+  copies <- IM.fromList <$> mapM (\n -> do c <- G.freshId; pure (n,c)) originals
+  let copy n = IM.findWithDefault (G.resolve g n) (G.resolve g n) copies
+      root = copy source
+      frontier = [n | n <- originals, not (G.underBinder g n gen)]
+      copyTag t = case t of
+        G.Arr a b -> G.Arr (copy a) (copy b)
+        G.Con c ns -> G.Con c (map copy ns)
+        G.Gen n -> G.Gen (copy n)
+        G.TyApp a b -> G.TyApp (copy a) (copy b)
+        _ -> t
+  forM_ originals $ \n -> do
+    k <- lift (G.kindAt g n)
+    let v = G.nodeAt g n
+        new | n `elem` frontier = G.Node (G.bottomTag k) (Just destination) Flexible
+            | n == source = G.Node (copyTag (G.tag v)) (Just destination) Flexible
+            | otherwise = G.Node (copyTag (G.tag v))
+                (fmap (\b -> if G.resolve g b == G.resolve g gen then root else copy b) (G.binder v)) (G.flag v)
+    G.setNode (copy n) new
+  pure (root,copies,[(n,copy n) | n <- frontier])
 
 sameGraph :: G.Graph -> Solver.Solver -> IO ()
 sameGraph expected solver = do

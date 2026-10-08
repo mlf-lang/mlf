@@ -1,0 +1,53 @@
+--- upstream.rs
++++ main.rs
+@@ -5,8 +5,6 @@
+ // contributed by Renat Galimov
+ 
+ 
+-use std::sync::Arc;
+-use std::thread;
+ use std::collections::HashMap;
+ use std::vec::Vec;
+ use std::string::String;
+@@ -80,9 +78,9 @@
+         sorted_items.push((key, value));
+     }
+ 
+-    sorted_items.sort_by_key(|item| item.1);
++    sorted_items.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+ 
+-    for item in sorted_items.iter().rev() {
++    for item in sorted_items.iter() {
+         let count = (item.1 * 100) as f64 / total_count as f64;
+         println!("{} {:.3}", std::str::from_utf8(&item.0).unwrap(), count);
+     }
+@@ -101,26 +99,10 @@
+ 
+ fn main() {
+ 
+-    let data = Arc::new(read_input());
+-
+-    let mut threads = HashMap::<usize, thread::JoinHandle<HashMap<Vec<u8>, usize>>>::new();
+-
+-    for k in vec![1, 2, 3, 4, 6, 12, 18] {
+-        let data_ptr = data.clone();
+-
+-        let handle = thread::spawn(move || {
+-            count_nucleotides(&data_ptr, k)
+-        });
+-
+-        threads.insert(k, handle);
+-    }
+-
++    let data = read_input();
+     let mut results = HashMap::<usize, HashMap<Vec<u8>, usize>>::new();
+-
+-    for (key, thread) in threads.drain() {
+-        thread.join().map(|value| {
+-            results.insert(key, value)
+-        });
++    for k in [1, 2, 3, 4, 6, 12, 18] {
++        results.insert(k, count_nucleotides(&data, k));
+     }
+ 
+     print_percents(results.remove(&1).unwrap_or_else(|| HashMap::<Vec<u8>, usize>::new()));

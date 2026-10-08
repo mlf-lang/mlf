@@ -34,8 +34,18 @@ extra-source-files:
   benchmarks/mandelbrot/c/*.c, benchmarks/mandelbrot/c/*.patch,
   benchmarks/mandelbrot/rust/*.rs, benchmarks/mandelbrot/rust/*.patch,
   benchmarks/mandelbrot/haskell/*.hs, benchmarks/mandelbrot/haskell/*.patch,
-  benchmarks/mandelbrot/mlf/*.emlf
-data-files: runtime/mlf_runtime.c, runtime/mlf_runtime.h
+  benchmarks/mandelbrot/mlf/*.emlf,
+  benchmarks/reverse-complement/*.md, benchmarks/reverse-complement/*.txt,
+  benchmarks/reverse-complement/c/*.c, benchmarks/reverse-complement/c/*.patch,
+  benchmarks/reverse-complement/rust/*.rs, benchmarks/reverse-complement/rust/*.patch,
+  benchmarks/reverse-complement/haskell/*.hs, benchmarks/reverse-complement/haskell/*.patch,
+  benchmarks/reverse-complement/mlf/*.emlf,
+  benchmarks/k-nucleotide/*.md, benchmarks/k-nucleotide/*.txt,
+  benchmarks/k-nucleotide/c/*.c, benchmarks/k-nucleotide/c/*.patch,
+  benchmarks/k-nucleotide/rust/*.rs, benchmarks/k-nucleotide/rust/*.patch,
+  benchmarks/k-nucleotide/haskell/*.hs, benchmarks/k-nucleotide/haskell/*.patch,
+  benchmarks/k-nucleotide/mlf/*.emlf, runtime/*.md
+data-files: runtime/mlf_runtime.c, runtime/mlf_runtime.h, runtime/khash.h
 
 common settings
   default-language: Haskell2010
@@ -44,7 +54,7 @@ common settings
 
 library
   import: settings
-  build-depends: bytestring, text
+  build-depends: bytestring, text, hashtables ==1.4.2
   hs-source-dirs: src
   exposed-modules:
     MLF.Compiler
@@ -105,7 +115,7 @@ test-suite backend-tests
   type: exitcode-stdio-1.0
   hs-source-dirs: test, examples
   main-is: BackendMain.hs
-  other-modules: Backends, BackendCases, IOTests, PreludeTests, Snake, SnakeBaseline, NativeOptimization, NumericArrays, ByteArrays
+  other-modules: Backends, BackendCases, IOTests, PreludeTests, Snake, SnakeBaseline, NativeOptimization, NumericArrays, ByteArrays, DNA
   build-depends: mlf, directory, filepath, process, bytestring, text, unix
 
 benchmark compiler-bench
@@ -114,7 +124,7 @@ benchmark compiler-bench
   hs-source-dirs: bench
   main-is: Main.hs
   build-tool-depends: mlf:emlf
-  build-depends: directory, process
+  build-depends: directory, process, hashtables ==1.4.2, hashable ==1.5.1.0
 
 test-suite benchmark-harness-tests
   import: settings

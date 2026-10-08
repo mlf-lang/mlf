@@ -14,7 +14,7 @@ import Numeric (showHex)
 import GHC.Float (castDoubleToWord64)
 import qualified MLF.LLVM.Analysis as A
 import qualified MLF.LLVM.Kernel as K
-import MLF.LLVM.Optimize (applications)
+import MLF.LLVM.Optimize (applications, free)
 import qualified MLF.Primitive as P
 import qualified MLF.X.Syntax as X
 
@@ -27,6 +27,7 @@ data Output = Output
   , constructors :: Constructors, functions :: A.Functions
   , workers :: Set.Set X.Name, wrappers :: Map.Map X.Name String
   , numericKernels :: Set.Set X.Name, kernelWorkers :: Set.Set (X.Name,[NativeMode])
+  , collectingKernels :: Set.Set X.Name
   , kernelEntries :: Map.Map X.Name String
   , inlinePrimitives :: Bool
   , scalarRanges :: Map.Map String (Integer,Integer)
@@ -38,9 +39,23 @@ type Build = StateT Output (Either String)
 generate :: Constructors -> X.Erased -> Either String (String,[String])
 generate cs term = do
   let fs = A.analyze term
+      ks = K.kernels fs
   (entry,out) <- runStateT (callback [] Nothing term)
-    (Output 0 [] "entry" [] [] cs fs Set.empty Map.empty (K.kernels fs) Set.empty Map.empty True Map.empty Map.empty Map.empty)
-  pure (entry, runtimeDeclarations ++ reverse (constants out) ++ reverse (definitions out))
+    (Output 0 [] "entry" [] [] cs fs Set.empty Map.empty ks Set.empty (K.collecting fs ks) Map.empty True Map.empty Map.empty Map.empty)
+  pure (entry, runtimeDeclarations ++ aliasMetadata ++ reverse (constants out) ++ reverse (definitions out))
+
+-- Managed headers and external array storage are disjoint allocations. The
+-- source language cannot cast an array cell pointer to a managed object.
+-- Do not claim that two arrays are disjoint: aliases retain their usual IO
+-- semantics. Runtime calls remain conservative, including pool reuse by GC.
+aliasMetadata :: [String]
+aliasMetadata =
+  [ "!0 = !{!\"MLF storage\"}"
+  , "!1 = !{!\"managed object\", !0}"
+  , "!2 = !{!\"array cells\", !0}"
+  , "!3 = !{!1, !1, i64 0}"
+  , "!4 = !{!2, !2, i64 0}"
+  ]
 
 fresh :: String -> Build String
 fresh prefix = do
@@ -73,14 +88,22 @@ immediate :: Integer -> String
 immediate n = "inttoptr (i64 " ++ show n ++ " to ptr)"
 
 definition :: String -> [String] -> Build String -> Build ()
-definition name args body = do
+definition name args body = definitionBody name args $ do
+  value <- body
+  emit ("  ret ptr " ++ value)
+
+-- A terminating body can emit returns directly in both branches, preserving
+-- tail position without relying on LLVM to collapse a result phi first.
+definitionBody :: String -> [String] -> Build () -> Build ()
+definitionBody name args body = do
   saved <- gets (\s -> (instructions s,block s,scalarRanges s,arrayViews s,unboxedDoubles s))
   modify' (\s -> s { instructions = [], block = "entry", scalarRanges = Map.empty,
     arrayViews = Map.empty, unboxedDoubles = Map.empty })
-  value <- body
-  emit ("  ret ptr " ++ value)
+  body
   code <- gets (reverse . instructions)
-  let attributes = if take 13 name == "@mlf.numeric." && take 19 name /= "@mlf.numeric.entry." then " alwaysinline" else ""
+  collectors <- gets collectingKernels
+  let collectingWorker = any ((== takeWhile (/= '.') (drop 13 name)) . show . X.nameId) (Set.toList collectors)
+      attributes = if take 13 name == "@mlf.numeric." && take 19 name /= "@mlf.numeric.entry." && not collectingWorker then " alwaysinline" else ""
       text = unlines (["define private ptr " ++ name ++ "(" ++ intercalate ", " args ++ ")" ++ attributes ++ " {", "entry:"] ++ code ++ ["}"])
   let (savedInstructions,savedBlock,savedRanges,savedViews,savedDoubles) = saved
   modify' (\s -> s { instructions = savedInstructions, block = savedBlock,
@@ -216,7 +239,7 @@ kernelAction scope name f args = do
   call "@mlf_native_io" [pointer entry,pointer env]
 
 data Scalar = Boxed String | Floating String
-data NativeMode = General | UnboxedDouble | NonnegativeInt deriving (Eq,Ord)
+data NativeMode = General | UnboxedDouble | NonnegativeInt | SmallIndex deriving (Eq,Ord)
 type NumericScope = Map.Map X.Name Scalar
 
 boxed :: Scalar -> Build String
@@ -243,14 +266,33 @@ floating (Boxed v) = do
 -- The guarded public entry retains the general boxed ABI and lazy fallback.
 invokeKernel :: X.Name -> A.Function -> [Scalar] -> Build String
 invokeKernel name f arguments = do
+  (code,values) <- kernelCall name f arguments
+  call code (map scalarArgument values)
+
+scalarArgument :: Scalar -> String
+scalarArgument (Floating x) = "double " ++ x
+scalarArgument (Boxed x) = pointer x
+
+isFloating :: Scalar -> Bool
+isFloating (Floating _) = True
+isFloating (Boxed _) = False
+
+kernelCall :: X.Name -> A.Function -> [Scalar] -> Build (String,[Scalar])
+kernelCall name f arguments = do
   facts <- gets scalarRanges
   doubles <- gets unboxedDoubles
   -- Reuse a dominating payload read: it also proves the boxed argument's
   -- representation, so subsequent calls can use the unboxed private ABI.
   let values = [case v of Boxed p | Just x <- Map.lookup p doubles -> Floating x; _ -> v | v <- arguments]
   let counters = zeroTested (A.functionBody f)
+      indices = integerParameters (A.functionBody f)
+  collects <- gets (Set.member name . collectingKernels)
+  let narrow = not collects && indexLoop (A.functionBody f) && and
+        [case v of Boxed p -> maybe False (\(lo,hi) -> lo >= 0 && hi < 2^(31::Int)) (Map.lookup p facts); _ -> False |
+          (n,v) <- zip (A.captures f ++ A.parameters f) values, Set.member n indices]
       mode _ (Floating _) = UnboxedDouble
       mode n (Boxed v) = case Map.lookup v facts of
+        _ | narrow && Set.member n indices -> SmallIndex
         Just (lo,hi) | Set.member n counters && lo >= 0 && hi < 2^(62::Int) -> NonnegativeInt
         _ -> General
       requested = zipWith mode (A.captures f ++ A.parameters f) values
@@ -261,7 +303,7 @@ invokeKernel name f arguments = do
         length [() | (n,ms) <- Set.toList variants, n == name, specialized ms] >= 8
   actual <- if overflow then mapM (fmap Boxed . boxed) values else pure values
   code <- kernelWorker name f (if overflow then replicate (length values) General else requested)
-  call code [case v of Floating x -> "double " ++ x; Boxed x -> pointer x | v <- actual]
+  pure (code,actual)
 
 zeroTested :: X.Erased -> Set.Set X.Name
 zeroTested expression = case applications expression of
@@ -274,11 +316,51 @@ zeroTested expression = case applications expression of
     X.ELetRec _ b -> zeroTested b
     _ -> Set.empty
 
+-- Resolved primitive signatures identify integer operands after erasure.
+-- This is only a request for a dynamic range guard, never a type/range guess.
+integerParameters :: X.Erased -> Set.Set X.Name
+integerParameters expression = direct `Set.union` nested
+  where
+    direct = case applications expression of
+      (X.EPrimitive p,args) -> Set.fromList
+        [n | (i,X.EVar n) <- zip [0::Int ..] args, i `elem` positions p]
+      _ -> Set.empty
+
+    positions p
+      | p `elem` [P.AddInt,P.SubInt,P.MulInt,P.QuotInt,P.RemInt,P.AndInt,P.EqInt,P.LtInt,P.NewIntArray,P.NewByteArray] = [0,1]
+      | p `elem` [P.IntToDouble,P.NewDoubleArray] = [0]
+      | p `elem` [P.ReadIntArray,P.ReadDoubleArray,P.ReadByteArray,P.ReadIntTable,P.WriteDoubleArray] = [1]
+      | p `elem` [P.WriteIntArray,P.WriteByteArray,P.WriteIntTable,P.PutBytes] = [1,2]
+      | otherwise = []
+    nested = case expression of
+      X.EAbs _ b -> integerParameters b
+      X.EApp a b -> integerParameters a `Set.union` integerParameters b
+      X.ELet _ a b -> integerParameters a `Set.union` integerParameters b
+      X.ELetRec _ b -> integerParameters b
+      _ -> Set.empty
+
+-- Range versioning pays for itself in checked indexed integer/byte loops.
+-- Avoid duplicating floating kernels or table operations, whose cost is
+-- dominated by other work and whose private ABI is already specialized.
+indexLoop :: X.Erased -> Bool
+indexLoop expression = any (`elem` ps) [P.ReadByteArray,P.WriteByteArray,P.ReadIntArray,P.WriteIntArray] &&
+  not (any (`elem` ps) [P.ReadIntTable,P.WriteIntTable,P.AddDouble,P.SubDouble,P.MulDouble,
+    P.DivDouble,P.SqrtDouble,P.IntToDouble,P.ReadDoubleArray,P.WriteDoubleArray])
+  where
+    ps = primitives expression
+    primitives e = case e of
+      X.EPrimitive p -> [p]
+      X.EAbs _ b -> primitives b
+      X.EApp a b -> primitives a ++ primitives b
+      X.ELet _ a b -> primitives a ++ primitives b
+      X.ELetRec _ b -> primitives b
+      _ -> []
+
 kernelWorker :: X.Name -> A.Function -> [NativeMode] -> Build String
 kernelWorker name f modes = do
   let symbol = "@mlf.numeric." ++ show (X.nameId name) ++
         if any (/= General) modes then "." ++ map suffix modes else ""
-      suffix m = case m of General -> 'p'; UnboxedDouble -> 'd'; NonnegativeInt -> 'n'
+      suffix m = case m of General -> 'p'; UnboxedDouble -> 'd'; NonnegativeInt -> 'n'; SmallIndex -> 'i'
       names = A.captures f ++ A.parameters f
       registers = ["%a" ++ show i | i <- [0 :: Int .. length names - 1]]
       key = (name,modes)
@@ -287,14 +369,110 @@ kernelWorker name f modes = do
     modify' (\s -> s { kernelWorkers = Set.insert key (kernelWorkers s) })
     let arguments = zipWith (\m r -> (if m == UnboxedDouble then "double " else "ptr ") ++ r) modes registers
         values = zipWith (\m r -> if m == UnboxedDouble then Floating r else Boxed r) modes registers
-    definition symbol arguments $ do
+    definitionBody symbol arguments $ do
+      collects <- gets (Set.member name . collectingKernels)
+      when collects $ do
+        let roots = [r | (m,r) <- zip modes registers, m /= UnboxedDouble]
+        slots <- rootSlots roots
+        emit ("  call void @mlf_gc_check(" ++ number (length roots) ++ ", ptr " ++ slots ++ ")")
       forM_ (zip modes registers) $ \(m,r) ->
-        when (m == NonnegativeInt) (recordRange r (0,2^(62::Int)-1))
-      executeNumeric (Map.fromList (zip names values)) (A.functionBody f) >>= boxed
+        case m of
+          NonnegativeInt -> recordRange r (0,2^(62::Int)-1)
+          SmallIndex -> recordRange r (0,2^(31::Int)-1)
+          _ -> pure ()
+      let scope = Map.fromList (zip names values)
+          integers = integerParameters (A.functionBody f)
+          narrow = [i | (i,(n,m)) <- zip [0::Int ..] (zip names modes),
+                        Set.member n integers, m == General || m == NonnegativeInt]
+          narrowed = [if i `elem` narrow then SmallIndex else m | (i,m) <- zip [0::Int ..] modes]
+          ordinary = executeNumericReturn modes scope (A.functionBody f)
+          body = case K.byteCopy name f of
+            Just ns -> copyBytesReturn scope ns ordinary
+            Nothing -> ordinary
+      variants <- gets kernelWorkers
+      let allowed = Set.member (name,narrowed) variants ||
+            length [() | (n,ms) <- Set.toList variants, n == name, any (/= General) ms] < 8
+      if K.byteCopy name f /= Nothing || collects || not (indexLoop (A.functionBody f)) || null narrow || not allowed then body else do
+        tests <- forM narrow $ \i -> do
+          bits <- result ("ptrtoint ptr " ++ registers !! i ++ " to i64")
+          tag <- result ("and i64 " ++ bits ++ ", 1") >>= \v -> result ("icmp ne i64 " ++ v ++ ", 0")
+          range <- result ("icmp ult i64 " ++ bits ++ ", 4294967296")
+          result ("and i1 " ++ tag ++ ", " ++ range)
+        ready <- foldM (\a b -> result ("and i1 " ++ a ++ ", " ++ b)) "true" tests
+        fast <- fresh "range.fast."; slow <- fresh "range.general."
+        emit ("  br i1 " ++ ready ++ ", label %" ++ fast ++ ", label %" ++ slow)
+        label fast
+        code <- kernelWorker name f narrowed
+        v <- result ("musttail call ptr " ++ code ++ "(" ++ intercalate ", " (map scalarArgument values) ++ ")")
+        emit ("  ret ptr " ++ v)
+        label slow
+        body
   pure symbol
+
+copyBytesReturn :: NumericScope -> [X.Name] -> Build () -> Build ()
+copyBytesReturn scope names fallback = do
+  values <- mapM (numericValue scope >=> boxed) names
+  case values of
+    [source,dest,end,offset,index] -> do
+      (sourceLength,sourceCells) <- arrayView source
+      (destLength,destCells) <- arrayView dest
+      bits <- mapM (\v -> result ("ptrtoint ptr " ++ v ++ " to i64")) [end,offset,index]
+      tests <- forM bits $ \b -> result ("and i64 " ++ b ++ ", 1") >>= \t -> result ("icmp ne i64 " ++ t ++ ", 0")
+      numbers <- mapM (\b -> result ("ashr i64 " ++ b ++ ", 1")) bits
+      case numbers of
+        [n,o,i] -> do
+          validStart <- result ("icmp sge i64 " ++ i ++ ", 0")
+          validEnd <- result ("icmp sge i64 " ++ n ++ ", " ++ i)
+          validSource <- result ("icmp ule i64 " ++ n ++ ", " ++ sourceLength)
+          validOffset <- result ("icmp ule i64 " ++ o ++ ", " ++ destLength)
+          available <- result ("sub i64 " ++ destLength ++ ", " ++ o)
+          validDest <- result ("icmp ule i64 " ++ n ++ ", " ++ available)
+          count <- result ("sub i64 " ++ n ++ ", " ++ i)
+          separate <- result ("icmp ne ptr " ++ sourceCells ++ ", " ++ destCells)
+          samePosition <- result ("icmp eq i64 " ++ o ++ ", 0")
+          disjoint <- result ("icmp uge i64 " ++ o ++ ", " ++ count)
+          safeAlias <- result ("or i1 " ++ separate ++ ", " ++ samePosition) >>= \t -> result ("or i1 " ++ t ++ ", " ++ disjoint)
+          ready <- foldM (\a b -> result ("and i1 " ++ a ++ ", " ++ b)) "true"
+            (tests ++ [validStart,validEnd,validSource,validOffset,validDest,safeAlias])
+          fast <- fresh "copy.bulk."; slow <- fresh "copy.scalar."
+          emit ("  br i1 " ++ ready ++ ", label %" ++ fast ++ ", label %" ++ slow)
+          label fast
+          from <- result ("getelementptr i8, ptr " ++ sourceCells ++ ", i64 " ++ i)
+          start <- result ("add i64 " ++ o ++ ", " ++ i)
+          to <- result ("getelementptr i8, ptr " ++ destCells ++ ", i64 " ++ start)
+          emit ("  call void @llvm.memmove.p0.p0.i64(ptr " ++ to ++ ", ptr " ++ from ++ ", i64 " ++ count ++ ", i1 false)")
+          emit ("  ret ptr " ++ immediate 4)
+          label slow
+          fallback
+        _ -> lift (Left "LLVM invalid copy indices")
+    _ -> lift (Left "LLVM invalid copy operands")
 
 numericValue :: NumericScope -> X.Name -> Build Scalar
 numericValue scope n = maybe (lift (Left ("LLVM numeric region unbound identity: " ++ show n))) pure (Map.lookup n scope)
+
+rootSlots :: [String] -> Build String
+rootSlots [] = pure "null"
+rootSlots roots = do
+  slots <- result ("alloca [" ++ show (length roots) ++ " x ptr], align 8")
+  forM_ (zip [0::Int ..] roots) $ \(i,v) -> do
+    slot <- result ("getelementptr ptr, ptr " ++ slots ++ ", i64 " ++ show i)
+    emit ("  store ptr " ++ v ++ ", ptr " ++ slot ++ ", align 8")
+  pure slots
+
+-- Collection only occurs at explicitly rooted native IO entries. Protect
+-- the caller's live values over a non-tail call to such an entry. Tail calls
+-- need only the callee's parameters, rooted by its entry before collection.
+withNumericRoots :: X.Name -> NumericScope -> Build a -> Build a
+withNumericRoots name scope action = do
+  collects <- gets (Set.member name . collectingKernels)
+  if not collects then action else do
+    let roots = Set.toAscList (Set.fromList [v | Boxed v <- Map.elems scope])
+    slots <- rootSlots roots
+    frame <- result "alloca [3 x ptr], align 8"
+    emit ("  call void @mlf_roots_enter(ptr " ++ frame ++ ", " ++ number (length roots) ++ ", ptr " ++ slots ++ ")")
+    value <- action
+    emit ("  call void @mlf_roots_leave(ptr " ++ frame ++ ")")
+    pure value
 
 numericCondition :: Scalar -> Build String
 numericCondition v = boxed v >>= \p -> result ("icmp eq ptr " ++ p ++ ", " ++ immediate 6)
@@ -305,25 +483,82 @@ numericChoose condition yes no = Boxed <$> choose "ptr" condition (yes >>= boxed
 numericBranch :: NumericScope -> X.Erased -> Build Scalar -> Build Scalar -> Build Scalar
 numericBranch scope expression yes no = do
   condition <- scalarValue scope expression >>= numericCondition
-  -- Equality with an interval endpoint narrows either branch. Only existing
-  -- tagged-Int proofs are refined; unknown or GMP values remain general.
-  let refine truth = case applications expression of
-        (X.EPrimitive P.EqInt,[X.EVar n,X.EInt k]) -> endpoint truth n k
-        (X.EPrimitive P.EqInt,[X.EInt k,X.EVar n]) -> endpoint truth n k
-        _ -> pure ()
-      endpoint truth n k = case Map.lookup n scope of
-        Just (Boxed v) -> do
-          bounds <- gets (Map.lookup v . scalarRanges)
-          case bounds of
-            Just (lo,hi) -> do
-              let (lo',hi') | truth = (max lo k,min hi k)
-                            | k == lo = (lo+1,hi)
-                            | k == hi = (lo,hi-1)
-                            | otherwise = (lo,hi)
-              when (lo' <= hi') (recordRange v (lo',hi'))
-            _ -> pure ()
-        _ -> pure ()
-  numericChoose condition (refine True >> yes) (refine False >> no)
+  numericChoose condition (refineNumeric scope expression True >> yes) (refineNumeric scope expression False >> no)
+
+-- Equality with an interval endpoint narrows either branch. Only existing
+-- tagged-Int proofs are refined; unknown or GMP values remain general.
+refineNumeric :: NumericScope -> X.Erased -> Bool -> Build ()
+refineNumeric scope expression truth = case applications expression of
+  (X.EPrimitive P.EqInt,[X.EVar n,X.EInt k]) -> endpoint n k
+  (X.EPrimitive P.EqInt,[X.EInt k,X.EVar n]) -> endpoint n k
+  (X.EPrimitive P.LtInt,[a,b]) -> do
+    facts <- gets scalarRanges
+    case (reference a,reference b) of
+      (Just x,Just y) | Just (lo,hi) <- Map.lookup x facts, Just (lo',hi') <- Map.lookup y facts -> do
+        let xs = if truth then (lo,min hi (hi'-1)) else (max lo lo',hi)
+            ys = if truth then (max lo' (lo+1),hi') else (lo',min hi' hi)
+        when (uncurry (<=) xs) (recordRange x xs)
+        when (uncurry (<=) ys) (recordRange y ys)
+      _ -> pure ()
+  _ -> pure ()
+  where
+    reference (X.EVar n) = case Map.lookup n scope of Just (Boxed v) -> Just v; _ -> Nothing
+    reference (X.EInt n) | n >= negate (2^(62::Int)) && n < 2^(62::Int) = Just (immediate (n*2+1))
+    reference _ = Nothing
+    endpoint n k = case Map.lookup n scope of
+      Just (Boxed v) -> do
+        bounds <- gets (Map.lookup v . scalarRanges)
+        case bounds of
+          Just (lo,hi) -> do
+            let (lo',hi') | truth = (max lo k,min hi k)
+                          | k == lo = (lo+1,hi)
+                          | k == hi = (lo,hi-1)
+                          | otherwise = (lo,hi)
+            when (lo' <= hi') (recordRange v (lo',hi'))
+          _ -> pure ()
+      _ -> pure ()
+
+-- Guaranteed tail calls for matching private ABIs. No pointer here refers
+-- to a caller's stack: values/environments are managed heap objects or tags.
+-- Different arities/Double representations use an ordinary call; recursive
+-- loops with a stable representation use musttail even at LLVM -O0.
+executeNumericReturn :: [NativeMode] -> NumericScope -> X.Erased -> Build ()
+executeNumericReturn modes scope expression
+  | Just update <- tableUpdate expression = do
+      (local,rest) <- executeTableUpdate scope update
+      executeNumericReturn modes local rest
+  | otherwise = case expression of
+  X.ELet n a b -> scalarValue scope a >>= \v -> executeNumericReturn modes (Map.insert n v scope) b
+  X.ELetRec _ b -> executeNumericReturn modes scope b
+  _ -> case applications expression of
+    (X.EPrimitive P.IOBind,[a,X.EAbs n b]) -> do
+      v <- executeNumeric scope a
+      executeNumericReturn modes (Map.insert n v scope) b
+    (X.EPrimitive P.IfThenElse,[c,a,b]) -> do
+      condition <- scalarValue scope c >>= numericCondition
+      before <- gets (\s -> (scalarRanges s,arrayViews s,unboxedDoubles s))
+      yes <- fresh "tail.yes."; no <- fresh "tail.no."
+      emit ("  br i1 " ++ condition ++ ", label %" ++ yes ++ ", label %" ++ no)
+      label yes
+      refineNumeric scope c True
+      executeNumericReturn modes scope a
+      let (ranges,views,doubles) = before
+      modify' (\s -> s { scalarRanges = ranges, arrayViews = views, unboxedDoubles = doubles })
+      label no
+      refineNumeric scope c False
+      executeNumericReturn modes scope b
+    (X.EVar n,args) -> do
+      fs <- gets functions
+      let f = fs Map.! n
+      captured <- mapM (numericValue scope) (A.captures f)
+      values <- mapM (scalarValue scope) args
+      (code,actual) <- kernelCall n f (captured ++ values)
+      let marker = if map (== UnboxedDouble) modes == map isFloating actual then "musttail " else ""
+      v <- result (marker ++ "call ptr " ++ code ++ "(" ++ intercalate ", " (map scalarArgument actual) ++ ")")
+      emit ("  ret ptr " ++ v)
+    _ -> do
+      v <- executeNumeric scope expression >>= boxed
+      emit ("  ret ptr " ++ v)
 
 -- No allocation is needed for array reads or floating intermediates. A
 -- Double is boxed at a general ABI or result boundary. Int retains
@@ -373,6 +608,7 @@ scalarValue scope expression = case expression of
           Boxed <$> case (p,vs) of
             (_,[a,b]) | p `elem` [P.AddInt,P.SubInt,P.EqInt,P.LtInt] -> numericInteger p a b
             (_,[a,b]) | p `elem` [P.MulInt,P.QuotInt,P.RemInt] -> numericProduct p a b
+            (P.AndInt,[a,b]) -> numericAnd a b
             _ -> call ("@mlf_prim" ++ show (length args)) (number (primitiveCode p) : map pointer vs)
     (X.EVar n,args) -> do
       fs <- gets functions
@@ -391,7 +627,11 @@ scalarValue scope expression = case expression of
     _ -> Boxed <$> evaluate Map.empty expression
 
 executeNumeric :: NumericScope -> X.Erased -> Build Scalar
-executeNumeric scope expression = case expression of
+executeNumeric scope expression
+  | Just update <- tableUpdate expression = do
+      (local,rest) <- executeTableUpdate scope update
+      executeNumeric local rest
+  | otherwise = case expression of
   X.ELet n a b -> scalarValue scope a >>= \v -> executeNumeric (Map.insert n v scope) b
   X.ELetRec _ b -> executeNumeric scope b
   _ -> case applications expression of
@@ -406,7 +646,7 @@ executeNumeric scope expression = case expression of
       let f = fs Map.! n
       captured <- mapM (numericValue scope) (A.captures f)
       values <- mapM (scalarValue scope) args
-      Boxed <$> invokeKernel n f (captured ++ values)
+      Boxed <$> withNumericRoots n scope (invokeKernel n f (captured ++ values))
     (X.EPrimitive p,args) | p `elem` [P.ReadIntArray,P.ReadDoubleArray,P.WriteIntArray,P.WriteDoubleArray,
                                     P.LengthIntArray,P.LengthDoubleArray,
                                     P.ReadByteArray,P.WriteByteArray,P.LengthByteArray] -> do
@@ -435,7 +675,7 @@ executeNumeric scope expression = case expression of
         address <- result ("getelementptr " ++ (if byteArray then "i8" else "i64") ++ ", ptr " ++ cells ++ ", i64 " ++ i)
         case p of
           P.ReadByteArray -> do
-            x <- result ("load i8, ptr " ++ address ++ ", align 1")
+            x <- result ("load i8, ptr " ++ address ++ ", align 1, !tbaa !4")
             wide <- result ("zext i8 " ++ x ++ " to i64")
             tagged <- result ("shl i64 " ++ wide ++ ", 1") >>= \v -> result ("or i64 " ++ v ++ ", 1")
             v <- result ("inttoptr i64 " ++ tagged ++ " to ptr")
@@ -444,23 +684,78 @@ executeNumeric scope expression = case expression of
           P.WriteByteArray -> do
             v <- boxed (values !! 2)
             x <- numericByte v
-            emit ("  store i8 " ++ x ++ ", ptr " ++ address ++ ", align 1")
+            emit ("  store i8 " ++ x ++ ", ptr " ++ address ++ ", align 1, !tbaa !4")
             pure (Boxed (immediate 4))
-          P.ReadDoubleArray -> Floating <$> result ("load double, ptr " ++ address ++ ", align 8")
-          P.ReadIntArray -> Boxed <$> result ("load ptr, ptr " ++ address ++ ", align 8")
+          P.ReadDoubleArray -> Floating <$> result ("load double, ptr " ++ address ++ ", align 8, !tbaa !4")
+          P.ReadIntArray -> Boxed <$> result ("load ptr, ptr " ++ address ++ ", align 8, !tbaa !4")
           P.WriteDoubleArray -> do
             v <- floating (values !! 2)
-            emit ("  store double " ++ v ++ ", ptr " ++ address ++ ", align 8")
+            emit ("  store double " ++ v ++ ", ptr " ++ address ++ ", align 8, !tbaa !4")
             pure (Boxed (immediate 4))
           _ -> do
             v <- boxed (values !! 2)
-            emit ("  store ptr " ++ v ++ ", ptr " ++ address ++ ", align 8")
+            emit ("  store ptr " ++ v ++ ", ptr " ++ address ++ ", align 8, !tbaa !4")
             pure (Boxed (immediate 4))
+    (X.EPrimitive p,args) | p `elem` [P.ReadIntTable,P.WriteIntTable] -> do
+      values <- mapM (scalarValue scope >=> boxed) args
+      Boxed <$> call (if p == P.ReadIntTable then "@mlf_read_int_table" else "@mlf_write_int_table")
+        (map pointer values)
+    (X.EPrimitive p,args) | p `elem` [P.GetByteLine,P.NewByteArray,P.NewIntArray,P.NewDoubleArray,
+                                    P.ByteArrayFromString,P.PutBytes,P.NewIntTable] -> do
+      values <- mapM (scalarValue scope >=> boxed) args
+      let (symbol,prefix) = case p of
+            P.GetByteLine -> ("@mlf_get_byte_line",[])
+            P.NewIntTable -> ("@mlf_new_int_table",[])
+            P.ByteArrayFromString -> ("@mlf_bytes_from_string",[])
+            P.PutBytes -> ("@mlf_put_bytes",[])
+            _ -> ("@mlf_new_array",[number (primitiveCode p)])
+      Boxed <$> call symbol (prefix ++ map pointer values)
     _ -> lift (Left "LLVM unsupported numeric IO region")
+
+-- Fuse adjacent operations on the identical table/key, with no intervening
+-- effect. The increment must not depend on the old value; that value stays
+-- available as a snapshot after the update. Only total native operands reach
+-- this path, so eager evaluation cannot reorder a language error or divergence.
+type TableUpdate = (X.Name,X.Erased,X.Erased,X.Erased,X.Name,X.Erased)
+
+tableUpdate :: X.Erased -> Maybe TableUpdate
+tableUpdate expression = do
+  (readAction,old,body) <- bindParts expression
+  (X.EPrimitive P.ReadIntTable,[table,key]) <- pure (applications readAction)
+  (writeAction,done,rest) <- bindParts body
+  (X.EPrimitive P.WriteIntTable,[table',key',value]) <- pure (applications writeAction)
+  (X.EPrimitive P.AddInt,[a,b]) <- pure (applications value)
+  delta <- if a == X.EVar old then Just b else if b == X.EVar old then Just a else Nothing
+  if table == table' && key == key' && not (Set.member old (free delta))
+    then Just (old,table,key,delta,done,rest) else Nothing
+  where
+    bindParts e = case applications e of
+      (X.EPrimitive P.IOBind,[a,X.EAbs n b]) -> Just (a,n,b)
+      _ -> Nothing
+
+executeTableUpdate :: NumericScope -> TableUpdate -> Build (NumericScope,X.Erased)
+executeTableUpdate scope (old,table,key,delta,done,rest) = do
+  values <- mapM (scalarValue scope >=> boxed) [table,key,delta]
+  previous <- call "@mlf_add_int_table" (map pointer values)
+  pure (Map.insert done (Boxed (immediate 4)) (Map.insert old (Boxed previous) scope),rest)
 
 recordRange :: String -> (Integer,Integer) -> Build ()
 recordRange value bounds = modify' (\s -> s { scalarRanges = Map.insertWith
   (\(a,b) (c,d) -> (max a c,min b d)) value bounds (scalarRanges s) })
+
+numericAnd :: String -> String -> Build String
+numericAnd a b = do
+  x <- result ("ptrtoint ptr " ++ a ++ " to i64")
+  y <- result ("ptrtoint ptr " ++ b ++ " to i64")
+  bits <- result ("and i64 " ++ x ++ ", " ++ y)
+  tag <- result ("and i64 " ++ bits ++ ", 1") >>= \v -> result ("icmp ne i64 " ++ v ++ ", 0")
+  value <- choose "ptr" tag (result ("inttoptr i64 " ++ bits ++ " to ptr"))
+    (call "@mlf_prim2" [number (primitiveCode P.AndInt),pointer a,pointer b])
+  facts <- gets scalarRanges
+  case [hi | v <- [a,b], Just (lo,hi) <- [Map.lookup v facts], lo >= 0] of
+    [] -> pure ()
+    bounds -> recordRange value (0,minimum bounds)
+  pure value
 
 numericByte :: String -> Build String
 numericByte value = do
@@ -741,14 +1036,18 @@ choose ty condition yes no = do
     (\(lo,hi) (lo',hi') -> (min lo lo',max hi hi')) afterYes afterNo,
     arrayViews = Map.filterWithKey (\key value -> Map.lookup key viewsNo == Just value) viewsYes,
     unboxedDoubles = Map.filterWithKey (\key value -> Map.lookup key doublesNo == Just value) doublesYes })
-  phi ty [(a,aBlock),(b,bBlock)]
+  value <- phi ty [(a,aBlock),(b,bBlock)]
+  when (ty == "ptr") $ case (Map.lookup a afterYes,Map.lookup b afterNo) of
+    (Just (lo,hi),Just (lo',hi')) -> recordRange value (min lo lo',max hi hi')
+    _ -> pure ()
+  pure value
 
 -- Layout is a small explicit 64-bit ABI, asserted by the runtime. Typed,
 -- evaluated constructor cases cannot scrutinize partial constructors.
 loadAt :: String -> String -> Int -> Build String
 loadAt ty value offset = do
   address <- result ("getelementptr i8, ptr " ++ value ++ ", i64 " ++ show offset)
-  result ("load " ++ ty ++ ", ptr " ++ address ++ ", align 8")
+  result ("load " ++ ty ++ ", ptr " ++ address ++ ", align 8, !tbaa !3")
 
 -- Reuse descriptor loads only along dominated paths within this function.
 -- Cells may alias and mutate, but descriptors cannot change while a native
@@ -838,6 +1137,8 @@ primitiveCode p = case p of
   P.NewDoubleArray -> 31; P.ReadDoubleArray -> 32; P.WriteDoubleArray -> 33; P.LengthDoubleArray -> 34
   P.NewByteArray -> 35; P.ReadByteArray -> 36; P.WriteByteArray -> 37; P.LengthByteArray -> 38
   P.ByteArrayFromString -> 39; P.PutBytes -> 40
+  P.GetByteLine -> 41; P.NewIntTable -> 42; P.ReadIntTable -> 43; P.WriteIntTable -> 44
+  P.AndInt -> 45
 
 runtimeDeclarations :: [String]
 runtimeDeclarations =
@@ -848,6 +1149,14 @@ runtimeDeclarations =
   , "declare ptr @mlf_integer(ptr)", "declare ptr @mlf_string(ptr, i64)"
   , "declare ptr @mlf_double(double)", "declare double @llvm.sqrt.f64(double)"
   , "declare double @mlf_int_to_double(ptr)"
+  , "declare ptr @mlf_read_int_table(ptr, ptr)", "declare ptr @mlf_write_int_table(ptr, ptr, ptr)"
+  , "declare ptr @mlf_add_int_table(ptr, ptr, ptr)"
+  , "declare void @mlf_roots_enter(ptr, i64, ptr)", "declare void @mlf_roots_leave(ptr)"
+  , "declare void @mlf_gc_check(i64, ptr)"
+  , "declare ptr @mlf_get_byte_line()", "declare ptr @mlf_new_array(i64, ptr, ptr)"
+  , "declare ptr @mlf_bytes_from_string(ptr)", "declare ptr @mlf_put_bytes(ptr, ptr, ptr)"
+  , "declare ptr @mlf_new_int_table()"
+  , "declare void @llvm.memmove.p0.p0.i64(ptr, ptr, i64, i1)"
   , "declare i8 @mlf_byte(ptr)"
   , "declare ptr @mlf_peek(ptr)", "declare ptr @mlf_native_io(ptr, ptr)"
   , "declare void @mlf_bounds_failure() noreturn"

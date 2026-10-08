@@ -11,6 +11,20 @@
 typedef struct MlfValue MlfValue;
 typedef struct MlfEnv MlfEnv;
 typedef MlfValue *(*MlfCode)(MlfEnv *, MlfValue *);
+typedef struct MlfRoots {
+    struct MlfRoots *previous;
+    uint64_t count;
+    MlfValue **values;
+} MlfRoots;
+
+void mlf_roots_enter(MlfRoots *frame, uint64_t count, MlfValue **values);
+void mlf_roots_leave(MlfRoots *frame);
+void mlf_gc_check(uint64_t count, MlfValue **values);
+MlfValue *mlf_get_byte_line(void);
+MlfValue *mlf_new_array(int64_t primitive, MlfValue *size, MlfValue *initial);
+MlfValue *mlf_bytes_from_string(MlfValue *text);
+MlfValue *mlf_put_bytes(MlfValue *array, MlfValue *offset, MlfValue *count);
+MlfValue *mlf_new_int_table(void);
 
 MlfEnv *mlf_env_new(uint64_t count);
 void mlf_env_set(MlfEnv *env, uint64_t index, MlfValue *value);
@@ -39,6 +53,10 @@ MlfValue *mlf_sub_int(MlfValue *a, MlfValue *b);
 MlfValue *mlf_eq_int(MlfValue *a, MlfValue *b);
 MlfValue *mlf_lt_int(MlfValue *a, MlfValue *b);
 int64_t mlf_truth(MlfValue *value);
+MlfValue *mlf_read_int_table(MlfValue *table, MlfValue *key);
+MlfValue *mlf_write_int_table(MlfValue *table, MlfValue *key, MlfValue *entry);
+/* Native-region ABI: all three operands have checked types and are values. */
+MlfValue *mlf_add_int_table(MlfValue *table, MlfValue *key, MlfValue *delta);
 MlfValue *mlf_prim1(int64_t primitive, MlfValue *a);
 MlfValue *mlf_prim2(int64_t primitive, MlfValue *a, MlfValue *b);
 MlfValue *mlf_prim3(int64_t primitive, MlfValue *a, MlfValue *b, MlfValue *c);
