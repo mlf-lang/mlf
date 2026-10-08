@@ -27,6 +27,7 @@ desugarDo expression = evalState (go expression) (0 :: Int, used)
       Let n a b -> Let n <$> go a <*> go b
       Ann a ty -> (`Ann` ty) <$> go a
       Case a branches -> Case <$> go a <*> mapM (\(Alternative p b) -> Alternative p <$> go b) branches
+      Equations rows -> Equations <$> mapM (\(ps,b) -> (,) ps <$> go b) rows
       Do statements result -> go result >>= block statements
       LetRec definitions body -> LetRec <$> mapM (\(n,ty,a) -> (\a' -> (n,ty,a')) <$> go a) definitions <*> go body
       Checked ty a -> Checked ty <$> go a
@@ -41,13 +42,14 @@ desugarDo expression = evalState (go expression) (0 :: Int, used)
           pure (Let n (maybe value' (Ann value') annotation) continuation)
         DoThen action -> fresh >>= \n -> binding (DefaultPattern (Just n)) action continuation
         DoBind pattern' action -> binding pattern' action continuation
+        DoLetRec ds -> LetRec <$> mapM (\(n,t,a) -> (,,) n t <$> go a) ds <*> pure continuation
 
     binding pattern' action continuation = do
       action' <- go action
       (n,body) <- case pattern' of
         DefaultPattern (Just name) -> pure (name,continuation)
         DefaultPattern Nothing -> fresh >>= \name -> pure (name,continuation)
-        ConstructorPattern _ _ -> do
+        _ -> do
           name <- fresh
           pure (name,Case (Var name) [Alternative pattern' continuation])
       pure (App (App (Var "bind") action') (Lam n Nothing body))

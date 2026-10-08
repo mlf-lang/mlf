@@ -40,8 +40,11 @@ data Expr
   | Primitive Primitive
   | Case Expr [Alternative]
   | Do [Statement] Expr
-  -- Internal forms introduced by dictionary translation; not parser shortcuts.
+  -- Surface function equations are eliminated before inference.
+  | Equations [([Pattern], Expr)]
+  -- Recursive groups have explicit, closed signatures.
   | LetRec [(String, Annotation, Expr)] Expr
+  -- Internal forms introduced by dictionary translation.
   | Wanted String [(EvidenceRole, String)]
   | Checked Type Expr
   deriving (Eq, Show)
@@ -49,6 +52,11 @@ data Expr
 data Pattern
   = ConstructorPattern String [Maybe String]
   | DefaultPattern (Maybe String)
+  | NestedPattern String [Pattern]
+  | AnnotatedPattern String Annotation
+  | IntPattern Integer
+  | StringPattern String
+  | BoolPattern Bool
   deriving (Eq, Show)
 
 data Alternative = Alternative Pattern Expr deriving (Eq, Show)
@@ -57,6 +65,7 @@ data Statement
   = DoBind Pattern Expr
   | DoThen Expr
   | DoLet String (Maybe Annotation) Expr
+  | DoLetRec [(String, Annotation, Expr)]
   deriving (Eq, Show)
 
 data Predicate = Predicate String [Type] deriving (Eq, Show)

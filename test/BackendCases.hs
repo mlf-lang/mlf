@@ -13,6 +13,7 @@ import qualified MLF.X.Parser as XP
 import MLF.X.Pretty (prettyTerm)
 import qualified MLF.X.Syntax as X
 import qualified MLF.X.Type as T
+import Readability (readabilityPrograms)
 
 type Test = (String,IO ())
 
@@ -173,10 +174,41 @@ rejected =
 
 programs :: [(String,String,[String],String)]
 programs =
+  readabilityPrograms ++
   [ ("unicode-input", "do { line <- getLine; putStrLn line }", ["你好🌍\0input"], "你好🌍\0input\n")
   , ("unicode", "do { putStrLn \"你好🌍\\n\\\"quoted\\\"\\t\\\\\"; printInt (ifThenElse (eqString \"你好\" \"你好\") 1 0) }", [], "你好🌍\n\"quoted\"\t\\\n1\n")
   , ("nul", "do { putStr (concatString \"a\\0b\" \"c\"); printInt (ifThenElse (eqString \"a\\0b\" \"a\\0c\") 1 0) }", [], "a\0bc0\n")
   , ("curried-closure", "let f = \\x -> let saved = x in \\y -> addInt saved y in let add = f 19 in printInt (add 23)", [], "42\n")
   , ("lazy-field", "data Loop a = Loop (Loop a -> a); data Pair a b = Pair a b; let spin : Int = let go = \\r -> case r of { Loop f -> f r } in go (Loop go) in case Pair 42 spin of { Pair x _ -> printInt x }", [], "42\n")
   , ("selected-case", "data Choice = A | B; case B of { A -> putStrLn \"wrong\"; other -> putStrLn \"right\" }", [], "right\n")
+  , ("surface: declarations, signatures and precedence",
+      "scale : Int -> Int -> Int; scale x y = x * 4 + y; main = do { printInt (scale 10 2); printInt (10-3-2); printInt (20 / 3 % 4); printInt ((2 + 3) * 4) };",
+      [], "42\n5\n2\n20\n")
+  , ("surface: ordered scope and polymorphic functions",
+      "id x = x; n = id 40; main = let add x y = x + y in do { let add x y = add x y + 1; printInt (add n 1); putStrLn (id \"polymorphic\") };",
+      [], "42\npolymorphic\n")
+  , ("surface: signed literals, negation and arbitrary precision",
+      "identity x = x; negative x = -x; main = do { printInt (identity (-7) / 3); printInt ((-7) % 3); printInt (negative 42); printInt (18446744073709551616 * 3 + 1); putStrLn (formatDouble 1 (-0.0)); putStrLn (formatDouble 3 (-2.5e-2)) };",
+      [], "-2\n-1\n-42\n55340232221128654849\n-0.0\n-0.025\n")
+  , ("surface: operator and conditional hygiene",
+      "addInt x y = 0; ifThenElse condition yes no = no; concatString x y = \"captured\"; main = do { printInt (if true then 20 + 22 else 0); putStrLn (\"a\" ++ \"b\" ++ \"c\"); printInt (addInt 20 22); printInt (ifThenElse true 42 0) };",
+      [], "42\nabc\n0\n0\n")
+  , ("surface: all integer comparisons",
+      "bit b = if b then 1 else 0; main = do { printInt (bit (2 == 2)); printInt (bit (2 == 3)); printInt (bit (2 /= 3)); printInt (bit (2 /= 2)); printInt (bit (2 < 3)); printInt (bit (3 < 2)); printInt (bit (2 <= 2)); printInt (bit (3 <= 2)); printInt (bit (3 > 2)); printInt (bit (2 > 2)); printInt (bit (2 >= 2)); printInt (bit (2 >= 3)) };",
+      [], "1\n0\n1\n0\n1\n0\n1\n0\n1\n0\n1\n0\n")
+  , ("surface: dynamic short circuit true",
+      "main = do { line <- getLine; let b = readInt line == 1; printInt (if b || 1 / 0 == 0 then 42 else 0); printInt (if b && 2 < 3 then 7 else 0); if b then putStrLn \"selected\" else do { ignored <- getLine; putStrLn ignored } };",
+      ["1"], "42\n7\nselected\n")
+  , ("surface: dynamic short circuit false",
+      "main = do { line <- getLine; let b = readInt line == 1; printInt (if b && 1 / 0 == 0 then 0 else 42); printInt (if b || 2 < 3 then 7 else 0); if b then do { ignored <- getLine; putStrLn ignored } else putStrLn \"selected\" };",
+      ["0"], "42\n7\nselected\n")
+  , ("surface: nested conditionals and Boolean precedence",
+      "main = do { printInt (if true then if false then 1 else 2 else 3); printInt (if true || false && false then 4 else 5); printInt (1 + if false then 10 else 20) };",
+      [], "2\n4\n21\n")
+  , ("surface: do-local annotated function",
+      "main = do { let id x : forall a. a -> a = x; let n = id 42; printInt n; putStrLn (id \"local\") };",
+      [], "42\nlocal\n")
+  , ("surface: instance method equations and qualified declaration",
+      "class Render a where { render : a -> String }; instance Render Int where { render x = \"value=\" ++ showInt x }; display : forall a. Render a => a -> IO Unit; display x = putStrLn (render x); main = display (6 * 7);",
+      [], "value=42\n")
   ]

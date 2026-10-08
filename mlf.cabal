@@ -8,6 +8,7 @@ build-type: Simple
 license: BSD-3-Clause
 extra-source-files:
   README.md, examples/*.emlf, examples/*.hs, test/fixtures/*.emlf, test/*.c, test/*.py, docs/*.txt, scripts/*.py,
+  examples/modules/*.emlf, examples/modules/Geometry/*.emlf,
   benchmarks/*.md, benchmarks/*.json, benchmarks/results/*.json, benchmarks/LICENSE.BenchmarksGame,
   benchmarks/binary-trees/*.md, benchmarks/binary-trees/*.txt,
   benchmarks/binary-trees/c/*.c, benchmarks/binary-trees/c/*.patch,
@@ -54,12 +55,16 @@ common settings
 
 library
   import: settings
-  build-depends: bytestring, text, hashtables ==1.4.2
+  build-depends: bytestring, text, hashtables ==1.4.2, directory, filepath
   hs-source-dirs: src
   exposed-modules:
     MLF.Compiler
+    MLF.Module.Syntax
+    MLF.Module
     MLF.Prelude
     MLF.Desugar
+    MLF.Surface
+    MLF.Layout
     MLF.Primitive
     MLF.Runtime
     MLF.LLVM
@@ -99,8 +104,8 @@ test-suite mlf-tests
   type: exitcode-stdio-1.0
   hs-source-dirs: test, examples
   main-is: Main.hs
-  other-modules: Oracle, Computations, Datatypes, Typeclasses, DoNotation, GraphValidation, GraphUnification, GraphUnificationReference, GraphSolver
-  build-depends: mlf, directory
+  other-modules: Oracle, Computations, Datatypes, Typeclasses, DoNotation, SurfaceSyntax, Readability, Modules, GraphValidation, GraphUnification, GraphUnificationReference, GraphSolver
+  build-depends: mlf, directory, filepath
 
 test-suite figure12-tests
   import: settings
@@ -115,7 +120,8 @@ test-suite backend-tests
   type: exitcode-stdio-1.0
   hs-source-dirs: test, examples
   main-is: BackendMain.hs
-  other-modules: Backends, BackendCases, IOTests, PreludeTests, Snake, SnakeBaseline, NativeOptimization, NumericArrays, ByteArrays, DNA
+  build-tool-depends: mlf:emlf
+  other-modules: Backends, BackendCases, IOTests, PreludeTests, Snake, SnakeBaseline, NativeOptimization, NumericArrays, ByteArrays, DNA, Readability, Modules, ModuleBackends
   build-depends: mlf, directory, filepath, process, bytestring, text, unix
 
 benchmark compiler-bench

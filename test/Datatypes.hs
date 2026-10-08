@@ -97,6 +97,7 @@ datatypeTests =
       (maybeDecl ++ "let make = Just in let a = make 42 in make true") (maybeT bool)
   , hasType "phantom parameter" "data Phantom a = Phantom; Phantom : Phantom Int" (T.Con "Phantom" [int])
   , hasType "exhaustive case" (maybeDecl ++ "case Just 42 of { Nothing -> 0; Just x -> x }") int
+  , hasType "nested patterns" (maybeDecl ++ "case Just Nothing of { Just (Just x) -> x; _ -> 0 }") int
   , hasType "reordered alternatives" (maybeDecl ++ "case Just 42 of { Just x -> x; Nothing -> 0; }") int
   , hasType "case constrains scrutinee"
       (maybeDecl ++ "\\m -> case m of { Nothing -> 0; Just x -> x }") (T.Arrow (maybeT int) int)
@@ -231,7 +232,6 @@ datatypeTests =
       [ ("declaration separator required", "data T = T T")
       , ("lowercase constructor", "data T = bad; bad")
       , ("empty case", maybeDecl ++ "case Nothing of {}")
-      , ("nested patterns require nested cases", maybeDecl ++ "case Just Nothing of { Just (Just x) -> x; _ -> 0 }")
       , ("wildcard token boundary", pairDecl ++ "case Pair 1 2 of { Pair _x -> 0 }")
       ]
   ]

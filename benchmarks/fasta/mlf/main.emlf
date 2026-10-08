@@ -1,95 +1,120 @@
 -- Copy ALU, then generate both random sequences with one continuous LCG.
 -- General byte arrays buffer 1024 complete 60-column lines per output action.
-data Rec a = Rec (Rec a -> a);
-let fix : forall a. (a -> a) -> a = \f ->
-  let go = \r -> case r of { Rec next -> f (next r) } in go (Rec go) in
-let minimum = \a b -> ifThenElse (ltInt a b) a b in
-let chunkBytes = \n -> addInt n (quotInt (addInt n 59) 60) in
-let cumulative : DoubleArray -> Int -> Int -> IO Unit =
-  fix (\again probabilities length i -> ifThenElse (ltInt i length) (do {
-    previous <- readDoubleArray probabilities (subInt i 1);
-    current <- readDoubleArray probabilities i;
-    writeDoubleArray probabilities i (addDouble previous current);
-    again probabilities length (addInt i 1)
-  }) (return ())) in
-let search : ByteArray -> DoubleArray -> DoubleArray -> Int -> Int -> IO Int =
-  fix (\again alphabet probabilities random lo hi ->
-    ifThenElse (ltInt (addInt lo 1) hi) (do {
-      let middle = quotInt (addInt lo hi) 2;
-      p <- readDoubleArray probabilities middle; r <- readDoubleArray random 0;
-      ifThenElse (ltDouble r p) (again alphabet probabilities random lo middle)
-        (again alphabet probabilities random middle hi)
-    }) (readByteArray alphabet hi)) in
-let select = \alphabet probabilities random length -> do {
-  p <- readDoubleArray probabilities 0; r <- readDoubleArray random 0;
-  ifThenElse (ltDouble r p) (readByteArray alphabet 0)
-    (search alphabet probabilities random 0 (subInt length 1))
-} in
--- Explicitly force the changing counters at saturation, as in fannkuch.
--- This keeps loop entry arguments evaluated without changing any output work.
-let repeatFill : ByteArray -> ByteArray -> Int -> Int -> Int -> Int -> Int -> Int -> IO Int =
-  fix (\again source out length count i index column offset ->
-    let counters = addInt i (addInt index (addInt column offset)) in
-    ifThenElse (eqInt counters counters)
-      (ifThenElse (eqInt column 60) (do {
-            writeByteArray out offset 10;
-            again source out length count i index 0 (addInt offset 1)
-          }) (ifThenElse (eqInt i count)
-            (ifThenElse (eqInt column 0) (return index) (do { writeByteArray out offset 10; return index }))
-            (do {
-              byte <- readByteArray source index; writeByteArray out offset byte;
-              let next = ifThenElse (ltInt (addInt index 1) length) (addInt index 1) 0;
-              again source out length count (addInt i 1) next (addInt column 1) (addInt offset 1)
-            })))
-      (return 0)) in
-let repeatChunks : ByteArray -> ByteArray -> Int -> Int -> Int -> IO Unit =
-  fix (\again source out length remaining index -> ifThenElse (eqInt remaining 0) (return ()) (do {
-    let count = minimum remaining 61440;
-    next <- repeatFill source out length count 0 index 0 0;
-    putBytes out 0 (chunkBytes count);
-    again source out length (subInt remaining count) next
-  })) in
-let randomFill : ByteArray -> DoubleArray -> IntArray -> DoubleArray -> ByteArray -> Int -> Int -> Int -> Int -> Int -> IO Unit =
-  fix (\again alphabet probabilities seed random out length count i column offset ->
-    let counters = addInt i (addInt column offset) in
-    ifThenElse (eqInt counters counters)
-      (ifThenElse (eqInt column 60) (do {
-          writeByteArray out offset 10;
-          again alphabet probabilities seed random out length count i 0 (addInt offset 1)
-        }) (ifThenElse (eqInt i count)
-          (ifThenElse (eqInt column 0) (return ()) (writeByteArray out offset 10))
-          (do {
-            previous <- readIntArray seed 0;
-            let next = remInt (addInt (mulInt previous 3877) 29573) 139968;
-            writeIntArray seed 0 next;
-            writeDoubleArray random 0 (divDouble (intToDouble next) 139968.0);
-            byte <- select alphabet probabilities random length;
-            writeByteArray out offset byte;
-            again alphabet probabilities seed random out length count (addInt i 1) (addInt column 1) (addInt offset 1)
-          })))
-      (return ())) in
-let randomChunks : ByteArray -> DoubleArray -> IntArray -> DoubleArray -> ByteArray -> Int -> Int -> IO Unit =
-  fix (\again alphabet probabilities seed random out length remaining ->
-    ifThenElse (eqInt remaining 0) (return ()) (do {
-      let count = minimum remaining 61440;
-      randomFill alphabet probabilities seed random out length count 0 0 0;
-      putBytes out 0 (chunkBytes count);
-      again alphabet probabilities seed random out length (subInt remaining count)
-    })) in
-do {
-  input <- getLine; let n = readInt input;
-  alu <- byteArrayFromString "GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAA";
-  iub <- byteArrayFromString "acgtBDHKMNRSVWY"; homo <- byteArrayFromString "acgt";
-  iubProb <- newDoubleArray 15 0.02;
-  writeDoubleArray iubProb 0 0.27; writeDoubleArray iubProb 1 0.12;
-  writeDoubleArray iubProb 2 0.12; writeDoubleArray iubProb 3 0.27;
-  homoProb <- newDoubleArray 4 0.0;
-  writeDoubleArray homoProb 0 0.3029549426680; writeDoubleArray homoProb 1 0.1979883004921;
-  writeDoubleArray homoProb 2 0.1975473066391; writeDoubleArray homoProb 3 0.3015094502008;
-  cumulative iubProb 15 1; cumulative homoProb 4 1;
-  out <- newByteArray 62464 0; seed <- newIntArray 1 42; random <- newDoubleArray 1 0.0;
-  length <- lengthByteArray alu;
-  putStrLn ">ONE Homo sapiens alu"; repeatChunks alu out length (mulInt n 2) 0;
-  putStrLn ">TWO IUB ambiguity codes"; randomChunks iub iubProb seed random out 15 (mulInt n 3);
-  putStrLn ">THREE Homo sapiens frequency"; randomChunks homo homoProb seed random out 4 (mulInt n 5)
-}
+
+minimum a b = if a < b then a else b
+
+chunkBytes n = n + (n + 59) / 60
+
+cumulative : DoubleArray -> Int -> Int -> IO Unit
+cumulative probabilities length i =
+  if i < length then do
+    previous <- readDoubleArray probabilities (i - 1)
+    current <- readDoubleArray probabilities i
+    writeDoubleArray probabilities i (addDouble previous current)
+    cumulative probabilities length (i + 1)
+  else return ()
+
+search : ByteArray -> DoubleArray -> DoubleArray -> Int -> Int -> IO Int
+search alphabet probabilities random lo hi =
+  if lo + 1 < hi then do
+    let middle = (lo + hi) / 2
+    p <- readDoubleArray probabilities middle
+    r <- readDoubleArray random 0
+    if ltDouble r p then search alphabet probabilities random lo middle
+    else search alphabet probabilities random middle hi
+  else readByteArray alphabet hi
+
+select alphabet probabilities random length = do
+  p <- readDoubleArray probabilities 0
+  r <- readDoubleArray random 0
+  if ltDouble r p then readByteArray alphabet 0 else search alphabet probabilities random 0 (length - 1)
+
+-- Force the changing counters at saturation to keep loop arguments
+-- evaluated without changing any output work.
+repeatFill : ByteArray -> ByteArray -> Int -> Int -> Int -> Int -> Int -> Int -> IO Int
+repeatFill source out length count i index column offset =
+  let
+    counters = i + (index + (column + offset))
+  in if counters == counters then
+    if column == 60 then do
+      writeByteArray out offset 10
+      repeatFill source out length count i index 0 (offset + 1)
+    else
+      if i == count then
+        if column == 0 then return index
+        else do
+          writeByteArray out offset 10
+          return index
+      else do
+        byte <- readByteArray source index
+        writeByteArray out offset byte
+        let next = if index + 1 < length then index + 1 else 0
+        repeatFill source out length count (i + 1) next (column + 1) (offset + 1)
+  else return 0
+
+repeatChunks : ByteArray -> ByteArray -> Int -> Int -> Int -> IO Unit
+repeatChunks source out length remaining index =
+  if remaining == 0 then return ()
+  else do
+    let count = minimum remaining 61440
+    next <- repeatFill source out length count 0 index 0 0
+    putBytes out 0 (chunkBytes count)
+    repeatChunks source out length (remaining - count) next
+
+randomFill : ByteArray -> DoubleArray -> IntArray -> DoubleArray -> ByteArray -> Int -> Int -> Int -> Int -> Int -> IO Unit
+randomFill alphabet probabilities seed random out length count i column offset =
+  let
+    counters = i + (column + offset)
+  in if counters == counters then
+    if column == 60 then do
+      writeByteArray out offset 10
+      randomFill alphabet probabilities seed random out length count i 0 (offset + 1)
+    else
+      if i == count then if column == 0 then return () else writeByteArray out offset 10
+      else do
+        previous <- readIntArray seed 0
+        let next = (previous * 3877 + 29573) % 139968
+        writeIntArray seed 0 next
+        writeDoubleArray random 0 (divDouble (intToDouble next) 139968.0)
+        byte <- select alphabet probabilities random length
+        writeByteArray out offset byte
+        randomFill alphabet probabilities seed random out length count (i + 1) (column + 1) (offset + 1)
+  else return ()
+
+randomChunks : ByteArray -> DoubleArray -> IntArray -> DoubleArray -> ByteArray -> Int -> Int -> IO Unit
+randomChunks alphabet probabilities seed random out length remaining =
+  if remaining == 0 then return ()
+  else do
+    let count = minimum remaining 61440
+    randomFill alphabet probabilities seed random out length count 0 0 0
+    putBytes out 0 (chunkBytes count)
+    randomChunks alphabet probabilities seed random out length (remaining - count)
+
+main = do
+  input <- getLine
+  let n = readInt input
+  alu <- byteArrayFromString "GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAA"
+  iub <- byteArrayFromString "acgtBDHKMNRSVWY"
+  homo <- byteArrayFromString "acgt"
+  iubProb <- newDoubleArray 15 0.02
+  writeDoubleArray iubProb 0 0.27
+  writeDoubleArray iubProb 1 0.12
+  writeDoubleArray iubProb 2 0.12
+  writeDoubleArray iubProb 3 0.27
+  homoProb <- newDoubleArray 4 0.0
+  writeDoubleArray homoProb 0 0.302954942668
+  writeDoubleArray homoProb 1 0.1979883004921
+  writeDoubleArray homoProb 2 0.1975473066391
+  writeDoubleArray homoProb 3 0.3015094502008
+  cumulative iubProb 15 1
+  cumulative homoProb 4 1
+  out <- newByteArray 62464 0
+  seed <- newIntArray 1 42
+  random <- newDoubleArray 1 0.0
+  length <- lengthByteArray alu
+  putStrLn ">ONE Homo sapiens alu"
+  repeatChunks alu out length (n * 2) 0
+  putStrLn ">TWO IUB ambiguity codes"
+  randomChunks iub iubProb seed random out 15 (n * 3)
+  putStrLn ">THREE Homo sapiens frequency"
+  randomChunks homo homoProb seed random out 4 (n * 5)

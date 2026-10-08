@@ -1,73 +1,87 @@
 -- Incremental permutation/count arrays and a separate flip workspace.
 -- No permutation or flip operation is delegated to the native runtime.
-data Rec a = Rec (Rec a -> a);
-data Result = Result Int Int;
-let fix : forall a. (a -> a) -> a = \f ->
-  let go = \r -> case r of { Rec next -> f (next r) } in go (Rec go) in
 
-let initialize : IntArray -> Int -> Int -> IO Unit =
-  fix (\again perm n i -> ifThenElse (eqInt i n) (return ())
-    (do { writeIntArray perm i (addInt i 1); again perm n (addInt i 1) })) in
-let copy : IntArray -> IntArray -> Int -> Int -> IO Unit =
-  fix (\again source dest n i -> ifThenElse (eqInt i n) (return ())
-    (do { x <- readIntArray source i; writeIntArray dest i x; again source dest n (addInt i 1) })) in
-let reversePrefix : IntArray -> Int -> Int -> IO Unit =
-  fix (\again perm i j -> ifThenElse (ltInt i j)
-    (do {
-      x <- readIntArray perm i; y <- readIntArray perm j;
-      writeIntArray perm i y; writeIntArray perm j x;
-      again perm (addInt i 1) (subInt j 1)
-    }) (return ())) in
-let countFlips : IntArray -> Int -> IO Int =
-  fix (\again perm flips -> do {
-    first <- readIntArray perm 0;
-    ifThenElse (eqInt first 1) (return flips)
-      (do { reversePrefix perm 0 (subInt first 1); again perm (addInt flips 1) })
-  }) in
+data Result = Result Int Int
 
-let rotate : IntArray -> Int -> Int -> Int -> IO Unit =
-  fix (\again perm end first i -> ifThenElse (eqInt i end)
-    (writeIntArray perm end first)
-    (do {
-      x <- readIntArray perm (addInt i 1); writeIntArray perm i x;
-      again perm end first (addInt i 1)
-    })) in
-let nextPermutation : IntArray -> IntArray -> Int -> Int -> IO Bool =
-  fix (\again perm count n i -> ifThenElse (eqInt i n) (return false)
-    (do {
-      first <- readIntArray perm 0; rotate perm i first 0;
-      c <- readIntArray count i;
-      ifThenElse (ltInt c i)
-        (do { writeIntArray count i (addInt c 1); return true })
-        (do { writeIntArray count i 0; again perm count n (addInt i 1) })
-    })) in
-let permutations : IntArray -> IntArray -> IntArray -> Int -> Int -> Int -> Int -> IO Result =
-  fix (\again perm scratch count n index checksum maximum -> do {
-    copy perm scratch n 0;
-    flips <- countFlips scratch 0;
-    let total = ifThenElse (eqInt (remInt index 2) 0) (addInt checksum flips) (subInt checksum flips);
-    let best = ifThenElse (ltInt maximum flips) flips maximum;
-    -- Demand both accumulators before the next action, as binary-trees does.
-    -- Otherwise a lazy chain retains all completed permutations until output.
-    ifThenElse (eqInt total total)
-      (ifThenElse (eqInt best best)
-        (do {
-          more <- nextPermutation perm count n 1;
-          ifThenElse more (again perm scratch count n (addInt index 1) total best)
-            (return (Result total best))
-        }) (return (Result 0 0))) (return (Result 0 0))
-  }) in
-do {
-  input <- getLine;
-  let n = readInt input;
-  perm <- newIntArray n 0;
-  scratch <- newIntArray n 0;
-  count <- newIntArray n 0;
-  initialize perm n 0;
-  result <- permutations perm scratch count n 0 0 0;
-  case result of { Result checksum maximum -> do {
-    printInt checksum;
-    putStrLn (concatString "Pfannkuchen(" (concatString (showInt n)
-      (concatString ") = " (showInt maximum))))
-  } }
-}
+initialize : IntArray -> Int -> Int -> IO Unit
+initialize perm n i =
+  if i == n then return ()
+  else do
+    writeIntArray perm i (i + 1)
+    initialize perm n (i + 1)
+
+copy : IntArray -> IntArray -> Int -> Int -> IO Unit
+copy source dest n i =
+  if i == n then return ()
+  else do
+    x <- readIntArray source i
+    writeIntArray dest i x
+    copy source dest n (i + 1)
+
+reversePrefix : IntArray -> Int -> Int -> IO Unit
+reversePrefix perm i j =
+  if i < j then do
+    x <- readIntArray perm i
+    y <- readIntArray perm j
+    writeIntArray perm i y
+    writeIntArray perm j x
+    reversePrefix perm (i + 1) (j - 1)
+  else return ()
+
+countFlips : IntArray -> Int -> IO Int
+countFlips perm flips = do
+  first <- readIntArray perm 0
+  if first == 1 then return flips
+  else do
+    reversePrefix perm 0 (first - 1)
+    countFlips perm (flips + 1)
+
+rotate : IntArray -> Int -> Int -> Int -> IO Unit
+rotate perm end first i =
+  if i == end then writeIntArray perm end first
+  else do
+    x <- readIntArray perm (i + 1)
+    writeIntArray perm i x
+    rotate perm end first (i + 1)
+
+nextPermutation : IntArray -> IntArray -> Int -> Int -> IO Bool
+nextPermutation perm count n i =
+  if i == n then return false
+  else do
+    first <- readIntArray perm 0
+    rotate perm i first 0
+    c <- readIntArray count i
+    if c < i then do
+      writeIntArray count i (c + 1)
+      return true
+    else do
+      writeIntArray count i 0
+      nextPermutation perm count n (i + 1)
+
+-- Demand both accumulators before the next action, as binary-trees does.
+-- Otherwise a lazy chain retains all completed permutations until output.
+permutations : IntArray -> IntArray -> IntArray -> Int -> Int -> Int -> Int -> IO Result
+permutations perm scratch count n index checksum maximum = do
+  copy perm scratch n 0
+  flips <- countFlips scratch 0
+  let total = if index % 2 == 0 then checksum + flips else checksum - flips
+  let best = if maximum < flips then flips else maximum
+  if total == total then
+    if best == best then do
+      more <- nextPermutation perm count n 1
+      if more then permutations perm scratch count n (index + 1) total best else return (Result total best)
+    else return (Result 0 0)
+  else return (Result 0 0)
+
+main = do
+  input <- getLine
+  let n = readInt input
+  perm <- newIntArray n 0
+  scratch <- newIntArray n 0
+  count <- newIntArray n 0
+  initialize perm n 0
+  result <- permutations perm scratch count n 0 0 0
+  case result of
+    Result checksum maximum -> do
+      printInt checksum
+      putStrLn ("Pfannkuchen(" ++ showInt n ++ ") = " ++ showInt maximum)

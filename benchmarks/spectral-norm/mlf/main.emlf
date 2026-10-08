@@ -1,50 +1,74 @@
 -- Matrix-free power iteration: the same 20 applications of A^T A as the
 -- upstream programs. Scalar accumulators are carried between loop iterations.
-data Rec a = Rec (Rec a -> a);
-let fix : forall a. (a -> a) -> a = \f ->
-  let go = \r -> case r of { Rec next -> f (next r) } in go (Rec go) in
-let evalA = \i j ->
-  let x = intToDouble i in let y = intToDouble j in
-  let sum = addDouble x y in
-  divDouble 1.0 (addDouble (addDouble (divDouble (mulDouble sum (addDouble sum 1.0)) 2.0) x) 1.0) in
-let rowA : Int -> DoubleArray -> DoubleArray -> Int -> Int -> Double -> IO Unit =
-  fix (\again n u out i j sum -> ifThenElse (ltInt j n) (do {
-    x <- readDoubleArray u j;
-    again n u out i (addInt j 1) (addDouble sum (mulDouble (evalA i j) x))
-  }) (writeDoubleArray out i sum)) in
-let rowAt : Int -> DoubleArray -> DoubleArray -> Int -> Int -> Double -> IO Unit =
-  fix (\again n u out i j sum -> ifThenElse (ltInt j n) (do {
-    x <- readDoubleArray u j;
-    again n u out i (addInt j 1) (addDouble sum (mulDouble (evalA j i) x))
-  }) (writeDoubleArray out i sum)) in
-let evalAv : Int -> DoubleArray -> DoubleArray -> Int -> IO Unit =
-  fix (\again n u out i -> ifThenElse (ltInt i n) (do {
-    rowA n u out i 0 0.0;
-    again n u out (addInt i 1)
-  }) (return ())) in
-let evalAtv : Int -> DoubleArray -> DoubleArray -> Int -> IO Unit =
-  fix (\again n u out i -> ifThenElse (ltInt i n) (do {
-    rowAt n u out i 0 0.0;
-    again n u out (addInt i 1)
-  }) (return ())) in
-let evalAtAv = \n u out tmp -> do { evalAv n u tmp 0; evalAtv n tmp out 0 } in
-let power : Int -> DoubleArray -> DoubleArray -> DoubleArray -> Int -> IO Unit =
-  fix (\again n u v tmp remaining -> ifThenElse (eqInt remaining 0) (return ()) (do {
-    evalAtAv n u v tmp; evalAtAv n v u tmp; again n u v tmp (subInt remaining 1)
-  })) in
-let dot : Int -> DoubleArray -> DoubleArray -> DoubleArray -> Int -> IO Unit =
-  fix (\again n u v sums i -> ifThenElse (ltInt i n) (do {
-    x <- readDoubleArray u i; y <- readDoubleArray v i;
-    uv <- readDoubleArray sums 0; vv <- readDoubleArray sums 1;
-    writeDoubleArray sums 0 (addDouble uv (mulDouble x y));
-    writeDoubleArray sums 1 (addDouble vv (mulDouble y y));
-    again n u v sums (addInt i 1)
-  }) (return ())) in
-do {
-  input <- getLine; let n = readInt input;
-  u <- newDoubleArray n 1.0; v <- newDoubleArray n 0.0;
-  tmp <- newDoubleArray n 0.0; sums <- newDoubleArray 2 0.0;
-  power n u v tmp 10; dot n u v sums 0;
-  uv <- readDoubleArray sums 0; vv <- readDoubleArray sums 1;
+
+evalA i j =
+  let
+    x = intToDouble i
+    y = intToDouble j
+    sum = addDouble x y
+  in divDouble 1.0 (addDouble (addDouble (divDouble (mulDouble sum (addDouble sum 1.0)) 2.0) x) 1.0)
+
+rowA : Int -> DoubleArray -> DoubleArray -> Int -> Int -> Double -> IO Unit
+rowA n u out i j sum =
+  if j < n then do
+    x <- readDoubleArray u j
+    rowA n u out i (j + 1) (addDouble sum (mulDouble (evalA i j) x))
+  else writeDoubleArray out i sum
+
+rowAt : Int -> DoubleArray -> DoubleArray -> Int -> Int -> Double -> IO Unit
+rowAt n u out i j sum =
+  if j < n then do
+    x <- readDoubleArray u j
+    rowAt n u out i (j + 1) (addDouble sum (mulDouble (evalA j i) x))
+  else writeDoubleArray out i sum
+
+evalAv : Int -> DoubleArray -> DoubleArray -> Int -> IO Unit
+evalAv n u out i =
+  if i < n then do
+    rowA n u out i 0 0.0
+    evalAv n u out (i + 1)
+  else return ()
+
+evalAtv : Int -> DoubleArray -> DoubleArray -> Int -> IO Unit
+evalAtv n u out i =
+  if i < n then do
+    rowAt n u out i 0 0.0
+    evalAtv n u out (i + 1)
+  else return ()
+
+evalAtAv n u out tmp = do
+  evalAv n u tmp 0
+  evalAtv n tmp out 0
+
+power : Int -> DoubleArray -> DoubleArray -> DoubleArray -> Int -> IO Unit
+power n u v tmp remaining =
+  if remaining == 0 then return ()
+  else do
+    evalAtAv n u v tmp
+    evalAtAv n v u tmp
+    power n u v tmp (remaining - 1)
+
+dot : Int -> DoubleArray -> DoubleArray -> DoubleArray -> Int -> IO Unit
+dot n u v sums i =
+  if i < n then do
+    x <- readDoubleArray u i
+    y <- readDoubleArray v i
+    uv <- readDoubleArray sums 0
+    vv <- readDoubleArray sums 1
+    writeDoubleArray sums 0 (addDouble uv (mulDouble x y))
+    writeDoubleArray sums 1 (addDouble vv (mulDouble y y))
+    dot n u v sums (i + 1)
+  else return ()
+
+main = do
+  input <- getLine
+  let n = readInt input
+  u <- newDoubleArray n 1.0
+  v <- newDoubleArray n 0.0
+  tmp <- newDoubleArray n 0.0
+  sums <- newDoubleArray 2 0.0
+  power n u v tmp 10
+  dot n u v sums 0
+  uv <- readDoubleArray sums 0
+  vv <- readDoubleArray sums 1
   putStrLn (formatDouble 9 (sqrtDouble (divDouble uv vv)))
-}

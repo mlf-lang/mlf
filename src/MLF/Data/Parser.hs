@@ -1,4 +1,4 @@
-module MLF.Data.Parser (declaration, upperIdentifier, lowerIdentifier, doubleLiteral) where
+module MLF.Data.Parser (declaration, sourceDeclaration, upperIdentifier, lowerIdentifier, doubleLiteral) where
 
 import Data.Char (isLower, isUpper)
 import Text.Parsec
@@ -32,7 +32,13 @@ lowerIdentifier lexer = do
 -- Field applications and arrows are parenthesized in a constructor's argument
 -- list, following the ordinary prefix data declaration syntax.
 declaration :: Tok.TokenParser () -> Parser DataDecl
-declaration lexer = do
+declaration = declarationWith False
+
+sourceDeclaration :: Tok.TokenParser () -> Parser DataDecl
+sourceDeclaration = declarationWith True
+
+declarationWith :: Bool -> Tok.TokenParser () -> Parser DataDecl
+declarationWith qualifiedFields lexer = do
   Tok.reserved lexer "data"
   n <- upperName
   ps <- many parameter
@@ -44,7 +50,7 @@ declaration lexer = do
     -- particular, names such as "id" are not target computation keywords here.
     name = Tok.lexeme lexer $ try $ do
       n <- (:) <$> letter <*> many (alphaNum <|> oneOf "_'")
-      if n `elem` ["data","class","instance","where","case","of","let","in","forall","exists","true","false","bot"]
+      if n `elem` ["data","class","instance","where","case","of","let","rec","in","if","then","else","forall","exists","true","false","bot","module","import"]
         then unexpected ("reserved word " ++ n) else pure n
     upperName = do
       n <- lookAhead name
@@ -66,5 +72,9 @@ declaration lexer = do
     apply (Applied c args) a = Applied c (args ++ [a])
     apply f a = Application f a
     atom = Tok.parens lexer typ
-       <|> ((`Applied` []) <$> upperName)
+       <|> ((`Applied` []) <$> fieldName)
        <|> (Parameter <$> lowerName)
+    fieldName | qualifiedFields = do
+                  ns <- upperName `sepBy1` Tok.symbol lexer "."
+                  pure (foldr1 (\a b -> a ++ "." ++ b) ns)
+              | otherwise = upperName

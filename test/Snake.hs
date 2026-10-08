@@ -173,6 +173,9 @@ withRulesEntry entry program = case program of
     replace (S.Let name rhs body)
       | name == "step" = Right (S.Let name rhs entry)
       | otherwise = S.Let name rhs <$> replace body
+    replace (S.LetRec definitions body)
+      | any (\(name,_,_) -> name == "step") definitions = Right (S.LetRec definitions entry)
+      | otherwise = S.LetRec definitions <$> replace body
     replace _ = Left "Snake example no longer defines step in its helper scope"
 
 position :: (Int,Int) -> String
@@ -242,15 +245,15 @@ rulesDriver = unlines
   -- Construct the near-full fixture at runtime, keeping compilation small.
   -- Unlike findFood's row-major scan, this path alternates row direction.
   -- Starting at (2,0) leaves the head (1,0) and last food (0,0) free.
-  [ "let serpentine : Int -> Int -> Int -> List Position = fix (\\again x y dx ->"
-  , "  ifThenElse (eqInt y 8) Nil"
-  , "    (ifThenElse (eqInt x 12) (again 11 (addInt y 1) (-1))"
-  , "      (ifThenElse (ltInt x 0) (again 0 (addInt y 1) 1)"
-  , "        (Cons (Position x y) (again (addInt x dx) y dx))))) in"
+  [ "let rec serpentine x y dx : Int -> Int -> Int -> List Position ="
+  , "  if y == 8 then Nil"
+  , "  else if x == 12 then serpentine 11 (y + 1) (-1)"
+  , "  else if x < 0 then serpentine 0 (y + 1) 1"
+  , "  else Cons (Position x y) (serpentine (x + dx) y dx) in"
   , "let showPosition = \\position -> case position of { Position x y ->"
   , "  concatString \"(\" (concatString (showInt x) (concatString \",\" (concatString (showInt y) \")\"))) } in"
-  , "let showBody : List Position -> String = fix (\\again body -> case body of {"
-  , "  Nil -> \"\"; Cons p rest -> concatString (showPosition p) (again rest) }) in"
+  , "let rec showBody body : List Position -> String = case body of {"
+  , "  Nil -> \"\"; Cons p rest -> concatString (showPosition p) (showBody rest) } in"
   , "let describe = \\outcome -> case outcome of {"
   , "  Lost reason score -> concatString \"lost \" (concatString reason (concatString \" score=\" (showInt score)));"
   , "  Won score -> concatString \"won score=\" (showInt score);"

@@ -404,8 +404,8 @@ class NativeAllocationTests(unittest.TestCase):
     def test_mlf_allocates_every_tree_node(self):
         # Untimed allocation probe. The generated LLVM is unchanged; a temporary
         # runtime counts fully applied constructors, not curried descriptors.
-        # Tags follow this checked source: 0 Unit, 1 Nil, 2 Node, 3 Rec,
-        # 4 Monad dictionary (see MLF.LLVM).
+        # Tags follow this checked source: 0 Unit, 1 Nil, 2 Node,
+        # 3 Monad dictionary (see MLF.LLVM).
         # This tests work, not merely an output that a closed formula could fake.
         emlf = shutil.which("emlf")
         self.assertIsNotNone(emlf, "Run using cabal test benchmark-harness-tests")

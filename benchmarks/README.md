@@ -51,6 +51,16 @@ one shared frontend would answer a different question.
 The [measured results](RESULTS.md) include the current-machine table and an
 archived JSON report with all raw samples.
 
+All nine MLF sources use the current surface syntax: function declarations,
+typed recursion, indentation, conditionals, and infix integer/string operators.
+Binary-trees also uses constructor equations and a local `let rec`;
+k-nucleotide uses literal equations. There is no hand-written `Rec`/`fix`
+plumbing. Double operations retain their explicit primitives and original
+evaluation order. The existing strictness checks, algorithms, workload sizes,
+baseline sources, compiler flags, and correctness/work audits are preserved.
+The ratio-limit command above measures these source files directly through
+the checked compiler; it does not bypass the new parser or desugaring.
+
 Defaults are three serial samples per dimension, using the per-workload inputs
 above. All languages execute the same substantial inputs. Use `--compile-only`
 or the small-input
