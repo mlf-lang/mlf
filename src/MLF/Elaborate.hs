@@ -3,6 +3,7 @@ module MLF.Elaborate
 
 import Control.Monad (unless)
 import qualified Data.IntMap.Strict as IM
+import qualified Data.IntSet as IS
 import qualified Data.Map.Strict as Map
 import MLF.Graph
 import qualified MLF.Graph.Solver as Solver
@@ -61,13 +62,18 @@ schemeType g gen = foldr (uncurry T.Forall) (reference g (genRoot g gen)) (bound
 -- It also implements the reordering of §15.3.2, without equating reordered types.
 -- There is deliberately no congruence rule under arrows or type constructors.
 proveInstance :: Graph -> (NodeId -> NodeId) -> Check.TypeEnv -> T.Type -> T.Type -> Either String X.Computation
-proveInstance targetGraph image env source target = do
+proveInstance targetGraph = proveInstanceWith (graphDatatypes targetGraph) targetGraph
+
+graphDatatypes :: Graph -> D.DataEnv
+graphDatatypes graph = D.withKinds [(c,k) | Node (TyCon c k) _ _ <- IM.elems (nodes graph)]
+
+proveInstanceWith :: D.DataEnv -> Graph -> (NodeId -> NodeId) -> Check.TypeEnv -> T.Type -> T.Type -> Either String X.Computation
+proveInstanceWith datatypes targetGraph image env source target = do
   phi <- go env source target
   actual <- Check.checkComputationIn datatypes env phi source
   unless (T.alphaEq actual target) (Left "instance evidence has the wrong target")
   pure phi
   where
-    datatypes = D.withKinds [(c,k) | Node (TyCon c k) _ _ <- IM.elems (nodes targetGraph)]
     go gamma s t
       | T.alphaEq s t = pure X.Refl
       | s == T.Bot = pure (X.Bottom t)
@@ -97,21 +103,41 @@ proveInstance targetGraph image env source target = do
       _ -> Left ("no permitted instance from " ++ show s ++ " to " ++ show t)
 
 -- | Reflexive edges need only Inst-Refl, whose proof uses no node image.
--- Otherwise re-expand the FINAL presolution (§15.3.10), solve the frontier
+-- Other edges first try a checked proof from existing structural positions.
+-- If that fails, re-expand the FINAL presolution (§15.3.10), solve the frontier
 -- first (§15.2.2), and translate only the interior copy's correspondence.
-edgeComputation :: Solver.Solver -> Check.TypeEnv -> Edge -> Either String X.Computation
-edgeComputation solver env edge
-  | T.alphaEq source targetType = proveInstance g id env source targetType
+edgeComputation :: D.DataEnv -> Solver.Solver -> Check.TypeEnv -> Edge -> Either String X.Computation
+edgeComputation datatypes solver env edge
+  | T.alphaEq source targetType = Right X.Refl
+  | Right proof <- proveInstanceWith datatypes g directImage env source targetType = Right proof
   | otherwise = do
       (copies,result) <- Solver.witness (fromGen edge) target solver
       let solved = Solver.graph result
       let image n = resolve solved (IM.findWithDefault n n copies)
-      proveInstance g image env source targetType
+      proveInstanceWith datatypes g image env source targetType
   where
     g = Solver.graph solver
     target = resolve g (toNode edge)
     source = schemeType g (fromGen edge)
     targetType = reference g target
+    -- Match existing structural positions as a candidate correspondence.
+    -- This is only a proof-construction shortcut: proveInstance checks every
+    -- computation rule and its exact target independently. Incompatible
+    -- shapes or binder scopes cannot be accepted by this candidate;
+    -- the general frontier/copy witness remains the fallback.
+    correspondence = match IS.empty IM.empty [(genRoot g (fromGen edge),target)]
+    directImage n = IM.findWithDefault n (resolve g n) correspondence
+    match _ images [] = images
+    match seen images ((a0,b0):rest)
+      | IS.member a seen = match seen images rest
+      | otherwise = match (IS.insert a seen) (IM.insert a b images) (pairs ++ rest)
+      where
+        a = resolve g a0; b = resolve g b0
+        pairs = case (tag (nodeAt g a),tag (nodeAt g b)) of
+          (Arr x y,Arr z w) -> [(x,z),(y,w)]
+          (TyApp x y,TyApp z w) -> [(x,z),(y,w)]
+          (Con c xs,Con d ys) | c == d && length xs == length ys -> zip xs ys
+          _ -> []
 
 -- | Figure 15.3.5, including the coercion-function translation of §15.3.8.
 elaborate :: Graph -> Typed -> Either String X.Term
@@ -146,11 +172,12 @@ elaborateResolved graph evidence typed = do
   solver <- Solver.prepare graph
   go solver Map.empty typed
   where
+    datatypes = graphDatatypes graph
     go solver outer term = do
       let gen = generalization term
           bs = boundsAt graph gen
           env = foldl (\gamma (a,b) -> Map.insert a b gamma) outer bs
-          inst t e = X.instantiate t <$> edgeComputation solver env e
+          inst t e = X.instantiate t <$> edgeComputation datatypes solver env e
           child = go solver env
       body <- case form term of
         Variable n Nothing -> pure (X.VarTerm n)
@@ -172,9 +199,10 @@ elaborateResolved graph evidence typed = do
               dom = reference graph domain
               cod = if Map.member (T.TyVar (resolve graph codomain)) gamma
                       then T.Var (T.TyVar (resolve graph codomain)) else typeAt graph codomain
-          phi <- proveInstance graph id gamma dom cod
+          phi <- proveInstanceWith datatypes graph id gamma dom cod
           pure (foldr (uncurry X.TypeAbs) (X.Abs n dom (X.instantiate (X.VarTerm n) phi)) local)
         IntegerLiteral n -> pure (X.IntTerm n)
+        DoubleLiteral n -> pure (X.DoubleTerm n)
         BooleanLiteral b -> pure (X.BoolTerm b)
         StringLiteral s -> pure (X.StringTerm s)
         Primitive p ns -> pure (X.Primitive p (map (reference graph) ns))
@@ -193,6 +221,6 @@ elaborateResolved graph evidence typed = do
         Checked variables b e -> do
           let local = foldl (\gamma (a,k) -> Map.insert a (T.bottomKind k) gamma) env variables
           b' <- go solver local b
-          phi <- edgeComputation solver local e
+          phi <- edgeComputation datatypes solver local e
           pure (foldr (\(a,k) -> X.TypeAbs a (T.bottomKind k)) (X.instantiate b' phi) variables)
       pure (foldr (uncurry X.TypeAbs) body bs)

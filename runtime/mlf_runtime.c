@@ -8,6 +8,8 @@
 #include <gmp.h>
 #include <errno.h>
 #include <inttypes.h>
+#include <limits.h>
+#include <math.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,6 +17,9 @@
 
 #ifndef MLF_GC_THRESHOLD
 #define MLF_GC_THRESHOLD 4096
+#endif
+#ifndef MLF_GC_INTEGER_BYTES
+#define MLF_GC_INTEGER_BYTES (8 * 1024 * 1024)
 #endif
 
 typedef enum { OBJECT_VALUE, OBJECT_ENV } ObjectKind;
@@ -27,14 +32,23 @@ typedef struct Object {
 typedef enum {
     HOLE, BUSY, INDIRECT, THUNK, APPLICATION, CLOSURE,
     INTEGER, BOOLEAN, STRING, CONSTRUCTOR, PRIMITIVE, ACTION,
-    CONSTRUCTOR_1, CONSTRUCTOR_2
+    CONSTRUCTOR_1, CONSTRUCTOR_2, DOUBLE, INT_ARRAY, DOUBLE_ARRAY,
+    WRITE_INT_ACTION, WRITE_DOUBLE_ACTION, NATIVE_IO,
+    BYTE_ARRAY, WRITE_BYTE_ACTION, PUT_BYTES_ACTION
 } Tag;
 
 /* These numbers are shared with primitiveCode in MLF.LLVM. */
 typedef enum {
     IO_RETURN, IO_BIND, PUT_STR, PUT_STR_LN, GET_LINE, PRINT_INT,
     CONCAT_STRING, SHOW_INT, ADD_INT, SUB_INT, EQ_INT, LT_INT,
-    EQ_STRING, IF_THEN_ELSE, PRIMITIVE_COUNT
+    EQ_STRING, IF_THEN_ELSE, MUL_INT, QUOT_INT, REM_INT, READ_INT,
+    ADD_DOUBLE, SUB_DOUBLE, MUL_DOUBLE, DIV_DOUBLE, SQRT_DOUBLE,
+    EQ_DOUBLE, LT_DOUBLE, INT_TO_DOUBLE, FORMAT_DOUBLE,
+    NEW_INT_ARRAY, READ_INT_ARRAY, WRITE_INT_ARRAY, LENGTH_INT_ARRAY,
+    NEW_DOUBLE_ARRAY, READ_DOUBLE_ARRAY, WRITE_DOUBLE_ARRAY, LENGTH_DOUBLE_ARRAY,
+    NEW_BYTE_ARRAY, READ_BYTE_ARRAY, WRITE_BYTE_ARRAY, LENGTH_BYTE_ARRAY,
+    BYTE_ARRAY_FROM_STRING, PUT_BYTES,
+    PRIMITIVE_COUNT
 } Primitive;
 
 struct MlfEnv {
@@ -51,6 +65,11 @@ struct MlfValue {
         struct { MlfCode code; MlfEnv *env; } closure;
         struct { MlfValue *function, *argument; } application;
         mpz_t integer;
+        double floating;
+        struct { size_t length; MlfValue **cells; } int_array;
+        struct { size_t length; double *cells; } double_array;
+        struct { size_t length; unsigned char *cells; } byte_array;
+        struct { MlfValue *array, *index, *entry; } array_write;
         int boolean;
         struct { size_t length; char *bytes; } string;
         struct { int64_t identity, arity; MlfEnv *fields; } constructor;
@@ -70,6 +89,8 @@ static Object *heap;
 static Stack *active_stacks;
 static size_t objects;
 static size_t collection_limit = MLF_GC_THRESHOLD;
+static size_t integer_bytes;
+static size_t integer_collection_limit = MLF_GC_INTEGER_BYTES;
 static void cleanup(void);
 
 /* The low bits distinguish immediate integers, booleans and nullary data
@@ -79,6 +100,14 @@ _Static_assert(sizeof(void *) == 8 && sizeof(long) == 8, "native runtime require
 _Static_assert(_Alignof(MlfValue) >= 8, "native tagged pointer alignment");
 _Static_assert(offsetof(MlfValue, as.packed.identity) == 24, "constructor identity ABI");
 _Static_assert(offsetof(MlfValue, as.packed.fields) == 32, "constructor field ABI");
+_Static_assert(offsetof(MlfValue, as.floating) == 24, "Double payload ABI");
+_Static_assert(offsetof(MlfValue, as.int_array.length) == 24 &&
+               offsetof(MlfValue, as.double_array.length) == 24 &&
+               offsetof(MlfValue, as.byte_array.length) == 24, "array length ABI");
+_Static_assert(offsetof(MlfValue, as.int_array.cells) == 32 &&
+               offsetof(MlfValue, as.double_array.cells) == 32 &&
+               offsetof(MlfValue, as.byte_array.cells) == 32, "array storage ABI");
+_Static_assert(sizeof(MlfValue) == 48, "managed value size ABI");
 #define SMALL_MIN (-(INT64_C(1) << 62))
 #define SMALL_MAX ((INT64_C(1) << 62) - 1)
 static int immediate(const void *p) { return ((uintptr_t)p & 7) != 0; }
@@ -195,6 +224,7 @@ static MlfValue *code_value(Tag tag, MlfCode code, MlfEnv *env) {
 
 MlfValue *mlf_thunk(MlfCode code, MlfEnv *env) { return code_value(THUNK, code, env); }
 MlfValue *mlf_closure(MlfCode code, MlfEnv *env) { return code_value(CLOSURE, code, env); }
+MlfValue *mlf_native_io(MlfCode code, MlfEnv *env) { return code_value(NATIVE_IO, code, env); }
 MlfValue *mlf_hole(void) { return value(HOLE); }
 
 void mlf_fill(MlfValue *hole, MlfValue *entry) {
@@ -218,11 +248,18 @@ MlfValue *mlf_integer(const char *decimal) {
     MlfValue *result = value(INTEGER);
     mpz_init(result->as.integer);
     if (mpz_set_str(result->as.integer, decimal, 10)) fail("invalid integer literal");
+    integer_bytes += mpz_size(result->as.integer) * sizeof(mp_limb_t);
     return result;
 }
 
 MlfValue *mlf_boolean(int64_t boolean) {
     return (MlfValue *)(uintptr_t)(boolean ? 6 : 2);
+}
+
+MlfValue *mlf_double(double n) {
+    MlfValue *result = value(DOUBLE);
+    result->as.floating = n;
+    return result;
 }
 
 MlfValue *mlf_string(const char *bytes, uint64_t length) {
@@ -315,6 +352,20 @@ MlfValue *mlf_field(MlfValue *entry, uint64_t index) {
 }
 
 _Noreturn void mlf_match_failure(void) { fail("non-exhaustive runtime case"); }
+_Noreturn void mlf_bounds_failure(void) { fail("array index out of bounds"); }
+
+/* Non-forcing guard for an eager numeric region. INDIRECT chains only arise
+ * from completed evaluation (recursive holes may form cycles, so they are
+ * deliberately not followed here). A miss uses the ordinary lazy worker. */
+MlfValue *mlf_peek(MlfValue *entry) {
+    if (!entry) return NULL;
+    if (immediate(entry) || entry->tag >= CLOSURE) return entry;
+    if (entry->tag == INDIRECT) {
+        MlfValue *next = entry->as.indirect;
+        if (next && (immediate(next) || next->tag >= CLOSURE)) return next;
+    }
+    return NULL;
+}
 
 static MlfEnv *append(MlfEnv *env, MlfValue *entry) {
     if (env->count == SIZE_MAX) fail("too many arguments");
@@ -339,9 +390,22 @@ static MlfValue *show_integer(MlfValue *entry) {
     return result;
 }
 
-static void integer_copy(mpz_t destination, MlfValue *source) {
-    if (small_integer(source)) mpz_set_si(destination, (long)small_value(source));
-    else mpz_set(destination, source->as.integer);
+/* The result is the newest managed allocation. A small result need not
+ * retain a dead GMP allocation until the next IO collection. */
+static MlfValue *compact_integer(MlfValue *result) {
+    if (mpz_fits_slong_p(result->as.integer)) {
+        int64_t n = mpz_get_si(result->as.integer);
+        if (n >= SMALL_MIN && n <= SMALL_MAX) {
+            mpz_clear(result->as.integer);
+            heap = result->object.next;
+            --objects;
+            result->object.next = (Object *)free_values;
+            free_values = result;
+            return small(n);
+        }
+    }
+    integer_bytes += mpz_size(result->as.integer) * sizeof(mp_limb_t);
+    return result;
 }
 
 static MlfValue *integer_operation(MlfValue *a, MlfValue *b, int subtract) {
@@ -351,21 +415,84 @@ static MlfValue *integer_operation(MlfValue *a, MlfValue *b, int subtract) {
         if (n >= SMALL_MIN && n <= SMALL_MAX) return small(n);
     }
     MlfValue *result = value(INTEGER);
-    mpz_t other;
-    mpz_init(result->as.integer); mpz_init(other);
-    integer_copy(result->as.integer, a); integer_copy(other, b);
-    if (subtract) mpz_sub(result->as.integer, result->as.integer, other);
-    else mpz_add(result->as.integer, result->as.integer, other);
-    mpz_clear(other);
-    if (mpz_fits_slong_p(result->as.integer)) {
-        int64_t n = mpz_get_si(result->as.integer);
-        if (n >= SMALL_MIN && n <= SMALL_MAX) return small(n);
+    mpz_init(result->as.integer);
+    if (!small_integer(a) && !small_integer(b)) {
+        if (subtract) mpz_sub(result->as.integer,a->as.integer,b->as.integer);
+        else mpz_add(result->as.integer,a->as.integer,b->as.integer);
+    } else if (small_integer(a) && small_integer(b)) {
+        mpz_set_si(result->as.integer,small_value(a));
+        int64_t n = small_value(b);
+        if (subtract) n = -n;
+        if (n >= 0) mpz_add_ui(result->as.integer,result->as.integer,(unsigned long)n);
+        else mpz_sub_ui(result->as.integer,result->as.integer,(unsigned long)-n);
+    } else {
+        MlfValue *big = small_integer(a) ? b : a;
+        int64_t n = small_value(small_integer(a) ? a : b);
+        if (subtract && !small_integer(a)) n = -n;
+        if (subtract && small_integer(a)) {
+            /* n - big = -(big - n), without copying either operand. */
+            if (n >= 0) mpz_sub_ui(result->as.integer,big->as.integer,(unsigned long)n);
+            else mpz_add_ui(result->as.integer,big->as.integer,(unsigned long)-n);
+            mpz_neg(result->as.integer,result->as.integer);
+        } else if (n >= 0) mpz_add_ui(result->as.integer,big->as.integer,(unsigned long)n);
+        else mpz_sub_ui(result->as.integer,big->as.integer,(unsigned long)-n);
     }
-    return result;
+    return compact_integer(result);
 }
 
 MlfValue *mlf_add_int(MlfValue *a, MlfValue *b) { return integer_operation(a, b, 0); }
 MlfValue *mlf_sub_int(MlfValue *a, MlfValue *b) { return integer_operation(a, b, 1); }
+
+static MlfValue *integer_extended(Primitive p, MlfValue *a, MlfValue *b) {
+    a = expect(a, INTEGER); b = expect(b, INTEGER);
+    if (p != MUL_INT && (small_integer(b) ? small_value(b) == 0 : mpz_sgn(b->as.integer) == 0))
+        fail("integer division by zero");
+    if (small_integer(a) && small_integer(b)) {
+        int64_t x = small_value(a), y = small_value(b), n;
+        if (p == MUL_INT) {
+            if (!__builtin_mul_overflow(x,y,&n) && n >= SMALL_MIN && n <= SMALL_MAX) return small(n);
+        } else {
+            /* The 63-bit operands cannot trigger INT64_MIN/-1 overflow. */
+            n = p == QUOT_INT ? x / y : x % y;
+            if (n >= SMALL_MIN && n <= SMALL_MAX) return small(n);
+        }
+    }
+    MlfValue *result = value(INTEGER);
+    mpz_init(result->as.integer);
+    if (p == MUL_INT && (small_integer(a) || small_integer(b))) {
+        MlfValue *big = small_integer(a) ? b : a;
+        long n = small_value(small_integer(a) ? a : b);
+        if (small_integer(big)) {
+            mpz_set_si(result->as.integer,small_value(big));
+            mpz_mul_si(result->as.integer,result->as.integer,n);
+        } else mpz_mul_si(result->as.integer,big->as.integer,n);
+    } else {
+        /* GMP accepts immutable operand pointers. Only immediate operands
+         * need a temporary, avoiding two full bignum copies per operation. */
+        mpz_t left, right;
+        mpz_srcptr x, y;
+        if (small_integer(a)) { mpz_init_set_si(left,small_value(a)); x = left; }
+        else x = a->as.integer;
+        if (small_integer(b)) { mpz_init_set_si(right,small_value(b)); y = right; }
+        else y = b->as.integer;
+        if (p == MUL_INT) mpz_mul(result->as.integer,x,y);
+        else if (p == QUOT_INT) mpz_tdiv_q(result->as.integer,x,y);
+        else mpz_tdiv_r(result->as.integer,x,y);
+        if (small_integer(a)) mpz_clear(left);
+        if (small_integer(b)) mpz_clear(right);
+    }
+    return compact_integer(result);
+}
+
+static MlfValue *read_integer(MlfValue *entry) {
+    MlfValue *s = expect(entry, STRING);
+    size_t n = s->as.string.length, i = 0;
+    const char *bytes = s->as.string.bytes;
+    if (n && (bytes[0] == '-' || bytes[0] == '+')) ++i;
+    if (i == n) fail("invalid integer input");
+    for (; i < n; ++i) if (bytes[i] < '0' || bytes[i] > '9') fail("invalid integer input");
+    return mlf_integer(bytes + (bytes[0] == '+'));
+}
 
 static int integer_compare(MlfValue *a, MlfValue *b) {
     a = expect(a, INTEGER); b = expect(b, INTEGER);
@@ -386,10 +513,71 @@ int64_t mlf_truth(MlfValue *entry) {
     return boolean_value(b) ? ((uintptr_t)b == 6) : b->as.boolean;
 }
 
+static uint64_t bounded_integer(MlfValue *entry, uint64_t limit, const char *error) {
+    entry = expect(entry, INTEGER);
+    uint64_t n;
+    if (small_integer(entry)) {
+        int64_t signed_n = small_value(entry);
+        if (signed_n < 0) fail(error);
+        n = (uint64_t)signed_n;
+    } else {
+        if (!mpz_fits_ulong_p(entry->as.integer)) fail(error);
+        n = mpz_get_ui(entry->as.integer);
+    }
+    if (n > limit) fail(error);
+    return n;
+}
+
+static double unbox_double(MlfValue *entry) { return expect(entry, DOUBLE)->as.floating; }
+
+uint8_t mlf_byte(MlfValue *entry) {
+    return (uint8_t)bounded_integer(entry,255,"byte value must be between 0 and 255");
+}
+
+double mlf_int_to_double(MlfValue *entry) {
+    entry = expect(entry, INTEGER);
+    if (small_integer(entry)) return (double)small_value(entry);
+    /* mpz_get_d truncates. Decimal conversion rounds to nearest like the
+     * interpreter, including integers outside the finite binary64 range. */
+    MlfValue *decimal = show_integer(entry);
+    return strtod(decimal->as.string.bytes,NULL);
+}
+
+static MlfValue *format_double(MlfValue *places, MlfValue *entry) {
+    /* Match the strict left-to-right arguments of saturated generated calls,
+     * including when the primitive escapes and is applied by the runtime. */
+    places = expect(places,INTEGER);
+    double n = unbox_double(entry);
+    int precision = (int)bounded_integer(places,17,"Double precision must be between 0 and 17");
+    if (isnan(n)) return mlf_string("NaN",3);
+    if (isinf(n)) return n < 0 ? mlf_string("-Infinity",9) : mlf_string("Infinity",8);
+    /* binary64 needs at most 309 integer digits, a sign, dot and 17 decimals.
+     * The runtime never changes the initial C locale or rounding mode. */
+    char text[384];
+    int length = snprintf(text,sizeof(text),"%.*f",precision,n);
+    if (length < 0 || (size_t)length >= sizeof(text)) fail("Double formatting failed");
+    return mlf_string(text,(uint64_t)length);
+}
+
+static MlfValue *array_write_action(Tag tag, MlfValue *a, MlfValue *i, MlfValue *x) {
+    MlfValue *result = value(tag);
+    result->as.array_write.array = a;
+    result->as.array_write.index = i;
+    result->as.array_write.entry = x;
+    return result;
+}
+
 static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValue *c) {
     switch (p) {
     case IO_RETURN: case IO_BIND: case PUT_STR: case PUT_STR_LN: case GET_LINE: case PRINT_INT:
+    case NEW_INT_ARRAY: case READ_INT_ARRAY: case LENGTH_INT_ARRAY:
+    case NEW_DOUBLE_ARRAY: case READ_DOUBLE_ARRAY: case LENGTH_DOUBLE_ARRAY:
+    case NEW_BYTE_ARRAY: case READ_BYTE_ARRAY: case LENGTH_BYTE_ARRAY: case BYTE_ARRAY_FROM_STRING:
         return action(p, a, b);
+    case WRITE_INT_ARRAY: return array_write_action(WRITE_INT_ACTION,a,b,c);
+    case WRITE_DOUBLE_ARRAY: return array_write_action(WRITE_DOUBLE_ACTION,a,b,c);
+    case WRITE_BYTE_ARRAY: return array_write_action(WRITE_BYTE_ACTION,a,b,c);
+    case PUT_BYTES: return array_write_action(PUT_BYTES_ACTION,a,b,c);
     case SHOW_INT: return show_integer(a);
     case CONCAT_STRING: {
         a = expect(a, STRING); b = expect(b, STRING);
@@ -404,6 +592,23 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
     }
     case ADD_INT: return mlf_add_int(a,b);
     case SUB_INT: return mlf_sub_int(a,b);
+    case MUL_INT: case QUOT_INT: case REM_INT: return integer_extended(p,a,b);
+    case READ_INT: return read_integer(a);
+    case ADD_DOUBLE: case SUB_DOUBLE: case MUL_DOUBLE: case DIV_DOUBLE: case EQ_DOUBLE: case LT_DOUBLE: {
+        double x = unbox_double(a);
+        double y = unbox_double(b);
+        switch (p) {
+        case ADD_DOUBLE: return mlf_double(x + y);
+        case SUB_DOUBLE: return mlf_double(x - y);
+        case MUL_DOUBLE: return mlf_double(x * y);
+        case DIV_DOUBLE: return mlf_double(x / y);
+        case EQ_DOUBLE: return mlf_boolean(x == y);
+        default: return mlf_boolean(x < y);
+        }
+    }
+    case SQRT_DOUBLE: return mlf_double(sqrt(unbox_double(a)));
+    case INT_TO_DOUBLE: return mlf_double(mlf_int_to_double(a));
+    case FORMAT_DOUBLE: return format_double(a,b);
     case EQ_INT: return mlf_eq_int(a,b);
     case LT_INT: return mlf_lt_int(a,b);
     case EQ_STRING:
@@ -417,7 +622,10 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
 }
 
 static MlfValue *primitive(Primitive p, MlfEnv *arguments) {
-    static const size_t arities[PRIMITIVE_COUNT] = {1,2,1,1,0,1,2,1,2,2,2,2,2,3};
+    static const size_t arities[PRIMITIVE_COUNT] = {
+        1,2,1,1,0,1,2,1,2,2,2,2,2,3,2,2,2,1,
+        2,2,2,2,1,2,2,1,2,2,2,3,1,2,2,3,1,2,2,3,1,1,3
+    };
     if (arguments->count < arities[p]) {
         MlfValue *result = value(PRIMITIVE);
         result->as.primitive.identity = p;
@@ -489,7 +697,9 @@ MlfValue *mlf_force(MlfValue *entry) {
  * IO actions; only the ordinary strict primitives demand their operands. */
 MlfValue *mlf_prim1(int64_t p, MlfValue *a) {
     switch (p) {
-    case IO_RETURN: case PUT_STR: case PUT_STR_LN: case PRINT_INT: case SHOW_INT:
+    case IO_RETURN: case PUT_STR: case PUT_STR_LN: case PRINT_INT: case SHOW_INT: case READ_INT:
+    case SQRT_DOUBLE: case INT_TO_DOUBLE: case LENGTH_INT_ARRAY: case LENGTH_DOUBLE_ARRAY:
+    case LENGTH_BYTE_ARRAY: case BYTE_ARRAY_FROM_STRING:
         return primitive_result((Primitive)p,a,NULL,NULL);
     default: fail("unary primitive arity mismatch");
     }
@@ -497,16 +707,34 @@ MlfValue *mlf_prim1(int64_t p, MlfValue *a) {
 MlfValue *mlf_prim2(int64_t p, MlfValue *a, MlfValue *b) {
     switch (p) {
     case IO_BIND: case CONCAT_STRING: case ADD_INT: case SUB_INT: case EQ_INT: case LT_INT: case EQ_STRING:
+    case MUL_INT: case QUOT_INT: case REM_INT:
+    case ADD_DOUBLE: case SUB_DOUBLE: case MUL_DOUBLE: case DIV_DOUBLE: case EQ_DOUBLE: case LT_DOUBLE:
+    case FORMAT_DOUBLE: case NEW_INT_ARRAY: case READ_INT_ARRAY: case NEW_DOUBLE_ARRAY: case READ_DOUBLE_ARRAY:
+    case NEW_BYTE_ARRAY: case READ_BYTE_ARRAY:
         return primitive_result((Primitive)p,a,b,NULL);
     default: fail("binary primitive arity mismatch");
+    }
+}
+
+MlfValue *mlf_prim3(int64_t p, MlfValue *a, MlfValue *b, MlfValue *c) {
+    switch (p) {
+    case IF_THEN_ELSE: case WRITE_INT_ARRAY: case WRITE_DOUBLE_ARRAY: case WRITE_BYTE_ARRAY: case PUT_BYTES:
+        return primitive_result((Primitive)p,a,b,c);
+    default: fail("ternary primitive arity mismatch");
     }
 }
 
 static void release(Object *entry) {
     if (entry->kind == OBJECT_VALUE) {
         MlfValue *v = (MlfValue *)entry;
-        if (v->tag == INTEGER) mpz_clear(v->as.integer);
+        if (v->tag == INTEGER) {
+            integer_bytes -= mpz_size(v->as.integer) * sizeof(mp_limb_t);
+            mpz_clear(v->as.integer);
+        }
         if (v->tag == STRING) free(v->as.string.bytes);
+        if (v->tag == INT_ARRAY) free(v->as.int_array.cells);
+        if (v->tag == DOUBLE_ARRAY) free(v->as.double_array.cells);
+        if (v->tag == BYTE_ARRAY) free(v->as.byte_array.cells);
         v->object.next = (Object *)free_values;
         free_values = v;
         return;
@@ -533,6 +761,8 @@ static void cleanup(void) {
     free_values = NULL;
     objects = 0;
     collection_limit = MLF_GC_THRESHOLD;
+    integer_bytes = 0;
+    integer_collection_limit = MLF_GC_INTEGER_BYTES;
 }
 
 static void mark(Stack *pending, void *entry) {
@@ -555,7 +785,7 @@ static void collect(MlfValue *root, const Stack *continuations) {
         MlfValue *v = (MlfValue *)o;
         switch (v->tag) {
         case INDIRECT: mark(&pending, v->as.indirect); break;
-        case THUNK: case CLOSURE: mark(&pending, v->as.closure.env); break;
+        case THUNK: case CLOSURE: case NATIVE_IO: mark(&pending, v->as.closure.env); break;
         case APPLICATION:
             mark(&pending, v->as.application.function); mark(&pending, v->as.application.argument); break;
         case CONSTRUCTOR: mark(&pending, v->as.constructor.fields); break;
@@ -564,6 +794,12 @@ static void collect(MlfValue *root, const Stack *continuations) {
             mark(&pending, v->as.packed.fields[0]); mark(&pending, v->as.packed.fields[1]); break;
         case PRIMITIVE: mark(&pending, v->as.primitive.arguments); break;
         case ACTION: mark(&pending, v->as.action.first); mark(&pending, v->as.action.second); break;
+        case INT_ARRAY:
+            for (size_t i = 0; i < v->as.int_array.length; ++i) mark(&pending, v->as.int_array.cells[i]);
+            break;
+        case WRITE_INT_ACTION: case WRITE_DOUBLE_ACTION: case WRITE_BYTE_ACTION: case PUT_BYTES_ACTION:
+            mark(&pending, v->as.array_write.array); mark(&pending, v->as.array_write.index);
+            mark(&pending, v->as.array_write.entry); break;
         case BUSY: case HOLE: fail("unfinished evaluation at garbage collection");
         default: break;
         }
@@ -577,6 +813,8 @@ static void collect(MlfValue *root, const Stack *continuations) {
     }
     collection_limit = objects > (SIZE_MAX - MLF_GC_THRESHOLD) / 2 ? SIZE_MAX :
         objects * 2 + MLF_GC_THRESHOLD;
+    integer_collection_limit = integer_bytes > (SIZE_MAX - MLF_GC_INTEGER_BYTES) / 2 ? SIZE_MAX :
+        integer_bytes * 2 + MLF_GC_INTEGER_BYTES;
 }
 
 static void write_string(MlfValue *entry, int newline) {
@@ -620,14 +858,103 @@ static MlfValue *read_line(void) {
     return result;
 }
 
+static size_t array_index(MlfValue *index, size_t length) {
+    index = expect(index,INTEGER);
+    if (!length) fail("array index out of bounds");
+    return (size_t)bounded_integer(index,length-1,"array index out of bounds");
+}
+
+static MlfValue *new_array(Primitive p, MlfValue *size, MlfValue *initial) {
+    size_t n = (size_t)bounded_integer(size,INT64_MAX / 8,"invalid array length");
+    if (p == NEW_BYTE_ARRAY) {
+        uint8_t x = mlf_byte(initial);
+        MlfValue *result = value(BYTE_ARRAY);
+        result->as.byte_array.length = n;
+        result->as.byte_array.cells = NULL;
+        result->as.byte_array.cells = allocate(n ? n : 1);
+        memset(result->as.byte_array.cells,x,n);
+        return result;
+    }
+    if (p == NEW_INT_ARRAY) {
+        initial = expect(initial,INTEGER);
+        MlfValue *result = value(INT_ARRAY);
+        result->as.int_array.length = n;
+        result->as.int_array.cells = NULL;
+        result->as.int_array.cells = allocate(n ? n * sizeof(MlfValue *) : 1);
+        for (size_t i = 0; i < n; ++i) result->as.int_array.cells[i] = initial;
+        return result;
+    }
+    double x = unbox_double(initial);
+    MlfValue *result = value(DOUBLE_ARRAY);
+    result->as.double_array.length = n;
+    result->as.double_array.cells = NULL;
+    result->as.double_array.cells = allocate(n ? n * sizeof(double) : 1);
+    for (size_t i = 0; i < n; ++i) result->as.double_array.cells[i] = x;
+    return result;
+}
+
+static MlfValue *write_array(MlfValue *operation) {
+    MlfValue *a = operation->as.array_write.array;
+    MlfValue *i = operation->as.array_write.index;
+    MlfValue *x = operation->as.array_write.entry;
+    if (operation->tag == WRITE_INT_ACTION) {
+        a = expect(a,INT_ARRAY);
+        size_t index = array_index(i,a->as.int_array.length);
+        a->as.int_array.cells[index] = expect(x,INTEGER);
+    } else if (operation->tag == WRITE_BYTE_ACTION) {
+        a = expect(a,BYTE_ARRAY);
+        size_t index = array_index(i,a->as.byte_array.length);
+        a->as.byte_array.cells[index] = mlf_byte(x);
+    } else {
+        a = expect(a,DOUBLE_ARRAY);
+        size_t index = array_index(i,a->as.double_array.length);
+        a->as.double_array.cells[index] = unbox_double(x);
+    }
+    return mlf_constructor(0,0);
+}
+
+static MlfValue *bytes_from_string(MlfValue *text) {
+    text = expect(text,STRING);
+    size_t length = text->as.string.length;
+    if (length > INT64_MAX / 8) fail("invalid array length");
+    MlfValue *result = value(BYTE_ARRAY);
+    result->as.byte_array.length = length;
+    result->as.byte_array.cells = NULL;
+    result->as.byte_array.cells = allocate(length ? length : 1);
+    memcpy(result->as.byte_array.cells,text->as.string.bytes,length);
+    return result;
+}
+
+static MlfValue *put_bytes(MlfValue *operation) {
+    MlfValue *a = expect(operation->as.array_write.array,BYTE_ARRAY);
+    size_t length = a->as.byte_array.length;
+    size_t offset = (size_t)bounded_integer(operation->as.array_write.index,length,"byte slice out of bounds");
+    size_t count = (size_t)bounded_integer(operation->as.array_write.entry,length-offset,"byte slice out of bounds");
+    if (fwrite(a->as.byte_array.cells+offset,1,count,stdout) != count || fflush(stdout) == EOF)
+        fail("IO error: output failed");
+    return mlf_constructor(0,0);
+}
+
 int32_t mlf_run(MlfValue *root, int64_t is_io) {
     if (!is_io) { (void)force(root); cleanup(); return 0; }
     Stack continuations = {0};
     MlfValue *current = root;
     for (;;) {
-        if (objects >= collection_limit) collect(current, &continuations);
-        MlfValue *operation = expect(current, ACTION);
+        if (objects >= collection_limit || integer_bytes >= integer_collection_limit)
+            collect(current, &continuations);
+        MlfValue *operation = force(current);
         MlfValue *result;
+        if (!immediate(operation) && operation->tag == NATIVE_IO) {
+            current = operation->as.closure.code(operation->as.closure.env,NULL);
+            continue;
+        }
+        if (!immediate(operation) && operation->tag == PUT_BYTES_ACTION) {
+            result = put_bytes(operation);
+        } else if (!immediate(operation) && (operation->tag == WRITE_INT_ACTION ||
+                   operation->tag == WRITE_DOUBLE_ACTION || operation->tag == WRITE_BYTE_ACTION)) {
+            result = write_array(operation);
+        } else {
+        operation = expect(operation,ACTION);
         switch (operation->as.action.operation) {
         case IO_BIND:
             push(&continuations, operation->as.action.second);
@@ -641,7 +968,34 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
         case PRINT_INT:
             write_string(show_integer(operation->as.action.first), 1);
             result = mlf_constructor(0, 0); break;
+        case NEW_INT_ARRAY: case NEW_DOUBLE_ARRAY: case NEW_BYTE_ARRAY:
+            result = new_array(operation->as.action.operation,operation->as.action.first,operation->as.action.second);
+            break;
+        case READ_INT_ARRAY: {
+            MlfValue *a = expect(operation->as.action.first,INT_ARRAY);
+            size_t i = array_index(operation->as.action.second,a->as.int_array.length);
+            result = a->as.int_array.cells[i]; break;
+        }
+        case READ_DOUBLE_ARRAY: {
+            MlfValue *a = expect(operation->as.action.first,DOUBLE_ARRAY);
+            size_t i = array_index(operation->as.action.second,a->as.double_array.length);
+            result = mlf_double(a->as.double_array.cells[i]); break;
+        }
+        case READ_BYTE_ARRAY: {
+            MlfValue *a = expect(operation->as.action.first,BYTE_ARRAY);
+            size_t i = array_index(operation->as.action.second,a->as.byte_array.length);
+            result = small(a->as.byte_array.cells[i]); break;
+        }
+        case BYTE_ARRAY_FROM_STRING:
+            result = bytes_from_string(operation->as.action.first); break;
+        case LENGTH_BYTE_ARRAY:
+            result = small((int64_t)expect(operation->as.action.first,BYTE_ARRAY)->as.byte_array.length); break;
+        case LENGTH_INT_ARRAY:
+            result = small((int64_t)expect(operation->as.action.first,INT_ARRAY)->as.int_array.length); break;
+        case LENGTH_DOUBLE_ARRAY:
+            result = small((int64_t)expect(operation->as.action.first,DOUBLE_ARRAY)->as.double_array.length); break;
         default: fail("invalid IO action");
+        }
         }
         if (!continuations.count) break;
         MlfValue *next = continuations.items[--continuations.count];

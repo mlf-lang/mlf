@@ -51,7 +51,9 @@ emptyDataEnv :: DataEnv
 emptyDataEnv = withKinds []
 
 primitiveKinds :: Map.Map String Kind
-primitiveKinds = Map.fromList [("Int",Star),("Bool",Star),("String",Star),("Unit",Star),("IO",KArrow Star Star)]
+primitiveKinds = Map.fromList
+  [("Int",Star),("Double",Star),("Bool",Star),("String",Star),("Unit",Star),
+   ("IntArray",Star),("DoubleArray",Star),("ByteArray",Star),("IO",KArrow Star Star)]
 
 unitDeclaration :: DataDecl
 unitDeclaration = DataDecl "Unit" [] [ConstructorDecl "Unit" []]

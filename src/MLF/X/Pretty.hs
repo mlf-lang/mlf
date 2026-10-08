@@ -60,6 +60,7 @@ prettyTerm = term (0 :: Int)
         intercalate "; " [name n ++ " : " ++ prettyType ty ++ " = " ++ term 0 a | (n,ty,a) <- ds] ++
         " } in " ++ term 0 b)
       IntTerm n -> show n
+      DoubleTerm n -> show n
       BoolTerm b -> if b then "true" else "false"
       StringTerm s -> show s
       Primitive primitive ts -> "primitive " ++ primitiveName primitive ++ "(" ++ intercalate ", " (map prettyType ts) ++ ")"

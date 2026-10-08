@@ -120,6 +120,7 @@ freeNames e = case e of
   S.Let x a b -> freeNames a `Set.union` Set.delete x (freeNames b)
   S.Ann a _ -> freeNames a
   S.IntLit _ -> Set.empty
+  S.DoubleLit _ -> Set.empty
   S.BoolLit _ -> Set.empty
   S.StringLit _ -> Set.empty
   S.Primitive _ -> Set.empty

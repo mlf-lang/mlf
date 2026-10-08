@@ -12,7 +12,29 @@ extra-source-files:
   benchmarks/binary-trees/*.md, benchmarks/binary-trees/*.txt,
   benchmarks/binary-trees/c/*.c, benchmarks/binary-trees/c/*.patch,
   benchmarks/binary-trees/rust/*.rs, benchmarks/binary-trees/rust/*.patch,
-  benchmarks/binary-trees/haskell/*.hs, benchmarks/binary-trees/mlf/*.emlf
+  benchmarks/binary-trees/haskell/*.hs, benchmarks/binary-trees/mlf/*.emlf,
+  benchmarks/pidigits/*.md, benchmarks/pidigits/*.txt,
+  benchmarks/pidigits/c/*.c, benchmarks/pidigits/c/*.patch,
+  benchmarks/pidigits/rust/*.rs, benchmarks/pidigits/rust/*.patch,
+  benchmarks/pidigits/haskell/*.hs, benchmarks/pidigits/mlf/*.emlf,
+  benchmarks/n-body/*.md, benchmarks/n-body/*.txt,
+  benchmarks/n-body/c/*.c, benchmarks/n-body/rust/*.rs,
+  benchmarks/n-body/haskell/*.hs, benchmarks/n-body/mlf/*.emlf,
+  benchmarks/fannkuch-redux/*.md, benchmarks/fannkuch-redux/*.txt,
+  benchmarks/fannkuch-redux/c/*.c, benchmarks/fannkuch-redux/rust/*.rs,
+  benchmarks/fannkuch-redux/rust/*.patch, benchmarks/fannkuch-redux/haskell/*.hs,
+  benchmarks/fannkuch-redux/haskell/*.patch, benchmarks/fannkuch-redux/mlf/*.emlf,
+  benchmarks/spectral-norm/*.md, benchmarks/spectral-norm/*.txt,
+  benchmarks/spectral-norm/c/*.c, benchmarks/spectral-norm/rust/*.rs,
+  benchmarks/spectral-norm/rust/*.patch, benchmarks/spectral-norm/haskell/*.hs,
+  benchmarks/spectral-norm/mlf/*.emlf,
+  benchmarks/fasta/*.md, benchmarks/fasta/*.txt, benchmarks/fasta/c/*.c,
+  benchmarks/fasta/rust/*.rs, benchmarks/fasta/haskell/*.hs, benchmarks/fasta/mlf/*.emlf,
+  benchmarks/mandelbrot/*.md, benchmarks/mandelbrot/*.pbm,
+  benchmarks/mandelbrot/c/*.c, benchmarks/mandelbrot/c/*.patch,
+  benchmarks/mandelbrot/rust/*.rs, benchmarks/mandelbrot/rust/*.patch,
+  benchmarks/mandelbrot/haskell/*.hs, benchmarks/mandelbrot/haskell/*.patch,
+  benchmarks/mandelbrot/mlf/*.emlf
 data-files: runtime/mlf_runtime.c, runtime/mlf_runtime.h
 
 common settings
@@ -22,6 +44,7 @@ common settings
 
 library
   import: settings
+  build-depends: bytestring, text
   hs-source-dirs: src
   exposed-modules:
     MLF.Compiler
@@ -33,6 +56,7 @@ library
     MLF.LLVM.Optimize
     MLF.LLVM.Analysis
     MLF.LLVM.Codegen
+    MLF.LLVM.Kernel
     MLF.Classes
     MLF.Kind
     MLF.Kinding
@@ -81,7 +105,7 @@ test-suite backend-tests
   type: exitcode-stdio-1.0
   hs-source-dirs: test, examples
   main-is: BackendMain.hs
-  other-modules: Backends, BackendCases, IOTests, PreludeTests, Snake, SnakeBaseline, NativeOptimization
+  other-modules: Backends, BackendCases, IOTests, PreludeTests, Snake, SnakeBaseline, NativeOptimization, NumericArrays, ByteArrays
   build-depends: mlf, directory, filepath, process, bytestring, text, unix
 
 benchmark compiler-bench

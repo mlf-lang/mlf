@@ -58,7 +58,38 @@ graphSolverTests =
       let broken = scopedGraph { G.nodes = IM.adjust (\v -> v { G.tag = G.Gen 99 }) 0 (G.nodes scopedGraph) }
       reject (Solver.prepare broken)
       initial <- right (Solver.prepare scopedGraph)
-      reject (Solver.unify [(4,99)] initial))
+      reject (Solver.unify [(4,99)] initial)
+      reject (Solver.unify [(99,99)] initial))
+  , ("closed-instance optimization preserves all original schemes", do
+      counts <- forM (fixtures ++ ["benchmarks/" ++ name ++ "/mlf/main.emlf" |
+          name <- ["binary-trees","pidigits","n-body","fannkuch-redux"]]) $ \file -> do
+        c <- constraints file
+        initial <- right (Solver.prepare (initialGraph c) >>= Solver.unify (equalities c))
+        exact <- right (foldM (\s e -> Solver.instantiate (fromGen e) (toNode e) s) initial (instances c)
+          >>= Solver.finish)
+        optimized <- right (solve c)
+        let expected = G.normalize exact
+            gens = [n | (n,v) <- IM.toAscList (G.nodes (initialGraph c)), G.Gen _ <- [G.tag v]]
+        forM_ gens $ \gen -> unless (T.alphaEq (schemeType expected gen) (schemeType optimized gen))
+          (fail (file ++ ": changed scheme at " ++ show gen ++ "\n" ++
+                 show (schemeType expected gen) ++ "\n" ++ show (schemeType optimized gen)))
+        pure (length gens)
+      putStrLn ("Closed instances: " ++ show (sum counts) ++ " independent scheme comparisons"))
+  , ("closed-instance matching checks repeated, rigid and frontier variables", do
+      let graph fieldFlag fieldBinder rightName = G.Graph (IM.fromList
+            [(0,G.Node (G.Gen 1) Nothing Flexible), (1,G.Node (G.Con "Unit" []) (Just 0) Rigid)
+            ,(2,G.Node (G.Gen 3) (Just 0) Flexible), (3,G.Node (G.Arr 4 4) (Just 2) Flexible)
+            ,(4,G.Node G.Bot (Just fieldBinder) fieldFlag)
+            ,(5,G.Node (G.Gen 6) (Just 0) Flexible), (6,G.Node (G.Arr 7 8) (Just 5) Flexible)
+            ,(7,G.Node (G.Con "Int" []) (Just 6) Rigid), (8,G.Node (G.Con rightName []) (Just 6) Rigid)]) IM.empty 9
+          run g = Solver.prepare g >>= Solver.instantiateClosed 2 6 >>= Solver.finish
+      reject (run (graph Flexible 2 "Bool"))
+      reject (run (graph Rigid 2 "Int"))
+      result <- right (run (graph Flexible 0 "Int"))
+      unless (G.tag (G.nodeAt result 4) == G.Con "Int" [])
+        (fail "external frontier was mistaken for a quantified variable")
+      _ <- right (run (graph Flexible 2 "Int"))
+      pure ())
   ]
 
 fixtures :: [FilePath]

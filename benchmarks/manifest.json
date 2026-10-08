@@ -4,8 +4,7 @@
     "repository": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame.git",
     "revision": "40296663ed350d5fe4a6ab5e367bab61cb77c219",
     "license": "benchmarks/LICENSE.BenchmarksGame",
-    "extraction": "HTMLParser with convert_charrefs=True; concatenate text inside the first pre element, retaining whitespace",
-    "fixture_path": "public/download/binarytrees-output.txt"
+    "extraction": "HTMLParser with convert_charrefs=True; concatenate text inside the first pre element, retaining whitespace"
   },
   "pinned_sha256": {
     "benchmarks/LICENSE.BenchmarksGame": "e5dd0024dd43d92434808c8e1df3c09870a2832744283232aa1dc16c737237b1",
@@ -16,7 +15,47 @@
     "benchmarks/binary-trees/haskell/upstream.hs": "0b6aa7815bfe566c3624771c341d9f33c2e9d306565682c380bb9f7d11ed886f",
     "benchmarks/binary-trees/rust/adaptation.patch": "f18e3c383790bd753d966bef9c7237b3163edf4fda028f892344729c02650dbe",
     "benchmarks/binary-trees/rust/main.rs": "f5757256cdef36a442424ca39cb12a9a9d618dcb008f77aba4cd772ea97a46e3",
-    "benchmarks/binary-trees/rust/upstream.rs": "c344da05a4bcc7d206528ba3bcbab6e78f09d049e10bf91e0fcceb666d5e99b5"
+    "benchmarks/binary-trees/rust/upstream.rs": "c344da05a4bcc7d206528ba3bcbab6e78f09d049e10bf91e0fcceb666d5e99b5",
+    "benchmarks/pidigits/expected-30.txt": "dbf95cc20ad23ff1a385d30436f0c63b5ae7f41bb1003cf204f5e4888b74a39c",
+    "benchmarks/pidigits/rust/adaptation.patch": "3d785b422794afc85138b912096fdc1ed9917725e342b3d59e70a09d1e07a9cc",
+    "benchmarks/pidigits/rust/main.rs": "0181c641199da98e2f77ea5f64e28abe4a0d11c53af5175661bdc0fe2b658923",
+    "benchmarks/pidigits/rust/upstream.rs": "600bc8d8351ea1a487b8127f703d03691dd060db063256654d234a1601d98fe8",
+    "benchmarks/pidigits/haskell/upstream.hs": "a61fd2106576157bb0e3b219bb9e8c2927f4d442db9fe72a6483487899000ce0",
+    "benchmarks/pidigits/c/adaptation.patch": "a7bfef21672c7cba980494aa4e04e262ba8efebc0ea5413b01821deddf1e226e",
+    "benchmarks/pidigits/c/upstream.c": "6360874e2e1bb353136e29a28f93685a1d206615f3665219662fe18ed0c4ba81",
+    "benchmarks/pidigits/c/main.c": "9b09dff01b8bb0b84f6a248a19285ae26f9618f3d64e4087108b2563923cb181",
+    "benchmarks/n-body/expected-1000.txt": "76de83d6d51a74f82828547423f516e7815cfe8cfea6290a2831aa173f806de7",
+    "benchmarks/n-body/rust/upstream.rs": "1a5ccd1738a04074695b1c0458803dfd6a59ee7fa8cd5c429ce67475a3005d69",
+    "benchmarks/n-body/haskell/upstream.hs": "b9ec3360854eea9b5e597bae888854757b5f160a5d35c2227a5e156d8e59aaf4",
+    "benchmarks/n-body/c/upstream.c": "a2750e1505f86f3815cc0efbb0c665c9117cdca3ae4ae55bbb3da597858062b2",
+    "benchmarks/fannkuch-redux/expected-7.txt": "2dc0a3cd4a547ba69389f97f3b447bd4d487fe6216c3cacd2f9bf8c908dc127f",
+    "benchmarks/fannkuch-redux/rust/adaptation.patch": "1ee2e61965b53adb404d04409529d2fb8f2adb75acafd90ea0c23307d4347f8d",
+    "benchmarks/fannkuch-redux/rust/main.rs": "766b84a9ad1de0af4f01298678733262a5ccd6a10505b21f11402825413e7eb8",
+    "benchmarks/fannkuch-redux/rust/upstream.rs": "5ec7ce9915bd599ac127575c9caa9ef15a8233397975d6e3bf0b3cb6e15c8d6a",
+    "benchmarks/fannkuch-redux/haskell/upstream.hs": "55ab21ffcfd129c387b51d515e843a843a2e5d6186028aa424c61f1c7f949ddc",
+    "benchmarks/fannkuch-redux/haskell/adaptation.patch": "ac8962905ab546325b2c23a18ad9a175b9c4754beb67b4fad491a7afc4ac0ff8",
+    "benchmarks/fannkuch-redux/haskell/main.hs": "4ff92aa5f7cc1b2b1d46a9c1dc4e6bcd92dd3ba8b79e9360d7211ae61b01f983",
+    "benchmarks/fannkuch-redux/c/upstream.c": "0240c14bb25b31bbb685cd25314b1a6349319cabbb08158db32e8f335e6ab233",
+    "benchmarks/spectral-norm/c/upstream.c": "0933bb14371cf8218c7873fd8d6aaddc7b34a4818368b82471ca796704846460",
+    "benchmarks/spectral-norm/rust/adaptation.patch": "dad299a551a14f1c52440b11ca2b59f64649672a33412280ae9576dbecd6354b",
+    "benchmarks/spectral-norm/rust/upstream.rs": "51a4da9501d1e115145f946b3a902a0e572be10442d8d14c6fd90319bd10ad83",
+    "benchmarks/spectral-norm/rust/main.rs": "22447927b50327c260bdc5c4e35ed2993d2ae403004abea8ece2174eaa4f9941",
+    "benchmarks/spectral-norm/haskell/upstream.hs": "0dc87db364d3e4d7566f33ebc0b1d419e8e7ca78235c5d2161aa3ace49c308e7",
+    "benchmarks/spectral-norm/expected-100.txt": "a95e11fa07f7b196ef488e73f67afbbbc16cf6a2c6de5f8d54ea49821fe604e6",
+    "benchmarks/fasta/c/upstream.c": "29ecdd18431bfc65861f9ae537307bf45846e7225d40b28993381f28f005279b",
+    "benchmarks/fasta/rust/upstream.rs": "91f6762cae723fadf57c94fa995ce706e1691f2a9b8869bd9ff891b6391a5201",
+    "benchmarks/fasta/haskell/upstream.hs": "446ea6ff611b1b943d6334e1993cf50121acd4782c7fc6c5f0e6b3e19a81d6ec",
+    "benchmarks/fasta/expected-1000.txt": "62d1e8d0df7938d2aefda9a37887e0389231ea72c099c29a51afb6edca1bdc73",
+    "benchmarks/mandelbrot/c/main.c": "5ebaf745490d20f0082726ba1f1087b8b18b6c9cb604b628ee559482a1606ba3",
+    "benchmarks/mandelbrot/c/upstream.c": "ff0d4b64c72a72fda8d374a963310b2eff9f6c2d48945df883f3380abb90f33c",
+    "benchmarks/mandelbrot/c/adaptation.patch": "dbbd459951593202d99d626c70c718830cb7b5b9e15ea173c658cc49bf7d6312",
+    "benchmarks/mandelbrot/rust/main.rs": "d48811a7a1c54189cde0be9fef200588bb50c20b9de62eaa508d60c2adec6e68",
+    "benchmarks/mandelbrot/rust/adaptation.patch": "08d698e94c32818cf8b329545835450a29c15b54f7641abd8cba208e1a07689c",
+    "benchmarks/mandelbrot/rust/upstream.rs": "84cc0a3c0cb887c6e76091300d4afccbbb73de1ee717ce0a13ffde7cf747c5be",
+    "benchmarks/mandelbrot/haskell/main.hs": "47a7b99460af9c18a1a82dfa00089678e259d1ad828e02ddffc4e845c04fb80d",
+    "benchmarks/mandelbrot/haskell/adaptation.patch": "e2d2af9b0455b595b3b7d0f380cdb0d77511131583d536639c82a94495a3be9a",
+    "benchmarks/mandelbrot/haskell/upstream.hs": "e56fdab481003f3e6f612dc55afdcbc724fd259e3e6c35e3698164a6d99f215d",
+    "benchmarks/mandelbrot/expected-200.pbm": "97610473750700638fc63d13cfa49d339b67c18e7f26b3f9c9acb61e746472d5"
   },
   "workloads": [
     {
@@ -77,6 +116,438 @@
           "-XBangPatterns",
           "-fno-full-laziness",
           "-fno-cse",
+          "-fforce-recomp"
+        ],
+        "mlf": [
+          "-O2",
+          "-Wno-override-module"
+        ]
+      },
+      "fixture_input": 10,
+      "post_build_input": 6,
+      "fixture_upstream_path": "public/download/binarytrees-output.txt",
+      "output_comparison": "Whitespace-only normalization against mathematical node-count oracle and pinned fixture; separate allocation audit"
+    },
+    {
+      "name": "pidigits",
+      "default_input": 10000,
+      "minimum_input": 1,
+      "maximum_input": 20000,
+      "check_inputs": [
+        1,
+        10,
+        27,
+        30
+      ],
+      "fixture_input": 30,
+      "post_build_input": 27,
+      "fixture": "benchmarks/pidigits/expected-30.txt",
+      "provenance": {
+        "c": {
+          "implementation": "pidigits-gcc-1",
+          "authors": "Mr Ledrug",
+          "upstream_path": "public/program/pidigits-gcc-1.html",
+          "upstream_git_blob": "253146f451fcb2c775f574337bd81f20749c18a0",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/pidigits-gcc-1.html",
+          "original_source": "benchmarks/pidigits/c/upstream.c",
+          "build_source": "benchmarks/pidigits/c/main.c"
+        },
+        "rust": {
+          "implementation": "pidigits-rust-1",
+          "authors": "TeXitoi",
+          "upstream_path": "public/program/pidigits-rust-1.html",
+          "upstream_git_blob": "824f21ad09494abab15a198f84d93a29b98c7a8a",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/pidigits-rust-1.html",
+          "original_source": "benchmarks/pidigits/rust/upstream.rs",
+          "build_source": "benchmarks/pidigits/rust/main.rs"
+        },
+        "haskell": {
+          "implementation": "pidigits-ghc-6",
+          "authors": "Bryan O'Sullivan; Eugene Kirpichov; W. Gordon Goodsman",
+          "upstream_path": "public/program/pidigits-ghc-6.html",
+          "upstream_git_blob": "06f23994d31ae9275abaf2b7f6be8825e50edc20",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/pidigits-ghc-6.html",
+          "original_source": "benchmarks/pidigits/haskell/upstream.hs",
+          "build_source": "benchmarks/pidigits/haskell/upstream.hs"
+        }
+      },
+      "sources": {
+        "c": "benchmarks/pidigits/c/main.c",
+        "rust": "benchmarks/pidigits/rust/main.rs",
+        "haskell": "benchmarks/pidigits/haskell/upstream.hs",
+        "mlf": "benchmarks/pidigits/mlf/main.emlf"
+      },
+      "flags": {
+        "c": [
+          "-O3"
+        ],
+        "rust": [
+          "-O",
+          "--edition=2021"
+        ],
+        "haskell": [
+          "-O2",
+          "-fforce-recomp"
+        ],
+        "mlf": [
+          "-O2",
+          "-Wno-override-module"
+        ]
+      },
+      "gmp_languages": [
+        "c",
+        "rust"
+      ],
+      "fixture_upstream_path": "public/download/pidigits-output.txt",
+      "output_comparison": "Whitespace-only normalization against independent fixed-point Machin formula oracle and pinned fixture"
+    },
+    {
+      "name": "n-body",
+      "default_input": 2000000,
+      "minimum_input": 0,
+      "maximum_input": 5000000,
+      "check_inputs": [
+        0,
+        1,
+        1000
+      ],
+      "fixture_input": 1000,
+      "post_build_input": 1,
+      "fixture": "benchmarks/n-body/expected-1000.txt",
+      "provenance": {
+        "c": {
+          "implementation": "nbody-gcc-1",
+          "authors": "Christoph Bauer",
+          "upstream_path": "public/program/nbody-gcc-1.html",
+          "upstream_git_blob": "1f6a4bf3ea17a32e453cd92d266c5e9866796c36",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/nbody-gcc-1.html",
+          "original_source": "benchmarks/n-body/c/upstream.c",
+          "build_source": "benchmarks/n-body/c/upstream.c"
+        },
+        "rust": {
+          "implementation": "nbody-rust-1",
+          "authors": "Rust Project Developers; TeXitoi",
+          "upstream_path": "public/program/nbody-rust-1.html",
+          "upstream_git_blob": "c8e9f9e5dcb370ccfcf596f6117d14d109c56826",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/nbody-rust-1.html",
+          "original_source": "benchmarks/n-body/rust/upstream.rs",
+          "build_source": "benchmarks/n-body/rust/upstream.rs"
+        },
+        "haskell": {
+          "implementation": "nbody-ghc-1",
+          "authors": "Olof Kraigher; Don Stewart; Ersin Er",
+          "upstream_path": "public/program/nbody-ghc-1.html",
+          "upstream_git_blob": "0ebae64b5db16b6fbed6a2f502bce877cc906629",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/nbody-ghc-1.html",
+          "original_source": "benchmarks/n-body/haskell/upstream.hs",
+          "build_source": "benchmarks/n-body/haskell/upstream.hs"
+        }
+      },
+      "sources": {
+        "c": "benchmarks/n-body/c/upstream.c",
+        "rust": "benchmarks/n-body/rust/upstream.rs",
+        "haskell": "benchmarks/n-body/haskell/upstream.hs",
+        "mlf": "benchmarks/n-body/mlf/main.emlf"
+      },
+      "flags": {
+        "c": [
+          "-O3"
+        ],
+        "rust": [
+          "-O",
+          "--edition=2021"
+        ],
+        "haskell": [
+          "-O2",
+          "-XBangPatterns",
+          "-fforce-recomp"
+        ],
+        "mlf": [
+          "-O2",
+          "-Wno-override-module"
+        ]
+      },
+      "fixture_upstream_path": "public/download/nbody-output.txt",
+      "output_comparison": "Exactly two finite energies; absolute error <= 1e-8 against independent scalar Python reference and pinned fixture"
+    },
+    {
+      "name": "fannkuch-redux",
+      "default_input": 10,
+      "minimum_input": 1,
+      "maximum_input": 11,
+      "check_inputs": [
+        1,
+        2,
+        5,
+        7
+      ],
+      "fixture_input": 7,
+      "post_build_input": 5,
+      "fixture": "benchmarks/fannkuch-redux/expected-7.txt",
+      "provenance": {
+        "c": {
+          "implementation": "fannkuchredux-gcc-1",
+          "authors": "Joseph Pich\u00e9; Oleg Mazurov; Isaac Gouy",
+          "upstream_path": "public/program/fannkuchredux-gcc-1.html",
+          "upstream_git_blob": "148f0df3e006573e90bd9215efb6df1a2fc42251",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/fannkuchredux-gcc-1.html",
+          "original_source": "benchmarks/fannkuch-redux/c/upstream.c",
+          "build_source": "benchmarks/fannkuch-redux/c/upstream.c"
+        },
+        "rust": {
+          "implementation": "fannkuchredux-rust-2",
+          "authors": "Rust Project Developers; TeXitoi",
+          "upstream_path": "public/program/fannkuchredux-rust-2.html",
+          "upstream_git_blob": "b679ba6714dd4bff61fc26c3f5830257cc5e56a0",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/fannkuchredux-rust-2.html",
+          "original_source": "benchmarks/fannkuch-redux/rust/upstream.rs",
+          "build_source": "benchmarks/fannkuch-redux/rust/main.rs"
+        },
+        "haskell": {
+          "implementation": "fannkuchredux-ghc-4",
+          "authors": "Branimir Maksimovic; Bryan O'Sullivan; Gabriel Gonzalez; Artem Pelenitsyn",
+          "upstream_path": "public/program/fannkuchredux-ghc-4.html",
+          "upstream_git_blob": "3c708eefb97e694ade0f42bb1926875ae068c4ac",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/fannkuchredux-ghc-4.html",
+          "original_source": "benchmarks/fannkuch-redux/haskell/upstream.hs",
+          "build_source": "benchmarks/fannkuch-redux/haskell/main.hs"
+        }
+      },
+      "sources": {
+        "c": "benchmarks/fannkuch-redux/c/upstream.c",
+        "rust": "benchmarks/fannkuch-redux/rust/main.rs",
+        "haskell": "benchmarks/fannkuch-redux/haskell/main.hs",
+        "mlf": "benchmarks/fannkuch-redux/mlf/main.emlf"
+      },
+      "flags": {
+        "c": [
+          "-O3"
+        ],
+        "rust": [
+          "-O",
+          "--edition=2021"
+        ],
+        "haskell": [
+          "-O2",
+          "-XBangPatterns",
+          "-fforce-recomp"
+        ],
+        "mlf": [
+          "-O2",
+          "-Wno-override-module"
+        ]
+      },
+      "fixture_upstream_path": "public/download/fannkuchredux-output.txt",
+      "output_comparison": "Whitespace-only normalization against independent factoradic-unranking oracle and pinned fixture"
+    },
+    {
+      "name": "spectral-norm",
+      "default_input": 2000,
+      "minimum_input": 1,
+      "maximum_input": 5500,
+      "check_inputs": [
+        1,
+        2,
+        3,
+        100
+      ],
+      "fixture_input": 100,
+      "post_build_input": 3,
+      "fixture": "benchmarks/spectral-norm/expected-100.txt",
+      "fixture_upstream_path": "public/download/spectralnorm-output.txt",
+      "output_comparison": "Exactly one finite value within absolute error 1e-8 of an independent dense-matrix reference; pinned N=100 fixture",
+      "provenance": {
+        "c": {
+          "implementation": "spectralnorm-gcc-1",
+          "authors": "Sebastien Loisel",
+          "upstream_path": "public/program/spectralnorm-gcc-1.html",
+          "upstream_git_blob": "23669276ecc9701659b11498a2e7e63ed45233e9",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/spectralnorm-gcc-1.html",
+          "original_source": "benchmarks/spectral-norm/c/upstream.c",
+          "build_source": "benchmarks/spectral-norm/c/upstream.c"
+        },
+        "rust": {
+          "implementation": "spectralnorm-rust-3",
+          "authors": "Rust Project Developers; TeXitoi; Tung Duong",
+          "upstream_path": "public/program/spectralnorm-rust-3.html",
+          "upstream_git_blob": "7e04f9cf600da015d44c165ceefc949cf10c38a7",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/spectralnorm-rust-3.html",
+          "original_source": "benchmarks/spectral-norm/rust/upstream.rs",
+          "build_source": "benchmarks/spectral-norm/rust/main.rs"
+        },
+        "haskell": {
+          "implementation": "spectralnorm-ghc-2",
+          "authors": "Greg Buchholz",
+          "upstream_path": "public/program/spectralnorm-ghc-2.html",
+          "upstream_git_blob": "6699709808023f2480d89ccaf4ee13f4d983823f",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/spectralnorm-ghc-2.html",
+          "original_source": "benchmarks/spectral-norm/haskell/upstream.hs",
+          "build_source": "benchmarks/spectral-norm/haskell/upstream.hs"
+        }
+      },
+      "sources": {
+        "c": "benchmarks/spectral-norm/c/upstream.c",
+        "rust": "benchmarks/spectral-norm/rust/main.rs",
+        "haskell": "benchmarks/spectral-norm/haskell/upstream.hs",
+        "mlf": "benchmarks/spectral-norm/mlf/main.emlf"
+      },
+      "flags": {
+        "c": [
+          "-O3"
+        ],
+        "rust": [
+          "-O",
+          "--edition=2021"
+        ],
+        "haskell": [
+          "-O2",
+          "-fforce-recomp"
+        ],
+        "mlf": [
+          "-O2",
+          "-Wno-override-module"
+        ]
+      }
+    },
+    {
+      "name": "fasta",
+      "default_input": 2000000,
+      "minimum_input": 0,
+      "maximum_input": 25000000,
+      "check_inputs": [
+        0,
+        1,
+        29,
+        30,
+        31,
+        1000,
+        12288,
+        12289
+      ],
+      "fixture_input": 1000,
+      "post_build_input": 31,
+      "fixture": "benchmarks/fasta/expected-1000.txt",
+      "fixture_upstream_path": "public/download/fasta-output.txt",
+      "output_comparison": "Exact bytes, including headers, 60-column wrapping, random sequence and final newline; independent decimal-probability oracle",
+      "provenance": {
+        "c": {
+          "implementation": "fasta-gcc-1",
+          "authors": "Paul Hsieh",
+          "upstream_path": "public/program/fasta-gcc-1.html",
+          "upstream_git_blob": "5cd96adf707f7fd7be282793151d0dd126bfa58e",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/fasta-gcc-1.html",
+          "original_source": "benchmarks/fasta/c/upstream.c",
+          "build_source": "benchmarks/fasta/c/upstream.c"
+        },
+        "rust": {
+          "implementation": "fasta-rust-4",
+          "authors": "leonardo",
+          "upstream_path": "public/program/fasta-rust-4.html",
+          "upstream_git_blob": "b2934014cb7d719ccea880574990efcd2e29cbc0",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/fasta-rust-4.html",
+          "original_source": "benchmarks/fasta/rust/upstream.rs",
+          "build_source": "benchmarks/fasta/rust/upstream.rs"
+        },
+        "haskell": {
+          "implementation": "fasta-ghc-1",
+          "authors": "Roman Kashitsyn",
+          "upstream_path": "public/program/fasta-ghc-1.html",
+          "upstream_git_blob": "2ac60c9341e5db66acd0b4e1376027b5ccedd43d",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/fasta-ghc-1.html",
+          "original_source": "benchmarks/fasta/haskell/upstream.hs",
+          "build_source": "benchmarks/fasta/haskell/upstream.hs"
+        }
+      },
+      "sources": {
+        "c": "benchmarks/fasta/c/upstream.c",
+        "rust": "benchmarks/fasta/rust/upstream.rs",
+        "haskell": "benchmarks/fasta/haskell/upstream.hs",
+        "mlf": "benchmarks/fasta/mlf/main.emlf"
+      },
+      "flags": {
+        "c": [
+          "-O3"
+        ],
+        "rust": [
+          "-O",
+          "--edition=2021"
+        ],
+        "haskell": [
+          "-O2",
+          "-XBangPatterns",
+          "-XOverloadedStrings",
+          "-fforce-recomp"
+        ],
+        "mlf": [
+          "-O2",
+          "-Wno-override-module"
+        ]
+      }
+    },
+    {
+      "name": "mandelbrot",
+      "default_input": 4096,
+      "minimum_input": 1,
+      "maximum_input": 16000,
+      "check_inputs": [
+        1,
+        2,
+        7,
+        8,
+        9,
+        200
+      ],
+      "fixture_input": 200,
+      "post_build_input": 9,
+      "fixture": "benchmarks/mandelbrot/expected-200.pbm",
+      "fixture_upstream_path": "public/download/mandelbrot-output.pbm",
+      "output_comparison": "Exact binary PBM, including dimensions, row padding and every pixel; independent complex-number oracle",
+      "provenance": {
+        "c": {
+          "implementation": "mandelbrot-gcc-2",
+          "authors": "Greg Buchholz",
+          "upstream_path": "public/program/mandelbrot-gcc-2.html",
+          "upstream_git_blob": "ab64b4de04cd9393fa0900e0a5692cc3c0d373ce",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/mandelbrot-gcc-2.html",
+          "original_source": "benchmarks/mandelbrot/c/upstream.c",
+          "build_source": "benchmarks/mandelbrot/c/main.c"
+        },
+        "rust": {
+          "implementation": "mandelbrot-rust-1",
+          "authors": "Matt Watson; TeXitoi",
+          "upstream_path": "public/program/mandelbrot-rust-1.html",
+          "upstream_git_blob": "3ab13b2d6e95253e31320e7633cd98fc500f0b0e",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/mandelbrot-rust-1.html",
+          "original_source": "benchmarks/mandelbrot/rust/upstream.rs",
+          "build_source": "benchmarks/mandelbrot/rust/main.rs"
+        },
+        "haskell": {
+          "implementation": "mandelbrot-ghc-2",
+          "authors": "Spencer Janssen; Trevor McCort; Christophe Poucet; Don Stewart; Tim Newsham",
+          "upstream_path": "public/program/mandelbrot-ghc-2.html",
+          "upstream_git_blob": "6c70d6937dd194b156becadba8296190fbde0948",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/mandelbrot-ghc-2.html",
+          "original_source": "benchmarks/mandelbrot/haskell/upstream.hs",
+          "build_source": "benchmarks/mandelbrot/haskell/main.hs"
+        }
+      },
+      "sources": {
+        "c": "benchmarks/mandelbrot/c/main.c",
+        "rust": "benchmarks/mandelbrot/rust/main.rs",
+        "haskell": "benchmarks/mandelbrot/haskell/main.hs",
+        "mlf": "benchmarks/mandelbrot/mlf/main.emlf"
+      },
+      "flags": {
+        "c": [
+          "-O3"
+        ],
+        "rust": [
+          "-O",
+          "--edition=2021"
+        ],
+        "haskell": [
+          "-O2",
+          "-XBangPatterns",
           "-fforce-recomp"
         ],
         "mlf": [

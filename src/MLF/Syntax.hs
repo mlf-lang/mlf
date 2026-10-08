@@ -34,6 +34,7 @@ data Expr
   | Let String Expr Expr
   | Ann Expr Annotation
   | IntLit Integer
+  | DoubleLit Double
   | BoolLit Bool
   | StringLit String
   | Primitive Primitive

@@ -1,0 +1,11 @@
+--- upstream.c
++++ main.c
+@@ -11,7 +11,7 @@
+ int main (int argc, char **argv)
+ {
+     int w, h, bit_num = 0;
+-    char byte_acc = 0;
++    unsigned char byte_acc = 0;
+     int i, iter = 50;
+     double x, y, limit = 2.0;
+     double Zr, Zi, Cr, Ci, Tr, Ti;

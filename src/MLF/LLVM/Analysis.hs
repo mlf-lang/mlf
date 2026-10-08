@@ -17,11 +17,7 @@ data Function = Function
 type Functions = Map.Map X.Name Function
 
 primitiveArity :: P.Primitive -> Int
-primitiveArity p = case p of
-  P.GetLine -> 0
-  P.IOReturn -> 1; P.PutStr -> 1; P.PutStrLn -> 1; P.PrintInt -> 1; P.ShowInt -> 1
-  P.IfThenElse -> 3
-  _ -> 2
+primitiveArity = P.primitiveArity
 
 needed :: Functions -> X.Erased -> Set.Set X.Name
 needed functions expression = Set.unions
@@ -68,7 +64,7 @@ demanded fs expression = case expression of
   X.EApp _ _ -> case applications expression of
     (X.EPrimitive P.IfThenElse,[c,a,b]) -> go c `Set.union` (go a `Set.intersection` go b)
     (X.EPrimitive p,args) | length args == primitiveArity p ->
-      if p `elem` [P.AddInt,P.SubInt,P.EqInt,P.LtInt,P.ConcatString,P.EqString,P.ShowInt]
+      if P.primitiveStrict p
         then Set.unions (map go args) else Set.empty
     (X.EVar n,args) | Just f <- Map.lookup n fs, length args == length (parameters f) ->
       (strict f `Set.intersection` Set.fromList (captures f)) `Set.union`

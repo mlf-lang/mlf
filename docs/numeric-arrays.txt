@@ -1,0 +1,133 @@
+Numbers, mutable arrays and binary output
+========================================
+
+Int remains an arbitrary-precision signed integer. mulInt, quotInt and remInt
+are strict, curried Int -> Int -> Int operations. For nonzero y:
+  x == quotInt x y * y + remInt x y
+Quotient truncates toward zero; nonzero remainder has x's sign. Both division
+operations fail with "integer division by zero" for a zero divisor, including
+on the GMP path. Multiplication checks the tagged 63-bit range and overflow
+before falling back to GMP. Results that fit return to the tagged range.
+
+readInt : String -> Int accepts [+-]?[0-9]+ with at least one digit, and consumes
+the entire string. Whitespace, embedded NUL, fractions and trailing characters
+are errors. Leading zeros and signed zero are accepted. This is not Haskell
+Read syntax and does not implicitly trim console input.
+
+Double is a separate nominal type of kind *. Literals require a decimal point
+or exponent, for example 1.0, -2.5, 3e2, 1.2e-10. Source and xMLF literals are
+finite IEEE binary64 values; overflowed literals and forged non-finite AST
+literals are rejected before execution. Underflow and signed zero follow
+binary64 conversion. Int literals are not overloaded; intToDouble converts an
+arbitrary Int with nearest-even rounding (possibly to infinity).
+
+addDouble, subDouble, mulDouble, divDouble : Double -> Double -> Double
+sqrtDouble : Double -> Double
+eqDouble, ltDouble : Double -> Double -> Bool
+
+Arithmetic uses IEEE semantics with no fast-math rules. Division by zero and
+sqrt of negative values produce IEEE infinity/NaN instead of integer-style
+exceptions. NaN compares unequal to all values, including itself, and neither
+less-than comparison involving NaN is true. Positive/negative zero compare
+equal. The native backend emits scalar LLVM floating operations for saturated
+calls and uses equivalent C operations for escaping or partially applied calls.
+
+formatDouble : Int -> Double -> String
+The first argument is fixed decimal precision, between 0 and 17 inclusive.
+Formatting rounds the exact binary value to nearest, ties to even, preserves
+negative zero (including negative finite values rounded to zero), and uses a
+dot independent of the user's locale. Special values are "NaN", "Infinity",
+and "-Infinity". The interpreter rounds an exact Rational; the fresh native
+runtime uses C-locale snprintf with its initial nearest-even rounding mode.
+For example formatDouble 2 1.005 is "1.00", since the binary64 input is below
+the exact decimal midpoint. Native linking now includes -lm on POSIX systems.
+
+IntArray and DoubleArray are opaque nominal types of kind *. They cannot be
+redefined or constructed by data declarations. Their corresponding operations:
+
+newIntArray      : Int -> Int -> IO IntArray
+readIntArray     : IntArray -> Int -> IO Int
+writeIntArray    : IntArray -> Int -> Int -> IO Unit
+lengthIntArray   : IntArray -> IO Int
+newDoubleArray   : Int -> Double -> IO DoubleArray
+readDoubleArray  : DoubleArray -> Int -> IO Double
+writeDoubleArray : DoubleArray -> Int -> Double -> IO Unit
+lengthDoubleArray: DoubleArray -> IO Int
+
+Length is immutable; indices are zero-based. An index must satisfy
+0 <= index < length. New arrays initialize every cell and evaluate the initial
+number even for length zero. Negative or unrepresentable lengths fail before
+allocation. The current 64-bit implementations limit lengths to 2^60-1, then
+allocation is subject to available memory. Empty arrays are valid, but have no
+valid index. Invalid access reports "array index out of bounds"; invalid length
+reports "invalid array length". A write checks its index before forcing the
+new number and mutates only after those checks succeed.
+
+Every operation is sequenced through IO, including reads and length queries.
+Constructing, returning or sharing an action does not perform it. Running a
+shared allocation action twice creates distinct arrays; running a shared read
+action twice reads the current cell each time. Aliases refer to the same array,
+while a previously read numeric value is an immutable snapshot. Writes force
+the numeric value before storing, preventing a thunk from capturing a mutable
+location. No unsafe pure read, resize, raw pointer, or whole-workload helper is
+exposed. Numeric arrays support all current class/prelude/do machinery.
+
+The interpreter uses IOArray Int Integer and IOUArray Int Double. The native
+runtime uses contiguous arrays of tagged-or-GMP integer values and unboxed
+doubles. The collector marks every boxed integer cell and releases both array
+buffers at reclamation/exit. Managed values retain the 48-byte ABI, so adding
+arrays does not enlarge existing tree nodes. The IO driver can dispatch an
+eligible first-order numeric region that directly executes array effects in
+order, with unboxed Double intermediates and checked indices. Its argument
+guard never forces an unknown thunk; unsuccessful guards use the ordinary
+lazy implementation. Each execution of an action runs the region again.
+Collection occurs after the region returns to the driver, not while its
+native stack contains live values. See docs/llvm-backend.txt for eligibility
+and fallback details.
+
+NumericArrays in backend-tests checks both backends with the same checked and
+serialized target programs, expected output and errors. It covers generic
+curried operations, overflow boundaries, quotient signs, invalid parsing,
+floating special values, formatting, aliases, fresh repeated allocation,
+snapshot/repeated reads, bounds errors and collection with live numeric cells.
+Native-region cases also assert that the optimized worker was emitted and
+check repeated actions, aliasing, overflow, lazy fallback and error ordering.
+Benchmark kernels and baselines are described under benchmarks/.
+
+ByteArray and raw output
+------------------------
+ByteArray is an opaque nominal type of kind *, with the same allocation,
+index, mutation, aliasing and repeatable-action rules as numeric arrays:
+
+newByteArray       : Int -> Int -> IO ByteArray
+readByteArray      : ByteArray -> Int -> IO Int
+writeByteArray     : ByteArray -> Int -> Int -> IO Unit
+lengthByteArray    : ByteArray -> IO Int
+byteArrayFromString: String -> IO ByteArray
+putBytes          : ByteArray -> Int -> Int -> IO Unit
+
+Initial and written byte values must be between 0 and 255 inclusive. They
+are checked, never silently truncated. Reads return an Int snapshot. Each
+execution of byteArrayFromString creates a fresh mutable copy of the UTF-8
+encoding, including embedded NULs; length counts bytes, not Unicode characters.
+Invalid Unicode scalar literals are rejected by the target checker.
+
+putBytes array offset count writes exactly that slice and flushes stdout,
+without Unicode decoding, encoding, newline translation or a trailing newline.
+It reads the current buffer when executed, so a reused action sees intervening
+writes. Offset is checked first (0 <= offset <= length), then count
+(0 <= count <= length-offset), before emitting anything. A zero-length slice
+at the end is valid. Invalid slices report "byte slice out of bounds"; invalid
+stored bytes report "byte value must be between 0 and 255". Failure stops the
+continuation. Programs buffer output by filling reusable arrays before writing.
+
+The interpreter uses IOUArray Int Word8 and IOBackend.writeBytes (ByteString).
+The native runtime uses contiguous unsigned char buffers. Eligible native IO
+regions emit i8 loads/stores with the same bounds and value checks. Raw output
+returns to the ordinary IO driver. Byte buffers contain no collector pointers,
+and all pending slice operands remain rooted until execution.
+
+ByteArrays in backend-tests compares exact binary observations on both backends:
+all 256 byte values, UTF-8/NUL copies, aliases, reused actions, curried operations,
+empty slices, collection, validation/error order, and output failures. It also
+runs fasta fixtures and Mandelbrot's packed pixels, odd widths and upstream PBM.

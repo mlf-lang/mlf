@@ -1,26 +1,31 @@
 -- | Incremental, scope-preserving use of the checked graph unifier.
 --
 -- Type components are closed under structural edges in BOTH directions and
--- type binding edges in BOTH directions. Gen nodes stop this closure, but
--- their entire binding ancestry is retained. A Gen cannot be merged or be
--- a structural child; its binding parent must therefore also be a Gen.
+-- type binding edges in BOTH directions. Gen nodes stop this closure. Their
+-- binding ancestry is projected with every relevant type-binding LCA intact;
+-- unary empty Gen chains can be compressed and restored after unification.
+-- A Gen cannot be merged or be a structural child; its binding parent must
+-- therefore also be a Gen.
 -- Permissions of type nodes stop at Gens, and their inertness depends only
 -- on binding descendants inside the component. Consequently the projection
 -- preserves every relevant permission, structural parent and binding LCA.
 -- Unrelated Gen roots are represented by private bottom leaves, then restored.
 -- Neither these leaves nor compact scratch identities escape into the graph.
 module MLF.Graph.Solver
-  ( Solver, prepare, graph, finish, unify, instantiate, witness ) where
+  ( Solver, prepare, graph, finish, unify, instantiate, instantiateClosed, witness ) where
 
 import Control.Monad (forM, forM_, unless, when)
 import qualified Data.Array as A
 import qualified Data.IntMap.Strict as IM
+import qualified Data.IntMap.Lazy as Lazy
 import qualified Data.IntSet as IS
 import qualified Data.List as List
+import qualified Data.Set as Set
 import Data.Maybe (maybeToList)
 import MLF.Graph (Graph (..), Node (..), NodeId, Tag (..), children, resolve)
 import qualified MLF.Graph as G
 import MLF.Syntax (Flag (..))
+import MLF.Kind (Kind (..))
 
 type Index = IM.IntMap IS.IntSet
 
@@ -101,20 +106,47 @@ component solver = go IS.empty
 -- | Run the same checked unifier on a compact, closed component. Sorting
 -- identities preserves the unifier's minimum-identity representative choice.
 unify :: [(NodeId,NodeId)] -> Solver -> Either String Solver
-unify [] solver = pure solver
 unify equations solver = do
-  selected <- component solver (concatMap (\(a,b) -> [a,b]) equations)
   let g = graph solver
+      canonical = [(resolve g a,resolve g b) | (a,b) <- equations]
+  forM_ canonical $ \(a,b) -> forM_ [a,b] $ \n ->
+    unless (IM.member n (nodes g)) (Left ("missing graph node " ++ show n))
+  case filter (uncurry (/=)) canonical of
+    [] -> pure solver
+    pending -> unifyDistinct pending solver
+
+unifyDistinct :: [(NodeId,NodeId)] -> Solver -> Either String Solver
+unifyDistinct equations solver = do
+  connected <- component solver (concatMap (\(a,b) -> [a,b]) equations)
+  let g = graph solver
+      connectedNodes = IM.restrictKeys (nodes g) connected
+      -- Unary runs of generalization ancestors do not affect a type's
+      -- permissions or an LCA. Retain every type binder, visible Gen root,
+      -- branch point and the root. The projected binding tree then preserves
+      -- all possible type-binding LCAs, without hundreds of empty scope stubs
+      -- for a small equation deep inside a sequence of lets/IO binds.
+      typeBinders = IS.fromList [b | v <- IM.elems connectedNodes,
+        case tag v of Gen _ -> False; _ -> True, Just b <- [binder v]]
+      genChildren = IM.fromListWith (+) [(b,1::Int) | v <- IM.elems connectedNodes,
+        Gen _ <- [tag v], Just b <- [binder v]]
+      keep n v = case tag v of
+        Gen root -> binder v == Nothing || IS.member n typeBinders || IS.member root connected ||
+          IM.findWithDefault 0 n genChildren > 1
+        _ -> True
+      selected = IM.keysSet (IM.filterWithKey keep connectedNodes)
+      nearest = Lazy.mapWithKey (\n v -> if IS.member n selected then n else
+        maybe n (nearest IM.!) (binder v)) connectedNodes
       originals = [(n,nodes g IM.! n) | n <- IS.toAscList selected]
       count = length originals
       forward = IM.fromDistinctAscList (zip (map fst originals) [0..])
       backward = A.listArray (0,count-1) (map fst originals)
       compact n = forward IM.! resolve g n
+      projectBinder n = compact (nearest IM.! n)
       hiddenRoots = [(n,v) | (n,v) <- originals, Gen root <- [tag v], IS.notMember root selected]
       stubs = IM.fromList (zip (map fst hiddenRoots) [count..])
       localNode n v = Node
         (case IM.lookup n stubs of Just stub -> Gen stub; Nothing -> mapTag compact (tag v))
-        (fmap compact (binder v)) (flag v)
+        (fmap projectBinder (binder v)) (flag v)
       local = Graph (IM.fromDistinctAscList
         ([(compact n,localNode n v) | (n,v) <- originals] ++
          [(stub,Node Bot (Just (compact n)) Flexible) | ((n,_),stub) <- zip hiddenRoots [count..]]))
@@ -126,7 +158,7 @@ unify equations solver = do
       (Left "local unification changed a hidden scope root")
   forM_ originals $ \(n,v) -> case tag v of
     Gen _ -> case IM.lookup (compact n) (nodes solved) of
-      Just v' | binder v' == fmap compact (binder v), flag v' == flag v -> pure ()
+      Just v' | binder v' == fmap projectBinder (binder v), flag v' == flag v -> pure ()
       _ -> Left "local unification changed a generalization scope"
     _ -> pure ()
   let original n
@@ -143,12 +175,18 @@ unify equations solver = do
     t <- case tag (nodes g IM.! n') of
       Gen root -> pure (Gen (resolve withAliases root))
       _ -> traverseTag original (tag v)
-    b <- traverse original (binder v)
+    b <- case tag (nodes g IM.! n') of
+      Gen _ -> pure (binder (nodes g IM.! n'))
+      _ -> traverse original (binder v)
     pure (n',Node t b (flag v))
-  let patched = withAliases { nodes = IM.union (IM.fromDistinctAscList restored)
-        (IM.withoutKeys (nodes g) selected) }
-      removed = List.foldl' removeNode solver originals
-      indexed = List.foldl' addNode removed restored
+  let restoredMap = IM.fromDistinctAscList restored
+      removedNodes = [(n,v) | (n,v) <- originals, IM.lookup n restoredMap /= Just v]
+      changedNodes = [(n,v) | (n,v) <- restored, IM.lookup n (nodes g) /= Just v]
+      deleted = selected `IS.difference` IM.keysSet restoredMap
+      patched = withAliases { nodes = List.foldl' (\ns (n,v) -> IM.insert n v ns)
+        (IM.withoutKeys (nodes g) deleted) changedNodes }
+      removed = List.foldl' removeNode solver removedNodes
+      indexed = List.foldl' addNode removed changedNodes
   pure indexed { solverGraph = patched }
 
 -- Expansion only allocates fresh nodes. Its entire structural copy belongs
@@ -172,6 +210,111 @@ instantiate :: NodeId -> NodeId -> Solver -> Either String Solver
 instantiate source target solver = do
   (root,_,frontier,expandedSolver) <- expanded source target solver
   unify (frontier ++ [(root,target)]) expandedSolver
+
+-- | Production fast path; 'instantiate' remains the exact graph operation
+-- for clients requiring the fresh-copy identities and differential tests.
+instantiateClosed :: NodeId -> NodeId -> Solver -> Either String Solver
+instantiateClosed source target solver
+  | Just grafted <- groundGraft source target solver = pure grafted
+  | groundInstance (graph solver) source target = pure solver
+  | otherwise = instantiate source target solver
+
+-- Instantiating a closed monotype into a green bottom is exactly grafting.
+-- Copy its entire ground structure beneath the destination, with fresh
+-- identities and no shared frontier. There is no old type child to rebind,
+-- and all newly introduced nodes are inert. The destination's original
+-- identity/binder is retained, so every incoming reference stays valid.
+groundGraft :: NodeId -> NodeId -> Solver -> Maybe Solver
+groundGraft source destination solver = do
+  let g = graph solver
+      target = resolve g destination
+  old <- IM.lookup target (nodes g)
+  expectedKind <- case tag old of Bot -> Just Star; BotK k -> Just k; _ -> Nothing
+  unless (green g target) Nothing
+  sourceNode <- IM.lookup (resolve g source) (nodes g)
+  root <- case tag sourceNode of Gen n -> Just (resolve g n); _ -> Nothing
+  originals <- groundNodes g IS.empty [root]
+  unless (G.kindAt g root == Right expectedKind) Nothing
+  let descendants = IS.toAscList (IS.delete root originals)
+      count = length descendants
+  when (toInteger (nextId g) + toInteger count > toInteger (maxBound :: Int)) Nothing
+  let copies = IM.insert root target (IM.fromDistinctAscList (zip descendants [nextId g..]))
+      image n = copies IM.! resolve g n
+      replacement = old { tag = mapTag image (tag (G.nodeAt g root)) }
+      fresh = [(image n,Node (mapTag image (tag (G.nodeAt g n))) (Just target) Rigid) | n <- descendants]
+      g' = g { nodes = IM.insert target replacement (IM.union (IM.fromDistinctAscList fresh) (nodes g)),
+               nextId = nextId g + count }
+      indexed = List.foldl' addNode (removeNode solver (target,old)) ((target,replacement):fresh)
+  pure indexed { solverGraph = g' }
+  where
+    green g n = case G.nodeAt g n of
+      Node (Gen _) _ _ -> True
+      Node _ b Flexible -> maybe False (green g) b
+      _ -> False
+    groundNodes _ seen [] = Just seen
+    groundNodes g seen (x:xs)
+      | IS.member n seen = groundNodes g seen xs
+      | otherwise = do
+          v <- IM.lookup n (nodes g)
+          case tag v of
+            Bot -> Nothing; BotK _ -> Nothing; Skolem _ _ -> Nothing; Gen _ -> Nothing
+            t -> groundNodes g (IS.insert n seen) (children t ++ xs)
+      where n = resolve g x
+
+-- A closed target cannot constrain any frontier variable. Match its shape
+-- against the source, allowing only unconstrained flexible variables bound
+-- directly by the source Gen. Repeated variables must have equal ground
+-- images and kinds must agree. No external variable or bounded/rigid bottom
+-- is substituted. All target nodes are inert, so retaining their distinct
+-- identities changes no permission after normalization. General instances
+-- continue through expansion/unification, and xMLF evidence is still checked.
+groundInstance :: Graph -> NodeId -> NodeId -> Bool
+groundInstance g source target = case IM.lookup (resolve g source) (nodes g) of
+  Just (Node (Gen root) _ _) -> closed IS.empty [target] && go Set.empty IM.empty [(root,target)]
+  _ -> False
+  where
+    closed _ [] = True
+    closed seen (x:xs)
+      | IS.member n seen = closed seen xs
+      | otherwise = case IM.lookup n (nodes g) of
+          Just v -> case tag v of
+            Bot -> False; BotK _ -> False; Skolem _ _ -> False; Gen _ -> False
+            t -> closed (IS.insert n seen) (children t ++ xs)
+          Nothing -> False
+      where n = resolve g x
+    go _ _ [] = True
+    go seen images ((x,y):rest)
+      | Set.member (a,b) seen = go seen images rest
+      | otherwise = case (IM.lookup a (nodes g),IM.lookup b (nodes g)) of
+          (Just av,Just bv) -> case (tag av,tag bv) of
+            (Bot,_) -> variable av Star
+            (BotK k,_) -> variable av k
+            (TyCon c k,TyCon d l) | c == d && k == l -> next []
+            (Arr p q,Arr r s) -> next [(p,r),(q,s)]
+            (TyApp p q,TyApp r s) -> next [(p,r),(q,s)]
+            (Con c ps,Con d qs) | c == d && length ps == length qs -> next (zip ps qs)
+            _ -> False
+          _ -> False
+      where
+        a = resolve g x; b = resolve g y
+        next pairs = go (Set.insert (a,b) seen) images (pairs ++ rest)
+        variable v k = flag v == Flexible && binder v == Just (resolve g source) &&
+          G.kindAt g b == Right k &&
+          case IM.lookup a images of
+            Nothing -> go (Set.insert (a,b) seen) (IM.insert a b images) rest
+            Just previous -> equal Set.empty [(previous,b)] && next []
+    equal _ [] = True
+    equal seen ((x,y):rest)
+      | a == b || Set.member (a,b) seen = equal seen rest
+      | otherwise = case (tag (G.nodeAt g a),tag (G.nodeAt g b)) of
+          (TyCon c k,TyCon d l) | c == d && k == l -> next []
+          (Arr p q,Arr r s) -> next [(p,r),(q,s)]
+          (TyApp p q,TyApp r s) -> next [(p,r),(q,s)]
+          (Con c ps,Con d qs) | c == d && length ps == length qs -> next (zip ps qs)
+          _ -> False
+      where
+        a = resolve g x; b = resolve g y
+        next pairs = equal (Set.insert (a,b) seen) (pairs ++ rest)
 
 -- | Elaboration preserves the required separate frontier-solving step and
 -- returns the original-to-copy identities used to construct instance proofs.
