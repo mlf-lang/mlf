@@ -1,7 +1,7 @@
 -- | Classes elaborate to ordinary, explicitly typed dictionary data. Local
 -- overloaded lets abstract their wanted dictionaries; uses request fresh
 -- evidence, so the graph solver still controls type generalization.
-module MLF.Classes (lowerClasses, lowerClassesWithImports, prettyQualified) where
+module MLF.Classes (lowerClasses, lowerClassesWithImports, lowerClassesWithScopes, prettyQualified) where
 
 import Control.Monad (foldM, forM, forM_, unless, when)
 import Control.Monad.State.Strict
@@ -11,6 +11,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified MLF.Data as D
 import MLF.Desugar (desugarDo)
+import MLF.Surface (lowerSurface, patternVariables)
 import MLF.Kind
 import qualified MLF.Kinding as K
 import qualified MLF.Syntax as S
@@ -22,6 +23,8 @@ type Infos = Map.Map String Info
 type Front = StateT (Int,Set.Set String) (Either String)
 type Overloads = Map.Map String (String,[String])
 type Wants = [(String,String)]
+type Candidates = [(S.EvidenceRole,String)]
+type ValueScopes = Map.Map String Candidates
 
 fresh :: String -> Front String
 fresh prefix = do
@@ -111,8 +114,21 @@ lowerClasses = lowerClassesWithImports Set.empty
 -- Imported classes retain their full dictionaries and instance interfaces.
 -- Only unqualified method lookup gives local declarations precedence.
 lowerClassesWithImports :: Set.Set String -> S.Program -> Either String (S.Program, Map.Map String String)
-lowerClassesWithImports _ p@(S.Program _ _) = pure (p,Map.empty)
-lowerClassesWithImports imported program@(S.ClassProgram datatypes declarations instances body) = do
+lowerClassesWithImports imported original = lowerSurface original >>= lowerCoreClasses imported Map.empty Nothing
+
+-- Indices refer to instances in source order, after the module graph is linked.
+-- A definition must not acquire instances merely because its caller imports them.
+lowerClassesWithScopes :: Map.Map String (Set.Set Int) -> [Set.Set Int] -> S.Program
+                       -> Either String (S.Program, Map.Map String String)
+lowerClassesWithScopes values instances original =
+  lowerSurface original >>= lowerCoreClasses Set.empty values (Just instances)
+
+lowerCoreClasses :: Set.Set String -> Map.Map String (Set.Set Int) -> Maybe [Set.Set Int]
+                 -> S.Program -> Either String (S.Program, Map.Map String String)
+lowerCoreClasses _ _ _ p@(S.Program _ _) = pure (p,Map.empty)
+lowerCoreClasses imported valueIndices instanceIndices program@(S.ClassProgram datatypes declarations instances body) = do
+  forM_ instanceIndices $ \scopes ->
+    unless (length scopes == length instances) (Left "module instance scope count mismatch")
   base <- D.validateDeclarations datatypes
   unique "class" (map S.className declarations)
   forM_ [False,True] $ \isImported ->
@@ -143,21 +159,24 @@ lowerClassesWithImports imported program@(S.ClassProgram datatypes declarations 
       checkedInstances <- lift (mapM (validateInstance ds infos) instances)
       lift (checkOverlap checkedInstances)
       names <- mapM (const (fresh "instanceDictionary")) checkedInstances
-      let globalCandidates = [(S.InstanceEvidence,n) | n <- names] ++
-            [(S.SuperclassEvidence,n) | (_,Info _ _ _ _ ns) <- entries, n <- ns]
+      let supers = [(S.SuperclassEvidence,n) | (_,Info _ _ _ _ ns) <- entries, n <- ns]
+          globalCandidates = [(S.InstanceEvidence,n) | n <- names] ++ supers
+          select indices = [(S.InstanceEvidence,n) | (i,n) <- zip [0..] names, Set.member i indices] ++ supers
+          valueScopes = Map.map select valueIndices
+          instanceScopes = maybe (repeat globalCandidates) (map select) instanceIndices
           methodBindings isImported = Map.fromList [(name,(selector,[className])) |
             (className,Info _ _ _ methods _) <- entries,
             Set.member className imported == isImported, (name,selector) <- methods]
           methodEnv = Map.union (methodBindings False) (methodBindings True)
       selectors <- concat <$> mapM (selectorDefinitions infos . snd) entries
-      definitions <- forM (zip names checkedInstances) $ \(name,inst) -> do
+      definitions <- forM (zip3 names checkedInstances instanceScopes) $ \(name,inst,available) -> do
         Info decl _ ctor _ _ <- lift (lookupInfo infos (S.instanceClass inst))
         givenNames <- mapM (const (fresh "givenDictionary")) (S.instanceContext inst)
         let givens = [(S.GivenEvidence,n) | n <- givenNames]
-            candidates = givens ++ globalCandidates
+            candidates = givens ++ available
         methodBodies <- forM (S.classMethods decl) $ \(method,methodType) -> do
           original <- maybe (lift (Left ("missing instance method: " ++ method))) pure (lookup method (S.instanceMethods inst))
-          (translated,wants) <- lowerExpr ds infos methodEnv candidates original
+          (translated,wants) <- lowerExpr valueScopes ds infos methodEnv candidates original
           expected <- instantiateMethod (Map.fromList (zip (map fst (S.classParameters decl)) (S.instanceHead inst))) methodType
           pure (S.Checked expected (closeWants infos candidates wants translated))
         superBodies <- forM (S.superclasses decl) $ \(S.Predicate c _) -> do
@@ -169,7 +188,7 @@ lowerClassesWithImports imported program@(S.ClassProgram datatypes declarations 
             rhs = foldr (\n b -> S.Lam n Nothing b)
               (foldl S.App (S.Constructor ctor) (superBodies ++ methodBodies)) givenNames
         pure (name,S.Annotation [] ty,rhs)
-      (expression,wants) <- lowerExpr ds infos methodEnv globalCandidates body
+      (expression,wants) <- lowerExpr valueScopes ds infos methodEnv globalCandidates body
       let result = closeWants infos globalCandidates wants expression
           bindings = [(n,annotation,S.Checked ty rhs) | (n,annotation@(S.Annotation [] ty),rhs) <- selectors ++ definitions]
           expr = if null bindings then result else S.LetRec bindings result
@@ -292,8 +311,8 @@ occurrences a (S.TypeApp f x) = occurrences a f + occurrences a x
 occurrences a (S.Arrow x y) = occurrences a x + occurrences a y
 occurrences _ _ = 0
 
-lowerExpr :: D.DataEnv -> Infos -> Overloads -> [(S.EvidenceRole,String)] -> S.Expr -> Front (S.Expr,Wants)
-lowerExpr ds infos env candidates expression = case expression of
+lowerExpr :: ValueScopes -> D.DataEnv -> Infos -> Overloads -> Candidates -> S.Expr -> Front (S.Expr,Wants)
+lowerExpr valueScopes ds infos env candidates expression = case expression of
   S.Var x -> case Map.lookup x env of
     Nothing -> pure (expression,[])
     Just (name,classes) -> do
@@ -321,16 +340,16 @@ lowerExpr ds infos env candidates expression = case expression of
         translated <- if null existential then lift (translateScheme ds infos ty) else pure ty
         let (_,ps,_) = scheme ty
         pure (Just (S.Annotation existential translated),[c | S.Predicate c _ <- ps])
-    (body',wants) <- lowerExpr ds infos (Map.insert x (x,classes) env) candidates body
+    (body',wants) <- lowerExpr valueScopes ds infos (Map.insert x (x,classes) env) candidates body
     pure (S.Lam x annotation' body',wants)
   S.Let x (S.Ann rhs (S.Annotation [] ty)) body -> do
-    rhs' <- signed rhs ty
+    rhs' <- signedIn (forValue x) env rhs ty
     let (_,ps,_) = scheme ty
-    (body',wants) <- lowerExpr ds infos (Map.insert x (x,[c | S.Predicate c _ <- ps]) env) candidates body
+    (body',wants) <- lowerExpr valueScopes ds infos (Map.insert x (x,[c | S.Predicate c _ <- ps]) env) candidates body
     pure (S.Let x rhs' body',wants)
   S.Let x rhs body -> do
-    (rhs',wanted) <- recurse rhs
-    (body',wants) <- lowerExpr ds infos (Map.insert x (x,map snd wanted) env) candidates body
+    (rhs',wanted) <- lowerExpr valueScopes ds infos env (forValue x) rhs
+    (body',wants) <- lowerExpr valueScopes ds infos (Map.insert x (x,map snd wanted) env) candidates body
     pure (S.Let x (foldr (\(n,_) -> S.Lam n Nothing) rhs' wanted) body',wants)
   S.Ann a (S.Annotation existential ty) -> do
     let (_,ps,_) = scheme ty
@@ -345,23 +364,37 @@ lowerExpr ds infos env candidates expression = case expression of
   S.Case a branches -> do
     (a',as) <- recurse a
     bs <- forM branches $ \(S.Alternative p b) -> do
-      let names = case p of S.ConstructorPattern _ ns -> [n | Just n <- ns]; S.DefaultPattern n -> [x | Just x <- [n]]
+      let names = patternVariables p
           scope = foldr (\n -> Map.insert n (n,[])) env names
-      (b',wants) <- lowerExpr ds infos scope candidates b
+      (b',wants) <- lowerExpr valueScopes ds infos scope candidates b
       pure (S.Alternative p b',wants)
     pure (S.Case a' (map fst bs),as ++ concatMap snd bs)
   S.Do _ _ -> recurse (desugarDo expression)
-  S.LetRec _ _ -> lift (Left "recursive source forms are reserved for dictionary translation")
+  S.LetRec definitions body -> do
+    signatures <- forM definitions $ \(n,a,rhs) -> case a of
+      S.Annotation [] ty -> pure (n,ty,rhs)
+      _ -> lift (Left ("recursive definition " ++ n ++ " requires an explicit closed signature"))
+    let entry (n,ty,_) = let (_,ps,_) = scheme ty in (n,(n,[c | S.Predicate c _ <- ps]))
+        scope = Map.union (Map.fromList (map entry signatures)) env
+    definitions' <- forM signatures $ \(n,ty,rhs) -> do
+      translated <- lift (translateScheme ds infos ty)
+      rhs' <- signedIn (forValue n) scope rhs ty
+      pure (n,S.Annotation [] translated,rhs')
+    (body',wants) <- lowerExpr valueScopes ds infos scope candidates body
+    pure (S.LetRec definitions' body',wants)
+  S.Equations _ -> lift (Left "surface equations escaped lowering")
   S.Wanted _ _ -> lift (Left "dictionary holes are reserved for dictionary translation")
   S.Checked _ _ -> lift (Left "checked source forms are reserved for dictionary translation")
   where
-    recurse = lowerExpr ds infos env candidates
-    signed a ty = do
+    recurse = lowerExpr valueScopes ds infos env candidates
+    forValue name = Map.findWithDefault candidates name valueScopes
+    signed = signedIn candidates env
+    signedIn available scope a ty = do
       translated <- lift (translateScheme ds infos ty)
       let (_,ps,_) = scheme ty
       names <- mapM (const (fresh "givenDictionary")) ps
-      let local = [(S.GivenEvidence,n) | n <- names] ++ candidates
-      (body,wants) <- lowerExpr ds infos env local a
+      let local = [(S.GivenEvidence,n) | n <- names] ++ available
+      (body,wants) <- lowerExpr valueScopes ds infos scope local a
       let closed = closeWants infos local wants body
       pure (S.Checked translated (foldr (\n -> S.Lam n Nothing) closed names))
 
@@ -377,6 +410,7 @@ closeWants infos candidates wants = go
       S.Ann a t -> S.Ann (go a) t
       S.Case a bs -> S.Case (go a) [S.Alternative p (go b) | S.Alternative p b <- bs]
       S.Checked ty a -> S.Checked ty (go a)
+      S.LetRec ds b -> S.LetRec [(n,t,go a) | (n,t,a) <- ds] (go b)
       _ -> expr
 
 -- Substitute all class parameters simultaneously. Instance variables may

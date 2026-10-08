@@ -1,76 +1,94 @@
 -- Reverse-complement every FASTA record, using a complement lookup table
 -- and reusable 60-column output chunks. All byte work is written in MLF.
-data Rec a = Rec (Rec a -> a);
-let fix : forall a. (a -> a) -> a = \f ->
-  let go = \r -> case r of { Rec next -> f (next r) } in go (Rec go) in
-let minimum = \a b -> ifThenElse (ltInt a b) a b in
+
+minimum a b = if a < b then a else b
+
 -- Read one line at a time. Each record starts small and doubles as needed;
 -- no file-size query or whole-input allocation is used.
-let copy : ByteArray -> ByteArray -> Int -> Int -> Int -> IO Unit =
-  fix (\again source dest n offset i -> ifThenElse (ltInt i n) (do {
-    b <- readByteArray source i; writeByteArray dest (addInt offset i) b;
-    again source dest n offset (addInt i 1)
-  }) (return ())) in
-let capacityFor : Int -> Int -> IO Int = fix (\again capacity needed ->
-  ifThenElse (ltInt capacity needed) (again (mulInt capacity 2) needed) (return capacity)) in
-let trimLine : ByteArray -> Int -> IO Int = fix (\again line n ->
-  ifThenElse (eqInt n 0) (return 0) (do {
-    b <- readByteArray line (subInt n 1);
-    ifThenElse (eqInt b 10) (again line (subInt n 1))
-      (ifThenElse (eqInt b 13) (again line (subInt n 1)) (return n))
-  })) in
+copy : ByteArray -> ByteArray -> Int -> Int -> Int -> IO Unit
+copy source dest n offset i =
+  if i < n then do
+    b <- readByteArray source i
+    writeByteArray dest (offset + i) b
+    copy source dest n offset (i + 1)
+  else return ()
 
-let initTable : ByteArray -> ByteArray -> ByteArray -> Int -> IO Unit =
-  fix (\again table letters complements i -> ifThenElse (ltInt i 16) (do {
-    b <- readByteArray letters i; c <- readByteArray complements i;
-    writeByteArray table b c; writeByteArray table (addInt b 32) c;
-    again table letters complements (addInt i 1)
-  }) (return ())) in
-let fillRow : ByteArray -> ByteArray -> ByteArray -> Int -> Int -> Int -> Int -> IO Unit =
-  fix (\again table source out last offset count i -> ifThenElse (ltInt i count) (do {
-    b <- readByteArray source (subInt last i); c <- readByteArray table b;
-    writeByteArray out (addInt offset i) c;
-    again table source out last offset count (addInt i 1)
-  }) (return ())) in
-let fill : ByteArray -> ByteArray -> ByteArray -> Int -> Int -> Int -> IO Unit =
-  fix (\again table source out last remaining offset ->
-    ifThenElse (eqInt remaining 0) (return ()) (do {
-      let count = minimum remaining 60;
-      fillRow table source out last offset count 0;
-      writeByteArray out (addInt offset count) 10;
-      again table source out (subInt last count) (subInt remaining count) (addInt (addInt offset count) 1)
-    })) in
-let emit : ByteArray -> ByteArray -> ByteArray -> Int -> IO Unit =
-  fix (\again table out source remaining -> ifThenElse (eqInt remaining 0) (return ()) (do {
-    let count = minimum remaining 61440;
-    fill table source out (subInt remaining 1) count 0;
-    putBytes out 0 (addInt count (quotInt (addInt count 59) 60));
-    again table out source (subInt remaining count)
-  })) in
-let records : ByteArray -> ByteArray -> ByteArray -> Int -> Int -> IO Unit =
-  fix (\again table out bytes used capacity -> do {
-    line <- getByteLine; length <- lengthByteArray line;
-    ifThenElse (eqInt length 0) (emit table out bytes used) (do {
-      first <- readByteArray line 0;
-      ifThenElse (eqInt first 62) (do {
-        emit table out bytes used; putBytes line 0 length;
-        again table out bytes 0 capacity
-      }) (do {
-        count <- trimLine line length;
-        let needed = addInt used count;
-        ifThenElse (ltInt capacity needed) (do {
-          next <- capacityFor capacity needed;
-          grown <- newByteArray next 0; copy bytes grown used 0 0;
-          copy line grown count used 0; again table out grown needed next
-        }) (do { copy line bytes count used 0; again table out bytes needed capacity })
-      })
-    })
-  }) in
-do {
-  table <- newByteArray 256 0;
-  letters <- byteArrayFromString "ACGTUMRWSYKVHDBN";
-  complements <- byteArrayFromString "TGCAAKYWSRMBDHVN";
-  initTable table letters complements 0;
-  bytes <- newByteArray 1024 0; out <- newByteArray 62464 0;
+capacityFor : Int -> Int -> IO Int
+capacityFor capacity needed = if capacity < needed then capacityFor (capacity * 2) needed else return capacity
+
+trimLine : ByteArray -> Int -> IO Int
+trimLine line n =
+  if n == 0 then return 0
+  else do
+    b <- readByteArray line (n - 1)
+    if b == 10 then trimLine line (n - 1) else if b == 13 then trimLine line (n - 1) else return n
+
+initTable : ByteArray -> ByteArray -> ByteArray -> Int -> IO Unit
+initTable table letters complements i =
+  if i < 16 then do
+    b <- readByteArray letters i
+    c <- readByteArray complements i
+    writeByteArray table b c
+    writeByteArray table (b + 32) c
+    initTable table letters complements (i + 1)
+  else return ()
+
+fillRow : ByteArray -> ByteArray -> ByteArray -> Int -> Int -> Int -> Int -> IO Unit
+fillRow table source out last offset count i =
+  if i < count then do
+    b <- readByteArray source (last - i)
+    c <- readByteArray table b
+    writeByteArray out (offset + i) c
+    fillRow table source out last offset count (i + 1)
+  else return ()
+
+fill : ByteArray -> ByteArray -> ByteArray -> Int -> Int -> Int -> IO Unit
+fill table source out last remaining offset =
+  if remaining == 0 then return ()
+  else do
+    let count = minimum remaining 60
+    fillRow table source out last offset count 0
+    writeByteArray out (offset + count) 10
+    fill table source out (last - count) (remaining - count) (offset + count + 1)
+
+emit : ByteArray -> ByteArray -> ByteArray -> Int -> IO Unit
+emit table out source remaining =
+  if remaining == 0 then return ()
+  else do
+    let count = minimum remaining 61440
+    fill table source out (remaining - 1) count 0
+    putBytes out 0 (count + (count + 59) / 60)
+    emit table out source (remaining - count)
+
+records : ByteArray -> ByteArray -> ByteArray -> Int -> Int -> IO Unit
+records table out bytes used capacity = do
+  line <- getByteLine
+  length <- lengthByteArray line
+  if length == 0 then emit table out bytes used
+  else do
+    first <- readByteArray line 0
+    if first == 62 then do
+      emit table out bytes used
+      putBytes line 0 length
+      records table out bytes 0 capacity
+    else do
+      count <- trimLine line length
+      let needed = used + count
+      if capacity < needed then do
+        next <- capacityFor capacity needed
+        grown <- newByteArray next 0
+        copy bytes grown used 0 0
+        copy line grown count used 0
+        records table out grown needed next
+      else do
+        copy line bytes count used 0
+        records table out bytes needed capacity
+
+main = do
+  table <- newByteArray 256 0
+  letters <- byteArrayFromString "ACGTUMRWSYKVHDBN"
+  complements <- byteArrayFromString "TGCAAKYWSRMBDHVN"
+  initTable table letters complements 0
+  bytes <- newByteArray 1024 0
+  out <- newByteArray 62464 0
   records table out bytes 0 1024
-}

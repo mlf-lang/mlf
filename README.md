@@ -26,12 +26,13 @@ cabal run emlf -- --type examples/monad-maybe.emlf
 cabal run emlf -- --type examples/monad-state-do.emlf
 cabal run emlf -- --run examples/io-hello.emlf
 cabal run emlf -- --run examples/snake.emlf
+cabal run emlf -- --run examples/modules/Main.emlf
 ```
 
 Omit `--offline` if the dependencies are not already installed. The executable
 also accepts standard input and `--expr '...source...'`. `--type` prints only
 the inferred source type, including class constraints. A failed parse,
-inference, dictionary resolution, elaboration, or verification
+module resolution, inference, dictionary resolution, elaboration, or verification
 exits unsuccessfully and identifies the failing phase.
 
 The output is xMLF source, preceded by a comment containing its type. Compile
@@ -92,7 +93,8 @@ runtime with a 64-bit ABI, tested on macOS ARM64 with Clang 23.1.2 and GMP 6.3.0
 `cabal test -j1` runs every backend behavior test through both the xMLF
 interpreter and LLVM native code. The shared matrix compares results, ordered
 read/write events, write boundaries, and unused input. It includes all 16
-examples, IO and Prelude behavior, and all seven Snake sessions and eleven
+standalone examples, the multi-file module example, IO and Prelude behavior,
+and all seven Snake sessions and eleven
 rule checks against the independent Haskell game. A coverage audit fails if
 either backend is missing from any execution case.
 Run the shared suite, optionally with sanitizers or LLVM optimization disabled:
@@ -113,25 +115,36 @@ reports xMLF emission, LLVM IR emission, and complete native builds separately.
 
 ## Source language
 
+The grammar below shows explicit separators; indentation can supply the
+braces and semicolons described under Layout.
+
 ```text
-program ::= ((data-declaration | class-declaration | instance-declaration) ";")* e
+program ::= (declaration ";")* e
+          | (declaration ";")* value-declaration [";"]
+declaration ::= data-declaration | class-declaration | instance-declaration
+              | value-declaration
+value-declaration ::= [x ":" annotation ";"] x pattern-atom ... [":" annotation] = e
+binding-block ::= value-declaration | { value-declaration; ... }
 
 e ::= x | integer | double | string | true | false | ()
-    | \x -> e | \(x : annotation) -> e
-    | e e | let x = e in e | (e : annotation)
+    | \pattern-atom ... -> e
+    | e e | let [rec] binding-block in e | (e : annotation)
+    | if e then e else e | e operator e | -e | +e
     | Constructor | case e of { pattern -> e; ... }
     | do { statement; ...; e }
 
-statement ::= pattern <- e | e | let x [: annotation] = e
+statement ::= pattern <- e | e | let [rec] binding-block
 
 data-declaration ::= data TypeName parameter ... = Constructor field ... | ...
 parameter ::= a | (a : kind)
 kind ::= * | kind -> kind
-pattern ::= Constructor x-or-wildcard ... | x | _
+pattern ::= Constructor pattern-atom ... | pattern-atom
+pattern-atom ::= x | _ | Constructor | integer | string | true | false | ()
+               | (pattern) | (x : annotation)
 
 class-declaration ::= class [context =>] ClassName parameter ... where { method : type; ... }
 instance-declaration ::= instance [forall parameter ... .] [context =>]
-                         ClassName type-atom ... where { method = e; ... }
+                         ClassName type-atom ... where { value-declaration; ... }
 context ::= ClassName type-atom ... | (ClassName type-atom ..., ...)
 type-atom ::= a | Constructor | (type)
 
@@ -153,12 +166,262 @@ existentials, whose values are inferred. Comments use `--` or nested `{- -}`.
 
 The source includes lambda, application, nonrecursive let, expression and
 parameter annotations, integer/Double/Boolean/string literals, algebraic data types, and
-type classes with multiple and higher-kinded parameters, and `do` blocks.
-Abstract constructor types are still allowed in annotations for library
-signatures. General recursive source bindings are not implemented. Instance methods can
-be recursive through their dictionaries. The interpreter evaluates erased
+type classes with multiple and higher-kinded parameters, `do` blocks,
+function equations, nested patterns, typed recursive bindings, layout,
+conditionals, fixed-precedence infix operators, and named modules with imports.
+Module-free core programs also allow abstract constructor types in annotations;
+named modules resolve type names through their declarations and imports.
+Instance methods can be recursive through their dictionaries.
+The interpreter evaluates erased
 xMLF with lazy bindings and executes explicit IO actions. xMLF type computations are
 compilation evidence; erasure removes them.
+
+### Modules and imports
+
+Files can declare a module and its public interface:
+
+```haskell
+-- Geometry/Point.emlf
+module Geometry.Point (Point(..), move, distanceSquared) where
+
+data Point = Point Int Int
+
+move dx dy (Point x y) = Point (x + dx) (y + dy)
+square x = x * x
+distanceSquared (Point x y) = square x + square y
+```
+
+```haskell
+-- Main.emlf
+module Main (main) where
+
+import Geometry.Point (Point(..))
+import qualified Geometry.Point as Point (move, distanceSquared)
+
+main = do
+  let destination = Point.move 3 4 (Point 0 0)
+  printInt (Point.distanceSquared destination)
+```
+
+Run the complete [example](examples/modules/Main.emlf) with
+`cabal run emlf -- --run examples/modules/Main.emlf`; it prints `25`.
+The same entry works with `--type`, xMLF emission, and `--emit-llvm`.
+
+Import/export forms follow the names-and-interfaces model in
+[Haskell 2010, Chapter 5](https://www.haskell.org/onlinereport/haskell2010/haskellch5.html):
+
+| Form | Effect |
+| --- | --- |
+| `module A where` | Exports all local declarations. Imported names stay private. |
+| `module A (f, T, C(method)) where` | Exports `f`, abstract datatype `T`, and class `C` with one method. |
+| `T(..)` / `T(MkT)` | Includes all visible constructors / selected constructors; the same forms select class methods. |
+| `import A` | Imports exported names both unqualified and as `A.name`. |
+| `import A (f, T(..))` | Imports only those names. |
+| `import A hiding (f)` | Excludes `f` from both unqualified and qualified access. |
+| `import qualified A as B` | Exposes names only as `B.name`. |
+| `import A as B` | Exposes names unqualified and as `B.name`. |
+| `module A (module B) where` | Re-exports names available both unqualified and through `B`, which may be an import alias. |
+| `import A ()` | Imports no names, but still imports instances transitively. |
+
+Imports precede declarations. A named module contains declarations only;
+the entry evaluates its local `main`, or an imported `main` when there is no
+local one. Library modules need no `main`. Headerless scripts may also use
+imports and keep their existing final-expression syntax.
+Qualified names work in expressions, annotations, data fields, class constraints,
+instance heads, and constructor patterns.
+
+Unexported helpers, types, and constructors cannot be accessed even through a
+qualified name. Distinct modules may reuse private names safely. Repeated imports
+of the same original declaration are harmless; two different declarations with
+the same name make an unqualified use ambiguous. Use qualification or `hiding`
+to resolve a conflict, including conflicts with a top-level local definition.
+Lambda, pattern, and local-let binders shadow imported values normally.
+
+Instances follow the transitive import graph independently of export lists.
+Instance bodies can use module-level helpers. Each signed value and instance
+is checked using the instances visible in its defining module; importing it
+alongside another instance does not retroactively change that scope.
+Overlapping instances remain an error.
+
+Each module implicitly imports the built-in `Prelude`. Any explicit
+`import Prelude`, including `qualified` or `()`, suppresses that implicit import
+for that file. For example, `import Prelude hiding (return)` permits a local
+`return`. Prelude exports the existing primitives, builtin types, `Monad`,
+and its `IO` instance. `--no-prelude` disables implicit class imports across the
+graph; explicit Prelude imports still work, and files without one retain the
+existing primitive fallback. Literals, unit syntax, fixed operators, and `if`
+remain built-in syntax.
+
+The loader maps `Foo.Bar` to `Foo/Bar.emlf`. It searches beside the entry,
+then each `-i` directory in order, then the entry's inferred hierarchy root
+and the current directory; the first matching file wins. An imported file
+must declare the requested module name. Put search options before the command:
+
+```sh
+cabal run emlf -- -i src -i vendor --run app/Main.emlf
+cabal run emlf -- -isrc --emit-llvm app/Main.emlf > program.ll
+```
+
+For API users, `parseModule` preserves declarations and imports.
+`compileFile searchRoots path` loads a graph from disk; `compileModules sources
+path input` is pure and takes a `Map moduleName (filePath, sourceText)`.
+Both have `WithPrelude` variants, and `compileSourceWithImports` loads imports
+for an entry supplied as text. `compile` remains pure: it accepts standalone
+modules and builtin Prelude imports, but external imports require one of those
+graph-loading APIs. `parseProgram` and `compileProgram` remain the closed-program
+APIs used by existing clients.
+
+This implementation links source modules into one program before inference,
+then uses the same checked xMLF and both existing backends. Private declarations
+are still checked. It does not yet provide cyclic imports, separate object/interface
+compilation, packages, or user-defined operator imports. An import cycle reports
+its dependency chain. Ordinary module-free scripts retain the existing compilation
+path and Prelude behavior.
+
+### Function declarations and expressions
+
+Top-level values and functions use aligned or semicolon-separated declarations. A file
+without a final expression evaluates its `main` binding:
+
+```haskell
+scale : Int -> Int -> Int
+scale x y = x * 4 + y
+
+main = do
+  let result = scale 10 2
+  if result == 42 then putStrLn "forty-two" else printInt result
+```
+
+A separate signature must immediately precede its definition. You can also
+write an inline signature, such as `scale x y : Int -> Int -> Int = x * 4 + y`;
+it annotates the whole function. Parameters may have annotations, for example
+`apply (f : forall a. a -> a) = f f`. Function parameters also work in local
+bindings (`let inc x = x + 1 in inc 41`), `do` declarations
+(`do { let inc x = x + 1; printInt (inc 41) }`), and instance methods.
+
+Top-level values can refer forward to other values. The compiler orders
+dependencies and generalizes acyclic definitions as ordinary `let` bindings;
+recursive groups require signatures as described below. In module-free scripts,
+class and instance declarations retain their separate scope. A final expression can select a
+result instead of `main`: `inc x = x + 1; inc 41`.
+
+Functions may have multiple contiguous equations with the same number of
+parameters. They are tried in source order. Constructor patterns can nest;
+parenthesize a constructor application used as a parameter:
+
+```haskell
+data List a = Nil | Cons a (List a)
+
+second (Cons _ (Cons x _)) = x
+second _ = 0
+
+main = printInt (second (Cons 10 (Cons 42 Nil)))
+```
+
+Patterns also work in lambdas, `case`, `do` bindings, and instance methods.
+Integer, string, and Boolean literal patterns are supported. Use a fallback
+variable or `_` for integer and string matches, and cover both Boolean values
+or provide a fallback. Matches must be exhaustive. Pattern variables are
+distinct within an equation and scope only over its body. Wildcards leave
+their values lazy; matching tests each equation's required arguments from
+left to right. Nested patterns lower to flat, independently checked xMLF cases.
+
+### Layout
+
+Align top-level declarations at the same indentation. After `do`, `of`, or
+`where`, the first item establishes the block's indentation. Items at that
+column are separated implicitly; a dedent closes the block. More deeply
+indented lines continue the current item. Strings and comments do not affect
+layout, and parse errors retain the original source positions.
+
+```haskell
+move direction (Position x y) =
+  case direction of
+    North -> Position x (y - 1)
+    South -> Position x (y + 1)
+    West -> Position (x - 1) y
+    East -> Position (x + 1) y
+```
+
+A `let` or `let rec` followed by a newline introduces an aligned group of
+local declarations, ending at `in` or the next `do` statement. Inline
+`let x = value in body` and `do { let x = value; action }` remain available.
+Explicit braces and semicolons can be mixed with layout; use braces for
+multiple declarations on one line. Parentheses suspend surrounding layout,
+while an implicit block opened inside parentheses still follows indentation.
+
+### Recursive bindings
+
+Every member of a recursive top-level dependency group needs an explicit,
+closed signature. This supports self recursion, mutual recursion, cyclic
+lazy data, and polymorphic recursion without guessing recursive MLF schemes:
+
+```haskell
+factorial : Int -> Int
+factorial 0 = 1
+factorial n = n * factorial (n - 1)
+
+main = printInt (factorial 6)
+```
+
+An ordinary local `let` keeps its nonrecursive meaning. Use `let rec` for
+local recursion, including inside `do`:
+
+```haskell
+main = do
+  let rec
+    countdown : Int -> IO Unit
+    countdown 0 = putStrLn "done"
+    countdown n = do
+      printInt n
+      countdown (n - 1)
+  countdown 3
+```
+
+Local recursive groups require signatures on every binding. Quantified and
+qualified signatures, such as `forall (m : * -> *) a. Monad m => Int -> m a -> m a`,
+are supported; free annotation variables and existential signatures are not
+closed recursive interfaces. Bodies are checked against their declared schemes,
+and recursive uses instantiate those schemes. The generated xMLF `letrec` is
+verified by the existing independent checker.
+
+### Conditionals and operators
+
+`if condition then yes else no` requires a `Bool` condition and compatible
+branch types. It evaluates only the selected branch, including when the
+branches are IO actions. An `else` belongs to the nearest unmatched `if`.
+Use parentheses to pass a conditional as a function argument.
+
+Operators have the following precedence, from highest to lowest:
+
+| Operators | Associativity | Meaning |
+| --- | --- | --- |
+| Function application | Left | `f x y` |
+| Prefix `-`, `+` | Prefix | Negation and unary plus |
+| `*`, `/`, `%` | Left | Integer multiplication, quotient, remainder |
+| `+`, `-` | Left | Integer addition, subtraction |
+| `++` | Right | String concatenation |
+| `==`, `/=`, `<`, `<=`, `>`, `>=` | None | Integer comparisons |
+| `&&` | Right | Short-circuit Boolean conjunction |
+| `\|\|` | Right | Short-circuit Boolean disjunction |
+
+For example, `f x * 4 + y` means `(f x * 4) + y`, and
+`x < 0 || x >= width && enabled` means `x < 0 || (x >= width && enabled)`.
+Comparisons cannot be chained: write `x < y && y < z`. An expression annotation
+binds below the operators, so `x + 1 : Int` annotates the sum.
+
+Arithmetic and comparisons use the existing arbitrary-precision `Int`
+primitives. `/` truncates toward zero and `%` has the dividend's sign.
+They are not overloaded: use `addDouble`, `ltDouble`, or `eqString` for other
+types. Signed `Double` literals such as `-2.5e-2` remain supported; negating a
+`Double` variable uses `subDouble 0.0 x`. Operators and `if` lower to primitive
+identities, so local names such as `addInt` or `ifThenElse` cannot capture them.
+Explicit calls to those names still follow ordinary lexical scoping.
+
+Signs now participate in expression syntax: `f -1` and `f - 1` both mean
+subtraction. Parenthesize negative arguments as `f (-1)` or `f (-2.5)`.
+`--` still begins a comment; write `x - (-1)` or `x - -1` for subtraction of a
+negative value. The words `if`, `then`, `else`, and `rec` are reserved.
 
 For example, this retains the MLF instance bound, rather than specializing the
 identity function to a monotype:
@@ -186,7 +449,8 @@ example [`examples/partial-annotation.emlf`](examples/partial-annotation.emlf).
 
 ## Algebraic data types
 
-Put declarations before the expression and terminate each with a semicolon:
+Put datatype declarations before the expression; use aligned lines or explicit
+semicolons:
 
 ```haskell
 data Maybe a = Nothing | Just a;
@@ -228,12 +492,12 @@ data Wrap (f : * -> *) a = Wrap (f a);
 Declarations require at least one constructor. GADTs, existential fields,
 records, and deriving are not implemented.
 
-Cases use explicit braces and semicolons. A constructor pattern must bind
-exactly its fields; use `_` to ignore a field. Cases must cover every constructor
-or end with a wildcard or variable alternative. Patterns from different data
-types, duplicate constructors or variables, and alternatives after a default
-are rejected. A variable alternative binds the whole scrutinee. Constructor
-patterns have one level; use nested `case` expressions to inspect deeper values.
+Cases use layout or explicit braces and semicolons. A constructor pattern must
+have exactly its fields; use `_` to ignore a field. Cases must cover every
+constructor or provide a wildcard or variable fallback. A variable alternative
+binds the whole scrutinee. Constructor patterns may nest, for example
+`Pair (Just x) (Cons y rest)`. Different data types in the same pattern position,
+duplicate variables, and non-exhaustive matches are rejected.
 
 MLF can instantiate datatype parameters with polymorphic types:
 
@@ -291,11 +555,13 @@ IO is intended. Dictionary resolution does not guess a type from the available
 instances. `ioReturn`, `ioBind`, and the IO-specific `pure` alias remain
 available as primitive operations.
 
-Ordinary lexical bindings and locally declared class methods shadow imported
-method names. A source declaration
+In module-free scripts, ordinary lexical bindings and locally declared class
+methods shadow imported method names. A source declaration
 named `Monad` replaces the imported class and its associated `IO` instance,
 allowing the custom hierarchy in `monad-maybe.emlf`. Duplicate instances for
-the imported class are rejected by the normal overlap check.
+the imported class are rejected by the normal overlap check. Named modules use
+the explicit import rules above: hide an imported class or method before
+reusing its unqualified name at the top level.
 
 To disable the implicit prelude, put `--no-prelude` before other CLI options:
 
@@ -408,31 +674,30 @@ quantifiers, and constraints nested inside method signatures are not implemented
 
 ## Do notation
 
-Use explicit braces and semicolons, as with `case`:
+Use layout, or explicit braces and semicolons as with `case`:
 
 ```haskell
-do {
-  value <- action;
-  let saved = value;
-  anotherAction;
+do
+  value <- action
+  let saved = value
+  anotherAction
   return saved
-}
 ```
 
 `value <- action` translates to `bind action (\value -> ...)`. A statement
 without `<-` also uses `bind` and discards its result. `_ <- action` discards
 the result explicitly. Local `let` statements are nonrecursive, support
-annotations, and generalize like ordinary lets. A block must end with an
+annotations, and generalize like ordinary lets; `let rec` introduces a typed
+recursive group. A block must end with an
 expression; that expression is used directly, without inserting `return`.
-Nested blocks and an optional trailing semicolon are accepted. Indentation
-alone does not delimit a block.
+Nested blocks and an optional trailing semicolon are accepted.
 
 `bind` is the function in lexical scope, normally the prelude's `Monad` method.
 With `--no-prelude`, its built-in fallback is IO-specific. This lets
 `do` work with the existing class machinery or an ordinary local `bind`
 function. The translation generates fresh temporary names so discarded results
-and pattern matching cannot capture user variables. Flat constructor patterns
-are supported when exhaustive, for example `Pair x y <- action` for a
+and pattern matching cannot capture user variables. Nested constructor patterns
+are supported when exhaustive, for example `Pair x (Pair y z) <- action` for a
 single-constructor `Pair` datatype. Refutable patterns require an explicit
 `case`; there is no implicit `MonadFail` operation.
 
@@ -615,13 +880,15 @@ when the tail leaves on that turn. Food placement is deterministic, choosing
 the first free square from the top left. Input uses `getLine`, so the game waits
 for a command on every turn.
 
-The example uses ADTs for positions, directions, commands, a nonempty snake,
+The example uses layout, function equations, nested patterns, `if` expressions,
+and infix operators,
+with ADTs for positions, directions, commands, a nonempty snake,
 game state, and outcomes. The standard prelude's `Monad IO` instance supplies
 `bind` and `return` to the `do` blocks for drawing, input, and the game loop.
-A small typed
-fixed-point function, built with the recursive `Rec` datatype, supplies
-recursion despite the source language's nonrecursive `let`. Movement and food
-placement are pure functions; only the interface uses IO.
+Typed recursive functions implement the list helpers and game loop, and local
+`let rec` groups implement the food scan and row renderer. The example needs
+no `Rec` datatype, explicit fixed-point function, braces, or semicolons.
+Movement and food placement are pure functions; only the interface uses IO.
 
 ### Native Haskell baseline
 
@@ -710,6 +977,9 @@ pipeline on pinned Benchmarks Game **binary-trees, pidigits, n-body,
 fannkuch-redux, spectral-norm, fasta, mandelbrot, reverse-complement and
 k-nucleotide** sources. Compilation and
 runtime are timed separately, after four-language correctness validation.
+All nine MLF sources use the new declarations, layout, typed recursion,
+conditionals and operators, so this benchmark includes their parsing and
+desugaring costs.
 It writes `bench-results.json` with raw samples, medians, ratios, CPU/RSS,
 toolchain identities and source provenance. Rust and Python 3.9+ are required
 in addition to the native build dependencies. The default takes three samples
@@ -865,7 +1135,8 @@ Every successful compilation checks both:
 The Haskell API is `MLF.Compiler.compile :: FilePath -> String -> Either
 CompileError Compilation`, `compileProgram` for a `Program` AST containing
 declarations, or `compileExpr` for an expression without declarations. Use
-`MLF.Parser.parseProgram` to parse a complete source file. A `Compilation`
+`MLF.Parser.parseProgram` for closed programs, or `parseModule` with the
+module-aware APIs described above for imports. A `Compilation`
 contains `inferredType` (the explicit target type), `sourceType` (the source
 display with class constraints), `compiledTerm`, and the normalized `presolution`.
 The checker and xMLF parser can be used independently of the compiler.

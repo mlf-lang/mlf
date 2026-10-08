@@ -1,67 +1,74 @@
 -- Scalar z <- z*z+c, with at most 50 iterations per pixel. ByteArray holds
 -- one PBM row; no Unicode encoding is applied to its packed bytes.
-data Rec a = Rec (Rec a -> a);
-let fix : forall a. (a -> a) -> a = \f ->
-  let go = \r -> case r of { Rec next -> f (next r) } in go (Rec go) in
+
 -- Orbit values are scalar arguments, as in the C recurrence.
-let pixel : Double -> Double -> Double -> Double -> Double -> Double -> Int -> IO Int =
-  fix (\again zr zi tr ti cr ci remaining ->
-  ifThenElse (ltDouble 4.0 (addDouble tr ti)) (return 0)
-    (ifThenElse (eqInt remaining 0) (return 1) (
-      let nextI = addDouble (mulDouble (mulDouble 2.0 zr) zi) ci in
-      let nextR = addDouble (subDouble tr ti) cr in
-      again nextR nextI (mulDouble nextR nextR) (mulDouble nextI nextI) cr ci (subInt remaining 1)
-    ))) in
+pixel : Double -> Double -> Double -> Double -> Double -> Double -> Int -> IO Int
+pixel zr zi tr ti cr ci remaining =
+  if ltDouble 4.0 (addDouble tr ti) then return 0
+  else
+    if remaining == 0 then return 1
+    else
+      let
+        nextI = addDouble (mulDouble (mulDouble 2.0 zr) zi) ci
+        nextR = addDouble (subDouble tr ti) cr
+      in pixel nextR nextI (mulDouble nextR nextR) (mulDouble nextI nextI) cr ci (remaining - 1)
+
 -- Interleave two independent scalar orbits. An escaped lane stays masked
 -- while its neighbour finishes; no threads or explicit SIMD are involved.
-let pixels : Double -> Double -> Double -> Double -> Double ->
-             Double -> Double -> Double -> Double -> Double -> Double ->
-             Bool -> Bool -> Int -> IO Int =
-  fix (\again zr0 zi0 tr0 ti0 cr0 zr1 zi1 tr1 ti1 cr1 ci active0 active1 remaining ->
-    let live0 = ifThenElse (ltDouble 4.0 (addDouble tr0 ti0)) false active0 in
-    let live1 = ifThenElse (ltDouble 4.0 (addDouble tr1 ti1)) false active1 in
-    ifThenElse (ifThenElse live0 true live1)
-      (ifThenElse (eqInt remaining 0)
-        (return (addInt (ifThenElse live0 2 0) (ifThenElse live1 1 0))) (
-        let nextI0 = addDouble (mulDouble (mulDouble 2.0 zr0) zi0) ci in
-        let nextR0 = addDouble (subDouble tr0 ti0) cr0 in
-        let nextI1 = addDouble (mulDouble (mulDouble 2.0 zr1) zi1) ci in
-        let nextR1 = addDouble (subDouble tr1 ti1) cr1 in
-        again nextR0 nextI0 (mulDouble nextR0 nextR0) (mulDouble nextI0 nextI0) cr0
-          nextR1 nextI1 (mulDouble nextR1 nextR1) (mulDouble nextI1 nextI1) cr1 ci
-          live0 live1 (subInt remaining 1)
-      )) (return 0)) in
-let pad : ByteArray -> Int -> Int -> IO Unit = fix (\again out index bits ->
-  ifThenElse (eqInt bits 0) (return ()) (do {
-    byte <- readByteArray out index; writeByteArray out index (mulInt byte 2);
-    again out index (subInt bits 1)
-  })) in
-let row : ByteArray -> Int -> Int -> Int -> IO Unit =
-  fix (\again out n y x -> ifThenElse (ltInt x n) (do {
-    let cr = subDouble (divDouble (mulDouble 2.0 (intToDouble x)) (intToDouble n)) 1.5;
-    let ci = subDouble (divDouble (mulDouble 2.0 (intToDouble y)) (intToDouble n)) 1.0;
-    let index = quotInt x 8;
-    ifThenElse (eqInt (remInt x 8) 0) (writeByteArray out index 0) (return ());
-    byte <- readByteArray out index;
-    ifThenElse (ltInt (addInt x 1) n) (do {
-      let dr = subDouble (divDouble (mulDouble 2.0 (intToDouble (addInt x 1))) (intToDouble n)) 1.5;
-      bits <- pixels 0.0 0.0 0.0 0.0 cr 0.0 0.0 0.0 0.0 dr ci true true 50;
-      writeByteArray out index (addInt (mulInt byte 4) bits);
-      again out n y (addInt x 2)
-    }) (do {
-      bit <- pixel 0.0 0.0 0.0 0.0 cr ci 50;
-      writeByteArray out index (addInt (mulInt byte 2) bit);
-      again out n y (addInt x 1)
-    })
-  }) (pad out (quotInt n 8) (ifThenElse (eqInt (remInt n 8) 0) 0 (subInt 8 (remInt n 8))))) in
-let rows : ByteArray -> Int -> Int -> IO Unit =
-  fix (\again out n y -> ifThenElse (ltInt y n) (do {
-    row out n y 0; putBytes out 0 (quotInt (addInt n 7) 8);
-    again out n (addInt y 1)
-  }) (return ())) in
-do {
-  input <- getLine; let n = readInt input;
-  out <- newByteArray (quotInt (addInt n 7) 8) 0;
-  putStrLn (concatString "P4\n" (concatString (showInt n) (concatString " " (showInt n))));
+pixels : Double -> Double -> Double -> Double -> Double -> Double -> Double -> Double -> Double -> Double -> Double -> Bool -> Bool -> Int -> IO Int
+pixels zr0 zi0 tr0 ti0 cr0 zr1 zi1 tr1 ti1 cr1 ci active0 active1 remaining =
+  let
+    live0 = if ltDouble 4.0 (addDouble tr0 ti0) then false else active0
+    live1 = if ltDouble 4.0 (addDouble tr1 ti1) then false else active1
+  in if live0 || live1 then
+    if remaining == 0 then return ((if live0 then 2 else 0) + (if live1 then 1 else 0))
+    else
+      let
+        nextI0 = addDouble (mulDouble (mulDouble 2.0 zr0) zi0) ci
+        nextR0 = addDouble (subDouble tr0 ti0) cr0
+        nextI1 = addDouble (mulDouble (mulDouble 2.0 zr1) zi1) ci
+        nextR1 = addDouble (subDouble tr1 ti1) cr1
+      in pixels nextR0 nextI0 (mulDouble nextR0 nextR0) (mulDouble nextI0 nextI0) cr0 nextR1 nextI1 (mulDouble nextR1 nextR1) (mulDouble nextI1 nextI1) cr1 ci live0 live1 (remaining - 1)
+  else return 0
+
+pad : ByteArray -> Int -> Int -> IO Unit
+pad out index bits =
+  if bits == 0 then return ()
+  else do
+    byte <- readByteArray out index
+    writeByteArray out index (byte * 2)
+    pad out index (bits - 1)
+
+row : ByteArray -> Int -> Int -> Int -> IO Unit
+row out n y x =
+  if x < n then do
+    let cr = subDouble (divDouble (mulDouble 2.0 (intToDouble x)) (intToDouble n)) 1.5
+    let ci = subDouble (divDouble (mulDouble 2.0 (intToDouble y)) (intToDouble n)) 1.0
+    let index = x / 8
+    if x % 8 == 0 then writeByteArray out index 0 else return ()
+    byte <- readByteArray out index
+    if x + 1 < n then do
+      let dr = subDouble (divDouble (mulDouble 2.0 (intToDouble (x + 1))) (intToDouble n)) 1.5
+      bits <- pixels 0.0 0.0 0.0 0.0 cr 0.0 0.0 0.0 0.0 dr ci true true 50
+      writeByteArray out index (byte * 4 + bits)
+      row out n y (x + 2)
+    else do
+      bit <- pixel 0.0 0.0 0.0 0.0 cr ci 50
+      writeByteArray out index (byte * 2 + bit)
+      row out n y (x + 1)
+  else pad out (n / 8) (if n % 8 == 0 then 0 else 8 - n % 8)
+
+rows : ByteArray -> Int -> Int -> IO Unit
+rows out n y =
+  if y < n then do
+    row out n y 0
+    putBytes out 0 ((n + 7) / 8)
+    rows out n (y + 1)
+  else return ()
+
+main = do
+  input <- getLine
+  let n = readInt input
+  out <- newByteArray ((n + 7) / 8) 0
+  putStrLn ("P4\n" ++ showInt n ++ " " ++ showInt n)
   rows out n 0
-}

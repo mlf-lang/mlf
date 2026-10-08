@@ -126,14 +126,22 @@ freeNames e = case e of
   S.Primitive _ -> Set.empty
   S.Wanted _ candidates -> Set.fromList (map snd candidates)
   S.Checked _ a -> freeNames a
+  S.Equations equations -> Set.unions
+    [freeNames body `Set.difference` Set.fromList (concatMap bound patterns)
+    | (patterns, body) <- equations]
   S.Do _ _ -> freeNames (desugarDo e)
   S.LetRec ds b -> Set.unions (freeNames b : [freeNames a | (_,_,a) <- ds])
     `Set.difference` Set.fromList [n | (n,_,_) <- ds]
   S.Case a bs -> freeNames a `Set.union` Set.unions
     [freeNames b `Set.difference` Set.fromList (bound p) | S.Alternative p b <- bs]
-    where
-      bound (S.ConstructorPattern _ ns) = [n | Just n <- ns]
-      bound (S.DefaultPattern n) = [x | Just x <- [n]]
+  where
+    bound (S.ConstructorPattern _ ns) = [n | Just n <- ns]
+    bound (S.DefaultPattern n) = [x | Just x <- [n]]
+    bound (S.NestedPattern _ ps) = concatMap bound ps
+    bound (S.AnnotatedPattern n _) = [n]
+    bound (S.IntPattern _) = []
+    bound (S.StringPattern _) = []
+    bound (S.BoolPattern _) = []
 
 assumptions :: Case -> Either String [(String, String)]
 assumptions c = do

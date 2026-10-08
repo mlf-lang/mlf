@@ -13,6 +13,7 @@ import Data.List (nub)
 import Data.Maybe (catMaybes)
 import qualified MLF.Data as D
 import MLF.Desugar (desugarDo)
+import MLF.Surface (lowerExpression)
 import qualified MLF.Primitive as P
 import qualified MLF.Syntax as S
 import MLF.Kind
@@ -75,9 +76,15 @@ desugar expr = case expr of
   S.Primitive p -> CPrimitive p
   S.Case a bs -> CCase (desugar a) [(p,desugar b) | S.Alternative p b <- bs]
   S.Do _ _ -> desugar (desugarDo expr)
-  S.LetRec ds b -> CRec [(n,t,desugar a) | (n,t,a) <- ds] (desugar b)
+  S.LetRec ds b -> CRec [(n,t,recursiveRHS t a) | (n,t,a) <- ds] (desugar b)
+  S.Equations _ -> error "surface equations escaped lowering"
   S.Wanted c candidates -> CWanted c candidates
   S.Checked ty body -> CChecked ty body
+  where
+    recursiveRHS (S.Annotation [] ty) a = case a of
+      S.Checked ty' _ | ty == ty' -> desugar a
+      _ -> CChecked ty a
+    recursiveRHS _ a = desugar a
 
 data Binding = Mono X.Name NodeId | Poly X.Name NodeId
 type Generate = WriterT ([(NodeId,NodeId)], [Edge]) Build
@@ -89,7 +96,7 @@ generate = generateProgram . S.Program []
 generateProgram :: S.Program -> Either String Constraints
 generateProgram (S.Program declarations expr) = do
   datatypes <- D.validateDeclarations declarations
-  let lowered = desugarDo expr
+  lowered <- lowerExpression expr
   validateAnnotations datatypes lowered
   ((t,(eqs,es)),g) <- runBuild emptyGraph (runWriterT (build datatypes Map.empty Nothing Map.empty (desugar lowered)))
   validateGraph g
@@ -261,6 +268,7 @@ build datatypes typeScope parent env core = do
             resolved <- traverse fresh name
             pure (X.DefaultPattern resolved,
               [(x,Mono n domain) | Just x <- [name], Just n <- [resolved]])
+          _ -> lift (lift (Left "surface pattern escaped lowering"))
         b' <- child (Map.union (Map.fromList bindings) env) b
         eb <- edge (generalization b') s
         pure (Branch pattern' b' eb)
@@ -278,6 +286,7 @@ sourceField f = case f of
 patternShape :: S.Pattern -> (Maybe String, Int)
 patternShape (S.ConstructorPattern c ns) = (Just c,length ns)
 patternShape (S.DefaultPattern _) = (Nothing,0)
+patternShape _ = error "surface pattern escaped lowering"
 
 validateAnnotations :: D.DataEnv -> S.Expr -> Either String ()
 validateAnnotations ds = go Map.empty
@@ -296,6 +305,7 @@ validateAnnotations ds = go Map.empty
       S.Primitive _ -> pure ()
       S.Case a bs -> go scope a >> mapM_ (\(S.Alternative _ b) -> go scope b) bs
       S.Do _ _ -> go scope (desugarDo e)
+      S.Equations _ -> Left "surface equations escaped lowering"
       S.LetRec bs b -> mapM_ (\(_,t,a) -> annotation scope t >> go scope a) bs >> go scope b
       S.Wanted _ _ -> pure ()
       S.Checked ty a -> do

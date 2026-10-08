@@ -1,0 +1,10 @@
+module Geometry.Point (Point(..), move, distanceSquared) where
+
+data Point = Point Int Int
+
+move dx dy (Point x y) = Point (x + dx) (y + dy)
+
+-- This helper stays private to the module.
+square x = x * x
+
+distanceSquared (Point x y) = square x + square y

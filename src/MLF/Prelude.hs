@@ -1,11 +1,12 @@
 -- | The implicit source prelude. Its dictionaries go through the same kind,
 -- instance, inference, elaboration, and target checks as user declarations.
-module MLF.Prelude (PreludeMode (..), withPrelude) where
+module MLF.Prelude (PreludeMode (..), withPrelude, monadClass, ioInstance) where
 
 import qualified Data.Set as Set
 import MLF.Kind
 import qualified MLF.Primitive as P
 import qualified MLF.Syntax as S
+import qualified MLF.Surface as Surface
 
 data PreludeMode = ImplicitPrelude | NoImplicitPrelude deriving (Eq, Show)
 
@@ -61,6 +62,7 @@ freeNames expression = case expression of
   S.Case value branches -> freeNames value `Set.union` Set.unions
     [freeNames body Set.\\ patternNames p | S.Alternative p body <- branches]
   S.Do statements result -> foldr statementNames (freeNames result) statements
+  S.Equations _ -> Surface.freeNames expression
   S.LetRec definitions body -> Set.unions (freeNames body : [freeNames e | (_,_,e) <- definitions])
     Set.\\ Set.fromList [name | (name,_,_) <- definitions]
   S.Checked _ value -> freeNames value
@@ -70,10 +72,11 @@ freeNames expression = case expression of
       S.DoBind p value -> Set.insert "bind" (freeNames value `Set.union` (rest Set.\\ patternNames p))
       S.DoThen value -> Set.insert "bind" (freeNames value `Set.union` rest)
       S.DoLet name _ value -> freeNames value `Set.union` Set.delete name rest
+      S.DoLetRec ds -> Set.unions (rest : [freeNames a | (_,_,a) <- ds])
+        Set.\\ Set.fromList [n | (n,_,_) <- ds]
 
 patternNames :: S.Pattern -> Set.Set String
-patternNames (S.ConstructorPattern _ names) = Set.fromList [name | Just name <- names]
-patternNames (S.DefaultPattern name) = maybe Set.empty Set.singleton name
+patternNames = Set.fromList . Surface.patternVariables
 
 predicateMentionsMonad :: S.Predicate -> Bool
 predicateMentionsMonad (S.Predicate name arguments) = name == "Monad" || any typeMentionsMonad arguments
@@ -102,8 +105,9 @@ exprMentionsMonad expression = case expression of
   S.App f a -> recurse f || recurse a
   S.Let _ value body -> recurse value || recurse body
   S.Ann value annotation -> recurse value || annotationMentionsMonad annotation
-  S.Case value branches -> recurse value || any (\(S.Alternative _ body) -> recurse body) branches
+  S.Case value branches -> recurse value || any (\(S.Alternative p body) -> patternMentionsMonad p || recurse body) branches
   S.Do statements result -> any statementMentionsMonad statements || recurse result
+  S.Equations rows -> any (\(ps,b) -> any patternMentionsMonad ps || recurse b) rows
   S.LetRec definitions body -> any (\(_,a,e) -> annotationMentionsMonad a || recurse e) definitions || recurse body
   S.Checked ty value -> typeMentionsMonad ty || recurse value
   _ -> False
@@ -111,6 +115,11 @@ exprMentionsMonad expression = case expression of
     recurse = exprMentionsMonad
     annotationMentionsMonad (S.Annotation _ ty) = typeMentionsMonad ty
     statementMentionsMonad statement = case statement of
-      S.DoBind _ value -> recurse value
+      S.DoBind p value -> patternMentionsMonad p || recurse value
       S.DoThen value -> recurse value
       S.DoLet _ annotation value -> maybe False annotationMentionsMonad annotation || recurse value
+      S.DoLetRec ds -> any (\(_,a,e) -> annotationMentionsMonad a || recurse e) ds
+    patternMentionsMonad p = case p of
+      S.AnnotatedPattern _ a -> annotationMentionsMonad a
+      S.NestedPattern _ ps -> any patternMentionsMonad ps
+      _ -> False

@@ -1,0 +1,9 @@
+module Main (main) where
+
+import Geometry.Point (Point(..))
+import qualified Geometry.Point as Point (move, distanceSquared)
+
+main = do
+  let origin = Point 0 0
+  let destination = Point.move 3 4 origin
+  printInt (Point.distanceSquared destination)

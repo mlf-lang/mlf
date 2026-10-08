@@ -1,119 +1,157 @@
 -- Five-body scalar simulation, matching nbody-gcc-1. Each body occupies
 -- seven contiguous DoubleArray cells: x,y,z,vx,vy,vz,mass. All integration,
 -- pair iteration, momentum correction and energy calculation are MLF code.
-data Rec a = Rec (Rec a -> a);
-let fix : forall a. (a -> a) -> a = \f ->
-  let go = \r -> case r of { Rec next -> f (next r) } in go (Rec go) in
-let solarMass = mulDouble (mulDouble 4.0 3.141592653589793) 3.141592653589793 in
-let year = 365.24 in
-let get = \b i field -> readDoubleArray b (addInt i field) in
-let set = \b i field x -> writeDoubleArray b (addInt i field) x in
-let norm2 = \x y z -> addDouble (addDouble (mulDouble x x) (mulDouble y y)) (mulDouble z z) in
 
-let initialize : DoubleArray -> IO Unit = \b -> do {
-  set b 0 6 solarMass;
-  set b 7 0 4.84143144246472090e+00;
-  set b 7 1 (-1.16032004402742839e+00);
-  set b 7 2 (-1.03622044471123109e-01);
-  set b 7 3 (mulDouble 1.66007664274403694e-03 year);
-  set b 7 4 (mulDouble 7.69901118419740425e-03 year);
-  set b 7 5 (mulDouble (-6.90460016972063023e-05) year);
-  set b 7 6 (mulDouble 9.54791938424326609e-04 solarMass);
-  set b 14 0 8.34336671824457987e+00;
-  set b 14 1 4.12479856412430479e+00;
-  set b 14 2 (-4.03523417114321381e-01);
-  set b 14 3 (mulDouble (-2.76742510726862411e-03) year);
-  set b 14 4 (mulDouble 4.99852801234917238e-03 year);
-  set b 14 5 (mulDouble 2.30417297573763929e-05 year);
-  set b 14 6 (mulDouble 2.85885980666130812e-04 solarMass);
-  set b 21 0 1.28943695621391310e+01;
-  set b 21 1 (-1.51111514016986312e+01);
-  set b 21 2 (-2.23307578892655734e-01);
-  set b 21 3 (mulDouble 2.96460137564761618e-03 year);
-  set b 21 4 (mulDouble 2.37847173959480950e-03 year);
-  set b 21 5 (mulDouble (-2.96589568540237556e-05) year);
-  set b 21 6 (mulDouble 4.36624404335156298e-05 solarMass);
-  set b 28 0 1.53796971148509165e+01;
-  set b 28 1 (-2.59193146099879641e+01);
-  set b 28 2 1.79258772950371181e-01;
-  set b 28 3 (mulDouble 2.68067772490389322e-03 year);
-  set b 28 4 (mulDouble 1.62824170038242295e-03 year);
-  set b 28 5 (mulDouble (-9.51592254519715870e-05) year);
+solarMass = mulDouble (mulDouble 4.0 3.141592653589793) 3.141592653589793
+
+year = 365.24
+
+get b i field = readDoubleArray b (i + field)
+
+set b i field x = writeDoubleArray b (i + field) x
+
+norm2 x y z = addDouble (addDouble (mulDouble x x) (mulDouble y y)) (mulDouble z z)
+
+initialize : DoubleArray -> IO Unit
+initialize b = do
+  set b 0 6 solarMass
+  set b 7 0 4.84143144246472090e+00
+  set b 7 1 (-1.16032004402742839e+00)
+  set b 7 2 (-1.03622044471123109e-01)
+  set b 7 3 (mulDouble 1.66007664274403694e-03 year)
+  set b 7 4 (mulDouble 7.69901118419740425e-03 year)
+  set b 7 5 (mulDouble (-6.90460016972063023e-05) year)
+  set b 7 6 (mulDouble 9.54791938424326609e-04 solarMass)
+  set b 14 0 8.34336671824457987e+00
+  set b 14 1 4.12479856412430479e+00
+  set b 14 2 (-4.03523417114321381e-01)
+  set b 14 3 (mulDouble (-2.76742510726862411e-03) year)
+  set b 14 4 (mulDouble 4.99852801234917238e-03 year)
+  set b 14 5 (mulDouble 2.30417297573763929e-05 year)
+  set b 14 6 (mulDouble 2.85885980666130812e-04 solarMass)
+  set b 21 0 1.28943695621391310e+01
+  set b 21 1 (-1.51111514016986312e+01)
+  set b 21 2 (-2.23307578892655734e-01)
+  set b 21 3 (mulDouble 2.96460137564761618e-03 year)
+  set b 21 4 (mulDouble 2.37847173959480950e-03 year)
+  set b 21 5 (mulDouble (-2.96589568540237556e-05) year)
+  set b 21 6 (mulDouble 4.36624404335156298e-05 solarMass)
+  set b 28 0 1.53796971148509165e+01
+  set b 28 1 (-2.59193146099879641e+01)
+  set b 28 2 1.79258772950371181e-01
+  set b 28 3 (mulDouble 2.68067772490389322e-03 year)
+  set b 28 4 (mulDouble 1.62824170038242295e-03 year)
+  set b 28 5 (mulDouble (-9.51592254519715870e-05) year)
   set b 28 6 (mulDouble 5.15138902046611451e-05 solarMass)
-} in
 
-let offset : DoubleArray -> Int -> Double -> Double -> Double -> IO Unit =
-  fix (\again b i px py pz -> ifThenElse (eqInt i 35)
-    (do {
-      set b 0 3 (divDouble (subDouble 0.0 px) solarMass);
-      set b 0 4 (divDouble (subDouble 0.0 py) solarMass);
-      set b 0 5 (divDouble (subDouble 0.0 pz) solarMass)
-    })
-    (do {
-      vx <- get b i 3; vy <- get b i 4; vz <- get b i 5; mass <- get b i 6;
-      again b (addInt i 7) (addDouble px (mulDouble vx mass))
-        (addDouble py (mulDouble vy mass)) (addDouble pz (mulDouble vz mass))
-    })) in
+offset : DoubleArray -> Int -> Double -> Double -> Double -> IO Unit
+offset b i px py pz =
+  if i == 35 then do
+    set b 0 3 (divDouble (subDouble 0.0 px) solarMass)
+    set b 0 4 (divDouble (subDouble 0.0 py) solarMass)
+    set b 0 5 (divDouble (subDouble 0.0 pz) solarMass)
+  else do
+    vx <- get b i 3
+    vy <- get b i 4
+    vz <- get b i 5
+    mass <- get b i 6
+    offset b (i + 7) (addDouble px (mulDouble vx mass))
+      (addDouble py (mulDouble vy mass)) (addDouble pz (mulDouble vz mass))
 
-let pairEnergy : DoubleArray -> Int -> Int -> Double -> IO Double =
-  fix (\again b i j e -> ifThenElse (eqInt j 35) (return e)
-    (do {
-      x <- get b i 0; y <- get b i 1; z <- get b i 2; m <- get b i 6;
-      x2 <- get b j 0; y2 <- get b j 1; z2 <- get b j 2; m2 <- get b j 6;
-      let distance = sqrtDouble (norm2 (subDouble x x2) (subDouble y y2) (subDouble z z2));
-      again b i (addInt j 7) (subDouble e (divDouble (mulDouble m m2) distance))
-    })) in
-let energy : DoubleArray -> Int -> Double -> IO Double =
-  fix (\again b i e -> ifThenElse (eqInt i 35) (return e)
-    (do {
-      vx <- get b i 3; vy <- get b i 4; vz <- get b i 5; mass <- get b i 6;
-      potential <- pairEnergy b i (addInt i 7)
-        (addDouble e (mulDouble (mulDouble 0.5 mass) (norm2 vx vy vz)));
-      again b (addInt i 7) potential
-    })) in
+pairEnergy : DoubleArray -> Int -> Int -> Double -> IO Double
+pairEnergy b i j e =
+  if j == 35 then return e
+  else do
+    x <- get b i 0
+    y <- get b i 1
+    z <- get b i 2
+    m <- get b i 6
+    x2 <- get b j 0
+    y2 <- get b j 1
+    z2 <- get b j 2
+    m2 <- get b j 6
+    let distance = sqrtDouble (norm2 (subDouble x x2) (subDouble y y2) (subDouble z z2))
+    pairEnergy b i (j + 7) (subDouble e (divDouble (mulDouble m m2) distance))
 
-let pairs : DoubleArray -> Int -> Int -> IO Unit =
-  fix (\again b i j -> ifThenElse (eqInt j 35) (return ())
-    (do {
-      x <- get b i 0; y <- get b i 1; z <- get b i 2; m <- get b i 6;
-      x2 <- get b j 0; y2 <- get b j 1; z2 <- get b j 2; m2 <- get b j 6;
-      let dx = subDouble x x2; let dy = subDouble y y2; let dz = subDouble z z2;
-      let distance = sqrtDouble (norm2 dx dy dz);
-      let mag = divDouble 0.01 (mulDouble (mulDouble distance distance) distance);
-      vx <- get b i 3; vy <- get b i 4; vz <- get b i 5;
-      vx2 <- get b j 3; vy2 <- get b j 4; vz2 <- get b j 5;
-      set b i 3 (subDouble vx (mulDouble (mulDouble dx m2) mag));
-      set b i 4 (subDouble vy (mulDouble (mulDouble dy m2) mag));
-      set b i 5 (subDouble vz (mulDouble (mulDouble dz m2) mag));
-      set b j 3 (addDouble vx2 (mulDouble (mulDouble dx m) mag));
-      set b j 4 (addDouble vy2 (mulDouble (mulDouble dy m) mag));
-      set b j 5 (addDouble vz2 (mulDouble (mulDouble dz m) mag));
-      again b i (addInt j 7)
-    })) in
-let velocities : DoubleArray -> Int -> IO Unit =
-  fix (\again b i -> ifThenElse (eqInt i 35) (return ())
-    (do { pairs b i (addInt i 7); again b (addInt i 7) })) in
-let positions : DoubleArray -> Int -> IO Unit =
-  fix (\again b i -> ifThenElse (eqInt i 35) (return ())
-    (do {
-      x <- get b i 0; y <- get b i 1; z <- get b i 2;
-      vx <- get b i 3; vy <- get b i 4; vz <- get b i 5;
-      set b i 0 (addDouble x (mulDouble 0.01 vx));
-      set b i 1 (addDouble y (mulDouble 0.01 vy));
-      set b i 2 (addDouble z (mulDouble 0.01 vz));
-      again b (addInt i 7)
-    })) in
-let advance : DoubleArray -> Int -> IO Unit =
-  fix (\again b n -> ifThenElse (eqInt n 0) (return ())
-    (do { velocities b 0; positions b 0; again b (subInt n 1) })) in
-do {
-  input <- getLine;
-  bodies <- newDoubleArray 35 0.0;
-  initialize bodies;
-  offset bodies 0 0.0 0.0 0.0;
-  before <- energy bodies 0 0.0;
-  putStrLn (formatDouble 9 before);
-  advance bodies (readInt input);
-  after <- energy bodies 0 0.0;
+energy : DoubleArray -> Int -> Double -> IO Double
+energy b i e =
+  if i == 35 then return e
+  else do
+    vx <- get b i 3
+    vy <- get b i 4
+    vz <- get b i 5
+    mass <- get b i 6
+    potential <- pairEnergy b i (i + 7) (addDouble e (mulDouble (mulDouble 0.5 mass) (norm2 vx vy vz)))
+    energy b (i + 7) potential
+
+pairs : DoubleArray -> Int -> Int -> IO Unit
+pairs b i j =
+  if j == 35 then return ()
+  else do
+    x <- get b i 0
+    y <- get b i 1
+    z <- get b i 2
+    m <- get b i 6
+    x2 <- get b j 0
+    y2 <- get b j 1
+    z2 <- get b j 2
+    m2 <- get b j 6
+    let dx = subDouble x x2
+    let dy = subDouble y y2
+    let dz = subDouble z z2
+    let distance = sqrtDouble (norm2 dx dy dz)
+    let mag = divDouble 0.01 (mulDouble (mulDouble distance distance) distance)
+    vx <- get b i 3
+    vy <- get b i 4
+    vz <- get b i 5
+    vx2 <- get b j 3
+    vy2 <- get b j 4
+    vz2 <- get b j 5
+    set b i 3 (subDouble vx (mulDouble (mulDouble dx m2) mag))
+    set b i 4 (subDouble vy (mulDouble (mulDouble dy m2) mag))
+    set b i 5 (subDouble vz (mulDouble (mulDouble dz m2) mag))
+    set b j 3 (addDouble vx2 (mulDouble (mulDouble dx m) mag))
+    set b j 4 (addDouble vy2 (mulDouble (mulDouble dy m) mag))
+    set b j 5 (addDouble vz2 (mulDouble (mulDouble dz m) mag))
+    pairs b i (j + 7)
+
+velocities : DoubleArray -> Int -> IO Unit
+velocities b i =
+  if i == 35 then return ()
+  else do
+    pairs b i (i + 7)
+    velocities b (i + 7)
+
+positions : DoubleArray -> Int -> IO Unit
+positions b i =
+  if i == 35 then return ()
+  else do
+    x <- get b i 0
+    y <- get b i 1
+    z <- get b i 2
+    vx <- get b i 3
+    vy <- get b i 4
+    vz <- get b i 5
+    set b i 0 (addDouble x (mulDouble 0.01 vx))
+    set b i 1 (addDouble y (mulDouble 0.01 vy))
+    set b i 2 (addDouble z (mulDouble 0.01 vz))
+    positions b (i + 7)
+
+advance : DoubleArray -> Int -> IO Unit
+advance b n =
+  if n == 0 then return ()
+  else do
+    velocities b 0
+    positions b 0
+    advance b (n - 1)
+
+main = do
+  input <- getLine
+  bodies <- newDoubleArray 35 0.0
+  initialize bodies
+  offset bodies 0 0.0 0.0 0.0
+  before <- energy bodies 0 0.0
+  putStrLn (formatDouble 9 before)
+  advance bodies (readInt input)
+  after <- energy bodies 0 0.0
   putStrLn (formatDouble 9 after)
-}

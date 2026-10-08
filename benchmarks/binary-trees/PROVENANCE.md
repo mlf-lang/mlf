@@ -56,9 +56,9 @@ The harness rejects out-of-range inputs and sends canonical decimal text.
 This small input adapter is included in runtime timing. Invalid standalone
 MLF input falls back to the minimum depth and is outside the harness contract.
 
-The surface language has nonrecursive `let`, so `Rec` supplies a typed fixed
-point, as in the existing Snake example. IO and `return` use the standard
-prelude. Every accumulated check is forced by `eqInt next next` before an IO
+The source uses typed recursive declarations, constructor equations, and
+layout, including a local `let rec` for the input adapter. IO and `return`
+use the standard prelude. Every accumulated check is forced by `next == next` before an IO
 step; it is a demand for evaluation, not a precomputed result. The native
 collector only runs at IO boundaries, so this lets each completed temporary
 tree become unreachable before the next iteration. The long-lived tree stays
