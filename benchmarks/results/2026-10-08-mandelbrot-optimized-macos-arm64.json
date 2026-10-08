@@ -1,0 +1,3288 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "recorded_at_utc": "2026-10-08T10:27:13.348102+00:00",
+  "disclaimer": "This benchmark measures practical end-to-end compiler/language implementation performance. It does NOT perfectly isolate backend code-generation quality because C, Rust, Haskell and MLF have different language semantics, runtime systems, allocation models and abstractions.",
+  "host": {
+    "os": "Darwin",
+    "release": "25.6.0",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "architecture": "arm64",
+    "logical_cpus": 10,
+    "python": "3.14.8"
+  },
+  "configuration": {
+    "runs": 7,
+    "size_override": null,
+    "compile_only": false,
+    "runtime_only": false,
+    "timeout_seconds": 600,
+    "maximum_mlf_c_ratios": {
+      "compilation": 5.0,
+      "runtime": 1.0
+    }
+  },
+  "results": [
+    {
+      "benchmark": "mandelbrot",
+      "input": 4096,
+      "languages": {
+        "c": {
+          "source": "benchmarks/mandelbrot/c/main.c",
+          "compiler_flags": [
+            "-O3"
+          ],
+          "preparation": {
+            "wall_seconds": 0.13224295800318941,
+            "cpu_seconds": 0.16106199999999998,
+            "peak_rss_bytes": 71499776,
+            "stages": [
+              {
+                "command": [
+                  "/opt/homebrew/opt/llvm/bin/clang",
+                  "-O3",
+                  "/Volumes/src/mlf/benchmarks/mandelbrot/c/main.c",
+                  "-lm",
+                  "-o",
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/prepared/program"
+                ],
+                "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/prepared",
+                "wall_seconds": 0.13175166700966656,
+                "user_seconds": 0.11401599999999999,
+                "system_seconds": 0.047046,
+                "cpu_seconds": 0.16106199999999998,
+                "peak_rss_bytes": 71499776,
+                "stderr": ""
+              }
+            ],
+            "executable_bytes": 33560,
+            "executable_sha256": "aab3c6cc7769298f5ef0d6810d3868ad98b71b6bc614a3d2cd13f72793e76b5c"
+          },
+          "correctness": [
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/prepared/program",
+                "1"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.27250212494982406,
+              "user_seconds": 0.000806,
+              "system_seconds": 0.0012389999999999999,
+              "cpu_seconds": 0.002045,
+              "peak_rss_bytes": 1359872,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "a8ed35a163cba662b15fe455af22d5f91668d6eb59ef9a2aa9e19e1658745819"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/prepared/program",
+                "2"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.002907542046159506,
+              "user_seconds": 0.000652,
+              "system_seconds": 0.0010789999999999999,
+              "cpu_seconds": 0.001731,
+              "peak_rss_bytes": 1359872,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "2e4e5f9f953fd314adbaa1326f7020d08d403929fec8e60c1ef777440af987dd"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/prepared/program",
+                "7"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.0028351249638944864,
+              "user_seconds": 0.000752,
+              "system_seconds": 0.000976,
+              "cpu_seconds": 0.001728,
+              "peak_rss_bytes": 1359872,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "5c8c0137a526ae1609eb7fd0b4cf7b2502816f9c8fdebab1346e47923d43c108"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/prepared/program",
+                "8"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.0029944580164738,
+              "user_seconds": 0.000736,
+              "system_seconds": 0.001019,
+              "cpu_seconds": 0.001755,
+              "peak_rss_bytes": 1359872,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "5cb3c72ff26073f0dcd32ae46289dcf3ef468694ab383f4b98b1bf33c155f6d3"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/prepared/program",
+                "9"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.0029627920011989772,
+              "user_seconds": 0.00071,
+              "system_seconds": 0.000992,
+              "cpu_seconds": 0.001702,
+              "peak_rss_bytes": 1359872,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/prepared/program",
+                "200"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.005722499976400286,
+              "user_seconds": 0.0036179999999999997,
+              "system_seconds": 0.0009739999999999999,
+              "cpu_seconds": 0.004592,
+              "peak_rss_bytes": 1359872,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "97610473750700638fc63d13cfa49d339b67c18e7f26b3f9c9acb61e746472d5"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/prepared/program",
+                "4096"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.9386972910142504,
+              "user_seconds": 0.9268879999999999,
+              "system_seconds": 0.009342999999999999,
+              "cpu_seconds": 0.9362309999999999,
+              "peak_rss_bytes": 1359872,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77"
+            }
+          ],
+          "executable_bytes": 33560,
+          "compilation": {
+            "samples": [
+              {
+                "wall_seconds": 0.12879333301680163,
+                "cpu_seconds": 0.16237200000000002,
+                "peak_rss_bytes": 71499776,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O3",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/c/main.c",
+                      "-lm",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/sample-0/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/sample-0",
+                    "wall_seconds": 0.12820204196032137,
+                    "user_seconds": 0.117827,
+                    "system_seconds": 0.044545,
+                    "cpu_seconds": 0.16237200000000002,
+                    "peak_rss_bytes": 71499776,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 33560,
+                "executable_sha256": "aab3c6cc7769298f5ef0d6810d3868ad98b71b6bc614a3d2cd13f72793e76b5c",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/sample-0/program",
+                    "9"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.18493970902636647,
+                  "user_seconds": 0.0007909999999999999,
+                  "system_seconds": 0.0016849999999999999,
+                  "cpu_seconds": 0.002476,
+                  "peak_rss_bytes": 1359872,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 1,
+                "order_in_round": 0
+              },
+              {
+                "wall_seconds": 0.14147508301539347,
+                "cpu_seconds": 0.16724999999999998,
+                "peak_rss_bytes": 71352320,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O3",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/c/main.c",
+                      "-lm",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/sample-1/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/sample-1",
+                    "wall_seconds": 0.14088166697183624,
+                    "user_seconds": 0.12526199999999998,
+                    "system_seconds": 0.041988,
+                    "cpu_seconds": 0.16724999999999998,
+                    "peak_rss_bytes": 71352320,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 33560,
+                "executable_sha256": "aab3c6cc7769298f5ef0d6810d3868ad98b71b6bc614a3d2cd13f72793e76b5c",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/sample-1/program",
+                    "9"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.16002670797752216,
+                  "user_seconds": 0.0008309999999999999,
+                  "system_seconds": 0.0013579999999999998,
+                  "cpu_seconds": 0.002189,
+                  "peak_rss_bytes": 1359872,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 2,
+                "order_in_round": 3
+              },
+              {
+                "wall_seconds": 0.1480276669608429,
+                "cpu_seconds": 0.18343399999999999,
+                "peak_rss_bytes": 71614464,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O3",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/c/main.c",
+                      "-lm",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/sample-2/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/sample-2",
+                    "wall_seconds": 0.14691087504616007,
+                    "user_seconds": 0.13666499999999998,
+                    "system_seconds": 0.046769,
+                    "cpu_seconds": 0.18343399999999999,
+                    "peak_rss_bytes": 71614464,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 33560,
+                "executable_sha256": "aab3c6cc7769298f5ef0d6810d3868ad98b71b6bc614a3d2cd13f72793e76b5c",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/sample-2/program",
+                    "9"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.40075433399761096,
+                  "user_seconds": 0.000811,
+                  "system_seconds": 0.001359,
+                  "cpu_seconds": 0.00217,
+                  "peak_rss_bytes": 1359872,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 3,
+                "order_in_round": 2
+              },
+              {
+                "wall_seconds": 0.14528670901199803,
+                "cpu_seconds": 0.174275,
+                "peak_rss_bytes": 71548928,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O3",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/c/main.c",
+                      "-lm",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/sample-3/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/sample-3",
+                    "wall_seconds": 0.1447189159807749,
+                    "user_seconds": 0.128856,
+                    "system_seconds": 0.045419,
+                    "cpu_seconds": 0.174275,
+                    "peak_rss_bytes": 71548928,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 33560,
+                "executable_sha256": "aab3c6cc7769298f5ef0d6810d3868ad98b71b6bc614a3d2cd13f72793e76b5c",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/sample-3/program",
+                    "9"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.1655741659924388,
+                  "user_seconds": 0.0008219999999999999,
+                  "system_seconds": 0.001339,
+                  "cpu_seconds": 0.0021609999999999997,
+                  "peak_rss_bytes": 1359872,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 4,
+                "order_in_round": 1
+              },
+              {
+                "wall_seconds": 0.1568880410050042,
+                "cpu_seconds": 0.193694,
+                "peak_rss_bytes": 71467008,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O3",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/c/main.c",
+                      "-lm",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/sample-4/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/sample-4",
+                    "wall_seconds": 0.15595162496902049,
+                    "user_seconds": 0.141511,
+                    "system_seconds": 0.052183,
+                    "cpu_seconds": 0.193694,
+                    "peak_rss_bytes": 71467008,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 33560,
+                "executable_sha256": "aab3c6cc7769298f5ef0d6810d3868ad98b71b6bc614a3d2cd13f72793e76b5c",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/sample-4/program",
+                    "9"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.17297070799395442,
+                  "user_seconds": 0.000843,
+                  "system_seconds": 0.001317,
+                  "cpu_seconds": 0.00216,
+                  "peak_rss_bytes": 1359872,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 5,
+                "order_in_round": 0
+              },
+              {
+                "wall_seconds": 0.14672700001392514,
+                "cpu_seconds": 0.174306,
+                "peak_rss_bytes": 71483392,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O3",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/c/main.c",
+                      "-lm",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/sample-5/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/sample-5",
+                    "wall_seconds": 0.14613800001097843,
+                    "user_seconds": 0.129413,
+                    "system_seconds": 0.044892999999999995,
+                    "cpu_seconds": 0.174306,
+                    "peak_rss_bytes": 71483392,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 33560,
+                "executable_sha256": "aab3c6cc7769298f5ef0d6810d3868ad98b71b6bc614a3d2cd13f72793e76b5c",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/sample-5/program",
+                    "9"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.16618808294879273,
+                  "user_seconds": 0.000803,
+                  "system_seconds": 0.001268,
+                  "cpu_seconds": 0.002071,
+                  "peak_rss_bytes": 1359872,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 6,
+                "order_in_round": 3
+              },
+              {
+                "wall_seconds": 0.1442331249709241,
+                "cpu_seconds": 0.174866,
+                "peak_rss_bytes": 71385088,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O3",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/c/main.c",
+                      "-lm",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/sample-6/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/sample-6",
+                    "wall_seconds": 0.143609541002661,
+                    "user_seconds": 0.13177,
+                    "system_seconds": 0.043095999999999995,
+                    "cpu_seconds": 0.174866,
+                    "peak_rss_bytes": 71385088,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 33560,
+                "executable_sha256": "aab3c6cc7769298f5ef0d6810d3868ad98b71b6bc614a3d2cd13f72793e76b5c",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/sample-6/program",
+                    "9"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.16035520797595382,
+                  "user_seconds": 0.0007999999999999999,
+                  "system_seconds": 0.001473,
+                  "cpu_seconds": 0.002273,
+                  "peak_rss_bytes": 1359872,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 7,
+                "order_in_round": 2
+              }
+            ],
+            "sample_count": 7,
+            "median_wall_seconds": 0.14528670901199803,
+            "median_cpu_seconds": 0.174306,
+            "max_peak_rss_bytes": 71614464
+          },
+          "runtime": {
+            "samples": [
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/prepared/program",
+                  "4096"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.9683439590153284,
+                "user_seconds": 0.9421959999999999,
+                "system_seconds": 0.01126,
+                "cpu_seconds": 0.953456,
+                "peak_rss_bytes": 1359872,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 1,
+                "order_in_round": 0
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/prepared/program",
+                  "4096"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.9431664579897188,
+                "user_seconds": 0.9258,
+                "system_seconds": 0.01439,
+                "cpu_seconds": 0.94019,
+                "peak_rss_bytes": 1359872,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 2,
+                "order_in_round": 3
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/prepared/program",
+                  "4096"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.9562944589997642,
+                "user_seconds": 0.935043,
+                "system_seconds": 0.01676,
+                "cpu_seconds": 0.951803,
+                "peak_rss_bytes": 1359872,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 3,
+                "order_in_round": 2
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/prepared/program",
+                  "4096"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.9468654159572907,
+                "user_seconds": 0.9296989999999999,
+                "system_seconds": 0.013134,
+                "cpu_seconds": 0.9428329999999999,
+                "peak_rss_bytes": 1359872,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 4,
+                "order_in_round": 1
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/prepared/program",
+                  "4096"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.9650625829817727,
+                "user_seconds": 0.9342509999999999,
+                "system_seconds": 0.019003,
+                "cpu_seconds": 0.9532539999999999,
+                "peak_rss_bytes": 1359872,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 5,
+                "order_in_round": 0
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/prepared/program",
+                  "4096"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.9435020419768989,
+                "user_seconds": 0.929207,
+                "system_seconds": 0.010990999999999999,
+                "cpu_seconds": 0.940198,
+                "peak_rss_bytes": 1359872,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 6,
+                "order_in_round": 3
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/c/prepared/program",
+                  "4096"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.9549567079520784,
+                "user_seconds": 0.937105,
+                "system_seconds": 0.013678,
+                "cpu_seconds": 0.9507829999999999,
+                "peak_rss_bytes": 1359872,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 7,
+                "order_in_round": 2
+              }
+            ],
+            "sample_count": 7,
+            "median_wall_seconds": 0.9549567079520784,
+            "median_cpu_seconds": 0.9507829999999999,
+            "max_peak_rss_bytes": 1359872
+          }
+        },
+        "rust": {
+          "source": "benchmarks/mandelbrot/rust/main.rs",
+          "compiler_flags": [
+            "-O",
+            "--edition=2021"
+          ],
+          "preparation": {
+            "wall_seconds": 0.18010987498564646,
+            "cpu_seconds": 0.23734299999999997,
+            "peak_rss_bytes": 112099328,
+            "stages": [
+              {
+                "command": [
+                  "/opt/homebrew/bin/rustc",
+                  "-O",
+                  "--edition=2021",
+                  "/Volumes/src/mlf/benchmarks/mandelbrot/rust/main.rs",
+                  "-o",
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/prepared/program"
+                ],
+                "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/prepared",
+                "wall_seconds": 0.17955283302580938,
+                "user_seconds": 0.18209599999999998,
+                "system_seconds": 0.055247,
+                "cpu_seconds": 0.23734299999999997,
+                "peak_rss_bytes": 112099328,
+                "stderr": ""
+              }
+            ],
+            "executable_bytes": 453224,
+            "executable_sha256": "da523b18ac44776c183458f1cb097572a4e5a4bd318bf9369e255edd28960833"
+          },
+          "correctness": [
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/prepared/program",
+                "1"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.29676966700935736,
+              "user_seconds": 0.0025399999999999997,
+              "system_seconds": 0.003671,
+              "cpu_seconds": 0.0062109999999999995,
+              "peak_rss_bytes": 1572864,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "a8ed35a163cba662b15fe455af22d5f91668d6eb59ef9a2aa9e19e1658745819"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/prepared/program",
+                "2"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.005501790961716324,
+              "user_seconds": 0.0012469999999999998,
+              "system_seconds": 0.0015249999999999999,
+              "cpu_seconds": 0.0027719999999999997,
+              "peak_rss_bytes": 1572864,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "2e4e5f9f953fd314adbaa1326f7020d08d403929fec8e60c1ef777440af987dd"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/prepared/program",
+                "7"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.005136290972586721,
+              "user_seconds": 0.0013189999999999999,
+              "system_seconds": 0.0017959999999999999,
+              "cpu_seconds": 0.0031149999999999997,
+              "peak_rss_bytes": 1572864,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "5c8c0137a526ae1609eb7fd0b4cf7b2502816f9c8fdebab1346e47923d43c108"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/prepared/program",
+                "8"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.004392584029119462,
+              "user_seconds": 0.001199,
+              "system_seconds": 0.001318,
+              "cpu_seconds": 0.002517,
+              "peak_rss_bytes": 1572864,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "5cb3c72ff26073f0dcd32ae46289dcf3ef468694ab383f4b98b1bf33c155f6d3"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/prepared/program",
+                "9"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.0031187919666990638,
+              "user_seconds": 0.000945,
+              "system_seconds": 0.001003,
+              "cpu_seconds": 0.001948,
+              "peak_rss_bytes": 1572864,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/prepared/program",
+                "200"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.0036165420315228403,
+              "user_seconds": 0.001518,
+              "system_seconds": 0.0009729999999999999,
+              "cpu_seconds": 0.002491,
+              "peak_rss_bytes": 1605632,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "97610473750700638fc63d13cfa49d339b67c18e7f26b3f9c9acb61e746472d5"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/prepared/program",
+                "4096"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.21957116696285084,
+              "user_seconds": 0.211446,
+              "system_seconds": 0.006758,
+              "cpu_seconds": 0.218204,
+              "peak_rss_bytes": 3850240,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77"
+            }
+          ],
+          "executable_bytes": 453224,
+          "compilation": {
+            "samples": [
+              {
+                "wall_seconds": 0.18414304195903242,
+                "cpu_seconds": 0.24911299999999997,
+                "peak_rss_bytes": 112050176,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/bin/rustc",
+                      "-O",
+                      "--edition=2021",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/rust/main.rs",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/sample-0/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/sample-0",
+                    "wall_seconds": 0.18357762502273545,
+                    "user_seconds": 0.19123099999999998,
+                    "system_seconds": 0.057881999999999996,
+                    "cpu_seconds": 0.24911299999999997,
+                    "peak_rss_bytes": 112050176,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 453224,
+                "executable_sha256": "da523b18ac44776c183458f1cb097572a4e5a4bd318bf9369e255edd28960833",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/sample-0/program",
+                    "9"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.1796142079983838,
+                  "user_seconds": 0.0012159999999999999,
+                  "system_seconds": 0.001756,
+                  "cpu_seconds": 0.002972,
+                  "peak_rss_bytes": 1572864,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 1,
+                "order_in_round": 1
+              },
+              {
+                "wall_seconds": 0.17596424999646842,
+                "cpu_seconds": 0.233146,
+                "peak_rss_bytes": 110608384,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/bin/rustc",
+                      "-O",
+                      "--edition=2021",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/rust/main.rs",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/sample-1/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/sample-1",
+                    "wall_seconds": 0.1753894580178894,
+                    "user_seconds": 0.182917,
+                    "system_seconds": 0.050228999999999996,
+                    "cpu_seconds": 0.233146,
+                    "peak_rss_bytes": 110608384,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 453224,
+                "executable_sha256": "da523b18ac44776c183458f1cb097572a4e5a4bd318bf9369e255edd28960833",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/sample-1/program",
+                    "9"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.19297166599426419,
+                  "user_seconds": 0.00113,
+                  "system_seconds": 0.001567,
+                  "cpu_seconds": 0.0026969999999999997,
+                  "peak_rss_bytes": 1572864,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 2,
+                "order_in_round": 0
+              },
+              {
+                "wall_seconds": 0.17633495898917317,
+                "cpu_seconds": 0.245764,
+                "peak_rss_bytes": 111886336,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/bin/rustc",
+                      "-O",
+                      "--edition=2021",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/rust/main.rs",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/sample-2/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/sample-2",
+                    "wall_seconds": 0.17574091703863814,
+                    "user_seconds": 0.190114,
+                    "system_seconds": 0.05565,
+                    "cpu_seconds": 0.245764,
+                    "peak_rss_bytes": 111886336,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 453224,
+                "executable_sha256": "da523b18ac44776c183458f1cb097572a4e5a4bd318bf9369e255edd28960833",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/sample-2/program",
+                    "9"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.1901883750106208,
+                  "user_seconds": 0.001197,
+                  "system_seconds": 0.0017499999999999998,
+                  "cpu_seconds": 0.002947,
+                  "peak_rss_bytes": 1572864,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 3,
+                "order_in_round": 3
+              },
+              {
+                "wall_seconds": 0.1716733340290375,
+                "cpu_seconds": 0.235206,
+                "peak_rss_bytes": 111902720,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/bin/rustc",
+                      "-O",
+                      "--edition=2021",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/rust/main.rs",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/sample-3/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/sample-3",
+                    "wall_seconds": 0.17108804202871397,
+                    "user_seconds": 0.17812,
+                    "system_seconds": 0.057086,
+                    "cpu_seconds": 0.235206,
+                    "peak_rss_bytes": 111902720,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 453224,
+                "executable_sha256": "da523b18ac44776c183458f1cb097572a4e5a4bd318bf9369e255edd28960833",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/sample-3/program",
+                    "9"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.17805308400420472,
+                  "user_seconds": 0.00109,
+                  "system_seconds": 0.001446,
+                  "cpu_seconds": 0.002536,
+                  "peak_rss_bytes": 1572864,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 4,
+                "order_in_round": 2
+              },
+              {
+                "wall_seconds": 0.19176904199412093,
+                "cpu_seconds": 0.23334899999999997,
+                "peak_rss_bytes": 112115712,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/bin/rustc",
+                      "-O",
+                      "--edition=2021",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/rust/main.rs",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/sample-4/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/sample-4",
+                    "wall_seconds": 0.19101354200392962,
+                    "user_seconds": 0.17579799999999998,
+                    "system_seconds": 0.057551,
+                    "cpu_seconds": 0.23334899999999997,
+                    "peak_rss_bytes": 112115712,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 453224,
+                "executable_sha256": "da523b18ac44776c183458f1cb097572a4e5a4bd318bf9369e255edd28960833",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/sample-4/program",
+                    "9"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.19563829200342298,
+                  "user_seconds": 0.001064,
+                  "system_seconds": 0.001491,
+                  "cpu_seconds": 0.002555,
+                  "peak_rss_bytes": 1572864,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 5,
+                "order_in_round": 1
+              },
+              {
+                "wall_seconds": 0.191127999976743,
+                "cpu_seconds": 0.24504299999999998,
+                "peak_rss_bytes": 112050176,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/bin/rustc",
+                      "-O",
+                      "--edition=2021",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/rust/main.rs",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/sample-5/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/sample-5",
+                    "wall_seconds": 0.1904945420101285,
+                    "user_seconds": 0.18481999999999998,
+                    "system_seconds": 0.060223,
+                    "cpu_seconds": 0.24504299999999998,
+                    "peak_rss_bytes": 112050176,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 453224,
+                "executable_sha256": "da523b18ac44776c183458f1cb097572a4e5a4bd318bf9369e255edd28960833",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/sample-5/program",
+                    "9"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.18614395800977945,
+                  "user_seconds": 0.001095,
+                  "system_seconds": 0.0015409999999999998,
+                  "cpu_seconds": 0.002636,
+                  "peak_rss_bytes": 1572864,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 6,
+                "order_in_round": 0
+              },
+              {
+                "wall_seconds": 0.17540004203328863,
+                "cpu_seconds": 0.249854,
+                "peak_rss_bytes": 111886336,
+                "stages": [
+                  {
+                    "command": [
+                      "/opt/homebrew/bin/rustc",
+                      "-O",
+                      "--edition=2021",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/rust/main.rs",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/sample-6/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/sample-6",
+                    "wall_seconds": 0.174722625000868,
+                    "user_seconds": 0.19053799999999999,
+                    "system_seconds": 0.059316,
+                    "cpu_seconds": 0.249854,
+                    "peak_rss_bytes": 111886336,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 453224,
+                "executable_sha256": "da523b18ac44776c183458f1cb097572a4e5a4bd318bf9369e255edd28960833",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/sample-6/program",
+                    "9"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.17792633397039026,
+                  "user_seconds": 0.001086,
+                  "system_seconds": 0.001532,
+                  "cpu_seconds": 0.0026179999999999997,
+                  "peak_rss_bytes": 1572864,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 7,
+                "order_in_round": 3
+              }
+            ],
+            "sample_count": 7,
+            "median_wall_seconds": 0.17633495898917317,
+            "median_cpu_seconds": 0.24504299999999998,
+            "max_peak_rss_bytes": 112115712
+          },
+          "runtime": {
+            "samples": [
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/prepared/program",
+                  "4096"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.22322495799744502,
+                "user_seconds": 0.212814,
+                "system_seconds": 0.008111,
+                "cpu_seconds": 0.220925,
+                "peak_rss_bytes": 3850240,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 1,
+                "order_in_round": 1
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/prepared/program",
+                  "4096"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.22324858303181827,
+                "user_seconds": 0.212229,
+                "system_seconds": 0.008699,
+                "cpu_seconds": 0.220928,
+                "peak_rss_bytes": 3850240,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 2,
+                "order_in_round": 0
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/prepared/program",
+                  "4096"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.22342224995372817,
+                "user_seconds": 0.212253,
+                "system_seconds": 0.008629,
+                "cpu_seconds": 0.220882,
+                "peak_rss_bytes": 3850240,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 3,
+                "order_in_round": 3
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/prepared/program",
+                  "4096"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.22196087497286499,
+                "user_seconds": 0.21236,
+                "system_seconds": 0.00743,
+                "cpu_seconds": 0.21978999999999999,
+                "peak_rss_bytes": 3850240,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 4,
+                "order_in_round": 2
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/prepared/program",
+                  "4096"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.22508974996162578,
+                "user_seconds": 0.21393099999999998,
+                "system_seconds": 0.008858,
+                "cpu_seconds": 0.222789,
+                "peak_rss_bytes": 3850240,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 5,
+                "order_in_round": 1
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/prepared/program",
+                  "4096"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.2227511249948293,
+                "user_seconds": 0.21271099999999998,
+                "system_seconds": 0.007548,
+                "cpu_seconds": 0.22025899999999998,
+                "peak_rss_bytes": 3850240,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 6,
+                "order_in_round": 0
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/rust/prepared/program",
+                  "4096"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.22694433300057426,
+                "user_seconds": 0.215501,
+                "system_seconds": 0.008535,
+                "cpu_seconds": 0.22403599999999999,
+                "peak_rss_bytes": 3850240,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 7,
+                "order_in_round": 3
+              }
+            ],
+            "sample_count": 7,
+            "median_wall_seconds": 0.22324858303181827,
+            "median_cpu_seconds": 0.220925,
+            "max_peak_rss_bytes": 3850240
+          }
+        },
+        "haskell": {
+          "source": "benchmarks/mandelbrot/haskell/main.hs",
+          "compiler_flags": [
+            "-O2",
+            "-XBangPatterns",
+            "-fforce-recomp"
+          ],
+          "preparation": {
+            "wall_seconds": 0.4435425419942476,
+            "cpu_seconds": 0.603035,
+            "peak_rss_bytes": 181927936,
+            "stages": [
+              {
+                "command": [
+                  "/Users/ares/.ghcup/bin/ghc",
+                  "-O2",
+                  "-XBangPatterns",
+                  "-fforce-recomp",
+                  "/Volumes/src/mlf/benchmarks/mandelbrot/haskell/main.hs",
+                  "-outputdir",
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/prepared",
+                  "-o",
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/prepared/program"
+                ],
+                "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/prepared",
+                "wall_seconds": 0.44277908297954127,
+                "user_seconds": 0.478419,
+                "system_seconds": 0.12461599999999999,
+                "cpu_seconds": 0.603035,
+                "peak_rss_bytes": 181927936,
+                "stderr": "/Volumes/src/mlf/benchmarks/mandelbrot/haskell/main.hs:31:31: warning: [GHC-63394] [-Wx-partial]\n    In the use of \u2018head\u2019\n    (imported from Prelude, but defined in GHC.Internal.List):\n    \"This is a partial function, it throws an error on empty lists. Use pattern matching, 'Data.List.uncons' or 'Data.Maybe.listToMaybe' instead. Consider refactoring to use \"Data.List.NonEmpty\".\"\n   |\n31 |     w <- getArgs >>= readIO . head\n   |                               ^^^^\n\n"
+              }
+            ],
+            "executable_bytes": 13480264,
+            "executable_sha256": "39a8858d20378356e80195e797e38ecfccbb263f07870cb371684b43c182268e"
+          },
+          "correctness": [
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/prepared/program",
+                "1"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.30487208400154486,
+              "user_seconds": 0.005566,
+              "system_seconds": 0.01253,
+              "cpu_seconds": 0.018096,
+              "peak_rss_bytes": 11632640,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "a8ed35a163cba662b15fe455af22d5f91668d6eb59ef9a2aa9e19e1658745819"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/prepared/program",
+                "2"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.02214345900574699,
+              "user_seconds": 0.0037709999999999996,
+              "system_seconds": 0.005568,
+              "cpu_seconds": 0.009339,
+              "peak_rss_bytes": 11632640,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "2e4e5f9f953fd314adbaa1326f7020d08d403929fec8e60c1ef777440af987dd"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/prepared/program",
+                "7"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.020918667025398463,
+              "user_seconds": 0.003029,
+              "system_seconds": 0.0043809999999999995,
+              "cpu_seconds": 0.00741,
+              "peak_rss_bytes": 11632640,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "5c8c0137a526ae1609eb7fd0b4cf7b2502816f9c8fdebab1346e47923d43c108"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/prepared/program",
+                "8"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.019970583962276578,
+              "user_seconds": 0.002806,
+              "system_seconds": 0.0043289999999999995,
+              "cpu_seconds": 0.007134999999999999,
+              "peak_rss_bytes": 11632640,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "5cb3c72ff26073f0dcd32ae46289dcf3ef468694ab383f4b98b1bf33c155f6d3"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/prepared/program",
+                "9"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.019583333050832152,
+              "user_seconds": 0.0025429999999999997,
+              "system_seconds": 0.003702,
+              "cpu_seconds": 0.006245,
+              "peak_rss_bytes": 11632640,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/prepared/program",
+                "200"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.019628708017989993,
+              "user_seconds": 0.005536999999999999,
+              "system_seconds": 0.003652,
+              "cpu_seconds": 0.009189,
+              "peak_rss_bytes": 11665408,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "97610473750700638fc63d13cfa49d339b67c18e7f26b3f9c9acb61e746472d5"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/prepared/program",
+                "4096"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 1.0082060840213671,
+              "user_seconds": 0.98098,
+              "system_seconds": 0.010164999999999999,
+              "cpu_seconds": 0.9911449999999999,
+              "peak_rss_bytes": 11665408,
+              "stderr": "",
+              "stdin": "",
+              "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77"
+            }
+          ],
+          "executable_bytes": 13480264,
+          "compilation": {
+            "samples": [
+              {
+                "wall_seconds": 0.48607358295703307,
+                "cpu_seconds": 0.640859,
+                "peak_rss_bytes": 182108160,
+                "stages": [
+                  {
+                    "command": [
+                      "/Users/ares/.ghcup/bin/ghc",
+                      "-O2",
+                      "-XBangPatterns",
+                      "-fforce-recomp",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/haskell/main.hs",
+                      "-outputdir",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-0",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-0/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-0",
+                    "wall_seconds": 0.48497166601009667,
+                    "user_seconds": 0.506057,
+                    "system_seconds": 0.134802,
+                    "cpu_seconds": 0.640859,
+                    "peak_rss_bytes": 182108160,
+                    "stderr": "/Volumes/src/mlf/benchmarks/mandelbrot/haskell/main.hs:31:31: warning: [GHC-63394] [-Wx-partial]\n    In the use of \u2018head\u2019\n    (imported from Prelude, but defined in GHC.Internal.List):\n    \"This is a partial function, it throws an error on empty lists. Use pattern matching, 'Data.List.uncons' or 'Data.Maybe.listToMaybe' instead. Consider refactoring to use \"Data.List.NonEmpty\".\"\n   |\n31 |     w <- getArgs >>= readIO . head\n   |                               ^^^^\n\n"
+                  }
+                ],
+                "executable_bytes": 13480264,
+                "executable_sha256": "39a8858d20378356e80195e797e38ecfccbb263f07870cb371684b43c182268e",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-0/program",
+                    "9"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.3097989590023644,
+                  "user_seconds": 0.002828,
+                  "system_seconds": 0.011647,
+                  "cpu_seconds": 0.014474999999999998,
+                  "peak_rss_bytes": 11632640,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 1,
+                "order_in_round": 2
+              },
+              {
+                "wall_seconds": 0.4823104999959469,
+                "cpu_seconds": 0.644631,
+                "peak_rss_bytes": 185237504,
+                "stages": [
+                  {
+                    "command": [
+                      "/Users/ares/.ghcup/bin/ghc",
+                      "-O2",
+                      "-XBangPatterns",
+                      "-fforce-recomp",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/haskell/main.hs",
+                      "-outputdir",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-1",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-1/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-1",
+                    "wall_seconds": 0.4814738330314867,
+                    "user_seconds": 0.503178,
+                    "system_seconds": 0.141453,
+                    "cpu_seconds": 0.644631,
+                    "peak_rss_bytes": 185237504,
+                    "stderr": "/Volumes/src/mlf/benchmarks/mandelbrot/haskell/main.hs:31:31: warning: [GHC-63394] [-Wx-partial]\n    In the use of \u2018head\u2019\n    (imported from Prelude, but defined in GHC.Internal.List):\n    \"This is a partial function, it throws an error on empty lists. Use pattern matching, 'Data.List.uncons' or 'Data.Maybe.listToMaybe' instead. Consider refactoring to use \"Data.List.NonEmpty\".\"\n   |\n31 |     w <- getArgs >>= readIO . head\n   |                               ^^^^\n\n"
+                  }
+                ],
+                "executable_bytes": 13480264,
+                "executable_sha256": "39a8858d20378356e80195e797e38ecfccbb263f07870cb371684b43c182268e",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-1/program",
+                    "9"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.29902525001671165,
+                  "user_seconds": 0.0047859999999999995,
+                  "system_seconds": 0.011129,
+                  "cpu_seconds": 0.015915,
+                  "peak_rss_bytes": 11632640,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 2,
+                "order_in_round": 1
+              },
+              {
+                "wall_seconds": 0.47248495899839327,
+                "cpu_seconds": 0.629351,
+                "peak_rss_bytes": 181714944,
+                "stages": [
+                  {
+                    "command": [
+                      "/Users/ares/.ghcup/bin/ghc",
+                      "-O2",
+                      "-XBangPatterns",
+                      "-fforce-recomp",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/haskell/main.hs",
+                      "-outputdir",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-2",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-2/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-2",
+                    "wall_seconds": 0.47136262501589954,
+                    "user_seconds": 0.49796199999999996,
+                    "system_seconds": 0.131389,
+                    "cpu_seconds": 0.629351,
+                    "peak_rss_bytes": 181714944,
+                    "stderr": "/Volumes/src/mlf/benchmarks/mandelbrot/haskell/main.hs:31:31: warning: [GHC-63394] [-Wx-partial]\n    In the use of \u2018head\u2019\n    (imported from Prelude, but defined in GHC.Internal.List):\n    \"This is a partial function, it throws an error on empty lists. Use pattern matching, 'Data.List.uncons' or 'Data.Maybe.listToMaybe' instead. Consider refactoring to use \"Data.List.NonEmpty\".\"\n   |\n31 |     w <- getArgs >>= readIO . head\n   |                               ^^^^\n\n"
+                  }
+                ],
+                "executable_bytes": 13480264,
+                "executable_sha256": "39a8858d20378356e80195e797e38ecfccbb263f07870cb371684b43c182268e",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-2/program",
+                    "9"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.3346275420044549,
+                  "user_seconds": 0.005259,
+                  "system_seconds": 0.0129,
+                  "cpu_seconds": 0.018159,
+                  "peak_rss_bytes": 11632640,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 3,
+                "order_in_round": 0
+              },
+              {
+                "wall_seconds": 0.48303320800187066,
+                "cpu_seconds": 0.640622,
+                "peak_rss_bytes": 183943168,
+                "stages": [
+                  {
+                    "command": [
+                      "/Users/ares/.ghcup/bin/ghc",
+                      "-O2",
+                      "-XBangPatterns",
+                      "-fforce-recomp",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/haskell/main.hs",
+                      "-outputdir",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-3",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-3/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-3",
+                    "wall_seconds": 0.48233041597995907,
+                    "user_seconds": 0.505216,
+                    "system_seconds": 0.135406,
+                    "cpu_seconds": 0.640622,
+                    "peak_rss_bytes": 183943168,
+                    "stderr": "/Volumes/src/mlf/benchmarks/mandelbrot/haskell/main.hs:31:31: warning: [GHC-63394] [-Wx-partial]\n    In the use of \u2018head\u2019\n    (imported from Prelude, but defined in GHC.Internal.List):\n    \"This is a partial function, it throws an error on empty lists. Use pattern matching, 'Data.List.uncons' or 'Data.Maybe.listToMaybe' instead. Consider refactoring to use \"Data.List.NonEmpty\".\"\n   |\n31 |     w <- getArgs >>= readIO . head\n   |                               ^^^^\n\n"
+                  }
+                ],
+                "executable_bytes": 13480264,
+                "executable_sha256": "39a8858d20378356e80195e797e38ecfccbb263f07870cb371684b43c182268e",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-3/program",
+                    "9"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.2894428750150837,
+                  "user_seconds": 0.003908,
+                  "system_seconds": 0.008995,
+                  "cpu_seconds": 0.012903,
+                  "peak_rss_bytes": 11649024,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 4,
+                "order_in_round": 3
+              },
+              {
+                "wall_seconds": 0.4778055840288289,
+                "cpu_seconds": 0.6447109999999999,
+                "peak_rss_bytes": 182075392,
+                "stages": [
+                  {
+                    "command": [
+                      "/Users/ares/.ghcup/bin/ghc",
+                      "-O2",
+                      "-XBangPatterns",
+                      "-fforce-recomp",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/haskell/main.hs",
+                      "-outputdir",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-4",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-4/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-4",
+                    "wall_seconds": 0.4770137920277193,
+                    "user_seconds": 0.505458,
+                    "system_seconds": 0.139253,
+                    "cpu_seconds": 0.6447109999999999,
+                    "peak_rss_bytes": 182075392,
+                    "stderr": "/Volumes/src/mlf/benchmarks/mandelbrot/haskell/main.hs:31:31: warning: [GHC-63394] [-Wx-partial]\n    In the use of \u2018head\u2019\n    (imported from Prelude, but defined in GHC.Internal.List):\n    \"This is a partial function, it throws an error on empty lists. Use pattern matching, 'Data.List.uncons' or 'Data.Maybe.listToMaybe' instead. Consider refactoring to use \"Data.List.NonEmpty\".\"\n   |\n31 |     w <- getArgs >>= readIO . head\n   |                               ^^^^\n\n"
+                  }
+                ],
+                "executable_bytes": 13480264,
+                "executable_sha256": "39a8858d20378356e80195e797e38ecfccbb263f07870cb371684b43c182268e",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-4/program",
+                    "9"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.316891000024043,
+                  "user_seconds": 0.006222,
+                  "system_seconds": 0.013066,
+                  "cpu_seconds": 0.019288,
+                  "peak_rss_bytes": 11632640,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 5,
+                "order_in_round": 2
+              },
+              {
+                "wall_seconds": 0.5054264170466922,
+                "cpu_seconds": 0.63576,
+                "peak_rss_bytes": 182353920,
+                "stages": [
+                  {
+                    "command": [
+                      "/Users/ares/.ghcup/bin/ghc",
+                      "-O2",
+                      "-XBangPatterns",
+                      "-fforce-recomp",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/haskell/main.hs",
+                      "-outputdir",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-5",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-5/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-5",
+                    "wall_seconds": 0.5045740420464426,
+                    "user_seconds": 0.49463599999999996,
+                    "system_seconds": 0.141124,
+                    "cpu_seconds": 0.63576,
+                    "peak_rss_bytes": 182353920,
+                    "stderr": "/Volumes/src/mlf/benchmarks/mandelbrot/haskell/main.hs:31:31: warning: [GHC-63394] [-Wx-partial]\n    In the use of \u2018head\u2019\n    (imported from Prelude, but defined in GHC.Internal.List):\n    \"This is a partial function, it throws an error on empty lists. Use pattern matching, 'Data.List.uncons' or 'Data.Maybe.listToMaybe' instead. Consider refactoring to use \"Data.List.NonEmpty\".\"\n   |\n31 |     w <- getArgs >>= readIO . head\n   |                               ^^^^\n\n"
+                  }
+                ],
+                "executable_bytes": 13480264,
+                "executable_sha256": "39a8858d20378356e80195e797e38ecfccbb263f07870cb371684b43c182268e",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-5/program",
+                    "9"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.30454400001326576,
+                  "user_seconds": 0.0050609999999999995,
+                  "system_seconds": 0.012097,
+                  "cpu_seconds": 0.017158,
+                  "peak_rss_bytes": 11632640,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 6,
+                "order_in_round": 1
+              },
+              {
+                "wall_seconds": 0.4686030420125462,
+                "cpu_seconds": 0.642379,
+                "peak_rss_bytes": 183566336,
+                "stages": [
+                  {
+                    "command": [
+                      "/Users/ares/.ghcup/bin/ghc",
+                      "-O2",
+                      "-XBangPatterns",
+                      "-fforce-recomp",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/haskell/main.hs",
+                      "-outputdir",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-6",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-6/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-6",
+                    "wall_seconds": 0.4678802920388989,
+                    "user_seconds": 0.505039,
+                    "system_seconds": 0.13734,
+                    "cpu_seconds": 0.642379,
+                    "peak_rss_bytes": 183566336,
+                    "stderr": "/Volumes/src/mlf/benchmarks/mandelbrot/haskell/main.hs:31:31: warning: [GHC-63394] [-Wx-partial]\n    In the use of \u2018head\u2019\n    (imported from Prelude, but defined in GHC.Internal.List):\n    \"This is a partial function, it throws an error on empty lists. Use pattern matching, 'Data.List.uncons' or 'Data.Maybe.listToMaybe' instead. Consider refactoring to use \"Data.List.NonEmpty\".\"\n   |\n31 |     w <- getArgs >>= readIO . head\n   |                               ^^^^\n\n"
+                  }
+                ],
+                "executable_bytes": 13480264,
+                "executable_sha256": "39a8858d20378356e80195e797e38ecfccbb263f07870cb371684b43c182268e",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/sample-6/program",
+                    "9"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.2995142909931019,
+                  "user_seconds": 0.004857,
+                  "system_seconds": 0.009748999999999999,
+                  "cpu_seconds": 0.014606,
+                  "peak_rss_bytes": 11632640,
+                  "stderr": "",
+                  "stdin": "",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 7,
+                "order_in_round": 0
+              }
+            ],
+            "sample_count": 7,
+            "median_wall_seconds": 0.4823104999959469,
+            "median_cpu_seconds": 0.640859,
+            "max_peak_rss_bytes": 185237504
+          },
+          "runtime": {
+            "samples": [
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/prepared/program",
+                  "4096"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 1.0148599999956787,
+                "user_seconds": 0.981737,
+                "system_seconds": 0.019188,
+                "cpu_seconds": 1.000925,
+                "peak_rss_bytes": 11665408,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 1,
+                "order_in_round": 2
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/prepared/program",
+                  "4096"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 1.018600624985993,
+                "user_seconds": 0.9863219999999999,
+                "system_seconds": 0.0172,
+                "cpu_seconds": 1.003522,
+                "peak_rss_bytes": 11665408,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 2,
+                "order_in_round": 1
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/prepared/program",
+                  "4096"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 1.0092063340125605,
+                "user_seconds": 0.979047,
+                "system_seconds": 0.014367999999999999,
+                "cpu_seconds": 0.993415,
+                "peak_rss_bytes": 11665408,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 3,
+                "order_in_round": 0
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/prepared/program",
+                  "4096"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 1.0022255829535425,
+                "user_seconds": 0.9790679999999999,
+                "system_seconds": 0.015827,
+                "cpu_seconds": 0.994895,
+                "peak_rss_bytes": 11665408,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 4,
+                "order_in_round": 3
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/prepared/program",
+                  "4096"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 1.0094149580108933,
+                "user_seconds": 0.982887,
+                "system_seconds": 0.014771999999999999,
+                "cpu_seconds": 0.997659,
+                "peak_rss_bytes": 11665408,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 5,
+                "order_in_round": 2
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/prepared/program",
+                  "4096"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 1.0100127920159139,
+                "user_seconds": 0.983845,
+                "system_seconds": 0.016606,
+                "cpu_seconds": 1.000451,
+                "peak_rss_bytes": 11665408,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 6,
+                "order_in_round": 1
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/haskell/prepared/program",
+                  "4096"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 1.047616207972169,
+                "user_seconds": 0.991829,
+                "system_seconds": 0.015446,
+                "cpu_seconds": 1.007275,
+                "peak_rss_bytes": 11665408,
+                "stderr": "",
+                "stdin": "",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 7,
+                "order_in_round": 0
+              }
+            ],
+            "sample_count": 7,
+            "median_wall_seconds": 1.0100127920159139,
+            "median_cpu_seconds": 1.000451,
+            "max_peak_rss_bytes": 11665408
+          }
+        },
+        "mlf": {
+          "source": "benchmarks/mandelbrot/mlf/main.emlf",
+          "compiler_flags": [
+            "-O2",
+            "-Wno-override-module"
+          ],
+          "preparation": {
+            "wall_seconds": 0.5315941250300966,
+            "cpu_seconds": 0.564707,
+            "peak_rss_bytes": 91095040,
+            "stages": [
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+                  "--emit-llvm",
+                  "/Volumes/src/mlf/benchmarks/mandelbrot/mlf/main.emlf"
+                ],
+                "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/prepared",
+                "wall_seconds": 0.10901187499985099,
+                "user_seconds": 0.096735,
+                "system_seconds": 0.00762,
+                "cpu_seconds": 0.104355,
+                "peak_rss_bytes": 50298880,
+                "stderr": "",
+                "stdout_file": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/prepared/program.ll"
+              },
+              {
+                "command": [
+                  "/opt/homebrew/opt/llvm/bin/clang",
+                  "-O2",
+                  "-Wno-override-module",
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/prepared/program.ll",
+                  "/Volumes/src/mlf/runtime/mlf_runtime.c",
+                  "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+                  "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+                  "-lgmp",
+                  "-lm",
+                  "-o",
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/prepared/program"
+                ],
+                "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/prepared",
+                "wall_seconds": 0.42029412498231977,
+                "user_seconds": 0.39669,
+                "system_seconds": 0.063662,
+                "cpu_seconds": 0.460352,
+                "peak_rss_bytes": 91095040,
+                "stderr": ""
+              }
+            ],
+            "executable_bytes": 87448,
+            "executable_sha256": "a87db62d1f66e1edf3ebde9109699dc7112b9f1a711b6588db54fea4d5ab4d7a"
+          },
+          "correctness": [
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/prepared/program"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.18078716698801145,
+              "user_seconds": 0.001062,
+              "system_seconds": 0.001831,
+              "cpu_seconds": 0.0028929999999999997,
+              "peak_rss_bytes": 1556480,
+              "stderr": "",
+              "stdin": "1\n",
+              "output_sha256": "a8ed35a163cba662b15fe455af22d5f91668d6eb59ef9a2aa9e19e1658745819"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/prepared/program"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.0036659580073319376,
+              "user_seconds": 0.0009729999999999999,
+              "system_seconds": 0.001223,
+              "cpu_seconds": 0.002196,
+              "peak_rss_bytes": 1556480,
+              "stderr": "",
+              "stdin": "2\n",
+              "output_sha256": "2e4e5f9f953fd314adbaa1326f7020d08d403929fec8e60c1ef777440af987dd"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/prepared/program"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.0036042080027982593,
+              "user_seconds": 0.0009699999999999999,
+              "system_seconds": 0.0012029999999999999,
+              "cpu_seconds": 0.0021729999999999996,
+              "peak_rss_bytes": 1556480,
+              "stderr": "",
+              "stdin": "7\n",
+              "output_sha256": "5c8c0137a526ae1609eb7fd0b4cf7b2502816f9c8fdebab1346e47923d43c108"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/prepared/program"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.0035973330377601087,
+              "user_seconds": 0.000936,
+              "system_seconds": 0.001431,
+              "cpu_seconds": 0.002367,
+              "peak_rss_bytes": 1556480,
+              "stderr": "",
+              "stdin": "8\n",
+              "output_sha256": "5cb3c72ff26073f0dcd32ae46289dcf3ef468694ab383f4b98b1bf33c155f6d3"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/prepared/program"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.003495457989629358,
+              "user_seconds": 0.000919,
+              "system_seconds": 0.001204,
+              "cpu_seconds": 0.002123,
+              "peak_rss_bytes": 1572864,
+              "stderr": "",
+              "stdin": "9\n",
+              "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/prepared/program"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.007030208013020456,
+              "user_seconds": 0.0034089999999999997,
+              "system_seconds": 0.001926,
+              "cpu_seconds": 0.0053349999999999995,
+              "peak_rss_bytes": 1785856,
+              "stderr": "",
+              "stdin": "200\n",
+              "output_sha256": "97610473750700638fc63d13cfa49d339b67c18e7f26b3f9c9acb61e746472d5"
+            },
+            {
+              "command": [
+                "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/prepared/program"
+              ],
+              "cwd": "/Volumes/src/mlf",
+              "wall_seconds": 0.644849750038702,
+              "user_seconds": 0.628398,
+              "system_seconds": 0.013732999999999999,
+              "cpu_seconds": 0.642131,
+              "peak_rss_bytes": 1785856,
+              "stderr": "",
+              "stdin": "4096\n",
+              "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77"
+            }
+          ],
+          "executable_bytes": 87448,
+          "compilation": {
+            "samples": [
+              {
+                "wall_seconds": 0.5415095839998685,
+                "cpu_seconds": 0.558522,
+                "peak_rss_bytes": 90505216,
+                "stages": [
+                  {
+                    "command": [
+                      "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+                      "--emit-llvm",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/mlf/main.emlf"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-0",
+                    "wall_seconds": 0.1319814170128666,
+                    "user_seconds": 0.11068599999999999,
+                    "system_seconds": 0.012742,
+                    "cpu_seconds": 0.123428,
+                    "peak_rss_bytes": 50298880,
+                    "stderr": "",
+                    "stdout_file": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-0/program.ll"
+                  },
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O2",
+                      "-Wno-override-module",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-0/program.ll",
+                      "/Volumes/src/mlf/runtime/mlf_runtime.c",
+                      "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+                      "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+                      "-lgmp",
+                      "-lm",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-0/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-0",
+                    "wall_seconds": 0.4079984159907326,
+                    "user_seconds": 0.37877299999999997,
+                    "system_seconds": 0.056320999999999996,
+                    "cpu_seconds": 0.435094,
+                    "peak_rss_bytes": 90505216,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 87448,
+                "executable_sha256": "a87db62d1f66e1edf3ebde9109699dc7112b9f1a711b6588db54fea4d5ab4d7a",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-0/program"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.17278916703071445,
+                  "user_seconds": 0.0010379999999999999,
+                  "system_seconds": 0.001482,
+                  "cpu_seconds": 0.0025199999999999997,
+                  "peak_rss_bytes": 1572864,
+                  "stderr": "",
+                  "stdin": "9\n",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 1,
+                "order_in_round": 3
+              },
+              {
+                "wall_seconds": 0.5478905410273001,
+                "cpu_seconds": 0.5679460000000001,
+                "peak_rss_bytes": 90603520,
+                "stages": [
+                  {
+                    "command": [
+                      "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+                      "--emit-llvm",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/mlf/main.emlf"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-1",
+                    "wall_seconds": 0.13132383296033368,
+                    "user_seconds": 0.11078299999999999,
+                    "system_seconds": 0.009966,
+                    "cpu_seconds": 0.120749,
+                    "peak_rss_bytes": 50298880,
+                    "stderr": "",
+                    "stdout_file": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-1/program.ll"
+                  },
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O2",
+                      "-Wno-override-module",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-1/program.ll",
+                      "/Volumes/src/mlf/runtime/mlf_runtime.c",
+                      "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+                      "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+                      "-lgmp",
+                      "-lm",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-1/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-1",
+                    "wall_seconds": 0.4151124160271138,
+                    "user_seconds": 0.384237,
+                    "system_seconds": 0.06296,
+                    "cpu_seconds": 0.447197,
+                    "peak_rss_bytes": 90603520,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 87448,
+                "executable_sha256": "a87db62d1f66e1edf3ebde9109699dc7112b9f1a711b6588db54fea4d5ab4d7a",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-1/program"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.17523204197641462,
+                  "user_seconds": 0.001045,
+                  "system_seconds": 0.0015199999999999999,
+                  "cpu_seconds": 0.0025649999999999996,
+                  "peak_rss_bytes": 1572864,
+                  "stderr": "",
+                  "stdin": "9\n",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 2,
+                "order_in_round": 2
+              },
+              {
+                "wall_seconds": 0.5463590840226971,
+                "cpu_seconds": 0.564534,
+                "peak_rss_bytes": 91062272,
+                "stages": [
+                  {
+                    "command": [
+                      "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+                      "--emit-llvm",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/mlf/main.emlf"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-2",
+                    "wall_seconds": 0.13374250003835186,
+                    "user_seconds": 0.111229,
+                    "system_seconds": 0.010060999999999999,
+                    "cpu_seconds": 0.12129,
+                    "peak_rss_bytes": 50298880,
+                    "stderr": "",
+                    "stdout_file": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-2/program.ll"
+                  },
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O2",
+                      "-Wno-override-module",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-2/program.ll",
+                      "/Volumes/src/mlf/runtime/mlf_runtime.c",
+                      "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+                      "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+                      "-lgmp",
+                      "-lm",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-2/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-2",
+                    "wall_seconds": 0.4108487499761395,
+                    "user_seconds": 0.38705799999999996,
+                    "system_seconds": 0.056186,
+                    "cpu_seconds": 0.44324399999999997,
+                    "peak_rss_bytes": 91062272,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 87448,
+                "executable_sha256": "a87db62d1f66e1edf3ebde9109699dc7112b9f1a711b6588db54fea4d5ab4d7a",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-2/program"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.18702570802997798,
+                  "user_seconds": 0.001046,
+                  "system_seconds": 0.001465,
+                  "cpu_seconds": 0.002511,
+                  "peak_rss_bytes": 1572864,
+                  "stderr": "",
+                  "stdin": "9\n",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 3,
+                "order_in_round": 1
+              },
+              {
+                "wall_seconds": 0.5442250000196509,
+                "cpu_seconds": 0.574083,
+                "peak_rss_bytes": 90226688,
+                "stages": [
+                  {
+                    "command": [
+                      "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+                      "--emit-llvm",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/mlf/main.emlf"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-3",
+                    "wall_seconds": 0.12313983397325501,
+                    "user_seconds": 0.10621799999999999,
+                    "system_seconds": 0.009200999999999999,
+                    "cpu_seconds": 0.115419,
+                    "peak_rss_bytes": 50298880,
+                    "stderr": "",
+                    "stdout_file": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-3/program.ll"
+                  },
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O2",
+                      "-Wno-override-module",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-3/program.ll",
+                      "/Volumes/src/mlf/runtime/mlf_runtime.c",
+                      "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+                      "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+                      "-lgmp",
+                      "-lm",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-3/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-3",
+                    "wall_seconds": 0.4197557090083137,
+                    "user_seconds": 0.397793,
+                    "system_seconds": 0.060870999999999995,
+                    "cpu_seconds": 0.458664,
+                    "peak_rss_bytes": 90226688,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 87448,
+                "executable_sha256": "a87db62d1f66e1edf3ebde9109699dc7112b9f1a711b6588db54fea4d5ab4d7a",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-3/program"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.17482058296445757,
+                  "user_seconds": 0.001054,
+                  "system_seconds": 0.0015199999999999999,
+                  "cpu_seconds": 0.002574,
+                  "peak_rss_bytes": 1572864,
+                  "stderr": "",
+                  "stdin": "9\n",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 4,
+                "order_in_round": 0
+              },
+              {
+                "wall_seconds": 0.5588446249603294,
+                "cpu_seconds": 0.579951,
+                "peak_rss_bytes": 91193344,
+                "stages": [
+                  {
+                    "command": [
+                      "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+                      "--emit-llvm",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/mlf/main.emlf"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-4",
+                    "wall_seconds": 0.130870875029359,
+                    "user_seconds": 0.111343,
+                    "system_seconds": 0.010839999999999999,
+                    "cpu_seconds": 0.122183,
+                    "peak_rss_bytes": 50298880,
+                    "stderr": "",
+                    "stdout_file": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-4/program.ll"
+                  },
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O2",
+                      "-Wno-override-module",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-4/program.ll",
+                      "/Volumes/src/mlf/runtime/mlf_runtime.c",
+                      "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+                      "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+                      "-lgmp",
+                      "-lm",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-4/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-4",
+                    "wall_seconds": 0.42640554101672024,
+                    "user_seconds": 0.39705999999999997,
+                    "system_seconds": 0.060708,
+                    "cpu_seconds": 0.45776799999999995,
+                    "peak_rss_bytes": 91193344,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 87448,
+                "executable_sha256": "a87db62d1f66e1edf3ebde9109699dc7112b9f1a711b6588db54fea4d5ab4d7a",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-4/program"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.1865799580118619,
+                  "user_seconds": 0.001109,
+                  "system_seconds": 0.0018169999999999998,
+                  "cpu_seconds": 0.0029259999999999998,
+                  "peak_rss_bytes": 1572864,
+                  "stderr": "",
+                  "stdin": "9\n",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 5,
+                "order_in_round": 3
+              },
+              {
+                "wall_seconds": 0.5601361250155605,
+                "cpu_seconds": 0.592671,
+                "peak_rss_bytes": 91062272,
+                "stages": [
+                  {
+                    "command": [
+                      "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+                      "--emit-llvm",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/mlf/main.emlf"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-5",
+                    "wall_seconds": 0.13535945798503235,
+                    "user_seconds": 0.10918399999999999,
+                    "system_seconds": 0.009871999999999999,
+                    "cpu_seconds": 0.119056,
+                    "peak_rss_bytes": 50298880,
+                    "stderr": "",
+                    "stdout_file": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-5/program.ll"
+                  },
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O2",
+                      "-Wno-override-module",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-5/program.ll",
+                      "/Volumes/src/mlf/runtime/mlf_runtime.c",
+                      "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+                      "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+                      "-lgmp",
+                      "-lm",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-5/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-5",
+                    "wall_seconds": 0.4232654169900343,
+                    "user_seconds": 0.40987599999999996,
+                    "system_seconds": 0.063739,
+                    "cpu_seconds": 0.47361499999999995,
+                    "peak_rss_bytes": 91062272,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 87448,
+                "executable_sha256": "a87db62d1f66e1edf3ebde9109699dc7112b9f1a711b6588db54fea4d5ab4d7a",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-5/program"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.18163816700689495,
+                  "user_seconds": 0.0010659999999999999,
+                  "system_seconds": 0.00162,
+                  "cpu_seconds": 0.002686,
+                  "peak_rss_bytes": 1572864,
+                  "stderr": "",
+                  "stdin": "9\n",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 6,
+                "order_in_round": 2
+              },
+              {
+                "wall_seconds": 0.5395476670237258,
+                "cpu_seconds": 0.55763,
+                "peak_rss_bytes": 90161152,
+                "stages": [
+                  {
+                    "command": [
+                      "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+                      "--emit-llvm",
+                      "/Volumes/src/mlf/benchmarks/mandelbrot/mlf/main.emlf"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-6",
+                    "wall_seconds": 0.13234125002054498,
+                    "user_seconds": 0.10740799999999999,
+                    "system_seconds": 0.008593,
+                    "cpu_seconds": 0.11600099999999999,
+                    "peak_rss_bytes": 50298880,
+                    "stderr": "",
+                    "stdout_file": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-6/program.ll"
+                  },
+                  {
+                    "command": [
+                      "/opt/homebrew/opt/llvm/bin/clang",
+                      "-O2",
+                      "-Wno-override-module",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-6/program.ll",
+                      "/Volumes/src/mlf/runtime/mlf_runtime.c",
+                      "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+                      "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+                      "-lgmp",
+                      "-lm",
+                      "-o",
+                      "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-6/program"
+                    ],
+                    "cwd": "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-6",
+                    "wall_seconds": 0.40554116695420817,
+                    "user_seconds": 0.385885,
+                    "system_seconds": 0.055743999999999995,
+                    "cpu_seconds": 0.441629,
+                    "peak_rss_bytes": 90161152,
+                    "stderr": ""
+                  }
+                ],
+                "executable_bytes": 87448,
+                "executable_sha256": "a87db62d1f66e1edf3ebde9109699dc7112b9f1a711b6588db54fea4d5ab4d7a",
+                "post_build_check": {
+                  "command": [
+                    "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/sample-6/program"
+                  ],
+                  "cwd": "/Volumes/src/mlf",
+                  "wall_seconds": 0.1810221669729799,
+                  "user_seconds": 0.001071,
+                  "system_seconds": 0.00153,
+                  "cpu_seconds": 0.002601,
+                  "peak_rss_bytes": 1556480,
+                  "stderr": "",
+                  "stdin": "9\n",
+                  "output_sha256": "938f0a0fb19d6e0d884754e89369ae63cf71b840291bc40796692859cec261ce"
+                },
+                "round": 7,
+                "order_in_round": 1
+              }
+            ],
+            "sample_count": 7,
+            "median_wall_seconds": 0.5463590840226971,
+            "median_cpu_seconds": 0.5679460000000001,
+            "max_peak_rss_bytes": 91193344
+          },
+          "runtime": {
+            "samples": [
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/prepared/program"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.6488849580055103,
+                "user_seconds": 0.626591,
+                "system_seconds": 0.019114,
+                "cpu_seconds": 0.645705,
+                "peak_rss_bytes": 1802240,
+                "stderr": "",
+                "stdin": "4096\n",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 1,
+                "order_in_round": 3
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/prepared/program"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.6470612920238636,
+                "user_seconds": 0.626382,
+                "system_seconds": 0.016656,
+                "cpu_seconds": 0.643038,
+                "peak_rss_bytes": 1818624,
+                "stderr": "",
+                "stdin": "4096\n",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 2,
+                "order_in_round": 2
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/prepared/program"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.6427868750179186,
+                "user_seconds": 0.6230939999999999,
+                "system_seconds": 0.017061,
+                "cpu_seconds": 0.6401549999999999,
+                "peak_rss_bytes": 1802240,
+                "stderr": "",
+                "stdin": "4096\n",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 3,
+                "order_in_round": 1
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/prepared/program"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.6461807499872521,
+                "user_seconds": 0.626637,
+                "system_seconds": 0.016551,
+                "cpu_seconds": 0.643188,
+                "peak_rss_bytes": 1785856,
+                "stderr": "",
+                "stdin": "4096\n",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 4,
+                "order_in_round": 0
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/prepared/program"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.6537579580326565,
+                "user_seconds": 0.628899,
+                "system_seconds": 0.018319,
+                "cpu_seconds": 0.647218,
+                "peak_rss_bytes": 1818624,
+                "stderr": "",
+                "stdin": "4096\n",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 5,
+                "order_in_round": 3
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/prepared/program"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.6463457500212826,
+                "user_seconds": 0.626902,
+                "system_seconds": 0.016503999999999998,
+                "cpu_seconds": 0.6434059999999999,
+                "peak_rss_bytes": 1802240,
+                "stderr": "",
+                "stdin": "4096\n",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 6,
+                "order_in_round": 2
+              },
+              {
+                "command": [
+                  "/Volumes/src/mlf/dist-newstyle/benchmarks/languages-46cffpli/mandelbrot/mlf/prepared/program"
+                ],
+                "cwd": "/Volumes/src/mlf",
+                "wall_seconds": 0.647104625008069,
+                "user_seconds": 0.6279899999999999,
+                "system_seconds": 0.015811,
+                "cpu_seconds": 0.643801,
+                "peak_rss_bytes": 1835008,
+                "stderr": "",
+                "stdin": "4096\n",
+                "output_sha256": "1fd02dc5301814ca8ff0425e18a4a91ffdae22362127aa2332da2acb1e066b77",
+                "round": 7,
+                "order_in_round": 1
+              }
+            ],
+            "sample_count": 7,
+            "median_wall_seconds": 0.6470612920238636,
+            "median_cpu_seconds": 0.6434059999999999,
+            "max_peak_rss_bytes": 1835008
+          }
+        }
+      },
+      "correctness_inputs": [
+        1,
+        2,
+        7,
+        8,
+        9,
+        200,
+        4096
+      ],
+      "compilation_ratios": {
+        "c": 1.0,
+        "rust": 1.2137033056107778,
+        "haskell": 3.319715225679156,
+        "mlf": 3.760557918464364
+      },
+      "runtime_ratios": {
+        "c": 1.0,
+        "rust": 0.23377874742675908,
+        "haskell": 1.0576529633284677,
+        "mlf": 0.6775818072543812
+      }
+    }
+  ],
+  "warnings": [],
+  "geometric_means": {
+    "compilation": null,
+    "runtime": null
+  },
+  "corpus_compilation": {
+    "program_count": 1,
+    "languages": {
+      "c": {
+        "summed_wall_samples_seconds": [
+          0.12879333301680163,
+          0.14147508301539347,
+          0.1480276669608429,
+          0.14528670901199803,
+          0.1568880410050042,
+          0.14672700001392514,
+          0.1442331249709241
+        ],
+        "median_seconds": 0.14528670901199803,
+        "programs_per_second": 6.882942058501843
+      },
+      "rust": {
+        "summed_wall_samples_seconds": [
+          0.18414304195903242,
+          0.17596424999646842,
+          0.17633495898917317,
+          0.1716733340290375,
+          0.19176904199412093,
+          0.191127999976743,
+          0.17540004203328863
+        ],
+        "median_seconds": 0.17633495898917317,
+        "programs_per_second": 5.671025222295253
+      },
+      "haskell": {
+        "summed_wall_samples_seconds": [
+          0.48607358295703307,
+          0.4823104999959469,
+          0.47248495899839327,
+          0.48303320800187066,
+          0.4778055840288289,
+          0.5054264170466922,
+          0.4686030420125462
+        ],
+        "median_seconds": 0.4823104999959469,
+        "programs_per_second": 2.073353161518158
+      },
+      "mlf": {
+        "summed_wall_samples_seconds": [
+          0.5415095839998685,
+          0.5478905410273001,
+          0.5463590840226971,
+          0.5442250000196509,
+          0.5588446249603294,
+          0.5601361250155605,
+          0.5395476670237258
+        ],
+        "median_seconds": 0.5463590840226971,
+        "programs_per_second": 1.8302981120717627
+      }
+    },
+    "scope": "Sum of fresh per-program latencies per round; includes each compiler startup. With one workload this duplicates latency and does not isolate processing throughput."
+  },
+  "controlled_environment": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "GHCRTS": "",
+    "GHC_ENVIRONMENT": "-"
+  },
+  "toolchain": {
+    "clang": {
+      "path": "/opt/homebrew/opt/llvm/bin/clang",
+      "version": "Homebrew clang version 23.1.2\nTarget: arm64-apple-darwin25.6.0\nThread model: posix\nInstalledDir: /opt/homebrew/Cellar/llvm/23.1.2/bin\nConfiguration file: /opt/homebrew/Cellar/llvm/23.1.2/etc/clang/arm64-apple-darwin25.cfg",
+      "sha256": "d64d1ee59d8aff01397eb88adea263e490ac65766faefc8b5323b4a06d0438e5"
+    },
+    "rustc": {
+      "path": "/opt/homebrew/bin/rustc",
+      "version": "rustc 1.99.0 (b940084d7 2026-09-28) (Homebrew)\nbinary: rustc\ncommit-hash: b940084d7eb6a299eb4bfeb8e34901bc051e7ac4\ncommit-date: 2026-09-28\nhost: aarch64-apple-darwin\nrelease: 1.99.0\nLLVM version: 23.1.2",
+      "sha256": "951efe952b1e70ab89d1b040de27315385ddb1ea8ece7d260655a54c3e52034f"
+    },
+    "ghc": {
+      "path": "/Users/ares/.ghcup/bin/ghc",
+      "version": "The Glorious Glasgow Haskell Compilation System, version 9.14.1",
+      "sha256": "39fd1ee0cf7eb5739a595d5c238a95a7a062942397cc6d2a16425d6eeb18283e"
+    },
+    "emlf": {
+      "path": "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+      "version": "[(\"GHC RTS\", \"YES\")\n ,(\"GHC version\", \"9.14.1\")\n ,(\"RTS way\", \"rts_v\")\n ,(\"Host platform\", \"aarch64-apple-darwin\")\n ,(\"Host architecture\", \"aarch64\")\n ,(\"Host OS\", \"darwin\")\n ,(\"Host vendor\", \"apple\")\n ,(\"Word size\", \"64\")\n ,(\"Compiler unregisterised\", \"NO\")\n ,(\"Tables next to code\", \"YES\")\n ,(\"Flag -with-rtsopts\", \"-A32m\")\n ,(\"I/O manager default\", \"select\")\n ]",
+      "sha256": "7102d492a149d46c565fd25d7d84d72b271c14d0c9d796a033313875c3665abd"
+    },
+    "pkg_config": {
+      "path": "/opt/homebrew/bin/pkg-config",
+      "version": "3.0.7",
+      "sha256": "39b6b8b701470ebf31a24972bc1fafc7da54a5c32215d972fdadaf21c7cfa91b"
+    },
+    "runtime": {
+      "path": "/Volumes/src/mlf/runtime/mlf_runtime.c",
+      "sha256": "c57258e16401f3cb4be78b9c5904111385d3d1dfce545b56fa1644d6bf5f60db",
+      "header_sha256": "266f5cfd64602ed798ae307c66c5e7890de107c7e1bdeee75d4254e2ab32b374"
+    },
+    "gmp_flags": [
+      "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+      "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+      "-lgmp"
+    ],
+    "gmp_version": "6.3.0"
+  },
+  "manifest": {
+    "schema_version": 1,
+    "upstream": {
+      "repository": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame.git",
+      "revision": "40296663ed350d5fe4a6ab5e367bab61cb77c219",
+      "license": "benchmarks/LICENSE.BenchmarksGame",
+      "extraction": "HTMLParser with convert_charrefs=True; concatenate text inside the first pre element, retaining whitespace"
+    },
+    "pinned_sha256": {
+      "benchmarks/LICENSE.BenchmarksGame": "e5dd0024dd43d92434808c8e1df3c09870a2832744283232aa1dc16c737237b1",
+      "benchmarks/binary-trees/c/adaptation.patch": "f4ac32a07dc7daef25b343aca571596c12a8039cab017e017b5a25ee1d1bd954",
+      "benchmarks/binary-trees/c/main.c": "3149135fbe1c7fbcca7c38d815f024d46bedf48a9f40611e72ad88c83fc62ad2",
+      "benchmarks/binary-trees/c/upstream.c": "0896dbbe8f2026c48a7f681cae56480b44dff6d114092f36f01474e58603c009",
+      "benchmarks/binary-trees/expected-10.txt": "b7f92c56b5d8aeb0a4d698842d1d87a57b4909865c3c84e5e10313e16663c3cb",
+      "benchmarks/binary-trees/haskell/upstream.hs": "0b6aa7815bfe566c3624771c341d9f33c2e9d306565682c380bb9f7d11ed886f",
+      "benchmarks/binary-trees/rust/adaptation.patch": "f18e3c383790bd753d966bef9c7237b3163edf4fda028f892344729c02650dbe",
+      "benchmarks/binary-trees/rust/main.rs": "f5757256cdef36a442424ca39cb12a9a9d618dcb008f77aba4cd772ea97a46e3",
+      "benchmarks/binary-trees/rust/upstream.rs": "c344da05a4bcc7d206528ba3bcbab6e78f09d049e10bf91e0fcceb666d5e99b5",
+      "benchmarks/pidigits/expected-30.txt": "dbf95cc20ad23ff1a385d30436f0c63b5ae7f41bb1003cf204f5e4888b74a39c",
+      "benchmarks/pidigits/rust/adaptation.patch": "3d785b422794afc85138b912096fdc1ed9917725e342b3d59e70a09d1e07a9cc",
+      "benchmarks/pidigits/rust/main.rs": "0181c641199da98e2f77ea5f64e28abe4a0d11c53af5175661bdc0fe2b658923",
+      "benchmarks/pidigits/rust/upstream.rs": "600bc8d8351ea1a487b8127f703d03691dd060db063256654d234a1601d98fe8",
+      "benchmarks/pidigits/haskell/upstream.hs": "a61fd2106576157bb0e3b219bb9e8c2927f4d442db9fe72a6483487899000ce0",
+      "benchmarks/pidigits/c/adaptation.patch": "a7bfef21672c7cba980494aa4e04e262ba8efebc0ea5413b01821deddf1e226e",
+      "benchmarks/pidigits/c/upstream.c": "6360874e2e1bb353136e29a28f93685a1d206615f3665219662fe18ed0c4ba81",
+      "benchmarks/pidigits/c/main.c": "9b09dff01b8bb0b84f6a248a19285ae26f9618f3d64e4087108b2563923cb181",
+      "benchmarks/n-body/expected-1000.txt": "76de83d6d51a74f82828547423f516e7815cfe8cfea6290a2831aa173f806de7",
+      "benchmarks/n-body/rust/upstream.rs": "1a5ccd1738a04074695b1c0458803dfd6a59ee7fa8cd5c429ce67475a3005d69",
+      "benchmarks/n-body/haskell/upstream.hs": "b9ec3360854eea9b5e597bae888854757b5f160a5d35c2227a5e156d8e59aaf4",
+      "benchmarks/n-body/c/upstream.c": "a2750e1505f86f3815cc0efbb0c665c9117cdca3ae4ae55bbb3da597858062b2",
+      "benchmarks/fannkuch-redux/expected-7.txt": "2dc0a3cd4a547ba69389f97f3b447bd4d487fe6216c3cacd2f9bf8c908dc127f",
+      "benchmarks/fannkuch-redux/rust/adaptation.patch": "1ee2e61965b53adb404d04409529d2fb8f2adb75acafd90ea0c23307d4347f8d",
+      "benchmarks/fannkuch-redux/rust/main.rs": "766b84a9ad1de0af4f01298678733262a5ccd6a10505b21f11402825413e7eb8",
+      "benchmarks/fannkuch-redux/rust/upstream.rs": "5ec7ce9915bd599ac127575c9caa9ef15a8233397975d6e3bf0b3cb6e15c8d6a",
+      "benchmarks/fannkuch-redux/haskell/upstream.hs": "55ab21ffcfd129c387b51d515e843a843a2e5d6186028aa424c61f1c7f949ddc",
+      "benchmarks/fannkuch-redux/haskell/adaptation.patch": "ac8962905ab546325b2c23a18ad9a175b9c4754beb67b4fad491a7afc4ac0ff8",
+      "benchmarks/fannkuch-redux/haskell/main.hs": "4ff92aa5f7cc1b2b1d46a9c1dc4e6bcd92dd3ba8b79e9360d7211ae61b01f983",
+      "benchmarks/fannkuch-redux/c/upstream.c": "0240c14bb25b31bbb685cd25314b1a6349319cabbb08158db32e8f335e6ab233",
+      "benchmarks/spectral-norm/c/upstream.c": "0933bb14371cf8218c7873fd8d6aaddc7b34a4818368b82471ca796704846460",
+      "benchmarks/spectral-norm/rust/adaptation.patch": "dad299a551a14f1c52440b11ca2b59f64649672a33412280ae9576dbecd6354b",
+      "benchmarks/spectral-norm/rust/upstream.rs": "51a4da9501d1e115145f946b3a902a0e572be10442d8d14c6fd90319bd10ad83",
+      "benchmarks/spectral-norm/rust/main.rs": "22447927b50327c260bdc5c4e35ed2993d2ae403004abea8ece2174eaa4f9941",
+      "benchmarks/spectral-norm/haskell/upstream.hs": "0dc87db364d3e4d7566f33ebc0b1d419e8e7ca78235c5d2161aa3ace49c308e7",
+      "benchmarks/spectral-norm/expected-100.txt": "a95e11fa07f7b196ef488e73f67afbbbc16cf6a2c6de5f8d54ea49821fe604e6",
+      "benchmarks/fasta/c/upstream.c": "29ecdd18431bfc65861f9ae537307bf45846e7225d40b28993381f28f005279b",
+      "benchmarks/fasta/rust/upstream.rs": "91f6762cae723fadf57c94fa995ce706e1691f2a9b8869bd9ff891b6391a5201",
+      "benchmarks/fasta/haskell/upstream.hs": "446ea6ff611b1b943d6334e1993cf50121acd4782c7fc6c5f0e6b3e19a81d6ec",
+      "benchmarks/fasta/expected-1000.txt": "62d1e8d0df7938d2aefda9a37887e0389231ea72c099c29a51afb6edca1bdc73",
+      "benchmarks/mandelbrot/c/main.c": "5ebaf745490d20f0082726ba1f1087b8b18b6c9cb604b628ee559482a1606ba3",
+      "benchmarks/mandelbrot/c/upstream.c": "ff0d4b64c72a72fda8d374a963310b2eff9f6c2d48945df883f3380abb90f33c",
+      "benchmarks/mandelbrot/c/adaptation.patch": "dbbd459951593202d99d626c70c718830cb7b5b9e15ea173c658cc49bf7d6312",
+      "benchmarks/mandelbrot/rust/main.rs": "d48811a7a1c54189cde0be9fef200588bb50c20b9de62eaa508d60c2adec6e68",
+      "benchmarks/mandelbrot/rust/adaptation.patch": "08d698e94c32818cf8b329545835450a29c15b54f7641abd8cba208e1a07689c",
+      "benchmarks/mandelbrot/rust/upstream.rs": "84cc0a3c0cb887c6e76091300d4afccbbb73de1ee717ce0a13ffde7cf747c5be",
+      "benchmarks/mandelbrot/haskell/main.hs": "47a7b99460af9c18a1a82dfa00089678e259d1ad828e02ddffc4e845c04fb80d",
+      "benchmarks/mandelbrot/haskell/adaptation.patch": "e2d2af9b0455b595b3b7d0f380cdb0d77511131583d536639c82a94495a3be9a",
+      "benchmarks/mandelbrot/haskell/upstream.hs": "e56fdab481003f3e6f612dc55afdcbc724fd259e3e6c35e3698164a6d99f215d",
+      "benchmarks/mandelbrot/expected-200.pbm": "97610473750700638fc63d13cfa49d339b67c18e7f26b3f9c9acb61e746472d5"
+    },
+    "workloads": [
+      {
+        "name": "binary-trees",
+        "default_input": 16,
+        "minimum_input": 0,
+        "maximum_input": 20,
+        "check_inputs": [
+          0,
+          7,
+          10
+        ],
+        "fixture": "benchmarks/binary-trees/expected-10.txt",
+        "provenance": {
+          "c": {
+            "implementation": "binarytrees-gcc-1",
+            "authors": "Kevin Carson",
+            "upstream_path": "public/program/binarytrees-gcc-1.html",
+            "upstream_git_blob": "3b3471fd45e64faaf5c46b347b3d647e93904c32",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/binarytrees-gcc-1.html",
+            "original_source": "benchmarks/binary-trees/c/upstream.c",
+            "build_source": "benchmarks/binary-trees/c/main.c"
+          },
+          "rust": {
+            "implementation": "binarytrees-rust-1",
+            "authors": "Rust Project Developers; TeXitoi",
+            "upstream_path": "public/program/binarytrees-rust-1.html",
+            "upstream_git_blob": "02bf10bd3bbc14f07ae5ee315f3cd684fd58be85",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/binarytrees-rust-1.html",
+            "original_source": "benchmarks/binary-trees/rust/upstream.rs",
+            "build_source": "benchmarks/binary-trees/rust/main.rs"
+          },
+          "haskell": {
+            "implementation": "binarytrees-ghc-1",
+            "authors": "Don Stewart",
+            "upstream_path": "public/program/binarytrees-ghc-1.html",
+            "upstream_git_blob": "ae9dd630ab3c74ef9912fe563d3060d0ab3a85c7",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/binarytrees-ghc-1.html",
+            "original_source": "benchmarks/binary-trees/haskell/upstream.hs",
+            "build_source": "benchmarks/binary-trees/haskell/upstream.hs"
+          }
+        },
+        "sources": {
+          "c": "benchmarks/binary-trees/c/main.c",
+          "rust": "benchmarks/binary-trees/rust/main.rs",
+          "haskell": "benchmarks/binary-trees/haskell/upstream.hs",
+          "mlf": "benchmarks/binary-trees/mlf/main.emlf"
+        },
+        "flags": {
+          "c": [
+            "-O3"
+          ],
+          "rust": [
+            "-O"
+          ],
+          "haskell": [
+            "-O2",
+            "-XBangPatterns",
+            "-fno-full-laziness",
+            "-fno-cse",
+            "-fforce-recomp"
+          ],
+          "mlf": [
+            "-O2",
+            "-Wno-override-module"
+          ]
+        },
+        "fixture_input": 10,
+        "post_build_input": 6,
+        "fixture_upstream_path": "public/download/binarytrees-output.txt",
+        "output_comparison": "Whitespace-only normalization against mathematical node-count oracle and pinned fixture; separate allocation audit"
+      },
+      {
+        "name": "pidigits",
+        "default_input": 10000,
+        "minimum_input": 1,
+        "maximum_input": 20000,
+        "check_inputs": [
+          1,
+          10,
+          27,
+          30
+        ],
+        "fixture_input": 30,
+        "post_build_input": 27,
+        "fixture": "benchmarks/pidigits/expected-30.txt",
+        "provenance": {
+          "c": {
+            "implementation": "pidigits-gcc-1",
+            "authors": "Mr Ledrug",
+            "upstream_path": "public/program/pidigits-gcc-1.html",
+            "upstream_git_blob": "253146f451fcb2c775f574337bd81f20749c18a0",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/pidigits-gcc-1.html",
+            "original_source": "benchmarks/pidigits/c/upstream.c",
+            "build_source": "benchmarks/pidigits/c/main.c"
+          },
+          "rust": {
+            "implementation": "pidigits-rust-1",
+            "authors": "TeXitoi",
+            "upstream_path": "public/program/pidigits-rust-1.html",
+            "upstream_git_blob": "824f21ad09494abab15a198f84d93a29b98c7a8a",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/pidigits-rust-1.html",
+            "original_source": "benchmarks/pidigits/rust/upstream.rs",
+            "build_source": "benchmarks/pidigits/rust/main.rs"
+          },
+          "haskell": {
+            "implementation": "pidigits-ghc-6",
+            "authors": "Bryan O'Sullivan; Eugene Kirpichov; W. Gordon Goodsman",
+            "upstream_path": "public/program/pidigits-ghc-6.html",
+            "upstream_git_blob": "06f23994d31ae9275abaf2b7f6be8825e50edc20",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/pidigits-ghc-6.html",
+            "original_source": "benchmarks/pidigits/haskell/upstream.hs",
+            "build_source": "benchmarks/pidigits/haskell/upstream.hs"
+          }
+        },
+        "sources": {
+          "c": "benchmarks/pidigits/c/main.c",
+          "rust": "benchmarks/pidigits/rust/main.rs",
+          "haskell": "benchmarks/pidigits/haskell/upstream.hs",
+          "mlf": "benchmarks/pidigits/mlf/main.emlf"
+        },
+        "flags": {
+          "c": [
+            "-O3"
+          ],
+          "rust": [
+            "-O",
+            "--edition=2021"
+          ],
+          "haskell": [
+            "-O2",
+            "-fforce-recomp"
+          ],
+          "mlf": [
+            "-O2",
+            "-Wno-override-module"
+          ]
+        },
+        "gmp_languages": [
+          "c",
+          "rust"
+        ],
+        "fixture_upstream_path": "public/download/pidigits-output.txt",
+        "output_comparison": "Whitespace-only normalization against independent fixed-point Machin formula oracle and pinned fixture"
+      },
+      {
+        "name": "n-body",
+        "default_input": 2000000,
+        "minimum_input": 0,
+        "maximum_input": 5000000,
+        "check_inputs": [
+          0,
+          1,
+          1000
+        ],
+        "fixture_input": 1000,
+        "post_build_input": 1,
+        "fixture": "benchmarks/n-body/expected-1000.txt",
+        "provenance": {
+          "c": {
+            "implementation": "nbody-gcc-1",
+            "authors": "Christoph Bauer",
+            "upstream_path": "public/program/nbody-gcc-1.html",
+            "upstream_git_blob": "1f6a4bf3ea17a32e453cd92d266c5e9866796c36",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/nbody-gcc-1.html",
+            "original_source": "benchmarks/n-body/c/upstream.c",
+            "build_source": "benchmarks/n-body/c/upstream.c"
+          },
+          "rust": {
+            "implementation": "nbody-rust-1",
+            "authors": "Rust Project Developers; TeXitoi",
+            "upstream_path": "public/program/nbody-rust-1.html",
+            "upstream_git_blob": "c8e9f9e5dcb370ccfcf596f6117d14d109c56826",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/nbody-rust-1.html",
+            "original_source": "benchmarks/n-body/rust/upstream.rs",
+            "build_source": "benchmarks/n-body/rust/upstream.rs"
+          },
+          "haskell": {
+            "implementation": "nbody-ghc-1",
+            "authors": "Olof Kraigher; Don Stewart; Ersin Er",
+            "upstream_path": "public/program/nbody-ghc-1.html",
+            "upstream_git_blob": "0ebae64b5db16b6fbed6a2f502bce877cc906629",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/nbody-ghc-1.html",
+            "original_source": "benchmarks/n-body/haskell/upstream.hs",
+            "build_source": "benchmarks/n-body/haskell/upstream.hs"
+          }
+        },
+        "sources": {
+          "c": "benchmarks/n-body/c/upstream.c",
+          "rust": "benchmarks/n-body/rust/upstream.rs",
+          "haskell": "benchmarks/n-body/haskell/upstream.hs",
+          "mlf": "benchmarks/n-body/mlf/main.emlf"
+        },
+        "flags": {
+          "c": [
+            "-O3"
+          ],
+          "rust": [
+            "-O",
+            "--edition=2021"
+          ],
+          "haskell": [
+            "-O2",
+            "-XBangPatterns",
+            "-fforce-recomp"
+          ],
+          "mlf": [
+            "-O2",
+            "-Wno-override-module"
+          ]
+        },
+        "fixture_upstream_path": "public/download/nbody-output.txt",
+        "output_comparison": "Exactly two finite energies; absolute error <= 1e-8 against independent scalar Python reference and pinned fixture"
+      },
+      {
+        "name": "fannkuch-redux",
+        "default_input": 10,
+        "minimum_input": 1,
+        "maximum_input": 11,
+        "check_inputs": [
+          1,
+          2,
+          5,
+          7
+        ],
+        "fixture_input": 7,
+        "post_build_input": 5,
+        "fixture": "benchmarks/fannkuch-redux/expected-7.txt",
+        "provenance": {
+          "c": {
+            "implementation": "fannkuchredux-gcc-1",
+            "authors": "Joseph Pich\u00e9; Oleg Mazurov; Isaac Gouy",
+            "upstream_path": "public/program/fannkuchredux-gcc-1.html",
+            "upstream_git_blob": "148f0df3e006573e90bd9215efb6df1a2fc42251",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/fannkuchredux-gcc-1.html",
+            "original_source": "benchmarks/fannkuch-redux/c/upstream.c",
+            "build_source": "benchmarks/fannkuch-redux/c/upstream.c"
+          },
+          "rust": {
+            "implementation": "fannkuchredux-rust-2",
+            "authors": "Rust Project Developers; TeXitoi",
+            "upstream_path": "public/program/fannkuchredux-rust-2.html",
+            "upstream_git_blob": "b679ba6714dd4bff61fc26c3f5830257cc5e56a0",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/fannkuchredux-rust-2.html",
+            "original_source": "benchmarks/fannkuch-redux/rust/upstream.rs",
+            "build_source": "benchmarks/fannkuch-redux/rust/main.rs"
+          },
+          "haskell": {
+            "implementation": "fannkuchredux-ghc-4",
+            "authors": "Branimir Maksimovic; Bryan O'Sullivan; Gabriel Gonzalez; Artem Pelenitsyn",
+            "upstream_path": "public/program/fannkuchredux-ghc-4.html",
+            "upstream_git_blob": "3c708eefb97e694ade0f42bb1926875ae068c4ac",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/fannkuchredux-ghc-4.html",
+            "original_source": "benchmarks/fannkuch-redux/haskell/upstream.hs",
+            "build_source": "benchmarks/fannkuch-redux/haskell/main.hs"
+          }
+        },
+        "sources": {
+          "c": "benchmarks/fannkuch-redux/c/upstream.c",
+          "rust": "benchmarks/fannkuch-redux/rust/main.rs",
+          "haskell": "benchmarks/fannkuch-redux/haskell/main.hs",
+          "mlf": "benchmarks/fannkuch-redux/mlf/main.emlf"
+        },
+        "flags": {
+          "c": [
+            "-O3"
+          ],
+          "rust": [
+            "-O",
+            "--edition=2021"
+          ],
+          "haskell": [
+            "-O2",
+            "-XBangPatterns",
+            "-fforce-recomp"
+          ],
+          "mlf": [
+            "-O2",
+            "-Wno-override-module"
+          ]
+        },
+        "fixture_upstream_path": "public/download/fannkuchredux-output.txt",
+        "output_comparison": "Whitespace-only normalization against independent factoradic-unranking oracle and pinned fixture"
+      },
+      {
+        "name": "spectral-norm",
+        "default_input": 2000,
+        "minimum_input": 1,
+        "maximum_input": 5500,
+        "check_inputs": [
+          1,
+          2,
+          3,
+          100
+        ],
+        "fixture_input": 100,
+        "post_build_input": 3,
+        "fixture": "benchmarks/spectral-norm/expected-100.txt",
+        "fixture_upstream_path": "public/download/spectralnorm-output.txt",
+        "output_comparison": "Exactly one finite value within absolute error 1e-8 of an independent dense-matrix reference; pinned N=100 fixture",
+        "provenance": {
+          "c": {
+            "implementation": "spectralnorm-gcc-1",
+            "authors": "Sebastien Loisel",
+            "upstream_path": "public/program/spectralnorm-gcc-1.html",
+            "upstream_git_blob": "23669276ecc9701659b11498a2e7e63ed45233e9",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/spectralnorm-gcc-1.html",
+            "original_source": "benchmarks/spectral-norm/c/upstream.c",
+            "build_source": "benchmarks/spectral-norm/c/upstream.c"
+          },
+          "rust": {
+            "implementation": "spectralnorm-rust-3",
+            "authors": "Rust Project Developers; TeXitoi; Tung Duong",
+            "upstream_path": "public/program/spectralnorm-rust-3.html",
+            "upstream_git_blob": "7e04f9cf600da015d44c165ceefc949cf10c38a7",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/spectralnorm-rust-3.html",
+            "original_source": "benchmarks/spectral-norm/rust/upstream.rs",
+            "build_source": "benchmarks/spectral-norm/rust/main.rs"
+          },
+          "haskell": {
+            "implementation": "spectralnorm-ghc-2",
+            "authors": "Greg Buchholz",
+            "upstream_path": "public/program/spectralnorm-ghc-2.html",
+            "upstream_git_blob": "6699709808023f2480d89ccaf4ee13f4d983823f",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/spectralnorm-ghc-2.html",
+            "original_source": "benchmarks/spectral-norm/haskell/upstream.hs",
+            "build_source": "benchmarks/spectral-norm/haskell/upstream.hs"
+          }
+        },
+        "sources": {
+          "c": "benchmarks/spectral-norm/c/upstream.c",
+          "rust": "benchmarks/spectral-norm/rust/main.rs",
+          "haskell": "benchmarks/spectral-norm/haskell/upstream.hs",
+          "mlf": "benchmarks/spectral-norm/mlf/main.emlf"
+        },
+        "flags": {
+          "c": [
+            "-O3"
+          ],
+          "rust": [
+            "-O",
+            "--edition=2021"
+          ],
+          "haskell": [
+            "-O2",
+            "-fforce-recomp"
+          ],
+          "mlf": [
+            "-O2",
+            "-Wno-override-module"
+          ]
+        }
+      },
+      {
+        "name": "fasta",
+        "default_input": 2000000,
+        "minimum_input": 0,
+        "maximum_input": 25000000,
+        "check_inputs": [
+          0,
+          1,
+          29,
+          30,
+          31,
+          1000,
+          12288,
+          12289
+        ],
+        "fixture_input": 1000,
+        "post_build_input": 31,
+        "fixture": "benchmarks/fasta/expected-1000.txt",
+        "fixture_upstream_path": "public/download/fasta-output.txt",
+        "output_comparison": "Exact bytes, including headers, 60-column wrapping, random sequence and final newline; independent decimal-probability oracle",
+        "provenance": {
+          "c": {
+            "implementation": "fasta-gcc-1",
+            "authors": "Paul Hsieh",
+            "upstream_path": "public/program/fasta-gcc-1.html",
+            "upstream_git_blob": "5cd96adf707f7fd7be282793151d0dd126bfa58e",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/fasta-gcc-1.html",
+            "original_source": "benchmarks/fasta/c/upstream.c",
+            "build_source": "benchmarks/fasta/c/upstream.c"
+          },
+          "rust": {
+            "implementation": "fasta-rust-4",
+            "authors": "leonardo",
+            "upstream_path": "public/program/fasta-rust-4.html",
+            "upstream_git_blob": "b2934014cb7d719ccea880574990efcd2e29cbc0",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/fasta-rust-4.html",
+            "original_source": "benchmarks/fasta/rust/upstream.rs",
+            "build_source": "benchmarks/fasta/rust/upstream.rs"
+          },
+          "haskell": {
+            "implementation": "fasta-ghc-1",
+            "authors": "Roman Kashitsyn",
+            "upstream_path": "public/program/fasta-ghc-1.html",
+            "upstream_git_blob": "2ac60c9341e5db66acd0b4e1376027b5ccedd43d",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/fasta-ghc-1.html",
+            "original_source": "benchmarks/fasta/haskell/upstream.hs",
+            "build_source": "benchmarks/fasta/haskell/upstream.hs"
+          }
+        },
+        "sources": {
+          "c": "benchmarks/fasta/c/upstream.c",
+          "rust": "benchmarks/fasta/rust/upstream.rs",
+          "haskell": "benchmarks/fasta/haskell/upstream.hs",
+          "mlf": "benchmarks/fasta/mlf/main.emlf"
+        },
+        "flags": {
+          "c": [
+            "-O3"
+          ],
+          "rust": [
+            "-O",
+            "--edition=2021"
+          ],
+          "haskell": [
+            "-O2",
+            "-XBangPatterns",
+            "-XOverloadedStrings",
+            "-fforce-recomp"
+          ],
+          "mlf": [
+            "-O2",
+            "-Wno-override-module"
+          ]
+        }
+      },
+      {
+        "name": "mandelbrot",
+        "default_input": 4096,
+        "minimum_input": 1,
+        "maximum_input": 16000,
+        "check_inputs": [
+          1,
+          2,
+          7,
+          8,
+          9,
+          200
+        ],
+        "fixture_input": 200,
+        "post_build_input": 9,
+        "fixture": "benchmarks/mandelbrot/expected-200.pbm",
+        "fixture_upstream_path": "public/download/mandelbrot-output.pbm",
+        "output_comparison": "Exact binary PBM, including dimensions, row padding and every pixel; independent complex-number oracle",
+        "provenance": {
+          "c": {
+            "implementation": "mandelbrot-gcc-2",
+            "authors": "Greg Buchholz",
+            "upstream_path": "public/program/mandelbrot-gcc-2.html",
+            "upstream_git_blob": "ab64b4de04cd9393fa0900e0a5692cc3c0d373ce",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/mandelbrot-gcc-2.html",
+            "original_source": "benchmarks/mandelbrot/c/upstream.c",
+            "build_source": "benchmarks/mandelbrot/c/main.c"
+          },
+          "rust": {
+            "implementation": "mandelbrot-rust-1",
+            "authors": "Matt Watson; TeXitoi",
+            "upstream_path": "public/program/mandelbrot-rust-1.html",
+            "upstream_git_blob": "3ab13b2d6e95253e31320e7633cd98fc500f0b0e",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/mandelbrot-rust-1.html",
+            "original_source": "benchmarks/mandelbrot/rust/upstream.rs",
+            "build_source": "benchmarks/mandelbrot/rust/main.rs"
+          },
+          "haskell": {
+            "implementation": "mandelbrot-ghc-2",
+            "authors": "Spencer Janssen; Trevor McCort; Christophe Poucet; Don Stewart; Tim Newsham",
+            "upstream_path": "public/program/mandelbrot-ghc-2.html",
+            "upstream_git_blob": "6c70d6937dd194b156becadba8296190fbde0948",
+            "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/mandelbrot-ghc-2.html",
+            "original_source": "benchmarks/mandelbrot/haskell/upstream.hs",
+            "build_source": "benchmarks/mandelbrot/haskell/main.hs"
+          }
+        },
+        "sources": {
+          "c": "benchmarks/mandelbrot/c/main.c",
+          "rust": "benchmarks/mandelbrot/rust/main.rs",
+          "haskell": "benchmarks/mandelbrot/haskell/main.hs",
+          "mlf": "benchmarks/mandelbrot/mlf/main.emlf"
+        },
+        "flags": {
+          "c": [
+            "-O3"
+          ],
+          "rust": [
+            "-O",
+            "--edition=2021"
+          ],
+          "haskell": [
+            "-O2",
+            "-XBangPatterns",
+            "-fforce-recomp"
+          ],
+          "mlf": [
+            "-O2",
+            "-Wno-override-module"
+          ]
+        }
+      }
+    ]
+  },
+  "source_sha256": {
+    "benchmarks/mandelbrot/haskell/main.hs": "47a7b99460af9c18a1a82dfa00089678e259d1ad828e02ddffc4e845c04fb80d",
+    "benchmarks/mandelbrot/c/main.c": "5ebaf745490d20f0082726ba1f1087b8b18b6c9cb604b628ee559482a1606ba3",
+    "benchmarks/mandelbrot/rust/main.rs": "d48811a7a1c54189cde0be9fef200588bb50c20b9de62eaa508d60c2adec6e68",
+    "benchmarks/mandelbrot/mlf/main.emlf": "12eac8e858ed8ff971ded5bc00af2131146005cbbd724badc22d161a8cc942eb"
+  },
+  "harness_sha256": "2b523d5dd438b9c4298ab8b57e98e2f557e05bcf4d3ae7e9aae3a38128fb008e",
+  "input_sha256": {
+    "benchmarks/mandelbrot/haskell/main.hs": "47a7b99460af9c18a1a82dfa00089678e259d1ad828e02ddffc4e845c04fb80d",
+    "benchmarks/mandelbrot/c/main.c": "5ebaf745490d20f0082726ba1f1087b8b18b6c9cb604b628ee559482a1606ba3",
+    "benchmarks/mandelbrot/rust/main.rs": "d48811a7a1c54189cde0be9fef200588bb50c20b9de62eaa508d60c2adec6e68",
+    "benchmarks/mandelbrot/mlf/main.emlf": "12eac8e858ed8ff971ded5bc00af2131146005cbbd724badc22d161a8cc942eb",
+    "benchmarks/LICENSE.BenchmarksGame": "e5dd0024dd43d92434808c8e1df3c09870a2832744283232aa1dc16c737237b1",
+    "benchmarks/binary-trees/c/adaptation.patch": "f4ac32a07dc7daef25b343aca571596c12a8039cab017e017b5a25ee1d1bd954",
+    "benchmarks/binary-trees/c/main.c": "3149135fbe1c7fbcca7c38d815f024d46bedf48a9f40611e72ad88c83fc62ad2",
+    "benchmarks/binary-trees/c/upstream.c": "0896dbbe8f2026c48a7f681cae56480b44dff6d114092f36f01474e58603c009",
+    "benchmarks/binary-trees/expected-10.txt": "b7f92c56b5d8aeb0a4d698842d1d87a57b4909865c3c84e5e10313e16663c3cb",
+    "benchmarks/binary-trees/haskell/upstream.hs": "0b6aa7815bfe566c3624771c341d9f33c2e9d306565682c380bb9f7d11ed886f",
+    "benchmarks/binary-trees/rust/adaptation.patch": "f18e3c383790bd753d966bef9c7237b3163edf4fda028f892344729c02650dbe",
+    "benchmarks/binary-trees/rust/main.rs": "f5757256cdef36a442424ca39cb12a9a9d618dcb008f77aba4cd772ea97a46e3",
+    "benchmarks/binary-trees/rust/upstream.rs": "c344da05a4bcc7d206528ba3bcbab6e78f09d049e10bf91e0fcceb666d5e99b5",
+    "benchmarks/pidigits/expected-30.txt": "dbf95cc20ad23ff1a385d30436f0c63b5ae7f41bb1003cf204f5e4888b74a39c",
+    "benchmarks/pidigits/rust/adaptation.patch": "3d785b422794afc85138b912096fdc1ed9917725e342b3d59e70a09d1e07a9cc",
+    "benchmarks/pidigits/rust/main.rs": "0181c641199da98e2f77ea5f64e28abe4a0d11c53af5175661bdc0fe2b658923",
+    "benchmarks/pidigits/rust/upstream.rs": "600bc8d8351ea1a487b8127f703d03691dd060db063256654d234a1601d98fe8",
+    "benchmarks/pidigits/haskell/upstream.hs": "a61fd2106576157bb0e3b219bb9e8c2927f4d442db9fe72a6483487899000ce0",
+    "benchmarks/pidigits/c/adaptation.patch": "a7bfef21672c7cba980494aa4e04e262ba8efebc0ea5413b01821deddf1e226e",
+    "benchmarks/pidigits/c/upstream.c": "6360874e2e1bb353136e29a28f93685a1d206615f3665219662fe18ed0c4ba81",
+    "benchmarks/pidigits/c/main.c": "9b09dff01b8bb0b84f6a248a19285ae26f9618f3d64e4087108b2563923cb181",
+    "benchmarks/n-body/expected-1000.txt": "76de83d6d51a74f82828547423f516e7815cfe8cfea6290a2831aa173f806de7",
+    "benchmarks/n-body/rust/upstream.rs": "1a5ccd1738a04074695b1c0458803dfd6a59ee7fa8cd5c429ce67475a3005d69",
+    "benchmarks/n-body/haskell/upstream.hs": "b9ec3360854eea9b5e597bae888854757b5f160a5d35c2227a5e156d8e59aaf4",
+    "benchmarks/n-body/c/upstream.c": "a2750e1505f86f3815cc0efbb0c665c9117cdca3ae4ae55bbb3da597858062b2",
+    "benchmarks/fannkuch-redux/expected-7.txt": "2dc0a3cd4a547ba69389f97f3b447bd4d487fe6216c3cacd2f9bf8c908dc127f",
+    "benchmarks/fannkuch-redux/rust/adaptation.patch": "1ee2e61965b53adb404d04409529d2fb8f2adb75acafd90ea0c23307d4347f8d",
+    "benchmarks/fannkuch-redux/rust/main.rs": "766b84a9ad1de0af4f01298678733262a5ccd6a10505b21f11402825413e7eb8",
+    "benchmarks/fannkuch-redux/rust/upstream.rs": "5ec7ce9915bd599ac127575c9caa9ef15a8233397975d6e3bf0b3cb6e15c8d6a",
+    "benchmarks/fannkuch-redux/haskell/upstream.hs": "55ab21ffcfd129c387b51d515e843a843a2e5d6186028aa424c61f1c7f949ddc",
+    "benchmarks/fannkuch-redux/haskell/adaptation.patch": "ac8962905ab546325b2c23a18ad9a175b9c4754beb67b4fad491a7afc4ac0ff8",
+    "benchmarks/fannkuch-redux/haskell/main.hs": "4ff92aa5f7cc1b2b1d46a9c1dc4e6bcd92dd3ba8b79e9360d7211ae61b01f983",
+    "benchmarks/fannkuch-redux/c/upstream.c": "0240c14bb25b31bbb685cd25314b1a6349319cabbb08158db32e8f335e6ab233",
+    "benchmarks/spectral-norm/c/upstream.c": "0933bb14371cf8218c7873fd8d6aaddc7b34a4818368b82471ca796704846460",
+    "benchmarks/spectral-norm/rust/adaptation.patch": "dad299a551a14f1c52440b11ca2b59f64649672a33412280ae9576dbecd6354b",
+    "benchmarks/spectral-norm/rust/upstream.rs": "51a4da9501d1e115145f946b3a902a0e572be10442d8d14c6fd90319bd10ad83",
+    "benchmarks/spectral-norm/rust/main.rs": "22447927b50327c260bdc5c4e35ed2993d2ae403004abea8ece2174eaa4f9941",
+    "benchmarks/spectral-norm/haskell/upstream.hs": "0dc87db364d3e4d7566f33ebc0b1d419e8e7ca78235c5d2161aa3ace49c308e7",
+    "benchmarks/spectral-norm/expected-100.txt": "a95e11fa07f7b196ef488e73f67afbbbc16cf6a2c6de5f8d54ea49821fe604e6",
+    "benchmarks/fasta/c/upstream.c": "29ecdd18431bfc65861f9ae537307bf45846e7225d40b28993381f28f005279b",
+    "benchmarks/fasta/rust/upstream.rs": "91f6762cae723fadf57c94fa995ce706e1691f2a9b8869bd9ff891b6391a5201",
+    "benchmarks/fasta/haskell/upstream.hs": "446ea6ff611b1b943d6334e1993cf50121acd4782c7fc6c5f0e6b3e19a81d6ec",
+    "benchmarks/fasta/expected-1000.txt": "62d1e8d0df7938d2aefda9a37887e0389231ea72c099c29a51afb6edca1bdc73",
+    "benchmarks/mandelbrot/c/upstream.c": "ff0d4b64c72a72fda8d374a963310b2eff9f6c2d48945df883f3380abb90f33c",
+    "benchmarks/mandelbrot/c/adaptation.patch": "dbbd459951593202d99d626c70c718830cb7b5b9e15ea173c658cc49bf7d6312",
+    "benchmarks/mandelbrot/rust/adaptation.patch": "08d698e94c32818cf8b329545835450a29c15b54f7641abd8cba208e1a07689c",
+    "benchmarks/mandelbrot/rust/upstream.rs": "84cc0a3c0cb887c6e76091300d4afccbbb73de1ee717ce0a13ffde7cf747c5be",
+    "benchmarks/mandelbrot/haskell/adaptation.patch": "e2d2af9b0455b595b3b7d0f380cdb0d77511131583d536639c82a94495a3be9a",
+    "benchmarks/mandelbrot/haskell/upstream.hs": "e56fdab481003f3e6f612dc55afdcbc724fd259e3e6c35e3698164a6d99f215d",
+    "benchmarks/mandelbrot/expected-200.pbm": "97610473750700638fc63d13cfa49d339b67c18e7f26b3f9c9acb61e746472d5",
+    "benchmarks/manifest.json": "eaee233529c07232e76bb3c4c00f48e62e907511dd7859caef2a4f2a551a3f2a",
+    "/Volumes/src/mlf/scripts/benchmark-languages.py": "2b523d5dd438b9c4298ab8b57e98e2f557e05bcf4d3ae7e9aae3a38128fb008e",
+    "/opt/homebrew/opt/llvm/bin/clang": "d64d1ee59d8aff01397eb88adea263e490ac65766faefc8b5323b4a06d0438e5",
+    "/opt/homebrew/bin/rustc": "951efe952b1e70ab89d1b040de27315385ddb1ea8ece7d260655a54c3e52034f",
+    "/Users/ares/.ghcup/bin/ghc": "39fd1ee0cf7eb5739a595d5c238a95a7a062942397cc6d2a16425d6eeb18283e",
+    "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf": "7102d492a149d46c565fd25d7d84d72b271c14d0c9d796a033313875c3665abd",
+    "/opt/homebrew/bin/pkg-config": "39b6b8b701470ebf31a24972bc1fafc7da54a5c32215d972fdadaf21c7cfa91b",
+    "/Volumes/src/mlf/runtime/mlf_runtime.c": "c57258e16401f3cb4be78b9c5904111385d3d1dfce545b56fa1644d6bf5f60db",
+    "/Volumes/src/mlf/runtime/mlf_runtime.h": "266f5cfd64602ed798ae307c66c5e7890de107c7e1bdeee75d4254e2ab32b374"
+  },
+  "repository": {
+    "revision": "ca725a8544631a489a3eba1eb9683b65b90c1815",
+    "dirty": true
+  },
+  "methodology": {
+    "compile": "Fresh serial source-to-executable builds, including MLF LLVM emission, IR writes, runtime C compilation and linking. Tool/compiler/harness setup excluded. Fresh output directory per sample; no object cache. Rotating language order.",
+    "runtime": "All binaries built and checked before any timed samples; exact runtime input checked once before timing as warmup. Process startup/IO/GC/exit included. Output checked again after each sample, outside timing. No time subtraction.",
+    "resource_measurement": "wait4 child usage: user+system CPU; Darwin RSS bytes, Linux RSS KiB converted to bytes. Pipeline CPU summed, RSS maximum over stages.",
+    "normalization": "Wall medians divided by C wall median; ratio below 1 is allowed."
+  },
+  "input_integrity": "All recorded source, manifest, harness, compiler and runtime hashes unchanged",
+  "performance_checks": [
+    {
+      "benchmark": "mandelbrot",
+      "dimension": "compilation",
+      "mlf_over_c": 3.760557918464364,
+      "maximum_ratio": 5.0,
+      "passed": true
+    },
+    {
+      "benchmark": "mandelbrot",
+      "dimension": "runtime",
+      "mlf_over_c": 0.6775818072543812,
+      "maximum_ratio": 1.0,
+      "passed": true
+    }
+  ],
+  "completed_at_utc": "2026-10-08T10:28:57.066336+00:00"
+}

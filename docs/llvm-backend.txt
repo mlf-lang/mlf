@@ -96,12 +96,31 @@ retain that existing demand at saturation. Successful guards call a native
 worker and wrap its result in an ordinary return action. Reusing the action
 runs the worker again; construction itself neither reads nor writes arrays.
 
-Within these workers, numeric binds lower directly to ordered operations,
-and Double reads/intermediates stay unboxed in SSA until a call/result
-boundary requires a value. Int retains checked tagged arithmetic and GMP
-fallback. Array access checks the index before loading or storing a cell.
+Within these workers, numeric binds lower directly to ordered operations.
+Private workers specialize their argument representation from the actual
+scalar values at native call sites: Double temporaries and already loaded
+Double payloads pass directly in SSA, including captures and recursive calls.
+Payload loads are reused only where they dominate; branch-local loads cannot
+escape their branch. Results and general ABI calls still use ordinary values.
+No erased parameter type is guessed and the public lazy guard is unchanged.
+
+Proven nonnegative tagged arguments that the function tests against zero
+carry the interval [0,2^62-1] into a specialized worker. Other integer
+parameters keep the general ABI, avoiding variants for every array offset.
+Equality with a known interval endpoint refines each
+branch, letting a positive countdown decrement without overflow checks.
+Other values retain checked tagged arithmetic and GMP fallback. Each function
+has at most eight specialized variants plus its general worker; a new mode
+past that limit boxes its arguments and uses the general ABI.
+
+Native multiplication checks both i64 overflow and the signed 63-bit tagged
+range. Native quotient/remainder use truncating signed operations, keeping
+zero and small-minimum / -1 on the runtime path. Interval-proved products can
+omit the checks. All large operands and promoted results keep GMP semantics.
+Array access checks the index before loading or storing a cell.
 ByteArray reads zero-extend i8 cells into Int values, and writes check the
-0–255 range after the index check before storing i8. Integer-to-Double conversion
+0–255 range after the index check before storing i8; tagged bytes use an inline
+check and other values retain the runtime check. Integer-to-Double conversion
 uses sitofp for tagged values and a nearest-rounding runtime helper for GMP.
 A successful check establishes an integer interval; subsequent arithmetic
 uses unchecked machine operations only when its result is proved in range.
@@ -192,8 +211,8 @@ target AST and scripted input to both the xMLF interpreter and LLVM native
 code. Frontend-only type and source-rejection assertions still run once.
 There is no per-fixture backend selector. A coverage audit checks that both
 backends completed every matrix row; missing executions or toolchain
-dependencies fail the suite. The current suite has 209 fixtures containing
-205 execution rows, each run on both backends. Some fixtures contain multiple
+dependencies fail the suite. The current suite has 216 fixtures containing
+214 execution rows, each run on both backends. Some fixtures contain multiple
 rows, while others check only parsing or types.
 
 The suite requires POSIX processes, clang, and pkg-config/GMP. It compiles
@@ -221,13 +240,19 @@ compiles and links emitted IR with Clang. It includes:
   signed zero, tie rounding, infinities/NaN and generic floating primitives.
 - Typed array allocation, aliasing, repeatable actions, snapshot reads, bounds
   failures, strict numeric writes and live GMP cells surviving collection.
-- Eight native-region regressions require emitted numeric workers and compare
+- Native-region regressions require emitted numeric workers and compare
   both backends against expected output/failure: reused actions/GMP snapshots,
   lazy fallback, Double aliasing, branch-local range facts, write error order,
   and negative, GMP and empty-array indices.
+- Specialized scalar workers cover recursive Double captures, IEEE exceptional
+  values and signed zero, branch-local payload loads, unused failing arguments,
+  the eight-variant limit with a boxed fallback, and integer range transitions
+  through negative values and GMP promotion. A native array loop checks 189
+  multiplication/quotient/remainder results against Haskell Integer, including
+  machine overflow and the small-minimum / -1 boundary.
 - All 256 byte values, UTF-8 and embedded NUL copies, fresh/shared byte arrays,
   raw slices, empty output, GC retention, error ordering and write failures.
-  Native byte stores also check byte range and bounds precedence. Native
+  Native byte stores also check small/GMP byte range and bounds precedence. Native
   integer-to-Double conversion checks both tagged and GMP rounding/overflow.
 - Lazy default cases and lazy returned values around a recursive black hole;
   demand of that hole, EOF, and a final input line without a newline.

@@ -3,7 +3,7 @@
 module NumericArrays (numericArrayTests) where
 
 import Control.Monad (forM_, unless)
-import Data.List (isInfixOf)
+import Data.List (group, isInfixOf, sort)
 import Backends (Backends, Entry (..), Input (..))
 import qualified Backends as B
 import MLF.Compiler (compile, compiledTerm)
@@ -32,6 +32,13 @@ observe backends term expected = do
 
 numericArrayTests :: Backends -> [(String,IO ())]
 numericArrayTests backends =
+  [("native scalar arguments: " ++ label, do
+      term <- checked (recursion ++ source)
+      llvm <- right (emitLLVMIO term)
+      unless (any (\line -> "define private ptr @mlf.numeric." `isInfixOf` line &&
+                    "double %a" `isInfixOf` line) (lines llvm))
+        (fail "fixture did not exercise an unboxed Double worker")
+      observe backends term expected) | (label,source,expected) <- scalarPrograms] ++
   [("native numeric region: " ++ label, do
       term <- checked (recursion ++ source)
       llvm <- right (emitLLVMIO term)
@@ -51,7 +58,51 @@ numericArrayTests backends =
       case B.outcome result of
         Left err | message `isInfixOf` show err && B.output result == "before\n" -> pure ()
         _ -> fail (show result)) | (label,source,message) <- failures] ++
-  [ ("numeric: multiplication and signed quotient boundaries", do
+  [ ("native numeric region: multiplication and division retain arbitrary precision", do
+      let limit = 2^(62 :: Int) :: Integer
+          values = [-2^(100 :: Int),-limit-1,-limit,-3,0,3,limit-1,limit,2^(100 :: Int)]
+          pairs = [(a,b) | a <- values, b <- [-1,2,limit-1]]
+          ops = ["mulInt x y", "quotInt x (-1)", "remInt x (-1)",
+                 "quotInt x 3", "remInt x 3", "quotInt x (-3)", "remInt x (-3)"]
+          expected (a,b) = [a*b,a `quot` (-1),a `rem` (-1),a `quot` 3,a `rem` 3,a `quot` (-3),a `rem` (-3)]
+          source = recursion ++
+            "let loop : IntArray -> IntArray -> Int -> IO Unit = fix (\\again a b i -> " ++
+            "ifThenElse (ltInt i " ++ show (length pairs) ++ ") (do { " ++
+            "x <- readIntArray a (mulInt i 2); y <- readIntArray a (addInt (mulInt i 2) 1); " ++
+            concat ["writeIntArray b (addInt (mulInt i 7) " ++ show j ++ ") (" ++ op ++ "); "
+                   | (j,op) <- zip [0::Int ..] ops] ++
+            "again a b (addInt i 1) }) (return ())) in " ++
+            "let dump : IntArray -> Int -> IO Unit = fix (\\again a i -> " ++
+            "ifThenElse (ltInt i " ++ show (length pairs*7) ++ ") " ++
+            "(do { x <- readIntArray a i; printInt x; again a (addInt i 1) }) (return ())) in " ++
+            "do { a <- newIntArray " ++ show (length pairs*2) ++ " 0; " ++
+            concat ["writeIntArray a " ++ show i ++ " (" ++ show n ++ "); "
+                   | (i,n) <- zip [0::Int ..] (concatMap (\(a,b) -> [a,b]) pairs)] ++
+            "b <- newIntArray " ++ show (length pairs*7) ++ " 0; loop a b 0; dump b 0 }"
+      term <- checked source
+      llvm <- right (emitLLVMIO term)
+      unless (all (`isInfixOf` llvm) ["call { i64, i1 } @llvm.smul.with.overflow.i64", "sdiv i64", "srem i64"])
+        (fail "arithmetic boundary fixture missed the native fast paths")
+      observe backends term (unlines (map show (concatMap expected pairs))))
+  , ("native scalar arguments: recursive permutations bound specialization", do
+      let arguments = ["x" ++ show i | i <- [1::Int ..9]]
+          source = recursion ++ "let start : " ++ concat (replicate 9 "Double -> ") ++ "IO Double = \\" ++
+            unwords arguments ++ " -> let rotate : Int -> " ++ concat (replicate 10 "Double -> ") ++
+            "IO Double = fix (\\again n first " ++ unwords arguments ++ " -> " ++
+            "ifThenElse (eqInt n 0) (return first) (again (subInt n 1) " ++
+            unwords arguments ++ " (addDouble first 0.0))) in rotate 21 1.0 " ++ unwords arguments ++ " in " ++
+            "do { x <- start " ++ unwords [show i ++ ".0" | i <- [2::Int ..10]] ++
+            "; putStrLn (formatDouble 1 x) }"
+      term <- checked source
+      llvm <- right (emitLLVMIO term)
+      let prefix = "define private ptr @mlf.numeric."
+          counts = map length . group . sort $
+            [takeWhile (\c -> c /= '.' && c /= '(') (drop (length prefix) line)
+             | line <- lines llvm, take (length prefix) line == prefix,
+               not ("@mlf.numeric.entry." `isInfixOf` line)]
+      unless (9 `elem` counts && all (<=9) counts) (fail ("specialization cap was not exercised: " ++ show counts))
+      observe backends term "2.0\n")
+  , ("numeric: multiplication and signed quotient boundaries", do
       let limit = 2^(62 :: Int)
           values = [-2^(100 :: Int),-limit-1,-limit,-1,0,1,3,limit-1,limit,2^(100 :: Int)]
           pairs = [(a,b) | a <- values, b <- values]
@@ -123,9 +174,42 @@ numericArrayTests backends =
         unless (B.output result == expected && null (B.remaining result)) (fail (show result)))
   ]
 
+scalarPrograms :: [(String,String,String)]
+scalarPrograms =
+  [ ("captured doubles and nonnegative countdown",
+      "let start : Double -> IO Double = \\step -> " ++
+      "let loop : Int -> Double -> IO Double = fix (\\again n x -> " ++
+      "ifThenElse (eqInt 0 n) (return x) (again (subInt n 1) (addDouble x step))) in loop 12 0.0 in " ++
+      "do { x <- start 0.5; putStrLn (formatDouble 1 x) }", "6.0\n")
+  , ("IEEE values survive recursive calls",
+      "let loop : Int -> Double -> IO Double = fix (\\again n x -> " ++
+      "ifThenElse (eqInt n 0) (return x) (again (subInt n 1) (divDouble x 1.0))) in " ++
+      "do { a <- newDoubleArray 1 (-0.0); x <- readDoubleArray a 0; r <- loop 3 x; " ++
+      "putStrLn (formatDouble 2 r); writeDoubleArray a 0 (divDouble 1.0 0.0); y <- readDoubleArray a 0; " ++
+      "s <- loop 3 y; putStrLn (formatDouble 2 s); writeDoubleArray a 0 (divDouble 0.0 0.0); " ++
+      "z <- readDoubleArray a 0; t <- loop 3 z; putStrLn (formatDouble 2 t) }", "-0.00\nInfinity\nNaN\n")
+  , ("payload reads stay within their branch",
+      "let loop : Bool -> Int -> Double -> IO Double = fix (\\again flag n x -> " ++
+      "ifThenElse (eqInt n 0) (return x) (do { ignored <- ifThenElse flag " ++
+      "(return (addDouble x 1.0)) (return 0.0); again flag (subInt n 1) (mulDouble x 2.0) })) in " ++
+      "do { x <- loop false 3 1.0; y <- loop true 2 1.0; putStrLn (formatDouble 1 x); " ++
+      "putStrLn (formatDouble 1 y) }", "8.0\n4.0\n")
+  , ("unused failing floating arguments remain lazy",
+      "let loop : Int -> Double -> Double -> IO Double = fix (\\again n bad x -> " ++
+      "ifThenElse (eqInt n 0) (return x) (again (subInt n 1) bad (addDouble x 0.5))) in " ++
+      "do { x <- loop 3 (intToDouble (quotInt 1 0)) 1.0; putStrLn (formatDouble 1 x) }", "2.5\n")
+  ]
+
 regionPrograms :: [(String,String,Either String String)]
 regionPrograms =
-  [ ("reused actions execute and snapshots stay immutable",
+  [ ("specialized integer ranges permit negative results and GMP promotion",
+      "let loop : Int -> Int -> IO Int = fix (\\again n x -> ifThenElse (eqInt n 0) (return x) " ++
+      "(ifThenElse (eqInt x 4611686018427387903) (again (subInt n 1) (addInt x 1)) " ++
+      "(ifThenElse (eqInt x 0) (again (subInt n 1) (subInt x 1)) (again (subInt n 1) (addInt x 1))))) in " ++
+      "let start : Bool -> IO Int = \\large -> ifThenElse large (loop 1 4611686018427387903) (loop 2 0) in " ++
+      "do { x <- start true; y <- start false; printInt x; printInt y }",
+      Right "4611686018427387904\n0\n")
+  , ("reused actions execute and snapshots stay immutable",
       "let loop : IntArray -> Int -> IO Int = fix (\\again a n -> ifThenElse (eqInt n 0) " ++
       "(readIntArray a 0) (do { x <- readIntArray a 0; writeIntArray a 0 (addInt x 1); again a (subInt n 1) })) in " ++
       "do { a <- newIntArray 1 4611686018427387902; let action = loop a 2; x <- action; y <- action; printInt x; printInt y }",
