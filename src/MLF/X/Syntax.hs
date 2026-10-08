@@ -37,6 +37,7 @@ data Term
   | Let Name Term Term
   | LetRec [(Name, Type, Term)] Term
   | IntTerm Integer
+  | DoubleTerm Double
   | BoolTerm Bool
   | StringTerm String
   | Primitive P.Primitive [Type]
@@ -72,7 +73,7 @@ typeApplication t = Then (Inner (Bottom t)) Elim
 
 data Erased
   = EVar Name | EAbs Name Erased | EApp Erased Erased
-  | ELet Name Erased Erased | EInt Integer | EBool Bool
+  | ELet Name Erased Erased | EInt Integer | EDouble Double | EBool Bool
   | EString String | EPrimitive P.Primitive
   | ELetRec [(Name, Erased)] Erased
   | EEvidenceHole Int
@@ -91,6 +92,7 @@ erase t = case t of
   Let n a b -> ELet n (erase a) (erase b)
   LetRec ds b -> ELetRec [(n,erase a) | (n,_,a) <- ds] (erase b)
   IntTerm i -> EInt i
+  DoubleTerm d -> EDouble d
   BoolTerm b -> EBool b
   StringTerm s -> EString s
   Primitive p _ -> EPrimitive p

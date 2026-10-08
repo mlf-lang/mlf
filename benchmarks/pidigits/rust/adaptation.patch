@@ -1,0 +1,39 @@
+--- upstream.rs
++++ main.rs
+@@ -7,20 +7,9 @@
+ 
+ #![allow(non_camel_case_types)]
+ 
+-//extern crate libc;
+-// exporting needed things from libc for linux x64 (still unstable)
+-#[cfg(all(target_os = "linux", any(target_arch = "x86_64", target_arch = "x86")))]
+-mod libc {
+-    #![allow(non_camel_case_types)]
+-    #[repr(u8)]
+-    pub enum c_void { __variant1, __variant2 }
+-    pub type c_int = i32;
+-    #[cfg(target_arch = "x86_64")] pub type c_ulong = u64;
+-    #[cfg(target_arch = "x86")] pub type c_ulong = u32;
+-}
+-
+-use libc::{c_int, c_ulong, c_void};
+-use std::mem::uninitialized;
++// Portable C ABI types and initialized GMP storage (no external Rust crates).
++use std::os::raw::{c_int, c_ulong, c_void};
++use std::mem::MaybeUninit;
+ use std::cmp::Ordering;
+ 
+ fn main() {
+@@ -102,9 +91,9 @@
+ impl Mpz {
+     pub fn from_ui(i: c_ulong) -> Mpz {
+         unsafe {
+-            let mut mpz = uninitialized();
+-            __gmpz_init_set_ui(&mut mpz, i);
+-            Mpz { mpz: mpz }
++            let mut mpz = MaybeUninit::<mpz_struct>::uninit();
++            __gmpz_init_set_ui(mpz.as_mut_ptr(), i);
++            Mpz { mpz: mpz.assume_init() }
+         }
+     }
+     // self = a * b

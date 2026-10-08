@@ -2,6 +2,7 @@ module MLF.X.Check
   ( TypeEnv, Env (..), emptyEnv, wellFormed, checkComputation, checkComputationIn, infer, inferWithData, checkClosed ) where
 
 import Control.Monad (forM_, unless, when)
+import Data.Char (ord)
 import Data.List (nub)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -126,8 +127,14 @@ inferIn ds env term = case term of
       unless (alphaEq expected actual) (Left "recursive definition does not have its declared type")
     inferIn ds scope body
   IntTerm _ -> pure (Con "Int" [])
+  DoubleTerm n -> do
+    unless (not (isNaN n || isInfinite n)) (Left "non-finite Double literal")
+    pure (Con "Double" [])
   BoolTerm _ -> pure (Con "Bool" [])
-  StringTerm _ -> pure (Con "String" [])
+  StringTerm text -> do
+    unless (all (\c -> ord c < 0xd800 || ord c > 0xdfff) text)
+      (Left "invalid Unicode scalar in string literal")
+    pure (Con "String" [])
   Primitive p arguments -> do
     let (parameters,signature) = P.primitiveSignature p
     unless (length arguments == length parameters) (Left "primitive type argument arity mismatch")

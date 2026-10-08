@@ -51,6 +51,7 @@ capture input action = do
               [] -> ioError (userError "Snake requested unexpected input")
               line:rest -> writeIORef pending rest >> pure line
         , R.writeText = \s -> modifyIORef' output (s:)
+        , R.writeBytes = \_ -> fail "Snake unexpectedly wrote binary output"
         }
   outcome <- timeout 10000000 (action backend)
   case outcome of

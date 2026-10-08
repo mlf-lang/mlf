@@ -9,7 +9,7 @@ import qualified Text.Parsec.Token as Tok
 import Text.Parsec.Language (emptyDef)
 import MLF.X.Syntax
 import MLF.X.Type
-import MLF.Data.Parser (declaration, upperIdentifier)
+import MLF.Data.Parser (declaration, upperIdentifier, doubleLiteral)
 import MLF.Kind
 import MLF.Primitive (lookupTargetPrimitive)
 
@@ -129,6 +129,7 @@ term = letP <|> recP <|> typeAbsP <|> absP <|> caseP <|> (foldl1 App <$> many1 p
     atom = parens term
       <|> (BoolTerm True <$ reserved "true")
       <|> (BoolTerm False <$ reserved "false")
+      <|> (DoubleTerm <$> doubleLiteral lexer)
       <|> (IntTerm <$> Tok.integer lexer)
       <|> (StringTerm <$> Tok.stringLiteral lexer)
       <|> (reserved "primitive" *> (do

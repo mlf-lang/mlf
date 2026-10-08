@@ -1,4 +1,4 @@
-module MLF.Data.Parser (declaration, upperIdentifier, lowerIdentifier) where
+module MLF.Data.Parser (declaration, upperIdentifier, lowerIdentifier, doubleLiteral) where
 
 import Data.Char (isLower, isUpper)
 import Text.Parsec
@@ -6,6 +6,14 @@ import Text.Parsec.String (Parser)
 import qualified Text.Parsec.Token as Tok
 import MLF.Data
 import MLF.Kind
+
+-- A decimal point or exponent distinguishes Double from arbitrary-precision
+-- Int. Both source and target use the same finite IEEE binary64 literals.
+doubleLiteral :: Tok.TokenParser () -> Parser Double
+doubleLiteral lexer = try $ do
+  sign <- option id ((negate <$ char '-') <|> (id <$ char '+'))
+  n <- sign <$> Tok.float lexer
+  if isInfinite n || isNaN n then fail "non-finite Double literal" else pure n
 
 upperIdentifier :: Tok.TokenParser () -> Parser String
 upperIdentifier lexer = do

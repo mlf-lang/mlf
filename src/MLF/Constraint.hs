@@ -31,6 +31,7 @@ data Form
   | Binding X.Name Typed Typed Edge
   | Coercion X.Name NodeId NodeId
   | IntegerLiteral Integer
+  | DoubleLiteral Double
   | BooleanLiteral Bool
   | StringLiteral String
   | Primitive P.Primitive [NodeId]
@@ -51,7 +52,7 @@ data Constraints = Constraints
 
 data Core
   = CVar String | CLam String Core | CApp Core Core | CLet String Core Core
-  | CCoerce S.Annotation | CInt Integer | CBool Bool | CString String
+  | CCoerce S.Annotation | CInt Integer | CDouble Double | CBool Bool | CString String
   | CPrimitive P.Primitive
   | CConstructor String | CCase Core [(S.Pattern, Core)]
   | CRec [(String, S.Annotation, Core)] Core
@@ -68,6 +69,7 @@ desugar expr = case expr of
   S.Let x a b -> CLet x (desugar a) (desugar b)
   S.Ann a t -> CApp (CCoerce t) (desugar a)
   S.IntLit n -> CInt n
+  S.DoubleLit n -> CDouble n
   S.BoolLit b -> CBool b
   S.StringLit s -> CString s
   S.Primitive p -> CPrimitive p
@@ -205,6 +207,7 @@ build datatypes typeScope parent env core = do
       name <- fresh "coerce"
       pure (Coercion name domain result)
     CInt n -> setTag (Con "Int" []) >> pure (IntegerLiteral n)
+    CDouble n -> setTag (Con "Double" []) >> pure (DoubleLiteral n)
     CBool b -> setTag (Con "Bool" []) >> pure (BooleanLiteral b)
     CString value -> setTag (Con "String" []) >> pure (StringLiteral value)
     CPrimitive primitive -> do
@@ -287,6 +290,7 @@ validateAnnotations ds = go Map.empty
       S.Let _ a b -> go scope a >> go scope b
       S.Ann a t -> go scope a >> annotation scope t
       S.IntLit _ -> pure ()
+      S.DoubleLit n -> unless (not (isNaN n || isInfinite n)) (Left "non-finite Double literal")
       S.BoolLit _ -> pure ()
       S.StringLit _ -> pure ()
       S.Primitive _ -> pure ()
@@ -363,7 +367,7 @@ embed ds env ty = do
 solve :: Constraints -> Either String Graph
 solve c = do
   initial <- Solver.prepare (initialGraph c) >>= Solver.unify (equalities c)
-  solved <- foldM (\solver e -> Solver.instantiate (fromGen e) (toNode e) solver) initial (instances c)
+  solved <- foldM (\solver e -> Solver.instantiateClosed (fromGen e) (toNode e) solver) initial (instances c)
   g <- Solver.finish solved
   let normalized = normalize g
   validateGraph normalized
@@ -382,6 +386,7 @@ eraseSourceWith evidence t = case form t of
   Binding n a b _ -> X.ELet n (go a) (go b)
   Coercion n _ _ -> X.EAbs n (X.EVar n)
   IntegerLiteral n -> X.EInt n
+  DoubleLiteral n -> X.EDouble n
   BooleanLiteral b -> X.EBool b
   StringLiteral s -> X.EString s
   Primitive p _ -> X.EPrimitive p

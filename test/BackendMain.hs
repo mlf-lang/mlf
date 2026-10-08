@@ -11,12 +11,14 @@ import IOTests (ioTests)
 import PreludeTests (preludeTests)
 import Snake (snakeTests)
 import NativeOptimization (nativeOptimizationTests)
+import NumericArrays (numericArrayTests)
+import ByteArrays (byteArrayTests)
 
 main :: IO ()
 main = do
   hSetBuffering stdout LineBuffering
   withBackends $ \backends -> do
-    let suite = ioTests backends ++ preludeTests backends ++ snakeTests backends ++ backendTests backends ++ nativeOptimizationTests backends
+    let suite = ioTests backends ++ preludeTests backends ++ snakeTests backends ++ backendTests backends ++ nativeOptimizationTests backends ++ numericArrayTests backends ++ byteArrayTests backends
         labels = map fst suite
     unless (length labels == length (nub labels)) (fail "duplicate backend fixture labels")
     results <- forM suite $ \(label,action) -> do

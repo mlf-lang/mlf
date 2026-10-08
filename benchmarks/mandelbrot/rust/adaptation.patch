@@ -1,0 +1,57 @@
+--- upstream.rs
++++ main.rs
+@@ -6,8 +6,6 @@
+ // contributed by TeXitoi
+ 
+ use std::io::Write;
+-use std::thread;
+-const THREADS: usize = 20;
+ const MAX_ITER: usize = 50;
+ const VLEN: usize = 8;
+ const ZEROS: Vecf64 = [0.0; VLEN];
+@@ -75,30 +73,25 @@
+     let xloc = &xvals;
+     let yloc = &yvals;
+ 
+-    assert!(size % THREADS == 0);// FIXME
+-    let handles: Vec<_> = (0..THREADS).map(|e| {
+-        let xloc = xloc.to_vec();
+-        let yloc = yloc.to_vec();
+-        thread::spawn(move || {
+-            let mut rows = vec![vec![0 as u8; size / 8]; size / THREADS];
+-            for y in 0..size / THREADS {
+-                for x in 0..size / 8 {
+-                    let mut cr = ZEROS;
+-                    let ci = [yloc[y + e * size / THREADS]; VLEN];
+-                    for i in 0..VLEN {
+-                        cr[i] = xloc[8 * x + i];
+-                    }
+-                    rows[y][x] = mbrot8(cr, ci);
+-                }
+-            }
+-            rows
+-        })
+-    }).collect();
++    // One sequential worker; retain the upstream eight scalar lanes.
++    // Complete the final partial byte and clear its unused low bits.
++    let row_bytes = (size + 7) / 8;
++    let mut rows = vec![vec![0u8; row_bytes]; size];
++    for y in 0..size {
++        for x in 0..row_bytes {
++            let mut cr = ZEROS;
++            let ci = [yloc[y]; VLEN];
++            let valid = (size - 8*x).min(8);
++            for i in 0..valid { cr[i] = xloc[8*x+i]; }
++            let mask = if valid == 8 { 0xff } else { 0xffu8 << (8-valid) };
++            rows[y][x] = mbrot8(cr, ci) & mask;
++        }
++    }
+ 
+     println!("P4\n{} {}", size, size);
+     let stdout_unlocked = std::io::stdout();
+     let mut stdout = stdout_unlocked.lock();
+-    for row in handles.into_iter().flat_map(|h| h.join().unwrap().into_iter()) {
++    for row in rows {
+         stdout.write_all(&row).unwrap();
+     }
+     stdout.flush().unwrap();

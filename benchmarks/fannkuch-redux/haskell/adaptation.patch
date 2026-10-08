@@ -1,0 +1,107 @@
+--- upstream.hs	2026-10-08 02:58:25.264965029 +0800
++++ main.hs	2026-10-08 03:03:10.398947208 +0800
+@@ -13,9 +13,8 @@
+ import Text.Printf
+ import Data.Bits
+ 
+-import qualified Data.Vector.Unboxed.Mutable as VM
+-import qualified Data.Vector.Generic.Mutable as VG
+-import qualified Data.Vector.Unboxed as V
++import Data.Array.IO (IOUArray, newListArray, newArray)
++import Data.Array.Base (unsafeRead, unsafeWrite)
+ 
+ main = do
+     n <- getArgs >>= readIO.head
+@@ -24,9 +23,9 @@
+ 
+ fannkuch :: Int -> IO (Int, Int)
+ fannkuch n = do
+-    perm <- V.unsafeThaw $ V.enumFromN 1 n
+-    !tperm <- VG.new n
+-    !cnt <- VG.replicate n 0
++    perm <- newListArray (0,n-1) [1..n]
++    !tperm <- newArray (0,n-1) 0
++    !cnt <- newArray (0,n-1) 0
+     let
+         loop :: Int -> Int -> Int -> IO(Int,Int)
+         loop !c !m !pc = do
+@@ -34,46 +33,65 @@
+             if b == False
+             then return (c,m)
+             else do
+-                VM.unsafeCopy tperm perm
++                copyInts n tperm perm
+                 let count_flips !flips = {-# SCC "count_flips" #-} do
+-                        f <- VM.unsafeRead tperm 0
++                        f <- unsafeRead tperm 0
+                         if f == 1
+                         then loop (c + (if pc .&. 1 == 0 then flips else -flips))
+                                 (max m flips)
+                                 (pc+1)
+                         else do
+-                                VG.reverse $ VM.unsafeSlice 0 f tperm
++                                reversePrefix f tperm
+                                 count_flips (flips+1)
+                 count_flips 0
+     loop 0 0 1
+ 
+-next_permutation :: VM.IOVector Int -> Int -> VM.IOVector Int -> IO Bool
++next_permutation :: IOUArray Int Int -> Int -> IOUArray Int Int -> IO Bool
+ next_permutation perm !n !cnt = loop 1
+     where
+     loop :: Int -> IO Bool
+     loop i
+         | i >= n = done i
+         | otherwise = do
+-            tmp <- VM.unsafeRead perm 0
++            tmp <- unsafeRead perm 0
+             let
+                 rotate :: Int -> IO()
+                 rotate j
+-                    | j >= i = VM.unsafeWrite perm i tmp
++                    | j >= i = unsafeWrite perm i tmp
+                     | otherwise = do
+-                        !v <- VM.unsafeRead perm (j+1)
+-                        VM.unsafeWrite perm j v
++                        !v <- unsafeRead perm (j+1)
++                        unsafeWrite perm j v
+                         rotate (j+1)
+             rotate 0
+-            v <- VM.unsafeRead cnt i
++            v <- unsafeRead cnt i
+             if v >= i
+-            then VM.unsafeWrite cnt i 0 >> loop (i+1)
++            then unsafeWrite cnt i 0 >> loop (i+1)
+             else done i
+ 
+     done :: Int -> IO Bool
+     done i
+         | i >= n = return False
+         | otherwise = do
+-            v <- VM.unsafeRead cnt i
+-            VM.unsafeWrite cnt i (v+1)
++            v <- unsafeRead cnt i
++            unsafeWrite cnt i (v+1)
+             return True
+-    
+\ No newline at end of file
++    
++-- Storage adapter: contiguous unboxed arrays from GHC's boot array package.
++copyInts :: Int -> IOUArray Int Int -> IOUArray Int Int -> IO ()
++copyInts n dst src = go 0
++  where
++    go :: Int -> IO ()
++    go !i | i == n = return ()
++          | otherwise = unsafeRead src i >>= unsafeWrite dst i >> go (i+1)
++
++reversePrefix :: Int -> IOUArray Int Int -> IO ()
++reversePrefix n a = go 0 (n-1)
++  where
++    go :: Int -> Int -> IO ()
++    go !i !j | i >= j = return ()
++             | otherwise = do
++                 x <- unsafeRead a i
++                 y <- unsafeRead a j
++                 unsafeWrite a i y
++                 unsafeWrite a j x
++                 go (i+1) (j-1)

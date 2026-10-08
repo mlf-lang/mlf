@@ -59,7 +59,7 @@ EMLF_BIN="$(cabal list-bin exe:emlf)"
 "$EMLF_BIN" examples/snake.emlf > snake.xmlf
 "$EMLF_BIN" --xmlf-to-llvm snake.xmlf > snake.ll
 MLF_RUNTIME="$("$EMLF_BIN" --llvm-runtime)"
-clang -O2 snake.ll "$MLF_RUNTIME" $(pkg-config --cflags --libs gmp) -o snake
+clang -O2 snake.ll "$MLF_RUNTIME" $(pkg-config --cflags --libs gmp) -lm -o snake
 ./snake
 ```
 
@@ -116,7 +116,7 @@ reports xMLF emission, LLVM IR emission, and complete native builds separately.
 ```text
 program ::= ((data-declaration | class-declaration | instance-declaration) ";")* e
 
-e ::= x | integer | string | true | false | ()
+e ::= x | integer | double | string | true | false | ()
     | \x -> e | \(x : annotation) -> e
     | e e | let x = e in e | (e : annotation)
     | Constructor | case e of { pattern -> e; ... }
@@ -152,7 +152,7 @@ with an uppercase letter. Annotations must be closed except for their explicit
 existentials, whose values are inferred. Comments use `--` or nested `{- -}`.
 
 The source includes lambda, application, nonrecursive let, expression and
-parameter annotations, integer/Boolean/string literals, algebraic data types, and
+parameter annotations, integer/Double/Boolean/string literals, algebraic data types, and
 type classes with multiple and higher-kinded parameters, and `do` blocks.
 Abstract constructor types are still allowed in annotations for library
 signatures. General recursive source bindings are not implemented. Instance methods can
@@ -473,15 +473,70 @@ and cause a nonzero exit. Console output is flushed before the next action.
 | `printInt` | `Int -> IO Unit` |
 | `concatString` | `String -> String -> String` |
 | `showInt` | `Int -> String` |
-| `addInt`, `subInt` | `Int -> Int -> Int` |
+| `addInt`, `subInt`, `mulInt`, `quotInt`, `remInt` | `Int -> Int -> Int` |
+| `readInt` | `String -> Int` |
 | `eqInt`, `ltInt` | `Int -> Int -> Bool` |
+| `addDouble`, `subDouble`, `mulDouble`, `divDouble` | `Double -> Double -> Double` |
+| `sqrtDouble` | `Double -> Double` |
+| `eqDouble`, `ltDouble` | `Double -> Double -> Bool` |
+| `intToDouble` | `Int -> Double` |
+| `formatDouble` | `Int -> Double -> String` |
+| `newIntArray` | `Int -> Int -> IO IntArray` |
+| `readIntArray` | `IntArray -> Int -> IO Int` |
+| `writeIntArray` | `IntArray -> Int -> Int -> IO Unit` |
+| `lengthIntArray` | `IntArray -> IO Int` |
+| `newDoubleArray` | `Int -> Double -> IO DoubleArray` |
+| `readDoubleArray` | `DoubleArray -> Int -> IO Double` |
+| `writeDoubleArray` | `DoubleArray -> Int -> Double -> IO Unit` |
+| `lengthDoubleArray` | `DoubleArray -> IO Int` |
+| `newByteArray` | `Int -> Int -> IO ByteArray` |
+| `readByteArray` | `ByteArray -> Int -> IO Int` |
+| `writeByteArray` | `ByteArray -> Int -> Int -> IO Unit` |
+| `lengthByteArray` | `ByteArray -> IO Int` |
+| `byteArrayFromString` | `String -> IO ByteArray` |
+| `putBytes` | `ByteArray -> Int -> Int -> IO Unit` |
 | `eqString` | `String -> String -> Bool` |
 | `ifThenElse` | `forall a. Bool -> a -> a -> a` |
 
 Integer arithmetic uses arbitrary-precision signed integers. `ltInt` is strict
-less-than, and string equality is case-sensitive. `ifThenElse condition yes no`
+less-than. `quotInt` truncates toward zero, `remInt` has the dividend's sign,
+and division by zero fails at runtime. `readInt` accepts an optional sign and
+one or more ASCII decimal digits, with no whitespace or trailing characters.
+String equality is case-sensitive. `ifThenElse condition yes no`
 evaluates only the selected branch; it also works with functions, datatypes,
 and IO actions. Selecting an IO action does not execute it until it is sequenced.
+
+`Double` is IEEE binary64, distinct from `Int`: use `1.0`, `-2.5`, or `3e2`
+and convert integers explicitly with `intToDouble`. Literals must be finite;
+arithmetic can produce infinities or NaN with ordinary IEEE comparisons.
+`formatDouble places value` writes fixed decimals (0–17 places), rounding to
+nearest with ties to even and preserving negative zero. Non-finite results
+format as `Infinity`, `-Infinity`, or `NaN`.
+
+`IntArray` and `DoubleArray` are opaque mutable arrays with zero-based indices.
+Allocation initializes every cell; reads, writes and lengths run through IO.
+Writes force the stored numeric value, bounds are checked, and reusing a read
+action reads the current cell again. Empty arrays are allowed. For example:
+
+```haskell
+do {
+  a <- newDoubleArray 3 0.0;
+  writeDoubleArray a 1 (sqrtDouble 2.0);
+  x <- readDoubleArray a 1;
+  putStrLn (formatDouble 9 x)
+}
+```
+
+Both backends implement these operations. The LLVM backend emits floating
+arithmetic directly and stores Double array elements unboxed; Int array cells
+retain arbitrary precision. See [numeric semantics](docs/numeric-arrays.txt).
+
+`ByteArray` stores unsigned bytes. Reads return `Int`; writes and initial
+values must be between 0 and 255. `byteArrayFromString` allocates a fresh
+mutable copy of a string's UTF-8 bytes, including embedded NULs. `putBytes
+buffer offset count` writes and flushes that exact slice without text encoding.
+Offsets and counts are checked before output. This supports reusable output
+buffers and binary formats such as Mandelbrot's PBM bitmap on both backends.
 
 The standard prelude connects `return` and `bind` to these operations through
 its `Monad IO` instance. `pure` is an IO-specific alias for `ioReturn` in this
@@ -510,7 +565,7 @@ Without a file, `--run` and `--run-xmlf` consume standard input as source, so
 that input stream is unavailable for subsequent `getLine` actions.
 
 The library entry point is `MLF.Runtime.runTerm`, with an `IOBackend` providing
-`readLine` and `writeText`. It requires an IO entry, as does
+`readLine`, `writeText` and `writeBytes :: ByteString -> IO ()`. It requires an IO entry, as does
 `MLF.LLVM.emitLLVMIO`. `MLF.Runtime.runProgram` and `MLF.LLVM.emitLLVM` also
 accept pure programs, evaluating them to weak head normal form and discarding
 the result. Tests observe action order and failure behavior through both
@@ -594,14 +649,27 @@ lowest common ancestors. Sparse external identities retain the map-based
 implementation. `MLF.Graph.Solver` maintains reverse edges and applies this
 checked unifier to the affected type component, preserving structural parents,
 binding descendants, generalization scopes, and original identities. This
-avoids repeatedly traversing unrelated definitions. Each component is checked
-before and after unification; full graph and index checks bracket inference.
-Graphs remain immutable outside each analysis, and unchanged nodes are shared.
-During elaboration, alpha-equivalent instance
-types use independently checked `Inst-Refl` evidence directly; other edges
-retain expansion, frontier solving, and identity-based evidence construction.
-An empty frontier needs no separate unification. The compiler still checks
-graph invariants, unification permissions, target typing, and source erasure.
+avoids repeatedly traversing unrelated definitions. Local projections compress
+unary runs of empty generalization scopes while retaining every type-binding LCA;
+updates touch only changed nodes and reverse edges. Closed ground instances
+can graft a fresh ground structure or check an existing ground substitution
+without copying and unifying the surrounding graph. General instances retain
+the full expansion path. Full graph and index checks bracket inference, and
+differential tests compare both paths against the original solver.
+
+Elaboration caches datatype metadata and constructs `Inst-Refl` for
+alpha-equivalent edges. For other edges it first tries structural
+correspondence between existing source and target nodes, accepting only an
+independently checked xMLF computation with the exact target type. Failed
+candidates retain expansion, frontier solving, and identity-based evidence
+construction. The compiler still checks graph invariants, unification
+permissions, target typing, and source erasure.
+
+The native backend lowers eligible first-order numeric IO functions to direct,
+bounds-checked array loops with unboxed Double intermediates. A non-forcing
+argument guard preserves the lazy fallback; actions remain repeatable. GMP
+arithmetic reads immutable operands directly and collection also accounts for
+large-integer limb storage. See [backend design](docs/llvm-backend.txt).
 
 The project builds with `-O2`; the CLI uses a 32 MiB allocation area to reduce
 garbage collection during inference. These defaults are in `cabal.project`
@@ -614,13 +682,16 @@ cabal bench -j1
 ```
 
 The default compares Clang `-O3`, Rust `-O`, GHC `-O2`, and MLF's native LLVM
-pipeline on pinned Benchmarks Game binary-trees sources. Compilation and
+pipeline on pinned Benchmarks Game **binary-trees, pidigits, n-body,
+fannkuch-redux, spectral-norm, fasta and mandelbrot** sources. Compilation and
 runtime are timed separately, after four-language correctness validation.
 It writes `bench-results.json` with raw samples, medians, ratios, CPU/RSS,
 toolchain identities and source provenance. Rust and Python 3.9+ are required
-in addition to the native build dependencies. The default includes three
-depth-16 runtime samples. The native optimizer brings each MLF execution
-to roughly 0.3 seconds on the development machine; see the measured report.
+in addition to the native build dependencies. The default takes three samples
+per dimension with workload-specific inputs: depth 16, 10,000 digits,
+2,000,000 integration steps, permutation size 10, a 2000-element spectral
+vector, fasta n=2,000,000, and a 4096×4096 Mandelbrot bitmap. `--compile-only` and
+small selected inputs provide quicker checks.
 See [benchmark methodology, commands and limitations](benchmarks/README.md)
 and [workload selection](benchmarks/INVESTIGATION.md). The
 [measured results](benchmarks/RESULTS.md) include a complete archived JSON run.
@@ -629,7 +700,18 @@ and [workload selection](benchmarks/INVESTIGATION.md). The
 cabal bench --benchmark-options='--compile-only'
 cabal bench --benchmark-options='--runtime-only'
 cabal bench --benchmark-options='--benchmark binary-trees'
+cabal bench --benchmark-options='--benchmark n-body --size 1000 --runs 2'
+cabal bench --benchmark-options='--benchmark spectral-norm --size 100 --runs 2'
+cabal bench --benchmark-options='--benchmark fasta --size 1000 --runs 2'
+cabal bench --benchmark-options='--benchmark mandelbrot --size 200 --runs 2'
+cabal bench -j1 --benchmark-options='--runs 7 --max-compile-ratio 5 --max-runtime-ratio 2'
 ```
+
+The optional ratio limits check every workload's MLF/C ratio of medians and
+fail the run if any limit is exceeded, preserving all measurements in the
+report. No limit is applied by default.
+The current seven-workload run meets the compile limit throughout; the three
+new workloads still exceed the 2x runtime limit. See the measured results above.
 
 The existing Snake compilation comparison is an explicit mode:
 

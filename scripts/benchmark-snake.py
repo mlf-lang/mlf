@@ -122,7 +122,7 @@ def main():
         }
         commands["llvm_native"] = [commands["llvm_ir"],
             [clang, "-O2", "-Wno-override-module", str(llvm_source), str(runtime),
-             *shlex.split(gmp_flags.decode()), "-o", str(llvm_native)]]
+             *shlex.split(gmp_flags.decode()), "-lm", "-o", str(llvm_native)]]
         report["commands"] = commands
         for repetition in range(args.runs):
             offset = repetition % len(workflows)

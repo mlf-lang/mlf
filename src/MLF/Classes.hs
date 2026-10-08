@@ -301,6 +301,7 @@ lowerExpr ds infos env candidates expression = case expression of
       pure (foldl S.App (S.Var name) [S.Var n | (n,_) <- wants],wants)
   S.Constructor _ -> pure (expression,[])
   S.IntLit _ -> pure (expression,[])
+  S.DoubleLit _ -> pure (expression,[])
   S.BoolLit _ -> pure (expression,[])
   S.StringLit _ -> pure (expression,[])
   S.Primitive _ -> pure (expression,[])

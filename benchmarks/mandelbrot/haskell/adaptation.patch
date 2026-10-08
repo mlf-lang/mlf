@@ -1,0 +1,50 @@
+--- upstream.hs
++++ main.hs
+@@ -23,37 +23,20 @@
+ import System.IO
+ import Foreign
+ import Foreign.Marshal.Array
+-import Control.Concurrent
+-import Control.Concurrent.MVar
+-import Control.Concurrent.Chan
+ import Control.Monad
+ 
++-- Serial row dispatcher. The scalar recurrence below is unchanged.
++-- Round row storage upward, begin at byte zero, and free each emitted row.
+ main = do
+-    -- width in pixels
+     w <- getArgs >>= readIO . head
+-        -- width in bytes
+-    let n      = w `div` 8
+-        -- width of a pixel in the complex plane
+-        m  = 2 / fromIntegral w
+-        coords = [T 1 0 y (fromIntegral y * m - 1) | y <- [0..w-1]]
+-    q <- newChan
+-    replies <- replicateM w newEmptyMVar
+-    mapM_ (writeChan q) $ zip coords replies
+-    replicateM_ 4 . forkIO $ worker q w m n
+-
+-    putStrLn ("P4\n"++show w++" "++show w)
+-    mapM_ (takeMVar >=> \b -> hPutBuf stdout b n) replies
+-
+--- Worker computes one line of the image and sends it to the master
+--- q - work queue
+--- w - width in pixels
+--- m - width of a pixel in the complex plane
+--- n - width in bytes
+-worker q w m n = forever (do
+-    (coord, reply) <- readChan q
+-    p <- mallocArray0 n
+-    unfold (next_x w m n) p coord
+-    putMVar reply p)
++    let n = (w + 7) `div` 8
++        m = 2 / fromIntegral w
++    putStrLn ("P4\n" ++ show w ++ " " ++ show w)
++    forM_ [0..w-1] $ \y -> do
++        p <- mallocArray n
++        unfold (next_x w m n) p (T 0 0 y (fromIntegral y * m - 1))
++        hPutBuf stdout p n
++        free p
+ 
+ -- f - takes coordinates and returns Nothing if done
+ --     or the next byte of the bitmap otherwise.

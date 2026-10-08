@@ -1,0 +1,50 @@
+-- Scalar z <- z*z+c, with at most 50 iterations per pixel. ByteArray holds
+-- one PBM row; no Unicode encoding is applied to its packed bytes.
+data Rec a = Rec (Rec a -> a);
+let fix : forall a. (a -> a) -> a = \f ->
+  let go = \r -> case r of { Rec next -> f (next r) } in go (Rec go) in
+-- State cells: zr, zi, zr*zr, zi*zi, cr, ci.
+let pixel : DoubleArray -> Int -> IO Int = fix (\again state remaining -> do {
+  tr <- readDoubleArray state 2; ti <- readDoubleArray state 3;
+  ifThenElse (ltDouble 4.0 (addDouble tr ti)) (return 0)
+    (ifThenElse (eqInt remaining 0) (return 1) (do {
+      zr <- readDoubleArray state 0; zi <- readDoubleArray state 1;
+      cr <- readDoubleArray state 4; ci <- readDoubleArray state 5;
+      let nextI = addDouble (mulDouble (mulDouble 2.0 zr) zi) ci;
+      let nextR = addDouble (subDouble tr ti) cr;
+      writeDoubleArray state 0 nextR; writeDoubleArray state 1 nextI;
+      writeDoubleArray state 2 (mulDouble nextR nextR);
+      writeDoubleArray state 3 (mulDouble nextI nextI);
+      again state (subInt remaining 1)
+    }))
+}) in
+let pad : ByteArray -> Int -> Int -> IO Unit = fix (\again out index bits ->
+  ifThenElse (eqInt bits 0) (return ()) (do {
+    byte <- readByteArray out index; writeByteArray out index (mulInt byte 2);
+    again out index (subInt bits 1)
+  })) in
+let row : ByteArray -> DoubleArray -> Int -> Int -> Int -> IO Unit =
+  fix (\again out state n y x -> ifThenElse (ltInt x n) (do {
+    writeDoubleArray state 0 0.0; writeDoubleArray state 1 0.0;
+    writeDoubleArray state 2 0.0; writeDoubleArray state 3 0.0;
+    writeDoubleArray state 4 (subDouble (divDouble (mulDouble 2.0 (intToDouble x)) (intToDouble n)) 1.5);
+    writeDoubleArray state 5 (subDouble (divDouble (mulDouble 2.0 (intToDouble y)) (intToDouble n)) 1.0);
+    bit <- pixel state 50;
+    let index = quotInt x 8;
+    ifThenElse (eqInt (remInt x 8) 0) (writeByteArray out index 0) (return ());
+    byte <- readByteArray out index;
+    writeByteArray out index (addInt (mulInt byte 2) bit);
+    again out state n y (addInt x 1)
+  }) (pad out (quotInt n 8) (ifThenElse (eqInt (remInt n 8) 0) 0 (subInt 8 (remInt n 8))))) in
+let rows : ByteArray -> DoubleArray -> Int -> Int -> IO Unit =
+  fix (\again out state n y -> ifThenElse (ltInt y n) (do {
+    row out state n y 0; putBytes out 0 (quotInt (addInt n 7) 8);
+    again out state n (addInt y 1)
+  }) (return ())) in
+do {
+  input <- getLine; let n = readInt input;
+  out <- newByteArray (quotInt (addInt n 7) 8) 0;
+  state <- newDoubleArray 6 0.0;
+  putStrLn (concatString "P4\n" (concatString (showInt n) (concatString " " (showInt n))));
+  rows out state n 0
+}

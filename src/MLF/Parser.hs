@@ -8,7 +8,7 @@ import Text.Parsec.String (Parser)
 import qualified Text.Parsec.Token as Tok
 import Text.Parsec.Language (emptyDef)
 import MLF.Syntax
-import MLF.Data.Parser (declaration, upperIdentifier, lowerIdentifier)
+import MLF.Data.Parser (declaration, upperIdentifier, lowerIdentifier, doubleLiteral)
 import MLF.Kind
 import qualified MLF.Data as D
 
@@ -163,6 +163,7 @@ atom = parens (option (Constructor "Unit") expr)
    <|> doExpr
    <|> (BoolLit True <$ (reserved "true" <|> reserved "True"))
    <|> (BoolLit False <$ (reserved "false" <|> reserved "False"))
+   <|> (DoubleLit <$> doubleLiteral lexer)
    <|> (IntLit <$> Tok.integer lexer)
    <|> (StringLit <$> Tok.stringLiteral lexer)
    <|> (Constructor <$> upperIdentifier lexer)

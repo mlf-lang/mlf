@@ -1,6 +1,6 @@
 module Backends
   ( Backends, Event (..), Entry (..), Input (..), Observation (..)
-  , withBackends, inCase, auditBackends, execute, capture, output
+  , withBackends, inCase, auditBackends, execute, capture, output, outputBytes
   ) where
 
 import Control.Concurrent (threadDelay)
@@ -18,8 +18,9 @@ import System.Directory
 import System.Environment (getEnvironment, lookupEnv)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
-import System.IO (hClose, openTempFile)
-import System.Process (CreateProcess (..), proc, readCreateProcessWithExitCode)
+import System.IO (IOMode (..), hClose, openTempFile, withBinaryFile)
+import System.Process (CreateProcess (..), StdStream (..), proc, readCreateProcessWithExitCode,
+  withCreateProcess, waitForProcess)
 import System.Posix.Process (ProcessStatus (..), exitImmediately, forkProcess, getProcessStatus)
 import System.Posix.Signals (sigKILL, signalProcess)
 import System.Timeout (timeout)
@@ -30,7 +31,7 @@ import qualified MLF.X.Syntax as X
 
 data Kind = Interpreter | LLVM deriving (Eq, Ord, Show, Enum, Bounded)
 data Entry = IOEntry | ProgramEntry deriving (Eq, Show)
-data Event = ReadLine | Write String deriving (Eq, Show)
+data Event = ReadLine | Write String | WriteBytes BS.ByteString deriving (Eq, Show, Read)
 data Input = Input { inputText :: String, failWrites :: Bool } deriving Show
 data Observation = Observation
   { outcome :: Either R.RuntimeError (), events :: [Event], remaining :: String }
@@ -69,7 +70,7 @@ withBackends action = do
     _ <- command compiler (common ++ includes ++ interpose ++ ["-DMLF_GC_THRESHOLD=32",
       "-c","runtime/mlf_runtime.c","-o",dir </> "runtime.o"])
     _ <- command compiler (common ++ ["-c","test/native_trace.c","-o",dir </> "trace.o"])
-    context <- Backends dir compiler ([optimization] ++ extra ++ gmp)
+    context <- Backends dir compiler ([optimization] ++ extra ++ gmp ++ ["-lm"])
       <$> newIORef Map.empty <*> newIORef 0 <*> newIORef "<unlabelled>" <*> newIORef Map.empty
     action context
   where
@@ -128,7 +129,14 @@ capture context term inputs = do
   pure (outcome observed,events observed)
 
 output :: Observation -> String
-output = concatMap (\event -> case event of Write text -> text; ReadLine -> "") . events
+output = Text.unpack . Text.decodeUtf8 . outputBytes
+
+outputBytes :: Observation -> BS.ByteString
+outputBytes = BS.concat . map (\event -> case event of
+  Write text -> Text.encodeUtf8 (Text.pack text); WriteBytes bytes -> bytes; ReadLine -> BS.empty) . events
+
+bytesEvent :: BS.ByteString -> Event
+bytesEvent bytes = either (const (WriteBytes bytes)) (Write . Text.unpack) (Text.decodeUtf8' bytes)
 
 -- Keep the timeout in the parent: an in-process timer prevents GHC from
 -- diagnosing a blocked recursive thunk as NonTermination. Forking also
@@ -143,7 +151,7 @@ isolated context index action = mask $ \restore -> do
               Left err -> Left (displayException err)
               Right observed -> Right
                 ( either (Left . show) Right (outcome observed)
-                , map (\event -> case event of ReadLine -> Nothing; Write text -> Just text) (events observed)
+                , events observed
                 , remaining observed )
         writeFile file (show reply)
         exitImmediately ExitSuccess
@@ -166,9 +174,9 @@ isolated context index action = mask $ \restore -> do
     Exited ExitSuccess -> pure ()
     _ -> fail ("interpreter process failed: " ++ show status)
   encoded <- readFile file
-  case readMaybe encoded :: Maybe (Either String (Either String (),[Maybe String],String)) of
+  case readMaybe encoded :: Maybe (Either String (Either String (),[Event],String)) of
     Just (Right (result,trace,unused)) -> pure (Observation
-      (either (Left . R.RuntimeError) Right result) (map (maybe ReadLine Write) trace) unused)
+      (either (Left . R.RuntimeError) Right result) trace unused)
     Just (Left err) -> fail ("interpreter worker: " ++ err)
     Nothing -> fail "malformed interpreter observation"
 
@@ -188,6 +196,9 @@ interpreted entry input term = do
                 pure line
         , R.writeText = \text -> do
             modifyIORef' trace (Write text:)
+            when (failWrites input) (ioError (userError "write failed"))
+        , R.writeBytes = \bytes -> do
+            modifyIORef' trace (bytesEvent bytes:)
             when (failWrites input) (ioError (userError "write failed"))
         }
       run = case entry of IOEntry -> R.runTerm; ProgramEntry -> R.runProgram
@@ -226,11 +237,21 @@ native context index entry input term = case emitter term of
     inherited <- filter (\(key,_) -> key `notElem` ["MLF_TEST_TRACE","MLF_TEST_FAIL_WRITE"]) <$> getEnvironment
     let environment = ("MLF_TEST_TRACE",traceFile) :
           [("MLF_TEST_FAIL_WRITE","1") | failWrites input] ++ inherited
-    (status,stdoutText,errors) <- bounded (readCreateProcessWithExitCode
-      (proc executable []) { env = Just environment } (inputText input))
+    let inputFile = traceFile ++ ".stdin"
+        outputFile = traceFile ++ ".stdout"
+        errorFile = traceFile ++ ".stderr"
+    BS.writeFile inputFile (Text.encodeUtf8 (Text.pack (inputText input)))
+    status <- withBinaryFile inputFile ReadMode $ \hin ->
+      withBinaryFile outputFile WriteMode $ \hout ->
+      withBinaryFile errorFile WriteMode $ \herr -> bounded $
+        withCreateProcess (proc executable []) { env = Just environment,
+          std_in = UseHandle hin, std_out = UseHandle hout, std_err = UseHandle herr } $
+          \_ _ _ process -> waitForProcess process
+    stdoutBytes <- BS.readFile outputFile
+    errors <- readFile errorFile
     require (not ("Sanitizer" `isInfixOf` errors || "runtime error:" `isInfixOf` errors)) errors
     (trace,unused) <- readFile traceFile >>= parseTrace
-    require (stdoutText == concat [text | Write text <- trace]) "native stdout and write trace disagree"
+    require (stdoutBytes == outputBytes (Observation (Right ()) trace unused)) "native stdout and write trace disagree"
     result <- case status of
       ExitSuccess -> require (null errors) errors >> pure (Right ())
       ExitFailure 1 -> case stripPrefix "Runtime: " errors of
@@ -248,8 +269,8 @@ parseTrace text = go [] (lines text)
       pure (reverse accumulated,remainingText)
     go accumulated ("R":rest) = go (ReadLine:accumulated) rest
     go accumulated (line:rest) | Just bytes <- stripPrefix "W " line = do
-      value <- decode bytes
-      go (Write value:accumulated) rest
+      value <- bytesEvent . BS.pack <$> hexBytes bytes
+      go (value:accumulated) rest
     go _ _ = fail ("malformed native event trace: " ++ text)
     decode encoded = do
       bytes <- hexBytes encoded

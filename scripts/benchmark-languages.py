@@ -4,6 +4,7 @@
 import argparse
 from datetime import datetime, timezone
 import hashlib
+from functools import lru_cache
 import json
 import math
 import os
@@ -53,6 +54,20 @@ def load_manifest(path=ROOT / "benchmarks/manifest.json"):
 def expected_output(workload, size):
     # Independent mathematical oracle, used only in the driver, never in a
     # measured executable. Also checked against the pinned upstream fixture.
+    if workload["name"] == "pidigits":
+        digits = pi_digits(size)
+        return "\n".join(f"{digits[i:i+10]:<10}\t:{min(i+10,size)}" for i in range(0,size,10)).encode()
+    if workload["name"] == "n-body":
+        return "\n".join(f"{e:.9f}" for e in nbody_energy(size)).encode()
+    if workload["name"] == "spectral-norm":
+        return f"{spectral_norm(size):.9f}".encode()
+    if workload["name"] == "fasta":
+        return fasta_output(size)
+    if workload["name"] == "mandelbrot":
+        return mandelbrot_output(size)
+    if workload["name"] == "fannkuch-redux":
+        checksum, maximum = fannkuch_result(size)
+        return f"{checksum}\nPfannkuchen({size}) = {maximum}".encode()
     if workload["name"] != "binary-trees":
         raise ValueError("No correctness oracle for " + workload["name"])
     maximum = max(6, size)
@@ -64,12 +79,167 @@ def expected_output(workload, size):
     return "\n".join(lines).encode()
 
 
+@lru_cache(maxsize=32)
+def pi_digits(size):
+    # Independent Machin formula oracle, not the measured spigot algorithm.
+    # Thirty guard digits dominate fixed-point truncation for supported sizes.
+    if hasattr(sys, "set_int_max_str_digits"):
+        sys.set_int_max_str_digits(0)
+    scale = 10 ** (size + 30)
+    def atan_inverse(q):
+        power, total, odd, sign = scale // q, 0, 1, 1
+        while power:
+            total += sign * (power // odd)
+            power //= q*q
+            odd += 2
+            sign = -sign
+        return total
+    return str(16*atan_inverse(5) - 4*atan_inverse(239))[:size]
+
+
+@lru_cache(maxsize=32)
+def nbody_energy(steps):
+    # Independent Python scalar reference. Only the driver uses this; none of
+    # the measured programs can read its state or answers. It runs once per
+    # input outside every measured interval, including for the runtime input.
+    solar, year = 4*math.pi*math.pi, 365.24
+    bodies = [
+        [0.,0.,0.,0.,0.,0.,solar],
+        [4.84143144246472090,-1.16032004402742839,-.103622044471123109,
+         .00166007664274403694*year,.00769901118419740425*year,-.0000690460016972063023*year,.000954791938424326609*solar],
+        [8.34336671824457987,4.12479856412430479,-.403523417114321381,
+         -.00276742510726862411*year,.00499852801234917238*year,.0000230417297573763929*year,.000285885980666130812*solar],
+        [12.8943695621391310,-15.1111514016986312,-.223307578892655734,
+         .00296460137564761618*year,.00237847173959480950*year,-.0000296589568540237556*year,.0000436624404335156298*solar],
+        [15.3796971148509165,-25.9193146099879641,.179258772950371181,
+         .00268067772490389322*year,.00162824170038242295*year,-.0000951592254519715870*year,.0000515138902046611451*solar]]
+    pairs = [(a,b) for i,a in enumerate(bodies) for b in bodies[i+1:]]
+    for k in (3,4,5):
+        bodies[0][k] = -sum(b[k]*b[6] for b in bodies)/solar
+    def energy():
+        kinetic = sum(.5*b[6]*sum(v*v for v in b[3:6]) for b in bodies)
+        potential = sum(a[6]*b[6]/math.sqrt(sum((a[k]-b[k])**2 for k in (0,1,2))) for a,b in pairs)
+        return kinetic-potential
+    before = energy()
+    for _ in range(steps):
+        for a,b in pairs:
+            dx,dy,dz = a[0]-b[0],a[1]-b[1],a[2]-b[2]
+            distance = math.sqrt(dx*dx+dy*dy+dz*dz)
+            mag = .01/(distance*distance*distance)
+            for k,delta in ((3,dx),(4,dy),(5,dz)):
+                a[k] -= delta*b[6]*mag
+                b[k] += delta*a[6]*mag
+        for b in bodies:
+            for k in (0,1,2):
+                b[k] += .01*b[k+3]
+    return before,energy()
+
+
+@lru_cache(maxsize=16)
+def fannkuch_result(size):
+    # Factoradic unranking reconstructs each permutation independently. This
+    # deliberately differs from the incremental count-array generators in the
+    # measured programs and checks both parity checksum and maximum flips.
+    factorials = [math.factorial(i) for i in range(size+1)]
+    checksum, maximum = 0,0
+    for rank in range(factorials[size]):
+        permutation, remaining = list(range(1,size+1)),rank
+        for i in range(size-1,0,-1):
+            rotation, remaining = divmod(remaining,factorials[i])
+            permutation[:i+1] = permutation[rotation:i+1] + permutation[:rotation]
+        flips = 0
+        while permutation[0] != 1:
+            end = permutation[0]
+            permutation[:end] = permutation[:end][::-1]
+            flips += 1
+        checksum += flips if rank % 2 == 0 else -flips
+        maximum = max(maximum,flips)
+    return checksum,maximum
+
+
+@lru_cache(maxsize=16)
+def spectral_norm(size):
+    # Materialize an independent dense matrix, then use accurate summation.
+    # Measured programs instead compute entries on demand. Reference storage
+    # is released before timing, and no executable can access this state.
+    matrix = [[1.0 / ((i+j)*(i+j+1)//2+i+1) for j in range(size)] for i in range(size)]
+    def multiply(vector, transpose=False):
+        if transpose:
+            return [math.fsum(matrix[j][i]*vector[j] for j in range(size)) for i in range(size)]
+        return [math.fsum(a*x for a,x in zip(row,vector)) for row in matrix]
+    u = [1.0]*size
+    for _ in range(20):
+        v = u
+        u = multiply(multiply(v), transpose=True)
+    return math.sqrt(math.fsum(a*b for a,b in zip(u,v)) / math.fsum(b*b for b in v))
+
+
+@lru_cache(maxsize=16)
+def fasta_output(size):
+    from fractions import Fraction
+    alu = (b"GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGG"
+           b"TCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGG"
+           b"CGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGC"
+           b"GGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAA")
+    output = bytearray()
+    def record(header, sequence):
+        output.extend(header+b"\n")
+        for i in range(0,len(sequence),60):
+            output.extend(sequence[i:i+60]); output.append(10)
+    record(b">ONE Homo sapiens alu", (alu*((2*size+len(alu)-1)//len(alu)))[:2*size])
+    seed = 42
+    for header, letters, probabilities, count in [
+        (b">TWO IUB ambiguity codes", b"acgtBDHKMNRSVWY", ["0.27","0.12","0.12","0.27"]+["0.02"]*11,3*size),
+        (b">THREE Homo sapiens frequency", b"acgt", ["0.3029549426680","0.1979883004921","0.1975473066391","0.3015094502008"],5*size)]:
+        cumulative, bounds = Fraction(0),[]
+        for p in probabilities:
+            cumulative += Fraction(p)
+            bounds.append((cumulative.numerator*139968,cumulative.denominator))
+        sequence = bytearray(count)
+        for i in range(count):
+            seed = (seed*3877+29573)%139968
+            sequence[i] = next(c for c,(numerator,denominator) in zip(letters,bounds) if seed*denominator < numerator)
+        record(header,sequence)
+    return bytes(output)
+
+
+@lru_cache(maxsize=16)
+def mandelbrot_output(size):
+    # Independent complex-number recurrence, with explicit PBM bit positions.
+    # The measured programs use scalar components and shift accumulators.
+    stride = (size+7)//8
+    pixels = bytearray(stride*size)
+    for y in range(size):
+        for x in range(size):
+            c, z = complex(2.0*x/size-1.5, 2.0*y/size-1.0), 0j
+            for _ in range(50):
+                z = z*z+c
+                if z.real*z.real+z.imag*z.imag > 4.0:
+                    break
+            else:
+                pixels[y*stride+x//8] |= 0x80 >> (x%8)
+    return f"P4\n{size} {size}\n".encode()+pixels
+
+
 def validate_output(workload, size, output):
-    # Whitespace ONLY. Extra/missing tokens, wrong signs and checks all fail.
+    # Integer workloads normalize whitespace ONLY. The official n-body
+    # tolerance is absolute 1e-8; non-finite and missing/extra values fail.
     expected = expected_output(workload, size)
-    if output.split() != expected.split():
-        raise ValueError(f"{workload['name']}({size}) output mismatch:\n"
-                         f"expected: {expected!r}\nactual: {output[:4096]!r}")
+    if workload["name"] in ("n-body", "spectral-norm"):
+        try:
+            actual = [float(token) for token in output.split()]
+        except ValueError:
+            actual = []
+        reference = nbody_energy(size) if workload["name"] == "n-body" else [spectral_norm(size)]
+        if len(actual) == len(reference) and all(math.isfinite(a) and abs(a-b) <= 1e-8 for a,b in zip(actual,reference)):
+            return
+    elif workload["name"] in ("fasta", "mandelbrot"):
+        if output == expected:
+            return
+    elif output.split() == expected.split():
+        return
+    raise ValueError(f"{workload['name']}({size}) output mismatch:\n"
+                     f"expected: {expected[:4096]!r}\nactual: {output[:4096]!r}")
 
 
 def run(command, *, data=b"", cwd=ROOT, env=None, timeout=600, output_file=None):
@@ -159,14 +329,16 @@ def build(workload, language, directory, paths, runtime, gmp, env, timeout):
     ir = directory / "program.ll"
     flags = workload["flags"][language]
     if language == "c":
-        commands = [([paths["clang"], *flags, source, "-lm", "-o", str(binary)], None)]
+        libraries = gmp if language in workload.get("gmp_languages", []) else []
+        commands = [([paths["clang"], *flags, source, *libraries, "-lm", "-o", str(binary)], None)]
     elif language == "rust":
-        commands = [([paths["rustc"], *flags, source, "-o", str(binary)], None)]
+        libraries = ["-Lnative=" + f[2:] for f in gmp if f.startswith("-L")] if language in workload.get("gmp_languages", []) else []
+        commands = [([paths["rustc"], *flags, *libraries, source, "-o", str(binary)], None)]
     elif language == "haskell":
         commands = [([paths["ghc"], *flags, source, "-outputdir", str(directory), "-o", str(binary)], None)]
     else:
         commands = [([paths["emlf"], "--emit-llvm", source], ir),
-                    ([paths["clang"], *flags, str(ir), str(runtime), *gmp, "-o", str(binary)], None)]
+                    ([paths["clang"], *flags, str(ir), str(runtime), *gmp, "-lm", "-o", str(binary)], None)]
     start = time.perf_counter()
     stages = []
     for command, output in commands:
@@ -207,6 +379,24 @@ def ratios(values):
     return {language: value / baseline for language, value in values.items()}
 
 
+def performance_checks(results, targets):
+    """Gate each workload's median ratio, never just a corpus average."""
+    checks = []
+    for row in results:
+        for dimension, limit in targets.items():
+            if limit is None:
+                continue
+            measured = row.get(dimension + "_ratios")
+            if measured is None:
+                raise ValueError(f"Cannot check an unmeasured {dimension} target")
+            ratio = measured["mlf"]
+            if not math.isfinite(ratio) or ratio <= 0:
+                raise ValueError("Performance checks require finite positive ratios")
+            checks.append({"benchmark": row["benchmark"], "dimension": dimension,
+                           "mlf_over_c": ratio, "maximum_ratio": limit, "passed": ratio <= limit})
+    return checks
+
+
 def render(report):
     print("\nMLF cross-language benchmarks (smaller times/ratios are better)")
     for dimension in ("compilation", "runtime"):
@@ -234,6 +424,9 @@ def render(report):
             print(f"{LABELS[language]:<16}{cpu:>18}{rss:>18}{item['executable_bytes'] / 1024:>18.2f}")
     for warning in report["warnings"]:
         print("Measurement note: " + warning)
+    for check in report.get("performance_checks", []):
+        print(f"Target {'PASS' if check['passed'] else 'FAIL'}: {check['benchmark']} "
+              f"{check['dimension']} {check['mlf_over_c']:.3f}x <= {check['maximum_ratio']:g}x C")
     print("\n" + DISCLAIMER)
 
 
@@ -258,12 +451,19 @@ def main(argv=None):
     mode.add_argument("--compile-only", action="store_true")
     mode.add_argument("--runtime-only", action="store_true")
     parser.add_argument("--runs", type=int, default=3, help="samples per language per dimension, at least 2")
-    parser.add_argument("--size", type=int, help="override workload input; binary-trees maximum depth 0..20")
+    parser.add_argument("--size", type=int, help="override one selected workload's input (range in manifest)")
     parser.add_argument("--timeout", type=float, default=600, help="seconds per subprocess")
+    parser.add_argument("--max-compile-ratio", type=float, help="fail if any MLF/C compilation median exceeds this ratio")
+    parser.add_argument("--max-runtime-ratio", type=float, help="fail if any MLF/C runtime median exceeds this ratio")
     parser.add_argument("--output", type=Path, default=ROOT / "bench-results.json")
     args = parser.parse_args(argv)
     if args.runs < 2 or not math.isfinite(args.timeout) or args.timeout <= 0:
         parser.error("--runs must be at least 2; --timeout must be finite and positive")
+    targets = {"compilation": args.max_compile_ratio, "runtime": args.max_runtime_ratio}
+    if any(v is not None and (not math.isfinite(v) or v <= 0) for v in targets.values()):
+        parser.error("Performance ratio limits must be finite and positive")
+    if (args.compile_only and args.max_runtime_ratio is not None) or (args.runtime_only and args.max_compile_ratio is not None):
+        parser.error("Performance limits require measuring the requested dimension")
     report = {"schema_version": 1, "status": "running",
               "recorded_at_utc": datetime.now(timezone.utc).isoformat(), "disclaimer": DISCLAIMER,
               "host": {"os": platform.system(), "release": platform.release(),
@@ -271,9 +471,12 @@ def main(argv=None):
                        "logical_cpus": os.cpu_count(), "python": platform.python_version()},
               "configuration": {"runs": args.runs, "size_override": args.size,
                                 "compile_only": args.compile_only, "runtime_only": args.runtime_only,
-                                "timeout_seconds": args.timeout},
+                                "timeout_seconds": args.timeout, "maximum_mlf_c_ratios": targets},
               "results": [], "warnings": [], "geometric_means": {}, "corpus_compilation": None}
     try:
+        # Invalidate an old success before setup. Even a hard interruption
+        # then leaves a non-success report, never stale green history.
+        atomic_json(args.output, report)
         if sys.platform not in ("darwin", "linux"):
             raise ValueError("Per-process wait4 measurement currently supports macOS and Linux")
         manifest = load_manifest()
@@ -281,11 +484,13 @@ def main(argv=None):
         workloads = [w for w in manifest["workloads"] if w["name"] in names]
         if set(names) != {w["name"] for w in workloads}:
             raise ValueError("Unknown benchmark; available: " + ", ".join(w["name"] for w in manifest["workloads"]))
+        if args.size is not None and len(workloads) != 1:
+            raise ValueError("--size requires exactly one --benchmark selection")
         sizes = {w["name"]: args.size if args.size is not None else w["default_input"] for w in workloads}
         for w in workloads:
             if not w["minimum_input"] <= sizes[w["name"]] <= w["maximum_input"]:
                 raise ValueError(f"{w['name']}: input must be {w['minimum_input']}..{w['maximum_input']}")
-            validate_output(w, 10, (ROOT / w["fixture"]).read_bytes())
+            validate_output(w, w["fixture_input"], (ROOT / w["fixture"]).read_bytes())
         # Prevent inherited runtime tuning from silently changing the comparison.
         env = dict(os.environ, LC_ALL="C", LANG="C", GHCRTS="", GHC_ENVIRONMENT="-")
         report["controlled_environment"] = {k: env[k] for k in ("LC_ALL", "LANG", "GHCRTS", "GHC_ENVIRONMENT")}
@@ -347,7 +552,7 @@ def main(argv=None):
                                 binary, sample = build(workload, language, scratch / name / language / f"sample-{repetition}",
                                                        paths, runtime, gmp, env, args.timeout)
                                 # The just-timed product must itself work; this run is NOT timed as compilation.
-                                sample["post_build_check"] = execute(workload, language, binary, 6, env, args.timeout)
+                                sample["post_build_check"] = execute(workload, language, binary, workload["post_build_input"], env, args.timeout)
                             else:
                                 sample = execute(workload, language, prepared[name, language], sizes[name], env, args.timeout)
                             sample["round"] = repetition + 1
@@ -384,12 +589,20 @@ def main(argv=None):
                              "With one workload this duplicates latency and does not isolate processing throughput."}
             check_integrity(report["input_sha256"])
             report["input_integrity"] = "All recorded source, manifest, harness, compiler and runtime hashes unchanged"
-            report["status"] = "passed"
+            report["performance_checks"] = performance_checks(report["results"], targets)
+            report["status"] = "passed" if all(c["passed"] for c in report["performance_checks"]) else "failed"
+            if report["status"] == "failed":
+                report["error"] = "One or more per-workload MLF/C performance limits were exceeded"
             report["completed_at_utc"] = datetime.now(timezone.utc).isoformat()
         atomic_json(args.output, report)
         render(report)
         print(f"\nRaw samples, commands, provenance and metadata: {args.output.resolve()}")
-        return 0
+        return 0 if report["status"] == "passed" else 1
+    except KeyboardInterrupt:
+        report.update(status="failed", error="Benchmark interrupted")
+        atomic_json(args.output, report)
+        print(f"Benchmark interrupted; failure report: {args.output.resolve()}", file=sys.stderr)
+        return 130
     except (OSError, ValueError, RuntimeError, TimeoutError, KeyError) as error:
         report.update(status="failed", error=str(error))
         atomic_json(args.output, report)

@@ -1,0 +1,37 @@
+-- Sequential unbounded spigot: both extract(3) and extract(4) are evaluated.
+-- Arithmetic is implemented by language primitives, not a foreign pi helper.
+data Rec a = Rec (Rec a -> a);
+let fix : forall a. (a -> a) -> a = \f ->
+  let go = \r -> case r of { Rec next -> f (next r) }
+  in go (Rec go)
+in
+let spaces : Int -> String = fix (\again n ->
+  ifThenElse (eqInt n 0) "" (concatString " " (again (subInt n 1))))
+in
+let digits : Int -> Int -> Int -> Int -> Int -> Int -> String -> IO Unit =
+  fix (\again wanted produced k num acc den row ->
+    ifThenElse (eqInt produced wanted)
+      (ifThenElse (eqInt (remInt produced 10) 0) (return ())
+        (putStrLn (concatString row (concatString (spaces (subInt 10 (remInt produced 10)))
+          (concatString "\t:" (showInt produced))))))
+      (let nextK = addInt k 1 in
+       let twice = addInt (mulInt nextK 2) 1 in
+       let n = mulInt num nextK in
+       let a = mulInt (addInt acc (mulInt num 2)) twice in
+       let d = mulInt den twice in
+       ifThenElse (ltInt a n)
+         (again wanted produced nextK n a d row)
+         (let q = quotInt (addInt (mulInt n 3) a) d in
+          let r = quotInt (addInt (mulInt n 4) a) d in
+          ifThenElse (eqInt q r)
+            (let count = addInt produced 1 in
+             let text = concatString row (showInt q) in
+             do {
+               ifThenElse (eqInt (remInt count 10) 0)
+                 (putStrLn (concatString text (concatString "\t:" (showInt count))))
+                 (return ());
+               again wanted count nextK (mulInt n 10) (mulInt (subInt a (mulInt d q)) 10) d
+                 (ifThenElse (eqInt (remInt count 10) 0) "" text)
+             })
+            (again wanted produced nextK n a d row))))
+in do { input <- getLine; digits (readInt input) 0 0 1 0 1 "" }

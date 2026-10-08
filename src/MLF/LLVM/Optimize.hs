@@ -120,6 +120,7 @@ atom e = case e of
   X.EPrimitive _ -> True
   X.EConstructor _ -> True
   X.EInt _ -> True
+  X.EDouble _ -> True
   X.EBool _ -> True
   _ -> False
 
