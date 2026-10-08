@@ -78,7 +78,10 @@ doubles. The collector marks every boxed integer cell and releases both array
 buffers at reclamation/exit. Managed values retain the 48-byte ABI, so adding
 arrays does not enlarge existing tree nodes. The IO driver can dispatch an
 eligible first-order numeric region that directly executes array effects in
-order, with unboxed Double intermediates and checked indices. Its argument
+order, with unboxed Double intermediates, specialized scalar arguments across
+native recursive calls, and checked indices. Proven nonnegative counters keep
+their range through countdown branches; multiplication/division/remainder have
+checked machine paths with arbitrary-precision fallback. Its public argument
 guard never forces an unknown thunk; unsuccessful guards use the ordinary
 lazy implementation. Each execution of an action runs the region again.
 Collection occurs after the region returns to the driver, not while its

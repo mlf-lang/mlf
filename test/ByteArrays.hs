@@ -50,6 +50,8 @@ byteArrayTests backends =
   , ("bytes: native stores check bounds before byte range", forM_
       [(0,256,"byte value must be between 0 and 255"),
        (0,-1,"byte value must be between 0 and 255"),
+       (0,4611686018427387904,"byte value must be between 0 and 255"),
+       (0,-4611686018427387905,"byte value must be between 0 and 255"),
        (1,256,"array index out of bounds"),
        (4611686018427387904,256,"array index out of bounds")] $ \(index,value,message) -> do
       term <- checked (recursion ++ "let write : ByteArray -> Int -> Int -> Int -> IO Unit = " ++

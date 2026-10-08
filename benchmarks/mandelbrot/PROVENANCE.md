@@ -20,14 +20,18 @@ The shared [BSD license](../LICENSE.BenchmarksGame) applies.
   at one), rounds row storage upward for partial bytes, and frees each row
   after writing it. The scalar `fractal`, `loop_x` and `next_x` functions are
   unchanged. Foreign memory only stores output; all pixel iteration is Haskell.
-- MLF: `mlf/main.emlf` computes each scalar orbit for at most 50 steps,
-  stores its numeric state in a six-element DoubleArray, and packs bits into
-  one reusable ByteArray row. Doubling and adding a bit perform ordinary
-  byte packing; the runtime provides only checked storage and raw slice output.
+- MLF: `mlf/main.emlf` interleaves two independent scalar orbits for at most
+  50 steps, keeping their state in recursive Double arguments. Each escaped
+  lane remains masked while its neighbour finishes. An odd final pixel uses
+  the single-orbit loop. Ordinary multiplication/addition packs one or two bits
+  into a reusable ByteArray row. The runtime provides general arithmetic,
+  checked storage and raw slice output; it contains no Mandelbrot kernel.
 
 All implementations are sequential and calculate every pixel. Rust keeps
-updating escaped lanes until all eight have escaped; the scalar versions
-stop each pixel individually. Rust stores the whole bitmap; Haskell and MLF
+updating escaped lanes until all eight have escaped; MLF does the same for
+pairs. C and Haskell stop each pixel individually. There are no explicit SIMD
+intrinsics, fast-math flags, symmetry or interior-region shortcuts in MLF.
+Rust stores the whole bitmap; Haskell and MLF
 store rows. Rust/Haskell precompute `2/n` for coordinates, while C/MLF divide
 `2*x` and `2*y` by n. These source differences remain visible in the comparison.
 

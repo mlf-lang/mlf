@@ -666,8 +666,10 @@ construction. The compiler still checks graph invariants, unification
 permissions, target typing, and source erasure.
 
 The native backend lowers eligible first-order numeric IO functions to direct,
-bounds-checked array loops with unboxed Double intermediates. A non-forcing
-argument guard preserves the lazy fallback; actions remain repeatable. GMP
+bounds-checked array loops with unboxed Double intermediates and recursive
+arguments. Specialized workers preserve proven integer ranges, while checked
+machine multiplication/division retain GMP fallback. A non-forcing argument
+guard preserves the lazy fallback; actions remain repeatable. GMP
 arithmetic reads immutable operands directly and collection also accounts for
 large-integer limb storage. See [backend design](docs/llvm-backend.txt).
 
