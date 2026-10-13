@@ -286,9 +286,14 @@ forceBinding (CGBinding value forced) = if forced then cgPure value else do
   case previous of
     Just result -> cgPure result
     Nothing -> do
-      result <- call "@mlf_force" (args1 (pointer value))
+      result <- forceValue value
       modify (\state -> withForcedValues (M.insert compareString value result (M.insert compareString result result (forcedValues state))) state)
       cgPure result
+
+forceValue : String -> Build String
+forceValue value = do
+  header <- gets objectHeaderBytes
+  call (if header == 0 then "@mlf.force" else "@mlf_force") (args1 (pointer value))
 
 bindingOperand : CGBinding -> Build String
 bindingOperand (CGBinding value forced) = gets (\state -> L.fromMaybe value (M.lookup compareString value (forcedValues state)))

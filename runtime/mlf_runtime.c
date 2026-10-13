@@ -258,6 +258,17 @@ static int argument_count;
 static char **argument_values;
 
 void mlf_set_args(int32_t argc, char **argv) {
+    /* Generated entry points initialize arguments before any language IO.
+     * Batch byte/line reads share a modest stdio buffer; getline still defines
+     * read boundaries, and every output action keeps its explicit flush.
+     * Do this only once, so an embedding cannot discard buffered input when
+     * updating arguments for another entry point in the same process. */
+    static char input_buffer[65536];
+    static int input_configured;
+    if (!input_configured) {
+        (void)setvbuf(stdin, input_buffer, _IOFBF, sizeof(input_buffer));
+        input_configured = 1;
+    }
     argument_count = argc > 0 ? argc - 1 : 0;
     argument_values = argc > 0 ? argv + 1 : NULL;
 }
@@ -267,7 +278,12 @@ void mlf_set_args(int32_t argc, char **argv) {
  * their arbitrary-precision GMP representation. */
 _Static_assert(sizeof(void *) == 8 && sizeof(long) == 8, "native runtime requires a 64-bit ABI");
 _Static_assert(_Alignof(MlfValue) >= 8, "native tagged pointer alignment");
+_Static_assert(sizeof(Tag) == 4 && INDIRECT == 2 && CLOSURE == 5 &&
+               HOLE < CLOSURE && BUSY < CLOSURE && THUNK < CLOSURE && APPLICATION < CLOSURE,
+               "generated WHNF test tag ABI");
 #ifdef MLF_COMPACT_BDWGC
+_Static_assert(offsetof(MlfValue, tag) == 0 && offsetof(MlfValue, as.indirect) == 8,
+               "compact generated WHNF test offsets");
 _Static_assert(offsetof(MlfValue, as.packed.identity) == 8, "constructor identity ABI");
 _Static_assert(offsetof(MlfValue, as.packed.fields) == 16, "constructor field ABI");
 _Static_assert(offsetof(MlfValue, as.constructor.fields) == 24, "general constructor environment ABI");

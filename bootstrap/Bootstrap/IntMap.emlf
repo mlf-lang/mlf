@@ -111,13 +111,13 @@ fromListWith combine entries = wrap (L.foldlStrict (\tree entry -> case entry of
 fromDistinctAscList : forall a. List (Pair Int a) -> IntMap a
 fromDistinctAscList entries = wrap (M.fromDistinctAscList entries)
 union : forall a. IntMap a -> IntMap a -> IntMap a
-union (IntMap a) (IntMap b) = wrap (M.union L.compareInt a b)
+union (IntMap a) (IntMap b) = wrap (M.foldlWithKeyStrict (\tree key value -> insertTree key value tree) b a)
 unionWith : forall a. (a -> a -> a) -> IntMap a -> IntMap a -> IntMap a
 unionWith combine (IntMap a) (IntMap b) = wrap (M.unionWith L.compareInt combine a b)
 unions : forall a. List (IntMap a) -> IntMap a
 unions trees = L.foldlStrict union empty trees
 difference : forall a b. IntMap a -> IntMap b -> IntMap a
-difference (IntMap a) (IntMap b) = wrap (M.difference L.compareInt a b)
+difference (IntMap a) (IntMap b) = wrap (M.foldlWithKeyStrict (\tree key value -> deleteTree key tree) a b)
 intersection : forall a b. IntMap a -> IntMap b -> IntMap a
 intersection (IntMap a) (IntMap b) = wrap (M.intersection L.compareInt a b)
 intersectionWith : forall a b c. (a -> b -> c) -> IntMap a -> IntMap b -> IntMap c

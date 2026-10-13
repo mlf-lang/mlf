@@ -1,0 +1,1781 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-13T16:58:49.202767+00:00",
+  "description": "Verified stage 3 release: all gates use the exact packaged compiler; both native generated-program layouts pass.",
+  "release_directory": "/Volumes/src/mlf/dist-newstyle/release-2026-10-14",
+  "release_verification_sha256": "fbfd7f76f5b224fd160238eb9805e154cd4d74e3d42ca586ae5e33aa8a7f5951",
+  "release": {
+    "schema_version": 1,
+    "complete": true,
+    "started": 1791907273.204193,
+    "steps": [
+      {
+        "name": "cabal-tests",
+        "command": [
+          "cabal",
+          "test",
+          "-j1",
+          "--test-show-details=direct"
+        ],
+        "started": 1791907273.223805,
+        "log": "cabal-tests.log",
+        "finished": 1791908649.159039,
+        "exit_code": 0,
+        "log_sha256": "98e506d44c442d622184628425aef850db5e63d302b1f935108b119d08a2b21b"
+      },
+      {
+        "name": "bootstrap",
+        "command": [
+          "/opt/homebrew/opt/python@3.14/bin/python3.14",
+          "/Volumes/src/mlf/scripts/bootstrap-compiler.py",
+          "--output",
+          "/Volumes/src/mlf/dist-newstyle/release-2026-10-14/bootstrap"
+        ],
+        "started": 1791908649.160558,
+        "log": "bootstrap.log",
+        "finished": 1791909404.565355,
+        "exit_code": 0,
+        "log_sha256": "60a97a21b51463aed81c88706b77c0387fcf97e20a302685470b8e06e7c96128"
+      },
+      {
+        "name": "backends",
+        "command": [
+          "/opt/homebrew/opt/python@3.14/bin/python3.14",
+          "/Volumes/src/mlf/scripts/bootstrap-backends.py",
+          "--compiler",
+          "/Volumes/src/mlf/dist-newstyle/release-2026-10-14/bootstrap/emlf-stage3",
+          "--abi",
+          "both",
+          "--output",
+          "/Volumes/src/mlf/dist-newstyle/release-2026-10-14/backends"
+        ],
+        "started": 1791909404.566505,
+        "log": "backends.log",
+        "finished": 1791910085.353792,
+        "exit_code": 0,
+        "log_sha256": "7e987f68365aaceb523e416c6df3954270d535d81b842468f4aba01b01a084df"
+      },
+      {
+        "name": "benchmarks",
+        "command": [
+          "cabal",
+          "bench",
+          "compiler-bench",
+          "-j1",
+          "--benchmark-options=--emlf /Volumes/src/mlf/dist-newstyle/release-2026-10-14/bootstrap/emlf-stage3 --runs 5 --max-compile-ratio 5 --max-runtime-ratio 2 --output /Volumes/src/mlf/dist-newstyle/release-2026-10-14/benchmarks.json"
+        ],
+        "started": 1791910085.355107,
+        "log": "benchmarks.log",
+        "finished": 1791910474.586529,
+        "exit_code": 0,
+        "log_sha256": "e6225905ee21fc86217994fc241de599997dbcb0db9ff2da3267615585c922ff"
+      }
+    ],
+    "host": {
+      "system": "Darwin",
+      "machine": "arm64"
+    },
+    "sources": {
+      "app/Main.hs": "991ac6edbe670e27696a807a9bf3d5bbf1c1a4f44d1cee43eedc3a27d33a94df",
+      "bench/Main.hs": "256479c812312b974620b7fe8a7e463fa3d44b8477d6cbab7ec4d3d89c16f2ef",
+      "benchmarks/binary-trees/c/main.c": "3149135fbe1c7fbcca7c38d815f024d46bedf48a9f40611e72ad88c83fc62ad2",
+      "benchmarks/binary-trees/c/upstream.c": "0896dbbe8f2026c48a7f681cae56480b44dff6d114092f36f01474e58603c009",
+      "benchmarks/binary-trees/expected-10.txt": "b7f92c56b5d8aeb0a4d698842d1d87a57b4909865c3c84e5e10313e16663c3cb",
+      "benchmarks/binary-trees/haskell/upstream.hs": "0b6aa7815bfe566c3624771c341d9f33c2e9d306565682c380bb9f7d11ed886f",
+      "benchmarks/binary-trees/mlf/main.emlf": "a9a8c5053d3ea18769da91bf2557c0e943d55766d9d3259b8e685ead88636270",
+      "benchmarks/binary-trees/rust/main.rs": "f5757256cdef36a442424ca39cb12a9a9d618dcb008f77aba4cd772ea97a46e3",
+      "benchmarks/binary-trees/rust/upstream.rs": "c344da05a4bcc7d206528ba3bcbab6e78f09d049e10bf91e0fcceb666d5e99b5",
+      "benchmarks/fannkuch-redux/c/upstream.c": "0240c14bb25b31bbb685cd25314b1a6349319cabbb08158db32e8f335e6ab233",
+      "benchmarks/fannkuch-redux/expected-7.txt": "2dc0a3cd4a547ba69389f97f3b447bd4d487fe6216c3cacd2f9bf8c908dc127f",
+      "benchmarks/fannkuch-redux/haskell/main.hs": "4ff92aa5f7cc1b2b1d46a9c1dc4e6bcd92dd3ba8b79e9360d7211ae61b01f983",
+      "benchmarks/fannkuch-redux/haskell/upstream.hs": "55ab21ffcfd129c387b51d515e843a843a2e5d6186028aa424c61f1c7f949ddc",
+      "benchmarks/fannkuch-redux/mlf/main.emlf": "f349294284c87ff923844475d2d5250f9b0c704cb43efd744342a015ea26cf29",
+      "benchmarks/fannkuch-redux/rust/main.rs": "766b84a9ad1de0af4f01298678733262a5ccd6a10505b21f11402825413e7eb8",
+      "benchmarks/fannkuch-redux/rust/upstream.rs": "5ec7ce9915bd599ac127575c9caa9ef15a8233397975d6e3bf0b3cb6e15c8d6a",
+      "benchmarks/fasta/c/upstream.c": "29ecdd18431bfc65861f9ae537307bf45846e7225d40b28993381f28f005279b",
+      "benchmarks/fasta/expected-1000.txt": "62d1e8d0df7938d2aefda9a37887e0389231ea72c099c29a51afb6edca1bdc73",
+      "benchmarks/fasta/haskell/upstream.hs": "446ea6ff611b1b943d6334e1993cf50121acd4782c7fc6c5f0e6b3e19a81d6ec",
+      "benchmarks/fasta/mlf/main.emlf": "37aed66d57b6eacbe55a610dae2b83940518a1f363a307a72455d45d61817698",
+      "benchmarks/fasta/rust/upstream.rs": "91f6762cae723fadf57c94fa995ce706e1691f2a9b8869bd9ff891b6391a5201",
+      "benchmarks/k-nucleotide/c/main.c": "33e542fe63c851b40aae6d927325efe57d1c9fbd6efa4d2c1027dbe1758cba6f",
+      "benchmarks/k-nucleotide/c/upstream.c": "fe7a12f17707b148d28773924ee5a8a3246592414ac50f1edad821a0ac8ade65",
+      "benchmarks/k-nucleotide/expected-1000.txt": "baa63c46addb89c63e68ea0055952847fbccf450e89997b2b62234c90e66f500",
+      "benchmarks/k-nucleotide/haskell/main.hs": "7e98b9c09e48eb4b3f27b1a2b84f4da446e654c0dea0a92a06ab38aa54cf570e",
+      "benchmarks/k-nucleotide/haskell/upstream.hs": "845aa974415745dda39bded47175498d2d334f2d6f4cac59e48b6eae1ac48fbc",
+      "benchmarks/k-nucleotide/input-1000.txt": "62d1e8d0df7938d2aefda9a37887e0389231ea72c099c29a51afb6edca1bdc73",
+      "benchmarks/k-nucleotide/mlf/main.emlf": "613042a4b8e9e5c4028c4135b6def2a1444b2327f16bea41ab0ca79376f23ea7",
+      "benchmarks/k-nucleotide/rust/main.rs": "cb4811abbe5d367b4cfa1f9e7753093a4b044074479837c8eaff8754e34fb3c0",
+      "benchmarks/k-nucleotide/rust/upstream.rs": "0649ac36c7a0b190c9606cec240604056d393d6cb7b3bb61965efb64925bcdf9",
+      "benchmarks/mandelbrot/c/main.c": "5ebaf745490d20f0082726ba1f1087b8b18b6c9cb604b628ee559482a1606ba3",
+      "benchmarks/mandelbrot/c/upstream.c": "ff0d4b64c72a72fda8d374a963310b2eff9f6c2d48945df883f3380abb90f33c",
+      "benchmarks/mandelbrot/expected-200.pbm": "97610473750700638fc63d13cfa49d339b67c18e7f26b3f9c9acb61e746472d5",
+      "benchmarks/mandelbrot/haskell/main.hs": "47a7b99460af9c18a1a82dfa00089678e259d1ad828e02ddffc4e845c04fb80d",
+      "benchmarks/mandelbrot/haskell/upstream.hs": "e56fdab481003f3e6f612dc55afdcbc724fd259e3e6c35e3698164a6d99f215d",
+      "benchmarks/mandelbrot/mlf/main.emlf": "6aa84697293d90814f64f083ec52be179cc1d321b5211a6da5f141b9f3366136",
+      "benchmarks/mandelbrot/rust/main.rs": "d48811a7a1c54189cde0be9fef200588bb50c20b9de62eaa508d60c2adec6e68",
+      "benchmarks/mandelbrot/rust/upstream.rs": "84cc0a3c0cb887c6e76091300d4afccbbb73de1ee717ce0a13ffde7cf747c5be",
+      "benchmarks/manifest.json": "5b77f64ff0af146fb13b9a7bd3ec6838d63f182c936eabd955158dc9ca932e35",
+      "benchmarks/n-body/c/upstream.c": "a2750e1505f86f3815cc0efbb0c665c9117cdca3ae4ae55bbb3da597858062b2",
+      "benchmarks/n-body/expected-1000.txt": "76de83d6d51a74f82828547423f516e7815cfe8cfea6290a2831aa173f806de7",
+      "benchmarks/n-body/haskell/upstream.hs": "b9ec3360854eea9b5e597bae888854757b5f160a5d35c2227a5e156d8e59aaf4",
+      "benchmarks/n-body/mlf/main.emlf": "cb0f4756f1e16e6c37db79fed2ad905aca428c334e30535b04cfffd71383e79c",
+      "benchmarks/n-body/rust/upstream.rs": "1a5ccd1738a04074695b1c0458803dfd6a59ee7fa8cd5c429ce67475a3005d69",
+      "benchmarks/pidigits/c/main.c": "9b09dff01b8bb0b84f6a248a19285ae26f9618f3d64e4087108b2563923cb181",
+      "benchmarks/pidigits/c/upstream.c": "6360874e2e1bb353136e29a28f93685a1d206615f3665219662fe18ed0c4ba81",
+      "benchmarks/pidigits/expected-30.txt": "dbf95cc20ad23ff1a385d30436f0c63b5ae7f41bb1003cf204f5e4888b74a39c",
+      "benchmarks/pidigits/haskell/upstream.hs": "a61fd2106576157bb0e3b219bb9e8c2927f4d442db9fe72a6483487899000ce0",
+      "benchmarks/pidigits/mlf/main.emlf": "ff663a5b00c83097c64b8792a0f2113d7aff39fc4cae5ebaeb02e773616aa53e",
+      "benchmarks/pidigits/rust/main.rs": "0181c641199da98e2f77ea5f64e28abe4a0d11c53af5175661bdc0fe2b658923",
+      "benchmarks/pidigits/rust/upstream.rs": "600bc8d8351ea1a487b8127f703d03691dd060db063256654d234a1601d98fe8",
+      "benchmarks/reverse-complement/c/main.c": "b4fdef2ea2b77859712c3659e2c9f8105f0335dc443c94e1ad4482061449aecd",
+      "benchmarks/reverse-complement/c/upstream.c": "bb4e05c8357b28829e3d0c5b9d5571b45b919cbb18bca7fb41570855fa89bbf6",
+      "benchmarks/reverse-complement/expected-1000.txt": "549dcdcc7df2685145e6cbdfd682469bd9c12ff1beec93c270f8ba447acd4855",
+      "benchmarks/reverse-complement/haskell/main.hs": "7a87145fa591b2fe72e010681891e93fe4f9f897bcefd8e8aff33610a177b1b1",
+      "benchmarks/reverse-complement/haskell/upstream.hs": "55d39729fc23c6e379af8c2f53f5fde19256e3e82525ec194dffd6ca54635002",
+      "benchmarks/reverse-complement/input-1000.txt": "62d1e8d0df7938d2aefda9a37887e0389231ea72c099c29a51afb6edca1bdc73",
+      "benchmarks/reverse-complement/mlf/main.emlf": "870ff16b72a7b084738ca0fb36d35cf727de9b097e315b361eedae47dee35b1e",
+      "benchmarks/reverse-complement/rust/main.rs": "490bdf5b55f3fd56c35642e596a4a1d6df9f25f036726d7273bc7deb77a13f19",
+      "benchmarks/reverse-complement/rust/upstream.rs": "39d5bbe0a662b862da7e455dcfaa2f8f04bccc9dacddd1e7f19122ec9ef4c231",
+      "benchmarks/spectral-norm/c/upstream.c": "0933bb14371cf8218c7873fd8d6aaddc7b34a4818368b82471ca796704846460",
+      "benchmarks/spectral-norm/expected-100.txt": "a95e11fa07f7b196ef488e73f67afbbbc16cf6a2c6de5f8d54ea49821fe604e6",
+      "benchmarks/spectral-norm/haskell/upstream.hs": "0dc87db364d3e4d7566f33ebc0b1d419e8e7ca78235c5d2161aa3ace49c308e7",
+      "benchmarks/spectral-norm/mlf/main.emlf": "46bc43dcc8dea72e31315149581c8a97cf94ef70ff075971c3e56768093ce68c",
+      "benchmarks/spectral-norm/rust/main.rs": "22447927b50327c260bdc5c4e35ed2993d2ae403004abea8ece2174eaa4f9941",
+      "benchmarks/spectral-norm/rust/upstream.rs": "51a4da9501d1e115145f946b3a902a0e572be10442d8d14c6fd90319bd10ad83",
+      "bootstrap/Bootstrap/Classes.emlf": "613f18dc4f56669953ac756c9ca45adb62d31bb1e7b4fab3bf1befc0dff19ef3",
+      "bootstrap/Bootstrap/Compiler.emlf": "23d2d6e8bf4e03153030f0f0c4d06505322811263fd357fa2ee5b2bf3031bcaa",
+      "bootstrap/Bootstrap/Constraint.emlf": "fd2ccc41e247b0ffc05da83f08dd2c7157df763dd3957871cf4ded6500c077da",
+      "bootstrap/Bootstrap/Data.emlf": "1a798a05dc70440f4076b099adf40dca717752b077edb49e0dcbda78b3e31c4f",
+      "bootstrap/Bootstrap/Desugar.emlf": "d668bfb3dd66693907e72a087abffc6af35beab6e251ee4d1028b15ecb9da6c6",
+      "bootstrap/Bootstrap/Elaborate.emlf": "479ffdbc081928375d1486d047e9a7f6a4ff77ce1a8ba5773dcc3520294c8c79",
+      "bootstrap/Bootstrap/Evidence.emlf": "7e031bf638d709ac84822901cc3436223e2aaf0ec76aad46beb8ec2952c6d14d",
+      "bootstrap/Bootstrap/Fresh.emlf": "b6af7da1aceb0e81b68ee6a1100616b71f6558fa8f551de62dbddecc4d7483a0",
+      "bootstrap/Bootstrap/Graph/Solver.emlf": "c94debcd152d8ee1c0a6a6bb7bce2d375ed2a37c4f5456463846bb5918eeb630",
+      "bootstrap/Bootstrap/Graph.emlf": "b541d79da0f7c957e0389e426bb9279a42630b362e99b8fd4c54ad057ec31901",
+      "bootstrap/Bootstrap/IntMap.emlf": "a5cce880a0cac66d07c9b4e30e981766b80da8e5e4e6b311f235c03997d14dfa",
+      "bootstrap/Bootstrap/IntSet.emlf": "519784adfb1be285f1f056f1e93a25a68e13db7ad37e9852a6ddb18dff815a82",
+      "bootstrap/Bootstrap/Kind.emlf": "4195e17517b2eb3a6b12c0c96112b1b5b6d1119ef3e9f1ba0a1ecf043c831772",
+      "bootstrap/Bootstrap/Kinding.emlf": "517aec41c9260a6a463a3042717d589b97df175670ada755fd45fcdbc6f0d36c",
+      "bootstrap/Bootstrap/LLVM/Analysis.emlf": "7d6f03ac5e09110b11e540a71856ac269c449772350b6527d02bd2b47ffbcf6d",
+      "bootstrap/Bootstrap/LLVM/Build.emlf": "9a635d1ccdd0857eafb7b87825d234ed649b7c3728c83ea0a3c731323cf6c728",
+      "bootstrap/Bootstrap/LLVM/Codegen.emlf": "72b8ac720bfeffad2b9e7c53419f5de55fcb597dbcb4d15acc88dffcaef14597",
+      "bootstrap/Bootstrap/LLVM/Kernel.emlf": "fa7a94be851dfc285786712060fed906bdf81270552f870c066d5303c580e434",
+      "bootstrap/Bootstrap/LLVM/Native.emlf": "6138103c4bacbbbce4ae65aadd942380dce54c376b9062429e63e79c20e6f3bc",
+      "bootstrap/Bootstrap/LLVM/Optimize.emlf": "ff8b3ea2824d4456081c1f77090627a70c2703064928367a8378635f2ef03519",
+      "bootstrap/Bootstrap/LLVM/StrictFields.emlf": "bee5f7df5e8f7cb592342e51a42f1cd6c63f9024082b56dd76c347196af1e1b3",
+      "bootstrap/Bootstrap/LLVM.emlf": "eecd7f70b179d35d5265de4ea673b5125a334f8bddaf01ed38ff70906066892d",
+      "bootstrap/Bootstrap/Layout.emlf": "7eb281a16bac3adb35ff15dbfaf0150e5df7b0d4af8f046cbb6362a520f329e6",
+      "bootstrap/Bootstrap/Lexer.emlf": "702c67d0d3377ddc438b242762e1505945b91a959c94c737e117f0bafcee4161",
+      "bootstrap/Bootstrap/Map.emlf": "b7d5921dbae083f227e4562a257efaaac2f1b7e6f270073857c8ba43b674e08a",
+      "bootstrap/Bootstrap/Module.emlf": "079deb1f792e5a9ee15fdb741bf773495966b64bf633bbd187e3af745f8c5230",
+      "bootstrap/Bootstrap/Parsec.emlf": "ffc64213d5baf649aa40ccab44521af79a4aaf84cb268bd87cd70c2873f1500e",
+      "bootstrap/Bootstrap/Parser.emlf": "28a093dca7a7f86a1a14a8579405e7cfae3401e27bf214abdf31a87818fd484d",
+      "bootstrap/Bootstrap/Prelude.emlf": "e4908ab88f9cc3350e09ca09196db60abdfabb035055ff0ceff9a10a732c21d5",
+      "bootstrap/Bootstrap/Primitive.emlf": "1922e41a3935d7d87483bfccd87529b573f77e996e38ce3349117f91d0baeef7",
+      "bootstrap/Bootstrap/Runtime.emlf": "db6d959430c33ce1fde5192a5dfb596ddcb83132d115f10bf05d9b26e5d51ba5",
+      "bootstrap/Bootstrap/ST.emlf": "657c2b7f3958a8b14ed7a336908689f951480b45ff50059b242cfe3f3df7d7b0",
+      "bootstrap/Bootstrap/Set.emlf": "bac505cf121011b0b325d5ea59d1bd8c2abd919a8158516540d707a813abbc77",
+      "bootstrap/Bootstrap/SourceEquality.emlf": "5fc11a57d42b85d7776ff76dee9872a7264ff7f920121833f221c277ec37f4af",
+      "bootstrap/Bootstrap/Std.emlf": "50c455982728484d3e3cc0359f4314f5bfeef0706e051701979fd529779428f7",
+      "bootstrap/Bootstrap/Surface.emlf": "f8d4f9abd96bec1582dcf21b30e8500677a448637854a25e7fc80b7a762ac437",
+      "bootstrap/Bootstrap/Types.emlf": "5a790419e00d4825ffbc5f06cca4b8e64813d8dabd69d34d4fdde926e013e1dd",
+      "bootstrap/Bootstrap/Unicode.emlf": "fdde8c09d3cd1bdddcbc6a3c65c6ab7668c8d60b6795d9a0c106a098c1b647b4",
+      "bootstrap/Bootstrap/X/Check.emlf": "b20e256bdc4d25ddfc3c76dc0c91083957133c3cf973de5a8244e40285defee6",
+      "bootstrap/Bootstrap/X/Parser.emlf": "3ea0d9cb15c9d08c2ca76c0c1f5d903d34978b6476075c0ebfa9655aa8841f03",
+      "bootstrap/Bootstrap/X/Pretty.emlf": "a7c23152c6297315e4ef0bf1dbba9685688cb68010c0194fa544c2c39f48f0e4",
+      "bootstrap/Bootstrap/X/Syntax.emlf": "40ef760efb420654dcc7f5c05334eafea81f21d0bc269f8e0d1de9ee5c5eda70",
+      "bootstrap/Bootstrap/X/Type.emlf": "ac916c2902d99edfce443f96930cdc52bdf341eff3007c38d203450400b9446c",
+      "bootstrap/CheckTarget.hs": "636aedb1da284ad8b2da962e52836585bc4a0e41931fd76fa138432e90f42a83",
+      "bootstrap/ExportCorpus.hs": "5e615a1f131f6c0bc5a5a33eea9e06254d2e09675f6f24f2367793e2c799dae0",
+      "bootstrap/LLVMDriver.emlf": "d04bd38721059978607996a92aef2347962ee8b4e5e071dd8e18b41076bc03fe",
+      "bootstrap/LanguageParity.hs": "d4e6d91392e2728ebcf2a471f7679d847e70372bc369e635f83e8147edc436d8",
+      "bootstrap/Main.emlf": "c76a243eb120b779987f29aa737d5780fae7a03b66095a0fc5f79aa3d7ca7aa6",
+      "bootstrap/RuntimeDriver.emlf": "ba943012e7f1d369bb3122c5098672ac2682263e76536001665dd7be89ab3990",
+      "bootstrap/generate-unicode.hs": "6dbcb84d77827206788fb764d9838f18f257dbc442ab2d80490ae753675b6d7f",
+      "bootstrap/tests/ConstructorProjection.emlf": "c83229426f6d79c8a7e272d784a18051cc27a70debee78866061559bd4936184",
+      "bootstrap/tests/ConstructorProjection.expected": "6fd00c7c9496496f88dc3315a04afe4985519ad969f19ec794aa04b2c499a374",
+      "bootstrap/tests/EmbeddingPruning.emlf": "dc3fca089316752a726001b989c9589e662729c142fdeffd1d75bbd99a7c7bf9",
+      "bootstrap/tests/EmbeddingPruning.expected": "8bea4d3cddc7c240458bb2563773f79969e1f0fc55f1f7a8ef628265bc616603",
+      "bootstrap/tests/EmbeddingPruningReference.hs": "3cf5ad6a6207b6a066ef4532fccae5b69e1e5fb55ba06f6c1fb4ef58b700926c",
+      "bootstrap/tests/ForceReuse.emlf": "531afe40bd7fe51c29980edc835d28da5122d19269eb32e0d2c3de0b19ebda8a",
+      "bootstrap/tests/ForceReuse.expected": "8a738e1643ec8699897158760c6f7d8118b2df68ec69709c1a634f9bc74decf4",
+      "bootstrap/tests/GCDefaults.c": "2dd0812b42ce8f5f7fa0a16d7c83508c575c83533a60090ecd8a0533d89072b8",
+      "bootstrap/tests/GCSpine.c": "74c154443bb4244f03097997756cb8cfcfb0065d6ac39ae83604823bca80fcf8",
+      "bootstrap/tests/GraphConformance.emlf": "86f85d0ded341b6cb7908b58477a03a59c2e7d8e46286ebb88b227a702a54943",
+      "bootstrap/tests/GraphConformance.expected": "c76858cc19806b8e9f866419978a86c19546bfaa21a29b8b6c5a87ca81d93c4e",
+      "bootstrap/tests/GraphDense.emlf": "ce828f6d6c003d0c914da90a3b168b3ba692fe51e3472c794f73d629938e4448",
+      "bootstrap/tests/GraphDense.expected": "e5e4aa6c8107d032e2162d3802fe873d79dc6018d98fc1b9badcbe215295aea5",
+      "bootstrap/tests/GraphDenseProbe.emlf": "c4c3c85eb2546d3a2cdcf21322e577106ac49198317a8e3ddd2fcfe906744e6f",
+      "bootstrap/tests/GraphDenseReference.hs": "d17f1f8d7a0fa91c8a3e3e7bf9af764165899c726baec5bef5d41ad93874e947",
+      "bootstrap/tests/GraphReference.hs": "8556cf8a4d00da0d93779c128e15cb5c650d8b66c870220f526cb6a5c6178309",
+      "bootstrap/tests/GraphScopes.emlf": "b0314b23c47a931edc10ceb0d54f7e529951f8b9f9bfe750a55b818d71d10f21",
+      "bootstrap/tests/GraphScopes.expected": "4165435c76f5da9a8fd10820714c737261c33e2c458bc350b22d1e134b144dfc",
+      "bootstrap/tests/GraphScopesReference.hs": "aa836ccd8bed59d62f54c3f319d58a809fa56270077643f610ea9e475de23e96",
+      "bootstrap/tests/GraphSmoke.emlf": "ef099955729cd0ed64966a503e06446d24129750b4315d7ced82a87832fc2f10",
+      "bootstrap/tests/GraphStack.emlf": "05d34749539cb8f58a3a2109792efdb370700238ff625eef56981b0219983874",
+      "bootstrap/tests/GraphStack.expected": "06e3c282a151ccc1826c46e72d7d8145b524df917d9fc2b4d7ff1d8361a581a2",
+      "bootstrap/tests/InferenceConformance.emlf": "fb62b18cdf0fad8e878643ca354d583b9a0b740a7263d72c359ffb2d522164d2",
+      "bootstrap/tests/InferenceConformance.expected": "f77af8c3e8aa02861ba20f1edc37b79f3c6e9e3c37924ffd48add30d7b70940f",
+      "bootstrap/tests/InferenceReference.hs": "6236b655042b98395eb04bdd8494b99d7a69292f8d7d97c47a48426a0e4c25ad",
+      "bootstrap/tests/IntegerContainers.emlf": "0e41282d32f44ba950789708d864d6d0dc14530d2bf9a81255036906858c9ea7",
+      "bootstrap/tests/IntegerContainers.expected": "232c79977b43e551a948a5ddf851dfb28a258d1f6d081cb5201dee37fd5a7fcb",
+      "bootstrap/tests/LLVMBuild.emlf": "cadd61c0e94a3d3c75ec52c17bf840be186c5aac0c960eeeab604b01598533d5",
+      "bootstrap/tests/LLVMBuild.expected": "52b36de599764b55b933980fe837c909717eb458a79a93c4289e1f74b4666937",
+      "bootstrap/tests/LexerCounters.emlf": "2d562a64d74c7e0f9be88c9f73ddf7b403ca978c91b6527a308f7b4fb9b552f0",
+      "bootstrap/tests/LexerCounters.expected": "edf79b56db2b7eb7f5bea1b67461600faae2864397da01e2188253e456d5fca9",
+      "bootstrap/tests/MapFolds.emlf": "90a1471cec114224a04d0cfc54e010ec1704f52494a2d855c268372a5f549098",
+      "bootstrap/tests/MapFolds.expected": "94ac0f4b5234d402c30fa7a5177d2fa1171cbffda06f039c7e4b58261e926e98",
+      "bootstrap/tests/OptimizerQueries.emlf": "3f7e11a679bb53613c8fe27ca2e4b83a9c9338a8f8d1603fe6f731ac88700e58",
+      "bootstrap/tests/OptimizerQueries.expected": "476b9595283a4c138e28657433d7c2436ae37905e93fcbc772eec794981d619e",
+      "bootstrap/tests/OrderedTraversal.emlf": "d8cb8e6ee8ad681f01a53b862a730f8129ced313abc2fb04a5c50589bfd51320",
+      "bootstrap/tests/OrderedTraversal.expected": "2b1980eaa1f1d7f8ce1fe63b46fb7605eee5003e9f8c8f68ab4938716d2ecbdb",
+      "bootstrap/tests/OrderedTraversalReference.hs": "1166b9e5d2c38fd37a48bf5fc11a208aebdc6be660574e793106b503ab676df1",
+      "bootstrap/tests/PhaseProbe.emlf": "7d1c5186c10279a9dff66903c2bc9ca6a6ad092de73ef113911b0bf379304aa6",
+      "bootstrap/tests/PrimitiveMetadata.emlf": "c161d3ce921df72e7f81acc00da8afbb81092c5d2640acd1590a0c636a50b2fd",
+      "bootstrap/tests/RuntimeCases.emlf": "9f79ba21fcff9161c80f4939ad74d359bcda4a0e5cd27c516d0252f3fe35a1fa",
+      "bootstrap/tests/RuntimeCases.expected": "42f1078d76cae2ace89233b50d3dedb72920603e132542452784e91e4f6bb52f",
+      "bootstrap/tests/RuntimeSmoke.emlf": "ac612567558a34fd255f848b1b51cacf0dd4ecc697315b3181e413c4fc259c1a",
+      "bootstrap/tests/RuntimeSmoke.expected": "a6755593e04ae363d138af2ec2db5c5e8bfb24891e81a55bc678594dd45a9a04",
+      "bootstrap/tests/SolverReuse.emlf": "d640cf0769f80f7a0a8e2e4386a8e2d40af58080b6947c67d97bf5b81bbd9fcd",
+      "bootstrap/tests/SolverReuse.expected": "935075d9dab434dd4bc8e9f005208730ec47c78295198358224a3bf6edcbffb1",
+      "bootstrap/tests/StateRuntime.emlf": "dc07e3f2594eeaf7e3b5f1fac15184132158ab7e8144d63168112c60e98e187f",
+      "bootstrap/tests/StateRuntime.expected": "89efe84cbf7bf973862d0ba6deb13a02216df9fbb6f7a67c23e78123055a101a",
+      "bootstrap/tests/StateTypes.emlf": "383d8c20655254dd655ce70cd7cc74661522c46cfc1df62602cf59db4bf59fa0",
+      "bootstrap/tests/StateTypes.expected": "28055bd5b2a90e3cd0b06a1bdf945bb2c7005182ec7999b9358442d098caba95",
+      "bootstrap/tests/StrictFields.emlf": "18c4dc8ea3a89c8a330d41ce0b3ea5c206e20ac38d62ec881f622dc35b2e0c66",
+      "bootstrap/tests/StrictFields.expected": "1a252402972f6057fa53cc172b52b9ffca698e18311facd0f3b06ecaaef79e17",
+      "bootstrap/tests/Target.emlf": "d7c78b8cea49dd219f8fc92a43ae8be5a56a89fa10bea4631bc9b8beb9914e00",
+      "bootstrap/tests/Target.expected": "fc17bf2377d534c127996712284a61cff132724c9d3d28658b4fa8c78d9147d0",
+      "bootstrap/tests/TypeCache.emlf": "d6ff8e1afef0db13ebb0429c858f763b084d922daec0514994c5fffe2719d3d3",
+      "bootstrap/tests/TypeCache.expected": "002492491ed3537fab7a1dfcf72a3bd0834d23e59053ad081f657a41c7d38565",
+      "bootstrap/tests/classes-stage0.emlf": "b81c56da1ade9ca4f097ee972bd553a1723f336d1870dcc8c4c414d3ac8de23f",
+      "bootstrap/tests/foundation.emlf": "afb60cd83d96174ebbe3e2c20d2e8fd232dd208ebfc7b28d006bfbae15ee0bd9",
+      "bootstrap/tests/foundation.expected": "a9d20fae58d507d19abeccb35c7f0bbdc5ec065971c6c23dafdc9389eea9a5b2",
+      "bootstrap/tests/frontend-stage0.emlf": "34d9a97cb89e7b12d49a9774841d3ee166eabce08b456261620c6a6aa5c64415",
+      "bootstrap/tests/frontend.emlf": "3daa8a62aaf1f036b8549c984f4b8f6f957732db99be02ef6e449fdd1f2f7391",
+      "bootstrap/tests/frontend.expected": "de811ef0303c2702bf32bb362b2c5de613c6422e8e7eb6f33c02f8028ce20340",
+      "bootstrap/tests/parsec-stage0.emlf": "64d2b8819f7087968b15e89a33922d35b842ac1ce9970dc6aad90c3449c94777",
+      "bootstrap/tests/parser-corpus.emlf": "3240b6a72a9a549cf95cccec3edbabf0701f26fb5b2dd53ab171b45b71e63cb9",
+      "bootstrap/tests/prelude.emlf": "ddfc04ae6f168be36e41ae501a8304dde9462e3485fd1bec9b19ecdfd8cbd87e",
+      "bootstrap/tests/prelude.expected": "e9abd456cdabaf2e19da542cf6fb52d459bcd23cd7647c4248039d806b29177d",
+      "cabal.project": "abb985acfbee56f0efaf9915db57c75727db7c9efc6c6fcf1a008ebad3b1d6b7",
+      "examples/choose-id.emlf": "b9fe3a9d93bf8804b61008652746a18c1ed45e6aced1154455779f24e159ff22",
+      "examples/contextual-instance.emlf": "fc5e591fbccd1d40ccbb12672ce9328458c2b4fff1ee6ebb179d1aa56717a9d3",
+      "examples/identity.emlf": "21fad8a972ac11e07ef775f4bb39963d11a5ddadb2608fc0490b0b4c8a8900fb",
+      "examples/impredicative.emlf": "a64c3b7e59c1b18e2c8b24300abc4efb3d3fc515877e6c5dce8f02bcf10ea896",
+      "examples/io-hello.emlf": "1087831711ede49cfffdf5443b24f065ee4e9e8f558eab614cb6f6007ac31a67",
+      "examples/let-polymorphism.emlf": "18dc317faadd6c7a9be6582525a6b4429c9f7588499004040155e1370248b10d",
+      "examples/maybe.emlf": "45bb7f01bac1e30675640929d1b86276cf86e648eecc356386c1bc6f2933b5b8",
+      "examples/modules/Geometry/Point.emlf": "0b1a66713eaf55c5be273a1b025ff8a36d100ddb598df1d07010bf7a08e60803",
+      "examples/modules/Main.emlf": "83c1cd0f4b46f22e5bc3765b148587e387f904421b30dd625dde5e9b59aabb76",
+      "examples/monad-io.emlf": "11a336564b485868368dc26afd59257ba252be9c6b0d83c8b6234249c177d040",
+      "examples/monad-maybe.emlf": "7e4cf5523802b4dbced501540cb1a98fbc0389e5686e52e735949c5548a5b410",
+      "examples/monad-state-do.emlf": "2baebb63cc1e4723fa32696d6a6d5c92414028e376c410c46c255b1ba209b66a",
+      "examples/multiparameter.emlf": "506ce1d6a6fb6a4f0c0a7ae3fbcd13279db4a146f70deb184d860f29adb32a27",
+      "examples/partial-annotation.emlf": "fc295fa4c5bc89f61b2ea477cdf31469ae52154a0ab1b13fa966320d5dd987bc",
+      "examples/polymorphic-data.emlf": "760223d14a74df4c2e4dcd0b9923f448b1c48bac4abaae23d63bfe3d28721413",
+      "examples/recursive-data.emlf": "b034808a28a5ff60c3a2200e89541efb36b56e6d9da4234b02dbc771d1ef982c",
+      "examples/self-application.emlf": "4c17ee38e3a0b352f258b318afac80ccdff902ad078650b6c814713c05202617",
+      "examples/snake.emlf": "7c3ba6ecac399921f19a878639b23b4720cd6f1b228c552fabe4cbd3f2a211e1",
+      "mlf.cabal": "f972a7f05ecf5676c22b85985713b568e2579179565743f865da272774a2b332",
+      "runtime/THIRD_PARTY.md": "29cc01fba0f3d71baa3dcbec9087771fb6f3af865159fd1448f581d26b89ba9d",
+      "runtime/khash.h": "4582c7fd4b98f61339ce677bb1daa7a45a53075b112a494a335525c4bda72074",
+      "runtime/mlf_runtime.c": "907893cb216c1cd596d92a3707488d7dd121657f5f0629ab54b737b5f383fbe5",
+      "runtime/mlf_runtime.h": "21254da67997079b785702bffdfb67dfe87536468960ec3c50bd09aa71704fcc",
+      "scripts/benchmark-compiler.py": "1ae49d2be82684f2e15ec7060f8b0351d32398a0cdb0313c552ebe553459b1f2",
+      "scripts/benchmark-languages.py": "5a9a093d9c80c0ea38ec80beb1e9c3161d0ed76afe4fff23b6c3b7f06865f1e1",
+      "scripts/benchmark-snake.py": "c6c8155a91a134e12720f435528cdd1c8e5ee424d862f713b0a76b98fd17cb98",
+      "scripts/bootstrap-backends.py": "7d8b440882f8fcd5dcbaf3491a7a1cbd75715fea38e35f5a4addb7d2f9e6773d",
+      "scripts/bootstrap-compiler.py": "4e62527aa31b11ef149882d1b07156d91da240c494498bb2afd2876916fac9a0",
+      "scripts/bootstrap-gc.py": "736c3ab4ab0ebb274cbea1d9bd84d845278101257bbff80b4a406be464185e82",
+      "scripts/compile_native.py": "a830f290d5abbc1add4a0a0bc63ceaf8b1b94ad9788fffa731a352b4d7646c68",
+      "scripts/compiler_process.py": "81e3e6600ba4d6c91cf109c638ae1d38c1ae014763e9465b2328cdded502ff0e",
+      "scripts/release.py": "de8e853b448fa8cfff1ef1bcd97b8d7376381ac383d835226deafe7d5118b706",
+      "scripts/runtime_st_validation.py": "e52cdf21815d53a1846314f37334a12b61a4cda2eedb76df46f504e158511813",
+      "src/MLF/Classes.hs": "d19ffe5dce923ce23890a99c1b744d7e5539d88fed2be93148f71872a967994b",
+      "src/MLF/Compiler.hs": "19e82ccc149c1b7a977b5024edc3929705c16e64ed3cb05e71aa800b099ec164",
+      "src/MLF/Constraint.hs": "94f757a6619f2f860e314b8c8f46f15e0a5c743593cc57a5e51c958769ac2cc6",
+      "src/MLF/Data/Parser.hs": "f8bcb819c612ce6dc745233ccef0108b0b735c9fbe2b099bc23cf3646dac7a14",
+      "src/MLF/Data.hs": "f66abdf5f899f255bf7d127a716c9c5cae2981141c5002867804013f2d8c12dc",
+      "src/MLF/Desugar.hs": "8e96a8253dee04c6b980a9ab21cd69b7ab33a8bb23c12876d1d72fe65449c8a4",
+      "src/MLF/Elaborate.hs": "ed6b89f7563721373bc4f5cdfb0bf89c902be9810043645865d35d1b0a0e6776",
+      "src/MLF/Evidence.hs": "898ee8cd42348da67179f9d02a5c0a2f2e57800b1a63f45dc6a2dd0d62b08d41",
+      "src/MLF/Graph/Solver.hs": "2ceb267bca7c2202b3f50d706ff14e0084fc4b590022a9cafd1785fce69c6f23",
+      "src/MLF/Graph.hs": "6456fc83fdcf1cc2fd3365c1c40d2f608d3a34f16b106587d817973cb9b93d51",
+      "src/MLF/Kind.hs": "d6eec39e54a8c38c6f62635974385e7afdd018055c247f8ab8e3fa0e1d992d3b",
+      "src/MLF/Kinding.hs": "93ae79fd258a0e8289fa5fcbd8edd1ea72b5869545ed06e38f47900ffe6419c7",
+      "src/MLF/LLVM/Analysis.hs": "e43fa8f500626066180c983a9d11cfff1c281a4eda51ed06b69ec5f2f990e64e",
+      "src/MLF/LLVM/Codegen.hs": "cccbd60913202985792b882bc178fdc69221e63090cf9a7a76269915a50f2799",
+      "src/MLF/LLVM/Kernel.hs": "bedbfddb3bc571509ed1f3950a871fa6b324c21e699b82a7048a163324980cda",
+      "src/MLF/LLVM/Optimize.hs": "0e5f0d2f8b35cab7f80c0aefcd2cd066071fa7f63884c301a492a79babcb9056",
+      "src/MLF/LLVM/StrictFields.hs": "668aa2061a7e3799010b8ac407a7260ddbe8a2c501cf4a237df386d4cbc117ac",
+      "src/MLF/LLVM.hs": "6324e4c99296bb964b0542e82bcc10e7b5bce4f698598541354a17e8fd92f481",
+      "src/MLF/Layout.hs": "eec74eec6c241760e63b8cb331ba662e50b292f9e774394a3292e776649c0c6b",
+      "src/MLF/Module/Syntax.hs": "9fed594b6c2b5cdb913672b4db1b17d7d420a632eaf4d2b3a9753926bc817298",
+      "src/MLF/Module.hs": "1e3bd857c35ee0a335fd69966c8d2a3888625dc95e853aa9d9547ea43ca9ee16",
+      "src/MLF/Parser.hs": "a48af42261f447e101f6925787bcf05e5ad9a8771cc01100f9b35bbb759c0648",
+      "src/MLF/Prelude.hs": "2ea7635056e36d7fe1102adf592984efb6e3218ece8e5c6f43ff5bdc91ec5970",
+      "src/MLF/Primitive.hs": "6ffcd3de18f7dabe59e5f10e894d266b01bd4d54f82f554b69e2b195538afb8c",
+      "src/MLF/Runtime.hs": "ef5c4a44f65820878ee57d458f3299ff61f9720abfe1024126dea2c6a2242c6c",
+      "src/MLF/Surface.hs": "b1ba74dffa7139c02f92cbec08e928fec3953c376fde89b61240484c54c1beab",
+      "src/MLF/Syntax.hs": "81441237f6708d3749ff7c1d42e01c0b063c1eb796118cc281e702cc309cb9a9",
+      "src/MLF/X/Check.hs": "802eab4fba00135bcbcbc7c31845538a87fd67d52d9d845334893d2ab7204922",
+      "src/MLF/X/Parser.hs": "8a33271c0bd453af8e76f8781a24b368fcf99e98a9e70d4bac5bfda4416f9216",
+      "src/MLF/X/Pretty.hs": "b7b22a923d4b138bc59c990ede2bbe23ff6e02d9a30d9bcddcf7393e0dc5a2c2",
+      "src/MLF/X/Syntax.hs": "050a21bb876a344f35be5d520451229124bb8f4ca89de21e9ec0b03cb6e5212e",
+      "src/MLF/X/Type.hs": "66f2c899b846439e94b5dc7e70757ca75d14d655e50b7910ad20e2572ebe681c",
+      "test/BackendCases.hs": "3cde1bff4949f8565a8691166af5299cb0e28e2aeab8c847af42add1cd019c39",
+      "test/BackendMain.hs": "a598f8d733d71ce98cfde70097fea56a12fce2dd41012e8d32618e0018301927",
+      "test/Backends.hs": "1268a7397aeae1d032cfd47e5d1b91204ddcbfdcc345d1a7743be1dd5efa54f8",
+      "test/BenchmarkHarnessMain.hs": "d037423521f139ec3ef48a10b75a1e11bb65b295e5f5ae9c760d5f86a0b8a976",
+      "test/BoolConditions.hs": "6aa03c5cbcfbaaa0356274d7f01cca4988fddf4fe2fcb35f4837d364afe50ef1",
+      "test/BootstrapPortMain.hs": "35dd7cff7de908b5933e81be36e925476662a067f5a68d64bc2d55d0ba2dc1e4",
+      "test/BootstrapPrimitives.hs": "8a049f5a254de27811c88d9ee6b5d92a5fc3e238b34c0b1c264b4d0fb923f405",
+      "test/ByteArrays.hs": "b43812f999d8d273a79eacb1588796401a616eeadd5d5b59039adbe8693d5397",
+      "test/Computations.hs": "20bad74bf600fe6cab1826ffdfb1b7c540bbab41b406f90e46c2f41cf8558207",
+      "test/ConstructorProjection.hs": "da901313853248b7e759f3fc8aaa4c083a715a9adb641a1ad31adcccc4a79c5b",
+      "test/DNA.hs": "76826075804fd57f38ddebf8f6093fde6a810d83fdf4cb0284125ae64e3ba00d",
+      "test/Datatypes.hs": "7d09627717ef652eadd1a88beb9a19b656f36e912eca3babdbd32f8ea5e6e72a",
+      "test/DoNotation.hs": "c2d400716e0559fe869bcdc43b3c1e11b268782bcdad274cd8265a07ae47a098",
+      "test/EmbeddingPruning.hs": "6cb508a392aaf61b1cfc69e8f779242d4a680714799d48ac0d9d968bac7bfc86",
+      "test/EnvironmentAccess.hs": "d9c6fb53579348220d27e716f2a4676da657546c51c59dbf9cd0b6bf0599689f",
+      "test/Figure12.hs": "a8a9861c917510763816009e0ac59af1f237185fa824ce556153b156fb1edb0c",
+      "test/Figure12Main.hs": "270b2a6ffb527076e48bf34850ce907f71bc5ea1332f4c836b8dd32310af5423",
+      "test/ForceReuse.hs": "5fe1d6aa368f771c4d83c7923e2d1e78b8040fa86eaac27059a361b537d4196d",
+      "test/GraphSolver.hs": "8fb8a905d5d1bc3f4911a7c8326e185d9f144b4af12a05ccbbb9bc55b23311df",
+      "test/GraphUnification.hs": "dbfe9dd4ac0fdb7120b8bd9f397ef010e842797aa12f8893eb328e971b6c358f",
+      "test/GraphUnificationReference.hs": "73b71ace8e41eb2ec13d2d27be2b3ad81b9ec85cb2cff5d518511c7ddd92455b",
+      "test/GraphValidation.hs": "d48a10d5d05b1ef12dc42abc655df4fe1016a1aa3b92877b38f58288b4720864",
+      "test/HigherOrderSpecialization.hs": "a593fc55ffb9af479f47f1e094702cf3359cb2db09e042ab1ec6c02eaed324fd",
+      "test/IOTests.hs": "0a82f993d8f14ec0a93eedfe3a5d9623deb48d04b5fa359373f0de5f6825420c",
+      "test/Main.hs": "3bb73fc3b99b6ff9329b74761ff5421b0c35003fec71da822c2fc7580af7c0f6",
+      "test/ModuleBackends.hs": "789d40b574650b4293b895ea5e8c03987260ba50741ab99a6a7d7a3deae6d6c4",
+      "test/Modules.hs": "69af6c6092eaf5a855ebe9c86ed19ff0d90c2c8af6812da56ad95144b5897cb2",
+      "test/NativeOptimization.hs": "9bddb9b8f64c65be8e9c7b8aa13e720d7c1f320c58da766d99e763dcbc5c43a1",
+      "test/NumericArrays.hs": "d2c1a2b82127929aa00f10c9543149e8dc20c728ecf353f7239ebdffb3532f04",
+      "test/OptimizerQueries.hs": "0c551f7016d8f88694da44a93f7c4c7ac0ad5c58807bdd9c6ae0109746f8942f",
+      "test/Oracle.hs": "c7726b6cfd6b1f681b379495ff5ff1a1cc1ffbfe2fb51c2c99af19317bd0ead6",
+      "test/PreludeTests.hs": "8c5983db0179cc08f16db494af5df0fa1966704cf626e3c893d05fe13c9648e6",
+      "test/Readability.hs": "ab637b0845a9948e7a65189a056b1ecac89c10a72bb10faafea2be674cc74dac",
+      "test/Snake.hs": "53371de9b259e682187a09d0e76b9e5af92cdfbf87121e3f67706ab5690a5e75",
+      "test/StateCases.hs": "45e94b2c3971134cdaa222559cea2f6a11a90270f44041e88cd9683ad76aa7c4",
+      "test/StateRuntime.hs": "63f85411a038a94859e7746bdff79c597245a340918d8a93aa50511b54f833ab",
+      "test/StateTypes.hs": "1bd4c51aa4ba946fe4176471b943cad5846ad43a9c9b49d392bde63d3fa26118",
+      "test/StrictFieldAnalysis.hs": "b8ac1312b47634799dd9ae41bcd643949b36b03d69f0a09746e3690ee02a3429",
+      "test/StrictFields.hs": "38073931f387843e1ddc3ed198023abc01bfea81c580d3c7c395482caf96e52d",
+      "test/SurfaceSyntax.hs": "03371fdca749c7b341e09e56860b373a5f6b122e15277723db400a898e42e3c2",
+      "test/Typeclasses.hs": "0d874093f261c01d1b406ac533ef4c3f870e113586ae52d0683645ab6666a598",
+      "test/benchmark_allocations.c": "d2728298d47858830743ca6e3779d121db1549962ecd6c8af70d4573e15d0129",
+      "test/benchmark_tables.c": "e891ed5acc6231735d6ea92da21562e3a1884321b46a3f097c2564ef299206d6",
+      "test/fixtures/figure12-a8.emlf": "4b017e2697f192e0114eb9052b266fceb1084d92c1ba1ad778dca360e1cf665f",
+      "test/native_trace.c": "f6dde7bf8073d0baf6a845944cc4dfbdb290f7388f68060571563a9d39e402a7",
+      "test/runtime_allocation.c": "4afee271a762e25574ea77d21d4711122ebb9d86289f6fbf53d0511a155dfe03",
+      "test/runtime_force.c": "39b75c373598e2cc31b369df43e962cf4dc7f82f69f7cd5484157856080af547",
+      "test/runtime_st.c": "9edea6c76ddfd920a0e5781dad55366baac27a0b2365ea44e8370ed0f420e045",
+      "test/runtime_values.c": "7eceafe6a1ae340a05d67b236d05fa88d22186d351f149db3cb3828971f24c9c",
+      "test/test_benchmarks.py": "4e0f895c27b3a3298234c0212b7a5978d5e86b3557a570285ec04c59c12cfc60",
+      "test/test_bootstrap.py": "5f8a2e5dc0c384ceb036c84d0296c4d51aaf3a3115095b3f900e3bb766b9394c",
+      "test/test_release.py": "6df2dc5dc827d020644c156534def8c32753d7da9d5fef021d81ca3ceb9080ad"
+    },
+    "smoke": {
+      "backends": [
+        "interpreter",
+        "llvm"
+      ],
+      "expected_stdout": "native release\n",
+      "outside_checkout": true,
+      "features": [
+        "modules",
+        "algebraic data types",
+        "do",
+        "prelude"
+      ]
+    },
+    "compiler_sha256": "da24e2c6438b11fe1cc7ccaa82fd35d16354fa2894d0f157199c959cecb15493",
+    "package_files": {
+      "compiler_process.py": "81e3e6600ba4d6c91cf109c638ae1d38c1ae014763e9465b2328cdded502ff0e",
+      "emlf": "da24e2c6438b11fe1cc7ccaa82fd35d16354fa2894d0f157199c959cecb15493",
+      "emlf-compile": "a830f290d5abbc1add4a0a0bc63ceaf8b1b94ad9788fffa731a352b4d7646c68",
+      "evidence/backends.json": "8a7bf0e6222c47008aa0c73e14e868b1be9ee58308ae3146cac037cc00332b22",
+      "evidence/benchmarks.json": "8264eb833f4551292e4ba936118e0039d7c54b76d86ad743029c0b52a16dbdcc",
+      "evidence/bootstrap.json": "a17e40c7d6699f171b5210281dfdcb04ca21059abcf7636917e42564f6ea0817",
+      "evidence/cabal-tests.log": "98e506d44c442d622184628425aef850db5e63d302b1f935108b119d08a2b21b",
+      "evidence/manifest.json": "5b77f64ff0af146fb13b9a7bd3ec6838d63f182c936eabd955158dc9ca932e35",
+      "licenses/BDWGC.txt": "46cf78d79f08ec7295e1c767213582c60eccba2c5bcb07b1b29fd7ddb138fbdc",
+      "mlf.cabal": "f972a7f05ecf5676c22b85985713b568e2579179565743f865da272774a2b332",
+      "runtime/khash.h": "4582c7fd4b98f61339ce677bb1daa7a45a53075b112a494a335525c4bda72074",
+      "runtime/mlf_runtime.c": "907893cb216c1cd596d92a3707488d7dd121657f5f0629ab54b737b5f383fbe5",
+      "runtime/mlf_runtime.h": "21254da67997079b785702bffdfb67dfe87536468960ec3c50bd09aa71704fcc"
+    },
+    "finished": 1791910476.207968
+  },
+  "bootstrap": {
+    "schema_version": 2,
+    "complete": true,
+    "stages": [
+      {
+        "stage": 1,
+        "compiler": "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+        "llvm_sha256": "dbcf169fe89d3683a8cf22f3b489f19caee0c1c97df2576fc136d44ba0380d95",
+        "binary_sha256": "f5decef17940b8de36e26c3a5ec838516eb036a53961d7aba9eeb6530c5681de",
+        "reused_seed_compilation": false,
+        "compilation_seconds": 34.20698766698479
+      },
+      {
+        "stage": 2,
+        "compiler": "/Volumes/src/mlf/dist-newstyle/release-2026-10-14/bootstrap/emlf-stage1",
+        "llvm_sha256": "f05cf38f9d4a474d93f0c26e84c3faa2dcab96f31d29d3e0069917ce9acef480",
+        "binary_sha256": "ee02b50b1a16960e504c6a869d6b9934d21e0da6c3af615c31c69f1e5f469c19",
+        "reused_seed_compilation": false,
+        "compilation_seconds": 219.72972858298454
+      },
+      {
+        "stage": 3,
+        "compiler": "/Volumes/src/mlf/dist-newstyle/release-2026-10-14/bootstrap/emlf-stage2",
+        "llvm_sha256": "f05cf38f9d4a474d93f0c26e84c3faa2dcab96f31d29d3e0069917ce9acef480",
+        "binary_sha256": "da24e2c6438b11fe1cc7ccaa82fd35d16354fa2894d0f157199c959cecb15493",
+        "reused_seed_compilation": false,
+        "compilation_seconds": 222.97174895802164
+      }
+    ],
+    "started": 1791908649.208446,
+    "llvm_abi": "compact-bdwgc-v1",
+    "seed_sha256": "52ec73d625fceb927334c3c157f8bfca5e50f148f609aa4b7ba5abf6358bdf90",
+    "sources": {
+      "bootstrap/Bootstrap/Classes.emlf": "613f18dc4f56669953ac756c9ca45adb62d31bb1e7b4fab3bf1befc0dff19ef3",
+      "bootstrap/Bootstrap/Compiler.emlf": "23d2d6e8bf4e03153030f0f0c4d06505322811263fd357fa2ee5b2bf3031bcaa",
+      "bootstrap/Bootstrap/Constraint.emlf": "fd2ccc41e247b0ffc05da83f08dd2c7157df763dd3957871cf4ded6500c077da",
+      "bootstrap/Bootstrap/Data.emlf": "1a798a05dc70440f4076b099adf40dca717752b077edb49e0dcbda78b3e31c4f",
+      "bootstrap/Bootstrap/Desugar.emlf": "d668bfb3dd66693907e72a087abffc6af35beab6e251ee4d1028b15ecb9da6c6",
+      "bootstrap/Bootstrap/Elaborate.emlf": "479ffdbc081928375d1486d047e9a7f6a4ff77ce1a8ba5773dcc3520294c8c79",
+      "bootstrap/Bootstrap/Evidence.emlf": "7e031bf638d709ac84822901cc3436223e2aaf0ec76aad46beb8ec2952c6d14d",
+      "bootstrap/Bootstrap/Fresh.emlf": "b6af7da1aceb0e81b68ee6a1100616b71f6558fa8f551de62dbddecc4d7483a0",
+      "bootstrap/Bootstrap/Graph/Solver.emlf": "c94debcd152d8ee1c0a6a6bb7bce2d375ed2a37c4f5456463846bb5918eeb630",
+      "bootstrap/Bootstrap/Graph.emlf": "b541d79da0f7c957e0389e426bb9279a42630b362e99b8fd4c54ad057ec31901",
+      "bootstrap/Bootstrap/IntMap.emlf": "a5cce880a0cac66d07c9b4e30e981766b80da8e5e4e6b311f235c03997d14dfa",
+      "bootstrap/Bootstrap/IntSet.emlf": "519784adfb1be285f1f056f1e93a25a68e13db7ad37e9852a6ddb18dff815a82",
+      "bootstrap/Bootstrap/Kind.emlf": "4195e17517b2eb3a6b12c0c96112b1b5b6d1119ef3e9f1ba0a1ecf043c831772",
+      "bootstrap/Bootstrap/Kinding.emlf": "517aec41c9260a6a463a3042717d589b97df175670ada755fd45fcdbc6f0d36c",
+      "bootstrap/Bootstrap/LLVM/Analysis.emlf": "7d6f03ac5e09110b11e540a71856ac269c449772350b6527d02bd2b47ffbcf6d",
+      "bootstrap/Bootstrap/LLVM/Build.emlf": "9a635d1ccdd0857eafb7b87825d234ed649b7c3728c83ea0a3c731323cf6c728",
+      "bootstrap/Bootstrap/LLVM/Codegen.emlf": "72b8ac720bfeffad2b9e7c53419f5de55fcb597dbcb4d15acc88dffcaef14597",
+      "bootstrap/Bootstrap/LLVM/Kernel.emlf": "fa7a94be851dfc285786712060fed906bdf81270552f870c066d5303c580e434",
+      "bootstrap/Bootstrap/LLVM/Native.emlf": "6138103c4bacbbbce4ae65aadd942380dce54c376b9062429e63e79c20e6f3bc",
+      "bootstrap/Bootstrap/LLVM/Optimize.emlf": "ff8b3ea2824d4456081c1f77090627a70c2703064928367a8378635f2ef03519",
+      "bootstrap/Bootstrap/LLVM/StrictFields.emlf": "bee5f7df5e8f7cb592342e51a42f1cd6c63f9024082b56dd76c347196af1e1b3",
+      "bootstrap/Bootstrap/LLVM.emlf": "eecd7f70b179d35d5265de4ea673b5125a334f8bddaf01ed38ff70906066892d",
+      "bootstrap/Bootstrap/Layout.emlf": "7eb281a16bac3adb35ff15dbfaf0150e5df7b0d4af8f046cbb6362a520f329e6",
+      "bootstrap/Bootstrap/Lexer.emlf": "702c67d0d3377ddc438b242762e1505945b91a959c94c737e117f0bafcee4161",
+      "bootstrap/Bootstrap/Map.emlf": "b7d5921dbae083f227e4562a257efaaac2f1b7e6f270073857c8ba43b674e08a",
+      "bootstrap/Bootstrap/Module.emlf": "079deb1f792e5a9ee15fdb741bf773495966b64bf633bbd187e3af745f8c5230",
+      "bootstrap/Bootstrap/Parsec.emlf": "ffc64213d5baf649aa40ccab44521af79a4aaf84cb268bd87cd70c2873f1500e",
+      "bootstrap/Bootstrap/Parser.emlf": "28a093dca7a7f86a1a14a8579405e7cfae3401e27bf214abdf31a87818fd484d",
+      "bootstrap/Bootstrap/Prelude.emlf": "e4908ab88f9cc3350e09ca09196db60abdfabb035055ff0ceff9a10a732c21d5",
+      "bootstrap/Bootstrap/Primitive.emlf": "1922e41a3935d7d87483bfccd87529b573f77e996e38ce3349117f91d0baeef7",
+      "bootstrap/Bootstrap/Runtime.emlf": "db6d959430c33ce1fde5192a5dfb596ddcb83132d115f10bf05d9b26e5d51ba5",
+      "bootstrap/Bootstrap/ST.emlf": "657c2b7f3958a8b14ed7a336908689f951480b45ff50059b242cfe3f3df7d7b0",
+      "bootstrap/Bootstrap/Set.emlf": "bac505cf121011b0b325d5ea59d1bd8c2abd919a8158516540d707a813abbc77",
+      "bootstrap/Bootstrap/SourceEquality.emlf": "5fc11a57d42b85d7776ff76dee9872a7264ff7f920121833f221c277ec37f4af",
+      "bootstrap/Bootstrap/Std.emlf": "50c455982728484d3e3cc0359f4314f5bfeef0706e051701979fd529779428f7",
+      "bootstrap/Bootstrap/Surface.emlf": "f8d4f9abd96bec1582dcf21b30e8500677a448637854a25e7fc80b7a762ac437",
+      "bootstrap/Bootstrap/Types.emlf": "5a790419e00d4825ffbc5f06cca4b8e64813d8dabd69d34d4fdde926e013e1dd",
+      "bootstrap/Bootstrap/Unicode.emlf": "fdde8c09d3cd1bdddcbc6a3c65c6ab7668c8d60b6795d9a0c106a098c1b647b4",
+      "bootstrap/Bootstrap/X/Check.emlf": "b20e256bdc4d25ddfc3c76dc0c91083957133c3cf973de5a8244e40285defee6",
+      "bootstrap/Bootstrap/X/Parser.emlf": "3ea0d9cb15c9d08c2ca76c0c1f5d903d34978b6476075c0ebfa9655aa8841f03",
+      "bootstrap/Bootstrap/X/Pretty.emlf": "a7c23152c6297315e4ef0bf1dbba9685688cb68010c0194fa544c2c39f48f0e4",
+      "bootstrap/Bootstrap/X/Syntax.emlf": "40ef760efb420654dcc7f5c05334eafea81f21d0bc269f8e0d1de9ee5c5eda70",
+      "bootstrap/Bootstrap/X/Type.emlf": "ac916c2902d99edfce443f96930cdc52bdf341eff3007c38d203450400b9446c",
+      "bootstrap/LLVMDriver.emlf": "d04bd38721059978607996a92aef2347962ee8b4e5e071dd8e18b41076bc03fe",
+      "bootstrap/Main.emlf": "c76a243eb120b779987f29aa737d5780fae7a03b66095a0fc5f79aa3d7ca7aa6",
+      "bootstrap/RuntimeDriver.emlf": "ba943012e7f1d369bb3122c5098672ac2682263e76536001665dd7be89ab3990",
+      "bootstrap/tests/ConstructorProjection.emlf": "c83229426f6d79c8a7e272d784a18051cc27a70debee78866061559bd4936184",
+      "bootstrap/tests/EmbeddingPruning.emlf": "dc3fca089316752a726001b989c9589e662729c142fdeffd1d75bbd99a7c7bf9",
+      "bootstrap/tests/ForceReuse.emlf": "531afe40bd7fe51c29980edc835d28da5122d19269eb32e0d2c3de0b19ebda8a",
+      "bootstrap/tests/GraphConformance.emlf": "86f85d0ded341b6cb7908b58477a03a59c2e7d8e46286ebb88b227a702a54943",
+      "bootstrap/tests/GraphDense.emlf": "ce828f6d6c003d0c914da90a3b168b3ba692fe51e3472c794f73d629938e4448",
+      "bootstrap/tests/GraphDenseProbe.emlf": "c4c3c85eb2546d3a2cdcf21322e577106ac49198317a8e3ddd2fcfe906744e6f",
+      "bootstrap/tests/GraphScopes.emlf": "b0314b23c47a931edc10ceb0d54f7e529951f8b9f9bfe750a55b818d71d10f21",
+      "bootstrap/tests/GraphSmoke.emlf": "ef099955729cd0ed64966a503e06446d24129750b4315d7ced82a87832fc2f10",
+      "bootstrap/tests/GraphStack.emlf": "05d34749539cb8f58a3a2109792efdb370700238ff625eef56981b0219983874",
+      "bootstrap/tests/InferenceConformance.emlf": "fb62b18cdf0fad8e878643ca354d583b9a0b740a7263d72c359ffb2d522164d2",
+      "bootstrap/tests/IntegerContainers.emlf": "0e41282d32f44ba950789708d864d6d0dc14530d2bf9a81255036906858c9ea7",
+      "bootstrap/tests/LLVMBuild.emlf": "cadd61c0e94a3d3c75ec52c17bf840be186c5aac0c960eeeab604b01598533d5",
+      "bootstrap/tests/LexerCounters.emlf": "2d562a64d74c7e0f9be88c9f73ddf7b403ca978c91b6527a308f7b4fb9b552f0",
+      "bootstrap/tests/MapFolds.emlf": "90a1471cec114224a04d0cfc54e010ec1704f52494a2d855c268372a5f549098",
+      "bootstrap/tests/OptimizerQueries.emlf": "3f7e11a679bb53613c8fe27ca2e4b83a9c9338a8f8d1603fe6f731ac88700e58",
+      "bootstrap/tests/OrderedTraversal.emlf": "d8cb8e6ee8ad681f01a53b862a730f8129ced313abc2fb04a5c50589bfd51320",
+      "bootstrap/tests/PhaseProbe.emlf": "7d1c5186c10279a9dff66903c2bc9ca6a6ad092de73ef113911b0bf379304aa6",
+      "bootstrap/tests/PrimitiveMetadata.emlf": "c161d3ce921df72e7f81acc00da8afbb81092c5d2640acd1590a0c636a50b2fd",
+      "bootstrap/tests/RuntimeCases.emlf": "9f79ba21fcff9161c80f4939ad74d359bcda4a0e5cd27c516d0252f3fe35a1fa",
+      "bootstrap/tests/RuntimeSmoke.emlf": "ac612567558a34fd255f848b1b51cacf0dd4ecc697315b3181e413c4fc259c1a",
+      "bootstrap/tests/SolverReuse.emlf": "d640cf0769f80f7a0a8e2e4386a8e2d40af58080b6947c67d97bf5b81bbd9fcd",
+      "bootstrap/tests/StateRuntime.emlf": "dc07e3f2594eeaf7e3b5f1fac15184132158ab7e8144d63168112c60e98e187f",
+      "bootstrap/tests/StateTypes.emlf": "383d8c20655254dd655ce70cd7cc74661522c46cfc1df62602cf59db4bf59fa0",
+      "bootstrap/tests/StrictFields.emlf": "18c4dc8ea3a89c8a330d41ce0b3ea5c206e20ac38d62ec881f622dc35b2e0c66",
+      "bootstrap/tests/Target.emlf": "d7c78b8cea49dd219f8fc92a43ae8be5a56a89fa10bea4631bc9b8beb9914e00",
+      "bootstrap/tests/TypeCache.emlf": "d6ff8e1afef0db13ebb0429c858f763b084d922daec0514994c5fffe2719d3d3",
+      "bootstrap/tests/classes-stage0.emlf": "b81c56da1ade9ca4f097ee972bd553a1723f336d1870dcc8c4c414d3ac8de23f",
+      "bootstrap/tests/foundation.emlf": "afb60cd83d96174ebbe3e2c20d2e8fd232dd208ebfc7b28d006bfbae15ee0bd9",
+      "bootstrap/tests/frontend-stage0.emlf": "34d9a97cb89e7b12d49a9774841d3ee166eabce08b456261620c6a6aa5c64415",
+      "bootstrap/tests/frontend.emlf": "3daa8a62aaf1f036b8549c984f4b8f6f957732db99be02ef6e449fdd1f2f7391",
+      "bootstrap/tests/parsec-stage0.emlf": "64d2b8819f7087968b15e89a33922d35b842ac1ce9970dc6aad90c3449c94777",
+      "bootstrap/tests/parser-corpus.emlf": "3240b6a72a9a549cf95cccec3edbabf0701f26fb5b2dd53ab171b45b71e63cb9",
+      "bootstrap/tests/prelude.emlf": "ddfc04ae6f168be36e41ae501a8304dde9462e3485fd1bec9b19ecdfd8cbd87e"
+    },
+    "runtime_sources": {
+      "runtime/khash.h": "4582c7fd4b98f61339ce677bb1daa7a45a53075b112a494a335525c4bda72074",
+      "runtime/mlf_runtime.c": "907893cb216c1cd596d92a3707488d7dd121657f5f0629ab54b737b5f383fbe5",
+      "runtime/mlf_runtime.h": "21254da67997079b785702bffdfb67dfe87536468960ec3c50bd09aa71704fcc"
+    },
+    "validation_sources": {
+      "app/Main.hs": "991ac6edbe670e27696a807a9bf3d5bbf1c1a4f44d1cee43eedc3a27d33a94df",
+      "bootstrap/CheckTarget.hs": "636aedb1da284ad8b2da962e52836585bc4a0e41931fd76fa138432e90f42a83",
+      "bootstrap/ExportCorpus.hs": "5e615a1f131f6c0bc5a5a33eea9e06254d2e09675f6f24f2367793e2c799dae0",
+      "bootstrap/LanguageParity.hs": "d4e6d91392e2728ebcf2a471f7679d847e70372bc369e635f83e8147edc436d8",
+      "bootstrap/generate-unicode.hs": "6dbcb84d77827206788fb764d9838f18f257dbc442ab2d80490ae753675b6d7f",
+      "bootstrap/tests/EmbeddingPruningReference.hs": "3cf5ad6a6207b6a066ef4532fccae5b69e1e5fb55ba06f6c1fb4ef58b700926c",
+      "bootstrap/tests/GCDefaults.c": "2dd0812b42ce8f5f7fa0a16d7c83508c575c83533a60090ecd8a0533d89072b8",
+      "bootstrap/tests/GCSpine.c": "74c154443bb4244f03097997756cb8cfcfb0065d6ac39ae83604823bca80fcf8",
+      "bootstrap/tests/GraphDenseReference.hs": "d17f1f8d7a0fa91c8a3e3e7bf9af764165899c726baec5bef5d41ad93874e947",
+      "bootstrap/tests/GraphReference.hs": "8556cf8a4d00da0d93779c128e15cb5c650d8b66c870220f526cb6a5c6178309",
+      "bootstrap/tests/GraphScopesReference.hs": "aa836ccd8bed59d62f54c3f319d58a809fa56270077643f610ea9e475de23e96",
+      "bootstrap/tests/InferenceReference.hs": "6236b655042b98395eb04bdd8494b99d7a69292f8d7d97c47a48426a0e4c25ad",
+      "bootstrap/tests/OrderedTraversalReference.hs": "1166b9e5d2c38fd37a48bf5fc11a208aebdc6be660574e793106b503ab676df1",
+      "mlf.cabal": "f972a7f05ecf5676c22b85985713b568e2579179565743f865da272774a2b332",
+      "scripts/bootstrap-compiler.py": "4e62527aa31b11ef149882d1b07156d91da240c494498bb2afd2876916fac9a0",
+      "scripts/bootstrap-gc.py": "736c3ab4ab0ebb274cbea1d9bd84d845278101257bbff80b4a406be464185e82",
+      "scripts/runtime_st_validation.py": "e52cdf21815d53a1846314f37334a12b61a4cda2eedb76df46f504e158511813",
+      "src/MLF/Classes.hs": "d19ffe5dce923ce23890a99c1b744d7e5539d88fed2be93148f71872a967994b",
+      "src/MLF/Compiler.hs": "19e82ccc149c1b7a977b5024edc3929705c16e64ed3cb05e71aa800b099ec164",
+      "src/MLF/Constraint.hs": "94f757a6619f2f860e314b8c8f46f15e0a5c743593cc57a5e51c958769ac2cc6",
+      "src/MLF/Data/Parser.hs": "f8bcb819c612ce6dc745233ccef0108b0b735c9fbe2b099bc23cf3646dac7a14",
+      "src/MLF/Data.hs": "f66abdf5f899f255bf7d127a716c9c5cae2981141c5002867804013f2d8c12dc",
+      "src/MLF/Desugar.hs": "8e96a8253dee04c6b980a9ab21cd69b7ab33a8bb23c12876d1d72fe65449c8a4",
+      "src/MLF/Elaborate.hs": "ed6b89f7563721373bc4f5cdfb0bf89c902be9810043645865d35d1b0a0e6776",
+      "src/MLF/Evidence.hs": "898ee8cd42348da67179f9d02a5c0a2f2e57800b1a63f45dc6a2dd0d62b08d41",
+      "src/MLF/Graph/Solver.hs": "2ceb267bca7c2202b3f50d706ff14e0084fc4b590022a9cafd1785fce69c6f23",
+      "src/MLF/Graph.hs": "6456fc83fdcf1cc2fd3365c1c40d2f608d3a34f16b106587d817973cb9b93d51",
+      "src/MLF/Kind.hs": "d6eec39e54a8c38c6f62635974385e7afdd018055c247f8ab8e3fa0e1d992d3b",
+      "src/MLF/Kinding.hs": "93ae79fd258a0e8289fa5fcbd8edd1ea72b5869545ed06e38f47900ffe6419c7",
+      "src/MLF/LLVM/Analysis.hs": "e43fa8f500626066180c983a9d11cfff1c281a4eda51ed06b69ec5f2f990e64e",
+      "src/MLF/LLVM/Codegen.hs": "cccbd60913202985792b882bc178fdc69221e63090cf9a7a76269915a50f2799",
+      "src/MLF/LLVM/Kernel.hs": "bedbfddb3bc571509ed1f3950a871fa6b324c21e699b82a7048a163324980cda",
+      "src/MLF/LLVM/Optimize.hs": "0e5f0d2f8b35cab7f80c0aefcd2cd066071fa7f63884c301a492a79babcb9056",
+      "src/MLF/LLVM/StrictFields.hs": "668aa2061a7e3799010b8ac407a7260ddbe8a2c501cf4a237df386d4cbc117ac",
+      "src/MLF/LLVM.hs": "6324e4c99296bb964b0542e82bcc10e7b5bce4f698598541354a17e8fd92f481",
+      "src/MLF/Layout.hs": "eec74eec6c241760e63b8cb331ba662e50b292f9e774394a3292e776649c0c6b",
+      "src/MLF/Module/Syntax.hs": "9fed594b6c2b5cdb913672b4db1b17d7d420a632eaf4d2b3a9753926bc817298",
+      "src/MLF/Module.hs": "1e3bd857c35ee0a335fd69966c8d2a3888625dc95e853aa9d9547ea43ca9ee16",
+      "src/MLF/Parser.hs": "a48af42261f447e101f6925787bcf05e5ad9a8771cc01100f9b35bbb759c0648",
+      "src/MLF/Prelude.hs": "2ea7635056e36d7fe1102adf592984efb6e3218ece8e5c6f43ff5bdc91ec5970",
+      "src/MLF/Primitive.hs": "6ffcd3de18f7dabe59e5f10e894d266b01bd4d54f82f554b69e2b195538afb8c",
+      "src/MLF/Runtime.hs": "ef5c4a44f65820878ee57d458f3299ff61f9720abfe1024126dea2c6a2242c6c",
+      "src/MLF/Surface.hs": "b1ba74dffa7139c02f92cbec08e928fec3953c376fde89b61240484c54c1beab",
+      "src/MLF/Syntax.hs": "81441237f6708d3749ff7c1d42e01c0b063c1eb796118cc281e702cc309cb9a9",
+      "src/MLF/X/Check.hs": "802eab4fba00135bcbcbc7c31845538a87fd67d52d9d845334893d2ab7204922",
+      "src/MLF/X/Parser.hs": "8a33271c0bd453af8e76f8781a24b368fcf99e98a9e70d4bac5bfda4416f9216",
+      "src/MLF/X/Pretty.hs": "b7b22a923d4b138bc59c990ede2bbe23ff6e02d9a30d9bcddcf7393e0dc5a2c2",
+      "src/MLF/X/Syntax.hs": "050a21bb876a344f35be5d520451229124bb8f4ca89de21e9ec0b03cb6e5212e",
+      "src/MLF/X/Type.hs": "66f2c899b846439e94b5dc7e70757ca75d14d655e50b7910ad20e2572ebe681c",
+      "test/BackendCases.hs": "3cde1bff4949f8565a8691166af5299cb0e28e2aeab8c847af42add1cd019c39",
+      "test/BackendMain.hs": "a598f8d733d71ce98cfde70097fea56a12fce2dd41012e8d32618e0018301927",
+      "test/Backends.hs": "1268a7397aeae1d032cfd47e5d1b91204ddcbfdcc345d1a7743be1dd5efa54f8",
+      "test/BenchmarkHarnessMain.hs": "d037423521f139ec3ef48a10b75a1e11bb65b295e5f5ae9c760d5f86a0b8a976",
+      "test/BoolConditions.hs": "6aa03c5cbcfbaaa0356274d7f01cca4988fddf4fe2fcb35f4837d364afe50ef1",
+      "test/BootstrapPortMain.hs": "35dd7cff7de908b5933e81be36e925476662a067f5a68d64bc2d55d0ba2dc1e4",
+      "test/BootstrapPrimitives.hs": "8a049f5a254de27811c88d9ee6b5d92a5fc3e238b34c0b1c264b4d0fb923f405",
+      "test/ByteArrays.hs": "b43812f999d8d273a79eacb1588796401a616eeadd5d5b59039adbe8693d5397",
+      "test/Computations.hs": "20bad74bf600fe6cab1826ffdfb1b7c540bbab41b406f90e46c2f41cf8558207",
+      "test/ConstructorProjection.hs": "da901313853248b7e759f3fc8aaa4c083a715a9adb641a1ad31adcccc4a79c5b",
+      "test/DNA.hs": "76826075804fd57f38ddebf8f6093fde6a810d83fdf4cb0284125ae64e3ba00d",
+      "test/Datatypes.hs": "7d09627717ef652eadd1a88beb9a19b656f36e912eca3babdbd32f8ea5e6e72a",
+      "test/DoNotation.hs": "c2d400716e0559fe869bcdc43b3c1e11b268782bcdad274cd8265a07ae47a098",
+      "test/EmbeddingPruning.hs": "6cb508a392aaf61b1cfc69e8f779242d4a680714799d48ac0d9d968bac7bfc86",
+      "test/EnvironmentAccess.hs": "d9c6fb53579348220d27e716f2a4676da657546c51c59dbf9cd0b6bf0599689f",
+      "test/Figure12.hs": "a8a9861c917510763816009e0ac59af1f237185fa824ce556153b156fb1edb0c",
+      "test/Figure12Main.hs": "270b2a6ffb527076e48bf34850ce907f71bc5ea1332f4c836b8dd32310af5423",
+      "test/ForceReuse.hs": "5fe1d6aa368f771c4d83c7923e2d1e78b8040fa86eaac27059a361b537d4196d",
+      "test/GraphSolver.hs": "8fb8a905d5d1bc3f4911a7c8326e185d9f144b4af12a05ccbbb9bc55b23311df",
+      "test/GraphUnification.hs": "dbfe9dd4ac0fdb7120b8bd9f397ef010e842797aa12f8893eb328e971b6c358f",
+      "test/GraphUnificationReference.hs": "73b71ace8e41eb2ec13d2d27be2b3ad81b9ec85cb2cff5d518511c7ddd92455b",
+      "test/GraphValidation.hs": "d48a10d5d05b1ef12dc42abc655df4fe1016a1aa3b92877b38f58288b4720864",
+      "test/HigherOrderSpecialization.hs": "a593fc55ffb9af479f47f1e094702cf3359cb2db09e042ab1ec6c02eaed324fd",
+      "test/IOTests.hs": "0a82f993d8f14ec0a93eedfe3a5d9623deb48d04b5fa359373f0de5f6825420c",
+      "test/Main.hs": "3bb73fc3b99b6ff9329b74761ff5421b0c35003fec71da822c2fc7580af7c0f6",
+      "test/ModuleBackends.hs": "789d40b574650b4293b895ea5e8c03987260ba50741ab99a6a7d7a3deae6d6c4",
+      "test/Modules.hs": "69af6c6092eaf5a855ebe9c86ed19ff0d90c2c8af6812da56ad95144b5897cb2",
+      "test/NativeOptimization.hs": "9bddb9b8f64c65be8e9c7b8aa13e720d7c1f320c58da766d99e763dcbc5c43a1",
+      "test/NumericArrays.hs": "d2c1a2b82127929aa00f10c9543149e8dc20c728ecf353f7239ebdffb3532f04",
+      "test/OptimizerQueries.hs": "0c551f7016d8f88694da44a93f7c4c7ac0ad5c58807bdd9c6ae0109746f8942f",
+      "test/Oracle.hs": "c7726b6cfd6b1f681b379495ff5ff1a1cc1ffbfe2fb51c2c99af19317bd0ead6",
+      "test/PreludeTests.hs": "8c5983db0179cc08f16db494af5df0fa1966704cf626e3c893d05fe13c9648e6",
+      "test/Readability.hs": "ab637b0845a9948e7a65189a056b1ecac89c10a72bb10faafea2be674cc74dac",
+      "test/Snake.hs": "53371de9b259e682187a09d0e76b9e5af92cdfbf87121e3f67706ab5690a5e75",
+      "test/StateCases.hs": "45e94b2c3971134cdaa222559cea2f6a11a90270f44041e88cd9683ad76aa7c4",
+      "test/StateRuntime.hs": "63f85411a038a94859e7746bdff79c597245a340918d8a93aa50511b54f833ab",
+      "test/StateTypes.hs": "1bd4c51aa4ba946fe4176471b943cad5846ad43a9c9b49d392bde63d3fa26118",
+      "test/StrictFieldAnalysis.hs": "b8ac1312b47634799dd9ae41bcd643949b36b03d69f0a09746e3690ee02a3429",
+      "test/StrictFields.hs": "38073931f387843e1ddc3ed198023abc01bfea81c580d3c7c395482caf96e52d",
+      "test/SurfaceSyntax.hs": "03371fdca749c7b341e09e56860b373a5f6b122e15277723db400a898e42e3c2",
+      "test/Typeclasses.hs": "0d874093f261c01d1b406ac533ef4c3f870e113586ae52d0683645ab6666a598",
+      "test/runtime_allocation.c": "4afee271a762e25574ea77d21d4711122ebb9d86289f6fbf53d0511a155dfe03",
+      "test/runtime_force.c": "39b75c373598e2cc31b369df43e962cf4dc7f82f69f7cd5484157856080af547",
+      "test/runtime_st.c": "9edea6c76ddfd920a0e5781dad55366baac27a0b2365ea44e8370ed0f420e045",
+      "test/test_benchmarks.py": "4e0f895c27b3a3298234c0212b7a5978d5e86b3557a570285ec04c59c12cfc60",
+      "test/test_bootstrap.py": "5f8a2e5dc0c384ceb036c84d0296c4d51aaf3a3115095b3f900e3bb766b9394c",
+      "test/test_release.py": "6df2dc5dc827d020644c156534def8c32753d7da9d5fef021d81ca3ceb9080ad"
+    },
+    "bootstrap_allocator": {
+      "profile": "BDWGC compact",
+      "flags": {
+        "cflags": [
+          "-I/Volumes/src/mlf/dist-newstyle/bootstrap-deps/bdwgc-8.2.12-install/include"
+        ],
+        "libs": [
+          "/Volumes/src/mlf/dist-newstyle/bootstrap-deps/bdwgc-8.2.12-install/lib/libgc.a"
+        ]
+      },
+      "io_collection_allocation_threshold": 1048576,
+      "environment": {
+        "GC_INITIAL_HEAP_SIZE": "536870912",
+        "GC_FREE_SPACE_DIVISOR": "1"
+      },
+      "builder_sha256": "736c3ab4ab0ebb274cbea1d9bd84d845278101257bbff80b4a406be464185e82",
+      "spine_regression": {
+        "retained_bytes": 1282048,
+        "retained_limit": 4194304,
+        "result": 42,
+        "cycle_tag": 17,
+        "source_sha256": "74c154443bb4244f03097997756cb8cfcfb0065d6ac39ae83604823bca80fcf8"
+      },
+      "defaults_regression": {
+        "source_sha256": "2dd0812b42ce8f5f7fa0a16d7c83508c575c83533a60090ecd8a0533d89072b8",
+        "cases": [
+          {
+            "name": "default",
+            "environment": {},
+            "arguments": [],
+            "heap_bytes": 536870912,
+            "divisor": 1
+          },
+          {
+            "name": "initial-override",
+            "environment": {
+              "GC_INITIAL_HEAP_SIZE": "8388608"
+            },
+            "arguments": [],
+            "heap_bytes": 8388608,
+            "divisor": 1
+          },
+          {
+            "name": "divisor-override",
+            "environment": {
+              "GC_FREE_SPACE_DIVISOR": "5"
+            },
+            "arguments": [],
+            "heap_bytes": 536870912,
+            "divisor": 5
+          },
+          {
+            "name": "both-overrides",
+            "environment": {
+              "GC_INITIAL_HEAP_SIZE": "8388608",
+              "GC_FREE_SPACE_DIVISOR": "5"
+            },
+            "arguments": [],
+            "heap_bytes": 8388608,
+            "divisor": 5
+          },
+          {
+            "name": "environment-cap",
+            "environment": {
+              "GC_MAXIMUM_HEAP_SIZE": "33554432"
+            },
+            "arguments": [],
+            "heap_bytes": 65536,
+            "divisor": 1
+          },
+          {
+            "name": "api-cap",
+            "environment": {},
+            "arguments": [
+              "api-cap"
+            ],
+            "heap_bytes": 65536,
+            "divisor": 1
+          }
+        ]
+      },
+      "allocation_regression": {
+        "source_sha256": "4afee271a762e25574ea77d21d4711122ebb9d86289f6fbf53d0511a155dfe03",
+        "variants": [
+          {
+            "variant": "ordinary",
+            "binary_sha256": "8755ac1c63f2783cd9cf817e0519b80e50991ffdaad4e5a4d60bfa803c629c61",
+            "runtime_object_sha256": "d152505cb9e1ef263796cba6d6bf6d0b36c822ba43f37e178effa6ccb79df689",
+            "cases": [
+              {
+                "mode": "success",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 0
+              },
+              {
+                "mode": "negative-tag",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "short",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "overflow",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "unset-slot",
+                "exit_code": 1,
+                "error": "invalid environment read"
+              }
+            ]
+          },
+          {
+            "variant": "bdwgc",
+            "binary_sha256": "9fedd103e8be38117070b49a5c7941642700dbddd41f94dd610a359e6aec50c5",
+            "runtime_object_sha256": "ba4f77e32255da1cbcd2bc79f444ff0242507d5ab0a21bdd0a05bf53e4a3cc5c",
+            "cases": [
+              {
+                "mode": "success",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 57344
+              },
+              {
+                "mode": "no-interior",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 61440
+              },
+              {
+                "mode": "incremental",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 77824
+              },
+              {
+                "mode": "negative-tag",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "short",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "overflow",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "unset-slot",
+                "exit_code": 1,
+                "error": "invalid environment read"
+              }
+            ]
+          },
+          {
+            "variant": "bdwgc-compact",
+            "binary_sha256": "f5461289c7ced675fe5fc39b50c69420531e3dc158a035d4ab5fab4dd3e5e2f4",
+            "runtime_object_sha256": "e6af21566eb91c3bbb18cd8b2e9cebee95042ab004a712e14b556555e425a588",
+            "cases": [
+              {
+                "mode": "success",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 73728
+              },
+              {
+                "mode": "no-interior",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 69632
+              },
+              {
+                "mode": "incremental",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 65536
+              },
+              {
+                "mode": "negative-tag",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "short",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "overflow",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "unset-slot",
+                "exit_code": 1,
+                "error": "invalid environment read"
+              }
+            ]
+          },
+          {
+            "variant": "bdwgc-compact-debug",
+            "binary_sha256": "da1540a50c221bce167611196c1ed77383de457b39ffdb8d7c7cac16359d1ff3",
+            "runtime_object_sha256": "ceb502bc1fef7a649b60b1a2092a2d61f90f178366e312bd4f71539609c128e8",
+            "cases": [
+              {
+                "mode": "success",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 4096
+              },
+              {
+                "mode": "no-interior",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 0
+              },
+              {
+                "mode": "incremental",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 0
+              },
+              {
+                "mode": "negative-tag",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "short",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "overflow",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "unset-slot",
+                "exit_code": 1,
+                "error": "invalid environment read"
+              }
+            ]
+          },
+          {
+            "variant": "bdwgc-debug",
+            "binary_sha256": "0d7169a20d99d8325f40d1a14ce3b9334b406aa16497ec731a0f64a88bdc1811",
+            "runtime_object_sha256": "a23840db88ebfb6f9a6b400a0de180e4881041a6bc8993aad272b63e47494db9",
+            "cases": [
+              {
+                "mode": "success",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 4096
+              },
+              {
+                "mode": "no-interior",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 4096
+              },
+              {
+                "mode": "incremental",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 4096
+              },
+              {
+                "mode": "negative-tag",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "short",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "overflow",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "unset-slot",
+                "exit_code": 1,
+                "error": "invalid environment read"
+              }
+            ]
+          }
+        ]
+      },
+      "state_regression": {
+        "source_sha256": "9edea6c76ddfd920a0e5781dad55366baac27a0b2365ea44e8370ed0f420e045",
+        "runtime_sha256": "e6af21566eb91c3bbb18cd8b2e9cebee95042ab004a712e14b556555e425a588",
+        "executions": 35,
+        "cases": [
+          {
+            "mode": "success",
+            "status": 0,
+            "stdout": "runtime ST: laziness, snapshots, repetition, nesting, WHNF, and GC passed\n",
+            "stderr": ""
+          },
+          {
+            "mode": "negative-size",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid array length\n"
+          },
+          {
+            "mode": "huge-size",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid array length\n"
+          },
+          {
+            "mode": "zero-read",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "negative-read",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "past-read",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "huge-read",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "negative-write",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "past-write",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "huge-write",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "ignored-invalid-read",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "io-as-st",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid value for runtime operation\n"
+          },
+          {
+            "mode": "nested-io-as-st",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid value for runtime operation\n"
+          },
+          {
+            "mode": "st-as-io",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid value for runtime operation\n"
+          },
+          {
+            "mode": "int-array-as-st",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid value for runtime operation\n"
+          },
+          {
+            "mode": "st-array-as-io",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid value for runtime operation\n"
+          },
+          {
+            "mode": "null-return",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid environment write\n"
+          },
+          {
+            "mode": "wrong-arity",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: unary primitive arity mismatch\n"
+          },
+          {
+            "mode": "demand-poison",
+            "status": 91,
+            "stdout": "",
+            "stderr": "runtime ST: forced a lazy element\n"
+          },
+          {
+            "mode": "cycle",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: cyclic evaluation of a recursive binding\n"
+          },
+          {
+            "mode": "direct-negative-size",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid array length\n"
+          },
+          {
+            "mode": "direct-huge-size",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid array length\n"
+          },
+          {
+            "mode": "direct-zero-read",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "direct-negative-read",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "direct-past-read",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "direct-huge-read",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "direct-negative-write",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "direct-past-write",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "direct-huge-write",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "direct-io-as-st",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid value for runtime operation\n"
+          },
+          {
+            "mode": "direct-nested-io-as-st",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid value for runtime operation\n"
+          },
+          {
+            "mode": "direct-int-array-as-st",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid value for runtime operation\n"
+          },
+          {
+            "mode": "direct-wrong-length",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid value for runtime operation\n"
+          },
+          {
+            "mode": "direct-null-initial",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: missing runtime value\n"
+          },
+          {
+            "mode": "direct-null-stored",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: missing runtime value\n"
+          }
+        ]
+      }
+    },
+    "compiler_link_flags": [
+      "-Wl,-stack_size,0x4000000"
+    ],
+    "fixed_point": true,
+    "candidate": {
+      "stage": 3,
+      "path": "/Volumes/src/mlf/dist-newstyle/release-2026-10-14/bootstrap/emlf-stage3",
+      "sha256": "da24e2c6438b11fe1cc7ccaa82fd35d16354fa2894d0f157199c959cecb15493"
+    },
+    "abi_regression": {
+      "source_sha256": "f4afe228efbf1cd09c51acf65ff5d49649f5fcff3e5ec455d6eb24aae5cd540a",
+      "comparison": "Exact LLVM except external declaration order",
+      "cases": [
+        {
+          "compiler": "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+          "compact": false,
+          "llvm_sha256": "26351ceb678c8cab269f437f6d0839550b7b76c4a02844c73fc8c043eed2efcb",
+          "binary_sha256": "268684b3ca181f69a4220c1424518446bd4f0fc614a0bb71f340fe84f9501e4f",
+          "stdout": "42\n3.50\n2\n",
+          "mismatched_link_rejected": true,
+          "force_regression": {
+            "source_sha256": "39b75c373598e2cc31b369df43e962cf4dc7f82f69f7cd5484157856080af547",
+            "llvm_sha256": "df621e75d492d58ff9d7aeb008ab7f9d3cda756439c18af0af5a10794ebfcb8a",
+            "binary_sha256": "0e8befe3586d2de85a742b15e780f7ed99f8be06992b17a845f8b38837a517bb",
+            "cases": [
+              {
+                "mode": "success",
+                "ready_values": 14,
+                "spine_length": 20000,
+                "thunk_calls": 1,
+                "application_calls": 1
+              },
+              {
+                "mode": "null",
+                "exit_code": 1,
+                "error": "missing runtime value"
+              },
+              {
+                "mode": "hole",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              },
+              {
+                "mode": "indirection-cycle",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              },
+              {
+                "mode": "thunk-cycle",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              }
+            ]
+          }
+        },
+        {
+          "compiler": "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+          "compact": true,
+          "llvm_sha256": "545a5b06d80ef98556d98e0a38a39bb1477bce8fe3175bdcf884b678fa171197",
+          "binary_sha256": "3e0ab66258a5acb151b66a7b64fc5fe20c56b421f8e61d015671ee7b7a1d8b0e",
+          "stdout": "42\n3.50\n2\n",
+          "mismatched_link_rejected": true,
+          "force_regression": {
+            "source_sha256": "39b75c373598e2cc31b369df43e962cf4dc7f82f69f7cd5484157856080af547",
+            "llvm_sha256": "7243466b83489f6ac678fa0e38ceeb7209aa50c05c66bfbd26d7c2e030eb7a4d",
+            "binary_sha256": "4689945bb894a592256c50a916f28a37106b7f56f2177062cf1c72dff01b9663",
+            "cases": [
+              {
+                "mode": "success",
+                "ready_values": 14,
+                "spine_length": 20000,
+                "thunk_calls": 1,
+                "application_calls": 1
+              },
+              {
+                "mode": "null",
+                "exit_code": 1,
+                "error": "missing runtime value"
+              },
+              {
+                "mode": "hole",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              },
+              {
+                "mode": "indirection-cycle",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              },
+              {
+                "mode": "thunk-cycle",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              }
+            ]
+          }
+        },
+        {
+          "compiler": "/Volumes/src/mlf/dist-newstyle/release-2026-10-14/bootstrap/emlf-stage3",
+          "compact": false,
+          "llvm_sha256": "3d7d6f6beaabd251275b16b31e59dd99579df96b626f20a4232fa21e6ed1c494",
+          "binary_sha256": "50b670f83d566f70251c01f07b2167cc4c5a52aa5b904a92f81bf512991bbd34",
+          "stdout": "42\n3.50\n2\n",
+          "mismatched_link_rejected": true,
+          "force_regression": {
+            "source_sha256": "39b75c373598e2cc31b369df43e962cf4dc7f82f69f7cd5484157856080af547",
+            "llvm_sha256": "dd8c490f31f37d8900e5151334b2d018afc617ed208086f0c4d654fe43990287",
+            "binary_sha256": "ad7afc1cb93aee401312942890785cb3706bd8d40a4ed5cb1ea221f881f6747a",
+            "cases": [
+              {
+                "mode": "success",
+                "ready_values": 14,
+                "spine_length": 20000,
+                "thunk_calls": 1,
+                "application_calls": 1
+              },
+              {
+                "mode": "null",
+                "exit_code": 1,
+                "error": "missing runtime value"
+              },
+              {
+                "mode": "hole",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              },
+              {
+                "mode": "indirection-cycle",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              },
+              {
+                "mode": "thunk-cycle",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              }
+            ]
+          }
+        },
+        {
+          "compiler": "/Volumes/src/mlf/dist-newstyle/release-2026-10-14/bootstrap/emlf-stage3",
+          "compact": true,
+          "llvm_sha256": "278a283d0337fc09420e7427683ec7772243c330d85f4da45bbecc0eb73a6aea",
+          "binary_sha256": "01cf6b1c74f2cbc961240e8752423ccb3c030c17af3d06712e338e525052e891",
+          "stdout": "42\n3.50\n2\n",
+          "mismatched_link_rejected": true,
+          "force_regression": {
+            "source_sha256": "39b75c373598e2cc31b369df43e962cf4dc7f82f69f7cd5484157856080af547",
+            "llvm_sha256": "d61cb937028d3ee0f674adda6a102c1c35dbd99374437e30e112e79be1584eac",
+            "binary_sha256": "b86cc04f55aac891b8a6085d899711b0e9f5c3e7513b9ddaae21de47b9e2e5a3",
+            "cases": [
+              {
+                "mode": "success",
+                "ready_values": 14,
+                "spine_length": 20000,
+                "thunk_calls": 1,
+                "application_calls": 1
+              },
+              {
+                "mode": "null",
+                "exit_code": 1,
+                "error": "missing runtime value"
+              },
+              {
+                "mode": "hole",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              },
+              {
+                "mode": "indirection-cycle",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              },
+              {
+                "mode": "thunk-cycle",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "parity": {
+      "accepted": 3199,
+      "rejected": 3884,
+      "runtime_rows": 80,
+      "runtime_executions": 160,
+      "cases": 7083,
+      "categories": {
+        "figure12": 43,
+        "hm-exhaustive": 1712,
+        "hm-generated": 5000,
+        "annotations": 126,
+        "readability": 18,
+        "state": 97,
+        "modules": 60,
+        "examples": 18,
+        "benchmarks": 9
+      },
+      "manifest_sha256": "95954a9e164e8bf3faf15de41f38c99df61bd365d01849c98c4c00b37006e6cf",
+      "compiler": "/Volumes/src/mlf/dist-newstyle/release-2026-10-14/bootstrap/emlf-stage3",
+      "compiler_sha256": "da24e2c6438b11fe1cc7ccaa82fd35d16354fa2894d0f157199c959cecb15493"
+    },
+    "finished": 1791909404.557526
+  },
+  "native_backends": {
+    "schema_version": 2,
+    "complete": true,
+    "started": 1791909404.6195068,
+    "drivers": {
+      "RuntimeDriver": {
+        "llvm_sha256": "df88c7a4f73d50bfd2e234d5bf961113a9f7ce977d2870abd3376631d86e9cf9",
+        "binary_sha256": "66d98f6afe424926993b2d69e486e2dd1043aa5aef67d2497342ebc9dbda3b31"
+      },
+      "LLVMDriver": {
+        "llvm_sha256": "d09d50102ad23bc1ec2afb4efb19ba9be0ae9283cd4614b65c5df2b4da77d2c5",
+        "binary_sha256": "3ec2682533503d11832612fa449eb154703f8e11e6bd24e2027e6ccdebaa31c4"
+      }
+    },
+    "matrices": {
+      "standard": {
+        "rows": 475,
+        "backends": 2,
+        "fixtures": 428,
+        "cli_compiler": "/Volumes/src/mlf/dist-newstyle/release-2026-10-14/bootstrap/emlf-stage3",
+        "environment": {
+          "MLF_BOOTSTRAP_INTERPRETER": "/Volumes/src/mlf/dist-newstyle/release-2026-10-14/backends/RuntimeDriver",
+          "MLF_BOOTSTRAP_LLVM": "/Volumes/src/mlf/dist-newstyle/release-2026-10-14/backends/LLVMDriver",
+          "MLF_BOOTSTRAP_COMPILER": "/Volumes/src/mlf/dist-newstyle/release-2026-10-14/bootstrap/emlf-stage3",
+          "MLF_BOOTSTRAP_TIMEOUT_SECONDS": "1800",
+          "MLF_LLVM_TEST_ABI": "standard",
+          "MLF_LLVM_TEST_CFLAGS": "",
+          "MLF_LLVM_TEST_LIBS": "",
+          "MLF_LLVM_TEST_OPT": "-O2",
+          "GC_INITIAL_HEAP_SIZE": "536870912",
+          "GC_FREE_SPACE_DIVISOR": "1"
+        }
+      },
+      "compact-gc": {
+        "rows": 475,
+        "backends": 2,
+        "fixtures": 428,
+        "cli_compiler": "/Volumes/src/mlf/dist-newstyle/release-2026-10-14/bootstrap/emlf-stage3",
+        "environment": {
+          "MLF_BOOTSTRAP_INTERPRETER": "/Volumes/src/mlf/dist-newstyle/release-2026-10-14/backends/RuntimeDriver",
+          "MLF_BOOTSTRAP_LLVM": "/Volumes/src/mlf/dist-newstyle/release-2026-10-14/backends/LLVMDriver",
+          "MLF_BOOTSTRAP_COMPILER": "/Volumes/src/mlf/dist-newstyle/release-2026-10-14/bootstrap/emlf-stage3",
+          "MLF_BOOTSTRAP_TIMEOUT_SECONDS": "1800",
+          "MLF_LLVM_TEST_ABI": "compact-gc",
+          "MLF_LLVM_TEST_CFLAGS": "-I/Volumes/src/mlf/dist-newstyle/bootstrap-deps/bdwgc-8.2.12-install/include",
+          "MLF_LLVM_TEST_LIBS": "/Volumes/src/mlf/dist-newstyle/bootstrap-deps/bdwgc-8.2.12-install/lib/libgc.a",
+          "MLF_LLVM_TEST_OPT": "-O2",
+          "GC_INITIAL_HEAP_SIZE": "8388608",
+          "GC_FREE_SPACE_DIVISOR": "1"
+        }
+      }
+    },
+    "compiler": "/Volumes/src/mlf/dist-newstyle/release-2026-10-14/bootstrap/emlf-stage3",
+    "compiler_sha256": "da24e2c6438b11fe1cc7ccaa82fd35d16354fa2894d0f157199c959cecb15493",
+    "seed": "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+    "seed_sha256": "52ec73d625fceb927334c3c157f8bfca5e50f148f609aa4b7ba5abf6358bdf90",
+    "sources": {
+      "app/Main.hs": "991ac6edbe670e27696a807a9bf3d5bbf1c1a4f44d1cee43eedc3a27d33a94df",
+      "bootstrap/Bootstrap/Classes.emlf": "613f18dc4f56669953ac756c9ca45adb62d31bb1e7b4fab3bf1befc0dff19ef3",
+      "bootstrap/Bootstrap/Compiler.emlf": "23d2d6e8bf4e03153030f0f0c4d06505322811263fd357fa2ee5b2bf3031bcaa",
+      "bootstrap/Bootstrap/Constraint.emlf": "fd2ccc41e247b0ffc05da83f08dd2c7157df763dd3957871cf4ded6500c077da",
+      "bootstrap/Bootstrap/Data.emlf": "1a798a05dc70440f4076b099adf40dca717752b077edb49e0dcbda78b3e31c4f",
+      "bootstrap/Bootstrap/Desugar.emlf": "d668bfb3dd66693907e72a087abffc6af35beab6e251ee4d1028b15ecb9da6c6",
+      "bootstrap/Bootstrap/Elaborate.emlf": "479ffdbc081928375d1486d047e9a7f6a4ff77ce1a8ba5773dcc3520294c8c79",
+      "bootstrap/Bootstrap/Evidence.emlf": "7e031bf638d709ac84822901cc3436223e2aaf0ec76aad46beb8ec2952c6d14d",
+      "bootstrap/Bootstrap/Fresh.emlf": "b6af7da1aceb0e81b68ee6a1100616b71f6558fa8f551de62dbddecc4d7483a0",
+      "bootstrap/Bootstrap/Graph/Solver.emlf": "c94debcd152d8ee1c0a6a6bb7bce2d375ed2a37c4f5456463846bb5918eeb630",
+      "bootstrap/Bootstrap/Graph.emlf": "b541d79da0f7c957e0389e426bb9279a42630b362e99b8fd4c54ad057ec31901",
+      "bootstrap/Bootstrap/IntMap.emlf": "a5cce880a0cac66d07c9b4e30e981766b80da8e5e4e6b311f235c03997d14dfa",
+      "bootstrap/Bootstrap/IntSet.emlf": "519784adfb1be285f1f056f1e93a25a68e13db7ad37e9852a6ddb18dff815a82",
+      "bootstrap/Bootstrap/Kind.emlf": "4195e17517b2eb3a6b12c0c96112b1b5b6d1119ef3e9f1ba0a1ecf043c831772",
+      "bootstrap/Bootstrap/Kinding.emlf": "517aec41c9260a6a463a3042717d589b97df175670ada755fd45fcdbc6f0d36c",
+      "bootstrap/Bootstrap/LLVM/Analysis.emlf": "7d6f03ac5e09110b11e540a71856ac269c449772350b6527d02bd2b47ffbcf6d",
+      "bootstrap/Bootstrap/LLVM/Build.emlf": "9a635d1ccdd0857eafb7b87825d234ed649b7c3728c83ea0a3c731323cf6c728",
+      "bootstrap/Bootstrap/LLVM/Codegen.emlf": "72b8ac720bfeffad2b9e7c53419f5de55fcb597dbcb4d15acc88dffcaef14597",
+      "bootstrap/Bootstrap/LLVM/Kernel.emlf": "fa7a94be851dfc285786712060fed906bdf81270552f870c066d5303c580e434",
+      "bootstrap/Bootstrap/LLVM/Native.emlf": "6138103c4bacbbbce4ae65aadd942380dce54c376b9062429e63e79c20e6f3bc",
+      "bootstrap/Bootstrap/LLVM/Optimize.emlf": "ff8b3ea2824d4456081c1f77090627a70c2703064928367a8378635f2ef03519",
+      "bootstrap/Bootstrap/LLVM/StrictFields.emlf": "bee5f7df5e8f7cb592342e51a42f1cd6c63f9024082b56dd76c347196af1e1b3",
+      "bootstrap/Bootstrap/LLVM.emlf": "eecd7f70b179d35d5265de4ea673b5125a334f8bddaf01ed38ff70906066892d",
+      "bootstrap/Bootstrap/Layout.emlf": "7eb281a16bac3adb35ff15dbfaf0150e5df7b0d4af8f046cbb6362a520f329e6",
+      "bootstrap/Bootstrap/Lexer.emlf": "702c67d0d3377ddc438b242762e1505945b91a959c94c737e117f0bafcee4161",
+      "bootstrap/Bootstrap/Map.emlf": "b7d5921dbae083f227e4562a257efaaac2f1b7e6f270073857c8ba43b674e08a",
+      "bootstrap/Bootstrap/Module.emlf": "079deb1f792e5a9ee15fdb741bf773495966b64bf633bbd187e3af745f8c5230",
+      "bootstrap/Bootstrap/Parsec.emlf": "ffc64213d5baf649aa40ccab44521af79a4aaf84cb268bd87cd70c2873f1500e",
+      "bootstrap/Bootstrap/Parser.emlf": "28a093dca7a7f86a1a14a8579405e7cfae3401e27bf214abdf31a87818fd484d",
+      "bootstrap/Bootstrap/Prelude.emlf": "e4908ab88f9cc3350e09ca09196db60abdfabb035055ff0ceff9a10a732c21d5",
+      "bootstrap/Bootstrap/Primitive.emlf": "1922e41a3935d7d87483bfccd87529b573f77e996e38ce3349117f91d0baeef7",
+      "bootstrap/Bootstrap/Runtime.emlf": "db6d959430c33ce1fde5192a5dfb596ddcb83132d115f10bf05d9b26e5d51ba5",
+      "bootstrap/Bootstrap/ST.emlf": "657c2b7f3958a8b14ed7a336908689f951480b45ff50059b242cfe3f3df7d7b0",
+      "bootstrap/Bootstrap/Set.emlf": "bac505cf121011b0b325d5ea59d1bd8c2abd919a8158516540d707a813abbc77",
+      "bootstrap/Bootstrap/SourceEquality.emlf": "5fc11a57d42b85d7776ff76dee9872a7264ff7f920121833f221c277ec37f4af",
+      "bootstrap/Bootstrap/Std.emlf": "50c455982728484d3e3cc0359f4314f5bfeef0706e051701979fd529779428f7",
+      "bootstrap/Bootstrap/Surface.emlf": "f8d4f9abd96bec1582dcf21b30e8500677a448637854a25e7fc80b7a762ac437",
+      "bootstrap/Bootstrap/Types.emlf": "5a790419e00d4825ffbc5f06cca4b8e64813d8dabd69d34d4fdde926e013e1dd",
+      "bootstrap/Bootstrap/Unicode.emlf": "fdde8c09d3cd1bdddcbc6a3c65c6ab7668c8d60b6795d9a0c106a098c1b647b4",
+      "bootstrap/Bootstrap/X/Check.emlf": "b20e256bdc4d25ddfc3c76dc0c91083957133c3cf973de5a8244e40285defee6",
+      "bootstrap/Bootstrap/X/Parser.emlf": "3ea0d9cb15c9d08c2ca76c0c1f5d903d34978b6476075c0ebfa9655aa8841f03",
+      "bootstrap/Bootstrap/X/Pretty.emlf": "a7c23152c6297315e4ef0bf1dbba9685688cb68010c0194fa544c2c39f48f0e4",
+      "bootstrap/Bootstrap/X/Syntax.emlf": "40ef760efb420654dcc7f5c05334eafea81f21d0bc269f8e0d1de9ee5c5eda70",
+      "bootstrap/Bootstrap/X/Type.emlf": "ac916c2902d99edfce443f96930cdc52bdf341eff3007c38d203450400b9446c",
+      "bootstrap/LLVMDriver.emlf": "d04bd38721059978607996a92aef2347962ee8b4e5e071dd8e18b41076bc03fe",
+      "bootstrap/Main.emlf": "c76a243eb120b779987f29aa737d5780fae7a03b66095a0fc5f79aa3d7ca7aa6",
+      "bootstrap/RuntimeDriver.emlf": "ba943012e7f1d369bb3122c5098672ac2682263e76536001665dd7be89ab3990",
+      "bootstrap/tests/ConstructorProjection.emlf": "c83229426f6d79c8a7e272d784a18051cc27a70debee78866061559bd4936184",
+      "bootstrap/tests/EmbeddingPruning.emlf": "dc3fca089316752a726001b989c9589e662729c142fdeffd1d75bbd99a7c7bf9",
+      "bootstrap/tests/ForceReuse.emlf": "531afe40bd7fe51c29980edc835d28da5122d19269eb32e0d2c3de0b19ebda8a",
+      "bootstrap/tests/GraphConformance.emlf": "86f85d0ded341b6cb7908b58477a03a59c2e7d8e46286ebb88b227a702a54943",
+      "bootstrap/tests/GraphDense.emlf": "ce828f6d6c003d0c914da90a3b168b3ba692fe51e3472c794f73d629938e4448",
+      "bootstrap/tests/GraphDenseProbe.emlf": "c4c3c85eb2546d3a2cdcf21322e577106ac49198317a8e3ddd2fcfe906744e6f",
+      "bootstrap/tests/GraphScopes.emlf": "b0314b23c47a931edc10ceb0d54f7e529951f8b9f9bfe750a55b818d71d10f21",
+      "bootstrap/tests/GraphSmoke.emlf": "ef099955729cd0ed64966a503e06446d24129750b4315d7ced82a87832fc2f10",
+      "bootstrap/tests/GraphStack.emlf": "05d34749539cb8f58a3a2109792efdb370700238ff625eef56981b0219983874",
+      "bootstrap/tests/InferenceConformance.emlf": "fb62b18cdf0fad8e878643ca354d583b9a0b740a7263d72c359ffb2d522164d2",
+      "bootstrap/tests/IntegerContainers.emlf": "0e41282d32f44ba950789708d864d6d0dc14530d2bf9a81255036906858c9ea7",
+      "bootstrap/tests/LLVMBuild.emlf": "cadd61c0e94a3d3c75ec52c17bf840be186c5aac0c960eeeab604b01598533d5",
+      "bootstrap/tests/LexerCounters.emlf": "2d562a64d74c7e0f9be88c9f73ddf7b403ca978c91b6527a308f7b4fb9b552f0",
+      "bootstrap/tests/MapFolds.emlf": "90a1471cec114224a04d0cfc54e010ec1704f52494a2d855c268372a5f549098",
+      "bootstrap/tests/OptimizerQueries.emlf": "3f7e11a679bb53613c8fe27ca2e4b83a9c9338a8f8d1603fe6f731ac88700e58",
+      "bootstrap/tests/OrderedTraversal.emlf": "d8cb8e6ee8ad681f01a53b862a730f8129ced313abc2fb04a5c50589bfd51320",
+      "bootstrap/tests/PhaseProbe.emlf": "7d1c5186c10279a9dff66903c2bc9ca6a6ad092de73ef113911b0bf379304aa6",
+      "bootstrap/tests/PrimitiveMetadata.emlf": "c161d3ce921df72e7f81acc00da8afbb81092c5d2640acd1590a0c636a50b2fd",
+      "bootstrap/tests/RuntimeCases.emlf": "9f79ba21fcff9161c80f4939ad74d359bcda4a0e5cd27c516d0252f3fe35a1fa",
+      "bootstrap/tests/RuntimeSmoke.emlf": "ac612567558a34fd255f848b1b51cacf0dd4ecc697315b3181e413c4fc259c1a",
+      "bootstrap/tests/SolverReuse.emlf": "d640cf0769f80f7a0a8e2e4386a8e2d40af58080b6947c67d97bf5b81bbd9fcd",
+      "bootstrap/tests/StateRuntime.emlf": "dc07e3f2594eeaf7e3b5f1fac15184132158ab7e8144d63168112c60e98e187f",
+      "bootstrap/tests/StateTypes.emlf": "383d8c20655254dd655ce70cd7cc74661522c46cfc1df62602cf59db4bf59fa0",
+      "bootstrap/tests/StrictFields.emlf": "18c4dc8ea3a89c8a330d41ce0b3ea5c206e20ac38d62ec881f622dc35b2e0c66",
+      "bootstrap/tests/Target.emlf": "d7c78b8cea49dd219f8fc92a43ae8be5a56a89fa10bea4631bc9b8beb9914e00",
+      "bootstrap/tests/TypeCache.emlf": "d6ff8e1afef0db13ebb0429c858f763b084d922daec0514994c5fffe2719d3d3",
+      "bootstrap/tests/classes-stage0.emlf": "b81c56da1ade9ca4f097ee972bd553a1723f336d1870dcc8c4c414d3ac8de23f",
+      "bootstrap/tests/foundation.emlf": "afb60cd83d96174ebbe3e2c20d2e8fd232dd208ebfc7b28d006bfbae15ee0bd9",
+      "bootstrap/tests/frontend-stage0.emlf": "34d9a97cb89e7b12d49a9774841d3ee166eabce08b456261620c6a6aa5c64415",
+      "bootstrap/tests/frontend.emlf": "3daa8a62aaf1f036b8549c984f4b8f6f957732db99be02ef6e449fdd1f2f7391",
+      "bootstrap/tests/parsec-stage0.emlf": "64d2b8819f7087968b15e89a33922d35b842ac1ce9970dc6aad90c3449c94777",
+      "bootstrap/tests/parser-corpus.emlf": "3240b6a72a9a549cf95cccec3edbabf0701f26fb5b2dd53ab171b45b71e63cb9",
+      "bootstrap/tests/prelude.emlf": "ddfc04ae6f168be36e41ae501a8304dde9462e3485fd1bec9b19ecdfd8cbd87e",
+      "mlf.cabal": "f972a7f05ecf5676c22b85985713b568e2579179565743f865da272774a2b332",
+      "runtime/khash.h": "4582c7fd4b98f61339ce677bb1daa7a45a53075b112a494a335525c4bda72074",
+      "runtime/mlf_runtime.c": "907893cb216c1cd596d92a3707488d7dd121657f5f0629ab54b737b5f383fbe5",
+      "runtime/mlf_runtime.h": "21254da67997079b785702bffdfb67dfe87536468960ec3c50bd09aa71704fcc",
+      "scripts/bootstrap-backends.py": "7d8b440882f8fcd5dcbaf3491a7a1cbd75715fea38e35f5a4addb7d2f9e6773d",
+      "scripts/bootstrap-gc.py": "736c3ab4ab0ebb274cbea1d9bd84d845278101257bbff80b4a406be464185e82",
+      "src/MLF/Classes.hs": "d19ffe5dce923ce23890a99c1b744d7e5539d88fed2be93148f71872a967994b",
+      "src/MLF/Compiler.hs": "19e82ccc149c1b7a977b5024edc3929705c16e64ed3cb05e71aa800b099ec164",
+      "src/MLF/Constraint.hs": "94f757a6619f2f860e314b8c8f46f15e0a5c743593cc57a5e51c958769ac2cc6",
+      "src/MLF/Data/Parser.hs": "f8bcb819c612ce6dc745233ccef0108b0b735c9fbe2b099bc23cf3646dac7a14",
+      "src/MLF/Data.hs": "f66abdf5f899f255bf7d127a716c9c5cae2981141c5002867804013f2d8c12dc",
+      "src/MLF/Desugar.hs": "8e96a8253dee04c6b980a9ab21cd69b7ab33a8bb23c12876d1d72fe65449c8a4",
+      "src/MLF/Elaborate.hs": "ed6b89f7563721373bc4f5cdfb0bf89c902be9810043645865d35d1b0a0e6776",
+      "src/MLF/Evidence.hs": "898ee8cd42348da67179f9d02a5c0a2f2e57800b1a63f45dc6a2dd0d62b08d41",
+      "src/MLF/Graph/Solver.hs": "2ceb267bca7c2202b3f50d706ff14e0084fc4b590022a9cafd1785fce69c6f23",
+      "src/MLF/Graph.hs": "6456fc83fdcf1cc2fd3365c1c40d2f608d3a34f16b106587d817973cb9b93d51",
+      "src/MLF/Kind.hs": "d6eec39e54a8c38c6f62635974385e7afdd018055c247f8ab8e3fa0e1d992d3b",
+      "src/MLF/Kinding.hs": "93ae79fd258a0e8289fa5fcbd8edd1ea72b5869545ed06e38f47900ffe6419c7",
+      "src/MLF/LLVM/Analysis.hs": "e43fa8f500626066180c983a9d11cfff1c281a4eda51ed06b69ec5f2f990e64e",
+      "src/MLF/LLVM/Codegen.hs": "cccbd60913202985792b882bc178fdc69221e63090cf9a7a76269915a50f2799",
+      "src/MLF/LLVM/Kernel.hs": "bedbfddb3bc571509ed1f3950a871fa6b324c21e699b82a7048a163324980cda",
+      "src/MLF/LLVM/Optimize.hs": "0e5f0d2f8b35cab7f80c0aefcd2cd066071fa7f63884c301a492a79babcb9056",
+      "src/MLF/LLVM/StrictFields.hs": "668aa2061a7e3799010b8ac407a7260ddbe8a2c501cf4a237df386d4cbc117ac",
+      "src/MLF/LLVM.hs": "6324e4c99296bb964b0542e82bcc10e7b5bce4f698598541354a17e8fd92f481",
+      "src/MLF/Layout.hs": "eec74eec6c241760e63b8cb331ba662e50b292f9e774394a3292e776649c0c6b",
+      "src/MLF/Module/Syntax.hs": "9fed594b6c2b5cdb913672b4db1b17d7d420a632eaf4d2b3a9753926bc817298",
+      "src/MLF/Module.hs": "1e3bd857c35ee0a335fd69966c8d2a3888625dc95e853aa9d9547ea43ca9ee16",
+      "src/MLF/Parser.hs": "a48af42261f447e101f6925787bcf05e5ad9a8771cc01100f9b35bbb759c0648",
+      "src/MLF/Prelude.hs": "2ea7635056e36d7fe1102adf592984efb6e3218ece8e5c6f43ff5bdc91ec5970",
+      "src/MLF/Primitive.hs": "6ffcd3de18f7dabe59e5f10e894d266b01bd4d54f82f554b69e2b195538afb8c",
+      "src/MLF/Runtime.hs": "ef5c4a44f65820878ee57d458f3299ff61f9720abfe1024126dea2c6a2242c6c",
+      "src/MLF/Surface.hs": "b1ba74dffa7139c02f92cbec08e928fec3953c376fde89b61240484c54c1beab",
+      "src/MLF/Syntax.hs": "81441237f6708d3749ff7c1d42e01c0b063c1eb796118cc281e702cc309cb9a9",
+      "src/MLF/X/Check.hs": "802eab4fba00135bcbcbc7c31845538a87fd67d52d9d845334893d2ab7204922",
+      "src/MLF/X/Parser.hs": "8a33271c0bd453af8e76f8781a24b368fcf99e98a9e70d4bac5bfda4416f9216",
+      "src/MLF/X/Pretty.hs": "b7b22a923d4b138bc59c990ede2bbe23ff6e02d9a30d9bcddcf7393e0dc5a2c2",
+      "src/MLF/X/Syntax.hs": "050a21bb876a344f35be5d520451229124bb8f4ca89de21e9ec0b03cb6e5212e",
+      "src/MLF/X/Type.hs": "66f2c899b846439e94b5dc7e70757ca75d14d655e50b7910ad20e2572ebe681c",
+      "test/BackendCases.hs": "3cde1bff4949f8565a8691166af5299cb0e28e2aeab8c847af42add1cd019c39",
+      "test/BackendMain.hs": "a598f8d733d71ce98cfde70097fea56a12fce2dd41012e8d32618e0018301927",
+      "test/Backends.hs": "1268a7397aeae1d032cfd47e5d1b91204ddcbfdcc345d1a7743be1dd5efa54f8",
+      "test/BenchmarkHarnessMain.hs": "d037423521f139ec3ef48a10b75a1e11bb65b295e5f5ae9c760d5f86a0b8a976",
+      "test/BoolConditions.hs": "6aa03c5cbcfbaaa0356274d7f01cca4988fddf4fe2fcb35f4837d364afe50ef1",
+      "test/BootstrapPortMain.hs": "35dd7cff7de908b5933e81be36e925476662a067f5a68d64bc2d55d0ba2dc1e4",
+      "test/BootstrapPrimitives.hs": "8a049f5a254de27811c88d9ee6b5d92a5fc3e238b34c0b1c264b4d0fb923f405",
+      "test/ByteArrays.hs": "b43812f999d8d273a79eacb1588796401a616eeadd5d5b59039adbe8693d5397",
+      "test/Computations.hs": "20bad74bf600fe6cab1826ffdfb1b7c540bbab41b406f90e46c2f41cf8558207",
+      "test/ConstructorProjection.hs": "da901313853248b7e759f3fc8aaa4c083a715a9adb641a1ad31adcccc4a79c5b",
+      "test/DNA.hs": "76826075804fd57f38ddebf8f6093fde6a810d83fdf4cb0284125ae64e3ba00d",
+      "test/Datatypes.hs": "7d09627717ef652eadd1a88beb9a19b656f36e912eca3babdbd32f8ea5e6e72a",
+      "test/DoNotation.hs": "c2d400716e0559fe869bcdc43b3c1e11b268782bcdad274cd8265a07ae47a098",
+      "test/EmbeddingPruning.hs": "6cb508a392aaf61b1cfc69e8f779242d4a680714799d48ac0d9d968bac7bfc86",
+      "test/EnvironmentAccess.hs": "d9c6fb53579348220d27e716f2a4676da657546c51c59dbf9cd0b6bf0599689f",
+      "test/Figure12.hs": "a8a9861c917510763816009e0ac59af1f237185fa824ce556153b156fb1edb0c",
+      "test/Figure12Main.hs": "270b2a6ffb527076e48bf34850ce907f71bc5ea1332f4c836b8dd32310af5423",
+      "test/ForceReuse.hs": "5fe1d6aa368f771c4d83c7923e2d1e78b8040fa86eaac27059a361b537d4196d",
+      "test/GraphSolver.hs": "8fb8a905d5d1bc3f4911a7c8326e185d9f144b4af12a05ccbbb9bc55b23311df",
+      "test/GraphUnification.hs": "dbfe9dd4ac0fdb7120b8bd9f397ef010e842797aa12f8893eb328e971b6c358f",
+      "test/GraphUnificationReference.hs": "73b71ace8e41eb2ec13d2d27be2b3ad81b9ec85cb2cff5d518511c7ddd92455b",
+      "test/GraphValidation.hs": "d48a10d5d05b1ef12dc42abc655df4fe1016a1aa3b92877b38f58288b4720864",
+      "test/HigherOrderSpecialization.hs": "a593fc55ffb9af479f47f1e094702cf3359cb2db09e042ab1ec6c02eaed324fd",
+      "test/IOTests.hs": "0a82f993d8f14ec0a93eedfe3a5d9623deb48d04b5fa359373f0de5f6825420c",
+      "test/Main.hs": "3bb73fc3b99b6ff9329b74761ff5421b0c35003fec71da822c2fc7580af7c0f6",
+      "test/ModuleBackends.hs": "789d40b574650b4293b895ea5e8c03987260ba50741ab99a6a7d7a3deae6d6c4",
+      "test/Modules.hs": "69af6c6092eaf5a855ebe9c86ed19ff0d90c2c8af6812da56ad95144b5897cb2",
+      "test/NativeOptimization.hs": "9bddb9b8f64c65be8e9c7b8aa13e720d7c1f320c58da766d99e763dcbc5c43a1",
+      "test/NumericArrays.hs": "d2c1a2b82127929aa00f10c9543149e8dc20c728ecf353f7239ebdffb3532f04",
+      "test/OptimizerQueries.hs": "0c551f7016d8f88694da44a93f7c4c7ac0ad5c58807bdd9c6ae0109746f8942f",
+      "test/Oracle.hs": "c7726b6cfd6b1f681b379495ff5ff1a1cc1ffbfe2fb51c2c99af19317bd0ead6",
+      "test/PreludeTests.hs": "8c5983db0179cc08f16db494af5df0fa1966704cf626e3c893d05fe13c9648e6",
+      "test/Readability.hs": "ab637b0845a9948e7a65189a056b1ecac89c10a72bb10faafea2be674cc74dac",
+      "test/Snake.hs": "53371de9b259e682187a09d0e76b9e5af92cdfbf87121e3f67706ab5690a5e75",
+      "test/StateCases.hs": "45e94b2c3971134cdaa222559cea2f6a11a90270f44041e88cd9683ad76aa7c4",
+      "test/StateRuntime.hs": "63f85411a038a94859e7746bdff79c597245a340918d8a93aa50511b54f833ab",
+      "test/StateTypes.hs": "1bd4c51aa4ba946fe4176471b943cad5846ad43a9c9b49d392bde63d3fa26118",
+      "test/StrictFieldAnalysis.hs": "b8ac1312b47634799dd9ae41bcd643949b36b03d69f0a09746e3690ee02a3429",
+      "test/StrictFields.hs": "38073931f387843e1ddc3ed198023abc01bfea81c580d3c7c395482caf96e52d",
+      "test/SurfaceSyntax.hs": "03371fdca749c7b341e09e56860b373a5f6b122e15277723db400a898e42e3c2",
+      "test/Typeclasses.hs": "0d874093f261c01d1b406ac533ef4c3f870e113586ae52d0683645ab6666a598",
+      "test/native_trace.c": "f6dde7bf8073d0baf6a845944cc4dfbdb290f7388f68060571563a9d39e402a7"
+    },
+    "environment": {
+      "MLF_BOOTSTRAP_INTERPRETER": "/Volumes/src/mlf/dist-newstyle/release-2026-10-14/backends/RuntimeDriver",
+      "MLF_BOOTSTRAP_LLVM": "/Volumes/src/mlf/dist-newstyle/release-2026-10-14/backends/LLVMDriver",
+      "MLF_BOOTSTRAP_COMPILER": "/Volumes/src/mlf/dist-newstyle/release-2026-10-14/bootstrap/emlf-stage3",
+      "MLF_BOOTSTRAP_TIMEOUT_SECONDS": "1800",
+      "MLF_LLVM_TEST_ABI": "standard",
+      "MLF_LLVM_TEST_CFLAGS": "",
+      "MLF_LLVM_TEST_LIBS": "",
+      "MLF_LLVM_TEST_OPT": "-O2",
+      "GC_INITIAL_HEAP_SIZE": "536870912",
+      "GC_FREE_SPACE_DIVISOR": "1"
+    },
+    "allocator": {
+      "profile": "BDWGC compact",
+      "flags": {
+        "cflags": [
+          "-I/Volumes/src/mlf/dist-newstyle/bootstrap-deps/bdwgc-8.2.12-install/include"
+        ],
+        "libs": [
+          "/Volumes/src/mlf/dist-newstyle/bootstrap-deps/bdwgc-8.2.12-install/lib/libgc.a"
+        ]
+      },
+      "io_threshold": 1048576,
+      "macos_stack_bytes": 67108864
+    },
+    "finished": 1791910085.346519
+  },
+  "cabal_summary": [
+    "564 checks; 0 failures",
+    "Test suite mlf-tests: PASS",
+    "43/43 expressions match regression expectations; 0 failure(s)",
+    "36 supplementary checks; 0 failures",
+    "Test suite figure12-tests: PASS",
+    "Backend matrix: 26 rows x 2 backends; no missing executions",
+    "26 MLF port fixtures; 0 failures",
+    "Test suite bootstrap-port-tests: PASS",
+    "Ran 53 tests in 10.385s",
+    "Test suite benchmark-harness-tests: PASS",
+    "Backend matrix: 475 rows x 2 backends; no missing executions",
+    "428 shared IO/prelude/backend fixtures; 0 failures",
+    "Test suite backend-tests: PASS"
+  ],
+  "installation": {
+    "compiler_sha256": "da24e2c6438b11fe1cc7ccaa82fd35d16354fa2894d0f157199c959cecb15493",
+    "relocation_checked": true,
+    "outside_checkout": true,
+    "program": "examples/snake.emlf",
+    "stdin": "q\n",
+    "backends": [
+      "interpreter",
+      "llvm"
+    ],
+    "output_sha256": "0c9ab86e08d16519c02ffc9270168940a1f14f1abff67a8036f15618ece7e8e2",
+    "output_bytes": 426,
+    "native_build_compiler": "/Volumes/src/mlf/dist-newstyle/native-release-2026-10-14 moved/libexec/mlf/a4e9de76c822e8a3/emlf",
+    "frontend_sha256": "da24e2c6438b11fe1cc7ccaa82fd35d16354fa2894d0f157199c959cecb15493",
+    "prefix": "/Volumes/src/mlf/dist-newstyle/native-release-2026-10-14"
+  },
+  "benchmark": {
+    "path": "benchmarks/results/2026-10-14-stage3-release-macos-arm64.json",
+    "sha256": "8264eb833f4551292e4ba936118e0039d7c54b76d86ad743029c0b52a16dbdcc",
+    "status": "passed",
+    "compiler_sha256": "da24e2c6438b11fe1cc7ccaa82fd35d16354fa2894d0f157199c959cecb15493",
+    "checks": [
+      {
+        "benchmark": "binary-trees",
+        "dimension": "compilation",
+        "mlf_over_c": 2.9613208520555028,
+        "maximum_ratio": 5.0,
+        "passed": true
+      },
+      {
+        "benchmark": "binary-trees",
+        "dimension": "runtime",
+        "mlf_over_c": 0.8489556230177038,
+        "maximum_ratio": 2.0,
+        "passed": true
+      },
+      {
+        "benchmark": "pidigits",
+        "dimension": "compilation",
+        "mlf_over_c": 2.890404045670299,
+        "maximum_ratio": 5.0,
+        "passed": true
+      },
+      {
+        "benchmark": "pidigits",
+        "dimension": "runtime",
+        "mlf_over_c": 1.152650548918994,
+        "maximum_ratio": 2.0,
+        "passed": true
+      },
+      {
+        "benchmark": "n-body",
+        "dimension": "compilation",
+        "mlf_over_c": 4.641421747971316,
+        "maximum_ratio": 5.0,
+        "passed": true
+      },
+      {
+        "benchmark": "n-body",
+        "dimension": "runtime",
+        "mlf_over_c": 1.124697181735758,
+        "maximum_ratio": 2.0,
+        "passed": true
+      },
+      {
+        "benchmark": "fannkuch-redux",
+        "dimension": "compilation",
+        "mlf_over_c": 3.2660732764406006,
+        "maximum_ratio": 5.0,
+        "passed": true
+      },
+      {
+        "benchmark": "fannkuch-redux",
+        "dimension": "runtime",
+        "mlf_over_c": 1.1073984903193321,
+        "maximum_ratio": 2.0,
+        "passed": true
+      },
+      {
+        "benchmark": "spectral-norm",
+        "dimension": "compilation",
+        "mlf_over_c": 2.9292024813122564,
+        "maximum_ratio": 5.0,
+        "passed": true
+      },
+      {
+        "benchmark": "spectral-norm",
+        "dimension": "runtime",
+        "mlf_over_c": 0.8053346179100067,
+        "maximum_ratio": 2.0,
+        "passed": true
+      },
+      {
+        "benchmark": "fasta",
+        "dimension": "compilation",
+        "mlf_over_c": 4.548829361759917,
+        "maximum_ratio": 5.0,
+        "passed": true
+      },
+      {
+        "benchmark": "fasta",
+        "dimension": "runtime",
+        "mlf_over_c": 1.5891031592394367,
+        "maximum_ratio": 2.0,
+        "passed": true
+      },
+      {
+        "benchmark": "mandelbrot",
+        "dimension": "compilation",
+        "mlf_over_c": 3.418322469699126,
+        "maximum_ratio": 5.0,
+        "passed": true
+      },
+      {
+        "benchmark": "mandelbrot",
+        "dimension": "runtime",
+        "mlf_over_c": 0.680394729220145,
+        "maximum_ratio": 2.0,
+        "passed": true
+      },
+      {
+        "benchmark": "reverse-complement",
+        "dimension": "compilation",
+        "mlf_over_c": 3.706347973014424,
+        "maximum_ratio": 5.0,
+        "passed": true
+      },
+      {
+        "benchmark": "reverse-complement",
+        "dimension": "runtime",
+        "mlf_over_c": 1.5889225401392928,
+        "maximum_ratio": 2.0,
+        "passed": true
+      },
+      {
+        "benchmark": "k-nucleotide",
+        "dimension": "compilation",
+        "mlf_over_c": 4.273671547401587,
+        "maximum_ratio": 5.0,
+        "passed": true
+      },
+      {
+        "benchmark": "k-nucleotide",
+        "dimension": "runtime",
+        "mlf_over_c": 1.6485450805186603,
+        "maximum_ratio": 2.0,
+        "passed": true
+      }
+    ]
+  },
+  "workloads_unchanged_from_previous_stage3": {
+    "report": "benchmarks/results/2026-10-13-stage3-force-macos-arm64.json",
+    "source_count": 36,
+    "sources": true,
+    "default_inputs": true,
+    "correctness_inputs_and_stdin_bytes": true
+  }
+}

@@ -61,11 +61,36 @@ and independent test oracles. Run the three-stage bootstrap and parity gate with
 python3 scripts/bootstrap-compiler.py
 ```
 
-The gate requires identical stage 2 and stage 3 LLVM and runs the exported
-language corpus through the native MLF compiler. The bootstrap binaries use a
+The gate requires identical stage 2 and stage 3 LLVM and runs the full exported
+language corpus through stage 3. The bootstrap binaries use a
 locally built, pinned garbage collector for long pure compilation phases.
 See [`bootstrap/README.md`](bootstrap/README.md) for dependencies, validation,
 and artifact locations.
+
+For a verified native installation, use the release gate:
+
+```sh
+python3 scripts/release.py build --output dist-newstyle/release
+python3 scripts/release.py verify --release dist-newstyle/release
+python3 scripts/release.py install --release dist-newstyle/release --prefix "$HOME/.local"
+"$HOME/.local/bin/emlf" --type examples/choose-id.emlf
+"$HOME/.local/bin/emlf-compile" examples/snake.emlf -o snake
+```
+
+This runs all Cabal tests, a fresh three-stage bootstrap, both native backend
+matrices, and five-sample `cabal bench` measurements of all nine Benchmarks Game
+workloads. Every workload must meet 5x C compilation and 2x C runtime limits.
+Only the exact stage 3 executable that passed these gates is packaged and
+installed. Failed runs retain their evidence; each build needs a new output
+directory. Installation verifies the package hashes and tests imports, IO and
+native compilation outside the checkout before switching to the new version.
+
+The installed compiler requires GMP, but no Haskell compiler or Cabal at runtime.
+`emlf-compile` additionally needs Python 3, Clang and `pkg-config`. Packages are
+verified for their build host's operating system and architecture, with its
+shared-library dependencies; they are not cross-platform binaries. The full
+release build also needs the Rust and Haskell benchmark toolchains described in
+[`benchmarks/README.md`](benchmarks/README.md).
 
 ## Native compilation with LLVM
 

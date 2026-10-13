@@ -1,4 +1,7 @@
-module Modules (moduleTests, modulePrograms, checkModule, withScratch, ModuleProgram) where
+module Modules
+  ( moduleTests, modulePrograms, moduleRejections, ModuleRejection (..)
+  , checkModule, withScratch, ModuleProgram
+  ) where
 
 import Control.Exception (bracket)
 import Control.Monad (forM_, unless)
@@ -136,11 +139,107 @@ modulePrograms =
       "module Main where\naddInt x y = x - y\nmain = printInt (addInt 43 1)\n", "42\n")
   ]
 
-rejects :: String -> Libraries -> String -> Phase -> String -> Test
-rejects label libraries input expected reason = ("modules rejection: " ++ label,
+data ModuleRejection = ModuleRejection String Libraries String Phase String
+
+rejects :: ModuleRejection -> Test
+rejects (ModuleRejection label libraries input expected reason) = ("modules rejection: " ++ label,
   case build ImplicitPrelude libraries input of
     Left err -> require (phase err == expected && reason `isInfixOf` diagnostic err) (show err)
     Right result -> fail ("unexpected acceptance: " ++ sourceType result))
+
+moduleRejections :: [ModuleRejection]
+moduleRejections =
+  [ ModuleRejection "private function" numbers
+      "module Main where\nimport Math.Numbers\nmain = private\n" ModuleResolution "not in scope: private"
+  , ModuleRejection "qualified private function" numbers
+      "module Main where\nimport qualified Math.Numbers as N\nmain = N.private\n" ModuleResolution "not in scope: N.private"
+  , ModuleRejection "selected imports exclude others" numbers
+      "import Math.Numbers (inc)\nfactorial 6" ModuleResolution "not in scope: factorial"
+  , ModuleRejection "qualified-only is not unqualified" numbers
+      "import qualified Math.Numbers\ninc 1" ModuleResolution "not in scope: inc"
+  , ModuleRejection "alias replaces qualified module name" numbers
+      "import Math.Numbers as N\nMath.Numbers.inc 1" ModuleResolution "not in scope: Math.Numbers.inc"
+  , ModuleRejection "hiding also affects qualification" numbers
+      "import Math.Numbers hiding (inc)\nMath.Numbers.inc 1" ModuleResolution "not in scope: Math.Numbers.inc"
+  , ModuleRejection "unknown import selection" numbers
+      "import Math.Numbers (missing)\n42" ModuleResolution "not in scope: missing"
+  , ModuleRejection "unknown hidden name" numbers
+      "import Math.Numbers hiding (missing)\n42" ModuleResolution "not in scope: missing"
+  , ModuleRejection "private constructor" [("A","module A (Box, make) where\ndata Box = Box Int\nmake = Box\n")]
+      "import A\nBox 42" ModuleResolution "not in scope: Box"
+  , ModuleRejection "type-only selective import" box
+      "import Data.Box (Box)\nBox 42" ModuleResolution "not in scope: Box"
+  , ModuleRejection "member belongs to selected type" box
+      "import Data.Box (Box(Other))\n42" ModuleResolution "not a visible member"
+  , ModuleRejection "private type annotation" [("A","module A (make) where\ndata Box = Box Int\nmake = Box\n")]
+      "import A\n(make 42 : Box)" ModuleResolution "not in scope: Box"
+  , ModuleRejection "hidden members cannot be reexported"
+      [("A","module A (Box) where\ndata Box = Box Int\n"),
+       ("B","module B (Box(..)) where\nimport A\n")]
+      "import B\nBox 42" ModuleResolution "not in scope: Box"
+  , ModuleRejection "default exports exclude imports"
+      [("A","module A where\nx = 1\n"),("B","module B where\nimport A\ny = x\n")]
+      "import B\nx" ModuleResolution "not in scope: x"
+  , ModuleRejection "transitive names are not imported" rendering
+      "import Facade\nprefix" ModuleResolution "not in scope: prefix"
+  , ModuleRejection "distinct imports are ambiguous"
+      [("A","module A where\nx = 1\n"),("B","module B where\nx = 2\n")]
+      "import A\nimport B\nx" ModuleResolution "ambiguous name x"
+  , ModuleRejection "top-level import collision requires hiding"
+      [("A","module A where\nx = 1\n")]
+      "module Main where\nimport A\nx = 2\nmain = x\n" ModuleResolution "ambiguous name x"
+  , ModuleRejection "explicit reexport conflict"
+      [("A","module A where\nx = 1\n"),("B","module B where\nx = 2\n"),
+       ("Both","module Both (A.x, B.x) where\nimport qualified A\nimport qualified B\n")]
+      "import Both\n42" ModuleResolution "conflicting declarations or exports"
+  , ModuleRejection "unknown module reexport" []
+      "module Main (module Missing) where\nmain = 42\n" ModuleResolution "unimported module"
+  , ModuleRejection "qualified-only module reexport has no unqualified names"
+      [("A","module A where\nx = 1\n"),("B","module B (module A) where\nimport qualified A\n")]
+      "import B\nx" ModuleResolution "not in scope: x"
+  , ModuleRejection "empty exports"
+      [("A","module A () where\nx = 1\n")] "import A\nx" ModuleResolution "not in scope: x"
+  , ModuleRejection "missing module" [] "import Missing\n42" ModuleResolution "cannot find module Missing"
+  , ModuleRejection "mismatched module header" [("A","module B where\nx = 1\n")]
+      "import A\n42" ModuleResolution "expected module A, found B"
+  , ModuleRejection "unnamed library" [("A","x = 1\nmain = x\n")]
+      "import A\n42" ModuleResolution "expected module A, found an unnamed script"
+  , ModuleRejection "cycle includes chain"
+      [("A","module A where\nimport B\nx = 1\n"),("B","module B where\nimport A\ny = 2\n")]
+      "import A\n42" ModuleResolution "Main -> A -> B -> A"
+  , ModuleRejection "self import" [] "module Main where\nimport Main\nmain = 42\n"
+      ModuleResolution "Main -> Main"
+  , ModuleRejection "module header followed by bare expression" [] "module Main where\n42\n" Parsing "declarations only"
+  , ModuleRejection "imports must precede definitions" [] "module Main where\nmain = 42\nimport Prelude\n" Parsing "import"
+  , ModuleRejection "definitions cannot be qualified" [] "module Main where\nA.f = 42\n" Parsing "named modules contain declarations only"
+  , ModuleRejection "explicit empty Prelude removes value names" []
+      "module Main where\nimport Prelude ()\nmain = printInt 42\n" ModuleResolution "not in scope: printInt"
+  , ModuleRejection "qualified Prelude suppresses implicit Prelude" []
+      "module Main where\nimport qualified Prelude as P\nmain = return 42\n" ModuleResolution "not in scope: return"
+  , ModuleRejection "Prelude cannot be redefined" [] "module Prelude where\nmain = 42\n"
+      ModuleResolution "built-in module"
+  , ModuleRejection "primitive constructor cannot be redefined" []
+      "module Main where\ndata Foo = Unit\nmain = Unit\n" ModuleResolution "primitive constructor"
+  , ModuleRejection "primitive type cannot be redefined" []
+      "module Main where\ndata Int = Number\nmain = Number\n" ModuleResolution "primitive type"
+  , ModuleRejection "unused private definitions still checked"
+      [("A","module A (x) where\nx = 42\nbad = missing\n")]
+      "import A\nx" ModuleResolution "not in scope: missing"
+  , ModuleRejection "export list cannot name missing value" []
+      "module Main (missing) where\nmain = 42\n" ModuleResolution "not in scope: missing"
+  , ModuleRejection "recursive signature error names the source function" []
+      "module Main where\nloop x = loop x\nmain = loop 0\n" ModuleResolution "Main.loop requires an explicit closed signature"
+  , ModuleRejection "instance not visible in imported signed definition"
+      [("Render","module Render where\nclass Render a where\n  render : a -> String\n"),
+       ("Bad","module Bad (text) where\nimport Render\ntext : String\ntext = render 42\n"),
+       ("Orphan","module Orphan () where\nimport Render\ninstance Render Int where\n  render = showInt\n")]
+      "module Main where\nimport Bad\nimport Orphan ()\nmain = putStrLn text\n" Resolution "no instance or given constraint for Render.Render Int"
+  , ModuleRejection "instance not visible in another instance"
+      [("A","module A where\nclass First a where\n  first : a -> String\nclass Second a where\n  second : a -> String\n"),
+       ("Bad","module Bad () where\nimport A\ninstance First Int where\n  first n = second n\n"),
+       ("Orphan","module Orphan () where\nimport A\ninstance Second Int where\n  second = showInt\n")]
+      "module Main where\nimport A\nimport Bad ()\nimport Orphan ()\nmain = putStrLn (first 42)\n" Resolution "no instance or given constraint for A.Second Int"
+  ]
 
 moduleTests :: [Test]
 moduleTests =
@@ -148,97 +247,8 @@ moduleTests =
       result <- checkModule mode libraries input
       require (T.alphaEq (inferredType result) (T.Con "IO" [T.Con "Unit" []])) (sourceType result))
     | (label,mode,libraries,input,_) <- modulePrograms ] ++
-  [ rejects "private function" numbers
-      "module Main where\nimport Math.Numbers\nmain = private\n" ModuleResolution "not in scope: private"
-  , rejects "qualified private function" numbers
-      "module Main where\nimport qualified Math.Numbers as N\nmain = N.private\n" ModuleResolution "not in scope: N.private"
-  , rejects "selected imports exclude others" numbers
-      "import Math.Numbers (inc)\nfactorial 6" ModuleResolution "not in scope: factorial"
-  , rejects "qualified-only is not unqualified" numbers
-      "import qualified Math.Numbers\ninc 1" ModuleResolution "not in scope: inc"
-  , rejects "alias replaces qualified module name" numbers
-      "import Math.Numbers as N\nMath.Numbers.inc 1" ModuleResolution "not in scope: Math.Numbers.inc"
-  , rejects "hiding also affects qualification" numbers
-      "import Math.Numbers hiding (inc)\nMath.Numbers.inc 1" ModuleResolution "not in scope: Math.Numbers.inc"
-  , rejects "unknown import selection" numbers
-      "import Math.Numbers (missing)\n42" ModuleResolution "not in scope: missing"
-  , rejects "unknown hidden name" numbers
-      "import Math.Numbers hiding (missing)\n42" ModuleResolution "not in scope: missing"
-  , rejects "private constructor" [("A","module A (Box, make) where\ndata Box = Box Int\nmake = Box\n")]
-      "import A\nBox 42" ModuleResolution "not in scope: Box"
-  , rejects "type-only selective import" box
-      "import Data.Box (Box)\nBox 42" ModuleResolution "not in scope: Box"
-  , rejects "member belongs to selected type" box
-      "import Data.Box (Box(Other))\n42" ModuleResolution "not a visible member"
-  , rejects "private type annotation" [("A","module A (make) where\ndata Box = Box Int\nmake = Box\n")]
-      "import A\n(make 42 : Box)" ModuleResolution "not in scope: Box"
-  , rejects "hidden members cannot be reexported"
-      [("A","module A (Box) where\ndata Box = Box Int\n"),
-       ("B","module B (Box(..)) where\nimport A\n")]
-      "import B\nBox 42" ModuleResolution "not in scope: Box"
-  , rejects "default exports exclude imports"
-      [("A","module A where\nx = 1\n"),("B","module B where\nimport A\ny = x\n")]
-      "import B\nx" ModuleResolution "not in scope: x"
-  , rejects "transitive names are not imported" rendering
-      "import Facade\nprefix" ModuleResolution "not in scope: prefix"
-  , rejects "distinct imports are ambiguous"
-      [("A","module A where\nx = 1\n"),("B","module B where\nx = 2\n")]
-      "import A\nimport B\nx" ModuleResolution "ambiguous name x"
-  , rejects "top-level import collision requires hiding"
-      [("A","module A where\nx = 1\n")]
-      "module Main where\nimport A\nx = 2\nmain = x\n" ModuleResolution "ambiguous name x"
-  , rejects "explicit reexport conflict"
-      [("A","module A where\nx = 1\n"),("B","module B where\nx = 2\n"),
-       ("Both","module Both (A.x, B.x) where\nimport qualified A\nimport qualified B\n")]
-      "import Both\n42" ModuleResolution "conflicting declarations or exports"
-  , rejects "unknown module reexport" []
-      "module Main (module Missing) where\nmain = 42\n" ModuleResolution "unimported module"
-  , rejects "qualified-only module reexport has no unqualified names"
-      [("A","module A where\nx = 1\n"),("B","module B (module A) where\nimport qualified A\n")]
-      "import B\nx" ModuleResolution "not in scope: x"
-  , rejects "empty exports"
-      [("A","module A () where\nx = 1\n")] "import A\nx" ModuleResolution "not in scope: x"
-  , rejects "missing module" [] "import Missing\n42" ModuleResolution "cannot find module Missing"
-  , rejects "mismatched module header" [("A","module B where\nx = 1\n")]
-      "import A\n42" ModuleResolution "expected module A, found B"
-  , rejects "unnamed library" [("A","x = 1\nmain = x\n")]
-      "import A\n42" ModuleResolution "expected module A, found an unnamed script"
-  , rejects "cycle includes chain"
-      [("A","module A where\nimport B\nx = 1\n"),("B","module B where\nimport A\ny = 2\n")]
-      "import A\n42" ModuleResolution "Main -> A -> B -> A"
-  , rejects "self import" [] "module Main where\nimport Main\nmain = 42\n"
-      ModuleResolution "Main -> Main"
-  , rejects "module header followed by bare expression" [] "module Main where\n42\n" Parsing "declarations only"
-  , rejects "imports must precede definitions" [] "module Main where\nmain = 42\nimport Prelude\n" Parsing ""
-  , rejects "definitions cannot be qualified" [] "module Main where\nA.f = 42\n" Parsing ""
-  , rejects "explicit empty Prelude removes value names" []
-      "module Main where\nimport Prelude ()\nmain = printInt 42\n" ModuleResolution "not in scope: printInt"
-  , rejects "qualified Prelude suppresses implicit Prelude" []
-      "module Main where\nimport qualified Prelude as P\nmain = return 42\n" ModuleResolution "not in scope: return"
-  , rejects "Prelude cannot be redefined" [] "module Prelude where\nmain = 42\n"
-      ModuleResolution "built-in module"
-  , rejects "primitive constructor cannot be redefined" []
-      "module Main where\ndata Foo = Unit\nmain = Unit\n" ModuleResolution "primitive constructor"
-  , rejects "primitive type cannot be redefined" []
-      "module Main where\ndata Int = Number\nmain = Number\n" ModuleResolution "primitive type"
-  , rejects "unused private definitions still checked"
-      [("A","module A (x) where\nx = 42\nbad = missing\n")]
-      "import A\nx" ModuleResolution "not in scope: missing"
-  , rejects "export list cannot name missing value" []
-      "module Main (missing) where\nmain = 42\n" ModuleResolution "not in scope: missing"
-  , rejects "recursive signature error names the source function" []
-      "module Main where\nloop x = loop x\nmain = loop 0\n" ModuleResolution "Main.loop requires an explicit closed signature"
-  , rejects "instance not visible in imported signed definition"
-      [("Render","module Render where\nclass Render a where\n  render : a -> String\n"),
-       ("Bad","module Bad (text) where\nimport Render\ntext : String\ntext = render 42\n"),
-       ("Orphan","module Orphan () where\nimport Render\ninstance Render Int where\n  render = showInt\n")]
-      "module Main where\nimport Bad\nimport Orphan ()\nmain = putStrLn text\n" Resolution ""
-  , rejects "instance not visible in another instance"
-      [("A","module A where\nclass First a where\n  first : a -> String\nclass Second a where\n  second : a -> String\n"),
-       ("Bad","module Bad () where\nimport A\ninstance First Int where\n  first n = second n\n"),
-       ("Orphan","module Orphan () where\nimport A\ninstance Second Int where\n  second = showInt\n")]
-      "module Main where\nimport A\nimport Bad ()\nimport Orphan ()\nmain = putStrLn (first 42)\n" Resolution ""
-  , ("modules: original source type names", do
+  map rejects moduleRejections ++
+  [ ("modules: original source type names", do
       result <- checkModule ImplicitPrelude box "import Data.Box\nBox 42"
       require ("Data.Box.Box" `isInfixOf` sourceType result) (sourceType result))
   , ("modules: unit syntax is intrinsic", do
@@ -289,6 +299,8 @@ fileTests = withScratch $ \directory -> do
   put entry "module Main where\nimport Math.Numbers (inc)\nmain = inc 41\n"
   good <- compileFile [includes] entry >>= right
   require (sourceType good == "Int") (sourceType good)
+  unusedMissing <- compileFile [directory </> "absent search root",includes] entry >>= right
+  require (sourceType unusedMissing == "Int") "unused missing search root changed compilation"
   missing <- compileFile [] entry
   case missing of
     Left err -> require ("cannot find module Math.Numbers; searched" `isInfixOf` diagnostic err) (show err)

@@ -1057,7 +1057,16 @@ schemeOrExistential graph identity node = case binder node of
 normalize : Graph -> Graph
 normalize graph =
   let inertness = inertNodes graph in
-  mkGraph (mapNodesWithKey (\n -> \v -> if isGen (tag v) then v else if IM.findWithDefault false n inertness || schemeOrExistential graph n v then mkNode (tag v) (binder v) Rigid else v) (nodes graph)) (links graph) (nextId graph)
+  -- Several nodes can share a generalization binder. Keep its structural
+  -- closure lazy and share it for this immutable graph, rather than rebuilding
+  -- the same reachability set for each existential check.
+  let scopes = IM.map (\v -> case tag v of GGen root -> reachable graph root; _ -> IS.empty) (nodes graph) in
+  let scheme = \n v -> case binder v of
+        Nothing -> false
+        Just parent -> case tag (nodeAt graph parent) of
+          GGen root -> n == resolve graph root || L.not (IS.member n (IM.get (resolve graph parent) scopes))
+          _ -> false in
+  mkGraph (mapNodesWithKey (\n -> \v -> if isGen (tag v) then v else if IM.findWithDefault false n inertness || scheme n v then mkNode (tag v) (binder v) Rigid else v) (nodes graph)) (links graph) (nextId graph)
 
 -- Reverse accumulation makes the postorder traversal linear in its output.
 -- The public accumulator helper retains its forward-prefix contract.

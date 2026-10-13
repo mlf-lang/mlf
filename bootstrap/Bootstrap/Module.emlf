@@ -132,8 +132,11 @@ loadModuleFiles : List String -> SourceModule -> IO (Either String (List SourceM
 loadModuleFiles includes root = do
   let directory = takeDirectory (sourcePath root)
   let hierarchy = parentDirectory (length (components (moduleIdentity root)) - 1) directory
-  paths <- mapM canonicalPath (nubBy eqString (Cons directory (append includes (Cons hierarchy (Cons "." Nil)))))
-  loadGraph (fetchFile (nubBy eqString paths)) root
+  -- Search roots need not exist: an unused -i path must not abort loading.
+  -- fileExists/readFile resolve relative paths, dot segments and symlinks
+  -- through the filesystem; no canonicalPath precondition is needed here.
+  let paths = nubBy eqString (Cons directory (append includes (Cons hierarchy (Cons "." Nil))))
+  loadGraph (fetchFile paths) root
 
 -- Interfaces retain original entity identity across diamonds and re-exports.
 data ModuleSpace = Terms | Types

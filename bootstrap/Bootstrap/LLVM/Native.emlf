@@ -439,7 +439,7 @@ scalarGeneralApplication scope expression = case O.applications expression of
           initial <- call "@mlf_constructor" (args2 (number tag) (number arity))
           L.foldM (\f a -> do
             app <- call "@mlf_application" (args2 (pointer f) (pointer a))
-            call "@mlf_force" (args1 (pointer app))) initial values
+            forceValue app) initial values
         cgPure (Boxed value)
   _ -> scalarAtom expression
 

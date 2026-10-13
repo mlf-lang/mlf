@@ -153,6 +153,14 @@ and write order follow the same IO semantics as the fallback.
 LLVM TBAA distinguishes managed object storage from separately allocated
 array cells. It does not assert that different array references are disjoint.
 
+Checked STArray reads, writes and lengths use these same header loads inside
+direct state workers. Index checks require a tagged integer and an unsigned
+index below the length, rejecting negative and GMP-sized indices before the
+cell access. Pointer cells remain lazy: reading returns the stored value and
+writing does not force it. Cell loads are never reused across writes. Array
+allocation and opaque state actions retain the runtime path, including the
+bounded worker fallback. Both the Haskell and MLF emitters implement this rule.
+
 An exact forward byte-copy loop may lower to llvm.memmove after checking its
 complete source/destination ranges and aliasing. A positive overlapping
 destination can change later source reads in a forward scalar loop, so that
@@ -218,6 +226,13 @@ Three-argument writes and raw slice output use dedicated tags, keeping managed
 values at 48 bytes; the mark phase retains all three operands until execution.
 No mutable read occurs while
 constructing an action, and every write forces its numeric value at execution.
+
+Generated entry points configure one 64 KiB stdin buffer before language IO.
+Byte and text reads share that buffer; getline still determines each read
+boundary, and output actions retain their explicit flush. Reinitializing the
+argument list does not reset the buffer. The backend matrix checks raw lines
+on either side of the buffer boundary, mixed Unicode text reads, retained
+earlier byte arrays, and unused trailing input.
 
 Mark/sweep collection occurs at the top of the IO driver and at explicitly
 rooted allocating-native-IO entries. Roots include the current action, pending
