@@ -185,18 +185,60 @@ main = do
             guard = b"mlf_require_compact_gc_abi" if gc else b"mlf_require_standard_abi"
             if not mismatch.returncode or guard not in mismatch.stderr:
                 raise RuntimeError(f"{name}: mismatched runtime did not fail on its ABI guard")
+            force = force_regression(ir, directory / (name + "-force"), compact if gc else ordinary,
+                                     flags, gc_flags, gc)
             rows.append({"compiler": str(compiler), "compact": gc, "llvm_sha256": digest(ir),
                          "binary_sha256": digest(binary), "stdout": checked.stdout.decode(),
-                         "mismatched_link_rejected": True})
+                         "mismatched_link_rejected": True, "force_regression": force})
     return {"source_sha256": digest(source), "comparison": "Exact LLVM except external declaration order", "cases": rows}
 
 
-def parity(compiler: Path, manifest: Path, checker: Path, directory: Path,
-           runtime: Path, flags: list[str]) -> dict:
-    rows = [json.loads(line) for line in manifest.read_text().splitlines() if line]
+def force_regression(ir: Path, output: Path, runtime: Path, flags: list[str], gc_flags: dict,
+                     compact: bool) -> dict:
+    """Call emitted forcing with independently constructed ready/lazy/cyclic values."""
+    source = ROOT / "test" / "runtime_force.c"
+    text = ir.read_text()
+    if text.count("define i32 @main(") != 1:
+        raise RuntimeError("Force probe needs exactly one generated entry point")
+    symbol = "mlf.force" if compact else "mlf_force"
+    if compact and text.count("define private ptr @mlf.force(") != 1:
+        raise RuntimeError("Compact compiler did not emit its force helper")
+    probe_ir = output.with_suffix(".ll")
+    probe_ir.write_text(text.replace("define i32 @main(", "define i32 @mlf_test_program_main(") +
+        f"\ndefine ptr @mlf_force_generated(ptr %value) {{\n"
+        f"  %result = call ptr @{symbol}(ptr %value)\n  ret ptr %result\n}}\n")
+    command(["clang", "-O2", "-Wno-override-module", "-I" + str(ROOT / "runtime"),
+             *(["-DMLF_USE_BDWGC", "-DMLF_COMPACT_BDWGC", *gc_flags["cflags"]] if compact else []),
+             source, probe_ir, runtime, *flags, *(gc_flags["libs"] if compact else []),
+             "-lm", "-o", output])
+    environment = {name: value for name, value in os.environ.items() if not name.startswith("GC_")}
+    environment["GC_INITIAL_HEAP_SIZE"] = str(8 * 1024 * 1024)
+    failures = {"null": "missing runtime value", "hole": "cyclic evaluation of a recursive binding",
+                "indirection-cycle": "cyclic evaluation of a recursive binding",
+                "thunk-cycle": "cyclic evaluation of a recursive binding"}
+    rows = []
+    for mode in ["success", *failures]:
+        checked = subprocess.run([str(output), mode], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                 env=environment, timeout=60)
+        if mode == "success":
+            expected = {"ready_values": 14, "spine_length": 20000, "thunk_calls": 1, "application_calls": 1}
+            if checked.returncode or checked.stderr or json.loads(checked.stdout) != expected:
+                raise RuntimeError(f"Generated forcing regression: {checked}")
+            rows.append({"mode": mode, **expected})
+        else:
+            diagnostic = ("Runtime: " + failures[mode] + "\n").encode()
+            if checked.returncode != 1 or checked.stdout or checked.stderr != diagnostic:
+                raise RuntimeError(f"Generated forcing {mode} rejection changed: {checked}")
+            rows.append({"mode": mode, "exit_code": 1, "error": failures[mode]})
+    return {"source_sha256": digest(source), "llvm_sha256": digest(probe_ir),
+            "binary_sha256": digest(output), "cases": rows}
+
+
+def validate_manifest(rows: list[dict]):
     categories_present = Counter(row["category"] for row in rows)
     required = {"figure12": 43, "hm-exhaustive": 1712, "hm-generated": 5000,
-                "annotations": 126, "readability": 18, "state": 97, "examples": 18, "benchmarks": 9}
+                "annotations": 126, "readability": 18, "state": 97, "modules": 60,
+                "examples": 18, "benchmarks": 9}
     for category, minimum in required.items():
         if categories_present[category] < minimum:
             raise RuntimeError(f"Parity corpus lacks {category}: expected at least {minimum} cases")
@@ -207,6 +249,34 @@ def parity(compiler: Path, manifest: Path, checker: Path, directory: Path,
     a8 = next((row for row in rows if row["id"] == "figure12-A8"), None)
     if not a8 or a8["expected_accept"] or a8.get("expected_phase") != "Inference":
         raise RuntimeError("Parity corpus lost the Figure 12 A8 inference rejection")
+    modules = [row for row in rows if row["category"] == "modules"]
+    if (sum(row["expected_accept"] for row in modules) < 21 or
+            sum(not row["expected_accept"] for row in modules) < 39 or
+            not any(row.get("no_prelude") and row["expected_accept"] for row in modules)):
+        raise RuntimeError("Module corpus lost positive, negative or explicit-prelude coverage")
+    if any(not row["expected_accept"] and (not row.get("expected_phase") or
+            not isinstance(row.get("expected_error_contains"), str) or
+            not row["expected_error_contains"].strip()) for row in modules):
+        raise RuntimeError("Module rejection lacks a prescribed phase or diagnostic expectation")
+
+
+def check_rejection(row: dict, result):
+    if result.returncode != 1 or result.stdout:
+        raise RuntimeError(f"{row['id']}: rejected input must exit 1 without emitting a target")
+    phase = row.get("expected_phase")
+    if phase and not result.stderr.decode("utf8", "replace").startswith(phase + ":"):
+        raise RuntimeError(f"{row['id']}: wrong rejection phase: "
+                           + result.stderr.decode("utf8", "replace"))
+    reason = row.get("expected_error_contains", "")
+    if reason not in result.stderr.decode("utf8", "replace"):
+        raise RuntimeError(f"{row['id']}: wrong rejection diagnostic, expected {reason!r}: "
+                           + result.stderr.decode("utf8", "replace"))
+
+
+def parity(compiler: Path, manifest: Path, checker: Path, directory: Path,
+           runtime: Path, flags: list[str]) -> dict:
+    rows = [json.loads(line) for line in manifest.read_text().splitlines() if line]
+    validate_manifest(rows)
     directory.mkdir(parents=True, exist_ok=True)
     counts = {"accepted": 0, "rejected": 0, "runtime_rows": 0, "runtime_executions": 0}
     categories = {}
@@ -246,10 +316,7 @@ def parity(compiler: Path, manifest: Path, checker: Path, directory: Path,
                                    + candidate_check.stderr.decode("utf8", "replace"))
         else:
             counts["rejected"] += 1
-            phase = row.get("expected_phase")
-            if phase and not result.stderr.decode("utf8", "replace").startswith(phase + ":"):
-                raise RuntimeError(f"{row['id']}: wrong rejection phase: "
-                                   + result.stderr.decode("utf8", "replace"))
+            check_rejection(row, result)
         if "expected_stdout" in row:
             if not expected_accept:
                 raise RuntimeError("Rejected corpus row contains a runtime expectation")
@@ -281,7 +348,8 @@ def parity(compiler: Path, manifest: Path, checker: Path, directory: Path,
             print(f"Parity: {number + 1}/{len(rows)}", flush=True)
     if not counts["accepted"] or not counts["rejected"] or not counts["runtime_rows"]:
         raise RuntimeError("Parity corpus lacks positive, negative, or two-backend runtime cases")
-    return {**counts, "cases": len(rows), "categories": categories, "manifest_sha256": digest(manifest)}
+    return {**counts, "cases": len(rows), "categories": categories, "manifest_sha256": digest(manifest),
+            "compiler": str(compiler.resolve()), "compiler_sha256": digest(compiler)}
 
 
 def main() -> int:
@@ -294,7 +362,7 @@ def main() -> int:
     args = parser.parse_args()
     directory = args.output.resolve()
     directory.mkdir(parents=True, exist_ok=True)
-    report = {"complete": False, "stages": [], "started": time.time()}
+    report = {"schema_version": 2, "complete": False, "stages": [], "started": time.time()}
     report_path = directory / "verification.json"
     try:
         previous_report = json.loads(report_path.read_text()) if args.reuse_stage1 else None
@@ -321,13 +389,17 @@ def main() -> int:
         report["runtime_sources"] = {str(p.relative_to(ROOT)): digest(p)
                                       for p in sorted((ROOT / "runtime").glob("*"))
                                       if p.suffix in (".c", ".h")}
-        validation_sources = [ROOT / "test" / "runtime_allocation.c",
+        validation_sources = {ROOT / "test" / "runtime_allocation.c",
+                              ROOT / "test" / "runtime_force.c",
                               ROOT / "test" / "runtime_st.c",
                               ROOT / "scripts" / "runtime_st_validation.py",
                               ROOT / "bootstrap" / "tests" / "GCSpine.c",
-                              ROOT / "bootstrap" / "tests" / "GCDefaults.c"]
+                              ROOT / "bootstrap" / "tests" / "GCDefaults.c",
+                              ROOT / "mlf.cabal", Path(__file__).resolve()}
+        for pattern in ("src/**/*.hs", "app/*.hs", "test/*.hs", "test/*.py", "bootstrap/**/*.hs", "scripts/bootstrap-gc.py"):
+            validation_sources.update(ROOT.glob(pattern))
         report["validation_sources"] = {str(path.relative_to(ROOT)): digest(path)
-                                         for path in validation_sources}
+                                         for path in sorted(validation_sources)}
         cflags = shlex.split(subprocess.check_output(["pkg-config", "--cflags", "gmp"], text=True))
         flags = shlex.split(subprocess.check_output(["pkg-config", "--libs", "gmp"], text=True))
         runtime = directory / "runtime.o"
@@ -394,8 +466,10 @@ def main() -> int:
         if (directory / "stage2.ll").read_bytes() != (directory / "stage3.ll").read_bytes():
             raise RuntimeError("Bootstrap did not reach a fixed point: stage2.ll differs from stage3.ll")
         report["fixed_point"] = True
+        candidate = directory / "emlf-stage3"
+        report["candidate"] = {"stage": 3, "path": str(candidate), "sha256": digest(candidate)}
         report["abi_regression"] = abi_regressions(
-            [seed, directory / "emlf-stage2"], directory, runtime, bootstrap_runtime, flags, gc_flags)
+            [seed, candidate], directory, runtime, bootstrap_runtime, flags, gc_flags)
         checker = directory / "check-target"
         ghc_output = directory / "ghc"
         ghc_output.mkdir(exist_ok=True)
@@ -409,7 +483,7 @@ def main() -> int:
             command(["ghc", "-O2", "-isrc", "-itest", "-outputdir", export_output,
                      ROOT / "bootstrap" / "ExportCorpus.hs", "-o", exporter])
             command([exporter, manifest.parent])
-        report["parity"] = parity(directory / "emlf-stage2", manifest, checker,
+        report["parity"] = parity(candidate, manifest, checker,
                                    directory / "parity", runtime, flags)
         for path, expected in report["sources"].items():
             if digest(ROOT / path) != expected:
@@ -422,6 +496,8 @@ def main() -> int:
                 raise RuntimeError("Validation source changed during verification: " + path)
         if digest(seed) != report["seed_sha256"]:
             raise RuntimeError("Haskell seed changed during verification")
+        if digest(candidate) != report["candidate"]["sha256"]:
+            raise RuntimeError("Stage 3 candidate changed during verification")
         report["complete"] = True
         print("Bootstrap fixed point and full exported parity corpus passed.")
         return 0

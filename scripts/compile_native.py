@@ -54,7 +54,9 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path)
     parser.add_argument("-o", "--output", type=Path, required=True)
-    parser.add_argument("--compiler", default="emlf", help="Haskell seed or native MLF compiler")
+    bundled = Path(__file__).resolve().with_name("emlf")
+    parser.add_argument("--compiler", default=str(bundled) if bundled.is_file() else "emlf",
+                        help="Installed native compiler, or emlf on PATH when run from the source tree")
     parser.add_argument("--clang", default="clang")
     parser.add_argument("--pkg-config", default="pkg-config")
     parser.add_argument("--runtime", type=Path, help="Otherwise use the compiler's --llvm-runtime path")
@@ -78,7 +80,7 @@ def main(argv=None):
         _, flags = run([args.pkg_config, "--cflags", "--libs", "gmp"], timeout=args.timeout)
         frontend_options = ["--no-prelude"] if args.no_prelude else []
         for path in args.include:
-            frontend_options.extend(["-i", str(path.resolve(strict=True))])
+            frontend_options.extend(["-i", str(path.resolve())])
         destination = args.output.resolve()
         # Same-directory rename preserves an existing executable if any
         # compilation phase fails, and publishes only a complete replacement.

@@ -32,11 +32,11 @@ toList (IntSet tree) = M.keys tree
 toAscList : IntSet -> List Int
 toAscList tree = toList tree
 union : IntSet -> IntSet -> IntSet
-union (IntSet a) (IntSet b) = wrap (M.union L.compareInt a b)
+union (IntSet a) (IntSet b) = wrap (M.foldlWithKeyStrict (\tree key value -> IM.insertTree key Unit tree) b a)
 unions : List IntSet -> IntSet
 unions trees = L.foldlStrict union empty trees
 difference : IntSet -> IntSet -> IntSet
-difference (IntSet a) (IntSet b) = wrap (M.difference L.compareInt a b)
+difference (IntSet a) (IntSet b) = wrap (M.foldlWithKeyStrict (\tree key value -> IM.deleteTree key tree) a b)
 intersection : IntSet -> IntSet -> IntSet
 intersection (IntSet a) (IntSet b) = wrap (M.intersection L.compareInt a b)
 isSubsetOf : IntSet -> IntSet -> Bool

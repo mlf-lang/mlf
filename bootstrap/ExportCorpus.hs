@@ -6,7 +6,7 @@ module Main (main) where
 
 import Control.Monad (forM, forM_, unless, when)
 import Data.Char (isAlphaNum, ord)
-import Data.List (intercalate, isSuffixOf, nub, sort)
+import Data.List (intercalate, isInfixOf, isSuffixOf, nub, sort)
 import Numeric (showHex)
 import System.Directory
   ( canonicalizePath, createDirectoryIfMissing, doesDirectoryExist
@@ -18,6 +18,7 @@ import qualified Figure12
 import qualified Oracle
 import qualified Readability
 import qualified StateCases
+import qualified Modules
 import MLF.Compiler
 import qualified MLF.Module.Syntax as MS
 import MLF.Parser (parseExpr, parseModule)
@@ -42,6 +43,8 @@ data Case = Case
   , originalPath :: Maybe FilePath
   , includes :: [FilePath]
   , runtime :: Maybe (String, String)
+  , preludeMode :: PreludeMode
+  , rejection :: Maybe (Phase, String)
   }
 
 data Exported = Exported Case (Either CompileError Compilation)
@@ -100,7 +103,8 @@ main = do
     createDirectoryIfMissing True (takeDirectory destination)
     copyFile (repository </> file) destination
   fileCases <- mapM (fileCase repository) files
-  let cases = figureCases ++ oracleCases ++ annotationCases ++ readabilityCases ++ stateTypes ++ stateRuntime ++ fileCases
+  moduleCases <- exportModules output
+  let cases = figureCases ++ oracleCases ++ annotationCases ++ readabilityCases ++ stateTypes ++ stateRuntime ++ moduleCases ++ fileCases
   unless (length (nub (map caseId cases)) == length cases) (fail "duplicate corpus case identity")
   results <- mapM (exportCase output) cases
   writeUtf8 (output </> "manifest.jsonl") (unlines (map manifestRow results))
@@ -118,6 +122,8 @@ main = do
     , ("readability_runtime_count", show (length readabilityCases))
     , ("state_type_count", show (length stateTypes))
     , ("state_runtime_count", show (length stateRuntime))
+    , ("module_accept_count", show (length Modules.modulePrograms))
+    , ("module_reject_count", show (length Modules.moduleRejections))
     , ("repository_source_count", show (length files))
     , ("repository_sources", jsonArray (map jsonString files))
     ] ++ "\n"
@@ -130,7 +136,9 @@ main = do
     , "are expected to compile; a seed disagreement aborts export rather than changing it."
     , "expected_type is the seed's independently checked xMLF type, not an independent"
     , "MLF principal-type oracle. Compare it by xMLF alpha equivalence."
-    , "expected_phase is supplied for rejected cases; diagnostics need not be identical."
+    , "Module fixtures preserve their independent acceptance, rejection phase and diagnostic fragments."
+    , "no_prelude is explicit for every case; use --no-prelude when true."
+    , "expected_phase is supplied for rejected cases; expected_error_contains checks a prescribed diagnostic fragment."
     , "Runtime rows additionally have expected_stdin and expected_stdout UTF-8 strings."
     , "A library-only source gets a separate import probe; its original file is copied"
     , "unchanged and original_path identifies it. This checks all imported declarations."
@@ -143,7 +151,39 @@ main = do
 
 simpleCase :: String -> String -> String -> Bool -> String -> String -> Case
 simpleCase identity group name accepts oracle text = Case identity group
-  ("cases" </> group </> identity ++ ".emlf") name accepts oracle text Nothing [] Nothing
+  ("cases" </> group </> identity ++ ".emlf") name accepts oracle text Nothing [] Nothing ImplicitPrelude Nothing
+
+-- Materialize each module graph in its own search root. These are the same
+-- prescribed fixtures exercised by the seed tests, including negative lexical
+-- scopes and instance visibility; seed acceptance does not define expectations.
+exportModules :: FilePath -> IO [Case]
+exportModules output = do
+  unless (length Modules.modulePrograms == 21 && length Modules.moduleRejections == 39)
+    (fail "module corpus must retain 21 runtime cases and 39 prescribed rejections")
+  accepted <- forM (zip [1..] Modules.modulePrograms) $ \(i,(name,mode,libraries,input,expectedOutput)) ->
+    writeCase ("module-accept-" ++ padded i) name mode libraries input True
+      (Just ("",expectedOutput)) Nothing
+  rejected <- forM (zip [1..] Modules.moduleRejections) $ \(i,Modules.ModuleRejection name libraries input phase reason) ->
+    writeCase ("module-reject-" ++ padded i) name ImplicitPrelude libraries input False
+      Nothing (Just (phase,reason))
+  pure (accepted ++ rejected)
+  where
+    writeCase identity name mode libraries input accepts expectedOutput expectedError = do
+      let directory = "cases" </> "modules" </> identity
+          search = directory </> "libraries"
+          -- An unused missing include root is legal. Preserve this loader
+          -- regression in the full native parity gate as well as CLI tests.
+          searchPaths = if identity == "module-accept-000001"
+            then [directory </> "missing search root",search] else [search]
+      createDirectoryIfMissing True (output </> search)
+      forM_ libraries $ \(moduleName,text) -> do
+        let file = output </> search </> intercalate "/" (moduleParts moduleName) ++ ".emlf"
+        createDirectoryIfMissing True (takeDirectory file)
+        writeUtf8 file text
+      pure $ (simpleCase identity "modules" name accepts
+        "test/Modules.hs prescribed module scope, typing, diagnostic and runtime outcomes" input)
+        { relativeSource = directory </> "Main.emlf", includes = searchPaths
+        , runtime = expectedOutput, preludeMode = mode, rejection = expectedError }
 
 oracleGroup :: String -> String -> [S.Expr] -> [Case]
 oracleGroup group oracle terms =
@@ -184,7 +224,7 @@ fileCase repository file = do
       input = if library then probe else text
   pure $ Case identity group relative file True
     (if library then "repository library import must compile" else "repository example or benchmark must compile")
-    input (Just file) search Nothing
+    input (Just file) search Nothing ImplicitPrelude Nothing
 
 moduleParts :: String -> [String]
 moduleParts name = case break (== '.') name of
@@ -197,12 +237,16 @@ exportCase output c = do
   createDirectoryIfMissing True (takeDirectory path)
   unless (originalPath c == Just (drop 11 (relativeSource c)) && take 11 (relativeSource c) == "repository/")
     (writeUtf8 path (source c ++ "\n"))
-  result <- compileFile (map (output </>) (includes c)) path
+  result <- compileFileWithPrelude (preludeMode c) (map (output </>) (includes c)) path
   case result of
     Left err -> do
       when (expected c) (fail ("seed rejects independently expected acceptance " ++ caseId c ++ ": " ++ show err))
       when (category c `elem` ["hm-exhaustive","hm-generated","state"] && phase err /= Inference)
         (fail ("Typing negative failed outside inference: " ++ caseId c ++ ": " ++ show err))
+      case rejection c of
+        Just (expectedPhase,reason) -> unless (phase err == expectedPhase && reason `isInfixOf` diagnostic err)
+          (fail ("seed disagrees with prescribed rejection " ++ caseId c ++ ": " ++ show err))
+        Nothing -> pure ()
     Right compilation -> do
       unless (expected c) (fail ("seed accepts independently expected rejection " ++ caseId c))
       ty <- either fail pure (XC.checkClosed (compiledTerm compilation))
@@ -223,7 +267,9 @@ manifestRow (Exported c result) = jsonObject $
   , ("expected_accept",if expected c then "true" else "false")
   , ("acceptance_oracle",jsonString (acceptanceOracle c))
   , ("include_dirs",jsonArray (map jsonString (includes c)))
+  , ("no_prelude",if preludeMode c == NoImplicitPrelude then "true" else "false")
   ] ++ maybe [] (\path -> [("original_path",jsonString path)]) (originalPath c) ++
+  maybe [] (\(_,reason) -> [("expected_error_contains",jsonString reason)]) (rejection c) ++
   (case result of
     Left err -> [("expected_phase",jsonString (show (phase err)))]
     Right compilation -> [("expected_type",jsonString (XPretty.prettyType (inferredType compilation))),

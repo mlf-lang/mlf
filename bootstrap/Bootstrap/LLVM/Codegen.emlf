@@ -25,7 +25,7 @@ generateWithHeader headerBytes cs term =
   let output = Output 0 Nil "entry" Nil Nil cs fs S.empty M.empty ks S.empty (K.collecting fs ks) M.empty true M.empty M.empty M.empty M.empty (F.infer (M.map L.snd cs) fs term) S.empty headerBytes in
   case runBuild (callback Nil Nothing term) output of
     Left message -> Left message
-    Right (Pair entry out) -> Right (Pair entry (L.concat (args4 runtimeDeclarations aliasMetadata (L.reverse (constants out)) (L.reverse (definitions out)))))
+    Right (Pair entry out) -> Right (Pair entry (L.concat (Cons runtimeDeclarations (args4 (forceDefinition headerBytes) aliasMetadata (L.reverse (constants out)) (L.reverse (definitions out))))))
 
 lookupName : Map XName CGBinding -> XName -> Build CGBinding
 lookupName scope name = case M.lookup O.compareName name scope of
@@ -377,7 +377,11 @@ executeST fuel scope expression = case expression of
       Pair (XEPrimitive p) args -> case stateHelper p of
         Just (Pair symbol strict) -> if L.length args == L.length strict then do
           values <- L.mapM (\entry -> case entry of { Pair demanded argument -> if demanded then evaluate scope argument else thunk scope argument }) (L.zip strict args)
-          call symbol (L.map pointer values)
+          case p of
+            PReadSTArray -> stateArray p values
+            PWriteSTArray -> stateArray p values
+            PLengthSTArray -> stateArray p values
+            _ -> call symbol (L.map pointer values)
           else executeSTFallback scope expression
         Nothing -> executeSTFallback scope expression
       _ -> executeSTFallback scope expression
@@ -394,6 +398,43 @@ stateHelper primitive = case primitive of
   PWriteSTArray -> Just (Pair "@mlf_st_write_array" (args3 true true false))
   PLengthSTArray -> Just (Pair "@mlf_st_length_array" (args1 true))
   _ -> Nothing
+
+-- Execute checked state-array access directly, preserving bounds failures and
+-- lazy cell values. The runtime still allocates arrays and handles opaque ST.
+stateArray : Primitive -> List String -> Build String
+stateArray p values = case values of
+  Nil -> failure "LLVM missing state array"
+  Cons array rest -> do
+    Pair len cells <- arrayView array
+    let lengthOnly = case p of PLengthSTArray -> true; _ -> false
+    if lengthOnly then do
+      shifted <- result ("shl i64 " ++ len ++ ", 1")
+      bits <- result ("or i64 " ++ shifted ++ ", 1")
+      result ("inttoptr i64 " ++ bits ++ " to ptr")
+    else case rest of
+      Nil -> failure "LLVM missing state array index"
+      Cons index entries -> do
+        bits <- result ("ptrtoint ptr " ++ index ++ " to i64")
+        i <- result ("ashr i64 " ++ bits ++ ", 1")
+        low <- result ("and i64 " ++ bits ++ ", 1")
+        tag <- result ("icmp ne i64 " ++ low ++ ", 0")
+        bounds <- result ("icmp ult i64 " ++ i ++ ", " ++ len)
+        ok <- result ("and i1 " ++ tag ++ ", " ++ bounds)
+        valid <- fresh "state.valid."
+        invalid <- fresh "state.invalid."
+        emit ("  br i1 " ++ ok ++ ", label %" ++ valid ++ ", label %" ++ invalid)
+        label invalid
+        emit "  call void @mlf_bounds_failure()"
+        emit "  unreachable"
+        label valid
+        address <- result ("getelementptr ptr, ptr " ++ cells ++ ", i64 " ++ i)
+        let readOnly = case p of PReadSTArray -> true; _ -> false
+        if readOnly then result ("load ptr, ptr " ++ address ++ ", align 8, !tbaa !4")
+        else case entries of
+          Cons entry Nil -> do
+            emit ("  store ptr " ++ entry ++ ", ptr " ++ address ++ ", align 8, !tbaa !4")
+            cgPure (immediate 4)
+          _ -> failure "LLVM missing state array value"
 
 -- Single-use action aliases remain in the execution context above; ordinary
 -- values retain the same demand and sharing rules as ordinary code generation.
@@ -597,8 +638,51 @@ genericApplication scope expression = case expression of
     function <- thunk scope f
     argument <- thunk scope a
     app <- call "@mlf_application" (args2 (pointer function) (pointer argument))
-    call "@mlf_force" (args1 (pointer app))
+    forceValue app
   _ -> failure "LLVM expected application"
+
+-- Mirror the runtime's non-evaluating WHNF test for the compact layout.
+-- Runtime fallback preserves null/cycle errors and evaluates deferred values.
+forceDefinition : Int -> List String
+forceDefinition header = if header /= 0 then Nil else
+  Cons "define private ptr @mlf.force(ptr %value) alwaysinline {" (
+  Cons "entry:" (
+  Cons "  %null = icmp eq ptr %value, null" (
+  Cons "  br i1 %null, label %slow, label %test" (
+  Cons "test:" (
+  Cons "  %bits = ptrtoint ptr %value to i64" (
+  Cons "  %kind = and i64 %bits, 7" (
+  Cons "  %immediate = icmp ne i64 %kind, 0" (
+  Cons "  br i1 %immediate, label %done, label %tagged" (
+  Cons "tagged:" (
+  Cons "  %tag = load i32, ptr %value, align 4" (
+  Cons "  %ready = icmp uge i32 %tag, 5" (
+  Cons "  br i1 %ready, label %done, label %indirect" (
+  Cons "indirect:" (
+  Cons "  %forwarded = icmp eq i32 %tag, 2" (
+  Cons "  br i1 %forwarded, label %next, label %slow" (
+  Cons "next:" (
+  Cons "  %slot = getelementptr i8, ptr %value, i64 8" (
+  Cons "  %p = load ptr, ptr %slot, align 8" (
+  Cons "  %missing = icmp eq ptr %p, null" (
+  Cons "  br i1 %missing, label %slow, label %nexttest" (
+  Cons "nexttest:" (
+  Cons "  %pbits = ptrtoint ptr %p to i64" (
+  Cons "  %pkind = and i64 %pbits, 7" (
+  Cons "  %pimm = icmp ne i64 %pkind, 0" (
+  Cons "  br i1 %pimm, label %forward, label %ptagged" (
+  Cons "ptagged:" (
+  Cons "  %ptag = load i32, ptr %p, align 4" (
+  Cons "  %pready = icmp uge i32 %ptag, 5" (
+  Cons "  br i1 %pready, label %forward, label %slow" (
+  Cons "forward:" (
+  Cons "  ret ptr %p" (
+  Cons "done:" (
+  Cons "  ret ptr %value" (
+  Cons "slow:" (
+  Cons "  %result = tail call ptr @mlf_force(ptr %value)" (
+  Cons "  ret ptr %result" (
+  Cons "}" Nil)))))))))))))))))))))))))))))))))))))
 
 aliasMetadata : List String
 aliasMetadata =

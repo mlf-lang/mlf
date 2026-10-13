@@ -48,6 +48,14 @@ dnaTests backends =
       let bytes = BS.pack (take 17000 (cycle [0,128,255,65])) <> ASCII.pack "\n"
       run backends "do { a <- getByteLine; n <- lengthByteArray a; putBytes a 0 n }"
         (RawInput (bytes <> ASCII.pack "tail") False) bytes "tail")
+  , ("byte input: buffer boundaries preserve mixed reads and retained lines", forM_ [65535,65536,65537] $ \size -> do
+      let first = BS.pack (take size (cycle [0,128,255,65])) <> ASCII.pack "\n"
+          text = BS.pack [206,187,240,159,152,128,10]
+          next = ASCII.pack "next\n"
+      run backends
+        "do { first <- getByteLine; text <- getLine; next <- getByteLine; putStrLn text; n <- lengthByteArray first; putBytes first 0 n; m <- lengthByteArray next; putBytes next 0 m }"
+        (RawInput (first <> text <> next <> ASCII.pack "tail") False)
+        (text <> first <> next) "tail")
   , ("byte input: discarded action does not consume input", run backends
       "do { return getByteLine; putStrLn \"ok\" }" (RawInput (BS.pack [255]) False) (ASCII.pack "ok\n") ['\255'])
   , ("byte input: invalid UTF-8 still fails for text input", do

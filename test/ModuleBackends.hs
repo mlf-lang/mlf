@@ -2,7 +2,8 @@ module ModuleBackends (moduleBackendTests) where
 
 import Control.Monad (unless)
 import Data.List (isInfixOf)
-import System.Directory (createDirectory, findExecutable)
+import System.Directory (canonicalizePath, createDirectory, createDirectoryLink, findExecutable)
+import System.Environment (lookupEnv)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
 import System.Process (readProcessWithExitCode)
@@ -31,7 +32,15 @@ moduleBackendTests backends =
 -- LLVM emission with the separately parsed xMLF-to-LLVM command.
 cliTests :: Backends -> IO ()
 cliTests backends = withScratch $ \directory -> do
-  compiler <- findExecutable "emlf" >>= maybe (fail "Cabal did not provide the emlf build tool") pure
+  configured <- lookupEnv "MLF_BOOTSTRAP_COMPILER"
+  nativeDrivers <- any (/= Nothing) <$> mapM lookupEnv ["MLF_BOOTSTRAP_INTERPRETER","MLF_BOOTSTRAP_LLVM"]
+  selected <- case configured of
+    Just candidate -> pure candidate
+    Nothing -> do
+      unless (not nativeDrivers) (fail "Native backend CLI tests require MLF_BOOTSTRAP_COMPILER; refusing seed fallback")
+      pure "emlf"
+  compiler <- findExecutable selected >>= maybe (fail ("Cannot execute selected module CLI compiler: " ++ selected)) canonicalizePath
+  putStrLn ("Module CLI compiler: " ++ compiler)
   let libraries = directory </> "library files"
       entry = directory </> "Main.emlf"
       command args input = do
@@ -52,12 +61,23 @@ cliTests backends = withScratch $ \directory -> do
   writeFile (libraries </> "Helpers.emlf") "module Helpers (inc) where\ninc x = x + 1\n"
   writeFile entry "module Main where\nimport Helpers (inc)\nmain = printInt (inc 41)\n"
   command ["-i",libraries,"--type",entry] "" >>= equal "IO Unit\n"
+  command ["-i",directory </> "missing search root","-i",libraries,"--type",entry] "" >>= equal "IO Unit\n"
   target <- command ["-i",libraries,entry] ""
   runTarget target
   command ["--check"] target >>= equal "IO Unit\n"
   direct <- command ["-i" ++ libraries,"--emit-llvm",entry] ""
   command ["--xmlf-to-llvm"] target >>= equal direct
   command ["-i",libraries,"--run",entry] "" >>= equal "42\n"
+  command ["-i",libraries </> ".." </> "library files","--run",entry] "" >>= equal "42\n"
+  let alias = directory </> "module alias"
+  createDirectoryLink libraries alias
+  command ["-i",alias,"--run",entry] "" >>= equal "42\n"
+  let hierarchy = libraries </> "Geometry"
+      nestedEntry = hierarchy </> "Main.emlf"
+  createDirectory hierarchy
+  writeFile (hierarchy </> "Support.emlf") "module Geometry.Support (inc) where\ninc x = x + 1\n"
+  writeFile nestedEntry "module Geometry.Main where\nimport Geometry.Support\nmain = printInt (inc 41)\n"
+  command ["--run",nestedEntry] "" >>= equal "42\n"
   command ["--run-xmlf"] target >>= equal "42\n"
   let expression = "import Helpers (inc)\nprintInt (inc 41)"
   command ["-i",libraries,"--expr",expression] "" >>= runTarget
@@ -66,4 +86,5 @@ cliTests backends = withScratch $ \directory -> do
   command ["--no-prelude","-i",libraries,"--type","--expr",
     "import Prelude (Monad(..), IO, Int)\n(return 42 : IO Int)"] "" >>= equal "IO Int\n"
   reject ["--type",entry] "cannot find module Helpers"
+  reject ["-i",directory </> "missing search root","--type",entry] "ModuleResolution: cannot find module Helpers"
   reject ["-i"] "-i requires a module search directory"

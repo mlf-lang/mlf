@@ -54,7 +54,56 @@ generateWithHeader headerBytes cs term = do
       ks = K.kernels fs
   (entry,out) <- runStateT (callback [] Nothing term)
     (Output 0 [] "entry" [] [] cs fs Set.empty Map.empty ks Set.empty (K.collecting fs ks) Map.empty True Map.empty Map.empty Map.empty Map.empty (F.infer (Map.map snd cs) fs term) headerBytes Set.empty)
-  pure (entry, runtimeDeclarations ++ aliasMetadata ++ reverse (constants out) ++ reverse (definitions out))
+  pure (entry, runtimeDeclarations ++ forceDefinition headerBytes ++ aliasMetadata ++ reverse (constants out) ++ reverse (definitions out))
+
+-- Compact programs allocate and inspect many lazy values. Expose the runtime's
+-- non-evaluating WHNF test to LLVM so callers can avoid an external call for a
+-- ready value or a single completed indirection. All other cases still enter
+-- the runtime, including nulls, black holes and longer indirection chains.
+-- Keep the ordinary profile's small modules and out-of-line forcing unchanged.
+forceDefinition :: Int -> [String]
+forceDefinition headerBytes
+  | headerBytes /= 0 = []
+  | otherwise =
+    [ "define private ptr @mlf.force(ptr %value) alwaysinline {"
+    , "entry:"
+    , "  %null = icmp eq ptr %value, null"
+    , "  br i1 %null, label %slow, label %test"
+    , "test:"
+    , "  %bits = ptrtoint ptr %value to i64"
+    , "  %kind = and i64 %bits, 7"
+    , "  %immediate = icmp ne i64 %kind, 0"
+    , "  br i1 %immediate, label %done, label %tagged"
+    , "tagged:"
+    , "  %tag = load i32, ptr %value, align 4"
+    , "  %ready = icmp uge i32 %tag, 5"
+    , "  br i1 %ready, label %done, label %indirect"
+    , "indirect:"
+    , "  %forwarded = icmp eq i32 %tag, 2"
+    , "  br i1 %forwarded, label %next, label %slow"
+    , "next:"
+    , "  %slot = getelementptr i8, ptr %value, i64 8"
+    , "  %p = load ptr, ptr %slot, align 8"
+    , "  %missing = icmp eq ptr %p, null"
+    , "  br i1 %missing, label %slow, label %nexttest"
+    , "nexttest:"
+    , "  %pbits = ptrtoint ptr %p to i64"
+    , "  %pkind = and i64 %pbits, 7"
+    , "  %pimm = icmp ne i64 %pkind, 0"
+    , "  br i1 %pimm, label %forward, label %ptagged"
+    , "ptagged:"
+    , "  %ptag = load i32, ptr %p, align 4"
+    , "  %pready = icmp uge i32 %ptag, 5"
+    , "  br i1 %pready, label %forward, label %slow"
+    , "forward:"
+    , "  ret ptr %p"
+    , "done:"
+    , "  ret ptr %value"
+    , "slow:"
+    , "  %result = tail call ptr @mlf_force(ptr %value)"
+    , "  ret ptr %result"
+    , "}"
+    ]
 
 -- Managed headers and external array storage are disjoint allocations. The
 -- source language cannot cast an array cell pointer to a managed object.
@@ -185,9 +234,14 @@ forceBinding binding
       case previous of
         Just value -> pure value
         Nothing -> do
-          value <- call "@mlf_force" [pointer original]
+          value <- forceValue original
           modify' (\s -> s { forcedValues = Map.insert original value (Map.insert value value (forcedValues s)) })
           pure value
+
+forceValue :: String -> Build String
+forceValue value = do
+  header <- gets objectHeaderBytes
+  call (if header == 0 then "@mlf.force" else "@mlf_force") [pointer value]
 
 bindingOperand :: Binding -> Build String
 bindingOperand binding = gets (Map.findWithDefault (operand binding) (operand binding) . forcedValues)
@@ -684,7 +738,7 @@ scalarValue scope expression = case expression of
       else do
         constructor <- call "@mlf_constructor" [number tag,number arity]
         Boxed <$> foldM (\f a -> call "@mlf_application" [pointer f,pointer a] >>= \v ->
-          call "@mlf_force" [pointer v]) constructor values
+          forceValue v) constructor values
     _ -> Boxed <$> evaluate Map.empty expression
 
 executeNumeric :: NumericScope -> X.Erased -> Build Scalar
@@ -1107,7 +1161,9 @@ executeST fuel scope expression = case expression of
             -- Initial and written cell values remain lazy.
             values <- forM (zip strict args) $ \(demanded,argument) ->
               if demanded then evaluate scope argument else thunk scope argument
-            call symbol (map pointer values)
+            if p `elem` [P.ReadSTArray,P.WriteSTArray,P.LengthSTArray]
+              then stateArray p values
+              else call symbol (map pointer values)
       _ -> do
         action <- evaluate scope expression
         call "@mlf_execute_st_lazy" [pointer action]
@@ -1116,6 +1172,38 @@ executeST fuel scope expression = case expression of
       (P.ReadSTArray,("@mlf_st_read_array",[True,True])),
       (P.WriteSTArray,("@mlf_st_write_array",[True,True,False])),
       (P.LengthSTArray,("@mlf_st_length_array",[True]))]
+
+-- Checked ST operands have the same array layout as IO arrays. Execute the
+-- bounds check at the state operation, and leave cell values unevaluated.
+-- Exposing these reads/writes lets LLVM reuse addresses and scalar arithmetic
+-- in state loops without the redundant runtime forcing/type dispatch.
+stateArray :: P.Primitive -> [String] -> Build String
+stateArray p values = case values of
+  array:rest -> do
+    (len,cells) <- arrayView array
+    if p == P.LengthSTArray then do
+      bits <- result ("shl i64 " ++ len ++ ", 1") >>= \v -> result ("or i64 " ++ v ++ ", 1")
+      result ("inttoptr i64 " ++ bits ++ " to ptr")
+    else case rest of
+      index:entries -> do
+        bits <- result ("ptrtoint ptr " ++ index ++ " to i64")
+        i <- result ("ashr i64 " ++ bits ++ ", 1")
+        tag <- result ("and i64 " ++ bits ++ ", 1") >>= \v -> result ("icmp ne i64 " ++ v ++ ", 0")
+        bounds <- result ("icmp ult i64 " ++ i ++ ", " ++ len)
+        ok <- result ("and i1 " ++ tag ++ ", " ++ bounds)
+        valid <- fresh "state.valid."; invalid <- fresh "state.invalid."
+        emit ("  br i1 " ++ ok ++ ", label %" ++ valid ++ ", label %" ++ invalid)
+        label invalid
+        emit "  call void @mlf_bounds_failure()"
+        emit "  unreachable"
+        label valid
+        address <- result ("getelementptr ptr, ptr " ++ cells ++ ", i64 " ++ i)
+        if p == P.ReadSTArray then result ("load ptr, ptr " ++ address ++ ", align 8, !tbaa !4")
+        else case entries of
+          [entry] -> emit ("  store ptr " ++ entry ++ ", ptr " ++ address ++ ", align 8, !tbaa !4") >> pure (immediate 4)
+          _ -> lift (Left "LLVM missing state array value")
+      _ -> lift (Left "LLVM missing state array index")
+  _ -> lift (Left "LLVM missing state array")
 
 -- Tail transfers keep the caller's fuel: they replace a frame, whereas
 -- non-tail calls spend one unit. A musttail call is used only for identical
@@ -1288,7 +1376,7 @@ application scope expression = do
         function <- thunk scope f
         argument <- thunk scope a
         app <- call "@mlf_application" [pointer function,pointer argument]
-        call "@mlf_force" [pointer app]
+        forceValue app
       _ -> lift (Left "LLVM expected application")
 
 phi :: String -> [(String,String)] -> Build String

@@ -114,9 +114,15 @@ maxViewWithKey tree = case tree of
     Nothing -> Just (Pair (Pair k v) l)
     Just (Pair entry rest) -> Just (Pair entry (balance k v l rest))
 lookupMin : forall k v. Map k v -> Maybe (Pair k v)
-lookupMin tree = S.mapOptional S.fst (minViewWithKey tree)
+lookupMin tree = case tree of
+  MapEmpty -> Nothing
+  MapNode n k v MapEmpty r -> Just (Pair k v)
+  MapNode n k v l r -> lookupMin l
 lookupMax : forall k v. Map k v -> Maybe (Pair k v)
-lookupMax tree = S.mapOptional S.fst (maxViewWithKey tree)
+lookupMax tree = case tree of
+  MapEmpty -> Nothing
+  MapNode n k v l MapEmpty -> Just (Pair k v)
+  MapNode n k v l r -> lookupMax r
 findMin : forall k v. Map k v -> Pair k v
 findMin tree = case lookupMin tree of
   Nothing -> panic "findMin: empty map"

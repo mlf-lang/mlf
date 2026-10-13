@@ -20,7 +20,7 @@ stateRuntimeTests backends =
         unless (all (`isInfixOf` llvm)
           ["define private ptr @mlf.st.worker.", "icmp eq i64 %st.fuel, 0",
            "call ptr @mlf_execute_st_lazy(", "call ptr @mlf_st_new_array(",
-           "call ptr @mlf_st_read_array(", "call ptr @mlf_st_write_array("])
+           "state.valid.", "getelementptr ptr, ptr "])
           (fail "bounded direct state execution was not exercised")
       else pure ()
       if label `elem` ["bounded-tail-state-worker", "bounded-mixed-tail-state-worker"] then do
@@ -31,7 +31,8 @@ stateRuntimeTests backends =
       else pure ()
       if label == "single-use-action-alias" then do
         llvm <- either fail pure (emitLLVM (C.compiledTerm result))
-        unless ("call ptr @mlf_st_read_array(" `isInfixOf` llvm &&
+        unless ("state.valid." `isInfixOf` llvm &&
+                not ("call ptr @mlf_st_read_array(" `isInfixOf` llvm) &&
                 not ("call ptr @mlf_execute_st_lazy(" `isInfixOf` llvm))
           (fail "single-use action alias fell back to generic execution")
       else pure ()

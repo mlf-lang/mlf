@@ -75,7 +75,7 @@ def driver_commands(directory, compiler, gmp_libs, gc_libs, system):
         yield name, emit, ir, errors, link, executable
 
 
-def environment(directory, seed):
+def environment(directory, seed, compiler, abi="standard", gc=None):
     env = os.environ.copy()
     # The drivers use BDWGC; generated programs use the ordinary test runtime.
     # Do not accidentally inherit a different matrix/profile from the caller.
@@ -83,14 +83,24 @@ def environment(directory, seed):
         env.pop(key, None)
     env.update(MLF_BOOTSTRAP_INTERPRETER=str(directory / "RuntimeDriver"),
                MLF_BOOTSTRAP_LLVM=str(directory / "LLVMDriver"),
+               MLF_BOOTSTRAP_COMPILER=str(compiler),
                MLF_BOOTSTRAP_TIMEOUT_SECONDS="1800",
                MLF_LLVM_TEST_ABI="standard", MLF_LLVM_TEST_CFLAGS="", MLF_LLVM_TEST_LIBS="", MLF_LLVM_TEST_OPT="-O2",
                GC_INITIAL_HEAP_SIZE="536870912", GC_FREE_SPACE_DIVISOR="1")
     env["PATH"] = str(seed.parent) + os.pathsep + env.get("PATH", "")
+    if abi == "compact-gc":
+        if gc is None:
+            raise ValueError("Compact backend matrix requires collector flags")
+        env.update(MLF_LLVM_TEST_ABI=abi,
+                   MLF_LLVM_TEST_CFLAGS=shlex.join(gc["cflags"]),
+                   MLF_LLVM_TEST_LIBS=shlex.join(gc["libs"]),
+                   GC_INITIAL_HEAP_SIZE="8388608")
+    elif abi != "standard":
+        raise ValueError("Unknown backend matrix ABI: " + abi)
     return env
 
 
-def dry_run(directory, compiler):
+def dry_run(directory, compiler, abis):
     print("Plan only: no commands executed, drivers reused, or test result recorded.")
     seed = Path("<cabal-seed-directory>") / "emlf"
     show(BUILD)
@@ -104,22 +114,28 @@ def dry_run(directory, compiler):
             directory, compiler or seed, ["<GMP libraries>"], ["<BDWGC libraries>"], platform.system()):
         show(emit, ir, errors)
         show(link)
-    env = environment(directory, seed)
-    print("Matrix environment:")
-    for key in ("MLF_BOOTSTRAP_INTERPRETER", "MLF_BOOTSTRAP_LLVM", "MLF_BOOTSTRAP_TIMEOUT_SECONDS",
-                "MLF_LLVM_TEST_CFLAGS", "MLF_LLVM_TEST_LIBS", "MLF_LLVM_TEST_OPT",
-                "GC_INITIAL_HEAP_SIZE", "GC_FREE_SPACE_DIVISOR"):
-        print(f"  {key}={shlex.quote(env[key])}")
-    print("  PATH=<cabal-seed-directory>:<inherited PATH>")
-    show(TEST)
+    for abi in abis:
+        env = environment(directory, seed, compiler or seed, abi,
+                          {"cflags": ["<BDWGC cflags>"], "libs": ["<BDWGC libraries>"]})
+        print(f"Matrix environment ({abi}):")
+        for key in ("MLF_BOOTSTRAP_INTERPRETER", "MLF_BOOTSTRAP_LLVM", "MLF_BOOTSTRAP_COMPILER", "MLF_BOOTSTRAP_TIMEOUT_SECONDS",
+                    "MLF_LLVM_TEST_ABI", "MLF_LLVM_TEST_CFLAGS", "MLF_LLVM_TEST_LIBS", "MLF_LLVM_TEST_OPT",
+                    "GC_INITIAL_HEAP_SIZE", "GC_FREE_SPACE_DIVISOR"):
+            print(f"  {key}={shlex.quote(env[key])}")
+        print("  PATH=<cabal-seed-directory>:<inherited PATH>")
+        show(TEST)
 
 
-def matrix_summary(text):
+def matrix_summary(text, compiler):
     rows = re.findall(r"^Backend matrix: ([0-9]+) rows x 2 backends; no missing executions$", text, re.M)
     fixtures = re.findall(r"^([0-9]+) shared IO/prelude/backend fixtures; 0 failures$", text, re.M)
     if len(rows) != 1 or len(fixtures) != 1 or int(rows[0]) == 0 or int(fixtures[0]) == 0:
         raise RuntimeError("Cabal did not report one complete, nonempty two-backend matrix")
-    return {"rows": int(rows[0]), "backends": 2, "fixtures": int(fixtures[0])}
+    selected = re.findall(r"^Module CLI compiler: (.+)$", text, re.M)
+    if selected != [str(Path(compiler).resolve())]:
+        raise RuntimeError("Module CLI tests did not execute the selected compiler exactly once")
+    return {"rows": int(rows[0]), "backends": 2, "fixtures": int(fixtures[0]),
+            "cli_compiler": selected[0]}
 
 
 def matrix(env, log_path):
@@ -134,7 +150,7 @@ def matrix(env, log_path):
             status = process.wait()
     if status:
         raise RuntimeError(f"Cabal backend-tests failed ({status}); see {log_path}")
-    return matrix_summary(log_path.read_text())
+    return matrix_summary(log_path.read_text(), env["MLF_BOOTSTRAP_COMPILER"])
 
 
 def main():
@@ -143,19 +159,22 @@ def main():
                         help="Compiler used to build both drivers; defaults to the Cabal Haskell seed")
     parser.add_argument("--output", type=Path, default=ROOT / "dist-newstyle" / "bootstrap-backends",
                         help="Driver artifacts, build diagnostics, matrix log and verification report")
+    parser.add_argument("--abi", choices=("standard", "compact-gc", "both"), default="standard",
+                        help="Generated-program layouts to test; both rebuilds the drivers once and runs both matrices")
     parser.add_argument("--dry-run", action="store_true",
                         help="Print the command plan without building, reusing drivers, or running tests")
     args = parser.parse_args()
     directory = args.output.resolve()
     compiler = args.compiler.resolve() if args.compiler else None
+    abis = ("standard", "compact-gc") if args.abi == "both" else (args.abi,)
     if args.dry_run:
-        dry_run(directory, compiler)
+        dry_run(directory, compiler, abis)
         return 0
     if compiler is not None and (not compiler.is_file() or not os.access(compiler, os.X_OK)):
         parser.error(f"--compiler is not an executable file: {compiler}")
     directory.mkdir(parents=True, exist_ok=True)
     report_path = directory / "verification.json"
-    report = {"complete": False, "started": time.time(), "drivers": {}}
+    report = {"schema_version": 2, "complete": False, "started": time.time(), "drivers": {}, "matrices": {}}
     report_path.write_text(json.dumps(report, indent=2) + "\n")
     try:
         build_env = os.environ.copy()
@@ -166,16 +185,16 @@ def main():
             raise RuntimeError(f"Compiler is not executable: {compiler}")
         report.update(compiler=str(compiler), compiler_sha256=digest(compiler),
                       seed=str(seed), seed_sha256=digest(seed), sources=sources())
-        env = environment(directory, seed)
+        env = environment(directory, seed, compiler)
         report["environment"] = {key: env[key] for key in (
-            "MLF_BOOTSTRAP_INTERPRETER", "MLF_BOOTSTRAP_LLVM", "MLF_BOOTSTRAP_TIMEOUT_SECONDS",
-            "MLF_LLVM_TEST_CFLAGS", "MLF_LLVM_TEST_LIBS", "MLF_LLVM_TEST_OPT",
+            "MLF_BOOTSTRAP_INTERPRETER", "MLF_BOOTSTRAP_LLVM", "MLF_BOOTSTRAP_COMPILER", "MLF_BOOTSTRAP_TIMEOUT_SECONDS",
+            "MLF_LLVM_TEST_ABI", "MLF_LLVM_TEST_CFLAGS", "MLF_LLVM_TEST_LIBS", "MLF_LLVM_TEST_OPT",
             "GC_INITIAL_HEAP_SIZE", "GC_FREE_SPACE_DIVISOR")}
         gmp_cflags = shlex.split(run(["pkg-config", "--cflags", "gmp"], env=env, capture=True))
         gmp_libs = shlex.split(run(["pkg-config", "--libs", "gmp"], env=env, capture=True))
         gc = json.loads(run([sys.executable, ROOT / "scripts" / "bootstrap-gc.py", "--flags"],
                             env=env, capture=True))
-        report["allocator"] = {"profile": "BDWGC", "flags": gc, "io_threshold": 1048576,
+        report["allocator"] = {"profile": "BDWGC compact", "flags": gc, "io_threshold": 1048576,
                                "macos_stack_bytes": 67108864 if platform.system() == "Darwin" else None}
         for argv in runtime_commands(directory, gmp_cflags, gc["cflags"]):
             run(argv, env=env)
@@ -191,7 +210,12 @@ def main():
             report["drivers"][name] = {"llvm_sha256": digest(ir), "binary_sha256": digest(executable)}
         if sources() != report["sources"] or digest(compiler) != report["compiler_sha256"]:
             raise RuntimeError("Compiler or sources changed while building the drivers")
-        report["matrix"] = matrix(env, directory / "matrix.log")
+        for abi in abis:
+            matrix_env = environment(directory, seed, compiler, abi, gc)
+            summary = matrix(matrix_env, directory / ("matrix.log" if len(abis) == 1 else f"matrix-{abi}.log"))
+            report["matrices"][abi] = {**summary, "environment": {key: matrix_env[key] for key in report["environment"]}}
+        if len(abis) == 1:
+            report["matrix"] = summary
         if (sources() != report["sources"] or digest(compiler) != report["compiler_sha256"] or
                 digest(seed) != report["seed_sha256"]):
             raise RuntimeError("Compiler, seed or sources changed during the backend matrix")
