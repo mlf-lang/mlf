@@ -1,0 +1,7 @@
+annotation: checked solver reuse agrees
+nested-data: checked solver reuse agrees
+recursive-signature: checked solver reuse agrees
+multiparam-class: checked solver reuse agrees
+superclass: checked solver reuse agrees
+do-io: checked solver reuse agrees
+module-reexport: checked solver reuse agrees

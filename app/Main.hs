@@ -8,7 +8,7 @@ import System.Exit (exitFailure)
 import System.FilePath ((</>), takeDirectory)
 import System.IO (hPutStrLn, stderr)
 import MLF.Compiler
-import MLF.LLVM (emitLLVM)
+import MLF.LLVM (emitLLVM, emitLLVMIO, emitLLVMForGC, emitLLVMIOForGC)
 import MLF.X.Pretty
 import Paths_mlf (getDataFileName)
 import qualified MLF.X.Parser as X
@@ -28,7 +28,7 @@ main = getArgs >>= options ImplicitPrelude []
 
 runArgs :: PreludeMode -> [FilePath] -> [String] -> IO ()
 runArgs mode includes args =
-  case args of
+  case commandArgs of
     ["--help"] -> putStrLn usage
     ["--llvm-runtime"] -> runtimePath >>= putStrLn
     ["--emit-llvm","--expr",source] -> emitSource "<expression>" source
@@ -56,6 +56,19 @@ runArgs mode includes args =
     [file] | take 2 file /= "--" -> readSource file False
     _ -> die usage
   where
+    (requestedArgs,argumentSuffix) = break (== "--") args
+    (compact,requireIO,commandArgs) = case requestedArgs of
+      "--emit-llvm-gc":rest -> (True,False,"--emit-llvm":rest)
+      "--xmlf-to-llvm-gc":rest -> (True,False,"--xmlf-to-llvm":rest)
+      "--xmlf-to-llvm-io":rest -> (False,True,"--xmlf-to-llvm":rest)
+      "--xmlf-to-llvm-io-gc":rest -> (True,True,"--xmlf-to-llvm":rest)
+      _ -> (False,False,requestedArgs)
+    emit = case (compact,requireIO) of
+      (False,False) -> emitLLVM
+      (False,True) -> emitLLVMIO
+      (True,False) -> emitLLVMForGC
+      (True,True) -> emitLLVMIOForGC
+    programArguments = drop 1 argumentSuffix
     readSource file onlyType = compileFileWithPrelude mode includes file >>= printCompiled onlyType
     load file = do
       source <- try (readFile file >>= \s -> length s `seq` pure s) :: IO (Either IOException String)
@@ -76,11 +89,11 @@ runArgs mode includes args =
     emitSource file source = compileSourceWithImports mode includes file source >>= emitCompiled
     emitCompiled result = case result of
       Left err -> die (show err)
-      Right compiled -> either die putStr (emitLLVM (compiledTerm compiled))
-    emitTarget file source = either die putStr (X.parseTerm file source >>= emitLLVM)
+      Right compiled -> either die putStr (emit (compiledTerm compiled))
+    emitTarget file source = either die putStr (X.parseTerm file source >>= emit)
     executeTarget file source = either die executeTerm (X.parseTerm file source)
     executeTerm term = do
-      outcome <- R.runTerm R.consoleBackend term
+      outcome <- R.runTermWithArguments programArguments R.consoleBackend term
       either (die . ("Runtime: " ++) . show) pure outcome
 
 die :: String -> IO a
@@ -107,10 +120,12 @@ usage :: String
 usage = unlines
   [ "Usage: emlf [--no-prelude] [-i DIR ...] [--type] [FILE | --expr SOURCE]"
   , "       emlf --check [XMLF_FILE]"
-  , "       emlf [--no-prelude] [-i DIR ...] --run [FILE | --expr SOURCE]"
-  , "       emlf --run-xmlf [XMLF_FILE]"
+  , "       emlf [--no-prelude] [-i DIR ...] --run [FILE | --expr SOURCE] [-- ARGS...]"
+  , "       emlf --run-xmlf [XMLF_FILE] [-- ARGS...]"
   , "       emlf [--no-prelude] [-i DIR ...] --emit-llvm [FILE | --expr SOURCE]"
   , "       emlf --xmlf-to-llvm [XMLF_FILE]"
+  , "       emlf [--no-prelude] [-i DIR ...] --emit-llvm-gc [FILE | --expr SOURCE]"
+  , "       emlf --xmlf-to-llvm[-io]-gc [XMLF_FILE]"
   , "       emlf --llvm-runtime"
   , "With no FILE, read eMLF from standard input."
   , "Compile expressions, algebraic data types, classes, and modules to checked xMLF."
@@ -123,4 +138,5 @@ usage = unlines
   , "--xmlf-to-llvm independently checks xMLF, then emits native LLVM IR."
   , "--emit-llvm compiles eMLF through checked xMLF to LLVM IR."
   , "Link IR with clang, the C file printed by --llvm-runtime, and GMP."
+  , "The -gc commands require the runtime built with MLF_USE_BDWGC and MLF_COMPACT_BDWGC."
   ]

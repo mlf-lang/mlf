@@ -106,6 +106,12 @@ readabilityTests =
   , ("recursion: monomorphic closure captures an outer value", do
       result <- checked "let offset = 2 in let rec count n : Int -> Int = if n == 0 then offset else count (n-1) + 1 in count 3"
       require (T.alphaEq (inferredType result) (T.Con "Int" [])) (sourceType result))
+  , ("recursion: explicit quantifiers preserve their declared order", do
+      result <- checked "data List a = Nil | Cons a (List a); foldl : forall a b. (b -> a -> b) -> b -> List a -> b; foldl f z xs = case xs of { Nil -> z; Cons x rest -> foldl f (f z x) rest }; main = foldl (\\count value -> count + 1) 0 (Cons true (Cons false Nil));"
+      require (T.alphaEq (inferredType result) (T.Con "Int" [])) (sourceType result))
+  , ("recursion: unused explicit quantified variables are discharged", do
+      result <- checked "count : forall a. Int -> Int; count n = if n == 0 then 0 else 1 + count (n - 1); main = count 4;"
+      require (T.alphaEq (inferredType result) (T.Con "Int" [])) (sourceType result))
   , ("equations: parameter can shadow the function name", do
       result <- checked "identity identity = identity; main = identity 42;"
       require (T.alphaEq (inferredType result) (T.Con "Int" [])) (sourceType result))
@@ -163,6 +169,14 @@ readabilityPrograms =
   [ ("readability: factorial equations", unlines
       ["fact : Int -> Int", "fact 0 = 1", "fact n = n * fact (n - 1)",
        "main = do", "  printInt (fact 0)", "  printInt (fact 6)"], [], "1\n720\n")
+  , ("readability: recursive forall order", unlines
+      ["data List a = Nil | Cons a (List a)",
+       "foldl : forall a b. (b -> a -> b) -> b -> List a -> b",
+       "foldl f z xs = case xs of { Nil -> z; Cons x rest -> foldl f (f z x) rest }",
+       "main = printInt (foldl (\\count value -> count + 1) 0 (Cons true (Cons false Nil)))"], [], "2\n")
+  , ("readability: unused recursive forall", unlines
+      ["count : forall a. Int -> Int", "count n = if n == 0 then 0 else 1 + count (n - 1)",
+       "main = printInt (count 4)"], [], "4\n")
   , ("readability: mutual recursion", unlines
       ["even : Int -> Bool", "even 0 = true", "even n = odd (n - 1)",
        "odd : Int -> Bool", "odd 0 = false", "odd n = even (n - 1)",

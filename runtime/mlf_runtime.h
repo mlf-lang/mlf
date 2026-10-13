@@ -7,7 +7,20 @@
  * integer, 2/6 = false/true, (tag << 3)|4 = nullary constructor. Heap
  * pointers are aligned to 8 bytes. Evaluated constructors store their tag
  * at byte 24; fully applied unary/binary constructors have inline fields
- * at byte 32. Static assertions in the implementation guard these offsets. */
+ * at byte 32. General constructors store an environment pointer at byte 40;
+ * its field slots start at byte 24. Compact BDWGC subtracts 16 from each
+ * offset except that saturated arity >= 3 values store their fields inline
+ * starting at byte 24. Static assertions guard both layouts. */
+/* The default ABI includes 16 bytes of pool metadata per value/environment.
+ * --emit-llvm-gc omits that metadata: compile this runtime with both
+ * MLF_USE_BDWGC and MLF_COMPACT_BDWGC. Generated entry points reference the
+ * corresponding guard so mixing layouts fails during linking. */
+#ifdef MLF_COMPACT_BDWGC
+void mlf_require_compact_gc_abi(void);
+#else
+void mlf_require_standard_abi(void);
+#endif
+
 typedef struct MlfValue MlfValue;
 typedef struct MlfEnv MlfEnv;
 typedef MlfValue *(*MlfCode)(MlfEnv *, MlfValue *);
@@ -47,6 +60,13 @@ MlfValue *mlf_primitive(int64_t primitive);
 MlfValue *mlf_constructor(int64_t tag, int64_t arity);
 MlfValue *mlf_constructor1(int64_t tag, MlfValue *a);
 MlfValue *mlf_constructor2(int64_t tag, MlfValue *a, MlfValue *b);
+/* Construct a saturated data value from a fully initialized environment.
+ * Fields remain lazy. The caller must not write the environment afterwards. */
+MlfValue *mlf_constructor_fields(int64_t tag, MlfEnv *fields);
+/* Allocate a saturated constructor of arity >= 3 with cleared field slots.
+ * Generated code initializes every slot through the documented layout before
+ * exposing the value. Field initialization must not evaluate the fields. */
+MlfValue *mlf_constructor_new(int64_t tag, uint64_t count);
 MlfValue *mlf_force(MlfValue *value);
 MlfValue *mlf_add_int(MlfValue *a, MlfValue *b);
 MlfValue *mlf_sub_int(MlfValue *a, MlfValue *b);
@@ -57,12 +77,21 @@ MlfValue *mlf_read_int_table(MlfValue *table, MlfValue *key);
 MlfValue *mlf_write_int_table(MlfValue *table, MlfValue *key, MlfValue *entry);
 /* Native-region ABI: all three operands have checked types and are values. */
 MlfValue *mlf_add_int_table(MlfValue *table, MlfValue *key, MlfValue *delta);
+/* Execution-only ST helpers. Array elements and executor results stay lazy;
+ * the enclosing checked runST expression forces only its final result. These
+ * functions never perform the ordinary collector's explicit IO-boundary GC. */
+MlfValue *mlf_execute_st_lazy(MlfValue *action);
+MlfValue *mlf_st_new_array(MlfValue *size, MlfValue *initial);
+MlfValue *mlf_st_read_array(MlfValue *array, MlfValue *index);
+MlfValue *mlf_st_write_array(MlfValue *array, MlfValue *index, MlfValue *entry);
+MlfValue *mlf_st_length_array(MlfValue *array);
 MlfValue *mlf_prim1(int64_t primitive, MlfValue *a);
 MlfValue *mlf_prim2(int64_t primitive, MlfValue *a, MlfValue *b);
 MlfValue *mlf_prim3(int64_t primitive, MlfValue *a, MlfValue *b, MlfValue *c);
 int64_t mlf_tag(MlfValue *value);
 MlfValue *mlf_field(MlfValue *value, uint64_t index);
 _Noreturn void mlf_match_failure(void);
+void mlf_set_args(int32_t argc, char **argv);
 int32_t mlf_run(MlfValue *root, int64_t is_io);
 
 #endif

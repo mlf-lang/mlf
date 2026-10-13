@@ -1,0 +1,5 @@
+WHNF reuse: one successful force
+WHNF reuse: independent definitions
+WHNF reuse: isolated branch paths
+WHNF reuse: dominating branch facts
+WHNF reuse: isolated case paths

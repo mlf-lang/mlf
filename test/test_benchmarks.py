@@ -16,9 +16,13 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "scripts"))
 spec = importlib.util.spec_from_file_location("benchmarks", ROOT / "scripts/benchmark-languages.py")
 B = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(B)
+state_spec = importlib.util.spec_from_file_location("runtime_st_validation", ROOT / "scripts/runtime_st_validation.py")
+ST = importlib.util.module_from_spec(state_spec)
+state_spec.loader.exec_module(ST)
 
 
 class HarnessTests(unittest.TestCase):
@@ -46,6 +50,50 @@ class HarnessTests(unittest.TestCase):
         for args in options:
             with self.subTest(args=args), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 B.main(["--emlf", "nonexistent-compiler", *args])
+
+    def test_native_compiler_identification_uses_public_cli_and_exact_binary(self):
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            native = directory / "native compiler"
+            calls = directory / "native-calls.jsonl"
+            runtime = ROOT / "runtime/mlf_runtime.c"
+            help_text = "Usage: emlf [--type] [FILE | --expr SOURCE]\n"
+            native.write_text(f"#!{sys.executable}\n" +
+                "import json,pathlib,sys\n" +
+                f"with pathlib.Path({str(calls)!r}).open('a') as log:\n" +
+                " log.write(json.dumps(sys.argv[1:])+'\\n')\n" +
+                f"if sys.argv[1:] == ['--help']: print({help_text!r}, end='')\n" +
+                f"elif sys.argv[1:] == ['--llvm-runtime']: print({str(runtime)!r})\n" +
+                "else: raise SystemExit(9)\n")
+            native.chmod(0o755)
+            other = directory / "other-tool"
+            other.write_text(f"#!{sys.executable}\n" +
+                "import sys\n"
+                "if sys.argv[1:] == ['--cflags', '--libs', 'gmp']: print('-lgmp')\n"
+                "elif sys.argv[1:] == ['--modversion', 'gmp']: print('6.3.0')\n"
+                "else: print('test tool 1.0')\n")
+            other.chmod(0o755)
+            args = B.argparse.Namespace(emlf=str(native), clang=str(other), rustc=str(other),
+                                        ghc=str(other), pkg_config=str(other))
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                paths, found_runtime, gmp, metadata = B.toolchain(args, os.environ)
+            self.assertEqual(paths["emlf"], str(native))
+            self.assertEqual(found_runtime, runtime)
+            self.assertEqual(gmp, ["-lgmp"])
+            self.assertIn(f"Selected MLF compiler: {native}", stdout.getvalue())
+            self.assertEqual(metadata["emlf"], {
+                "path": str(native), "sha256": B.digest(native),
+                "identification": {"command": [str(native), "--help"], "stdout": help_text.strip()}})
+            self.assertEqual(metadata["ghc"]["version"], "test tool 1.0")
+            self.assertEqual([json.loads(line) for line in calls.read_text().splitlines()],
+                             [["--help"], ["--llvm-runtime"]])
+
+            # An invalid selected compiler must fail; do not switch to the
+            # Cabal seed or silently accept failed identification.
+            native.write_text(f"#!{sys.executable}\nraise SystemExit(9)\n")
+            with contextlib.redirect_stdout(io.StringIO()), self.assertRaisesRegex(RuntimeError, "exited 9"):
+                B.toolchain(args, os.environ)
 
     def test_oracle_matches_independent_pinned_fixture(self):
         B.validate_output(self.workload, 10, (ROOT / self.workload["fixture"]).read_bytes())
@@ -275,21 +323,75 @@ class HarnessTests(unittest.TestCase):
             # Clang. Its on-disk artifact also detects reuse of an output directory.
             compiler.write_text(f"#!{sys.executable}\n" +
                 "import pathlib,sys,time\n"
+                "def wait_for(name):\n"
+                " end=time.monotonic()+3\n"
+                " while not pathlib.Path(name).exists():\n"
+                "  assert time.monotonic()<end, 'independent phases did not overlap'\n"
+                "  time.sleep(0.001)\n"
                 "if '--emit-llvm' in sys.argv:\n"
+                " pathlib.Path('frontend.started').touch(); wait_for('runtime.started')\n"
                 " time.sleep(0.1); print('IR')\n"
-                "else:\n"
+                "elif '-c' in sys.argv:\n"
                 " assert not pathlib.Path('cache.o').exists()\n"
                 " pathlib.Path('cache.o').touch()\n"
+                " pathlib.Path('runtime.started').touch(); wait_for('frontend.started')\n"
+                " out=pathlib.Path(sys.argv[sys.argv.index('-o')+1]); out.write_text('object')\n"
+                "else:\n"
+                " assert pathlib.Path('runtime.o').read_text()=='object'\n"
+                " assert pathlib.Path('program.ll').read_text().strip()=='IR'\n"
                 " out=pathlib.Path(sys.argv[sys.argv.index('-o')+1]); out.write_text('binary'); out.chmod(0o755)\n")
             compiler.chmod(0o755)
             paths = {"emlf": str(compiler), "clang": str(compiler)}
             _, sample = B.build(self.workload, "mlf", directory / "first", paths, ROOT / "runtime/mlf_runtime.c", [], None, 10)
-            self.assertEqual(len(sample["stages"]), 2)
+            self.assertEqual([s["phase"] for s in sample["stages"]], ["frontend", "runtime", "llvm-and-link"])
+            self.assertEqual([s.get("parallel_group") for s in sample["stages"]], [0, 0, None])
+            self.assertEqual(sample["maximum_parallel_compilers"], 2)
             self.assertGreaterEqual(sample["wall_seconds"], 0.1)
-            self.assertGreaterEqual(sample["wall_seconds"], sum(s["wall_seconds"] for s in sample["stages"]))
+            self.assertGreaterEqual(sample["wall_seconds"], max(s["wall_seconds"] for s in sample["stages"]))
+            self.assertAlmostEqual(sample["cpu_seconds"], sum(s["cpu_seconds"] for s in sample["stages"]))
             with self.assertRaises(FileExistsError):
                 B.build(self.workload, "mlf", directory / "first", paths, ROOT / "runtime/mlf_runtime.c", [], None, 10)
             B.build(self.workload, "mlf", directory / "second", paths, ROOT / "runtime/mlf_runtime.c", [], None, 10)
+
+    def test_parallel_phase_failure_and_timeout_reap_every_child(self):
+        for fails in (True, False):
+            with self.subTest(fails=fails):
+                commands = [([sys.executable, "-c", "import time; time.sleep(30)"], b"", None)]
+                if fails:
+                    commands.append(([sys.executable, "-c", "import sys; sys.exit(23)"], b"", None))
+                started = time.perf_counter()
+                with self.assertRaises(RuntimeError if fails else TimeoutError):
+                    B.compile_native.run_group(commands, timeout=0.2 if not fails else 5)
+                self.assertLess(time.perf_counter() - started, 3)
+                with self.assertRaises(ChildProcessError):
+                    os.waitpid(-1, os.WNOHANG)
+
+    def test_native_driver_preserves_existing_executable_on_failure(self):
+        with tempfile.TemporaryDirectory(prefix="compiler driver ") as temporary:
+            directory = Path(temporary)
+            compiler = directory / "compiler"
+            compiler.write_text(f"#!{sys.executable}\nimport sys\n"
+                "if '--emit-llvm' in sys.argv:\n"
+                " print('invalid source', file=sys.stderr); sys.exit(17)\n")
+            compiler.chmod(0o755)
+            clang = directory / "clang"
+            clang.write_text(f"#!{sys.executable}\nimport pathlib,sys\n"
+                "assert '-c' in sys.argv, 'link ran after frontend failure'\n"
+                "pathlib.Path(sys.argv[sys.argv.index('-o')+1]).write_text('object')\n")
+            clang.chmod(0o755)
+            source = directory / "bad.emlf"
+            source.write_text("invalid source")
+            target = directory / "program"
+            target.write_text("previous executable")
+            errors = io.StringIO()
+            with contextlib.redirect_stderr(errors):
+                status = B.compile_native.main([str(source), "-o", str(target),
+                    "--compiler", str(compiler), "--clang", str(clang),
+                    "--pkg-config", str(compiler), "--runtime", str(source)])
+            self.assertEqual(status, 1)
+            self.assertIn("invalid source", errors.getvalue())
+            self.assertEqual(target.read_text(), "previous executable")
+            self.assertEqual(list(directory.glob(".mlf-build-*")), [])
 
     def test_medians_and_ratios_allow_c_to_lose(self):
         samples = [{"wall_seconds": n, "cpu_seconds": n / 2, "peak_rss_bytes": n * 100} for n in [9, 1, 2]]
@@ -349,6 +451,70 @@ class HarnessTests(unittest.TestCase):
 
 
 class NativeAllocationTests(unittest.TestCase):
+    def test_runtime_state_actions_preserve_laziness_and_roots(self):
+        gmp = shlex.split(subprocess.check_output(["pkg-config", "--cflags", "--libs", "gmp"], text=True))
+        with tempfile.TemporaryDirectory() as directory:
+            result = ST.validate_st_runtime(
+                compiler=B.tool("clang"), fixture=ROOT / "test/runtime_st.c",
+                runtime=ROOT / "runtime/mlf_runtime.c", include_dirs=[ROOT / "runtime"],
+                cflags=["-DMLF_GC_THRESHOLD=32"], libraries=gmp,
+                output=Path(directory) / "runtime-st")
+            self.assertEqual(result["executions"], 35)
+
+    def test_runtime_constructor_allocation_and_cleanup(self):
+        clang = B.tool("clang")
+        gmp = shlex.split(subprocess.check_output(["pkg-config", "--cflags", "--libs", "gmp"], text=True))
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / "runtime-allocation"
+            subprocess.run([clang, "-O2", "-std=c11", "-Wall", "-Wextra", "-Werror",
+                            "-I", str(ROOT / "runtime"), str(ROOT / "test/runtime_allocation.c"),
+                            str(ROOT / "runtime/mlf_runtime.c"), *gmp, "-lm", "-o", str(binary)],
+                           check=True, capture_output=True)
+            result = subprocess.run([str(binary), "success"], check=True, capture_output=True,
+                                    text=True, timeout=30)
+            self.assertEqual(json.loads(result.stdout), {
+                "constructor_arities": 7, "field_evaluations": 8,
+                "zero_environments": 4100, "retained_bytes": 0,
+            })
+            self.assertEqual(result.stderr, "")
+            for mode in ("negative-tag", "short", "overflow", "unset-slot"):
+                with self.subTest(mode=mode):
+                    result = subprocess.run([str(binary), mode], capture_output=True, text=True, timeout=30)
+                    self.assertEqual(result.returncode, 1)
+                    self.assertEqual(result.stdout, "")
+                    message = "invalid environment read" if mode == "unset-slot" else "invalid constructor descriptor"
+                    self.assertEqual(result.stderr, "Runtime: " + message + "\n")
+
+    def test_runtime_constructor_fields_and_update_spines(self):
+        clang = B.tool("clang")
+        gmp = shlex.split(subprocess.check_output(["pkg-config", "--cflags", "--libs", "gmp"], text=True))
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / "runtime-values"
+            subprocess.run([clang, "-O2", "-std=c11", "-Wall", "-Wextra", "-Werror",
+                            "-I", str(ROOT / "runtime"), str(ROOT / "test/runtime_values.c"),
+                            str(ROOT / "runtime/mlf_runtime.c"), *gmp, "-lm", "-o", str(binary)],
+                           check=True, capture_output=True)
+            result = subprocess.run([str(binary), "success"], check=True, capture_output=True,
+                                    text=True, timeout=30)
+            self.assertEqual(result.stdout,
+                             "runtime values: sharing, lazy fields, recursive data, and spill boundaries passed\n")
+            self.assertEqual(result.stderr, "")
+            failures = {
+                "negative-tag": "invalid constructor descriptor",
+                "null-fields": "invalid constructor descriptor",
+                "overapplication": "constructor overapplication",
+                "field-bounds": "invalid environment read",
+                "cycle-hole": "cyclic evaluation of a recursive binding",
+                "cycle-pair": "cyclic evaluation of a recursive binding",
+                "cycle-thunk": "cyclic evaluation of a recursive binding",
+            }
+            for mode, message in failures.items():
+                with self.subTest(mode=mode):
+                    result = subprocess.run([str(binary), mode], capture_output=True, text=True, timeout=30)
+                    self.assertEqual(result.returncode, 1)
+                    self.assertEqual(result.stdout, "")
+                    self.assertEqual(result.stderr, "Runtime: " + message + "\n")
+
     def test_real_console_raw_input_matches_native_bytes_and_eof(self):
         emlf = shutil.which("emlf")
         self.assertIsNotNone(emlf, "Run using cabal test benchmark-harness-tests")

@@ -4,6 +4,7 @@ module MLF.LLVM.Optimize (optimize, free, applications, lambdas) where
 
 import Control.Monad.State.Strict
 import Control.Monad (foldM)
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified MLF.X.Syntax as X
@@ -37,24 +38,41 @@ lambdas :: X.Erased -> ([X.Name],X.Erased)
 lambdas (X.EAbs n b) = let (ns,body) = lambdas b in (n:ns,body)
 lambdas e = ([],e)
 
-size :: X.Erased -> Int
-size e = 1 + case e of
-  X.EAbs _ b -> size b
-  X.EApp f a -> size f + size a
-  X.ELet _ a b -> size a + size b
-  X.ELetRec ds b -> sum (map (size . snd) ds) + size b
-  X.ECase s bs -> size s + sum [size b | X.ErasedAlternative _ b <- bs]
-  _ -> 0
+-- The inlining threshold only needs a bounded prefix of the tree. Returning
+-- the remaining budget lets siblings share that bound without computing the
+-- complete size of a large function that cannot be inlined.
+remainingSize :: Int -> X.Erased -> Int
+remainingSize budget _ | budget <= 0 = -1
+remainingSize budget e = case e of
+  X.EAbs _ b -> remainingSize rest b
+  X.EApp f a -> remainingSize (remainingSize rest f) a
+  X.ELet _ a b -> remainingSize (remainingSize rest a) b
+  X.ELetRec ds b -> spend (remainingSize rest b) (map snd ds)
+  X.ECase s bs -> spend (remainingSize rest s) [b | X.ErasedAlternative _ b <- bs]
+  _ -> rest
+  where
+    rest = budget - 1
+    spend n _ | n < 0 = -1
+    spend n [] = n
+    spend n (a:as) = spend (remainingSize n a) as
 
-occurrences :: X.Name -> X.Erased -> Int
-occurrences n e = case e of
+-- Dead bindings and single-use lambdas only distinguish zero, one, and
+-- multiple free occurrences. Stop at the supplied limit rather than building
+-- a free-variable set or counting every occurrence in the remaining program.
+occurrences :: Int -> X.Name -> X.Erased -> Int
+occurrences limit _ _ | limit <= 0 = 0
+occurrences limit n e = case e of
   X.EVar v -> if n == v then 1 else 0
-  X.EAbs _ b -> occurrences n b
-  X.EApp f a -> occurrences n f + occurrences n a
-  X.ELet _ a b -> occurrences n a + occurrences n b
-  X.ELetRec ds b -> sum (map (occurrences n . snd) ds) + occurrences n b
-  X.ECase s bs -> occurrences n s + sum [occurrences n b | X.ErasedAlternative _ b <- bs]
+  X.EAbs v b -> if n == v then 0 else occurrences limit n b
+  X.EApp f a -> count limit [f,a]
+  X.ELet v a b -> count limit (a : [b | n /= v])
+  X.ELetRec ds b -> if n `elem` map fst ds then 0 else count limit (b : map snd ds)
+  X.ECase s bs -> count limit (s : [b | X.ErasedAlternative p b <- bs, n `notElem` X.patternNames p])
   _ -> 0
+  where
+    count left _ | left <= 0 = 0
+    count _ [] = 0
+    count left (a:as) = let used = occurrences left n a in used + count (left - used) as
 
 -- Capture-avoiding substitution also freshens copied binders. This keeps the
 -- global identity uniqueness required by later direct-call analysis.
@@ -126,10 +144,95 @@ atom e = case e of
 
 smallValue :: X.Erased -> Bool
 smallValue e = atom e || case e of
-  X.EAbs _ _ -> size e <= 24
+  X.EAbs _ _ -> remainingSize 24 e >= 0
   _ -> case applications e of
     (X.EConstructor _,args) -> all atom args
     _ -> False
+
+-- Constructor patterns have already passed the independent target checker.
+-- They provide arities without assuming any constructor spelling or tag. An
+-- absent or inconsistent arity disables this optimization for that name.
+type Arities = Map.Map String (Maybe Int)
+type ConstructorFacts = Map.Map X.Name (String,[X.Erased])
+
+subterms :: X.Erased -> [X.Erased]
+subterms e = case e of
+  X.EAbs _ b -> [b]
+  X.EApp f a -> [f,a]
+  X.ELet _ a b -> [a,b]
+  X.ELetRec ds b -> map snd ds ++ [b]
+  X.ECase s bs -> s : [b | X.ErasedAlternative _ b <- bs]
+  _ -> []
+
+constructorArities :: X.Erased -> Arities
+constructorArities = collect Map.empty
+  where
+    collect known e = List.foldl' collect (case e of
+      X.ECase _ bs -> List.foldl' alternative known bs
+      _ -> known) (subterms e)
+    alternative known (X.ErasedAlternative p _) = case p of
+      X.ConstructorPattern c ns -> Map.insertWith agree c (Just (length ns)) known
+      _ -> known
+    agree a b = if a == b then a else Nothing
+
+constructorValue :: Arities -> X.Erased -> Maybe (String,[X.Erased])
+constructorValue arities e = case applications e of
+  (X.EConstructor c,args) | Map.lookup c arities == Just (Just (length args)) -> Just (c,args)
+  _ -> Nothing
+
+-- Extract fields once, before propagation: replacing two projections by two
+-- copies of a field computation would destroy call-by-need sharing. Ordinary
+-- fields stay in their lexical scope; recursive fields stay in their group,
+-- including fields that refer back to the original constructor or a method.
+liftConstructorFields :: Arities -> X.Erased -> Fresh X.Erased
+liftConstructorFields arities e = children (liftConstructorFields arities) e >>= \e' -> case e' of
+  X.ELet n rhs body -> do
+    (fields,value) <- liftValue rhs
+    pure (foldr (uncurry X.ELet) (X.ELet n value body) fields)
+  X.ELetRec ds body -> do
+    lifted <- mapM (\(n,rhs) -> do
+      (fields,value) <- liftValue rhs
+      pure ((n,value),fields)) ds
+    pure (X.ELetRec (map fst lifted ++ concatMap snd lifted) body)
+  _ -> pure e'
+  where
+    liftValue rhs = case constructorValue arities rhs of
+      Just (c,args) -> do
+        fields <- mapM liftField args
+        pure (concatMap fst fields,foldl X.EApp (X.EConstructor c) (map snd fields))
+      Nothing -> pure ([],rhs)
+    liftField field | atom field = pure ([],field)
+    liftField field = do
+      n <- fresh
+      pure ([(n,field)],X.EVar n)
+
+constructorFacts :: Arities -> X.Erased -> ConstructorFacts
+constructorFacts arities = collect Map.empty
+  where
+    collect known e = List.foldl' collect (case e of
+      X.ELet n rhs _ -> binding known (n,rhs)
+      X.ELetRec ds _ -> List.foldl' binding known ds
+      _ -> known) (subterms e)
+    binding known (n,rhs) = case constructorValue arities rhs of
+      Just value@(_,fields) | all smallValue fields -> Map.insert n value known
+      _ -> known
+
+selectConstructor :: String -> [X.Erased] -> [X.ErasedAlternative] -> Maybe X.Erased
+selectConstructor _ _ [] = Nothing
+selectConstructor c args (X.ErasedAlternative p b:rest) = case p of
+  X.ConstructorPattern c' ns | c == c' && length ns == length args ->
+    Just (foldr (\(n,a) body -> maybe body (\v -> X.ELet v a body) n) b (zip ns args))
+  X.DefaultPattern n -> Just (maybe b (\v -> X.ELet v (foldl X.EApp (X.EConstructor c) args) b) n)
+  _ -> selectConstructor c args rest
+
+projectConstructors :: ConstructorFacts -> X.Erased -> Fresh X.Erased
+projectConstructors facts e = children (projectConstructors facts) e >>= \e' -> case e' of
+  X.ECase (X.EVar n) bs | Just (c,args) <- Map.lookup n facts,
+    Just selected <- selectConstructor c args bs ->
+      -- Small lifted values can have been inlined back into fields. Freshen
+      -- their binders when copying them into each independent projection.
+      copy Map.empty selected
+  _ -> pure e'
 
 -- A bounded bottom-up rewrite, not an evaluator. Newly created beta redexes
 -- are visited on the next pass, so self application cannot loop the compiler.
@@ -138,14 +241,16 @@ pass e = children pass e >>= \e' -> case e' of
   X.EApp (X.EAbs n b) a -> pure (X.ELet n a b)
   X.EApp (X.ELet n a f) b -> pure (X.ELet n a (X.EApp f b))
   X.EApp (X.ELetRec ds f) a -> pure (X.ELetRec ds (X.EApp f a))
-  X.ELet n a b
-    | not (Set.member n (free b)) -> pure b
-    | smallValue a -> substitute n a b
-    | X.EAbs _ _ <- a, occurrences n b == 1 -> substitute n a b
-  X.ELet n (X.ELet x a b) body -> pure (X.ELet x a (X.ELet n b body))
-  X.ELet n (X.ELetRec [(r,rhs)] (X.EVar r')) b | r == r' -> do
-    rhs' <- copy (Map.singleton r (X.EVar n)) rhs
-    pure (X.ELetRec [(n,rhs')] b)
+  X.ELet n a b ->
+    let uses = occurrences 2 n b
+        singleLambda = case a of X.EAbs _ _ -> uses == 1; _ -> False
+    in if uses == 0 then pure b else
+      if smallValue a || singleLambda then substitute n a b else case a of
+        X.ELet x value body -> pure (X.ELet x value (X.ELet n body b))
+        X.ELetRec [(r,rhs)] (X.EVar r') | r == r' -> do
+          rhs' <- copy (Map.singleton r (X.EVar n)) rhs
+          pure (X.ELetRec [(n,rhs')] b)
+        _ -> pure e'
   X.ELetRec ds b -> do
     let group = Set.fromList (map fst ds)
         expandable = [(n,a) | (n,a) <- ds, smallValue a, Set.null (free a `Set.intersection` group)]
@@ -155,7 +260,7 @@ pass e = children pass e >>= \e' -> case e' of
   X.ECase s [X.ErasedAlternative (X.DefaultPattern n) b] ->
     pure (maybe b (\name -> X.ELet name s b) n)
   X.ECase s bs -> case applications s of
-    (X.EConstructor c,args) -> case select c args bs of
+    (X.EConstructor c,args) -> case selectConstructor c args bs of
       Just b -> pure b
       Nothing -> pure e'
     _ -> pure e'
@@ -167,12 +272,61 @@ pass e = children pass e >>= \e' -> case e' of
       where
         go (X.EVar v) | v == n = copy Map.empty a
         go term = children go term
-    select _ _ [] = Nothing
-    select c args (X.ErasedAlternative p b:rest) = case p of
-      X.ConstructorPattern c' ns | c == c' && length ns == length args ->
-        Just (foldr (\(n,a) body -> maybe body (\v -> X.ELet v a body) n) b (zip ns args))
-      X.DefaultPattern n -> Just (maybe b (\v -> X.ELet v (foldl X.EApp (X.EConstructor c) args) b) n)
-      _ -> select c args rest
+
+
+-- Specialize one original call site at a time, with a bounded fresh-name
+-- budget. Only syntactic function values can be duplicated; captured
+-- computations remain shared variables. Clones are not revisited here.
+specializeHigherOrder :: X.Erased -> Fresh X.Erased
+specializeHigherOrder expression = do
+  seed <- get
+  visit (seed + 16384) expression
+  where
+    definitions = collect expression
+    collect e = Map.unions (case e of
+      X.ELet n a _ -> Map.singleton n a : map collect (subterms e)
+      X.ELetRec ds _ -> Map.fromList ds : map collect (subterms e)
+      _ -> map collect (subterms e))
+    static e = case e of
+      X.EAbs _ _ -> remainingSize 64 e >= 0
+      _ -> case applications e of
+        (X.EVar n,args) | Just rhs <- Map.lookup n definitions ->
+          length args < length (fst (lambdas rhs)) && all atom args
+        (X.EPrimitive _,args) -> null args
+        (X.EConstructor _,args) -> all atom args
+        _ -> False
+    applied n e = case applications e of
+      (X.EVar f,_:_) | f == n -> True
+      _ -> any (applied n) (subterms e)
+    visit limit e = do
+      e' <- children (visit limit) e
+      used <- get
+      case applications e' of
+        (X.EVar name,callback:args) | used < limit,
+          Just rhs <- Map.lookup name definitions,
+          let (params,body) = lambdas rhs,
+          first:rest <- params, not (null rest),
+          length args == length rest,
+          remainingSize 128 rhs >= 0, static callback,
+          Set.member name (free body), applied first body -> do
+            specialized <- fresh
+            -- Freshen the original parameter scopes before inserting the
+            -- callback, whose free names belong to the caller's scope.
+            copied <- copy Map.empty rhs
+            case lambdas copied of
+              (key:newParams,newBody) -> do
+                let change term = case applications term of
+                      (X.EVar self,X.EVar argument:remaining)
+                        | self == name && argument == key && length remaining == length rest ->
+                            foldl X.EApp (X.EVar specialized) <$> mapM change remaining
+                      _ -> case term of
+                        X.EVar n | n == key -> copy Map.empty callback
+                        _ -> children change term
+                replaced <- change newBody
+                pure (X.ELetRec [(specialized,foldr X.EAbs replaced newParams)]
+                  (foldl X.EApp (X.EVar specialized) args))
+              _ -> pure e'
+        _ -> pure e'
 
 optimize :: X.Erased -> X.Erased
 optimize expression = evalState work (1 + maximum (0 : ids expression))
@@ -183,14 +337,20 @@ optimize expression = evalState work (1 + maximum (0 : ids expression))
       unique <- copy Map.empty expression
       clean <- identities unique
       recursive <- fixedPoints clean
-      normalized <- iterations (16 :: Int) recursive
+      let arities = constructorArities recursive
+      lifted <- liftConstructorFields arities recursive
+      simple <- iterations arities (16 :: Int) lifted
+      specialized <- specializeHigherOrder simple
+      normalized <- iterations arities (16 :: Int) specialized
       -- A closed erasure can be alpha-normalized from zero. Saved xMLF and
       -- source compilation then produce the same LLVM despite parser IDs.
       pure (evalState (copy Map.empty normalized) 0)
-    iterations 0 e = pure e
-    iterations n e = do
-      next <- pass e
-      if next == e then pure e else iterations (n - 1) next
+    iterations _ 0 e = pure e
+    iterations arities n e = do
+      let facts = constructorFacts arities e
+      projected <- if Map.null facts then pure e else projectConstructors facts e
+      next <- pass projected
+      if next == e then pure e else iterations arities (n - 1) next
     ids e = case e of
       X.EVar n -> [X.nameId n]
       X.EAbs n b -> X.nameId n : ids b

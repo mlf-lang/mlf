@@ -1,0 +1,55 @@
+import Bootstrap.Types
+import qualified Bootstrap.LLVM.StrictFields as F
+import qualified Bootstrap.LLVM.Analysis as A
+import qualified Bootstrap.Map as M
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.LLVM.Codegen as CG
+
+cs : Map String Int
+cs = M.fromList compareString (Cons (Pair "C" 3) (Cons (Pair "One" 1) (Cons (Pair "Wrap" 1) (Cons (Pair "Empty" 0) Nil))))
+
+equalBools : List Bool -> List Bool -> Bool
+equalBools xs ys = case xs of
+  Nil -> L.null ys
+  Cons x rest -> case ys of
+    Nil -> false
+    Cons y tail -> (if x then y else L.not y) && equalBools rest tail
+
+equalOptional : Maybe (List Bool) -> Maybe (List Bool) -> Bool
+equalOptional xs ys = case xs of
+  Nothing -> case ys of { Nothing -> true; _ -> false }
+  Just x -> case ys of { Just y -> equalBools x y; _ -> false }
+
+check : Case -> Int
+check (Case label c expression expected) =
+  let result = M.lookup compareString c (F.infer cs (A.analyze expression) expression) in
+  if equalOptional result expected then 1 else panic label
+
+
+
+data Case = Case String String XErased (Maybe (List Bool))
+cases : List Case
+cases = (Cons (Case "strict worker, lazy value" "C" (XELet (XName 0 "probe") (XEAbs (XName 1 "probe") (XEAbs (XName 2 "probe") (XEAbs (XName 3 "probe") (XEApp (XEApp (XEPrimitive PSeq) (XEVar (XName 1 "probe"))) (XEApp (XEApp (XEPrimitive PSeq) (XEVar (XName 3 "probe"))) (XEApp (XEApp (XEApp (XEConstructor "C") (XEVar (XName 1 "probe"))) (XEVar (XName 2 "probe"))) (XEVar (XName 3 "probe")))))))) (XEApp (XEApp (XEApp (XEVar (XName 0 "probe")) (XEInt 1)) (XEApp (XEPrimitive PPanic) (XEString "unused"))) (XEInt 3))) (Just (Cons true (Cons false (Cons true Nil))))) (Cons (Case "partial escape invalidates all" "C" (XELet (XName 4 "probe") (XEConstructor "C") (XELet (XName 0 "probe") (XEAbs (XName 1 "probe") (XEAbs (XName 2 "probe") (XEAbs (XName 3 "probe") (XEApp (XEApp (XEPrimitive PSeq) (XEVar (XName 1 "probe"))) (XEApp (XEApp (XEPrimitive PSeq) (XEVar (XName 3 "probe"))) (XEApp (XEApp (XEApp (XEConstructor "C") (XEVar (XName 1 "probe"))) (XEVar (XName 2 "probe"))) (XEVar (XName 3 "probe")))))))) (XEApp (XEApp (XEApp (XEVar (XName 0 "probe")) (XEInt 1)) (XEApp (XEPrimitive PPanic) (XEString "unused"))) (XEInt 3)))) (Just (Cons false (Cons false (Cons false Nil))))) (Cons (Case "literal and constructor atoms" "C" (XEApp (XEApp (XEApp (XEConstructor "C") (XEInt 1)) (XEApp (XEConstructor "One") (XEApp (XEPrimitive PPanic) (XEString "unused")))) (XEAbs (XName 9 "probe") (XEApp (XEPrimitive PPanic) (XEString "unused")))) (Just (Cons true (Cons true (Cons true Nil))))) (Cons (Case "meet across sites" "C" (XELet (XName 8 "probe") (XELet (XName 0 "probe") (XEAbs (XName 1 "probe") (XEAbs (XName 2 "probe") (XEAbs (XName 3 "probe") (XEApp (XEApp (XEPrimitive PSeq) (XEVar (XName 1 "probe"))) (XEApp (XEApp (XEPrimitive PSeq) (XEVar (XName 3 "probe"))) (XEApp (XEApp (XEApp (XEConstructor "C") (XEVar (XName 1 "probe"))) (XEVar (XName 2 "probe"))) (XEVar (XName 3 "probe")))))))) (XEApp (XEApp (XEApp (XEVar (XName 0 "probe")) (XEInt 1)) (XEApp (XEPrimitive PPanic) (XEString "unused"))) (XEInt 3))) (XEApp (XEApp (XEApp (XEConstructor "C") (XEApp (XEPrimitive PPanic) (XEString "unused"))) (XEInt 2)) (XEInt 3))) (Just (Cons false (Cons false (Cons true Nil))))) (Cons (Case "anonymous callback drops capture facts" "One" (XELet (XName 0 "probe") (XEAbs (XName 1 "probe") (XEApp (XEApp (XEPrimitive PSeq) (XEVar (XName 1 "probe"))) (XEAbs (XName 2 "probe") (XEApp (XEConstructor "One") (XEVar (XName 1 "probe")))))) (XEApp (XEVar (XName 0 "probe")) (XEInt 1))) (Just (Cons false Nil))) (Cons (Case "compound suspension drops capture facts" "One" (XELet (XName 0 "probe") (XEAbs (XName 1 "probe") (XEApp (XEApp (XEPrimitive PSeq) (XEVar (XName 1 "probe"))) (XEApp (XEConstructor "Wrap") (XEApp (XEApp (XEPrimitive PSeq) (XEInt 1)) (XEApp (XEConstructor "One") (XEVar (XName 1 "probe"))))))) (XEApp (XEVar (XName 0 "probe")) (XEInt 1))) (Just (Cons false Nil))) (Cons (Case "strict let canonical result" "One" (XELet (XName 1 "probe") (XEApp (XEApp (XEPrimitive PAddInt) (XEInt 1)) (XEInt 2)) (XEApp (XEApp (XEPrimitive PSeq) (XEVar (XName 1 "probe"))) (XEApp (XEConstructor "One") (XEVar (XName 1 "probe"))))) (Just (Cons true Nil))) (Cons (Case "recursive hole remains unknown" "One" (XELetRec (Cons (Pair (XName 1 "probe") (XEInt 1)) Nil) (XEApp (XEApp (XEPrimitive PSeq) (XEVar (XName 1 "probe"))) (XEApp (XEConstructor "One") (XEVar (XName 1 "probe"))))) (Just (Cons false Nil))) (Cons (Case "unused constructor has no vacuous fact" "C" (XEInt 0) Nothing) (Cons (Case "pattern fields remain unknown" "One" (XECase (XEApp (XEApp (XEApp (XEConstructor "C") (XEInt 1)) (XEInt 2)) (XEInt 3)) (Cons (XErasedAlternative (XConstructorPattern "C" (Cons (Just (XName 1 "probe")) (Cons Nothing (Cons Nothing Nil)))) (XEApp (XEConstructor "One") (XEVar (XName 1 "probe")))) Nil)) (Just (Cons false Nil))) (Cons (Case "lazy default binder remains unknown" "One" (XECase (XEInt 1) (Cons (XErasedAlternative (XDefaultPattern (Just (XName 1 "probe"))) (XEApp (XEConstructor "One") (XEVar (XName 1 "probe")))) Nil)) (Just (Cons false Nil))) (Cons (Case "checked default binder is canonical" "One" (XECase (XEConstructor "Empty") (Cons (XErasedAlternative (XConstructorPattern "Empty" Nil) (XEApp (XEConstructor "One") (XEInt 1))) (Cons (XErasedAlternative (XDefaultPattern (Just (XName 1 "probe"))) (XEApp (XEConstructor "One") (XEVar (XName 1 "probe")))) Nil))) (Just (Cons true Nil))) Nil))))))))))))
+
+contains : String -> String -> Bool
+contains needle text = L.any (\index -> eqString needle (stringSlice text index (stringLength needle)))
+  (L.range 0 (stringLength text - stringLength needle))
+
+-- The complete generated entry must consume its proven field without force.
+-- Constructor slots stay lazy unless every construction proves canonical WHNF.
+lowering : Int
+lowering =
+  let name n = XName n "field" in
+  let variable n = XEVar (name n) in
+  let seqTerm a b = XEApp (XEApp (XEPrimitive PSeq) a) b in
+  let expression = XELet (name 0) (XEAbs (name 1) (seqTerm (variable 1) (XEApp (XEConstructor "Cell") (variable 1))))
+        (XECase (XEApp (variable 0) (XEInt 42)) (Cons (XErasedAlternative (XConstructorPattern "Cell" (Cons (Just (name 2)) Nil))
+          (seqTerm (variable 2) (XEApp (XEPrimitive PPrintInt) (variable 2)))) Nil)) in
+  let constructors = M.fromList compareString (Cons (Pair "Unit" (Pair 0 0)) (Cons (Pair "Cell" (Pair 1 1)) Nil)) in
+  case CG.generate constructors expression of
+    Left message -> panic message
+    Right (Pair entry code) -> case L.filter (contains ("define private ptr " ++ entry ++ "(")) code of
+      Cons body Nil -> if contains "call ptr @mlf_force(" body then panic "proven constructor field was forced" else 1
+      _ -> panic "missing strict-field lowering entry"
+
+main = printInt (lowering + L.sum (L.map check cases))

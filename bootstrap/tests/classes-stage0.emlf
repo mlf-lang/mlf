@@ -1,0 +1,9 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Parser as Parser
+import qualified Bootstrap.Classes as Classes
+main = case Parser.parseProgram "<probe>" "class Describe a where { describe : a -> String }; instance Describe Int where { describe x = showInt x }; main = describe 42" of
+  Left e -> putStrLn e
+  Right program -> case Classes.lowerClasses program of
+    Left e -> putStrLn e
+    Right _ -> putStrLn "lowered"

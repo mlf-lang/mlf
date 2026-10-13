@@ -22,7 +22,7 @@ import qualified MLF.Data as D
 import MLF.Desugar (desugarDo)
 import MLF.Module.Syntax
 import MLF.Parser (parseModule)
-import MLF.Prelude (PreludeMode (..), monadClass, ioInstance)
+import MLF.Prelude (PreludeMode (..), monadClass, ioInstance, stInstance)
 import qualified MLF.Primitive as P
 import qualified MLF.Surface as Surface
 import qualified MLF.Syntax as S
@@ -139,14 +139,14 @@ locals m = do
   where entity n = Entity (moduleIdentity m) n
 
 preludeSource :: SourceModule
-preludeSource = SourceModule "<Prelude>" (Just "Prelude") Nothing [] [] [monadClass] [ioInstance] [] Nothing
+preludeSource = SourceModule "<Prelude>" (Just "Prelude") Nothing [] [] [monadClass] [ioInstance,stInstance] [] Nothing
 
 primitiveEntities :: [Entity]
 primitiveEntities =
   [Entity "Prelude" (P.primitiveName p) (Primitive p) | p <- [minBound .. maxBound]] ++
   [Entity "Prelude" "pure" (Primitive P.IOReturn)] ++
   [Entity "Prelude" t BuiltinType |
-    t <- ["Int","Double","Bool","String","Unit","IO","IntArray","DoubleArray","ByteArray","IntTable"]] ++
+    t <- ["Int","Double","Bool","String","Unit","IO","IntArray","DoubleArray","ByteArray","IntTable","ST","STArray"]] ++
   [Entity "Prelude" "Unit" (Constructor "Unit"), Entity "Prelude" "True" (Boolean True),
     Entity "Prelude" "False" (Boolean False)]
 

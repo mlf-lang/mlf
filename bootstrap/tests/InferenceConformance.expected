@@ -1,0 +1,62 @@
+identity	ACCEPT forall a3. a3 -> a3
+arithmetic	ACCEPT Int
+datatype	ACCEPT List Int
+nested-pattern	ACCEPT Int
+polymorphic-recursion-signature-order	ACCEPT Int
+do-io	ACCEPT IO Unit
+multiparam-class	ACCEPT String
+bad-self-application	REJECT Inference
+higher-kinded-field	ACCEPT Maybe Int
+superclass-given	ACCEPT Int
+superclass-discard-parameter	ACCEPT Int
+superclass-reorder-parameters	ACCEPT Int
+missing-instance	REJECT Resolution
+ambiguous-instance	REJECT Resolution
+module-qualified	ACCEPT Int
+module-hidden	REJECT ModuleResolution
+module-reexport	ACCEPT Bool
+module-ambiguous	REJECT ModuleResolution
+module-cycle	REJECT ModuleResolution
+Fig12-A1	ACCEPT forall a3. forall (a4 >= forall a14. a14 -> a14). a3 -> a4
+Fig12-A2	ACCEPT forall (a4 >= forall (a90 >= forall (a92 >= forall a93. a93 -> a93). a92 -> a92). (forall a91. a91 -> a91) -> a90). (forall a53. a53 -> a53 -> a53) -> a4
+Fig12-A3	ACCEPT (forall a86. a86 -> a86 -> a86) -> List (forall a95. a95 -> a95) -> (forall a104. List a104) -> List (forall a133. a133 -> a133)
+Fig12-A4	ACCEPT forall (a4 >= forall a46. a46 -> a46). (forall a30. a30 -> a30) -> a4
+Fig12-A5	ACCEPT ((forall a58. a58 -> a58) -> (forall a60. a60 -> a60)) -> (forall a69. a69 -> a69) -> (forall a84. a84 -> a84) -> (forall a86. a86 -> a86)
+Fig12-A6	ACCEPT forall (a4 >= forall (a108 >= forall a110. (forall a111. a111 -> a111) -> a110 -> a110). (forall a109. a109 -> a109) -> a108). (forall a57. (forall a59. a59 -> a59) -> a57 -> a57) -> a4
+Fig12-A7	ACCEPT ((forall a87. a87 -> a87) -> (forall a89. a89 -> a89)) -> (forall a98. a98 -> a98 -> a98) -> (forall a106. a106 -> a106) -> (forall a130. a130 -> a130) -> (forall a130. a130 -> a130)
+Fig12-A8	REJECT Inference
+Fig12-A9	ACCEPT forall (a4 >= forall (a251 >= forall (a258 >= forall (a261 >= forall a265. a265 -> a265). List (forall a263. a263 -> a263) -> a261). (forall a259. a259 -> a259) -> a258). (forall a252. (a252 -> a252) -> List a252 -> a252) -> a251). (forall a119. a119 -> a119 -> a119) -> a4
+Fig12-A10.1	ACCEPT (forall a63. a63 -> a63) -> ((forall a70. a70 -> a70) -> Pair Int Bool) -> Pair Int Bool
+Fig12-A10.2	ACCEPT ((forall a48. a48 -> a48) -> Pair Int Bool) -> Pair Int Bool
+Fig12-A10.3	ACCEPT (forall a74. a74 -> a74) -> ((forall a81. a81 -> a81) -> Pair Int Bool) -> Pair Int Bool
+Fig12-A11	REJECT Inference
+Fig12-A12.1	ACCEPT (forall a63. a63 -> a63) -> ((forall a70. a70 -> a70) -> Pair Int Bool) -> Pair Int Bool
+Fig12-A12.2	ACCEPT (forall a96. forall a97. (a96 -> a97) -> a96 -> a97) -> (forall a108. a108 -> a108) -> ((forall a115. a115 -> a115) -> Pair Int Bool) -> Pair Int Bool
+Fig12-A12.3	ACCEPT (forall a96. a96 -> a96) -> ((forall a103. a103 -> a103) -> Pair Int Bool) -> (forall a120. forall a121. a120 -> (a120 -> a121) -> a121) -> Pair Int Bool
+Fig12-A13.1	ACCEPT (forall a98. forall a99. (a98 -> a99) -> a98 -> a99) -> (forall a110. ST a110 Int) -> (forall a122. (forall a124. ST a124 a122) -> a122) -> Int
+Fig12-A13.2	ACCEPT (forall a98. ST a98 Int) -> (forall a110. forall a111. a110 -> (a110 -> a111) -> a111) -> (forall a122. (forall a124. ST a124 a122) -> a122) -> Int
+Fig12-B1.1	ACCEPT List (forall a62. a62 -> a62) -> (forall a71. List a71 -> Int) -> Int
+Fig12-B1.2	ACCEPT List (forall a64. a64 -> a64) -> (forall a73. List a73 -> List a73) -> List (forall a104. a104 -> a104)
+Fig12-B1.3	ACCEPT forall (a4 >= forall (a107 >= forall a111. a111 -> a111). List (forall a109. a109 -> a109) -> a107). (forall a59. List a59 -> a59) -> a4
+Fig12-B1.4	ACCEPT forall (a4 >= forall (a101 >= forall (a105 >= forall a107. a107 -> a107). List a105). (forall a102. a102 -> List a102) -> a101). (forall a55. a55 -> a55) -> a4
+Fig12-B2	ACCEPT (forall a92. a92 -> List a92 -> List a92) -> (forall a108. a108 -> a108) -> List (forall a115. a115 -> a115) -> List (forall a140. a140 -> a140)
+Fig12-B3	ACCEPT (forall a76. a76 -> List a76 -> List a76) -> List (forall a93. a93 -> a93) -> List (forall a117. a117 -> a117)
+Fig12-B4	ACCEPT (forall a131. List a131 -> List a131 -> List a131) -> (forall a151. a151 -> a151) -> (Int -> Int) -> (forall a165. a165 -> List a165) -> List (Int -> Int)
+Fig12-B5	ACCEPT (forall a127. List a127 -> List a127 -> List a127) -> (forall a147. a147 -> a147) -> List (forall a154. a154 -> a154) -> (forall a163. a163 -> List a163) -> List (forall a205. a205 -> a205)
+Fig12-B6	ACCEPT (forall a135. a135 -> a135) -> (forall a141. forall a142. (a141 -> a142) -> List a141 -> List a142) -> ((forall a162. a162 -> a162) -> Pair Int Bool) -> (forall a179. a179 -> List a179) -> List (Pair Int Bool)
+Fig12-B7.1	ACCEPT (forall a131. List a131 -> a131) -> List (forall a142. a142 -> a142) -> (forall a151. forall a152. (a151 -> a152) -> List a151 -> List a152) -> (forall a171. a171 -> List a171) -> List (forall a234. a234 -> a234)
+Fig12-B7.2	ACCEPT (forall a65. List a65 -> a65) -> List (forall a76. a76 -> a76) -> Bool
+Fig12-C1a	REJECT Inference
+Fig12-C1b	ACCEPT (forall a79. forall a80. a79 -> a80 -> Pair a79 a80) -> (forall a95. a95 -> a95) -> Pair Int Bool
+Fig12-C1c	REJECT Inference
+Fig12-C2	ACCEPT ((forall a49. a49 -> (forall a51. a51 -> a51)) -> Int) -> Int
+Fig12-E1a	REJECT Inference
+Fig12-E1b	ACCEPT forall (a4 >= forall (a235 >= forall (a241 >= forall a249. Int -> a249 -> a249). List (forall a243. Int -> a243 -> a243) -> a241). (forall a236. a236 -> List a236 -> a236) -> a235). (Int -> (forall a109. a109 -> a109)) -> a4
+Fig12-E2a	ACCEPT ((forall a48. a48 -> a48) -> Pair Int Bool) -> (forall a73. a73 -> a73) -> Pair Int Bool
+Fig12-E2b	ACCEPT ((forall a71. a71 -> a71) -> Pair Int Bool) -> (forall a38. a38 -> a38) -> Pair Int Bool
+Fig12-E3a	ACCEPT (forall a96. forall a97. (a96 -> a97) -> a96 -> a97) -> (forall a108. a108 -> a108) -> ((forall a115. a115 -> a115) -> Pair Int Bool) -> Pair Int Bool
+Fig12-E3b	ACCEPT (forall a107. forall a108. (a107 -> a108) -> a107 -> a108) -> (forall a119. a119 -> a119) -> ((forall a126. a126 -> a126) -> Pair Int Bool) -> Pair Int Bool
+Fig12-E4a	ACCEPT List (forall a109. a109 -> a109) -> (forall a118. forall a119. (a118 -> a119) -> List a118 -> List a119) -> ((forall a139. a139 -> a139) -> Pair Int Bool) -> List (Pair Int Bool)
+Fig12-E4b	ACCEPT List (forall a120. a120 -> a120) -> (forall a129. forall a130. (a129 -> a130) -> List a129 -> List a130) -> ((forall a150. a150 -> a150) -> Pair Int Bool) -> List (Pair Int Bool)
+Fig12-E5a	ACCEPT (forall a107. forall a108. forall a106. (a107 -> a108) -> (a106 -> a107) -> a106 -> a108) -> (forall a124. List a124 -> a124) -> ((forall a135. a135 -> a135) -> Pair Int Bool) -> List (forall a193. a193 -> a193) -> Pair Int Bool
+Fig12-E5b	ACCEPT (forall a78. List a78 -> a78) -> ((forall a89. a89 -> a89) -> Pair Int Bool) -> List (forall a123. a123 -> a123) -> Pair Int Bool

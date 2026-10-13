@@ -1,0 +1,118 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.IntSet as IS
+import qualified Bootstrap.Graph as G
+import qualified Bootstrap.Constraint as C
+import qualified Bootstrap.Parser as P
+
+assert : Bool -> String -> Either String Unit
+assert predicate message = if predicate then Right Unit else Left message
+
+sameGraph : Graph -> Graph -> Bool
+sameGraph a b = G.nextId a == G.nextId b &&
+  IM.eqIntMap G.equalNode (G.nodes a) (G.nodes b) &&
+  IM.eqIntMap (\x y -> x == y) (G.links a) (G.links b)
+
+subsets : List Int -> List (List Int)
+subsets values = case values of
+  Nil -> Cons Nil Nil
+  Cons value rest -> let smaller = subsets rest in
+    L.append smaller (L.map (Cons value) smaller)
+
+-- The declared edges specify liveness independently of the pruning routine.
+-- Gaps arise from varying present identities separately from live identities.
+histories : Int -> List (Triple Int (List Int) Graph)
+histories limit = L.concatMap (\stop ->
+  L.concatMap (\present ->
+    L.concatMap (\live ->
+      L.map (\start ->
+        let root = Node (GCon "Root" live) Nothing Rigid in
+        let leaves = L.map (\identity -> Pair identity (Node (GCon (showInt identity) Nil) (Just 0) Flexible)) present in
+        Triple start live (Graph (IM.fromList (Cons (Pair 0 root) leaves)) IM.empty stop))
+      (L.range 0 stop))
+    (subsets present))
+  (subsets (L.range 1 (stop - 1))))
+  (L.range 1 limit)
+
+checkHistory : Triple Int (List Int) Graph -> Either String Unit
+checkHistory (Triple start live after) = do
+  let result = C.pruneEmbedding start 0 after
+  assert (G.nextId result == G.nextId after && IM.eqIntMap (\a b -> a == b) (G.links result) (G.links after))
+    "pruning changed the allocator or alias table"
+  assert (L.all (\identity -> IM.member identity (G.nodes after)) (IM.keys (G.nodes result)))
+    "pruning invented an identity"
+  L.mapM_ (\entry -> case entry of
+    Pair identity value ->
+      let wanted = identity < start || identity == 0 || L.elem (\a b -> a == b) identity live in
+      assert (L.eqMaybe G.equalNode (IM.lookup identity (G.nodes result)) (if wanted then Just value else Nothing))
+        "pruning violated identity/value conservation") (IM.toList (G.nodes after))
+  assert (IS.eqIntSet (G.reachable result 0) (G.reachable after 0))
+    "pruning changed the embedded structural graph"
+  assert (sameGraph (C.pruneEmbedding start 0 result) result) "pruning is not idempotent"
+
+gapGraph = Graph (IM.fromList
+  (Cons (Pair 0 (Node (GCon "ChangedOldValue" Nil) (Just 2) Rigid))
+  (Cons (Pair 2 (Node (GArr 7 7) Nothing Rigid))
+  (Cons (Pair 4 (Node GBot Nothing Flexible))
+  (Cons (Pair 7 (Node GBot (Just 2) Flexible))
+  (Cons (Pair 8 (Node (GCon "UnusedBound" Nil) Nothing Rigid)) Nil))))))
+  (IM.singleton 3 2) 10
+
+checkGaps : Unit -> Either String Unit
+checkGaps unit = do
+  let result = C.pruneEmbedding 4 3 gapGraph
+  assert (L.eqList (\a b -> a == b) (IM.keys (G.nodes result)) (Cons 0 (Cons 2 (Cons 7 Nil))))
+    "unused fresh nodes or allocation gaps survived"
+  assert (G.equalNode (G.nodeAt result 0) (G.nodeAt gapGraph 0)) "changed old node was restored or discarded"
+  assert (G.equalNode (G.nodeAt result 3) (G.nodeAt gapGraph 2)) "old root alias changed"
+  assert (IM.eqIntMap (\a b -> a == b) (G.links result) (G.links gapGraph) && G.nextId result == 10)
+    "allocation gap pruning changed aliases or the next ID"
+  assert (sameGraph (C.pruneEmbedding 10 3 gapGraph) gapGraph) "zero allocation changed the graph"
+
+data AnnotationCase = AnnotationCase String String Int Bool
+
+annotationCases =
+  Cons (AnnotationCase "unused binder" "(\\x -> x) : forall unused a. a -> a" 2 false)
+  (Cons (AnnotationCase "alias binder" "(\\x -> x) : forall a (b >= a). b -> b" 2 false)
+  (Cons (AnnotationCase "bound is root" "(\\x -> x) : forall (a >= forall b. b -> b). a" 2 false)
+  (Cons (AnnotationCase "unused compound bound" "(\\x -> x) : forall (unused >= Int -> Bool) a. a -> a" 2 false)
+  (Cons (AnnotationCase "existing root" "(\\x -> x) : exists a. a" 1 true)
+  (Cons (AnnotationCase "existing root and unused bound" "(\\x -> x) : exists a. forall (unused >= Int -> Bool). a" 1 true)
+  (Cons (AnnotationCase "shared old child" "(\\x -> x) : exists a. a -> a" 2 false) Nil))))))
+
+checkAnnotation : AnnotationCase -> Either String Unit
+checkAnnotation (AnnotationCase label source count shared) = do
+  expression <- P.parseExpr label source
+  constraints <- C.generate expression
+  let graph = C.initialGraph constraints
+  roots <- case C.form (C.skeleton constraints) of
+    FApply coercion _ _ _ -> case C.form coercion of
+      FCoercion _ a b -> Right (Pair a b)
+      _ -> Left "annotation did not produce a coercion"
+    _ -> Left "annotation did not produce an application"
+  case roots of
+    Pair domain result -> do
+      assert (IS.size (G.reachable graph domain) == count && IS.size (G.reachable graph result) == count)
+        (label ++ ": bound pruning changed the embedded type nodes")
+      assert (if shared then domain == result else L.not (domain == result))
+        (label ++ ": scoped identity sharing changed")
+      assert (L.all (\identity -> identity < G.nextId graph) (IM.keys (G.nodes graph))) "allocator bound is false"
+      solved <- C.solve constraints
+      seq solved (Right Unit)
+
+runCheck : String -> Either String Unit -> IO Unit
+runCheck message result = case result of
+  Left error -> panic error
+  Right unit -> putStrLn message
+
+reportAnnotation : AnnotationCase -> IO Unit
+reportAnnotation fixture = case fixture of
+  AnnotationCase label _ _ _ -> runCheck (label ++ ": ok") (checkAnnotation fixture)
+
+main = do
+  let small = histories 4
+  runCheck ("allocation histories: " ++ showInt (L.length small)) (L.mapM_ checkHistory small)
+  runCheck "old updates, aliases, gaps and zero allocation: ok" (checkGaps Unit)
+  L.mapM_ reportAnnotation annotationCases

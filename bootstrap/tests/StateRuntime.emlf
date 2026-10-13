@@ -1,0 +1,154 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Bootstrap.Map as M
+import qualified Bootstrap.Data as D
+import qualified Bootstrap.Runtime as R
+
+one a = Cons a Nil
+two a b = Cons a (one b)
+three a b c = Cons a (two b c)
+call primitive arguments = S.foldl XEApp (XEPrimitive primitive) arguments
+ret value = call PSTReturn (one value)
+region action = call PRunST (one action)
+new count initial = call PNewSTArray (two (XEInt count) initial)
+read array index = call PReadSTArray (two array (XEInt index))
+write array index value = call PWriteSTArray (three array (XEInt index) value)
+len array = call PLengthSTArray (one array)
+bindST name action body = call PSTBind (two action (XEAbs name body))
+thenST action body = bindST ignored action body
+add a b = call PAddInt (two a b)
+poison = call PPanic (one (XEString "poisoned ST value"))
+ignored = XName 0 "ignored"
+array = XName 1 "array"
+other = XName 2 "other"
+first = XName 3 "first"
+second = XName 4 "second"
+saved = XName 5 "saved"
+parameter = XName 6 "parameter"
+stream = XName 7 "stream"
+loop = XName 8 "loop"
+counter = XName 9 "counter"
+
+declarations = two
+  (DataDecl "Box" (one "a") (one (ConstructorDecl "BoxValue" (one (Parameter "a")))))
+  (DataDecl "Stream" Nil (one (ConstructorDecl "StreamValue" (two (Applied "Int" Nil) (Applied "Stream" Nil)))))
+ds = case D.validateDeclarations declarations of
+  Left message -> panic message
+  Right value -> value
+evaluate term = R.evaluate ds (R.REnv M.empty) term
+
+expect condition label = if condition then ioReturn Unit else panic label
+expectInt expected term label = case R.integer (evaluate term) of
+  Left message -> panic (label ++ ": " ++ message)
+  Right actual -> expect (actual == expected) (label ++ ": expected " ++ showInt expected ++ ", got " ++ showInt actual)
+expectError expected term label = case evaluate term of
+  Left message -> expect (eqString expected message) (label ++ ": " ++ message)
+  Right value -> panic (label ++ ": error not reported")
+
+actionCreated primitive arguments = case evaluate (call primitive arguments) of
+  Right (R.RSTAction operation fields) -> true
+  _ -> false
+
+simple = region (bindST array (new 2 (XEInt 3))
+  (thenST (write (XEVar array) 1 (XEInt 11)) (read (XEVar array) 1)))
+snapshot = region (bindST array (new 1 (XEInt 9))
+  (bindST first (read (XEVar array) 0)
+    (thenST (write (XEVar array) 0 (XEInt 11)) (ret (XEVar first)))))
+repeatedRead = region (bindST array (new 1 (XEInt 9))
+  (XELet saved (read (XEVar array) 0)
+    (bindST first (XEVar saved)
+      (thenST (write (XEVar array) 0 (XEInt 11))
+        (bindST second (XEVar saved) (ret (add (XEVar first) (XEVar second))))))))
+repeatedAllocation = region (XELet saved (new 1 (XEInt 0))
+  (bindST array (XEVar saved) (bindST other (XEVar saved)
+    (thenST (write (XEVar array) 0 (XEInt 17)) (read (XEVar other) 0)))))
+aliased = region (bindST array (new 1 (XEInt 0))
+  (XELet other (XEVar array)
+    (thenST (write (XEVar other) 0 (XEInt 31)) (read (XEVar array) 0))))
+separate = add
+  (region (bindST array (new 1 (XEInt 0)) (thenST (write (XEVar array) 0 (XEInt 17)) (read (XEVar array) 0))))
+  (region (bindST array (new 1 (XEInt 0)) (read (XEVar array) 0)))
+nested = region (bindST array (new 1 (XEInt 5))
+  (thenST (write (XEVar array) 0 (XEInt 7))
+    (bindST first (read (XEVar array) 0)
+      (ret (add (XEVar first)
+        (region (bindST other (new 1 (XEInt 11))
+          (thenST (write (XEVar other) 0 (XEInt 3)) (read (XEVar other) 0)))))))))
+functionCell = region (bindST array (new 1 (XEAbs parameter (add (XEVar parameter) (XEInt 3))))
+  (bindST first (read (XEVar array) 0) (ret (XEApp (XEVar first) (XEInt 4)))))
+boxedCell = region (bindST array (new 1 (XEApp (XEConstructor "BoxValue") poison)) (read (XEVar array) 0))
+recursiveCell = XELetRec
+  (one (Pair stream (XEApp (XEApp (XEConstructor "StreamValue") (XEInt 1)) (XEVar stream))))
+  (region (bindST array (new 1 (XEVar stream)) (read (XEVar array) 0)))
+isRecursive value = case value of
+  Right (R.RConstructor tag (Cons head (Cons tail Nil))) -> eqString tag "StreamValue" &&
+    (case R.integer head of {Right 1 -> true; _ -> false}) &&
+    (case tail of
+      Right (R.RConstructor nextTag (Cons nextHead rest)) -> eqString nextTag "StreamValue" &&
+        (case R.integer nextHead of {Right 1 -> true; _ -> false})
+      _ -> false)
+  _ -> false
+
+manyBinds = XELetRec (one (Pair loop (XEAbs counter
+  (call PIfThenElse (three (call PEqInt (two (XEVar counter) (XEInt 0)))
+    (ret (XEInt 23))
+    (thenST (ret (XEConstructor "Unit"))
+      (XEApp (XEVar loop) (call PSubInt (two (XEVar counter) (XEInt 1))))))))))
+  (region (XEApp (XEVar loop) (XEInt 10000)))
+
+main = do
+  expect (actionCreated PSTReturn (one poison)) "stReturn construction forced value"
+  expect (actionCreated PSTBind (two poison poison)) "stBind construction forced inputs"
+  expect (actionCreated PNewSTArray (two poison poison)) "newSTArray construction forced inputs"
+  expect (actionCreated PReadSTArray (two poison poison)) "readSTArray construction forced inputs"
+  expect (actionCreated PWriteSTArray (three poison poison poison)) "writeSTArray construction forced inputs"
+  expect (actionCreated PLengthSTArray (one poison)) "lengthSTArray construction forced handle"
+  expectInt 42 (region (ret (XEInt 42))) "stReturn"
+  expectInt 11 simple "write and read"
+  expectInt 0 (region (bindST array (new 0 poison) (len (XEVar array)))) "zero length lazy default"
+  expectInt 42 (region (bindST array (new 1 poison)
+    (thenST (write (XEVar array) 0 poison)
+      (thenST (write (XEVar array) 0 (XEInt 42)) (read (XEVar array) 0))))) "overwritten poisoned cells"
+  expectInt 9 snapshot "read snapshots the prior cell"
+  expectInt 20 repeatedRead "shared read action executes again"
+  expectInt 0 repeatedAllocation "shared allocation action creates distinct arrays"
+  expectInt 31 aliased "array handle aliasing"
+  expectInt 17 separate "separate stores"
+  expectInt 10 nested "nested stores"
+  expectInt 7 functionCell "function-valued cells"
+  expect (case R.boolean (evaluate (region (bindST array (new 1 (XEBool true)) (read (XEVar array) 0)))) of
+    Right value -> value
+    _ -> false) "Bool-valued cells"
+  expect (case R.string (evaluate (region (bindST array (new 1 (XEString "state")) (read (XEVar array) 0)))) of
+    Right value -> eqString value "state"
+    _ -> false) "String-valued cells"
+  expect (case R.floating (evaluate (region (bindST array (new 1 (XEDouble 1.25)) (read (XEVar array) 0)))) of
+    Right value -> eqDouble value 1.25
+    _ -> false) "Double-valued cells"
+  expect (case evaluate boxedCell of {Right (R.RConstructor tag fields) -> eqString tag "BoxValue"; _ -> false}) "lazy boxed fields and callback data environment"
+  expect (isRecursive (evaluate recursiveCell)) "recursive lazy cells"
+  expectInt 1267650600228229401496703205376
+    (region (bindST array (new 1 (XEInt 1267650600228229401496703205376)) (read (XEVar array) 0))) "unbounded elements"
+  expectInt (-1267650600228229401496703205376)
+    (region (bindST array (new 1 (XEInt 0))
+      (thenST (write (XEVar array) 0 (XEInt (-1267650600228229401496703205376))) (read (XEVar array) 0)))) "negative unbounded elements"
+  expectInt 42 (region (bindST ignored (ret poison) (ret (XEInt 42)))) "bindST leaves ignored result lazy"
+  expectInt 5 (region (call PSTBind (two (ret (XEInt 5)) (XEPrimitive PSTReturn)))) "primitive callback"
+  expectInt 23 manyBinds "continuation loop"
+  expectError "invalid array length" (region (new (-1) poison)) "negative length"
+  expectError "invalid array length" (region (new 1267650600228229401496703205376 poison)) "unbounded invalid length"
+  expectError "array index out of bounds" (region (bindST array (new 0 poison) (read (XEVar array) 0))) "zero array read"
+  expectError "array index out of bounds" (region (bindST array (new 1 poison) (read (XEVar array) (-1)))) "negative read index"
+  expectError "array index out of bounds" (region (bindST array (new 1 poison) (read (XEVar array) 1))) "upper read boundary"
+  expectError "array index out of bounds" (region (bindST array (new 1 poison) (read (XEVar array) 1267650600228229401496703205376))) "unbounded read index"
+  expectError "array index out of bounds" (region (bindST array (new 1 poison) (write (XEVar array) 1 poison))) "write bounds before value"
+  expectError "runtime primitive expected STArray" (region (len (XEInt 0))) "invalid handle value"
+  expectError "runtime expected an ST action" (region (call PIOReturn (one (XEInt 0)))) "IO action rejected by state interpreter"
+  expectError "poisoned ST value" (region (ret poison)) "runST forces its result"
+  expect (case R.runStateRegion ds (R.runtimePrimitive ds PLengthSTArray (one (Right (R.RSTArrayHandle 0)))) of
+    Left message -> eqString message "STArray does not belong to this region"
+    _ -> false) "missing region handle"
+  result <- R.runAction Nil ds (evaluate (ret (XEInt 0)))
+  expect (case result of {Left message -> eqString message "runtime expected an IO action"; _ -> false}) "state action rejected by IO interpreter"
+  putStrLn "ST runtime: lazy actions, snapshots, regions, polymorphic cells, bounds, and 10000 binds passed"

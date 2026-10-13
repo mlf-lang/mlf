@@ -1,0 +1,87 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.Map as M
+
+-- Exhaustive finite membership oracle, independent of map traversal and balancing.
+data Key = Key Int String
+data Link = Link (Map Int Link)
+
+recursiveValues : Map Int Link
+recursiveValues = M.union L.compareInt (M.singleton 1 (Link recursiveValues)) (M.singleton 2 (Link recursiveValues))
+
+expect : Bool -> String -> IO Unit
+expect condition label = if condition then pure Unit else panic label
+
+compareKey : Key -> Key -> Int
+compareKey (Key left _) (Key right _) = L.compareInt left right
+
+labelAt : Int -> Map Key Int -> String
+labelAt identity tree = case M.lookupGE compareKey (Key identity "search") tree of
+  Just (Pair (Key actual label) _) -> if actual == identity then label else "wrong key"
+  Nothing -> "missing"
+
+containsBit : Int -> Int -> Bool
+containsBit mask key = if key < 0 || key > 4 then false else
+  if key == 0 then mask % 2 == 1 else containsBit (quotInt mask 2) (key - 1)
+
+leftValue : Int -> Int
+leftValue key = key * 3 + 7
+rightValue : Int -> Int
+rightValue key = key * 5 - 2
+
+smallMap : (Int -> Int) -> Int -> Map Int Int
+smallMap value mask = M.fromDistinctAscList (L.map (\key -> Pair key (value key)) (L.filter (containsBit mask) (L.range 0 4)))
+
+checkEntry : Int -> Int -> Map Int Int -> Map Int Int -> Map Int Int -> Map Int Int -> Int -> Bool
+checkEntry left right united combined different common key =
+  let hasLeft = containsBit left key in
+  let hasRight = containsBit right key in
+  let lv = leftValue key in
+  let rv = rightValue key in
+  let expectedUnion = if hasLeft then lv else if hasRight then rv else -999 in
+  let expectedCombined = if hasLeft && hasRight then lv - rv else expectedUnion in
+  let expectedDifference = if hasLeft && L.not hasRight then lv else -999 in
+  let expectedIntersection = if hasLeft && hasRight then lv * 2 - rv else -999 in
+  M.findWithDefault L.compareInt (-999) key united == expectedUnion &&
+  M.findWithDefault L.compareInt (-999) key combined == expectedCombined &&
+  M.findWithDefault L.compareInt (-999) key different == expectedDifference &&
+  M.findWithDefault L.compareInt (-999) key common == expectedIntersection
+
+checkPair : Int -> Int -> Bool
+checkPair left right =
+  let a = smallMap leftValue left in
+  let b = smallMap rightValue right in
+  let united = M.union L.compareInt a b in
+  let combined = M.unionWith L.compareInt subInt a b in
+  let different = M.difference L.compareInt a b in
+  let common = M.intersectionWith L.compareInt (\x y -> x * 2 - y) a b in
+  M.valid L.compareInt united && M.valid L.compareInt combined &&
+  M.valid L.compareInt different && M.valid L.compareInt common &&
+  L.all (checkEntry left right united combined different common) (L.range (-1) 5)
+
+semantics : IO Unit
+semantics = do
+  expect (L.all (\left -> L.all (checkPair left) (L.range 0 31)) (L.range 0 31)) "1024 subset pairs"
+  let a = M.fromDistinctAscList (Cons (Pair 1 (panic "left value demanded")) (Cons (Pair 2 42) Nil))
+  let b = M.fromDistinctAscList (Cons (Pair 2 (panic "right value demanded")) (Cons (Pair 3 (panic "right-only value demanded")) Nil))
+  expect (M.size (M.union L.compareInt a b) == 3 && M.get L.compareInt 2 (M.union L.compareInt a b) == 42) "union values stay lazy and left biased"
+  expect (M.size (M.unionWith L.compareInt (\x y -> panic "union combination demanded") a b) == 3) "unionWith combination stays lazy"
+  expect (M.size (M.difference L.compareInt a b) == 1) "difference ignores stored values"
+  expect (M.size (M.intersectionWith L.compareInt (\x y -> panic "intersection combination demanded") a b) == 1) "intersectionWith combination stays lazy"
+  expect (M.get L.compareInt 2 (M.intersection L.compareInt a b) == 42) "intersection chooses left value"
+  expect (case M.get L.compareInt 1 recursiveValues of {Link linked -> M.size linked == 2}) "recursive values stay lazy"
+  let numbers = M.fromDistinctAscList (Cons (Pair 1 10) (Cons (Pair 2 20) Nil))
+  expect (M.foldlWithKey (\acc key value -> if key == 2 then 42 else panic "foldlWithKey intermediate demanded") 0 numbers == 42) "generic keyed fold stays lazy"
+  expect (M.foldl (\acc value -> if value == 20 then 42 else panic "foldl intermediate demanded") 0 numbers == 42) "generic fold stays lazy"
+  let taggedLeft = M.fromList compareKey (Cons (Pair (Key 1 "left-one") 7) (Cons (Pair (Key 2 "left-two") 8) Nil))
+  let taggedRight = M.fromList compareKey (Cons (Pair (Key 2 "right-two") 9) (Cons (Pair (Key 3 "right-three") 10) Nil))
+  expect (eqString (labelAt 2 (M.union compareKey taggedLeft taggedRight)) "left-two") "union key representative"
+  expect (eqString (labelAt 2 (M.intersection compareKey taggedLeft taggedRight)) "left-two") "intersection key representative"
+  expect (eqString (labelAt 1 (M.difference compareKey taggedLeft taggedRight)) "left-one") "difference key representative"
+  let sparse = M.fromDistinctAscList (Cons (Pair (-1000000000000000000000) 5) (Cons (Pair 0 6) (Cons (Pair 1180591620717411303428 7) Nil)))
+  expect (M.valid L.compareInt (M.union L.compareInt sparse sparse) && M.size (M.difference L.compareInt sparse sparse) == 0 && M.size (M.intersection L.compareInt sparse sparse) == 3) "sparse arbitrary precision keys"
+  putStrLn "map fold semantics: 1024 subset pairs and laziness/key checks passed"
+
+
+main = semantics

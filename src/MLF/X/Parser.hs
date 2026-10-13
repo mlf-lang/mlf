@@ -129,7 +129,7 @@ term = letP <|> recP <|> typeAbsP <|> absP <|> caseP <|> (foldl1 App <$> many1 p
     atom = parens term
       <|> (BoolTerm True <$ reserved "true")
       <|> (BoolTerm False <$ reserved "false")
-      <|> (DoubleTerm <$> doubleLiteral lexer)
+      <|> (DoubleTerm <$> (specialDoubleLiteral <|> doubleLiteral lexer))
       <|> (IntTerm <$> Tok.integer lexer)
       <|> (StringTerm <$> Tok.stringLiteral lexer)
       <|> (reserved "primitive" *> (do
@@ -138,6 +138,15 @@ term = letP <|> recP <|> typeAbsP <|> absP <|> caseP <|> (foldl1 App <$> many1 p
         Primitive p <$> parens (typ `sepBy` Tok.comma lexer)))
       <|> (reserved "construct" *> (Constructor <$> upperIdentifier lexer <*> parens (typ `sepBy` Tok.comma lexer)))
       <|> (VarTerm <$> termVariable)
+
+-- The target printer also serializes deliberately invalid literals used by
+-- verifier clients. Preserve those values so the independent checker makes
+-- the rejection decision; the source language still rejects non-finite input.
+specialDoubleLiteral :: Parser Double
+specialDoubleLiteral = try $ do
+  sign <- option id ((negate <$ op "-") <|> (id <$ op "+"))
+  value <- (0 / 0 <$ reserved "NaN") <|> (1 / 0 <$ reserved "Infinity")
+  pure (sign value)
 
 computation :: Parser Computation
 computation = chainl1 primitive (Then <$ op ";")

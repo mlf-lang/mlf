@@ -1,0 +1,161 @@
+module Main where
+
+-- A native compiler phase probe. Every marker follows an explicit force of
+-- the phase result, including recursive source/target term counts. Markers
+-- are real IO boundaries, so an ordinary runtime may collect between phases.
+-- Usage: phase-probe [-i path] [--no-prelude] [--expr source | file]
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.Graph as G
+import qualified Bootstrap.Parser as P
+import qualified Bootstrap.Module as Modules
+import qualified Bootstrap.Prelude as Prelude
+import qualified Bootstrap.Classes as Classes
+import qualified Bootstrap.Constraint as C
+import qualified Bootstrap.Elaborate as E
+import qualified Bootstrap.X.Check as Check
+import qualified Bootstrap.X.Syntax as X
+import qualified Bootstrap.X.Type as T
+
+fatal : forall a. String -> IO a
+fatal message = ioBind (putErr (message ++ "\n")) (\_ -> exitWith 1)
+
+phase : forall a. String -> (a -> Int) -> Either String a -> IO a
+phase name measure result = case result of
+  Left message -> fatal (name ++ ": " ++ message)
+  Right value -> let count = measure value in seq value (seq count (do
+    putStrLn ("phase\t" ++ name ++ "\t" ++ showInt count)
+    ioReturn value))
+
+sumBy : forall a. (a -> Int) -> List a -> Int
+sumBy f xs = L.foldl (\n x -> n + f x) 0 xs
+
+sourceSize : SExpr -> Int
+sourceSize expression = 1 + (case expression of
+  SLam _ _ body -> sourceSize body
+  SApp f a -> sourceSize f + sourceSize a
+  SLet _ a b -> sourceSize a + sourceSize b
+  SAnn a _ -> sourceSize a
+  SCase a branches -> sourceSize a + sumBy (\branch -> case branch of SAlternative _ body -> sourceSize body) branches
+  SDo statements body -> sumBy statementSize statements + sourceSize body
+  SEquations equations -> sumBy (\equation -> case equation of Pair _ body -> sourceSize body) equations
+  SLetRec definitions body -> sumBy (\definition -> case definition of Triple _ _ rhs -> sourceSize rhs) definitions + sourceSize body
+  SChecked _ body -> sourceSize body
+  _ -> 0)
+
+statementSize : SStatement -> Int
+statementSize statement = case statement of
+  SDoBind _ body -> sourceSize body
+  SDoThen body -> sourceSize body
+  SDoLet _ _ body -> sourceSize body
+  SDoLetRec definitions -> sumBy (\definition -> case definition of Triple _ _ rhs -> sourceSize rhs) definitions
+
+instanceSize : SInstanceDecl -> Int
+instanceSize (SInstanceDecl _ _ _ _ methods) = sumBy (\entry -> case entry of Pair _ body -> sourceSize body) methods
+
+moduleSize : SourceModule -> Int
+moduleSize (SourceModule _ _ _ imports declarations classes instances definitions body) =
+  L.length imports + L.length declarations + L.length classes + sumBy instanceSize instances +
+    sumBy (\definition -> case definition of Triple _ _ rhs -> sourceSize rhs) definitions +
+    (case body of Nothing -> 0; Just expression -> sourceSize expression)
+
+programSize : SProgram -> Int
+programSize program = case program of
+  SProgram declarations body -> L.length declarations + sourceSize body
+  SClassProgram declarations classes instances body -> L.length declarations + L.length classes + sumBy instanceSize instances + sourceSize body
+
+typeSize : XType -> Int
+typeSize ty = 1 + (case ty of
+  XArrow a b -> typeSize a + typeSize b
+  XCon _ arguments -> sumBy typeSize arguments
+  XApply f a -> typeSize f + typeSize a
+  XForall _ bound body -> typeSize bound + typeSize body
+  _ -> 0)
+
+computationSize : XComputation -> Int
+computationSize proof = 1 + (case proof of
+  XBottom ty -> typeSize ty
+  XInner p -> computationSize p
+  XOuter _ p -> computationSize p
+  XThen p q -> computationSize p + computationSize q
+  _ -> 0)
+
+termSize : XTerm -> Int
+termSize term = 1 + (case term of
+  XAbs _ ty body -> typeSize ty + termSize body
+  XApp f a -> termSize f + termSize a
+  XTypeAbs _ bound body -> typeSize bound + termSize body
+  XTypeApp body proof -> termSize body + computationSize proof
+  XLet _ a b -> termSize a + termSize b
+  XLetRec definitions body -> sumBy (\definition -> case definition of Triple _ ty rhs -> typeSize ty + termSize rhs) definitions + termSize body
+  XPrimitive _ arguments -> sumBy typeSize arguments
+  XConstructor _ arguments -> sumBy typeSize arguments
+  XCase a ty branches -> termSize a + typeSize ty + sumBy (\branch -> case branch of XAlternative _ body -> termSize body) branches
+  XWithData declarations body -> L.length declarations + termSize body
+  _ -> 0)
+
+graphSize : Graph -> Int
+graphSize graph = seq (G.strictGraph graph) (IM.size (G.nodes graph))
+
+constraintSize : Constraints -> Int
+constraintSize constraints = seq (L.length (C.equalities constraints)) (seq (L.length (C.instances constraints)) (graphSize (C.initialGraph constraints)))
+
+finish : Pair SProgram (Map String String) -> IO Unit
+finish (Pair program names) = case program of
+  SClassProgram _ _ _ _ -> fatal "class translation did not produce a core program"
+  SProgram declarations expression -> do
+    constraints <- phase "generate" constraintSize (C.generateProgram program)
+    graph <- phase "solve" graphSize (C.solve constraints)
+    evidence <- phase "resolve" (\entries -> sumBy termSize (IM.elems entries)) (E.resolveEvidence graph (C.skeleton constraints))
+    body <- phase "elaborate" termSize (E.elaborateResolved graph evidence (C.skeleton constraints))
+    let term = if L.null declarations then body else XWithData declarations body
+    ty <- phase "check" typeSize (Check.checkClosed term)
+    let expected = E.schemeType graph (C.generalization (C.skeleton constraints))
+    if L.not (T.alphaEq ty expected) then fatal "verification: elaboration changed the inferred type"
+    else if L.not (X.equalErased (X.erase term) (C.eraseSourceWith evidence (C.skeleton constraints))) then fatal "verification: elaboration changed source erasure"
+    else do
+      putStrLn "phase\tverified\t1"
+      putStrLn ("type\t" ++ Classes.prettyQualified names ty)
+
+standalone : SourceModule -> Bool
+standalone (SourceModule _ name _ imports _ _ _ _ _) = case name of
+  Nothing -> L.null imports
+  Just _ -> false
+
+compile : PreludeMode -> List String -> String -> String -> IO Unit
+compile mode paths file source = do
+  root <- phase "parse" moduleSize (P.parseModule file source)
+  lowered <- if standalone root then do
+    program <- phase "declarations" programSize (P.standaloneProgram root)
+    case Prelude.withPrelude mode program of
+      Pair imports source -> phase "lower" (\answer -> case answer of Pair core _ -> programSize core) (Classes.lowerClassesWithImports imports source)
+    else do
+      loaded <- Modules.loadModuleFiles paths root
+      modules <- phase "load" (sumBy moduleSize) loaded
+      linked <- phase "link" (\answer -> case answer of LinkedModule program _ _ _ -> programSize program) (Modules.linkModules mode modules)
+      case linked of
+        LinkedModule program names valueScopes instanceScopes -> phase "lower" (\answer -> case answer of Pair core _ -> programSize core) (Classes.lowerClassesWithScopes valueScopes instanceScopes program)
+  finish lowered
+
+readArguments : Int -> Int -> IO (List String)
+readArguments index count = if index >= count then ioReturn Nil else do
+  argument <- getArg index
+  rest <- readArguments (index + 1) count
+  ioReturn (Cons argument rest)
+
+options : PreludeMode -> List String -> List String -> IO Unit
+options mode paths arguments = case arguments of
+  Cons "-i" (Cons path rest) -> options mode (L.snoc paths path) rest
+  Cons "--no-prelude" rest -> options NoImplicitPrelude paths rest
+  Cons "--expr" (Cons source Nil) -> compile mode paths "<expression>" source
+  Cons file Nil -> do
+    source <- readFile file
+    compile mode paths file source
+  Nil -> compile mode paths "<default>" "do { printInt 42; putStrLn \"ok\" }"
+  _ -> fatal "usage: phase-probe [-i path] [--no-prelude] [--expr source | file]"
+
+main = do
+  count <- getArgCount
+  arguments <- readArguments 0 count
+  options ImplicitPrelude Nil arguments

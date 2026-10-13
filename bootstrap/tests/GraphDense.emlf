@@ -1,0 +1,169 @@
+module Main where
+
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.Graph as G
+
+list2 : forall a. a -> a -> List a
+list2 a b = Cons a (Cons b Nil)
+list3 : forall a. a -> a -> a -> List a
+list3 a b c = Cons a (Cons b (Cons c Nil))
+list4 : forall a. a -> a -> a -> a -> List a
+list4 a b c d = Cons a (Cons b (Cons c (Cons d Nil)))
+
+assert : Bool -> String -> IO Unit
+assert condition message = if condition then ioReturn Unit else panic message
+
+forEach : forall a. (a -> IO Unit) -> List a -> IO Unit
+forEach action values = case values of
+  Nil -> ioReturn Unit
+  Cons value rest -> ioBind (action value) (\ignored -> forEach action rest)
+
+isRight : forall a. Either String a -> Bool
+isRight value = case value of { Left message -> false; Right answer -> true }
+
+showValidation : Either String Unit -> String
+showValidation value = case value of { Left message -> message; Right answer -> "ok" }
+
+-- The index order matches test/GraphValidation.hs's independent Haskell
+-- enumeration, including malformed binding trees and aliased children.
+choiceParent : Int -> Maybe Int
+choiceParent n = if n == 0 then Nothing else if n == 1 then Just 0 else Just 2
+choiceLeftParent : Int -> Maybe Int
+choiceLeftParent n = if n == 0 then Nothing else if n == 1 then Just 0 else if n == 2 then Just 1 else if n == 3 then Just 3 else Just 9
+choiceRightParent : Int -> Maybe Int
+choiceRightParent n = if n == 0 then Nothing else if n == 1 then Just 0 else if n == 2 then Just 1 else if n == 3 then Just 2 else Just 9
+choiceTop : Int -> GTag
+choiceTop n = if n == 0 then GArr 2 3 else if n == 1 then GArr 2 2 else if n == 2 then GTyApp 2 3 else if n == 3 then GCon "Pair" (list2 2 3) else GArr 5 3
+choiceLeft : Int -> GTag
+choiceLeft n = if n == 0 then GBot else if n == 1 then GTyCon "F" (KArrow Star Star) else if n == 2 then GArr 3 3 else GGen 3
+choiceRight : Int -> GTag
+choiceRight n = if n == 0 then GBot else if n == 1 then GTyCon "G" (KArrow Star Star) else if n == 2 then GArr 2 2 else GArr 9 9
+
+smallGraph : Int -> Graph
+smallGraph index = Graph (IM.fromList (list4
+  (Pair 0 (Node (GGen 1) Nothing Flexible))
+  (Pair 1 (Node (choiceTop (quotInt index 2400)) (choiceParent (remInt (quotInt index 50) 3)) Flexible))
+  (Pair 2 (Node (choiceLeft (remInt (quotInt index 600) 4)) (choiceLeftParent (remInt (quotInt index 10) 5)) Flexible))
+  (Pair 3 (Node (choiceRight (remInt (quotInt index 150) 4)) (choiceRightParent (remInt (quotInt index 2) 5)) Rigid))))
+  (if remInt index 2 == 0 then IM.empty else IM.fromList (list2 (Pair 5 4) (Pair 4 2))) 6
+
+hashString : Int -> String -> Int
+hashString initial text = hashCodes initial text 0 (stringLength text)
+hashCodes : Int -> String -> Int -> Int -> Int
+hashCodes value text index count = if index == count then value else
+  hashCodes (remInt (value * 65599 + stringCodeAt text index) 2147483647) text (index + 1) count
+
+validationStats : Triple Int Int Int
+validationStats = L.foldlStrict validationStep (Triple 0 0 0) (L.range 0 11999)
+
+validationStep : Triple Int Int Int -> Int -> Triple Int Int Int
+validationStep (Triple count accepted checksum) index =
+  let outcome = G.validateGraph (smallGraph index) in
+  let valid = if isRight outcome then 1 else 0 in
+  let next = hashString checksum (showInt index ++ ":" ++ showValidation outcome ++ "\n") in
+  let newCount = count + 1 in let newAccepted = accepted + valid in
+  seq newCount (seq newAccepted (seq next (Triple newCount newAccepted next)))
+
+showKind : Kind -> String
+showKind kind = case kind of
+  Star -> "*"
+  KArrow a b -> "(" ++ showKind a ++ ">" ++ showKind b ++ ")"
+showTag : GTag -> String
+showTag t = case t of
+  GBot -> "b"
+  GBotK kind -> "k" ++ showKind kind
+  GArr a b -> "a" ++ showInt a ++ "," ++ showInt b
+  GCon name arguments -> "c" ++ name ++ "[" ++ L.intercalate "," (L.map showInt arguments) ++ "]"
+  GTyCon name kind -> "t" ++ name ++ showKind kind
+  GSkolem n kind -> "s" ++ showInt n ++ showKind kind
+  GTyApp a b -> "p" ++ showInt a ++ "," ++ showInt b
+  GGen n -> "g" ++ showInt n
+showGraph : Graph -> String
+showGraph graph = L.concatStrings (L.map showNode (IM.toList (G.nodes graph))) ++ "|" ++
+  L.concatStrings (L.map (\entry -> case entry of Pair n p -> showInt n ++ ":" ++ showInt p ++ ";") (IM.toList (G.links graph))) ++ "|" ++ showInt (G.nextId graph)
+showNode : Pair Int Node -> String
+showNode (Pair n v) = showInt n ++ ":" ++ showTag (G.tag v) ++ ":" ++
+  (case G.binder v of { Nothing -> "_"; Just b -> showInt b }) ++ ":" ++
+  (case G.flag v of { Flexible -> "f"; Rigid -> "r" }) ++ ";"
+
+showUnification : Either String Graph -> String
+showUnification result = case result of
+  Left message -> "!" ++ message
+  Right graph -> showGraph graph
+
+equations : List (List (Pair Int Int))
+equations = L.append (list4 Nil (Cons (Pair 1 2) Nil) (Cons (Pair 1 3) Nil) (Cons (Pair 2 3) Nil))
+  (L.append (list2 (Cons (Pair 2 2) Nil) (Cons (Pair 0 1) Nil))
+    (list3 (list2 (Pair 1 2) (Pair 2 3)) (list2 (Pair 2 3) (Pair 1 2)) (list2 (Pair 3 2) (Pair 2 1))))
+
+setFlags : Int -> Graph -> Graph
+setFlags bits graph = Graph (IM.mapWithKey (\n -> \v -> Node (G.tag v) (G.binder v)
+  (if n == 1 then (if bits < 4 then Flexible else Rigid) else
+   if n == 2 then (if remInt (quotInt bits 2) 2 == 0 then Flexible else Rigid) else
+   if n == 3 then (if remInt bits 2 == 0 then Flexible else Rigid) else G.flag v)) (G.nodes graph)) (G.links graph) (G.nextId graph)
+
+unificationInputs : List (Pair Graph (List (Pair Int Int)))
+unificationInputs = L.concatMap (\index -> let graph = smallGraph index in
+  if isRight (G.validateGraph graph) then L.concatMap (\bits -> L.map (\eqs -> Pair (setFlags bits graph) eqs) equations) (L.range 0 7) else Nil) (L.range 0 11999)
+
+sparseUnify : List (Pair Int Int) -> Graph -> Either String Graph
+sparseUnify eqs before = G.bindE (G.validateSparse before) (\valid ->
+  G.bindE (G.kindsAt before (L.concatMap G.equationNodes eqs)) (\kinds ->
+  G.bindE (G.foldE (G.firstOrder kinds) before eqs) (\skeleton ->
+  G.bindE (G.rebindSparse before (G.canonicalize skeleton)) (\rebuilt ->
+  G.bindE (G.validateSparse rebuilt) (\checked -> Right rebuilt)))))
+
+unificationStats : Triple Int Int Int
+unificationStats = L.foldlStrict unificationStep (Triple 0 0 0) unificationInputs
+
+unificationStep : Triple Int Int Int -> Pair Graph (List (Pair Int Int)) -> Triple Int Int Int
+unificationStep (Triple count accepted checksum) (Pair graph eqs) =
+  let outcome = G.unify eqs graph in
+  let reference = sparseUnify eqs graph in
+  let same = case outcome of
+        Left message -> L.not (isRight reference)
+        Right answer -> case reference of { Left message -> false; Right expected -> eqString (showGraph answer) (showGraph expected) } in
+  let next = hashString checksum (showInt count ++ ":" ++ showUnification outcome ++ "\n") in
+  if same then
+    let newCount = count + 1 in let newAccepted = accepted + (if isRight outcome then 1 else 0) in
+    seq newCount (seq newAccepted (seq next (Triple newCount newAccepted next)))
+  else panic ("dense/sparse unification mismatch at " ++ showInt count)
+
+rename : (Int -> Int) -> Graph -> Graph
+rename change graph = Graph
+  (IM.fromList (L.map (\entry -> case entry of Pair n v -> Pair (change n) (Node (G.mapTag change (G.tag v)) (G.mapMaybeInt change (G.binder v)) (G.flag v))) (IM.toList (G.nodes graph))))
+  (IM.fromList (L.map (\entry -> case entry of Pair n p -> Pair (change n) (change p)) (IM.toList (G.links graph)))) (change (G.nextId graph))
+
+simple : Graph
+simple = Graph (IM.fromList (list4
+  (Pair 0 (Node (GGen 1) Nothing Flexible))
+  (Pair 1 (Node (GArr 2 3) (Just 0) Flexible))
+  (Pair 2 (Node GBot (Just 1) Flexible))
+  (Pair 3 (Node GBot (Just 1) Flexible)))) IM.empty 4
+
+checkRename : (Int -> Int) -> Bool -> IO Unit
+checkRename change dense =
+  let graph = rename change simple in
+  let bounds = case G.denseBounds graph of { Nothing -> false; Just pair -> true } in
+  let result = G.unify (Cons (Pair (change 2) (change 3)) Nil) graph in
+  let original = G.unify (Cons (Pair 2 3) Nil) simple in do
+    assert (if dense then bounds else L.not bounds) "dense span guard selected the wrong representation"
+    case original of
+      Left message -> panic message
+      Right expected -> case result of
+        Left message -> panic message
+        Right actual -> assert (eqString (showGraph actual) (showGraph (rename change expected))) "dense/sparse graph identities changed"
+
+main = do
+  case validationStats of Triple count accepted checksum -> putStrLn ("validation|" ++ showInt count ++ "|" ++ showInt accepted ++ "|" ++ showInt checksum)
+  case unificationStats of Triple count accepted checksum -> putStrLn ("unification|" ++ showInt count ++ "|" ++ showInt accepted ++ "|" ++ showInt checksum)
+  let huge = 1000000000000000000000000000000
+  checkRename (\n -> n - 30) true
+  checkRename (\n -> n + huge) true
+  checkRename (\n -> n - huge) true
+  checkRename (\n -> n * huge) false
+  assert (case G.denseBounds G.emptyGraph of { Nothing -> true; Just bounds -> false }) "empty graph used dense storage"
+  assert (case G.denseBounds (Graph (G.nodes simple) (IM.insert 1 2 IM.empty) 4) of { Nothing -> true; Just bounds -> false }) "overlapping node and alias identities used dense storage"
+  putStrLn "dense offsets and sparse fallbacks: ok"

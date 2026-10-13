@@ -63,6 +63,7 @@ demanded fs expression = case expression of
     [go b `Set.difference` Set.fromList (X.patternNames p) | X.ErasedAlternative p b <- bs]
   X.EApp _ _ -> case applications expression of
     (X.EPrimitive P.IfThenElse,[c,a,b]) -> go c `Set.union` (go a `Set.intersection` go b)
+    (X.EPrimitive P.Seq,[a,b]) -> go a `Set.union` go b
     (X.EPrimitive p,args) | length args == primitiveArity p ->
       if P.primitiveStrict p
         then Set.unions (map go args) else Set.empty

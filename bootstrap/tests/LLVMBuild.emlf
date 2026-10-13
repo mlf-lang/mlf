@@ -1,0 +1,32 @@
+module Main where
+
+import Bootstrap.Types
+import qualified Bootstrap.LLVM.Build as B
+import qualified Bootstrap.Map as M
+import qualified Bootstrap.Set as S
+
+initial : B.Output
+initial = B.Output 0 Nil "entry" Nil Nil M.empty M.empty S.empty M.empty S.empty S.empty S.empty M.empty true M.empty M.empty M.empty M.empty M.empty S.empty 16
+
+-- Keep only each next Output: discarded names must not be needed to force its
+-- numeric counter. The former lazy update overflows the ordinary native stack.
+advance : Int -> B.Output -> B.Output
+advance count state = if count <= 0 then state else
+  case B.runBuild (B.fresh (panic "fresh forced a discarded prefix")) state of
+    Left message -> panic message
+    Right (Pair ignored after) -> advance (count - 1) after
+
+main = do
+  let lazyFields = B.withInstructions (panic "fresh forced instructions") (B.withDefinitions (panic "fresh forced definitions") initial)
+  let final = advance 100001 lazyFields
+  printInt (B.serial final)
+  case B.runBuild (B.fresh "%v") final of
+    Left message -> panic message
+    Right (Pair first after) -> do
+      putStrLn first
+      case B.runBuild (B.fresh "block.") after of
+        Left message -> panic message
+        Right (Pair second finished) -> do
+          putStrLn second
+          printInt (B.serial finished)
+  putStrLn "LLVM build: ok"

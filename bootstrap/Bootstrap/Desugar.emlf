@@ -1,0 +1,68 @@
+module Bootstrap.Desugar where
+import Bootstrap.Types
+import Bootstrap.Std
+import Bootstrap.Fresh
+
+patternVariables : SPattern -> List String
+patternVariables pattern = case pattern of
+  SDefaultPattern name -> case name of {Nothing -> Nil; Just n -> Cons n Nil}
+  SConstructorPattern _ names -> concatMap (\n -> case n of {Nothing -> Nil; Just a -> Cons a Nil}) names
+  SNestedPattern _ patterns -> concatMap patternVariables patterns
+  SAnnotatedPattern n _ -> Cons n Nil
+  _ -> Nil
+allNames : SExpr -> List String
+allNames expression = case expression of
+  SVar name -> Cons name Nil
+  SConstructor name -> Cons name Nil
+  SLam name _ body -> Cons name (allNames body)
+  SApp f a -> append (allNames f) (allNames a)
+  SLet name a b -> Cons name (append (allNames a) (allNames b))
+  SAnn a _ -> allNames a
+  SCase a alternatives -> append (allNames a) (concatMap (\(SAlternative p b) -> append (patternVariables p) (allNames b)) alternatives)
+  SEquations rows -> concatMap (\(Pair ps b) -> append (concatMap patternVariables ps) (allNames b)) rows
+  SLetRec definitions body -> append (concatMap (\(Triple n _ e) -> Cons n (allNames e)) definitions) (allNames body)
+  SDo statements result -> append (concatMap statementNames statements) (allNames result)
+  SChecked _ a -> allNames a
+  SWanted n candidates -> Cons n (map snd candidates)
+  _ -> Nil
+statementNames : SStatement -> List String
+statementNames statement = case statement of
+  SDoBind p e -> append (patternVariables p) (allNames e)
+  SDoThen e -> allNames e
+  SDoLet n _ e -> Cons n (allNames e)
+  SDoLetRec ds -> concatMap (\(Triple n _ e) -> Cons n (allNames e)) ds
+desugarDo : SExpr -> SExpr
+desugarDo expression = case runFresh (allNames expression) (go expression) of {Left error -> panic error; Right result -> result}
+go : SExpr -> Fresh SExpr
+go expression = case expression of
+  SLam n a b -> do {body <- go b; freshPure (SLam n a body)}
+  SApp a b -> do {f <- go a; x <- go b; freshPure (SApp f x)}
+  SLet n a b -> do {value <- go a; body <- go b; freshPure (SLet n value body)}
+  SAnn a t -> do {value <- go a; freshPure (SAnn value t)}
+  SCase a alternatives -> do {value <- go a; branches <- mapM (\(SAlternative p b) -> do {body <- go b; freshPure (SAlternative p body)}) alternatives; freshPure (SCase value branches)}
+  SEquations rows -> do {rows2 <- mapM (\(Pair ps b) -> do {body <- go b; freshPure (Pair ps body)}) rows; freshPure (SEquations rows2)}
+  SDo statements result -> do {end <- go result; block statements end}
+  SLetRec definitions body -> do {ds <- mapM goDefinition definitions; end <- go body; freshPure (SLetRec ds end)}
+  SChecked ty a -> do {value <- go a; freshPure (SChecked ty value)}
+  _ -> freshPure expression
+goDefinition : Triple String SAnnotation SExpr -> Fresh (Triple String SAnnotation SExpr)
+goDefinition (Triple n t a) = do {value <- go a; freshPure (Triple n t value)}
+block : List SStatement -> SExpr -> Fresh SExpr
+block statements result = case statements of
+  Nil -> freshPure result
+  Cons statement rest -> do
+    continuation <- block rest result
+    case statement of
+      SDoLet n annotation value -> do {value2 <- go value; freshPure (SLet n (case annotation of {Nothing -> value2; Just a -> SAnn value2 a}) continuation)}
+      SDoThen action -> do {name <- freshName "doValue"; binding (SDefaultPattern (Just name)) action continuation}
+      SDoBind pattern action -> binding pattern action continuation
+      SDoLetRec definitions -> do {ds <- mapM goDefinition definitions; freshPure (SLetRec ds continuation)}
+binding : SPattern -> SExpr -> SExpr -> Fresh SExpr
+binding pattern action continuation = do
+  value <- go action
+  result <- case pattern of
+    SDefaultPattern (Just name) -> freshPure (Pair name continuation)
+    SDefaultPattern Nothing -> do {name <- freshName "doValue"; freshPure (Pair name continuation)}
+    _ -> do {name <- freshName "doValue"; freshPure (Pair name (SCase (SVar name) (Cons (SAlternative pattern continuation) Nil)))}
+  case result of
+    Pair name body -> freshPure (SApp (SApp (SVar "bind") value) (SLam name Nothing body))

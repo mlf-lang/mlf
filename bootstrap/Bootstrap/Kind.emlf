@@ -1,0 +1,28 @@
+module Bootstrap.Kind where
+
+import Bootstrap.Types
+
+eqKind : Kind -> Kind -> Bool
+eqKind Star Star = true
+eqKind (KArrow a b) (KArrow c d) = eqKind a c && eqKind b d
+eqKind _ _ = false
+
+kindEqual = eqKind
+
+prettyKind : Kind -> String
+prettyKind Star = "*"
+prettyKind (KArrow a b) = leftKind a ++ " -> " ++ prettyKind b
+
+leftKind : Kind -> String
+leftKind Star = "*"
+leftKind k = "(" ++ prettyKind k ++ ")"
+
+applyKind : Kind -> Kind -> Either String Kind
+applyKind Star _ = Left "invalid type constructor arity: a type of kind * cannot be applied"
+applyKind (KArrow domain result) argument =
+  if eqKind domain argument then Right result
+  else Left ("kind mismatch: expected " ++ prettyKind domain ++ ", got " ++ prettyKind argument)
+
+kindArity : Kind -> Int
+kindArity Star = 0
+kindArity (KArrow _ k) = 1 + kindArity k

@@ -1,0 +1,79 @@
+module Main where
+
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.Map as M
+import qualified Bootstrap.Set as S
+import qualified Bootstrap.X.Type as T
+import qualified Bootstrap.X.Syntax as X
+import qualified Bootstrap.X.Check as C
+import qualified Bootstrap.X.Parser as P
+import qualified Bootstrap.X.Pretty as Pretty
+
+assert : Bool -> String -> IO Unit
+assert good message = if good then ioReturn Unit else do
+  putErr ("target port: " ++ message ++ "\n")
+  exitWith 1
+
+acceptType : XTerm -> XType -> Bool
+acceptType term expected = case C.checkClosed term of
+  Left _ -> false
+  Right actual -> T.alphaEq actual expected
+
+reject : XTerm -> Bool
+reject term = case C.checkClosed term of
+  Left _ -> true
+  Right _ -> false
+
+roundtrip : XTerm -> Bool
+roundtrip term = case P.parseTerm "<roundtrip>" (Pretty.prettyTerm term) of
+  Left _ -> false
+  Right parsed -> X.equalErased (X.erase term) (X.erase parsed) && case C.checkClosed term of
+    Left _ -> reject parsed
+    Right expected -> acceptType parsed expected
+
+doubleRoundtrip bits = case P.parseTerm "<double roundtrip>" (Pretty.prettyTerm (XDoubleTerm (doubleFromBits bits))) of
+  Right (XDoubleTerm actual) -> doubleToBits actual == bits
+  _ -> false
+
+rejectNonFinite bits = case P.parseTerm "<non-finite roundtrip>" (Pretty.prettyTerm (XDoubleTerm (doubleFromBits bits))) of
+  Right (XDoubleTerm actual) -> doubleToBits actual == bits && reject (XDoubleTerm actual)
+  _ -> false
+
+intType = XCon "Int" Nil
+boolType = XCon "Bool" Nil
+v = XTyVar 0
+w = XTyVar 1
+n = XName 0 "x"
+identity = XTypeAbs v XBot (XAbs n (XVar v) (XVarTerm n))
+identityType = XForall v XBot (XArrow (XVar v) (XVar v))
+constant = XIntTerm 42
+
+quantified : Int -> Int -> XType -> XType
+quantified count offset body =
+  if count == 0 then body else
+    let next = XForall (XTyVar (offset + count)) XBot body in
+    seq next (quantified (count - 1) offset next)
+
+main = do
+  assert (acceptType identity identityType) "polymorphic identity"
+  assert (acceptType constant intType) "integer"
+  assert (acceptType (XApp (XTypeApp identity (X.typeApplication intType)) constant) intType) "explicit instantiation"
+  assert (reject (XApp constant constant)) "reject non-function application"
+  assert (reject (XTypeApp constant XElim)) "reject invalid computation"
+  assert (reject (XTypeAbs v XBot (XTypeApp constant (XHyp v)))) "Inst-Hyp checks its bound"
+  assert (reject (XTypeAbs v XBot (XTypeAbs v XBot constant))) "binder identity collision"
+  assert (reject (XLet n constant (XLet (XName 0 "different") constant constant))) "term identity collision"
+  assert (roundtrip identity) "identity target print/parse"
+  assert (roundtrip (XApp (XTypeApp identity (X.typeApplication intType)) constant)) "computation target print/parse"
+  assert (roundtrip (XStringTerm "你好\0\n\"\\🌍")) "Unicode target print/parse"
+  assert (doubleRoundtrip 1) "subnormal target print/parse"
+  assert (doubleRoundtrip 9223372036854775808) "negative zero target print/parse"
+  assert (doubleRoundtrip 9218868437227405311) "largest finite target print/parse"
+  assert (rejectNonFinite 9221120237041090560) "NaN reaches independent checker"
+  assert (rejectNonFinite 9218868437227405312) "Infinity reaches independent checker"
+  assert (rejectNonFinite 18442240474082181120) "negative Infinity reaches independent checker"
+  assert (T.alphaEq (T.substitute v (XVar w) (XForall w XBot (XArrow (XVar v) (XVar w)))) (XForall (XTyVar 2) XBot (XArrow (XVar w) (XVar (XTyVar 2))))) "capture-avoiding substitution"
+  assert (T.alphaEq (quantified 512 0 (XVar (XTyVar 512))) (quantified 512 1000 (XVar (XTyVar 1512)))) "nested binder depths survive unused binders"
+  assert (L.not (T.alphaEq (quantified 512 0 (XVar (XTyVar 512))) (quantified 512 1000 (XVar (XTyVar 1001))))) "nested binder depths distinguish inner and outer references"
+  putStrLn "target port: 20 checks passed"

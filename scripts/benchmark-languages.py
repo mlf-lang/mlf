@@ -19,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import compile_native
 
 ROOT = Path(__file__).resolve().parent.parent
 LANGUAGES = ("c", "rust", "haskell", "mlf")
@@ -382,18 +383,28 @@ def tool(name):
 def toolchain(args, env):
     paths = {name: tool(getattr(args, name)) for name in ("clang", "rustc", "ghc", "emlf", "pkg_config")}
     probes = {"clang": ["--version"], "rustc": ["--version", "--verbose"],
-              "ghc": ["--version"], "emlf": ["+RTS", "--info", "-RTS"],
-              "pkg_config": ["--version"]}
+              "ghc": ["--version"], "pkg_config": ["--version"]}
+    print(f"Selected MLF compiler: {paths['emlf']}", flush=True)
     versions = {}
     for name, options in probes.items():
         _, output = run([paths[name], *options], env=env)
         versions[name] = output.decode().strip()
+    # Both the Haskell seed and the native MLF compiler expose this CLI. RTS
+    # options identify GHC's runtime, not the compiler, and do not exist in a
+    # native bootstrap. Neither compiler currently has a version command, so
+    # record its real identification output without calling it a version.
+    identification_command = [paths["emlf"], "--help"]
+    _, identification = run(identification_command, env=env)
     _, output = run([paths["emlf"], "--llvm-runtime"], env=env)
     runtime = Path(os.fsdecode(output).strip()).resolve(strict=True)
     _, output = run([paths["pkg_config"], "--cflags", "--libs", "gmp"], env=env)
     gmp = shlex.split(output.decode())
-    metadata = {name: {"path": path, "version": versions[name], "sha256": digest(path)}
+    metadata = {name: {"path": path, "sha256": digest(path)}
                 for name, path in paths.items()}
+    for name, version in versions.items():
+        metadata[name]["version"] = version
+    metadata["emlf"]["identification"] = {"command": identification_command,
+                                            "stdout": identification.decode().strip()}
     metadata["runtime"] = {"path": str(runtime), "sha256": digest(runtime),
                            "header_sha256": digest(runtime.with_suffix(".h"))}
     metadata["gmp_flags"] = gmp
@@ -460,8 +471,9 @@ def build(workload, language, directory, paths, runtime, gmp, env, timeout, hask
     elif language == "haskell":
         commands = [([paths["ghc"], *flags, *(haskell_flags if workload.get("haskell_packages") else []), source, "-outputdir", str(directory), "-o", str(binary)], None)]
     else:
-        commands = [([paths["emlf"], "--emit-llvm", source], ir),
-                    ([paths["clang"], *flags, str(ir), str(runtime), *gmp, "-lm", "-o", str(binary)], None)]
+        return compile_native.build(compiler=paths["emlf"], clang=paths["clang"],
+            source=source, runtime=runtime, directory=directory, flags=flags,
+            gmp=gmp, env=env, timeout=timeout)
     start = time.perf_counter()
     stages = []
     for command, output in commands:
@@ -633,6 +645,7 @@ def main(argv=None):
         report["harness_sha256"] = digest(__file__)
         inputs = [*report["source_sha256"], *manifest["pinned_sha256"],
                   "benchmarks/manifest.json", str(Path(__file__).resolve()),
+                  "scripts/compile_native.py", "scripts/compiler_process.py",
                   *paths.values(), str(runtime), str(runtime.with_suffix(".h")), str(runtime.with_name("khash.h"))]
         report["input_sha256"] = {name: digest(ROOT / name) for name in inputs}
         report["input_sha256"].update(package_hashes)
@@ -641,14 +654,17 @@ def main(argv=None):
         report["repository"] = {"revision": git.stdout.strip() if git.returncode == 0 else None,
                                 "dirty": bool(status.stdout) if status.returncode == 0 else None}
         report["methodology"] = {
-            "compile": "Fresh serial source-to-executable builds, including MLF LLVM emission, IR writes, "
-                       "runtime C compilation and linking. Tool/compiler/harness setup excluded. "
+            "compile": "Fresh source-to-executable builds. MLF uses the general compile_native.py driver: "
+                       "LLVM emission/IR writes and fresh runtime C compilation overlap, followed by LLVM "
+                       "compilation and linking. At most two compiler processes overlap within an MLF build; "
+                       "samples/languages remain serial. Tool/compiler/harness setup excluded. "
                        "Fresh output directory per sample; no object cache. Rotating language order.",
             "runtime": "All binaries built and checked before any timed samples; exact runtime input checked "
                        "once before timing as warmup. Process startup/IO/GC/exit included. Output checked "
                        "again after each sample, outside timing. No time subtraction.",
             "resource_measurement": "wait4 child usage: user+system CPU; Darwin RSS bytes, Linux RSS KiB "
-                                    "converted to bytes. Pipeline CPU summed, RSS maximum over stages.",
+                                    "converted to bytes. Pipeline CPU summed, RSS maximum over stages "
+                                    "(largest child peak, not simultaneous aggregate memory).",
             "normalization": "Wall medians divided by C wall median; ratio below 1 is allowed."}
         scratch_parent = ROOT / "dist-newstyle/benchmarks"
         scratch_parent.mkdir(parents=True, exist_ok=True)

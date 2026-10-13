@@ -1,7 +1,7 @@
 -- | Native workers for known saturated functions, with memoized closures for
 -- everything that remains lazy or higher order. Demand information is only
 -- used at saturation, never while constructing a partial application.
-module MLF.LLVM.Codegen (generate) where
+module MLF.LLVM.Codegen (generate, generateForGC) where
 
 import Control.Monad (foldM, forM, forM_, unless, when, (>=>))
 import Control.Monad.State.Strict
@@ -13,6 +13,7 @@ import qualified Data.Set as Set
 import Numeric (showHex)
 import GHC.Float (castDoubleToWord64)
 import qualified MLF.LLVM.Analysis as A
+import qualified MLF.LLVM.StrictFields as F
 import qualified MLF.LLVM.Kernel as K
 import MLF.LLVM.Optimize (applications, free)
 import qualified MLF.Primitive as P
@@ -33,15 +34,26 @@ data Output = Output
   , scalarRanges :: Map.Map String (Integer,Integer)
   , arrayViews :: Map.Map String (String,String)
   , unboxedDoubles :: Map.Map String String
+  , forcedValues :: Map.Map String String
+  , constructorFacts :: Map.Map String [Bool]
+  , objectHeaderBytes :: !Int
+  , stateWorkers :: Set.Set X.Name
   }
 type Build = StateT Output (Either String)
 
 generate :: Constructors -> X.Erased -> Either String (String,[String])
-generate cs term = do
+generate = generateWithHeader 16
+
+-- BDWGC traces allocations itself and needs no per-object pool header.
+generateForGC :: Constructors -> X.Erased -> Either String (String,[String])
+generateForGC = generateWithHeader 0
+
+generateWithHeader :: Int -> Constructors -> X.Erased -> Either String (String,[String])
+generateWithHeader headerBytes cs term = do
   let fs = A.analyze term
       ks = K.kernels fs
   (entry,out) <- runStateT (callback [] Nothing term)
-    (Output 0 [] "entry" [] [] cs fs Set.empty Map.empty ks Set.empty (K.collecting fs ks) Map.empty True Map.empty Map.empty Map.empty)
+    (Output 0 [] "entry" [] [] cs fs Set.empty Map.empty ks Set.empty (K.collecting fs ks) Map.empty True Map.empty Map.empty Map.empty Map.empty (F.infer (Map.map snd cs) fs term) headerBytes Set.empty)
   pure (entry, runtimeDeclarations ++ aliasMetadata ++ reverse (constants out) ++ reverse (definitions out))
 
 -- Managed headers and external array storage are disjoint allocations. The
@@ -87,6 +99,41 @@ number = ("i64 " ++) . show
 immediate :: Integer -> String
 immediate n = "inttoptr (i64 " ++ show n ++ " to ptr)"
 
+-- Each environment has a fixed layout chosen together with its callback or
+-- constructor. Accessing its known slots preserves the lazy field pointers.
+environmentSlot :: String -> Int -> Build String
+environmentSlot env index = do
+  header <- gets objectHeaderBytes
+  result ("getelementptr i8, ptr " ++ env ++ ", i64 " ++ show (header + 8 + 8*index))
+
+loadEnvironment :: String -> Int -> Build String
+loadEnvironment env index = do
+  address <- environmentSlot env index
+  result ("load ptr, ptr " ++ address ++ ", align 8, !tbaa !3")
+
+storeEnvironment :: String -> Int -> String -> Build ()
+storeEnvironment env index value = do
+  address <- environmentSlot env index
+  emit ("  store ptr " ++ value ++ ", ptr " ++ address ++ ", align 8, !tbaa !3")
+
+-- A saturated constructor stores its already prepared lazy fields directly.
+-- Partial applications continue through the ordinary closure/application ABI.
+constructorValue :: Int -> [String] -> Build String
+constructorValue tag fields = case fields of
+  [] -> pure (immediate (toInteger tag * 8 + 4))
+  [a] -> call "@mlf_constructor1" [number tag,pointer a]
+  [a,b] -> call "@mlf_constructor2" [number tag,pointer a,pointer b]
+  _ -> do
+    value <- call "@mlf_constructor_new" [number tag,number (length fields)]
+    header <- gets objectHeaderBytes
+    if header == 0 then forM_ (zip [0 :: Int ..] fields) (\(index,field) -> do
+      address <- result ("getelementptr i8, ptr " ++ value ++ ", i64 " ++ show (24 + 8*index))
+      emit ("  store ptr " ++ field ++ ", ptr " ++ address ++ ", align 8, !tbaa !3"))
+    else do
+      env <- loadAt "ptr" value 40
+      forM_ (zip [0..] fields) $ \(index,field) -> storeEnvironment env index field
+    pure value
+
 definition :: String -> [String] -> Build String -> Build ()
 definition name args body = definitionBody name args $ do
   value <- body
@@ -96,18 +143,18 @@ definition name args body = definitionBody name args $ do
 -- tail position without relying on LLVM to collapse a result phi first.
 definitionBody :: String -> [String] -> Build () -> Build ()
 definitionBody name args body = do
-  saved <- gets (\s -> (instructions s,block s,scalarRanges s,arrayViews s,unboxedDoubles s))
+  saved <- gets (\s -> (instructions s,block s,scalarRanges s,arrayViews s,unboxedDoubles s,forcedValues s))
   modify' (\s -> s { instructions = [], block = "entry", scalarRanges = Map.empty,
-    arrayViews = Map.empty, unboxedDoubles = Map.empty })
+    arrayViews = Map.empty, unboxedDoubles = Map.empty, forcedValues = Map.empty })
   body
   code <- gets (reverse . instructions)
   collectors <- gets collectingKernels
   let collectingWorker = any ((== takeWhile (/= '.') (drop 13 name)) . show . X.nameId) (Set.toList collectors)
       attributes = if take 13 name == "@mlf.numeric." && take 19 name /= "@mlf.numeric.entry." && not collectingWorker then " alwaysinline" else ""
       text = unlines (["define private ptr " ++ name ++ "(" ++ intercalate ", " args ++ ")" ++ attributes ++ " {", "entry:"] ++ code ++ ["}"])
-  let (savedInstructions,savedBlock,savedRanges,savedViews,savedDoubles) = saved
+  let (savedInstructions,savedBlock,savedRanges,savedViews,savedDoubles,savedForced) = saved
   modify' (\s -> s { instructions = savedInstructions, block = savedBlock,
-    scalarRanges = savedRanges, arrayViews = savedViews, unboxedDoubles = savedDoubles,
+    scalarRanges = savedRanges, arrayViews = savedViews, unboxedDoubles = savedDoubles, forcedValues = savedForced,
     definitions = text : definitions s })
 
 lookupConstructor :: String -> Build (Int,Int)
@@ -126,23 +173,37 @@ lookupName scope name = case Map.lookup name scope of
         env <- environment scope (A.captures f)
         Binding <$> call "@mlf_closure" [pointer code,pointer env] <*> pure True
 
+-- Successful forcing returns a canonical WHNF pointer. Reuse that pointer,
+-- including for lazy arguments/captures, without demanding anything new.
+-- Facts are local to a definition and only survive dominated control flow.
 forceBinding :: Binding -> Build String
 forceBinding binding
   | evaluated binding = pure (operand binding)
-  | otherwise = call "@mlf_force" [pointer (operand binding)]
+  | otherwise = do
+      let original = operand binding
+      previous <- gets (Map.lookup original . forcedValues)
+      case previous of
+        Just value -> pure value
+        Nothing -> do
+          value <- call "@mlf_force" [pointer original]
+          modify' (\s -> s { forcedValues = Map.insert original value (Map.insert value value (forcedValues s)) })
+          pure value
+
+bindingOperand :: Binding -> Build String
+bindingOperand binding = gets (Map.findWithDefault (operand binding) (operand binding) . forcedValues)
 
 environment :: Scope -> [X.Name] -> Build String
 environment _ [] = pure "null"
 environment scope names = do
   env <- call "@mlf_env_new" [number (length names)]
   forM_ (zip [0..] names) $ \(index,name) -> do
-    value <- operand <$> lookupName scope name
-    emit ("  call void @mlf_env_set(" ++ intercalate ", " [pointer env,number index,pointer value] ++ ")")
+    value <- lookupName scope name >>= bindingOperand
+    storeEnvironment env index value
   pure env
 
 readEnvironment :: [X.Name] -> Build Scope
 readEnvironment names = Map.fromList <$> forM (zip [0..] names) (\(index,n) -> do
-  value <- call "@mlf_env_get" ["ptr %env",number index]
+  value <- loadEnvironment "%env" index
   pure (n,Binding value False))
 
 callback :: [X.Name] -> Maybe X.Name -> X.Erased -> Build String
@@ -201,7 +262,7 @@ invokeOrdinary :: Scope -> X.Name -> A.Function -> [X.Erased] -> Build String
 invokeOrdinary scope name f args = do
   symbol <- worker name f
   captured <- forM (A.captures f) $ \n -> lookupName scope n >>= \b ->
-    if Set.member n (A.strict f) then forceBinding b else pure (operand b)
+    if Set.member n (A.strict f) then forceBinding b else bindingOperand b
   values <- forM (zip (A.parameters f) args) $ \(n,a) ->
     if Set.member n (A.strict f) then evaluate scope a else thunk scope a
   call symbol (map pointer (captured ++ values))
@@ -230,12 +291,12 @@ kernelAction scope name f args = do
           (invokeOrdinary saved name f (map X.EVar (A.parameters f)))
       pure symbol
   captured <- forM (A.captures f) $ \n -> lookupName scope n >>= \b ->
-    if Set.member n (A.strict f) then forceBinding b else pure (operand b)
+    if Set.member n (A.strict f) then forceBinding b else bindingOperand b
   values <- forM (zip (A.parameters f) args) $ \(n,a) ->
     if Set.member n (A.strict f) then evaluate scope a else thunk scope a
   env <- call "@mlf_env_new" [number (length captured + length values)]
   forM_ (zip [0..] (captured ++ values)) $ \(i,v) ->
-    emit ("  call void @mlf_env_set(" ++ intercalate ", " [pointer env,number i,pointer v] ++ ")")
+    storeEnvironment env i v
   call "@mlf_native_io" [pointer entry,pointer env]
 
 data Scalar = Boxed String | Floating String
@@ -536,14 +597,14 @@ executeNumericReturn modes scope expression
       executeNumericReturn modes (Map.insert n v scope) b
     (X.EPrimitive P.IfThenElse,[c,a,b]) -> do
       condition <- scalarValue scope c >>= numericCondition
-      before <- gets (\s -> (scalarRanges s,arrayViews s,unboxedDoubles s))
+      before <- gets (\s -> (scalarRanges s,arrayViews s,unboxedDoubles s,forcedValues s))
       yes <- fresh "tail.yes."; no <- fresh "tail.no."
       emit ("  br i1 " ++ condition ++ ", label %" ++ yes ++ ", label %" ++ no)
       label yes
       refineNumeric scope c True
       executeNumericReturn modes scope a
-      let (ranges,views,doubles) = before
-      modify' (\s -> s { scalarRanges = ranges, arrayViews = views, unboxedDoubles = doubles })
+      let (ranges,views,doubles,forced) = before
+      modify' (\s -> s { scalarRanges = ranges, arrayViews = views, unboxedDoubles = doubles, forcedValues = forced })
       label no
       refineNumeric scope c False
       executeNumericReturn modes scope b
@@ -618,8 +679,8 @@ scalarValue scope expression = case expression of
     (X.EConstructor c,args) | not (null args) -> do
       values <- mapM (scalarValue scope >=> boxed) args
       (tag,arity) <- lookupConstructor c
-      if arity == length args && arity <= 2 then
-        Boxed <$> call ("@mlf_constructor" ++ show arity) (number tag : map pointer values)
+      if arity == length args then
+        Boxed <$> constructorValue tag values
       else do
         constructor <- call "@mlf_constructor" [number tag,number arity]
         Boxed <$> foldM (\f a -> call "@mlf_application" [pointer f,pointer a] >>= \v ->
@@ -852,7 +913,7 @@ numericInteger p a b = do
 -- one memoized callback, rather than a heap application at every syntax node.
 thunk :: Scope -> X.Erased -> Build String
 thunk scope expression = case expression of
-  X.EVar n -> operand <$> lookupName scope n
+  X.EVar n -> lookupName scope n >>= bindingOperand
   X.EInt _ -> evaluate scope expression
   X.EDouble _ -> evaluate scope expression
   X.EBool _ -> evaluate scope expression
@@ -917,49 +978,268 @@ evaluate scope expression = case expression of
       hole <- operand <$> lookupName recursive n
       emit ("  call void @mlf_fill(ptr " ++ hole ++ ", ptr " ++ value ++ ")")
     evaluate recursive body
-  X.ECase scrutinee alternatives -> case alternatives of
-    [X.ErasedAlternative (X.DefaultPattern name) body] -> do
-      value <- thunk scope scrutinee
-      evaluate (maybe scope (\n -> Map.insert n (Binding value False) scope) name) body
-    _ -> do
-      value <- evaluate scope scrutinee
-      tag <- constructorTag value
-      labelled <- forM alternatives $ \a -> (,) <$> fresh "case." <*> pure a
-      missing <- fresh "case.missing."
-      join <- fresh "case.join."
-      let fallback = case [l | (l,X.ErasedAlternative (X.DefaultPattern _) _) <- labelled] of
-            l:_ -> l
-            [] -> missing
-      entries <- forM [(l,c) | (l,X.ErasedAlternative (X.ConstructorPattern c _) _) <- labelled] $ \(l,c) -> do
-        (identity,_) <- lookupConstructor c
-        pure ("    i64 " ++ show identity ++ ", label %" ++ l)
-      emit ("  switch i64 " ++ tag ++ ", label %" ++ fallback ++ " [")
-      mapM_ emit entries
-      emit "  ]"
-      incoming <- forM labelled $ \(l,X.ErasedAlternative pattern' body) -> do
-        label l
-        local <- case pattern' of
-          X.DefaultPattern name -> pure (maybe scope (\n -> Map.insert n (Binding value True) scope) name)
-          X.ConstructorPattern c names -> do
-            (_,arity) <- lookupConstructor c
-            foldM (\env (index,name) -> case name of
-              Nothing -> pure env
-              Just n -> do
-                field <- if arity <= 2 then loadAt "ptr" value (32 + 8*index) else
-                  call "@mlf_field" [pointer value,number index]
-                pure (Map.insert n (Binding field False) env)) scope (zip [0..] names)
-        v <- evaluate local body
-        from <- gets block
-        emit ("  br label %" ++ join)
-        pure (v,from)
-      when (fallback == missing) $ do
-        label missing
-        emit "  call void @mlf_match_failure()"
-        emit "  unreachable"
-      label join
-      phi "ptr" incoming
+  X.ECase scrutinee alternatives -> evaluateCase evaluate scope scrutinee alternatives
   X.EApp _ _ -> application scope expression
   X.EEvidenceHole _ -> lift (Left "LLVM unresolved dictionary evidence")
+
+-- Both ordinary evaluation and ST execution share pattern binding, field
+-- liveness and dominance-safe cache isolation. The body continuation chooses
+-- whether the checked branch computes a value or executes an ST action.
+evaluateCase :: (Scope -> X.Erased -> Build String) -> Scope -> X.Erased -> [X.ErasedAlternative] -> Build String
+evaluateCase finish scope scrutinee alternatives = case alternatives of
+  [X.ErasedAlternative (X.DefaultPattern name) body] -> do
+    value <- thunk scope scrutinee
+    finish (maybe scope (\n -> Map.insert n (Binding value False) scope) name) body
+  _ -> do
+    value <- evaluate scope scrutinee
+    tag <- constructorTag value
+    labelled <- forM alternatives $ \a -> (,) <$> fresh "case." <*> pure a
+    missing <- fresh "case.missing."
+    join <- fresh "case.join."
+    let fallback = case [l | (l,X.ErasedAlternative (X.DefaultPattern _) _) <- labelled] of
+          l:_ -> l
+          [] -> missing
+    entries <- forM [(l,c) | (l,X.ErasedAlternative (X.ConstructorPattern c _) _) <- labelled] $ \(l,c) -> do
+      (identity,_) <- lookupConstructor c
+      pure ("    i64 " ++ show identity ++ ", label %" ++ l)
+    emit ("  switch i64 " ++ tag ++ ", label %" ++ fallback ++ " [")
+    mapM_ emit entries
+    emit "  ]"
+    forcedBefore <- gets forcedValues
+    incoming <- forM labelled $ \(l,X.ErasedAlternative pattern' body) -> do
+      modify' (\s -> s { forcedValues = forcedBefore })
+      label l
+      local <- caseScope scope value pattern' body
+      v <- finish local body
+      from <- gets block
+      emit ("  br label %" ++ join)
+      pure (v,from)
+    when (fallback == missing) $ do
+      label missing
+      emit "  call void @mlf_match_failure()"
+      emit "  unreachable"
+    label join
+    modify' (\s -> s { forcedValues = forcedBefore })
+    phi "ptr" incoming
+
+caseScope :: Scope -> String -> X.Pattern -> X.Erased -> Build Scope
+caseScope scope value pattern' body = case pattern' of
+  X.DefaultPattern name -> pure (maybe scope (\n -> Map.insert n (Binding value True) scope) name)
+  X.ConstructorPattern c names -> do
+    (_,arity) <- lookupConstructor c
+    fs <- gets functions
+    facts <- gets constructorFacts
+    let flags = Map.findWithDefault [] c facts
+        needed = A.needed fs body
+        fields = [(index,n) | (index,Just n) <- zip [0..] names, Set.member n needed]
+    if null fields then pure scope else do
+      -- Checked cases already have a saturated WHNF. General fields
+      -- live in one immutable environment; fetching them stays lazy.
+      header <- gets objectHeaderBytes
+      base <- if arity <= 2 || header == 0 then pure value else loadAt "ptr" value 40
+      let offset = if arity <= 2 then 32 else if header == 0 then 40 else 24
+      foldM (\env (index,n) -> do
+        field <- loadAt "ptr" base (offset + 8*index)
+        pure (Map.insert n (Binding field (index < length flags && flags !! index)) env)) scope fields
+
+-- Entered only where checked runST/STBind requires an ST action. Results
+-- remain lazy; the enclosing runST is the only boundary that demands WHNF.
+-- Existing worker/let demands are preserved: those values were already needed
+-- to produce the action description. This retains StrictFields' canonical-slot
+-- proof; inlining a bind only gives its unknown result the ordinary lazy scope.
+executeST :: String -> Scope -> X.Erased -> Build String
+executeST fuel scope expression = case expression of
+  -- A single-use action alias introduced by beta reduction must stay in the
+  -- execution context. Replacing only the bind's action slot preserves its
+  -- sharing, effect order and the laziness of the continuation and result.
+  X.ELet n action (X.EApp (X.EApp (X.EPrimitive P.STBind) (X.EVar use)) next)
+    | n == use && Set.notMember n (free next) ->
+        executeST fuel scope (X.EApp (X.EApp (X.EPrimitive P.STBind) action) next)
+  X.ELet n action (X.EVar use) | n == use -> executeST fuel scope action
+  X.ELet n rhs body -> do
+    fs <- gets functions
+    if Map.member n fs then executeST fuel scope body else do
+      let strict = Set.member n (A.demanded fs body)
+      value <- if strict then evaluate scope rhs else thunk scope rhs
+      executeST fuel (Map.insert n (Binding value strict) scope) body
+  X.ELetRec bindings body -> do
+    fs <- gets functions
+    let values = [(n,a) | (n,a) <- bindings, Map.notMember n fs]
+    holes <- forM values $ \(n,_) -> do
+      hole <- call "@mlf_hole" []
+      pure (n,Binding hole False)
+    let recursive = Map.union (Map.fromList holes) scope
+    forM_ values $ \(n,rhs) -> do
+      value <- thunk recursive rhs
+      hole <- operand <$> lookupName recursive n
+      emit ("  call void @mlf_fill(ptr " ++ hole ++ ", ptr " ++ value ++ ")")
+    executeST fuel recursive body
+  X.ECase scrutinee alternatives -> evaluateCase (executeST fuel) scope scrutinee alternatives
+  _ -> do
+    fs <- gets functions
+    case applications expression of
+      (X.EPrimitive P.STReturn,[value]) -> thunk scope value
+      (X.EPrimitive P.STBind,[action,next]) -> do
+        value <- executeST fuel scope action
+        case next of
+          X.EAbs n body -> executeST fuel (Map.insert n (Binding value False) scope) body
+          _ -> do
+            continuation <- thunk scope next
+            following <- call "@mlf_application" [pointer continuation,pointer value]
+            call "@mlf_execute_st_lazy" [pointer following]
+      (X.EPrimitive P.IfThenElse,[condition,yes,no]) -> do
+        value <- evaluate scope condition
+        test <- result ("icmp eq ptr " ++ value ++ ", " ++ immediate 6)
+        choose "ptr" test (executeST fuel scope yes) (executeST fuel scope no)
+      (X.EPrimitive P.Seq,[first,next]) -> do
+        _ <- evaluate scope first
+        executeST fuel scope next
+      (X.EVar n,args) | Just f <- Map.lookup n fs, length args == length (A.parameters f) -> do
+        symbol <- stateWorker n f
+        captures <- forM (A.captures f) $ \name -> lookupName scope name >>= \binding ->
+          if Set.member name (A.strict f) then forceBinding binding else bindingOperand binding
+        arguments <- forM (zip (A.parameters f) args) $ \(name,argument) ->
+          if Set.member name (A.strict f) then evaluate scope argument else thunk scope argument
+        call symbol (("i64 " ++ fuel) : map pointer (captures ++ arguments))
+      (X.EPrimitive p,args)
+        | Just (symbol,strict) <- lookup p stateHelpers, length args == length strict -> do
+            -- Execute operand demands here, after preceding state operations.
+            -- Initial and written cell values remain lazy.
+            values <- forM (zip strict args) $ \(demanded,argument) ->
+              if demanded then evaluate scope argument else thunk scope argument
+            call symbol (map pointer values)
+      _ -> do
+        action <- evaluate scope expression
+        call "@mlf_execute_st_lazy" [pointer action]
+  where
+    stateHelpers = [(P.NewSTArray,("@mlf_st_new_array",[True,False])),
+      (P.ReadSTArray,("@mlf_st_read_array",[True,True])),
+      (P.WriteSTArray,("@mlf_st_write_array",[True,True,False])),
+      (P.LengthSTArray,("@mlf_st_length_array",[True]))]
+
+-- Tail transfers keep the caller's fuel: they replace a frame, whereas
+-- non-tail calls spend one unit. A musttail call is used only for identical
+-- all-pointer worker signatures; other calls retain the bounded fallback.
+executeSTTail :: Int -> String -> String -> Scope -> X.Erased -> Build ()
+executeSTTail arity tailFuel fuel scope expression = case expression of
+  X.ELet n action (X.EApp (X.EApp (X.EPrimitive P.STBind) (X.EVar use)) next)
+    | n == use && Set.notMember n (free next) ->
+        finish scope (X.EApp (X.EApp (X.EPrimitive P.STBind) action) next)
+  X.ELet n action (X.EVar use) | n == use -> finish scope action
+  X.ELet n rhs body -> do
+    fs <- gets functions
+    if Map.member n fs then finish scope body else do
+      let strict = Set.member n (A.demanded fs body)
+      value <- if strict then evaluate scope rhs else thunk scope rhs
+      finish (Map.insert n (Binding value strict) scope) body
+  X.ELetRec bindings body -> do
+    fs <- gets functions
+    let values = [(n,a) | (n,a) <- bindings, Map.notMember n fs]
+    holes <- forM values $ \(n,_) -> do
+      hole <- call "@mlf_hole" []
+      pure (n,Binding hole False)
+    let recursive = Map.union (Map.fromList holes) scope
+    forM_ values $ \(n,rhs) -> do
+      value <- thunk recursive rhs
+      hole <- operand <$> lookupName recursive n
+      emit ("  call void @mlf_fill(ptr " ++ hole ++ ", ptr " ++ value ++ ")")
+    finish recursive body
+  X.ECase scrutinee alternatives -> finishCase finish scope scrutinee alternatives
+  _ -> do
+    fs <- gets functions
+    case applications expression of
+      (X.EPrimitive P.STBind,[action,X.EAbs n body]) -> do
+        value <- executeST fuel scope action
+        finish (Map.insert n (Binding value False) scope) body
+      (X.EPrimitive P.IfThenElse,[condition,yes,no]) -> do
+        value <- evaluate scope condition
+        test <- result ("icmp eq ptr " ++ value ++ ", " ++ immediate 6)
+        finishChoice test (finish scope yes) (finish scope no)
+      (X.EPrimitive P.Seq,[first,next]) -> do
+        _ <- evaluate scope first
+        finish scope next
+      (X.EVar n,args) | Just f <- Map.lookup n fs,
+          length args == length (A.parameters f),
+          length (A.captures f) + length args == arity -> do
+        symbol <- stateWorker n f
+        captures <- forM (A.captures f) $ \name -> lookupName scope name >>= \binding ->
+          if Set.member name (A.strict f) then forceBinding binding else bindingOperand binding
+        arguments <- forM (zip (A.parameters f) args) $ \(name,argument) ->
+          if Set.member name (A.strict f) then evaluate scope argument else thunk scope argument
+        value <- result ("musttail call ptr " ++ symbol ++ "(" ++
+          intercalate ", " (("i64 " ++ tailFuel) : map pointer (captures ++ arguments)) ++ ")")
+        emit ("  ret ptr " ++ value)
+      _ -> do
+        value <- executeST fuel scope expression
+        emit ("  ret ptr " ++ value)
+  where
+    finish = executeSTTail arity tailFuel fuel
+
+finishChoice :: String -> Build () -> Build () -> Build ()
+finishChoice condition yes no = do
+  saved <- get
+  yesLabel <- fresh "yes."
+  noLabel <- fresh "no."
+  emit ("  br i1 " ++ condition ++ ", label %" ++ yesLabel ++ ", label %" ++ noLabel)
+  label yesLabel
+  yes
+  modify' (\s -> s { scalarRanges = scalarRanges saved, arrayViews = arrayViews saved,
+    unboxedDoubles = unboxedDoubles saved, forcedValues = forcedValues saved })
+  label noLabel
+  no
+
+finishCase :: (Scope -> X.Erased -> Build ()) -> Scope -> X.Erased -> [X.ErasedAlternative] -> Build ()
+finishCase finish scope scrutinee alternatives = case alternatives of
+  [X.ErasedAlternative (X.DefaultPattern name) body] -> do
+    value <- thunk scope scrutinee
+    finish (maybe scope (\n -> Map.insert n (Binding value False) scope) name) body
+  _ -> do
+    value <- evaluate scope scrutinee
+    tag <- constructorTag value
+    labelled <- forM alternatives $ \a -> (,) <$> fresh "case." <*> pure a
+    missing <- fresh "case.missing."
+    let fallback = case [l | (l,X.ErasedAlternative (X.DefaultPattern _) _) <- labelled] of
+          l:_ -> l
+          [] -> missing
+    entries <- forM [(l,c) | (l,X.ErasedAlternative (X.ConstructorPattern c _) _) <- labelled] $ \(l,c) -> do
+      (identity,_) <- lookupConstructor c
+      pure ("    i64 " ++ show identity ++ ", label %" ++ l)
+    emit ("  switch i64 " ++ tag ++ ", label %" ++ fallback ++ " [")
+    mapM_ emit entries
+    emit "  ]"
+    saved <- get
+    forM_ labelled $ \(l,X.ErasedAlternative pattern' body) -> do
+      modify' (\s -> s { scalarRanges = scalarRanges saved, arrayViews = arrayViews saved,
+        unboxedDoubles = unboxedDoubles saved, forcedValues = forcedValues saved })
+      label l
+      local <- caseScope scope value pattern' body
+      finish local body
+    when (fallback == missing) $ do
+      label missing
+      emit "  call void @mlf_match_failure()"
+      emit "  unreachable"
+
+stateWorker :: X.Name -> A.Function -> Build String
+stateWorker name function = do
+  let symbol = "@mlf.st.worker." ++ show (X.nameId name)
+      names = A.captures function ++ A.parameters function
+      registers = ["%a" ++ show i | i <- [0 :: Int .. length names - 1]]
+  seen <- gets (Set.member name . stateWorkers)
+  unless seen $ do
+    modify' (\out -> out { stateWorkers = Set.insert name (stateWorkers out) })
+    let scope = Map.fromList [(n,Binding register (Set.member n (A.strict function))) | (n,register) <- zip names registers]
+    -- Bound native continuations even for non-tail recursive state programs.
+    -- Exhaustion continues with the generic executor's explicit stack; it is
+    -- an execution strategy change, never a limit on the user's computation.
+    definitionBody symbol ("i64 %st.fuel" : map pointer registers) $ do
+      exhausted <- result "icmp eq i64 %st.fuel, 0"
+      finishChoice exhausted
+        (do action <- evaluate scope (A.functionBody function)
+            value <- call "@mlf_execute_st_lazy" [pointer action]
+            emit ("  ret ptr " ++ value))
+        (do fuel <- result "sub i64 %st.fuel, 1"
+            executeSTTail (length names) "%st.fuel" fuel scope (A.functionBody function))
+  pure symbol
 
 application :: Scope -> X.Erased -> Build String
 application scope expression = do
@@ -968,9 +1248,15 @@ application scope expression = do
     (X.EVar n,args) | Just f <- Map.lookup n fs, length args == length (A.parameters f) -> invoke scope n f args
     (X.EPrimitive P.IfThenElse,[c,a,b]) -> do
       condition <- evaluate scope c
-      truth <- result ("call i64 @mlf_truth(ptr " ++ condition ++ ")")
-      test <- result ("icmp ne i64 " ++ truth ++ ", 0")
+      -- Checked Bool values in WHNF use the canonical immediates 2 and 6.
+      test <- result ("icmp eq ptr " ++ condition ++ ", " ++ immediate 6)
       choose "ptr" test (evaluate scope a) (evaluate scope b)
+    (X.EPrimitive P.RunST,[action]) -> do
+      value <- executeST "512" scope action
+      forceBinding (Binding value False)
+    (X.EPrimitive P.Seq,[a,b]) -> do
+      _ <- evaluate scope a
+      evaluate scope b
     (X.EPrimitive p,args) | length args == A.primitiveArity p -> do
       let strict = P.primitiveStrict p
       values <- mapM (if strict then evaluate scope else thunk scope) args
@@ -979,6 +1265,7 @@ application scope expression = do
       else case (p,values) of
         (P.AddInt,[a,b]) -> integerOperation p a b
         (P.SubInt,[a,b]) -> integerOperation p a b
+        (_, [a,b]) | p `elem` [P.MulInt,P.QuotInt,P.RemInt] -> numericProduct p a b
         (P.EqInt,[a,b]) -> integerOperation p a b
         (P.LtInt,[a,b]) -> integerOperation p a b
         (P.SqrtDouble,[a]) -> do
@@ -990,9 +1277,9 @@ application scope expression = do
         _ -> call ("@mlf_prim" ++ show (length args)) (number (primitiveCode p) : map pointer values)
     (X.EConstructor c,args) -> do
       (tag,arity) <- lookupConstructor c
-      if arity <= 2 && length args == arity then do
+      if length args == arity then do
         fields <- mapM (thunk scope) args
-        call ("@mlf_constructor" ++ show arity) (number tag : map pointer fields)
+        constructorValue tag fields
       else generic
     _ -> generic
   where
@@ -1012,6 +1299,8 @@ choose ty condition yes no = do
   before <- gets scalarRanges
   viewsBefore <- gets arrayViews
   doublesBefore <- gets unboxedDoubles
+  -- Values first forced in either arm do not dominate the other arm or join.
+  forcedBefore <- gets forcedValues
   yesLabel <- fresh "yes."
   noLabel <- fresh "no."
   join <- fresh "join."
@@ -1024,7 +1313,7 @@ choose ty condition yes no = do
   doublesYes <- gets unboxedDoubles
   emit ("  br label %" ++ join)
   label noLabel
-  modify' (\s -> s { scalarRanges = before, arrayViews = viewsBefore, unboxedDoubles = doublesBefore })
+  modify' (\s -> s { scalarRanges = before, arrayViews = viewsBefore, unboxedDoubles = doublesBefore, forcedValues = forcedBefore })
   b <- no
   bBlock <- gets block
   afterNo <- gets scalarRanges
@@ -1035,18 +1324,21 @@ choose ty condition yes no = do
   modify' (\s -> s { scalarRanges = Map.intersectionWith
     (\(lo,hi) (lo',hi') -> (min lo lo',max hi hi')) afterYes afterNo,
     arrayViews = Map.filterWithKey (\key value -> Map.lookup key viewsNo == Just value) viewsYes,
-    unboxedDoubles = Map.filterWithKey (\key value -> Map.lookup key doublesNo == Just value) doublesYes })
+    unboxedDoubles = Map.filterWithKey (\key value -> Map.lookup key doublesNo == Just value) doublesYes,
+    forcedValues = forcedBefore })
   value <- phi ty [(a,aBlock),(b,bBlock)]
   when (ty == "ptr") $ case (Map.lookup a afterYes,Map.lookup b afterNo) of
     (Just (lo,hi),Just (lo',hi')) -> recordRange value (min lo lo',max hi hi')
     _ -> pure ()
   pure value
 
+-- Offsets use the standard header as origin; compact GC omits its 16 bytes.
 -- Layout is a small explicit 64-bit ABI, asserted by the runtime. Typed,
 -- evaluated constructor cases cannot scrutinize partial constructors.
 loadAt :: String -> String -> Int -> Build String
 loadAt ty value offset = do
-  address <- result ("getelementptr i8, ptr " ++ value ++ ", i64 " ++ show offset)
+  header <- gets objectHeaderBytes
+  address <- result ("getelementptr i8, ptr " ++ value ++ ", i64 " ++ show (offset + header - 16))
   result ("load " ++ ty ++ ", ptr " ++ address ++ ", align 8, !tbaa !3")
 
 -- Reuse descriptor loads only along dominated paths within this function.
@@ -1139,10 +1431,20 @@ primitiveCode p = case p of
   P.ByteArrayFromString -> 39; P.PutBytes -> 40
   P.GetByteLine -> 41; P.NewIntTable -> 42; P.ReadIntTable -> 43; P.WriteIntTable -> 44
   P.AndInt -> 45
+  P.StringLength -> 46; P.StringCodeAt -> 47; P.StringSlice -> 48; P.StringFromCode -> 49
+  P.CompareString -> 50; P.ReadDouble -> 51; P.DoubleToBits -> 52; P.DoubleFromBits -> 53
+  P.Seq -> 54; P.Panic -> 55; P.ReadFile -> 56; P.WriteFile -> 57; P.FileExists -> 58
+  P.CanonicalPath -> 59; P.GetArgCount -> 60; P.GetArg -> 61; P.PutErr -> 62; P.ExitWith -> 63
+  P.GetExecutablePath -> 64; P.GetContents -> 65
+  P.STReturn -> 66; P.STBind -> 67; P.RunST -> 68
+  P.NewSTArray -> 69; P.ReadSTArray -> 70; P.WriteSTArray -> 71; P.LengthSTArray -> 72
 
 runtimeDeclarations :: [String]
 runtimeDeclarations =
-  [ "declare ptr @mlf_env_new(i64)", "declare void @mlf_env_set(ptr, i64, ptr)"
+  [ "declare ptr @mlf_execute_st_lazy(ptr)"
+  , "declare ptr @mlf_st_new_array(ptr, ptr)", "declare ptr @mlf_st_read_array(ptr, ptr)"
+  , "declare ptr @mlf_st_write_array(ptr, ptr, ptr)", "declare ptr @mlf_st_length_array(ptr)"
+  , "declare ptr @mlf_env_new(i64)", "declare void @mlf_env_set(ptr, i64, ptr)"
   , "declare ptr @mlf_env_get(ptr, i64)", "declare ptr @mlf_thunk(ptr, ptr)"
   , "declare ptr @mlf_closure(ptr, ptr)", "declare ptr @mlf_application(ptr, ptr)"
   , "declare ptr @mlf_hole()", "declare void @mlf_fill(ptr, ptr)"
@@ -1167,9 +1469,12 @@ runtimeDeclarations =
   , "declare ptr @mlf_sub_int(ptr, ptr)", "declare ptr @mlf_eq_int(ptr, ptr)"
   , "declare ptr @mlf_lt_int(ptr, ptr)", "declare ptr @mlf_constructor(i64, i64)"
   , "declare ptr @mlf_constructor1(i64, ptr)", "declare ptr @mlf_constructor2(i64, ptr, ptr)"
+  , "declare ptr @mlf_constructor_fields(i64, ptr)"
+  , "declare ptr @mlf_constructor_new(i64, i64)"
   , "declare ptr @mlf_field(ptr, i64)", "declare void @mlf_match_failure() noreturn"
   , "declare { i64, i1 } @llvm.sadd.with.overflow.i64(i64, i64)"
   , "declare { i64, i1 } @llvm.smul.with.overflow.i64(i64, i64)"
   , "declare { i64, i1 } @llvm.ssub.with.overflow.i64(i64, i64)"
+  , "declare void @mlf_set_args(i32, ptr)"
   , "declare i32 @mlf_run(ptr, i64)", ""
   ]

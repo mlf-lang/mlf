@@ -1,0 +1,9 @@
+allocation histories: 182
+old updates, aliases, gaps and zero allocation: ok
+unused binder: ok
+alias binder: ok
+bound is root: ok
+unused compound bound: ok
+existing root: ok
+existing root and unused bound: ok
+shared old child: ok

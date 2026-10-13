@@ -1,0 +1,5 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Graph as G
+import qualified Bootstrap.Graph.Solver as Solver
+main = G.nextId G.emptyGraph

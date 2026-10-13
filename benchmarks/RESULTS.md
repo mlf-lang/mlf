@@ -1,47 +1,52 @@
-# Cross-language benchmarks after module support: 2026-10-09
+# Native MLF stage 1 benchmarks: 2026-10-13
 
-All **nine workloads pass the 5x C compilation and 2x C runtime limits**
-with the module-aware compiler. At the existing default inputs on this machine,
-the largest compilation ratio is **4.11x** (fasta);
-the largest runtime ratio is **1.90x** (reverse-complement).
-Every timing input passes the independent correctness oracle in C, Rust,
-Haskell and MLF.
+All **nine workloads pass the 5x C compilation and 2x C runtime limits** using
+**the compiler written in MLF**. The largest compilation ratio is **4.762x**
+(n-body); the largest runtime ratio is **1.876x** (reverse-complement).
+
+The measured executable is native stage 1, built from `bootstrap/Main.emlf` by
+the Haskell seed. It performs source parsing, inference, checked xMLF elaboration
+and LLVM generation itself. Timed workload binaries use the ordinary runtime.
+The [preceding report](results/2026-10-09-bootstrap-macos-arm64.json) measured
+the Haskell seed; its timing results are not substituted for native compilation.
 
 ```sh
-cabal bench compiler-bench -j1 --benchmark-options='--runs 5 --max-compile-ratio 5 --max-runtime-ratio 2 --output benchmarks/results/2026-10-09-modules-macos-arm64.json'
+cabal bench compiler-bench -j1 --benchmark-options='--emlf /Volumes/src/mlf/dist-newstyle/bootstrap-stage1-final/emlf-stage1 --runs 5 --max-compile-ratio 5 --max-runtime-ratio 2 --output benchmarks/results/2026-10-13-stage1-final-macos-arm64.json'
 ```
 
-The [archived report](results/2026-10-09-modules-macos-arm64.json)
-contains **180 fresh compilation samples and 180 runtime samples**, preparation
-and post-build correctness checks, exact commands, source/library/tool hashes,
-CPU time, peak RSS and executable sizes. All recorded input hashes remained
-unchanged. All **18 per-workload performance checks passed**; geometric means
-are descriptive and do not substitute for an individual workload passing.
+The [archived report](results/2026-10-13-stage1-final-macos-arm64.json) contains
+**180 fresh compilation samples and 180 runtime samples**, independent
+correctness checks before timing and after every fresh build, exact commands,
+source/library/tool hashes, CPU time, peak RSS and executable sizes. All recorded
+input hashes remained unchanged; all **18 per-workload limits** passed.
+Geometric means do not substitute for individual workloads passing.
 
 ## Compilation
 
 Wall-clock medians in milliseconds. MLF total includes checked eMLF -> xMLF
 -> LLVM emission, IR writes, compiling the complete C runtime afresh and linking.
-The LLVM emission column measures the compiler subprocess and is already
-included in the total. Compiler, dependency and harness builds are excluded.
+The general [native build driver](../scripts/compile_native.py) overlaps the
+frontend with fresh runtime compilation, then compiles and links the LLVM IR.
+At most two compiler processes overlap within a build; samples and languages
+run serially. No emitted LLVM or runtime object is reused between samples.
+The LLVM emission column is the frontend subprocess and is included in total.
+Compiler, dependency and harness builds are outside the measured regions.
 
 | Workload | C | Rust | Haskell | MLF emit LLVM | MLF total | MLF/C |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| binary-trees | 145.47 | 160.68 | 435.39 | 63.70 | 380.62 | 2.62x |
-| pidigits | 148.91 | 136.29 | 436.68 | 53.75 | 367.99 | 2.47x |
-| n-body | 158.17 | 148.33 | 499.68 | 205.03 | 618.71 | 3.91x |
-| fannkuch-redux | 154.49 | 196.39 | 474.33 | 97.87 | 485.10 | 3.14x |
-| spectral-norm | 155.23 | 164.69 | 539.75 | 98.09 | 433.59 | 2.79x |
-| fasta | 158.44 | 177.16 | 484.54 | 177.96 | 650.46 | 4.11x |
-| mandelbrot | 147.80 | 178.47 | 448.92 | 95.85 | 475.57 | 3.22x |
-| reverse-complement | 148.21 | 153.30 | 493.96 | 116.69 | 540.34 | 3.65x |
-| k-nucleotide | 167.04 | 230.39 | 1004.50 | 188.59 | 603.41 | 3.61x |
+| binary-trees | 142.92 | 159.89 | 433.68 | 133.42 | 411.72 | 2.881x |
+| pidigits | 147.51 | 133.63 | 433.36 | 117.55 | 412.44 | 2.796x |
+| n-body | 159.32 | 146.83 | 484.98 | 533.70 | 758.62 | 4.762x |
+| fannkuch-redux | 150.80 | 193.46 | 464.43 | 262.18 | 483.00 | 3.203x |
+| spectral-norm | 151.32 | 163.73 | 533.42 | 249.65 | 436.85 | 2.887x |
+| fasta | 153.49 | 171.90 | 484.90 | 465.78 | 729.56 | 4.753x |
+| mandelbrot | 140.58 | 174.23 | 443.87 | 248.80 | 472.11 | 3.358x |
+| reverse-complement | 144.07 | 151.88 | 491.66 | 295.57 | 530.42 | 3.682x |
+| k-nucleotide | 166.29 | 229.41 | 982.52 | 487.19 | 711.89 | 4.281x |
 
-Geometric mean of MLF/C compilation ratios: **3.23x**.
-The median sum of nine fresh MLF compilations is
-**4.570 s**, versus **1.383 s** for C.
-These sums include a new compiler process for every program; they do not
-isolate persistent-compiler throughput.
+Geometric mean of MLF/C compilation ratios: **3.549x**.
+Median sum of nine fresh compilations: **4.947 s** for MLF and
+**1.358 s** for C. Each compilation starts a fresh process.
 
 ## Runtime
 
@@ -52,80 +57,83 @@ reading the resulting stdin bytes is timed.
 
 | Workload | Input | C | Rust | Haskell | MLF | MLF/C |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| binary-trees | 16 | 0.33895 | 0.40501 | 0.13019 | 0.34678 | 1.02x |
-| pidigits | 10,000 | 0.36449 | 0.36759 | 0.48648 | 0.42555 | 1.17x |
-| n-body | 2,000,000 | 0.10695 | 0.10568 | 0.12695 | 0.12022 | 1.12x |
-| fannkuch-redux | 10 | 0.21262 | 0.16021 | 0.23333 | 0.23079 | 1.09x |
-| spectral-norm | 2,000 | 0.20147 | 0.27829 | 0.88114 | 0.16188 | 0.80x |
-| fasta | 2,000,000 | 0.20953 | 0.24163 | 0.38777 | 0.33061 | 1.58x |
-| mandelbrot | 4,096 | 0.93247 | 0.21964 | 0.99632 | 0.63194 | 0.68x |
-| reverse-complement | 10,000,000 | 0.13990 | 0.08008 | 0.38199 | 0.26578 | 1.90x |
-| k-nucleotide | 1,000,000 | 0.17550 | 1.49416 | 1.81986 | 0.28307 | 1.61x |
+| binary-trees | 16 | 0.33955 | 0.40532 | 0.12687 | 0.28742 | 0.846x |
+| pidigits | 10,000 | 0.36363 | 0.36601 | 0.48198 | 0.41496 | 1.141x |
+| n-body | 2,000,000 | 0.10668 | 0.10566 | 0.12638 | 0.11937 | 1.119x |
+| fannkuch-redux | 10 | 0.21139 | 0.16037 | 0.23192 | 0.22981 | 1.087x |
+| spectral-norm | 2,000 | 0.20139 | 0.27754 | 0.87670 | 0.16153 | 0.802x |
+| fasta | 2,000,000 | 0.21044 | 0.24145 | 0.38273 | 0.33410 | 1.588x |
+| mandelbrot | 4,096 | 0.93338 | 0.22023 | 0.98915 | 0.63220 | 0.677x |
+| reverse-complement | 10,000,000 | 0.13902 | 0.07680 | 0.37961 | 0.26079 | 1.876x |
+| k-nucleotide | 1,000,000 | 0.17015 | 1.48676 | 1.80226 | 0.28199 | 1.657x |
 
-Geometric mean of MLF/C runtime ratios: **1.16x**.
-The harness flags reverse-complement/Rust below 100 ms; startup can materially
-affect that particular comparison. Every C and MLF median exceeds 100 ms.
+Geometric mean of MLF/C runtime ratios: **1.136x**.
+All C and MLF runtime medians exceed 100 ms. The harness flags the shorter
+reverse-complement/Rust measurement, where startup can materially affect the ratio.
 
-## Source and compiler changes
+## Compiler changes and resource tradeoffs
 
-All nine MLF implementations use function declarations, typed recursive
-bindings, layout, conditionals, and infix integer/string operators. Binary-trees
-uses constructor equations and a local `let rec`; k-nucleotide uses literal
-equations. The hand-written `Rec` datatype and `fix` combinator are removed.
+The native compiler now reuses type translation results, traverses dense graph
+state through directly lowered ST operations, and specializes bounded recursive
+higher-order calls. Ordinary integer multiplication and quotient/remainder use
+checked machine arithmetic with the existing unbounded-integer fallback.
+Compact BDWGC objects remove unused ordinary-collector headers and store large
+constructor fields inline. These changes are general compiler/runtime paths;
+the workload sources, algorithms, inputs and optimization flags are unchanged.
+The native build driver also overlaps the independent frontend and runtime
+compilation phases while including both in the measured interval.
 
-The compiler now also supports named modules, export lists, selective and
-qualified imports, aliases, hiding, re-exports, and transitive instances.
-Module-free programs retain the existing inference and backend path. These
-benchmark files remain standalone: this run checks compatibility and performance
-of the new compiler, not the overhead of a large module graph. Multi-file
-behavior is covered by the shared interpreter/LLVM tests and module example.
+The native compiler uses a **512 MiB initial GC heap** and free-space divisor 1.
+This trades memory for compilation speed; the largest observed per-child
+compilation RSS was **532.0 MiB**. The reported RSS is the largest child peak,
+not the sum of simultaneous child memory. CPU time sums all compiler children.
+Automatic collection and IO-boundary collection remain enabled. Environment
+settings can override the initial heap and divisor, and configured heap caps
+are respected. Generated workload programs retain the ordinary pooled runtime.
 
-The algorithms, default inputs, C/Rust/Haskell baselines, flags, and performance
-limits are unchanged. Tree construction still forces both actual children;
-the accumulated tree checks, fannkuch totals, and FASTA counters retain their
-strictness points. Floating-point operations keep their original order and
-constants. Byte buffering, copy loops, the two Mandelbrot orbits, and all seven
-k-mer frequency tables perform the same work. No backend or runtime optimization
-was required for module support.
+The [first native baseline](results/2026-10-11-stage1-baseline-macos-arm64.json)
+failed all nine compilation limits, with a worst ratio of 291.649x C. Later
+checkpoint reports retain unsuccessful candidates and partial measurements.
+These separate runs demonstrate the overall improvement, including scheduling
+and allocation changes; they do not isolate each optimization's contribution.
 
-The [preceding syntax-migration report](results/2026-10-09-readable-syntax-macos-arm64.json)
-records maxima of 4.31x compilation and 1.92x runtime with the same benchmark
-sources. These are separate machine runs, not a paired experiment isolating
-parser or module-loader overhead. The current run establishes the requested
-limits for the recorded compiler and workload sources.
+## Workloads and validation
 
-## Validation
+All **36 workload source hashes** match the preceding Haskell-seed report.
+The MLF programs use declarations, typed recursion, layout, conditionals,
+infix operators and constructor or literal equations. All four languages pass
+the independent oracles for every preparation input and timed execution;
+every fresh compilation also runs a post-build correctness check.
 
-```sh
-cabal test -j1 --test-show-details=direct
-```
+The [archived validation record](results/2026-10-13-stage1-validation.json)
+identifies the same stage 1 executable by SHA-256 and records these passing gates:
 
-All four suites pass: **470 compiler checks**, **43 Figure 12 cases plus
-36 supplementary checks**, **291 shared backend fixtures with 311 execution
-rows x 2 backends**, and **30 benchmark-harness tests**. Snake's 7 sessions
-and 11 rule checks also match the independent Haskell version on both backends.
+- Byte-identical stage 2/3 LLVM, with **7,023 parity cases**: 3,178 accepted and
+  3,845 rejected, plus 59 runtime rows executed on both native backends.
+- **468 rows x 2 backends** in each of three matrices: standard runtime,
+  compact runtime with an 8 MiB initial heap, and native MLF interpreter/LLVM
+  drivers built by stage 1. No executions are missing; the native driver matrix
+  has no fallback to the Haskell implementations.
+- **26 port fixtures x 2 backends**, 564 compiler checks, all 43 Figure 12
+  expressions and 36 supplementary checks, and 36 benchmark-harness tests.
+- Runtime allocation, sharing, collection and state regressions, plus positive
+  and negative ABI link tests. The compact profile also passes collector debug,
+  incremental collection and disabled-interior-pointer checks.
 
-Module tests cover import/export visibility, qualified and private identities,
-re-exports and diamonds, constructor/type/class imports, instance scope,
-Prelude selection, missing files and cycles, search roots, and CLI compilation
-from files, stdin and expressions. CLI xMLF is independently parsed and executed
-on both backends; direct LLVM emission matches xMLF-to-LLVM emission.
-
-The suite executes benchmark regression cases on both the interpreter and
-LLVM backend, checks the pinned fixtures, and audits actual work. The untimed
-tree audit counts every allocated node. The k-nucleotide audit compares writes
-and distinct insertions in all seven tables against independent Python sets.
-Every fresh timed build and every timed runtime output is also checked by the
-benchmark harness.
+The latest fixed-point gate reused matching seed-produced stage 1 LLVM after
+checking its provenance, then freshly compiled stages 2 and 3 and reran all
+parity checks. The stage 2/3 LLVM SHA-256 is
+`2c9a554702c19354688eb849981c2547ae6e204744fec34f38f2f6da3fce1c59`.
+Build and validation commands are documented in [bootstrap/README.md](../bootstrap/README.md).
 
 ## Comparison scope
 
 Host: macOS 26.6.2, ARM64, 10 logical CPUs; Python 3.14.8. Toolchains:
-Clang 23.1.2, rustc 1.99.0, GHC 9.14.1 and GMP 6.3.0. The run spans
-2026-10-08T21:11:29.884457+00:00 to 2026-10-08T21:17:48.122362+00:00.
-The checkout is based on `e5da2c81118a2f9937e06f8c39e5f622fe105efc` with uncommitted
+Clang 23.1.3, rustc 1.99.0, GHC 9.14.1 and GMP 6.3.0. This run spans
+2026-10-13T12:06:16.727474+00:00 to 2026-10-13T12:12:34.044067+00:00.
+The checkout is based on `818c7a0b6a08902f43aad1595cdddc735a3260f0` with uncommitted
 changes; recorded hashes identify the measured inputs. C uses `-O3`, Rust `-O`,
-GHC `-O2`, and MLF's LLVM/runtime pipeline Clang `-O2`. There is no LTO,
-fast-math, explicit SIMD, parallel benchmark worker or cached runtime object.
-System load, thermal state and OS caches are not controlled, so results apply
-to this recorded machine and run.
+GHC `-O2`, and the MLF LLVM/runtime pipeline Clang `-O2`. Compiler/test jobs
+finished before benchmark timing began. OS caches and thermal state are not
+controlled, and these margins are measurements on this host rather than
+performance guarantees for other machines or inputs.

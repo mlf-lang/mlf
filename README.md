@@ -11,7 +11,7 @@ small C runtime for lazy evaluation, algebraic data, and IO.
 
 ## Build and run
 
-The frontend requires GHC and Cabal; no external solver is needed. Tested
+The Haskell seed requires GHC and Cabal; no external solver is needed. Tested
 with GHC 9.14.1. Native linking, `backend-tests`, and `cabal bench` additionally
 require Clang/LLVM 15 or later, GMP development files, and `pkg-config` on
 `PATH`. The benchmark drivers also require Python 3.
@@ -50,6 +50,23 @@ source inference engine. All identifiers in this output carry explicit IDs,
 for example `x_12` and `a27`. These distinguish source shadowing and graph
 sharing; the numbers have no type-theoretic significance.
 
+## Compiler written in MLF
+
+[`bootstrap/Main.emlf`](bootstrap/Main.emlf) implements the compiler in MLF,
+including modules, classes, graph inference, checked elaboration, the xMLF
+checker, interpreter, and LLVM backend. The Haskell compiler supplies the seed
+and independent test oracles. Run the three-stage bootstrap and parity gate with:
+
+```sh
+python3 scripts/bootstrap-compiler.py
+```
+
+The gate requires identical stage 2 and stage 3 LLVM and runs the exported
+language corpus through the native MLF compiler. The bootstrap binaries use a
+locally built, pinned garbage collector for long pure compilation phases.
+See [`bootstrap/README.md`](bootstrap/README.md) for dependencies, validation,
+and artifact locations.
+
 ## Native compilation with LLVM
 
 Compile a saved xMLF program to LLVM IR, then link it with the runtime:
@@ -70,6 +87,19 @@ eMLF directly through the same checked xMLF boundary, use
 `emlf --emit-llvm examples/snake.emlf` or `emlf --emit-llvm --expr 'printInt 42'`.
 Both commands write only LLVM IR to standard output. `--no-prelude` also
 applies to `--emit-llvm`.
+
+To produce an executable in one command, use the native build driver:
+
+```sh
+python3 scripts/compile_native.py --compiler "$EMLF_BIN" examples/snake.emlf -o snake
+```
+
+The driver accepts either the Haskell seed or a native MLF stage, plus `-i`
+and `--no-prelude`. It compiles the complete C runtime afresh while the frontend
+emits LLVM, then compiles and links the LLVM with that runtime object. It uses
+Clang `-O2`, keeps intermediate files in a new temporary directory, and replaces
+the output only after a successful build. `--report FILE` records phase timings
+and commands. The cross-language benchmark uses this same build implementation.
 
 The generated module contains native closure and case functions, `mlf_entry`,
 and `main`. It supports the complete current xMLF term syntax, including
@@ -526,7 +556,8 @@ case structure while removing declarations and type arguments.
 ## Standard prelude
 
 Every compiler entry point imports a small standard prelude from
-[`MLF.Prelude`](src/MLF/Prelude.hs). It supplies this class and its `IO` instance:
+[`MLF.Prelude`](src/MLF/Prelude.hs). It supplies this class, its `IO` instance,
+and an instance for local state, `Monad (ST s)`:
 
 ```haskell
 class Monad (m : * -> *) where {
@@ -557,7 +588,7 @@ available as primitive operations.
 
 In module-free scripts, ordinary lexical bindings and locally declared class
 methods shadow imported method names. A source declaration
-named `Monad` replaces the imported class and its associated `IO` instance,
+named `Monad` replaces the imported class and its associated instances,
 allowing the custom hierarchy in `monad-maybe.emlf`. Duplicate instances for
 the imported class are rejected by the normal overlap check. Named modules use
 the explicit import rules above: hide an imported class or method before
@@ -707,6 +738,43 @@ generic `replace` function uses `get`, `put`, and `do` under a single
 `MonadState s m` constraint; `bind` and `return` are obtained from the `Monad`
 superclass. The complete program compiles to `Pair Int Int`.
 
+## Local mutable state
+
+`ST s a` describes a local computation producing `a`; `STArray s a` is an opaque
+array whose elements can have any type. Both types have kind `* -> * -> *`.
+`runST : forall a. (forall s. ST s a) -> a` runs an action with a fresh state
+scope. Its nested quantifier prevents an array, usable state action, or mutating
+closure from escaping that scope. There is no conversion between `ST` and `IO`.
+
+```haskell
+answer : forall s. ST s Int
+answer = do
+  cells <- newSTArray 2 0
+  writeSTArray cells 1 42
+  readSTArray cells 1
+
+main = printInt (runST answer)
+```
+
+Use the explicit `forall s` action signature with `do`, as above. The current
+dictionary inference does not infer that scope for an inline `runST (do ...)`.
+Direct `stReturn` and `stBind` operations also work without the implicit prelude.
+
+| Operation | Type |
+| --- | --- |
+| `stReturn` | `forall s a. a -> ST s a` |
+| `stBind` | `forall s a b. ST s a -> (a -> ST s b) -> ST s b` |
+| `newSTArray` | `forall s a. Int -> a -> ST s (STArray s a)` |
+| `readSTArray` | `forall s a. STArray s a -> Int -> ST s a` |
+| `writeSTArray` | `forall s a. STArray s a -> Int -> a -> ST s Unit` |
+| `lengthSTArray` | `forall s a. STArray s a -> ST s Int` |
+
+Elements remain lazy and shared. A read captures the value stored when that
+action executes; later writes do not change the captured value. Reusing an
+action repeats its operations. Empty arrays are allowed, and sizes and
+zero-based indices are checked. `runST` demands its final result only to weak
+head normal form, preserving lazy constructor fields.
+
 ## IO and execution
 
 `IO` is an opaque type of kind `* -> *`. An `IO a` value describes an action
@@ -849,8 +917,8 @@ the result. Tests observe action order and failure behavior through both
 backends. The runtime keeps data fields, arguments, lets,
 and recursive dictionaries lazy, while `ioBind` executes actions in order.
 Reusing an action executes it again. There is no pure operation that extracts
-a value from `IO`; file IO, concurrency, and language-level exception handling
-are not implemented.
+a value from `IO`; concurrency and language-level exception handling are not
+implemented.
 
 ## Snake example
 

@@ -1,0 +1,14 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.Primitive as P
+import qualified Bootstrap.Data as D
+
+row : Primitive -> String
+row primitive = case P.primitiveSignature primitive of
+  Pair variables field ->
+    showInt (P.primitiveCode primitive) ++ "\t" ++ P.primitiveName primitive ++ "\t" ++
+    showInt (P.primitiveArity primitive) ++ "\t" ++
+    (if P.primitiveStrict primitive then "strict" else "lazy") ++ "\t" ++
+    D.prettyDeclaration (DataDeclK "Sig" variables (Cons (ConstructorDecl "M" (Cons field Nil)) Nil))
+main = L.mapM_ (\primitive -> putStrLn (row primitive)) P.allPrimitives

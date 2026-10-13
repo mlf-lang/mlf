@@ -1,0 +1,251 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.IntSet as IS
+import qualified Bootstrap.Graph as G
+import qualified Bootstrap.Graph.Solver as Solver
+
+list2 : forall a. a -> a -> List a
+list2 a b = Cons a (Cons b Nil)
+list3 : forall a. a -> a -> a -> List a
+list3 a b c = Cons a (Cons b (Cons c Nil))
+list4 : forall a. a -> a -> a -> a -> List a
+list4 a b c d = Cons a (Cons b (Cons c (Cons d Nil)))
+list5 : forall a. a -> a -> a -> a -> a -> List a
+list5 a b c d e = Cons a (Cons b (Cons c (Cons d (Cons e Nil))))
+
+showKind : Kind -> String
+showKind kind = case kind of
+  Star -> "*"
+  KArrow a b -> "(" ++ showKind a ++ ">" ++ showKind b ++ ")"
+showTag : GTag -> String
+showTag t = case t of
+  GBot -> "b"
+  GBotK k -> "k" ++ showKind k
+  GArr a b -> "a" ++ showInt a ++ "," ++ showInt b
+  GCon c xs -> "c" ++ c ++ "[" ++ L.intercalate "," (L.map showInt xs) ++ "]"
+  GTyCon c k -> "t" ++ c ++ showKind k
+  GSkolem n k -> "s" ++ showInt n ++ showKind k
+  GTyApp a b -> "p" ++ showInt a ++ "," ++ showInt b
+  GGen n -> "g" ++ showInt n
+showNode : Pair Int Node -> String
+showNode (Pair n v) = showInt n ++ ":" ++ showTag (G.tag v) ++ ":" ++
+  (case G.binder v of { Nothing -> "_"; Just b -> showInt b }) ++ ":" ++
+  (case G.flag v of { Flexible -> "f"; Rigid -> "r" }) ++ ";"
+showGraph : Graph -> String
+showGraph graph = L.concatStrings (L.map showNode (IM.toList (G.nodes graph))) ++ "|" ++
+  L.concatStrings (L.map (\entry -> case entry of { Pair n p -> showInt n ++ ":" ++ showInt p ++ ";" }) (IM.toList (G.links graph))) ++ "|" ++ showInt (G.nextId graph)
+
+sameGraph : Graph -> Graph -> Bool
+sameGraph a b = G.nextId a == G.nextId b && IM.eqIntMap G.equalNode (G.nodes a) (G.nodes b) && IM.eqIntMap (\x -> \y -> x == y) (G.links a) (G.links b)
+
+forEachIO : forall a. (a -> IO Unit) -> List a -> IO Unit
+forEachIO action items = case items of
+  Nil -> ioReturn Unit
+  Cons item rest -> ioBind (action item) (\ignored -> forEachIO action rest)
+
+node : Int -> GTag -> Maybe Int -> Flag -> Pair Int Node
+node n t b f = Pair n (Node t b f)
+
+scoped : Graph
+scoped = Graph (IM.fromList (L.append
+  (list5 (node 0 (GGen 1) Nothing Flexible) (node 1 (GCon "Unit" Nil) (Just 0) Rigid)
+    (node 2 (GGen 3) (Just 0) Flexible) (node 3 (GArr 4 5) (Just 2) Rigid) (node 4 GBot (Just 3) Rigid))
+  (list5 (node 5 GBot (Just 3) Flexible) (node 6 (GGen 7) (Just 0) Flexible)
+    (node 7 (GArr 8 9) (Just 6) Flexible) (node 8 GBot (Just 7) Flexible) (node 9 (GCon "Int" Nil) (Just 7) Rigid)))) IM.empty 10
+
+frontier : Graph
+frontier = G.setNode 4 (Node GBot (Just 0) Flexible) scoped
+
+branchParent : Int -> Maybe Int
+branchParent n = if n == 0 then Nothing else if n == 41 then Just 0 else if n == 31 then Just 8 else Just (2 * (n - 1))
+branching : Graph
+branching = Graph (IM.fromList (L.concatMap (\n -> list2
+  (node (2 * n) (GGen (2 * n + 1)) (branchParent n) Flexible)
+  (node (2 * n + 1) GBot (Just (2 * n)) Flexible)) (L.range 0 50))) IM.empty 102
+
+closed : Flag -> Int -> String -> Graph
+closed f b rightName = Graph (IM.fromList (L.append
+  (list5 (node 0 (GGen 1) Nothing Flexible) (node 1 (GCon "Unit" Nil) (Just 0) Rigid)
+    (node 2 (GGen 3) (Just 0) Flexible) (node 3 (GArr 4 4) (Just 2) Flexible) (node 4 GBot (Just b) f))
+  (list4 (node 5 (GGen 6) (Just 0) Flexible) (node 6 (GArr 7 8) (Just 5) Flexible)
+    (node 7 (GCon "Int" Nil) (Just 6) Rigid) (node 8 (GCon rightName Nil) (Just 6) Rigid)))) IM.empty 9
+
+closedGraft : Graph
+closedGraft = Graph (IM.fromList (L.append
+  (list4 (node 0 (GGen 1) Nothing Flexible) (node 1 (GCon "Unit" Nil) (Just 0) Rigid)
+    (node 2 (GGen 3) (Just 0) Flexible) (node 3 (GArr 4 5) (Just 2) Rigid))
+  (list4 (node 4 (GCon "Int" Nil) (Just 3) Rigid) (node 5 (GCon "Bool" Nil) (Just 3) Rigid)
+    (node 6 (GGen 7) (Just 0) Flexible) (node 7 GBot (Just 6) Flexible)))) IM.empty 8
+
+graftChain : Flag -> Graph
+graftChain parentFlag = Graph
+  (IM.insert 9 (Node (GCon "Int" Nil) (Just 8) Rigid)
+  (IM.insert 8 (Node (GArr 7 9) (Just 6) parentFlag)
+  (IM.insert 7 (Node GBot (Just 8) Flexible)
+  (IM.insert 6 (Node (GGen 8) (Just 0) Flexible) (G.nodes closedGraft))))) IM.empty 10
+
+rename : (Int -> Int) -> Graph -> Graph
+rename f graph = Graph
+  (IM.fromList (L.map (\entry -> case entry of { Pair n v -> node (f n) (G.mapTag f (G.tag v)) (G.mapMaybeInt f (G.binder v)) (G.flag v) }) (IM.toList (G.nodes graph))))
+  (IM.fromList (L.map (\entry -> case entry of { Pair n p -> Pair (f n) (f p) }) (IM.toList (G.links graph)))) (f (G.nextId graph))
+
+showIds : IntMap Int -> String
+showIds table = L.concatStrings (L.map (\entry -> case entry of { Pair n p -> showInt n ++ ":" ++ showInt p ++ ";" }) (IM.toList table))
+showPermission : Permission -> String
+showPermission value = case value of
+  Green -> "Green"
+  Orange -> "Orange"
+  Red -> "Red"
+  Inert -> "Inert"
+
+result : String -> Either String Graph -> IO Unit
+result label outcome = putStrLn (label ++ "|" ++ (case outcome of { Left error -> "!"; Right graph -> showGraph graph }))
+
+complete : Either String Solver -> Either String Graph
+complete solver = G.bindE solver Solver.finish
+
+solveEquation : Graph -> Int -> Int -> Either String Graph
+solveEquation graph a b = complete (G.bindE (Solver.prepare graph) (Solver.solverUnify (Cons (Pair a b) Nil)))
+
+checkExpansion : Graph -> IO Unit
+checkExpansion graph = case G.expand 2 0 graph of
+  Left error -> putStrLn "expand|!"
+  Right (Pair (Triple root copies edges) next) -> putStrLn ("expand|" ++ showInt root ++ "|" ++ showIds copies ++ "|" ++ showIds (IM.fromList edges) ++ "|" ++ showGraph next)
+
+checkWitness : Graph -> Int -> IO Unit
+checkWitness graph target = case G.bindE (Solver.prepare graph) (Solver.witness 2 target) of
+  Left error -> putStrLn "witness|!"
+  Right (Pair copies solver) -> case Solver.finish solver of
+    Left error -> panic error
+    Right final -> putStrLn ("witness|" ++ showIds copies ++ "|" ++ showGraph final)
+
+checkInstance : Graph -> Int -> IO Unit
+checkInstance graph target = do
+  result "instance" (complete (G.bindE (Solver.prepare graph) (Solver.instantiate 2 target)))
+  checkWitness graph target
+
+checkSource : Graph -> IO Unit
+checkSource graph = do
+  checkExpansion graph
+  forEachIO (checkInstance graph) (list2 3 8)
+
+points : List Int
+points = L.append (list5 0 1 4 7 15) (list5 30 31 40 41 50)
+
+assert : Bool -> String -> IO Unit
+assert condition message = if condition then ioReturn Unit else panic message
+
+checkDemand : Unit -> IO Unit
+checkDemand unit = do
+  -- A failed demand raises an error, so these checks catch repeated scans
+  -- deterministically without relying on wall-clock limits or a large graph.
+  case G.inertVisit closedGraft (panic "bottom forced the binding index") IM.empty 7 of
+    Pair answer cache -> assert (L.not answer && L.eqMaybe (\a b -> if a then b else L.not b) (IM.lookup 7 cache) (Just false)) "bottom inertness or cache changed"
+  assert (L.not (G.inert (G.setNode 7 (Node (GBotK (KArrow Star Star)) (Just 6) Flexible) closedGraft) 7)) "kinded bottom is inert"
+  putStrLn "bottom short-circuit: ok"
+  assert (Solver.green closedGraft 7) "direct flexible bottom was not green"
+  assert (Solver.green (graftChain Flexible) 7) "flexible ancestry was not green"
+  assert (L.not (Solver.green (graftChain Rigid) 7)) "rigid ancestry became green"
+  assert (L.not (Solver.green (G.setNode 7 (Node GBot Nothing Flexible) closedGraft) 7)) "missing binder became green"
+  assert (L.not (Solver.green (G.setNode 7 (Node GBot (Just 6) Rigid) closedGraft) 7)) "rigid bottom became green"
+  assert (Solver.green (G.setNode 6 (Node (GGen 7) (Just 0) Rigid) closedGraft) 6) "Gen did not stop the ancestry walk"
+  putStrLn "graft guards: ok"
+  let a = Node GBot Nothing Flexible
+  let b = Node (GCon "Int" Nil) Nothing Rigid
+  -- The old prefix is deliberately unavailable. Ordered lookups of the
+  -- allocated interval need only the right branch, including its ID gaps.
+  let table = IntMap (MapNode 5 3 a (panic "fresh indexing traversed the old prefix")
+        (MapNode 2 8 a MapEmpty (MapNode 1 10 b MapEmpty MapEmpty)))
+  let entries = Solver.allocatedNodes 8 12 table
+  assert (L.eqList (L.eqPair (\x y -> x == y) G.equalNode) entries (list2 (Pair 8 a) (Pair 10 b))) "fresh interval changed identities, order or node values"
+  assert (L.null (Solver.allocatedNodes 12 12 (panic "empty allocation read the graph"))) "empty allocation was not empty"
+  putStrLn "fresh interval demand: ok"
+
+checkAscendingNodes : IO Unit
+checkAscendingNodes = do
+  let huge = 1000000000000000000000000000000
+  let keys = list5 (0 - huge) (0 - 7) 0 1 huge
+  let values = L.map (\key -> Pair key (Node (GArr key key) (Just key) Flexible)) keys
+  assert (IM.eqIntMap G.equalNode (G.nodesFromDistinctAscList values) (G.nodesFromList values)) "ascending graph node builder changed entries"
+  assert (IM.valid (G.nodesFromDistinctAscList values)) "ascending graph node builder is unbalanced"
+  forEachIO (\count ->
+    let entries = L.map (\n -> Pair (3 * n - 70) (Node (GGen n) Nothing Flexible)) (L.range 0 (count - 1)) in
+    assert (IM.valid (G.nodesFromDistinctAscList entries) && IM.eqIntMap G.equalNode (G.nodesFromDistinctAscList entries) (G.nodesFromList entries)) "ascending graph node size changed") (L.range 0 100)
+  -- strictNode forces the tag, binder constructor, and flag, but not these
+  -- unused fields. The optimized builder must preserve that boundary.
+  let deferred = Node (GCon "Unused" (panic "node builder forced constructor arguments")) (Just (panic "node builder forced binder identity")) Rigid
+  assert (IM.size (G.nodesFromDistinctAscList (Cons (Pair 0 deferred) Nil)) == 1) "ascending graph node demand changed"
+  putStrLn "ascending graph nodes: ok"
+
+checkLargeIdentities : Int -> IO Unit
+checkLargeIdentities shift = do
+  let move = \n -> n + shift
+  result "huge-projection" (solveEquation (rename move branching) (move 63) (move 101))
+  result "huge-expansion" (complete (G.bindE (Solver.prepare (rename move scoped)) (Solver.instantiate (move 2) (move 3))))
+  result "huge-graft" (complete (G.bindE (Solver.prepare (rename move closedGraft)) (Solver.instantiateClosed (move 2) (move 7))))
+
+-- Compare against the unchanged complete traversal, including cyclic and
+-- shared structure, sparse keys, alias chains, and absent targets.
+containmentGraph : Int -> Graph
+containmentGraph seed =
+  let keys = L.map (\n -> n * 7 + 3) (L.range 0 6) in
+  let entries = L.map (\n -> Pair n (G.mkNode (GCon "T" (L.filter (\m -> remInt (n * 13 + m * 17 + seed * (n + 1)) 97 < 24) keys)) Nothing Flexible)) keys in
+  let aliases = L.concatMap (\n -> Cons (Pair (n + 100) n) (Cons (Pair (n + 200) (n + 100)) Nil)) keys in
+  G.mkGraph (G.nodesFromList entries) (IM.fromList aliases) 300
+
+containmentAgrees : Graph -> Bool
+containmentAgrees graph =
+  let sources = L.append (IM.keys (G.nodes graph)) (IM.keys (G.links graph)) in
+  let targets = L.append sources (Cons 999 Nil) in
+  L.all (\source ->
+    let complete = G.reachable graph source in
+    L.all (\target ->
+      let actual = G.structurallyContains graph source target in
+      let expected = IS.member (G.resolve graph target) complete in
+      if actual then expected else L.not expected) targets) sources
+
+checkContainment : IO Unit
+checkContainment = do
+  assert (L.all (\seed -> containmentAgrees (containmentGraph seed)) (L.range 0 31)) "structural containment disagrees with complete reachability"
+  let shift = 1000000000000000000000000000000
+  assert (containmentAgrees (rename (\n -> n + shift) (containmentGraph 7))) "structural containment changed huge identities"
+  assert (containmentAgrees (rename (\n -> n - shift) (containmentGraph 19))) "structural containment changed negative identities"
+  putStrLn "structural containment oracle: 15708 comparisons passed"
+  let graph = G.mkGraph (G.nodesFromList (list2
+        (node 0 (GCon "T" (Cons 1 (panic "containment forced an unvisited branch"))) Nothing Flexible)
+        (node 1 GBot Nothing Flexible))) IM.empty 2
+  assert (G.structurallyContains graph 0 1) "structural containment missed an immediate target"
+  putStrLn "structural containment demand: ok"
+
+main = do
+  putStrLn (L.concatStrings (L.map (\n -> showPermission (G.permission scoped n)) (L.range 0 9)))
+  result "normalize" (Right (G.normalize scoped))
+  let first = G.bindE (Solver.prepare scoped) (Solver.solverUnify (Cons (Pair 4 8) Nil))
+  result "merge" (complete first)
+  result "rigid" (complete (G.bindE first (Solver.solverUnify (Cons (Pair 8 9) Nil))))
+  result "protected" (complete (G.bindE first (Solver.solverUnify (Cons (Pair 5 9) Nil))))
+  forEachIO (\scale -> forEachIO (\shift ->
+    let f = \n -> scale * n + shift in
+    result "renamed" (solveEquation (rename f scoped) (f 4) (f 8))) (list2 0 (0 - 30))) (list2 1 100000)
+  forEachIO checkSource (list2 scoped frontier)
+  forEachIO (\a -> forEachIO (\b -> result "branch" (solveEquation branching (2 * a + 1) (2 * b + 1))) (L.filter (\b -> a < b) points)) points
+  forEachIO (\graph -> result "closed" (complete (G.bindE (Solver.prepare graph) (Solver.instantiateClosed 2 6))))
+    (list4 (closed Flexible 2 "Bool") (closed Rigid 2 "Int") (closed Flexible 0 "Int") (closed Flexible 2 "Int"))
+  result "graft" (complete (G.bindE (Solver.prepare closedGraft) (Solver.instantiateClosed 2 7)))
+  checkDemand Unit
+  result "graft-flexible-parent" (complete (G.bindE (Solver.prepare (graftChain Flexible)) (Solver.instantiateClosed 2 7)))
+  result "graft-rigid-parent" (complete (G.bindE (Solver.prepare (graftChain Rigid)) (Solver.instantiateClosed 2 7)))
+  result "graft-rigid-target" (complete (G.bindE (Solver.prepare (G.setNode 7 (Node GBot (Just 6) Rigid) closedGraft)) (Solver.instantiateClosed 2 7)))
+  result "graft-kind-mismatch" (complete (G.bindE (Solver.prepare (G.setNode 7 (Node (GBotK (KArrow Star Star)) (Just 6) Flexible) closedGraft)) (Solver.instantiateClosed 2 7)))
+  forEachIO (\scale -> forEachIO (\shift ->
+    let f = \n -> scale * n + shift in
+    result "fresh-renamed" (complete (G.bindE (Solver.prepare (rename f scoped)) (Solver.instantiate (f 2) (f 3))))) (list2 0 (0 - 30))) (list2 1 100000)
+  checkAscendingNodes
+  let swap = \n -> if n == 4 then 8 else if n == 8 then 4 else n
+  result "permuted-projection" (solveEquation (rename swap scoped) (swap 4) (swap 8))
+  let sparse = \n -> 100003 * n - 9001
+  result "sparse-branch" (solveEquation (rename sparse branching) (sparse 63) (sparse 101))
+  forEachIO checkLargeIdentities (list2 1000000000000000000000000000000 (0 - 1000000000000000000000000000000))
+  checkContainment

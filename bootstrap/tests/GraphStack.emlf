@@ -1,0 +1,42 @@
+module Main where
+
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.IntSet as IS
+import qualified Bootstrap.Graph as G
+import qualified Bootstrap.Graph.Solver as S
+
+-- Wide inputs expose deferred left-fold accumulators without requiring deep
+-- source types or a larger native stack. The old binding-index fold needs
+-- about 12 MiB of stack for this case and fails the ordinary 8 MiB native stack.
+buildGraph : Bool -> Int -> Graph
+buildGraph scopes count =
+  let root = G.mkNode (GGen 1) Nothing Flexible in
+  let bottom = G.mkNode GBot (Just 0) Flexible in
+  let leaf = G.mkNode (if scopes then GGen 1 else GCon "Int" Nil) (Just 0) Flexible in
+  let entries = Cons (Pair 0 root) (Cons (Pair 1 bottom) (L.map (\identity -> Pair identity leaf) (L.range 2 (count + 1)))) in
+  G.mkGraph (IM.fromDistinctAscList entries) IM.empty (count + 2)
+
+checkFull : Bool -> Int -> IO Unit
+checkFull scopes count =
+  let graph = buildGraph scopes count in
+  case G.validateGraph graph of
+    Left message -> panic message
+    Right _ -> case S.prepare graph of
+      Left message -> panic message
+      Right solver -> case S.finish solver of
+        Left message -> panic message
+        Right final -> do
+          printInt (IM.size (G.nodes final))
+          printInt (IS.size (IM.findWithDefault IS.empty 0 (S.bindingChildren solver)))
+          printInt (IS.size (IM.findWithDefault IS.empty 1 (S.structuralParents solver)))
+          printInt (IM.size (S.scopeIntervals (S.scopeIndex solver)))
+
+main = do
+  let graph = buildGraph false 35000
+  printInt (IM.size (G.nodes graph))
+  printInt (L.length (IM.findWithDefault Nil 0 (G.bindingChildrenMap graph)))
+  checkFull false 1000
+  checkFull true 1000
+  putStrLn "graph stack: ok"
