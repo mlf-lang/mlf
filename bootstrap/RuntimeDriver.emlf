@@ -1,0 +1,37 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Runtime as R
+import qualified Bootstrap.X.Parser as X
+
+arguments : Int -> Int -> IO (List String)
+arguments i count = if i >= count then ioReturn Nil else do
+  value <- getArg i
+  rest <- arguments (i + 1) count
+  return (Cons value rest)
+
+die message = do
+  putErr (message ++ "\n")
+  exitWith 1
+
+run requireIO file args = do
+  source <- readFile file
+  case X.parseTerm "<target>" source of
+    Left message -> panic message
+    Right term -> do
+      result <- if requireIO then R.runTermWithArguments args term else R.runProgramWithArguments args term
+      case result of
+        Left message -> panic message
+        Right ignored -> return ()
+
+main = do
+  count <- getArgCount
+  if count < 2 then die "usage: runtime-driver --run-xmlf|--run-program-xmlf FILE -- ARGS..." else do
+    mode <- getArg 0
+    file <- getArg 1
+    rest <- arguments 2 count
+    let args = case rest of
+          Cons first tail -> if eqString first "--" then tail else rest
+          Nil -> Nil
+    if eqString mode "--run-xmlf" then run true file args
+    else if eqString mode "--run-program-xmlf" then run false file args
+    else die "unknown runtime driver command"

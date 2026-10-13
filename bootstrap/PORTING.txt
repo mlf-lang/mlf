@@ -1,0 +1,53 @@
+Full self-hosting port contract
+
+Goal: implement the existing compiler in ordinary .emlf source. The Haskell
+compiler is stage 0 only. Stage 1 must independently parse, infer, elaborate,
+check, interpret and emit LLVM, including modules and classes. No subprocess
+delegation to the seed, compiler primitive, embedded seed binary, or cached
+answers. Stage 1 compiles the same sources to stage 2; stage 2 repeats to
+stage 3. Compare emitted artifacts and run the existing acceptance/rejection,
+runtime, module and backend corpus. Do not claim completion from self-rebuild
+alone; incomplete features remain explicitly reported by the parity gate.
+
+Source uses the CURRENT supported .emlf syntax: modules, ordinary ADTs,
+explicit forall signatures, function equations, layout, do, if and fixed
+operators. No Haskell lists/tuples/records/type synonyms/guards/where.
+Every recursively connected top-level function needs an explicit signature.
+Use shared types from Bootstrap.Types and containers from Bootstrap.Std,
+Bootstrap.Map, Bootstrap.Set, Bootstrap.IntMap, Bootstrap.IntSet.
+
+Foundation conventions:
+  List a = Nil | Cons a (List a)
+  Pair a b = Pair a b; Triple a b c = Triple a b c
+  Maybe a = Nothing | Just a; Either e a = Left e | Right a
+  Map k v and Set a: persistent ordered trees, comparator returns Int.
+  Source types/expressions/annotations use SType, SExpr, SAnnotation and
+  constructor prefixes S (SVar, SLam, SCon, etc.). Target types and terms use
+  XType, XTerm, XComputation, XErased with constructor prefixes X.
+  Graph types use Graph, Node, GTag and G-prefixed tag constructors.
+  Shared Kind = Star | KArrow Kind Kind; Flag = Flexible | Rigid.
+  Types.emlf owns all compiler AST and graph datatypes to avoid module cycles.
+  Owners must publish exact exported signatures and coordinate mismatches.
+
+Runtime support being added (use these spellings):
+  stringLength : String -> Int                       (Unicode scalar count)
+  stringCodeAt : String -> Int -> Int                 (checked scalar index)
+  stringSlice : String -> Int -> Int -> String        (start/count, checked)
+  stringFromCode : Int -> String                      (valid Unicode scalar)
+  compareString : String -> String -> Int             (-1/0/1)
+  readDouble : String -> Double                       (strict decimal)
+  doubleToBits : Double -> Int; doubleFromBits : Int -> Double
+  seq : forall a b. a -> b -> b
+  panic : forall a. String -> a
+  readFile : String -> IO String; writeFile : String -> String -> IO Unit
+  fileExists : String -> IO Bool; canonicalPath : String -> IO String
+  getArgCount : IO Int; getArg : Int -> IO String
+  putErr : String -> IO Unit; exitWith : forall a. Int -> IO a
+  getExecutablePath : IO String; getContents : IO String
+
+Ownership: runtime support, foundations/types, source frontend, graph solver,
+constraint/elaboration, and LLVM backend have separate agents. Root owns
+target checker/parser/printer, compiler entry, and bootstrap/parity harness.
+Keep Cabal runs serialized with root. Agents may run existing emlf directly
+on probes after coordinating dependency readiness. Do not edit another owner's
+files without agreeing. Do not commit. Preserve previous uncommitted work.

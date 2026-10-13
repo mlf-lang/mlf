@@ -1,0 +1,117 @@
+module Bootstrap.Compiler where
+
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.Map as M
+import qualified Bootstrap.Constraint as C
+import qualified Bootstrap.Elaborate as E
+import qualified Bootstrap.Graph.Solver as Solver
+import qualified Bootstrap.Parser as P
+import qualified Bootstrap.Module as Modules
+import qualified Bootstrap.Prelude as Prelude
+import qualified Bootstrap.Classes as Classes
+import qualified Bootstrap.X.Check as Check
+import qualified Bootstrap.X.Syntax as X
+import qualified Bootstrap.X.Type as T
+
+inferredType (Compilation t _ _ _) = t
+compiledTerm (Compilation _ t _ _) = t
+presolution (Compilation _ _ g _) = g
+sourceType (Compilation _ _ _ s) = s
+phase (CompileError p _) = p
+diagnostic (CompileError _ s) = s
+prettyPhase p = case p of
+  Parsing -> "Parsing"
+  ModuleResolution -> "ModuleResolution"
+  Inference -> "Inference"
+  Resolution -> "Resolution"
+  Elaboration -> "Elaboration"
+  Verification -> "Verification"
+prettyError (CompileError p s) = prettyPhase p ++ ": " ++ s
+
+atPhase : forall a. Phase -> Either String a -> Either CompileError a
+atPhase p value = case value of
+  Left e -> Left (CompileError p e)
+  Right a -> Right a
+
+compile : String -> String -> Either CompileError Compilation
+compile file source = compileWithPrelude ImplicitPrelude file source
+compileWithPrelude : PreludeMode -> String -> String -> Either CompileError Compilation
+compileWithPrelude mode file source = compileModulesWithPrelude mode M.empty file source
+compileModules : Map String (Pair String String) -> String -> String -> Either CompileError Compilation
+compileModules sources file input = compileModulesWithPrelude ImplicitPrelude sources file input
+compileModulesWithPrelude : PreludeMode -> Map String (Pair String String) -> String -> String -> Either CompileError Compilation
+compileModulesWithPrelude mode sources file input = do
+  root <- atPhase Parsing (P.parseModule file input)
+  if standalone root then compileStandalone mode root else do
+    modules <- atPhase ModuleResolution (Modules.loadModuleMap sources root)
+    compileLinked mode modules
+
+compileFile : List String -> String -> IO (Either CompileError Compilation)
+compileFile paths file = compileFileWithPrelude ImplicitPrelude paths file
+compileFileWithPrelude : PreludeMode -> List String -> String -> IO (Either CompileError Compilation)
+compileFileWithPrelude mode paths file = do
+  present <- fileExists file
+  if present then do
+    input <- readFile file
+    compileSourceWithImports mode paths file input
+  else ioReturn (Left (CompileError ModuleResolution ("file does not exist: " ++ file)))
+compileSourceWithImports : PreludeMode -> List String -> String -> String -> IO (Either CompileError Compilation)
+compileSourceWithImports mode paths file input = case atPhase Parsing (P.parseModule file input) of
+  Left err -> ioReturn (Left err)
+  Right root -> if standalone root then ioReturn (compileStandalone mode root) else do
+    modules <- Modules.loadModuleFiles paths root
+    ioReturn (case atPhase ModuleResolution modules of
+      Left err -> Left err
+      Right loaded -> compileLinked mode loaded)
+
+standalone (SourceModule _ name _ imports _ _ _ _ _) = case name of
+  Nothing -> L.null imports
+  Just _ -> false
+compileStandalone : PreludeMode -> SourceModule -> Either CompileError Compilation
+compileStandalone mode root = do
+  program <- atPhase Parsing (P.standaloneProgram root)
+  compileProgramWithPrelude mode program
+
+compileLinked : PreludeMode -> List SourceModule -> Either CompileError Compilation
+compileLinked mode modules = do
+  LinkedModule program names valueScopes instanceScopes <- atPhase ModuleResolution (Modules.linkModules mode modules)
+  let display = Modules.displayNames names
+  lowered <- case Classes.lowerClassesWithScopes valueScopes instanceScopes program of
+    Left err -> Left (CompileError Inference (display err))
+    Right lowered -> Right lowered
+  case lowered of
+    Pair core classes ->
+      let diagnosticNames = M.union compareString (M.map display classes) names in
+      case finishCompilation lowered of
+        Left (CompileError p message) -> Left (CompileError p (Modules.displayNames diagnosticNames message))
+        Right (Compilation ty term graph source) -> Right (Compilation ty term graph (display source))
+
+compileExpr : SExpr -> Either CompileError Compilation
+compileExpr expr = compileExprWithPrelude ImplicitPrelude expr
+compileExprWithPrelude : PreludeMode -> SExpr -> Either CompileError Compilation
+compileExprWithPrelude mode expr = compileProgramWithPrelude mode (SProgram Nil expr)
+compileProgram : SProgram -> Either CompileError Compilation
+compileProgram program = compileProgramWithPrelude ImplicitPrelude program
+compileProgramWithPrelude : PreludeMode -> SProgram -> Either CompileError Compilation
+compileProgramWithPrelude mode original = case Prelude.withPrelude mode original of
+  Pair imports source -> do
+    lowered <- atPhase Inference (Classes.lowerClassesWithImports imports source)
+    finishCompilation lowered
+
+finishCompilation : Pair SProgram (Map String String) -> Either CompileError Compilation
+finishCompilation (Pair program names) = case program of
+  SClassProgram _ _ _ _ -> Left (CompileError Inference "class translation did not produce a core program")
+  SProgram declarations expression -> do
+    constraints <- atPhase Inference (C.generateProgram program)
+    solved <- atPhase Inference (C.solvePrepared constraints)
+    let graph = Solver.solverGraph solved
+    let types = E.prepareTypes graph
+    evidence <- atPhase Resolution (E.resolveEvidenceIn types (C.skeleton constraints))
+    body <- atPhase Elaboration (E.elaboratePreparedIn types solved evidence (C.skeleton constraints))
+    let term = if L.null declarations then body else XWithData declarations body
+    ty <- atPhase Verification (Check.checkClosed term)
+    let expected = E.schemeTypeIn types (C.generalization (C.skeleton constraints))
+    if L.not (T.alphaEq ty expected) then Left (CompileError Verification "elaboration changed the inferred type")
+    else if L.not (X.equalErased (X.erase term) (C.eraseSourceWith evidence (C.skeleton constraints))) then Left (CompileError Verification "elaboration changed source erasure")
+    else Right (Compilation ty term graph (Classes.prettyQualified names ty))

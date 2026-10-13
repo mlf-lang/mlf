@@ -4,8 +4,8 @@
  * lazy evaluation and scalar primitives never collect on the native stack.
  */
 #define _POSIX_C_SOURCE 200809L
+#define _XOPEN_SOURCE 700
 #include "mlf_runtime.h"
-#include "khash.h"
 #include <gmp.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -15,12 +15,118 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
+
+/* Bootstrap builds may opt into BDWGC so long pure computations collect as
+ * well as IO. The ordinary pooled runtime remains the performance default.
+ * Every pointer-bearing allocation, including khash and evaluation stacks,
+ * must use the collector; GMP limbs are pointer-free atomic allocations. */
+#if defined(MLF_COMPACT_BDWGC) && !defined(MLF_USE_BDWGC)
+#error "MLF_COMPACT_BDWGC requires MLF_USE_BDWGC"
+#endif
+#ifdef MLF_USE_BDWGC
+#include <gc/gc.h>
+static void gc_register_layout(void);
+static void *gc_integer_malloc(size_t size) {
+    void *memory = GC_MALLOC_ATOMIC(size ? size : 1);
+    if (!memory) abort();
+    return memory;
+}
+static void *gc_integer_realloc(void *memory, size_t old_size, size_t size) {
+    (void)old_size;
+    void *result = GC_REALLOC(memory,size ? size : 1);
+    if (!result) abort();
+    return result;
+}
+static void gc_integer_free(void *memory, size_t size) { (void)size; GC_FREE(memory); }
+static void gc_start(void) {
+    static int initialized;
+    if (initialized) return;
+    initialized = 1;
+    gc_register_layout();
+    GC_INIT();
+#ifndef GC_FREE_SPACE_DIVISOR
+    if (!getenv("GC_FREE_SPACE_DIVISOR")) GC_set_free_space_divisor(1);
+#endif
+#ifndef GC_INITIAL_HEAP_SIZE
+    if (!getenv("GC_INITIAL_HEAP_SIZE")) {
+#ifdef MLF_COMPACT_BDWGC
+        const size_t preferred = 512 * 1024 * 1024;
+#else
+        const size_t preferred = 256 * 1024 * 1024;
+#endif
+        size_t current = GC_get_heap_size();
+        /* GC_INIT has already read any maximum-heap setting. Expansion is
+         * only a preference: GC_expand_hp also honors a cap set through the
+         * collector API, and may reject the request without failing startup. */
+        if (current < preferred) (void)GC_expand_hp(preferred - current);
+    }
+#endif
+    mp_set_memory_functions(gc_integer_malloc,gc_integer_realloc,gc_integer_free);
+}
+#if defined(GC_DEBUG) || defined(GC_DEBUG_REPLACEMENT)
+/* The batch API has no debugging allocator counterpart. */
+static void *gc_malloc(size_t size) { gc_start(); return GC_MALLOC(size ? size : 1); }
+#else
+/* The runtime is single-threaded. Cache one traced batch per small size
+ * class; the pinned collector returns at most one block plus one object.
+ * Class upper bounds leave room for its one-past-the-end padding in the
+ * same allocation bucket. Batches are cleared except for first-word links.
+ * Static heads retain only unused objects (less than 75 KiB with BDWGC
+ * 8.2.12). A populated class proves gc_start has already completed. */
+static void *gc_pending[17];
+static void *gc_malloc(size_t size) {
+    if (size > 256) { gc_start(); return GC_MALLOC(size); }
+    size_t index = size / 16;
+    void *result = gc_pending[index];
+    if (!result) {
+        gc_start();
+        result = GC_malloc_many((index + 1) * 16 - 1);
+        if (!result) return GC_MALLOC(size ? size : 1);
+    }
+    void *next = GC_NEXT(result);
+    gc_pending[index] = next;
+    GC_NEXT(result) = NULL;
+    GC_reachable_here(next);
+    return result;
+}
+#endif
+static void *gc_calloc(size_t count, size_t size) {
+    if (size && count > SIZE_MAX / size) return NULL;
+    return gc_malloc(count * size);
+}
+static void *gc_realloc(void *memory, size_t size) {
+    gc_start();
+    return !memory || GC_base(memory) ? GC_REALLOC(memory,size ? size : 1) : realloc(memory,size);
+}
+static void gc_free(void *memory) {
+    if (!memory) return;
+    if (GC_base(memory)) GC_FREE(memory); else free(memory);
+}
+#define malloc(size) gc_malloc(size)
+#define calloc(count,size) gc_calloc(count,size)
+#define realloc(memory,size) gc_realloc(memory,size)
+#define free(memory) gc_free(memory)
+#endif
+#include "khash.h"
 
 #ifndef MLF_GC_THRESHOLD
 #define MLF_GC_THRESHOLD 4096
 #endif
 #ifndef MLF_GC_INTEGER_BYTES
 #define MLF_GC_INTEGER_BYTES (8 * 1024 * 1024)
+#endif
+
+/* Generated modules reference exactly one ABI symbol. Linking against a
+ * runtime with incompatible field offsets must fail before execution. */
+#ifdef MLF_COMPACT_BDWGC
+void mlf_require_compact_gc_abi(void) {}
+#else
+void mlf_require_standard_abi(void) {}
 #endif
 
 typedef enum { OBJECT_VALUE, OBJECT_ENV } ObjectKind;
@@ -36,7 +142,7 @@ typedef enum {
     CONSTRUCTOR_1, CONSTRUCTOR_2, DOUBLE, INT_ARRAY, DOUBLE_ARRAY,
     WRITE_INT_ACTION, WRITE_DOUBLE_ACTION, NATIVE_IO,
     BYTE_ARRAY, WRITE_BYTE_ACTION, PUT_BYTES_ACTION, INT_TABLE, WRITE_TABLE_ACTION,
-    SMALL_INT_TABLE
+    SMALL_INT_TABLE, ST_ACTION, ST_ARRAY, CONSTRUCTOR_WIDE
 } Tag;
 
 /* These numbers are shared with primitiveCode in MLF.LLVM. */
@@ -51,11 +157,18 @@ typedef enum {
     NEW_BYTE_ARRAY, READ_BYTE_ARRAY, WRITE_BYTE_ARRAY, LENGTH_BYTE_ARRAY,
     BYTE_ARRAY_FROM_STRING, PUT_BYTES, GET_BYTE_LINE, NEW_INT_TABLE, READ_INT_TABLE, WRITE_INT_TABLE,
     AND_INT,
+    STRING_LENGTH, STRING_CODE_AT, STRING_SLICE, STRING_FROM_CODE, COMPARE_STRING,
+    READ_DOUBLE, DOUBLE_TO_BITS, DOUBLE_FROM_BITS, SEQ, PANIC,
+    READ_FILE, WRITE_FILE, FILE_EXISTS, CANONICAL_PATH, GET_ARG_COUNT, GET_ARG, PUT_ERR, EXIT_WITH,
+    GET_EXECUTABLE_PATH, GET_CONTENTS,
+    ST_RETURN, ST_BIND, RUN_ST, NEW_ST_ARRAY, READ_ST_ARRAY, WRITE_ST_ARRAY, LENGTH_ST_ARRAY,
     PRIMITIVE_COUNT
 } Primitive;
 
 struct MlfEnv {
+#ifndef MLF_COMPACT_BDWGC
     Object object;
+#endif
     size_t count;
     MlfValue *slots[];
 };
@@ -70,7 +183,9 @@ KHASH_INIT(mlf_int, MlfValue *, MlfValue *, 1, integer_hash, integer_equal)
 KHASH_INIT(mlf_tagged, MlfValue *, MlfValue *, 1, tagged_hash, tagged_equal)
 
 struct MlfValue {
+#ifndef MLF_COMPACT_BDWGC
     Object object;
+#endif
     Tag tag;
     union {
         MlfValue *indirect;
@@ -85,13 +200,42 @@ struct MlfValue {
         khash_t(mlf_tagged) *small_table;
         struct { MlfValue *array, *index, *entry; } array_write;
         int boolean;
-        struct { size_t length; char *bytes; } string;
+        struct { size_t length; char *bytes; size_t *indices; } string;
         struct { int64_t identity, arity; MlfEnv *fields; } constructor;
         struct { int64_t identity; MlfValue *fields[2]; } packed;
         struct { Primitive identity; MlfEnv *arguments; } primitive;
         struct { Primitive operation; MlfValue *first, *second; } action;
     } as;
 };
+
+/* Wide compact constructors keep MlfValue as their first real subobject.
+ * Field zero uses its final pointer slot; the remaining fields follow it. */
+#ifdef MLF_COMPACT_BDWGC
+typedef struct {
+    MlfValue value;
+    MlfValue *remaining_fields[];
+} WideConstructor;
+_Static_assert(offsetof(WideConstructor, remaining_fields) == 32, "compact wide tail ABI");
+static MlfValue *wide_field(MlfValue *value, uint64_t index) {
+    return index ? ((WideConstructor *)value)->remaining_fields[index - 1]
+                 : (MlfValue *)value->as.constructor.fields;
+}
+#endif
+
+#ifdef MLF_USE_BDWGC
+static void gc_register_layout(void) {
+    /* A general constructor may share an allocation with its environment.
+     * Retain that allocation even when only an environment reference remains
+     * and the embedding caller has disabled arbitrary interior pointers.
+     * Register before initialization/allocation; the macro also accounts for
+     * collector debug headers. */
+    GC_REGISTER_DISPLACEMENT(sizeof(MlfValue));
+#ifdef MLF_COMPACT_BDWGC
+    /* Generated field views can outlive the value pointer itself. */
+    GC_REGISTER_DISPLACEMENT(offsetof(MlfValue, as.constructor.fields));
+#endif
+}
+#endif
 
 typedef struct Stack {
     void **items;
@@ -109,14 +253,38 @@ static size_t collection_limit = MLF_GC_THRESHOLD;
 static size_t integer_bytes;
 static size_t integer_collection_limit = MLF_GC_INTEGER_BYTES;
 static void cleanup(void);
+static int valid_utf8(const unsigned char *bytes, size_t length);
+static int argument_count;
+static char **argument_values;
+
+void mlf_set_args(int32_t argc, char **argv) {
+    argument_count = argc > 0 ? argc - 1 : 0;
+    argument_values = argc > 0 ? argv + 1 : NULL;
+}
 
 /* The low bits distinguish immediate integers, booleans and nullary data
  * from aligned heap pointers. Integers outside the signed 63-bit range keep
  * their arbitrary-precision GMP representation. */
 _Static_assert(sizeof(void *) == 8 && sizeof(long) == 8, "native runtime requires a 64-bit ABI");
 _Static_assert(_Alignof(MlfValue) >= 8, "native tagged pointer alignment");
+#ifdef MLF_COMPACT_BDWGC
+_Static_assert(offsetof(MlfValue, as.packed.identity) == 8, "constructor identity ABI");
+_Static_assert(offsetof(MlfValue, as.packed.fields) == 16, "constructor field ABI");
+_Static_assert(offsetof(MlfValue, as.constructor.fields) == 24, "general constructor environment ABI");
+_Static_assert(offsetof(MlfEnv, slots) == 8, "environment slots ABI");
+_Static_assert(offsetof(MlfValue, as.floating) == 8, "Double payload ABI");
+_Static_assert(offsetof(MlfValue, as.int_array.length) == 8 &&
+               offsetof(MlfValue, as.double_array.length) == 8 &&
+               offsetof(MlfValue, as.byte_array.length) == 8, "array length ABI");
+_Static_assert(offsetof(MlfValue, as.int_array.cells) == 16 &&
+               offsetof(MlfValue, as.double_array.cells) == 16 &&
+               offsetof(MlfValue, as.byte_array.cells) == 16, "array storage ABI");
+_Static_assert(sizeof(MlfValue) == 32, "managed value size ABI");
+#else
 _Static_assert(offsetof(MlfValue, as.packed.identity) == 24, "constructor identity ABI");
 _Static_assert(offsetof(MlfValue, as.packed.fields) == 32, "constructor field ABI");
+_Static_assert(offsetof(MlfValue, as.constructor.fields) == 40, "general constructor environment ABI");
+_Static_assert(offsetof(MlfEnv, slots) == 24, "environment slots ABI");
 _Static_assert(offsetof(MlfValue, as.floating) == 24, "Double payload ABI");
 _Static_assert(offsetof(MlfValue, as.int_array.length) == 24 &&
                offsetof(MlfValue, as.double_array.length) == 24 &&
@@ -125,6 +293,7 @@ _Static_assert(offsetof(MlfValue, as.int_array.cells) == 32 &&
                offsetof(MlfValue, as.double_array.cells) == 32 &&
                offsetof(MlfValue, as.byte_array.cells) == 32, "array storage ABI");
 _Static_assert(sizeof(MlfValue) == 48, "managed value size ABI");
+#endif
 _Static_assert(sizeof(MlfRoots) == 24, "native roots ABI");
 #define SMALL_MIN (-(INT64_C(1) << 62))
 #define SMALL_MAX ((INT64_C(1) << 62) - 1)
@@ -160,7 +329,9 @@ typedef struct ValuePage {
     MlfValue values[4096];
 } ValuePage;
 static ValuePage *value_pages;
+#ifndef MLF_COMPACT_BDWGC
 static MlfValue *free_values;
+#endif
 
 #ifdef MLF_ALLOCATION_AUDIT
 extern void mlf_bench_constructed_node(int64_t tag);
@@ -215,15 +386,27 @@ static void release_stack(Stack *stack) {
 
 static void *object(size_t size, ObjectKind kind) {
     Object *result = allocate(size);
+#ifndef MLF_COMPACT_BDWGC
     result->kind = kind;
+#else
+    (void)kind;
+#endif
+#ifndef MLF_USE_BDWGC
     result->next = heap;
     heap = result;
+#endif
     ++objects;
     return result;
 }
 
 static MlfValue *value(Tag tag) {
     MlfValue *result;
+#ifdef MLF_USE_BDWGC
+    result = allocate(sizeof(*result));
+#ifndef MLF_COMPACT_BDWGC
+    result->object = (Object){NULL, OBJECT_VALUE, 0};
+#endif
+#else
     if (free_values) {
         result = free_values;
         free_values = (MlfValue *)result->object.next;
@@ -237,6 +420,7 @@ static MlfValue *value(Tag tag) {
     }
     result->object = (Object){heap, OBJECT_VALUE, 0};
     heap = &result->object;
+#endif
     ++objects;
     result->tag = tag;
     return result;
@@ -312,6 +496,7 @@ MlfValue *mlf_string(const char *bytes, uint64_t length) {
     MlfValue *result = value(STRING);
     result->as.string.length = (size_t)length;
     result->as.string.bytes = allocate((size_t)length + 1);
+    result->as.string.indices = NULL;
     memcpy(result->as.string.bytes, bytes, (size_t)length);
     return result;
 }
@@ -346,6 +531,65 @@ MlfValue *mlf_constructor2(int64_t identity, MlfValue *a, MlfValue *b) {
     return result;
 }
 
+MlfValue *mlf_constructor_fields(int64_t identity, MlfEnv *fields) {
+    if (identity < 0 || !fields || fields->count > INT64_MAX)
+        fail("invalid constructor descriptor");
+    if (!fields->count) return mlf_constructor(identity, 0);
+    if (fields->count == 1) return mlf_constructor1(identity, fields->slots[0]);
+    if (fields->count == 2) return mlf_constructor2(identity, fields->slots[0], fields->slots[1]);
+#ifdef MLF_COMPACT_BDWGC
+    MlfValue *result = mlf_constructor_new(identity, fields->count);
+    result->as.constructor.fields = (MlfEnv *)fields->slots[0];
+    memcpy(((WideConstructor *)result)->remaining_fields, fields->slots + 1,
+           (fields->count - 1) * sizeof(MlfValue *));
+    return result;
+#else
+    MlfValue *result = value(CONSTRUCTOR);
+    result->as.constructor.identity = identity;
+    result->as.constructor.arity = (int64_t)fields->count;
+    result->as.constructor.fields = fields;
+    CONSTRUCTED(identity);
+    return result;
+#endif
+}
+
+MlfValue *mlf_constructor_new(int64_t identity, uint64_t count) {
+    if (identity < 0 || count < 3 || count > INT64_MAX ||
+        count > (SIZE_MAX - sizeof(MlfValue) - sizeof(MlfEnv)) / sizeof(MlfValue *))
+        fail("invalid constructor descriptor");
+#ifdef MLF_COMPACT_BDWGC
+    WideConstructor *allocation = allocate(sizeof(WideConstructor) + (count - 1) * sizeof(MlfValue *));
+    MlfValue *result = &allocation->value;
+    result->tag = CONSTRUCTOR_WIDE;
+    result->as.constructor.identity = identity;
+    result->as.constructor.arity = (int64_t)count;
+    ++objects;
+    CONSTRUCTED(identity);
+    return result;
+#elif defined(MLF_USE_BDWGC) && !defined(GC_DEBUG) && !defined(GC_DEBUG_REPLACEMENT)
+    MlfValue *result = allocate(sizeof(MlfValue) + sizeof(MlfEnv) + count * sizeof(MlfValue *));
+    MlfEnv *fields = (MlfEnv *)((unsigned char *)result + sizeof(MlfValue));
+#ifndef MLF_COMPACT_BDWGC
+    fields->object.kind = OBJECT_ENV;
+#endif
+    fields->count = (size_t)count;
+#ifndef MLF_COMPACT_BDWGC
+    result->object.kind = OBJECT_VALUE;
+#endif
+    result->tag = CONSTRUCTOR;
+    result->as.constructor.identity = identity;
+    result->as.constructor.arity = (int64_t)count;
+    result->as.constructor.fields = fields;
+    objects += 2;
+    CONSTRUCTED(identity);
+    return result;
+#else
+    /* The ordinary collector separately registers and releases environments.
+     * Keep that ownership model, also for collector debugging allocations. */
+    return mlf_constructor_fields(identity, mlf_env_new(count));
+#endif
+}
+
 static MlfValue *action(Primitive operation, MlfValue *first, MlfValue *second) {
     MlfValue *result = value(ACTION);
     result->as.action.operation = operation;
@@ -356,7 +600,8 @@ static MlfValue *action(Primitive operation, MlfValue *first, MlfValue *second) 
 
 MlfValue *mlf_primitive(int64_t identity) {
     if (identity < 0 || identity >= PRIMITIVE_COUNT) fail("unknown primitive");
-    if (identity == GET_LINE || identity == GET_BYTE_LINE || identity == NEW_INT_TABLE)
+    if (identity == GET_LINE || identity == GET_BYTE_LINE || identity == NEW_INT_TABLE || identity == GET_ARG_COUNT ||
+        identity == GET_EXECUTABLE_PATH || identity == GET_CONTENTS)
         return action((Primitive)identity, NULL, NULL);
     MlfValue *result = value(PRIMITIVE);
     result->as.primitive.identity = (Primitive)identity;
@@ -373,7 +618,7 @@ static MlfValue *expect(MlfValue *entry, Tag tag) {
             (tag == CONSTRUCTOR && nullary(result))) return result;
         fail("invalid value for runtime operation");
     }
-    if (tag == CONSTRUCTOR && (result->tag == CONSTRUCTOR_1 || result->tag == CONSTRUCTOR_2)) return result;
+    if (tag == CONSTRUCTOR && (result->tag == CONSTRUCTOR_1 || result->tag == CONSTRUCTOR_2 || result->tag == CONSTRUCTOR_WIDE)) return result;
     if (tag == INT_TABLE && result->tag == SMALL_INT_TABLE) return result;
     if (result->tag != tag) fail("invalid value for runtime operation");
     return result;
@@ -383,6 +628,7 @@ int64_t mlf_tag(MlfValue *entry) {
     MlfValue *result = expect(entry, CONSTRUCTOR);
     if (nullary(result)) return (int64_t)((uintptr_t)result >> 3);
     if (result->tag == CONSTRUCTOR_1 || result->tag == CONSTRUCTOR_2) return result->as.packed.identity;
+    if (result->tag == CONSTRUCTOR_WIDE) return result->as.constructor.identity;
     if ((uint64_t)result->as.constructor.arity != result->as.constructor.fields->count)
         fail("case scrutinized a partial constructor");
     return result->as.constructor.identity;
@@ -395,6 +641,13 @@ MlfValue *mlf_field(MlfValue *entry, uint64_t index) {
         if (index >= (uint64_t)(result->tag == CONSTRUCTOR_1 ? 1 : 2)) fail("invalid environment read");
         return result->as.packed.fields[index];
     }
+#ifdef MLF_COMPACT_BDWGC
+    if (result->tag == CONSTRUCTOR_WIDE) {
+        if (index >= (uint64_t)result->as.constructor.arity || !wide_field(result,index))
+            fail("invalid environment read");
+        return wide_field(result,index);
+    }
+#endif
     return mlf_env_get(result->as.constructor.fields, index);
 }
 
@@ -444,10 +697,14 @@ static MlfValue *compact_integer(MlfValue *result) {
         int64_t n = mpz_get_si(result->as.integer);
         if (n >= SMALL_MIN && n <= SMALL_MAX) {
             mpz_clear(result->as.integer);
+#ifdef MLF_USE_BDWGC
+            free(result);
+#else
             heap = result->object.next;
-            --objects;
             result->object.next = (Object *)free_values;
             free_values = result;
+#endif
+            --objects;
             return small(n);
         }
     }
@@ -616,13 +873,148 @@ static MlfValue *array_write_action(Tag tag, MlfValue *a, MlfValue *i, MlfValue 
     return result;
 }
 
+/* Scalar offsets are cached only when a string is indexed. Sequential output
+ * and concatenation retain their existing representation and cost. */
+static size_t *string_indices(MlfValue *text) {
+    if (text->as.string.indices) return text->as.string.indices;
+    const unsigned char *bytes = (const unsigned char *)text->as.string.bytes;
+    size_t length = text->as.string.length, count = 0;
+    if (!valid_utf8(bytes,length)) fail("invalid Unicode scalar");
+    for (size_t i = 0; i < length; ++i) if ((bytes[i] & 0xc0) != 0x80) ++count;
+    if (count > SIZE_MAX / sizeof(size_t) - 2) fail("string too large");
+    size_t *indices = allocate((count + 2) * sizeof(size_t));
+    indices[0] = count;
+    size_t next = 1;
+    for (size_t i = 0; i < length; ++i) if ((bytes[i] & 0xc0) != 0x80) indices[next++] = i;
+    indices[next] = length;
+    text->as.string.indices = indices;
+    return indices;
+}
+
+static MlfValue *string_code_at(MlfValue *text, MlfValue *index) {
+    text = expect(text,STRING);
+    index = expect(index,INTEGER);
+    size_t *indices = string_indices(text);
+    if (!indices[0]) fail("string index out of bounds");
+    size_t i = (size_t)bounded_integer(index,indices[0]-1,"string index out of bounds");
+    const unsigned char *bytes = (const unsigned char *)text->as.string.bytes;
+    size_t position = indices[i+1], end = indices[i+2];
+    unsigned scalar = bytes[position++];
+    if (scalar >= 0xc0) scalar &= end-position == 1 ? 0x1f : end-position == 2 ? 0x0f : 7;
+    while (position < end) scalar = (scalar << 6) | (bytes[position++] & 0x3f);
+    return small((int64_t)scalar);
+}
+
+static MlfValue *string_slice(MlfValue *text, MlfValue *offset, MlfValue *count) {
+    text = expect(text,STRING);
+    offset = expect(offset,INTEGER);
+    count = expect(count,INTEGER);
+    size_t *indices = string_indices(text);
+    size_t start = (size_t)bounded_integer(offset,indices[0],"string slice out of bounds");
+    size_t length = (size_t)bounded_integer(count,indices[0]-start,"string slice out of bounds");
+    return mlf_string(text->as.string.bytes + indices[start+1],indices[start+length+1]-indices[start+1]);
+}
+
+static MlfValue *string_from_code(MlfValue *entry) {
+    unsigned scalar = (unsigned)bounded_integer(entry,0x10ffff,"invalid Unicode scalar");
+    if (scalar >= 0xd800 && scalar <= 0xdfff) fail("invalid Unicode scalar");
+    unsigned char bytes[4];
+    size_t count;
+    if (scalar < 0x80) { count = 1; bytes[0] = (unsigned char)scalar; }
+    else if (scalar < 0x800) {
+        count = 2; bytes[0] = 0xc0 | (scalar >> 6); bytes[1] = 0x80 | (scalar & 0x3f);
+    } else if (scalar < 0x10000) {
+        count = 3; bytes[0] = 0xe0 | (scalar >> 12); bytes[1] = 0x80 | ((scalar >> 6) & 0x3f); bytes[2] = 0x80 | (scalar & 0x3f);
+    } else {
+        count = 4; bytes[0] = 0xf0 | (scalar >> 18); bytes[1] = 0x80 | ((scalar >> 12) & 0x3f);
+        bytes[2] = 0x80 | ((scalar >> 6) & 0x3f); bytes[3] = 0x80 | (scalar & 0x3f);
+    }
+    return mlf_string((const char *)bytes,count);
+}
+
+static MlfValue *compare_string(MlfValue *a, MlfValue *b) {
+    a = expect(a,STRING); b = expect(b,STRING);
+    size_t left = a->as.string.length, right = b->as.string.length;
+    int order = memcmp(a->as.string.bytes,b->as.string.bytes,left < right ? left : right);
+    if (!order) order = (left > right) - (left < right);
+    return small((order > 0) - (order < 0));
+}
+
+static int decimal_digit(char c) { return c >= '0' && c <= '9'; }
+static MlfValue *read_double(MlfValue *text) {
+    text = expect(text,STRING);
+    const char *s = text->as.string.bytes;
+    size_t n = text->as.string.length, i = 0, start;
+    if (i < n && (s[i] == '-' || s[i] == '+')) ++i;
+    start = i;
+    while (i < n && decimal_digit(s[i])) ++i;
+    if (i == start) fail("invalid Double input");
+    if (i < n && s[i] == '.') {
+        start = ++i;
+        while (i < n && decimal_digit(s[i])) ++i;
+        if (i == start) fail("invalid Double input");
+    }
+    if (i < n && (s[i] == 'e' || s[i] == 'E')) {
+        ++i;
+        if (i < n && (s[i] == '-' || s[i] == '+')) ++i;
+        start = i;
+        while (i < n && decimal_digit(s[i])) ++i;
+        if (i == start) fail("invalid Double input");
+    }
+    if (i != n) fail("invalid Double input");
+    return mlf_double(strtod(s,NULL));
+}
+
+static MlfValue *double_to_bits(MlfValue *entry) {
+    double n = unbox_double(entry);
+    uint64_t bits;
+    memcpy(&bits,&n,sizeof(bits));
+    if (bits <= SMALL_MAX) return small((int64_t)bits);
+    MlfValue *result = value(INTEGER);
+    mpz_init_set_ui(result->as.integer,(unsigned long)bits);
+    integer_bytes += mpz_size(result->as.integer) * sizeof(mp_limb_t);
+    return result;
+}
+
+static MlfValue *double_from_bits(MlfValue *entry) {
+    uint64_t bits = bounded_integer(entry,UINT64_MAX,"Double bit pattern out of bounds");
+    double n;
+    memcpy(&n,&bits,sizeof(n));
+    return mlf_double(n);
+}
+
+/* State actions are immutable descriptions, distinct from IO. Stored operands
+ * remain lazy until the local executor needs their sizes, indices or arrays. */
+static MlfValue *st_action(Primitive operation, size_t count,
+                           MlfValue *first, MlfValue *second, MlfValue *third) {
+    MlfEnv *arguments = mlf_env_new(count);
+    if (count > 0) mlf_env_set(arguments,0,first);
+    if (count > 1) mlf_env_set(arguments,1,second);
+    if (count > 2) mlf_env_set(arguments,2,third);
+    MlfValue *result = value(ST_ACTION);
+    result->as.primitive.identity = operation;
+    result->as.primitive.arguments = arguments;
+    return result;
+}
+
+static MlfValue *run_st(MlfValue *root);
+
 static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValue *c) {
     switch (p) {
+    case ST_RETURN: case LENGTH_ST_ARRAY: return st_action(p,1,a,NULL,NULL);
+    case ST_BIND: case NEW_ST_ARRAY: case READ_ST_ARRAY: return st_action(p,2,a,b,NULL);
+    case WRITE_ST_ARRAY: return st_action(p,3,a,b,c);
+    /* Codegen.evaluate promises canonical WHNF for a saturated pure result.
+     * The executor itself preserves the laziness of values passed to binds. */
+    case RUN_ST: return force(run_st(a));
     case IO_RETURN: case IO_BIND: case PUT_STR: case PUT_STR_LN: case GET_LINE: case PRINT_INT:
     case NEW_INT_ARRAY: case READ_INT_ARRAY: case LENGTH_INT_ARRAY:
     case NEW_DOUBLE_ARRAY: case READ_DOUBLE_ARRAY: case LENGTH_DOUBLE_ARRAY:
     case NEW_BYTE_ARRAY: case READ_BYTE_ARRAY: case LENGTH_BYTE_ARRAY: case BYTE_ARRAY_FROM_STRING:
     case GET_BYTE_LINE: case NEW_INT_TABLE: case READ_INT_TABLE:
+    case READ_FILE: case WRITE_FILE: case FILE_EXISTS: case CANONICAL_PATH:
+    case GET_ARG_COUNT: case GET_ARG: case PUT_ERR: case EXIT_WITH:
+    case GET_EXECUTABLE_PATH: case GET_CONTENTS:
         return action(p, a, b);
     case WRITE_INT_ARRAY: return array_write_action(WRITE_INT_ACTION,a,b,c);
     case WRITE_DOUBLE_ARRAY: return array_write_action(WRITE_DOUBLE_ACTION,a,b,c);
@@ -637,6 +1029,7 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
         MlfValue *result = value(STRING);
         result->as.string.length = left + right;
         result->as.string.bytes = allocate(left + right + 1);
+        result->as.string.indices = NULL;
         memcpy(result->as.string.bytes, a->as.string.bytes, left);
         memcpy(result->as.string.bytes + left, b->as.string.bytes, right);
         return result;
@@ -645,6 +1038,21 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
     case SUB_INT: return mlf_sub_int(a,b);
     case MUL_INT: case QUOT_INT: case REM_INT: case AND_INT: return integer_extended(p,a,b);
     case READ_INT: return read_integer(a);
+    case STRING_LENGTH: return small((int64_t)string_indices(expect(a,STRING))[0]);
+    case STRING_CODE_AT: return string_code_at(a,b);
+    case STRING_SLICE: return string_slice(a,b,c);
+    case STRING_FROM_CODE: return string_from_code(a);
+    case COMPARE_STRING: return compare_string(a,b);
+    case READ_DOUBLE: return read_double(a);
+    case DOUBLE_TO_BITS: return double_to_bits(a);
+    case DOUBLE_FROM_BITS: return double_from_bits(a);
+    case SEQ: (void)force(a); return b;
+    case PANIC:
+        a = expect(a,STRING);
+        fprintf(stderr,"Runtime: ");
+        for (size_t i = 0; i < a->as.string.length; ++i) fprintf(stderr,"%c",(unsigned char)a->as.string.bytes[i]);
+        fprintf(stderr,"\n");
+        cleanup(); exit(1);
     case ADD_DOUBLE: case SUB_DOUBLE: case MUL_DOUBLE: case DIV_DOUBLE: case EQ_DOUBLE: case LT_DOUBLE: {
         double x = unbox_double(a);
         double y = unbox_double(b);
@@ -675,7 +1083,9 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
 static MlfValue *primitive(Primitive p, MlfEnv *arguments) {
     static const size_t arities[PRIMITIVE_COUNT] = {
         1,2,1,1,0,1,2,1,2,2,2,2,2,3,2,2,2,1,
-        2,2,2,2,1,2,2,1,2,2,2,3,1,2,2,3,1,2,2,3,1,1,3,0,0,2,3,2
+        2,2,2,2,1,2,2,1,2,2,2,3,1,2,2,3,1,2,2,3,1,1,3,0,0,2,3,2,
+        1,2,3,1,2,1,1,1,2,1,1,2,1,1,0,1,1,1,0,0,
+        1,2,1,2,2,3,1
     };
     if (arguments->count < arities[p]) {
         MlfValue *result = value(PRIMITIVE);
@@ -696,6 +1106,7 @@ static MlfValue *apply(MlfValue *function, MlfValue *argument) {
     case CLOSURE: return function->as.closure.code(function->as.closure.env, argument);
     case PRIMITIVE:
         return primitive(function->as.primitive.identity, append(function->as.primitive.arguments, argument));
+    case CONSTRUCTOR_WIDE: fail("constructor overapplication");
     case CONSTRUCTOR: {
         if (function->as.constructor.fields->count >= (uint64_t)function->as.constructor.arity)
             fail("constructor overapplication");
@@ -705,6 +1116,10 @@ static MlfValue *apply(MlfValue *function, MlfValue *argument) {
         MlfValue *result = value(CONSTRUCTOR);
         result->as.constructor = function->as.constructor;
         result->as.constructor.fields = append(function->as.constructor.fields, argument);
+#ifdef MLF_COMPACT_BDWGC
+        if ((uint64_t)result->as.constructor.arity == result->as.constructor.fields->count)
+            return mlf_constructor_fields(result->as.constructor.identity,result->as.constructor.fields);
+#endif
         if ((uint64_t)result->as.constructor.arity == result->as.constructor.fields->count) CONSTRUCTED(result->as.constructor.identity);
         return result;
     }
@@ -715,7 +1130,20 @@ static MlfValue *apply(MlfValue *function, MlfValue *argument) {
 /* Follow tail applications/indirections iteratively and update every thunk
  * on the spine. BUSY catches recursive demand, including x = x cycles.
  */
+static void memoize(MlfValue *old, MlfValue *entry) {
+    old->tag = INDIRECT;
+#ifdef MLF_USE_BDWGC
+    /* The collector scans the whole union, so discard obsolete closure
+     * environments and application arguments after memoizing the result. */
+    memset(&old->as, 0, sizeof(old->as));
+#endif
+    old->as.indirect = entry;
+}
+
 static MlfValue *force(MlfValue *entry) {
+    /* Most evaluations update one thunk. Keep that root on the native stack
+     * and use the managed spill stack only for longer update spines. */
+    MlfValue *first_update = NULL;
     Stack updates = {0};
     for (;;) {
         if (!entry) fail("missing runtime value");
@@ -723,24 +1151,48 @@ static MlfValue *force(MlfValue *entry) {
         Tag tag = entry->tag;
         if (tag == HOLE || tag == BUSY) fail("cyclic evaluation of a recursive binding");
         if (tag != THUNK && tag != APPLICATION && tag != INDIRECT) break;
+        if (tag == INDIRECT) {
+            MlfValue *ready = mlf_peek(entry);
+            if (ready) { entry = ready; break; }
+        }
         MlfValue *old = entry;
-        push(&updates, old);
+        if (first_update) push(&updates, old);
+        else first_update = old;
         old->tag = BUSY;
+#ifdef MLF_USE_BDWGC
+        /* An entered thunk only needs its identity for the eventual update.
+         * Keeping its old environment on this spine retains every historical
+         * state until the whole computation returns. Live C operands protect
+         * the values still needed by the callback or application. */
+        if (tag == THUNK) {
+            MlfCode code = old->as.closure.code;
+            MlfEnv *env = old->as.closure.env;
+            memset(&old->as, 0, sizeof(old->as));
+            entry = code(env, NULL);
+        } else if (tag == APPLICATION) {
+            MlfValue *function = old->as.application.function;
+            MlfValue *argument = old->as.application.argument;
+            memset(&old->as, 0, sizeof(old->as));
+            entry = apply(function, argument);
+        } else {
+            entry = old->as.indirect;
+            memset(&old->as, 0, sizeof(old->as));
+        }
+#else
         if (tag == THUNK) entry = old->as.closure.code(old->as.closure.env, NULL);
         else if (tag == APPLICATION) entry = apply(old->as.application.function, old->as.application.argument);
         else entry = old->as.indirect;
+#endif
     }
-    for (size_t i = 0; i < updates.count; ++i) {
-        MlfValue *old = updates.items[i];
-        old->tag = INDIRECT;
-        old->as.indirect = entry;
-    }
+    if (first_update) memoize(first_update, entry);
+    for (size_t i = 0; i < updates.count; ++i) memoize(updates.items[i], entry);
     release_stack(&updates);
     return entry;
 }
 
 MlfValue *mlf_force(MlfValue *entry) {
-    if (entry && (immediate(entry) || entry->tag >= CLOSURE)) return entry;
+    MlfValue *ready = mlf_peek(entry);
+    if (ready) return ready;
     return force(entry);
 }
 
@@ -751,6 +1203,9 @@ MlfValue *mlf_prim1(int64_t p, MlfValue *a) {
     case IO_RETURN: case PUT_STR: case PUT_STR_LN: case PRINT_INT: case SHOW_INT: case READ_INT:
     case SQRT_DOUBLE: case INT_TO_DOUBLE: case LENGTH_INT_ARRAY: case LENGTH_DOUBLE_ARRAY:
     case LENGTH_BYTE_ARRAY: case BYTE_ARRAY_FROM_STRING:
+    case STRING_LENGTH: case STRING_FROM_CODE: case READ_DOUBLE: case DOUBLE_TO_BITS: case DOUBLE_FROM_BITS:
+    case PANIC: case READ_FILE: case FILE_EXISTS: case CANONICAL_PATH: case GET_ARG: case PUT_ERR: case EXIT_WITH:
+    case ST_RETURN: case RUN_ST: case LENGTH_ST_ARRAY:
         return primitive_result((Primitive)p,a,NULL,NULL);
     default: fail("unary primitive arity mismatch");
     }
@@ -762,6 +1217,8 @@ MlfValue *mlf_prim2(int64_t p, MlfValue *a, MlfValue *b) {
     case ADD_DOUBLE: case SUB_DOUBLE: case MUL_DOUBLE: case DIV_DOUBLE: case EQ_DOUBLE: case LT_DOUBLE:
     case FORMAT_DOUBLE: case NEW_INT_ARRAY: case READ_INT_ARRAY: case NEW_DOUBLE_ARRAY: case READ_DOUBLE_ARRAY:
     case NEW_BYTE_ARRAY: case READ_BYTE_ARRAY: case READ_INT_TABLE:
+    case STRING_CODE_AT: case COMPARE_STRING: case SEQ: case WRITE_FILE:
+    case ST_BIND: case NEW_ST_ARRAY: case READ_ST_ARRAY:
         return primitive_result((Primitive)p,a,b,NULL);
     default: fail("binary primitive arity mismatch");
     }
@@ -769,12 +1226,16 @@ MlfValue *mlf_prim2(int64_t p, MlfValue *a, MlfValue *b) {
 
 MlfValue *mlf_prim3(int64_t p, MlfValue *a, MlfValue *b, MlfValue *c) {
     switch (p) {
-    case IF_THEN_ELSE: case WRITE_INT_ARRAY: case WRITE_DOUBLE_ARRAY: case WRITE_BYTE_ARRAY: case PUT_BYTES: case WRITE_INT_TABLE:
+    case IF_THEN_ELSE: case WRITE_INT_ARRAY: case WRITE_DOUBLE_ARRAY: case WRITE_BYTE_ARRAY: case PUT_BYTES: case WRITE_INT_TABLE: case STRING_SLICE:
+    case WRITE_ST_ARRAY:
         return primitive_result((Primitive)p,a,b,c);
     default: fail("ternary primitive arity mismatch");
     }
 }
 
+#ifdef MLF_COMPACT_BDWGC
+static void release(Object *entry) { (void)entry; }
+#else
 static void release(Object *entry) {
     if (entry->kind == OBJECT_VALUE) {
         MlfValue *v = (MlfValue *)entry;
@@ -782,8 +1243,8 @@ static void release(Object *entry) {
             integer_bytes -= mpz_size(v->as.integer) * sizeof(mp_limb_t);
             mpz_clear(v->as.integer);
         }
-        if (v->tag == STRING) free(v->as.string.bytes);
-        if (v->tag == INT_ARRAY) free(v->as.int_array.cells);
+        if (v->tag == STRING) { free(v->as.string.bytes); free(v->as.string.indices); }
+        if (v->tag == INT_ARRAY || v->tag == ST_ARRAY) free(v->as.int_array.cells);
         if (v->tag == DOUBLE_ARRAY) free(v->as.double_array.cells);
         if (v->tag == BYTE_ARRAY) free(v->as.byte_array.cells);
         if (v->tag == INT_TABLE) kh_destroy(mlf_int,v->as.int_table);
@@ -794,6 +1255,8 @@ static void release(Object *entry) {
     }
     free(entry);
 }
+
+#endif
 
 static void cleanup(void) {
     while (active_stacks) {
@@ -811,7 +1274,9 @@ static void cleanup(void) {
         free(value_pages);
         value_pages = next;
     }
+#ifndef MLF_COMPACT_BDWGC
     free_values = NULL;
+#endif
     native_roots = NULL;
     io_current = NULL;
     io_continuations = NULL;
@@ -830,6 +1295,14 @@ static __attribute__((noinline)) void mark(Stack *pending, void *entry) {
 }
 
 static void collect(MlfValue *root, const Stack *continuations) {
+#ifdef MLF_USE_BDWGC
+    /* GC_malloc already collects during allocation. An IO boundary can also
+     * drop dead temporary graphs and reset the advisory allocation counters. */
+    GC_gcollect();
+    objects = 0;
+    integer_bytes = 0;
+    return;
+#endif
     Stack pending = {0};
     mark(&pending, root);
     for (size_t i = 0; i < continuations->count; ++i) mark(&pending, continuations->items[i]);
@@ -852,9 +1325,9 @@ static void collect(MlfValue *root, const Stack *continuations) {
         case CONSTRUCTOR_1: mark(&pending, v->as.packed.fields[0]); break;
         case CONSTRUCTOR_2:
             mark(&pending, v->as.packed.fields[0]); mark(&pending, v->as.packed.fields[1]); break;
-        case PRIMITIVE: mark(&pending, v->as.primitive.arguments); break;
+        case PRIMITIVE: case ST_ACTION: mark(&pending, v->as.primitive.arguments); break;
         case ACTION: mark(&pending, v->as.action.first); mark(&pending, v->as.action.second); break;
-        case INT_ARRAY:
+        case INT_ARRAY: case ST_ARRAY:
             for (size_t i = 0; i < v->as.int_array.length; ++i) mark(&pending, v->as.int_array.cells[i]);
             break;
         case INT_TABLE:
@@ -929,6 +1402,142 @@ static int valid_utf8(const unsigned char *bytes, size_t length) {
     return 1;
 }
 
+static const char *file_path(MlfValue *entry) {
+    entry = expect(entry,STRING);
+    if (memchr(entry->as.string.bytes,0,entry->as.string.length)) fail("file path contains NUL");
+    return entry->as.string.bytes;
+}
+
+static MlfValue *read_file(MlfValue *entry) {
+    const char *path = file_path(entry);
+    FILE *file = fopen(path,"rb");
+    if (!file) fail("IO error: file read failed");
+    size_t length = 0, capacity = 4096;
+    char *buffer = allocate(capacity);
+    for (;;) {
+        size_t n = fread(buffer + length,1,capacity - length,file);
+        length += n;
+        if (ferror(file)) { free(buffer); fclose(file); fail("IO error: file read failed"); }
+        if (feof(file)) break;
+        if (length == capacity) {
+            if (capacity > SIZE_MAX / 2) { free(buffer); fclose(file); fail("string too large"); }
+            capacity *= 2;
+            char *next = realloc(buffer,capacity);
+            if (!next) { free(buffer); fclose(file); fail("out of memory"); }
+            buffer = next;
+        }
+    }
+    if (fclose(file)) { free(buffer); fail("IO error: file read failed"); }
+    if (!valid_utf8((unsigned char *)buffer,length)) { free(buffer); fail("IO error: invalid UTF-8 input"); }
+    MlfValue *result = mlf_string(buffer,length);
+    free(buffer);
+    return result;
+}
+
+static void write_file(MlfValue *name, MlfValue *contents) {
+    const char *path = file_path(name);
+    contents = expect(contents,STRING);
+    FILE *file = fopen(path,"wb");
+    if (!file) fail("IO error: file write failed");
+    int failed = fwrite(contents->as.string.bytes,1,contents->as.string.length,file) != contents->as.string.length;
+    if (fclose(file)) failed = 1;
+    if (failed) fail("IO error: file write failed");
+}
+
+static MlfValue *file_exists(MlfValue *name) {
+    const char *path = file_path(name);
+    struct stat status;
+    return mlf_boolean(stat(path,&status) == 0 && S_ISREG(status.st_mode));
+}
+
+static MlfValue *canonical_path(MlfValue *name) {
+    const char *path = file_path(name);
+    char *resolved = realpath(path,NULL);
+    if (!resolved) fail("IO error: canonical path failed");
+    size_t n = strlen(resolved);
+    if (!valid_utf8((unsigned char *)resolved,n)) { free(resolved); fail("IO error: invalid UTF-8 input"); }
+    MlfValue *result = mlf_string(resolved,n);
+    free(resolved);
+    return result;
+}
+
+static MlfValue *executable_path(void) {
+    char *buffer = NULL;
+#ifdef __APPLE__
+    uint32_t capacity = 0;
+    (void)_NSGetExecutablePath(NULL,&capacity);
+    if (!capacity) fail("IO error: executable path failed");
+    buffer = allocate(capacity);
+    if (_NSGetExecutablePath(buffer,&capacity)) { free(buffer); fail("IO error: executable path failed"); }
+#elif defined(__linux__)
+    size_t capacity = 256;
+    for (;;) {
+        buffer = allocate(capacity + 1);
+        ssize_t size = readlink("/proc/self/exe",buffer,capacity);
+        if (size < 0) { free(buffer); fail("IO error: executable path failed"); }
+        if ((size_t)size < capacity) { buffer[size] = 0; break; }
+        free(buffer);
+        if (capacity > SIZE_MAX / 2 - 1) fail("IO error: executable path failed");
+        capacity *= 2;
+    }
+#else
+    fail("IO error: executable path failed");
+#endif
+    char *resolved = realpath(buffer,NULL);
+    free(buffer);
+    if (!resolved) fail("IO error: executable path failed");
+    size_t length = strlen(resolved);
+    if (!valid_utf8((unsigned char *)resolved,length)) { free(resolved); fail("IO error: invalid UTF-8 input"); }
+    MlfValue *result = mlf_string(resolved,length);
+    free(resolved);
+    return result;
+}
+
+static MlfValue *read_contents(void) {
+    char *line = NULL;
+    size_t line_capacity = 0, capacity = 4096, length = 0;
+    char *buffer = allocate(capacity);
+    for (;;) {
+        ssize_t count = getline(&line,&line_capacity,stdin);
+        if (count < 0) break;
+        if ((size_t)count > SIZE_MAX - length) { free(buffer); free(line); fail("string too large"); }
+        size_t required = length + (size_t)count;
+        if (required > capacity) {
+            while (capacity < required) {
+                if (capacity > SIZE_MAX / 2) { capacity = required; break; }
+                capacity *= 2;
+            }
+            char *next = realloc(buffer,capacity);
+            if (!next) { free(buffer); free(line); fail("out of memory"); }
+            buffer = next;
+        }
+        memcpy(buffer + length,line,(size_t)count);
+        length = required;
+    }
+    free(line);
+    if (!feof(stdin)) { free(buffer); fail("IO error: input failed"); }
+    if (!valid_utf8((unsigned char *)buffer,length)) { free(buffer); fail("IO error: invalid UTF-8 input"); }
+    MlfValue *result = mlf_string(buffer,length);
+    free(buffer);
+    return result;
+}
+
+static MlfValue *get_argument(MlfValue *entry) {
+    entry = expect(entry,INTEGER);
+    if (!argument_count) fail("argument index out of bounds");
+    uint64_t i = bounded_integer(entry,(uint64_t)argument_count-1,"argument index out of bounds");
+    const char *s = argument_values[i];
+    size_t n = strlen(s);
+    if (!valid_utf8((const unsigned char *)s,n)) fail("IO error: invalid UTF-8 input");
+    return mlf_string(s,n);
+}
+
+static void write_error(MlfValue *entry) {
+    entry = expect(entry,STRING);
+    if (fwrite(entry->as.string.bytes,1,entry->as.string.length,stderr) != entry->as.string.length || fflush(stderr) == EOF)
+        fail("IO error: output failed");
+}
+
 static MlfValue *read_line(void) {
     char *buffer = NULL;
     size_t capacity = 0;
@@ -950,8 +1559,14 @@ MlfValue *mlf_get_byte_line(void) {
     if (length < 0 && !feof(stdin)) { free(buffer); fail("IO error: byte input failed"); }
     MlfValue *result = value(BYTE_ARRAY);
     result->as.byte_array.length = length < 0 ? 0 : (size_t)length;
+#ifdef MLF_USE_BDWGC
+    result->as.byte_array.cells = allocate(result->as.byte_array.length ? result->as.byte_array.length : 1);
+    if (length > 0) memcpy(result->as.byte_array.cells,buffer,(size_t)length);
+    free(buffer);
+#else
     result->as.byte_array.cells = (unsigned char *)buffer;
     if (!buffer) result->as.byte_array.cells = allocate(1);
+#endif
     return result;
 }
 
@@ -1066,6 +1681,84 @@ static size_t array_index(MlfValue *index, size_t length) {
     return (size_t)bounded_integer(index,length-1,"array index out of bounds");
 }
 
+MlfValue *mlf_st_new_array(MlfValue *size, MlfValue *initial) {
+    size_t count = (size_t)bounded_integer(size,
+        INT64_MAX / sizeof(MlfValue *),"invalid array length");
+    if (!initial) fail("missing runtime value");
+    MlfValue *result = value(ST_ARRAY);
+    result->as.int_array.length = count;
+    result->as.int_array.cells = NULL;
+    result->as.int_array.cells = allocate(count ? count * sizeof(MlfValue *) : 1);
+    for (size_t i = 0; i < count; ++i) result->as.int_array.cells[i] = initial;
+    return result;
+}
+
+MlfValue *mlf_st_read_array(MlfValue *array, MlfValue *index) {
+    array = expect(array,ST_ARRAY);
+    size_t i = array_index(index,array->as.int_array.length);
+    /* Snapshot now. A deferred lookup would observe a later write. */
+    return array->as.int_array.cells[i];
+}
+
+MlfValue *mlf_st_write_array(MlfValue *array, MlfValue *index, MlfValue *entry) {
+    array = expect(array,ST_ARRAY);
+    size_t i = array_index(index,array->as.int_array.length);
+    if (!entry) fail("missing runtime value");
+    array->as.int_array.cells[i] = entry;
+    return mlf_constructor(0,0);
+}
+
+MlfValue *mlf_st_length_array(MlfValue *array) {
+    return small((int64_t)expect(array,ST_ARRAY)->as.int_array.length);
+}
+
+/* ST has no process-global current action or mutable store: each call owns
+ * its continuation stack, while boxed arrays keep ordinary heap reachability.
+ * Do not explicitly collect here. Pure generated frames do not register every
+ * live root with the ordinary collector; BDWGC scans the native stack itself. */
+static MlfValue *run_st(MlfValue *root) {
+    Stack continuations = {0};
+    MlfValue *current = root;
+    for (;;) {
+        MlfValue *operation = expect(current,ST_ACTION);
+        MlfEnv *arguments = operation->as.primitive.arguments;
+        MlfValue *result;
+        switch (operation->as.primitive.identity) {
+        case ST_BIND:
+            push(&continuations, mlf_env_get(arguments,1));
+            current = mlf_env_get(arguments,0);
+            continue;
+        case ST_RETURN:
+            result = mlf_env_get(arguments,0);
+            break;
+        case NEW_ST_ARRAY:
+            result = mlf_st_new_array(mlf_env_get(arguments,0),mlf_env_get(arguments,1));
+            break;
+        case READ_ST_ARRAY:
+            result = mlf_st_read_array(mlf_env_get(arguments,0),mlf_env_get(arguments,1));
+            break;
+        case WRITE_ST_ARRAY:
+            result = mlf_st_write_array(mlf_env_get(arguments,0),mlf_env_get(arguments,1),mlf_env_get(arguments,2));
+            break;
+        case LENGTH_ST_ARRAY:
+            result = mlf_st_length_array(mlf_env_get(arguments,0));
+            break;
+        default: fail("invalid ST action");
+        }
+        if (!continuations.count) {
+            release_stack(&continuations);
+            return result;
+        }
+        MlfValue *next = continuations.items[--continuations.count];
+#ifdef MLF_USE_BDWGC
+        continuations.items[continuations.count] = NULL;
+#endif
+        current = mlf_application(next,result);
+    }
+}
+
+MlfValue *mlf_execute_st_lazy(MlfValue *action) { return run_st(action); }
+
 MlfValue *mlf_new_array(int64_t p, MlfValue *size, MlfValue *initial) {
     size_t n = (size_t)bounded_integer(size,INT64_MAX / 8,"invalid array length");
     if (p == NEW_BYTE_ARRAY) {
@@ -1178,6 +1871,23 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
             continue;
         case IO_RETURN: result = operation->as.action.first; break;
         case GET_LINE: result = read_line(); break;
+        case READ_FILE: result = read_file(operation->as.action.first); break;
+        case WRITE_FILE:
+            write_file(operation->as.action.first,operation->as.action.second);
+            result = mlf_constructor(0,0); break;
+        case FILE_EXISTS: result = file_exists(operation->as.action.first); break;
+        case CANONICAL_PATH: result = canonical_path(operation->as.action.first); break;
+        case GET_ARG_COUNT: result = small(argument_count); break;
+        case GET_ARG: result = get_argument(operation->as.action.first); break;
+        case GET_EXECUTABLE_PATH: result = executable_path(); break;
+        case GET_CONTENTS: result = read_contents(); break;
+        case PUT_ERR:
+            write_error(operation->as.action.first);
+            result = mlf_constructor(0,0); break;
+        case EXIT_WITH: {
+            int status = (int)bounded_integer(operation->as.action.first,255,"exit status must be between 0 and 255");
+            cleanup(); exit(status);
+        }
         case GET_BYTE_LINE: result = mlf_get_byte_line(); break;
         case NEW_INT_TABLE: result = mlf_new_int_table(); break;
         case READ_INT_TABLE:
@@ -1219,6 +1929,9 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
         }
         if (!continuations.count) break;
         MlfValue *next = continuations.items[--continuations.count];
+#ifdef MLF_USE_BDWGC
+        continuations.items[continuations.count] = NULL;
+#endif
         current = mlf_application(next, result);
     }
     release_stack(&continuations);

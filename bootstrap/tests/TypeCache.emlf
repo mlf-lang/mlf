@@ -1,0 +1,88 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.Graph as G
+import qualified Bootstrap.Elaborate as E
+import qualified Bootstrap.X.Type as T
+import qualified Bootstrap.X.Pretty as Pretty
+
+-- A direct recursive translation is the independent oracle for the cache.
+-- It deliberately recomputes ordered bounds and never calls cached helpers.
+originalType : Graph -> Int -> XType
+originalType graph identity =
+  let n = G.resolve graph identity in
+  let body = case G.tag (G.nodeAt graph n) of
+        GBot -> XBot
+        GBotK kind -> T.bottomKind kind
+        GArr a b -> XArrow (originalChild graph a) (originalChild graph b)
+        GCon name xs -> XCon name (L.map (originalChild graph) xs)
+        GTyCon name kind -> XCon name Nil
+        GSkolem name kind -> XVar (XTyVar name)
+        GTyApp f a -> T.apply (originalChild graph f) (originalChild graph a)
+        GGen child -> panic "oracle cannot translate a generalization node"
+  in L.foldr (\bound rest -> case bound of Pair name ty -> XForall name ty rest) body (originalBounds graph n)
+
+originalChild : Graph -> Int -> XType
+originalChild graph n = case G.flag (G.nodeAt graph n) of
+  Flexible -> XVar (XTyVar (G.resolve graph n))
+  Rigid -> originalType graph n
+
+originalBounds : Graph -> Int -> List (Pair XTyVar XType)
+originalBounds graph parent =
+  let root = case G.tag (G.nodeAt graph parent) of { GGen n -> n; _ -> parent } in
+  L.map (\n -> Pair (XTyVar n) (originalType graph n))
+    (L.filter (\n -> E.sameParent (G.resolve graph parent) (G.binder (G.nodeAt graph n)) && E.isFlexible (G.flag (G.nodeAt graph n)))
+      (G.orderedBelow graph root))
+
+originalReference graph n =
+  let v = G.nodeAt graph n in
+  if E.isFlexible (G.flag v) && (case G.binder v of
+    Nothing -> false
+    Just p -> G.isGen (G.tag (G.nodeAt graph p)))
+  then XVar (XTyVar (G.resolve graph n)) else originalType graph n
+
+originalScheme graph n = L.foldr (\bound body -> case bound of Pair name ty -> XForall name ty body)
+  (originalReference graph (G.genRoot graph n)) (originalBounds graph n)
+
+shared = Graph (IM.fromList
+  (Cons (Pair 0 (Node (GGen 1) Nothing Flexible))
+  (Cons (Pair 1 (Node (GArr 2 3) (Just 0) Rigid))
+  (Cons (Pair 2 (Node GBot (Just 0) Flexible))
+  (Cons (Pair 3 (Node (GArr 4 2) (Just 0) Rigid))
+  (Cons (Pair 4 (Node GBot (Just 3) Flexible))
+  (Cons (Pair 5 (Node (GGen 6) (Just 0) Flexible))
+  (Cons (Pair 6 (Node GBot (Just 5) Flexible)) Nil))))))))
+  (IM.fromList (Cons (Pair 8 9) (Cons (Pair 9 3) Nil))) 10
+
+higher = Graph (IM.fromList
+  (Cons (Pair 0 (Node (GGen 1) Nothing Flexible))
+  (Cons (Pair 1 (Node (GTyApp 2 3) (Just 0) Flexible))
+  (Cons (Pair 2 (Node (GTyCon "F" (KArrow Star Star)) (Just 1) Rigid))
+  (Cons (Pair 3 (Node GBot (Just 1) Flexible)) Nil))))) IM.empty 4
+
+translateNode offset (Pair n v) = Pair (n + offset)
+  (Node (G.mapTag (\i -> i + offset) (G.tag v)) (L.mapOptional (\i -> i + offset) (G.binder v)) (G.flag v))
+
+translate offset graph = Graph
+  (IM.fromList (L.map (translateNode offset) (IM.toList (G.nodes graph))))
+  (IM.fromList (L.map (\entry -> case entry of Pair n target -> Pair (n + offset) (target + offset)) (IM.toList (G.links graph))))
+  (G.nextId graph + offset)
+
+sameType a b = eqString (Pretty.prettyType a) (Pretty.prettyType b)
+sameBounds a b = L.eqList (\x y -> case x of Pair a t -> case y of Pair b u -> T.tyVarId a == T.tyVarId b && sameType t u) a b
+
+check graph = case G.validateGraph graph of
+  Left message -> panic ("invalid cache test graph: " ++ message)
+  Right ignored ->
+    let context = E.prepareTypes graph in
+    L.all (\n ->
+      sameBounds (E.boundsAtIn context n) (originalBounds graph n) &&
+      (if G.isGen (G.tag (G.nodeAt graph n)) then sameType (E.schemeTypeIn context n) (originalScheme graph n)
+       else sameType (E.typeAtIn context n) (originalType graph n) && sameType (E.referenceIn context n) (originalReference graph n)))
+      (L.append (IM.keys (G.nodes graph)) (IM.keys (G.links graph)))
+
+main = if L.all (\offset -> check (translate offset shared) && check (translate offset higher))
+  (Cons 0 (Cons 1267650600228229401496703205376 (Cons (-1267650600228229401496703205376) Nil)))
+  then putStrLn "type cache: six graphs, aliases, higher kinds, nested bounds and lazy generalizations passed"
+  else panic "cached graph translation differs from direct recursion"

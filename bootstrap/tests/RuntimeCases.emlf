@@ -1,0 +1,54 @@
+module Main where
+import Bootstrap.Types
+import Bootstrap.Std
+import qualified Bootstrap.Runtime as R
+
+intType = XCon "Int" Nil
+unitType = XCon "Unit" Nil
+ioUnit = XCon "IO" (Cons unitType Nil)
+arrayType = XCon "IntArray" Nil
+apps f xs = foldl XApp f xs
+prim p xs = apps (XPrimitive p Nil) xs
+integer n = XIntTerm n
+print n = XApp (XPrimitive PPrintInt Nil) n
+ret = XApp (XPrimitive PIOReturn (Cons unitType Nil)) (XConstructor "Unit" Nil)
+thenIO a b = apps (XPrimitive PIOBind (Cons unitType (Cons unitType Nil))) (Cons a (Cons (XAbs (XName 900 "ignored") unitType b) Nil))
+bindIO ty name a b = apps (XPrimitive PIOBind (Cons ty (Cons unitType Nil))) (Cons a (Cons (XAbs name ty b) Nil))
+condition c a b = apps (XPrimitive PIfThenElse (Cons ioUnit Nil)) (Cons c (Cons a (Cons b Nil)))
+
+lazyCase = XCase (XApp (XPrimitive PPanic (Cons intType Nil)) (XStringTerm "unforced")) ioUnit
+  (Cons (XAlternative (XDefaultPattern Nothing) (XApp (XPrimitive PPutStrLn Nil) (XStringTerm "lazy"))) Nil)
+
+countName = XName 1 "count"
+nName = XName 2 "n"
+countBody = XAbs nName intType
+  (condition (prim PEqInt (Cons (XVarTerm nName) (Cons (integer 0) Nil))) ret
+    (thenIO (print (XVarTerm nName))
+      (XApp (XVarTerm countName) (prim PSubInt (Cons (XVarTerm nName) (Cons (integer 1) Nil))))))
+recursive = XLetRec (Cons (Triple countName (XArrow intType ioUnit) countBody) Nil)
+  (XApp (XVarTerm countName) (integer 3))
+
+arrayName = XName 3 "array"
+entryName = XName 4 "entry"
+arrayProgram = bindIO arrayType arrayName (prim PNewIntArray (Cons (integer 2) (Cons (integer 3) Nil)))
+  (thenIO (prim PWriteIntArray (Cons (XVarTerm arrayName) (Cons (integer 0) (Cons (integer 9) Nil))))
+    (bindIO intType entryName (prim PReadIntArray (Cons (XVarTerm arrayName) (Cons (integer 0) Nil))) (print (XVarTerm entryName))))
+
+run program = do
+  result <- R.runTerm program
+  case result of
+    Left message -> panic message
+    Right unit -> return ()
+
+main = do
+  run lazyCase
+  run recursive
+  run arrayProgram
+  result <- R.runTerm (integer 1)
+  case result of
+    Left message -> putStrLn message
+    Right unit -> panic "pure IO entry accepted"
+  result <- R.runTerm (XApp (XPrimitive PPrintInt Nil) (prim PQuotInt (Cons (integer 1) (Cons (integer 0) Nil))))
+  case result of
+    Left message -> putStrLn message
+    Right unit -> panic "division by zero accepted"

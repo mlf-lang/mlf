@@ -127,9 +127,15 @@ numericArrayTests backends =
       ] $ \source -> case compile "<invalid numeric/array test>" source of
         Left _ -> pure ()
         Right _ -> fail ("accepted: " ++ source))
-  , ("numeric: non-finite target literal rejected by both backends", do
-      let term = X.App (X.Primitive P.IOReturn [T.Con "Double" []]) (X.DoubleTerm (0/0))
-      result <- B.execute backends IOEntry (Input "" False) term
+  , ("numeric: non-finite target literal rejected by both backends", forM_ [0/0, 1/0, -1/0] $ \value -> do
+      let term = X.App (X.Primitive P.IOReturn [T.Con "Double" []]) (X.DoubleTerm value)
+      parsed <- right (XP.parseTerm "<non-finite xMLF>" (prettyTerm term))
+      case parsed of
+        X.App _ (X.DoubleTerm actual) ->
+          unless (if isNaN value then isNaN actual else actual == value)
+            (fail "target serialization changed a non-finite Double")
+        _ -> fail "target serialization lost a non-finite Double"
+      result <- B.execute backends IOEntry (Input "" False) parsed
       case B.outcome result of
         Left err | "non-finite Double literal" `isInfixOf` show err && null (B.events result) -> pure ()
         _ -> fail (show result))

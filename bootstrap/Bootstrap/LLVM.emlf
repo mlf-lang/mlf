@@ -1,0 +1,79 @@
+module Bootstrap.LLVM where
+
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.Map as M
+import qualified Bootstrap.X.Check as Check
+import qualified Bootstrap.X.Syntax as X
+import qualified Bootstrap.LLVM.Codegen as Codegen
+import qualified Bootstrap.LLVM.Optimize as Optimize
+
+emitLLVM : XTerm -> Either String String
+emitLLVM term = emitEntry false false term
+
+emitLLVMIO : XTerm -> Either String String
+emitLLVMIO term = emitEntry false true term
+
+emitLLVMChunks : XTerm -> Either String (List String)
+emitLLVMChunks term = emitEntryChunks false false term
+
+emitLLVMIOChunks : XTerm -> Either String (List String)
+emitLLVMIOChunks term = emitEntryChunks false true term
+
+emitLLVMForGC : XTerm -> Either String String
+emitLLVMForGC term = emitEntry true false term
+
+emitLLVMIOForGC : XTerm -> Either String String
+emitLLVMIOForGC term = emitEntry true true term
+
+emitLLVMGCChunks : XTerm -> Either String (List String)
+emitLLVMGCChunks term = emitEntryChunks true false term
+
+emitLLVMIOGCChunks : XTerm -> Either String (List String)
+emitLLVMIOGCChunks term = emitEntryChunks true true term
+
+ioType : XType -> Bool
+ioType ty = case ty of
+  XForall variable bound body -> ioType body
+  XCon name (Cons argument Nil) -> eqString name "IO"
+  _ -> false
+
+dataConstructors : DataDecl -> List ConstructorDecl
+dataConstructors declaration = case declaration of
+  DataDecl name parameters constructors -> constructors
+  DataDeclK name parameters constructors -> constructors
+
+constructorEntry : Int -> ConstructorDecl -> Pair String (Pair Int Int)
+constructorEntry index (ConstructorDecl name fields) = Pair name (Pair index (L.length fields))
+
+emitEntry : Bool -> Bool -> XTerm -> Either String String
+emitEntry compact requireIO term = L.mapEither L.concatStrings (emitEntryChunks compact requireIO term)
+
+-- Keep the module as output chunks for the executable driver. Streaming these
+-- through IO bounds temporary String copies and permits runtime collection.
+emitEntryChunks : Bool -> Bool -> XTerm -> Either String (List String)
+emitEntryChunks compact requireIO term = case Check.checkClosed term of
+  Left error -> Left ("LLVM target verification failed: " ++ error)
+  Right ty -> if requireIO && L.not (ioType ty) then Left "program must have type IO a to run" else
+    let declarations = case term of XWithData ds body -> ds; _ -> Nil in
+    let dataConstructorsAll = L.concatMap dataConstructors declarations in
+    let constructors = M.fromList compareString (Cons (Pair "Unit" (Pair 0 0)) (L.zipWith constructorEntry (L.range 1 (L.length dataConstructorsAll)) dataConstructorsAll)) in
+    case (if compact then Codegen.generateForGC else Codegen.generate) constructors (Optimize.optimize (X.erase term)) of
+      Left error -> Left error
+      Right (Pair entry code) -> Right (L.map (\line -> line ++ "\n") (L.append (Cons "; Generated from independently checked xMLF." (Cons "source_filename = \"emlf\"" (Cons "" Nil))) (L.append code (entryCode compact entry (ioType ty)))))
+
+entryCode : Bool -> String -> Bool -> List String
+entryCode compact entry executeIO =
+  let abi = if compact then "mlf_require_compact_gc_abi" else "mlf_require_standard_abi" in
+  Cons ("declare void @" ++ abi ++ "()") (
+  Cons "define ptr @mlf_entry() {" (
+  Cons ("  call void @" ++ abi ++ "()") (
+  Cons ("  %root = call ptr " ++ entry ++ "(ptr null, ptr null)") (
+  Cons "  ret ptr %root" (
+  Cons "}" (
+  Cons "define i32 @main(i32 %argc, ptr %argv) {" (
+  Cons "  call void @mlf_set_args(i32 %argc, ptr %argv)" (
+  Cons "  %root = call ptr @mlf_entry()" (
+  Cons ("  %status = call i32 @mlf_run(ptr %root, i64 " ++ (if executeIO then "1" else "0") ++ ")") (
+  Cons "  ret i32 %status" (
+  Cons "}" Nil)))))))))))

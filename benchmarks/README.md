@@ -85,15 +85,17 @@ clang -O3 benchmarks/binary-trees/c/main.c -lm -o "$OUT/program"
 rustc -O benchmarks/binary-trees/rust/main.rs -o "$OUT/program"
 ghc -O2 -XBangPatterns -fno-full-laziness -fno-cse -fforce-recomp \
   benchmarks/binary-trees/haskell/upstream.hs -outputdir "$OUT" -o "$OUT/program"
-emlf --emit-llvm benchmarks/binary-trees/mlf/main.emlf > "$OUT/program.ll"
-clang -O2 -Wno-override-module "$OUT/program.ll" "$(emlf --llvm-runtime)" \
-  $(pkg-config --cflags --libs gmp) -lm -o "$OUT/program"
+python3 scripts/compile_native.py --compiler emlf \
+  benchmarks/binary-trees/mlf/main.emlf -o "$OUT/program"
 ```
 
 In the actual driver, runtime path and GMP flag discovery happen **before**
 measurement. Paths are passed as argument arrays, not interpreted by a shell.
-MLF uses this repository's normal checked eMLF → xMLF → LLVM pipeline, then
-Clang `-O2` compiles the LLVM IR **and fresh C runtime** and links GMP. There
+MLF uses the general [native driver](../scripts/compile_native.py): checked
+eMLF → xMLF → LLVM emission overlaps Clang `-O2` compilation of the **fresh C
+runtime**. Clang then compiles the LLVM IR and links the runtime object and GMP.
+At most two compiler processes overlap within an MLF build. This scheduling
+uses the same source, optimization flags and complete runtime as serial builds. There
 is no prebuilt runtime object reused between samples. C uses the requested
 `-O3`, Rust `-O`, and GHC `-O2`. No native CPU tuning, LTO, profile-guided
 optimization, parallel runtime or debug/sanitizer build is enabled. The
@@ -121,7 +123,10 @@ after linking. It includes compiler startup, MLF IR writes, backend/runtime
 compilation and linking. Fresh temporary directories and GHC force-recompile
 prevent reuse of object/interface/output files. OS file caches remain warm;
 this is not a disk-cache-flushing or cold-machine experiment. Language order
-rotates between rounds, all builds are serial, and the median is reported.
+rotates between rounds, samples and languages run serially, and the median is
+reported. MLF's frontend and runtime phases overlap within each build; their
+individual elapsed times must not be added to reconstruct wall time. The
+measured outer interval includes both phases and the final LLVM compile/link.
 Each timed build is subsequently executed on a small input to check its
 product; that execution is outside the compilation interval.
 
@@ -178,7 +183,8 @@ in `cabal test`; the measured programs are uninstrumented.
 Wall timing uses Python's high-resolution monotonic `perf_counter`; POSIX
 `wait4` supplies per-process user/system CPU and peak RSS. Darwin reports RSS
 in bytes, Linux in KiB, converted to bytes. CPU is summed over compilation
-stages and stage RSS is reported as a maximum, not a sum. OS resource usage
+stages and stage RSS is reported as a maximum, not a sum or a simultaneous
+aggregate memory measurement. OS resource usage
 for compiler subprocess descendants has platform-specific accounting;
 runtime programs are single-process. Wall timing includes process startup,
 input parsing, output, garbage collection and exit. Temporary file IO avoids

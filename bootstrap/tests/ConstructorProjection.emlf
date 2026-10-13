@@ -1,0 +1,74 @@
+module Main where
+
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.Set as S
+import qualified Bootstrap.Map as M
+import qualified Bootstrap.X.Syntax as X
+import qualified Bootstrap.LLVM.Optimize as O
+
+assert good message = if good then ioReturn Unit else do
+  putErr ("constructor projection: " ++ message ++ "\n")
+  exitWith 1
+
+name n = XName n "same"
+app f a = XEApp f a
+construct c fields = L.foldl app (XEConstructor c) fields
+pair a b = construct "Result" (Cons a (Cons b Nil))
+field box n rest = XECase (XEVar box) (Cons (XErasedAlternative
+  (XConstructorPattern "Cell" (Cons (Just n) (Cons Nothing Nil))) rest) Nil)
+readValue = XEApp (XEPrimitive PReadInt) (XEString "42")
+poison = XEApp (XEPrimitive PPanic) (XEString "unused field")
+
+readCount : XErased -> Int
+readCount expression = (case expression of XEPrimitive PReadInt -> 1; _ -> 0) + L.sum (L.map readCount (O.subterms expression))
+
+caseCount : String -> XErased -> Int
+caseCount constructor expression = (case expression of
+  XECase value branches -> if L.any (\branch -> case branch of
+    XErasedAlternative (XConstructorPattern c names) body -> eqString c constructor
+    _ -> false) branches then 1 else 0
+  _ -> 0) + L.sum (L.map (caseCount constructor) (O.subterms expression))
+
+binders : XErased -> List XName
+binders expression = L.append (case expression of
+  XEAbs n b -> Cons n Nil
+  XELet n a b -> Cons n Nil
+  XELetRec ds b -> L.map L.fst ds
+  XECase value branches -> L.concatMap (\branch -> case branch of XErasedAlternative p b -> X.patternNames p) branches
+  _ -> Nil) (L.concatMap binders (O.subterms expression))
+
+unique expression = L.length (binders expression) == S.size (S.fromList O.compareName (binders expression))
+
+main = do
+  let box = name 0
+  let x = name 1
+  let y = name 2
+  let shared = XELet box (construct "Cell" (Cons readValue (Cons poison Nil)))
+        (field box x (field box y (pair (XEVar x) (XEVar y))))
+  let result = O.optimize shared
+  assert (caseCount "Cell" result == 0 && readCount result == 1) "projections run and share the field computation"
+  assert (S.null (O.free result) && unique result) "shared projection identities"
+  let stream = name 10
+  let next = name 11
+  let recursive = XELetRec (Cons (Pair stream (construct "Stream" (Cons readValue (Cons (XEVar stream) Nil)))) Nil)
+        (XECase (XEVar stream) (Cons (XErasedAlternative (XConstructorPattern "Stream" (Cons (Just x) (Cons (Just next) Nil)))
+          (XECase (XEVar next) (Cons (XErasedAlternative (XConstructorPattern "Stream" (Cons (Just y) (Cons Nothing Nil)))
+            (pair (XEVar x) (XEVar y))) Nil))) Nil))
+  let recursiveResult = O.optimize recursive
+  assert (caseCount "Stream" recursiveResult == 0 && readCount recursiveResult == 1) "recursive fields preserve their knot and sharing"
+  assert (S.null (O.free recursiveResult) && unique recursiveResult) "recursive projection identities"
+  let captured = name 20
+  let argument = name 21
+  let applyField f = XEApp (XEVar f) (XEInt 23)
+  let function = XEAbs argument (XEApp (XEApp (XEPrimitive PAddInt) (XEVar captured)) (XEVar argument))
+  let functions = XELet captured readValue (XELet box (construct "Cell" (Cons function (Cons poison Nil)))
+        (field box x (field box y (pair (applyField x) (applyField y)))))
+  let functionResult = O.optimize functions
+  assert (caseCount "Cell" functionResult == 0 && readCount functionResult == 1 && S.null (O.free functionResult) && unique functionResult) "copied captured functions retain shared values and fresh binders"
+  let arities = M.singleton "Cell" (Just 2)
+  assert (case O.constructorValue arities (construct "Cell" (Cons poison Nil)) of Nothing -> true; _ -> false) "partial constructor is not saturated data"
+  let conflict = XECase (XEInt 0) (Cons (XErasedAlternative (XConstructorPattern "Cell" (Cons Nothing Nil)) (XEInt 0))
+        (Cons (XErasedAlternative (XConstructorPattern "Cell" (Cons Nothing (Cons Nothing Nil))) (XEInt 1)) Nil))
+  assert (case M.lookup compareString "Cell" (O.constructorArities conflict) of Just Nothing -> true; _ -> false) "inconsistent arity evidence disables propagation"
+  putStrLn "constructor projection: 7 checks passed"

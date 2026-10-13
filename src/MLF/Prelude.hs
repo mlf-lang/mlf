@@ -1,6 +1,6 @@
 -- | The implicit source prelude. Its dictionaries go through the same kind,
 -- instance, inference, elaboration, and target checks as user declarations.
-module MLF.Prelude (PreludeMode (..), withPrelude, monadClass, ioInstance) where
+module MLF.Prelude (PreludeMode (..), withPrelude, monadClass, ioInstance, stInstance) where
 
 import qualified Data.Set as Set
 import MLF.Kind
@@ -19,7 +19,7 @@ withPrelude ImplicitPrelude program
   | any ((== "Monad") . S.className) classes = (Set.empty,program)
   | not needed = (Set.empty,program)
   | otherwise = (Set.singleton "Monad",
-      S.ClassProgram datatypes (monadClass : classes) (ioInstance : instances) body)
+      S.ClassProgram datatypes (monadClass : classes) (ioInstance : stInstance : instances) body)
   where
     (datatypes,classes,instances,body) = case program of
       S.Program ds e -> (ds,[],[],e)
@@ -47,6 +47,10 @@ monadClass = S.ClassDecl "Monad" [("m",KArrow Star Star)] []
 ioInstance :: S.InstanceDecl
 ioInstance = S.InstanceDecl [] [] "Monad" [S.Con "IO" []]
   [("return",S.Primitive P.IOReturn), ("bind",S.Primitive P.IOBind)]
+
+stInstance :: S.InstanceDecl
+stInstance = S.InstanceDecl [("s",Star)] [] "Monad" [S.Con "ST" [S.TVar "s"]]
+  [("return",S.Primitive P.STReturn), ("bind",S.Primitive P.STBind)]
 
 -- Import only used declarations: pure eMLF terms should neither allocate
 -- dictionaries nor change graph identities because an unused prelude exists.

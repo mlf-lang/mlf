@@ -1,0 +1,25 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.SourceEquality as E
+import qualified Bootstrap.Prelude as P
+import qualified Bootstrap.Set as S
+
+expect : Bool -> String -> IO Unit
+expect good label = if good then ioReturn Unit else panic ("prelude assertion: " ++ label)
+usesPrelude : SProgram -> Bool
+usesPrelude program = case P.withPrelude ImplicitPrelude program of
+  Pair classes result -> S.member compareString "Monad" classes
+main = do
+  expect (usesPrelude (SProgram Nil (SApp (SVar "return") (SIntLit 7)))) "return imports Monad"
+  expect (L.not (usesPrelude (SProgram Nil (SIntLit 7)))) "pure terms avoid prelude"
+  expect (L.not (usesPrelude (SProgram Nil (SLam "return" Nothing (SVar "return"))))) "local return shadows imported method"
+  expect (L.not (usesPrelude (SClassProgram Nil (Cons P.monadClass Nil) Nil (SVar "return")))) "local Monad shadows prelude"
+  expect (case P.withPrelude NoImplicitPrelude (SProgram Nil (SVar "return")) of {Pair classes program -> S.null classes && E.eqSProgram program (SProgram Nil (SVar "return"))}) "no implicit prelude"
+  expect (usesPrelude (SProgram Nil (SAnn (SVar "f") (SAnnotation Nil (SQualified (Cons (SPredicate "Monad" (Cons (STVar "m") Nil)) Nil) (SArrow (STVar "a") (STVar "a"))))))) "qualified annotation imports Monad"
+  expect (S.eqSet eqString (P.freeNames (SDo (Cons (SDoBind (SDefaultPattern (Just "x")) (SVar "action")) Nil) (SVar "x"))) (S.fromList compareString (Cons "bind" (Cons "action" Nil)))) "do free variable scope"
+  expect (E.eqSType (SForall Flexible "a" SBottom (SArrow (STVar "a") (STVar "a"))) (SForall Flexible "a" SBottom (SArrow (STVar "a") (STVar "a")))) "structural type equality"
+  expect (L.not (E.eqSType (SForall Flexible "a" SBottom (STVar "a")) (SForall Rigid "a" SBottom (STVar "a")))) "flags affect structural type equality"
+  expect (L.not (E.eqSExpr (SCase (SVar "x") (Cons (SAlternative (SIntPattern 1) (SStringLit "a")) Nil)) (SCase (SVar "x") (Cons (SAlternative (SIntPattern 1) (SStringLit "b")) Nil)))) "branch body affects expression equality"
+  expect (L.not (E.eqSPattern (SNestedPattern "Pair" (Cons (SDefaultPattern (Just "a")) Nil)) (SNestedPattern "Pair" (Cons (SDefaultPattern Nothing) Nil)))) "nested pattern equality"
+  putStrLn "prelude-ok"

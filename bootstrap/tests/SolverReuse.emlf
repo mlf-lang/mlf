@@ -1,0 +1,103 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.Map as M
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.IntSet as IS
+import qualified Bootstrap.Graph as G
+import qualified Bootstrap.Graph.Solver as S
+import qualified Bootstrap.Constraint as C
+import qualified Bootstrap.Compiler as Compiler
+import qualified Bootstrap.Elaborate as E
+import qualified Bootstrap.Parser as P
+import qualified Bootstrap.Module as Modules
+import qualified Bootstrap.Prelude as Prelude
+import qualified Bootstrap.Classes as Classes
+import qualified Bootstrap.X.Check as Check
+import qualified Bootstrap.X.Syntax as X
+import qualified Bootstrap.X.Type as T
+import qualified Bootstrap.X.Pretty as Pretty
+
+assert condition message = if condition then Right Unit else Left message
+sameGraph a b = G.nextId a == G.nextId b && IM.eqIntMap G.equalNode (G.nodes a) (G.nodes b) && IM.eqIntMap eqInt (G.links a) (G.links b)
+sameIndexes a b = IM.eqIntMap IS.eqIntSet (S.structuralParents a) (S.structuralParents b) && IM.eqIntMap IS.eqIntSet (S.bindingChildren a) (S.bindingChildren b) && S.equalScopes (S.scopeIndex a) (S.scopeIndex b)
+
+-- The old checked route is retained explicitly. It rebuilds a solver during
+-- elaborateResolved instead of sharing the finished solver with elaboration.
+legacySolve constraints = do
+  prepared <- S.prepare (C.initialGraph constraints)
+  unified <- S.solverUnify (C.equalities constraints) prepared
+  solved <- L.foldM (\solver edge -> S.instantiateClosed (C.fromGen edge) (C.toNode edge) solver) unified (C.instances constraints)
+  finished <- S.finish solved
+  let normalized = G.normalize finished
+  G.validateGraph normalized
+  Right normalized
+
+lower sources file source = do
+  root <- P.parseModule file source
+  if Compiler.standalone root then do
+    original <- P.standaloneProgram root
+    case Prelude.withPrelude ImplicitPrelude original of
+      Pair imports program -> Classes.lowerClassesWithImports imports program
+  else do
+    modules <- Modules.loadModuleMap sources root
+    LinkedModule program names valueScopes instanceScopes <- Modules.linkModules ImplicitPrelude modules
+    Classes.lowerClassesWithScopes valueScopes instanceScopes program
+
+checkCounters constraints = case constraints of
+  Constraints (Graph nodes aliases fresh) typed equations instances ->
+    case C.solvePrepared (Constraints (Graph nodes aliases 0) typed equations instances) of
+      Left error -> assert (eqString error "fresh identity counter overlaps graph nodes") "fresh counter failure changed"
+      Right solver -> Left "checked solver reuse skipped initial freshness validation"
+
+checkFixture sources file source = do
+  Pair program names <- lower sources file source
+  case program of
+    SClassProgram _ _ _ _ -> Left "class lowering did not finish"
+    SProgram declarations expression -> do
+      constraints <- C.generateProgram program
+      checkCounters constraints
+      oldGraph <- legacySolve constraints
+      reused <- C.solvePrepared constraints
+      let graph = S.solverGraph reused
+      assert (sameGraph oldGraph graph) "solvePrepared changed the solved graph"
+      projected <- C.solve constraints
+      assert (sameGraph projected graph) "legacy solve changed its graph result"
+      assert (sameGraph graph (G.canonicalize graph)) "normalized graph is not canonical"
+      rebuilt <- S.prepare graph
+      assert (sameIndexes rebuilt reused) "normalized solver indexes differ from independent reconstruction"
+      finished <- S.finish reused
+      assert (sameGraph finished graph) "normalized checked solver failed independent finish"
+      oldEvidence <- E.resolveEvidence oldGraph (C.skeleton constraints)
+      evidence <- E.resolveEvidence graph (C.skeleton constraints)
+      oldBody <- E.elaborateResolved oldGraph oldEvidence (C.skeleton constraints)
+      body <- E.elaboratePrepared reused evidence (C.skeleton constraints)
+      let oldTerm = if L.null declarations then oldBody else XWithData declarations oldBody
+      let term = if L.null declarations then body else XWithData declarations body
+      oldType <- Check.checkClosed oldTerm
+      ty <- Check.checkClosed term
+      assert (eqString (Pretty.prettyTerm oldTerm) (Pretty.prettyTerm term)) "solver reuse changed a checked target"
+      assert (eqString (Pretty.prettyType oldType) (Pretty.prettyType ty)) "solver reuse changed target type identities"
+      assert (T.alphaEq ty (E.schemeType graph (C.generalization (C.skeleton constraints)))) "solver reuse changed source type"
+      assert (X.equalErased (X.erase oldTerm) (C.eraseSourceWith oldEvidence (C.skeleton constraints))) "legacy erasure agreement failed"
+      assert (X.equalErased (X.erase term) (C.eraseSourceWith evidence (C.skeleton constraints))) "solver reuse erasure agreement failed"
+      assert (X.equalErased (X.erase oldTerm) (X.erase term)) "solver reuse changed runtime erasure"
+      case Compiler.compileModules sources file source of
+        Left error -> Left (Compiler.prettyError error)
+        Right compiled -> assert (eqString (Pretty.prettyTerm (Compiler.compiledTerm compiled)) (Pretty.prettyTerm term)) "compiler did not use the equivalent checked route"
+
+run label modules source = case checkFixture (M.fromList compareString modules) (label ++ ".emlf") source of
+  Left error -> panic (label ++ ": " ++ error)
+  Right ignored -> putStrLn (label ++ ": checked solver reuse agrees")
+
+main = do
+  run "annotation" Nil "identity : forall unused a. a -> a; identity x = x; main = identity True"
+  run "nested-data" Nil "data Maybe a = Nothing | Just a; data Box a = Box a; unbox (Box (Just x)) = x; unbox _ = 0; main = unbox (Box (Just 4))"
+  run "recursive-signature" Nil "data List a = Nil | Cons a (List a); foldl : forall a b. (b -> a -> b) -> b -> List a -> b; foldl f z Nil = z; foldl f z (Cons x xs) = foldl f (f z x) xs; main = foldl (\\z x -> z + x) 0 (Cons 1 Nil)"
+  run "multiparam-class" Nil "class Convert a b where { convert : a -> b }; instance Convert Int String where { convert = showInt }; main = (convert 42 : String)"
+  run "superclass" Nil "class Inspect a where { inspect : a -> Bool }; class Inspect b => Two a b where { two : a -> b -> Bool }; let f : forall a b. Two a b => a -> b -> Bool = \\x y -> inspect y in 42"
+  run "do-io" Nil "main = do { x <- return 41; printInt (x + 1) }"
+  run "module-reexport"
+    (Cons (Pair "A" (Pair "A.emlf" "module A (ident) where\nident x = x"))
+      (Cons (Pair "B" (Pair "B.emlf" "module B (module A) where\nimport A")) Nil))
+    "module Main where\nimport B\nmain = ident True"

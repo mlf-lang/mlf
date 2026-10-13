@@ -1,6 +1,6 @@
 -- | Checked xMLF to native LLVM functions. Type computations are erased only
 -- after the independent target checker accepts the complete term.
-module MLF.LLVM (emitLLVM, emitLLVMIO) where
+module MLF.LLVM (emitLLVM, emitLLVMIO, emitLLVMForGC, emitLLVMIOForGC) where
 
 import Control.Monad (when)
 import Data.Bifunctor (first)
@@ -16,13 +16,20 @@ import qualified MLF.X.Type as T
 -- and GMP. IO entries execute their action; pure entries evaluate to weak
 -- head normal form and discard the result without implicitly printing it.
 emitLLVM :: X.Term -> Either String String
-emitLLVM = emitEntry False
+emitLLVM = emitEntry False False
 
 emitLLVMIO :: X.Term -> Either String String
-emitLLVMIO = emitEntry True
+emitLLVMIO = emitEntry False True
 
-emitEntry :: Bool -> X.Term -> Either String String
-emitEntry requireIO term = do
+-- | Emit the compact layout for the BDWGC runtime allocation profile.
+emitLLVMForGC :: X.Term -> Either String String
+emitLLVMForGC = emitEntry True False
+
+emitLLVMIOForGC :: X.Term -> Either String String
+emitLLVMIOForGC = emitEntry True True
+
+emitEntry :: Bool -> Bool -> X.Term -> Either String String
+emitEntry compact requireIO term = do
   ty <- first ("LLVM target verification failed: " ++) (Check.checkClosed term)
   let declarations = case term of X.WithData ds _ -> ds; _ -> []
       constructors = Map.fromList (("Unit",(0,0)) :
@@ -32,13 +39,18 @@ emitEntry requireIO term = do
       ioType (T.Con "IO" [_]) = True
       ioType _ = False
   when (requireIO && not (ioType ty)) (Left "program must have type IO a to run")
-  (entry,code) <- Codegen.generate constructors (Optimize.optimize (X.erase term))
+  let generate = if compact then Codegen.generateForGC else Codegen.generate
+      abi = if compact then "mlf_require_compact_gc_abi" else "mlf_require_standard_abi"
+  (entry,code) <- generate constructors (Optimize.optimize (X.erase term))
   pure $ unlines (["; Generated from independently checked xMLF.",
     "source_filename = \"emlf\"", ""] ++ code ++
-    [ "define ptr @mlf_entry() {"
+    [ "declare void @" ++ abi ++ "()"
+    , "define ptr @mlf_entry() {"
+    , "  call void @" ++ abi ++ "()"
     , "  %root = call ptr " ++ entry ++ "(ptr null, ptr null)"
     , "  ret ptr %root", "}"
-    , "define i32 @main() {"
+    , "define i32 @main(i32 %argc, ptr %argv) {"
+    , "  call void @mlf_set_args(i32 %argc, ptr %argv)"
     , "  %root = call ptr @mlf_entry()"
     , "  %status = call i32 @mlf_run(ptr %root, i64 " ++ (if ioType ty then "1" else "0") ++ ")"
     , "  ret i32 %status", "}"

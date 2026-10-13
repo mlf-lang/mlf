@@ -2,6 +2,8 @@
 -- IO actions; only the action interpreter below can call the backend.
 module MLF.Runtime
   ( IOBackend (..), consoleBackend, RuntimeError (..), runTerm, runProgram
+  , RuntimeOptions (..), defaultRuntimeOptions
+  , runTermWithArguments, runProgramWithArguments, runTermWithOptions, runProgramWithOptions
   ) where
 
 import Control.Exception (IOException, displayException, try)
@@ -10,15 +12,22 @@ import Control.Monad (unless)
 import qualified Data.Array.IO as Array
 import Data.Bifunctor (first)
 import Data.Bits ((.&.))
+import Data.Char (chr, ord)
 import qualified Data.ByteString as BS
 import qualified Data.Map.Lazy as Map
+import qualified Data.IntMap.Lazy as IM
 import qualified Data.HashTable.IO as Hash
 import Data.Maybe (fromMaybe)
 import qualified Data.List as List
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
-import Data.Word (Word8)
-import System.IO (hFlush, hPutStr, stdin, stdout)
+import Data.Word (Word8, Word64)
+import GHC.Float (castDoubleToWord64, castWord64ToDouble)
+import System.Directory (canonicalizePath, doesFileExist, doesPathExist)
+import qualified System.Environment as Environment
+import qualified System.Exit as Exit
+import System.IO (hFlush, hPutStr, stdin, stdout, stderr)
+import Text.Read (readMaybe)
 import qualified MLF.Data as D
 import MLF.Primitive
 import qualified MLF.X.Check as C
@@ -31,6 +40,16 @@ data IOBackend = IOBackend
   , writeBytes :: BS.ByteString -> IO ()
   , readByteLine :: IO BS.ByteString
   }
+
+-- Keep the stream backend compatible with callers that construct it directly.
+-- Command arguments and diagnostic output are configured independently.
+data RuntimeOptions = RuntimeOptions
+  { runtimeArguments :: [String]
+  , runtimeWriteError :: String -> IO ()
+  }
+
+defaultRuntimeOptions :: RuntimeOptions
+defaultRuntimeOptions = RuntimeOptions [] (\text -> hPutStr stderr text >> hFlush stderr)
 
 consoleBackend :: IOBackend
 consoleBackend = IOBackend getLine (\text -> hPutStr stdout text >> hFlush stdout)
@@ -65,6 +84,8 @@ data Value
   | ConstructorValue String [Thunk]
   | PrimitiveValue Primitive [Thunk]
   | ActionValue Action
+  | STActionValue Primitive [Thunk]
+  | STArrayValue Int
 
 data Action
   = ReturnAction Thunk
@@ -73,6 +94,7 @@ data Action
   | WriteAction Bool Thunk
   | PrintIntAction Thunk
   | ArrayAction Primitive [Thunk]
+  | SystemAction Primitive [Thunk]
 
 failure :: String -> Result a
 failure = Left . RuntimeError
@@ -80,19 +102,31 @@ failure = Left . RuntimeError
 -- | Check even caller-constructed target terms before executing any effects.
 -- The result value of the final IO action is discarded, as with a main action.
 runTerm :: IOBackend -> X.Term -> IO (Result ())
-runTerm = runEntry True
+runTerm = runTermWithOptions defaultRuntimeOptions
 
 -- | The native executable entry convention: execute IO, or evaluate a pure
 -- program to weak head normal form without printing or forcing its fields.
 runProgram :: IOBackend -> X.Term -> IO (Result ())
-runProgram = runEntry False
+runProgram = runProgramWithOptions defaultRuntimeOptions
 
-runEntry :: Bool -> IOBackend -> X.Term -> IO (Result ())
-runEntry requireIO backend term = case prepare of
+runTermWithArguments :: [String] -> IOBackend -> X.Term -> IO (Result ())
+runTermWithArguments args = runTermWithOptions defaultRuntimeOptions { runtimeArguments = args }
+
+runProgramWithArguments :: [String] -> IOBackend -> X.Term -> IO (Result ())
+runProgramWithArguments args = runProgramWithOptions defaultRuntimeOptions { runtimeArguments = args }
+
+runTermWithOptions :: RuntimeOptions -> IOBackend -> X.Term -> IO (Result ())
+runTermWithOptions = runEntry True
+
+runProgramWithOptions :: RuntimeOptions -> IOBackend -> X.Term -> IO (Result ())
+runProgramWithOptions = runEntry False
+
+runEntry :: Bool -> RuntimeOptions -> IOBackend -> X.Term -> IO (Result ())
+runEntry requireIO options backend term = case prepare of
   Left err -> pure (Left err)
   Right (ds,action) -> do
     let value = evaluate ds Map.empty (X.erase term)
-        execute | action = fmap (fmap (const ())) (runAction ds backend value)
+        execute | action = fmap (fmap (const ())) (runAction options ds backend value)
                 | otherwise = Exception.evaluate (value >>= \v -> v `seq` Right ())
     outcome <- try execute
       :: IO (Either IOException (Result ()))
@@ -120,7 +154,7 @@ evaluate ds env expression = case expression of
   X.EDouble n -> pure (DoubleValue n)
   X.EBool b -> pure (BooleanValue b)
   X.EString s -> pure (StringValue s)
-  X.EPrimitive p -> primitive p []
+  X.EPrimitive p -> primitive ds p []
   X.EConstructor c -> D.lookupConstructor ds c `orError` \_ -> pure (ConstructorValue c [])
   X.ECase scrutinee alternatives -> choose alternatives
     where
@@ -148,18 +182,25 @@ apply ds function argument = case function of
   ConstructorValue name fields -> D.lookupConstructor ds name `orError` \(_,constructor) -> do
     unless (length fields < length (D.constructorFields constructor)) (failure "runtime constructor overapplication")
     pure (ConstructorValue name (fields ++ [argument]))
-  PrimitiveValue p arguments -> primitive p (arguments ++ [argument])
+  PrimitiveValue p arguments -> primitive ds p (arguments ++ [argument])
   _ -> failure "runtime application of a non-function"
 
-primitive :: Primitive -> [Thunk] -> Thunk
-primitive p arguments
+primitive :: D.DataEnv -> Primitive -> [Thunk] -> Thunk
+primitive ds p arguments
   | length arguments < primitiveArity p = pure (PrimitiveValue p arguments)
+  | length arguments == primitiveArity p && p `elem`
+      [ReadFile,WriteFile,FileExists,CanonicalPath,GetArgCount,GetArg,PutErr,ExitWith,GetExecutablePath,GetContents] =
+      pure (ActionValue (SystemAction p arguments))
   | length arguments == primitiveArity p && p `elem`
       [NewIntArray,ReadIntArray,WriteIntArray,LengthIntArray,
        NewDoubleArray,ReadDoubleArray,WriteDoubleArray,LengthDoubleArray,
        NewByteArray,ReadByteArray,WriteByteArray,LengthByteArray,ByteArrayFromString,PutBytes,GetByteLine,NewIntTable,ReadIntTable,WriteIntTable] =
       pure (ActionValue (ArrayAction p arguments))
+  | length arguments == primitiveArity p && p `elem`
+      [STReturn,STBind,NewSTArray,ReadSTArray,WriteSTArray,LengthSTArray] =
+      pure (STActionValue p arguments)
   | otherwise = case (p,arguments) of
+      (RunST,[action]) -> runStateRegion ds action
       (IOReturn,[value]) -> pure (ActionValue (ReturnAction value))
       (IOBind,[action,next]) -> pure (ActionValue (BindAction action next))
       (GetLine,[]) -> pure (ActionValue ReadLineAction)
@@ -175,6 +216,39 @@ primitive p arguments
       (QuotInt,[a,b]) -> divide quot a b
       (RemInt,[a,b]) -> divide rem a b
       (ReadInt,[a]) -> string a >>= parseInteger
+      (StringLength,[a]) -> IntegerValue . toInteger . length <$> string a
+      (StringCodeAt,[a,b]) -> do
+        s <- string a
+        i <- integer b
+        if i < 0 || i >= toInteger (length s) then failure "string index out of bounds"
+          else pure (IntegerValue (toInteger (ord (s !! fromInteger i))))
+      (StringSlice,[a,b,c]) -> do
+        s <- string a
+        i <- integer b
+        n <- integer c
+        if i < 0 || i > toInteger (length s) || n < 0 || n > toInteger (length s)-i
+          then failure "string slice out of bounds"
+          else pure (StringValue (take (fromInteger n) (drop (fromInteger i) s)))
+      (StringFromCode,[a]) -> do
+        n <- integer a
+        if n < 0 || n > 0x10ffff || (n >= 0xd800 && n <= 0xdfff)
+          then failure "invalid Unicode scalar" else pure (StringValue [chr (fromInteger n)])
+      (CompareString,[a,b]) -> do
+        x <- string a
+        y <- string b
+        pure (IntegerValue (case compare x y of LT -> -1; EQ -> 0; GT -> 1))
+      (ReadDouble,[a]) -> do
+        s <- string a
+        if decimal s then maybe (failure "invalid Double input") (pure . DoubleValue)
+          (readMaybe (case s of '+':rest -> rest; _ -> s))
+          else failure "invalid Double input"
+      (DoubleToBits,[a]) -> IntegerValue . toInteger . castDoubleToWord64 <$> double a
+      (DoubleFromBits,[a]) -> do
+        n <- integer a
+        if n < 0 || n > toInteger (maxBound :: Word64) then failure "Double bit pattern out of bounds"
+          else pure (DoubleValue (castWord64ToDouble (fromInteger n)))
+      (Seq,[a,b]) -> a >>= \v -> v `seq` b
+      (Panic,[a]) -> string a >>= failure
       (AddDouble,[a,b]) -> DoubleValue <$> ((+) <$> double a <*> double b)
       (SubDouble,[a,b]) -> DoubleValue <$> ((-) <$> double a <*> double b)
       (MulDouble,[a,b]) -> DoubleValue <$> ((*) <$> double a <*> double b)
@@ -207,6 +281,22 @@ primitive p arguments
       in if null digits || any (\c -> c < '0' || c > '9') digits
          then failure "invalid integer input"
          else pure (IntegerValue (sign * List.foldl' (\n c -> 10*n + toInteger (fromEnum c - fromEnum '0')) 0 digits))
+
+-- A locale-independent, whole-input decimal grammar shared with the native
+-- parser. Binary64 overflow/underflow follow the normal IEEE conversion.
+decimal :: String -> Bool
+decimal input = case span digit (sign input) of
+  ([],_) -> False
+  (_,'.':rest) -> case span digit rest of ([],_) -> False; (_,xs) -> decimalExponent xs
+  (_,rest) -> decimalExponent rest
+  where
+    digit c = c >= '0' && c <= '9'
+    sign ('+':xs) = xs
+    sign ('-':xs) = xs
+    sign xs = xs
+    decimalExponent [] = True
+    decimalExponent (e:xs) | e == 'e' || e == 'E' = let digits = sign xs in not (null digits) && all digit digits
+    decimalExponent _ = False
 
 -- Round the exact binary value to nearest, ties to even. This agrees with
 -- printf in the native runtime, including negative zero, without depending
@@ -304,8 +394,8 @@ boolean thunk = do
     BooleanValue b -> pure b
     _ -> failure "runtime primitive expected Bool"
 
-runAction :: D.DataEnv -> IOBackend -> Thunk -> IO (Result Thunk)
-runAction ds backend thunk = case thunk of
+runAction :: RuntimeOptions -> D.DataEnv -> IOBackend -> Thunk -> IO (Result Thunk)
+runAction options ds backend thunk = case thunk of
   Left err -> pure (Left err)
   Right (ActionValue action) -> perform action
   Right _ -> pure (failure "runtime expected an IO action")
@@ -313,10 +403,10 @@ runAction ds backend thunk = case thunk of
     unit = pure (ConstructorValue "Unit" [])
     perform (ReturnAction value) = pure (Right value)
     perform (BindAction firstAction next) = do
-      result <- runAction ds backend firstAction
+      result <- runAction options ds backend firstAction
       case result of
         Left err -> pure (Left err)
-        Right value -> runAction ds backend (next >>= \function -> apply ds function value)
+        Right value -> runAction options ds backend (next >>= \function -> apply ds function value)
     perform ReadLineAction = do
       line <- readLine backend
       pure (Right (pure (StringValue line)))
@@ -330,6 +420,39 @@ runAction ds backend thunk = case thunk of
       Right n -> do
         writeText backend (show n ++ "\n")
         pure (Right unit)
+    perform (SystemAction p arguments) = case (p,arguments) of
+      (ReadFile,[name]) -> checked (path name) $ \file -> systemIO "file read failed" $ do
+        bytes <- BS.readFile file
+        pure $ case Text.decodeUtf8' bytes of
+          Left _ -> failure "IO error: invalid UTF-8 input"
+          Right s -> Right (pure (StringValue (Text.unpack s)))
+      (WriteFile,[name,contents]) -> checked ((,) <$> path name <*> string contents) $ \(file,s) ->
+        systemIO "file write failed" (BS.writeFile file (Text.encodeUtf8 (Text.pack s)) >> pure (Right unit))
+      (FileExists,[name]) -> checked (path name) $ \file ->
+        systemIO "file existence check failed" (Right . pure . BooleanValue <$> doesFileExist file)
+      (CanonicalPath,[name]) -> checked (path name) $ \file -> systemIO "canonical path failed" $ do
+        exists <- doesPathExist file
+        if exists then Right . pure . StringValue <$> canonicalizePath file
+          else pure (failure "IO error: canonical path failed")
+      (GetArgCount,[]) -> pure (Right (pure (IntegerValue (toInteger (length (runtimeArguments options))))))
+      (GetArg,[index]) -> checked (integer index) $ \i ->
+        if i < 0 || i >= toInteger (length (runtimeArguments options))
+          then pure (failure "argument index out of bounds")
+          else pure (Right (pure (StringValue (runtimeArguments options !! fromInteger i))))
+      (PutErr,[text]) -> checked (string text) $ \s -> do
+        runtimeWriteError options s
+        pure (Right unit)
+      (ExitWith,[code]) -> checked (integer code) $ \n ->
+        if n < 0 || n > 255 then pure (failure "exit status must be between 0 and 255")
+          else Exit.exitWith (if n == 0 then Exit.ExitSuccess else Exit.ExitFailure (fromInteger n))
+      (GetExecutablePath,[]) -> systemIO "executable path failed" $
+        Right . pure . StringValue <$> (Environment.getExecutablePath >>= canonicalizePath)
+      (GetContents,[]) -> do
+        bytes <- contents []
+        pure $ case Text.decodeUtf8' bytes of
+          Left _ -> failure "IO error: invalid UTF-8 input"
+          Right s -> Right (pure (StringValue (Text.unpack s)))
+      _ -> pure (failure "runtime system primitive arity mismatch")
     perform (ArrayAction p arguments) = case (p,arguments) of
       (GetByteLine,[]) -> do
         bytes <- readByteLine backend
@@ -393,3 +516,65 @@ runAction ds backend thunk = case thunk of
       _ -> pure (failure "runtime array primitive arity mismatch")
     checked (Left err) _ = pure (Left err)
     checked (Right a) next = next a
+    path argument = do
+      name <- string argument
+      if '\0' `elem` name then failure "file path contains NUL" else pure name
+    systemIO message action = do
+      result <- try action
+      pure (either (const (failure ("IO error: " ++ message))) id (result :: Either IOException (Result Thunk)))
+    contents chunks = do
+      line <- readByteLine backend
+      if BS.null line then pure (BS.concat (reverse chunks)) else contents (line:chunks)
+
+
+-- A reference semantics for local state: no host IO or unsafe coercion is
+-- needed. Cells hold shared lazy values; reading snapshots the stored thunk
+-- before a later write changes the persistent store. Each runST has its own
+-- store and continuation stack, so nested regions remain independent.
+data RegionArray = RegionArray !Int Thunk (IM.IntMap Thunk)
+data RegionStore = RegionStore !Int (IM.IntMap RegionArray)
+
+runStateRegion :: D.DataEnv -> Thunk -> Thunk
+runStateRegion ds action = run (RegionStore 0 IM.empty) [] action
+  where
+    run store continuations current = do
+      operation <- current
+      case operation of
+        STActionValue STBind [firstAction,next] -> run store (next:continuations) firstAction
+        STActionValue p args -> do
+          (result,nextStore) <- step store p args
+          case continuations of
+            [] -> result
+            next:rest -> run nextStore rest (next >>= \function -> apply ds function result)
+        _ -> failure "invalid ST action"
+    step store p args = case (p,args) of
+      (STReturn,[entry]) -> pure (entry,store)
+      (NewSTArray,[size,initial]) -> do
+        count <- arraySize size
+        case store of
+          RegionStore fresh arrays ->
+            if fresh == maxBound then failure "too many ST arrays" else
+            let array = RegionArray count initial IM.empty
+            in pure (pure (STArrayValue fresh),RegionStore (fresh+1) (IM.insert fresh array arrays))
+      (ReadSTArray,[array,index]) -> do
+        (_,RegionArray count initial cells) <- regionArray store array
+        offset <- arrayIndex count index
+        pure (IM.findWithDefault initial offset cells,store)
+      (WriteSTArray,[array,index,entry]) -> do
+        (identity,RegionArray count initial cells) <- regionArray store array
+        offset <- arrayIndex count index
+        case store of
+          RegionStore fresh arrays ->
+            let changed = RegionArray count initial (IM.insert offset entry cells)
+            in pure (pure (ConstructorValue "Unit" []),RegionStore fresh (IM.insert identity changed arrays))
+      (LengthSTArray,[array]) -> do
+        (_,RegionArray count _ _) <- regionArray store array
+        pure (pure (IntegerValue (toInteger count)),store)
+      _ -> failure "runtime ST primitive arity mismatch"
+    regionArray (RegionStore _ arrays) thunk = do
+      value <- thunk
+      case value of
+        STArrayValue identity -> case IM.lookup identity arrays of
+          Just array -> pure (identity,array)
+          Nothing -> failure "ST array is outside its region"
+        _ -> failure "runtime primitive expected STArray"

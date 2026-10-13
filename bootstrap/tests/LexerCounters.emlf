@@ -1,0 +1,44 @@
+module Main where
+
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.Lexer as X
+import qualified Bootstrap.Layout as Y
+
+-- Force cursor constructors at every step, as the lexer does when it inspects
+-- the source index. Numeric fields must not retain a deferred update spine.
+advanceMany : Int -> Int -> X.Cursor -> X.Cursor
+advanceMany count code cursor = if count == 0 then cursor else
+  let next = X.advance code cursor in seq next (advanceMany (count - 1) code next)
+
+checkCursor : Int -> Int -> Int -> X.Cursor -> Bool
+checkCursor i l c cursor = case cursor of
+  X.Cursor index line column -> index == i && line == l && column == c
+
+checkNumber : String -> Int -> Bool
+checkNumber source expected = case X.naturalValue source of
+  Left _ -> false
+  Right value -> value == expected
+
+checkComment : Int -> Bool
+checkComment depth =
+  let source = L.concatStrings (L.append (L.replicate depth "{-") (L.append (L.replicate depth "-}") (Cons "z" Nil))) in
+  case X.scanTokens "nested" source of
+    Right (X.Scanned (Cons token Nil) finish) ->
+      eqString (X.tokenText token) "z" && X.tokenColumn token == depth * 4 + 1 && X.tokenEndColumn finish == depth * 4 + 2
+    _ -> false
+
+check : String -> Bool -> IO Unit
+check name success = if success then pure Unit else panic name
+
+main = do
+  check "long source column" (checkCursor 100001 1 100002 (advanceMany 100001 32 (X.Cursor 0 1 1)))
+  check "long source line" (checkCursor 100001 100002 1 (advanceMany 100001 10 (X.Cursor 0 1 1)))
+  check "tab columns" (checkCursor 100001 1 800009 (advanceMany 100001 9 (X.Cursor 0 1 1)))
+  check "layout indentation" (Y.lineIndent (L.concatStrings (L.replicate 20001 " ")) 1 == 20002)
+  check "numeric accumulator" (checkNumber (L.concatStrings (L.append (L.replicate 20001 "0") (Cons "1" Nil))) 1)
+  check "nested comment depth" (checkComment 2001)
+  check "position resets" (checkCursor 3 2 9 (X.advance 9 (X.advance 10 (X.advance 32 (X.Cursor 0 1 1)))))
+  check "radix values" (checkNumber "0xABCD" 43981 && checkNumber "0o765" 501)
+  check "malformed digit" (case X.readBase 10 "x" 0 (panic "invalid digit forced accumulator") of { Left _ -> true; Right _ -> false })
+  putStrLn "lexer counters: ok"

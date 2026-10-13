@@ -1,0 +1,107 @@
+module Main where
+
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.IntSet as IS
+import qualified Bootstrap.Graph as G
+
+-- Frozen independent copy of the pre-optimization MLF implementation.
+oldVisit : Graph -> Pair IntSet (List Int) -> Int -> Pair IntSet (List Int)
+oldVisit graph (Pair seen order) original =
+  let identity = G.resolve graph original in
+  if IS.member identity seen then Pair seen order else
+    case L.foldl (oldVisit graph) (Pair (IS.insert identity seen) order) (G.children (G.tag (G.nodeAt graph identity))) of
+      Pair visited result -> Pair visited (L.append result (Cons identity Nil))
+
+sameIds : List Int -> List Int -> Bool
+sameIds a b = L.eqList (\x y -> x == y) a b
+assert : Bool -> String -> IO Unit
+assert condition message = if condition then ioReturn Unit else panic message
+forEach : forall a. (a -> IO Unit) -> List a -> IO Unit
+forEach action values = case values of
+  Nil -> ioReturn Unit
+  Cons value rest -> ioBind (action value) (\ignored -> forEach action rest)
+showIds : List Int -> String
+showIds values = L.intercalate "," (L.map showInt values)
+
+graphFor : Int -> Graph
+graphFor seed =
+  let keys = L.range 0 6 in
+  let edges = \n -> L.concatMap (\m -> if remInt (n * 13 + m * 17 + seed * (n + 1)) 97 < 29 then
+        Cons (if remInt (m + seed) 3 == 0 then m + 200 else m) (if remInt (n + m + seed) 5 == 0 then Cons m Nil else Nil) else Nil) keys in
+  let entries = L.map (\n -> Pair n (Node (GCon "T" (edges n)) Nothing Flexible)) keys in
+  let aliases = L.concatMap (\n -> Cons (Pair (n + 100) n) (Cons (Pair (n + 200) (n + 100)) Nil)) keys in
+  Graph (IM.fromList entries) (IM.fromList aliases) 300
+
+rename : (Int -> Int) -> Graph -> Graph
+rename f graph = Graph
+  (IM.fromList (L.map (\entry -> case entry of { Pair n v -> Pair (f n) (Node (G.mapTag f (G.tag v)) (G.mapMaybeInt f (G.binder v)) (G.flag v)) }) (IM.toList (G.nodes graph))))
+  (IM.fromList (L.map (\entry -> case entry of { Pair n p -> Pair (f n) (f p) }) (IM.toList (G.links graph)))) (f (G.nextId graph))
+
+preseen : Int -> Int -> List Int
+preseen mode root = case mode of
+  0 -> Nil
+  1 -> Cons root Nil
+  2 -> Cons 0 (Cons 3 (Cons 6 Nil))
+  3 -> Cons 103 (Cons 999 Nil)
+  4 -> L.range 0 6
+  _ -> L.append (L.range 100 106) (L.range 200 206)
+
+checkRow : Int -> Int -> Int -> Graph -> (Int -> Int) -> Int -> Int -> IO Unit
+checkRow seed transform root graph move state prefixMode =
+  let initial = IS.fromList (L.map move (preseen state root)) in
+  let prefix = if prefixMode == 0 then Nil else L.map move (Cons 999 (Cons 0 (Cons 999 Nil))) in
+  case oldVisit graph (Pair initial prefix) (move root) of
+    Pair oldSeen oldOrder -> case G.orderedVisit graph (Pair initial prefix) (move root) of
+      Pair newSeen newOrder -> do
+        assert (IS.eqIntSet oldSeen newSeen && sameIds oldOrder newOrder) "new orderedVisit disagrees with the frozen old MLF path"
+        if state == 0 && prefixMode == 0 then assert (sameIds newOrder (G.orderedBelow graph (move root))) "orderedBelow disagrees with orderedVisit" else ioReturn Unit
+        putStrLn (showInt seed ++ "/" ++ showInt transform ++ "/" ++ showInt root ++ "/" ++ showInt state ++ "/" ++ showInt prefixMode ++ "|" ++ showIds (IS.toList newSeen) ++ "|" ++ showIds newOrder)
+
+checkGraph : Int -> Int -> (Int -> Int) -> IO Unit
+checkGraph seed transform move =
+  let graph = rename move (graphFor seed) in
+  forEach (\root -> forEach (\state -> forEach (checkRow seed transform root graph move state) (L.range 0 1)) (L.range 0 5))
+    (L.append (L.range 0 6) (L.append (L.range 100 106) (L.range 200 206)))
+
+checkDemandWith : (Graph -> Pair IntSet (List Int) -> Int -> Pair IntSet (List Int)) -> IO Unit
+checkDemandWith visit = do
+  let preseenGraph = Graph (panic "orderedVisit read nodes for an already seen root") IM.empty (panic "orderedVisit read nextId")
+  case visit preseenGraph (Pair (IS.singleton 3) (Cons 41 (panic "orderedVisit forced the unused prefix tail"))) 3 of
+    Pair seen order -> assert (IS.member 3 seen && L.head order == 41) "preseen root/prefix changed"
+  let leaf = Node (GCon (panic "orderedVisit forced the constructor name") Nil) (panic "orderedVisit forced binder") (panic "orderedVisit forced flag")
+  let graph = Graph (IM.fromList (Cons (Pair 0 leaf) (Cons (Pair 1 (panic "orderedVisit forced an unreachable node")) Nil))) IM.empty (panic "orderedVisit forced nextId")
+  case visit graph (Pair IS.empty (panic "orderedVisit forced prefix when only visited set was needed")) 0 of
+    Pair seen order -> assert (IS.member 0 seen) "visited result changed"
+  case visit graph (Pair IS.empty (Cons 43 (panic "orderedVisit forced an unused prefix tail"))) 0 of
+    Pair seen order -> assert (L.head order == 43) "prefix head changed"
+  case visit graph (Pair IS.empty (L.repeat 47)) 0 of
+    Pair seen order -> assert (sameIds (L.take 4 order) (L.replicate 4 47)) "infinite prefix changed"
+  let skipped = Graph (IM.singleton 0 (Node (GArr 999 999) Nothing Flexible)) IM.empty 1
+  case visit skipped (Pair (IS.singleton 999) Nil) 0 of
+    Pair seen order -> assert (sameIds order (Cons 0 Nil) && IS.size seen == 2) "preseen missing child was visited"
+  let leaves = Graph (IM.fromList (Cons (Pair 0 (Node (GBotK (panic "orderedVisit forced bottom kind")) Nothing Flexible))
+        (Cons (Pair 1 (Node (GTyCon (panic "orderedVisit forced type name") (panic "orderedVisit forced type kind")) Nothing Flexible))
+        (Cons (Pair 2 (Node (GSkolem (panic "orderedVisit forced skolem identity") (panic "orderedVisit forced skolem kind")) Nothing Flexible)) Nil)))) IM.empty 3
+  forEach (\root -> case visit leaves (Pair IS.empty Nil) root of { Pair seen order -> assert (sameIds order (Cons root Nil)) "leaf kind/name demand changed" }) (L.range 0 2)
+
+main = do
+  checkDemandWith oldVisit
+  checkDemandWith G.orderedVisit
+  putStrLn "ordered traversal demand: ok"
+  let handGraph = Graph (IM.fromList (Cons (Pair 0 (Node (GArr 1 2) Nothing Flexible))
+        (Cons (Pair 1 (Node (GTyApp 4 3) Nothing Flexible))
+        (Cons (Pair 2 (Node (GGen 4) Nothing Flexible))
+        (Cons (Pair 3 (Node GBot Nothing Flexible))
+        (Cons (Pair 4 (Node (GCon "Cycle" (Cons 0 (Cons 5 (Cons 5 Nil)))) Nothing Flexible))
+        (Cons (Pair 5 (Node (GTyCon "K" Star) Nothing Flexible)) Nil))))))) IM.empty 6
+  let expected = Cons 5 (Cons 4 (Cons 3 (Cons 1 (Cons 2 (Cons 0 Nil)))))
+  assert (sameIds (G.orderedBelow handGraph 0) expected) "leftmost postorder over mixed tags changed"
+  case oldVisit handGraph (Pair IS.empty Nil) 0 of { Pair seen order -> assert (sameIds order expected) "old mixed-tag order changed" }
+  putStrLn "mixed-tag order: 5,4,3,1,2,0"
+  forEach (\seed -> checkGraph seed 0 (\n -> n * 11 - 29)) (L.range 0 15)
+  let huge = 1000000000000000000000000000000
+  checkGraph 7 1 (\n -> huge + n)
+  checkGraph 12 2 (\n -> n - huge)
+  checkGraph 9 3 (\n -> huge - n)

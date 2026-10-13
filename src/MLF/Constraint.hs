@@ -1,6 +1,6 @@
 module MLF.Constraint
   ( Edge (..), Typed (..), Form (..), Branch (..), EvidenceBinding (..), Constraints (..)
-  , generate, generateProgram, solve, eraseSource, eraseSourceWith
+  , generate, generateProgram, solve, eraseSource, eraseSourceWith, pruneEmbedding
   ) where
 
 import Control.Monad (foldM, forM, forM_, unless, when)
@@ -335,8 +335,7 @@ embed ds env ty = do
   start <- gets nextId
   root <- go env ty
   g <- get
-  let keep = reachable g root
-  put g { nodes = IM.filterWithKey (\n _ -> n < start || IS.member n keep) (nodes g) }
+  put (pruneEmbedding start root g)
   pure root
   where
     go :: Map.Map String NodeId -> S.Type -> Build NodeId
@@ -371,6 +370,22 @@ embed ds env ty = do
       r <- newNode (TyApp f a) Nothing S.Rigid
       forM_ [f,a] $ \n -> unless (n `elem` Map.elems scope) (attach r S.Rigid n)
       pure r
+
+-- | Discard unused nodes allocated by an embedding. Identities below start
+-- predate it, and every node identity is below nextId. Retain their current
+-- values from the final graph: embedding may have updated existing nodes.
+-- Visiting only the allocation interval avoids rebuilding the growing graph
+-- for every annotation, primitive and constructor signature.
+pruneEmbedding :: NodeId -> NodeId -> Graph -> Graph
+pruneEmbedding start root g = g { nodes = prune start (nodes g) }
+  where
+    stop = nextId g
+    keep = reachable g root
+    prune n retained
+      | n >= stop = retained
+      | IS.member n keep = prune (n + 1) retained
+      | otherwise = let remaining = IM.delete n retained
+                    in remaining `seq` prune (n + 1) remaining
 
 -- | §12.1.3. Generation emits instance edges after all dependencies. Lambda
 -- equalities are solved first, so expansion never generalizes a lambda parameter.

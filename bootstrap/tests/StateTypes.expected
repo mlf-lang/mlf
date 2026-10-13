@@ -1,0 +1,68 @@
+return	ACCEPT	Int
+bind	ACCEPT	Int
+array-read	ACCEPT	Int
+array-write	ACCEPT	Int
+array-length	ACCEPT	Int
+implicit-do	ACCEPT	Int
+implicit-return	ACCEPT	Int
+explicit-action-signature	ACCEPT	Int
+polymorphic-result	ACCEPT	forall a69. a69 -> a69
+impredicative-array-functions	ACCEPT	Pair Int Bool
+nested-independent	ACCEPT	Int
+reuse-independent-allocation	ACCEPT	Int
+pure-io-description-result	ACCEPT	IO Unit
+unused-poisoned-cell	ACCEPT	Int
+snapshot	ACCEPT	Int
+repeated-read-action	ACCEPT	Int
+higher-order-runner	ACCEPT	Int
+primitive-shadowing	ACCEPT	Int
+qualified-prelude-import	ACCEPT	Int
+explicit-prelude-types	ACCEPT	Int
+opaque-existential-package	ACCEPT	Hidden
+opaque-parametric-callback	ACCEPT	(forall a266. STArray a266 Int -> Int) -> Int
+escape-array	REJECT	Inference
+escape-through-bind	REJECT	Inference
+escape-through-data	REJECT	Inference
+escape-read-action	REJECT	Inference
+escape-write-action	REJECT	Inference
+escape-reader-closure	REJECT	Inference
+nested-read-outer-region	REJECT	Inference
+nested-write-outer-region	REJECT	Inference
+cross-region-read-signature	REJECT	Inference
+cross-region-write-signature	REJECT	Inference
+monomorphic-argument	REJECT	Inference
+monomorphic-bound-argument	REJECT	Inference
+monomorphic-runner-signature	REJECT	Inference
+io-as-st	REJECT	Inference
+bind-io-action	REJECT	Inference
+bind-io-continuation	REJECT	Inference
+io-bind-st-action	REJECT	Inference
+io-array-as-st-array	REJECT	Inference
+wrong-array-value-type	REJECT	Inference
+polymorphic-reference-attack	REJECT	Inference
+impredicative-reference-attack	REJECT	Inference
+repackage-action-as-region-polymorphic	REJECT	Inference
+existential-coercion-escape	REJECT	Inference
+opaque-package-read-attack	REJECT	Inference
+opaque-package-write-attack	REJECT	Inference
+redefine-st	REJECT	Inference
+redefine-array	REJECT	Inference
+construct-opaque-st	REJECT	Inference
+construct-opaque-array	REJECT	Inference
+pattern-opaque-st	REJECT	Inference
+st-wrong-arity	REJECT	Inference
+array-wrong-arity	REJECT	Inference
+st-region-wrong-kind	REJECT	Inference
+array-element-wrong-kind	REJECT	Inference
+target-rank2-runner	ACCEPT
+target-monomorphic-action-value	ACCEPT
+target-rank2-region-action	ACCEPT
+target-monomorphic-runST-input	REJECT
+target-outer-forall-cannot-replace-inner	REJECT
+target-io-to-st-cast	REJECT
+target-cross-region-read	REJECT
+target-cross-region-write	REJECT
+target-unbound-region	REJECT
+target-runST-extra-type-argument	REJECT
+target-higher-kind-region	REJECT
+target-unexecuted-array-action	REJECT

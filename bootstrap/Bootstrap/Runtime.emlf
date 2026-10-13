@@ -1,0 +1,447 @@
+module Bootstrap.Runtime where
+
+import Bootstrap.Types
+import Bootstrap.Std
+import qualified Bootstrap.Map as M
+import qualified Bootstrap.Data as D
+import qualified Bootstrap.Primitive as P
+import qualified Bootstrap.X.Check as C
+import qualified Bootstrap.X.Syntax as X
+
+-- The host's lazy fields supply call-by-need for interpreted closures and
+-- recursive environments. Effects stay in explicit action values until run.
+data REnv = REnv (Map XName (Either String RValue))
+data RValue = RInteger Int | RDouble Double | RBoolean Bool | RString String | RIntArray IntArray | RDoubleArray DoubleArray | RByteArray ByteArray | RIntTable IntTable | RClosure REnv XName XErased | RConstructor String (List (Either String RValue)) | RPrimitive Primitive (List (Either String RValue)) | RAction Primitive (List (Either String RValue)) | RSTAction Primitive (List (Either String RValue)) | RSTArrayHandle Int
+
+runTerm : XTerm -> IO (Either String Unit)
+runTerm term = runTermWithArguments Nil term
+runProgram : XTerm -> IO (Either String Unit)
+runProgram term = runProgramWithArguments Nil term
+runTermWithArguments : List String -> XTerm -> IO (Either String Unit)
+runTermWithArguments args term = runEntry true args term
+runProgramWithArguments : List String -> XTerm -> IO (Either String Unit)
+runProgramWithArguments args term = runEntry false args term
+
+isIO : XType -> Bool
+isIO ty = case ty of
+  XForall a lower body -> isIO body
+  XCon name (Cons arg Nil) -> eqString name "IO"
+  _ -> false
+
+declarations term = case term of
+  XWithData ds body -> ds
+  _ -> Nil
+
+prepare : Bool -> XTerm -> Either String (Pair DataEnv Bool)
+prepare requireIO term = do
+  ty <- mapLeft (\message -> "target verification failed: " ++ message) (C.checkClosed term)
+  ensure (not requireIO || isIO ty) "program must have type IO a to run"
+  ds <- D.validateDeclarations (declarations term)
+  Right (Pair ds (isIO ty))
+
+runEntry requireIO args term = case prepare requireIO term of
+  Left message -> ioReturn (Left message)
+  Right (Pair ds action) ->
+    let value = evaluate ds (REnv M.empty) (X.erase term)
+    in if action then ioBind (runAction args ds value) (\result -> ioReturn (mapEither (\ignored -> Unit) result))
+       else ioReturn (mapEither (\v -> seq v Unit) value)
+
+envLookup n (REnv env) = M.lookup compareName n env
+envInsert n value (REnv env) = REnv (M.insert compareName n value env)
+envExtend entries (REnv env) = REnv (M.union compareName (M.fromList compareName entries) env)
+
+recursiveEnv : DataEnv -> REnv -> List (Pair XName XErased) -> REnv
+recursiveEnv ds env bindings =
+  let rec result : REnv = envExtend (map (\entry -> case entry of { Pair name rhs -> Pair name (evaluate ds result rhs) }) bindings) env
+  in result
+
+evaluate : DataEnv -> REnv -> XErased -> Either String RValue
+evaluate ds env expression = case expression of
+  XEVar n -> case envLookup n env of
+    Nothing -> Left ("unbound runtime variable: " ++ nameHint n)
+    Just value -> value
+  XEAbs name body -> Right (RClosure env name body)
+  XEApp f a -> bindEither (evaluate ds env f) (\function -> apply ds function (evaluate ds env a))
+  XELet name rhs body -> evaluate ds (envInsert name (evaluate ds env rhs) env) body
+  XELetRec bindings body -> evaluate ds (recursiveEnv ds env bindings) body
+  XEInt n -> Right (RInteger n)
+  XEDouble n -> Right (RDouble n)
+  XEBool b -> Right (RBoolean b)
+  XEString s -> Right (RString s)
+  XEPrimitive primitive -> runtimePrimitive ds primitive Nil
+  XEConstructor name -> bindEither (D.lookupConstructor ds name) (\ignored -> Right (RConstructor name Nil))
+  XECase scrutinee alternatives -> choose ds env (evaluate ds env scrutinee) alternatives
+  XEEvidenceHole ignored -> Left "unresolved runtime dictionary evidence"
+
+choose : DataEnv -> REnv -> Either String RValue -> List XErasedAlternative -> Either String RValue
+choose ds env value alternatives = case alternatives of
+  Nil -> Left "non-exhaustive runtime case"
+  Cons (XErasedAlternative pattern body) rest -> case pattern of
+    XDefaultPattern name -> evaluate ds (maybe env (\n -> envInsert n value env) name) body
+    XConstructorPattern constructor names -> bindEither value (\v -> case v of
+      RConstructor tag fields -> if eqString constructor tag then
+        if length names == length fields then
+          evaluate ds (envExtend (catMaybes (zipWith (\name field -> mapOptional (\n -> Pair n field) name) names fields)) env) body
+        else Left "runtime constructor pattern arity mismatch"
+        else choose ds env value rest
+      _ -> Left "constructor pattern matched a non-data value")
+
+apply : DataEnv -> RValue -> Either String RValue -> Either String RValue
+apply ds function argument = case function of
+  RClosure env name body -> evaluate ds (envInsert name argument env) body
+  RConstructor name fields -> bindEither (D.lookupConstructor ds name) (\entry -> case entry of
+    Pair declaration constructor -> if length fields < length (D.constructorFields constructor)
+      then Right (RConstructor name (snoc fields argument)) else Left "runtime constructor overapplication")
+  RPrimitive primitive arguments -> runtimePrimitive ds primitive (snoc arguments argument)
+  _ -> Left "runtime application of a non-function"
+
+integer : Either String RValue -> Either String Int
+integer thunk = bindEither thunk (\value -> case value of
+  RInteger n -> Right n
+  _ -> Left "runtime primitive expected Int")
+floating : Either String RValue -> Either String Double
+floating thunk = bindEither thunk (\value -> case value of
+  RDouble n -> Right n
+  _ -> Left "runtime primitive expected Double")
+string : Either String RValue -> Either String String
+string thunk = bindEither thunk (\value -> case value of
+  RString s -> Right s
+  _ -> Left "runtime primitive expected String")
+boolean : Either String RValue -> Either String Bool
+boolean thunk = bindEither thunk (\value -> case value of
+  RBoolean b -> Right b
+  _ -> Left "runtime primitive expected Bool")
+intArray : Either String RValue -> Either String IntArray
+intArray thunk = bindEither thunk (\value -> case value of
+  RIntArray a -> Right a
+  _ -> Left "runtime primitive expected IntArray")
+doubleArray : Either String RValue -> Either String DoubleArray
+doubleArray thunk = bindEither thunk (\value -> case value of
+  RDoubleArray a -> Right a
+  _ -> Left "runtime primitive expected DoubleArray")
+byteArray : Either String RValue -> Either String ByteArray
+byteArray thunk = bindEither thunk (\value -> case value of
+  RByteArray a -> Right a
+  _ -> Left "runtime primitive expected ByteArray")
+intTable : Either String RValue -> Either String IntTable
+intTable thunk = bindEither thunk (\value -> case value of
+  RIntTable a -> Right a
+  _ -> Left "runtime primitive expected IntTable")
+
+integer2 f a b = do
+  x <- integer a
+  y <- integer b
+  Right (RInteger (f x y))
+double2 f a b = do
+  x <- floating a
+  y <- floating b
+  Right (RDouble (f x y))
+intCompare f a b = do
+  x <- integer a
+  y <- integer b
+  Right (RBoolean (f x y))
+doubleCompare f a b = do
+  x <- floating a
+  y <- floating b
+  Right (RBoolean (f x y))
+divide f a b = do
+  x <- integer a
+  y <- integer b
+  ensure (y /= 0) "integer division by zero"
+  Right (RInteger (f x y))
+
+isAction primitive =
+  let n = P.primitiveCode primitive in
+  n <= 5 || (n >= 27 && n <= 44) || (n >= 56 && n <= 65)
+
+isSTAction primitive = case primitive of
+  PSTReturn -> true
+  PSTBind -> true
+  PNewSTArray -> true
+  PReadSTArray -> true
+  PWriteSTArray -> true
+  PLengthSTArray -> true
+  _ -> false
+
+runtimePrimitive : DataEnv -> Primitive -> List (Either String RValue) -> Either String RValue
+runtimePrimitive ds primitive arguments =
+  let arity = P.primitiveArity primitive
+  in if length arguments < arity then Right (RPrimitive primitive arguments)
+     else if not (length arguments == arity) then Left ("runtime primitive arity mismatch: " ++ P.primitiveName primitive)
+     else if isAction primitive then Right (RAction primitive arguments)
+     else if isSTAction primitive then Right (RSTAction primitive arguments)
+     else primitiveResult ds primitive arguments
+
+primitiveResult : DataEnv -> Primitive -> List (Either String RValue) -> Either String RValue
+primitiveResult ds primitive arguments =
+  let a = head arguments in
+  let b = head (tail arguments) in
+  let c = head (tail (tail arguments)) in
+  case primitive of
+    PRunST -> runStateRegion ds a
+    PConcatString -> do
+      x <- string a
+      y <- string b
+      Right (RString (x ++ y))
+    PShowInt -> mapEither (\n -> RString (showInt n)) (integer a)
+    PAddInt -> integer2 addInt a b
+    PSubInt -> integer2 subInt a b
+    PMulInt -> integer2 mulInt a b
+    PAndInt -> integer2 andInt a b
+    PQuotInt -> divide quotInt a b
+    PRemInt -> divide remInt a b
+    PReadInt -> bindEither (string a) (\s -> if validInteger s then Right (RInteger (readInt s)) else Left "invalid integer input")
+    PEqInt -> intCompare eqInt a b
+    PLtInt -> intCompare ltInt a b
+    PAddDouble -> double2 addDouble a b
+    PSubDouble -> double2 subDouble a b
+    PMulDouble -> double2 mulDouble a b
+    PDivDouble -> double2 divDouble a b
+    PSqrtDouble -> mapEither (\n -> RDouble (sqrtDouble n)) (floating a)
+    PEqDouble -> doubleCompare eqDouble a b
+    PLtDouble -> doubleCompare ltDouble a b
+    PIntToDouble -> mapEither (\n -> RDouble (intToDouble n)) (integer a)
+    PFormatDouble -> do
+      places <- integer a
+      n <- floating b
+      ensure (places >= 0 && places <= 17) "Double precision must be between 0 and 17"
+      Right (RString (formatDouble places n))
+    PEqString -> do
+      x <- string a
+      y <- string b
+      Right (RBoolean (eqString x y))
+    PIfThenElse -> bindEither (boolean a) (\choice -> if choice then b else c)
+    PStringLength -> mapEither (\s -> RInteger (stringLength s)) (string a)
+    PStringCodeAt -> do
+      s <- string a
+      i <- integer b
+      ensure (i >= 0 && i < stringLength s) "string index out of bounds"
+      Right (RInteger (stringCodeAt s i))
+    PStringSlice -> do
+      s <- string a
+      i <- integer b
+      n <- integer c
+      ensure (i >= 0 && i <= stringLength s && n >= 0 && n <= stringLength s - i) "string slice out of bounds"
+      Right (RString (stringSlice s i n))
+    PStringFromCode -> do
+      n <- integer a
+      ensure (n >= 0 && n <= 1114111 && (n < 55296 || n > 57343)) "invalid Unicode scalar"
+      Right (RString (stringFromCode n))
+    PCompareString -> do
+      x <- string a
+      y <- string b
+      Right (RInteger (compareString x y))
+    PReadDouble -> bindEither (string a) (\s -> if validDecimal s then Right (RDouble (readDouble s)) else Left "invalid Double input")
+    PDoubleToBits -> mapEither (\n -> RInteger (doubleToBits n)) (floating a)
+    PDoubleFromBits -> do
+      n <- integer a
+      ensure (n >= 0 && n <= 18446744073709551615) "Double bit pattern out of bounds"
+      Right (RDouble (doubleFromBits n))
+    PSeq -> bindEither a (\value -> seq value b)
+    PPanic -> bindEither (string a) Left
+    _ -> Left ("runtime primitive arity mismatch: " ++ P.primitiveName primitive)
+
+isDigit c = c >= 48 && c <= 57
+skipSign s i = if i < stringLength s && (stringCodeAt s i == 43 || stringCodeAt s i == 45) then i + 1 else i
+skipDigits : String -> Int -> Int
+skipDigits s i = if i < stringLength s && isDigit (stringCodeAt s i) then skipDigits s (i + 1) else i
+validInteger s = let start = skipSign s 0 in start < stringLength s && skipDigits s start == stringLength s
+validExponent s i = if i == stringLength s then true else
+  if stringCodeAt s i == 101 || stringCodeAt s i == 69 then
+    let start = skipSign s (i + 1) in start < stringLength s && skipDigits s start == stringLength s
+  else false
+validDecimal s =
+  let start = skipSign s 0 in
+  let end = skipDigits s start in
+  if start == end then false else
+    if end < stringLength s && stringCodeAt s end == 46 then
+      let fraction = skipDigits s (end + 1) in fraction > end + 1 && validExponent s fraction
+    else validExponent s end
+
+unit = Right (RConstructor "Unit" Nil)
+
+-- Each runST starts a fresh persistent store. The checked region type keeps
+-- handles local to this store; no host mutation or IO operation is involved.
+-- Keeping the default cell separate avoids allocating or forcing every slot.
+data RSTArrayState = RSTArrayState Int (Either String RValue) (Map Int (Either String RValue))
+data RSTStore = RSTStore Int (Map Int RSTArrayState)
+
+stateArray n initial cells = seq n (seq cells (RSTArrayState n initial cells))
+stateStore next arrays = seq next (seq arrays (RSTStore next arrays))
+
+stateArrayHandle : Either String RValue -> Either String Int
+stateArrayHandle thunk = bindEither thunk (\value -> case value of
+  RSTArrayHandle handle -> Right handle
+  _ -> Left "runtime primitive expected STArray")
+
+stateArrayLookup : Int -> Map Int RSTArrayState -> Either String RSTArrayState
+stateArrayLookup handle arrays = case M.lookup compareInt handle arrays of
+  Nothing -> Left "STArray does not belong to this region"
+  Just array -> Right array
+
+runStateRegion : DataEnv -> Either String RValue -> Either String RValue
+runStateRegion ds action = bindEither
+  (runStateAction ds (stateStore 0 M.empty) action Nil)
+  (\result -> case result of
+    Pair finalStore value -> bindEither value (\ready -> seq ready (Right ready)))
+
+-- Continuations contain unevaluated callback values. Results are thunks:
+-- a read returns the cell from this immutable store version, so a later
+-- write cannot change an earlier read even if its value is forced later.
+runStateAction : DataEnv -> RSTStore -> Either String RValue -> List (Either String RValue) -> Either String (Pair RSTStore (Either String RValue))
+runStateAction ds store thunk continuations = bindEither thunk (\value -> case value of
+  RSTAction primitive arguments -> performState ds store primitive arguments continuations
+  _ -> Left "runtime expected an ST action")
+
+resumeState : DataEnv -> RSTStore -> Either String RValue -> List (Either String RValue) -> Either String (Pair RSTStore (Either String RValue))
+resumeState ds store value continuations = seq store (case continuations of
+  Nil -> Right (Pair store value)
+  Cons next rest -> bindEither next (\function ->
+    runStateAction ds store (apply ds function value) rest))
+
+performState : DataEnv -> RSTStore -> Primitive -> List (Either String RValue) -> List (Either String RValue) -> Either String (Pair RSTStore (Either String RValue))
+performState ds store primitive arguments continuations =
+  let a = head arguments in
+  let b = head (tail arguments) in
+  let c = head (tail (tail arguments)) in
+  case primitive of
+    PSTReturn -> resumeState ds store a continuations
+    PSTBind -> runStateAction ds store a (Cons b continuations)
+    PNewSTArray -> do
+      n <- arraySize a
+      case store of
+        RSTStore next arrays ->
+          let array = stateArray n b M.empty in
+          let updated = stateStore (next + 1) (M.insert compareInt next array arrays) in
+          resumeState ds updated (Right (RSTArrayHandle next)) continuations
+    PReadSTArray -> do
+      handle <- stateArrayHandle a
+      case store of
+        RSTStore next arrays -> do
+          array <- stateArrayLookup handle arrays
+          case array of
+            RSTArrayState n initial cells -> do
+              index <- arrayIndex n b
+              resumeState ds store (M.findWithDefault compareInt initial index cells) continuations
+    PWriteSTArray -> do
+      handle <- stateArrayHandle a
+      case store of
+        RSTStore next arrays -> do
+          array <- stateArrayLookup handle arrays
+          case array of
+            RSTArrayState n initial cells -> do
+              index <- arrayIndex n b
+              let updatedArray = stateArray n initial (M.insert compareInt index c cells)
+              let updated = stateStore next (M.insert compareInt handle updatedArray arrays)
+              seq updatedArray (resumeState ds updated unit continuations)
+    PLengthSTArray -> do
+      handle <- stateArrayHandle a
+      case store of
+        RSTStore next arrays -> do
+          array <- stateArrayLookup handle arrays
+          case array of
+            RSTArrayState n initial cells -> resumeState ds store (Right (RInteger n)) continuations
+    _ -> Left "runtime ST action primitive arity mismatch"
+
+wrapIO : forall a. IO a -> (a -> RValue) -> IO (Either String (Either String RValue))
+wrapIO action wrap = ioBind action (\value -> ioReturn (Right (Right (wrap value))))
+finishIO action = ioBind action (\ignored -> ioReturn (Right unit))
+checkedIO : forall a. Either String a -> (a -> IO (Either String (Either String RValue))) -> IO (Either String (Either String RValue))
+checkedIO result next = case result of
+  Left message -> ioReturn (Left message)
+  Right value -> next value
+
+runAction : List String -> DataEnv -> Either String RValue -> IO (Either String (Either String RValue))
+runAction args ds thunk = case thunk of
+  Left message -> ioReturn (Left message)
+  Right value -> case value of
+    RAction primitive arguments -> perform args ds primitive arguments
+    _ -> ioReturn (Left "runtime expected an IO action")
+
+perform : List String -> DataEnv -> Primitive -> List (Either String RValue) -> IO (Either String (Either String RValue))
+perform args ds primitive arguments =
+  let a = head arguments in
+  let b = head (tail arguments) in
+  let c = head (tail (tail arguments)) in
+  case primitive of
+    PIOReturn -> ioReturn (Right a)
+    PIOBind -> ioBind (runAction args ds a) (\result -> case result of
+      Left message -> ioReturn (Left message)
+      Right value -> runAction args ds (bindEither b (\function -> apply ds function value)))
+    PGetLine -> wrapIO getLine RString
+    PPutStr -> checkedIO (string a) (\s -> finishIO (putStr s))
+    PPutStrLn -> checkedIO (string a) (\s -> finishIO (putStrLn s))
+    PPrintInt -> checkedIO (integer a) (\n -> finishIO (printInt n))
+    PNewIntArray -> checkedIO (do { n <- arraySize a; x <- integer b; Right (Pair n x) })
+      (\entry -> case entry of { Pair n x -> wrapIO (newIntArray n x) RIntArray })
+    PNewDoubleArray -> checkedIO (do { n <- arraySize a; x <- floating b; Right (Pair n x) })
+      (\entry -> case entry of { Pair n x -> wrapIO (newDoubleArray n x) RDoubleArray })
+    PNewByteArray -> checkedIO (do { n <- arraySize a; x <- byte b; Right (Pair n x) })
+      (\entry -> case entry of { Pair n x -> wrapIO (newByteArray n x) RByteArray })
+    PReadIntArray -> checkedIO (intArray a) (\array -> ioBind (lengthIntArray array) (\n ->
+      checkedIO (arrayIndex n b) (\i -> wrapIO (readIntArray array i) RInteger)))
+    PReadDoubleArray -> checkedIO (doubleArray a) (\array -> ioBind (lengthDoubleArray array) (\n ->
+      checkedIO (arrayIndex n b) (\i -> wrapIO (readDoubleArray array i) RDouble)))
+    PReadByteArray -> checkedIO (byteArray a) (\array -> ioBind (lengthByteArray array) (\n ->
+      checkedIO (arrayIndex n b) (\i -> wrapIO (readByteArray array i) RInteger)))
+    PWriteIntArray -> checkedIO (intArray a) (\array -> ioBind (lengthIntArray array) (\n ->
+      checkedIO (do { i <- arrayIndex n b; x <- integer c; Right (Pair i x) })
+        (\entry -> case entry of { Pair i x -> finishIO (writeIntArray array i x) })))
+    PWriteDoubleArray -> checkedIO (doubleArray a) (\array -> ioBind (lengthDoubleArray array) (\n ->
+      checkedIO (do { i <- arrayIndex n b; x <- floating c; Right (Pair i x) })
+        (\entry -> case entry of { Pair i x -> finishIO (writeDoubleArray array i x) })))
+    PWriteByteArray -> checkedIO (byteArray a) (\array -> ioBind (lengthByteArray array) (\n ->
+      checkedIO (do { i <- arrayIndex n b; x <- byte c; Right (Pair i x) })
+        (\entry -> case entry of { Pair i x -> finishIO (writeByteArray array i x) })))
+    PLengthIntArray -> checkedIO (intArray a) (\array -> wrapIO (lengthIntArray array) RInteger)
+    PLengthDoubleArray -> checkedIO (doubleArray a) (\array -> wrapIO (lengthDoubleArray array) RInteger)
+    PLengthByteArray -> checkedIO (byteArray a) (\array -> wrapIO (lengthByteArray array) RInteger)
+    PByteArrayFromString -> checkedIO (string a) (\s -> wrapIO (byteArrayFromString s) RByteArray)
+    PPutBytes -> checkedIO (byteArray a) (\array -> ioBind (lengthByteArray array) (\n ->
+      checkedIO (byteSlice n b c) (\slice -> case slice of { Pair offset count -> finishIO (putBytes array offset count) })))
+    PGetByteLine -> wrapIO getByteLine RByteArray
+    PNewIntTable -> wrapIO newIntTable RIntTable
+    PReadIntTable -> checkedIO (do { table <- intTable a; key <- integer b; Right (Pair table key) })
+      (\entry -> case entry of { Pair table key -> wrapIO (readIntTable table key) RInteger })
+    PWriteIntTable -> checkedIO (do { table <- intTable a; key <- integer b; value <- integer c; Right (Triple table key value) })
+      (\entry -> case entry of { Triple table key value -> finishIO (writeIntTable table key value) })
+    PReadFile -> checkedIO (path a) (\file -> wrapIO (readFile file) RString)
+    PWriteFile -> checkedIO (do { file <- path a; text <- string b; Right (Pair file text) })
+      (\entry -> case entry of { Pair file text -> finishIO (writeFile file text) })
+    PFileExists -> checkedIO (path a) (\file -> wrapIO (fileExists file) RBoolean)
+    PCanonicalPath -> checkedIO (path a) (\file -> wrapIO (canonicalPath file) RString)
+    PGetArgCount -> ioReturn (Right (Right (RInteger (length args))))
+    PGetArg -> checkedIO (integer a) (\i -> case at i args of
+      Nothing -> ioReturn (Left "argument index out of bounds")
+      Just argument -> ioReturn (Right (Right (RString argument))))
+    PPutErr -> checkedIO (string a) (\s -> finishIO (putErr s))
+    PExitWith -> checkedIO (integer a) (\status ->
+      if status < 0 || status > 255 then ioReturn (Left "exit status must be between 0 and 255") else exitWith status)
+    PGetExecutablePath -> wrapIO getExecutablePath RString
+    PGetContents -> wrapIO getContents RString
+    _ -> ioReturn (Left "runtime action primitive arity mismatch")
+
+arraySize a = do
+  n <- integer a
+  ensure (n >= 0 && n <= 1152921504606846975) "invalid array length"
+  Right n
+byte a = do
+  n <- integer a
+  ensure (n >= 0 && n <= 255) "byte value must be between 0 and 255"
+  Right n
+arrayIndex size a = do
+  n <- integer a
+  ensure (n >= 0 && n < size) "array index out of bounds"
+  Right n
+byteSlice size offset count = do
+  i <- integer offset
+  ensure (i >= 0 && i <= size) "byte slice out of bounds"
+  n <- integer count
+  ensure (n >= 0 && n <= size - i) "byte slice out of bounds"
+  Right (Pair i n)
+path a = do
+  name <- string a
+  ensure (not (hasNul name 0)) "file path contains NUL"
+  Right name
+hasNul : String -> Int -> Bool
+hasNul s i = if i >= stringLength s then false else stringCodeAt s i == 0 || hasNul s (i + 1)

@@ -13,6 +13,8 @@ main :: IO ()
 main = do
   arguments <- getArgs
   compiler <- requireTool "emlf" "Run this benchmark with cabal bench."
+  -- let compiler = "/Volumes/src/mlf/dist-newstyle/bootstrap/emlf-stage1"
+  -- The language driver reports the selected compiler after --emlf overrides.
   python <- requireTool "python3" "The benchmark drivers require Python 3."
   let (script,defaults,options) = case arguments of
         "compare-revisions":rest ->

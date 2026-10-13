@@ -22,6 +22,11 @@ data Primitive
   | ByteArrayFromString | PutBytes
   | GetByteLine | NewIntTable | ReadIntTable | WriteIntTable
   | AndInt
+  | StringLength | StringCodeAt | StringSlice | StringFromCode | CompareString
+  | ReadDouble | DoubleToBits | DoubleFromBits | Seq | Panic
+  | ReadFile | WriteFile | FileExists | CanonicalPath | GetArgCount | GetArg | PutErr | ExitWith
+  | GetExecutablePath | GetContents
+  | STReturn | STBind | RunST | NewSTArray | ReadSTArray | WriteSTArray | LengthSTArray
   deriving (Eq, Ord, Show, Enum, Bounded)
 
 primitiveName :: Primitive -> String
@@ -72,6 +77,33 @@ primitiveName p = case p of
   ReadIntTable -> "readIntTable"
   WriteIntTable -> "writeIntTable"
   AndInt -> "andInt"
+  StringLength -> "stringLength"
+  StringCodeAt -> "stringCodeAt"
+  StringSlice -> "stringSlice"
+  StringFromCode -> "stringFromCode"
+  CompareString -> "compareString"
+  ReadDouble -> "readDouble"
+  DoubleToBits -> "doubleToBits"
+  DoubleFromBits -> "doubleFromBits"
+  Seq -> "seq"
+  Panic -> "panic"
+  ReadFile -> "readFile"
+  WriteFile -> "writeFile"
+  FileExists -> "fileExists"
+  CanonicalPath -> "canonicalPath"
+  GetArgCount -> "getArgCount"
+  GetArg -> "getArg"
+  PutErr -> "putErr"
+  ExitWith -> "exitWith"
+  GetExecutablePath -> "getExecutablePath"
+  GetContents -> "getContents"
+  STReturn -> "stReturn"
+  STBind -> "stBind"
+  RunST -> "runST"
+  NewSTArray -> "newSTArray"
+  ReadSTArray -> "readSTArray"
+  WriteSTArray -> "writeSTArray"
+  LengthSTArray -> "lengthSTArray"
 
 lookupTargetPrimitive :: String -> Maybe Primitive
 lookupTargetPrimitive name = find ((== name) . primitiveName) [minBound .. maxBound]
@@ -130,10 +162,39 @@ primitiveSignature primitive = case primitive of
   ReadIntTable -> ([],Function intTable (Function int (io int)))
   WriteIntTable -> ([],Function intTable (Function int (Function int (io unit))))
   AndInt -> ([],Function int (Function int int))
+  StringLength -> ([],Function string int)
+  StringCodeAt -> ([],Function string (Function int int))
+  StringSlice -> ([],Function string (Function int (Function int string)))
+  StringFromCode -> ([],Function int string)
+  CompareString -> ([],Function string (Function string int))
+  ReadDouble -> ([],Function string double)
+  DoubleToBits -> ([],Function double int)
+  DoubleFromBits -> ([],Function int double)
+  Seq -> ([("a",Star),("b",Star)],Function a (Function b b))
+  Panic -> ([("a",Star)],Function string a)
+  ReadFile -> ([],Function string (io string))
+  WriteFile -> ([],Function string (Function string (io unit)))
+  FileExists -> ([],Function string (io bool))
+  CanonicalPath -> ([],Function string (io string))
+  GetArgCount -> ([],io int)
+  GetArg -> ([],Function int (io string))
+  PutErr -> ([],Function string (io unit))
+  ExitWith -> ([("a",Star)],Function int (io a))
+  GetExecutablePath -> ([],io string)
+  GetContents -> ([],io string)
+  STReturn -> ([("s",Star),("a",Star)],Function a (st a))
+  STBind -> ([("s",Star),("a",Star),("b",Star)],Function (st a) (Function (Function a (st b)) (st b)))
+  RunST -> ([("a",Star)],Function (Quantified "s" Star (st a)) a)
+  NewSTArray -> ([("s",Star),("a",Star)],Function int (Function a (st (stArray a))))
+  ReadSTArray -> ([("s",Star),("a",Star)],Function (stArray a) (Function int (st a)))
+  WriteSTArray -> ([("s",Star),("a",Star)],Function (stArray a) (Function int (Function a (st unit))))
+  LengthSTArray -> ([("s",Star),("a",Star)],Function (stArray a) (st int))
   where
     a = Parameter "a"
     b = Parameter "b"
     io t = Applied "IO" [t]
+    st t = Applied "ST" [Parameter "s",t]
+    stArray t = Applied "STArray" [Parameter "s",t]
     string = Applied "String" []
     int = Applied "Int" []
     double = Applied "Double" []
@@ -155,4 +216,5 @@ primitiveArity = arity . snd . primitiveSignature
 primitiveStrict :: Primitive -> Bool
 primitiveStrict p = p `elem`
   [ConcatString,ShowInt,AddInt,SubInt,EqInt,LtInt,EqString,MulInt,QuotInt,RemInt,AndInt,ReadInt,
-   AddDouble,SubDouble,MulDouble,DivDouble,SqrtDouble,EqDouble,LtDouble,IntToDouble,FormatDouble]
+   AddDouble,SubDouble,MulDouble,DivDouble,SqrtDouble,EqDouble,LtDouble,IntToDouble,FormatDouble,
+   StringLength,StringCodeAt,StringSlice,StringFromCode,CompareString,ReadDouble,DoubleToBits,DoubleFromBits,Panic,RunST]

@@ -1,0 +1,72 @@
+module Main where
+import Bootstrap.Types
+import Bootstrap.Std
+import Bootstrap.Fresh
+import qualified Bootstrap.Map as M
+import qualified Bootstrap.Parser as P
+import qualified Bootstrap.Classes as C
+import qualified Bootstrap.Surface as S
+import qualified Bootstrap.SourceEquality as E
+import qualified Bootstrap.Unicode as U
+
+isExpression : String -> SExpr -> Bool
+isExpression source expected = case P.parseExpr "test" source of {Left _ -> false; Right actual -> E.eqSExpr actual expected}
+rejectExpression : String -> Bool
+rejectExpression source = isLeft (P.parseExpr "test" source)
+acceptProgram : String -> Bool
+acceptProgram source = case P.parseProgram "test" source of {Left _ -> false; Right program -> isRight (C.lowerClasses program)}
+rejectProgram : String -> Bool
+rejectProgram source = case P.parseProgram "test" source of {Left _ -> true; Right program -> isLeft (C.lowerClasses program)}
+int2 : Primitive -> SExpr -> SExpr -> SExpr
+int2 primitive a b = SApp (SApp (SPrimitive primitive) a) b
+choice : SExpr -> SExpr -> SExpr -> SExpr
+choice a b c = SApp (int2 PIfThenElse a b) c
+moduleTest : Bool
+moduleTest = case P.parseModule "test" "module Library (f, Box(..), module Support) where\nimport qualified Support as S hiding (hidden)\ndata Box a = Box a\nf x = Box x\n" of
+  Right (SourceModule path (Just name) (Just exports) imports datatypes Nil Nil values Nothing) ->
+    eqString path "test" && eqString name "Library" && length exports == 3 && length imports == 1 && length datatypes == 1 && length values == 1
+  _ -> false
+annotationTest : Bool
+annotationTest = case P.parseAnnotation "exists a. forall (f : * -> *) (b >= a). f b -> a" of
+  Right (SAnnotation variables ty) -> eqList eqString variables (Cons "a" Nil) && E.eqSType ty (SForall Flexible "f" (SBottomKind (KArrow Star Star)) (SForall Flexible "b" (STVar "a") (SArrow (STypeApp (STVar "f") (STVar "b")) (STVar "a"))))
+  _ -> false
+patternTest : Bool
+patternTest = case P.parseExpr "test" "\\(Box (Pair x y)) -> x" of
+  Right (SEquations (Cons (Pair (Cons (SNestedPattern box (Cons (SConstructorPattern pair fields) Nil)) Nil) (SVar result)) Nil)) -> eqString box "Box" && eqString pair "Pair" && length fields == 2 && eqString result "x"
+  _ -> false
+layoutTest : Bool
+layoutTest = case P.parseProgram "test" "f x =\n  if true then\n    x\n  else\n    x\nmain = do\n  let answer = f 42\n  printInt answer\n" of
+  Right (SProgram Nil _) -> true
+  _ -> false
+surfaceTest : Bool
+surfaceTest = case P.parseProgram "test" "data Option a = None | Some a\nf (Some x) = x\nf None = 0\nmain = f (Some 42)\n" of
+  Left _ -> false
+  Right program -> isRight (S.lowerSurface program)
+recursionTest : Bool
+recursionTest = case P.parseProgram "test" "f : Int -> Int\nf n = if n == 0 then 1 else f (n-1)\nmain = f 3\n" of
+  Right (SProgram _ (SLetRec (Cons _ Nil) _)) -> true
+  _ -> false
+methodCaptureTest : Bool
+methodCaptureTest = case runFresh Nil (C.instantiateMethod (M.singleton "a" (STVar "methodType0")) (SForall Flexible "b" SBottom (SArrow (STVar "b") (STVar "a")))) of
+  Right (SForall _ binder _ (SArrow (STVar argument) (STVar result))) -> not (eqString binder "methodType0") && eqString binder argument && eqString result "methodType0"
+  _ -> false
+
+freshCollisionTest : Bool
+freshCollisionTest = case runFresh Nil (do
+  first <- freshName "X1"
+  freshNames 9 "unused"
+  second <- freshName "X"
+  freshPure (Pair first second)) of
+    Right (Pair first second) -> eqString first "X10" && eqString second "X11"
+    _ -> false
+
+wideTypeCounts : Bool
+wideTypeCounts = let wide = SCon "Wide" (replicate 100001 (STVar "a")) in C.typeSize wide == 100002 && C.occurrences "a" wide == 100001
+
+cases : List (Pair String Bool)
+cases = Cons (Pair "wide type counts" wideTypeCounts) (Cons (Pair "generated name collision" freshCollisionTest) (Cons (Pair "class substitution capture" methodCaptureTest) (Cons (Pair "identity" (isExpression "\\x -> x" (SLam "x" Nothing (SVar "x")) && isExpression "\\x->-1" (SLam "x" Nothing (SIntLit (-1))) && isExpression "\\x.-1" (SLam "x" Nothing (SIntLit (-1))))) (Cons (Pair "unicode variable" (isExpression "\\é -> é" (SLam "é" Nothing (SVar "é")) && isExpression "λx.x" (SLam "x" Nothing (SVar "x")))) (Cons (Pair "unicode classifiers" (U.isAlpha 233 && U.isUpper 937 && U.isLower 955 && U.isSpace 8195 && not (U.isAlpha 128013))) (Cons (Pair "nested comments" (isExpression "{- outer {- inner -} -} 42 -- tail" (SIntLit 42))) (Cons (Pair "precedence" (isExpression "x - 1 * 2" (int2 PSubInt (SVar "x") (int2 PMulInt (SIntLit 1) (SIntLit 2))))) (Cons (Pair "conditional" (isExpression "if true then 1 else 2" (choice (SBoolLit true) (SIntLit 1) (SIntLit 2)))) (Cons (Pair "hex integer" (isExpression "0xDEAD" (SIntLit 57005))) (Cons (Pair "octal integer" (isExpression "0o177" (SIntLit 127))) (Cons (Pair "float exponent" (isExpression "1.25e2" (SDoubleLit 125.0))) (Cons (Pair "string escapes" (isExpression "\"a\\n\\x3bb\\&z\"" (SStringLit "a\nλz"))) (Cons (Pair "string gap" (isExpression "\"a\\\n  \\b\"" (SStringLit "ab"))) (Cons (Pair "unit" (isExpression "()" (SConstructor "Unit"))) (Cons (Pair "comparison non-associative" (rejectExpression "1 < 2 < 3")) (Cons (Pair "duplicate lambda parameter" (rejectExpression "\\x x -> x")) (Cons (Pair "unterminated comment" (rejectExpression "{- unfinished")) (Cons (Pair "nonfinite float" (rejectExpression "1e999")) (Cons (Pair "module grammar" moduleTest) (Cons (Pair "annotation grammar" annotationTest) (Cons (Pair "nested pattern grammar" patternTest) (Cons (Pair "layout" layoutTest) (Cons (Pair "pattern lowering" surfaceTest) (Cons (Pair "typed recursion" recursionTest) (Cons (Pair "unsigned recursion rejected" (rejectProgram "f x = f x\nmain = f 0\n")) (Cons (Pair "class lowering" (acceptProgram "class Describe a where { describe : a -> String }; instance Describe Int where { describe x = showInt x }; main = describe 42")) (Cons (Pair "multiparameter class" (acceptProgram "class Convert a b where { convert : a -> b }; instance Convert Int String where { convert = showInt }; main = convert 42")) (Cons (Pair "overlap rejected" (rejectProgram "class Describe a where { describe : a -> String }; instance Describe Int where { describe = showInt }; instance Describe Int where { describe = showInt }; main = describe 42")) (Cons (Pair "missing method rejected" (rejectProgram "class Describe a where { describe : a -> String }; instance Describe Int where { }; main = 42")) (Cons (Pair "cyclic superclass rejected" (rejectProgram "class B a => A a where { getA : a -> a }; class A a => B a where { getB : a -> a }; main = 42")) (Cons (Pair "nondecreasing context rejected" (rejectProgram "class C a where { get : a -> a }; instance forall a. C (Box a) => C (Box a) where { get x = x }; data Box a = Box a; main = 42")) (Nil))))))))))))))))))))))))))))))))
+runCases : List (Pair String Bool) -> IO Unit
+runCases tests = case tests of
+  Nil -> putStrLn "frontend: 32 checks passed"
+  Cons (Pair name success) rest -> if success then runCases rest else do {putErr ("frontend failure: " ++ name ++ "\n"); exitWith 1}
+main = runCases cases

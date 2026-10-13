@@ -1,0 +1,212 @@
+module Bootstrap.LLVM.Kernel where
+
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.Map as M
+import qualified Bootstrap.Set as S
+import qualified Bootstrap.Primitive as P
+import qualified Bootstrap.LLVM.Analysis as A
+import qualified Bootstrap.LLVM.Optimize as O
+
+data CopyLoop = CopyLoop XName XName XName XName XName XName
+
+primitiveIn : Primitive -> List Int -> Bool
+primitiveIn p codes = L.any (\code -> P.primitiveCode p == code) codes
+
+safeScalarPrimitive : Primitive -> Bool
+safeScalarPrimitive p = case p of
+  PAddInt -> true
+  PSubInt -> true
+  PMulInt -> true
+  PAndInt -> true
+  PEqInt -> true
+  PLtInt -> true
+  PIfThenElse -> true
+  PAddDouble -> true
+  PSubDouble -> true
+  PMulDouble -> true
+  PDivDouble -> true
+  PSqrtDouble -> true
+  PEqDouble -> true
+  PLtDouble -> true
+  PIntToDouble -> true
+  _ -> false
+
+safeQuotient : Primitive -> List XErased -> Bool
+safeQuotient p args = case p of
+  PQuotInt -> nonzeroDivisor args
+  PRemInt -> nonzeroDivisor args
+  _ -> false
+
+nonzeroDivisor : List XErased -> Bool
+nonzeroDivisor args = case args of
+  Cons a (Cons (XEInt n) Nil) -> n /= 0
+  _ -> false
+
+scalar : Map XName A.WorkerFunction -> XErased -> Bool
+scalar fs expression = scalarSeen fs S.empty expression
+
+scalarSeen : Map XName A.WorkerFunction -> Set XName -> XErased -> Bool
+scalarSeen fs seen expression = case expression of
+  XEVar n -> L.not (M.member O.compareName n fs)
+  XEInt n -> true
+  XEDouble n -> true
+  XEBool n -> true
+  XEString n -> true
+  XEConstructor n -> true
+  XELet n a b -> scalarSeen fs seen a && scalarSeen fs seen b
+  _ -> case O.applications expression of
+    Pair (XEPrimitive p) args -> L.length args == P.primitiveArity p && L.all (scalarSeen fs seen) args && (safeScalarPrimitive p || safeQuotient p args)
+    Pair (XEConstructor c) args -> L.all (scalarSeen fs seen) args
+    Pair (XEVar n) args -> case M.lookup O.compareName n fs of
+      Nothing -> false
+      Just f -> L.length args == L.length (A.parameters f) && L.not (S.member O.compareName n seen) && L.all (scalarSeen fs seen) args && scalarSeen fs (S.insert O.compareName n seen) (A.functionBody f)
+    _ -> false
+
+operation : Primitive -> Bool
+operation p = case p of
+  PIOReturn -> true
+  PIOBind -> true
+  PReadIntArray -> true
+  PWriteIntArray -> true
+  PLengthIntArray -> true
+  PReadDoubleArray -> true
+  PWriteDoubleArray -> true
+  PLengthDoubleArray -> true
+  PReadByteArray -> true
+  PWriteByteArray -> true
+  PLengthByteArray -> true
+  PReadIntTable -> true
+  PWriteIntTable -> true
+  PGetByteLine -> true
+  PNewByteArray -> true
+  PNewIntArray -> true
+  PNewDoubleArray -> true
+  PByteArrayFromString -> true
+  PPutBytes -> true
+  PNewIntTable -> true
+  _ -> false
+
+anchored : Map XName A.WorkerFunction -> Set XName -> XName -> Bool
+anchored fs seen name = if S.member O.compareName name seen then false else case M.lookup O.compareName name fs of
+  Nothing -> false
+  Just f -> anchor fs (S.insert O.compareName name seen) (A.functionBody f)
+
+anchor : Map XName A.WorkerFunction -> Set XName -> XErased -> Bool
+anchor fs seen expression = case expression of
+  XELet n a b -> anchor fs seen b
+  XELetRec ds b -> anchor fs seen b
+  _ -> case O.applications expression of
+    Pair (XEPrimitive PIfThenElse) args -> L.any (anchor fs seen) (L.drop 1 args)
+    Pair (XEPrimitive p) args -> operation p && L.length args == P.primitiveArity p
+    Pair (XEVar n) args -> anchored fs seen n
+    _ -> false
+
+eligible : Map XName A.WorkerFunction -> Set XName -> XErased -> Bool
+eligible fs names expression = case expression of
+  XELet n a b -> scalar fs a && eligible fs names b
+  XELetRec ds b -> L.all (\entry -> case entry of Pair n a -> M.member O.compareName n fs) ds && eligible fs names b
+  _ -> case O.applications expression of
+    Pair (XEPrimitive PIOBind) (Cons a (Cons (XEAbs n b) Nil)) -> eligible fs names a && eligible fs names b
+    Pair (XEPrimitive PIfThenElse) (Cons c (Cons a (Cons b Nil))) -> scalar fs c && eligible fs names a && eligible fs names b
+    Pair (XEPrimitive PIOBind) args -> false
+    Pair (XEPrimitive p) args -> operation p && L.length args == P.primitiveArity p && L.all (scalar fs) args
+    Pair (XEVar n) args -> case M.lookup O.compareName n fs of
+      Nothing -> false
+      Just f -> S.member O.compareName n names && L.length args == L.length (A.parameters f) && L.all (scalar fs) args
+    _ -> false
+
+kernelFixed : Map XName A.WorkerFunction -> Set XName -> Set XName
+kernelFixed fs names =
+  let next = S.filter (\name -> case M.lookup O.compareName name fs of Nothing -> false; Just f -> eligible fs names (A.functionBody f)) names in
+  if A.sameNames (S.toList names) (S.toList next) then names else kernelFixed fs next
+
+kernels : Map XName A.WorkerFunction -> Set XName
+kernels fs = kernelFixed fs (S.fromList O.compareName (L.filter (anchored fs S.empty) (M.keys fs)))
+
+allocation : Primitive -> Bool
+allocation p = case p of
+  PGetByteLine -> true
+  PNewByteArray -> true
+  PNewIntArray -> true
+  PNewDoubleArray -> true
+  PByteArrayFromString -> true
+  PNewIntTable -> true
+  _ -> false
+
+reaches : Set XName -> XErased -> Bool
+reaches previous expression = case O.applications expression of
+  Pair (XEPrimitive p) args -> if allocation p then true else reachesChildren previous expression
+  Pair (XEVar n) args -> if S.member O.compareName n previous then true else reachesChildren previous expression
+  _ -> reachesChildren previous expression
+
+reachesChildren : Set XName -> XErased -> Bool
+reachesChildren previous expression = case expression of
+  XEAbs n b -> reaches previous b
+  XEApp a b -> reaches previous a || reaches previous b
+  XELet n a b -> reaches previous a || reaches previous b
+  XELetRec ds b -> reaches previous b
+  _ -> false
+
+collectingFixed : Map XName A.WorkerFunction -> Set XName -> Set XName -> Set XName
+collectingFixed fs names previous =
+  let next = S.filter (\name -> case M.lookup O.compareName name fs of Nothing -> false; Just f -> reaches previous (A.functionBody f)) names in
+  if A.sameNames (S.toList previous) (S.toList next) then previous else collectingFixed fs names next
+
+collecting : Map XName A.WorkerFunction -> Set XName -> Set XName
+collecting fs names = collectingFixed fs names S.empty
+
+byteCopy : XName -> A.WorkerFunction -> Maybe (List XName)
+byteCopy name f = if L.null (A.captures f) then case A.parameters f of
+  Cons source (Cons dest (Cons end (Cons offset (Cons index Nil)))) ->
+    let candidate = CopyLoop name source dest end offset index in
+    if copyBody candidate (A.functionBody f) then Just (A.parameters f) else Nothing
+  _ -> Nothing
+  else Nothing
+
+copyBody : CopyLoop -> XErased -> Bool
+copyBody candidate expression = case O.applications expression of
+  Pair (XEPrimitive PIfThenElse) (Cons condition (Cons body (Cons done Nil))) -> copyCondition candidate condition && copyRead candidate body && copyDone done
+  _ -> false
+
+copyCondition : CopyLoop -> XErased -> Bool
+copyCondition (CopyLoop name source dest end offset index) expression = case O.applications expression of
+  Pair (XEPrimitive PLtInt) (Cons (XEVar i) (Cons (XEVar n) Nil)) -> O.eqName index i && O.eqName end n
+  _ -> false
+
+copyDone : XErased -> Bool
+copyDone expression = case O.applications expression of
+  Pair (XEPrimitive PIOReturn) (Cons (XEConstructor unit) Nil) -> eqString unit "Unit"
+  _ -> false
+
+copyRead : CopyLoop -> XErased -> Bool
+copyRead candidate expression = case O.applications expression of
+  Pair (XEPrimitive PIOBind) (Cons action (Cons (XEAbs cell rest) Nil)) -> case O.applications action of
+    Pair (XEPrimitive PReadByteArray) (Cons (XEVar array) (Cons (XEVar i) Nil)) -> case candidate of
+      CopyLoop name source dest end offset index -> O.eqName source array && O.eqName index i && copyWrite candidate cell rest
+    _ -> false
+  _ -> false
+
+copyWrite : CopyLoop -> XName -> XErased -> Bool
+copyWrite candidate cell expression = case O.applications expression of
+  Pair (XEPrimitive PIOBind) (Cons action (Cons (XEAbs ignored tail) Nil)) -> case O.applications action of
+    Pair (XEPrimitive PWriteByteArray) (Cons (XEVar array) (Cons address (Cons (XEVar c) Nil))) -> case candidate of
+      CopyLoop name source dest end offset index -> O.eqName dest array && O.eqName cell c && copyAddress candidate address && copyTail candidate tail
+    _ -> false
+  _ -> false
+
+copyAddress : CopyLoop -> XErased -> Bool
+copyAddress (CopyLoop name source dest end offset index) expression = case O.applications expression of
+  Pair (XEPrimitive PAddInt) (Cons (XEVar o) (Cons (XEVar i) Nil)) -> O.eqName offset o && O.eqName index i
+  _ -> false
+
+copyTail : CopyLoop -> XErased -> Bool
+copyTail (CopyLoop name source dest end offset index) expression = case O.applications expression of
+  Pair (XEVar self) (Cons (XEVar a) (Cons (XEVar b) (Cons (XEVar n) (Cons (XEVar o) (Cons next Nil))))) ->
+    O.eqName name self && O.eqName source a && O.eqName dest b && O.eqName end n && O.eqName offset o && copyNext index next
+  _ -> false
+
+copyNext : XName -> XErased -> Bool
+copyNext index expression = case O.applications expression of
+  Pair (XEPrimitive PAddInt) (Cons (XEVar i) (Cons (XEInt one) Nil)) -> O.eqName index i && one == 1
+  _ -> false

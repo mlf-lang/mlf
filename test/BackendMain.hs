@@ -11,16 +11,24 @@ import IOTests (ioTests)
 import PreludeTests (preludeTests)
 import Snake (snakeTests)
 import NativeOptimization (nativeOptimizationTests)
+import ConstructorProjection (constructorProjectionTests)
+import ForceReuse (forceReuseTests)
+import BoolConditions (boolConditionTests)
+import EnvironmentAccess (environmentAccessTests)
+import StrictFields (strictFieldTests)
 import NumericArrays (numericArrayTests)
 import ByteArrays (byteArrayTests)
 import DNA (dnaTests)
 import ModuleBackends (moduleBackendTests)
+import BootstrapPrimitives (bootstrapPrimitiveTests)
+import StateRuntime (stateRuntimeTests)
+import HigherOrderSpecialization (higherOrderTests)
 
 main :: IO ()
 main = do
   hSetBuffering stdout LineBuffering
   withBackends $ \backends -> do
-    let suite = ioTests backends ++ preludeTests backends ++ snakeTests backends ++ backendTests backends ++ nativeOptimizationTests backends ++ numericArrayTests backends ++ byteArrayTests backends ++ dnaTests backends ++ moduleBackendTests backends
+    let suite = ioTests backends ++ preludeTests backends ++ snakeTests backends ++ backendTests backends ++ nativeOptimizationTests backends ++ constructorProjectionTests backends ++ forceReuseTests backends ++ boolConditionTests backends ++ environmentAccessTests backends ++ strictFieldTests backends ++ numericArrayTests backends ++ byteArrayTests backends ++ dnaTests backends ++ moduleBackendTests backends ++ bootstrapPrimitiveTests backends ++ stateRuntimeTests backends ++ higherOrderTests backends
         labels = map fst suite
     unless (length labels == length (nub labels)) (fail "duplicate backend fixture labels")
     results <- forM suite $ \(label,action) -> do

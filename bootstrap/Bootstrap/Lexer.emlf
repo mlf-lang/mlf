@@ -1,0 +1,176 @@
+module Bootstrap.Lexer where
+import Bootstrap.Types
+import Bootstrap.Std
+import qualified Bootstrap.Unicode as U
+
+data Token = Token String Int Int Int Int
+data Cursor = Cursor Int Int Int
+data Scanned = Scanned (List Token) Token
+
+tokenText : Token -> String
+tokenText (Token s _ _ _ _) = s
+tokenLine : Token -> Int
+tokenLine (Token _ n _ _ _) = n
+tokenColumn : Token -> Int
+tokenColumn (Token _ _ n _ _) = n
+tokenEndLine : Token -> Int
+tokenEndLine (Token _ _ _ n _) = n
+tokenEndColumn : Token -> Int
+tokenEndColumn (Token _ _ _ _ n) = n
+cursorIndex : Cursor -> Int
+cursorIndex (Cursor n _ _) = n
+advance : Int -> Cursor -> Cursor
+advance c (Cursor i l n) =
+  let nextIndex = i + 1 in
+  let nextLine = if c == 10 then l + 1 else l in
+  let nextColumn = if c == 10 then 1 else if c == 9 then n + 8 - ((n-1) % 8) else n + 1 in
+  seq nextIndex (seq nextLine (seq nextColumn (Cursor nextIndex nextLine nextColumn)))
+lexError : String -> Cursor -> String -> String
+lexError file (Cursor _ line column) message = file ++ ":" ++ showInt line ++ ":" ++ showInt column ++ ": " ++ message
+codeAt : String -> Int -> Int -> Int
+codeAt source size i = if i < size then stringCodeAt source i else -1
+isDigit : Int -> Bool
+isDigit c = c >= 48 && c <= 57
+isHexDigit : Int -> Bool
+isHexDigit c = isDigit c || (c >= 65 && c <= 70) || (c >= 97 && c <= 102)
+isIdentChar : Int -> Bool
+isIdentChar c = U.isAlphaNum c || c == 95 || c == 39
+isOperator : Int -> Bool
+isOperator c = elem eqInt c (Cons 58 (Cons 33 (Cons 35 (Cons 36 (Cons 37 (Cons 38 (Cons 42 (Cons 43 (Cons 46 (Cons 47 (Cons 60 (Cons 61 (Cons 62 (Cons 63 (Cons 64 (Cons 92 (Cons 94 (Cons 124 (Cons 45 (Cons 126 (Nil)))))))))))))))))))))
+starts : String -> Int -> Int -> Int -> Bool
+starts source size i c = codeAt source size i == c
+skipLine : String -> Int -> Cursor -> Cursor
+skipLine source size cursor = let i = cursorIndex cursor in if i >= size || codeAt source size i == 10 then cursor else skipLine source size (advance (codeAt source size i) cursor)
+skipComment : String -> String -> Int -> Int -> Cursor -> Either String Cursor
+skipComment file source size depth cursor = let i = cursorIndex cursor in
+  if i >= size then Left (lexError file cursor "unterminated comment")
+  else if starts source size i 123 && starts source size (i+1) 45 then
+    let nextDepth = depth + 1 in seq nextDepth (skipComment file source size nextDepth (advance 45 (advance 123 cursor)))
+  else if starts source size i 45 && starts source size (i+1) 125 then
+    let next = advance 125 (advance 45 cursor) in if depth == 1 then Right next else
+      let nextDepth = depth - 1 in seq nextDepth (skipComment file source size nextDepth next)
+  else skipComment file source size depth (advance (codeAt source size i) cursor)
+skipWhite : String -> String -> Int -> Cursor -> Either String Cursor
+skipWhite file source size cursor = let i = cursorIndex cursor in
+  if i >= size then Right cursor
+  else if U.isSpace (codeAt source size i) then skipWhite file source size (advance (codeAt source size i) cursor)
+  else if starts source size i 45 && starts source size (i+1) 45 then skipWhite file source size (skipLine source size cursor)
+  else if starts source size i 123 && starts source size (i+1) 45 then
+    case skipComment file source size 1 (advance 45 (advance 123 cursor)) of
+      Left e -> Left e
+      Right next -> skipWhite file source size next
+  else Right cursor
+consumeWhile : (Int -> Bool) -> String -> Int -> Cursor -> Cursor
+consumeWhile predicate source size cursor = let i = cursorIndex cursor in
+  if i < size && predicate (codeAt source size i) then consumeWhile predicate source size (advance (codeAt source size i) cursor) else cursor
+scanQuoted : String -> String -> Int -> Cursor -> Either String Cursor
+scanQuoted file source size cursor = let i = cursorIndex cursor in
+  if i >= size then Left (lexError file cursor "unterminated string")
+  else if starts source size i 34 then Right (advance 34 cursor)
+  else if starts source size i 92 then
+    let next = advance 92 cursor in let j = cursorIndex next in
+    if j >= size then Left (lexError file next "unterminated string escape")
+    else if U.isSpace (codeAt source size j) then
+      let gap = consumeWhile U.isSpace source size next in
+      if starts source size (cursorIndex gap) 92 then scanQuoted file source size (advance 92 gap) else Left (lexError file gap "string gap must end with backslash")
+    else scanQuoted file source size (advance (codeAt source size j) next)
+  else if codeAt source size i <= 26 then Left (lexError file cursor "unescaped control character in string")
+  else scanQuoted file source size (advance (codeAt source size i) cursor)
+scanNumber : String -> Int -> Cursor -> Cursor
+scanNumber source size cursor = let i = cursorIndex cursor in
+  if starts source size i 48 && (starts source size (i+1) 120 || starts source size (i+1) 88) then consumeWhile isHexDigit source size (advance (codeAt source size (i+1)) (advance 48 cursor))
+  else if starts source size i 48 && (starts source size (i+1) 111 || starts source size (i+1) 79) then consumeWhile (\c -> c >= 48 && c <= 55) source size (advance (codeAt source size (i+1)) (advance 48 cursor))
+  else let digits = consumeWhile isDigit source size cursor in
+    let j = cursorIndex digits in
+    let fraction = if starts source size j 46 && isDigit (codeAt source size (j+1)) then consumeWhile isDigit source size (advance 46 digits) else digits in
+    let k = cursorIndex fraction in
+    if starts source size k 101 || starts source size k 69 then
+      let exponent = advance (codeAt source size k) fraction in
+      let q = cursorIndex exponent in
+      let signed = if starts source size q 43 || starts source size q 45 then advance (codeAt source size q) exponent else exponent in
+      if isDigit (codeAt source size (cursorIndex signed)) then consumeWhile isDigit source size signed else fraction
+    else fraction
+scanTokens : String -> String -> Either String Scanned
+scanTokens file source = scanMore file source (stringLength source) (Cursor 0 1 1)
+scanMore : String -> String -> Int -> Cursor -> Either String Scanned
+scanMore file source size cursor = case skipWhite file source size cursor of
+  Left e -> Left e
+  Right begin -> case begin of
+    Cursor i line column -> if i >= size then Right (Scanned Nil (Token "" line column line column)) else
+      let c = codeAt source size i in
+      let next = if c == 34 then scanQuoted file source size (advance c begin)
+                 else Right (if U.isAlpha c || c == 95 || c == 39 then consumeWhile isIdentChar source size begin
+                   else if isDigit c then scanNumber source size begin
+                   else if isOperator c then consumeWhile isOperator source size begin
+                   else advance c begin) in
+      case next of
+        Left e -> Left e
+        Right end -> case end of
+          Cursor j lastLine lastColumn -> case scanMore file source size end of
+            Left e -> Left e
+            Right (Scanned rest finish) -> Right (Scanned (Cons (Token (stringSlice source i (j-i)) line column lastLine lastColumn) rest) finish)
+
+digitValue : Int -> Int
+digitValue c = if c >= 48 && c <= 57 then c-48 else if c >= 65 && c <= 70 then c-55 else if c >= 97 && c <= 102 then c-87 else -1
+readBase : Int -> String -> Int -> Int -> Either String Int
+readBase base source index value = if index == stringLength source then Right value else
+  let digit = digitValue (stringCodeAt source index) in
+  if digit < 0 || digit >= base then Left "invalid integer literal" else
+    let nextValue = value * base + digit in seq nextValue (readBase base source (index+1) nextValue)
+naturalValue : String -> Either String Int
+naturalValue source = let size = stringLength source in
+  if size >= 2 && stringCodeAt source 0 == 48 && (stringCodeAt source 1 == 120 || stringCodeAt source 1 == 88) then if size == 2 then Left "empty hexadecimal literal" else readBase 16 source 2 0
+  else if size >= 2 && stringCodeAt source 0 == 48 && (stringCodeAt source 1 == 111 || stringCodeAt source 1 == 79) then if size == 2 then Left "empty octal literal" else readBase 8 source 2 0
+  else readBase 10 source 0 0
+isFloating : String -> Bool
+isFloating source = stringAny (\c -> c == 46 || c == 101 || c == 69) source
+stringAny : (Int -> Bool) -> String -> Bool
+stringAny predicate source = stringAnyAt predicate source 0 (stringLength source)
+stringAnyAt : (Int -> Bool) -> String -> Int -> Int -> Bool
+stringAnyAt predicate source i size = i < size && (predicate (stringCodeAt source i) || stringAnyAt predicate source (i+1) size)
+
+stringValue : String -> Either String String
+stringValue source = decodeString source 1 (stringLength source - 1)
+decodeString : String -> Int -> Int -> Either String String
+decodeString source i size = mapEither concatStrings (decodeStringChunks source i size)
+decodeStringChunks : String -> Int -> Int -> Either String (List String)
+decodeStringChunks source i size = if i >= size then Right Nil else
+  if stringCodeAt source i == 92 then case decodeEscape source (i+1) size of
+    Left e -> Left e
+    Right (Pair text next) -> case decodeStringChunks source next size of
+      Left e -> Left e
+      Right rest -> Right (if stringLength text == 0 then rest else Cons text rest)
+  else let end = unescapedEnd source i size in
+    case decodeStringChunks source end size of
+      Left e -> Left e
+      Right rest -> Right (Cons (stringSlice source i (end-i)) rest)
+unescapedEnd : String -> Int -> Int -> Int
+unescapedEnd source i size = if i >= size || stringCodeAt source i == 92 then i else unescapedEnd source (i+1) size
+decodeEscape : String -> Int -> Int -> Either String (Pair String Int)
+decodeEscape source i size = if i >= size then Left "unterminated string escape" else
+  let c = stringCodeAt source i in
+  if U.isSpace c then let end = cursorIndex (consumeWhile U.isSpace source size (Cursor i 1 1)) in
+    if end < size && stringCodeAt source end == 92 then Right (Pair "" (end+1)) else Left "invalid string gap"
+  else if c == 38 then Right (Pair "" (i+1))
+  else if c == 94 then if i+1 < size then let control = stringCodeAt source (i+1) in if control >= 64 && control <= 95 then Right (Pair (stringFromCode (control-64)) (i+2)) else Left "invalid control escape" else Left "incomplete control escape"
+  else if isDigit c then escapedNumber 10 source i size
+  else if c == 111 then escapedNumber 8 source (i+1) size
+  else if c == 120 then escapedNumber 16 source (i+1) size
+  else case simpleEscape c of
+    Just result -> Right (Pair (stringFromCode result) (i+1))
+    Nothing -> namedEscape source i size asciiEscapes
+simpleEscape : Int -> Maybe Int
+simpleEscape c = if c == 97 then Just 7 else if c == 98 then Just 8 else if c == 102 then Just 12 else if c == 110 then Just 10 else if c == 114 then Just 13 else if c == 116 then Just 9 else if c == 118 then Just 11 else if c == 92 || c == 34 || c == 39 then Just c else Nothing
+escapedNumber : Int -> String -> Int -> Int -> Either String (Pair String Int)
+escapedNumber base source i size = let end = cursorIndex (consumeWhile (\c -> digitValue c >= 0 && digitValue c < base) source size (Cursor i 1 1)) in
+  if end == i then Left "empty numeric escape" else case readBase base (stringSlice source i (end-i)) 0 0 of
+    Left e -> Left e
+    Right value -> if value > 1114111 || (value >= 55296 && value <= 57343) then Left "invalid Unicode scalar escape" else Right (Pair (stringFromCode value) end)
+namedEscape : String -> Int -> Int -> List (Pair String Int) -> Either String (Pair String Int)
+namedEscape source i size names = case names of
+  Nil -> Left "unknown string escape"
+  Cons (Pair name value) rest -> let count = stringLength name in
+    if i+count <= size && eqString name (stringSlice source i count) then Right (Pair (stringFromCode value) (i+count)) else namedEscape source i size rest
+
+asciiEscapes : List (Pair String Int)
+asciiEscapes = Cons (Pair "NUL" 0) (Cons (Pair "SOH" 1) (Cons (Pair "STX" 2) (Cons (Pair "ETX" 3) (Cons (Pair "EOT" 4) (Cons (Pair "ENQ" 5) (Cons (Pair "ACK" 6) (Cons (Pair "BEL" 7) (Cons (Pair "DLE" 16) (Cons (Pair "DC1" 17) (Cons (Pair "DC2" 18) (Cons (Pair "DC3" 19) (Cons (Pair "DC4" 20) (Cons (Pair "NAK" 21) (Cons (Pair "SYN" 22) (Cons (Pair "ETB" 23) (Cons (Pair "CAN" 24) (Cons (Pair "SUB" 26) (Cons (Pair "ESC" 27) (Cons (Pair "DEL" 127) (Cons (Pair "BS" 8) (Cons (Pair "HT" 9) (Cons (Pair "LF" 10) (Cons (Pair "VT" 11) (Cons (Pair "FF" 12) (Cons (Pair "CR" 13) (Cons (Pair "SO" 14) (Cons (Pair "SI" 15) (Cons (Pair "EM" 25) (Cons (Pair "FS" 28) (Cons (Pair "GS" 29) (Cons (Pair "RS" 30) (Cons (Pair "US" 31) (Cons (Pair "SP" 32) (Nil))))))))))))))))))))))))))))))))))

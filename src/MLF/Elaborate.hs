@@ -68,7 +68,19 @@ graphDatatypes :: Graph -> D.DataEnv
 graphDatatypes graph = D.withKinds [(c,k) | Node (TyCon c k) _ _ <- IM.elems (nodes graph)]
 
 proveInstanceWith :: D.DataEnv -> Graph -> (NodeId -> NodeId) -> Check.TypeEnv -> T.Type -> T.Type -> Either String X.Computation
-proveInstanceWith datatypes targetGraph image env source target = do
+proveInstanceWith datatypes targetGraph image = proveInstanceUsing datatypes replacement
+  where
+    replacement gamma a = do
+      let n = image (T.tyVarId a)
+      unless (IM.member n (nodes targetGraph)) (Left ("instance lost node provenance: " ++ show a))
+      pure (if Map.member (T.TyVar n) gamma then T.Var (T.TyVar n) else typeAt targetGraph n)
+
+-- The rule construction is shared by graph instances and the explicit
+-- abstraction introduced while checking a polymorphic declaration. The
+-- latter can retain syntactically unused binders, which have no graph node.
+proveInstanceUsing :: D.DataEnv -> (Check.TypeEnv -> T.TyVar -> Either String T.Type)
+  -> Check.TypeEnv -> T.Type -> T.Type -> Either String X.Computation
+proveInstanceUsing datatypes replacement env source target = do
   phi <- go env source target
   actual <- Check.checkComputationIn datatypes env phi source
   unless (T.alphaEq actual target) (Left "instance evidence has the wrong target")
@@ -93,12 +105,9 @@ proveInstanceWith datatypes targetGraph image env source target = do
           _ -> eliminate gamma s t
     eliminate gamma s t = case s of
       T.Forall a bound body -> do
-        let n = image (T.tyVarId a)
-        unless (IM.member n (nodes targetGraph)) (Left ("instance lost node provenance: " ++ show a))
-        let replacement = if Map.member (T.TyVar n) gamma
-              then T.Var (T.TyVar n) else typeAt targetGraph n
-        p <- go gamma bound replacement
-        q <- go gamma (T.substitute a replacement body) t
+        argument <- replacement gamma a
+        p <- go gamma bound argument
+        q <- go gamma (T.substitute a argument body) t
         pure (X.compose (X.compose (if p == X.Refl then X.Refl else X.Inner p) X.Elim) q)
       _ -> Left ("no permitted instance from " ++ show s ++ " to " ++ show t)
 
@@ -222,5 +231,44 @@ elaborateResolved graph evidence typed = do
           let local = foldl (\gamma (a,k) -> Map.insert a (T.bottomKind k) gamma) env variables
           b' <- go solver local b
           phi <- edgeComputation datatypes solver local e
-          pure (foldr (\(a,k) -> X.TypeAbs a (T.bottomKind k)) (X.instantiate b' phi) variables)
+          let abstracted = foldr (\(a,k) -> X.TypeAbs a (T.bottomKind k)) (X.instantiate b' phi) variables
+              actual = foldr (\(a,k) -> T.Forall a (T.bottomKind k)) (reference graph (toNode e)) variables
+              expected = reference graph (genRoot graph gen)
+              -- A declaration's explicit forall order need not be the
+              -- graph's leftmost-lowermost order. Relate each checked
+              -- skolem to its position in the annotation graph, and adapt
+              -- with checked Intro/Outer/Inner/Elim rules. Unused source
+              -- binders instantiate to their kind's bottom type.
+              positions = checkedCorrespondence graph (toNode e) (genRoot graph gen)
+              kinds = Map.fromList variables
+              replacement gamma a = case IM.lookup (T.tyVarId a) positions of
+                Just n -> pure (if Map.member (T.TyVar n) gamma then T.Var (T.TyVar n) else typeAt graph n)
+                Nothing -> case Map.lookup a kinds of
+                  Just k -> pure (T.bottomKind k)
+                  Nothing -> let n = resolve graph (T.tyVarId a) in
+                    if IM.member n (nodes graph)
+                      then pure (if Map.member (T.TyVar n) gamma then T.Var (T.TyVar n) else typeAt graph n)
+                      else Left ("checked declaration lost type provenance: " ++ show a)
+          adaptation <- proveInstanceUsing datatypes replacement env actual expected
+          pure (X.instantiate abstracted adaptation)
       pure (foldr (uncurry X.TypeAbs) body bs)
+
+checkedCorrespondence :: Graph -> NodeId -> NodeId -> IM.IntMap NodeId
+checkedCorrespondence graph source target = go IS.empty IM.empty [(source,target)]
+  where
+    go _ images [] = images
+    go seen images ((a0,b0):rest)
+      | IS.member a seen = go seen images rest
+      | otherwise = go (IS.insert a seen) withSkolem (pairs ++ rest)
+      where
+        a = resolve graph a0
+        b = resolve graph b0
+        inserted = IM.insert a b images
+        withSkolem = case tag (nodeAt graph a) of
+          Skolem identity _ -> IM.insert identity b inserted
+          _ -> inserted
+        pairs = case (tag (nodeAt graph a),tag (nodeAt graph b)) of
+          (Arr x y,Arr z w) -> [(x,z),(y,w)]
+          (TyApp x y,TyApp z w) -> [(x,z),(y,w)]
+          (Con c xs,Con d ys) | c == d && length xs == length ys -> zip xs ys
+          _ -> []

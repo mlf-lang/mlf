@@ -1,0 +1,8 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Runtime as R
+main = do
+  result <- R.runTerm (XApp (XPrimitive PPrintInt Nil) (XIntTerm 42))
+  case result of
+    Left message -> putStrLn message
+    Right unit -> putStrLn "ok"

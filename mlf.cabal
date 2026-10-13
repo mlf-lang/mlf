@@ -45,7 +45,9 @@ extra-source-files:
   benchmarks/k-nucleotide/c/*.c, benchmarks/k-nucleotide/c/*.patch,
   benchmarks/k-nucleotide/rust/*.rs, benchmarks/k-nucleotide/rust/*.patch,
   benchmarks/k-nucleotide/haskell/*.hs, benchmarks/k-nucleotide/haskell/*.patch,
-  benchmarks/k-nucleotide/mlf/*.emlf, runtime/*.md
+  benchmarks/k-nucleotide/mlf/*.emlf, runtime/*.md,
+  bootstrap/**/*.emlf, bootstrap/**/*.hs, bootstrap/**/*.py, bootstrap/**/*.txt, bootstrap/**/*.md, bootstrap/**/*.expected,
+  bootstrap/tests/*.c
 data-files: runtime/mlf_runtime.c, runtime/mlf_runtime.h, runtime/khash.h
 
 common settings
@@ -70,6 +72,7 @@ library
     MLF.LLVM
     MLF.LLVM.Optimize
     MLF.LLVM.Analysis
+    MLF.LLVM.StrictFields
     MLF.LLVM.Codegen
     MLF.LLVM.Kernel
     MLF.Classes
@@ -104,7 +107,7 @@ test-suite mlf-tests
   type: exitcode-stdio-1.0
   hs-source-dirs: test, examples
   main-is: Main.hs
-  other-modules: Oracle, Computations, Datatypes, Typeclasses, DoNotation, SurfaceSyntax, Readability, Modules, GraphValidation, GraphUnification, GraphUnificationReference, GraphSolver
+  other-modules: Oracle, Computations, Datatypes, Typeclasses, DoNotation, SurfaceSyntax, Readability, Modules, GraphValidation, GraphUnification, GraphUnificationReference, GraphSolver, EmbeddingPruning, OptimizerQueries, StrictFieldAnalysis, StateCases, StateTypes
   build-depends: mlf, directory, filepath
 
 test-suite figure12-tests
@@ -117,11 +120,12 @@ test-suite figure12-tests
 
 test-suite backend-tests
   import: settings
+  ghc-options: -threaded
   type: exitcode-stdio-1.0
   hs-source-dirs: test, examples
   main-is: BackendMain.hs
   build-tool-depends: mlf:emlf
-  other-modules: Backends, BackendCases, IOTests, PreludeTests, Snake, SnakeBaseline, NativeOptimization, NumericArrays, ByteArrays, DNA, Readability, Modules, ModuleBackends
+  other-modules: Backends, BackendCases, IOTests, PreludeTests, Snake, SnakeBaseline, NativeOptimization, ConstructorProjection, ForceReuse, BoolConditions, EnvironmentAccess, StrictFields, NumericArrays, ByteArrays, DNA, Readability, Modules, ModuleBackends, BootstrapPrimitives, StateCases, StateTypes, StateRuntime, HigherOrderSpecialization
   build-depends: mlf, directory, filepath, process, bytestring, text, unix
 
 benchmark compiler-bench
@@ -139,3 +143,14 @@ test-suite benchmark-harness-tests
   main-is: BenchmarkHarnessMain.hs
   build-tool-depends: mlf:emlf
   build-depends: directory, process
+
+-- Validate the compiler written in MLF with independently specified outcomes.
+test-suite bootstrap-port-tests
+  import: settings
+  ghc-options: -threaded
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: BootstrapPortMain.hs
+  build-tool-depends: mlf:emlf
+  other-modules: Backends
+  build-depends: mlf, directory, filepath, process, bytestring, text, unix

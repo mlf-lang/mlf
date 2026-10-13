@@ -1,0 +1,14 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Parser as Parser
+
+checkFiles : Int -> Int -> IO Unit
+checkFiles index count = if index == count then putStrLn ("parser corpus: " ++ showInt count ++ " files passed") else do
+  path <- getArg index
+  source <- readFile path
+  case Parser.parseModule path source of
+    Left error -> do {putErr (error ++ "\n"); exitWith 1}
+    Right _ -> checkFiles (index+1) count
+main = do
+  count <- getArgCount
+  checkFiles 0 count

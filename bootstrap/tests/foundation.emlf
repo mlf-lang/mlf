@@ -1,0 +1,86 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.Map as M
+import qualified Bootstrap.Set as S
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.IntSet as IS
+import qualified Bootstrap.Primitive as P
+
+data Link = Link (Map Int Link)
+recursiveValues : Map Int Link
+recursiveValues = M.singleton 1 (Link recursiveValues)
+expect : Bool -> String -> IO Unit
+expect good label = if good then ioReturn Unit else panic ("foundation assertion: " ++ label)
+ints : List Int
+ints = Cons 3 (Cons 1 (Cons 4 (Cons 1 (Cons 5 Nil))))
+listEquals : List Int -> List Int -> Bool
+listEquals a b = L.eqList eqInt a b
+oraclePut : Int -> Int -> List (Pair Int Int) -> List (Pair Int Int)
+oraclePut key value entries = case entries of
+  Nil -> Cons (Pair key value) Nil
+  Cons (Pair k v) rest -> if key < k then Cons (Pair key value) entries else if key == k then Cons (Pair key value) rest else Cons (Pair k v) (oraclePut key value rest)
+oracleDelete : Int -> List (Pair Int Int) -> List (Pair Int Int)
+oracleDelete key entries = case entries of
+  Nil -> Nil
+  Cons (Pair k v) rest -> if key == k then rest else Cons (Pair k v) (oracleDelete key rest)
+mapSteps : Int -> Int -> Map Int Int -> List (Pair Int Int) -> Bool
+mapSteps remaining seed tree oracle = if remaining <= 0 then true else
+  let key = remInt seed 97 in
+  let remove = remInt seed 3 == 0 in
+  let updated = if remove then M.delete L.compareInt key tree else M.insert L.compareInt key (seed * 3) tree in
+  let expected = if remove then oracleDelete key oracle else oraclePut key (seed * 3) oracle in
+  let nextSeed = remInt (seed * 1103515245 + 12345) 2147483648 in
+  M.valid L.compareInt updated && L.eqList (L.eqPair eqInt eqInt) (M.toList updated) expected && mapSteps (remaining - 1) nextSeed updated expected
+buildAscending : Int -> Map Int Int
+buildAscending n = M.fromList L.compareInt (L.map (\i -> Pair i (i * 2)) (L.range 1 n))
+buildDescending : Int -> Map Int Int
+buildDescending n = M.fromList L.compareInt (L.map (\i -> Pair i (i * 2)) (L.reverse (L.range 1 n)))
+deleteAll : List Int -> Map Int Int -> Bool
+deleteAll keys tree = case keys of
+  Nil -> M.null tree
+  Cons key rest -> let next = M.delete L.compareInt key tree in M.valid L.compareInt next && deleteAll rest next
+maybeNumbers : Maybe (List Int)
+maybeNumbers = L.mapM (\n -> if n > 0 then Just (n * 2) else Nothing) (L.range 1 5)
+eitherNumbers : Either String (List Int)
+eitherNumbers = L.mapM (\n -> Right (n + 1)) (L.range 1 5)
+eitherStops : Either String (List Int)
+eitherStops = L.traverseEither (\n -> if n == 3 then Left "stop" else if n > 3 then panic "Either traversed past failure" else Right n) (L.range 1 10)
+main = do
+  expect (L.foldl (\acc n -> acc * 10 + n) 0 ints == 31415) "foldl order"
+  expect (L.foldl (\acc n -> if n == 1 then panic "foldl forced a discarded intermediate" else 42) 0 (Cons 1 (Cons 2 Nil)) == 42) "foldl retains lazy accumulator semantics"
+  expect (listEquals (L.reverse ints) (Cons 5 (Cons 1 (Cons 4 (Cons 1 (Cons 3 Nil)))))) "reverse"
+  expect (listEquals (L.sortBy L.compareInt ints) (Cons 1 (Cons 1 (Cons 3 (Cons 4 (Cons 5 Nil)))))) "merge sort"
+  expect (listEquals (L.nubBy eqInt ints) (Cons 3 (Cons 1 (Cons 4 (Cons 5 Nil))))) "stable nub"
+  expect (L.index ints 2 == 4 && L.last ints == 5 && L.length (L.init ints) == 4) "index and ends"
+  expect (L.length (L.replicate 100001 Unit) == 100001) "large length uses a strict counter"
+  expect (L.length (Cons (panic "length forced an element") Nil) == 1) "length leaves elements lazy"
+  expect (listEquals (L.append (L.take 3 ints) (L.drop 3 ints)) ints) "take/drop"
+  expect (eqString (L.intercalate "," (L.map showInt ints)) "3,1,4,1,5") "string join"
+  expect (eqString (L.concatStrings Nil) "" && eqString (L.concatStrings (Cons "solo" Nil)) "solo" && eqString (L.concatStrings (Cons "a" (Cons "" (Cons "β" (Cons "c" (Cons "🌍" Nil)))))) "aβc🌍") "balanced string joins"
+  expect (stringLength (L.concatStrings (L.replicate 32768 "λ")) == 32768) "large string join"
+  expect (L.eqMaybe listEquals maybeNumbers (Just (Cons 2 (Cons 4 (Cons 6 (Cons 8 (Cons 10 Nil))))))) "Maybe Monad mapM"
+  expect (case eitherNumbers of {Left error -> false; Right result -> listEquals result (L.range 2 6)}) "Either Monad mapM"
+  expect (case eitherStops of {Left error -> eqString error "stop"; Right result -> false}) "Either short circuit"
+  expect (M.valid L.compareInt (buildAscending 600) && M.valid L.compareInt (buildDescending 600)) "ordered insertion balance"
+  expect (M.eqMap eqInt eqInt (buildAscending 600) (buildDescending 600)) "insertion order independence"
+  expect (deleteAll (L.range 1 600) (buildDescending 600)) "ascending deletion balance"
+  expect (deleteAll (L.reverse (L.range 1 600)) (buildAscending 600)) "descending deletion balance"
+  expect (mapSteps 800 17 M.empty Nil) "mixed map operations against list oracle"
+  let lazyMap = M.singleton 1 (panic "Map forced a stored value")
+  expect (M.size lazyMap == 1 && M.size (M.map (\value -> panic "Map.map forced a stored value") lazyMap) == 1) "Map values remain lazy"
+  expect (M.size (M.adjust L.compareInt (\value -> panic "Map.adjust forced a stored value") 1 lazyMap) == 1 && M.size (M.insertWith L.compareInt (\new old -> panic "Map.insertWith forced a stored value") 1 42 lazyMap) == 1) "Map updates keep values lazy"
+  expect (IM.size (IM.singleton 1 (panic "IntMap forced a stored value")) == 1 && IM.size (IM.map (\value -> panic "IntMap.map forced a stored value") (IM.singleton 1 7)) == 1) "IntMap values remain lazy"
+  expect (case M.get L.compareInt 1 recursiveValues of {Link linked -> M.size linked == 1}) "recursive map value environment"
+  let a = M.fromList L.compareInt (Cons (Pair 1 10) (Cons (Pair 2 20) Nil))
+  let b = M.fromList L.compareInt (Cons (Pair 2 99) (Cons (Pair 3 30) Nil))
+  expect (M.findWithDefault L.compareInt 0 2 (M.union L.compareInt a b) == 20) "left biased union"
+  expect (M.findWithDefault L.compareInt 0 2 (M.unionWith L.compareInt subInt a b) == 0 - 79) "unionWith argument order"
+  expect (M.size (M.difference L.compareInt a b) == 1 && M.size (M.intersection L.compareInt a b) == 1) "map set operations"
+  expect (L.eqMaybe (L.eqPair eqInt eqInt) (M.lookupLE L.compareInt 2 a) (Just (Pair 2 20)) && L.eqMaybe (L.eqPair eqInt eqInt) (M.lookupGE L.compareInt 0 a) (Just (Pair 1 10))) "ordered lookups"
+  expect (IM.valid (IM.fromList (L.map (\i -> Pair i i) (L.range 0 300)))) "IntMap wrapper"
+  expect (IS.size (IS.union (IS.fromList (L.range 1 30)) (IS.fromList (L.range 20 50))) == 50) "IntSet union"
+  expect (S.size (S.fromList compareString (Cons "z" (Cons "a" (Cons "z" Nil)))) == 2) "generic Set"
+  expect (listEquals (L.map P.primitiveCode P.allPrimitives) (L.range 0 72)) "primitive ABI sequence"
+  expect (P.primitiveArity PStringSlice == 3 && P.primitiveArity PGetArgCount == 0 && L.not (P.primitiveStrict PSeq)) "primitive metadata"
+  putStrLn "foundation-ok"

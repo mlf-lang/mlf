@@ -1,0 +1,135 @@
+Runtime support for self-hosting
+
+The compiler port uses ordinary language operations. No primitive invokes,
+embeds or delegates to a compiler. Primitive ids 0 through 45 are unchanged;
+ids 46 through 65 add the following general-purpose operations to both the
+checked interpreter and native runtime.
+
+46 stringLength : String -> Int
+47 stringCodeAt : String -> Int -> Int
+48 stringSlice : String -> Int -> Int -> String
+49 stringFromCode : Int -> String
+50 compareString : String -> String -> Int
+
+Strings contain Unicode scalar values and may contain NUL. Length and indices
+count scalars, not UTF-8 bytes. Indexing is zero based. Slices take start/count
+and permit an empty slice at the end. Negative/out-of-range indices, counts,
+surrogates and code points above U+10FFFF fail. Comparison is lexicographic by
+scalar value, returning -1, 0 or 1. Native strings build and cache scalar byte
+offsets on first indexing; those offsets follow the lifetime of their string.
+
+51 readDouble : String -> Double
+52 doubleToBits : Double -> Int
+53 doubleFromBits : Int -> Double
+
+readDouble accepts an optional sign, ASCII digits, an optional decimal point
+followed by digits, and an optional e/E exponent with optional sign and digits.
+It consumes the entire string. Whitespace, NaN/Infinity spellings, hexadecimal
+numbers and missing digits are rejected. Decimal overflow/underflow yield IEEE
+infinity/zero. The bit conversion operations preserve all 64 bits, including
+signed zero and NaN payloads. Int holds the unsigned pattern (0..2^64-1).
+
+54 seq : forall a b. a -> b -> b
+55 panic : forall a. String -> a
+
+seq returns its second argument only if its first argument reaches weak head
+normal form. Fields of a constructor and bodies of closures remain lazy.
+panic reports a runtime failure only when demanded. When multiple demanded
+pure operands fail, their evaluation order is unspecified: strict-worker
+optimization may expose different diagnostics across backends. seq does not
+order those pure failures. IO effects retain their order, and unused arguments,
+branches and results remain lazy; the shared backend tests check these rules.
+
+56 readFile : String -> IO String
+57 writeFile : String -> String -> IO Unit
+58 fileExists : String -> IO Bool
+59 canonicalPath : String -> IO String
+60 getArgCount : IO Int
+61 getArg : Int -> IO String
+62 putErr : String -> IO Unit
+63 exitWith : forall a. Int -> IO a
+64 getExecutablePath : IO String
+65 getContents : IO String
+
+File operations use strict UTF-8 and preserve NUL in contents. A path containing
+NUL is rejected. writeFile creates or truncates a file. fileExists tests regular
+files, following symlinks; directories and missing files return false.
+canonicalPath requires an existing path and resolves it to an absolute path
+with symlinks removed. getArg uses a checked zero-based index, excluding the
+executable name. Native main supplies argc/argv through mlf_set_args; manually
+linked entries default to no arguments. The Haskell CLI accepts program
+arguments after -- for --run and --run-xmlf. putErr writes and flushes standard
+error without adding a newline. exitWith accepts status 0..255 and terminates
+without running pending actions. getExecutablePath returns the canonical
+absolute executable location on macOS and Linux. getContents reads all remaining
+standard input, retaining line endings and NUL and rejecting invalid UTF-8.
+
+The Haskell reference runtime preserves its four-field IOBackend API. Separate
+RuntimeOptions supply arguments and diagnostic output; runTermWithArguments
+and runProgramWithArguments offer convenience wrappers.
+
+Validation lives in test/BootstrapPrimitives.hs and the shared Backends matrix.
+Every runtime row executes both implementations, including Unicode and NUL,
+bit patterns, strict input errors, escaped primitive values, laziness, files,
+arguments, stderr ordering, exit codes and retained strings across collection.
+
+66 stReturn : forall s a. a -> ST s a
+67 stBind : forall s a b. ST s a -> (a -> ST s b) -> ST s b
+68 runST : forall a. (forall s. ST s a) -> a
+69 newSTArray : forall s a. Int -> a -> ST s (STArray s a)
+70 readSTArray : forall s a. STArray s a -> Int -> ST s a
+71 writeSTArray : forall s a. STArray s a -> Int -> a -> ST s Unit
+72 lengthSTArray : forall s a. STArray s a -> ST s Int
+
+ST and STArray are opaque constructors of kind * -> * -> *. The inner state
+quantifier in runST prevents usable region-specific arrays or actions from
+escaping. The prelude supplies Monad (ST s); explicitly forall-s-signed actions
+support do notation. IO and ST cannot be converted or executed by one another.
+
+Creating an action does not execute it. Array sizes and indices are checked
+when their operations execute. Initial and stored values remain lazy and shared;
+reads snapshot the current value before later writes. Repeated actions repeat
+effects, nested runST calls have independent local continuation stacks, and a
+shared pure runST expression follows ordinary call-by-need memoization. Its
+saturated primitive returns canonical WHNF while preserving lazy result fields.
+
+The native runtime has separate ST action/array tags, boxed GC-visible cells,
+and a local continuation loop. It never explicitly collects inside unrooted
+pure frames; BDWGC traces such frames automatically. Both reference interpreters
+use independent persistent stores with lazy cells and no unsafe host IO.
+StateCases/StateTypes/StateRuntime and bootstrap/tests/StateRuntime check region
+typing, independent target checking, semantics and both backends. runtime_st.c
+also checks the public ABI and retained roots under ordinary and BDWGC allocation.
+
+Bootstrap allocator profile
+
+The ordinary runtime retains its pooled allocator and precise collection at
+rooted IO boundaries. A compiler performs long pure computations between those
+boundaries. Bootstrap executables therefore opt into MLF_USE_BDWGC, using the
+Boehm-Demers-Weiser collector to scan native stacks and reclaim unreachable
+values during pure evaluation. This profile adds no compiler-specific primitive
+or subprocess support and does not alter the ordinary benchmark allocator.
+
+Run python3 scripts/bootstrap-gc.py --flags to build the pinned BDWGC 8.2.12
+release under dist-newstyle/bootstrap-deps and obtain JSON cflags/libs. The
+helper verifies the upstream archive SHA-256, builds a static single-threaded
+library, runs its upstream tests, and caches the installation. It requires a
+C compiler, make, Python 3 and network access on its first invocation; no system
+package installation is needed. Compile mlf_runtime.c with -DMLF_USE_BDWGC and
+the returned cflags, then link with the returned libs in addition to GMP/libm.
+Do not combine this profile with manually initialized GMP memory hooks.
+
+Every pointer-bearing runtime allocation, including closure environments,
+evaluation stacks, arrays and hash tables, belongs to the collector in this
+profile. GMP limbs use atomic collector allocations. The custom global object
+list and value pool are disabled so they cannot retain unreachable objects;
+memoized thunks and popped continuation slots clear obsolete references. The
+collector's native stack support preserves suspended evaluations and recursive
+binding holes without requiring a language-specific stack scanner.
+
+The shared backend matrix can also validate this profile: set
+MLF_LLVM_TEST_CFLAGS to -DMLF_USE_BDWGC plus the helper's include flags, and
+MLF_LLVM_TEST_LIBS to its libraries when running backend-tests. Link libraries
+are appended after generated objects. The stress fixture retains suspended
+dynamic applications, cyclic data, GMP integers, arrays and table entries
+across a long pure allocation interval and checks their results independently.
