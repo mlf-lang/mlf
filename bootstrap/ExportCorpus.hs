@@ -97,12 +97,16 @@ main = do
     parsed <- either fail pure (parseExpr "<corpus-printer>" (prettyExpr term))
     unless (parsed == term) (fail ("corpus source printer changed AST: " ++ show term))
   files <- concat <$> mapM (sourceFiles repository) ["examples", "benchmarks"]
+  sourceModules <- forM files $ \file -> do
+    input <- readFile (repository </> file)
+    parsed <- either fail pure (parseModule file input)
+    pure (file,parsed)
   -- Preserve every module dependency at its original relative location.
   forM_ files $ \file -> do
     let destination = output </> "repository" </> file
     createDirectoryIfMissing True (takeDirectory destination)
     copyFile (repository </> file) destination
-  fileCases <- mapM (fileCase repository) files
+  fileCases <- mapM (fileCase repository sourceModules) files
   moduleCases <- exportModules output
   let cases = figureCases ++ oracleCases ++ annotationCases ++ readabilityCases ++ stateTypes ++ stateRuntime ++ moduleCases ++ fileCases
   unless (length (nub (map caseId cases)) == length cases) (fail "duplicate corpus case identity")
@@ -200,22 +204,44 @@ sourceFiles repository directory = do
   concat <$> forM names (\name -> do
     let file = directory </> name
     isDirectory <- doesDirectoryExist (repository </> file)
-    if isDirectory then sourceFiles repository file
+    if name == ".mlf-build" then pure []
+    else if isDirectory then sourceFiles repository file
       else pure [file | ".emlf" `isSuffixOf` file])
 
-fileCase :: FilePath -> FilePath -> IO Case
-fileCase repository file = do
+-- Discover only the roots required by this source's imports. Local packages
+-- need not share a source directory. Reject ambiguous providers instead of
+-- letting traversal order choose one. Package visibility itself is exercised
+-- independently by the package-manager integration suite.
+dependencyRoots :: [(FilePath,MS.SourceModule)] -> MS.SourceModule -> Either String [FilePath]
+dependencyRoots modules entry = go [] (map MS.importedModule (MS.sourceImports entry))
+  where
+    go _ [] = Right []
+    go seen (name:rest)
+      | name == "Prelude" || name `elem` seen = go seen rest
+      | otherwise = case [(file,m) | (file,m) <- modules, MS.sourceModuleName m == Just name] of
+          [(file,m)] -> do
+            others <- go (name:seen) (map MS.importedModule (MS.sourceImports m) ++ rest)
+            pure (moduleRoot ("repository" </> file) m : others)
+          [] -> Left ("corpus import has no repository provider: " ++ name)
+          _ -> Left ("corpus import has ambiguous repository providers: " ++ name)
+
+moduleRoot :: FilePath -> MS.SourceModule -> FilePath
+moduleRoot file parsed = foldl (\p _ -> takeDirectory p) (takeDirectory file)
+  [2..maybe 1 (length . moduleParts) (MS.sourceModuleName parsed)]
+
+fileCase :: FilePath -> [(FilePath,MS.SourceModule)] -> FilePath -> IO Case
+fileCase repository modules file = do
   text <- readFile (repository </> file)
   parsed <- either fail pure (parseModule file text)
+  dependencySearch <- either fail pure (dependencyRoots modules parsed)
   let group = if take 11 file == "benchmarks/" then "benchmarks" else "examples"
       identity = "file-" ++ map (\c -> if isAlphaNum c then c else '-') (dropExtension file)
       copied = "repository" </> file
       -- Module paths derive from their dotted module name and source path.
-      root = foldl (\p _ -> takeDirectory p) (takeDirectory copied)
-        [2..maybe 1 (length . moduleParts) (MS.sourceModuleName parsed)]
+      root = moduleRoot copied parsed
       library = MS.sourceBody parsed == Nothing &&
         not (any (\(n,_,_) -> n == "main") (MS.sourceValues parsed))
-      search = nub [takeDirectory copied,root,"repository/examples/modules","repository/examples"]
+      search = nub ([takeDirectory copied,root] ++ dependencySearch ++ ["repository/examples/modules","repository/examples"])
   when library $ unless (MS.sourceModuleName parsed /= Nothing)
     (fail ("declaration-only source has no module identity or entry: " ++ file))
   let name = maybe "Main" id (MS.sourceModuleName parsed)

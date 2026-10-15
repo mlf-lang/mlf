@@ -1,0 +1,72 @@
+module Tests.Figure12Suite where
+import Bootstrap.Types
+import Bootstrap.Compiler
+import Tests.Figure12
+import qualified Bootstrap.Std as S
+import qualified Tests.Helpers as H
+import qualified Bootstrap.X.Check as Check
+import qualified Bootstrap.X.Parser as Parser
+import Bootstrap.X.Pretty (prettyTerm, prettyType)
+import qualified Bootstrap.X.Syntax as X
+import qualified Bootstrap.X.Type as T
+import qualified Package.OS as O
+checkOutput : Compilation -> IO Unit
+checkOutput result = do
+ parsed <- H.right (Parser.parseTerm "<Figure12 xMLF>" (prettyTerm (compiledTerm result)))
+ ty <- H.right (Check.checkClosed parsed)
+ H.assert (T.alphaEq ty (inferredType result)) "Figure12 target roundtrip changed type"
+ H.assert (X.equalErased (X.erase parsed) (X.erase (compiledTerm result))) "Figure12 target roundtrip changed erasure"
+testCase : Case -> IO String
+testCase c = do
+ source <- H.right (program c)
+ case compile ("<Figure12 " ++ caseId c ++ ">") source of
+  Left err -> do
+   H.assert (S.not (expectedAcceptance c)) ("expected acceptance: " ++ prettyError err)
+   H.assert (H.eq (phase err) Inference) ("wrong rejection phase: " ++ prettyError err)
+   let protected = S.elem eqString (caseId c) (Cons "A8" (Cons "E1a" Nil))
+   let reason = if protected then "cannot raise a protected type variable" else "type constructor mismatch:"
+   H.assert (H.contains reason (diagnostic err)) ("wrong rejection reason: " ++ prettyError err)
+   if protected then return Unit else H.assert (H.contains "Con \"Bool\" []" (diagnostic err) && H.contains "Con \"Int\" []" (diagnostic err)) "expected Int/Bool conflict"
+   return "rejected"
+  Right result -> do
+   H.assert (expectedAcceptance c) ("expected rejection: " ++ prettyType (inferredType result))
+   checkOutput result
+   return "accepted; checked xMLF roundtrip"
+runTest : Pair String (IO String) -> IO Unit
+runTest (Pair label action) = do { result <- action; putStrLn ("PASS " ++ label ++ "  " ++ result) }
+typed : String -> XType -> IO String
+typed source expected = do { result <- (H.right (compile "<Figure 12 type assertion>" source)); do { (checkOutput result); do { (H.assert (T.alphaEq (inferredType result) expected) (H.append "expected " (H.append (prettyType expected) (H.append ", got " (prettyType (inferredType result)))))); (return (prettyType (inferredType result))) } } }
+
+identity : XType
+identity = (XForall (XTyVar 0) XBot (XArrow (XVar (XTyVar 0)) (XVar (XTyVar 0))))
+
+typeChecks : (List ( (Pair (String) (IO String)) ))
+typeChecks = (Cons (Pair "A1 principal type" (typed "\\x y -> y" (XForall (XTyVar 1) XBot (XForall (XTyVar 2) identity (XArrow (XVar (XTyVar 1)) (XVar (XTyVar 2))))))) (Cons (Pair "A2 principal type" (typed "let choose = ((\\x y -> x) : forall a. a -> a -> a) in let id = \\x -> x in choose id" (XForall (XTyVar 1) identity (XArrow (XVar (XTyVar 1)) (XVar (XTyVar 1)))))) (Cons (Pair "A4 inferred result bound" (typed "\\(x : forall a. a -> a) -> x x" (XForall (XTyVar 1) identity (XArrow identity (XVar (XTyVar 1)))))) (Cons (Pair "A4 admits paper signature" (typed "(\\(x : forall a. a -> a) -> x x) : (forall a. a -> a) -> (forall a. a -> a)" (XArrow identity identity))) Nil))))
+main : IO Unit
+main = do
+ let names = S.map caseId cases
+ let rows = S.nubBy eqString (S.map (\name -> H.stringTakeWhile (\c -> S.not (c == 46)) name) names)
+ let wanted = S.concat (Cons (S.map (\i -> "A" ++ showInt i) (S.range 1 13)) (Cons (S.map (\i -> "B" ++ showInt i) (S.range 1 7)) (Cons (O.words "C1a C1b C1c C2") (Cons (S.concatMap (\i -> S.map (\suffix -> "E" ++ showInt i ++ suffix) (Cons "a" (Cons "b" Nil))) (S.range 1 5)) Nil))))
+ H.assert (S.eqList eqString (S.sortBy compareString rows) (S.sortBy compareString wanted)) "Figure12 row coverage changed"
+ H.assert (S.length cases == 43 && S.length (S.nubBy eqString names) == 43) "Figure12 expression coverage changed"
+ H.assert (S.eqList eqString (S.map caseId (S.filter (\c -> S.not (paperAcceptance c)) cases)) (O.words "A11 C1a C1c E1a")) "paper expectations changed"
+ H.assert (S.eqList eqString (S.map caseId (S.filter (\c -> S.not (expectedAcceptance c)) cases)) (O.words "A8 A11 C1a C1c E1a")) "regression expectations changed"
+ let discrepancies = S.filter (\c -> S.not (H.eq (paperAcceptance c) (expectedAcceptance c))) cases
+ H.assert (S.eqList eqString (S.map caseId discrepancies) (Cons "A8" Nil)) "Figure12 discrepancies changed"
+ assumptions' <- H.right (S.mapM assumptions cases)
+ let signatures = S.nubBy (S.eqPair eqString eqString) (S.concat assumptions')
+ S.mapM_ (\(Pair name signature) -> runTest (Pair ("assumption " ++ name ++ " : " ++ signature) (do
+  result <- H.right (compile "<signature control>" ("\\(" ++ name ++ " : " ++ signature ++ ") -> " ++ name))
+  checkOutput result
+  return "checked"))) signatures
+ S.mapM_ runTest typeChecks
+ S.mapM_ (\label -> do
+  let c = S.fromMaybe (panic "missing negative Figure12 case") (S.find (\c -> eqString label (caseId c)) cases)
+  let expression = if eqString label "A11" then "k (\\(f : forall a. a -> a) -> pair (f 1) (f True)) xs" else if eqString label "C1a" then "\\(f : forall a. a -> a) -> pair (f 1) (f True)" else "g (\\(f : forall a. a -> a) -> pair (f 1) (f True))"
+  let repaired = Case (caseId c) expression (paperAcceptance c) true (localSignatures c)
+  runTest (Pair (label ++ " explicit annotation control") (testCase repaired))) (O.words "A11 C1a C1c")
+ putStrLn "Figure12: 34 rows / 43 expressions; explicit-signature regression expectations"
+ S.mapM_ (\c -> runTest (Pair (caseId c ++ "  " ++ expression c) (testCase c))) cases
+ H.assert (S.length signatures + S.length typeChecks + 3 == 36) "Figure12 supplementary coverage changed"
+ putStrLn "43/43 expressions match regression expectations; 0 failures"
+ putStrLn "36 supplementary checks; 0 failures"

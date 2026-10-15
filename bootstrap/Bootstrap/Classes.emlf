@@ -99,8 +99,19 @@ lowerClassesWithImports imported original = do {program <- Surface.lowerSurface 
 lowerClassesWithScopes : Map String IntSet -> List IntSet -> SProgram -> Either String (Pair SProgram (Map String String))
 lowerClassesWithScopes values instances original = do {program <- Surface.lowerSurface original; lowerCoreClasses S.empty values (Just instances) program}
 lowerCoreClasses : Set String -> Map String IntSet -> Maybe (List IntSet) -> SProgram -> Either String (Pair SProgram (Map String String))
-lowerCoreClasses imported valueIndices instanceIndices program = case program of
-  SProgram _ _ -> Right (Pair program M.empty)
+lowerCoreClasses imported valueIndices instanceIndices program = lowerCoreClassesWith Nothing imported valueIndices instanceIndices program
+lowerSeparateClasses externals instanceNames original = do
+  program <- Surface.lowerSurface (case original of {SProgram ds b -> SClassProgram ds Nil Nil b; _ -> original})
+  case program of
+    SClassProgram ds Nil Nil body ->
+      let parameters = map (\(Pair n ty) -> Triple n (SAnnotation Nil ty) (SChecked ty (SApp (SPrimitive PPanic) (SStringLit "unlinked module parameter")))) (M.toList externals) in
+      Right (Pair (SProgram ds (if null parameters then body else SLetRec parameters body)) M.empty)
+    _ -> lowerCoreClassesWith (Just (Pair externals instanceNames)) S.empty M.empty Nothing program
+lowerCoreClassesWith : Maybe (Pair (Map String SType) (List String)) -> Set String -> Map String IntSet -> Maybe (List IntSet) -> SProgram -> Either String (Pair SProgram (Map String String))
+lowerCoreClassesWith config imported valueIndices instanceIndices program = case program of
+  SProgram ds body -> case config of
+    Nothing -> Right (Pair program M.empty)
+    Just _ -> lowerCoreClassesWith config imported valueIndices instanceIndices (SClassProgram ds Nil Nil body)
   SClassProgram datatypes declarations instances body -> do
     case instanceIndices of {Nothing -> Right Unit; Just scopes -> ensure (length scopes == length instances) "module instance scope count mismatch"}
     base <- D.validateDeclarations datatypes
@@ -115,7 +126,7 @@ lowerCoreClasses imported valueIndices instanceIndices program = case program of
     let used = append (Desugar.allNames body) (append (concatMap (\i -> concatMap (\(Pair _ e) -> Desugar.allNames e) (instanceMethods i)) instances)
           (append (concatMap (\d -> Cons (D.datatypeName d) (map D.constructorName (D.datatypeConstructors d))) datatypes)
             (concatMap (\d -> Cons (className d) (append (map fst (classParameters d)) (concatMap (\(Pair n ty) -> Cons n (typeNames ty)) (classMethods d)))) declarations)))
-    runFresh used (lowerClassesBody imported valueIndices instanceIndices datatypes instances body base classes)
+    runFresh used (lowerClassesBody config imported valueIndices instanceIndices datatypes instances body base classes)
 implicitParameters : SClassDecl -> SClassDecl
 implicitParameters (SClassDecl name parameters supers methods) = SClassDecl name parameters supers (map (\(Pair n ty) -> Pair n (quantify (map (\a -> Pair a Star) (Surface.without (freeType ty) (map fst parameters))) ty)) methods)
 typeNames : SType -> List String
@@ -127,13 +138,14 @@ typeNames ty = case ty of
   STypeApp a b -> append (typeNames a) (typeNames b)
   SQualified ps t -> append (concatMap (\(SPredicate n ts) -> Cons n (concatMap typeNames ts)) ps) (typeNames t)
   _ -> Nil
-lowerClassesBody : Set String -> Map String IntSet -> Maybe (List IntSet) -> List DataDecl -> List SInstanceDecl -> SExpr -> DataEnv -> List SClassDecl -> Fresh (Pair SProgram (Map String String))
-lowerClassesBody imported valueIndices instanceIndices datatypes instances body base classes = do
+separateName config stable prefix = case config of {Nothing -> freshName prefix; Just _ -> freshPure stable}
+lowerClassesBody : Maybe (Pair (Map String SType) (List String)) -> Set String -> Map String IntSet -> Maybe (List IntSet) -> List DataDecl -> List SInstanceDecl -> SExpr -> DataEnv -> List SClassDecl -> Fresh (Pair SProgram (Map String String))
+lowerClassesBody config imported valueIndices instanceIndices datatypes instances body base classes = do
   entries <- mapM (\declaration -> do
-    dict <- freshName ("Dict" ++ className declaration)
-    ctor <- freshName ("Make" ++ className declaration)
-    methods <- mapM (\(Pair n _) -> do {selector <- freshName ("select" ++ className declaration); freshPure (Pair n selector)}) (classMethods declaration)
-    supers <- mapM (\p -> freshName "superclass") (superclasses declaration)
+    dict <- separateName config ("Dict_" ++ className declaration) ("Dict" ++ className declaration)
+    ctor <- separateName config ("Make_" ++ className declaration) ("Make" ++ className declaration)
+    methods <- mapM (\(Pair n _) -> do {selector <- separateName config ("select_" ++ n) ("select" ++ className declaration); freshPure (Pair n selector)}) (classMethods declaration)
+    supers <- mapM (\i -> separateName config ("super_" ++ className declaration ++ "_" ++ showInt i) "superclass") (range 0 (length (superclasses declaration)-1))
     freshPure (Pair (className declaration) (Info declaration dict ctor methods supers))) classes
   let infos = M.fromList compareString entries
   freshLift (validateClasses base infos)
@@ -141,19 +153,30 @@ lowerClassesBody imported valueIndices instanceIndices datatypes instances body 
   ds <- freshLift (D.validateDeclarations (append datatypes dictionaries))
   checkedInstances <- freshLift (traverseEither (validateInstance ds infos) instances)
   freshLift (checkOverlap checkedInstances)
-  names <- mapM (\inst -> freshName "instanceDictionary") checkedInstances
+  names <- case config of
+    Nothing -> mapM (\inst -> freshName "instanceDictionary") checkedInstances
+    Just (Pair _ ns) -> do
+      freshLift (ensure (length ns == length checkedInstances) "separate instance identity count mismatch")
+      freshPure ns
   let supers = concatMap (\(Pair _ (Info _ _ _ _ ns)) -> map (\n -> Pair SuperclassEvidence n) ns) entries
   let globalCandidates = append (map (\n -> Pair InstanceEvidence n) names) supers
   let select = selectCandidates names supers
   let valueScopes = M.map select valueIndices
   let instanceScopes = case instanceIndices of {Nothing -> replicate (length instances) globalCandidates; Just scopes -> map select scopes}
-  let methodEnv = M.union compareString (methodBindings imported false entries) (methodBindings imported true entries)
+  let externalSchemes = case config of {Nothing -> M.empty; Just (Pair es _) -> es}
+  let externalOverloads = M.mapWithKey (\n ty -> case scheme ty of {Triple _ ps _ -> Pair n (map (\(SPredicate c _) -> c) ps)}) externalSchemes
+  let methodEnv = M.union compareString externalOverloads (M.union compareString (methodBindings imported false entries) (methodBindings imported true entries))
   selectorGroups <- mapM (\entry -> selectorDefinitions infos (snd entry)) entries
   definitions <- mapM (\(Pair (Pair name inst) available) -> instanceDefinition valueScopes ds infos methodEnv name inst available) (zip (zip names checkedInstances) instanceScopes)
   Pair expression wants <- lowerExpr valueScopes ds infos methodEnv globalCandidates body
   let result = closeWants infos globalCandidates wants expression
   let bindings = map (\(Triple n annotation rhs) -> case annotation of {SAnnotation _ ty -> Triple n annotation (SChecked ty rhs)}) (append (concat selectorGroups) definitions)
-  let output = if null bindings then result else SLetRec bindings result
+  let localBindings = filter (\(Triple n _ _) -> not (M.member compareString n externalSchemes)) bindings
+  let inner = if null localBindings then result else SLetRec localBindings result
+  externalBindings <- mapM (\(Pair n ty) -> do
+    translated <- freshLift (translateScheme ds infos ty)
+    freshPure (Triple n (SAnnotation Nil translated) (SChecked translated (SApp (SPrimitive PPanic) (SStringLit "unlinked module parameter"))))) (M.toList externalSchemes)
+  let output = if null externalBindings then inner else SLetRec externalBindings inner
   freshPure (Pair (SProgram (append datatypes dictionaries) output) (M.fromList compareString (map (\(Pair name (Info _ dict _ _ _)) -> Pair dict name) entries)))
 selectCandidates : List String -> List (Pair EvidenceRole String) -> IntSet -> List (Pair EvidenceRole String)
 selectCandidates names supers indices = append (concatMap (\(Pair i n) -> if I.member i indices then Cons (Pair InstanceEvidence n) Nil else Nil) (zip (range 0 (length names-1)) names)) supers
@@ -212,13 +235,15 @@ selectorDefinitions infos (Info declaration dict ctor methods supers) = do
     let rhs = SLam d Nothing (SCase (SVar d) (Cons (SAlternative (SConstructorPattern ctor fields) (SVar value)) Nil))
     let signature = quantify parameters (SArrow (SCon dict (map (\(Pair n _) -> STVar n) parameters)) ty)
     freshPure (Triple name (SAnnotation Nil signature) rhs)) (zip (range 0 (length signatures-1)) signatures)
+methodNames : List String -> String
+methodNames names = "[" ++ intercalate "," (map Pretty.prettyString (sortBy compareString names)) ++ "]"
 validateInstance : DataEnv -> Map String Info -> SInstanceDecl -> Either String SInstanceDecl
 validateInstance ds infos inst = do
   Info declaration _ _ _ _ <- lookupInfo infos (instanceClass inst)
   unique "instance method" (map fst (instanceMethods inst))
   let required = map fst (classMethods declaration)
   let supplied = map fst (instanceMethods inst)
-  ensure (null (Surface.without required supplied) && null (Surface.without supplied required)) ("instance methods do not match class " ++ instanceClass inst ++ "; missing " ++ intercalate ", " (Surface.without required supplied) ++ "; unexpected " ++ intercalate ", " (Surface.without supplied required))
+  ensure (null (Surface.without required supplied) && null (Surface.without supplied required)) ("instance methods do not match class " ++ instanceClass inst ++ "; missing " ++ methodNames (Surface.without required supplied) ++ "; unexpected " ++ methodNames (Surface.without supplied required))
   unique "instance type variable" (map fst (instanceVariables inst))
   let arguments = instanceHead inst
   let free = sortBy compareString (nubBy eqString (concatMap freeType arguments))

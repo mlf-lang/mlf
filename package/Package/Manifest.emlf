@@ -1,0 +1,165 @@
+module Package.Manifest where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Bootstrap.Parser as P
+import qualified Package.OS as O
+import qualified Package.Json as J
+
+data Package = Package String J.Json (List Module)
+data Module = Module String String String (List String)
+data PackageGraph = PackageGraph Package (List Package) (List Module)
+packageRoot (Package path _ _) = O.parent path
+packagePath (Package path _ _) = path
+packageData (Package _ value _) = value
+packageName p = J.getText "name" "" (packageData p)
+packageModules (Package _ _ modules) = modules
+moduleName (Module name _ _ _) = name
+moduleSource (Module _ _ source _) = source
+moduleOwner (Module _ owner _ _) = owner
+moduleImports (Module _ _ _ imports) = imports
+rootPackage (PackageGraph p _ _) = p
+packages (PackageGraph _ ps _) = ps
+modules (PackageGraph _ _ ms) = ms
+keys value = S.map S.fst (J.items value)
+lookupModule name ms = S.fromMaybe (panic ("missing module " ++ name)) (S.find (\m -> eqString (moduleName m) name) ms)
+lookupPackage name ps = S.fromMaybe (panic ("missing package " ++ name)) (S.find (\p -> eqString (packageName p) name) ps)
+lower n = n >= 97 && n <= 122
+upper n = n >= 65 && n <= 90
+digit n = n >= 48 && n <= 57
+codes text = S.map (stringCodeAt text) (S.range 0 (stringLength text - 1))
+validName text = stringLength text > 0 && lower (stringCodeAt text 0) && S.all (\c -> lower c || digit c || c == 45) (codes text)
+validModule text = S.all (\part -> stringLength part > 0 && upper (stringCodeAt part 0) && S.all (\c -> lower c || upper c || digit c || c == 95 || c == 39) (codes part)) (O.split 46 text) && S.not (eqString text "Prelude")
+validVersion text = let parts = O.split 46 text in S.length parts == 3 && S.all (\part -> stringLength part > 0 && S.all digit (codes part)) parts
+localFile root value = do
+  let name = J.text value
+  O.require (stringLength name > 0 && S.not (O.starts "/" name)) "source paths must be relative"
+  present <- fileExists (O.join root name)
+  O.require present ("missing source: " ++ O.join root name)
+  path <- canonicalPath (O.join root name)
+  O.require (O.starts (root ++ "/") path) ("source path outside package: " ++ path)
+  ioReturn path
+readModule owner source = do
+  text <- readFile source
+  case P.parseModule source text of
+    Left error -> O.fatal error
+    Right parsed -> case parsed of
+      SourceModule _ _ _ imports _ _ _ _ _ ->
+        ioReturn (Module (P.moduleIdentity parsed) owner source (S.nubBy eqString (S.filter (\n -> S.not (eqString n "Prelude")) (S.map (\entry -> case entry of { Import name _ _ _ -> name }) imports))))
+readModules root owner value = S.mapM (\entry -> do
+  let name = S.fst entry
+  O.require (validModule name) ("invalid or reserved module name: " ++ name)
+  source <- localFile root (S.snd entry)
+  m <- readModule owner source
+  O.require (eqString name (moduleName m)) ("manifest declares " ++ name ++ ", source declares " ++ moduleName m)
+  ioReturn m) (J.items value)
+fields value allowed context = J.fields value (O.words allowed) context
+readPackage path = do
+  value <- J.read path
+  fields value "format name version dependencies library executables tests" path
+  O.require (J.equal (J.get "format" value) (J.num 1)) (path ++ ": expected format 1")
+  let name = J.getText "name" "" value
+  O.require (validName name) (path ++ ": invalid package name")
+  O.require (validVersion (J.getText "version" "" value)) "version must be MAJOR.MINOR.PATCH"
+  let deps = J.getObject "dependencies" value
+  S.mapM_ (\entry -> do
+    O.require (validName (S.fst entry)) "invalid dependency name"
+    fields (S.snd entry) "path" ("dependency " ++ S.fst entry)
+    O.require (stringLength (J.getText "path" "" (S.snd entry)) > 0) "dependency requires a local path") (J.items deps)
+  fields (J.getObject "library" value) "modules" "library"
+  ms <- readModules (O.parent path) name (J.getObject "modules" (J.getObject "library" value))
+  let p = Package path value ms
+  S.mapM_ (validateTarget p false) (J.items (J.getObject "executables" value))
+  S.mapM_ (validateTarget p true) (J.items (J.getObject "tests" value))
+  O.require (S.not (S.null ms) || S.not (S.null (keys (J.getObject "executables" value))) || S.not (S.null (keys (J.getObject "tests" value)))) "package contains no targets"
+  ioReturn p
+validateTarget p testing entry = do
+  let name = S.fst entry
+  let target = S.snd entry
+  O.require (validName name) ("invalid target name: " ++ name)
+  if testing && J.has "command" target then do
+    fields target "command requires" ("test " ++ name)
+    let argv = J.getStrings "command" target
+    O.require (S.not (S.null argv) && S.all (\x -> stringLength x >= 0) argv) "test command cannot be empty"
+    let required = J.getStrings "requires" target
+    O.require (S.all (\n -> J.has n (J.getObject "executables" (packageData p))) required) "unknown required executable"
+  else do
+    fields target "main modules link profile no-prelude arguments stdin stdout" ("target " ++ name)
+    source <- localFile (packageRoot p) (J.get "main" target)
+    ms <- readModules (packageRoot p) (packageName p) (J.getObject "modules" target)
+    O.require (S.elem eqString (J.getText "link" "separate" target) (O.words "separate source")) "invalid link mode"
+    O.require (S.elem eqString (J.getText "profile" "standard" target) (O.words "standard compiler")) "invalid runtime profile"
+    O.require (J.getBool "no-prelude" false target || S.not (J.getBool "no-prelude" false target)) "invalid no-prelude"
+    O.require (S.all (\x -> stringLength x >= 0) (J.getStrings "arguments" target)) "invalid arguments"
+    O.require (stringLength (J.getText "stdin" "" target) >= 0 && stringLength (J.getText "stdout" "" target) >= 0) "invalid test streams"
+    O.require (S.not testing || J.has "stdout" target) "expected stdout is required"
+visit : String -> List String -> List Package -> IO (List Package)
+visit path trail done = do
+  canonical <- canonicalPath path
+  O.require (S.not (S.elem eqString canonical trail)) ("dependency cycle: " ++ S.intercalate " -> " (S.snoc trail canonical))
+  case S.find (\p -> eqString canonical (packagePath p)) done of
+    Just _ -> ioReturn done
+    Nothing -> do
+      p <- readPackage canonical
+      O.require (S.not (S.any (\q -> eqString (packageName p) (packageName q)) done)) ("package " ++ packageName p ++ " resolves to multiple local paths")
+      children <- visitDependencies p (S.snoc trail canonical) done (S.sortBy (\a b -> compareString (S.fst a) (S.fst b)) (J.items (J.getObject "dependencies" (packageData p))))
+      O.require (S.not (S.any (\q -> eqString (packageName p) (packageName q)) children)) ("package " ++ packageName p ++ " resolves to multiple local paths")
+      ioReturn (S.snoc children p)
+visitDependencies : Package -> List String -> List Package -> List (Pair String J.Json) -> IO (List Package)
+visitDependencies p trail done deps = case deps of
+  Nil -> ioReturn done
+  Cons (Pair name dep) rest -> do
+    path <- canonicalPath (O.join (O.join (packageRoot p) (J.getText "path" "" dep)) "mlf-package.json")
+    next <- visit path trail done
+    let child = S.fromMaybe (panic "missing dependency") (S.find (\q -> eqString path (packagePath q)) next)
+    O.require (eqString name (packageName child)) ("dependency " ++ name ++ " resolves to package " ++ packageName child)
+    visitDependencies p trail next rest
+visible ps p = S.concat (Cons (S.map moduleName (packageModules p)) (S.map (\name -> S.map moduleName (packageModules (lookupPackage name ps))) (keys (J.getObject "dependencies" (packageData p)))))
+checkImports ps p local = S.mapM_ (\m -> S.mapM_ (\name -> O.require (S.elem eqString name (S.append (visible ps p) (S.map moduleName local))) (packageName p ++ ":" ++ moduleName m ++ ": import " ++ name ++ " is not declared in this package or a direct dependency")) (moduleImports m)) local
+sortModules ms names = sortVisitMany ms Nil Nil names
+sortVisitMany : List Module -> List String -> List Module -> List String -> IO (List Module)
+sortVisitMany ms trail done names = case names of
+  Nil -> ioReturn done
+  Cons name rest -> do { next <- sortVisit ms trail done name; sortVisitMany ms trail next rest }
+sortVisit : List Module -> List String -> List Module -> String -> IO (List Module)
+sortVisit ms trail done name = do
+  O.require (S.not (S.elem eqString name trail)) ("module cycle: " ++ S.intercalate " -> " (S.snoc trail name))
+  if S.any (\m -> eqString (moduleName m) name) done then ioReturn done else do
+    let m = lookupModule name ms
+    next <- sortVisitMany ms (S.snoc trail name) done (moduleImports m)
+    ioReturn (S.snoc next m)
+targetModules graph p target = do
+  local <- readModules (packageRoot p) (packageName p) (J.getObject "modules" target)
+  source <- localFile (packageRoot p) (J.get "main" target)
+  entry <- readModule (packageName p) source
+  O.require (S.not (S.any (\m -> eqString (moduleName m) (moduleName entry)) local)) "entry module also appears in target modules"
+  let private = Cons entry local
+  O.require (S.not (S.any (\m -> S.any (\n -> eqString (moduleName m) (moduleName n)) (modules graph)) private)) "entry/private module conflicts with a library module"
+  checkImports (packages graph) p private
+  let available = S.append (modules graph) private
+  all <- sortModules available (S.map moduleName available)
+  reachable <- sortModules all (Cons (moduleName entry) Nil)
+  ioReturn (Pair (moduleName entry) reachable)
+load path = do
+  ps <- visit path Nil Nil
+  let p = S.last ps
+  let ms = S.concatMap packageModules ps
+  O.require (S.length (S.nubBy eqString (S.map moduleName ms)) == S.length ms) "module is provided by multiple packages"
+  S.mapM_ (\q -> checkImports ps q (packageModules q)) ps
+  sorted <- sortModules ms (S.sortBy compareString (S.map moduleName ms))
+  let graph = PackageGraph p ps sorted
+  S.mapM_ (\q -> S.mapM_ (\target -> if J.has "main" target then do { ignored <- targetModules graph q target; ioReturn Unit } else ioReturn Unit) (S.map S.snd (S.append (J.items (J.getObject "executables" (packageData q))) (J.items (J.getObject "tests" (packageData q)))))) ps
+  ioReturn graph
+sourceFiles p = do
+  nested <- S.mapM (\target -> if J.has "main" target then do
+    source <- localFile (packageRoot p) (J.get "main" target)
+    ms <- readModules (packageRoot p) (packageName p) (J.getObject "modules" target)
+    ioReturn (Cons source (S.map moduleSource ms))
+    else ioReturn Nil) (S.map S.snd (S.append (J.items (J.getObject "executables" (packageData p))) (J.items (J.getObject "tests" (packageData p)))))
+  ioReturn (S.sortBy compareString (S.nubBy eqString (S.append (S.map moduleSource (packageModules p)) (S.concat nested))))
+snapshot graph = do
+  rows <- S.mapM (\p -> do
+    paths <- sourceFiles p
+    hashes <- S.mapM (\path -> do { hash <- fileDigest path; ioReturn (Pair (O.relative (packageRoot p) path) (J.str hash)) }) paths
+    manifest <- fileDigest (packagePath p)
+    ioReturn (J.Object (Cons (Pair "name" (J.str (packageName p))) (Cons (Pair "version" (J.get "version" (packageData p))) (Cons (Pair "path" (J.str (O.relative (packageRoot (rootPackage graph)) (packageRoot p)))) (Cons (Pair "manifest" (J.str manifest)) (Cons (Pair "sources" (J.Object hashes)) Nil))))))) (packages graph)
+  ioReturn (J.Object (Cons (Pair "format" (J.num 1)) (Cons (Pair "packages" (J.Array rows)) Nil)))

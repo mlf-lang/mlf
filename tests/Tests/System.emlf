@@ -1,0 +1,63 @@
+module Tests.System where
+import Bootstrap.Types
+import Prelude hiding (listDirectory)
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+import qualified Tests.Helpers as H
+
+data ExitCode = ExitSuccess | ExitFailure Int
+instance H.Eq ExitCode where
+  eq ExitSuccess ExitSuccess = true
+  eq (ExitFailure a) (ExitFailure b) = a == b
+  eq _ _ = false
+instance H.Show ExitCode where
+  show ExitSuccess = "ExitSuccess"
+  show (ExitFailure code) = "ExitFailure " ++ showInt code
+canonicalizePath = canonicalPath
+createDirectoryIfMissing : Bool -> String -> IO Unit
+createDirectoryIfMissing parents directory = O.mkdir directory
+createDirectory directory = O.run "" (Cons "/bin/mkdir" (Cons directory Nil))
+removeDirectoryRecursive = O.remove
+removeFile file = O.run "" (Cons "/bin/rm" (Cons "-f" (Cons file Nil)))
+renameFile = O.move
+renameDirectory = O.move
+copyFile = O.copy
+doesFileExist = fileExists
+doesDirectoryExist = directoryExists
+listDirectory = O.entries
+takeDirectory = O.parent
+lookupEnv name = do { text <- getEnv name; ioReturn (if eqString text "" then Nothing else Just text) }
+findExecutable name = do
+  if stringLength name == 0 then ioReturn Nothing else do
+    path <- getEnv "PATH"
+    findIn name (if H.contains "/" name then Cons "" Nil else O.split 58 path)
+findIn : String -> List String -> IO (Maybe String)
+findIn name directories = case directories of
+  Nil -> ioReturn Nothing
+  Cons directory rest -> do
+    let file = if eqString directory "" then name else O.join directory name
+    present <- fileExists file
+    if present then do { path <- canonicalPath file; ioReturn (Just path) } else findIn name rest
+readProcessWithExitCode command args input = do
+  root <- getEnv "MLF_TEST_WORK"
+  let stem = root ++ "/command"
+  O.writeAtomic (stem ++ ".stdin") input
+  code <- O.exec "" (Cons command args) (stem ++ ".stdin") (stem ++ ".stdout") (stem ++ ".stderr") 1800
+  output <- readFile (stem ++ ".stdout")
+  errors <- readFile (stem ++ ".stderr")
+  return (Triple (if code == 0 then ExitSuccess else ExitFailure code) output errors)
+withScratch : forall a. (String -> IO a) -> IO a
+withScratch action = do
+  root <- getEnv "MLF_TEST_WORK"
+  let output = root ++ "/mktemp.out"
+  O.run "" (Cons "/bin/mkdir" (Cons "-p" (Cons (root ++ "/scratch") Nil)))
+  code <- O.exec "" (Cons "mktemp" (Cons "-d" (Cons (root ++ "/scratch/test.XXXXXXXX") Nil))) "" output (output ++ ".stderr") 60
+  H.assert (code == 0) "creating test scratch directory failed"
+  text <- readFile output
+  let directory = O.trim text
+  result <- action directory
+  O.remove directory
+  return result
+writeSource path text = do { O.mkdir (O.parent path); writeFile path text }
+createDirectoryLink source link = O.run "" (Cons "/bin/ln" (Cons "-s" (Cons source (Cons link Nil))))
+createFileLink = createDirectoryLink

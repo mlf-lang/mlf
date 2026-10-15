@@ -1,0 +1,12 @@
+module PackagesMain where
+import Bootstrap.Types
+import qualified Package.OS as O
+import qualified Tests.Packages as P
+import qualified Tests.PackageResolver as R
+main : IO Unit
+main = do
+ args <- O.allArguments
+ case args of
+  Cons "--package-gc-check" (Cons prefix (Cons binary Nil)) -> P.checkGC prefix binary
+  Nil -> do { R.main; P.integration }
+  _ -> O.fatal "invalid package test arguments"

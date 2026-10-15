@@ -1,0 +1,10 @@
+{
+  "format": 1,
+  "name": "local-packages-example",
+  "version": "0.1.0",
+  "dependencies": {"greeting": {"path": "greeting"}},
+  "executables": {"hello": {"main": "Main.emlf"}},
+  "tests": {
+    "hello": {"main": "Main.emlf", "stdout": "Hello, local packages!\n"}
+  }
+}

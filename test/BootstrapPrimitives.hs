@@ -109,6 +109,64 @@ bootstrapPrimitiveTests backends =
       unless (B.output observed == "1\n0\n0\n" ++ contents ++ canonical ++ "\n") (fail (show observed))
       bytes <- BS.readFile file
       unless (bytes == Text.encodeUtf8 (Text.pack contents)) (fail "writeFile changed UTF-8 bytes"))
+  , ("host IO: environment mutation and inheritance", do
+      term <- checked "do { setEnv \"MLF_PACKAGE_TEST_ENV\" \"literal $() λ\"; value <- getEnv \"MLF_PACKAGE_TEST_ENV\"; putStrLn value; unsetEnv \"MLF_PACKAGE_TEST_ENV\"; absent <- getEnv \"MLF_PACKAGE_TEST_ENV\"; printInt (stringLength absent) }"
+      observed <- B.execute backends IOEntry (Input "" False) term
+      right (B.outcome observed)
+      unless (B.output observed == "literal $() λ\n0\n") (fail (show observed)))
+  , ("host IO: binary SHA-256 vectors", withScratch $ \directory -> do
+      let file = directory </> "digest input"
+      forM_ [(BS.empty,"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+             (BS.pack [97,98,99],"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"),
+             (BS.replicate 1000000 97,"cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0")]
+        $ \(bytes,expected) -> do
+          BS.writeFile file bytes
+          term <- checked ("do { hash <- fileDigest " ++ show file ++ "; putStrLn hash }")
+          observed <- B.execute backends IOEntry (Input "" False) term
+          right (B.outcome observed)
+          unless (B.output observed == expected ++ "\n") (fail (show observed)))
+  , ("host IO: directory listing and lock lifecycle", withScratch $ \directory -> do
+      let file = directory </> "only file"
+          lock = directory </> "lock"
+      writeFile file "x"
+      writeFile lock ""
+      term <- checked ("do { yes <- directoryExists " ++ show directory ++ "; no <- directoryExists " ++ show file ++
+        "; printInt (if yes then 1 else 0); printInt (if no then 1 else 0); names <- listDirectory " ++ show directory ++
+        "; printInt (stringLength names); handle <- acquireFileLock " ++ show lock ++ "; releaseFileLock handle; putStrLn \"released\" }")
+      observed <- B.execute backends IOEntry (Input "" False) term
+      right (B.outcome observed)
+      unless (B.output observed == "1\n0\n15\nreleased\n") (fail (show observed)))
+  , ("host IO: literal argv, cwd, redirects and exit status", withScratch $ \directory -> do
+      let out = directory </> "stdout"
+          err = directory </> "stderr"
+          spec = concatMap (++ "\0") ["10","",out,err,"/usr/bin/printf","%s|%s|%s","a b","$(false)","λ\nline"]
+      term <- checked ("do { status <- runProcess " ++ show directory ++ " " ++ show spec ++
+        "; printInt status; text <- readFile " ++ show out ++ "; putStrLn text; errors <- readFile " ++ show err ++ "; printInt (stringLength errors) }")
+      observed <- B.execute backends IOEntry (Input "" False) term
+      right (B.outcome observed)
+      unless (B.output observed == "0\na b|$(false)|λ\nline\n0\n") (fail (show observed)))
+  , ("host IO: process launch failures return status", withScratch $ \directory -> do
+      let nonExecutable = directory </> "not executable"
+      writeFile nonExecutable "not a program"
+      forM_ [(directory </> "missing",127),(nonExecutable,126)] $ \(command,status) -> do
+        let spec = concatMap (++ "\0") ["5","",directory </> "out",directory </> "err",command]
+        term <- checked ("do { status <- runProcess " ++ show directory ++ " " ++ show spec ++ "; printInt status }")
+        observed <- B.execute backends IOEntry (Input "" False) term
+        right (B.outcome observed)
+        unless (B.output observed == show (status :: Int) ++ "\n") (fail (show observed)))
+  , ("host IO: repeated launches retain process-group isolation", withScratch $ \directory -> do
+      let spec = concatMap (++ "\0") ["5","",directory </> "out",directory </> "err","/usr/bin/true"]
+      term <- checked ("go : Int -> IO Int\ngo n = if n == 0 then return 0 else do { status <- runProcess " ++
+        show directory ++ " " ++ show spec ++ "; if status == 0 then go (n - 1) else return status }\nmain = do { status <- go 80; printInt status }")
+      observed <- B.execute backends IOEntry (Input "" False) term
+      right (B.outcome observed)
+      unless (B.output observed == "0\n") (fail (show observed)))
+  , ("host IO: process timeout returns 124", withScratch $ \directory -> do
+      let spec = concatMap (++ "\0") ["1","",directory </> "out",directory </> "err","/bin/sleep","10"]
+      term <- checked ("do { status <- runProcess " ++ show directory ++ " " ++ show spec ++ "; printInt status }")
+      observed <- B.execute backends IOEntry (Input "" False) term
+      right (B.outcome observed)
+      unless (B.output observed == "124\n") (fail (show observed)))
   , ("bootstrap primitives: file errors retain effect order", withScratch $ \directory -> do
       let bad = directory </> "bad.emlf"
       BS.writeFile bad (BS.pack [255])

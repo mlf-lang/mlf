@@ -1,3 +1,4 @@
+normalization: graph and index failures remain checked
 annotation: checked solver reuse agrees
 nested-data: checked solver reuse agrees
 recursive-signature: checked solver reuse agrees

@@ -4,6 +4,9 @@
 -- scopes. Every user entity receives a fresh name before the core pipeline.
 module MLF.Module
   ( LinkedModule (..), loadModuleMap, loadModuleFiles, linkModules, displayNames
+  , Space (..), Role (..), Entity (..), Interface, Names, interface, visible
+  , locals, scope, exportsFor, renameModule, primitiveEntities, primitiveScope
+  , preludeSource, importsFor, label, space
   ) where
 
 import Control.Exception (IOException, evaluate, try)

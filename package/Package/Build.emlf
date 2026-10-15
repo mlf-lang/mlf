@@ -1,0 +1,237 @@
+module Package.Build where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+import qualified Package.Json as J
+import qualified Package.Manifest as M
+
+data Builder = Builder M.PackageGraph J.Json String J.Json J.Json
+config : Builder -> J.Json
+config (Builder _ c _ _ _) = c
+graph : Builder -> M.PackageGraph
+graph (Builder g _ _ _ _) = g
+directory : Builder -> String
+directory (Builder _ _ d _ _) = d
+tools : Builder -> J.Json
+tools (Builder _ _ _ t _) = t
+initial : Builder -> J.Json
+initial (Builder _ _ _ _ s) = s
+root : Builder -> String
+root b = M.packageRoot (M.rootPackage (graph b))
+compiler : Builder -> String
+compiler b = J.getText "path" "" (J.get "compiler" (tools b))
+clang : Builder -> String
+clang b = J.getText "path" "" (J.get "clang" (tools b))
+reportPath : Builder -> String
+reportPath b = directory b ++ "/build-report.json"
+record : Builder -> String -> J.Json -> IO Unit
+record b key value = do { report <- J.read (reportPath b); J.write (reportPath b) (J.add key value report) }
+info : List (Pair String J.Json) -> J.Json
+info fields = J.Object fields
+obj1 : String -> J.Json -> J.Json
+obj1 k v = J.Object (Cons (Pair k v) Nil)
+obj2 : String -> J.Json -> String -> J.Json -> J.Json
+obj2 k v l w = J.Object (Cons (Pair k v) (Cons (Pair l w) Nil))
+hashFiles : List String -> IO J.Json
+hashFiles paths = do
+  rows <- S.mapM (\path -> do { hash <- fileDigest path; ioReturn (Pair path (J.str hash)) }) (S.sortBy compareString (S.nubBy eqString paths))
+  ioReturn (J.Object rows)
+tool : String -> IO J.Json
+tool name = do { path <- O.which name; hash <- fileDigest path; ioReturn (obj2 "path" (J.str path) "sha256" (J.str hash)) }
+raw : String -> List String -> IO String
+raw directory argv = do
+  let output = directory ++ "/query.out"
+  let errors = directory ++ "/query.err"
+  code <- O.exec "" argv "" output errors 1800
+  if code /= 0 then do { error <- readFile errors; O.fatal ("command failed: " ++ S.intercalate " " argv ++ "\n" ++ error) } else readFile output
+-- pkg-config uses shell-style quoting in its output; decode words without
+-- executing them. In particular, escaped spaces remain in one argv entry.
+flags : String -> List String
+flags text = flagsAt text 0 0 false "" Nil
+flagsAt : String -> Int -> Int -> Bool -> String -> List String -> List String
+flagsAt text i quote escaped word acc = if i >= stringLength text then
+  if quote /= 0 || escaped then panic "invalid pkg-config quoting" else S.reverse (if eqString word "" then acc else Cons word acc)
+  else let c = stringCodeAt text i in
+  if escaped then flagsAt text (i + 1) quote false (word ++ O.char text i) acc else
+  if c == 92 && quote /= 39 then flagsAt text (i + 1) quote true word acc else
+  if quote /= 0 then if c == quote then flagsAt text (i + 1) 0 false word acc else flagsAt text (i + 1) quote false (word ++ O.char text i) acc else
+  if c == 34 || c == 39 then flagsAt text (i + 1) c false word acc else
+  if J.space c then flagsAt text (i + 1) 0 false "" (if eqString word "" then acc else Cons word acc) else flagsAt text (i + 1) 0 false (word ++ O.char text i) acc
+libraryFiles : List String -> IO (List String)
+libraryFiles flags = do
+  let dirs = S.map (O.drop 2) (S.filter (O.starts "-L") flags)
+  selected <- S.mapM (\flag -> do
+    present <- fileExists flag
+    if present then do { path <- canonicalPath flag; ioReturn (Cons path Nil) } else if O.starts "-l" flag then do
+      candidates <- S.mapM (\dir -> S.mapM (\suffix -> do { let path = dir ++ "/lib" ++ O.drop 2 flag ++ suffix; yes <- fileExists path; if yes then do { actual <- canonicalPath path; ioReturn (Just actual) } else ioReturn Nothing }) (Cons ".dylib" (Cons ".so" (Cons ".a" Nil)))) dirs
+      ioReturn (S.take 1 (S.mapMaybe S.id (S.concat candidates)))
+    else ioReturn Nil) flags
+  ioReturn (S.concat selected)
+flagIdentity : List String -> IO J.Json
+flagIdentity flags = do
+  libraries <- libraryFiles flags
+  hashes <- hashFiles libraries
+  let includes = S.map (O.drop 2) (S.filter (O.starts "-I") flags)
+  trees <- S.mapM O.files includes
+  headers <- hashFiles (S.filter (O.ends ".h") (S.concat trees))
+  ioReturn (info (Cons (Pair "flags" (J.stringArray flags)) (Cons (Pair "libraries" hashes) (Cons (Pair "headers" headers) Nil))))
+create : M.PackageGraph -> J.Json -> String -> IO Builder
+create g options buildDirectory = do
+  O.mkdir (buildDirectory ++ "/cache")
+  O.mkdir (buildDirectory ++ "/commands")
+  comp <- tool (J.getText "compiler" "emlf" options)
+  cc <- tool (J.getText "clang" "clang" options)
+  pkg <- tool (J.getText "pkg-config" "pkg-config" options)
+  manager <- getExecutablePath
+  managerHash <- fileDigest manager
+  system <- raw buildDirectory (Cons "/usr/bin/uname" (Cons "-s" Nil))
+  machine <- raw buildDirectory (Cons "/usr/bin/uname" (Cons "-m" Nil))
+  gmpText <- raw buildDirectory (Cons (J.getText "path" "" pkg) (O.words "--cflags --libs gmp"))
+  gmp <- flagIdentity (flags gmpText)
+  runtimeText <- if J.has "runtime" options then ioReturn (J.getText "runtime" "" options) else raw buildDirectory (Cons (J.getText "path" "" comp) (Cons "--llvm-runtime" Nil))
+  runtime <- canonicalPath (O.trim runtimeText)
+  runtimeFiles <- O.entries (O.parent runtime)
+  runtimeHashes <- hashFiles (S.map (O.join (O.parent runtime)) (S.filter (\n -> O.ends ".c" n || O.ends ".h" n) runtimeFiles))
+  env <- S.mapM (\key -> do { value <- getEnv key; ioReturn (Pair key (J.str value)) }) (O.words "SDKROOT MACOSX_DEPLOYMENT_TARGET CPATH C_INCLUDE_PATH LIBRARY_PATH")
+  snapshot <- M.snapshot g
+  let identity = info (Cons (Pair "compiler" comp) (Cons (Pair "clang" cc) (Cons (Pair "pkg-config" pkg) (Cons (Pair "manager" (obj2 "path" (J.str manager) "sha256" (J.str managerHash))) (Cons (Pair "system" (J.str (O.trim system))) (Cons (Pair "machine" (J.str (O.trim machine))) (Cons (Pair "native_environment" (J.Object env)) (Cons (Pair "runtime" runtimeHashes) (Cons (Pair "runtime-path" (J.str runtime)) (Cons (Pair "gmp" gmp) Nil))))))))))
+  let b = Builder g options buildDirectory identity snapshot
+  J.write (reportPath b) (info (Cons (Pair "format" (J.num 1)) (Cons (Pair "complete" (J.Boolean false)) (Cons (Pair "implementation" (J.str "MLF")) (Cons (Pair "packages" snapshot) (Cons (Pair "toolchain" identity) (Cons (Pair "commands" (J.Array Nil)) (Cons (Pair "builds" (J.Array Nil)) (Cons (Pair "tests" (J.Array Nil)) Nil)))))))))
+  ioReturn b
+capture : Builder -> String -> List String -> String -> String -> IO String
+capture b cwd argv input output = do
+  report <- J.read (reportPath b)
+  let stem = directory b ++ "/commands/" ++ showInt (S.length (J.values (J.get "commands" report)))
+  let result = if eqString output "" then stem ++ ".stdout" else output
+  let errors = stem ++ ".stderr"
+  code <- O.exec cwd argv input result errors (readInt (J.getText "timeout" "1800" (config b)))
+  record b "commands" (info (Cons (Pair "argv" (J.stringArray argv)) (Cons (Pair "cwd" (J.str cwd)) (Cons (Pair "exit_code" (J.num code)) (Cons (Pair "stdout" (J.str result)) (Cons (Pair "stderr" (J.str errors)) Nil))))))
+  if code /= 0 then do
+    error <- readFile errors
+    O.fatal ("command failed (" ++ showInt code ++ "): " ++ S.intercalate " " argv ++ "\n" ++ error)
+  else if eqString output "" then readFile result else ioReturn ""
+gcFlags : Builder -> IO J.Json
+gcFlags b = do
+  let prefix = J.getText "gc-prefix" "" (config b)
+  selected <- if eqString prefix "" then do
+    text <- capture b (root b) (Cons (J.getText "path" "" (J.get "pkg-config" (tools b))) (O.words "--cflags --libs bdw-gc")) "" ""
+    ioReturn (flags text)
+    else do
+      path <- canonicalPath prefix
+      let library = path ++ "/lib/libgc.a"
+      present <- fileExists library
+      O.require present ("missing BDWGC library: " ++ library)
+      ioReturn (Cons ("-I" ++ path ++ "/include") (Cons library (if eqString (J.getText "system" "" (tools b)) "Linux" then Cons "-ldl" Nil else Nil)))
+  identity <- flagIdentity selected
+  record b "native_inputs" identity
+  ioReturn identity
+preludeOptions : J.Json -> List String
+preludeOptions target = if J.getBool "no-prelude" false target then Cons "--no-prelude" Nil else Nil
+stackFlags : Builder -> List String
+stackFlags b = if eqString (J.getText "system" "" (tools b)) "Darwin" then Cons "-Wl,-stack_size,0x10000000" Nil else Nil
+profileFlags : List String
+profileFlags = O.words "-DMLF_USE_BDWGC -DMLF_COMPACT_BDWGC -DMLF_GC_THRESHOLD=1048576"
+fingerprint : Builder -> J.Json -> IO String
+fingerprint b value = do { J.write (directory b ++ "/fingerprint.json") value; fileDigest (directory b ++ "/fingerprint.json") }
+validFiles : String -> J.Json -> IO Bool
+validFiles destination saved = do
+  checks <- S.mapM (\entry -> do
+    let path = S.fst entry
+    if O.starts "/" path || S.elem eqString ".." (O.split 47 path) then ioReturn false else do
+      present <- fileExists (destination ++ "/" ++ path)
+      if present then do { actual <- fileDigest (destination ++ "/" ++ path); ioReturn (eqString actual (J.text (S.snd entry))) } else ioReturn false) (J.items saved)
+  ioReturn (S.not (S.null checks) && S.and checks)
+cacheValid : String -> String -> IO Bool
+cacheValid destination key = do
+  let stamp = destination ++ "/artifact.json"
+  present <- fileExists stamp
+  if S.not present then ioReturn false else do
+    text <- readFile stamp
+    case J.parse text of
+      Left _ -> ioReturn false
+      Right value -> case value of
+        J.Object _ -> if J.equal (J.get "key" value) (J.str key) then case J.get "files" value of { J.Object _ -> validFiles destination (J.get "files" value); _ -> ioReturn false } else ioReturn false
+        _ -> ioReturn false
+cached : Builder -> String -> J.Json -> (String -> IO Unit) -> IO String
+cached b kind inputs action = do
+  key <- fingerprint b (obj2 "kind" (J.str kind) "inputs" inputs)
+  let destination = directory b ++ "/cache/" ++ key
+  reusable <- cacheValid destination key
+  if reusable then ioReturn Unit else do
+    putErr ("Building " ++ kind ++ "\n")
+    let work = destination ++ ".work"
+    O.remove work
+    O.mkdir work
+    action work
+    paths <- O.files work
+    hashes <- S.mapM (\path -> do { hash <- fileDigest path; ioReturn (Pair (O.relative work path) (J.str hash)) }) paths
+    O.require (S.not (S.null hashes)) (kind ++ " produced no artifacts")
+    J.write (work ++ "/artifact.json") (info (Cons (Pair "key" (J.str key)) (Cons (Pair "inputs" inputs) (Cons (Pair "files" (J.Object hashes)) Nil))))
+    O.remove destination
+    O.move work destination
+  record b "builds" (info (Cons (Pair "kind" (J.str kind)) (Cons (Pair "key" (J.str key)) (Cons (Pair "cached" (J.Boolean reusable)) Nil))))
+  ioReturn destination
+stageSources : String -> List M.Module -> IO Unit
+stageSources destination ms = S.mapM_ (\m -> O.copy (M.moduleSource m) (destination ++ "/" ++ O.modulePath (M.moduleName m) ++ ".emlf")) ms
+objects : Builder -> List M.Module -> Bool -> IO (List (Pair String String))
+objects b ms noPrelude = objectLoop b ms noPrelude Nil ms
+objectLoop : Builder -> List M.Module -> Bool -> List (Pair String String) -> List M.Module -> IO (List (Pair String String))
+objectLoop b ms noPrelude done pending = case pending of
+  Nil -> ioReturn done
+  Cons m rest -> do
+    deps <- M.sortModules ms (M.moduleImports m)
+    interfaces <- S.mapM (\dep -> do { let name = M.moduleName dep; hash <- fileDigest (S.fromMaybe (panic "missing compiled module") (S.lookup eqString name done) ++ "/unit.mlfi"); ioReturn (Pair name (J.str hash)) }) deps
+    sourceHash <- fileDigest (M.moduleSource m)
+    let inputs = info (Cons (Pair "compiler" (J.get "compiler" (tools b))) (Cons (Pair "manager" (J.get "manager" (tools b))) (Cons (Pair "source" (J.str sourceHash)) (Cons (Pair "name" (J.str (M.moduleName m))) (Cons (Pair "no-prelude" (J.Boolean noPrelude)) (Cons (Pair "interfaces" (J.Object interfaces)) Nil))))))
+    artifact <- cached b ("module " ++ M.moduleName m) inputs (\work -> do
+      let include = work ++ "/imports"
+      O.mkdir include
+      S.mapM_ (\dep -> O.copy (S.fromMaybe (panic "missing interface") (S.lookup eqString (M.moduleName dep) done) ++ "/unit.mlfi") (include ++ "/" ++ O.modulePath (M.moduleName dep) ++ ".mlfi")) deps
+      O.copy (M.moduleSource m) (work ++ "/source.emlf")
+      ignored <- capture b work (S.append (Cons (compiler b) (if noPrelude then Cons "--no-prelude" Nil else Nil)) (Cons "-i" (Cons include (Cons "--compile-module" (Cons (work ++ "/source.emlf") (Cons "-o" (Cons (work ++ "/unit") Nil))))))) "" ""
+      one <- fileExists (work ++ "/unit.mlfi")
+      two <- fileExists (work ++ "/unit.mlfo")
+      O.require (one && two) "compiler did not produce an interface/object pair"
+      O.remove include
+      O.remove (work ++ "/source.emlf"))
+    objectLoop b ms noPrelude (S.snoc done (Pair (M.moduleName m) artifact)) rest
+buildTarget : Builder -> M.Package -> String -> J.Json -> Bool -> IO (Pair String String)
+buildTarget b p name target publish = do
+  Pair entry ms <- M.targetModules (graph b) p target
+  let compact = eqString (J.getText "profile" "standard" target) "compiler"
+  let separate = eqString (J.getText "link" "separate" target) "separate"
+  gc <- if compact then gcFlags b else ioReturn J.empty
+  built <- if separate then objects b ms (J.getBool "no-prelude" false target) else ioReturn Nil
+  sourceHashes <- S.mapM (\m -> do { hash <- fileDigest (M.moduleSource m); ioReturn (Pair (M.moduleName m) (J.str hash)) }) ms
+  objectHashes <- S.mapM (\entry -> do { hash <- fileDigest (S.snd entry ++ "/unit.mlfo"); ioReturn (Pair (S.fst entry) (J.str hash)) }) built
+  let inputs = info (Cons (Pair "toolchain" (tools b)) (Cons (Pair "gc" gc) (Cons (Pair "target" target) (Cons (Pair "sources" (J.Object sourceHashes)) (Cons (Pair "objects" (J.Object objectHashes)) Nil)))))
+  artifact <- cached b ("executable " ++ M.packageName p ++ ":" ++ name) inputs (\work -> do
+    let sources = work ++ "/sources"
+    stageSources sources ms
+    if separate then S.mapM_ (\item -> S.mapM_ (\extension -> O.copy (S.snd item ++ "/unit" ++ extension) (work ++ "/modules/" ++ O.modulePath (S.fst item) ++ extension)) (Cons ".mlfi" (Cons ".mlfo" Nil))) built else ioReturn Unit
+    let include = work ++ (if separate then "/modules" else "/sources")
+    let input = include ++ "/" ++ O.modulePath entry ++ (if separate then ".mlfi" else ".emlf")
+    let emit = (if separate then "--module-to-llvm" else "--emit-llvm") ++ (if compact then "-gc" else "")
+    ignored <- capture b work (S.append (Cons (compiler b) (preludeOptions target)) (Cons "-i" (Cons include (Cons emit (Cons input Nil))))) "" (work ++ "/program.ll")
+    let allFlags = S.append (J.getStrings "flags" (J.get "gmp" (tools b))) (J.getStrings "flags" gc)
+    let cflags = S.append (S.filter (\f -> O.starts "-I" f || O.starts "-D" f) allFlags) (if compact then profileFlags else Nil)
+    ignored <- capture b work (S.append (Cons (clang b) (O.words "-O2 -std=c11")) (S.append cflags (Cons "-c" (Cons (J.getText "runtime-path" "" (tools b)) (Cons "-o" (Cons (work ++ "/runtime.o") Nil)))))) "" ""
+    ignored <- capture b work (S.append (Cons (clang b) (O.words "-O2 -Wno-override-module")) (S.append (Cons (work ++ "/program.ll") (Cons (work ++ "/runtime.o") allFlags)) (S.append (Cons "-lm" (if compact then stackFlags b else Nil)) (Cons "-o" (Cons (work ++ "/program") Nil))))) "" ""
+    present <- fileExists (work ++ "/program")
+    O.require present "linker did not produce executable")
+  let binary = directory b ++ "/bin/" ++ name
+  if publish then do { O.copy (artifact ++ "/program") (binary ++ ".new"); O.move (binary ++ ".new") binary } else ioReturn Unit
+  ioReturn (Pair (if publish then binary else artifact ++ "/program") artifact)
+verifyHashes : J.Json -> IO Unit
+verifyHashes values = S.mapM_ (\entry -> do { actual <- fileDigest (S.fst entry); O.require (eqString actual (J.text (S.snd entry))) ("input changed during build/test: " ++ S.fst entry) }) (J.items values)
+finish : Builder -> IO Unit
+finish b = do
+  snapshot <- M.snapshot (graph b)
+  O.require (J.equal snapshot (initial b)) "package sources or manifests changed during build/test"
+  S.mapM_ (\key -> do { let identity = J.get key (tools b); actual <- fileDigest (J.getText "path" "" identity); O.require (eqString actual (J.getText "sha256" "" identity)) (key ++ " changed during build/test") }) (O.words "compiler clang pkg-config manager")
+  verifyHashes (J.get "runtime" (tools b))
+  verifyHashes (J.get "libraries" (J.get "gmp" (tools b)))
+  verifyHashes (J.get "headers" (J.get "gmp" (tools b)))
+  report <- J.read (reportPath b)
+  S.mapM_ (\value -> do { verifyHashes (J.get "libraries" value); verifyHashes (J.get "headers" value) }) (J.values (J.getOr "native_inputs" (J.Array Nil) report))
+  J.write (reportPath b) (J.set "complete" (J.Boolean true) report)

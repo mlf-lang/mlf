@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Language and ecosystem discussions
+    url: https://github.com/orgs/mlf-lang/discussions
+    about: Ask questions or discuss language ideas here.

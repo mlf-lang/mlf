@@ -520,16 +520,14 @@ solve constraints = do
 
 -- Normalization only changes flags: structural indexes depend on tags,
 -- binding indexes on binders, and scope indexes on Gen tags/binders.
--- Preserve all validation before sharing these finished indexes.
+-- finishNormalized checks the whole graph and indexes before this
+-- validity-preserving transformation, then shares the finished indexes.
 solvePrepared : Constraints -> Either String Solver
 solvePrepared constraints = do
   prepared <- Solver.prepare (initialGraph constraints)
   initial <- Solver.solverUnify (equalities constraints) prepared
   solved <- foldM (\solver e -> Solver.instantiateClosed (fromGen e) (toNode e) solver) initial (instances constraints)
-  graph <- Solver.finish solved
-  let normalized = G.normalize graph
-  G.validateGraph normalized
-  Right (Solver.withGraph normalized solved)
+  Solver.finishNormalized solved
 
 eraseSource typed = eraseSourceWith IM.empty typed
 

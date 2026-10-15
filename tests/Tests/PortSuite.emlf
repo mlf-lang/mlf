@@ -1,0 +1,61 @@
+module Tests.PortSuite where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+import qualified Tests.Helpers as H
+import qualified Tests.Backends as B
+import qualified Tests.Bytes as Bytes
+import qualified Bootstrap.Compiler as C
+import qualified Tests.IndependentCheck as Check
+import qualified Bootstrap.X.Parser as P
+import qualified Bootstrap.X.Pretty as Pretty
+import qualified Bootstrap.X.Syntax as X
+import qualified Bootstrap.X.Type as T
+import qualified Bootstrap.Primitive as Primitive
+import qualified Bootstrap.Data as D
+names = O.words "foundation MapFolds IntegerContainers OptimizerQueries ConstructorProjection ForceReuse StrictFields prelude Target frontend LexerCounters LLVMBuild RuntimeSmoke RuntimeCases StateRuntime StateTypes GraphConformance GraphScopes GraphDense OrderedTraversal SolverReuse TypeCache GraphStack EmbeddingPruning InferenceConformance PrimitiveMetadata"
+references = Cons (Pair "GraphConformance" "GraphReference") (Cons (Pair "GraphScopes" "GraphScopesReference") (Cons (Pair "GraphDense" "GraphDenseReference") (Cons (Pair "OrderedTraversal" "OrderedTraversalReference") (Cons (Pair "EmbeddingPruning" "EmbeddingPruningReference") (Cons (Pair "InferenceConformance" "InferenceReference") Nil)))))
+metadata = S.unlines (S.map (\primitive -> case Primitive.primitiveSignature primitive of
+ Pair variables field -> showInt (Primitive.primitiveCode primitive) ++ "\t" ++ Primitive.primitiveName primitive ++ "\t" ++ showInt (Primitive.primitiveArity primitive) ++ "\t" ++ (if Primitive.primitiveStrict primitive then "strict" else "lazy") ++ "\t" ++ D.prettyDeclaration (DataDeclK "Sig" variables (Cons (ConstructorDecl "M" (Cons field Nil)) Nil))) Primitive.allPrimitives)
+runFixture backends name = do
+ let source = "bootstrap/tests/" ++ name ++ ".emlf"
+ expected <- if eqString name "PrimitiveMetadata" then return (Bytes.encode metadata) else Bytes.readFile ("bootstrap/tests/" ++ name ++ ".expected")
+ H.assert (S.not (Bytes.null expected)) "empty port fixture expectation"
+ case S.lookup eqString name references of
+  Nothing -> return Unit
+  Just reference -> do
+   exe <- getEnv "MLF_TEST_REFERENCES"
+   work <- getEnv "MLF_TEST_WORK"
+   code <- O.exec "" (Cons exe (Cons reference Nil)) "" (work ++ "/oracle.out") (work ++ "/oracle.err") 1800
+   output <- Bytes.readFile (work ++ "/oracle.out")
+   error <- readFile (work ++ "/oracle.err")
+   H.assert (code == 0 && eqString error "" && H.eq output expected) ("independent reference differs: " ++ name)
+   if eqString name "InferenceConformance" then do
+    code <- O.exec "" (Cons exe (Cons reference (Cons "--generate" Nil))) "" (work ++ "/generated.emlf") (work ++ "/generated.err") 1800
+    generated <- Bytes.readFile (work ++ "/generated.emlf")
+    original <- Bytes.readFile source
+    H.assert (code == 0 && H.eq generated original && H.contains "Fig12-A8\tREJECT Inference\n" (Bytes.decodeText expected)) "inference input generation or A8 coverage differs"
+    else return Unit
+ result <- C.compileFile (Cons "bootstrap" Nil) source
+ compilation <- H.right result
+ ty <- H.right (Check.checkClosed (C.compiledTerm compilation))
+ H.assert (T.alphaEq ty (C.inferredType compilation)) "port inferred/target type differs"
+ parsed <- H.right (P.parseTerm source (Pretty.prettyTerm (C.compiledTerm compilation)))
+ parsedType <- H.right (Check.checkClosed parsed)
+ H.assert (T.alphaEq parsedType ty && X.equalErased (X.erase parsed) (X.erase (C.compiledTerm compilation))) "port target serialization changed"
+ let context = B.withExecutionTimeout (if S.elem eqString name (O.words "GraphConformance GraphDense InferenceConformance SolverReuse StateTypes") then 1800 else 60) backends
+ observed <- B.execute context B.IOEntry (B.Input "" false) parsed
+ H.right (B.outcome observed)
+ H.assert (H.eq (B.outputBytes observed) expected && eqString (B.stderrOutput observed) "" && eqString (B.remaining observed) "") ("port runtime output differs: " ++ name)
+main = do
+ args <- O.allArguments
+ selected <- case args of
+  Nil -> return names
+  Cons "--only" names' -> do
+   H.assert (S.not (S.null names') && S.length names' == S.length (S.nubBy eqString names') && S.all (\name -> S.elem eqString name names) names') "invalid port fixture selection"
+   return names'
+  _ -> H.fail "invalid port arguments"
+ B.withBackends (\backends -> do
+  S.mapM_ (\name -> B.inCase backends ("MLF compiler port: " ++ name) (do { runFixture backends name; putStrLn ("PASS " ++ name) })) selected
+  B.auditBackends backends
+  putStrLn (showInt (S.length selected) ++ " MLF port fixtures; 0 failures"))

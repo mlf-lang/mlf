@@ -4,6 +4,7 @@ module MLF.Compiler
   , compileWithPrelude, compileExprWithPrelude, compileProgramWithPrelude
   , compileModules, compileModulesWithPrelude
   , compileFile, compileFileWithPrelude, compileSourceWithImports
+  , finishCompilation
   ) where
 
 import Control.Monad (unless)

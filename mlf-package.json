@@ -1,0 +1,117 @@
+{
+  "format": 1,
+  "name": "mlf-compiler",
+  "version": "0.1.0",
+  "dependencies": {
+    "mlf-bootstrap": {
+      "path": "bootstrap"
+    },
+    "mlf-package-tools": {
+      "path": "package"
+    }
+  },
+  "executables": {
+    "emlf": {
+      "main": "bootstrap/Main.emlf",
+      "profile": "compiler",
+      "link": "source"
+    },
+    "mlfpkg": {
+      "main": "package/Main.emlf",
+      "profile": "compiler",
+      "link": "source"
+    }
+  },
+  "tests": {
+    "unit": {
+      "requires": [
+        "emlf",
+        "mlfpkg"
+      ],
+      "command": [
+        "{bin:mlfpkg}",
+        "compiler-test",
+        "unit",
+        "--compiler",
+        "{bin:emlf}",
+        "--build-dir",
+        "{build}/compiler-tests/unit"
+      ]
+    },
+    "packages": {
+      "requires": [
+        "emlf",
+        "mlfpkg"
+      ],
+      "command": [
+        "{bin:mlfpkg}",
+        "compiler-test",
+        "packages",
+        "--compiler",
+        "{bin:emlf}",
+        "--build-dir",
+        "{build}/compiler-tests/packages"
+      ]
+    },
+    "self-host": {
+      "requires": [
+        "emlf",
+        "mlfpkg"
+      ],
+      "command": [
+        "{bin:mlfpkg}",
+        "compiler-test",
+        "self-host",
+        "--compiler",
+        "{bin:emlf}",
+        "--build-dir",
+        "{build}/compiler-tests/self-host"
+      ]
+    },
+    "parity": {
+      "requires": [
+        "emlf",
+        "mlfpkg"
+      ],
+      "command": [
+        "{bin:mlfpkg}",
+        "compiler-test",
+        "parity",
+        "--compiler",
+        "{bin:emlf}",
+        "--build-dir",
+        "{build}/compiler-tests/parity"
+      ]
+    },
+    "backends": {
+      "requires": [
+        "emlf",
+        "mlfpkg"
+      ],
+      "command": [
+        "{bin:mlfpkg}",
+        "compiler-test",
+        "backends",
+        "--compiler",
+        "{bin:emlf}",
+        "--build-dir",
+        "{build}/compiler-tests/backends"
+      ]
+    },
+    "port": {
+      "requires": [
+        "emlf",
+        "mlfpkg"
+      ],
+      "command": [
+        "{bin:mlfpkg}",
+        "compiler-test",
+        "port",
+        "--compiler",
+        "{bin:emlf}",
+        "--build-dir",
+        "{build}/compiler-tests/port"
+      ]
+    }
+  }
+}

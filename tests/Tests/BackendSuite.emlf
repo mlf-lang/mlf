@@ -1,0 +1,44 @@
+module Tests.BackendSuite where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Tests.Backends as B
+import qualified Tests.Helpers as H
+import qualified Tests.Snake as Sn
+import qualified Tests.BackendCases as Ba
+import qualified Tests.IOTests as Io
+import qualified Tests.PreludeTests as Pr
+import qualified Tests.NativeOptimization as Na
+import qualified Tests.ConstructorProjection as Co
+import qualified Tests.ForceReuse as Fo
+import qualified Tests.BoolConditions as Bo
+import qualified Tests.EnvironmentAccess as En
+import qualified Tests.StrictFields as St
+import qualified Tests.NumericArrays as Nu
+import qualified Tests.ByteArrays as By
+import qualified Tests.DNA as Dn
+import qualified Tests.ModuleBackends as Mo
+import qualified Tests.SeparateBackends as Se
+import qualified Tests.BootstrapPrimitives as Bs
+import qualified Tests.StateRuntime as Sr
+import qualified Tests.HigherOrderSpecialization as Hi
+import qualified Package.OS as O
+suite : B.Backends -> List (Pair String (IO Unit))
+suite backends = S.concat (Cons (Io.ioTests backends) (Cons (Pr.preludeTests backends) (Cons (Sn.snakeTests backends) (Cons (Ba.backendTests backends) (Cons (Na.nativeOptimizationTests backends) (Cons (Co.constructorProjectionTests backends) (Cons (Fo.forceReuseTests backends) (Cons (Bo.boolConditionTests backends) (Cons (En.environmentAccessTests backends) (Cons (St.strictFieldTests backends) (Cons (Nu.numericArrayTests backends) (Cons (By.byteArrayTests backends) (Cons (Dn.dnaTests backends) (Cons (Mo.moduleBackendTests backends) (Cons (Se.separateBackendTests backends) (Cons (Bs.bootstrapPrimitiveTests backends) (Cons (Sr.stateRuntimeTests backends) (Cons (Hi.higherOrderTests backends) Nil))))))))))))))))))
+main : IO Unit
+main = do
+ args <- O.allArguments
+ B.withBackends (\backends -> do
+  let allCases = suite backends
+  let labels = S.map S.fst allCases
+  H.assert (S.length allCases == 494) "preserved backend fixture coverage changed"
+  H.assert (S.length labels == S.length (S.nubBy eqString labels)) "duplicate backend fixture labels"
+  cases <- case args of
+   Nil -> return allCases
+   Cons "--from" (Cons prefix Nil) -> do
+    let selected = S.dropWhile (\entry -> S.not (O.starts prefix (S.fst entry))) allCases
+    H.assert (S.not (S.null selected)) ("unknown backend fixture prefix: " ++ prefix)
+    return selected
+   _ -> H.fail "backends [--from FIXTURE-PREFIX]"
+  S.mapM_ (\(Pair label action) -> B.inCase backends label (do { putStrLn label; action })) cases
+  count <- B.auditBackends backends
+  putStrLn (showInt (S.length cases) ++ " shared IO/prelude/backend fixtures; 0 failures"))

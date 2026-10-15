@@ -1,0 +1,33 @@
+module Tests.BoolConditions where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as OS
+import qualified Tests.Helpers as H
+import Tests.Helpers (Quint(..), Sext(..))
+import qualified Tests.Map as Map
+import Tests.Backends
+import qualified Tests.Backends as B
+import Bootstrap.Compiler (compile, compiledTerm)
+import qualified Bootstrap.LLVM.Codegen as Codegen
+import qualified Bootstrap.Primitive as P
+import qualified Bootstrap.X.Check as Check
+import qualified Bootstrap.X.Syntax as X
+import qualified Bootstrap.X.Type as T
+
+checked : String -> IO XTerm
+checked = (S.compose (S.either (S.compose H.fail H.show) (S.compose return compiledTerm)) (compile "<Boolean condition>"))
+
+observe : B.Backends -> Input -> XTerm -> String -> IO Unit
+observe backends input term expected = do { result <- (B.execute backends IOEntry input term); do { (S.either (S.compose H.fail H.show) return (B.outcome result)); (S.unless (H.eq (B.output result) expected) (H.fail (H.show result))) } }
+
+boolConditionTests : B.Backends -> (List ( (Pair (String) (IO Unit)) ))
+boolConditionTests backends = (H.append (Cons (Pair "Boolean conditions: checked ordinary branches compare forced canonical Bool" do { _ <- (S.either H.fail return (Check.checkClosed ordinaryCondition)); do { (Pair _ code) <- (S.either H.fail return (Codegen.generate (Map.singleton "Unit" (Pair 0 0)) (X.erase ordinaryCondition))); (let { llvm = (S.unlines code) } in do { (S.unless ((H.contains "call ptr @mlf_force(ptr %arg)" llvm) && ((S.any (\line -> ((H.contains "icmp eq ptr " line) && (H.contains ", inttoptr (i64 6 to ptr)" line))) (H.lines llvm)) && ((S.not (H.contains "call i64 @mlf_truth(" llvm)) && (S.not (H.contains "define private ptr @mlf.numeric." llvm))))) (H.fail "ordinary conditional did not force and compare its canonical Boolean")); (observe backends (Input "" false) ordinaryCondition "yes\n") }) } }) (Cons (Pair "Boolean conditions: runtime producers agree on both branches" do { term <- (checked producerSource); (observe backends (Input "same\n" false) term (H.concat (S.replicate 7 "true\nfalse\n"))) }) (Cons (Pair "Boolean conditions: lazy fields captures and partial primitives" do { term <- (checked lazySource); (observe backends (Input "" false) term "before\nyes\nno\ncaptured\npartial\nfield true\nfield false\nafter\n") }) Nil))) (S.concatMap (\(Triple label source message) -> (Cons (Pair (H.append "Boolean conditions: " label) do { term <- (checked source); do { result <- (B.execute backends IOEntry (Input "" false) term); (S.unless ((S.either (S.compose (\section1 -> (H.eq section1 message)) H.show) (S.const false) (B.outcome result)) && (H.eq (B.events result) (Cons (B.Write "before\n") Nil))) (H.fail (H.show result))) } }) Nil)) (Cons (Triple "condition failure follows preceding IO" (H.append "do { putStrLn \"before\"; flag <- ioReturn (panic \"condition failure\"); " "if flag then putStrLn \"selected\" else putStrLn \"other\"; putStrLn \"after\" }") "condition failure") (Cons (Triple "selected branch failure follows preceding IO" (H.append "do { putStrLn \"before\"; flag <- ioReturn true; " "if flag then panic \"selected failure\" else panic \"unselected failure\"; putStrLn \"after\" }") "selected failure") Nil))))
+
+ordinaryCondition : XTerm
+ordinaryCondition = (let { flag = (XName 0 "flag") } in (let { ioUnit = (XCon "IO" (Cons (XCon "Unit" Nil) Nil)) } in (let { output = (S.compose (XApp (XPrimitive PPutStrLn Nil)) XStringTerm) } in (let { body = (XApp (XApp (XApp (XPrimitive PIfThenElse (Cons ioUnit Nil)) (XVarTerm flag)) (output "yes")) (output "no")) } in (let { comparison = (XApp (XApp (XPrimitive PEqString Nil) (XStringTerm "same")) (XStringTerm "same")) } in (XApp (XAbs flag (XCon "Bool" Nil) body) comparison))))))
+
+producerSource : String
+producerSource = (H.append "let showBool = \\flag -> if flag then putStrLn \"true\" else putStrLn \"false\" in " (H.append "do { yes <- ioReturn true; no <- ioReturn false; showBool yes; showBool no; " (H.append "small <- ioReturn (readInt \"1\"); large <- ioReturn (readInt \"123456789012345678901234567890\"); " (H.append "showBool (eqInt small small); showBool (eqInt small large); showBool (ltInt small large); " (H.append "showBool (ltInt large small); d <- ioReturn (readDouble \"1.5\"); " (H.append "showBool (eqDouble d d); showBool (eqDouble d 2.5); showBool (ltDouble d 2.5); showBool (ltDouble 2.5 d); " (H.append "line <- getLine; showBool (eqString line \"same\"); showBool (eqString line \"other\"); " (H.append "path <- getExecutablePath; present <- fileExists path; showBool present; " "absent <- fileExists \"\"; showBool absent }"))))))))
+
+lazySource : String
+lazySource = (H.append "data Flags = Flags Bool Bool Bool; " (H.append "let select = \\flag left right -> if flag then left else right in " (H.append "do { yes <- ioReturn true; no <- ioReturn false; " (H.append "putStrLn \"before\"; putStrLn (select yes \"yes\" (panic \"unused false\")); " (H.append "putStrLn (select no (panic \"unused true\") \"no\"); " (H.append "capture <- ioReturn (if yes then (\\text -> select no (panic \"captured unused\") text) " (H.append "else (panic \"unused closure\")); putStrLn (capture \"captured\"); " (H.append "opaque <- ioReturn ifThenElse; putStrLn (opaque yes \"partial\" (panic \"unused generic\")); " (H.append "flags <- ioReturn (Flags yes (panic \"unused field\") no); " (H.append "case flags of { Flags first _ third -> do { " (H.append "putStrLn (if first then \"field true\" else panic \"wrong first\"); " (H.append "putStrLn (if third then panic \"wrong third\" else \"field false\") } }; " "putStrLn \"after\" }"))))))))))))

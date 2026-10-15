@@ -28,7 +28,8 @@ def build(*, compiler, clang, source, runtime, directory, flags=("-O2",),
         raise ValueError("Native build requires an empty working directory")
     ir, obj, binary = (directory / name for name in ("program.ll", "runtime.o", "program"))
     include_flags = [flag for flag in gmp if not flag.startswith(("-l", "-L", "-Wl,"))]
-    commands = [([str(compiler), *frontend_options, "--emit-llvm", str(source)], b"", ir),
+    frontend_command = "--module-to-llvm" if Path(source).suffix == ".mlfi" else "--emit-llvm"
+    commands = [([str(compiler), *frontend_options, frontend_command, str(source)], b"", ir),
                 ([str(clang), *flags, *include_flags, "-c", str(runtime), "-o", str(obj)], b"", None)]
     started = time.perf_counter()
     stages = [sample for sample, _ in run_group(commands, cwd=directory, env=env, timeout=timeout)]

@@ -1,0 +1,44 @@
+module Tests.BootstrapSuite where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.Json as J
+import qualified Package.OS as O
+import qualified Package.Verification as V
+import qualified Tests.Basic as H
+rejected : forall a. Either String a -> IO Unit
+rejected result = H.assert (S.isLeft result) "damaged bootstrap evidence accepted"
+main : IO Unit
+main = do
+ let candidate = "/selected compiler/emlf-stage3"
+ let selected = "Module CLI compiler: " ++ candidate ++ "\n"
+ let matrix = "Backend matrix: 468 rows x 2 backends; no missing executions\n423 shared IO/prelude/backend fixtures; 0 failures\n"
+ value <- H.right (V.matrixSummary (selected ++ matrix) candidate)
+ H.assert (eqString (J.getText "cli_compiler" "" value) candidate) "matrix compiler identity changed"
+ S.mapM_ (\log -> rejected (V.matrixSummary log candidate)) (Cons matrix (Cons (selected ++ selected ++ matrix) (Cons ("Module CLI compiler: /seed/emlf\n" ++ matrix) (Cons (selected ++ O.replace "468 rows" "0 rows" matrix) (Cons (selected ++ O.replace "0 failures" "1 failures" matrix) Nil)))))
+ putStrLn "PASS test_native_matrix_requires_the_selected_cli_compiler"
+ env <- H.right (V.matrixEnvironment (J.Object (Cons (Pair "MLF_BOOTSTRAP_COMPILER" (J.str "seed")) (Cons (Pair "MLF_LLVM_TEST_ABI" (J.str "compact-gc")) Nil))) "/drivers" "/seed" candidate "standard" J.empty)
+ H.assert (eqString (V.text "MLF_BOOTSTRAP_COMPILER" env) candidate && eqString (V.text "MLF_LLVM_TEST_ABI" env) "standard") "inherited compiler replaced candidate"
+ putStrLn "PASS test_native_matrix_overrides_inherited_compiler_selection"
+ let collector = J.Object (Cons (Pair "cflags" (J.stringArray (Cons "-I/path with spaces/include" Nil))) (Cons (Pair "libs" (J.stringArray (Cons "/path with spaces/libgc.a" Nil))) Nil))
+ env <- H.right (V.matrixEnvironment (J.Object (Cons (Pair "GC_INITIAL_HEAP_SIZE" (J.str "536870912")) (Cons (Pair "MLF_LLVM_TEST_LIBS" (J.str "wrong")) (Cons (Pair "MLF_TEST_TRACE" (J.str "unexpected")) Nil)))) "/drivers" "/seed" candidate "compact-gc" collector)
+ H.assert (eqString (V.text "MLF_LLVM_TEST_ABI" env) "compact-gc" && eqString (V.text "GC_INITIAL_HEAP_SIZE" env) "8388608" && eqString (V.text "GC_FREE_SPACE_DIVISOR" env) "1" && eqString (V.text "MLF_LLVM_TEST_CFLAGS" env) "'-I/path with spaces/include'" && eqString (V.text "MLF_LLVM_TEST_LIBS" env) "'/path with spaces/libgc.a'" && S.not (J.has "MLF_TEST_TRACE" env)) "compact environment changed"
+ S.mapM_ (\abi -> rejected (V.matrixEnvironment J.empty "/drivers" "/seed" candidate abi J.empty)) (O.words "compact-gc unknown")
+ putStrLn "PASS test_compact_matrix_requires_collector_and_small_heap"
+ H.assert (S.eqList eqString (V.layoutPlan (O.words "standard compact-gc")) (O.words "RuntimeDriver LLVMDriver matrix:standard matrix:compact-gc")) "drivers rebuilt or a native matrix skipped"
+ putStrLn "PASS test_both_layout_plan_builds_drivers_once_and_runs_each_matrix"
+ let counts = Cons (Pair "figure12" 43) (Cons (Pair "hm-exhaustive" 1712) (Cons (Pair "hm-generated" 5000) (Cons (Pair "annotations" 126) (Cons (Pair "readability" 18) (Cons (Pair "state" 97) (Cons (Pair "modules" 60) (Cons (Pair "examples" 18) (Cons (Pair "benchmarks" 9) Nil))))))))
+ let rows = S.concatMap (\(Pair group count) -> S.map (\i ->
+  let row = J.Object (Cons (Pair "schema_version" (J.num 1)) (Cons (Pair "id" (J.str (group ++ "-" ++ showInt i))) (Cons (Pair "category" (J.str group)) (Cons (Pair "expected_accept" (J.Boolean true)) (Cons (Pair "no_prelude" (J.Boolean false)) Nil))))) in
+  if eqString group "modules" then if i >= 21 then J.set "expected_accept" (J.Boolean false) (J.set "expected_phase" (J.str "ModuleResolution") (J.set "expected_error_contains" (J.str "not in scope") row)) else if i == 0 then J.set "no_prelude" (J.Boolean true) row else row
+  else if eqString group "figure12" && i == 0 then J.set "id" (J.str "figure12-A8") (J.set "expected_accept" (J.Boolean false) (J.set "expected_phase" (J.str "Inference") row)) else row) (S.range 0 (count - 1))) counts
+ H.right (V.validateManifest rows)
+ rejected (V.validateManifest (S.filter (\row -> S.not (eqString (V.text "category" row) "modules")) rows))
+ rejected (V.validateManifest (S.map (\row -> if eqString (V.text "id" row) "modules-21" then J.set "expected_accept" (J.Boolean true) row else row) rows))
+ rejected (V.validateManifest (S.map (\row -> if eqString (V.text "id" row) "modules-0" then J.set "no_prelude" (J.Boolean false) row else row) rows))
+ S.mapM_ (\missing -> rejected (V.validateManifest (S.map (\row -> if eqString (V.text "id" row) "modules-21" then J.set "expected_error_contains" missing row else row) rows))) (Cons J.Null (Cons (J.str "") (Cons (J.str " \n\t") Nil)))
+ putStrLn "PASS test_module_corpus_cannot_drop_rejections_or_prelude_modes"
+ let row = J.Object (Cons (Pair "expected_phase" (J.str "ModuleResolution")) (Cons (Pair "expected_error_contains" (J.str "not in scope: private")) Nil))
+ let diagnostic = "ModuleResolution: not in scope: private\n"
+ H.right (V.checkRejection row 1 "" diagnostic)
+ S.mapM_ (\(Triple code out err) -> rejected (V.checkRejection row code out err)) (Cons (Triple (-11) "" diagnostic) (Cons (Triple 2 "" diagnostic) (Cons (Triple 1 "partial target" diagnostic) (Cons (Triple 1 "" "Runtime: not in scope: private\n") (Cons (Triple 1 "" "ModuleResolution: cannot find module Wrong\n") Nil)))))
+ putStrLn "PASS test_crashes_partial_targets_and_wrong_diagnostics_are_not_rejections"

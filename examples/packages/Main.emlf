@@ -1,0 +1,5 @@
+module Main where
+import Greeting (greet)
+
+main = do
+  putStrLn (greet "local packages")

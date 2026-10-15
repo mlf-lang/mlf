@@ -81,6 +81,15 @@ cabal test bootstrap-port-tests -j1 --test-show-details=direct --test-options='-
 The selector rejects empty, duplicate, or unknown names and still audits both
 backends for every selected fixture. Without `--only`, the suite runs all fixtures.
 
+The solver's `finishNormalized` validates the complete graph and its maintained
+indexes before normalization. Normalization only strengthens non-generalization
+flags; it preserves all fields used by graph validation and index construction,
+so the compiler reuses that validation. The independent xMLF type and erasure
+checks still run. `GraphDense` compares 624 normalization cases with the Haskell
+oracle, explicitly revalidates each result, and checks the preserved fields and
+sparse/unbounded identities. `SolverReuse` verifies that malformed graphs and
+corrupt structural, binding and scope indexes still fail before normalization.
+
 Run the complete shared backend matrix through both native MLF implementations:
 
 ```sh
@@ -256,3 +265,26 @@ benchmark samples. The worst ratios are 4.641x C compilation and 1.649x C
 runtime. The installed package also compiles and runs Snake outside the checkout
 after relocation. Full measurements and the remaining compilation-headroom
 target are in [RESULTS.md](../benchmarks/RESULTS.md).
+
+The compiler sources now also implement separate compilation. Both the seed and
+native CLI accept `--compile-module FILE -o PREFIX`, `--show-interface FILE.mlfi`,
+`--link-module FILE.mlfi`, `--run-module FILE.mlfi`, and
+`--module-to-llvm[-gc] FILE.mlfi`. Create output directories first and pass `-i`
+directories containing compiled dependencies. Interfaces and checked xMLF
+objects are interchangeable between the seed and self-hosted compiler. See the
+[module documentation](../README.md#modules-and-imports) for the object boundary and rebuild
+rules. The archived release above predates these commands; rebuild the compiler
+to use them.
+
+## Cabal-free package builds
+
+The root `mlf-package.json` builds `Main.emlf` with this directory's
+`mlf-bootstrap` local package. With `MLF_COMPILER` pointing to an existing native
+compiler supporting the host IO primitives and `MLF_GC_PREFIX` to a local BDWGC
+installation, first run `./scripts/bootstrap-package.sh`, then `./mlfpkg build`
+and `./mlfpkg test` from the repository root. The build uses the native compiler;
+tests compile the independent Haskell oracle harnesses directly with GHC.
+The package manager and compiler test runner are implemented in `package/*.emlf`
+and `package/Package/*.emlf`. No Cabal command runs in this workflow. See
+[`docs/package-manager.md`](../docs/package-manager.md) for the manifest format,
+package example, dependencies, and validation groups.

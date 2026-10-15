@@ -1,0 +1,121 @@
+{
+  "format": 1,
+  "name": "mlf-tests",
+  "version": "0.1.0",
+  "dependencies": {
+    "mlf-bootstrap": {
+      "path": "../bootstrap"
+    },
+    "mlf-package-tools": {
+      "path": "../package"
+    }
+  },
+  "library": {
+    "modules": {
+      "Tests.BackendCases": "Tests/BackendCases.emlf",
+      "Tests.BackendSuite": "Tests/BackendSuite.emlf",
+      "Tests.Backends": "Tests/Backends.emlf",
+      "Tests.BoolConditions": "Tests/BoolConditions.emlf",
+      "Tests.BootstrapPrimitives": "Tests/BootstrapPrimitives.emlf",
+      "Tests.ByteArrays": "Tests/ByteArrays.emlf",
+      "Tests.Bytes": "Tests/Bytes.emlf",
+      "Tests.Char8": "Tests/Char8.emlf",
+      "Tests.Computations": "Tests/Computations.emlf",
+      "Tests.ConstructorProjection": "Tests/ConstructorProjection.emlf",
+      "Tests.Core": "Tests/Core.emlf",
+      "Tests.DNA": "Tests/DNA.emlf",
+      "Tests.Datatypes": "Tests/Datatypes.emlf",
+      "Tests.DoNotation": "Tests/DoNotation.emlf",
+      "Tests.EmbeddingPruning": "Tests/EmbeddingPruning.emlf",
+      "Tests.EnvironmentAccess": "Tests/EnvironmentAccess.emlf",
+      "Tests.Figure12": "Tests/Figure12.emlf",
+      "Tests.Figure12Suite": "Tests/Figure12Suite.emlf",
+      "Tests.ForceReuse": "Tests/ForceReuse.emlf",
+      "Tests.Graph": "Tests/Graph.emlf",
+      "Tests.GraphSolver": "Tests/GraphSolver.emlf",
+      "Tests.GraphUnification": "Tests/GraphUnification.emlf",
+      "Tests.GraphUnificationReference": "Tests/GraphUnificationReference.emlf",
+      "Tests.GraphValidation": "Tests/GraphValidation.emlf",
+      "Tests.Helpers": "Tests/Helpers.emlf",
+      "Tests.HigherOrderSpecialization": "Tests/HigherOrderSpecialization.emlf",
+      "Tests.IOTests": "Tests/IOTests.emlf",
+      "Tests.Map": "Tests/Map.emlf",
+      "Tests.ModuleBackends": "Tests/ModuleBackends.emlf",
+      "Tests.Modules": "Tests/Modules.emlf",
+      "Tests.NativeOptimization": "Tests/NativeOptimization.emlf",
+      "Tests.NumericArrays": "Tests/NumericArrays.emlf",
+      "Tests.OptimizerQueries": "Tests/OptimizerQueries.emlf",
+      "Tests.Oracle": "Tests/Oracle.emlf",
+      "Tests.PackageResolver": "Tests/PackageResolver.emlf",
+      "Tests.Packages": "Tests/Packages.emlf",
+      "Tests.PreludeTests": "Tests/PreludeTests.emlf",
+      "Tests.Readability": "Tests/Readability.emlf",
+      "Tests.Separate": "Tests/Separate.emlf",
+      "Tests.SeparateBackends": "Tests/SeparateBackends.emlf",
+      "Tests.Set": "Tests/Set.emlf",
+      "Tests.Snake": "Tests/Snake.emlf",
+      "Tests.SnakeBaseline": "Tests/SnakeBaseline.emlf",
+      "Tests.StateCases": "Tests/StateCases.emlf",
+      "Tests.StateRuntime": "Tests/StateRuntime.emlf",
+      "Tests.StateTypes": "Tests/StateTypes.emlf",
+      "Tests.StrictFieldAnalysis": "Tests/StrictFieldAnalysis.emlf",
+      "Tests.StrictFields": "Tests/StrictFields.emlf",
+      "Tests.SurfaceSyntax": "Tests/SurfaceSyntax.emlf",
+      "Tests.System": "Tests/System.emlf",
+      "Tests.Text": "Tests/Text.emlf",
+      "Tests.Typeclasses": "Tests/Typeclasses.emlf",
+      "Tests.Basic": "Tests/Basic.emlf",
+      "Tests.Corpus": "Tests/Corpus.emlf",
+      "Tests.IndependentCheck": "Tests/IndependentCheck.emlf",
+      "Tests.IndependentType": "Tests/IndependentType.emlf",
+      "Tests.GraphDenseReference": "Tests/GraphDenseReference.emlf",
+      "Tests.GraphReference": "Tests/GraphReference.emlf",
+      "Tests.GraphScopesReference": "Tests/GraphScopesReference.emlf",
+      "Tests.InferenceReference": "Tests/InferenceReference.emlf",
+      "Tests.NativeABI": "Tests/NativeABI.emlf",
+      "Tests.OrderedTraversalReference": "Tests/OrderedTraversalReference.emlf",
+      "Tests.PortSuite": "Tests/PortSuite.emlf",
+      "Tests.BenchmarkSuite": "Tests/BenchmarkSuite.emlf",
+      "Tests.BootstrapSuite": "Tests/BootstrapSuite.emlf",
+      "Tests.ReleaseSuite": "Tests/ReleaseSuite.emlf"
+    }
+  },
+  "executables": {
+    "core": {
+      "main": "CoreMain.emlf",
+      "profile": "compiler"
+    },
+    "figure12": {
+      "main": "Figure12SuiteMain.emlf",
+      "profile": "compiler"
+    },
+    "backends": {
+      "main": "BackendSuiteMain.emlf",
+      "profile": "compiler"
+    },
+    "packages": {
+      "main": "PackagesMain.emlf",
+      "profile": "compiler"
+    },
+    "port": {
+      "main": "PortMain.emlf",
+      "profile": "compiler"
+    },
+    "references": {
+      "main": "ReferencesMain.emlf",
+      "profile": "compiler"
+    },
+    "check-target": {
+      "main": "CheckTarget.emlf",
+      "profile": "compiler"
+    },
+    "corpus": {
+      "main": "CorpusMain.emlf",
+      "profile": "compiler"
+    },
+    "harness": {
+      "main": "HarnessMain.emlf",
+      "profile": "compiler"
+    }
+  }
+}

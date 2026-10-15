@@ -1,0 +1,24 @@
+module Tests.ForceReuse where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as OS
+import qualified Tests.Helpers as H
+import Tests.Helpers (Quint(..), Sext(..))
+import qualified Tests.Map as Map
+import Tests.Backends
+import qualified Tests.Backends as B
+import Bootstrap.Compiler (compile, compiledTerm)
+import qualified Bootstrap.LLVM.Codegen as Codegen
+import qualified Bootstrap.Primitive as P
+import qualified Bootstrap.X.Check as Check
+import qualified Bootstrap.X.Syntax as X
+import qualified Bootstrap.X.Type as T
+
+observe : B.Backends -> XTerm -> String -> IO Unit
+observe backends term expected = do { result <- (B.execute backends IOEntry (Input "" false) term); do { (S.either (S.compose H.fail H.show) return (B.outcome result)); (S.unless (H.eq (B.output result) expected) (H.fail (H.show result))) } }
+
+forceReuseTests : B.Backends -> (List ( (Pair (String) (IO Unit)) ))
+forceReuseTests backends = (let { sources = (Cons (Triple "branch joins retain conditional laziness" (H.append "let joined = \\flag x y -> (if flag then seq x 3 else seq y 4) + " (H.append "(if flag then x + x else y + y) in do { flag <- ioReturn true; other <- ioReturn false; " (H.append "printInt (joined flag (readInt \"7\") (panic \"unused right after join\")); " "printInt (joined other (panic \"unused left after join\") (readInt \"8\")) }"))) "17\n20\n") (Cons (Triple "case alternatives isolate forced operands" (H.append "data Decision = LeftSide | RightSide; let mixed = \\side flag x -> case side of { " (H.append "LeftSide -> x + x; RightSide -> if flag then x * x else 0 } in " (H.append "do { left <- ioReturn LeftSide; right <- ioReturn RightSide; " (H.append "printInt (mixed left false (readInt \"5\")); printInt (mixed right true (readInt \"7\")); " "printInt (mixed right false (panic \"unselected case subbranch\")) }")))) "10\n49\n0\n") (Cons (Triple "escaping closures preserve forcing and repeated actions" (H.append "let capture = \\flag x -> if flag then seq x (\\n -> x + n) else (\\n -> n * 2) in " (H.append "do { flag <- ioReturn true; other <- ioReturn false; " (H.append "saved <- ioReturn (capture flag (readInt \"21\")); printInt (saved 4); " (H.append "printInt (capture other (panic \"unused closure capture\") 4); " "action <- ioReturn (putStrLn \"again\"); action; action }")))) "25\n8\nagain\nagain\n") Nil))) } in (H.append (Cons (Pair "force reuse: dominated uses emit one force" do { _ <- (S.either H.fail return (Check.checkClosed repeated)); do { (Pair _ code) <- (S.either H.fail return (Codegen.generate (Map.singleton "Unit" (Pair 0 0)) (X.erase repeated))); (let { definitions = (S.concatMap (\comprehension3 -> case comprehension3 of { (Cons line body) -> (if (OS.starts "define private ptr @mlf.worker.0(" line) then (Cons (S.takeWhile (\section2 -> (S.not (H.eq section2 "}"))) body) Nil) else Nil); _ -> Nil }) (H.tails (H.lines (S.unlines code)))) } in do { (case definitions of { (Cons body Nil) -> (S.unless (H.eq (H.length (S.filter (\section4 -> (H.contains "call ptr @mlf_force(ptr %a1)" section4)) body)) 1) (H.fail "a repeated conditional operand did not reuse its dominating WHNF")); _ -> (H.fail "force-reuse fixture did not retain its known worker") }); (observe backends repeated "84\n") }) } }) (Cons (Pair "force reuse: selected exceptions follow preceding IO" do { term <- (H.fmap compiledTerm (S.either (S.compose H.fail H.show) return (compile "<force reuse failure>" (H.append "let pick = \\flag x y -> if flag then x + x else y + y in " (H.append "do { putStrLn \"before\"; printInt (pick true (panic \"selected force\") " "(panic \"unused force\")); putStrLn \"after\" }"))))); do { result <- (B.execute backends IOEntry (Input "" false) term); (S.unless ((S.either (S.compose (\section1 -> (H.eq section1 "selected force")) H.show) (S.const false) (B.outcome result)) && (H.eq (B.events result) (Cons (B.Write "before\n") Nil))) (H.fail (H.show result))) } }) Nil)) (S.concatMap (\(Triple label source expected) -> (Cons (Pair (H.append "force reuse: " label) do { term <- (H.fmap compiledTerm (S.either (S.compose H.fail H.show) return (compile "<force reuse>" source))); (observe backends term expected) }) Nil)) sources)))
+
+repeated : XTerm
+repeated = (let { function = (XName 0 "repeat") } in (let { flag = (XName 1 "flag") } in (let { value = (XName 2 "value") } in (let { int = (XCon "Int" Nil) } in (let { bool = (XCon "Bool" Nil) } in (let { twice = (XApp (XApp (XPrimitive PAddInt Nil) (XVarTerm value)) (XVarTerm value)) } in (let { body = (XApp (XApp (XApp (XPrimitive PIfThenElse (Cons int Nil)) (XVarTerm flag)) twice) (XIntTerm 0)) } in ((XLet function (XAbs flag bool (XAbs value int body))) (XApp (XPrimitive PPrintInt Nil) (XApp (XApp (XVarTerm function) (XBoolTerm true)) (XIntTerm 42)))))))))))

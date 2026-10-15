@@ -136,6 +136,14 @@ finish solver = G.bindE (G.validateGraph (graph solver)) (\ignored ->
   if IM.eqIntMap IS.eqIntSet (structuralParents solver) (structuralParents indexed) && IM.eqIntMap IS.eqIntSet (bindingChildren solver) (bindingChildren indexed) && equalScopes (scopeIndex solver) (scopeIndex indexed)
   then Right (graph solver) else Left "incremental graph index disagrees with the graph")
 
+-- Normalization only changes flags on non-Gen nodes. It preserves every tag,
+-- structural edge, binder, identity and alias, and leaves Gen flags unchanged.
+-- These are exactly the facts checked by validateGraph and the reverse/scope
+-- index audit in finish, so the checked result remains valid after normalization.
+finishNormalized : Solver -> Either String Solver
+finishNormalized solver = G.bindE (finish solver) (\checked ->
+  Right (withGraph (G.normalize checked) solver))
+
 componentVisit : Solver -> IntSet -> List Int -> Either String IntSet
 componentVisit solver seen pending = case pending of
   Nil -> Right seen

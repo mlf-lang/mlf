@@ -1,0 +1,41 @@
+module Tests.DoNotation where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as OS
+import qualified Tests.Helpers as H
+import Tests.Helpers (Quint(..), Sext(..))
+import Bootstrap.Compiler
+import Bootstrap.Desugar (desugarDo)
+import Bootstrap.Parser (parseExpr)
+import qualified Bootstrap.X.Check as C
+import qualified Bootstrap.X.Parser as P
+import Bootstrap.X.Pretty (prettyTerm, prettyType)
+import qualified Bootstrap.X.Syntax as X
+import qualified Bootstrap.X.Type as T
+
+checked : String -> IO Compilation
+checked source = do { result <- (H.right (compile "<do test>" source)); do { parsed <- (H.right (P.parseTerm "<do xMLF>" (prettyTerm (compiledTerm result)))); do { ty <- (H.right (C.checkClosed parsed)); do { (H.assert (T.alphaEq ty (inferredType result)) "do xMLF round trip changed type"); do { (H.assert (H.eq (X.erase parsed) (X.erase (compiledTerm result))) "do xMLF round trip changed erasure"); (return result) } } } } }
+
+hasType : String -> String -> XType -> Pair String (IO Unit)
+hasType label source expected = (Pair (H.append "do: " label) do { result <- (checked source); (H.assert (T.alphaEq (inferredType result) expected) (H.append "expected " (H.append (prettyType expected) (H.append ", got " (sourceType result))))) })
+
+rejects : String -> String -> Phase -> String -> Pair String (IO Unit)
+rejects label source expectedPhase reason = (Pair (H.append "do rejection: " label) (case (compile "<invalid do>" source) of { (Left err) -> do { (H.assert (H.eq (phase err) expectedPhase) (H.append "wrong rejection phase: " (H.show err))); (H.assert (H.contains reason (diagnostic err)) (H.append "wrong rejection reason: " (H.show err))) }; (Right result) -> (H.fail (H.append "unexpected acceptance: " (sourceType result))) }))
+
+int : XType
+int = (XCon "Int" Nil)
+
+bool : XType
+bool = (XCon "Bool" Nil)
+
+maybeT : XType -> XType
+maybeT t = (XCon "Maybe" (Cons t Nil))
+
+maybeDecl : String
+maybeDecl = "data Maybe a = Nothing | Just a; "
+
+maybeBind : String
+maybeBind = (H.append "let bind : forall a b. Maybe a -> (a -> Maybe b) -> Maybe b = " "\\value next -> case value of { Nothing -> Nothing; Just x -> next x } in let return = Just in ")
+
+doTests : (List ( Pair String (IO Unit) ))
+doTests = (let { prefix = (H.append maybeDecl maybeBind) } in (Cons (hasType "single expression" "do { 42 }" int) (Cons (hasType "local let needs no bind" "do { let x = 42; x }" int) (Cons (hasType "binding" (H.append prefix "do { x <- Just 42; return x }") (maybeT int)) (Cons (hasType "sequencing" (H.append prefix "do { Just true; Just 42 }") (maybeT int)) (Cons (hasType "wildcard binding" (H.append prefix "do { _ <- Just true; Just 42 }") (maybeT int)) (Cons (hasType "optional trailing semicolon" (H.append prefix "do { x <- Just 42; return x; }") (maybeT int)) (Cons (hasType "nested blocks" (H.append prefix "do { x <- do { y <- Just 42; return y }; return x }") (maybeT int)) (Cons (hasType "bind statement sees the outer binding" (H.append prefix "let x = 42 in do { x <- return x; return x }") (maybeT int)) (Cons (hasType "local let sees the outer binding" (H.append prefix "let x = 42 in do { let x = return x; x }") (maybeT int)) (Cons (hasType "local let is generalized" (H.append prefix "do { let id = \\x -> x; let n = id 42; return (id true) }") (maybeT bool)) (Cons (hasType "local let annotation" (H.append prefix "do { let id : forall a. a -> a = \\x -> x; let n = id 42; return (id true) }") (maybeT bool)) (Cons (hasType "let-in expression is an action" (H.append prefix "do { let x = 42 in return x; return true }") (maybeT bool)) (Cons (hasType "do expression used as an argument" (H.append prefix "(\\x -> x) (do { x <- Just 42; return x })") (maybeT int)) (Cons (hasType "do expression annotation" (H.append prefix "do { x <- Just 42; return x } : Maybe Int") (maybeT int)) (Cons (hasType "constructor pattern" (H.append maybeDecl (H.append "data Pair a b = Pair a b; " (H.append maybeBind "do { Pair n b <- Just (Pair 42 true); return n }"))) (maybeT int)) (Cons (hasType "constructor wildcard field" (H.append maybeDecl (H.append "data Pair a b = Pair a b; " (H.append maybeBind "do { Pair _ b <- Just (Pair 42 true); return b }"))) (maybeT bool)) (Cons (hasType "discarded action cannot capture an outer name" (H.append prefix "let doValue0 = true in do { Just 42; return doValue0 }") (maybeT bool)) (Cons (hasType "pattern temporary cannot capture an outer name" (H.append maybeDecl (H.append "data Box a = Box a; " (H.append maybeBind "let doValue0 = true in do { Box n <- Just (Box 42); return doValue0 }"))) (maybeT bool)) (Cons (hasType "uses the lexical bind function" "let bind = \\action next -> next action in do { x <- 42; x }" int) (Cons (rejects "empty block" "do {}" Parsing "unexpected") (Cons (rejects "final statement must be an expression" (H.append prefix "do { x <- Just 42 }") Parsing "must end with an expression") (Cons (rejects "cannot end with a local declaration" "do { let x = 42 }" Parsing "must end with an expression") (Cons (rejects "statements need separators" (H.append prefix "do { x <- Just 42 return x }") Parsing "must end with an expression") (Cons (rejects "default IO bind requires an action" "do { 42; 43 }" Inference "type constructor mismatch") (Cons (rejects "bound variable cannot escape" (H.append prefix "let result = do { x <- Just 42; return x } in x") Inference "unbound variable: x") (Cons (rejects "binding is not recursive" (H.append prefix "do { x <- return x; return x }") Inference "unbound variable: x") (Cons (rejects "later binding is unavailable" (H.append prefix "do { x <- return y; y <- Just 42; return x }") Inference "unbound variable: y") (Cons (rejects "action type mismatch" (H.append prefix "do { x <- 42; return x }") Inference "type constructor mismatch") (Cons (rejects "final action has the right monadic type" (H.append prefix "do { x <- Just 42; x }") Inference "type constructor mismatch") (Cons (rejects "refutable pattern requires an explicit case" (H.append prefix "do { Just x <- Just (Just 42); return x }") Inference "non-exhaustive case") (Cons (rejects "pattern binder duplicates" (H.append maybeDecl (H.append "data Pair a b = Pair a b; " (H.append maybeBind "do { Pair x x <- Just (Pair 1 2); return x }"))) Inference "duplicate pattern variable") (Cons (Pair "do: parser preserves statement forms" do { parsed <- (H.right (parseExpr "<do syntax>" "do { x <- action; let y = x; finish y }")); (let { expected = (SDo (Cons (SDoBind (SDefaultPattern (Just "x")) (SVar "action")) (Cons (SDoLet "y" Nothing (SVar "x")) Nil)) (SApp (SVar "finish") (SVar "y"))) } in (H.assert (H.eq parsed expected) (H.append "unexpected do AST: " (H.show parsed)))) }) (Cons (Pair "do: lowering preserves binding order and the final action" do { parsed <- (H.right (parseExpr "<do lowering>" "do { x <- first; y <- second x; finish y }")); (let { makeSourceBind action name body = (SApp (SApp (SVar "bind") action) (SLam name Nothing body)) } in (let { expected = (makeSourceBind (SVar "first") "x" (makeSourceBind (SApp (SVar "second") (SVar "x")) "y" (SApp (SVar "finish") (SVar "y")))) } in (H.assert (H.eq (desugarDo parsed) expected) "do did not lower to the expected nested bind applications"))) }) (Cons (Pair "do: multiparameter MonadState example" do { source <- (readFile "examples/monad-state-do.emlf"); do { result <- (checked source); (H.assert (T.alphaEq (inferredType result) (XCon "Pair" (Cons int (Cons int Nil)))) "wrong State result") } }) Nil)))))))))))))))))))))))))))))))))))

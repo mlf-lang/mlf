@@ -25,6 +25,7 @@ import DoNotation (doTests)
 import SurfaceSyntax (surfaceSyntaxTests)
 import Readability (readabilityTests)
 import Modules (moduleTests)
+import Separate (separateTests)
 import GraphValidation (graphValidationTests)
 import GraphUnification (graphUnificationTests)
 import GraphSolver (graphSolverTests)
@@ -39,7 +40,7 @@ main :: IO ()
 main = do
   hSetBuffering stdout LineBuffering
   let suite = compilerTests ++ computationTests ++ hygieneTests ++ graphTests ++ graphValidationTests ++ graphUnificationTests ++ graphSolverTests ++ embeddingPruningTests ++ optimizerQueryTests ++ strictFieldAnalysisTests ++ datatypeTests ++ typeclassTests ++ doTests ++ surfaceSyntaxTests ++ readabilityTests ++
-        moduleTests ++ stateTypeTests ++ [("independent ML typability oracle", oracleTest), ("annotation corpus", annotationCorpus), ("example files", examplesTest)]
+        moduleTests ++ separateTests ++ stateTypeTests ++ [("independent ML typability oracle", oracleTest), ("annotation corpus", annotationCorpus), ("example files", examplesTest)]
   outcomes <- forM suite $ \(label,test) -> do
     outcome <- try test :: IO (Either SomeException ())
     case outcome of

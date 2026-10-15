@@ -1,0 +1,97 @@
+-- Independent Algorithm W; no imports of the compiler, graph solver or xMLF checker.
+module Tests.Oracle where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Bootstrap.Map as M
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.IntSet as IS
+
+data Mono = Meta Int | Fun Mono Mono | IntegerType | BooleanType
+data Scheme = Scheme (List Int) Mono
+data WState = WState Int (IntMap Mono)
+data W a = W (WState -> Either String (Pair a WState))
+runW (W f) state = f state
+returnW x = W (\s -> Right (Pair x s))
+bindW : forall a b. W a -> (a -> W b) -> W b
+bindW (W f) next = W (\s -> S.eitherBind (f s) (\(Pair x changed) -> runW (next x) changed))
+instance Monad W where { return = returnW; bind = bindW }
+get : W WState
+get = W (\s -> Right (Pair s s))
+put s = W (\old -> Right (Pair Unit s))
+fail message = W (\s -> Left message)
+apply : IntMap Mono -> Mono -> Mono
+apply subst ty = case ty of
+  Meta n -> case IM.lookup n subst of { Nothing -> ty; Just replacement -> apply subst replacement }
+  Fun a b -> Fun (apply subst a) (apply subst b)
+  _ -> ty
+free : Mono -> IntSet
+free (Meta n) = IS.singleton n
+free (Fun a b) = IS.union (free a) (free b)
+free _ = IS.empty
+equal : Mono -> Mono -> Bool
+equal (Meta a) (Meta b) = a == b
+equal (Fun a b) (Fun c d) = equal a c && equal b d
+equal IntegerType IntegerType = true
+equal BooleanType BooleanType = true
+equal _ _ = false
+fresh : W Mono
+fresh = do { WState n subst <- get; put (WState (n + 1) subst); return (Meta n) }
+unify : Mono -> Mono -> W Unit
+unify t u = do
+  WState n subst <- get
+  let a = apply subst t
+  let b = apply subst u
+  if equal a b then return Unit else case Pair a b of
+    Pair (Meta i) value -> if S.not (IS.member i (free value)) then put (WState n (IM.insert i value subst)) else fail "HM mismatch"
+    Pair value (Meta i) -> if S.not (IS.member i (free value)) then put (WState n (IM.insert i value subst)) else fail "HM mismatch"
+    Pair (Fun a b) (Fun c d) -> do { unify a c; unify b d }
+    _ -> fail "HM mismatch"
+infer : Map String Scheme -> SExpr -> W Mono
+infer env expression = case expression of
+  SVar x -> case M.lookup compareString x env of
+    Nothing -> fail "unbound"
+    Just (Scheme variables ty) -> do
+      replacements <- S.mapM (\ignored -> fresh) variables
+      WState n subst <- get
+      return (apply (IM.fromList (S.zip variables replacements)) (apply subst ty))
+  SLam x Nothing body -> do
+    a <- fresh
+    result <- infer (M.insert compareString x (Scheme Nil a) env) body
+    WState n subst <- get
+    return (Fun (apply subst a) (apply subst result))
+  SApp function argument -> do
+    f <- infer env function
+    x <- infer env argument
+    result <- fresh
+    unify f (Fun x result)
+    WState n subst <- get
+    return (apply subst result)
+  SLet x rhs body -> do
+    ty <- infer env rhs
+    WState n subst <- get
+    let t = apply subst ty
+    let envFree = IS.unions (S.map (\(Scheme variables u) -> IS.difference (free (apply subst u)) (IS.fromList variables)) (M.elems env))
+    let variables = IS.toList (IS.difference (free t) envFree)
+    infer (M.insert compareString x (Scheme variables t) env) body
+  SIntLit n -> return IntegerType
+  SBoolLit b -> return BooleanType
+  _ -> fail "oracle accepts only unannotated terms"
+hmTypable expression = S.isRight (runW (infer M.empty expression) (WState 0 IM.empty))
+closedTerms limit = S.concatMap (\n -> terms n Nil) (S.range 1 limit)
+terms : Int -> List String -> List SExpr
+terms n env = if n == 1 then Cons (SIntLit 0) (Cons (SBoolLit true) (S.map SVar env)) else
+  let x = "x" ++ showInt (S.length env) in S.concat (Cons (S.map (SLam x Nothing) (terms (n - 1) (Cons x env)))
+    (Cons (S.concatMap (\k -> S.concatMap (\a -> S.map (SApp a) (terms (n - 1 - k) env)) (terms k env)) (S.range 1 (n - 2)))
+    (Cons (S.concatMap (\k -> S.concatMap (\a -> S.map (SLet x a) (terms (n - 1 - k) (Cons x env))) (terms k env)) (S.range 1 (n - 2))) Nil)))
+pick size seed = let next = remInt (seed * 48271) 2147483647 in Pair (remInt next size) next
+generatedTerms count = S.map (\seed -> S.fst (gen (7 + remInt seed 19) Nil seed)) (S.range 1 count)
+gen : Int -> List String -> Int -> Pair SExpr Int
+gen n env seed = if n <= 1 then case pick (2 + S.length env) seed of
+  Pair i next -> Pair (if i == 0 then SIntLit 0 else if i == 1 then SBoolLit true else SVar (S.index env (i - 2))) next
+  else case (if n == 2 then Pair 0 seed else pick 3 seed) of
+    Pair shape next -> let x = "x" ++ showInt (S.length env) in
+      if shape == 0 then case gen (n - 1) (Cons x env) next of { Pair body final -> Pair (SLam x Nothing body) final } else
+        case pick (n - 2) next of
+          Pair smaller next -> let k = smaller + 1 in case gen k env next of
+            Pair left next -> case gen (n - 1 - k) (if shape == 1 then env else Cons x env) next of
+              Pair right final -> Pair (if shape == 1 then SApp left right else SLet x left right) final

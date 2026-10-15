@@ -4,6 +4,7 @@ import Bootstrap.Types
 import qualified Bootstrap.Std as L
 import qualified Bootstrap.IntMap as IM
 import qualified Bootstrap.Graph as G
+import qualified Bootstrap.Graph.Solver as Solver
 
 list2 : forall a. a -> a -> List a
 list2 a b = Cons a (Cons b Nil)
@@ -131,6 +132,41 @@ unificationStep (Triple count accepted checksum) (Pair graph eqs) =
     seq newCount (seq newAccepted (seq next (Triple newCount newAccepted next)))
   else panic ("dense/sparse unification mismatch at " ++ showInt count)
 
+-- The seed oracle retains its independent validation after normalization.
+-- Check the preservation argument as well as the resulting graph bytes:
+-- normalization can only strengthen non-Gen flags, never change the graph
+-- structure or the Gen flags examined by the validator and scope index.
+normalizationPreserves : Graph -> Graph -> Bool
+normalizationPreserves before after =
+  G.nextId before == G.nextId after && IM.eqIntMap eqInt (G.links before) (G.links after) &&
+  IM.eqIntMap (\a -> \b ->
+    G.equalNode a (Node (G.tag b) (G.binder b) (G.flag a)) &&
+    (if G.isGen (G.tag a) then G.equalFlag (G.flag a) (G.flag b) else
+      G.equalFlag (G.flag a) (G.flag b) || G.equalFlag (G.flag b) Rigid)) (G.nodes before) (G.nodes after)
+
+normalizationInputs : List Graph
+normalizationInputs = L.concatMap (\index -> let graph = smallGraph index in
+  if isRight (G.validateGraph graph) then L.map (\bits -> setFlags bits graph) (L.range 0 7) else Nil) (L.range 0 11999)
+
+normalizedResult : Graph -> Either String Graph
+normalizedResult graph = do
+  before <- Solver.prepare graph
+  after <- Solver.finishNormalized before
+  let result = Solver.graph after
+  G.check (normalizationPreserves (Solver.graph before) result) "normalization changed a validation invariant"
+  G.validateGraph result
+  Solver.finish after
+
+normalizationStats : Triple Int Int Int
+normalizationStats = L.foldlStrict normalizationStep (Triple 0 0 0) normalizationInputs
+
+normalizationStep : Triple Int Int Int -> Graph -> Triple Int Int Int
+normalizationStep (Triple count accepted checksum) graph =
+  let outcome = normalizedResult graph in
+  let next = hashString checksum (showInt count ++ ":" ++ showUnification outcome ++ "\n") in
+  let newCount = count + 1 in let newAccepted = accepted + (if isRight outcome then 1 else 0) in
+  seq newCount (seq newAccepted (seq next (Triple newCount newAccepted next)))
+
 rename : (Int -> Int) -> Graph -> Graph
 rename change graph = Graph
   (IM.fromList (L.map (\entry -> case entry of Pair n v -> Pair (change n) (Node (G.mapTag change (G.tag v)) (G.mapMaybeInt change (G.binder v)) (G.flag v))) (IM.toList (G.nodes graph))))
@@ -155,10 +191,16 @@ checkRename change dense =
       Right expected -> case result of
         Left message -> panic message
         Right actual -> assert (eqString (showGraph actual) (showGraph (rename change expected))) "dense/sparse graph identities changed"
+    case normalizedResult simple of
+      Left message -> panic message
+      Right expected -> case normalizedResult graph of
+        Left message -> panic message
+        Right actual -> assert (eqString (showGraph actual) (showGraph (rename change expected))) "checked normalization changed sparse or unbounded identities"
 
 main = do
   case validationStats of Triple count accepted checksum -> putStrLn ("validation|" ++ showInt count ++ "|" ++ showInt accepted ++ "|" ++ showInt checksum)
   case unificationStats of Triple count accepted checksum -> putStrLn ("unification|" ++ showInt count ++ "|" ++ showInt accepted ++ "|" ++ showInt checksum)
+  case normalizationStats of Triple count accepted checksum -> putStrLn ("normalization|" ++ showInt count ++ "|" ++ showInt accepted ++ "|" ++ showInt checksum)
   let huge = 1000000000000000000000000000000
   checkRename (\n -> n - 30) true
   checkRename (\n -> n + huge) true

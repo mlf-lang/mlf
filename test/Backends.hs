@@ -85,19 +85,37 @@ candidateBudget = do
   when enabled (putStrLn ("Bootstrap candidate execution/emission budget: " ++ show seconds ++ " seconds"))
   pure (seconds * 1000000)
 
+-- Environment flags and pkg-config output use shell word quoting. Decode
+-- quoting only: no expansion or shell execution. Native MLF package tests pass
+-- literal argv entries through this compatibility boundary.
+parseToolFlags :: String -> IO [String]
+parseToolFlags = either fail pure . go Nothing False False [] []
+  where
+    go quote escaped started word result input = case input of
+      [] | escaped || quote /= Nothing -> Left "unterminated tool flag quote or escape"
+         | otherwise -> Right (reverse (if started then reverse word:result else result))
+      c:rest
+        | escaped -> go quote False True (c:word) result rest
+        | c == '\\' && quote /= Just '\'' -> go quote True True word result rest
+        | Just q <- quote -> if c == q then go Nothing False True word result rest
+                            else go quote False True (c:word) result rest
+        | c == '\'' || c == '"' -> go (Just c) False True word result rest
+        | c `elem` " \t\r\n" -> go Nothing False False [] (if started then reverse word:result else result) rest
+        | otherwise -> go Nothing False True (c:word) result rest
+
 withBackends :: (Backends -> IO a) -> IO a
 withBackends action = do
   candidateTimeout <- candidateBudget
   compiler <- tool "clang"
   pkg <- tool "pkg-config"
-  includes <- words <$> command pkg ["--cflags","gmp"]
-  gmp <- words <$> command pkg ["--libs","gmp"]
-  supplied <- maybe [] words <$> lookupEnv "MLF_LLVM_TEST_CFLAGS"
+  includes <- command pkg ["--cflags","gmp"] >>= parseToolFlags
+  gmp <- command pkg ["--libs","gmp"] >>= parseToolFlags
+  supplied <- lookupEnv "MLF_LLVM_TEST_CFLAGS" >>= maybe (pure []) parseToolFlags
   abi <- maybe "standard" id <$> lookupEnv "MLF_LLVM_TEST_ABI"
   require (abi `elem` ["standard","compact-gc"]) "invalid MLF_LLVM_TEST_ABI"
   let compact = abi == "compact-gc"
       extra = supplied ++ if compact then ["-DMLF_USE_BDWGC","-DMLF_COMPACT_BDWGC"] else []
-  extraLibraries <- maybe [] words <$> lookupEnv "MLF_LLVM_TEST_LIBS"
+  extraLibraries <- lookupEnv "MLF_LLVM_TEST_LIBS" >>= maybe (pure []) parseToolFlags
   optimization <- maybe "-O2" id <$> lookupEnv "MLF_LLVM_TEST_OPT"
   require (optimization `elem` ["-O0","-O1","-O2","-O3"]) "invalid MLF_LLVM_TEST_OPT"
   bracket scratch removeDirectoryRecursive $ \dir -> do

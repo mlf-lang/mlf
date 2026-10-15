@@ -1,0 +1,20 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Bootstrap.X.Parser as P
+import qualified Tests.IndependentCheck as C
+import qualified Tests.IndependentType as T
+import qualified Bootstrap.X.Pretty as Pretty
+import qualified Package.OS as O
+main = do
+  targetPath <- getArg 0
+  expectedPath <- getArg 1
+  source <- readFile targetPath
+  expected <- readFile expectedPath
+  case P.parseTerm targetPath source of
+    Left error -> O.fatal error
+    Right term -> case C.checkClosed term of
+      Left error -> O.fatal error
+      Right actual -> case P.parseType expected of
+        Left error -> O.fatal error
+        Right ty -> O.require (T.alphaEq actual ty) ("inferred type mismatch\nexpected: " ++ Pretty.prettyType ty ++ "\nactual: " ++ Pretty.prettyType actual)

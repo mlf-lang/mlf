@@ -1,0 +1,4 @@
+module Greeting (greet) where
+import Message (Message(..), render)
+
+greet who = render (Message ("Hello, " ++ who ++ "!"))

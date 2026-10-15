@@ -1055,6 +1055,8 @@ schemeOrExistential graph identity node = case binder node of
     _ -> false
 
 normalize : Graph -> Graph
+-- Solver.finishNormalized reuses validation across this transformation:
+-- only non-Gen flags may change; identities, tags and binders stay intact.
 normalize graph =
   let inertness = inertNodes graph in
   -- Several nodes can share a generalization binder. Keep its structural

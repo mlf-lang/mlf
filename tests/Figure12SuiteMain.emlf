@@ -1,0 +1,6 @@
+module Figure12SuiteMain where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Tests.Figure12Suite as T
+main : IO Unit
+main = T.main

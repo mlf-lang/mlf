@@ -1,0 +1,85 @@
+module Package.OS where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+
+fatal : forall a. String -> IO a
+fatal message = do
+  putErr ("mlfpkg: " ++ message ++ "\n")
+  exitWith 1
+require condition message = if condition then ioReturn Unit else fatal message
+starts prefix text = stringLength text >= stringLength prefix && eqString (stringSlice text 0 (stringLength prefix)) prefix
+ends suffix text = stringLength text >= stringLength suffix && eqString (stringSlice text (stringLength text - stringLength suffix) (stringLength suffix)) suffix
+drop n text = stringSlice text n (stringLength text - n)
+char text i = stringSlice text i 1
+split separator text = splitAt separator text 0 0
+splitAt : Int -> String -> Int -> Int -> List String
+splitAt separator text begin i = if i == stringLength text then Cons (stringSlice text begin (i - begin)) Nil else
+  if stringCodeAt text i == separator then Cons (stringSlice text begin (i - begin)) (splitAt separator text (i + 1) (i + 1)) else splitAt separator text begin (i + 1)
+nonempty xs = S.filter (\x -> stringLength x > 0) xs
+words text = nonempty (split 32 (replace "\t" " " (replace "\n" " " (replace "\r" " " text))))
+lines text = split 10 text
+trim text = S.intercalate " " (words text)
+replace old new text = replaceAt old new text 0
+replaceAt : String -> String -> String -> Int -> String
+replaceAt old new text i = if i >= stringLength text then "" else
+  if stringLength old > 0 && starts old (drop i text) then new ++ replaceAt old new text (i + stringLength old) else char text i ++ replaceAt old new text (i + 1)
+join a b = if starts "/" b then b else if eqString a "" then b else a ++ "/" ++ b
+parent path = let pieces = split 47 path in let front = S.take (S.length pieces - 1) pieces in let result = S.intercalate "/" front in if eqString result "" then (if starts "/" path then "/" else ".") else result
+base path = S.last (split 47 path)
+relative root path = if eqString root path then "." else
+  let a = split 47 root in let b = split 47 path in relativeParts a b
+relativeParts : List String -> List String -> String
+relativeParts a b = case a of
+  Nil -> S.intercalate "/" b
+  Cons x xs -> case b of
+    Cons y ys -> if eqString x y then relativeParts xs ys else S.intercalate "/" (S.append (S.map (\_ -> "..") a) b)
+    Nil -> S.intercalate "/" (S.map (\_ -> "..") a)
+modulePath name = replace "." "/" name
+nul = stringFromCode 0
+pack fields = S.concatStrings (S.map (\x -> x ++ nul) fields)
+unpack text = if eqString text "" then Nil else S.take (S.length (split 0 text) - 1) (split 0 text)
+arguments : Int -> Int -> IO (List String)
+arguments i n = if i >= n then ioReturn Nil else do
+  x <- getArg i
+  xs <- arguments (i + 1) n
+  ioReturn (Cons x xs)
+allArguments = do { n <- getArgCount; arguments 0 n }
+exec cwd argv input output errors timeout = do
+  require (timeout > 0 && timeout <= 2147483647) "invalid process timeout"
+  require (S.all (\x -> S.not (S.elem eqString nul (S.map (char x) (S.range 0 (stringLength x - 1))))) argv) "NUL in process argument"
+  runProcess cwd (pack (Cons (showInt timeout) (Cons input (Cons output (Cons errors argv)))))
+run cwd argv = do
+  code <- exec cwd argv "" "" "" 1800
+  require (code == 0) ("command failed (" ++ showInt code ++ "): " ++ S.intercalate " " argv)
+mkdir path = run "" (Cons "/bin/mkdir" (Cons "-p" (Cons path Nil)))
+copy source destination = do
+  mkdir (parent destination)
+  run "" (Cons "/bin/cp" (Cons "-p" (Cons source (Cons destination Nil))))
+move source destination = run "" (Cons "/bin/mv" (Cons "-f" (Cons source (Cons destination Nil))))
+remove path = do
+  require (starts "/" path && stringLength path > 5 && S.not (eqString path "/tmp")) "unsafe artifact removal path"
+  run "" (Cons "/bin/rm" (Cons "-rf" (Cons path Nil)))
+writeAtomic path text = do
+  mkdir (parent path)
+  writeFile (path ++ ".new") text
+  move (path ++ ".new") path
+readOptional path = do { present <- fileExists path; if present then readFile path else ioReturn "" }
+envDefault name fallback = do { value <- getEnv name; ioReturn (if eqString value "" then fallback else value) }
+which command = if S.any (\x -> eqString x "/") (S.map (char command) (S.range 0 (stringLength command - 1))) then canonicalPath command else do
+  path <- getEnv "PATH"
+  findTool command (split 58 path)
+findTool : String -> List String -> IO String
+findTool command directories = case directories of
+  Nil -> fatal ("executable not found: " ++ command)
+  Cons directory rest -> do
+    let path = join (if eqString directory "" then "." else directory) command
+    present <- fileExists path
+    if present then canonicalPath path else findTool command rest
+entries path = do { text <- listDirectory path; ioReturn (S.sortBy compareString (unpack text)) }
+files : String -> IO (List String)
+files path = do
+  isFile <- fileExists path
+  if isFile then ioReturn (Cons path Nil) else do
+    names <- entries path
+    nested <- S.mapM (\name -> files (join path name)) names
+    ioReturn (S.concat nested)

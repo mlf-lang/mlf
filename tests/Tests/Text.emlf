@@ -1,0 +1,8 @@
+module Tests.Text where
+import Bootstrap.Types
+import qualified Tests.Bytes as B
+pack x = x
+unpack x = x
+encodeUtf8 = B.encode
+decodeUtf8 = B.decodeText
+decodeUtf8' = B.decode

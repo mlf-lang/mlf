@@ -1,0 +1,10 @@
+module Main where
+import Bootstrap.Types
+import qualified Package.OS as O
+import qualified Package.Command as C
+import qualified Package.CompilerTests as T
+main = do
+  args <- O.allArguments
+  case args of
+    Cons "compiler-test" rest -> T.main rest
+    _ -> C.run args

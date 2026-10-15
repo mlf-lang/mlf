@@ -1,0 +1,1281 @@
+{
+  "schema_version": 1,
+  "complete": true,
+  "purpose": "Verify stage 3 after reusing final graph validation across flag-only normalization, with all 5x C compilation and 2x C runtime limits.",
+  "compiler": "/Volumes/src/mlf/dist-newstyle/compile-margin/bootstrap/emlf-stage3",
+  "compiler_sha256": "2171934964af6ec4c7894e12e6c25ee4e1fb425122ae815c91128716678ae581",
+  "benchmark_report": {
+    "path": "benchmarks/results/2026-10-14-stage3-normalization-macos-arm64.json",
+    "sha256": "cb8cffab6215e23a302266f1cc83f1d3d94dc39a7a61a8e4b1f0b094aa5ac254"
+  },
+  "frontend_comparison": {
+    "path": "benchmarks/results/2026-10-14-stage3-normalization-comparison.json",
+    "sha256": "7ee271c3a0b1a7a1823bae3eb24153299b54c35064dd18e225ce06646a3d6997"
+  },
+  "workload_and_runtime_input_hashes_match_before_change": true,
+  "other_tool_runtime_library_and_harness_hashes_match_before_change": true,
+  "bootstrap": {
+    "schema_version": 2,
+    "complete": true,
+    "stages": [
+      {
+        "stage": 1,
+        "compiler": "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+        "llvm_sha256": "84310a83526d7a9a7b6057281373fedce9ed077c29c0b67320fe5fea97c48910",
+        "binary_sha256": "f190fc254c37074819cceb0673a0e71172c1954f04052772e23ee4f7266aac57",
+        "reused_seed_compilation": false,
+        "compilation_seconds": 43.546571708022384
+      },
+      {
+        "stage": 2,
+        "compiler": "/Volumes/src/mlf/dist-newstyle/compile-margin/bootstrap/emlf-stage1",
+        "llvm_sha256": "12e35b4a3d530c466e4738abdaf37b3a8bc4e368ac98dac1f80c27b89404ab13",
+        "binary_sha256": "9714004bfa8f0e44622a7a17e349f4180df8b2e21cb0338f08fad654a757dea9",
+        "reused_seed_compilation": false,
+        "compilation_seconds": 289.09056333301123
+      },
+      {
+        "stage": 3,
+        "compiler": "/Volumes/src/mlf/dist-newstyle/compile-margin/bootstrap/emlf-stage2",
+        "llvm_sha256": "12e35b4a3d530c466e4738abdaf37b3a8bc4e368ac98dac1f80c27b89404ab13",
+        "binary_sha256": "2171934964af6ec4c7894e12e6c25ee4e1fb425122ae815c91128716678ae581",
+        "reused_seed_compilation": false,
+        "compilation_seconds": 269.92690183297964
+      }
+    ],
+    "started": 1791926444.266804,
+    "llvm_abi": "compact-bdwgc-v1",
+    "seed_sha256": "7fe03d28d006df1a34b2ec11203d3b91673e54efd86795ca810200f8c783092b",
+    "sources": {
+      "bootstrap/Bootstrap/Classes.emlf": "a7a3eacb3cb9c48c84887564c5669fb2d115ca48e1594c569c6353b809e3519c",
+      "bootstrap/Bootstrap/Compiler.emlf": "23d2d6e8bf4e03153030f0f0c4d06505322811263fd357fa2ee5b2bf3031bcaa",
+      "bootstrap/Bootstrap/Constraint.emlf": "9bd0875707a58662a4e5335f543997329b0d042179fe55ce8aadc20d5da9d05a",
+      "bootstrap/Bootstrap/Data.emlf": "1a798a05dc70440f4076b099adf40dca717752b077edb49e0dcbda78b3e31c4f",
+      "bootstrap/Bootstrap/Desugar.emlf": "d668bfb3dd66693907e72a087abffc6af35beab6e251ee4d1028b15ecb9da6c6",
+      "bootstrap/Bootstrap/Elaborate.emlf": "479ffdbc081928375d1486d047e9a7f6a4ff77ce1a8ba5773dcc3520294c8c79",
+      "bootstrap/Bootstrap/Evidence.emlf": "7e031bf638d709ac84822901cc3436223e2aaf0ec76aad46beb8ec2952c6d14d",
+      "bootstrap/Bootstrap/Fresh.emlf": "b6af7da1aceb0e81b68ee6a1100616b71f6558fa8f551de62dbddecc4d7483a0",
+      "bootstrap/Bootstrap/Graph/Solver.emlf": "b0c34592894e6f43e48470c05b10560e29bb113fbe475a34eae5968aaaff51e4",
+      "bootstrap/Bootstrap/Graph.emlf": "75229485db24e13e1d568122733270142a55eced1bf3b7f7498772d07445edfc",
+      "bootstrap/Bootstrap/IntMap.emlf": "a5cce880a0cac66d07c9b4e30e981766b80da8e5e4e6b311f235c03997d14dfa",
+      "bootstrap/Bootstrap/IntSet.emlf": "519784adfb1be285f1f056f1e93a25a68e13db7ad37e9852a6ddb18dff815a82",
+      "bootstrap/Bootstrap/Kind.emlf": "4195e17517b2eb3a6b12c0c96112b1b5b6d1119ef3e9f1ba0a1ecf043c831772",
+      "bootstrap/Bootstrap/Kinding.emlf": "517aec41c9260a6a463a3042717d589b97df175670ada755fd45fcdbc6f0d36c",
+      "bootstrap/Bootstrap/LLVM/Analysis.emlf": "7d6f03ac5e09110b11e540a71856ac269c449772350b6527d02bd2b47ffbcf6d",
+      "bootstrap/Bootstrap/LLVM/Build.emlf": "9a635d1ccdd0857eafb7b87825d234ed649b7c3728c83ea0a3c731323cf6c728",
+      "bootstrap/Bootstrap/LLVM/Codegen.emlf": "72b8ac720bfeffad2b9e7c53419f5de55fcb597dbcb4d15acc88dffcaef14597",
+      "bootstrap/Bootstrap/LLVM/Kernel.emlf": "fa7a94be851dfc285786712060fed906bdf81270552f870c066d5303c580e434",
+      "bootstrap/Bootstrap/LLVM/Native.emlf": "6138103c4bacbbbce4ae65aadd942380dce54c376b9062429e63e79c20e6f3bc",
+      "bootstrap/Bootstrap/LLVM/Optimize.emlf": "ff8b3ea2824d4456081c1f77090627a70c2703064928367a8378635f2ef03519",
+      "bootstrap/Bootstrap/LLVM/StrictFields.emlf": "bee5f7df5e8f7cb592342e51a42f1cd6c63f9024082b56dd76c347196af1e1b3",
+      "bootstrap/Bootstrap/LLVM.emlf": "eecd7f70b179d35d5265de4ea673b5125a334f8bddaf01ed38ff70906066892d",
+      "bootstrap/Bootstrap/Layout.emlf": "7eb281a16bac3adb35ff15dbfaf0150e5df7b0d4af8f046cbb6362a520f329e6",
+      "bootstrap/Bootstrap/Lexer.emlf": "702c67d0d3377ddc438b242762e1505945b91a959c94c737e117f0bafcee4161",
+      "bootstrap/Bootstrap/Map.emlf": "b7d5921dbae083f227e4562a257efaaac2f1b7e6f270073857c8ba43b674e08a",
+      "bootstrap/Bootstrap/Module.emlf": "079deb1f792e5a9ee15fdb741bf773495966b64bf633bbd187e3af745f8c5230",
+      "bootstrap/Bootstrap/Parsec.emlf": "ffc64213d5baf649aa40ccab44521af79a4aaf84cb268bd87cd70c2873f1500e",
+      "bootstrap/Bootstrap/Parser.emlf": "28a093dca7a7f86a1a14a8579405e7cfae3401e27bf214abdf31a87818fd484d",
+      "bootstrap/Bootstrap/Prelude.emlf": "e4908ab88f9cc3350e09ca09196db60abdfabb035055ff0ceff9a10a732c21d5",
+      "bootstrap/Bootstrap/Primitive.emlf": "1922e41a3935d7d87483bfccd87529b573f77e996e38ce3349117f91d0baeef7",
+      "bootstrap/Bootstrap/Runtime.emlf": "db6d959430c33ce1fde5192a5dfb596ddcb83132d115f10bf05d9b26e5d51ba5",
+      "bootstrap/Bootstrap/ST.emlf": "657c2b7f3958a8b14ed7a336908689f951480b45ff50059b242cfe3f3df7d7b0",
+      "bootstrap/Bootstrap/Separate.emlf": "b7ca7a48e8e33591f21ca2e1642a0e6ddb5fb7dfe3910480ae2173ee95885158",
+      "bootstrap/Bootstrap/Set.emlf": "bac505cf121011b0b325d5ea59d1bd8c2abd919a8158516540d707a813abbc77",
+      "bootstrap/Bootstrap/SourceEquality.emlf": "5fc11a57d42b85d7776ff76dee9872a7264ff7f920121833f221c277ec37f4af",
+      "bootstrap/Bootstrap/Std.emlf": "50c455982728484d3e3cc0359f4314f5bfeef0706e051701979fd529779428f7",
+      "bootstrap/Bootstrap/Surface.emlf": "f8d4f9abd96bec1582dcf21b30e8500677a448637854a25e7fc80b7a762ac437",
+      "bootstrap/Bootstrap/Types.emlf": "5a790419e00d4825ffbc5f06cca4b8e64813d8dabd69d34d4fdde926e013e1dd",
+      "bootstrap/Bootstrap/Unicode.emlf": "fdde8c09d3cd1bdddcbc6a3c65c6ab7668c8d60b6795d9a0c106a098c1b647b4",
+      "bootstrap/Bootstrap/X/Check.emlf": "b20e256bdc4d25ddfc3c76dc0c91083957133c3cf973de5a8244e40285defee6",
+      "bootstrap/Bootstrap/X/Parser.emlf": "3ea0d9cb15c9d08c2ca76c0c1f5d903d34978b6476075c0ebfa9655aa8841f03",
+      "bootstrap/Bootstrap/X/Pretty.emlf": "a7c23152c6297315e4ef0bf1dbba9685688cb68010c0194fa544c2c39f48f0e4",
+      "bootstrap/Bootstrap/X/Syntax.emlf": "40ef760efb420654dcc7f5c05334eafea81f21d0bc269f8e0d1de9ee5c5eda70",
+      "bootstrap/Bootstrap/X/Type.emlf": "ac916c2902d99edfce443f96930cdc52bdf341eff3007c38d203450400b9446c",
+      "bootstrap/LLVMDriver.emlf": "d04bd38721059978607996a92aef2347962ee8b4e5e071dd8e18b41076bc03fe",
+      "bootstrap/Main.emlf": "b594e6215a6f8002efb1c6f72b8b980d3a0eb6eea8e84303bf68b57550688026",
+      "bootstrap/RuntimeDriver.emlf": "ba943012e7f1d369bb3122c5098672ac2682263e76536001665dd7be89ab3990",
+      "bootstrap/tests/ConstructorProjection.emlf": "c83229426f6d79c8a7e272d784a18051cc27a70debee78866061559bd4936184",
+      "bootstrap/tests/EmbeddingPruning.emlf": "dc3fca089316752a726001b989c9589e662729c142fdeffd1d75bbd99a7c7bf9",
+      "bootstrap/tests/ForceReuse.emlf": "531afe40bd7fe51c29980edc835d28da5122d19269eb32e0d2c3de0b19ebda8a",
+      "bootstrap/tests/GraphConformance.emlf": "86f85d0ded341b6cb7908b58477a03a59c2e7d8e46286ebb88b227a702a54943",
+      "bootstrap/tests/GraphDense.emlf": "ae74d1ddac69caa83b2b25a532e222fae829dbb18d1e2cd4608247d48ef72b7e",
+      "bootstrap/tests/GraphDenseProbe.emlf": "c4c3c85eb2546d3a2cdcf21322e577106ac49198317a8e3ddd2fcfe906744e6f",
+      "bootstrap/tests/GraphScopes.emlf": "b0314b23c47a931edc10ceb0d54f7e529951f8b9f9bfe750a55b818d71d10f21",
+      "bootstrap/tests/GraphSmoke.emlf": "ef099955729cd0ed64966a503e06446d24129750b4315d7ced82a87832fc2f10",
+      "bootstrap/tests/GraphStack.emlf": "05d34749539cb8f58a3a2109792efdb370700238ff625eef56981b0219983874",
+      "bootstrap/tests/InferenceConformance.emlf": "fb62b18cdf0fad8e878643ca354d583b9a0b740a7263d72c359ffb2d522164d2",
+      "bootstrap/tests/IntegerContainers.emlf": "0e41282d32f44ba950789708d864d6d0dc14530d2bf9a81255036906858c9ea7",
+      "bootstrap/tests/LLVMBuild.emlf": "cadd61c0e94a3d3c75ec52c17bf840be186c5aac0c960eeeab604b01598533d5",
+      "bootstrap/tests/LexerCounters.emlf": "2d562a64d74c7e0f9be88c9f73ddf7b403ca978c91b6527a308f7b4fb9b552f0",
+      "bootstrap/tests/MapFolds.emlf": "90a1471cec114224a04d0cfc54e010ec1704f52494a2d855c268372a5f549098",
+      "bootstrap/tests/OptimizerQueries.emlf": "3f7e11a679bb53613c8fe27ca2e4b83a9c9338a8f8d1603fe6f731ac88700e58",
+      "bootstrap/tests/OrderedTraversal.emlf": "d8cb8e6ee8ad681f01a53b862a730f8129ced313abc2fb04a5c50589bfd51320",
+      "bootstrap/tests/PhaseProbe.emlf": "7d1c5186c10279a9dff66903c2bc9ca6a6ad092de73ef113911b0bf379304aa6",
+      "bootstrap/tests/PrimitiveMetadata.emlf": "c161d3ce921df72e7f81acc00da8afbb81092c5d2640acd1590a0c636a50b2fd",
+      "bootstrap/tests/RuntimeCases.emlf": "9f79ba21fcff9161c80f4939ad74d359bcda4a0e5cd27c516d0252f3fe35a1fa",
+      "bootstrap/tests/RuntimeSmoke.emlf": "ac612567558a34fd255f848b1b51cacf0dd4ecc697315b3181e413c4fc259c1a",
+      "bootstrap/tests/SolverReuse.emlf": "3188dadf4ab9da8f4b602f63b49d967dbdeb57cce00ab60c1a97e6ac6c36439d",
+      "bootstrap/tests/StateRuntime.emlf": "dc07e3f2594eeaf7e3b5f1fac15184132158ab7e8144d63168112c60e98e187f",
+      "bootstrap/tests/StateTypes.emlf": "383d8c20655254dd655ce70cd7cc74661522c46cfc1df62602cf59db4bf59fa0",
+      "bootstrap/tests/StrictFields.emlf": "18c4dc8ea3a89c8a330d41ce0b3ea5c206e20ac38d62ec881f622dc35b2e0c66",
+      "bootstrap/tests/Target.emlf": "d7c78b8cea49dd219f8fc92a43ae8be5a56a89fa10bea4631bc9b8beb9914e00",
+      "bootstrap/tests/TypeCache.emlf": "d6ff8e1afef0db13ebb0429c858f763b084d922daec0514994c5fffe2719d3d3",
+      "bootstrap/tests/classes-stage0.emlf": "b81c56da1ade9ca4f097ee972bd553a1723f336d1870dcc8c4c414d3ac8de23f",
+      "bootstrap/tests/foundation.emlf": "afb60cd83d96174ebbe3e2c20d2e8fd232dd208ebfc7b28d006bfbae15ee0bd9",
+      "bootstrap/tests/frontend-stage0.emlf": "34d9a97cb89e7b12d49a9774841d3ee166eabce08b456261620c6a6aa5c64415",
+      "bootstrap/tests/frontend.emlf": "3daa8a62aaf1f036b8549c984f4b8f6f957732db99be02ef6e449fdd1f2f7391",
+      "bootstrap/tests/parsec-stage0.emlf": "64d2b8819f7087968b15e89a33922d35b842ac1ce9970dc6aad90c3449c94777",
+      "bootstrap/tests/parser-corpus.emlf": "3240b6a72a9a549cf95cccec3edbabf0701f26fb5b2dd53ab171b45b71e63cb9",
+      "bootstrap/tests/prelude.emlf": "ddfc04ae6f168be36e41ae501a8304dde9462e3485fd1bec9b19ecdfd8cbd87e"
+    },
+    "runtime_sources": {
+      "runtime/khash.h": "4582c7fd4b98f61339ce677bb1daa7a45a53075b112a494a335525c4bda72074",
+      "runtime/mlf_runtime.c": "907893cb216c1cd596d92a3707488d7dd121657f5f0629ab54b737b5f383fbe5",
+      "runtime/mlf_runtime.h": "21254da67997079b785702bffdfb67dfe87536468960ec3c50bd09aa71704fcc"
+    },
+    "validation_sources": {
+      "app/Main.hs": "db4457652adda84310f32be0d981a102d8b399d34f191846c9d15eda53cf58de",
+      "bootstrap/CheckTarget.hs": "636aedb1da284ad8b2da962e52836585bc4a0e41931fd76fa138432e90f42a83",
+      "bootstrap/ExportCorpus.hs": "5e615a1f131f6c0bc5a5a33eea9e06254d2e09675f6f24f2367793e2c799dae0",
+      "bootstrap/LanguageParity.hs": "d4e6d91392e2728ebcf2a471f7679d847e70372bc369e635f83e8147edc436d8",
+      "bootstrap/generate-unicode.hs": "6dbcb84d77827206788fb764d9838f18f257dbc442ab2d80490ae753675b6d7f",
+      "bootstrap/tests/EmbeddingPruningReference.hs": "3cf5ad6a6207b6a066ef4532fccae5b69e1e5fb55ba06f6c1fb4ef58b700926c",
+      "bootstrap/tests/GCDefaults.c": "2dd0812b42ce8f5f7fa0a16d7c83508c575c83533a60090ecd8a0533d89072b8",
+      "bootstrap/tests/GCSpine.c": "74c154443bb4244f03097997756cb8cfcfb0065d6ac39ae83604823bca80fcf8",
+      "bootstrap/tests/GraphDenseReference.hs": "0f6e056a50d4766a4f3a6710650d85a3b337e72a04f991a3600800f9d3282cdb",
+      "bootstrap/tests/GraphReference.hs": "8556cf8a4d00da0d93779c128e15cb5c650d8b66c870220f526cb6a5c6178309",
+      "bootstrap/tests/GraphScopesReference.hs": "aa836ccd8bed59d62f54c3f319d58a809fa56270077643f610ea9e475de23e96",
+      "bootstrap/tests/InferenceReference.hs": "6236b655042b98395eb04bdd8494b99d7a69292f8d7d97c47a48426a0e4c25ad",
+      "bootstrap/tests/OrderedTraversalReference.hs": "1166b9e5d2c38fd37a48bf5fc11a208aebdc6be660574e793106b503ab676df1",
+      "mlf.cabal": "b4278e89e80f1e259a34652524bce0c160cd7e6f12b7ccd4ba89b5573794fa16",
+      "scripts/bootstrap-compiler.py": "4e62527aa31b11ef149882d1b07156d91da240c494498bb2afd2876916fac9a0",
+      "scripts/bootstrap-gc.py": "736c3ab4ab0ebb274cbea1d9bd84d845278101257bbff80b4a406be464185e82",
+      "scripts/runtime_st_validation.py": "e52cdf21815d53a1846314f37334a12b61a4cda2eedb76df46f504e158511813",
+      "src/MLF/Classes.hs": "e82f2d73541b9920c106ff195c94ae3cd3e4449c89d9cde6e4c77a747a649c20",
+      "src/MLF/Compiler.hs": "c96ac42dffc460ea1fae280ac7deeeee436f7d4935425f4e2b819e174d437077",
+      "src/MLF/Constraint.hs": "94f757a6619f2f860e314b8c8f46f15e0a5c743593cc57a5e51c958769ac2cc6",
+      "src/MLF/Data/Parser.hs": "f8bcb819c612ce6dc745233ccef0108b0b735c9fbe2b099bc23cf3646dac7a14",
+      "src/MLF/Data.hs": "f66abdf5f899f255bf7d127a716c9c5cae2981141c5002867804013f2d8c12dc",
+      "src/MLF/Desugar.hs": "8e96a8253dee04c6b980a9ab21cd69b7ab33a8bb23c12876d1d72fe65449c8a4",
+      "src/MLF/Elaborate.hs": "ed6b89f7563721373bc4f5cdfb0bf89c902be9810043645865d35d1b0a0e6776",
+      "src/MLF/Evidence.hs": "898ee8cd42348da67179f9d02a5c0a2f2e57800b1a63f45dc6a2dd0d62b08d41",
+      "src/MLF/Graph/Solver.hs": "2ceb267bca7c2202b3f50d706ff14e0084fc4b590022a9cafd1785fce69c6f23",
+      "src/MLF/Graph.hs": "6456fc83fdcf1cc2fd3365c1c40d2f608d3a34f16b106587d817973cb9b93d51",
+      "src/MLF/Kind.hs": "d6eec39e54a8c38c6f62635974385e7afdd018055c247f8ab8e3fa0e1d992d3b",
+      "src/MLF/Kinding.hs": "93ae79fd258a0e8289fa5fcbd8edd1ea72b5869545ed06e38f47900ffe6419c7",
+      "src/MLF/LLVM/Analysis.hs": "e43fa8f500626066180c983a9d11cfff1c281a4eda51ed06b69ec5f2f990e64e",
+      "src/MLF/LLVM/Codegen.hs": "cccbd60913202985792b882bc178fdc69221e63090cf9a7a76269915a50f2799",
+      "src/MLF/LLVM/Kernel.hs": "bedbfddb3bc571509ed1f3950a871fa6b324c21e699b82a7048a163324980cda",
+      "src/MLF/LLVM/Optimize.hs": "0e5f0d2f8b35cab7f80c0aefcd2cd066071fa7f63884c301a492a79babcb9056",
+      "src/MLF/LLVM/StrictFields.hs": "668aa2061a7e3799010b8ac407a7260ddbe8a2c501cf4a237df386d4cbc117ac",
+      "src/MLF/LLVM.hs": "6324e4c99296bb964b0542e82bcc10e7b5bce4f698598541354a17e8fd92f481",
+      "src/MLF/Layout.hs": "eec74eec6c241760e63b8cb331ba662e50b292f9e774394a3292e776649c0c6b",
+      "src/MLF/Module/Syntax.hs": "9fed594b6c2b5cdb913672b4db1b17d7d420a632eaf4d2b3a9753926bc817298",
+      "src/MLF/Module.hs": "5dbd9a5d42db5395a29d6fe3a84d743a8ff95df26e12ed81fb0285e58f88cd75",
+      "src/MLF/Parser.hs": "a48af42261f447e101f6925787bcf05e5ad9a8771cc01100f9b35bbb759c0648",
+      "src/MLF/Prelude.hs": "2ea7635056e36d7fe1102adf592984efb6e3218ece8e5c6f43ff5bdc91ec5970",
+      "src/MLF/Primitive.hs": "6ffcd3de18f7dabe59e5f10e894d266b01bd4d54f82f554b69e2b195538afb8c",
+      "src/MLF/Runtime.hs": "ef5c4a44f65820878ee57d458f3299ff61f9720abfe1024126dea2c6a2242c6c",
+      "src/MLF/Separate.hs": "198cb92c08d68cffecad8aaaecf4624a8d7e265e64febb9841279f5979e51786",
+      "src/MLF/Surface.hs": "b1ba74dffa7139c02f92cbec08e928fec3953c376fde89b61240484c54c1beab",
+      "src/MLF/Syntax.hs": "81441237f6708d3749ff7c1d42e01c0b063c1eb796118cc281e702cc309cb9a9",
+      "src/MLF/X/Check.hs": "802eab4fba00135bcbcbc7c31845538a87fd67d52d9d845334893d2ab7204922",
+      "src/MLF/X/Parser.hs": "8a33271c0bd453af8e76f8781a24b368fcf99e98a9e70d4bac5bfda4416f9216",
+      "src/MLF/X/Pretty.hs": "b7b22a923d4b138bc59c990ede2bbe23ff6e02d9a30d9bcddcf7393e0dc5a2c2",
+      "src/MLF/X/Syntax.hs": "050a21bb876a344f35be5d520451229124bb8f4ca89de21e9ec0b03cb6e5212e",
+      "src/MLF/X/Type.hs": "66f2c899b846439e94b5dc7e70757ca75d14d655e50b7910ad20e2572ebe681c",
+      "test/BackendCases.hs": "3cde1bff4949f8565a8691166af5299cb0e28e2aeab8c847af42add1cd019c39",
+      "test/BackendMain.hs": "7be3b2d90ebe4919ec00cc8a943f37b11da61ec2d3a8a96b618bdde5c34d1171",
+      "test/Backends.hs": "1268a7397aeae1d032cfd47e5d1b91204ddcbfdcc345d1a7743be1dd5efa54f8",
+      "test/BenchmarkHarnessMain.hs": "d037423521f139ec3ef48a10b75a1e11bb65b295e5f5ae9c760d5f86a0b8a976",
+      "test/BoolConditions.hs": "6aa03c5cbcfbaaa0356274d7f01cca4988fddf4fe2fcb35f4837d364afe50ef1",
+      "test/BootstrapPortMain.hs": "35dd7cff7de908b5933e81be36e925476662a067f5a68d64bc2d55d0ba2dc1e4",
+      "test/BootstrapPrimitives.hs": "8a049f5a254de27811c88d9ee6b5d92a5fc3e238b34c0b1c264b4d0fb923f405",
+      "test/ByteArrays.hs": "b43812f999d8d273a79eacb1588796401a616eeadd5d5b59039adbe8693d5397",
+      "test/Computations.hs": "20bad74bf600fe6cab1826ffdfb1b7c540bbab41b406f90e46c2f41cf8558207",
+      "test/ConstructorProjection.hs": "da901313853248b7e759f3fc8aaa4c083a715a9adb641a1ad31adcccc4a79c5b",
+      "test/DNA.hs": "76826075804fd57f38ddebf8f6093fde6a810d83fdf4cb0284125ae64e3ba00d",
+      "test/Datatypes.hs": "7d09627717ef652eadd1a88beb9a19b656f36e912eca3babdbd32f8ea5e6e72a",
+      "test/DoNotation.hs": "c2d400716e0559fe869bcdc43b3c1e11b268782bcdad274cd8265a07ae47a098",
+      "test/EmbeddingPruning.hs": "6cb508a392aaf61b1cfc69e8f779242d4a680714799d48ac0d9d968bac7bfc86",
+      "test/EnvironmentAccess.hs": "d9c6fb53579348220d27e716f2a4676da657546c51c59dbf9cd0b6bf0599689f",
+      "test/Figure12.hs": "a8a9861c917510763816009e0ac59af1f237185fa824ce556153b156fb1edb0c",
+      "test/Figure12Main.hs": "270b2a6ffb527076e48bf34850ce907f71bc5ea1332f4c836b8dd32310af5423",
+      "test/ForceReuse.hs": "5fe1d6aa368f771c4d83c7923e2d1e78b8040fa86eaac27059a361b537d4196d",
+      "test/GraphSolver.hs": "8fb8a905d5d1bc3f4911a7c8326e185d9f144b4af12a05ccbbb9bc55b23311df",
+      "test/GraphUnification.hs": "dbfe9dd4ac0fdb7120b8bd9f397ef010e842797aa12f8893eb328e971b6c358f",
+      "test/GraphUnificationReference.hs": "73b71ace8e41eb2ec13d2d27be2b3ad81b9ec85cb2cff5d518511c7ddd92455b",
+      "test/GraphValidation.hs": "d48a10d5d05b1ef12dc42abc655df4fe1016a1aa3b92877b38f58288b4720864",
+      "test/HigherOrderSpecialization.hs": "a593fc55ffb9af479f47f1e094702cf3359cb2db09e042ab1ec6c02eaed324fd",
+      "test/IOTests.hs": "0a82f993d8f14ec0a93eedfe3a5d9623deb48d04b5fa359373f0de5f6825420c",
+      "test/Main.hs": "09344dd1987460d108a2be74d8bd1caf308b4f58142491d13e5178e6dd0d64c7",
+      "test/ModuleBackends.hs": "789d40b574650b4293b895ea5e8c03987260ba50741ab99a6a7d7a3deae6d6c4",
+      "test/Modules.hs": "69af6c6092eaf5a855ebe9c86ed19ff0d90c2c8af6812da56ad95144b5897cb2",
+      "test/NativeOptimization.hs": "9bddb9b8f64c65be8e9c7b8aa13e720d7c1f320c58da766d99e763dcbc5c43a1",
+      "test/NumericArrays.hs": "d2c1a2b82127929aa00f10c9543149e8dc20c728ecf353f7239ebdffb3532f04",
+      "test/OptimizerQueries.hs": "0c551f7016d8f88694da44a93f7c4c7ac0ad5c58807bdd9c6ae0109746f8942f",
+      "test/Oracle.hs": "c7726b6cfd6b1f681b379495ff5ff1a1cc1ffbfe2fb51c2c99af19317bd0ead6",
+      "test/PreludeTests.hs": "8c5983db0179cc08f16db494af5df0fa1966704cf626e3c893d05fe13c9648e6",
+      "test/Readability.hs": "ab637b0845a9948e7a65189a056b1ecac89c10a72bb10faafea2be674cc74dac",
+      "test/Separate.hs": "1c7aa6a194758eb6455493d42c8d2e946639eb022ee827b30d84709d8c40f084",
+      "test/SeparateBackends.hs": "ef22eac98dcb9248eae68ad60875fafedea8759dd00f0bd1622bd4e97754cc91",
+      "test/Snake.hs": "53371de9b259e682187a09d0e76b9e5af92cdfbf87121e3f67706ab5690a5e75",
+      "test/StateCases.hs": "45e94b2c3971134cdaa222559cea2f6a11a90270f44041e88cd9683ad76aa7c4",
+      "test/StateRuntime.hs": "63f85411a038a94859e7746bdff79c597245a340918d8a93aa50511b54f833ab",
+      "test/StateTypes.hs": "1bd4c51aa4ba946fe4176471b943cad5846ad43a9c9b49d392bde63d3fa26118",
+      "test/StrictFieldAnalysis.hs": "b8ac1312b47634799dd9ae41bcd643949b36b03d69f0a09746e3690ee02a3429",
+      "test/StrictFields.hs": "38073931f387843e1ddc3ed198023abc01bfea81c580d3c7c395482caf96e52d",
+      "test/SurfaceSyntax.hs": "03371fdca749c7b341e09e56860b373a5f6b122e15277723db400a898e42e3c2",
+      "test/Typeclasses.hs": "0d874093f261c01d1b406ac533ef4c3f870e113586ae52d0683645ab6666a598",
+      "test/runtime_allocation.c": "4afee271a762e25574ea77d21d4711122ebb9d86289f6fbf53d0511a155dfe03",
+      "test/runtime_force.c": "39b75c373598e2cc31b369df43e962cf4dc7f82f69f7cd5484157856080af547",
+      "test/runtime_st.c": "9edea6c76ddfd920a0e5781dad55366baac27a0b2365ea44e8370ed0f420e045",
+      "test/test_benchmarks.py": "f1dd0af37b6bfaad6e3f0fb30d7c9ee3763cb8e1633390c48a99a3749f19c42d",
+      "test/test_bootstrap.py": "5f8a2e5dc0c384ceb036c84d0296c4d51aaf3a3115095b3f900e3bb766b9394c",
+      "test/test_release.py": "6df2dc5dc827d020644c156534def8c32753d7da9d5fef021d81ca3ceb9080ad"
+    },
+    "bootstrap_allocator": {
+      "profile": "BDWGC compact",
+      "flags": {
+        "cflags": [
+          "-I/Volumes/src/mlf/dist-newstyle/bootstrap-deps/bdwgc-8.2.12-install/include"
+        ],
+        "libs": [
+          "/Volumes/src/mlf/dist-newstyle/bootstrap-deps/bdwgc-8.2.12-install/lib/libgc.a"
+        ]
+      },
+      "io_collection_allocation_threshold": 1048576,
+      "environment": {
+        "GC_INITIAL_HEAP_SIZE": "536870912",
+        "GC_FREE_SPACE_DIVISOR": "1"
+      },
+      "builder_sha256": "736c3ab4ab0ebb274cbea1d9bd84d845278101257bbff80b4a406be464185e82",
+      "spine_regression": {
+        "retained_bytes": 1282048,
+        "retained_limit": 4194304,
+        "result": 42,
+        "cycle_tag": 17,
+        "source_sha256": "74c154443bb4244f03097997756cb8cfcfb0065d6ac39ae83604823bca80fcf8"
+      },
+      "defaults_regression": {
+        "source_sha256": "2dd0812b42ce8f5f7fa0a16d7c83508c575c83533a60090ecd8a0533d89072b8",
+        "cases": [
+          {
+            "name": "default",
+            "environment": {},
+            "arguments": [],
+            "heap_bytes": 536870912,
+            "divisor": 1
+          },
+          {
+            "name": "initial-override",
+            "environment": {
+              "GC_INITIAL_HEAP_SIZE": "8388608"
+            },
+            "arguments": [],
+            "heap_bytes": 8388608,
+            "divisor": 1
+          },
+          {
+            "name": "divisor-override",
+            "environment": {
+              "GC_FREE_SPACE_DIVISOR": "5"
+            },
+            "arguments": [],
+            "heap_bytes": 536870912,
+            "divisor": 5
+          },
+          {
+            "name": "both-overrides",
+            "environment": {
+              "GC_INITIAL_HEAP_SIZE": "8388608",
+              "GC_FREE_SPACE_DIVISOR": "5"
+            },
+            "arguments": [],
+            "heap_bytes": 8388608,
+            "divisor": 5
+          },
+          {
+            "name": "environment-cap",
+            "environment": {
+              "GC_MAXIMUM_HEAP_SIZE": "33554432"
+            },
+            "arguments": [],
+            "heap_bytes": 65536,
+            "divisor": 1
+          },
+          {
+            "name": "api-cap",
+            "environment": {},
+            "arguments": [
+              "api-cap"
+            ],
+            "heap_bytes": 65536,
+            "divisor": 1
+          }
+        ]
+      },
+      "allocation_regression": {
+        "source_sha256": "4afee271a762e25574ea77d21d4711122ebb9d86289f6fbf53d0511a155dfe03",
+        "variants": [
+          {
+            "variant": "ordinary",
+            "binary_sha256": "8755ac1c63f2783cd9cf817e0519b80e50991ffdaad4e5a4d60bfa803c629c61",
+            "runtime_object_sha256": "d152505cb9e1ef263796cba6d6bf6d0b36c822ba43f37e178effa6ccb79df689",
+            "cases": [
+              {
+                "mode": "success",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 0
+              },
+              {
+                "mode": "negative-tag",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "short",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "overflow",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "unset-slot",
+                "exit_code": 1,
+                "error": "invalid environment read"
+              }
+            ]
+          },
+          {
+            "variant": "bdwgc",
+            "binary_sha256": "9fedd103e8be38117070b49a5c7941642700dbddd41f94dd610a359e6aec50c5",
+            "runtime_object_sha256": "ba4f77e32255da1cbcd2bc79f444ff0242507d5ab0a21bdd0a05bf53e4a3cc5c",
+            "cases": [
+              {
+                "mode": "success",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 65536
+              },
+              {
+                "mode": "no-interior",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 61440
+              },
+              {
+                "mode": "incremental",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 77824
+              },
+              {
+                "mode": "negative-tag",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "short",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "overflow",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "unset-slot",
+                "exit_code": 1,
+                "error": "invalid environment read"
+              }
+            ]
+          },
+          {
+            "variant": "bdwgc-compact",
+            "binary_sha256": "f5461289c7ced675fe5fc39b50c69420531e3dc158a035d4ab5fab4dd3e5e2f4",
+            "runtime_object_sha256": "e6af21566eb91c3bbb18cd8b2e9cebee95042ab004a712e14b556555e425a588",
+            "cases": [
+              {
+                "mode": "success",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 73728
+              },
+              {
+                "mode": "no-interior",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 61440
+              },
+              {
+                "mode": "incremental",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 61440
+              },
+              {
+                "mode": "negative-tag",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "short",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "overflow",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "unset-slot",
+                "exit_code": 1,
+                "error": "invalid environment read"
+              }
+            ]
+          },
+          {
+            "variant": "bdwgc-compact-debug",
+            "binary_sha256": "da1540a50c221bce167611196c1ed77383de457b39ffdb8d7c7cac16359d1ff3",
+            "runtime_object_sha256": "ceb502bc1fef7a649b60b1a2092a2d61f90f178366e312bd4f71539609c128e8",
+            "cases": [
+              {
+                "mode": "success",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 4096
+              },
+              {
+                "mode": "no-interior",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 8192
+              },
+              {
+                "mode": "incremental",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 0
+              },
+              {
+                "mode": "negative-tag",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "short",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "overflow",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "unset-slot",
+                "exit_code": 1,
+                "error": "invalid environment read"
+              }
+            ]
+          },
+          {
+            "variant": "bdwgc-debug",
+            "binary_sha256": "0d7169a20d99d8325f40d1a14ce3b9334b406aa16497ec731a0f64a88bdc1811",
+            "runtime_object_sha256": "a23840db88ebfb6f9a6b400a0de180e4881041a6bc8993aad272b63e47494db9",
+            "cases": [
+              {
+                "mode": "success",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 4096
+              },
+              {
+                "mode": "no-interior",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 4096
+              },
+              {
+                "mode": "incremental",
+                "constructor_arities": 7,
+                "field_evaluations": 8,
+                "zero_environments": 4100,
+                "retained_bytes": 4096
+              },
+              {
+                "mode": "negative-tag",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "short",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "overflow",
+                "exit_code": 1,
+                "error": "invalid constructor descriptor"
+              },
+              {
+                "mode": "unset-slot",
+                "exit_code": 1,
+                "error": "invalid environment read"
+              }
+            ]
+          }
+        ]
+      },
+      "state_regression": {
+        "source_sha256": "9edea6c76ddfd920a0e5781dad55366baac27a0b2365ea44e8370ed0f420e045",
+        "runtime_sha256": "e6af21566eb91c3bbb18cd8b2e9cebee95042ab004a712e14b556555e425a588",
+        "executions": 35,
+        "cases": [
+          {
+            "mode": "success",
+            "status": 0,
+            "stdout": "runtime ST: laziness, snapshots, repetition, nesting, WHNF, and GC passed\n",
+            "stderr": ""
+          },
+          {
+            "mode": "negative-size",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid array length\n"
+          },
+          {
+            "mode": "huge-size",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid array length\n"
+          },
+          {
+            "mode": "zero-read",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "negative-read",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "past-read",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "huge-read",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "negative-write",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "past-write",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "huge-write",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "ignored-invalid-read",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "io-as-st",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid value for runtime operation\n"
+          },
+          {
+            "mode": "nested-io-as-st",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid value for runtime operation\n"
+          },
+          {
+            "mode": "st-as-io",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid value for runtime operation\n"
+          },
+          {
+            "mode": "int-array-as-st",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid value for runtime operation\n"
+          },
+          {
+            "mode": "st-array-as-io",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid value for runtime operation\n"
+          },
+          {
+            "mode": "null-return",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid environment write\n"
+          },
+          {
+            "mode": "wrong-arity",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: unary primitive arity mismatch\n"
+          },
+          {
+            "mode": "demand-poison",
+            "status": 91,
+            "stdout": "",
+            "stderr": "runtime ST: forced a lazy element\n"
+          },
+          {
+            "mode": "cycle",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: cyclic evaluation of a recursive binding\n"
+          },
+          {
+            "mode": "direct-negative-size",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid array length\n"
+          },
+          {
+            "mode": "direct-huge-size",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid array length\n"
+          },
+          {
+            "mode": "direct-zero-read",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "direct-negative-read",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "direct-past-read",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "direct-huge-read",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "direct-negative-write",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "direct-past-write",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "direct-huge-write",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: array index out of bounds\n"
+          },
+          {
+            "mode": "direct-io-as-st",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid value for runtime operation\n"
+          },
+          {
+            "mode": "direct-nested-io-as-st",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid value for runtime operation\n"
+          },
+          {
+            "mode": "direct-int-array-as-st",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid value for runtime operation\n"
+          },
+          {
+            "mode": "direct-wrong-length",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: invalid value for runtime operation\n"
+          },
+          {
+            "mode": "direct-null-initial",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: missing runtime value\n"
+          },
+          {
+            "mode": "direct-null-stored",
+            "status": 1,
+            "stdout": "",
+            "stderr": "Runtime: missing runtime value\n"
+          }
+        ]
+      }
+    },
+    "compiler_link_flags": [
+      "-Wl,-stack_size,0x4000000"
+    ],
+    "fixed_point": true,
+    "candidate": {
+      "stage": 3,
+      "path": "/Volumes/src/mlf/dist-newstyle/compile-margin/bootstrap/emlf-stage3",
+      "sha256": "2171934964af6ec4c7894e12e6c25ee4e1fb425122ae815c91128716678ae581"
+    },
+    "abi_regression": {
+      "source_sha256": "f4afe228efbf1cd09c51acf65ff5d49649f5fcff3e5ec455d6eb24aae5cd540a",
+      "comparison": "Exact LLVM except external declaration order",
+      "cases": [
+        {
+          "compiler": "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+          "compact": false,
+          "llvm_sha256": "26351ceb678c8cab269f437f6d0839550b7b76c4a02844c73fc8c043eed2efcb",
+          "binary_sha256": "268684b3ca181f69a4220c1424518446bd4f0fc614a0bb71f340fe84f9501e4f",
+          "stdout": "42\n3.50\n2\n",
+          "mismatched_link_rejected": true,
+          "force_regression": {
+            "source_sha256": "39b75c373598e2cc31b369df43e962cf4dc7f82f69f7cd5484157856080af547",
+            "llvm_sha256": "df621e75d492d58ff9d7aeb008ab7f9d3cda756439c18af0af5a10794ebfcb8a",
+            "binary_sha256": "0e8befe3586d2de85a742b15e780f7ed99f8be06992b17a845f8b38837a517bb",
+            "cases": [
+              {
+                "mode": "success",
+                "ready_values": 14,
+                "spine_length": 20000,
+                "thunk_calls": 1,
+                "application_calls": 1
+              },
+              {
+                "mode": "null",
+                "exit_code": 1,
+                "error": "missing runtime value"
+              },
+              {
+                "mode": "hole",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              },
+              {
+                "mode": "indirection-cycle",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              },
+              {
+                "mode": "thunk-cycle",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              }
+            ]
+          }
+        },
+        {
+          "compiler": "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+          "compact": true,
+          "llvm_sha256": "545a5b06d80ef98556d98e0a38a39bb1477bce8fe3175bdcf884b678fa171197",
+          "binary_sha256": "3e0ab66258a5acb151b66a7b64fc5fe20c56b421f8e61d015671ee7b7a1d8b0e",
+          "stdout": "42\n3.50\n2\n",
+          "mismatched_link_rejected": true,
+          "force_regression": {
+            "source_sha256": "39b75c373598e2cc31b369df43e962cf4dc7f82f69f7cd5484157856080af547",
+            "llvm_sha256": "7243466b83489f6ac678fa0e38ceeb7209aa50c05c66bfbd26d7c2e030eb7a4d",
+            "binary_sha256": "4689945bb894a592256c50a916f28a37106b7f56f2177062cf1c72dff01b9663",
+            "cases": [
+              {
+                "mode": "success",
+                "ready_values": 14,
+                "spine_length": 20000,
+                "thunk_calls": 1,
+                "application_calls": 1
+              },
+              {
+                "mode": "null",
+                "exit_code": 1,
+                "error": "missing runtime value"
+              },
+              {
+                "mode": "hole",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              },
+              {
+                "mode": "indirection-cycle",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              },
+              {
+                "mode": "thunk-cycle",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              }
+            ]
+          }
+        },
+        {
+          "compiler": "/Volumes/src/mlf/dist-newstyle/compile-margin/bootstrap/emlf-stage3",
+          "compact": false,
+          "llvm_sha256": "3d7d6f6beaabd251275b16b31e59dd99579df96b626f20a4232fa21e6ed1c494",
+          "binary_sha256": "50b670f83d566f70251c01f07b2167cc4c5a52aa5b904a92f81bf512991bbd34",
+          "stdout": "42\n3.50\n2\n",
+          "mismatched_link_rejected": true,
+          "force_regression": {
+            "source_sha256": "39b75c373598e2cc31b369df43e962cf4dc7f82f69f7cd5484157856080af547",
+            "llvm_sha256": "dd8c490f31f37d8900e5151334b2d018afc617ed208086f0c4d654fe43990287",
+            "binary_sha256": "ad7afc1cb93aee401312942890785cb3706bd8d40a4ed5cb1ea221f881f6747a",
+            "cases": [
+              {
+                "mode": "success",
+                "ready_values": 14,
+                "spine_length": 20000,
+                "thunk_calls": 1,
+                "application_calls": 1
+              },
+              {
+                "mode": "null",
+                "exit_code": 1,
+                "error": "missing runtime value"
+              },
+              {
+                "mode": "hole",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              },
+              {
+                "mode": "indirection-cycle",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              },
+              {
+                "mode": "thunk-cycle",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              }
+            ]
+          }
+        },
+        {
+          "compiler": "/Volumes/src/mlf/dist-newstyle/compile-margin/bootstrap/emlf-stage3",
+          "compact": true,
+          "llvm_sha256": "278a283d0337fc09420e7427683ec7772243c330d85f4da45bbecc0eb73a6aea",
+          "binary_sha256": "01cf6b1c74f2cbc961240e8752423ccb3c030c17af3d06712e338e525052e891",
+          "stdout": "42\n3.50\n2\n",
+          "mismatched_link_rejected": true,
+          "force_regression": {
+            "source_sha256": "39b75c373598e2cc31b369df43e962cf4dc7f82f69f7cd5484157856080af547",
+            "llvm_sha256": "d61cb937028d3ee0f674adda6a102c1c35dbd99374437e30e112e79be1584eac",
+            "binary_sha256": "b86cc04f55aac891b8a6085d899711b0e9f5c3e7513b9ddaae21de47b9e2e5a3",
+            "cases": [
+              {
+                "mode": "success",
+                "ready_values": 14,
+                "spine_length": 20000,
+                "thunk_calls": 1,
+                "application_calls": 1
+              },
+              {
+                "mode": "null",
+                "exit_code": 1,
+                "error": "missing runtime value"
+              },
+              {
+                "mode": "hole",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              },
+              {
+                "mode": "indirection-cycle",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              },
+              {
+                "mode": "thunk-cycle",
+                "exit_code": 1,
+                "error": "cyclic evaluation of a recursive binding"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "parity": {
+      "accepted": 3199,
+      "rejected": 3884,
+      "runtime_rows": 80,
+      "runtime_executions": 160,
+      "cases": 7083,
+      "categories": {
+        "figure12": 43,
+        "hm-exhaustive": 1712,
+        "hm-generated": 5000,
+        "annotations": 126,
+        "readability": 18,
+        "state": 97,
+        "modules": 60,
+        "examples": 18,
+        "benchmarks": 9
+      },
+      "manifest_sha256": "95954a9e164e8bf3faf15de41f38c99df61bd365d01849c98c4c00b37006e6cf",
+      "compiler": "/Volumes/src/mlf/dist-newstyle/compile-margin/bootstrap/emlf-stage3",
+      "compiler_sha256": "2171934964af6ec4c7894e12e6c25ee4e1fb425122ae815c91128716678ae581"
+    },
+    "finished": 1791927324.528849
+  },
+  "native_backends": {
+    "schema_version": 2,
+    "complete": true,
+    "started": 1791927835.0004191,
+    "drivers": {
+      "RuntimeDriver": {
+        "llvm_sha256": "df88c7a4f73d50bfd2e234d5bf961113a9f7ce977d2870abd3376631d86e9cf9",
+        "binary_sha256": "66d98f6afe424926993b2d69e486e2dd1043aa5aef67d2497342ebc9dbda3b31"
+      },
+      "LLVMDriver": {
+        "llvm_sha256": "d09d50102ad23bc1ec2afb4efb19ba9be0ae9283cd4614b65c5df2b4da77d2c5",
+        "binary_sha256": "3ec2682533503d11832612fa449eb154703f8e11e6bd24e2027e6ccdebaa31c4"
+      }
+    },
+    "matrices": {
+      "standard": {
+        "rows": 536,
+        "backends": 2,
+        "fixtures": 487,
+        "cli_compiler": "/Volumes/src/mlf/dist-newstyle/compile-margin/bootstrap/emlf-stage3",
+        "environment": {
+          "MLF_BOOTSTRAP_INTERPRETER": "/Volumes/src/mlf/dist-newstyle/compile-margin/backends/RuntimeDriver",
+          "MLF_BOOTSTRAP_LLVM": "/Volumes/src/mlf/dist-newstyle/compile-margin/backends/LLVMDriver",
+          "MLF_BOOTSTRAP_COMPILER": "/Volumes/src/mlf/dist-newstyle/compile-margin/bootstrap/emlf-stage3",
+          "MLF_BOOTSTRAP_TIMEOUT_SECONDS": "1800",
+          "MLF_LLVM_TEST_ABI": "standard",
+          "MLF_LLVM_TEST_CFLAGS": "",
+          "MLF_LLVM_TEST_LIBS": "",
+          "MLF_LLVM_TEST_OPT": "-O2",
+          "GC_INITIAL_HEAP_SIZE": "536870912",
+          "GC_FREE_SPACE_DIVISOR": "1"
+        }
+      },
+      "compact-gc": {
+        "rows": 536,
+        "backends": 2,
+        "fixtures": 487,
+        "cli_compiler": "/Volumes/src/mlf/dist-newstyle/compile-margin/bootstrap/emlf-stage3",
+        "environment": {
+          "MLF_BOOTSTRAP_INTERPRETER": "/Volumes/src/mlf/dist-newstyle/compile-margin/backends/RuntimeDriver",
+          "MLF_BOOTSTRAP_LLVM": "/Volumes/src/mlf/dist-newstyle/compile-margin/backends/LLVMDriver",
+          "MLF_BOOTSTRAP_COMPILER": "/Volumes/src/mlf/dist-newstyle/compile-margin/bootstrap/emlf-stage3",
+          "MLF_BOOTSTRAP_TIMEOUT_SECONDS": "1800",
+          "MLF_LLVM_TEST_ABI": "compact-gc",
+          "MLF_LLVM_TEST_CFLAGS": "-I/Volumes/src/mlf/dist-newstyle/bootstrap-deps/bdwgc-8.2.12-install/include",
+          "MLF_LLVM_TEST_LIBS": "/Volumes/src/mlf/dist-newstyle/bootstrap-deps/bdwgc-8.2.12-install/lib/libgc.a",
+          "MLF_LLVM_TEST_OPT": "-O2",
+          "GC_INITIAL_HEAP_SIZE": "8388608",
+          "GC_FREE_SPACE_DIVISOR": "1"
+        }
+      }
+    },
+    "compiler": "/Volumes/src/mlf/dist-newstyle/compile-margin/bootstrap/emlf-stage3",
+    "compiler_sha256": "2171934964af6ec4c7894e12e6c25ee4e1fb425122ae815c91128716678ae581",
+    "seed": "/Volumes/src/mlf/dist-newstyle/build/aarch64-osx/ghc-9.14.1/mlf-0.1.0.0/x/emlf/opt/build/emlf/emlf",
+    "seed_sha256": "7fe03d28d006df1a34b2ec11203d3b91673e54efd86795ca810200f8c783092b",
+    "sources": {
+      "app/Main.hs": "db4457652adda84310f32be0d981a102d8b399d34f191846c9d15eda53cf58de",
+      "bootstrap/Bootstrap/Classes.emlf": "a7a3eacb3cb9c48c84887564c5669fb2d115ca48e1594c569c6353b809e3519c",
+      "bootstrap/Bootstrap/Compiler.emlf": "23d2d6e8bf4e03153030f0f0c4d06505322811263fd357fa2ee5b2bf3031bcaa",
+      "bootstrap/Bootstrap/Constraint.emlf": "9bd0875707a58662a4e5335f543997329b0d042179fe55ce8aadc20d5da9d05a",
+      "bootstrap/Bootstrap/Data.emlf": "1a798a05dc70440f4076b099adf40dca717752b077edb49e0dcbda78b3e31c4f",
+      "bootstrap/Bootstrap/Desugar.emlf": "d668bfb3dd66693907e72a087abffc6af35beab6e251ee4d1028b15ecb9da6c6",
+      "bootstrap/Bootstrap/Elaborate.emlf": "479ffdbc081928375d1486d047e9a7f6a4ff77ce1a8ba5773dcc3520294c8c79",
+      "bootstrap/Bootstrap/Evidence.emlf": "7e031bf638d709ac84822901cc3436223e2aaf0ec76aad46beb8ec2952c6d14d",
+      "bootstrap/Bootstrap/Fresh.emlf": "b6af7da1aceb0e81b68ee6a1100616b71f6558fa8f551de62dbddecc4d7483a0",
+      "bootstrap/Bootstrap/Graph/Solver.emlf": "b0c34592894e6f43e48470c05b10560e29bb113fbe475a34eae5968aaaff51e4",
+      "bootstrap/Bootstrap/Graph.emlf": "75229485db24e13e1d568122733270142a55eced1bf3b7f7498772d07445edfc",
+      "bootstrap/Bootstrap/IntMap.emlf": "a5cce880a0cac66d07c9b4e30e981766b80da8e5e4e6b311f235c03997d14dfa",
+      "bootstrap/Bootstrap/IntSet.emlf": "519784adfb1be285f1f056f1e93a25a68e13db7ad37e9852a6ddb18dff815a82",
+      "bootstrap/Bootstrap/Kind.emlf": "4195e17517b2eb3a6b12c0c96112b1b5b6d1119ef3e9f1ba0a1ecf043c831772",
+      "bootstrap/Bootstrap/Kinding.emlf": "517aec41c9260a6a463a3042717d589b97df175670ada755fd45fcdbc6f0d36c",
+      "bootstrap/Bootstrap/LLVM/Analysis.emlf": "7d6f03ac5e09110b11e540a71856ac269c449772350b6527d02bd2b47ffbcf6d",
+      "bootstrap/Bootstrap/LLVM/Build.emlf": "9a635d1ccdd0857eafb7b87825d234ed649b7c3728c83ea0a3c731323cf6c728",
+      "bootstrap/Bootstrap/LLVM/Codegen.emlf": "72b8ac720bfeffad2b9e7c53419f5de55fcb597dbcb4d15acc88dffcaef14597",
+      "bootstrap/Bootstrap/LLVM/Kernel.emlf": "fa7a94be851dfc285786712060fed906bdf81270552f870c066d5303c580e434",
+      "bootstrap/Bootstrap/LLVM/Native.emlf": "6138103c4bacbbbce4ae65aadd942380dce54c376b9062429e63e79c20e6f3bc",
+      "bootstrap/Bootstrap/LLVM/Optimize.emlf": "ff8b3ea2824d4456081c1f77090627a70c2703064928367a8378635f2ef03519",
+      "bootstrap/Bootstrap/LLVM/StrictFields.emlf": "bee5f7df5e8f7cb592342e51a42f1cd6c63f9024082b56dd76c347196af1e1b3",
+      "bootstrap/Bootstrap/LLVM.emlf": "eecd7f70b179d35d5265de4ea673b5125a334f8bddaf01ed38ff70906066892d",
+      "bootstrap/Bootstrap/Layout.emlf": "7eb281a16bac3adb35ff15dbfaf0150e5df7b0d4af8f046cbb6362a520f329e6",
+      "bootstrap/Bootstrap/Lexer.emlf": "702c67d0d3377ddc438b242762e1505945b91a959c94c737e117f0bafcee4161",
+      "bootstrap/Bootstrap/Map.emlf": "b7d5921dbae083f227e4562a257efaaac2f1b7e6f270073857c8ba43b674e08a",
+      "bootstrap/Bootstrap/Module.emlf": "079deb1f792e5a9ee15fdb741bf773495966b64bf633bbd187e3af745f8c5230",
+      "bootstrap/Bootstrap/Parsec.emlf": "ffc64213d5baf649aa40ccab44521af79a4aaf84cb268bd87cd70c2873f1500e",
+      "bootstrap/Bootstrap/Parser.emlf": "28a093dca7a7f86a1a14a8579405e7cfae3401e27bf214abdf31a87818fd484d",
+      "bootstrap/Bootstrap/Prelude.emlf": "e4908ab88f9cc3350e09ca09196db60abdfabb035055ff0ceff9a10a732c21d5",
+      "bootstrap/Bootstrap/Primitive.emlf": "1922e41a3935d7d87483bfccd87529b573f77e996e38ce3349117f91d0baeef7",
+      "bootstrap/Bootstrap/Runtime.emlf": "db6d959430c33ce1fde5192a5dfb596ddcb83132d115f10bf05d9b26e5d51ba5",
+      "bootstrap/Bootstrap/ST.emlf": "657c2b7f3958a8b14ed7a336908689f951480b45ff50059b242cfe3f3df7d7b0",
+      "bootstrap/Bootstrap/Separate.emlf": "b7ca7a48e8e33591f21ca2e1642a0e6ddb5fb7dfe3910480ae2173ee95885158",
+      "bootstrap/Bootstrap/Set.emlf": "bac505cf121011b0b325d5ea59d1bd8c2abd919a8158516540d707a813abbc77",
+      "bootstrap/Bootstrap/SourceEquality.emlf": "5fc11a57d42b85d7776ff76dee9872a7264ff7f920121833f221c277ec37f4af",
+      "bootstrap/Bootstrap/Std.emlf": "50c455982728484d3e3cc0359f4314f5bfeef0706e051701979fd529779428f7",
+      "bootstrap/Bootstrap/Surface.emlf": "f8d4f9abd96bec1582dcf21b30e8500677a448637854a25e7fc80b7a762ac437",
+      "bootstrap/Bootstrap/Types.emlf": "5a790419e00d4825ffbc5f06cca4b8e64813d8dabd69d34d4fdde926e013e1dd",
+      "bootstrap/Bootstrap/Unicode.emlf": "fdde8c09d3cd1bdddcbc6a3c65c6ab7668c8d60b6795d9a0c106a098c1b647b4",
+      "bootstrap/Bootstrap/X/Check.emlf": "b20e256bdc4d25ddfc3c76dc0c91083957133c3cf973de5a8244e40285defee6",
+      "bootstrap/Bootstrap/X/Parser.emlf": "3ea0d9cb15c9d08c2ca76c0c1f5d903d34978b6476075c0ebfa9655aa8841f03",
+      "bootstrap/Bootstrap/X/Pretty.emlf": "a7c23152c6297315e4ef0bf1dbba9685688cb68010c0194fa544c2c39f48f0e4",
+      "bootstrap/Bootstrap/X/Syntax.emlf": "40ef760efb420654dcc7f5c05334eafea81f21d0bc269f8e0d1de9ee5c5eda70",
+      "bootstrap/Bootstrap/X/Type.emlf": "ac916c2902d99edfce443f96930cdc52bdf341eff3007c38d203450400b9446c",
+      "bootstrap/LLVMDriver.emlf": "d04bd38721059978607996a92aef2347962ee8b4e5e071dd8e18b41076bc03fe",
+      "bootstrap/Main.emlf": "b594e6215a6f8002efb1c6f72b8b980d3a0eb6eea8e84303bf68b57550688026",
+      "bootstrap/RuntimeDriver.emlf": "ba943012e7f1d369bb3122c5098672ac2682263e76536001665dd7be89ab3990",
+      "bootstrap/tests/ConstructorProjection.emlf": "c83229426f6d79c8a7e272d784a18051cc27a70debee78866061559bd4936184",
+      "bootstrap/tests/EmbeddingPruning.emlf": "dc3fca089316752a726001b989c9589e662729c142fdeffd1d75bbd99a7c7bf9",
+      "bootstrap/tests/ForceReuse.emlf": "531afe40bd7fe51c29980edc835d28da5122d19269eb32e0d2c3de0b19ebda8a",
+      "bootstrap/tests/GraphConformance.emlf": "86f85d0ded341b6cb7908b58477a03a59c2e7d8e46286ebb88b227a702a54943",
+      "bootstrap/tests/GraphDense.emlf": "ae74d1ddac69caa83b2b25a532e222fae829dbb18d1e2cd4608247d48ef72b7e",
+      "bootstrap/tests/GraphDenseProbe.emlf": "c4c3c85eb2546d3a2cdcf21322e577106ac49198317a8e3ddd2fcfe906744e6f",
+      "bootstrap/tests/GraphScopes.emlf": "b0314b23c47a931edc10ceb0d54f7e529951f8b9f9bfe750a55b818d71d10f21",
+      "bootstrap/tests/GraphSmoke.emlf": "ef099955729cd0ed64966a503e06446d24129750b4315d7ced82a87832fc2f10",
+      "bootstrap/tests/GraphStack.emlf": "05d34749539cb8f58a3a2109792efdb370700238ff625eef56981b0219983874",
+      "bootstrap/tests/InferenceConformance.emlf": "fb62b18cdf0fad8e878643ca354d583b9a0b740a7263d72c359ffb2d522164d2",
+      "bootstrap/tests/IntegerContainers.emlf": "0e41282d32f44ba950789708d864d6d0dc14530d2bf9a81255036906858c9ea7",
+      "bootstrap/tests/LLVMBuild.emlf": "cadd61c0e94a3d3c75ec52c17bf840be186c5aac0c960eeeab604b01598533d5",
+      "bootstrap/tests/LexerCounters.emlf": "2d562a64d74c7e0f9be88c9f73ddf7b403ca978c91b6527a308f7b4fb9b552f0",
+      "bootstrap/tests/MapFolds.emlf": "90a1471cec114224a04d0cfc54e010ec1704f52494a2d855c268372a5f549098",
+      "bootstrap/tests/OptimizerQueries.emlf": "3f7e11a679bb53613c8fe27ca2e4b83a9c9338a8f8d1603fe6f731ac88700e58",
+      "bootstrap/tests/OrderedTraversal.emlf": "d8cb8e6ee8ad681f01a53b862a730f8129ced313abc2fb04a5c50589bfd51320",
+      "bootstrap/tests/PhaseProbe.emlf": "7d1c5186c10279a9dff66903c2bc9ca6a6ad092de73ef113911b0bf379304aa6",
+      "bootstrap/tests/PrimitiveMetadata.emlf": "c161d3ce921df72e7f81acc00da8afbb81092c5d2640acd1590a0c636a50b2fd",
+      "bootstrap/tests/RuntimeCases.emlf": "9f79ba21fcff9161c80f4939ad74d359bcda4a0e5cd27c516d0252f3fe35a1fa",
+      "bootstrap/tests/RuntimeSmoke.emlf": "ac612567558a34fd255f848b1b51cacf0dd4ecc697315b3181e413c4fc259c1a",
+      "bootstrap/tests/SolverReuse.emlf": "3188dadf4ab9da8f4b602f63b49d967dbdeb57cce00ab60c1a97e6ac6c36439d",
+      "bootstrap/tests/StateRuntime.emlf": "dc07e3f2594eeaf7e3b5f1fac15184132158ab7e8144d63168112c60e98e187f",
+      "bootstrap/tests/StateTypes.emlf": "383d8c20655254dd655ce70cd7cc74661522c46cfc1df62602cf59db4bf59fa0",
+      "bootstrap/tests/StrictFields.emlf": "18c4dc8ea3a89c8a330d41ce0b3ea5c206e20ac38d62ec881f622dc35b2e0c66",
+      "bootstrap/tests/Target.emlf": "d7c78b8cea49dd219f8fc92a43ae8be5a56a89fa10bea4631bc9b8beb9914e00",
+      "bootstrap/tests/TypeCache.emlf": "d6ff8e1afef0db13ebb0429c858f763b084d922daec0514994c5fffe2719d3d3",
+      "bootstrap/tests/classes-stage0.emlf": "b81c56da1ade9ca4f097ee972bd553a1723f336d1870dcc8c4c414d3ac8de23f",
+      "bootstrap/tests/foundation.emlf": "afb60cd83d96174ebbe3e2c20d2e8fd232dd208ebfc7b28d006bfbae15ee0bd9",
+      "bootstrap/tests/frontend-stage0.emlf": "34d9a97cb89e7b12d49a9774841d3ee166eabce08b456261620c6a6aa5c64415",
+      "bootstrap/tests/frontend.emlf": "3daa8a62aaf1f036b8549c984f4b8f6f957732db99be02ef6e449fdd1f2f7391",
+      "bootstrap/tests/parsec-stage0.emlf": "64d2b8819f7087968b15e89a33922d35b842ac1ce9970dc6aad90c3449c94777",
+      "bootstrap/tests/parser-corpus.emlf": "3240b6a72a9a549cf95cccec3edbabf0701f26fb5b2dd53ab171b45b71e63cb9",
+      "bootstrap/tests/prelude.emlf": "ddfc04ae6f168be36e41ae501a8304dde9462e3485fd1bec9b19ecdfd8cbd87e",
+      "mlf.cabal": "b4278e89e80f1e259a34652524bce0c160cd7e6f12b7ccd4ba89b5573794fa16",
+      "runtime/khash.h": "4582c7fd4b98f61339ce677bb1daa7a45a53075b112a494a335525c4bda72074",
+      "runtime/mlf_runtime.c": "907893cb216c1cd596d92a3707488d7dd121657f5f0629ab54b737b5f383fbe5",
+      "runtime/mlf_runtime.h": "21254da67997079b785702bffdfb67dfe87536468960ec3c50bd09aa71704fcc",
+      "scripts/bootstrap-backends.py": "7d8b440882f8fcd5dcbaf3491a7a1cbd75715fea38e35f5a4addb7d2f9e6773d",
+      "scripts/bootstrap-gc.py": "736c3ab4ab0ebb274cbea1d9bd84d845278101257bbff80b4a406be464185e82",
+      "src/MLF/Classes.hs": "e82f2d73541b9920c106ff195c94ae3cd3e4449c89d9cde6e4c77a747a649c20",
+      "src/MLF/Compiler.hs": "c96ac42dffc460ea1fae280ac7deeeee436f7d4935425f4e2b819e174d437077",
+      "src/MLF/Constraint.hs": "94f757a6619f2f860e314b8c8f46f15e0a5c743593cc57a5e51c958769ac2cc6",
+      "src/MLF/Data/Parser.hs": "f8bcb819c612ce6dc745233ccef0108b0b735c9fbe2b099bc23cf3646dac7a14",
+      "src/MLF/Data.hs": "f66abdf5f899f255bf7d127a716c9c5cae2981141c5002867804013f2d8c12dc",
+      "src/MLF/Desugar.hs": "8e96a8253dee04c6b980a9ab21cd69b7ab33a8bb23c12876d1d72fe65449c8a4",
+      "src/MLF/Elaborate.hs": "ed6b89f7563721373bc4f5cdfb0bf89c902be9810043645865d35d1b0a0e6776",
+      "src/MLF/Evidence.hs": "898ee8cd42348da67179f9d02a5c0a2f2e57800b1a63f45dc6a2dd0d62b08d41",
+      "src/MLF/Graph/Solver.hs": "2ceb267bca7c2202b3f50d706ff14e0084fc4b590022a9cafd1785fce69c6f23",
+      "src/MLF/Graph.hs": "6456fc83fdcf1cc2fd3365c1c40d2f608d3a34f16b106587d817973cb9b93d51",
+      "src/MLF/Kind.hs": "d6eec39e54a8c38c6f62635974385e7afdd018055c247f8ab8e3fa0e1d992d3b",
+      "src/MLF/Kinding.hs": "93ae79fd258a0e8289fa5fcbd8edd1ea72b5869545ed06e38f47900ffe6419c7",
+      "src/MLF/LLVM/Analysis.hs": "e43fa8f500626066180c983a9d11cfff1c281a4eda51ed06b69ec5f2f990e64e",
+      "src/MLF/LLVM/Codegen.hs": "cccbd60913202985792b882bc178fdc69221e63090cf9a7a76269915a50f2799",
+      "src/MLF/LLVM/Kernel.hs": "bedbfddb3bc571509ed1f3950a871fa6b324c21e699b82a7048a163324980cda",
+      "src/MLF/LLVM/Optimize.hs": "0e5f0d2f8b35cab7f80c0aefcd2cd066071fa7f63884c301a492a79babcb9056",
+      "src/MLF/LLVM/StrictFields.hs": "668aa2061a7e3799010b8ac407a7260ddbe8a2c501cf4a237df386d4cbc117ac",
+      "src/MLF/LLVM.hs": "6324e4c99296bb964b0542e82bcc10e7b5bce4f698598541354a17e8fd92f481",
+      "src/MLF/Layout.hs": "eec74eec6c241760e63b8cb331ba662e50b292f9e774394a3292e776649c0c6b",
+      "src/MLF/Module/Syntax.hs": "9fed594b6c2b5cdb913672b4db1b17d7d420a632eaf4d2b3a9753926bc817298",
+      "src/MLF/Module.hs": "5dbd9a5d42db5395a29d6fe3a84d743a8ff95df26e12ed81fb0285e58f88cd75",
+      "src/MLF/Parser.hs": "a48af42261f447e101f6925787bcf05e5ad9a8771cc01100f9b35bbb759c0648",
+      "src/MLF/Prelude.hs": "2ea7635056e36d7fe1102adf592984efb6e3218ece8e5c6f43ff5bdc91ec5970",
+      "src/MLF/Primitive.hs": "6ffcd3de18f7dabe59e5f10e894d266b01bd4d54f82f554b69e2b195538afb8c",
+      "src/MLF/Runtime.hs": "ef5c4a44f65820878ee57d458f3299ff61f9720abfe1024126dea2c6a2242c6c",
+      "src/MLF/Separate.hs": "198cb92c08d68cffecad8aaaecf4624a8d7e265e64febb9841279f5979e51786",
+      "src/MLF/Surface.hs": "b1ba74dffa7139c02f92cbec08e928fec3953c376fde89b61240484c54c1beab",
+      "src/MLF/Syntax.hs": "81441237f6708d3749ff7c1d42e01c0b063c1eb796118cc281e702cc309cb9a9",
+      "src/MLF/X/Check.hs": "802eab4fba00135bcbcbc7c31845538a87fd67d52d9d845334893d2ab7204922",
+      "src/MLF/X/Parser.hs": "8a33271c0bd453af8e76f8781a24b368fcf99e98a9e70d4bac5bfda4416f9216",
+      "src/MLF/X/Pretty.hs": "b7b22a923d4b138bc59c990ede2bbe23ff6e02d9a30d9bcddcf7393e0dc5a2c2",
+      "src/MLF/X/Syntax.hs": "050a21bb876a344f35be5d520451229124bb8f4ca89de21e9ec0b03cb6e5212e",
+      "src/MLF/X/Type.hs": "66f2c899b846439e94b5dc7e70757ca75d14d655e50b7910ad20e2572ebe681c",
+      "test/BackendCases.hs": "3cde1bff4949f8565a8691166af5299cb0e28e2aeab8c847af42add1cd019c39",
+      "test/BackendMain.hs": "7be3b2d90ebe4919ec00cc8a943f37b11da61ec2d3a8a96b618bdde5c34d1171",
+      "test/Backends.hs": "1268a7397aeae1d032cfd47e5d1b91204ddcbfdcc345d1a7743be1dd5efa54f8",
+      "test/BenchmarkHarnessMain.hs": "d037423521f139ec3ef48a10b75a1e11bb65b295e5f5ae9c760d5f86a0b8a976",
+      "test/BoolConditions.hs": "6aa03c5cbcfbaaa0356274d7f01cca4988fddf4fe2fcb35f4837d364afe50ef1",
+      "test/BootstrapPortMain.hs": "35dd7cff7de908b5933e81be36e925476662a067f5a68d64bc2d55d0ba2dc1e4",
+      "test/BootstrapPrimitives.hs": "8a049f5a254de27811c88d9ee6b5d92a5fc3e238b34c0b1c264b4d0fb923f405",
+      "test/ByteArrays.hs": "b43812f999d8d273a79eacb1588796401a616eeadd5d5b59039adbe8693d5397",
+      "test/Computations.hs": "20bad74bf600fe6cab1826ffdfb1b7c540bbab41b406f90e46c2f41cf8558207",
+      "test/ConstructorProjection.hs": "da901313853248b7e759f3fc8aaa4c083a715a9adb641a1ad31adcccc4a79c5b",
+      "test/DNA.hs": "76826075804fd57f38ddebf8f6093fde6a810d83fdf4cb0284125ae64e3ba00d",
+      "test/Datatypes.hs": "7d09627717ef652eadd1a88beb9a19b656f36e912eca3babdbd32f8ea5e6e72a",
+      "test/DoNotation.hs": "c2d400716e0559fe869bcdc43b3c1e11b268782bcdad274cd8265a07ae47a098",
+      "test/EmbeddingPruning.hs": "6cb508a392aaf61b1cfc69e8f779242d4a680714799d48ac0d9d968bac7bfc86",
+      "test/EnvironmentAccess.hs": "d9c6fb53579348220d27e716f2a4676da657546c51c59dbf9cd0b6bf0599689f",
+      "test/Figure12.hs": "a8a9861c917510763816009e0ac59af1f237185fa824ce556153b156fb1edb0c",
+      "test/Figure12Main.hs": "270b2a6ffb527076e48bf34850ce907f71bc5ea1332f4c836b8dd32310af5423",
+      "test/ForceReuse.hs": "5fe1d6aa368f771c4d83c7923e2d1e78b8040fa86eaac27059a361b537d4196d",
+      "test/GraphSolver.hs": "8fb8a905d5d1bc3f4911a7c8326e185d9f144b4af12a05ccbbb9bc55b23311df",
+      "test/GraphUnification.hs": "dbfe9dd4ac0fdb7120b8bd9f397ef010e842797aa12f8893eb328e971b6c358f",
+      "test/GraphUnificationReference.hs": "73b71ace8e41eb2ec13d2d27be2b3ad81b9ec85cb2cff5d518511c7ddd92455b",
+      "test/GraphValidation.hs": "d48a10d5d05b1ef12dc42abc655df4fe1016a1aa3b92877b38f58288b4720864",
+      "test/HigherOrderSpecialization.hs": "a593fc55ffb9af479f47f1e094702cf3359cb2db09e042ab1ec6c02eaed324fd",
+      "test/IOTests.hs": "0a82f993d8f14ec0a93eedfe3a5d9623deb48d04b5fa359373f0de5f6825420c",
+      "test/Main.hs": "09344dd1987460d108a2be74d8bd1caf308b4f58142491d13e5178e6dd0d64c7",
+      "test/ModuleBackends.hs": "789d40b574650b4293b895ea5e8c03987260ba50741ab99a6a7d7a3deae6d6c4",
+      "test/Modules.hs": "69af6c6092eaf5a855ebe9c86ed19ff0d90c2c8af6812da56ad95144b5897cb2",
+      "test/NativeOptimization.hs": "9bddb9b8f64c65be8e9c7b8aa13e720d7c1f320c58da766d99e763dcbc5c43a1",
+      "test/NumericArrays.hs": "d2c1a2b82127929aa00f10c9543149e8dc20c728ecf353f7239ebdffb3532f04",
+      "test/OptimizerQueries.hs": "0c551f7016d8f88694da44a93f7c4c7ac0ad5c58807bdd9c6ae0109746f8942f",
+      "test/Oracle.hs": "c7726b6cfd6b1f681b379495ff5ff1a1cc1ffbfe2fb51c2c99af19317bd0ead6",
+      "test/PreludeTests.hs": "8c5983db0179cc08f16db494af5df0fa1966704cf626e3c893d05fe13c9648e6",
+      "test/Readability.hs": "ab637b0845a9948e7a65189a056b1ecac89c10a72bb10faafea2be674cc74dac",
+      "test/Separate.hs": "1c7aa6a194758eb6455493d42c8d2e946639eb022ee827b30d84709d8c40f084",
+      "test/SeparateBackends.hs": "ef22eac98dcb9248eae68ad60875fafedea8759dd00f0bd1622bd4e97754cc91",
+      "test/Snake.hs": "53371de9b259e682187a09d0e76b9e5af92cdfbf87121e3f67706ab5690a5e75",
+      "test/StateCases.hs": "45e94b2c3971134cdaa222559cea2f6a11a90270f44041e88cd9683ad76aa7c4",
+      "test/StateRuntime.hs": "63f85411a038a94859e7746bdff79c597245a340918d8a93aa50511b54f833ab",
+      "test/StateTypes.hs": "1bd4c51aa4ba946fe4176471b943cad5846ad43a9c9b49d392bde63d3fa26118",
+      "test/StrictFieldAnalysis.hs": "b8ac1312b47634799dd9ae41bcd643949b36b03d69f0a09746e3690ee02a3429",
+      "test/StrictFields.hs": "38073931f387843e1ddc3ed198023abc01bfea81c580d3c7c395482caf96e52d",
+      "test/SurfaceSyntax.hs": "03371fdca749c7b341e09e56860b373a5f6b122e15277723db400a898e42e3c2",
+      "test/Typeclasses.hs": "0d874093f261c01d1b406ac533ef4c3f870e113586ae52d0683645ab6666a598",
+      "test/native_trace.c": "f6dde7bf8073d0baf6a845944cc4dfbdb290f7388f68060571563a9d39e402a7"
+    },
+    "environment": {
+      "MLF_BOOTSTRAP_INTERPRETER": "/Volumes/src/mlf/dist-newstyle/compile-margin/backends/RuntimeDriver",
+      "MLF_BOOTSTRAP_LLVM": "/Volumes/src/mlf/dist-newstyle/compile-margin/backends/LLVMDriver",
+      "MLF_BOOTSTRAP_COMPILER": "/Volumes/src/mlf/dist-newstyle/compile-margin/bootstrap/emlf-stage3",
+      "MLF_BOOTSTRAP_TIMEOUT_SECONDS": "1800",
+      "MLF_LLVM_TEST_ABI": "standard",
+      "MLF_LLVM_TEST_CFLAGS": "",
+      "MLF_LLVM_TEST_LIBS": "",
+      "MLF_LLVM_TEST_OPT": "-O2",
+      "GC_INITIAL_HEAP_SIZE": "536870912",
+      "GC_FREE_SPACE_DIVISOR": "1"
+    },
+    "allocator": {
+      "profile": "BDWGC compact",
+      "flags": {
+        "cflags": [
+          "-I/Volumes/src/mlf/dist-newstyle/bootstrap-deps/bdwgc-8.2.12-install/include"
+        ],
+        "libs": [
+          "/Volumes/src/mlf/dist-newstyle/bootstrap-deps/bdwgc-8.2.12-install/lib/libgc.a"
+        ]
+      },
+      "io_threshold": 1048576,
+      "macos_stack_bytes": 67108864
+    },
+    "finished": 1791928508.131644
+  },
+  "seed_test_suites": {
+    "command": [
+      "cabal",
+      "test",
+      "mlf-tests",
+      "figure12-tests",
+      "benchmark-harness-tests",
+      "-j1",
+      "--test-show-details=direct"
+    ],
+    "passed": true,
+    "compiler_checks": 636,
+    "figure12_expressions": 43,
+    "supplementary_checks": 36,
+    "benchmark_harness_tests": 53,
+    "log": "dist-newstyle/compile-margin/cabal-tests.log",
+    "log_sha256": "2cd1a4fcd26eda31f04b71800ff9543b5160c81b79f43213523ab5fb74f57bf6"
+  },
+  "focused_port_tests": {
+    "fixtures": [
+      "GraphDense",
+      "SolverReuse"
+    ],
+    "passed": true,
+    "backends_per_fixture": 2,
+    "normalization_oracle_cases": 624,
+    "normalization_result_hash": 685423717,
+    "rejected_corrupt_graphs_and_indexes": 6,
+    "runs": [
+      {
+        "command": [
+          "cabal",
+          "test",
+          "bootstrap-port-tests",
+          "-j1",
+          "--test-options=--only GraphDense SolverReuse",
+          "--test-show-details=direct"
+        ],
+        "log": "dist-newstyle/compile-margin/port-tests.log",
+        "log_sha256": "66236134efcd260c28a812dd10e0f5fb16524a930e5337872985ecbfa6a5394b",
+        "exit_code": 1,
+        "outcome": "SolverReuse passed both backends. GraphDense initially had a fixture layout parse error, repaired before the successful rerun below."
+      },
+      {
+        "command": [
+          "cabal",
+          "test",
+          "bootstrap-port-tests",
+          "-j1",
+          "--test-options=--only GraphDense",
+          "--test-show-details=direct"
+        ],
+        "log": "dist-newstyle/compile-margin/graph-dense-tests.log",
+        "log_sha256": "5f7fb5c05a91cb7f818fbb16c909b135b159c62e3ba4f222fd15124a82e5ea73",
+        "exit_code": 0,
+        "outcome": "GraphDense passed both backends and the independent Haskell oracle."
+      }
+    ]
+  }
+}

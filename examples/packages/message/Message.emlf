@@ -1,0 +1,4 @@
+module Message (Message(..), render) where
+
+data Message = Message String
+render (Message text) = text

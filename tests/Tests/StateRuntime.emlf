@@ -1,0 +1,15 @@
+module Tests.StateRuntime where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as OS
+import qualified Tests.Helpers as H
+import Tests.Helpers (Quint(..), Sext(..))
+import Tests.Backends
+import qualified Tests.Backends as B
+import qualified Bootstrap.Compiler as C
+import Bootstrap.LLVM (emitLLVM)
+import Tests.StateCases (stateRuntimeCases)
+import Tests.StateTypes (checkedStateSource)
+
+stateRuntimeTests : B.Backends -> (List ( (Pair (String) (IO Unit)) ))
+stateRuntimeTests backends = (S.concatMap (\(Quad label source expected failure) -> (Cons (Pair (H.append "ST runtime: " label) do { result <- (checkedStateSource source); do { (if (H.eq label "bounded-non-tail-state-worker") then do { llvm <- (S.either H.fail return (emitLLVM (C.compiledTerm result))); (S.unless (S.all (\section1 -> (H.contains section1 llvm)) (Cons "define private ptr @mlf.st.worker." (Cons "icmp eq i64 %st.fuel, 0" (Cons "call ptr @mlf_execute_st_lazy(" (Cons "call ptr @mlf_st_new_array(" (Cons "state.valid." (Cons "getelementptr ptr, ptr " Nil))))))) (H.fail "bounded direct state execution was not exercised")) } else (return Unit)); do { (if (H.elem label (Cons "bounded-tail-state-worker" (Cons "bounded-mixed-tail-state-worker" Nil))) then do { llvm <- (S.either H.fail return (emitLLVM (C.compiledTerm result))); (S.unless ((H.contains "musttail call ptr @mlf.st.worker." llvm) && (H.contains "(i64 %st.fuel," llvm)) (H.fail "state tail transfer did not preserve its continuation budget")) } else (return Unit)); do { (if (H.eq label "single-use-action-alias") then do { llvm <- (S.either H.fail return (emitLLVM (C.compiledTerm result))); (S.unless ((H.contains "state.valid." llvm) && ((S.not (H.contains "call ptr @mlf_st_read_array(" llvm)) && (S.not (H.contains "call ptr @mlf_execute_st_lazy(" llvm)))) (H.fail "single-use action alias fell back to generic execution")) } else (return Unit)); do { observed <- (B.execute backends ProgramEntry (Input "" false) (C.compiledTerm result)); (let { outcomeMatches = (case (Pair failure (B.outcome observed)) of { (Pair Nothing (Right Unit)) -> true; (Pair (Just expectedError) (Left actual)) -> (H.eq (H.show actual) expectedError); _ -> false }) } in (S.unless (outcomeMatches && ((H.eq (B.output observed) expected) && ((H.null (B.stderrOutput observed)) && (H.null (B.remaining observed))))) (H.fail (H.show observed)))) } } } } }) Nil)) stateRuntimeCases)

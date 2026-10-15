@@ -328,7 +328,7 @@ class HarnessTests(unittest.TestCase):
                 " while not pathlib.Path(name).exists():\n"
                 "  assert time.monotonic()<end, 'independent phases did not overlap'\n"
                 "  time.sleep(0.001)\n"
-                "if '--emit-llvm' in sys.argv:\n"
+                "if '--emit-llvm' in sys.argv or '--module-to-llvm' in sys.argv:\n"
                 " pathlib.Path('frontend.started').touch(); wait_for('runtime.started')\n"
                 " time.sleep(0.1); print('IR')\n"
                 "elif '-c' in sys.argv:\n"
@@ -352,6 +352,13 @@ class HarnessTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 B.build(self.workload, "mlf", directory / "first", paths, ROOT / "runtime/mlf_runtime.c", [], None, 10)
             B.build(self.workload, "mlf", directory / "second", paths, ROOT / "runtime/mlf_runtime.c", [], None, 10)
+            separate = directory / "separate"
+            separate.mkdir()
+            _, linked = B.compile_native.build(compiler=compiler, clang=compiler,
+                source=directory / "Main.mlfi", runtime=ROOT / "runtime/mlf_runtime.c",
+                directory=separate, timeout=10)
+            self.assertIn("--module-to-llvm", linked["stages"][0]["command"])
+            self.assertNotIn("--emit-llvm", linked["stages"][0]["command"])
 
     def test_parallel_phase_failure_and_timeout_reap_every_child(self):
         for fails in (True, False):

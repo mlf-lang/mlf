@@ -162,6 +162,7 @@ typedef enum {
     READ_FILE, WRITE_FILE, FILE_EXISTS, CANONICAL_PATH, GET_ARG_COUNT, GET_ARG, PUT_ERR, EXIT_WITH,
     GET_EXECUTABLE_PATH, GET_CONTENTS,
     ST_RETURN, ST_BIND, RUN_ST, NEW_ST_ARRAY, READ_ST_ARRAY, WRITE_ST_ARRAY, LENGTH_ST_ARRAY,
+    GET_ENV, SET_ENV, UNSET_ENV, RUN_PROCESS, LIST_DIRECTORY, DIRECTORY_EXISTS, FILE_DIGEST, ACQUIRE_FILE_LOCK, RELEASE_FILE_LOCK,
     PRIMITIVE_COUNT
 } Primitive;
 
@@ -1031,6 +1032,7 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
     case READ_FILE: case WRITE_FILE: case FILE_EXISTS: case CANONICAL_PATH:
     case GET_ARG_COUNT: case GET_ARG: case PUT_ERR: case EXIT_WITH:
     case GET_EXECUTABLE_PATH: case GET_CONTENTS:
+    case GET_ENV: case SET_ENV: case UNSET_ENV: case RUN_PROCESS: case LIST_DIRECTORY: case DIRECTORY_EXISTS: case FILE_DIGEST: case ACQUIRE_FILE_LOCK: case RELEASE_FILE_LOCK:
         return action(p, a, b);
     case WRITE_INT_ARRAY: return array_write_action(WRITE_INT_ACTION,a,b,c);
     case WRITE_DOUBLE_ARRAY: return array_write_action(WRITE_DOUBLE_ACTION,a,b,c);
@@ -1101,7 +1103,8 @@ static MlfValue *primitive(Primitive p, MlfEnv *arguments) {
         1,2,1,1,0,1,2,1,2,2,2,2,2,3,2,2,2,1,
         2,2,2,2,1,2,2,1,2,2,2,3,1,2,2,3,1,2,2,3,1,1,3,0,0,2,3,2,
         1,2,3,1,2,1,1,1,2,1,1,2,1,1,0,1,1,1,0,0,
-        1,2,1,2,2,3,1
+        1,2,1,2,2,3,1,
+        1,2,1,2,1,1,1,1,1
     };
     if (arguments->count < arities[p]) {
         MlfValue *result = value(PRIMITIVE);
@@ -1221,6 +1224,7 @@ MlfValue *mlf_prim1(int64_t p, MlfValue *a) {
     case LENGTH_BYTE_ARRAY: case BYTE_ARRAY_FROM_STRING:
     case STRING_LENGTH: case STRING_FROM_CODE: case READ_DOUBLE: case DOUBLE_TO_BITS: case DOUBLE_FROM_BITS:
     case PANIC: case READ_FILE: case FILE_EXISTS: case CANONICAL_PATH: case GET_ARG: case PUT_ERR: case EXIT_WITH:
+    case GET_ENV: case UNSET_ENV: case LIST_DIRECTORY: case DIRECTORY_EXISTS: case FILE_DIGEST: case ACQUIRE_FILE_LOCK: case RELEASE_FILE_LOCK:
     case ST_RETURN: case RUN_ST: case LENGTH_ST_ARRAY:
         return primitive_result((Primitive)p,a,NULL,NULL);
     default: fail("unary primitive arity mismatch");
@@ -1234,6 +1238,7 @@ MlfValue *mlf_prim2(int64_t p, MlfValue *a, MlfValue *b) {
     case FORMAT_DOUBLE: case NEW_INT_ARRAY: case READ_INT_ARRAY: case NEW_DOUBLE_ARRAY: case READ_DOUBLE_ARRAY:
     case NEW_BYTE_ARRAY: case READ_BYTE_ARRAY: case READ_INT_TABLE:
     case STRING_CODE_AT: case COMPARE_STRING: case SEQ: case WRITE_FILE:
+    case SET_ENV: case RUN_PROCESS:
     case ST_BIND: case NEW_ST_ARRAY: case READ_ST_ARRAY:
         return primitive_result((Primitive)p,a,b,NULL);
     default: fail("binary primitive arity mismatch");
@@ -1508,6 +1513,8 @@ static MlfValue *executable_path(void) {
     free(resolved);
     return result;
 }
+
+#include "mlf_system.h"
 
 static MlfValue *read_contents(void) {
     char *line = NULL;
@@ -1897,6 +1904,16 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
         case GET_ARG: result = get_argument(operation->as.action.first); break;
         case GET_EXECUTABLE_PATH: result = executable_path(); break;
         case GET_CONTENTS: result = read_contents(); break;
+        case GET_ENV: result = os_getEnv(operation->as.action.first); break;
+        case SET_ENV: result = os_setEnv(operation->as.action.first,operation->as.action.second); break;
+        case UNSET_ENV: result = os_unsetEnv(operation->as.action.first); break;
+        case RUN_PROCESS: result = os_runProcess(operation->as.action.first,operation->as.action.second); break;
+        case LIST_DIRECTORY: result = os_listDirectory(operation->as.action.first); break;
+        case DIRECTORY_EXISTS: result = os_directoryExists(operation->as.action.first); break;
+        case FILE_DIGEST: result = os_fileDigest(operation->as.action.first); break;
+        case ACQUIRE_FILE_LOCK: result = os_acquireFileLock(operation->as.action.first); break;
+        case RELEASE_FILE_LOCK: result = os_releaseFileLock(operation->as.action.first); break;
+
         case PUT_ERR:
             write_error(operation->as.action.first);
             result = mlf_constructor(0,0); break;
