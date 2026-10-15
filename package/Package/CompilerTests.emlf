@@ -79,8 +79,10 @@ nativeTest c target = do
   (Cons (Cons "--compiler" (Cons (compiler c) Nil))
   (Cons (Cons "--runtime" (Cons (root c ++ "/runtime/mlf_runtime.c") Nil))
   (Cons (Cons "--build-dir" (Cons build Nil))
-  (Cons (Cons "build" (Cons "--target" (Cons target Nil))) Nil))))))
- run c args
+  (Cons (S.snoc (O.words "--timeout 21600 build --target") target) Nil))))))
+ putStrLn ("+ " ++ S.intercalate " " args)
+ code <- O.exec (root c) args "" "" "" 21600
+ O.require (code == 0) ("native test build failed (" ++ showInt code ++ ")")
  return (build ++ "/bin/" ++ target)
 transports : TestContext -> IO Unit
 transports c = do
@@ -119,7 +121,7 @@ prepareDrivers c = do
  extra <- stack c
  drivers <- S.mapM (\name -> do
   let ir = output c ++ "/" ++ name ++ ".ll"
-  capture c (Cons (compiler c) (Cons "-i" (Cons (root c ++ "/bootstrap") (Cons "--emit-llvm-gc" (Cons (root c ++ "/bootstrap/" ++ name ++ ".emlf") Nil))))) ir
+  captureWithin c (Cons (compiler c) (Cons "-i" (Cons (root c ++ "/bootstrap") (Cons "--emit-llvm-gc" (Cons (root c ++ "/bootstrap/" ++ name ++ ".emlf") Nil))))) ir 21600
   let objects = if eqString name "RuntimeDriver" then Cons (output c ++ "/runtime-traced.o") (Cons (output c ++ "/trace.o") Nil) else Cons (output c ++ "/runtime.o") Nil
   let binary = output c ++ "/" ++ name
   link c ir objects flags binary extra
