@@ -1,0 +1,23 @@
+module Tests.OptimizerQueries where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as OS
+import qualified Tests.Helpers as H
+import Tests.Helpers (Quint(..), Sext(..))
+import qualified Bootstrap.LLVM.Optimize as O
+import qualified Bootstrap.X.Syntax as X
+
+name : Int -> XName
+name n = (XName n "reused")
+
+pair : XErased -> XErased -> XErased
+pair a b = (XEApp (XEApp (XEConstructor "Pair") a) b)
+
+function : Int -> XErased
+function nodes = (S.foldr (S.compose XEAbs name) (XEVar (name 1)) (S.range 1 (nodes - 1)))
+
+lets : XErased -> Int
+lets expression = (case expression of { (XEAbs _ b) -> (lets b); (XEApp f a) -> ((lets f) + (lets a)); (XELet _ a b) -> ((1 + (lets a)) + (lets b)); (XELetRec ds b) -> (((H.length ds) + (S.sum (S.map (S.compose lets S.snd) ds))) + (lets b)); (XECase a bs) -> ((lets a) + (S.sum (S.concatMap (\comprehension1 -> case comprehension1 of { (XErasedAlternative _ b) -> (Cons (lets b) Nil); _ -> Nil }) bs))); _ -> 0 })
+
+optimizerQueryTests : (List ( (Pair (String) (IO Unit)) ))
+optimizerQueryTests = (Cons (Pair "optimizer queries: inclusive small-lambda size boundary" ((H.forM_ (S.range 20 28)) (\nodes -> (let { f = (name 100) } in (let { term = (XELet f (function nodes) (pair (XEVar f) (XEVar f))) } in (let { wanted = (if (nodes <= 24) then 0 else 1) } in (S.unless (H.eq (lets (O.optimize term)) wanted) (H.fail (H.append "lambda size threshold changed at " (H.show nodes)))))))))) (Cons (Pair "optimizer queries: zero, one, and multiple lambda uses" ((H.forM_ (S.range 0 5)) (\uses -> (let { f = (name 100) } in (let { body = (S.foldr pair (XEInt 42) (S.replicate uses (XEVar f))) } in (let { term = (XELet f (function 80) body) } in (let { wanted = (if (uses <= 1) then 0 else 1) } in (S.unless (H.eq (lets (O.optimize term)) wanted) (H.fail (H.append "lambda occurrence count changed at " (H.show uses))))))))))) (Cons (Pair "optimizer queries: disjoint scopes reuse an identity" (let { n = (name 0) } in (let { term = (XELet n (XEApp (XEConstructor "Keep") (XEInt 19)) (XELet n (XEInt 42) (XEVar n))) } in (S.unless (H.eq (O.optimize term) (XEInt 42)) (H.fail "a shadowed outer binding survived"))))) (Cons (Pair "optimizer queries: captured and recursive uses remain shared" (let { f = (name 100) } in (let { loop = (name 101) } in (let { argument = (name 102) } in (let { rhs = (XEAbs argument (pair (XEVar f) (XEApp (XEVar loop) (XEVar argument)))) } in (let { term = (XELet f (function 80) (XELetRec (Cons (Pair loop rhs) Nil) (pair (XEVar f) (XEVar loop)))) } in (S.unless (H.eq (lets (O.optimize term)) 2) (H.fail "a multiply captured lambda was duplicated")))))))) (Cons (Pair "optimizer queries: pattern binders keep their own identity" (let { n = (name 0) } in (let { term = (XELet n (function 80) (XECase (XEVar (name 1)) (Cons (XErasedAlternative (XConstructorPattern "Keep" (Cons (Just n) Nil)) (XEVar n)) Nil))) } in (S.unless (H.eq (lets (O.optimize term)) 0) (H.fail "a pattern occurrence retained an unrelated binding"))))) Nil)))))

@@ -1,0 +1,68 @@
+module Tests.Bytes where
+import Bootstrap.Types
+import Prelude hiding (readFile, writeFile)
+import qualified Bootstrap.Std as S
+import qualified Tests.Helpers as H
+import qualified Package.OS as O
+
+data Bytes = Bytes (List Int)
+instance H.Eq Bytes where { eq (Bytes a) (Bytes b) = S.eqList eqInt a b }
+instance H.Show Bytes where { show = hex }
+instance H.Append Bytes where { append (Bytes a) (Bytes b) = Bytes (S.append a b) }
+instance H.Sized Bytes where { length (Bytes xs) = S.length xs; null (Bytes xs) = S.null xs }
+pack xs = Bytes xs
+unpack (Bytes xs) = xs
+empty = Bytes Nil
+length (Bytes xs) = S.length xs
+null (Bytes xs) = S.null xs
+append (Bytes a) (Bytes b) = Bytes (S.append a b)
+concat xs = Bytes (S.concat (S.map unpack xs))
+singleton x = Bytes (Cons x Nil)
+snoc (Bytes xs) x = Bytes (S.snoc xs x)
+head (Bytes xs) = S.head xs
+last (Bytes xs) = S.last xs
+init (Bytes xs) = Bytes (S.init xs)
+take n (Bytes xs) = Bytes (S.take n xs)
+drop n (Bytes xs) = Bytes (S.drop n xs)
+index (Bytes xs) n = S.index xs n
+break p (Bytes xs) = case S.break p xs of { Pair a b -> Pair (Bytes a) (Bytes b) }
+replicate n x = Bytes (S.replicate n x)
+hex (Bytes xs) = S.concatStrings (S.map (\x -> stringSlice "0123456789abcdef" (quotInt x 16) 1 ++ stringSlice "0123456789abcdef" (remInt x 16) 1) xs)
+fromHex text = Bytes (hexAt text 0)
+hexAt : String -> Int -> List Int
+hexAt text i = if i >= stringLength text then Nil else
+  if i + 1 >= stringLength text then panic "truncated binary hex" else Cons (hexDigit (stringCodeAt text i) * 16 + hexDigit (stringCodeAt text (i + 1))) (hexAt text (i + 2))
+hexDigit code = if code >= 48 && code <= 57 then code - 48 else if code >= 97 && code <= 102 then code - 87 else panic "invalid binary hex"
+encode text = Bytes (S.concatMap encodeCode (S.map (stringCodeAt text) (S.range 0 (stringLength text - 1))))
+encodeCode c = if c < 128 then Cons c Nil else if c < 2048 then Cons (192 + quotInt c 64) (Cons (128 + remInt c 64) Nil) else
+  if c < 65536 then Cons (224 + quotInt c 4096) (Cons (128 + remInt (quotInt c 64) 64) (Cons (128 + remInt c 64) Nil)) else
+    Cons (240 + quotInt c 262144) (Cons (128 + remInt (quotInt c 4096) 64) (Cons (128 + remInt (quotInt c 64) 64) (Cons (128 + remInt c 64) Nil)))
+decode (Bytes xs) = S.mapEither S.concatStrings (decodeCodes xs)
+decodeCodes : List Int -> Either String (List String)
+decodeCodes xs = case xs of
+  Nil -> Right Nil
+  Cons a rest -> if a < 128 then S.mapEither (Cons (stringFromCode a)) (decodeCodes rest) else do
+    let count = if a >= 194 && a < 224 then 1 else if a >= 224 && a < 240 then 2 else if a >= 240 && a <= 244 then 3 else 0
+    S.ensure (count > 0 && S.length (S.take count rest) == count) "invalid UTF-8 input"
+    let bytes = S.take count rest
+    S.ensure (S.all (\b -> b >= 128 && b < 192) bytes) "invalid UTF-8 input"
+    let code = S.foldl (\x b -> x * 64 + b - 128) (a - (if count == 1 then 192 else if count == 2 then 224 else 240)) bytes
+    S.ensure (code >= (if count == 1 then 128 else if count == 2 then 2048 else 65536) && code <= 1114111 && (code < 55296 || code > 57343)) "invalid UTF-8 input"
+    S.mapEither (Cons (stringFromCode code)) (decodeCodes (S.drop count rest))
+decodeText bytes = S.either panic S.id (decode bytes)
+latin1 (Bytes xs) = S.concatStrings (S.map stringFromCode xs)
+readFile path = do
+  tool <- getEnv "MLF_TEST_BINARY_FILES"
+  scratch <- getEnv "MLF_TEST_WORK"
+  O.require (stringLength tool > 0 && stringLength scratch > 0) "missing binary transport configuration"
+  let result = scratch ++ "/binary-transport.hex"
+  code <- O.exec "" (Cons tool (Cons "read" (Cons path Nil))) "" result (result ++ ".err") 60
+  O.require (code == 0) ("binary file read failed: " ++ path)
+  text <- O.readOptional result
+  ioReturn (fromHex text)
+writeFile path bytes = do
+  tool <- getEnv "MLF_TEST_BINARY_FILES"
+  scratch <- getEnv "MLF_TEST_WORK"
+  let input = scratch ++ "/binary-transport-input.hex"
+  O.writeAtomic input (hex bytes)
+  O.run "" (Cons tool (Cons "write" (Cons path (Cons input Nil))))

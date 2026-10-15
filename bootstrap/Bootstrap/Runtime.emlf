@@ -10,8 +10,24 @@ import qualified Bootstrap.X.Syntax as X
 
 -- The host's lazy fields supply call-by-need for interpreted closures and
 -- recursive environments. Effects stay in explicit action values until run.
-data REnv = REnv (Map XName (Either String RValue))
-data RValue = RInteger Int | RDouble Double | RBoolean Bool | RString String | RIntArray IntArray | RDoubleArray DoubleArray | RByteArray ByteArray | RIntTable IntTable | RClosure REnv XName XErased | RConstructor String (List (Either String RValue)) | RPrimitive Primitive (List (Either String RValue)) | RAction Primitive (List (Either String RValue)) | RSTAction Primitive (List (Either String RValue)) | RSTArrayHandle Int
+data REnv = REnv (Map XName (Either String RValue)) | RLocal XName (Either String RValue) REnv | RRecursive (Map XName (Either String RValue)) REnv
+data RValue = RInteger Int | RDouble Double | RBoolean Bool | RString String | RIntArray IntArray | RDoubleArray DoubleArray | RByteArray ByteArray | RIntTable IntTable | RClosure REnv XName XErased | RConstructor String (List (Either String RValue)) | RConstructorFunction String Int (List (Either String RValue)) | RPrimitive Primitive (List (Either String RValue)) | RAction Primitive (List (Either String RValue)) | RSTAction Primitive (List (Either String RValue)) | RSTArrayHandle Int
+
+-- Primitive payloads represent the language value itself. Forcing only the
+-- interpreter's wrapper would leave strict numeric accumulators suspended.
+-- Algebraic fields, closures and actions retain their ordinary lazy behavior.
+forceValue : RValue -> RValue
+forceValue value = case value of
+  RInteger n -> seq n value
+  RDouble n -> seq n value
+  RBoolean b -> seq b value
+  RString text -> seq text value
+  RIntArray array -> seq array value
+  RDoubleArray array -> seq array value
+  RByteArray array -> seq array value
+  RIntTable table -> seq table value
+  RSTArrayHandle handle -> seq handle value
+  _ -> value
 
 runTerm : XTerm -> IO (Either String Unit)
 runTerm term = runTermWithArguments Nil term
@@ -44,15 +60,21 @@ runEntry requireIO args term = case prepare requireIO term of
   Right (Pair ds action) ->
     let value = evaluate ds (REnv M.empty) (X.erase term)
     in if action then ioBind (runAction args ds value) (\result -> ioReturn (mapEither (\ignored -> Unit) result))
-       else ioReturn (mapEither (\v -> seq v Unit) value)
+       else ioReturn (mapEither (\v -> seq (forceValue v) Unit) value)
 
-envLookup n (REnv env) = M.lookup compareName n env
-envInsert n value (REnv env) = REnv (M.insert compareName n value env)
-envExtend entries (REnv env) = REnv (M.union compareName (M.fromList compareName entries) env)
+envLookup : XName -> REnv -> Maybe (Either String RValue)
+envLookup n env = case env of
+  REnv values -> M.lookup compareName n values
+  RLocal key value parent -> if nameId n == nameId key then Just value else envLookup n parent
+  RRecursive values parent -> case M.lookup compareName n values of
+    Just value -> Just value
+    Nothing -> envLookup n parent
+envInsert n value env = RLocal n value env
+envExtend entries env = foldlStrict (\scope entry -> case entry of {Pair name value -> envInsert name value scope}) env entries
 
 recursiveEnv : DataEnv -> REnv -> List (Pair XName XErased) -> REnv
 recursiveEnv ds env bindings =
-  let rec result : REnv = envExtend (map (\entry -> case entry of { Pair name rhs -> Pair name (evaluate ds result rhs) }) bindings) env
+  let rec result : REnv = RRecursive (M.fromList compareName (map (\entry -> case entry of { Pair name rhs -> Pair name (evaluate ds result rhs) }) bindings)) env
   in result
 
 evaluate : DataEnv -> REnv -> XErased -> Either String RValue
@@ -69,7 +91,9 @@ evaluate ds env expression = case expression of
   XEBool b -> Right (RBoolean b)
   XEString s -> Right (RString s)
   XEPrimitive primitive -> runtimePrimitive ds primitive Nil
-  XEConstructor name -> bindEither (D.lookupConstructor ds name) (\ignored -> Right (RConstructor name Nil))
+  XEConstructor name -> bindEither (D.lookupConstructor ds name) (\entry -> case entry of
+    Pair _ constructor -> let remaining = length (D.constructorFields constructor) in
+      Right (if remaining == 0 then RConstructor name Nil else RConstructorFunction name remaining Nil))
   XECase scrutinee alternatives -> choose ds env (evaluate ds env scrutinee) alternatives
   XEEvidenceHole ignored -> Left "unresolved runtime dictionary evidence"
 
@@ -78,7 +102,7 @@ choose ds env value alternatives = case alternatives of
   Nil -> Left "non-exhaustive runtime case"
   Cons (XErasedAlternative pattern body) rest -> case pattern of
     XDefaultPattern name -> evaluate ds (maybe env (\n -> envInsert n value env) name) body
-    XConstructorPattern constructor names -> bindEither value (\v -> case v of
+    XConstructorPattern constructor names -> bindEither value (\v -> case constructorView v of
       RConstructor tag fields -> if eqString constructor tag then
         if length names == length fields then
           evaluate ds (envExtend (catMaybes (zipWith (\name field -> mapOptional (\n -> Pair n field) name) names fields)) env) body
@@ -86,9 +110,17 @@ choose ds env value alternatives = case alternatives of
         else choose ds env value rest
       _ -> Left "constructor pattern matched a non-data value")
 
+constructorView : RValue -> RValue
+constructorView value = case value of
+  RConstructorFunction name _ fields -> RConstructor name fields
+  _ -> value
 apply : DataEnv -> RValue -> Either String RValue -> Either String RValue
 apply ds function argument = case function of
   RClosure env name body -> evaluate ds (envInsert name argument env) body
+  RConstructorFunction name remaining fields ->
+    let next = snoc fields argument in
+    if remaining <= 0 then Left "runtime constructor overapplication" else
+      Right (if remaining == 1 then RConstructor name next else RConstructorFunction name (remaining - 1) next)
   RConstructor name fields -> bindEither (D.lookupConstructor ds name) (\entry -> case entry of
     Pair declaration constructor -> if length fields < length (D.constructorFields constructor)
       then Right (RConstructor name (snoc fields argument)) else Left "runtime constructor overapplication")
@@ -152,7 +184,7 @@ divide f a b = do
 
 isAction primitive =
   let n = P.primitiveCode primitive in
-  n <= 5 || (n >= 27 && n <= 44) || (n >= 56 && n <= 65)
+  n <= 5 || (n >= 27 && n <= 44) || (n >= 56 && n <= 65) || (n >= 73 && n <= 81)
 
 isSTAction primitive = case primitive of
   PSTReturn -> true
@@ -237,7 +269,7 @@ primitiveResult ds primitive arguments =
       n <- integer a
       ensure (n >= 0 && n <= 18446744073709551615) "Double bit pattern out of bounds"
       Right (RDouble (doubleFromBits n))
-    PSeq -> bindEither a (\value -> seq value b)
+    PSeq -> bindEither a (\value -> seq (forceValue value) b)
     PPanic -> bindEither (string a) Left
     _ -> Left ("runtime primitive arity mismatch: " ++ P.primitiveName primitive)
 
@@ -283,7 +315,7 @@ runStateRegion : DataEnv -> Either String RValue -> Either String RValue
 runStateRegion ds action = bindEither
   (runStateAction ds (stateStore 0 M.empty) action Nil)
   (\result -> case result of
-    Pair finalStore value -> bindEither value (\ready -> seq ready (Right ready)))
+    Pair finalStore value -> bindEither value (\ready -> seq (forceValue ready) (Right ready)))
 
 -- Continuations contain unevaluated callback values. Results are thunks:
 -- a read returns the cell from this immutable store version, so a later
@@ -419,6 +451,15 @@ perform args ds primitive arguments =
       if status < 0 || status > 255 then ioReturn (Left "exit status must be between 0 and 255") else exitWith status)
     PGetExecutablePath -> wrapIO getExecutablePath RString
     PGetContents -> wrapIO getContents RString
+    PGetEnv -> checkedIO (path a) (\x -> wrapIO (getEnv x) RString)
+    PSetEnv -> checkedIO (do { x <- path a; y <- string b; Right (Pair x y) }) (\pair -> case pair of { Pair x y -> finishIO (setEnv x y) })
+    PUnsetEnv -> checkedIO (path a) (\x -> finishIO (unsetEnv x))
+    PRunProcess -> checkedIO (do { x <- path a; y <- string b; Right (Pair x y) }) (\pair -> case pair of { Pair x y -> wrapIO (runProcess x y) RInteger })
+    PListDirectory -> checkedIO (path a) (\x -> wrapIO (listDirectory x) RString)
+    PDirectoryExists -> checkedIO (path a) (\x -> wrapIO (directoryExists x) RBoolean)
+    PFileDigest -> checkedIO (path a) (\x -> wrapIO (fileDigest x) RString)
+    PAcquireFileLock -> checkedIO (path a) (\x -> wrapIO (acquireFileLock x) RInteger)
+    PReleaseFileLock -> checkedIO (integer a) (\x -> finishIO (releaseFileLock x))
     _ -> ioReturn (Left "runtime action primitive arity mismatch")
 
 arraySize a = do

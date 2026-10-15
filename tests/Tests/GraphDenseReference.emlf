@@ -1,0 +1,55 @@
+module Tests.GraphDenseReference where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Tests.Helpers as H
+import qualified Package.OS as O
+import qualified Tests.Graph as G
+import Tests.Graph
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.IntSet as IS
+import qualified Tests.Map as Map
+import qualified Tests.Set as Set
+import qualified Bootstrap.Graph.Solver as Solver
+import Tests.GraphValidation (smallGraphs)
+import Tests.GraphUnificationReference (referenceUnify)
+
+showValidation : Either String Unit -> String
+showValidation = (S.either S.id (S.const "ok"))
+
+showKind : Kind -> String
+showKind Star = "*"
+
+showKind (KArrow a b) = (H.append "(" (H.append (showKind a) (H.append ">" (H.append (showKind b) ")"))))
+
+showTag : GTag -> String
+showTag t = (case t of { GBot -> "b"; (GBotK k) -> (H.append "k" (showKind k)); (GArr a b) -> (H.append "a" (H.append (H.show a) (H.append "," (H.show b)))); (GCon c ns) -> (H.append "c" (H.append c (H.append "[" (H.append (H.intercalate "," (S.map H.show ns)) "]")))); (GTyCon c k) -> (H.append "t" (H.append c (showKind k))); (GSkolem n k) -> (H.append "s" (H.append (H.show n) (showKind k))); (GTyApp a b) -> (H.append "p" (H.append (H.show a) (H.append "," (H.show b)))); (GGen n) -> (H.append "g" (H.show n)) })
+
+showGraph : Graph -> String
+showGraph g = (let { showNode (Pair n v) = (H.append (H.show n) (H.append ":" (H.append (showTag (tag v)) (H.append ":" (H.append (S.maybe "_" H.show (binder v)) (H.append ":" (H.append (if (H.eq (flag v) Flexible) then "f" else "r") ";"))))))) } in (H.append (H.concatMap showNode (IM.toList (nodes g))) (H.append "|" (H.append (H.concatMap (\(Pair n p) -> (H.append (H.show n) (H.append ":" (H.append (H.show p) ";")))) (IM.toList (links g))) (H.append "|" (H.show (nextId g)))))))
+
+showUnification : Either String Graph -> String
+showUnification = S.either (\message -> "!" ++ message) showGraph
+
+equations : (List ( (List ( (Pair (Int) (Int)) )) ))
+equations = (Cons Nil (Cons (Cons (Pair 1 2) Nil) (Cons (Cons (Pair 1 3) Nil) (Cons (Cons (Pair 2 3) Nil) (Cons (Cons (Pair 2 2) Nil) (Cons (Cons (Pair 0 1) Nil) (Cons (Cons (Pair 1 2) (Cons (Pair 2 3) Nil)) (Cons (Cons (Pair 2 3) (Cons (Pair 1 2) Nil)) (Cons (Cons (Pair 3 2) (Cons (Pair 2 1) Nil)) Nil)))))))))
+
+unificationInputs : (List ( (Pair (Graph) ((List ( (Pair (Int) (Int)) )))) ))
+unificationInputs = (S.concatMap (\g -> (S.concatMap (\a -> (S.concatMap (\b -> (S.concatMap (\c -> (S.concatMap (\eqs -> (Cons (Pair (Graph (IM.mapWithKey (\n v -> (Node (G.tag v) (G.binder v) (case n of { 1 -> a; 2 -> b; 3 -> c; _ -> (flag v) }))) (nodes g)) (G.links g) (G.nextId g)) eqs) Nil)) equations)) (Cons Flexible (Cons Rigid Nil)))) (Cons Flexible (Cons Rigid Nil)))) (Cons Flexible (Cons Rigid Nil)))) (S.filter (S.compose S.isRight validateGraph) smallGraphs))
+
+hash : Int -> String -> Int
+hash checksum text = S.foldlStrict (\h c -> remInt (h * 65599 + c) 2147483647) checksum (S.map (stringCodeAt text) (S.range 0 (stringLength text - 1)))
+
+stats : forall a. ( Either String a -> String ) -> (List ( Either String a )) -> String
+stats render outcomes = (let { step (Triple n accepted checksum) value = (let { next = (hash checksum (H.append (H.show n) (H.append ":" (H.append (render value) "\n")))) } in (seq next (Triple (n + 1) (accepted + (if (S.isRight value) then 1 else 0)) next))) } in (case (S.foldlStrict step (Triple 0 0 0) outcomes) of { (Triple count accepted checksum) -> (H.intercalate "|" (S.map H.show (Cons count (Cons accepted (Cons checksum Nil))))) }))
+
+validation : (List ( Either String Unit ))
+validation = (S.map validateGraph smallGraphs)
+
+unification : (List ( Either String Graph ))
+unification = (S.concatMap (\(Pair g eqs) -> (Cons (H.fmap S.snd (runBuild g (unify eqs))) Nil)) unificationInputs)
+
+normalization : (List ( Either String Graph ))
+normalization = (let { checked g = do { solver <- (Solver.prepare g); do { original <- (Solver.finish solver); (let { result = (normalize original) } in do { (validateGraph result); (return result) }) } } } in (S.concatMap (\(Pair g eqs) -> (if (H.null eqs) then (Cons (checked g) Nil) else Nil)) unificationInputs))
+
+main : IO Unit
+main = do { args <- O.allArguments; (case args of { (Cons "validation" Nil) -> ((H.forM_ (S.zip (S.range 0 9223372036854775807) validation)) (\(Pair n value) -> (putStrLn (H.append (H.show n) (H.append ":" (showValidation value)))))); (Cons "unification" Nil) -> ((H.forM_ (S.zip (S.range 0 9223372036854775807) unification)) (\(Pair n value) -> (putStrLn (H.append (H.show n) (H.append ":" (showUnification value)))))); _ -> do { (putStrLn (H.append "validation|" (stats showValidation validation))); do { (putStrLn (H.append "unification|" (stats showUnification unification))); do { (putStrLn (H.append "normalization|" (stats showUnification normalization))); (putStrLn "dense offsets and sparse fallbacks: ok") } } } }) }

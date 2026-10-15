@@ -34,6 +34,7 @@ pChoice first second = Parser (\state -> case pRun first state of
 pChoices : forall a. List (Parser a) -> Parser a
 pChoices parsers = case parsers of
   Nil -> pFail "no matching alternative"
+  Cons parser Nil -> parser
   Cons parser rest -> pChoice parser (pChoices rest)
 pTry : forall a. Parser a -> Parser a
 pTry parser = Parser (\state -> case pRun parser state of

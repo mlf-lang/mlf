@@ -10,6 +10,7 @@ import Data.List (foldl', intercalate)
 import qualified Data.IntMap.Strict as IM
 import System.Environment (getArgs)
 import MLF.Graph
+import qualified MLF.Graph.Solver as Solver
 import GraphValidation (smallGraphs)
 import MLF.Kind
 import MLF.Syntax (Flag(..))
@@ -69,6 +70,18 @@ validation = map validateGraph smallGraphs
 unification :: [Either String Graph]
 unification = [snd <$> runBuild g (unify eqs) | (g,eqs) <- unificationInputs]
 
+normalization :: [Either String Graph]
+normalization = [checked g | (g,eqs) <- unificationInputs, null eqs]
+  where
+    -- Keep this oracle on the old route, including a full validation of the
+    -- normalized graph, independent of the MLF compiler's validation reuse.
+    checked g = do
+      solver <- Solver.prepare g
+      original <- Solver.finish solver
+      let result = normalize original
+      validateGraph result
+      pure result
+
 main :: IO ()
 main = do
   args <- getArgs
@@ -78,4 +91,5 @@ main = do
     _ -> do
       putStrLn ("validation|" ++ stats showValidation validation)
       putStrLn ("unification|" ++ stats showUnification unification)
+      putStrLn ("normalization|" ++ stats showUnification normalization)
       putStrLn "dense offsets and sparse fallbacks: ok"

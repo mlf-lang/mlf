@@ -1,0 +1,6 @@
+module Tests.Char8 where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Tests.Bytes as B
+pack text = B.pack (S.map (stringCodeAt text) (S.range 0 (stringLength text - 1)))
+unpack = B.latin1

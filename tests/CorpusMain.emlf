@@ -1,0 +1,3 @@
+module CorpusMain where
+import qualified Tests.Corpus as C
+main = do { directory <- getArg 0; C.main directory }

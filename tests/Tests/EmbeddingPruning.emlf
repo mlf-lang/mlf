@@ -1,0 +1,35 @@
+module Tests.EmbeddingPruning where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as OS
+import qualified Tests.Helpers as H
+import Tests.Helpers (Quint(..), Sext(..))
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.IntSet as IS
+import Bootstrap.Constraint
+import qualified Tests.Graph as G
+import Bootstrap.Parser (parseExpr)
+
+histories : Int -> (List ( (Triple (Int) ((List ( Int ))) (Graph)) ))
+histories limit = (S.concatMap (\stop -> (S.concatMap (\present -> (S.concatMap (\live -> (S.concatMap (\start -> (let { root = (Node (GCon "Root" live) Nothing Rigid); leaves = (S.concatMap (\n -> (Cons (Pair n (Node (GCon (H.show n) Nil) (Just 0) Flexible)) Nil)) present) } in (Cons (Triple start live (Graph (IM.fromList (Cons (Pair 0 root) leaves)) IM.empty stop)) Nil))) (S.range 0 stop))) (H.subsequences present))) (H.subsequences (S.range 1 (stop - 1))))) (S.range 1 limit))
+
+checkHistory : (Triple (Int) ((List ( Int ))) (Graph)) -> IO Unit
+checkHistory (Triple start live after) = (let { result = (pruneEmbedding start 0 after) } in (let { old = (IM.keys (G.nodes after)) } in (let { wanted n = ((n < start) || ((H.eq n 0) || (H.elem n live))) } in do { (H.assert ((H.eq (G.nextId result) (G.nextId after)) && (H.eq (G.links result) (G.links after))) "pruning changed the allocator or alias table"); do { (H.assert (S.all (\section1 -> (H.elem section1 old)) (IM.keys (G.nodes result))) "pruning invented an identity"); do { ((H.forM_ (IM.toList (G.nodes after))) (\(Pair n value) -> (H.assert (H.eq (IM.lookup n (G.nodes result)) (if (wanted n) then (Just value) else Nothing)) (H.append "pruning violated identity/value conservation at " (H.show (Pair start n)))))); do { (H.assert (H.eq (G.reachable result 0) (G.reachable after 0)) "pruning changed the embedded type's structural graph"); (H.assert (H.eq (pruneEmbedding start 0 result) result) "pruning is not idempotent") } } } })))
+
+gapGraph : Graph
+gapGraph = (Graph (IM.fromList (Cons (Pair 0 (Node (GCon "ChangedOldValue" Nil) (Just 2) Rigid)) (Cons (Pair 2 (Node (GArr 7 7) Nothing Rigid)) (Cons (Pair 4 (Node GBot Nothing Flexible)) (Cons (Pair 7 (Node GBot (Just 2) Flexible)) (Cons (Pair 8 (Node (GCon "UnusedBound" Nil) Nothing Rigid)) Nil)))))) (IM.singleton 3 2) 10)
+
+checkGaps : IO Unit
+checkGaps = (let { result = (pruneEmbedding 4 3 gapGraph) } in do { (H.assert (H.eq (IM.keys (G.nodes result)) (Cons 0 (Cons 2 (Cons 7 Nil)))) "unused fresh nodes or allocation gaps survived"); do { (H.assert (H.eq (G.nodeAt result 0) (G.nodeAt gapGraph 0)) "changed old node was restored or discarded"); do { (H.assert (H.eq (G.nodeAt result 3) (G.nodeAt gapGraph 2)) "old root alias changed"); do { (H.assert ((H.eq (G.links result) (G.links gapGraph)) && (H.eq (G.nextId result) 10)) "allocation gap pruning changed alias identities or the next ID"); (H.assert (H.eq (pruneEmbedding 10 3 gapGraph) gapGraph) "zero allocation changed the graph") } } } })
+
+annotationCases : (List ( (Quad (String) (String) (Int) (Bool)) ))
+annotationCases = (Cons (Quad "unused binder" "(\\x -> x) : forall unused a. a -> a" 2 false) (Cons (Quad "alias binder" "(\\x -> x) : forall a (b >= a). b -> b" 2 false) (Cons (Quad "bound is root" "(\\x -> x) : forall (a >= forall b. b -> b). a" 2 false) (Cons (Quad "unused compound bound" "(\\x -> x) : forall (unused >= Int -> Bool) a. a -> a" 2 false) (Cons (Quad "existing root" "(\\x -> x) : exists a. a" 1 true) (Cons (Quad "existing root and unused bound" "(\\x -> x) : exists a. forall (unused >= Int -> Bool). a" 1 true) (Cons (Quad "shared old child" "(\\x -> x) : exists a. a -> a" 2 false) Nil)))))))
+
+checkAnnotation : (Quad (String) (String) (Int) (Bool)) -> IO Unit
+checkAnnotation (Quad label source count shared) = do { constraints <- (H.right (bind (parseExpr label source) generate)); (let { graph = (initialGraph constraints) } in do { (Pair domain result) <- (case (form (skeleton constraints)) of { (FApply coercion _ _ _) -> (case (form coercion) of { (FCoercion _ a b) -> (return (Pair a b)); _ -> (H.fail "annotation did not produce a coercion") }); _ -> (H.fail "annotation did not produce an application") }); do { (H.assert ((H.eq (IS.size (G.reachable graph domain)) count) && (H.eq (IS.size (G.reachable graph result)) count)) (H.append label ": bound pruning changed the embedded type's nodes")); do { (H.assert (H.eq (H.eq domain result) shared) (H.append label ": scoped identity sharing changed")); do { (H.assert (S.all (\section2 -> (section2 < (G.nextId graph))) (IM.keys (G.nodes graph))) "allocator bound is false"); do { _ <- (H.right (solve constraints)); (return Unit) } } } } }) }
+
+embeddingPruningTests : (List ( (Pair (String) (IO Unit)) ))
+embeddingPruningTests = (Cons (Pair "embedding pruning preserves identities and values over allocation histories" (H.mapM_ checkHistory (histories 7))) (Cons (Pair "embedding pruning preserves old updates, aliases and allocation gaps" checkGaps) (Cons (Pair "embedding pruning preserves source bound and existential semantics" (H.mapM_ checkAnnotation annotationCases)) Nil)))
+
+pruningConformance : IO Unit
+pruningConformance = (let { small = (histories 4) } in do { (H.mapM_ checkHistory small); do { (putStrLn (H.append "allocation histories: " (H.show (H.length small)))); do { checkGaps; do { (putStrLn "old updates, aliases, gaps and zero allocation: ok"); ((H.forM_ annotationCases) (\fixture -> (case fixture of { (Quad label _ _ _) -> do { (checkAnnotation fixture); (putStrLn (H.append label ": ok")) } }))) } } } })

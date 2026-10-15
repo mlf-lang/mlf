@@ -1,0 +1,189 @@
+-- Black-box local package tests: invoke the native MLF manager, never an installer.
+module Tests.Packages where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+import qualified Package.Json as J
+import qualified Tests.Basic as H
+import qualified Tests.Basic as Sys
+
+data Context = Context String String String String
+work (Context a _ _ _) = a
+manager (Context _ a _ _) = a
+compiler (Context _ _ a _) = a
+output (Context _ _ _ a) = a
+obj entries = J.Object entries
+field key value = Pair key value
+text = J.str
+list = J.Array
+expect : Context -> List String -> Bool -> String -> IO (Pair String String)
+expect c args success reason = do
+ let stem = work c ++ "/invocation"
+ let base = Cons (manager c) (Cons "--manifest" (Cons (work c ++ "/app/mlf-package.json") (Cons "--compiler" (Cons (compiler c) (Cons "--build-dir" (Cons (output c) Nil))))))
+ code <- O.exec (work c) (S.append base args) "" (stem ++ ".out") (stem ++ ".err") 1800
+ stdout <- readFile (stem ++ ".out")
+ stderr <- readFile (stem ++ ".err")
+ H.assert (H.eq (code == 0) success) ("package command status " ++ showInt code ++ ": " ++ stderr)
+ H.assert (eqString reason "" || H.contains reason stderr) ("package error missing " ++ reason ++ ": " ++ stderr)
+ return (Pair stdout stderr)
+manifest c = J.read (work c ++ "/app/mlf-package.json")
+edit c f = do { before <- manifest c; J.write (work c ++ "/app/mlf-package.json") (f before) }
+report c = J.read (output c ++ "/build-report.json")
+runBinary c expected = do
+ code <- O.exec (work c) (Cons (output c ++ "/bin/hello") Nil) "" (work c ++ "/program.out") (work c ++ "/program.err") 60
+ out <- readFile (work c ++ "/program.out")
+ err <- readFile (work c ++ "/program.err")
+ H.assert (code == 0 && eqString out expected && eqString err "") ("package program output mismatch: " ++ out ++ err)
+passed label = putStrLn ("PASS " ++ label)
+integration : IO Unit
+integration = Sys.withScratch (\dir -> do
+ root <- canonicalPath "."
+ manager <- getEnv "MLF_PACKAGE_MANAGER"
+ compiler <- getEnv "MLF_BOOTSTRAP_COMPILER"
+ O.run "" (Cons "/bin/cp" (Cons "-R" (Cons (root ++ "/examples/packages") (Cons (dir ++ "/app") Nil))))
+ let c = Context dir manager compiler (dir ++ "/build output")
+ expect c (Cons "build" Nil) true ""
+ initial <- report c
+ H.assert (S.all (\row -> S.not (J.getBool "cached" true row)) (J.values (J.get "builds" initial))) "first package build reused an artifact"
+ runBinary c "Hello, local packages!\n"
+ passed "transitive local dependencies, ADT, do notation, spaces in paths"
+ expect c (Cons "build" Nil) true ""
+ cached <- report c
+ H.assert (S.all (J.getBool "cached" false) (J.values (J.get "builds" cached))) "unchanged package build missed cache"
+ passed "content-addressed no-op build"
+ expect c (Cons "test" Nil) true ""
+ tested <- report c
+ H.assert (J.equal (J.get "backends" (S.head (J.values (J.get "tests" tested)))) (J.stringArray (Cons "interpreter" (Cons "llvm" Nil)))) "package test missed a backend"
+ passed "expected output checked on interpreter and LLVM"
+ let rows = J.values (J.get "builds" initial)
+ let artifact = output c ++ "/cache/" ++ J.getText "key" "" (S.last rows)
+ let source = work c ++ "/app/message/Message.emlf"
+ original <- readFile source
+ Sys.removeFile source
+ code <- O.exec dir (Cons compiler (Cons "-i" (Cons (artifact ++ "/modules") (Cons "--run-module" (Cons (artifact ++ "/modules/Main.mlfi") Nil))))) "" (dir ++ "/interface.out") (dir ++ "/interface.err") 60
+ out <- readFile (dir ++ "/interface.out")
+ H.assert (code == 0 && eqString out "Hello, local packages!\n") "interface/object still needs library source"
+ writeFile source original
+ passed "interface/object executable works without dependency source"
+ writeFile source (O.replace "render (Message text) = text" "render (Message text) = text ++ \" updated\"" original)
+ expect c (Cons "build" Nil) true ""
+ changed <- report c
+ H.assert (S.not (J.getBool "cached" true (S.last (J.values (J.get "builds" changed))))) "dependency implementation edit did not relink"
+ runBinary c "Hello, local packages! updated\n"
+ passed "transitive implementation edit invalidates the executable"
+ expect c (Cons "test" Nil) false "unexpected stdout"
+ failed <- report c
+ H.assert (S.not (J.getBool "complete" true failed)) "output mismatch marked complete"
+ passed "test output mismatch fails the package test"
+ before <- fileDigest (output c ++ "/bin/hello")
+ writeFile source "module Message where\nthis is invalid @@@\n"
+ expect c (Cons "build" Nil) false ""
+ after <- fileDigest (output c ++ "/bin/hello")
+ failed <- report c
+ H.assert (eqString before after && S.not (J.getBool "complete" true failed)) "failed compile replaced working executable"
+ writeFile source original
+ expect c (Cons "build" Nil) true ""
+ passed "failed compilation preserves the last successful binary"
+ let object = output c ++ "/cache/" ++ J.getText "key" "" (S.head rows) ++ "/unit.mlfo"
+ writeFile object "corrupted"
+ expect c (Cons "build" Nil) true ""
+ repaired <- report c
+ H.assert (S.not (J.getBool "cached" true (S.head (J.values (J.get "builds" repaired))))) "tampered object reused"
+ runBinary c "Hello, local packages!\n"
+ passed "tampered object is rebuilt and checked"
+ O.copy compiler (dir ++ "/other compiler")
+ expect c (Cons "--compiler" (Cons (dir ++ "/other compiler") (Cons "build" Nil))) true ""
+ alternate <- report c
+ H.assert (S.all (\row -> S.not (J.getBool "cached" true row)) (J.values (J.get "builds" alternate))) "compiler path did not affect cache"
+ passed "compiler identity participates in cache keys"
+ expect c (Cons "lock" Nil) true ""
+ expect c (Cons "--locked" (Cons "build" Nil)) true ""
+ writeFile source (original ++ "\n-- changed local dependency\n")
+ expect c (Cons "--locked" (Cons "build" Nil)) false "lock is stale"
+ writeFile source original
+ passed "locked build rejects changed local sources"
+ writeFile (dir ++ "/Ambient.emlf") "module Ambient where\nx = 0\n"
+ let mainSource = dir ++ "/app/Main.emlf"
+ originalMain <- readFile mainSource
+ writeFile mainSource (O.replace "import Greeting" "import Ambient\nimport Greeting" originalMain)
+ expect c (Cons "build" Nil) false "not declared"
+ writeFile mainSource originalMain
+ passed "undeclared ambient imports fail before compilation"
+ edit c (\doc -> J.set "executables" (J.set "hello" (J.set "link" (text "source") (J.get "hello" (J.get "executables" doc))) (J.get "executables" doc)) (J.set "tests" (J.set "hello" (J.set "link" (text "source") (J.get "hello" (J.get "tests" doc))) (J.get "tests" doc)) doc))
+ expect c (Cons "build" Nil) true ""
+ expect c (Cons "test" Nil) true ""
+ runBinary c "Hello, local packages!\n"
+ passed "whole-program local package mode on both backends"
+ writeFile (dir ++ "/app/Echo.emlf") "module Echo where\nimport Private\nmain = do\n  prefix <- getArg 0\n  line <- getLine\n  putStrLn (identity (prefix ++ line))\n"
+ writeFile (dir ++ "/app/Private.emlf") "module Private (identity) where\nidentity x = x\n"
+ let echo = obj (Cons (field "main" (text "Echo.emlf")) (Cons (field "modules" (obj (Cons (field "Private" (text "Private.emlf")) Nil))) (Cons (field "arguments" (J.stringArray (Cons "prefix:" Nil))) (Cons (field "stdin" (text "hello\n")) (Cons (field "stdout" (text "prefix:hello\n")) Nil)))))
+ edit c (J.set "tests" (obj (Cons (field "echo" echo) Nil)))
+ expect c (Cons "test" Nil) true ""
+ echoReport <- report c
+ H.assert (J.equal (J.get "backends" (S.head (J.values (J.get "tests" echoReport)))) (J.stringArray (Cons "interpreter" (Cons "llvm" Nil)))) "private echo missed a backend"
+ passed "private target modules, program arguments, and stdin on both backends"
+ Pair out err <- expect c (Cons "run" (Cons "hello" (Cons "--" (Cons "unused" Nil)))) true ""
+ H.assert (eqString out "Hello, local packages!\n") "run mixed build output with program stdout"
+ passed "run forwards arguments and keeps program stdout clean"
+ edit c (J.set "tests" (obj (Cons (field "failure" (obj (Cons (field "command" (J.stringArray (Cons "/bin/sh" (Cons "-c" (Cons "exit 17" Nil))))) Nil))) Nil)))
+ expect c (Cons "test" Nil) false ""
+ failure <- report c
+ H.assert (S.not (J.getBool "complete" true failure) && J.equal (J.get "exit_code" (S.last (J.values (J.get "commands" failure)))) (J.num 17)) "command failure swallowed"
+ passed "external test exit status is propagated"
+ extraCases c root
+ putStrLn "19 package integration cases passed")
+extraCases : Context -> String -> IO Unit
+extraCases c repository = do
+ gc <- getEnv "MLF_GC_PREFIX"
+ actual <- canonicalPath gc
+ let dir = work c
+ let bundled = dir ++ "/app/dist-newstyle/bootstrap-deps/bdwgc-test-install"
+ O.mkdir (O.parent bundled)
+ O.run "" (Cons "/bin/ln" (Cons "-s" (Cons actual (Cons bundled Nil))))
+ edit c (\doc -> J.set "executables" (J.set "hello" (J.set "profile" (text "compiler") (J.get "hello" (J.get "executables" doc))) (J.get "executables" doc)) doc)
+ parent <- getExecutablePath
+ let test = obj (Cons (field "requires" (J.stringArray (Cons "hello" Nil))) (Cons (field "command" (J.stringArray (Cons parent (Cons "--package-gc-check" (Cons actual (Cons "{bin:hello}" Nil)))))) Nil))
+ edit c (J.set "tests" (obj (Cons (field "gc" test) Nil)))
+ unsetEnv "MLF_GC_PREFIX"
+ expect c (Cons "test" Nil) true ""
+ saved <- report c
+ H.assert (S.any (\row -> S.elem eqString (actual ++ "/lib/libgc.a") (J.getStrings "flags" row)) (J.values (J.get "native_inputs" saved))) "checkout collector not used"
+ passed "checkout BDWGC discovery and command-test inheritance without an exported prefix"
+ setEnv "MLF_GC_PREFIX" (dir ++ "/missing prefix")
+ expect c (Cons "--gc-prefix" (Cons actual (Cons "test" Nil))) true ""
+ passed "explicit BDWGC prefix overrides the environment and reaches test subprocesses"
+ setEnv "MLF_GC_PREFIX" actual
+ edit c (\doc -> J.set "name" (text "mlf-compiler") (J.set "executables" (J.set "emlf" (obj (Cons (field "main" (text "Main.emlf")) Nil)) (J.get "executables" doc)) doc))
+ O.run "" (Cons "/bin/ln" (Cons "-s" (Cons (compiler c) (Cons (output c ++ "/bin/emlf") Nil))))
+ let oldBin = dir ++ "/old installation"
+ O.mkdir oldBin
+ let old = oldBin ++ "/emlf"
+ let marker = dir ++ "/old compiler selected"
+ writeFile old ("#!/bin/sh\nprintf used > '" ++ marker ++ "'\nexit 99\n")
+ O.run "" (Cons "/bin/chmod" (Cons "+x" (Cons old Nil)))
+ priorPath <- getEnv "PATH"
+ priorCompiler <- getEnv "MLF_COMPILER"
+ unsetEnv "MLF_COMPILER"
+ setEnv "PATH" (oldBin ++ ":" ++ priorPath)
+ let command = Cons (manager c) (Cons "--manifest" (Cons (dir ++ "/app/mlf-package.json") (Cons "--build-dir" (Cons (output c) (Cons "--runtime" (Cons (repository ++ "/runtime/mlf_runtime.c") Nil))))))
+ code <- O.exec dir (S.append command (O.words "build --target hello")) "" (dir ++ "/local.out") (dir ++ "/local.err") 1800
+ marked <- fileExists marker
+ selected <- report c
+ H.assert (code == 0 && S.not marked && eqString (J.getText "path" "" (J.get "compiler" (J.get "toolchain" selected))) (compiler c)) "checkout selected old PATH compiler"
+ passed "checkout compiler selection takes precedence over an older compiler on PATH"
+ code <- O.exec dir (S.append command (Cons "--compiler" (Cons old (O.words "build --target hello")))) "" (dir ++ "/explicit.out") (dir ++ "/explicit.err") 1800
+ marked <- fileExists marker
+ errors <- readFile (dir ++ "/explicit.err")
+ H.assert (S.not (code == 0) && marked && H.contains "(99)" errors) "explicit compiler did not override checkout"
+ passed "explicit compiler selection overrides a locally built compiler"
+ setEnv "PATH" priorPath
+ if eqString priorCompiler "" then unsetEnv "MLF_COMPILER" else setEnv "MLF_COMPILER" priorCompiler
+checkGC : String -> String -> IO Unit
+checkGC expected binary = do
+ prefix <- getEnv "MLF_GC_PREFIX"
+ actual <- canonicalPath prefix
+ H.assert (eqString expected actual) "command test lost selected collector"
+ Sys.withScratch (\dir -> do
+  code <- O.exec "" (Cons binary Nil) "" (dir ++ "/out") (dir ++ "/err") 60
+  output <- readFile (dir ++ "/out")
+  H.assert (code == 0 && eqString output "Hello, local packages!\n") "collector command test program failed")

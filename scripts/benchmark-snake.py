@@ -77,7 +77,7 @@ def main():
     runtime = Path(os.fsdecode(runtime_path).strip()).resolve(strict=True)
     runtime_header = runtime.with_name("mlf_runtime.h").resolve(strict=True)
     fingerprints = {str(p): digest(p) for p in
-                    (emlf, source, baseline, runtime, runtime_header, Path(__file__).resolve(),
+                    (emlf, source, baseline, runtime, runtime_header, *runtime.parent.glob("*.h"), Path(__file__).resolve(),
                      *(Path(tool) for tool in toolchain.values()))}
     report = {
         "recorded_at_utc": datetime.now(timezone.utc).isoformat(),

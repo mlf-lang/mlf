@@ -1,0 +1,32 @@
+module Tests.Map where
+import Bootstrap.Types
+import qualified Bootstrap.Map as M
+import qualified Tests.Helpers as H
+empty = M.empty
+singleton k v = M.singleton k v
+size = M.size
+null = M.null
+map = M.map
+mapWithKey = M.mapWithKey
+elems = M.elems
+keys = M.keys
+toList = M.toList
+toAscList = M.toList
+fromList : forall k v. H.Ord k => List (Pair k v) -> Map k v
+fromList xs = M.fromList H.compare xs
+lookup : forall k v. H.Ord k => k -> Map k v -> Maybe v
+lookup k m = M.lookup H.compare k m
+get : forall k v. H.Ord k => Map k v -> k -> v
+get m k = M.get H.compare k m
+insert : forall k v. H.Ord k => k -> v -> Map k v -> Map k v
+insert k v m = M.insert H.compare k v m
+union : forall k v. H.Ord k => Map k v -> Map k v -> Map k v
+union a b = M.union H.compare a b
+adjust : forall k v. H.Ord k => (v -> v) -> k -> Map k v -> Map k v
+adjust f k m = M.adjust H.compare f k m
+member : forall k v. H.Ord k => k -> Map k v -> Bool
+member k m = M.member H.compare k m
+
+fromDistinctAscList = M.fromDistinctAscList
+findWithDefault : forall k v. H.Ord k => v -> k -> Map k v -> v
+findWithDefault fallback key map = M.findWithDefault H.compare fallback key map

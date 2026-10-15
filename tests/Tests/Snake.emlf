@@ -1,0 +1,92 @@
+module Tests.Snake where
+import Bootstrap.Types
+import Bootstrap.Compiler
+import Bootstrap.Parser (parseExpr, parseProgram)
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+import qualified Package.OS as OS
+import qualified Tests.Helpers as H
+import qualified Tests.Backends as B
+import Tests.Backends (Event(..))
+import qualified Bootstrap.X.Check as C
+import qualified Bootstrap.X.Parser as XP
+import Bootstrap.X.Pretty (prettyTerm)
+import qualified Bootstrap.X.Syntax as X
+import qualified Bootstrap.X.Type as T
+import qualified Tests.SnakeBaseline as Ref
+
+data Script a = Script (List String -> Either String (Triple a (List String) String))
+instance Monad Script where
+ return a = Script (\xs -> Right (Triple a xs ""))
+ bind (Script action) f = Script (\xs -> case action xs of
+  Left err -> Left err
+  Right (Triple a rest out) -> case f a of
+   Script next -> case next rest of
+    Left err -> Left err
+    Right (Triple b remaining text) -> Right (Triple b remaining (out ++ text)))
+scriptRead = Script (\xs -> case xs of { Nil -> Left "baseline requested unexpected input"; Cons x rest -> Right (Triple x rest "") })
+scriptWrite text = Script (\xs -> Right (Triple Unit xs text))
+baseline input = case Ref.runGame (Ref.Console scriptRead scriptWrite) of
+ Script action -> do
+  Triple _ remaining output <- H.right (action input)
+  H.assert (S.null remaining) "baseline stopped before consuming scripted input"
+  return output
+runWithBaseline backends term input = do
+ output <- runOn backends term input
+ reference <- baseline input
+ H.assert (eqString output reference) ("independent Snake transcript mismatch\n" ++ output ++ "\n" ++ reference)
+ return output
+frames : String -> IO (List (List String))
+frames output = scanFrames (H.lines output)
+scanFrames : List String -> IO (List (List String))
+scanFrames Nil = return Nil
+scanFrames (Cons line rest) = if eqString line "+------------+" then do
+ let cells = S.take 8 rest
+ let after = S.drop 8 rest
+ H.assert (S.length cells == 8 && S.all (\row -> stringLength row == 14 && stringCodeAt row 0 == 124 && stringCodeAt row 13 == 124) cells) "malformed Snake board"
+ case after of
+  Cons end more -> do
+   H.assert (eqString end "+------------+") "missing Snake bottom border"
+   suffix <- scanFrames more
+   return (Cons cells suffix)
+  _ -> H.fail "missing Snake bottom border"
+ else scanFrames rest
+
+checked : Compilation -> IO XTerm
+checked result = do { term <- (H.right (XP.parseTerm "<Snake xMLF>" (prettyTerm (compiledTerm result)))); do { ty <- (H.right (C.checkClosed term)); do { (H.assert (T.alphaEq ty (XCon "IO" (Cons (XCon "Unit" Nil) Nil))) "Snake must have type IO Unit"); do { (H.assert (H.eq (X.erase term) (X.erase (compiledTerm result))) "Snake round trip changed erasure"); (return term) } } } }
+
+runOn : B.Backends -> XTerm -> (List ( String )) -> IO String
+runOn backends term input = do { (Pair result trace) <- (B.capture backends term input); do { (H.right result); (return (H.concat (S.concatMap (\comprehension1 -> case comprehension1 of { (Write text) -> (Cons text Nil); _ -> Nil }) trace))) } }
+
+board : (List ( (Pair (Int) (String)) )) -> (List ( String ))
+board changed = (S.concatMap (\y -> (Cons (H.append "|" (H.append (S.maybe (H.repeatChar 12 46) S.id (H.lookup y changed)) "|")) Nil)) (S.range 0 7))
+
+initialBoard : (List ( String ))
+initialBoard = (board (Cons (Pair 3 "..oo@.*.....") Nil))
+
+snakeTests : B.Backends -> (List ( Pair String (IO Unit) ))
+snakeTests backends = (let { run = (runOn backends) } in (let { runBoth = (runWithBaseline backends) } in (Cons (Pair "Snake: playable source and xMLF sessions" do { (putStrLn "  Snake: compiling the interactive example"); do { source <- (readFile "examples/snake.emlf"); do { result <- (H.right (compile "examples/snake.emlf" source)); do { term <- (checked result); do { direct <- (run (compiledTerm result) (Cons "q" Nil)); do { quit <- (runBoth term (Cons "q" Nil)); do { (H.assert (H.eq direct quit) "source and standalone xMLF execution differ"); do { quitFrames <- (frames quit); do { (H.assert ((H.eq quitFrames (Cons initialBoard Nil)) && (H.contains "Goodbye. Score: 0\n" quit)) (H.append "unexpected initial game: " quit)); do { growth <- (runBoth term (Cons "d" (Cons "d" (Cons "q" Nil)))); do { growthFrames <- (frames growth); do { (H.assert (H.eq growthFrames (Cons initialBoard (Cons (board (Cons (Pair 3 "...oo@*.....") Nil)) (Cons (board (Cons (Pair 0 "*...........") (Cons (Pair 3 "...ooo@.....") Nil))) Nil)))) (H.append "movement/growth rendered incorrectly: " growth)); do { (H.assert (H.contains "Goodbye. Score: 1\n" growth) "eating did not increase the score"); do { invalid <- (runBoth term (Cons "x" (Cons "" (Cons "q" Nil)))); do { invalidFrames <- (frames invalid); do { (H.assert ((H.eq invalidFrames (Cons initialBoard (Cons initialBoard (Cons (board (Cons (Pair 3 "...oo@*.....") Nil)) Nil)))) && (H.contains "No move made." invalid)) (H.append "invalid/empty command behavior: " invalid)); do { reverseTurn <- (runBoth term (Cons "a" (Cons "q" Nil))); do { reverseFrames <- (frames reverseTurn); do { (H.assert (H.eq reverseFrames (Cons initialBoard (Cons (board (Cons (Pair 3 "...oo@*.....") Nil)) Nil))) "reverse turn was not ignored"); do { turns <- (runBoth term (Cons "w" (Cons "a" (Cons "s" (Cons "d" (Cons "q" Nil)))))); do { turnFrames <- (frames turns); do { (H.assert ((H.eq (H.length turnFrames) 5) && (H.eq (S.last turnFrames) (board (Cons (Pair 2 "...o........") (Cons (Pair 3 "...o@.*.....") Nil))))) (H.append "WASD turns produced the wrong snake: " turns)); do { (H.assert (H.eq (S.filter (OS.starts "Score:") (H.lines turns)) (S.concatMap (\d -> (Cons (H.append "Score: 0  Direction: " d) Nil)) (Cons "right" (Cons "up" (Cons "left" (Cons "down" (Cons "right" Nil))))))) "wrong headings"); do { wall <- (runBoth term (S.replicate 8 "d")); do { wallFrames <- (frames wall); do { (H.assert ((H.eq (H.length wallFrames) 8) && (H.contains "Game over: hit wall. Score: 1\n" wall)) (H.append "wall collision did not end the game: " wall)); do { body <- (runBoth term (H.append (Cons "d" (Cons "d" Nil)) (H.append (S.replicate 3 "w") (H.append (S.replicate 6 "a") (Cons "s" (Cons "d" (Cons "w" Nil))))))); do { bodyFrames <- (frames body); do { (H.assert ((H.eq (H.length bodyFrames) 14) && (H.contains "Game over: hit body. Score: 2\n" body)) (H.append "body collision did not end the game: " body)); (putStrLn "  Snake: all 7 sessions pass on both backends and match Haskell") } } } } } } } } } } } } } } } } } } } } } } } } } } } } }) (Cons (Pair "Snake: pure rules, departing tail, food search, and full-board win" do { (putStrLn "  Snake: compiling the pure-rule checks"); do { source <- (readFile "examples/snake.emlf"); do { program <- (H.right (parseProgram "examples/snake.emlf" source)); do { entry <- (H.right (parseExpr "<Snake rule checks>" rulesDriver)); do { program' <- (H.right (withRulesEntry entry program)); do { result <- (H.right (compileProgram program')); do { term <- (checked result); do { output <- (run term Nil); do { (H.assert (H.eq (H.lines output) (S.map (\(Triple label _ expected) -> (H.append label (H.append ": " expected))) ruleCases)) (H.append "unexpected rule outcomes:\n" output)); (let { baseline = (S.concatMap (\(Pair label result') -> (Cons (H.append label (H.append ": " (describeOutcome result'))) Nil)) baselineRuleCases) } in do { (H.assert (H.eq (H.lines output) baseline) (H.append "Haskell/eMLF rule mismatch:\n" (S.unlines baseline))); (putStrLn (H.append "  Snake: " (H.append (H.show (H.length ruleCases)) " rule checks pass on both backends and match Haskell"))) }) } } } } } } } } }) Nil))))
+
+withRulesEntry : SExpr -> SProgram -> Either String SProgram
+withRulesEntry entry program = (let rec { replace : SExpr -> Either String SExpr; replace (SLet name rhs body) = (if (H.eq name "step") then (Right (SLet name rhs entry)) else (if true then (H.fmap (SLet name rhs) (replace body)) else (panic "non-exhaustive test guard"))); replace (SLetRec definitions body) = (if (S.any (\(Triple name _ _) -> (H.eq name "step")) definitions) then (Right (SLetRec definitions entry)) else (if true then (H.fmap (SLetRec definitions) (replace body)) else (panic "non-exhaustive test guard"))); replace _ = (Left "Snake example no longer defines step in its helper scope") } in (case program of { (SProgram ds body) -> (H.fmap (SProgram ds) (replace body)); (SClassProgram ds cs instances body) -> (H.fmap (SClassProgram ds cs instances) (replace body)) }))
+
+position : (Pair (Int) (Int)) -> String
+position (Pair x y) = (H.append "(Position " (H.append (H.show x) (H.append " " (H.append (H.show y) ")"))))
+
+positions : (List ( (Pair (Int) (Int)) )) -> String
+positions = (S.foldr (\p rest -> (H.append "(Cons " (H.append (position p) (H.append " " (H.append rest ")"))))) "Nil")
+
+game : (Pair (Int) (Int)) -> (List ( (Pair (Int) (Int)) )) -> String -> (Pair (Int) (Int)) -> Int -> String
+game headPosition body heading food score = (H.append "(Game (Snake " (H.append (position headPosition) (H.append " " (H.append (positions body) (H.append ") " (H.append heading (H.append " " (H.append (position food) (H.append " " (H.append (H.show score) ")"))))))))))
+
+describeOutcome : Ref.Outcome -> String
+describeOutcome outcome = (let { showPosition (Ref.Position x y) = (H.append "(" (H.append (H.show x) (H.append "," (H.append (H.show y) ")")))) } in (case outcome of { (Ref.Lost reason score) -> (H.append "lost " (H.append reason (H.append " score=" (H.show score)))); (Ref.Won score) -> (H.append "won score=" (H.show score)); (Ref.Continue (Ref.Game (Ref.Snake headPosition body) _ food score)) -> (H.append "continue " (H.append (showPosition headPosition) (H.append " [" (H.append (H.concatMap showPosition body) (H.append "] food=" (H.append (showPosition food) (H.append " score=" (H.show score)))))))) }))
+
+baselineRuleCases : (List ( (Pair (String) (Ref.Outcome)) ))
+baselineRuleCases = (let { point (Pair x y) = (Ref.Position x y) } in (let { state headPosition body heading food score = (Ref.Game (Ref.Snake (point headPosition) (S.map point body)) heading (point food) score) } in (let { almostFull = (S.drop 2 (S.concatMap (\y -> (S.concatMap (\x -> (Cons (Pair x y) Nil)) (if (H.even y) then (S.range 0 11) else (H.rangeStep 11 10 0)))) (S.range 0 7))) } in (Cons (Pair "ordinary move" (Ref.step Ref.East (state (Pair 4 3) (Cons (Pair 3 3) (Cons (Pair 2 3) Nil)) Ref.East (Pair 6 3) 0))) (Cons (Pair "growth" (Ref.step Ref.East (state (Pair 5 3) (Cons (Pair 4 3) (Cons (Pair 3 3) Nil)) Ref.East (Pair 6 3) 0))) (Cons (Pair "reverse" (Ref.step Ref.West (state (Pair 4 3) (Cons (Pair 3 3) (Cons (Pair 2 3) Nil)) Ref.East (Pair 6 3) 0))) (Cons (Pair "departing tail" (Ref.step Ref.West (state (Pair 1 1) (Cons (Pair 1 2) (Cons (Pair 0 2) (Cons (Pair 0 1) Nil))) Ref.North (Pair 11 7) 7))) (Cons (Pair "body" (Ref.step Ref.East (state (Pair 1 1) (Cons (Pair 1 0) (Cons (Pair 2 0) (Cons (Pair 2 1) (Cons (Pair 2 2) Nil)))) Ref.South (Pair 11 7) 7))) (Cons (Pair "left wall" (Ref.step Ref.West (state (Pair 0 3) Nil Ref.West (Pair 11 7) 7))) (Cons (Pair "right wall" (Ref.step Ref.East (state (Pair 11 3) Nil Ref.East (Pair 0 0) 7))) (Cons (Pair "top wall" (Ref.step Ref.North (state (Pair 3 0) Nil Ref.North (Pair 11 7) 7))) (Cons (Pair "bottom wall" (Ref.step Ref.South (state (Pair 3 7) Nil Ref.South (Pair 0 0) 7))) (Cons (Pair "food skips snake" (Ref.step Ref.East (state (Pair 1 0) (Cons (Pair 0 0) Nil) Ref.East (Pair 2 0) 0))) (Cons (Pair "full board" (Ref.step Ref.West (state (Pair 1 0) almostFull Ref.West (Pair 0 0) 92))) Nil))))))))))))))
+
+ruleCases : (List ( (Triple (String) (String) (String)) ))
+ruleCases = (Cons (Triple "ordinary move" (H.append "step East " (game (Pair 4 3) (Cons (Pair 3 3) (Cons (Pair 2 3) Nil)) "East" (Pair 6 3) 0)) "continue (5,3) [(4,3)(3,3)] food=(6,3) score=0") (Cons (Triple "growth" (H.append "step East " (game (Pair 5 3) (Cons (Pair 4 3) (Cons (Pair 3 3) Nil)) "East" (Pair 6 3) 0)) "continue (6,3) [(5,3)(4,3)(3,3)] food=(0,0) score=1") (Cons (Triple "reverse" (H.append "step West " (game (Pair 4 3) (Cons (Pair 3 3) (Cons (Pair 2 3) Nil)) "East" (Pair 6 3) 0)) "continue (5,3) [(4,3)(3,3)] food=(6,3) score=0") (Cons (Triple "departing tail" (H.append "step West " (game (Pair 1 1) (Cons (Pair 1 2) (Cons (Pair 0 2) (Cons (Pair 0 1) Nil))) "North" (Pair 11 7) 7)) "continue (0,1) [(1,1)(1,2)(0,2)] food=(11,7) score=7") (Cons (Triple "body" (H.append "step East " (game (Pair 1 1) (Cons (Pair 1 0) (Cons (Pair 2 0) (Cons (Pair 2 1) (Cons (Pair 2 2) Nil)))) "South" (Pair 11 7) 7)) "lost body score=7") (Cons (Triple "left wall" (H.append "step West " (game (Pair 0 3) Nil "West" (Pair 11 7) 7)) "lost wall score=7") (Cons (Triple "right wall" (H.append "step East " (game (Pair 11 3) Nil "East" (Pair 0 0) 7)) "lost wall score=7") (Cons (Triple "top wall" (H.append "step North " (game (Pair 3 0) Nil "North" (Pair 11 7) 7)) "lost wall score=7") (Cons (Triple "bottom wall" (H.append "step South " (game (Pair 3 7) Nil "South" (Pair 0 0) 7)) "lost wall score=7") (Cons (Triple "food skips snake" (H.append "step East " (game (Pair 1 0) (Cons (Pair 0 0) Nil) "East" (Pair 2 0) 0)) "continue (2,0) [(1,0)(0,0)] food=(3,0) score=1") (Cons (Triple "full board" "step West (Game (Snake (Position 1 0) (serpentine 2 0 1)) West (Position 0 0) 92)" "won score=93") Nil)))))))))))
+
+rulesDriver : String
+rulesDriver = (S.unlines (Cons "let rec serpentine x y dx : Int -> Int -> Int -> List Position =" (Cons "  if y == 8 then Nil" (Cons "  else if x == 12 then serpentine 11 (y + 1) (-1)" (Cons "  else if x < 0 then serpentine 0 (y + 1) 1" (Cons "  else Cons (Position x y) (serpentine (x + dx) y dx) in" (Cons "let showPosition = \\position -> case position of { Position x y ->" (Cons "  concatString \"(\" (concatString (showInt x) (concatString \",\" (concatString (showInt y) \")\"))) } in" (Cons "let rec showBody body : List Position -> String = case body of {" (Cons "  Nil -> \"\"; Cons p rest -> concatString (showPosition p) (showBody rest) } in" (Cons "let describe = \\outcome -> case outcome of {" (Cons "  Lost reason score -> concatString \"lost \" (concatString reason (concatString \" score=\" (showInt score)));" (Cons "  Won score -> concatString \"won score=\" (showInt score);" (Cons "  Continue game -> case game of { Game snake heading food score -> case snake of { Snake head body ->" (Cons "    concatString \"continue \" (concatString (showPosition head) (concatString \" [\" (concatString (showBody body)" (Cons "      (concatString \"] food=\" (concatString (showPosition food) (concatString \" score=\" (showInt score))))))) } }" (Cons "} in do {" (Cons (H.concat (S.concatMap (\(Triple label expression _) -> (Cons (H.append "putStrLn (concatString " (H.append (H.show (H.append label ": ")) (H.append " (describe (" (H.append expression ")));\n")))) Nil)) ruleCases)) (Cons "return () }" Nil)))))))))))))))))))

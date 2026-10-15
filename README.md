@@ -6,12 +6,39 @@ A standalone compiler for the core eMLF language in Boris Yakobowski's
 It performs graph-based MLF inference and emits explicit, independently
 type-checked xMLF.
 An interpreter runs checked `IO` programs with console input and output.
-A Haskell LLVM backend compiles checked xMLF to native functions, with a
+An LLVM backend compiles checked xMLF to native functions, with a
 small C runtime for lazy evaluation, algebraic data, and IO.
+
+## Install
+
+Native developer-preview releases are published at
+[mlf-lang/mlf](https://github.com/mlf-lang/mlf/releases). The first package supports
+Apple Silicon on macOS 26+. See [installation and releases](docs/releases.md)
+for checksums, the versioned installer, dependencies, and the release process.
+The repository is currently private; GitHub access is required to download it.
 
 ## Build and run
 
-The Haskell seed requires GHC and Cabal; no external solver is needed. Tested
+The package manager is written in MLF. With an existing compiler supporting
+the host IO primitives, it builds and tests this repository without Cabal:
+
+```sh
+export MLF_COMPILER=/path/to/emlf
+export MLF_GC_PREFIX=/path/to/bdwgc-install
+./scripts/bootstrap-package.sh
+./mlfpkg build
+./mlfpkg --timeout 21600 test
+```
+
+The build compiles both `emlf` and `mlfpkg` against their local MLF dependencies.
+Package resolution, caching, builds, and compiler test orchestration run in MLF.
+The compiler tests and independent reference programs run in MLF; the active
+path needs neither GHC, Cabal, nor Python. Clang builds the retained C ABI probes
+and process transports. See [the package manager guide](docs/package-manager.md)
+for prerequisites, local dependencies, caching, and test targets, and
+[the native test coverage](tests/README.md) for validation evidence.
+
+The traditional Haskell seed workflow uses GHC and Cabal; no external solver is needed. Tested
 with GHC 9.14.1. Native linking, `backend-tests`, and `cabal bench` additionally
 require Clang/LLVM 15 or later, GMP development files, and `pkg-config` on
 `PATH`. The benchmark drivers also require Python 3.
@@ -326,12 +353,44 @@ modules and builtin Prelude imports, but external imports require one of those
 graph-loading APIs. `parseProgram` and `compileProgram` remain the closed-program
 APIs used by existing clients.
 
-This implementation links source modules into one program before inference,
-then uses the same checked xMLF and both existing backends. Private declarations
-are still checked. It does not yet provide cyclic imports, separate object/interface
-compilation, packages, or user-defined operator imports. An import cycle reports
-its dependency chain. Ordinary module-free scripts retain the existing compilation
-path and Prelude behavior.
+The source commands above link source modules before inference. Separate
+compilation is also available in both the Haskell and self-hosted compilers:
+
+```sh
+mkdir -p build/Geometry
+emlf --compile-module examples/modules/Geometry/Point.emlf -o build/Geometry/Point
+emlf -i build --compile-module examples/modules/Main.emlf -o build/Main
+emlf -i build --show-interface build/Main.mlfi
+emlf -i build --run-module build/Main.mlfi
+emlf -i build --link-module build/Main.mlfi > build/main.xmlf
+python3 scripts/compile_native.py --compiler emlf -i build build/Main.mlfi -o build/main
+```
+
+Compile dependencies first, using prefixes that match their module paths.
+`--compile-module` writes a `.mlfi` interface and a `.mlfo` implementation object.
+It reads dependency **interfaces only**: dependency source and object files are
+not needed for compilation. All local definitions, including private ones, are
+checked. Imports, re-exports, abstract datatypes, polymorphism, classes, instances,
+recursive functions, and Prelude retain their usual scope rules.
+
+Objects contain independently checked xMLF with explicit import parameters.
+The linker resolves nominal identities, freshens binders, verifies dependency
+schemes and datatype layouts, and checks the resulting closed program. Both
+backends consume that program. `--module-to-llvm` and `--module-to-llvm-gc` emit
+LLVM directly from the linked objects. LLVM optimization and native code
+generation happen at link time; `.mlfo` is a portable checked-IR object, not a
+platform `.o` file. Dependencies are not reparsed or reinferred from source.
+
+Interfaces carry versioned metadata and dependency fingerprints. An
+implementation-only edit can replace an object without rebuilding consumers;
+a changed interface produces a stale-dependency diagnostic until consumers are
+recompiled. Checksums detect incomplete or mismatched interface/object pairs;
+they are not cryptographic signatures. There is no automatic source fallback or
+automatic dependency rebuild. The built-in Prelude needs no files on disk.
+
+Cyclic imports, packages, and user-defined operator imports remain unsupported.
+An import cycle reports its dependency chain. Ordinary module-free scripts retain
+the existing compilation path and Prelude behavior.
 
 ### Function declarations and expressions
 

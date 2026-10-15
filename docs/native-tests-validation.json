@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "validated_date": "2026-10-15",
+  "implementation": "MLF",
+  "system": "Darwin",
+  "machine": "arm64",
+  "compiler_sha256": "6f658807be3a2fb1955ee42284b4ba34a736f7927ac9964da9c3cd234cb41bc0",
+  "manager_sha256": "80f3a21e4e62565b4519d8a60835bee3eb4d9443a1aade9d9dc1fe757ac0a5fa",
+  "source_files": 413,
+  "source_manifest_sha256": "fd7ba2e230a847a67b4966483b88e9d96a25fb8598380d13b08c2fc1a69d6e22",
+  "groups": {
+    "unit": {
+      "passed": true,
+      "report": ".mlf-build/test-port/root-finalized/compiler-tests/unit/verification.json",
+      "report_sha256": "c4558e63df55e8af3ec34235647699fda9d2956c9270b7f0cb072b0e31004256"
+    },
+    "packages": {
+      "passed": true,
+      "report": ".mlf-build/test-port/root-finalized/compiler-tests/packages/verification.json",
+      "report_sha256": "842af756b2b478e4041a8e5892063cb9b1c96d09b7df1ab58869c07534f84d7d"
+    },
+    "self-host": {
+      "passed": true,
+      "report": ".mlf-build/test-port/root-finalized/compiler-tests/self-host/verification.json",
+      "report_sha256": "45068a921282da22d0da09fe902f264cf2b0643e985031bc1e3df3a19f5c0430"
+    },
+    "parity": {
+      "passed": true,
+      "report": ".mlf-build/test-port/root-finalized/compiler-tests/parity/verification.json",
+      "report_sha256": "24cab7241464e94d79d421dde2a4171642f11672ef41e2eb760d9ad0b68655e3"
+    },
+    "backends": {
+      "passed": true,
+      "report": ".mlf-build/test-port/root-finalized/compiler-tests/backends/verification.json",
+      "report_sha256": "ca215a965f921c6beba58c2ead0b50fa4a46f296e2279fd4fc66b577923e0d97"
+    },
+    "port": {
+      "passed": true,
+      "report": ".mlf-build/test-port/root-finalized/compiler-tests/port/verification.json",
+      "report_sha256": "f2dad08f8eb328780538a077ffc27c6f0c6fb727f08d31a0961a1b70b3cca24c"
+    }
+  },
+  "unit": {
+    "compiler_fixtures": 636,
+    "substring_adapter_checks": 13,
+    "algorithm_w_terms": 6712,
+    "algorithm_w_typable": 2906,
+    "annotation_programs": 126,
+    "figure12_expressions": 43,
+    "figure12_controls": 36,
+    "harness_methods": 53
+  },
+  "packages": {
+    "resolver_methods": 18,
+    "integration_cases": 19
+  },
+  "matrices": {
+    "backends": {
+      "compact-gc": {
+        "fixtures": 494,
+        "rows": 546,
+        "backends": 2,
+        "log_sha256": "642f55e7c65a4237d7a1727ffaec22f34a786af32e7b094972490e71decd0221",
+        "ledger_sha256": "8e30080e0d6c8bad5d668cdc757a7fdc6cb428b9d5a14361a11a99fcdda21799",
+        "runtime_object_sha256": "e04ab60bc3b028560e312bfa0ee6555baafc3b0eabbeea61d4f3ba83d128a4ec"
+      },
+      "standard": {
+        "fixtures": 494,
+        "rows": 546,
+        "backends": 2,
+        "log_sha256": "642f55e7c65a4237d7a1727ffaec22f34a786af32e7b094972490e71decd0221",
+        "ledger_sha256": "8e30080e0d6c8bad5d668cdc757a7fdc6cb428b9d5a14361a11a99fcdda21799",
+        "runtime_object_sha256": "2d012d347858a6f066672b267b2700352cd38e277d553f1bf2c239a8088da71c"
+      }
+    },
+    "port": {
+      "compact-gc": {
+        "fixtures": 26,
+        "rows": 26,
+        "backends": 2,
+        "log_sha256": "a904322f810051fa4c544f3dbd9527c3878521da00eb52ab730510c93578910b",
+        "ledger_sha256": "68504c296a5e3cf15b87d91306f648ab95a29c26b20f30cc1e2fe11a4951d49a",
+        "runtime_object_sha256": "e04ab60bc3b028560e312bfa0ee6555baafc3b0eabbeea61d4f3ba83d128a4ec"
+      },
+      "standard": {
+        "fixtures": 26,
+        "rows": 26,
+        "backends": 2,
+        "log_sha256": "a904322f810051fa4c544f3dbd9527c3878521da00eb52ab730510c93578910b",
+        "ledger_sha256": "68504c296a5e3cf15b87d91306f648ab95a29c26b20f30cc1e2fe11a4951d49a",
+        "runtime_object_sha256": "2d012d347858a6f066672b267b2700352cd38e277d553f1bf2c239a8088da71c"
+      }
+    }
+  },
+  "independent_port_references": 6,
+  "parity": {
+    "accepted": 3202,
+    "cases": 7086,
+    "manifest_sha256": "c32f9fd7a57dbc9b5d792194ad70a81e62b4d64d5359f433bd65dc9c4072fa2d",
+    "rejected": 3884,
+    "runtime_executions": 160,
+    "runtime_rows": 80
+  },
+  "fixed_point": {
+    "llvm_sha256": "b5866443a271d7d7a7463bdc65958aa9b0c28541be7600e1209051cd40f9eabc",
+    "next_compiler_sha256": "6f658807be3a2fb1955ee42284b4ba34a736f7927ac9964da9c3cd234cb41bc0",
+    "reused_candidate_build": false
+  },
+  "blocked_tools": [
+    "ghc",
+    "ghc-pkg",
+    "runghc",
+    "runhaskell",
+    "cabal",
+    "python",
+    "python3"
+  ],
+  "blocked_tool_invocations": 0,
+  "root_report": {
+    "path": ".mlf-build/test-port/root-finalized/build-report.json",
+    "sha256": "e2db2b9fbbf67ca18783dda75b88a487d0dffdc1413a57d41986b0e383ac0363"
+  },
+  "test_command": [
+    ".mlf-build/test-port/manager-verified/bin/mlfpkg",
+    "--manifest",
+    "mlf-package.json",
+    "--compiler",
+    "/Volumes/src/mlf/.mlf-build/test-port/root-verified/bin/emlf",
+    "--build-dir",
+    "/Volumes/src/mlf/.mlf-build/test-port/root-finalized",
+    "--timeout",
+    "21600",
+    "--locked",
+    "test"
+  ]
+}

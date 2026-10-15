@@ -29,6 +29,7 @@ import qualified System.Exit as Exit
 import System.IO (hFlush, hPutStr, stdin, stdout, stderr)
 import Text.Read (readMaybe)
 import qualified MLF.Data as D
+import qualified MLF.SystemIO as Sys
 import MLF.Primitive
 import qualified MLF.X.Check as C
 import qualified MLF.X.Syntax as X
@@ -189,7 +190,7 @@ primitive :: D.DataEnv -> Primitive -> [Thunk] -> Thunk
 primitive ds p arguments
   | length arguments < primitiveArity p = pure (PrimitiveValue p arguments)
   | length arguments == primitiveArity p && p `elem`
-      [ReadFile,WriteFile,FileExists,CanonicalPath,GetArgCount,GetArg,PutErr,ExitWith,GetExecutablePath,GetContents] =
+      [ReadFile,WriteFile,FileExists,CanonicalPath,GetArgCount,GetArg,PutErr,ExitWith,GetExecutablePath,GetContents,GetEnv,SetEnv,UnsetEnv,RunProcess,ListDirectory,DirectoryExists,FileDigest,AcquireFileLock,ReleaseFileLock] =
       pure (ActionValue (SystemAction p arguments))
   | length arguments == primitiveArity p && p `elem`
       [NewIntArray,ReadIntArray,WriteIntArray,LengthIntArray,
@@ -452,6 +453,15 @@ runAction options ds backend thunk = case thunk of
         pure $ case Text.decodeUtf8' bytes of
           Left _ -> failure "IO error: invalid UTF-8 input"
           Right s -> Right (pure (StringValue (Text.unpack s)))
+      (GetEnv,[a]) -> checked (path a) $ \x -> systemIO "getEnv failed" (Right . pure . StringValue <$> Sys.getEnv x)
+      (SetEnv,[a,b]) -> checked (((,) <$> path a <*> string b)) $ \(x,y) -> systemIO "setEnv failed" (Sys.setEnv x y >> pure (Right unit))
+      (UnsetEnv,[a]) -> checked (path a) $ \x -> systemIO "unsetEnv failed" (Sys.unsetEnv x >> pure (Right unit))
+      (RunProcess,[a,b]) -> checked (((,) <$> path a <*> string b)) $ \(x,y) -> systemIO "runProcess failed" (Right . pure . IntegerValue <$> Sys.runProcess x y)
+      (ListDirectory,[a]) -> checked (path a) $ \x -> systemIO "listDirectory failed" (Right . pure . StringValue <$> Sys.listDirectory x)
+      (DirectoryExists,[a]) -> checked (path a) $ \x -> systemIO "directoryExists failed" (Right . pure . BooleanValue <$> Sys.directoryExists x)
+      (FileDigest,[a]) -> checked (path a) $ \x -> systemIO "fileDigest failed" (Right . pure . StringValue <$> Sys.fileDigest x)
+      (AcquireFileLock,[a]) -> checked (path a) $ \x -> systemIO "acquireFileLock failed" (Right . pure . IntegerValue <$> Sys.acquireFileLock x)
+      (ReleaseFileLock,[a]) -> checked (integer a) $ \x -> systemIO "releaseFileLock failed" (Sys.releaseFileLock x >> pure (Right unit))
       _ -> pure (failure "runtime system primitive arity mismatch")
     perform (ArrayAction p arguments) = case (p,arguments) of
       (GetByteLine,[]) -> do

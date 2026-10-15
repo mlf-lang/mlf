@@ -6,7 +6,13 @@ description: Graph-based type inference and explicit elaboration following Yakob
 category: Language
 build-type: Simple
 license: BSD-3-Clause
+license-file: LICENSE
 extra-source-files:
+  mlfpkg, mlf-package.json, mlf.lock, docs/package-manager.md, scripts/bootstrap-package.sh,
+  package/*.emlf, package/Package/*.emlf, package/mlf-package.json, bootstrap/mlf-package.json,
+  examples/packages/*.emlf, examples/packages/mlf-package.json,
+  examples/packages/greeting/*.emlf, examples/packages/greeting/mlf-package.json,
+  examples/packages/message/*.emlf, examples/packages/message/mlf-package.json,
   README.md, examples/*.emlf, examples/*.hs, test/fixtures/*.emlf, test/*.c, test/*.py, docs/*.txt, scripts/*.py,
   examples/modules/*.emlf, examples/modules/Geometry/*.emlf,
   benchmarks/*.md, benchmarks/*.json, benchmarks/results/*.json, benchmarks/LICENSE.BenchmarksGame,
@@ -48,7 +54,7 @@ extra-source-files:
   benchmarks/k-nucleotide/mlf/*.emlf, runtime/*.md,
   bootstrap/**/*.emlf, bootstrap/**/*.hs, bootstrap/**/*.py, bootstrap/**/*.txt, bootstrap/**/*.md, bootstrap/**/*.expected,
   bootstrap/tests/*.c
-data-files: runtime/mlf_runtime.c, runtime/mlf_runtime.h, runtime/khash.h
+data-files: runtime/mlf_runtime.c, runtime/mlf_runtime.h, runtime/khash.h, runtime/mlf_system.h
 
 common settings
   default-language: Haskell2010
@@ -57,18 +63,20 @@ common settings
 
 library
   import: settings
-  build-depends: bytestring, text, hashtables ==1.4.2, directory, filepath
+  build-depends: bytestring, text, hashtables ==1.4.2, directory, filepath, process, unix >=2.8
   hs-source-dirs: src
   exposed-modules:
     MLF.Compiler
     MLF.Module.Syntax
     MLF.Module
+    MLF.Separate
     MLF.Prelude
     MLF.Desugar
     MLF.Surface
     MLF.Layout
     MLF.Primitive
     MLF.Runtime
+    MLF.SystemIO
     MLF.LLVM
     MLF.LLVM.Optimize
     MLF.LLVM.Analysis
@@ -107,7 +115,7 @@ test-suite mlf-tests
   type: exitcode-stdio-1.0
   hs-source-dirs: test, examples
   main-is: Main.hs
-  other-modules: Oracle, Computations, Datatypes, Typeclasses, DoNotation, SurfaceSyntax, Readability, Modules, GraphValidation, GraphUnification, GraphUnificationReference, GraphSolver, EmbeddingPruning, OptimizerQueries, StrictFieldAnalysis, StateCases, StateTypes
+  other-modules: Oracle, Computations, Datatypes, Typeclasses, DoNotation, SurfaceSyntax, Readability, Modules, Separate, GraphValidation, GraphUnification, GraphUnificationReference, GraphSolver, EmbeddingPruning, OptimizerQueries, StrictFieldAnalysis, StateCases, StateTypes
   build-depends: mlf, directory, filepath
 
 test-suite figure12-tests
@@ -125,7 +133,7 @@ test-suite backend-tests
   hs-source-dirs: test, examples
   main-is: BackendMain.hs
   build-tool-depends: mlf:emlf
-  other-modules: Backends, BackendCases, IOTests, PreludeTests, Snake, SnakeBaseline, NativeOptimization, ConstructorProjection, ForceReuse, BoolConditions, EnvironmentAccess, StrictFields, NumericArrays, ByteArrays, DNA, Readability, Modules, ModuleBackends, BootstrapPrimitives, StateCases, StateTypes, StateRuntime, HigherOrderSpecialization
+  other-modules: Backends, BackendCases, IOTests, PreludeTests, Snake, SnakeBaseline, NativeOptimization, ConstructorProjection, ForceReuse, BoolConditions, EnvironmentAccess, StrictFields, NumericArrays, ByteArrays, DNA, Readability, Modules, ModuleBackends, Separate, SeparateBackends, BootstrapPrimitives, StateCases, StateTypes, StateRuntime, HigherOrderSpecialization
   build-depends: mlf, directory, filepath, process, bytestring, text, unix
 
 benchmark compiler-bench

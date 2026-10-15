@@ -12,11 +12,15 @@ data Value = Signature String SAnnotation | Equation String (List SPattern) (May
 
 reservedWords = Cons "data" (Cons "class" (Cons "instance" (Cons "where" (Cons "case" (Cons "of" (Cons "do" (Cons "let" (Cons "rec" (Cons "in" (Cons "if" (Cons "then" (Cons "else" (Cons "forall" (Cons "exists" (Cons "true" (Cons "false" (Cons "True" (Cons "False" (Cons "bot" (Cons "module" (Cons "import" Nil)))))))))))))))))))))
 identifier : Parser String
-identifier = pSatisfy (\n -> stringLength n > 0 && U.isAlpha (stringCodeAt n 0) && not (elem eqString n reservedWords)) "identifier"
+identifier = namedIdentifier U.isAlpha "identifier"
 upperIdentifier : Parser String
-upperIdentifier = pSatisfy (\n -> stringLength n > 0 && U.isUpper (stringCodeAt n 0) && not (elem eqString n reservedWords)) "constructor name"
+upperIdentifier = namedIdentifier U.isUpper "constructor name"
 lowerIdentifier : Parser String
-lowerIdentifier = pSatisfy (\n -> stringLength n > 0 && U.isLower (stringCodeAt n 0) && not (elem eqString n reservedWords)) "variable name"
+lowerIdentifier = namedIdentifier U.isLower "variable name"
+namedIdentifier : (Int -> Bool) -> String -> Parser String
+namedIdentifier predicate expected = pTry (do
+  name <- pSatisfy (\n -> stringLength n > 0 && predicate (stringCodeAt n 0)) expected
+  if elem eqString name reservedWords then pFail ("unexpected reserved word " ++ name) else pPure name)
 upperReference : Parser String
 upperReference = qualified (pChoices (Cons upperIdentifier (Cons (pToken "True") (Cons (pToken "False") Nil))))
 lowerReference : Parser String
@@ -127,7 +131,7 @@ groupValues declarations = case collectValues Nothing declarations of
     if length names == length (nubBy eqString names) then Right values else Left "function equations must be contiguous; duplicate value declaration"
 collectValues : Maybe (Pair String SAnnotation) -> List Value -> Either String (List (Triple String (Maybe SAnnotation) SExpr))
 collectValues signature values = case values of
-  Nil -> case signature of {Nothing -> Right Nil; Just (Pair n _) -> Left ("signature without a definition: " ++ n)}
+  Nil -> case signature of {Nothing -> Right Nil; Just (Pair n _) -> Left ("unexpected end of declarations; signature without a definition: " ++ n)}
   Cons (Signature n ty) rest -> case signature of {Just _ -> Left ("duplicate signature for " ++ n); Nothing -> collectValues (Just (Pair n ty)) rest}
   Cons (Equation name args inline body) rest ->
     let ty = case signature of
@@ -194,7 +198,8 @@ comparison = do
   pOption a (do
     operator <- comparisonOperator
     b <- concatenation
-    pNot comparisonOperator
+    next <- pOptional (pLook comparisonOperator)
+    case next of {Nothing -> pPure Unit; Just _ -> pFail "ambiguous use of a non-associative comparison operator"}
     pPure (operator a b))
 comparisonOperator : Parser (SExpr -> SExpr -> SExpr)
 comparisonOperator = pChoices (Cons (pMap (\_ -> primitive2 PEqInt) (pToken "=="))
@@ -225,7 +230,7 @@ conditional condition yes no = SApp (primitive2 PIfThenElse condition yes) no
 notValue : SExpr -> SExpr
 notValue a = conditional a (SBoolLit false) (SBoolLit true)
 negateValue : SExpr -> SExpr
-negateValue a = case a of {SIntLit n -> SIntLit (0-n); SDoubleLit n -> SDoubleLit (subDouble 0.0 n); _ -> primitive2 PSubInt (SIntLit 0) a}
+negateValue a = case a of {SIntLit n -> SIntLit (0-n); SDoubleLit n -> SDoubleLit (mulDouble (-1.0) n); _ -> primitive2 PSubInt (SIntLit 0) a}
 positiveValue : SExpr -> SExpr
 positiveValue a = case a of {SIntLit _ -> a; SDoubleLit _ -> a; _ -> primitive2 PAddInt (SIntLit 0) a}
 ifExpr : Parser SExpr
@@ -326,13 +331,20 @@ typeAtom = pChoices (Cons (pParens (pOption (SCon "Unit" Nil) typ))
   (Cons (pMap (\_ -> SBottom) (pChoice (pToken "bot") (pToken "⊥")))
   (Cons (pMap STVar lowerIdentifier) (Cons (pMap (\n -> SCon n Nil) upperReference) Nil))))
 
+-- Reserved Boolean spellings are parsed in declarations so semantic validation
+-- can report the same inference rejection as the maintained seed compiler.
+declarationIdentifier : Parser String
+declarationIdentifier = pChoices (Cons upperIdentifier (Cons (pToken "True") (Cons (pToken "False") Nil)))
 dataDeclaration : Parser DataDecl
 dataDeclaration = do
   pToken "data"
-  name <- upperIdentifier
+  name <- declarationIdentifier
   parameters <- pMany parameter
+  state <- pState
+  let next = tokenText (stateToken state)
+  if elem eqString next reservedWords then pFail ("unexpected reserved word " ++ next) else pPure Unit
   pToken "="
-  constructors <- pSepBy1 (do {n <- upperIdentifier; fields <- pMany fieldAtom; pPure (ConstructorDecl n fields)}) (pToken "|")
+  constructors <- pSepBy1 (do {n <- declarationIdentifier; fields <- pMany fieldAtom; pPure (ConstructorDecl n fields)}) (pToken "|")
   pPure (if all (\(Pair _ k) -> case k of {Star -> true; _ -> false}) parameters then DataDecl name (map (\(Pair n _) -> n) parameters) constructors else DataDeclK name parameters constructors)
 fieldType : Parser Field
 fieldType = pChoice (do {pToken "forall"; binders <- pSome parameter; pToken "."; body <- fieldType; pPure (foldr (\(Pair n k) b -> Quantified n k b) body binders)}) (pChainr fieldApplication (pMap (\_ -> Function) (pToken "->")))

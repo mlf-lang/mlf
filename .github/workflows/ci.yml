@@ -1,0 +1,41 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  metadata:
+    name: Release metadata
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: tools/release/check.sh
+  native:
+    name: Native smoke and self-host
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Native dependencies
+        run: brew install llvm gmp pkg-config bdw-gc
+      - name: Fetch verified native seed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: tools/release/fetch-seed.sh .mlf-build/seed
+      - name: Build, exercise both backends, and self-host without GHC or Python
+        run: tools/release/native-ci.sh smoke
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: native-smoke-evidence
+          include-hidden-files: true
+          path: |
+            .mlf-build/build-report.json
+            .mlf-build/compiler-tests/self-host/verification.json
+            .mlf-build/compiler-tests/self-host/*.log

@@ -1,7 +1,7 @@
 -- | Classes elaborate to ordinary, explicitly typed dictionary data. Local
 -- overloaded lets abstract their wanted dictionaries; uses request fresh
 -- evidence, so the graph solver still controls type generalization.
-module MLF.Classes (lowerClasses, lowerClassesWithImports, lowerClassesWithScopes, prettyQualified) where
+module MLF.Classes (lowerClasses, lowerClassesWithImports, lowerClassesWithScopes, lowerSeparateClasses, prettyQualified) where
 
 import Control.Monad (foldM, forM, forM_, unless, when)
 import Control.Monad.State.Strict
@@ -15,6 +15,7 @@ import MLF.Surface (lowerSurface, patternVariables)
 import MLF.Kind
 import qualified MLF.Kinding as K
 import qualified MLF.Syntax as S
+import qualified MLF.Primitive as P
 import qualified MLF.X.Type as T
 import MLF.X.Pretty (prettyType)
 
@@ -125,8 +126,32 @@ lowerClassesWithScopes values instances original =
 
 lowerCoreClasses :: Set.Set String -> Map.Map String (Set.Set Int) -> Maybe [Set.Set Int]
                  -> S.Program -> Either String (S.Program, Map.Map String String)
-lowerCoreClasses _ _ _ p@(S.Program _ _) = pure (p,Map.empty)
-lowerCoreClasses imported valueIndices instanceIndices program@(S.ClassProgram datatypes declarations instances body) = do
+lowerCoreClasses = lowerCoreClassesWith Nothing
+
+-- Separate units use nominal dictionary names and imported, already checked
+-- schemes. The temporary definitions are removed after elaboration and become
+-- explicit module parameters; they are never executed or written as objects.
+lowerSeparateClasses :: Map.Map String S.Type -> [String] -> S.Program
+                     -> Either String (S.Program, Map.Map String String)
+lowerSeparateClasses externals instanceNames original = do
+  lowered <- lowerSurface (case original of S.Program ds b -> S.ClassProgram ds [] [] b; _ -> original)
+  case lowered of
+    S.ClassProgram ds [] [] body -> do
+      -- Without classes, retain the ordinary core annotation rules. In
+      -- particular an annotated let is an MLF coercion, not a class signature.
+      let parameters = [(n,S.Annotation [] ty,S.Checked ty
+            (S.App (S.Primitive P.Panic) (S.StringLit "unlinked module parameter"))) |
+            (n,ty) <- Map.toAscList externals]
+      pure (S.Program ds (if null parameters then body else S.LetRec parameters body),Map.empty)
+    _ -> lowerCoreClassesWith (Just (externals,instanceNames)) Set.empty Map.empty Nothing lowered
+
+lowerCoreClassesWith :: Maybe (Map.Map String S.Type,[String]) -> Set.Set String
+                     -> Map.Map String (Set.Set Int) -> Maybe [Set.Set Int]
+                     -> S.Program -> Either String (S.Program, Map.Map String String)
+lowerCoreClassesWith Nothing _ _ _ p@(S.Program _ _) = pure (p,Map.empty)
+lowerCoreClassesWith config imported values scopes (S.Program ds body) =
+  lowerCoreClassesWith config imported values scopes (S.ClassProgram ds [] [] body)
+lowerCoreClassesWith config imported valueIndices instanceIndices program@(S.ClassProgram datatypes declarations instances body) = do
   forM_ instanceIndices $ \scopes ->
     unless (length scopes == length instances) (Left "module instance scope count mismatch")
   base <- D.validateDeclarations datatypes
@@ -147,10 +172,11 @@ lowerCoreClasses imported valueIndices instanceIndices program@(S.ClassProgram d
   where
     lower base classes = do
       entries <- forM classes $ \d -> do
-        dict <- fresh ("Dict" ++ S.className d)
-        ctor <- fresh ("Make" ++ S.className d)
-        methods <- forM (S.classMethods d) $ \(n,_) -> (,) n <$> fresh ("select" ++ S.className d)
-        supers <- mapM (const (fresh "superclass")) (S.superclasses d)
+        dict <- named ("Dict_" ++ S.className d) ("Dict" ++ S.className d)
+        ctor <- named ("Make_" ++ S.className d) ("Make" ++ S.className d)
+        methods <- forM (S.classMethods d) $ \(n,_) -> (,) n <$> named ("select_" ++ n) ("select" ++ S.className d)
+        supers <- forM (zip [0 :: Int ..] (S.superclasses d)) $ \(i,_) ->
+          named ("super_" ++ S.className d ++ "_" ++ show i) "superclass"
         pure (S.className d,Info d dict ctor methods supers)
       let infos = Map.fromList entries
       lift (validateClasses base infos)
@@ -158,7 +184,11 @@ lowerCoreClasses imported valueIndices instanceIndices program@(S.ClassProgram d
       ds <- lift (D.validateDeclarations (datatypes ++ dictionaries))
       checkedInstances <- lift (mapM (validateInstance ds infos) instances)
       lift (checkOverlap checkedInstances)
-      names <- mapM (const (fresh "instanceDictionary")) checkedInstances
+      names <- case config of
+        Nothing -> mapM (const (fresh "instanceDictionary")) checkedInstances
+        Just (_,ns) -> do
+          lift (unless (length ns == length checkedInstances) (Left "separate instance identity count mismatch"))
+          pure ns
       let supers = [(S.SuperclassEvidence,n) | (_,Info _ _ _ _ ns) <- entries, n <- ns]
           globalCandidates = [(S.InstanceEvidence,n) | n <- names] ++ supers
           select indices = [(S.InstanceEvidence,n) | (i,n) <- zip [0..] names, Set.member i indices] ++ supers
@@ -167,7 +197,10 @@ lowerCoreClasses imported valueIndices instanceIndices program@(S.ClassProgram d
           methodBindings isImported = Map.fromList [(name,(selector,[className])) |
             (className,Info _ _ _ methods _) <- entries,
             Set.member className imported == isImported, (name,selector) <- methods]
-          methodEnv = Map.union (methodBindings False) (methodBindings True)
+          externalSchemes = maybe Map.empty fst config
+          externalOverloads = Map.mapWithKey (\n ty -> let (_,ps,_) = scheme ty
+            in (n,[c | S.Predicate c _ <- ps])) externalSchemes
+          methodEnv = Map.unions [externalOverloads,methodBindings False,methodBindings True]
       selectors <- concat <$> mapM (selectorDefinitions infos . snd) entries
       definitions <- forM (zip3 names checkedInstances instanceScopes) $ \(name,inst,available) -> do
         Info decl _ ctor _ _ <- lift (lookupInfo infos (S.instanceClass inst))
@@ -191,9 +224,16 @@ lowerCoreClasses imported valueIndices instanceIndices program@(S.ClassProgram d
       (expression,wants) <- lowerExpr valueScopes ds infos methodEnv globalCandidates body
       let result = closeWants infos globalCandidates wants expression
           bindings = [(n,annotation,S.Checked ty rhs) | (n,annotation@(S.Annotation [] ty),rhs) <- selectors ++ definitions]
-          expr = if null bindings then result else S.LetRec bindings result
+          localBindings = filter (\(n,_,_) -> Map.notMember n externalSchemes) bindings
+          inner = if null localBindings then result else S.LetRec localBindings result
+      externalBindings <- forM (Map.toAscList externalSchemes) $ \(n,ty) -> do
+        translated <- lift (translateScheme ds infos ty)
+        pure (n,S.Annotation [] translated,S.Checked translated
+          (S.App (S.Primitive P.Panic) (S.StringLit "unlinked module parameter")))
+      let expr = if null externalBindings then inner else S.LetRec externalBindings inner
       pure (S.Program (datatypes ++ dictionaries) expr,
         Map.fromList [(dict,c) | (c,Info _ dict _ _ _) <- entries])
+    named stable prefix = case config of Nothing -> fresh prefix; Just _ -> pure stable
 
 validateClasses :: D.DataEnv -> Infos -> Either String ()
 validateClasses ds infos = do

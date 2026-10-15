@@ -1,0 +1,6 @@
+{
+  "format": 1,
+  "name": "message",
+  "version": "0.1.0",
+  "library": {"modules": {"Message": "Message.emlf"}}
+}

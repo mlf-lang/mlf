@@ -646,7 +646,7 @@ def main(argv=None):
         inputs = [*report["source_sha256"], *manifest["pinned_sha256"],
                   "benchmarks/manifest.json", str(Path(__file__).resolve()),
                   "scripts/compile_native.py", "scripts/compiler_process.py",
-                  *paths.values(), str(runtime), str(runtime.with_suffix(".h")), str(runtime.with_name("khash.h"))]
+                  *paths.values(), str(runtime), str(runtime.with_suffix(".h")), str(runtime.with_name("khash.h")), str(runtime.with_name("mlf_system.h"))]
         report["input_sha256"] = {name: digest(ROOT / name) for name in inputs}
         report["input_sha256"].update(package_hashes)
         git = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True)

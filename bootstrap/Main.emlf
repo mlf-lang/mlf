@@ -8,6 +8,7 @@ import qualified Bootstrap.X.Parser as Parse
 import qualified Bootstrap.X.Pretty as Pretty
 import qualified Bootstrap.Runtime as Runtime
 import qualified Bootstrap.LLVM as LLVM
+import qualified Bootstrap.Separate as Separate
 
 data Command = PrintSource Bool | RunSource | EmitSource Bool | CheckTarget | RunTarget | RunProgramTarget | EmitTarget Bool | EmitIOTarget Bool
 data Source = SourceFile String | SourceText String String | SourceStdin
@@ -40,6 +41,18 @@ runArgs mode paths arguments = case arguments of
   Cons "--llvm-runtime" Nil -> do
     path <- runtimePath
     putStrLn path
+  Cons "--compile-module" (Cons file (Cons "-o" (Cons prefix Nil))) -> do
+    result <- Separate.compileModuleFile mode paths file prefix
+    case result of {Left message -> fatal message; Right _ -> ioReturn Unit}
+  Cons "--show-interface" (Cons file Nil) -> do
+    result <- Separate.showInterfaceFile file
+    case result of {Left message -> fatal message; Right text -> putStr text}
+  Cons "--link-module" (Cons file Nil) -> separateCommand paths (PrintSource false) Nil file
+  Cons "--module-to-llvm" (Cons file Nil) -> separateCommand paths (EmitSource false) Nil file
+  Cons "--module-to-llvm-gc" (Cons file Nil) -> separateCommand paths (EmitSource true) Nil file
+  Cons "--run-module" rest -> case splitArguments rest of
+    Pair (Cons file Nil) args -> separateCommand paths RunSource args file
+    _ -> fatal usage
   Cons "--type" rest -> sourceCommand mode paths (PrintSource true) Nil rest
   Cons "--emit-llvm" rest -> sourceCommand mode paths (EmitSource false) Nil rest
   Cons "--emit-llvm-gc" rest -> sourceCommand mode paths (EmitSource true) Nil rest
@@ -55,6 +68,16 @@ runArgs mode paths arguments = case arguments of
   Cons "--run-program-xmlf" rest -> case splitArguments rest of
     Pair source arguments -> targetCommand RunProgramTarget arguments source
   _ -> sourceCommand mode paths (PrintSource false) Nil arguments
+
+separateCommand paths command args file = do
+  linked <- Separate.linkModuleFile paths file
+  case linked of
+    Left message -> fatal message
+    Right term -> case command of
+      PrintSource _ -> putStrLn (Pretty.prettyTerm term)
+      RunSource -> execute args term
+      EmitSource compact -> printLLVM ((if compact then LLVM.emitLLVMGCChunks else LLVM.emitLLVMChunks) term)
+      _ -> fatal "invalid module command"
 
 splitArguments : List String -> Pair (List String) (List String)
 splitArguments arguments = case arguments of
@@ -165,4 +188,6 @@ chooseRuntime paths = case paths of
     h <- fileExists (path ++ "/runtime/mlf_runtime.h")
     if c && h then canonicalPath (path ++ "/runtime/mlf_runtime.c") else chooseRuntime rest
 
-usage = "Usage: emlf [--no-prelude] [-i DIR ...] [--type] [FILE | --expr SOURCE]\n       emlf --check [XMLF_FILE]\n       emlf [--no-prelude] [-i DIR ...] --run [FILE | --expr SOURCE] [-- ARG ...]\n       emlf --run-xmlf [XMLF_FILE] [-- ARG ...]\n       emlf [--no-prelude] [-i DIR ...] --emit-llvm [FILE | --expr SOURCE]\n       emlf --xmlf-to-llvm [XMLF_FILE]\n       emlf [--no-prelude] [-i DIR ...] --emit-llvm-gc [FILE | --expr SOURCE]\n       emlf --xmlf-to-llvm[-io]-gc [XMLF_FILE]\n       emlf --llvm-runtime\nWith no FILE, read eMLF from standard input.\nImports load Foo.Bar from Foo/Bar.emlf beside the entry or in -i search roots.\nThe standard prelude supplies Monad and Monad IO; --no-prelude disables it.\nLink LLVM IR with clang, runtime/mlf_runtime.c, and GMP.\nThe -gc commands require the runtime built with MLF_USE_BDWGC and MLF_COMPACT_BDWGC.\n"
+usage = separateUsage ++ baseUsage
+separateUsage = "Separate compilation: emlf [--no-prelude] [-i DIR ...] --compile-module FILE -o PREFIX\n       emlf --show-interface FILE.mlfi\n       emlf [-i DIR ...] --link-module FILE.mlfi\n       emlf [-i DIR ...] --run-module FILE.mlfi [-- ARGS...]\n       emlf [-i DIR ...] --module-to-llvm[-gc] FILE.mlfi\n"
+baseUsage = "Usage: emlf [--no-prelude] [-i DIR ...] [--type] [FILE | --expr SOURCE]\n       emlf --check [XMLF_FILE]\n       emlf [--no-prelude] [-i DIR ...] --run [FILE | --expr SOURCE] [-- ARG ...]\n       emlf --run-xmlf [XMLF_FILE] [-- ARG ...]\n       emlf [--no-prelude] [-i DIR ...] --emit-llvm [FILE | --expr SOURCE]\n       emlf --xmlf-to-llvm [XMLF_FILE]\n       emlf [--no-prelude] [-i DIR ...] --emit-llvm-gc [FILE | --expr SOURCE]\n       emlf --xmlf-to-llvm[-io]-gc [XMLF_FILE]\n       emlf --llvm-runtime\nWith no FILE, read eMLF from standard input.\nImports load Foo.Bar from Foo/Bar.emlf beside the entry or in -i search roots.\nThe standard prelude supplies Monad and Monad IO; --no-prelude disables it.\nLink LLVM IR with clang, runtime/mlf_runtime.c, and GMP.\nThe -gc commands require the runtime built with MLF_USE_BDWGC and MLF_COMPACT_BDWGC.\n"

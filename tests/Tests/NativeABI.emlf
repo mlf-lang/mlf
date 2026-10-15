@@ -1,0 +1,91 @@
+module Tests.NativeABI where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+import qualified Package.Json as J
+import qualified Tests.Basic as H
+import qualified Package.Benchmark as B
+import qualified Tests.Bytes as Bytes
+capture directory argv input = do
+ code <- O.exec "" argv input (directory ++ "/out") (directory ++ "/err") 1800
+ out <- readFile (directory ++ "/out")
+ err <- readFile (directory ++ "/err")
+ return (Triple code out err)
+flags directory = do
+ Triple code output errors <- capture directory (O.words "pkg-config --cflags --libs gmp") ""
+ H.assert (code == 0 && eqString errors "") "GMP flags unavailable"
+ return (O.words output)
+compile directory source macros = do
+ gmp <- flags directory
+ let binary = directory ++ "/probe"
+ O.run "" (S.append (O.words "clang -O2 -std=c11 -Wall -Wextra -Werror -Iruntime") (S.append macros (S.append (Cons source (Cons "runtime/mlf_runtime.c" Nil)) (S.append gmp (Cons "-lm" (Cons "-o" (Cons binary Nil)))))))
+ return binary
+check directory binary mode status output errors = do
+ Triple code out err <- capture directory (Cons binary (Cons mode Nil)) ""
+ H.assert (code == status && eqString out output && eqString err errors) ("native ABI " ++ mode ++ " mismatch: " ++ showInt code ++ out ++ err)
+st = H.withScratch (\directory -> do
+ binary <- compile directory "test/runtime_st.c" (Cons "-DMLF_GC_THRESHOLD=32" Nil)
+ check directory binary "success" 0 "runtime ST: laziness, snapshots, repetition, nesting, WHNF, and GC passed\n" ""
+ S.mapM_ (\(Pair mode reason) -> check directory binary mode (if eqString mode "demand-poison" then 91 else 1) "" ((if eqString mode "demand-poison" then "" else "Runtime: ") ++ reason ++ "\n")) stErrors
+ H.assert (S.length stErrors + 1 == 35) "ST ABI mode coverage changed")
+stErrors = Cons (Pair "negative-size" "invalid array length") (Cons (Pair "huge-size" "invalid array length") (Cons (Pair "zero-read" "array index out of bounds") (Cons (Pair "negative-read" "array index out of bounds") (Cons (Pair "past-read" "array index out of bounds") (Cons (Pair "huge-read" "array index out of bounds") (Cons (Pair "negative-write" "array index out of bounds") (Cons (Pair "past-write" "array index out of bounds") (Cons (Pair "huge-write" "array index out of bounds") (Cons (Pair "ignored-invalid-read" "array index out of bounds") (Cons (Pair "io-as-st" "invalid value for runtime operation") (Cons (Pair "nested-io-as-st" "invalid value for runtime operation") (Cons (Pair "st-as-io" "invalid value for runtime operation") (Cons (Pair "int-array-as-st" "invalid value for runtime operation") (Cons (Pair "st-array-as-io" "invalid value for runtime operation") (Cons (Pair "null-return" "invalid environment write") (Cons (Pair "wrong-arity" "unary primitive arity mismatch") (Cons (Pair "demand-poison" "runtime ST: forced a lazy element") (Cons (Pair "cycle" "cyclic evaluation of a recursive binding") (Cons (Pair "direct-wrong-length" "invalid value for runtime operation") (Cons (Pair "direct-null-initial" "missing runtime value") (Cons (Pair "direct-null-stored" "missing runtime value") (Cons (Pair "direct-negative-size" "invalid array length") (Cons (Pair "direct-huge-size" "invalid array length") (Cons (Pair "direct-zero-read" "array index out of bounds") (Cons (Pair "direct-negative-read" "array index out of bounds") (Cons (Pair "direct-past-read" "array index out of bounds") (Cons (Pair "direct-huge-read" "array index out of bounds") (Cons (Pair "direct-negative-write" "array index out of bounds") (Cons (Pair "direct-past-write" "array index out of bounds") (Cons (Pair "direct-huge-write" "array index out of bounds") (Cons (Pair "direct-io-as-st" "invalid value for runtime operation") (Cons (Pair "direct-nested-io-as-st" "invalid value for runtime operation") (Cons (Pair "direct-int-array-as-st" "invalid value for runtime operation") (Nil))))))))))))))))))))))))))))))))))
+allocation = H.withScratch (\directory -> do
+ binary <- compile directory "test/runtime_allocation.c" Nil
+ Triple code out err <- capture directory (Cons binary (Cons "success" Nil)) ""
+ value <- H.right (J.parse out)
+ expected <- H.right (J.parse "{\"constructor_arities\":7,\"field_evaluations\":8,\"zero_environments\":4100,\"retained_bytes\":0}")
+ H.assert (code == 0 && eqString err "" && J.equal value expected) "constructor allocation accounting mismatch"
+ S.mapM_ (\mode -> check directory binary mode 1 "" ("Runtime: " ++ (if eqString mode "unset-slot" then "invalid environment read" else "invalid constructor descriptor") ++ "\n")) (O.words "negative-tag short overflow unset-slot"))
+values = H.withScratch (\directory -> do
+ binary <- compile directory "test/runtime_values.c" Nil
+ check directory binary "success" 0 "runtime values: sharing, lazy fields, recursive data, and spill boundaries passed\n" ""
+ S.mapM_ (\(Pair mode reason) -> check directory binary mode 1 "" ("Runtime: " ++ reason ++ "\n")) (Cons (Pair "negative-tag" "invalid constructor descriptor") (Cons (Pair "null-fields" "invalid constructor descriptor") (Cons (Pair "overapplication" "constructor overapplication") (Cons (Pair "field-bounds" "invalid environment read") (S.map (\mode -> Pair mode "cyclic evaluation of a recursive binding") (O.words "cycle-hole cycle-pair cycle-thunk")))))))
+compileLLVM directory source runtime macros objects = do
+ compiler <- getEnv "MLF_BOOTSTRAP_COMPILER"
+ Triple code out err <- capture directory (Cons compiler (Cons "--emit-llvm" (Cons source Nil))) ""
+ H.assert (code == 0 && eqString err "") "selected compiler failed LLVM emission"
+ writeFile (directory ++ "/program.ll") out
+ gmp <- flags directory
+ let object = directory ++ "/runtime.o"
+ O.run "" (S.append (O.words "clang -O2 -std=c11 -Iruntime") (S.append macros (S.append gmp (Cons "-c" (Cons runtime (Cons "-o" (Cons object Nil)))))))
+ let binary = directory ++ "/program"
+ O.run "" (S.append (Cons "clang" (Cons "-O2" (Cons "-Wno-override-module" (Cons (directory ++ "/program.ll") (Cons object objects))))) (S.append gmp (S.append (O.words "-Iruntime -lm -o") (Cons binary Nil))))
+ return binary
+rawConsole = H.withScratch (\directory -> do
+ let source = "do { a <- getByteLine; n <- lengthByteArray a; putBytes a 0 n; b <- getByteLine; m <- lengthByteArray b; putBytes b 0 m; end <- getByteLine; size <- lengthByteArray end; printInt size }"
+ writeFile (directory ++ "/console.emlf") source
+ let inputBytes = Bytes.pack (Cons 0 (Cons 255 (Cons 128 (Cons 10 (Cons 129 (Cons 65 Nil))))))
+ Bytes.writeFile (directory ++ "/input") inputBytes
+ compiler <- getEnv "MLF_BOOTSTRAP_COMPILER"
+ binary <- compileLLVM directory (directory ++ "/console.emlf") "runtime/mlf_runtime.c" Nil Nil
+ S.mapM_ (\argv -> do
+  code <- O.exec "" argv (directory ++ "/input") (directory ++ "/bytes.out") (directory ++ "/bytes.err") 60
+  out <- Bytes.readFile (directory ++ "/bytes.out")
+  err <- readFile (directory ++ "/bytes.err")
+  H.assert (code == 0 && S.eqList eqInt (Bytes.unpack out) (S.append (Bytes.unpack inputBytes) (B.textBytes "0\n")) && eqString err "") "raw console bytes or EOF changed") (Cons (Cons compiler (Cons "--run" (Cons (directory ++ "/console.emlf") Nil))) (Cons (Cons binary Nil) Nil)))
+
+allTables = H.withScratch (\directory -> do
+ binary <- compileLLVM directory "benchmarks/k-nucleotide/mlf/main.emlf" "runtime/mlf_runtime.c" (O.words "-DMLF_TABLE_AUDIT -DMLF_GC_THRESHOLD=32 -Dmlf_run=mlf_original_run") (Cons "test/benchmark_tables.c" Nil)
+ S.mapM_ (\size -> do
+  let input = B.fasta size
+  writeFile (directory ++ "/input") input
+  Triple code out err <- capture directory (Cons binary Nil) (directory ++ "/input")
+  H.assert (code == 0 && O.starts "tables=7\n" err) "not all seven tables were used"
+  let sequence = B.upper (S.snd (S.index (B.records input) 2))
+  let expected = S.map (\width -> let keys = S.nubBy eqString (B.windows width sequence) in Pair (S.max 0 (stringLength sequence - width + 1) + (if width <= 2 then S.length keys else 0)) (S.length keys)) (Cons 1 (Cons 2 (Cons 3 (Cons 4 (Cons 6 (Cons 12 (Cons 18 Nil)))))))
+  let writes = S.map (\token -> readInt (O.drop 7 token)) (S.filter (O.starts "writes=") (O.words err))
+  let distinct = S.map (\token -> readInt (O.drop 9 token)) (S.filter (O.starts "distinct=") (O.words err))
+  H.assert (S.eqList (S.eqPair eqInt eqInt) (S.zip writes distinct) expected && B.validateOutput "k-nucleotide" size (B.textBytes out)) "table write or distinct-key counts changed") (Cons 1 (Cons 7 (Cons 31 (Cons 1000 Nil)))))
+allTreeNodes = H.withScratch (\directory -> do
+ binary <- compileLLVM directory "benchmarks/binary-trees/mlf/main.emlf" "runtime/mlf_runtime.c" (O.words "-DMLF_ALLOCATION_AUDIT -Dmlf_run=mlf_original_run") (Cons "test/benchmark_allocations.c" Nil)
+ S.mapM_ (\size -> do
+  writeFile (directory ++ "/input") (showInt size ++ "\n")
+  Triple code out err <- capture directory (Cons binary Nil) (directory ++ "/input")
+  let counts = S.map (\line -> readInt (S.last (O.words line))) (O.lines (B.binaryTrees size))
+  H.assert (code == 0 && eqString (O.trim err) ("allocated_tree_nodes=" ++ showInt (S.sum counts)) && B.validateOutput "binary-trees" size (B.textBytes out)) "tree nodes were omitted or shortcut") (Cons 6 (Cons 7 (Cons 10 (Cons 16 Nil)))))
+suite = Cons (Pair "test_runtime_state_actions_preserve_laziness_and_roots" st)
+ (Cons (Pair "test_runtime_constructor_allocation_and_cleanup" allocation)
+ (Cons (Pair "test_runtime_constructor_fields_and_update_spines" values)
+ (Cons (Pair "test_real_console_raw_input_matches_native_bytes_and_eof" rawConsole)
+ (Cons (Pair "test_mlf_counts_every_window_and_distinct_key_in_all_seven_tables" allTables)
+ (Cons (Pair "test_mlf_allocates_every_tree_node" allTreeNodes) Nil)))))

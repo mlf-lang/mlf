@@ -1,0 +1,84 @@
+-- Fresh deterministic inputs; expected types remain frozen independent oracle data.
+module Tests.Corpus where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+import qualified Package.Json as J
+import qualified Tests.Helpers as H
+import qualified Tests.Oracle as W
+import qualified Tests.Figure12 as F
+import qualified Bootstrap.Kind as K
+prettyExpr : SExpr -> String
+prettyExpr expression = case expression of
+ SVar name -> name
+ SLam name annotation body -> "(\\" ++ parameter name annotation ++ " -> " ++ prettyExpr body ++ ")"
+ SApp function argument -> "(" ++ prettyExpr function ++ " " ++ prettyExpr argument ++ ")"
+ SLet name value body -> "(let " ++ name ++ " = " ++ prettyExpr value ++ " in " ++ prettyExpr body ++ ")"
+ SAnn value annotation -> "(" ++ prettyExpr value ++ " : " ++ prettyAnnotation annotation ++ ")"
+ SIntLit n -> "(" ++ showInt n ++ ")"
+ SBoolLit b -> if b then "true" else "false"
+ _ -> panic "unsupported independent oracle AST"
+parameter : String -> Maybe SAnnotation -> String
+parameter name annotation = case annotation of { Nothing -> name; Just a -> "(" ++ name ++ " : " ++ prettyAnnotation a ++ ")" }
+prettyAnnotation : SAnnotation -> String
+prettyAnnotation (SAnnotation variables ty) = (if S.null variables then "" else "exists " ++ S.unwords variables ++ ". ") ++ prettySourceType ty
+prettySourceType : SType -> String
+prettySourceType ty = case ty of
+ STVar name -> name
+ SBottom -> "bot"
+ SBottomKind kind -> "(bot : " ++ K.prettyKind kind ++ ")"
+ SArrow a b -> "(" ++ prettySourceType a ++ " -> " ++ prettySourceType b ++ ")"
+ SCon name Nil -> name
+ SCon name args -> "(" ++ S.unwords (Cons name (S.map prettySourceType args)) ++ ")"
+ STypeApp f a -> "(" ++ prettySourceType f ++ " " ++ prettySourceType a ++ ")"
+ SForall flag name bound body -> "(forall " ++ boundParameter flag name bound ++ ". " ++ prettySourceType body ++ ")"
+ _ -> panic "qualified type outside annotation corpus"
+boundParameter : Flag -> String -> SType -> String
+boundParameter flag name bound = case Pair flag bound of
+ Pair Flexible SBottom -> name
+ _ -> "(" ++ name ++ (if S.eqFlag flag Flexible then " >= " else " = ") ++ prettySourceType bound ++ ")"
+annotationTerms =
+ let identityExpr = SLam "x" Nothing (SVar "x") in
+ let identityType = SForall Flexible "a" SBottom (SArrow (STVar "a") (STVar "a")) in
+ let types = Cons SBottom (Cons (SCon "Int" Nil) (Cons (SCon "Bool" Nil) (Cons identityType (Cons (SForall Flexible "a" SBottom (SCon "List" (Cons (STVar "a") Nil))) (Cons (SForall Flexible "a" identityType (SArrow (STVar "a") (STVar "a"))) Nil))))) in
+ let nested = S.append types (S.concatMap (\a -> S.map (SArrow a) types) types) in
+ S.concatMap (\ty -> Cons (SAnn identityExpr (SAnnotation Nil (SArrow ty ty))) (Cons (SLam "x" (Just (SAnnotation Nil ty)) (SVar "x")) (Cons (SLet "f" (SAnn identityExpr (SAnnotation Nil (SArrow ty ty))) (SVar "f")) Nil))) nested
+rows directory = do
+ text <- readFile (directory ++ "/manifest.jsonl")
+ S.mapM (\line -> H.right (J.parse line)) (O.nonempty (H.lines text))
+regenerate directory group expressions oracle manifest = do
+ let selected = S.filter (\row -> eqString group (J.getText "category" "" row)) manifest
+ H.assert (S.length selected == S.length expressions) ("changed generated corpus coverage: " ++ group)
+ S.mapM_ (\(Pair row expression) -> do
+  let path = directory ++ "/" ++ J.getText "source_path" "" row
+  let text = prettyExpr expression ++ "\n"
+  original <- readFile path
+  H.assert (eqString original text) ("generated source changed: " ++ path)
+  H.assert (H.eq (oracle expression) (J.getBool "expected_accept" false row)) ("independent acceptance differs: " ++ path)
+  writeFile path text) (S.zip selected expressions)
+main : String -> IO Unit
+main directory = do
+ root <- canonicalPath "."
+ O.mkdir directory
+ O.run "" (Cons "tar" (Cons "-xzf" (Cons (root ++ "/tests/golden/parity-seed.tar.gz") (Cons "-C" (Cons directory Nil)))))
+ manifest <- rows directory
+ H.assert (S.length manifest == 7086) "parity baseline coverage changed"
+ regenerate directory "hm-exhaustive" (W.closedTerms 6) W.hmTypable manifest
+ regenerate directory "hm-generated" (W.generatedTerms 5000) W.hmTypable manifest
+ regenerate directory "annotations" annotationTerms (\_ -> true) manifest
+ S.mapM_ (\c -> do
+  let identity = "figure12-" ++ F.caseId c
+  let row = S.fromMaybe (panic "missing Figure12 corpus row") (S.find (\r -> eqString identity (J.getText "id" "" r)) manifest)
+  text <- H.right (F.program c)
+  original <- readFile (directory ++ "/" ++ J.getText "source_path" "" row)
+  H.assert (eqString original (text ++ "\n")) ("Figure12 source changed: " ++ identity)
+  H.assert (H.eq (F.expectedAcceptance c) (J.getBool "expected_accept" false row)) "Figure12 acceptance changed") F.cases
+ -- Refresh repository inputs from the current checkout while keeping prescribed oracle types.
+ files <- O.files (directory ++ "/repository")
+ S.mapM_ (\path -> do
+  let relative = O.relative (directory ++ "/repository") path
+  current <- readFile (root ++ "/" ++ relative)
+  original <- readFile path
+  H.assert (eqString current original) ("repository corpus input changed; review oracle: " ++ relative)
+  writeFile path current) files
+ putStrLn "Fresh MLF corpus: 7086 rows; exhaustive, seeded, annotation, and Figure12 inputs reproduced"

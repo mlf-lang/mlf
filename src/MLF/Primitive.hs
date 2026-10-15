@@ -27,6 +27,7 @@ data Primitive
   | ReadFile | WriteFile | FileExists | CanonicalPath | GetArgCount | GetArg | PutErr | ExitWith
   | GetExecutablePath | GetContents
   | STReturn | STBind | RunST | NewSTArray | ReadSTArray | WriteSTArray | LengthSTArray
+  | GetEnv | SetEnv | UnsetEnv | RunProcess | ListDirectory | DirectoryExists | FileDigest | AcquireFileLock | ReleaseFileLock
   deriving (Eq, Ord, Show, Enum, Bounded)
 
 primitiveName :: Primitive -> String
@@ -104,6 +105,16 @@ primitiveName p = case p of
   ReadSTArray -> "readSTArray"
   WriteSTArray -> "writeSTArray"
   LengthSTArray -> "lengthSTArray"
+
+  GetEnv -> "getEnv"
+  SetEnv -> "setEnv"
+  UnsetEnv -> "unsetEnv"
+  RunProcess -> "runProcess"
+  ListDirectory -> "listDirectory"
+  DirectoryExists -> "directoryExists"
+  FileDigest -> "fileDigest"
+  AcquireFileLock -> "acquireFileLock"
+  ReleaseFileLock -> "releaseFileLock"
 
 lookupTargetPrimitive :: String -> Maybe Primitive
 lookupTargetPrimitive name = find ((== name) . primitiveName) [minBound .. maxBound]
@@ -189,6 +200,15 @@ primitiveSignature primitive = case primitive of
   ReadSTArray -> ([("s",Star),("a",Star)],Function (stArray a) (Function int (st a)))
   WriteSTArray -> ([("s",Star),("a",Star)],Function (stArray a) (Function int (Function a (st unit))))
   LengthSTArray -> ([("s",Star),("a",Star)],Function (stArray a) (st int))
+  GetEnv -> ([], (Function string (io string)))
+  SetEnv -> ([], (Function string (Function string (io unit))))
+  UnsetEnv -> ([], (Function string (io unit)))
+  RunProcess -> ([], (Function string (Function string (io int))))
+  ListDirectory -> ([], (Function string (io string)))
+  DirectoryExists -> ([], (Function string (io bool)))
+  FileDigest -> ([], (Function string (io string)))
+  AcquireFileLock -> ([], (Function string (io int)))
+  ReleaseFileLock -> ([], (Function int (io unit)))
   where
     a = Parameter "a"
     b = Parameter "b"

@@ -1527,6 +1527,16 @@ primitiveCode p = case p of
   P.STReturn -> 66; P.STBind -> 67; P.RunST -> 68
   P.NewSTArray -> 69; P.ReadSTArray -> 70; P.WriteSTArray -> 71; P.LengthSTArray -> 72
 
+  P.GetEnv -> 73
+  P.SetEnv -> 74
+  P.UnsetEnv -> 75
+  P.RunProcess -> 76
+  P.ListDirectory -> 77
+  P.DirectoryExists -> 78
+  P.FileDigest -> 79
+  P.AcquireFileLock -> 80
+  P.ReleaseFileLock -> 81
+
 runtimeDeclarations :: [String]
 runtimeDeclarations =
   [ "declare ptr @mlf_execute_st_lazy(ptr)"

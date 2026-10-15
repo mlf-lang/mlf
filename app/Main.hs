@@ -8,6 +8,7 @@ import System.Exit (exitFailure)
 import System.FilePath ((</>), takeDirectory)
 import System.IO (hPutStrLn, stderr)
 import MLF.Compiler
+import qualified MLF.Separate as Separate
 import MLF.LLVM (emitLLVM, emitLLVMIO, emitLLVMForGC, emitLLVMIOForGC)
 import MLF.X.Pretty
 import Paths_mlf (getDataFileName)
@@ -31,6 +32,11 @@ runArgs mode includes args =
   case commandArgs of
     ["--help"] -> putStrLn usage
     ["--llvm-runtime"] -> runtimePath >>= putStrLn
+    ["--compile-module",file,"-o",prefix] -> Separate.compileModuleFile mode includes file prefix >>= either die pure
+    ["--show-interface",file] -> Separate.showInterfaceFile file >>= either die putStr
+    ["--link-module",file] -> Separate.linkModuleFile includes file >>= either die (putStrLn . prettyTerm)
+    ["--run-module",file] -> Separate.linkModuleFile includes file >>= either die executeTerm
+    ["--module-to-llvm",file] -> Separate.linkModuleFile includes file >>= either die (either die putStr . emit)
     ["--emit-llvm","--expr",source] -> emitSource "<expression>" source
     ["--emit-llvm"] -> getContents >>= emitSource "<stdin>"
     ["--emit-llvm","-"] -> getContents >>= emitSource "<stdin>"
@@ -62,6 +68,7 @@ runArgs mode includes args =
       "--xmlf-to-llvm-gc":rest -> (True,False,"--xmlf-to-llvm":rest)
       "--xmlf-to-llvm-io":rest -> (False,True,"--xmlf-to-llvm":rest)
       "--xmlf-to-llvm-io-gc":rest -> (True,True,"--xmlf-to-llvm":rest)
+      "--module-to-llvm-gc":rest -> (True,False,"--module-to-llvm":rest)
       _ -> (False,False,requestedArgs)
     emit = case (compact,requireIO) of
       (False,False) -> emitLLVM
@@ -127,6 +134,11 @@ usage = unlines
   , "       emlf [--no-prelude] [-i DIR ...] --emit-llvm-gc [FILE | --expr SOURCE]"
   , "       emlf --xmlf-to-llvm[-io]-gc [XMLF_FILE]"
   , "       emlf --llvm-runtime"
+  , "       emlf [--no-prelude] [-i DIR ...] --compile-module FILE -o PREFIX"
+  , "       emlf [-i DIR ...] --link-module FILE.mlfi"
+  , "       emlf [-i DIR ...] --run-module FILE.mlfi [-- ARGS...]"
+  , "       emlf [-i DIR ...] --module-to-llvm[-gc] FILE.mlfi"
+  , "       emlf --show-interface FILE.mlfi"
   , "With no FILE, read eMLF from standard input."
   , "Compile expressions, algebraic data types, classes, and modules to checked xMLF."
   , "Imports load Foo.Bar from Foo/Bar.emlf beside the entry or in -i search roots."

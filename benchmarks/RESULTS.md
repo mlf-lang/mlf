@@ -1,3 +1,117 @@
+# Stage 3 validation reuse: 2026-10-14
+
+The rebuilt stage 3 compiler passes the **5x C compilation / 2x C runtime
+limits for all nine workloads**, using seven samples per language and workload.
+**n-body: 4.742x compilation, 1.122x runtime. FASTA: 4.526x compilation,
+1.518x runtime.** The largest compilation ratio is n-body's 4.742x; the largest
+runtime ratio is reverse-complement's 1.686x.
+
+The solver now reuses final graph validation across normalization. The complete
+graph and its structural, binding and scope indexes are checked first.
+Normalization only strengthens flags on non-generalization nodes, preserving
+every field examined by graph validation and index construction. The independent
+xMLF type, inferred-type agreement and source-erasure checks still run.
+
+The measured command was:
+
+```sh
+cabal bench compiler-bench -j1 --benchmark-options='--emlf dist-newstyle/compile-margin/bootstrap/emlf-stage3 --runs 7 --max-compile-ratio 5 --max-runtime-ratio 2 --output dist-newstyle/compile-margin/stage3-benchmarks.json'
+```
+
+The [raw benchmark report](results/2026-10-14-stage3-normalization-macos-arm64.json)
+contains **252 fresh compilation samples and 252 runtime samples**, independent
+correctness checks, commands, hashes, CPU time, peak RSS and executable sizes.
+The [validation archive](results/2026-10-14-stage3-normalization-validation.json)
+binds those measurements to the same compiler used for the bootstrap and both
+native backend matrices. Dates here use Asia/Shanghai; raw timestamps use UTC.
+
+## Compilation
+
+Wall-clock medians in milliseconds. LLVM emission includes parsing, inference,
+elaboration and xMLF checking. Total compilation overlaps emission with a fresh
+runtime compilation, then compiles and links the LLVM. Each sample uses a new
+directory and runtime object, with the existing flags and measured build phases.
+
+| Workload | C | Rust | Haskell | MLF emit LLVM | MLF total | MLF/C |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| binary-trees | 143.47 | 164.12 | 457.66 | 129.84 | 417.94 | 2.913x |
+| pidigits | 149.18 | 136.40 | 457.93 | 114.08 | 424.03 | 2.842x |
+| n-body | 160.50 | 145.79 | 513.53 | 520.91 | 761.09 | 4.742x |
+| fannkuch-redux | 155.20 | 198.65 | 499.33 | 253.49 | 490.10 | 3.158x |
+| spectral-norm | 153.18 | 164.33 | 565.61 | 236.71 | 446.94 | 2.918x |
+| fasta | 157.93 | 174.69 | 513.18 | 436.26 | 714.84 | 4.526x |
+| mandelbrot | 142.88 | 175.12 | 466.07 | 239.20 | 484.31 | 3.390x |
+| reverse-complement | 147.30 | 153.74 | 517.00 | 285.47 | 531.66 | 3.609x |
+| k-nucleotide | 168.80 | 233.93 | 1052.27 | 478.84 | 708.52 | 4.197x |
+
+Geometric mean of compilation ratios: **3.525x**.
+
+## Runtime
+
+Wall-clock medians in seconds, including startup, input, output, collection and
+exit. Inputs and correctness checks follow the [methodology](README.md).
+
+| Workload | Input | C | Rust | Haskell | MLF | MLF/C |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| binary-trees | 16 | 0.34074 | 0.40601 | 0.12730 | 0.29159 | 0.856x |
+| pidigits | 10,000 | 0.36498 | 0.37001 | 0.48466 | 0.42342 | 1.160x |
+| n-body | 2,000,000 | 0.10699 | 0.10628 | 0.12692 | 0.12008 | 1.122x |
+| fannkuch-redux | 10 | 0.21258 | 0.16023 | 0.23360 | 0.23508 | 1.106x |
+| spectral-norm | 2,000 | 0.20174 | 0.27857 | 0.88081 | 0.16262 | 0.806x |
+| fasta | 2,000,000 | 0.22014 | 0.24375 | 0.39393 | 0.33420 | 1.518x |
+| mandelbrot | 4,096 | 0.93320 | 0.22036 | 0.99613 | 0.64127 | 0.687x |
+| reverse-complement | 10,000,000 | 0.15138 | 0.08011 | 0.38123 | 0.25524 | 1.686x |
+| k-nucleotide | 1,000,000 | 0.17173 | 1.49497 | 1.80880 | 0.28249 | 1.645x |
+
+Geometric mean of runtime ratios: **1.124x**.
+
+## Controlled comparison and validation
+
+A separate [15-run alternating comparison](results/2026-10-14-stage3-normalization-comparison.json)
+compares the previous and rebuilt stage 3 compilers. Each invocation starts a
+fresh process and includes source checking and captured xMLF output; it excludes
+LLVM generation and native linking. Both compilers emit byte-identical xMLF,
+which is checked again independently of source inference.
+
+| Workload | Before (ms) | After (ms) | Frontend time reduction |
+| --- | ---: | ---: | ---: |
+| n-body | 428.37 | 421.73 | 1.55% |
+| fasta | 364.24 | 347.44 | 4.61% |
+
+The C ratios above use freshly measured C baselines. Changes between separate
+C-comparison runs also reflect timing variation; the alternating comparison
+isolates the compiler change more closely. All 36 workload sources, default
+sizes, runtime stdin bytes, other tool binaries, libraries, runtime and benchmark
+harness hashes match the preceding measurement. The compiler binary is the
+intentionally changed input.
+
+Validation passed:
+
+- A fresh three-stage bootstrap, with byte-identical stage 2/3 LLVM and **7,083
+  parity cases**: 3,199 accepted, 3,884 rejected, and 80 runtime cases executed
+  on both backends.
+- **536 rows x 2 backends in each runtime layout** (standard and compact), with
+  both native drivers freshly built by the measured stage 3 compiler; 487 shared
+  fixtures per layout and no missing executions.
+- 636 compiler checks, 43 Figure 12 expectations, 36 supplementary checks, and
+  53 benchmark-harness tests.
+- The focused `GraphDense` and `SolverReuse` fixtures on both backends.
+  `GraphDense` compares 624 normalization cases against the independent Haskell
+  implementation, fully revalidates their results, checks the preserved fields,
+  and covers sparse and arbitrary-precision identities. `SolverReuse` checks six
+  malformed graph/index states and compares the optimized route with the prior
+  route that explicitly validates after normalization.
+- All 18 per-workload performance limits, with compiler and source hashes
+  consistent across the recorded gates.
+
+These measurements use the recorded macOS ARM64 toolchain and default workload
+inputs. The compiler retains its 512 MiB initial GC heap and free-space divisor
+1; maximum per-child compilation RSS was 532.9 MiB. Workload executables use the
+ordinary runtime. The raw report retains short-measurement warnings, including
+reverse-complement/Rust below 100 ms.
+
+---
+
 # Verified stage 3 release: 2026-10-14
 
 The **stage 3 release passes every 5x C compilation / 2x C runtime limit**

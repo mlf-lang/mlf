@@ -1,0 +1,26 @@
+module Tests.Set where
+import Bootstrap.Types
+import qualified Bootstrap.Set as S
+import qualified Tests.Helpers as H
+empty = S.empty
+singleton = S.singleton
+size = S.size
+toList = S.toList
+toAscList = S.toList
+fromList : forall a. H.Ord a => List a -> Set a
+fromList xs = S.fromList H.compare xs
+insert : forall a. H.Ord a => a -> Set a -> Set a
+insert a xs = S.insert H.compare a xs
+member : forall a. H.Ord a => a -> Set a -> Bool
+member a xs = S.member H.compare a xs
+union : forall a. H.Ord a => Set a -> Set a -> Set a
+union a b = S.union H.compare a b
+delete : forall a. H.Ord a => a -> Set a -> Set a
+delete a xs = S.delete H.compare a xs
+difference : forall a. H.Ord a => Set a -> Set a -> Set a
+difference a b = S.difference H.compare a b
+unions : forall a. H.Ord a => List (Set a) -> Set a
+unions xs = S.unions H.compare xs
+null = S.null
+intersection : forall a. H.Ord a => Set a -> Set a -> Set a
+intersection a b = S.intersection H.compare a b

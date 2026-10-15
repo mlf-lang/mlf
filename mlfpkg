@@ -1,0 +1,10 @@
+#!/bin/sh
+# Thin launcher only; package resolution, builds and tests are MLF programs.
+set -eu
+root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+manager=${MLF_PACKAGE_MANAGER:-"$root/.mlf-build/package-manager/mlfpkg"}
+if [ ! -x "$manager" ]; then
+  printf '%s\n' 'Build the native MLF package manager first: MLF_COMPILER=/path/to/emlf scripts/bootstrap-package.sh' >&2
+  exit 1
+fi
+exec "$manager" "$@"

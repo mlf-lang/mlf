@@ -5,6 +5,27 @@ import qualified Bootstrap.Map as M
 import qualified Bootstrap.Data as D
 import qualified Bootstrap.Runtime as R
 
+expectEnvironment : Int -> XName -> R.REnv -> String -> IO Unit
+expectEnvironment expected name environment label = expect (case R.envLookup name environment of
+  Just value -> case R.integer value of {Right observed -> observed == expected; _ -> false}
+  Nothing -> false) label
+environmentFrames : IO Unit
+environmentFrames = do
+  let outer = XName (-7) "outer"
+  let local = XName 1267650600228229401496703205376 "local"
+  let base = R.REnv (M.singleton outer (Right (R.RInteger 42)))
+  let extended = R.envExtend (two (Pair local (Right (R.RInteger 7))) (Pair local (Right (R.RInteger 9)))) base
+  expectEnvironment 9 local extended "environment extension keeps the last duplicate"
+  expectEnvironment 42 outer extended "local frames preserve outer bindings"
+  expectEnvironment 9 (XName 1267650600228229401496703205376 "different hint") extended "runtime lookup uses variable identity"
+  let lazy = R.envInsert local (panic "environment forced an unused value") base
+  expectEnvironment 42 outer lazy "environment frames retain lazy values"
+  let first = XName 81 "first"
+  let second = XName 82 "second"
+  let recursive = R.recursiveEnv ds extended (two (Pair first (XEVar second)) (Pair second (XEInt 23)))
+  expectEnvironment 23 first recursive "recursive frames share the recursive environment"
+  expectEnvironment 42 outer recursive "recursive frames preserve captured bindings"
+
 one a = Cons a Nil
 two a b = Cons a (one b)
 three a b c = Cons a (two b c)
@@ -151,4 +172,5 @@ main = do
     _ -> false) "missing region handle"
   result <- R.runAction Nil ds (evaluate (ret (XEInt 0)))
   expect (case result of {Left message -> eqString message "runtime expected an IO action"; _ -> false}) "state action rejected by IO interpreter"
+  environmentFrames
   putStrLn "ST runtime: lazy actions, snapshots, regions, polymorphic cells, bounds, and 10000 binds passed"

@@ -1,0 +1,256 @@
+module Tests.Helpers where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Bootstrap.Map as M
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.IntSet as IS
+import qualified Bootstrap.Set as Set
+import qualified Bootstrap.Graph as G
+import qualified Bootstrap.SourceEquality as SE
+import qualified Bootstrap.Primitive as P
+import qualified Bootstrap.Compiler as C
+import qualified Bootstrap.X.Type as T
+import qualified Bootstrap.X.Syntax as X
+import qualified Bootstrap.X.Pretty as Pretty
+import qualified Package.OS as O
+
+data Quint a b c d e = Quint a b c d e
+data Sext a b c d e f = Sext a b c d e f
+class Eq a where { eq : a -> a -> Bool }
+instance Eq Int where { eq = eqInt }
+instance Eq Bool where { eq a b = if a then b else S.not b }
+instance Eq String where { eq = eqString }
+instance Eq Unit where { eq a b = true }
+instance forall a. Eq a => Eq (List a) where { eq = S.eqList eq }
+instance forall a. Eq a => Eq (Maybe a) where { eq = S.eqMaybe eq }
+instance forall a b. (Eq a, Eq b) => Eq (Pair a b) where { eq = S.eqPair eq eq }
+instance forall a b c. (Eq a, Eq b, Eq c) => Eq (Triple a b c) where { eq (Triple a b c) (Triple x y z) = eq a x && eq b y && eq c z }
+instance forall a b. (Eq a, Eq b) => Eq (Either a b) where
+  eq (Left a) (Left b) = eq a b
+  eq (Right a) (Right b) = eq a b
+  eq _ _ = false
+instance forall k v. (Eq k, Eq v) => Eq (Map k v) where { eq a b = eq (M.toList a) (M.toList b) }
+instance forall a. Eq a => Eq (IntMap a) where { eq a b = eq (IM.toList a) (IM.toList b) }
+instance Eq IntSet where { eq a b = eq (IS.toList a) (IS.toList b) }
+instance Eq Kind where { eq = S.eqKind }
+instance Eq Flag where { eq = S.eqFlag }
+instance Eq Permission where { eq = G.equalPermission }
+instance Eq GTag where { eq = G.equalTag }
+instance Eq Node where { eq = G.equalNode }
+instance Eq Graph where { eq a b = eq (G.nodes a) (G.nodes b) && eq (G.links a) (G.links b) && G.nextId a == G.nextId b }
+instance Eq XName where { eq = S.eqName }
+instance Eq XTyVar where { eq = S.eqTyVar }
+instance Eq XType where { eq = equalType }
+instance Eq XErased where { eq = X.equalErased }
+instance Eq Primitive where { eq a b = P.primitiveCode a == P.primitiveCode b }
+instance Eq Phase where { eq a b = eqString (C.prettyPhase a) (C.prettyPhase b) }
+instance Eq SType where { eq = SE.eqType }
+instance Eq SExpr where { eq = SE.eqExpr }
+
+class Show a where { show : a -> String }
+instance Show Int where { show = showInt }
+instance Show Bool where { show a = if a then "True" else "False" }
+instance Show String where { show a = quoteSource a }
+instance Show Unit where { show a = "()" }
+instance forall a. Show a => Show (List a) where { show xs = "[" ++ S.intercalate "," (S.map show xs) ++ "]" }
+instance forall a. Show a => Show (Maybe a) where
+  show Nothing = "Nothing"
+  show (Just x) = "Just " ++ show x
+instance forall a b. (Show a, Show b) => Show (Pair a b) where { show (Pair a b) = "(" ++ show a ++ "," ++ show b ++ ")" }
+instance forall a b. (Show a, Show b) => Show (Either a b) where
+  show (Left a) = "Left " ++ show a
+  show (Right b) = "Right " ++ show b
+instance Show CompileError where { show = C.prettyError }
+instance Show XType where { show = Pretty.prettyType }
+instance Show SExpr where { show a = "source expression" }
+instance Show XErased where { show a = "erased target" }
+instance Show Graph where { show g = "Graph(" ++ show (G.nextId g) ++ ")" }
+instance Show Permission where
+  show Green = "Green"
+  show Orange = "Orange"
+  show Red = "Red"
+  show Inert = "Inert"
+
+class Append a where { append : a -> a -> a }
+instance Append String where { append = concatString }
+instance forall a. Append (List a) where { append = S.append }
+class Sized a where { length : a -> Int; null : a -> Bool }
+instance Sized String where { length = stringLength; null x = stringLength x == 0 }
+instance forall a. Sized (List a) where { length = S.length; null = S.null }
+
+fail : forall a. String -> IO a
+fail message = do { putErr ("TEST FAILURE: " ++ message ++ "\n"); exitWith 1 }
+assert : Bool -> String -> IO Unit
+assert condition message = if condition then ioReturn Unit else fail message
+right : forall e a. Show e => Either e a -> IO a
+right value = case value of { Left error -> fail (show error); Right result -> ioReturn result }
+reject : forall e a. Either e a -> IO Unit
+reject value = case value of { Left error -> ioReturn Unit; Right result -> fail "unexpected success" }
+fmap : forall (m : * -> *) a b. Monad m => (a -> b) -> m a -> m b
+fmap f x = do { value <- x; return (f value) }
+ap : forall (m : * -> *) a b. Monad m => m (a -> b) -> m a -> m b
+ap f x = do { function <- f; value <- x; return (function value) }
+elem : forall a. Eq a => a -> List a -> Bool
+elem x xs = S.elem eq x xs
+notElem : forall a. Eq a => a -> List a -> Bool
+notElem x xs = S.not (elem x xs)
+nub : forall a. Eq a => List a -> List a
+nub xs = S.nubBy eq xs
+-- Match Haskell's scalar substring search without constructing every suffix.
+contains needle text = containsAt needle text (stringLength needle) (stringLength text) 0
+containsAt : String -> String -> Int -> Int -> Int -> Bool
+containsAt needle text width size start = if width == 0 then true else
+  if start > size - width then false else
+    if containsMatch needle text width start 0 then true else containsAt needle text width size (start + 1)
+containsMatch : String -> String -> Int -> Int -> Int -> Bool
+containsMatch needle text width start index = if index == width then true else
+  if stringCodeAt needle index == stringCodeAt text (start + index) then containsMatch needle text width start (index + 1) else false
+intercalate separator xs = S.intercalate separator xs
+sort xs = S.sortBy compareString xs
+subsequences : forall a. List a -> List (List a)
+subsequences xs = case xs of { Nil -> Cons Nil Nil; Cons x rest -> let suffix = subsequences rest in S.append suffix (S.map (Cons x) suffix) }
+isAlpha code = code >= 65 && code <= 90 || code >= 97 && code <= 122
+isAlphaNum code = isAlpha code || code >= 48 && code <= 57
+instance forall a. Eq a => Eq (Set a) where { eq a b = eq (Set.toList a) (Set.toList b) }
+instance Eq SProgram where { eq = SE.eqSProgram }
+instance Eq Field where { eq = SE.eqField }
+instance Eq DataDecl where { eq = SE.eqDataDecl }
+instance Eq SAnnotation where { eq = SE.eqAnnotation }
+class Ord a where { compare : a -> a -> Int }
+instance Ord Int where { compare = S.compareInt }
+instance Ord String where { compare = compareString }
+instance Ord XTyVar where { compare = S.compareTyVar }
+instance Ord XName where { compare = S.compareName }
+instance Ord Flag where { compare = S.compareFlag }
+equalType : XType -> XType -> Bool
+equalType (XVar a) (XVar b) = S.eqTyVar a b
+equalType XBot XBot = true
+equalType (XBotKind a) (XBotKind b) = S.eqKind a b
+equalType (XArrow a b) (XArrow c d) = equalType a c && equalType b d
+equalType (XCon a xs) (XCon b ys) = eqString a b && S.eqList equalType xs ys
+equalType (XApply a b) (XApply c d) = equalType a c && equalType b d
+equalType (XForall a b c) (XForall d e f) = S.eqTyVar a d && equalType b e && equalType c f
+equalType _ _ = false
+forM_ = S.forM_
+mapM_ = S.mapM_
+rangeStep : Int -> Int -> Int -> List Int
+rangeStep first second end = if second >= first then (if first > end then Nil else Cons first (rangeStep second (second + second - first) end)) else (if first < end then Nil else Cons first (rangeStep second (second + second - first) end))
+power : Int -> Int -> Int
+power x n = if n == 0 then 1 else let y = power x (quotInt n 2) in if remInt n 2 == 0 then y * y else x * y * y
+lookup : forall a b. Eq a => a -> List (Pair a b) -> Maybe b
+lookup key xs = S.lookup eq key xs
+quoteSource text = "\"" ++ S.concatStrings (S.map (\i -> let c = stringCodeAt text i in if c == 34 then "\\\"" else if c == 92 then "\\\\" else if c == 10 then "\\n" else if c == 13 then "\\r" else if c == 9 then "\\t" else if c < 32 then "\\x" ++ hexInt c ++ "\\&" else stringFromCode c) (S.range 0 (stringLength text - 1))) ++ "\""
+hexInt : Int -> String
+hexInt x = if x < 16 then stringSlice "0123456789abcdef" x 1 else hexInt (quotInt x 16) ++ stringSlice "0123456789abcdef" (remInt x 16) 1
+instance forall a b c. (Show a, Show b, Show c) => Show (Triple a b c) where { show (Triple a b c) = "(" ++ show a ++ "," ++ show b ++ "," ++ show c ++ ")" }
+instance forall a b c d. (Show a, Show b, Show c, Show d) => Show (Quad a b c d) where { show (Quad a b c d) = "(" ++ show a ++ "," ++ show b ++ "," ++ show c ++ "," ++ show d ++ ")" }
+instance forall a. Show a => Show (IntMap a) where { show a = show (IM.toList a) }
+instance Show Primitive where { show = P.primitiveName }
+instance Show Node where { show (Node t b f) = G.tagDescription t ++ " bound " ++ show b }
+instance Show GTag where { show = G.tagDescription }
+instance Show XTerm where { show = Pretty.prettyTerm }
+instance Show SProgram where { show p = "source program" }
+tails : forall a. List a -> List (List a)
+tails xs = case xs of { Nil -> Cons Nil Nil; Cons x rest -> Cons xs (tails rest) }
+instance Eq SourceModule where { eq = SE.eqSourceModule }
+instance Show SourceModule where { show m = "source module" }
+instance Eq XPattern where
+  eq (XDefaultPattern a) (XDefaultPattern b) = S.eqMaybe S.eqName a b
+  eq (XConstructorPattern a xs) (XConstructorPattern b ys) = eqString a b && S.eqList (S.eqMaybe S.eqName) xs ys
+  eq _ _ = false
+instance Eq Double where { eq = eqDouble }
+instance Eq XComputation where { eq = equalComputation }
+instance Eq XTerm where { eq = equalTerm }
+equalComputation : XComputation -> XComputation -> Bool
+equalComputation XRefl XRefl = true
+equalComputation (XBottom a) (XBottom b) = equalType a b
+equalComputation (XHyp a) (XHyp b) = S.eqTyVar a b
+equalComputation (XInner a) (XInner b) = equalComputation a b
+equalComputation (XOuter a b) (XOuter c d) = S.eqTyVar a c && equalComputation b d
+equalComputation XElim XElim = true
+equalComputation (XIntro a) (XIntro b) = S.eqTyVar a b
+equalComputation (XIntroKind a b) (XIntroKind c d) = S.eqTyVar a c && S.eqKind b d
+equalComputation (XThen a b) (XThen c d) = equalComputation a c && equalComputation b d
+equalComputation _ _ = false
+equalTerm : XTerm -> XTerm -> Bool
+equalTerm (XVarTerm a) (XVarTerm b) = S.eqName a b
+equalTerm (XAbs a b c) (XAbs x y z) = S.eqName a x && equalType b y && equalTerm c z
+equalTerm (XApp a b) (XApp c d) = equalTerm a c && equalTerm b d
+equalTerm (XTypeAbs a b c) (XTypeAbs x y z) = S.eqTyVar a x && equalType b y && equalTerm c z
+equalTerm (XTypeApp a b) (XTypeApp c d) = equalTerm a c && equalComputation b d
+equalTerm (XLet a b c) (XLet x y z) = S.eqName a x && equalTerm b y && equalTerm c z
+equalTerm (XLetRec ds a) (XLetRec es b) = S.eqList (\(Triple n t x) (Triple m u y) -> S.eqName n m && equalType t u && equalTerm x y) ds es && equalTerm a b
+equalTerm (XIntTerm a) (XIntTerm b) = a == b
+equalTerm (XDoubleTerm a) (XDoubleTerm b) = eqDouble a b
+equalTerm (XBoolTerm a) (XBoolTerm b) = eq a b
+equalTerm (XStringTerm a) (XStringTerm b) = eqString a b
+equalTerm (XPrimitive a xs) (XPrimitive b ys) = eq a b && S.eqList equalType xs ys
+equalTerm (XConstructor a xs) (XConstructor b ys) = eqString a b && S.eqList equalType xs ys
+equalTerm (XCase a t xs) (XCase b u ys) = equalTerm a b && equalType t u && S.eqList (\(XAlternative p a) (XAlternative q b) -> eq p q && equalTerm a b) xs ys
+equalTerm (XWithData ds a) (XWithData es b) = S.eqList SE.eqDataDecl ds es && equalTerm a b
+equalTerm _ _ = false
+bit n = power 2 n
+shiftL : Int -> Int -> Int
+shiftL n k = if k < 0 then shiftR n (0 - k) else n * power 2 k
+shiftR : Int -> Int -> Int
+shiftR n k = if k < 0 then shiftL n (0 - k) else let divisor = power 2 k in let q = quotInt n divisor in if n < 0 && remInt n divisor /= 0 then q - 1 else q
+xor a b = a + b - 2 * andInt a b
+complement n = 0 - n - 1
+testBit n k = andInt n (power 2 k) /= 0
+isNaN value = S.not (eqDouble value value)
+isInfinite value = eqInt (andInt (doubleToBits value) 9223372036854775807) 9218868437227405312
+absDouble value = if ltDouble value 0.0 then subDouble 0.0 value else value
+class Read a where { read : String -> a }
+instance Read Int where { read = readInt }
+instance Read Double where { read = readDouble }
+doubleWithin actual bound = ltDouble actual bound || eqDouble actual bound
+group : forall a. Eq a => List a -> List (List a)
+group xs = case xs of { Nil -> Nil; Cons x rest -> case S.span (eq x) rest of { Pair same different -> Cons (Cons x same) (group different) } }
+class Concatenate a where { concat : List a -> a }
+instance Concatenate String where { concat = S.concatStrings }
+instance forall a. Concatenate (List a) where { concat = S.concat }
+cycle : forall a. List a -> List a
+cycle xs = S.append xs (cycle xs)
+repeatChar count code = S.concatStrings (S.replicate count (stringFromCode code))
+maximum : forall a. Ord a => List a -> a
+maximum xs = S.foldl (\a b -> if compare a b < 0 then b else a) (S.head xs) (S.tail xs)
+minimum : forall a. Ord a => List a -> a
+minimum xs = S.foldl (\a b -> if compare a b > 0 then b else a) (S.head xs) (S.tail xs)
+
+traverseIntMap : forall a b. (Int -> a -> Either String b) -> IntMap a -> Either String (IntMap b)
+traverseIntMap f m = traverseIntEntries f (IM.toList m)
+traverseIntEntries : forall a b. (Int -> a -> Either String b) -> List (Pair Int a) -> Either String (IntMap b)
+traverseIntEntries f entries = fmap IM.fromList (S.mapM (\(Pair k v) -> fmap (Pair k) (f k v)) entries)
+
+subtract x y = y - x
+even x = remInt x 2 == 0
+
+stringTake n text = stringSlice text 0 (S.max 0 (S.min n (stringLength text)))
+stringDrop = O.drop
+stringTakeWhile predicate text = stringSlice text 0 (stringPrefixLength predicate text 0)
+stringPrefixLength : (Int -> Bool) -> String -> Int -> Int
+stringPrefixLength predicate text i = if i == stringLength text || S.not (predicate (stringCodeAt text i)) then i else stringPrefixLength predicate text (i + 1)
+
+negateInt x = 0 - x
+splitIntMap key map = Pair (IM.filterWithKey (\k _ -> k < key) map) (IM.filterWithKey (\k _ -> k > key) map)
+
+concatMap : forall a b. Concatenate b => (a -> b) -> List a -> b
+concatMap f xs = concat (S.map f xs)
+stringMap f text = S.concatStrings (S.map (\i -> stringFromCode (f (stringCodeAt text i))) (S.range 0 (stringLength text - 1)))
+lines : String -> List String
+lines text = if stringLength text == 0 then Nil else
+  let chunks = O.lines text in if O.ends "\n" text then S.init chunks else chunks
+
+notEqual : forall a. Eq a => a -> a -> Bool
+notEqual a b = S.not (eq a b)
+lessEqual a b = a <= b
+greater a b = a > b
+greaterEqual a b = a >= b
+
+instance Show Kind where { show = showKindDerived }
+showKindDerived : Kind -> String
+showKindDerived Star = "Star"
+showKindDerived (KArrow a b) = "KArrow " ++ showKindArgument a ++ " " ++ showKindArgument b
+showKindArgument : Kind -> String
+showKindArgument Star = "Star"
+showKindArgument k = "(" ++ showKindDerived k ++ ")"

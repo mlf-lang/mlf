@@ -1,0 +1,136 @@
+module Tests.PackageResolver where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+import qualified Package.Json as J
+import qualified Tests.Basic as Sys
+import qualified Tests.Basic as H
+
+data Resolver = Resolver String String
+root (Resolver r _) = r
+manager (Resolver _ m) = m
+make r name moduleName deps imports = do
+ let directory = root r ++ "/" ++ name
+ O.mkdir directory
+ let path = directory ++ "/mlf-package.json"
+ let dependencies = J.Object (S.map (\(Pair name path) -> Pair name (J.Object (Cons (Pair "path" (J.str path)) Nil))) deps)
+ let library = J.Object (Cons (Pair "modules" (J.Object (Cons (Pair moduleName (J.str "Source.emlf")) Nil))) Nil)
+ J.write path (J.Object (Cons (Pair "format" (J.num 1)) (Cons (Pair "name" (J.str name)) (Cons (Pair "version" (J.str "0.1.0")) (Cons (Pair "dependencies" dependencies) (Cons (Pair "library" library) Nil))))))
+ writeFile (directory ++ "/Source.emlf") ("module " ++ moduleName ++ " where\n" ++ imports ++ "\nvalue = 1\n")
+ return path
+modify path f = do { before <- J.read path; J.write path (f before) }
+command r path args success reason = do
+ let stem = root r ++ "/resolver-command"
+ code <- O.exec (root r) (S.append (Cons (manager r) (Cons "--manifest" (Cons path Nil))) args) "" (stem ++ ".stdout") (stem ++ ".stderr") 60
+ stdout <- readFile (stem ++ ".stdout")
+ stderr <- readFile (stem ++ ".stderr")
+ H.assert (H.eq (code == 0) success && (success || stringLength stderr > 0) && (eqString reason "" || H.contains reason stderr)) ("resolver command failed: " ++ stderr)
+ return stdout
+plan r path success reason = command r path (Cons "plan" Nil) success reason
+check name action = do { action; putStrLn ("PASS test_packages." ++ name) }
+main : IO Unit
+main = Sys.withScratch (\directory -> do
+ manager <- getEnv "MLF_PACKAGE_MANAGER"
+ let r = Resolver directory manager
+ check "test_local_dependency_plan" (do
+  base <- make r "base" "Base" Nil ""
+  app <- make r "app" "App" (Cons (Pair "base" "../base") Nil) "import Base"
+  text <- plan r app true ""
+  doc <- H.right (J.parse text)
+  H.assert (J.equal (J.get "modules" doc) (J.stringArray (Cons "Base" (Cons "App" Nil)))) "package ordering changed")
+ check "test_dependency_paths_are_manifest_relative" (do
+  app <- make r "relative" "Relative" (Cons (Pair "base" "../base") Nil) "import Base"
+  plan r app true "")
+ check "test_diamond_and_canonical_symlink" (do
+  left <- make r "left" "Left" (Cons (Pair "base" "../base") Nil) "import Base"
+  O.run "" (Cons "/bin/ln" (Cons "-s" (Cons (directory ++ "/base") (Cons (directory ++ "/base-link") Nil))))
+  right <- make r "right" "Right" (Cons (Pair "base" "../base-link") Nil) "import Base"
+  top <- make r "diamond" "Diamond" (Cons (Pair "left" "../left") (Cons (Pair "right" "../right") Nil)) "import Left\nimport Right"
+  text <- plan r top true ""
+  doc <- H.right (J.parse text)
+  H.assert (S.length (J.values (J.get "packages" doc)) == 4) "diamond dependency duplicated"
+  H.assert (J.equal (J.Array (S.map (J.get "name") (J.values (J.get "packages" doc)))) (J.stringArray (Cons "base" (Cons "left" (Cons "right" (Cons "diamond" Nil)))))) "diamond package ordering changed"
+  H.assert (J.equal (J.get "modules" doc) (J.stringArray (Cons "Base" (Cons "Left" (Cons "Right" (Cons "Diamond" Nil)))))) "diamond module ordering changed")
+ check "test_package_cycle" (do
+  a <- make r "cycle-a" "CycleA" (Cons (Pair "cycle-b" "../cycle-b") Nil) ""
+  b <- make r "cycle-b" "CycleB" (Cons (Pair "cycle-a" "../cycle-a") Nil) ""
+  plan r a false "dependency cycle"
+  first <- canonicalPath a
+  second <- canonicalPath b
+  error <- readFile (directory ++ "/resolver-command.stderr")
+  H.assert (H.contains (first ++ " -> " ++ second ++ " -> " ++ first) error) "dependency cycle lost its complete chain")
+ check "test_symlink_dependency_cycle" (do
+  a <- make r "symlink-cycle" "Cycle" (Cons (Pair "symlink-cycle" "../cycle-alias") Nil) ""
+  O.run "" (Cons "/bin/ln" (Cons "-s" (Cons (directory ++ "/symlink-cycle") (Cons (directory ++ "/cycle-alias") Nil))))
+  plan r a false "dependency cycle")
+ check "test_missing_dependency" (do
+  a <- make r "missing-dep" "Missing" (Cons (Pair "missing" "../does-not-exist") Nil) ""
+  plan r a false "canonical path")
+ check "test_dependency_key_must_match_identity" (do
+  app <- make r "bad-key" "BadKey" (Cons (Pair "wrong" "../base") Nil) ""
+  plan r app false "resolves to package base")
+ check "test_duplicate_module_and_package_identity" (do
+  a <- make r "same-a" "Shared" Nil ""
+  b <- make r "same-b" "Shared" (Cons (Pair "same-a" "../same-a") Nil) ""
+  plan r b false "multiple packages"
+  modify b (J.set "name" (J.str "same-a"))
+  plan r b false "multiple local paths")
+ check "test_direct_dependency_visibility" (do
+  mid <- make r "mid" "Mid" (Cons (Pair "base" "../base") Nil) "import Base"
+  top <- make r "top" "Top" (Cons (Pair "mid" "../mid") Nil) "import Base"
+  plan r top false "direct dependency")
+ check "test_module_cycle" (do
+  app <- make r "module-cycle" "A" Nil "import B"
+  writeFile (directory ++ "/module-cycle/B.emlf") "module B where\nimport A\ny = 2\n"
+  modify app (\doc -> J.set "library" (J.Object (Cons (Pair "modules" (J.Object (Cons (Pair "A" (J.str "Source.emlf")) (Cons (Pair "B" (J.str "B.emlf")) Nil)))) Nil)) doc)
+  plan r app false "module cycle: A -> B -> A")
+ check "test_manifest_module_identity" (do
+  app <- make r "wrong-module" "A" Nil ""
+  modify app (J.set "library" (J.Object (Cons (Pair "modules" (J.Object (Cons (Pair "Other" (J.str "Source.emlf")) Nil))) Nil)))
+  plan r app false "manifest declares Other, source declares A")
+ check "test_source_escape_and_symlink" (do
+  app <- make r "escape" "A" Nil ""
+  writeFile (directory ++ "/Outside.emlf") "module A where\nx = 1\n"
+  O.run "" (Cons "/bin/ln" (Cons "-s" (Cons (directory ++ "/Outside.emlf") (Cons (directory ++ "/escape/link.emlf") Nil))))
+  S.mapM_ (\name -> do
+   modify app (J.set "library" (J.Object (Cons (Pair "modules" (J.Object (Cons (Pair "A" (J.str name)) Nil))) Nil)))
+   plan r app false "outside package") (Cons "../Outside.emlf" (Cons "link.emlf" Nil)))
+ check "test_lock_tracks_content" (do
+  app <- make r "locked" "Locked" Nil ""
+  before <- plan r app true ""
+  writeFile (directory ++ "/locked/Source.emlf") "module Locked where\nvalue = 2\n"
+  after <- plan r app true ""
+  H.assert (S.not (eqString before after)) "source edit did not affect plan"
+  command r app (Cons "lock" Nil) true ""
+  command r app (Cons "--locked" (Cons "plan" Nil)) true ""
+  writeFile (directory ++ "/locked/Source.emlf") "module Locked where\nvalue = 3\n"
+  command r app (Cons "--locked" (Cons "plan" Nil)) false "mlf.lock is stale")
+ check "test_unknown_and_duplicate_fields" (do
+  app <- make r "unknown" "Unknown" Nil ""
+  modify app (J.set "dependecies" J.empty)
+  plan r app false "unknown field"
+  writeFile app "{\"name\":\"a\",\"name\":\"b\"}"
+  plan r app false "duplicate JSON key")
+ check "test_invalid_manifest_shapes" (S.mapM_ (\mutation -> do
+  app <- make r "invalid" "Invalid" Nil ""
+  modify app mutation
+  plan r app false "") (Cons (J.set "format" (J.Boolean true)) (Cons (J.set "executables" (J.Object (Cons (Pair "a" J.Null) Nil))) (Cons (J.set "tests" (J.Object (Cons (Pair "a" (J.Object (Cons (Pair "command" (J.Array Nil)) Nil))) Nil))) (Cons (J.set "tests" (J.Object (Cons (Pair "a" (J.Object (Cons (Pair "main" (J.str "Source.emlf")) Nil))) Nil))) (Cons (J.set "dependencies" (J.Object (Cons (Pair "remote" (J.Object (Cons (Pair "url" (J.str "https://invalid.example")) Nil))) Nil))) Nil))))))
+ check "test_real_parser_handles_multiline_imports_and_comments" (do
+  base <- make r "real" "Real.Library" Nil ""
+  app <- make r "parser" "A" (Cons (Pair "real" "../real") Nil) ""
+  writeFile (directory ++ "/parser/Source.emlf") "{- module Fake where {- import Missing -} -}\nmodule A where {\nimport\n qualified\n Real.Library\n as Alias (value);\n-- import Ignored\nvalue = \"import Not.Real\" }\n"
+  text <- plan r app true ""
+  doc <- H.right (J.parse text)
+  H.assert (J.equal (J.get "modules" doc) (J.stringArray (Cons "Real.Library" (Cons "A" Nil)))) "parser treated comments or strings as imports")
+ check "test_truncated_source_rejected" (do
+  app <- make r "truncated" "Truncated" Nil ""
+  S.mapM_ (\source -> do { writeFile (directory ++ "/truncated/Source.emlf") source; plan r app false "" }) (Cons "{- open {- nested -}" (Cons "module Truncated where\nvalue = \"open" Nil)))
+ check "test_json_unicode_and_invalid_tokens" (do
+  app <- make r "unicode" "Unicode" Nil ""
+  O.move (directory ++ "/unicode/Source.emlf") (directory ++ "/unicode/λ😀.emlf")
+  modify app (J.set "library" (J.Object (Cons (Pair "modules" (J.Object (Cons (Pair "Unicode" (J.str "λ😀.emlf")) Nil))) Nil)))
+  text <- plan r app true ""
+  doc <- H.right (J.parse text)
+  H.assert (J.has "λ😀.emlf" (J.get "sources" (S.head (J.values (J.get "packages" doc))))) "Unicode source path lost"
+  S.mapM_ (\text -> do { writeFile app text; plan r app false "invalid JSON" }) (Cons "{\"format\":1,}" (Cons "{\"format\":01}" (Cons "{\"name\":\"\\ud800\"}" (Cons "[true,]" Nil)))))
+ putStrLn "18 package resolver tests passed")
