@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Separate quick package integration CI from manually requested compiler
+  self-hosting; allow long hosted-runner bootstrap stages without changing
+  individual test fixture limits.
+- Use current Node 24 GitHub Actions, pinned to reviewed commit hashes.
+
 ## 0.1.0 — 2026-10-15
 
 First developer preview of the self-hosted MLF toolchain.

@@ -17,10 +17,8 @@ done
 export PATH="$PWD/.mlf-build/forbidden-tools:$PATH"
 group=${1:-smoke}
 if [ "$group" = smoke ]; then
-  ./mlfpkg --runtime "$PWD/runtime/mlf_runtime.c" --locked build
-  .mlf-build/bin/emlf --type --expr '\x -> x'
-  MLF_COMPILER="$PWD/.mlf-build/bin/emlf" .mlf-build/bin/mlfpkg --manifest examples/packages/mlf-package.json test
-  .mlf-build/bin/mlfpkg compiler-test self-host --compiler "$PWD/.mlf-build/bin/emlf" --build-dir "$PWD/.mlf-build/compiler-tests/self-host"
+  "$MLF_COMPILER" --type --expr '\x -> x'
+  ./mlfpkg --compiler "$MLF_COMPILER" --runtime "$PWD/runtime/mlf_runtime.c" --manifest examples/packages/mlf-package.json --timeout 21600 test
 else
   case "$group" in unit|packages|self-host|parity|backends|port) ;; *) exit 2 ;; esac
   ./mlfpkg --runtime "$PWD/runtime/mlf_runtime.c" --timeout 21600 --locked test --target "$group"
