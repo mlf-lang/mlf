@@ -45,10 +45,15 @@ unchanged. Keep the whole package when using its `bin` directory directly.
    verifies a fresh self-host fixed point, tests relocation and installation,
    then uploads a new developer-preview release with SHA-256 checksums.
 
-CI on `main` and pull requests checks release metadata, builds the native
-compiler and manager from the pinned seed in `.github/seed.env`, exercises
-interpreter and LLVM with local packages, and checks a fresh self-host build.
-The release workflow is manual because the full matrices are much more expensive.
+CI on `main` and pull requests checks release metadata, downloads the pinned
+native seed in `.github/seed.env`, and builds checkout example packages on both
+interpreter and LLVM. This fast check verifies installation and local package
+integration; it does not rebuild or validate modified compiler implementations.
+Dispatch **CI** with `self_host` enabled for a fresh compiler build and fixed
+point, or **Native release** for all six compiler groups. These full checks are
+manual because compilation on hosted M1 runners can exceed 30 minutes per stage.
+Bootstrap builds explicitly allow six hours; individual fixture limits remain
+unchanged. Native release publication still requires every group to pass.
 No workflow installs GHC or invokes Python. Seed downloads check both published
 archive checksums and the independently pinned native executable hashes.
 

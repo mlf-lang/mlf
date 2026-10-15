@@ -260,7 +260,10 @@ selfHost c = do
   manager <- getExecutablePath
   let next = output c ++ "/next-stage"
   O.remove next
-  run c (Cons manager (Cons "--compiler" (Cons (compiler c) (Cons "--build-dir" (Cons next (O.words "build --target emlf"))))))
+  let argv = Cons manager (Cons "--timeout" (Cons "21600" (Cons "--compiler" (Cons (compiler c) (Cons "--build-dir" (Cons next (O.words "build --target emlf")))))))
+  putStrLn ("+ " ++ S.intercalate " " argv)
+  code <- O.exec (root c) argv "" "" "" 21600
+  O.require (code == 0) ("self-host compiler build failed (" ++ showInt code ++ ")")
   saved <- J.read (next ++ "/build-report.json")
   O.require (J.getBool "complete" false saved) "next-stage package build incomplete"
   let row = S.fromMaybe (panic "missing next compiler artifact") (S.find (\row -> eqString (J.getText "kind" "" row) "executable mlf-compiler:emlf") (J.values (J.get "builds" saved)))
