@@ -14,7 +14,7 @@
     "emlf": {
       "main": "bootstrap/Main.emlf",
       "profile": "compiler",
-      "link": "source"
+      "link": "separate"
     },
     "mlfpkg": {
       "main": "package/Main.emlf",

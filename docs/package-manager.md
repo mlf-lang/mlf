@@ -78,8 +78,14 @@ interpreter. The timeout above allows the complete suite to finish while each
 fixture keeps its original execution limit. See
 [the verified native coverage](../tests/README.md).
 
-The compiler executable explicitly uses `"link": "source"` and
-`"profile": "compiler"`. This preserves the existing whole-program bootstrap
+The compiler executable explicitly uses `"link": "separate"` and
+`"profile": "compiler"`. Per-module inference releases each graph before the
+next process; checked objects and interfaces are validated again when linked.
+This lowers cold bootstrap memory while retaining independent xMLF checking,
+inferred-type agreement, source-erasure checks, and module boundaries. The
+package-manager executable keeps `"link": "source"`. See the
+[bootstrap memory measurements](../tools/profile/results/2026-10-19-bootstrap-memory/README.md)
+for the measured memory/time tradeoff. The compiler profile retains the existing
 pipeline and compact BDWGC runtime. Ordinary packages default to separate
 `.mlfi`/`.mlfo` compilation. Test executables use separate compilation and interface/object files. Compiler
 profiles and native test drivers use a 256 MiB stack on Darwin. Interface

@@ -78,6 +78,27 @@ includes the child commands and must not be added to their totals. Ordinary CI
 self-host and native-release bootstrap steps retain the same evidence, including
 on failure; started commands without a result record were interrupted.
 
+Current compiler builds infer modules separately and check their interfaces,
+typed objects, dependency boundaries, and final linked xMLF. This releases each
+module's inference graph before building the next one. Neither compiler checks
+nor test coverage are disabled. In three local cold build pairs, sampled
+aggregate RSS fell from a 9.99 GB median to 3.27 GB (maximum 3.28 GB), while
+median full build time rose from 332.38s to 460.87s. The
+[memory report](../tools/profile/results/2026-10-19-bootstrap-memory/README.md)
+records the tradeoff and the limits of extrapolating to a hosted runner.
+
+The timing helper defaults `MLF_BOOTSTRAP_MAX_RSS_BYTES` to `5500000000` and
+fails before publishing candidate paths when a measured command exceeds that
+budget. This is a per-command RSS high-water guard, not a hard heap cap or an
+aggregate process-tree limit. `0` disables this resource gate for diagnostics.
+Explicit caller settings are respected. Separate builds keep the runtime's
+`GC_FREE_SPACE_DIVISOR=1` policy; immutable older target tags that still request
+source linking default to `4`, collecting more frequently. Successful bootstrap
+steps pass that policy to subsequent CI steps. No maximum heap size is imposed.
+The diagnostic seed comparison driver explicitly keeps divisor `1` and disables
+the resource gate by default so historical comparisons retain their conditions
+and all over-budget samples.
+
 For local packaging, after all six groups pass on the same candidate:
 
 ```sh

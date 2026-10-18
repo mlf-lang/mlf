@@ -50,6 +50,18 @@ repository. Use `EMLF_BIN` to run the candidate compiler. Global package-manager
 options go before `build`, `test`, or `run`; `--build-dir DIR` selects the output
 directory.
 
+The compiler target uses checked separate compilation: the package manager
+infers each module in its own process, writes checked `.mlfi`/`.mlfo` artifacts,
+then checks the linked xMLF before LLVM emission. Independent type checking,
+inferred-type agreement, source-erasure checks, and module-boundary validation
+remain enabled. The package-manager target retains source linking.
+Three alternating cold build pairs measured median sampled process-tree RSS
+of **3.27 GB**, down from **9.99 GB**, including the manager and measurement
+process. Local median complete build time increased from **332.38s to 460.87s**.
+See the [bootstrap memory report](tools/profile/results/2026-10-19-bootstrap-memory/README.md)
+for raw samples, scope, and reproduction. Direct whole-source self-compilation
+through `emlf --emit-llvm-gc bootstrap/Main.emlf` still uses the monolithic path.
+
 Run all six native test groups, or select groups for development:
 
 ```sh

@@ -1,5 +1,24 @@
 # Native self-compilation profiling
 
+## Bootstrap memory — 2026-10-19
+
+The root compiler target now uses the existing checked module build path.
+Three alternating, fully cold build pairs measured median sampled process-tree
+RSS of **9.994 GB → 3.270 GB** (67.284% lower); the largest candidate sample was
+**3.276 GB**. Per-command high-water RSS medians were **9.773 GB → 2.613 GB**.
+The boundary includes both native tools, fresh runtime C, Clang O2 LLVM
+compilation, and linking. Every build report confirms no cache hits.
+
+This buys headroom for the 7 GB CI runner at a local time cost:
+**332.38s → 460.87s** median complete build time, **38.658% slower** on the
+32 GiB development machine. There is no measured hosted time improvement.
+The CI timing helper rejects a command peak above 5.5 GB before exposing a
+candidate to later steps; the paired driver also checks sampled aggregate RSS.
+All six native groups passed, including a fresh LLVM/binary self-host fixed
+point and both backend layouts. All nine workloads emit identical LLVM in both
+layouts. All checks remain enabled. See the [complete report](results/2026-10-19-bootstrap-memory/README.md)
+for samples, variation, exact identities, verification, and reproduction.
+
 ## Published release seed bootstrap — 2026-10-19
 
 Three alternating cold build pairs on identical v0.1.1 sources measured a

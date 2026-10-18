@@ -17,6 +17,11 @@ done
 export MLF_SEED_PAIR_OLD="$old" MLF_SEED_PAIR_NEW="$new"
 export MLF_SEED_PAIR_SOURCE="$source_tree" MLF_SEED_PAIR_OUTPUT="$out"
 export MLF_SEED_PAIR_TOOLS="$scripts" MLF_SEED_PAIR_SCRIPT="$scripts/../profile/seed-pairs.sh"
+# Preserve the historical seed comparison policy even when the CI helper uses
+# a more frequent collection policy for immutable, monolithic source targets.
+# This diagnostic comparison intentionally retains over-budget baseline runs.
+export GC_FREE_SPACE_DIVISOR=${GC_FREE_SPACE_DIVISOR:-1}
+export MLF_BOOTSTRAP_MAX_RSS_BYTES=${MLF_BOOTSTRAP_MAX_RSS_BYTES:-0}
 node <<'JS'
 const fs=require('fs'),cp=require('child_process'),path=require('path'),crypto=require('crypto');
 const e=process.env,src=e.MLF_SEED_PAIR_SOURCE,out=e.MLF_SEED_PAIR_OUTPUT;

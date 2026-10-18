@@ -1,3 +1,36 @@
+# Checked cold bootstrap memory — 2026-10-19
+
+The root compiler target now uses checked separate compilation, with the native
+package manager still source-linked. Three alternating cold build pairs on
+identical compiler/runtime sources measured median sampled aggregate RSS of
+**9,994,472,504 → 3,269,801,760 bytes** (67.283899% lower), with a candidate
+maximum of **3,275,260,344 bytes**. Per-command RSS medians fell from
+9,772,531,712 to 2,612,903,936 bytes. Fresh runtime C, Clang `-O2` LLVM
+compilation, and linking remain inside the complete build boundary; every
+native build report records zero cache hits.
+
+Local median complete build time increased **332.38s → 460.87s** (38.657561%).
+Ranges were 324.25–403.17s / 459.68–470.15s; MADs were 8.13s / 1.19s.
+This improves memory headroom for the requested 7 GB runner, with a measured
+local time cost. It does not establish a hosted speedup or explain the
+historical hour-long CI job. Compiler checks and test implementations are
+unchanged. The CI helper now enforces a 5.5 GB per-command RSS budget before
+passing a candidate to later stages; the paired driver also gates sampled
+aggregate RSS.
+
+All six native groups passed on the same candidate and 426-file source
+snapshot, including an entirely fresh LLVM/binary self-host fixed point and
+both backend layouts. All nine workloads emit byte-identical LLVM in both
+layouts. Primary-log hashes, every matrix row, and unchanged source/tool
+identities were independently audited; raw evidence is retained in the report.
+
+See the [full report and reproducible commands](results/2026-10-19-bootstrap-memory/README.md),
+[all samples and variation](results/2026-10-19-bootstrap-memory/pairs/summary.json),
+and [exact frozen source/tool identities](results/2026-10-19-bootstrap-memory/pairs/context.json).
+This stock native module-built compiler has SHA-256
+`d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6`;
+the historical PGO results below retain their original binary/input scope.
+
 # Native compilation optimization — 2026-10-18
 
 All nine workloads pass the median 3× C compilation / 2× C runtime gate, with every observed maximum MLF sample also below the limit relative to the corresponding minimum C sample.
