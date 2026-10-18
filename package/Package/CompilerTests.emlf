@@ -48,7 +48,7 @@ sources r = do
   hashes <- B.hashFiles (S.append paths (Cons (r ++ "/mlfpkg") (Cons (r ++ "/mlf-package.json") Nil)))
   ioReturn (J.Object (S.map (\entry -> Pair (O.relative r (S.fst entry)) (S.snd entry)) (J.items hashes)))
 clearDrivers : IO Unit
-clearDrivers = S.mapM_ unsetEnv (O.words "MLF_BOOTSTRAP_INTERPRETER MLF_BOOTSTRAP_LLVM MLF_BOOTSTRAP_TIMEOUT_SECONDS MLF_TEST_TRACE MLF_TEST_FAIL_WRITE MLF_LLVM_TEST_ABI MLF_LLVM_TEST_CFLAGS MLF_LLVM_TEST_LIBS MLF_LLVM_TEST_OPT")
+clearDrivers = S.mapM_ unsetEnv (O.words "MLF_BENCH_STREAM_LINK MLF_MOCK_FAIL_RUNTIME MLF_BENCH_STREAM_LLVM MLF_BENCH_MLF_CLANG MLF_MOCK_FAST_FRONTEND MLF_BOOTSTRAP_INTERPRETER MLF_BOOTSTRAP_LLVM MLF_BOOTSTRAP_TIMEOUT_SECONDS MLF_TEST_TRACE MLF_TEST_FAIL_WRITE MLF_LLVM_TEST_ABI MLF_LLVM_TEST_CFLAGS MLF_LLVM_TEST_LIBS MLF_LLVM_TEST_OPT")
 nativeFlags : TestContext -> Bool -> IO (List String)
 nativeFlags c compact = do
   text <- query c (Cons "pkg-config" (O.words "--cflags --libs gmp"))
@@ -105,9 +105,9 @@ suite c target expectations = do
 unit : TestContext -> IO Unit
 unit c = do
  transports c
- suite c "core" (Cons "636 checks; 0 failures" (Cons "Oracle: 6712 closed terms" Nil))
+ suite c "core" (Cons "654 checks; 0 failures" (Cons "Oracle: 6712 closed terms" Nil))
  suite c "figure12" (Cons "43/43 expressions match regression expectations; 0 failures" (Cons "36 supplementary checks; 0 failures" Nil))
- suite c "harness" (Cons "53 native benchmark/bootstrap/release harness tests passed" Nil)
+ suite c "harness" (Cons "57 native benchmark/bootstrap/release harness tests passed" Nil)
 packages : TestContext -> IO Unit
 packages c = do
  transports c
@@ -155,8 +155,8 @@ matrices c binary portFixtures = do
   text <- readFile log
   let rows = S.filter (O.starts "Backend matrix: ") (O.lines text)
   O.require (S.length rows == 1 && contains "rows x 2 backends; no missing executions" text) "missing native backend audit"
-  O.require (readInt (S.index (O.words (S.head rows)) 2) == (if portFixtures then 26 else 546)) "native execution row coverage changed"
-  let expected = if portFixtures then "26 MLF port fixtures; 0 failures" else "494 shared IO/prelude/backend fixtures; 0 failures"
+  O.require (readInt (S.index (O.words (S.head rows)) 2) == (if portFixtures then 26 else 552)) "native execution row coverage changed"
+  let expected = if portFixtures then "26 MLF port fixtures; 0 failures" else "500 shared IO/prelude/backend fixtures; 0 failures"
   O.require (contains expected text) "native fixture coverage changed"
   hash <- fileDigest log
   let row = B.info (Cons (Pair "rows" (J.num (readInt (S.index (O.words (S.head rows)) 2)))) (Cons (Pair "backends" (J.num 2)) (Cons (Pair "cli_compiler" (J.str (compiler c))) (Cons (Pair "log_sha256" (J.str hash)) Nil))))

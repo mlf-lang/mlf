@@ -68,6 +68,12 @@ static void gc_start(void) {
 #endif
     mp_set_memory_functions(gc_integer_malloc,gc_integer_realloc,gc_integer_free);
 }
+/* Generated compact thunks share the runtime's traced small-object batches.
+ * A nonempty head proves initialization; debug heads stay empty. */
+#ifdef MLF_COMPACT_BDWGC
+void *mlf_compact_pending[17];
+#define gc_pending mlf_compact_pending
+#endif
 #if defined(GC_DEBUG) || defined(GC_DEBUG_REPLACEMENT)
 /* The batch API has no debugging allocator counterpart. */
 static void *gc_malloc(size_t size) { gc_start(); return GC_MALLOC(size ? size : 1); }
@@ -78,7 +84,9 @@ static void *gc_malloc(size_t size) { gc_start(); return GC_MALLOC(size ? size :
  * same allocation bucket. Batches are cleared except for first-word links.
  * Static heads retain only unused objects (less than 75 KiB with BDWGC
  * 8.2.12). A populated class proves gc_start has already completed. */
+#ifndef MLF_COMPACT_BDWGC
 static void *gc_pending[17];
+#endif
 static void *gc_malloc(size_t size) {
     if (size > 256) { gc_start(); return GC_MALLOC(size); }
     size_t index = size / 16;
@@ -253,6 +261,17 @@ static size_t objects;
 static size_t collection_limit = MLF_GC_THRESHOLD;
 static size_t integer_bytes;
 static size_t integer_collection_limit = MLF_GC_INTEGER_BYTES;
+/* Compact collection is driven entirely by the collector's allocation
+ * policy. The pooled/standard IO scheduling counters have no compact use. */
+#ifdef MLF_COMPACT_BDWGC
+#define COUNT_OBJECTS(n) ((void)0)
+#define COUNT_INTEGER_BYTES(n) ((void)0)
+#define UNCOUNT_INTEGER_BYTES(n) ((void)0)
+#else
+#define COUNT_OBJECTS(n) (objects += (n))
+#define COUNT_INTEGER_BYTES(n) (integer_bytes += (n))
+#define UNCOUNT_INTEGER_BYTES(n) (integer_bytes -= (n))
+#endif
 static void cleanup(void);
 static int valid_utf8(const unsigned char *bytes, size_t length);
 static int argument_count;
@@ -285,6 +304,8 @@ _Static_assert(sizeof(Tag) == 4 && INDIRECT == 2 && CLOSURE == 5 &&
 #ifdef MLF_COMPACT_BDWGC
 _Static_assert(offsetof(MlfValue, tag) == 0 && offsetof(MlfValue, as.indirect) == 8,
                "compact generated WHNF test offsets");
+_Static_assert(BUSY == 1 && INDIRECT == 2 && THUNK == 3 && CLOSURE == 5, "compact force tag ABI");
+_Static_assert(offsetof(MlfValue, tag) == 0 && offsetof(MlfValue, as.closure.code) == 8 && offsetof(MlfValue, as.closure.env) == 16, "compact force payload ABI");
 _Static_assert(offsetof(MlfValue, as.packed.identity) == 8, "constructor identity ABI");
 _Static_assert(offsetof(MlfValue, as.packed.fields) == 16, "constructor field ABI");
 _Static_assert(offsetof(MlfValue, as.constructor.fields) == 24, "general constructor environment ABI");
@@ -297,6 +318,9 @@ _Static_assert(offsetof(MlfValue, as.int_array.cells) == 16 &&
                offsetof(MlfValue, as.double_array.cells) == 16 &&
                offsetof(MlfValue, as.byte_array.cells) == 16, "array storage ABI");
 _Static_assert(sizeof(MlfValue) == 32, "managed value size ABI");
+_Static_assert(STRING == 8 && offsetof(MlfValue, as.string.length) == 8 &&
+               offsetof(MlfValue, as.string.bytes) == 16 &&
+               offsetof(MlfValue, as.string.indices) == 24, "compact static string ABI");
 #else
 _Static_assert(offsetof(MlfValue, as.packed.identity) == 24, "constructor identity ABI");
 _Static_assert(offsetof(MlfValue, as.packed.fields) == 32, "constructor field ABI");
@@ -412,14 +436,29 @@ static void *object(size_t size, ObjectKind kind) {
     result->next = heap;
     heap = result;
 #endif
-    ++objects;
+    COUNT_OBJECTS(1);
     return result;
 }
 
 static MlfValue *value(Tag tag) {
     MlfValue *result;
 #ifdef MLF_USE_BDWGC
+    /* These tags use at most two payload words. Mutable evaluation cells only
+     * become BUSY/INDIRECT and clear those same two words. No operation reads
+     * the unused trailing union word; keeping the prefix saves a GC size class. */
+#ifdef MLF_COMPACT_BDWGC
+    switch (tag) {
+    case HOLE: case BUSY: case INDIRECT: case THUNK: case APPLICATION:
+    case CLOSURE: case INTEGER: case DOUBLE: case PRIMITIVE: case NATIVE_IO:
+    case CONSTRUCTOR_1: case INT_ARRAY: case DOUBLE_ARRAY: case BYTE_ARRAY:
+    case INT_TABLE: case SMALL_INT_TABLE: case ST_ARRAY:
+        result = allocate(offsetof(MlfValue, as) + 2 * sizeof(void *));
+        break;
+    default: result = allocate(sizeof(*result)); break;
+    }
+#else
     result = allocate(sizeof(*result));
+#endif
 #ifndef MLF_COMPACT_BDWGC
     result->object = (Object){NULL, OBJECT_VALUE, 0};
 #endif
@@ -438,7 +477,7 @@ static MlfValue *value(Tag tag) {
     result->object = (Object){heap, OBJECT_VALUE, 0};
     heap = &result->object;
 #endif
-    ++objects;
+    COUNT_OBJECTS(1);
     result->tag = tag;
     return result;
 }
@@ -468,6 +507,43 @@ static MlfValue *code_value(Tag tag, MlfCode code, MlfEnv *env) {
     return result;
 }
 
+/* The generated single-entry callback consumes and clears this private
+ * environment before evaluating its body. Clearing is essential: after the
+ * thunk is entered, its update root otherwise keeps every captured value
+ * alive through this shared allocation, even after the union is cleared. */
+MlfValue *mlf_thunk_new(MlfCode code, uint64_t count) {
+    if (!code) fail("missing native code");
+    if (!count) return code_value(THUNK, code, NULL);
+    if (count > (SIZE_MAX - sizeof(MlfValue) - sizeof(MlfEnv)) / sizeof(MlfValue *))
+        fail("environment too large");
+#ifdef MLF_USE_BDWGC
+    /* Captures follow the closure payload. The unused third union word
+     * belongs to the environment count in compact allocations. The existing
+     * displacement registration at byte 24 also covers this environment. */
+#ifdef MLF_COMPACT_BDWGC
+    const size_t prefix = offsetof(MlfValue, as.closure) + sizeof(((MlfValue *)0)->as.closure);
+    _Static_assert(offsetof(MlfValue, as.closure) + sizeof(((MlfValue *)0)->as.closure) == 24, "compact capture prefix ABI");
+    _Static_assert(THUNK == 3 && offsetof(MlfValue, as.closure.code) == 8 && offsetof(MlfValue, as.closure.env) == 16 && sizeof(MlfEnv) == 8, "compact inline thunk ABI");
+#else
+    const size_t prefix = sizeof(MlfValue);
+#endif
+    MlfValue *result = allocate(prefix + sizeof(MlfEnv) + (size_t)count * sizeof(MlfValue *));
+    MlfEnv *env = (MlfEnv *)((unsigned char *)result + prefix);
+#ifndef MLF_COMPACT_BDWGC
+    result->object.kind = OBJECT_VALUE;
+    env->object.kind = OBJECT_ENV;
+#endif
+    result->tag = THUNK;
+    result->as.closure.code = code;
+    result->as.closure.env = env;
+    env->count = (size_t)count;
+    COUNT_OBJECTS(2);
+    return result;
+#else
+    return code_value(THUNK, code, mlf_env_new(count));
+#endif
+}
+
 MlfValue *mlf_thunk(MlfCode code, MlfEnv *env) { return code_value(THUNK, code, env); }
 MlfValue *mlf_closure(MlfCode code, MlfEnv *env) { return code_value(CLOSURE, code, env); }
 MlfValue *mlf_native_io(MlfCode code, MlfEnv *env) { return code_value(NATIVE_IO, code, env); }
@@ -494,7 +570,7 @@ MlfValue *mlf_integer(const char *decimal) {
     MlfValue *result = value(INTEGER);
     mpz_init(result->as.integer);
     if (mpz_set_str(result->as.integer, decimal, 10)) fail("invalid integer literal");
-    integer_bytes += mpz_size(result->as.integer) * sizeof(mp_limb_t);
+    COUNT_INTEGER_BYTES(mpz_size(result->as.integer) * sizeof(mp_limb_t));
     return result;
 }
 
@@ -517,6 +593,38 @@ MlfValue *mlf_string(const char *bytes, uint64_t length) {
     memcpy(result->as.string.bytes, bytes, (size_t)length);
     return result;
 }
+
+/* Only generated compact constructors use these batches. In debug/audit
+ * builds the heads stay empty, routing every allocation through the public
+ * allocator or audit hook. Each index denotes the exact requested word count.
+ * Normal BDWGC allocation retains its one-past-end padding and descriptor. */
+#ifdef MLF_COMPACT_BDWGC
+_Static_assert(CONSTRUCTOR_1 == 12 && CONSTRUCTOR_2 == 13 && CONSTRUCTOR_WIDE == 28, "compact constructor tag ABI");
+_Static_assert(offsetof(MlfValue, as.packed.identity) == 8 && offsetof(MlfValue, as.packed.fields) == 16, "compact packed constructor ABI");
+void *mlf_constructor_pending[33];
+void *mlf_constructor_allocate(int64_t identity, uint64_t count) {
+    if (identity < 0 || count == 0 || count > INT64_MAX ||
+        count > (SIZE_MAX - 24) / sizeof(void *))
+        fail("invalid constructor descriptor");
+    size_t size = (count <= 2 ? 16 : 24) + count * sizeof(void *);
+    void *result;
+#if !defined(GC_DEBUG) && !defined(GC_DEBUG_REPLACEMENT) && !defined(MLF_ALLOCATION_AUDIT)
+    if (size <= 256) {
+        gc_start();
+        result = GC_malloc_many((size / 16 + 1) * 16 - 1);
+        if (!result) result = GC_MALLOC(size);
+        if (!result) fail("out of memory");
+        void *next = GC_NEXT(result);
+        mlf_constructor_pending[size / sizeof(void *)] = next;
+        GC_NEXT(result) = NULL;
+        GC_reachable_here(next);
+    } else
+#endif
+        result = allocate(size);
+    CONSTRUCTED(identity);
+    return result;
+}
+#endif
 
 MlfValue *mlf_constructor(int64_t identity, int64_t arity) {
     if (identity < 0 || arity < 0) fail("invalid constructor descriptor");
@@ -580,7 +688,7 @@ MlfValue *mlf_constructor_new(int64_t identity, uint64_t count) {
     result->tag = CONSTRUCTOR_WIDE;
     result->as.constructor.identity = identity;
     result->as.constructor.arity = (int64_t)count;
-    ++objects;
+    COUNT_OBJECTS(1);
     CONSTRUCTED(identity);
     return result;
 #elif defined(MLF_USE_BDWGC) && !defined(GC_DEBUG) && !defined(GC_DEBUG_REPLACEMENT)
@@ -597,7 +705,7 @@ MlfValue *mlf_constructor_new(int64_t identity, uint64_t count) {
     result->as.constructor.identity = identity;
     result->as.constructor.arity = (int64_t)count;
     result->as.constructor.fields = fields;
-    objects += 2;
+    COUNT_OBJECTS(2);
     CONSTRUCTED(identity);
     return result;
 #else
@@ -721,11 +829,11 @@ static MlfValue *compact_integer(MlfValue *result) {
             result->object.next = (Object *)free_values;
             free_values = result;
 #endif
-            --objects;
+            COUNT_OBJECTS(-1);
             return small(n);
         }
     }
-    integer_bytes += mpz_size(result->as.integer) * sizeof(mp_limb_t);
+    COUNT_INTEGER_BYTES(mpz_size(result->as.integer) * sizeof(mp_limb_t));
     return result;
 }
 
@@ -989,7 +1097,7 @@ static MlfValue *double_to_bits(MlfValue *entry) {
     if (bits <= SMALL_MAX) return small((int64_t)bits);
     MlfValue *result = value(INTEGER);
     mpz_init_set_ui(result->as.integer,(unsigned long)bits);
-    integer_bytes += mpz_size(result->as.integer) * sizeof(mp_limb_t);
+    COUNT_INTEGER_BYTES(mpz_size(result->as.integer) * sizeof(mp_limb_t));
     return result;
 }
 
@@ -1154,7 +1262,7 @@ static void memoize(MlfValue *old, MlfValue *entry) {
 #ifdef MLF_USE_BDWGC
     /* The collector scans the whole union, so discard obsolete closure
      * environments and application arguments after memoizing the result. */
-    memset(&old->as, 0, sizeof(old->as));
+    memset(&old->as, 0, sizeof(old->as.closure));
 #endif
     old->as.indirect = entry;
 }
@@ -1186,16 +1294,16 @@ static MlfValue *force(MlfValue *entry) {
         if (tag == THUNK) {
             MlfCode code = old->as.closure.code;
             MlfEnv *env = old->as.closure.env;
-            memset(&old->as, 0, sizeof(old->as));
+            memset(&old->as, 0, sizeof(old->as.closure));
             entry = code(env, NULL);
         } else if (tag == APPLICATION) {
             MlfValue *function = old->as.application.function;
             MlfValue *argument = old->as.application.argument;
-            memset(&old->as, 0, sizeof(old->as));
+            memset(&old->as, 0, sizeof(old->as.closure));
             entry = apply(function, argument);
         } else {
             entry = old->as.indirect;
-            memset(&old->as, 0, sizeof(old->as));
+            memset(&old->as, 0, sizeof(old->as.closure));
         }
 #else
         if (tag == THUNK) entry = old->as.closure.code(old->as.closure.env, NULL);
@@ -1261,7 +1369,7 @@ static void release(Object *entry) {
     if (entry->kind == OBJECT_VALUE) {
         MlfValue *v = (MlfValue *)entry;
         if (v->tag == INTEGER) {
-            integer_bytes -= mpz_size(v->as.integer) * sizeof(mp_limb_t);
+            UNCOUNT_INTEGER_BYTES(mpz_size(v->as.integer) * sizeof(mp_limb_t));
             mpz_clear(v->as.integer);
         }
         if (v->tag == STRING) { free(v->as.string.bytes); free(v->as.string.indices); }
@@ -1317,9 +1425,13 @@ static __attribute__((noinline)) void mark(Stack *pending, void *entry) {
 
 static void collect(MlfValue *root, const Stack *continuations) {
 #ifdef MLF_USE_BDWGC
-    /* GC_malloc already collects during allocation. An IO boundary can also
-     * drop dead temporary graphs and reset the advisory allocation counters. */
+    /* Compact native programs use BDWGC's allocation policy to schedule
+     * collections. IO thresholds reset advisory counters without duplicating
+     * its full-heap scans. Standard and debugging callers can still request
+     * collection explicitly through the collector API. */
+#ifndef MLF_COMPACT_BDWGC
     GC_gcollect();
+#endif
     objects = 0;
     integer_bytes = 0;
     return;
@@ -1373,7 +1485,7 @@ static void collect(MlfValue *root, const Stack *continuations) {
     while (*cursor) {
         Object *o = *cursor;
         if (o->marked) { o->marked = 0; cursor = &o->next; }
-        else { *cursor = o->next; release(o); --objects; }
+        else { *cursor = o->next; release(o); COUNT_OBJECTS(-1); }
     }
     collection_limit = objects > (SIZE_MAX - MLF_GC_THRESHOLD) / 2 ? SIZE_MAX :
         objects * 2 + MLF_GC_THRESHOLD;

@@ -1,0 +1,2 @@
+# Preserve byte-exact archived measurements and patches, including whitespace.
+tools/profile/results/** -whitespace

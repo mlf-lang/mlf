@@ -42,6 +42,10 @@ MlfValue *mlf_new_int_table(void);
 MlfEnv *mlf_env_new(uint64_t count);
 void mlf_env_set(MlfEnv *env, uint64_t index, MlfValue *value);
 MlfValue *mlf_env_get(MlfEnv *env, uint64_t index);
+/* Private captures for a single-entry callback. The caller initializes every
+ * slot before publishing the thunk. The callback loads, then clears its slots
+ * before evaluating its body. Environment pointer: byte 32 / compact byte 16. */
+MlfValue *mlf_thunk_new(MlfCode code, uint64_t count);
 MlfValue *mlf_thunk(MlfCode code, MlfEnv *env);
 MlfValue *mlf_closure(MlfCode code, MlfEnv *env);
 MlfValue *mlf_native_io(MlfCode code, MlfEnv *env);
@@ -93,5 +97,15 @@ MlfValue *mlf_field(MlfValue *value, uint64_t index);
 _Noreturn void mlf_match_failure(void);
 void mlf_set_args(int32_t argc, char **argv);
 int32_t mlf_run(MlfValue *root, int64_t is_io);
+
+#ifdef MLF_COMPACT_BDWGC
+/* Reserved for generated small captured thunks. These are the runtime's own
+ * traced batches, indexed by requested bytes / 16; debug heads stay empty. */
+extern void *mlf_compact_pending[17];
+/* Reserved for generated constructor allocation. The caller initializes the
+ * already-cleared object immediately; the heads are collector roots. */
+extern void *mlf_constructor_pending[33];
+void *mlf_constructor_allocate(int64_t identity, uint64_t count);
+#endif
 
 #endif

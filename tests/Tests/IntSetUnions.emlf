@@ -1,0 +1,21 @@
+module Tests.IntSetUnions where
+import Bootstrap.Types
+import qualified Tests.Helpers as H
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.Map as M
+import qualified Bootstrap.IntSet as IS
+
+assert value = H.assert value "set union disagrees with sorted-list oracle or breaks balancing"
+check a b = do
+ let left = IS.fromList (L.append a (L.reverse a))
+ let right = IS.fromList (L.append b (L.reverse b))
+ let expected = L.sortBy L.compareInt (L.nubBy eqInt (L.append a b))
+ L.mapM_ (\result -> case result of { IntSet tree -> assert (L.eqList eqInt (IS.toList result) expected && IS.size result == L.length expected && M.valid L.compareInt tree) }) (Cons (IS.union left right) (Cons (IS.union right left) Nil))
+
+unions = do
+ let counts = Cons 0 (Cons 1 (Cons 2 (Cons 5 (Cons 17 (Cons 65 Nil)))))
+ let offsets = Cons (-1000000000000000000000000000000000000) (Cons (-1000) (Cons 0 (Cons 3 (Cons 1000000000000000000000000000000000000 Nil))))
+ L.mapM_ (\n -> L.mapM_ (\m -> L.mapM_ (\offset -> check (L.map (\i -> 17 * i) (L.range 0 (n - 1))) (L.map (\i -> offset + 17 * i) (L.range 0 (m - 1)))) offsets) counts) counts
+ return Unit
+
+suite = Cons (Pair "size-biased set unions agree with independent sorted lists" unions) Nil

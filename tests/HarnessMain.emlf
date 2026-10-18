@@ -27,20 +27,47 @@ outputPath args = case S.dropWhile (\arg -> S.not (eqString arg "-o")) args of
  _ -> panic "mock tool missing output argument"
 mockBuild args = if S.elem eqString "--emit-llvm" args || S.elem eqString "--module-to-llvm" args then do
  writeFile "frontend.started" ""
- waitFor "runtime.started" 300
- O.run "" (O.words "/bin/sleep 0.1")
+ fast <- getEnv "MLF_MOCK_FAST_FRONTEND"
+ streaming <- getEnv "MLF_BENCH_STREAM_LLVM"
+ if eqString fast "1" then return Unit else do
+  waitFor "runtime.started" 300
+  if eqString streaming "1" then waitFor "llvm.launched" 300 else return Unit
+  linking <- getEnv "MLF_BENCH_STREAM_LINK"
+  if eqString linking "1" then waitFor "link.launched" 300 else return Unit
+  O.run "" (O.words "/bin/sleep 0.1")
  putStrLn "IR"
+ else if S.elem eqString "-c" args && S.any (O.ends "program.ll") args then do
+  if S.elem eqString "--mlf-stream-ir" args then do
+   writeFile "llvm.launched" ""
+   fast <- getEnv "MLF_MOCK_FAST_FRONTEND"
+   if eqString fast "1" then O.run "" (O.words "/bin/sleep 0.05") else return Unit
+   code <- O.exec "" (O.words "/bin/cat program.ll.pipe") "" "program.ll" "stream-read.err" 5
+   H.assert (code == 0) "streaming LLVM archive failed"
+   else return Unit
+  ir <- readFile "program.ll"
+  H.assert (eqString (O.trim ir) "IR") "LLVM compilation started before emission completed"
+  writeFile "llvm.started" ""
+  writeFile (outputPath args) "code"
  else if S.elem eqString "-c" args then do
   present <- fileExists "cache.o"
   H.assert (S.not present) "runtime output directory reused"
   writeFile "cache.o" ""
   writeFile "runtime.started" ""
+  failure <- getEnv "MLF_MOCK_FAIL_RUNTIME"
+  if eqString failure "1" then exitWith 9 else return Unit
   waitFor "frontend.started" 300
+  waitFor "llvm.started" 300
   writeFile (outputPath args) "object"
   else do
+   streaming <- getEnv "MLF_BENCH_STREAM_LINK"
+   if eqString streaming "1" then do
+    writeFile "link.launched" ""
+    waitFor "program.o.ready" 300
+    waitFor "runtime.o.ready" 300
+    else return Unit
    object <- readFile "runtime.o"
-   ir <- readFile "program.ll"
-   H.assert (eqString object "object" && eqString (O.trim ir) "IR") "link started before independent phases completed"
+   code <- readFile "program.o"
+   H.assert (eqString object "object" && eqString code "code") "link started before independent phases completed"
    writeFile (outputPath args) "binary"
 main : IO Unit
 main = do
@@ -51,5 +78,5 @@ main = do
   Cons "--check-clean-environment" names -> do
    values <- S.mapM getEnv names
    H.assert (S.all (\value -> eqString value "") values) "gate inherited compiler or collector overrides"
-  Nil -> do { Boot.main; Release.main; Bench.main; putStrLn "53 native benchmark/bootstrap/release harness tests passed" }
+  Nil -> do { Boot.main; Release.main; Bench.main; putStrLn "57 native benchmark/bootstrap/release harness tests passed" }
   _ -> exitWith 2

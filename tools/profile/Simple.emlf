@@ -1,0 +1,45 @@
+module Simple where
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.Graph as G
+
+-- Diagnostic prototype. The input graph must already have passed validation.
+-- A class with one mapped binder needs no LCA search if that binder dominates
+-- its new structural parents. Full validation of the candidate checks this.
+-- Unchanged original binders imply no raising. Conservative permission guards
+-- rule out red merges/flag changes and require green for every bottom graft.
+data Class = Class (Maybe Int) Flag Bool Bool
+
+nonRed : Graph -> Int -> Node -> Bool
+nonRed old n v = G.equalFlag (G.flag v) Rigid ||
+ (L.not (G.isBottom (G.tag v)) && L.null (G.children (G.tag v))) || G.flexiblePath old n
+
+collect : Graph -> Graph -> IntMap Class -> List (Pair Int Node) -> Maybe (IntMap Class)
+collect old skeleton classes entries = case entries of
+ Nil -> Just classes
+ Cons (Pair n v) rest ->
+  let image = G.resolve skeleton n in
+  let parent = G.mapMaybeInt (G.resolve skeleton) (G.binder v) in
+  let safe = nonRed old n v in
+  if G.isBottom (G.tag v) && L.not (G.isBottom (G.tag (G.nodeAt skeleton image))) && L.not (G.flexiblePath old n)
+  then Nothing else case IM.lookup image classes of
+   Nothing -> collect old skeleton (IM.insert image (Class parent (G.flag v) false safe) classes) rest
+   Just (Class before flag merged allowed) ->
+    if L.not (G.equalMaybeInt parent before) then Nothing else
+     collect old skeleton (IM.insert image (Class parent (if G.equalFlag flag Rigid then Rigid else G.flag v) true (allowed && safe)) classes) rest
+
+acceptable entry = case entry of Class parent flag merged safe -> L.not merged || safe
+node classes n v = case IM.get n classes of
+ Class parent flag merged safe -> if G.equalMaybeInt parent (G.binder v) && G.equalFlag flag (G.flag v) then v else G.mkNode (G.tag v) parent flag
+
+attempt : Graph -> Graph -> Maybe Graph
+attempt old skeleton = case collect old skeleton IM.empty (IM.toList (G.nodes old)) of
+ Nothing -> Nothing
+ Just classes -> if L.not (L.all acceptable (IM.elems classes)) then Nothing else
+  let candidate = G.mkGraph (G.mapNodesWithKey (node classes) (G.nodes skeleton)) (G.links skeleton) (G.nextId skeleton) in
+  case G.validateGraph candidate of
+   Left _ -> Nothing
+   Right _ -> Just candidate
+
+equal a b = G.nextId a == G.nextId b && IM.eqIntMap eqInt (G.links a) (G.links b) && IM.eqIntMap G.equalNode (G.nodes a) (G.nodes b)

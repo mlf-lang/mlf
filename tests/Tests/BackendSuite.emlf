@@ -13,6 +13,7 @@ import qualified Tests.ForceReuse as Fo
 import qualified Tests.BoolConditions as Bo
 import qualified Tests.EnvironmentAccess as En
 import qualified Tests.StrictFields as St
+import qualified Tests.StrictWrappers as Wr
 import qualified Tests.NumericArrays as Nu
 import qualified Tests.ByteArrays as By
 import qualified Tests.DNA as Dn
@@ -23,14 +24,14 @@ import qualified Tests.StateRuntime as Sr
 import qualified Tests.HigherOrderSpecialization as Hi
 import qualified Package.OS as O
 suite : B.Backends -> List (Pair String (IO Unit))
-suite backends = S.concat (Cons (Io.ioTests backends) (Cons (Pr.preludeTests backends) (Cons (Sn.snakeTests backends) (Cons (Ba.backendTests backends) (Cons (Na.nativeOptimizationTests backends) (Cons (Co.constructorProjectionTests backends) (Cons (Fo.forceReuseTests backends) (Cons (Bo.boolConditionTests backends) (Cons (En.environmentAccessTests backends) (Cons (St.strictFieldTests backends) (Cons (Nu.numericArrayTests backends) (Cons (By.byteArrayTests backends) (Cons (Dn.dnaTests backends) (Cons (Mo.moduleBackendTests backends) (Cons (Se.separateBackendTests backends) (Cons (Bs.bootstrapPrimitiveTests backends) (Cons (Sr.stateRuntimeTests backends) (Cons (Hi.higherOrderTests backends) Nil))))))))))))))))))
+suite backends = S.append (Wr.backendTests backends) (S.concat (Cons (Io.ioTests backends) (Cons (Pr.preludeTests backends) (Cons (Sn.snakeTests backends) (Cons (Ba.backendTests backends) (Cons (Na.nativeOptimizationTests backends) (Cons (Co.constructorProjectionTests backends) (Cons (Fo.forceReuseTests backends) (Cons (Bo.boolConditionTests backends) (Cons (En.environmentAccessTests backends) (Cons (St.strictFieldTests backends) (Cons (Nu.numericArrayTests backends) (Cons (By.byteArrayTests backends) (Cons (Dn.dnaTests backends) (Cons (Mo.moduleBackendTests backends) (Cons (Se.separateBackendTests backends) (Cons (Bs.bootstrapPrimitiveTests backends) (Cons (Sr.stateRuntimeTests backends) (Cons (Hi.higherOrderTests backends) Nil)))))))))))))))))))
 main : IO Unit
 main = do
  args <- O.allArguments
  B.withBackends (\backends -> do
   let allCases = suite backends
   let labels = S.map S.fst allCases
-  H.assert (S.length allCases == 494) "preserved backend fixture coverage changed"
+  H.assert (S.length allCases == 500) "preserved backend fixture coverage changed"
   H.assert (S.length labels == S.length (S.nubBy eqString labels)) "duplicate backend fixture labels"
   cases <- case args of
    Nil -> return allCases

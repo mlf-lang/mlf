@@ -25,7 +25,7 @@ generateWithHeader headerBytes cs term =
   let output = Output 0 Nil "entry" Nil Nil cs fs S.empty M.empty ks S.empty (K.collecting fs ks) M.empty true M.empty M.empty M.empty M.empty (F.infer (M.map L.snd cs) fs term) S.empty headerBytes in
   case runBuild (callback Nil Nothing term) output of
     Left message -> Left message
-    Right (Pair entry out) -> Right (Pair entry (L.concat (Cons runtimeDeclarations (args4 (forceDefinition headerBytes) aliasMetadata (L.reverse (constants out)) (L.reverse (definitions out))))))
+    Right (Pair entry out) -> Right (Pair entry (L.concat (Cons (if headerBytes == 0 then Cons "declare ptr @mlf_thunk_new(ptr, i64)" runtimeDeclarations else runtimeDeclarations) (args4 (L.append (allocationDefinition headerBytes) (L.append (thunkAllocationDefinition headerBytes) (forceDefinition headerBytes))) aliasMetadata (L.reverse (constants out)) (L.reverse (definitions out))))))
 
 lookupName : Map XName CGBinding -> XName -> Build CGBinding
 lookupName scope name = case M.lookup O.compareName name scope of
@@ -59,10 +59,18 @@ readEnvironment names = do
   cgPure (M.fromList O.compareName entries)
 
 callback : List XName -> Maybe XName -> XErased -> Build String
-callback captures argument body = do
+callback captures argument body = callbackWithClear false captures argument body
+
+-- A compiled suspended expression owns its capture environment and runs once.
+-- Drop those slots after loading them, before entering its possibly long body.
+-- Reusable function and IO environments must keep their captures intact.
+callbackWithClear : Bool -> List XName -> Maybe XName -> XErased -> Build String
+callbackWithClear private captures argument body = do
   name <- fresh "@mlf.code."
   definition name (args2 "ptr %env" "ptr %arg") (do
     scope <- readEnvironment captures
+    header <- gets objectHeaderBytes
+    if private && header == 0 then L.mapM_ (\index -> storeEnvironment "%env" index "null") (L.range 0 (L.length captures - 1)) else cgPure Unit
     let local = case argument of
           Nothing -> scope
           Just n -> M.insert O.compareName n (CGBinding "%arg" false) scope
@@ -161,9 +169,20 @@ suspended : Map XName CGBinding -> XErased -> Build String
 suspended scope expression = do
   fs <- gets functions
   let captures = S.toList (A.needed fs expression)
-  code <- callback captures Nothing expression
-  env <- environment scope captures
-  call "@mlf_thunk" (args2 (pointer code) (pointer env))
+  code <- callbackWithClear true captures Nothing expression
+  header <- gets objectHeaderBytes
+  if header /= 0 || L.null captures then do
+    env <- environment scope captures
+    call "@mlf_thunk" (args2 (pointer code) (pointer env))
+  else do
+    value <- call (if L.length captures <= 28 then "@mlf.allocate.thunk" else "@mlf_thunk_new") (args2 (pointer code) (number (L.length captures)))
+    env <- loadAt "ptr" value 32
+    L.mapM_ (\entry -> case entry of
+      Pair index name -> do
+        binding <- lookupName scope name
+        captured <- bindingOperand binding
+        storeEnvironment env index captured) (L.zip (L.range 0 (L.length captures - 1)) captures)
+    cgPure value
 
 thunk : Map XName CGBinding -> XErased -> Build String
 thunk scope expression = case expression of
@@ -194,7 +213,16 @@ evaluate scope expression = case expression of
   XEBool b -> cgPure (immediate (if b then 6 else 2))
   XEString text -> do
     literal <- stringConstant text
-    call "@mlf_string" (args2 (pointer (L.fst literal)) (number (L.snd literal)))
+    header <- gets objectHeaderBytes
+    if header == 0 then do
+      -- Compact strings have immutable bytes and a lazily initialized Unicode
+      -- index. A writable global value is itself a BDWGC root for that index;
+      -- repeated evaluation needs no allocation or byte copying.
+      let name = L.fst literal ++ ".value"
+      let value = name ++ " = private global { i32, i32, i64, ptr, ptr } { i32 8, i32 0, i64 " ++ showInt (L.snd literal) ++ ", ptr " ++ L.fst literal ++ ", ptr null }, align 8"
+      modify (\state -> withConstants (Cons value (constants state)) state)
+      cgPure name
+    else call "@mlf_string" (args2 (pointer (L.fst literal)) (number (L.snd literal)))
   XEPrimitive p -> call "@mlf_primitive" (args1 (number (P.primitiveCode p)))
   XEConstructor c -> do
     constructor <- lookupConstructor c
@@ -642,7 +670,9 @@ genericApplication scope expression = case expression of
   _ -> failure "LLVM expected application"
 
 -- Mirror the runtime's non-evaluating WHNF test for the compact layout.
--- Runtime fallback preserves null/cycle errors and evaluates deferred values.
+-- A single thunk can use its own update root directly. Mark it busy before
+-- calling, clear captures through its callback, then force and memoize its
+-- result. Runtime fallback preserves null/cycle errors and longer spines.
 forceDefinition : Int -> List String
 forceDefinition header = if header /= 0 then Nil else
   Cons "define private ptr @mlf.force(ptr %value) alwaysinline {" (
@@ -657,7 +687,10 @@ forceDefinition header = if header /= 0 then Nil else
   Cons "tagged:" (
   Cons "  %tag = load i32, ptr %value, align 4" (
   Cons "  %ready = icmp uge i32 %tag, 5" (
-  Cons "  br i1 %ready, label %done, label %indirect" (
+  Cons "  br i1 %ready, label %done, label %deferred" (
+  Cons "deferred:" (
+  Cons "  %isthunk = icmp eq i32 %tag, 3" (
+  Cons "  br i1 %isthunk, label %enter, label %indirect" (
   Cons "indirect:" (
   Cons "  %forwarded = icmp eq i32 %tag, 2" (
   Cons "  br i1 %forwarded, label %next, label %slow" (
@@ -679,10 +712,23 @@ forceDefinition header = if header /= 0 then Nil else
   Cons "  ret ptr %p" (
   Cons "done:" (
   Cons "  ret ptr %value" (
+  Cons "enter:" (
+  Cons "  %code.slot = getelementptr i8, ptr %value, i64 8" (
+  Cons "  %env.slot = getelementptr i8, ptr %value, i64 16" (
+  Cons "  %code = load ptr, ptr %code.slot, align 8" (
+  Cons "  %env = load ptr, ptr %env.slot, align 8" (
+  Cons "  store i32 1, ptr %value, align 4" (
+  Cons "  store ptr null, ptr %code.slot, align 8" (
+  Cons "  store ptr null, ptr %env.slot, align 8" (
+  Cons "  %returned = call ptr %code(ptr %env, ptr null)" (
+  Cons "  %canonical = call ptr @mlf_force(ptr %returned)" (
+  Cons "  store i32 2, ptr %value, align 4" (
+  Cons "  store ptr %canonical, ptr %code.slot, align 8" (
+  Cons "  ret ptr %canonical" (
   Cons "slow:" (
   Cons "  %result = tail call ptr @mlf_force(ptr %value)" (
   Cons "  ret ptr %result" (
-  Cons "}" Nil)))))))))))))))))))))))))))))))))))))
+  Cons "}" Nil)))))))))))))))))))))))))))))))))))))))))))))))))))))
 
 aliasMetadata : List String
 aliasMetadata =
@@ -748,3 +794,92 @@ runtimeDeclarations =
   Cons "declare i32 @mlf_run(ptr, i64)" (
   Cons "" (
   Nil)))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+
+-- Shared helpers keep emitted modules small; LLVM inlines their fast paths.
+allocationDefinition : Int -> List String
+allocationDefinition header = if header /= 0 then Nil else
+  Cons "@mlf_constructor_pending = external global [33 x ptr]" (
+  Cons "declare ptr @mlf_constructor_allocate(i64, i64)" (
+  Cons "define private ptr @mlf.allocate.constructor(i64 %identity, i64 %count, i64 %size) alwaysinline {" (
+  Cons "entry:" (
+  Cons "  %small = icmp ule i64 %size, 256" (
+  Cons "  br i1 %small, label %batch, label %slow" (
+  Cons "batch:" (
+  Cons "  %index = lshr i64 %size, 3" (
+  Cons "  %slot = getelementptr [33 x ptr], ptr @mlf_constructor_pending, i64 0, i64 %index" (
+  Cons "  %value = load ptr, ptr %slot, align 8" (
+  Cons "  %empty = icmp eq ptr %value, null" (
+  Cons "  br i1 %empty, label %slow, label %ready" (
+  Cons "ready:" (
+  Cons "  %next = load ptr, ptr %value, align 8" (
+  Cons "  store ptr %next, ptr %slot, align 8" (
+  Cons "  store i64 0, ptr %value, align 8" (
+  Cons "  ret ptr %value" (
+  Cons "slow:" (
+  Cons "  %allocated = call ptr @mlf_constructor_allocate(i64 %identity, i64 %count)" (
+  Cons "  ret ptr %allocated" (
+  Cons "}" (
+  Cons "define private ptr @mlf.construct.1(i64 %identity, ptr %a) alwaysinline {" (
+  Cons "entry:" (
+  Cons "  %value = call ptr @mlf.allocate.constructor(i64 %identity, i64 1, i64 24)" (
+  Cons "  store i32 12, ptr %value, align 4" (
+  Cons "  %id = getelementptr i8, ptr %value, i64 8" (
+  Cons "  store i64 %identity, ptr %id, align 8" (
+  Cons "  %first = getelementptr i8, ptr %value, i64 16" (
+  Cons "  store ptr %a, ptr %first, align 8" (
+  Cons "  ret ptr %value" (
+  Cons "}" (
+  Cons "define private ptr @mlf.construct.2(i64 %identity, ptr %a, ptr %b) alwaysinline {" (
+  Cons "entry:" (
+  Cons "  %value = call ptr @mlf.allocate.constructor(i64 %identity, i64 2, i64 32)" (
+  Cons "  store i32 13, ptr %value, align 4" (
+  Cons "  %id = getelementptr i8, ptr %value, i64 8" (
+  Cons "  store i64 %identity, ptr %id, align 8" (
+  Cons "  %first = getelementptr i8, ptr %value, i64 16" (
+  Cons "  store ptr %a, ptr %first, align 8" (
+  Cons "  %second = getelementptr i8, ptr %value, i64 24" (
+  Cons "  store ptr %b, ptr %second, align 8" (
+  Cons "  ret ptr %value" (
+  Cons "}" (
+  Cons "define private ptr @mlf.construct.wide(i64 %identity, i64 %count) alwaysinline {" (
+  Cons "entry:" (
+  Cons "  %fields = mul i64 %count, 8" (
+  Cons "  %size = add i64 %fields, 24" (
+  Cons "  %value = call ptr @mlf.allocate.constructor(i64 %identity, i64 %count, i64 %size)" (
+  Cons "  store i32 28, ptr %value, align 4" (
+  Cons "  %id = getelementptr i8, ptr %value, i64 8" (
+  Cons "  store i64 %identity, ptr %id, align 8" (
+  Cons "  %arity = getelementptr i8, ptr %value, i64 16" (
+  Cons "  store i64 %count, ptr %arity, align 8" (
+  Cons "  ret ptr %value" (
+  Cons "}" (Nil)))))))))))))))))))))))))))))))))))))))))))))))))))))))
+
+-- Only positive capture counts up to 28 reach this helper. They use the
+-- same rounded, traced allocation class as gc_malloc; captures start clear.
+-- The slow path handles initialization, refill and debug allocations.
+thunkAllocationDefinition : Int -> List String
+thunkAllocationDefinition header = if header /= 0 then Nil else
+  Cons "@mlf_compact_pending = external global [17 x ptr]" (
+  Cons "define private ptr @mlf.allocate.thunk(ptr %code, i64 %count) alwaysinline {" (
+  Cons "entry:" (
+  Cons "  %words = add i64 %count, 4" (
+  Cons "  %index = lshr i64 %words, 1" (
+  Cons "  %slot = getelementptr [17 x ptr], ptr @mlf_compact_pending, i64 0, i64 %index" (
+  Cons "  %value = load ptr, ptr %slot, align 8" (
+  Cons "  %empty = icmp eq ptr %value, null" (
+  Cons "  br i1 %empty, label %slow, label %ready" (
+  Cons "ready:" (
+  Cons "  %next = load ptr, ptr %value, align 8" (
+  Cons "  store ptr %next, ptr %slot, align 8" (
+  Cons "  store i64 3, ptr %value, align 8" (
+  Cons "  %function = getelementptr i8, ptr %value, i64 8" (
+  Cons "  store ptr %code, ptr %function, align 8" (
+  Cons "  %environment = getelementptr i8, ptr %value, i64 24" (
+  Cons "  %capture = getelementptr i8, ptr %value, i64 16" (
+  Cons "  store ptr %environment, ptr %capture, align 8" (
+  Cons "  store i64 %count, ptr %environment, align 8" (
+  Cons "  ret ptr %value" (
+  Cons "slow:" (
+  Cons "  %allocated = call ptr @mlf_thunk_new(ptr %code, i64 %count)" (
+  Cons "  ret ptr %allocated" (
+  Cons "}" (Nil))))))))))))))))))))))))

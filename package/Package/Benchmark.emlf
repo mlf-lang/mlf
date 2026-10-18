@@ -257,6 +257,20 @@ runGroup directory timeout commands = do
  if S.not (code == 0) then return (Left "group transport failed") else do
   value <- J.read (directory ++ "/group.json")
   return (if V.int "exit_code" value == 0 && V.int "remaining_children" value == 0 then Right value else Left "parallel compiler phase failed or timed out")
+-- The caller describes a dependency graph; the transport records every stage
+-- against one clock, including source emission, fresh runtime, LLVM and link.
+runPipeline : String -> Double -> List (Pair (List Int) (Quad String String String (List String))) -> IO (Either String J.Json)
+runPipeline directory timeout commands = do
+ host <- getEnv "MLF_TEST_HOST_SUPPORT"
+ O.mkdir directory
+ let spec = directory ++ "/pipeline.spec"
+ let fields = Cons (showInt (S.length commands)) (S.concatMap (\(Pair dependencies (Quad cwd input output argv)) -> S.append (Cons (showInt (S.length dependencies)) (S.map showInt dependencies)) (S.append (Cons cwd (Cons input (Cons output (Cons (output ++ ".stderr") (Cons (showInt (S.length argv)) Nil))))) argv)) commands)
+ writeFile spec (O.pack fields)
+ code <- O.exec "" (Cons host (Cons "pipeline" (Cons (formatDouble 6 timeout) (Cons spec Nil)))) "" (directory ++ "/pipeline.json") (directory ++ "/pipeline.err") (1 + readInt (formatDouble 0 timeout))
+ if S.not (code == 0) then return (Left "pipeline transport failed") else do
+  value <- J.read (directory ++ "/pipeline.json")
+  return (if V.int "exit_code" value == 0 && V.int "remaining_children" value == 0 then Right value else Left "compiler pipeline failed or timed out")
+
 buildParallel : String -> String -> String -> String -> String -> List String -> Double -> IO (Either String (Pair String J.Json))
 buildParallel directory compiler clang source runtime flags timeout = do
  present <- directoryExists directory
@@ -265,25 +279,36 @@ buildParallel directory compiler clang source runtime flags timeout = do
   O.mkdir directory
   let ir = directory ++ "/program.ll"
   let object = directory ++ "/runtime.o"
+  let code = directory ++ "/program.o"
+  let binary = directory ++ "/pending-executable"
   let mode = if O.ends ".mlfi" source then "--module-to-llvm" else "--emit-llvm"
-  let frontend = Quad directory "" ir (Cons compiler (Cons mode (Cons source Nil)))
-  let runtimePhase = Quad directory "" (directory ++ "/runtime.stdout") (S.append (Cons clang (O.words "-O2 -std=c11 -c")) (S.append (Cons runtime flags) (Cons "-o" (Cons object Nil))))
-  parallel <- runGroup directory timeout (Cons frontend (Cons runtimePhase Nil))
-  case parallel of
+  streaming <- getEnv "MLF_BENCH_STREAM_LLVM"
+  O.require (eqString streaming "" || eqString streaming "1") "invalid streaming compiler setting"
+  let stream = eqString streaming "1"
+  linking <- getEnv "MLF_BENCH_STREAM_LINK"
+  O.require (eqString linking "" || (eqString linking "1" && stream)) "streaming link requires streaming LLVM"
+  let streamLink = eqString linking "1"
+  let frontend = if stream then Cons "/bin/bash" (Cons "-o" (Cons "pipefail" (Cons "-c" (Cons "fifo=$1; shift; \"$@\" | /bin/cat > \"$fifo\"" (Cons "mlf-stream" (Cons (ir ++ ".pipe") (Cons compiler (Cons mode (Cons source (Nil)))))))))) else Cons compiler (Cons mode (Cons source Nil))
+  let runtimeCommand = S.append (Cons clang (O.words "-O2 -std=c11 -c")) (S.append (Cons runtime flags) (Cons "-o" (Cons object Nil)))
+  let llvmCommand = S.append (Cons clang (S.append (if stream then Cons "--mlf-stream-ir" Nil else Nil) (O.words "-O2 -Wno-override-module -c"))) (Cons ir (Cons "-o" (Cons code Nil)))
+  let linkCommand = S.append (Cons clang (S.append (if streamLink then Cons "--mlf-wait-objects" Nil else Nil) (Cons code (Cons object flags)))) (Cons "-lm" (Cons "-o" (Cons binary Nil)))
+  let ordinary = Cons frontend (Cons runtimeCommand (Cons llvmCommand (Cons linkCommand Nil)))
+  let setup = Cons "/usr/bin/mkfifo" (Cons (ir ++ ".pipe") Nil)
+  let linked = Cons setup (Cons frontend (Cons runtimeCommand (Cons llvmCommand (Cons (Cons "/usr/bin/touch" (Cons (object ++ ".ready") Nil)) (Cons (Cons "/usr/bin/touch" (Cons (code ++ ".ready") Nil)) (Cons linkCommand Nil))))))
+  let commands = if streamLink then linked else if stream then Cons setup ordinary else ordinary
+  let linkDependencies = Cons Nil (Cons (Cons 0 Nil) (Cons Nil (Cons (Cons 0 Nil) (Cons (Cons 0 (Cons 2 Nil)) (Cons (Cons 0 (Cons 3 Nil)) (Cons (Cons 0 Nil) Nil))))))
+  let dependencies = if streamLink then linkDependencies else if stream then Cons Nil (Cons (Cons 0 Nil) (Cons Nil (Cons (Cons 0 Nil) (Cons (Cons 1 (Cons 2 (Cons 3 Nil))) Nil)))) else Cons Nil (Cons Nil (Cons (Cons 0 Nil) (Cons (Cons 1 (Cons 2 Nil)) Nil)))
+  let ordinaryOutputs = Cons (if stream then directory ++ "/frontend.stdout" else ir) (Cons (directory ++ "/runtime.stdout") (Cons (directory ++ "/llvm.stdout") (Cons (directory ++ "/link.stdout") Nil)))
+  let linkedOutputs = Cons (directory ++ "/setup.stdout") (Cons (directory ++ "/frontend.stdout") (Cons (directory ++ "/runtime.stdout") (Cons (directory ++ "/llvm.stdout") (Cons (directory ++ "/runtime-ready.stdout") (Cons (directory ++ "/llvm-ready.stdout") (Cons (directory ++ "/link.stdout") Nil))))))
+  let outputs = if streamLink then linkedOutputs else if stream then Cons (directory ++ "/setup.stdout") ordinaryOutputs else ordinaryOutputs
+  let phases = O.words (if streamLink then "setup frontend runtime llvm runtime-ready llvm-ready link" else if stream then "setup frontend runtime llvm link" else "frontend runtime llvm link")
+  result <- runPipeline directory timeout (S.zipWith (\deps command -> Pair deps command) dependencies (S.zipWith (\output argv -> Quad directory "" output argv) outputs commands))
+  case result of
    Left error -> return (Left error)
    Right group -> do
-    let binary = directory ++ "/pending-executable"
-    linked <- measure directory (S.append (Cons clang (Cons "-O2" (Cons "-Wno-override-module" (Cons ir (Cons object flags))))) (Cons "-lm" (Cons "-o" (Cons binary Nil)))) "" 10
-    case linked of
-     Left error -> return (Left error)
-     Right link -> do
-      let stages = V.array "stages" group
-      let frontend = J.set "phase" (J.str "frontend") (J.set "parallel_group" (J.num 0) (J.set "command" (J.stringArray (Cons compiler (Cons mode (Cons source Nil)))) (S.index stages 0)))
-      let runtime = J.set "phase" (J.str "runtime") (J.set "parallel_group" (J.num 0) (S.index stages 1))
-      let final = J.set "phase" (J.str "llvm-and-link") link
-      let wall = addDouble (V.double 0.0 (J.get "wall_seconds" group)) (V.double 0.0 (J.get "wall_seconds" link))
-      let cpu = S.foldl addDouble 0.0 (S.map (\row -> V.double 0.0 (J.get "cpu_seconds" row)) (Cons frontend (Cons runtime (Cons final Nil))))
-      return (Right (Pair binary (J.Object (Cons (Pair "wall_seconds" (J.Number (formatDouble 9 wall))) (Cons (Pair "cpu_seconds" (J.Number (formatDouble 9 cpu))) (Cons (Pair "maximum_parallel_compilers" (J.num 2)) (Cons (Pair "stages" (J.Array (Cons frontend (Cons runtime (Cons final Nil))))) Nil)))))))
+    let stages = S.zipWith (\name entry -> J.set "phase" (J.str name) entry) phases (S.zipWith (\argv entry -> J.set "command" (J.stringArray argv) entry) commands (V.array "stages" group))
+    let cpu = S.foldl addDouble 0.0 (S.map (\row -> V.double 0.0 (J.get "cpu_seconds" row)) stages)
+    return (Right (Pair binary (J.set "cpu_seconds" (J.Number (formatDouble 9 cpu)) (J.set "stages" (J.Array stages) group))))
 
 validateSelection : J.Json -> J.Json -> Either String Unit
 validateSelection configuration manifest = do

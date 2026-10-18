@@ -17,6 +17,7 @@ import qualified Bootstrap.Kind as K
 import qualified Bootstrap.X.Type as T
 import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Check as Check
+import qualified Bootstrap.X.Checked as Checked
 import qualified Bootstrap.X.Parser as XP
 import qualified Bootstrap.X.Pretty as Pretty
 
@@ -464,15 +465,15 @@ validateObjectBoundary interfaces (UnitObject iface term) = do
   Pair program _ <- Classes.lowerSeparateClasses M.empty (map fst instances) (SClassProgram declared classes (map snd instances) (SConstructor "Unit"))
   expectedData <- case program of {SProgram xs _ -> Right xs; _ -> Left "invalid module metadata"}
   ensure (eqList eqString (sortBy compareString (map D.prettyDeclaration ds)) (sortBy compareString (map D.prettyDeclaration expectedData))) "module object datatype interface mismatch"
-linkObjects objects root = do
+linkObjects objects root = mapEither Checked.term (linkCheckedObjects objects root)
+linkCheckedObjects objects root = do
   ensure (not (null objects)) "no compiled modules to link"
   traverseEither (validateObjectBoundary (map objectInterface objects)) objects
   LinkState serial _ bindings bodies declarations <- foldEither linkObject (LinkState 0 M.empty M.empty Nil Nil) objects
   entry <- linkEntry serial (map objectInterface objects) bindings root
   body <- foldEither (\body declarations -> graft declarations body) entry (reverse bodies)
   let term = XWithData declarations body
-  Check.checkClosed term
-  Right term
+  Checked.check term
 
 linkEntry serial interfaces available root = do
   ensure (M.member compareString (mainName root) available) ("entry module has no main binding: " ++ root)
@@ -555,6 +556,9 @@ compileModuleFile mode includes source prefix = do
           writeFile (prefix ++ ".mlfi") (encodeInterface (objectInterface object))
           ioReturn (Right Unit)
 linkModuleFile includes path = do
+  linked <- linkCheckedModuleFile includes path
+  ioReturn (mapEither Checked.term linked)
+linkCheckedModuleFile includes path = do
   input <- readStrict path
   case bindEither input decodeInterface of
     Left e -> ioReturn (Left e)
@@ -566,7 +570,7 @@ linkModuleFile includes path = do
           objects <- mapM (\(Pair file i) -> if eqString file "<Prelude>" then ioReturn builtinPrelude else do
             input <- readStrict (stringSlice file 0 (stringLength file - 5) ++ ".mlfo")
             ioReturn (bindEither input (decodeObject i))) interfaces
-          ioReturn (bindEither (sequenceEither objects) (\os -> linkObjects os (unitName root)))
+          ioReturn (bindEither (sequenceEither objects) (\os -> linkCheckedObjects os (unitName root)))
 showInterfaceFile path = do
   input <- readStrict path
   ioReturn (do

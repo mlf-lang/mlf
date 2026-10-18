@@ -6,7 +6,7 @@ three-component version; the historical Haskell seed uses a trailing `.0` in
 must never be replaced; make a new patch release to correct a package.
 
 Before 1.0, patch releases preserve documented behavior and minor releases may
-change language or package interfaces. Version 0.1.0 is a developer preview.
+change language or package interfaces. Version 0.1.1 is a developer preview.
 It has no stability or cross-platform performance guarantee.
 
 ## Install a release
@@ -17,11 +17,11 @@ with access to the private repository, then:
 ```sh
 brew install gmp llvm pkg-config bdw-gc
 mkdir mlf-download && cd mlf-download
-gh release download v0.1.0 --repo mlf-lang/mlf \
-  --pattern 'mlf-0.1.0-macos-arm64.tar.gz' --pattern SHA256SUMS
+gh release download v0.1.1 --repo mlf-lang/mlf \
+  --pattern 'mlf-0.1.1-macos-arm64.tar.gz' --pattern SHA256SUMS
 shasum -a 256 -c SHA256SUMS
-tar -xzf mlf-0.1.0-macos-arm64.tar.gz
-./mlf-0.1.0-macos-arm64/install.sh "$HOME/.local"
+tar -xzf mlf-0.1.1-macos-arm64.tar.gz
+./mlf-0.1.1-macos-arm64/install.sh "$HOME/.local"
 export PATH="$HOME/.local/bin:$PATH"
 emlf --version
 mlfpkg --version

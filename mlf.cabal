@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: mlf
-version: 0.1.0.0
+version: 0.1.1.0
 synopsis: Evidence-producing eMLF to xMLF compiler
 description: Graph-based type inference and explicit elaboration following Yakobowski's thesis.
 category: Language

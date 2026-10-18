@@ -72,4 +72,3 @@ data Binding = Mono XName Int | Poly XName Int
 
 data Phase = Parsing | ModuleResolution | Inference | Resolution | Elaboration | Verification
 data CompileError = CompileError Phase String
-data Compilation = Compilation XType XTerm Graph String

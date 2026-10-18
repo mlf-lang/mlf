@@ -32,7 +32,11 @@ toList (IntSet tree) = M.keys tree
 toAscList : IntSet -> List Int
 toAscList tree = toList tree
 union : IntSet -> IntSet -> IntSet
-union (IntSet a) (IntSet b) = wrap (M.foldlWithKeyStrict (\tree key value -> IM.insertTree key Unit tree) b a)
+-- Set union is commutative. Reuse the larger tree rather than reconstructing
+-- an entire component when adding just a few enclosing scope identities.
+union (IntSet a) (IntSet b) = if M.size a <= M.size b
+  then wrap (M.foldlWithKeyStrict (\tree key value -> IM.insertTree key Unit tree) b a)
+  else wrap (M.foldlWithKeyStrict (\tree key value -> IM.insertTree key Unit tree) a b)
 unions : List IntSet -> IntSet
 unions trees = L.foldlStrict union empty trees
 difference : IntSet -> IntSet -> IntSet

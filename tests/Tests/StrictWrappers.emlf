@@ -1,0 +1,56 @@
+module Tests.StrictWrappers where
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.Map as M
+import qualified Bootstrap.Set as S
+import qualified Bootstrap.Compiler as C
+import qualified Bootstrap.LLVM.StrictWrappers as W
+import qualified Bootstrap.LLVM.StrictFields as F
+import qualified Bootstrap.LLVM.Analysis as A
+import qualified Bootstrap.LLVM.Optimize as O
+import qualified Bootstrap.X.Syntax as X
+import qualified Tests.Helpers as H
+import qualified Tests.Backends as B
+
+constructors = M.fromList compareString (Cons (Pair "Box" (Pair 1 1)) Nil)
+declarations = Cons (DataDecl "Box" Nil (Cons (ConstructorDecl "Box" (Cons (Applied "Int" Nil) Nil)) Nil)) Nil
+x = XName 1 "x"
+y = XName 2 "y"
+box field = XEApp (XEConstructor "Box") field
+poison = XEApp (XEApp (XEPrimitive PQuotInt) (XEInt 1)) (XEInt 0)
+seqE a b = XEApp (XEApp (XEPrimitive PSeq) a) b
+has expression = S.member compareString "Box" (W.candidates declarations constructors expression)
+
+proofs : IO Unit
+proofs = do
+ let forced = XELetRec (Cons (Pair x (XEInt 7)) Nil) (seqE (XEVar x) (box (XEVar x)))
+ let mixed = XELet x (box (XEInt 7)) (box poison)
+ let escaped = XELet x (XEConstructor "Box") (XEApp (XEVar x) (XEInt 7))
+ H.assert (has (box (XEInt 7)) && has (box (XEAbs x (XEVar x))) && has forced) "evaluated unary field proof missing"
+ H.assert (L.not (has (box poison)) && L.not (has mixed) && L.not (has escaped) && L.not (has (XEConstructor "Box"))) "lazy or escaping constructor was erased"
+ H.assert (H.eq (M.lookup compareString "Box" (F.infer (M.map L.snd constructors) (A.analyze forced) forced)) (Just (Cons false Nil))) "semantic WHNF leaked into canonical-pointer proof"
+ let sum = Cons (DataDecl "Sum" Nil (Cons (ConstructorDecl "Box" (Cons (Applied "Int" Nil) Nil)) (Cons (ConstructorDecl "Empty" Nil) Nil))) Nil
+ H.assert (S.null (W.candidates sum constructors (box (XEInt 7)))) "sum constructor was erased"
+ H.assert (X.equalErased (W.optimize declarations constructors (box (XEInt 7))) (XEInt 7)) "eligible representation was retained"
+ H.assert (X.equalErased (W.optimize declarations constructors mixed) mixed && X.equalErased (W.optimize declarations constructors escaped) escaped) "ineligible representation changed"
+ let lazyDefault = XELet x (box (XEInt 7)) (XECase poison (Cons (XErasedAlternative (XDefaultPattern Nothing) (XEVar x)) Nil))
+ let expected = XELet x (XEInt 7) (XECase poison (Cons (XErasedAlternative (XDefaultPattern Nothing) (XEVar x)) Nil))
+ H.assert (X.equalErased (W.optimize declarations constructors lazyDefault) expected) "lazy default began forcing its scrutinee"
+ let projected = XECase (box (XEInt 7)) (Cons (XErasedAlternative (XConstructorPattern "Box" (Cons (Just y) Nil)) (XEVar y)) Nil)
+ H.assert (X.equalErased (W.optimize declarations constructors projected) (XELet y (XEInt 7) (seqE (XEVar y) (XEVar y)))) "constructor match lost its demand or binding"
+
+suite : List (Pair String (IO Unit))
+suite = Cons (Pair "strict unary representation requires whole-program evaluated fields" proofs) Nil
+
+observe backends source input expected = do
+ compilation <- H.right (C.compile "<strict wrappers>" source)
+ result <- B.execute backends B.IOEntry (B.Input input false) (C.compiledTerm compilation)
+ _ <- H.right (B.outcome result)
+ H.assert (eqString (B.output result) expected) "strict wrapper lowering changed output"
+
+backendTests : B.Backends -> List (Pair String (IO Unit))
+backendTests backends = L.map (\(Triple label source expected) -> Pair ("strict unary representation: " ++ label) (observe backends source "7\n" expected))
+ (Cons (Triple "evaluated recursive producer" "data Box = Box Int; box : Int -> Int -> Box; box n x = if n == 0 then seq x (Box x) else box (n - 1) x; main = do { line <- getLine; case box 3 (readInt line) of { Box x -> printInt x } }" "7\n")
+ (Cons (Triple "lazy poison remains unforced" "data Box = Box Int; box : Int -> Box; box n = if n == 0 then Box (quotInt 1 0) else box (n - 1); main = case box 3 of { Box unused -> printInt 1 }" "1\n")
+ (Cons (Triple "mixed and escaping constructor" "data Box = Box Int; choose : Bool -> (Int -> Box); choose flag = if flag then Box else (\\x -> Box (quotInt x 0)); main = do { line <- getLine; case choose true (readInt line) of { Box x -> printInt x } }" "7\n")
+ (Cons (Triple "recursive lazy field" "data Box = Box Box; loop : Box; loop = Box loop; main = case loop of { Box child -> case child of { Box next -> printInt 1 } }" "1\n") Nil))))

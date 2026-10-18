@@ -1,0 +1,47 @@
+module Instances where
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.Parser as P
+import qualified Bootstrap.Classes as Classes
+import qualified Bootstrap.Prelude as Prelude
+import qualified Bootstrap.Constraint as C
+import qualified Bootstrap.Graph as G
+import qualified Bootstrap.Graph.Solver as S
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.IntSet as IS
+
+data Stats = Stats Int Int Int Int Int Int Int Int
+right result = case result of { Left error -> do { putErr (error ++ "\n"); exitWith 1 }; Right value -> return value }
+step (Pair solver (Stats graft ground general size largest copied bottom closed)) e =
+ let source = C.fromGen e in let target = C.toNode e in
+ case S.groundGraft source target solver of
+  Just result -> Right (Pair result (Stats (graft + 1) ground general size largest copied bottom closed))
+  Nothing -> if S.groundInstance (S.graph solver) source target then Right (Pair solver (Stats graft (ground + 1) general size largest copied bottom closed)) else do
+   Quad root copies frontier expanded <- S.expanded source target solver
+   let equations = L.append frontier (Cons (Pair root target) Nil)
+   component <- S.component expanded (L.concatMap G.equationNodes equations)
+   result <- S.solverUnify equations expanded
+   let count = IS.size component
+   Right (Pair result (Stats graft ground (general + 1) (size + count) (L.max largest count) (copied + IM.size copies) (bottom + (if G.isBottom (G.tag (G.nodeAt (S.graph solver) target)) then 1 else 0)) (closed + (if eligible source target solver then 1 else 0))))
+eligible source target solver =
+ let graph = S.graph solver in
+ let t = G.resolve graph target in
+ if L.not (G.isBottom (G.tag (G.nodeAt graph t))) || L.not (S.green graph t) || IS.size (IM.findWithDefault IS.empty t (S.bindingChildren solver)) /= 0 then false else
+ let gen = G.resolve graph source in
+ let root = G.genRoot graph gen in
+ let selected = G.reachable graph root in
+ L.all (\n -> let v = G.nodeAt graph n in L.not (G.isGen (G.tag v)) && (case G.binder v of { Nothing -> false; Just b -> G.resolve graph b == gen || IS.member (G.resolve graph b) selected })) (IS.toList selected)
+main = do
+ file <- getArg 0
+ text <- readFile file
+ root <- right (P.parseModule file text)
+ program <- right (P.standaloneProgram root)
+ case Prelude.withPrelude ImplicitPrelude program of
+  Pair imports source -> do
+   Pair lowered names <- right (Classes.lowerClassesWithImports imports source)
+   constraints <- right (C.generateProgram lowered)
+   prepared <- right (S.prepare (C.initialGraph constraints))
+   initial <- right (S.solverUnify (C.equalities constraints) prepared)
+   Pair result (Stats graft ground general size largest copied bottom closed) <- right (L.foldM step (Pair initial (Stats 0 0 0 0 0 0 0 0)) (C.instances constraints))
+   _ <- right (S.finishNormalized result)
+   putStrLn ("{\"ground_grafts\":" ++ showInt graft ++ ",\"ground_checks\":" ++ showInt ground ++ ",\"general_instantiations\":" ++ showInt general ++ ",\"component_nodes_total\":" ++ showInt size ++ ",\"largest_component\":" ++ showInt largest ++ ",\"copied_nodes_total\":" ++ showInt copied ++ ",\"bottom_targets\":" ++ showInt bottom ++ ",\"closed_graft_targets\":" ++ showInt closed ++ ",\"final_nodes\":" ++ showInt (IM.size (G.nodes (S.graph result))) ++ "}")

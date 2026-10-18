@@ -12,6 +12,7 @@
 #include <string.h>
 #ifdef MLF_USE_BDWGC
 #include <gc/gc.h>
+#include <gc/gc_mark.h>
 #endif
 
 static unsigned calls, expected_calls;
@@ -90,14 +91,18 @@ static void general_fields(MlfValue *entry, MlfValue **expected, unsigned count)
      * memcpy avoids adding alignment or C aliasing assumptions to the test. */
     MlfEnv *env;
 #ifdef MLF_COMPACT_BDWGC
-    env = (MlfEnv *)((unsigned char *)entry + 24);
+    uint32_t tag;
+    memcpy(&tag, entry, sizeof tag);
+    require(tag == 9 || tag == 28, "unexpected general constructor tag");
+    if (tag == 28) env = (MlfEnv *)((unsigned char *)entry + 24);
+    else memcpy(&env, (const unsigned char *)entry + 24, sizeof env);
 #else
     memcpy(&env, (const unsigned char *)entry + 40, sizeof env);
 #endif
     for (unsigned i = 0; i < count; ++i) {
         MlfValue *field;
 #ifdef MLF_COMPACT_BDWGC
-        memcpy(&field, (const unsigned char *)env + 8 * i, sizeof field);
+        memcpy(&field, (const unsigned char *)env + (tag == 28 ? 0 : 8) + 8 * i, sizeof field);
 #else
         memcpy(&field, (const unsigned char *)env + 24 + 8 * i, sizeof field);
 #endif
@@ -175,10 +180,146 @@ static void booleans(void) {
     }
 }
 
+static unsigned private_count;
+static MlfValue *consume_captures(MlfEnv *env, MlfValue *argument) {
+    require(argument == NULL, "thunk received an argument");
+    ++calls;
+    if (!private_count) { require(env == NULL, "empty capture environment"); return mlf_integer("42"); }
+    MlfValue *first = mlf_env_get(env, 0);
+    MlfValue *last = mlf_env_get(env, private_count - 1);
+    /* Model the generated callback: retain loaded values, then clear slots
+     * before allocating/collecting. Unused captures remain unevaluated. */
+    memset((unsigned char *)env + HEADER_BYTES + 8, 0, private_count * sizeof(MlfValue *));
+#ifdef MLF_USE_BDWGC
+    GC_gcollect();
+#endif
+    return mlf_constructor2(73, first, last);
+}
+
+static void private_thunks(void) {
+    const unsigned counts[] = {0, 1, 2, 17, 513};
+    for (unsigned c = 0; c < sizeof counts / sizeof *counts; ++c) {
+        private_count = counts[c]; calls = 0;
+        MlfValue *entry = mlf_thunk_new(consume_captures, private_count);
+        MlfEnv *env;
+        memcpy(&env, (const unsigned char *)entry + HEADER_BYTES + 16, sizeof env);
+        MlfValue *answer = mlf_integer("340282366920938463463374607431768211456");
+        for (unsigned i = 0; i < private_count; ++i)
+            mlf_env_set(env, i, i == 0 || i + 1 == private_count ? answer : mlf_thunk(poison, NULL));
+#ifdef MLF_USE_BDWGC
+        GC_gcollect();
+#endif
+        MlfValue *result = mlf_force(entry);
+        require(calls == 1 && mlf_force(entry) == result, "private thunk was reexecuted");
+        if (private_count) {
+            require(mlf_field(result, 0) == answer && mlf_field(result, 1) == answer, "private captures lost across collection");
+            for (unsigned i = 0; i < private_count; ++i) {
+                MlfValue *slot;
+                memcpy(&slot, (const unsigned char *)env + HEADER_BYTES + 8 + i * sizeof slot, sizeof slot);
+                require(slot == NULL, "consumed private capture retained");
+            }
+        }
+    }
+}
+
+#ifdef MLF_COMPACT_BDWGC
+/* The generated compact string ABI permits writable static values. Their
+ * Unicode index must remain rooted even when no evaluated MLF value owns it. */
+static struct LiteralString {
+    int32_t tag, padding;
+    uint64_t length;
+    const unsigned char *bytes;
+    size_t *indices;
+} unicode_literal = {8, 0, 6, (const unsigned char *)"\xce\xbb\xf0\x9f\x98\x80", NULL},
+  nul_literal = {8, 0, 3, (const unsigned char *)"a\0b", NULL},
+  empty_literal = {8, 0, 0, (const unsigned char *)"", NULL};
+static void static_strings(void) {
+    MlfValue *unicode = (MlfValue *)&unicode_literal;
+    MlfValue *nul = (MlfValue *)&nul_literal;
+    MlfValue *empty = (MlfValue *)&empty_literal;
+    for (unsigned pass = 0; pass < 3; ++pass) {
+        require(mlf_prim1(46, unicode) == mlf_integer("2"), "static Unicode length changed");
+        require(mlf_prim2(47, unicode, mlf_integer("0")) == mlf_integer("955"), "static Unicode first scalar changed");
+        require(mlf_prim2(47, unicode, mlf_integer("1")) == mlf_integer("128512"), "static Unicode final scalar changed");
+        require(mlf_prim1(46, nul) == mlf_integer("3") &&
+                mlf_prim2(47, nul, mlf_integer("1")) == mlf_integer("0"), "static embedded NUL changed");
+        require(mlf_prim1(46, empty) == mlf_integer("0"), "static empty string changed");
+        (void)GC_clear_stack(NULL);
+        GC_gcollect();
+    }
+}
+#else
+static void static_strings(void) {}
+#endif
+
+#ifdef MLF_ALLOCATION_AUDIT
+static size_t constructor_audits;
+void mlf_bench_constructed_node(int64_t identity) {
+    (void)identity;
+    ++constructor_audits;
+}
+#endif
+
+#ifdef MLF_COMPACT_BDWGC
+/* Independently exercise the emitted allocation protocol, including its last
+ * size class, the first oversized object, and debug/audit refill fallbacks. */
+static MlfValue *generated_constructor(int64_t identity, size_t count) {
+    size_t offset = count <= 2 ? 16 : 24;
+    size_t bytes = offset + 8 * count;
+    void *memory = bytes <= 256 ? mlf_constructor_pending[bytes / 8] : NULL;
+    if (memory) {
+        void *next;
+        memcpy(&next, memory, sizeof next);
+        mlf_constructor_pending[bytes / 8] = next;
+    } else memory = mlf_constructor_allocate(identity, count);
+    uint32_t kind = count == 1 ? 12 : count == 2 ? 13 : 28;
+    memset(memory, 0, 8);
+    memcpy(memory, &kind, sizeof kind);
+    memcpy((char *)memory + 8, &identity, 8);
+    if (count > 2) memcpy((char *)memory + 16, &count, 8);
+    for (size_t i = 0; i < count; ++i) {
+        MlfValue *entry = mlf_constructor1(900, mlf_integer("71"));
+        memcpy((char *)memory + offset + 8 * i, &entry, sizeof entry);
+    }
+    return memory;
+}
+static void inline_constructors(void) {
+    static const size_t widths[] = {1, 2, 3, 4, 5, 17, 28, 29, 30, 31, 32, 513};
+    for (size_t i = 0; i < sizeof widths / sizeof widths[0]; ++i) {
+        size_t count = widths[i];
+#ifdef MLF_ALLOCATION_AUDIT
+        size_t before = constructor_audits;
+#endif
+        for (size_t repeat = 0; repeat < 140; ++repeat) {
+            MlfValue *root = generated_constructor(901, count);
+            GC_clear_stack(NULL);
+            GC_gcollect();
+            require(mlf_tag(root) == 901, "inline constructor identity");
+            for (size_t field = 0; field < count; ++field) {
+                MlfValue *child = mlf_field(root, field);
+                require(mlf_tag(child) == 900 && mlf_force(mlf_field(child, 0)) == mlf_integer("71"),
+                        "inline constructor field survived collection");
+            }
+        }
+#ifdef MLF_ALLOCATION_AUDIT
+        require(constructor_audits == before + 140 * (count + 1), "inline constructor audit coverage");
+        for (size_t head = 0; head < 33; ++head)
+            require(mlf_constructor_pending[head] == NULL, "audited constructor bypassed hook");
+#endif
+    }
+}
+#else
+static void inline_constructors(void) {}
+#endif
+
 int main(int argc, char **argv) {
     require(argc == 2, "expected one probe mode");
     const char *mode = argv[1];
-    if (!strcmp(mode, "success")) {
+#ifdef MLF_USE_BDWGC
+    GC_set_max_heap_size(8 * 1024 * 1024);
+    if (!strcmp(mode, "no-interior")) GC_set_all_interior_pointers(0);
+#endif
+    if (!strcmp(mode, "success") || !strcmp(mode, "no-interior")) {
         const unsigned lengths[] = {0, 1, 2, 3, 4, 5, 16, 17, 64, 65, 1025};
         for (unsigned mode = 0; mode < 3; ++mode)
             for (unsigned i = 0; i < sizeof lengths / sizeof *lengths; ++i)
@@ -189,10 +330,15 @@ int main(int argc, char **argv) {
             if (arities[i] > 2) constructor(arities[i], 1);
         }
         booleans();
+        private_thunks();
+        static_strings();
+        inline_constructors();
         puts("runtime values: sharing, lazy fields, recursive data, and spill boundaries passed");
         return 0;
     }
-    if (!strcmp(mode, "negative-tag")) (void)mlf_constructor_fields(-1, mlf_env_new(3));
+    if (!strcmp(mode, "capture-null-code")) (void)mlf_thunk_new(NULL, 1);
+    else if (!strcmp(mode, "capture-overflow")) (void)mlf_thunk_new(consume_captures, UINT64_MAX);
+    else if (!strcmp(mode, "negative-tag")) (void)mlf_constructor_fields(-1, mlf_env_new(3));
     else if (!strcmp(mode, "null-fields")) (void)mlf_constructor_fields(1, NULL);
     else if (!strcmp(mode, "overapplication")) (void)mlf_force(mlf_application(wide(5), mlf_integer("1")));
     else if (!strcmp(mode, "field-bounds")) (void)mlf_field(wide(5), 5);

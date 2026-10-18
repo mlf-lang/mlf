@@ -1,0 +1,469 @@
+-- Structural normal-form forcing for diagnostic phase boundaries.
+-- No serialization, graph validation, or pointer-equality shortcut.
+module Force where
+import Bootstrap.Types
+scalar : forall a. a -> Unit
+scalar x = seq x Unit
+
+forceList : forall a. (a -> Unit) -> (List a) -> Unit
+forceList fa value = case value of
+  Nil -> Unit
+  Cons x0 x1 -> seq (fa x0) (seq ((forceList fa) x1) (Unit))
+
+forcePair : forall a b. (a -> Unit) -> (b -> Unit) -> (Pair a b) -> Unit
+forcePair fa fb value = case value of
+  Pair x0 x1 -> seq (fa x0) (seq (fb x1) (Unit))
+
+forceTriple : forall a b c. (a -> Unit) -> (b -> Unit) -> (c -> Unit) -> (Triple a b c) -> Unit
+forceTriple fa fb fc value = case value of
+  Triple x0 x1 x2 -> seq (fa x0) (seq (fb x1) (seq (fc x2) (Unit)))
+
+forceQuad : forall a b c d. (a -> Unit) -> (b -> Unit) -> (c -> Unit) -> (d -> Unit) -> (Quad a b c d) -> Unit
+forceQuad fa fb fc fd value = case value of
+  Quad x0 x1 x2 x3 -> seq (fa x0) (seq (fb x1) (seq (fc x2) (seq (fd x3) (Unit))))
+
+forceMaybe : forall a. (a -> Unit) -> (Maybe a) -> Unit
+forceMaybe fa value = case value of
+  Nothing -> Unit
+  Just x0 -> seq (fa x0) (Unit)
+
+forceEither : forall e a. (e -> Unit) -> (a -> Unit) -> (Either e a) -> Unit
+forceEither fe fa value = case value of
+  Left x0 -> seq (fe x0) (Unit)
+  Right x0 -> seq (fa x0) (Unit)
+
+forceMap : forall k v. (k -> Unit) -> (v -> Unit) -> (Map k v) -> Unit
+forceMap fk fv value = case value of
+  MapEmpty -> Unit
+  MapNode x0 x1 x2 x3 x4 -> seq (scalar x0) (seq (fk x1) (seq (fv x2) (seq ((forceMap fk fv) x3) (seq ((forceMap fk fv) x4) (Unit)))))
+
+forceSet : forall a. (a -> Unit) -> (Set a) -> Unit
+forceSet fa value = case value of
+  Set x0 -> seq ((forceMap fa scalar) x0) (Unit)
+
+forceIntMap : forall a. (a -> Unit) -> (IntMap a) -> Unit
+forceIntMap fa value = case value of
+  IntMap x0 -> seq ((forceMap scalar fa) x0) (Unit)
+
+forceIntSet : IntSet -> Unit
+forceIntSet value = case value of
+  IntSet x0 -> seq ((forceMap scalar scalar) x0) (Unit)
+
+forceKind : Kind -> Unit
+forceKind value = case value of
+  Star -> Unit
+  KArrow x0 x1 -> seq ((forceKind) x0) (seq ((forceKind) x1) (Unit))
+
+forceFlag : Flag -> Unit
+forceFlag value = case value of
+  Flexible -> Unit
+  Rigid -> Unit
+
+forceField : Field -> Unit
+forceField value = case value of
+  Parameter x0 -> seq (scalar x0) (Unit)
+  Function x0 x1 -> seq ((forceField) x0) (seq ((forceField) x1) (Unit))
+  Applied x0 x1 -> seq (scalar x0) (seq ((forceList (forceField)) x1) (Unit))
+  Application x0 x1 -> seq ((forceField) x0) (seq ((forceField) x1) (Unit))
+  Quantified x0 x1 x2 -> seq (scalar x0) (seq ((forceKind) x1) (seq ((forceField) x2) (Unit)))
+
+forceConstructorDecl : ConstructorDecl -> Unit
+forceConstructorDecl value = case value of
+  ConstructorDecl x0 x1 -> seq (scalar x0) (seq ((forceList (forceField)) x1) (Unit))
+
+forceDataDecl : DataDecl -> Unit
+forceDataDecl value = case value of
+  DataDecl x0 x1 x2 -> seq (scalar x0) (seq ((forceList scalar) x1) (seq ((forceList (forceConstructorDecl)) x2) (Unit)))
+  DataDeclK x0 x1 x2 -> seq (scalar x0) (seq ((forceList (forcePair scalar (forceKind))) x1) (seq ((forceList (forceConstructorDecl)) x2) (Unit)))
+
+forceDataEnv : DataEnv -> Unit
+forceDataEnv value = case value of
+  DataEnv x0 x1 x2 -> seq ((forceMap scalar (forceDataDecl)) x0) (seq ((forceMap scalar (forcePair (forceDataDecl) (forceConstructorDecl))) x1) (seq ((forceMap scalar (forceKind)) x2) (Unit)))
+
+forcePrimitive : Primitive -> Unit
+forcePrimitive value = case value of
+  PIOReturn -> Unit
+  PIOBind -> Unit
+  PPutStr -> Unit
+  PPutStrLn -> Unit
+  PGetLine -> Unit
+  PPrintInt -> Unit
+  PConcatString -> Unit
+  PShowInt -> Unit
+  PAddInt -> Unit
+  PSubInt -> Unit
+  PEqInt -> Unit
+  PLtInt -> Unit
+  PEqString -> Unit
+  PIfThenElse -> Unit
+  PMulInt -> Unit
+  PQuotInt -> Unit
+  PRemInt -> Unit
+  PReadInt -> Unit
+  PAddDouble -> Unit
+  PSubDouble -> Unit
+  PMulDouble -> Unit
+  PDivDouble -> Unit
+  PSqrtDouble -> Unit
+  PEqDouble -> Unit
+  PLtDouble -> Unit
+  PIntToDouble -> Unit
+  PFormatDouble -> Unit
+  PNewIntArray -> Unit
+  PReadIntArray -> Unit
+  PWriteIntArray -> Unit
+  PLengthIntArray -> Unit
+  PNewDoubleArray -> Unit
+  PReadDoubleArray -> Unit
+  PWriteDoubleArray -> Unit
+  PLengthDoubleArray -> Unit
+  PNewByteArray -> Unit
+  PReadByteArray -> Unit
+  PWriteByteArray -> Unit
+  PLengthByteArray -> Unit
+  PByteArrayFromString -> Unit
+  PPutBytes -> Unit
+  PGetByteLine -> Unit
+  PNewIntTable -> Unit
+  PReadIntTable -> Unit
+  PWriteIntTable -> Unit
+  PAndInt -> Unit
+  PStringLength -> Unit
+  PStringCodeAt -> Unit
+  PStringSlice -> Unit
+  PStringFromCode -> Unit
+  PCompareString -> Unit
+  PReadDouble -> Unit
+  PDoubleToBits -> Unit
+  PDoubleFromBits -> Unit
+  PSeq -> Unit
+  PPanic -> Unit
+  PReadFile -> Unit
+  PWriteFile -> Unit
+  PFileExists -> Unit
+  PCanonicalPath -> Unit
+  PGetArgCount -> Unit
+  PGetArg -> Unit
+  PPutErr -> Unit
+  PExitWith -> Unit
+  PGetExecutablePath -> Unit
+  PGetContents -> Unit
+  PSTReturn -> Unit
+  PSTBind -> Unit
+  PRunST -> Unit
+  PNewSTArray -> Unit
+  PReadSTArray -> Unit
+  PWriteSTArray -> Unit
+  PLengthSTArray -> Unit
+  PGetEnv -> Unit
+  PSetEnv -> Unit
+  PUnsetEnv -> Unit
+  PRunProcess -> Unit
+  PListDirectory -> Unit
+  PDirectoryExists -> Unit
+  PFileDigest -> Unit
+  PAcquireFileLock -> Unit
+  PReleaseFileLock -> Unit
+
+forceSType : SType -> Unit
+forceSType value = case value of
+  STVar x0 -> seq (scalar x0) (Unit)
+  SBottom -> Unit
+  SBottomKind x0 -> seq ((forceKind) x0) (Unit)
+  SArrow x0 x1 -> seq ((forceSType) x0) (seq ((forceSType) x1) (Unit))
+  SCon x0 x1 -> seq (scalar x0) (seq ((forceList (forceSType)) x1) (Unit))
+  STypeApp x0 x1 -> seq ((forceSType) x0) (seq ((forceSType) x1) (Unit))
+  SForall x0 x1 x2 x3 -> seq ((forceFlag) x0) (seq (scalar x1) (seq ((forceSType) x2) (seq ((forceSType) x3) (Unit))))
+  SQualified x0 x1 -> seq ((forceList (forceSPredicate)) x0) (seq ((forceSType) x1) (Unit))
+
+forceSAnnotation : SAnnotation -> Unit
+forceSAnnotation value = case value of
+  SAnnotation x0 x1 -> seq ((forceList scalar) x0) (seq ((forceSType) x1) (Unit))
+
+forceSExpr : SExpr -> Unit
+forceSExpr value = case value of
+  SVar x0 -> seq (scalar x0) (Unit)
+  SConstructor x0 -> seq (scalar x0) (Unit)
+  SLam x0 x1 x2 -> seq (scalar x0) (seq ((forceMaybe (forceSAnnotation)) x1) (seq ((forceSExpr) x2) (Unit)))
+  SApp x0 x1 -> seq ((forceSExpr) x0) (seq ((forceSExpr) x1) (Unit))
+  SLet x0 x1 x2 -> seq (scalar x0) (seq ((forceSExpr) x1) (seq ((forceSExpr) x2) (Unit)))
+  SAnn x0 x1 -> seq ((forceSExpr) x0) (seq ((forceSAnnotation) x1) (Unit))
+  SIntLit x0 -> seq (scalar x0) (Unit)
+  SDoubleLit x0 -> seq (scalar x0) (Unit)
+  SBoolLit x0 -> seq (scalar x0) (Unit)
+  SStringLit x0 -> seq (scalar x0) (Unit)
+  SPrimitive x0 -> seq ((forcePrimitive) x0) (Unit)
+  SCase x0 x1 -> seq ((forceSExpr) x0) (seq ((forceList (forceSAlternative)) x1) (Unit))
+  SDo x0 x1 -> seq ((forceList (forceSStatement)) x0) (seq ((forceSExpr) x1) (Unit))
+  SEquations x0 -> seq ((forceList (forcePair (forceList (forceSPattern)) (forceSExpr))) x0) (Unit)
+  SLetRec x0 x1 -> seq ((forceList (forceTriple scalar (forceSAnnotation) (forceSExpr))) x0) (seq ((forceSExpr) x1) (Unit))
+  SWanted x0 x1 -> seq (scalar x0) (seq ((forceList (forcePair (forceEvidenceRole) scalar)) x1) (Unit))
+  SChecked x0 x1 -> seq ((forceSType) x0) (seq ((forceSExpr) x1) (Unit))
+
+forceSPattern : SPattern -> Unit
+forceSPattern value = case value of
+  SConstructorPattern x0 x1 -> seq (scalar x0) (seq ((forceList (forceMaybe scalar)) x1) (Unit))
+  SDefaultPattern x0 -> seq ((forceMaybe scalar) x0) (Unit)
+  SNestedPattern x0 x1 -> seq (scalar x0) (seq ((forceList (forceSPattern)) x1) (Unit))
+  SAnnotatedPattern x0 x1 -> seq (scalar x0) (seq ((forceSAnnotation) x1) (Unit))
+  SIntPattern x0 -> seq (scalar x0) (Unit)
+  SStringPattern x0 -> seq (scalar x0) (Unit)
+  SBoolPattern x0 -> seq (scalar x0) (Unit)
+
+forceSAlternative : SAlternative -> Unit
+forceSAlternative value = case value of
+  SAlternative x0 x1 -> seq ((forceSPattern) x0) (seq ((forceSExpr) x1) (Unit))
+
+forceSStatement : SStatement -> Unit
+forceSStatement value = case value of
+  SDoBind x0 x1 -> seq ((forceSPattern) x0) (seq ((forceSExpr) x1) (Unit))
+  SDoThen x0 -> seq ((forceSExpr) x0) (Unit)
+  SDoLet x0 x1 x2 -> seq (scalar x0) (seq ((forceMaybe (forceSAnnotation)) x1) (seq ((forceSExpr) x2) (Unit)))
+  SDoLetRec x0 -> seq ((forceList (forceTriple scalar (forceSAnnotation) (forceSExpr))) x0) (Unit)
+
+forceSPredicate : SPredicate -> Unit
+forceSPredicate value = case value of
+  SPredicate x0 x1 -> seq (scalar x0) (seq ((forceList (forceSType)) x1) (Unit))
+
+forceSClassDecl : SClassDecl -> Unit
+forceSClassDecl value = case value of
+  SClassDecl x0 x1 x2 x3 -> seq (scalar x0) (seq ((forceList (forcePair scalar (forceKind))) x1) (seq ((forceList (forceSPredicate)) x2) (seq ((forceList (forcePair scalar (forceSType))) x3) (Unit))))
+
+forceSInstanceDecl : SInstanceDecl -> Unit
+forceSInstanceDecl value = case value of
+  SInstanceDecl x0 x1 x2 x3 x4 -> seq ((forceList (forcePair scalar (forceKind))) x0) (seq ((forceList (forceSPredicate)) x1) (seq (scalar x2) (seq ((forceList (forceSType)) x3) (seq ((forceList (forcePair scalar (forceSExpr))) x4) (Unit)))))
+
+forceEvidenceRole : EvidenceRole -> Unit
+forceEvidenceRole value = case value of
+  GivenEvidence -> Unit
+  SuperclassEvidence -> Unit
+  InstanceEvidence -> Unit
+
+forceSProgram : SProgram -> Unit
+forceSProgram value = case value of
+  SProgram x0 x1 -> seq ((forceList (forceDataDecl)) x0) (seq ((forceSExpr) x1) (Unit))
+  SClassProgram x0 x1 x2 x3 -> seq ((forceList (forceDataDecl)) x0) (seq ((forceList (forceSClassDecl)) x1) (seq ((forceList (forceSInstanceDecl)) x2) (seq ((forceSExpr) x3) (Unit))))
+
+forceSourceModule : SourceModule -> Unit
+forceSourceModule value = case value of
+  SourceModule x0 x1 x2 x3 x4 x5 x6 x7 x8 -> seq (scalar x0) (seq ((forceMaybe scalar) x1) (seq ((forceMaybe (forceList (forceExport))) x2) (seq ((forceList (forceImport)) x3) (seq ((forceList (forceDataDecl)) x4) (seq ((forceList (forceSClassDecl)) x5) (seq ((forceList (forceSInstanceDecl)) x6) (seq ((forceList (forceTriple scalar (forceMaybe (forceSAnnotation)) (forceSExpr))) x7) (seq ((forceMaybe (forceSExpr)) x8) (Unit)))))))))
+
+forceImport : Import -> Unit
+forceImport value = case value of
+  Import x0 x1 x2 x3 -> seq (scalar x0) (seq (scalar x1) (seq ((forceMaybe scalar) x2) (seq ((forceSelection) x3) (Unit))))
+
+forceSelection : Selection -> Unit
+forceSelection value = case value of
+  Everything -> Unit
+  Only x0 -> seq ((forceList (forceExport)) x0) (Unit)
+  Hiding x0 -> seq ((forceList (forceExport)) x0) (Unit)
+
+forceExport : Export -> Unit
+forceExport value = case value of
+  ExportValue x0 -> seq (scalar x0) (Unit)
+  ExportType x0 x1 -> seq (scalar x0) (seq ((forceMembers) x1) (Unit))
+  ExportModule x0 -> seq (scalar x0) (Unit)
+
+forceMembers : Members -> Unit
+forceMembers value = case value of
+  Abstract -> Unit
+  AllMembers -> Unit
+  Members x0 -> seq ((forceList scalar) x0) (Unit)
+
+forcePreludeMode : PreludeMode -> Unit
+forcePreludeMode value = case value of
+  ImplicitPrelude -> Unit
+  NoImplicitPrelude -> Unit
+
+forceLinkedModule : LinkedModule -> Unit
+forceLinkedModule value = case value of
+  LinkedModule x0 x1 x2 x3 -> seq ((forceSProgram) x0) (seq ((forceMap scalar scalar) x1) (seq ((forceMap scalar (forceIntSet)) x2) (seq ((forceList (forceIntSet)) x3) (Unit))))
+
+forceXTyVar : XTyVar -> Unit
+forceXTyVar value = case value of
+  XTyVar x0 -> seq (scalar x0) (Unit)
+
+forceXName : XName -> Unit
+forceXName value = case value of
+  XName x0 x1 -> seq (scalar x0) (seq (scalar x1) (Unit))
+
+forceXType : XType -> Unit
+forceXType value = case value of
+  XVar x0 -> seq ((forceXTyVar) x0) (Unit)
+  XBot -> Unit
+  XBotKind x0 -> seq ((forceKind) x0) (Unit)
+  XArrow x0 x1 -> seq ((forceXType) x0) (seq ((forceXType) x1) (Unit))
+  XCon x0 x1 -> seq (scalar x0) (seq ((forceList (forceXType)) x1) (Unit))
+  XApply x0 x1 -> seq ((forceXType) x0) (seq ((forceXType) x1) (Unit))
+  XForall x0 x1 x2 -> seq ((forceXTyVar) x0) (seq ((forceXType) x1) (seq ((forceXType) x2) (Unit)))
+
+forceXComputation : XComputation -> Unit
+forceXComputation value = case value of
+  XRefl -> Unit
+  XBottom x0 -> seq ((forceXType) x0) (Unit)
+  XHyp x0 -> seq ((forceXTyVar) x0) (Unit)
+  XInner x0 -> seq ((forceXComputation) x0) (Unit)
+  XOuter x0 x1 -> seq ((forceXTyVar) x0) (seq ((forceXComputation) x1) (Unit))
+  XElim -> Unit
+  XIntro x0 -> seq ((forceXTyVar) x0) (Unit)
+  XIntroKind x0 x1 -> seq ((forceXTyVar) x0) (seq ((forceKind) x1) (Unit))
+  XThen x0 x1 -> seq ((forceXComputation) x0) (seq ((forceXComputation) x1) (Unit))
+
+forceXTerm : XTerm -> Unit
+forceXTerm value = case value of
+  XVarTerm x0 -> seq ((forceXName) x0) (Unit)
+  XAbs x0 x1 x2 -> seq ((forceXName) x0) (seq ((forceXType) x1) (seq ((forceXTerm) x2) (Unit)))
+  XApp x0 x1 -> seq ((forceXTerm) x0) (seq ((forceXTerm) x1) (Unit))
+  XTypeAbs x0 x1 x2 -> seq ((forceXTyVar) x0) (seq ((forceXType) x1) (seq ((forceXTerm) x2) (Unit)))
+  XTypeApp x0 x1 -> seq ((forceXTerm) x0) (seq ((forceXComputation) x1) (Unit))
+  XLet x0 x1 x2 -> seq ((forceXName) x0) (seq ((forceXTerm) x1) (seq ((forceXTerm) x2) (Unit)))
+  XLetRec x0 x1 -> seq ((forceList (forceTriple (forceXName) (forceXType) (forceXTerm))) x0) (seq ((forceXTerm) x1) (Unit))
+  XIntTerm x0 -> seq (scalar x0) (Unit)
+  XDoubleTerm x0 -> seq (scalar x0) (Unit)
+  XBoolTerm x0 -> seq (scalar x0) (Unit)
+  XStringTerm x0 -> seq (scalar x0) (Unit)
+  XPrimitive x0 x1 -> seq ((forcePrimitive) x0) (seq ((forceList (forceXType)) x1) (Unit))
+  XConstructor x0 x1 -> seq (scalar x0) (seq ((forceList (forceXType)) x1) (Unit))
+  XCase x0 x1 x2 -> seq ((forceXTerm) x0) (seq ((forceXType) x1) (seq ((forceList (forceXAlternative)) x2) (Unit)))
+  XWithData x0 x1 -> seq ((forceList (forceDataDecl)) x0) (seq ((forceXTerm) x1) (Unit))
+
+forceXPattern : XPattern -> Unit
+forceXPattern value = case value of
+  XConstructorPattern x0 x1 -> seq (scalar x0) (seq ((forceList (forceMaybe (forceXName))) x1) (Unit))
+  XDefaultPattern x0 -> seq ((forceMaybe (forceXName)) x0) (Unit)
+
+forceXAlternative : XAlternative -> Unit
+forceXAlternative value = case value of
+  XAlternative x0 x1 -> seq ((forceXPattern) x0) (seq ((forceXTerm) x1) (Unit))
+
+forceXErased : XErased -> Unit
+forceXErased value = case value of
+  XEVar x0 -> seq ((forceXName) x0) (Unit)
+  XEAbs x0 x1 -> seq ((forceXName) x0) (seq ((forceXErased) x1) (Unit))
+  XEApp x0 x1 -> seq ((forceXErased) x0) (seq ((forceXErased) x1) (Unit))
+  XELet x0 x1 x2 -> seq ((forceXName) x0) (seq ((forceXErased) x1) (seq ((forceXErased) x2) (Unit)))
+  XEInt x0 -> seq (scalar x0) (Unit)
+  XEDouble x0 -> seq (scalar x0) (Unit)
+  XEBool x0 -> seq (scalar x0) (Unit)
+  XEString x0 -> seq (scalar x0) (Unit)
+  XEPrimitive x0 -> seq ((forcePrimitive) x0) (Unit)
+  XELetRec x0 x1 -> seq ((forceList (forcePair (forceXName) (forceXErased))) x0) (seq ((forceXErased) x1) (Unit))
+  XEEvidenceHole x0 -> seq (scalar x0) (Unit)
+  XEConstructor x0 -> seq (scalar x0) (Unit)
+  XECase x0 x1 -> seq ((forceXErased) x0) (seq ((forceList (forceXErasedAlternative)) x1) (Unit))
+
+forceXErasedAlternative : XErasedAlternative -> Unit
+forceXErasedAlternative value = case value of
+  XErasedAlternative x0 x1 -> seq ((forceXPattern) x0) (seq ((forceXErased) x1) (Unit))
+
+forceXEnv : XEnv -> Unit
+forceXEnv value = case value of
+  XEnv x0 x1 -> seq ((forceMap (forceXTyVar) (forceXType)) x0) (seq ((forceMap (forceXName) (forceXType)) x1) (Unit))
+
+forceGTag : GTag -> Unit
+forceGTag value = case value of
+  GBot -> Unit
+  GBotK x0 -> seq ((forceKind) x0) (Unit)
+  GArr x0 x1 -> seq (scalar x0) (seq (scalar x1) (Unit))
+  GCon x0 x1 -> seq (scalar x0) (seq ((forceList scalar) x1) (Unit))
+  GTyCon x0 x1 -> seq (scalar x0) (seq ((forceKind) x1) (Unit))
+  GSkolem x0 x1 -> seq (scalar x0) (seq ((forceKind) x1) (Unit))
+  GTyApp x0 x1 -> seq (scalar x0) (seq (scalar x1) (Unit))
+  GGen x0 -> seq (scalar x0) (Unit)
+
+forceNode : Node -> Unit
+forceNode value = case value of
+  Node x0 x1 x2 -> seq ((forceGTag) x0) (seq ((forceMaybe scalar) x1) (seq ((forceFlag) x2) (Unit)))
+
+forceGraph : Graph -> Unit
+forceGraph value = case value of
+  Graph x0 x1 x2 -> seq ((forceIntMap (forceNode)) x0) (seq ((forceIntMap scalar) x1) (seq (scalar x2) (Unit)))
+
+forcePermission : Permission -> Unit
+forcePermission value = case value of
+  Green -> Unit
+  Orange -> Unit
+  Red -> Unit
+  Inert -> Unit
+
+forceScopeIndex : ScopeIndex -> Unit
+forceScopeIndex value = case value of
+  ScopeIndex x0 x1 -> seq ((forceIntMap (forcePair scalar scalar)) x0) (seq ((forceList (forceIntMap scalar)) x1) (Unit))
+
+forceSolver : Solver -> Unit
+forceSolver value = case value of
+  Solver x0 x1 x2 x3 -> seq ((forceGraph) x0) (seq ((forceIntMap (forceIntSet)) x1) (seq ((forceIntMap (forceIntSet)) x2) (seq ((forceScopeIndex) x3) (Unit))))
+
+forceEdge : Edge -> Unit
+forceEdge value = case value of
+  Edge x0 x1 -> seq (scalar x0) (seq (scalar x1) (Unit))
+
+forceTyped : Typed -> Unit
+forceTyped value = case value of
+  Typed x0 x1 -> seq (scalar x0) (seq ((forceForm) x1) (Unit))
+
+forceForm : Form -> Unit
+forceForm value = case value of
+  FVariable x0 x1 -> seq ((forceXName) x0) (seq ((forceMaybe (forceEdge)) x1) (Unit))
+  FLambda x0 x1 x2 x3 -> seq ((forceXName) x0) (seq (scalar x1) (seq ((forceTyped) x2) (seq ((forceEdge) x3) (Unit))))
+  FApply x0 x1 x2 x3 -> seq ((forceTyped) x0) (seq ((forceTyped) x1) (seq ((forceEdge) x2) (seq ((forceEdge) x3) (Unit))))
+  FBinding x0 x1 x2 x3 -> seq ((forceXName) x0) (seq ((forceTyped) x1) (seq ((forceTyped) x2) (seq ((forceEdge) x3) (Unit))))
+  FCoercion x0 x1 x2 -> seq ((forceXName) x0) (seq (scalar x1) (seq (scalar x2) (Unit)))
+  FIntegerLiteral x0 -> seq (scalar x0) (Unit)
+  FDoubleLiteral x0 -> seq (scalar x0) (Unit)
+  FBooleanLiteral x0 -> seq (scalar x0) (Unit)
+  FStringLiteral x0 -> seq (scalar x0) (Unit)
+  FPrimitive x0 x1 -> seq ((forcePrimitive) x0) (seq ((forceList scalar) x1) (Unit))
+  FConstructor x0 x1 -> seq (scalar x0) (seq ((forceList scalar) x1) (Unit))
+  FMatch x0 x1 x2 -> seq ((forceTyped) x0) (seq ((forceEdge) x1) (seq ((forceList (forceBranch)) x2) (Unit)))
+  FRecursive x0 x1 x2 -> seq ((forceList (forceQuad (forceXName) scalar (forceTyped) (forceEdge))) x0) (seq ((forceTyped) x1) (seq ((forceEdge) x2) (Unit)))
+  FEvidence x0 -> seq ((forceList (forceEvidenceBinding)) x0) (Unit)
+  FChecked x0 x1 x2 -> seq ((forceList (forcePair (forceXTyVar) (forceKind))) x0) (seq ((forceTyped) x1) (seq ((forceEdge) x2) (Unit)))
+
+forceBranch : Branch -> Unit
+forceBranch value = case value of
+  Branch x0 x1 x2 -> seq ((forceXPattern) x0) (seq ((forceTyped) x1) (seq ((forceEdge) x2) (Unit)))
+
+forceEvidenceBinding : EvidenceBinding -> Unit
+forceEvidenceBinding value = case value of
+  EvidenceBinding x0 x1 x2 x3 -> seq ((forceEvidenceRole) x0) (seq ((forceXName) x1) (seq (scalar x2) (seq (scalar x3) (Unit))))
+
+forceConstraints : Constraints -> Unit
+forceConstraints value = case value of
+  Constraints x0 x1 x2 x3 -> seq ((forceGraph) x0) (seq ((forceTyped) x1) (seq ((forceList (forcePair scalar scalar)) x2) (seq ((forceList (forceEdge)) x3) (Unit))))
+
+forceCore : Core -> Unit
+forceCore value = case value of
+  CVar x0 -> seq (scalar x0) (Unit)
+  CLam x0 x1 -> seq (scalar x0) (seq ((forceCore) x1) (Unit))
+  CApp x0 x1 -> seq ((forceCore) x0) (seq ((forceCore) x1) (Unit))
+  CLet x0 x1 x2 -> seq (scalar x0) (seq ((forceCore) x1) (seq ((forceCore) x2) (Unit)))
+  CCoerce x0 -> seq ((forceSAnnotation) x0) (Unit)
+  CInt x0 -> seq (scalar x0) (Unit)
+  CDouble x0 -> seq (scalar x0) (Unit)
+  CBool x0 -> seq (scalar x0) (Unit)
+  CString x0 -> seq (scalar x0) (Unit)
+  CPrimitive x0 -> seq ((forcePrimitive) x0) (Unit)
+  CConstructor x0 -> seq (scalar x0) (Unit)
+  CCase x0 x1 -> seq ((forceCore) x0) (seq ((forceList (forcePair (forceSPattern) (forceCore))) x1) (Unit))
+  CRec x0 x1 -> seq ((forceList (forceTriple scalar (forceSAnnotation) (forceCore))) x0) (seq ((forceCore) x1) (Unit))
+  CWanted x0 x1 -> seq (scalar x0) (seq ((forceList (forcePair (forceEvidenceRole) scalar)) x1) (Unit))
+  CChecked x0 x1 -> seq ((forceSType) x0) (seq ((forceSExpr) x1) (Unit))
+
+forceBinding : Binding -> Unit
+forceBinding value = case value of
+  Mono x0 x1 -> seq ((forceXName) x0) (seq (scalar x1) (Unit))
+  Poly x0 x1 -> seq ((forceXName) x0) (seq (scalar x1) (Unit))
+
+forcePhase : Phase -> Unit
+forcePhase value = case value of
+  Parsing -> Unit
+  ModuleResolution -> Unit
+  Inference -> Unit
+  Resolution -> Unit
+  Elaboration -> Unit
+  Verification -> Unit
+
+forceCompileError : CompileError -> Unit
+forceCompileError value = case value of
+  CompileError x0 x1 -> seq ((forcePhase) x0) (seq (scalar x1) (Unit))

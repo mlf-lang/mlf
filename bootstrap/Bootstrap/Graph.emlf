@@ -43,13 +43,17 @@ mkNode : GTag -> Maybe Int -> Flag -> Node
 mkNode t b f = seq (forceTag t) (seq b (seq f (Node t b f)))
 
 strictNode : Node -> Node
-strictNode (Node t b f) = mkNode t b f
+-- Preserve the record after forcing its required fields. Reconstructing the
+-- same Node here allocated a second record at every graph-map boundary.
+strictNode node = case node of
+  Node t b f -> seq (forceTag t) (seq b (seq f node))
 
 mkGraph : IntMap Node -> IntMap Int -> Int -> Graph
 mkGraph ns aliases fresh = seq (forceIntMap ns) (seq (forceIntMap aliases) (seq fresh (Graph ns aliases fresh)))
 
 strictGraph : Graph -> Graph
-strictGraph (Graph ns aliases fresh) = mkGraph ns aliases fresh
+strictGraph graph = case graph of
+  Graph ns aliases fresh -> seq (forceIntMap ns) (seq (forceIntMap aliases) (seq fresh graph))
 
 insertNodeMap : Int -> Node -> IntMap Node -> IntMap Node
 insertNodeMap n value ns = let strict = strictNode value in seq strict (IM.insert n strict ns)
@@ -71,7 +75,12 @@ buildNodeTree count entries = if count <= 0 then Pair MapEmpty entries else
       Cons (Pair key value) following ->
         let node = strictNode value in seq node (
           case buildNodeTree (count - quotInt count 2 - 1) following of
-            Pair right after -> Pair (M.node count key node left right) after)
+            Pair right after ->
+              -- Keep each completed subtree strict while consuming the list.
+              -- A lazy Pair field otherwise retains a second construction
+              -- spine until the final root demands all its child maps.
+              let tree = M.node count key node left right in
+              seq tree (Pair tree after))
 
 mapNodeTree : (Int -> Node -> Node) -> Map Int Node -> Map Int Node
 mapNodeTree action tree = case tree of
@@ -1057,7 +1066,12 @@ schemeOrExistential graph identity node = case binder node of
 normalize : Graph -> Graph
 -- Solver.finishNormalized reuses validation across this transformation:
 -- only non-Gen flags may change; identities, tags and binders stay intact.
-normalize graph =
+normalize graph = case denseBounds graph of
+  Nothing -> normalizeSparse graph
+  Just (Pair low high) -> normalizeDense graph low high
+
+normalizeSparse : Graph -> Graph
+normalizeSparse graph =
   let inertness = inertNodes graph in
   -- Several nodes can share a generalization binder. Keep its structural
   -- closure lazy and share it for this immutable graph, rather than rebuilding
@@ -1069,6 +1083,103 @@ normalize graph =
           GGen root -> n == resolve graph root || L.not (IS.member n (IM.get (resolve graph parent) scopes))
           _ -> false in
   mkGraph (mapNodesWithKey (\n -> \v -> if isGen (tag v) then v else if IM.findWithDefault false n inertness || scheme n v then mkNode (tag v) (binder v) Rigid else v) (nodes graph)) (links graph) (nextId graph)
+
+-- Normalize dense graphs with bounded scratch arrays. Only flags may change;
+-- the persistent sparse path remains available for arbitrary identity spans.
+data DenseNormalization s = DenseNormalization Graph Int (STArray s (Maybe Node)) (STArray s (List Int)) (STArray s Int) (STArray s Int) (STArray s Bool) (STArray s (List Int))
+
+normalizeDense : Graph -> Int -> Int -> Graph
+normalizeDense graph low high = runST (
+  let count = high - low + 1 in
+  stBind (newSTArray count Nothing) (\table ->
+  stBind (newSTArray count Nil) (\descendants ->
+  stBind (newSTArray count (0 - 1)) (\inertness ->
+  stBind (newSTArray count (low - 1)) (\seen ->
+  stBind (newSTArray count false) (\rigid ->
+  stBind (newSTArray count Nil) (\candidates ->
+    let state = DenseNormalization graph low table descendants inertness seen rigid candidates in
+    let entries = IM.toList (nodes graph) in
+    stBind (normalLoad state entries) (\loaded ->
+    stBind (normalGather state entries) (\gathered ->
+    stBind (normalScopes state entries) (\marked ->
+    stBind (normalResults state entries) (\result ->
+      stReturn (mkGraph (nodesFromDistinctAscList result) (links graph) (nextId graph)))))))))))))
+
+normalLoad : forall s. DenseNormalization s -> List (Pair Int Node) -> ST s Unit
+normalLoad state entries = case entries of
+  Nil -> stReturn Unit
+  Cons (Pair n v) rest -> case state of
+    DenseNormalization graph low table descendants inertness seen rigid candidates ->
+      stBind (writeDense low table n (Just v)) (\loaded ->
+      stBind (if equalFlag (flag v) Rigid then stReturn Unit else case binder v of
+        Nothing -> stReturn Unit
+        Just parent -> stBind (readDense low descendants parent) (\previous -> writeDense low descendants parent (Cons n previous))) (\added ->
+        normalLoad state rest))
+
+normalInert : forall s. DenseNormalization s -> Int -> ST s Bool
+normalInert state n = case state of
+  DenseNormalization graph low table descendants inertness seen rigid candidates ->
+    stBind (readDense low inertness n) (\known ->
+      if known >= 0 then stReturn (known == 1) else
+      stBind (denseTableNode low table n) (\v ->
+      stBind (if isBottom (tag v) then stReturn false else
+        stBind (readDense low descendants n) (normalAllInert state)) (\answer ->
+      stBind (writeDenseInt low inertness n (if answer then 1 else 0)) (\stored -> stReturn answer))))
+
+normalAllInert : forall s. DenseNormalization s -> List Int -> ST s Bool
+normalAllInert state pending = case pending of
+  Nil -> stReturn true
+  Cons n rest -> stBind (normalInert state n) (\answer -> if answer then normalAllInert state rest else stReturn false)
+
+normalGather : forall s. DenseNormalization s -> List (Pair Int Node) -> ST s Unit
+normalGather state entries = case entries of
+  Nil -> stReturn Unit
+  Cons (Pair n v) rest -> case state of
+    DenseNormalization graph low table descendants inertness seen rigid candidates ->
+      stBind (if isGen (tag v) || equalFlag (flag v) Rigid then stReturn Unit else
+        stBind (normalInert state n) (\inert -> if inert then writeDense low rigid n true else case binder v of
+          Nothing -> stReturn Unit
+          Just parent -> stBind (denseTableNode low table parent) (\scope -> case tag scope of
+            GGen root -> if n == resolve graph root then writeDense low rigid n true else
+              stBind (readDense low candidates parent) (\previous -> writeDense low candidates parent (Cons n previous))
+            _ -> stReturn Unit))) (\gathered -> normalGather state rest)
+
+normalScopes : forall s. DenseNormalization s -> List (Pair Int Node) -> ST s Unit
+normalScopes state entries = case entries of
+  Nil -> stReturn Unit
+  Cons (Pair n v) rest -> case state of
+    DenseNormalization graph low table descendants inertness seen rigid candidates ->
+      stBind (case tag v of
+        GGen root -> stBind (readDense low candidates n) (\pending -> if L.null pending then stReturn Unit else
+          stBind (normalReach state n (Cons root Nil)) (\visited -> normalExistentials state n pending))
+        _ -> stReturn Unit) (\marked -> normalScopes state rest)
+
+normalReach : forall s. DenseNormalization s -> Int -> List Int -> ST s Unit
+normalReach state stamp pending = case pending of
+  Nil -> stReturn Unit
+  Cons original rest -> case state of
+    DenseNormalization graph low table descendants inertness seen rigid candidates ->
+      let n = resolve graph original in
+      stBind (readDense low seen n) (\previous -> if previous == stamp then normalReach state stamp rest else
+      stBind (writeDenseInt low seen n stamp) (\marked ->
+      stBind (denseTableNode low table n) (\v -> normalReach state stamp (L.append (children (tag v)) rest))))
+
+normalExistentials : forall s. DenseNormalization s -> Int -> List Int -> ST s Unit
+normalExistentials state stamp pending = case pending of
+  Nil -> stReturn Unit
+  Cons n rest -> case state of
+    DenseNormalization graph low table descendants inertness seen rigid candidates ->
+      stBind (readDense low seen n) (\visited ->
+      stBind (writeDense low rigid n (visited /= stamp)) (\marked -> normalExistentials state stamp rest))
+
+normalResults : forall s. DenseNormalization s -> List (Pair Int Node) -> ST s (List (Pair Int Node))
+normalResults state entries = case entries of
+  Nil -> stReturn Nil
+  Cons (Pair n v) rest -> case state of
+    DenseNormalization graph low table descendants inertness seen rigid candidates ->
+      stBind (readDense low rigid n) (\changed ->
+      stBind (normalResults state rest) (\tail ->
+        stReturn (Cons (Pair n (if changed then mkNode (tag v) (binder v) Rigid else v)) tail)))
 
 -- Reverse accumulation makes the postorder traversal linear in its output.
 -- The public accumulator helper retains its forward-prefix contract.

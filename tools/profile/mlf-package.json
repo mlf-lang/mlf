@@ -1,0 +1,38 @@
+{
+  "format": 1,
+  "name": "mlf-phase-profile",
+  "version": "0.1.0",
+  "dependencies": {
+    "mlf-bootstrap": {
+      "path": "../../bootstrap"
+    }
+  },
+  "library": {
+    "modules": {
+      "Force": "Force.emlf",
+      "Simple": "Simple.emlf"
+    }
+  },
+  "executables": {
+    "stages": {
+      "main": "Stages.emlf",
+      "profile": "compiler",
+      "link": "source"
+    },
+    "instances": {
+      "main": "Instances.emlf",
+      "profile": "compiler",
+      "link": "source"
+    },
+    "unification": {
+      "main": "Unification.emlf",
+      "profile": "compiler",
+      "link": "source"
+    },
+    "unify-trace": {
+      "main": "UnifyTrace.emlf",
+      "profile": "compiler",
+      "link": "source"
+    }
+  }
+}

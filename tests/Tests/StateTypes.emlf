@@ -5,6 +5,7 @@ import qualified Package.OS as OS
 import qualified Tests.Helpers as H
 import Tests.Helpers (Quint(..), Sext(..))
 import qualified Bootstrap.Compiler as C
+import Bootstrap.Compiler (Compilation)
 import qualified Bootstrap.Primitive as P
 import qualified Bootstrap.X.Check as Check
 import qualified Bootstrap.X.Parser as Parser

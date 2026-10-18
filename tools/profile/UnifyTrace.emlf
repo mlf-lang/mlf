@@ -1,0 +1,98 @@
+module UnifyTrace where
+import Bootstrap.Types
+import Bootstrap.Graph.Solver
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.Parser as P
+import qualified Bootstrap.Classes as Classes
+import qualified Bootstrap.Prelude as Prelude
+import qualified Bootstrap.Constraint as C
+import qualified Bootstrap.Graph as G
+import qualified Bootstrap.Graph.Solver as S
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.IntSet as IS
+import qualified Force as F
+import qualified Simple as Simple
+
+mark label = putErr ("MLF_PHASE " ++ label ++ "\n")
+right result = case result of { Left error -> do { putErr (error ++ "\n"); exitWith 1 }; Right value -> return value }
+forced label force value = do
+ seq (force value) (mark label)
+ return value
+checked label force result = do { value <- right result; forced label force value }
+shallow solver = seq (S.graph solver) (seq (S.structuralParents solver) (seq (S.bindingChildren solver) Unit))
+
+unifyLocal equations before = do
+ _ <- checked "validate-input" F.scalar (G.validateGraph before)
+ kinds <- checked "kinds" (F.forceIntMap F.forceKind) (G.kindsAt before (L.concatMap G.equationNodes equations))
+ raw <- checked "first-order" F.forceGraph (G.foldE (G.firstOrder kinds) before equations)
+ skeleton <- forced "canonicalize" F.forceGraph (G.canonicalize raw)
+ let fast = Simple.attempt before skeleton
+ seq fast (mark (case fast of { Nothing -> "fast-no"; Just _ -> "fast-yes" }))
+ rebuilt <- checked "rebind" F.forceGraph (G.rebind before skeleton)
+ _ <- case fast of
+  Nothing -> return Unit
+  Just result -> if Simple.equal result rebuilt then return Unit else do { putErr "fast result differs from general rebinding\n"; exitWith 1 }
+ mark "fast-audit"
+ _ <- checked "validate-output" F.scalar (G.validateGraph rebuilt)
+ return rebuilt
+
+unifyDistinctTrace equations solver = do
+ connected <- checked "component" F.forceIntSet (component solver (L.concatMap G.equationNodes equations))
+ let old = graph solver
+ let boundaries = IS.fromList (L.filter (\n -> G.isGen (G.tag (G.nodeAt old n))) (IS.toList connected))
+ scopes <- forced "project-scopes" (F.forceIntMap (F.forceMaybe F.scalar)) (projectScopes (scopeIndex solver) boundaries)
+ let selected = IS.union connected (IS.fromList (IM.keys scopes))
+ let originals = L.map (\n -> Pair n (G.nodeAt old n)) (IS.toList selected)
+ let count = L.length originals
+ let originalIds = L.map (\(Pair n v) -> n) originals
+ let forward = selected
+ let backward = selected
+ let compact = compactIdentity old forward
+ let hiddenRoots = L.filter (\(Pair n v) -> case G.tag v of { GGen root -> L.not (IS.member root selected); _ -> false }) originals
+ let stubIds = L.range count (count + L.length hiddenRoots - 1)
+ let stubs = IM.fromDistinctAscList (L.zip (L.map (\(Pair n v) -> n) hiddenRoots) stubIds)
+ let existing = L.map (\(Pair n v) -> Pair (compact n) (localNode old forward scopes stubs n v)) originals
+ let placeholders = L.map (\(Pair original stub) -> Pair stub (G.mkNode GBot (Just (compact original)) Flexible)) (IM.toList stubs)
+ local <- forced "project-nodes" F.forceGraph (G.mkGraph (G.nodesFromDistinctAscList (L.append existing placeholders)) IM.empty (count + L.length hiddenRoots))
+ solved <- unifyLocal (L.map (\(Pair a b) -> Pair (compact a) (compact b)) equations) local
+ _ <- right (G.mapE_ (\stub -> G.check (matchesNode (G.nodes solved) stub (G.nodeAt local stub) && G.resolve solved stub == stub) "local unification changed a hidden scope root") (IM.elems stubs))
+ _ <- right (G.mapE_ (checkPreservedScope old solved forward scopes) originals)
+ mark "preserve-scopes"
+ checked "restore" shallow (restoreProjection solver selected originals backward count solved)
+
+solverTrace equations solver = do
+ let old = S.graph solver
+ let canonical = L.map (\(Pair a b) -> Pair (G.resolve old a) (G.resolve old b)) equations
+ _ <- right (G.mapE_ (\n -> G.check (IM.member n (G.nodes old)) ("missing graph node " ++ showInt n)) (L.concatMap G.equationNodes canonical))
+ let pending = L.filter (\(Pair a b) -> a /= b) canonical
+ if L.null pending then do { mark "reflexive"; return solver } else unifyDistinctTrace pending solver
+
+step solver edge = do
+ mark "step"
+ let source = C.fromGen edge
+ let target = C.toNode edge
+ let graft = S.groundGraft source target solver
+ seq graft (mark "graft-probe")
+ case graft of
+  Just result -> forced "graft-patch" shallow result
+  Nothing -> do
+   matches <- forced "match-probe" F.scalar (S.groundInstance (S.graph solver) source target)
+   if matches then return solver else do
+    Quad root copies frontier expanded <- checked "expand" (F.forceQuad F.scalar (F.forceIntMap F.scalar) (F.forceList (F.forcePair F.scalar F.scalar)) shallow) (S.expanded source target solver)
+    solverTrace (L.append frontier (Cons (Pair root target) Nil)) expanded
+
+main = do
+ file <- getArg 0
+ mark "start"
+ text <- readFile file
+ root <- right (P.parseModule file text)
+ program <- right (P.standaloneProgram root)
+ case Prelude.withPrelude ImplicitPrelude program of
+  Pair imports source -> do
+   Pair lowered names <- right (Classes.lowerClassesWithImports imports source)
+   constraints <- checked "generate" F.forceConstraints (C.generateProgram lowered)
+   prepared <- checked "prepare" F.forceSolver (S.prepare (C.initialGraph constraints))
+   initial <- checked "initial-unify" F.forceSolver (S.solverUnify (C.equalities constraints) prepared)
+   result <- L.foldM step initial (C.instances constraints)
+   final <- checked "finish" F.forceSolver (S.finishNormalized result)
+   putStrLn ("nodes=" ++ showInt (IM.size (G.nodes (S.graph final))))
