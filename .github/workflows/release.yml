@@ -59,6 +59,11 @@ jobs:
           mkdir -p .mlf-build/release-evidence/bin .mlf-build/release-evidence/compiler-tests
           cp .mlf-build/bin/emlf .mlf-build/bin/mlfpkg .mlf-build/release-evidence/bin/
           cp -R ".mlf-build/compiler-tests/$TEST_GROUP" .mlf-build/release-evidence/compiler-tests/
+          mkdir -p .mlf-build/release-evidence/diagnostics
+          if test -f ".mlf-build/tests/$TEST_GROUP.log"; then
+            cp ".mlf-build/tests/$TEST_GROUP.log" ".mlf-build/release-evidence/diagnostics/$TEST_GROUP.log"
+            tail -n 100 ".mlf-build/tests/$TEST_GROUP.log"
+          fi
           mkdir -p ".mlf-build/release-evidence/diagnostics/$TEST_GROUP"
           if [ -f ".mlf-build/tests/$TEST_GROUP.log" ]; then
             cp ".mlf-build/tests/$TEST_GROUP.log" ".mlf-build/release-evidence/diagnostics/$TEST_GROUP/outer.log"
