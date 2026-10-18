@@ -1,0 +1,32 @@
+{
+  "kind": "clang",
+  "cwd": "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/pairs/1-old/cache/126ebdf72ad2c8b041a27fbc69f6d2724f8ea0d8114b75d8eb01ee5c8be4b062.work",
+  "started_utc": "2026-10-18T16:25:54Z",
+  "argv": [
+    "/opt/homebrew/opt/llvm/bin/clang",
+    "-O2",
+    "-Wno-override-module",
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/pairs/1-old/cache/126ebdf72ad2c8b041a27fbc69f6d2724f8ea0d8114b75d8eb01ee5c8be4b062.work/program.ll",
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/pairs/1-old/cache/126ebdf72ad2c8b041a27fbc69f6d2724f8ea0d8114b75d8eb01ee5c8be4b062.work/runtime.o",
+    "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+    "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+    "-lgmp",
+    "-I/opt/homebrew/Cellar/bdw-gc/8.2.12/include",
+    "/opt/homebrew/Cellar/bdw-gc/8.2.12/lib/libgc.a",
+    "-lm",
+    "-Wl,-stack_size,0x10000000",
+    "-o",
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/pairs/1-old/cache/126ebdf72ad2c8b041a27fbc69f6d2724f8ea0d8114b75d8eb01ee5c8be4b062.work/program"
+  ],
+  "phase": "llvm-and-link",
+  "complete": true,
+  "finished_utc": "2026-10-18T16:26:10Z",
+  "exit_code": 0,
+  "wall_seconds": 15.63,
+  "user_seconds": 15.06,
+  "system_seconds": 0.42,
+  "peak_rss_bytes": 1516847104,
+  "page_reclaims": 104994,
+  "page_faults": 1910,
+  "swaps": 0
+}

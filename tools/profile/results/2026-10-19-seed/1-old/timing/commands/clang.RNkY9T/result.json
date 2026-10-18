@@ -1,0 +1,30 @@
+{
+  "kind": "clang",
+  "cwd": "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/pairs/1-old/cache/ed22f1673720b8fb56aa4916085b5d2fd60eaf6446b07adca38ee42abf1c754f.work",
+  "started_utc": "2026-10-18T16:27:02Z",
+  "argv": [
+    "/opt/homebrew/opt/llvm/bin/clang",
+    "-O2",
+    "-std=c11",
+    "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+    "-I/opt/homebrew/Cellar/bdw-gc/8.2.12/include",
+    "-DMLF_USE_BDWGC",
+    "-DMLF_COMPACT_BDWGC",
+    "-DMLF_GC_THRESHOLD=1048576",
+    "-c",
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/source/runtime/mlf_runtime.c",
+    "-o",
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/pairs/1-old/cache/ed22f1673720b8fb56aa4916085b5d2fd60eaf6446b07adca38ee42abf1c754f.work/runtime.o"
+  ],
+  "phase": "runtime-c",
+  "complete": true,
+  "finished_utc": "2026-10-18T16:27:02Z",
+  "exit_code": 0,
+  "wall_seconds": 0.33,
+  "user_seconds": 0.30,
+  "system_seconds": 0.02,
+  "peak_rss_bytes": 103006208,
+  "page_reclaims": 6382,
+  "page_faults": 133,
+  "swaps": 0
+}

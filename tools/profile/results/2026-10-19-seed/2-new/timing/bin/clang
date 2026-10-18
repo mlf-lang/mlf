@@ -1,0 +1,2 @@
+#!/bin/sh
+exec "$MLF_TIMING_DRIVER" "$MLF_TIMING_DIR" clang "$MLF_TIMING_CLANG" "$@"

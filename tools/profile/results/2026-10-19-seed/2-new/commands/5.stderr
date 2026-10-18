@@ -1,0 +1,2 @@
+clang: warning: argument unused during compilation: '-I /opt/homebrew/Cellar/gmp/6.3.0/include' [-Wunused-command-line-argument]
+clang: warning: argument unused during compilation: '-I /opt/homebrew/Cellar/bdw-gc/8.2.12/include' [-Wunused-command-line-argument]

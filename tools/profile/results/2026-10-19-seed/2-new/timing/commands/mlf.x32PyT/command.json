@@ -1,0 +1,13 @@
+{
+  "kind": "mlf",
+  "cwd": "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/pairs/2-new/cache/d02f146998a53a82a419c5c9c92c77ddbe04b0e0bcc6491c71f5045dbd37f8e1.work",
+  "started_utc": "2026-10-18T16:32:20Z",
+  "argv": [
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/releases/new/mlf-0.1.1-macos-arm64/libexec/emlf",
+    "-i",
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/pairs/2-new/cache/d02f146998a53a82a419c5c9c92c77ddbe04b0e0bcc6491c71f5045dbd37f8e1.work/sources",
+    "--emit-llvm-gc",
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/pairs/2-new/cache/d02f146998a53a82a419c5c9c92c77ddbe04b0e0bcc6491c71f5045dbd37f8e1.work/sources/Main.emlf"
+  ],
+  "phase": "mlf"
+}

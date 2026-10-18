@@ -1,0 +1,2 @@
+#!/bin/sh
+exec "$MLF_TIMING_DRIVER" "$MLF_TIMING_DIR" mlf "$MLF_TIMING_COMPILER" "$@"

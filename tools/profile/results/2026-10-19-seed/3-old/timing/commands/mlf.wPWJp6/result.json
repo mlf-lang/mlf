@@ -1,0 +1,23 @@
+{
+  "kind": "mlf",
+  "cwd": "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/pairs/3-old/cache/744c19e29927bfe9d204559682dddccc3f0fdda1ee0c14fdc89f55fa274911bd.work",
+  "started_utc": "2026-10-18T16:43:27Z",
+  "argv": [
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/releases/old/mlf-0.1.0-macos-arm64/libexec/emlf",
+    "-i",
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/pairs/3-old/cache/744c19e29927bfe9d204559682dddccc3f0fdda1ee0c14fdc89f55fa274911bd.work/sources",
+    "--emit-llvm-gc",
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/pairs/3-old/cache/744c19e29927bfe9d204559682dddccc3f0fdda1ee0c14fdc89f55fa274911bd.work/sources/Main.emlf"
+  ],
+  "phase": "mlf",
+  "complete": true,
+  "finished_utc": "2026-10-18T16:48:18Z",
+  "exit_code": 0,
+  "wall_seconds": 291.18,
+  "user_seconds": 288.64,
+  "system_seconds": 2.28,
+  "peak_rss_bytes": 9992257536,
+  "page_reclaims": 641086,
+  "page_faults": 1,
+  "swaps": 0
+}

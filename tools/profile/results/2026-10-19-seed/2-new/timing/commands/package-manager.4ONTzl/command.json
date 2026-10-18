@@ -1,0 +1,21 @@
+{
+  "kind": "package-manager",
+  "cwd": "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/source",
+  "started_utc": "2026-10-18T16:32:16Z",
+  "argv": [
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/source/mlfpkg",
+    "--compiler",
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/pairs/2-new/timing/bin/emlf",
+    "--clang",
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/pairs/2-new/timing/bin/clang",
+    "--runtime",
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/source/runtime/mlf_runtime.c",
+    "--timeout",
+    "21600",
+    "--locked",
+    "--build-dir",
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/pairs/2-new",
+    "build"
+  ],
+  "phase": "package-manager"
+}

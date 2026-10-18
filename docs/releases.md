@@ -57,8 +57,14 @@ from the pinned seed before building the candidate tested by all six groups.
 This lets the candidate and its fresh self-build use the same updated generator.
 Bootstrap builds explicitly allow six hours; individual fixture limits remain
 unchanged. Native release publication still requires every group to pass.
-No workflow installs GHC or invokes Python. Seed downloads check both published
-archive checksums and the independently pinned native executable hashes.
+No workflow installs GHC or invokes Python. Seed downloads check the selected published archive checksum and both
+independently pinned native executable hashes. CI now pins v0.1.1. Release jobs
+read seed pins and verification/timing tools from the workflow's immutable
+commit, so an older target tag cannot silently select its old seed. The checksum
+file can also cover supplementary validation archives that are not downloaded
+for bootstrapping. The [three-pair seed comparison](../tools/profile/results/2026-10-19-seed/README.md)
+measured a 16.326% lower local median full bootstrap time; hosted timing remains
+a separate measurement.
 
 To diagnose bootstrap time without running tests or another compiler generation,
 dispatch **Native bootstrap timing** (`gh workflow run bootstrap.yml --ref main`).

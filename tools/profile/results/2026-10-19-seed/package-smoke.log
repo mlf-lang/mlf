@@ -1,0 +1,6 @@
+Testing hello
+Building module Message
+Building module Greeting
+Building module Main
+Building executable local-packages-example:test-hello
+test passed; report: /Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/package-smoke/build-report.json

@@ -1,0 +1,31 @@
+{
+  "kind": "package-manager",
+  "cwd": "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/source",
+  "started_utc": "2026-10-18T16:37:21Z",
+  "argv": [
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/source/mlfpkg",
+    "--compiler",
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/pairs/2-old/timing/bin/emlf",
+    "--clang",
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/pairs/2-old/timing/bin/clang",
+    "--runtime",
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/source/runtime/mlf_runtime.c",
+    "--timeout",
+    "21600",
+    "--locked",
+    "--build-dir",
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/pairs/2-old",
+    "build"
+  ],
+  "phase": "package-manager",
+  "complete": true,
+  "finished_utc": "2026-10-18T16:43:22Z",
+  "exit_code": 0,
+  "wall_seconds": 361.15,
+  "user_seconds": 353.61,
+  "system_seconds": 3.97,
+  "peak_rss_bytes": 9474981888,
+  "page_reclaims": 1102989,
+  "page_faults": 6289,
+  "swaps": 0
+}

@@ -1,0 +1,20 @@
+{
+  "kind": "clang",
+  "cwd": "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/pairs/2-new/cache/9b571013b3feb7897d5842d4a801feca2f1d529d2574d01ca5d2353cd13e6b1a.work",
+  "started_utc": "2026-10-18T16:37:13Z",
+  "argv": [
+    "/opt/homebrew/opt/llvm/bin/clang",
+    "-O2",
+    "-std=c11",
+    "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+    "-I/opt/homebrew/Cellar/bdw-gc/8.2.12/include",
+    "-DMLF_USE_BDWGC",
+    "-DMLF_COMPACT_BDWGC",
+    "-DMLF_GC_THRESHOLD=1048576",
+    "-c",
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/source/runtime/mlf_runtime.c",
+    "-o",
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/pairs/2-new/cache/9b571013b3feb7897d5842d4a801feca2f1d529d2574d01ca5d2353cd13e6b1a.work/runtime.o"
+  ],
+  "phase": "runtime-c"
+}

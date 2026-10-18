@@ -1,0 +1,30 @@
+{
+  "downloads": {
+    "old": {
+      "version": "0.1.0",
+      "archive": "mlf-0.1.0-macos-arm64.tar.gz",
+      "sha256": "7a3c50fb178d9ad19c06ab3ccc07a41857e4af488679e29f80b8eb3a61e75c8b"
+    },
+    "new": {
+      "version": "0.1.1",
+      "archive": "mlf-0.1.1-macos-arm64.tar.gz",
+      "sha256": "e056f0f37fc957e4eb3393dea1046f954140bed07cddd93f8d005fc38890cd62"
+    }
+  },
+  "mlf_peak_rss_bytes": {
+    "old": [
+      10675355648,
+      9474981888,
+      9992257536
+    ],
+    "new": [
+      10312384512,
+      9791488000,
+      9738043392
+    ]
+  },
+  "all_new_build_binary_hashes_equal_published_release": true,
+  "representative_llvm": "One module per variant and target is retained; all three repetitions have identical hashes within each variant.",
+  "validation_llvm_sha256": "317dfcff63923c09aeb1f302c14ef396a3f0a7bf973e22d0e9906949d4490f5b",
+  "phase_accounting": "MLF and Clang calls are serial. The enclosing package-manager duration includes all children; do not add it to child totals."
+}

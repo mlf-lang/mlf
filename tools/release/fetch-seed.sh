@@ -9,7 +9,11 @@ mkdir -p "$destination"
 destination=$(cd "$destination" && pwd)
 archive="mlf-$MLF_SEED_VERSION-macos-arm64.tar.gz"
 gh release download "v$MLF_SEED_VERSION" --repo mlf-lang/mlf --pattern "$archive" --pattern SHA256SUMS --dir "$destination"
-(cd "$destination" && shasum -a 256 -c SHA256SUMS)
+# A release can also publish supplementary validation archives. Verify the
+# archive downloaded here; both native executable hashes are checked below.
+awk -v archive="$archive" '$2 == archive { print; found++ } END { if (found != 1) exit 1 }' \
+  "$destination/SHA256SUMS" > "$destination/archive.sha256"
+(cd "$destination" && shasum -a 256 -c archive.sha256)
 tar -xzf "$destination/$archive" -C "$destination"
 package="$destination/mlf-$MLF_SEED_VERSION-macos-arm64"
 test "$(shasum -a 256 "$package/libexec/emlf" | awk '{print $1}')" = "$MLF_SEED_COMPILER_SHA256"

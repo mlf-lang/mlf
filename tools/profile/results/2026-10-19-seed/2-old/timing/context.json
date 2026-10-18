@@ -1,0 +1,17 @@
+{
+  "commit": "c6033e67601c197cc91d19a0c3a3db4fbdaa1435",
+  "compiler": {
+    "path": "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/releases/old/mlf-0.1.0-macos-arm64/libexec/emlf",
+    "sha256": "6f658807be3a2fb1955ee42284b4ba34a736f7927ac9964da9c3cd234cb41bc0"
+  },
+  "manager": {
+    "path": "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/releases/old/mlf-0.1.0-macos-arm64/libexec/mlfpkg",
+    "sha256": "80f3a21e4e62565b4519d8a60835bee3eb4d9443a1aade9d9dc1fe757ac0a5fa"
+  },
+  "clang": {
+    "path": "/opt/homebrew/opt/llvm/bin/clang",
+    "sha256": "06793e4ad680ffa8f678c839107ae8bba4e4ca04feaf5ebbb36dd2ad241dbb82"
+  },
+  "rss_units": "bytes",
+  "time_resolution_seconds": 0.01
+}
