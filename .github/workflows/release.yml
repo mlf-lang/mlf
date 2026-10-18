@@ -59,7 +59,11 @@ jobs:
           mkdir -p .mlf-build/release-evidence/bin .mlf-build/release-evidence/compiler-tests
           cp .mlf-build/bin/emlf .mlf-build/bin/mlfpkg .mlf-build/release-evidence/bin/
           cp -R ".mlf-build/compiler-tests/$TEST_GROUP" .mlf-build/release-evidence/compiler-tests/
-          find .mlf-build/release-evidence/compiler-tests -type f ! -name verification.json ! -name '*.log' -delete
+          mkdir -p ".mlf-build/release-evidence/diagnostics/$TEST_GROUP"
+          if [ -f ".mlf-build/tests/$TEST_GROUP.log" ]; then
+            cp ".mlf-build/tests/$TEST_GROUP.log" ".mlf-build/release-evidence/diagnostics/$TEST_GROUP/outer.log"
+          fi
+          find .mlf-build/release-evidence/compiler-tests -type f ! -name verification.json ! -name '*.log' ! -name '*.stderr' ! -name '*.err' -delete
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
