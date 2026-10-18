@@ -36,6 +36,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: tools/release/fetch-seed.sh .mlf-build/seed
+      # A seed with an older code generator cannot itself produce fixed-point
+      # LLVM for the updated compiler. Validate the next native generation.
+      - name: Bootstrap the updated native code generator
+        run: |
+          export MLF_GC_PREFIX="$(brew --prefix bdw-gc)"
+          export PATH="$(brew --prefix llvm)/bin:$PATH"
+          ./mlfpkg --runtime "$PWD/runtime/mlf_runtime.c" --timeout 21600 --locked \
+            --build-dir "$PWD/.mlf-build/bootstrap-stage1" build
+          printf 'MLF_COMPILER=%s\nMLF_PACKAGE_MANAGER=%s\n' \
+            "$PWD/.mlf-build/bootstrap-stage1/bin/emlf" \
+            "$PWD/.mlf-build/bootstrap-stage1/bin/mlfpkg" >> "$GITHUB_ENV"
       - name: Run compiler test group
         env:
           TEST_GROUP: ${{ matrix.group }}

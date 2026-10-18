@@ -52,6 +52,9 @@ integration; it does not rebuild or validate modified compiler implementations.
 Dispatch **CI** with `self_host` enabled for a fresh compiler build and fixed
 point, or **Native release** for all six compiler groups. These full checks are
 manual because compilation on hosted M1 runners can exceed 30 minutes per stage.
+When the code generator changes, an intermediate native generation is built
+from the pinned seed before building the candidate tested by all six groups.
+This lets the candidate and its fresh self-build use the same updated generator.
 Bootstrap builds explicitly allow six hours; individual fixture limits remain
 unchanged. Native release publication still requires every group to pass.
 No workflow installs GHC or invokes Python. Seed downloads check both published
