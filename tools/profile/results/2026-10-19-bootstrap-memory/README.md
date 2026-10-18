@@ -10,9 +10,10 @@ implementation was changed.
 
 This is a memory improvement with a measured local time regression: median
 complete build time increased **38.657561%**, from **332.38s to 460.87s** on the
-32 GiB development host. It is not a measured hosted speedup. Avoiding pressure
-on a smaller runner may improve its elapsed time, but that requires hosted
-measurements; the historical hour-long job has no phase data proving its cause.
+32 GiB development host. A subsequent cold hosted build verified the fit on a
+7 GiB runner in 995.59s, at 2,733,703,168 bytes maximum process RSS. This is one
+hosted observation, not a paired hosted speedup measurement; the historical
+hour-long job has no phase data proving its cause.
 
 ## Cold paired measurements
 
@@ -56,8 +57,45 @@ are retained alongside each sample. `/usr/bin/time -lp` supplies complementary
 command high-water RSS, faults, CPU times, exit statuses, and raw output.
 The package-manager timing row includes its children: **do not add it to child
 totals**, or sum high-water RSS from different times. Local measurements support
-substantial headroom for a 7 GB runner; actual hosted resource use remains a
-separate verification.
+substantial headroom for a 7 GB runner. The hosted verification below records
+the actual runner separately, using process high-water RSS rather than the
+local sampler's aggregate metric.
+
+## Verified hosted runner
+
+The [cold bootstrap run](https://github.com/mlf-lang/mlf/actions/runs/39169819058)
+passed on implementation commit `9b1973a43de4be1798d326c330d819a0c4d3a932`.
+The runner reports **7,516,192,768 bytes (7 GiB)** RAM, three virtual Apple M1
+CPUs, and macOS 26.6.2. The earlier account billing restriction has cleared;
+[automatic CI](https://github.com/mlf-lang/mlf/actions/runs/39169650757) passed
+before this measurement, and no other build/test job overlapped this run.
+
+| Hosted cold-build measurement | Result |
+| --- | ---: |
+| Complete native package build | 995.59s (16m 35.59s) |
+| 48 MLF compiler invocations | 786.55s |
+| 4 Clang invocations, including fresh runtime C and LLVM/link | 53.27s |
+| Maximum measured command/process RSS | 2,733,703,168 bytes |
+| Resource gate | 5,500,000,000 bytes; passed |
+| Native cache decisions | 48 misses; zero hits |
+
+Both compiler and package-manager **LLVM and binary hashes exactly match the
+locally verified candidate**. All recorded source, typed-object and interface
+entries also match the local cold build. Thus the full six-group local test
+results apply to these exact binaries; the hosted timing job itself does not
+rerun those groups. Its GC divisor is `1`, with initial/maximum heap overrides
+unset. [Hosted audit](hosted/audit.json), [source/object audit](hosted/source-object-audit.json),
+[native build report](hosted/build-report.json), [timing summary](hosted/timing/summary.json),
+and [host/tool identities](hosted/timing/host.txt) retain those scopes.
+
+`hosted/artifact.zip` is the complete original Actions artifact. Its SHA-256
+`f577e24034c3521808763e3d59fb0e9a909fbd6e5e2c450b00236a7a1ccdfade`
+was checked against GitHub's artifact digest; the extracted member hashes,
+workflow log, run/job metadata, full argv and raw time records are retained.
+The enclosing package-manager time includes child calls. The remaining 155.77s
+includes orchestration and wrapper work; it is not an independently timed phase.
+Hosted process RSS is not a sampled aggregate, and this single run does not
+establish a controlled speedup over the old hour-long build.
 
 ## Where the time and memory go
 

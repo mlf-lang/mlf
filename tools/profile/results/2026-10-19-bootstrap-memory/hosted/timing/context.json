@@ -1,0 +1,23 @@
+{
+  "commit": "9b1973a43de4be1798d326c330d819a0c4d3a932",
+  "compiler": {
+    "path": "/Users/runner/work/mlf/mlf/.mlf-build/seed/mlf-0.1.1-macos-arm64/libexec/emlf",
+    "sha256": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6"
+  },
+  "manager": {
+    "path": "/Users/runner/work/mlf/mlf/.mlf-build/seed/mlf-0.1.1-macos-arm64/libexec/mlfpkg",
+    "sha256": "3ad5f14b10258a54ab144e73cbcb40d4c286d9eae5dcc6278adab6c5e8ff4f68"
+  },
+  "clang": {
+    "path": "/opt/homebrew/opt/llvm/bin/clang",
+    "sha256": "28b684ac1e9e091fe825160fcce78a031a843b159d8a2bcf43305f984f6e22fe"
+  },
+  "gc_environment": {
+    "GC_FREE_SPACE_DIVISOR": "1",
+    "GC_INITIAL_HEAP_SIZE": "",
+    "GC_MAXIMUM_HEAP_SIZE": ""
+  },
+  "memory_budget_bytes": 5500000000,
+  "rss_units": "bytes",
+  "time_resolution_seconds": 0.01
+}

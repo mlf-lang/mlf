@@ -11,7 +11,10 @@ compilation, and linking. Every build report confirms no cache hits.
 
 This buys headroom for the 7 GB CI runner at a local time cost:
 **332.38s → 460.87s** median complete build time, **38.658% slower** on the
-32 GiB development machine. There is no measured hosted time improvement.
+32 GiB development machine. A subsequent cold build on the actual 7 GiB hosted
+runner passed in **995.59s**, at **2.734 GB maximum process RSS**, and reproduced
+both locally tested binaries exactly. This is one hosted observation, not a
+paired hosted speed comparison.
 The CI timing helper rejects a command peak above 5.5 GB before exposing a
 candidate to later steps; the paired driver also checks sampled aggregate RSS.
 All six native groups passed, including a fresh LLVM/binary self-host fixed

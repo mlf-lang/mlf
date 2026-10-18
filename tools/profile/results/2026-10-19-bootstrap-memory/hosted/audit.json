@@ -1,0 +1,35 @@
+{
+  "complete": true,
+  "run_url": "https://github.com/mlf-lang/mlf/actions/runs/39169819058",
+  "commit": "9b1973a43de4be1798d326c330d819a0c4d3a932",
+  "artifact_id": 12152801170,
+  "artifact_sha256": "f577e24034c3521808763e3d59fb0e9a909fbd6e5e2c450b00236a7a1ccdfade",
+  "artifact_digest_verified": true,
+  "compiler_checks_unchanged": true,
+  "no_cache_hits": true,
+  "memory_budget": {
+    "limit_bytes": 5500000000,
+    "peak_process_rss_bytes": 2733703168,
+    "passed": true
+  },
+  "host_memory_bytes": 7516192768,
+  "host_cpu": "Apple M1 (Virtual), 3 CPUs",
+  "wall_seconds": 995.59,
+  "mlf_seconds": 786.55,
+  "clang_seconds": 53.27,
+  "outputs": {
+    "emlf": {
+      "binary_sha256": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+      "llvm_sha256": "6681b744a867617156f6e8caf4a91c3a1c6f28ecd0d51a3f36f98051f9e701dd",
+      "llvm_equals_local": true,
+      "binary_equals_local": true
+    },
+    "mlfpkg": {
+      "binary_sha256": "3ad5f14b10258a54ab144e73cbcb40d4c286d9eae5dcc6278adab6c5e8ff4f68",
+      "llvm_sha256": "4d690c2c80397b00673f2f218a3ce87cbbe052240d70f72d095540cdf6b5e015",
+      "llvm_equals_local": true,
+      "binary_equals_local": true
+    }
+  },
+  "scope": "One cold hosted bootstrap, not a paired speed comparison. RSS is command/process high-water, not aggregate tree RSS. Full six-group correctness verification was local."
+}

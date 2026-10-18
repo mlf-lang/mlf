@@ -1,0 +1,8 @@
+{
+  "complete": true,
+  "local_source_commit": "39daab5af1051160ed48f229552e8fcbaf709acb plus candidate.patch",
+  "hosted_commit": "9b1973a43de4be1798d326c330d819a0c4d3a932",
+  "source_entries_compared": 65,
+  "checked_object_interface_entries_compared": 184,
+  "all_equal": true
+}
