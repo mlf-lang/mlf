@@ -1,0 +1,33 @@
+name: Native bootstrap timing
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bootstrap:
+    name: One cold native bootstrap
+    runs-on: macos-26
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - run: brew install llvm gmp pkg-config bdw-gc
+      - name: Fetch verified native seed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: tools/release/fetch-seed.sh .mlf-build/seed
+      - name: Time one bootstrap without tests or further generations
+        run: |
+          export MLF_GC_PREFIX="$(brew --prefix bdw-gc)"
+          export PATH="$(brew --prefix llvm)/bin:$PATH"
+          tools/release/timed-bootstrap.sh
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: native-bootstrap-timing
+          include-hidden-files: true
+          retention-days: 30
+          path: |
+            .mlf-build/bootstrap-stage1/build-report.json
+            .mlf-build/bootstrap-stage1/commands/
+            .mlf-build/bootstrap-stage1/cache/**/artifact.json
+            .mlf-build/bootstrap-stage1/timing/

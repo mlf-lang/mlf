@@ -61,11 +61,18 @@ jobs:
         run: |
           export MLF_GC_PREFIX="$(brew --prefix bdw-gc)"
           export PATH="$(brew --prefix llvm)/bin:$PATH"
-          ./mlfpkg --runtime "$PWD/runtime/mlf_runtime.c" --timeout 21600 --locked \
-            --build-dir "$PWD/.mlf-build/bootstrap-stage1" build
-          printf 'MLF_COMPILER=%s\nMLF_PACKAGE_MANAGER=%s\n' \
-            "$PWD/.mlf-build/bootstrap-stage1/bin/emlf" \
-            "$PWD/.mlf-build/bootstrap-stage1/bin/mlfpkg" >> "$GITHUB_ENV"
+          tools/release/timed-bootstrap.sh
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: native-bootstrap-evidence
+          include-hidden-files: true
+          retention-days: 30
+          path: |
+            .mlf-build/bootstrap-stage1/build-report.json
+            .mlf-build/bootstrap-stage1/commands/
+            .mlf-build/bootstrap-stage1/cache/**/artifact.json
+            .mlf-build/bootstrap-stage1/timing/
       - name: Build and check a fresh compiler fixed point
         run: tools/release/native-ci.sh self-host
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6

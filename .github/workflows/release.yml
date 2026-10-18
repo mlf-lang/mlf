@@ -36,17 +36,32 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: tools/release/fetch-seed.sh .mlf-build/seed
+      # The release tag can predate the diagnostic scripts. Use the tools from
+      # this workflow's immutable commit while building the tagged sources.
+      - name: Fetch workflow timing tools
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .mlf-build/ci-tools
+          sparse-checkout: tools/release
       # A seed with an older code generator cannot itself produce fixed-point
       # LLVM for the updated compiler. Validate the next native generation.
       - name: Bootstrap the updated native code generator
         run: |
           export MLF_GC_PREFIX="$(brew --prefix bdw-gc)"
           export PATH="$(brew --prefix llvm)/bin:$PATH"
-          ./mlfpkg --runtime "$PWD/runtime/mlf_runtime.c" --timeout 21600 --locked \
-            --build-dir "$PWD/.mlf-build/bootstrap-stage1" build
-          printf 'MLF_COMPILER=%s\nMLF_PACKAGE_MANAGER=%s\n' \
-            "$PWD/.mlf-build/bootstrap-stage1/bin/emlf" \
-            "$PWD/.mlf-build/bootstrap-stage1/bin/mlfpkg" >> "$GITHUB_ENV"
+          .mlf-build/ci-tools/tools/release/timed-bootstrap.sh
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: bootstrap-${{ matrix.group }}
+          include-hidden-files: true
+          retention-days: 30
+          path: |
+            .mlf-build/bootstrap-stage1/build-report.json
+            .mlf-build/bootstrap-stage1/commands/
+            .mlf-build/bootstrap-stage1/cache/**/artifact.json
+            .mlf-build/bootstrap-stage1/timing/
       - name: Run compiler test group
         env:
           TEST_GROUP: ${{ matrix.group }}
