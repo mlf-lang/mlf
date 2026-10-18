@@ -75,3 +75,15 @@ Use the current script and its sibling `tools/release` timing scripts from main;
 the frozen target source remains v0.1.1. Builds and validation use native MLF
 compilers and package managers; no GHC, Cabal or Python is invoked. The historical
 source-to-LLVM PGO comparison has a different input/binary scope and boundary.
+
+## CI verification after the seed change
+
+The seed/workflow change and this measured evidence were pushed in commit
+`555fcc7d4b1897f0be42e05a99eeb491dda4b109`. The resulting
+[CI run](https://github.com/mlf-lang/mlf/actions/runs/39147449854) could not start
+its jobs: GitHub reported failed recent account payments or a spending-limit
+restriction. `ci-run.json` and `ci-annotations.json` retain the exact status and
+annotation. This is not a native build/test failure and supplies no hosted
+bootstrap timing. No additional timing job was dispatched while that block
+remained confirmed. Local native verification and the three-pair measurements
+above completed successfully.
