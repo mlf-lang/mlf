@@ -58,6 +58,8 @@ remain enabled. The package-manager target retains source linking.
 Three alternating cold build pairs measured median sampled process-tree RSS
 of **3.27 GB**, down from **9.99 GB**, including the manager and measurement
 process. Local median complete build time increased from **332.38s to 460.87s**.
+A cold build on the actual 7 GiB CI runner passed in **995.59s**, with
+**2.73 GB maximum process RSS**, producing the exact locally tested binaries.
 See the [bootstrap memory report](tools/profile/results/2026-10-19-bootstrap-memory/README.md)
 for raw samples, scope, and reproduction. Direct whole-source self-compilation
 through `emlf --emit-llvm-gc bootstrap/Main.emlf` still uses the monolithic path.

@@ -24,6 +24,13 @@ both backend layouts. All nine workloads emit byte-identical LLVM in both
 layouts. Primary-log hashes, every matrix row, and unchanged source/tool
 identities were independently audited; raw evidence is retained in the report.
 
+The [hosted cold bootstrap](https://github.com/mlf-lang/mlf/actions/runs/39169819058)
+also passed on the actual 7 GiB, three-CPU Apple M1 virtual runner: **995.59s**,
+**2,733,703,168 bytes maximum process RSS**, with all 48 cache decisions misses.
+Both LLVM modules and executable hashes exactly match the locally tested
+candidate. This confirms the runner fit; one hosted observation does not prove
+a paired speedup or the cause of the historical hour-long run.
+
 See the [full report and reproducible commands](results/2026-10-19-bootstrap-memory/README.md),
 [all samples and variation](results/2026-10-19-bootstrap-memory/pairs/summary.json),
 and [exact frozen source/tool identities](results/2026-10-19-bootstrap-memory/pairs/context.json).

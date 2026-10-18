@@ -86,6 +86,8 @@ aggregate RSS fell from a 9.99 GB median to 3.27 GB (maximum 3.28 GB), while
 median full build time rose from 332.38s to 460.87s. The
 [memory report](../tools/profile/results/2026-10-19-bootstrap-memory/README.md)
 records the tradeoff and the limits of extrapolating to a hosted runner.
+A subsequent cold build on the actual 7 GiB hosted runner passed in 995.59s,
+at 2.73 GB maximum process RSS, reproducing both locally tested binaries exactly.
 
 The timing helper defaults `MLF_BOOTSTRAP_MAX_RSS_BYTES` to `5500000000` and
 fails before publishing candidate paths when a measured command exceeds that
