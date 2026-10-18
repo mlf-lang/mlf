@@ -60,6 +60,18 @@ unchanged. Native release publication still requires every group to pass.
 No workflow installs GHC or invokes Python. Seed downloads check both published
 archive checksums and the independently pinned native executable hashes.
 
+To diagnose bootstrap time without running tests or another compiler generation,
+dispatch **Native bootstrap timing** (`gh workflow run bootstrap.yml --ref main`).
+It runs one cold seed build on `macos-26`, with the usual compiler and Clang flags.
+Each MLF and Clang invocation retains its full arguments, wall/user/system time,
+peak RSS, page-fault counts, exit status, and raw `/usr/bin/time` output. The
+artifact also includes the native `build-report.json`, command logs, cache
+manifests, source/tool hashes, host details, and a summary. LLVM compilation and
+linking remain one Clang command. The enclosing package-manager measurement
+includes the child commands and must not be added to their totals. Ordinary CI
+self-host and native-release bootstrap steps retain the same evidence, including
+on failure; started commands without a result record were interrupted.
+
 For local packaging, after all six groups pass on the same candidate:
 
 ```sh
