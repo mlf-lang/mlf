@@ -63,6 +63,10 @@ manager path and arguments; its executable hash is in the JSON context. Local
 packaging uses `tools/release/package.sh VERIFIED_INPUTS FRESH_OUTPUT
  tools/release/licenses/BDWGC.txt` from the clean tagged checkout.
 
+New [main CI jobs](https://github.com/mlf-lang/mlf/actions/runs/39133028273)
+were subsequently blocked before starting by GitHub's account billing/spending
+limit check. This is separate from the completed native acceptance runs above.
+
 The separate [seven-sample performance gate](../tools/profile/RESULTS.md) passed
 3× C compilation and 2× C runtime for every workload using its identified PGO
 compiler and LLVM/linker configuration. It was not rerun for this stock release

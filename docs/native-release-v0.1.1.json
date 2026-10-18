@@ -92,5 +92,10 @@
     "release_binary_gate_rerun": false,
     "verified_pgo_compiler_sha256": "0bc6f35450ec7bf03df75a1dbebedea3d5de5ed692aabb69e97ed2dbb364806d",
     "report": "tools/profile/results/2026-10-18-compile3/summary.json"
+  },
+  "new_ci_block": {
+    "run": "https://github.com/mlf-lang/mlf/actions/runs/39133028273",
+    "started": false,
+    "github_annotation": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the Billing & plans section in your settings"
   }
 }
