@@ -1,0 +1,28 @@
+PASS foundation
+PASS MapFolds
+PASS IntegerContainers
+PASS OptimizerQueries
+PASS ConstructorProjection
+PASS ForceReuse
+PASS StrictFields
+PASS prelude
+PASS Target
+PASS frontend
+PASS LexerCounters
+PASS LLVMBuild
+PASS RuntimeSmoke
+PASS RuntimeCases
+PASS StateRuntime
+PASS StateTypes
+PASS GraphConformance
+PASS GraphScopes
+PASS GraphDense
+PASS OrderedTraversal
+PASS SolverReuse
+PASS TypeCache
+PASS GraphStack
+PASS EmbeddingPruning
+PASS InferenceConformance
+PASS PrimitiveMetadata
+Backend matrix: 26 rows x 2 backends; no missing executions
+26 MLF port fixtures; 0 failures

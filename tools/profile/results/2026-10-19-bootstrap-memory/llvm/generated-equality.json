@@ -1,0 +1,538 @@
+{
+  "complete": true,
+  "compilers": {
+    "baseline": {
+      "file": "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/pairs/3-baseline/bin/emlf",
+      "sha256": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6"
+    },
+    "candidate": {
+      "file": "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/pairs/3-candidate/bin/emlf",
+      "sha256": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6"
+    }
+  },
+  "rows": [
+    {
+      "workload": "binary-trees",
+      "layout": "standard",
+      "source": "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/binary-trees/mlf/main.emlf",
+      "source_sha256": "a9a8c5053d3ea18769da91bf2557c0e943d55766d9d3259b8e685ead88636270",
+      "outputs": {
+        "baseline": {
+          "compiler_sha256": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6",
+          "argv": [
+            "--emit-llvm",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/binary-trees/mlf/main.emlf"
+          ],
+          "llvm_sha256": "23efadb14b9aa03ddc149491eae56946e6437ef81aa5f63d28505f31864f5371",
+          "bytes": 37192,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "candidate": {
+          "compiler_sha256": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+          "argv": [
+            "--emit-llvm",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/binary-trees/mlf/main.emlf"
+          ],
+          "llvm_sha256": "23efadb14b9aa03ddc149491eae56946e6437ef81aa5f63d28505f31864f5371",
+          "bytes": 37192,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "equal": true
+    },
+    {
+      "workload": "binary-trees",
+      "layout": "compact-gc",
+      "source": "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/binary-trees/mlf/main.emlf",
+      "source_sha256": "a9a8c5053d3ea18769da91bf2557c0e943d55766d9d3259b8e685ead88636270",
+      "outputs": {
+        "baseline": {
+          "compiler_sha256": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6",
+          "argv": [
+            "--emit-llvm-gc",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/binary-trees/mlf/main.emlf"
+          ],
+          "llvm_sha256": "47775f92128755747ea105b139ebc8c63c8bdaf53174f180e9f16416d3a49d27",
+          "bytes": 44898,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "candidate": {
+          "compiler_sha256": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+          "argv": [
+            "--emit-llvm-gc",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/binary-trees/mlf/main.emlf"
+          ],
+          "llvm_sha256": "47775f92128755747ea105b139ebc8c63c8bdaf53174f180e9f16416d3a49d27",
+          "bytes": 44898,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "equal": true
+    },
+    {
+      "workload": "pidigits",
+      "layout": "standard",
+      "source": "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/pidigits/mlf/main.emlf",
+      "source_sha256": "ff663a5b00c83097c64b8792a0f2113d7aff39fc4cae5ebaeb02e773616aa53e",
+      "outputs": {
+        "baseline": {
+          "compiler_sha256": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6",
+          "argv": [
+            "--emit-llvm",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/pidigits/mlf/main.emlf"
+          ],
+          "llvm_sha256": "ad65bca37be5cd87e3476ac3d6277910f4467609d893a51299e996294e8dcf05",
+          "bytes": 43646,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "candidate": {
+          "compiler_sha256": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+          "argv": [
+            "--emit-llvm",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/pidigits/mlf/main.emlf"
+          ],
+          "llvm_sha256": "ad65bca37be5cd87e3476ac3d6277910f4467609d893a51299e996294e8dcf05",
+          "bytes": 43646,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "equal": true
+    },
+    {
+      "workload": "pidigits",
+      "layout": "compact-gc",
+      "source": "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/pidigits/mlf/main.emlf",
+      "source_sha256": "ff663a5b00c83097c64b8792a0f2113d7aff39fc4cae5ebaeb02e773616aa53e",
+      "outputs": {
+        "baseline": {
+          "compiler_sha256": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6",
+          "argv": [
+            "--emit-llvm-gc",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/pidigits/mlf/main.emlf"
+          ],
+          "llvm_sha256": "c491353505be527f5ddb9f412b561bded1b242e61a7d1398f68e489698b36e1b",
+          "bytes": 50947,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "candidate": {
+          "compiler_sha256": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+          "argv": [
+            "--emit-llvm-gc",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/pidigits/mlf/main.emlf"
+          ],
+          "llvm_sha256": "c491353505be527f5ddb9f412b561bded1b242e61a7d1398f68e489698b36e1b",
+          "bytes": 50947,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "equal": true
+    },
+    {
+      "workload": "n-body",
+      "layout": "standard",
+      "source": "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/n-body/mlf/main.emlf",
+      "source_sha256": "cb0f4756f1e16e6c37db79fed2ad905aca428c334e30535b04cfffd71383e79c",
+      "outputs": {
+        "baseline": {
+          "compiler_sha256": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6",
+          "argv": [
+            "--emit-llvm",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/n-body/mlf/main.emlf"
+          ],
+          "llvm_sha256": "317dfcff63923c09aeb1f302c14ef396a3f0a7bf973e22d0e9906949d4490f5b",
+          "bytes": 341986,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "candidate": {
+          "compiler_sha256": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+          "argv": [
+            "--emit-llvm",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/n-body/mlf/main.emlf"
+          ],
+          "llvm_sha256": "317dfcff63923c09aeb1f302c14ef396a3f0a7bf973e22d0e9906949d4490f5b",
+          "bytes": 341986,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "equal": true
+    },
+    {
+      "workload": "n-body",
+      "layout": "compact-gc",
+      "source": "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/n-body/mlf/main.emlf",
+      "source_sha256": "cb0f4756f1e16e6c37db79fed2ad905aca428c334e30535b04cfffd71383e79c",
+      "outputs": {
+        "baseline": {
+          "compiler_sha256": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6",
+          "argv": [
+            "--emit-llvm-gc",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/n-body/mlf/main.emlf"
+          ],
+          "llvm_sha256": "91cbbc1d56abe7f9f06558fb76097d0f796ae4ad762e58c1c75f9064cdbc72b1",
+          "bytes": 384081,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "candidate": {
+          "compiler_sha256": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+          "argv": [
+            "--emit-llvm-gc",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/n-body/mlf/main.emlf"
+          ],
+          "llvm_sha256": "91cbbc1d56abe7f9f06558fb76097d0f796ae4ad762e58c1c75f9064cdbc72b1",
+          "bytes": 384081,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "equal": true
+    },
+    {
+      "workload": "fannkuch-redux",
+      "layout": "standard",
+      "source": "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/fannkuch-redux/mlf/main.emlf",
+      "source_sha256": "f349294284c87ff923844475d2d5250f9b0c704cb43efd744342a015ea26cf29",
+      "outputs": {
+        "baseline": {
+          "compiler_sha256": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6",
+          "argv": [
+            "--emit-llvm",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/fannkuch-redux/mlf/main.emlf"
+          ],
+          "llvm_sha256": "8f65a4e2f8f9880e27a7ec036a71c707e857f500a1c8727631c5576b1753f8f6",
+          "bytes": 117179,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "candidate": {
+          "compiler_sha256": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+          "argv": [
+            "--emit-llvm",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/fannkuch-redux/mlf/main.emlf"
+          ],
+          "llvm_sha256": "8f65a4e2f8f9880e27a7ec036a71c707e857f500a1c8727631c5576b1753f8f6",
+          "bytes": 117179,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "equal": true
+    },
+    {
+      "workload": "fannkuch-redux",
+      "layout": "compact-gc",
+      "source": "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/fannkuch-redux/mlf/main.emlf",
+      "source_sha256": "f349294284c87ff923844475d2d5250f9b0c704cb43efd744342a015ea26cf29",
+      "outputs": {
+        "baseline": {
+          "compiler_sha256": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6",
+          "argv": [
+            "--emit-llvm-gc",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/fannkuch-redux/mlf/main.emlf"
+          ],
+          "llvm_sha256": "69c2f197e60402848fdfc20b4a759abbd086e5bab4e0033f851ff138a2ea149a",
+          "bytes": 129874,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "candidate": {
+          "compiler_sha256": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+          "argv": [
+            "--emit-llvm-gc",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/fannkuch-redux/mlf/main.emlf"
+          ],
+          "llvm_sha256": "69c2f197e60402848fdfc20b4a759abbd086e5bab4e0033f851ff138a2ea149a",
+          "bytes": 129874,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "equal": true
+    },
+    {
+      "workload": "spectral-norm",
+      "layout": "standard",
+      "source": "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/spectral-norm/mlf/main.emlf",
+      "source_sha256": "46bc43dcc8dea72e31315149581c8a97cf94ef70ff075971c3e56768093ce68c",
+      "outputs": {
+        "baseline": {
+          "compiler_sha256": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6",
+          "argv": [
+            "--emit-llvm",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/spectral-norm/mlf/main.emlf"
+          ],
+          "llvm_sha256": "c2a33b24a93ce0efd5bce9129e4bc9626f34a762270b19ca426b12bfdefdc227",
+          "bytes": 90998,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "candidate": {
+          "compiler_sha256": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+          "argv": [
+            "--emit-llvm",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/spectral-norm/mlf/main.emlf"
+          ],
+          "llvm_sha256": "c2a33b24a93ce0efd5bce9129e4bc9626f34a762270b19ca426b12bfdefdc227",
+          "bytes": 90998,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "equal": true
+    },
+    {
+      "workload": "spectral-norm",
+      "layout": "compact-gc",
+      "source": "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/spectral-norm/mlf/main.emlf",
+      "source_sha256": "46bc43dcc8dea72e31315149581c8a97cf94ef70ff075971c3e56768093ce68c",
+      "outputs": {
+        "baseline": {
+          "compiler_sha256": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6",
+          "argv": [
+            "--emit-llvm-gc",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/spectral-norm/mlf/main.emlf"
+          ],
+          "llvm_sha256": "6cf53b8de5aecad29d58c7604d2f90269425218b4586054004de6a5293a6cfc0",
+          "bytes": 103903,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "candidate": {
+          "compiler_sha256": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+          "argv": [
+            "--emit-llvm-gc",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/spectral-norm/mlf/main.emlf"
+          ],
+          "llvm_sha256": "6cf53b8de5aecad29d58c7604d2f90269425218b4586054004de6a5293a6cfc0",
+          "bytes": 103903,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "equal": true
+    },
+    {
+      "workload": "fasta",
+      "layout": "standard",
+      "source": "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/fasta/mlf/main.emlf",
+      "source_sha256": "37aed66d57b6eacbe55a610dae2b83940518a1f363a307a72455d45d61817698",
+      "outputs": {
+        "baseline": {
+          "compiler_sha256": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6",
+          "argv": [
+            "--emit-llvm",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/fasta/mlf/main.emlf"
+          ],
+          "llvm_sha256": "4c5581b433df98b5edece139a7ca23a61f6e3d8c25a56f3aa965f9dcb90ff380",
+          "bytes": 229547,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "candidate": {
+          "compiler_sha256": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+          "argv": [
+            "--emit-llvm",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/fasta/mlf/main.emlf"
+          ],
+          "llvm_sha256": "4c5581b433df98b5edece139a7ca23a61f6e3d8c25a56f3aa965f9dcb90ff380",
+          "bytes": 229547,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "equal": true
+    },
+    {
+      "workload": "fasta",
+      "layout": "compact-gc",
+      "source": "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/fasta/mlf/main.emlf",
+      "source_sha256": "37aed66d57b6eacbe55a610dae2b83940518a1f363a307a72455d45d61817698",
+      "outputs": {
+        "baseline": {
+          "compiler_sha256": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6",
+          "argv": [
+            "--emit-llvm-gc",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/fasta/mlf/main.emlf"
+          ],
+          "llvm_sha256": "ea9c64a2f29744e93875b799bb453c32d588b8796177df33e104d1c88ed97ceb",
+          "bytes": 245244,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "candidate": {
+          "compiler_sha256": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+          "argv": [
+            "--emit-llvm-gc",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/fasta/mlf/main.emlf"
+          ],
+          "llvm_sha256": "ea9c64a2f29744e93875b799bb453c32d588b8796177df33e104d1c88ed97ceb",
+          "bytes": 245244,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "equal": true
+    },
+    {
+      "workload": "mandelbrot",
+      "layout": "standard",
+      "source": "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/mandelbrot/mlf/main.emlf",
+      "source_sha256": "6aa84697293d90814f64f083ec52be179cc1d321b5211a6da5f141b9f3366136",
+      "outputs": {
+        "baseline": {
+          "compiler_sha256": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6",
+          "argv": [
+            "--emit-llvm",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/mandelbrot/mlf/main.emlf"
+          ],
+          "llvm_sha256": "1231a2a6163bd1c0da1721bb775bd0f3e8b901b81b3c9b81822095b688685b33",
+          "bytes": 120688,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "candidate": {
+          "compiler_sha256": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+          "argv": [
+            "--emit-llvm",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/mandelbrot/mlf/main.emlf"
+          ],
+          "llvm_sha256": "1231a2a6163bd1c0da1721bb775bd0f3e8b901b81b3c9b81822095b688685b33",
+          "bytes": 120688,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "equal": true
+    },
+    {
+      "workload": "mandelbrot",
+      "layout": "compact-gc",
+      "source": "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/mandelbrot/mlf/main.emlf",
+      "source_sha256": "6aa84697293d90814f64f083ec52be179cc1d321b5211a6da5f141b9f3366136",
+      "outputs": {
+        "baseline": {
+          "compiler_sha256": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6",
+          "argv": [
+            "--emit-llvm-gc",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/mandelbrot/mlf/main.emlf"
+          ],
+          "llvm_sha256": "3df8dd1ba99a7816f413f6fe37875570450240546920203f245c54e7847d04b6",
+          "bytes": 133241,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "candidate": {
+          "compiler_sha256": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+          "argv": [
+            "--emit-llvm-gc",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/mandelbrot/mlf/main.emlf"
+          ],
+          "llvm_sha256": "3df8dd1ba99a7816f413f6fe37875570450240546920203f245c54e7847d04b6",
+          "bytes": 133241,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "equal": true
+    },
+    {
+      "workload": "reverse-complement",
+      "layout": "standard",
+      "source": "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/reverse-complement/mlf/main.emlf",
+      "source_sha256": "870ff16b72a7b084738ca0fb36d35cf727de9b097e315b361eedae47dee35b1e",
+      "outputs": {
+        "baseline": {
+          "compiler_sha256": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6",
+          "argv": [
+            "--emit-llvm",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/reverse-complement/mlf/main.emlf"
+          ],
+          "llvm_sha256": "37d708cda7f11252e774da236990a7080a2f42df7dcd0ef1eb6bdb8667017162",
+          "bytes": 154360,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "candidate": {
+          "compiler_sha256": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+          "argv": [
+            "--emit-llvm",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/reverse-complement/mlf/main.emlf"
+          ],
+          "llvm_sha256": "37d708cda7f11252e774da236990a7080a2f42df7dcd0ef1eb6bdb8667017162",
+          "bytes": 154360,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "equal": true
+    },
+    {
+      "workload": "reverse-complement",
+      "layout": "compact-gc",
+      "source": "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/reverse-complement/mlf/main.emlf",
+      "source_sha256": "870ff16b72a7b084738ca0fb36d35cf727de9b097e315b361eedae47dee35b1e",
+      "outputs": {
+        "baseline": {
+          "compiler_sha256": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6",
+          "argv": [
+            "--emit-llvm-gc",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/reverse-complement/mlf/main.emlf"
+          ],
+          "llvm_sha256": "6df0d9c254a4dc5b766cb7334760161ac7ee1a5c69226e68ae44e0a55222cd37",
+          "bytes": 169618,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "candidate": {
+          "compiler_sha256": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+          "argv": [
+            "--emit-llvm-gc",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/reverse-complement/mlf/main.emlf"
+          ],
+          "llvm_sha256": "6df0d9c254a4dc5b766cb7334760161ac7ee1a5c69226e68ae44e0a55222cd37",
+          "bytes": 169618,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "equal": true
+    },
+    {
+      "workload": "k-nucleotide",
+      "layout": "standard",
+      "source": "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/k-nucleotide/mlf/main.emlf",
+      "source_sha256": "613042a4b8e9e5c4028c4135b6def2a1444b2327f16bea41ab0ca79376f23ea7",
+      "outputs": {
+        "baseline": {
+          "compiler_sha256": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6",
+          "argv": [
+            "--emit-llvm",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/k-nucleotide/mlf/main.emlf"
+          ],
+          "llvm_sha256": "7a081ac87f2141ec1fe43aa49f6376a4a2980aaa826e1a10fcc5187b287875be",
+          "bytes": 232921,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "candidate": {
+          "compiler_sha256": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+          "argv": [
+            "--emit-llvm",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/k-nucleotide/mlf/main.emlf"
+          ],
+          "llvm_sha256": "7a081ac87f2141ec1fe43aa49f6376a4a2980aaa826e1a10fcc5187b287875be",
+          "bytes": 232921,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "equal": true
+    },
+    {
+      "workload": "k-nucleotide",
+      "layout": "compact-gc",
+      "source": "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/k-nucleotide/mlf/main.emlf",
+      "source_sha256": "613042a4b8e9e5c4028c4135b6def2a1444b2327f16bea41ab0ca79376f23ea7",
+      "outputs": {
+        "baseline": {
+          "compiler_sha256": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6",
+          "argv": [
+            "--emit-llvm-gc",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/k-nucleotide/mlf/main.emlf"
+          ],
+          "llvm_sha256": "4d9660e75a0afbb78e4c055dcd037616f323687879e02f35359009142c0d6b6c",
+          "bytes": 253497,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "candidate": {
+          "compiler_sha256": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+          "argv": [
+            "--emit-llvm-gc",
+            "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source-separate/benchmarks/k-nucleotide/mlf/main.emlf"
+          ],
+          "llvm_sha256": "4d9660e75a0afbb78e4c055dcd037616f323687879e02f35359009142c0d6b6c",
+          "bytes": 253497,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "equal": true
+    }
+  ],
+  "all_18_pairs_equal": true
+}

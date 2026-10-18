@@ -1,0 +1,69 @@
+{
+  "rows": {
+    "baseline": {
+      "bytes": 31848536,
+      "lines": 755100,
+      "functions": 18601,
+      "globals": 7104,
+      "sha256": "40d04cfb94852792ca9413f4bad06435b1936ccc0154bed5069c1e1f53b6270d"
+    },
+    "candidate": {
+      "bytes": 31851688,
+      "lines": 755100,
+      "functions": 18601,
+      "globals": 7104,
+      "sha256": "6681b744a867617156f6e8caf4a91c3a1c6f28ecd0d51a3f36f98051f9e701dd"
+    }
+  },
+  "first_differences": [
+    {
+      "line": 200,
+      "baseline": "@mlf.bytes.579 = private unnamed_addr constant [4629 x i8] c\"\\41\\5a\\61\\7a\\c2\\aa\\c2\\aa\\c2\\b5\\c2\\b5\\c2\\ba\\c2\\ba\\c3\\80\\c3\\96\\c3\\98\\c3\\b6\\c3\\b8\\cb\\81\\cb\\86\\cb\\91\\cb\\a0\\cb\\a4\\cb\\ac\\cb\\ac\\cb\\ae\\cb\\ae\\cd\\b0\\cd\\b4\\cd\\b6\\cd\\b7\\cd\\ba\\cd\\bd\\",
+      "candidate": "@mlf.bytes.70 = private unnamed_addr constant [4629 x i8] c\"\\41\\5a\\61\\7a\\c2\\aa\\c2\\aa\\c2\\b5\\c2\\b5\\c2\\ba\\c2\\ba\\c3\\80\\c3\\96\\c3\\98\\c3\\b6\\c3\\b8\\cb\\81\\cb\\86\\cb\\91\\cb\\a0\\cb\\a4\\cb\\ac\\cb\\ac\\cb\\ae\\cb\\ae\\cd\\b0\\cd\\b4\\cd\\b6\\cd\\b7\\cd\\ba\\cd\\bd\\c"
+    },
+    {
+      "line": 201,
+      "baseline": "@mlf.bytes.579.value = private global { i32, i32, i64, ptr, ptr } { i32 8, i32 0, i64 4628, ptr @mlf.bytes.579, ptr null }, align 8",
+      "candidate": "@mlf.bytes.70.value = private global { i32, i32, i64, ptr, ptr } { i32 8, i32 0, i64 4628, ptr @mlf.bytes.70, ptr null }, align 8"
+    },
+    {
+      "line": 202,
+      "baseline": "@mlf.bytes.580 = private unnamed_addr constant [5293 x i8] c\"\\30\\39\\41\\5a\\61\\7a\\c2\\aa\\c2\\aa\\c2\\b2\\c2\\b3\\c2\\b5\\c2\\b5\\c2\\b9\\c2\\ba\\c2\\bc\\c2\\be\\c3\\80\\c3\\96\\c3\\98\\c3\\b6\\c3\\b8\\cb\\81\\cb\\86\\cb\\91\\cb\\a0\\cb\\a4\\cb\\ac\\cb\\ac\\cb\\ae\\cb\\ae\\cd\\b0\\",
+      "candidate": "@mlf.bytes.71 = private unnamed_addr constant [5293 x i8] c\"\\30\\39\\41\\5a\\61\\7a\\c2\\aa\\c2\\aa\\c2\\b2\\c2\\b3\\c2\\b5\\c2\\b5\\c2\\b9\\c2\\ba\\c2\\bc\\c2\\be\\c3\\80\\c3\\96\\c3\\98\\c3\\b6\\c3\\b8\\cb\\81\\cb\\86\\cb\\91\\cb\\a0\\cb\\a4\\cb\\ac\\cb\\ac\\cb\\ae\\cb\\ae\\cd\\b0\\c"
+    },
+    {
+      "line": 203,
+      "baseline": "@mlf.bytes.580.value = private global { i32, i32, i64, ptr, ptr } { i32 8, i32 0, i64 5292, ptr @mlf.bytes.580, ptr null }, align 8",
+      "candidate": "@mlf.bytes.71.value = private global { i32, i32, i64, ptr, ptr } { i32 8, i32 0, i64 5292, ptr @mlf.bytes.71, ptr null }, align 8"
+    },
+    {
+      "line": 204,
+      "baseline": "@mlf.bytes.581 = private unnamed_addr constant [3489 x i8] c\"\\41\\5a\\c3\\80\\c3\\96\\c3\\98\\c3\\9e\\c4\\80\\c4\\80\\c4\\82\\c4\\82\\c4\\84\\c4\\84\\c4\\86\\c4\\86\\c4\\88\\c4\\88\\c4\\8a\\c4\\8a\\c4\\8c\\c4\\8c\\c4\\8e\\c4\\8e\\c4\\90\\c4\\90\\c4\\92\\c4\\92\\c4\\94\\c4\\94\\c4\\96\\",
+      "candidate": "@mlf.bytes.72 = private unnamed_addr constant [3489 x i8] c\"\\41\\5a\\c3\\80\\c3\\96\\c3\\98\\c3\\9e\\c4\\80\\c4\\80\\c4\\82\\c4\\82\\c4\\84\\c4\\84\\c4\\86\\c4\\86\\c4\\88\\c4\\88\\c4\\8a\\c4\\8a\\c4\\8c\\c4\\8c\\c4\\8e\\c4\\8e\\c4\\90\\c4\\90\\c4\\92\\c4\\92\\c4\\94\\c4\\94\\c4\\96\\c"
+    },
+    {
+      "line": 205,
+      "baseline": "@mlf.bytes.581.value = private global { i32, i32, i64, ptr, ptr } { i32 8, i32 0, i64 3488, ptr @mlf.bytes.581, ptr null }, align 8",
+      "candidate": "@mlf.bytes.72.value = private global { i32, i32, i64, ptr, ptr } { i32 8, i32 0, i64 3488, ptr @mlf.bytes.72, ptr null }, align 8"
+    },
+    {
+      "line": 206,
+      "baseline": "@mlf.bytes.582 = private unnamed_addr constant [3529 x i8] c\"\\61\\7a\\c2\\b5\\c2\\b5\\c3\\9f\\c3\\b6\\c3\\b8\\c3\\bf\\c4\\81\\c4\\81\\c4\\83\\c4\\83\\c4\\85\\c4\\85\\c4\\87\\c4\\87\\c4\\89\\c4\\89\\c4\\8b\\c4\\8b\\c4\\8d\\c4\\8d\\c4\\8f\\c4\\8f\\c4\\91\\c4\\91\\c4\\93\\c4\\93\\c4\\95\\",
+      "candidate": "@mlf.bytes.73 = private unnamed_addr constant [3529 x i8] c\"\\61\\7a\\c2\\b5\\c2\\b5\\c3\\9f\\c3\\b6\\c3\\b8\\c3\\bf\\c4\\81\\c4\\81\\c4\\83\\c4\\83\\c4\\85\\c4\\85\\c4\\87\\c4\\87\\c4\\89\\c4\\89\\c4\\8b\\c4\\8b\\c4\\8d\\c4\\8d\\c4\\8f\\c4\\8f\\c4\\91\\c4\\91\\c4\\93\\c4\\93\\c4\\95\\c"
+    },
+    {
+      "line": 207,
+      "baseline": "@mlf.bytes.582.value = private global { i32, i32, i64, ptr, ptr } { i32 8, i32 0, i64 3528, ptr @mlf.bytes.582, ptr null }, align 8",
+      "candidate": "@mlf.bytes.73.value = private global { i32, i32, i64, ptr, ptr } { i32 8, i32 0, i64 3528, ptr @mlf.bytes.73, ptr null }, align 8"
+    }
+  ],
+  "normalized_identifier_text_equal": false,
+  "interpretation": "Separate compilation uses stable module encodings and freshens object identities before grafting. Numeric identifier normalization alone does not yield byte equality; original LLVM is retained. Equal function/global/line counts do not constitute semantic equivalence. Compiler behavior and self-host fixed point must be independently checked. String literal payload multisets are identical. Function definition order differs; no alpha equivalence or semantic equivalence is claimed from this structural comparison.",
+  "literal_payloads": {
+    "baseline": 3560,
+    "candidate": 3560,
+    "unique_baseline": 1142,
+    "unique_candidate": 1142,
+    "multisets_identical": true
+  }
+}

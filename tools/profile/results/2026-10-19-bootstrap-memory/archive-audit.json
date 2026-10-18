@@ -1,0 +1,36 @@
+{
+  "measured_drivers_match_context": true,
+  "output_hashes_rechecked": true,
+  "archived": [
+    {
+      "name": "1-baseline",
+      "module_artifacts": 0,
+      "commands": 6
+    },
+    {
+      "name": "1-candidate",
+      "module_artifacts": 184,
+      "commands": 52
+    },
+    {
+      "name": "2-candidate",
+      "module_artifacts": 184,
+      "commands": 52
+    },
+    {
+      "name": "2-baseline",
+      "module_artifacts": 0,
+      "commands": 6
+    },
+    {
+      "name": "3-baseline",
+      "module_artifacts": 0,
+      "commands": 6
+    },
+    {
+      "name": "3-candidate",
+      "module_artifacts": 184,
+      "commands": 52
+    }
+  ]
+}

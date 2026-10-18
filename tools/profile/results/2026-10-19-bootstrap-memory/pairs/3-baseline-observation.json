@@ -1,0 +1,12 @@
+{
+  "variant": "baseline",
+  "sample": 3,
+  "code": 0,
+  "signal": null,
+  "samples": 665,
+  "peak_tree_rss_bytes": 9886449664,
+  "peak_sampler_rss_bytes": 148327288,
+  "peak_tree_plus_sampler_rss_bytes": 9994472504,
+  "max_processes": 9,
+  "helper_wall_seconds": 332.751842792
+}

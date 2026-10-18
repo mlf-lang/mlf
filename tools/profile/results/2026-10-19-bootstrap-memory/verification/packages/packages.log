@@ -1,0 +1,39 @@
+PASS test_packages.test_local_dependency_plan
+PASS test_packages.test_dependency_paths_are_manifest_relative
+PASS test_packages.test_diamond_and_canonical_symlink
+PASS test_packages.test_package_cycle
+PASS test_packages.test_symlink_dependency_cycle
+PASS test_packages.test_missing_dependency
+PASS test_packages.test_dependency_key_must_match_identity
+PASS test_packages.test_duplicate_module_and_package_identity
+PASS test_packages.test_direct_dependency_visibility
+PASS test_packages.test_module_cycle
+PASS test_packages.test_manifest_module_identity
+PASS test_packages.test_source_escape_and_symlink
+PASS test_packages.test_lock_tracks_content
+PASS test_packages.test_unknown_and_duplicate_fields
+PASS test_packages.test_invalid_manifest_shapes
+PASS test_packages.test_real_parser_handles_multiline_imports_and_comments
+PASS test_packages.test_truncated_source_rejected
+PASS test_packages.test_json_unicode_and_invalid_tokens
+18 package resolver tests passed
+PASS transitive local dependencies, ADT, do notation, spaces in paths
+PASS content-addressed no-op build
+PASS expected output checked on interpreter and LLVM
+PASS interface/object executable works without dependency source
+PASS transitive implementation edit invalidates the executable
+PASS test output mismatch fails the package test
+PASS failed compilation preserves the last successful binary
+PASS tampered object is rebuilt and checked
+PASS compiler identity participates in cache keys
+PASS locked build rejects changed local sources
+PASS undeclared ambient imports fail before compilation
+PASS whole-program local package mode on both backends
+PASS private target modules, program arguments, and stdin on both backends
+PASS run forwards arguments and keeps program stdout clean
+PASS external test exit status is propagated
+PASS checkout BDWGC discovery and command-test inheritance without an exported prefix
+PASS explicit BDWGC prefix overrides the environment and reaches test subprocesses
+PASS checkout compiler selection takes precedence over an older compiler on PATH
+PASS explicit compiler selection overrides a locally built compiler
+19 package integration cases passed

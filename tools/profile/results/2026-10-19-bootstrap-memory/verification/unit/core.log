@@ -1,0 +1,662 @@
+PASS component scopes agree with independent edge enumeration
+PASS projected nodes preserve explicit rank identities
+PASS ordered restoration preserves checked inverse identities
+PASS size-biased set unions agree with independent sorted lists
+PASS incremental reverse indices agree with independent edge enumeration
+PASS reverse-index edits agree with independent edge lists
+PASS ordered component ranks agree with independent renaming maps
+PASS linear projection patches agree with independent map differences
+PASS strict unary representation requires whole-program evaluated fields
+PASS incremental index audit agrees with independent reconstruction
+PASS dense normalization agrees with an independent list oracle
+PASS checked emission agrees with raw independently checked emission
+PASS external xMLF emission still rejects malformed terms
+PASS checked emission still enforces IO entry types
+PASS checked witness and compilation constructors are private
+PASS strict graph builder agrees with independent insertion
+PASS node forcing preserves arbitrary identities and lazy constructor fields
+PASS graph expansion preserves independent allocation and frontier identities
+PASS identity
+PASS constant 42
+PASS boolean
+PASS identity self-application
+PASS let polymorphism
+PASS lambda scope is not generalized
+PASS lexical shadowing
+PASS let RHS sees outer binding
+PASS application under an unannotated lambda
+PASS K preserves its polymorphic return bound
+PASS choose id retains an MLF bound
+PASS g g
+PASS g g applied to identity
+PASS g g retains its identity lower bound
+PASS closed annotation
+PASS let annotation
+PASS bounded annotation
+PASS annotated self-application
+PASS polymorphic parameter at distinct instances
+PASS impredicative result
+PASS partial annotation
+PASS existential root
+PASS existential annotation shares both sides
+PASS alias bounds normalized before xMLF
+PASS inert bounds inlined
+PASS unused bounds disappear
+PASS forall a.a equivalent to its bound
+PASS annotation alpha-renaming
+PASS parameterized type constructor
+PASS rigid polymorphic bound
+PASS multiple quantified variables
+PASS shared type has independent lexical binders
+PASS arbitrary-rank annotation
+PASS unannotated self-application
+PASS inconsistent monomorphic argument
+PASS integer is not a function
+PASS cannot satisfy universal identity with an integer result
+PASS distinct skolems cannot merge
+PASS wrong closed annotation
+PASS cannot invent a polymorphic value
+PASS free source variable
+PASS recursive let is not implicit
+PASS type annotation has a free variable
+PASS constructor arity
+PASS trailing input is rejected
+PASS parser handles nested comments
+PASS generated computations are necessary
+PASS Inst-Reflex
+PASS Inst-Bot
+PASS Inst-Hyp
+PASS Inst-Inner
+PASS Inst-Outer
+PASS Inst-Quant-Elim
+PASS Inst-Quant-Intro
+PASS Inst-Trans / System F application
+PASS outer alpha conversion
+PASS Inst-Hyp checks its bound
+PASS Inst-Hyp requires a binding
+PASS Inst-Bot requires bottom source
+PASS elimination requires a quantifier
+PASS inner does not cross arrows
+PASS introduction cannot capture
+PASS outer cannot capture
+PASS cyclic environments rejected
+PASS malformed term environment rejected
+PASS capture-avoiding substitution
+PASS quantifier does not scope over its own bound
+PASS alpha-equivalence tracks shadowing
+PASS type quantifiers have lexical scope
+PASS xMLF does not identify inert or alias bounds
+PASS expansion resets scheme flag and binding
+PASS all inert nodes normalized
+PASS well-domination enforced
+Graph validation: 12000 graphs; 78 valid
+PASS graph validation agrees with uncached reference
+PASS graph validation checks deeply nested binding scopes
+PASS graph validation checks shared higher-kinded subgraphs
+Graph unification: 5616 cases; 1433 accepted
+PASS indexed unification agrees with map-based reference
+PASS indexed graph analysis preserves sparse and negative identities
+PASS indexed unification agrees on successive scoped expansions
+PASS dependency traversal rejects structural cycles created by merging
+Component inference: 1539 complete graph/index comparisons
+PASS component solver matches every full-graph inference step
+Component witnesses: 193 full-graph comparisons
+PASS component witnesses preserve separate frontier solving and identities
+PASS component solver includes incoming references and protected siblings
+PASS component solver rejects malformed disconnected input
+PASS component solver preserves deep branching scopes and separate type components
+PASS expansion preserves the exact fresh identity budget across word boundaries
+Closed instances: 5290 independent scheme comparisons
+PASS closed-instance optimization preserves all original schemes
+PASS closed-instance matching checks repeated, rigid and frontier variables
+PASS embedding pruning preserves identities and values over allocation histories
+PASS embedding pruning preserves old updates, aliases and allocation gaps
+PASS embedding pruning preserves source bound and existential semantics
+PASS optimizer queries: inclusive small-lambda size boundary
+PASS optimizer queries: zero, one, and multiple lambda uses
+PASS optimizer queries: disjoint scopes reuse an identity
+PASS optimizer queries: captured and recursive uses remain shared
+PASS optimizer queries: pattern binders keep their own identity
+PASS strict constructor fields: strict worker, lazy value
+PASS strict constructor fields: partial escape invalidates all
+PASS strict constructor fields: literal and constructor atoms
+PASS strict constructor fields: meet across sites
+PASS strict constructor fields: anonymous callback drops capture facts
+PASS strict constructor fields: compound suspension drops capture facts
+PASS strict constructor fields: strict let canonical result
+PASS strict constructor fields: recursive hole remains unknown
+PASS strict constructor fields: unused constructor has no vacuous fact
+PASS strict constructor fields: pattern fields remain unknown
+PASS strict constructor fields: lazy default binder remains unknown
+PASS strict constructor fields: checked default binder is canonical
+PASS data: nullary constructor
+PASS data: polymorphic nullary constructor
+PASS data: constructor is a first-class function
+PASS data: constructor application
+PASS data: partial constructor application
+PASS data: multiple parameters
+PASS data: let-bound constructor has independent instances
+PASS data: phantom parameter
+PASS data: exhaustive case
+PASS data: nested patterns
+PASS data: reordered alternatives
+PASS data: case constrains scrutinee
+PASS data: case returns its polymorphic scrutinee
+PASS data: case rebuilds polymorphic data
+PASS data: case generalizes an unconstrained result
+PASS data: case retains an MLF result bound
+PASS data: generalized case function
+PASS data: pattern field order
+PASS data: wildcard field
+PASS data: multiple wildcard fields
+PASS data: wildcard alternative
+PASS data: variable alternative and nested case
+PASS data: wildcard-only case
+PASS data: variable-only case
+PASS data: pattern shadows outer variable
+PASS data: recursive list
+PASS data: recursive list deconstruction
+PASS data: recursive tree
+PASS data: mutually recursive declarations
+PASS data: non-regular recursive declaration
+PASS data: function field
+PASS data: polymorphic type argument
+PASS data: polymorphic case result
+PASS data: polymorphic field used with an explicit annotation
+PASS data: declaration parameter is not a target keyword
+PASS data: explicitly polymorphic field
+PASS data: unknown constructor
+PASS data: wrong field type
+PASS data: pattern fields are not implicitly generalized
+PASS data: overapplied nullary constructor
+PASS data: wrong scrutinee type
+PASS data: inconsistent branch results
+PASS data: non-exhaustive case
+PASS data: too few pattern fields
+PASS data: too many pattern fields
+PASS data: duplicate constructor alternative
+PASS data: mixed datatype alternatives
+PASS data: default must be last
+PASS data: duplicate pattern variable
+PASS data: pattern variables do not escape
+PASS data: pattern variable unavailable in sibling branch
+PASS data: duplicate datatype
+PASS data: duplicate constructor across datatypes
+PASS data: duplicate constructor within datatype
+PASS data: duplicate type parameter
+PASS data: free field type parameter
+PASS data: unknown field type
+PASS data: recursive type arity
+PASS data: declared annotation arity
+PASS data: primitive type redefinition
+PASS data: reserved datatype name
+PASS data: primitive constructor redefinition
+PASS data: declaration and case parse tree
+PASS data: empty declaration rejected by AST API
+PASS data: constructor and case erasure
+PASS data target: independent constructor and case typing
+PASS data target: unknown constructor
+PASS data target: constructor type argument count
+PASS data target: constructor type argument is well formed
+PASS data target: constructor field type
+PASS data target: non-exhaustive case
+PASS data target: empty case
+PASS data target: case result type
+PASS data target: case scrutinee type
+PASS data target: pattern field count
+PASS data target: repeated alternative
+PASS data target: pattern binder freshness
+PASS data target: pattern scope
+PASS data target: declared arity in an annotation
+PASS data target: declared arity inside a type computation
+PASS data target: invalid declaration
+PASS data target: nested declaration scope
+PASS data syntax: declaration separator required
+PASS data syntax: lowercase constructor
+PASS data syntax: empty case
+PASS data syntax: wildcard token boundary
+PASS class: concrete method
+PASS class: inferred constrained let at distinct instances
+PASS class: implicit method quantification
+PASS class: explicit qualified function
+PASS class: qualified expression in function position
+PASS class: qualified function parameter
+PASS class: two givens of the same class
+PASS class: concrete call inside a generic constraint
+PASS class: lambda shadows method
+PASS class: let shadows method
+PASS class: pattern shadows method
+PASS class: higher-kinded method
+PASS class: partial type constructor instance
+PASS class: instance definitions are order independent
+PASS class: superclass given without concrete instances
+PASS class: mutually recursive methods
+PASS class: higher-kinded datatype application
+PASS class: higher-kinded annotation
+PASS class: Monad hierarchy example
+PASS class: contextual recursive instance example
+PASS class: qualified result is displayed using its class name
+PASS class rejection: missing concrete instance
+PASS class rejection: does not pick the only instance for an unknown type
+PASS class rejection: wrong instance body
+PASS class rejection: method body is checked polymorphically
+PASS class rejection: missing method
+PASS class rejection: extra method
+PASS class rejection: duplicate method implementation
+PASS class rejection: duplicate class
+PASS class rejection: methods share a global namespace
+PASS class rejection: method must mention its class parameter
+PASS class rejection: unknown class
+PASS class rejection: duplicate instance
+PASS class rejection: overlapping generic and concrete instances
+PASS class rejection: variable instance head
+PASS class rejection: nondecreasing instance context
+PASS class rejection: instance context variable absent from head
+PASS class rejection: cyclic superclasses
+PASS class rejection: missing superclass instance
+PASS class rejection: class instance kind
+PASS class rejection: class context kind
+PASS class rejection: higher-kinded argument must have the declared kind
+PASS class rejection: ordinary type variable cannot be applied
+PASS class rejection: method constraints require supported signatures
+PASS class target: recursive dictionary body has wrong declared type
+PASS class target: recursive binders must be unique
+PASS class target: recursive binding cannot reuse an outer binder
+PASS class target: term annotation has kind star
+PASS class target: constructor checks the kind of a type argument
+PASS class target: compact and general application spines agree
+PASS class target: Inst-Bot cannot change kinds
+PASS class evidence: chooses the given by its type
+PASS class: two parameters
+PASS class: instances with the same first parameter are disjoint
+PASS class: instances with the same second parameter are disjoint
+PASS class: repeated variables are shared across instance arguments
+PASS class: class parameter substitution is simultaneous
+PASS class: inferred multiparameter constraint
+PASS class: explicit multiparameter constraint
+PASS class: three parameters
+PASS class: superclass can discard a parameter
+PASS class: superclass can reorder parameters
+PASS class: same class givens with different second arguments
+PASS class: recursive multiparameter instance example
+PASS class: multi-parameter constraint display
+PASS class rejection: instance is missing a parameter
+PASS class rejection: instance has an extra parameter
+PASS class rejection: constraint is missing a parameter
+PASS class rejection: duplicate class parameter
+PASS class rejection: method omits a class parameter
+PASS class rejection: does not infer an output parameter from the only instance
+PASS class rejection: matches every repeated parameter
+PASS class rejection: overlap needs joint unification across parameters
+PASS class rejection: overlapping variable and concrete argument
+PASS class rejection: context must decrease across the whole argument tuple
+PASS class rejection: context cannot duplicate a variable
+PASS class rejection: later parameter kind is checked
+PASS class evidence: superclass projection preserves caller variable identities
+PASS do: single expression
+PASS do: local let needs no bind
+PASS do: binding
+PASS do: sequencing
+PASS do: wildcard binding
+PASS do: optional trailing semicolon
+PASS do: nested blocks
+PASS do: bind statement sees the outer binding
+PASS do: local let sees the outer binding
+PASS do: local let is generalized
+PASS do: local let annotation
+PASS do: let-in expression is an action
+PASS do: do expression used as an argument
+PASS do: do expression annotation
+PASS do: constructor pattern
+PASS do: constructor wildcard field
+PASS do: discarded action cannot capture an outer name
+PASS do: pattern temporary cannot capture an outer name
+PASS do: uses the lexical bind function
+PASS do rejection: empty block
+PASS do rejection: final statement must be an expression
+PASS do rejection: cannot end with a local declaration
+PASS do rejection: statements need separators
+PASS do rejection: default IO bind requires an action
+PASS do rejection: bound variable cannot escape
+PASS do rejection: binding is not recursive
+PASS do rejection: later binding is unavailable
+PASS do rejection: action type mismatch
+PASS do rejection: final action has the right monadic type
+PASS do rejection: refutable pattern requires an explicit case
+PASS do rejection: pattern binder duplicates
+PASS do: parser preserves statement forms
+PASS do: lowering preserves binding order and the final action
+PASS do: multiparameter MonadState example
+PASS surface parser: multiplication binds above addition
+PASS surface parser: application binds above arithmetic
+PASS surface parser: subtraction associates left
+PASS surface parser: quotient and remainder associate left
+PASS surface parser: parentheses override precedence
+PASS surface parser: Boolean precedence
+PASS surface parser: concatenation associates right
+PASS surface parser: subtraction without spaces is not signed application
+PASS surface parser: negative argument is parenthesized
+PASS surface parser: unary minus applies after function application
+PASS surface parser: signed Double exponent
+PASS surface parser: signed hexadecimal integer
+PASS surface parser: plus sign and negative right operand
+PASS surface parser: comments at operators
+PASS surface parser: nearest else
+PASS surface parser: arithmetic inside branches
+PASS surface parser: control expression as right operand
+PASS surface parser: annotation covers the infix expression
+PASS surface parser: local parameters lower to lambdas
+PASS surface program: declarations have ordered let scopes
+PASS surface program: implicit main with trailing semicolon
+PASS surface program: implicit main without trailing semicolon
+PASS surface program: explicit entry overrides main
+PASS surface program: separate signature covers the whole function
+PASS surface checking: declarations generalize
+PASS surface checking: annotated function parameter
+PASS surface checking: inline whole-function signature
+PASS surface checking: annotated local function
+PASS surface checking: do-local function generalizes
+PASS surface checking: do-local function sees outer binding
+PASS surface checking: conditional returns polymorphic function
+PASS surface checking: conditional works in a case scrutinee
+PASS surface checking: keyword prefixes remain identifiers
+PASS surface checking: instance method parameters
+PASS surface checking: qualified function declaration
+PASS surface checking: syntax needs no implicit prelude
+PASS surface rejection: recursion needs a signature
+PASS surface checking: forward value references
+PASS surface rejection: branch types must agree
+PASS surface rejection: condition must be Bool
+PASS surface rejection: arithmetic does not overload Double
+PASS surface rejection: unary plus requires a number
+PASS surface rejection: unary minus requires a number
+PASS surface rejection: comparisons do not overload String
+PASS surface rejection: whole function signature is checked
+PASS surface rejection: chained comparisons
+PASS surface rejection: mixed chained comparisons
+PASS surface rejection: missing else
+PASS surface rejection: missing then
+PASS surface checking: layout declaration separator
+PASS surface rejection: declaration-only file needs main
+PASS surface rejection: unreachable equation
+PASS surface rejection: duplicate function parameters
+PASS surface rejection: signature must name its next definition
+PASS surface rejection: duplicate signatures
+PASS surface rejection: signature without equation
+PASS surface rejection: reserved conditional word
+PASS surface rejection: reserved word in datatype parameter
+PASS layout: top-level data, signatures and equations
+PASS layout: nested do with a trailing semicolon
+PASS layout: nested case and do
+PASS layout: parenthesized implicit block
+PASS layout: implicit block in explicit block
+PASS layout: same-line else closes do
+PASS layout: local declaration layout
+PASS layout: do local group followed by another statement
+PASS layout: nested explicit let matches its own in
+PASS layout: class and instance layout
+PASS layout: explicit braces after a keyword on another line
+PASS layout: keywords in comments and strings
+PASS layout: tabs have tab-stop indentation
+PASS layout: indented file
+PASS layout: leading comment does not set the top-level column
+PASS layout: string gap ending before the closing quote
+PASS layout: explicit top-level braces
+PASS layout: parseExpr accepts an implicit do
+PASS layout: diagnostics keep original line and column
+PASS recursion: declared polymorphism is independently checked
+PASS recursion: monomorphic closure captures an outer value
+PASS recursion: explicit quantifiers preserve their declared order
+PASS recursion: unused explicit quantified variables are discharged
+PASS equations: parameter can shadow the function name
+PASS readability rejection: recursive forall cannot specialize to Int
+PASS readability rejection: mutual recursion needs every signature
+PASS readability rejection: local recursion needs a signature
+PASS readability rejection: recursive existentials are not closed signatures
+PASS readability rejection: recursive signature free variable
+PASS readability rejection: equation arity
+PASS readability rejection: equations must be contiguous
+PASS readability rejection: missing constructor equation
+PASS readability rejection: missing nested constructor
+PASS readability rejection: integer equations need fallback
+PASS readability rejection: Boolean coverage
+PASS readability rejection: mixed literal types
+PASS readability rejection: nested case duplicate binder
+PASS readability rejection: constructor arity in function pattern
+PASS readability rejection: pattern variable cannot escape an equation
+PASS readability rejection: empty implicit do
+PASS readability rejection: dedent closes do before application
+PASS readability checking: readability: factorial equations
+PASS readability checking: readability: recursive forall order
+PASS readability checking: readability: unused recursive forall
+PASS readability checking: readability: mutual recursion
+PASS readability checking: readability: recursive IO and do-local recursion
+PASS readability checking: readability: qualified recursive function
+PASS readability checking: readability: polymorphic recursion
+PASS readability checking: readability: cyclic lazy value
+PASS readability checking: readability: nested patterns and fallback
+PASS readability checking: readability: constructor equation order keeps wildcard lazy
+PASS readability checking: readability: nested lambda and do patterns
+PASS readability checking: readability: pattern annotation imports the prelude
+PASS readability checking: readability: pattern temporary hygiene
+PASS readability checking: readability: literal patterns
+PASS readability checking: readability: literal case order and wildcard laziness
+PASS readability checking: readability: instance equations
+PASS readability checking: readability: nested conditional IO layout
+PASS readability checking: readability: local equation group
+PASS modules checking: selective and qualified imports
+PASS modules checking: unnamed entry expression imports
+PASS modules checking: qualified types, fields and nested patterns
+PASS modules checking: private names and constructor identities
+PASS modules checking: diamond reexports preserve identity
+PASS modules checking: transitive empty imports carry instances and private helpers
+PASS modules checking: qualified class, hidden methods in instance declaration
+PASS modules checking: abstract datatype used by exported functions
+PASS modules checking: local shadowing and self qualification
+PASS modules checking: explicit qualified Prelude
+PASS modules checking: explicit Prelude with implicit import disabled
+PASS modules checking: hiding Prelude method for local definition
+PASS modules checking: module lexical scope protects imported do
+PASS modules checking: polymorphic Monad function across modules
+PASS modules checking: qualified Boolean constructor patterns
+PASS modules checking: internal name hygiene
+PASS modules checking: same method name from distinct classes
+PASS modules checking: instance may recursively use an exported helper
+PASS modules checking: bare primitive fallback without implicit Prelude
+PASS modules checking: entry selects its own main
+PASS modules checking: primitive fallback permits local definitions
+PASS modules rejection: private function
+PASS modules rejection: qualified private function
+PASS modules rejection: selected imports exclude others
+PASS modules rejection: qualified-only is not unqualified
+PASS modules rejection: alias replaces qualified module name
+PASS modules rejection: hiding also affects qualification
+PASS modules rejection: unknown import selection
+PASS modules rejection: unknown hidden name
+PASS modules rejection: private constructor
+PASS modules rejection: type-only selective import
+PASS modules rejection: member belongs to selected type
+PASS modules rejection: private type annotation
+PASS modules rejection: hidden members cannot be reexported
+PASS modules rejection: default exports exclude imports
+PASS modules rejection: transitive names are not imported
+PASS modules rejection: distinct imports are ambiguous
+PASS modules rejection: top-level import collision requires hiding
+PASS modules rejection: explicit reexport conflict
+PASS modules rejection: unknown module reexport
+PASS modules rejection: qualified-only module reexport has no unqualified names
+PASS modules rejection: empty exports
+PASS modules rejection: missing module
+PASS modules rejection: mismatched module header
+PASS modules rejection: unnamed library
+PASS modules rejection: cycle includes chain
+PASS modules rejection: self import
+PASS modules rejection: module header followed by bare expression
+PASS modules rejection: imports must precede definitions
+PASS modules rejection: definitions cannot be qualified
+PASS modules rejection: explicit empty Prelude removes value names
+PASS modules rejection: qualified Prelude suppresses implicit Prelude
+PASS modules rejection: Prelude cannot be redefined
+PASS modules rejection: primitive constructor cannot be redefined
+PASS modules rejection: primitive type cannot be redefined
+PASS modules rejection: unused private definitions still checked
+PASS modules rejection: export list cannot name missing value
+PASS modules rejection: recursive signature error names the source function
+PASS modules rejection: instance not visible in imported signed definition
+PASS modules rejection: instance not visible in another instance
+PASS modules: original source type names
+PASS modules: unit syntax is intrinsic
+PASS modules: empty libraries and multiline headers
+PASS modules: explicit braces and layout parse identically
+PASS modules: libraries can be parsed without main
+PASS modules: unused imports do not cause value ambiguity
+PASS modules: legacy compile path preserves checked output
+PASS modules: file loader, includes, hierarchy and errors
+PASS separate modules: selective and qualified imports
+PASS separate modules: unnamed entry expression imports
+PASS separate modules: qualified types, fields and nested patterns
+PASS separate modules: private names and constructor identities
+PASS separate modules: diamond reexports preserve identity
+PASS separate modules: transitive empty imports carry instances and private helpers
+PASS separate modules: qualified class, hidden methods in instance declaration
+PASS separate modules: abstract datatype used by exported functions
+PASS separate modules: local shadowing and self qualification
+PASS separate modules: explicit qualified Prelude
+PASS separate modules: explicit Prelude with implicit import disabled
+PASS separate modules: hiding Prelude method for local definition
+PASS separate modules: module lexical scope protects imported do
+PASS separate modules: polymorphic Monad function across modules
+PASS separate modules: qualified Boolean constructor patterns
+PASS separate modules: internal name hygiene
+PASS separate modules: same method name from distinct classes
+PASS separate modules: instance may recursively use an exported helper
+PASS separate modules: bare primitive fallback without implicit Prelude
+PASS separate modules: entry selects its own main
+PASS separate modules: primitive fallback permits local definitions
+PASS separate modules: inferred overloaded export
+PASS separate modules: rank-n constructor field
+PASS separate modules: class-free bounded annotation rules
+PASS separate modules: unexported nominal type in inferred signature
+PASS separate modules: mutually recursive module values
+PASS separate modules: Unicode interface identity
+PASS separate modules: nominal global cannot capture local binder
+PASS separate modules: imported entry binding
+PASS separate rejects: private function
+PASS separate rejects: qualified private function
+PASS separate rejects: selected imports exclude others
+PASS separate rejects: qualified-only is not unqualified
+PASS separate rejects: alias replaces qualified module name
+PASS separate rejects: hiding also affects qualification
+PASS separate rejects: unknown import selection
+PASS separate rejects: unknown hidden name
+PASS separate rejects: private constructor
+PASS separate rejects: type-only selective import
+PASS separate rejects: member belongs to selected type
+PASS separate rejects: private type annotation
+PASS separate rejects: hidden members cannot be reexported
+PASS separate rejects: default exports exclude imports
+PASS separate rejects: transitive names are not imported
+PASS separate rejects: distinct imports are ambiguous
+PASS separate rejects: top-level import collision requires hiding
+PASS separate rejects: explicit reexport conflict
+PASS separate rejects: unknown module reexport
+PASS separate rejects: qualified-only module reexport has no unqualified names
+PASS separate rejects: empty exports
+PASS separate rejects: missing module
+PASS separate rejects: mismatched module header
+PASS separate rejects: unnamed library
+PASS separate rejects: cycle includes chain
+PASS separate rejects: self import
+PASS separate rejects: module header followed by bare expression
+PASS separate rejects: imports must precede definitions
+PASS separate rejects: definitions cannot be qualified
+PASS separate rejects: explicit empty Prelude removes value names
+PASS separate rejects: qualified Prelude suppresses implicit Prelude
+PASS separate rejects: Prelude cannot be redefined
+PASS separate rejects: primitive constructor cannot be redefined
+PASS separate rejects: primitive type cannot be redefined
+PASS separate rejects: unused private definitions still checked
+PASS separate rejects: export list cannot name missing value
+PASS separate rejects: recursive signature error names the source function
+PASS separate rejects: instance not visible in imported signed definition
+PASS separate rejects: instance not visible in another instance
+PASS separate interface version rejection
+PASS separate object export scheme is independently checked
+PASS separate object datatype layout is independently checked
+PASS separate object dependency parameters are checked even when unused
+PASS ST source type: return
+PASS ST source type: bind
+PASS ST source type: array-read
+PASS ST source type: array-write
+PASS ST source type: array-length
+PASS ST source type: implicit-do
+PASS ST source type: implicit-return
+PASS ST source type: explicit-action-signature
+PASS ST source type: polymorphic-result
+PASS ST source type: impredicative-array-functions
+PASS ST source type: nested-independent
+PASS ST source type: reuse-independent-allocation
+PASS ST source type: pure-io-description-result
+PASS ST source type: unused-poisoned-cell
+PASS ST source type: snapshot
+PASS ST source type: repeated-read-action
+PASS ST source type: higher-order-runner
+PASS ST source type: primitive-shadowing
+PASS ST source type: qualified-prelude-import
+PASS ST source type: explicit-prelude-types
+PASS ST source type: opaque-existential-package
+PASS ST source type: opaque-parametric-callback
+PASS ST source type: escape-array
+PASS ST source type: escape-through-bind
+PASS ST source type: escape-through-data
+PASS ST source type: escape-read-action
+PASS ST source type: escape-write-action
+PASS ST source type: escape-reader-closure
+PASS ST source type: nested-read-outer-region
+PASS ST source type: nested-write-outer-region
+PASS ST source type: cross-region-read-signature
+PASS ST source type: cross-region-write-signature
+PASS ST source type: monomorphic-argument
+PASS ST source type: monomorphic-bound-argument
+PASS ST source type: monomorphic-runner-signature
+PASS ST source type: io-as-st
+PASS ST source type: bind-io-action
+PASS ST source type: bind-io-continuation
+PASS ST source type: io-bind-st-action
+PASS ST source type: io-array-as-st-array
+PASS ST source type: wrong-array-value-type
+PASS ST source type: polymorphic-reference-attack
+PASS ST source type: impredicative-reference-attack
+PASS ST source type: repackage-action-as-region-polymorphic
+PASS ST source type: existential-coercion-escape
+PASS ST source type: opaque-package-read-attack
+PASS ST source type: opaque-package-write-attack
+PASS ST source type: redefine-st
+PASS ST source type: redefine-array
+PASS ST source type: construct-opaque-st
+PASS ST source type: construct-opaque-array
+PASS ST source type: pattern-opaque-st
+PASS ST source type: st-wrong-arity
+PASS ST source type: array-wrong-arity
+PASS ST source type: st-region-wrong-kind
+PASS ST source type: array-element-wrong-kind
+PASS ST target type: rank2-runner
+PASS ST target type: monomorphic-action-value
+PASS ST target type: rank2-region-action
+PASS ST target type: monomorphic-runST-input
+PASS ST target type: outer-forall-cannot-replace-inner
+PASS ST target type: io-to-st-cast
+PASS ST target type: cross-region-read
+PASS ST target type: cross-region-write
+PASS ST target type: unbound-region
+PASS ST target type: runST-extra-type-argument
+PASS ST target type: higher-kind-region
+PASS ST target type: unexecuted-array-action
+PASS ST primitive ABI is appended and action construction stays lazy
+PASS ST primitives work with implicit prelude disabled
+Oracle: 6712 closed terms (exhaustive through size 6, plus 5000 seeded terms); 2906 typable
+PASS independent ML typability oracle
+Annotations: 126 typed programs
+PASS annotation corpus
+PASS example files
+654 checks; 0 failures

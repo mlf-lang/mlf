@@ -1,0 +1,3 @@
+MLF_COMPILER=/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/legacy/bin/emlf
+MLF_PACKAGE_MANAGER=/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/legacy/bin/mlfpkg
+GC_FREE_SPACE_DIVISOR=4

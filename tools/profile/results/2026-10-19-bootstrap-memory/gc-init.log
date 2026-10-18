@@ -1,0 +1,28 @@
+Grow heap to 256 KiB after 0 bytes allocated
+Grew heap sections array to 32 elements
+Number of processors: 10
+Initiating full world-stop collection!
+
+--> Marking for collection #1 after 0 allocated bytes
+GC #1 freed 0 bytes, heap 256 KiB (+ 0 KiB unmapped + 768 KiB internal)
+World-stopped marking took 0 ms 13000 ns (0 ms in average)
+In-use heap: 0% (0 KiB pointers + 0 KiB other)
+0 finalization entries; 0/0 short/long disappearing links alive
+0 finalization-ready objects; 0/0 short/long links cleared
+Finalize and initiate sweep took 0 ms 0 ns + 0 ms 7000 ns
+Complete collection took 0 ms 38000 ns
+Grow heap to 524288 KiB after 0 bytes allocated
+Adding block map for size of 2 granules (32 bytes)
+Adding block map for size of 3 granules (48 bytes)
+Adding block map for size of 1 granules (16 bytes)
+Adding block map for size of 4 granules (64 bytes)
+Adding block map for size of 6 granules (96 bytes)
+Adding block map for size of 5 granules (80 bytes)
+Adding block map for size of 7 granules (112 bytes)
+Adding block map for size of 15 granules (240 bytes)
+Adding block map for size of 32 granules (512 bytes)
+Adding block map for size of 42 granules (672 bytes)
+Adding block map for size of 11 granules (176 bytes)
+Adding block map for size of 8 granules (128 bytes)
+Adding block map for size of 16 granules (256 bytes)
+Adding block map for size of 9 granules (144 bytes)

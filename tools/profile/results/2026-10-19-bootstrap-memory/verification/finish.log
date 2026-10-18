@@ -1,0 +1,3 @@
+{"complete":true,"source_files":426,"groups":["unit","packages","self-host","parity","backends","port"]}
+All nine workloads emit identical LLVM in both layouts.
+Legacy cold build passed default memory gate, exact output identity, and policy export.

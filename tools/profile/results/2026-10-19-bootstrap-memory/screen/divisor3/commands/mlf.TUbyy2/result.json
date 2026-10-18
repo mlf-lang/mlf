@@ -1,0 +1,29 @@
+{
+  "kind": "mlf",
+  "cwd": "/Volumes/src/mlf",
+  "started_utc": "2026-10-18T17:44:07Z",
+  "argv": [
+    "/usr/bin/env",
+    "-u",
+    "GC_INITIAL_HEAP_SIZE",
+    "-u",
+    "GC_MAXIMUM_HEAP_SIZE",
+    "GC_FREE_SPACE_DIVISOR=3",
+    "/Volumes/src/mlf/.mlf-build/seed-comparison-2026-10-19/releases/new/mlf-0.1.1-macos-arm64/libexec/emlf",
+    "-i",
+    "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source/bootstrap",
+    "--emit-llvm-gc",
+    "/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/source/bootstrap/Main.emlf"
+  ],
+  "phase": "mlf",
+  "complete": true,
+  "finished_utc": "2026-10-18T17:49:29Z",
+  "exit_code": 0,
+  "wall_seconds": 321.94,
+  "user_seconds": 312.16,
+  "system_seconds": 4.87,
+  "peak_rss_bytes": 5663506432,
+  "page_reclaims": 363855,
+  "page_faults": 12,
+  "swaps": 0
+}

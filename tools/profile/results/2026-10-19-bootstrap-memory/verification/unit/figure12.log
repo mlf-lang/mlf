@@ -1,0 +1,82 @@
+PASS assumption choose : forall a. a -> a -> a  checked
+PASS assumption id : forall a. a -> a  checked
+PASS assumption ids : List (forall a. a -> a)  checked
+PASS assumption nil : forall p. List p  checked
+PASS assumption auto : (forall a. a -> a) -> (forall a. a -> a)  checked
+PASS assumption auto' : forall b. (forall a. a -> a) -> b -> b  checked
+PASS assumption f : forall a. (a -> a) -> List a -> a  checked
+PASS assumption poly : (forall a. a -> a) -> Pair Int Bool  checked
+PASS assumption k : forall a. a -> List a -> Int  checked
+PASS assumption pair : forall a b. a -> b -> Pair a b  checked
+PASS assumption xs : List ((forall a. a -> a) -> Pair Int Bool)  checked
+PASS assumption app : forall a b. (a -> b) -> a -> b  checked
+PASS assumption revapp : forall a b. a -> (a -> b) -> b  checked
+PASS assumption argST : forall s. ST s Int  checked
+PASS assumption runST : forall d. (forall s. ST s d) -> d  checked
+PASS assumption length : forall p. List p -> Int  checked
+PASS assumption tail : forall p. List p -> List p  checked
+PASS assumption head : forall p. List p -> p  checked
+PASS assumption single : forall p. p -> List p  checked
+PASS assumption cons : forall p. p -> List p -> List p  checked
+PASS assumption append : forall p. List p -> List p -> List p  checked
+PASS assumption inc : Int -> Int  checked
+PASS assumption map : forall p q. (p -> q) -> List p -> List q  checked
+PASS assumption g : ((forall a. a -> a) -> Pair Int Bool) -> Char  checked
+PASS assumption r : (forall a. a -> (forall b. b -> b)) -> Int  checked
+PASS assumption h : Int -> (forall a. a -> a)  checked
+PASS assumption k : forall a. a -> List a -> a  checked
+PASS assumption lst : List (forall a. Int -> a -> a)  checked
+PASS assumption compose : forall a b c. (b -> c) -> (a -> b) -> a -> c  checked
+PASS A1 principal type  forall a3. forall (a4 >= forall a14. a14 -> a14). a3 -> a4
+PASS A2 principal type  forall (a44 >= forall a71. a71 -> a71). a44 -> a44
+PASS A4 inferred result bound  forall (a4 >= forall a46. a46 -> a46). (forall a30. a30 -> a30) -> a4
+PASS A4 admits paper signature  (forall a5. a5 -> a5) -> (forall a7. a7 -> a7)
+PASS A11 explicit annotation control  accepted; checked xMLF roundtrip
+PASS C1a explicit annotation control  accepted; checked xMLF roundtrip
+PASS C1c explicit annotation control  accepted; checked xMLF roundtrip
+Figure12: 34 rows / 43 expressions; explicit-signature regression expectations
+PASS A1  \x y -> y  accepted; checked xMLF roundtrip
+PASS A2  choose id  accepted; checked xMLF roundtrip
+PASS A3  choose nil ids  accepted; checked xMLF roundtrip
+PASS A4  \(x : forall a. a -> a) -> x x  accepted; checked xMLF roundtrip
+PASS A5  id auto  accepted; checked xMLF roundtrip
+PASS A6  id auto'  accepted; checked xMLF roundtrip
+PASS A7  choose id auto  accepted; checked xMLF roundtrip
+PASS A8  choose id auto'  rejected
+PASS A9  f (choose id) ids  accepted; checked xMLF roundtrip
+PASS A10.1  poly id  accepted; checked xMLF roundtrip
+PASS A10.2  poly (\x -> x)  accepted; checked xMLF roundtrip
+PASS A10.3  id poly (\x -> x)  accepted; checked xMLF roundtrip
+PASS A11  k (\f -> pair (f 1) (f True)) xs  rejected
+PASS A12.1  poly id  accepted; checked xMLF roundtrip
+PASS A12.2  app poly id  accepted; checked xMLF roundtrip
+PASS A12.3  revapp id poly  accepted; checked xMLF roundtrip
+PASS A13.1  app runST argST  accepted; checked xMLF roundtrip
+PASS A13.2  revapp argST runST  accepted; checked xMLF roundtrip
+PASS B1.1  length ids  accepted; checked xMLF roundtrip
+PASS B1.2  tail ids  accepted; checked xMLF roundtrip
+PASS B1.3  head ids  accepted; checked xMLF roundtrip
+PASS B1.4  single id  accepted; checked xMLF roundtrip
+PASS B2  cons id ids  accepted; checked xMLF roundtrip
+PASS B3  cons (\x -> x) ids  accepted; checked xMLF roundtrip
+PASS B4  append (single inc) (single id)  accepted; checked xMLF roundtrip
+PASS B5  append (single id) ids  accepted; checked xMLF roundtrip
+PASS B6  map poly (single id)  accepted; checked xMLF roundtrip
+PASS B7.1  map head (single ids)  accepted; checked xMLF roundtrip
+PASS B7.2  head ids True  accepted; checked xMLF roundtrip
+PASS C1a  \f -> pair (f 1) (f True)  rejected
+PASS C1b  \(f : forall a. a -> a) -> pair (f 1) (f True)  accepted; checked xMLF roundtrip
+PASS C1c  g (\f -> pair (f 1) (f True))  rejected
+PASS C2  r (\x y -> y)  accepted; checked xMLF roundtrip
+PASS E1a  k h lst  rejected
+PASS E1b  k (\x -> h x) lst  accepted; checked xMLF roundtrip
+PASS E2a  \x -> poly x  accepted; checked xMLF roundtrip
+PASS E2b  (\x -> poly x) : (forall a. a -> a) -> Pair Int Bool  accepted; checked xMLF roundtrip
+PASS E3a  app poly id  accepted; checked xMLF roundtrip
+PASS E3b  app (\x -> poly x) id  accepted; checked xMLF roundtrip
+PASS E4a  map poly ids  accepted; checked xMLF roundtrip
+PASS E4b  map (\x -> poly x) ids  accepted; checked xMLF roundtrip
+PASS E5a  compose poly head  accepted; checked xMLF roundtrip
+PASS E5b  \xs -> poly (head xs)  accepted; checked xMLF roundtrip
+43/43 expressions match regression expectations; 0 failures
+36 supplementary checks; 0 failures

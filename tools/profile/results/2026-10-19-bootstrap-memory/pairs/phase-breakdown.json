@@ -1,0 +1,99 @@
+{
+  "rows": [
+    {
+      "sample": 1,
+      "variant": "baseline",
+      "full": 324.25,
+      "module_inference": 0,
+      "checked_link_and_llvm": 0,
+      "source_and_llvm": 285.14,
+      "runtime_c": 0.9299999999999999,
+      "clang_llvm_and_link": 32.16,
+      "mlf_calls": 2,
+      "orchestration_and_wrapper_remainder": 6.02000000000001
+    },
+    {
+      "sample": 1,
+      "variant": "candidate",
+      "full": 459.68,
+      "module_inference": 169.46999999999997,
+      "checked_link_and_llvm": 171.36,
+      "source_and_llvm": 36.8,
+      "runtime_c": 0.64,
+      "clang_llvm_and_link": 31.93,
+      "mlf_calls": 48,
+      "orchestration_and_wrapper_remainder": 49.48000000000001
+    },
+    {
+      "sample": 2,
+      "variant": "candidate",
+      "full": 470.15,
+      "module_inference": 168.59,
+      "checked_link_and_llvm": 174.33,
+      "source_and_llvm": 39.92,
+      "runtime_c": 0.72,
+      "clang_llvm_and_link": 36.98,
+      "mlf_calls": 48,
+      "orchestration_and_wrapper_remainder": 49.60999999999994
+    },
+    {
+      "sample": 2,
+      "variant": "baseline",
+      "full": 403.17,
+      "module_inference": 0,
+      "checked_link_and_llvm": 0,
+      "source_and_llvm": 363.40999999999997,
+      "runtime_c": 1.03,
+      "clang_llvm_and_link": 32.94,
+      "mlf_calls": 2,
+      "orchestration_and_wrapper_remainder": 5.790000000000049
+    },
+    {
+      "sample": 3,
+      "variant": "baseline",
+      "full": 332.38,
+      "module_inference": 0,
+      "checked_link_and_llvm": 0,
+      "source_and_llvm": 292.3,
+      "runtime_c": 0.95,
+      "clang_llvm_and_link": 33.45,
+      "mlf_calls": 2,
+      "orchestration_and_wrapper_remainder": 5.6799999999999855
+    },
+    {
+      "sample": 3,
+      "variant": "candidate",
+      "full": 460.87,
+      "module_inference": 173.79,
+      "checked_link_and_llvm": 168.84,
+      "source_and_llvm": 34.67,
+      "runtime_c": 0.9199999999999999,
+      "clang_llvm_and_link": 30.79,
+      "mlf_calls": 48,
+      "orchestration_and_wrapper_remainder": 51.85999999999999
+    }
+  ],
+  "medians": {
+    "baseline": {
+      "full": 332.38,
+      "module_inference": 0,
+      "checked_link_and_llvm": 0,
+      "source_and_llvm": 292.3,
+      "runtime_c": 0.95,
+      "clang_llvm_and_link": 32.94,
+      "mlf_calls": 2,
+      "orchestration_and_wrapper_remainder": 5.790000000000049
+    },
+    "candidate": {
+      "full": 460.87,
+      "module_inference": 169.46999999999997,
+      "checked_link_and_llvm": 171.36,
+      "source_and_llvm": 36.8,
+      "runtime_c": 0.72,
+      "clang_llvm_and_link": 31.93,
+      "mlf_calls": 48,
+      "orchestration_and_wrapper_remainder": 49.60999999999994
+    }
+  },
+  "note": "Serial native child invocations; the enclosing package-manager row already includes these commands. Module inference includes independent checking, interface and object serialization. Checked link includes object parsing, boundary validation, final independent check, optimization and LLVM emission. No intrusive diagnostic forcing was used."
+}

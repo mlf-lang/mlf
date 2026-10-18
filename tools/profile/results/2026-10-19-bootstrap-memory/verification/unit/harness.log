@@ -1,0 +1,74 @@
+PASS test_native_matrix_requires_the_selected_cli_compiler
+PASS test_native_matrix_overrides_inherited_compiler_selection
+PASS test_compact_matrix_requires_collector_and_small_heap
+PASS test_both_layout_plan_builds_drivers_once_and_runs_each_matrix
+PASS test_module_corpus_cannot_drop_rejections_or_prelude_modes
+PASS test_crashes_partial_targets_and_wrong_diagnostics_are_not_rejections
+PASS test_complete_stage3_evidence_passes
+PASS test_stage2_parity_cannot_certify_stage3
+PASS test_fixed_point_and_fresh_stages_are_required
+PASS test_neither_layout_nor_backend_can_be_skipped
+PASS test_benchmark_coverage_and_samples_cannot_be_faked_by_pass_status
+PASS test_ratios_are_recomputed_from_measurements
+PASS test_medians_are_recomputed_and_bad_samples_fail
+PASS test_failed_step_preserves_failure_and_never_completes_release
+PASS test_gate_does_not_inherit_compiler_or_collector_overrides
+PASS test_incomplete_or_changed_packages_are_not_installable
+PASS test_installation_is_relocatable_and_does_not_replace_unrelated_files
+PASS test_performance_limits_apply_to_every_workload_and_include_boundary
+PASS test_invalid_performance_limits_fail_before_tools
+PASS test_oracle_matches_independent_pinned_fixture
+PASS test_all_workloads_have_complete_provenance_and_fixtures
+PASS test_dna_inputs_match_pinned_fasta_fixtures
+PASS test_reverse_complement_checks_headers_ambiguity_and_line_wrapping
+PASS test_nucleotide_counts_include_overlaps_ties_and_only_record_three
+PASS test_nucleotide_rounding_accepts_only_exact_midpoint_neighbours
+PASS test_spectral_norm_checks_single_finite_result
+PASS test_fasta_requires_exact_bases_wrapping_and_rng_continuity
+PASS test_mandelbrot_requires_exact_pixels_header_and_zero_padding
+PASS test_pidigits_oracle_and_partial_row_checks
+PASS test_nbody_tolerance_rejects_nonfinite_missing_and_wrong_values
+PASS test_fannkuch_unranking_checks_checksum_and_maximum
+patching file '/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/verification/compiler-tests/unit/scratch/test.iQeaVeqT/upstream.c'
+patching file '/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/verification/compiler-tests/unit/scratch/test.LQYo7nhb/upstream.rs'
+patching file '/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/verification/compiler-tests/unit/scratch/test.sYsMsUyL/upstream.c'
+patching file '/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/verification/compiler-tests/unit/scratch/test.ttISb2KG/upstream.rs'
+patching file '/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/verification/compiler-tests/unit/scratch/test.teWdGMuy/upstream.rs'
+patching file '/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/verification/compiler-tests/unit/scratch/test.WkFxhTEi/upstream.hs'
+patching file '/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/verification/compiler-tests/unit/scratch/test.G5dJSBcK/upstream.rs'
+patching file '/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/verification/compiler-tests/unit/scratch/test.VmzJCCTX/upstream.c'
+patching file '/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/verification/compiler-tests/unit/scratch/test.aMEW7Y6D/upstream.rs'
+patching file '/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/verification/compiler-tests/unit/scratch/test.5w1cIey5/upstream.hs'
+patching file '/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/verification/compiler-tests/unit/scratch/test.aOtzUqdL/upstream.c'
+patching file '/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/verification/compiler-tests/unit/scratch/test.MUFi11Cx/upstream.rs'
+patching file '/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/verification/compiler-tests/unit/scratch/test.0VMRVgyl/upstream.hs'
+patching file '/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/verification/compiler-tests/unit/scratch/test.GOeV6kV2/upstream.c'
+patching file '/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/verification/compiler-tests/unit/scratch/test.nTfNoDDr/upstream.rs'
+patching file '/Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/verification/compiler-tests/unit/scratch/test.3DiWJXYT/upstream.hs'
+PASS test_vendored_adaptation_patches_reconstruct_build_sources
+PASS test_only_whitespace_is_normalized
+PASS test_pin_tampering_fails
+PASS test_native_compiler_identification_uses_public_cli_and_exact_binary
+PASS test_stdin_workloads_share_bytes_and_record_hash_without_embedding_input
+PASS test_four_languages_are_mandatory
+PASS test_changes_during_measurement_invalidate_the_run
+PASS test_failed_and_timed_out_children_are_not_samples
+PASS test_rss_is_per_process_not_cumulative_high_water
+PASS test_medians_and_ratios_allow_c_to_lose
+PASS test_failure_replaces_stale_success_and_no_measurement_starts
+PASS test_invalid_cli_inputs_fail_before_tools
+PASS test_prestarted_link_waits_for_complete_objects_and_reaps_failed_producers
+PASS test_streaming_build_overlaps_startup_and_archives_exact_ir
+PASS test_blocked_fifo_failure_and_timeout_reap_process_groups
+PASS test_llvm_emission_time_is_included_and_build_directory_is_fresh
+PASS test_parallel_phase_failure_and_timeout_reap_every_child
+PASS test_native_driver_preserves_existing_executable_on_failure
+PASS test_interruption_cannot_leave_a_stale_success
+PASS test_generated_force_preserves_memoization_and_errors
+PASS test_runtime_state_actions_preserve_laziness_and_roots
+PASS test_runtime_constructor_allocation_and_cleanup
+PASS test_runtime_constructor_fields_and_update_spines
+PASS test_real_console_raw_input_matches_native_bytes_and_eof
+PASS test_mlf_counts_every_window_and_distinct_key_in_all_seven_tables
+PASS test_mlf_allocates_every_tree_node
+57 native benchmark/bootstrap/release harness tests passed

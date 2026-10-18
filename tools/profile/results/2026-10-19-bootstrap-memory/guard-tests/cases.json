@@ -1,0 +1,34 @@
+{
+  "complete": true,
+  "summarizer_sha256": "3f66cffaa48abdc495312429c94f04a5c9a42fe6481a8670327f76c3051ad83e",
+  "input_archive_sha256": "eee2632cd8a525e1f10d131eae34271732787957a7002b0dad7a4741ba756bac",
+  "cases": [
+    {
+      "budget": 5500000000,
+      "exit_code": 0,
+      "summary": {
+        "limit_bytes": 5500000000,
+        "peak_process_rss_bytes": 2523725824,
+        "passed": true
+      }
+    },
+    {
+      "budget": 1,
+      "exit_code": 78,
+      "summary": {
+        "limit_bytes": 1,
+        "peak_process_rss_bytes": 2523725824,
+        "passed": false
+      }
+    },
+    {
+      "budget": 0,
+      "exit_code": 0,
+      "summary": {
+        "limit_bytes": 0,
+        "peak_process_rss_bytes": 2523725824,
+        "passed": true
+      }
+    }
+  ]
+}

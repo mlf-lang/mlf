@@ -1,0 +1,273 @@
+{
+  "complete": true,
+  "rows": [
+    {
+      "variant": "baseline",
+      "sample": 1,
+      "code": 0,
+      "signal": null,
+      "samples": 649,
+      "peak_tree_rss_bytes": 9764306944,
+      "peak_sampler_rss_bytes": 108973920,
+      "peak_tree_plus_sampler_rss_bytes": 9811596736,
+      "max_processes": 9,
+      "helper_wall_seconds": 324.712594916,
+      "wall_seconds": 324.25,
+      "mlf_seconds": 285.14,
+      "clang_seconds": 33.09,
+      "peak_process_rss_bytes": 9755951104,
+      "binaries": {
+        "emlf": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6",
+        "mlfpkg": "3ad5f14b10258a54ab144e73cbcb40d4c286d9eae5dcc6278adab6c5e8ff4f68"
+      },
+      "llvm": {
+        "emlf": "40d04cfb94852792ca9413f4bad06435b1936ccc0154bed5069c1e1f53b6270d",
+        "mlfpkg": "4d690c2c80397b00673f2f218a3ce87cbbe052240d70f72d095540cdf6b5e015"
+      },
+      "validation": "317dfcff63923c09aeb1f302c14ef396a3f0a7bf973e22d0e9906949d4490f5b"
+    },
+    {
+      "variant": "candidate",
+      "sample": 1,
+      "code": 0,
+      "signal": null,
+      "samples": 919,
+      "peak_tree_rss_bytes": 3211821056,
+      "peak_sampler_rss_bytes": 113223640,
+      "peak_tree_plus_sampler_rss_bytes": 3253872408,
+      "max_processes": 9,
+      "helper_wall_seconds": 460.054413625,
+      "wall_seconds": 459.68,
+      "mlf_seconds": 377.63,
+      "clang_seconds": 32.57,
+      "peak_process_rss_bytes": 2612903936,
+      "binaries": {
+        "emlf": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+        "mlfpkg": "3ad5f14b10258a54ab144e73cbcb40d4c286d9eae5dcc6278adab6c5e8ff4f68"
+      },
+      "llvm": {
+        "emlf": "6681b744a867617156f6e8caf4a91c3a1c6f28ecd0d51a3f36f98051f9e701dd",
+        "mlfpkg": "4d690c2c80397b00673f2f218a3ce87cbbe052240d70f72d095540cdf6b5e015"
+      },
+      "validation": "317dfcff63923c09aeb1f302c14ef396a3f0a7bf973e22d0e9906949d4490f5b"
+    },
+    {
+      "variant": "candidate",
+      "sample": 2,
+      "code": 0,
+      "signal": null,
+      "samples": 940,
+      "peak_tree_rss_bytes": 3211837440,
+      "peak_sampler_rss_bytes": 93890472,
+      "peak_tree_plus_sampler_rss_bytes": 3269801760,
+      "max_processes": 9,
+      "helper_wall_seconds": 470.491825542,
+      "wall_seconds": 470.15,
+      "mlf_seconds": 382.84000000000003,
+      "clang_seconds": 37.7,
+      "peak_process_rss_bytes": 2612887552,
+      "binaries": {
+        "emlf": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+        "mlfpkg": "3ad5f14b10258a54ab144e73cbcb40d4c286d9eae5dcc6278adab6c5e8ff4f68"
+      },
+      "llvm": {
+        "emlf": "6681b744a867617156f6e8caf4a91c3a1c6f28ecd0d51a3f36f98051f9e701dd",
+        "mlfpkg": "4d690c2c80397b00673f2f218a3ce87cbbe052240d70f72d095540cdf6b5e015"
+      },
+      "validation": "317dfcff63923c09aeb1f302c14ef396a3f0a7bf973e22d0e9906949d4490f5b"
+    },
+    {
+      "variant": "baseline",
+      "sample": 2,
+      "code": 0,
+      "signal": null,
+      "samples": 806,
+      "peak_tree_rss_bytes": 10172383232,
+      "peak_sampler_rss_bytes": 106695544,
+      "peak_tree_plus_sampler_rss_bytes": 10233460032,
+      "max_processes": 9,
+      "helper_wall_seconds": 403.642054084,
+      "wall_seconds": 403.17,
+      "mlf_seconds": 363.40999999999997,
+      "clang_seconds": 33.97,
+      "peak_process_rss_bytes": 10180476928,
+      "binaries": {
+        "emlf": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6",
+        "mlfpkg": "3ad5f14b10258a54ab144e73cbcb40d4c286d9eae5dcc6278adab6c5e8ff4f68"
+      },
+      "llvm": {
+        "emlf": "40d04cfb94852792ca9413f4bad06435b1936ccc0154bed5069c1e1f53b6270d",
+        "mlfpkg": "4d690c2c80397b00673f2f218a3ce87cbbe052240d70f72d095540cdf6b5e015"
+      },
+      "validation": "317dfcff63923c09aeb1f302c14ef396a3f0a7bf973e22d0e9906949d4490f5b"
+    },
+    {
+      "variant": "baseline",
+      "sample": 3,
+      "code": 0,
+      "signal": null,
+      "samples": 665,
+      "peak_tree_rss_bytes": 9886449664,
+      "peak_sampler_rss_bytes": 148327288,
+      "peak_tree_plus_sampler_rss_bytes": 9994472504,
+      "max_processes": 9,
+      "helper_wall_seconds": 332.751842792,
+      "wall_seconds": 332.38,
+      "mlf_seconds": 292.3,
+      "clang_seconds": 34.4,
+      "peak_process_rss_bytes": 9772531712,
+      "binaries": {
+        "emlf": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6",
+        "mlfpkg": "3ad5f14b10258a54ab144e73cbcb40d4c286d9eae5dcc6278adab6c5e8ff4f68"
+      },
+      "llvm": {
+        "emlf": "40d04cfb94852792ca9413f4bad06435b1936ccc0154bed5069c1e1f53b6270d",
+        "mlfpkg": "4d690c2c80397b00673f2f218a3ce87cbbe052240d70f72d095540cdf6b5e015"
+      },
+      "validation": "317dfcff63923c09aeb1f302c14ef396a3f0a7bf973e22d0e9906949d4490f5b"
+    },
+    {
+      "variant": "candidate",
+      "sample": 3,
+      "code": 0,
+      "signal": null,
+      "samples": 920,
+      "peak_tree_rss_bytes": 3225010176,
+      "peak_sampler_rss_bytes": 151522768,
+      "peak_tree_plus_sampler_rss_bytes": 3275260344,
+      "max_processes": 9,
+      "helper_wall_seconds": 461.253941292,
+      "wall_seconds": 460.87,
+      "mlf_seconds": 377.3,
+      "clang_seconds": 31.71,
+      "peak_process_rss_bytes": 2626158592,
+      "binaries": {
+        "emlf": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+        "mlfpkg": "3ad5f14b10258a54ab144e73cbcb40d4c286d9eae5dcc6278adab6c5e8ff4f68"
+      },
+      "llvm": {
+        "emlf": "6681b744a867617156f6e8caf4a91c3a1c6f28ecd0d51a3f36f98051f9e701dd",
+        "mlfpkg": "4d690c2c80397b00673f2f218a3ce87cbbe052240d70f72d095540cdf6b5e015"
+      },
+      "validation": "317dfcff63923c09aeb1f302c14ef396a3f0a7bf973e22d0e9906949d4490f5b"
+    }
+  ],
+  "statistics": {
+    "baseline": {
+      "wall_seconds": {
+        "samples": [
+          324.25,
+          403.17,
+          332.38
+        ],
+        "median": 332.38,
+        "min": 324.25,
+        "max": 403.17,
+        "mad": 8.129999999999995
+      },
+      "mlf_seconds": {
+        "samples": [
+          285.14,
+          363.40999999999997,
+          292.3
+        ],
+        "median": 292.3,
+        "min": 285.14,
+        "max": 363.40999999999997,
+        "mad": 7.160000000000025
+      },
+      "clang_seconds": {
+        "samples": [
+          33.09,
+          33.97,
+          34.4
+        ],
+        "median": 33.97,
+        "min": 33.09,
+        "max": 34.4,
+        "mad": 0.4299999999999997
+      },
+      "peak_process_rss_bytes": {
+        "samples": [
+          9755951104,
+          10180476928,
+          9772531712
+        ],
+        "median": 9772531712,
+        "min": 9755951104,
+        "max": 10180476928,
+        "mad": 16580608
+      },
+      "peak_tree_plus_sampler_rss_bytes": {
+        "samples": [
+          9811596736,
+          10233460032,
+          9994472504
+        ],
+        "median": 9994472504,
+        "min": 9811596736,
+        "max": 10233460032,
+        "mad": 182875768
+      }
+    },
+    "candidate": {
+      "wall_seconds": {
+        "samples": [
+          459.68,
+          470.15,
+          460.87
+        ],
+        "median": 460.87,
+        "min": 459.68,
+        "max": 470.15,
+        "mad": 1.1899999999999977
+      },
+      "mlf_seconds": {
+        "samples": [
+          377.63,
+          382.84000000000003,
+          377.3
+        ],
+        "median": 377.63,
+        "min": 377.3,
+        "max": 382.84000000000003,
+        "mad": 0.3299999999999841
+      },
+      "clang_seconds": {
+        "samples": [
+          32.57,
+          37.7,
+          31.71
+        ],
+        "median": 32.57,
+        "min": 31.71,
+        "max": 37.7,
+        "mad": 0.8599999999999994
+      },
+      "peak_process_rss_bytes": {
+        "samples": [
+          2612903936,
+          2612887552,
+          2626158592
+        ],
+        "median": 2612903936,
+        "min": 2612887552,
+        "max": 2626158592,
+        "mad": 16384
+      },
+      "peak_tree_plus_sampler_rss_bytes": {
+        "samples": [
+          3253872408,
+          3269801760,
+          3275260344
+        ],
+        "median": 3269801760,
+        "min": 3253872408,
+        "max": 3275260344,
+        "mad": 5458584
+      }
+    }
+  },
+  "source_and_tools_unchanged": true,
+  "all_validation_llvm_equal": true
+}

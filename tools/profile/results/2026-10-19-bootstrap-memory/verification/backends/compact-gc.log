@@ -1,0 +1,508 @@
+strict unary representation: evaluated recursive producer
+strict unary representation: lazy poison remains unforced
+strict unary representation: mixed and escaping constructor
+strict unary representation: recursive lazy field
+IO type: string literal
+IO type: unit literal
+IO type: unit constructor
+IO type: unit type alias
+IO type: getLine
+IO type: putStrLn
+IO type: return
+IO type: IO-specific return
+IO type: pure
+IO: greeting and input order
+IO: integer printing and string conversion
+IO: integer arithmetic is signed and unbounded
+IO: integer equality and strict ordering
+IO: string equality respects case, empty strings, and Unicode
+IO: primitives are curried ordinary values
+IO: conditional executes only the chosen IO branch
+IO: conditional preserves a polymorphic branch
+IO: local bindings shadow arithmetic primitives
+IO: conditional does not force an unselected pure branch
+IO: string escapes and unicode
+IO: an action can be executed more than once
+IO: constructing unused actions has no effects
+IO: return does not execute its argument
+IO: extracting a nested action still needs sequencing
+IO: unit pattern
+IO: polymorphic function returned by IO
+IO: local bindings shadow IO primitives
+IO: data fields can contain IO actions
+IO: unselected case branch has no effects
+IO: constructor and case evaluation
+IO: recursive dictionary methods
+IO: generic Monad IO bind
+IO: generic Monad IO input
+IO rejection: IO cannot be redefined
+IO rejection: String cannot be redefined
+IO rejection: Unit cannot be redefined
+IO rejection: Unit constructor cannot be forged
+IO rejection: putStrLn expects a string
+IO rejection: arithmetic expects integers
+IO rejection: comparison expects integers
+IO rejection: string equality expects strings
+IO rejection: conditional requires a Boolean
+IO rejection: conditional branches must agree
+IO rejection: printInt expects an integer
+IO rejection: getLine is an action rather than a function
+IO rejection: IO action cannot be used as a pure string
+IO rejection: bind continuation must return an action
+IO rejection: IO has a fixed arity
+IO rejection: IO cannot take two parameters
+IO target: primitive type arity
+IO target: primitive type kind
+IO target: primitive type scope
+IO target: primitive value argument type
+IO target: conditional type argument arity
+IO target: conditional branch type checked independently
+IO target: no IO constructor
+IO target: target IO type cannot be forged
+IO: pure programs are not executable entry points
+IO: target verification happens before any effects
+IO: EOF is reported and stops the continuation
+IO: backend output errors are reported
+IO: unknown target primitive is rejected
+IO monad law: left identity
+IO monad law: right identity
+IO monad law: associativity
+prelude runtime: IO sequencing without declarations
+prelude runtime: qualified generic IO function
+prelude runtime: one generic function at IO and a user instance
+prelude: user Monad instance needs no class declaration
+prelude: inferred constraints use the imported methods
+prelude: qualified annotation alone imports the class
+prelude: superclass alone imports Monad
+prelude: instance context alone imports Monad
+prelude runtime: prelude implementation uses primitive identities
+prelude runtime: given dictionary and lexical shadowing coexist
+prelude runtime: local class method shadows only the imported method
+prelude rejection: import shadowing does not allow duplicate local methods
+prelude: local Monad declaration shadows the imported class
+prelude rejection: local Monad also hides imported IO instance
+prelude rejection: duplicate imported instance
+prelude rejection: user instance is still checked
+prelude rejection: missing user instance
+prelude rejection: no implicit monad defaulting
+prelude: every compiler API imports the prelude
+prelude: every compiler API supports explicit opt-out
+prelude: opt-out removes implicit class declarations
+prelude: unused imports preserve pure programs
+prelude: unused imports preserve lambda shadowing
+prelude: unused imports preserve pattern shadowing
+prelude: unused imports preserve do-let shadowing
+prelude: unused imports preserve do-pattern shadowing
+prelude: unused imports preserve single-expression do
+prelude: unused imports preserve unrelated class method
+Snake: playable source and xMLF sessions
+  Snake: compiling the interactive example
+  Snake: all 7 sessions pass on both backends and match Haskell
+Snake: pure rules, departing tail, food search, and full-board win
+  Snake: compiling the pure-rule checks
+  Snake: 11 rule checks pass on both backends and match Haskell
+backend: readability: factorial equations
+backend: readability: recursive forall order
+backend: readability: unused recursive forall
+backend: readability: mutual recursion
+backend: readability: recursive IO and do-local recursion
+backend: readability: qualified recursive function
+backend: readability: polymorphic recursion
+backend: readability: cyclic lazy value
+backend: readability: nested patterns and fallback
+backend: readability: constructor equation order keeps wildcard lazy
+backend: readability: nested lambda and do patterns
+backend: readability: pattern annotation imports the prelude
+backend: readability: pattern temporary hygiene
+backend: readability: literal patterns
+backend: readability: literal case order and wildcard laziness
+backend: readability: instance equations
+backend: readability: nested conditional IO layout
+backend: readability: local equation group
+backend: unicode-input
+backend: unicode
+backend: nul
+backend: curried-closure
+backend: lazy-field
+backend: selected-case
+backend: surface: declarations, signatures and precedence
+backend: surface: ordered scope and polymorphic functions
+backend: surface: signed literals, negation and arbitrary precision
+backend: surface: operator and conditional hygiene
+backend: surface: all integer comparisons
+backend: surface: dynamic short circuit true
+backend: surface: dynamic short circuit false
+backend: surface: nested conditionals and Boolean precedence
+backend: surface: do-local annotated function
+backend: surface: instance method equations and qualified declaration
+backend target: non-function
+backend target: bad computation
+backend target: bad unused branch
+backend target: free identity
+backend: identity capture
+backend: cyclic data
+backend: 10000 IO steps
+backend: mutual recursion
+backend: pure program entry does not print
+backend: lazy default case
+backend: lazy returned value
+backend: recursive demand fails
+backend: final line without newline
+backend: unused input is retained
+backend: binary-trees benchmark
+backend: all examples execute
+  Both backends executed all 16 examples
+backend: state dictionary result
+backend: superclass dictionary result
+native optimization: tagged integer boundaries
+native optimization: ordinary products and division preserve Integer boundaries
+native optimization: partial workers stay lazy
+native optimization: seq propagates saturated worker demands
+native optimization: seq worker forces both operands after preceding effects
+native optimization: partial seq stays lazy
+native optimization: function captures and mutual recursion
+native optimization: identities reused in disjoint scopes
+native optimization: packed and general constructor layouts
+native optimization: wide constructors keep fields lazy and recursive
+native optimization: five-field constructor returned from numeric region
+native optimization: general fields retain captured worker values
+native optimization: dead and wildcard fields need no environment
+native optimization: recursive encoding is structural
+native optimization: escaping recursive function
+native optimization: captured closures survive collection
+native optimization: lazy recursive fields and conditional demands
+native optimization: seq demands stay inside the chosen branch
+native optimization: seq preserves ignored arguments and unused results
+native optimization: three-field constructor partially applied
+native optimization: generic arithmetic crosses immediate range
+constructor projections: demanded field fails after preceding effects
+constructor projections: shared fields and lazy poison
+constructor projections: captured function becomes a known worker
+constructor projections: recursive data keeps its knot
+constructor projections: mutually recursive dictionary methods
+constructor projections: partial constructors remain lazy
+constructor projections: same spelling in disjoint scopes
+constructor projections: escaping constructor shares its fields
+constructor projections: default branch preserves its bound constructor
+force reuse: dominated uses emit one force
+force reuse: selected exceptions follow preceding IO
+force reuse: branch joins retain conditional laziness
+force reuse: case alternatives isolate forced operands
+force reuse: escaping closures preserve forcing and repeated actions
+Boolean conditions: checked ordinary branches compare forced canonical Bool
+Boolean conditions: runtime producers agree on both branches
+Boolean conditions: lazy fields captures and partial primitives
+Boolean conditions: condition failure follows preceding IO
+Boolean conditions: selected branch failure follows preceding IO
+environment slots: curried captures and constructor fields remain lazy
+environment slots: repeated native action preserves captures and laziness
+environment slots: captured thunk boundary 28
+environment slots: captured thunk boundary 29
+strict constructor fields: checked lowering uses the pointer proof
+strict constructor fields: lazy, partial, mixed and recursive values
+native scalar arguments: captured doubles and nonnegative countdown
+native scalar arguments: IEEE values survive recursive calls
+native scalar arguments: payload reads stay within their branch
+native scalar arguments: unused failing floating arguments remain lazy
+native numeric region: specialized integer ranges permit negative results and GMP promotion
+native numeric region: reused actions execute and snapshots stay immutable
+native numeric region: unforced unused arguments take the lazy boundary
+native numeric region: aliased Double arrays preserve write and read order
+native numeric region: range facts do not escape a conditional branch
+native numeric region: lazy write operands retain bounds-error ordering
+native numeric region: negative native index
+native numeric region: GMP native index
+native numeric region: empty native array
+numeric: read unbounded signed decimals
+numeric: curried GMP primitives
+numeric: curried unbounded bitwise AND
+numeric: unused bitwise arguments remain lazy
+numeric: binary64 arithmetic and scientific literals
+numeric: rounding ties and signed zero
+numeric: generic floating primitives and IEEE comparisons
+numeric: IEEE non-finite results
+numeric: large integer conversion rounds to nearest
+numeric: IntArray aliasing and repeated action reads
+numeric: allocation actions produce distinct arrays
+numeric: DoubleArray values are copied at read time
+numeric: generic ternary writes
+numeric: unused actions and unselected arithmetic remain lazy
+numeric: empty arrays have zero length
+numeric: array roots and boxed cells survive collection
+numeric failure: quotient by zero
+numeric failure: remainder by zero
+numeric failure: bitwise zero mask still demands its argument
+numeric failure: direct bitwise arguments are ordered
+numeric failure: curried bitwise arguments are ordered
+numeric failure: empty integer input
+numeric failure: signed empty input
+numeric failure: whitespace integer input
+numeric failure: embedded NUL input
+numeric failure: fractional integer input
+numeric failure: negative precision
+numeric failure: large precision
+numeric failure: negative array length
+numeric failure: huge array length
+numeric failure: negative read index
+numeric failure: huge read index
+numeric failure: empty array read
+numeric failure: integer write past end
+numeric failure: negative Double write
+numeric failure: writes force stored values
+numeric failure: direct floating arguments are ordered
+numeric failure: curried floating arguments are ordered
+native numeric region: multiplication and division retain arbitrary precision
+native scalar arguments: recursive permutations bound specialization
+numeric: multiplication and signed quotient boundaries
+numeric: types reject invalid numeric and array programs
+numeric: non-finite target literal rejected by both backends
+numeric: direct and curried formatting force the same arguments
+numeric: pidigits benchmark partial and full rows
+numeric: n-body benchmark initialization and integration
+numeric: spectral-norm benchmark small and odd matrices
+numeric: fannkuch-redux benchmark checksum and flips
+bytes: raw high bytes, NUL and text retain order
+bytes: UTF-8 source strings produce byte lengths and fresh mutable buffers
+bytes: shared reads are snapshots and shared outputs read current contents
+bytes: generic primitive applications preserve slicing
+bytes: empty slices and unused failing actions remain lazy
+bytes: byte buffers and pending slices survive collection
+byte failure: negative length
+byte failure: huge length
+byte failure: negative initial value
+byte failure: initial value outside byte
+byte failure: huge write value
+byte failure: negative write value
+byte failure: negative read
+byte failure: GMP index
+byte failure: write checks bounds before value
+byte failure: empty array still demands index
+byte failure: negative slice
+byte failure: negative count
+byte failure: slice past end
+byte failure: huge count
+byte failure: offset checked before count
+byte failure: write demands value
+bytes: native loop emits every byte without Unicode conversion
+bytes: bulk copy preserves offsets, empty ranges and forward overlap
+bytes: bulk copy fallback retains bounds failures
+bytes: native stores check bounds before byte range
+bytes: write failures stop continuation and preserve raw output
+bytes: nominal types reject invalid operations
+bytes: forged surrogate is rejected before encoding by both backends
+numeric region: integer-to-Double conversion preserves rounding
+bytes: fasta empty, single-base and upstream fixture
+bytes: mandelbrot packed pixels, partial rows and upstream fixture
+byte input: raw bytes, blank lines, final line and repeated EOF
+byte input: shared reads execute again and mix with getLine
+byte input: long raw line grows without decoding
+byte input: buffer boundaries preserve mixed reads and retained lines
+byte input: discarded action does not consume input
+byte input: invalid UTF-8 still fails for text input
+table: fresh actions, aliasing, overwrite and snapshot reads
+table: generic applications and unbounded signed keys and values
+table: native counting loop grows and updates collision-prone keys
+native IO: nested collections preserve caller values and prior results
+table fusion: snapshots, large signed keys and promotion across updates
+table fusion: intervening writes and unequal keys retain their order
+table: GMP keys and values and pending IO survive collection
+table: unused actions do not demand failing operands
+table: small keys retain GMP values through collection and promotion
+table: demanded operands fail after preceding effects
+table: nominal types and IO signatures are checked
+DNA: reverse-complement ambiguity codes, records and growing buffers
+DNA: both upstream fixtures
+DNA: k-nucleotide short inputs, ties, mixed case and record termination
+modules runtime: selective and qualified imports
+modules runtime: unnamed entry expression imports
+modules runtime: qualified types, fields and nested patterns
+modules runtime: private names and constructor identities
+modules runtime: diamond reexports preserve identity
+modules runtime: transitive empty imports carry instances and private helpers
+modules runtime: qualified class, hidden methods in instance declaration
+modules runtime: abstract datatype used by exported functions
+modules runtime: local shadowing and self qualification
+modules runtime: explicit qualified Prelude
+modules runtime: explicit Prelude with implicit import disabled
+modules runtime: hiding Prelude method for local definition
+modules runtime: module lexical scope protects imported do
+modules runtime: polymorphic Monad function across modules
+modules runtime: qualified Boolean constructor patterns
+modules runtime: internal name hygiene
+modules runtime: same method name from distinct classes
+modules runtime: instance may recursively use an exported helper
+modules runtime: bare primitive fallback without implicit Prelude
+modules runtime: entry selects its own main
+modules runtime: primitive fallback permits local definitions
+modules runtime: multi-file example
+modules runtime: CLI imports and output paths
+Module CLI compiler: /Volumes/src/mlf/.mlf-build/bootstrap-memory-2026-10-19/pairs/3-candidate/bin/emlf
+separate runtime: selective and qualified imports
+separate runtime: unnamed entry expression imports
+separate runtime: qualified types, fields and nested patterns
+separate runtime: private names and constructor identities
+separate runtime: diamond reexports preserve identity
+separate runtime: transitive empty imports carry instances and private helpers
+separate runtime: qualified class, hidden methods in instance declaration
+separate runtime: abstract datatype used by exported functions
+separate runtime: local shadowing and self qualification
+separate runtime: explicit qualified Prelude
+separate runtime: explicit Prelude with implicit import disabled
+separate runtime: hiding Prelude method for local definition
+separate runtime: module lexical scope protects imported do
+separate runtime: polymorphic Monad function across modules
+separate runtime: qualified Boolean constructor patterns
+separate runtime: internal name hygiene
+separate runtime: same method name from distinct classes
+separate runtime: instance may recursively use an exported helper
+separate runtime: bare primitive fallback without implicit Prelude
+separate runtime: entry selects its own main
+separate runtime: primitive fallback permits local definitions
+separate runtime: inferred overloaded export
+separate runtime: rank-n constructor field
+separate runtime: class-free bounded annotation rules
+separate runtime: unexported nominal type in inferred signature
+separate runtime: mutually recursive module values
+separate runtime: Unicode interface identity
+separate runtime: nominal global cannot capture local binder
+separate runtime: imported entry binding
+separate CLI: selective and qualified imports
+separate CLI: unnamed entry expression imports
+separate CLI: qualified types, fields and nested patterns
+separate CLI: private names and constructor identities
+separate CLI: diamond reexports preserve identity
+separate CLI: transitive empty imports carry instances and private helpers
+separate CLI: qualified class, hidden methods in instance declaration
+separate CLI: abstract datatype used by exported functions
+separate CLI: local shadowing and self qualification
+separate CLI: explicit qualified Prelude
+separate CLI: explicit Prelude with implicit import disabled
+separate CLI: hiding Prelude method for local definition
+separate CLI: module lexical scope protects imported do
+separate CLI: polymorphic Monad function across modules
+separate CLI: qualified Boolean constructor patterns
+separate CLI: internal name hygiene
+separate CLI: same method name from distinct classes
+separate CLI: instance may recursively use an exported helper
+separate CLI: bare primitive fallback without implicit Prelude
+separate CLI: entry selects its own main
+separate CLI: primitive fallback permits local definitions
+separate CLI: inferred overloaded export
+separate CLI: rank-n constructor field
+separate CLI: class-free bounded annotation rules
+separate CLI: unexported nominal type in inferred signature
+separate CLI: mutually recursive module values
+separate CLI: Unicode interface identity
+separate CLI: nominal global cannot capture local binder
+separate CLI: imported entry binding
+separate runtime: interface-only CLI and invalidation
+bootstrap primitives: scalar indexing counts characters and preserves NUL
+bootstrap primitives: string comparison follows Unicode scalar order
+bootstrap primitives: floating bit representation includes signed zero and nonfinite values
+bootstrap primitives: seq forces only weak head and unused panic stays lazy
+bootstrap primitives: escaping primitives follow the same runtime ABI
+bootstrap primitives: empty arguments and lazy file operations
+bootstrap primitive failure: empty index
+bootstrap primitive failure: negative index
+bootstrap primitive failure: huge index
+bootstrap primitive failure: negative slice
+bootstrap primitive failure: oversize slice
+bootstrap primitive failure: negative slice count
+bootstrap primitive failure: surrogate
+bootstrap primitive failure: past maximum scalar
+bootstrap primitive failure: negative scalar
+bootstrap primitive failure: negative double bits
+bootstrap primitive failure: oversize double bits
+bootstrap primitive failure: seq demands first
+bootstrap primitive failure: panic preserves embedded NUL and newline
+bootstrap primitive failure: missing argument
+bootstrap primitive failure: invalid negative exit
+bootstrap primitive failure: invalid large exit
+bootstrap primitive failure: NUL path
+bootstrap primitives: Unicode scalar boundaries
+bootstrap primitives: strict decimal input
+bootstrap primitives: arguments exclude executable and preserve Unicode
+bootstrap primitives: diagnostics are ordered and separate from stdout
+bootstrap primitives: diagnostic write failures stop continuation
+bootstrap primitives: executable path is canonical and names this process
+bootstrap primitives: complete input preserves UTF-8, lines and NUL
+bootstrap primitives: complete input rejects invalid UTF-8
+bootstrap primitives: exit status stops pending effects
+bootstrap primitives: UTF-8 files and canonical paths
+host IO: environment mutation and inheritance
+host IO: binary SHA-256 vectors
+host IO: directory listing and lock lifecycle
+host IO: literal argv, cwd, redirects and exit status
+host IO: process launch failures return status
+host IO: repeated launches retain process-group isolation
+host IO: process timeout returns 124
+bootstrap primitives: file errors retain effect order
+bootstrap primitives: cached Unicode offsets survive collection
+bootstrap primitives: collection preserves suspended pure work and cyclic data
+bootstrap primitives: signatures reject mismatched types
+ST runtime: return
+ST runtime: write-read
+ST runtime: length-zero-lazy-initial
+ST runtime: length-lazy-initial
+ST runtime: snapshot
+ST runtime: repeated-read-action
+ST runtime: allocation-actions-repeat
+ST runtime: array-aliases
+ST runtime: separate-regions
+ST runtime: nested-regions
+ST runtime: large-integer
+ST runtime: unused-written-poison
+ST runtime: unused-return-poison
+ST runtime: unused-actions
+ST runtime: prelude-do
+ST runtime: polymorphic-elements
+ST runtime: constructor-elements
+ST runtime: recursive-elements
+ST runtime: opaque-package
+ST runtime: io-description-result
+ST runtime: order
+ST runtime: nested-poison-order
+ST runtime: negative-size
+ST runtime: huge-size
+ST runtime: negative-index
+ST runtime: past-end
+ST runtime: huge-index
+ST runtime: empty-array-read
+ST runtime: negative-write-index
+ST runtime: past-end-write
+ST runtime: huge-write-index
+ST runtime: bool-whnf
+ST runtime: int-whnf
+ST runtime: double-whnf
+ST runtime: lazy-data-result
+ST runtime: polymorphic-function-result
+ST runtime: primitive-laziness
+ST runtime: ignored-bind-result
+ST runtime: recursive-state-worker
+ST runtime: case-state-worker
+ST runtime: lazy-default-case
+ST runtime: strict-worker-constructor
+ST runtime: strict-captured-constructor
+ST runtime: strict-let-constructor
+ST runtime: partial-continuation
+ST runtime: dynamic-continuation
+ST runtime: deferred-state-poison
+ST runtime: branch-laziness
+ST runtime: sequence-in-state
+ST runtime: bounded-non-tail-state-worker
+ST runtime: bounded-tail-state-worker
+ST runtime: bounded-mixed-tail-state-worker
+ST runtime: single-use-action-alias
+higher-order specialization: primitive-callback
+higher-order specialization: captured-callback
+higher-order specialization: partial-callback
+higher-order specialization: empty-lazy-capture
+higher-order specialization: discarded-callback-argument
+higher-order specialization: changing-callback
+higher-order specialization: recursive-capture-scope
+higher-order specialization: unbounded-callback-integers
+higher-order specialization: constructor-callback
+higher-order specialization: lazy-constructor-callback
+higher-order specialization: escaping-original-worker
+Backend matrix: 552 rows x 2 backends; no missing executions
+500 shared IO/prelude/backend fixtures; 0 failures

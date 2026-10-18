@@ -1,0 +1,12 @@
+{
+  "variant": "candidate",
+  "sample": 3,
+  "code": 0,
+  "signal": null,
+  "samples": 920,
+  "peak_tree_rss_bytes": 3225010176,
+  "peak_sampler_rss_bytes": 151522768,
+  "peak_tree_plus_sampler_rss_bytes": 3275260344,
+  "max_processes": 9,
+  "helper_wall_seconds": 461.253941292
+}

@@ -1,0 +1,122 @@
+Sample 1: baseline
+Sample 1: candidate
+Sample 2: candidate
+Sample 2: baseline
+Sample 3: baseline
+Sample 3: candidate
+{
+  "baseline": {
+    "wall_seconds": {
+      "samples": [
+        324.25,
+        403.17,
+        332.38
+      ],
+      "median": 332.38,
+      "min": 324.25,
+      "max": 403.17,
+      "mad": 8.129999999999995
+    },
+    "mlf_seconds": {
+      "samples": [
+        285.14,
+        363.40999999999997,
+        292.3
+      ],
+      "median": 292.3,
+      "min": 285.14,
+      "max": 363.40999999999997,
+      "mad": 7.160000000000025
+    },
+    "clang_seconds": {
+      "samples": [
+        33.09,
+        33.97,
+        34.4
+      ],
+      "median": 33.97,
+      "min": 33.09,
+      "max": 34.4,
+      "mad": 0.4299999999999997
+    },
+    "peak_process_rss_bytes": {
+      "samples": [
+        9755951104,
+        10180476928,
+        9772531712
+      ],
+      "median": 9772531712,
+      "min": 9755951104,
+      "max": 10180476928,
+      "mad": 16580608
+    },
+    "peak_tree_plus_sampler_rss_bytes": {
+      "samples": [
+        9811596736,
+        10233460032,
+        9994472504
+      ],
+      "median": 9994472504,
+      "min": 9811596736,
+      "max": 10233460032,
+      "mad": 182875768
+    }
+  },
+  "candidate": {
+    "wall_seconds": {
+      "samples": [
+        459.68,
+        470.15,
+        460.87
+      ],
+      "median": 460.87,
+      "min": 459.68,
+      "max": 470.15,
+      "mad": 1.1899999999999977
+    },
+    "mlf_seconds": {
+      "samples": [
+        377.63,
+        382.84000000000003,
+        377.3
+      ],
+      "median": 377.63,
+      "min": 377.3,
+      "max": 382.84000000000003,
+      "mad": 0.3299999999999841
+    },
+    "clang_seconds": {
+      "samples": [
+        32.57,
+        37.7,
+        31.71
+      ],
+      "median": 32.57,
+      "min": 31.71,
+      "max": 37.7,
+      "mad": 0.8599999999999994
+    },
+    "peak_process_rss_bytes": {
+      "samples": [
+        2612903936,
+        2612887552,
+        2626158592
+      ],
+      "median": 2612903936,
+      "min": 2612887552,
+      "max": 2626158592,
+      "mad": 16384
+    },
+    "peak_tree_plus_sampler_rss_bytes": {
+      "samples": [
+        3253872408,
+        3269801760,
+        3275260344
+      ],
+      "median": 3269801760,
+      "min": 3253872408,
+      "max": 3275260344,
+      "mad": 5458584
+    }
+  }
+}

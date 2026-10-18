@@ -1,0 +1,18 @@
+{
+  "complete": true,
+  "no_cache_hits": true,
+  "caller_gc_policy_unset": true,
+  "effective_divisor": 4,
+  "no_maximum_heap": true,
+  "candidate_export_verified": true,
+  "outputs": {
+    "emlf": {
+      "binary_sha256": "36816b701ad373d28e16f4dbeba0d3548921cbf36e4b4ca0816b1b53d558e9b6",
+      "llvm_sha256": "40d04cfb94852792ca9413f4bad06435b1936ccc0154bed5069c1e1f53b6270d"
+    },
+    "mlfpkg": {
+      "binary_sha256": "3ad5f14b10258a54ab144e73cbcb40d4c286d9eae5dcc6278adab6c5e8ff4f68",
+      "llvm_sha256": "4d690c2c80397b00673f2f218a3ce87cbbe052240d70f72d095540cdf6b5e015"
+    }
+  }
+}
