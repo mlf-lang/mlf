@@ -30,27 +30,31 @@ export MLF_COMPILER=/absolute/path/to/native/emlf
 export MLF_GC_PREFIX=/absolute/path/to/bdwgc-install
 ./scripts/bootstrap-package.sh
 export MLF_PACKAGE_MANAGER="$PWD/.mlf-build/package-manager/mlfpkg"
-./mlfpkg --compiler "$MLF_COMPILER" --timeout 21600 build
+./mlfpkg --compiler "$MLF_COMPILER" --timeout 21600 \
+  --build-dir "$PWD/.mlf-build/native-stage1" build
 
+export MLF_COMPILER="$PWD/.mlf-build/native-stage1/bin/emlf"
+export MLF_PACKAGE_MANAGER="$PWD/.mlf-build/native-stage1/bin/mlfpkg"
+./mlfpkg --compiler "$MLF_COMPILER" --timeout 21600 build
 export EMLF_BIN="$PWD/.mlf-build/bin/emlf"
-export MLF_COMPILER="$EMLF_BIN"
-export MLF_PACKAGE_MANAGER="$PWD/.mlf-build/bin/mlfpkg"
 "$EMLF_BIN" --type examples/choose-id.emlf
 printf 'Ada\n' | "$EMLF_BIN" --run examples/io-hello.emlf
 "$EMLF_BIN" --run examples/modules/Main.emlf
 ```
 
-The bootstrap script builds the initial package manager. The manifest-driven
-build then produces both `.mlf-build/bin/emlf` and `.mlf-build/bin/mlfpkg`.
-The exports above select those newly built executables for subsequent builds
-and tests. Global package-manager options go before `build`, `test`, or `run`.
-Use `--build-dir DIR` to select a separate build directory.
+The bootstrap script builds the initial package manager. The first native
+stage updates the code generator; the second produces `.mlf-build/bin/emlf`
+and `.mlf-build/bin/mlfpkg`. Keep the stage-1 tools selected as the package
+manager's inputs, in their separate directory, when rebuilding or testing the
+repository. Use `EMLF_BIN` to run the candidate compiler. Global package-manager
+options go before `build`, `test`, or `run`; `--build-dir DIR` selects the output
+directory.
 
 Run all six native test groups, or select groups for development:
 
 ```sh
-./mlfpkg --compiler "$EMLF_BIN" --timeout 21600 test
-./mlfpkg --compiler "$EMLF_BIN" --timeout 21600 test \
+./mlfpkg --compiler "$MLF_COMPILER" --timeout 21600 test
+./mlfpkg --compiler "$MLF_COMPILER" --timeout 21600 test \
   --target unit --target packages
 ```
 
@@ -58,6 +62,7 @@ The groups are `unit`, `packages`, `self-host`, `parity`, `backends`, and `port`
 They include a fresh self-host LLVM fixed point and interpreter/LLVM execution
 in both standard and compact-GC layouts. The full port suite contains large
 interpreted graph programs; its complete run needs the longer timeout above.
+The retained local full-suite verification used 32 GiB RAM.
 Build reports are written to `.mlf-build/build-report.json`, with detailed
 compiler-test evidence under `.mlf-build/compiler-tests/`.
 
@@ -98,7 +103,7 @@ fixed point. The independent checking modules and reference algorithms execute
 as MLF programs; frozen Haskell-seed expectations remain parity oracle data.
 
 ```sh
-./mlfpkg --compiler "$EMLF_BIN" --timeout 21600 test \
+./mlfpkg --compiler "$MLF_COMPILER" --timeout 21600 test \
   --target self-host --target parity
 ```
 
@@ -187,7 +192,7 @@ either backend is missing from any execution case.
 Run the shared backend and compiler-port suites:
 
 ```sh
-./mlfpkg --compiler "$EMLF_BIN" --timeout 21600 test \
+./mlfpkg --compiler "$MLF_COMPILER" --timeout 21600 test \
   --target backends --target port
 ```
 
@@ -1403,7 +1408,7 @@ suite reports the discrepancy; a passing suite does not mean full table
 agreement. See [the reference comparison](docs/figure12-a8-reference.txt).
 
 ```sh
-./mlfpkg --compiler "$EMLF_BIN" --timeout 21600 test --target unit
+./mlfpkg --compiler "$MLF_COMPILER" --timeout 21600 test --target unit
 ```
 
 See [the test report](docs/figure12-results.txt) for the encoding, type checks,
