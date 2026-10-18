@@ -32,18 +32,21 @@ jobs:
           test "$(git describe --tags --exact-match HEAD)" = "$RELEASE_TAG"
           tools/release/check.sh
       - run: brew install llvm gmp pkg-config bdw-gc
-      - name: Fetch verified native seed
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: tools/release/fetch-seed.sh .mlf-build/seed
       # The release tag can predate the diagnostic scripts. Use the tools from
       # this workflow's immutable commit while building the tagged sources.
-      - name: Fetch workflow timing tools
+      - name: Fetch workflow seed pins and timing tools
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ github.workflow_sha }}
           path: .mlf-build/ci-tools
-          sparse-checkout: tools/release
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /tools/release/
+            /.github/seed.env
+      - name: Fetch verified native seed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .mlf-build/ci-tools/tools/release/fetch-seed.sh .mlf-build/seed
       # A seed with an older code generator cannot itself produce fixed-point
       # LLVM for the updated compiler. Validate the next native generation.
       - name: Bootstrap the updated native code generator
