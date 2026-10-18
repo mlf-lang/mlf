@@ -97,5 +97,37 @@
     "run": "https://github.com/mlf-lang/mlf/actions/runs/39133028273",
     "started": false,
     "github_annotation": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the Billing & plans section in your settings"
+  },
+  "published": {
+    "url": "https://github.com/mlf-lang/mlf/releases/tag/v0.1.1",
+    "published_at": "2026-10-18T13:50:07Z",
+    "is_draft": false,
+    "is_prerelease": true,
+    "assets": [
+      {
+        "name": "mlf-0.1.1-macos-arm64.tar.gz",
+        "size": 2441726,
+        "digest": "sha256:e056f0f37fc957e4eb3393dea1046f954140bed07cddd93f8d005fc38890cd62"
+      },
+      {
+        "name": "mlf-0.1.1-validation.tar.gz",
+        "size": 45965579,
+        "digest": "sha256:a01fa088e17e9c71fc45c0ca2c6046ae18848137b61046f505c82d5560831923"
+      },
+      {
+        "name": "SHA256SUMS",
+        "size": 189,
+        "digest": "sha256:c964b4b46512ec79a832c4dfc74c8ff8e63eafd0ec73603a58d54fda2b60dd1d"
+      }
+    ],
+    "independent_download_verification": {
+      "passed": true,
+      "checked_at": "2026-10-18T13:54:02.874Z",
+      "all_archive_checksums": true,
+      "all_bundle_file_checksums": true,
+      "compiler_and_manager_hashes_match": true,
+      "launcher_versions": "0.1.1",
+      "compiler_smoke_type": "forall a3. a3 -> a3"
+    }
   }
 }
