@@ -1,0 +1,8 @@
+{
+  "package_manager": {
+    "path": "/Volumes/src/mlf/.mlf-build/compile3/final-manager-v2/bin/mlfpkg",
+    "sha256": "9c4d72a22698abc8b6bdc02fb3a7d0295ee489aacd8f24f76f6f2f6cb34b8761"
+  },
+  "build_report_sha256": "e7bf6bc837371cddf7561b33c30cba97f2db5c554b11bf8d8301a1631b780846",
+  "fingerprint_sha256": "9e53a4dfacb5375a3f2fbcb092a454e122655f018b1a0d9fe7163b53c9ff04d0"
+}

@@ -1,0 +1,1 @@
+Retained: independent 3072 edge-list operations and 768 graph-index transitions passed; all27 candidate standard LLVM outputs equal baseline; n-body median -3.04%, FASTA -2.04% in alternating three-pair emission comparisons. No timing samples excluded.

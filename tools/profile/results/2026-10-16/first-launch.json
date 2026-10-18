@@ -1,0 +1,24 @@
+{
+  "purpose": "Explain exact-file runtime warm-up; not a performance gate",
+  "first": {
+    "exit_code": 0,
+    "timed_out": false,
+    "interrupted": false,
+    "termination_signal": 0,
+    "wall_seconds": 0.7742,
+    "cpu_seconds": 0.133606,
+    "peak_rss_bytes": 1376256,
+    "pid": 38425
+  },
+  "repeat": {
+    "exit_code": 0,
+    "timed_out": false,
+    "interrupted": false,
+    "termination_signal": 0,
+    "wall_seconds": 0.108918,
+    "cpu_seconds": 0.10684,
+    "peak_rss_bytes": 1376256,
+    "pid": 38427
+  },
+  "binary_sha256": "9a7d210a87f68cc2f555ff4ea8bb501c71dc9068977a99d0947fd875c7c805c5"
+}

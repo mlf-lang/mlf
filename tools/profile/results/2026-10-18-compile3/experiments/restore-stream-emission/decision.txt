@@ -1,0 +1,1 @@
+Retained: 1536 ordered restoration cases passed; all27 candidate standard LLVM outputs equal baseline; n-body median -2.04%, FASTA -3.66% in alternating three-pair emission comparisons. No timing samples excluded.

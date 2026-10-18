@@ -1,0 +1,32 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.IntMap as IM
+
+assert value = if value then return Unit else panic "integer map update disagrees with independent sorted association list"
+put : (Int -> Int -> Int) -> Int -> Int -> List (Pair Int Int) -> List (Pair Int Int)
+put combine key value entries = case entries of
+ Nil -> Cons (Pair key value) Nil
+ Cons (Pair k v) rest -> if key < k then Cons (Pair key value) entries else if key > k then Cons (Pair k v) (put combine key value rest) else Cons (Pair key (combine value v)) rest
+same entries tree = IM.valid tree && L.eqList (\(Pair k v) (Pair j w) -> k == j && v == w) entries (IM.toList tree) && IM.size tree == L.length entries
+step : IntMap Int -> List (Pair Int Int) -> List Int -> Bool -> IO Unit
+step table entries keys useCombine = case keys of
+ Nil -> return Unit
+ Cons key rest -> do
+  let value = key * 7 + 3
+  let combine = if useCombine then (\new old -> new * 31 + old) else (\new old -> new)
+  let expected = put combine key value entries
+  let actual = if useCombine then IM.insertWith combine key value table else IM.insert key value table
+  assert (same expected actual)
+  step actual expected rest useCombine
+check count offset stride = do
+ let keys = L.map (\n -> offset + n * stride) (L.range 0 (count - 1))
+ let operations = L.append keys (L.append (L.reverse keys) (L.append keys (L.map (\n -> n + 1) keys)))
+ step IM.empty Nil operations false
+ step IM.empty Nil operations true
+main = do
+ L.mapM_ (\count -> L.mapM_ (\offset -> L.mapM_ (check count offset) (Cons 1 (Cons 17 Nil))) (Cons (-1000000000000000000000000000000000000) (Cons (-7) (Cons 0 (Cons 1000000000000000000000000000000000000 Nil))))) (Cons 0 (Cons 1 (Cons 2 (Cons 5 (Cons 17 (Cons 65 Nil))))))
+ let lazy = IM.insert 0 (panic "unused map value forced") (IM.singleton 1 9)
+ let replaced = IM.insert 0 7 lazy
+ assert (IM.get 0 replaced == 7 && IM.get 1 replaced == 9)
+ putStrLn "96 integer map traces and lazy replacement passed"

@@ -1,4 +1,10 @@
-module Bootstrap.Compiler where
+module Bootstrap.Compiler
+  (Compilation, inferredType, compiledTerm, checkedTerm, presolution, sourceType,
+   phase, diagnostic, prettyPhase, prettyError, atPhase,
+   compile, compileWithPrelude, compileModules, compileModulesWithPrelude,
+   compileFile, compileFileWithPrelude, compileSourceWithImports, standalone,
+   compileStandalone, compileLinked, compileExpr, compileExprWithPrelude,
+   compileProgram, compileProgramWithPrelude, finishCompilation) where
 
 import Bootstrap.Types
 import qualified Bootstrap.Std as L
@@ -10,14 +16,17 @@ import qualified Bootstrap.Parser as P
 import qualified Bootstrap.Module as Modules
 import qualified Bootstrap.Prelude as Prelude
 import qualified Bootstrap.Classes as Classes
-import qualified Bootstrap.X.Check as Check
+import qualified Bootstrap.X.Checked as Checked
 import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Type as T
 
-inferredType (Compilation t _ _ _) = t
-compiledTerm (Compilation _ t _ _) = t
-presolution (Compilation _ _ g _) = g
-sourceType (Compilation _ _ _ s) = s
+data Compilation = Compilation Checked.CheckedTerm Graph String
+
+inferredType (Compilation checked _ _) = Checked.typeOf checked
+compiledTerm (Compilation checked _ _) = Checked.term checked
+checkedTerm (Compilation checked _ _) = checked
+presolution (Compilation _ g _) = g
+sourceType (Compilation _ _ s) = s
 phase (CompileError p _) = p
 diagnostic (CompileError _ s) = s
 prettyPhase p = case p of
@@ -85,7 +94,7 @@ compileLinked mode modules = do
       let diagnosticNames = M.union compareString (M.map display classes) names in
       case finishCompilation lowered of
         Left (CompileError p message) -> Left (CompileError p (Modules.displayNames diagnosticNames message))
-        Right (Compilation ty term graph source) -> Right (Compilation ty term graph (display source))
+        Right (Compilation checked graph source) -> Right (Compilation checked graph (display source))
 
 compileExpr : SExpr -> Either CompileError Compilation
 compileExpr expr = compileExprWithPrelude ImplicitPrelude expr
@@ -110,8 +119,9 @@ finishCompilation (Pair program names) = case program of
     evidence <- atPhase Resolution (E.resolveEvidenceIn types (C.skeleton constraints))
     body <- atPhase Elaboration (E.elaboratePreparedIn types solved evidence (C.skeleton constraints))
     let term = if L.null declarations then body else XWithData declarations body
-    ty <- atPhase Verification (Check.checkClosed term)
+    checked <- atPhase Verification (Checked.check term)
+    let ty = Checked.typeOf checked
     let expected = E.schemeTypeIn types (C.generalization (C.skeleton constraints))
     if L.not (T.alphaEq ty expected) then Left (CompileError Verification "elaboration changed the inferred type")
     else if L.not (X.equalErased (X.erase term) (C.eraseSourceWith evidence (C.skeleton constraints))) then Left (CompileError Verification "elaboration changed source erasure")
-    else Right (Compilation ty term graph (Classes.prettyQualified names ty))
+    else Right (Compilation checked graph (Classes.prettyQualified names ty))

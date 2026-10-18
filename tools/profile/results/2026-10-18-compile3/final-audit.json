@@ -1,0 +1,52 @@
+{
+  "complete": true,
+  "compiler": {
+    "path": "/Volumes/src/mlf/.mlf-build/compile3/pgo7/candidate/bin/emlf",
+    "sha256": "0bc6f35450ec7bf03df75a1dbebedea3d5de5ed692aabb69e97ed2dbb364806d"
+  },
+  "head": "ff8362d6cd5678b062e68b105ba23890ef847e33",
+  "branch": "main",
+  "initial_files_present": 662,
+  "initial_source_snapshot_files_verified": 662,
+  "changed_starting_files": [
+    "tools/bench/Main.emlf",
+    "tools/bench/README.md",
+    "tools/bench/mlf-package.json",
+    "tools/profile/README.md",
+    "tools/profile/RESULTS.md",
+    "benchmarks/RESULTS.md",
+    "bootstrap/Bootstrap/Graph.emlf",
+    "bootstrap/Bootstrap/Graph/Solver.emlf",
+    "bootstrap/Bootstrap/IntSet.emlf",
+    "bootstrap/Bootstrap/LLVM.emlf",
+    "bootstrap/Bootstrap/LLVM/Build.emlf",
+    "bootstrap/Bootstrap/LLVM/Codegen.emlf",
+    "bootstrap/Bootstrap/LLVM/StrictFields.emlf",
+    "bootstrap/mlf-package.json",
+    "mlf.lock",
+    "package/Package/Benchmark.emlf",
+    "package/Package/CompilerTests.emlf",
+    "runtime/mlf_runtime.c",
+    "runtime/mlf_runtime.h",
+    "test/host_support.c",
+    "test/runtime_values.c",
+    "tests/CoreMain.emlf",
+    "tests/HarnessMain.emlf",
+    "tests/Tests/BackendSuite.emlf",
+    "tests/Tests/BenchmarkSuite.emlf",
+    "tests/Tests/Core.emlf",
+    "tests/Tests/EnvironmentAccess.emlf",
+    "tests/Tests/NativeABI.emlf",
+    "tests/mlf-package.json"
+  ],
+  "source_hashes_verified": 452,
+  "all_378_timed_samples_successful_and_medians_recomputed": true,
+  "native_groups_verified": 6,
+  "forbidden_invocation_log_present": false,
+  "git_diff_check": "passed",
+  "historical_reports_preserved_verbatim": true,
+  "reports_sha256": {
+    "tools/profile/RESULTS.md": "8fc44d53c1ae7e3aa02839acf621163687d26af868cc89d6ec2a81caccd83945",
+    "benchmarks/RESULTS.md": "8c46c890537c8f60b3bc4f6c5b5325537e0002a4a979c5bca9fce7451053ee1a"
+  }
+}

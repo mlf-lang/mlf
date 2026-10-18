@@ -1,0 +1,24 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.IntSet as IS
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.Graph as G
+import qualified Bootstrap.Graph.Solver as S
+
+assert : Bool -> IO Unit
+assert ok = if ok then return Unit else panic "bounded projection intervals disagree with independent ordered maps"
+same a b = case a of { Left x -> case b of { Left y -> eqString x y; _ -> false }; Right x -> case b of { Right y -> x == y; _ -> false } }
+check supplied = do
+ let selected = IS.fromList (L.append supplied (L.reverse supplied))
+ let ordered = IS.toList selected
+ let indices = L.range 0 (L.length ordered - 1)
+ let forward = IM.fromList (L.zip ordered indices)
+ let backward = IM.fromList (L.zip indices ordered)
+ let mapping = S.projectionMap selected
+ L.mapM_ (\n -> assert (S.projectionRank mapping n == IM.get n forward)) ordered
+ L.mapM_ (\n -> let alias = Graph IM.empty (IM.singleton (n + 1) n) 0 in assert (S.compactProjection alias mapping (n + 1) == IM.get n forward)) ordered
+ L.mapM_ (\n -> assert (same (S.projectionSelect mapping n) (case IM.lookup n backward of { Nothing -> Left "scope placeholder escaped local unification"; Just v -> Right v }))) (L.append indices (Cons (-1) (Cons (L.length ordered) (Cons (L.length ordered + 100) Nil))))
+main = do
+ L.mapM_ (\count -> L.mapM_ (\offset -> L.mapM_ (\stride -> L.mapM_ (\runs -> check (L.concatMap (\r -> L.map (\i -> offset + r * 1000003 + stride * i) (L.range 0 (count - 1))) (L.range 0 (runs - 1)))) (Cons 0 (Cons 1 (Cons 2 (Cons 4 (Cons 5 (Cons 8 Nil))))))) (Cons 1 (Cons 17 Nil))) (Cons 0 (Cons (-10000) (Cons 1000000000000000000000000000000000000000000000000000000000000001 Nil)))) (Cons 0 (Cons 1 (Cons 2 (Cons 3 (Cons 5 (Cons 17 (Cons 65 Nil)))))))
+ putStrLn "252 bounded and sparse projection maps passed independent rank, select and alias checks"

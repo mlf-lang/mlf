@@ -1,0 +1,40 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+import qualified Package.Json as J
+import qualified Package.Benchmark as B
+import qualified Package.Verification as V
+right value = case value of { Left message -> O.fatal message; Right item -> return item }
+main = do
+ compiler <- getArg 0
+ backend <- getArg 1
+ directory <- getArg 2
+ O.mkdir directory
+ setEnv "MLF_TEST_HOST_SUPPORT" "/Volumes/src/mlf/.mlf-build/compile3/final-bench-v1/host-support"
+ setEnv "MLF_BENCH_STREAM_LLVM" "1"
+ writeFile (directory ++ "/input") "1000\n"
+ let source = "/Volumes/src/mlf/benchmarks/n-body/mlf/main.emlf"
+ status <- O.exec "" (O.words "pkg-config --cflags --libs gmp") "" (directory ++ "/flags") (directory ++ "/flags.err") 30
+ O.require (status == 0) "GMP flags failed"
+ flagText <- readFile (directory ++ "/flags")
+ let flags = O.words flagText
+ rows <- S.mapM (\run -> do
+  samples <- S.mapM (\stream -> do
+   let name = showInt run ++ (if stream then "-stream" else "-ordinary")
+   let output = directory ++ "/" ++ name
+   setEnv "MLF_BENCH_STREAM_LINK" (if stream then "1" else "")
+   result <- B.buildParallel output compiler backend source "/Volumes/src/mlf/runtime/mlf_runtime.c" flags 10.0
+   Pair binary sample <- right result
+   J.write (directory ++ "/" ++ name ++ ".json") sample
+   code <- O.exec "" (Cons binary Nil) (directory ++ "/input") (output ++ "/result") (output ++ "/result.err") 30
+   out <- readFile (output ++ "/result")
+   expected <- readFile "/Volumes/src/mlf/benchmarks/n-body/expected-1000.txt"
+   O.require (code == 0 && eqString (O.trim out) (O.trim expected)) "streamed link output changed"
+   hash <- fileDigest (output ++ "/program.ll")
+   object <- fileDigest (output ++ "/program.o")
+   runtime <- fileDigest (output ++ "/runtime.o")
+   return (J.Object (Cons (Pair "name" (J.str name)) (Cons (Pair "program_llvm" (J.str hash)) (Cons (Pair "program_object" (J.str object)) (Cons (Pair "runtime_object" (J.str runtime)) (Cons (Pair "sample" sample) Nil))))))) (if run == 2 then Cons true (Cons false Nil) else Cons false (Cons true Nil))
+  return samples) (Cons 1 (Cons 2 (Cons 3 Nil)))
+ J.write (directory ++ "/results.json") (J.Array (S.concat rows))
+ putStrLn "All six fresh n-body builds and outputs passed"

@@ -19,57 +19,68 @@ The repository is currently private; GitHub access is required to download it.
 
 ## Build and run
 
-The package manager is written in MLF. With an existing compiler supporting
-the host IO primitives, it builds and tests this repository without Cabal:
+Run these commands from the repository root. You need a working native MLF
+compiler as the seed, Clang/LLVM, GMP development files, `pkg-config`, and a
+local BDWGC installation. An installed [native release](docs/releases.md) can
+supply the seed. The compiler and package manager are written in MLF; this
+build and test path needs no GHC, Cabal, or Python.
 
 ```sh
-export MLF_COMPILER=/path/to/emlf
-export MLF_GC_PREFIX=/path/to/bdwgc-install
+export MLF_COMPILER=/absolute/path/to/native/emlf
+export MLF_GC_PREFIX=/absolute/path/to/bdwgc-install
 ./scripts/bootstrap-package.sh
-./mlfpkg build
-./mlfpkg --timeout 21600 test
+export MLF_PACKAGE_MANAGER="$PWD/.mlf-build/package-manager/mlfpkg"
+./mlfpkg --compiler "$MLF_COMPILER" --timeout 21600 build
+
+export EMLF_BIN="$PWD/.mlf-build/bin/emlf"
+export MLF_COMPILER="$EMLF_BIN"
+export MLF_PACKAGE_MANAGER="$PWD/.mlf-build/bin/mlfpkg"
+"$EMLF_BIN" --type examples/choose-id.emlf
+printf 'Ada\n' | "$EMLF_BIN" --run examples/io-hello.emlf
+"$EMLF_BIN" --run examples/modules/Main.emlf
 ```
 
-The build compiles both `emlf` and `mlfpkg` against their local MLF dependencies.
-Package resolution, caching, builds, and compiler test orchestration run in MLF.
-The compiler tests and independent reference programs run in MLF; the active
-path needs neither GHC, Cabal, nor Python. Clang builds the retained C ABI probes
-and process transports. See [the package manager guide](docs/package-manager.md)
-for prerequisites, local dependencies, caching, and test targets, and
-[the native test coverage](tests/README.md) for validation evidence.
+The bootstrap script builds the initial package manager. The manifest-driven
+build then produces both `.mlf-build/bin/emlf` and `.mlf-build/bin/mlfpkg`.
+The exports above select those newly built executables for subsequent builds
+and tests. Global package-manager options go before `build`, `test`, or `run`.
+Use `--build-dir DIR` to select a separate build directory.
 
-The traditional Haskell seed workflow uses GHC and Cabal; no external solver is needed. Tested
-with GHC 9.14.1. Native linking, `backend-tests`, and `cabal bench` additionally
-require Clang/LLVM 15 or later, GMP development files, and `pkg-config` on
-`PATH`. The benchmark drivers also require Python 3.
+Run all six native test groups, or select groups for development:
 
 ```sh
-cabal build all --offline -j1
-cabal test --offline -j1 --test-show-details=direct
-cabal bench --offline -j1
-cabal run emlf -- examples/self-application.emlf
-cabal run emlf -- --type examples/choose-id.emlf
-cabal run emlf -- --type examples/monad-maybe.emlf
-cabal run emlf -- --type examples/monad-state-do.emlf
-cabal run emlf -- --run examples/io-hello.emlf
-cabal run emlf -- --run examples/snake.emlf
-cabal run emlf -- --run examples/modules/Main.emlf
+./mlfpkg --compiler "$EMLF_BIN" --timeout 21600 test
+./mlfpkg --compiler "$EMLF_BIN" --timeout 21600 test \
+  --target unit --target packages
 ```
 
-Omit `--offline` if the dependencies are not already installed. The executable
-also accepts standard input and `--expr '...source...'`. `--type` prints only
-the inferred source type, including class constraints. A failed parse,
-module resolution, inference, dictionary resolution, elaboration, or verification
+The groups are `unit`, `packages`, `self-host`, `parity`, `backends`, and `port`.
+They include a fresh self-host LLVM fixed point and interpreter/LLVM execution
+in both standard and compact-GC layouts. The full port suite contains large
+interpreted graph programs; its complete run needs the longer timeout above.
+Build reports are written to `.mlf-build/build-report.json`, with detailed
+compiler-test evidence under `.mlf-build/compiler-tests/`.
+
+Package resolution, caching, builds, tests, and independent reference programs
+run in MLF. Clang builds the C runtime, ABI probes, and process transports.
+The verified 2026-10-18 toolchain used Apple Silicon macOS 26.6.2,
+Clang/LLVM 23.1.3, GMP 6.3.0, and BDWGC 8.2.12. See the
+[package manager guide](docs/package-manager.md) for prerequisites and local
+dependencies, [native test coverage](tests/README.md), and the
+[latest verification report](tools/profile/RESULTS.md).
+
+The executable also accepts standard input and `--expr '...source...'`.
+`--type` prints only the inferred source type, including class constraints.
+A failed parse, module resolution, inference, dictionary resolution,
+elaboration, or verification
 exits unsuccessfully and identifies the failing phase.
 
-The output is xMLF source, preceded by a comment containing its type. Compile
-and check a file with the executable directly, keeping Cabal's build messages
-out of the generated file:
+The default output is xMLF source, preceded by a comment containing its type.
+Compile and independently check a file with the native executable:
 
 ```sh
-EMLF_BIN="$(cabal list-bin exe:emlf)"
-"$EMLF_BIN" examples/choose-id.emlf > choose-id.xmlf
-"$EMLF_BIN" --check choose-id.xmlf
+"$EMLF_BIN" examples/choose-id.emlf > .mlf-build/choose-id.xmlf
+"$EMLF_BIN" --check .mlf-build/choose-id.xmlf
 ```
 
 `--check` parses the xMLF and runs the target checker; it does not call the
@@ -81,56 +92,44 @@ sharing; the numbers have no type-theoretic significance.
 
 [`bootstrap/Main.emlf`](bootstrap/Main.emlf) implements the compiler in MLF,
 including modules, classes, graph inference, checked elaboration, the xMLF
-checker, interpreter, and LLVM backend. The Haskell compiler supplies the seed
-and independent test oracles. Run the three-stage bootstrap and parity gate with:
+checker, interpreter, and LLVM backend. The native package manager rebuilds it
+using an existing MLF compiler and checks self-hosting through a fresh LLVM
+fixed point. The independent checking modules and reference algorithms execute
+as MLF programs; frozen Haskell-seed expectations remain parity oracle data.
 
 ```sh
-python3 scripts/bootstrap-compiler.py
+./mlfpkg --compiler "$EMLF_BIN" --timeout 21600 test \
+  --target self-host --target parity
 ```
 
-The gate requires identical stage 2 and stage 3 LLVM and runs the full exported
-language corpus through stage 3. The bootstrap binaries use a
-locally built, pinned garbage collector for long pure compilation phases.
-See [`bootstrap/README.md`](bootstrap/README.md) for dependencies, validation,
-and artifact locations.
+Compiler-profile builds use the compact BDWGC runtime for long pure compilation
+phases. For two native generations and compiler-only PGO, see
+[native self-compilation profiling](tools/profile/README.md). The latest frozen
+source comparison measured **181.955 s versus 257.289 s**, a **29.280%** median
+reduction; the raw measurements and exact compiler hashes are linked there.
 
-For a verified native installation, use the release gate:
+The [native release workflow](docs/releases.md) requires all six native groups,
+a fresh self-host fixed point, and relocation/installation checks before
+packaging the tested executables. It records the build host and native library
+dependencies. The separate [performance report](benchmarks/RESULTS.md) verifies
+all nine workloads at **3× C compilation / 2× C runtime** using its explicit
+LLVM/linker configuration. This performance run is separate from release CI.
 
-```sh
-python3 scripts/release.py build --output dist-newstyle/release
-python3 scripts/release.py verify --release dist-newstyle/release
-python3 scripts/release.py install --release dist-newstyle/release --prefix "$HOME/.local"
-"$HOME/.local/bin/emlf" --type examples/choose-id.emlf
-"$HOME/.local/bin/emlf-compile" examples/snake.emlf -o snake
-```
-
-This runs all Cabal tests, a fresh three-stage bootstrap, both native backend
-matrices, and five-sample `cabal bench` measurements of all nine Benchmarks Game
-workloads. Every workload must meet 5x C compilation and 2x C runtime limits.
-Only the exact stage 3 executable that passed these gates is packaged and
-installed. Failed runs retain their evidence; each build needs a new output
-directory. Installation verifies the package hashes and tests imports, IO and
-native compilation outside the checkout before switching to the new version.
-
-The installed compiler requires GMP, but no Haskell compiler or Cabal at runtime.
-`emlf-compile` additionally needs Python 3, Clang and `pkg-config`. Packages are
-verified for their build host's operating system and architecture, with its
-shared-library dependencies; they are not cross-platform binaries. The full
-release build also needs the Rust and Haskell benchmark toolchains described in
-[`benchmarks/README.md`](benchmarks/README.md).
+The optional Haskell seed and its historical Python bootstrap/release scripts
+remain documented in [`bootstrap/README.md`](bootstrap/README.md) and
+[release documentation](docs/releases.md).
 
 ## Native compilation with LLVM
 
 Compile a saved xMLF program to LLVM IR, then link it with the runtime:
 
 ```sh
-cabal build exe:emlf -j1
-EMLF_BIN="$(cabal list-bin exe:emlf)"
-"$EMLF_BIN" examples/snake.emlf > snake.xmlf
-"$EMLF_BIN" --xmlf-to-llvm snake.xmlf > snake.ll
+"$EMLF_BIN" examples/snake.emlf > .mlf-build/snake.xmlf
+"$EMLF_BIN" --xmlf-to-llvm .mlf-build/snake.xmlf > .mlf-build/snake.ll
 MLF_RUNTIME="$("$EMLF_BIN" --llvm-runtime)"
-clang -O2 snake.ll "$MLF_RUNTIME" $(pkg-config --cflags --libs gmp) -lm -o snake
-./snake
+clang -O2 -std=c11 .mlf-build/snake.ll "$MLF_RUNTIME" \
+  $(pkg-config --cflags --libs gmp) -lm -o .mlf-build/snake
+.mlf-build/snake
 ```
 
 `--xmlf-to-llvm` independently checks the input before erasing type evidence;
@@ -140,18 +139,21 @@ eMLF directly through the same checked xMLF boundary, use
 Both commands write only LLVM IR to standard output. `--no-prelude` also
 applies to `--emit-llvm`.
 
-To produce an executable in one command, use the native build driver:
+For a manifest-driven native executable, the package manager builds, links,
+and runs the selected target:
 
 ```sh
-python3 scripts/compile_native.py --compiler "$EMLF_BIN" examples/snake.emlf -o snake
+./mlfpkg --compiler "$EMLF_BIN" \
+  --manifest examples/packages/mlf-package.json run hello
 ```
 
-The driver accepts either the Haskell seed or a native MLF stage, plus `-i`
-and `--no-prelude`. It compiles the complete C runtime afresh while the frontend
-emits LLVM, then compiles and links the LLVM with that runtime object. It uses
-Clang `-O2`, keeps intermediate files in a new temporary directory, and replaces
-the output only after a successful build. `--report FILE` records phase timings
-and commands. The cross-language benchmark uses this same build implementation.
+Declare your own executable in `mlf-package.json`; see the
+[package format and examples](docs/package-manager.md#local-packages).
+Normal builds use Clang `-O2` and content-addressed caches with source/tool
+fingerprints. The [native benchmark runner](tools/bench/README.md) instead
+creates fresh runtime and LLVM objects for every sample and times the complete
+build, including linking. Its optional LLVM/linker configuration is also usable
+with `./mlfpkg --clang /absolute/path/to/clang-mlf build`.
 
 The generated module contains native closure and case functions, `mlf_entry`,
 and `main`. It supports the complete current xMLF term syntax, including
@@ -166,31 +168,32 @@ GMP preserves the language's unbounded `Int`; strings use length-delimited
 UTF-8, including embedded NULs. Invalid Unicode scalar literals are rejected.
 
 The runtime memoizes pure thunks and executes shared IO actions afresh on
-each bind. Its collector runs between IO steps, retaining the current action
+each bind. The standard collector runs between IO steps, retaining the current action
 and pending continuations. Managed values use reusable allocation pages,
 with reachability-based reclamation. Long pure computations can retain allocations
 until the next IO step or program exit. This is a single-threaded POSIX
-runtime with a 64-bit ABI, tested on macOS ARM64 with Clang 23.1.2 and GMP 6.3.0.
+runtime with a 64-bit ABI. Compiler-profile builds use compact BDWGC allocation
+and collection during pure evaluation. The latest native validation used macOS
+ARM64, Clang 23.1.3, GMP 6.3.0, and BDWGC 8.2.12.
 
-`cabal test -j1` runs every backend behavior test through both the xMLF
-interpreter and LLVM native code. The shared matrix compares results, ordered
-read/write events, write boundaries, and unused input. It includes all 16
-standalone examples, the multi-file module example, IO and Prelude behavior,
-and all seven Snake sessions and eleven
-rule checks against the independent Haskell game. A coverage audit fails if
+The native `backends` group runs every backend behavior test through both the
+xMLF interpreter and LLVM native code, in both runtime layouts. It compares
+results, ordered read/write events, write boundaries, and unused input.
+It includes all 16 standalone examples, the multi-file module example,
+IO and Prelude behavior,
+and all seven Snake sessions and eleven rule checks against independently
+retained expectations. A coverage audit fails if
 either backend is missing from any execution case.
-Run the shared suite, optionally with sanitizers or LLVM optimization disabled:
+Run the shared backend and compiler-port suites:
 
 ```sh
-cabal test backend-tests -j1 --test-show-details=direct
-MLF_LLVM_TEST_CFLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer' \
-  cabal test backend-tests -j1 --test-show-details=direct
-MLF_LLVM_TEST_OPT=-O0 cabal test backend-tests -j1 --test-show-details=direct
+./mlfpkg --compiler "$EMLF_BIN" --timeout 21600 test \
+  --target backends --target port
 ```
 
 The shared suite requires POSIX process support and the native toolchain;
-missing dependencies fail the suite. Frontend
-tests can be run separately with `cabal test mlf-tests figure12-tests -j1`.
+missing dependencies fail the suite. Run frontend tests and Figure 12 cases
+with the `unit` target shown under Build and run.
 See [`docs/llvm-backend.txt`](docs/llvm-backend.txt) for the lowering and runtime
 boundaries. The [Snake benchmark](docs/snake-llvm-compilation-performance.txt)
 reports xMLF emission, LLVM IR emission, and complete native builds separately.
@@ -286,7 +289,7 @@ main = do
 ```
 
 Run the complete [example](examples/modules/Main.emlf) with
-`cabal run emlf -- --run examples/modules/Main.emlf`; it prints `25`.
+`"$EMLF_BIN" --run examples/modules/Main.emlf`; it prints `25`.
 The same entry works with `--type`, xMLF emission, and `--emit-llvm`.
 
 Import/export forms follow the names-and-interfaces model in
@@ -340,8 +343,8 @@ and the current directory; the first matching file wins. An imported file
 must declare the requested module name. Put search options before the command:
 
 ```sh
-cabal run emlf -- -i src -i vendor --run app/Main.emlf
-cabal run emlf -- -isrc --emit-llvm app/Main.emlf > program.ll
+"$EMLF_BIN" -i src -i vendor --run app/Main.emlf
+"$EMLF_BIN" -isrc --emit-llvm app/Main.emlf > program.ll
 ```
 
 For API users, `parseModule` preserves declarations and imports.
@@ -358,12 +361,14 @@ compilation is also available in both the Haskell and self-hosted compilers:
 
 ```sh
 mkdir -p build/Geometry
-emlf --compile-module examples/modules/Geometry/Point.emlf -o build/Geometry/Point
-emlf -i build --compile-module examples/modules/Main.emlf -o build/Main
-emlf -i build --show-interface build/Main.mlfi
-emlf -i build --run-module build/Main.mlfi
-emlf -i build --link-module build/Main.mlfi > build/main.xmlf
-python3 scripts/compile_native.py --compiler emlf -i build build/Main.mlfi -o build/main
+"$EMLF_BIN" --compile-module examples/modules/Geometry/Point.emlf -o build/Geometry/Point
+"$EMLF_BIN" -i build --compile-module examples/modules/Main.emlf -o build/Main
+"$EMLF_BIN" -i build --show-interface build/Main.mlfi
+"$EMLF_BIN" -i build --run-module build/Main.mlfi
+"$EMLF_BIN" -i build --link-module build/Main.mlfi > build/main.xmlf
+"$EMLF_BIN" -i build --module-to-llvm build/Main.mlfi > build/main.ll
+clang -O2 -std=c11 build/main.ll "$("$EMLF_BIN" --llvm-runtime)" \
+  $(pkg-config --cflags --libs gmp) -lm -o build/main
 ```
 
 Compile dependencies first, using prefixes that match their module paths.
@@ -681,7 +686,7 @@ reusing its unqualified name at the top level.
 To disable the implicit prelude, put `--no-prelude` before other CLI options:
 
 ```sh
-cabal run emlf -- --no-prelude --type --expr 'return 42'
+"$EMLF_BIN" --no-prelude --type --expr 'return 42'
 ```
 
 The library exposes `compileWithPrelude`, `compileExprWithPrelude`, and
@@ -873,7 +878,7 @@ do {
 }
 ```
 
-Run it with `cabal run emlf -- --run examples/io-hello.emlf`. Ordinary
+Run it with `"$EMLF_BIN" --run examples/io-hello.emlf`. Ordinary
 compilation, `--type`, and `--check` perform no program IO. `--run` checks the
 generated target before executing its final action; the action's result is
 discarded. The entry point must have type `IO a` (possibly universally
@@ -983,7 +988,6 @@ in expressions and patterns, and for the `Unit` type in annotations.
 Use a file or `--expr` when the program reads interactive input:
 
 ```sh
-EMLF_BIN="$(cabal list-bin exe:emlf)"
 "$EMLF_BIN" --run --expr 'do { printInt 42; putStrLn "done" }'
 "$EMLF_BIN" examples/io-hello.emlf > hello.xmlf
 "$EMLF_BIN" --run-xmlf hello.xmlf
@@ -1010,14 +1014,13 @@ implemented.
 Snake game written in the source language:
 
 ```sh
-cabal run emlf -- --run examples/snake.emlf
+"$EMLF_BIN" --run examples/snake.emlf
 ```
 
 This larger example takes longer to compile than the small examples. To play
 again without recompiling, save the xMLF once and run that file:
 
 ```sh
-EMLF_BIN="$(cabal list-bin exe:emlf)"
 "$EMLF_BIN" examples/snake.emlf > snake.xmlf
 "$EMLF_BIN" --run-xmlf snake.xmlf
 ```
@@ -1066,12 +1069,12 @@ parses, checks, and interprets on each invocation. `--emit-llvm` followed by
 Clang produces a linked native executable. The benchmark below reports each
 output separately alongside the GHC native build.
 
-`cabal test` compares all seven scripted game transcripts byte for byte
-between Haskell, the xMLF interpreter, and LLVM native code. It checks the same
-eleven pure-rule outcomes on both backends against Haskell and handwritten
-expectations, including the departing tail and full-board win.
+The native `backends` group checks all seven scripted game transcripts against
+the retained independent Haskell-game expectations on the xMLF interpreter and
+LLVM native code. It also checks eleven pure-rule outcomes, including the
+departing tail and full-board win.
 
-### Compiler performance
+## Compiler performance
 
 Graph validation uses indexed scratch tables for densely numbered graphs,
 numbers the binding tree once, and checks kinds, scope, and structural cycles
@@ -1114,9 +1117,39 @@ large-integer limb storage. Allocating byte/array/table IO uses explicitly
 rooted native calls. Adjacent table count updates fuse, and guarded copy loops
 use LLVM memory intrinsics. See [backend design](docs/llvm-backend.txt).
 
-The project builds with `-O2`; the CLI uses a 32 MiB allocation area to reduce
-garbage collection during inference. These defaults are in `cabal.project`
-and `mlf.cabal`. The allocation area can be overridden with RTS options.
+The native compiler builds with Clang `-O2` and the compact BDWGC runtime.
+[Compiler-only PGO](tools/profile/README.md#compiler-only-profile-guided-optimization)
+trains on frozen compiler sources, without benchmark programs or inputs.
+The [2026-10-18 verification](tools/profile/RESULTS.md) passed all six native
+test groups and the seven-sample **3× C compilation / 2× C runtime** gate for
+every one of the nine workloads. Compilation includes fresh runtime C, LLVM
+compilation, and linking; exact-executable runtime warm-up is applied equally
+to C and MLF. Every observed maximum MLF time divided by the corresponding
+minimum C time also remained below its limit.
+
+Use the [native benchmark guide](tools/bench/README.md) to build the runner and
+configure the generic LLVM/linker backend used by that performance result.
+Its final arguments explicitly select the per-workload limits:
+
+```sh
+MLF_BENCH_STREAM_LINK=1 MLF_BENCH_STREAM_LLVM=1 \
+MLF_BENCH_MLF_CLANG="$PWD/.mlf-build/backend-ready-link/clang-mlf" \
+  .mlf-build/native-bench-driver/bin/bench \
+  /absolute/path/to/optimized/emlf /absolute/path/to/baseline/emlf \
+  "$PWD/.mlf-build/native-bench-results" 7 /absolute/path/to/clang 3 2
+```
+
+The configuration, runner, and compilers must be built first, and the output
+directory must be new. Run measured jobs alone. The
+[results](benchmarks/RESULTS.md) retain raw samples, medians, variation, source
+and toolchain hashes; [self-compilation profiling](tools/profile/README.md)
+reports the separate frozen-source comparison and diagnostic timing boundaries.
+
+### Historical Haskell benchmarks
+
+The Haskell seed builds with `-O2`; its CLI uses a 32 MiB allocation area.
+These defaults are in `cabal.project` and `mlf.cabal`. Its allocation area can
+be overridden with RTS options.
 
 Run the cross-language compilation and runtime benchmarks through Cabal:
 
@@ -1302,8 +1335,8 @@ reconstruction uses a dependency queue while retaining every validation check.
 
 ## Validation
 
-`cabal test` exercises the eight computation rules and their failure cases,
-capture-avoiding substitution, alpha-equivalence, rigid/skolem checks, graph
+The native `unit` group exercises the eight computation rules and their failure
+cases, capture-avoiding substitution, alpha-equivalence, rigid/skolem checks, graph
 domination, expansion reset, let scopes, `choose id`, `g g`, arbitrary-rank
 annotations, existentials, and the source examples. Generated xMLF is printed,
 parsed again, and checked in the targeted and annotation tests.
@@ -1325,7 +1358,7 @@ projections that reorder or drop parameters. Do-notation tests check statement
 order, lexical scope, fresh temporary names, local polymorphism, constructor
 patterns, invalid blocks, and integration with `MonadState`.
 
-All execution tests share `test/Backends.hs` in the `backend-tests` suite;
+Native execution tests share `tests/Tests/Backends.emlf`;
 fixtures cannot select just one backend. Each matrix row must complete on
 both the interpreter and LLVM, with the same outcome, ordered IO trace, and
 remaining input. Frontend-only type and rejection assertions run once.
@@ -1348,7 +1381,7 @@ quit, invalid commands, growth, reverse turns, and wall/body collisions.
 Additional checks call the example's pure rules to cover all four walls,
 the departing tail, food occupancy, and the full-board win.
 
-An independent Algorithm W implementation in `test/Oracle.hs` checks the
+An independent Algorithm W implementation in `tests/Tests/Oracle.emlf` checks the
 unannotated-language typability correspondence of Theorem 12.3.1. The corpus
 contains all 1,712 closed terms through AST size 6 plus 5,000 deterministic
 larger terms, including both accepted and rejected programs. Another corpus
@@ -1356,7 +1389,8 @@ contains 126 typed annotation programs over polymorphic and nested types.
 These tests do not substitute the inference engine for its own oracle, and
 elaboration/verification failures are never treated as legitimate rejections.
 
-The separate `figure12-tests` suite tests examples from the **MLF column** of Figure 12 in
+The Figure 12 suite within the native `unit` group tests examples from the
+**MLF column** of Figure 12 in
 [A Quick Look at Impredicativity](https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf).
 It covers all 34 rows and 43 expressions, using the paper's library signatures
 and checking printed/reparsed xMLF for every accepted expression. **All 43
@@ -1369,7 +1403,7 @@ suite reports the discrepancy; a passing suite does not mean full table
 agreement. See [the reference comparison](docs/figure12-a8-reference.txt).
 
 ```sh
-cabal test figure12-tests --offline -j1 --test-show-details=direct
+./mlfpkg --compiler "$EMLF_BIN" --timeout 21600 test --target unit
 ```
 
 See [the test report](docs/figure12-results.txt) for the encoding, type checks,

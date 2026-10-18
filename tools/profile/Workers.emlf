@@ -1,0 +1,21 @@
+module Workers where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Bootstrap.Map as M
+import qualified Bootstrap.Compiler as C
+import qualified Bootstrap.X.Syntax as X
+import qualified NamedOptimize as O
+import qualified Bootstrap.LLVM.Analysis as A
+
+safe : String -> String
+safe text = S.concatStrings (S.map (\i -> let c = stringCodeAt text i in
+ if c >= 48 && c <= 57 || c >= 65 && c <= 90 || c >= 97 && c <= 122 || c == 95 || c == 46 then stringFromCode c else "_") (S.range 0 (stringLength text - 1)))
+main = do
+ file <- getArg 0
+ root <- getArg 1
+ result <- C.compileFile (Cons root (Cons "tools/profile" Nil)) file
+ case result of
+  Left error -> do { putErr (C.prettyError error ++ "\n"); exitWith 1 }
+  Right compiled -> do
+   let functions = A.analyze (O.optimize (X.erase (C.compiledTerm compiled)))
+   S.mapM_ (\(XName identity hint) -> putStrLn (showInt identity ++ "\t" ++ safe hint)) (M.keys functions)

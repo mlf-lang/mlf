@@ -1,0 +1,7 @@
+{
+  "observed_utc": "2026-10-17T23:04:22.832Z",
+  "status": "incomplete",
+  "reason": "Command session ended before result aggregation; no active measurement process on continuation; completed and partial sample files retained.",
+  "last_logged_workload": "mandelbrot",
+  "acceptance_evidence": false
+}

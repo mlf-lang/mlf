@@ -244,7 +244,12 @@ storeEnvironment env index value = do
 -- Store all fields at saturation without evaluating their lazy pointers.
 -- Both ordinary workers and numeric regions use the same constructor ABI.
 constructorValue : Int -> List String -> Build String
-constructorValue tag fields = case fields of
+constructorValue tag fields = do
+  header <- gets objectHeaderBytes
+  if header == 0 && L.not (L.null fields) then compactConstructor tag fields else ordinaryConstructor tag fields
+
+ordinaryConstructor : Int -> List String -> Build String
+ordinaryConstructor tag fields = case fields of
   Nil -> cgPure (immediate (tag * 8 + 4))
   Cons a Nil -> call "@mlf_constructor1" (args2 (number tag) (pointer a))
   Cons a (Cons b Nil) -> call "@mlf_constructor2" (args3 (number tag) (pointer a) (pointer b))
@@ -467,3 +472,18 @@ literalInteger : Int -> Build String
 literalInteger value = if value >= 0 - 4611686018427387904 && value < 4611686018427387904 then cgPure (immediate (2 * value + 1)) else do
   literal <- stringConstant (showInt value)
   call "@mlf_integer" (args1 (pointer (L.fst literal)))
+
+-- Compact allocation inlines only the cleared-batch fast path. Refill,
+-- allocator debugging and constructor audits remain runtime responsibilities.
+compactConstructor : Int -> List String -> Build String
+compactConstructor tag fields = case fields of
+  Nil -> cgPure (immediate (tag * 8 + 4))
+  Cons a Nil -> call "@mlf.construct.1" (args2 (number tag) (pointer a))
+  Cons a (Cons b Nil) -> call "@mlf.construct.2" (args3 (number tag) (pointer a) (pointer b))
+  _ -> do
+    value <- call "@mlf.construct.wide" (args2 (number tag) (number (L.length fields)))
+    L.mapM_ (\entry -> case entry of
+      Pair index field -> do
+        address <- result ("getelementptr i8, ptr " ++ value ++ ", i64 " ++ showInt (24 + 8 * index))
+        emit ("  store ptr " ++ field ++ ", ptr " ++ address ++ ", align 8, !tbaa !3")) (L.zip (L.range 0 (L.length fields - 1)) fields)
+    cgPure value

@@ -1,0 +1,798 @@
+{
+  "groups": {
+    "ordinary": {
+      "samples": [
+        0.924126,
+        0.507157,
+        0.518458
+      ],
+      "median": 0.518458
+    },
+    "stream": {
+      "samples": [
+        0.51005,
+        0.48371,
+        0.497881
+      ],
+      "median": 0.497881
+    }
+  },
+  "equality": {
+    "program_llvm": true,
+    "program_object": true,
+    "runtime_object": true
+  },
+  "raw": [
+    {
+      "name": "1-ordinary",
+      "program_llvm": "317dfcff63923c09aeb1f302c14ef396a3f0a7bf973e22d0e9906949d4490f5b",
+      "program_object": "bb52631710000a51e17a5b28798e886d856461ba69c18283b83f70c465f641eb",
+      "runtime_object": "a5f01e4ef3a84cc96a9b56140ceb0230a7b2405593970799aaa004b3fa60657d",
+      "sample": {
+        "cpu_seconds": 0.922116,
+        "exit_code": 0,
+        "maximum_parallel_compilers": 3,
+        "remaining_children": 0,
+        "stages": [
+          {
+            "command": [
+              "/usr/bin/mkfifo",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/1-ordinary/program.ll.pipe"
+            ],
+            "cpu_seconds": 0.001957,
+            "exit_code": 0,
+            "finished_seconds": 0.002921,
+            "peak_rss_bytes": 1196032,
+            "phase": "setup",
+            "pid": 49179,
+            "started_seconds": 0.000002,
+            "wall_seconds": 0.002919
+          },
+          {
+            "command": [
+              "/bin/bash",
+              "-o",
+              "pipefail",
+              "-c",
+              "fifo=$1; shift; \"$@\" | /bin/cat > \"$fifo\"",
+              "mlf-stream",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/1-ordinary/program.ll.pipe",
+              "/Volumes/src/mlf/.mlf-build/compile3/pgo6/candidate/bin/emlf",
+              "--emit-llvm",
+              "/Volumes/src/mlf/benchmarks/n-body/mlf/main.emlf"
+            ],
+            "cpu_seconds": 0.430085,
+            "exit_code": 0,
+            "finished_seconds": 0.533744,
+            "peak_rss_bytes": 561070080,
+            "phase": "frontend",
+            "pid": 49181,
+            "started_seconds": 0.003949,
+            "wall_seconds": 0.529795
+          },
+          {
+            "command": [
+              "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2/clang-mlf",
+              "-O2",
+              "-std=c11",
+              "-c",
+              "/Volumes/src/mlf/runtime/mlf_runtime.c",
+              "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+              "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+              "-lgmp",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/1-ordinary/runtime.o"
+            ],
+            "cpu_seconds": 0.35551,
+            "exit_code": 0,
+            "finished_seconds": 0.876206,
+            "peak_rss_bytes": 102612992,
+            "phase": "runtime",
+            "pid": 49180,
+            "started_seconds": 0.000254,
+            "wall_seconds": 0.875952
+          },
+          {
+            "command": [
+              "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2/clang-mlf",
+              "--mlf-stream-ir",
+              "-O2",
+              "-Wno-override-module",
+              "-c",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/1-ordinary/program.ll",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/1-ordinary/program.o"
+            ],
+            "cpu_seconds": 0.09474,
+            "exit_code": 0,
+            "finished_seconds": 0.6144,
+            "peak_rss_bytes": 55263232,
+            "phase": "llvm",
+            "pid": 49182,
+            "started_seconds": 0.004266,
+            "wall_seconds": 0.610134
+          },
+          {
+            "command": [
+              "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2/clang-mlf",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/1-ordinary/program.o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/1-ordinary/runtime.o",
+              "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+              "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+              "-lgmp",
+              "-lm",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/1-ordinary/pending-executable"
+            ],
+            "cpu_seconds": 0.039824,
+            "exit_code": 0,
+            "finished_seconds": 0.924123,
+            "peak_rss_bytes": 35618816,
+            "phase": "link",
+            "pid": 49229,
+            "started_seconds": 0.877463,
+            "wall_seconds": 0.04666
+          }
+        ],
+        "wall_seconds": 0.924126
+      }
+    },
+    {
+      "name": "1-stream",
+      "program_llvm": "317dfcff63923c09aeb1f302c14ef396a3f0a7bf973e22d0e9906949d4490f5b",
+      "program_object": "bb52631710000a51e17a5b28798e886d856461ba69c18283b83f70c465f641eb",
+      "runtime_object": "a5f01e4ef3a84cc96a9b56140ceb0230a7b2405593970799aaa004b3fa60657d",
+      "sample": {
+        "cpu_seconds": 0.887376,
+        "exit_code": 0,
+        "maximum_parallel_compilers": 4,
+        "remaining_children": 0,
+        "stages": [
+          {
+            "command": [
+              "/usr/bin/mkfifo",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/1-stream/program.ll.pipe"
+            ],
+            "cpu_seconds": 0.001997,
+            "exit_code": 0,
+            "finished_seconds": 0.002861,
+            "peak_rss_bytes": 1196032,
+            "phase": "setup",
+            "pid": 49280,
+            "started_seconds": 0.000001,
+            "wall_seconds": 0.00286
+          },
+          {
+            "command": [
+              "/bin/bash",
+              "-o",
+              "pipefail",
+              "-c",
+              "fifo=$1; shift; \"$@\" | /bin/cat > \"$fifo\"",
+              "mlf-stream",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/1-stream/program.ll.pipe",
+              "/Volumes/src/mlf/.mlf-build/compile3/pgo6/candidate/bin/emlf",
+              "--emit-llvm",
+              "/Volumes/src/mlf/benchmarks/n-body/mlf/main.emlf"
+            ],
+            "cpu_seconds": 0.409394,
+            "exit_code": 0,
+            "finished_seconds": 0.421165,
+            "peak_rss_bytes": 561086464,
+            "phase": "frontend",
+            "pid": 49282,
+            "started_seconds": 0.004116,
+            "wall_seconds": 0.417049
+          },
+          {
+            "command": [
+              "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2/clang-mlf",
+              "-O2",
+              "-std=c11",
+              "-c",
+              "/Volumes/src/mlf/runtime/mlf_runtime.c",
+              "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+              "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+              "-lgmp",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/1-stream/runtime.o"
+            ],
+            "cpu_seconds": 0.354073,
+            "exit_code": 0,
+            "finished_seconds": 0.362111,
+            "peak_rss_bytes": 102170624,
+            "phase": "runtime",
+            "pid": 49281,
+            "started_seconds": 0.000175,
+            "wall_seconds": 0.361936
+          },
+          {
+            "command": [
+              "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2/clang-mlf",
+              "--mlf-stream-ir",
+              "-O2",
+              "-Wno-override-module",
+              "-c",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/1-stream/program.ll",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/1-stream/program.o"
+            ],
+            "cpu_seconds": 0.082614,
+            "exit_code": 0,
+            "finished_seconds": 0.492284,
+            "peak_rss_bytes": 55099392,
+            "phase": "llvm",
+            "pid": 49283,
+            "started_seconds": 0.004435,
+            "wall_seconds": 0.487849
+          },
+          {
+            "command": [
+              "/usr/bin/touch",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/1-stream/runtime.o.ready"
+            ],
+            "cpu_seconds": 0.002803,
+            "exit_code": 0,
+            "finished_seconds": 0.368501,
+            "peak_rss_bytes": 1196032,
+            "phase": "runtime-ready",
+            "pid": 49287,
+            "started_seconds": 0.363369,
+            "wall_seconds": 0.005132
+          },
+          {
+            "command": [
+              "/usr/bin/touch",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/1-stream/program.o.ready"
+            ],
+            "cpu_seconds": 0.001989,
+            "exit_code": 0,
+            "finished_seconds": 0.496276,
+            "peak_rss_bytes": 1196032,
+            "phase": "llvm-ready",
+            "pid": 49288,
+            "started_seconds": 0.493546,
+            "wall_seconds": 0.00273
+          },
+          {
+            "command": [
+              "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2/clang-mlf",
+              "--mlf-wait-objects",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/1-stream/program.o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/1-stream/runtime.o",
+              "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+              "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+              "-lgmp",
+              "-lm",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/1-stream/pending-executable"
+            ],
+            "cpu_seconds": 0.034506,
+            "exit_code": 0,
+            "finished_seconds": 0.510047,
+            "peak_rss_bytes": 35225600,
+            "phase": "link",
+            "pid": 49284,
+            "started_seconds": 0.00458,
+            "wall_seconds": 0.505467
+          }
+        ],
+        "wall_seconds": 0.51005
+      }
+    },
+    {
+      "name": "2-stream",
+      "program_llvm": "317dfcff63923c09aeb1f302c14ef396a3f0a7bf973e22d0e9906949d4490f5b",
+      "program_object": "bb52631710000a51e17a5b28798e886d856461ba69c18283b83f70c465f641eb",
+      "runtime_object": "a5f01e4ef3a84cc96a9b56140ceb0230a7b2405593970799aaa004b3fa60657d",
+      "sample": {
+        "cpu_seconds": 0.856988,
+        "exit_code": 0,
+        "maximum_parallel_compilers": 4,
+        "remaining_children": 0,
+        "stages": [
+          {
+            "command": [
+              "/usr/bin/mkfifo",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/2-stream/program.ll.pipe"
+            ],
+            "cpu_seconds": 0.001865,
+            "exit_code": 0,
+            "finished_seconds": 0.003054,
+            "peak_rss_bytes": 1196032,
+            "phase": "setup",
+            "pid": 49339,
+            "started_seconds": 0.000002,
+            "wall_seconds": 0.003052
+          },
+          {
+            "command": [
+              "/bin/bash",
+              "-o",
+              "pipefail",
+              "-c",
+              "fifo=$1; shift; \"$@\" | /bin/cat > \"$fifo\"",
+              "mlf-stream",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/2-stream/program.ll.pipe",
+              "/Volumes/src/mlf/.mlf-build/compile3/pgo6/candidate/bin/emlf",
+              "--emit-llvm",
+              "/Volumes/src/mlf/benchmarks/n-body/mlf/main.emlf"
+            ],
+            "cpu_seconds": 0.391295,
+            "exit_code": 0,
+            "finished_seconds": 0.396889,
+            "peak_rss_bytes": 561020928,
+            "phase": "frontend",
+            "pid": 49341,
+            "started_seconds": 0.004308,
+            "wall_seconds": 0.392581
+          },
+          {
+            "command": [
+              "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2/clang-mlf",
+              "-O2",
+              "-std=c11",
+              "-c",
+              "/Volumes/src/mlf/runtime/mlf_runtime.c",
+              "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+              "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+              "-lgmp",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/2-stream/runtime.o"
+            ],
+            "cpu_seconds": 0.346139,
+            "exit_code": 0,
+            "finished_seconds": 0.352635,
+            "peak_rss_bytes": 102268928,
+            "phase": "runtime",
+            "pid": 49340,
+            "started_seconds": 0.000188,
+            "wall_seconds": 0.352447
+          },
+          {
+            "command": [
+              "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2/clang-mlf",
+              "--mlf-stream-ir",
+              "-O2",
+              "-Wno-override-module",
+              "-c",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/2-stream/program.ll",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/2-stream/program.o"
+            ],
+            "cpu_seconds": 0.08065,
+            "exit_code": 0,
+            "finished_seconds": 0.464407,
+            "peak_rss_bytes": 55312384,
+            "phase": "llvm",
+            "pid": 49342,
+            "started_seconds": 0.0045,
+            "wall_seconds": 0.459907
+          },
+          {
+            "command": [
+              "/usr/bin/touch",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/2-stream/runtime.o.ready"
+            ],
+            "cpu_seconds": 0.00201,
+            "exit_code": 0,
+            "finished_seconds": 0.356659,
+            "peak_rss_bytes": 1196032,
+            "phase": "runtime-ready",
+            "pid": 49347,
+            "started_seconds": 0.35389,
+            "wall_seconds": 0.002769
+          },
+          {
+            "command": [
+              "/usr/bin/touch",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/2-stream/program.o.ready"
+            ],
+            "cpu_seconds": 0.001866,
+            "exit_code": 0,
+            "finished_seconds": 0.46861,
+            "peak_rss_bytes": 1196032,
+            "phase": "llvm-ready",
+            "pid": 49348,
+            "started_seconds": 0.465686,
+            "wall_seconds": 0.002924
+          },
+          {
+            "command": [
+              "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2/clang-mlf",
+              "--mlf-wait-objects",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/2-stream/program.o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/2-stream/runtime.o",
+              "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+              "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+              "-lgmp",
+              "-lm",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/2-stream/pending-executable"
+            ],
+            "cpu_seconds": 0.033163,
+            "exit_code": 0,
+            "finished_seconds": 0.483706,
+            "peak_rss_bytes": 35471360,
+            "phase": "link",
+            "pid": 49343,
+            "started_seconds": 0.004709,
+            "wall_seconds": 0.478997
+          }
+        ],
+        "wall_seconds": 0.48371
+      }
+    },
+    {
+      "name": "2-ordinary",
+      "program_llvm": "317dfcff63923c09aeb1f302c14ef396a3f0a7bf973e22d0e9906949d4490f5b",
+      "program_object": "bb52631710000a51e17a5b28798e886d856461ba69c18283b83f70c465f641eb",
+      "runtime_object": "a5f01e4ef3a84cc96a9b56140ceb0230a7b2405593970799aaa004b3fa60657d",
+      "sample": {
+        "cpu_seconds": 0.847962,
+        "exit_code": 0,
+        "maximum_parallel_compilers": 3,
+        "remaining_children": 0,
+        "stages": [
+          {
+            "command": [
+              "/usr/bin/mkfifo",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/2-ordinary/program.ll.pipe"
+            ],
+            "cpu_seconds": 0.001962,
+            "exit_code": 0,
+            "finished_seconds": 0.003146,
+            "peak_rss_bytes": 1196032,
+            "phase": "setup",
+            "pid": 49399,
+            "started_seconds": 0.000001,
+            "wall_seconds": 0.003145
+          },
+          {
+            "command": [
+              "/bin/bash",
+              "-o",
+              "pipefail",
+              "-c",
+              "fifo=$1; shift; \"$@\" | /bin/cat > \"$fifo\"",
+              "mlf-stream",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/2-ordinary/program.ll.pipe",
+              "/Volumes/src/mlf/.mlf-build/compile3/pgo6/candidate/bin/emlf",
+              "--emit-llvm",
+              "/Volumes/src/mlf/benchmarks/n-body/mlf/main.emlf"
+            ],
+            "cpu_seconds": 0.389567,
+            "exit_code": 0,
+            "finished_seconds": 0.396629,
+            "peak_rss_bytes": 561053696,
+            "phase": "frontend",
+            "pid": 49401,
+            "started_seconds": 0.004417,
+            "wall_seconds": 0.392212
+          },
+          {
+            "command": [
+              "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2/clang-mlf",
+              "-O2",
+              "-std=c11",
+              "-c",
+              "/Volumes/src/mlf/runtime/mlf_runtime.c",
+              "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+              "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+              "-lgmp",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/2-ordinary/runtime.o"
+            ],
+            "cpu_seconds": 0.339864,
+            "exit_code": 0,
+            "finished_seconds": 0.345246,
+            "peak_rss_bytes": 102072320,
+            "phase": "runtime",
+            "pid": 49400,
+            "started_seconds": 0.000185,
+            "wall_seconds": 0.345061
+          },
+          {
+            "command": [
+              "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2/clang-mlf",
+              "--mlf-stream-ir",
+              "-O2",
+              "-Wno-override-module",
+              "-c",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/2-ordinary/program.ll",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/2-ordinary/program.o"
+            ],
+            "cpu_seconds": 0.081454,
+            "exit_code": 0,
+            "finished_seconds": 0.4654,
+            "peak_rss_bytes": 55410688,
+            "phase": "llvm",
+            "pid": 49402,
+            "started_seconds": 0.004918,
+            "wall_seconds": 0.460482
+          },
+          {
+            "command": [
+              "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2/clang-mlf",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/2-ordinary/program.o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/2-ordinary/runtime.o",
+              "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+              "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+              "-lgmp",
+              "-lm",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/2-ordinary/pending-executable"
+            ],
+            "cpu_seconds": 0.035115,
+            "exit_code": 0,
+            "finished_seconds": 0.507154,
+            "peak_rss_bytes": 35274752,
+            "phase": "link",
+            "pid": 49405,
+            "started_seconds": 0.466657,
+            "wall_seconds": 0.040497
+          }
+        ],
+        "wall_seconds": 0.507157
+      }
+    },
+    {
+      "name": "3-ordinary",
+      "program_llvm": "317dfcff63923c09aeb1f302c14ef396a3f0a7bf973e22d0e9906949d4490f5b",
+      "program_object": "bb52631710000a51e17a5b28798e886d856461ba69c18283b83f70c465f641eb",
+      "runtime_object": "a5f01e4ef3a84cc96a9b56140ceb0230a7b2405593970799aaa004b3fa60657d",
+      "sample": {
+        "cpu_seconds": 0.877897,
+        "exit_code": 0,
+        "maximum_parallel_compilers": 3,
+        "remaining_children": 0,
+        "stages": [
+          {
+            "command": [
+              "/usr/bin/mkfifo",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/3-ordinary/program.ll.pipe"
+            ],
+            "cpu_seconds": 0.001855,
+            "exit_code": 0,
+            "finished_seconds": 0.003069,
+            "peak_rss_bytes": 1196032,
+            "phase": "setup",
+            "pid": 49412,
+            "started_seconds": 0.000003,
+            "wall_seconds": 0.003066
+          },
+          {
+            "command": [
+              "/bin/bash",
+              "-o",
+              "pipefail",
+              "-c",
+              "fifo=$1; shift; \"$@\" | /bin/cat > \"$fifo\"",
+              "mlf-stream",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/3-ordinary/program.ll.pipe",
+              "/Volumes/src/mlf/.mlf-build/compile3/pgo6/candidate/bin/emlf",
+              "--emit-llvm",
+              "/Volumes/src/mlf/benchmarks/n-body/mlf/main.emlf"
+            ],
+            "cpu_seconds": 0.40368,
+            "exit_code": 0,
+            "finished_seconds": 0.410267,
+            "peak_rss_bytes": 561053696,
+            "phase": "frontend",
+            "pid": 49414,
+            "started_seconds": 0.004333,
+            "wall_seconds": 0.405934
+          },
+          {
+            "command": [
+              "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2/clang-mlf",
+              "-O2",
+              "-std=c11",
+              "-c",
+              "/Volumes/src/mlf/runtime/mlf_runtime.c",
+              "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+              "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+              "-lgmp",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/3-ordinary/runtime.o"
+            ],
+            "cpu_seconds": 0.355169,
+            "exit_code": 0,
+            "finished_seconds": 0.360023,
+            "peak_rss_bytes": 101875712,
+            "phase": "runtime",
+            "pid": 49413,
+            "started_seconds": 0.000223,
+            "wall_seconds": 0.3598
+          },
+          {
+            "command": [
+              "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2/clang-mlf",
+              "--mlf-stream-ir",
+              "-O2",
+              "-Wno-override-module",
+              "-c",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/3-ordinary/program.ll",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/3-ordinary/program.o"
+            ],
+            "cpu_seconds": 0.082932,
+            "exit_code": 0,
+            "finished_seconds": 0.480778,
+            "peak_rss_bytes": 55525376,
+            "phase": "llvm",
+            "pid": 49415,
+            "started_seconds": 0.004609,
+            "wall_seconds": 0.476169
+          },
+          {
+            "command": [
+              "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2/clang-mlf",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/3-ordinary/program.o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/3-ordinary/runtime.o",
+              "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+              "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+              "-lgmp",
+              "-lm",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/3-ordinary/pending-executable"
+            ],
+            "cpu_seconds": 0.034261,
+            "exit_code": 0,
+            "finished_seconds": 0.518456,
+            "peak_rss_bytes": 35487744,
+            "phase": "link",
+            "pid": 49462,
+            "started_seconds": 0.482032,
+            "wall_seconds": 0.036424
+          }
+        ],
+        "wall_seconds": 0.518458
+      }
+    },
+    {
+      "name": "3-stream",
+      "program_llvm": "317dfcff63923c09aeb1f302c14ef396a3f0a7bf973e22d0e9906949d4490f5b",
+      "program_object": "bb52631710000a51e17a5b28798e886d856461ba69c18283b83f70c465f641eb",
+      "runtime_object": "a5f01e4ef3a84cc96a9b56140ceb0230a7b2405593970799aaa004b3fa60657d",
+      "sample": {
+        "cpu_seconds": 0.858891,
+        "exit_code": 0,
+        "maximum_parallel_compilers": 4,
+        "remaining_children": 0,
+        "stages": [
+          {
+            "command": [
+              "/usr/bin/mkfifo",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/3-stream/program.ll.pipe"
+            ],
+            "cpu_seconds": 0.001763,
+            "exit_code": 0,
+            "finished_seconds": 0.002947,
+            "peak_rss_bytes": 1196032,
+            "phase": "setup",
+            "pid": 49469,
+            "started_seconds": 0.000002,
+            "wall_seconds": 0.002945
+          },
+          {
+            "command": [
+              "/bin/bash",
+              "-o",
+              "pipefail",
+              "-c",
+              "fifo=$1; shift; \"$@\" | /bin/cat > \"$fifo\"",
+              "mlf-stream",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/3-stream/program.ll.pipe",
+              "/Volumes/src/mlf/.mlf-build/compile3/pgo6/candidate/bin/emlf",
+              "--emit-llvm",
+              "/Volumes/src/mlf/benchmarks/n-body/mlf/main.emlf"
+            ],
+            "cpu_seconds": 0.391292,
+            "exit_code": 0,
+            "finished_seconds": 0.401775,
+            "peak_rss_bytes": 561020928,
+            "phase": "frontend",
+            "pid": 49471,
+            "started_seconds": 0.004204,
+            "wall_seconds": 0.397571
+          },
+          {
+            "command": [
+              "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2/clang-mlf",
+              "-O2",
+              "-std=c11",
+              "-c",
+              "/Volumes/src/mlf/runtime/mlf_runtime.c",
+              "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+              "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+              "-lgmp",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/3-stream/runtime.o"
+            ],
+            "cpu_seconds": 0.3476,
+            "exit_code": 0,
+            "finished_seconds": 0.354499,
+            "peak_rss_bytes": 102383616,
+            "phase": "runtime",
+            "pid": 49470,
+            "started_seconds": 0.000175,
+            "wall_seconds": 0.354324
+          },
+          {
+            "command": [
+              "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2/clang-mlf",
+              "--mlf-stream-ir",
+              "-O2",
+              "-Wno-override-module",
+              "-c",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/3-stream/program.ll",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/3-stream/program.o"
+            ],
+            "cpu_seconds": 0.08129,
+            "exit_code": 0,
+            "finished_seconds": 0.473778,
+            "peak_rss_bytes": 55476224,
+            "phase": "llvm",
+            "pid": 49472,
+            "started_seconds": 0.00451,
+            "wall_seconds": 0.469268
+          },
+          {
+            "command": [
+              "/usr/bin/touch",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/3-stream/runtime.o.ready"
+            ],
+            "cpu_seconds": 0.002083,
+            "exit_code": 0,
+            "finished_seconds": 0.358618,
+            "peak_rss_bytes": 1196032,
+            "phase": "runtime-ready",
+            "pid": 49520,
+            "started_seconds": 0.355753,
+            "wall_seconds": 0.002865
+          },
+          {
+            "command": [
+              "/usr/bin/touch",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/3-stream/program.o.ready"
+            ],
+            "cpu_seconds": 0.001916,
+            "exit_code": 0,
+            "finished_seconds": 0.477928,
+            "peak_rss_bytes": 1196032,
+            "phase": "llvm-ready",
+            "pid": 49522,
+            "started_seconds": 0.475037,
+            "wall_seconds": 0.002891
+          },
+          {
+            "command": [
+              "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2/clang-mlf",
+              "--mlf-wait-objects",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/3-stream/program.o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/3-stream/runtime.o",
+              "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+              "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+              "-lgmp",
+              "-lm",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/compile3/ready-link-pairs/3-stream/pending-executable"
+            ],
+            "cpu_seconds": 0.032947,
+            "exit_code": 0,
+            "finished_seconds": 0.497879,
+            "peak_rss_bytes": 35356672,
+            "phase": "link",
+            "pid": 49473,
+            "started_seconds": 0.004714,
+            "wall_seconds": 0.493165
+          }
+        ],
+        "wall_seconds": 0.497881
+      }
+    }
+  ]
+}

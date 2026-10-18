@@ -1,0 +1,1 @@
+Rejected. Immediate dispatch after reaping a successful child changed the paired median from 0.410785 s to 0.416517 s, a regression. Every sample and equal IR/object digest is retained. The production test/host_support.c was never changed for this experiment.

@@ -1,0 +1,35 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+
+contains needle text = eqString needle "" || S.not (eqString text (O.replace needle "" text))
+
+main = do
+ compiler <- getArg 0
+ directory <- getArg 1
+ source <- getArg 2
+ present <- directoryExists directory
+ O.require (S.not present) "force probe requires a fresh output directory"
+ O.mkdir directory
+ gc <- getEnv "MLF_GC_PREFIX"
+ code <- O.exec "" (Cons compiler (O.words "--emit-llvm-gc --expr 0")) "" (directory ++ "/original.ll") (directory ++ "/emission.err") 30
+ O.require (code == 0) "force probe LLVM emission failed"
+ llvm <- readFile (directory ++ "/original.ll")
+ O.require (contains "define private ptr @mlf.force" llvm && contains "define i32 @main(" llvm) "missing generated force or main"
+ writeFile (directory ++ "/probe.ll") (O.replace "define i32 @main(" "define i32 @mlf_force_probe_ignored_main(" llvm ++ "\ndefine ptr @probe_force(ptr %value) {\nentry:\n  %result = call ptr @mlf.force(ptr %value)\n  ret ptr %result\n}\n")
+ old <- getEnv "GC_INITIAL_HEAP_SIZE"
+ setEnv "GC_INITIAL_HEAP_SIZE" "8388608"
+ S.mapM_ (\(Pair name macros) -> do
+  let binary = directory ++ "/" ++ name
+  let flags = S.append (O.words "-O2 -std=c11 -Wno-override-module -Iruntime -DMLF_USE_BDWGC -DMLF_COMPACT_BDWGC") (S.append (Cons ("-I" ++ gc ++ "/include") (Cons (gc ++ "/lib/libgc.a") Nil)) (S.append (O.words "-I/opt/homebrew/Cellar/gmp/6.3.0/include -L/opt/homebrew/Cellar/gmp/6.3.0/lib -lgmp -lm") macros))
+  O.run "" (S.append (Cons "/opt/homebrew/Cellar/llvm/23.1.3/bin/clang-23" flags) (Cons source (Cons "runtime/mlf_runtime.c" (Cons (directory ++ "/probe.ll") (Cons "-o" (Cons binary Nil))))))
+  S.mapM_ (\mode -> do
+   status <- O.exec "" (Cons binary (Cons mode Nil)) "" (directory ++ "/" ++ name ++ "-" ++ mode ++ ".out") (directory ++ "/" ++ name ++ "-" ++ mode ++ ".err") 30
+   out <- readFile (directory ++ "/" ++ name ++ "-" ++ mode ++ ".out")
+   err <- readFile (directory ++ "/" ++ name ++ "-" ++ mode ++ ".err")
+   let success = eqString mode "success"
+   let reason = if eqString mode "null" then "missing runtime value" else "cyclic evaluation of a recursive binding"
+   O.require (status == (if success then 0 else 1) && eqString out (if success then "generated force: sharing, canonical values, long spines and no-interior GC passed\n" else "") && eqString err (if success then "" else "Runtime: " ++ reason ++ "\n")) ("generated force ABI mismatch: " ++ name ++ " " ++ mode)) (O.words "success null hole cycle-enter cycle-return")) (Cons (Pair "compact" Nil) (Cons (Pair "debug" (Cons "-DGC_DEBUG" Nil)) (Cons (Pair "audit" (Cons "-DMLF_ALLOCATION_AUDIT" Nil)) Nil)))
+ if eqString old "" then unsetEnv "GC_INITIAL_HEAP_SIZE" else setEnv "GC_INITIAL_HEAP_SIZE" old
+ putStrLn "15 generated force ABI modes passed under three compact runtime profiles"

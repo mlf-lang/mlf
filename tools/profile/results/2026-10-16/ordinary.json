@@ -1,0 +1,107 @@
+{
+  "recorded_at": "2026-10-15T20:21:19.063Z",
+  "description": "Fresh processes compiling the same frozen original compiler source to LLVM; excludes Clang/native linking; executables warmed once; no other builds/tests ran concurrently.",
+  "baseline_commit": "ff8362d6cd5678b062e68b105ba23890ef847e33",
+  "baseline_compiler_sha256": "6f658807be3a2fb1955ee42284b4ba34a736f7927ac9964da9c3cd234cb41bc0",
+  "candidate_compiler_sha256": "6a04cdf5fbd6e1f304fb3b2847e081e58b659594f8d722712b977758007fd0ce",
+  "input": "baseline-source/bootstrap/Main.emlf",
+  "order": [
+    "baseline",
+    "candidate",
+    "candidate",
+    "baseline",
+    "baseline",
+    "candidate"
+  ],
+  "script": "#!/bin/bash\nset -euo pipefail\ncd /Volumes/src/mlf\nexport PATH=\"$PWD/.mlf-build/self-profile/blocked:$PATH\"\nroot=\"$PWD/.mlf-build/self-profile\"\nout=\"$root/ordinary\"\nmkdir -p \"$out\"\nif [[ -e \"$out/baseline-1.json\" ]]; then exit 2; fi\nsource_root=\"$root/baseline-source/bootstrap\"\nhost=\"$root/bench-results-warm/host-support\"\n\"$root/baseline-emlf\" --type --expr 42 > \"$out/baseline-warmup.txt\"\n\"$root/candidate-v3/bin/emlf\" --type --expr 42 > \"$out/candidate-warmup.txt\"\nfor round in 1 2 3; do\n  if [[ \"$round\" == 2 ]]; then order='candidate baseline'; else order='baseline candidate'; fi\n  for label in $order; do\n    compiler=\"$root/baseline-emlf\"\n    if [[ \"$label\" == candidate ]]; then compiler=\"$root/candidate-v3/bin/emlf\"; fi\n    printf 'Self-compilation %s %s\\n' \"$round\" \"$label\"\n    \"$host\" measure 21600 '' \"$out/$label-$round.ll\" \"$out/$label-$round.stderr\" \\\n      \"$compiler\" -i \"$source_root\" --emit-llvm-gc \"$source_root/Main.emlf\" > \"$out/$label-$round.json\"\n    grep -q '\"exit_code\":0,' \"$out/$label-$round.json\"\n    cmp \"$root/baseline/self.ll\" \"$out/$label-$round.ll\"\n    cat \"$out/$label-$round.json\"\n  done\ndone\ntest ! -e \"$root/forbidden.log\"\n",
+  "clock_transport_sha256": "136c1a5e3eb940bf9f258c0a34064c3b5e77ae2b42380eed3fa25ad24db31ac1",
+  "samples": {
+    "baseline": [
+      {
+        "exit_code": 0,
+        "timed_out": false,
+        "interrupted": false,
+        "termination_signal": 0,
+        "wall_seconds": 259.857985,
+        "cpu_seconds": 259.426036,
+        "peak_rss_bytes": 9678831616,
+        "pid": 66541,
+        "round": 1,
+        "llvm_sha256": "b5866443a271d7d7a7463bdc65958aa9b0c28541be7600e1209051cd40f9eabc",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "exit_code": 0,
+        "timed_out": false,
+        "interrupted": false,
+        "termination_signal": 0,
+        "wall_seconds": 270.033305,
+        "cpu_seconds": 268.293815,
+        "peak_rss_bytes": 10949050368,
+        "pid": 4774,
+        "round": 2,
+        "llvm_sha256": "b5866443a271d7d7a7463bdc65958aa9b0c28541be7600e1209051cd40f9eabc",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "exit_code": 0,
+        "timed_out": false,
+        "interrupted": false,
+        "termination_signal": 0,
+        "wall_seconds": 284.508729,
+        "cpu_seconds": 281.127214,
+        "peak_rss_bytes": 11180949504,
+        "pid": 17042,
+        "round": 3,
+        "llvm_sha256": "b5866443a271d7d7a7463bdc65958aa9b0c28541be7600e1209051cd40f9eabc",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "candidate": [
+      {
+        "exit_code": 0,
+        "timed_out": false,
+        "interrupted": false,
+        "termination_signal": 0,
+        "wall_seconds": 264.284936,
+        "cpu_seconds": 262.581485,
+        "peak_rss_bytes": 10886529024,
+        "pid": 78393,
+        "round": 1,
+        "llvm_sha256": "b5866443a271d7d7a7463bdc65958aa9b0c28541be7600e1209051cd40f9eabc",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "exit_code": 0,
+        "timed_out": false,
+        "interrupted": false,
+        "termination_signal": 0,
+        "wall_seconds": 302.320202,
+        "cpu_seconds": 299.865685,
+        "peak_rss_bytes": 10868326400,
+        "pid": 90726,
+        "round": 2,
+        "llvm_sha256": "b5866443a271d7d7a7463bdc65958aa9b0c28541be7600e1209051cd40f9eabc",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "exit_code": 0,
+        "timed_out": false,
+        "interrupted": false,
+        "termination_signal": 0,
+        "wall_seconds": 279.94168,
+        "cpu_seconds": 278.217408,
+        "peak_rss_bytes": 9798975488,
+        "pid": 30470,
+        "round": 3,
+        "llvm_sha256": "b5866443a271d7d7a7463bdc65958aa9b0c28541be7600e1209051cd40f9eabc",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  "median_wall_seconds": {
+    "baseline": 270.033305,
+    "candidate": 279.94168
+  },
+  "time_reduction_percent": -3.66931590160704
+}

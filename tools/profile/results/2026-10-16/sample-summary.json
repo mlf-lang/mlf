@@ -1,0 +1,1684 @@
+{
+  "samples": 4509,
+  "nearest_graph_function": [
+    {
+      "name": "<no graph>",
+      "count": 977,
+      "percent": 21.667775559991128
+    },
+    {
+      "name": "mlf.worker.12862_Bootstrap.Graph.Solver.solverUnify",
+      "count": 774,
+      "percent": 17.16566866267465
+    },
+    {
+      "name": "mlf.worker.10346_Bootstrap.Graph.buildNodeTree",
+      "count": 656,
+      "percent": 14.54868041694389
+    },
+    {
+      "name": "mlf.st.worker.12080_Bootstrap.Graph.denseValidation",
+      "count": 284,
+      "percent": 6.29851408294522
+    },
+    {
+      "name": "mlf.st.worker.11039_Bootstrap.Graph.denseChild",
+      "count": 173,
+      "percent": 3.836770902639166
+    },
+    {
+      "name": "mlf.worker.10377_Bootstrap.Graph.mapE",
+      "count": 167,
+      "percent": 3.7037037037037037
+    },
+    {
+      "name": "mlf.st.worker.12363_Bootstrap.Graph.denseLoadRemainings",
+      "count": 155,
+      "percent": 3.437569305832779
+    },
+    {
+      "name": "mlf.worker.11514_Bootstrap.Graph.mapNodeTree",
+      "count": 154,
+      "percent": 3.415391439343535
+    },
+    {
+      "name": "mlf.worker.10333_Bootstrap.Graph.forceTag",
+      "count": 136,
+      "percent": 3.016189842537148
+    },
+    {
+      "name": "mlf.worker.10513_Bootstrap.Graph.children",
+      "count": 109,
+      "percent": 2.417387447327567
+    },
+    {
+      "name": "mlf.st.worker.11040_Bootstrap.Graph.denseKind",
+      "count": 108,
+      "percent": 2.395209580838323
+    },
+    {
+      "name": "mlf.st.worker.12401_Bootstrap.Graph.densePlace",
+      "count": 90,
+      "percent": 1.996007984031936
+    },
+    {
+      "name": "mlf.worker.10388_Bootstrap.Graph.mapE_",
+      "count": 89,
+      "percent": 1.9738301175426924
+    },
+    {
+      "name": "mlf.st.worker.10987_Bootstrap.Graph.denseBindingVisit",
+      "count": 86,
+      "percent": 1.9072965180749613
+    },
+    {
+      "name": "mlf.st.worker.12489_Bootstrap.Graph.newDensePermissions",
+      "count": 84,
+      "percent": 1.8629407850964737
+    },
+    {
+      "name": "mlf.worker.10473_Bootstrap.Graph.resolve",
+      "count": 81,
+      "percent": 1.7964071856287425
+    },
+    {
+      "name": "mlf.worker.13758_Bootstrap.Graph.mapE",
+      "count": 42,
+      "percent": 0.9314703925482368
+    },
+    {
+      "name": "mlf.st.worker.12124_Bootstrap.Graph.denseLoadOriginals",
+      "count": 34,
+      "percent": 0.754047460634287
+    },
+    {
+      "name": "mlf.st.worker.12196_Bootstrap.Graph.denseFinalNodes",
+      "count": 31,
+      "percent": 0.6875138611665558
+    },
+    {
+      "name": "mlf.worker.10537_Bootstrap.Graph.kindVisit",
+      "count": 28,
+      "percent": 0.6209802616988246
+    },
+    {
+      "name": "mlf.st.worker.12244_Bootstrap.Graph.denseRaiseOriginals",
+      "count": 21,
+      "percent": 0.4657351962741184
+    },
+    {
+      "name": "mlf.worker.10419_Bootstrap.Graph.equalNode",
+      "count": 17,
+      "percent": 0.3770237303171435
+    },
+    {
+      "name": "mlf.st.worker.12283_Bootstrap.Graph.denseCheckOriginals",
+      "count": 14,
+      "percent": 0.3104901308494123
+    },
+    {
+      "name": "mlf.worker.10522_Bootstrap.Graph.mapTag",
+      "count": 13,
+      "percent": 0.28831226436016855
+    },
+    {
+      "name": "mlf.worker.14014_Bootstrap.Graph.Solver.expanded",
+      "count": 13,
+      "percent": 0.28831226436016855
+    },
+    {
+      "name": "mlf.worker.12565_Bootstrap.Graph.Solver.insertIndex",
+      "count": 13,
+      "percent": 0.28831226436016855
+    },
+    {
+      "name": "mlf.worker.12600_Bootstrap.Graph.Solver.addNode",
+      "count": 13,
+      "percent": 0.28831226436016855
+    },
+    {
+      "name": "mlf.st.worker.12391_Bootstrap.Graph.denseCommonFold",
+      "count": 12,
+      "percent": 0.2661343978709248
+    },
+    {
+      "name": "mlf.worker.10482_Bootstrap.Graph.require",
+      "count": 11,
+      "percent": 0.24395653138168108
+    },
+    {
+      "name": "mlf.st.worker.12535_Bootstrap.Graph.denseCheckMergeEntries",
+      "count": 10,
+      "percent": 0.22177866489243736
+    },
+    {
+      "name": "mlf.worker.10893_Bootstrap.Graph.intervalContains",
+      "count": 10,
+      "percent": 0.22177866489243736
+    },
+    {
+      "name": "mlf.worker.14207_Bootstrap.Graph.Solver.groundNodes",
+      "count": 9,
+      "percent": 0.1996007984031936
+    },
+    {
+      "name": "mlf.st.worker.12402_Bootstrap.Graph.densePlaces",
+      "count": 8,
+      "percent": 0.17742293191394987
+    },
+    {
+      "name": "mlf.worker.11934_Bootstrap.Graph.insideScope",
+      "count": 8,
+      "percent": 0.17742293191394987
+    },
+    {
+      "name": "mlf.worker.11498_Bootstrap.Graph.foldE",
+      "count": 7,
+      "percent": 0.15524506542470615
+    },
+    {
+      "name": "mlf.st.worker.10981_Bootstrap.Graph.denseRequire",
+      "count": 7,
+      "percent": 0.15524506542470615
+    },
+    {
+      "name": "mlf.worker.11394_Bootstrap.Graph.firstOrder",
+      "count": 7,
+      "percent": 0.15524506542470615
+    },
+    {
+      "name": "mlf.worker.12842_Bootstrap.Graph.Solver.projectedBinder",
+      "count": 6,
+      "percent": 0.1330671989354624
+    },
+    {
+      "name": "mlf.worker.10340_Bootstrap.Graph.mkGraph",
+      "count": 5,
+      "percent": 0.11088933244621868
+    },
+    {
+      "name": "mlf.st.worker.10968_Bootstrap.Graph.denseGetNode",
+      "count": 4,
+      "percent": 0.08871146595697493
+    },
+    {
+      "name": "mlf.st.worker.11888_Bootstrap.Graph.denseFlexiblePath",
+      "count": 4,
+      "percent": 0.08871146595697493
+    },
+    {
+      "name": "mlf.worker.12579_Bootstrap.Graph.Solver.removeIndex",
+      "count": 4,
+      "percent": 0.08871146595697493
+    },
+    {
+      "name": "mlf.worker.10617_Bootstrap.Graph.kindsAt",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.st.worker.10988_Bootstrap.Graph.denseBindingChildren",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.st.worker.12162_Bootstrap.Graph.denseMarkOriginals",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.st.worker.11913_Bootstrap.Graph.densePermission",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.worker.12550_Bootstrap.Graph.Solver.mkSolver",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.worker.14008_Bootstrap.Graph.Solver.allocatedNodes",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.worker.10468_Bootstrap.Graph.applyKind",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.st.worker.11699_Bootstrap.Graph.denseCandidates",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.st.worker.11863_Bootstrap.Graph.denseInert",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.worker.10916_Bootstrap.Graph.denseBounds",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.st.worker.12461_Bootstrap.Graph.densePlaceEntries",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.worker.12763_Bootstrap.Graph.Solver.sortScopes",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.st.worker.11662_Bootstrap.Graph.denseTableNode",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.st.worker.11669_Bootstrap.Graph.denseMarks",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.14382_Bootstrap.Graph.Solver.sameGroundShape",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.10405_Bootstrap.Graph.equalKind",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.12196_Bootstrap.Graph.denseFinalNodes",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.14448_Bootstrap.Graph.Solver.groundInstanceVisit",
+      "count": 1,
+      "percent": 0.022177866489243733
+    }
+  ],
+  "nearest_source_function": [
+    {
+      "name": "mlf.worker.780_Bootstrap.IntMap.lookupTree",
+      "count": 489,
+      "percent": 10.844976713240186
+    },
+    {
+      "name": "mlf.worker.10346_Bootstrap.Graph.buildNodeTree",
+      "count": 448,
+      "percent": 9.935684187181193
+    },
+    {
+      "name": "mlf.worker.415_Bootstrap.Map.balance",
+      "count": 429,
+      "percent": 9.514304723885562
+    },
+    {
+      "name": "mlf.worker.12862_Bootstrap.Graph.Solver.solverUnify",
+      "count": 394,
+      "percent": 8.738079396762032
+    },
+    {
+      "name": "mlf.st.worker.12080_Bootstrap.Graph.denseValidation",
+      "count": 188,
+      "percent": 4.1694388999778225
+    },
+    {
+      "name": "mlf.worker.646_Bootstrap.Map.entriesInto",
+      "count": 181,
+      "percent": 4.014193834553116
+    },
+    {
+      "name": "mlf.st.worker.11039_Bootstrap.Graph.denseChild",
+      "count": 173,
+      "percent": 3.836770902639166
+    },
+    {
+      "name": "mlf.worker.839_Bootstrap.IntMap.splitTree",
+      "count": 164,
+      "percent": 3.6371701042359725
+    },
+    {
+      "name": "mlf.worker.11514_Bootstrap.Graph.mapNodeTree",
+      "count": 153,
+      "percent": 3.3932135728542914
+    },
+    {
+      "name": "mlf.worker.116_Bootstrap.Std.map",
+      "count": 121,
+      "percent": 2.683521845198492
+    },
+    {
+      "name": "mlf.worker.10513_Bootstrap.Graph.children",
+      "count": 109,
+      "percent": 2.417387447327567
+    },
+    {
+      "name": "mlf.st.worker.11040_Bootstrap.Graph.denseKind",
+      "count": 104,
+      "percent": 2.3064981148813484
+    },
+    {
+      "name": "mlf.worker.10377_Bootstrap.Graph.mapE",
+      "count": 102,
+      "percent": 2.2621423819028608
+    },
+    {
+      "name": "mlf.worker.10333_Bootstrap.Graph.forceTag",
+      "count": 100,
+      "percent": 2.2177866489243736
+    },
+    {
+      "name": "mlf.st.worker.10987_Bootstrap.Graph.denseBindingVisit",
+      "count": 86,
+      "percent": 1.9072965180749613
+    },
+    {
+      "name": "mlf.st.worker.12401_Bootstrap.Graph.densePlace",
+      "count": 84,
+      "percent": 1.8629407850964737
+    },
+    {
+      "name": "mlf.st.worker.12489_Bootstrap.Graph.newDensePermissions",
+      "count": 84,
+      "percent": 1.8629407850964737
+    },
+    {
+      "name": "mlf.worker.10388_Bootstrap.Graph.mapE_",
+      "count": 82,
+      "percent": 1.8185850521179863
+    },
+    {
+      "name": "mlf.st.worker.12363_Bootstrap.Graph.denseLoadRemainings",
+      "count": 77,
+      "percent": 1.7076957196717675
+    },
+    {
+      "name": "<none>",
+      "count": 70,
+      "percent": 1.5524506542470615
+    },
+    {
+      "name": "mlf.worker.289_Bootstrap.Std.mergeBy",
+      "count": 63,
+      "percent": 1.3972055888223553
+    },
+    {
+      "name": "mlf.worker.133_Bootstrap.Std.foldlStrict",
+      "count": 60,
+      "percent": 1.3306719893546242
+    },
+    {
+      "name": "mlf.worker.105_Bootstrap.Std.lengthAcc",
+      "count": 51,
+      "percent": 1.1310711909514304
+    },
+    {
+      "name": "mlf.worker.788_Bootstrap.IntMap.memberTree",
+      "count": 49,
+      "percent": 1.086715457972943
+    },
+    {
+      "name": "mlf.worker.796_Bootstrap.IntMap.insertTree",
+      "count": 43,
+      "percent": 0.9536482590374806
+    },
+    {
+      "name": "mlf.worker.400_Bootstrap.Map.bin",
+      "count": 43,
+      "percent": 0.9536482590374806
+    },
+    {
+      "name": "mlf.worker.111_Bootstrap.Std.append",
+      "count": 43,
+      "percent": 0.9536482590374806
+    },
+    {
+      "name": "mlf.worker.654_Bootstrap.Map.keysInto",
+      "count": 40,
+      "percent": 0.8871146595697494
+    },
+    {
+      "name": "mlf.st.worker.12196_Bootstrap.Graph.denseFinalNodes",
+      "count": 31,
+      "percent": 0.6875138611665558
+    },
+    {
+      "name": "mlf.worker.242_Bootstrap.Std.zip",
+      "count": 28,
+      "percent": 0.6209802616988246
+    },
+    {
+      "name": "mlf.worker.10473_Bootstrap.Graph.resolve",
+      "count": 26,
+      "percent": 0.5766245287203371
+    },
+    {
+      "name": "mlf.st.worker.12124_Bootstrap.Graph.denseLoadOriginals",
+      "count": 26,
+      "percent": 0.5766245287203371
+    },
+    {
+      "name": "mlf.worker.670_Bootstrap.Map.buildAsc",
+      "count": 25,
+      "percent": 0.5544466622310934
+    },
+    {
+      "name": "mlf.st.worker.12244_Bootstrap.Graph.denseRaiseOriginals",
+      "count": 21,
+      "percent": 0.4657351962741184
+    },
+    {
+      "name": "mlf.worker.10537_Bootstrap.Graph.kindVisit",
+      "count": 19,
+      "percent": 0.421379463295631
+    },
+    {
+      "name": "mlf.worker.10419_Bootstrap.Graph.equalNode",
+      "count": 17,
+      "percent": 0.3770237303171435
+    },
+    {
+      "name": "mlf.worker.851_Bootstrap.IntMap.unionTree",
+      "count": 15,
+      "percent": 0.33266799733865604
+    },
+    {
+      "name": "mlf.st.worker.12283_Bootstrap.Graph.denseCheckOriginals",
+      "count": 14,
+      "percent": 0.3104901308494123
+    },
+    {
+      "name": "mlf.worker.10522_Bootstrap.Graph.mapTag",
+      "count": 13,
+      "percent": 0.28831226436016855
+    },
+    {
+      "name": "mlf.st.worker.12391_Bootstrap.Graph.denseCommonFold",
+      "count": 12,
+      "percent": 0.2661343978709248
+    },
+    {
+      "name": "mlf.worker.13926_Bootstrap.Std.filter",
+      "count": 12,
+      "percent": 0.2661343978709248
+    },
+    {
+      "name": "mlf.worker.12930_Bootstrap.Std.filter",
+      "count": 11,
+      "percent": 0.24395653138168108
+    },
+    {
+      "name": "mlf.worker.10482_Bootstrap.Graph.require",
+      "count": 11,
+      "percent": 0.24395653138168108
+    },
+    {
+      "name": "mlf.st.worker.12535_Bootstrap.Graph.denseCheckMergeEntries",
+      "count": 10,
+      "percent": 0.22177866489243736
+    },
+    {
+      "name": "mlf.worker.13068_Bootstrap.Std.map",
+      "count": 10,
+      "percent": 0.22177866489243736
+    },
+    {
+      "name": "mlf.st.worker.12402_Bootstrap.Graph.densePlaces",
+      "count": 7,
+      "percent": 0.15524506542470615
+    },
+    {
+      "name": "mlf.worker.14014_Bootstrap.Graph.Solver.expanded",
+      "count": 7,
+      "percent": 0.15524506542470615
+    },
+    {
+      "name": "mlf.worker.10893_Bootstrap.Graph.intervalContains",
+      "count": 7,
+      "percent": 0.15524506542470615
+    },
+    {
+      "name": "mlf.worker.12973_Bootstrap.Std.foldr",
+      "count": 7,
+      "percent": 0.15524506542470615
+    },
+    {
+      "name": "mlf.worker.13087_Bootstrap.Std.filter",
+      "count": 7,
+      "percent": 0.15524506542470615
+    },
+    {
+      "name": "mlf.worker.815_Bootstrap.IntMap.deleteTree",
+      "count": 6,
+      "percent": 0.1330671989354624
+    },
+    {
+      "name": "mlf.st.worker.10981_Bootstrap.Graph.denseRequire",
+      "count": 6,
+      "percent": 0.1330671989354624
+    },
+    {
+      "name": "mlf.worker.11934_Bootstrap.Graph.insideScope",
+      "count": 6,
+      "percent": 0.1330671989354624
+    },
+    {
+      "name": "mlf.worker.12565_Bootstrap.Graph.Solver.insertIndex",
+      "count": 6,
+      "percent": 0.1330671989354624
+    },
+    {
+      "name": "mlf.worker.12842_Bootstrap.Graph.Solver.projectedBinder",
+      "count": 6,
+      "percent": 0.1330671989354624
+    },
+    {
+      "name": "mlf.worker.12600_Bootstrap.Graph.Solver.addNode",
+      "count": 6,
+      "percent": 0.1330671989354624
+    },
+    {
+      "name": "mlf.worker.13758_Bootstrap.Graph.mapE",
+      "count": 6,
+      "percent": 0.1330671989354624
+    },
+    {
+      "name": "mlf.worker.11394_Bootstrap.Graph.firstOrder",
+      "count": 5,
+      "percent": 0.11088933244621868
+    },
+    {
+      "name": "mlf.worker.10340_Bootstrap.Graph.mkGraph",
+      "count": 5,
+      "percent": 0.11088933244621868
+    },
+    {
+      "name": "mlf.worker.14207_Bootstrap.Graph.Solver.groundNodes",
+      "count": 5,
+      "percent": 0.11088933244621868
+    },
+    {
+      "name": "mlf.worker.528_Bootstrap.Map.glue",
+      "count": 5,
+      "percent": 0.11088933244621868
+    },
+    {
+      "name": "mlf.worker.13054_Bootstrap.Std.map",
+      "count": 5,
+      "percent": 0.11088933244621868
+    },
+    {
+      "name": "mlf.worker.13936_Bootstrap.Std.filter",
+      "count": 5,
+      "percent": 0.11088933244621868
+    },
+    {
+      "name": "mlf.st.worker.10968_Bootstrap.Graph.denseGetNode",
+      "count": 4,
+      "percent": 0.08871146595697493
+    },
+    {
+      "name": "mlf.st.worker.11888_Bootstrap.Graph.denseFlexiblePath",
+      "count": 4,
+      "percent": 0.08871146595697493
+    },
+    {
+      "name": "mlf.worker.12769_Bootstrap.Std.map",
+      "count": 4,
+      "percent": 0.08871146595697493
+    },
+    {
+      "name": "mlf.worker.13909_Bootstrap.Std.filter",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.worker.11498_Bootstrap.Graph.foldE",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.worker.12100_Bootstrap.Std.filter",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.st.worker.10988_Bootstrap.Graph.denseBindingChildren",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.st.worker.12162_Bootstrap.Graph.denseMarkOriginals",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.st.worker.11913_Bootstrap.Graph.densePermission",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.worker.12550_Bootstrap.Graph.Solver.mkSolver",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.worker.824_Bootstrap.IntMap.joinTree",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.worker.10468_Bootstrap.Graph.applyKind",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.st.worker.11699_Bootstrap.Graph.denseCandidates",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.st.worker.11863_Bootstrap.Graph.denseInert",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.worker.11133_Bootstrap.Std.any",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.worker.13043_Bootstrap.Map.foldlWithKeyStrict",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.worker.10916_Bootstrap.Graph.denseBounds",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.worker.207_Bootstrap.Std.splitAt",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.st.worker.12461_Bootstrap.Graph.densePlaceEntries",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.worker.13950_Bootstrap.Std.filter",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.worker.506_Bootstrap.Map.minViewWithKey",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.st.worker.11662_Bootstrap.Graph.denseTableNode",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.st.worker.11669_Bootstrap.Graph.denseMarks",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.14382_Bootstrap.Graph.Solver.sameGroundShape",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.12892_Bootstrap.Std.foldr",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.10405_Bootstrap.Graph.equalKind",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.517_Bootstrap.Map.maxViewWithKey",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.12196_Bootstrap.Graph.denseFinalNodes",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.13172_Bootstrap.Std.foldr",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.297_Bootstrap.Std.sortBy",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.10617_Bootstrap.Graph.kindsAt",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.12871_Bootstrap.Std.map",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.14448_Bootstrap.Graph.Solver.groundInstanceVisit",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.662_Bootstrap.Map.valuesInto",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.12579_Bootstrap.Graph.Solver.removeIndex",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.14008_Bootstrap.Graph.Solver.allocatedNodes",
+      "count": 1,
+      "percent": 0.022177866489243733
+    }
+  ],
+  "top_of_stack": [
+    {
+      "name": "GC_mark_from",
+      "count": 1574,
+      "percent": 34.90796185406964
+    },
+    {
+      "name": "mlf.worker.780_Bootstrap.IntMap.lookupTree",
+      "count": 455,
+      "percent": 10.0909292526059
+    },
+    {
+      "name": "_platform_memset",
+      "count": 315,
+      "percent": 6.986027944111776
+    },
+    {
+      "name": "GC_push_contents_hdr",
+      "count": 294,
+      "percent": 6.520292747837658
+    },
+    {
+      "name": "GC_reclaim_generic",
+      "count": 254,
+      "percent": 5.633178088267909
+    },
+    {
+      "name": "GC_header_cache_miss",
+      "count": 215,
+      "percent": 4.768241295187403
+    },
+    {
+      "name": "force",
+      "count": 139,
+      "percent": 3.082723442004879
+    },
+    {
+      "name": "mlf.worker.415_Bootstrap.Map.balance",
+      "count": 79,
+      "percent": 1.752051452650255
+    },
+    {
+      "name": "mlf_constructor_new",
+      "count": 51,
+      "percent": 1.1310711909514304
+    },
+    {
+      "name": "GC_build_fl",
+      "count": 51,
+      "percent": 1.1310711909514304
+    },
+    {
+      "name": "GC_find_header",
+      "count": 51,
+      "percent": 1.1310711909514304
+    },
+    {
+      "name": "mlf_env_new",
+      "count": 50,
+      "percent": 1.1088933244621868
+    },
+    {
+      "name": "mlf_constructor2",
+      "count": 50,
+      "percent": 1.1088933244621868
+    },
+    {
+      "name": "code_value",
+      "count": 49,
+      "percent": 1.086715457972943
+    },
+    {
+      "name": "DYLD-STUB$$bzero",
+      "count": 40,
+      "percent": 0.8871146595697494
+    },
+    {
+      "name": "mlf.worker.788_Bootstrap.IntMap.memberTree",
+      "count": 37,
+      "percent": 0.8205810601020181
+    },
+    {
+      "name": "GC_mark_some",
+      "count": 34,
+      "percent": 0.754047460634287
+    },
+    {
+      "name": "mlf.worker.796_Bootstrap.IntMap.insertTree",
+      "count": 28,
+      "percent": 0.6209802616988246
+    },
+    {
+      "name": "GC_allochblk_nth",
+      "count": 27,
+      "percent": 0.5988023952095808
+    },
+    {
+      "name": "GC_reclaim_block",
+      "count": 27,
+      "percent": 0.5988023952095808
+    },
+    {
+      "name": "mlf.worker.10473_Bootstrap.Graph.resolve",
+      "count": 25,
+      "percent": 0.5544466622310934
+    },
+    {
+      "name": "mlf_constructor1",
+      "count": 24,
+      "percent": 0.5322687957418496
+    },
+    {
+      "name": "mlf.worker.10346_Bootstrap.Graph.buildNodeTree",
+      "count": 24,
+      "percent": 0.5322687957418496
+    },
+    {
+      "name": "mlf.st.worker.11040_Bootstrap.Graph.denseKind",
+      "count": 24,
+      "percent": 0.5322687957418496
+    },
+    {
+      "name": "mlf_force",
+      "count": 21,
+      "percent": 0.4657351962741184
+    },
+    {
+      "name": "mlf.worker.10419_Bootstrap.Graph.equalNode",
+      "count": 16,
+      "percent": 0.35484586382789973
+    },
+    {
+      "name": "GC_generic_malloc_many",
+      "count": 15,
+      "percent": 0.33266799733865604
+    },
+    {
+      "name": "__bzero",
+      "count": 15,
+      "percent": 0.33266799733865604
+    },
+    {
+      "name": "get_index",
+      "count": 15,
+      "percent": 0.33266799733865604
+    },
+    {
+      "name": "mlf.worker.10333_Bootstrap.Graph.forceTag",
+      "count": 14,
+      "percent": 0.3104901308494123
+    },
+    {
+      "name": "mlf.st.worker.12080_Bootstrap.Graph.denseValidation",
+      "count": 14,
+      "percent": 0.3104901308494123
+    },
+    {
+      "name": "mlf.st.worker.12244_Bootstrap.Graph.denseRaiseOriginals",
+      "count": 14,
+      "percent": 0.3104901308494123
+    },
+    {
+      "name": "clear_marks_for_block",
+      "count": 14,
+      "percent": 0.3104901308494123
+    },
+    {
+      "name": "mlf.worker.654_Bootstrap.Map.keysInto",
+      "count": 13,
+      "percent": 0.28831226436016855
+    },
+    {
+      "name": "GC_freehblk",
+      "count": 13,
+      "percent": 0.28831226436016855
+    },
+    {
+      "name": "mlf.worker.105_Bootstrap.Std.lengthAcc",
+      "count": 12,
+      "percent": 0.2661343978709248
+    },
+    {
+      "name": "mlf.st.worker.12401_Bootstrap.Graph.densePlace",
+      "count": 12,
+      "percent": 0.2661343978709248
+    },
+    {
+      "name": "mlf.worker.12862_Bootstrap.Graph.Solver.solverUnify",
+      "count": 11,
+      "percent": 0.24395653138168108
+    },
+    {
+      "name": "mlf.code.9357",
+      "count": 10,
+      "percent": 0.22177866489243736
+    },
+    {
+      "name": "mlf_st_new_array",
+      "count": 10,
+      "percent": 0.22177866489243736
+    },
+    {
+      "name": "mlf.st.worker.12391_Bootstrap.Graph.denseCommonFold",
+      "count": 10,
+      "percent": 0.22177866489243736
+    },
+    {
+      "name": "mlf.st.worker.12283_Bootstrap.Graph.denseCheckOriginals",
+      "count": 9,
+      "percent": 0.1996007984031936
+    },
+    {
+      "name": "mlf.worker.10513_Bootstrap.Graph.children",
+      "count": 9,
+      "percent": 0.1996007984031936
+    },
+    {
+      "name": "mlf.worker.10522_Bootstrap.Graph.mapTag",
+      "count": 8,
+      "percent": 0.17742293191394987
+    },
+    {
+      "name": "mlf.st.worker.12124_Bootstrap.Graph.denseLoadOriginals",
+      "count": 8,
+      "percent": 0.17742293191394987
+    },
+    {
+      "name": "GC_apply_to_all_blocks",
+      "count": 8,
+      "percent": 0.17742293191394987
+    },
+    {
+      "name": "mlf.worker.646_Bootstrap.Map.entriesInto",
+      "count": 7,
+      "percent": 0.15524506542470615
+    },
+    {
+      "name": "mlf.st.worker.11039_Bootstrap.Graph.denseChild",
+      "count": 7,
+      "percent": 0.15524506542470615
+    },
+    {
+      "name": "mlf.code.174089",
+      "count": 7,
+      "percent": 0.15524506542470615
+    },
+    {
+      "name": "mlf.worker.670_Bootstrap.Map.buildAsc",
+      "count": 7,
+      "percent": 0.15524506542470615
+    },
+    {
+      "name": "GC_add_to_black_list_stack",
+      "count": 7,
+      "percent": 0.15524506542470615
+    },
+    {
+      "name": "mlf.code.155004",
+      "count": 6,
+      "percent": 0.1330671989354624
+    },
+    {
+      "name": "mlf.code.184841",
+      "count": 6,
+      "percent": 0.1330671989354624
+    },
+    {
+      "name": "mlf.worker.815_Bootstrap.IntMap.deleteTree",
+      "count": 6,
+      "percent": 0.1330671989354624
+    },
+    {
+      "name": "mlf.st.worker.12196_Bootstrap.Graph.denseFinalNodes",
+      "count": 6,
+      "percent": 0.1330671989354624
+    },
+    {
+      "name": "GC_clear_stack_inner",
+      "count": 6,
+      "percent": 0.1330671989354624
+    },
+    {
+      "name": "mlf.code.186039",
+      "count": 5,
+      "percent": 0.11088933244621868
+    },
+    {
+      "name": "mlf.worker.400_Bootstrap.Map.bin",
+      "count": 5,
+      "percent": 0.11088933244621868
+    },
+    {
+      "name": "mlf.worker.111_Bootstrap.Std.append",
+      "count": 5,
+      "percent": 0.11088933244621868
+    },
+    {
+      "name": "mlf.st.worker.10981_Bootstrap.Graph.denseRequire",
+      "count": 5,
+      "percent": 0.11088933244621868
+    },
+    {
+      "name": "mlf.st.worker.12489_Bootstrap.Graph.newDensePermissions",
+      "count": 5,
+      "percent": 0.11088933244621868
+    },
+    {
+      "name": "mlf_application",
+      "count": 5,
+      "percent": 0.11088933244621868
+    },
+    {
+      "name": "GC_clear_stack",
+      "count": 5,
+      "percent": 0.11088933244621868
+    },
+    {
+      "name": "mlf.code.155750",
+      "count": 5,
+      "percent": 0.11088933244621868
+    },
+    {
+      "name": "mlf.code.185896",
+      "count": 5,
+      "percent": 0.11088933244621868
+    },
+    {
+      "name": "GC_unmap_old",
+      "count": 5,
+      "percent": 0.11088933244621868
+    },
+    {
+      "name": "mlf.code.45980",
+      "count": 5,
+      "percent": 0.11088933244621868
+    },
+    {
+      "name": "mlf.worker.12930_Bootstrap.Std.filter",
+      "count": 4,
+      "percent": 0.08871146595697493
+    },
+    {
+      "name": "mlf.st.worker.10968_Bootstrap.Graph.denseGetNode",
+      "count": 4,
+      "percent": 0.08871146595697493
+    },
+    {
+      "name": "mlf.st.worker.10987_Bootstrap.Graph.denseBindingVisit",
+      "count": 4,
+      "percent": 0.08871146595697493
+    },
+    {
+      "name": "mlf.st.worker.11888_Bootstrap.Graph.denseFlexiblePath",
+      "count": 4,
+      "percent": 0.08871146595697493
+    },
+    {
+      "name": "mlf.worker.10377_Bootstrap.Graph.mapE",
+      "count": 4,
+      "percent": 0.08871146595697493
+    },
+    {
+      "name": "mlf.worker.10537_Bootstrap.Graph.kindVisit",
+      "count": 4,
+      "percent": 0.08871146595697493
+    },
+    {
+      "name": "GC_malloc",
+      "count": 4,
+      "percent": 0.08871146595697493
+    },
+    {
+      "name": "GC_malloc_many",
+      "count": 4,
+      "percent": 0.08871146595697493
+    },
+    {
+      "name": "GC_allochblk",
+      "count": 4,
+      "percent": 0.08871146595697493
+    },
+    {
+      "name": "GC_remove_protection",
+      "count": 4,
+      "percent": 0.08871146595697493
+    },
+    {
+      "name": "GC_approx_sp",
+      "count": 4,
+      "percent": 0.08871146595697493
+    },
+    {
+      "name": "GC_promote_black_lists",
+      "count": 4,
+      "percent": 0.08871146595697493
+    },
+    {
+      "name": "mlf.code.153119",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.code.138238",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.code.153584",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.worker.12100_Bootstrap.Std.filter",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.st.worker.10988_Bootstrap.Graph.denseBindingChildren",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.st.worker.12162_Bootstrap.Graph.denseMarkOriginals",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.worker.12565_Bootstrap.Graph.Solver.insertIndex",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.worker.528_Bootstrap.Map.glue",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.worker.11514_Bootstrap.Graph.mapNodeTree",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.code.38730",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.worker.839_Bootstrap.IntMap.splitTree",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.worker.242_Bootstrap.Std.zip",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.worker.824_Bootstrap.IntMap.joinTree",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.worker.13068_Bootstrap.Std.map",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.worker.10893_Bootstrap.Graph.intervalContains",
+      "count": 3,
+      "percent": 0.0665335994677312
+    },
+    {
+      "name": "mlf.code.154050",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.code.155243",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.code.157416",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.worker.10468_Bootstrap.Graph.applyKind",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.code.156543",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.st.worker.11863_Bootstrap.Graph.denseInert",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.st.worker.12363_Bootstrap.Graph.denseLoadRemainings",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.st.worker.12535_Bootstrap.Graph.denseCheckMergeEntries",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.worker.11133_Bootstrap.Std.any",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.worker.11394_Bootstrap.Graph.firstOrder",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.worker.11934_Bootstrap.Graph.insideScope",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.worker.13043_Bootstrap.Map.foldlWithKeyStrict",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.code.152784",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.code.173626",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.code.155250",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "_platform_memmove",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.worker.13936_Bootstrap.Std.filter",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.code.48614",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.code.42459",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.code.193228",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.code.155058",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.code.89658",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "GC_install_header",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.worker.13087_Bootstrap.Std.filter",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.code.154315",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.worker.12973_Bootstrap.Std.foldr",
+      "count": 2,
+      "percent": 0.04435573297848747
+    },
+    {
+      "name": "mlf.code.184069",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.153644",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.13909_Bootstrap.Std.filter",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.152896",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.188124",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.st.worker.11662_Bootstrap.Graph.denseTableNode",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.st.worker.11669_Bootstrap.Graph.denseMarks",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.st.worker.11699_Bootstrap.Graph.denseCandidates",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.st.worker.11913_Bootstrap.Graph.densePermission",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.st.worker.12402_Bootstrap.Graph.densePlaces",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.10340_Bootstrap.Graph.mkGraph",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.10916_Bootstrap.Graph.denseBounds",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.14014_Bootstrap.Graph.Solver.expanded",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.14207_Bootstrap.Graph.Solver.groundNodes",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.14382_Bootstrap.Graph.Solver.sameGroundShape",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.207_Bootstrap.Std.splitAt",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.42936",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.152761",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf_thunk",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.13054_Bootstrap.Std.map",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.137514",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf_string",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.155374",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.148865",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.173479",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.172861",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.192332",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.10405_Bootstrap.Graph.equalKind",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.12550_Bootstrap.Graph.Solver.mkSolver",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.worker.517_Bootstrap.Map.maxViewWithKey",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.153020",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.155053",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.153215",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.155872",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.154914",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.173522",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.89642",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "gc_start",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "_platform_memcmp",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.192753",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.70111",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.153763",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.186917",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "GC_notify_or_invoke_finalizers",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.192770",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.154941",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.150676",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.curry.150717",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.89608",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "GC_expand_hp_inner",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "GC_is_black_listed",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "GC_never_stop_func",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.154449",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.77218",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "GC_remove_header",
+      "count": 1,
+      "percent": 0.022177866489243733
+    },
+    {
+      "name": "mlf.code.153746",
+      "count": 1,
+      "percent": 0.022177866489243733
+    }
+  ]
+}

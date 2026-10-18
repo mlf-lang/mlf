@@ -1,7 +1,7 @@
 {
   "format": 1,
   "name": "mlf-tests",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "dependencies": {
     "mlf-bootstrap": {
       "path": "../bootstrap"
@@ -77,7 +77,17 @@
       "Tests.PortSuite": "Tests/PortSuite.emlf",
       "Tests.BenchmarkSuite": "Tests/BenchmarkSuite.emlf",
       "Tests.BootstrapSuite": "Tests/BootstrapSuite.emlf",
-      "Tests.ReleaseSuite": "Tests/ReleaseSuite.emlf"
+      "Tests.ReleaseSuite": "Tests/ReleaseSuite.emlf",
+      "Tests.CheckedEmission": "Tests/CheckedEmission.emlf",
+      "Tests.SolverAllocation": "Tests/SolverAllocation.emlf",
+      "Tests.DenseNormalization": "Tests/DenseNormalization.emlf",
+      "Tests.SolverIndexAudit": "Tests/SolverIndexAudit.emlf",
+      "Tests.StrictWrappers": "Tests/StrictWrappers.emlf",
+      "Tests.ProjectionRanks": "Tests/ProjectionRanks.emlf",
+      "Tests.ProjectionChanges": "Tests/ProjectionChanges.emlf",
+      "Tests.IntSetUnions": "Tests/IntSetUnions.emlf",
+      "Tests.IndexEdges": "Tests/IndexEdges.emlf",
+      "Tests.ComponentProjection": "Tests/ComponentProjection.emlf"
     }
   },
   "executables": {

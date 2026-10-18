@@ -1,0 +1,47 @@
+module Tests.SolverIndexAudit where
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.IntSet as IS
+import qualified Bootstrap.Graph as G
+import qualified Bootstrap.Graph.Solver as S
+import qualified Tests.DenseNormalization as N
+import qualified Tests.Helpers as H
+
+suite : List (Pair String (IO Unit))
+suite = Cons (Pair "incremental index audit agrees with independent reconstruction" audits) Nil
+
+-- Keep the previous reconstruction algorithm as an independent oracle.
+reference solver = G.bindE (G.validateGraph (S.graph solver)) (\ignored ->
+ let rebuilt = L.foldlStrict S.addNode (S.mkSolver (S.graph solver) IM.empty IM.empty (S.indexScopes (S.graph solver))) (IM.toList (G.nodes (S.graph solver))) in
+ if IM.eqIntMap IS.eqIntSet (S.structuralParents solver) (S.structuralParents rebuilt) && IM.eqIntMap IS.eqIntSet (S.bindingChildren solver) (S.bindingChildren rebuilt) && S.equalScopes (S.scopeIndex solver) (S.scopeIndex rebuilt)
+ then Right (S.graph solver) else Left "incremental graph index disagrees with the graph")
+
+sizeWrong (IntMap tree) = IntMap (case tree of
+ MapEmpty -> MapNode 1 0 IS.empty MapEmpty MapEmpty
+ MapNode count key value left right -> MapNode (count + 1) key value left right)
+setSizeWrong (IntSet tree) = IntSet (case tree of
+ MapEmpty -> MapNode 1 0 Unit MapEmpty MapEmpty
+ MapNode count key value left right -> MapNode (count + 1) key value left right)
+variants index = case IM.toList index of
+ Nil -> Cons index Nil
+ Cons (Pair key values) rest ->
+  Cons index (Cons (IM.delete key index) (Cons (IM.insert key IS.empty index)
+  (Cons (IM.insert key (IS.insert 999999 values) index)
+  (Cons (IM.insert 999999 values index) (Cons (sizeWrong index)
+  (Cons (IM.insert key (setSizeWrong values) index)
+  (Cons (IntMap (MapNode 2 key values MapEmpty (MapNode 1 key values MapEmpty MapEmpty))) Nil)))))))
+
+check solver = H.assert (H.eq (S.finish solver) (reference solver)) "incremental index audit changed acceptance or returned graph"
+audits : IO Unit
+audits = L.mapM_ (\scale -> L.mapM_ (\shift -> do
+ let input = N.rename (\n -> shift + scale * n) (N.fixture 7)
+ prepared <- H.right (S.prepare input)
+ let graph = S.graph prepared
+ let parents = S.structuralParents prepared
+ let descendants = S.bindingChildren prepared
+ let scopes = S.scopeIndex prepared
+ L.mapM_ (\p -> L.mapM_ (\d -> check (Solver graph p d scopes)) (variants descendants)) (variants parents)
+ check (Solver graph parents descendants (ScopeIndex IM.empty Nil))
+ check (Solver (Graph IM.empty IM.empty 0) parents descendants scopes))
+ (Cons 0 (Cons 340282366920938463463374607431768211456 (Cons (-340282366920938463463374607431768211456) Nil)))) (Cons 1 (Cons 100003 Nil))

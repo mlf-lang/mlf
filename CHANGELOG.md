@@ -1,7 +1,26 @@
 # Changelog
 
-## Unreleased
+## 0.1.1 — 2026-10-18
 
+Compiler performance and native development improvements.
+
+- Reduce graph solver allocation and repeated index/projection work while
+  preserving independent xMLF verification, inferred types, source erasure,
+  module boundaries, and opaque checked witnesses.
+- Improve compact runtime allocation, thunk forcing, strict unary wrappers,
+  and LLVM emission; add focused native regression coverage.
+- Add reproducible native compiler profiling, compiler-only PGO tooling,
+  streaming compilation, and configurable per-workload benchmark limits.
+- Verify all nine Benchmarks Game workloads with seven samples against an
+  explicit 3× C compilation / 2× C runtime gate. Every workload passes,
+  including each observed MLF maximum divided by the C minimum. These results
+  identify the exact locally tested PGO compiler, backend configuration,
+  sources, and toolchain; they do not measure the release archive's binary.
+- Retain raw reports, all experimental samples, LLVM equality checks, all six
+  native test groups, and frozen-source self-compilation measurements. Ordinary
+  self-compilation improves from 257.289087s to 181.955334s median on that host.
+- Rewrite the README build/run instructions for the native compiler and
+  package manager, and update native self-compilation profiling documentation.
 - Separate quick package integration CI from manually requested compiler
   self-hosting; allow long hosted-runner bootstrap stages without changing
   individual test fixture limits.

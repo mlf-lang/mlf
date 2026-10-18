@@ -1,0 +1,157 @@
+{
+  "default": {
+    "samples": [
+      {
+        "exit_code": 0,
+        "timed_out": false,
+        "interrupted": false,
+        "termination_signal": 0,
+        "wall_seconds": 0.542744,
+        "cpu_seconds": 0.045498,
+        "peak_rss_bytes": 35553280,
+        "pid": 51118
+      },
+      {
+        "exit_code": 0,
+        "timed_out": false,
+        "interrupted": false,
+        "termination_signal": 0,
+        "wall_seconds": 0.031841,
+        "cpu_seconds": 0.029824,
+        "peak_rss_bytes": 35504128,
+        "pid": 51171
+      },
+      {
+        "exit_code": 0,
+        "timed_out": false,
+        "interrupted": false,
+        "termination_signal": 0,
+        "wall_seconds": 0.030304,
+        "cpu_seconds": 0.029393,
+        "peak_rss_bytes": 35389440,
+        "pid": 51174
+      },
+      {
+        "exit_code": 0,
+        "timed_out": false,
+        "interrupted": false,
+        "termination_signal": 0,
+        "wall_seconds": 0.030291,
+        "cpu_seconds": 0.029273,
+        "peak_rss_bytes": 35438592,
+        "pid": 51228
+      },
+      {
+        "exit_code": 0,
+        "timed_out": false,
+        "interrupted": false,
+        "termination_signal": 0,
+        "wall_seconds": 0.03033,
+        "cpu_seconds": 0.029273,
+        "peak_rss_bytes": 35536896,
+        "pid": 51231
+      },
+      {
+        "exit_code": 0,
+        "timed_out": false,
+        "interrupted": false,
+        "termination_signal": 0,
+        "wall_seconds": 0.031868,
+        "cpu_seconds": 0.029848,
+        "peak_rss_bytes": 35487744,
+        "pid": 51245
+      },
+      {
+        "exit_code": 0,
+        "timed_out": false,
+        "interrupted": false,
+        "termination_signal": 0,
+        "wall_seconds": 0.031849,
+        "cpu_seconds": 0.029534,
+        "peak_rss_bytes": 35373056,
+        "pid": 51249
+      }
+    ],
+    "median": 0.031841,
+    "min": 0.030291,
+    "max": 0.542744
+  },
+  "single": {
+    "samples": [
+      {
+        "exit_code": 0,
+        "timed_out": false,
+        "interrupted": false,
+        "termination_signal": 0,
+        "wall_seconds": 0.437851,
+        "cpu_seconds": 0.047416,
+        "peak_rss_bytes": 35078144,
+        "pid": 51165
+      },
+      {
+        "exit_code": 0,
+        "timed_out": false,
+        "interrupted": false,
+        "termination_signal": 0,
+        "wall_seconds": 0.030276,
+        "cpu_seconds": 0.026937,
+        "peak_rss_bytes": 35340288,
+        "pid": 51168
+      },
+      {
+        "exit_code": 0,
+        "timed_out": false,
+        "interrupted": false,
+        "termination_signal": 0,
+        "wall_seconds": 0.03033,
+        "cpu_seconds": 0.027734,
+        "peak_rss_bytes": 35422208,
+        "pid": 51177
+      },
+      {
+        "exit_code": 0,
+        "timed_out": false,
+        "interrupted": false,
+        "termination_signal": 0,
+        "wall_seconds": 0.031742,
+        "cpu_seconds": 0.028928,
+        "peak_rss_bytes": 35373056,
+        "pid": 51181
+      },
+      {
+        "exit_code": 0,
+        "timed_out": false,
+        "interrupted": false,
+        "termination_signal": 0,
+        "wall_seconds": 0.029926,
+        "cpu_seconds": 0.027397,
+        "peak_rss_bytes": 35209216,
+        "pid": 51237
+      },
+      {
+        "exit_code": 0,
+        "timed_out": false,
+        "interrupted": false,
+        "termination_signal": 0,
+        "wall_seconds": 0.03011,
+        "cpu_seconds": 0.028061,
+        "peak_rss_bytes": 35176448,
+        "pid": 51241
+      },
+      {
+        "exit_code": 0,
+        "timed_out": false,
+        "interrupted": false,
+        "termination_signal": 0,
+        "wall_seconds": 0.031858,
+        "cpu_seconds": 0.0277,
+        "peak_rss_bytes": 35176448,
+        "pid": 51252
+      }
+    ],
+    "median": 0.03033,
+    "min": 0.029926,
+    "max": 0.437851
+  },
+  "decision": "Do not retain: 1.5ms median difference is small, distributions overlap; large first-sample launch costs retained."
+}

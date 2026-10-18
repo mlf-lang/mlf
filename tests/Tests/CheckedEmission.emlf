@@ -1,0 +1,58 @@
+module Tests.CheckedEmission where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Bootstrap.Compiler as C
+import qualified Bootstrap.LLVM as LLVM
+import qualified Bootstrap.X.Checked as Checked
+import qualified Bootstrap.X.Check as Check
+import qualified Tests.Helpers as H
+import qualified Tests.System as System
+import qualified Package.OS as O
+
+suite : List (Pair String (IO Unit))
+suite = Cons (Pair "checked emission agrees with raw independently checked emission" agreement)
+  (Cons (Pair "external xMLF emission still rejects malformed terms" rejects)
+  (Cons (Pair "checked emission still enforces IO entry types" ioEntry)
+  (Cons (Pair "checked witness and compilation constructors are private" opaque) Nil)))
+
+agreement : IO Unit
+agreement = S.mapM_ (\source -> do
+  compiled <- H.right (C.compile "<checked-emission>" source)
+  expected <- H.right (Check.checkClosed (C.compiledTerm compiled))
+  H.assert (H.eq expected (Checked.typeOf (C.checkedTerm compiled))) "witness type differs"
+  S.mapM_ (\compact -> do
+    raw <- H.right (LLVM.emitEntryChunks compact false (C.compiledTerm compiled))
+    reused <- H.right (LLVM.emitCheckedChunks compact false (C.checkedTerm compiled))
+    H.assert (S.eqList eqString raw reused) "LLVM changed when sharing the successful check")
+    (Cons false (Cons true Nil)))
+  (Cons "42" (Cons "let id = \\x -> x in id id"
+  (Cons "data Box a = Box a; case Box 42 of { Box x -> x }"
+  (Cons "do { putStrLn \"checked\"; return 42 }" Nil))))
+
+rejects : IO Unit
+rejects = S.mapM_ (\term -> S.mapM_ (\compact -> do
+  H.reject (LLVM.emitEntryChunks compact false term)
+  H.reject (LLVM.emitEntryChunks compact true term)) (Cons false (Cons true Nil)))
+  (Cons (XVarTerm (XName 0 "free"))
+  (Cons (XApp (XIntTerm 1) (XIntTerm 2))
+  (Cons (XTypeApp (XIntTerm 1) XElim)
+  (Cons (XWithData (Cons (DataDecl "Bad" Nil (Cons (ConstructorDecl "Bad" (Cons (Parameter "missing") Nil)) Nil)) Nil) (XIntTerm 1)) Nil))))
+
+ioEntry : IO Unit
+ioEntry = do
+  pure <- H.right (C.compile "<pure>" "42")
+  action <- H.right (C.compile "<action>" "return 42 : IO Int")
+  S.mapM_ (\compact -> do
+    H.reject (LLVM.emitCheckedChunks compact true (C.checkedTerm pure))
+    _ <- H.right (LLVM.emitCheckedChunks compact true (C.checkedTerm action))
+    return Unit) (Cons false (Cons true Nil))
+
+opaque : IO Unit
+opaque = System.withScratch (\directory -> S.mapM_ (\(Pair moduleName constructor) -> do
+  let file = directory ++ "/Main.emlf"
+  writeFile file ("module Main where\nimport qualified " ++ moduleName ++ " as Private\nmain = Private." ++ constructor ++ "\n")
+  result <- C.compileFile (Cons "bootstrap" Nil) file
+  case result of
+    Left (CompileError ModuleResolution message) -> H.assert (H.contains "not in scope" message || H.contains "not exported" message) ("unexpected privacy error: " ++ message)
+    _ -> H.fail "private checked constructor escaped module resolution")
+  (Cons (Pair "Bootstrap.X.Checked" "CheckedTerm") (Cons (Pair "Bootstrap.Compiler" "Compilation") Nil)))

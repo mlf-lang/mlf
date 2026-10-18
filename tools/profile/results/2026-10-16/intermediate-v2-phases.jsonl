@@ -1,0 +1,50 @@
+{"phase":"start","elapsed_seconds":0.000000000,"delta_seconds":0.000000000,"gc_seconds":0.000000000,"allocated_bytes":76064,"heap_bytes":536870912,"collections":1,"max_rss":2031616}
+{"phase":"parse-root","elapsed_seconds":0.015440000,"delta_seconds":0.015440000,"gc_seconds":0.000000000,"allocated_bytes":33999264,"heap_bytes":536870912,"collections":1,"max_rss":37502976}
+{"phase":"parse-root-forced-again","elapsed_seconds":0.015530000,"delta_seconds":0.000090000,"gc_seconds":0.000000000,"allocated_bytes":34003344,"heap_bytes":536870912,"collections":1,"max_rss":37502976}
+{"phase":"load-modules","elapsed_seconds":1.675734000,"delta_seconds":1.660204000,"gc_seconds":0.692716000,"allocated_bytes":2864099088,"heap_bytes":285376512,"collections":28,"max_rss":313868288}
+{"phase":"load-modules-forced-again","elapsed_seconds":1.682437000,"delta_seconds":0.006703000,"gc_seconds":0.692716000,"allocated_bytes":2864858656,"heap_bytes":285376512,"collections":28,"max_rss":313868288}
+{"phase":"link-modules","elapsed_seconds":26.817927000,"delta_seconds":25.135490000,"gc_seconds":9.936021000,"allocated_bytes":31070793248,"heap_bytes":637534208,"collections":104,"max_rss":662175744}
+{"phase":"link-modules-forced-again","elapsed_seconds":26.825166000,"delta_seconds":0.007239000,"gc_seconds":9.936021000,"allocated_bytes":31072280672,"heap_bytes":637534208,"collections":104,"max_rss":662175744}
+{"phase":"lower-classes","elapsed_seconds":27.288941000,"delta_seconds":0.463775000,"gc_seconds":10.070492000,"allocated_bytes":32057566096,"heap_bytes":637599744,"collections":106,"max_rss":662552576}
+{"phase":"lower-classes-forced-again","elapsed_seconds":27.299401000,"delta_seconds":0.010460000,"gc_seconds":10.070492000,"allocated_bytes":32057950864,"heap_bytes":637599744,"collections":106,"max_rss":662552576}
+{"phase":"generate","elapsed_seconds":34.873441000,"delta_seconds":7.574040000,"gc_seconds":14.337024000,"allocated_bytes":40866973968,"heap_bytes":1338507264,"collections":124,"max_rss":1389428736}
+{"phase":"generate-forced-again","elapsed_seconds":34.989660000,"delta_seconds":0.116219000,"gc_seconds":14.337024000,"allocated_bytes":40894320432,"heap_bytes":1338507264,"collections":124,"max_rss":1389428736}
+{"phase":"prepare","elapsed_seconds":39.446453000,"delta_seconds":4.456793000,"gc_seconds":16.608735000,"allocated_bytes":46949606880,"heap_bytes":1598554112,"collections":132,"max_rss":1658847232}
+{"phase":"prepare-forced-again","elapsed_seconds":40.151045000,"delta_seconds":0.704592000,"gc_seconds":17.060126000,"allocated_bytes":47212243584,"heap_bytes":1598554112,"collections":133,"max_rss":1658847232}
+{"phase":"unify","elapsed_seconds":46.768999000,"delta_seconds":6.617954000,"gc_seconds":19.975607000,"allocated_bytes":55075765408,"heap_bytes":3452436480,"collections":138,"max_rss":3574956032}
+{"phase":"unify-forced-again","elapsed_seconds":47.495912000,"delta_seconds":0.726913000,"gc_seconds":20.451066000,"allocated_bytes":55334398192,"heap_bytes":3452436480,"collections":139,"max_rss":3574956032}
+{"phase":"instantiate","elapsed_seconds":106.787331000,"delta_seconds":59.291419000,"gc_seconds":50.177802999,"allocated_bytes":144058764480,"heap_bytes":8200388608,"collections":170,"max_rss":8391999488}
+{"phase":"instantiate-forced-again","elapsed_seconds":108.590250000,"delta_seconds":1.802919000,"gc_seconds":51.358265999,"allocated_bytes":144513270896,"heap_bytes":8200388608,"collections":171,"max_rss":8391999488}
+{"phase":"finish-normalize","elapsed_seconds":126.272435000,"delta_seconds":17.682185000,"gc_seconds":59.177707999,"allocated_bytes":168980872944,"heap_bytes":8656322560,"collections":177,"max_rss":8963866624}
+{"phase":"finish-normalize-forced-again","elapsed_seconds":127.924550000,"delta_seconds":1.652115000,"gc_seconds":60.241047999,"allocated_bytes":169435376352,"heap_bytes":8656322560,"collections":178,"max_rss":8963866624}
+{"phase":"resolve","elapsed_seconds":131.320878000,"delta_seconds":3.396328000,"gc_seconds":62.451913999,"allocated_bytes":173238512944,"heap_bytes":8656322560,"collections":180,"max_rss":8964063232}
+{"phase":"resolve-forced-again","elapsed_seconds":132.506911000,"delta_seconds":1.186033000,"gc_seconds":63.637007999,"allocated_bytes":173238643600,"heap_bytes":8656322560,"collections":181,"max_rss":8964063232}
+{"phase":"elaborate","elapsed_seconds":138.777743000,"delta_seconds":6.270832000,"gc_seconds":66.383314999,"allocated_bytes":182539659104,"heap_bytes":8571486208,"collections":183,"max_rss":8965652480}
+{"phase":"elaborate-forced-again","elapsed_seconds":138.814662000,"delta_seconds":0.036919000,"gc_seconds":66.383314999,"allocated_bytes":182540047856,"heap_bytes":8571486208,"collections":183,"max_rss":8965652480}
+{"phase":"check","elapsed_seconds":142.134341000,"delta_seconds":3.319679000,"gc_seconds":68.362342999,"allocated_bytes":187557784688,"heap_bytes":8571486208,"collections":185,"max_rss":8965652480}
+{"phase":"check-forced-again","elapsed_seconds":142.134391000,"delta_seconds":0.000050000,"gc_seconds":68.362342999,"allocated_bytes":187557784688,"heap_bytes":8571486208,"collections":185,"max_rss":8965652480}
+{"phase":"type-agreement","elapsed_seconds":142.134443000,"delta_seconds":0.000052000,"gc_seconds":68.362342999,"allocated_bytes":187557784688,"heap_bytes":8571486208,"collections":185,"max_rss":8965652480}
+{"phase":"erasure-agreement","elapsed_seconds":142.176793000,"delta_seconds":0.042350000,"gc_seconds":68.362342999,"allocated_bytes":187597815152,"heap_bytes":8571486208,"collections":185,"max_rss":8965652480}
+{"phase":"recheck","elapsed_seconds":143.755194000,"delta_seconds":1.578401000,"gc_seconds":68.630309999,"allocated_bytes":192615184384,"heap_bytes":8571486208,"collections":186,"max_rss":8965652480}
+{"phase":"recheck-forced-again","elapsed_seconds":143.755241000,"delta_seconds":0.000047000,"gc_seconds":68.630309999,"allocated_bytes":192615184384,"heap_bytes":8571486208,"collections":186,"max_rss":8965652480}
+{"phase":"llvm","elapsed_seconds":249.554102000,"delta_seconds":105.798861000,"gc_seconds":79.982017999,"allocated_bytes":362742247792,"heap_bytes":8571486208,"collections":207,"max_rss":8965652480}
+{"phase":"llvm-forced-again","elapsed_seconds":249.777220000,"delta_seconds":0.223118000,"gc_seconds":80.201553999,"allocated_bytes":362743204144,"heap_bytes":8571486208,"collections":208,"max_rss":8965652480}
+{"phase":"write","elapsed_seconds":249.846600000,"delta_seconds":0.069380000,"gc_seconds":80.201553999,"allocated_bytes":362749253424,"heap_bytes":8571486208,"collections":208,"max_rss":8965652480}
+      250.56 real       248.80 user         0.98 sys
+          8965652480  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              550864  page reclaims
+                   1  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                 109  voluntary context switches
+                6429  involuntary context switches
+       1556882906288  instructions retired
+        802556320055  cycles elapsed
+          8967477872  peak memory footprint

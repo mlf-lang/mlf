@@ -1,0 +1,22 @@
+module Main where
+import Bootstrap.Types
+import qualified Package.OS as O
+import qualified Package.Benchmark as B
+main = do
+ compiler <- getArg 0
+ backend <- getArg 1
+ directory <- getArg 2
+ O.mkdir directory
+ writeFile (directory ++ "/Main.emlf") "printInt 42\n"
+ setEnv "MLF_BENCH_STREAM_LLVM" "1"
+ setEnv "MLF_BENCH_STREAM_LINK" "1"
+ setEnv "MLF_TEST_HOST_SUPPORT" "/Volumes/src/mlf/.mlf-build/compile3/pgo5-bench/host-support"
+ result <- B.buildParallel (directory ++ "/build") compiler backend (directory ++ "/Main.emlf") "/Volumes/src/mlf/runtime/mlf_runtime.c" (O.words "-I/opt/homebrew/Cellar/gmp/6.3.0/include -L/opt/homebrew/Cellar/gmp/6.3.0/lib -lgmp") 10.0
+ case result of
+  Left message -> O.fatal message
+  Right (Pair binary sample) -> do
+   code <- O.exec "" (Cons binary Nil) "" (directory ++ "/output") (directory ++ "/error") 10
+   output <- readFile (directory ++ "/output")
+   errors <- readFile (directory ++ "/error")
+   O.require (code == 0 && eqString output "42\n" && eqString errors "") "streaming build output mismatch"
+   putStrLn "Fresh streaming LLVM build passed"

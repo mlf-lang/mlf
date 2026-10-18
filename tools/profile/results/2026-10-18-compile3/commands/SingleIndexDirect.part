@@ -1,0 +1,13 @@
+
+referenceEdges entries =
+ let keys = L.nubBy eqInt (L.map L.fst entries) in
+ IM.fromList (L.map (\key -> Pair key (IS.fromList (L.map L.snd (L.filter (\entry -> L.fst entry == key) entries)))) keys)
+indexSteps : Int -> Int -> Int -> List (Pair Int Int) -> IntMap IntSet -> IO Unit
+indexSteps offset seed step entries index = if step >= 96 then return Unit else do
+ let key = offset + remInt (step * 17 + seed * 13) 19
+ let value = offset + remInt (step * 11 + seed) 7
+ let adding = remInt (step + seed) 5 < 3
+ let nextEntries = if adding then Cons (Pair key value) entries else L.filter (\entry -> L.not (L.fst entry == key && L.snd entry == value)) entries
+ let next = if adding then S.insertIndex key value index else S.removeIndex key value index
+ if same next (referenceEdges nextEntries) then indexSteps offset seed (step + 1) nextEntries next else panic "single-traversal index disagrees with edge-list oracle"
+directUpdates = L.mapM_ (\offset -> L.mapM_ (\seed -> indexSteps offset seed 0 Nil IM.empty) (L.range 0 7)) (Cons (-1000000000000000000000000000000) (Cons (-7) (Cons 0 (Cons 1000000000000000000000000000000 Nil))))

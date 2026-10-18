@@ -4,6 +4,7 @@ import Bootstrap.Types
 import qualified Bootstrap.Std as L
 import qualified Bootstrap.Compiler as C
 import qualified Bootstrap.X.Check as Check
+import qualified Bootstrap.X.Checked as Checked
 import qualified Bootstrap.X.Parser as Parse
 import qualified Bootstrap.X.Pretty as Pretty
 import qualified Bootstrap.Runtime as Runtime
@@ -70,13 +71,13 @@ runArgs mode paths arguments = case arguments of
   _ -> sourceCommand mode paths (PrintSource false) Nil arguments
 
 separateCommand paths command args file = do
-  linked <- Separate.linkModuleFile paths file
+  linked <- Separate.linkCheckedModuleFile paths file
   case linked of
     Left message -> fatal message
-    Right term -> case command of
+    Right checked -> let term = Checked.term checked in case command of
       PrintSource _ -> putStrLn (Pretty.prettyTerm term)
       RunSource -> execute args term
-      EmitSource compact -> printLLVM ((if compact then LLVM.emitLLVMGCChunks else LLVM.emitLLVMChunks) term)
+      EmitSource compact -> printLLVM (LLVM.emitCheckedChunks compact false checked)
       _ -> fatal "invalid module command"
 
 splitArguments : List String -> Pair (List String) (List String)
@@ -111,7 +112,7 @@ sourceCommand mode paths command programArguments arguments = case parseSource t
           putStrLn ((if onlyType then "" else "-- type: ") ++ C.sourceType result)
           if onlyType then ioReturn Unit else putStrLn (Pretty.prettyTerm (C.compiledTerm result))
         RunSource -> execute programArguments (C.compiledTerm result)
-        EmitSource compact -> printLLVM ((if compact then LLVM.emitLLVMGCChunks else LLVM.emitLLVMChunks) (C.compiledTerm result))
+        EmitSource compact -> printLLVM (LLVM.emitCheckedChunks compact false (C.checkedTerm result))
         _ -> fatal "invalid source command"
 
 load : Source -> IO (Pair String String)

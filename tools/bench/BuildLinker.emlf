@@ -1,0 +1,26 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+import qualified Package.Json as J
+main = do
+ args <- O.allArguments
+ case args of
+  Cons compiler (Cons llvm (Cons linker (Cons source (Cons output Nil)))) -> do
+   present <- directoryExists output
+   O.require (S.not present) "linker build requires a fresh directory"
+   cc <- canonicalPath compiler
+   prefix <- canonicalPath llvm
+   lld <- canonicalPath linker
+   input <- canonicalPath source
+   O.mkdir output
+   directory <- canonicalPath output
+   let binary = directory ++ "/mlf-link"
+   let command = S.append (Cons cc (O.words "-std=c++17 -O2 -Wall -Wextra -Werror")) (S.append (S.concatMap (\root -> Cons ("-I" ++ root ++ "/include") (Cons ("-L" ++ root ++ "/lib") (Cons ("-Wl,-rpath," ++ root ++ "/lib") Nil))) (Cons prefix (Cons lld Nil))) (S.append (Cons input (O.words "-llldMachO -llldCommon -lLLVM -lc++")) (Cons "-o" (Cons binary Nil))))
+   O.run "" command
+   llvmHeaders <- O.files (prefix ++ "/include/llvm")
+   lldHeaders <- O.files (lld ++ "/include/lld")
+   let files = S.append (Cons cc (Cons input (Cons binary (Cons (prefix ++ "/lib/libLLVM.dylib") (Cons (lld ++ "/lib/liblldMachO.dylib") (Cons (lld ++ "/lib/liblldCommon.dylib") Nil)))))) (S.append llvmHeaders lldHeaders)
+   hashes <- S.mapM (\path -> do { real <- canonicalPath path; hash <- fileDigest real; return (Pair real (J.str hash)) }) files
+   writeFile (directory ++ "/build.json") (J.render (J.Object (Cons (Pair "command" (J.stringArray command)) (Cons (Pair "sha256" (J.Object hashes)) Nil))) ++ "\n")
+  _ -> O.fatal "build-linker CLANG LLVM_PREFIX LLD_PREFIX SOURCE FRESH_OUTPUT_DIRECTORY"

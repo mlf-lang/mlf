@@ -1,0 +1,47 @@
+-- Most locally projected identities occupy a few consecutive intervals.
+-- Bound the interval count so fragmented sets retain logarithmic rank/select.
+data ProjectionMap = ProjectionIntervals (List (Triple Int Int Int)) | ProjectionRanks IntSet
+
+projectionIntervals : Int -> Int -> Int -> Int -> List Int -> Maybe (List (Triple Int Int Int))
+projectionIntervals remaining start end offset entries = case entries of
+  Nil -> Just (Cons (Triple start end offset) Nil)
+  Cons n rest -> if n == end + 1 then projectionIntervals remaining start n offset rest else
+    if remaining <= 1 then Nothing else
+      L.mapOptional (\tail -> Cons (Triple start end offset) tail)
+        (projectionIntervals (remaining - 1) n n (offset + end - start + 1) rest)
+
+projectionMap : IntSet -> ProjectionMap
+projectionMap selected = case IS.toList selected of
+  Nil -> ProjectionIntervals Nil
+  Cons n rest -> case projectionIntervals 4 n n 0 rest of
+    Nothing -> ProjectionRanks selected
+    Just intervals -> ProjectionIntervals intervals
+
+intervalRank : Int -> List (Triple Int Int Int) -> Int
+intervalRank identity intervals = case intervals of
+  Nil -> panic "map key not found"
+  Cons (Triple start end offset) rest ->
+    if identity < start then panic "map key not found"
+    else if identity <= end then offset + identity - start else intervalRank identity rest
+
+projectionRank : ProjectionMap -> Int -> Int
+projectionRank mapping identity = case mapping of
+  ProjectionRanks (IntSet selected) -> rankIdentity identity 0 selected
+  ProjectionIntervals intervals -> intervalRank identity intervals
+
+intervalSelect : Int -> List (Triple Int Int Int) -> Either String Int
+intervalSelect position intervals = case intervals of
+  Nil -> Left "scope placeholder escaped local unification"
+  Cons (Triple start end offset) rest ->
+    if position < offset then Left "scope placeholder escaped local unification"
+    else if position <= offset + end - start then Right (start + position - offset)
+    else intervalSelect position rest
+
+projectionSelect : ProjectionMap -> Int -> Either String Int
+projectionSelect mapping position = case mapping of
+  ProjectionRanks selected -> originalIdentity selected position
+  ProjectionIntervals intervals -> intervalSelect position intervals
+
+compactProjection : Graph -> ProjectionMap -> Int -> Int
+compactProjection graph mapping identity = projectionRank mapping (G.resolve graph identity)
+

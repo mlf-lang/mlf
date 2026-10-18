@@ -1,0 +1,69 @@
+diff --git a/bootstrap/Bootstrap/Graph.emlf b/bootstrap/Bootstrap/Graph.emlf
+index fc997ea..5cf0871 100644
+--- a/bootstrap/Bootstrap/Graph.emlf
++++ b/bootstrap/Bootstrap/Graph.emlf
+@@ -1040,10 +1040,16 @@ expandWithScopes intervals generalization destination graph =
+   case expansionVisitCached graph generalization intervals (Pair IS.empty IM.empty) (Cons source Nil) of
+     Pair visited scopes ->
+       let originals = IS.toList visited in
+-      bindE (kindsAt graph originals) (\kinds -> case allocateCopies graph originals of
+-        Pair copies allocated ->
++      bindE (kindsAt graph originals) (\kinds ->
++          -- The visited set is distinct and ascending. Allocate the same
++          -- identity interval as allocateCopies, but construct both maps in
++          -- linear order and merge the fresh subtree into the old graph once.
++          let count = L.length originals in
++          let first = nextId graph in
++          let copies = IM.fromDistinctAscList (L.zip originals (L.range first (first + count - 1))) in
+           let copy = copyIdentity graph copies in
+-          let result = L.foldlStrict (\current -> \n -> setNode (copy n) (expansionNode graph generalization destination source copies kinds scopes n) current) allocated originals in
++          let fresh = nodesFromDistinctAscList (L.map (\n -> Pair (copy n) (expansionNode graph generalization destination source copies kinds scopes n)) originals) in
++          let result = mkGraph (IM.union fresh (nodes graph)) (links graph) (first + count) in
+           let frontier = L.filter (\n -> L.not (IM.findWithDefault false n scopes)) originals in
+           Right (Pair (Triple (copy source) copies (L.map (\n -> Pair n (copy n)) frontier)) result))
+ 
+diff --git a/bootstrap/Bootstrap/IntMap.emlf b/bootstrap/Bootstrap/IntMap.emlf
+index 46aa93a..051a0ac 100644
+--- a/bootstrap/Bootstrap/IntMap.emlf
++++ b/bootstrap/Bootstrap/IntMap.emlf
+@@ -111,7 +111,39 @@ fromListWith combine entries = wrap (L.foldlStrict (\tree entry -> case entry of
+ fromDistinctAscList : forall a. List (Pair Int a) -> IntMap a
+ fromDistinctAscList entries = wrap (M.fromDistinctAscList entries)
+ union : forall a. IntMap a -> IntMap a -> IntMap a
+-union (IntMap a) (IntMap b) = wrap (M.foldlWithKeyStrict (\tree key value -> insertTree key value tree) b a)
++union (IntMap a) (IntMap b) = wrap (unionTree a b)
++
++-- Split/join union shares untouched subtrees. The former insertion fold
++-- copied a root-to-leaf path for every expansion node or restored alias.
++-- Comparisons stay on arbitrary-precision Int; values remain lazy and the
++-- left map wins at duplicate keys, just as in the insertion implementation.
++joinTree : forall a. Int -> a -> Map Int a -> Map Int a -> Map Int a
++joinTree key value left right = case left of
++  MapEmpty -> insertTree key value right
++  MapNode ln lk lv ll lr -> case right of
++    MapEmpty -> insertTree key value left
++    MapNode rn rk rv rl rr ->
++      if rn > 3 * ln then M.balance rk rv (joinTree key value left rl) rr
++      else if ln > 3 * rn then M.balance lk lv ll (joinTree key value lr right)
++      else M.bin key value left right
++
++splitTree : forall a. Int -> Map Int a -> Pair (Map Int a) (Map Int a)
++splitTree wanted tree = case tree of
++  MapEmpty -> Pair MapEmpty MapEmpty
++  MapNode n key value left right ->
++    if wanted < key then case splitTree wanted left of
++      Pair below above -> Pair below (joinTree key value above right)
++    else if wanted > key then case splitTree wanted right of
++      Pair below above -> Pair (joinTree key value left below) above
++    else Pair left right
++
++unionTree : forall a. Map Int a -> Map Int a -> Map Int a
++unionTree left right = case left of
++  MapEmpty -> right
++  MapNode n key value below above -> case right of
++    MapEmpty -> left
++    _ -> case splitTree key right of
++      Pair smaller larger -> joinTree key value (unionTree below smaller) (unionTree above larger)
+ unionWith : forall a. (a -> a -> a) -> IntMap a -> IntMap a -> IntMap a
+ unionWith combine (IntMap a) (IntMap b) = wrap (M.unionWith L.compareInt combine a b)
+ unions : forall a. List (IntMap a) -> IntMap a

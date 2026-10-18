@@ -1,0 +1,44 @@
+{
+  "boundary": "link-only microbenchmark; not an acceptance measurement",
+  "input": "/Volumes/src/mlf/.mlf-build/compile3/global-cli-bench/n-body/sample-1/mlf/build",
+  "order": "default/single, single/default, alternating; seven pairs",
+  "sha256": {
+    "/Volumes/src/mlf/.mlf-build/compile3/backend-global-cli/toolchain.json": "783437f6cb69b7fc3d088d5e7edb660e70ac2962d936cb5b6e0537b6d09494ea",
+    "/Volumes/src/mlf/.mlf-build/compile3/global-cli-bench/n-body/sample-1/mlf/build/program.o": "bb52631710000a51e17a5b28798e886d856461ba69c18283b83f70c465f641eb",
+    "/Volumes/src/mlf/.mlf-build/compile3/global-cli-bench/n-body/sample-1/mlf/build/runtime.o": "a5f01e4ef3a84cc96a9b56140ceb0230a7b2405593970799aaa004b3fa60657d"
+  },
+  "output_sha256": {
+    "1-default": "2de3a0d73f7e61cd2f39cc2070651f92879918e2ee53950c9ba76559ca42ca03",
+    "2-default": "e9387be2f5eb9ba5bfb53eb9f1b904e7379c3fd96cd5029aefb7f875afff2cab",
+    "3-default": "64f1fad1b4831291099a6e89ada14443914ad800ed9af2b16342634e681e370e",
+    "4-default": "0b9fd2bbb69e6496cf3bf88407047031f5b47ff8640348e8a3ac4628467376ce",
+    "5-default": "9f32a070ea97890abb74ae7d62aa9a137a3f8b0799d98a934cc093d1632c30f9",
+    "6-default": "a2058ededbe568165e03d947c1d4e8f2a24c2377a71e3fa7c86e416c482ebe3a",
+    "7-default": "2f014c1e6ca443e7d9cccdedde821138ffebd01002a3285d2579fa4be12281b7",
+    "1-single": "3414aca7fac6626e30ce60cf01305b7961d17aa200d528844f9cc98f8d81f5a7",
+    "2-single": "8cbd15f310b15819dc78c6f65cda85c051fc2ea205727da6e7f245b662c31661",
+    "3-single": "4f8a984fefd858ac4b1ad7ad093c1cbcb97639575d27e2ad73338dfe4f991faf",
+    "4-single": "5ad8ce1999b7e9973e60ab74a78f030c3f067a5dc326a60d936501909dbae513",
+    "5-single": "ec0f53df723694ae05a1e9f18c42ca2ec857131037df315a1ea1d37eb74a95b1",
+    "6-single": "8e111b5568cf3d362a75782b7ab1380765247864c29f47826eaf92f75938c37f",
+    "7-single": "8422a495c7aa48e8a406fd8e8bc715a14c6878586700c9980ae28285b56924c3"
+  },
+  "normalized_sha256": {
+    "1-default": "1b82ee065575bb608be7da17982c3aaeeb7e4a52c9d594625e7914815f81573e",
+    "2-default": "1b82ee065575bb608be7da17982c3aaeeb7e4a52c9d594625e7914815f81573e",
+    "3-default": "1b82ee065575bb608be7da17982c3aaeeb7e4a52c9d594625e7914815f81573e",
+    "4-default": "1b82ee065575bb608be7da17982c3aaeeb7e4a52c9d594625e7914815f81573e",
+    "5-default": "1b82ee065575bb608be7da17982c3aaeeb7e4a52c9d594625e7914815f81573e",
+    "6-default": "1b82ee065575bb608be7da17982c3aaeeb7e4a52c9d594625e7914815f81573e",
+    "7-default": "1b82ee065575bb608be7da17982c3aaeeb7e4a52c9d594625e7914815f81573e",
+    "1-single": "1b82ee065575bb608be7da17982c3aaeeb7e4a52c9d594625e7914815f81573e",
+    "2-single": "1b82ee065575bb608be7da17982c3aaeeb7e4a52c9d594625e7914815f81573e",
+    "3-single": "1b82ee065575bb608be7da17982c3aaeeb7e4a52c9d594625e7914815f81573e",
+    "4-single": "1b82ee065575bb608be7da17982c3aaeeb7e4a52c9d594625e7914815f81573e",
+    "5-single": "1b82ee065575bb608be7da17982c3aaeeb7e4a52c9d594625e7914815f81573e",
+    "6-single": "1b82ee065575bb608be7da17982c3aaeeb7e4a52c9d594625e7914815f81573e",
+    "7-single": "1b82ee065575bb608be7da17982c3aaeeb7e4a52c9d594625e7914815f81573e"
+  },
+  "validation": "All 14 executable images match byte-for-byte except Mach-O UUID and code signature, whose output identifiers depend on filenames; all n-body 1000-step outputs match.",
+  "inputs_unchanged": true
+}

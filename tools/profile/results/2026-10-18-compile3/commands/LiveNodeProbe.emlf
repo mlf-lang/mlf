@@ -1,0 +1,18 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.Graph as G
+import qualified Bootstrap.Graph.Solver as S
+import qualified ComponentFixtures as F
+
+check input = do
+ solver <- F.right (S.prepare input)
+ let graph = S.graph solver
+ L.mapM_ (\n -> F.assert (G.equalNode (S.currentNode graph n) (G.nodeAt graph n)) "live-node lookup changed graph identity") (L.append (IM.keys (G.nodes graph)) (IM.keys (G.links graph)))
+ let collision = G.mkGraph (G.nodes graph) (IM.insert (L.head (IM.keys (G.nodes graph))) (L.last (IM.keys (G.nodes graph))) (G.links graph)) (G.nextId graph)
+ F.assert (L.isLeft (S.prepare collision)) "solver accepted a live node that was also an alias"
+
+main = do
+ L.mapM_ check (L.concatMap (\offset -> L.concatMap (\stride -> L.map (F.rename (\n -> offset + stride * n)) (Cons (F.fixture 7) (L.map F.chain (Cons 1 (Cons 2 (Cons 17 (Cons 65 Nil))))))) (Cons 1 (Cons 100003 Nil))) (Cons 0 (Cons 340282366920938463463374607431768211456 (Cons (-340282366920938463463374607431768211456) Nil))))
+ putStrLn "30 live-node and alias graphs matched canonical lookup; collisions rejected"

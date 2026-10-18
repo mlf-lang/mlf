@@ -1,0 +1,30 @@
+{
+  "format": 1,
+  "name": "mlf-native-bench",
+  "version": "0.1.0",
+  "dependencies": {
+    "mlf-package-tools": {
+      "path": "../../package"
+    },
+    "mlf-bootstrap": {
+      "path": "../../bootstrap"
+    }
+  },
+  "executables": {
+    "bench": {
+      "main": "Main.emlf",
+      "profile": "compiler",
+      "link": "source"
+    },
+    "build-backend": {
+      "main": "BuildBackend.emlf",
+      "profile": "compiler",
+      "link": "source"
+    },
+    "build-linker": {
+      "main": "BuildLinker.emlf",
+      "profile": "compiler",
+      "link": "source"
+    }
+  }
+}

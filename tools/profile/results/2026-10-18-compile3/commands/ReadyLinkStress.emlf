@@ -1,0 +1,31 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+import qualified Package.Json as J
+import qualified Package.Benchmark as B
+import qualified Package.Verification as V
+main = do
+ compiler <- getArg 0
+ backend <- getArg 1
+ directory <- getArg 2
+ O.mkdir directory
+ writeFile (directory ++ "/Main.emlf") "printInt 42\n"
+ writeFile (directory ++ "/bad.c") "#error intentional producer failure\n"
+ setEnv "MLF_BENCH_STREAM_LLVM" "1"
+ setEnv "MLF_BENCH_STREAM_LINK" "1"
+ setEnv "MLF_TEST_HOST_SUPPORT" "/Volumes/src/mlf/.mlf-build/compile3/final-bench-v1/host-support"
+ let flags = O.words "-I/opt/homebrew/Cellar/gmp/6.3.0/include -L/opt/homebrew/Cellar/gmp/6.3.0/lib -lgmp"
+ S.mapM_ (\n -> do
+  let output = directory ++ "/sample-" ++ showInt n
+  result <- B.buildParallel output compiler backend (directory ++ "/Main.emlf") "/Volumes/src/mlf/runtime/mlf_runtime.c" flags 10.0
+  case result of
+   Left error -> O.fatal error
+   Right (Pair binary sample) -> do
+    code <- O.exec "" (Cons binary Nil) "" (output ++ "/result") (output ++ "/result.err") 10
+    out <- readFile (output ++ "/result")
+    O.require (code == 0 && eqString out "42\n") "fresh ready-link stress output mismatch") (S.range 1 50)
+ result <- B.buildParallel (directory ++ "/failed-producer") compiler backend (directory ++ "/Main.emlf") (directory ++ "/bad.c") flags 10.0
+ report <- J.read (directory ++ "/failed-producer/pipeline.json")
+ O.require (S.isLeft result && V.int "remaining_children" report == 0 && ltDouble (V.double 0.0 (J.get "wall_seconds" report)) 3.0) "producer failure did not terminate the waiting linker"
+ putStrLn "50 fresh ready-link builds and producer failure cleanup passed"

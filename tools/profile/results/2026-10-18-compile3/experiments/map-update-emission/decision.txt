@@ -1,0 +1,1 @@
+Rejected: n-body -0.60%, FASTA -2.42%, but six of nine workloads regressed; all 27 standard LLVM outputs equal and independent map oracle passed. Restored only this experiment from its pre-edit backup.

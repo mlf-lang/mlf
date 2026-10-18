@@ -1,0 +1,27 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+import qualified Package.Json as J
+main = do
+ compiler <- getArg 0
+ backend <- getArg 1
+ manager <- getArg 2
+ directory <- getArg 3
+ O.mkdir directory
+ writeFile (directory ++ "/Main.emlf") "main = printInt 42\n"
+ writeFile (directory ++ "/mlf-package.json") "{\"format\":1,\"name\":\"backend-smoke\",\"version\":\"0.1.0\",\"executables\":{\"hello\":{\"main\":\"Main.emlf\"}}}\n"
+ let build = directory ++ "/build"
+ let args = Cons manager (Cons "--manifest" (Cons (directory ++ "/mlf-package.json") (Cons "--compiler" (Cons compiler (Cons "--clang" (Cons backend (Cons "--runtime" (Cons "/Volumes/src/mlf/runtime/mlf_runtime.c" (Cons "--build-dir" (Cons build (O.words "build --target hello")))))))))))
+ status <- O.exec "" args "" (directory ++ "/build.log") (directory ++ "/build.err") 1800
+ O.require (status == 0) "package combined LLVM/link build failed"
+ code <- O.exec "" (Cons (build ++ "/bin/hello") Nil) "" (directory ++ "/output") (directory ++ "/error") 30
+ out <- readFile (directory ++ "/output")
+ err <- readFile (directory ++ "/error")
+ O.require (code == 0 && eqString out "42\n" && eqString err "") "package combined LLVM/link output failed"
+ writeFile (directory ++ "/invalid.ll") "define i32 @bad() { ret ptr null }\n"
+ rejected <- O.exec "" (Cons backend (Cons "-O2" (Cons "-c" (Cons (directory ++ "/invalid.ll") (Cons "-o" (Cons (directory ++ "/invalid.o") Nil)))))) "" (directory ++ "/invalid.out") (directory ++ "/invalid.err") 30
+ object <- fileExists (directory ++ "/invalid.o")
+ message <- readFile (directory ++ "/invalid.err")
+ O.require (rejected /= 0 && S.not object && stringLength message > 0) "invalid LLVM unexpectedly produced an object"
+ putStrLn "Native package combined LLVM/link and malformed IR rejection passed"

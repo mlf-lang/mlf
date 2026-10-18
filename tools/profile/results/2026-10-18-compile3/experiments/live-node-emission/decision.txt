@@ -1,0 +1,1 @@
+Rejected: n-body -0.12% (negligible) and FASTA +1.07%; restored only the experiment from its immediate pre-edit backup. All independent graph tests and 27 LLVM comparisons passed.

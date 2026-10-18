@@ -1,0 +1,29 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.IntSet as IS
+import qualified Bootstrap.Graph as G
+import qualified Bootstrap.Graph.Solver as S
+
+sameResult actual expected = case actual of
+ Left message -> case expected of Left other -> eqString message other; _ -> false
+ Right nodes -> case expected of
+  Left message -> false
+  Right others -> L.eqList (\(Pair n a) (Pair m b) -> n == m && G.equalNode a b) nodes others
+
+check count offset stride mode = do
+ let key = \n -> offset + stride * n
+ let ids = L.map key (L.range 0 (count - 1))
+ let originals = L.map (\n -> Pair (key n) (G.mkNode (if remInt n 3 == 0 then GGen (key (count + 2)) else GBot) (if remInt n 2 == 0 then Nothing else Just (key 0)) Flexible)) (L.range 0 (count - 1))
+ let old = G.mkGraph (IM.fromList originals) IM.empty (key (count + 3))
+ let aliased = G.mkGraph (G.nodes old) (IM.singleton (key (count + 2)) (key 0)) (G.nextId old)
+ let selected = IS.fromList ids
+ let solved = L.map (\n -> Pair n (G.mkNode (if remInt n 2 == 0 then GArr (remInt (n + 1) count) 0 else GCon "T" (Cons 0 Nil)) (if mode == 7 then Just count else if remInt n 2 == 0 then Nothing else Just 0) (if remInt mode 2 == 0 then Rigid else Flexible))) (L.filter (\n -> remInt (n + mode) 4 /= 0) (L.range 0 (count - 1)))
+ L.mapM_ (\entries -> do
+  let expected = G.mapE (S.restoreNode old aliased selected) entries
+  let actual = S.restoreProjectedNodes aliased selected 0 originals entries
+  if sameResult actual expected then return Unit else panic "ordered restoration disagrees with independent inverse-rank/map lookups") (Cons solved (Cons Nil (Cons (Cons (Pair (-1) (G.mkNode GBot Nothing Flexible)) Nil) (Cons (Cons (Pair count (G.mkNode GBot Nothing Flexible)) Nil) Nil))))
+main = do
+ L.mapM_ (\count -> L.mapM_ (\offset -> L.mapM_ (\stride -> L.mapM_ (check count offset stride) (L.range 0 7)) (Cons 1 (Cons 100003 Nil))) (Cons (-340282366920938463463374607431768211456) (Cons (-7) (Cons 0 (Cons 340282366920938463463374607431768211456 Nil))))) (Cons 0 (Cons 1 (Cons 2 (Cons 5 (Cons 17 (Cons 33 Nil))))))
+ putStrLn "1536 ordered restoration cases passed"

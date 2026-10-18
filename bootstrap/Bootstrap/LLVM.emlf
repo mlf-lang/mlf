@@ -3,10 +3,11 @@ module Bootstrap.LLVM where
 import Bootstrap.Types
 import qualified Bootstrap.Std as L
 import qualified Bootstrap.Map as M
-import qualified Bootstrap.X.Check as Check
+import qualified Bootstrap.X.Checked as Checked
 import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.LLVM.Codegen as Codegen
 import qualified Bootstrap.LLVM.Optimize as Optimize
+import qualified Bootstrap.LLVM.StrictWrappers as Wrappers
 
 emitLLVM : XTerm -> Either String String
 emitLLVM term = emitEntry false false term
@@ -52,13 +53,23 @@ emitEntry compact requireIO term = L.mapEither L.concatStrings (emitEntryChunks 
 -- Keep the module as output chunks for the executable driver. Streaming these
 -- through IO bounds temporary String copies and permits runtime collection.
 emitEntryChunks : Bool -> Bool -> XTerm -> Either String (List String)
-emitEntryChunks compact requireIO term = case Check.checkClosed term of
+emitEntryChunks compact requireIO term = case Checked.check term of
   Left error -> Left ("LLVM target verification failed: " ++ error)
-  Right ty -> if requireIO && L.not (ioType ty) then Left "program must have type IO a to run" else
+  Right checked -> emitCheckedChunks compact requireIO checked
+
+-- Only an opaque successful check can enter this path. Raw xMLF entry points
+-- above always check, including terms deserialized from outside the compiler.
+emitCheckedChunks : Bool -> Bool -> Checked.CheckedTerm -> Either String (List String)
+emitCheckedChunks compact requireIO checked =
+  let term = Checked.term checked in
+  let ty = Checked.typeOf checked in
+  if requireIO && L.not (ioType ty) then Left "program must have type IO a to run" else
     let declarations = case term of XWithData ds body -> ds; _ -> Nil in
     let dataConstructorsAll = L.concatMap dataConstructors declarations in
     let constructors = M.fromList compareString (Cons (Pair "Unit" (Pair 0 0)) (L.zipWith constructorEntry (L.range 1 (L.length dataConstructorsAll)) dataConstructorsAll)) in
-    case (if compact then Codegen.generateForGC else Codegen.generate) constructors (Optimize.optimize (X.erase term)) of
+    let optimized = Optimize.optimize (X.erase term) in
+    let lowered = if compact then Wrappers.optimize declarations constructors optimized else optimized in
+    case (if compact then Codegen.generateForGC else Codegen.generate) constructors lowered of
       Left error -> Left error
       Right (Pair entry code) -> Right (L.map (\line -> line ++ "\n") (L.append (Cons "; Generated from independently checked xMLF." (Cons "source_filename = \"emlf\"" (Cons "" Nil))) (L.append code (entryCode compact entry (ioType ty)))))
 

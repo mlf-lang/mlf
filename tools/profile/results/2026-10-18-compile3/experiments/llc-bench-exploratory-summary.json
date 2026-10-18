@@ -1,0 +1,2282 @@
+{
+  "status": "rejected-source-integrity; see experiment-note.txt",
+  "rows": [
+    {
+      "name": "binary-trees",
+      "languages": {
+        "c": {
+          "build": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.123824,
+                "cpu_seconds": 0.148902,
+                "peak_rss_bytes": 71516160,
+                "pid": 31519
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.127489,
+                "cpu_seconds": 0.156078,
+                "peak_rss_bytes": 71516160,
+                "pid": 31577
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.12384,
+                "cpu_seconds": 0.153946,
+                "peak_rss_bytes": 71434240,
+                "pid": 31919
+              }
+            ],
+            "median": 0.12384
+          },
+          "run": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.342607,
+                "cpu_seconds": 0.340584,
+                "peak_rss_bytes": 5636096,
+                "pid": 31573
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.34007,
+                "cpu_seconds": 0.33768,
+                "peak_rss_bytes": 5619712,
+                "pid": 31630
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.340346,
+                "cpu_seconds": 0.339121,
+                "peak_rss_bytes": 5619712,
+                "pid": 31971
+              }
+            ],
+            "median": 0.340346
+          }
+        },
+        "mlf": {
+          "build": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.289903,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000001,
+                    "finished_seconds": 0.081784,
+                    "wall_seconds": 0.081783,
+                    "cpu_seconds": 0.080356,
+                    "peak_rss_bytes": 246022144,
+                    "pid": 31400
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000133,
+                    "finished_seconds": 0.257954,
+                    "wall_seconds": 0.257821,
+                    "cpu_seconds": 0.253157,
+                    "peak_rss_bytes": 95928320,
+                    "pid": 31401
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.083289,
+                    "finished_seconds": 0.124284,
+                    "wall_seconds": 0.040995,
+                    "cpu_seconds": 0.023968,
+                    "peak_rss_bytes": 40402944,
+                    "pid": 31402
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.259469,
+                    "finished_seconds": 0.289901,
+                    "wall_seconds": 0.030432,
+                    "cpu_seconds": 0.029637,
+                    "peak_rss_bytes": 35143680,
+                    "pid": 31404
+                  }
+                ]
+              },
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.292803,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000001,
+                    "finished_seconds": 0.081583,
+                    "wall_seconds": 0.081582,
+                    "cpu_seconds": 0.078017,
+                    "peak_rss_bytes": 246022144,
+                    "pid": 31738
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000163,
+                    "finished_seconds": 0.26084,
+                    "wall_seconds": 0.260677,
+                    "cpu_seconds": 0.255805,
+                    "peak_rss_bytes": 96075776,
+                    "pid": 31739
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.083088,
+                    "finished_seconds": 0.125396,
+                    "wall_seconds": 0.042308,
+                    "cpu_seconds": 0.024117,
+                    "peak_rss_bytes": 40419328,
+                    "pid": 31740
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.262346,
+                    "finished_seconds": 0.292801,
+                    "wall_seconds": 0.030455,
+                    "cpu_seconds": 0.029196,
+                    "peak_rss_bytes": 34881536,
+                    "pid": 31742
+                  }
+                ]
+              },
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.296525,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000001,
+                    "finished_seconds": 0.083293,
+                    "wall_seconds": 0.083292,
+                    "cpu_seconds": 0.078986,
+                    "peak_rss_bytes": 246022144,
+                    "pid": 31799
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.00013,
+                    "finished_seconds": 0.261432,
+                    "wall_seconds": 0.261302,
+                    "cpu_seconds": 0.258275,
+                    "peak_rss_bytes": 95387648,
+                    "pid": 31800
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.084798,
+                    "finished_seconds": 0.125712,
+                    "wall_seconds": 0.040914,
+                    "cpu_seconds": 0.024093,
+                    "peak_rss_bytes": 40452096,
+                    "pid": 31801
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.262937,
+                    "finished_seconds": 0.296523,
+                    "wall_seconds": 0.033586,
+                    "cpu_seconds": 0.031474,
+                    "peak_rss_bytes": 35110912,
+                    "pid": 31804
+                  }
+                ]
+              }
+            ],
+            "median": 0.292803
+          },
+          "run": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.301409,
+                "cpu_seconds": 0.296962,
+                "peak_rss_bytes": 22462464,
+                "pid": 31454
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.29918,
+                "cpu_seconds": 0.296606,
+                "peak_rss_bytes": 22462464,
+                "pid": 31750
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.294147,
+                "cpu_seconds": 0.292705,
+                "peak_rss_bytes": 22462464,
+                "pid": 31856
+              }
+            ],
+            "median": 0.29918
+          }
+        }
+      },
+      "compile_ratio": 2.364365310077519,
+      "runtime_ratio": 0.8790466172659588
+    },
+    {
+      "name": "pidigits",
+      "languages": {
+        "c": {
+          "build": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.128026,
+                "cpu_seconds": 0.167587,
+                "peak_rss_bytes": 72990720,
+                "pid": 32640
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.129758,
+                "cpu_seconds": 0.168307,
+                "peak_rss_bytes": 72908800,
+                "pid": 32865
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.127838,
+                "cpu_seconds": 0.151728,
+                "peak_rss_bytes": 72925184,
+                "pid": 34004
+              }
+            ],
+            "median": 0.128026
+          },
+          "run": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.364503,
+                "cpu_seconds": 0.362975,
+                "peak_rss_bytes": 3227648,
+                "pid": 32816
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.365396,
+                "cpu_seconds": 0.362914,
+                "peak_rss_bytes": 3260416,
+                "pid": 32962
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.368399,
+                "cpu_seconds": 0.366541,
+                "peak_rss_bytes": 3293184,
+                "pid": 34143
+              }
+            ],
+            "median": 0.365396
+          }
+        },
+        "mlf": {
+          "build": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.289754,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000001,
+                    "finished_seconds": 0.072766,
+                    "wall_seconds": 0.072765,
+                    "cpu_seconds": 0.069973,
+                    "peak_rss_bytes": 215187456,
+                    "pid": 32261
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000136,
+                    "finished_seconds": 0.256289,
+                    "wall_seconds": 0.256153,
+                    "cpu_seconds": 0.252515,
+                    "peak_rss_bytes": 95780864,
+                    "pid": 32262
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.074272,
+                    "finished_seconds": 0.1178,
+                    "wall_seconds": 0.043528,
+                    "cpu_seconds": 0.025706,
+                    "peak_rss_bytes": 41353216,
+                    "pid": 32263
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.257794,
+                    "finished_seconds": 0.289752,
+                    "wall_seconds": 0.031958,
+                    "cpu_seconds": 0.031078,
+                    "peak_rss_bytes": 35274752,
+                    "pid": 32265
+                  }
+                ]
+              },
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.292771,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000002,
+                    "finished_seconds": 0.074222,
+                    "wall_seconds": 0.07422,
+                    "cpu_seconds": 0.071265,
+                    "peak_rss_bytes": 215171072,
+                    "pid": 33357
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000149,
+                    "finished_seconds": 0.260945,
+                    "wall_seconds": 0.260796,
+                    "cpu_seconds": 0.257169,
+                    "peak_rss_bytes": 95993856,
+                    "pid": 33358
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.075729,
+                    "finished_seconds": 0.120248,
+                    "wall_seconds": 0.044519,
+                    "cpu_seconds": 0.02595,
+                    "peak_rss_bytes": 41320448,
+                    "pid": 33359
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.262448,
+                    "finished_seconds": 0.292769,
+                    "wall_seconds": 0.030321,
+                    "cpu_seconds": 0.029548,
+                    "peak_rss_bytes": 35028992,
+                    "pid": 33361
+                  }
+                ]
+              },
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.28771,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000002,
+                    "finished_seconds": 0.071207,
+                    "wall_seconds": 0.071205,
+                    "cpu_seconds": 0.068443,
+                    "peak_rss_bytes": 215171072,
+                    "pid": 33583
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000142,
+                    "finished_seconds": 0.255884,
+                    "wall_seconds": 0.255742,
+                    "cpu_seconds": 0.253076,
+                    "peak_rss_bytes": 95961088,
+                    "pid": 33584
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.072712,
+                    "finished_seconds": 0.116239,
+                    "wall_seconds": 0.043527,
+                    "cpu_seconds": 0.025506,
+                    "peak_rss_bytes": 41271296,
+                    "pid": 33585
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.257388,
+                    "finished_seconds": 0.287707,
+                    "wall_seconds": 0.030319,
+                    "cpu_seconds": 0.030107,
+                    "peak_rss_bytes": 34963456,
+                    "pid": 33587
+                  }
+                ]
+              }
+            ],
+            "median": 0.289754
+          },
+          "run": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.421599,
+                "cpu_seconds": 0.417526,
+                "peak_rss_bytes": 203014144,
+                "pid": 32424
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.414148,
+                "cpu_seconds": 0.411789,
+                "peak_rss_bytes": 190431232,
+                "pid": 33534
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.420909,
+                "cpu_seconds": 0.416827,
+                "peak_rss_bytes": 203161600,
+                "pid": 33683
+              }
+            ],
+            "median": 0.420909
+          }
+        }
+      },
+      "compile_ratio": 2.2632434036836266,
+      "runtime_ratio": 1.1519255821081784
+    },
+    {
+      "name": "n-body",
+      "languages": {
+        "c": {
+          "build": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.138773,
+                "cpu_seconds": 0.162702,
+                "peak_rss_bytes": 75988992,
+                "pid": 34706
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.139958,
+                "cpu_seconds": 0.1599,
+                "peak_rss_bytes": 75972608,
+                "pid": 34718
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.141143,
+                "cpu_seconds": 0.187376,
+                "peak_rss_bytes": 76103680,
+                "pid": 35059
+              }
+            ],
+            "median": 0.139958
+          },
+          "run": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.10629,
+                "cpu_seconds": 0.104527,
+                "peak_rss_bytes": 1392640,
+                "pid": 34714
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.10538,
+                "cpu_seconds": 0.104449,
+                "peak_rss_bytes": 1392640,
+                "pid": 34772
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.105485,
+                "cpu_seconds": 0.104664,
+                "peak_rss_bytes": 1392640,
+                "pid": 35074
+              }
+            ],
+            "median": 0.105485
+          }
+        },
+        "mlf": {
+          "build": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.518183,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000001,
+                    "finished_seconds": 0.381011,
+                    "wall_seconds": 0.38101,
+                    "cpu_seconds": 0.375082,
+                    "peak_rss_bytes": 559939584,
+                    "pid": 34531
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000149,
+                    "finished_seconds": 0.278882,
+                    "wall_seconds": 0.278733,
+                    "cpu_seconds": 0.274774,
+                    "peak_rss_bytes": 96157696,
+                    "pid": 34533
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.382516,
+                    "finished_seconds": 0.484811,
+                    "wall_seconds": 0.102295,
+                    "cpu_seconds": 0.076004,
+                    "peak_rss_bytes": 55312384,
+                    "pid": 34586
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.486316,
+                    "finished_seconds": 0.51818,
+                    "wall_seconds": 0.031864,
+                    "cpu_seconds": 0.029906,
+                    "peak_rss_bytes": 35471360,
+                    "pid": 34588
+                  }
+                ]
+              },
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.518513,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000002,
+                    "finished_seconds": 0.38409,
+                    "wall_seconds": 0.384088,
+                    "cpu_seconds": 0.376964,
+                    "peak_rss_bytes": 559939584,
+                    "pid": 34836
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000144,
+                    "finished_seconds": 0.27382,
+                    "wall_seconds": 0.273676,
+                    "cpu_seconds": 0.270438,
+                    "peak_rss_bytes": 96436224,
+                    "pid": 34837
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.385594,
+                    "finished_seconds": 0.486656,
+                    "wall_seconds": 0.101062,
+                    "cpu_seconds": 0.075569,
+                    "peak_rss_bytes": 55427072,
+                    "pid": 34883
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.488187,
+                    "finished_seconds": 0.518511,
+                    "wall_seconds": 0.030324,
+                    "cpu_seconds": 0.029307,
+                    "peak_rss_bytes": 35454976,
+                    "pid": 34885
+                  }
+                ]
+              },
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.515587,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000002,
+                    "finished_seconds": 0.379677,
+                    "wall_seconds": 0.379675,
+                    "cpu_seconds": 0.372718,
+                    "peak_rss_bytes": 559955968,
+                    "pid": 34896
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000136,
+                    "finished_seconds": 0.273422,
+                    "wall_seconds": 0.273286,
+                    "cpu_seconds": 0.270538,
+                    "peak_rss_bytes": 96550912,
+                    "pid": 34897
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.381204,
+                    "finished_seconds": 0.483708,
+                    "wall_seconds": 0.102504,
+                    "cpu_seconds": 0.076474,
+                    "peak_rss_bytes": 55427072,
+                    "pid": 34943
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.485213,
+                    "finished_seconds": 0.515586,
+                    "wall_seconds": 0.030373,
+                    "cpu_seconds": 0.029514,
+                    "peak_rss_bytes": 35291136,
+                    "pid": 34945
+                  }
+                ]
+              }
+            ],
+            "median": 0.518183
+          },
+          "run": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.156223,
+                "cpu_seconds": 0.154679,
+                "peak_rss_bytes": 1622016,
+                "pid": 34594
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.155715,
+                "cpu_seconds": 0.154384,
+                "peak_rss_bytes": 1622016,
+                "pid": 34891
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.156564,
+                "cpu_seconds": 0.154723,
+                "peak_rss_bytes": 1605632,
+                "pid": 34951
+              }
+            ],
+            "median": 0.156223
+          }
+        }
+      },
+      "compile_ratio": 3.7024178682176077,
+      "runtime_ratio": 1.480997298194056
+    },
+    {
+      "name": "fannkuch-redux",
+      "languages": {
+        "c": {
+          "build": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.140983,
+                "cpu_seconds": 0.172946,
+                "peak_rss_bytes": 75055104,
+                "pid": 35636
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.142013,
+                "cpu_seconds": 0.173015,
+                "peak_rss_bytes": 75218944,
+                "pid": 35890
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.134003,
+                "cpu_seconds": 0.161052,
+                "peak_rss_bytes": 74973184,
+                "pid": 36219
+              }
+            ],
+            "median": 0.140983
+          },
+          "run": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.218213,
+                "cpu_seconds": 0.215892,
+                "peak_rss_bytes": 1376256,
+                "pid": 35812
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.214208,
+                "cpu_seconds": 0.212068,
+                "peak_rss_bytes": 1376256,
+                "pid": 35933
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.211965,
+                "cpu_seconds": 0.210485,
+                "peak_rss_bytes": 1376256,
+                "pid": 36273
+              }
+            ],
+            "median": 0.214208
+          }
+        },
+        "mlf": {
+          "build": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.296245,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000001,
+                    "finished_seconds": 0.164844,
+                    "wall_seconds": 0.164843,
+                    "cpu_seconds": 0.158664,
+                    "peak_rss_bytes": 496566272,
+                    "pid": 35368
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000161,
+                    "finished_seconds": 0.26433,
+                    "wall_seconds": 0.264169,
+                    "cpu_seconds": 0.260124,
+                    "peak_rss_bytes": 95387648,
+                    "pid": 35369
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.166348,
+                    "finished_seconds": 0.226698,
+                    "wall_seconds": 0.06035,
+                    "cpu_seconds": 0.039624,
+                    "peak_rss_bytes": 44761088,
+                    "pid": 35370
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.265835,
+                    "finished_seconds": 0.296244,
+                    "wall_seconds": 0.030409,
+                    "cpu_seconds": 0.030052,
+                    "peak_rss_bytes": 35110912,
+                    "pid": 35372
+                  }
+                ]
+              },
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.296201,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000002,
+                    "finished_seconds": 0.163254,
+                    "wall_seconds": 0.163252,
+                    "cpu_seconds": 0.15848,
+                    "peak_rss_bytes": 496599040,
+                    "pid": 36041
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000159,
+                    "finished_seconds": 0.264354,
+                    "wall_seconds": 0.264195,
+                    "cpu_seconds": 0.261681,
+                    "peak_rss_bytes": 95436800,
+                    "pid": 36042
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.164759,
+                    "finished_seconds": 0.225235,
+                    "wall_seconds": 0.060476,
+                    "cpu_seconds": 0.039582,
+                    "peak_rss_bytes": 44679168,
+                    "pid": 36043
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.265858,
+                    "finished_seconds": 0.296198,
+                    "wall_seconds": 0.03034,
+                    "cpu_seconds": 0.030433,
+                    "peak_rss_bytes": 35078144,
+                    "pid": 36045
+                  }
+                ]
+              },
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.297433,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000001,
+                    "finished_seconds": 0.162909,
+                    "wall_seconds": 0.162908,
+                    "cpu_seconds": 0.160355,
+                    "peak_rss_bytes": 496566272,
+                    "pid": 36101
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000134,
+                    "finished_seconds": 0.264094,
+                    "wall_seconds": 0.26396,
+                    "cpu_seconds": 0.260437,
+                    "peak_rss_bytes": 95895552,
+                    "pid": 36102
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.164413,
+                    "finished_seconds": 0.224965,
+                    "wall_seconds": 0.060552,
+                    "cpu_seconds": 0.040322,
+                    "peak_rss_bytes": 44695552,
+                    "pid": 36103
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.265598,
+                    "finished_seconds": 0.29743,
+                    "wall_seconds": 0.031832,
+                    "cpu_seconds": 0.029827,
+                    "peak_rss_bytes": 34881536,
+                    "pid": 36105
+                  }
+                ]
+              }
+            ],
+            "median": 0.296245
+          },
+          "run": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.277,
+                "cpu_seconds": 0.27573,
+                "peak_rss_bytes": 1556480,
+                "pid": 35378
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.276548,
+                "cpu_seconds": 0.274122,
+                "peak_rss_bytes": 1556480,
+                "pid": 36095
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.275281,
+                "cpu_seconds": 0.273526,
+                "peak_rss_bytes": 1556480,
+                "pid": 36155
+              }
+            ],
+            "median": 0.276548
+          }
+        }
+      },
+      "compile_ratio": 2.10128171481668,
+      "runtime_ratio": 1.291025545264416
+    },
+    {
+      "name": "spectral-norm",
+      "languages": {
+        "c": {
+          "build": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.135168,
+                "cpu_seconds": 0.162895,
+                "peak_rss_bytes": 74399744,
+                "pid": 36733
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.133926,
+                "cpu_seconds": 0.169529,
+                "peak_rss_bytes": 74383360,
+                "pid": 36787
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.136834,
+                "cpu_seconds": 0.184331,
+                "peak_rss_bytes": 74547200,
+                "pid": 37083
+              }
+            ],
+            "median": 0.135168
+          },
+          "run": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.201576,
+                "cpu_seconds": 0.199749,
+                "peak_rss_bytes": 1376256,
+                "pid": 36783
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.20684,
+                "cpu_seconds": 0.20514,
+                "peak_rss_bytes": 1376256,
+                "pid": 36839
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.203629,
+                "cpu_seconds": 0.201877,
+                "peak_rss_bytes": 1376256,
+                "pid": 37091
+              }
+            ],
+            "median": 0.203629
+          }
+        },
+        "mlf": {
+          "build": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.300514,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000004,
+                    "finished_seconds": 0.152713,
+                    "wall_seconds": 0.152709,
+                    "cpu_seconds": 0.147844,
+                    "peak_rss_bytes": 462569472,
+                    "pid": 36613
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000225,
+                    "finished_seconds": 0.267637,
+                    "wall_seconds": 0.267412,
+                    "cpu_seconds": 0.265804,
+                    "peak_rss_bytes": 96223232,
+                    "pid": 36614
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.154218,
+                    "finished_seconds": 0.213411,
+                    "wall_seconds": 0.059193,
+                    "cpu_seconds": 0.039763,
+                    "peak_rss_bytes": 43401216,
+                    "pid": 36616
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.268735,
+                    "finished_seconds": 0.300512,
+                    "wall_seconds": 0.031777,
+                    "cpu_seconds": 0.029725,
+                    "peak_rss_bytes": 34783232,
+                    "pid": 36661
+                  }
+                ]
+              },
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.297149,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000001,
+                    "finished_seconds": 0.153987,
+                    "wall_seconds": 0.153986,
+                    "cpu_seconds": 0.148009,
+                    "peak_rss_bytes": 462618624,
+                    "pid": 36905
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000134,
+                    "finished_seconds": 0.265338,
+                    "wall_seconds": 0.265204,
+                    "cpu_seconds": 0.261025,
+                    "peak_rss_bytes": 95764480,
+                    "pid": 36906
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.155491,
+                    "finished_seconds": 0.21118,
+                    "wall_seconds": 0.055689,
+                    "cpu_seconds": 0.035866,
+                    "peak_rss_bytes": 43319296,
+                    "pid": 36907
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.266843,
+                    "finished_seconds": 0.297147,
+                    "wall_seconds": 0.030304,
+                    "cpu_seconds": 0.029316,
+                    "peak_rss_bytes": 34930688,
+                    "pid": 36909
+                  }
+                ]
+              },
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.300235,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000001,
+                    "finished_seconds": 0.155102,
+                    "wall_seconds": 0.155101,
+                    "cpu_seconds": 0.15328,
+                    "peak_rss_bytes": 462569472,
+                    "pid": 36964
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000128,
+                    "finished_seconds": 0.266693,
+                    "wall_seconds": 0.266565,
+                    "cpu_seconds": 0.263128,
+                    "peak_rss_bytes": 97091584,
+                    "pid": 36965
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.15663,
+                    "finished_seconds": 0.21238,
+                    "wall_seconds": 0.05575,
+                    "cpu_seconds": 0.036621,
+                    "peak_rss_bytes": 43417600,
+                    "pid": 36966
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.268216,
+                    "finished_seconds": 0.300233,
+                    "wall_seconds": 0.032017,
+                    "cpu_seconds": 0.029703,
+                    "peak_rss_bytes": 34963456,
+                    "pid": 36968
+                  }
+                ]
+              }
+            ],
+            "median": 0.300235
+          },
+          "run": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.180482,
+                "cpu_seconds": 0.178859,
+                "peak_rss_bytes": 1654784,
+                "pid": 36668
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.180441,
+                "cpu_seconds": 0.179025,
+                "peak_rss_bytes": 1703936,
+                "pid": 36959
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.180663,
+                "cpu_seconds": 0.179163,
+                "peak_rss_bytes": 1687552,
+                "pid": 37018
+              }
+            ],
+            "median": 0.180482
+          }
+        }
+      },
+      "compile_ratio": 2.2211988044507573,
+      "runtime_ratio": 0.8863275859528849
+    },
+    {
+      "name": "fasta",
+      "languages": {
+        "c": {
+          "build": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.13774,
+                "cpu_seconds": 0.168714,
+                "peak_rss_bytes": 74203136,
+                "pid": 37796
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.139494,
+                "cpu_seconds": 0.174121,
+                "peak_rss_bytes": 74416128,
+                "pid": 37853
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.135148,
+                "cpu_seconds": 0.161958,
+                "peak_rss_bytes": 74366976,
+                "pid": 38349
+              }
+            ],
+            "median": 0.13774
+          },
+          "run": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.209359,
+                "cpu_seconds": 0.203637,
+                "peak_rss_bytes": 1425408,
+                "pid": 37849
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.209116,
+                "cpu_seconds": 0.204225,
+                "peak_rss_bytes": 1425408,
+                "pid": 37905
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.212317,
+                "cpu_seconds": 0.208763,
+                "peak_rss_bytes": 1425408,
+                "pid": 38357
+              }
+            ],
+            "median": 0.209359
+          }
+        },
+        "mlf": {
+          "build": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.43127,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000002,
+                    "finished_seconds": 0.315114,
+                    "wall_seconds": 0.315112,
+                    "cpu_seconds": 0.308321,
+                    "peak_rss_bytes": 559644672,
+                    "pid": 37590
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000135,
+                    "finished_seconds": 0.271642,
+                    "wall_seconds": 0.271507,
+                    "cpu_seconds": 0.268253,
+                    "peak_rss_bytes": 96124928,
+                    "pid": 37591
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.316618,
+                    "finished_seconds": 0.399397,
+                    "wall_seconds": 0.082779,
+                    "cpu_seconds": 0.059347,
+                    "peak_rss_bytes": 48775168,
+                    "pid": 37636
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.400901,
+                    "finished_seconds": 0.431268,
+                    "wall_seconds": 0.030367,
+                    "cpu_seconds": 0.029367,
+                    "peak_rss_bytes": 35110912,
+                    "pid": 37638
+                  }
+                ]
+              },
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.43189,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000001,
+                    "finished_seconds": 0.313885,
+                    "wall_seconds": 0.313884,
+                    "cpu_seconds": 0.3075,
+                    "peak_rss_bytes": 559628288,
+                    "pid": 38014
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000135,
+                    "finished_seconds": 0.268779,
+                    "wall_seconds": 0.268644,
+                    "cpu_seconds": 0.264953,
+                    "peak_rss_bytes": 95240192,
+                    "pid": 38015
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.315389,
+                    "finished_seconds": 0.400046,
+                    "wall_seconds": 0.084657,
+                    "cpu_seconds": 0.059584,
+                    "peak_rss_bytes": 48758784,
+                    "pid": 38052
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.40155,
+                    "finished_seconds": 0.431887,
+                    "wall_seconds": 0.030337,
+                    "cpu_seconds": 0.030859,
+                    "peak_rss_bytes": 35061760,
+                    "pid": 38062
+                  }
+                ]
+              },
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.4406,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000001,
+                    "finished_seconds": 0.321696,
+                    "wall_seconds": 0.321695,
+                    "cpu_seconds": 0.315559,
+                    "peak_rss_bytes": 559628288,
+                    "pid": 38140
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000135,
+                    "finished_seconds": 0.279563,
+                    "wall_seconds": 0.279428,
+                    "cpu_seconds": 0.27617,
+                    "peak_rss_bytes": 96600064,
+                    "pid": 38141
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.3232,
+                    "finished_seconds": 0.408601,
+                    "wall_seconds": 0.085401,
+                    "cpu_seconds": 0.061166,
+                    "peak_rss_bytes": 48742400,
+                    "pid": 38143
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.410105,
+                    "finished_seconds": 0.440598,
+                    "wall_seconds": 0.030493,
+                    "cpu_seconds": 0.029896,
+                    "peak_rss_bytes": 35127296,
+                    "pid": 38145
+                  }
+                ]
+              }
+            ],
+            "median": 0.43189
+          },
+          "run": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.352145,
+                "cpu_seconds": 0.347005,
+                "peak_rss_bytes": 1654784,
+                "pid": 37649
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.355773,
+                "cpu_seconds": 0.352624,
+                "peak_rss_bytes": 1654784,
+                "pid": 38073
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.352275,
+                "cpu_seconds": 0.347975,
+                "peak_rss_bytes": 1654784,
+                "pid": 38197
+              }
+            ],
+            "median": 0.352275
+          }
+        }
+      },
+      "compile_ratio": 3.135545230143749,
+      "runtime_ratio": 1.6826360462172634
+    },
+    {
+      "name": "mandelbrot",
+      "languages": {
+        "c": {
+          "build": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.121652,
+                "cpu_seconds": 0.149203,
+                "peak_rss_bytes": 71434240,
+                "pid": 39073
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.129269,
+                "cpu_seconds": 0.160412,
+                "peak_rss_bytes": 71467008,
+                "pid": 39255
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.12313,
+                "cpu_seconds": 0.152352,
+                "peak_rss_bytes": 71368704,
+                "pid": 39983
+              }
+            ],
+            "median": 0.12313
+          },
+          "run": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.934533,
+                "cpu_seconds": 0.932367,
+                "peak_rss_bytes": 1359872,
+                "pid": 39207
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.937712,
+                "cpu_seconds": 0.93497,
+                "peak_rss_bytes": 1359872,
+                "pid": 39353
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.936766,
+                "cpu_seconds": 0.934543,
+                "peak_rss_bytes": 1359872,
+                "pid": 40039
+              }
+            ],
+            "median": 0.936766
+          }
+        },
+        "mlf": {
+          "build": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.301794,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000001,
+                    "finished_seconds": 0.155418,
+                    "wall_seconds": 0.155417,
+                    "cpu_seconds": 0.152904,
+                    "peak_rss_bytes": 467517440,
+                    "pid": 38854
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000149,
+                    "finished_seconds": 0.268342,
+                    "wall_seconds": 0.268193,
+                    "cpu_seconds": 0.26505,
+                    "peak_rss_bytes": 95649792,
+                    "pid": 38855
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.156924,
+                    "finished_seconds": 0.223252,
+                    "wall_seconds": 0.066328,
+                    "cpu_seconds": 0.045145,
+                    "peak_rss_bytes": 44793856,
+                    "pid": 38856
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.269845,
+                    "finished_seconds": 0.301792,
+                    "wall_seconds": 0.031947,
+                    "cpu_seconds": 0.032032,
+                    "peak_rss_bytes": 35012608,
+                    "pid": 38858
+                  }
+                ]
+              },
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.299721,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000002,
+                    "finished_seconds": 0.152799,
+                    "wall_seconds": 0.152797,
+                    "cpu_seconds": 0.146713,
+                    "peak_rss_bytes": 467517440,
+                    "pid": 39595
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000137,
+                    "finished_seconds": 0.266398,
+                    "wall_seconds": 0.266261,
+                    "cpu_seconds": 0.262975,
+                    "peak_rss_bytes": 96518144,
+                    "pid": 39596
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.154303,
+                    "finished_seconds": 0.21973,
+                    "wall_seconds": 0.065427,
+                    "cpu_seconds": 0.044766,
+                    "peak_rss_bytes": 44892160,
+                    "pid": 39597
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.267903,
+                    "finished_seconds": 0.299719,
+                    "wall_seconds": 0.031816,
+                    "cpu_seconds": 0.030575,
+                    "peak_rss_bytes": 35061760,
+                    "pid": 39599
+                  }
+                ]
+              },
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.295859,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000002,
+                    "finished_seconds": 0.155731,
+                    "wall_seconds": 0.155729,
+                    "cpu_seconds": 0.150718,
+                    "peak_rss_bytes": 467533824,
+                    "pid": 39699
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000161,
+                    "finished_seconds": 0.263851,
+                    "wall_seconds": 0.26369,
+                    "cpu_seconds": 0.25991,
+                    "peak_rss_bytes": 96043008,
+                    "pid": 39700
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.157236,
+                    "finished_seconds": 0.221702,
+                    "wall_seconds": 0.064466,
+                    "cpu_seconds": 0.043657,
+                    "peak_rss_bytes": 44810240,
+                    "pid": 39701
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.265355,
+                    "finished_seconds": 0.295857,
+                    "wall_seconds": 0.030502,
+                    "cpu_seconds": 0.029625,
+                    "peak_rss_bytes": 34897920,
+                    "pid": 39703
+                  }
+                ]
+              }
+            ],
+            "median": 0.299721
+          },
+          "run": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.691062,
+                "cpu_seconds": 0.689271,
+                "peak_rss_bytes": 1556480,
+                "pid": 38908
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.689849,
+                "cpu_seconds": 0.688539,
+                "peak_rss_bytes": 1556480,
+                "pid": 39650
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.691501,
+                "cpu_seconds": 0.689779,
+                "peak_rss_bytes": 1556480,
+                "pid": 39753
+              }
+            ],
+            "median": 0.691062
+          }
+        }
+      },
+      "compile_ratio": 2.434183383415902,
+      "runtime_ratio": 0.7377103780453176
+    },
+    {
+      "name": "reverse-complement",
+      "languages": {
+        "c": {
+          "build": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.128003,
+                "cpu_seconds": 0.176276,
+                "peak_rss_bytes": 71860224,
+                "pid": 41157
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.124708,
+                "cpu_seconds": 0.153585,
+                "peak_rss_bytes": 71663616,
+                "pid": 41303
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.126059,
+                "cpu_seconds": 0.153123,
+                "peak_rss_bytes": 71761920,
+                "pid": 42278
+              }
+            ],
+            "median": 0.126059
+          },
+          "run": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.170433,
+                "cpu_seconds": 0.130174,
+                "peak_rss_bytes": 52559872,
+                "pid": 41253
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.177439,
+                "cpu_seconds": 0.131465,
+                "peak_rss_bytes": 52559872,
+                "pid": 41433
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.164437,
+                "cpu_seconds": 0.130276,
+                "peak_rss_bytes": 52559872,
+                "pid": 42409
+              }
+            ],
+            "median": 0.170433
+          }
+        },
+        "mlf": {
+          "build": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.301125,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000002,
+                    "finished_seconds": 0.196744,
+                    "wall_seconds": 0.196742,
+                    "cpu_seconds": 0.192418,
+                    "peak_rss_bytes": 559218688,
+                    "pid": 40767
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000128,
+                    "finished_seconds": 0.267819,
+                    "wall_seconds": 0.267691,
+                    "cpu_seconds": 0.264016,
+                    "peak_rss_bytes": 96026624,
+                    "pid": 40768
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.198248,
+                    "finished_seconds": 0.26782,
+                    "wall_seconds": 0.069572,
+                    "cpu_seconds": 0.04795,
+                    "peak_rss_bytes": 46202880,
+                    "pid": 40769
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.269328,
+                    "finished_seconds": 0.301123,
+                    "wall_seconds": 0.031795,
+                    "cpu_seconds": 0.030949,
+                    "peak_rss_bytes": 35143680,
+                    "pid": 40773
+                  }
+                ]
+              },
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.332167,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000001,
+                    "finished_seconds": 0.207602,
+                    "wall_seconds": 0.207601,
+                    "cpu_seconds": 0.20243,
+                    "peak_rss_bytes": 559218688,
+                    "pid": 41676
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000169,
+                    "finished_seconds": 0.295753,
+                    "wall_seconds": 0.295584,
+                    "cpu_seconds": 0.287624,
+                    "peak_rss_bytes": 96796672,
+                    "pid": 41677
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.209107,
+                    "finished_seconds": 0.298761,
+                    "wall_seconds": 0.089654,
+                    "cpu_seconds": 0.057291,
+                    "peak_rss_bytes": 46071808,
+                    "pid": 41679
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.300265,
+                    "finished_seconds": 0.332165,
+                    "wall_seconds": 0.0319,
+                    "cpu_seconds": 0.03117,
+                    "peak_rss_bytes": 35176448,
+                    "pid": 41681
+                  }
+                ]
+              },
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.305872,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000002,
+                    "finished_seconds": 0.199804,
+                    "wall_seconds": 0.199802,
+                    "cpu_seconds": 0.193793,
+                    "peak_rss_bytes": 559218688,
+                    "pid": 41902
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000138,
+                    "finished_seconds": 0.269353,
+                    "wall_seconds": 0.269215,
+                    "cpu_seconds": 0.265852,
+                    "peak_rss_bytes": 97157120,
+                    "pid": 41903
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.201308,
+                    "finished_seconds": 0.272362,
+                    "wall_seconds": 0.071054,
+                    "cpu_seconds": 0.047577,
+                    "peak_rss_bytes": 45858816,
+                    "pid": 41905
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.273868,
+                    "finished_seconds": 0.305869,
+                    "wall_seconds": 0.032001,
+                    "cpu_seconds": 0.030447,
+                    "peak_rss_bytes": 35225600,
+                    "pid": 41907
+                  }
+                ]
+              }
+            ],
+            "median": 0.305872
+          },
+          "run": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.271273,
+                "cpu_seconds": 0.263443,
+                "peak_rss_bytes": 136593408,
+                "pid": 40865
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.275059,
+                "cpu_seconds": 0.266579,
+                "peak_rss_bytes": 136593408,
+                "pid": 41809
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.275646,
+                "cpu_seconds": 0.267829,
+                "peak_rss_bytes": 136609792,
+                "pid": 41957
+              }
+            ],
+            "median": 0.275059
+          }
+        }
+      },
+      "compile_ratio": 2.4264193750545378,
+      "runtime_ratio": 1.6138834615362048
+    },
+    {
+      "name": "k-nucleotide",
+      "languages": {
+        "c": {
+          "build": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.192139,
+                "cpu_seconds": 0.208873,
+                "peak_rss_bytes": 77234176,
+                "pid": 43002
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.148663,
+                "cpu_seconds": 0.182581,
+                "peak_rss_bytes": 77119488,
+                "pid": 43058
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.147379,
+                "cpu_seconds": 0.19922,
+                "peak_rss_bytes": 76791808,
+                "pid": 43401
+              }
+            ],
+            "median": 0.148663
+          },
+          "run": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.1713,
+                "cpu_seconds": 0.169643,
+                "peak_rss_bytes": 10862592,
+                "pid": 43054
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.170234,
+                "cpu_seconds": 0.168281,
+                "peak_rss_bytes": 10878976,
+                "pid": 43110
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.170175,
+                "cpu_seconds": 0.168061,
+                "peak_rss_bytes": 10813440,
+                "pid": 43453
+              }
+            ],
+            "median": 0.170234
+          }
+        },
+        "mlf": {
+          "build": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.455951,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000001,
+                    "finished_seconds": 0.335322,
+                    "wall_seconds": 0.335321,
+                    "cpu_seconds": 0.333452,
+                    "peak_rss_bytes": 559857664,
+                    "pid": 42883
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000136,
+                    "finished_seconds": 0.27191,
+                    "wall_seconds": 0.271774,
+                    "cpu_seconds": 0.268219,
+                    "peak_rss_bytes": 95764480,
+                    "pid": 42884
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.336826,
+                    "finished_seconds": 0.422646,
+                    "wall_seconds": 0.08582,
+                    "cpu_seconds": 0.061893,
+                    "peak_rss_bytes": 49692672,
+                    "pid": 42885
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.42415,
+                    "finished_seconds": 0.455949,
+                    "wall_seconds": 0.031799,
+                    "cpu_seconds": 0.032098,
+                    "peak_rss_bytes": 35307520,
+                    "pid": 42887
+                  }
+                ]
+              },
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.458107,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000001,
+                    "finished_seconds": 0.337774,
+                    "wall_seconds": 0.337773,
+                    "cpu_seconds": 0.330754,
+                    "peak_rss_bytes": 559841280,
+                    "pid": 43180
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000156,
+                    "finished_seconds": 0.274729,
+                    "wall_seconds": 0.274573,
+                    "cpu_seconds": 0.270971,
+                    "peak_rss_bytes": 96894976,
+                    "pid": 43181
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.339278,
+                    "finished_seconds": 0.424879,
+                    "wall_seconds": 0.085601,
+                    "cpu_seconds": 0.059762,
+                    "peak_rss_bytes": 49479680,
+                    "pid": 43226
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.426383,
+                    "finished_seconds": 0.458105,
+                    "wall_seconds": 0.031722,
+                    "cpu_seconds": 0.030516,
+                    "peak_rss_bytes": 35323904,
+                    "pid": 43228
+                  }
+                ]
+              },
+              {
+                "exit_code": 0,
+                "wall_seconds": 0.455265,
+                "remaining_children": 0,
+                "maximum_parallel_compilers": 2,
+                "stages": [
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000002,
+                    "finished_seconds": 0.333448,
+                    "wall_seconds": 0.333446,
+                    "cpu_seconds": 0.327376,
+                    "peak_rss_bytes": 559824896,
+                    "pid": 43283
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.000131,
+                    "finished_seconds": 0.26861,
+                    "wall_seconds": 0.268479,
+                    "cpu_seconds": 0.265533,
+                    "peak_rss_bytes": 95846400,
+                    "pid": 43284
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.334952,
+                    "finished_seconds": 0.421945,
+                    "wall_seconds": 0.086993,
+                    "cpu_seconds": 0.059984,
+                    "peak_rss_bytes": 49676288,
+                    "pid": 43285
+                  },
+                  {
+                    "exit_code": 0,
+                    "started_seconds": 0.423449,
+                    "finished_seconds": 0.455263,
+                    "wall_seconds": 0.031814,
+                    "cpu_seconds": 0.030254,
+                    "peak_rss_bytes": 35307520,
+                    "pid": 43287
+                  }
+                ]
+              }
+            ],
+            "median": 0.455951
+          },
+          "run": {
+            "samples": [
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.280109,
+                "cpu_seconds": 0.277698,
+                "peak_rss_bytes": 27738112,
+                "pid": 42937
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.287501,
+                "cpu_seconds": 0.285941,
+                "peak_rss_bytes": 28819456,
+                "pid": 43234
+              },
+              {
+                "exit_code": 0,
+                "timed_out": false,
+                "interrupted": false,
+                "termination_signal": 0,
+                "wall_seconds": 0.277794,
+                "cpu_seconds": 0.276109,
+                "peak_rss_bytes": 27738112,
+                "pid": 43337
+              }
+            ],
+            "median": 0.280109
+          }
+        }
+      },
+      "compile_ratio": 3.0670106213381945,
+      "runtime_ratio": 1.6454351069704054
+    }
+  ]
+}

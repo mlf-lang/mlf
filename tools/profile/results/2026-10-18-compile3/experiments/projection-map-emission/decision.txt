@@ -1,0 +1,1 @@
+Rejected: no n-body gain (+0.09%) and FASTA +3.74%; six workloads regressed. All 252 mapping cases and 27 LLVM comparisons passed. Restored only this experiment from its pre-edit backup.

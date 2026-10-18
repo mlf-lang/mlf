@@ -1,0 +1,58 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+import qualified Package.Json as J
+import qualified Package.Benchmark as B
+import qualified Package.Verification as V
+right value = case value of { Left message -> O.fatal message; Right item -> return item }
+streamLink directory compiler backend source flags = do
+ O.mkdir directory
+ let ir = directory ++ "/program.ll"
+ let object = directory ++ "/runtime.o"
+ let code = directory ++ "/program.o"
+ let binary = directory ++ "/pending-executable"
+ let make = Cons "/usr/bin/mkfifo" (Cons (ir ++ ".pipe") (Cons (code ++ ".pipe.o") (Cons (object ++ ".pipe.o") Nil)))
+ let frontend = S.append (O.words "/bin/bash -o pipefail -c") (Cons "fifo=$1; shift; \"$@\" | /bin/cat > \"$fifo\"" (Cons "mlf-stream" (Cons (ir ++ ".pipe") (Cons compiler (Cons "--emit-llvm" (Cons source Nil))))))
+ let runtime = S.append (Cons backend (O.words "-O2 -std=c11 -c /Volumes/src/mlf/runtime/mlf_runtime.c")) (S.append flags (Cons "-o" (Cons object Nil)))
+ let llvm = S.append (Cons backend (O.words "--mlf-stream-ir -O2 -Wno-override-module -c")) (Cons ir (Cons "-o" (Cons code Nil)))
+ let link = S.append (Cons backend (Cons (code ++ ".pipe.o") (Cons (object ++ ".pipe.o") flags))) (Cons "-lm" (Cons "-o" (Cons binary Nil)))
+ let commands = Cons make (Cons frontend (Cons runtime (Cons llvm (Cons (Cons "/bin/cat" (Cons object Nil)) (Cons (Cons "/bin/cat" (Cons code Nil)) (Cons link Nil))))))
+ let dependencies = Cons Nil (Cons (Cons 0 Nil) (Cons Nil (Cons (Cons 0 Nil) (Cons (Cons 0 (Cons 2 Nil)) (Cons (Cons 0 (Cons 3 Nil)) (Cons (Cons 0 Nil) Nil))))))
+ let outputs = Cons (directory ++ "/setup.out") (Cons (directory ++ "/frontend.out") (Cons (directory ++ "/runtime.out") (Cons (directory ++ "/llvm.out") (Cons (object ++ ".pipe.o") (Cons (code ++ ".pipe.o") (Cons (directory ++ "/link.out") Nil))))))
+ result <- B.runPipeline directory 10.0 (S.zipWith (\deps command -> Pair deps command) dependencies (S.zipWith (\output argv -> Quad directory "" output argv) outputs commands))
+ sample <- right result
+ return (Pair binary sample)
+main = do
+ compiler <- getArg 0
+ backend <- getArg 1
+ directory <- getArg 2
+ O.mkdir directory
+ let oldHost = "/Volumes/src/mlf/.mlf-build/compile3/final-bench-v1/host-support"
+ let newHost = directory ++ "/host-progress"
+ O.run "" (S.append (O.words "/opt/homebrew/Cellar/llvm/23.1.3/bin/clang-23 -O2 -std=c11 -Wall -Wextra -Werror /Volumes/src/mlf/.mlf-build/compile3/host-progress.c -o") (Cons newHost Nil))
+ setEnv "MLF_BENCH_STREAM_LLVM" "1"
+ writeFile (directory ++ "/input") "1000\n"
+ let source = "/Volumes/src/mlf/benchmarks/n-body/mlf/main.emlf"
+ status <- O.exec "" (O.words "pkg-config --cflags --libs gmp") "" (directory ++ "/flags") (directory ++ "/flags.err") 30
+ O.require (status == 0) "GMP flags failed"
+ flagText <- readFile (directory ++ "/flags")
+ let flags = O.words flagText
+ rows <- S.mapM (\run -> do
+  samples <- S.mapM (\stream -> do
+   let name = showInt run ++ (if stream then "-stream" else "-ordinary")
+   let output = directory ++ "/" ++ name
+   setEnv "MLF_TEST_HOST_SUPPORT" (if stream then newHost else oldHost)
+   Pair binary sample <- streamLink output compiler backend source flags
+   J.write (directory ++ "/" ++ name ++ ".json") sample
+   code <- O.exec "" (Cons binary Nil) (directory ++ "/input") (output ++ "/result") (output ++ "/result.err") 30
+   out <- readFile (output ++ "/result")
+   expected <- readFile "/Volumes/src/mlf/benchmarks/n-body/expected-1000.txt"
+   O.require (code == 0 && eqString (O.trim out) (O.trim expected)) "streamed link output changed"
+   hash <- fileDigest (output ++ "/program.ll")
+   object <- fileDigest (output ++ "/program.o")
+   runtime <- fileDigest (output ++ "/runtime.o")
+   return (J.Object (Cons (Pair "name" (J.str name)) (Cons (Pair "program_llvm" (J.str hash)) (Cons (Pair "program_object" (J.str object)) (Cons (Pair "runtime_object" (J.str runtime)) (Cons (Pair "sample" sample) Nil))))))) (if run == 2 then Cons true (Cons false Nil) else Cons false (Cons true Nil))
+  return samples) (Cons 1 (Cons 2 (Cons 3 Nil)))
+ J.write (directory ++ "/results.json") (J.Array (S.concat rows))
+ putStrLn "All six fresh n-body builds and outputs passed"

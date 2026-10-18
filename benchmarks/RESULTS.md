@@ -1,3 +1,78 @@
+# Native 3× compilation gate — 2026-10-18
+
+All nine workloads pass the median 3× C compilation / 2× C runtime gate, with every observed maximum MLF sample also below the limit relative to the corresponding minimum C sample.
+
+Seven samples were collected for each compiler/workload with alternating order, fresh runtime/object/output directories, unchanged C reference flags, equal exact-executable runtime warm-up and independent output validation. All compilation stages, including runtime C, LLVM compilation and linking, remain timed. Decisions use unrounded ratios.
+
+| Workload | C compile ms | MLF compile ms | Compile / C | C runtime ms | MLF runtime ms | Runtime / C | Gate |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| binary-trees | 125.742 | 327.445 | 2.604102050 | 339.305 | 288.541 | 0.850388294 | PASS |
+| pidigits | 132.988 | 327.212 | 2.460462598 | 366.014 | 420.549 | 1.148997033 | PASS |
+| n-body | 141.021 | 400.672 | 2.841222229 | 105.716 | 159.232 | 1.506224223 | PASS |
+| fannkuch-redux | 133.679 | 333.933 | 2.498021380 | 212.006 | 274.181 | 1.293270002 | PASS |
+| spectral-norm | 135.273 | 332.952 | 2.461333747 | 201.439 | 181.797 | 0.902491573 | PASS |
+| fasta | 137.789 | 342.982 | 2.489182736 | 222.628 | 363.866 | 1.634412563 | PASS |
+| mandelbrot | 125.477 | 335.219 | 2.671557337 | 935.824 | 698.645 | 0.746555976 | PASS |
+| reverse-complement | 127.317 | 337.822 | 2.653392713 | 195.893 | 293.922 | 1.500421148 | PASS |
+| k-nucleotide | 149.863 | 369.828 | 2.467773900 | 170.390 | 280.410 | 1.645695170 | PASS |
+
+[The raw native report](../tools/profile/results/2026-10-18-compile3/bench-final.json) contains all 189 compilation and 189 runtime samples. [The detailed report](../tools/profile/RESULTS.md) includes ranges, MADs, stage overlap, diagnostic phases, rejected experiments, reproducible commands, source/toolchain hashes and all six native test groups. All 63 final standard LLVM outputs match the starting compiler.
+
+Ordinary self-compilation on identical frozen sources measured 257.289 s for the original and 181.955 s for the candidate (-29.280%). This is the separately reported source-to-LLVM boundary.
+
+Compiler SHA-256: `0bc6f35450ec7bf03df75a1dbebedea3d5de5ed692aabb69e97ed2dbb364806d`. Measurements use Apple M1 Max, macOS 26.6.2, Clang/LLVM 23.1.3, GMP 6.3.0 and BDWGC 8.2.12. The native benchmark uses the explicitly configured LLVM backend described in the reproduction commands. No commit or push was made; the earlier report below is preserved verbatim.
+
+---
+
+# Native MLF profiling milestone: 2026-10-16
+
+All nine workloads pass the **5x C compilation / 2x C runtime** limits with
+seven samples per compiler and workload. The runner, package manager, compiler
+and test suites are native MLF; this run uses no GHC, Cabal or Python.
+The [raw report](../tools/bench/results/2026-10-16-native-macos-arm64.json)
+contains 189 fresh compilation samples and 189 timed runtime samples across
+C, the original native MLF compiler and the final native MLF compiler.
+Haskell and Rust were not remeasured.
+
+| Workload | C compile (ms) | MLF compile (ms) | Compile / C | C runtime (s) | MLF runtime (s) | Runtime / C |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| binary-trees | 139.18 | 479.10 | 3.442x | 0.34950 | 0.29660 | 0.849x |
+| pidigits | 142.36 | 471.08 | 3.309x | 0.37409 | 0.44486 | 1.189x |
+| n-body | 154.50 | 764.37 | 4.947x | 0.10844 | 0.12236 | 1.128x |
+| fannkuch-redux | 145.33 | 548.59 | 3.775x | 0.21508 | 0.23457 | 1.091x |
+| spectral-norm | 144.75 | 502.74 | 3.473x | 0.20542 | 0.16582 | 0.807x |
+| fasta | 149.12 | 715.56 | 4.798x | 0.22969 | 0.35480 | 1.545x |
+| mandelbrot | 140.01 | 533.57 | 3.811x | 0.95914 | 0.65273 | 0.681x |
+| reverse-complement | 137.27 | 584.30 | 4.257x | 0.18693 | 0.29164 | 1.560x |
+| k-nucleotide | 160.55 | 693.47 | 4.319x | 0.17519 | 0.29314 | 1.673x |
+
+The largest compilation ratio is **4.947x** for n-body, leaving only about 1%
+margin. The largest runtime ratio is **1.673x** for k-nucleotide. These are
+medians on this machine, not a guarantee against timing variation. Workload
+sources, default inputs, correctness oracles and C optimization flags are
+unchanged. All 63 final MLF LLVM outputs match the original compiler's
+corresponding output byte for byte.
+
+Each compilation uses a fresh runtime object and output directory. MLF source
+emission overlaps runtime C compilation, followed by LLVM compilation and
+linking. Every freshly linked executable receives one untimed, output-checked
+invocation at the measured input before its timed fresh process. Startup, IO,
+collection and exit remain inside the timed run. This avoids the operating
+system's one-time verification of a newly linked executable dominating runtime
+ratios. The [runner instructions](../tools/bench/README.md) describe reproduction.
+
+An [earlier run](../tools/profile/results/2026-10-16/earlier-unwarmed-v2-benchmark.json)
+using an intermediate compiler failed n-body compilation at 5.006x and lacked
+this exact-file runtime warm-up. Its runtime ratios are not the final results.
+A [controlled first-launch check](../tools/profile/results/2026-10-16/first-launch.json)
+recorded 0.7742 s on first execution versus 0.1089 s on repeat execution of the
+same n-body binary. The failed run is retained as diagnostic evidence.
+
+See the [self-compilation report](../tools/profile/RESULTS.md) for the compiler
+changes, phase profiles, ordinary compiler comparison and native validation.
+
+---
+
 # Stage 3 validation reuse: 2026-10-14
 
 The rebuilt stage 3 compiler passes the **5x C compilation / 2x C runtime

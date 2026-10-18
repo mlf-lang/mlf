@@ -1,0 +1,394 @@
+diff --git a/benchmarks/RESULTS.md b/benchmarks/RESULTS.md
+index eed7f38..a20001d 100644
+--- a/benchmarks/RESULTS.md
++++ b/benchmarks/RESULTS.md
+@@ -1,3 +1,52 @@
++# Native MLF profiling milestone: 2026-10-16
++
++All nine workloads pass the **5x C compilation / 2x C runtime** limits with
++seven samples per compiler and workload. The runner, package manager, compiler
++and test suites are native MLF; this run uses no GHC, Cabal or Python.
++The [raw report](../tools/bench/results/2026-10-16-native-macos-arm64.json)
++contains 189 fresh compilation samples and 189 timed runtime samples across
++C, the original native MLF compiler and the final native MLF compiler.
++Haskell and Rust were not remeasured.
++
++| Workload | C compile (ms) | MLF compile (ms) | Compile / C | C runtime (s) | MLF runtime (s) | Runtime / C |
++| --- | ---: | ---: | ---: | ---: | ---: | ---: |
++| binary-trees | 139.18 | 479.10 | 3.442x | 0.34950 | 0.29660 | 0.849x |
++| pidigits | 142.36 | 471.08 | 3.309x | 0.37409 | 0.44486 | 1.189x |
++| n-body | 154.50 | 764.37 | 4.947x | 0.10844 | 0.12236 | 1.128x |
++| fannkuch-redux | 145.33 | 548.59 | 3.775x | 0.21508 | 0.23457 | 1.091x |
++| spectral-norm | 144.75 | 502.74 | 3.473x | 0.20542 | 0.16582 | 0.807x |
++| fasta | 149.12 | 715.56 | 4.798x | 0.22969 | 0.35480 | 1.545x |
++| mandelbrot | 140.01 | 533.57 | 3.811x | 0.95914 | 0.65273 | 0.681x |
++| reverse-complement | 137.27 | 584.30 | 4.257x | 0.18693 | 0.29164 | 1.560x |
++| k-nucleotide | 160.55 | 693.47 | 4.319x | 0.17519 | 0.29314 | 1.673x |
++
++The largest compilation ratio is **4.947x** for n-body, leaving only about 1%
++margin. The largest runtime ratio is **1.673x** for k-nucleotide. These are
++medians on this machine, not a guarantee against timing variation. Workload
++sources, default inputs, correctness oracles and C optimization flags are
++unchanged. All 63 final MLF LLVM outputs match the original compiler's
++corresponding output byte for byte.
++
++Each compilation uses a fresh runtime object and output directory. MLF source
++emission overlaps runtime C compilation, followed by LLVM compilation and
++linking. Every freshly linked executable receives one untimed, output-checked
++invocation at the measured input before its timed fresh process. Startup, IO,
++collection and exit remain inside the timed run. This avoids the operating
++system's one-time verification of a newly linked executable dominating runtime
++ratios. The [runner instructions](../tools/bench/README.md) describe reproduction.
++
++An [earlier run](../tools/profile/results/2026-10-16/earlier-unwarmed-v2-benchmark.json)
++using an intermediate compiler failed n-body compilation at 5.006x and lacked
++this exact-file runtime warm-up. Its runtime ratios are not the final results.
++A [controlled first-launch check](../tools/profile/results/2026-10-16/first-launch.json)
++recorded 0.7742 s on first execution versus 0.1089 s on repeat execution of the
++same n-body binary. The failed run is retained as diagnostic evidence.
++
++See the [self-compilation report](../tools/profile/RESULTS.md) for the compiler
++changes, phase profiles, ordinary compiler comparison and native validation.
++
++---
++
+ # Stage 3 validation reuse: 2026-10-14
+ 
+ The rebuilt stage 3 compiler passes the **5x C compilation / 2x C runtime
+diff --git a/bootstrap/Bootstrap/Compiler.emlf b/bootstrap/Bootstrap/Compiler.emlf
+index 2f34d26..ffce29d 100644
+--- a/bootstrap/Bootstrap/Compiler.emlf
++++ b/bootstrap/Bootstrap/Compiler.emlf
+@@ -1,4 +1,10 @@
+-module Bootstrap.Compiler where
++module Bootstrap.Compiler
++  (Compilation, inferredType, compiledTerm, checkedTerm, presolution, sourceType,
++   phase, diagnostic, prettyPhase, prettyError, atPhase,
++   compile, compileWithPrelude, compileModules, compileModulesWithPrelude,
++   compileFile, compileFileWithPrelude, compileSourceWithImports, standalone,
++   compileStandalone, compileLinked, compileExpr, compileExprWithPrelude,
++   compileProgram, compileProgramWithPrelude, finishCompilation) where
+ 
+ import Bootstrap.Types
+ import qualified Bootstrap.Std as L
+@@ -10,14 +16,17 @@ import qualified Bootstrap.Parser as P
+ import qualified Bootstrap.Module as Modules
+ import qualified Bootstrap.Prelude as Prelude
+ import qualified Bootstrap.Classes as Classes
+-import qualified Bootstrap.X.Check as Check
++import qualified Bootstrap.X.Checked as Checked
+ import qualified Bootstrap.X.Syntax as X
+ import qualified Bootstrap.X.Type as T
+ 
+-inferredType (Compilation t _ _ _) = t
+-compiledTerm (Compilation _ t _ _) = t
+-presolution (Compilation _ _ g _) = g
+-sourceType (Compilation _ _ _ s) = s
++data Compilation = Compilation Checked.CheckedTerm Graph String
++
++inferredType (Compilation checked _ _) = Checked.typeOf checked
++compiledTerm (Compilation checked _ _) = Checked.term checked
++checkedTerm (Compilation checked _ _) = checked
++presolution (Compilation _ g _) = g
++sourceType (Compilation _ _ s) = s
+ phase (CompileError p _) = p
+ diagnostic (CompileError _ s) = s
+ prettyPhase p = case p of
+@@ -85,7 +94,7 @@ compileLinked mode modules = do
+       let diagnosticNames = M.union compareString (M.map display classes) names in
+       case finishCompilation lowered of
+         Left (CompileError p message) -> Left (CompileError p (Modules.displayNames diagnosticNames message))
+-        Right (Compilation ty term graph source) -> Right (Compilation ty term graph (display source))
++        Right (Compilation checked graph source) -> Right (Compilation checked graph (display source))
+ 
+ compileExpr : SExpr -> Either CompileError Compilation
+ compileExpr expr = compileExprWithPrelude ImplicitPrelude expr
+@@ -110,8 +119,9 @@ finishCompilation (Pair program names) = case program of
+     evidence <- atPhase Resolution (E.resolveEvidenceIn types (C.skeleton constraints))
+     body <- atPhase Elaboration (E.elaboratePreparedIn types solved evidence (C.skeleton constraints))
+     let term = if L.null declarations then body else XWithData declarations body
+-    ty <- atPhase Verification (Check.checkClosed term)
++    checked <- atPhase Verification (Checked.check term)
++    let ty = Checked.typeOf checked
+     let expected = E.schemeTypeIn types (C.generalization (C.skeleton constraints))
+     if L.not (T.alphaEq ty expected) then Left (CompileError Verification "elaboration changed the inferred type")
+     else if L.not (X.equalErased (X.erase term) (C.eraseSourceWith evidence (C.skeleton constraints))) then Left (CompileError Verification "elaboration changed source erasure")
+-    else Right (Compilation ty term graph (Classes.prettyQualified names ty))
++    else Right (Compilation checked graph (Classes.prettyQualified names ty))
+diff --git a/bootstrap/Bootstrap/Graph.emlf b/bootstrap/Bootstrap/Graph.emlf
+index fc997ea..8f36869 100644
+--- a/bootstrap/Bootstrap/Graph.emlf
++++ b/bootstrap/Bootstrap/Graph.emlf
+@@ -43,13 +43,17 @@ mkNode : GTag -> Maybe Int -> Flag -> Node
+ mkNode t b f = seq (forceTag t) (seq b (seq f (Node t b f)))
+ 
+ strictNode : Node -> Node
+-strictNode (Node t b f) = mkNode t b f
++-- Preserve the record after forcing its required fields. Reconstructing the
++-- same Node here allocated a second record at every graph-map boundary.
++strictNode node = case node of
++  Node t b f -> seq (forceTag t) (seq b (seq f node))
+ 
+ mkGraph : IntMap Node -> IntMap Int -> Int -> Graph
+ mkGraph ns aliases fresh = seq (forceIntMap ns) (seq (forceIntMap aliases) (seq fresh (Graph ns aliases fresh)))
+ 
+ strictGraph : Graph -> Graph
+-strictGraph (Graph ns aliases fresh) = mkGraph ns aliases fresh
++strictGraph graph = case graph of
++  Graph ns aliases fresh -> seq (forceIntMap ns) (seq (forceIntMap aliases) (seq fresh graph))
+ 
+ insertNodeMap : Int -> Node -> IntMap Node -> IntMap Node
+ insertNodeMap n value ns = let strict = strictNode value in seq strict (IM.insert n strict ns)
+@@ -71,7 +75,12 @@ buildNodeTree count entries = if count <= 0 then Pair MapEmpty entries else
+       Cons (Pair key value) following ->
+         let node = strictNode value in seq node (
+           case buildNodeTree (count - quotInt count 2 - 1) following of
+-            Pair right after -> Pair (M.node count key node left right) after)
++            Pair right after ->
++              -- Keep each completed subtree strict while consuming the list.
++              -- A lazy Pair field otherwise retains a second construction
++              -- spine until the final root demands all its child maps.
++              let tree = M.node count key node left right in
++              seq tree (Pair tree after))
+ 
+ mapNodeTree : (Int -> Node -> Node) -> Map Int Node -> Map Int Node
+ mapNodeTree action tree = case tree of
+diff --git a/bootstrap/Bootstrap/Graph/Solver.emlf b/bootstrap/Bootstrap/Graph/Solver.emlf
+index 61fcf59..1a46626 100644
+--- a/bootstrap/Bootstrap/Graph/Solver.emlf
++++ b/bootstrap/Bootstrap/Graph/Solver.emlf
+@@ -27,7 +27,10 @@ forceIntSet : IntSet -> Unit
+ forceIntSet (IntSet tree) = seq tree Unit
+ 
+ strictScopes : ScopeIndex -> ScopeIndex
+-strictScopes (ScopeIndex intervals jumps) = seq (G.forceIntMap intervals) (seq jumps (ScopeIndex intervals jumps))
++-- The scope index is immutable across component updates. Force its required
++-- fields without allocating another wrapper for every added/removed node.
++strictScopes scopes = case scopes of
++  ScopeIndex intervals jumps -> seq (G.forceIntMap intervals) (seq jumps scopes)
+ 
+ mkSolver : Graph -> IntMap IntSet -> IntMap IntSet -> ScopeIndex -> Solver
+ mkSolver current parents descendants scopes =
+diff --git a/bootstrap/Bootstrap/LLVM.emlf b/bootstrap/Bootstrap/LLVM.emlf
+index c7be4b5..bb6d7f9 100644
+--- a/bootstrap/Bootstrap/LLVM.emlf
++++ b/bootstrap/Bootstrap/LLVM.emlf
+@@ -3,7 +3,7 @@ module Bootstrap.LLVM where
+ import Bootstrap.Types
+ import qualified Bootstrap.Std as L
+ import qualified Bootstrap.Map as M
+-import qualified Bootstrap.X.Check as Check
++import qualified Bootstrap.X.Checked as Checked
+ import qualified Bootstrap.X.Syntax as X
+ import qualified Bootstrap.LLVM.Codegen as Codegen
+ import qualified Bootstrap.LLVM.Optimize as Optimize
+@@ -52,9 +52,17 @@ emitEntry compact requireIO term = L.mapEither L.concatStrings (emitEntryChunks
+ -- Keep the module as output chunks for the executable driver. Streaming these
+ -- through IO bounds temporary String copies and permits runtime collection.
+ emitEntryChunks : Bool -> Bool -> XTerm -> Either String (List String)
+-emitEntryChunks compact requireIO term = case Check.checkClosed term of
++emitEntryChunks compact requireIO term = case Checked.check term of
+   Left error -> Left ("LLVM target verification failed: " ++ error)
+-  Right ty -> if requireIO && L.not (ioType ty) then Left "program must have type IO a to run" else
++  Right checked -> emitCheckedChunks compact requireIO checked
++
++-- Only an opaque successful check can enter this path. Raw xMLF entry points
++-- above always check, including terms deserialized from outside the compiler.
++emitCheckedChunks : Bool -> Bool -> Checked.CheckedTerm -> Either String (List String)
++emitCheckedChunks compact requireIO checked =
++  let term = Checked.term checked in
++  let ty = Checked.typeOf checked in
++  if requireIO && L.not (ioType ty) then Left "program must have type IO a to run" else
+     let declarations = case term of XWithData ds body -> ds; _ -> Nil in
+     let dataConstructorsAll = L.concatMap dataConstructors declarations in
+     let constructors = M.fromList compareString (Cons (Pair "Unit" (Pair 0 0)) (L.zipWith constructorEntry (L.range 1 (L.length dataConstructorsAll)) dataConstructorsAll)) in
+diff --git a/bootstrap/Bootstrap/Separate.emlf b/bootstrap/Bootstrap/Separate.emlf
+index 53374c7..8605d7a 100644
+--- a/bootstrap/Bootstrap/Separate.emlf
++++ b/bootstrap/Bootstrap/Separate.emlf
+@@ -17,6 +17,7 @@ import qualified Bootstrap.Kind as K
+ import qualified Bootstrap.X.Type as T
+ import qualified Bootstrap.X.Syntax as X
+ import qualified Bootstrap.X.Check as Check
++import qualified Bootstrap.X.Checked as Checked
+ import qualified Bootstrap.X.Parser as XP
+ import qualified Bootstrap.X.Pretty as Pretty
+ 
+@@ -464,15 +465,15 @@ validateObjectBoundary interfaces (UnitObject iface term) = do
+   Pair program _ <- Classes.lowerSeparateClasses M.empty (map fst instances) (SClassProgram declared classes (map snd instances) (SConstructor "Unit"))
+   expectedData <- case program of {SProgram xs _ -> Right xs; _ -> Left "invalid module metadata"}
+   ensure (eqList eqString (sortBy compareString (map D.prettyDeclaration ds)) (sortBy compareString (map D.prettyDeclaration expectedData))) "module object datatype interface mismatch"
+-linkObjects objects root = do
++linkObjects objects root = mapEither Checked.term (linkCheckedObjects objects root)
++linkCheckedObjects objects root = do
+   ensure (not (null objects)) "no compiled modules to link"
+   traverseEither (validateObjectBoundary (map objectInterface objects)) objects
+   LinkState serial _ bindings bodies declarations <- foldEither linkObject (LinkState 0 M.empty M.empty Nil Nil) objects
+   entry <- linkEntry serial (map objectInterface objects) bindings root
+   body <- foldEither (\body declarations -> graft declarations body) entry (reverse bodies)
+   let term = XWithData declarations body
+-  Check.checkClosed term
+-  Right term
++  Checked.check term
+ 
+ linkEntry serial interfaces available root = do
+   ensure (M.member compareString (mainName root) available) ("entry module has no main binding: " ++ root)
+@@ -555,6 +556,9 @@ compileModuleFile mode includes source prefix = do
+           writeFile (prefix ++ ".mlfi") (encodeInterface (objectInterface object))
+           ioReturn (Right Unit)
+ linkModuleFile includes path = do
++  linked <- linkCheckedModuleFile includes path
++  ioReturn (mapEither Checked.term linked)
++linkCheckedModuleFile includes path = do
+   input <- readStrict path
+   case bindEither input decodeInterface of
+     Left e -> ioReturn (Left e)
+@@ -566,7 +570,7 @@ linkModuleFile includes path = do
+           objects <- mapM (\(Pair file i) -> if eqString file "<Prelude>" then ioReturn builtinPrelude else do
+             input <- readStrict (stringSlice file 0 (stringLength file - 5) ++ ".mlfo")
+             ioReturn (bindEither input (decodeObject i))) interfaces
+-          ioReturn (bindEither (sequenceEither objects) (\os -> linkObjects os (unitName root)))
++          ioReturn (bindEither (sequenceEither objects) (\os -> linkCheckedObjects os (unitName root)))
+ showInterfaceFile path = do
+   input <- readStrict path
+   ioReturn (do
+diff --git a/bootstrap/Bootstrap/Types.emlf b/bootstrap/Bootstrap/Types.emlf
+index 2603fe6..5d77bf7 100644
+--- a/bootstrap/Bootstrap/Types.emlf
++++ b/bootstrap/Bootstrap/Types.emlf
+@@ -72,4 +72,3 @@ data Binding = Mono XName Int | Poly XName Int
+ 
+ data Phase = Parsing | ModuleResolution | Inference | Resolution | Elaboration | Verification
+ data CompileError = CompileError Phase String
+-data Compilation = Compilation XType XTerm Graph String
+diff --git a/bootstrap/Main.emlf b/bootstrap/Main.emlf
+index b6f925b..54d7bec 100644
+--- a/bootstrap/Main.emlf
++++ b/bootstrap/Main.emlf
+@@ -4,6 +4,7 @@ import Bootstrap.Types
+ import qualified Bootstrap.Std as L
+ import qualified Bootstrap.Compiler as C
+ import qualified Bootstrap.X.Check as Check
++import qualified Bootstrap.X.Checked as Checked
+ import qualified Bootstrap.X.Parser as Parse
+ import qualified Bootstrap.X.Pretty as Pretty
+ import qualified Bootstrap.Runtime as Runtime
+@@ -70,13 +71,13 @@ runArgs mode paths arguments = case arguments of
+   _ -> sourceCommand mode paths (PrintSource false) Nil arguments
+ 
+ separateCommand paths command args file = do
+-  linked <- Separate.linkModuleFile paths file
++  linked <- Separate.linkCheckedModuleFile paths file
+   case linked of
+     Left message -> fatal message
+-    Right term -> case command of
++    Right checked -> let term = Checked.term checked in case command of
+       PrintSource _ -> putStrLn (Pretty.prettyTerm term)
+       RunSource -> execute args term
+-      EmitSource compact -> printLLVM ((if compact then LLVM.emitLLVMGCChunks else LLVM.emitLLVMChunks) term)
++      EmitSource compact -> printLLVM (LLVM.emitCheckedChunks compact false checked)
+       _ -> fatal "invalid module command"
+ 
+ splitArguments : List String -> Pair (List String) (List String)
+@@ -111,7 +112,7 @@ sourceCommand mode paths command programArguments arguments = case parseSource t
+           putStrLn ((if onlyType then "" else "-- type: ") ++ C.sourceType result)
+           if onlyType then ioReturn Unit else putStrLn (Pretty.prettyTerm (C.compiledTerm result))
+         RunSource -> execute programArguments (C.compiledTerm result)
+-        EmitSource compact -> printLLVM ((if compact then LLVM.emitLLVMGCChunks else LLVM.emitLLVMChunks) (C.compiledTerm result))
++        EmitSource compact -> printLLVM (LLVM.emitCheckedChunks compact false (C.checkedTerm result))
+         _ -> fatal "invalid source command"
+ 
+ load : Source -> IO (Pair String String)
+diff --git a/bootstrap/mlf-package.json b/bootstrap/mlf-package.json
+index e341dbb..f275930 100644
+--- a/bootstrap/mlf-package.json
++++ b/bootstrap/mlf-package.json
+@@ -44,6 +44,7 @@
+       "Bootstrap.Types": "Bootstrap/Types.emlf",
+       "Bootstrap.Unicode": "Bootstrap/Unicode.emlf",
+       "Bootstrap.X.Check": "Bootstrap/X/Check.emlf",
++      "Bootstrap.X.Checked": "Bootstrap/X/Checked.emlf",
+       "Bootstrap.X.Parser": "Bootstrap/X/Parser.emlf",
+       "Bootstrap.X.Pretty": "Bootstrap/X/Pretty.emlf",
+       "Bootstrap.X.Syntax": "Bootstrap/X/Syntax.emlf",
+diff --git a/mlf.lock b/mlf.lock
+index 031ab31..d1fe588 100644
+--- a/mlf.lock
++++ b/mlf.lock
+@@ -1 +1 @@
+-{"format":1,"packages":[{"manifest":"13835f0501b07e08c0a946ccbbae6bd4948add74f8f76dd7b9e13c55bd4c9b6f","name":"mlf-bootstrap","path":"bootstrap","sources":{"Bootstrap/Classes.emlf":"4ba8b1a3a9218d1eb104ecfe7fb403dc9305ccb7bada756a96420da8d0b27ebf","Bootstrap/Compiler.emlf":"23d2d6e8bf4e03153030f0f0c4d06505322811263fd357fa2ee5b2bf3031bcaa","Bootstrap/Constraint.emlf":"9bd0875707a58662a4e5335f543997329b0d042179fe55ce8aadc20d5da9d05a","Bootstrap/Data.emlf":"1a798a05dc70440f4076b099adf40dca717752b077edb49e0dcbda78b3e31c4f","Bootstrap/Desugar.emlf":"d668bfb3dd66693907e72a087abffc6af35beab6e251ee4d1028b15ecb9da6c6","Bootstrap/Elaborate.emlf":"479ffdbc081928375d1486d047e9a7f6a4ff77ce1a8ba5773dcc3520294c8c79","Bootstrap/Evidence.emlf":"7e031bf638d709ac84822901cc3436223e2aaf0ec76aad46beb8ec2952c6d14d","Bootstrap/Fresh.emlf":"b6af7da1aceb0e81b68ee6a1100616b71f6558fa8f551de62dbddecc4d7483a0","Bootstrap/Graph.emlf":"75229485db24e13e1d568122733270142a55eced1bf3b7f7498772d07445edfc","Bootstrap/Graph/Solver.emlf":"b0c34592894e6f43e48470c05b10560e29bb113fbe475a34eae5968aaaff51e4","Bootstrap/IntMap.emlf":"a5cce880a0cac66d07c9b4e30e981766b80da8e5e4e6b311f235c03997d14dfa","Bootstrap/IntSet.emlf":"519784adfb1be285f1f056f1e93a25a68e13db7ad37e9852a6ddb18dff815a82","Bootstrap/Kind.emlf":"4195e17517b2eb3a6b12c0c96112b1b5b6d1119ef3e9f1ba0a1ecf043c831772","Bootstrap/Kinding.emlf":"517aec41c9260a6a463a3042717d589b97df175670ada755fd45fcdbc6f0d36c","Bootstrap/LLVM.emlf":"eecd7f70b179d35d5265de4ea673b5125a334f8bddaf01ed38ff70906066892d","Bootstrap/LLVM/Analysis.emlf":"7d6f03ac5e09110b11e540a71856ac269c449772350b6527d02bd2b47ffbcf6d","Bootstrap/LLVM/Build.emlf":"9a635d1ccdd0857eafb7b87825d234ed649b7c3728c83ea0a3c731323cf6c728","Bootstrap/LLVM/Codegen.emlf":"72b8ac720bfeffad2b9e7c53419f5de55fcb597dbcb4d15acc88dffcaef14597","Bootstrap/LLVM/Kernel.emlf":"fa7a94be851dfc285786712060fed906bdf81270552f870c066d5303c580e434","Bootstrap/LLVM/Native.emlf":"6138103c4bacbbbce4ae65aadd942380dce54c376b9062429e63e79c20e6f3bc","Bootstrap/LLVM/Optimize.emlf":"ff8b3ea2824d4456081c1f77090627a70c2703064928367a8378635f2ef03519","Bootstrap/LLVM/StrictFields.emlf":"bee5f7df5e8f7cb592342e51a42f1cd6c63f9024082b56dd76c347196af1e1b3","Bootstrap/Layout.emlf":"7eb281a16bac3adb35ff15dbfaf0150e5df7b0d4af8f046cbb6362a520f329e6","Bootstrap/Lexer.emlf":"702c67d0d3377ddc438b242762e1505945b91a959c94c737e117f0bafcee4161","Bootstrap/Map.emlf":"b7d5921dbae083f227e4562a257efaaac2f1b7e6f270073857c8ba43b674e08a","Bootstrap/Module.emlf":"079deb1f792e5a9ee15fdb741bf773495966b64bf633bbd187e3af745f8c5230","Bootstrap/Parsec.emlf":"6954761e3cc04fa7f07ddb2baaf9f30e2393908414e078d15c0dbdd0b6bc38c5","Bootstrap/Parser.emlf":"0ed7d762fe3f1e1488371ee58f7f9030b56b0c587c880d9f050c3f3fd4059f0e","Bootstrap/Prelude.emlf":"e4908ab88f9cc3350e09ca09196db60abdfabb035055ff0ceff9a10a732c21d5","Bootstrap/Primitive.emlf":"83a71db6cb4145dc136bcffb36ee11472bd9f55a642979e57419386076999d0f","Bootstrap/Runtime.emlf":"82c5d04723c90122c20503e2df23ac380eb64a812100d20719694a7ec9831dab","Bootstrap/ST.emlf":"657c2b7f3958a8b14ed7a336908689f951480b45ff50059b242cfe3f3df7d7b0","Bootstrap/Separate.emlf":"36c17d80f83f03b6f730d83232014132eba388838705217a0dc59849ea462aea","Bootstrap/Set.emlf":"bac505cf121011b0b325d5ea59d1bd8c2abd919a8158516540d707a813abbc77","Bootstrap/SourceEquality.emlf":"5fc11a57d42b85d7776ff76dee9872a7264ff7f920121833f221c277ec37f4af","Bootstrap/Std.emlf":"50c455982728484d3e3cc0359f4314f5bfeef0706e051701979fd529779428f7","Bootstrap/Surface.emlf":"f8d4f9abd96bec1582dcf21b30e8500677a448637854a25e7fc80b7a762ac437","Bootstrap/Types.emlf":"1425852ce324ce0dc9aede07849635a89febbf6998827f964605990c3723ecc8","Bootstrap/Unicode.emlf":"fdde8c09d3cd1bdddcbc6a3c65c6ab7668c8d60b6795d9a0c106a098c1b647b4","Bootstrap/X/Check.emlf":"b20e256bdc4d25ddfc3c76dc0c91083957133c3cf973de5a8244e40285defee6","Bootstrap/X/Parser.emlf":"3ea0d9cb15c9d08c2ca76c0c1f5d903d34978b6476075c0ebfa9655aa8841f03","Bootstrap/X/Pretty.emlf":"a7c23152c6297315e4ef0bf1dbba9685688cb68010c0194fa544c2c39f48f0e4","Bootstrap/X/Syntax.emlf":"40ef760efb420654dcc7f5c05334eafea81f21d0bc269f8e0d1de9ee5c5eda70","Bootstrap/X/Type.emlf":"ac916c2902d99edfce443f96930cdc52bdf341eff3007c38d203450400b9446c"},"version":"0.1.0"},{"manifest":"94b37ee841458f95a36b0ca5ea1407e2c15c7f8dabbe8949d2a718d2e66f58e8","name":"mlf-package-tools","path":"package","sources":{"Package/Benchmark.emlf":"877aa4921b273224aea88d61a280433935c16f4f26b1b505bf20a2b6ac46ed7f","Package/Build.emlf":"2cd4fb2f9ec30941113e1101712c5ff3a0d8359db9f70b25238d2d0f4fbf6de0","Package/Command.emlf":"9f274110ca319b194aecd74038e11d8ac4374c30eedd86976e47b50d534b3df5","Package/CompilerTests.emlf":"e042818d6d39573c5c30103d2eeba91ce45c54382bcc5d1c3ad765a74341ef78","Package/Json.emlf":"9f0261a7822c1668acc40eb94621c3bd104038021b1eb5c44634b65d60925aee","Package/Manifest.emlf":"7472cc769c1fa6c7cb88e64b6b7b0f50145bc04c22fa9665747f4a274f819cbd","Package/OS.emlf":"b564d98626ef8707e02f7a57905b559a143a4f12cf34a7f2eadd8656a3bc90bd","Package/Verification.emlf":"7e0bf80341efa245f82524a441dd64f7f61ad06adfe0c614ba6a7d668cd6b7f9"},"version":"0.1.0"},{"manifest":"42e6d682808e3d3b49aff855ba34e031d77d2418f4ec6ef1db0d2d5a95933e24","name":"mlf-compiler","path":".","sources":{"bootstrap/Main.emlf":"b594e6215a6f8002efb1c6f72b8b980d3a0eb6eea8e84303bf68b57550688026","package/Main.emlf":"9e860a9c0312bec22ca024550fbe503b52207143ca1982bb7e24570b8c9ba7fe"},"version":"0.1.0"}]}
++{"format":1,"packages":[{"manifest":"64f8f60192445268a36837d893a5366f1a3e912981efeffc97ba2ced5f12b0d6","name":"mlf-bootstrap","path":"bootstrap","sources":{"Bootstrap/Classes.emlf":"4ba8b1a3a9218d1eb104ecfe7fb403dc9305ccb7bada756a96420da8d0b27ebf","Bootstrap/Compiler.emlf":"8ae8d7e64d8685788dbedc0bb3aab4615bb5bfae8ca3df6e6bcb311763661e24","Bootstrap/Constraint.emlf":"9bd0875707a58662a4e5335f543997329b0d042179fe55ce8aadc20d5da9d05a","Bootstrap/Data.emlf":"1a798a05dc70440f4076b099adf40dca717752b077edb49e0dcbda78b3e31c4f","Bootstrap/Desugar.emlf":"d668bfb3dd66693907e72a087abffc6af35beab6e251ee4d1028b15ecb9da6c6","Bootstrap/Elaborate.emlf":"479ffdbc081928375d1486d047e9a7f6a4ff77ce1a8ba5773dcc3520294c8c79","Bootstrap/Evidence.emlf":"7e031bf638d709ac84822901cc3436223e2aaf0ec76aad46beb8ec2952c6d14d","Bootstrap/Fresh.emlf":"b6af7da1aceb0e81b68ee6a1100616b71f6558fa8f551de62dbddecc4d7483a0","Bootstrap/Graph.emlf":"b2c4302fecdf28629ea05f0e254aab0e67d59409a85678aacdcd2632cdad0da8","Bootstrap/Graph/Solver.emlf":"e30eefe34935783cfd911e9bf8f66eea6624423fcc064fce279f4580cc0ccbd5","Bootstrap/IntMap.emlf":"a5cce880a0cac66d07c9b4e30e981766b80da8e5e4e6b311f235c03997d14dfa","Bootstrap/IntSet.emlf":"519784adfb1be285f1f056f1e93a25a68e13db7ad37e9852a6ddb18dff815a82","Bootstrap/Kind.emlf":"4195e17517b2eb3a6b12c0c96112b1b5b6d1119ef3e9f1ba0a1ecf043c831772","Bootstrap/Kinding.emlf":"517aec41c9260a6a463a3042717d589b97df175670ada755fd45fcdbc6f0d36c","Bootstrap/LLVM.emlf":"ba1cd44c9b3c508dd2b09317e0a0ffa892cc1b81962be664df44799125d4abf8","Bootstrap/LLVM/Analysis.emlf":"7d6f03ac5e09110b11e540a71856ac269c449772350b6527d02bd2b47ffbcf6d","Bootstrap/LLVM/Build.emlf":"9a635d1ccdd0857eafb7b87825d234ed649b7c3728c83ea0a3c731323cf6c728","Bootstrap/LLVM/Codegen.emlf":"72b8ac720bfeffad2b9e7c53419f5de55fcb597dbcb4d15acc88dffcaef14597","Bootstrap/LLVM/Kernel.emlf":"fa7a94be851dfc285786712060fed906bdf81270552f870c066d5303c580e434","Bootstrap/LLVM/Native.emlf":"6138103c4bacbbbce4ae65aadd942380dce54c376b9062429e63e79c20e6f3bc","Bootstrap/LLVM/Optimize.emlf":"ff8b3ea2824d4456081c1f77090627a70c2703064928367a8378635f2ef03519","Bootstrap/LLVM/StrictFields.emlf":"bee5f7df5e8f7cb592342e51a42f1cd6c63f9024082b56dd76c347196af1e1b3","Bootstrap/Layout.emlf":"7eb281a16bac3adb35ff15dbfaf0150e5df7b0d4af8f046cbb6362a520f329e6","Bootstrap/Lexer.emlf":"702c67d0d3377ddc438b242762e1505945b91a959c94c737e117f0bafcee4161","Bootstrap/Map.emlf":"b7d5921dbae083f227e4562a257efaaac2f1b7e6f270073857c8ba43b674e08a","Bootstrap/Module.emlf":"079deb1f792e5a9ee15fdb741bf773495966b64bf633bbd187e3af745f8c5230","Bootstrap/Parsec.emlf":"6954761e3cc04fa7f07ddb2baaf9f30e2393908414e078d15c0dbdd0b6bc38c5","Bootstrap/Parser.emlf":"0ed7d762fe3f1e1488371ee58f7f9030b56b0c587c880d9f050c3f3fd4059f0e","Bootstrap/Prelude.emlf":"e4908ab88f9cc3350e09ca09196db60abdfabb035055ff0ceff9a10a732c21d5","Bootstrap/Primitive.emlf":"83a71db6cb4145dc136bcffb36ee11472bd9f55a642979e57419386076999d0f","Bootstrap/Runtime.emlf":"82c5d04723c90122c20503e2df23ac380eb64a812100d20719694a7ec9831dab","Bootstrap/ST.emlf":"657c2b7f3958a8b14ed7a336908689f951480b45ff50059b242cfe3f3df7d7b0","Bootstrap/Separate.emlf":"fd76ede0ccea9b50dbeecbda0b9f0c9914fe4d09e50911ea413f3599d3244d6c","Bootstrap/Set.emlf":"bac505cf121011b0b325d5ea59d1bd8c2abd919a8158516540d707a813abbc77","Bootstrap/SourceEquality.emlf":"5fc11a57d42b85d7776ff76dee9872a7264ff7f920121833f221c277ec37f4af","Bootstrap/Std.emlf":"50c455982728484d3e3cc0359f4314f5bfeef0706e051701979fd529779428f7","Bootstrap/Surface.emlf":"f8d4f9abd96bec1582dcf21b30e8500677a448637854a25e7fc80b7a762ac437","Bootstrap/Types.emlf":"b02c0d97357d7a1574a9169d23bcd6e5e5a11fa9ae9cbf483c75de3071b2693c","Bootstrap/Unicode.emlf":"fdde8c09d3cd1bdddcbc6a3c65c6ab7668c8d60b6795d9a0c106a098c1b647b4","Bootstrap/X/Check.emlf":"b20e256bdc4d25ddfc3c76dc0c91083957133c3cf973de5a8244e40285defee6","Bootstrap/X/Checked.emlf":"3c7070655b23fa04b0cdce11541c27dc5bb6dfb2924ce8099ab57cc798ab8cd8","Bootstrap/X/Parser.emlf":"3ea0d9cb15c9d08c2ca76c0c1f5d903d34978b6476075c0ebfa9655aa8841f03","Bootstrap/X/Pretty.emlf":"a7c23152c6297315e4ef0bf1dbba9685688cb68010c0194fa544c2c39f48f0e4","Bootstrap/X/Syntax.emlf":"40ef760efb420654dcc7f5c05334eafea81f21d0bc269f8e0d1de9ee5c5eda70","Bootstrap/X/Type.emlf":"ac916c2902d99edfce443f96930cdc52bdf341eff3007c38d203450400b9446c"},"version":"0.1.0"},{"manifest":"94b37ee841458f95a36b0ca5ea1407e2c15c7f8dabbe8949d2a718d2e66f58e8","name":"mlf-package-tools","path":"package","sources":{"Package/Benchmark.emlf":"877aa4921b273224aea88d61a280433935c16f4f26b1b505bf20a2b6ac46ed7f","Package/Build.emlf":"2cd4fb2f9ec30941113e1101712c5ff3a0d8359db9f70b25238d2d0f4fbf6de0","Package/Command.emlf":"9f274110ca319b194aecd74038e11d8ac4374c30eedd86976e47b50d534b3df5","Package/CompilerTests.emlf":"05fe9364c79deaadbdad88fb983be7edf71569403da2871de348d2a8ad0a194b","Package/Json.emlf":"9f0261a7822c1668acc40eb94621c3bd104038021b1eb5c44634b65d60925aee","Package/Manifest.emlf":"7472cc769c1fa6c7cb88e64b6b7b0f50145bc04c22fa9665747f4a274f819cbd","Package/OS.emlf":"b564d98626ef8707e02f7a57905b559a143a4f12cf34a7f2eadd8656a3bc90bd","Package/Verification.emlf":"7e0bf80341efa245f82524a441dd64f7f61ad06adfe0c614ba6a7d668cd6b7f9"},"version":"0.1.0"},{"manifest":"42e6d682808e3d3b49aff855ba34e031d77d2418f4ec6ef1db0d2d5a95933e24","name":"mlf-compiler","path":".","sources":{"bootstrap/Main.emlf":"765e3ce7eeda1911f4be1fb5ac93846c80eab42acca894e0653cbe64cbd63d21","package/Main.emlf":"9e860a9c0312bec22ca024550fbe503b52207143ca1982bb7e24570b8c9ba7fe"},"version":"0.1.0"}]}
+diff --git a/package/Package/CompilerTests.emlf b/package/Package/CompilerTests.emlf
+index 78d6102..c5d90e1 100644
+--- a/package/Package/CompilerTests.emlf
++++ b/package/Package/CompilerTests.emlf
+@@ -105,7 +105,7 @@ suite c target expectations = do
+ unit : TestContext -> IO Unit
+ unit c = do
+  transports c
+- suite c "core" (Cons "636 checks; 0 failures" (Cons "Oracle: 6712 closed terms" Nil))
++ suite c "core" (Cons "643 checks; 0 failures" (Cons "Oracle: 6712 closed terms" Nil))
+  suite c "figure12" (Cons "43/43 expressions match regression expectations; 0 failures" (Cons "36 supplementary checks; 0 failures" Nil))
+  suite c "harness" (Cons "53 native benchmark/bootstrap/release harness tests passed" Nil)
+ packages : TestContext -> IO Unit
+diff --git a/tests/CoreMain.emlf b/tests/CoreMain.emlf
+index b0c954c..72d826e 100644
+--- a/tests/CoreMain.emlf
++++ b/tests/CoreMain.emlf
+@@ -25,7 +25,7 @@ main = do
+  args <- O.allArguments
+  cases <- case args of
+   Nil -> do
+-   O.require (S.length T.suite == 636) "preserved core test coverage changed"
++   O.require (S.length T.suite == 643) "preserved core test coverage changed"
+    return T.suite
+   Cons "--from" (Cons prefix Nil) -> do
+    let selected = S.dropWhile (\entry -> S.not (O.starts prefix (S.fst entry))) T.suite
+diff --git a/tests/Tests/Core.emlf b/tests/Tests/Core.emlf
+index 93fa318..b242302 100644
+--- a/tests/Tests/Core.emlf
++++ b/tests/Tests/Core.emlf
+@@ -29,6 +29,8 @@ import Tests.EmbeddingPruning (embeddingPruningTests)
+ import Tests.OptimizerQueries (optimizerQueryTests)
+ import Tests.StrictFieldAnalysis (strictFieldAnalysisTests)
+ import Tests.StateTypes (stateTypeTests)
++import qualified Tests.CheckedEmission as CheckedEmission
++import qualified Tests.SolverAllocation as SolverAllocation
+ import Tests.Oracle (hmTypable, closedTerms, generatedTerms)
+ 
+ v : Int -> XType
+@@ -85,4 +87,6 @@ examplesTest = do { files <- (H.fmap (S.compose H.sort (S.filter (\section1 -> (
+ stripComputations : XTerm -> XTerm
+ stripComputations t = (case t of { (XTypeApp a _) -> (stripComputations a); (XAbs n ty b) -> (XAbs n ty (stripComputations b)); (XApp a b) -> (XApp (stripComputations a) (stripComputations b)); (XTypeAbs a ty b) -> (XTypeAbs a ty (stripComputations b)); (XLet n a b) -> (XLet n (stripComputations a) (stripComputations b)); (XLetRec ds b) -> (XLetRec (S.concatMap (\(Triple n ty a) -> (Cons (Triple n ty (stripComputations a)) Nil)) ds) (stripComputations b)); (XWithData ds b) -> (XWithData ds (stripComputations b)); (XCase a ty bs) -> (XCase (stripComputations a) ty (S.concatMap (\comprehension2 -> case comprehension2 of { (XAlternative p b) -> (Cons (XAlternative p (stripComputations b)) Nil); _ -> Nil }) bs)); _ -> t })
+ suite : List (Pair String (IO Unit))
+-suite = S.concat (Cons compilerTests (Cons computationTests (Cons hygieneTests (Cons graphTests (Cons graphValidationTests (Cons graphUnificationTests (Cons graphSolverTests (Cons embeddingPruningTests (Cons optimizerQueryTests (Cons strictFieldAnalysisTests (Cons datatypeTests (Cons typeclassTests (Cons doTests (Cons surfaceSyntaxTests (Cons readabilityTests (Cons moduleTests (Cons separateTests (Cons stateTypeTests (Cons (Cons (Pair "independent ML typability oracle" oracleTest) (Cons (Pair "annotation corpus" annotationCorpus) (Cons (Pair "example files" examplesTest) Nil))) Nil)))))))))))))))))))
++suite = S.append CheckedEmission.suite (S.append SolverAllocation.suite originalSuite)
++
++originalSuite = S.concat (Cons compilerTests (Cons computationTests (Cons hygieneTests (Cons graphTests (Cons graphValidationTests (Cons graphUnificationTests (Cons graphSolverTests (Cons embeddingPruningTests (Cons optimizerQueryTests (Cons strictFieldAnalysisTests (Cons datatypeTests (Cons typeclassTests (Cons doTests (Cons surfaceSyntaxTests (Cons readabilityTests (Cons moduleTests (Cons separateTests (Cons stateTypeTests (Cons (Cons (Pair "independent ML typability oracle" oracleTest) (Cons (Pair "annotation corpus" annotationCorpus) (Cons (Pair "example files" examplesTest) Nil))) Nil)))))))))))))))))))
+diff --git a/tests/Tests/StateTypes.emlf b/tests/Tests/StateTypes.emlf
+index a7b5475..1934069 100644
+--- a/tests/Tests/StateTypes.emlf
++++ b/tests/Tests/StateTypes.emlf
+@@ -5,6 +5,7 @@ import qualified Package.OS as OS
+ import qualified Tests.Helpers as H
+ import Tests.Helpers (Quint(..), Sext(..))
+ import qualified Bootstrap.Compiler as C
++import Bootstrap.Compiler (Compilation)
+ import qualified Bootstrap.Primitive as P
+ import qualified Bootstrap.X.Check as Check
+ import qualified Bootstrap.X.Parser as Parser
+diff --git a/tests/mlf-package.json b/tests/mlf-package.json
+index 647a3c4..35a73a7 100644
+--- a/tests/mlf-package.json
++++ b/tests/mlf-package.json
+@@ -77,7 +77,9 @@
+       "Tests.PortSuite": "Tests/PortSuite.emlf",
+       "Tests.BenchmarkSuite": "Tests/BenchmarkSuite.emlf",
+       "Tests.BootstrapSuite": "Tests/BootstrapSuite.emlf",
+-      "Tests.ReleaseSuite": "Tests/ReleaseSuite.emlf"
++      "Tests.ReleaseSuite": "Tests/ReleaseSuite.emlf",
++      "Tests.CheckedEmission": "Tests/CheckedEmission.emlf",
++      "Tests.SolverAllocation": "Tests/SolverAllocation.emlf"
+     }
+   },
+   "executables": {

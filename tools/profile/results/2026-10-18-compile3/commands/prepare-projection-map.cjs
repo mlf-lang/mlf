@@ -1,0 +1,27 @@
+const fs=require('fs'),b='.mlf-build/compile3',p='bootstrap/Bootstrap/Graph/Solver.emlf';let s=fs.readFileSync(p,'utf8');
+fs.writeFileSync(b+'/before-projection-map-Solver.emlf',s,{flag:'wx'});
+const replace=(before,after)=>{if(!s.includes(before))throw Error('Missing source: '+before.slice(0,100));s=s.replace(before,after);};
+replace('projectedBinder :',fs.readFileSync(b+'/ProjectionMap.part','utf8')+'projectedBinder :');
+replace('projectedBinder graph forward scopes n node =\n  G.mapMaybeInt (compactIdentity graph forward)', 'projectedBinder graph forward scopes n node = projectedBinderWith (compactIdentity graph forward) scopes n node\n\nprojectedBinderWith : (Int -> Int) -> IntMap (Maybe Int) -> Int -> Node -> Maybe Int\nprojectedBinderWith compact scopes n node =\n  G.mapMaybeInt compact');
+replace('localNode graph forward scopes stubs n node =\n  G.mkNode', 'localNode graph forward scopes stubs n node = localNodeWith (compactIdentity graph forward) scopes stubs n node\n\nlocalNodeWith : (Int -> Int) -> IntMap (Maybe Int) -> IntMap Int -> Int -> Node -> Node\nlocalNodeWith compact scopes stubs n node =\n  G.mkNode');
+replace('G.mapTag (compactIdentity graph forward) (G.tag node)', 'G.mapTag compact (G.tag node)');
+replace('(projectedBinder graph forward scopes n node) (G.flag node)', '(projectedBinderWith compact scopes n node) (G.flag node)');
+replace('projectNodes graph selected scopes stubs position originals = case originals of', 'projectNodes graph selected scopes stubs position originals = projectNodesWith (compactIdentity graph selected) scopes stubs position originals\n\nprojectNodesWith : (Int -> Int) -> IntMap (Maybe Int) -> IntMap Int -> Int -> List (Pair Int Node) -> List (Pair Int Node)\nprojectNodesWith compact scopes stubs position originals = case originals of');
+replace('(localNode graph selected scopes stubs n node)', '(localNodeWith compact scopes stubs n node)');
+replace('(projectNodes graph selected scopes stubs (position + 1) rest)', '(projectNodesWith compact scopes stubs (position + 1) rest)');
+replace('restoreNode old withAliases backward (Pair n node) =\n  G.bindE (originalIdentity backward n)', 'restoreNode old withAliases backward entry = restoreNodeWith (originalIdentity backward) old withAliases entry\n\nrestoreNodeWith : (Int -> Either String Int) -> Graph -> Graph -> Pair Int Node -> Either String (Pair Int Node)\nrestoreNodeWith original old withAliases (Pair n node) =\n  G.bindE (original n)');
+// The inverse function and original identity have distinct names in this worker.
+const a=s.indexOf('restoreNodeWith original old'),z=s.indexOf('\nrestoreAliases :',a);
+let block=s.slice(a,z).replace('(\\original ->','(\\identity ->').replace('G.nodeAt old original','G.nodeAt old identity').replace('(originalIdentity backward)','original').replace('(originalIdentity backward b)','(original b)').replace('(Pair original (G.mkNode','(Pair identity (G.mkNode');
+s=s.slice(0,a)+block+s.slice(z);
+replace('restoreAliases backward (Pair a b) =\n  G.bindE (originalIdentity backward a) (\\left -> G.bindE (originalIdentity backward b)', 'restoreAliases backward entry = restoreAliasesWith (originalIdentity backward) entry\n\nrestoreAliasesWith : (Int -> Either String Int) -> Pair Int Int -> Either String (Pair Int Int)\nrestoreAliasesWith original (Pair a b) =\n  G.bindE (original a) (\\left -> G.bindE (original b)');
+replace('checkPreservedScope original solved forward scopes (Pair n node) =', 'checkPreservedScope original solved forward scopes entry = checkPreservedScopeWith (compactIdentity original forward) solved scopes entry\n\ncheckPreservedScopeWith : (Int -> Int) -> Graph -> IntMap (Maybe Int) -> Pair Int Node -> Either String Unit\ncheckPreservedScopeWith compact solved scopes (Pair n node) =');
+replace('IM.lookup (compactIdentity original forward n) (G.nodes solved)', 'IM.lookup (compact n) (G.nodes solved)');
+replace('(projectedBinder original forward scopes n node)', '(projectedBinderWith compact scopes n node)');
+replace('restoreProjection solver selected originals backward count solved =\n  G.bindE (G.mapE (restoreAliases backward)', 'restoreProjection solver selected originals backward count solved = restoreProjectionWith solver originals (originalIdentity backward) count solved\n\nrestoreProjectionWith : Solver -> List (Pair Int Node) -> (Int -> Either String Int) -> Int -> Graph -> Either String Solver\nrestoreProjectionWith solver originals original count solved =\n  G.bindE (G.mapE (restoreAliasesWith original)');
+replace('(restoreNode originalGraph withAliases backward)', '(restoreNodeWith original originalGraph withAliases)');
+replace('    let forward = selected in\n    let backward = selected in\n    let compact = compactIdentity old forward in', '    let mapping = projectionMap selected in\n    let compact = compactProjection old mapping in\n    let original = projectionSelect mapping in');
+replace('projectNodes old forward scopes stubs 0 originals', 'projectNodesWith compact scopes stubs 0 originals');
+replace('(checkPreservedScope old solved forward scopes)', '(checkPreservedScopeWith compact solved scopes)');
+replace('restoreProjection solver selected originals backward count solved))))', 'restoreProjectionWith solver originals original count solved))))');
+fs.writeFileSync(p,s);

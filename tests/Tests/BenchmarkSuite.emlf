@@ -218,10 +218,84 @@ processGroupRace directory = do
  grouped <- B.runGroup directory 5.0 (Cons (Quad "" "" (directory ++ "/race.out") (Cons "/usr/bin/true" Nil)) Nil)
  sample <- H.right grouped
  H.assert (V.int "exit_code" sample == 0 && V.int "remaining_children" sample == 0) "redundant group setup changed execution or cleanup"
+ pipelined <- B.runPipeline directory 5.0 (Cons (Pair Nil (Quad "" "" (directory ++ "/pipeline-race.out") (Cons "/usr/bin/true" Nil))) Nil)
+ sample <- H.right pipelined
+ H.assert (V.int "exit_code" sample == 0 && V.int "remaining_children" sample == 0) "pipeline process group cleanup failed"
  setEnv "MLF_TEST_HOST_SUPPORT" original
 
 buildFailures : IO Unit
 buildFailures = do
+ check "test_prestarted_link_waits_for_complete_objects_and_reaps_failed_producers" (H.withScratch (\directory -> do
+  exe <- getExecutablePath
+  O.copy exe (directory ++ "/mock")
+  setEnv "MLF_MOCK_BUILD" "1"
+  setEnv "MLF_BENCH_STREAM_LLVM" "1"
+  setEnv "MLF_BENCH_STREAM_LINK" "1"
+  let compiler = directory ++ "/mock"
+  result <- B.buildParallel (directory ++ "/normal") compiler compiler (directory ++ "/Main.emlf") (directory ++ "/runtime.c") Nil 10.0
+  Pair binary sample <- H.right result
+  let stages = V.array "stages" sample
+  let started index = V.double 0.0 (J.get "started_seconds" (S.index stages index))
+  let finished index = V.double 0.0 (J.get "finished_seconds" (S.index stages index))
+  H.assert (S.eqList eqString (S.map (V.text "phase") stages) (O.words "setup frontend runtime llvm runtime-ready llvm-ready link") && V.int "maximum_parallel_compilers" sample >= 4) "streamed object stage inventory changed"
+  H.assert (ltDouble (started 6) (finished 1) && S.not (ltDouble (started 4) (finished 2)) && S.not (ltDouble (started 5) (finished 3))) "link startup or transfer dependencies changed"
+  contents <- readFile binary
+  object <- readFile (directory ++ "/normal/runtime.o")
+  code <- readFile (directory ++ "/normal/program.o")
+  objectReady <- fileExists (directory ++ "/normal/runtime.o.ready")
+  codeReady <- fileExists (directory ++ "/normal/program.o.ready")
+  H.assert (eqString contents "binary" && eqString object "object" && eqString code "code" && objectReady && codeReady) "link did not wait for complete fresh objects"
+  setEnv "MLF_MOCK_FAIL_RUNTIME" "1"
+  failure <- B.buildParallel (directory ++ "/failure") compiler compiler (directory ++ "/Main.emlf") (directory ++ "/runtime.c") Nil 5.0
+  observed <- J.read (directory ++ "/failure/pipeline.json")
+  H.assert (S.isLeft failure && V.int "remaining_children" observed == 0 && ltDouble (V.double 0.0 (J.get "wall_seconds" observed)) 3.0) "failed producer left a blocked object reader alive"
+  unsetEnv "MLF_MOCK_FAIL_RUNTIME"
+  unsetEnv "MLF_BENCH_STREAM_LINK"
+  unsetEnv "MLF_BENCH_STREAM_LLVM"
+  unsetEnv "MLF_MOCK_BUILD"))
+ check "test_streaming_build_overlaps_startup_and_archives_exact_ir" (H.withScratch (\directory -> do
+  exe <- getExecutablePath
+  O.copy exe (directory ++ "/mock")
+  setEnv "MLF_MOCK_BUILD" "1"
+  setEnv "MLF_BENCH_STREAM_LLVM" "1"
+  let compiler = directory ++ "/mock"
+  result <- B.buildParallel (directory ++ "/normal") compiler compiler (directory ++ "/Main.emlf") (directory ++ "/runtime.c") Nil 10.0
+  Pair binary sample <- H.right result
+  let stages = V.array "stages" sample
+  H.assert (S.eqList eqString (S.map (V.text "phase") stages) (O.words "setup frontend runtime llvm link") && V.int "maximum_parallel_compilers" sample == 3) "streaming stage inventory changed"
+  let started index = V.double 0.0 (J.get "started_seconds" (S.index stages index))
+  let finished index = V.double 0.0 (J.get "finished_seconds" (S.index stages index))
+  H.assert (ltDouble (started 3) (finished 1)) "LLVM startup did not overlap the frontend"
+  H.assert (S.all (\index -> S.not (ltDouble (started 4) (finished index))) (Cons 1 (Cons 2 (Cons 3 Nil)))) "streaming link did not wait for all producers"
+  ir <- readFile (directory ++ "/normal/program.ll")
+  H.assert (eqString ir "IR\n") "streaming archive changed LLVM bytes"
+  reused <- B.buildParallel (directory ++ "/normal") compiler compiler (directory ++ "/Main.emlf") (directory ++ "/runtime.c") Nil 10.0
+  H.assert (S.isLeft reused) "streaming build reused output objects"
+  setEnv "MLF_MOCK_FAST_FRONTEND" "1"
+  short <- B.buildParallel (directory ++ "/short") compiler compiler (directory ++ "/Main.emlf") (directory ++ "/runtime.c") Nil 10.0
+  H.right short
+  shortIR <- readFile (directory ++ "/short/program.ll")
+  H.assert (eqString shortIR "IR\n") "short producer exited before the streaming reader consumed its output"
+  unsetEnv "MLF_MOCK_FAST_FRONTEND"
+  unsetEnv "MLF_BENCH_STREAM_LLVM"
+  unsetEnv "MLF_MOCK_BUILD"))
+ check "test_blocked_fifo_failure_and_timeout_reap_process_groups" (H.withScratch (\directory -> do
+  S.mapM_ (\fails -> do
+   let suffix = if fails then "failure" else "timeout"
+   let fifo = directory ++ "/" ++ suffix ++ ".pipe"
+   let started = directory ++ "/" ++ suffix ++ ".started"
+   O.run "" (Cons "/usr/bin/mkfifo" (Cons fifo Nil))
+   let reader = Cons "/bin/sh" (Cons "-c" (Cons "echo started > \"$1\"; exec /bin/cat < \"$2\"" (Cons "fifo-reader" (Cons started (Cons fifo Nil)))))
+   let failure = Cons "/bin/sh" (Cons "-c" (Cons "while [ ! -f \"$1\" ]; do /bin/sleep 0.01; done; exit 23" (Cons "fifo-failure" (Cons started Nil))))
+   let stages = Cons (Pair Nil (Quad "" "" (directory ++ "/reader.out") reader)) (if fails then Cons (Pair Nil (Quad "" "" (directory ++ "/failure.out") failure)) Nil else Nil)
+   let blocked = directory ++ "/" ++ suffix ++ ".dependent"
+   let dependencies = if fails then Cons 0 (Cons 1 Nil) else Cons 0 Nil
+   result <- B.runPipeline directory (if fails then 5.0 else 0.2) (S.snoc stages (Pair dependencies (Quad "" "" blocked (Cons "/usr/bin/true" Nil))))
+   observed <- J.read (directory ++ "/pipeline.json")
+   ran <- fileExists blocked
+   let pid = V.int "pid" (S.head (V.array "stages" observed))
+   group <- O.exec "" (Cons "/bin/sh" (Cons "-c" (Cons "kill -0 -\"$1\"" (Cons "check-group" (Cons (showInt pid) Nil))))) "" (directory ++ "/group.out") (directory ++ "/group.err") 5
+   H.assert (S.isLeft result && S.not ran && V.int "remaining_children" observed == 0 && group /= 0 && ltDouble (V.double 0.0 (J.get "wall_seconds" observed)) 3.0) "blocked FIFO leaked a process group or started its dependent stage") (Cons true (Cons false Nil))))
  check "test_llvm_emission_time_is_included_and_build_directory_is_fresh" (H.withScratch (\directory -> do
   exe <- getExecutablePath
   O.copy exe (directory ++ "/mock")
@@ -234,7 +308,7 @@ buildFailures = do
   first <- B.buildParallel (directory ++ "/first") compiler compiler source runtime Nil 10.0
   Pair binary sample <- H.right first
   let stages = V.array "stages" sample
-  H.assert (S.eqList eqString (S.map (V.text "phase") stages) (O.words "frontend runtime llvm-and-link") && V.int "maximum_parallel_compilers" sample == 2 && V.int "parallel_group" (S.index stages 0) == 0 && V.int "parallel_group" (S.index stages 1) == 0 && J.equal (J.get "parallel_group" (S.index stages 2)) J.Null && S.not (ltDouble (V.double 0.0 (J.get "wall_seconds" sample)) 0.1) && S.all (\row -> S.not (ltDouble (V.double 0.0 (J.get "wall_seconds" sample)) (V.double 0.0 (J.get "wall_seconds" row)))) stages) "parallel phases or emission timing missing"
+  H.assert (S.eqList eqString (S.map (V.text "phase") stages) (O.words "frontend runtime llvm link") && V.int "maximum_parallel_compilers" sample == 2 && S.not (ltDouble (V.double 0.0 (J.get "started_seconds" (S.index stages 2))) (V.double 0.0 (J.get "finished_seconds" (S.index stages 0)))) && ltDouble (V.double 0.0 (J.get "started_seconds" (S.index stages 2))) (V.double 0.0 (J.get "finished_seconds" (S.index stages 1))) && S.not (ltDouble (V.double 0.0 (J.get "started_seconds" (S.index stages 3))) (V.double 0.0 (J.get "finished_seconds" (S.index stages 1)))) && S.not (ltDouble (V.double 0.0 (J.get "started_seconds" (S.index stages 3))) (V.double 0.0 (J.get "finished_seconds" (S.index stages 2)))) && S.not (ltDouble (V.double 0.0 (J.get "wall_seconds" sample)) 0.1) && S.all (\row -> S.not (ltDouble (V.double 0.0 (J.get "wall_seconds" sample)) (V.double 0.0 (J.get "wall_seconds" row)))) stages) "parallel phases or emission timing missing"
   let totalCPU = S.foldl addDouble 0.0 (S.map (\row -> V.double 0.0 (J.get "cpu_seconds" row)) stages)
   H.assert (S.not (ltDouble 0.00000001 (abs (subDouble totalCPU (V.double 0.0 (J.get "cpu_seconds" sample)))))) "phase CPU not summed"
   reused <- B.buildParallel (directory ++ "/first") compiler compiler source runtime Nil 10.0
@@ -252,7 +326,14 @@ buildFailures = do
    let commands = Cons (Quad "" "" (directory ++ "/sleep.out") (O.words "/bin/sleep 30")) (if fails then Cons (Quad "" "" (directory ++ "/fail.out") (Cons "/bin/sh" (Cons "-c" (Cons "exit 23" Nil)))) Nil else Nil)
    result <- B.runGroup directory (if fails then 5.0 else 0.2) commands
    observed <- J.read (directory ++ "/group.json")
-   H.assert (S.isLeft result && V.int "remaining_children" observed == 0 && ltDouble (V.double 0.0 (J.get "wall_seconds" observed)) 3.0) "parallel failure did not reap every child promptly") (Cons true (Cons false Nil))))
+   H.assert (S.isLeft result && V.int "remaining_children" observed == 0 && ltDouble (V.double 0.0 (J.get "wall_seconds" observed)) 3.0) "parallel failure did not reap every child promptly"
+   let dependency = if fails then O.words "0 1" else O.words "0"
+   let blocked = directory ++ (if fails then "/failed-dependent.out" else "/timeout-dependent.out")
+   let pipeline = S.snoc (S.map (\command -> Pair Nil command) commands) (Pair (S.map readInt dependency) (Quad "" "" blocked (Cons "/usr/bin/true" Nil)))
+   result <- B.runPipeline directory (if fails then 5.0 else 0.2) pipeline
+   observed <- J.read (directory ++ "/pipeline.json")
+   started <- fileExists blocked
+   H.assert (S.isLeft result && S.not started && V.int "remaining_children" observed == 0 && ltDouble (V.double 0.0 (J.get "wall_seconds" observed)) 3.0) "pipeline failure ran a dependent stage or leaked a child") (Cons true (Cons false Nil))))
  check "test_native_driver_preserves_existing_executable_on_failure" (H.withScratch (\directory -> do
   compiler <- getEnv "MLF_BOOTSTRAP_COMPILER"
   let source = directory ++ "/bad.emlf"

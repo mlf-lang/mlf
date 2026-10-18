@@ -1,0 +1,310 @@
+module Package.CompilerTests where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+import qualified Package.Json as J
+import qualified Package.Build as B
+import qualified Package.Command as C
+
+-- Build and execute native MLF tests; preserved oracle data and test-only
+-- checking modules remain independent of the candidate compiler.
+data TestContext = TestContext String String String
+root : TestContext -> String
+root (TestContext r _ _) = r
+output : TestContext -> String
+output (TestContext _ d _) = d
+compiler : TestContext -> String
+compiler (TestContext _ _ c) = c
+report : TestContext -> String
+report c = output c ++ "/verification.json"
+record : TestContext -> String -> J.Json -> IO Unit
+record c key value = do { saved <- J.read (report c); J.write (report c) (J.set key value saved) }
+run : TestContext -> List String -> IO Unit
+run c argv = do
+  putStrLn ("+ " ++ S.intercalate " " argv)
+  code <- O.exec (root c) argv "" "" "" 1800
+  O.require (code == 0) ("compiler test command failed (" ++ showInt code ++ "): " ++ S.intercalate " " argv)
+query : TestContext -> List String -> IO String
+query c argv = B.raw (output c) argv
+capture : TestContext -> List String -> String -> IO Unit
+capture c argv destination = captureWithin c argv destination 1800
+captureWithin : TestContext -> List String -> String -> Int -> IO Unit
+captureWithin c argv destination seconds = do
+  let errors = destination ++ ".stderr"
+  putStrLn ("+ " ++ S.intercalate " " argv)
+  code <- O.exec (root c) argv "" destination errors seconds
+  if code == 0 then ioReturn Unit else do { text <- readFile errors; O.fatal ("compiler test command failed (" ++ showInt code ++ "): " ++ text) }
+walk : String -> IO (List String)
+walk path = do
+  present <- fileExists path
+  if present then ioReturn (Cons path Nil) else do
+    names <- O.entries path
+    nested <- S.mapM (\name -> walk (O.join path name)) (S.filter (\name -> S.not (S.elem eqString name (O.words ".mlf-build .git dist-newstyle __pycache__"))) names)
+    ioReturn (S.concat nested)
+sources : String -> IO J.Json
+sources r = do
+  nested <- S.mapM (\dir -> walk (r ++ "/" ++ dir)) (O.words "src app test scripts runtime bootstrap package examples benchmarks tests")
+  let paths = S.filter (\p -> S.any (\suffix -> O.ends suffix p) (O.words ".hs .emlf .c .h .py .sh .expected .json .gz")) (S.concat nested)
+  hashes <- B.hashFiles (S.append paths (Cons (r ++ "/mlfpkg") (Cons (r ++ "/mlf-package.json") Nil)))
+  ioReturn (J.Object (S.map (\entry -> Pair (O.relative r (S.fst entry)) (S.snd entry)) (J.items hashes)))
+clearDrivers : IO Unit
+clearDrivers = S.mapM_ unsetEnv (O.words "MLF_BENCH_STREAM_LLVM MLF_BENCH_MLF_CLANG MLF_MOCK_FAST_FRONTEND MLF_BOOTSTRAP_INTERPRETER MLF_BOOTSTRAP_LLVM MLF_BOOTSTRAP_TIMEOUT_SECONDS MLF_TEST_TRACE MLF_TEST_FAIL_WRITE MLF_LLVM_TEST_ABI MLF_LLVM_TEST_CFLAGS MLF_LLVM_TEST_LIBS MLF_LLVM_TEST_OPT")
+nativeFlags : TestContext -> Bool -> IO (List String)
+nativeFlags c compact = do
+  text <- query c (Cons "pkg-config" (O.words "--cflags --libs gmp"))
+  extra <- if compact then do
+    prefix <- getEnv "MLF_GC_PREFIX"
+    if eqString prefix "" then do { flags <- query c (Cons "pkg-config" (O.words "--cflags --libs bdw-gc")); ioReturn (B.flags flags) }
+      else do
+        actual <- canonicalPath prefix
+        system <- query c (O.words "uname -s")
+        ioReturn (Cons ("-I" ++ actual ++ "/include") (Cons (actual ++ "/lib/libgc.a") (if eqString (O.trim system) "Linux" then Cons "-ldl" Nil else Nil)))
+    else ioReturn Nil
+  ioReturn (S.append (B.flags text) extra)
+stack : TestContext -> IO (List String)
+stack c = do { system <- query c (O.words "uname -s"); ioReturn (if eqString (O.trim system) "Darwin" then Cons "-Wl,-stack_size,0x10000000" Nil else Nil) }
+compileRuntime : TestContext -> List String -> Bool -> Bool -> String -> IO Unit
+compileRuntime c flags compact trace name = do
+  let macros = if compact then B.profileFlags else Nil
+  let interpose = if trace then O.words "-Dgetline=mlf_test_getline -Dfwrite=mlf_test_fwrite -Dfputc=mlf_test_fputc -Dfflush=mlf_test_fflush" else Nil
+  run c (S.append (O.words "clang -O2 -std=c11 -Wall -Wextra -Werror") (S.append (S.filter (O.starts "-I") flags) (S.append macros (S.append interpose (Cons "-c" (Cons (root c ++ "/runtime/mlf_runtime.c") (Cons "-o" (Cons (output c ++ "/" ++ name) Nil))))))))
+link : TestContext -> String -> List String -> List String -> String -> List String -> IO Unit
+link c ir objects flags binary extra = run c (S.append (O.words "clang -O2 -Wno-override-module") (S.append (Cons ir objects) (S.append flags (S.append (Cons "-lm" extra) (Cons "-o" (Cons binary Nil))))))
+nativeTest : TestContext -> String -> IO String
+nativeTest c target = do
+ manager <- getExecutablePath
+ let build = O.parent (output c) ++ "/mlf-test-suite"
+ let args = S.concat (Cons (Cons manager Nil)
+  (Cons (Cons "--manifest" (Cons (root c ++ "/tests/mlf-package.json") Nil))
+  (Cons (Cons "--compiler" (Cons (compiler c) Nil))
+  (Cons (Cons "--runtime" (Cons (root c ++ "/runtime/mlf_runtime.c") Nil))
+  (Cons (Cons "--build-dir" (Cons build Nil))
+  (Cons (S.snoc (O.words "--timeout 21600 build --target") target) Nil))))))
+ putStrLn ("+ " ++ S.intercalate " " args)
+ code <- O.exec (root c) args "" "" "" 21600
+ O.require (code == 0) ("native test build failed (" ++ showInt code ++ ")")
+ return (build ++ "/bin/" ++ target)
+transports : TestContext -> IO Unit
+transports c = do
+ S.mapM_ (\(Pair source target) -> run c (S.append (O.words "clang -O2 -std=c11 -Wall -Wextra -Werror") (Cons (root c ++ "/test/" ++ source) (Cons "-o" (Cons (output c ++ "/" ++ target) Nil))))) (Cons (Pair "binary_files.c" "binary-files") (Cons (Pair "host_support.c" "host-support") Nil))
+ setEnv "MLF_TEST_BINARY_FILES" (output c ++ "/binary-files")
+ setEnv "MLF_TEST_HOST_SUPPORT" (output c ++ "/host-support")
+ setEnv "MLF_TEST_WORK" (output c)
+ setEnv "MLF_TEST_ROOT" (output c)
+suite : TestContext -> String -> List String -> IO Unit
+suite c target expectations = do
+ binary <- nativeTest c target
+ let log = output c ++ "/" ++ target ++ ".log"
+ capture c (Cons binary Nil) log
+ text <- readFile log
+ O.require (S.all (\expected -> contains expected text) expectations) (target ++ ": preserved coverage summary is missing")
+ hash <- fileDigest log
+ saved <- J.read (report c)
+ record c "suites" (J.set target (B.obj2 "log_sha256" (J.str hash) "coverage" (J.stringArray expectations)) (J.getObject "suites" saved))
+ putStr (O.drop (S.max 0 (stringLength text - 2000)) text)
+unit : TestContext -> IO Unit
+unit c = do
+ transports c
+ suite c "core" (Cons "652 checks; 0 failures" (Cons "Oracle: 6712 closed terms" Nil))
+ suite c "figure12" (Cons "43/43 expressions match regression expectations; 0 failures" (Cons "36 supplementary checks; 0 failures" Nil))
+ suite c "harness" (Cons "56 native benchmark/bootstrap/release harness tests passed" Nil)
+packages : TestContext -> IO Unit
+packages c = do
+ transports c
+ suite c "packages" (Cons "18 package resolver tests passed" (Cons "19 package integration cases passed" Nil))
+prepareDrivers : TestContext -> IO (List String)
+prepareDrivers c = do
+ flags <- nativeFlags c true
+ compileRuntime c flags true false "runtime.o"
+ compileRuntime c flags true true "runtime-traced.o"
+ run c (S.append (O.words "clang -O2 -std=c11 -Wall -Wextra -Werror -c") (Cons (root c ++ "/test/native_trace.c") (Cons "-o" (Cons (output c ++ "/trace.o") Nil))))
+ extra <- stack c
+ drivers <- S.mapM (\name -> do
+  let ir = output c ++ "/" ++ name ++ ".ll"
+  captureWithin c (Cons (compiler c) (Cons "-i" (Cons (root c ++ "/bootstrap") (Cons "--emit-llvm-gc" (Cons (root c ++ "/bootstrap/" ++ name ++ ".emlf") Nil))))) ir 21600
+  let objects = if eqString name "RuntimeDriver" then Cons (output c ++ "/runtime-traced.o") (Cons (output c ++ "/trace.o") Nil) else Cons (output c ++ "/runtime.o") Nil
+  let binary = output c ++ "/" ++ name
+  link c ir objects flags binary extra
+  hash <- fileDigest binary
+  llvm <- fileDigest ir
+  return (Pair name (B.obj2 "sha256" (J.str hash) "llvm_sha256" (J.str llvm)))) (O.words "RuntimeDriver LLVMDriver")
+ record c "drivers" (J.Object drivers)
+ return (S.append flags extra)
+matrices : TestContext -> String -> Bool -> IO Unit
+matrices c binary portFixtures = do
+ flags <- prepareDrivers c
+ setEnv "MLF_BOOTSTRAP_INTERPRETER" (output c ++ "/RuntimeDriver")
+ setEnv "MLF_BOOTSTRAP_LLVM" (output c ++ "/LLVMDriver")
+ setEnv "MLF_BOOTSTRAP_COMPILER" (compiler c)
+ setEnv "MLF_BOOTSTRAP_TIMEOUT_SECONDS" "1800"
+ S.mapM_ (\abi -> do
+  let compact = eqString abi "compact-gc"
+  setEnv "MLF_LLVM_TEST_ABI" abi
+  setEnv "GC_INITIAL_HEAP_SIZE" (if compact then "8388608" else "536870912")
+  setEnv "GC_FREE_SPACE_DIVISOR" "1"
+  let flagsFile = output c ++ "/link-flags.bin"
+  writeFile flagsFile (O.pack flags)
+  setEnv "MLF_TEST_LINK_FLAGS_FILE" flagsFile
+  let directory = output c ++ "/matrix-" ++ abi
+  O.mkdir directory
+  compileRuntime c flags compact true ("matrix-" ++ abi ++ "/runtime.o")
+  let log = output c ++ "/" ++ abi ++ ".log"
+  -- Each fixture retains its own execution limit. The complete matrix also
+  -- includes native candidate emission, linking, and graph reference workloads.
+  captureWithin c (Cons binary Nil) log 14400
+  text <- readFile log
+  let rows = S.filter (O.starts "Backend matrix: ") (O.lines text)
+  O.require (S.length rows == 1 && contains "rows x 2 backends; no missing executions" text) "missing native backend audit"
+  O.require (readInt (S.index (O.words (S.head rows)) 2) == (if portFixtures then 26 else 552)) "native execution row coverage changed"
+  let expected = if portFixtures then "26 MLF port fixtures; 0 failures" else "500 shared IO/prelude/backend fixtures; 0 failures"
+  O.require (contains expected text) "native fixture coverage changed"
+  hash <- fileDigest log
+  let row = B.info (Cons (Pair "rows" (J.num (readInt (S.index (O.words (S.head rows)) 2)))) (Cons (Pair "backends" (J.num 2)) (Cons (Pair "cli_compiler" (J.str (compiler c))) (Cons (Pair "log_sha256" (J.str hash)) Nil))))
+  saved <- J.read (report c)
+  record c "matrices" (J.set abi row (J.getObject "matrices" saved))
+  putStr (O.drop (S.max 0 (stringLength text - 2000)) text)) (O.words "standard compact-gc")
+ clearDrivers
+backends : TestContext -> IO Unit
+backends c = do
+ transports c
+ binary <- nativeTest c "backends"
+ matrices c binary false
+port : TestContext -> IO Unit
+port c = do
+ transports c
+ references <- nativeTest c "references"
+ setEnv "MLF_TEST_REFERENCES" references
+ binary <- nativeTest c "port"
+ matrices c binary true
+shellQuote : String -> String
+shellQuote text = "'" ++ O.replace "'" "'\\''" text ++ "'"
+contains : String -> String -> Bool
+contains needle text = S.not (eqString text (O.replace needle "" text))
+-- The exported corpus prescribes acceptance, rejection phase/diagnostic,
+-- checked target type and (where applicable) exact output for both backends.
+parity : TestContext -> IO Unit
+parity c = do
+  checker <- nativeTest c "check-target"
+  exporter <- nativeTest c "corpus"
+  let corpus = output c ++ "/corpus"
+  run c (Cons exporter (Cons corpus Nil))
+  source <- readFile (corpus ++ "/manifest.jsonl")
+  rows <- S.mapM (\line -> case J.parse line of { Left error -> O.fatal error; Right value -> ioReturn value }) (O.nonempty (O.lines source))
+  O.require (S.length (S.nubBy eqString (S.map (J.getText "id" "") rows)) == S.length rows) "duplicate parity identities"
+  O.require (S.all (\row -> J.equal (J.get "schema_version" row) (J.num 1)) rows) "unsupported parity schema"
+  S.mapM_ (\pair -> O.require (S.length (S.filter (\row -> eqString (J.getText "category" "" row) (S.fst pair)) rows) >= S.snd pair) ("parity corpus lacks " ++ S.fst pair))
+    (Cons (Pair "figure12" 43) (Cons (Pair "hm-exhaustive" 1712) (Cons (Pair "hm-generated" 5000) (Cons (Pair "annotations" 126) (Cons (Pair "readability" 18) (Cons (Pair "state" 97) (Cons (Pair "modules" 60) (Cons (Pair "examples" 21) (Cons (Pair "benchmarks" 9) Nil)))))))))
+  let a8 = S.fromMaybe (panic "missing Figure12 A8") (S.find (\row -> eqString (J.getText "id" "" row) "figure12-A8") rows)
+  O.require (S.not (J.getBool "expected_accept" true a8) && eqString (J.getText "expected_phase" "" a8) "Inference") "A8 must be rejected by inference"
+  let moduleRows = S.filter (\row -> eqString (J.getText "category" "" row) "modules") rows
+  O.require (S.length (S.filter (J.getBool "expected_accept" false) moduleRows) >= 21 && S.length (S.filter (\row -> S.not (J.getBool "expected_accept" false row)) moduleRows) >= 39) "module corpus lacks positive or negative coverage"
+  O.require (S.any (\row -> J.getBool "no_prelude" false row && J.getBool "expected_accept" false row) moduleRows) "module corpus lacks explicit prelude coverage"
+  O.require (S.all (\row -> J.getBool "expected_accept" false row || (stringLength (J.getText "expected_phase" "" row) > 0 && stringLength (O.trim (J.getText "expected_error_contains" "" row)) > 0)) moduleRows) "module rejection lacks a prescribed phase or diagnostic"
+  flags <- nativeFlags c false
+  compileRuntime c flags false false "runtime.o"
+  O.mkdir (output c ++ "/parity")
+  parityLoop c corpus checker flags 0 rows
+  let accepted = S.length (S.filter (J.getBool "expected_accept" false) rows)
+  let runtime = S.length (S.filter (J.has "expected_stdout") rows)
+  O.require (S.length rows == 7086 && accepted == 3202 && runtime == 80) "preserved parity coverage changed"
+  hash <- fileDigest (corpus ++ "/manifest.jsonl")
+  record c "parity" (B.info (Cons (Pair "cases" (J.num (S.length rows))) (Cons (Pair "accepted" (J.num accepted)) (Cons (Pair "rejected" (J.num (S.length rows - accepted))) (Cons (Pair "runtime_rows" (J.num runtime)) (Cons (Pair "runtime_executions" (J.num (runtime * 2))) (Cons (Pair "manifest_sha256" (J.str hash)) Nil)))))))
+parityLoop : TestContext -> String -> String -> List String -> Int -> List J.Json -> IO Unit
+parityLoop c corpus checker flags number rows = case rows of
+  Nil -> ioReturn Unit
+  Cons row rest -> do
+    let stem = output c ++ "/parity/" ++ showInt number
+    let prefix = S.append (Cons (compiler c) (if J.getBool "no_prelude" false row then Cons "--no-prelude" Nil else Nil)) (S.concatMap (\path -> Cons "-i" (Cons (corpus ++ "/" ++ path) Nil)) (J.getStrings "include_dirs" row))
+    let source = corpus ++ "/" ++ J.getText "source_path" "" row
+    code <- O.exec (root c) (S.snoc prefix source) "" (stem ++ ".xmlf") (stem ++ ".stderr") 1800
+    let accept = J.getBool "expected_accept" false row
+    error <- readFile (stem ++ ".stderr")
+    O.require ((code == 0 && accept) || (code == 1 && S.not accept)) (J.getText "id" "" row ++ ": acceptance mismatch: " ++ error)
+    if accept then do
+      writeFile (stem ++ ".type") (J.getText "expected_type" "" row)
+      checked <- O.exec (root c) (Cons checker (Cons (stem ++ ".xmlf") (Cons (stem ++ ".type") Nil))) "" (stem ++ ".check.out") (stem ++ ".check.err") 1800
+      O.require (checked == 0) ("independent target check failed: " ++ stem)
+      checked <- O.exec (root c) (Cons (compiler c) (Cons "--check" (Cons (stem ++ ".xmlf") Nil))) "" (stem ++ ".self.out") (stem ++ ".self.err") 1800
+      O.require (checked == 0) ("candidate target check failed: " ++ stem)
+    else do
+      target <- readFile (stem ++ ".xmlf")
+      O.require (eqString target "") "rejected input emitted a target"
+      let phase = J.getText "expected_phase" "" row
+      let reason = J.getText "expected_error_contains" "" row
+      O.require (eqString phase "" || O.starts (phase ++ ":") error) ("wrong rejection phase: " ++ stem)
+      O.require (eqString reason "" || contains reason error) ("wrong rejection diagnostic: " ++ stem)
+    if J.has "expected_stdout" row then do
+      O.require accept "rejected corpus row has runtime expectation"
+      writeFile (stem ++ ".stdin") (J.getText "expected_stdin" "" row)
+      checkOutput c row (S.append prefix (Cons "--run" (Cons source Nil))) stem "interpreter"
+      generated <- O.exec (root c) (S.append prefix (Cons "--emit-llvm" (Cons source Nil))) "" (stem ++ ".ll") (stem ++ ".llvm.err") 1800
+      O.require (generated == 0) ("LLVM emission failed: " ++ stem)
+      link c (stem ++ ".ll") (Cons (output c ++ "/runtime.o") Nil) flags (stem ++ ".native") Nil
+      checkOutput c row (Cons (stem ++ ".native") Nil) stem "llvm"
+    else ioReturn Unit
+    if remInt (number + 1) 100 == 0 then putStrLn ("Parity: " ++ showInt (number + 1)) else ioReturn Unit
+    parityLoop c corpus checker flags (number + 1) rest
+checkOutput : TestContext -> J.Json -> List String -> String -> String -> IO Unit
+checkOutput c row argv stem backend = do
+  code <- O.exec (root c) argv (stem ++ ".stdin") (stem ++ "." ++ backend ++ ".out") (stem ++ "." ++ backend ++ ".err") 1800
+  out <- readFile (stem ++ "." ++ backend ++ ".out")
+  err <- readFile (stem ++ "." ++ backend ++ ".err")
+  O.require (code == 0 && eqString out (J.getText "expected_stdout" "" row) && eqString err (J.getText "expected_stderr" "" row)) (backend ++ " output/status mismatch: " ++ stem)
+findArtifact : String -> String -> List String -> IO String
+findArtifact hash cache names = case names of
+  Nil -> O.fatal "cannot find the package artifact that produced the candidate"
+  Cons name rest -> do
+    let binary = cache ++ "/" ++ name ++ "/program"
+    present <- fileExists binary
+    if present then do { actual <- fileDigest binary; if eqString actual hash then ioReturn (O.parent binary) else findArtifact hash cache rest } else findArtifact hash cache rest
+selfHost : TestContext -> IO Unit
+selfHost c = do
+  manager <- getExecutablePath
+  let next = output c ++ "/next-stage"
+  O.remove next
+  let argv = Cons manager (Cons "--timeout" (Cons "21600" (Cons "--compiler" (Cons (compiler c) (Cons "--build-dir" (Cons next (O.words "build --target emlf")))))))
+  putStrLn ("+ " ++ S.intercalate " " argv)
+  code <- O.exec (root c) argv "" "" "" 21600
+  O.require (code == 0) ("self-host compiler build failed (" ++ showInt code ++ ")")
+  saved <- J.read (next ++ "/build-report.json")
+  O.require (J.getBool "complete" false saved) "next-stage package build incomplete"
+  let row = S.fromMaybe (panic "missing next compiler artifact") (S.find (\row -> eqString (J.getText "kind" "" row) "executable mlf-compiler:emlf") (J.values (J.get "builds" saved)))
+  O.require (S.not (J.getBool "cached" true row)) "next compiler reused a previous build"
+  let ir = next ++ "/cache/" ++ J.getText "key" "" row ++ "/program.ll"
+  hash <- fileDigest (compiler c)
+  let cache = O.parent (O.parent (compiler c)) ++ "/cache"
+  names <- O.entries cache
+  original <- findArtifact hash cache names
+  old <- fileDigest (original ++ "/program.ll")
+  new <- fileDigest ir
+  O.require (eqString old new) "package self-build did not reach an LLVM fixed point"
+  binary <- fileDigest (next ++ "/bin/emlf")
+  record c "fixed_point" (B.info (Cons (Pair "llvm_sha256" (J.str new)) (Cons (Pair "next_compiler_sha256" (J.str binary)) (Cons (Pair "reused_candidate_build" (J.get "cached" row)) Nil))))
+main : List String -> IO Unit
+main args = case args of
+  Cons group rest -> do
+    Pair options remaining <- C.options J.empty rest
+    O.require (S.null remaining && J.has "compiler" options && J.has "build-dir" options) "compiler-test GROUP --compiler TOOL --build-dir DIRECTORY"
+    root <- canonicalPath "."
+    O.mkdir (J.getText "build-dir" "" options)
+    out <- canonicalPath (J.getText "build-dir" "" options)
+    compiler <- canonicalPath (J.getText "compiler" "" options)
+    let c = TestContext root out compiler
+    sourceHashes <- sources root
+    hash <- fileDigest compiler
+    J.write (report c) (B.info (Cons (Pair "complete" (J.Boolean false)) (Cons (Pair "implementation" (J.str "MLF")) (Cons (Pair "group" (J.str group)) (Cons (Pair "compiler" (J.str compiler)) (Cons (Pair "compiler_sha256" (J.str hash)) (Cons (Pair "sources" sourceHashes) Nil)))))))
+    manager <- getExecutablePath
+    setEnv "MLF_PACKAGE_MANAGER" manager
+    clearDrivers
+    setEnv "MLF_BOOTSTRAP_COMPILER" compiler
+    path <- getEnv "PATH"
+    setEnv "PATH" (O.parent compiler ++ ":" ++ path)
+    if eqString group "self-host" then selfHost c else do
+      if eqString group "packages" then packages c else if eqString group "unit" then unit c else if eqString group "port" then port c else if eqString group "backends" then backends c else if eqString group "parity" then parity c else O.fatal "unknown compiler test group"
+    after <- sources root
+    O.require (J.equal sourceHashes after) "compiler/test sources changed during validation"
+    current <- fileDigest compiler
+    O.require (eqString hash current) "compiler changed during validation"
+    record c "complete" (J.Boolean true)
+    putStrLn ("Compiler package " ++ group ++ " passed")
+  Nil -> O.fatal "missing compiler test group"

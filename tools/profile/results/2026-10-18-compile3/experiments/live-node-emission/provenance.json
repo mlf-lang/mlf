@@ -1,0 +1,36 @@
+{
+  "candidate": "/Volumes/src/mlf/.mlf-build/compile3/live-node/bin/emlf",
+  "baseline": "/Volumes/src/mlf/.mlf-build/compile3/project-enumeration/bin/emlf",
+  "boundary": "fresh process: standard LLVM emission",
+  "order": [
+    [
+      "baseline",
+      "candidate"
+    ],
+    [
+      "candidate",
+      "baseline"
+    ],
+    [
+      "baseline",
+      "candidate"
+    ]
+  ],
+  "sha256": {
+    "/Volumes/src/mlf/.mlf-build/compile3/live-node/bin/emlf": "1a9f282330ecb1552d6b1b3465d9ace0614683be29bcd2c6ff3716ff012e62bd",
+    "/Volumes/src/mlf/.mlf-build/compile3/project-enumeration/bin/emlf": "2a70ed40255d198b7146f1ada58011c806ec98f49c28b1b38e2062ff8326593f",
+    "/Volumes/src/mlf/.mlf-build/compile3/baseline-bench/host-support": "136c1a5e3eb940bf9f258c0a34064c3b5e77ae2b42380eed3fa25ad24db31ac1",
+    "/Volumes/src/mlf/.mlf-build/compile3/measure-emission.sh": "f0c70bd28db932c7e69a9600cc43d01e554a489ae22fddb09a6c94bc553c8c97",
+    "/Volumes/src/mlf/benchmarks/manifest.json": "5b77f64ff0af146fb13b9a7bd3ec6838d63f182c936eabd955158dc9ca932e35",
+    "/Volumes/src/mlf/benchmarks/binary-trees/mlf/main.emlf": "a9a8c5053d3ea18769da91bf2557c0e943d55766d9d3259b8e685ead88636270",
+    "/Volumes/src/mlf/benchmarks/pidigits/mlf/main.emlf": "ff663a5b00c83097c64b8792a0f2113d7aff39fc4cae5ebaeb02e773616aa53e",
+    "/Volumes/src/mlf/benchmarks/n-body/mlf/main.emlf": "cb0f4756f1e16e6c37db79fed2ad905aca428c334e30535b04cfffd71383e79c",
+    "/Volumes/src/mlf/benchmarks/fannkuch-redux/mlf/main.emlf": "f349294284c87ff923844475d2d5250f9b0c704cb43efd744342a015ea26cf29",
+    "/Volumes/src/mlf/benchmarks/spectral-norm/mlf/main.emlf": "46bc43dcc8dea72e31315149581c8a97cf94ef70ff075971c3e56768093ce68c",
+    "/Volumes/src/mlf/benchmarks/fasta/mlf/main.emlf": "37aed66d57b6eacbe55a610dae2b83940518a1f363a307a72455d45d61817698",
+    "/Volumes/src/mlf/benchmarks/mandelbrot/mlf/main.emlf": "6aa84697293d90814f64f083ec52be179cc1d321b5211a6da5f141b9f3366136",
+    "/Volumes/src/mlf/benchmarks/reverse-complement/mlf/main.emlf": "870ff16b72a7b084738ca0fb36d35cf727de9b097e315b361eedae47dee35b1e",
+    "/Volumes/src/mlf/benchmarks/k-nucleotide/mlf/main.emlf": "613042a4b8e9e5c4028c4135b6def2a1444b2327f16bea41ab0ca79376f23ea7"
+  },
+  "inputs_unchanged": true
+}

@@ -1,0 +1,28 @@
+module ComponentFixtures where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.Graph as G
+assert : Bool -> String -> IO Unit
+assert ok message = if ok then return Unit else panic message
+right : forall a. Either String a -> IO a
+right result = case result of { Left message -> panic message; Right value -> return value }
+flag bits position = if remInt (quotInt bits position) 2 == 0 then Flexible else Rigid
+fixture bits = Graph (IM.fromList (
+ Cons (Pair 0 (Node (GGen 1) Nothing Flexible)) (
+ Cons (Pair 1 (Node (GArr 10 3) (Just 0) (flag bits 1))) (
+ Cons (Pair 2 (Node GBot (Just 1) (flag bits 2))) (
+ Cons (Pair 3 (Node (GCon "Int" Nil) (Just 1) (flag bits 4))) (
+ Cons (Pair 4 (Node GBot (Just 0) (flag bits 8))) (
+ Cons (Pair 5 (Node (GGen 6) (Just 0) Flexible)) (
+ Cons (Pair 6 (Node (GArr 7 8) (Just 5) (flag bits 16))) (
+ Cons (Pair 7 (Node GBot (Just 6) Flexible)) (
+ Cons (Pair 8 (Node (GCon "Unit" Nil) (Just 6) Rigid)) (
+ Cons (Pair 9 (Node GBot (Just 5) Flexible)) Nil))))))))))) (IM.singleton 10 2) 11
+rename f graph = Graph
+ (IM.fromList (S.map (\(Pair n v) -> Pair (f n) (Node (G.mapTag f (G.tag v)) (S.mapOptional f (G.binder v)) (G.flag v))) (IM.toList (G.nodes graph))))
+ (IM.fromList (S.map (\(Pair a b) -> Pair (f a) (f b)) (IM.toList (G.links graph)))) (f (G.nextId graph))
+chain count = Graph (IM.fromList (Cons (Pair 0 (Node (GGen 1) Nothing Flexible))
+ (L.map (\n -> Pair n (Node (if n == count then GBot else GArr (n + 1) (n + 1)) (Just 0) Flexible)) (L.range 1 count)))) IM.empty (count + 1)
+

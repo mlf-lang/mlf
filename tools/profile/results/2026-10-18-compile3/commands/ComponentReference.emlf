@@ -1,0 +1,34 @@
+module ComponentReference where
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.IntSet as IS
+import qualified Bootstrap.Graph as G
+import qualified Bootstrap.Graph.Solver as S
+import qualified Tests.DenseNormalization as N
+import qualified Tests.Helpers as H
+
+-- Find incoming edges from the graph itself, without the solver's indexes,
+-- scratch storage or persistent visited sets.
+reference : Graph -> List Int -> List Int -> Either String (List Int)
+reference graph seen pending = case pending of
+ Nil -> Right (L.sortBy L.compareInt seen)
+ Cons original rest ->
+  let n = N.resolve graph original in
+  if L.elem eqInt n seen then reference graph seen rest else
+  case IM.lookup n (G.nodes graph) of
+   Nothing -> Left ("missing graph node " ++ showInt n)
+   Just node ->
+    let incoming = L.map L.fst (L.filter (\(Pair key value) ->
+         L.elem eqInt n (G.children (G.tag value)) || G.equalMaybeInt (G.binder value) (Just n)) (IM.toList (G.nodes graph))) in
+    let adjacent = if G.isGen (G.tag node) then Nil else
+         L.append (G.children (G.tag node)) (L.append (L.maybeToList (G.binder node)) incoming) in
+    reference graph (Cons n seen) (L.append adjacent rest)
+
+check solver starts =
+ let actual = G.bindE (S.component solver starts) (\values -> Right (IS.toList values)) in
+ H.assert (H.eq actual (reference (S.graph solver) Nil starts)) "component membership or missing-node error changed"
+
+chain count = Graph (IM.fromList (Cons (Pair 0 (Node (GGen 1) Nothing Flexible))
+ (L.map (\n -> Pair n (Node (if n == count then GBot else GArr (n + 1) (n + 1)) (Just 0) Flexible)) (L.range 1 count)))) IM.empty (count + 1)
+

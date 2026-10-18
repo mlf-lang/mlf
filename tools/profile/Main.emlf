@@ -1,0 +1,63 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.Map as M
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.Parser as P
+import qualified Bootstrap.Module as Modules
+import qualified Bootstrap.Classes as Classes
+import qualified Bootstrap.Prelude as Prelude
+import qualified Bootstrap.Constraint as C
+import qualified Bootstrap.Graph.Solver as S
+import qualified Bootstrap.Elaborate as E
+import qualified Bootstrap.X.Check as Check
+import qualified Bootstrap.X.Type as T
+import qualified Bootstrap.X.Syntax as X
+import qualified Bootstrap.LLVM as LLVM
+import qualified Force as F
+
+mark label = putErr ("MLF_PHASE " ++ label ++ "\n")
+checked : forall a. String -> (a -> Unit) -> Either String a -> IO a
+checked label force result = case result of
+  Left message -> do { putErr (label ++ ": " ++ message ++ "\n"); exitWith 1 }
+  Right value -> do
+    seq (force value) (mark label)
+    -- A second traversal measures the forcing-only diagnostic overhead.
+    seq (force value) (mark (label ++ "-forced-again"))
+    ioReturn value
+
+main = do
+  file <- getArg 0
+  includes <- getArg 1
+  mark "start"
+  source <- readFile file
+  root <- checked "parse-root" F.forceSourceModule (P.parseModule file source)
+  loaded <- Modules.loadModuleFiles (Cons includes Nil) root
+  modules <- checked "load-modules" (F.forceList F.forceSourceModule) loaded
+  LinkedModule program names valueScopes instanceScopes <- checked "link-modules" F.forceLinkedModule (Modules.linkModules ImplicitPrelude modules)
+  Pair lowered classNames <- checked "lower-classes" (F.forcePair F.forceSProgram (F.forceMap F.scalar F.scalar)) (Classes.lowerClassesWithScopes valueScopes instanceScopes program)
+  case lowered of
+    SClassProgram _ _ _ _ -> panic "unlowered classes"
+    SProgram declarations expression -> do
+      constraints <- checked "generate" F.forceConstraints (C.generateProgram lowered)
+      prepared <- checked "prepare" F.forceSolver (S.prepare (C.initialGraph constraints))
+      initial <- checked "unify" F.forceSolver (S.solverUnify (C.equalities constraints) prepared)
+      instantiated <- checked "instantiate" F.forceSolver (L.foldM (\solver e -> S.instantiateClosed (C.fromGen e) (C.toNode e) solver) initial (C.instances constraints))
+      solved <- checked "finish-normalize" F.forceSolver (S.finishNormalized instantiated)
+      let graph = S.solverGraph solved
+      let types = E.prepareTypes graph
+      evidence <- checked "resolve" (F.forceIntMap F.forceXTerm) (E.resolveEvidenceIn types (C.skeleton constraints))
+      body <- checked "elaborate" F.forceXTerm (E.elaboratePreparedIn types solved evidence (C.skeleton constraints))
+      let term = if L.null declarations then body else XWithData declarations body
+      ty <- checked "check" F.forceXType (Check.checkClosed term)
+      let expected = E.schemeTypeIn types (C.generalization (C.skeleton constraints))
+      if L.not (T.alphaEq ty expected) then panic "type mismatch" else mark "type-agreement"
+      if L.not (X.equalErased (X.erase term) (C.eraseSourceWith evidence (C.skeleton constraints))) then panic "erasure mismatch" else mark "erasure-agreement"
+      _ <- checked "recheck" F.forceXType (Check.checkClosed term)
+      chunks <- checked "llvm" (F.forceList F.scalar) (LLVM.emitLLVMGCChunks term)
+      printChunks chunks
+      mark "write"
+printChunks : List String -> IO Unit
+printChunks chunks = case chunks of
+  Nil -> ioReturn Unit
+  Cons chunk rest -> do { putStr chunk; printChunks rest }

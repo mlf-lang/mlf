@@ -1,0 +1,511 @@
+{
+  "format": 1,
+  "platform": "darwin",
+  "architecture": "arm64",
+  "environment": {
+    "SDKROOT": "",
+    "MACOSX_DEPLOYMENT_TARGET": "",
+    "CPATH": "",
+    "C_INCLUDE_PATH": "",
+    "LIBRARY_PATH": "",
+    "DYLD_LIBRARY_PATH": "",
+    "DYLD_INSERT_LIBRARIES": ""
+  },
+  "dynamic_libraries": {
+    "/Volumes/src/mlf/.mlf-build/compile3/link-helper/mlf-link": [
+      {
+        "reference": "/opt/homebrew/opt/lld/lib/liblldMachO.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldMachO.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/opt/homebrew/opt/lld/lib/liblldCommon.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldCommon.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/opt/homebrew/opt/llvm/lib/libLLVM.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/llvm/23.1.3/lib/libLLVM.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/usr/lib/libc++.1.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      },
+      {
+        "reference": "/usr/lib/libSystem.B.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      }
+    ],
+    "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldMachO.23.1.dylib": [
+      {
+        "reference": "/opt/homebrew/opt/lld/lib/liblldMachO.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldMachO.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "@rpath/liblldCommon.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldCommon.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/opt/homebrew/opt/llvm/lib/libLLVM.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/llvm/23.1.3/lib/libLLVM.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/usr/lib/libc++.1.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      },
+      {
+        "reference": "/usr/lib/libSystem.B.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      }
+    ],
+    "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldCommon.23.1.dylib": [
+      {
+        "reference": "/opt/homebrew/opt/lld/lib/liblldCommon.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldCommon.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/opt/homebrew/opt/llvm/lib/libLLVM.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/llvm/23.1.3/lib/libLLVM.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/usr/lib/libc++.1.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      },
+      {
+        "reference": "/usr/lib/libSystem.B.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      }
+    ],
+    "/opt/homebrew/Cellar/llvm/23.1.3/lib/libLLVM.23.1.dylib": [
+      {
+        "reference": "/opt/homebrew/opt/llvm/lib/libLLVM.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/llvm/23.1.3/lib/libLLVM.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/usr/lib/libffi.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      },
+      {
+        "reference": "/usr/lib/libedit.3.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      },
+      {
+        "reference": "/usr/lib/libSystem.B.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      },
+      {
+        "reference": "/opt/homebrew/opt/z3/lib/libz3.5.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/z3/5.1.0/lib/libz3.5.1.0.0.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/usr/lib/libz.1.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      },
+      {
+        "reference": "/opt/homebrew/opt/zstd/lib/libzstd.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/zstd/1.5.7_1/lib/libzstd.1.5.7.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/usr/lib/libxml2.2.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      },
+      {
+        "reference": "/usr/lib/libc++.1.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      }
+    ],
+    "/opt/homebrew/Cellar/z3/5.1.0/lib/libz3.5.1.0.0.dylib": [
+      {
+        "reference": "/opt/homebrew/opt/z3/lib/libz3.5.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/z3/5.1.0/lib/libz3.5.1.0.0.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/usr/lib/libc++.1.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      },
+      {
+        "reference": "/usr/lib/libSystem.B.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      }
+    ],
+    "/opt/homebrew/Cellar/zstd/1.5.7_1/lib/libzstd.1.5.7.dylib": [
+      {
+        "reference": "/opt/homebrew/opt/zstd/lib/libzstd.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/zstd/1.5.7_1/lib/libzstd.1.5.7.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/usr/lib/libSystem.B.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      }
+    ],
+    "/opt/homebrew/Cellar/llvm/23.1.3/bin/clang-23": [
+      {
+        "reference": "@rpath/libclang-cpp.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/llvm/23.1.3/lib/libclang-cpp.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "@rpath/libLLVM.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/llvm/23.1.3/lib/libLLVM.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/usr/lib/libc++.1.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      },
+      {
+        "reference": "/usr/lib/libSystem.B.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      }
+    ],
+    "/opt/homebrew/Cellar/llvm/23.1.3/lib/libclang-cpp.23.1.dylib": [
+      {
+        "reference": "/opt/homebrew/opt/llvm/lib/libclang-cpp.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/llvm/23.1.3/lib/libclang-cpp.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/System/Library/Frameworks/CoreServices.framework/Versions/A/CoreServices",
+        "resolved": null,
+        "system_shared_cache": true
+      },
+      {
+        "reference": "@rpath/libLLVM.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/llvm/23.1.3/lib/libLLVM.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/usr/lib/libc++.1.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      },
+      {
+        "reference": "/usr/lib/libSystem.B.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      },
+      {
+        "reference": "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+        "resolved": null,
+        "system_shared_cache": true
+      }
+    ],
+    "/opt/homebrew/Cellar/llvm/23.1.3/bin/opt": [
+      {
+        "reference": "@rpath/libLLVM.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/llvm/23.1.3/lib/libLLVM.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/usr/lib/libc++.1.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      },
+      {
+        "reference": "/usr/lib/libSystem.B.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      }
+    ],
+    "/opt/homebrew/Cellar/lld/23.1.3/bin/lld": [
+      {
+        "reference": "@rpath/liblldELF.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldELF.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "@rpath/liblldMachO.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldMachO.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "@rpath/liblldMinGW.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldMinGW.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "@rpath/liblldWasm.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldWasm.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "@rpath/liblldCOFF.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldCOFF.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "@rpath/liblldCommon.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldCommon.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/opt/homebrew/opt/llvm/lib/libLLVM.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/llvm/23.1.3/lib/libLLVM.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/usr/lib/libc++.1.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      },
+      {
+        "reference": "/usr/lib/libSystem.B.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      }
+    ],
+    "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldELF.23.1.dylib": [
+      {
+        "reference": "/opt/homebrew/opt/lld/lib/liblldELF.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldELF.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "@rpath/liblldCommon.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldCommon.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/usr/lib/libz.1.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      },
+      {
+        "reference": "/opt/homebrew/opt/zstd/lib/libzstd.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/zstd/1.5.7_1/lib/libzstd.1.5.7.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/opt/homebrew/opt/llvm/lib/libLLVM.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/llvm/23.1.3/lib/libLLVM.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/usr/lib/libc++.1.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      },
+      {
+        "reference": "/usr/lib/libSystem.B.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      }
+    ],
+    "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldMinGW.23.1.dylib": [
+      {
+        "reference": "/opt/homebrew/opt/lld/lib/liblldMinGW.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldMinGW.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "@rpath/liblldCOFF.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldCOFF.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "@rpath/liblldCommon.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldCommon.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/opt/homebrew/opt/llvm/lib/libLLVM.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/llvm/23.1.3/lib/libLLVM.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/usr/lib/libc++.1.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      },
+      {
+        "reference": "/usr/lib/libSystem.B.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      }
+    ],
+    "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldCOFF.23.1.dylib": [
+      {
+        "reference": "/opt/homebrew/opt/lld/lib/liblldCOFF.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldCOFF.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "@rpath/liblldCommon.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldCommon.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/opt/homebrew/opt/llvm/lib/libLLVM.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/llvm/23.1.3/lib/libLLVM.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/usr/lib/libc++.1.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      },
+      {
+        "reference": "/usr/lib/libSystem.B.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      }
+    ],
+    "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldWasm.23.1.dylib": [
+      {
+        "reference": "/opt/homebrew/opt/lld/lib/liblldWasm.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldWasm.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "@rpath/liblldCommon.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldCommon.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/opt/homebrew/opt/llvm/lib/libLLVM.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/llvm/23.1.3/lib/libLLVM.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/usr/lib/libc++.1.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      },
+      {
+        "reference": "/usr/lib/libSystem.B.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      }
+    ],
+    "/Volumes/src/mlf/.mlf-build/compile3/llvm-final-v1/mlf-llvm": [
+      {
+        "reference": "/opt/homebrew/opt/llvm/lib/libLLVM.23.1.dylib",
+        "resolved": "/opt/homebrew/Cellar/llvm/23.1.3/lib/libLLVM.23.1.dylib",
+        "system_shared_cache": false
+      },
+      {
+        "reference": "/usr/lib/libSystem.B.dylib",
+        "resolved": null,
+        "system_shared_cache": true
+      }
+    ]
+  },
+  "resolved_invocations": {
+    "/opt/homebrew/opt/lld/bin/ld64.lld": "/opt/homebrew/Cellar/lld/23.1.3/bin/lld"
+  },
+  "configure_command": [
+    "/opt/homebrew/Cellar/node/26.11.0/bin/node",
+    "/Volumes/src/mlf/tools/bench/configure-backend.cjs",
+    "/opt/homebrew/Cellar/llvm/23.1.3/bin/clang-23",
+    "/opt/homebrew/Cellar/llvm/23.1.3/bin/opt",
+    "/opt/homebrew/opt/lld/bin/ld64.lld",
+    "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2",
+    "--single-process",
+    "/Volumes/src/mlf/.mlf-build/compile3/llvm-final-v1/mlf-llvm",
+    "--prestart-link",
+    "/Volumes/src/mlf/.mlf-build/compile3/link-helper/mlf-link"
+  ],
+  "probe_command": [
+    "/opt/homebrew/Cellar/llvm/23.1.3/bin/clang-23",
+    "-###",
+    "-fuse-ld=/opt/homebrew/opt/lld/bin/ld64.lld",
+    "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2/probe-a.o",
+    "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2/probe-b.o",
+    "-lm",
+    "-o",
+    "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2/probe"
+  ],
+  "prestarted_linker": "/Volumes/src/mlf/.mlf-build/compile3/link-helper/mlf-link",
+  "link_template": [
+    "/opt/homebrew/opt/lld/bin/ld64.lld",
+    "-demangle",
+    "-lto_library",
+    "/opt/homebrew/Cellar/llvm/23.1.3/lib/libLTO.dylib",
+    "-dynamic",
+    "-arch",
+    "arm64",
+    "-platform_version",
+    "macos",
+    "26.0.0",
+    "26.5",
+    "-syslibroot",
+    "/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk",
+    "-mllvm",
+    "-enable-linkonceodr-outlining",
+    "<object/link arguments>",
+    "-lSystem",
+    "/opt/homebrew/Cellar/llvm/23.1.3/lib/clang/23/lib/darwin/libclang_rt.osx.a"
+  ],
+  "llvm_passes": "always-inline,function(instcombine,simplifycfg,early-cse,tailcallelim),globaldce",
+  "runtime_optimization": "unchanged (-O2 in the benchmark pipeline)",
+  "machine_optimization": "-O1",
+  "machine_command": [
+    "/Volumes/src/mlf/.mlf-build/compile3/llvm-final-v1/mlf-llvm",
+    "<input>",
+    "<output>",
+    "arm64-apple-macosx26.0.0",
+    "apple-m1",
+    "apple-m5",
+    "+v8.4a,+aes,+altnzcv,+ccdp,+ccpp,+complxnum,+crc,+dotprod,+flagm,+fp-armv8,+fp16fml,+fptoint,+fullfp16,+jsconv,+lse,+neon,+pauth,+perfmon,+predres,+ras,+rcpc,+rdm,+sb,+sha2,+sha3,+specrestrict,+ssbs",
+    "darwinpcs"
+  ],
+  "c_baseline": "unmodified; invoke the real C compiler directly",
+  "sha256": {
+    "/Volumes/src/mlf/.mlf-build/compile3/link-helper/mlf-link": "4673f66ee44465e8d64a1dd3d5bee4234b4c6ec087a05c0b50fd83aebc3cfcfc",
+    "/Volumes/src/mlf/.mlf-build/compile3/link-helper/build.json": "8869f5a33ef5fae152262dc9d7124985b59ffe58727d91413e404d0d65489171",
+    "/bin/bash": "16303dedab719ddb63efd9dd68092a0da37b397bfd4fcb856d5f1c86c5ee414b",
+    "/bin/cat": "2b6e8f3f90c42a9d8d1e5471efb4173ad3499fc8ca4039b39327b394616cf39e",
+    "/usr/bin/mkfifo": "e5772ef8df4aa2d90ee5bb0608ef73ee4bc78ddd1d618b3459dc2a56d8a2e439",
+    "/usr/bin/touch": "f63b07192f180955fe1566ff2d7c24db044b28aa38a6df4b714330f6ddc5eb83",
+    "/opt/homebrew/Cellar/llvm/23.1.3/bin/clang-23": "06793e4ad680ffa8f678c839107ae8bba4e4ca04feaf5ebbb36dd2ad241dbb82",
+    "/opt/homebrew/Cellar/llvm/23.1.3/bin/opt": "594d8a8fded57a4ee0046ed04ab3676f340fa4896e6f80e7207e4ad0707146ab",
+    "/opt/homebrew/Cellar/lld/23.1.3/bin/lld": "d0c01832ea0596c71ce3d1780d4a984456cbfe0c255863488b19369977eb6f53",
+    "/Volumes/src/mlf/.mlf-build/compile3/llvm-final-v1/mlf-llvm": "d5b874473273d94a18c31ce414e88f7e48d4bfaec13d963a67bfa368ceda03ca",
+    "/Volumes/src/mlf/.mlf-build/compile3/llvm-final-v1/build.json": "c34c0e78ac0157cf7fb5a60ca25ab073442223b4d0d7446f4cca7add2d8ca4a6",
+    "/Volumes/src/mlf/tools/bench/configure-backend.cjs": "ce6145baeaa171bf227426cbc85ca7347b9158e1eb6330aab0eb2b12e332a162",
+    "/Volumes/src/mlf/.mlf-build/compile3/backend-ready-link-v2/clang-mlf": "1d07a0226d8287457fc40a805fe4d9e68486721c03099a7cc58bdb92dbda6425",
+    "/opt/homebrew/Cellar/llvm/23.1.3/lib/libLTO.dylib": "9301bc2572ef242b54821cb78b64bf2f7fe23c8d31daf65339efbe163950c2b1",
+    "/opt/homebrew/Cellar/llvm/23.1.3/lib/clang/23/lib/darwin/libclang_rt.osx.a": "1b4f62bc1d8199ac73ca50f6000508e8a497b9b0088aab0391545d54b71e6d9d",
+    "/opt/homebrew/etc/clang/arm64-apple-darwin25.cfg": "ac7ed4621b841f2103cf6162dff770b79b202dffe60b37ac6bb5406c5ea0d925",
+    "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/SDKSettings.json": "f8d005f09381389167f9e0aeaa169bc9e7dff162ef22ca2fd8e98df7ff1acafe",
+    "/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk/usr/lib/libSystem.B.tbd": "20cfce043f11a083e2eb6111efe3579919a8082fa4cc912a7bd839af2010ec57",
+    "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldMachO.23.1.dylib": "a81d380dbb51e38aaabec4e92a41e8fae5d1fc19d73f13173c56a6accdd8ccf8",
+    "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldCommon.23.1.dylib": "52540305d4a3442df094710b2c622e4865c74ff25d6e7830da9d1fbbb2237635",
+    "/opt/homebrew/Cellar/llvm/23.1.3/lib/libLLVM.23.1.dylib": "8404ca98316042576aa446be45fb60473bbd1b9d9934fd786567e412a6045b88",
+    "/opt/homebrew/Cellar/z3/5.1.0/lib/libz3.5.1.0.0.dylib": "45344d6a38b6f75304433c2458d6fa16bc4907d426c96e2bedf0a90603460422",
+    "/opt/homebrew/Cellar/zstd/1.5.7_1/lib/libzstd.1.5.7.dylib": "e2847c4613b386683c234913ae3b7b04299254096caf7616e3b3cd9bb97a39ab",
+    "/opt/homebrew/Cellar/llvm/23.1.3/lib/libclang-cpp.23.1.dylib": "8983b1ca49f66df20c907ae7fbe816759d329c59f5e036f5e67d7e413a9c0a95",
+    "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldELF.23.1.dylib": "bd4c1df273f6c9d36a0dd404ad79679b2378691e964f5004341d7a25dc4913cd",
+    "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldMinGW.23.1.dylib": "7749e2be82d19271979af73bcb9211f1e2a5f4993a9fba07a18f2a24e3d7d0ef",
+    "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldCOFF.23.1.dylib": "22e35ee3b1d697c8de2032f5f3806716e430eba534eee7a79f7d49165366eae1",
+    "/opt/homebrew/Cellar/lld/23.1.3/lib/liblldWasm.23.1.dylib": "6f282e78f646e1a7906327009905fac7bc71d89067e823f57c8442123c039dcc"
+  }
+}

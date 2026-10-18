@@ -1,0 +1,490 @@
+{
+  "meaning": "stream means immediate dependency dispatch; ordinary means old polling; both use streamed object linking",
+  "groups": {
+    "ordinary": {
+      "samples": [
+        0.410785,
+        0.407755,
+        0.414947
+      ],
+      "median": 0.410785
+    },
+    "stream": {
+      "samples": [
+        0.419816,
+        0.410352,
+        0.416517
+      ],
+      "median": 0.416517
+    }
+  },
+  "equality": {
+    "program_llvm": true,
+    "program_object": true,
+    "runtime_object": true
+  },
+  "raw": [
+    {
+      "name": "1-ordinary",
+      "program_llvm": "317dfcff63923c09aeb1f302c14ef396a3f0a7bf973e22d0e9906949d4490f5b",
+      "program_object": "bb52631710000a51e17a5b28798e886d856461ba69c18283b83f70c465f641eb",
+      "runtime_object": "a5f01e4ef3a84cc96a9b56140ceb0230a7b2405593970799aaa004b3fa60657d",
+      "sample": {
+        "exit_code": 0,
+        "maximum_parallel_compilers": 4,
+        "remaining_children": 0,
+        "stages": [
+          {
+            "cpu_seconds": 0.001572,
+            "exit_code": 0,
+            "finished_seconds": 0.003402,
+            "peak_rss_bytes": 1196032,
+            "pid": 72195,
+            "started_seconds": 0.000001,
+            "wall_seconds": 0.003401
+          },
+          {
+            "cpu_seconds": 0.323304,
+            "exit_code": 0,
+            "finished_seconds": 0.329025,
+            "peak_rss_bytes": 561070080,
+            "pid": 72197,
+            "started_seconds": 0.004907,
+            "wall_seconds": 0.324118
+          },
+          {
+            "cpu_seconds": 0.325058,
+            "exit_code": 0,
+            "finished_seconds": 0.330531,
+            "peak_rss_bytes": 101449728,
+            "pid": 72196,
+            "started_seconds": 0.000221,
+            "wall_seconds": 0.33031
+          },
+          {
+            "cpu_seconds": 0.074913,
+            "exit_code": 0,
+            "finished_seconds": 0.392509,
+            "peak_rss_bytes": 54968320,
+            "pid": 72198,
+            "started_seconds": 0.005063,
+            "wall_seconds": 0.387446
+          },
+          {
+            "cpu_seconds": 0.00143,
+            "exit_code": 0,
+            "finished_seconds": 0.398737,
+            "peak_rss_bytes": 1359872,
+            "pid": 72203,
+            "started_seconds": 0.332036,
+            "wall_seconds": 0.066701
+          },
+          {
+            "cpu_seconds": 0.001805,
+            "exit_code": 0,
+            "finished_seconds": 0.39723,
+            "peak_rss_bytes": 1359872,
+            "pid": 72204,
+            "started_seconds": 0.394012,
+            "wall_seconds": 0.003218
+          },
+          {
+            "cpu_seconds": 0.03135,
+            "exit_code": 0,
+            "finished_seconds": 0.410782,
+            "peak_rss_bytes": 35618816,
+            "pid": 72199,
+            "started_seconds": 0.005205,
+            "wall_seconds": 0.405577
+          }
+        ],
+        "wall_seconds": 0.410785
+      }
+    },
+    {
+      "name": "1-stream",
+      "program_llvm": "317dfcff63923c09aeb1f302c14ef396a3f0a7bf973e22d0e9906949d4490f5b",
+      "program_object": "bb52631710000a51e17a5b28798e886d856461ba69c18283b83f70c465f641eb",
+      "runtime_object": "a5f01e4ef3a84cc96a9b56140ceb0230a7b2405593970799aaa004b3fa60657d",
+      "sample": {
+        "exit_code": 0,
+        "maximum_parallel_compilers": 4,
+        "remaining_children": 0,
+        "stages": [
+          {
+            "cpu_seconds": 0.002509,
+            "exit_code": 0,
+            "finished_seconds": 0.003869,
+            "peak_rss_bytes": 1196032,
+            "pid": 72255,
+            "started_seconds": 0.000005,
+            "wall_seconds": 0.003864
+          },
+          {
+            "cpu_seconds": 0.335164,
+            "exit_code": 0,
+            "finished_seconds": 0.338246,
+            "peak_rss_bytes": 561037312,
+            "pid": 72257,
+            "started_seconds": 0.003869,
+            "wall_seconds": 0.334377
+          },
+          {
+            "cpu_seconds": 0.336296,
+            "exit_code": 0,
+            "finished_seconds": 0.341261,
+            "peak_rss_bytes": 102055936,
+            "pid": 72256,
+            "started_seconds": 0.00049,
+            "wall_seconds": 0.340771
+          },
+          {
+            "cpu_seconds": 0.079153,
+            "exit_code": 0,
+            "finished_seconds": 0.403058,
+            "peak_rss_bytes": 54902784,
+            "pid": 72258,
+            "started_seconds": 0.004027,
+            "wall_seconds": 0.399031
+          },
+          {
+            "cpu_seconds": 0.001467,
+            "exit_code": 0,
+            "finished_seconds": 0.407763,
+            "peak_rss_bytes": 1359872,
+            "pid": 72262,
+            "started_seconds": 0.341262,
+            "wall_seconds": 0.066501
+          },
+          {
+            "cpu_seconds": 0.001786,
+            "exit_code": 0,
+            "finished_seconds": 0.406257,
+            "peak_rss_bytes": 1359872,
+            "pid": 72263,
+            "started_seconds": 0.403058,
+            "wall_seconds": 0.003199
+          },
+          {
+            "cpu_seconds": 0.040131,
+            "exit_code": 0,
+            "finished_seconds": 0.419813,
+            "peak_rss_bytes": 35258368,
+            "pid": 72259,
+            "started_seconds": 0.00431,
+            "wall_seconds": 0.415503
+          }
+        ],
+        "wall_seconds": 0.419816
+      }
+    },
+    {
+      "name": "2-stream",
+      "program_llvm": "317dfcff63923c09aeb1f302c14ef396a3f0a7bf973e22d0e9906949d4490f5b",
+      "program_object": "bb52631710000a51e17a5b28798e886d856461ba69c18283b83f70c465f641eb",
+      "runtime_object": "a5f01e4ef3a84cc96a9b56140ceb0230a7b2405593970799aaa004b3fa60657d",
+      "sample": {
+        "exit_code": 0,
+        "maximum_parallel_compilers": 4,
+        "remaining_children": 0,
+        "stages": [
+          {
+            "cpu_seconds": 0.001821,
+            "exit_code": 0,
+            "finished_seconds": 0.003361,
+            "peak_rss_bytes": 1196032,
+            "pid": 72314,
+            "started_seconds": 0.000001,
+            "wall_seconds": 0.00336
+          },
+          {
+            "cpu_seconds": 0.325725,
+            "exit_code": 0,
+            "finished_seconds": 0.32862,
+            "peak_rss_bytes": 561037312,
+            "pid": 72316,
+            "started_seconds": 0.003361,
+            "wall_seconds": 0.325259
+          },
+          {
+            "cpu_seconds": 0.322605,
+            "exit_code": 0,
+            "finished_seconds": 0.326829,
+            "peak_rss_bytes": 101810176,
+            "pid": 72315,
+            "started_seconds": 0.000174,
+            "wall_seconds": 0.326655
+          },
+          {
+            "cpu_seconds": 0.075517,
+            "exit_code": 0,
+            "finished_seconds": 0.393523,
+            "peak_rss_bytes": 54853632,
+            "pid": 72317,
+            "started_seconds": 0.003522,
+            "wall_seconds": 0.390001
+          },
+          {
+            "cpu_seconds": 0.001556,
+            "exit_code": 0,
+            "finished_seconds": 0.39827,
+            "peak_rss_bytes": 1359872,
+            "pid": 72321,
+            "started_seconds": 0.32683,
+            "wall_seconds": 0.07144
+          },
+          {
+            "cpu_seconds": 0.001793,
+            "exit_code": 0,
+            "finished_seconds": 0.396741,
+            "peak_rss_bytes": 1359872,
+            "pid": 72322,
+            "started_seconds": 0.393524,
+            "wall_seconds": 0.003217
+          },
+          {
+            "cpu_seconds": 0.031946,
+            "exit_code": 0,
+            "finished_seconds": 0.410349,
+            "peak_rss_bytes": 35356672,
+            "pid": 72318,
+            "started_seconds": 0.003673,
+            "wall_seconds": 0.406676
+          }
+        ],
+        "wall_seconds": 0.410352
+      }
+    },
+    {
+      "name": "2-ordinary",
+      "program_llvm": "317dfcff63923c09aeb1f302c14ef396a3f0a7bf973e22d0e9906949d4490f5b",
+      "program_object": "bb52631710000a51e17a5b28798e886d856461ba69c18283b83f70c465f641eb",
+      "runtime_object": "a5f01e4ef3a84cc96a9b56140ceb0230a7b2405593970799aaa004b3fa60657d",
+      "sample": {
+        "exit_code": 0,
+        "maximum_parallel_compilers": 4,
+        "remaining_children": 0,
+        "stages": [
+          {
+            "cpu_seconds": 0.001895,
+            "exit_code": 0,
+            "finished_seconds": 0.003397,
+            "peak_rss_bytes": 1196032,
+            "pid": 72382,
+            "started_seconds": 0.000001,
+            "wall_seconds": 0.003396
+          },
+          {
+            "cpu_seconds": 0.322199,
+            "exit_code": 0,
+            "finished_seconds": 0.327355,
+            "peak_rss_bytes": 561037312,
+            "pid": 72384,
+            "started_seconds": 0.004902,
+            "wall_seconds": 0.322453
+          },
+          {
+            "cpu_seconds": 0.324903,
+            "exit_code": 0,
+            "finished_seconds": 0.330367,
+            "peak_rss_bytes": 102072320,
+            "pid": 72383,
+            "started_seconds": 0.000192,
+            "wall_seconds": 0.330175
+          },
+          {
+            "cpu_seconds": 0.075028,
+            "exit_code": 0,
+            "finished_seconds": 0.389427,
+            "peak_rss_bytes": 54722560,
+            "pid": 72385,
+            "started_seconds": 0.005093,
+            "wall_seconds": 0.384334
+          },
+          {
+            "cpu_seconds": 0.00149,
+            "exit_code": 0,
+            "finished_seconds": 0.395663,
+            "peak_rss_bytes": 1359872,
+            "pid": 72389,
+            "started_seconds": 0.331873,
+            "wall_seconds": 0.06379
+          },
+          {
+            "cpu_seconds": 0.001829,
+            "exit_code": 0,
+            "finished_seconds": 0.394157,
+            "peak_rss_bytes": 1359872,
+            "pid": 72390,
+            "started_seconds": 0.390932,
+            "wall_seconds": 0.003225
+          },
+          {
+            "cpu_seconds": 0.032048,
+            "exit_code": 0,
+            "finished_seconds": 0.407752,
+            "peak_rss_bytes": 35389440,
+            "pid": 72386,
+            "started_seconds": 0.005316,
+            "wall_seconds": 0.402436
+          }
+        ],
+        "wall_seconds": 0.407755
+      }
+    },
+    {
+      "name": "3-ordinary",
+      "program_llvm": "317dfcff63923c09aeb1f302c14ef396a3f0a7bf973e22d0e9906949d4490f5b",
+      "program_object": "bb52631710000a51e17a5b28798e886d856461ba69c18283b83f70c465f641eb",
+      "runtime_object": "a5f01e4ef3a84cc96a9b56140ceb0230a7b2405593970799aaa004b3fa60657d",
+      "sample": {
+        "exit_code": 0,
+        "maximum_parallel_compilers": 4,
+        "remaining_children": 0,
+        "stages": [
+          {
+            "cpu_seconds": 0.002132,
+            "exit_code": 0,
+            "finished_seconds": 0.003475,
+            "peak_rss_bytes": 1196032,
+            "pid": 72398,
+            "started_seconds": 0.000002,
+            "wall_seconds": 0.003473
+          },
+          {
+            "cpu_seconds": 0.329741,
+            "exit_code": 0,
+            "finished_seconds": 0.33471,
+            "peak_rss_bytes": 561053696,
+            "pid": 72400,
+            "started_seconds": 0.004988,
+            "wall_seconds": 0.329722
+          },
+          {
+            "cpu_seconds": 0.331441,
+            "exit_code": 0,
+            "finished_seconds": 0.334711,
+            "peak_rss_bytes": 102187008,
+            "pid": 72399,
+            "started_seconds": 0.000272,
+            "wall_seconds": 0.334439
+          },
+          {
+            "cpu_seconds": 0.076397,
+            "exit_code": 0,
+            "finished_seconds": 0.396688,
+            "peak_rss_bytes": 54984704,
+            "pid": 72401,
+            "started_seconds": 0.005169,
+            "wall_seconds": 0.391519
+          },
+          {
+            "cpu_seconds": 0.00139,
+            "exit_code": 0,
+            "finished_seconds": 0.402898,
+            "peak_rss_bytes": 1359872,
+            "pid": 72449,
+            "started_seconds": 0.336216,
+            "wall_seconds": 0.066682
+          },
+          {
+            "cpu_seconds": 0.001739,
+            "exit_code": 0,
+            "finished_seconds": 0.401392,
+            "peak_rss_bytes": 1359872,
+            "pid": 72450,
+            "started_seconds": 0.398191,
+            "wall_seconds": 0.003201
+          },
+          {
+            "cpu_seconds": 0.03412,
+            "exit_code": 0,
+            "finished_seconds": 0.414943,
+            "peak_rss_bytes": 35373056,
+            "pid": 72402,
+            "started_seconds": 0.005317,
+            "wall_seconds": 0.409626
+          }
+        ],
+        "wall_seconds": 0.414947
+      }
+    },
+    {
+      "name": "3-stream",
+      "program_llvm": "317dfcff63923c09aeb1f302c14ef396a3f0a7bf973e22d0e9906949d4490f5b",
+      "program_object": "bb52631710000a51e17a5b28798e886d856461ba69c18283b83f70c465f641eb",
+      "runtime_object": "a5f01e4ef3a84cc96a9b56140ceb0230a7b2405593970799aaa004b3fa60657d",
+      "sample": {
+        "exit_code": 0,
+        "maximum_parallel_compilers": 4,
+        "remaining_children": 0,
+        "stages": [
+          {
+            "cpu_seconds": 0.00201,
+            "exit_code": 0,
+            "finished_seconds": 0.003412,
+            "peak_rss_bytes": 1196032,
+            "pid": 72457,
+            "started_seconds": 0.000002,
+            "wall_seconds": 0.00341
+          },
+          {
+            "cpu_seconds": 0.329441,
+            "exit_code": 0,
+            "finished_seconds": 0.333255,
+            "peak_rss_bytes": 561053696,
+            "pid": 72459,
+            "started_seconds": 0.003413,
+            "wall_seconds": 0.329842
+          },
+          {
+            "cpu_seconds": 0.328453,
+            "exit_code": 0,
+            "finished_seconds": 0.331531,
+            "peak_rss_bytes": 101335040,
+            "pid": 72458,
+            "started_seconds": 0.000204,
+            "wall_seconds": 0.331327
+          },
+          {
+            "cpu_seconds": 0.08201,
+            "exit_code": 0,
+            "finished_seconds": 0.401207,
+            "peak_rss_bytes": 54837248,
+            "pid": 72460,
+            "started_seconds": 0.003596,
+            "wall_seconds": 0.397611
+          },
+          {
+            "cpu_seconds": 0.001523,
+            "exit_code": 0,
+            "finished_seconds": 0.405975,
+            "peak_rss_bytes": 1359872,
+            "pid": 72466,
+            "started_seconds": 0.331532,
+            "wall_seconds": 0.074443
+          },
+          {
+            "cpu_seconds": 0.001672,
+            "exit_code": 0,
+            "finished_seconds": 0.404468,
+            "peak_rss_bytes": 1359872,
+            "pid": 72509,
+            "started_seconds": 0.401208,
+            "wall_seconds": 0.00326
+          },
+          {
+            "cpu_seconds": 0.03358,
+            "exit_code": 0,
+            "finished_seconds": 0.416514,
+            "peak_rss_bytes": 35405824,
+            "pid": 72461,
+            "started_seconds": 0.003766,
+            "wall_seconds": 0.412748
+          }
+        ],
+        "wall_seconds": 0.416517
+      }
+    }
+  ]
+}

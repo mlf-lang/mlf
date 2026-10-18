@@ -1,0 +1,300 @@
+{
+  "rows": [
+    {
+      "workload": "n-body",
+      "mode": 0,
+      "samples": [
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.972805,
+          "cpu_seconds": 0.448732,
+          "peak_rss_bytes": 557662208,
+          "pid": 18933
+        },
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.432377,
+          "cpu_seconds": 0.42411,
+          "peak_rss_bytes": 557645824,
+          "pid": 19207
+        },
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.431673,
+          "cpu_seconds": 0.418491,
+          "peak_rss_bytes": 557629440,
+          "pid": 19254
+        }
+      ],
+      "median": 0.432377
+    },
+    {
+      "workload": "n-body",
+      "mode": 1,
+      "samples": [
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.511129,
+          "cpu_seconds": 0.472092,
+          "peak_rss_bytes": 557678592,
+          "pid": 19052
+        },
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.466462,
+          "cpu_seconds": 0.459164,
+          "peak_rss_bytes": 557613056,
+          "pid": 19205
+        },
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.506409,
+          "cpu_seconds": 0.471782,
+          "peak_rss_bytes": 557613056,
+          "pid": 19256
+        }
+      ],
+      "median": 0.506409
+    },
+    {
+      "workload": "n-body",
+      "mode": 2,
+      "samples": [
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.559592,
+          "cpu_seconds": 0.536174,
+          "peak_rss_bytes": 557662208,
+          "pid": 19105
+        },
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.553427,
+          "cpu_seconds": 0.541703,
+          "peak_rss_bytes": 557678592,
+          "pid": 19158
+        },
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.547275,
+          "cpu_seconds": 0.53575,
+          "peak_rss_bytes": 557662208,
+          "pid": 19302
+        }
+      ],
+      "median": 0.553427
+    },
+    {
+      "workload": "n-body",
+      "mode": 3,
+      "samples": [
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.60766,
+          "cpu_seconds": 0.591174,
+          "peak_rss_bytes": 557645824,
+          "pid": 19107
+        },
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.600564,
+          "cpu_seconds": 0.586105,
+          "peak_rss_bytes": 557662208,
+          "pid": 19156
+        },
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.593439,
+          "cpu_seconds": 0.58331,
+          "peak_rss_bytes": 557645824,
+          "pid": 19305
+        }
+      ],
+      "median": 0.600564
+    },
+    {
+      "workload": "fasta",
+      "mode": 0,
+      "samples": [
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.36761,
+          "cpu_seconds": 0.360001,
+          "peak_rss_bytes": 557481984,
+          "pid": 19448
+        },
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.371586,
+          "cpu_seconds": 0.358159,
+          "peak_rss_bytes": 557498368,
+          "pid": 19599
+        },
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.364359,
+          "cpu_seconds": 0.355003,
+          "peak_rss_bytes": 557465600,
+          "pid": 19645
+        }
+      ],
+      "median": 0.36761
+    },
+    {
+      "workload": "fasta",
+      "mode": 1,
+      "samples": [
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.397776,
+          "cpu_seconds": 0.388464,
+          "peak_rss_bytes": 557465600,
+          "pid": 19495
+        },
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.39104,
+          "cpu_seconds": 0.381513,
+          "peak_rss_bytes": 557481984,
+          "pid": 19597
+        },
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.397712,
+          "cpu_seconds": 0.392865,
+          "peak_rss_bytes": 557481984,
+          "pid": 19648
+        }
+      ],
+      "median": 0.397712
+    },
+    {
+      "workload": "fasta",
+      "mode": 2,
+      "samples": [
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.429922,
+          "cpu_seconds": 0.42117,
+          "peak_rss_bytes": 557514752,
+          "pid": 19499
+        },
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.434245,
+          "cpu_seconds": 0.428088,
+          "peak_rss_bytes": 557498368,
+          "pid": 19552
+        },
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.433283,
+          "cpu_seconds": 0.419518,
+          "peak_rss_bytes": 557481984,
+          "pid": 19650
+        }
+      ],
+      "median": 0.433283
+    },
+    {
+      "workload": "fasta",
+      "mode": 3,
+      "samples": [
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.460712,
+          "cpu_seconds": 0.454206,
+          "peak_rss_bytes": 557531136,
+          "pid": 19515
+        },
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.501379,
+          "cpu_seconds": 0.448861,
+          "peak_rss_bytes": 557514752,
+          "pid": 19549
+        },
+        {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.454586,
+          "cpu_seconds": 0.447168,
+          "peak_rss_bytes": 557514752,
+          "pid": 19696
+        }
+      ],
+      "median": 0.460712
+    }
+  ]
+}

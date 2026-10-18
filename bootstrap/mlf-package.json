@@ -1,7 +1,7 @@
 {
   "format": 1,
   "name": "mlf-bootstrap",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "library": {
     "modules": {
       "Bootstrap.Classes": "Bootstrap/Classes.emlf",
@@ -44,10 +44,12 @@
       "Bootstrap.Types": "Bootstrap/Types.emlf",
       "Bootstrap.Unicode": "Bootstrap/Unicode.emlf",
       "Bootstrap.X.Check": "Bootstrap/X/Check.emlf",
+      "Bootstrap.X.Checked": "Bootstrap/X/Checked.emlf",
       "Bootstrap.X.Parser": "Bootstrap/X/Parser.emlf",
       "Bootstrap.X.Pretty": "Bootstrap/X/Pretty.emlf",
       "Bootstrap.X.Syntax": "Bootstrap/X/Syntax.emlf",
-      "Bootstrap.X.Type": "Bootstrap/X/Type.emlf"
+      "Bootstrap.X.Type": "Bootstrap/X/Type.emlf",
+      "Bootstrap.LLVM.StrictWrappers": "Bootstrap/LLVM/StrictWrappers.emlf"
     }
   }
 }

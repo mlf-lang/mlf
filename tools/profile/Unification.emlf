@@ -1,0 +1,86 @@
+module Unification where
+import Bootstrap.Types
+import Bootstrap.Graph.Solver
+import qualified Simple as Simple
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.Parser as P
+import qualified Bootstrap.Classes as Classes
+import qualified Bootstrap.Prelude as Prelude
+import qualified Bootstrap.Constraint as C
+import qualified Bootstrap.Graph as G
+import qualified Bootstrap.Graph.Solver as S
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.IntSet as IS
+right result = case result of { Left error -> do { putErr (error ++ "\n"); exitWith 1 }; Right value -> return value }
+
+profileUnify mode equations before =
+ let validate g = if IM.size (G.nodes g) <= 64 && (mode == 1 || mode == 3) then G.validateSparse g else G.validateGraph g in
+ G.bindE (validate before) (\ignored ->
+ G.bindE (G.kindsAt before (L.concatMap G.equationNodes equations)) (\kinds ->
+ G.bindE (G.foldE (G.firstOrder kinds) before equations) (\raw ->
+ let skeleton = G.canonicalize raw in
+ let fallback = G.bindE (if IM.size (G.nodes before) <= 64 && (mode == 2 || mode == 3) then G.rebindSparse before skeleton else G.rebind before skeleton) (\rebuilt -> G.bindE (validate rebuilt) (\verified -> Right rebuilt)) in
+ if mode < 4 then fallback else case Simple.attempt before skeleton of
+  Nothing -> fallback
+  Just checked -> if mode == 4 then Right checked else G.bindE fallback (\expected ->
+   if Simple.equal checked expected then Right checked else Left "simple rebinding disagrees with the general algorithm"))))
+unifyDistinctProfile : (List (Pair Int Int) -> Graph -> Either String Graph) -> List (Pair Int Int) -> Solver -> Either String Solver
+unifyDistinctProfile unify equations solver =
+  G.bindE (component solver (L.concatMap G.equationNodes equations)) (\connected ->
+    let old = graph solver in
+    let boundaries = IS.fromList (L.filter (\n -> G.isGen (G.tag (G.nodeAt old n))) (IS.toList connected)) in
+    let scopes = projectScopes (scopeIndex solver) boundaries in
+    let selected = IS.union connected (IS.fromList (IM.keys scopes)) in
+    let originals = L.map (\n -> Pair n (G.nodeAt old n)) (IS.toList selected) in
+    let count = L.length originals in
+    let originalIds = L.map (\entry -> case entry of Pair n v -> n) originals in
+    -- selected is ordered and distinct; compact identities are its positions.
+    let forward = selected in
+    let backward = selected in
+    let compact = compactIdentity old forward in
+    let hiddenRoots = L.filter (\entry -> case entry of Pair n v -> case G.tag v of GGen root -> L.not (IS.member root selected); _ -> false) originals in
+    let stubIds = L.range count (count + L.length hiddenRoots - 1) in
+    let stubs = IM.fromDistinctAscList (L.zip (L.map (\entry -> case entry of Pair n v -> n) hiddenRoots) stubIds) in
+    let existing = L.map (\entry -> case entry of Pair n v -> Pair (compact n) (localNode old forward scopes stubs n v)) originals in
+    let placeholders = L.map (\entry -> case entry of Pair original stub -> Pair stub (G.mkNode GBot (Just (compact original)) Flexible)) (IM.toList stubs) in
+    -- Original positions precede the fresh placeholder positions.
+    let local = G.mkGraph (G.nodesFromDistinctAscList (L.append existing placeholders)) IM.empty (count + L.length hiddenRoots) in
+    G.bindE (unify (L.map (\entry -> case entry of Pair a b -> Pair (compact a) (compact b)) equations) local) (\solved ->
+      G.bindE (G.mapE_ (\stub -> G.check (matchesNode (G.nodes solved) stub (G.nodeAt local stub) && G.resolve solved stub == stub) "local unification changed a hidden scope root") (IM.elems stubs)) (\checkedStubs ->
+        G.bindE (G.mapE_ (checkPreservedScope old solved forward scopes) originals) (\checkedScopes ->
+          restoreProjection solver selected originals backward count solved))))
+
+solverUnifyProfile mode equations solver =
+ let old = S.graph solver in
+ let canonical = L.map (\(Pair a b) -> Pair (G.resolve old a) (G.resolve old b)) equations in
+ G.bindE (G.mapE_ (\n -> G.check (IM.member n (G.nodes old)) ("missing graph node " ++ showInt n)) (L.concatMap G.equationNodes canonical)) (\checked ->
+ let pending = L.filter (\(Pair a b) -> a /= b) canonical in
+ if L.null pending then Right solver else unifyDistinctProfile (profileUnify mode) pending solver)
+step mode solver e =
+ let source = C.fromGen e in let target = C.toNode e in
+ case S.groundGraft source target solver of
+  Just result -> Right result
+  Nothing -> if S.groundInstance (S.graph solver) source target then Right solver else do
+   Quad root copies frontier next <- S.expanded source target solver
+   solverUnifyProfile mode (L.append frontier (Cons (Pair root target) Nil)) next
+main = do
+ file <- getArg 0
+ option <- getArg 1
+ text <- readFile file
+ root <- right (P.parseModule file text)
+ program <- right (P.standaloneProgram root)
+ case Prelude.withPrelude ImplicitPrelude program of
+  Pair imports source -> do
+   Pair lowered names <- right (Classes.lowerClassesWithImports imports source)
+   constraints <- right (C.generateProgram lowered)
+   prepared <- right (S.prepare (C.initialGraph constraints))
+   initial <- right (S.solverUnify (C.equalities constraints) prepared)
+   let requested = readInt option
+   let mode = if requested < 0 then 0 - requested - 1 else requested
+   result <- right (L.foldM (step mode) initial (C.instances constraints))
+   final <- right (S.finishNormalized result)
+   if requested >= 0 then putStrLn ("nodes=" ++ showInt (IM.size (G.nodes (S.graph final)))) else do
+    let g = S.graph final
+    L.mapM_ (\(Pair n v) -> putStrLn (showInt n ++ ":" ++ G.tagDescription (G.tag v) ++ ":" ++ (case G.binder v of { Nothing -> "root"; Just b -> showInt b }) ++ ":" ++ (if G.equalFlag (G.flag v) Flexible then "flexible" else "rigid"))) (IM.toList (G.nodes g))
+    L.mapM_ (\(Pair a b) -> putStrLn ("alias " ++ showInt a ++ " " ++ showInt b)) (IM.toList (G.links g))
+    putStrLn ("next=" ++ showInt (G.nextId g))

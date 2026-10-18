@@ -1,0 +1,27 @@
+module Tests.ProjectionChanges where
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.Graph as G
+import qualified Bootstrap.Graph.Solver as S
+
+equalEntries = L.eqList (\(Pair n v) (Pair m w) -> n == m && G.equalNode v w)
+same (Triple a b c) (Triple d e f) = equalEntries a d && equalEntries b e && L.eqList eqInt c f
+oracle before after =
+ let old = IM.fromList before in
+ let next = IM.fromList after in
+ Triple (L.filter (\(Pair n v) -> L.not (S.matchesNode next n v)) before)
+   (L.filter (\(Pair n v) -> L.not (S.matchesNode old n v)) after)
+   (L.filter (\n -> L.not (IM.member n next)) (L.map L.fst before))
+entries count offset stride mode = L.map (\n -> Pair (offset + n * stride) (G.mkNode (if remInt (n + mode) 3 == 0 then GBot else GArr (n + mode) (n + mode + 1)) (if remInt mode 2 == 0 then Nothing else Just mode) (if remInt n 2 == 0 then Flexible else Rigid))) (L.filter (\n -> remInt (n + mode) 4 /= 0) (L.range 0 (count - 1)))
+check count offset stride a b =
+ let before = entries count offset stride a in
+ let after = entries (count + b) offset stride b in
+ if same (S.projectionChanges before after) (oracle before after) then ioReturn Unit else do { putErr "projection patch disagrees with independent maps\n"; exitWith 1 }
+patches : IO Unit
+patches = do
+ L.mapM_ (\count -> L.mapM_ (\offset -> L.mapM_ (\stride -> L.mapM_ (\a -> L.mapM_ (\b -> check count offset stride a b) (L.range 0 3)) (L.range 0 3)) (Cons 1 (Cons 17 Nil))) (Cons (-10000) (Cons 0 (Cons 1000000000000000000000000000000000000000000000001 Nil)))) (Cons 0 (Cons 1 (Cons 2 (Cons 5 (Cons 17 (Cons 65 (Cons 257 Nil)))))))
+ ioReturn Unit
+
+suite : List (Pair String (IO Unit))
+suite = Cons (Pair "linear projection patches agree with independent map differences" patches) Nil

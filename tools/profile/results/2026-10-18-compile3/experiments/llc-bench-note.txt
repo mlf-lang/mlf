@@ -1,0 +1,6 @@
+This exploratory three-sample run completed all workload executions, but its
+final source-integrity check rejected the run. During it, tools/bench/mlf-package.json
+was changed to add an optional native backend-builder executable. The running
+benchmark executable, workload inputs/sources, runtime, C flags and configured
+LLC backend were not changed. Every raw sample is retained here. This run is
+not used as verified acceptance evidence; later runs must use frozen manifests.

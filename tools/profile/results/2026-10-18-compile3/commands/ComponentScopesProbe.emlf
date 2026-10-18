@@ -1,0 +1,25 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.IntSet as IS
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.Graph as G
+import qualified Bootstrap.Graph.Solver as S
+import qualified Tests.DenseNormalization as N
+import qualified Tests.Helpers as H
+import qualified ComponentReference as R
+
+check solver starts = do
+ let graph = S.graph solver
+ let expected = G.bindE (R.reference graph Nil starts) (\ids -> Right (Pair ids (L.filter (\n -> G.isGen (G.tag (IM.get n (G.nodes graph)))) ids)))
+ let actual = G.bindE (S.componentScopes solver starts) (\(Pair ids scopes) -> Right (Pair (IS.toList ids) (IS.toList scopes)))
+ H.assert (H.eq actual expected) "component membership, boundaries or missing-node errors changed"
+ R.check solver starts
+
+main = do
+ L.mapM_ (\input -> do
+  solver <- H.right (S.prepare input)
+  let keys = IM.keys (G.nodes input)
+  let starts = Cons Nil (Cons (Cons (L.head keys) Nil) (Cons (Cons (L.index keys 1) Nil) (Cons (Cons (L.last keys) Nil) (Cons keys (Cons (L.append keys keys) (Cons (IM.keys (G.links input)) (Cons (Cons (G.nextId input) Nil) (Cons (Cons (L.head keys - 1) Nil) Nil))))))))
+  L.mapM_ (check solver) starts) (L.concatMap (\offset -> L.concatMap (\stride -> L.map (N.rename (\n -> offset + stride * n)) (Cons (N.fixture 7) (L.map R.chain (Cons 1 (Cons 31 (Cons 127 (Cons 2 (Cons 257 (Cons 33 Nil))))))))) (Cons 1 (Cons 100003 Nil))) (Cons 0 (Cons 340282366920938463463374607431768211456 (Cons (-340282366920938463463374607431768211456) Nil))))
+ putStrLn "378 independently enumerated component and boundary cases passed"

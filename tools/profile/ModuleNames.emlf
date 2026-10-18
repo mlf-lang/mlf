@@ -1,0 +1,19 @@
+module ModuleNames where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Bootstrap.Map as M
+import qualified Bootstrap.Parser as P
+import qualified Bootstrap.Module as Modules
+
+right result = case result of
+  Left message -> do { putErr (message ++ "\n"); exitWith 1 }
+  Right value -> ioReturn value
+main = do
+  file <- getArg 0
+  root <- getArg 1
+  source <- readFile file
+  parsed <- right (P.parseModule file source)
+  loaded <- Modules.loadModuleFiles (Cons root (Cons "tools/profile" Nil)) parsed
+  modules <- right loaded
+  LinkedModule _ names _ _ <- right (Modules.linkModules ImplicitPrelude modules)
+  S.mapM_ (\(Pair internal display) -> putStrLn (internal ++ "\t" ++ display)) (M.toList names)

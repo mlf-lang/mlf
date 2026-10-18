@@ -1,0 +1,33 @@
+module Tests.IndexEdges where
+import Bootstrap.Types
+import qualified Tests.Helpers as H
+import qualified Bootstrap.Std as L
+import qualified Bootstrap.Graph as G
+import qualified Bootstrap.Graph.Solver as S
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.IntSet as IS
+
+edges structural node = if structural then G.children (G.tag node) else L.maybeToList (G.binder node)
+reference structural entries =
+ let targets = L.nubBy eqInt (L.concatMap (\entry -> edges structural (L.snd entry)) entries) in
+ IM.fromList (L.map (\target -> Pair target (IS.fromList (L.map L.fst (L.filter (\entry -> L.elem eqInt target (edges structural (L.snd entry))) entries)))) targets)
+same first second = IM.eqIntMap IS.eqIntSet first second && IM.valid first
+node offset mode n = G.mkNode
+ (if remInt mode 4 == 0 then GBot else if remInt mode 4 == 1 then GArr (offset + n) (offset + n + 1) else if remInt mode 4 == 2 then GCon "C" (L.map (\i -> offset + remInt i 7) (L.range 0 (if remInt n 2 == 0 then 17 else 2))) else GGen (offset + n))
+ (if remInt (mode + n) 3 == 0 then Nothing else Just (offset + remInt (mode + n) 5))
+ (if remInt mode 2 == 0 then Flexible else Rigid)
+check count offset mode = do
+ let before = L.map (\n -> Pair (offset + n * 13) (node offset mode n)) (L.range 0 (count - 1))
+ let kept = L.filter (\n -> remInt (n + mode) 3 /= 0) (L.range 0 (count - 1))
+ let after = L.map (\n -> Pair (offset + n * 13) (if remInt mode 2 == 0 then node offset (mode + 1) n else G.mkNode (G.tag (node offset mode n)) (G.binder (node offset mode n)) Flexible)) (L.append kept (Cons count Nil))
+ L.mapM_ (\pair -> case pair of { Pair first second -> do
+  let graph = G.mkGraph (IM.fromList first) IM.empty (offset + (count + 2) * 13)
+  let initial = S.mkSolver graph (reference true first) (reference false first) (ScopeIndex IM.empty Nil)
+  let full = S.patchIndexedNodes initial first second
+  let changed = case S.projectionChanges first second of Triple removed added deleted -> S.patchIndexedNodes initial removed added
+  L.mapM_ (\result -> if same (S.structuralParents result) (reference true second) && same (S.bindingChildren result) (reference false second) then return Unit else panic "incremental edge patches disagree with independent reverse-edge enumeration") (Cons full (Cons changed Nil)) }) (Cons (Pair before after) (Cons (Pair after before) Nil))
+transitions = do
+ L.mapM_ (\count -> L.mapM_ (\offset -> L.mapM_ (check count offset) (L.range 0 7)) (Cons (-1000000000000000000000000000000) (Cons (-7) (Cons 0 (Cons 1000000000000000000000000000000 Nil))))) (Cons 0 (Cons 1 (Cons 2 (Cons 5 (Cons 17 (Cons 33 Nil))))))
+ return Unit
+
+suite = Cons (Pair "incremental reverse indices agree with independent edge enumeration" transitions) Nil
