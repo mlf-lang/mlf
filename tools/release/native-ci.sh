@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../.."
+group=${1:-smoke}
+profile=${2:-${MLF_TEST_RUNTIME_PROFILE:-}}
+test "$#" -le 2 || { printf '%s\n' 'Expected a group and optional port profile.' >&2; exit 2; }
+case "$group" in smoke|unit|packages|self-host|parity|backends|port) ;; *) exit 2 ;; esac
+if [ "$group" = port ]; then
+  case "$profile" in ''|standard|compact-gc) ;; *) printf '%s\n' 'Invalid port runtime profile.' >&2; exit 2 ;; esac
+  export MLF_TEST_RUNTIME_PROFILE="$profile"
+else
+  test -z "$profile" || { printf '%s\n' 'Runtime profiles are only supported for port tests.' >&2; exit 2; }
+fi
+evidence_group=$group
+if [ -n "$profile" ]; then evidence_group="port-$profile"; fi
 case "$(uname -s):$(uname -m)" in
   Darwin:arm64)
     export MLF_GC_PREFIX=${MLF_GC_PREFIX:-"$(brew --prefix bdw-gc)"}
@@ -40,7 +52,6 @@ SH
   chmod 755 ".mlf-build/forbidden-tools/$command_name"
 done
 export PATH="$PWD/.mlf-build/forbidden-tools:$PATH"
-group=${1:-smoke}
 if [ "$group" = smoke ]; then
   "$MLF_COMPILER" --type --expr '\x -> x'
   ./mlfpkg --compiler "$MLF_COMPILER" --runtime "$PWD/runtime/mlf_runtime.c" --manifest examples/packages/mlf-package.json --timeout 21600 test
@@ -48,15 +59,26 @@ else
   case "$group" in unit|packages|self-host|parity|backends|port) ;; *) exit 2 ;; esac
   # Native test commands retain their primary logs for the release evidence.
   # Follow those same files while tests run so CI also shows suite progress.
-  mkdir -p .mlf-build/tests ".mlf-build/compiler-tests/$group"
+  mkdir -p .mlf-build/tests ".mlf-build/compiler-tests/$evidence_group"
   logs=(".mlf-build/tests/$group.log")
   case "$group" in
     unit) suites='core figure12 harness' ;;
     packages) suites='packages' ;;
-    backends|port) suites='standard compact-gc' ;;
+    backends) suites='standard compact-gc' ;;
+    port) suites=${profile:-'standard compact-gc'} ;;
     *) suites='' ;;
   esac
-  for suite in $suites; do logs+=(".mlf-build/compiler-tests/$group/$suite.log"); done
+  for suite in $suites; do logs+=(".mlf-build/compiler-tests/$evidence_group/$suite.log"); done
+  if [ "$group" = port ]; then
+    # These three bounded fixture outputs expose progress inside expensive
+    # interpreted compiler workloads. The native supervisor truncates them
+    # before each run; following the same files does not change validation.
+    for suite in $suites; do
+      matrix=".mlf-build/compiler-tests/$evidence_group/matrix-$suite"
+      mkdir -p "$matrix"
+      for index in 15 20 24; do logs+=("$matrix/case-$index-interpreter.stdout"); done
+    done
+  fi
   touch "${logs[@]}"
   tail -n +1 -f "${logs[@]}" &
   log_pid=$!

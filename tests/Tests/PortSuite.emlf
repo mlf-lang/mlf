@@ -43,10 +43,12 @@ runFixture backends name = do
  parsed <- H.right (P.parseTerm source (Pretty.prettyTerm (C.compiledTerm compilation)))
  parsedType <- H.right (Check.checkClosed parsed)
  H.assert (T.alphaEq parsedType ty && X.equalErased (X.erase parsed) (X.erase (C.compiledTerm compilation))) "port target serialization changed"
- let execution = B.withExecutionTimeout (if S.elem eqString name (O.words "GraphConformance GraphDense InferenceConformance SolverReuse StateTypes") then 1800 else 60) backends
- -- StateTypes keeps 68 exact compiler/checker output rows. Its macOS interpreter
- -- exhausted 30 minutes of CPU-bound work; native and emitter limits stay fixed.
- let context = if eqString name "StateTypes" then B.withInterpreterTimeout 3600 execution else execution
+ let heavy = S.elem eqString name (O.words "GraphConformance GraphDense InferenceConformance SolverReuse StateTypes")
+ let execution = B.withExecutionTimeout (if heavy then 1800 else 60) backends
+ -- These nested compiler/graph workloads exhausted the macOS interpreter's
+ -- 30-minute limit. Keep every fixture and exact output; bound interpretation
+ -- separately without extending native execution or LLVM emission limits.
+ let context = if heavy then B.withInterpreterTimeout 7200 execution else execution
  observed <- B.execute context B.IOEntry (B.Input "" false) parsed
  H.right (B.outcome observed)
  H.assert (H.eq (B.outputBytes observed) expected && eqString (B.stderrOutput observed) "" && eqString (B.remaining observed) "") ("port runtime output differs: " ++ name)

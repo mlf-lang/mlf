@@ -8,13 +8,15 @@ import qualified Package.Command as C
 
 -- Build and execute native MLF tests; preserved oracle data and test-only
 -- checking modules remain independent of the candidate compiler.
-data TestContext = TestContext String String String
+data TestContext = TestContext String String String (List String)
 root : TestContext -> String
-root (TestContext r _ _) = r
+root (TestContext r _ _ _) = r
 output : TestContext -> String
-output (TestContext _ d _) = d
+output (TestContext _ d _ _) = d
 compiler : TestContext -> String
-compiler (TestContext _ _ c) = c
+compiler (TestContext _ _ c _) = c
+runtimeProfiles : TestContext -> List String
+runtimeProfiles (TestContext _ _ _ profiles) = profiles
 report : TestContext -> String
 report c = output c ++ "/verification.json"
 record : TestContext -> String -> J.Json -> IO Unit
@@ -152,7 +154,7 @@ matrices c binary portFixtures = do
   let log = output c ++ "/" ++ abi ++ ".log"
   -- Each fixture retains its own execution limit. The complete matrix also
   -- includes native candidate emission, linking, and graph reference workloads.
-  captureWithin c (Cons binary Nil) log 14400
+  captureWithin c (Cons binary Nil) log (if portFixtures then 18000 else 14400)
   text <- readFile log
   let rows = S.filter (O.starts "Backend matrix: ") (O.lines text)
   O.require (S.length rows == 1 && contains "rows x 2 backends; no missing executions" text) "missing native backend audit"
@@ -163,7 +165,7 @@ matrices c binary portFixtures = do
   let row = B.info (Cons (Pair "rows" (J.num (readInt (S.index (O.words (S.head rows)) 2)))) (Cons (Pair "backends" (J.num 2)) (Cons (Pair "cli_compiler" (J.str (compiler c))) (Cons (Pair "log_sha256" (J.str hash)) Nil))))
   saved <- J.read (report c)
   record c "matrices" (J.set abi row (J.getObject "matrices" saved))
-  putStr (O.drop (S.max 0 (stringLength text - 2000)) text)) (O.words "standard compact-gc")
+  putStr (O.drop (S.max 0 (stringLength text - 2000)) text)) (runtimeProfiles c)
  clearDrivers
 backends : TestContext -> IO Unit
 backends c = do
@@ -286,15 +288,22 @@ main args = case args of
   Cons group rest -> do
     Pair options remaining <- C.options J.empty rest
     O.require (S.null remaining && J.has "compiler" options && J.has "build-dir" options) "compiler-test GROUP --compiler TOOL --build-dir DIRECTORY"
+    profile <- getEnv "MLF_TEST_RUNTIME_PROFILE"
+    O.require (eqString profile "" || eqString group "port") "runtime profile selection is supported only for the port group"
+    O.require (eqString profile "" || S.elem eqString profile (O.words "standard compact-gc")) "invalid runtime profile; expected standard or compact-gc"
+    let profiles = if eqString group "port" || eqString group "backends" then (if eqString profile "" then O.words "standard compact-gc" else Cons profile Nil) else Nil
+    let directory = J.getText "build-dir" "" options ++ (if eqString profile "" then "" else "-" ++ profile)
     root <- canonicalPath "."
-    O.mkdir (J.getText "build-dir" "" options)
-    out <- canonicalPath (J.getText "build-dir" "" options)
+    O.mkdir directory
+    out <- canonicalPath directory
     compiler <- canonicalPath (J.getText "compiler" "" options)
-    let c = TestContext root out compiler
+    let c = TestContext root out compiler profiles
     sourceHashes <- sources root
     hash <- fileDigest compiler
-    J.write (report c) (B.info (Cons (Pair "complete" (J.Boolean false)) (Cons (Pair "implementation" (J.str "MLF")) (Cons (Pair "group" (J.str group)) (Cons (Pair "compiler" (J.str compiler)) (Cons (Pair "compiler_sha256" (J.str hash)) (Cons (Pair "sources" sourceHashes) Nil)))))))
     manager <- getExecutablePath
+    managerHash <- fileDigest manager
+    let identity = B.info (Cons (Pair "complete" (J.Boolean false)) (Cons (Pair "implementation" (J.str "MLF")) (Cons (Pair "group" (J.str group)) (Cons (Pair "compiler" (J.str compiler)) (Cons (Pair "compiler_sha256" (J.str hash)) (Cons (Pair "sources" sourceHashes) Nil))))))
+    J.write (report c) (J.set "requested_profiles" (J.stringArray profiles) (J.set "manager_sha256" (J.str managerHash) (J.set "manager" (J.str manager) identity)))
     setEnv "MLF_PACKAGE_MANAGER" manager
     clearDrivers
     setEnv "MLF_BOOTSTRAP_COMPILER" compiler
@@ -306,6 +315,8 @@ main args = case args of
     O.require (J.equal sourceHashes after) "compiler/test sources changed during validation"
     current <- fileDigest compiler
     O.require (eqString hash current) "compiler changed during validation"
+    currentManager <- fileDigest manager
+    O.require (eqString managerHash currentManager) "package manager changed during validation"
     record c "complete" (J.Boolean true)
     putStrLn ("Compiler package " ++ group ++ " passed")
   Nil -> O.fatal "missing compiler test group"
