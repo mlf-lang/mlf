@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: mlf
-version: 0.1.1.0
+version: 0.1.2.0
 synopsis: Evidence-producing eMLF to xMLF compiler
 description: Graph-based type inference and explicit elaboration following Yakobowski's thesis.
 category: Language
@@ -8,7 +8,7 @@ build-type: Simple
 license: BSD-3-Clause
 license-file: LICENSE
 extra-source-files:
-  mlfpkg, mlf-package.json, mlf.lock, docs/package-manager.md, scripts/bootstrap-package.sh,
+  mlfpkg, mlfpkg.ps1, mlfpkg.cmd, mlf-package.json, mlf.lock, docs/package-manager.md, docs/windows.md, scripts/bootstrap-package.sh, scripts/bootstrap-package-windows.ps1,
   package/*.emlf, package/Package/*.emlf, package/mlf-package.json, bootstrap/mlf-package.json,
   examples/packages/*.emlf, examples/packages/mlf-package.json,
   examples/packages/greeting/*.emlf, examples/packages/greeting/mlf-package.json,
@@ -54,7 +54,7 @@ extra-source-files:
   benchmarks/k-nucleotide/mlf/*.emlf, runtime/*.md,
   bootstrap/**/*.emlf, bootstrap/**/*.hs, bootstrap/**/*.py, bootstrap/**/*.txt, bootstrap/**/*.md, bootstrap/**/*.expected,
   bootstrap/tests/*.c
-data-files: runtime/mlf_runtime.c, runtime/mlf_runtime.h, runtime/khash.h, runtime/mlf_system.h
+data-files: runtime/mlf_runtime.c, runtime/mlf_runtime.h, runtime/khash.h, runtime/mlf_system.h, runtime/mlf_integer64.h, runtime/mlf_windows.h, runtime/mlf_system_windows.h, runtime/mlf_windows_host.c
 
 common settings
   default-language: Haskell2010
@@ -63,7 +63,11 @@ common settings
 
 library
   import: settings
-  build-depends: bytestring, text, hashtables ==1.4.2, directory, filepath, process, unix >=2.8
+  build-depends: bytestring, text, hashtables ==1.4.2, directory, filepath, process
+  if os(windows)
+    other-modules: MLF.SystemIO.Windows
+  else
+    build-depends: unix >=2.8
   hs-source-dirs: src
   exposed-modules:
     MLF.Compiler

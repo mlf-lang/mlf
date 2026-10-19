@@ -32,10 +32,11 @@ validModule text = S.all (\part -> stringLength part > 0 && upper (stringCodeAt 
 validVersion text = let parts = O.split 46 text in S.length parts == 3 && S.all (\part -> stringLength part > 0 && S.all digit (codes part)) parts
 localFile root value = do
   let name = J.text value
-  O.require (stringLength name > 0 && S.not (O.starts "/" name)) "source paths must be relative"
+  O.require (stringLength name > 0 && S.not (O.absolute name) && S.not (O.drivePath name)) "source paths must be relative"
   present <- fileExists (O.join root name)
   O.require present ("missing source: " ++ O.join root name)
-  path <- canonicalPath (O.join root name)
+  actual <- canonicalPath (O.join root name)
+  let path = O.normalize actual
   O.require (O.starts (root ++ "/") path) ("source path outside package: " ++ path)
   ioReturn path
 readModule owner source = do

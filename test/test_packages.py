@@ -10,6 +10,14 @@ ROOT = Path(__file__).resolve().parent.parent
 MANAGER = os.environ.get("MLF_PACKAGE_MANAGER", str(ROOT / "mlfpkg"))
 
 
+def directory_alias(alias, target):
+    if os.name == "nt":
+        host = os.environ.get("MLF_WINDOWS_HOST", str(Path(MANAGER).parent / "mlf-host.exe"))
+        subprocess.run([host, "link", "-s", str(target), str(alias)], check=True)
+    else:
+        alias.symlink_to(target, target_is_directory=True)
+
+
 class PackageTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="mlf package resolver ")
@@ -34,7 +42,7 @@ class PackageTests(unittest.TestCase):
         path.write_text(json.dumps(data))
 
     def run_manager(self, path, *args, error=None):
-        result = subprocess.run([MANAGER, "--manifest", str(path), *args], capture_output=True, text=True, timeout=60)
+        result = subprocess.run([MANAGER, "--manifest", str(path), *args], capture_output=True, text=True, encoding="utf-8", timeout=60)
         if error is None:
             self.assertEqual(result.returncode, 0, result.stderr)
         else:
@@ -62,7 +70,7 @@ class PackageTests(unittest.TestCase):
 
     def test_symlink_dependency_cycle(self):
         a = self.package("a", deps={"a": "../alias"})
-        (self.root / "alias").symlink_to(a.parent)
+        directory_alias(self.root / "alias", a.parent)
         self.plan(a, "dependency cycle")
 
     def test_missing_dependency_and_identity(self):
@@ -99,8 +107,13 @@ class PackageTests(unittest.TestCase):
     def test_source_escape_and_symlink(self):
         root = self.package("a")
         (self.root / "Outside.emlf").write_text("module A where\nx = 1\n")
-        (root.parent / "link.emlf").symlink_to(self.root / "Outside.emlf")
-        for name in ("../Outside.emlf", "link.emlf"):
+        if os.name == "nt":
+            directory_alias(root.parent / "link-directory", self.root)
+            alias_source = "link-directory/Outside.emlf"
+        else:
+            (root.parent / "link.emlf").symlink_to(self.root / "Outside.emlf")
+            alias_source = "link.emlf"
+        for name in ("../Outside.emlf", alias_source):
             self.modify(root, lambda d: d.update(library={"modules": {"A": name}}))
             self.plan(root, "outside package")
 

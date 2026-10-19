@@ -17,6 +17,10 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include "mlf_integer64.h"
+#ifdef _WIN32
+#include "mlf_windows.h"
+#endif
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif
@@ -286,17 +290,33 @@ void mlf_set_args(int32_t argc, char **argv) {
     static char input_buffer[65536];
     static int input_configured;
     if (!input_configured) {
+#ifdef _WIN32
+        _setmode(_fileno(stdin),_O_BINARY);
+        _setmode(_fileno(stdout),_O_BINARY);
+        _setmode(_fileno(stderr),_O_BINARY);
+#endif
         (void)setvbuf(stdin, input_buffer, _IOFBF, sizeof(input_buffer));
         input_configured = 1;
     }
     argument_count = argc > 0 ? argc - 1 : 0;
     argument_values = argc > 0 ? argv + 1 : NULL;
+#ifdef _WIN32
+    int count;
+    wchar_t **wide=CommandLineToArgvW(GetCommandLineW(),&count);
+    if (!wide) abort();
+    char **utf8=malloc((size_t)count*sizeof(char *));
+    if (!utf8) abort();
+    for (int i=0;i<count;++i) { utf8[i]=mlf_utf8(wide[i]); if (!utf8[i]) abort(); }
+    LocalFree(wide);
+    argument_count=count>0 ? count-1 : 0;
+    argument_values=count>0 ? utf8+1 : NULL;
+#endif
 }
 
 /* The low bits distinguish immediate integers, booleans and nullary data
  * from aligned heap pointers. Integers outside the signed 63-bit range keep
  * their arbitrary-precision GMP representation. */
-_Static_assert(sizeof(void *) == 8 && sizeof(long) == 8, "native runtime requires a 64-bit ABI");
+_Static_assert(sizeof(void *) == 8 && sizeof(size_t) == 8, "native runtime requires a 64-bit ABI");
 _Static_assert(_Alignof(MlfValue) >= 8, "native tagged pointer alignment");
 _Static_assert(sizeof(Tag) == 4 && INDIRECT == 2 && CLOSURE == 5 &&
                HOLE < CLOSURE && BUSY < CLOSURE && THUNK < CLOSURE && APPLICATION < CLOSURE,
@@ -852,19 +872,19 @@ static MlfValue *integer_operation(MlfValue *a, MlfValue *b, int subtract) {
         mpz_set_si(result->as.integer,small_value(a));
         int64_t n = small_value(b);
         if (subtract) n = -n;
-        if (n >= 0) mpz_add_ui(result->as.integer,result->as.integer,(unsigned long)n);
-        else mpz_sub_ui(result->as.integer,result->as.integer,(unsigned long)-n);
+        if (n >= 0) mpz_add_ui(result->as.integer,result->as.integer,(uint64_t)n);
+        else mpz_sub_ui(result->as.integer,result->as.integer,(uint64_t)-n);
     } else {
         MlfValue *big = small_integer(a) ? b : a;
         int64_t n = small_value(small_integer(a) ? a : b);
         if (subtract && !small_integer(a)) n = -n;
         if (subtract && small_integer(a)) {
             /* n - big = -(big - n), without copying either operand. */
-            if (n >= 0) mpz_sub_ui(result->as.integer,big->as.integer,(unsigned long)n);
-            else mpz_add_ui(result->as.integer,big->as.integer,(unsigned long)-n);
+            if (n >= 0) mpz_sub_ui(result->as.integer,big->as.integer,(uint64_t)n);
+            else mpz_add_ui(result->as.integer,big->as.integer,(uint64_t)-n);
             mpz_neg(result->as.integer,result->as.integer);
-        } else if (n >= 0) mpz_add_ui(result->as.integer,big->as.integer,(unsigned long)n);
-        else mpz_sub_ui(result->as.integer,big->as.integer,(unsigned long)-n);
+        } else if (n >= 0) mpz_add_ui(result->as.integer,big->as.integer,(uint64_t)n);
+        else mpz_sub_ui(result->as.integer,big->as.integer,(uint64_t)-n);
     }
     return compact_integer(result);
 }
@@ -891,7 +911,7 @@ static MlfValue *integer_extended(Primitive p, MlfValue *a, MlfValue *b) {
     mpz_init(result->as.integer);
     if (p == MUL_INT && (small_integer(a) || small_integer(b))) {
         MlfValue *big = small_integer(a) ? b : a;
-        long n = small_value(small_integer(a) ? a : b);
+        int64_t n = small_value(small_integer(a) ? a : b);
         if (small_integer(big)) {
             mpz_set_si(result->as.integer,small_value(big));
             mpz_mul_si(result->as.integer,result->as.integer,n);
@@ -929,10 +949,10 @@ static int integer_compare(MlfValue *a, MlfValue *b) {
     a = expect(a, INTEGER); b = expect(b, INTEGER);
     if (small_integer(a) && small_integer(b)) return (small_value(a) > small_value(b)) - (small_value(a) < small_value(b));
     if (small_integer(a)) {
-        int order = mpz_cmp_si(b->as.integer, (long)small_value(a));
+        int order = mpz_cmp_si(b->as.integer, (int64_t)small_value(a));
         return (order < 0) - (order > 0);
     }
-    if (small_integer(b)) return mpz_cmp_si(a->as.integer, (long)small_value(b));
+    if (small_integer(b)) return mpz_cmp_si(a->as.integer, (int64_t)small_value(b));
     return mpz_cmp(a->as.integer, b->as.integer);
 }
 
@@ -1096,7 +1116,7 @@ static MlfValue *double_to_bits(MlfValue *entry) {
     memcpy(&bits,&n,sizeof(bits));
     if (bits <= SMALL_MAX) return small((int64_t)bits);
     MlfValue *result = value(INTEGER);
-    mpz_init_set_ui(result->as.integer,(unsigned long)bits);
+    mpz_init_set_ui(result->as.integer,(uint64_t)bits);
     COUNT_INTEGER_BYTES(mpz_size(result->as.integer) * sizeof(mp_limb_t));
     return result;
 }
@@ -1579,8 +1599,13 @@ static void write_file(MlfValue *name, MlfValue *contents) {
 
 static MlfValue *file_exists(MlfValue *name) {
     const char *path = file_path(name);
+#ifdef _WIN32
+    DWORD attributes = mlf_windows_attributes(path);
+    return mlf_boolean(attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY));
+#else
     struct stat status;
     return mlf_boolean(stat(path,&status) == 0 && S_ISREG(status.st_mode));
+#endif
 }
 
 static MlfValue *canonical_path(MlfValue *name) {
@@ -1596,7 +1621,19 @@ static MlfValue *canonical_path(MlfValue *name) {
 
 static MlfValue *executable_path(void) {
     char *buffer = NULL;
-#ifdef __APPLE__
+#ifdef _WIN32
+    DWORD capacity = 256;
+    for (;;) {
+        wchar_t *wide = allocate((size_t)capacity * sizeof(wchar_t));
+        DWORD size = GetModuleFileNameW(NULL,wide,capacity);
+        if (!size) { free(wide); fail("IO error: executable path failed"); }
+        if (size < capacity) { buffer=mlf_utf8(wide); free(wide); break; }
+        free(wide);
+        if (capacity > 32768) fail("IO error: executable path failed");
+        capacity *= 2;
+    }
+    if (!buffer) fail("IO error: executable path failed");
+#elif defined(__APPLE__)
     uint32_t capacity = 0;
     (void)_NSGetExecutablePath(NULL,&capacity);
     if (!capacity) fail("IO error: executable path failed");
