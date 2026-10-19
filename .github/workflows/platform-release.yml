@@ -112,7 +112,7 @@ jobs:
       fail-fast: false
       matrix:
         platform: [macos-arm64, linux-x64]
-        group: [unit, packages, self-host, parity, backends, port]
+        group: [unit, packages, self-host, parity, backends, port-standard, port-compact-gc]
         include:
           - platform: macos-arm64
             runner: macos-26
@@ -156,7 +156,11 @@ jobs:
       - name: Run complete native compiler group
         env:
           TEST_GROUP: ${{ matrix.group }}
-        run: tools/release/native-ci.sh "$TEST_GROUP"
+        run: |
+          case "$TEST_GROUP" in
+            port-standard|port-compact-gc) tools/release/native-ci.sh port "${TEST_GROUP#port-}" ;;
+            *) tools/release/native-ci.sh "$TEST_GROUP" ;;
+          esac
       - name: Collect exact candidate and primary evidence
         if: always()
         env:
@@ -168,11 +172,13 @@ jobs:
           done
           if test -d ".mlf-build/compiler-tests/$TEST_GROUP"; then
             cp -R ".mlf-build/compiler-tests/$TEST_GROUP" .mlf-build/release-evidence/compiler-tests/
-            find .mlf-build/release-evidence/compiler-tests -type f ! -name verification.json ! -name '*.log' ! -name '*.stderr' ! -name '*.err' ! -name '*.status.json' ! -name rows.jsonl ! -name current-label ! -path '*/port/matrix-standard/case-15-interpreter.stdout' ! -path '*/port/matrix-compact-gc/case-15-interpreter.stdout' -delete
+            find .mlf-build/release-evidence/compiler-tests -type f ! -name verification.json ! -name '*.log' ! -name '*.stderr' ! -name '*.err' ! -name '*.status.json' ! -name rows.jsonl ! -name current-label ! -path '*/port-*/matrix-*/case-15-interpreter.stdout' ! -path '*/port-*/matrix-*/case-20-interpreter.stdout' ! -path '*/port-*/matrix-*/case-24-interpreter.stdout' -delete
           fi
-          if test -f ".mlf-build/tests/$TEST_GROUP.log"; then
-            cp ".mlf-build/tests/$TEST_GROUP.log" ".mlf-build/release-evidence/diagnostics/$TEST_GROUP.log"
-            tail -n 50 ".mlf-build/tests/$TEST_GROUP.log"
+          log_group=$TEST_GROUP
+          case "$TEST_GROUP" in port-*) log_group=port ;; esac
+          if test -f ".mlf-build/tests/$log_group.log"; then
+            cp ".mlf-build/tests/$log_group.log" ".mlf-build/release-evidence/diagnostics/$TEST_GROUP.log"
+            tail -n 50 ".mlf-build/tests/$log_group.log"
           fi
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
@@ -211,11 +217,10 @@ jobs:
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           pattern: native-${{ matrix.platform }}-*
-          merge-multiple: true
+          merge-multiple: false
           path: .mlf-build/release-input
       - name: Verify six groups and test the relocated installation
         run: |
-          chmod +x .mlf-build/release-input/bin/*
           tools/release/package.sh .mlf-build/release-input .mlf-build/release tools/release/licenses/BDWGC.txt
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:

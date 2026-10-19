@@ -1,5 +1,5 @@
 {
   "version": "0.1.2",
-  "attempt": 6,
+  "attempt": 7,
   "platforms": ["linux-x64", "macos-arm64", "windows-x64"]
 }
