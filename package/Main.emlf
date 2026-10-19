@@ -1,10 +1,12 @@
 module Main where
 import Bootstrap.Types
+import qualified Bootstrap.Version as Version
 import qualified Package.OS as O
 import qualified Package.Command as C
 import qualified Package.CompilerTests as T
 main = do
   args <- O.allArguments
   case args of
-    Cons "compiler-test" rest -> T.main rest
+    Cons "--version" Nil -> putStrLn ("mlfpkg " ++ Version.version)
+    Cons "compiler-test" rest -> do { O.setupWindows; T.main rest }
     _ -> C.run args

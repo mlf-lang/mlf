@@ -12,12 +12,18 @@ small C runtime for lazy evaluation, algebraic data, and IO.
 ## Install
 
 Native developer-preview releases are published at
-[mlf-lang/mlf](https://github.com/mlf-lang/mlf/releases). The first package supports
-Apple Silicon on macOS 26+. See [installation and releases](docs/releases.md)
-for checksums, the versioned installer, dependencies, and the release process.
-The repository is currently private; GitHub access is required to download it.
+[mlf-lang/mlf](https://github.com/mlf-lang/mlf/releases). Version 0.1.2 adds
+Windows x64 and Linux x64 alongside Apple Silicon on macOS 26+.
+See [installation and releases](docs/releases.md) for platform dependencies,
+checksums, installation and validation coverage.
 
 ## Build and run
+
+For native Windows `.exe` tools, see the [Windows bootstrap](docs/windows.md).
+It builds the compiler and package manager, supports `plan`, `lock`, `build`,
+package `test` and `run`, and checks the independent compiler parity corpus.
+Windows uses the PowerShell bootstrap and `mlfpkg.ps1` or `mlfpkg.cmd` launchers.
+The shell commands and six compiler test groups below describe the POSIX path.
 
 Run these commands from the repository root. You need a working native MLF
 compiler as the seed, Clang/LLVM, GMP development files, `pkg-config`, and a

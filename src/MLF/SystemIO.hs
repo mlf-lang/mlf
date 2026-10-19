@@ -1,19 +1,27 @@
--- | Generic POSIX services shared by the reference interpreter. The native
+{-# LANGUAGE CPP #-}
+-- | Generic host services shared by the reference interpreter. The native
 -- runtime implements the same protocol without invoking a shell.
 module MLF.SystemIO where
 
 import Control.Exception (IOException, bracket, catch, onException)
 import Control.Monad (unless)
 import Data.Char (isHexDigit)
+#ifdef mingw32_HOST_OS
+import Data.Char (isSpace, toLower)
+#endif
 import Data.List (sort)
 import Data.Maybe (fromMaybe)
 import qualified System.Directory as D
 import qualified System.Environment as E
 import System.Exit (ExitCode(..))
 import System.IO (IOMode(..), SeekMode(..), hClose, openBinaryFile)
+#ifdef mingw32_HOST_OS
+import qualified MLF.SystemIO.Windows as Windows
+#else
 import qualified System.Posix.IO as P
 import System.Posix.Signals (sigKILL, signalProcessGroup)
 import System.Posix.Types (Fd(..))
+#endif
 import qualified System.Process as P
 import System.Timeout (timeout)
 import System.IO.Error (isDoesNotExistError)
@@ -34,14 +42,22 @@ listDirectory path = concatMap (++ "\0") . sort <$> D.listDirectory path
 directoryExists :: FilePath -> IO Bool
 directoryExists = D.doesDirectoryExist
 acquireFileLock :: FilePath -> IO Integer
+#ifdef mingw32_HOST_OS
+acquireFileLock = Windows.acquireFileLock
+#else
 acquireFileLock path = do
   fd@(Fd n) <- P.openFd path P.ReadWrite P.defaultFileFlags {P.creat=Just 0o600,P.cloexec=True}
   P.waitToSetLock fd (P.WriteLock,AbsoluteSeek,0,0) `onException` P.closeFd fd
   pure (toInteger n)
+#endif
 releaseFileLock :: Integer -> IO ()
+#ifdef mingw32_HOST_OS
+releaseFileLock = Windows.releaseFileLock
+#else
 releaseFileLock n = do
   unless (n>=0 && n<=2147483647) (fail "invalid file lock")
   P.closeFd (Fd (fromInteger n))
+#endif
 
 splitFields :: String -> [String]
 splitFields "" = []
@@ -57,15 +73,23 @@ runProcess directory spec = case splitFields spec of
       (redirect input ReadMode $ \i -> redirect output WriteMode $ \o ->
         (if not (null output) && output==errors then (\k -> k o) else redirect errors WriteMode) $ \e -> do
           let process = (P.proc command args) {P.cwd=if null directory then Nothing else Just directory,
-                P.std_in=i,P.std_out=o,P.std_err=e,P.create_group=True,P.close_fds=True}
+                P.std_in=i,P.std_out=o,P.std_err=e,P.create_group=True,P.close_fds=True
+#ifdef mingw32_HOST_OS
+                ,P.use_process_jobs=True
+#endif
+                }
           (P.withCreateProcess process $ \_ _ _ handle -> do
             result <- timeout (n*1000000) (P.waitForProcess handle)
             case result of
               Just ExitSuccess -> pure 0
               Just (ExitFailure code) -> pure (toInteger (if code<0 then 128-code else code))
               Nothing -> do
+#ifdef mingw32_HOST_OS
+                P.terminateProcess handle
+#else
                 pid <- P.getPid handle
                 maybe (pure ()) (signalProcessGroup sigKILL) pid
+#endif
                 _ <- P.waitForProcess handle
                 pure 124) `catch` spawnFailure) `catch` redirectFailure
   _ -> fail "invalid process specification"
@@ -81,6 +105,15 @@ runProcess directory spec = case splitFields spec of
 fileDigest :: FilePath -> IO String
 fileDigest path = do
   file <- D.canonicalizePath path
+#ifdef mingw32_HOST_OS
+  text <- P.readProcess "certutil.exe" ["-hashfile", file, "SHA256"] ""
+  let candidates = [map toLower clean | line <- lines text,
+                     let clean = filter (not . isSpace) line,
+                     length clean == 64, all isHexDigit clean]
+  case candidates of
+    [digest] -> pure digest
+    _ -> fail "invalid SHA-256 output"
+#else
   sha <- D.findExecutable "sha256sum"
   text <- case sha of
     Just tool -> P.readProcess tool [file] ""
@@ -88,3 +121,4 @@ fileDigest path = do
   let digest=take 64 text
   unless (length digest==64 && all isHexDigit digest) (fail "invalid SHA-256 output")
   pure digest
+#endif

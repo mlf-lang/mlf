@@ -275,7 +275,7 @@ def check_rejection(row: dict, result):
 
 def parity(compiler: Path, manifest: Path, checker: Path, directory: Path,
            runtime: Path, flags: list[str]) -> dict:
-    rows = [json.loads(line) for line in manifest.read_text().splitlines() if line]
+    rows = [json.loads(line) for line in manifest.read_text(encoding="utf-8").splitlines() if line]
     validate_manifest(rows)
     directory.mkdir(parents=True, exist_ok=True)
     counts = {"accepted": 0, "rejected": 0, "runtime_rows": 0, "runtime_executions": 0}
@@ -303,7 +303,7 @@ def parity(compiler: Path, manifest: Path, checker: Path, directory: Path,
         if expected_accept:
             counts["accepted"] += 1
             expected = stem.with_suffix(".type")
-            expected.write_text(row["expected_type"])
+            expected.write_text(row["expected_type"], encoding="utf-8")
             checked = subprocess.run([str(checker), str(target), str(expected)],
                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if checked.returncode:

@@ -8,6 +8,17 @@ it never invokes a Python package-manager implementation. Parsing, inference,
 checked xMLF linking, and LLVM generation use the selected MLF compiler. It uses only local dependencies
 and installed tools. It never downloads a compiler or a dependency.
 
+On Windows, use native `mlfpkg.exe` with `mlf-host.exe`, native `pkg-config`,
+MinGW Clang and the GMP/BDWGC SDK described in the
+[Windows guide](windows.md#package-manager). The source launchers are
+`mlfpkg.ps1` and `mlfpkg.cmd`; `scripts/bootstrap-package-windows.ps1` builds
+the manager from an existing native MLF compiler. Windows supports `plan`,
+`lock`, `build`, ordinary package `test`, and `run`, including `.exe` publication,
+runtime DLLs, drive/UNC paths, and Unicode. Set `MLF_NATIVE_PREFIX` to the SDK
+root when running a manager built outside that SDK, and `MLF_CLANG` to the
+MinGW Clang executable. The six internal compiler-test groups below still
+require their POSIX transports; they are not Windows release qualification.
+
 ## Build and test this compiler
 
 Provide a working native MLF compiler as the bootstrap seed, Clang, GMP with
@@ -88,7 +99,8 @@ package-manager executable keeps `"link": "source"`. See the
 for the measured memory/time tradeoff. The compiler profile retains the existing
 pipeline and compact BDWGC runtime. Ordinary packages default to separate
 `.mlfi`/`.mlfo` compilation. Test executables use separate compilation and interface/object files. Compiler
-profiles and native test drivers use a 256 MiB stack on Darwin. Interface
+profiles use a 256 MiB stack on Darwin and Windows; native test drivers also use
+it on Darwin. Interface
 fingerprints force their accumulators at each scalar to bound deferred
 arithmetic in large serialized objects.
 

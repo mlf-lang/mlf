@@ -12,7 +12,7 @@ import System.Directory
   ( canonicalizePath, createDirectoryIfMissing, doesDirectoryExist
   , listDirectory, copyFile )
 import System.Environment (getArgs)
-import System.FilePath ((</>), takeDirectory, dropExtension)
+import System.FilePath ((</>), takeDirectory, dropExtension, isPathSeparator)
 import System.IO (IOMode (WriteMode), hSetEncoding, utf8, withFile, hPutStr)
 import qualified Figure12
 import qualified Oracle
@@ -234,7 +234,7 @@ fileCase repository modules file = do
   text <- readFile (repository </> file)
   parsed <- either fail pure (parseModule file text)
   dependencySearch <- either fail pure (dependencyRoots modules parsed)
-  let group = if take 11 file == "benchmarks/" then "benchmarks" else "examples"
+  let group = if take 11 (portablePath file) == "benchmarks/" then "benchmarks" else "examples"
       identity = "file-" ++ map (\c -> if isAlphaNum c then c else '-') (dropExtension file)
       copied = "repository" </> file
       -- Module paths derive from their dotted module name and source path.
@@ -261,7 +261,7 @@ exportCase :: FilePath -> Case -> IO Exported
 exportCase output c = do
   let path = output </> relativeSource c
   createDirectoryIfMissing True (takeDirectory path)
-  unless (originalPath c == Just (drop 11 (relativeSource c)) && take 11 (relativeSource c) == "repository/")
+  unless (fmap portablePath (originalPath c) == Just (drop 11 (portablePath (relativeSource c))) && take 11 (portablePath (relativeSource c)) == "repository/")
     (writeUtf8 path (source c ++ "\n"))
   result <- compileFileWithPrelude (preludeMode c) (map (output </>) (includes c)) path
   case result of
@@ -318,6 +318,9 @@ jsonString input = '"' : concatMap escape input ++ "\""
     escape '\t' = "\\t"
     escape c | ord c < 32 = let h = showHex (ord c) "" in "\\u" ++ replicate (4-length h) '0' ++ h
              | otherwise = [c]
+
+portablePath :: FilePath -> FilePath
+portablePath = map (\c -> if isPathSeparator c then '/' else c)
 
 writeUtf8 :: FilePath -> String -> IO ()
 writeUtf8 path text = withFile path WriteMode $ \handle -> hSetEncoding handle utf8 >> hPutStr handle text

@@ -3,19 +3,20 @@ set -eu
 package=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 prefix=${1:-"$HOME/.local"}
 case "$prefix" in /*) ;; *) printf '%s\n' 'Use an absolute install prefix.' >&2; exit 1 ;; esac
-(cd "$package" && shasum -a 256 -c CHECKSUMS >/dev/null)
+sha256() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$@"; else shasum -a 256 "$@"; fi; }
+(cd "$package" && sha256 -c CHECKSUMS >/dev/null)
 version=$(cat "$package/VERSION")
 commit=$(cat "$package/COMMIT")
 mkdir -p "$prefix/lib/mlf" "$prefix/bin"
 destination="$prefix/lib/mlf/$version-$commit"
 if [ -e "$destination" ]; then
   cmp "$package/CHECKSUMS" "$destination/CHECKSUMS"
-  (cd "$destination" && shasum -a 256 -c CHECKSUMS >/dev/null)
+  (cd "$destination" && sha256 -c CHECKSUMS >/dev/null)
 else
   staged=$(mktemp -d "$prefix/lib/mlf/.install.XXXXXX")
   trap 'rm -rf "$staged"' EXIT HUP INT TERM
   cp -R "$package/." "$staged/"
-  (cd "$staged" && shasum -a 256 -c CHECKSUMS >/dev/null)
+  (cd "$staged" && sha256 -c CHECKSUMS >/dev/null)
   mv "$staged" "$destination"
   trap - EXIT HUP INT TERM
 fi

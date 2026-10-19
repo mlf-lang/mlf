@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.2 — 2026-10-18
+
+Native Windows and Linux developer previews alongside macOS ARM64.
+
+- Add native Windows x64 compiler and package manager executables, Win32
+  process jobs and locks, UTF-8 paths and arguments, and Win64 GMP conversions.
+- Support package planning, local dependency locks, cached builds, interpreter
+  and LLVM tests, and executable publication on Windows with native libraries.
+- Reduce compiler bootstrap memory through checked separate compilation,
+  preserving independent checking and module boundaries.
+- Add native `--version` reporting and platform-specific release packages,
+  checksums, installation and relocation checks for Windows, macOS and Linux.
+- Retain platform-specific validation evidence. Windows compiler qualification
+  uses the independent 7,086-case parity corpus, both runtime layouts, native
+  self-builds and package integration tests; its internal POSIX compiler-test
+  transports and historical performance gates are not claimed as Windows tests.
+
 ## 0.1.1 — 2026-10-18
 
 Compiler performance and native development improvements.

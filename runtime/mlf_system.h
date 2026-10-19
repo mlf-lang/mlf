@@ -1,6 +1,9 @@
 /* POSIX host IO. Package policy, manifests and build decisions live in MLF. */
 #ifndef MLF_SYSTEM_H
 #define MLF_SYSTEM_H
+#ifdef _WIN32
+#include "mlf_system_windows.h"
+#else
 #include <dirent.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -116,6 +119,7 @@ static MlfValue *os_runProcess(MlfValue *directory, MlfValue *specification) {
     return small(WIFEXITED(status) ? WEXITSTATUS(status) : 128+WTERMSIG(status));
 }
 
+#endif
 /* SHA-256, streaming binary files; independent of text encoding and tools. */
 static uint32_t os_rotr(uint32_t x, unsigned n) { return (x>>n)|(x<<(32-n)); }
 static void os_sha_block(uint32_t h[8], const unsigned char block[64]) {

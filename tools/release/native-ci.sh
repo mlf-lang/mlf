@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../.."
-test "$(uname -s):$(uname -m)" = Darwin:arm64
-export MLF_GC_PREFIX=${MLF_GC_PREFIX:-"$(brew --prefix bdw-gc)"}
-llvm_prefix=$(brew --prefix llvm)
-export PATH="$llvm_prefix/bin:$PATH"
+case "$(uname -s):$(uname -m)" in
+  Darwin:arm64)
+    export MLF_GC_PREFIX=${MLF_GC_PREFIX:-"$(brew --prefix bdw-gc)"}
+    llvm_prefix=$(brew --prefix llvm)
+    export PATH="$llvm_prefix/bin:$PATH"
+    ;;
+  Linux:x86_64)
+    # Linux defaults to a small stack. Native compiler recursion and child
+    # compiler tests inherit the job's unrestricted stack allowance.
+    ulimit -s unlimited
+    ;;
+  *) printf '%s\n' 'Unsupported native test host.' >&2; exit 2 ;;
+esac
 mkdir -p .mlf-build/forbidden-tools
 for command_name in ghc ghc-pkg runghc runhaskell cabal python python3; do
   cat > ".mlf-build/forbidden-tools/$command_name" <<'SH'

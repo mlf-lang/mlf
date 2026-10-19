@@ -23,9 +23,10 @@ configureCompiler package buildDirectory config = do
   let requested = J.getText "compiler" "" config
   if S.not (eqString requested "") then ioReturn config else do
     let checkout = M.packageRoot package
-    let candidates = if eqString (M.packageName package) "mlf-compiler" then
+    let candidates0 = if eqString (M.packageName package) "mlf-compiler" then
           Cons (buildDirectory ++ "/bin/emlf") (Cons (checkout ++ "/.mlf-build/bin/emlf") (Cons (checkout ++ "/.mlf-build/mlf-native/bin/emlf") Nil))
           else Nil
+    candidates <- S.mapM O.executable candidates0
     available <- S.mapM (\path -> do { present <- fileExists path; ioReturn (if present then Just path else Nothing) }) candidates
     let selected = S.fromMaybe "emlf" (S.listToMaybe (S.catMaybes available))
     ioReturn (J.set "compiler" (J.str selected) config)
@@ -33,6 +34,7 @@ configureCompiler package buildDirectory config = do
 -- Explicit options and the environment take precedence over that installation.
 configureGC : String -> J.Json -> IO J.Json
 configureGC packageRoot config = do
+  windows <- O.isWindows
   let requested = J.getText "gc-prefix" "" config
   selected <- if S.not (eqString requested "") then canonicalPath requested else do
     let dependencies = packageRoot ++ "/dist-newstyle/bootstrap-deps"
@@ -41,8 +43,10 @@ configureGC packageRoot config = do
       names <- O.entries dependencies
       found <- S.mapM (\name -> do
         let prefix = dependencies ++ "/" ++ name
-        library <- fileExists (prefix ++ "/lib/libgc.a")
-        header <- fileExists (prefix ++ "/include/gc.h")
+        library <- fileExists (prefix ++ (if windows then "/lib/libgc.dll.a" else "/lib/libgc.a"))
+        directHeader <- fileExists (prefix ++ "/include/gc.h")
+        nestedHeader <- fileExists (prefix ++ "/include/gc/gc.h")
+        let header = directHeader || nestedHeader
         if library && header then do { path <- canonicalPath prefix; ioReturn (Just path) } else ioReturn Nothing)
         (S.filter (\name -> O.starts "bdwgc-" name && O.ends "-install" name) names)
       ioReturn (S.nubBy eqString (S.catMaybes found))
@@ -104,8 +108,10 @@ runTests b p names = S.mapM_ (\name -> do
   B.record b "tests" (J.set "passed" (J.Boolean true) row)) names
 run : List String -> IO Unit
 run args = do
+  O.setupWindows
   compiler <- getEnv "MLF_COMPILER"
-  clang <- O.envDefault "CC" "clang"
+  defaultClang <- O.envDefault "MLF_CLANG" "clang"
+  clang <- O.envDefault "CC" defaultClang
   gc <- getEnv "MLF_GC_PREFIX"
   Pair config command <- options (B.info (Cons (Pair "compiler" (J.str compiler)) (Cons (Pair "clang" (J.str clang)) (Cons (Pair "gc-prefix" (J.str gc)) Nil)))) args
   case command of
@@ -146,7 +152,7 @@ run args = do
         if eqString action "run" then case rest of
           Cons name arguments -> do
             let forwarded = case arguments of { Cons "--" tail -> tail; _ -> arguments }
-            code <- O.exec (M.packageRoot p) (Cons (dir ++ "/bin/" ++ name) forwarded) "" "" "" (readInt (J.getText "timeout" "1800" config))
+            code <- O.exec (M.packageRoot p) (Cons (B.executable b (dir ++ "/bin/" ++ name)) forwarded) "" "" "" (readInt (J.getText "timeout" "1800" config))
             exitWith code
           Nil -> O.fatal usage
         else putStrLn (action ++ " passed; report: " ++ dir ++ "/build-report.json")

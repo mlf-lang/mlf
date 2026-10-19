@@ -63,7 +63,7 @@ libraryFiles flags = do
   selected <- S.mapM (\flag -> do
     present <- fileExists flag
     if present then do { path <- canonicalPath flag; ioReturn (Cons path Nil) } else if O.starts "-l" flag then do
-      candidates <- S.mapM (\dir -> S.mapM (\suffix -> do { let path = dir ++ "/lib" ++ O.drop 2 flag ++ suffix; yes <- fileExists path; if yes then do { actual <- canonicalPath path; ioReturn (Just actual) } else ioReturn Nothing }) (Cons ".dylib" (Cons ".so" (Cons ".a" Nil)))) dirs
+      candidates <- S.mapM (\dir -> S.mapM (\suffix -> do { let path = dir ++ "/lib" ++ O.drop 2 flag ++ suffix; yes <- fileExists path; if yes then do { actual <- canonicalPath path; ioReturn (Just actual) } else ioReturn Nothing }) (Cons ".dylib" (Cons ".so" (Cons ".dll.a" (Cons ".a" Nil))))) dirs
       ioReturn (S.take 1 (S.mapMaybe S.id (S.concat candidates)))
     else ioReturn Nil) flags
   ioReturn (S.concat selected)
@@ -86,6 +86,11 @@ create g options buildDirectory = do
   managerHash <- fileDigest manager
   system <- raw buildDirectory (Cons "/usr/bin/uname" (Cons "-s" Nil))
   machine <- raw buildDirectory (Cons "/usr/bin/uname" (Cons "-m" Nil))
+  version <- raw buildDirectory (Cons (J.getText "path" "" cc) (Cons "--version" Nil))
+  windows <- O.isWindows
+  helper <- if windows then do { path <- O.windowsHost; tool path } else ioReturn J.empty
+  prefix <- if windows then O.nativePrefix else ioReturn ""
+  dlls <- if windows then hashFiles (S.map (\name -> prefix ++ "/bin/" ++ name) (O.words "libgmp-10.dll libgc-1.dll libwinpthread-1.dll libpkgconf-8.dll")) else ioReturn J.empty
   gmpText <- raw buildDirectory (Cons (J.getText "path" "" pkg) (O.words "--cflags --libs gmp"))
   gmp <- flagIdentity (flags gmpText)
   runtimeText <- if J.has "runtime" options then ioReturn (J.getText "runtime" "" options) else raw buildDirectory (Cons (J.getText "path" "" comp) (Cons "--llvm-runtime" Nil))
@@ -94,7 +99,9 @@ create g options buildDirectory = do
   runtimeHashes <- hashFiles (S.map (O.join (O.parent runtime)) (S.filter (\n -> O.ends ".c" n || O.ends ".h" n) runtimeFiles))
   env <- S.mapM (\key -> do { value <- getEnv key; ioReturn (Pair key (J.str value)) }) (O.words "SDKROOT MACOSX_DEPLOYMENT_TARGET CPATH C_INCLUDE_PATH LIBRARY_PATH")
   snapshot <- M.snapshot g
-  let identity = info (Cons (Pair "compiler" comp) (Cons (Pair "clang" cc) (Cons (Pair "pkg-config" pkg) (Cons (Pair "manager" (obj2 "path" (J.str manager) "sha256" (J.str managerHash))) (Cons (Pair "system" (J.str (O.trim system))) (Cons (Pair "machine" (J.str (O.trim machine))) (Cons (Pair "native_environment" (J.Object env)) (Cons (Pair "runtime" runtimeHashes) (Cons (Pair "runtime-path" (J.str runtime)) (Cons (Pair "gmp" gmp) Nil))))))))))
+  let baseIdentity = info (Cons (Pair "compiler" comp) (Cons (Pair "clang" cc) (Cons (Pair "pkg-config" pkg) (Cons (Pair "manager" (obj2 "path" (J.str manager) "sha256" (J.str managerHash))) (Cons (Pair "system" (J.str (O.trim system))) (Cons (Pair "machine" (J.str (O.trim machine))) (Cons (Pair "native_environment" (J.Object env)) (Cons (Pair "runtime" runtimeHashes) (Cons (Pair "runtime-path" (J.str runtime)) (Cons (Pair "gmp" gmp) Nil))))))))))
+  let irFlags = if windows && S.any (O.starts "clang version 14.") (O.lines version) then O.words "-mllvm -opaque-pointers" else Nil
+  let identity = J.set "ir-flags" (J.stringArray irFlags) (if windows then J.set "windows" (info (Cons (Pair "helper" helper) (Cons (Pair "prefix" (J.str prefix)) (Cons (Pair "dlls" dlls) Nil)))) baseIdentity else baseIdentity)
   let b = Builder g options buildDirectory identity snapshot
   J.write (reportPath b) (info (Cons (Pair "format" (J.num 1)) (Cons (Pair "complete" (J.Boolean false)) (Cons (Pair "implementation" (J.str "MLF")) (Cons (Pair "packages" snapshot) (Cons (Pair "toolchain" identity) (Cons (Pair "commands" (J.Array Nil)) (Cons (Pair "builds" (J.Array Nil)) (Cons (Pair "tests" (J.Array Nil)) Nil)))))))))
   ioReturn b
@@ -118,7 +125,7 @@ gcFlags b = do
     ioReturn (flags text)
     else do
       path <- canonicalPath prefix
-      let library = path ++ "/lib/libgc.a"
+      let library = path ++ (if eqString (J.getText "system" "" (tools b)) "Windows" then "/lib/libgc.dll.a" else "/lib/libgc.a")
       present <- fileExists library
       O.require present ("missing BDWGC library: " ++ library)
       ioReturn (Cons ("-I" ++ path ++ "/include") (Cons library (if eqString (J.getText "system" "" (tools b)) "Linux" then Cons "-ldl" Nil else Nil)))
@@ -128,7 +135,14 @@ gcFlags b = do
 preludeOptions : J.Json -> List String
 preludeOptions target = if J.getBool "no-prelude" false target then Cons "--no-prelude" Nil else Nil
 stackFlags : Builder -> List String
-stackFlags b = if eqString (J.getText "system" "" (tools b)) "Darwin" then Cons "-Wl,-stack_size,0x10000000" Nil else Nil
+stackFlags b = if eqString (J.getText "system" "" (tools b)) "Darwin" then Cons "-Wl,-stack_size,0x10000000" Nil else if eqString (J.getText "system" "" (tools b)) "Windows" then Cons "-Wl,--stack,268435456" Nil else Nil
+executable b path = if eqString (J.getText "system" "" (tools b)) "Windows" then path ++ ".exe" else path
+windowsFiles b compact = if J.has "windows" (tools b) then Cons "libgmp-10.dll" (if compact then O.words "libgc-1.dll libwinpthread-1.dll mlf-host.exe" else Nil) else Nil
+copyWindowsFiles b compact destination = do
+  let prefix = J.getText "prefix" "" (J.get "windows" (tools b))
+  S.mapM_ (\name -> do
+    source <- if eqString name "mlf-host.exe" then O.windowsHost else ioReturn (prefix ++ "/bin/" ++ name)
+    O.copy source (destination ++ "/" ++ name)) (windowsFiles b compact)
 profileFlags : List String
 profileFlags = O.words "-DMLF_USE_BDWGC -DMLF_COMPACT_BDWGC -DMLF_GC_THRESHOLD=1048576"
 fingerprint : Builder -> J.Json -> IO String
@@ -137,7 +151,7 @@ validFiles : String -> J.Json -> IO Bool
 validFiles destination saved = do
   checks <- S.mapM (\entry -> do
     let path = S.fst entry
-    if O.starts "/" path || S.elem eqString ".." (O.split 47 path) then ioReturn false else do
+    if O.absolute path || O.drivePath path || S.elem eqString ".." (O.split 47 (O.normalize path)) then ioReturn false else do
       present <- fileExists (destination ++ "/" ++ path)
       if present then do { actual <- fileDigest (destination ++ "/" ++ path); ioReturn (eqString actual (J.text (S.snd entry))) } else ioReturn false) (J.items saved)
   ioReturn (S.not (S.null checks) && S.and checks)
@@ -216,12 +230,15 @@ buildTarget b p name target publish = do
     let allFlags = S.append (J.getStrings "flags" (J.get "gmp" (tools b))) (J.getStrings "flags" gc)
     let cflags = S.append (S.filter (\f -> O.starts "-I" f || O.starts "-D" f) allFlags) (if compact then profileFlags else Nil)
     ignored <- capture b work (S.append (Cons (clang b) (O.words "-O2 -std=c11")) (S.append cflags (Cons "-c" (Cons (J.getText "runtime-path" "" (tools b)) (Cons "-o" (Cons (work ++ "/runtime.o") Nil)))))) "" ""
-    ignored <- capture b work (S.append (Cons (clang b) (O.words "-O2 -Wno-override-module")) (S.append (Cons (work ++ "/program.ll") (Cons (work ++ "/runtime.o") allFlags)) (S.append (Cons "-lm" (if compact then stackFlags b else Nil)) (Cons "-o" (Cons (work ++ "/program") Nil))))) "" ""
-    present <- fileExists (work ++ "/program")
-    O.require present "linker did not produce executable")
-  let binary = directory b ++ "/bin/" ++ name
-  if publish then do { O.copy (artifact ++ "/program") (binary ++ ".new"); O.move (binary ++ ".new") binary } else ioReturn Unit
-  ioReturn (Pair (if publish then binary else artifact ++ "/program") artifact)
+    let hostFlags = if J.has "windows" (tools b) then Cons "-lshell32" (stackFlags b) else if compact then stackFlags b else Nil
+    let linkFlags = S.append (J.getStrings "ir-flags" (tools b)) (S.append allFlags hostFlags)
+    ignored <- capture b work (S.append (Cons (clang b) (O.words "-O2 -Wno-override-module")) (S.append (Cons (work ++ "/program.ll") (Cons (work ++ "/runtime.o") linkFlags)) (Cons "-lm" (Cons "-o" (Cons (executable b (work ++ "/program")) Nil))))) "" ""
+    present <- fileExists (executable b (work ++ "/program"))
+    O.require present "linker did not produce executable"
+    copyWindowsFiles b compact work)
+  let binary = executable b (directory b ++ "/bin/" ++ name)
+  if publish then do { O.copy (executable b (artifact ++ "/program")) (binary ++ ".new"); O.move (binary ++ ".new") binary; S.mapM_ (\file -> O.copy (artifact ++ "/" ++ file) (directory b ++ "/bin/" ++ file)) (windowsFiles b compact) } else ioReturn Unit
+  ioReturn (Pair (if publish then binary else executable b (artifact ++ "/program")) artifact)
 verifyHashes : J.Json -> IO Unit
 verifyHashes values = S.mapM_ (\entry -> do { actual <- fileDigest (S.fst entry); O.require (eqString actual (J.text (S.snd entry))) ("input changed during build/test: " ++ S.fst entry) }) (J.items values)
 finish : Builder -> IO Unit
@@ -232,6 +249,12 @@ finish b = do
   verifyHashes (J.get "runtime" (tools b))
   verifyHashes (J.get "libraries" (J.get "gmp" (tools b)))
   verifyHashes (J.get "headers" (J.get "gmp" (tools b)))
+  if J.has "windows" (tools b) then do
+    verifyHashes (J.get "dlls" (J.get "windows" (tools b)))
+    let helper = J.get "helper" (J.get "windows" (tools b))
+    actual <- fileDigest (J.getText "path" "" helper)
+    O.require (eqString actual (J.getText "sha256" "" helper)) "Windows host helper changed during build/test"
+  else ioReturn Unit
   report <- J.read (reportPath b)
   S.mapM_ (\value -> do { verifyHashes (J.get "libraries" value); verifyHashes (J.get "headers" value) }) (J.values (J.getOr "native_inputs" (J.Array Nil) report))
   J.write (reportPath b) (J.set "complete" (J.Boolean true) report)

@@ -27,6 +27,18 @@ def write_json(path, value):
     path.write_text(json.dumps(value, indent=2) + "\n")
 
 
+def executable(path):
+    return Path(str(path) + ".exe") if os.name == "nt" else path
+
+
+def directory_alias(alias, target, manager):
+    if os.name == "nt":
+        host = os.environ.get("MLF_WINDOWS_HOST", str(Path(manager).parent / "mlf-host.exe"))
+        subprocess.run([host, "link", "-s", str(target), str(alias)], check=True)
+    else:
+        alias.symlink_to(target, target_is_directory=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--compiler", type=Path, required=True)
@@ -74,7 +86,7 @@ def main():
             initial = build_report()
             require(initial["complete"] and len(initial["builds"]) == 4, "expected three separately compiled modules and an executable")
             require(all(not b["cached"] for b in initial["builds"]), "first build reused an artifact")
-            require(subprocess.check_output([output / "bin/hello"]) == b"Hello, local packages!\n", "wrong native output")
+            require(subprocess.check_output([executable(output / "bin/hello")]) == b"Hello, local packages!\n", "wrong native output")
             passed("transitive local dependencies, ADT, do notation, spaces in paths")
             run(["build"])
             require(all(b["cached"] for b in build_report()["builds"]), "unchanged build did not reuse all artifacts")
@@ -86,27 +98,28 @@ def main():
             executable_row = initial["builds"][-1]
             artifact = output / "cache" / executable_row["key"]
             source = package / "message/Message.emlf"
+            original_bytes = source.read_bytes()
             original = source.read_text()
             source.unlink()
             result = subprocess.check_output([args.compiler, "-i", artifact / "modules", "--run-module", artifact / "modules/Main.mlfi"], cwd=work)
             require(result == b"Hello, local packages!\n", "linked module still requires dependency source")
-            source.write_text(original)
+            source.write_bytes(original_bytes)
             passed("interface/object executable works without dependency source")
 
             source.write_text(original.replace("render (Message text) = text", 'render (Message text) = text ++ " updated"'))
             run(["build"])
             require(not build_report()["builds"][-1]["cached"], "transitive implementation change did not relink")
-            require(subprocess.check_output([output / "bin/hello"]) == b"Hello, local packages! updated\n", "stale dependency code linked")
+            require(subprocess.check_output([executable(output / "bin/hello")]) == b"Hello, local packages! updated\n", "stale dependency code linked")
             passed("transitive implementation edit invalidates the executable")
             result = run(["test"], success=False)
             require(b"unexpected stdout" in result.stderr and not build_report()["complete"], "output mismatch was not a failed test")
             passed("test output mismatch fails the package test")
 
-            before = digest(output / "bin/hello")
+            before = digest(executable(output / "bin/hello"))
             source.write_text("module Message where\nthis is invalid @@@\n")
             run(["build"], success=False)
-            require(digest(output / "bin/hello") == before and not build_report()["complete"], "failed rebuild replaced the working executable")
-            source.write_text(original)
+            require(digest(executable(output / "bin/hello")) == before and not build_report()["complete"], "failed rebuild replaced the working executable")
+            source.write_bytes(original_bytes)
             run(["build"])
             passed("failed compilation preserves the last successful binary")
 
@@ -114,12 +127,12 @@ def main():
             (artifact / "unit.mlfo").write_text("corrupted")
             run(["build"])
             require(not build_report()["builds"][0]["cached"], "corrupt checked object was reused")
-            require(subprocess.check_output([output / "bin/hello"]) == b"Hello, local packages!\n", "cache repair failed")
+            require(subprocess.check_output([executable(output / "bin/hello")]) == b"Hello, local packages!\n", "cache repair failed")
             passed("tampered object is rebuilt and checked")
 
             # Same executable bytes, different path: tool selection is part of
             # the cache identity, rather than an ambient PATH assumption.
-            alternate = work / "other compiler"
+            alternate = executable(work / "other compiler")
             shutil.copy2(args.compiler, alternate)
             run(["--compiler", str(alternate), "build"])
             require(all(not b["cached"] for b in build_report()["builds"]), "compiler selection did not invalidate cache")
@@ -130,7 +143,7 @@ def main():
             source.write_text(original + "\n-- changed local dependency\n")
             result = run(["--locked", "build"], success=False)
             require(b"lock is stale" in result.stderr, "locked build accepted changed sources")
-            source.write_text(original)
+            source.write_bytes(original_bytes)
             passed("locked build rejects changed local sources")
 
             # An undeclared import cannot be satisfied by the working directory.
@@ -146,7 +159,7 @@ def main():
             edit(manifest, lambda d: d["tests"]["hello"].update(link="source"))
             run(["build"])
             run(["test"])
-            require(subprocess.check_output([output / "bin/hello"]) == b"Hello, local packages!\n", "whole-program build changed semantics")
+            require(subprocess.check_output([executable(output / "bin/hello")]) == b"Hello, local packages!\n", "whole-program build changed semantics")
             passed("whole-program local package mode on both backends")
 
             (package / "Echo.emlf").write_text('''module Echo where
@@ -181,7 +194,7 @@ main = do
             gc = Path(configured_gc).resolve() if configured_gc else installations[0].resolve()
             bundled_gc = package / "dist-newstyle/bootstrap-deps/bdwgc-test-install"
             bundled_gc.parent.mkdir(parents=True)
-            bundled_gc.symlink_to(gc, target_is_directory=True)
+            directory_alias(bundled_gc, gc, prefix[0])
             edit(manifest, lambda d: d["executables"]["hello"].update(profile="compiler"))
             edit(manifest, lambda d: d.update(tests={"gc": {"requires": ["hello"], "command": [
                 sys.executable, "-c",
@@ -192,7 +205,8 @@ main = do
             environment = os.environ.copy()
             environment.pop("MLF_GC_PREFIX", None)
             run(["test"], env=environment)
-            require(any(str(gc / "lib/libgc.a") in row["flags"] for row in build_report()["native_inputs"]),
+            library = gc / ("lib/libgc.dll.a" if os.name == "nt" else "lib/libgc.a")
+            require(any(library.as_posix() in row["flags"] for row in build_report()["native_inputs"]),
                     "checkout BDWGC was not used to build the executable")
             passed("checkout BDWGC discovery and command-test inheritance without an exported prefix")
             environment["MLF_GC_PREFIX"] = str(work / "missing environment prefix")
@@ -203,15 +217,28 @@ main = do
             # emlf on PATH, while retaining explicit compiler overrides.
             edit(manifest, lambda d: d.update(name="mlf-compiler", executables={
                 **d["executables"], "emlf": {"main": "Main.emlf"}}))
-            (output / "bin/emlf").symlink_to(args.compiler)
+            local_compiler = executable(output / "bin/emlf")
+            if os.name == "nt":
+                shutil.copy2(args.compiler, local_compiler)
+            else:
+                local_compiler.symlink_to(args.compiler)
             old_bin = work / "old installation"
             old_bin.mkdir()
-            old_compiler = old_bin / "emlf"
+            old_compiler = executable(old_bin / "emlf")
             marker = work / "old compiler selected"
-            old_compiler.write_text("#!/bin/sh\nprintf used > " + shlex.quote(str(marker)) + "\nexit 99\n")
-            old_compiler.chmod(0o755)
+            if os.name == "nt":
+                mock_source = work / "old-compiler.c"
+                mock_source.write_text('#include <stdio.h>\n#include <stdlib.h>\n#include <wchar.h>\n'
+                    'int main(void) { FILE *f = _wfopen(_wgetenv(L"MLF_PACKAGE_TEST_MARKER"), L"wb"); '
+                    'if (!f) return 98; fputs("used", f); fclose(f); return 99; }\n', encoding="utf-8")
+                clang = initial["toolchain"]["clang"]["path"]
+                subprocess.run([clang, mock_source, "-o", old_compiler], check=True)
+            else:
+                old_compiler.write_text("#!/bin/sh\nprintf used > " + shlex.quote(str(marker)) + "\nexit 99\n")
+                old_compiler.chmod(0o755)
             environment = os.environ.copy()
             environment.pop("MLF_COMPILER", None)
+            environment["MLF_PACKAGE_TEST_MARKER"] = str(marker)
             environment["PATH"] = str(old_bin) + os.pathsep + environment["PATH"]
             checkout_command = [prefix[0], "--manifest", str(manifest), "--build-dir", str(output),
                                 "--runtime", str(ROOT / "runtime/mlf_runtime.c")]
@@ -219,7 +246,8 @@ main = do
                                     cwd=work, capture_output=True, timeout=180, env=environment)
             require(result.returncode == 0, result.stderr.decode(errors="replace"))
             require(not marker.exists(), "default checkout build selected the older compiler on PATH")
-            require(build_report()["toolchain"]["compiler"]["path"] == str(args.compiler),
+            expected_compiler = local_compiler if os.name == "nt" else args.compiler
+            require(build_report()["toolchain"]["compiler"]["path"] == expected_compiler.as_posix(),
                     "default checkout build did not select its local compiler")
             passed("checkout compiler selection takes precedence over an older compiler on PATH")
             result = subprocess.run([*checkout_command, "--compiler", str(old_compiler), "build", "--target", "hello"],
