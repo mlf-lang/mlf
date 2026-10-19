@@ -105,9 +105,10 @@ suite c target expectations = do
 unit : TestContext -> IO Unit
 unit c = do
  transports c
+ -- Check native toolchain and runtime probes before the longer compiler suites.
+ suite c "harness" (Cons "57 native benchmark/bootstrap/release harness tests passed" Nil)
  suite c "core" (Cons "654 checks; 0 failures" (Cons "Oracle: 6712 closed terms" Nil))
  suite c "figure12" (Cons "43/43 expressions match regression expectations; 0 failures" (Cons "36 supplementary checks; 0 failures" Nil))
- suite c "harness" (Cons "57 native benchmark/bootstrap/release harness tests passed" Nil)
 packages : TestContext -> IO Unit
 packages c = do
  transports c
