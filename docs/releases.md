@@ -82,8 +82,9 @@ executable checks. Its internal POSIX `compiler-test` transports and historical
 performance gates are not claimed as Windows qualification. Each archive
 retains the exact source/tool hashes and platform evidence.
 
-The original macOS-only **Native release** workflow remains available for
-historical tags. Its original sequence is:
+The **Native release** manual entry delegates to the same three-platform
+workflow, so it cannot publish a macOS-only release. Historical macOS previews
+used the following sequence:
 
 1. Update `VERSION`, the four toolchain manifests, `mlf.cabal`, and `CHANGELOG.md`.
 2. Run `./mlfpkg lock`, review the lock changes, and commit the release candidate.

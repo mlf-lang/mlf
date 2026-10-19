@@ -1,5 +1,11 @@
 name: Cross-platform release
 on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Existing immutable tag matching VERSION
+        required: true
+        type: string
   push:
     branches: [main]
     paths: [.github/release-request.json]
@@ -11,6 +17,8 @@ on:
         type: string
 permissions:
   contents: read
+env:
+  GC_FREE_SPACE_DIVISOR: '1'
 concurrency:
   group: platform-release-${{ inputs.tag || github.sha }}
   cancel-in-progress: false

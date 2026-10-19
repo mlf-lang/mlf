@@ -3,122 +3,15 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing immutable version tag, matching VERSION (for example v0.1.1)
+        description: Existing immutable version tag, matching VERSION
         required: true
         type: string
 permissions:
   contents: read
-concurrency:
-  group: release-${{ inputs.tag }}
-  cancel-in-progress: false
 jobs:
-  tests:
-    name: Native ${{ matrix.group }}
-    runs-on: macos-26
-    timeout-minutes: 360
-    strategy:
-      fail-fast: false
-      matrix:
-        group: [unit, packages, self-host, parity, backends, port]
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ inputs.tag }}
-      - name: Verify version tag
-        env:
-          RELEASE_TAG: ${{ inputs.tag }}
-        run: |
-          test "$RELEASE_TAG" = "v$(cat VERSION)"
-          test "$(git describe --tags --exact-match HEAD)" = "$RELEASE_TAG"
-          tools/release/check.sh
-      - run: brew install llvm gmp pkg-config bdw-gc
-      # The release tag can predate the diagnostic scripts. Use the tools from
-      # this workflow's immutable commit while building the tagged sources.
-      - name: Fetch workflow seed pins and timing tools
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ github.workflow_sha }}
-          path: .mlf-build/ci-tools
-          sparse-checkout-cone-mode: false
-          sparse-checkout: |
-            /tools/release/
-            /.github/seed.env
-      - name: Fetch verified native seed
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: .mlf-build/ci-tools/tools/release/fetch-seed.sh .mlf-build/seed
-      # A seed with an older code generator cannot itself produce fixed-point
-      # LLVM for the updated compiler. Validate the next native generation.
-      - name: Bootstrap the updated native code generator
-        run: |
-          export MLF_GC_PREFIX="$(brew --prefix bdw-gc)"
-          export PATH="$(brew --prefix llvm)/bin:$PATH"
-          .mlf-build/ci-tools/tools/release/timed-bootstrap.sh
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        if: always()
-        with:
-          name: bootstrap-${{ matrix.group }}
-          include-hidden-files: true
-          retention-days: 30
-          path: |
-            .mlf-build/bootstrap-stage1/build-report.json
-            .mlf-build/bootstrap-stage1/commands/
-            .mlf-build/bootstrap-stage1/cache/**/artifact.json
-            .mlf-build/bootstrap-stage1/timing/
-      - name: Run compiler test group
-        env:
-          TEST_GROUP: ${{ matrix.group }}
-        run: tools/release/native-ci.sh "$TEST_GROUP"
-      - name: Collect candidate and primary evidence
-        if: always()
-        env:
-          TEST_GROUP: ${{ matrix.group }}
-        run: |
-          mkdir -p .mlf-build/release-evidence/bin .mlf-build/release-evidence/compiler-tests
-          cp .mlf-build/bin/emlf .mlf-build/bin/mlfpkg .mlf-build/release-evidence/bin/
-          cp -R ".mlf-build/compiler-tests/$TEST_GROUP" .mlf-build/release-evidence/compiler-tests/
-          mkdir -p .mlf-build/release-evidence/diagnostics
-          if test -f ".mlf-build/tests/$TEST_GROUP.log"; then
-            cp ".mlf-build/tests/$TEST_GROUP.log" ".mlf-build/release-evidence/diagnostics/$TEST_GROUP.log"
-            tail -n 100 ".mlf-build/tests/$TEST_GROUP.log"
-          fi
-          mkdir -p ".mlf-build/release-evidence/diagnostics/$TEST_GROUP"
-          if [ -f ".mlf-build/tests/$TEST_GROUP.log" ]; then
-            cp ".mlf-build/tests/$TEST_GROUP.log" ".mlf-build/release-evidence/diagnostics/$TEST_GROUP/outer.log"
-          fi
-          find .mlf-build/release-evidence/compiler-tests -type f ! -name verification.json ! -name '*.log' ! -name '*.stderr' ! -name '*.err' ! -name '*.status.json' ! -name rows.jsonl ! -name current-label -delete
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        if: always()
-        with:
-          name: native-${{ matrix.group }}
-          include-hidden-files: true
-          path: .mlf-build/release-evidence/
-          retention-days: 14
-  publish:
-    name: Package and publish developer preview
-    needs: tests
-    runs-on: macos-26
-    timeout-minutes: 30
+  release:
     permissions:
       contents: write
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ inputs.tag }}
-      - run: brew install llvm gmp pkg-config bdw-gc
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
-        with:
-          pattern: native-*
-          merge-multiple: true
-          path: .mlf-build/release-input
-      - name: Restore executable modes and assemble verified package
-        run: |
-          chmod +x .mlf-build/release-input/bin/*
-          tools/release/package.sh .mlf-build/release-input .mlf-build/release tools/release/licenses/BDWGC.txt
-      - name: Publish a new release without replacing existing assets
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.tag }}
-        run: |
-          gh release create "$RELEASE_TAG" --verify-tag --draft --prerelease --title "MLF ${RELEASE_TAG#v} — developer preview" --notes-file CHANGELOG.md .mlf-build/release/*.tar.gz .mlf-build/release/SHA256SUMS
-          gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+    uses: ./.github/workflows/platform-release.yml
+    with:
+      tag: ${{ inputs.tag }}
