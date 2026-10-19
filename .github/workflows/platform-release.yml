@@ -168,7 +168,7 @@ jobs:
           done
           if test -d ".mlf-build/compiler-tests/$TEST_GROUP"; then
             cp -R ".mlf-build/compiler-tests/$TEST_GROUP" .mlf-build/release-evidence/compiler-tests/
-            find .mlf-build/release-evidence/compiler-tests -type f ! -name verification.json ! -name '*.log' ! -name '*.stderr' ! -name '*.err' ! -name '*.status.json' ! -name rows.jsonl ! -name current-label -delete
+            find .mlf-build/release-evidence/compiler-tests -type f ! -name verification.json ! -name '*.log' ! -name '*.stderr' ! -name '*.err' ! -name '*.status.json' ! -name rows.jsonl ! -name current-label ! -path '*/port/matrix-standard/case-15-interpreter.stdout' ! -path '*/port/matrix-compact-gc/case-15-interpreter.stdout' -delete
           fi
           if test -f ".mlf-build/tests/$TEST_GROUP.log"; then
             cp ".mlf-build/tests/$TEST_GROUP.log" ".mlf-build/release-evidence/diagnostics/$TEST_GROUP.log"
