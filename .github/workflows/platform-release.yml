@@ -153,6 +153,9 @@ jobs:
       - name: Bootstrap native Linux tools from verified LLVM
         if: matrix.platform == 'linux-x64'
         run: tools/release/bootstrap-linux.sh .mlf-build/portable-llvm
+      - name: Check real native ABI commands before the full unit group
+        if: matrix.platform == 'linux-x64' && matrix.group == 'unit'
+        run: tools/release/native-ci.sh abi-preflight
       - name: Run complete native compiler group
         env:
           TEST_GROUP: ${{ matrix.group }}
@@ -173,6 +176,16 @@ jobs:
           if test -f ".mlf-build/tests/$TEST_GROUP.log"; then
             cp ".mlf-build/tests/$TEST_GROUP.log" ".mlf-build/release-evidence/diagnostics/$TEST_GROUP.log"
             tail -n 50 ".mlf-build/tests/$TEST_GROUP.log"
+          fi
+          if test -d .mlf-build/native-abi-preflight; then
+            mkdir -p .mlf-build/release-evidence/diagnostics/native-abi-preflight
+            find .mlf-build/native-abi-preflight -maxdepth 1 -name '*.log' -exec cp {} .mlf-build/release-evidence/diagnostics/native-abi-preflight/ \;
+            if test -f .mlf-build/native-abi-preflight/build/build-report.json; then
+              cp .mlf-build/native-abi-preflight/build/build-report.json .mlf-build/release-evidence/diagnostics/native-abi-preflight/
+            fi
+            if test -d .mlf-build/native-abi-preflight/build/commands; then
+              cp -R .mlf-build/native-abi-preflight/build/commands .mlf-build/release-evidence/diagnostics/native-abi-preflight/
+            fi
           fi
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()

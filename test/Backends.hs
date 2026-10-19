@@ -400,8 +400,9 @@ native context index arguments entry input term = do
           let file = directory context </> ("program-" ++ show index)
               source = file ++ ".ll"
           writeFile source ir
-          _ <- command (clang context) (flags context ++ ["-Wno-override-module",source,
-            directory context </> "runtime.o",directory context </> "trace.o","-o",file] ++ linkFlags context)
+          _ <- command (clang context) (["-Wno-override-module",source,
+            directory context </> "runtime.o",directory context </> "trace.o"] ++ flags context ++
+            ["-o",file] ++ linkFlags context)
           modifyIORef' (binaries context) (Map.insert ir file)
           pure file
       observeExecutable context index arguments input executable

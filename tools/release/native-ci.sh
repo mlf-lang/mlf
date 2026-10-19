@@ -41,7 +41,9 @@ SH
 done
 export PATH="$PWD/.mlf-build/forbidden-tools:$PATH"
 group=${1:-smoke}
-if [ "$group" = smoke ]; then
+if [ "$group" = abi-preflight ]; then
+  tools/release/check-native-abi.sh "$MLF_COMPILER" .mlf-build/native-abi-preflight
+elif [ "$group" = smoke ]; then
   "$MLF_COMPILER" --type --expr '\x -> x'
   ./mlfpkg --compiler "$MLF_COMPILER" --runtime "$PWD/runtime/mlf_runtime.c" --manifest examples/packages/mlf-package.json --timeout 21600 test
 else
