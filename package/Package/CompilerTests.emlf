@@ -44,7 +44,7 @@ walk path = do
 sources : String -> IO J.Json
 sources r = do
   nested <- S.mapM (\dir -> walk (r ++ "/" ++ dir)) (O.words "src app test scripts runtime bootstrap package examples benchmarks tests")
-  let paths = S.filter (\p -> S.any (\suffix -> O.ends suffix p) (O.words ".hs .emlf .c .h .py .sh .expected .json .gz")) (S.concat nested)
+  let paths = S.filter (\p -> O.starts (r ++ "/benchmarks/") p || S.any (\suffix -> O.ends suffix p) (O.words ".hs .emlf .c .h .py .sh .expected .json .gz")) (S.concat nested)
   hashes <- B.hashFiles (S.append paths (Cons (r ++ "/mlfpkg") (Cons (r ++ "/mlf-package.json") Nil)))
   ioReturn (J.Object (S.map (\entry -> Pair (O.relative r (S.fst entry)) (S.snd entry)) (J.items hashes)))
 clearDrivers : IO Unit

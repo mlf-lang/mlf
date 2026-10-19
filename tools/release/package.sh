@@ -39,7 +39,7 @@ jq -r '.sources | to_entries[] | "\(.value)  \(.key)"' "$base" | sha256 -c >/dev
 cmp <(jq -r '.sources | keys[]' "$base" | LC_ALL=C sort) <(
   { find src app test scripts runtime bootstrap package examples benchmarks tests \
     -type d \( -name .mlf-build -o -name .git -o -name dist-newstyle -o -name __pycache__ \) -prune -o \
-    -type f \( -name '*.hs' -o -name '*.emlf' -o -name '*.c' -o -name '*.h' -o -name '*.py' -o -name '*.sh' -o -name '*.expected' -o -name '*.json' -o -name '*.gz' \) -print
+    -type f \( -path 'benchmarks/*' -o -name '*.hs' -o -name '*.emlf' -o -name '*.c' -o -name '*.h' -o -name '*.py' -o -name '*.sh' -o -name '*.expected' -o -name '*.json' -o -name '*.gz' \) -print
     printf '%s\n' mlfpkg mlf-package.json; } | LC_ALL=C sort
 )
 jq -e --arg hash "$compiler_hash" '.fixed_point.reused_candidate_build == false and .fixed_point.next_compiler_sha256 == $hash' "$build/compiler-tests/self-host/verification.json" >/dev/null

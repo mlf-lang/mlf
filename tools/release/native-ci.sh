@@ -46,5 +46,27 @@ if [ "$group" = smoke ]; then
   ./mlfpkg --compiler "$MLF_COMPILER" --runtime "$PWD/runtime/mlf_runtime.c" --manifest examples/packages/mlf-package.json --timeout 21600 test
 else
   case "$group" in unit|packages|self-host|parity|backends|port) ;; *) exit 2 ;; esac
+  # Native test commands retain their primary logs for the release evidence.
+  # Follow those same files while tests run so CI also shows suite progress.
+  mkdir -p .mlf-build/tests ".mlf-build/compiler-tests/$group"
+  logs=(".mlf-build/tests/$group.log")
+  case "$group" in
+    unit) suites='core figure12 harness' ;;
+    packages) suites='packages' ;;
+    backends|port) suites='standard compact-gc' ;;
+    *) suites='' ;;
+  esac
+  for suite in $suites; do logs+=(".mlf-build/compiler-tests/$group/$suite.log"); done
+  touch "${logs[@]}"
+  tail -n +1 -f "${logs[@]}" &
+  log_pid=$!
+  finish_logs() {
+    status=$?
+    trap - EXIT
+    kill "$log_pid" 2>/dev/null || true
+    wait "$log_pid" 2>/dev/null || true
+    exit "$status"
+  }
+  trap finish_logs EXIT
   ./mlfpkg --runtime "$PWD/runtime/mlf_runtime.c" --timeout 21600 --locked test --target "$group"
 fi
