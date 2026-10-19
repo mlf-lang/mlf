@@ -60,7 +60,7 @@ compileLLVM directory source runtime macros objects = do
  writeFile (directory ++ "/program.ll") out
  gmp <- flags directory
  let object = directory ++ "/runtime.o"
- O.run "" (S.append (O.words "clang -O2 -std=c11 -Iruntime") (S.append macros (S.append gmp (Cons "-c" (Cons runtime (Cons "-o" (Cons object Nil)))))))
+ O.run "" (S.append (O.words "clang -O2 -std=c11 -Iruntime") (S.append macros (S.append (S.filter (O.starts "-I") gmp) (Cons "-c" (Cons runtime (Cons "-o" (Cons object Nil)))))))
  let binary = directory ++ "/program"
  O.run "" (S.append (Cons "clang" (Cons "-O2" (Cons "-Wno-override-module" (Cons (directory ++ "/program.ll") (Cons object objects))))) (S.append gmp (S.append (O.words "-Iruntime -lm -o") (Cons binary Nil))))
  return binary
@@ -110,8 +110,12 @@ generatedForce = H.withScratch (\directory -> do
  setEnv "GC_INITIAL_HEAP_SIZE" "8388608"
  S.mapM_ (\(Pair name macros) -> do
   let binary = directory ++ "/" ++ name
-  let options = S.append (O.words "-O2 -std=c11 -Wno-override-module -Iruntime -DMLF_USE_BDWGC -DMLF_COMPACT_BDWGC") (S.append gc (S.append gmp (S.append (Cons "-lm" Nil) macros)))
-  O.run "" (S.append (Cons "clang" options) (Cons source (Cons "runtime/mlf_runtime.c" (Cons (directory ++ "/probe.ll") (Cons "-o" (Cons binary Nil))))))
+  let options = S.append (O.words "-O2 -std=c11 -Wno-override-module -Iruntime -DMLF_USE_BDWGC -DMLF_COMPACT_BDWGC") macros
+  let inputs = Cons source (Cons "runtime/mlf_runtime.c" Nil)
+  -- GNU ld resolves static archives against preceding object inputs.
+  -- Keep both native sources and generated LLVM before GC, GMP and libm.
+  let libraries = S.append gc (S.append gmp (Cons "-lm" Nil))
+  O.run "" (S.append (Cons "clang" options) (S.append inputs (Cons (directory ++ "/probe.ll") (S.append libraries (Cons "-o" (Cons binary Nil))))))
   S.mapM_ (\mode -> do
    status <- O.exec "" (Cons binary (Cons mode Nil)) "" (directory ++ "/" ++ name ++ "-" ++ mode ++ ".out") (directory ++ "/" ++ name ++ "-" ++ mode ++ ".err") 30
    out <- readFile (directory ++ "/" ++ name ++ "-" ++ mode ++ ".out")
