@@ -31,7 +31,7 @@ function Assert-ReleaseSources([string]$Root, $Expected) {
         Assert-Release ($actual[$entry.Key] -eq $entry.Value) "Release source changed after qualification: $($entry.Key)"
     }
 }
-function Invoke-ReleaseCommand([string]$Executable, [string[]]$Arguments, [string]$Log, [string]$Directory) {
+function Invoke-ReleaseCommand([string]$Executable, [string[]]$Arguments, [string]$Log, [string]$Directory, [switch]$StdoutOnly) {
     $start = [Diagnostics.ProcessStartInfo]::new($Executable)
     $start.UseShellExecute = $false
     $start.CreateNoWindow = $true
@@ -43,10 +43,11 @@ function Invoke-ReleaseCommand([string]$Executable, [string[]]$Arguments, [strin
     $output = $process.StandardOutput.ReadToEndAsync()
     $errors = $process.StandardError.ReadToEndAsync()
     $process.WaitForExit()
-    $text = $output.GetAwaiter().GetResult() + $errors.GetAwaiter().GetResult()
+    $stdout = $output.GetAwaiter().GetResult()
+    $text = $stdout + $errors.GetAwaiter().GetResult()
     [IO.File]::WriteAllText($Log, $text, [Text.UTF8Encoding]::new($false))
     if ($process.ExitCode) { throw "Command exited $($process.ExitCode): $Executable; see $Log" }
-    return $text
+    if ($StdoutOnly) { return $stdout } else { return $text }
 }
 function Get-PeImports([string]$Path) {
     # Read the PE import directory directly, so qualification needs no objdump.

@@ -33,11 +33,11 @@ try {
     foreach ($action in @('plan','lock','build','test')) {
         $null = Invoke-ReleaseCommand "$relocated/bin/mlfpkg.exe" ($prefix + @($action)) "$Output/package-$action.log" $Output
     }
-    $text = Invoke-ReleaseCommand "$relocated/bin/mlfpkg.exe" ($prefix + @('run','hello')) "$Output/package-run.log" $Output
+    $text = Invoke-ReleaseCommand "$relocated/bin/mlfpkg.exe" ($prefix + @('run','hello')) "$Output/package-run.log" $Output -StdoutOnly
     Assert-Release ($text -eq "Hello, local packages!`n") 'Relocated package manager run produced unexpected stdout'
     # The published program must carry its runtime dependencies with it.
     $env:PATH = "$env:SystemRoot/System32;$env:SystemRoot"
-    $text = Invoke-ReleaseCommand "$build/bin/hello.exe" @() "$Output/standalone-executable.log" $Output
+    $text = Invoke-ReleaseCommand "$build/bin/hello.exe" @() "$Output/standalone-executable.log" $Output -StdoutOnly
     Assert-Release ($text -eq "Hello, local packages!`n") 'Published native executable cannot run with system-only PATH'
     Write-ReleaseJson "$Output/verification.json" @{complete=$true;platform='windows-x64';version=$version;compiler_sha256=(Get-ReleaseHash "$relocated/bin/emlf.exe");manager_sha256=(Get-ReleaseHash "$relocated/bin/mlfpkg.exe");checks=@('relocated Unicode/spaced SDK','system-only initial PATH','embedded versions','compiler type query','plan','lock','build','both package test backends','run stdout','standalone generated executable')}
     Write-Output 'Windows release smoke passed: relocated SDK, compiler, plan/lock/build/test/run, standalone native executable.'
