@@ -1,6 +1,6 @@
 {
   "version": "0.2.0",
-  "attempt": 2,
+  "attempt": 3,
   "platforms": [
     "linux-x64",
     "macos-arm64",

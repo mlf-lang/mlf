@@ -166,6 +166,8 @@ from a fresh directory with the same Clang and profile. It requires equal LLVM
 and complete native bytes; independent profile reproduction and the full test
 groups are separate checks. The package group exercises real Clang profiling
 and therefore also requires `llvm-profdata` on PATH.
+On Ubuntu, install both `clang` and `llvm` and put `$(llvm-config --bindir)`
+on PATH so profiling and native compilation use the same LLVM installation.
 
 ## Local packages
 
