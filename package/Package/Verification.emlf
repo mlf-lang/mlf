@@ -65,12 +65,18 @@ quote : String -> String
 quote value = "'" ++ O.replace "'" "'\\''" value ++ "'"
 cleanEnvironment : List String -> List String
 cleanEnvironment names = S.filter (\name -> S.not (S.any (\prefix -> O.starts prefix name) (O.words "MLF_BOOTSTRAP_ MLF_LLVM_TEST_ MLF_TEST_ GC_"))) names
+matrixCollectionDivisor : String -> Either String String
+matrixCollectionDivisor requested =
+ let value = if eqString requested "" then "1" else requested in
+ if S.elem eqString value (O.words "1 2 4") then Right value
+ else Left "matrix GC free-space divisor must be 1, 2 or 4"
 matrixEnvironment : J.Json -> String -> String -> String -> String -> J.Json -> Either String J.Json
 matrixEnvironment inherited drivers seed candidate abi collector = do
  ensure (eqString abi "standard" || eqString abi "compact-gc") "unknown native ABI"
  ensure (eqString abi "standard" || J.has "libs" collector && J.has "cflags" collector) "compact matrix requires collector"
+ divisor <- matrixCollectionDivisor (text "MLF_TEST_MATRIX_GC_DIVISOR" inherited)
  let clean = J.Object (S.filter (\entry -> S.not (S.any (\prefix -> O.starts prefix (S.fst entry)) (O.words "MLF_BOOTSTRAP_ MLF_LLVM_TEST_ MLF_TEST_ GC_"))) (J.items inherited))
- let common = J.set "MLF_BOOTSTRAP_COMPILER" (J.str candidate) (J.set "MLF_BOOTSTRAP_INTERPRETER" (J.str (drivers ++ "/RuntimeDriver")) (J.set "MLF_BOOTSTRAP_LLVM" (J.str (drivers ++ "/LLVMDriver")) (J.set "MLF_LLVM_TEST_ABI" (J.str abi) (J.set "GC_INITIAL_HEAP_SIZE" (J.str (if eqString abi "compact-gc" then "8388608" else "536870912")) (J.set "GC_FREE_SPACE_DIVISOR" (J.str "1") clean)))))
+ let common = J.set "MLF_BOOTSTRAP_COMPILER" (J.str candidate) (J.set "MLF_BOOTSTRAP_INTERPRETER" (J.str (drivers ++ "/RuntimeDriver")) (J.set "MLF_BOOTSTRAP_LLVM" (J.str (drivers ++ "/LLVMDriver")) (J.set "MLF_LLVM_TEST_ABI" (J.str abi) (J.set "GC_INITIAL_HEAP_SIZE" (J.str (if eqString abi "compact-gc" then "8388608" else "536870912")) (J.set "GC_FREE_SPACE_DIVISOR" (J.str divisor) clean)))))
  return (if eqString abi "standard" then common else J.set "MLF_LLVM_TEST_CFLAGS" (J.str (S.intercalate " " (S.map quote (J.getStrings "cflags" collector)))) (J.set "MLF_LLVM_TEST_LIBS" (J.str (S.intercalate " " (S.map quote (J.getStrings "libs" collector)))) common))
 layoutPlan : List String -> List String
 layoutPlan layouts = S.append (O.words "RuntimeDriver LLVMDriver") (S.map (\abi -> "matrix:" ++ abi) layouts)

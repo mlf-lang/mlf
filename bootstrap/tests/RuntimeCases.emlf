@@ -2,6 +2,37 @@ module Main where
 import Bootstrap.Types
 import Bootstrap.Std
 import qualified Bootstrap.Runtime as R
+import qualified Bootstrap.Data as D
+
+runtimeData = case D.validateDeclarations Nil of
+  Left message -> panic message
+  Right value -> value
+evaluate term = R.evaluate runtimeData (R.REnv MapEmpty) term
+erasedCall primitive arguments = foldl XEApp (XEPrimitive primitive) arguments
+poison message = erasedCall PPanic (Cons (XEString message) Nil)
+expectInteger expected term = case R.integer (evaluate term) of
+  Right value -> if value == expected then return Unit else panic "direct primitive returned a different value"
+  Left message -> panic message
+expectError expected term = case evaluate term of
+  Left message -> if eqString message expected then return Unit else panic ("direct primitive changed error: " ++ message)
+  Right value -> panic "direct primitive lost its error"
+primitiveApplications = do
+  expectInteger 2 (erasedCall PStringLength (Cons (XEString "λ😀") Nil))
+  expectInteger 7 (erasedCall PAddInt (Cons (XEInt 3) (Cons (XEInt 4) Nil)))
+  expectInteger 11 (erasedCall PIfThenElse (Cons (XEBool true) (Cons (XEInt 11) (Cons (poison "unused branch") Nil))))
+  expectInteger 13 (erasedCall PIfThenElse (Cons (XEBool false) (Cons (poison "unused branch") (Cons (XEInt 13) Nil))))
+  let argument = XName 91 "argument"
+  let identity = XEAbs argument (XEVar argument)
+  expectInteger 17 (XEApp (erasedCall PSeq (Cons identity (Cons identity Nil))) (XEInt 17))
+  expectError "first argument" (erasedCall PAddInt (Cons (poison "first argument") (Cons (poison "second argument") Nil)))
+  expectError "direct panic" (XEApp (poison "direct panic") (XEInt 0))
+  expectError "runtime application of a non-function" (erasedCall PShowInt (Cons (XEInt 3) (Cons (XEInt 4) Nil)))
+  expectError "runtime application of a non-function" (erasedCall PGetArgCount (Cons (XEInt 0) Nil))
+  case evaluate (erasedCall PAddInt (Cons (XEInt 19) Nil)) of
+    Left message -> panic message
+    Right partial -> case R.integer (R.apply runtimeData partial (Right (R.RInteger 23))) of
+      Right value -> if value == 42 then return Unit else panic "partial primitive lost its captured argument"
+      Left message -> panic message
 
 intType = XCon "Int" Nil
 unitType = XCon "Unit" Nil
@@ -41,6 +72,9 @@ run program = do
     Right unit -> return ()
 
 main = do
+  primitiveApplications
+  run (print (integer 42))
+  putStrLn "ok"
   run lazyCase
   run recursive
   run arrayProgram

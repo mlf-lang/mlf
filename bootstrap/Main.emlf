@@ -1,6 +1,7 @@
 module Main where
 
 import Bootstrap.Types
+import qualified Bootstrap.Version as Version
 import qualified Bootstrap.Std as L
 import qualified Bootstrap.Compiler as C
 import qualified Bootstrap.X.Check as Check
@@ -40,6 +41,7 @@ options mode paths arguments = case arguments of
 
 runArgs : PreludeMode -> List String -> List String -> IO Unit
 runArgs mode paths arguments = case arguments of
+  Cons "--version" Nil -> putStrLn ("emlf " ++ Version.version)
   Cons "--help" Nil -> putStr usage
   Cons "--llvm-runtime" Nil -> do
     path <- runtimePath
@@ -197,6 +199,6 @@ chooseRuntime paths = case paths of
     h <- fileExists (path ++ "/runtime/mlf_runtime.h")
     if c && h then canonicalPath (path ++ "/runtime/mlf_runtime.c") else chooseRuntime rest
 
-usage = crateUsage ++ baseUsage
+usage = "emlf --version\n" ++ crateUsage ++ baseUsage
 crateUsage = "Crate compilation: emlf --compile-crate SPEC -o PREFIX\n       emlf --show-crate FILE.mlfci\n       emlf --link-crate FILE.mlfci\n       emlf --run-crate FILE.mlfci [-- ARGS...]\n       emlf --crate-to-llvm[-gc] FILE.mlfci\n"
 baseUsage = "Usage: emlf [--no-prelude] [-i DIR ...] [--type] [FILE | --expr SOURCE]\n       emlf --check [XMLF_FILE]\n       emlf [--no-prelude] [-i DIR ...] --run [FILE | --expr SOURCE] [-- ARG ...]\n       emlf --run-xmlf [XMLF_FILE] [-- ARG ...]\n       emlf [--no-prelude] [-i DIR ...] --emit-llvm [FILE | --expr SOURCE]\n       emlf --xmlf-to-llvm [XMLF_FILE]\n       emlf [--no-prelude] [-i DIR ...] --emit-llvm-gc [FILE | --expr SOURCE]\n       emlf --xmlf-to-llvm[-io]-gc [XMLF_FILE]\n       emlf --llvm-runtime\nWith no FILE, read eMLF from standard input.\nImports load Foo.Bar from Foo/Bar.emlf beside the entry or in -i search roots.\nThe standard prelude supplies Monad and Monad IO; --no-prelude disables it.\nLink LLVM IR with clang, runtime/mlf_runtime.c, and GMP.\nThe -gc commands require the runtime built with MLF_USE_BDWGC and MLF_COMPACT_BDWGC.\n"

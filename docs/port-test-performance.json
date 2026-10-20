@@ -1,0 +1,1469 @@
+{
+  "format": 1,
+  "measured_on": "2026-10-20",
+  "platform": "macos-arm64",
+  "scope": "Isolated execution of unchanged checked port targets and fresh port/reference builds. These observations do not measure the full port suite or the published release binary.",
+  "compiler_sha256": "dbcfd6422d592e237c1a0d17a3ea7b4fed3a0e711d992c3f6c733deb82b0d6d5",
+  "sources": {
+    "runtime_sha256": "28c7e1a31f07017c80c4fd3c8d82b25dba1afe654851e04357258a9974772b4d",
+    "primitive_sha256": "2e58ddd07dbcb2610c36ee39ae9dddac822330ebc60a752f071886433b5aaf1e"
+  },
+  "controls": {
+    "complete": true,
+    "rows": [
+      {
+        "name": "RuntimeCases",
+        "source_sha256": "fdd71096d242622e1e4c57f0d7d6d0dc459db3e4718cfd0da45a8e0a0b3c78e4",
+        "target_sha256": "437724ff3605cad81af310a673a250e5875ea963875343ce97e71790fde178f1",
+        "expected_sha256": "a3624707bcc8e9dcde9a48a08e13b0a1abde537cd785d459456b62f8745f212b",
+        "output_and_trace_equal": true
+      },
+      {
+        "name": "StateRuntime",
+        "source_sha256": "1f5485a849a700d2784063810361fb110e1f66e45ce78afe05c642f59b44c776",
+        "target_sha256": "63eecb03f28888aeda7d4fc73bfd90fc6b5cdc204cc0bea8d59d816a94b6a441",
+        "expected_sha256": "89efe84cbf7bf973862d0ba6deb13a02216df9fbb6f7a67c23e78123055a101a",
+        "output_and_trace_equal": true
+      },
+      {
+        "name": "PrimitiveMetadata",
+        "source_sha256": "28027164d5a4d3d5e3d4853b6729bd9cc7b2ed152ea7d46cc46e2d93e51213ed",
+        "target_sha256": "0e1517a0ecae91220424c2d2feb9c67cb24e8bf99885093bbadbffba269b9cd6",
+        "expected_sha256": "a62c6fc3284f69b806d9c0ad5ab984b4d4a35ba4a8b1e0f2994cdad6847b6f16",
+        "output_and_trace_equal": true
+      }
+    ],
+    "compiler_sha256": "dbcfd6422d592e237c1a0d17a3ea7b4fed3a0e711d992c3f6c733deb82b0d6d5",
+    "driver_sha256": "db0cdb2b8748695520a857b3eb23a044f2682aec58224229c0e1b2ab911a9806",
+    "runtime_source_sha256": "28c7e1a31f07017c80c4fd3c8d82b25dba1afe654851e04357258a9974772b4d",
+    "primitive_source_sha256": "2e58ddd07dbcb2610c36ee39ae9dddac822330ebc60a752f071886433b5aaf1e"
+  },
+  "comparisons": {
+    "isolated-comparison": {
+      "complete": true,
+      "rows": [
+        {
+          "variant": "baseline",
+          "fixture": "GraphDense",
+          "started_at": "2026-10-20T12:15:48.137Z",
+          "finished_at": "2026-10-20T12:17:30.072Z",
+          "code": 0,
+          "signal": null,
+          "status": {
+            "exit_code": 0,
+            "timed_out": false,
+            "interrupted": false,
+            "termination_signal": 0,
+            "wall_seconds": 101.931631,
+            "cpu_seconds": 101.507404,
+            "peak_rss_bytes": 619708416,
+            "pid": 85060
+          },
+          "output_equal": true,
+          "trace_equal": true,
+          "binary_sha256": "519b78427e126818851b3895360c4f0dbc258cde7dd12ea0a24f0583eae7d5ad",
+          "input_sha256": "00cf3eee7805f02f12b6ae21b9f5fe753a12c1df11d6508c0228fbd395f3bca9"
+        },
+        {
+          "variant": "indexed",
+          "fixture": "GraphDense",
+          "started_at": "2026-10-20T12:17:30.075Z",
+          "finished_at": "2026-10-20T12:19:38.622Z",
+          "code": 0,
+          "signal": null,
+          "status": {
+            "exit_code": 0,
+            "timed_out": false,
+            "interrupted": false,
+            "termination_signal": 0,
+            "wall_seconds": 128.542675,
+            "cpu_seconds": 128.4966,
+            "peak_rss_bytes": 620888064,
+            "pid": 92228
+          },
+          "output_equal": true,
+          "trace_equal": true,
+          "binary_sha256": "4dba5c96c4b3d88233e70dc0e6a63b49e447cfbfa073c54ee4a2425b63286271",
+          "input_sha256": "00cf3eee7805f02f12b6ae21b9f5fe753a12c1df11d6508c0228fbd395f3bca9"
+        },
+        {
+          "variant": "arity",
+          "fixture": "GraphDense",
+          "started_at": "2026-10-20T12:19:38.623Z",
+          "finished_at": "2026-10-20T12:21:00.639Z",
+          "code": 0,
+          "signal": null,
+          "status": {
+            "exit_code": 0,
+            "timed_out": false,
+            "interrupted": false,
+            "termination_signal": 0,
+            "wall_seconds": 82.012681,
+            "cpu_seconds": 81.974073,
+            "peak_rss_bytes": 619675648,
+            "pid": 1064
+          },
+          "output_equal": true,
+          "trace_equal": true,
+          "binary_sha256": "4a7fd6db40ae2f9af851e46db498de9874dd9467012a43bacbbb64655d5cf5bd",
+          "input_sha256": "00cf3eee7805f02f12b6ae21b9f5fe753a12c1df11d6508c0228fbd395f3bca9"
+        },
+        {
+          "variant": "combined",
+          "fixture": "GraphDense",
+          "started_at": "2026-10-20T12:21:00.641Z",
+          "finished_at": "2026-10-20T12:22:48.819Z",
+          "code": 0,
+          "signal": null,
+          "status": {
+            "exit_code": 0,
+            "timed_out": false,
+            "interrupted": false,
+            "termination_signal": 0,
+            "wall_seconds": 108.174479,
+            "cpu_seconds": 108.13117,
+            "peak_rss_bytes": 620756992,
+            "pid": 6577
+          },
+          "output_equal": true,
+          "trace_equal": true,
+          "binary_sha256": "b6de13ef469d7acb70a6c276e0992fbee6814126722e5b84f031b32155a97dc6",
+          "input_sha256": "00cf3eee7805f02f12b6ae21b9f5fe753a12c1df11d6508c0228fbd395f3bca9"
+        },
+        {
+          "variant": "applications",
+          "fixture": "GraphDense",
+          "started_at": "2026-10-20T12:22:48.821Z",
+          "finished_at": "2026-10-20T12:24:19.222Z",
+          "code": 0,
+          "signal": null,
+          "status": {
+            "exit_code": 0,
+            "timed_out": false,
+            "interrupted": false,
+            "termination_signal": 0,
+            "wall_seconds": 90.39769,
+            "cpu_seconds": 90.363535,
+            "peak_rss_bytes": 619659264,
+            "pid": 13677
+          },
+          "output_equal": true,
+          "trace_equal": true,
+          "binary_sha256": "7ca780b34eca0da2b302d9d961ca250f504c9729210be102bc4ee2bf636b9af5",
+          "input_sha256": "00cf3eee7805f02f12b6ae21b9f5fe753a12c1df11d6508c0228fbd395f3bca9"
+        },
+        {
+          "variant": "baseline",
+          "fixture": "GraphDense",
+          "started_at": "2026-10-20T12:24:19.224Z",
+          "finished_at": "2026-10-20T12:26:00.405Z",
+          "code": 0,
+          "signal": null,
+          "status": {
+            "exit_code": 0,
+            "timed_out": false,
+            "interrupted": false,
+            "termination_signal": 0,
+            "wall_seconds": 101.177871,
+            "cpu_seconds": 101.150489,
+            "peak_rss_bytes": 619708416,
+            "pid": 19785
+          },
+          "output_equal": true,
+          "trace_equal": true,
+          "binary_sha256": "519b78427e126818851b3895360c4f0dbc258cde7dd12ea0a24f0583eae7d5ad",
+          "input_sha256": "00cf3eee7805f02f12b6ae21b9f5fe753a12c1df11d6508c0228fbd395f3bca9"
+        }
+      ],
+      "environment": {
+        "GC_INITIAL_HEAP_SIZE": "536870912",
+        "GC_FREE_SPACE_DIVISOR": "1"
+      },
+      "waited_for": [
+        6101,
+        46763,
+        62069,
+        72372,
+        74736
+      ]
+    },
+    "direct-comparison": {
+      "complete": true,
+      "rows": [
+        {
+          "variant": "arity",
+          "fixture": "GraphDense",
+          "code": 0,
+          "signal": null,
+          "status": {
+            "exit_code": 0,
+            "timed_out": false,
+            "interrupted": false,
+            "termination_signal": 0,
+            "wall_seconds": 81.989779,
+            "cpu_seconds": 81.960221,
+            "peak_rss_bytes": 619708416,
+            "pid": 32186
+          },
+          "output_equal": true,
+          "trace_equal": true,
+          "started_at": "2026-10-20T12:27:24.984Z",
+          "finished_at": "2026-10-20T12:28:46.976Z",
+          "binary_sha256": "4a7fd6db40ae2f9af851e46db498de9874dd9467012a43bacbbb64655d5cf5bd",
+          "input_sha256": "00cf3eee7805f02f12b6ae21b9f5fe753a12c1df11d6508c0228fbd395f3bca9"
+        },
+        {
+          "variant": "direct-applications",
+          "fixture": "GraphDense",
+          "code": 0,
+          "signal": null,
+          "status": {
+            "exit_code": 0,
+            "timed_out": false,
+            "interrupted": false,
+            "termination_signal": 0,
+            "wall_seconds": 76.554434,
+            "cpu_seconds": 76.53151,
+            "peak_rss_bytes": 619675648,
+            "pid": 37662
+          },
+          "output_equal": true,
+          "trace_equal": true,
+          "started_at": "2026-10-20T12:28:46.979Z",
+          "finished_at": "2026-10-20T12:30:03.537Z",
+          "binary_sha256": "db0cdb2b8748695520a857b3eb23a044f2682aec58224229c0e1b2ab911a9806",
+          "input_sha256": "00cf3eee7805f02f12b6ae21b9f5fe753a12c1df11d6508c0228fbd395f3bca9"
+        },
+        {
+          "variant": "direct-applications",
+          "fixture": "GraphDense",
+          "code": 0,
+          "signal": null,
+          "status": {
+            "exit_code": 0,
+            "timed_out": false,
+            "interrupted": false,
+            "termination_signal": 0,
+            "wall_seconds": 76.899212,
+            "cpu_seconds": 76.864984,
+            "peak_rss_bytes": 619642880,
+            "pid": 42730
+          },
+          "output_equal": true,
+          "trace_equal": true,
+          "started_at": "2026-10-20T12:30:03.539Z",
+          "finished_at": "2026-10-20T12:31:20.441Z",
+          "binary_sha256": "db0cdb2b8748695520a857b3eb23a044f2682aec58224229c0e1b2ab911a9806",
+          "input_sha256": "00cf3eee7805f02f12b6ae21b9f5fe753a12c1df11d6508c0228fbd395f3bca9"
+        },
+        {
+          "variant": "arity",
+          "fixture": "GraphDense",
+          "code": 0,
+          "signal": null,
+          "status": {
+            "exit_code": 0,
+            "timed_out": false,
+            "interrupted": false,
+            "termination_signal": 0,
+            "wall_seconds": 81.83643,
+            "cpu_seconds": 81.807579,
+            "peak_rss_bytes": 619675648,
+            "pid": 47979
+          },
+          "output_equal": true,
+          "trace_equal": true,
+          "started_at": "2026-10-20T12:31:20.443Z",
+          "finished_at": "2026-10-20T12:32:42.282Z",
+          "binary_sha256": "4a7fd6db40ae2f9af851e46db498de9874dd9467012a43bacbbb64655d5cf5bd",
+          "input_sha256": "00cf3eee7805f02f12b6ae21b9f5fe753a12c1df11d6508c0228fbd395f3bca9"
+        }
+      ],
+      "environment": {
+        "GC_INITIAL_HEAP_SIZE": "536870912",
+        "GC_FREE_SPACE_DIVISOR": "1"
+      }
+    },
+    "heavy-comparison": {
+      "complete": true,
+      "rows": [
+        {
+          "variant": "baseline",
+          "fixture": "SolverReuse",
+          "initial_heap": "536870912",
+          "code": 0,
+          "signal": null,
+          "status": {
+            "exit_code": 0,
+            "timed_out": false,
+            "interrupted": false,
+            "termination_signal": 0,
+            "wall_seconds": 437.741097,
+            "cpu_seconds": 437.36686,
+            "peak_rss_bytes": 6549405696,
+            "pid": 60224
+          },
+          "output_equal": true,
+          "trace_equal": true,
+          "started_at": "2026-10-20T12:34:21.592Z",
+          "finished_at": "2026-10-20T12:41:39.338Z",
+          "binary_sha256": "519b78427e126818851b3895360c4f0dbc258cde7dd12ea0a24f0583eae7d5ad",
+          "input_sha256": "dbdc641d88f775c0d9377131784b58cdeddd7ae295c9541ae4b4995859527030"
+        },
+        {
+          "variant": "arity",
+          "fixture": "SolverReuse",
+          "initial_heap": "536870912",
+          "code": 0,
+          "signal": null,
+          "status": {
+            "exit_code": 0,
+            "timed_out": false,
+            "interrupted": false,
+            "termination_signal": 0,
+            "wall_seconds": 353.308875,
+            "cpu_seconds": 353.222776,
+            "peak_rss_bytes": 6499549184,
+            "pid": 89274
+          },
+          "output_equal": true,
+          "trace_equal": true,
+          "started_at": "2026-10-20T12:41:39.342Z",
+          "finished_at": "2026-10-20T12:47:32.654Z",
+          "binary_sha256": "4a7fd6db40ae2f9af851e46db498de9874dd9467012a43bacbbb64655d5cf5bd",
+          "input_sha256": "dbdc641d88f775c0d9377131784b58cdeddd7ae295c9541ae4b4995859527030"
+        },
+        {
+          "variant": "direct-applications",
+          "fixture": "SolverReuse",
+          "initial_heap": "536870912",
+          "code": 0,
+          "signal": null,
+          "status": {
+            "exit_code": 0,
+            "timed_out": false,
+            "interrupted": false,
+            "termination_signal": 0,
+            "wall_seconds": 328.877535,
+            "cpu_seconds": 328.779901,
+            "peak_rss_bytes": 6476627968,
+            "pid": 13485
+          },
+          "output_equal": true,
+          "trace_equal": true,
+          "started_at": "2026-10-20T12:47:32.657Z",
+          "finished_at": "2026-10-20T12:53:01.538Z",
+          "binary_sha256": "db0cdb2b8748695520a857b3eb23a044f2682aec58224229c0e1b2ab911a9806",
+          "input_sha256": "dbdc641d88f775c0d9377131784b58cdeddd7ae295c9541ae4b4995859527030"
+        },
+        {
+          "variant": "direct-applications",
+          "fixture": "StateTypes",
+          "initial_heap": "536870912",
+          "code": 0,
+          "signal": null,
+          "status": {
+            "exit_code": 0,
+            "timed_out": false,
+            "interrupted": false,
+            "termination_signal": 0,
+            "wall_seconds": 206.061677,
+            "cpu_seconds": 204.83372,
+            "peak_rss_bytes": 3302359040,
+            "pid": 35193
+          },
+          "output_equal": true,
+          "trace_equal": true,
+          "started_at": "2026-10-20T12:53:01.540Z",
+          "finished_at": "2026-10-20T12:56:27.606Z",
+          "binary_sha256": "db0cdb2b8748695520a857b3eb23a044f2682aec58224229c0e1b2ab911a9806",
+          "input_sha256": "2a48f2579f9a666d268a57bf70d5687a074937d61d6f71e1ed18f6fb57d391e8"
+        },
+        {
+          "variant": "baseline",
+          "fixture": "StateTypes",
+          "initial_heap": "536870912",
+          "code": 0,
+          "signal": null,
+          "status": {
+            "exit_code": 0,
+            "timed_out": false,
+            "interrupted": false,
+            "termination_signal": 0,
+            "wall_seconds": 272.809505,
+            "cpu_seconds": 271.562372,
+            "peak_rss_bytes": 4375396352,
+            "pid": 49131
+          },
+          "output_equal": true,
+          "trace_equal": true,
+          "started_at": "2026-10-20T12:56:27.609Z",
+          "finished_at": "2026-10-20T13:01:00.422Z",
+          "binary_sha256": "519b78427e126818851b3895360c4f0dbc258cde7dd12ea0a24f0583eae7d5ad",
+          "input_sha256": "2a48f2579f9a666d268a57bf70d5687a074937d61d6f71e1ed18f6fb57d391e8"
+        },
+        {
+          "variant": "baseline",
+          "fixture": "GraphDense",
+          "initial_heap": "8388608",
+          "code": 0,
+          "signal": null,
+          "status": {
+            "exit_code": 0,
+            "timed_out": false,
+            "interrupted": false,
+            "termination_signal": 0,
+            "wall_seconds": 136.467318,
+            "cpu_seconds": 136.076413,
+            "peak_rss_bytes": 474513408,
+            "pid": 67226
+          },
+          "output_equal": true,
+          "trace_equal": true,
+          "started_at": "2026-10-20T13:01:00.425Z",
+          "finished_at": "2026-10-20T13:03:16.898Z",
+          "binary_sha256": "519b78427e126818851b3895360c4f0dbc258cde7dd12ea0a24f0583eae7d5ad",
+          "input_sha256": "00cf3eee7805f02f12b6ae21b9f5fe753a12c1df11d6508c0228fbd395f3bca9"
+        },
+        {
+          "variant": "direct-applications",
+          "fixture": "GraphDense",
+          "initial_heap": "8388608",
+          "code": 0,
+          "signal": null,
+          "status": {
+            "exit_code": 0,
+            "timed_out": false,
+            "interrupted": false,
+            "termination_signal": 0,
+            "wall_seconds": 101.143528,
+            "cpu_seconds": 100.656235,
+            "peak_rss_bytes": 474497024,
+            "pid": 76702
+          },
+          "output_equal": true,
+          "trace_equal": true,
+          "started_at": "2026-10-20T13:03:16.900Z",
+          "finished_at": "2026-10-20T13:04:58.047Z",
+          "binary_sha256": "db0cdb2b8748695520a857b3eb23a044f2682aec58224229c0e1b2ab911a9806",
+          "input_sha256": "00cf3eee7805f02f12b6ae21b9f5fe753a12c1df11d6508c0228fbd395f3bca9"
+        }
+      ],
+      "compiler_sha256": "dbcfd6422d592e237c1a0d17a3ea7b4fed3a0e711d992c3f6c733deb82b0d6d5",
+      "runtime_source_sha256": "28c7e1a31f07017c80c4fd3c8d82b25dba1afe654851e04357258a9974772b4d",
+      "primitive_source_sha256": "2e58ddd07dbcb2610c36ee39ae9dddac822330ebc60a752f071886433b5aaf1e"
+    }
+  },
+  "decisions": {
+    "retained": [
+      "constant primitive arities, independently checked against all 82 type signatures",
+      "direct primitive application with lazy arguments and ordinary overapplication fallback"
+    ],
+    "rejected": [
+      "bounded environment indexing: slower in isolated comparison",
+      "direct primitive application with a lazy ordinary-application fallback: slower than arity-only"
+    ],
+    "excluded_measurements": "Earlier concurrent pilots and the initial ignored include-path override are diagnostics only. No performance claims use those timings."
+  },
+  "provenance": {
+    "clang": {
+      "path": "/opt/homebrew/Cellar/llvm/23.1.3/bin/clang-23",
+      "sha256": "06793e4ad680ffa8f678c839107ae8bba4e4ca04feaf5ebbb36dd2ad241dbb82"
+    },
+    "baseline_sources": {
+      "Runtime": "82c5d04723c90122c20503e2df23ac380eb64a812100d20719694a7ec9831dab",
+      "Primitive": "83a71db6cb4145dc136bcffb36ee11472bd9f55a642979e57419386076999d0f"
+    },
+    "raw_directory": ".mlf-build/release-next/port-performance",
+    "compiler": ".mlf-build/release-next/stage1/bin/emlf",
+    "native_flags": [
+      "-O2",
+      "-Wno-override-module",
+      "-lm",
+      "-Wl,-stack_size,0x10000000"
+    ],
+    "runtime_objects": {
+      "runtime-traced.o": "3c63ab4725acc06396af9ae5b6a54a09d8d05b48162cd7b3b98d594d94716ac3",
+      "trace.o": "06bce70eb61a4024d0111aa223c375fcd58947a4bad43959decf6b10ff0e95b5"
+    },
+    "gc_library_sha256": "87a270cbfc5b5a569c0b104e2fe7208bed7488010e50387e80d8015a295a1a69",
+    "gmp_library_sha256": "9220cca5e94b5077a99a068b0d1b9dd39da1d8febb3f518e6a8ce7aadc0d140b",
+    "input_directory": ".mlf-build/crate-migration/final-validation-r11/build/compiler-tests/port/matrix-standard",
+    "unchanged_input_indices": {
+      "SolverReuse": 20,
+      "StateTypes": 15,
+      "GraphDense": 18
+    }
+  },
+  "collection_policy": {
+    "complete": true,
+    "rows": [
+      {
+        "divisor": "2",
+        "fixture": "SolverReuse",
+        "code": 0,
+        "signal": null,
+        "status": {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 455.835839,
+          "cpu_seconds": 452.60859,
+          "peak_rss_bytes": 4440834048,
+          "pid": 83936
+        },
+        "output_equal": true,
+        "trace_equal": true,
+        "started_at": "2026-10-20T13:05:05.149Z",
+        "finished_at": "2026-10-20T13:12:40.990Z",
+        "binary_sha256": "db0cdb2b8748695520a857b3eb23a044f2682aec58224229c0e1b2ab911a9806",
+        "input_sha256": "dbdc641d88f775c0d9377131784b58cdeddd7ae295c9541ae4b4995859527030"
+      },
+      {
+        "divisor": "4",
+        "fixture": "SolverReuse",
+        "code": 0,
+        "signal": null,
+        "status": {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 621.528513,
+          "cpu_seconds": 616.56031,
+          "peak_rss_bytes": 3421716480,
+          "pid": 14449
+        },
+        "output_equal": true,
+        "trace_equal": true,
+        "started_at": "2026-10-20T13:12:40.995Z",
+        "finished_at": "2026-10-20T13:23:02.528Z",
+        "binary_sha256": "db0cdb2b8748695520a857b3eb23a044f2682aec58224229c0e1b2ab911a9806",
+        "input_sha256": "dbdc641d88f775c0d9377131784b58cdeddd7ae295c9541ae4b4995859527030"
+      }
+    ]
+  },
+  "test_builds": {
+    "complete": true,
+    "rows": [
+      {
+        "variant": "before",
+        "code": 0,
+        "signal": null,
+        "status": {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 1311.028033,
+          "cpu_seconds": 1255.49284,
+          "peak_rss_bytes": 3341451264,
+          "pid": 64602
+        },
+        "started_at": "2026-10-20T13:25:09.328Z",
+        "finished_at": "2026-10-20T13:47:00.362Z",
+        "complete": true,
+        "commands": [
+          {
+            "argv": [
+              "/Volumes/src/mlf/.mlf-build/release-next/stage1/bin/emlf",
+              "--compile-crate",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/7010708bc06c3baae8202541dd078f456e50051af2fc5ae56761c157aa9e6156.work/crate.spec",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/7010708bc06c3baae8202541dd078f456e50051af2fc5ae56761c157aa9e6156.work/unit"
+            ],
+            "exit_code": 0
+          },
+          {
+            "argv": [
+              "/Volumes/src/mlf/.mlf-build/release-next/stage1/bin/emlf",
+              "--compile-crate",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/65ae386069070dd43da01a280b1b6c89851a29bf35e4579d2c86f9d1f265e786.work/crate.spec",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/65ae386069070dd43da01a280b1b6c89851a29bf35e4579d2c86f9d1f265e786.work/unit"
+            ],
+            "exit_code": 0
+          },
+          {
+            "argv": [
+              "/Volumes/src/mlf/.mlf-build/release-next/stage1/bin/emlf",
+              "--compile-crate",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/dfcfeb4d671607c36307073e3dec677f0fa531081b4b6ab54e509b506724b3ac.work/crate.spec",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/dfcfeb4d671607c36307073e3dec677f0fa531081b4b6ab54e509b506724b3ac.work/unit"
+            ],
+            "exit_code": 0
+          },
+          {
+            "argv": [
+              "/Volumes/src/mlf/.mlf-build/release-next/stage1/bin/emlf",
+              "--compile-crate",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/9231c22c1636a68edda5a05074fbaa0afec44d9a344dee62b4eb6febb88317da.work/crate.spec",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/9231c22c1636a68edda5a05074fbaa0afec44d9a344dee62b4eb6febb88317da.work/unit"
+            ],
+            "exit_code": 0
+          },
+          {
+            "argv": [
+              "/Volumes/src/mlf/.mlf-build/release-next/stage1/bin/emlf",
+              "--crate-to-llvm-gc",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/9231c22c1636a68edda5a05074fbaa0afec44d9a344dee62b4eb6febb88317da/unit.mlfci",
+              "--cache",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/codegen-cache/dbcfd6422d592e237c1a0d17a3ea7b4fed3a0e711d992c3f6c733deb82b0d6d5"
+            ],
+            "exit_code": 0
+          },
+          {
+            "argv": [
+              "/opt/homebrew/Cellar/llvm/23.1.3/bin/clang-23",
+              "-O2",
+              "-Wno-override-module",
+              "-c",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/ab8d3dcdbd5fe5e46480395916e9b681b46a87aa3c074cca8a9a2d39ca2a03b3/program.ll",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/6f21a92e6027679c1aa513973655140f9c1e16a22c5b32c79ba366d057b0e297.work/program.o"
+            ],
+            "exit_code": 0
+          },
+          {
+            "argv": [
+              "/opt/homebrew/Cellar/llvm/23.1.3/bin/clang-23",
+              "-O2",
+              "-std=c11",
+              "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+              "-I/opt/homebrew/Cellar/bdw-gc/8.2.12/include",
+              "-DMLF_USE_BDWGC",
+              "-DMLF_COMPACT_BDWGC",
+              "-DMLF_GC_THRESHOLD=1048576",
+              "-c",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/source/runtime/mlf_runtime.c",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/99a941e7bcb3c545abecc6f39b08150856df581e54a1adc5646371d2a9733253.work/runtime.o"
+            ],
+            "exit_code": 0
+          },
+          {
+            "argv": [
+              "/opt/homebrew/Cellar/llvm/23.1.3/bin/clang-23",
+              "-O2",
+              "-Wno-override-module",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/6f21a92e6027679c1aa513973655140f9c1e16a22c5b32c79ba366d057b0e297/program.o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/99a941e7bcb3c545abecc6f39b08150856df581e54a1adc5646371d2a9733253/runtime.o",
+              "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+              "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+              "-lgmp",
+              "-I/opt/homebrew/Cellar/bdw-gc/8.2.12/include",
+              "/opt/homebrew/Cellar/bdw-gc/8.2.12/lib/libgc.a",
+              "-lm",
+              "-Wl,-stack_size,0x10000000",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/6d2da20c900303e8a526603071467a44b53d275b271b934a849084808c7d8e11.work/program"
+            ],
+            "exit_code": 0
+          },
+          {
+            "argv": [
+              "/Volumes/src/mlf/.mlf-build/release-next/stage1/bin/emlf",
+              "--compile-crate",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/c3b3287f0fe0db81727a01df7310736fbde8c5921b026241c2224fbb7684c183.work/crate.spec",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/c3b3287f0fe0db81727a01df7310736fbde8c5921b026241c2224fbb7684c183.work/unit"
+            ],
+            "exit_code": 0
+          },
+          {
+            "argv": [
+              "/Volumes/src/mlf/.mlf-build/release-next/stage1/bin/emlf",
+              "--crate-to-llvm-gc",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/c3b3287f0fe0db81727a01df7310736fbde8c5921b026241c2224fbb7684c183/unit.mlfci",
+              "--cache",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/codegen-cache/dbcfd6422d592e237c1a0d17a3ea7b4fed3a0e711d992c3f6c733deb82b0d6d5"
+            ],
+            "exit_code": 0
+          },
+          {
+            "argv": [
+              "/opt/homebrew/Cellar/llvm/23.1.3/bin/clang-23",
+              "-O2",
+              "-Wno-override-module",
+              "-c",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/dec06a1510d88e07e250a2891ef9504140d34c2207495ef7787089c5f15f53d9/program.ll",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/8939d79f9309780311c8f337b8b832e9f0b597fcaf2f60f35f7f14ccd4200043.work/program.o"
+            ],
+            "exit_code": 0
+          },
+          {
+            "argv": [
+              "/opt/homebrew/Cellar/llvm/23.1.3/bin/clang-23",
+              "-O2",
+              "-Wno-override-module",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/8939d79f9309780311c8f337b8b832e9f0b597fcaf2f60f35f7f14ccd4200043/program.o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/99a941e7bcb3c545abecc6f39b08150856df581e54a1adc5646371d2a9733253/runtime.o",
+              "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+              "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+              "-lgmp",
+              "-I/opt/homebrew/Cellar/bdw-gc/8.2.12/include",
+              "/opt/homebrew/Cellar/bdw-gc/8.2.12/lib/libgc.a",
+              "-lm",
+              "-Wl,-stack_size,0x10000000",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/before/build/cache/0fe697b81d8a1374f94e915857c6c5bcf11c11ae6630c357edda82afefa62b96.work/program"
+            ],
+            "exit_code": 0
+          }
+        ],
+        "binaries": {
+          "references": "c11b8684bf35c41d2ee212bfc112b504bf905b0ad78bd83e56cfee514668293d",
+          "port": "2de0ded451a0bd494e0478afc0ab2cc4e94f1e8f67e27d2aee26f1e1bec8e7bb"
+        }
+      },
+      {
+        "variant": "after",
+        "code": 0,
+        "signal": null,
+        "status": {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 710.993398,
+          "cpu_seconds": 670.432228,
+          "peak_rss_bytes": 3461808128,
+          "pid": 60257
+        },
+        "started_at": "2026-10-20T13:47:00.372Z",
+        "finished_at": "2026-10-20T13:58:51.369Z",
+        "complete": true,
+        "commands": [
+          {
+            "argv": [
+              "/Volumes/src/mlf/.mlf-build/release-next/stage1/bin/emlf",
+              "--compile-crate",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/30d9d4ff8287c7d1c88eaf05694440a474793b95c31a9cec64eb723ed98e5196.work/crate.spec",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/30d9d4ff8287c7d1c88eaf05694440a474793b95c31a9cec64eb723ed98e5196.work/unit"
+            ],
+            "exit_code": 0
+          },
+          {
+            "argv": [
+              "/Volumes/src/mlf/.mlf-build/release-next/stage1/bin/emlf",
+              "--compile-crate",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/492b8a52c5f81e4b076b44dd969d2053986db9a673cdb2faaf4cd31c31610e6a.work/crate.spec",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/492b8a52c5f81e4b076b44dd969d2053986db9a673cdb2faaf4cd31c31610e6a.work/unit"
+            ],
+            "exit_code": 0
+          },
+          {
+            "argv": [
+              "/Volumes/src/mlf/.mlf-build/release-next/stage1/bin/emlf",
+              "--compile-crate",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/50f346e2d3861cc80e9709db1c3e5a6060f51ecc0a0879e2784acc67fe626435.work/crate.spec",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/50f346e2d3861cc80e9709db1c3e5a6060f51ecc0a0879e2784acc67fe626435.work/unit"
+            ],
+            "exit_code": 0
+          },
+          {
+            "argv": [
+              "/Volumes/src/mlf/.mlf-build/release-next/stage1/bin/emlf",
+              "--compile-crate",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/803acb9bf75acff09cc85b7eece143039c398063f9f7f04917cb91c66c7c7f8c.work/crate.spec",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/803acb9bf75acff09cc85b7eece143039c398063f9f7f04917cb91c66c7c7f8c.work/unit"
+            ],
+            "exit_code": 0
+          },
+          {
+            "argv": [
+              "/Volumes/src/mlf/.mlf-build/release-next/stage1/bin/emlf",
+              "--crate-to-llvm-gc",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/803acb9bf75acff09cc85b7eece143039c398063f9f7f04917cb91c66c7c7f8c/unit.mlfci",
+              "--cache",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/codegen-cache/dbcfd6422d592e237c1a0d17a3ea7b4fed3a0e711d992c3f6c733deb82b0d6d5"
+            ],
+            "exit_code": 0
+          },
+          {
+            "argv": [
+              "/opt/homebrew/Cellar/llvm/23.1.3/bin/clang-23",
+              "-O2",
+              "-Wno-override-module",
+              "-c",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/054a4fc516aa3198974f2460664b14d787ed93e666c0c7b1b55b4d8f3730d92b/program.ll",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/40a832241bdb0d3a37dcbb41ab46f855be7858503a6d21ae213028f994ad352c.work/program.o"
+            ],
+            "exit_code": 0
+          },
+          {
+            "argv": [
+              "/opt/homebrew/Cellar/llvm/23.1.3/bin/clang-23",
+              "-O2",
+              "-std=c11",
+              "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+              "-I/opt/homebrew/Cellar/bdw-gc/8.2.12/include",
+              "-DMLF_USE_BDWGC",
+              "-DMLF_COMPACT_BDWGC",
+              "-DMLF_GC_THRESHOLD=1048576",
+              "-c",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/source/runtime/mlf_runtime.c",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/f851817e8c055df80c0f8be9779b81684854ae395b8e1a7ceecd490c378aa7ce.work/runtime.o"
+            ],
+            "exit_code": 0
+          },
+          {
+            "argv": [
+              "/opt/homebrew/Cellar/llvm/23.1.3/bin/clang-23",
+              "-O2",
+              "-Wno-override-module",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/40a832241bdb0d3a37dcbb41ab46f855be7858503a6d21ae213028f994ad352c/program.o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/f851817e8c055df80c0f8be9779b81684854ae395b8e1a7ceecd490c378aa7ce/runtime.o",
+              "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+              "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+              "-lgmp",
+              "-I/opt/homebrew/Cellar/bdw-gc/8.2.12/include",
+              "/opt/homebrew/Cellar/bdw-gc/8.2.12/lib/libgc.a",
+              "-lm",
+              "-Wl,-stack_size,0x10000000",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/01b64c9d4a684f71ea0fd710bf51bc359f4cc7fe186f8f9ef452dd732c086d2e.work/program"
+            ],
+            "exit_code": 0
+          },
+          {
+            "argv": [
+              "/Volumes/src/mlf/.mlf-build/release-next/stage1/bin/emlf",
+              "--compile-crate",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/05e586d143e42c947e84027a798ff082adad6164ff3ff92f6f7f9a772a6e3dfb.work/crate.spec",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/05e586d143e42c947e84027a798ff082adad6164ff3ff92f6f7f9a772a6e3dfb.work/unit"
+            ],
+            "exit_code": 0
+          },
+          {
+            "argv": [
+              "/Volumes/src/mlf/.mlf-build/release-next/stage1/bin/emlf",
+              "--crate-to-llvm-gc",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/05e586d143e42c947e84027a798ff082adad6164ff3ff92f6f7f9a772a6e3dfb/unit.mlfci",
+              "--cache",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/codegen-cache/dbcfd6422d592e237c1a0d17a3ea7b4fed3a0e711d992c3f6c733deb82b0d6d5"
+            ],
+            "exit_code": 0
+          },
+          {
+            "argv": [
+              "/opt/homebrew/Cellar/llvm/23.1.3/bin/clang-23",
+              "-O2",
+              "-Wno-override-module",
+              "-c",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/4dadc51cde9a34f81b471f8e83df2c944fa14b9cde8a6de9b15bdf461ae85f34/program.ll",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/1e19e394180bfc5121eb42c842865193654524e655b42454dbffd52f53092155.work/program.o"
+            ],
+            "exit_code": 0
+          },
+          {
+            "argv": [
+              "/opt/homebrew/Cellar/llvm/23.1.3/bin/clang-23",
+              "-O2",
+              "-Wno-override-module",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/1e19e394180bfc5121eb42c842865193654524e655b42454dbffd52f53092155/program.o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/f851817e8c055df80c0f8be9779b81684854ae395b8e1a7ceecd490c378aa7ce/runtime.o",
+              "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+              "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+              "-lgmp",
+              "-I/opt/homebrew/Cellar/bdw-gc/8.2.12/include",
+              "/opt/homebrew/Cellar/bdw-gc/8.2.12/lib/libgc.a",
+              "-lm",
+              "-Wl,-stack_size,0x10000000",
+              "-o",
+              "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/cache/366dc51928d3daa78e83efff9b8edd0de127d7339b917ad41755c889dbc1937f.work/program"
+            ],
+            "exit_code": 0
+          }
+        ],
+        "binaries": {
+          "references": "27c1cd41837393a58853d5028d0116946410dcad913d8c096f4a0c24b519f109",
+          "port": "c17c0cfb031fd4b96a92e1acb533485b90398c79861530ccf10609a618c41cac"
+        }
+      }
+    ]
+  },
+  "independent_references": {
+    "complete": true,
+    "rows": [
+      {
+        "variant": "before",
+        "reference": "GraphReference",
+        "code": 0,
+        "signal": null,
+        "status": {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.935732,
+          "cpu_seconds": 0.141,
+          "peak_rss_bytes": 400097280,
+          "pid": 16199
+        },
+        "output_equal": true,
+        "expected_sha256": "c76858cc19806b8e9f866419978a86c19546bfaa21a29b8b6c5a87ca81d93c4e"
+      },
+      {
+        "variant": "before",
+        "reference": "GraphScopesReference",
+        "code": 0,
+        "signal": null,
+        "status": {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.529421,
+          "cpu_seconds": 0.522087,
+          "peak_rss_bytes": 585940992,
+          "pid": 16268
+        },
+        "output_equal": true,
+        "expected_sha256": "4165435c76f5da9a8fd10820714c737261c33e2c458bc350b22d1e134b144dfc"
+      },
+      {
+        "variant": "before",
+        "reference": "GraphDenseReference",
+        "code": 0,
+        "signal": null,
+        "status": {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.424101,
+          "cpu_seconds": 0.410897,
+          "peak_rss_bytes": 586170368,
+          "pid": 16270
+        },
+        "output_equal": true,
+        "expected_sha256": "9c548eb8927bb096871d2393f9ca9378776f01a0771d7bd99e8cc5cc2bc1d149"
+      },
+      {
+        "variant": "before",
+        "reference": "OrderedTraversalReference",
+        "code": 0,
+        "signal": null,
+        "status": {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.098119,
+          "cpu_seconds": 0.096166,
+          "peak_rss_bytes": 274071552,
+          "pid": 16318
+        },
+        "output_equal": true,
+        "expected_sha256": "2b1980eaa1f1d7f8ce1fe63b46fb7605eee5003e9f8c8f68ab4938716d2ecbdb"
+      },
+      {
+        "variant": "before",
+        "reference": "EmbeddingPruningReference",
+        "code": 0,
+        "signal": null,
+        "status": {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.009121,
+          "cpu_seconds": 0.007236,
+          "peak_rss_bytes": 14827520,
+          "pid": 16341
+        },
+        "output_equal": true,
+        "expected_sha256": "8bea4d3cddc7c240458bb2563773f79969e1f0fc55f1f7a8ef628265bc616603"
+      },
+      {
+        "variant": "before",
+        "reference": "InferenceReference",
+        "code": 0,
+        "signal": null,
+        "status": {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.346184,
+          "cpu_seconds": 0.3433,
+          "peak_rss_bytes": 588251136,
+          "pid": 16343
+        },
+        "output_equal": true,
+        "expected_sha256": "3e9f6e39c30fbcd82ae8857d2242fdf6f6ffc02957075c7609ce207b11490489"
+      },
+      {
+        "variant": "after",
+        "reference": "GraphReference",
+        "code": 0,
+        "signal": null,
+        "status": {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.571221,
+          "cpu_seconds": 0.132998,
+          "peak_rss_bytes": 400080896,
+          "pid": 16345
+        },
+        "output_equal": true,
+        "expected_sha256": "c76858cc19806b8e9f866419978a86c19546bfaa21a29b8b6c5a87ca81d93c4e"
+      },
+      {
+        "variant": "after",
+        "reference": "GraphScopesReference",
+        "code": 0,
+        "signal": null,
+        "status": {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.531215,
+          "cpu_seconds": 0.526739,
+          "peak_rss_bytes": 585940992,
+          "pid": 16414
+        },
+        "output_equal": true,
+        "expected_sha256": "4165435c76f5da9a8fd10820714c737261c33e2c458bc350b22d1e134b144dfc"
+      },
+      {
+        "variant": "after",
+        "reference": "GraphDenseReference",
+        "code": 0,
+        "signal": null,
+        "status": {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.380167,
+          "cpu_seconds": 0.375457,
+          "peak_rss_bytes": 586219520,
+          "pid": 16416
+        },
+        "output_equal": true,
+        "expected_sha256": "9c548eb8927bb096871d2393f9ca9378776f01a0771d7bd99e8cc5cc2bc1d149"
+      },
+      {
+        "variant": "after",
+        "reference": "OrderedTraversalReference",
+        "code": 0,
+        "signal": null,
+        "status": {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.098761,
+          "cpu_seconds": 0.093763,
+          "peak_rss_bytes": 274055168,
+          "pid": 16420
+        },
+        "output_equal": true,
+        "expected_sha256": "2b1980eaa1f1d7f8ce1fe63b46fb7605eee5003e9f8c8f68ab4938716d2ecbdb"
+      },
+      {
+        "variant": "after",
+        "reference": "EmbeddingPruningReference",
+        "code": 0,
+        "signal": null,
+        "status": {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.009004,
+          "cpu_seconds": 0.006986,
+          "peak_rss_bytes": 14778368,
+          "pid": 16486
+        },
+        "output_equal": true,
+        "expected_sha256": "8bea4d3cddc7c240458bb2563773f79969e1f0fc55f1f7a8ef628265bc616603"
+      },
+      {
+        "variant": "after",
+        "reference": "InferenceReference",
+        "code": 0,
+        "signal": null,
+        "status": {
+          "exit_code": 0,
+          "timed_out": false,
+          "interrupted": false,
+          "termination_signal": 0,
+          "wall_seconds": 0.338324,
+          "cpu_seconds": 0.330829,
+          "peak_rss_bytes": 588283904,
+          "pid": 16488
+        },
+        "output_equal": true,
+        "expected_sha256": "3e9f6e39c30fbcd82ae8857d2242fdf6f6ffc02957075c7609ce207b11490489"
+      }
+    ]
+  },
+  "test_partition": {
+    "complete": true,
+    "original_modules": 77,
+    "shared_modules": [
+      "Tests.Backends",
+      "Tests.Basic",
+      "Tests.Bytes",
+      "Tests.Helpers",
+      "Tests.IndependentCheck",
+      "Tests.IndependentType",
+      "Tests.Map",
+      "Tests.Set"
+    ],
+    "entries": {
+      "core": [
+        "Tests.Backends",
+        "Tests.Bytes",
+        "Tests.CheckedEmission",
+        "Tests.ComponentProjection",
+        "Tests.Computations",
+        "Tests.Core",
+        "Tests.CrateCodegen",
+        "Tests.CrateQueries",
+        "Tests.Datatypes",
+        "Tests.DenseNormalization",
+        "Tests.DoNotation",
+        "Tests.EmbeddingPruning",
+        "Tests.Graph",
+        "Tests.GraphSolver",
+        "Tests.GraphUnification",
+        "Tests.GraphUnificationReference",
+        "Tests.GraphValidation",
+        "Tests.Helpers",
+        "Tests.IndexEdges",
+        "Tests.IntSetUnions",
+        "Tests.Map",
+        "Tests.Modules",
+        "Tests.OptimizerUses",
+        "Tests.Oracle",
+        "Tests.ProjectionChanges",
+        "Tests.ProjectionRanks",
+        "Tests.Readability",
+        "Tests.Separate",
+        "Tests.Set",
+        "Tests.SolverAllocation",
+        "Tests.SolverIndexAudit",
+        "Tests.StateCases",
+        "Tests.StateTypes",
+        "Tests.StrictWrappers",
+        "Tests.SurfaceSyntax",
+        "Tests.System",
+        "Tests.Typeclasses"
+      ],
+      "figure12": [
+        "Tests.Figure12",
+        "Tests.Figure12Suite",
+        "Tests.Helpers",
+        "Tests.Map",
+        "Tests.Set"
+      ],
+      "backends": [
+        "Tests.BackendCases",
+        "Tests.BackendSuite",
+        "Tests.Backends",
+        "Tests.BoolConditions",
+        "Tests.BootstrapPrimitives",
+        "Tests.ByteArrays",
+        "Tests.Bytes",
+        "Tests.Char8",
+        "Tests.ConstructorProjection",
+        "Tests.DNA",
+        "Tests.EnvironmentAccess",
+        "Tests.ForceReuse",
+        "Tests.Helpers",
+        "Tests.HigherOrderSpecialization",
+        "Tests.IOTests",
+        "Tests.Map",
+        "Tests.ModuleBackends",
+        "Tests.Modules",
+        "Tests.NativeOptimization",
+        "Tests.NumericArrays",
+        "Tests.PreludeTests",
+        "Tests.Readability",
+        "Tests.Separate",
+        "Tests.SeparateBackends",
+        "Tests.Set",
+        "Tests.Snake",
+        "Tests.SnakeBaseline",
+        "Tests.StateCases",
+        "Tests.StateRuntime",
+        "Tests.StateTypes",
+        "Tests.StrictFields",
+        "Tests.StrictWrappers",
+        "Tests.System",
+        "Tests.Text"
+      ],
+      "packages": [
+        "Tests.Basic",
+        "Tests.PackageResolver",
+        "Tests.Packages"
+      ],
+      "port": [
+        "Tests.Backends",
+        "Tests.Bytes",
+        "Tests.Helpers",
+        "Tests.IndependentCheck",
+        "Tests.IndependentType",
+        "Tests.PortSuite"
+      ],
+      "references": [
+        "Tests.EmbeddingPruning",
+        "Tests.Figure12",
+        "Tests.Graph",
+        "Tests.GraphDenseReference",
+        "Tests.GraphReference",
+        "Tests.GraphScopesReference",
+        "Tests.GraphUnificationReference",
+        "Tests.GraphValidation",
+        "Tests.Helpers",
+        "Tests.InferenceReference",
+        "Tests.Map",
+        "Tests.OrderedTraversalReference",
+        "Tests.Set"
+      ],
+      "check-target": [
+        "Tests.IndependentCheck",
+        "Tests.IndependentType"
+      ],
+      "corpus": [
+        "Tests.Corpus",
+        "Tests.Figure12",
+        "Tests.Helpers",
+        "Tests.Map",
+        "Tests.Oracle",
+        "Tests.Set"
+      ],
+      "harness": [
+        "Tests.Basic",
+        "Tests.BenchmarkSuite",
+        "Tests.BootstrapSuite",
+        "Tests.Bytes",
+        "Tests.Helpers",
+        "Tests.NativeABI",
+        "Tests.ReleaseSuite"
+      ]
+    },
+    "manifest_sha256": "c60de749ca0fe7fbf1f61c4070654b38c4590c50740dbb7a5938b434206681a7",
+    "source_hashes": {
+      "Tests.BackendCases": "d034978d441c169706b4faa396b7b89b952973e5c22cd2cb55cdc96166dfedab",
+      "Tests.BackendSuite": "d039a816ef24d90de9abd9c5fe794553c703f72d67b4a9383d7573bc067e286e",
+      "Tests.Backends": "278f1d6e7c38fa392ce0f794a072afb019bc382bbc49c8e16728df1fc81f85f7",
+      "Tests.BoolConditions": "ccb6a3dd54139a4acec21a9de4eb7cc83b66e7527ad9cbfee74338ec3673bd37",
+      "Tests.BootstrapPrimitives": "fbcafda19b24dd60ee1057661feb650274182eae70e9c339093c5b42aab1f073",
+      "Tests.ByteArrays": "23b330876c29f99a5808025d5ce83ccef4a6ea5a44cda14c99fa8354fa1bfc49",
+      "Tests.Bytes": "57996ab872e518a4dde928bde6a8a297a1ef8b09197c1ccf135f9535c5e24ebc",
+      "Tests.Char8": "fdc028169481936ec5c7fe52ba67afcf0bd04d01c1e8f0153ae8050999498387",
+      "Tests.Computations": "7512207b215d02552fa788cde38a23c93d9d0ded8cc49e88e568dfc91851fbef",
+      "Tests.ConstructorProjection": "c864dcf82e1367cbef7a00cbae23e2a146c9cbc808c8d221ff2aee28f30de31b",
+      "Tests.Core": "2f3d2ea2544c97ed880b9042b5ca88ddf9683210b97b10ff1a875d829ebfc2ad",
+      "Tests.CrateQueries": "c4aa3f21a3e01e9a3478c9c82f9f786e441560773c3eb03b8bf9c141edd06c04",
+      "Tests.DNA": "3fd284e2251ae0b5210b4d92cb03a686d1416c9e670b762b10b39d784824180a",
+      "Tests.Datatypes": "be6ba5225d8fa2ce1e03105672986976046bc8bb2cc4a3c8a70f63edf0d5c9b2",
+      "Tests.DoNotation": "da774f4882aaf020ab7fe15b4c963c0b799abcde33598d0b5b261ae06e69de95",
+      "Tests.EmbeddingPruning": "b7ff91919970d6f595f20683143499fa8616b901193b33b2c3b74f8230828943",
+      "Tests.EnvironmentAccess": "9245489c87410c5eb7c3fa597bf74442554d4535a46cda63f48317eb4f4b341a",
+      "Tests.Figure12": "457ee5cfbb36eee2a3670efb582d56057f3ef906b97355502e85c9f84cfaeeea",
+      "Tests.Figure12Suite": "9c0dbf0a183dbdd268192f59ab8fc4ab8c2c489efc3d6dd69ff30a4f66818513",
+      "Tests.ForceReuse": "2fc2f51e0ac34ac81702956c75999f8fa0bd3d19c56a42e0017b9b598d3bb683",
+      "Tests.Graph": "1e4f162763d325de5dc807912f44e4c16e898712900f2bc2ed6ab44f41519677",
+      "Tests.GraphSolver": "2d89f7b85b6bec02ddb4f48c3670ce1dfaff211cabb5e247ea06b7be111de055",
+      "Tests.GraphUnification": "bf9c536987272cdc308fb4760c0b966fab6969987ab1246c3a68c1b3005184c2",
+      "Tests.GraphUnificationReference": "956b95fd6ed1f2630201738d65c85c9022f1cfa059a9fcb50204cd9fb9f68364",
+      "Tests.GraphValidation": "a867548efc6f887da763a4d5f9a4e751ddc9364a6897206790d0fea85590fc50",
+      "Tests.Helpers": "1b4d4036a4b7cba9e0da7e6d75c378ae2a9aadff7a7abbb192b91f1c68091fca",
+      "Tests.HigherOrderSpecialization": "80927cedc28bb14e9800060b29f16f1df533367df432694a002be16f69c16638",
+      "Tests.IOTests": "317f403071fbdf4ab25a01e2b3f8122a599031d058e530caabd184d2e7e6fac8",
+      "Tests.Map": "e25205f125fdc00a8e8c09f255779f3b293b50116f8eeb5b7d715a89417e0026",
+      "Tests.ModuleBackends": "d4caf6a7a0a9793e54d6dbfaf32b14e8c1c53c43b8a5a67aa13e3688810ea6af",
+      "Tests.Modules": "58e6f5dda93fef32d924aa98f53350cba8261004dc6178e69c8ae18f2e5dd6b1",
+      "Tests.NativeOptimization": "06234b94cecbe2e5061c96eba4f2f028ba03c0a6e6d364a3e2280a3e2000f792",
+      "Tests.NumericArrays": "60af6777a4a5feba8604be7940c5c4086d202da7841e39342d26184f6e32780c",
+      "Tests.Oracle": "d3fd69a7829c0ecd1a7e652e736f525168b97d071ada5004696b7159a0646ca8",
+      "Tests.PackageResolver": "3a69affe016168568589cc8cc74244e39453b374404664e2dc2e9a15ad044f5e",
+      "Tests.Packages": "66821f7d5641be0e59d3c2bef08ba088bf123c1289aad6f5105182544eca5bcf",
+      "Tests.PreludeTests": "8e9d4b6e2ad58e8ac3b4617c90dee9c6da50c7b3aab176bfe6f185481095b405",
+      "Tests.Readability": "ec6febf8ea4dc0acfc236438843a85d89a070ff0d0bdab0ad16ff7667b930520",
+      "Tests.Separate": "91c61c84c6cb540093d479f73854d10c5cc0b406bfe55402e146aec17e71a3ed",
+      "Tests.SeparateBackends": "9d5bf57db46bfafec161d5f5cd525219888092c899aa87a9dba7be4059cac9c4",
+      "Tests.Set": "156c8cd12a13cad2d164821b63246e4f3ded13979243fd2efcc40f32ff6e9cfa",
+      "Tests.Snake": "b64f4d8a28776d8fdafb21dca7605c8231d0f6c27db7032b4da59058bb71a4ed",
+      "Tests.SnakeBaseline": "82da788cebc1fd2c9d38db43708a38e31c5b4723ee88e8115fbaa81c313068c3",
+      "Tests.StateCases": "2bb20ed7d6044c0d89390151f0828ac9c2740d7cd24bc3396e18c2f594164c50",
+      "Tests.StateRuntime": "1736b2d74956bda09c2ddd6d2d2193db06d6eea857d320b69d4356833af94933",
+      "Tests.StateTypes": "17be41546bca1b3820a00f695a013184f679ec93599cc7117557680ed81515d5",
+      "Tests.StrictFields": "372711507a82b9b8ae4ba4115419ca9421ee4310ec0d2ee59ffeb484d35598d7",
+      "Tests.SurfaceSyntax": "8e45c146cb69f537624b9c80a551174d3c703cc47250b2b91ddfce6e123189a7",
+      "Tests.System": "cd3f15ae851a52fdbfd48d4f34bbdc2fba6a44b24e21e33e76f5783815becec1",
+      "Tests.Text": "78df805a93b05bc54ec586388b0e0e45c17bfe48c4fa09a1396ef2707cd6789a",
+      "Tests.Typeclasses": "2754a411a42b9e09ca5b94dce17862685443bc2689fdaa3ddf0656aebda15757",
+      "Tests.Basic": "e97d873d899d34d58c2c25cd3f35228011501f478f6feb3f471eeed1b40b910a",
+      "Tests.Corpus": "12df381c7b8ba04c4b612b4ece4944b549fa108e64d17cc2449131d5105a244a",
+      "Tests.IndependentCheck": "df690d2d3c1c647b4b509fd16c80316c8bc659c8f24e6b6c3efc84c93bf0d57a",
+      "Tests.IndependentType": "60e5ea9c795f793e196fe51f1b613edb4eb629f8e116406361ed44188a5eb1e2",
+      "Tests.GraphDenseReference": "ff037e1090a4a60b038dc24efb9eabfb3fe980a6546dfd33375bb38f3d94b346",
+      "Tests.GraphReference": "a28f71e48cad785e8f602e9564e50a6b89f1b1bb5928fc044d906246d6f2225b",
+      "Tests.GraphScopesReference": "c81637346538a2e5539af8e13e190ee6cebad4200e7040b8eaa50b0313515bd1",
+      "Tests.InferenceReference": "3ceadfde666488475af7c5458a1376d176105e546b173d5374b2327dd4cedeb0",
+      "Tests.NativeABI": "38bfea16440fcc0cb6aa9fcaa3f2ebf6b6dc5dd109de6c3869838d00e088d532",
+      "Tests.OrderedTraversalReference": "d49b91dfdd29d2a3e6daf88adc30ef979ae1440e2f09dd02bb86ef8cce0d789f",
+      "Tests.PortSuite": "e83d31d56c1c72725729fe1f6afcc4c022c459ec7e89bbc4e809c57612659ecc",
+      "Tests.BenchmarkSuite": "bc48086976a56cf2f90d3550c2166bf8948805d6dbd433d945bec3b533de3075",
+      "Tests.BootstrapSuite": "793e53ee02ccf2db2b80c9105cc7fbfb6c19723efe76190ef0d9a67c7ea1ac23",
+      "Tests.ReleaseSuite": "86282e9216f05faaa15b9c6d424d8365ccd954dbf9913ad01d8a15fa7d87cebc",
+      "Tests.CheckedEmission": "550cdcac8595faa41961c56ec804d3a031445c3bfc7be215e06ee31a870d7b0b",
+      "Tests.SolverAllocation": "5f4c6448f2495ed9715a7c0841af660cc6290fb9c89d83834f0a1cd7cb651cd3",
+      "Tests.DenseNormalization": "48bf559d43a380d7e81e995ca9c0f4439948f914b32b044e429e8e56990eeb30",
+      "Tests.SolverIndexAudit": "5377c041efc59bb1def4d3355191a97c8cc78589171e38c8d89d0138a505dc9d",
+      "Tests.StrictWrappers": "1ed3ece9031ea3809d6845b6150064844ba139b95fabb9c6278dc67324f9508f",
+      "Tests.ProjectionRanks": "7022114e57422713c0f2b6ec188c6fd3676a4e17453ee7d7f923820e2fe84f18",
+      "Tests.ProjectionChanges": "579a291f74fd5410289c9326f44c482b0665c335f7a2e275243077826d601464",
+      "Tests.IntSetUnions": "29cde1dc82c408a8f4665b8face9a55aee8627a6e5c408939f6fd868d075f403",
+      "Tests.IndexEdges": "363707454f5b0e8b4bff4930a8591f3e2d1f7f0e3fbc635cc222b366ab1784ce",
+      "Tests.ComponentProjection": "a0846e1939c7e65b3f9c49eaebeffcf37707aba4f34f9c623c8244a367143e6d",
+      "Tests.CrateCodegen": "ce4a83e7ef6f00143eb87057c08b919cfab7e8c98ad14220b83b4e11567d362b",
+      "Tests.OptimizerUses": "e38dc08440d955e4e8dd77a82b9d7caa4a8b7c00d7164a00d11ed0cd9f34142c"
+    }
+  },
+  "partition_harness": {
+    "complete": true,
+    "records": [
+      {
+        "name": "build-harness",
+        "executable": "/Volumes/src/mlf/.mlf-build/release-next/stage1/bin/mlfpkg",
+        "args": [
+          "--manifest",
+          "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/source/tests/mlf-package.json",
+          "--compiler",
+          "/Volumes/src/mlf/.mlf-build/release-next/stage1/bin/emlf",
+          "--runtime",
+          "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/source/runtime/mlf_runtime.c",
+          "--build-dir",
+          "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build",
+          "--timeout",
+          "21600",
+          "build",
+          "--target",
+          "harness",
+          "--target",
+          "check-target"
+        ],
+        "cwd": "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/source",
+        "started_at": "2026-10-20T13:59:13.701Z",
+        "finished_at": "2026-10-20T14:03:19.662Z",
+        "code": 0,
+        "signal": null
+      },
+      {
+        "name": "build-host-support",
+        "executable": "clang",
+        "args": [
+          "-O2",
+          "-std=c11",
+          "-Wall",
+          "-Wextra",
+          "-Werror",
+          "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/source/tests/native/host_support.c",
+          "-o",
+          "/Volumes/src/mlf/.mlf-build/release-next/port-performance/partition-harness/host-support"
+        ],
+        "cwd": "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/source",
+        "started_at": "2026-10-20T14:03:19.663Z",
+        "finished_at": "2026-10-20T14:03:19.883Z",
+        "code": 0,
+        "signal": null
+      },
+      {
+        "name": "build-binary-files",
+        "executable": "clang",
+        "args": [
+          "-O2",
+          "-std=c11",
+          "-Wall",
+          "-Wextra",
+          "-Werror",
+          "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/source/tests/native/binary_files.c",
+          "-o",
+          "/Volumes/src/mlf/.mlf-build/release-next/port-performance/partition-harness/binary-files"
+        ],
+        "cwd": "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/source",
+        "started_at": "2026-10-20T14:03:19.883Z",
+        "finished_at": "2026-10-20T14:03:20.012Z",
+        "code": 0,
+        "signal": null
+      },
+      {
+        "name": "harness",
+        "executable": "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/bin/harness",
+        "args": [],
+        "cwd": "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/source",
+        "started_at": "2026-10-20T14:03:20.012Z",
+        "finished_at": "2026-10-20T14:04:00.143Z",
+        "code": 0,
+        "signal": null
+      },
+      {
+        "name": "state-types-target",
+        "executable": "/Volumes/src/mlf/.mlf-build/release-next/stage1/bin/emlf",
+        "args": [
+          "-i",
+          "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/source/bootstrap",
+          "-i",
+          "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/source/tests",
+          "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/source/bootstrap/tests/StateTypes.emlf"
+        ],
+        "cwd": "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/source",
+        "started_at": "2026-10-20T14:04:00.143Z",
+        "finished_at": "2026-10-20T14:05:01.723Z",
+        "code": 0,
+        "signal": null
+      },
+      {
+        "name": "state-types-independent-check",
+        "executable": "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/build/bin/check-target",
+        "args": [
+          "/Volumes/src/mlf/.mlf-build/release-next/port-performance/partition-harness/state-types-target.stdout",
+          "/Volumes/src/mlf/.mlf-build/release-next/port-performance/partition-harness/state-types.type"
+        ],
+        "cwd": "/Volumes/src/mlf/.mlf-build/release-next/port-performance/test-build-comparison/after/source",
+        "started_at": "2026-10-20T14:05:01.724Z",
+        "finished_at": "2026-10-20T14:05:06.980Z",
+        "code": 0,
+        "signal": null
+      }
+    ],
+    "coverage": "57 native benchmark/bootstrap/release harness tests passed",
+    "shared_state_inputs_independently_checked": true,
+    "expected_type": "IO Unit",
+    "compiler_sha256": "dbcfd6422d592e237c1a0d17a3ea7b4fed3a0e711d992c3f6c733deb82b0d6d5",
+    "manager_sha256": "f523f829a61d6432e98168a82e310a3bef88b177a4aef74db99b46e642f88696",
+    "executable_sha256": "94f3a7463cc610a4643698857c5f8d1bf96702c8c5d531d5088461da9c95b5a9",
+    "log_sha256": "31aef531a7a66cd7c12b2e166051569051daba40655f1674cadd0e256e927026",
+    "source_hashes": {
+      "package/Package/Verification.emlf": "bc4f95dd86520f13f1f1115e8043dca7317ccd68e4e22b34d1628381e2ff3a69",
+      "package/Package/CompilerTests.emlf": "d64952303f82e5ba8c37b0d5aaaed430cc50ce639bbc05f03a0661ee1b519881",
+      "tests/Tests/BootstrapSuite.emlf": "793e53ee02ccf2db2b80c9105cc7fbfb6c19723efe76190ef0d9a67c7ea1ac23",
+      "tests/mlf-package.json": "c60de749ca0fe7fbf1f61c4070654b38c4590c50740dbb7a5938b434206681a7",
+      "bootstrap/tests/StateTypes.emlf": "e1ec090f84c2048b3623712c9fb4e5880bd24b61b6d6da141c7d50e62c734358",
+      "tests/Tests/StateCases.emlf": "2bb20ed7d6044c0d89390151f0828ac9c2740d7cd24bc3396e18c2f594164c50"
+    }
+  }
+}

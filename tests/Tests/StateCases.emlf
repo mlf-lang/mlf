@@ -1,9 +1,6 @@
 module Tests.StateCases where
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
-import qualified Package.OS as OS
-import qualified Tests.Helpers as H
-import Tests.Helpers (Quint(..), Sext(..))
 
 
 stateTypeCases : (List ( (Quad (String) (Bool) (String) (Maybe String)) ))

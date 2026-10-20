@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 — 2026-10-20
 
 - Compile libraries and targets as crates with cycle-tolerant module namespaces,
   declaration/SCC inference, persistent checked semantic queries, generated
@@ -14,6 +14,38 @@
   discovery to `.mlf-build/deps`, and remove Python command placeholders.
 - Preserve pinned cross-language benchmark baselines, Snake, frozen oracle
   data, and archived measurements; update build, test, and release docs.
+
+- Add native Windows and Linux developer previews alongside macOS ARM64.
+
+- Add native Windows x64 compiler and package manager executables, Win32
+  process jobs and locks, UTF-8 paths and arguments, and Win64 GMP conversions.
+- Support package planning, local dependency locks, cached builds, interpreter
+  and LLVM tests, and executable publication on Windows with native libraries.
+- Reduce compiler bootstrap memory through checked separate compilation,
+  preserving independent checking and module boundaries.
+- Add native `--version` reporting and platform-specific release packages,
+  checksums, installation and relocation checks for Windows, macOS and Linux.
+- Retain platform-specific validation evidence. Windows compiler qualification
+  uses the independent 7,086-case parity corpus, both runtime layouts, native
+  self-builds and package integration tests; its internal POSIX compiler-test
+  transports and historical performance gates are not claimed as Windows tests.
+- Consolidate 17 repeated unit cases into the dual-backend port tests,
+  merge runtime smoke into the full runtime fixture, and share the unchanged
+  68 ST inputs. Preserve all independent reference and execution-path coverage.
+- Run Windows package and parity qualification through the native MLF harness,
+  including 18 resolver checks, 26 package integration cases, and 7,086 parity
+  cases. Preserve the frozen type/rejection oracles and both runtime backends.
+- Build test executables from their actual module dependencies, with a small
+  shared support library, so port and package qualification do not first compile
+  unrelated test cases. Preserve every active module and execution assertion.
+- Avoid rebuilding primitive type signatures just to obtain runtime arities.
+  Check all 82 arities against their unchanged type signatures.
+- Evaluate directly applied primitives without constructing intermediate partial
+  applications. Preserve lazy arguments, partial application, error order and
+  function-valued results, with interpreter and LLVM regression checks.
+- Record matrix collection policy and use more frequent port collection on
+  release-test hosts with at most 8 GiB RAM. Keep the faster default policy on
+  larger hosts and preserve both runtime layouts and all fixture limits.
 
 ## 0.1.1 — 2026-10-18
 

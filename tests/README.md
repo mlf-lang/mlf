@@ -7,12 +7,28 @@ The old Haskell/Python suites and Haskell compiler have been removed.
 No GHC, Cabal, or Python executable is needed. C fixtures live in `tests/native/`;
 benchmark baselines and golden oracle data remain unchanged.
 
+The shared test library contains eight helper, transport, collection-wrapper
+and independent-checker modules. Each executable explicitly lists the private
+test modules imported by its entry point. All 77 test modules remain reachable
+across those entries. Building `port` and its six reference programs now compiles
+21 test modules including their two entries, instead of compiling all 79 first.
+`mlfpkg --manifest tests/mlf-package.json plan` checks those import boundaries;
+adding a test module also requires adding it to each importing target's
+`modules` map, or to the shared library when it is common support.
+
+The [port performance record](../docs/port-test-performance.md) describes the
+unchanged-input interpreter measurements. Matrix tests default to GC free-space
+divisor 1. `MLF_TEST_MATRIX_GC_DIVISOR=1`, `2` or `4` selects an explicit policy;
+each native matrix report records it alongside the initial heap. The release
+wrapper chooses 4 for port on hosts with at most 8 GiB RAM, while preserving the
+512 MiB standard / 8 MiB compact initial heaps and every test execution.
+
 | Root group | MLF entry | Preserved coverage |
 | --- | --- | --- |
-| unit | CoreMain, Figure12SuiteMain, HarnessMain | 702 compiler checks, exhaustive/seeded Algorithm W, annotations, crate resolution, SCC queries and codegen caching, indexed optimizer and legacy differential checks, 43 Figure 12 expressions and 36 controls, 57 benchmark/bootstrap/release harness methods |
+| unit | CoreMain, Figure12SuiteMain, HarnessMain | 685 compiler checks, exhaustive/seeded Algorithm W, annotations, crate resolution, SCC queries and codegen caching, indexed optimizer and legacy differential checks, 43 Figure 12 expressions and 36 controls, 57 benchmark/bootstrap/release harness methods |
 | packages | PackagesMain | 15 original resolver methods plus three additional checks; 26 compiler integration cases, including native PGO cache isolation and profile-content invalidation |
 | backends | BackendSuiteMain | 523 fixtures and 575 execution rows on interpreter and LLVM, standard and compact GC layouts |
-| port | PortMain, ReferencesMain | 26 fixtures, six reference programs, generated inference input equality, both backends and layouts |
+| port | PortMain, ReferencesMain | 25 fixtures, six reference programs, generated inference input equality, both backends and layouts |
 | parity | CorpusMain, CheckTarget | 7086 prescribed acceptance/type/rejection cases and 80 runtime rows on both backends |
 | self-host | Package.CompilerTests | Fresh next-stage compiler build and LLVM/native binary fixed point |
 
@@ -33,6 +49,10 @@ acceptance overlays for crate compilation. Their prescribed type is `Int`,
 checked against the independent literal target `42`; the archive itself is
 unchanged. The resulting corpus has 3,204 accepted cases. See the
 [oracle migration record](../docs/crate-migration.md#oracle-migration).
+The [coverage audit](coverage-overlap.md) maps retained and consolidated cases.
+The 17 duplicate unit checks now run in the port matrix, whose runtime smoke
+case is merged into RuntimeCases. Shared ST input data retains separate
+unit/type, CLI parity, and nested compiler execution oracles.
 The port inference fixture also prescribes `Int` for its module-import cycle;
 its declarations are not mutually recursive. Its other inference expectations
 and generated source remain unchanged.

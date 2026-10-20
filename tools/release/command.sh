@@ -7,4 +7,9 @@ if [ "${1:-}" = --version ] && [ "$#" -eq 1 ]; then
   printf '%s %s (%s)\n' "$command_name" "$(cat "$package/VERSION")" "$(cat "$package/COMMIT")"
   exit 0
 fi
+if [ "$(uname -s)" = Linux ]; then
+  # Match the native validation environment for compiler recursion. This
+  # applies only to this command and descendants, not the calling shell.
+  ulimit -s unlimited
+fi
 exec "$package/libexec/$command_name" "$@"

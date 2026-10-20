@@ -1,6 +1,6 @@
 module Tests.Backends
  (Backends, Entry(..), Event(..), Input(..), Observation(..), RuntimeError(..),
-  withBackends, withExecutionTimeout, inCase, auditBackends, execute,
+  withBackends, withExecutionTimeout, withInterpreterTimeout, inCase, auditBackends, execute,
   executeWithArguments, executeSerialized, capture, outcome, events, remaining,
   output, outputBytes, stderrOutput) where
 import Bootstrap.Types
@@ -19,7 +19,7 @@ data Event = ReadLine | Write String | WriteBytes Bytes.Bytes | WriteError Strin
 data Input = Input String Bool | RawInput Bytes.Bytes Bool
 data RuntimeError = RuntimeError String
 data Observation = Observation (Either RuntimeError Unit) (List Event) String
-data Backends = Backends String Bool IntArray Int Int
+data Backends = Backends String Bool IntArray Int Int Int
 instance H.Eq RuntimeError where { eq (RuntimeError a) (RuntimeError b) = eqString a b }
 instance H.Show RuntimeError where { show (RuntimeError a) = a }
 instance H.Eq Event where
@@ -46,12 +46,14 @@ stderrOutput observed = S.concatStrings (S.map (\event -> case event of { WriteE
 encodedInput input = case input of { Input text _ -> Bytes.encode text; RawInput bytes _ -> bytes }
 failWrites input = case input of { Input _ fail -> fail; RawInput _ fail -> fail }
 decodeInput input bytes = case input of { Input _ _ -> Bytes.decodeText bytes; RawInput _ _ -> Bytes.latin1 bytes }
-directory (Backends d _ _ _ _) = d
-compact (Backends _ b _ _ _) = b
-serial (Backends _ _ s _ _) = s
-budget (Backends _ _ _ n _) = n
-candidateBudget (Backends _ _ _ _ n) = n
-withExecutionTimeout seconds (Backends d b s _ candidate) = Backends d b s seconds candidate
+directory (Backends d _ _ _ _ _) = d
+compact (Backends _ b _ _ _ _) = b
+serial (Backends _ _ s _ _ _) = s
+budget (Backends _ _ _ n _ _) = n
+candidateBudget (Backends _ _ _ _ n _) = n
+interpreterBudget (Backends _ _ _ _ _ n) = n
+withExecutionTimeout seconds (Backends d b s _ candidate interpreter) = Backends d b s seconds candidate interpreter
+withInterpreterTimeout seconds (Backends d b s native candidate _) = Backends d b s native candidate seconds
 withBackends : forall a. (Backends -> IO a) -> IO a
 withBackends action = do
   work <- getEnv "MLF_TEST_WORK"
@@ -71,7 +73,7 @@ withBackends action = do
   writeFile (dir ++ "/rows.jsonl") ""
   writeFile (dir ++ "/current-label") "<unlabelled>"
   count <- newIntArray 1 0
-  action (Backends dir (eqString abi "compact-gc") count 60 candidate)
+  action (Backends dir (eqString abi "compact-gc") count 60 candidate candidate)
 inCase context label action = do { writeFile (directory context ++ "/current-label") label; action }
 auditBackends context = do
   count <- readIntArray (serial context) 0
@@ -100,7 +102,7 @@ executeSerializedWithArguments context arguments entry input source = do
   writeFile (stem ++ ".xmlf") source
   interpreter <- getEnv "MLF_BOOTSTRAP_INTERPRETER"
   let mode = case entry of { IOEntry -> "--run-xmlf"; ProgramEntry -> "--run-program-xmlf" }
-  first <- observe (withExecutionTimeout (candidateBudget context) context) (stem ++ "-interpreter") (S.append (Cons interpreter (Cons mode (Cons (stem ++ ".xmlf") (Cons "--" Nil)))) arguments) input
+  first <- observe (withExecutionTimeout (interpreterBudget context) context) (stem ++ "-interpreter") (S.append (Cons interpreter (Cons mode (Cons (stem ++ ".xmlf") (Cons "--" Nil)))) arguments) input
   second <- native context stem arguments entry input
   H.assert (H.eq first second) ("backend mismatch\ninterpreter: " ++ H.show first ++ "\nLLVM: " ++ H.show second)
   label <- readFile (directory context ++ "/current-label")

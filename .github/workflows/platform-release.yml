@@ -1,0 +1,313 @@
+name: Cross-platform release
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Existing immutable tag matching VERSION
+        required: true
+        type: string
+  push:
+    branches: [main]
+    paths: [.github/release-request.json]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing immutable tag matching VERSION
+        required: true
+        type: string
+permissions:
+  contents: read
+env:
+  GC_FREE_SPACE_DIVISOR: '1'
+concurrency:
+  group: platform-release-${{ inputs.tag || github.sha }}
+  cancel-in-progress: false
+jobs:
+  metadata:
+    runs-on: ubuntu-24.04
+    outputs:
+      source: ${{ steps.version.outputs.source }}
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.tag || github.sha }}
+          fetch-depth: 0
+      - name: Validate immutable source and requested platforms
+        id: version
+        env:
+          REQUESTED_TAG: ${{ inputs.tag }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          tools/release/check.sh
+          version=$(cat VERSION)
+          tag="v$version"
+          source=$(git rev-parse HEAD)
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            test "$REQUESTED_TAG" = "$tag"
+            test "$(git rev-parse "$tag^{commit}")" = "$source"
+          else
+            jq -e --arg version "$version" '.version == $version and (.platforms | sort) == ["linux-x64","macos-arm64","windows-x64"]' .github/release-request.json
+          fi
+          printf 'source=%s\ntag=%s\nversion=%s\n' "$source" "$tag" "$version" >> "$GITHUB_OUTPUT"
+  mac-bootstrap:
+    needs: metadata
+    runs-on: macos-26
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.metadata.outputs.source }}
+      - run: brew install llvm gmp pkg-config bdw-gc
+      - name: Fetch independently pinned native macOS seed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: tools/release/fetch-seed.sh .mlf-build/seed
+      - name: Build current compiler and manager using checked modules
+        run: |
+          export MLF_GC_PREFIX="$(brew --prefix bdw-gc)"
+          export PATH="$(brew --prefix llvm)/bin:$PATH"
+          tools/release/timed-bootstrap.sh .mlf-build/bootstrap-stage1
+      - name: Export checked LLVM for native Linux and Windows bootstraps
+        run: |
+          set -euo pipefail
+          build=.mlf-build/bootstrap-stage1
+          jq -e '.complete == true and .implementation == "MLF"' "$build/build-report.json"
+          mkdir -p .mlf-build/portable-llvm .mlf-build/mac-candidate
+          for tool in emlf mlfpkg; do
+            key=$(jq -er --arg kind "executable mlf-compiler:$tool" '[.builds[] | select(.kind == $kind) | .key] | if length == 1 then .[0] else error("missing unique native tool") end' "$build/build-report.json")
+            cmp "$build/cache/$key/program" "$build/bin/$tool"
+            cp "$build/cache/$key/program.ll" ".mlf-build/portable-llvm/$tool.ll"
+          done
+          (cd .mlf-build/portable-llvm && shasum -a 256 emlf.ll mlfpkg.ll > SHA256SUMS)
+          cp "$build/build-report.json" .mlf-build/mac-candidate/build-report.json
+          tar -czf .mlf-build/mac-candidate/tools.tar.gz -C "$build" bin
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: portable-llvm
+          path: .mlf-build/portable-llvm/
+          retention-days: 14
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: mac-candidate
+          path: .mlf-build/mac-candidate/
+          retention-days: 14
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: platform-bootstrap-diagnostics
+          include-hidden-files: true
+          path: |
+            .mlf-build/bootstrap-stage1/build-report.json
+            .mlf-build/bootstrap-stage1/timing/
+          retention-days: 14
+  posix-tests:
+    name: ${{ matrix.platform }} ${{ matrix.group }}
+    needs: [metadata, mac-bootstrap]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-arm64, linux-x64]
+        group: [unit, packages, self-host, parity, backends, port-standard, port-compact-gc]
+        include:
+          - platform: macos-arm64
+            runner: macos-26
+          - platform: linux-x64
+            runner: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.metadata.outputs.source }}
+      - name: Native dependencies
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          if [ "$PLATFORM" = macos-arm64 ]; then
+            brew install llvm gmp pkg-config bdw-gc
+            echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+            echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
+          else
+            sudo apt-get update
+            sudo apt-get install -y clang libgmp-dev libgc-dev pkg-config jq
+          fi
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        if: matrix.platform == 'macos-arm64'
+        with:
+          name: mac-candidate
+          path: .mlf-build/mac-candidate
+      - name: Select identical macOS candidate
+        if: matrix.platform == 'macos-arm64'
+        run: |
+          tar -xzf .mlf-build/mac-candidate/tools.tar.gz -C .mlf-build/mac-candidate
+          echo "MLF_COMPILER=$PWD/.mlf-build/mac-candidate/bin/emlf" >> "$GITHUB_ENV"
+          echo "MLF_PACKAGE_MANAGER=$PWD/.mlf-build/mac-candidate/bin/mlfpkg" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        if: matrix.platform == 'linux-x64'
+        with:
+          name: portable-llvm
+          path: .mlf-build/portable-llvm
+      - name: Bootstrap native Linux tools from verified LLVM
+        if: matrix.platform == 'linux-x64'
+        run: tools/release/bootstrap-linux.sh .mlf-build/portable-llvm
+      - name: Run complete native compiler group
+        env:
+          TEST_GROUP: ${{ matrix.group }}
+        run: |
+          case "$TEST_GROUP" in
+            port-standard|port-compact-gc) tools/release/native-ci.sh port "${TEST_GROUP#port-}" ;;
+            *) tools/release/native-ci.sh "$TEST_GROUP" ;;
+          esac
+      - name: Collect exact candidate and primary evidence
+        if: always()
+        env:
+          TEST_GROUP: ${{ matrix.group }}
+        run: |
+          mkdir -p .mlf-build/release-evidence/bin .mlf-build/release-evidence/compiler-tests .mlf-build/release-evidence/diagnostics
+          for tool in emlf mlfpkg; do
+            if test -f ".mlf-build/bin/$tool"; then cp ".mlf-build/bin/$tool" .mlf-build/release-evidence/bin/; fi
+          done
+          if test -d ".mlf-build/compiler-tests/$TEST_GROUP"; then
+            cp -R ".mlf-build/compiler-tests/$TEST_GROUP" .mlf-build/release-evidence/compiler-tests/
+            find .mlf-build/release-evidence/compiler-tests -type f ! -name verification.json ! -name '*.log' ! -name '*.stderr' ! -name '*.err' ! -name '*.status.json' ! -name rows.jsonl ! -name current-label ! -path '*/port-*/matrix-*/case-14-interpreter.stdout' ! -path '*/port-*/matrix-*/case-19-interpreter.stdout' ! -path '*/port-*/matrix-*/case-23-interpreter.stdout' -delete
+          fi
+          log_group=$TEST_GROUP
+          case "$TEST_GROUP" in port-*) log_group=port ;; esac
+          if test -f ".mlf-build/tests/$log_group.log"; then
+            cp ".mlf-build/tests/$log_group.log" ".mlf-build/release-evidence/diagnostics/$TEST_GROUP.log"
+            tail -n 50 ".mlf-build/tests/$log_group.log"
+          fi
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: native-${{ matrix.platform }}-${{ matrix.group }}
+          include-hidden-files: true
+          path: .mlf-build/release-evidence/
+          retention-days: 14
+  posix-package:
+    needs: [metadata, posix-tests]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        include:
+          - platform: macos-arm64
+            runner: macos-26
+          - platform: linux-x64
+            runner: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.metadata.outputs.source }}
+      - name: Native linking dependencies
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          if [ "$PLATFORM" = macos-arm64 ]; then
+            brew install llvm gmp pkg-config bdw-gc
+            echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+            echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
+          else
+            sudo apt-get update
+            sudo apt-get install -y clang libgmp-dev libgc-dev pkg-config jq
+          fi
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: native-${{ matrix.platform }}-*
+          merge-multiple: false
+          path: .mlf-build/release-input
+      - name: Verify six groups and test the relocated installation
+        run: |
+          tools/release/package.sh .mlf-build/release-input .mlf-build/release tools/release/licenses/BDWGC.txt
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: release-${{ matrix.platform }}
+          path: .mlf-build/release/*.tar.gz
+          retention-days: 30
+  windows:
+    needs: [metadata, mac-bootstrap]
+    runs-on: windows-2025
+    timeout-minutes: 360
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.metadata.outputs.source }}
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: portable-llvm
+          path: .mlf-build/portable-llvm
+      - name: Install pinned native Windows dependencies
+        run: tools/release/setup-windows.ps1 -Output .mlf-build/windows-dependencies
+      - name: Bootstrap and self-build both native Windows tools
+        run: tools/release/bootstrap-windows-release.ps1 -Seed .mlf-build/portable-llvm -NativePrefix $env:MLF_NATIVE_PREFIX -Clang $env:MLF_CLANG -Output .mlf-build/windows-native
+      - name: Qualify exact Windows candidate and independent oracles
+        run: tools/release/qualify-windows.ps1 -Stage1 .mlf-build/windows-native/stage1 -Stage2 .mlf-build/windows-native/stage2 -NativePrefix $env:MLF_NATIVE_PREFIX -Clang $env:MLF_CLANG -Output .mlf-build/windows-evidence
+      - name: Package and relocate Windows SDK
+        run: tools/release/package-windows.ps1 -Build .mlf-build/windows-native/stage2 -NativePrefix $env:MLF_NATIVE_PREFIX -Evidence .mlf-build/windows-evidence -Clang $env:MLF_CLANG -Output .mlf-build/windows-release
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: release-windows-x64
+          path: .mlf-build/windows-release/*.zip
+          retention-days: 30
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: windows-release-diagnostics
+          include-hidden-files: true
+          path: |
+            .mlf-build/windows-evidence/*.json
+            .mlf-build/windows-evidence/*.log
+            .mlf-build/windows-native/**/*.json
+            .mlf-build/windows-native/*.log
+          retention-days: 14
+  publish:
+    needs: [metadata, posix-package, windows]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.metadata.outputs.source }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: .mlf-build/publish
+      - name: Publish all three platforms without replacing released assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.metadata.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+          SOURCE_COMMIT: ${{ needs.metadata.outputs.source }}
+        run: |
+          set -euo pipefail
+          cd .mlf-build/publish
+          expected=("mlf-$RELEASE_VERSION-linux-x64.tar.gz" "mlf-$RELEASE_VERSION-macos-arm64.tar.gz" "mlf-$RELEASE_VERSION-windows-x64.zip")
+          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 3
+          for file in "${expected[@]}"; do test -s "$file"; done
+          sha256sum "${expected[@]}" > SHA256SUMS
+          sha256sum --check --strict SHA256SUMS
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Refusing to replace an existing release or its assets.' >&2
+            exit 1
+          fi
+          cd ../..
+          if git rev-parse "$RELEASE_TAG^{commit}" >/dev/null 2>&1; then
+            test "$(git rev-parse "$RELEASE_TAG^{commit}")" = "$SOURCE_COMMIT"
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git tag -a "$RELEASE_TAG" "$SOURCE_COMMIT" -m "MLF $RELEASE_VERSION native developer preview"
+            git push origin "refs/tags/$RELEASE_TAG"
+          fi
+          awk -v version="$RELEASE_VERSION" '$0 ~ "^## " version " " {active=1;next} /^## / {if(active)exit} active' CHANGELOG.md > .mlf-build/publish/NOTES.md
+          gh release create "$RELEASE_TAG" --verify-tag --draft --prerelease --latest=false --title "MLF $RELEASE_VERSION — Windows, macOS and Linux preview" --notes-file .mlf-build/publish/NOTES.md .mlf-build/publish/*.tar.gz .mlf-build/publish/*.zip .mlf-build/publish/SHA256SUMS
+          gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
