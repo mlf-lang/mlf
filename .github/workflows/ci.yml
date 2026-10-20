@@ -7,7 +7,11 @@ on:
         type: string
         required: true
       seed_run:
-        description: Successful portable LLVM producer with identical MLF inputs
+        description: Successful portable LLVM producer used as a bootstrap seed
+        type: string
+        required: true
+      seed_source:
+        description: Exact source commit of the portable LLVM producer
         type: string
         required: true
 permissions:
@@ -40,24 +44,36 @@ jobs:
           path: .mlf-build/seed-provenance
           run-id: ${{ inputs.seed_run }}
           github-token: ${{ github.token }}
-      - name: Verify identical MLF source inputs before using portable LLVM
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.seed_source }}
+          path: .mlf-build/seed-source
+      - name: Verify bootstrap seed provenance and record candidate differences
         env:
           EXPECTED_SOURCE: ${{ inputs.source }}
+          EXPECTED_SEED_SOURCE: ${{ inputs.seed_source }}
           SEED_RUN: ${{ inputs.seed_run }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           . ./tools/release/windows-common.ps1
           $root = (Get-Location).Path
           Assert-Release ((git rev-parse HEAD).Trim() -eq $env:EXPECTED_SOURCE) 'Unexpected qualification source'
+          $producer = (gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:SEED_RUN" --jq .head_sha).Trim()
+          Assert-Release ($LASTEXITCODE -eq 0 -and $producer -eq $env:EXPECTED_SEED_SOURCE) 'Seed run source does not match its checkout'
           $build = Read-ReleaseJson .mlf-build/seed-provenance/build-report.json
           Assert-Release ($build.complete -eq $true -and $build.implementation -eq 'MLF') 'Incomplete portable LLVM producer'
+          $differences = @()
           foreach ($package in $build.packages.packages) {
-            $packageRoot = Join-Path $root $package.path
+            $packageRoot = Join-Path "$root/.mlf-build/seed-source" $package.path
+            $candidateRoot = Join-Path $root $package.path
             Assert-Release ((Get-ReleaseHash "$packageRoot/mlf-package.json") -eq $package.manifest) "Seed manifest differs: $packageRoot"
+            if ((Get-ReleaseHash "$candidateRoot/mlf-package.json") -ne $package.manifest) { $differences += "$($package.path)/mlf-package.json" }
             foreach ($entry in $package.sources.GetEnumerator()) {
               Assert-Release ((Get-ReleaseHash (Join-Path $packageRoot $entry.Key)) -eq $entry.Value) "Seed MLF source differs: $($entry.Key)"
+              if ((Get-ReleaseHash (Join-Path $candidateRoot $entry.Key)) -ne $entry.Value) { $differences += "$($package.path)/$($entry.Key)" }
             }
           }
-          Write-ReleaseJson .mlf-build/seed-provenance/source-equivalence.json @{source=$env:EXPECTED_SOURCE;seed_run=$env:SEED_RUN;mlf_inputs_identical=$true;runtime='compiled afresh from qualification source; no runtime reuse'}
+          Write-ReleaseJson .mlf-build/seed-provenance/bootstrap-seed.json @{source=$env:EXPECTED_SOURCE;seed_run=$env:SEED_RUN;seed_source=$producer;candidate_differences=$differences;candidate_generations=2;runtime='compiled afresh from qualification source; no runtime reuse'}
       - name: Install pinned native Windows dependencies
         run: tools/release/setup-windows.ps1 -Output .mlf-build/windows-dependencies
       - name: Build two fresh native Windows generations
