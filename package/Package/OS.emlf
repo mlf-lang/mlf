@@ -1,6 +1,7 @@
 module Package.OS where
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
+import qualified Bootstrap.Host as Host
 
 fatal : forall a. String -> IO a
 fatal message = do
@@ -47,28 +48,14 @@ arguments i n = if i >= n then ioReturn Nil else do
   xs <- arguments (i + 1) n
   ioReturn (Cons x xs)
 allArguments = do { n <- getArgCount; arguments 0 n }
-isWindows = do
-  system <- getEnv "OS"
-  executable <- getExecutablePath
-  ioReturn (eqString system "Windows_NT" || drivePath executable || starts "//" (normalize executable))
-windowsHost = do
-  selected <- getEnv "MLF_WINDOWS_HOST"
-  executable <- getExecutablePath
-  ioReturn (if eqString selected "" then join (parent executable) "mlf-host.exe" else selected)
+isWindows = Host.isWindows
+windowsHost = Host.windowsHost
 nativePrefix = do
   selected <- getEnv "MLF_NATIVE_PREFIX"
   executable <- getExecutablePath
   ioReturn (if eqString selected "" then parent (parent executable) else normalize selected)
 executable path = do { windows <- isWindows; ioReturn (if windows && S.not (ends ".exe" path) then path ++ ".exe" else path) }
-hostArguments argv = do
-  windows <- isWindows
-  if S.not windows then ioReturn argv else case argv of
-    Cons command rest ->
-      let operation = S.lookup eqString command (Cons (Pair "/bin/mkdir" "mkdir") (Cons (Pair "/bin/cp" "copy") (Cons (Pair "/bin/mv" "move") (Cons (Pair "/bin/rm" "remove") (Cons (Pair "/bin/test" "test") (Cons (Pair "/bin/ln" "link") (Cons (Pair "/usr/bin/uname" "uname") (Cons (Pair "uname" "uname") Nil)))))))) in
-      case operation of
-        Nothing -> if eqString command "mktemp" then do { host <- windowsHost; ioReturn (Cons host (Cons "mktemp" rest)) } else ioReturn argv
-        Just name -> do { host <- windowsHost; ioReturn (Cons host (Cons name rest)) }
-    Nil -> ioReturn Nil
+hostArguments argv = Host.hostArguments argv
 setupWindows = do
   windows <- isWindows
   if S.not windows then ioReturn Unit else do

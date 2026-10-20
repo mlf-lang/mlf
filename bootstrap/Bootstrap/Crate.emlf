@@ -5,6 +5,7 @@ import Bootstrap.Std
 import qualified Bootstrap.Map as M
 import qualified Bootstrap.Set as Set
 import qualified Bootstrap.Module as Modules
+import qualified Bootstrap.Host as Host
 import qualified Bootstrap.Parser as Parser
 import qualified Bootstrap.Classes as Classes
 import qualified Bootstrap.Data as D
@@ -38,10 +39,10 @@ decodeSpec text = do
       ensure (length paths == length (nubBy (\a b -> eqString (fst a) (fst b)) paths)) "duplicate crate source module"
       traverseEither (\(Pair name path) -> do
         Separate.validModuleName name
-        ensure (stringLength path > 0 && stringCodeAt path 0 == 47) "crate source path must be absolute") paths
+        ensure (Host.absolutePath path) "crate source path must be absolute") paths
       ensure (eqString entry "" || any (\p -> eqString (fst p) entry) paths) "crate entry module is outside its source inventory"
-      ensure (stringLength cache > 0 && stringCodeAt cache 0 == 47) "crate query cache path must be absolute"
-      ensure (stringLength prelude > 0 && stringCodeAt prelude 0 == 47) "shared prelude artifact prefix must be absolute"
+      ensure (Host.absolutePath cache) "crate query cache path must be absolute"
+      ensure (Host.absolutePath prelude) "shared prelude artifact prefix must be absolute"
       Right (CrateSpec identity entry mode (sortBy (\a b -> compareString (fst a) (fst b)) paths) deps cache prelude)
     _ -> Left "unsupported or malformed crate specification (expected MLF-CRATE-1)"
 
@@ -157,9 +158,7 @@ compilePrepared spec interfaces prepared = do
       Artifact.validateInterface (Artifact.objectInterface object)
       Right (Pair object report))
 
-parentDirectory path = stringSlice path 0 (lastSeparator path (stringLength path - 1))
-lastSeparator : String -> Int -> Int
-lastSeparator path i = if i <= 0 || stringCodeAt path i == 47 then i else lastSeparator path (i - 1)
+parentDirectory path = Host.parentDirectory path
 
 ensureBuiltin prefix = case Artifact.builtinPrelude of
   Left message -> ioReturn (Left message)

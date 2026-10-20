@@ -104,8 +104,8 @@ emitWithKey directory compact requireIO checked key = case key of
   Left error -> ioReturn (Left error)
   Right inputKey -> if stringLength directory == 0 then ioReturn (Left "code generation cache directory is empty") else do
     let cache = Query.cachePath directory
-    made <- Query.cacheCommand (Cons "/bin/mkdir" (Cons "-p" (Cons (cache ++ "/inputs") (Cons (cache ++ "/prepared") (Cons (cache ++ "/objects") Nil)))))
-    if made /= 0 then ioReturn (Left "cannot create code generation query cache") else do
+    made <- mapM Query.ensureDirectory (Cons (cache ++ "/inputs") (Cons (cache ++ "/prepared") (Cons (cache ++ "/objects") Nil)))
+    if any isLeft made then ioReturn (Left "cannot create code generation query cache") else do
       executable <- getExecutablePath
       compiler <- fileDigest executable
       lock <- acquireFileLock (cache ++ "/.lock")

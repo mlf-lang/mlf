@@ -21,10 +21,11 @@ GC layouts. These are different execution paths.
 | ST source/target inputs copied into StateTypes | Import Tests.StateCases as the single input table. All 56 source strings and 12 target strings, including order and labels, were compared before replacement. Unit type assertions, port nested compilation/roundtrip/output assertions and CLI parity frozen independent oracles remain separate. |
 | One library containing all 77 test modules | Keep eight shared support modules and assign each entry's remaining imports to its private target. Every original module remains reachable. Port plus references compiles 21 test modules including entries, instead of 79; it no longer has to infer unrelated unit and backend cases. |
 
-The resulting inventory is **685 unit checks**, **523 backend fixtures / 575
+The resulting inventory is **686 unit checks**, **523 backend fixtures / 575
 execution rows per layout**, and **25 port fixtures / 25 execution rows per
-layout**. The decrease of seventeen unit cases and one port row reflects the
-consolidations above, not missing executions. Package, parity, Figure 12,
+layout**. Seventeen duplicate unit cases and one port row were consolidated;
+one unit regression adds POSIX and Windows crate paths, rejection of relative
+paths and structured native cache commands. Package, parity, Figure 12,
 independent Algorithm W, harness and self-host requirements are unchanged.
 Native Windows also runs the same 18 resolver and 26 package integration checks,
 plus the native 7,086-case parity harness.

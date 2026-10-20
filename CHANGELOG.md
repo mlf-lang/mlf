@@ -21,6 +21,9 @@
   process jobs and locks, UTF-8 paths and arguments, and Win64 GMP conversions.
 - Support package planning, local dependency locks, cached builds, interpreter
   and LLVM tests, and executable publication on Windows with native libraries.
+- Accept drive-rooted and UNC crate paths, preserve their cache locations, and
+  share native Windows filesystem command translation between compiler queries
+  and package builds. Keep relative crate paths invalid.
 - Reduce compiler bootstrap memory through checked separate compilation,
   preserving independent checking and module boundaries.
 - Add native `--version` reporting and platform-specific release packages,

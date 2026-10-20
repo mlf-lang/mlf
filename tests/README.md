@@ -25,7 +25,7 @@ wrapper chooses 4 for port on hosts with at most 8 GiB RAM, while preserving the
 
 | Root group | MLF entry | Preserved coverage |
 | --- | --- | --- |
-| unit | CoreMain, Figure12SuiteMain, HarnessMain | 685 compiler checks, exhaustive/seeded Algorithm W, annotations, crate resolution, SCC queries and codegen caching, indexed optimizer and legacy differential checks, 43 Figure 12 expressions and 36 controls, 57 benchmark/bootstrap/release harness methods |
+| unit | CoreMain, Figure12SuiteMain, HarnessMain | 686 compiler checks, exhaustive/seeded Algorithm W, annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks, 43 Figure 12 expressions and 36 controls, 57 benchmark/bootstrap/release harness methods |
 | packages | PackagesMain | 15 original resolver methods plus three additional checks; 26 compiler integration cases, including native PGO cache isolation and profile-content invalidation |
 | backends | BackendSuiteMain | 523 fixtures and 575 execution rows on interpreter and LLVM, standard and compact GC layouts |
 | port | PortMain, ReferencesMain | 25 fixtures, six reference programs, generated inference input equality, both backends and layouts |

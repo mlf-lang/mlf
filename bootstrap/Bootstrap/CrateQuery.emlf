@@ -9,6 +9,7 @@ import qualified Bootstrap.Desugar as Desugar
 import qualified Bootstrap.InferenceUnit as Inference
 import qualified Bootstrap.Separate as Separate
 import qualified Bootstrap.Primitive as Primitive
+import qualified Bootstrap.Host as Host
 import qualified Bootstrap.Data as D
 import qualified Bootstrap.X.Type as T
 import qualified Bootstrap.X.Syntax as X
@@ -305,8 +306,10 @@ encodeCached key object = if contextualCache key object then
   else Separate.pack (Cons "MLF-QUERY-CACHE-1" (Cons key (Cons (Separate.encodeInterface (Separate.objectInterface object)) (Cons (Separate.encodeObject object) Nil))))
 
 -- Commands receive NUL-separated argv directly; paths never enter a shell.
-cacheCommand arguments = runProcess "" (concatMapString (\field -> field ++ stringFromCode 0) (Cons "1800" (Cons "" (Cons "" (Cons "" arguments)))))
-cachePath path = if stringLength path > 0 && stringCodeAt path 0 == 47 then path else "./" ++ path
+cacheCommand arguments = do
+  command <- Host.hostArguments arguments
+  runProcess "" (concatMapString (\field -> field ++ stringFromCode 0) (Cons "1800" (Cons "" (Cons "" (Cons "" command)))))
+cachePath path = if Host.absolutePath path then path else "./" ++ path
 writeCache path contents = do
   writeFile (path ++ ".new") contents
   code <- cacheCommand (Cons "/bin/mv" (Cons "-f" (Cons (path ++ ".new") (Cons path Nil))))
