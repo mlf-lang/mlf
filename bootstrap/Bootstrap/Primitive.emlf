@@ -271,7 +271,92 @@ primitiveSignature p = case p of
   PReleaseFileLock -> Pair Nil (Function (Applied "Int" Nil) (Applied "IO" (Cons (Applied "Unit" Nil) Nil)))
 
 primitiveArity : Primitive -> Int
-primitiveArity p = fieldArity (S.snd (primitiveSignature p))
+-- Runtime application asks for arity on every partial and saturated call.
+-- Avoid allocating a type signature here. PrimitiveMetadata checks every
+-- result independently against fieldArity (snd (primitiveSignature p)).
+primitiveArity p = case p of
+  PIOReturn -> 1
+  PIOBind -> 2
+  PPutStr -> 1
+  PPutStrLn -> 1
+  PGetLine -> 0
+  PPrintInt -> 1
+  PConcatString -> 2
+  PShowInt -> 1
+  PAddInt -> 2
+  PSubInt -> 2
+  PEqInt -> 2
+  PLtInt -> 2
+  PEqString -> 2
+  PIfThenElse -> 3
+  PMulInt -> 2
+  PQuotInt -> 2
+  PRemInt -> 2
+  PReadInt -> 1
+  PAddDouble -> 2
+  PSubDouble -> 2
+  PMulDouble -> 2
+  PDivDouble -> 2
+  PSqrtDouble -> 1
+  PEqDouble -> 2
+  PLtDouble -> 2
+  PIntToDouble -> 1
+  PFormatDouble -> 2
+  PNewIntArray -> 2
+  PReadIntArray -> 2
+  PWriteIntArray -> 3
+  PLengthIntArray -> 1
+  PNewDoubleArray -> 2
+  PReadDoubleArray -> 2
+  PWriteDoubleArray -> 3
+  PLengthDoubleArray -> 1
+  PNewByteArray -> 2
+  PReadByteArray -> 2
+  PWriteByteArray -> 3
+  PLengthByteArray -> 1
+  PByteArrayFromString -> 1
+  PPutBytes -> 3
+  PGetByteLine -> 0
+  PNewIntTable -> 0
+  PReadIntTable -> 2
+  PWriteIntTable -> 3
+  PAndInt -> 2
+  PStringLength -> 1
+  PStringCodeAt -> 2
+  PStringSlice -> 3
+  PStringFromCode -> 1
+  PCompareString -> 2
+  PReadDouble -> 1
+  PDoubleToBits -> 1
+  PDoubleFromBits -> 1
+  PSeq -> 2
+  PPanic -> 1
+  PReadFile -> 1
+  PWriteFile -> 2
+  PFileExists -> 1
+  PCanonicalPath -> 1
+  PGetArgCount -> 0
+  PGetArg -> 1
+  PPutErr -> 1
+  PExitWith -> 1
+  PGetExecutablePath -> 0
+  PGetContents -> 0
+  PSTReturn -> 1
+  PSTBind -> 2
+  PRunST -> 1
+  PNewSTArray -> 2
+  PReadSTArray -> 2
+  PWriteSTArray -> 3
+  PLengthSTArray -> 1
+  PGetEnv -> 1
+  PSetEnv -> 2
+  PUnsetEnv -> 1
+  PRunProcess -> 2
+  PListDirectory -> 1
+  PDirectoryExists -> 1
+  PFileDigest -> 1
+  PAcquireFileLock -> 1
+  PReleaseFileLock -> 1
 fieldArity : Field -> Int
 fieldArity field = case field of
   Function a b -> 1 + fieldArity b

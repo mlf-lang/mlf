@@ -8,6 +8,18 @@ it never invokes a Python package-manager implementation. Parsing, inference,
 checked xMLF linking, and LLVM generation use the selected MLF compiler. It uses only local dependencies
 and installed tools. It never downloads a compiler or a dependency.
 
+On Windows, use native `mlfpkg.exe` with `mlf-host.exe`, native `pkg-config`,
+MinGW Clang and the GMP/BDWGC SDK described in the
+[Windows guide](windows.md). The source launchers are
+`mlfpkg.ps1` and `mlfpkg.cmd`; `scripts/bootstrap-package-windows.ps1` builds
+the manager from an existing native MLF compiler. Windows supports `plan`,
+`lock`, `build`, ordinary package `test`, and `run`, including `.exe` publication,
+runtime DLLs, drive/UNC paths, and Unicode. Set `MLF_NATIVE_PREFIX` to the SDK
+root when running a manager built outside that SDK, and `MLF_CLANG` to the
+MinGW Clang executable. The unit/backend/port compiler-test transports below still
+require POSIX. Windows release qualification uses the native package and parity
+groups plus Windows runtime and relocation checks.
+
 ## Build and test this compiler
 
 Provide a working native MLF compiler as the bootstrap seed, Clang, GMP with
@@ -65,6 +77,9 @@ package manager. GHC, Cabal, and Python are not test prerequisites. Clang builds
 the retained C ABI probes and binary/process transports. The probes retain
 their low-level ABI checks; MLF runs them and checks their status, output,
 error modes, and allocation accounting.
+The test package shares only its support modules; each executable's `modules`
+map lists its own test-case dependencies. This keeps unrelated test cases out
+of individual test builds while retaining the complete root test inventory.
 
 The Haskell compiler and old Haskell/Python harnesses have been removed.
 Shared C fixtures live in `tests/native/`. Expected parity types remain
@@ -104,6 +119,7 @@ spellings; both select crate compilation. New manifests can omit `link`.
 See [crate compilation](crate-compilation.md) and
 [the validation ledger](crate-migration.md). Older bootstrap memory reports
 measure the retired per-module pipeline.
+Compiler profiles use a 256 MiB stack on Darwin and Windows.
 
 ## Native profile-guided construction
 

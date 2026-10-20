@@ -1,2 +1,14 @@
 # Preserve byte-exact archived measurements and patches, including whitespace.
 tools/profile/results/** -whitespace
+# Package locks hash source bytes; keep these inputs identical across hosts.
+*.emlf text eol=lf
+*.expected text eol=lf
+runtime/khash.h text eol=lf
+mlf-package.json text eol=lf
+mlf.lock text eol=lf
+# Frozen measurements include source copies whose original bytes are evidence.
+tools/profile/results/** -text
+# Benchmark provenance pins include raw bytes and unterminated final lines.
+benchmarks/** -text
+# Unified-diff data lines preserve their source's significant whitespace.
+benchmarks/**/adaptation.patch -whitespace

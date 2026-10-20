@@ -9,11 +9,14 @@ import qualified Package.Build as B
 import qualified Tests.Basic as H
 import qualified Tests.Basic as Sys
 
-data Context = Context String String String String
-work (Context a _ _ _) = a
-manager (Context _ a _ _) = a
-compiler (Context _ _ a _) = a
-output (Context _ _ _ a) = a
+data Context = Context String String String String Bool
+work (Context a _ _ _ _) = a
+manager (Context _ a _ _ _) = a
+compiler (Context _ _ a _ _) = a
+output (Context _ _ _ a _) = a
+windows (Context _ _ _ _ w) = w
+exe c path = path ++ (if windows c then ".exe" else "")
+program c = exe c (output c ++ "/bin/hello")
 obj entries = J.Object entries
 field key value = Pair key value
 text = J.str
@@ -32,7 +35,7 @@ manifest c = J.read (work c ++ "/app/mlf-package.json")
 edit c f = do { before <- manifest c; J.write (work c ++ "/app/mlf-package.json") (f before) }
 report c = J.read (output c ++ "/build-report.json")
 runBinary c expected = do
- code <- O.exec (work c) (Cons (output c ++ "/bin/hello") Nil) "" (work c ++ "/program.out") (work c ++ "/program.err") 60
+ code <- O.exec (work c) (Cons (program c) Nil) "" (work c ++ "/program.out") (work c ++ "/program.err") 60
  out <- readFile (work c ++ "/program.out")
  err <- readFile (work c ++ "/program.err")
  H.assert (code == 0 && eqString out expected && eqString err "") ("package program output mismatch: " ++ out ++ err)
@@ -43,7 +46,8 @@ integration = Sys.withScratch (\dir -> do
  manager <- getEnv "MLF_PACKAGE_MANAGER"
  compiler <- getEnv "MLF_BOOTSTRAP_COMPILER"
  O.run "" (Cons "/bin/cp" (Cons "-R" (Cons (root ++ "/examples/packages") (Cons (dir ++ "/app") Nil))))
- let c = Context dir manager compiler (dir ++ "/build output")
+ windows <- O.isWindows
+ let c = Context dir manager compiler (dir ++ "/build output") windows
  expect c (Cons "build" Nil) true ""
  initial <- report c
  H.assert (S.all (\row -> S.not (J.getBool "cached" true row)) (J.values (J.get "builds" initial))) "first package build reused an artifact"
@@ -90,10 +94,10 @@ integration = Sys.withScratch (\dir -> do
  failed <- report c
  H.assert (S.not (J.getBool "complete" true failed)) "output mismatch marked complete"
  passed "test output mismatch fails the package test"
- before <- fileDigest (output c ++ "/bin/hello")
+ before <- fileDigest (program c)
  writeFile source "module Message where\nthis is invalid @@@\n"
  expect c (Cons "build" Nil) false ""
- after <- fileDigest (output c ++ "/bin/hello")
+ after <- fileDigest (program c)
  failed <- report c
  H.assert (eqString before after && S.not (J.getBool "complete" true failed)) "failed compile replaced working executable"
  writeFile source original
@@ -113,8 +117,8 @@ integration = Sys.withScratch (\dir -> do
  runBinary c "Hello, local packages!\n"
  checkDependencyReceipts (output c ++ "/cache/" ++ J.getText "key" "" (S.head rows) ++ "/dependency-files.json")
  passed "outer cache validates and repairs the shared Prelude dependency closure"
- O.copy compiler (dir ++ "/other compiler")
- expect c (Cons "--compiler" (Cons (dir ++ "/other compiler") (Cons "build" Nil))) true ""
+ O.copy compiler (exe c (dir ++ "/other compiler"))
+ expect c (Cons "--compiler" (Cons (exe c (dir ++ "/other compiler")) (Cons "build" Nil))) true ""
  alternate <- report c
  H.assert (S.all (\row -> S.any (\kind -> eqString (J.getText "kind" "" row) kind) (Cons "runtime object" (Cons "LLVM object" (Cons "native link" Nil))) || S.not (J.getBool "cached" true row)) (J.values (J.get "builds" alternate))) "compiler path did not affect crate cache"
  passed "compiler identity participates in cache keys"
@@ -147,7 +151,8 @@ integration = Sys.withScratch (\dir -> do
  Pair out err <- expect c (Cons "run" (Cons "hello" (Cons "--" (Cons "unused" Nil)))) true ""
  H.assert (eqString out "Hello, local packages!\n") "run mixed build output with program stdout"
  passed "run forwards arguments and keeps program stdout clean"
- edit c (J.set "tests" (obj (Cons (field "failure" (obj (Cons (field "command" (J.stringArray (Cons "/bin/sh" (Cons "-c" (Cons "exit 17" Nil))))) Nil))) Nil)))
+ testRunner <- getExecutablePath
+ edit c (J.set "tests" (obj (Cons (field "failure" (obj (Cons (field "command" (J.stringArray (Cons testRunner (Cons "--fail-command" Nil)))) Nil))) Nil)))
  expect c (Cons "test" Nil) false ""
  failure <- report c
  H.assert (S.not (J.getBool "complete" true failure) && J.equal (J.get "exit_code" (S.last (J.values (J.get "commands" failure)))) (J.num 17)) "command failure swallowed"
@@ -160,7 +165,7 @@ integration = Sys.withScratch (\dir -> do
 nonEntryBodyCase parent = do
  let directory = work parent ++ "/library-expression"
  O.mkdir (directory ++ "/app")
- let c = Context directory (manager parent) (compiler parent) (directory ++ "/build")
+ let c = Context directory (manager parent) (compiler parent) (directory ++ "/build") (windows parent)
  let library = obj (Cons (field "modules" (obj (Cons (field "Main" (text "Library.emlf")) Nil))) Nil)
  let executable = obj (Cons (field "main" (text "App.emlf")) Nil)
  J.write (directory ++ "/app/mlf-package.json") (obj (Cons (field "format" (J.num 1)) (Cons (field "name" (text "library-expression")) (Cons (field "version" (text "0.1.0")) (Cons (field "library" library) (Cons (field "executables" (obj (Cons (field "hello" executable) Nil))) Nil))))))
@@ -213,7 +218,7 @@ crateCases : Context -> IO Unit
 crateCases parent = do
  let directory = work parent ++ "/crate-composition"
  O.mkdir (directory ++ "/app")
- let c = Context directory (manager parent) (compiler parent) (directory ++ "/build")
+ let c = Context directory (manager parent) (compiler parent) (directory ++ "/build") (windows parent)
  let library = obj (Cons (field "modules" (obj (Cons (field "A" (text "A.emlf")) (Cons (field "B" (text "B.emlf")) Nil)))) Nil)
  let executable = obj (Cons (field "main" (text "Main.emlf")) Nil)
  let target = obj (Cons (field "main" (text "Main.emlf")) (Cons (field "stdout" (text "42\n")) Nil))
@@ -244,7 +249,7 @@ crateCases parent = do
  H.assert (S.not (J.getBool "outer_cached" true (S.head targetRows)) && S.any (J.getBool "cached" false) (J.values (J.get "groups" targetDetailed))) "own-library edit bypassed declaration cache verification"
  H.assert (S.length (J.values (J.get "codegen" changed)) == 1 && S.all (\row -> S.not (J.getBool "input_reused" true (J.get "queries" row))) (J.values (J.get "codegen" changed))) "changed live dependency reused entry code generation"
  passed "declaration caches preserve unaffected groups and downstream schemes"
- before <- fileDigest (output c ++ "/bin/hello")
+ before <- fileDigest (program c)
  writeFile (directory ++ "/app/A.emlf") (O.replace "privateIdentity : Int -> Int" "privateIdentity : Bool -> Bool" originalA)
  expect c (Cons "build" Nil) true ""
  erased <- report c
@@ -253,7 +258,7 @@ crateCases parent = do
  let generated = J.get "queries" (S.head (J.values (J.get "codegen" erased)))
  H.assert (S.not (J.getBool "outer_cached" true generated) && J.getBool "input_reused" false generated) "type-only annotation change reran MLF code generation"
  S.mapM_ (\kind -> H.assert (S.any (\row -> eqString (J.getText "kind" "" row) kind && J.getBool "cached" false row) stages) ("unchanged emitted LLVM rebuilt " ++ kind)) (Cons "LLVM object" (Cons "native link" Nil))
- after <- fileDigest (output c ++ "/bin/hello")
+ after <- fileDigest (program c)
  H.assert (eqString before after) "type-only annotation change altered erased executable"
  runBinary c "43\n"
  let annotatedA = O.replace "privateIdentity : Int -> Int" "privateIdentity : Bool -> Bool" originalA
@@ -265,15 +270,15 @@ crateCases parent = do
  H.assert (S.not (J.getBool "outer_cached" true entryQueries) && J.getBool "input_reused" false entryQueries) "entry-independent implementation changes reran MLF optimization"
  H.assert (S.any (\row -> eqString (J.getText "kind" "" row) "LLVM emission" && S.not (J.getBool "cached" true row)) entryStages) "entry dependency test used an outer artifact hit"
  S.mapM_ (\kind -> H.assert (S.any (\row -> eqString (J.getText "kind" "" row) kind && J.getBool "cached" false row) entryStages) ("entry-independent changes rebuilt " ++ kind)) (Cons "LLVM object" (Cons "native link" Nil))
- unaffected <- fileDigest (output c ++ "/bin/hello")
+ unaffected <- fileDigest (program c)
  H.assert (eqString before unaffected) "entry-independent changes altered the cached native executable"
  runBinary c "43\n"
  passed "identical emitted LLVM reuses native code generation and linking"
- let clean = Context directory (manager parent) (compiler parent) (directory ++ "/clean-build")
+ let clean = Context directory (manager parent) (compiler parent) (directory ++ "/clean-build") (windows parent)
  expect clean (Cons "build" Nil) true ""
  runBinary clean "43\n"
- fresh <- fileDigest (output clean ++ "/bin/hello")
- incremental <- fileDigest (output c ++ "/bin/hello")
+ fresh <- fileDigest (program clean)
+ incremental <- fileDigest (program c)
  H.assert (eqString fresh incremental) "clean and incremental crate builds produced different executables"
  passed "clean and incremental crate compilation equivalence"
 extraCases : Context -> String -> IO Unit
@@ -291,24 +296,25 @@ extraCases c repository = do
  unsetEnv "MLF_GC_PREFIX"
  expect c (Cons "test" Nil) true ""
  saved <- report c
- H.assert (S.any (\row -> S.elem eqString (actual ++ "/lib/libgc.a") (J.getStrings "flags" row)) (J.values (J.get "native_inputs" saved))) "checkout collector not used"
+ H.assert (S.any (\row -> S.elem eqString (actual ++ (if windows c then "/lib/libgc.dll.a" else "/lib/libgc.a")) (J.getStrings "flags" row)) (J.values (J.get "native_inputs" saved))) "checkout collector not used"
  passed "checkout BDWGC discovery and command-test inheritance without an exported prefix"
  setEnv "MLF_GC_PREFIX" (dir ++ "/missing prefix")
  expect c (Cons "--gc-prefix" (Cons actual (Cons "test" Nil))) true ""
  passed "explicit BDWGC prefix overrides the environment and reaches test subprocesses"
  setEnv "MLF_GC_PREFIX" actual
  edit c (\doc -> J.set "name" (text "mlf-compiler") (J.set "executables" (J.set "emlf" (obj (Cons (field "main" (text "Main.emlf")) Nil)) (J.get "executables" doc)) doc))
- O.run "" (Cons "/bin/ln" (Cons "-s" (Cons (compiler c) (Cons (output c ++ "/bin/emlf") Nil))))
+ O.run "" (Cons "/bin/ln" (Cons "-s" (Cons (compiler c) (Cons (exe c (output c ++ "/bin/emlf")) Nil))))
  let oldBin = dir ++ "/old installation"
  O.mkdir oldBin
- let old = oldBin ++ "/emlf"
+ let old = exe c (oldBin ++ "/emlf")
  let marker = dir ++ "/old compiler selected"
- writeFile old ("#!/bin/sh\nprintf used > '" ++ marker ++ "'\nexit 99\n")
- O.run "" (Cons "/bin/chmod" (Cons "+x" (Cons old Nil)))
+ writeFile (oldBin ++ "/old.c") "#include <stdio.h>\n#include <stdlib.h>\nint main(void) { const char *path = getenv(\"MLF_TEST_OLD_COMPILER_MARKER\"); FILE *f = path ? fopen(path, \"wb\") : NULL; if (!f) return 98; fputs(\"used\", f); fclose(f); return 99; }\n"
+ O.run "" (Cons "clang" (Cons (oldBin ++ "/old.c") (Cons "-o" (Cons old Nil))))
+ setEnv "MLF_TEST_OLD_COMPILER_MARKER" marker
  priorPath <- getEnv "PATH"
  priorCompiler <- getEnv "MLF_COMPILER"
  unsetEnv "MLF_COMPILER"
- setEnv "PATH" (oldBin ++ ":" ++ priorPath)
+ setEnv "PATH" (oldBin ++ (if windows c then ";" else ":") ++ priorPath)
  let command = Cons (manager c) (Cons "--manifest" (Cons (dir ++ "/app/mlf-package.json") (Cons "--build-dir" (Cons (output c) (Cons "--runtime" (Cons (repository ++ "/runtime/mlf_runtime.c") Nil))))))
  code <- O.exec dir (S.append command (O.words "build --target hello")) "" (dir ++ "/local.out") (dir ++ "/local.err") 1800
  marked <- fileExists marker
@@ -320,6 +326,7 @@ extraCases c repository = do
  errors <- readFile (dir ++ "/explicit.err")
  H.assert (S.not (code == 0) && marked && H.contains "(99)" errors) "explicit compiler did not override checkout"
  passed "explicit compiler selection overrides a locally built compiler"
+ unsetEnv "MLF_TEST_OLD_COMPILER_MARKER"
  setEnv "PATH" priorPath
  if eqString priorCompiler "" then unsetEnv "MLF_COMPILER" else setEnv "MLF_COMPILER" priorCompiler
 checkGC : String -> String -> IO Unit
@@ -337,13 +344,13 @@ checkGC expected binary = do
 pgoCase parent = do
  let directory = work parent ++ "/native pgo"
  O.mkdir (directory ++ "/app")
- let c = Context directory (manager parent) (compiler parent) (directory ++ "/build")
+ let c = Context directory (manager parent) (compiler parent) (directory ++ "/build") (windows parent)
  let executable = obj (Cons (field "main" (text "Main.emlf")) Nil)
  J.write (directory ++ "/app/mlf-package.json") (obj (Cons (field "format" (J.num 1)) (Cons (field "name" (text "native-pgo")) (Cons (field "version" (text "0.1.0")) (Cons (field "executables" (obj (Cons (field "hello" executable) (Cons (field "other" executable) Nil)))) Nil)))))
  writeFile (directory ++ "/app/Main.emlf") "module Main where\nmain = do\n  line <- getLine\n  printInt (if eqString line \"a\" then 1 else 2)\n"
  expect c (Cons "build" Nil) true ""
  initial <- report c
- original <- fileDigest (output c ++ "/bin/hello")
+ original <- fileDigest (program c)
  let nativeRows saved = S.filter (\row -> S.any (\kind -> eqString (J.getText "kind" "" row) kind) (Cons "LLVM object" (Cons "runtime object" (Cons "native link" Nil)))) (J.values (J.get "builds" saved))
  let nativeKeys saved = S.map (J.get "key") (nativeRows saved)
  let emitted saved = S.map (J.get "key") (S.filter (\row -> eqString (J.getText "kind" "" row) "LLVM emission") (J.values (J.get "builds" saved)))
@@ -356,7 +363,7 @@ pgoCase parent = do
        writeFile (directory ++ "/stdin") input
        previous <- getEnv "LLVM_PROFILE_FILE"
        setEnv "LLVM_PROFILE_FILE" raw
-       code <- O.exec directory (Cons (output c ++ "/bin/hello") Nil) (directory ++ "/stdin") (directory ++ "/training.out") (directory ++ "/training.err") 60
+       code <- O.exec directory (Cons (program c) Nil) (directory ++ "/stdin") (directory ++ "/training.out") (directory ++ "/training.err") 60
        if eqString previous "" then unsetEnv "LLVM_PROFILE_FILE" else setEnv "LLVM_PROFILE_FILE" previous
        out <- readFile (directory ++ "/training.out")
        err <- readFile (directory ++ "/training.err")
@@ -383,10 +390,10 @@ pgoCase parent = do
  expect c use true ""
  repeated <- report c
  H.assert (S.all (J.getBool "cached" false) (J.values (J.get "builds" repeated))) "unchanged profile-use build missed cache"
- beforeFailure <- fileDigest (output c ++ "/bin/hello")
+ beforeFailure <- fileDigest (program c)
  writeFile profile "invalid native profile\n"
  expect c use false "command failed"
- afterFailure <- fileDigest (output c ++ "/bin/hello")
+ afterFailure <- fileDigest (program c)
  H.assert (eqString beforeFailure afterFailure) "invalid profile replaced the working executable"
  O.copy second profile
  expect c use true ""
@@ -395,7 +402,7 @@ pgoCase parent = do
  H.assert (S.not (S.eqList J.equal (S.take 3 (nativeKeys used)) (S.take 3 (nativeKeys changed)))) "profile content is absent from native keys"
  expect c (Cons "build" Nil) true ""
  ordinary <- report c
- restored <- fileDigest (output c ++ "/bin/hello")
+ restored <- fileDigest (program c)
  H.assert (eqString restored original && S.eqList J.equal (nativeKeys ordinary) (nativeKeys initial) && S.all (J.getBool "cached" false) (J.values (J.get "builds" ordinary))) "PGO polluted the ordinary native cache or output"
  expect c (O.words "--pgo-generate missing build") false "PGO target must name a root executable"
  expect c (O.words "--pgo-target hello build") false "use either"

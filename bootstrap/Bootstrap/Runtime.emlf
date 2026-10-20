@@ -83,7 +83,7 @@ evaluate ds env expression = case expression of
     Nothing -> Left ("unbound runtime variable: " ++ nameHint n)
     Just value -> value
   XEAbs name body -> Right (RClosure env name body)
-  XEApp f a -> bindEither (evaluate ds env f) (\function -> apply ds function (evaluate ds env a))
+  XEApp f a -> evaluateApplication ds env f a
   XELet name rhs body -> evaluate ds (envInsert name (evaluate ds env rhs) env) body
   XELetRec bindings body -> evaluate ds (recursiveEnv ds env bindings) body
   XEInt n -> Right (RInteger n)
@@ -96,6 +96,33 @@ evaluate ds env expression = case expression of
       Right (if remaining == 0 then RConstructor name Nil else RConstructorFunction name remaining Nil))
   XECase scrutinee alternatives -> choose ds env (evaluate ds env scrutinee) alternatives
   XEEvidenceHole ignored -> Left "unresolved runtime dictionary evidence"
+
+-- A syntactically known primitive has no effects or failure before saturation.
+-- Build its lazy argument list once instead of allocating partial RPrimitive
+-- values and Either wrappers at each application. Overapplication still takes
+-- the ordinary path, preserving the result's function/error behavior.
+evaluateApplication : DataEnv -> REnv -> XErased -> XErased -> Either String RValue
+evaluateApplication ds env function argument =
+  case function of
+    XEPrimitive primitive ->
+      if P.primitiveArity primitive >= 1 then
+        runtimePrimitive ds primitive (Cons (evaluate ds env argument) Nil)
+      else evaluateOrdinaryApplication ds env function argument
+    XEApp first second -> case first of
+      XEPrimitive primitive ->
+        if P.primitiveArity primitive >= 2 then
+          runtimePrimitive ds primitive (Cons (evaluate ds env second) (Cons (evaluate ds env argument) Nil))
+        else evaluateOrdinaryApplication ds env function argument
+      XEApp (XEPrimitive primitive) initial ->
+        if P.primitiveArity primitive >= 3 then
+          runtimePrimitive ds primitive (Cons (evaluate ds env initial) (Cons (evaluate ds env second) (Cons (evaluate ds env argument) Nil)))
+        else evaluateOrdinaryApplication ds env function argument
+      _ -> evaluateOrdinaryApplication ds env function argument
+    _ -> evaluateOrdinaryApplication ds env function argument
+
+evaluateOrdinaryApplication : DataEnv -> REnv -> XErased -> XErased -> Either String RValue
+evaluateOrdinaryApplication ds env function argument =
+  bindEither (evaluate ds env function) (\value -> apply ds value (evaluate ds env argument))
 
 choose : DataEnv -> REnv -> Either String RValue -> List XErasedAlternative -> Either String RValue
 choose ds env value alternatives = case alternatives of

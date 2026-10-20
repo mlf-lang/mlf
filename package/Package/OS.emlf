@@ -23,11 +23,14 @@ replace old new text = replaceAt old new text 0
 replaceAt : String -> String -> String -> Int -> String
 replaceAt old new text i = if i >= stringLength text then "" else
   if stringLength old > 0 && starts old (drop i text) then new ++ replaceAt old new text (i + stringLength old) else char text i ++ replaceAt old new text (i + 1)
-join a b = if starts "/" b then b else if eqString a "" then b else a ++ "/" ++ b
-parent path = let pieces = split 47 path in let front = S.take (S.length pieces - 1) pieces in let result = S.intercalate "/" front in if eqString result "" then (if starts "/" path then "/" else ".") else result
-base path = S.last (split 47 path)
+normalize path = replace "\\" "/" path
+drivePath path = stringLength path >= 2 && eqString (char path 1) ":"
+absolute path = starts "/" (normalize path) || (drivePath path && stringLength path >= 3 && eqString (char (normalize path) 2) "/")
+join a b = let left = normalize a in let right = normalize b in if absolute right then right else if eqString left "" then right else left ++ "/" ++ right
+parent path = let clean = normalize path in let pieces = split 47 clean in let front = S.take (S.length pieces - 1) pieces in let result = S.intercalate "/" front in if eqString result "" then (if starts "/" clean then "/" else ".") else if drivePath result && stringLength result == 2 then result ++ "/" else result
+base path = S.last (split 47 (normalize path))
 relative root path = if eqString root path then "." else
-  let a = split 47 root in let b = split 47 path in relativeParts a b
+  let a = split 47 (normalize root) in let b = split 47 (normalize path) in relativeParts a b
 relativeParts : List String -> List String -> String
 relativeParts a b = case a of
   Nil -> S.intercalate "/" b
@@ -44,10 +47,45 @@ arguments i n = if i >= n then ioReturn Nil else do
   xs <- arguments (i + 1) n
   ioReturn (Cons x xs)
 allArguments = do { n <- getArgCount; arguments 0 n }
+isWindows = do
+  system <- getEnv "OS"
+  executable <- getExecutablePath
+  ioReturn (eqString system "Windows_NT" || drivePath executable || starts "//" (normalize executable))
+windowsHost = do
+  selected <- getEnv "MLF_WINDOWS_HOST"
+  executable <- getExecutablePath
+  ioReturn (if eqString selected "" then join (parent executable) "mlf-host.exe" else selected)
+nativePrefix = do
+  selected <- getEnv "MLF_NATIVE_PREFIX"
+  executable <- getExecutablePath
+  ioReturn (if eqString selected "" then parent (parent executable) else normalize selected)
+executable path = do { windows <- isWindows; ioReturn (if windows && S.not (ends ".exe" path) then path ++ ".exe" else path) }
+hostArguments argv = do
+  windows <- isWindows
+  if S.not windows then ioReturn argv else case argv of
+    Cons command rest ->
+      let operation = S.lookup eqString command (Cons (Pair "/bin/mkdir" "mkdir") (Cons (Pair "/bin/cp" "copy") (Cons (Pair "/bin/mv" "move") (Cons (Pair "/bin/rm" "remove") (Cons (Pair "/bin/test" "test") (Cons (Pair "/bin/ln" "link") (Cons (Pair "/usr/bin/uname" "uname") (Cons (Pair "uname" "uname") Nil)))))))) in
+      case operation of
+        Nothing -> if eqString command "mktemp" then do { host <- windowsHost; ioReturn (Cons host (Cons "mktemp" rest)) } else ioReturn argv
+        Just name -> do { host <- windowsHost; ioReturn (Cons host (Cons name rest)) }
+    Nil -> ioReturn Nil
+setupWindows = do
+  windows <- isWindows
+  if S.not windows then ioReturn Unit else do
+    host <- windowsHost
+    setEnv "MLF_WINDOWS_HOST" host
+    executable <- getExecutablePath
+    prefix <- nativePrefix
+    setEnv "MLF_NATIVE_PREFIX" prefix
+    path <- getEnv "PATH"
+    setEnv "PATH" (parent executable ++ ";" ++ prefix ++ "/bin;" ++ path)
+    pkg <- getEnv "PKG_CONFIG_PATH"
+    setEnv "PKG_CONFIG_PATH" (prefix ++ "/lib/pkgconfig" ++ (if eqString pkg "" then "" else ";" ++ pkg))
 exec cwd argv input output errors timeout = do
   require (timeout > 0 && timeout <= 2147483647) "invalid process timeout"
   require (S.all (\x -> S.not (S.elem eqString nul (S.map (char x) (S.range 0 (stringLength x - 1))))) argv) "NUL in process argument"
-  runProcess cwd (pack (Cons (showInt timeout) (Cons input (Cons output (Cons errors argv)))))
+  command <- hostArguments argv
+  runProcess cwd (pack (Cons (showInt timeout) (Cons input (Cons output (Cons errors command)))))
 run cwd argv = do
   code <- exec cwd argv "" "" "" 1800
   require (code == 0) ("command failed (" ++ showInt code ++ "): " ++ S.intercalate " " argv)
@@ -57,7 +95,7 @@ copy source destination = do
   run "" (Cons "/bin/cp" (Cons "-p" (Cons source (Cons destination Nil))))
 move source destination = run "" (Cons "/bin/mv" (Cons "-f" (Cons source (Cons destination Nil))))
 remove path = do
-  require (starts "/" path && stringLength path > 5 && S.not (eqString path "/tmp")) "unsafe artifact removal path"
+  require (absolute path && stringLength path > 5 && S.not (eqString (normalize path) "/tmp")) "unsafe artifact removal path"
   run "" (Cons "/bin/rm" (Cons "-rf" (Cons path Nil)))
 writeAtomic path text = do
   mkdir (parent path)
@@ -65,16 +103,30 @@ writeAtomic path text = do
   move (path ++ ".new") path
 readOptional path = do { present <- fileExists path; if present then readFile path else ioReturn "" }
 envDefault name fallback = do { value <- getEnv name; ioReturn (if eqString value "" then fallback else value) }
-which command = if S.any (\x -> eqString x "/") (S.map (char command) (S.range 0 (stringLength command - 1))) then canonicalPath command else do
-  path <- getEnv "PATH"
-  findTool command (split 58 path)
+which command = do
+  windows <- isWindows
+  let clean = normalize command
+  let explicit = S.any (\x -> eqString x "/") (S.map (char clean) (S.range 0 (stringLength clean - 1))) || drivePath clean
+  if explicit then resolveTool clean else do
+    path <- getEnv "PATH"
+    findTool command (split (if windows then 59 else 58) path)
+resolveTool path = do
+  present <- fileExists path
+  if present then canonicalPath path else do
+    windows <- isWindows
+    let extension = path ++ ".exe"
+    found <- fileExists extension
+    require (windows && found) ("executable not found: " ++ path)
+    canonicalPath extension
 findTool : String -> List String -> IO String
 findTool command directories = case directories of
   Nil -> fatal ("executable not found: " ++ command)
   Cons directory rest -> do
     let path = join (if eqString directory "" then "." else directory) command
     present <- fileExists path
-    if present then canonicalPath path else findTool command rest
+    windows <- isWindows
+    extra <- if windows then fileExists (path ++ ".exe") else ioReturn false
+    if present || extra then resolveTool path else findTool command rest
 entries path = do { text <- listDirectory path; ioReturn (S.sortBy compareString (unpack text)) }
 files : String -> IO (List String)
 files path = do

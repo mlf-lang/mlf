@@ -6,21 +6,45 @@ must never be replaced; make a new patch release to correct a package.
 
 Before 1.0, patch releases preserve documented behavior and minor releases may
 change language or package interfaces. Version 0.1.1 is a developer preview.
-It has no stability or cross-platform performance guarantee.
+It has no stability or cross-platform performance guarantee. Version 0.2.0
+adds native Windows x64 and Linux x64 packages alongside macOS ARM64.
 
 ## Install a release
 
-The first binary package is for Apple Silicon and macOS 26+. Authenticate `gh`
-with access to the private repository, then:
+The public release contains `mlf-VERSION-windows-x64.zip`,
+`mlf-VERSION-macos-arm64.tar.gz`, `mlf-VERSION-linux-x64.tar.gz`, and one
+`SHA256SUMS` file covering all three archives. Published assets and tags are
+immutable. Download the archive matching the host and verify its checksum.
+
+Windows users extract the complete ZIP and, in PowerShell 7, run:
+
+```powershell
+. ./mlf-0.2.0-windows-x64/Activate.ps1 -Clang C:/path/to/mingw/bin/clang.exe
+emlf --version
+mlfpkg --version
+```
+
+The ZIP includes native GMP, BDWGC, pkg-config, import libraries, headers and
+the runtime DLLs. Native linking needs a MinGW-targeting Clang. PowerShell is
+used by activation and build helpers; the compiler and manager are native `.exe`
+files and do not require WSL, Cygwin or an MSYS shell.
+
+Linux x64 builds target Ubuntu 24.04 (glibc 2.39). Install runtime dependencies
+`libgmp10 libgc1`; native builds also need `clang libgmp-dev libgc-dev pkg-config`.
+Extract the Linux tarball, run `./install.sh "$HOME/.local"`, and add
+`$HOME/.local/bin` to `PATH`. The versioned installer checks file hashes,
+supports repeat installation, and preserves unrelated commands.
+
+For Apple Silicon on macOS 26+, use:
 
 ```sh
 brew install gmp llvm pkg-config bdw-gc
 mkdir mlf-download && cd mlf-download
-gh release download v0.1.1 --repo mlf-lang/mlf \
-  --pattern 'mlf-0.1.1-macos-arm64.tar.gz' --pattern SHA256SUMS
-shasum -a 256 -c SHA256SUMS
-tar -xzf mlf-0.1.1-macos-arm64.tar.gz
-./mlf-0.1.1-macos-arm64/install.sh "$HOME/.local"
+gh release download v0.2.0 --repo mlf-lang/mlf \
+  --pattern 'mlf-0.2.0-macos-arm64.tar.gz' --pattern SHA256SUMS
+grep '  mlf-0.2.0-macos-arm64.tar.gz$' SHA256SUMS | shasum -a 256 -c -
+tar -xzf mlf-0.2.0-macos-arm64.tar.gz
+./mlf-0.2.0-macos-arm64/install.sh "$HOME/.local"
 export PATH="$HOME/.local/bin:$PATH"
 emlf --version
 mlfpkg --version
@@ -36,7 +60,32 @@ unchanged. Keep the whole package when using its `bin` directory directly.
 
 ## Prepare the next release
 
-1. Update `VERSION`, the four toolchain manifests and `CHANGELOG.md`.
+For a release on all three platforms, update `VERSION`,
+`bootstrap/Bootstrap/Version.emlf`, the four toolchain manifests,
+and `CHANGELOG.md`, then regenerate `mlf.lock`. Change the version in
+`.github/release-request.json` and commit the reviewed candidate on `main`.
+The **Cross-platform release** workflow checks out that immutable commit,
+builds and verifies all three packages, and only then creates the annotated
+version tag and publishes one developer preview. Manual runs accept an existing
+version tag. Existing releases and assets are never replaced.
+
+The bootstrap starts with independently pinned macOS native tools. Checked
+LLVM from the new macOS build is hashed and transported as a workflow artifact;
+Linux and Windows compile it with their native C runtimes, then rebuild the
+toolchain natively. No compiler inference/checking is bypassed. Linux and
+macOS require all six native compiler groups and a fresh self-host fixed point.
+Windows requires fresh compiler and manager LLVM fixed points, 7,086 independent
+parity cases and 160 interpreter/native executions, both runtime layout tests,
+18 native resolver checks, 26 native package integration cases, and SDK relocation and native
+executable checks. Its internal POSIX `compiler-test` transports and historical
+performance gates are not claimed as Windows qualification. Each archive
+retains the exact source/tool hashes and platform evidence.
+
+The **Native release** manual entry delegates to the same three-platform
+workflow, so it cannot publish a macOS-only release. Historical macOS previews
+used the following sequence:
+
+1. Update `VERSION`, the four toolchain manifests, and `CHANGELOG.md`.
 2. Run `./mlfpkg lock`, review the lock changes, and commit the release candidate.
 3. Create an annotated version tag and push it. Tags are never moved.
 4. Run the **Native release** workflow on `main` with that tag. It runs all six
@@ -56,7 +105,9 @@ from the pinned seed before building the candidate tested by all six groups.
 This lets the candidate and its fresh self-build use the same updated generator.
 Bootstrap builds explicitly allow six hours; individual fixture limits remain
 unchanged. Native release publication still requires every group to pass.
-No workflow installs GHC or invokes Python. Seed downloads check the selected published archive checksum and both
+No workflow installs GHC or invokes Python. Compiler, parity and package
+qualification runs in native MLF on every supported platform. Seed
+downloads check the selected published archive checksum and both
 independently pinned native executable hashes. CI now pins v0.1.1. Release jobs
 read seed pins and verification/timing tools from the workflow's immutable
 commit, so an older target tag cannot silently select its old seed. The checksum

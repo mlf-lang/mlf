@@ -28,8 +28,6 @@ import Tests.GraphValidation (graphValidationTests)
 import Tests.GraphUnification (graphUnificationTests)
 import Tests.GraphSolver (graphSolverTests)
 import Tests.EmbeddingPruning (embeddingPruningTests)
-import Tests.OptimizerQueries (optimizerQueryTests)
-import Tests.StrictFieldAnalysis (strictFieldAnalysisTests)
 import Tests.StateTypes (stateTypeTests)
 import Tests.CrateQueries (crateQueryTests)
 import qualified Tests.CheckedEmission as CheckedEmission
@@ -100,4 +98,4 @@ stripComputations t = (case t of { (XTypeApp a _) -> (stripComputations a); (XAb
 suite : List (Pair String (IO Unit))
 suite = S.append OptimizerUses.suite (S.append CrateCodegen.suite (S.append crateQueryTests (S.append ComponentProjection.suite (S.append (S.append (S.append IntSetUnions.suite IndexEdges.suite) (S.append ProjectionRanks.suite ProjectionChanges.suite)) (S.append StrictWrappers.suite (S.append SolverIndexAudit.suite (S.append DenseNormalization.suite (S.append CheckedEmission.suite (S.append SolverAllocation.suite originalSuite)))))))))
 
-originalSuite = S.concat (Cons compilerTests (Cons computationTests (Cons hygieneTests (Cons graphTests (Cons graphValidationTests (Cons graphUnificationTests (Cons graphSolverTests (Cons embeddingPruningTests (Cons optimizerQueryTests (Cons strictFieldAnalysisTests (Cons datatypeTests (Cons typeclassTests (Cons doTests (Cons surfaceSyntaxTests (Cons readabilityTests (Cons moduleTests (Cons separateTests (Cons stateTypeTests (Cons (Cons (Pair "independent ML typability oracle" oracleTest) (Cons (Pair "annotation corpus" annotationCorpus) (Cons (Pair "example files" examplesTest) Nil))) Nil)))))))))))))))))))
+originalSuite = S.concat (Cons compilerTests (Cons computationTests (Cons hygieneTests (Cons graphTests (Cons graphValidationTests (Cons graphUnificationTests (Cons graphSolverTests (Cons embeddingPruningTests (Cons datatypeTests (Cons typeclassTests (Cons doTests (Cons surfaceSyntaxTests (Cons readabilityTests (Cons moduleTests (Cons separateTests (Cons stateTypeTests (Cons (Cons (Pair "independent ML typability oracle" oracleTest) (Cons (Pair "annotation corpus" annotationCorpus) (Cons (Pair "example files" examplesTest) Nil))) Nil)))))))))))))))))

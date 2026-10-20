@@ -11,4 +11,7 @@ row primitive = case P.primitiveSignature primitive of
     showInt (P.primitiveArity primitive) ++ "\t" ++
     (if P.primitiveStrict primitive then "strict" else "lazy") ++ "\t" ++
     D.prettyDeclaration (DataDeclK "Sig" variables (Cons (ConstructorDecl "M" (Cons field Nil)) Nil))
-main = L.mapM_ (\primitive -> putStrLn (row primitive)) P.allPrimitives
+main = L.mapM_ (\primitive ->
+  if P.primitiveArity primitive == P.fieldArity (L.snd (P.primitiveSignature primitive))
+  then putStrLn (row primitive)
+  else panic ("primitive arity differs from its type signature: " ++ P.primitiveName primitive)) P.allPrimitives

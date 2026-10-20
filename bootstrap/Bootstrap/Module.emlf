@@ -100,9 +100,9 @@ splitComponents text start position =
 components name = splitComponents name 0 0
 
 lastSlash : String -> Int -> Int
-lastSlash text position = if position < 0 then -1 else if stringCodeAt text position == 47 then position else lastSlash text (position - 1)
+lastSlash text position = if position < 0 then -1 else if stringCodeAt text position == 47 || stringCodeAt text position == 92 then position else lastSlash text (position - 1)
 trimSlash : String -> Int -> Int
-trimSlash path n = if n > 1 && stringCodeAt path (n - 1) == 47 then trimSlash path (n - 1) else n
+trimSlash path n = if n > 1 && (stringCodeAt path (n - 1) == 47 || stringCodeAt path (n - 1) == 92) then trimSlash path (n - 1) else n
 takeDirectory path =
   let end = trimSlash path (stringLength path) in
   let position = lastSlash path (end - 1) in

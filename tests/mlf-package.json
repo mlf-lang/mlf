@@ -1,7 +1,7 @@
 {
   "format": 1,
   "name": "mlf-tests",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "dependencies": {
     "mlf-bootstrap": {
       "path": "../bootstrap"
@@ -12,123 +12,152 @@
   },
   "library": {
     "modules": {
-      "Tests.BackendCases": "Tests/BackendCases.emlf",
-      "Tests.BackendSuite": "Tests/BackendSuite.emlf",
       "Tests.Backends": "Tests/Backends.emlf",
-      "Tests.BoolConditions": "Tests/BoolConditions.emlf",
-      "Tests.BootstrapPrimitives": "Tests/BootstrapPrimitives.emlf",
-      "Tests.ByteArrays": "Tests/ByteArrays.emlf",
-      "Tests.Bytes": "Tests/Bytes.emlf",
-      "Tests.Char8": "Tests/Char8.emlf",
-      "Tests.Computations": "Tests/Computations.emlf",
-      "Tests.ConstructorProjection": "Tests/ConstructorProjection.emlf",
-      "Tests.Core": "Tests/Core.emlf",
-      "Tests.CrateQueries": "Tests/CrateQueries.emlf",
-      "Tests.DNA": "Tests/DNA.emlf",
-      "Tests.Datatypes": "Tests/Datatypes.emlf",
-      "Tests.DoNotation": "Tests/DoNotation.emlf",
-      "Tests.EmbeddingPruning": "Tests/EmbeddingPruning.emlf",
-      "Tests.EnvironmentAccess": "Tests/EnvironmentAccess.emlf",
-      "Tests.Figure12": "Tests/Figure12.emlf",
-      "Tests.Figure12Suite": "Tests/Figure12Suite.emlf",
-      "Tests.ForceReuse": "Tests/ForceReuse.emlf",
-      "Tests.Graph": "Tests/Graph.emlf",
-      "Tests.GraphSolver": "Tests/GraphSolver.emlf",
-      "Tests.GraphUnification": "Tests/GraphUnification.emlf",
-      "Tests.GraphUnificationReference": "Tests/GraphUnificationReference.emlf",
-      "Tests.GraphValidation": "Tests/GraphValidation.emlf",
-      "Tests.Helpers": "Tests/Helpers.emlf",
-      "Tests.HigherOrderSpecialization": "Tests/HigherOrderSpecialization.emlf",
-      "Tests.IOTests": "Tests/IOTests.emlf",
-      "Tests.Map": "Tests/Map.emlf",
-      "Tests.ModuleBackends": "Tests/ModuleBackends.emlf",
-      "Tests.Modules": "Tests/Modules.emlf",
-      "Tests.NativeOptimization": "Tests/NativeOptimization.emlf",
-      "Tests.NumericArrays": "Tests/NumericArrays.emlf",
-      "Tests.OptimizerQueries": "Tests/OptimizerQueries.emlf",
-      "Tests.Oracle": "Tests/Oracle.emlf",
-      "Tests.PackageResolver": "Tests/PackageResolver.emlf",
-      "Tests.Packages": "Tests/Packages.emlf",
-      "Tests.PreludeTests": "Tests/PreludeTests.emlf",
-      "Tests.Readability": "Tests/Readability.emlf",
-      "Tests.Separate": "Tests/Separate.emlf",
-      "Tests.SeparateBackends": "Tests/SeparateBackends.emlf",
-      "Tests.Set": "Tests/Set.emlf",
-      "Tests.Snake": "Tests/Snake.emlf",
-      "Tests.SnakeBaseline": "Tests/SnakeBaseline.emlf",
-      "Tests.StateCases": "Tests/StateCases.emlf",
-      "Tests.StateRuntime": "Tests/StateRuntime.emlf",
-      "Tests.StateTypes": "Tests/StateTypes.emlf",
-      "Tests.StrictFieldAnalysis": "Tests/StrictFieldAnalysis.emlf",
-      "Tests.StrictFields": "Tests/StrictFields.emlf",
-      "Tests.SurfaceSyntax": "Tests/SurfaceSyntax.emlf",
-      "Tests.System": "Tests/System.emlf",
-      "Tests.Text": "Tests/Text.emlf",
-      "Tests.Typeclasses": "Tests/Typeclasses.emlf",
       "Tests.Basic": "Tests/Basic.emlf",
-      "Tests.Corpus": "Tests/Corpus.emlf",
+      "Tests.Bytes": "Tests/Bytes.emlf",
+      "Tests.Helpers": "Tests/Helpers.emlf",
       "Tests.IndependentCheck": "Tests/IndependentCheck.emlf",
       "Tests.IndependentType": "Tests/IndependentType.emlf",
-      "Tests.GraphDenseReference": "Tests/GraphDenseReference.emlf",
-      "Tests.GraphReference": "Tests/GraphReference.emlf",
-      "Tests.GraphScopesReference": "Tests/GraphScopesReference.emlf",
-      "Tests.InferenceReference": "Tests/InferenceReference.emlf",
-      "Tests.NativeABI": "Tests/NativeABI.emlf",
-      "Tests.OrderedTraversalReference": "Tests/OrderedTraversalReference.emlf",
-      "Tests.PortSuite": "Tests/PortSuite.emlf",
-      "Tests.BenchmarkSuite": "Tests/BenchmarkSuite.emlf",
-      "Tests.BootstrapSuite": "Tests/BootstrapSuite.emlf",
-      "Tests.ReleaseSuite": "Tests/ReleaseSuite.emlf",
-      "Tests.CheckedEmission": "Tests/CheckedEmission.emlf",
-      "Tests.SolverAllocation": "Tests/SolverAllocation.emlf",
-      "Tests.DenseNormalization": "Tests/DenseNormalization.emlf",
-      "Tests.SolverIndexAudit": "Tests/SolverIndexAudit.emlf",
-      "Tests.StrictWrappers": "Tests/StrictWrappers.emlf",
-      "Tests.ProjectionRanks": "Tests/ProjectionRanks.emlf",
-      "Tests.ProjectionChanges": "Tests/ProjectionChanges.emlf",
-      "Tests.IntSetUnions": "Tests/IntSetUnions.emlf",
-      "Tests.IndexEdges": "Tests/IndexEdges.emlf",
-      "Tests.ComponentProjection": "Tests/ComponentProjection.emlf",
-      "Tests.CrateCodegen": "Tests/CrateCodegen.emlf",
-      "Tests.OptimizerUses": "Tests/OptimizerUses.emlf"
+      "Tests.Map": "Tests/Map.emlf",
+      "Tests.Set": "Tests/Set.emlf"
     }
   },
   "executables": {
     "core": {
       "main": "CoreMain.emlf",
-      "profile": "compiler"
+      "profile": "compiler",
+      "modules": {
+        "Tests.CheckedEmission": "Tests/CheckedEmission.emlf",
+        "Tests.ComponentProjection": "Tests/ComponentProjection.emlf",
+        "Tests.Computations": "Tests/Computations.emlf",
+        "Tests.Core": "Tests/Core.emlf",
+        "Tests.CrateCodegen": "Tests/CrateCodegen.emlf",
+        "Tests.CrateQueries": "Tests/CrateQueries.emlf",
+        "Tests.Datatypes": "Tests/Datatypes.emlf",
+        "Tests.DenseNormalization": "Tests/DenseNormalization.emlf",
+        "Tests.DoNotation": "Tests/DoNotation.emlf",
+        "Tests.EmbeddingPruning": "Tests/EmbeddingPruning.emlf",
+        "Tests.Graph": "Tests/Graph.emlf",
+        "Tests.GraphSolver": "Tests/GraphSolver.emlf",
+        "Tests.GraphUnification": "Tests/GraphUnification.emlf",
+        "Tests.GraphUnificationReference": "Tests/GraphUnificationReference.emlf",
+        "Tests.GraphValidation": "Tests/GraphValidation.emlf",
+        "Tests.IndexEdges": "Tests/IndexEdges.emlf",
+        "Tests.IntSetUnions": "Tests/IntSetUnions.emlf",
+        "Tests.Modules": "Tests/Modules.emlf",
+        "Tests.OptimizerUses": "Tests/OptimizerUses.emlf",
+        "Tests.Oracle": "Tests/Oracle.emlf",
+        "Tests.ProjectionChanges": "Tests/ProjectionChanges.emlf",
+        "Tests.ProjectionRanks": "Tests/ProjectionRanks.emlf",
+        "Tests.Readability": "Tests/Readability.emlf",
+        "Tests.Separate": "Tests/Separate.emlf",
+        "Tests.SolverAllocation": "Tests/SolverAllocation.emlf",
+        "Tests.SolverIndexAudit": "Tests/SolverIndexAudit.emlf",
+        "Tests.StateCases": "Tests/StateCases.emlf",
+        "Tests.StateTypes": "Tests/StateTypes.emlf",
+        "Tests.StrictWrappers": "Tests/StrictWrappers.emlf",
+        "Tests.SurfaceSyntax": "Tests/SurfaceSyntax.emlf",
+        "Tests.System": "Tests/System.emlf",
+        "Tests.Typeclasses": "Tests/Typeclasses.emlf"
+      }
     },
     "figure12": {
       "main": "Figure12SuiteMain.emlf",
-      "profile": "compiler"
+      "profile": "compiler",
+      "modules": {
+        "Tests.Figure12": "Tests/Figure12.emlf",
+        "Tests.Figure12Suite": "Tests/Figure12Suite.emlf"
+      }
     },
     "backends": {
       "main": "BackendSuiteMain.emlf",
-      "profile": "compiler"
+      "profile": "compiler",
+      "modules": {
+        "Tests.BackendCases": "Tests/BackendCases.emlf",
+        "Tests.BackendSuite": "Tests/BackendSuite.emlf",
+        "Tests.BoolConditions": "Tests/BoolConditions.emlf",
+        "Tests.BootstrapPrimitives": "Tests/BootstrapPrimitives.emlf",
+        "Tests.ByteArrays": "Tests/ByteArrays.emlf",
+        "Tests.Char8": "Tests/Char8.emlf",
+        "Tests.ConstructorProjection": "Tests/ConstructorProjection.emlf",
+        "Tests.DNA": "Tests/DNA.emlf",
+        "Tests.EnvironmentAccess": "Tests/EnvironmentAccess.emlf",
+        "Tests.ForceReuse": "Tests/ForceReuse.emlf",
+        "Tests.HigherOrderSpecialization": "Tests/HigherOrderSpecialization.emlf",
+        "Tests.IOTests": "Tests/IOTests.emlf",
+        "Tests.ModuleBackends": "Tests/ModuleBackends.emlf",
+        "Tests.Modules": "Tests/Modules.emlf",
+        "Tests.NativeOptimization": "Tests/NativeOptimization.emlf",
+        "Tests.NumericArrays": "Tests/NumericArrays.emlf",
+        "Tests.PreludeTests": "Tests/PreludeTests.emlf",
+        "Tests.Readability": "Tests/Readability.emlf",
+        "Tests.Separate": "Tests/Separate.emlf",
+        "Tests.SeparateBackends": "Tests/SeparateBackends.emlf",
+        "Tests.Snake": "Tests/Snake.emlf",
+        "Tests.SnakeBaseline": "Tests/SnakeBaseline.emlf",
+        "Tests.StateCases": "Tests/StateCases.emlf",
+        "Tests.StateRuntime": "Tests/StateRuntime.emlf",
+        "Tests.StateTypes": "Tests/StateTypes.emlf",
+        "Tests.StrictFields": "Tests/StrictFields.emlf",
+        "Tests.StrictWrappers": "Tests/StrictWrappers.emlf",
+        "Tests.System": "Tests/System.emlf",
+        "Tests.Text": "Tests/Text.emlf"
+      }
     },
     "packages": {
       "main": "PackagesMain.emlf",
-      "profile": "compiler"
+      "profile": "compiler",
+      "modules": {
+        "Tests.PackageResolver": "Tests/PackageResolver.emlf",
+        "Tests.Packages": "Tests/Packages.emlf"
+      }
     },
     "port": {
       "main": "PortMain.emlf",
-      "profile": "compiler"
+      "profile": "compiler",
+      "modules": {
+        "Tests.PortSuite": "Tests/PortSuite.emlf"
+      }
     },
     "references": {
       "main": "ReferencesMain.emlf",
-      "profile": "compiler"
+      "profile": "compiler",
+      "modules": {
+        "Tests.EmbeddingPruning": "Tests/EmbeddingPruning.emlf",
+        "Tests.Figure12": "Tests/Figure12.emlf",
+        "Tests.Graph": "Tests/Graph.emlf",
+        "Tests.GraphDenseReference": "Tests/GraphDenseReference.emlf",
+        "Tests.GraphReference": "Tests/GraphReference.emlf",
+        "Tests.GraphScopesReference": "Tests/GraphScopesReference.emlf",
+        "Tests.GraphUnificationReference": "Tests/GraphUnificationReference.emlf",
+        "Tests.GraphValidation": "Tests/GraphValidation.emlf",
+        "Tests.InferenceReference": "Tests/InferenceReference.emlf",
+        "Tests.OrderedTraversalReference": "Tests/OrderedTraversalReference.emlf"
+      }
     },
     "check-target": {
       "main": "CheckTarget.emlf",
-      "profile": "compiler"
+      "profile": "compiler",
+      "modules": {}
     },
     "corpus": {
       "main": "CorpusMain.emlf",
-      "profile": "compiler"
+      "profile": "compiler",
+      "modules": {
+        "Tests.Corpus": "Tests/Corpus.emlf",
+        "Tests.Figure12": "Tests/Figure12.emlf",
+        "Tests.Oracle": "Tests/Oracle.emlf"
+      }
     },
     "harness": {
       "main": "HarnessMain.emlf",
-      "profile": "compiler"
+      "profile": "compiler",
+      "modules": {
+        "Tests.BenchmarkSuite": "Tests/BenchmarkSuite.emlf",
+        "Tests.BootstrapSuite": "Tests/BootstrapSuite.emlf",
+        "Tests.NativeABI": "Tests/NativeABI.emlf",
+        "Tests.ReleaseSuite": "Tests/ReleaseSuite.emlf"
+      }
     }
   }
 }

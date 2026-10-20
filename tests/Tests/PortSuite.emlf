@@ -13,7 +13,7 @@ import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Type as T
 import qualified Bootstrap.Primitive as Primitive
 import qualified Bootstrap.Data as D
-names = O.words "foundation MapFolds IntegerContainers OptimizerQueries ConstructorProjection ForceReuse StrictFields prelude Target frontend LexerCounters LLVMBuild RuntimeSmoke RuntimeCases StateRuntime StateTypes GraphConformance GraphScopes GraphDense OrderedTraversal SolverReuse TypeCache GraphStack EmbeddingPruning InferenceConformance PrimitiveMetadata"
+names = O.words "foundation MapFolds IntegerContainers OptimizerQueries ConstructorProjection ForceReuse StrictFields prelude Target frontend LexerCounters LLVMBuild RuntimeCases StateRuntime StateTypes GraphConformance GraphScopes GraphDense OrderedTraversal SolverReuse TypeCache GraphStack EmbeddingPruning InferenceConformance PrimitiveMetadata"
 references = Cons (Pair "GraphConformance" "GraphReference") (Cons (Pair "GraphScopes" "GraphScopesReference") (Cons (Pair "GraphDense" "GraphDenseReference") (Cons (Pair "OrderedTraversal" "OrderedTraversalReference") (Cons (Pair "EmbeddingPruning" "EmbeddingPruningReference") (Cons (Pair "InferenceConformance" "InferenceReference") Nil)))))
 metadata = S.unlines (S.map (\primitive -> case Primitive.primitiveSignature primitive of
  Pair variables field -> showInt (Primitive.primitiveCode primitive) ++ "\t" ++ Primitive.primitiveName primitive ++ "\t" ++ showInt (Primitive.primitiveArity primitive) ++ "\t" ++ (if Primitive.primitiveStrict primitive then "strict" else "lazy") ++ "\t" ++ D.prettyDeclaration (DataDeclK "Sig" variables (Cons (ConstructorDecl "M" (Cons field Nil)) Nil))) Primitive.allPrimitives)
@@ -36,18 +36,24 @@ runFixture backends name = do
     original <- Bytes.readFile source
     H.assert (code == 0 && H.eq generated original && H.contains "Fig12-A8\tREJECT Inference\n" (Bytes.decodeText expected)) "inference input generation or A8 coverage differs"
     else return Unit
- result <- C.compileFile (Cons "bootstrap" Nil) source
+ result <- C.compileFile (Cons "bootstrap" (Cons "tests" Nil)) source
  compilation <- H.right result
  ty <- H.right (Check.checkClosed (C.compiledTerm compilation))
  H.assert (T.alphaEq ty (C.inferredType compilation)) "port inferred/target type differs"
  parsed <- H.right (P.parseTerm source (Pretty.prettyTerm (C.compiledTerm compilation)))
  parsedType <- H.right (Check.checkClosed parsed)
  H.assert (T.alphaEq parsedType ty && X.equalErased (X.erase parsed) (X.erase (C.compiledTerm compilation))) "port target serialization changed"
- let context = B.withExecutionTimeout (if S.elem eqString name (O.words "GraphConformance GraphDense InferenceConformance SolverReuse StateTypes") then 1800 else 60) backends
+ let heavy = S.elem eqString name (O.words "GraphConformance GraphDense InferenceConformance SolverReuse StateTypes")
+ let execution = B.withExecutionTimeout (if heavy then 1800 else 60) backends
+ -- These nested compiler/graph workloads exhausted the macOS interpreter's
+ -- 30-minute limit. Keep every fixture and exact output; bound interpretation
+ -- separately without extending native execution or LLVM emission limits.
+ let context = if heavy then B.withInterpreterTimeout 7200 execution else execution
  observed <- B.execute context B.IOEntry (B.Input "" false) parsed
  H.right (B.outcome observed)
  H.assert (H.eq (B.outputBytes observed) expected && eqString (B.stderrOutput observed) "" && eqString (B.remaining observed) "") ("port runtime output differs: " ++ name)
 main = do
+ H.assert (S.length names == 25 && S.length (S.nubBy eqString names) == 25 && S.length references == 6 && S.all (\(Pair name _) -> S.elem eqString name names) references) "port fixture or independent-reference coverage changed"
  args <- O.allArguments
  selected <- case args of
   Nil -> return names

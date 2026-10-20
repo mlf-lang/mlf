@@ -64,7 +64,7 @@ libraryFiles flags = do
   selected <- S.mapM (\flag -> do
     present <- fileExists flag
     if present then do { path <- canonicalPath flag; ioReturn (Cons path Nil) } else if O.starts "-l" flag then do
-      candidates <- S.mapM (\dir -> S.mapM (\suffix -> do { let path = dir ++ "/lib" ++ O.drop 2 flag ++ suffix; yes <- fileExists path; if yes then do { actual <- canonicalPath path; ioReturn (Just actual) } else ioReturn Nothing }) (Cons ".dylib" (Cons ".so" (Cons ".a" Nil)))) dirs
+      candidates <- S.mapM (\dir -> S.mapM (\suffix -> do { let path = dir ++ "/lib" ++ O.drop 2 flag ++ suffix; yes <- fileExists path; if yes then do { actual <- canonicalPath path; ioReturn (Just actual) } else ioReturn Nothing }) (Cons ".dylib" (Cons ".so" (Cons ".dll.a" (Cons ".a" Nil))))) dirs
       ioReturn (S.take 1 (S.mapMaybe S.id (S.concat candidates)))
     else ioReturn Nil) flags
   ioReturn (S.concat selected)
@@ -122,6 +122,11 @@ create g options buildDirectory = do
   managerHash <- fileDigest manager
   system <- raw buildDirectory (Cons "/usr/bin/uname" (Cons "-s" Nil))
   machine <- raw buildDirectory (Cons "/usr/bin/uname" (Cons "-m" Nil))
+  version <- raw buildDirectory (Cons (J.getText "path" "" cc) (Cons "--version" Nil))
+  windows <- O.isWindows
+  helper <- if windows then do { path <- O.windowsHost; tool path } else ioReturn J.empty
+  prefix <- if windows then O.nativePrefix else ioReturn ""
+  dlls <- if windows then hashFiles (S.map (\name -> prefix ++ "/bin/" ++ name) (O.words "libgmp-10.dll libgc-1.dll libwinpthread-1.dll libpkgconf-8.dll")) else ioReturn J.empty
   gmpText <- raw buildDirectory (Cons (J.getText "path" "" pkg) (O.words "--cflags --libs gmp"))
   gmp <- flagIdentity (flags gmpText)
   runtimeText <- if J.has "runtime" options then ioReturn (J.getText "runtime" "" options) else raw buildDirectory (Cons (J.getText "path" "" comp) (Cons "--llvm-runtime" Nil))
@@ -130,7 +135,9 @@ create g options buildDirectory = do
   runtimeHashes <- hashFiles (S.map (O.join (O.parent runtime)) (S.filter (\n -> O.ends ".c" n || O.ends ".h" n) runtimeFiles))
   env <- S.mapM (\key -> do { value <- getEnv key; ioReturn (Pair key (J.str value)) }) (O.words "SDKROOT MACOSX_DEPLOYMENT_TARGET CPATH C_INCLUDE_PATH LIBRARY_PATH")
   snapshot <- M.snapshot g
-  let identity = info (Cons (Pair "compiler" comp) (Cons (Pair "clang" cc) (Cons (Pair "pkg-config" pkg) (Cons (Pair "manager" (obj2 "path" (J.str manager) "sha256" (J.str managerHash))) (Cons (Pair "system" (J.str (O.trim system))) (Cons (Pair "machine" (J.str (O.trim machine))) (Cons (Pair "native_environment" (J.Object env)) (Cons (Pair "runtime" runtimeHashes) (Cons (Pair "runtime-path" (J.str runtime)) (Cons (Pair "gmp" gmp) Nil))))))))))
+  let baseIdentity = info (Cons (Pair "compiler" comp) (Cons (Pair "clang" cc) (Cons (Pair "pkg-config" pkg) (Cons (Pair "manager" (obj2 "path" (J.str manager) "sha256" (J.str managerHash))) (Cons (Pair "system" (J.str (O.trim system))) (Cons (Pair "machine" (J.str (O.trim machine))) (Cons (Pair "native_environment" (J.Object env)) (Cons (Pair "runtime" runtimeHashes) (Cons (Pair "runtime-path" (J.str runtime)) (Cons (Pair "gmp" gmp) Nil))))))))))
+  let irFlags = if windows && S.any (O.starts "clang version 14.") (O.lines version) then O.words "-mllvm -opaque-pointers" else Nil
+  let identity = J.set "ir-flags" (J.stringArray irFlags) (if windows then J.set "windows" (info (Cons (Pair "helper" helper) (Cons (Pair "prefix" (J.str prefix)) (Cons (Pair "dlls" dlls) Nil)))) baseIdentity else baseIdentity)
   let b = Builder g (J.set "native-pgo" profile options) buildDirectory identity snapshot
   J.write (reportPath b) (info (Cons (Pair "format" (J.num 1)) (Cons (Pair "complete" (J.Boolean false)) (Cons (Pair "implementation" (J.str "MLF")) (Cons (Pair "packages" snapshot) (Cons (Pair "toolchain" identity) (Cons (Pair "commands" (J.Array Nil)) (Cons (Pair "builds" (J.Array Nil)) (Cons (Pair "tests" (J.Array Nil)) Nil)))))))))
   ioReturn b
@@ -154,7 +161,7 @@ gcFlags b = do
     ioReturn (flags text)
     else do
       path <- canonicalPath prefix
-      let library = path ++ "/lib/libgc.a"
+      let library = path ++ (if eqString (J.getText "system" "" (tools b)) "Windows" then "/lib/libgc.dll.a" else "/lib/libgc.a")
       present <- fileExists library
       O.require present ("missing BDWGC library: " ++ library)
       ioReturn (Cons ("-I" ++ path ++ "/include") (Cons library (if eqString (J.getText "system" "" (tools b)) "Linux" then Cons "-ldl" Nil else Nil)))
@@ -162,7 +169,14 @@ gcFlags b = do
   record b "native_inputs" identity
   ioReturn identity
 stackFlags : Builder -> List String
-stackFlags b = if eqString (J.getText "system" "" (tools b)) "Darwin" then Cons "-Wl,-stack_size,0x10000000" Nil else Nil
+stackFlags b = if eqString (J.getText "system" "" (tools b)) "Darwin" then Cons "-Wl,-stack_size,0x10000000" Nil else if eqString (J.getText "system" "" (tools b)) "Windows" then Cons "-Wl,--stack,268435456" Nil else Nil
+executable b path = if eqString (J.getText "system" "" (tools b)) "Windows" then path ++ ".exe" else path
+windowsFiles b compact = if J.has "windows" (tools b) then Cons "libgmp-10.dll" (if compact then O.words "libgc-1.dll libwinpthread-1.dll mlf-host.exe" else Nil) else Nil
+copyWindowsFiles b compact destination = do
+  let prefix = J.getText "prefix" "" (J.get "windows" (tools b))
+  S.mapM_ (\name -> do
+    source <- if eqString name "mlf-host.exe" then O.windowsHost else ioReturn (prefix ++ "/bin/" ++ name)
+    O.copy source (destination ++ "/" ++ name)) (windowsFiles b compact)
 profileFlags : List String
 profileFlags = O.words "-DMLF_USE_BDWGC -DMLF_COMPACT_BDWGC -DMLF_GC_THRESHOLD=1048576"
 fingerprint : Builder -> J.Json -> IO String
@@ -171,7 +185,7 @@ validFiles : String -> J.Json -> IO Bool
 validFiles destination saved = do
   checks <- S.mapM (\entry -> do
     let path = S.fst entry
-    if O.starts "/" path || S.elem eqString ".." (O.split 47 path) then ioReturn false else do
+    if O.absolute path || O.drivePath path || S.elem eqString ".." (O.split 47 (O.normalize path)) then ioReturn false else do
       present <- fileExists (destination ++ "/" ++ path)
       if present then do { actual <- fileDigest (destination ++ "/" ++ path); ioReturn (eqString actual (J.text (S.snd entry))) } else ioReturn false) (J.items saved)
   ioReturn (S.not (S.null checks) && S.and checks)
@@ -399,7 +413,7 @@ nativeLLVMObject b emitted = nativeLLVMObjectWithPgo b emitted J.empty
 nativeLLVMObjectWithPgo : Builder -> String -> J.Json -> IO String
 nativeLLVMObjectWithPgo b emitted profile = do
   digest <- fileDigest (emitted ++ "/program.ll")
-  let options = S.append (O.words "-O2 -Wno-override-module -c") (pgoFlags profile)
+  let options = S.append (O.words "-O2 -Wno-override-module -c") (S.append (J.getStrings "ir-flags" (tools b)) (pgoFlags profile))
   let inputs = info (S.append (S.map (\key -> Pair key (J.get key (tools b))) (O.words "clang system machine native_environment")) (Cons (Pair "llvm" (J.str digest)) (Cons (Pair "flags" (J.stringArray options)) Nil)))
   cached b "LLVM object" (pgoInputs profile inputs) (\work -> do
     ignored <- capture b work (S.append (Cons (clang b) options) (Cons (emitted ++ "/program.ll") (Cons "-o" (Cons (work ++ "/program.o") Nil)))) "" ""
@@ -413,12 +427,14 @@ linkNativeWithPgo b llvm runtime compact gc profile = do
   runtimeHash <- fileDigest (runtime ++ "/runtime.o")
   let libraries = S.append (J.getStrings "flags" (J.get "gmp" (tools b))) (J.getStrings "flags" gc)
   let options = S.append (O.words "-O2 -Wno-override-module") (if eqString (J.getText "mode" "" profile) "generate" then Cons "-fprofile-generate" Nil else Nil)
-  let trailing = S.append libraries (S.append (Cons "-lm" Nil) (if compact then stackFlags b else Nil))
+  let hostFlags = if J.has "windows" (tools b) then Cons "-lshell32" (stackFlags b) else if compact then stackFlags b else Nil
+  let trailing = S.append libraries (S.append (Cons "-lm" Nil) hostFlags)
   let inputs = info (S.append (S.map (\key -> Pair key (J.get key (tools b))) (O.words "clang system machine native_environment gmp")) (Cons (Pair "gc" gc) (Cons (Pair "llvm-object" (J.str llvmHash)) (Cons (Pair "runtime-object" (J.str runtimeHash)) (Cons (Pair "flags" (J.stringArray (S.append options trailing))) Nil)))))
-  cached b "native link" (pgoInputs profile inputs) (\work -> do
-    ignored <- capture b work (S.append (Cons (clang b) options) (Cons (llvm ++ "/program.o") (Cons (runtime ++ "/runtime.o") (S.append trailing (Cons "-o" (Cons (work ++ "/program") Nil)))))) "" ""
-    present <- fileExists (work ++ "/program")
-    O.require present "linker did not produce executable")
+  cached b "native link" (pgoInputs profile (if J.has "windows" (tools b) then J.set "windows" (J.get "windows" (tools b)) inputs else inputs)) (\work -> do
+    ignored <- capture b work (S.append (Cons (clang b) options) (Cons (llvm ++ "/program.o") (Cons (runtime ++ "/runtime.o") (S.append trailing (Cons "-o" (Cons (executable b (work ++ "/program")) Nil)))))) "" ""
+    present <- fileExists (executable b (work ++ "/program"))
+    O.require present "linker did not produce executable"
+    copyWindowsFiles b compact work)
 buildTarget : Builder -> M.Package -> String -> J.Json -> Bool -> IO (Pair String String)
 buildTarget b p name target publish = do
   Pair entry ms <- M.targetCrateModules (graph b) p target
@@ -435,7 +451,7 @@ buildTarget b p name target publish = do
   llvm <- nativeLLVMObjectWithPgo b emitted profile
   runtime <- runtimeObjectWithPgo b compact gc profile
   linked <- linkNativeWithPgo b llvm runtime compact gc profile
-  binaryHash <- fileDigest (linked ++ "/program")
+  binaryHash <- fileDigest (executable b (linked ++ "/program"))
   llvmHash <- fileDigest (emitted ++ "/program.ll")
   let inputs = info (Cons (Pair "toolchain" (tools b)) (Cons (Pair "target" target) (Cons (Pair "crate-path" (J.str crate)) (Cons (Pair "metadata" (J.str metadataHash)) (Cons (Pair "object" (J.str objectHash)) (Cons (Pair "llvm" (J.str llvmHash)) (Cons (Pair "binary" (J.str binaryHash)) Nil)))))))
   artifact <- cached b ("executable " ++ M.packageName p ++ ":" ++ name) (pgoInputs profile inputs) (\work -> do
@@ -443,10 +459,11 @@ buildTarget b p name target publish = do
     O.copy (crate ++ "/unit.mlfci") (work ++ "/unit.mlfci")
     O.copy (crate ++ "/unit.mlfco") (work ++ "/unit.mlfco")
     O.copy (emitted ++ "/program.ll") (work ++ "/program.ll")
-    O.copy (linked ++ "/program") (work ++ "/program"))
-  let binary = directory b ++ "/bin/" ++ name
-  if publish then do { O.copy (artifact ++ "/program") (binary ++ ".new"); O.move (binary ++ ".new") binary } else ioReturn Unit
-  ioReturn (Pair (if publish then binary else artifact ++ "/program") artifact)
+    O.copy (executable b (linked ++ "/program")) (executable b (work ++ "/program"))
+    copyWindowsFiles b compact work)
+  let binary = executable b (directory b ++ "/bin/" ++ name)
+  if publish then do { O.copy (executable b (artifact ++ "/program")) (binary ++ ".new"); O.move (binary ++ ".new") binary; S.mapM_ (\file -> O.copy (artifact ++ "/" ++ file) (directory b ++ "/bin/" ++ file)) (windowsFiles b compact) } else ioReturn Unit
+  ioReturn (Pair (if publish then binary else executable b (artifact ++ "/program")) artifact)
 verifyHashes : J.Json -> IO Unit
 verifyHashes values = S.mapM_ (\entry -> do { actual <- fileDigest (S.fst entry); O.require (eqString actual (J.text (S.snd entry))) ("input changed during build/test: " ++ S.fst entry) }) (J.items values)
 finish : Builder -> IO Unit
@@ -458,6 +475,12 @@ finish b = do
   verifyHashes (J.get "runtime" (tools b))
   verifyHashes (J.get "libraries" (J.get "gmp" (tools b)))
   verifyHashes (J.get "headers" (J.get "gmp" (tools b)))
+  if J.has "windows" (tools b) then do
+    verifyHashes (J.get "dlls" (J.get "windows" (tools b)))
+    let helper = J.get "helper" (J.get "windows" (tools b))
+    actual <- fileDigest (J.getText "path" "" helper)
+    O.require (eqString actual (J.getText "sha256" "" helper)) "Windows host helper changed during build/test"
+  else ioReturn Unit
   report <- J.read (reportPath b)
   S.mapM_ (\value -> do { verifyHashes (J.get "libraries" value); verifyHashes (J.get "headers" value) }) (J.values (J.getOr "native_inputs" (J.Array Nil) report))
   J.write (reportPath b) (J.set "complete" (J.Boolean true) report)

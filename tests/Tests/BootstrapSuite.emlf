@@ -22,6 +22,10 @@ main = do
  let collector = J.Object (Cons (Pair "cflags" (J.stringArray (Cons "-I/path with spaces/include" Nil))) (Cons (Pair "libs" (J.stringArray (Cons "/path with spaces/libgc.a" Nil))) Nil))
  env <- H.right (V.matrixEnvironment (J.Object (Cons (Pair "GC_INITIAL_HEAP_SIZE" (J.str "536870912")) (Cons (Pair "MLF_LLVM_TEST_LIBS" (J.str "wrong")) (Cons (Pair "MLF_TEST_TRACE" (J.str "unexpected")) Nil)))) "/drivers" "/seed" candidate "compact-gc" collector)
  H.assert (eqString (V.text "MLF_LLVM_TEST_ABI" env) "compact-gc" && eqString (V.text "GC_INITIAL_HEAP_SIZE" env) "8388608" && eqString (V.text "GC_FREE_SPACE_DIVISOR" env) "1" && eqString (V.text "MLF_LLVM_TEST_CFLAGS" env) "'-I/path with spaces/include'" && eqString (V.text "MLF_LLVM_TEST_LIBS" env) "'/path with spaces/libgc.a'" && S.not (J.has "MLF_TEST_TRACE" env)) "compact environment changed"
+ S.mapM_ (\divisor -> do
+  explicit <- H.right (V.matrixEnvironment (J.set "MLF_TEST_MATRIX_GC_DIVISOR" (J.str divisor) J.empty) "/drivers" "/seed" candidate "compact-gc" collector)
+  H.assert (eqString (V.text "GC_FREE_SPACE_DIVISOR" explicit) divisor && eqString (V.text "GC_INITIAL_HEAP_SIZE" explicit) "8388608" && eqString (V.text "MLF_BOOTSTRAP_COMPILER" explicit) candidate) "explicit collection policy changed layout or compiler") (O.words "1 2 4")
+ S.mapM_ (\divisor -> rejected (V.matrixEnvironment (J.set "MLF_TEST_MATRIX_GC_DIVISOR" (J.str divisor) J.empty) "/drivers" "/seed" candidate "standard" J.empty)) (O.words "0 -1 3 invalid")
  S.mapM_ (\abi -> rejected (V.matrixEnvironment J.empty "/drivers" "/seed" candidate abi J.empty)) (O.words "compact-gc unknown")
  putStrLn "PASS test_compact_matrix_requires_collector_and_small_heap"
  H.assert (S.eqList eqString (V.layoutPlan (O.words "standard compact-gc")) (O.words "RuntimeDriver LLVMDriver matrix:standard matrix:compact-gc")) "drivers rebuilt or a native matrix skipped"
