@@ -2,6 +2,7 @@ module Package.Build where
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Bootstrap.CrateArtifact as Artifact
+import qualified Bootstrap.Host as Host
 import qualified Package.OS as O
 import qualified Package.Json as J
 import qualified Package.Manifest as M
@@ -243,7 +244,7 @@ validDigest value = case value of
   J.String digest -> stringLength digest == 64 && S.all (\i -> let c = stringCodeAt digest i in c >= 48 && c <= 57 || c >= 97 && c <= 102) (S.range 0 63)
   _ -> false
 validDependencyShape saved = case saved of
-  J.Object entries -> let paths = S.map S.fst entries in S.length paths == S.length (S.nubBy eqString paths) && S.all (\(Pair path digest) -> O.starts "/" path && validDigest digest) entries
+  J.Object entries -> let paths = S.map S.fst entries in S.length paths == S.length (S.nubBy eqString paths) && S.all (\(Pair path digest) -> Host.absolutePath path && validDigest digest) entries
   _ -> false
 validDependencyFiles saved = case saved of
   J.Object entries -> do
@@ -275,7 +276,7 @@ verifiedDependencyProof artifact = do
   saved <- readProofJson (artifact ++ "/artifact.json")
   case saved of
     Nothing -> ioReturn J.empty
-    Just stamp -> if S.not (O.starts "/" artifact && validProofStamp artifact stamp) then ioReturn J.empty else do
+    Just stamp -> if S.not (Host.absolutePath artifact && validProofStamp artifact stamp) then ioReturn J.empty else do
       ownValid <- cacheValid artifact (O.base artifact)
       if S.not ownValid then ioReturn J.empty else do
         receipt <- readProofJson (artifact ++ "/dependency-files.json")
