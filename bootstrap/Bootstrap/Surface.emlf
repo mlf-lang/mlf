@@ -3,6 +3,8 @@ import Bootstrap.Types
 import Bootstrap.Std
 import Bootstrap.Fresh
 import qualified Bootstrap.Desugar as Desugar
+import qualified Bootstrap.Dependency as Dependency
+import qualified Bootstrap.Map as M
 
 patternVariables : SPattern -> List String
 patternVariables = Desugar.patternVariables
@@ -38,35 +40,19 @@ valueName (Triple n _ _) = n
 valueBody : Triple String (Maybe SAnnotation) SExpr -> SExpr
 valueBody (Triple _ _ e) = e
 bindValues : List (Triple String (Maybe SAnnotation) SExpr) -> SExpr -> Either String SExpr
-bindValues values body = let names = map valueName values in
-  if length names /= length (nubBy eqString names) then Left "duplicate value declaration" else
-    let dependencies = map (\(Triple n _ e) -> Pair n (filter (\v -> elem eqString v names) (freeNames e))) values in
-    let groups = components dependencies names in
-    case orderGroups dependencies Nil groups of {Left error -> Left error; Right sorted -> wrapGroups values dependencies sorted body}
-reachable : List (Pair String (List String)) -> List String -> List String -> List String
-reachable dependencies seen todo = case todo of
-  Nil -> seen
-  Cons n rest -> if elem eqString n seen then reachable dependencies seen rest else
-    reachable dependencies (Cons n seen) (append (case lookup eqString n dependencies of {Nothing -> Nil; Just ds -> ds}) rest)
-components : List (Pair String (List String)) -> List String -> List (List String)
-components dependencies pending = case pending of
-  Nil -> Nil
-  Cons n rest -> let reachableFrom = reachable dependencies Nil (Cons n Nil) in
-    let group = filter (\m -> elem eqString m reachableFrom && elem eqString n (reachable dependencies Nil (Cons m Nil))) pending in
-    Cons group (components dependencies (without pending group))
-orderGroups : List (Pair String (List String)) -> List String -> List (List String) -> Either String (List (List String))
-orderGroups dependencies done pending = case pending of
-  Nil -> Right Nil
-  _ -> case find (\group -> all (\n -> all (\d -> elem eqString d done || elem eqString d group) (case lookup eqString n dependencies of {Nothing -> Nil; Just ds -> ds})) group) pending of
-    Nothing -> Left "invalid declaration dependencies"
-    Just group -> case orderGroups dependencies (append group done) (filter (\g -> not (eqString (head g) (head group))) pending) of {Left error -> Left error; Right rest -> Right (Cons group rest)}
-wrapGroups : List (Triple String (Maybe SAnnotation) SExpr) -> List (Pair String (List String)) -> List (List String) -> SExpr -> Either String SExpr
-wrapGroups values dependencies groups body = case groups of
-  Nil -> Right body
-  Cons group rest -> case wrapGroups values dependencies rest body of
+bindValues values body =
+  case Dependency.declarationGroups values of
     Left error -> Left error
-    Right continuation -> let local = filter (\v -> elem eqString (valueName v) group) values in
-      let cyclic = length group > 1 || any (\n -> elem eqString n (case lookup eqString n dependencies of {Nothing -> Nil; Just ds -> ds})) group in
+    Right groups -> wrapGroups values (Dependency.declarationEdges values) groups body
+wrapGroups : List (Triple String (Maybe SAnnotation) SExpr) -> List (Pair String (List String)) -> List (List String) -> SExpr -> Either String SExpr
+wrapGroups values dependencies groups body = wrapIndexed (M.fromList compareString (map (\v -> Pair (valueName v) v) values)) (M.fromList compareString dependencies) groups body
+wrapIndexed : Map String (Triple String (Maybe SAnnotation) SExpr) -> Map String (List String) -> List (List String) -> SExpr -> Either String SExpr
+wrapIndexed values dependencies groups body = case groups of
+  Nil -> Right body
+  Cons group rest -> case wrapIndexed values dependencies rest body of
+    Left error -> Left error
+    Right continuation -> let local = map (\n -> M.get compareString n values) group in
+      let cyclic = length group > 1 || any (\n -> elem eqString n (M.findWithDefault compareString Nil n dependencies)) group in
       if cyclic then mapEither (\ds -> SLetRec ds continuation) (recursiveValues local)
       else case local of {Cons (Triple n a e) Nil -> Right (SLet n (case a of {Nothing -> e; Just t -> SAnn e t}) continuation); _ -> Left "invalid declaration group"}
 lowerSurface : SProgram -> Either String SProgram

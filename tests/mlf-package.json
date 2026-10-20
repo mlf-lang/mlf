@@ -23,6 +23,7 @@
       "Tests.Computations": "Tests/Computations.emlf",
       "Tests.ConstructorProjection": "Tests/ConstructorProjection.emlf",
       "Tests.Core": "Tests/Core.emlf",
+      "Tests.CrateQueries": "Tests/CrateQueries.emlf",
       "Tests.DNA": "Tests/DNA.emlf",
       "Tests.Datatypes": "Tests/Datatypes.emlf",
       "Tests.DoNotation": "Tests/DoNotation.emlf",
@@ -87,7 +88,9 @@
       "Tests.ProjectionChanges": "Tests/ProjectionChanges.emlf",
       "Tests.IntSetUnions": "Tests/IntSetUnions.emlf",
       "Tests.IndexEdges": "Tests/IndexEdges.emlf",
-      "Tests.ComponentProjection": "Tests/ComponentProjection.emlf"
+      "Tests.ComponentProjection": "Tests/ComponentProjection.emlf",
+      "Tests.CrateCodegen": "Tests/CrateCodegen.emlf",
+      "Tests.OptimizerUses": "Tests/OptimizerUses.emlf"
     }
   },
   "executables": {

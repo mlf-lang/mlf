@@ -25,7 +25,7 @@ main = do
  args <- O.allArguments
  cases <- case args of
   Nil -> do
-   O.require (S.length T.suite == 654) "preserved core test coverage changed"
+   O.require (S.length T.suite == 702) "preserved core test coverage changed"
    return T.suite
   Cons "--from" (Cons prefix Nil) -> do
    let selected = S.dropWhile (\entry -> S.not (O.starts prefix (S.fst entry))) T.suite

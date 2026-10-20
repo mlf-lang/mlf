@@ -71,15 +71,22 @@ sameFunctions a b = case a of
     Nil -> false
     Cons (Pair m g) tail -> O.eqName n m && sameFunction f g && sameFunctions rest tail
 
+-- Bodies and parameters stay fixed during capture propagation. Cache their
+-- lexical free names once; each iteration only changes the capture lists.
 captureFixed : Map XName WorkerFunction -> Map XName WorkerFunction
-captureFixed fs =
-  let next = M.map (\f -> WorkerFunction (parameters f) (functionBody f) (S.toList (S.difference O.compareName (needed fs (functionBody f)) (S.fromList O.compareName (parameters f)))) (strict f)) fs in
-  if sameFunctions (M.toList fs) (M.toList next) then fs else captureFixed next
+captureFixed fs = captureIndexed (M.map (\f -> Pair (S.toList (O.free (functionBody f))) (S.fromList O.compareName (parameters f))) fs) fs
+
+captureIndexed : Map XName (Pair (List XName) (Set XName)) -> Map XName WorkerFunction -> Map XName WorkerFunction
+captureIndexed inputs fs =
+  let next = M.mapWithKey (\name f -> case M.get O.compareName name inputs of
+        Pair names parameterNames -> WorkerFunction (parameters f) (functionBody f)
+          (S.toList (S.difference O.compareName (S.unions O.compareName (L.map (neededName fs) names)) parameterNames)) (strict f)) fs in
+  if M.eqMap O.eqName (\a b -> sameNames (captures a) (captures b)) fs next then fs else captureIndexed inputs next
 
 demandFixed : Map XName WorkerFunction -> Map XName WorkerFunction
 demandFixed fs =
   let next = M.map (\f -> WorkerFunction (parameters f) (functionBody f) (captures f) (S.intersection O.compareName (demanded fs (functionBody f)) (S.fromList O.compareName (L.append (parameters f) (captures f))))) fs in
-  if sameFunctions (M.toList fs) (M.toList next) then fs else demandFixed next
+  if M.eqMap O.eqName (\a b -> sameNames (S.toList (strict a)) (S.toList (strict b))) fs next then fs else demandFixed next
 
 analyze : XErased -> Map XName WorkerFunction
 analyze expression = demandFixed (captureFixed (collect expression))

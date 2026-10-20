@@ -7,11 +7,11 @@ import qualified Package.Manifest as M
 import qualified Package.Build as B
 
 usage : String
-usage = "Usage: mlfpkg [--manifest FILE] [--build-dir DIR] [--compiler TOOL] [--clang TOOL]\n              [--pkg-config TOOL] [--runtime FILE] [--gc-prefix DIR] [--timeout SECONDS] [--locked]\n              plan | lock | build [--target NAME ...] | test [--target NAME ...] | run NAME [-- ARGS...]\nLocal package manifests: mlf-package.json. All package orchestration is implemented in MLF.\n"
+usage = "Usage: mlfpkg [--manifest FILE] [--build-dir DIR] [--compiler TOOL] [--clang TOOL]\n              [--pkg-config TOOL] [--runtime FILE] [--gc-prefix DIR] [--timeout SECONDS] [--locked]\n              [--pgo-generate TARGET | --pgo-target TARGET --pgo-use FILE]\n              plan | lock | build [--target NAME ...] | test [--target NAME ...] | run NAME [-- ARGS...]\nLocal package manifests: mlf-package.json. All package orchestration is implemented in MLF.\n"
 options : J.Json -> List String -> IO (Pair J.Json (List String))
 options config args = case args of
   Cons "--locked" rest -> options (J.set "locked" (J.Boolean true) config) rest
-  Cons option (Cons value rest) -> if S.elem eqString option (O.words "--manifest --build-dir --compiler --clang --pkg-config --runtime --gc-prefix --timeout") then options (J.set (O.drop 2 option) (J.str value) config) rest else ioReturn (Pair config args)
+  Cons option (Cons value rest) -> if S.elem eqString option (O.words "--manifest --build-dir --compiler --clang --pkg-config --runtime --gc-prefix --timeout --pgo-generate --pgo-target --pgo-use") then options (J.set (O.drop 2 option) (J.str value) config) rest else ioReturn (Pair config args)
   _ -> ioReturn (Pair config args)
 selections : List String -> List String -> IO (List String)
 selections acc args = case args of
@@ -35,7 +35,7 @@ configureGC : String -> J.Json -> IO J.Json
 configureGC packageRoot config = do
   let requested = J.getText "gc-prefix" "" config
   selected <- if S.not (eqString requested "") then canonicalPath requested else do
-    let dependencies = packageRoot ++ "/dist-newstyle/bootstrap-deps"
+    let dependencies = packageRoot ++ "/.mlf-build/deps"
     present <- directoryExists dependencies
     candidates <- if present then do
       names <- O.entries dependencies
@@ -60,12 +60,10 @@ expand replacements text = S.foldl (\acc entry -> O.replace (S.fst entry) (S.snd
 commandTest : B.Builder -> M.Package -> String -> J.Json -> IO J.Json
 commandTest b p name target = do
   binaries <- S.mapM (\n -> do { Pair binary _ <- B.buildTarget b p n (J.get n (J.getObject "executables" (M.packageData p))) true; ioReturn (Pair ("{bin:" ++ n ++ "}") binary) }) (J.getStrings "requires" target)
-  -- Python may be a test subject/tool, never the package manager implementation.
   let requested = J.getStrings "command" target
-  python <- if S.any (\x -> S.not (eqString x (O.replace "{python}" "" x))) requested then O.which "python3" else ioReturn ""
-  let replacements = S.append binaries (Cons (Pair "{root}" (M.packageRoot p)) (Cons (Pair "{build}" (B.directory b)) (Cons (Pair "{python}" python) Nil)))
+  let replacements = S.append binaries (Cons (Pair "{root}" (M.packageRoot p)) (Cons (Pair "{build}" (B.directory b)) Nil))
   let argv = S.map (expand replacements) requested
-  O.require (S.all (\arg -> S.all (\prefix -> eqString arg (O.replace prefix "" arg)) (O.words "{root {build {python {bin:")) argv) "unresolved test placeholder"
+  O.require (S.all (\arg -> S.all (\prefix -> eqString arg (O.replace prefix "" arg)) (O.words "{root {build {bin:")) argv) "unresolved test placeholder"
   let log = B.directory b ++ "/tests/" ++ name ++ ".log"
   O.mkdir (O.parent log)
   code <- O.exec (M.packageRoot p) argv "" log log (readInt (J.getText "timeout" "1800" (B.config b)))
@@ -78,11 +76,7 @@ commandTest b p name target = do
 nativeTest : B.Builder -> M.Package -> String -> J.Json -> IO J.Json
 nativeTest b p name target = do
   Pair binary artifact <- B.buildTarget b p ("test-" ++ name) target false
-  Pair entry _ <- M.targetModules (B.graph b) p target
-  let separate = eqString (J.getText "link" "separate" target) "separate"
-  let base = artifact ++ (if separate then "/modules" else "/sources")
-  let input = base ++ "/" ++ O.modulePath entry ++ (if separate then ".mlfi" else ".emlf")
-  let command = S.append (Cons (B.compiler b) (B.preludeOptions target)) (Cons "-i" (Cons base (Cons (if separate then "--run-module" else "--run") (Cons input (Cons "--" (J.getStrings "arguments" target))))))
+  let command = Cons (B.compiler b) (Cons "--run-crate" (Cons (artifact ++ "/unit.mlfci") (Cons "--" (J.getStrings "arguments" target))))
   let testDir = B.directory b ++ "/tests/" ++ name
   O.mkdir testDir
   writeFile (testDir ++ "/stdin") (J.getText "stdin" "" target)
@@ -128,7 +122,8 @@ run args = do
       if J.getBool "locked" false config then do { saved <- J.read lockPath; O.require (J.equal saved snapshot) "mlf.lock is stale; review local changes and run mlfpkg lock" } else ioReturn Unit
       if eqString action "plan" then do
         O.require (S.null rest) usage
-        putStrLn (J.render (J.set "modules" (J.stringArray (S.map M.moduleName (M.modules graph))) (J.set "executables" (J.stringArray (M.keys (J.getObject "executables" (M.packageData p)))) (J.set "tests" (J.stringArray (M.keys (J.getObject "tests" (M.packageData p)))) snapshot))))
+        crates <- M.cratePlan graph
+        putStrLn (J.render (J.set "crates" crates (J.set "modules" (J.stringArray (S.map M.moduleName (M.modules graph))) (J.set "executables" (J.stringArray (M.keys (J.getObject "executables" (M.packageData p)))) (J.set "tests" (J.stringArray (M.keys (J.getObject "tests" (M.packageData p)))) snapshot)))))
       else if eqString action "lock" then do { O.require (S.null rest) usage; J.write lockPath snapshot; putStrLn lockPath }
       else do
         let targets = J.getObject (if eqString action "test" then "tests" else "executables") (M.packageData p)
@@ -139,7 +134,7 @@ run args = do
         compilerSettings <- configureCompiler p dir config
         settings <- configureGC (M.packageRoot p) compilerSettings
         b <- B.create graph settings dir
-        if eqString action "test" then runTests b p names else if S.null names then do { ignored <- B.objects b (M.modules graph) false; ioReturn Unit } else
+        if eqString action "test" then runTests b p names else if S.null names then do { ignored <- B.libraries b false; ioReturn Unit } else
           S.mapM_ (\name -> do { Pair binary _ <- B.buildTarget b p name (J.get name targets) true; if eqString action "run" then ioReturn Unit else putStrLn binary }) names
         B.finish b
         releaseFileLock lock

@@ -107,6 +107,17 @@ lowerSeparateClasses externals instanceNames original = do
       let parameters = map (\(Pair n ty) -> Triple n (SAnnotation Nil ty) (SChecked ty (SApp (SPrimitive PPanic) (SStringLit "unlinked module parameter")))) (M.toList externals) in
       Right (Pair (SProgram ds (if null parameters then body else SLetRec parameters body)) M.empty)
     _ -> lowerCoreClassesWith (Just (Pair externals instanceNames)) S.empty M.empty Nothing program
+-- Crate lowering has a complete declaration/instance inventory, but candidate
+-- visibility remains that of each declaration's defining module. Stable
+-- dictionary names make the lowered declarations reusable inference queries.
+lowerSeparateClassesWithScopes : Map String SType -> List String -> Map String IntSet -> List IntSet -> SProgram -> Either String (Pair SProgram (Map String String))
+lowerSeparateClassesWithScopes externals instanceNames valueScopes instanceScopes original = do
+  program <- Surface.lowerSurface (case original of {SProgram ds b -> SClassProgram ds Nil Nil b; _ -> original})
+  case program of
+    SClassProgram ds Nil Nil body ->
+      let parameters = map (\(Pair n ty) -> Triple n (SAnnotation Nil ty) (SChecked ty (SApp (SPrimitive PPanic) (SStringLit "unlinked crate parameter")))) (M.toList externals) in
+      Right (Pair (SProgram ds (if null parameters then body else SLetRec parameters body)) M.empty)
+    _ -> lowerCoreClassesWith (Just (Pair externals instanceNames)) S.empty valueScopes (Just instanceScopes) program
 lowerCoreClassesWith : Maybe (Pair (Map String SType) (List String)) -> Set String -> Map String IntSet -> Maybe (List IntSet) -> SProgram -> Either String (Pair SProgram (Map String String))
 lowerCoreClassesWith config imported valueIndices instanceIndices program = case program of
   SProgram ds body -> case config of

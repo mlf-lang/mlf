@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-19",
+  "implementation": "MLF",
+  "command": [
+    "./mlfpkg",
+    "--compiler",
+    "/Volumes/src/mlf/.mlf-build/retire-haskell/stage1/bin/emlf",
+    "--runtime",
+    "/Volumes/src/mlf/runtime/mlf_runtime.c",
+    "--timeout",
+    "21600",
+    "--build-dir",
+    "/Volumes/src/mlf/.mlf-build/retire-haskell/candidate",
+    "--locked",
+    "test"
+  ],
+  "build_report": "/Volumes/src/mlf/.mlf-build/retire-haskell/candidate/build-report.json",
+  "compiler_sha256": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+  "manager_sha256": "3e4736ffee1d25b07571811f061a574d729899f7610939934b616f8f1012a7d5",
+  "source_manifest_sha256": "cc2e605b0d4a53be3bd5efb66e7cba47813ff23c64ef850af7de25a1e7edfbe3",
+  "source_files": 321,
+  "forbidden_tools": {
+    "names": [
+      "ghc",
+      "ghc-pkg",
+      "runghc",
+      "runhaskell",
+      "cabal",
+      "python",
+      "python3",
+      "python3.9",
+      "python3.10",
+      "python3.11",
+      "python3.12",
+      "python3.13",
+      "python3.14"
+    ],
+    "invocations": 0,
+    "log": "/Volumes/src/mlf/.mlf-build/retire-haskell/forbidden-tools.log",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "preservation": {
+    "benchmark_pins": 72,
+    "unchanged_files": 2712,
+    "remaining_haskell_sources": [
+      "benchmarks/binary-trees/haskell/upstream.hs",
+      "benchmarks/fannkuch-redux/haskell/main.hs",
+      "benchmarks/fannkuch-redux/haskell/upstream.hs",
+      "benchmarks/fasta/haskell/upstream.hs",
+      "benchmarks/k-nucleotide/haskell/main.hs",
+      "benchmarks/k-nucleotide/haskell/upstream.hs",
+      "benchmarks/mandelbrot/haskell/main.hs",
+      "benchmarks/mandelbrot/haskell/upstream.hs",
+      "benchmarks/n-body/haskell/upstream.hs",
+      "benchmarks/pidigits/haskell/upstream.hs",
+      "benchmarks/reverse-complement/haskell/main.hs",
+      "benchmarks/reverse-complement/haskell/upstream.hs",
+      "benchmarks/spectral-norm/haskell/upstream.hs",
+      "examples/SnakeBaseline.hs"
+    ],
+    "documentation_updated": [
+      "benchmarks/README.md",
+      "benchmarks/INVESTIGATION.md"
+    ],
+    "native_fixtures_byte_identical": 12
+  },
+  "groups": {
+    "unit": {
+      "complete": true,
+      "report": "/Volumes/src/mlf/.mlf-build/retire-haskell/candidate/compiler-tests/unit/verification.json",
+      "suites": {
+        "core": {
+          "coverage": [
+            "654 checks; 0 failures",
+            "Oracle: 6712 closed terms"
+          ],
+          "log_sha256": "50930c02512fec6f630843a220aa38f92e3ed82264e32b8a449cd27caf04fe65"
+        },
+        "figure12": {
+          "coverage": [
+            "43/43 expressions match regression expectations; 0 failures",
+            "36 supplementary checks; 0 failures"
+          ],
+          "log_sha256": "0f5d185e2b22c93c90cee226c08e4a2b22235d2cae8e57c0a236cbb416d57b48"
+        },
+        "harness": {
+          "coverage": [
+            "57 native benchmark/bootstrap/release harness tests passed"
+          ],
+          "log_sha256": "760b9e2824c64991d1bb2a1f09f872323f90ba1cbc9587272ce67e63e0a62a46"
+        }
+      },
+      "report_sha256": "1a2e5a8dc5e3f956f9518efa0e313b88528d4d4b7a83a326069c9ea1a8eb3717"
+    },
+    "packages": {
+      "complete": true,
+      "report": "/Volumes/src/mlf/.mlf-build/retire-haskell/candidate/compiler-tests/packages/verification.json",
+      "suites": {
+        "packages": {
+          "coverage": [
+            "18 package resolver tests passed",
+            "19 package integration cases passed"
+          ],
+          "log_sha256": "3de21a63cd50919a3b7a63fd761f0c85a9ed8cfb009998f5d74e15870c0cb658"
+        }
+      },
+      "report_sha256": "723806bac105dc4ddeeb526bb0ac97f4ad4295594e4f1e1f6526b0d80b5b1b36"
+    },
+    "self-host": {
+      "complete": true,
+      "report": "/Volumes/src/mlf/.mlf-build/retire-haskell/candidate/compiler-tests/self-host/verification.json",
+      "fixed_point": {
+        "llvm_sha256": "6681b744a867617156f6e8caf4a91c3a1c6f28ecd0d51a3f36f98051f9e701dd",
+        "next_compiler_sha256": "d207c9a8988f9163c3ded6f9eca13f10452bfcf6e7ac93ea42a73924822b0bc6",
+        "reused_candidate_build": false
+      },
+      "report_sha256": "18895f44e2e490247e6142cfdbc66e01e23680e98dddef533092b16f04ce871a"
+    },
+    "parity": {
+      "complete": true,
+      "report": "/Volumes/src/mlf/.mlf-build/retire-haskell/candidate/compiler-tests/parity/verification.json",
+      "parity": {
+        "accepted": 3202,
+        "cases": 7086,
+        "manifest_sha256": "c32f9fd7a57dbc9b5d792194ad70a81e62b4d64d5359f433bd65dc9c4072fa2d",
+        "rejected": 3884,
+        "runtime_executions": 160,
+        "runtime_rows": 80
+      },
+      "report_sha256": "33cf88288572cbc51e4c0af7a1a5b72d96efa1bbb96047630acf6fd94ed0b8d2"
+    },
+    "backends": {
+      "complete": true,
+      "report": "/Volumes/src/mlf/.mlf-build/retire-haskell/candidate/compiler-tests/backends/verification.json",
+      "matrices": {
+        "compact-gc": {
+          "backends": 2,
+          "cli_compiler": "/Volumes/src/mlf/.mlf-build/retire-haskell/candidate/bin/emlf",
+          "log_sha256": "02c6a4c44efff94f623d5f88600153b28b972f95b4e4806b2287f4a1f98d042a",
+          "rows": 552
+        },
+        "standard": {
+          "backends": 2,
+          "cli_compiler": "/Volumes/src/mlf/.mlf-build/retire-haskell/candidate/bin/emlf",
+          "log_sha256": "02c6a4c44efff94f623d5f88600153b28b972f95b4e4806b2287f4a1f98d042a",
+          "rows": 552
+        }
+      },
+      "report_sha256": "88974e7f7e8f40d7899a9d883396c6e974311dcf34a3bd672ca1f89b41d27651"
+    },
+    "port": {
+      "complete": true,
+      "report": "/Volumes/src/mlf/.mlf-build/retire-haskell/candidate/compiler-tests/port/verification.json",
+      "matrices": {
+        "compact-gc": {
+          "backends": 2,
+          "cli_compiler": "/Volumes/src/mlf/.mlf-build/retire-haskell/candidate/bin/emlf",
+          "log_sha256": "a904322f810051fa4c544f3dbd9527c3878521da00eb52ab730510c93578910b",
+          "rows": 26
+        },
+        "standard": {
+          "backends": 2,
+          "cli_compiler": "/Volumes/src/mlf/.mlf-build/retire-haskell/candidate/bin/emlf",
+          "log_sha256": "a904322f810051fa4c544f3dbd9527c3878521da00eb52ab730510c93578910b",
+          "rows": 26
+        }
+      },
+      "report_sha256": "1c4a0ba9996790e0e726c4988494ee48dc80a462764196b3979409659be860b6"
+    }
+  },
+  "complete": true,
+  "lock_sha256": "57d4dc546c74e5a2b3ccba5e796f4a5f587710aa55bd4949df2d161add08b7e5",
+  "primary_log": {
+    "path": "/Volumes/src/mlf/.mlf-build/retire-haskell/all-tests.log",
+    "sha256": "34ca700b3ad12801a15e1f2808389dbbf7e02cd6a0235ac2451dcc0915cc9b3d"
+  },
+  "native_benchmark_tools": {
+    "complete": true,
+    "targets": [
+      "bench",
+      "build-backend",
+      "build-linker"
+    ],
+    "report": "/Volumes/src/mlf/.mlf-build/retire-haskell/native-bench/build-report.json",
+    "report_sha256": "c9a101d93f723cf8cabc45890ddac40912e63f40fa645c720791384aa2359f18",
+    "performance_gate_rerun": false
+  }
+}

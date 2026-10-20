@@ -164,7 +164,7 @@ operational manifest = do
   H.assert (S.isLeft failed && S.isLeft timed) "failed or timed-out child became sample"))
  check "test_rss_is_per_process_not_cumulative_high_water" (H.withScratch (\directory -> do
   let binary = directory ++ "/measure-work"
-  O.run "" (Cons "clang" (Cons "-O2" (Cons "test/measurement_fixture.c" (Cons "-o" (Cons binary Nil)))))
+  O.run "" (Cons "clang" (Cons "-O2" (Cons "tests/native/measurement_fixture.c" (Cons "-o" (Cons binary Nil)))))
   large <- B.measure directory (Cons binary (Cons "large" Nil)) "" 5
   large <- H.right large
   small <- B.measure directory (Cons binary (Cons "small" Nil)) "" 5
@@ -209,7 +209,7 @@ operational manifest = do
 processGroupRace : String -> IO Unit
 processGroupRace directory = do
  let helper = directory ++ "/group-race"
- O.run "" (S.append (O.words "clang -O2 -std=c11 -Dsetpgid=mlf_test_setpgid test/host_support.c test/process_group_fixture.c -o") (Cons helper Nil))
+ O.run "" (S.append (O.words "clang -O2 -std=c11 -Dsetpgid=mlf_test_setpgid tests/native/host_support.c tests/native/process_group_fixture.c -o") (Cons helper Nil))
  original <- getEnv "MLF_TEST_HOST_SUPPORT"
  setEnv "MLF_TEST_HOST_SUPPORT" helper
  measured <- B.measure directory (Cons "/usr/bin/true" Nil) "" 5
@@ -315,10 +315,10 @@ buildFailures = do
   H.assert (S.isLeft reused) "build directory reused"
   second <- B.buildParallel (directory ++ "/second") compiler compiler source runtime Nil 10.0
   H.right second
-  separate <- B.buildParallel (directory ++ "/separate") compiler compiler (directory ++ "/Main.mlfi") runtime Nil 10.0
+  separate <- B.buildParallel (directory ++ "/separate") compiler compiler (directory ++ "/Main.mlfci") runtime Nil 10.0
   Pair binary sample <- H.right separate
   let command = J.getStrings "command" (S.head (V.array "stages" sample))
-  H.assert (S.elem eqString "--module-to-llvm" command && S.not (S.elem eqString "--emit-llvm" command)) "interface native build selected wrong frontend"
+  H.assert (S.elem eqString "--crate-to-llvm" command && S.not (S.elem eqString "--emit-llvm" command)) "interface native build selected wrong frontend"
   unsetEnv "MLF_MOCK_BUILD"))
  check "test_parallel_phase_failure_and_timeout_reap_every_child" (H.withScratch (\directory -> do
   processGroupRace directory

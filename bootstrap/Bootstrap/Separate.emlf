@@ -7,7 +7,6 @@ import qualified Bootstrap.Map as M
 import qualified Bootstrap.Set as Set
 import qualified Bootstrap.Module as Modules
 import qualified Bootstrap.Classes as Classes
-import qualified Bootstrap.Compiler as Compiler
 import qualified Bootstrap.Parser as Parser
 import qualified Bootstrap.Primitive as Primitive
 import qualified Bootstrap.Desugar as Desugar
@@ -22,7 +21,7 @@ import qualified Bootstrap.X.Parser as XP
 import qualified Bootstrap.X.Pretty as Pretty
 
 data UnitInterface = UnitInterface String (List (Pair String String)) (List Modules.Entity) (List DataDecl) (List SClassDecl) (List (Pair String SInstanceDecl)) (List (Pair String XType)) String
-data UnitObject = UnitObject UnitInterface XTerm
+data UnitObject = UnitObject UnitInterface XTerm | CheckedUnitObject UnitInterface Checked.CheckedTerm
 unitName (UnitInterface n _ _ _ _ _ _ _) = n
 unitDependencies (UnitInterface _ ds _ _ _ _ _ _) = ds
 unitExports (UnitInterface _ _ es _ _ _ _ _) = es
@@ -31,8 +30,11 @@ unitClasses (UnitInterface _ _ _ _ cs _ _ _) = cs
 unitInstances (UnitInterface _ _ _ _ _ is _ _) = is
 unitBindings (UnitInterface _ _ _ _ _ _ bs _) = bs
 unitObjectFingerprint (UnitInterface _ _ _ _ _ _ _ h) = h
-objectInterface (UnitObject i _) = i
-objectTerm (UnitObject _ t) = t
+objectInterface object = case object of {UnitObject i _ -> i; CheckedUnitObject i _ -> i}
+objectTerm object = case object of {UnitObject _ t -> t; CheckedUnitObject _ checked -> Checked.term checked}
+objectChecked : UnitObject -> Either String Checked.CheckedTerm
+objectChecked object = case object of {UnitObject _ term -> Checked.check term; CheckedUnitObject _ checked -> Right checked}
+
 
 encodedFrom : String -> Int -> String
 encodedFrom text i = if i >= stringLength text then "" else showInt (stringCodeAt text i) ++ "_" ++ encodedFrom text (i+1)
@@ -87,7 +89,7 @@ hygieneIn env expression = case expression of
     freshPure (SEquations rows2)
   SDo _ _ -> hygieneIn env (Desugar.desugarDo expression)
   _ -> freshPure expression
-hygiene expression = runFresh Nil (hygieneIn M.empty expression)
+hygiene expression = runFresh (Desugar.allNames expression) (hygieneIn M.empty expression)
 mapMaybeValue f value = case value of {Nothing -> Nothing; Just a -> Just (f a)}
 
 sourceSchemeIn : Map String String -> Bool -> XType -> SType
@@ -145,71 +147,28 @@ closeInstance values (SInstanceDecl vars context klass head methods) = do
 stripInstance (SInstanceDecl vars context klass head methods) = SInstanceDecl vars context klass head (map (\(Pair n _) -> Pair n (SApp (SPrimitive PPanic) (SStringLit "interface method"))) methods)
 sortBindings bindings = sortBy (\a b -> compareString (fst a) (fst b)) bindings
 
-compileUnit : PreludeMode -> List UnitInterface -> SourceModule -> Either String UnitObject
-compileUnit mode dependencies original = do
-  let name = Modules.moduleIdentity original
-  let imported = nubBy eqString (map Modules.importedModule (Modules.importsFor mode original))
-  let dependencyMap = M.fromList compareString (map (\i -> Pair (unitName i) i) dependencies)
-  ensure (not (eqString name "Prelude") || eqString (Modules.sourcePath original) "<Prelude>") "Prelude is a built-in module and cannot be redefined"
-  ensure (not (M.member compareString name dependencyMap)) ("cyclic imports: " ++ name)
-  traverseEither (\n -> ensure (M.member compareString n dependencyMap) ("missing compiled interface for " ++ n)) imported
-  clean <- cleanSource original
-  declared <- Modules.locals clean
-  let local = if eqString name "Prelude" then Modules.union declared (Modules.interface Modules.primitiveEntities) else declared
-  let public = M.fromList compareString (map (\i -> Pair (unitName i) (Modules.interface (unitExports i))) dependencies)
-  env <- if eqString name "Prelude" then Right local else Modules.scope mode public clean local
-  exported <- Modules.exportsFor mode clean local env
-  let entities = Set.toList (Set.unions Modules.compareEntity (Cons (Modules.visible env) (Cons (Modules.visible local) (Cons (Modules.visible Modules.primitiveScope) Nil))))
-  let methods = concatMap (\e -> if Modules.isRole Modules.Class e then concatMap (\inst -> map (\(Pair n _) -> Modules.Entity (Modules.owner e) n (Modules.Method (Modules.spelling e))) (Modules.instanceMethods inst)) (Modules.sourceInstances original) else Nil) entities
-  let names = Modules.Names (M.fromList Modules.compareEntity (map (\e -> Pair e (stableName e)) (append entities methods)))
-  Modules.Renamed ds cs is vs expression <- Modules.renameModule names local env clean
-  let inheritedMain = case Set.toList (Modules.lookupEntities Modules.Terms "main" env) of
-        Cons e Nil -> if not (any (\v -> eqString (Modules.valueName v) (mainName name)) vs) && Modules.isRole Modules.Value e then Cons (Triple (mainName name) Nothing (SVar (stableName e))) Nil else Nil
-        _ -> Nil
-  let values = case expression of {Nothing -> append vs inheritedMain; Just e -> snoc vs (Triple (mainName name) Nothing e)}
-  instances <- traverseEither (closeInstance values) is
-  body <- Surface.bindValues values (SConstructor "Unit")
-  let allClasses = append (concatMap unitClasses dependencies) cs
-  let dictionaries = M.fromList compareString (map (\c -> Pair ("Dict_" ++ Classes.className c) (Classes.className c)) allClasses)
-  let externalTypes = M.fromList compareString (concatMap unitBindings dependencies)
-  let externals = M.mapWithKey (\n ty -> sourceScheme (if eqString (stringSlice n 0 7) "module_" then dictionaries else M.empty) ty) externalTypes
-  let ownInstances = map (\(Pair i inst) -> Pair ("instance_" ++ encoded name ++ "z_" ++ showInt i) inst) (zip (range 0 (length instances-1)) instances)
-  let allInstances = append (concatMap unitInstances dependencies) ownInstances
-  let program = SClassProgram (append (concatMap unitData dependencies) ds) allClasses (map snd allInstances) body
-  lowered <- Classes.lowerSeparateClasses externals (map fst allInstances) program
-  compiled <- mapLeft Compiler.prettyError (Compiler.finishCompilation lowered)
-  Pair declarations core <- Right (case Compiler.compiledTerm compiled of {XWithData ds t -> Pair ds t; t -> Pair Nil t})
-  Pair parameters implementation <- if M.null externalTypes then Right (Pair Nil core) else case core of
-    XLetRec bs rest -> do
-      ensure (eqList eqString (map (\(Triple n _ _) -> X.nameHint n) bs) (M.keys externalTypes)) "module import parameter order mismatch"
-      traverseEither (\(Triple n t _) -> ensure (case M.lookup compareString (X.nameHint n) externalTypes of {Nothing -> false; Just expected -> T.alphaEq t expected}) ("imported scheme changed during elaboration: " ++ X.nameHint n)) bs
-      Right (Pair (map (\(Triple n t _) -> Pair n t) bs) rest)
-    _ -> Left "module elaboration did not retain its import parameters"
-  dataEnv <- D.validateDeclarations declarations
-  bindings <- collectBindings dataEnv (XEnv M.empty (M.fromList X.compareName parameters)) implementation
-  let payload = XWithData declarations (foldr (\(Pair n t) b -> XAbs n t b) implementation parameters)
-  let iface = UnitInterface name (map (\n -> Pair n (interfaceFingerprint (M.findWithDefault compareString (panic "missing interface") n dependencyMap))) imported)
-        (sortBy (\a b -> compareString (entityEncoding a) (entityEncoding b)) (Set.toList (Modules.visible exported))) ds cs
-        (map (\(Pair n i) -> Pair n (stripInstance i)) ownInstances)
-        (sortBindings (map (\(Pair n t) -> Pair (X.nameHint n) (normalType t)) bindings)) (fingerprint (Pretty.prettyTerm payload))
-  Check.checkClosed payload
-  Right (UnitObject iface payload)
-
-builtinPrelude = compileUnit NoImplicitPrelude Nil Modules.preludeSource
 collectBindings : DataEnv -> XEnv -> XTerm -> Either String (List (Pair XName XType))
-collectBindings ds env term = case term of
+collectBindings ds env term = do
+  Check.validateTypeEnv ds (Check.typeEnv env)
+  mapM (Check.termType ds (Check.typeEnv env)) (M.elems (Check.termEnv env))
+  collectBindingsIn ds env term
+-- The starting environment is checked once. Inferred RHS types and explicitly
+-- checked recursive signatures preserve that invariant as the spine grows.
+collectBindingsIn : DataEnv -> XEnv -> XTerm -> Either String (List (Pair XName XType))
+collectBindingsIn ds env term = case term of
   XLet n rhs rest -> do
-    ty <- Check.inferWithData ds env rhs
-    ensure (Set.null (T.freeVars ty)) "module binding has an open type"
-    remaining <- collectBindings ds (XEnv (Check.typeEnv env) (M.insert X.compareName n ty (Check.termEnv env))) rest
+    ty <- Check.inferIn ds env rhs
+    ensure (Set.null (T.freeVars ty)) "inference binding has an open type"
+    remaining <- collectBindingsIn ds (XEnv (Check.typeEnv env) (M.insert X.compareName n ty (Check.termEnv env))) rest
     Right (Cons (Pair n ty) remaining)
   XLetRec bs rest -> do
     let entries = map (\(Triple n t _) -> Pair n t) bs
-    ensure (all (\p -> Set.null (T.freeVars (snd p))) entries) "module binding has an open type"
-    remaining <- collectBindings ds (XEnv (Check.typeEnv env) (M.union X.compareName (M.fromList X.compareName entries) (Check.termEnv env))) rest
+    ensure (all (\p -> Set.null (T.freeVars (snd p))) entries) "inference binding has an open type"
+    mapM (Check.termType ds (Check.typeEnv env)) (map snd entries)
+    remaining <- collectBindingsIn ds (XEnv (Check.typeEnv env) (M.union X.compareName (M.fromList X.compareName entries) (Check.termEnv env))) rest
     Right (append entries remaining)
   XConstructor "Unit" Nil -> Right Nil
-  _ -> Left "invalid module object: expected declarations ending in Unit"
+  _ -> Left "invalid inference fragment: expected declarations ending in Unit"
 
 pack fields = concatMapString (\s -> showInt (stringLength s) ++ ":" ++ s) fields
 digitEnd : String -> Int -> Int
@@ -230,6 +189,31 @@ fingerprintFrom text i a b = if i >= stringLength text then showInt a ++ "-" ++ 
   let nextB = (b * 131 + code) % 2147483629 in
   seq nextA (seq nextB (fingerprintFrom text (i+1) nextA nextB))
 fingerprint text = fingerprintFrom text 0 0 1
+
+-- Exact summaries of the two existing rolling checksums. A summary composes
+-- with any initial state, so shared datatype prefixes need not be rescanned
+-- for every independently checked fragment. The serialized digest is unchanged.
+fingerprintStateFrom : String -> Int -> Int -> Int -> Pair Int Int
+fingerprintStateFrom text i a b = if i >= stringLength text then Pair a b else
+  let code = stringCodeAt text i in
+  let nextA = (a * 65599 + code) % 2147483647 in
+  let nextB = (b * 131 + code) % 2147483629 in
+  seq nextA (seq nextB (fingerprintStateFrom text (i+1) nextA nextB))
+fingerprintPower : Int -> Int -> Int -> Int
+fingerprintPower base count modulus = if count == 0 then 1 else
+  let half = fingerprintPower base (quotInt count 2) modulus in
+  let squared = (half * half) % modulus in
+  if count % 2 == 0 then squared else (squared * base) % modulus
+fingerprintPart : String -> Quad Int Int Int Int
+fingerprintPart text = case fingerprintStateFrom text 0 0 0 of
+  Pair a b -> Quad (fingerprintPower 65599 (stringLength text) 2147483647) (fingerprintPower 131 (stringLength text) 2147483629) a b
+fingerprintAppend : Pair Int Int -> Quad Int Int Int Int -> Pair Int Int
+fingerprintAppend (Pair a b) (Quad powerA powerB partA partB) =
+  let nextA = (a * powerA + partA) % 2147483647 in
+  let nextB = (b * powerB + partB) % 2147483629 in
+  seq nextA (seq nextB (Pair nextA nextB))
+fingerprintAfter : Pair Int Int -> String -> String
+fingerprintAfter (Pair a b) text = fingerprintFrom text 0 a b
 entityEncoding (Modules.Entity owner name role) =
   let result = case role of
         Modules.Value -> Pair "value" ""
@@ -311,7 +295,42 @@ decodeInterface input = do
 validModuleName name = do
   parsed <- Parser.parseModule "<module identity>" ("module " ++ name ++ " where {}")
   ensure (eqMaybe eqString (Modules.sourceModuleName parsed) (Just name)) "invalid compiled module identity"
-encodeObject (UnitObject i term) = pack (Cons "MLFO-1" (Cons (unitName i) (Cons (interfaceFingerprint i) (Cons (Pretty.prettyTerm term) Nil))))
+encodeObject object = let i = objectInterface object in pack (Cons "MLFO-1" (Cons (unitName i) (Cons (interfaceFingerprint i) (Cons (Pretty.prettyTerm (objectTerm object)) Nil))))
+
+-- Crate objects and inference queries supply datatype contexts separately.
+-- Keep metadata and payload contexts distinct: a malformed object must not be
+-- repaired by replacing its payload's declarations with its header's layouts.
+objectContext : UnitObject -> List DataDecl
+objectContext object = case objectTerm object of {XWithData ds _ -> ds; _ -> Nil}
+objectBody : UnitObject -> XTerm
+objectBody object = case objectTerm object of {XWithData _ body -> body; body -> body}
+withInterfaceData : UnitInterface -> List DataDecl -> String -> UnitInterface
+withInterfaceData i datatypes checksum = UnitInterface (unitName i) (unitDependencies i) (unitExports i) datatypes (unitClasses i) (unitInstances i) (unitBindings i) checksum
+encodeContextualObject : UnitObject -> String
+encodeContextualObject object =
+  let body = Pretty.prettyTerm (objectBody object) in
+  let header = withInterfaceData (objectInterface object) Nil (fingerprint body) in
+  pack (Cons "MLFF-2" (Cons (encodeInterface header) (Cons body Nil)))
+decodeContextualObject : List DataDecl -> List DataDecl -> String -> Either String UnitObject
+decodeContextualObject headerData bodyData input =
+  decodeContextualObjectAfter (fingerprintStateFrom (unlines (map D.prettyDeclaration bodyData)) 0 0 1) headerData bodyData input
+decodeContextualObjectAfter : Pair Int Int -> List DataDecl -> List DataDecl -> String -> Either String UnitObject
+decodeContextualObjectAfter prefix headerData bodyData input = do
+  fields <- unpack input
+  case fields of
+    Cons "MLFF-2" (Cons metadata (Cons body Nil)) -> do
+      header <- decodeInterface metadata
+      ensure (null (unitData header)) "contextual fragment contains an inline datatype header"
+      ensure (eqString (fingerprint body) (unitObjectFingerprint header)) "contextual fragment body checksum mismatch"
+      parsed <- XP.parseTerm "<contextual inference fragment>" body
+      let term = XWithData bodyData parsed
+      checked <- Checked.check term
+      let restored = withInterfaceData header headerData (fingerprintAfter prefix (Pretty.prettyTerm parsed))
+      let object = CheckedUnitObject restored checked
+      ensure (eqString input (encodeContextualObject object)) "noncanonical contextual inference fragment"
+      Right object
+    _ -> Left "unsupported or malformed contextual inference fragment (expected MLFF-2)"
+
 decodeObject i input = do
   fields <- unpack input
   case fields of
@@ -403,91 +422,17 @@ splitParameters : XTerm -> Pair (List (Pair XName XType)) XTerm
 splitParameters term = case term of
   XAbs n ty b -> case splitParameters b of {Pair ps rest -> Pair (Cons (Pair n ty) ps) rest}
   _ -> Pair Nil term
-data LinkState = LinkState Int (Map String String) (Map String (Pair XName XType)) (List XTerm) (List DataDecl)
 mergeDeclaration declarations d = case filter (\other -> eqString (D.datatypeName other) (D.datatypeName d)) declarations of
   Nil -> Right (snoc declarations d)
   Cons other Nil -> if eqString (D.prettyDeclaration other) (D.prettyDeclaration d) then Right declarations else Left ("conflicting module datatype: " ++ D.datatypeName d)
   _ -> Left ("conflicting module datatype: " ++ D.datatypeName d)
-linkObject (LinkState serial done available bodies allData) (UnitObject iface original) = do
-  ensure (not (M.member compareString (unitName iface) done)) ("duplicate module object: " ++ unitName iface)
-  traverseEither (\(Pair n h) -> ensure (eqMaybe eqString (M.lookup compareString n done) (Just h)) ("stale or missing dependency interface: " ++ n)) (unitDependencies iface)
-  Pair next term <- Right (freshObject serial original)
-  Pair ds inner <- Right (case term of {XWithData ds b -> Pair ds b; _ -> Pair Nil term})
-  Pair parameters implementation <- Right (splitParameters inner)
-  replacements <- traverseEither (\(Pair n ty) -> case M.lookup compareString (X.nameHint n) available of
-    Nothing -> Left ("unresolved module symbol: " ++ X.nameHint n)
-    Just (Pair actual expected) -> do
-      ensure (T.alphaEq ty expected) ("module import type mismatch: " ++ X.nameHint n)
-      Right (Pair n actual)) parameters
-  let substitution = M.fromList X.compareName replacements
-  let linked = mapTerm (\n -> M.findWithDefault X.compareName n n substitution) (\a -> a) implementation
-  dataEnv <- D.validateDeclarations ds
-  own <- collectBindings dataEnv (XEnv M.empty (M.fromList X.compareName parameters)) implementation
-  let expected = sortBindings (unitBindings iface)
-  let actual = sortBindings (map (\(Pair n t) -> Pair (X.nameHint n) (normalType t)) own)
-  ensure (eqList (\a b -> eqString (fst a) (fst b) && T.alphaEq (snd a) (snd b)) actual expected) "module object export type mismatch"
-  let bindings = M.fromList compareString (map (\(Pair n t) -> Pair (X.nameHint n) (Pair n t)) own)
-  ensure (all (\n -> not (M.member compareString n available)) (M.keys bindings)) "duplicate module symbol"
-  combined <- foldEither mergeDeclaration allData ds
-  Check.checkClosed original
-  Right (LinkState next (M.insert compareString (unitName iface) (interfaceFingerprint iface) done) (M.union compareString bindings available) (snoc bodies linked) combined)
 graft : XTerm -> XTerm -> Either String XTerm
 graft declarations body = case declarations of
   XLet n a b -> mapEither (XLet n a) (graft b body)
   XLetRec ds b -> mapEither (XLetRec ds) (graft b body)
   XConstructor "Unit" Nil -> Right body
-  _ -> Left "invalid module object declaration spine"
-boundaryClosure : Map String UnitInterface -> List String -> List UnitInterface -> List String -> Either String (List UnitInterface)
-boundaryClosure interfaces trail done todo = case todo of
-  Nil -> Right done
-  Cons n ns ->
-    if elem eqString n trail then Left ("cyclic compiled imports: " ++ intercalate " -> " (snoc trail n))
-    else if any (\i -> eqString n (unitName i)) done then boundaryClosure interfaces trail done ns
-    else case M.lookup compareString n interfaces of
-      Nothing -> Left ("missing interface: " ++ n)
-      Just child -> do
-        earlier <- boundaryClosure interfaces (snoc trail n) done (map fst (unitDependencies child))
-        boundaryClosure interfaces trail (snoc earlier child) ns
-parameterTypes : XTerm -> List (Pair String XType)
-parameterTypes term = case term of
-  XAbs n t b -> Cons (Pair (X.nameHint n) (normalType t)) (parameterTypes b)
-  _ -> Nil
+  _ -> Left "invalid inference fragment declaration spine"
 sameSignature a b = eqString (fst a) (fst b) && T.alphaEq (snd a) (snd b)
-validateObjectBoundary interfaces (UnitObject iface term) = do
-  let byName = M.fromList compareString (map (\i -> Pair (unitName i) i) interfaces)
-  deps <- boundaryClosure byName (Cons (unitName iface) Nil) Nil (map fst (unitDependencies iface))
-  let allInterfaces = snoc deps iface
-  let classes = concatMap unitClasses allInterfaces
-  let instances = concatMap unitInstances allInterfaces
-  let declared = concatMap unitData allInterfaces
-  Pair ds inner <- Right (case term of {XWithData ds b -> Pair ds b; _ -> Pair Nil term})
-  ensure (eqList sameSignature (parameterTypes inner) (sortBindings (concatMap unitBindings deps))) "module object dependency parameter mismatch"
-  Pair program _ <- Classes.lowerSeparateClasses M.empty (map fst instances) (SClassProgram declared classes (map snd instances) (SConstructor "Unit"))
-  expectedData <- case program of {SProgram xs _ -> Right xs; _ -> Left "invalid module metadata"}
-  ensure (eqList eqString (sortBy compareString (map D.prettyDeclaration ds)) (sortBy compareString (map D.prettyDeclaration expectedData))) "module object datatype interface mismatch"
-linkObjects objects root = mapEither Checked.term (linkCheckedObjects objects root)
-linkCheckedObjects objects root = do
-  ensure (not (null objects)) "no compiled modules to link"
-  traverseEither (validateObjectBoundary (map objectInterface objects)) objects
-  LinkState serial _ bindings bodies declarations <- foldEither linkObject (LinkState 0 M.empty M.empty Nil Nil) objects
-  entry <- linkEntry serial (map objectInterface objects) bindings root
-  body <- foldEither (\body declarations -> graft declarations body) entry (reverse bodies)
-  let term = XWithData declarations body
-  Checked.check term
-
-linkEntry serial interfaces available root = do
-  ensure (M.member compareString (mainName root) available) ("entry module has no main binding: " ++ root)
-  let byName = M.fromList compareString (map (\i -> Pair (unitName i) i) interfaces)
-  reachable <- boundaryClosure byName Nil Nil (Cons root Nil)
-  let classes = concatMap unitClasses reachable
-  let instances = concatMap unitInstances reachable
-  let dictionaries = M.fromList compareString (map (\c -> Pair ("Dict_" ++ Classes.className c) (Classes.className c)) classes)
-  let signatures = M.fromList compareString (concatMap unitBindings reachable)
-  let externals = M.mapWithKey (\n ty -> sourceScheme (if eqString (stringSlice n 0 7) "module_" then dictionaries else M.empty) ty) signatures
-  let program = SClassProgram (concatMap unitData reachable) classes (map snd instances) (SVar (mainName root))
-  lowered <- Classes.lowerSeparateClasses externals (map fst instances) program
-  compiled <- mapLeft Compiler.prettyError (Compiler.finishCompilation lowered)
-  removeEntryParameters signatures available (snd (freshObject serial (Compiler.compiledTerm compiled)))
 removeEntryParameters : Map String XType -> Map String (Pair XName XType) -> XTerm -> Either String XTerm
 removeEntryParameters signatures available term = case term of
   XWithData _ b -> removeEntryParameters signatures available b
@@ -507,77 +452,3 @@ removeEntryParameters signatures available term = case term of
 readStrict path = do
   present <- fileExists path
   if present then do {text <- readFile path; ioReturn (Right text)} else ioReturn (Left ("file does not exist: " ++ path))
-findInterface : List String -> IO (Either String String)
-findInterface paths = case paths of
-  Nil -> ioReturn (Left "cannot find compiled module interface; compile dependencies first or add -i DIR")
-  Cons p ps -> do
-    present <- fileExists p
-    if present then ioReturn (Right p) else findInterface ps
-validateDependencies dependencies iface = do
-  traverseEither (\(Pair n h) -> ensure (eqMaybe eqString (lookup eqString n (map (\(Pair _ i) -> Pair (unitName i) (interfaceFingerprint i)) dependencies)) (Just h))
-    ("stale dependency interface: " ++ unitName iface ++ " requires a different " ++ n ++ "; recompile " ++ unitName iface)) (unitDependencies iface)
-  Right Unit
-loadInterfaceGraph : List String -> List String -> List (Pair String UnitInterface) -> List String -> IO (Either String (List (Pair String UnitInterface)))
-loadInterfaceGraph paths trail done todo = case todo of
-  Nil -> ioReturn (Right done)
-  Cons n ns ->
-    if elem eqString n trail then ioReturn (Left ("cyclic compiled imports: " ++ intercalate " -> " (snoc trail n)))
-    else if any (\p -> eqString (unitName (snd p)) n) done then loadInterfaceGraph paths trail done ns
-    else if eqString n "Prelude" then case builtinPrelude of
-      Left e -> ioReturn (Left e)
-      Right (UnitObject i _) -> loadInterfaceGraph paths trail (snoc done (Pair "<Prelude>" i)) ns
-    else do
-      found <- findInterface (map (\p -> Modules.joinPath p (intercalate "/" (Modules.components n) ++ ".mlfi")) paths)
-      case found of
-        Left e -> ioReturn (Left e)
-        Right path -> do
-          input <- readStrict path
-          case bindEither input decodeInterface of
-            Left e -> ioReturn (Left (path ++ ": " ++ e))
-            Right i -> if not (eqString (unitName i) n) then ioReturn (Left (path ++ ": expected interface for " ++ n)) else do
-              children <- loadInterfaceGraph paths (snoc trail n) done (map fst (unitDependencies i))
-              case bindEither children (\xs -> do {validateDependencies xs i; Right xs}) of
-                Left e -> ioReturn (Left e)
-                Right xs -> loadInterfaceGraph paths trail (snoc xs (Pair path i)) ns
-loadInterfaces paths roots = loadInterfaceGraph paths Nil Nil roots
-searchRoots includes file name =
-  let directory = Modules.takeDirectory file in
-  nubBy eqString (Cons directory (append includes (Cons (Modules.parentDirectory (length (Modules.components name)-1) directory) (Cons "." Nil))))
-compileModuleFile mode includes source prefix = do
-  input <- readStrict source
-  case bindEither input (Parser.parseModule source) of
-    Left e -> ioReturn (Left e)
-    Right root -> do
-      loaded <- loadInterfaces (searchRoots includes source (Modules.moduleIdentity root)) (nubBy eqString (map Modules.importedModule (Modules.importsFor mode root)))
-      case bindEither loaded (\deps -> compileUnit mode (map snd deps) root) of
-        Left e -> ioReturn (Left e)
-        Right object -> do
-          writeFile (prefix ++ ".mlfo") (encodeObject object)
-          writeFile (prefix ++ ".mlfi") (encodeInterface (objectInterface object))
-          ioReturn (Right Unit)
-linkModuleFile includes path = do
-  linked <- linkCheckedModuleFile includes path
-  ioReturn (mapEither Checked.term linked)
-linkCheckedModuleFile includes path = do
-  input <- readStrict path
-  case bindEither input decodeInterface of
-    Left e -> ioReturn (Left e)
-    Right root -> do
-      loaded <- loadInterfaces (searchRoots includes path (unitName root)) (map fst (unitDependencies root))
-      case bindEither loaded (\deps -> do {validateDependencies deps root; Right (snoc deps (Pair path root))}) of
-        Left e -> ioReturn (Left e)
-        Right interfaces -> do
-          objects <- mapM (\(Pair file i) -> if eqString file "<Prelude>" then ioReturn builtinPrelude else do
-            input <- readStrict (stringSlice file 0 (stringLength file - 5) ++ ".mlfo")
-            ioReturn (bindEither input (decodeObject i))) interfaces
-          ioReturn (bindEither (sequenceEither objects) (\os -> linkCheckedObjects os (unitName root)))
-showInterfaceFile path = do
-  input <- readStrict path
-  ioReturn (do
-    i <- bindEither input decodeInterface
-    let names = M.fromList compareString (map (\e -> Pair (stableName e) (Modules.label e)) (unitExports i))
-    let values = concatMap (\e -> if Modules.isRole Modules.Value e then case lookup eqString (stableName e) (unitBindings i) of
-          Nothing -> Nil
-          Just ty -> Cons (Modules.label e ++ " : " ++ Modules.displayNames names (Pretty.prettyType ty)) Nil
-          else Nil) (unitExports i)
-    Right (unlines (append (Cons ("module " ++ unitName i) (Cons ("interface " ++ interfaceFingerprint i) Nil)) (append (map (\(Pair n h) -> "import " ++ n ++ " " ++ h) (unitDependencies i)) values))))

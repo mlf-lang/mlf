@@ -13,13 +13,11 @@
   "executables": {
     "emlf": {
       "main": "bootstrap/Main.emlf",
-      "profile": "compiler",
-      "link": "separate"
+      "profile": "compiler"
     },
     "mlfpkg": {
       "main": "package/Main.emlf",
-      "profile": "compiler",
-      "link": "source"
+      "profile": "compiler"
     }
   },
   "tests": {

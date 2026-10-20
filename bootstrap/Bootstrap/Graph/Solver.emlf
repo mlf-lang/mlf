@@ -118,9 +118,9 @@ sortScopes (ScopeIndex intervals jumps) seeds =
   L.map L.snd (L.sortBy (\a -> \b -> L.compareInt (L.fst a) (L.fst b)) keyed)
 
 scopeRoot : ScopeIndex -> Int -> Int
-scopeRoot (ScopeIndex intervals jumps) n = case L.reverse jumps of
+scopeRoot (ScopeIndex intervals jumps) n = case jumps of
   Nil -> panic "empty scope ancestry index"
-  Cons final rest -> IM.get n final
+  _ -> IM.get n (L.last jumps)
 
 projectScopes : ScopeIndex -> IntSet -> IntMap (Maybe Int)
 projectScopes scopes seeds =
@@ -184,14 +184,126 @@ nodeIndexed parents descendants (Pair n node) =
   L.all (\child -> IS.member n (IM.findWithDefault IS.empty child parents)) (G.children (G.tag node)) &&
     (case G.binder node of { Nothing -> true; Just parent -> IS.member n (IM.findWithDefault IS.empty parent descendants) })
 
+-- For distinct graph identities, membership of every required edge plus
+-- equal cardinalities proves equality of the two finite edge sets. Audit
+-- index ordering, recorded sizes and nonempty buckets before counting; this
+-- retains the malformed-index checks without a second graph lookup per edge.
+ascendingNodes : List (Pair Int Node) -> Bool
+ascendingNodes entries = case entries of
+  Nil -> true
+  Cons (Pair n _) rest -> ascendingNodesAfter n rest
+ascendingNodesAfter : Int -> List (Pair Int Node) -> Bool
+ascendingNodesAfter previous entries = case entries of
+  Nil -> true
+  Cons (Pair n _) rest -> previous < n && ascendingNodesAfter n rest
+
+indexCardinality : IntMap IntSet -> Maybe Int
+indexCardinality index =
+  let entries = IM.toList index in
+  if IM.size index == L.length entries && ascending (L.map L.fst entries)
+  then indexCardinalityFrom 0 entries else Nothing
+indexCardinalityFrom : Int -> List (Pair Int IntSet) -> Maybe Int
+indexCardinalityFrom total entries = case entries of
+  Nil -> Just total
+  Cons (Pair _ sources) rest ->
+    let members = IS.toList sources in
+    if IS.size sources == L.length members && L.not (L.null members) && ascending members
+    then let next = total + IS.size sources in seq next (indexCardinalityFrom next rest)
+    else Nothing
+
+distinctChildCount : List Int -> Int
+distinctChildCount children = case children of
+  Nil -> 0
+  Cons _ Nil -> 1
+  Cons a (Cons b Nil) -> if a == b then 1 else 2
+  _ -> IS.size (IS.fromList children)
+
+requiredCardinalities : List (Pair Int Node) -> Pair Int Int
+requiredCardinalities entries = L.foldlStrict (\(Pair structural binding) (Pair _ node) ->
+  let nextStructural = structural + distinctChildCount (G.children (G.tag node)) in
+  let nextBinding = binding + (case G.binder node of {Nothing -> 0; Just _ -> 1}) in
+  seq nextStructural (seq nextBinding (Pair nextStructural nextBinding))) (Pair 0 0) entries
+
+indicesAgree : Graph -> IntMap IntSet -> IntMap IntSet -> Bool
+indicesAgree current parents descendants =
+  let entries = IM.toList (G.nodes current) in
+  -- Preserve the preceding audit for manually forged non-BST node maps.
+  if L.not (ascendingNodes entries) then
+    indexAgrees current true parents && indexAgrees current false descendants &&
+      L.all (nodeIndexed parents descendants) entries
+  else case indexCardinality parents of
+    Nothing -> false
+    Just structural -> case indexCardinality descendants of
+      Nothing -> false
+      Just binding -> case requiredCardinalities entries of
+        Pair expectedStructural expectedBinding ->
+          structural == expectedStructural && binding == expectedBinding &&
+          L.all (nodeIndexed parents descendants) entries
+
+-- The complete graph check in finish establishes a binding tree whose
+-- Gen nodes form this ancestry forest. Validate the stored DFS intervals
+-- against the exact original child/root order, and validate jump levels by
+-- their defining recurrence. No expected interval/jump trees are allocated.
+-- Exact map keys and recorded root sizes are checked, including forged maps.
+equalScopeLevel : IntMap Int -> IntMap Int -> Bool
+equalScopeLevel previous next = IM.size previous == IM.size next && equalScopeEntries previous (IM.toList previous) (IM.toList next)
+equalScopeEntries : IntMap Int -> List (Pair Int Int) -> List (Pair Int Int) -> Bool
+equalScopeEntries previous before after = case before of
+  Nil -> L.null after
+  Cons (Pair n parent) rest -> case after of
+    Nil -> false
+    Cons (Pair m ancestor) tail -> n == m && IM.get parent previous == ancestor && equalScopeEntries previous rest tail
+
+
+scopeLevelCount : IntMap Int -> Int -> List (IntMap Int) -> Bool
+scopeLevelCount previous remaining levels = if remaining == 0 then L.null levels else case levels of
+  Nil -> false
+  Cons next rest -> equalScopeLevel previous next && scopeLevelCount next (remaining - 1) rest
+
+scopeCheckedVisit : IntMap (List Int) -> IntMap (Pair Int Int) -> Int -> Int -> Maybe Int
+scopeCheckedVisit descendants intervals position n = case IM.lookup n intervals of
+  Nothing -> Nothing
+  Just (Pair start end) -> if start /= position then Nothing else
+    case scopeCheckedChildren descendants intervals (position + 1) (IM.findWithDefault Nil n descendants) of
+      Nothing -> Nothing
+      Just actualEnd -> if actualEnd == end then Just end else Nothing
+scopeCheckedChildren : IntMap (List Int) -> IntMap (Pair Int Int) -> Int -> List Int -> Maybe Int
+scopeCheckedChildren descendants intervals position children = case children of
+  Nil -> Just position
+  Cons child rest -> case scopeCheckedVisit descendants intervals position child of
+    Nothing -> Nothing
+    Just next -> scopeCheckedChildren descendants intervals next rest
+
+scopesAgreeValidated : Graph -> ScopeIndex -> Bool
+scopesAgreeValidated graph actual = case actual of
+  ScopeIndex intervals levels ->
+    let gens = L.filter (\(Pair _ node) -> G.isGen (G.tag node)) (IM.toList (G.nodes graph)) in
+    let parents = L.map (\(Pair n node) -> Pair n (case G.binder node of {Nothing -> n; Just parent -> G.resolve graph parent})) gens in
+    let names = L.map L.fst parents in
+    let count = L.length parents in
+    if L.not (ascending names) then equalScopes actual (indexScopes graph) else
+    case levels of
+      Nil -> false
+      Cons first rest ->
+        if IM.size first /= count || L.not (L.eqList (\(Pair n p) (Pair m q) -> n == m && p == q) (IM.toList first) parents) then false else
+        -- Preserve the general audit on a graph outside the validated Gen
+        -- forest precondition, including its existing failure behavior.
+        if L.not (L.all (\(Pair _ parent) -> IM.member parent first) parents) then equalScopes actual (indexScopes graph) else
+        if IM.size intervals /= count || L.not (L.eqList eqInt (IM.keys intervals) names) then false else
+        let descendants = L.foldlStrict (\table (Pair n parent) -> if n == parent then table else
+              let previous = IM.findWithDefault Nil parent table in seq previous (IM.insert parent (Cons n previous) table)) IM.empty parents in
+        let roots = L.map L.fst (L.filter (\(Pair n parent) -> n == parent) parents) in
+        case scopeCheckedChildren descendants intervals 0 roots of
+          Nothing -> false
+          Just actualCount -> actualCount == count && scopeLevelCount first (scopeLevels count - 1) rest
+
 finish : Solver -> Either String Graph
 finish solver = G.bindE (G.validateGraph (graph solver)) (\ignored ->
   let current = graph solver in
   let parents = structuralParents solver in
   let descendants = bindingChildren solver in
-  if indexAgrees current true parents && indexAgrees current false descendants &&
-    L.all (nodeIndexed parents descendants) (IM.toList (G.nodes current)) &&
-    equalScopes (scopeIndex solver) (indexScopes current)
+  if indicesAgree current parents descendants &&
+    scopesAgreeValidated current (scopeIndex solver)
   then Right current else Left "incremental graph index disagrees with the graph")
 
 -- Normalization only changes flags on non-Gen nodes. It preserves every tag,
@@ -221,6 +333,28 @@ componentScopesVisit solver seen scopes pending = case pending of
                     (L.append (IS.toList (IM.findWithDefault IS.empty n (bindingChildren solver))) rest))) in
           componentScopesVisit solver (IS.insert n seen) (if boundary then IS.insert n scopes else scopes) connected
 
+-- Prepared solver graphs keep canonical live fields; callers resolve only
+-- incoming external equation identities before entering this traversal.
+-- Keep the nodes already read while discovering a canonical component.
+-- The projection uses this same immutable view, including scope ancestors.
+componentCanonicalNodesVisit : Solver -> IntMap Node -> IntSet -> List Int -> Either String (Pair (IntMap Node) IntSet)
+componentCanonicalNodesVisit solver seen scopes pending = case pending of
+  Nil -> Right (Pair seen scopes)
+  Cons original rest ->
+    let currentGraph = graph solver in
+    let n = original in
+    if IM.member n seen then componentCanonicalNodesVisit solver seen scopes rest else
+      case IM.lookup n (G.nodes currentGraph) of
+        Nothing -> Left ("missing graph node " ++ showInt n)
+        Just node ->
+          let boundary = G.isGen (G.tag node) in
+          let connected = if boundary then rest else
+                L.append (G.children (G.tag node)) (L.append (L.maybeToList (G.binder node))
+                  (L.append (IS.toList (IM.findWithDefault IS.empty n (structuralParents solver)))
+                    (L.append (IS.toList (IM.findWithDefault IS.empty n (bindingChildren solver))) rest))) in
+          componentCanonicalNodesVisit solver (IM.insert n node seen) (if boundary then IS.insert n scopes else scopes) connected
+
+
 componentVisit : Solver -> IntSet -> List Int -> Either String IntSet
 componentVisit solver seen pending = G.bindE (componentScopesVisit solver seen IS.empty pending) (\(Pair connected scopes) -> Right connected)
 
@@ -233,7 +367,7 @@ componentScopes solver starts = componentScopesVisit solver IS.empty IS.empty st
 -- The ordered component set already stores subtree cardinalities. Its ranks
 -- and selection are the two inverse compact renamings; avoid constructing two
 -- more persistent maps for every local unification. Identities remain Int.
-rankIdentity : Int -> Int -> Map Int Unit -> Int
+rankIdentity : forall a. Int -> Int -> Map Int a -> Int
 rankIdentity wanted offset tree = case tree of
   MapEmpty -> panic "map key not found"
   MapNode count key value left right ->
@@ -262,10 +396,24 @@ projectNodes graph selected scopes stubs position originals = case originals of
   Cons (Pair n node) rest -> Cons (Pair position (localNode graph selected scopes stubs n node))
     (projectNodes graph selected scopes stubs (position + 1) rest)
 
+compactCanonical : IntSet -> Int -> Int
+compactCanonical (IntSet selected) identity = rankIdentity identity 0 selected
+
+localCanonicalNode : Map Int Node -> IntMap (Maybe Int) -> IntMap Int -> Int -> Node -> Node
+localCanonicalNode forward scopes stubs n node =
+  G.mkNode (case IM.lookup n stubs of Just stub -> GGen stub; Nothing -> G.mapTag (\n -> rankIdentity n 0 forward) (G.tag node))
+    (G.mapMaybeInt (\n -> rankIdentity n 0 forward) (if G.isGen (G.tag node) then IM.get n scopes else G.binder node)) (G.flag node)
+
+projectCanonicalNodes : Map Int Node -> IntMap (Maybe Int) -> IntMap Int -> Int -> List (Pair Int Node) -> List (Pair Int Node)
+projectCanonicalNodes selected scopes stubs position originals = case originals of
+  Nil -> Nil
+  Cons (Pair n node) rest -> Cons (Pair position (localCanonicalNode selected scopes stubs n node))
+    (projectCanonicalNodes selected scopes stubs (position + 1) rest)
+
 matchesNode : IntMap Node -> Int -> Node -> Bool
 matchesNode table n node = case IM.lookup n table of Nothing -> false; Just other -> G.equalNode node other
 
-selectIdentity : Int -> Map Int Unit -> Either String Int
+selectIdentity : forall a. Int -> Map Int a -> Either String Int
 selectIdentity position tree = case tree of
   MapEmpty -> Left "scope placeholder escaped local unification"
   MapNode count key value left right ->
@@ -288,20 +436,20 @@ traverseTag action t = case t of
 restoreNode : Graph -> Graph -> IntSet -> Pair Int Node -> Either String (Pair Int Node)
 restoreNode old withAliases backward (Pair n node) =
   G.bindE (originalIdentity backward n) (\original ->
-    restoreKnownNode withAliases backward original (G.nodeAt old original) node)
+    case backward of IntSet tree -> restoreKnownNode withAliases tree original (G.nodeAt old original) node)
 
-restoreKnownNode : Graph -> IntSet -> Int -> Node -> Node -> Either String (Pair Int Node)
+restoreKnownNode : forall a. Graph -> Map Int a -> Int -> Node -> Node -> Either String (Pair Int Node)
 restoreKnownNode withAliases backward original previous node =
-    G.bindE (case G.tag previous of GGen root -> Right (GGen (G.resolve withAliases root)); _ -> traverseTag (originalIdentity backward) (G.tag node)) (\restoredTag ->
+    G.bindE (case G.tag previous of GGen root -> Right (GGen (G.resolve withAliases root)); _ -> traverseTag (\n -> selectIdentity n backward) (G.tag node)) (\restoredTag ->
       G.bindE (if G.isGen (G.tag previous) then Right (G.binder previous) else case G.binder node of
         Nothing -> Right Nothing
-        Just b -> G.bindE (originalIdentity backward b) (\parent -> Right (Just parent))) (\restoredBinder ->
+        Just b -> G.bindE (selectIdentity b backward) (\parent -> Right (Just parent))) (\restoredBinder ->
           Right (Pair original (G.mkNode restoredTag restoredBinder (G.flag node)))))
 
 -- Both lists are ascending and distinct. Local keys are positions in originals;
 -- skip deleted positions and reuse the saved identity and original node. Field
 -- identities still use the checked inverse, and Gen roots still resolve aliases.
-restoreProjectedNodes : Graph -> IntSet -> Int -> List (Pair Int Node) -> List (Pair Int Node) -> Either String (List (Pair Int Node))
+restoreProjectedNodes : forall a. Graph -> Map Int a -> Int -> List (Pair Int Node) -> List (Pair Int Node) -> Either String (List (Pair Int Node))
 restoreProjectedNodes withAliases backward position originals solved = case solved of
   Nil -> Right Nil
   Cons (Pair n node) remaining -> case originals of
@@ -313,16 +461,18 @@ restoreProjectedNodes withAliases backward position originals solved = case solv
         G.bindE (restoreProjectedNodes withAliases backward (position + 1) rest remaining) (\following ->
           Right (Cons restored following)))
 
-restoreAliases : IntSet -> Pair Int Int -> Either String (Pair Int Int)
+restoreAliases : forall a. Map Int a -> Pair Int Int -> Either String (Pair Int Int)
 restoreAliases backward (Pair a b) =
-  G.bindE (originalIdentity backward a) (\left -> G.bindE (originalIdentity backward b) (\right -> Right (Pair left right)))
+  G.bindE (selectIdentity a backward) (\left -> G.bindE (selectIdentity b backward) (\right -> Right (Pair left right)))
 
-checkPreservedScope : Graph -> Graph -> IntSet -> IntMap (Maybe Int) -> Pair Int Node -> Either String Unit
+checkPreservedScope : Graph -> Graph -> Map Int Node -> IntMap (Maybe Int) -> Pair Int Node -> Either String Unit
 checkPreservedScope original solved forward scopes (Pair n node) =
   if L.not (G.isGen (G.tag node)) then Right Unit else
-  case IM.lookup (compactIdentity original forward n) (G.nodes solved) of
+  case IM.lookup (rankIdentity (G.resolve original n) 0 forward) (G.nodes solved) of
     Nothing -> Left "local unification changed a generalization scope"
-    Just next -> G.check (G.equalMaybeInt (G.binder next) (projectedBinder original forward scopes n node) && G.equalFlag (G.flag next) (G.flag node)) "local unification changed a generalization scope"
+    Just next ->
+      let projected = G.mapMaybeInt (\identity -> rankIdentity (G.resolve original identity) 0 forward) (IM.get n scopes) in
+      G.check (G.equalMaybeInt (G.binder next) projected && G.equalFlag (G.flag next) (G.flag node)) "local unification changed a generalization scope"
 
 -- Both lists enumerate distinct identities in ascending order. Compare them
 -- once, rather than building a temporary map and doing three lookup passes.
@@ -374,8 +524,8 @@ patchIndexedNodes solver before after = case before of
       else if n > m then patchIndexedNodes (addNode solver (Pair m w)) before tail
       else patchIndexedNodes (patchNodeEdges n v w solver) rest tail
 
-restoreProjection : Solver -> IntSet -> List (Pair Int Node) -> IntSet -> Int -> Graph -> Either String Solver
-restoreProjection solver selected originals backward count solved =
+restoreProjection : Solver -> List (Pair Int Node) -> Map Int Node -> Int -> Graph -> Either String Solver
+restoreProjection solver originals backward count solved =
   G.bindE (G.mapE (restoreAliases backward) (IM.toList (G.links solved))) (\aliases ->
     let originalGraph = graph solver in
     -- Compact identities and their inverse both preserve ascending order.
@@ -391,26 +541,26 @@ restoreProjection solver selected originals backward count solved =
 
 unifyDistinct : List (Pair Int Int) -> Solver -> Either String Solver
 unifyDistinct equations solver =
-  G.bindE (componentScopes solver (L.concatMap G.equationNodes equations)) (\(Pair connected boundaries) ->
+  G.bindE (componentCanonicalNodesVisit solver IM.empty IS.empty (L.map (G.resolve (graph solver)) (L.concatMap G.equationNodes equations))) (\(Pair connected boundaries) ->
     let old = graph solver in
     let scopes = projectScopes (scopeIndex solver) boundaries in
-    let selected = IS.union connected (IS.fromList (IM.keys scopes)) in
-    let originals = L.map (\n -> Pair n (G.nodeAt old n)) (IS.toList selected) in
+    let selected = L.foldlStrict (\found n -> if IM.member n found then found else IM.insert n (IM.get n (G.nodes old)) found) connected (IM.keys scopes) in
+    let originals = IM.toList selected in
     let count = L.length originals in
-    let forward = selected in
-    let backward = selected in
-    let compact = compactIdentity old forward in
-    let hiddenRoots = L.filter (\entry -> case entry of Pair n v -> case G.tag v of GGen root -> L.not (IS.member root selected); _ -> false) originals in
+    let forward = case selected of IntMap tree -> tree in
+    let backward = forward in
+    let compact = \n -> rankIdentity (G.resolve old n) 0 forward in
+    let hiddenRoots = L.filter (\entry -> case entry of Pair n v -> case G.tag v of GGen root -> L.not (IM.member root selected); _ -> false) originals in
     let stubIds = L.range count (count + L.length hiddenRoots - 1) in
     let stubs = IM.fromDistinctAscList (L.zip (L.map (\entry -> case entry of Pair n v -> n) hiddenRoots) stubIds) in
-    let existing = projectNodes old forward scopes stubs 0 originals in
-    let placeholders = L.map (\entry -> case entry of Pair original stub -> Pair stub (G.mkNode GBot (Just (compact original)) Flexible)) (IM.toList stubs) in
+    let existing = projectCanonicalNodes forward scopes stubs 0 originals in
+    let placeholders = L.map (\entry -> case entry of Pair original stub -> Pair stub (G.mkNode GBot (Just (rankIdentity original 0 forward)) Flexible)) (IM.toList stubs) in
     -- Original positions precede the fresh placeholder positions.
     let local = G.mkGraph (G.nodesFromDistinctAscList (L.append existing placeholders)) IM.empty (count + L.length hiddenRoots) in
     G.bindE (G.unify (L.map (\entry -> case entry of Pair a b -> Pair (compact a) (compact b)) equations) local) (\solved ->
       G.bindE (G.mapE_ (\stub -> G.check (matchesNode (G.nodes solved) stub (G.nodeAt local stub) && G.resolve solved stub == stub) "local unification changed a hidden scope root") (IM.elems stubs)) (\checkedStubs ->
         G.bindE (G.mapE_ (checkPreservedScope old solved forward scopes) originals) (\checkedScopes ->
-          restoreProjection solver selected originals backward count solved))))
+          restoreProjection solver originals backward count solved))))
 
 solverUnify : List (Pair Int Int) -> Solver -> Either String Solver
 solverUnify equations solver =

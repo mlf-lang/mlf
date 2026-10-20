@@ -49,7 +49,14 @@
       "Bootstrap.X.Pretty": "Bootstrap/X/Pretty.emlf",
       "Bootstrap.X.Syntax": "Bootstrap/X/Syntax.emlf",
       "Bootstrap.X.Type": "Bootstrap/X/Type.emlf",
-      "Bootstrap.LLVM.StrictWrappers": "Bootstrap/LLVM/StrictWrappers.emlf"
+      "Bootstrap.LLVM.StrictWrappers": "Bootstrap/LLVM/StrictWrappers.emlf",
+      "Bootstrap.CompilerCore": "Bootstrap/CompilerCore.emlf",
+      "Bootstrap.Dependency": "Bootstrap/Dependency.emlf",
+      "Bootstrap.InferenceUnit": "Bootstrap/InferenceUnit.emlf",
+      "Bootstrap.Crate": "Bootstrap/Crate.emlf",
+      "Bootstrap.CrateArtifact": "Bootstrap/CrateArtifact.emlf",
+      "Bootstrap.CrateQuery": "Bootstrap/CrateQuery.emlf",
+      "Bootstrap.CrateCodegen": "Bootstrap/CrateCodegen.emlf"
     }
   }
 }

@@ -47,26 +47,26 @@ linkedInstanceScopes (LinkedModule _ _ _ scopes) = scopes
 -- The same traversal serves in-memory tests and file-backed compilation.
 loadGraph : forall (m : * -> *). Monad m => (String -> m (Either String SourceModule)) -> SourceModule -> m (Either String (List SourceModule))
 loadGraph fetch root = do
-  result <- visit fetch Nil root Set.empty Nil
+  result <- visit fetch root Set.empty Nil
   return (mapEither (\state -> reverse (snd state)) result)
 
-visit : forall (m : * -> *). Monad m => (String -> m (Either String SourceModule)) -> List String -> SourceModule -> Set String -> List SourceModule -> m (Either String (Pair (Set String) (List SourceModule)))
-visit fetch trail source done order =
+visit : forall (m : * -> *). Monad m => (String -> m (Either String SourceModule)) -> SourceModule -> Set String -> List SourceModule -> m (Either String (Pair (Set String) (List SourceModule)))
+visit fetch source done order =
   let name = moduleIdentity source in
-  if elem eqString name trail then return (Left ("cyclic imports: " ++ intercalate " -> " (append trail (Cons name Nil))))
-  else if Set.member compareString name done then return (Right (Pair done order))
+  if Set.member compareString name done then return (Right (Pair done order))
   else do
     let dependencies = nubBy eqString (map importedModule (sourceImports source))
-    result <- visitDependencies fetch (append trail (Cons name Nil)) dependencies done order
-    return (mapEither (\state -> Pair (Set.insert compareString name (fst state)) (Cons source (snd state))) result)
+    -- Discovery and namespace dependencies are not a compilation order. Mark
+    -- before descending so a reference back into this crate needs no boot file.
+    result <- visitDependencies fetch dependencies (Set.insert compareString name done) order
+    return (mapEither (\state -> Pair (fst state) (Cons source (snd state))) result)
 
-visitDependencies : forall (m : * -> *). Monad m => (String -> m (Either String SourceModule)) -> List String -> List String -> Set String -> List SourceModule -> m (Either String (Pair (Set String) (List SourceModule)))
-visitDependencies fetch trail dependencies done order = case dependencies of
+visitDependencies : forall (m : * -> *). Monad m => (String -> m (Either String SourceModule)) -> List String -> Set String -> List SourceModule -> m (Either String (Pair (Set String) (List SourceModule)))
+visitDependencies fetch dependencies done order = case dependencies of
   Nil -> return (Right (Pair done order))
   Cons dependency rest ->
-    if eqString dependency "Prelude" then visitDependencies fetch trail rest done order
-    else if elem eqString dependency trail then return (Left ("cyclic imports: " ++ intercalate " -> " (append trail (Cons dependency Nil))))
-    else if Set.member compareString dependency done then visitDependencies fetch trail rest done order
+    if eqString dependency "Prelude" then visitDependencies fetch rest done order
+    else if Set.member compareString dependency done then visitDependencies fetch rest done order
     else do
       loaded <- fetch dependency
       case loaded of
@@ -75,10 +75,10 @@ visitDependencies fetch trail dependencies done order = case dependencies of
           if not (eqMaybe eqString (sourceModuleName child) (Just dependency)) then return (Left (sourcePath child ++ ": expected module " ++ dependency ++ ", found " ++ fromMaybe "an unnamed script" (sourceModuleName child)))
           else if isJust (sourceBody child) then return (Left (sourcePath child ++ ": imported modules must contain declarations only"))
           else do
-            result <- visit fetch trail child done order
+            result <- visit fetch child done order
             case result of
               Left message -> return (Left message)
-              Right state -> visitDependencies fetch trail rest (fst state) (snd state)
+              Right state -> visitDependencies fetch rest (fst state) (snd state)
 
 data ModuleIdentity a = ModuleIdentity a
 runIdentity (ModuleIdentity a) = a
@@ -146,6 +146,17 @@ data Interface = Interface (Map (Pair ModuleSpace String) (Set Entity))
 data Names = Names (Map Entity String)
 data Renamed = Renamed (List DataDecl) (List SClassDecl) (List SInstanceDecl) (List (Triple String (Maybe SAnnotation) SExpr)) (Maybe SExpr)
 data Resolved = Resolved SourceModule Interface Renamed
+-- Namespace resolution retains declaration identities and defining scopes. It
+-- neither binds declaration groups nor invokes inference; consumers choose
+-- declaration SCCs and artifact boundaries after this stage.
+data ResolvedCrate = ResolvedCrate Names (Map String String) (List Resolved) (List (Pair String SInstanceDecl)) (Map String IntSet) (List IntSet) (Map String (Set String))
+resolvedCrateNames (ResolvedCrate names _ _ _ _ _ _) = names
+resolvedCrateDisplayNames (ResolvedCrate _ names _ _ _ _ _) = names
+resolvedCrateModules (ResolvedCrate _ _ modules _ _ _ _) = modules
+resolvedCrateInstances (ResolvedCrate _ _ _ instances _ _ _) = instances
+resolvedCrateValueScopes (ResolvedCrate _ _ _ _ scopes _ _) = scopes
+resolvedCrateInstanceScopes (ResolvedCrate _ _ _ _ _ scopes _) = scopes
+resolvedCrateReach (ResolvedCrate _ _ _ _ _ _ reach) = reach
 
 owner (Entity name _ _) = name
 spelling (Entity _ name _) = name
@@ -312,6 +323,66 @@ exportItem aliases env acc item = case item of
   _ -> do
     selected <- selectItem false env item
     Right (union acc selected)
+
+namespacePart namespace (Interface entries) = Interface (M.filterWithKey (\key _ -> compareSpace (fst key) namespace == 0) entries)
+eqInterface a b = M.eqMap (\x y -> compareKey x y == 0) (Set.eqSet (\x y -> compareEntity x y == 0)) (interfaceMap a) (interfaceMap b)
+
+-- During namespace discovery a selector denotes all currently known candidate
+-- identities. Missing names and ambiguity are diagnosed only after convergence.
+-- Types are solved first: member hiding then has fixed parent identities and
+-- the term equations are monotone even through cyclic re-exports.
+partialSelectItem hiding env item = case item of
+  ExportModule _ -> emptyInterface
+  ExportValue name -> interface (Set.toList (lookupEntities Terms name env))
+  ExportType name Abstract -> if hiding then
+    interface (Set.toList (Set.union compareEntity (lookupEntities Types name env) (Set.filter isConstructor (lookupEntities Terms name env))))
+    else interface (Set.toList (lookupEntities Types name env))
+  ExportType name members ->
+    let types = lookupEntities Types name env in
+    let parents = map (\entity -> Pair (owner entity) (spelling entity)) (Set.toList types) in
+    let children = filter (\entity -> case parent entity of {Nothing -> false; Just identity -> elem (eqPair eqString eqString) identity parents}) (Set.toList (visible env)) in
+    let chosen = case members of {Abstract -> Nil; AllMembers -> children; Members names -> filter (\entity -> elem eqString (spelling entity) names) children} in
+    interface (append (Set.toList types) chosen)
+
+partialImport env selection = case selection of
+  Everything -> env
+  Only items -> foldl (\acc item -> union acc (partialSelectItem false env item)) emptyInterface items
+  Hiding items ->
+    let omitted = visible (foldl (\acc item -> union acc (partialSelectItem true env item)) emptyInterface items) in
+    Interface (M.mapMaybe (\entities -> let remaining = Set.difference compareEntity entities omitted in if Set.null remaining then Nothing else Just remaining) (interfaceMap env))
+
+partialScope mode exports source local =
+  let imported = map (\entry ->
+        let available = M.findWithDefault compareString emptyInterface (importedModule entry) exports in
+        let selected = partialImport available (importSelection entry) in
+        let qualified = qualify (fromMaybe (importedModule entry) (importAlias entry)) selected in
+        if importQualified entry then qualified else union selected qualified) (importsFor mode source) in
+  let builtins = if not (implicitMode mode) && not (any (\entry -> eqString (importedModule entry) "Prelude") (sourceImports source)) then primitiveScope else emptyInterface in
+  let declared = foldr union (union local (qualify (moduleIdentity source) local)) imported in
+  Interface (M.union compareKey (interfaceMap declared) (interfaceMap builtins))
+
+partialExports mode source local env = case sourceExports source of
+  Nothing -> local
+  Just items -> foldl (\acc item -> case item of
+    ExportModule name ->
+      let aliases = Cons (moduleIdentity source) (map (\entry -> fromMaybe (importedModule entry) (importAlias entry)) (importsFor mode source)) in
+      if elem eqString name aliases then case exportItem aliases env acc item of {Left _ -> acc; Right selected -> selected} else acc
+    _ -> union acc (partialSelectItem false env item)) emptyInterface items
+
+settleExports : PreludeMode -> Bool -> Map String Interface -> Map String Interface -> Map String Interface -> List SourceModule -> Map String Interface -> Map String Interface
+settleExports mode typePhase external typeExports localMap modules current =
+  let entries = map (\source ->
+        let name = moduleIdentity source in
+        let local = M.findWithDefault compareString emptyInterface name localMap in
+        let env = if eqString name "Prelude" then local else partialScope mode current source local in
+        let exported = partialExports mode source local env in
+        Pair name (if typePhase then namespacePart Types exported else union (M.findWithDefault compareString emptyInterface name typeExports) (namespacePart Terms exported))) modules in
+  let next = M.union compareString (M.fromList compareString entries) external in
+  if M.eqMap eqString eqInterface current next then next else settleExports mode typePhase external typeExports localMap modules next
+
+crateExports mode external localMap modules =
+  let types = settleExports mode true external M.empty localMap modules external in
+  settleExports mode false external types localMap modules types
 
 sourceUsed source =
   let datatypes = concatMap (\declaration -> Cons (D.datatypeName declaration) (map D.constructorName (D.datatypeConstructors declaration))) (sourceDatatypes source) in
@@ -553,22 +624,31 @@ renamedBody (Renamed _ _ _ _ body) = body
 resolvedSource (Resolved source _ _) = source
 resolvedScope (Resolved _ env _) = env
 resolvedContents (Resolved _ _ content) = content
+resolvedExports mode entry = do
+  let source = resolvedSource entry
+  declared <- locals source
+  let local = if eqString (moduleIdentity source) "Prelude" then union declared (interface primitiveEntities) else declared
+  exportsFor mode source local (resolvedScope entry)
 
--- Resolution is ordered by the loader; an interface becomes available only
--- after the exporting module has been checked and renamed.
-resolveOneWith mode names localMap state source = case state of
-  Pair exports done -> do
-    local <- case M.lookup compareString (moduleIdentity source) localMap of
-      Nothing -> Left "missing module declarations"
-      Just env -> Right env
-    env <- if eqString (moduleIdentity source) "Prelude" then Right local else scope mode exports source local
-    exported <- exportsFor mode source local env
-    renamed <- mapLeft (\message -> sourcePath source ++ ": " ++ message) (renameModule names local env source)
-    Right (Pair (M.insert compareString (moduleIdentity source) exported exports) (append done (Cons (Resolved source env renamed) Nil)))
+resolveOneWith mode names localMap exports source = do
+  local <- case M.lookup compareString (moduleIdentity source) localMap of
+    Nothing -> Left "missing module declarations"
+    Just env -> Right env
+  env <- if eqString (moduleIdentity source) "Prelude" then Right local else scope mode exports source local
+  -- Run the original strict selectors after the namespace fixed point. This
+  -- preserves private-name, missing-member and conflicting-export diagnostics.
+  exportsFor mode source local env
+  renamed <- mapLeft (\message -> sourcePath source ++ ": " ++ message) (renameModule names local env source)
+  Right (Resolved source env renamed)
 
-moduleReach mode acc source =
-  let dependencies = map (\entry -> M.findWithDefault compareString Set.empty (importedModule entry) acc) (importsFor mode source) in
-  M.insert compareString (moduleIdentity source) (Set.insert compareString (moduleIdentity source) (Set.unions compareString dependencies)) acc
+settleReach : Map String (Set String) -> Map String (Set String) -> Map String (Set String)
+settleReach direct current =
+  let next = M.mapWithKey (\name dependencies -> Set.insert compareString name (Set.unions compareString (Cons dependencies (map (\dependency -> M.findWithDefault compareString (Set.singleton dependency) dependency current) (Set.toList dependencies))))) direct in
+  if M.eqMap eqString (Set.eqSet eqString) current next then next else settleReach direct next
+
+crateReach mode modules =
+  let direct = M.fromList compareString (map (\source -> Pair (moduleIdentity source) (Set.fromList compareString (map importedModule (importsFor mode source)))) modules) in
+  settleReach direct direct
 
 candidateScope reach instances ownerName =
   let reachable = M.findWithDefault compareString Set.empty ownerName reach in
@@ -593,28 +673,53 @@ closeInstance publicNames values valueMap inst = do
     Right (Pair (fst method) body)) (instanceMethods inst)
   Right (SInstanceDecl (instanceVariables inst) (instanceContext inst) (instanceClass inst) (instanceHead inst) methods)
 
-linkModules : PreludeMode -> List SourceModule -> Either String LinkedModule
-linkModules mode supplied = if null supplied then Left "no entry module" else do
-  when (any (\source -> eqString (moduleIdentity source) "Prelude") supplied) (Left "Prelude is a built-in module and cannot be redefined")
+resolveCrate : PreludeMode -> Map String Interface -> (Entity -> String) -> List SourceModule -> Either String ResolvedCrate
+resolveCrate mode external mangle supplied = resolveCrateWithAllocator mode external (\_ entities -> Names (M.fromList compareEntity (map (\entity -> Pair entity (mangle entity)) (Set.toList entities)))) supplied
+
+resolveCrateWithAllocator : PreludeMode -> Map String Interface -> (List SourceModule -> Set Entity -> Names) -> List SourceModule -> Either String ResolvedCrate
+resolveCrateWithAllocator mode external allocate supplied = if null supplied then Left "no entry module" else do
+  when (any (\source -> eqString (moduleIdentity source) "Prelude" && not (eqString (sourcePath source) "<Prelude>")) supplied) (Left "Prelude is a built-in module and cannot be redefined")
+  let identities = map moduleIdentity supplied
+  unless (length identities == length (nubBy eqString identities)) (Left "duplicate source module")
+  mapM_ (\name -> when (M.member compareString name external) (Left ("source module conflicts with external module: " ++ name))) identities
   let usePrelude = any (\source -> any (\entry -> eqString (importedModule entry) "Prelude") (importsFor mode source)) supplied
-  let modules = if usePrelude then Cons preludeSource supplied else supplied
+  let modules = if usePrelude && not (M.member compareString "Prelude" external) && not (elem eqString "Prelude" identities) then Cons preludeSource supplied else supplied
   localEntries <- mapM (\source -> do
     local <- locals source
     Right (Pair (moduleIdentity source) (if eqString (moduleIdentity source) "Prelude" then union local (interface primitiveEntities) else local))) modules
   let localMap = M.fromList compareString localEntries
-  let allEntities = Set.unions compareEntity (Cons (visible primitiveScope) (map (\entry -> visible (snd entry)) localEntries))
-  let names = freshNames modules allEntities
+  let exports = crateExports mode external localMap modules
+  -- An instance implements its class's methods even when those method names
+  -- are intentionally omitted from the class's imported source namespace.
+  methodEntities <- mapM (\source -> do
+    let local = M.findWithDefault compareString emptyInterface (moduleIdentity source) localMap
+    env <- if eqString (moduleIdentity source) "Prelude" then Right local else scope mode exports source local
+    methods <- mapM (\inst -> do
+      klass <- lookupEntity Types (instanceClass inst) env
+      Right (map (\method -> Entity (owner klass) (fst method) (Method (spelling klass))) (instanceMethods inst))) (sourceInstances source)
+    Right (concat methods)) modules
+  let allEntities = Set.unions compareEntity (Cons (visible primitiveScope) (append (map (\entry -> visible (snd entry)) localEntries) (append (map visible (M.elems external)) (Cons (Set.fromList compareEntity (concat methodEntities)) Nil))))
+  let names = allocate modules allEntities
   let entries = case names of Names entries -> entries
   let publicNames = M.fromList compareString (map (\entry -> Pair (snd entry) (if eqString (owner (fst entry)) "Prelude" then spelling (fst entry) else label (fst entry))) (M.toList entries))
-  resolvedState <- foldM (resolveOneWith mode names localMap) (Pair M.empty Nil) modules
-  let resolved = snd resolvedState
-  let ds = concatMap (\entry -> renamedDatatypes (resolvedContents entry)) resolved
-  let cs = concatMap (\entry -> renamedClasses (resolvedContents entry)) resolved
+  resolved <- mapM (resolveOneWith mode names localMap exports) modules
   let instances = concatMap (\entry -> map (\inst -> Pair (moduleIdentity (resolvedSource entry)) inst) (renamedInstances (resolvedContents entry))) resolved
-  let values = concatMap (\entry -> renamedValues (resolvedContents entry)) resolved
-  let reach = foldl (moduleReach mode) M.empty modules
+  let reach = crateReach mode modules
   let candidates = candidateScope reach instances
   let scopes = M.fromList compareString (concatMap (\entry -> map (\value -> Pair (valueName value) (candidates (moduleIdentity (resolvedSource entry)))) (renamedValues (resolvedContents entry))) resolved)
+  Right (ResolvedCrate names publicNames resolved instances scopes (map (\inst -> candidates (fst inst)) instances) reach)
+
+linkModules : PreludeMode -> List SourceModule -> Either String LinkedModule
+linkModules mode supplied = do
+  crate <- resolveCrateWithAllocator mode M.empty freshNames supplied
+  let names = resolvedCrateNames crate
+  let publicNames = resolvedCrateDisplayNames crate
+  let resolved = resolvedCrateModules crate
+  let instances = resolvedCrateInstances crate
+  let scopes = resolvedCrateValueScopes crate
+  let ds = concatMap (\entry -> renamedDatatypes (resolvedContents entry)) resolved
+  let cs = concatMap (\entry -> renamedClasses (resolvedContents entry)) resolved
+  let values = concatMap (\entry -> renamedValues (resolvedContents entry)) resolved
   let entryModule = last resolved
   let source = resolvedSource entryModule
   entry <- case renamedBody (resolvedContents entryModule) of
@@ -624,7 +729,7 @@ linkModules mode supplied = if null supplied then Left "no entry module" else do
   let valueMap = M.fromList compareString (map (\value -> Pair (valueName value) value) values)
   instances' <- mapM (\inst -> closeInstance publicNames values valueMap (snd inst)) instances
   let program = if null cs && null instances' then SProgram ds body else SClassProgram ds cs instances' body
-  Right (LinkedModule program publicNames scopes (map (\inst -> candidates (fst inst)) instances))
+  Right (LinkedModule program publicNames scopes (resolvedCrateInstanceScopes crate))
 
 wordChar c = U.isAlphaNum c || c == 95 || c == 39
 wordEnd : String -> Int -> Int

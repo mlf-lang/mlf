@@ -32,9 +32,9 @@ done
 # Check every recorded source and detect newly added or removed inputs as well.
 jq -r '.sources | to_entries[] | "\(.value)  \(.key)"' "$base" | shasum -a 256 -c >/dev/null
 cmp <(jq -r '.sources | keys[]' "$base" | LC_ALL=C sort) <(
-  { find src app test scripts runtime bootstrap package examples benchmarks tests \
+  { find scripts runtime bootstrap package examples benchmarks tests \
     -type d \( -name .mlf-build -o -name .git -o -name dist-newstyle -o -name __pycache__ \) -prune -o \
-    -type f \( -name '*.hs' -o -name '*.emlf' -o -name '*.c' -o -name '*.h' -o -name '*.py' -o -name '*.sh' -o -name '*.expected' -o -name '*.json' -o -name '*.gz' \) -print
+    -type f \( -name '*.hs' -o -name '*.emlf' -o -name '*.c' -o -name '*.h' -o -name '*.sh' -o -name '*.expected' -o -name '*.json' -o -name '*.gz' \) -print
     printf '%s\n' mlfpkg mlf-package.json; } | LC_ALL=C sort
 )
 jq -e --arg hash "$compiler_hash" '.fixed_point.reused_candidate_build == false and .fixed_point.next_compiler_sha256 == $hash' "$build/compiler-tests/self-host/verification.json" >/dev/null

@@ -27,7 +27,7 @@ isRight value = case value of { Left message -> false; Right answer -> true }
 showValidation : Either String Unit -> String
 showValidation value = case value of { Left message -> message; Right answer -> "ok" }
 
--- The index order matches test/GraphValidation.hs's independent Haskell
+-- The index order matches the independent Tests.GraphValidation MLF
 -- enumeration, including malformed binding trees and aliased children.
 choiceParent : Int -> Maybe Int
 choiceParent n = if n == 0 then Nothing else if n == 1 then Just 0 else Just 2

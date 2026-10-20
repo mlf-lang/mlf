@@ -1,8 +1,7 @@
 # Versions and releases
 
 `VERSION` is the toolchain's version. Native package manifests use the same
-three-component version; the historical Haskell seed uses a trailing `.0` in
-`mlf.cabal`. Release tags are `vMAJOR.MINOR.PATCH`. Published tags and assets
+three-component version. Release tags are `vMAJOR.MINOR.PATCH`. Published tags and assets
 must never be replaced; make a new patch release to correct a package.
 
 Before 1.0, patch releases preserve documented behavior and minor releases may
@@ -37,7 +36,7 @@ unchanged. Keep the whole package when using its `bin` directory directly.
 
 ## Prepare the next release
 
-1. Update `VERSION`, the four toolchain manifests, `mlf.cabal`, and `CHANGELOG.md`.
+1. Update `VERSION`, the four toolchain manifests and `CHANGELOG.md`.
 2. Run `./mlfpkg lock`, review the lock changes, and commit the release candidate.
 3. Create an annotated version tag and push it. Tags are never moved.
 4. Run the **Native release** workflow on `main` with that tag. It runs all six
@@ -78,10 +77,13 @@ includes the child commands and must not be added to their totals. Ordinary CI
 self-host and native-release bootstrap steps retain the same evidence, including
 on failure; started commands without a result record were interrupted.
 
-Current compiler builds infer modules separately and check their interfaces,
-typed objects, dependency boundaries, and final linked xMLF. This releases each
-module's inference graph before building the next one. Neither compiler checks
-nor test coverage are disabled. In three local cold build pairs, sampled
+Current compiler builds resolve each crate together and infer declaration SCCs,
+releasing their inference graphs between queries. Checked metadata, fragments,
+dependency boundaries and the final linked xMLF remain mandatory. See
+[crate compilation](crate-compilation.md) for the current contract and
+[the migration ledger](crate-migration.md) for validation and performance evidence.
+
+The earlier per-module compiler was measured in three local cold build pairs: sampled
 aggregate RSS fell from a 9.99 GB median to 3.27 GB (maximum 3.28 GB), while
 median full build time rose from 332.38s to 460.87s. The
 [memory report](../tools/profile/results/2026-10-19-bootstrap-memory/README.md)
@@ -93,7 +95,8 @@ The timing helper defaults `MLF_BOOTSTRAP_MAX_RSS_BYTES` to `5500000000` and
 fails before publishing candidate paths when a measured command exceeds that
 budget. This is a per-command RSS high-water guard, not a hard heap cap or an
 aggregate process-tree limit. `0` disables this resource gate for diagnostics.
-Explicit caller settings are respected. Separate builds keep the runtime's
+Explicit caller settings are respected. Crate builds and older separate-module
+seed builds keep the runtime's
 `GC_FREE_SPACE_DIVISOR=1` policy; immutable older target tags that still request
 source linking default to `4`, collecting more frequently. Successful bootstrap
 steps pass that policy to subsequent CI steps. No maximum heap size is imposed.
@@ -120,8 +123,9 @@ validation. Its executables match `docs/native-tests-validation.json`; subsequen
 releases use that published native seed. This establishes the initial bootstrap
 anchor without introducing a GHC or Python dependency in CI.
 
-Historical `scripts/release.py` remains an optional Haskell-seed release gate.
-It also reruns C/Rust/Haskell comparisons and enforces compilation <=5x C and
-runtime <=2x C. The native developer-preview workflow above validates compiler
-correctness and self-hosting; it does not claim to rerun that performance gate.
+The historical Haskell/Python release and benchmark launchers have been
+removed. Use the [native benchmark runner](../tools/bench/README.md) for current
+C/MLF performance comparisons. The native developer-preview workflow above
+validates compiler correctness and self-hosting; performance remains a separate
+gate. Pinned C/Rust/Haskell baseline sources remain available.
 Existing benchmark reports retain their original source, binary, and host scope.

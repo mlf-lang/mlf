@@ -12,6 +12,7 @@ packageRoot (Package path _ _) = O.parent path
 packagePath (Package path _ _) = path
 packageData (Package _ value _) = value
 packageName p = J.getText "name" "" (packageData p)
+crateIdentity p kind = packageName p ++ "/" ++ J.getText "version" "" (packageData p) ++ "/" ++ kind
 packageModules (Package _ _ modules) = modules
 moduleName (Module name _ _ _) = name
 moduleSource (Module _ _ source _) = source
@@ -115,19 +116,20 @@ visitDependencies p trail done deps = case deps of
     visitDependencies p trail next rest
 visible ps p = S.concat (Cons (S.map moduleName (packageModules p)) (S.map (\name -> S.map moduleName (packageModules (lookupPackage name ps))) (keys (J.getObject "dependencies" (packageData p)))))
 checkImports ps p local = S.mapM_ (\m -> S.mapM_ (\name -> O.require (S.elem eqString name (S.append (visible ps p) (S.map moduleName local))) (packageName p ++ ":" ++ moduleName m ++ ": import " ++ name ++ " is not declared in this package or a direct dependency")) (moduleImports m)) local
-sortModules ms names = sortVisitMany ms Nil Nil names
-sortVisitMany : List Module -> List String -> List Module -> List String -> IO (List Module)
-sortVisitMany ms trail done names = case names of
+moduleClosure ms names = discoverMany ms Nil Nil names
+discoverMany : List Module -> List String -> List Module -> List String -> IO (List Module)
+discoverMany ms trail done names = case names of
   Nil -> ioReturn done
-  Cons name rest -> do { next <- sortVisit ms trail done name; sortVisitMany ms trail next rest }
-sortVisit : List Module -> List String -> List Module -> String -> IO (List Module)
-sortVisit ms trail done name = do
-  O.require (S.not (S.elem eqString name trail)) ("module cycle: " ++ S.intercalate " -> " (S.snoc trail name))
-  if S.any (\m -> eqString (moduleName m) name) done then ioReturn done else do
+  Cons name rest -> do { next <- discoverModule ms trail done name; discoverMany ms trail next rest }
+discoverModule : List Module -> List String -> List Module -> String -> IO (List Module)
+discoverModule ms trail done name = do
+  -- Imports discover namespaces, not separately compiled module prerequisites.
+  -- The package DAG above owns compilation-cycle rejection.
+  if S.elem eqString name trail || S.any (\m -> eqString (moduleName m) name) done then ioReturn done else do
     let m = lookupModule name ms
-    next <- sortVisitMany ms (S.snoc trail name) done (moduleImports m)
+    next <- discoverMany ms (S.snoc trail name) done (moduleImports m)
     ioReturn (S.snoc next m)
-targetModules graph p target = do
+targetCrateModules graph p target = do
   local <- readModules (packageRoot p) (packageName p) (J.getObject "modules" target)
   source <- localFile (packageRoot p) (J.get "main" target)
   entry <- readModule (packageName p) source
@@ -135,20 +137,27 @@ targetModules graph p target = do
   let private = Cons entry local
   O.require (S.not (S.any (\m -> S.any (\n -> eqString (moduleName m) (moduleName n)) (modules graph)) private)) "entry/private module conflicts with a library module"
   checkImports (packages graph) p private
-  let available = S.append (modules graph) private
-  all <- sortModules available (S.map moduleName available)
-  reachable <- sortModules all (Cons (moduleName entry) Nil)
-  ioReturn (Pair (moduleName entry) reachable)
+  ioReturn (Pair (moduleName entry) private)
 load path = do
   ps <- visit path Nil Nil
   let p = S.last ps
   let ms = S.concatMap packageModules ps
   O.require (S.length (S.nubBy eqString (S.map moduleName ms)) == S.length ms) "module is provided by multiple packages"
   S.mapM_ (\q -> checkImports ps q (packageModules q)) ps
-  sorted <- sortModules ms (S.sortBy compareString (S.map moduleName ms))
+  sorted <- moduleClosure ms (S.sortBy compareString (S.map moduleName ms))
   let graph = PackageGraph p ps sorted
-  S.mapM_ (\q -> S.mapM_ (\target -> if J.has "main" target then do { ignored <- targetModules graph q target; ioReturn Unit } else ioReturn Unit) (S.map S.snd (S.append (J.items (J.getObject "executables" (packageData q))) (J.items (J.getObject "tests" (packageData q)))))) ps
+  S.mapM_ (\q -> S.mapM_ (\target -> if J.has "main" target then do { ignored <- targetCrateModules graph q target; ioReturn Unit } else ioReturn Unit) (S.map S.snd (S.append (J.items (J.getObject "executables" (packageData q))) (J.items (J.getObject "tests" (packageData q)))))) ps
   ioReturn graph
+libraryDependencies graph p = S.map (\q -> crateIdentity q "library") (S.filter (\q -> S.not (S.null (packageModules q))) (S.map (\name -> lookupPackage name (packages graph)) (S.sortBy compareString (keys (J.getObject "dependencies" (packageData p))))))
+cratePlanRow identity entry ms deps = J.Object (Cons (Pair "crate" (J.str identity)) (Cons (Pair "entry" (J.str entry)) (Cons (Pair "modules" (J.stringArray (S.sortBy compareString (S.map moduleName ms)))) (Cons (Pair "dependencies" (J.stringArray deps)) Nil))))
+cratePlan graph = do
+  let p = rootPackage graph
+  let libraries = S.map (\q -> cratePlanRow (crateIdentity q "library") "" (packageModules q) (libraryDependencies graph q)) (S.filter (\q -> S.not (S.null (packageModules q))) (packages graph))
+  let own = if S.null (packageModules p) then Nil else Cons (crateIdentity p "library") Nil
+  let dependencies = S.append (libraryDependencies graph p) own
+  executables <- S.mapM (\(Pair name target) -> do { Pair entry ms <- targetCrateModules graph p target; ioReturn (cratePlanRow (crateIdentity p ("target-" ++ name)) entry ms dependencies) }) (J.items (J.getObject "executables" (packageData p)))
+  tests <- S.mapM (\(Pair name target) -> do { Pair entry ms <- targetCrateModules graph p target; ioReturn (cratePlanRow (crateIdentity p ("target-test-" ++ name)) entry ms dependencies) }) (S.filter (\entry -> J.has "main" (S.snd entry)) (J.items (J.getObject "tests" (packageData p))))
+  ioReturn (J.Array (S.append libraries (S.append executables tests)))
 sourceFiles p = do
   nested <- S.mapM (\target -> if J.has "main" target then do
     source <- localFile (packageRoot p) (J.get "main" target)

@@ -83,7 +83,10 @@ main = Sys.withScratch (\directory -> do
   app <- make r "module-cycle" "A" Nil "import B"
   writeFile (directory ++ "/module-cycle/B.emlf") "module B where\nimport A\ny = 2\n"
   modify app (\doc -> J.set "library" (J.Object (Cons (Pair "modules" (J.Object (Cons (Pair "A" (J.str "Source.emlf")) (Cons (Pair "B" (J.str "B.emlf")) Nil)))) Nil)) doc)
-  plan r app false "module cycle: A -> B -> A")
+  text <- plan r app true ""
+  doc <- H.right (J.parse text)
+  H.assert (S.length (J.values (J.get "modules" doc)) == 2) "cyclic module discovery duplicated a namespace"
+  H.assert (S.length (J.values (J.get "crates" doc)) == 1) "module cycle split one library into multiple compilation units")
  check "test_manifest_module_identity" (do
   app <- make r "wrong-module" "A" Nil ""
   modify app (J.set "library" (J.Object (Cons (Pair "modules" (J.Object (Cons (Pair "Other" (J.str "Source.emlf")) Nil))) Nil)))
@@ -132,5 +135,20 @@ main = Sys.withScratch (\directory -> do
   text <- plan r app true ""
   doc <- H.right (J.parse text)
   H.assert (J.has "λ😀.emlf" (J.get "sources" (S.head (J.values (J.get "packages" doc))))) "Unicode source path lost"
+  -- Query reports contain thousands of records and long stable identities.
+  -- Exercise offset scanning, long runs, all escapes and surrogate pairs in one
+  -- multi-megabyte document without relying on the JSON renderer as its oracle.
+  let member = S.concatStrings (S.replicate 64 "module_λ😀0123456789abcdef")
+  let longText = S.concatStrings (S.replicate 4096 "λ😀0123456789abcdef")
+  let group = "{\"cached\":false,\"members\":[\"" ++ member ++ "\"],\"count\":-12.5E+3,\"missing\":null}"
+  let large = "{\"groups\":[" ++ S.intercalate "," (S.replicate 2048 group) ++ "],\"long\":\"" ++ longText ++ "\",\"escaped\":\"\\\"\\\\\\/\\b\\f\\n\\r\\t\\u03bb\\ud83d\\ude00\",\"ok\":true}"
+  parsed <- H.right (J.parse large)
+  let groups = J.values (J.get "groups" parsed)
+  H.assert (S.length groups == 2048 && J.equal (J.get "members" (S.last groups)) (J.stringArray (Cons member Nil))) "large JSON query records changed"
+  H.assert (eqString (J.text (J.get "long" parsed)) longText && eqString (J.text (J.get "escaped" parsed)) "\"\\/\b\f\n\r\tλ😀") "JSON string chunks or escapes changed"
+  H.assert (J.equal (J.get "count" (S.head groups)) (J.Number "-12.5E+3") && J.equal (J.get "missing" (S.head groups)) J.Null && J.getBool "ok" false parsed && S.not (J.getBool "cached" true (S.last groups))) "JSON literal or number parsing changed"
+  roundtrip <- H.right (J.parse (J.render parsed))
+  H.assert (J.equal (J.get "long" roundtrip) (J.get "long" parsed) && J.equal (J.get "escaped" roundtrip) (J.get "escaped" parsed)) "long JSON string rendering changed"
+  S.mapM_ (\(Pair invalid expected) -> case J.parse invalid of {Left message -> H.assert (eqString message expected) "JSON error offset changed"; Right _ -> H.fail "invalid JSON was accepted"}) (Cons (Pair "{\"x\":\"\\ud800\"}" "invalid JSON at offset 7") (Cons (Pair "[1e+]" "invalid JSON at offset 1") (Cons (Pair "{\"x\":true,\"x\":false}" "duplicate JSON key: x") Nil)))
   S.mapM_ (\text -> do { writeFile app text; plan r app false "invalid JSON" }) (Cons "{\"format\":1,}" (Cons "{\"format\":01}" (Cons "{\"name\":\"\\ud800\"}" (Cons "[true,]" Nil)))))
  putStrLn "18 package resolver tests passed")

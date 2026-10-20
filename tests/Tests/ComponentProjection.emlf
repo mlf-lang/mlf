@@ -38,6 +38,10 @@ checkScopes solver starts = do
  let expected = G.bindE (reference graph Nil starts) (\ids -> Right (Pair ids (L.filter (\n -> G.isGen (G.tag (IM.get n (G.nodes graph)))) ids)))
  let actual = G.bindE (S.componentScopes solver starts) (\(Pair ids scopes) -> Right (Pair (IS.toList ids) (IS.toList scopes)))
  H.assert (H.eq actual expected) "component membership, boundaries or missing-node errors changed"
+ let retained = G.bindE (S.componentCanonicalNodesVisit solver IM.empty IS.empty (L.map (G.resolve graph) starts)) (\(Pair nodes scopes) ->
+       Right (Pair (IM.toList nodes) (IS.toList scopes)))
+ let expectedNodes = G.bindE (reference graph Nil starts) (\ids -> Right (Pair (L.map (\n -> Pair n (IM.get n (G.nodes graph))) ids) (L.filter (\n -> G.isGen (G.tag (IM.get n (G.nodes graph)))) ids)))
+ H.assert (H.eq retained expectedNodes) "retained component nodes, boundaries or missing-node errors changed"
  checkComponent solver starts
 
 scopes : IO Unit
@@ -60,6 +64,9 @@ checkProjection solver starts = do
  let stubs = IM.fromDistinctAscList (L.zip (L.map L.fst hidden) (L.range count (count + L.length hidden - 1)))
  let expected = L.map (\(Pair n node) -> Pair (S.compactIdentity old selected n) (S.localNode old selected scopes stubs n node)) originals
  let actual = S.projectNodes old selected scopes stubs 0 originals
+ let nodeTree = case IM.fromList (L.reverse originals) of IntMap tree -> tree
+ let retained = S.projectCanonicalNodes nodeTree scopes stubs 0 originals
+ H.assert (L.eqList (\(Pair n a) (Pair m b) -> n == m && G.equalNode a b) expected retained) "node-map projection changed identities, fields, binders or hidden scope roots"
  H.assert (L.eqList (\(Pair n a) (Pair m b) -> n == m && G.equalNode a b) expected actual) "enumerated projection changed identities, fields, binders or scope stubs"
 
 projection : IO Unit
@@ -86,7 +93,8 @@ checkRestoration count offset stride mode = do
  let solved = L.map (\n -> Pair n (G.mkNode (if remInt n 2 == 0 then GArr (remInt (n + 1) count) 0 else GCon "T" (Cons 0 Nil)) (if mode == 7 then Just count else if remInt n 2 == 0 then Nothing else Just 0) (if remInt mode 2 == 0 then Rigid else Flexible))) (L.filter (\n -> remInt (n + mode) 4 /= 0) (L.range 0 (count - 1)))
  L.mapM_ (\entries -> do
   let expected = G.mapE (S.restoreNode old aliased selected) entries
-  let actual = S.restoreProjectedNodes aliased selected 0 originals entries
+  let nodeTree = case IM.fromList (L.reverse originals) of IntMap tree -> tree
+  let actual = S.restoreProjectedNodes aliased nodeTree 0 originals entries
   if restorationResult actual expected then return Unit else panic "ordered restoration disagrees with independent inverse-rank/map lookups") (Cons solved (Cons Nil (Cons (Cons (Pair (-1) (G.mkNode GBot Nothing Flexible)) Nil) (Cons (Cons (Pair count (G.mkNode GBot Nothing Flexible)) Nil) Nil))))
 restoration : IO Unit
 restoration = do

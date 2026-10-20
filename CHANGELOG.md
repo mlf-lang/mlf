@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- Compile libraries and targets as crates with cycle-tolerant module namespaces,
+  declaration/SCC inference, persistent checked semantic queries, generated
+  `.mlfci`/`.mlfco` artifacts, and cached LLVM/native build stages. Preserve MLF's
+  principal polymorphism and existing closed-signature recursion rule. Retire
+  the per-module compiler and linker commands.
+- Remove the Haskell compiler, Cabal project, and retired Haskell/Python test,
+  bootstrap, release, and benchmark launchers. Native MLF package builds and
+  all six native test groups are the supported workflow.
+- Consolidate shared C fixtures under `tests/native/`, move local BDWGC
+  discovery to `.mlf-build/deps`, and remove Python command placeholders.
+- Preserve pinned cross-language benchmark baselines, Snake, frozen oracle
+  data, and archived measurements; update build, test, and release docs.
+
 ## 0.1.1 — 2026-10-18
 
 Compiler performance and native development improvements.

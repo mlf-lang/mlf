@@ -321,11 +321,6 @@ projectConstructors facts expression = do
       Nothing -> freshPure normalized
     _ -> freshPure normalized
 
-substitute : XName -> XErased -> XErased -> Fresh XErased
-substitute name value expression = case expression of
-  XEVar n -> if eqName n name then copy M.empty value else freshPure expression
-  _ -> children (substitute name value) expression
-
 selectConstructor : String -> List XErased -> List XErasedAlternative -> Maybe XErased
 selectConstructor constructor args branches = case branches of
   Nil -> Nothing
@@ -340,49 +335,141 @@ maybeLet optional value body = case optional of
   Nothing -> body
   Just name -> XELet name value body
 
+-- Cache capped free-use counts beside each rewrite subtree. Substitution can
+-- retain an unaffected subtree without walking it, preserving rewrite order
+-- and the exact fresh-name allocation order of the original pass.
+data UseTree = UseTree XErased (Map XName Int) UseChildren
+data UseChildren = UseLeaf | UseAbs XName UseTree | UseApp UseTree UseTree | UseLet XName UseTree UseTree | UseRec (List (Pair XName UseTree)) UseTree | UseCase UseTree (List (Pair XPattern UseTree))
+useTerm : UseTree -> XErased
+useTerm (UseTree term _ _) = term
+useCounts : UseTree -> Map XName Int
+useCounts (UseTree _ counts _) = counts
+useChildren : UseTree -> UseChildren
+useChildren (UseTree _ _ children) = children
+addUses : Int -> Int -> Int
+addUses a b = L.min 2 (a+b)
+mergeUses : Map XName Int -> Map XName Int -> Map XName Int
+mergeUses a b = if M.size a <= M.size b then M.unionWith compareName addUses a b else M.unionWith compareName addUses b a
+deleteUses : List XName -> Map XName Int -> Map XName Int
+deleteUses names counts = L.foldl (\current name -> M.delete compareName name current) counts names
+useAbs : XName -> UseTree -> UseTree
+useAbs name body = UseTree (XEAbs name (useTerm body)) (M.delete compareName name (useCounts body)) (UseAbs name body)
+useApp : UseTree -> UseTree -> UseTree
+useApp function argument = UseTree (XEApp (useTerm function) (useTerm argument)) (mergeUses (useCounts function) (useCounts argument)) (UseApp function argument)
+useLet : XName -> UseTree -> UseTree -> UseTree
+useLet name value body = UseTree (XELet name (useTerm value) (useTerm body)) (mergeUses (useCounts value) (M.delete compareName name (useCounts body))) (UseLet name value body)
+useRec : List (Pair XName UseTree) -> UseTree -> UseTree
+useRec bindings body =
+ let counts = L.foldl (\current binding -> mergeUses current (useCounts (L.snd binding))) (useCounts body) bindings in
+ UseTree (XELetRec (L.map (\(Pair name value) -> Pair name (useTerm value)) bindings) (useTerm body)) (deleteUses (L.map L.fst bindings) counts) (UseRec bindings body)
+useCase : UseTree -> List (Pair XPattern UseTree) -> UseTree
+useCase subject alternatives =
+ let counts = L.foldl (\current (Pair pattern body) -> mergeUses current (deleteUses (X.patternNames pattern) (useCounts body))) (useCounts subject) alternatives in
+ UseTree (XECase (useTerm subject) (L.map (\(Pair pattern body) -> XErasedAlternative pattern (useTerm body)) alternatives)) counts (UseCase subject alternatives)
+indexUses : XErased -> UseTree
+indexUses term = case term of
+ XEAbs name body -> useAbs name (indexUses body)
+ XEApp function argument -> useApp (indexUses function) (indexUses argument)
+ XELet name value body -> useLet name (indexUses value) (indexUses body)
+ XELetRec bindings body -> useRec (L.map (\(Pair name value) -> Pair name (indexUses value)) bindings) (indexUses body)
+ XECase subject alternatives -> useCase (indexUses subject) (L.map (\(XErasedAlternative pattern body) -> Pair pattern (indexUses body)) alternatives)
+ XEVar name -> UseTree term (M.singleton name 1) UseLeaf
+ _ -> UseTree term M.empty UseLeaf
+mapUseChildren : (UseTree -> Fresh UseTree) -> UseTree -> Fresh UseTree
+mapUseChildren f tree = case useChildren tree of
+ UseLeaf -> freshPure tree
+ UseAbs name body -> do { result <- f body; freshPure (useAbs name result) }
+ UseApp function argument -> do { a <- f function; b <- f argument; freshPure (useApp a b) }
+ UseLet name value body -> do { a <- f value; b <- f body; freshPure (useLet name a b) }
+ UseRec bindings body -> do
+  values <- traverseFresh (\(Pair name value) -> do { result <- f value; freshPure (Pair name result) }) bindings
+  result <- f body
+  freshPure (useRec values result)
+ UseCase subject alternatives -> do
+  value <- f subject
+  branches <- traverseFresh (\(Pair pattern body) -> do { result <- f body; freshPure (Pair pattern result) }) alternatives
+  freshPure (useCase value branches)
+substituteUsed : XName -> XErased -> UseTree -> Fresh UseTree
+substituteUsed name value tree = if L.not (M.member compareName name (useCounts tree)) then freshPure tree else case useTerm tree of
+ XEVar actual -> if eqName name actual then do { copied <- copy M.empty value; freshPure (indexUses copied) } else freshPure tree
+ _ -> mapUseChildren (substituteUsed name value) tree
+useApplications : List UseTree -> UseTree -> Pair UseTree (List UseTree)
+useApplications arguments tree = case useChildren tree of
+ UseApp function argument -> useApplications (Cons argument arguments) function
+ _ -> Pair tree arguments
+useMaybeLet : Maybe XName -> UseTree -> UseTree -> UseTree
+useMaybeLet optional value body = case optional of {Nothing -> body; Just name -> useLet name value body}
+selectUseConstructor : String -> List UseTree -> List (Pair XPattern UseTree) -> Maybe UseTree
+selectUseConstructor constructor arguments branches = case branches of
+ Nil -> Nothing
+ Cons (Pair pattern body) rest -> case pattern of
+  XConstructorPattern name fields -> if eqString constructor name && L.length fields == L.length arguments then
+   Just (L.foldr (\(Pair optional value) result -> useMaybeLet optional value result) body (L.zip fields arguments))
+   else selectUseConstructor constructor arguments rest
+  XDefaultPattern optional -> Just (useMaybeLet optional (L.foldl useApp (indexUses (XEConstructor constructor)) arguments) body)
+substituteUsedBindings : UseTree -> List (Pair XName UseTree) -> Fresh UseTree
+substituteUsedBindings body bindings = case bindings of
+ Nil -> freshPure body
+ Cons (Pair name value) rest -> do
+  result <- substituteUsed name (useTerm value) body
+  substituteUsedBindings result rest
+rewriteUsed : UseTree -> Fresh UseTree
+rewriteUsed tree = case useChildren tree of
+ UseApp function argument -> case useChildren function of
+  UseAbs name body -> freshPure (useLet name argument body)
+  UseLet name value body -> freshPure (useLet name value (useApp body argument))
+  UseRec bindings body -> freshPure (useRec bindings (useApp body argument))
+  _ -> freshPure tree
+ UseLet name value body ->
+  let uses = M.findWithDefault compareName 0 name (useCounts body) in
+  if uses == 0 then freshPure body else if smallValue (useTerm value) then substituteUsed name (useTerm value) body else case useChildren value of
+   UseAbs _ _ -> if uses == 1 then substituteUsed name (useTerm value) body else freshPure tree
+   UseLet inner a b -> freshPure (useLet inner a (useLet name b body))
+   UseRec (Cons (Pair r rhs) Nil) result -> case useTerm result of
+    XEVar other -> if eqName r other then do
+     replaced <- copy (M.singleton r (XEVar name)) (useTerm rhs)
+     freshPure (useRec (Cons (Pair name (indexUses replaced)) Nil) body)
+     else freshPure tree
+    _ -> freshPure tree
+   _ -> freshPure tree
+ UseRec bindings body ->
+  let group = S.fromList compareName (L.map L.fst bindings) in
+  let expandable = L.filter (\(Pair _ value) -> smallValue (useTerm value) && S.null (S.intersection compareName (free (useTerm value)) group)) bindings in
+  let names = S.fromList compareName (L.map L.fst expandable) in
+  let keep = L.filter (\(Pair name _) -> L.not (S.member compareName name names)) bindings in
+  substituteUsedBindings (if L.null keep then body else useRec keep body) expandable
+ UseCase subject (Cons (Pair (XDefaultPattern optional) body) Nil) -> freshPure (useMaybeLet optional subject body)
+ UseCase subject branches -> case useApplications Nil subject of
+  Pair head arguments -> case useTerm head of
+   XEConstructor constructor -> case selectUseConstructor constructor arguments branches of {Just selected -> freshPure selected; Nothing -> freshPure tree}
+   _ -> freshPure tree
+ _ -> freshPure tree
+passUsed : UseTree -> Fresh UseTree
+passUsed tree = do
+ normalized <- mapUseChildren passUsed tree
+ rewriteUsed normalized
+-- Build use indices for normalized results directly. An initial indexed copy
+-- of the input is unnecessary: its counts are never consulted by this walk.
+passRaw : XErased -> Fresh UseTree
+passRaw expression = do
+ normalized <- case expression of
+  XEAbs name body -> do { result <- passRaw body; freshPure (useAbs name result) }
+  XEApp function argument -> do { a <- passRaw function; b <- passRaw argument; freshPure (useApp a b) }
+  XELet name value body -> do { a <- passRaw value; b <- passRaw body; freshPure (useLet name a b) }
+  XELetRec bindings body -> do
+   values <- traverseFresh (\(Pair name value) -> do { result <- passRaw value; freshPure (Pair name result) }) bindings
+   result <- passRaw body
+   freshPure (useRec values result)
+  XECase subject alternatives -> do
+   value <- passRaw subject
+   branches <- traverseFresh (\(XErasedAlternative pattern body) -> do { result <- passRaw body; freshPure (Pair pattern result) }) alternatives
+   freshPure (useCase value branches)
+  _ -> freshPure (indexUses expression)
+ rewriteUsed normalized
 pass : XErased -> Fresh XErased
 pass expression = do
-  normalized <- children pass expression
-  rewrite normalized
-
-rewrite : XErased -> Fresh XErased
-rewrite expression = case expression of
-  XEApp (XEAbs n b) a -> freshPure (XELet n a b)
-  XEApp (XELet n a f) b -> freshPure (XELet n a (XEApp f b))
-  XEApp (XELetRec ds f) a -> freshPure (XELetRec ds (XEApp f a))
-  XELet n a b -> let uses = occurrences 2 n b in if uses == 0 then freshPure b else
-    if smallValue a then substitute n a b else case a of
-      XEAbs ignored body -> if uses == 1 then substitute n a b else rewriteLet n a b
-      _ -> rewriteLet n a b
-  XELetRec ds b ->
-    let group = S.fromList compareName (L.map (\entry -> case entry of Pair n a -> n) ds) in
-    let expandable = L.filter (\entry -> case entry of Pair n a -> smallValue a && S.null (S.intersection compareName (free a) group)) ds in
-    let expandedNames = S.fromList compareName (L.map (\entry -> case entry of Pair n a -> n) expandable) in
-    let keep = L.filter (\entry -> case entry of Pair n a -> L.not (S.member compareName n expandedNames)) ds in
-    substituteBindings (if L.null keep then b else XELetRec keep b) expandable
-  XECase a (Cons (XErasedAlternative (XDefaultPattern optional) b) Nil) -> freshPure (maybeLet optional a b)
-  XECase a branches -> case applications a of
-    Pair (XEConstructor c) args -> case selectConstructor c args branches of
-      Just b -> freshPure b
-      Nothing -> freshPure expression
-    _ -> freshPure expression
-  _ -> freshPure expression
-
-rewriteLet : XName -> XErased -> XErased -> Fresh XErased
-rewriteLet name value body = case value of
-  XELet inner a b -> freshPure (XELet inner a (XELet name b body))
-  XELetRec (Cons (Pair r rhs) Nil) (XEVar other) -> if eqName r other then do
-    replaced <- copy (M.singleton r (XEVar name)) rhs
-    freshPure (XELetRec (Cons (Pair name replaced) Nil) body)
-    else freshPure (XELet name value body)
-  _ -> freshPure (XELet name value body)
-
-substituteBindings : XErased -> List (Pair XName XErased) -> Fresh XErased
-substituteBindings body bindings = case bindings of
-  Nil -> freshPure body
-  Cons (Pair n a) rest -> do
-    result <- substitute n a body
-    substituteBindings result rest
+ result <- passRaw expression
+ freshPure (useTerm result)
 
 maxIdentity : XErased -> Int
 maxIdentity expression = case expression of

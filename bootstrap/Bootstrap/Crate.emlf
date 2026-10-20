@@ -1,0 +1,225 @@
+module Bootstrap.Crate where
+
+import Bootstrap.Types
+import Bootstrap.Std
+import qualified Bootstrap.Map as M
+import qualified Bootstrap.Set as Set
+import qualified Bootstrap.Module as Modules
+import qualified Bootstrap.Parser as Parser
+import qualified Bootstrap.Classes as Classes
+import qualified Bootstrap.Data as D
+import qualified Bootstrap.Separate as Separate
+import qualified Bootstrap.InferenceUnit as Inference
+import qualified Bootstrap.CrateQuery as Query
+import qualified Bootstrap.CrateArtifact as Artifact
+
+-- The package driver supplies the source inventory for exactly one crate.
+-- Dependency paths designate generated metadata, never upstream sources.
+data CrateSpec = CrateSpec String String PreludeMode (List (Pair String String)) (List String) String String
+specIdentity (CrateSpec identity _ _ _ _ _ _) = identity
+specEntry (CrateSpec _ entry _ _ _ _ _) = entry
+specMode (CrateSpec _ _ mode _ _ _ _) = mode
+specSources (CrateSpec _ _ _ sources _ _ _) = sources
+specDependencies (CrateSpec _ _ _ _ dependencies _ _) = dependencies
+specCache (CrateSpec _ _ _ _ _ cache _) = cache
+specPrelude (CrateSpec _ _ _ _ _ _ prelude) = prelude
+withDependencies (CrateSpec identity entry mode sources _ cache prelude) dependencies = CrateSpec identity entry mode sources dependencies cache prelude
+
+decodeSpec text = do
+  fields <- Separate.unpack text
+  case fields of
+    Cons "MLF-CRATE-1" (Cons identity (Cons entry (Cons noPrelude (Cons sources (Cons dependencies (Cons cache (Cons prelude Nil))))))) -> do
+      ensure (stringLength identity > 0) "crate identity is empty"
+      mode <- case noPrelude of {"true" -> Right NoImplicitPrelude; "false" -> Right ImplicitPrelude; _ -> Left "invalid crate prelude mode"}
+      sourceFields <- Separate.unpack sources
+      paths <- traverseEither Separate.decodePair sourceFields
+      deps <- Separate.unpack dependencies
+      ensure (not (null paths)) "crate has no source modules"
+      ensure (length paths == length (nubBy (\a b -> eqString (fst a) (fst b)) paths)) "duplicate crate source module"
+      traverseEither (\(Pair name path) -> do
+        Separate.validModuleName name
+        ensure (stringLength path > 0 && stringCodeAt path 0 == 47) "crate source path must be absolute") paths
+      ensure (eqString entry "" || any (\p -> eqString (fst p) entry) paths) "crate entry module is outside its source inventory"
+      ensure (stringLength cache > 0 && stringCodeAt cache 0 == 47) "crate query cache path must be absolute"
+      ensure (stringLength prelude > 0 && stringCodeAt prelude 0 == 47) "shared prelude artifact prefix must be absolute"
+      Right (CrateSpec identity entry mode (sortBy (\a b -> compareString (fst a) (fst b)) paths) deps cache prelude)
+    _ -> Left "unsupported or malformed crate specification (expected MLF-CRATE-1)"
+
+loadSources : List (Pair String String) -> IO (Either String (List SourceModule))
+loadSources paths = case paths of
+  Nil -> ioReturn (Right Nil)
+  Cons (Pair name path) rest -> do
+    present <- fileExists path
+    if not present then ioReturn (Left ("crate source does not exist: " ++ path)) else do
+      text <- readFile path
+      case Parser.parseModule path text of
+        Left message -> ioReturn (Left message)
+        Right source -> case do {ensure (eqString name (Modules.moduleIdentity source)) ("crate source declares " ++ Modules.moduleIdentity source ++ ", expected " ++ name); Separate.cleanSource source} of
+            Left message -> ioReturn (Left message)
+            Right clean -> do
+              remaining <- loadSources rest
+              ioReturn (mapEither (Cons clean) remaining)
+
+-- Only direct dependency namespaces are source-visible. The transitive
+-- metadata closure supplies their nominal identities and implementation ABI.
+externalNamespaces direct interfaces = do
+  let accessible = filter (\(Pair path iface) -> elem eqString path direct) interfaces
+  let exports = append (concatMap (\p -> Artifact.crateExports (snd p)) accessible)
+        (concatMap (\(Pair _ iface) -> filter (\p -> eqString (fst p) "Prelude") (Artifact.crateExports iface)) interfaces)
+  foldM (\acc (Pair name entities) -> case M.lookup compareString name acc of
+    Nothing -> Right (M.insert compareString name (Modules.interface entities) acc)
+    Just prior -> do
+      ensure (Set.eqSet (\a b -> Modules.compareEntity a b == 0) (Modules.visible prior) (Set.fromList Modules.compareEntity entities)) ("conflicting dependency module: " ++ name)
+      Right acc) M.empty exports
+
+moduleOwners identity sources interfaces = foldM (\acc (Pair name owner) -> case M.lookup compareString name acc of
+  Nothing -> Right (M.insert compareString name owner acc)
+  Just earlier -> if eqString earlier owner then Right acc else Left ("module belongs to multiple crates: " ++ name)) M.empty
+    (append (map (\source -> Pair (Modules.moduleIdentity source) identity) sources)
+      (concatMap (\(Pair _ iface) -> map (\name -> Pair name (Artifact.crateId iface)) (Artifact.crateModules iface)) interfaces))
+
+data PreparedCrate = PreparedCrate Modules.ResolvedCrate (List DataDecl) (List SClassDecl) (List (Pair String SInstanceDecl)) Inference.LoweredDeclarations String (Map String (Set String))
+preparedResolution (PreparedCrate r _ _ _ _ _ _) = r
+preparedData (PreparedCrate _ ds _ _ _ _ _) = ds
+preparedClasses (PreparedCrate _ _ cs _ _ _ _) = cs
+preparedInstances (PreparedCrate _ _ _ instances _ _ _) = instances
+preparedLowered (PreparedCrate _ _ _ _ lowered _ _) = lowered
+preparedEntry (PreparedCrate _ _ _ _ _ entry _) = entry
+preparedReach (PreparedCrate _ _ _ _ _ _ reach) = reach
+
+entryDeclaration spec resolution = if eqString (specEntry spec) "" then Right (Pair "" Nil) else do
+  entry <- case find (\r -> eqString (Modules.moduleIdentity (Modules.resolvedSource r)) (specEntry spec)) (Modules.resolvedCrateModules resolution) of
+    Nothing -> Left "crate entry module was not resolved"
+    Just r -> Right r
+  expression <- case Modules.renamedBody (Modules.resolvedContents entry) of
+    Just body -> Right body
+    Nothing -> if any (\value -> eqString (Modules.valueName value) "main") (Modules.sourceValues (Modules.resolvedSource entry)) then
+      mapEither SVar (Modules.resolvedName (Modules.resolvedCrateNames resolution) (Modules.Entity (specEntry spec) "main" Modules.Value))
+      else Modules.resolveExpr (Modules.resolvedCrateNames resolution) (Modules.resolvedScope entry) (SVar "main")
+  let symbol = Artifact.definitionName (specIdentity spec) (Modules.Entity (specEntry spec) "<crate-entry>" Modules.Value)
+  Right (Pair symbol (Cons (Triple symbol Nothing expression) Nil))
+
+externalInstanceOwners interfaces = concatMap (\(Pair _ iface) -> map (\(Pair name inst) -> mapEither (\owner -> Pair owner (Pair name inst)) (Artifact.instanceOwner iface name)) (Artifact.crateInstances iface)) interfaces
+
+prepareCrate spec interfaces sources = do
+  traverseEither (\source -> ensure (eqString (Modules.moduleIdentity source) (specEntry spec) || case Modules.sourceBody source of {Nothing -> true; Just _ -> false})
+    ("imported module contains a top-level expression: " ++ Modules.moduleIdentity source)) sources
+  external <- externalNamespaces (specDependencies spec) interfaces
+  owners <- moduleOwners (specIdentity spec) sources interfaces
+  let mangle = \entity -> Artifact.definitionName (M.findWithDefault compareString (specIdentity spec) (Modules.owner entity) owners) entity
+  resolution <- Modules.resolveCrate (specMode spec) external mangle sources
+  let resolved = Modules.resolvedCrateModules resolution
+  let ownData = concatMap (\r -> Modules.renamedDatatypes (Modules.resolvedContents r)) resolved
+  let ownClasses = concatMap (\r -> Modules.renamedClasses (Modules.resolvedContents r)) resolved
+  let ownValues = concatMap (\r -> Modules.renamedValues (Modules.resolvedContents r)) resolved
+  Pair entry extra <- entryDeclaration spec resolution
+  let values = append ownValues extra
+  let localInstances = map (\(Pair owner inst) -> Pair owner (Pair (Artifact.instanceName (specIdentity spec) owner inst) inst)) (Modules.resolvedCrateInstances resolution)
+  inheritedInstances <- sequenceEither (externalInstanceOwners interfaces)
+  let instances = append inheritedInstances localInstances
+  let externalReach = M.fromList compareString (concatMap (\(Pair _ iface) -> map (\(Pair name reach) -> Pair name (Set.fromList compareString reach)) (Artifact.crateImports iface)) interfaces)
+  let direct = M.union compareString (Modules.resolvedCrateReach resolution) externalReach
+  let reach = Modules.settleReach direct direct
+  let candidates = Modules.candidateScope reach (map (\(Pair owner value) -> Pair owner (snd value)) instances)
+  let valueScopes = M.fromList compareString (append (concatMap (\r -> map (\(Triple name _ _) -> Pair name (candidates (Modules.moduleIdentity (Modules.resolvedSource r)))) (Modules.renamedValues (Modules.resolvedContents r))) resolved)
+        (if eqString entry "" then Nil else Cons (Pair entry (candidates (specEntry spec))) Nil))
+  let allData = append (concatMap (\p -> Artifact.crateData (snd p)) interfaces) ownData
+  let allClasses = append (concatMap (\p -> Artifact.crateClasses (snd p)) interfaces) ownClasses
+  let dictionaries = M.fromList compareString (map (\c -> Pair ("Dict_" ++ Classes.className c) (Classes.className c)) allClasses)
+  let importedTypes = M.fromList compareString (concatMap (\p -> Artifact.crateBindings (snd p)) interfaces)
+  let imported = M.mapWithKey (\name ty -> Separate.sourceScheme (if eqString (stringSlice name 0 7) "module_" then dictionaries else M.empty) ty) importedTypes
+  let sourceNames = Modules.resolvedCrateDisplayNames resolution
+  let diagnosticNames = M.union compareString (M.map (Modules.displayNames sourceNames) dictionaries) sourceNames
+  lowered <- mapLeft (Modules.displayNames diagnosticNames) (Inference.lowerDeclarationsWithImports imported allData allClasses (map snd instances) valueScopes (map (\(Pair owner _) -> candidates owner) instances) values)
+  Right (PreparedCrate resolution ownData ownClasses (map (\(Pair _ (Pair name inst)) -> Pair name (Separate.stripInstance inst)) localInstances) lowered entry reach)
+
+-- Query compilation consumes only metadata-derived schemes. Upstream checked
+-- bodies are opened later by the linker and never enter an inference key.
+compilePrepared spec interfaces prepared = do
+  let lowered = preparedLowered prepared
+  let imported = map (\(Pair _ iface) -> Separate.UnitInterface (Artifact.crateId iface) Nil Nil Nil Nil Nil (Artifact.crateBindings iface) "metadata") interfaces
+  compiled <- Query.compileGroups (specIdentity spec) (specCache spec) imported (Inference.loweredData lowered) (Inference.loweredValues lowered)
+  case compiled of
+    Left message -> ioReturn (Left message)
+    Right (Pair fragments report) -> ioReturn (do
+      let resolved = Modules.resolvedCrateModules (preparedResolution prepared)
+      exports <- traverseEither (\r -> mapEither (\scope -> Pair (Modules.moduleIdentity (Modules.resolvedSource r)) (Set.toList (Modules.visible scope))) (Modules.resolvedExports (specMode spec) r)) resolved
+      let dependencies = map (\path -> case find (\p -> eqString (fst p) path) interfaces of
+            Nothing -> panic "missing direct crate metadata"
+            Just (Pair _ iface) -> Triple (Artifact.crateId iface) path (Artifact.semanticFingerprint iface)) (specDependencies spec)
+      let externalLayouts = Set.fromList compareString (concatMap (\(Pair _ iface) -> map D.datatypeName (Artifact.crateLoweredData iface)) interfaces)
+      let layouts = filter (\d -> not (Set.member compareString (D.datatypeName d) externalLayouts)) (Inference.loweredData lowered)
+      let modules = map (\r -> Modules.moduleIdentity (Modules.resolvedSource r)) resolved
+      let reach = map (\name -> Pair name (Set.toList (M.findWithDefault compareString Set.empty name (preparedReach prepared)))) modules
+      let bindings = concatMap (\f -> Separate.unitBindings (Separate.objectInterface f)) fragments
+      let iface = Artifact.CrateInterface (specIdentity spec) dependencies modules exports reach (preparedData prepared) (preparedClasses prepared) (preparedInstances prepared) layouts bindings (preparedEntry prepared) "pending"
+      let object = Artifact.makeObject iface fragments
+      Artifact.validateInterface (Artifact.objectInterface object)
+      Right (Pair object report))
+
+parentDirectory path = stringSlice path 0 (lastSeparator path (stringLength path - 1))
+lastSeparator : String -> Int -> Int
+lastSeparator path i = if i <= 0 || stringCodeAt path i == 47 then i else lastSeparator path (i - 1)
+
+ensureBuiltin prefix = case Artifact.builtinPrelude of
+  Left message -> ioReturn (Left message)
+  Right builtin -> do
+    let metadata = prefix ++ ".mlfci"
+    code <- Query.cacheCommand (Cons "/bin/mkdir" (Cons "-p" (Cons (parentDirectory prefix) Nil)))
+    if code /= 0 then ioReturn (Left "cannot create shared Prelude directory") else do
+      lock <- acquireFileLock (prefix ++ ".lock")
+      existing <- Artifact.readInterface metadata
+      object <- case existing of {Left message -> ioReturn (Left message); Right iface -> Artifact.readObject (prefix ++ ".mlfco") iface}
+      let valid = case object of {Left _ -> false; Right prior -> eqString (Artifact.encodeInterface (Artifact.objectInterface builtin)) (Artifact.encodeInterface (Artifact.objectInterface prior))}
+      result <- if valid then ioReturn (Right Unit) else do
+        body <- Query.writeCache (prefix ++ ".mlfco") (Artifact.encodeObject builtin)
+        case body of
+          Left message -> ioReturn (Left message)
+          Right _ -> Query.writeCache metadata (Artifact.encodeInterface (Artifact.objectInterface builtin))
+      releaseFileLock lock
+      ioReturn (mapEither (\_ -> metadata) result)
+
+withPrelude spec sources interfaces =
+  if any (\source -> any (\entry -> eqString (Modules.importedModule entry) "Prelude") (Modules.importsFor (specMode spec) source)) sources
+    then do
+      builtin <- case find (\(Pair _ iface) -> elem eqString "Prelude" (Artifact.crateModules iface)) interfaces of
+        Just (Pair metadata _) -> ioReturn (Right metadata)
+        Nothing -> ensureBuiltin (specPrelude spec)
+      case builtin of
+        Left message -> ioReturn (Left message)
+        Right metadata -> do
+          let updated = withDependencies spec (nubBy eqString (Cons metadata (specDependencies spec)))
+          loaded <- Artifact.loadInterfaces (specDependencies updated)
+          ioReturn (mapEither (Pair updated) loaded)
+  else ioReturn (Right (Pair spec interfaces))
+
+compileSources spec sources interfaces prefix = do
+  dependencies <- withPrelude spec sources interfaces
+  case do {Pair updated loaded <- dependencies; prepared <- prepareCrate updated loaded sources; Right (Triple updated loaded prepared)} of
+    Left message -> ioReturn (Left message)
+    Right (Triple updated loaded prepared) -> do
+      result <- compilePrepared updated loaded prepared
+      case result of
+        Left message ->
+          let names = Modules.resolvedCrateDisplayNames (preparedResolution prepared) in
+          let diagnostics = M.union compareString (M.map (Modules.displayNames names) (Inference.loweredNames (preparedLowered prepared))) names in
+          ioReturn (Left (Modules.displayNames diagnostics message))
+        Right (Pair object report) -> do
+          Artifact.writeObject prefix object
+          writeFile (prefix ++ ".queries") (Query.reportJSON (specIdentity spec) (Artifact.semanticFingerprint (Artifact.objectInterface object)) report)
+          ioReturn (Right Unit)
+
+compileSpecFile file prefix = do
+  present <- fileExists file
+  if not present then ioReturn (Left ("crate specification does not exist: " ++ file)) else do
+    text <- readFile file
+    case decodeSpec text of
+      Left message -> ioReturn (Left message)
+      Right spec -> do
+        sourceResult <- loadSources (specSources spec)
+        paths <- mapM canonicalPath (specDependencies spec)
+        let normalized = withDependencies spec paths
+        dependencies <- Artifact.loadInterfaces paths
+        case do {sources <- sourceResult; interfaces <- dependencies; Right (Pair sources interfaces)} of
+          Left message -> ioReturn (Left message)
+          Right (Pair sources interfaces) -> compileSources normalized sources interfaces prefix
