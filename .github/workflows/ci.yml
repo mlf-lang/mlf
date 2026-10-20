@@ -1,111 +1,89 @@
 name: CI
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
     inputs:
-      self_host:
-        description: Also rebuild the compiler and check a fresh self-host fixed point
-        type: boolean
-        default: false
-      windows_runtime_only:
-        description: Run only the native Windows runtime regressions
-        type: boolean
-        default: false
+      source:
+        description: Exact committed source to qualify
+        type: string
+        required: true
+      seed_run:
+        description: Successful portable LLVM producer with identical MLF inputs
+        type: string
+        required: true
 permissions:
   contents: read
+  actions: read
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: windows-release-check-${{ github.sha }}
+  cancel-in-progress: false
 jobs:
-  metadata:
-    name: Release metadata
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - run: tools/release/check.sh
-  native:
-    name: Native package smoke
-    if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only
-    runs-on: macos-26
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - name: Native dependencies
-        run: brew install llvm gmp pkg-config bdw-gc
-      - name: Fetch verified native seed
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: tools/release/fetch-seed.sh .mlf-build/seed
-      - name: Exercise checkout packages on both backends without GHC or Python
-        run: tools/release/native-ci.sh smoke
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        if: always()
-        with:
-          name: native-smoke-evidence
-          include-hidden-files: true
-          path: |
-            examples/packages/.mlf-build/build-report.json
-            examples/packages/.mlf-build/tests/**/*.stdout
-  windows-runtime:
-    name: Native Windows runtime
+  windows:
+    name: Windows candidate qualification
     runs-on: windows-2025
-    timeout-minutes: 20
+    timeout-minutes: 360
     defaults:
       run:
         shell: pwsh
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.source }}
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: portable-llvm
+          path: .mlf-build/portable-llvm
+          run-id: ${{ inputs.seed_run }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: mac-candidate
+          path: .mlf-build/seed-provenance
+          run-id: ${{ inputs.seed_run }}
+          github-token: ${{ github.token }}
+      - name: Verify identical MLF source inputs before using portable LLVM
+        env:
+          EXPECTED_SOURCE: ${{ inputs.source }}
+          SEED_RUN: ${{ inputs.seed_run }}
+        run: |
+          . ./tools/release/windows-common.ps1
+          $root = (Get-Location).Path
+          Assert-Release ((git rev-parse HEAD).Trim() -eq $env:EXPECTED_SOURCE) 'Unexpected qualification source'
+          $build = Read-ReleaseJson .mlf-build/seed-provenance/build-report.json
+          Assert-Release ($build.complete -eq $true -and $build.implementation -eq 'MLF') 'Incomplete portable LLVM producer'
+          foreach ($package in $build.packages.packages) {
+            $packageRoot = Join-Path $root $package.path
+            Assert-Release ((Get-ReleaseHash "$packageRoot/mlf-package.json") -eq $package.manifest) "Seed manifest differs: $packageRoot"
+            foreach ($entry in $package.sources.GetEnumerator()) {
+              Assert-Release ((Get-ReleaseHash (Join-Path $packageRoot $entry.Key)) -eq $entry.Value) "Seed MLF source differs: $($entry.Key)"
+            }
+          }
+          Write-ReleaseJson .mlf-build/seed-provenance/source-equivalence.json @{source=$env:EXPECTED_SOURCE;seed_run=$env:SEED_RUN;mlf_inputs_identical=$true;runtime='compiled afresh from qualification source; no runtime reuse'}
       - name: Install pinned native Windows dependencies
         run: tools/release/setup-windows.ps1 -Output .mlf-build/windows-dependencies
-      - name: Test both runtime layouts and native filesystem operations
-        run: tools/release/test-windows-runtime.ps1 -NativePrefix $env:MLF_NATIVE_PREFIX -Clang $env:MLF_CLANG -Output .mlf-build/windows-runtime
+      - name: Build two fresh native Windows generations
+        run: tools/release/bootstrap-windows-release.ps1 -Seed .mlf-build/portable-llvm -NativePrefix $env:MLF_NATIVE_PREFIX -Clang $env:MLF_CLANG -Output .mlf-build/windows-native
+      - name: Qualify exact tools and source
+        run: tools/release/qualify-windows.ps1 -Stage1 .mlf-build/windows-native/stage1 -Stage2 .mlf-build/windows-native/stage2 -NativePrefix $env:MLF_NATIVE_PREFIX -Clang $env:MLF_CLANG -Output .mlf-build/windows-evidence
+      - name: Package and relocate the candidate
+        run: tools/release/package-windows.ps1 -Build .mlf-build/windows-native/stage2 -NativePrefix $env:MLF_NATIVE_PREFIX -Evidence .mlf-build/windows-evidence -Clang $env:MLF_CLANG -Output .mlf-build/windows-release
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
-          name: windows-runtime-evidence
+          name: windows-candidate-diagnostics
           include-hidden-files: true
           path: |
-            .mlf-build/windows-runtime/*.json
-            .mlf-build/windows-runtime/*.log
-  self-host:
-    name: Fresh self-host
-    if: github.event_name == 'workflow_dispatch' && inputs.self_host && !inputs.windows_runtime_only
-    runs-on: macos-26
-    timeout-minutes: 360
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - run: brew install llvm gmp pkg-config bdw-gc
-      - name: Fetch verified native seed
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: tools/release/fetch-seed.sh .mlf-build/seed
-      # A seed with an older code generator cannot itself produce fixed-point
-      # LLVM for the updated compiler. Validate the next native generation.
-      - name: Bootstrap the updated native code generator
-        run: |
-          export MLF_GC_PREFIX="$(brew --prefix bdw-gc)"
-          export PATH="$(brew --prefix llvm)/bin:$PATH"
-          tools/release/timed-bootstrap.sh
+            .mlf-build/seed-provenance/*.json
+            .mlf-build/windows-evidence/**/*.json
+            .mlf-build/windows-evidence/**/*.log
+            .mlf-build/windows-evidence/**/*.err
+            .mlf-build/windows-evidence/**/*.stderr
+            .mlf-build/windows-native/**/*.json
+            .mlf-build/windows-native/*.log
+            .mlf-build/windows-release/smoke-work/**/*.json
+            .mlf-build/windows-release/*.log
+          retention-days: 14
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        if: always()
         with:
-          name: native-bootstrap-evidence
-          include-hidden-files: true
-          retention-days: 30
-          path: |
-            .mlf-build/bootstrap-stage1/build-report.json
-            .mlf-build/bootstrap-stage1/commands/
-            .mlf-build/bootstrap-stage1/cache/**/artifact.json
-            .mlf-build/bootstrap-stage1/timing/
-      - name: Build and check a fresh compiler fixed point
-        run: tools/release/native-ci.sh self-host
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        if: always()
-        with:
-          name: native-self-host-evidence
-          include-hidden-files: true
-          path: |
-            .mlf-build/build-report.json
-            .mlf-build/compiler-tests/self-host/verification.json
+          name: windows-qualified-candidate
+          path: .mlf-build/windows-release/*.zip
+          retention-days: 14
