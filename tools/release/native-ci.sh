@@ -42,6 +42,13 @@ case "$(uname -s):$(uname -m)" in
     ;;
   *) printf '%s\n' 'Unsupported native test host.' >&2; exit 2 ;;
 esac
+if [ "$group" = packages ]; then
+  command -v llvm-profdata >/dev/null || {
+    printf '%s\n' 'Package PGO tests require llvm-profdata from the matching LLVM installation on PATH.' >&2
+    exit 2
+  }
+  llvm-profdata --version
+fi
 if [ "$group" = port ]; then
   case "$(uname -s)" in
     Darwin) matrix_memory_bytes=$(sysctl -n hw.memsize) ;;

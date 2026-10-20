@@ -132,7 +132,11 @@ jobs:
             echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
           else
             sudo apt-get update
-            sudo apt-get install -y clang libgmp-dev libgc-dev pkg-config jq
+            sudo apt-get install -y clang llvm libgmp-dev libgc-dev pkg-config jq
+            llvm_bin=$(llvm-config --bindir)
+            test -x "$llvm_bin/clang"
+            test -x "$llvm_bin/llvm-profdata"
+            echo "$llvm_bin" >> "$GITHUB_PATH"
           fi
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         if: matrix.platform == 'macos-arm64'
@@ -212,7 +216,11 @@ jobs:
             echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
           else
             sudo apt-get update
-            sudo apt-get install -y clang libgmp-dev libgc-dev pkg-config jq
+            sudo apt-get install -y clang llvm libgmp-dev libgc-dev pkg-config jq
+            llvm_bin=$(llvm-config --bindir)
+            test -x "$llvm_bin/clang"
+            test -x "$llvm_bin/llvm-profdata"
+            echo "$llvm_bin" >> "$GITHUB_PATH"
           fi
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
