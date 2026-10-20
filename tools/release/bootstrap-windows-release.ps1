@@ -30,11 +30,11 @@ $env:PATH = "$NativePrefix/bin;" + $env:PATH
 $compilerVersion = (& $Clang --version | Out-String)
 $irFlags = @()
 if ($compilerVersion -match 'clang version (\d+)' -and [int]$Matches[1] -lt 15) { $irFlags = @('-mllvm','-opaque-pointers') }
-$null = Invoke-ReleaseCommand $Clang @('-O2','-std=c11','-DMLF_USE_BDWGC','-DMLF_COMPACT_BDWGC','-DMLF_GC_THRESHOLD=1048576',"-I$NativePrefix/include",'-c',"$root/runtime/mlf_runtime.c",'-o',"$Output/seed/runtime.o") "$Output/seed/runtime.log" $root
-$null = Invoke-ReleaseCommand $Clang @('-O2','-std=c11','-Wall','-Wextra','-Werror','-municode',"$root/runtime/mlf_windows_host.c",'-o',"$Output/seed/bin/mlf-host.exe") "$Output/seed/helper.log" $root
+$null = Invoke-ReleaseCommand $Clang @('-O2','-std=c11','-mno-incremental-linker-compatible','-DMLF_USE_BDWGC','-DMLF_COMPACT_BDWGC','-DMLF_GC_THRESHOLD=1048576',"-I$NativePrefix/include",'-c',"$root/runtime/mlf_runtime.c",'-o',"$Output/seed/runtime.o") "$Output/seed/runtime.log" $root
+$null = Invoke-ReleaseCommand $Clang @('-O2','-std=c11','-Wall','-Wextra','-Werror','-municode','-mno-incremental-linker-compatible','-Wl,--no-insert-timestamp',"$root/runtime/mlf_windows_host.c",'-o',"$Output/seed/bin/mlf-host.exe") "$Output/seed/helper.log" $root
 foreach ($file in @('libgmp-10.dll','libgc-1.dll','libwinpthread-1.dll')) { Copy-Item -LiteralPath "$NativePrefix/bin/$file" -Destination "$Output/seed/bin" }
 foreach ($name in @('emlf','mlfpkg')) {
-    $arguments = @('-O2','-Wno-override-module') + $irFlags + @("$Seed/$name.ll","$Output/seed/runtime.o","$NativePrefix/lib/libgc.dll.a","$NativePrefix/lib/libgmp.dll.a",'-lshell32','-lm','-Wl,--stack,268435456','-o',"$Output/seed/bin/$name.exe")
+    $arguments = @('-O2','-Wno-override-module','-mno-incremental-linker-compatible','-Wl,--no-insert-timestamp') + $irFlags + @("$Seed/$name.ll","$Output/seed/runtime.o","$NativePrefix/lib/libgc.dll.a","$NativePrefix/lib/libgmp.dll.a",'-lshell32','-lm','-Wl,--stack,268435456','-o',"$Output/seed/bin/$name.exe")
     $null = Invoke-ReleaseCommand $Clang $arguments "$Output/seed/$name-link.log" $root
 }
 Copy-Item -LiteralPath "$Seed/SHA256SUMS" -Destination "$Output/seed/LLVM-SHA256SUMS"

@@ -67,6 +67,8 @@ and dependency hashes. It requires:
   directory enumeration, canonical link identity, redirects, locks and cleanup.
   `tools/release/test-windows-runtime.ps1` runs these checks independently of a
   compiler bootstrap and is also a required CI job.
+  It also rebuilds C and LLVM objects and executables across a timestamp
+  boundary, requiring byte-identical outputs with zero COFF/PE timestamps.
 - PE import inspection, exact embedded versions, SDK relocation and standalone
   executable/DLL checks.
 

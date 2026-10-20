@@ -171,6 +171,9 @@ gcFlags b = do
   ioReturn identity
 stackFlags : Builder -> List String
 stackFlags b = if eqString (J.getText "system" "" (tools b)) "Darwin" then Cons "-Wl,-stack_size,0x10000000" Nil else if eqString (J.getText "system" "" (tools b)) "Windows" then Cons "-Wl,--stack,268435456" Nil else Nil
+-- COFF timestamps are not semantic inputs. Keep separately rebuilt objects
+-- byte-identical so content-addressed linking can reuse their actual bytes.
+objectFlags b = if J.has "windows" (tools b) then Cons "-mno-incremental-linker-compatible" Nil else Nil
 executable b path = if eqString (J.getText "system" "" (tools b)) "Windows" then path ++ ".exe" else path
 windowsFiles b compact = if J.has "windows" (tools b) then Cons "libgmp-10.dll" (if compact then O.words "libgc-1.dll libwinpthread-1.dll mlf-host.exe" else Nil) else Nil
 copyWindowsFiles b compact destination = do
@@ -379,7 +382,7 @@ runtimeObject b compact gc = runtimeObjectWithPgo b compact gc J.empty
 runtimeObjectWithPgo : Builder -> Bool -> J.Json -> J.Json -> IO String
 runtimeObjectWithPgo b compact gc profile = do
   let allFlags = S.append (J.getStrings "flags" (J.get "gmp" (tools b))) (J.getStrings "flags" gc)
-  let cflags = S.append (S.filter (\f -> O.starts "-I" f || O.starts "-D" f) allFlags) (if compact then profileFlags else Nil)
+  let cflags = S.append (S.filter (\f -> O.starts "-I" f || O.starts "-D" f) allFlags) (S.append (if compact then profileFlags else Nil) (objectFlags b))
   let inputs = info (S.append (S.map (\key -> Pair key (J.get key (tools b))) (O.words "clang runtime runtime-path system machine native_environment gmp")) (Cons (Pair "gc" gc) (Cons (Pair "flags" (J.stringArray (S.append (O.words "-O2 -std=c11") cflags))) Nil)))
   let options = S.append (O.words "-O2 -std=c11") (S.append cflags (pgoFlags profile))
   let runtime = J.getText "runtime-path" "" (tools b)
@@ -414,7 +417,7 @@ nativeLLVMObject b emitted = nativeLLVMObjectWithPgo b emitted J.empty
 nativeLLVMObjectWithPgo : Builder -> String -> J.Json -> IO String
 nativeLLVMObjectWithPgo b emitted profile = do
   digest <- fileDigest (emitted ++ "/program.ll")
-  let options = S.append (O.words "-O2 -Wno-override-module -c") (S.append (J.getStrings "ir-flags" (tools b)) (pgoFlags profile))
+  let options = S.append (O.words "-O2 -Wno-override-module -c") (S.append (J.getStrings "ir-flags" (tools b)) (S.append (objectFlags b) (pgoFlags profile)))
   let inputs = info (S.append (S.map (\key -> Pair key (J.get key (tools b))) (O.words "clang system machine native_environment")) (Cons (Pair "llvm" (J.str digest)) (Cons (Pair "flags" (J.stringArray options)) Nil)))
   cached b "LLVM object" (pgoInputs profile inputs) (\work -> do
     ignored <- capture b work (S.append (Cons (clang b) options) (Cons (emitted ++ "/program.ll") (Cons "-o" (Cons (work ++ "/program.o") Nil)))) "" ""
@@ -428,7 +431,7 @@ linkNativeWithPgo b llvm runtime compact gc profile = do
   runtimeHash <- fileDigest (runtime ++ "/runtime.o")
   let libraries = S.append (J.getStrings "flags" (J.get "gmp" (tools b))) (J.getStrings "flags" gc)
   let options = S.append (O.words "-O2 -Wno-override-module") (if eqString (J.getText "mode" "" profile) "generate" then Cons "-fprofile-generate" Nil else Nil)
-  let hostFlags = if J.has "windows" (tools b) then Cons "-lshell32" (stackFlags b) else if compact then stackFlags b else Nil
+  let hostFlags = if J.has "windows" (tools b) then Cons "-lshell32" (Cons "-Wl,--no-insert-timestamp" (stackFlags b)) else if compact then stackFlags b else Nil
   let trailing = S.append libraries (S.append (Cons "-lm" Nil) hostFlags)
   let inputs = info (S.append (S.map (\key -> Pair key (J.get key (tools b))) (O.words "clang system machine native_environment gmp")) (Cons (Pair "gc" gc) (Cons (Pair "llvm-object" (J.str llvmHash)) (Cons (Pair "runtime-object" (J.str runtimeHash)) (Cons (Pair "flags" (J.stringArray (S.append options trailing))) Nil)))))
   cached b "native link" (pgoInputs profile (if J.has "windows" (tools b) then J.set "windows" (J.get "windows" (tools b)) inputs else inputs)) (\work -> do
