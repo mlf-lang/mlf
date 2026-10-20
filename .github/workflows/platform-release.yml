@@ -269,8 +269,10 @@ jobs:
           name: windows-release-diagnostics
           include-hidden-files: true
           path: |
-            .mlf-build/windows-evidence/*.json
-            .mlf-build/windows-evidence/*.log
+            .mlf-build/windows-evidence/**/*.json
+            .mlf-build/windows-evidence/**/*.log
+            .mlf-build/windows-evidence/**/*.err
+            .mlf-build/windows-evidence/**/*.stderr
             .mlf-build/windows-native/**/*.json
             .mlf-build/windows-native/*.log
           retention-days: 14

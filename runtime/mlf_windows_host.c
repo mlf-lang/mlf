@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
+#include "mlf_windows_path.h"
 
 static wchar_t *absolute(const wchar_t *path) {
     DWORD n=GetFullPathNameW(path,0,NULL,NULL);
@@ -80,11 +81,18 @@ static int copy_tree(const wchar_t *from, const wchar_t *to) {
 static int safe_remove(const wchar_t *path) {
     wchar_t volume[32768];
     size_t n=wcslen(path);
-    if (n<5 || !GetVolumePathNameW(path,volume,32768)) return 0;
+    if (n<5 || !wcsncmp(path,L"\\\\.\\",4) || !GetVolumePathNameW(path,volume,32768)) return 0;
     size_t root=wcslen(volume);
     while (n && path[n-1]==L'\\') --n;
     while (root && volume[root-1]==L'\\') --root;
-    return n>root && !(n==root && !_wcsnicmp(path,volume,root));
+    /* GetVolumePathNameW may return the extended spelling. Compare lengths
+     * in the logical namespace so an explicit extended drive/share root is
+     * still refused, and deep paths retain the same removal guard. */
+    if (!wcsncmp(path,L"\\\\?\\UNC\\",8)) n-=6;
+    else if (!wcsncmp(path,L"\\\\?\\",4)) n-=4;
+    if (!wcsncmp(volume,L"\\\\?\\UNC\\",8)) root-=6;
+    else if (!wcsncmp(volume,L"\\\\?\\",4)) root-=4;
+    return n>root;
 }
 static int junction(const wchar_t *source, const wchar_t *destination) {
     size_t n=wcslen(source), substitute=n+4;

@@ -82,6 +82,13 @@ try {
         $text = Invoke-ReleaseCommand "$Stage2/bin/$name.exe" @('--version') "$Output/$name-version.log" $Output
         Assert-Release ($text.Trim() -eq "$name $version") "Embedded $name version does not match VERSION"
     }
+    Write-Output 'Windows qualification: standard and compact runtime regressions'
+    & "$PSScriptRoot/test-windows-runtime.ps1" -NativePrefix $NativePrefix -Clang $Clang -HostHelper $helper -Output "$Output/runtime"
+    $runtime = Read-ReleaseJson "$Output/runtime/runtime-verification.json"
+    Copy-Item -LiteralPath "$Output/runtime/runtime-verification.json" -Destination "$Output/runtime-verification.json"
+    foreach ($file in (Get-ChildItem "$Output/runtime/*.log")) { Copy-Item -LiteralPath $file.FullName -Destination "$Output/runtime-$($file.Name)" }
+    Assert-Release ($runtime.complete -eq $true -and $runtime.helper_sha256 -eq $report.helper_sha256) 'Runtime regressions did not use the qualified filesystem helper'
+    $report.tests.runtime = $runtime
     Write-Output 'Windows qualification: native 18 resolver checks and 26 package integration cases'
     $null = Invoke-ReleaseCommand $manager @('compiler-test','packages','--compiler',$compiler,'--build-dir',"$Output/packages") "$Output/package-integration.log" $root
     $integration = Read-ReleaseJson "$Output/packages/verification.json"
@@ -91,22 +98,6 @@ try {
     Copy-Item -LiteralPath "$Output/packages/packages.log" -Destination "$Output/packages-primary.log"
     $report.tests.resolver = @{passed=18;manager_sha256=$report.manager_sha256;implementation='MLF'}
     $report.tests.integration = @{passed=26;compiler_sha256=$report.compiler_sha256;manager_sha256=$report.manager_sha256;implementation='MLF'}
-    Write-Output 'Windows qualification: standard and compact BDWGC runtime regressions'
-    $runtime = [ordered]@{complete=$false;source_sha256=(Get-ReleaseHash "$root/tests/native/windows_runtime.c");profiles=[ordered]@{}}
-    foreach ($profile in @('standard','compact-gc')) {
-        $directory = "$Output/runtime-$profile"
-        New-Item -ItemType Directory -Path $directory | Out-Null
-        $arguments = @('-O2','-std=c11',"-I$NativePrefix/include", "$root/tests/native/windows_runtime.c")
-        if ($profile -eq 'compact-gc') { $arguments += @('-DMLF_USE_BDWGC','-DMLF_COMPACT_BDWGC',"$NativePrefix/lib/libgc.dll.a") }
-        $arguments += @("$NativePrefix/lib/libgmp.dll.a",'-lshell32','-lm','-Wl,--stack,268435456','-o',"$directory/runtime-test.exe")
-        $null = Invoke-ReleaseCommand $Clang $arguments "$Output/runtime-$profile-build.log" $directory
-        $text = Invoke-ReleaseCommand "$directory/runtime-test.exe" @() "$Output/runtime-$profile.log" $directory
-        Assert-Release ($text -match 'Windows runtime regressions passed') "Missing $profile runtime success marker"
-        $runtime.profiles[$profile] = @{passed=$true;binary_sha256=(Get-ReleaseHash "$directory/runtime-test.exe")}
-    }
-    $runtime.complete = $true
-    Write-ReleaseJson "$Output/runtime-verification.json" $runtime
-    $report.tests.runtime = $runtime
     Assert-Release (!$Checker -and !$Manifest) 'Native parity builds and verifies its own independent checker and corpus'
     Write-Output 'Windows qualification: native 7,086 parity cases and 160 interpreter/native runtime executions'
     $null = Invoke-ReleaseCommand $manager @('compiler-test','parity','--compiler',$compiler,'--build-dir',"$Output/parity") "$Output/parity.log" $root

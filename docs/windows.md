@@ -63,6 +63,10 @@ and dependency hashes. It requires:
   POSIX; expected types are never regenerated from the candidate.
 - `tests/native/windows_runtime.c` under standard and compact GC, checking Win64
   integer conversion, UTF-8 paths, process behavior and runtime operations.
+  Deep cache paths exceeding MAX_PATH cover writes, atomic replacement, copies,
+  directory enumeration, canonical link identity, redirects, locks and cleanup.
+  `tools/release/test-windows-runtime.ps1` runs these checks independently of a
+  compiler bootstrap and is also a required CI job.
 - PE import inspection, exact embedded versions, SDK relocation and standalone
   executable/DLL checks.
 

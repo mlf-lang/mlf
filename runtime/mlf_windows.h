@@ -13,6 +13,7 @@
 #include <io.h>
 #include <fcntl.h>
 #include <wchar.h>
+#include "mlf_windows_path.h"
 
 static wchar_t *mlf_wide(const char *text) {
     int n = MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,text,-1,NULL,0);
@@ -31,9 +32,9 @@ static char *mlf_utf8(const wchar_t *wide) {
     return text;
 }
 static FILE *mlf_windows_fopen(const char *path, const char *mode) {
-    wchar_t *p = mlf_wide(path), *m = mlf_wide(mode);
+    wchar_t *wide = mlf_wide(path), *p = wide ? mlf_windows_path(wide) : NULL, *m = mlf_wide(mode);
     FILE *result = p && m ? _wfopen(p,m) : NULL;
-    free(p); free(m); return result;
+    free(wide); free(p); free(m); return result;
 }
 static char *mlf_windows_realpath(const char *path, char *unused) {
     (void)unused;

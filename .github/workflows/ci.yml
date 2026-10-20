@@ -9,6 +9,10 @@ on:
         description: Also rebuild the compiler and check a fresh self-host fixed point
         type: boolean
         default: false
+      windows_runtime_only:
+        description: Run only the native Windows runtime regressions
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -23,6 +27,7 @@ jobs:
       - run: tools/release/check.sh
   native:
     name: Native package smoke
+    if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only
     runs-on: macos-26
     timeout-minutes: 90
     steps:
@@ -43,9 +48,30 @@ jobs:
           path: |
             examples/packages/.mlf-build/build-report.json
             examples/packages/.mlf-build/tests/**/*.stdout
+  windows-runtime:
+    name: Native Windows runtime
+    runs-on: windows-2025
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Install pinned native Windows dependencies
+        run: tools/release/setup-windows.ps1 -Output .mlf-build/windows-dependencies
+      - name: Test both runtime layouts and native filesystem operations
+        run: tools/release/test-windows-runtime.ps1 -NativePrefix $env:MLF_NATIVE_PREFIX -Clang $env:MLF_CLANG -Output .mlf-build/windows-runtime
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: windows-runtime-evidence
+          include-hidden-files: true
+          path: |
+            .mlf-build/windows-runtime/*.json
+            .mlf-build/windows-runtime/*.log
   self-host:
     name: Fresh self-host
-    if: github.event_name == 'workflow_dispatch' && inputs.self_host
+    if: github.event_name == 'workflow_dispatch' && inputs.self_host && !inputs.windows_runtime_only
     runs-on: macos-26
     timeout-minutes: 360
     steps:
