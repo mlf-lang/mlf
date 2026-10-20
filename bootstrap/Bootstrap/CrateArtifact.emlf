@@ -5,6 +5,7 @@ import Bootstrap.Std
 import qualified Bootstrap.Map as M
 import qualified Bootstrap.Set as Set
 import qualified Bootstrap.Module as Modules
+import qualified Bootstrap.Host as Host
 import qualified Bootstrap.Classes as Classes
 import qualified Bootstrap.CompilerCore as Compiler
 import qualified Bootstrap.Parser as Parser
@@ -90,7 +91,7 @@ decodeDependency text = do
   fields <- Separate.unpack text
   case fields of
     Cons name (Cons path (Cons semantic Nil)) -> do
-      ensure (stringLength name > 0 && stringLength semantic > 0 && stringLength path > 0 && stringCodeAt path 0 == 47) "crate dependency metadata path must be absolute"
+      ensure (stringLength name > 0 && stringLength semantic > 0 && Host.absolutePath path) "crate dependency metadata path must be absolute"
       Right (Triple name path semantic)
     _ -> Left "malformed crate dependency"
 decodeExports text = do

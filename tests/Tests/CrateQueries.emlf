@@ -78,6 +78,15 @@ openEnvironment = do
 
 cacheNoop = do
   directory <- scratch "noop"
+  let nested = directory ++ "/λ cache ; literal"
+  created <- Query.ensureDirectory nested
+  _ <- H.right created
+  firstWrite <- Query.writeAtomic (nested ++ "/entry") "first"
+  _ <- H.right firstWrite
+  replaced <- Query.writeAtomic (nested ++ "/entry") "replacement λ\n"
+  _ <- H.right replaced
+  contents <- readFile (nested ++ "/entry")
+  H.assert (eqString contents "replacement λ\n") "atomic query cache publication did not replace exact bytes"
   Pair original first <- query "Cache" directory Nil (values "x" false)
   counts 3 0 first
   Pair same second <- query "Cache" directory Nil (values "x" false)

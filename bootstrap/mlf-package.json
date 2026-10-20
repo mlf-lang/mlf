@@ -14,6 +14,7 @@
       "Bootstrap.Fresh": "Bootstrap/Fresh.emlf",
       "Bootstrap.Graph.Solver": "Bootstrap/Graph/Solver.emlf",
       "Bootstrap.Graph": "Bootstrap/Graph.emlf",
+      "Bootstrap.Host": "Bootstrap/Host.emlf",
       "Bootstrap.IntMap": "Bootstrap/IntMap.emlf",
       "Bootstrap.IntSet": "Bootstrap/IntSet.emlf",
       "Bootstrap.Kind": "Bootstrap/Kind.emlf",

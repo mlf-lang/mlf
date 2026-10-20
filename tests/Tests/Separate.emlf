@@ -11,6 +11,8 @@ import Bootstrap.Parser (parseModule)
 import qualified Bootstrap.Separate as Fragment
 import qualified Bootstrap.Crate as Crate
 import qualified Bootstrap.CrateArtifact as Artifact
+import qualified Bootstrap.CrateQuery as Query
+import qualified Bootstrap.Host as Host
 import qualified Bootstrap.X.Check as Check
 import qualified Bootstrap.X.Checked as Checked
 import qualified Bootstrap.Data as Data
@@ -28,6 +30,49 @@ legacySeparatePrograms = (H.append modulePrograms (H.append (Cons (Quint "inferr
 
 
 fixtureIdentity = "test:crate"
+
+cratePathSpec source cache prelude = Fragment.pack
+  (Cons "MLF-CRATE-1" (Cons fixtureIdentity (Cons "Main" (Cons "true"
+  (Cons (Fragment.pack (Cons (Fragment.pairEncoding (Pair "Main" source)) Nil))
+  (Cons (Fragment.pack Nil) (Cons cache (Cons prelude Nil))))))))
+
+cratePaths = do
+  S.mapM_ (\path -> do
+    spec <- H.right (Crate.decodeSpec (cratePathSpec path path path))
+    H.assert (S.eqList (\a b -> eqString (S.fst a) (S.fst b) && eqString (S.snd a) (S.snd b))
+      (Crate.specSources spec) (Cons (Pair "Main" path) Nil) &&
+      eqString (Crate.specCache spec) path && eqString (Crate.specPrelude spec) path &&
+      eqString (Query.cachePath path) path) "absolute crate paths changed"
+    dependency <- H.right (Artifact.decodeDependency (Artifact.encodeDependency (Triple "dependency" path "semantic")))
+    case dependency of
+      Triple name actual semantic -> H.assert (eqString name "dependency" && eqString actual path && eqString semantic "semantic") "dependency path changed")
+    (Cons "/tmp/λ crate/Main.emlf"
+    (Cons "D:/a/mlf/Main.emlf"
+    (Cons "c:\\a\\λ crate\\Main.emlf"
+    (Cons "//server/share/Main.emlf"
+    (Cons "\\\\server\\share\\Main.emlf" Nil)))))
+  S.mapM_ (\path -> do
+    expect "crate source path must be absolute" (Crate.decodeSpec (cratePathSpec path "/queries" "/prelude"))
+    expect "crate query cache path must be absolute" (Crate.decodeSpec (cratePathSpec "/Main.emlf" path "/prelude"))
+    expect "shared prelude artifact prefix must be absolute" (Crate.decodeSpec (cratePathSpec "/Main.emlf" "/queries" path))
+    expect "crate dependency metadata path must be absolute" (Artifact.decodeDependency (Artifact.encodeDependency (Triple "dependency" path "semantic"))))
+    (Cons "" (Cons "Main.emlf" (Cons "./Main.emlf" (Cons "../Main.emlf"
+    (Cons "D:Main.emlf" (Cons "D:" (Cons "\\Main.emlf" (Cons "1:/Main.emlf" Nil))))))))
+  S.mapM_ (\(Pair path parent) -> H.assert (eqString (Crate.parentDirectory path) parent) "crate parent directory changed")
+    (Cons (Pair "/unit" "/") (Cons (Pair "D:/unit" "D:/")
+    (Cons (Pair "D:\\unit" "D:\\") (Cons (Pair "D:\\cache\\unit" "D:\\cache") Nil))))
+  let host = "C:/native tools/mlf-host.exe"
+  let source = "D:/cache/λ ;$(literal).new"
+  let destination = "D:/cache/λ ;$(literal)"
+  let move = Cons "/bin/mv" (Cons "-f" (Cons source (Cons destination Nil)))
+  let moved = Cons host (Cons "move" (Cons "-f" (Cons source (Cons destination Nil))))
+  H.assert (S.eqList eqString (Host.argumentsFor true host move) moved) "Windows cache publication argv changed"
+  let mkdir = Cons "/bin/mkdir" (Cons "-p" (Cons destination Nil))
+  let made = Cons host (Cons "mkdir" (Cons "-p" (Cons destination Nil)))
+  H.assert (S.eqList eqString (Host.argumentsFor true host mkdir) made) "Windows cache directory argv changed"
+  H.assert (S.eqList eqString (Host.argumentsFor false host move) move) "POSIX cache command changed"
+  let compiler = Cons "D:/compiler/emlf.exe" (Cons "--compile-crate" (Cons source Nil))
+  H.assert (S.eqList eqString (Host.argumentsFor true host compiler) compiler) "unrelated Windows executable was translated"
 
 readCrateObjects metadata = do
   loaded <- Artifact.loadInterfaces (Cons metadata Nil)
@@ -100,6 +145,7 @@ separateTests = S.append
     (S.map (\(ModuleRejection name libraries source _ _) -> Pair ("crate rejects: " ++ name) do
       result <- compileSeparateProgram ImplicitPrelude libraries source
       case result of {Left _ -> return Unit; Right _ -> H.fail ("accepted invalid crate: " ++ name)}) moduleRejections)
+    (Cons (Pair "crate paths and native cache commands" cratePaths)
     (Cons (Pair "crate metadata version rejection" (expect "MLFCI-1" (Artifact.decodeInterface "7:MLFCI-9")))
     (Cons (Pair "crate object binding schemes are independently checked" do
       checkedReceipts
@@ -128,7 +174,7 @@ separateTests = S.append
       forgedFragments <- H.right (forgeUnusedParameter fragments Nil)
       S.mapM_ (\fragment -> do {_ <- H.right (Check.checkClosed (Fragment.objectTerm fragment)); return Unit}) forgedFragments
       let forged = Artifact.makeObject iface forgedFragments
-      expect "crate import scheme mismatch" (Artifact.linkObjects (replaceFixture forged objects) fixtureIdentity)) Nil)))))
+      expect "crate import scheme mismatch" (Artifact.linkObjects (replaceFixture forged objects) fixtureIdentity)) Nil))))))
 
 
 -- Receipt reuse retains exact transport bytes, and raw callers still cross the
