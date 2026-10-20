@@ -18,6 +18,61 @@ static MlfValue *packed(const char **fields) {
     }
     return mlf_string(data,n);
 }
+static void host_command(const char *operation, const char *a, const char *b) {
+    const char *helper=getenv("MLF_WINDOWS_HOST");
+    require(helper && *helper,"native filesystem helper required");
+    const char *fields[]={"10","","","",helper,operation,a,b,NULL};
+    require(small_value(os_runProcess(text(""),packed(fields)))==0,operation);
+}
+static void long_paths(MlfValue *self) {
+    char directory[1024]="windows-long-paths";
+    for (int i=0;i<6;++i)
+        strcat(directory,"/cache \xce\xbb-0123456789abcdef0123456789abcdef0123456789abcdef");
+    require(strlen(directory)>300,"long path regression must exceed MAX_PATH");
+    host_command("mkdir",directory,NULL);
+    require(mlf_truth(os_directoryExists(text(directory))),"long directory exists");
+    char file[1100], next[1100], copied[1100], output[1100], errors[1100], lockpath[1100], alias[1100];
+    snprintf(file,sizeof(file),"%s/data \xce\xbb.mlfq",directory);
+    snprintf(next,sizeof(next),"%s/./data \xce\xbb.mlfq.new",directory);
+    snprintf(copied,sizeof(copied),"%s/copy.txt",directory);
+    snprintf(output,sizeof(output),"%s/output.txt",directory);
+    snprintf(errors,sizeof(errors),"%s/errors.txt",directory);
+    snprintf(lockpath,sizeof(lockpath),"%s/query.lock",directory);
+    snprintf(alias,sizeof(alias),"%s/alias",directory);
+    write_file(text(next),text("abc"));
+    write_file(text(file),text("old"));
+    host_command("move",next,file);
+    require(!mlf_truth(file_exists(text(next))) && mlf_truth(file_exists(text(file))),"long atomic rename");
+    require(eq(read_file(text(file)),"abc"),"long UTF-8 file roundtrip");
+    require(eq(os_fileDigest(text(file)),"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"),"long file digest");
+    host_command("copy",file,copied);
+    require(eq(read_file(text(copied)),"abc"),"long file copy");
+    MlfValue *items=os_listDirectory(text(directory));
+    int found=0;
+    for (size_t i=0;i<items->as.string.length;i+=strlen(items->as.string.bytes+i)+1)
+        if (!strcmp(items->as.string.bytes+i,"data \xce\xbb.mlfq")) found=1;
+    require(found,"long directory enumeration");
+    MlfValue *canonical=canonical_path(text(file));
+    require(strncmp(canonical->as.string.bytes,"//?/",4)!=0,"canonical path leaks extended namespace");
+    require(eq(read_file(canonical),"abc"),"long canonical path roundtrip");
+    /* A relative directory link must keep its target identity, and deleting
+     * the link must never traverse the referenced directory. */
+    host_command("link",".",alias);
+    require(eq(canonical_path(text(alias)),canonical_path(text(directory))->as.string.bytes),"long junction identity");
+    host_command("remove",alias,NULL);
+    require(mlf_truth(file_exists(text(file))),"junction removal traversed target");
+    host_command("link","data \xce\xbb.mlfq",alias);
+    require(eq(canonical_path(text(alias)),canonical->as.string.bytes),"long file symlink identity");
+    host_command("remove",alias,NULL);
+    const char *fields[]={"10","",output,errors,self->as.string.bytes,"--echo","long path \xce\xbb",NULL};
+    require(small_value(os_runProcess(text(""),packed(fields)))==0,"long process redirects");
+    require(eq(read_file(text(output)),"long path \xce\xbb\n") && eq(read_file(text(errors)),"error\n"),"long redirect contents");
+    MlfValue *lock=os_acquireFileLock(text(lockpath));
+    os_releaseFileLock(lock);
+    require(mlf_truth(file_exists(text(lockpath))),"long file lock");
+    host_command("remove","windows-long-paths",NULL);
+    require(!mlf_truth(os_directoryExists(text(directory))),"long recursive removal");
+}
 int main(int argc, char **argv) {
     mlf_set_args(argc,argv);
     if (argument_count && !strcmp(argument_values[0],"--echo")) {
@@ -81,5 +136,6 @@ int main(int argc, char **argv) {
     DWORD status; require(GetExitCodeProcess(child.hProcess,&status) && !status,"lock contender failed");
     CloseHandle(child.hThread); CloseHandle(child.hProcess);
     require(eq(read_file(text("windows-lock.out")),"acquired"),"file lock handoff");
+    long_paths(self);
     puts("Windows runtime regressions passed"); return 0;
 }

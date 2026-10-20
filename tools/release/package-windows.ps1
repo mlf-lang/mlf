@@ -92,7 +92,7 @@ Build-Program.ps1 compiles a standalone .emlf source into a native .exe.
 release.json identifies the source commit and unchanged qualified executables.
 CHECKSUMS covers every bundled file. evidence/ records a native fixed point for
 both tools, all 7,086 independent parity cases, 160 compiler runtime executions,
-both native runtime layouts, and 34 package cases. The compiler repository's six
+both native runtime layouts, and 44 package cases. The compiler repository's six
 internal POSIX release/benchmark groups are not qualified on Windows.
 
 MLF is BSD-3-Clause. Dependency notices and redistribution sources are bundled

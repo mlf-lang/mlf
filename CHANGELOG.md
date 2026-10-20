@@ -24,6 +24,9 @@
 - Accept drive-rooted and UNC crate paths, preserve their cache locations, and
   share native Windows filesystem command translation between compiler queries
   and package builds. Keep relative crate paths invalid.
+- Support deep content-addressed cache paths on Windows without machine-wide
+  long-path settings. Exercise Unicode files, atomic replacement, links,
+  redirects, locks and cleanup past MAX_PATH under both runtime layouts.
 - Reduce compiler bootstrap memory through checked separate compilation,
   preserving independent checking and module boundaries.
 - Add native `--version` reporting and platform-specific release packages,
