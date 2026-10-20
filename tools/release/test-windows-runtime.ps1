@@ -33,6 +33,10 @@ try {
     $HostHelper = (Resolve-Path -LiteralPath $HostHelper).Path
     $env:MLF_WINDOWS_HOST = $HostHelper
     $report.helper_sha256 = Get-ReleaseHash $HostHelper
+    $null = Invoke-ReleaseCommand $Clang @('-O2','-std=c11','-Wall','-Wextra','-Werror','-municode',"$root/tests/native/windows_paths.c",'-o',"$Output/path-test.exe") "$Output/paths-build.log" $root
+    $text = Invoke-ReleaseCommand "$Output/path-test.exe" @() "$Output/paths.log" $Output
+    Assert-Release ($text -match 'Windows path guards passed') 'Missing path guard success marker'
+    $report.path_guards = @{passed=$true;source_sha256=(Get-ReleaseHash "$root/tests/native/windows_paths.c");binary_sha256=(Get-ReleaseHash "$Output/path-test.exe")}
     foreach ($profile in @('standard','compact-gc')) {
         $directory = "$Output/$profile"
         New-Item -ItemType Directory -Path $directory | Out-Null

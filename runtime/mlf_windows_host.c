@@ -88,9 +88,9 @@ static int safe_remove(const wchar_t *path) {
     /* GetVolumePathNameW may return the extended spelling. Compare lengths
      * in the logical namespace so an explicit extended drive/share root is
      * still refused, and deep paths retain the same removal guard. */
-    if (!wcsncmp(path,L"\\\\?\\UNC\\",8)) n-=6;
+    if (!_wcsnicmp(path,L"\\\\?\\UNC\\",8)) n-=6;
     else if (!wcsncmp(path,L"\\\\?\\",4)) n-=4;
-    if (!wcsncmp(volume,L"\\\\?\\UNC\\",8)) root-=6;
+    if (!_wcsnicmp(volume,L"\\\\?\\UNC\\",8)) root-=6;
     else if (!wcsncmp(volume,L"\\\\?\\",4)) root-=4;
     return n>root;
 }
