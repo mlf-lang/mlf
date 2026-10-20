@@ -1,18 +1,20 @@
 # Native MLF compiler tests
 
-The local `mlf-tests` package ports the original assertions, input corpora,
+The local `mlf-tests` package preserves the original assertions, input corpora,
 runtime event traces, generated graph properties, and harness fault injections.
 Root `mlfpkg test` builds these executables through the MLF package manager.
-No GHC or Python executable is needed by the active test path.
+The old Haskell/Python suites and Haskell compiler have been removed.
+No GHC, Cabal, or Python executable is needed. C fixtures live in `tests/native/`;
+benchmark baselines and golden oracle data remain unchanged.
 
 | Root group | MLF entry | Preserved coverage |
 | --- | --- | --- |
-| unit | CoreMain, Figure12SuiteMain, HarnessMain | 636 compiler checks, exhaustive/seeded Algorithm W, annotations, 43 Figure 12 expressions and 36 controls, 53 benchmark/bootstrap/release harness methods |
-| packages | PackagesMain | 15 original resolver methods plus three additional checks; 19 compiler integration cases |
-| backends | BackendSuiteMain | 494 fixtures and 546 execution rows on interpreter and LLVM, standard and compact GC layouts |
+| unit | CoreMain, Figure12SuiteMain, HarnessMain | 702 compiler checks, exhaustive/seeded Algorithm W, annotations, crate resolution, SCC queries and codegen caching, indexed optimizer and legacy differential checks, 43 Figure 12 expressions and 36 controls, 57 benchmark/bootstrap/release harness methods |
+| packages | PackagesMain | 15 original resolver methods plus three additional checks; 26 compiler integration cases, including native PGO cache isolation and profile-content invalidation |
+| backends | BackendSuiteMain | 523 fixtures and 575 execution rows on interpreter and LLVM, standard and compact GC layouts |
 | port | PortMain, ReferencesMain | 26 fixtures, six reference programs, generated inference input equality, both backends and layouts |
 | parity | CorpusMain, CheckTarget | 7086 prescribed acceptance/type/rejection cases and 80 runtime rows on both backends |
-| self-host | Package.CompilerTests | Fresh next-stage compiler build and LLVM fixed point |
+| self-host | Package.CompilerTests | Fresh next-stage compiler build and LLVM/native binary fixed point |
 
 `Tests.Oracle` has its own monotypes, substitution, and generalization. It imports
 no compiler, graph solver, or target checker. `Tests.GraphUnificationReference`
@@ -26,8 +28,16 @@ Haskell-seed expected types. `Tests.Corpus` reproduces the exhaustive, seeded,
 annotation, and Figure 12 inputs and validates their independent acceptance
 oracles before use. It checks current repository inputs against the reviewed
 baseline. Golden expectations are never rewritten from candidate inference.
+Exactly two archived module-import-cycle rejections have explicit, source-guarded
+acceptance overlays for crate compilation. Their prescribed type is `Int`,
+checked against the independent literal target `42`; the archive itself is
+unchanged. The resulting corpus has 3,204 accepted cases. See the
+[oracle migration record](../docs/crate-migration.md#oracle-migration).
+The port inference fixture also prescribes `Int` for its module-import cycle;
+its declarations are not mutually recursive. Its other inference expectations
+and generated source remain unchanged.
 
-The C files `binary_files.c` and `host_support.c` provide binary file transport,
+The C files `tests/native/binary_files.c` and `tests/native/host_support.c` provide binary file transport,
 environment-name enumeration, and per-process measurements/process groups.
 They contain no test assertions. Existing C ABI fixtures retain their low-level
 layout, sharing, and root checks. MLF drives every probe mode and checks exit
@@ -35,12 +45,28 @@ status, output, error diagnostics, and allocation counts. The process-group
 fault fixture injects a redundant `setpgid` failure; MLF verifies successful
 execution and complete child cleanup through both transport APIs.
 
-Validation on 2026-10-15 passed all six root groups through the native MLF
+Historical validation on 2026-10-15 passed all six root groups through the native MLF
 package manager, with GHC, Cabal, and Python blocked on `PATH`. The blocker log
 was empty. Both matrices ran independently for both backends and runtime
 layouts; the fresh self-host build reproduced the compiler's LLVM and binary
 hashes. The [validation record](../docs/native-tests-validation.json) records
 the source manifest, artifact hashes, coverage totals, and local log paths.
+
+After retiring the Haskell compiler and old harnesses, the 2026-10-19
+[complete native validation](../docs/native-only-validation.json) passed all six
+groups with a fresh two-generation native build and `--locked test`. Both full
+matrices and the self-host fixed point passed; the forbidden-tool log was
+empty. All 72 benchmark pins and the archived measurements remain unchanged.
+That record precedes the crate migration and does not validate its changes;
+the [crate migration ledger](../docs/crate-migration.md) records separate acceptance.
+
+The 2026-10-20 [crate validation](../docs/crate-validation.json) completes all six
+native groups against the immutable R11 source and recorded PGO compiler. Both
+backend/port layouts pass, and a fresh source self-host reproduces complete LLVM
+and native bytes using the same profile. Each group has a successful actual outer
+exit and a complete native report; R2's interrupted controller remains historical.
+Every test process reran. Self-host and performance builds used fresh empty
+directories. The final isolated builds and all nine native workload gates pass.
 
 Future validation must rerun every group against fresh source/tool snapshots.
 `--type` and individual module compilation are development checks, not

@@ -25,7 +25,7 @@ mockCompiler args = do
 outputPath args = case S.dropWhile (\arg -> S.not (eqString arg "-o")) args of
  Cons _ (Cons path _) -> path
  _ -> panic "mock tool missing output argument"
-mockBuild args = if S.elem eqString "--emit-llvm" args || S.elem eqString "--module-to-llvm" args then do
+mockBuild args = if S.elem eqString "--emit-llvm" args || S.elem eqString "--crate-to-llvm" args then do
  writeFile "frontend.started" ""
  fast <- getEnv "MLF_MOCK_FAST_FRONTEND"
  streaming <- getEnv "MLF_BENCH_STREAM_LLVM"

@@ -1,6 +1,7 @@
 module Package.Build where
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
+import qualified Bootstrap.CrateArtifact as Artifact
 import qualified Package.OS as O
 import qualified Package.Json as J
 import qualified Package.Manifest as M
@@ -75,8 +76,43 @@ flagIdentity flags = do
   trees <- S.mapM O.files includes
   headers <- hashFiles (S.filter (O.ends ".h") (S.concat trees))
   ioReturn (info (Cons (Pair "flags" (J.stringArray flags)) (Cons (Pair "libraries" hashes) (Cons (Pair "headers" headers) Nil))))
+-- Native PGO is an explicit construction option for one root executable.
+-- It never changes the source compiler identity or any other target's flags.
+pgoConfiguration : M.PackageGraph -> J.Json -> IO J.Json
+pgoConfiguration graph options = do
+  let generate = J.has "pgo-generate" options
+  let use = J.has "pgo-use" options
+  let selected = J.has "pgo-target" options
+  O.require (S.not (generate && (use || selected)) && (if use then selected else S.not selected)) "use either --pgo-generate TARGET or --pgo-target TARGET --pgo-use FILE"
+  if S.not (generate || use) then ioReturn J.empty else do
+    let name = J.getText (if generate then "pgo-generate" else "pgo-target") "" options
+    O.require (J.has name (J.getObject "executables" (M.packageData (M.rootPackage graph)))) "PGO target must name a root executable"
+    let entry = obj2 "target" (J.str name) "mode" (J.str (if generate then "generate" else "use"))
+    if generate then ioReturn entry else do
+      path <- canonicalPath (J.getText "pgo-use" "" options)
+      hash <- fileDigest path
+      ioReturn (J.set "profile" (obj2 "path" (J.str path) "sha256" (J.str hash)) entry)
+pgoForTarget : Builder -> M.Package -> String -> J.Json
+pgoForTarget b p name =
+  let profile = J.getObject "native-pgo" (config b) in
+  if eqString (M.packagePath p) (M.packagePath (M.rootPackage (graph b))) && eqString name (J.getText "target" "" profile) then profile else J.empty
+pgoFlags : J.Json -> List String
+pgoFlags profile = case J.getText "mode" "" profile of
+  "" -> Nil
+  "generate" -> Cons "-fprofile-generate" Nil
+  "use" -> Cons ("-fprofile-use=" ++ J.getText "path" "" (J.get "profile" profile)) (O.words "-Werror=profile-instr-unprofiled -Werror=profile-instr-out-of-date -Werror=backend-plugin")
+  _ -> panic "invalid native PGO mode"
+pgoInputs : J.Json -> J.Json -> J.Json
+pgoInputs profile inputs = if S.null (J.items profile) then inputs else J.set "native-pgo" profile inputs
+verifyPgo : J.Json -> IO Unit
+verifyPgo profile = if eqString (J.getText "mode" "" profile) "use" then do
+  let input = J.get "profile" profile
+  actual <- fileDigest (J.getText "path" "" input)
+  O.require (eqString actual (J.getText "sha256" "" input)) "native PGO profile changed during build/test"
+  else ioReturn Unit
 create : M.PackageGraph -> J.Json -> String -> IO Builder
 create g options buildDirectory = do
+  profile <- pgoConfiguration g options
   O.mkdir (buildDirectory ++ "/cache")
   O.mkdir (buildDirectory ++ "/commands")
   comp <- tool (J.getText "compiler" "emlf" options)
@@ -95,7 +131,7 @@ create g options buildDirectory = do
   env <- S.mapM (\key -> do { value <- getEnv key; ioReturn (Pair key (J.str value)) }) (O.words "SDKROOT MACOSX_DEPLOYMENT_TARGET CPATH C_INCLUDE_PATH LIBRARY_PATH")
   snapshot <- M.snapshot g
   let identity = info (Cons (Pair "compiler" comp) (Cons (Pair "clang" cc) (Cons (Pair "pkg-config" pkg) (Cons (Pair "manager" (obj2 "path" (J.str manager) "sha256" (J.str managerHash))) (Cons (Pair "system" (J.str (O.trim system))) (Cons (Pair "machine" (J.str (O.trim machine))) (Cons (Pair "native_environment" (J.Object env)) (Cons (Pair "runtime" runtimeHashes) (Cons (Pair "runtime-path" (J.str runtime)) (Cons (Pair "gmp" gmp) Nil))))))))))
-  let b = Builder g options buildDirectory identity snapshot
+  let b = Builder g (J.set "native-pgo" profile options) buildDirectory identity snapshot
   J.write (reportPath b) (info (Cons (Pair "format" (J.num 1)) (Cons (Pair "complete" (J.Boolean false)) (Cons (Pair "implementation" (J.str "MLF")) (Cons (Pair "packages" snapshot) (Cons (Pair "toolchain" identity) (Cons (Pair "commands" (J.Array Nil)) (Cons (Pair "builds" (J.Array Nil)) (Cons (Pair "tests" (J.Array Nil)) Nil)))))))))
   ioReturn b
 capture : Builder -> String -> List String -> String -> String -> IO String
@@ -125,8 +161,6 @@ gcFlags b = do
   identity <- flagIdentity selected
   record b "native_inputs" identity
   ioReturn identity
-preludeOptions : J.Json -> List String
-preludeOptions target = if J.getBool "no-prelude" false target then Cons "--no-prelude" Nil else Nil
 stackFlags : Builder -> List String
 stackFlags b = if eqString (J.getText "system" "" (tools b)) "Darwin" then Cons "-Wl,-stack_size,0x10000000" Nil else Nil
 profileFlags : List String
@@ -153,10 +187,13 @@ cacheValid destination key = do
         J.Object _ -> if J.equal (J.get "key" value) (J.str key) then case J.get "files" value of { J.Object _ -> validFiles destination (J.get "files" value); _ -> ioReturn false } else ioReturn false
         _ -> ioReturn false
 cached : Builder -> String -> J.Json -> (String -> IO Unit) -> IO String
-cached b kind inputs action = do
+cached b kind inputs action = cachedChecked b kind inputs (\_ -> ioReturn true) action
+cachedChecked : Builder -> String -> J.Json -> (String -> IO Bool) -> (String -> IO Unit) -> IO String
+cachedChecked b kind inputs validate action = do
   key <- fingerprint b (obj2 "kind" (J.str kind) "inputs" inputs)
   let destination = directory b ++ "/cache/" ++ key
-  reusable <- cacheValid destination key
+  ownValid <- cacheValid destination key
+  reusable <- if ownValid then validate destination else ioReturn false
   if reusable then ioReturn Unit else do
     putErr ("Building " ++ kind ++ "\n")
     let work = destination ++ ".work"
@@ -171,54 +208,242 @@ cached b kind inputs action = do
     O.move work destination
   record b "builds" (info (Cons (Pair "kind" (J.str kind)) (Cons (Pair "key" (J.str key)) (Cons (Pair "cached" (J.Boolean reusable)) Nil))))
   ioReturn destination
-stageSources : String -> List M.Module -> IO Unit
-stageSources destination ms = S.mapM_ (\m -> O.copy (M.moduleSource m) (destination ++ "/" ++ O.modulePath (M.moduleName m) ++ ".emlf")) ms
-objects : Builder -> List M.Module -> Bool -> IO (List (Pair String String))
-objects b ms noPrelude = objectLoop b ms noPrelude Nil ms
-objectLoop : Builder -> List M.Module -> Bool -> List (Pair String String) -> List M.Module -> IO (List (Pair String String))
-objectLoop b ms noPrelude done pending = case pending of
+-- The package graph orders crates. Module imports only determine namespaces;
+-- declarations inside a crate are resolved and inferred together by the compiler.
+pack : List String -> String
+pack fields = S.concatMapString (\value -> showInt (stringLength value) ++ ":" ++ value) fields
+packPair : Pair String String -> String
+packPair (Pair a b) = pack (Cons a (Cons b Nil))
+directLibraries : M.Package -> List (Pair String String) -> List String
+directLibraries p built = S.mapMaybe (\name -> S.lookup eqString name built) (S.sortBy compareString (M.keys (J.getObject "dependencies" (M.packageData p))))
+validCrateClosure : String -> IO Bool
+validCrateClosure destination = do
+  present <- fileExists (destination ++ "/dependency-files.json")
+  if S.not present then ioReturn false else do
+    saved <- J.read (destination ++ "/dependency-files.json")
+    -- The ordinary artifact stamp already checks our metadata, object and this
+    -- receipt. Its recursive inputs were independently checked when saved;
+    -- identical SHA256 bytes can reuse that check without decoding every SCC.
+    validDependencyFiles saved
+validDigest value = case value of
+  J.String digest -> stringLength digest == 64 && S.all (\i -> let c = stringCodeAt digest i in c >= 48 && c <= 57 || c >= 97 && c <= 102) (S.range 0 63)
+  _ -> false
+validDependencyShape saved = case saved of
+  J.Object entries -> let paths = S.map S.fst entries in S.length paths == S.length (S.nubBy eqString paths) && S.all (\(Pair path digest) -> O.starts "/" path && validDigest digest) entries
+  _ -> false
+validDependencyFiles saved = case saved of
+  J.Object entries -> do
+    if S.not (validDependencyShape saved) then ioReturn false else do
+      matches <- S.mapM (\(Pair path expected) -> do
+        present <- fileExists path
+        if S.not present then ioReturn false else do { actual <- fileDigest path; ioReturn (J.equal expected (J.str actual)) }) entries
+      ioReturn (S.and matches)
+  _ -> ioReturn false
+-- A diamond may name one verified file repeatedly, but conflicting SHA256
+-- claims must never be combined into a proof. Reject malformed receipts too.
+mergeDependencyProof left right =
+  if S.not (validDependencyShape left && validDependencyShape right) then Left "malformed crate dependency proof" else do
+    entries <- S.foldEither (\done (Pair path digest) -> case S.lookup eqString path done of
+      Nothing -> Right (Cons (Pair path digest) done)
+      Just previous -> if J.equal previous digest then Right done else Left ("conflicting crate dependency proof: " ++ path)) (J.items left) (J.items right)
+    Right (J.Object entries)
+readProofJson path = do
+  present <- fileExists path
+  if S.not present then ioReturn Nothing else do
+    text <- readFile path
+    ioReturn (S.either (\_ -> Nothing) Just (J.parse text))
+validProofStamp artifact stamp = case stamp of
+  J.Object _ -> case J.get "files" stamp of
+    J.Object files -> validDigest (J.str (O.base artifact)) && J.equal (J.get "key" stamp) (J.str (O.base artifact)) && S.all (\name -> J.has name (J.get "files" stamp)) (O.words "unit.mlfci unit.mlfco dependency-files.json") && S.all (\(Pair _ digest) -> validDigest digest) files
+    _ -> false
+  _ -> false
+verifiedDependencyProof artifact = do
+  saved <- readProofJson (artifact ++ "/artifact.json")
+  case saved of
+    Nothing -> ioReturn J.empty
+    Just stamp -> if S.not (O.starts "/" artifact && validProofStamp artifact stamp) then ioReturn J.empty else do
+      ownValid <- cacheValid artifact (O.base artifact)
+      if S.not ownValid then ioReturn J.empty else do
+        receipt <- readProofJson (artifact ++ "/dependency-files.json")
+        case receipt of
+          Nothing -> ioReturn J.empty
+          Just transitive -> if S.not (validDependencyShape transitive) then ioReturn J.empty else do
+            closureValid <- validCrateClosure artifact
+            if S.not closureValid then ioReturn J.empty else do
+              let files = J.get "files" stamp
+              receiptHash <- fileDigest (artifact ++ "/dependency-files.json")
+              if S.not (J.equal (J.get "dependency-files.json" files) (J.str receiptHash)) then ioReturn J.empty else
+                case mergeDependencyProof (obj2 (artifact ++ "/unit.mlfci") (J.get "unit.mlfci" files) (artifact ++ "/unit.mlfco") (J.get "unit.mlfco" files)) transitive of
+                  Left message -> O.fatal message
+                  Right proof -> ioReturn proof
+dependencyProofs artifacts = do
+  saved <- S.mapM verifiedDependencyProof artifacts
+  case S.foldEither mergeDependencyProof J.empty saved of
+    Left message -> O.fatal message
+    Right proof -> do
+      -- Check every claimed path, including transitive paths outside the
+      -- metadata graph we are about to consume. A changed proof falls back to
+      -- independent decoding rather than authorizing a stale cached check.
+      guarded <- validDependencyFiles proof
+      ioReturn (if guarded then proof else J.empty)
+provenCrateFiles proof metadata =
+  let object = Artifact.objectPath metadata in
+  if S.not (validDependencyShape proof && J.has metadata proof && J.has object proof) then ioReturn false else
+    validDependencyFiles (obj2 metadata (J.get metadata proof) object (J.get object proof))
+checkCrateObjects ownMetadata proof interfaces = do
+  checked <- S.mapM (\(Pair metadata iface) -> do
+    reused <- if eqString metadata ownMetadata then ioReturn false else provenCrateFiles proof metadata
+    if reused then ioReturn (Pair true true) else do
+      object <- Artifact.readObject (Artifact.objectPath metadata) iface
+      ioReturn (Pair (S.either (\_ -> false) (\_ -> true) object) false)) interfaces
+  let count = S.length checked
+  let reused = S.length (S.filter S.snd checked)
+  let report = info (Cons (Pair "format" (J.num 1)) (Cons (Pair "object_count" (J.num count)) (Cons (Pair "checked_objects" (J.num (count - reused))) (Cons (Pair "reused_objects" (J.num reused)) (Cons (Pair "root_checked" (J.Boolean (S.any (\(Pair metadata _) -> eqString metadata ownMetadata) interfaces))) Nil)))))
+  ioReturn (Pair (S.all S.fst checked) report)
+saveCrateClosure destination directArtifacts = do
+  loaded <- Artifact.loadInterfaces (Cons (destination ++ "/unit.mlfci") Nil)
+  case loaded of
+    Left message -> O.fatal ("invalid generated crate dependency closure: " ++ message)
+    Right interfaces -> do
+      proof <- dependencyProofs directArtifacts
+      ownMetadata <- canonicalPath (destination ++ "/unit.mlfci")
+      Pair checked validation <- checkCrateObjects ownMetadata proof interfaces
+      O.require checked "invalid generated crate dependency object"
+      O.require (J.getBool "root_checked" false validation) "generated crate object was not independently checked"
+      let dependencies = S.filter (\(Pair path _) -> S.not (eqString path ownMetadata)) interfaces
+      hashes <- hashFiles (S.concatMap (\(Pair path _) -> Cons path (Cons (Artifact.objectPath path) Nil)) dependencies)
+      J.write (destination ++ "/dependency-files.json") hashes
+      J.write (destination ++ "/unit.validation.json") validation
+-- Keep declaration identities in the immutable compiler query report. Build
+-- actions repeatedly read their own report, so embed only the bounded summary.
+crateQuerySummary saved = J.set "group_count" (J.num (S.length (J.values (J.get "groups" saved)))) (J.Object (S.filter (\(Pair key _) -> S.not (eqString key "groups")) (J.items saved)))
+compileCrate : Builder -> M.Package -> String -> String -> List M.Module -> List String -> Bool -> IO String
+compileCrate b p kind entry modules dependencies noPrelude = do
+  let identity = M.crateIdentity p kind
+  let ordered = S.sortBy (\a b -> compareString (M.moduleName a) (M.moduleName b)) modules
+  sources <- S.mapM (\m -> do { hash <- fileDigest (M.moduleSource m); ioReturn (Pair (M.moduleName m) (obj2 "path" (J.str (M.moduleSource m)) "sha256" (J.str hash))) }) ordered
+  imports <- S.mapM (\artifact -> do
+    metadata <- fileDigest (artifact ++ "/unit.mlfci")
+    object <- fileDigest (artifact ++ "/unit.mlfco")
+    ioReturn (info (Cons (Pair "path" (J.str (artifact ++ "/unit.mlfci"))) (Cons (Pair "metadata" (J.str metadata)) (Cons (Pair "object" (J.str object)) Nil))))) dependencies
+  let inputs = info (Cons (Pair "compiler" (J.get "compiler" (tools b))) (Cons (Pair "manager" (J.get "manager" (tools b))) (Cons (Pair "crate" (J.str identity)) (Cons (Pair "entry" (J.str entry)) (Cons (Pair "no-prelude" (J.Boolean noPrelude)) (Cons (Pair "sources" (J.Object sources)) (Cons (Pair "dependencies" (J.Array imports)) Nil)))))))
+  -- Keep query storage outside content-addressed crate artifacts so source edits
+  -- can reuse checked declaration groups. Compiler identities isolate schemas.
+  let queries = directory b ++ "/query-cache/" ++ identity ++ "/" ++ J.getText "sha256" "" (J.get "compiler" (tools b))
+  let builtin = directory b ++ "/query-cache/builtin-prelude/" ++ J.getText "sha256" "" (J.get "compiler" (tools b)) ++ "/unit"
+  O.mkdir queries
+  O.mkdir (O.parent builtin)
+  artifact <- cachedChecked b ("crate " ++ identity) inputs validCrateClosure (\work -> do
+    let spec = pack (Cons "MLF-CRATE-1" (Cons identity (Cons entry (Cons (if noPrelude then "true" else "false") (Cons (pack (S.map (\m -> packPair (Pair (M.moduleName m) (M.moduleSource m))) ordered)) (Cons (pack (S.map (\path -> path ++ "/unit.mlfci") dependencies)) (Cons queries (Cons builtin Nil))))))))
+    writeFile (work ++ "/crate.spec") spec
+    ignored <- capture b work (Cons (compiler b) (Cons "--compile-crate" (Cons (work ++ "/crate.spec") (Cons "-o" (Cons (work ++ "/unit") Nil))))) "" ""
+    S.mapM_ (\extension -> do { present <- fileExists (work ++ "/unit" ++ extension); O.require present ("compiler did not produce crate artifact " ++ extension) }) (O.words ".mlfci .mlfco .queries")
+    saveCrateClosure work dependencies
+    detailed <- J.read (work ++ "/unit.queries")
+    J.write (work ++ "/unit.query-summary.json") (crateQuerySummary detailed)
+    O.remove (work ++ "/crate.spec"))
+  saved <- J.read (artifact ++ "/unit.query-summary.json")
+  validation <- J.read (artifact ++ "/unit.validation.json")
+  report <- J.read (reportPath b)
+  let reused = J.getBool "cached" false (S.last (J.values (J.get "builds" report)))
+  let current = if reused then J.set "inferred_groups" (J.num 0) (J.set "reused_groups" (J.get "group_count" saved) saved) else saved
+  let queriesNow = J.set "outer_cached" (J.Boolean reused) (J.set "cache_source" (J.str (if reused then "crate-artifact" else "inference-queries")) current)
+  let validationNow = J.set "outer_cached" (J.Boolean reused) (J.set "cache_source" (J.str (if reused then "crate-artifact" else "dependency-receipts")) (if reused then J.set "root_checked" (J.Boolean false) (J.set "checked_objects" (J.num 0) (J.set "reused_objects" (J.get "object_count" validation) validation)) else validation))
+  record b "crates" (info (Cons (Pair "crate" (J.str identity)) (Cons (Pair "outer_cached" (J.Boolean reused)) (Cons (Pair "metadata" (J.str (artifact ++ "/unit.mlfci"))) (Cons (Pair "query_report" (J.str (artifact ++ "/unit.queries"))) (Cons (Pair "queries" queriesNow) (Cons (Pair "validation_report" (J.str (artifact ++ "/unit.validation.json"))) (Cons (Pair "validation" validationNow) Nil))))))))
+  ioReturn artifact
+libraries : Builder -> Bool -> IO (List (Pair String String))
+libraries b noPrelude = libraryLoop b noPrelude Nil (M.packages (graph b))
+libraryLoop : Builder -> Bool -> List (Pair String String) -> List M.Package -> IO (List (Pair String String))
+libraryLoop b noPrelude done pending = case pending of
   Nil -> ioReturn done
-  Cons m rest -> do
-    deps <- M.sortModules ms (M.moduleImports m)
-    interfaces <- S.mapM (\dep -> do { let name = M.moduleName dep; hash <- fileDigest (S.fromMaybe (panic "missing compiled module") (S.lookup eqString name done) ++ "/unit.mlfi"); ioReturn (Pair name (J.str hash)) }) deps
-    sourceHash <- fileDigest (M.moduleSource m)
-    let inputs = info (Cons (Pair "compiler" (J.get "compiler" (tools b))) (Cons (Pair "manager" (J.get "manager" (tools b))) (Cons (Pair "source" (J.str sourceHash)) (Cons (Pair "name" (J.str (M.moduleName m))) (Cons (Pair "no-prelude" (J.Boolean noPrelude)) (Cons (Pair "interfaces" (J.Object interfaces)) Nil))))))
-    artifact <- cached b ("module " ++ M.moduleName m) inputs (\work -> do
-      let include = work ++ "/imports"
-      O.mkdir include
-      S.mapM_ (\dep -> O.copy (S.fromMaybe (panic "missing interface") (S.lookup eqString (M.moduleName dep) done) ++ "/unit.mlfi") (include ++ "/" ++ O.modulePath (M.moduleName dep) ++ ".mlfi")) deps
-      O.copy (M.moduleSource m) (work ++ "/source.emlf")
-      ignored <- capture b work (S.append (Cons (compiler b) (if noPrelude then Cons "--no-prelude" Nil else Nil)) (Cons "-i" (Cons include (Cons "--compile-module" (Cons (work ++ "/source.emlf") (Cons "-o" (Cons (work ++ "/unit") Nil))))))) "" ""
-      one <- fileExists (work ++ "/unit.mlfi")
-      two <- fileExists (work ++ "/unit.mlfo")
-      O.require (one && two) "compiler did not produce an interface/object pair"
-      O.remove include
-      O.remove (work ++ "/source.emlf"))
-    objectLoop b ms noPrelude (S.snoc done (Pair (M.moduleName m) artifact)) rest
-buildTarget : Builder -> M.Package -> String -> J.Json -> Bool -> IO (Pair String String)
-buildTarget b p name target publish = do
-  Pair entry ms <- M.targetModules (graph b) p target
-  let compact = eqString (J.getText "profile" "standard" target) "compiler"
-  let separate = eqString (J.getText "link" "separate" target) "separate"
-  gc <- if compact then gcFlags b else ioReturn J.empty
-  built <- if separate then objects b ms (J.getBool "no-prelude" false target) else ioReturn Nil
-  sourceHashes <- S.mapM (\m -> do { hash <- fileDigest (M.moduleSource m); ioReturn (Pair (M.moduleName m) (J.str hash)) }) ms
-  objectHashes <- S.mapM (\entry -> do { hash <- fileDigest (S.snd entry ++ "/unit.mlfo"); ioReturn (Pair (S.fst entry) (J.str hash)) }) built
-  let inputs = info (Cons (Pair "toolchain" (tools b)) (Cons (Pair "gc" gc) (Cons (Pair "target" target) (Cons (Pair "sources" (J.Object sourceHashes)) (Cons (Pair "objects" (J.Object objectHashes)) Nil)))))
-  artifact <- cached b ("executable " ++ M.packageName p ++ ":" ++ name) inputs (\work -> do
-    let sources = work ++ "/sources"
-    stageSources sources ms
-    if separate then S.mapM_ (\item -> S.mapM_ (\extension -> O.copy (S.snd item ++ "/unit" ++ extension) (work ++ "/modules/" ++ O.modulePath (S.fst item) ++ extension)) (Cons ".mlfi" (Cons ".mlfo" Nil))) built else ioReturn Unit
-    let include = work ++ (if separate then "/modules" else "/sources")
-    let input = include ++ "/" ++ O.modulePath entry ++ (if separate then ".mlfi" else ".emlf")
-    let emit = (if separate then "--module-to-llvm" else "--emit-llvm") ++ (if compact then "-gc" else "")
-    ignored <- capture b work (S.append (Cons (compiler b) (preludeOptions target)) (Cons "-i" (Cons include (Cons emit (Cons input Nil))))) "" (work ++ "/program.ll")
-    let allFlags = S.append (J.getStrings "flags" (J.get "gmp" (tools b))) (J.getStrings "flags" gc)
-    let cflags = S.append (S.filter (\f -> O.starts "-I" f || O.starts "-D" f) allFlags) (if compact then profileFlags else Nil)
-    ignored <- capture b work (S.append (Cons (clang b) (O.words "-O2 -std=c11")) (S.append cflags (Cons "-c" (Cons (J.getText "runtime-path" "" (tools b)) (Cons "-o" (Cons (work ++ "/runtime.o") Nil)))))) "" ""
-    ignored <- capture b work (S.append (Cons (clang b) (O.words "-O2 -Wno-override-module")) (S.append (Cons (work ++ "/program.ll") (Cons (work ++ "/runtime.o") allFlags)) (S.append (Cons "-lm" (if compact then stackFlags b else Nil)) (Cons "-o" (Cons (work ++ "/program") Nil))))) "" ""
+  Cons p rest -> if S.null (M.packageModules p) then libraryLoop b noPrelude done rest else do
+    artifact <- compileCrate b p "library" "" (M.packageModules p) (directLibraries p done) noPrelude
+    libraryLoop b noPrelude (S.snoc done (Pair (M.packageName p) artifact)) rest
+runtimeObject : Builder -> Bool -> J.Json -> IO String
+runtimeObject b compact gc = runtimeObjectWithPgo b compact gc J.empty
+runtimeObjectWithPgo : Builder -> Bool -> J.Json -> J.Json -> IO String
+runtimeObjectWithPgo b compact gc profile = do
+  let allFlags = S.append (J.getStrings "flags" (J.get "gmp" (tools b))) (J.getStrings "flags" gc)
+  let cflags = S.append (S.filter (\f -> O.starts "-I" f || O.starts "-D" f) allFlags) (if compact then profileFlags else Nil)
+  let inputs = info (S.append (S.map (\key -> Pair key (J.get key (tools b))) (O.words "clang runtime runtime-path system machine native_environment gmp")) (Cons (Pair "gc" gc) (Cons (Pair "flags" (J.stringArray (S.append (O.words "-O2 -std=c11") cflags))) Nil)))
+  let options = S.append (O.words "-O2 -std=c11") (S.append cflags (pgoFlags profile))
+  let runtime = J.getText "runtime-path" "" (tools b)
+  let profiled = S.not (S.null (J.items profile))
+  let nativeInputs = if profiled then J.set "runtime-cwd" (J.str (O.parent runtime)) (J.set "flags" (J.stringArray options) (pgoInputs profile inputs)) else inputs
+  cached b "runtime object" nativeInputs (\work -> do
+    -- Relative basename makes internal C function profile names independent of
+    -- the build directory. Ordinary builds retain their original invocation.
+    ignored <- capture b (if profiled then O.parent runtime else work) (S.append (Cons (clang b) options) (Cons "-c" (Cons (if profiled then O.base runtime else runtime) (Cons "-o" (Cons (work ++ "/runtime.o") Nil))))) "" ""
+    present <- fileExists (work ++ "/runtime.o")
+    O.require present "C compiler did not produce runtime object")
+emitCrate : Builder -> String -> Bool -> String -> String -> IO String
+emitCrate b crate compact metadataHash objectHash = do
+  let inputs = info (Cons (Pair "compiler" (J.get "compiler" (tools b))) (Cons (Pair "crate-path" (J.str crate)) (Cons (Pair "metadata" (J.str metadataHash)) (Cons (Pair "object" (J.str objectHash)) (Cons (Pair "compact" (J.Boolean compact)) Nil)))))
+  let codegen = directory b ++ "/codegen-cache/" ++ J.getText "sha256" "" (J.get "compiler" (tools b))
+  O.mkdir codegen
+  artifact <- cached b "LLVM emission" inputs (\work -> do
+    let emit = "--crate-to-llvm" ++ (if compact then "-gc" else "")
+    ignored <- capture b work (Cons (compiler b) (Cons emit (Cons (crate ++ "/unit.mlfci") (Cons "--cache" (Cons codegen Nil))))) "" (work ++ "/program.ll")
+    present <- fileExists (codegen ++ "/last-query.json")
+    O.require present "compiler did not report the LLVM cache query"
+    O.copy (codegen ++ "/last-query.json") (work ++ "/codegen-query.json"))
+  saved <- J.read (artifact ++ "/codegen-query.json")
+  report <- J.read (reportPath b)
+  let reused = J.getBool "cached" false (S.last (J.values (J.get "builds" report)))
+  let current = if reused then J.set "input_reused" (J.Boolean true) (J.set "optimized_reused" (J.Boolean true) saved) else saved
+  let queries = J.set "outer_cached" (J.Boolean reused) (J.set "cache_source" (J.str (if reused then "emission-artifact" else "codegen-queries")) current)
+  record b "codegen" (info (Cons (Pair "metadata" (J.str (crate ++ "/unit.mlfci"))) (Cons (Pair "query_report" (J.str (artifact ++ "/codegen-query.json"))) (Cons (Pair "queries" queries) Nil))))
+  ioReturn artifact
+nativeLLVMObject : Builder -> String -> IO String
+nativeLLVMObject b emitted = nativeLLVMObjectWithPgo b emitted J.empty
+nativeLLVMObjectWithPgo : Builder -> String -> J.Json -> IO String
+nativeLLVMObjectWithPgo b emitted profile = do
+  digest <- fileDigest (emitted ++ "/program.ll")
+  let options = S.append (O.words "-O2 -Wno-override-module -c") (pgoFlags profile)
+  let inputs = info (S.append (S.map (\key -> Pair key (J.get key (tools b))) (O.words "clang system machine native_environment")) (Cons (Pair "llvm" (J.str digest)) (Cons (Pair "flags" (J.stringArray options)) Nil)))
+  cached b "LLVM object" (pgoInputs profile inputs) (\work -> do
+    ignored <- capture b work (S.append (Cons (clang b) options) (Cons (emitted ++ "/program.ll") (Cons "-o" (Cons (work ++ "/program.o") Nil)))) "" ""
+    present <- fileExists (work ++ "/program.o")
+    O.require present "LLVM compiler did not produce native object")
+linkNative : Builder -> String -> String -> Bool -> J.Json -> IO String
+linkNative b llvm runtime compact gc = linkNativeWithPgo b llvm runtime compact gc J.empty
+linkNativeWithPgo : Builder -> String -> String -> Bool -> J.Json -> J.Json -> IO String
+linkNativeWithPgo b llvm runtime compact gc profile = do
+  llvmHash <- fileDigest (llvm ++ "/program.o")
+  runtimeHash <- fileDigest (runtime ++ "/runtime.o")
+  let libraries = S.append (J.getStrings "flags" (J.get "gmp" (tools b))) (J.getStrings "flags" gc)
+  let options = S.append (O.words "-O2 -Wno-override-module") (if eqString (J.getText "mode" "" profile) "generate" then Cons "-fprofile-generate" Nil else Nil)
+  let trailing = S.append libraries (S.append (Cons "-lm" Nil) (if compact then stackFlags b else Nil))
+  let inputs = info (S.append (S.map (\key -> Pair key (J.get key (tools b))) (O.words "clang system machine native_environment gmp")) (Cons (Pair "gc" gc) (Cons (Pair "llvm-object" (J.str llvmHash)) (Cons (Pair "runtime-object" (J.str runtimeHash)) (Cons (Pair "flags" (J.stringArray (S.append options trailing))) Nil)))))
+  cached b "native link" (pgoInputs profile inputs) (\work -> do
+    ignored <- capture b work (S.append (Cons (clang b) options) (Cons (llvm ++ "/program.o") (Cons (runtime ++ "/runtime.o") (S.append trailing (Cons "-o" (Cons (work ++ "/program") Nil)))))) "" ""
     present <- fileExists (work ++ "/program")
     O.require present "linker did not produce executable")
+buildTarget : Builder -> M.Package -> String -> J.Json -> Bool -> IO (Pair String String)
+buildTarget b p name target publish = do
+  Pair entry ms <- M.targetCrateModules (graph b) p target
+  let compact = eqString (J.getText "profile" "standard" target) "compiler"
+  let noPrelude = J.getBool "no-prelude" false target
+  gc <- if compact then gcFlags b else ioReturn J.empty
+  built <- libraries b noPrelude
+  let dependencies = S.nubBy eqString (S.append (directLibraries p built) (S.maybe Nil (\path -> Cons path Nil) (S.lookup eqString (M.packageName p) built)))
+  crate <- compileCrate b p ("target-" ++ name) entry ms dependencies noPrelude
+  metadataHash <- fileDigest (crate ++ "/unit.mlfci")
+  objectHash <- fileDigest (crate ++ "/unit.mlfco")
+  emitted <- emitCrate b crate compact metadataHash objectHash
+  let profile = pgoForTarget b p name
+  llvm <- nativeLLVMObjectWithPgo b emitted profile
+  runtime <- runtimeObjectWithPgo b compact gc profile
+  linked <- linkNativeWithPgo b llvm runtime compact gc profile
+  binaryHash <- fileDigest (linked ++ "/program")
+  llvmHash <- fileDigest (emitted ++ "/program.ll")
+  let inputs = info (Cons (Pair "toolchain" (tools b)) (Cons (Pair "target" target) (Cons (Pair "crate-path" (J.str crate)) (Cons (Pair "metadata" (J.str metadataHash)) (Cons (Pair "object" (J.str objectHash)) (Cons (Pair "llvm" (J.str llvmHash)) (Cons (Pair "binary" (J.str binaryHash)) Nil)))))))
+  artifact <- cached b ("executable " ++ M.packageName p ++ ":" ++ name) (pgoInputs profile inputs) (\work -> do
+    -- Preserve both the metadata's object sibling and the fixed-point IR record.
+    O.copy (crate ++ "/unit.mlfci") (work ++ "/unit.mlfci")
+    O.copy (crate ++ "/unit.mlfco") (work ++ "/unit.mlfco")
+    O.copy (emitted ++ "/program.ll") (work ++ "/program.ll")
+    O.copy (linked ++ "/program") (work ++ "/program"))
   let binary = directory b ++ "/bin/" ++ name
   if publish then do { O.copy (artifact ++ "/program") (binary ++ ".new"); O.move (binary ++ ".new") binary } else ioReturn Unit
   ioReturn (Pair (if publish then binary else artifact ++ "/program") artifact)
@@ -226,6 +451,7 @@ verifyHashes : J.Json -> IO Unit
 verifyHashes values = S.mapM_ (\entry -> do { actual <- fileDigest (S.fst entry); O.require (eqString actual (J.text (S.snd entry))) ("input changed during build/test: " ++ S.fst entry) }) (J.items values)
 finish : Builder -> IO Unit
 finish b = do
+  verifyPgo (J.getObject "native-pgo" (config b))
   snapshot <- M.snapshot (graph b)
   O.require (J.equal snapshot (initial b)) "package sources or manifests changed during build/test"
   S.mapM_ (\key -> do { let identity = J.get key (tools b); actual <- fileDigest (J.getText "path" "" identity); O.require (eqString actual (J.getText "sha256" "" identity)) (key ++ " changed during build/test") }) (O.words "compiler clang pkg-config manager")

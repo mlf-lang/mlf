@@ -1,4 +1,4 @@
--- Frozen persistent-map unifier, independently ported from the retained Haskell reference.
+-- Frozen persistent-map unifier, independently ported from the historical Haskell reference.
 module Tests.GraphUnificationReference (referenceUnify) where
 import Bootstrap.Types
 import qualified Bootstrap.Std as S

@@ -25,6 +25,19 @@ local BDWGC installation. An installed [native release](docs/releases.md) can
 supply the seed. The compiler and package manager are written in MLF; this
 build and test path needs no GHC, Cabal, or Python.
 
+The seed used with the current manager must support `--compile-crate`. When
+migrating from the earlier module compiler, keep its matching native `mlfpkg`
+and use that manager for the first generation:
+
+```sh
+/path/to/previous/mlfpkg --compiler /path/to/previous/emlf --timeout 21600 \
+  --build-dir "$PWD/.mlf-build/crate-seed" build
+```
+
+Then select `.mlf-build/crate-seed/bin/emlf` and its sibling `mlfpkg` as the
+input tools and proceed with the second generation below. The earlier manager
+is only a bootstrap input; the resulting tools use crate compilation.
+
 ```sh
 export MLF_COMPILER=/absolute/path/to/native/emlf
 export MLF_GC_PREFIX=/absolute/path/to/bdwgc-install
@@ -50,19 +63,19 @@ repository. Use `EMLF_BIN` to run the candidate compiler. Global package-manager
 options go before `build`, `test`, or `run`; `--build-dir DIR` selects the output
 directory.
 
-The compiler target uses checked separate compilation: the package manager
-infers each module in its own process, writes checked `.mlfi`/`.mlfo` artifacts,
-then checks the linked xMLF before LLVM emission. Independent type checking,
-inferred-type agreement, source-erasure checks, and module-boundary validation
-remain enabled. The package-manager target retains source linking.
-Three alternating cold build pairs measured median sampled process-tree RSS
-of **3.27 GB**, down from **9.99 GB**, including the manager and measurement
-process. Local median complete build time increased from **332.38s to 460.87s**.
-A cold build on the actual 7 GiB CI runner passed in **995.59s**, with
-**2.73 GB maximum process RSS**, producing the exact locally tested binaries.
-See the [bootstrap memory report](tools/profile/results/2026-10-19-bootstrap-memory/README.md)
-for raw samples, scope, and reproduction. Direct whole-source self-compilation
-through `emlf --emit-llvm-gc bootstrap/Main.emlf` still uses the monolithic path.
+The package manager compiles each library and executable as a crate. Modules
+inside a crate are namespaces and may import one another cyclically. Value
+declarations are inferred in dependency SCCs, with closed schemes and checked
+xMLF fragments cached independently. Generated `.mlfci` metadata lets downstream
+crates infer without upstream source or implementation objects. The final linker
+checks selected imported schemes, nominal layouts, and the closed linked program.
+Inferred-type agreement and source-erasure checks remain enabled for every
+new inference query.
+
+See the [crate migration ledger](docs/crate-migration.md) for accepted measurements
+and the [validation record](docs/crate-validation.json) for all six native groups,
+fresh self-hosting and the exact source/tool configuration. The [earlier bootstrap memory report](tools/profile/results/2026-10-19-bootstrap-memory/README.md)
+describes the previous per-module pipeline; its results are historical.
 
 Run all six native test groups, or select groups for development:
 
@@ -86,7 +99,7 @@ The verified 2026-10-18 toolchain used Apple Silicon macOS 26.6.2,
 Clang/LLVM 23.1.3, GMP 6.3.0, and BDWGC 8.2.12. See the
 [package manager guide](docs/package-manager.md) for prerequisites and local
 dependencies, [native test coverage](tests/README.md), and the
-[latest verification report](tools/profile/RESULTS.md).
+[historical verification report](tools/profile/RESULTS.md).
 
 The executable also accepts standard input and `--expr '...source...'`.
 `--type` prints only the inferred source type, including class constraints.
@@ -122,8 +135,10 @@ as MLF programs; frozen Haskell-seed expectations remain parity oracle data.
 ```
 
 Compiler-profile builds use the compact BDWGC runtime for long pure compilation
-phases. For two native generations and compiler-only PGO, see
-[native self-compilation profiling](tools/profile/README.md). The latest frozen
+phases. For reproducible PGO construction with profile-aware native caches, see
+[the package build instructions](docs/package-manager.md#native-profile-guided-construction).
+For two native generations and historical compiler-only PGO, see
+[native self-compilation profiling](tools/profile/README.md). That historical frozen
 source comparison measured **181.955 s versus 257.289 s**, a **29.280%** median
 reduction; the raw measurements and exact compiler hashes are linked there.
 
@@ -134,9 +149,10 @@ dependencies. The separate [performance report](benchmarks/RESULTS.md) verifies
 all nine workloads at **3× C compilation / 2× C runtime** using its explicit
 LLVM/linker configuration. This performance run is separate from release CI.
 
-The optional Haskell seed and its historical Python bootstrap/release scripts
-remain documented in [`bootstrap/README.md`](bootstrap/README.md) and
-[release documentation](docs/releases.md).
+The Haskell compiler, Cabal project, and old Haskell/Python test and build
+harnesses have been removed. Native MLF is the supported build and test path.
+Pinned C/Rust/Haskell benchmark sources, the independent Snake baseline,
+golden oracle data, and archived measurements remain available.
 
 ## Native compilation with LLVM
 
@@ -375,46 +391,37 @@ modules and builtin Prelude imports, but external imports require one of those
 graph-loading APIs. `parseProgram` and `compileProgram` remain the closed-program
 APIs used by existing clients.
 
-The source commands above link source modules before inference. Separate
-compilation is also available in both the Haskell and self-hosted compilers:
+The source commands resolve all reachable modules as one crate. Package builds
+also persist generated crate metadata and checked implementation fragments:
 
 ```sh
-mkdir -p build/Geometry
-"$EMLF_BIN" --compile-module examples/modules/Geometry/Point.emlf -o build/Geometry/Point
-"$EMLF_BIN" -i build --compile-module examples/modules/Main.emlf -o build/Main
-"$EMLF_BIN" -i build --show-interface build/Main.mlfi
-"$EMLF_BIN" -i build --run-module build/Main.mlfi
-"$EMLF_BIN" -i build --link-module build/Main.mlfi > build/main.xmlf
-"$EMLF_BIN" -i build --module-to-llvm build/Main.mlfi > build/main.ll
-clang -O2 -std=c11 build/main.ll "$("$EMLF_BIN" --llvm-runtime)" \
-  $(pkg-config --cflags --libs gmp) -lm -o build/main
+./mlfpkg --manifest examples/packages/mlf-package.json build
+./mlfpkg --manifest examples/packages/mlf-package.json plan
 ```
 
-Compile dependencies first, using prefixes that match their module paths.
-`--compile-module` writes a `.mlfi` interface and a `.mlfo` implementation object.
-It reads dependency **interfaces only**: dependency source and object files are
-not needed for compilation. All local definitions, including private ones, are
-checked. Imports, re-exports, abstract datatypes, polymorphism, classes, instances,
-recursive functions, and Prelude retain their usual scope rules.
+`plan` shows the crate DAG and each crate's modules. A library is one crate;
+each executable or native test is another crate depending on its package's
+library and direct dependency libraries. Module import cycles within a crate are
+valid. Crate dependency cycles are rejected with their dependency chain.
 
-Objects contain independently checked xMLF with explicit import parameters.
-The linker resolves nominal identities, freshens binders, verifies dependency
-schemes and datatype layouts, and checks the resulting closed program. Both
-backends consume that program. `--module-to-llvm` and `--module-to-llvm-gc` emit
-LLVM directly from the linked objects. LLVM optimization and native code
-generation happen at link time; `.mlfo` is a portable checked-IR object, not a
-platform `.o` file. Dependencies are not reparsed or reinferred from source.
+The compiler's low-level package-driver protocol is
+`emlf --compile-crate SPEC -o PREFIX`. It writes `.mlfci` semantic metadata,
+`.mlfco` checked implementation fragments, and a `.queries` reuse report.
+`--show-crate`, `--link-crate`, `--run-crate`, and `--crate-to-llvm[-gc]` consume
+`.mlfci` paths. See the [artifact and cache contract](docs/crate-compilation.md)
+for the specification format and validation boundaries.
 
-Interfaces carry versioned metadata and dependency fingerprints. An
-implementation-only edit can replace an object without rebuilding consumers;
-a changed interface produces a stale-dependency diagnostic until consumers are
-recompiled. Checksums detect incomplete or mismatched interface/object pairs;
-they are not cryptographic signatures. There is no automatic source fallback or
-automatic dependency rebuild. The built-in Prelude needs no files on disk.
+Names retain their defining crate, module, namespace and role. The linker
+freshens local binders, verifies actual consumed schemes and datatype layouts,
+and independently checks the final program. Changed dependency implementations
+can be linked without re-inferring unchanged consumers. Changed consumed schemes
+or layouts invalidate the affected queries; unrelated declarations remain reusable.
+The shared built-in Prelude is a generated compiler artifact with one identity.
 
-Cyclic imports, packages, and user-defined operator imports remain unsupported.
-An import cycle reports its dependency chain. Ordinary module-free scripts retain
-the existing compilation path and Prelude behavior.
+Import cycles do not make all declarations recursive. Only actual value SCCs
+require the existing closed recursive signatures. Acyclic values retain their
+ordinary generalization and first-class polymorphism. User-defined operator
+imports remain unsupported.
 
 ### Function declarations and expressions
 
@@ -664,7 +671,7 @@ case structure while removing declarations and type arguments.
 ## Standard prelude
 
 Every compiler entry point imports a small standard prelude from
-[`MLF.Prelude`](src/MLF/Prelude.hs). It supplies this class, its `IO` instance,
+[`Bootstrap.Prelude`](bootstrap/Bootstrap/Prelude.emlf). It supplies this class, its `IO` instance,
 and an instance for local state, `Monad (ST s)`:
 
 ```haskell
@@ -1016,9 +1023,9 @@ Use a file or `--expr` when the program reads interactive input:
 Without a file, `--run` and `--run-xmlf` consume standard input as source, so
 that input stream is unavailable for subsequent `getLine` actions.
 
-The library entry point is `MLF.Runtime.runTerm`, with an `IOBackend` providing
+The library entry point is `Bootstrap.Runtime.runTerm`, with an `IOBackend` providing
 `readLine`, `writeText` and `writeBytes :: ByteString -> IO ()`. It requires an IO entry, as does
-`MLF.LLVM.emitLLVMIO`. `MLF.Runtime.runProgram` and `MLF.LLVM.emitLLVM` also
+`Bootstrap.LLVM.emitLLVMIO`. `Bootstrap.Runtime.runProgram` and `Bootstrap.LLVM.emitLLVM` also
 accept pure programs, evaluating them to weak head normal form and discarding
 the result. Tests observe action order and failure behavior through both
 backends. The runtime keeps data fields, arguments, lets,
@@ -1072,14 +1079,15 @@ the standard `IO` monad with `do`. It uses `Integer` to match eMLF's unbounded
 `Int`, and preserves the rules, deterministic food search, prompts, board
 format, and flushing after each write. Only the `base` package is needed.
 
-Compile an optimized native executable directly with GHC:
+This optional comparison uses GHC. The native test suite instead executes the
+independent MLF port in `tests/Tests/SnakeBaseline.emlf`. To build the baseline:
 
 ```sh
-mkdir -p dist-newstyle/snake-baseline
+mkdir -p .mlf-build/snake-baseline
 ghc -O2 -Wall -Werror -main-is SnakeBaseline examples/SnakeBaseline.hs \
-  -outputdir dist-newstyle/snake-baseline \
-  -o dist-newstyle/snake-baseline/snake-haskell
-./dist-newstyle/snake-baseline/snake-haskell
+  -outputdir .mlf-build/snake-baseline \
+  -o .mlf-build/snake-baseline/snake-haskell
+./.mlf-build/snake-baseline/snake-haskell
 ```
 
 For compilation timing, add `-fforce-recomp` to avoid an up-to-date build being
@@ -1089,7 +1097,7 @@ Clang produces a linked native executable. The benchmark below reports each
 output separately alongside the GHC native build.
 
 The native `backends` group checks all seven scripted game transcripts against
-the retained independent Haskell-game expectations on the xMLF interpreter and
+the independent MLF game and frozen expectations on the xMLF interpreter and
 LLVM native code. It also checks eleven pure-rule outcomes, including the
 departing tail and full-board win.
 
@@ -1099,7 +1107,7 @@ Graph validation uses indexed scratch tables for densely numbered graphs,
 numbers the binding tree once, and checks kinds, scope, and structural cycles
 in one traversal. Rebind uses a memoized dependency traversal and depth-based
 lowest common ancestors. Sparse external identities retain the map-based
-implementation. `MLF.Graph.Solver` maintains reverse edges and applies this
+implementation. `Bootstrap.Graph.Solver` maintains reverse edges and applies this
 checked unifier to the affected type component, preserving structural parents,
 binding descendants, generalization scopes, and original identities. This
 avoids repeatedly traversing unrelated definitions. Local projections compress
@@ -1146,6 +1154,14 @@ compilation, and linking; exact-executable runtime warm-up is applied equally
 to C and MLF. Every observed maximum MLF time divided by the corresponding
 minimum C time also remained below its limit.
 
+The later [crate migration acceptance](docs/crate-validation.json) uses reproducible
+O2 profiling of the compiler and runtime, trained only on fifteen existing language
+examples. Its fresh six-group validation and full nine-workload, three-sample
+median gates pass the same 3x compilation / 2x runtime limits. See the
+[construction instructions](docs/package-manager.md#native-profile-guided-construction)
+and [acceptance ledger](docs/crate-migration.md) for this configuration and its
+separate frozen build measurements.
+
 Use the [native benchmark guide](tools/bench/README.md) to build the runner and
 configure the generic LLVM/linker backend used by that performance result.
 Its final arguments explicitly select the per-workload limits:
@@ -1164,149 +1180,30 @@ directory must be new. Run measured jobs alone. The
 and toolchain hashes; [self-compilation profiling](tools/profile/README.md)
 reports the separate frozen-source comparison and diagnostic timing boundaries.
 
-### Historical Haskell benchmarks
+### Preserved benchmark baselines
 
-The Haskell seed builds with `-O2`; its CLI uses a 32 MiB allocation area.
-These defaults are in `cabal.project` and `mlf.cabal`. Its allocation area can
-be overridden with RTS options.
-
-Run the cross-language compilation and runtime benchmarks through Cabal:
-
-```sh
-cabal bench -j1
-```
-
-The default compares Clang `-O3`, Rust `-O`, GHC `-O2`, and MLF's native LLVM
-pipeline on pinned Benchmarks Game **binary-trees, pidigits, n-body,
-fannkuch-redux, spectral-norm, fasta, mandelbrot, reverse-complement and
-k-nucleotide** sources. Compilation and
-runtime are timed separately, after four-language correctness validation.
-All nine MLF sources use the new declarations, layout, typed recursion,
-conditionals and operators, so this benchmark includes their parsing and
-desugaring costs.
-It writes `bench-results.json` with raw samples, medians, ratios, CPU/RSS,
-toolchain identities and source provenance. Rust and Python 3.9+ are required
-in addition to the native build dependencies. The default takes three samples
-per dimension with workload-specific inputs: depth 16, 10,000 digits,
-2,000,000 integration steps, permutation size 10, a 2000-element spectral
-vector, fasta n=2,000,000, a 4096×4096 Mandelbrot bitmap,
-reverse-complement on FASTA n=10,000,000, and k-nucleotide on FASTA n=1,000,000. `--compile-only` and
-small selected inputs provide quicker checks.
-See [benchmark methodology, commands and limitations](benchmarks/README.md)
-and [workload selection](benchmarks/INVESTIGATION.md). The
-[measured results](benchmarks/RESULTS.md) include a complete archived JSON run.
-
-```sh
-cabal bench --benchmark-options='--compile-only'
-cabal bench --benchmark-options='--runtime-only'
-cabal bench --benchmark-options='--benchmark binary-trees'
-cabal bench --benchmark-options='--benchmark n-body --size 1000 --runs 2'
-cabal bench --benchmark-options='--benchmark spectral-norm --size 100 --runs 2'
-cabal bench --benchmark-options='--benchmark fasta --size 1000 --runs 2'
-cabal bench --benchmark-options='--benchmark mandelbrot --size 200 --runs 2'
-cabal bench --benchmark-options='--benchmark reverse-complement --size 1000 --runs 2'
-cabal bench --benchmark-options='--benchmark k-nucleotide --size 1000 --runs 2'
-cabal bench -j1 --benchmark-options='--runs 7 --max-compile-ratio 5 --max-runtime-ratio 2'
-```
-
-The optional ratio limits check every workload's MLF/C ratio of medians and
-fail the run if any limit is exceeded, preserving all measurements in the
-report. No limit is applied by default.
-The measured-results report records the scope and limits of each run; a
-passing run without an explicit performance gate only establishes correctness.
-The two FASTA-input workloads receive identical generated bytes on stdin in
-all four languages. Generation is outside timing; input reading and processing
-are included. Cabal builds the pinned Haskell hash-table dependencies before
-measurement, and the report records their exact package units and hashes.
-
-The existing Snake compilation comparison is an explicit mode:
-
-```sh
-cabal bench --benchmark-options='snake'
-```
-
-Cabal builds `emlf` as the `compiler-bench` tool dependency, then this mode runs
-five rounds of all four Snake workflows below. It saves the JSON report and
-`.xmlf`/`.ll` outputs under `dist-newstyle/benchmarks/snake.*`. Python 3,
-GHC, Clang, `pkg-config`, and GMP are required. The existing process-based
-timing driver runs after Cabal finishes building, so compiler builds and
-benchmark startup are outside the measured regions.
-
-Override driver options through Cabal, for example:
-
-```sh
-cabal bench compiler-bench -j1 \
-  --benchmark-options='snake --runs 10 --output dist-newstyle/benchmarks/snake-10.json'
-```
-
-Five serial rounds on macOS ARM64, GHC 9.14.1, Clang 23.1.2, and GMP 6.3.0:
-
-| Compilation workflow | Median (s) | vs GHC | Worst paired ratio |
-| --- | ---: | ---: | ---: |
-| eMLF → verified xMLF | 0.221131 | 0.2696× | 0.2803× |
-| eMLF → LLVM IR | 0.219582 | 0.2677× | 0.2781× |
-| eMLF → LLVM native executable | 0.479331 | 0.5844× | 0.6931× |
-| Haskell → GHC native executable | 0.820278 | 1.0000× | 1.0000× |
-
-The LLVM native timing includes fresh source-to-LLVM emission, writing IR,
-Clang `-O2` compilation of the IR and C runtime, and linking with GMP. GHC
-uses `-O2 -fforce-recomp` and links every time. Each workflow uses fresh
-processes; execution order rotates, with no source-compilation warmup or
-cached game/runtime build. Compiler metadata probes precede timing and are
-recorded separately, so these measurements exclude first-launch checks.
-
-The script checks identical xMLF and LLVM output across samples, independently
-checks the xMLF type, compares standalone xMLF lowering with direct LLVM
-emission, and compares both backend transcripts with Haskell. It records
-compiler, source, and runtime hashes and saves `.xmlf` and `.ll` artifacts
-beside the JSON report. The existing `--max-ratio 1` gate applies to each
-**xMLF/GHC** pair; LLVM ratios are also reported. All three eMLF workflows
-were below GHC in every round of this run. See the
-[LLVM benchmark report](docs/snake-llvm-compilation-performance.txt) for raw
-samples and reproduction details, and the
-[earlier frontend optimization report](docs/snake-compilation-parity.txt)
-for the solver changes. Timings depend on the machine and its load.
-
-To compare compiler revisions, save the earlier executable before rebuilding,
-then select the revision-comparison mode of the same Cabal benchmark:
-
-```sh
-cabal bench compiler-bench -j1 \
-  --benchmark-options='compare-revisions --before /path/to/emlf-before'
-```
-
-Cabal supplies the current compiler. This mode compares all `examples/*.emlf`
-by default and saves `dist-newstyle/benchmarks/revisions.json`. Append source
-paths to select a subset, or use `--runs` and `--output` to override defaults.
-
-Use the same GHC version, optimization settings, source files, and prelude
-configuration for both builds. The script
-alternates execution order, records every sample and input/binary hashes,
-requires byte-identical xMLF, and independently parses and checks the output.
-Timing includes process startup and the full source-to-verified-xMLF pipeline,
-but excludes building the compiler. See
-[`docs/compiler-performance.txt`](docs/compiler-performance.txt) for recorded
-measurements. The tests also compare graph validation with an uncached
-reference on 12,000 graphs and cover deep scopes and shared higher kinds.
-Unification is compared with the previous map-based algorithm on 5,616
-cases, including both the full-graph and component solvers, with additional
-sparse/negative identity, scope, and occurs checks. Stateful comparisons audit
-the complete graph and reverse indexes after 1,427 inference steps; 189
-instance witnesses also match the full-graph path and its identity maps.
+The pinned C, Rust, and Haskell implementations under [benchmarks/](benchmarks/)
+and [the independent Snake game](examples/SnakeBaseline.hs) remain unchanged,
+along with their provenance, fixtures, and archived measurements. The historical
+Cabal/Python benchmark launcher has been retired. Use the
+[native benchmark runner](tools/bench/README.md) for current C/MLF comparisons;
+it builds through the MLF package manager. Haskell and Rust baseline builds are
+optional comparisons outside the compiler build and test dependencies. Historical
+reports retain the exact commands and toolchain identities used for those runs.
 
 ## Implementation and thesis correspondence
 
 | Stage | Implementation | Thesis |
 | --- | --- | --- |
-| Parse and resolve source binders | `MLF.Parser`, `MLF.Constraint` | §9.4 |
-| Embed annotation types and desugar annotations to coercions | `MLF.Constraint` | §8.2.2, §12.3.2 |
-| First-order unification, then `Rebind` and permission checks | `MLF.Graph.unify` | Figures 7.3.1–7.3.2 |
-| Expand schemes with frontier equations and binding/flag reset | `MLF.Graph.expand` | §10.1 |
-| Solve equalities, then instance edges in dependency order | `MLF.Constraint.solve` | Figure 12.1.1 |
-| Normalize the presolution for translation | `MLF.Graph.normalize` | §15.2.6–15.2.8 |
-| Translate types in leftmost-lowermost order | `MLF.Elaborate` | §15.2.7, Figure 15.3.2 |
-| Generate computations and elaborate terms | `MLF.Elaborate` | §15.3.2–15.3.10, §15.4.1 |
-| Independently check xMLF | `MLF.X.Check` | Figures 14.2.6 and 14.2.8 |
+| Parse and resolve source binders | `Bootstrap.Parser`, `Bootstrap.Constraint` | §9.4 |
+| Embed annotation types and desugar annotations to coercions | `Bootstrap.Constraint` | §8.2.2, §12.3.2 |
+| First-order unification, then `Rebind` and permission checks | `Bootstrap.Graph.unify` | Figures 7.3.1–7.3.2 |
+| Expand schemes with frontier equations and binding/flag reset | `Bootstrap.Graph.expand` | §10.1 |
+| Solve equalities, then instance edges in dependency order | `Bootstrap.Constraint.solve` | Figure 12.1.1 |
+| Normalize the presolution for translation | `Bootstrap.Graph.normalize` | §15.2.6–15.2.8 |
+| Translate types in leftmost-lowermost order | `Bootstrap.Elaborate` | §15.2.7, Figure 15.3.2 |
+| Generate computations and elaborate terms | `Bootstrap.Elaborate` | §15.3.2–15.3.10, §15.4.1 |
+| Independently check xMLF | `Bootstrap.X.Check` | Figures 14.2.6 and 14.2.8 |
 
 As recommended by §15.3.10, elaboration happens **after** inference. Reflexive
 instance edges use `Inst-Refl`; other edges are re-expanded from the final
@@ -1336,10 +1233,10 @@ Every successful compilation checks both:
 2. Erasing its types and computations gives exactly the resolved source term
    after annotation desugaring (§15.3.14).
 
-The Haskell API is `MLF.Compiler.compile :: FilePath -> String -> Either
-CompileError Compilation`, `compileProgram` for a `Program` AST containing
+The MLF API is `Bootstrap.Compiler.compile : String -> String -> Either
+CompileError Compilation`. Use `compileProgram` for an `SProgram` AST containing
 declarations, or `compileExpr` for an expression without declarations. Use
-`MLF.Parser.parseProgram` for closed programs, or `parseModule` with the
+`Bootstrap.Parser.parseProgram` for closed programs, or `parseModule` with the
 module-aware APIs described above for imports. A `Compilation`
 contains `inferredType` (the explicit target type), `sourceType` (the source
 display with class constraints), `compiledTerm`, and the normalized `presolution`.
@@ -1426,5 +1323,5 @@ agreement. See [the reference comparison](docs/figure12-a8-reference.txt).
 ```
 
 See [the test report](docs/figure12-results.txt) for the encoding, type checks,
-and [a closed A8 reproduction](test/fixtures/figure12-a8.emlf). Passing this
+and [a closed A8 reproduction](tests/fixtures/figure12-a8.emlf). Passing this
 table is a finite conformance check, not a proof of theoretical completeness.

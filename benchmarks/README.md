@@ -1,33 +1,21 @@
-# Cross-language compiler and runtime benchmarks
+# Benchmark baselines and native measurements
 
-Run from the repository root:
+Use the [native C/MLF benchmark runner](../tools/bench/README.md), built through
+the MLF package manager, for current measurements. It needs native MLF, Clang,
+GMP, pkg-config, and BDWGC; no GHC, Cabal, or Python runs in that workflow.
 
-```sh
-cabal bench -j1
-cabal bench --benchmark-options='--compile-only'
-cabal bench --benchmark-options='--runtime-only'
-cabal bench --benchmark-options='--benchmark binary-trees'
-cabal bench --benchmark-options='--benchmark binary-trees --runs 5 --size 16 --output bench-results.json'
-cabal bench --benchmark-options='--benchmark pidigits --size 1000 --runs 2'
-cabal bench --benchmark-options='--benchmark n-body --size 1000 --runs 2'
-cabal bench --benchmark-options='--benchmark fannkuch-redux --size 7 --runs 2'
-cabal bench --benchmark-options='--benchmark spectral-norm --size 100 --runs 2'
-cabal bench --benchmark-options='--benchmark fasta --size 1000 --runs 2'
-cabal bench --benchmark-options='--benchmark mandelbrot --size 200 --runs 2'
-cabal bench --benchmark-options='--benchmark reverse-complement --size 1000 --runs 2'
-cabal bench --benchmark-options='--benchmark k-nucleotide --size 1000 --runs 2'
-cabal bench -j1 --benchmark-options='--runs 7 --max-compile-ratio 5 --max-runtime-ratio 2'
-```
+The pinned C/Rust/Haskell baseline sources, adaptation patches, manifest hashes,
+fixtures, provenance, and archived measurements are preserved.
+[The independent Snake baseline](../examples/SnakeBaseline.hs) is also retained.
+Haskell and Rust remain optional baseline toolchains, outside compiler builds
+and tests.
 
-Requires Python 3.9+, GHC with its boot `array`, `bytestring` and `text` packages,
-Clang, Rust (`rustc`, no Cargo), `pkg-config`, and
-GMP on macOS or Linux. Git is used only to record repository metadata.
-System tools must already be installed. Cabal resolves/builds the pinned
-Haskell `hashtables` 1.4.2 and `hashable` 1.5.1.0 library dependencies, the
-optimized `emlf` compiler and the small benchmark launcher before measurement. Baseline sources and khash are vendored; the measurement
-driver never downloads code or builds dependencies. Dependency setup is
-outside all measured intervals, as are Cabal and compiler builds. All four
-toolchains are required; missing tools, pin mismatches, failed commands and output mismatches fail the run.
+The historical Cabal/Python benchmark driver has been removed. The methodology
+below describes that archived four-language workflow; its old command examples
+and source paths identify historical runs and are not current entry points.
+Use the native guide above to reproduce current C/MLF comparisons.
+
+## Historical four-language methodology
 
 The suite contains nine workloads, all with pinned C/Rust/Haskell
 baselines and an MLF implementation:
@@ -91,7 +79,7 @@ python3 scripts/compile_native.py --compiler emlf \
 
 In the actual driver, runtime path and GMP flag discovery happen **before**
 measurement. Paths are passed as argument arrays, not interpreted by a shell.
-MLF uses the general [native driver](../scripts/compile_native.py): checked
+MLF uses the general native driver (`scripts/compile_native.py`, retired): checked
 eMLF → xMLF → LLVM emission overlaps Clang `-O2` compilation of the **fresh C
 runtime**. Clang then compiles the LLVM IR and links the runtime object and GMP.
 At most two compiler processes overlap within an MLF build. This scheduling

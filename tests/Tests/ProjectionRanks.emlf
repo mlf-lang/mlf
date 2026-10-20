@@ -16,6 +16,10 @@ ranks = do
    let indices = L.range 0 (L.length ordered - 1)
    let forward = IM.fromList (L.zip ordered indices)
    let backward = IM.fromList (L.zip indices ordered)
+   -- Values are deliberately bottom: rank and selection depend only on keys.
+   let nodeTree = case IM.fromList (L.map (\key -> Pair key (panic "projection forced an unused node" : Node)) (L.reverse ordered)) of IntMap tree -> tree
+   L.mapM_ (\key -> H.assert (S.rankIdentity key 0 nodeTree == IM.get key forward) "node-map rank disagrees with independent renaming map") ordered
+   L.mapM_ (\index -> H.assert (H.eq (S.selectIdentity index nodeTree) (case IM.lookup index backward of {Nothing -> Left "scope placeholder escaped local unification"; Just key -> Right key})) "node-map inverse rank disagrees with independent renaming map") (L.append indices (Cons (-1) (Cons (L.length ordered) Nil)))
    L.mapM_ (\key -> H.assert (S.compactIdentity G.emptyGraph selected key == IM.get key forward) "projection rank disagrees with independent map") ordered
    L.mapM_ (\key -> let alias = Graph IM.empty (IM.singleton (key + 1) key) 0 in H.assert (S.compactIdentity alias selected (key + 1) == IM.get key forward) "projection did not resolve an external alias") ordered
    L.mapM_ (\index -> H.assert (H.eq (S.originalIdentity selected index) (case IM.lookup index backward of { Nothing -> Left "scope placeholder escaped local unification"; Just key -> Right key })) "projection selection disagrees with independent map") (L.append indices (Cons (-1) (Cons (L.length ordered) (Cons (L.length ordered + 100) Nil))))) (Cons keys (Cons (IS.difference keys (IS.fromList (L.filter (\key -> remInt key 2 == 0) supplied))) Nil))) (Cons 1 (Cons 17 Nil))) (Cons 0 (Cons (-10000) (Cons 1000000000000000000000000000000000000000000000000000000000000001 Nil)))) (Cons 0 (Cons 1 (Cons 2 (Cons 3 (Cons 5 (Cons 17 (Cons 65 (Cons 257 Nil))))))))

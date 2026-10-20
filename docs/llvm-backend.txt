@@ -1,10 +1,10 @@
 xMLF to LLVM backend
 ====================
 
-MLF.LLVM.emitLLVM :: MLF.X.Syntax.Term -> Either String String
-MLF.LLVM.emitLLVMIO :: MLF.X.Syntax.Term -> Either String String
+Bootstrap.LLVM.emitLLVM : XTerm -> Either String String
+Bootstrap.LLVM.emitLLVMIO : XTerm -> Either String String
 
-Both public entry points invoke MLF.X.Check.checkClosed before erasure.
+Both public entry points invoke Bootstrap.X.Check.checkClosed before erasure.
 It accepts caller-constructed or parsed target terms independently of source
 inference. Type abstractions, applications, and computation evidence are
 checked and then erased. Invalid unused subterms are still rejected.
@@ -12,8 +12,8 @@ checked and then erased. Invalid unused subterms are still rejected.
 The CLI exposes --xmlf-to-llvm for saved xMLF and --emit-llvm for eMLF source.
 Both accept files or stdin; --emit-llvm also accepts --expr and --no-prelude.
 --llvm-runtime locates installed package data or the source checkout when
-the executable is invoked directly from dist-newstyle. Cabal packages the
-runtime C file and header as data files.
+the executable is invoked directly from .mlf-build. Native release packages
+include the runtime C files and headers beside their libexec directory.
 
 Lowering
 --------
@@ -23,7 +23,7 @@ blocks for constructor cases. It does not embed an xMLF AST or bytecode for
 the runtime to interpret. A small documented 64-bit runtime ABI supports
 tagged immediates and direct field loads, guarded by C static assertions.
 
-MLF.LLVM.Optimize first freshens lexical binders, including identities reused
+Bootstrap.LLVM.Optimize first freshens lexical binders, including identities reused
 in disjoint scopes. It removes erased identity coercions, performs bounded
 beta/let/constructor-case simplification, and lowers the standard recursive
 datatype encoding of a fixed point to LetRec. Recognition follows resolved
@@ -38,7 +38,7 @@ use fadd/fsub/fmul/fdiv, ordered comparisons, and llvm.sqrt.f64, without
 fast-math or contraction flags. The checked, evaluated Double payload is at
 byte 24. Generic curried primitive calls use equivalent runtime operations.
 
-MLF.LLVM.Analysis finds named functions, closes their capture sets, and solves
+Bootstrap.LLVM.Analysis finds named functions, closes their capture sets, and solves
 conservative argument demand to a least fixed point. A saturated known call
 uses a native worker taking its captures and all arguments directly. Proven
 strict arguments are evaluated at saturation; others remain lazy. Escaping
@@ -67,14 +67,14 @@ action and discards its result without forcing it. Other entries evaluate to
 weak head normal form and discard the value. Arbitrary polymorphic results
 are not implicitly shown or printed.
 
-emitLLVMIO requires an IO entry, matching MLF.Runtime.runTerm. The general
-emitLLVM entry matches MLF.Runtime.runProgram, which also accepts pure terms.
+emitLLVMIO requires an IO entry, matching Bootstrap.Runtime.runTerm. The general
+emitLLVM entry matches Bootstrap.Runtime.runProgram, which also accepts pure terms.
 This lets both backends test the same entry contracts without changing the
 CLI's existing IO-only --run or general native compilation behavior.
 
 Native numeric IO regions
 -------------------------
-MLF.LLVM.Kernel recognizes first-order IO functions whose bodies consist of
+Bootstrap.LLVM.Kernel recognizes first-order IO functions whose bodies consist of
 bind/return, lets, conditionals, array and table operations, raw byte input
 and output, allocation, and calls to other eligible functions. Each region must ultimately reach a
 concrete IO primitive; an unconstrained recursive pure function is not enough.
@@ -159,7 +159,7 @@ index below the length, rejecting negative and GMP-sized indices before the
 cell access. Pointer cells remain lazy: reading returns the stored value and
 writing does not force it. Cell loads are never reused across writes. Array
 allocation and opaque state actions retain the runtime path, including the
-bounded worker fallback. Both the Haskell and MLF emitters implement this rule.
+bounded worker fallback. The native MLF emitter implements this rule.
 
 An exact forward byte-copy loop may lower to llvm.memmove after checking its
 complete source/destination ranges and aliasing. A positive overlapping
@@ -310,7 +310,7 @@ compiles and links emitted IR with Clang. It includes:
   values and signed zero, branch-local payload loads, unused failing arguments,
   the eight-variant limit with a boxed fallback, and integer range transitions
   through negative values and GMP promotion. A native array loop checks
-  multiplication/quotient/remainder/AND results against Haskell Integer, including
+  multiplication/quotient/remainder/AND results against independent arbitrary-precision expectations, including
   machine overflow and the small-minimum / -1 boundary.
 - All 256 byte values, UTF-8 and embedded NUL copies, fresh/shared byte arrays,
   raw slices, empty output, GC retention, error ordering and write failures.
@@ -326,8 +326,9 @@ compiles and links emitted IR with Clang. It includes:
 - Inspection of the actual Maybe superclass and multiparameter State example
   results, rather than merely constructing their outer data tag.
 - All seven Snake transcripts compared byte for byte with both xMLF erasure
-  execution and the independent Haskell implementation, plus all eleven
-  pure-rule outcomes checked against Haskell and handwritten expectations.
+  execution and the independent Tests.SnakeBaseline MLF implementation, plus
+  all eleven pure-rule outcomes checked against the baseline and handwritten
+  expectations.
 - All IO and Prelude execution regressions, including repeated actions,
   action ordering, laziness, polymorphic dictionaries, IO failures, and
   both sides of the three monad laws.
@@ -335,7 +336,7 @@ compiles and links emitted IR with Clang. It includes:
 Observations include success or failure, ordered read requests, separate
 writes (including empty writes), exact binary output, and unconsumed input.
 Valid UTF-8 byte writes share the existing text observation; arbitrary byte
-sequences retain ByteString observations. Native stdout is captured as bytes.
+sequences retain binary byte observations. Native stdout is captured as bytes.
 A test-only stdio
 bridge records native events and injects write failures; stdout is checked
 against those events too. The production runtime is unchanged by tracing.
@@ -343,23 +344,20 @@ Only known diagnostic wording differences are normalized; crashes, malformed
 traces, sanitizer reports, and timeouts fail the harness. Expected outputs
 and traces remain independent assertions after backend agreement.
 
-Each interpreter execution runs in a forked process with its timeout in the
-parent. A timer in the interpreter process can prevent GHC from reporting
-NonTermination for a recursive black hole. Forking also preserves the exact
-AST identities and hints used by caller-constructed target tests. Native
-executables are reused for identical IR, but observations are never cached.
+Each interpreter and LLVM execution runs through a native process transport,
+with a parent-enforced timeout and ordered trace checks. The MLF harness
+serializes and independently checks caller-constructed target terms before
+execution. Native executables are reused for identical IR; observations are
+never cached.
 
-MLF_LLVM_TEST_CFLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer'
-instruments the runtime, trace bridge, and native program when running
-cabal test backend-tests -j1. MLF_LLVM_TEST_OPT=-O0 runs the entire same
-matrix with LLVM optimization disabled (the default is -O2).
-Adding -DMLF_GC_INTEGER_BYTES=64 to the sanitizer flags exercises frequent
-collection driven by large-integer storage as well as the low object limit.
-The compiler/graph/annotation/oracle/Figure 12 suites remain separate and are
-included in cabal test -j1.
+Run ./mlfpkg --timeout 21600 test --target backends for both complete layouts.
+The compiler/graph/annotation/oracle/Figure 12 suites run in the unit group;
+plain ./mlfpkg --timeout 21600 test includes all six groups. Runtime tracing,
+ABI probes, and transport fixtures live in tests/native/. No GHC, Cabal, or
+Python is needed.
 
 The emitted Snake module has also been verified with llvm-as and compiled
-through the CLI from saved, printed-and-parsed xMLF. The numeric and array
+through the CLI from saved, printed-and-parsed xBootstrap. The numeric and array
 extensions add nominal primitive types and literals; they do not change the
 graph typing or xMLF computation rules.
 

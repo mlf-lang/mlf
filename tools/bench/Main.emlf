@@ -172,8 +172,8 @@ main = do
    S.mapM_ (\(Pair path expected) -> do
     hash <- fileDigest path
     O.require (J.equal (J.str hash) expected) ("pinned source changed: " ++ path)) (J.items (J.get "pinned_sha256" manifest))
-   O.run "" (Cons clang (S.append (O.words "-O2 -std=c11 test/host_support.c -o") (one (directory ++ "/host-support"))))
-   O.run "" (Cons clang (S.append (O.words "-O2 -std=c11 test/binary_files.c -o") (one (directory ++ "/binary-files"))))
+   O.run "" (Cons clang (S.append (O.words "-O2 -std=c11 tests/native/host_support.c -o") (one (directory ++ "/host-support"))))
+   O.run "" (Cons clang (S.append (O.words "-O2 -std=c11 tests/native/binary_files.c -o") (one (directory ++ "/binary-files"))))
    setEnv "MLF_TEST_HOST_SUPPORT" (directory ++ "/host-support")
    setEnv "MLF_TEST_BINARY_FILES" (directory ++ "/binary-files")
    code <- O.exec "" (O.words "pkg-config --cflags --libs gmp") "" (directory ++ "/gmp.flags") (directory ++ "/gmp.err") 60
@@ -183,7 +183,7 @@ main = do
    O.run "" (Cons clang (S.append (O.words "-O3 benchmarks/fasta/c/upstream.c -lm -o") (one (directory ++ "/fasta-generator"))))
    let files = S.append (Cons candidate (Cons baseline (Cons clang (Cons "runtime/mlf_runtime.c" (Cons "runtime/mlf_runtime.h" (Cons "runtime/khash.h" (Cons "benchmarks/manifest.json" (Cons "tools/bench/Main.emlf" Nil)))))))) (S.concatMap (\w -> S.map (\l -> V.text l (J.get "sources" w)) (O.words "c mlf")) (V.array "workloads" manifest))
    runner <- getExecutablePath
-   let dependencies = S.append (two runner backend) (O.words "runtime/mlf_system.h test/host_support.c test/binary_files.c package/Package/Benchmark.emlf package/Package/Verification.emlf package/Package/Json.emlf package/Package/OS.emlf tools/bench/mlf-package.json")
+   let dependencies = S.append (two runner backend) (O.words "runtime/mlf_system.h tests/native/host_support.c tests/native/binary_files.c package/Package/Benchmark.emlf package/Package/Verification.emlf package/Package/Json.emlf package/Package/OS.emlf tools/bench/mlf-package.json")
    fingerprints <- S.mapM (\path -> do { hash <- fileDigest path; return (Pair path hash) }) (S.nubBy eqString (S.append files dependencies))
    let workloads = S.filter (\work -> S.null selected || S.elem eqString (V.text "name" work) selected) (V.array "workloads" manifest)
    rows <- S.mapM (workload c) workloads

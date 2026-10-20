@@ -1,31 +1,142 @@
 module Tests.SeparateBackends where
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
-import qualified Package.OS as OS
+import qualified Package.OS as O
+import qualified Package.Json as J
 import qualified Tests.Helpers as H
-import Tests.Helpers (Quint(..), Sext(..))
+import Tests.Helpers (Quint(..))
 import qualified Tests.Map as M
 import Tests.Backends
-import Bootstrap.Separate
-import Bootstrap.Module (loadModuleMap)
-import Bootstrap.Module (moduleIdentity)
+import qualified Tests.Backends as B
+import qualified Bootstrap.Separate as Framing
+import qualified Bootstrap.CrateArtifact as Artifact
+import Bootstrap.Module (loadModuleMap, moduleIdentity)
 import Bootstrap.Parser (parseModule)
 import qualified Bootstrap.X.Parser as XP
 import Tests.Modules ()
-import Tests.Separate (separatePrograms, compileSeparateProgram)
-import qualified Tests.Backends as B
+import Tests.Separate (separatePrograms, compileSeparateProgram, fixtureIdentity)
 import Tests.System
-import qualified Package.OS as O
 import Prelude hiding (listDirectory)
 
-separateBackendTests : B.Backends -> (List ( (Pair (String) (IO Unit)) ))
-separateBackendTests backends = (H.append (S.concatMap (\(Quint label mode libraries source expected) -> (Cons (Pair (H.append "separate runtime: " label) do { objects <- (S.either H.fail return (compileSeparateProgram mode libraries source)); do { term <- (S.either H.fail return (linkObjects objects "Main")); do { observed <- (execute backends IOEntry (Input "" false) term); do { (S.either (S.compose H.fail H.show) return (outcome observed)); (S.unless (H.eq (output observed) expected) (H.fail (H.show observed))) } } } }) Nil)) separatePrograms) (H.append (S.concatMap (\fixture -> case fixture of { (Quint label _ _ _ _) -> (Cons (Pair (H.append "separate CLI: " label) (cliProgram backends fixture)) Nil) }) separatePrograms) (Cons (Pair "separate runtime: interface-only CLI and invalidation" (cliTests backends)) Nil)))
+separateBackendTests : B.Backends -> List (Pair String (IO Unit))
+separateBackendTests backends = S.append
+  (S.map (\(Quint label mode libraries source expected) -> Pair ("crate runtime: " ++ label) do
+    result <- compileSeparateProgram mode libraries source
+    objects <- H.right result
+    term <- H.right (Artifact.linkObjects objects fixtureIdentity)
+    observed <- execute backends IOEntry (Input "" false) term
+    H.right (outcome observed)
+    H.assert (H.eq (output observed) expected) (H.show observed)) separatePrograms)
+  (S.append (S.map (\fixture -> case fixture of {Quint label _ _ _ _ -> Pair ("crate CLI: " ++ label) (cliProgram backends fixture)}) separatePrograms)
+    (Cons (Pair "crate runtime: source-free metadata and semantic invalidation" (cliTests backends)) Nil))
 
 selectedCompiler : IO String
-selectedCompiler = do { configured <- (lookupEnv "MLF_BOOTSTRAP_COMPILER"); do { nativeDrivers <- (H.fmap (S.any (\section1 -> (S.not (H.eq section1 Nothing)))) (S.mapM lookupEnv (Cons "MLF_BOOTSTRAP_INTERPRETER" (Cons "MLF_BOOTSTRAP_LLVM" Nil)))); do { selected <- (case configured of { (Just candidate) -> (return candidate); Nothing -> do { (S.unless (S.not nativeDrivers) (H.fail "Native separate-module tests require MLF_BOOTSTRAP_COMPILER")); (return "emlf") } }); (bind (findExecutable selected) (S.maybe (H.fail "Cannot find module compiler") canonicalizePath)) } } }
+selectedCompiler = do
+  configured <- lookupEnv "MLF_BOOTSTRAP_COMPILER"
+  selected <- case configured of {Just candidate -> return candidate; Nothing -> H.fail "Native crate tests require MLF_BOOTSTRAP_COMPILER"}
+  bind (findExecutable selected) (S.maybe (H.fail "Cannot find crate compiler") canonicalizePath)
 
-cliProgram : B.Backends -> (Quint String PreludeMode (List (Pair String String)) String String) -> IO Unit
-cliProgram backends (Quint _ mode libraries source expected) = (withScratch (\directory -> do { compiler <- selectedCompiler; do { root <- (S.either H.fail return (parseModule "Main.emlf" source)); do { graph <- (S.either H.fail return (loadModuleMap (M.fromList (S.concatMap (\(Pair n s) -> (Cons (Pair n (Pair (H.append n ".emlf") s)) Nil)) libraries)) root)); (let { originals = (M.insert "Main" source (M.fromList libraries)) } in (let { prefix name = (O.join directory (H.stringMap (\c -> (if (H.eq c 46) then 47 else c)) name)) } in (let { options = (case mode of { ImplicitPrelude -> Nil; NoImplicitPrelude -> (Cons "--no-prelude" Nil) }) } in (let { command args = do { (Triple code out err) <- (readProcessWithExitCode compiler (H.append options (H.append (Cons "-i" (Cons directory Nil)) args)) ""); do { (S.unless ((H.eq code ExitSuccess) && (H.null err)) (H.fail (H.show (Quad args code out err)))); (return out) } } } in do { ((H.forM_ graph) (\m -> (let { name = (moduleIdentity m) } in (let { file = (H.append (prefix name) ".emlf") } in do { text <- (S.maybe (H.fail (H.append "fixture missing " name)) return (M.lookup name originals)); do { (createDirectoryIfMissing true (O.parent file)); do { (writeFile file text); do { _ <- (command (Cons "--compile-module" (Cons file (Cons "-o" (Cons (prefix name) Nil))))); (removeFile file) } } } })))); do { target <- (command (Cons "--link-module" (Cons (H.append (prefix "Main") ".mlfi") Nil))); do { term <- (S.either H.fail return (XP.parseTerm "<separate CLI corpus>" target)); do { observed <- (execute backends IOEntry (Input "" false) term); do { (S.either (S.compose H.fail H.show) return (outcome observed)); (S.unless (H.eq (output observed) expected) (H.fail (H.show observed))) } } } } })))) } } }))
+command compiler args = do
+  Triple code out err <- readProcessWithExitCode compiler args ""
+  H.assert (H.eq code ExitSuccess && H.null err) (H.show (Quad args code out err))
+  return out
+reject compiler args reason = do
+  Triple code out err <- readProcessWithExitCode compiler args ""
+  H.assert (H.notEqual code ExitSuccess && H.null out && H.contains reason err) (H.show (Quad args code out err))
+
+writeSpec directory identity entry mode sources dependencies prefix = do
+  O.mkdir (O.parent prefix)
+  let fields = Cons "MLF-CRATE-1" (Cons identity (Cons entry
+        (Cons (case mode of {ImplicitPrelude -> "false"; NoImplicitPrelude -> "true"})
+        (Cons (Framing.pack (S.map Framing.pairEncoding sources))
+        (Cons (Framing.pack dependencies) (Cons (prefix ++ ".queries-cache") (Cons (directory ++ "/builtin/unit") Nil)))))))
+  let file = prefix ++ ".spec"
+  writeFile file (Framing.pack fields)
+  return file
+compileSpec compiler file prefix = do
+  _ <- command compiler (Cons "--compile-crate" (Cons file (Cons "-o" (Cons prefix Nil))))
+  return Unit
+runTarget backends expected text = do
+  term <- H.right (XP.parseTerm "<crate CLI>" text)
+  observed <- execute backends IOEntry (Input "" false) term
+  H.right (outcome observed)
+  H.assert (H.eq (output observed) expected) (H.show observed)
+
+cliProgram : B.Backends -> Quint String PreludeMode (List (Pair String String)) String String -> IO Unit
+cliProgram backends (Quint _ mode libraries source expected) = withScratch (\directory -> do
+  compiler <- selectedCompiler
+  root <- H.right (parseModule "Main.emlf" source)
+  graph <- H.right (loadModuleMap (M.fromList (S.map (\(Pair n text) -> Pair n (Pair (n ++ ".emlf") text)) libraries)) root)
+  let originals = M.insert "Main" source (M.fromList libraries)
+  paths <- S.mapM (\m -> do
+    let name = moduleIdentity m
+    let path = directory ++ "/sources/" ++ H.stringMap (\c -> if c == 46 then 47 else c) name ++ ".emlf"
+    text <- S.maybe (H.fail ("fixture missing " ++ name)) return (M.lookup name originals)
+    O.mkdir (O.parent path)
+    writeFile path text
+    return (Pair name path)) graph
+  let prefix = directory ++ "/main"
+  spec <- writeSpec directory fixtureIdentity "Main" mode paths Nil prefix
+  compileSpec compiler spec prefix
+  iface <- bind (readFile (prefix ++ ".mlfci")) (S.compose H.right Artifact.decodeInterface)
+  _ <- bind (readFile (prefix ++ ".mlfco")) (S.compose H.right (Artifact.decodeObject iface))
+  S.mapM_ (\(Pair _ path) -> removeFile path) paths
+  target <- command compiler (Cons "--link-crate" (Cons (prefix ++ ".mlfci") Nil))
+  runTarget backends expected target)
 
 cliTests : B.Backends -> IO Unit
-cliTests backends = (withScratch (\directory -> do { compiler <- selectedCompiler; (let { library = (O.join directory "compiled libraries") } in (let { source = (O.join directory "Library.emlf") } in (let { entry = (O.join directory "Main.emlf") } in (let { prefix = (O.join library "Library") } in (let { mainPrefix = (O.join directory "Main") } in (let { command args = do { (Triple code out err) <- (readProcessWithExitCode compiler args ""); do { (S.unless ((H.eq code ExitSuccess) && (H.null err)) (H.fail (H.show (Quad args code out err)))); (return out) } } } in (let { reject args reason = do { (Triple code out err) <- (readProcessWithExitCode compiler args ""); (S.unless ((S.not (H.eq code ExitSuccess)) && ((H.null out) && (H.contains reason err))) (H.fail (H.show (Triple code out err)))) } } in (let { librarySource value = (S.unlines (Cons "module Library (Box(..), identity, answer) where" (Cons "data Box a = Box a" (Cons "identity x = x" (Cons (H.append "answer = " value) Nil))))) } in (let { buildLib value = do { (writeFile source (librarySource value)); do { _ <- (command (Cons "--compile-module" (Cons source (Cons "-o" (Cons prefix Nil))))); (removeFile source) } } } in (let { link = (command (Cons "-i" (Cons library (Cons "--link-module" (Cons (H.append mainPrefix ".mlfi") Nil))))) } in (let { runTarget expected target = do { term <- (S.either H.fail return (XP.parseTerm "<separate CLI>" target)); do { observed <- (execute backends IOEntry (Input "" false) term); do { (S.either (S.compose H.fail H.show) return (outcome observed)); (S.unless (H.eq (output observed) expected) (H.fail (H.show observed))) } } } } in do { (createDirectory library); do { (buildLib "42"); do { nativeInterface <- (bind (readFile (H.append prefix ".mlfi")) (S.compose (S.either H.fail return) decodeInterface)); do { _ <- (bind (readFile (H.append prefix ".mlfo")) (S.compose (S.either H.fail return) (decodeObject nativeInterface))); do { sourceModule <- (S.either H.fail return (parseModule source (librarySource "42"))); do { (UnitObject prelude _) <- (S.either H.fail return builtinPrelude); do { seedObject <- (S.either H.fail return (compileUnit ImplicitPrelude (Cons prelude Nil) sourceModule)); (case seedObject of { (UnitObject seedInterface _) -> do { (writeFile (H.append prefix ".mlfo") (encodeObject seedObject)); do { (writeFile (H.append prefix ".mlfi") (encodeInterface seedInterface)); do { originalInterface <- (readFile (H.append prefix ".mlfi")); do { originalObject <- (readFile (H.append prefix ".mlfo")); do { (seq (seq (H.length originalInterface) (H.length originalObject)) (return Unit)); do { (renameFile (H.append prefix ".mlfo") (H.append prefix ".saved")); do { (writeFile entry (S.unlines (Cons "module Main where" (Cons "import Library" (Cons "main = case identity (Box answer) of" (Cons "  Box n -> printInt n" Nil)))))); do { _ <- (command (Cons "-i" (Cons library (Cons "--compile-module" (Cons entry (Cons "-o" (Cons mainPrefix Nil))))))); do { (removeFile entry); do { (reject (Cons "-i" (Cons library (Cons "--link-module" (Cons (H.append mainPrefix ".mlfi") Nil)))) ".mlfo"); do { (renameFile (H.append prefix ".saved") (H.append prefix ".mlfo")); do { target <- link; do { (runTarget "42\n" target); do { direct <- (command (Cons "-i" (Cons library (Cons "--module-to-llvm" (Cons (H.append mainPrefix ".mlfi") Nil))))); do { (Triple code llvm errors) <- (readProcessWithExitCode compiler (Cons "--xmlf-to-llvm" Nil) target); do { (S.unless ((H.eq code ExitSuccess) && ((H.null errors) && (H.eq direct llvm))) (H.fail "separate LLVM emission differs from checked target emission")); do { (buildLib "43"); do { (bind link (runTarget "43\n")); do { (buildLib "\"changed type\""); do { (reject (Cons "-i" (Cons library (Cons "--link-module" (Cons (H.append mainPrefix ".mlfi") Nil)))) "stale dependency interface"); do { (writeFile (H.append prefix ".mlfi") originalInterface); do { (writeFile (H.append prefix ".mlfo") (H.append originalObject "corrupt")); do { (reject (Cons "-i" (Cons library (Cons "--link-module" (Cons (H.append mainPrefix ".mlfi") Nil)))) "artifact"); do { (writeFile (H.append prefix ".mlfo") originalObject); do { (writeFile (H.append prefix ".mlfi") "6:MLFI-9"); do { (reject (Cons "-i" (Cons library (Cons "--link-module" (Cons (H.append mainPrefix ".mlfi") Nil)))) "unsupported"); do { (writeFile (H.append prefix ".mlfi") originalInterface); (bind link (runTarget "42\n")) } } } } } } } } } } } } } } } } } } } } } } } } } } } }) } } } } } } }))))))))))) }))
+cliTests backends = withScratch (\directory -> do
+  compiler <- selectedCompiler
+  let source = directory ++ "/Library.emlf"
+  let entry = directory ++ "/Main.emlf"
+  let prefix = directory ++ "/compiled libraries/Library"
+  let mainPrefix = directory ++ "/Main"
+  let librarySource value = "module Library (Box(..), identity, answer) where\ndata Box a = Box a\nidentity x = x\nanswer = " ++ value ++ "\n"
+  librarySpec <- writeSpec directory "fixture:library" "" ImplicitPrelude (Cons (Pair "Library" source) Nil) Nil prefix
+  let buildLibrary value = do
+        writeFile source (librarySource value)
+        compileSpec compiler librarySpec prefix
+        removeFile source
+  let entrySource = "module Main where\nimport Library\nmain = case identity (Box answer) of { Box n -> printInt n }\n"
+  mainSpec <- writeSpec directory "fixture:application" "Main" ImplicitPrelude (Cons (Pair "Main" entry) Nil) (Cons (prefix ++ ".mlfci") Nil) mainPrefix
+  let compileMain = do
+        writeFile entry entrySource
+        compileSpec compiler mainSpec mainPrefix
+        removeFile entry
+  let link = command compiler (Cons "--link-crate" (Cons (mainPrefix ++ ".mlfci") Nil))
+  buildLibrary "42"
+  originalInterface <- readFile (prefix ++ ".mlfci")
+  originalObject <- readFile (prefix ++ ".mlfco")
+  _ <- H.right (Artifact.decodeInterface originalInterface)
+  seq (stringLength originalObject) (return Unit)
+  -- Downstream inference consumes generated metadata with both upstream source
+  -- and implementation absent. Linking still requires the checked object.
+  renameFile (prefix ++ ".mlfco") (prefix ++ ".saved")
+  compileMain
+  reject compiler (Cons "--link-crate" (Cons (mainPrefix ++ ".mlfci") Nil)) ".mlfco"
+  renameFile (prefix ++ ".saved") (prefix ++ ".mlfco")
+  target <- link
+  runTarget backends "42\n" target
+  direct <- command compiler (Cons "--crate-to-llvm" (Cons (mainPrefix ++ ".mlfci") Nil))
+  -- The target-input command receives stdin explicitly through the process
+  -- adapter, since ordinary crate commands have no source stdin.
+  Triple llvmCode serializedLLVM llvmErrors <- readProcessWithExitCode compiler (Cons "--xmlf-to-llvm" Nil) target
+  H.assert (H.eq llvmCode ExitSuccess && H.null llvmErrors && H.eq direct serializedLLVM) "crate LLVM emission differs from checked target emission"
+  buildLibrary "43"
+  changed <- link
+  runTarget backends "43\n" changed
+  compileMain
+  report <- J.read (mainPrefix ++ ".queries")
+  let groups = J.values (J.get "groups" report)
+  H.assert (J.equal (J.get "inferred_groups" report) (J.num 0) && S.not (S.null groups) && S.all (J.getBool "cached" false) groups) "unchanged upstream semantic schemes invalidated downstream inference"
+  buildLibrary "\"changed type\""
+  reject compiler (Cons "--link-crate" (Cons (mainPrefix ++ ".mlfci") Nil)) "stale crate dependency interface"
+  writeFile (prefix ++ ".mlfci") originalInterface
+  writeFile (prefix ++ ".mlfco") (originalObject ++ "corrupt")
+  reject compiler (Cons "--link-crate" (Cons (mainPrefix ++ ".mlfci") Nil)) "malformed crate object framing"
+  writeFile (prefix ++ ".mlfco") originalObject
+  writeFile (prefix ++ ".mlfci") "7:MLFCI-9"
+  reject compiler (Cons "--link-crate" (Cons (mainPrefix ++ ".mlfci") Nil)) "unsupported"
+  writeFile (prefix ++ ".mlfci") originalInterface
+  restored <- link
+  runTarget backends "42\n" restored)

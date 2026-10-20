@@ -3,11 +3,11 @@
 set -euo pipefail
 test "$(uname -s):$(uname -m)" = Darwin:arm64
 scripts=$(cd -- "$(dirname -- "$0")" && pwd)
-# Separate module inference bounds the current compiler build. Immutable older
-# tags can still request one source unit; collect those more frequently instead
-# of imposing a hard heap cap. Explicit caller policies remain authoritative.
+# Current tools release inference graphs per SCC; older seed managers use the
+# default separate-module path. Immutable older tags can request source linking.
+# Explicit caller collection policies remain authoritative.
 if [ -z "${GC_FREE_SPACE_DIVISOR:-}" ]; then
-  if jq -e '.executables.emlf.link == "separate"' mlf-package.json >/dev/null; then
+  if jq -e '(.executables.emlf.link // "separate") == "separate"' mlf-package.json >/dev/null; then
     GC_FREE_SPACE_DIVISOR=1
   else
     GC_FREE_SPACE_DIVISOR=4

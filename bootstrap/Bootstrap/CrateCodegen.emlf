@@ -1,0 +1,124 @@
+module Bootstrap.CrateCodegen where
+
+import Bootstrap.Types
+import Bootstrap.Std
+import qualified Bootstrap.LLVM as LLVM
+import qualified Bootstrap.X.Checked as Checked
+import qualified Bootstrap.CrateArtifact as Artifact
+import qualified Bootstrap.CrateQuery as Query
+import qualified Bootstrap.Separate as Separate
+
+-- Both queries start from a checked linked program. The first erases types;
+-- the second observes the existing whole-program optimizer's result. No
+-- function-level optimization facts are replayed across unrelated programs.
+data CodegenResult = CodegenResult (List String) Bool Bool String String String
+codeChunks (CodegenResult chunks _ _ _ _ _) = chunks
+inputReused (CodegenResult _ reused _ _ _ _) = reused
+optimizedReused (CodegenResult _ _ reused _ _ _) = reused
+inputDigest (CodegenResult _ _ _ digest _ _) = digest
+optimizedDigest (CodegenResult _ _ _ _ digest _) = digest
+compilerDigest (CodegenResult _ _ _ _ _ digest) = digest
+
+validDigestFrom : String -> Int -> Bool
+validDigestFrom value index = if index == stringLength value then true else
+  let code = stringCodeAt value index in
+  ((code >= 48 && code <= 57) || (code >= 97 && code <= 102)) && validDigestFrom value (index+1)
+validDigest value = stringLength value == 64 && validDigestFrom value 0
+cacheFields key codeHash objectId = Cons "MLF-CODEGEN-CACHE-1" (Cons key (Cons codeHash (Cons objectId Nil)))
+encodeCached key codeHash objectId = let fields = cacheFields key codeHash objectId in Separate.pack (snoc fields (Separate.fingerprint (Separate.pack fields)))
+decodeCached key text = do
+  fields <- Separate.unpack text
+  case fields of
+    Cons "MLF-CODEGEN-CACHE-1" (Cons savedKey (Cons codeHash (Cons objectId (Cons checksum Nil)))) -> do
+      ensure (eqString key savedKey) "code generation cache key mismatch"
+      ensure (validDigest codeHash && validDigest objectId) "invalid code generation cache digest"
+      ensure (eqString checksum (Separate.fingerprint (Separate.pack (cacheFields savedKey codeHash objectId)))) "code generation cache metadata checksum mismatch"
+      ensure (eqString text (encodeCached savedKey codeHash objectId)) "noncanonical code generation cache metadata"
+      Right (Pair codeHash objectId)
+    _ -> Left "unsupported code generation cache metadata"
+
+readCached directory metadata key = do
+  input <- Separate.readStrict metadata
+  case bindEither input (decodeCached key) of
+    Left error -> ioReturn (Left error)
+    Right (Pair expected objectId) -> do
+      let path = directory ++ "/objects/" ++ objectId ++ ".ll"
+      present <- fileExists path
+      if not present then ioReturn (Left "missing cached LLVM output") else do
+        actual <- fileDigest path
+        if not (eqString expected actual) then ioReturn (Left "cached LLVM output checksum mismatch") else do
+          code <- readFile path
+          ioReturn (Right (Triple (Cons code Nil) actual objectId))
+
+digestKey directory key = do
+  writeFile (directory ++ "/query-key.new") key
+  fileDigest (directory ++ "/query-key.new")
+saltedKey compiler key = Separate.pack (Cons "MLF-CODEGEN-QUERY-1" (Cons compiler (Cons key Nil)))
+reportJSON result = "{\"format\":1,\"input_reused\":" ++ Query.boolean (inputReused result) ++ ",\"optimized_reused\":" ++ Query.boolean (optimizedReused result) ++ ",\"compiler\":" ++ Query.jsonString (compilerDigest result) ++ ",\"input_key\":" ++ Query.jsonString (inputDigest result) ++ ",\"optimized_key\":" ++ Query.jsonString (optimizedDigest result) ++ "}\n"
+saveReport directory result = do
+  saved <- Query.writeCache (directory ++ "/last-query.json") (reportJSON result)
+  ioReturn (mapEither (\_ -> result) saved)
+
+emitLocked directory compiler compact requireIO checked inputKey = do
+  let input = saltedKey compiler inputKey
+  inputId <- digestKey directory input
+  let inputPath = directory ++ "/inputs/" ++ inputId ++ ".mlfcg"
+  cached <- readCached directory inputPath input
+  case cached of
+    Right (Triple chunks _ optimizedId) -> saveReport directory (CodegenResult chunks true false inputId optimizedId compiler)
+    Left _ -> case LLVM.prepareChecked compact requireIO checked of
+      Left error -> ioReturn (Left error)
+      Right prepared -> do
+        let optimized = saltedKey compiler (LLVM.preparedKey prepared)
+        optimizedId <- digestKey directory optimized
+        let optimizedPath = directory ++ "/prepared/" ++ optimizedId ++ ".mlfcg"
+        rawPrior <- readCached directory optimizedPath optimized
+        let prior = bindEither rawPrior (\(Triple chunks hash objectId) -> do {ensure (eqString objectId optimizedId) "prepared code generation object identity mismatch"; Right (Triple chunks hash objectId)})
+        generated <- case prior of
+          Right (Triple chunks hash objectId) -> ioReturn (Right (Triple true chunks hash))
+          Left _ -> case LLVM.emitPreparedChunks prepared of
+            Left error -> ioReturn (Left error)
+            Right chunks -> do
+              let output = directory ++ "/objects/" ++ optimizedId ++ ".ll"
+              written <- Query.writeCache output (concatStrings chunks)
+              case written of
+                Left error -> ioReturn (Left error)
+                Right _ -> do
+                  hash <- fileDigest output
+                  saved <- Query.writeCache optimizedPath (encodeCached optimized hash optimizedId)
+                  ioReturn (mapEither (\_ -> Triple false chunks hash) saved)
+        case generated of
+          Left error -> ioReturn (Left error)
+          Right (Triple hit chunks hash) -> do
+            saved <- Query.writeCache inputPath (encodeCached input hash optimizedId)
+            case saved of
+              Left error -> ioReturn (Left error)
+              Right _ -> saveReport directory (CodegenResult chunks false hit inputId optimizedId compiler)
+
+emitChecked : String -> Bool -> Bool -> Checked.CheckedTerm -> IO (Either String CodegenResult)
+emitChecked directory compact requireIO checked = emitWithKey directory compact requireIO checked (LLVM.checkedInputKey compact requireIO checked)
+emitCrateChecked : String -> Bool -> Bool -> Checked.CheckedTerm -> IO (Either String CodegenResult)
+emitCrateChecked directory compact requireIO checked = emitWithKey directory compact requireIO checked (LLVM.crateInputKey compact requireIO checked)
+emitWithKey : String -> Bool -> Bool -> Checked.CheckedTerm -> Either String String -> IO (Either String CodegenResult)
+emitWithKey directory compact requireIO checked key = case key of
+  Left error -> ioReturn (Left error)
+  Right inputKey -> if stringLength directory == 0 then ioReturn (Left "code generation cache directory is empty") else do
+    let cache = Query.cachePath directory
+    made <- Query.cacheCommand (Cons "/bin/mkdir" (Cons "-p" (Cons (cache ++ "/inputs") (Cons (cache ++ "/prepared") (Cons (cache ++ "/objects") Nil)))))
+    if made /= 0 then ioReturn (Left "cannot create code generation query cache") else do
+      executable <- getExecutablePath
+      compiler <- fileDigest executable
+      lock <- acquireFileLock (cache ++ "/.lock")
+      result <- emitLocked cache compiler compact requireIO checked inputKey
+      releaseFileLock lock
+      ioReturn result
+emitCheckedChunks directory compact requireIO checked = do
+  result <- emitChecked directory compact requireIO checked
+  ioReturn (mapEither codeChunks result)
+emitFile directory compact requireIO path = do
+  checked <- Artifact.linkCheckedFile path
+  case checked of
+    Left error -> ioReturn (Left error)
+    Right term -> do
+      result <- emitCrateChecked directory compact requireIO term
+      ioReturn (mapEither codeChunks result)

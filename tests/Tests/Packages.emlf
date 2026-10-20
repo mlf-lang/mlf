@@ -2,8 +2,10 @@
 module Tests.Packages where
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
+import qualified Bootstrap.CrateArtifact as Artifact
 import qualified Package.OS as O
 import qualified Package.Json as J
+import qualified Package.Build as B
 import qualified Tests.Basic as H
 import qualified Tests.Basic as Sys
 
@@ -45,11 +47,17 @@ integration = Sys.withScratch (\dir -> do
  expect c (Cons "build" Nil) true ""
  initial <- report c
  H.assert (S.all (\row -> S.not (J.getBool "cached" true row)) (J.values (J.get "builds" initial))) "first package build reused an artifact"
+ S.mapM_ (\row -> do
+  detailed <- J.read (J.getText "query_report" "" row)
+  let summary = J.get "queries" row
+  H.assert (S.not (J.has "groups" summary) && J.equal (J.get "group_count" summary) (J.num (S.length (J.values (J.get "groups" detailed))))) "build report did not preserve a compact query summary") (J.values (J.get "crates" initial))
  runBinary c "Hello, local packages!\n"
  passed "transitive local dependencies, ADT, do notation, spaces in paths"
  expect c (Cons "build" Nil) true ""
  cached <- report c
  H.assert (S.all (J.getBool "cached" false) (J.values (J.get "builds" cached))) "unchanged package build missed cache"
+ H.assert (S.all (\row -> let queries = J.get "queries" row in J.getBool "outer_cached" false queries && J.equal (J.get "inferred_groups" queries) (J.num 0) && J.equal (J.get "reused_groups" queries) (J.get "group_count" queries)) (J.values (J.get "crates" cached))) "outer artifact hits did not normalize query summary counters"
+ H.assert (S.all (\row -> let validation = J.get "validation" row in J.getBool "outer_cached" false validation && S.not (J.getBool "root_checked" true validation) && J.equal (J.get "checked_objects" validation) (J.num 0) && J.equal (J.get "reused_objects" validation) (J.get "object_count" validation)) (J.values (J.get "crates" cached))) "outer artifact hits misreported independent object checks"
  passed "content-addressed no-op build"
  expect c (Cons "test" Nil) true ""
  tested <- report c
@@ -60,7 +68,7 @@ integration = Sys.withScratch (\dir -> do
  let source = work c ++ "/app/message/Message.emlf"
  original <- readFile source
  Sys.removeFile source
- code <- O.exec dir (Cons compiler (Cons "-i" (Cons (artifact ++ "/modules") (Cons "--run-module" (Cons (artifact ++ "/modules/Main.mlfi") Nil))))) "" (dir ++ "/interface.out") (dir ++ "/interface.err") 60
+ code <- O.exec dir (Cons compiler (Cons "--run-crate" (Cons (artifact ++ "/unit.mlfci") Nil))) "" (dir ++ "/interface.out") (dir ++ "/interface.err") 60
  out <- readFile (dir ++ "/interface.out")
  H.assert (code == 0 && eqString out "Hello, local packages!\n") "interface/object still needs library source"
  writeFile source original
@@ -69,6 +77,13 @@ integration = Sys.withScratch (\dir -> do
  expect c (Cons "build" Nil) true ""
  changed <- report c
  H.assert (S.not (J.getBool "cached" true (S.last (J.values (J.get "builds" changed))))) "dependency implementation edit did not relink"
+ let downstream = S.filter (\row -> S.not (eqString (J.getText "crate" "" row) "message/0.1.0/library")) (J.values (J.get "crates" changed))
+ H.assert (S.length downstream >= 2 && S.all (\row -> J.equal (J.get "inferred_groups" (J.get "queries" row)) (J.num 0)) downstream) "implementation-only change re-inferred downstream declarations"
+ S.mapM_ (\row -> do
+  detailed <- J.read (J.getText "query_report" "" row)
+  H.assert (S.not (J.getBool "outer_cached" true row) && S.any (J.getBool "cached" false) (J.values (J.get "groups" detailed))) "downstream reuse did not exercise persistent inference queries") downstream
+ H.assert (S.all (\row -> let validation = J.get "validation" row in J.getBool "root_checked" false validation && J.equal (J.get "checked_objects" validation) (J.num 1) && (case J.get "reused_objects" validation of {J.Number count -> readInt count > 0; _ -> false})) downstream) "downstream crates re-decoded verified upstream objects or skipped their own independent check"
+ H.assert (S.any (\row -> eqString (J.getText "kind" "" row) "runtime object" && J.getBool "cached" false row) (J.values (J.get "builds" changed))) "implementation-only change rebuilt runtime C"
  runBinary c "Hello, local packages! updated\n"
  passed "transitive implementation edit invalidates the executable"
  expect c (Cons "test" Nil) false "unexpected stdout"
@@ -84,17 +99,24 @@ integration = Sys.withScratch (\dir -> do
  writeFile source original
  expect c (Cons "build" Nil) true ""
  passed "failed compilation preserves the last successful binary"
- let object = output c ++ "/cache/" ++ J.getText "key" "" (S.head rows) ++ "/unit.mlfo"
+ let object = output c ++ "/cache/" ++ J.getText "key" "" (S.head rows) ++ "/unit.mlfco"
  writeFile object "corrupted"
  expect c (Cons "build" Nil) true ""
  repaired <- report c
  H.assert (S.not (J.getBool "cached" true (S.head (J.values (J.get "builds" repaired))))) "tampered object reused"
  runBinary c "Hello, local packages!\n"
  passed "tampered object is rebuilt and checked"
+ O.remove (output c ++ "/query-cache/builtin-prelude")
+ expect c (Cons "build" Nil) true ""
+ restored <- report c
+ H.assert (S.not (J.getBool "cached" true (S.head (J.values (J.get "builds" restored))))) "missing shared Prelude dependency reused an outer crate artifact"
+ runBinary c "Hello, local packages!\n"
+ checkDependencyReceipts (output c ++ "/cache/" ++ J.getText "key" "" (S.head rows) ++ "/dependency-files.json")
+ passed "outer cache validates and repairs the shared Prelude dependency closure"
  O.copy compiler (dir ++ "/other compiler")
  expect c (Cons "--compiler" (Cons (dir ++ "/other compiler") (Cons "build" Nil))) true ""
  alternate <- report c
- H.assert (S.all (\row -> S.not (J.getBool "cached" true row)) (J.values (J.get "builds" alternate))) "compiler path did not affect cache"
+ H.assert (S.all (\row -> S.any (\kind -> eqString (J.getText "kind" "" row) kind) (Cons "runtime object" (Cons "LLVM object" (Cons "native link" Nil))) || S.not (J.getBool "cached" true row)) (J.values (J.get "builds" alternate))) "compiler path did not affect crate cache"
  passed "compiler identity participates in cache keys"
  expect c (Cons "lock" Nil) true ""
  expect c (Cons "--locked" (Cons "build" Nil)) true ""
@@ -113,7 +135,7 @@ integration = Sys.withScratch (\dir -> do
  expect c (Cons "build" Nil) true ""
  expect c (Cons "test" Nil) true ""
  runBinary c "Hello, local packages!\n"
- passed "whole-program local package mode on both backends"
+ passed "legacy source link setting uses crate metadata on both backends"
  writeFile (dir ++ "/app/Echo.emlf") "module Echo where\nimport Private\nmain = do\n  prefix <- getArg 0\n  line <- getLine\n  putStrLn (identity (prefix ++ line))\n"
  writeFile (dir ++ "/app/Private.emlf") "module Private (identity) where\nidentity x = x\n"
  let echo = obj (Cons (field "main" (text "Echo.emlf")) (Cons (field "modules" (obj (Cons (field "Private" (text "Private.emlf")) Nil))) (Cons (field "arguments" (J.stringArray (Cons "prefix:" Nil))) (Cons (field "stdin" (text "hello\n")) (Cons (field "stdout" (text "prefix:hello\n")) Nil)))))
@@ -131,13 +153,135 @@ integration = Sys.withScratch (\dir -> do
  H.assert (S.not (J.getBool "complete" true failure) && J.equal (J.get "exit_code" (S.last (J.values (J.get "commands" failure)))) (J.num 17)) "command failure swallowed"
  passed "external test exit status is propagated"
  extraCases c root
- putStrLn "19 package integration cases passed")
+ crateCases c
+ nonEntryBodyCase c
+ pgoCase c
+ putStrLn "26 package integration cases passed")
+nonEntryBodyCase parent = do
+ let directory = work parent ++ "/library-expression"
+ O.mkdir (directory ++ "/app")
+ let c = Context directory (manager parent) (compiler parent) (directory ++ "/build")
+ let library = obj (Cons (field "modules" (obj (Cons (field "Main" (text "Library.emlf")) Nil))) Nil)
+ let executable = obj (Cons (field "main" (text "App.emlf")) Nil)
+ J.write (directory ++ "/app/mlf-package.json") (obj (Cons (field "format" (J.num 1)) (Cons (field "name" (text "library-expression")) (Cons (field "version" (text "0.1.0")) (Cons (field "library" library) (Cons (field "executables" (obj (Cons (field "hello" executable) Nil))) Nil))))))
+ writeFile (directory ++ "/app/Library.emlf") "42\n"
+ writeFile (directory ++ "/app/App.emlf") "module App where\nimport Main\nmain = printInt 42\n"
+ expect c (Cons "build" Nil) false "top-level expression"
+ failed <- report c
+ H.assert (S.not (J.getBool "complete" true failed)) "discarded library expression marked a build complete"
+ passed "library expressions cannot be silently discarded during crate compilation"
+checkDependencyReceipts path = do
+ receipt <- J.read path
+ let entries = J.items receipt
+ H.assert (S.not (S.null entries)) "implicit Prelude did not enter the recursive cache receipt"
+ valid <- B.validDependencyFiles receipt
+ H.assert valid "fresh dependency receipt did not validate"
+ proof <- B.verifiedDependencyProof (O.parent path)
+ let ownMetadata = O.parent path ++ "/unit.mlfci"
+ H.assert (J.has ownMetadata proof && J.has (O.parent path ++ "/unit.mlfco") proof) "verified artifact stamp did not prove its own pair"
+ proven <- B.provenCrateFiles proof ownMetadata
+ H.assert proven "verified upstream artifact pair could not reuse its checked receipt"
+ loaded <- Artifact.loadInterfaces (Cons ownMetadata Nil)
+ interfaces <- H.right loaded
+ Pair checked validation <- B.checkCrateObjects ownMetadata proof interfaces
+ H.assert (checked && J.getBool "root_checked" false validation && J.equal (J.get "checked_objects" validation) (J.num 1)) "a proof of the root pair bypassed its required independent check"
+ diamond <- H.right (B.mergeDependencyProof proof proof)
+ H.assert (J.equal diamond proof) "diamond dependency proof duplicated a file"
+ let incomplete = J.Object (Cons (Pair ownMetadata (J.get ownMetadata proof)) Nil)
+ incompleteAccepted <- B.provenCrateFiles incomplete ownMetadata
+ wrongPathAccepted <- B.provenCrateFiles proof (ownMetadata ++ ".different")
+ H.assert (S.not incompleteAccepted && S.not wrongPathAccepted) "dependency proof accepted an incomplete or different artifact pair"
+ let actual = J.text (J.get ownMetadata proof)
+ let altered = (if stringCodeAt actual 0 == 48 then "1" else "0") ++ O.drop 1 actual
+ let conflicting = J.set ownMetadata (J.str altered) proof
+ alteredAccepted <- B.provenCrateFiles conflicting ownMetadata
+ H.assert (S.not alteredAccepted) "dependency proof skipped an exact-file SHA256 guard"
+ case B.mergeDependencyProof proof conflicting of {Left message -> H.assert (H.contains "conflicting crate dependency proof" message) "dependency proof conflict lost its diagnostic"; Right _ -> H.fail "conflicting dependency SHA256 claims were merged"}
+ let first = S.head entries
+ let relative = J.Object (Cons (Pair (O.drop 1 (S.fst first)) (S.snd first)) (S.tail entries))
+ let malformed = J.Object (Cons (Pair (S.fst first) (J.str "short")) (S.tail entries))
+ let nonhex = J.Object (Cons (Pair (S.fst first) (J.str (S.concatMapString (\_ -> "g") (S.range 0 63)))) (S.tail entries))
+ let nontext = J.Object (Cons (Pair (S.fst first) (J.num 42)) (S.tail entries))
+ let duplicate = J.Object (S.snoc entries first)
+ S.mapM_ (\forged -> do
+  accepted <- B.validDependencyFiles forged
+  H.assert (S.not accepted) "malformed dependency receipt was accepted"
+  case B.mergeDependencyProof receipt forged of {Left _ -> ioReturn Unit; Right _ -> H.fail "malformed dependency receipt entered a merged proof"}) (Cons relative (Cons malformed (Cons nonhex (Cons nontext (Cons duplicate (Cons (J.Array Nil) Nil))))))
+ empty <- B.validDependencyFiles J.empty
+ H.assert empty "a crate without dependencies cannot use an empty receipt"
+crateCases : Context -> IO Unit
+crateCases parent = do
+ let directory = work parent ++ "/crate-composition"
+ O.mkdir (directory ++ "/app")
+ let c = Context directory (manager parent) (compiler parent) (directory ++ "/build")
+ let library = obj (Cons (field "modules" (obj (Cons (field "A" (text "A.emlf")) (Cons (field "B" (text "B.emlf")) Nil)))) Nil)
+ let executable = obj (Cons (field "main" (text "Main.emlf")) Nil)
+ let target = obj (Cons (field "main" (text "Main.emlf")) (Cons (field "stdout" (text "42\n")) Nil))
+ J.write (directory ++ "/app/mlf-package.json") (obj (Cons (field "format" (J.num 1)) (Cons (field "name" (text "crate-composition")) (Cons (field "version" (text "0.1.0")) (Cons (field "library" library) (Cons (field "executables" (obj (Cons (field "hello" executable) Nil))) (Cons (field "tests" (obj (Cons (field "hello" target) Nil))) Nil)))))))
+ let originalA = "module A (value, unchanged) where\nimport qualified B\nvalue = B.g\nunchanged = 7\nprivateIdentity : Int -> Int\nprivateIdentity x = x\n"
+ writeFile (directory ++ "/app/A.emlf") originalA
+ writeFile (directory ++ "/app/B.emlf") "module B (g) where\nimport qualified A\ng = 41\n"
+ writeFile (directory ++ "/app/Main.emlf") "module Main where\nimport A\nmain = printInt (value + 1)\n"
+ expect c (Cons "build" Nil) true ""
+ expect c (Cons "test" Nil) true ""
+ initial <- report c
+ H.assert (S.any (\row -> eqString (J.getText "crate" "" row) "crate-composition/0.1.0/library") (J.values (J.get "crates" initial))) "own library crate was not built"
+ passed "cyclic module namespaces and own-library target composition on both backends"
+ writeFile (directory ++ "/app/B.emlf") "module B (g) where\nimport qualified A\ng = 42\n"
+ expect c (Cons "build" Nil) true ""
+ runBinary c "43\n"
+ changed <- report c
+ let libraryRows = S.filter (\row -> eqString (J.getText "crate" "" row) "crate-composition/0.1.0/library") (J.values (J.get "crates" changed))
+ let targetRows = S.filter (\row -> eqString (J.getText "crate" "" row) "crate-composition/0.1.0/target-hello") (J.values (J.get "crates" changed))
+ H.assert (S.length libraryRows == 1 && S.length targetRows == 1) "crate query reports lost a compilation unit"
+ let libraryQueries = J.get "queries" (S.head libraryRows)
+ let targetQueries = J.get "queries" (S.head targetRows)
+ H.assert (J.equal (J.get "inferred_groups" libraryQueries) (J.num 1)) "single declaration edit re-inferred independent declarations"
+ libraryDetailed <- J.read (J.getText "query_report" "" (S.head libraryRows))
+ targetDetailed <- J.read (J.getText "query_report" "" (S.head targetRows))
+ H.assert (S.any (J.getBool "cached" false) (J.values (J.get "groups" libraryDetailed))) "unrelated declaration inference was not reused"
+ H.assert (J.equal (J.get "inferred_groups" targetQueries) (J.num 0)) "same-scheme own-library edit re-inferred target"
+ H.assert (S.not (J.getBool "outer_cached" true (S.head targetRows)) && S.any (J.getBool "cached" false) (J.values (J.get "groups" targetDetailed))) "own-library edit bypassed declaration cache verification"
+ H.assert (S.length (J.values (J.get "codegen" changed)) == 1 && S.all (\row -> S.not (J.getBool "input_reused" true (J.get "queries" row))) (J.values (J.get "codegen" changed))) "changed live dependency reused entry code generation"
+ passed "declaration caches preserve unaffected groups and downstream schemes"
+ before <- fileDigest (output c ++ "/bin/hello")
+ writeFile (directory ++ "/app/A.emlf") (O.replace "privateIdentity : Int -> Int" "privateIdentity : Bool -> Bool" originalA)
+ expect c (Cons "build" Nil) true ""
+ erased <- report c
+ let stages = J.values (J.get "builds" erased)
+ H.assert (S.any (\row -> eqString (J.getText "kind" "" row) "LLVM emission" && S.not (J.getBool "cached" true row)) stages) "metadata-only edit did not exercise new LLVM emission"
+ let generated = J.get "queries" (S.head (J.values (J.get "codegen" erased)))
+ H.assert (S.not (J.getBool "outer_cached" true generated) && J.getBool "input_reused" false generated) "type-only annotation change reran MLF code generation"
+ S.mapM_ (\kind -> H.assert (S.any (\row -> eqString (J.getText "kind" "" row) kind && J.getBool "cached" false row) stages) ("unchanged emitted LLVM rebuilt " ++ kind)) (Cons "LLVM object" (Cons "native link" Nil))
+ after <- fileDigest (output c ++ "/bin/hello")
+ H.assert (eqString before after) "type-only annotation change altered erased executable"
+ runBinary c "43\n"
+ let annotatedA = O.replace "privateIdentity : Int -> Int" "privateIdentity : Bool -> Bool" originalA
+ writeFile (directory ++ "/app/A.emlf") (O.replace "unchanged = 7" "unchanged = 9" (O.replace "privateIdentity x = x" "privateIdentity x = if x then false else true" annotatedA))
+ expect c (Cons "build" Nil) true ""
+ irrelevant <- report c
+ let entryQueries = J.get "queries" (S.head (J.values (J.get "codegen" irrelevant)))
+ let entryStages = J.values (J.get "builds" irrelevant)
+ H.assert (S.not (J.getBool "outer_cached" true entryQueries) && J.getBool "input_reused" false entryQueries) "entry-independent implementation changes reran MLF optimization"
+ H.assert (S.any (\row -> eqString (J.getText "kind" "" row) "LLVM emission" && S.not (J.getBool "cached" true row)) entryStages) "entry dependency test used an outer artifact hit"
+ S.mapM_ (\kind -> H.assert (S.any (\row -> eqString (J.getText "kind" "" row) kind && J.getBool "cached" false row) entryStages) ("entry-independent changes rebuilt " ++ kind)) (Cons "LLVM object" (Cons "native link" Nil))
+ unaffected <- fileDigest (output c ++ "/bin/hello")
+ H.assert (eqString before unaffected) "entry-independent changes altered the cached native executable"
+ runBinary c "43\n"
+ passed "identical emitted LLVM reuses native code generation and linking"
+ let clean = Context directory (manager parent) (compiler parent) (directory ++ "/clean-build")
+ expect clean (Cons "build" Nil) true ""
+ runBinary clean "43\n"
+ fresh <- fileDigest (output clean ++ "/bin/hello")
+ incremental <- fileDigest (output c ++ "/bin/hello")
+ H.assert (eqString fresh incremental) "clean and incremental crate builds produced different executables"
+ passed "clean and incremental crate compilation equivalence"
 extraCases : Context -> String -> IO Unit
 extraCases c repository = do
  gc <- getEnv "MLF_GC_PREFIX"
  actual <- canonicalPath gc
  let dir = work c
- let bundled = dir ++ "/app/dist-newstyle/bootstrap-deps/bdwgc-test-install"
+ let bundled = dir ++ "/app/.mlf-build/deps/bdwgc-test-install"
  O.mkdir (O.parent bundled)
  O.run "" (Cons "/bin/ln" (Cons "-s" (Cons actual (Cons bundled Nil))))
  edit c (\doc -> J.set "executables" (J.set "hello" (J.set "profile" (text "compiler") (J.get "hello" (J.get "executables" doc))) (J.get "executables" doc)) doc)
@@ -187,3 +331,74 @@ checkGC expected binary = do
   code <- O.exec "" (Cons binary Nil) "" (dir ++ "/out") (dir ++ "/err") 60
   output <- readFile (dir ++ "/out")
   H.assert (code == 0 && eqString output "Hello, local packages!\n") "collector command test program failed")
+
+-- Exercise actual Clang profiling, profile-content invalidation, and isolation
+-- from the other executable and the ordinary cache. No benchmark input is used.
+pgoCase parent = do
+ let directory = work parent ++ "/native pgo"
+ O.mkdir (directory ++ "/app")
+ let c = Context directory (manager parent) (compiler parent) (directory ++ "/build")
+ let executable = obj (Cons (field "main" (text "Main.emlf")) Nil)
+ J.write (directory ++ "/app/mlf-package.json") (obj (Cons (field "format" (J.num 1)) (Cons (field "name" (text "native-pgo")) (Cons (field "version" (text "0.1.0")) (Cons (field "executables" (obj (Cons (field "hello" executable) (Cons (field "other" executable) Nil)))) Nil)))))
+ writeFile (directory ++ "/app/Main.emlf") "module Main where\nmain = do\n  line <- getLine\n  printInt (if eqString line \"a\" then 1 else 2)\n"
+ expect c (Cons "build" Nil) true ""
+ initial <- report c
+ original <- fileDigest (output c ++ "/bin/hello")
+ let nativeRows saved = S.filter (\row -> S.any (\kind -> eqString (J.getText "kind" "" row) kind) (Cons "LLVM object" (Cons "runtime object" (Cons "native link" Nil)))) (J.values (J.get "builds" saved))
+ let nativeKeys saved = S.map (J.get "key") (nativeRows saved)
+ let emitted saved = S.map (J.get "key") (S.filter (\row -> eqString (J.getText "kind" "" row) "LLVM emission") (J.values (J.get "builds" saved)))
+ expect c (O.words "--pgo-generate hello build") true ""
+ instrumented <- report c
+ H.assert (S.length (nativeRows instrumented) == 6 && S.all (J.getBool "cached" false) (S.drop 3 (nativeRows instrumented))) "PGO generation changed the unselected executable"
+ H.assert (S.eqList J.equal (emitted initial) (emitted instrumented)) "native PGO changed MLF LLVM emission"
+ let train name input expected = do
+       let raw = directory ++ "/" ++ name ++ ".profraw"
+       writeFile (directory ++ "/stdin") input
+       previous <- getEnv "LLVM_PROFILE_FILE"
+       setEnv "LLVM_PROFILE_FILE" raw
+       code <- O.exec directory (Cons (output c ++ "/bin/hello") Nil) (directory ++ "/stdin") (directory ++ "/training.out") (directory ++ "/training.err") 60
+       if eqString previous "" then unsetEnv "LLVM_PROFILE_FILE" else setEnv "LLVM_PROFILE_FILE" previous
+       out <- readFile (directory ++ "/training.out")
+       err <- readFile (directory ++ "/training.err")
+       H.assert (code == 0 && eqString out expected && eqString err "") "instrumented executable changed behavior"
+       present <- fileExists raw
+       H.assert present "instrumented executable produced no profile"
+       let merged = directory ++ "/" ++ name ++ ".profdata"
+       O.run directory (Cons "llvm-profdata" (Cons "merge" (Cons ("-output=" ++ merged) (Cons raw Nil))))
+       ioReturn merged
+ first <- train "first" "a\n" "1\n"
+ second <- train "second" "b\n" "2\n"
+ firstHash <- fileDigest first
+ secondHash <- fileDigest second
+ H.assert (S.not (eqString firstHash secondHash)) "independent branch training produced identical profiles"
+ let profile = directory ++ "/active.profdata"
+ O.copy first profile
+ let use = S.append (O.words "--pgo-target hello --pgo-use") (Cons profile (Cons "build" Nil))
+ expect c use true ""
+ used <- report c
+ H.assert (S.eqList J.equal (emitted initial) (emitted used) && S.all (J.getBool "cached" false) (S.drop 3 (nativeRows used))) "profile-use changed LLVM or the unselected target"
+ let selected = S.head (nativeRows used)
+ stamp <- J.read (output c ++ "/cache/" ++ J.getText "key" "" selected ++ "/artifact.json")
+ H.assert (J.equal (J.get "sha256" (J.get "profile" (J.get "native-pgo" (J.get "inputs" stamp)))) (J.str firstHash)) "profile contents are absent from native cache provenance"
+ expect c use true ""
+ repeated <- report c
+ H.assert (S.all (J.getBool "cached" false) (J.values (J.get "builds" repeated))) "unchanged profile-use build missed cache"
+ beforeFailure <- fileDigest (output c ++ "/bin/hello")
+ writeFile profile "invalid native profile\n"
+ expect c use false "command failed"
+ afterFailure <- fileDigest (output c ++ "/bin/hello")
+ H.assert (eqString beforeFailure afterFailure) "invalid profile replaced the working executable"
+ O.copy second profile
+ expect c use true ""
+ changed <- report c
+ H.assert (S.all (\row -> S.not (J.getBool "cached" true row)) (S.take 3 (nativeRows changed)) && S.all (J.getBool "cached" false) (S.drop 3 (nativeRows changed))) "profile-content change failed to invalidate only the selected native stages"
+ H.assert (S.not (S.eqList J.equal (S.take 3 (nativeKeys used)) (S.take 3 (nativeKeys changed)))) "profile content is absent from native keys"
+ expect c (Cons "build" Nil) true ""
+ ordinary <- report c
+ restored <- fileDigest (output c ++ "/bin/hello")
+ H.assert (eqString restored original && S.eqList J.equal (nativeKeys ordinary) (nativeKeys initial) && S.all (J.getBool "cached" false) (J.values (J.get "builds" ordinary))) "PGO polluted the ordinary native cache or output"
+ expect c (O.words "--pgo-generate missing build") false "PGO target must name a root executable"
+ expect c (O.words "--pgo-target hello build") false "use either"
+ expect c (S.append (O.words "--pgo-use") (Cons profile (Cons "build" Nil))) false "use either"
+ expect c (S.append (O.words "--pgo-generate hello --pgo-target hello --pgo-use") (Cons profile (Cons "build" Nil))) false "use either"
+ passed "native PGO generation, content-addressed reuse, invalidation, failure, and target isolation"

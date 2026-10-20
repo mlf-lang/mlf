@@ -1,13 +1,15 @@
-Full self-hosting port contract
+Native MLF compiler maintenance contract
 
-Goal: implement the existing compiler in ordinary .emlf source. The Haskell
-compiler is stage 0 only. Stage 1 must independently parse, infer, elaborate,
-check, interpret and emit LLVM, including modules and classes. No subprocess
-delegation to the seed, compiler primitive, embedded seed binary, or cached
-answers. Stage 1 compiles the same sources to stage 2; stage 2 repeats to
-stage 3. Compare emitted artifacts and run the existing acceptance/rejection,
-runtime, module and backend corpus. Do not claim completion from self-rebuild
-alone; incomplete features remain explicitly reported by the parity gate.
+The compiler is implemented in ordinary .emlf source. Bootstrap from a native
+MLF release; the Haskell compiler and old Haskell/Python harnesses are retired.
+No subprocess delegation to an older compiler, embedded seed binary, or cached
+answers is allowed in the compiler. Every generation independently parses,
+infers, elaborates, checks, interprets, and emits LLVM.
+
+Use the root MLF package manager to run all six groups, including the fresh
+self-host fixed point, frozen parity corpus, independent reference algorithms,
+and interpreter/LLVM matrices in both runtime layouts. A self-rebuild alone is
+not sufficient validation. See README.md and ../tests/README.md.
 
 Source uses the CURRENT supported .emlf syntax: modules, ordinary ADTs,
 explicit forall signatures, function equations, layout, do, if and fixed
@@ -29,25 +31,6 @@ Foundation conventions:
   Types.emlf owns all compiler AST and graph datatypes to avoid module cycles.
   Owners must publish exact exported signatures and coordinate mismatches.
 
-Runtime support being added (use these spellings):
-  stringLength : String -> Int                       (Unicode scalar count)
-  stringCodeAt : String -> Int -> Int                 (checked scalar index)
-  stringSlice : String -> Int -> Int -> String        (start/count, checked)
-  stringFromCode : Int -> String                      (valid Unicode scalar)
-  compareString : String -> String -> Int             (-1/0/1)
-  readDouble : String -> Double                       (strict decimal)
-  doubleToBits : Double -> Int; doubleFromBits : Int -> Double
-  seq : forall a b. a -> b -> b
-  panic : forall a. String -> a
-  readFile : String -> IO String; writeFile : String -> String -> IO Unit
-  fileExists : String -> IO Bool; canonicalPath : String -> IO String
-  getArgCount : IO Int; getArg : Int -> IO String
-  putErr : String -> IO Unit; exitWith : forall a. Int -> IO a
-  getExecutablePath : IO String; getContents : IO String
-
-Ownership: runtime support, foundations/types, source frontend, graph solver,
-constraint/elaboration, and LLVM backend have separate agents. Root owns
-target checker/parser/printer, compiler entry, and bootstrap/parity harness.
-Keep Cabal runs serialized with root. Agents may run existing emlf directly
-on probes after coordinating dependency readiness. Do not edit another owner's
-files without agreeing. Do not commit. Preserve previous uncommitted work.
+Host IO primitives and allocator profiles are specified in RUNTIME.txt.
+Independent golden types and benchmark baselines must not be rewritten from
+the compiler under test.

@@ -281,7 +281,7 @@ buildParallel directory compiler clang source runtime flags timeout = do
   let object = directory ++ "/runtime.o"
   let code = directory ++ "/program.o"
   let binary = directory ++ "/pending-executable"
-  let mode = if O.ends ".mlfi" source then "--module-to-llvm" else "--emit-llvm"
+  let mode = if O.ends ".mlfci" source then "--crate-to-llvm" else "--emit-llvm"
   streaming <- getEnv "MLF_BENCH_STREAM_LLVM"
   O.require (eqString streaming "" || eqString streaming "1") "invalid streaming compiler setting"
   let stream = eqString streaming "1"

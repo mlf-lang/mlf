@@ -19,7 +19,7 @@ Inspection covered source algorithms and dependencies, not leaderboard ranks.
 | reverse-complement | C #4–5, Rust #1–3, GHC #2/#4 | Implemented with scalar C #4, sequential Rust #2, and GHC #4's growing byte buffers with a line-reader correction. MLF uses raw `getByteLine`, growing ByteArray records and buffered output. See [provenance](reverse-complement/PROVENANCE.md). |
 | k-nucleotide | C #1, Rust #1–9, GHC #1–3 | Implemented with serialized C #1, Rust #1 and GHC #2. General IntTable operations use library hash tables in both MLF backends. Every substring of all seven lengths is counted; an independent work audit checks actual writes and distinct keys. See [provenance](k-nucleotide/PROVENANCE.md). |
 
-Capability evidence is the exhaustive primitive set in `src/MLF/Primitive.hs`,
+Capability evidence is the exhaustive primitive set in `bootstrap/Bootstrap/Primitive.emlf`,
 the parser/ADT examples, and the interpreter/native runtime implementations.
 `Int` is unbounded; `Double` is IEEE binary64; `IntArray`, `DoubleArray` and
 `ByteArray` provide indexed, bounds-checked mutation through IO. Strings can

@@ -13,13 +13,13 @@ Figures 1 and 12 were rendered and visually checked before transcription.
 
 Reproduce
 ---------
-cabal test figure12-tests --offline -j1 --test-show-details=direct
-cabal test all --offline -j1 --test-show-details=direct
+./mlfpkg --timeout 21600 test --target unit
+./mlfpkg --timeout 21600 test
 
 The paper acceptance oracle is the MLF column, not the Quick Look column.
-test/Figure12.hs contains all 34 rows and 43 semicolon-separated expressions.
+tests/Tests/Figure12.emlf contains all 34 rows and 43 semicolon-separated expressions.
 It stores paperAcceptance separately from expectedAcceptance for the regression.
-test/Figure12Main.hs checks coverage and both sets of expectations. The paper's
+tests/Figure12SuiteMain.emlf checks coverage and both sets of expectations. The paper's
 four rejections are A11, C1a, C1c, and E1a. The regression additionally requires
 A8 to reject under its explicit signature, matching the authors' camlf reference
 prototype; see docs/figure12-a8-reference.txt. The suite prints this discrepancy
@@ -27,7 +27,7 @@ and does not count A8's rejection as agreement with the paper.
 
 Encoding
 --------
-The source compiler only exposes a closed-term API. Each open expression is
+The Figure 12 harness uses the closed-term API. Each open expression is
 closed with one annotated lambda parameter per free library name, using its
 signature in Figure 1 or the local signature in Figure 12. The parameter
 annotations desugar to coercions and polymorphic let bindings. No annotation
@@ -75,10 +75,13 @@ only difference:
   regression: reject
   actual:     Inference: cannot raise a protected type variable
 
-This also fails with ordinary closed lambda implementations, each annotated
-with the exact Figure 1 signature; see test/fixtures/figure12-a8.emlf:
+A closed reproduction using annotated library parameters with the exact
+Figure 1 signatures is preserved in tests/fixtures/figure12-a8.emlf:
 
-  cabal run emlf -- --type test/fixtures/figure12-a8.emlf
+  .mlf-build/bin/emlf --type tests/fixtures/figure12-a8.emlf
+
+The original check also used ordinary closed lambda implementations at those
+signatures; both forms produced the same inference rejection.
 
 The implementation of auto' alone compiles at its declared type. Thus the A8
 failure is reproducible without the harness's assumed-library lambda wrappers.
@@ -90,7 +93,9 @@ replace the A8 signature. Rejection is now the regression expectation for this
 encoding. The correspondence with the paper remains unresolved; this is not a
 proof that the paper is wrong. The production compiler was not changed.
 
-Validation used GHC 9.14.1 and Cabal 3.18.1.0, with serialized offline builds.
+The original 2026-10-06 validation used GHC 9.14.1 and Cabal 3.18.1.0.
+Those harnesses are retired; current reproduction uses the native MLF commands
+above. The historical totals below describe that original validation.
 The 36 supplementary checks pass (29 assumptions, 4 type checks, 3 annotated
 negative-case controls). The original mlf-tests suite passes all 76 checks,
 including 6,712 comparisons with the independent ML oracle and the 126-program
@@ -117,8 +122,9 @@ the two representations or a general proof of principality.
 
 Scope
 -----
-The tests assess static typing and compilation evidence. List, Pair, ST, and
-Char are uninterpreted type constructors here; this compiler has no runtime.
+These Figure 12 tests assess static typing and compilation evidence. List,
+Pair, ST, and Char are uninterpreted type constructors in this encoding;
+execution is covered separately by the native backend and port groups.
 Agreement on this finite table would not prove completeness of the thesis's
 inference or translation algorithms. A8's explicit-signature regression passes
 on rejection, so a green suite still does not establish full table agreement.

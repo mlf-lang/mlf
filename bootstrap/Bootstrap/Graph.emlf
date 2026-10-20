@@ -660,12 +660,69 @@ canonicalize graph = mkGraph (mapNodes (\node -> mkNode (mapTag (resolve graph) 
 equationNodes : Pair Int Int -> List Int
 equationNodes (Pair a b) = Cons a (Cons b Nil)
 
+-- This query is used only after complete validation, on an alias-free graph
+-- whose distinct ascending enumeration agrees with ordered-map lookup.
+-- Validation already establishes the *-kind premises of arrows and legacy
+-- constructors. Higher-kinded nodes, Gen roots and applications retain their
+-- explicit kinds. Type-application graphs keep the existing shared kind cache,
+-- avoiding repeated traversal of shared higher-kinded subgraphs.
+validatedKind : Graph -> Int -> Either String Kind
+validatedKind graph identity = bindE (require graph identity) (\node -> case tag node of
+  GBot -> Right Star
+  GBotK kind -> Right kind
+  GTyCon name kind -> Right kind
+  GSkolem identity kind -> Right kind
+  GArr a b -> Right Star
+  GCon name arguments -> Right Star
+  GGen root -> validatedKind graph root
+  GTyApp function argument -> kindAt graph identity)
+
+simpleKindTag : Node -> Bool
+simpleKindTag node = case tag node of
+  GTyApp function argument -> false
+  _ -> true
+
+orderedSimpleKinds : List (Pair Int Node) -> Bool
+orderedSimpleKinds entries = case entries of
+  Nil -> true
+  Cons (Pair first node) rest -> simpleKindTag node && orderedSimpleKindsAfter first rest
+orderedSimpleKindsAfter : Int -> List (Pair Int Node) -> Bool
+orderedSimpleKindsAfter previous entries = case entries of
+  Nil -> true
+  Cons (Pair next node) rest -> previous < next && simpleKindTag node && orderedSimpleKindsAfter next rest
+
+firstOrderValidated : Graph -> Graph -> Pair Int Int -> Either String Graph
+firstOrderValidated original graph (Pair left right) =
+  let a = resolve graph left in
+  let b = resolve graph right in
+  if a == b then Right graph else
+    bindE (validatedKind original a) (\ka ->
+      bindE (validatedKind original b) (\kb ->
+        if L.not (equalKind ka kb) then Left ("kind mismatch during unification: " ++ kindDescription ka ++ " versus " ++ kindDescription kb) else
+          bindE (tagEquations (tag (nodeAt graph a)) (tag (nodeAt graph b))) (\answer -> case answer of
+            Pair newTag equations ->
+              let winner = if a < b then a else b in
+              let loser = if a < b then b else a in
+              let old = nodeAt graph a in
+              let next = mkGraph (insertNodeMap winner (mkNode newTag (binder old) (flag old)) (IM.delete loser (nodes graph))) (IM.insert loser winner (links graph)) (nextId graph) in
+              foldE (firstOrderValidated original) next equations)))
+
+checkedFirstOrder : List (Pair Int Int) -> Graph -> Either String Graph
+checkedFirstOrder equations before =
+  if IM.null (links before) && orderedSimpleKinds (IM.toList (nodes before)) then
+    -- The preceding eager kind traversal checks every input identity before
+    -- any merge. Preserve that error priority even when an earlier pair would
+    -- fail constructor/kind equality. All structural premises were validated.
+    bindE (mapE_ (\n -> bindE (require before n) (\ignored -> Right Unit)) (L.concatMap equationNodes equations)) (\checked ->
+      foldE (firstOrderValidated before) before equations)
+  else bindE (kindsAt before (L.concatMap equationNodes equations)) (\kinds ->
+    foldE (firstOrder kinds) before equations)
+
 unify : List (Pair Int Int) -> Graph -> Either String Graph
 unify equations before = bindE (validateGraph before) (\ignored ->
-  bindE (kindsAt before (L.concatMap equationNodes equations)) (\kinds ->
-    bindE (foldE (firstOrder kinds) before equations) (\skeleton ->
-      bindE (rebind before (canonicalize skeleton)) (\rebuilt ->
-        bindE (validateGraph rebuilt) (\verified -> Right rebuilt)))))
+  bindE (checkedFirstOrder equations before) (\skeleton ->
+    bindE (rebind before (canonicalize skeleton)) (\rebuilt ->
+      bindE (validateGraph rebuilt) (\verified -> Right rebuilt))))
 
 graftedNodes : Graph -> Graph -> IntSet
 graftedNodes old skeleton = L.foldlStrict (\seen -> \entry -> case entry of { Pair n v -> if isBottom (tag v) then reachableVisit skeleton seen (children (tag (nodeAt skeleton n))) else seen }) IS.empty (IM.toList (nodes old))
@@ -1025,8 +1082,36 @@ expansionVisit : Graph -> Int -> IntSet -> List Int -> IntSet
 expansionVisit graph generalization seen pending = case expansionVisitCached graph generalization IM.empty (Pair seen IM.empty) pending of
   Pair visited scopes -> visited
 
+allocateCopiesUnordered : Graph -> List Int -> Pair (IntMap Int) Graph
+allocateCopiesUnordered graph originals = L.foldlStrict (\state -> \original -> case state of Pair copies current -> case freshId current of Pair fresh next -> seq fresh (strictPair (IM.insert original fresh copies) (strictGraph next))) (Pair IM.empty graph) originals
+
+-- Expansion visits enumerate distinct ascending identities. Allocate the
+-- corresponding contiguous fresh range and balanced map directly, instead
+-- of rebuilding a graph wrapper and inserting into the copy map per identity.
+-- The general public helper retains the preceding fold for other list orders.
+ascendingCopyIdentities : List Int -> Bool
+ascendingCopyIdentities originals = case originals of
+ Nil -> true
+ Cons first rest -> ascendingCopyIdentitiesAfter first rest
+ascendingCopyIdentitiesAfter : Int -> List Int -> Bool
+ascendingCopyIdentitiesAfter previous originals = case originals of
+ Nil -> true
+ Cons n rest -> previous < n && ascendingCopyIdentitiesAfter n rest
+
+freshCopyEntries : Int -> List Int -> List (Pair Int Int)
+freshCopyEntries first originals = case originals of
+ Nil -> Nil
+ Cons original rest -> seq first (Cons (Pair original first) (freshCopyEntries (first + 1) rest))
+
 allocateCopies : Graph -> List Int -> Pair (IntMap Int) Graph
-allocateCopies graph originals = L.foldlStrict (\state -> \original -> case state of Pair copies current -> case freshId current of Pair fresh next -> seq fresh (strictPair (IM.insert original fresh copies) (strictGraph next))) (Pair IM.empty graph) originals
+allocateCopies graph originals = case originals of
+ Nil -> Pair IM.empty graph
+ Cons _ _ -> if L.not (ascendingCopyIdentities originals) then allocateCopiesUnordered graph originals else
+  let first = nextId graph in
+  let entries = freshCopyEntries first originals in
+  let copied = IM.fromDistinctAscList entries in
+  let next = mkGraph (nodes graph) (links graph) (first + L.length originals) in
+  seq first (strictPair copied (strictGraph next))
 
 copyIdentity : Graph -> IntMap Int -> Int -> Int
 copyIdentity graph copies identity = let canonical = resolve graph identity in IM.findWithDefault canonical canonical copies

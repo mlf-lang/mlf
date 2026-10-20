@@ -6,21 +6,24 @@ import qualified Tests.Helpers as H
 import Tests.Helpers (Quint(..), Sext(..))
 import Tests.Graph (get, put, lift)
 import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.Map as M
+import qualified Tests.GraphValidation as Validation
 import qualified Bootstrap.IntSet as IS
 import Bootstrap.Classes (lowerClassesWithImports)
 import Bootstrap.Constraint
 import Bootstrap.Elaborate (reference, schemeType)
 import qualified Tests.Graph as G
 import qualified Bootstrap.Graph.Solver as Solver
+import qualified Bootstrap.Graph as NativeGraph
 import Bootstrap.Parser (parseProgram)
 import Bootstrap.Prelude (withPrelude)
 import qualified Bootstrap.X.Type as T
 
 graphSolverTests : (List ( (Pair (String) (IO Unit)) ))
-graphSolverTests = (Cons (Pair "component solver matches every full-graph inference step" do { counts <- ((S.forM fixtures) (\file -> do { c <- (constraints file); do { solver <- (H.right (Solver.prepare (initialGraph c))); do { first <- (H.right (Solver.unify (equalities c) solver)); do { (Pair _ expected) <- (H.right (G.runBuild (initialGraph c) (G.unify (equalities c)))); do { (sameGraph expected first); do { _ <- (S.foldM (\(Pair g s) edge -> do { (Pair _ g') <- (H.right (G.runBuild g (expandAndSolve false edge))); do { s' <- (H.right (Solver.instantiate (fromGen edge) (toNode edge) s)); do { (sameGraph g' s'); (return (Pair g' s')) } } }) (Pair expected first) (instances c)); (return ((H.length (instances c)) + 1)) } } } } } })); (putStrLn (H.append "Component inference: " (H.append (H.show (S.sum counts)) " complete graph/index comparisons"))) }) (Cons (Pair "component witnesses preserve separate frontier solving and identities" do { counts <- ((S.forM fixtures) (\file -> do { c <- (constraints file); do { g <- (H.right (solve c)); do { solver <- (H.right (Solver.prepare g)); (let { nonreflexive edge = (S.not (T.alphaEq (schemeType g (fromGen edge)) (reference g (toNode edge)))) } in (let { edges = (S.filter nonreflexive (instances c)) } in do { ((H.forM_ edges) (\edge -> do { (Pair expectedCopies expected) <- (H.right (G.runBuild g (expandAndSolve true edge))); do { (Pair copies result) <- (H.right (Solver.witness (fromGen edge) (toNode edge) solver)); do { (S.unless (H.eq copies expectedCopies) (H.fail "witness lost original-to-copy identity")); (sameGraph expected result) } } })); (return (H.length edges)) })) } } })); do { (S.unless ((S.sum counts) > 100) (H.fail "vacuous witness comparison")); (putStrLn (H.append "Component witnesses: " (H.append (H.show (S.sum counts)) " full-graph comparisons"))) } }) (Cons (Pair "component solver includes incoming references and protected siblings" do { initial <- (H.right (Solver.prepare scopedGraph)); do { first <- (H.right (Solver.unify (Cons (Pair 4 8) Nil) initial)); do { (Pair _ expected) <- (H.right (G.runBuild scopedGraph (G.unify (Cons (Pair 4 8) Nil)))); do { (sameGraph expected first); do { (H.reject (Solver.unify (Cons (Pair 8 9) Nil) first)); (H.reject (Solver.unify (Cons (Pair 5 9) Nil) first)) } } } } }) (Cons (Pair "component solver rejects malformed disconnected input" (let { broken = (Graph (IM.adjust (\v -> (Node (GGen 99) (G.binder v) (G.flag v))) 0 (G.nodes scopedGraph)) (G.links scopedGraph) (G.nextId scopedGraph)) } in do { (H.reject (Solver.prepare broken)); do { initial <- (H.right (Solver.prepare scopedGraph)); do { (H.reject (Solver.unify (Cons (Pair 4 99) Nil) initial)); (H.reject (Solver.unify (Cons (Pair 99 99) Nil) initial)) } } })) (Cons (Pair "component solver preserves deep branching scopes and separate type components" (let { parent n = (if (H.eq n 0) then Nothing else (if (H.eq n 401) then (Just 0) else (if (H.eq n 301) then (Just 20) else (if true then (Just (n - 1)) else (panic "non-exhaustive test guard"))))) } in (let { g = (Graph (IM.fromList (H.concat (S.concatMap (\n -> (Cons (Cons (Pair (2 * n) (Node (GGen ((2 * n) + 1)) (H.fmap (\section2 -> (section2 * 2)) (parent n)) Flexible)) (Cons (Pair ((2 * n) + 1) (Node GBot (Just (2 * n)) Flexible)) Nil)) Nil)) (S.range 0 500)))) IM.empty 1002) } in (let { points = (Cons 0 (Cons 1 (Cons 20 (Cons 31 (Cons 127 (Cons 255 (Cons 300 (Cons 301 (Cons 400 (Cons 401 (Cons 500 Nil))))))))))) } in do { initial <- (H.right (Solver.prepare g)); ((H.forM_ (S.concatMap (\a -> (S.concatMap (\b -> (if (a < b) then (Cons (Pair a b) Nil) else Nil)) points)) points)) (\(Pair a b) -> (let { equations = (Cons (Pair ((2 * a) + 1) ((2 * b) + 1)) Nil) } in (case G.runBuild g (G.unify equations) of {
+graphSolverTests = (Cons (Pair "component solver matches every full-graph inference step" do { validatedKindControls; counts <- ((S.forM fixtures) (\file -> do { c <- (constraints file); do { solver <- (H.right (Solver.prepare (initialGraph c))); do { first <- (H.right (Solver.unify (equalities c) solver)); do { (Pair _ expected) <- (H.right (G.runBuild (initialGraph c) (G.unify (equalities c)))); do { (sameGraph expected first); do { _ <- (S.foldM (\(Pair g s) edge -> do { (Pair _ g') <- (H.right (G.runBuild g (expandAndSolve false edge))); do { s' <- (H.right (Solver.instantiate (fromGen edge) (toNode edge) s)); do { (sameGraph g' s'); (return (Pair g' s')) } } }) (Pair expected first) (instances c)); (return ((H.length (instances c)) + 1)) } } } } } })); (putStrLn (H.append "Component inference: " (H.append (H.show (S.sum counts)) " complete graph/index comparisons"))) }) (Cons (Pair "component witnesses preserve separate frontier solving and identities" do { counts <- ((S.forM fixtures) (\file -> do { c <- (constraints file); do { g <- (H.right (solve c)); do { solver <- (H.right (Solver.prepare g)); (let { nonreflexive edge = (S.not (T.alphaEq (schemeType g (fromGen edge)) (reference g (toNode edge)))) } in (let { edges = (S.filter nonreflexive (instances c)) } in do { ((H.forM_ edges) (\edge -> do { (Pair expectedCopies expected) <- (H.right (G.runBuild g (expandAndSolve true edge))); do { (Pair copies result) <- (H.right (Solver.witness (fromGen edge) (toNode edge) solver)); do { (S.unless (H.eq copies expectedCopies) (H.fail "witness lost original-to-copy identity")); (sameGraph expected result) } } })); (return (H.length edges)) })) } } })); do { (S.unless ((S.sum counts) > 100) (H.fail "vacuous witness comparison")); (putStrLn (H.append "Component witnesses: " (H.append (H.show (S.sum counts)) " full-graph comparisons"))) } }) (Cons (Pair "component solver includes incoming references and protected siblings" do { aliasReceipts; initial <- (H.right (Solver.prepare scopedGraph)); do { first <- (H.right (Solver.unify (Cons (Pair 4 8) Nil) initial)); do { (Pair _ expected) <- (H.right (G.runBuild scopedGraph (G.unify (Cons (Pair 4 8) Nil)))); do { (sameGraph expected first); do { (H.reject (Solver.unify (Cons (Pair 8 9) Nil) first)); (H.reject (Solver.unify (Cons (Pair 5 9) Nil) first)) } } } } }) (Cons (Pair "component solver rejects malformed disconnected input" (let { broken = (Graph (IM.adjust (\v -> (Node (GGen 99) (G.binder v) (G.flag v))) 0 (G.nodes scopedGraph)) (G.links scopedGraph) (G.nextId scopedGraph)) } in do { indexAudit; (H.reject (Solver.prepare broken)); do { initial <- (H.right (Solver.prepare scopedGraph)); do { (H.reject (Solver.unify (Cons (Pair 4 99) Nil) initial)); (H.reject (Solver.unify (Cons (Pair 99 99) Nil) initial)) } } })) (Cons (Pair "component solver preserves deep branching scopes and separate type components" (let { parent n = (if (H.eq n 0) then Nothing else (if (H.eq n 401) then (Just 0) else (if (H.eq n 301) then (Just 20) else (if true then (Just (n - 1)) else (panic "non-exhaustive test guard"))))) } in (let { g = (Graph (IM.fromList (H.concat (S.concatMap (\n -> (Cons (Cons (Pair (2 * n) (Node (GGen ((2 * n) + 1)) (H.fmap (\section2 -> (section2 * 2)) (parent n)) Flexible)) (Cons (Pair ((2 * n) + 1) (Node GBot (Just (2 * n)) Flexible)) Nil)) Nil)) (S.range 0 500)))) IM.empty 1002) } in (let { points = (Cons 0 (Cons 1 (Cons 20 (Cons 31 (Cons 127 (Cons 255 (Cons 300 (Cons 301 (Cons 400 (Cons 401 (Cons 500 Nil))))))))))) } in do { initial <- (H.right (Solver.prepare g)); ((H.forM_ (S.concatMap (\a -> (S.concatMap (\b -> (if (a < b) then (Cons (Pair a b) Nil) else Nil)) points)) points)) (\(Pair a b) -> (let { equations = (Cons (Pair ((2 * a) + 1) ((2 * b) + 1)) Nil) } in (case G.runBuild g (G.unify equations) of {
  Left err -> case Solver.unify equations initial of { Left _ -> return Unit; Right _ -> H.fail ("component accepted a rejected scope merge: " ++ err) };
  Right (Pair _ expected) -> case Solver.unify equations initial of { Right actual -> sameGraph expected actual; Left err -> H.fail ("component rejected a valid scope merge: " ++ err) }
-})))) })))) (Cons (Pair "expansion preserves the exact fresh identity budget across word boundaries" (let { expandFrom next = (G.runBuild (Graph (G.nodes scopedGraph) (G.links scopedGraph) next) (G.expand 2 0)) } in do { do { Pair (Triple _ boundaryCopies _) boundary <- H.right (expandFrom (9223372036854775807 - 2)); H.assert (IM.size boundaryCopies == 3 && G.nextId boundary == 9223372036854775808 && S.eqList eqInt (IM.elems boundaryCopies) (Cons 9223372036854775805 (Cons 9223372036854775806 (Cons 9223372036854775807 Nil)))) "arbitrary-precision expansion crossed the word boundary incorrectly"; H.right (G.validateGraph boundary) }; do { (Pair (Triple _ copies _) expanded) <- (H.right (expandFrom (9223372036854775807 - 3))); do { (S.unless ((H.eq (IM.size copies) 3) && (H.eq (G.nextId expanded) 9223372036854775807)) (H.fail "expansion did not use exactly its three reserved identities")); (H.right (G.validateGraph expanded)) } } })) (Cons (Pair "closed-instance optimization preserves all original schemes" do { counts <- ((S.forM (H.append fixtures (S.concatMap (\name -> (Cons (H.append "benchmarks/" (H.append name "/mlf/main.emlf")) Nil)) (Cons "binary-trees" (Cons "pidigits" (Cons "n-body" (Cons "fannkuch-redux" Nil))))))) (\file -> do { c <- (constraints file); do { initial <- (H.right (bind (Solver.prepare (initialGraph c)) (Solver.unify (equalities c)))); do { exact <- (H.right (bind (S.foldM (\s e -> (Solver.instantiate (fromGen e) (toNode e) s)) initial (instances c)) Solver.finish)); do { optimized <- (H.right (solve c)); (let { expected = (G.normalize exact) } in (let { gens = (S.concatMap (\(Pair n v) -> (S.concatMap (\comprehension1 -> case comprehension1 of { (GGen _) -> (Cons n Nil); _ -> Nil }) (Cons (G.tag v) Nil))) (IM.toAscList (G.nodes (initialGraph c)))) } in do { ((H.forM_ gens) (\gen -> (S.unless (T.alphaEq (schemeType expected gen) (schemeType optimized gen)) (H.fail (H.append file (H.append ": changed scheme at " (H.append (H.show gen) (H.append "\n" (H.append (H.show (schemeType expected gen)) (H.append "\n" (H.show (schemeType optimized gen)))))))))))); (return (H.length gens)) })) } } } })); (putStrLn (H.append "Closed instances: " (H.append (H.show (S.sum counts)) " independent scheme comparisons"))) }) (Cons (Pair "closed-instance matching checks repeated, rigid and frontier variables" (let { graph fieldFlag fieldBinder rightName = (Graph (IM.fromList (Cons (Pair 0 (Node (GGen 1) Nothing Flexible)) (Cons (Pair 1 (Node (GCon "Unit" Nil) (Just 0) Rigid)) (Cons (Pair 2 (Node (GGen 3) (Just 0) Flexible)) (Cons (Pair 3 (Node (GArr 4 4) (Just 2) Flexible)) (Cons (Pair 4 (Node GBot (Just fieldBinder) fieldFlag)) (Cons (Pair 5 (Node (GGen 6) (Just 0) Flexible)) (Cons (Pair 6 (Node (GArr 7 8) (Just 5) Flexible)) (Cons (Pair 7 (Node (GCon "Int" Nil) (Just 6) Rigid)) (Cons (Pair 8 (Node (GCon rightName Nil) (Just 6) Rigid)) Nil)))))))))) IM.empty 9) } in (let { run g = (bind (bind (Solver.prepare g) (Solver.instantiateClosed 2 6)) Solver.finish) } in do { (H.reject (run (graph Flexible 2 "Bool"))); do { (H.reject (run (graph Rigid 2 "Int"))); do { result <- (H.right (run (graph Flexible 0 "Int"))); do { (S.unless (H.eq (G.tag (G.nodeAt result 4)) (GCon "Int" Nil)) (H.fail "external frontier was mistaken for a quantified variable")); do { _ <- (H.right (run (graph Flexible 2 "Int"))); (return Unit) } } } } }))) Nil))))))))
+})))) })))) (Cons (Pair "expansion preserves the exact fresh identity budget across word boundaries" (let { expandFrom next = (G.runBuild (Graph (G.nodes scopedGraph) (G.links scopedGraph) next) (G.expand 2 0)) } in do { copyAllocation; do { Pair (Triple _ boundaryCopies _) boundary <- H.right (expandFrom (9223372036854775807 - 2)); H.assert (IM.size boundaryCopies == 3 && G.nextId boundary == 9223372036854775808 && S.eqList eqInt (IM.elems boundaryCopies) (Cons 9223372036854775805 (Cons 9223372036854775806 (Cons 9223372036854775807 Nil)))) "arbitrary-precision expansion crossed the word boundary incorrectly"; H.right (G.validateGraph boundary) }; do { (Pair (Triple _ copies _) expanded) <- (H.right (expandFrom (9223372036854775807 - 3))); do { (S.unless ((H.eq (IM.size copies) 3) && (H.eq (G.nextId expanded) 9223372036854775807)) (H.fail "expansion did not use exactly its three reserved identities")); (H.right (G.validateGraph expanded)) } } })) (Cons (Pair "closed-instance optimization preserves all original schemes" do { counts <- ((S.forM (H.append fixtures (S.concatMap (\name -> (Cons (H.append "benchmarks/" (H.append name "/mlf/main.emlf")) Nil)) (Cons "binary-trees" (Cons "pidigits" (Cons "n-body" (Cons "fannkuch-redux" Nil))))))) (\file -> do { c <- (constraints file); do { initial <- (H.right (bind (Solver.prepare (initialGraph c)) (Solver.unify (equalities c)))); do { exact <- (H.right (bind (S.foldM (\s e -> (Solver.instantiate (fromGen e) (toNode e) s)) initial (instances c)) Solver.finish)); do { optimized <- (H.right (solve c)); (let { expected = (G.normalize exact) } in (let { gens = (S.concatMap (\(Pair n v) -> (S.concatMap (\comprehension1 -> case comprehension1 of { (GGen _) -> (Cons n Nil); _ -> Nil }) (Cons (G.tag v) Nil))) (IM.toAscList (G.nodes (initialGraph c)))) } in do { ((H.forM_ gens) (\gen -> (S.unless (T.alphaEq (schemeType expected gen) (schemeType optimized gen)) (H.fail (H.append file (H.append ": changed scheme at " (H.append (H.show gen) (H.append "\n" (H.append (H.show (schemeType expected gen)) (H.append "\n" (H.show (schemeType optimized gen)))))))))))); (return (H.length gens)) })) } } } })); (putStrLn (H.append "Closed instances: " (H.append (H.show (S.sum counts)) " independent scheme comparisons"))) }) (Cons (Pair "closed-instance matching checks repeated, rigid and frontier variables" (let { graph fieldFlag fieldBinder rightName = (Graph (IM.fromList (Cons (Pair 0 (Node (GGen 1) Nothing Flexible)) (Cons (Pair 1 (Node (GCon "Unit" Nil) (Just 0) Rigid)) (Cons (Pair 2 (Node (GGen 3) (Just 0) Flexible)) (Cons (Pair 3 (Node (GArr 4 4) (Just 2) Flexible)) (Cons (Pair 4 (Node GBot (Just fieldBinder) fieldFlag)) (Cons (Pair 5 (Node (GGen 6) (Just 0) Flexible)) (Cons (Pair 6 (Node (GArr 7 8) (Just 5) Flexible)) (Cons (Pair 7 (Node (GCon "Int" Nil) (Just 6) Rigid)) (Cons (Pair 8 (Node (GCon rightName Nil) (Just 6) Rigid)) Nil)))))))))) IM.empty 9) } in (let { run g = (bind (bind (Solver.prepare g) (Solver.instantiateClosed 2 6)) Solver.finish) } in do { (H.reject (run (graph Flexible 2 "Bool"))); do { (H.reject (run (graph Rigid 2 "Int"))); do { result <- (H.right (run (graph Flexible 0 "Int"))); do { (S.unless (H.eq (G.tag (G.nodeAt result 4)) (GCon "Int" Nil)) (H.fail "external frontier was mistaken for a quantified variable")); do { _ <- (H.right (run (graph Flexible 2 "Int"))); (return Unit) } } } } }))) Nil))))))))
 
 fixtures : (List ( String ))
 fixtures = (Cons "examples/snake.emlf" (Cons "examples/monad-state-do.emlf" (Cons "examples/monad-maybe.emlf" (Cons "examples/contextual-instance.emlf" (Cons "examples/partial-annotation.emlf" Nil)))))
@@ -35,7 +38,233 @@ referenceExpand : Int -> Int -> G.Build (Triple (Int) (IntMap Int) ((List ( (Pai
 referenceExpand gen destination = do { g <- get; (let { source = (G.genRoot g gen) } in (let rec { visit : IntSet -> Int -> IntSet; visit seen x = (let { n = (G.resolve g x) } in (if (IS.member n seen) then seen else (if (S.not (G.underBinder g n gen)) then (IS.insert n seen) else (if true then (S.foldl visit (IS.insert n seen) (G.children (G.tag (G.nodeAt g n)))) else (panic "non-exhaustive test guard"))))) } in (let { originals = (IS.toList (visit IS.empty source)) } in do { copies <- (H.fmap IM.fromList (S.mapM (\n -> do { c <- G.freshId; (return (Pair n c)) }) originals)); (let { copy n = (IM.findWithDefault (G.resolve g n) (G.resolve g n) copies) } in (let { root = (copy source) } in (let { frontier = (S.concatMap (\n -> (if (S.not (G.underBinder g n gen)) then (Cons n Nil) else Nil)) originals) } in (let { copyTag t = (case t of { (GArr a b) -> (GArr (copy a) (copy b)); (GCon c ns) -> (GCon c (S.map copy ns)); (GGen n) -> (GGen (copy n)); (GTyApp a b) -> (GTyApp (copy a) (copy b)); _ -> t }) } in do { ((H.forM_ originals) (\n -> do { k <- (lift (G.kindAt g n)); (let { v = (G.nodeAt g n) } in (let { new = (if (H.elem n frontier) then (Node (G.bottomTag k) (Just destination) Flexible) else (if (H.eq n source) then (Node (copyTag (G.tag v)) (Just destination) Flexible) else (if true then (Node (copyTag (G.tag v)) (H.fmap (\b -> (if (H.eq (G.resolve g b) (G.resolve g gen)) then root else (copy b))) (G.binder v)) (G.flag v)) else (panic "non-exhaustive test guard")))) } in (G.setNode (copy n) new))) })); (return (Triple root copies (S.concatMap (\n -> (Cons (Pair n (copy n)) Nil)) frontier))) })))) }))) }
 
 sameGraph : Graph -> Solver -> IO Unit
-sameGraph expected solver = do { actual <- (H.right (Solver.finish solver)); (S.unless (H.eq actual expected) (H.fail (H.append "component graph differs\nexpected: " (H.append (H.show expected) (H.append "\nactual: " (H.show actual)))))) }
+sameGraph expected solver = do { assertCanonical solver; actual <- (H.right (Solver.finish solver)); (S.unless (H.eq actual expected) (H.fail (H.append "component graph differs\nexpected: " (H.append (H.show expected) (H.append "\nactual: " (H.show actual)))))) }
 
 scopedGraph : Graph
 scopedGraph = (Graph (IM.fromList (Cons (Pair 0 (Node (GGen 1) Nothing Flexible)) (Cons (Pair 1 (Node (GCon "Unit" Nil) (Just 0) Rigid)) (Cons (Pair 2 (Node (GGen 3) (Just 0) Flexible)) (Cons (Pair 3 (Node (GArr 4 5) (Just 2) Rigid)) (Cons (Pair 4 (Node GBot (Just 3) Rigid)) (Cons (Pair 5 (Node GBot (Just 3) Flexible)) (Cons (Pair 6 (Node (GGen 7) (Just 0) Flexible)) (Cons (Pair 7 (Node (GArr 8 9) (Just 6) Flexible)) (Cons (Pair 8 (Node GBot (Just 7) Flexible)) (Cons (Pair 9 (Node (GCon "Int" Nil) (Just 7) Rigid)) Nil))))))))))) IM.empty 10)
+
+-- Prepared solver states use canonical live fields even while their external
+-- alias table grows. Projection and canonical projection rely on this construction
+-- invariant; keep it visible in every full-graph differential comparison.
+assertCanonical : Solver -> IO Unit
+assertCanonical solver =
+ let graph = Solver.solverGraph solver in
+ H.assert (S.all (\(Pair n node) -> G.resolve graph n == n && S.all (\child -> G.resolve graph child == child && IM.member child (G.nodes graph)) (S.append (G.children (G.tag node)) (S.maybeToList (G.binder node)))) (IM.toList (G.nodes graph))) "solver live fields contain an alias or missing node"
+
+aliasReceipts : IO Unit
+aliasReceipts = do
+ let nodes = IM.insert 10 (Node GBot (Just 0) Flexible) (G.nodes scopedGraph)
+ let aliases = IM.fromList (Cons (Pair 1000 0) (Cons (Pair 1001 10) Nil))
+ let graph = Graph nodes aliases 1002
+ prepared <- H.right (Solver.prepare graph)
+ expected <- case Solver.groundGraft 1000 1001 prepared of {Nothing -> H.fail "nonvacuous ground view fixture did not graft"; Just value -> return value}
+ actual <- H.right (Solver.instantiateClosed 1000 1001 prepared)
+ sameGraph (Solver.solverGraph expected) actual
+ H.assert (H.eq (G.links (Solver.solverGraph actual)) aliases) "solver discarded external aliases"
+ let aliases2 = IM.insert 1002 2 aliases
+ let second = Graph nodes aliases2 1003
+ initial <- H.right (Solver.prepare second)
+ -- The public expansion keeps alias-aware lookup. Compare it with the
+ -- solver's projection boundary, including frontier IDs and its fresh budget.
+ (Pair (Triple expectedRoot expectedCopies expectedFrontier) expectedGraph) <- H.right (G.runBuild second (G.expand 1002 0))
+ (Quad root copies frontier expanded) <- H.right (Solver.expanded 1002 1001 initial)
+ H.assert (root == expectedRoot && H.eq copies expectedCopies && H.eq frontier expectedFrontier) "canonical expansion changed its identity receipt"
+ sameGraph expectedGraph expanded
+
+
+-- The retained reverse-edge scan is an independent control for the finite-set
+-- cardinality audit. Compare the complete result, including graph diagnostics.
+legacyFinish : Solver -> Either String Graph
+legacyFinish solver = NativeGraph.bindE (NativeGraph.validateGraph (Solver.graph solver)) (\_ ->
+ let current = Solver.graph solver in
+ let parents = Solver.structuralParents solver in
+ let descendants = Solver.bindingChildren solver in
+ if Solver.indexAgrees current true parents && Solver.indexAgrees current false descendants &&
+   S.all (Solver.nodeIndexed parents descendants) (IM.toList (NativeGraph.nodes current)) &&
+   Solver.equalScopes (Solver.scopeIndex solver) (Solver.indexScopes current)
+ then Right current else Left "incremental graph index disagrees with the graph")
+
+indexMutations : IntMap IntSet -> List (IntMap IntSet)
+indexMutations table =
+ let corruptTree = case table of
+       IntMap MapEmpty -> Nil
+       IntMap (MapNode count key value left right) -> Cons (IntMap (MapNode (count + 1) key value left right))
+         (Cons (IntMap (MapNode count key value right left)) Nil) in
+ S.append (Cons table (Cons IM.empty (Cons (IM.insert 999 (IS.singleton 0) table)
+   (Cons (IM.map (IS.map (\n -> n + 1000)) table) corruptTree))))
+   (S.concatMap (\(Pair key values) -> Cons (IM.delete key table)
+    (Cons (IM.insert key IS.empty table)
+    (Cons (IM.insert key (IS.insert 999 values) table)
+    (Cons (IM.insert key (IntSet (MapNode 9 0 Unit MapEmpty MapEmpty)) table)
+    (Cons (IM.insert key (IntSet (MapNode 2 0 Unit (MapNode 1 0 Unit MapEmpty MapEmpty) MapEmpty)) table) Nil))))) (IM.toList table))
+
+indexAudit : IO Unit
+indexAudit = do
+ scopeAudit
+ let repeated = Graph (IM.fromList (Cons (Pair 0 (Node (GGen 1) Nothing Flexible))
+       (Cons (Pair 1 (Node (GArr 2 2) (Just 0) Flexible))
+       (Cons (Pair 2 (Node GBot (Just 1) Flexible)) Nil)))) IM.empty 3
+ S.mapM_ (\input -> do
+  initial <- H.right (Solver.prepare input)
+  let current = Solver.graph initial
+  let parents = Solver.structuralParents initial
+  let descendants = Solver.bindingChildren initial
+  let scopes = Solver.scopeIndex initial
+  S.mapM_ (\changed -> do
+   let forged = Solver current changed descendants scopes
+   H.assert (H.eq (legacyFinish forged) (Solver.finish forged)) "structural index audit changed a forged result") (indexMutations parents)
+  S.mapM_ (\changed -> do
+   let forged = Solver current parents changed scopes
+   H.assert (H.eq (legacyFinish forged) (Solver.finish forged)) "binding index audit changed a forged result") (indexMutations descendants)
+  -- Raw malformed node-map ordering uses the preceding full audit fallback.
+  let malformed = case NativeGraph.nodes current of
+       IntMap MapEmpty -> current
+       IntMap (MapNode count key value left right) -> Graph (IntMap (MapNode count key value right left)) (NativeGraph.links current) (NativeGraph.nextId current)
+  let old = Solver.indexAgrees malformed true parents && Solver.indexAgrees malformed false descendants &&
+       S.all (Solver.nodeIndexed parents descendants) (IM.toList (NativeGraph.nodes malformed))
+  H.assert (H.eq old (Solver.indicesAgree malformed parents descendants)) "malformed node ordering changed index audit") (Cons scopedGraph (Cons repeated Nil))
+
+-- Scope equality is checked against the retained reconstruction, including
+-- hidden extra keys, forged cardinalities, wrong DFS intervals and jump levels.
+legacyScopeRoot : ScopeIndex -> Int -> Int
+legacyScopeRoot (ScopeIndex _ levels) n = case S.reverse levels of
+ Nil -> panic "empty scope ancestry index"
+ Cons final _ -> IM.get n final
+
+forgeCount : forall a. Int -> IntMap a -> IntMap a
+forgeCount count table = case table of
+ IntMap MapEmpty -> table
+ IntMap (MapNode _ key value left right) -> IntMap (MapNode count key value left right)
+scopeMutations : ScopeIndex -> List ScopeIndex
+scopeMutations (ScopeIndex intervals levels) =
+ let alter table = S.append (Cons IM.empty (Cons (IM.map (\n -> n + 1) table) (Cons (forgeCount (IM.size table) (IM.insert 99999 0 table)) Nil))) (S.concatMap (\(Pair n value) -> Cons (IM.delete n table) (Cons (IM.insert n 99999 table) Nil)) (if IM.size table <= 16 then IM.toList table else S.append (S.take 3 (IM.toList table)) (S.drop (IM.size table - 3) (IM.toList table)))) in
+ let rec replacePrefix : List (IntMap Int) -> List (IntMap Int) -> List ScopeIndex = \prefix -> \pending -> case pending of
+       Nil -> Nil
+       Cons level rest -> S.append (S.map (\changed -> ScopeIndex intervals (S.append (S.reverse prefix) (Cons changed rest))) (alter level)) (replacePrefix (Cons level prefix) rest) in
+ S.append (Cons (ScopeIndex intervals Nil) (Cons (ScopeIndex intervals (S.reverse levels)) (Cons (ScopeIndex intervals (S.append levels levels)) (Cons (ScopeIndex IM.empty levels) (Cons (ScopeIndex (IM.map (\(Pair start end) -> Pair (start + 1) end) intervals) levels) (Cons (ScopeIndex (forgeCount (IM.size intervals) (IM.insert 99999 (Pair 0 1) intervals)) levels) Nil)))))) (replacePrefix Nil levels)
+
+auditOneScope : Graph -> IO Unit
+auditOneScope graph = do
+ solver <- H.right (Solver.prepare graph)
+ let expected = Solver.scopeIndex solver
+ S.mapM_ (\n -> H.assert (legacyScopeRoot expected n == Solver.scopeRoot expected n) "last-level selection changed a scope root") (IM.keys (Solver.scopeIntervals expected))
+ S.mapM_ (\changed -> do
+  H.assert (H.eq (Solver.equalScopes changed expected) (Solver.scopesAgreeValidated (Solver.graph solver) changed)) "scope audit changed equality"
+  let forged = Solver (Solver.graph solver) (Solver.structuralParents solver) (Solver.bindingChildren solver) changed
+  H.assert (H.eq (legacyFinish forged) (Solver.finish forged)) "scope audit changed the complete finish result") (Cons expected (scopeMutations expected))
+
+scopeAudit : IO Unit
+scopeAudit = do
+ auditOneScope scopedGraph
+ let entries = S.concatMap (\n -> Cons (Pair (2*n) (Node (GGen (2*n+1)) (if n == 0 then Nothing else Just (2*(n-1))) Flexible)) (Cons (Pair (2*n+1) (Node GBot (Just (2*n)) Flexible)) Nil)) (S.range 0 255)
+ auditOneScope (Graph (IM.fromList entries) IM.empty 512)
+ putStrLn "deep scopes, exact intervals, forged sizes/extra keys and ancestry levels agree"
+
+
+-- The expected receipt comes directly from each occurrence's position and
+-- the last occurrence of duplicate originals, independently of allocation.
+copyAllocation : IO Unit
+copyAllocation = do
+ S.mapM_ (\offset -> S.mapM_ (\count -> do
+  let identities = S.map (\n -> offset + 7*n) (S.range 0 (count - 1))
+  let cases = Cons identities (Cons (S.reverse identities) (Cons (S.append identities identities) (Cons Nil Nil)))
+  S.mapM_ (\fresh -> do
+   let graph = Graph (NativeGraph.nodes scopedGraph) (IM.fromList (Cons (Pair fresh 0) (Cons (Pair (fresh+1) 2) Nil))) fresh
+   S.mapM_ (\originals -> do
+    let expectedCopies = IM.fromList (S.zip originals (S.range fresh (fresh + S.length originals - 1)))
+    let expectedGraph = Graph (NativeGraph.nodes graph) (NativeGraph.links graph) (fresh + S.length originals)
+    H.assert (H.eq (NativeGraph.allocateCopies graph originals) (Pair expectedCopies expectedGraph)) "copy allocation changed occurrence identities, node/alias maps or the exact fresh budget") cases)
+    (Cons (-7) (Cons 0 (Cons 9223372036854775807 (Cons 1000000000000000000000000000000000000000000000001 Nil)))))
+   (Cons 0 (Cons 1 (Cons 2 (Cons 7 (Cons 31 (Cons 257 Nil)))))))
+  (Cons (-1000000000000000000000000000000000000000000000001) (Cons 0 (Cons 100003 Nil)))
+
+legacyKindUnify : List (Pair Int Int) -> Graph -> Either String Graph
+legacyKindUnify equations before = NativeGraph.bindE (NativeGraph.validateGraph before) (\checked ->
+ NativeGraph.bindE (NativeGraph.kindsAt before (S.concatMap NativeGraph.equationNodes equations)) (\kinds ->
+ NativeGraph.bindE (NativeGraph.foldE (NativeGraph.firstOrder kinds) before equations) (\skeleton ->
+ NativeGraph.bindE (NativeGraph.rebind before (NativeGraph.canonicalize skeleton)) (\rebuilt ->
+ NativeGraph.bindE (NativeGraph.validateGraph rebuilt) (\verified -> Right rebuilt)))))
+
+kindFixture : Kind -> Graph
+kindFixture kind = NativeGraph.mkGraph (IM.fromList
+ (Cons (Pair 0 (NativeGraph.mkNode (GGen 1) Nothing Flexible))
+ (Cons (Pair 1 (NativeGraph.mkNode (GTyApp 2 3) (Just 0) Flexible))
+ (Cons (Pair 2 (NativeGraph.mkNode (GTyCon "F" (KArrow Star kind)) (Just 1) Rigid))
+ (Cons (Pair 3 (NativeGraph.mkNode GBot (Just 1) Flexible))
+ (Cons (Pair 4 (NativeGraph.mkNode (GBotK kind) (Just 0) Flexible))
+ (Cons (Pair 5 (NativeGraph.mkNode (GTyCon "R" kind) (Just 0) Rigid))
+ (Cons (Pair 6 (NativeGraph.mkNode (GSkolem 999999999999999999999999999999 kind) (Just 0) Rigid)) Nil)))))))) IM.empty 7
+
+compareKindGraph : Graph -> IO Unit
+compareKindGraph graph = do
+ H.right (NativeGraph.validateGraph graph)
+ S.mapM_ (\n -> H.assert (H.eq (NativeGraph.kindAt graph n) (NativeGraph.validatedKind graph n)) "higher kind or Gen-root kind changed") (IM.keys (NativeGraph.nodes graph))
+ S.mapM_ (\a -> S.mapM_ (\b -> H.assert (H.eq (legacyKindUnify (Cons (Pair a b) Nil) graph) (NativeGraph.unify (Cons (Pair a b) Nil) graph)) "higher-kind unification or forged cardinality changed") (IM.keys (NativeGraph.nodes graph))) (IM.keys (NativeGraph.nodes graph))
+
+rawKindControls : IO Unit
+rawKindControls = do
+ S.mapM_ (\kind -> do
+  let original = kindFixture kind
+  compareKindGraph original
+  compareKindGraph (Graph (forgeCount 70 (NativeGraph.nodes original)) IM.empty 7))
+  (Cons Star (Cons (KArrow Star Star) (Cons (KArrow (KArrow Star Star) (KArrow Star Star)) Nil)))
+ -- Enumeration contains every valid node, but ordered lookup cannot find 15.
+ -- The dense validator accepts this raw representation. The ordered guard
+ -- must preserve the original kind traversal's missing-child diagnostic.
+ let value = \n -> if n == 0 then NativeGraph.mkNode (GGen 1) Nothing Flexible else
+       if n == 8 then NativeGraph.mkNode (GArr 15 15) (Just 0) Rigid else
+       if n == 15 then NativeGraph.mkNode GBot (Just 8) Flexible else
+       NativeGraph.mkNode (GCon "Unit" Nil) (Just 0) Rigid
+ let leaf = \n -> M.singleton n (value n)
+ let tree = M.bin 10 (value 10)
+       (M.bin 20 (value 20)
+        (M.bin 5 (value 5) (M.bin 0 (value 0) MapEmpty (leaf 1)) (M.bin 8 (value 8) MapEmpty (leaf 15)))
+        (leaf 30))
+       (M.bin 50 (value 50) (M.bin 25 (value 25) (leaf 12) (leaf 35)) (leaf 70))
+ let malformed = Graph (IntMap tree) IM.empty 71
+ H.right (NativeGraph.validateGraph malformed)
+ H.assert (S.not (Solver.ascending (IM.keys (NativeGraph.nodes malformed)))) "non-BST kind fallback fixture is vacuous"
+ let expected = legacyKindUnify (Cons (Pair 8 8) Nil) malformed
+ H.assert (H.eq expected (Left "missing graph node 15")) "non-BST reference did not reach the expected kind error"
+ H.assert (H.eq expected (NativeGraph.unify (Cons (Pair 8 8) Nil) malformed)) "non-BST map lost its original kind diagnostic"
+ putStrLn "higher kinds, Gen roots, forged counts and non-BST kind fallback agree"
+
+sharedKindGraph : Int -> Graph
+sharedKindGraph depth =
+ let root = 2*depth+2 in
+ let entries = Cons (Pair 0 (NativeGraph.mkNode (GGen root) Nothing Flexible))
+       (Cons (Pair 1 (NativeGraph.mkNode (GTyCon "Binary" (KArrow Star (KArrow Star Star))) (Just 0) Rigid))
+       (Cons (Pair 2 (NativeGraph.mkNode (GCon "Unit" Nil) (Just 0) Rigid))
+       (S.concatMap (\n -> Cons (Pair (2*n+1) (NativeGraph.mkNode (GTyApp 1 (2*n)) (Just 0) Rigid))
+         (Cons (Pair (2*n+2) (NativeGraph.mkNode (GTyApp (2*n+1) (2*n)) (Just 0) Rigid)) Nil)) (S.range 1 depth)))) in
+ NativeGraph.mkGraph (IM.fromDistinctAscList entries) IM.empty (root+1)
+
+sharedKindControls : IO Unit
+sharedKindControls = do
+ S.mapM_ (\depth -> do
+  let graph = sharedKindGraph depth
+  let root = 2*depth+2
+  H.right (NativeGraph.validateGraph graph)
+  H.assert (S.not (NativeGraph.orderedSimpleKinds (IM.toList (NativeGraph.nodes graph)))) "shared application DAG did not select the original kind cache"
+  H.assert (H.eq (NativeGraph.validatedKind graph root) (Right Star)) "shared DAG query changed its kind"
+  S.mapM_ (\equations -> H.assert (H.eq (legacyKindUnify equations graph) (NativeGraph.unify equations graph)) "shared application DAG changed unification")
+   (Cons (Cons (Pair root root) Nil) (Cons (Cons (Pair 2 root) Nil) Nil)))
+  (Cons 1 (Cons 8 (Cons 24 (Cons 64 Nil))))
+ putStrLn "shared higher-kind DAGs retain the original memoized path"
+
+validatedKindControls : IO Unit
+validatedKindControls = do
+ sharedKindControls
+ rawKindControls
+ S.mapM_ (\graph -> case NativeGraph.validateGraph graph of
+  Left _ -> return Unit
+  Right _ -> if IM.null (NativeGraph.links graph) && Solver.ascending (IM.keys (NativeGraph.nodes graph)) then do
+   S.mapM_ (\n -> H.assert (H.eq (NativeGraph.kindAt graph n) (NativeGraph.validatedKind graph n)) "validated tag kind disagrees with independent complete kind traversal") (IM.keys (NativeGraph.nodes graph))
+   let keys = IM.keys (NativeGraph.nodes graph)
+   let missing = NativeGraph.nextId graph + 1000000
+   S.mapM_ (\a -> S.mapM_ (\b -> do
+    let pair = Pair a b
+    S.mapM_ (\equations -> H.assert (H.eq (legacyKindUnify equations graph) (NativeGraph.unify equations graph)) "validated kind path changed unification or missing-input error priority")
+     (Cons (Cons pair (Cons (Pair missing missing) Nil)) (Cons (Cons (Pair missing missing) (Cons pair Nil)) (Cons (Cons pair Nil) Nil)))) keys) keys
+  else return Unit) Validation.smallGraphs
+ putStrLn "validated kinds and eager input-error priority agree"

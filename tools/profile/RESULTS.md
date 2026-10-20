@@ -1,6 +1,10 @@
 # Checked cold bootstrap memory — 2026-10-19
 
-The root compiler target now uses checked separate compilation, with the native
+This report measures the earlier per-module pipeline. The current crate
+migration and its validation are recorded in [the migration ledger](../../docs/crate-migration.md).
+The measurements below retain their original source and test provenance.
+
+The measured compiler target used checked separate compilation, with the native
 package manager still source-linked. Three alternating cold build pairs on
 identical compiler/runtime sources measured median sampled aggregate RSS of
 **9,994,472,504 → 3,269,801,760 bytes** (67.283899% lower), with a candidate

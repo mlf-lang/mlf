@@ -1,0 +1,4 @@
+\(auto' : forall b. (forall a. a -> a) -> b -> b) ->
+\(choose : forall a. a -> a -> a) ->
+\(id : forall a. a -> a) ->
+choose id auto'

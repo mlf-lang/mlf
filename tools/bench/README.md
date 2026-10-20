@@ -48,7 +48,7 @@ Decisions use the unrounded ratio. Any failed limit exits nonzero. Reports retai
 every sample, medians, extrema, median absolute deviation, and hashes of each
 executable, LLVM module and object.
 
-The existing native C process and binary-file transports under `test/` supply
+The existing native C process and binary-file transports under `tests/native/` supply
 clocks, process isolation and raw bytes. Assertions and orchestration run in
 MLF. GHC, Python and Cabal are not used.
 

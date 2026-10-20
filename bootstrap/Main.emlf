@@ -9,7 +9,9 @@ import qualified Bootstrap.X.Parser as Parse
 import qualified Bootstrap.X.Pretty as Pretty
 import qualified Bootstrap.Runtime as Runtime
 import qualified Bootstrap.LLVM as LLVM
-import qualified Bootstrap.Separate as Separate
+import qualified Bootstrap.Crate as Crate
+import qualified Bootstrap.CrateArtifact as CrateArtifact
+import qualified Bootstrap.CrateCodegen as CrateCodegen
 
 data Command = PrintSource Bool | RunSource | EmitSource Bool | CheckTarget | RunTarget | RunProgramTarget | EmitTarget Bool | EmitIOTarget Bool
 data Source = SourceFile String | SourceText String String | SourceStdin
@@ -42,17 +44,19 @@ runArgs mode paths arguments = case arguments of
   Cons "--llvm-runtime" Nil -> do
     path <- runtimePath
     putStrLn path
-  Cons "--compile-module" (Cons file (Cons "-o" (Cons prefix Nil))) -> do
-    result <- Separate.compileModuleFile mode paths file prefix
+  Cons "--compile-crate" (Cons file (Cons "-o" (Cons prefix Nil))) -> do
+    result <- Crate.compileSpecFile file prefix
     case result of {Left message -> fatal message; Right _ -> ioReturn Unit}
-  Cons "--show-interface" (Cons file Nil) -> do
-    result <- Separate.showInterfaceFile file
+  Cons "--show-crate" (Cons file Nil) -> do
+    result <- CrateArtifact.showInterfaceFile file
     case result of {Left message -> fatal message; Right text -> putStr text}
-  Cons "--link-module" (Cons file Nil) -> separateCommand paths (PrintSource false) Nil file
-  Cons "--module-to-llvm" (Cons file Nil) -> separateCommand paths (EmitSource false) Nil file
-  Cons "--module-to-llvm-gc" (Cons file Nil) -> separateCommand paths (EmitSource true) Nil file
-  Cons "--run-module" rest -> case splitArguments rest of
-    Pair (Cons file Nil) args -> separateCommand paths RunSource args file
+  Cons "--crate-to-llvm" (Cons file Nil) -> crateCommand (EmitSource false) Nil file
+  Cons "--crate-to-llvm-gc" (Cons file Nil) -> crateCommand (EmitSource true) Nil file
+  Cons "--crate-to-llvm" (Cons file (Cons "--cache" (Cons cache Nil))) -> cachedCrateCommand cache false file
+  Cons "--crate-to-llvm-gc" (Cons file (Cons "--cache" (Cons cache Nil))) -> cachedCrateCommand cache true file
+  Cons "--link-crate" (Cons file Nil) -> crateCommand (PrintSource false) Nil file
+  Cons "--run-crate" rest -> case splitArguments rest of
+    Pair (Cons file Nil) args -> crateCommand RunSource args file
     _ -> fatal usage
   Cons "--type" rest -> sourceCommand mode paths (PrintSource true) Nil rest
   Cons "--emit-llvm" rest -> sourceCommand mode paths (EmitSource false) Nil rest
@@ -70,15 +74,19 @@ runArgs mode paths arguments = case arguments of
     Pair source arguments -> targetCommand RunProgramTarget arguments source
   _ -> sourceCommand mode paths (PrintSource false) Nil arguments
 
-separateCommand paths command args file = do
-  linked <- Separate.linkCheckedModuleFile paths file
-  case linked of
+cachedCrateCommand cache compact file = do
+  chunks <- CrateCodegen.emitFile cache compact false file
+  printLLVM chunks
+
+crateCommand command args file = do
+  result <- CrateArtifact.linkCheckedFile file
+  case result of
     Left message -> fatal message
-    Right checked -> let term = Checked.term checked in case command of
-      PrintSource _ -> putStrLn (Pretty.prettyTerm term)
-      RunSource -> execute args term
+    Right checked -> case command of
+      PrintSource _ -> putStrLn (Pretty.prettyTerm (Checked.term checked))
+      RunSource -> execute args (Checked.term checked)
       EmitSource compact -> printLLVM (LLVM.emitCheckedChunks compact false checked)
-      _ -> fatal "invalid module command"
+      _ -> fatal "invalid crate command"
 
 splitArguments : List String -> Pair (List String) (List String)
 splitArguments arguments = case arguments of
@@ -189,6 +197,6 @@ chooseRuntime paths = case paths of
     h <- fileExists (path ++ "/runtime/mlf_runtime.h")
     if c && h then canonicalPath (path ++ "/runtime/mlf_runtime.c") else chooseRuntime rest
 
-usage = separateUsage ++ baseUsage
-separateUsage = "Separate compilation: emlf [--no-prelude] [-i DIR ...] --compile-module FILE -o PREFIX\n       emlf --show-interface FILE.mlfi\n       emlf [-i DIR ...] --link-module FILE.mlfi\n       emlf [-i DIR ...] --run-module FILE.mlfi [-- ARGS...]\n       emlf [-i DIR ...] --module-to-llvm[-gc] FILE.mlfi\n"
+usage = crateUsage ++ baseUsage
+crateUsage = "Crate compilation: emlf --compile-crate SPEC -o PREFIX\n       emlf --show-crate FILE.mlfci\n       emlf --link-crate FILE.mlfci\n       emlf --run-crate FILE.mlfci [-- ARGS...]\n       emlf --crate-to-llvm[-gc] FILE.mlfci\n"
 baseUsage = "Usage: emlf [--no-prelude] [-i DIR ...] [--type] [FILE | --expr SOURCE]\n       emlf --check [XMLF_FILE]\n       emlf [--no-prelude] [-i DIR ...] --run [FILE | --expr SOURCE] [-- ARG ...]\n       emlf --run-xmlf [XMLF_FILE] [-- ARG ...]\n       emlf [--no-prelude] [-i DIR ...] --emit-llvm [FILE | --expr SOURCE]\n       emlf --xmlf-to-llvm [XMLF_FILE]\n       emlf [--no-prelude] [-i DIR ...] --emit-llvm-gc [FILE | --expr SOURCE]\n       emlf --xmlf-to-llvm[-io]-gc [XMLF_FILE]\n       emlf --llvm-runtime\nWith no FILE, read eMLF from standard input.\nImports load Foo.Bar from Foo/Bar.emlf beside the entry or in -i search roots.\nThe standard prelude supplies Monad and Monad IO; --no-prelude disables it.\nLink LLVM IR with clang, runtime/mlf_runtime.c, and GMP.\nThe -gc commands require the runtime built with MLF_USE_BDWGC and MLF_COMPACT_BDWGC.\n"

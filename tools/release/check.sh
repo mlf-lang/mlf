@@ -6,7 +6,6 @@ version=$(cat VERSION)
 for manifest in mlf-package.json bootstrap/mlf-package.json package/mlf-package.json tests/mlf-package.json; do
   test "$(jq -r .version "$manifest")" = "$version"
 done
-test "$(awk '$1 == "version:" {print $2; exit}' mlf.cabal)" = "$version.0"
 grep -q "^## $version " CHANGELOG.md
 for script in tools/release/*.sh; do bash -n "$script"; done
 test -s LICENSE

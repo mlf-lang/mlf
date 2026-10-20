@@ -998,15 +998,53 @@ static MlfValue *array_write_action(Tag tag, MlfValue *a, MlfValue *i, MlfValue 
     return result;
 }
 
-/* Scalar offsets are cached only when a string is indexed. Sequential output
- * and concatenation retain their existing representation and cost. */
+/* The private index slot retains the generated string ABI. ASCII needs only
+ * a marker. Mostly ASCII text stores correction events after multibyte scalars;
+ * dense Unicode keeps its direct table. A cached event interval makes sequential
+ * indexing constant time without a size_t entry for every ASCII character. */
+static size_t ascii_string_indices;
 static size_t *string_indices(MlfValue *text) {
     if (text->as.string.indices) return text->as.string.indices;
     const unsigned char *bytes = (const unsigned char *)text->as.string.bytes;
     size_t length = text->as.string.length, count = 0;
+    while (count < length && bytes[count] < 0x80) ++count;
+    if (count == length) {
+        text->as.string.indices = &ascii_string_indices;
+        return &ascii_string_indices;
+    }
     if (!valid_utf8(bytes,length)) fail("invalid Unicode scalar");
-    for (size_t i = 0; i < length; ++i) if ((bytes[i] & 0xc0) != 0x80) ++count;
+    count = 0;
+    size_t multibyte = 0;
+    for (size_t i = 0; i < length; ++i) if ((bytes[i] & 0xc0) != 0x80) {
+        ++count;
+        if (bytes[i] >= 0xc0) ++multibyte;
+    }
     if (count > SIZE_MAX / sizeof(size_t) - 2) fail("string too large");
+    if (6 + 2 * multibyte < count + 2) {
+        /* Header: sentinel, scalar count, event count, cached inclusive
+         * lower/upper bounds, cached byte correction. Each event stores the
+         * scalar boundary after a multibyte character and its byte correction.
+         * A real dense count cannot reach the sentinel after the size check. */
+        size_t *indices = allocate((6 + 2 * multibyte) * sizeof(size_t));
+        indices[0] = SIZE_MAX;
+        indices[1] = count;
+        indices[2] = multibyte;
+        size_t next = 6, scalar = 0;
+        for (size_t i = 0; i < length; ++scalar) {
+            unsigned lead = bytes[i];
+            size_t width = lead < 0x80 ? 1 : lead < 0xe0 ? 2 : lead < 0xf0 ? 3 : 4;
+            i += width;
+            if (width > 1) {
+                indices[next++] = scalar + 1;
+                indices[next++] = i - scalar - 1;
+            }
+        }
+        indices[3] = 0;
+        indices[4] = indices[6] - 1;
+        indices[5] = 0;
+        text->as.string.indices = indices;
+        return indices;
+    }
     size_t *indices = allocate((count + 2) * sizeof(size_t));
     indices[0] = count;
     size_t next = 1;
@@ -1016,14 +1054,42 @@ static size_t *string_indices(MlfValue *text) {
     return indices;
 }
 
+static size_t string_index_count(MlfValue *text, size_t *indices) {
+    return indices == &ascii_string_indices ? text->as.string.length :
+        indices[0] == SIZE_MAX ? indices[1] : indices[0];
+}
+
+static size_t string_byte_offset(size_t *indices, size_t scalar) {
+    if (indices[0] != SIZE_MAX) return indices[scalar + 1];
+    if (scalar < indices[3] || scalar > indices[4]) {
+        /* Upper-bound search also accepts the final boundary for slicing. */
+        size_t low = 0, high = indices[2];
+        while (low < high) {
+            size_t middle = low + (high - low) / 2;
+            if (indices[6 + 2 * middle] <= scalar) low = middle + 1;
+            else high = middle;
+        }
+        indices[3] = low ? indices[6 + 2 * (low - 1)] : 0;
+        indices[4] = low < indices[2] ? indices[6 + 2 * low] - 1 : indices[1];
+        indices[5] = low ? indices[7 + 2 * (low - 1)] : 0;
+    }
+    return scalar + indices[5];
+}
+
+static size_t string_length(MlfValue *text) {
+    return string_index_count(text,string_indices(text));
+}
+
 static MlfValue *string_code_at(MlfValue *text, MlfValue *index) {
     text = expect(text,STRING);
     index = expect(index,INTEGER);
     size_t *indices = string_indices(text);
-    if (!indices[0]) fail("string index out of bounds");
-    size_t i = (size_t)bounded_integer(index,indices[0]-1,"string index out of bounds");
+    size_t count = string_index_count(text,indices);
+    if (!count) fail("string index out of bounds");
+    size_t i = (size_t)bounded_integer(index,count-1,"string index out of bounds");
     const unsigned char *bytes = (const unsigned char *)text->as.string.bytes;
-    size_t position = indices[i+1], end = indices[i+2];
+    if (indices == &ascii_string_indices) return small((int64_t)bytes[i]);
+    size_t position = string_byte_offset(indices,i), end = string_byte_offset(indices,i+1);
     unsigned scalar = bytes[position++];
     if (scalar >= 0xc0) scalar &= end-position == 1 ? 0x1f : end-position == 2 ? 0x0f : 7;
     while (position < end) scalar = (scalar << 6) | (bytes[position++] & 0x3f);
@@ -1035,9 +1101,17 @@ static MlfValue *string_slice(MlfValue *text, MlfValue *offset, MlfValue *count)
     offset = expect(offset,INTEGER);
     count = expect(count,INTEGER);
     size_t *indices = string_indices(text);
-    size_t start = (size_t)bounded_integer(offset,indices[0],"string slice out of bounds");
-    size_t length = (size_t)bounded_integer(count,indices[0]-start,"string slice out of bounds");
-    return mlf_string(text->as.string.bytes + indices[start+1],indices[start+length+1]-indices[start+1]);
+    size_t scalars = string_index_count(text,indices);
+    size_t start = (size_t)bounded_integer(offset,scalars,"string slice out of bounds");
+    size_t length = (size_t)bounded_integer(count,scalars-start,"string slice out of bounds");
+    if (indices == &ascii_string_indices) {
+        MlfValue *result = mlf_string(text->as.string.bytes + start,length);
+        result->as.string.indices = &ascii_string_indices;
+        return result;
+    }
+    size_t first = string_byte_offset(indices,start);
+    size_t last = string_byte_offset(indices,start+length);
+    return mlf_string(text->as.string.bytes + first,last-first);
 }
 
 static MlfValue *string_from_code(MlfValue *entry) {
@@ -1164,7 +1238,7 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
     case SUB_INT: return mlf_sub_int(a,b);
     case MUL_INT: case QUOT_INT: case REM_INT: case AND_INT: return integer_extended(p,a,b);
     case READ_INT: return read_integer(a);
-    case STRING_LENGTH: return small((int64_t)string_indices(expect(a,STRING))[0]);
+    case STRING_LENGTH: return small((int64_t)string_length(expect(a,STRING)));
     case STRING_CODE_AT: return string_code_at(a,b);
     case STRING_SLICE: return string_slice(a,b,c);
     case STRING_FROM_CODE: return string_from_code(a);
@@ -1372,7 +1446,10 @@ static void release(Object *entry) {
             UNCOUNT_INTEGER_BYTES(mpz_size(v->as.integer) * sizeof(mp_limb_t));
             mpz_clear(v->as.integer);
         }
-        if (v->tag == STRING) { free(v->as.string.bytes); free(v->as.string.indices); }
+        if (v->tag == STRING) {
+            free(v->as.string.bytes);
+            if (v->as.string.indices != &ascii_string_indices) free(v->as.string.indices);
+        }
         if (v->tag == INT_ARRAY || v->tag == ST_ARRAY) free(v->as.int_array.cells);
         if (v->tag == DOUBLE_ARRAY) free(v->as.double_array.cells);
         if (v->tag == BYTE_ARRAY) free(v->as.byte_array.cells);
