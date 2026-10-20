@@ -41,9 +41,9 @@ $gmp = Join-Path $PSScriptRoot 'lib/libgmp.dll.a'
 $runtimeObject = [IO.Path]::ChangeExtension($outputPath, '.runtime.o')
 # LLVM 14's opaque-pointer switch is only for the IR input. Applying it to
 # the C frontend can crash that compiler's loop vectorizer.
-& $Clang -O2 -std=c11 "-I$include" -c $runtime -o $runtimeObject
+& $Clang -O2 -std=c11 -mno-incremental-linker-compatible "-I$include" -c $runtime -o $runtimeObject
 if ($LASTEXITCODE) { throw 'Runtime compilation failed' }
-& $Clang -O2 -Wno-override-module @irFlags $irPath $runtimeObject $gmp -lshell32 -lm '-Wl,--stack,268435456' -o $outputPath
+& $Clang -O2 -Wno-override-module -mno-incremental-linker-compatible @irFlags $irPath $runtimeObject $gmp -lshell32 -lm '-Wl,--stack,268435456' '-Wl,--no-insert-timestamp' -o $outputPath
 if ($LASTEXITCODE) { throw 'Native linking failed' }
 $dll = Join-Path $PSScriptRoot 'bin/libgmp-10.dll'
 $destination = Join-Path $outputDirectory 'libgmp-10.dll'

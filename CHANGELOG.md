@@ -29,6 +29,8 @@
   redirects, locks and cleanup past MAX_PATH under both runtime layouts.
 - Validate Windows drive-rooted and UNC dependency receipts so unchanged crate
   builds reuse their checked artifacts while retaining exact-file hash guards.
+- Emit Windows COFF objects and PE executables without wall-clock timestamps,
+  preserving byte-identical clean/incremental builds and native link cache reuse.
 - Reduce compiler bootstrap memory through checked separate compilation,
   preserving independent checking and module boundaries.
 - Add native `--version` reporting and platform-specific release packages,
