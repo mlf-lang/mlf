@@ -20,7 +20,12 @@ jq -e --arg name "$name" --arg source "$source" --argjson run "$run" '
 ' "$work/list.json" > "$work/artifact.json"
 id=$(jq -er .id "$work/artifact.json")
 expected=$(jq -er '.digest | sub("^sha256:"; "")' "$work/artifact.json")
-gh api "repos/$repository/actions/artifacts/$id/zip" --allow-escape-sequences > "$work/artifact.zip"
+gh api --help > "$work/api-help"
+if grep -q -- '--allow-escape-sequences' "$work/api-help"; then
+  gh api "repos/$repository/actions/artifacts/$id/zip" --allow-escape-sequences > "$work/artifact.zip"
+else
+  gh api "repos/$repository/actions/artifacts/$id/zip" > "$work/artifact.zip"
+fi
 if command -v sha256sum >/dev/null 2>&1; then
   actual=$(sha256sum "$work/artifact.zip" | awk '{print $1}')
 else
