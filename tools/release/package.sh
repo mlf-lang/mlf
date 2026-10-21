@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Assemble existing native test results; compilation and tests remain in MLF.
 set -euo pipefail
-root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
+root=${MLF_RELEASE_SOURCE_ROOT:-$(cd -- "$(dirname -- "$0")/../.." && pwd)}
+root=$(cd -- "$root" && pwd)
 cd "$root"
 build=${1:?usage: package.sh BUILD_DIRECTORY OUTPUT_DIRECTORY BDWGC_NOTICE}
 output=${2:?output directory required}
@@ -55,7 +56,7 @@ for group in $groups; do
   done < <(jq -r '(.matrices // {}) | to_entries[] | [.key,.value.log_sha256] | @tsv' "$report")
 done
 # Check every recorded source and detect newly added or removed inputs as well.
-jq -r '.sources | to_entries[] | "\(.value)  \(.key)"' "$base" | sha256 -c >/dev/null
+jq -r '.sources | to_entries[] | "\(.value)  \(.key)"' "$base" | sha256 -c - >/dev/null
 cmp <(jq -r '.sources | keys[]' "$base" | LC_ALL=C sort) <(
   { find scripts runtime bootstrap package examples benchmarks tests \
     -type d \( -name .mlf-build -o -name .git -o -name dist-newstyle -o -name __pycache__ \) -prune -o \

@@ -78,7 +78,7 @@ jobs:
             bash .mlf-build/release-infra/tools/release/download-artifact.sh "$QUALIFICATION_RUN" "$name" ".mlf-build/release-input/$name" "$SOURCE_COMMIT"
           done
       - name: Verify all original proofs and smoke-test the relocated SDK
-        run: tools/release/package.sh .mlf-build/release-input .mlf-build/release tools/release/licenses/BDWGC.txt
+        run: MLF_RELEASE_SOURCE_ROOT="$GITHUB_WORKSPACE" bash .mlf-build/release-infra/tools/release/package.sh .mlf-build/release-input .mlf-build/release tools/release/licenses/BDWGC.txt
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: release-macos-arm64
