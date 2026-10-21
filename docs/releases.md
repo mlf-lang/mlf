@@ -69,6 +69,20 @@ builds and verifies all three packages, and only then creates the annotated
 version tag and publishes one developer preview. Manual runs accept an existing
 version tag. Existing releases and assets are never replaced.
 
+Qualification artifacts are downloaded individually, checked against their
+recorded SHA-256 digest and workflow source, then extracted sequentially. This
+also supports parity archives containing thousands of diagnostic files on
+macOS hosts with a small open-file limit.
+
+If qualification succeeds but macOS artifact extraction fails, the manual
+**Recover qualified release packaging** workflow accepts the original run ID
+and exact source commit. It requires successful jobs for all fourteen POSIX
+groups, Windows qualification/packaging and the Linux package. It preserves
+those original binaries and reports, repeats all macOS package evidence and
+relocation checks, then publishes the original qualified source with the
+existing Linux and Windows archives. It does not certify the infrastructure
+commit as a new compiler candidate or replace a published release.
+
 The bootstrap starts with independently pinned macOS native tools. Checked
 LLVM from the new macOS build is hashed and transported as a workflow artifact;
 Linux and Windows compile it with their native C runtimes, then rebuild the

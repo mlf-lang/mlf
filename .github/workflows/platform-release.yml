@@ -193,6 +193,9 @@ jobs:
           retention-days: 14
   posix-package:
     needs: [metadata, posix-tests]
+    permissions:
+      contents: read
+      actions: read
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     strategy:
@@ -222,11 +225,16 @@ jobs:
             test -x "$llvm_bin/llvm-profdata"
             echo "$llvm_bin" >> "$GITHUB_PATH"
           fi
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
-        with:
-          pattern: native-${{ matrix.platform }}-*
-          merge-multiple: false
-          path: .mlf-build/release-input
+      - name: Download digest-checked qualification archives sequentially
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PLATFORM: ${{ matrix.platform }}
+          SOURCE_COMMIT: ${{ needs.metadata.outputs.source }}
+        run: |
+          for part in unit packages self-host parity backends port-standard port-compact-gc; do
+            name="native-$PLATFORM-$part"
+            bash tools/release/download-artifact.sh "$GITHUB_RUN_ID" "$name" ".mlf-build/release-input/$name" "$SOURCE_COMMIT"
+          done
       - name: Verify six groups and test the relocated installation
         run: |
           tools/release/package.sh .mlf-build/release-input .mlf-build/release tools/release/licenses/BDWGC.txt

@@ -12,6 +12,7 @@ jobs:
   release:
     permissions:
       contents: write
+      actions: read
     uses: ./.github/workflows/platform-release.yml
     with:
       tag: ${{ inputs.tag }}

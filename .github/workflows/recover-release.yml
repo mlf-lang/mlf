@@ -1,0 +1,149 @@
+name: Recover qualified release packaging
+on:
+  workflow_dispatch:
+    inputs:
+      qualification_run:
+        description: Completed cross-platform qualification run
+        required: true
+        type: string
+      source:
+        description: Exact qualified source commit (40 hex characters)
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  metadata:
+    runs-on: ubuntu-24.04
+    outputs:
+      source: ${{ steps.verify.outputs.source }}
+      version: ${{ steps.verify.outputs.version }}
+      tag: ${{ steps.verify.outputs.tag }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ inputs.source }}
+          fetch-depth: 0
+      - name: Require the exact successful qualifications and existing platform packages
+        id: verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QUALIFICATION_RUN: ${{ inputs.qualification_run }}
+          SOURCE_COMMIT: ${{ inputs.source }}
+        run: |
+          set -euo pipefail
+          [[ "$QUALIFICATION_RUN" =~ ^[0-9]+$ && "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$SOURCE_COMMIT"
+          tools/release/check.sh
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$QUALIFICATION_RUN" > run.json
+          jq -e --arg source "$SOURCE_COMMIT" '.head_sha == $source and .status == "completed" and .path == ".github/workflows/platform-release.yml"' run.json
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/actions/runs/$QUALIFICATION_RUN/jobs?per_page=100" > jobs.json
+          for platform in macos-arm64 linux-x64; do
+            for group in unit packages self-host parity backends port-standard port-compact-gc; do
+              jq -e --arg name "$platform $group" '[.[].jobs[] | select(.name == $name)] | length == 1 and all(.[]; .status == "completed" and .conclusion == "success")' jobs.json
+            done
+          done
+          for name in windows 'posix-package (linux-x64, ubuntu-24.04)'; do
+            jq -e --arg name "$name" '[.[].jobs[] | select(.name == $name)] | length == 1 and all(.[]; .status == "completed" and .conclusion == "success")' jobs.json
+          done
+          version=$(cat VERSION)
+          printf 'source=%s\nversion=%s\ntag=v%s\n' "$SOURCE_COMMIT" "$version" "$version" >> "$GITHUB_OUTPUT"
+  macos-package:
+    needs: metadata
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ needs.metadata.outputs.source }}
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          path: .mlf-build/release-infra
+      - name: Native dependencies
+        run: |
+          brew install llvm gmp pkg-config bdw-gc
+          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+          echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
+      - name: Download original checked candidates and all primary evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QUALIFICATION_RUN: ${{ inputs.qualification_run }}
+          SOURCE_COMMIT: ${{ needs.metadata.outputs.source }}
+        run: |
+          set -euo pipefail
+          for part in unit packages self-host parity backends port-standard port-compact-gc; do
+            name="native-macos-arm64-$part"
+            bash .mlf-build/release-infra/tools/release/download-artifact.sh "$QUALIFICATION_RUN" "$name" ".mlf-build/release-input/$name" "$SOURCE_COMMIT"
+          done
+      - name: Verify all original proofs and smoke-test the relocated SDK
+        run: tools/release/package.sh .mlf-build/release-input .mlf-build/release tools/release/licenses/BDWGC.txt
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: release-macos-arm64
+          path: .mlf-build/release/*.tar.gz
+          retention-days: 30
+  publish:
+    needs: [metadata, macos-package]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ needs.metadata.outputs.source }}
+          fetch-depth: 0
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          path: .mlf-build/release-infra
+      - name: Verify and collect the three immutable platform archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QUALIFICATION_RUN: ${{ inputs.qualification_run }}
+          SOURCE_COMMIT: ${{ needs.metadata.outputs.source }}
+          INFRASTRUCTURE_COMMIT: ${{ github.sha }}
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+          helper=.mlf-build/release-infra/tools/release/download-artifact.sh
+          for platform in linux-x64 windows-x64; do
+            bash "$helper" "$QUALIFICATION_RUN" "release-$platform" ".mlf-build/assets/$platform" "$SOURCE_COMMIT"
+          done
+          bash "$helper" "$GITHUB_RUN_ID" release-macos-arm64 .mlf-build/assets/macos-arm64 "$INFRASTRUCTURE_COMMIT"
+          mkdir -p .mlf-build/publish
+          cp ".mlf-build/assets/linux-x64/mlf-$RELEASE_VERSION-linux-x64.tar.gz" .mlf-build/publish/
+          cp ".mlf-build/assets/windows-x64/mlf-$RELEASE_VERSION-windows-x64.zip" .mlf-build/publish/
+          cp ".mlf-build/assets/macos-arm64/mlf-$RELEASE_VERSION-macos-arm64.tar.gz" .mlf-build/publish/
+      - name: Publish the qualified source without replacing assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.metadata.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+          SOURCE_COMMIT: ${{ needs.metadata.outputs.source }}
+        run: |
+          set -euo pipefail
+          cd .mlf-build/publish
+          expected=("mlf-$RELEASE_VERSION-linux-x64.tar.gz" "mlf-$RELEASE_VERSION-macos-arm64.tar.gz" "mlf-$RELEASE_VERSION-windows-x64.zip")
+          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 3
+          for file in "${expected[@]}"; do test -s "$file"; done
+          sha256sum "${expected[@]}" > SHA256SUMS
+          sha256sum --check --strict SHA256SUMS
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Refusing to replace an existing release or its assets.' >&2
+            exit 1
+          fi
+          cd ../..
+          if git rev-parse "$RELEASE_TAG^{commit}" >/dev/null 2>&1; then
+            test "$(git rev-parse "$RELEASE_TAG^{commit}")" = "$SOURCE_COMMIT"
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git tag -a "$RELEASE_TAG" "$SOURCE_COMMIT" -m "MLF $RELEASE_VERSION native developer preview"
+            git push origin "refs/tags/$RELEASE_TAG"
+          fi
+          awk -v version="$RELEASE_VERSION" '$0 ~ "^## " version " " {active=1;next} /^## / {if(active)exit} active' CHANGELOG.md > .mlf-build/publish/NOTES.md
+          gh release create "$RELEASE_TAG" --verify-tag --draft --prerelease --latest=false --title "MLF $RELEASE_VERSION — Windows, macOS and Linux preview" --notes-file .mlf-build/publish/NOTES.md .mlf-build/publish/*.tar.gz .mlf-build/publish/*.zip .mlf-build/publish/SHA256SUMS
+          gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
