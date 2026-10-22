@@ -62,11 +62,7 @@ jobs:
             .mlf-build/pr-smoke/tests/verification.json
             .mlf-build/pr-smoke/tests/*.log*
             .mlf-build/pr-smoke/tests/*.coverage.jsonl
-            .mlf-build/pr-smoke/tests/framework-cli/**/*.jsonl
-            .mlf-build/pr-smoke/tests/framework-cli/**/*.json
-            .mlf-build/pr-smoke/tests/framework-cli/**/*.log
-            .mlf-build/pr-smoke/tests/framework-cli/**/*.stdout
-            .mlf-build/pr-smoke/tests/framework-cli/**/*.stderr
+            .mlf-build/pr-smoke/tests/framework-cli/
             tests/golden/unit-inventory.json
             .mlf-build/pr-smoke/tests/suite-build/build-report.json
             .mlf-build/pr-smoke/tests/driver-build/build-report.json
