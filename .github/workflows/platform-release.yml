@@ -151,7 +151,7 @@ jobs:
           export MLF_PACKAGE_MANAGER="$PWD/.mlf-build/mac-candidate/bin/mlfpkg"
           . tools/release/native-environment.sh
           ./mlfpkg --runtime "$PWD/runtime/mlf_runtime.c" --timeout 21600 --locked build
-      - name: Build shared qualification libraries and checker
+      - name: Build shared qualification libraries and port executable
         run: tools/release/prepare-qualification.sh
       - name: Verify and archive genuine native outputs
         run: tools/release/shared-candidate.sh export
@@ -203,7 +203,7 @@ jobs:
         run: |
           . tools/release/native-environment.sh
           tools/release/bootstrap-linux.sh .mlf-build/portable-llvm .mlf-build/linux-bootstrap .mlf-build
-      - name: Build shared qualification libraries and checker
+      - name: Build shared qualification libraries and port executable
         run: tools/release/prepare-qualification.sh
       - name: Verify and archive genuine native outputs
         run: tools/release/shared-candidate.sh export
