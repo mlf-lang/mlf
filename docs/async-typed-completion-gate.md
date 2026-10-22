@@ -1,22 +1,29 @@
 # Typed completion representation gate
 
-## Decision at the first checkpoint
+## Current decision
 
-The allocation/generalization gate **passes the focused source experiments**.
-MLF can express an IO allocation action whose result has one fixed element type,
-including a genuinely polymorphic function as that one element type. No change
-to inference/generalization semantics is indicated by these experiments.
+The allocation/generalization experiments pass, and the actual opaque primitive
+implementation is now present. Primitive IDs 83–94 cover typed completions,
+scoped resumptions and cancellable monotonic timers. Compiler kind/signature
+and module tables, independent target checking, native ABI/cache guards and a
+persistent interpreted IO store are updated together.
 
-A **live native representation prototype also passes** one-shot, bounded queue,
-forced-GC, lazy payload, owner invalidation and non-reentrant dispatch tests.
-Neither result means `Task a`/`Fiber a` is implemented. The new opaque primitive
-integration and interpreter/native equivalence gate remain pending at this
-checkpoint. The shipped process API is monomorphic.
+Verified locally so far:
 
-This is a positive feasibility result, not an impossibility claim and not a
-soundness proof for an unimplemented scheduler. The next slice is real opaque
-completion primitives plus a persistent interpreted IO store, followed by
-mixed-type source execution on both backends.
+- The updated interpreter module and its complete import graph typecheck with
+  the released seed, using the explicit stage-1 host bridge.
+- The real native representation passes **1,330 checks and 133 callbacks**,
+  including deterministic timer ordering, bounds, cancellation and root removal.
+- A separate **real native primitive/IO-driver integration test passes 20 checks
+  and 5 callbacks**, with forced GC, large integers, String captures, reused cold
+  allocation, duplicate resolution, non-reentrant dispatch and timer wait/cancel.
+
+The complete new source/native/interpreter parity runner is
+`tests/fixtures/async-completion/check.sh`. Its execution against the bootstrapped
+stage-2 compiler is still pending at this checkpoint. Native C integration and
+source typechecking do not substitute for this remaining gate. The original
+four-positive/ten-negative type-only experiments remain recorded below as
+historical evidence; they are not the actual primitive suite.
 
 ## Reproduction and provenance
 
@@ -54,7 +61,7 @@ clang -O2 -std=c11 -Wall -Wextra -Werror \
 /tmp/completion-cell-tests
 ```
 
-Observed result: **1,314 checks, 133 callbacks passed**. This command uses the
+Observed result: **1,330 checks, 133 callbacks passed**. This command uses the
 normal compact-BDWGC runtime, including real `MlfValue` closures and payloads.
 
 ## What the type experiments establish
@@ -137,8 +144,9 @@ timers or a full scheduler.
 
 ## Live native storage and ownership proof
 
-`runtime/mlf_completion.h` is a header-only internal prototype. It adds no
-public primitive IDs, compiler types, runtime value tags or library API.
+`runtime/mlf_completion.h` is the private header-only representation used by the
+real primitive driver. The additional `tests/native/async_completion_primitives.c`
+test exercises IDs 83–94 through one ordinary `mlf_run` invocation.
 
 - Scope, cells and subscriptions are scanned BDWGC allocations. Stored results
   and captured continuations are ordinary lazy `MlfValue *` roots.
@@ -175,10 +183,10 @@ and callback-driven resolution without reentrant invocation.
 It checks roots are explicitly cleared; it does **not** assert deterministic
 collection timing or finalizer behavior under a conservative collector.
 
-## Concrete next primitive slice
+## Implemented primitive slice
 
-The proposed narrow integration uses opaque `AsyncScope`, `Completion a` and
-`AsyncSubscription`. Names below are proposed, not available in this checkpoint:
+The narrow integration uses opaque `AsyncScope`, `Completion a` and
+`AsyncSubscription`. Its implemented signatures are:
 
 ```text
 asyncScopeNew             : Int -> Int -> IO AsyncScope
@@ -191,6 +199,8 @@ asyncSubscriptionStatus   : AsyncSubscription -> IO Int
 asyncCancelSubscription   : AsyncSubscription -> IO Int
 asyncStep                 : AsyncScope -> IO Int
 asyncEnqueue              : AsyncScope -> IO Unit -> IO AsyncSubscription
+asyncDelay                : AsyncScope -> Int -> IO Unit -> IO AsyncSubscription
+asyncWait                 : AsyncScope -> Int -> IO Int
 ```
 
 CPS allocation and observation supply typed fallback actions for full/closed
@@ -200,9 +210,9 @@ retains its status but no callback. Direct enqueue avoids allocating a retained
 result cell for every scheduler yield. Every queue belongs to an explicit scope,
 so nested runs do not consume one another's work.
 
-Proposed internal status numbers follow the prototype: 0 OK, 1 EMPTY,
+Internal status numbers follow the representation: 0 OK, 1 EMPTY,
 2 ALREADY_RESOLVED, 3 CLOSED, 4 FULL, 5 WRONG_OWNER, 6 CONSUMED, 7 NO_MEMORY;
-a guarded driver additionally needs 8 BUSY for reentrant stepping of one scope.
+the guarded driver returns 8 BUSY for reentrant stepping/waiting of one scope.
 The eventual public library should turn these into named error/outcome values.
 
 Producer operations must remain behind the public `Fiber a` abstraction.
@@ -212,48 +222,38 @@ An opaque fiber must hide its underlying completion. If public consumer
 endpoints are exposed directly, add a distinct opaque resolver capability and
 prove its allocation/signature rather than exposing a consumer-to-producer cast.
 
-## Required integration and remaining gates
+## Integration inventory and remaining gates
 
-1. **Kinds, signatures and independent checking:** append primitive constructors
-   in `libraries/mlf-foundation/Bootstrap/Types.emlf`; names/codes/signatures/
-   arities in `libraries/mlf-language-core/Bootstrap/Primitive.emlf`; opaque
-   kinds in `libraries/mlf-language-core/Bootstrap/Data.emlf`. The xMLF parser,
-   checker and type machinery consume these shared tables. Add direct-target
-   rejection tests for forged types, wrong type arguments and wrong kinds.
-2. **Interpreter:** `libraries/mlf-interpreter/Bootstrap/Runtime.emlf` currently
-   has a persistent `RSTStore` only for ST, while IO `runAction`/`perform` carries
-   no arbitrary-value store. Add internal state-threaded IO execution holding
-   completion scopes, lazy `Either String RValue` results, subscriptions and
-   the ready queue. Preserve the existing external entry wrappers. IDs inside
-   this checked interpreter are implementation handles, never a source-level
-   conversion from Int to `Completion a`.
-3. **Native runtime:** append opaque wrapper/action tags without renumbering
-   the compact ABI in `runtime/mlf_runtime.c`; add arities, lazy action creation
-   and IO-driver dispatch. Three-argument actions require a traced argument
-   environment, as ST actions already use. Drain callbacks through the current
-   IO continuation loop, with an explicit same-scope reentrancy guard and
-   completion marker. Do not recursively call top-level `mlf_run`, which runs
-   global cleanup on exit.
-4. **LLVM/ABI/cache:** ordinary primitive lowering can use the generic arity
-   paths, but update the ABI guard and cache version in
-   `libraries/mlf-llvm/Bootstrap/LLVM.emlf`, the runtime header, and any primitive
-   inventory tests. Verify old generated objects cannot silently use new IDs.
-5. **Bootstrap:** `scripts/bootstrap-async.sh` already isolates the released-seed
-   ProcessHost bridge. A state-threaded interpreter can represent completion
-   values without calling new completion primitives in the host, preserving a
-   released-seed build path. Any new native monotonic-time/sleep host operations
-   for timers need an explicit compatible bridge, never fabricated timestamps.
-6. **Actual parity:** execute mixed Int/String and polymorphic-function cells
-   through the new public primitive signatures on both backends; repeat actions;
-   check cancellation/close races, cold construction, late callbacks, bounded
-   queue reuse, lazy values and forced collection. Re-run compile-negative and
-   independent-target tests against the new opaque type rather than only the
-   interface model. Resolve the imported alias diagnostic discrepancy.
-7. **Task layer:** only then add fibers, the cooperative scheduler, scope failure,
-   await/cancellation, cycle checks, timers and combinators. Task callbacks must
-   stay on the coordinator and bounded queue admission must return explicit
-   failure. Primitive storage proof alone does not establish these invariants.
-
-The exact unfinished gate is **checked source-to-native/interpreter integration
-of the new storage and guarded callback driver**, not a demonstrated type-system
-limitation. The focused representation tests provide a concrete route forward.
+1. **Kinds, signatures and independent checking:** primitive constructors,
+   names/codes/signatures/arities, opaque kinds and `Bootstrap.Module` builtin
+   names are wired. New source negatives and direct-target forged-type,
+   wrong-argument and wrong-kind negatives are in `async-completion`. The new
+   runner requires rejection in the expected phase and checks invalid target
+   rejection by checking, execution and LLVM emission.
+2. **Interpreter:** IO binds now thread a persistent `RAsyncStore`. It retains
+   lazy `Either String RValue` payloads and ordinary resume closures. Cancellation
+   removes registrations, closure drops all cell/ticket roots, and closed scopes
+   are deleted. A missing previously-issued scope ID means CLOSED, so repeated
+   scope creation/closure does not grow a tombstone map. IDs remain internal;
+   no source-level Int-to-typed-value operation exists.
+3. **Native runtime:** appended opaque wrapper/action tags retain compact ABI
+   numbering. Three-argument actions have a traced argument environment. The
+   existing IO continuation loop dispatches callbacks and clears the same-scope
+   reentrancy guard through a completion continuation, without recursive
+   `mlf_run`. A BUSY step/wait leaves timer and ready ordering unchanged.
+4. **Timers:** delay registration is nonblocking and reserves normal callback
+   quota. The timer queue is sorted by monotonic deadline, stable for ties.
+   Cancellation unlinks timers and clears roots. Step/wait mature due timers
+   after existing ready work. Wait runs no user code; -1 waits for the earliest
+   timer, 0 polls, and nonnegative bounded waits stop at their limit. It returns
+   EMPTY immediately with no ready work or timers. Each host pause is at most
+   1000 ms and never later than the nearest deadline. The interpreted clock/pause
+   bridge transfers metadata only, using process transport 82. Precision is
+   milliseconds, not a preemption or hard real-time guarantee.
+5. **LLVM/ABI/cache:** generated entries require
+   `mlf_require_async_completion_v2_abi`; cache keys include `completion-v2`.
+   The released compact ABI and primitive-82 guard remain for bootstrap inputs.
+6. **Remaining evidence:** run the real stage-2 source suite, compare both
+   interpreter entry paths with native output, and qualify the higher-level
+   Task/Fiber structured lifecycle independently. The current C proofs cannot
+   establish inference safety or whole-Task cancellation on their own.

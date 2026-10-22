@@ -267,6 +267,38 @@ static void cancel_running(void) {
     status(mlf_process_cancel(s, h, 99), MLF_PROCESS_OK, "repeat cancellation is idempotent");
     same_outcome(out, await(s, h)); close_scope(s);
 }
+static void request_cancel(void) {
+    char marker[4096], forbidden[4096];
+    path(marker, sizeof(marker), "request-tree"); path(forbidden, sizeof(forbidden), "request-forbidden");
+    mlf_process_scope s = scope(1, 2, 4), other = scope(1, 1, 2);
+    const char *tree[] = {fixture, "tree", marker, NULL}, *queued[] = {fixture, "signal", forbidden, NULL};
+    mlf_process_handle running = submit(s, tree), pending = submit(s, queued);
+    long pids[3]; tree_pids(marker, pids);
+    status(mlf_process_request_cancel(other, running, 60), MLF_PROCESS_INVALID_HANDLE, "request rejects cross-scope handle");
+    status(mlf_process_request_cancel(s, pending, 61), MLF_PROCESS_OK, "request queued cancellation");
+    status(mlf_process_request_cancel(s, pending, 62), MLF_PROCESS_OK, "queued request is idempotent");
+    status(mlf_process_request_cancel(s, running, 63), MLF_PROCESS_OK, "request running cancellation without a join");
+    status(mlf_process_request_cancel(s, running, 64), MLF_PROCESS_OK, "running request is idempotent");
+    check(!test_exists(forbidden), "request cancellation never admits cancelled queued work");
+    /* The coordinator can perform unrelated work before it chooses to await
+     * cleanup; only await/poll subsequently commits the running outcome. */
+    const char *ok[] = {fixture, "exit", "0", NULL};
+    exited(await(other, submit(other, ok)), 0);
+    mlf_process_outcome a = await(s, running), b = await(s, pending);
+    check(a.kind == MLF_PROCESS_CANCELLED && a.cancel_reason == 63, "first running cancellation reason wins");
+    check(b.kind == MLF_PROCESS_CANCELLED && b.cancel_reason == 61 && !b.pid, "first queued cancellation reason wins");
+    tree_stopped(pids);
+    status(mlf_process_request_cancel(s, running, 65), MLF_PROCESS_OK, "request after completion preserves outcome");
+    same_outcome(a, await(s, running));
+    mlf_process_event event;
+    status(mlf_process_poll(s, &event), MLF_PROCESS_OK, "queued request produces one event");
+    check(same_handle(event.handle, pending), "queued cancellation is committed first");
+    status(mlf_process_poll(s, &event), MLF_PROCESS_OK, "running request produces one event");
+    check(same_handle(event.handle, running), "running event follows cleanup");
+    status(mlf_process_poll(s, &event), MLF_PROCESS_EMPTY, "request events are exactly once");
+    close_scope(s); close_scope(other);
+    status(mlf_process_request_cancel(s, running, 66), MLF_PROCESS_INVALID_SCOPE, "request rejects closed scope");
+}
 static void cancel_scope(void) {
     char marker[4096], forbidden[4096]; path(marker, sizeof(marker), "tree"); path(forbidden, sizeof(forbidden), "forbidden");
     mlf_process_scope s = scope(1, 2, 4);
@@ -618,7 +650,7 @@ static const struct scenario scenarios[] = {
     {"jobs-one-dynamic", serial_dynamic}, {"admission-and-queue-bound", admission_bound},
     {"retained-outcome-bound", retained_limit}, {"repeat-await-once-event", repeat_await},
     {"launch-versus-126-127", launch_and_exit}, {"nonzero-is-data", nonzero_is_data},
-    {"cancel-queued", cancel_queued}, {"cancel-running-tree", cancel_running},
+    {"cancel-queued", cancel_queued}, {"cancel-running-tree", cancel_running}, {"request-cancel", request_cancel},
     {"cancel-scope", cancel_scope}, {"cancel-completed", cancel_completed},
     {"running-timeout", running_timeout}, {"queued-total-timeout", queued_timeout},
     {"running-timeout-excludes-queue", running_timeout_excludes_queue}, {"wait-bound", wait_bound},

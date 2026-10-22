@@ -1,7 +1,7 @@
 module Async.Process
   ( ProcessScope, ProcessHandle, AsyncError(..), ScopeOptions(..), ProcessSpec(..), Environment(..),
     ProcessOutcome(..), ProcessEvent(..), Wait(..), defaultOptions, command,
-    withProcessScope, submit, poll, waitNext, awaitProcess, awaitWithin, cancel, cancelScope,
+    withProcessScope, submit, poll, waitNext, awaitProcess, awaitWithin, cancel, requestCancel, cancelScope,
     errorCode, errorMessage, exitCode, cleanupError ) where
 import Bootstrap.Types
 import qualified Bootstrap.Std as L
@@ -130,9 +130,17 @@ awaitWithin (ProcessScope scope) handle wait = do
   ioReturn (case result of { Left error -> Left error; Right values -> readOutcome values })
 awaitProcess : ProcessScope -> ProcessHandle -> IO (Either AsyncError ProcessOutcome)
 awaitProcess scope handle = awaitWithin scope handle Forever
+-- Cancellation reason codes are caller-defined integers from 0 to 2147483647.
 cancel : ProcessScope -> ProcessHandle -> Int -> IO (Either AsyncError Unit)
 cancel (ProcessScope scope) handle reason = do
   result <- call (Cons "cancel" (Cons scope (L.append (handleFields handle) (Cons (showInt reason) Nil))))
+  ioReturn (unitResult result)
+-- Accept cancellation without waiting for cleanup. The queued child will never
+-- launch; a running child keeps its permit until a later supervisor call reaps
+-- it. A task coordinator must continue servicing calls until terminal outcome.
+requestCancel : ProcessScope -> ProcessHandle -> Int -> IO (Either AsyncError Unit)
+requestCancel (ProcessScope scope) handle reason = do
+  result <- call (Cons "request-cancel" (Cons scope (L.append (handleFields handle) (Cons (showInt reason) Nil))))
   ioReturn (unitResult result)
 cancelScope : ProcessScope -> Int -> IO (Either AsyncError Unit)
 cancelScope (ProcessScope scope) reason = do

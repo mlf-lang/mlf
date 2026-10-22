@@ -1,0 +1,5 @@
+PASS self-await-rejected
+PASS mutual-wait-cycle-rejected
+PASS primary-and-cleanup-errors-retained
+PASS nested-late-cleanup-after-primary-and-parent-stop
+PASS synchronous-ancestor-stop-before-notification

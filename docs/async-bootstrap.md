@@ -12,16 +12,21 @@ scripts/bootstrap-async.sh
 export MLF_COMPILER="$PWD/.mlf-build/async-bootstrap/stage2"
 ```
 
-The script requires Clang, GMP, BDWGC and pkg-config.
+The script requires Clang, GMP, BDWGC, pkg-config and `shasum`.
 `MLF_ASYNC_BOOTSTRAP_DIR` and `CC` override output directory/compiler. It uses
 crate builds instead of monolithic emission to bound compiler memory. A fresh
 source snapshot and minimal seed-schema manifest isolate compatibility changes
 from the working tree; the snapshot and build reports remain as evidence.
+Snapshots have content-addressed names and separate stage-1/stage-2 source
+trees. Retrying with unchanged input reuses those paths and completed crate
+artifacts. The script rejects source changes detected while copying a snapshot.
+It defaults `GC_FREE_SPACE_DIVISOR` to 8 to collect more frequently on smaller
+bootstrap hosts, while honoring an explicitly selected value.
 
 Stage 1 uses the ordinary source catalogue and native backend, with only
 `Bootstrap.ProcessHost` replaced in that snapshot by `bootstrap/seed-compat`. Its interpreter
 returns an explicit unsupported error for the new primitive. Stage 2 is built
-with the real host source restored and uses the actual in-process supervisor. The script
+from the unchanged native snapshot and uses the actual in-process supervisor. The script
 checks the stage-2 interpreter's protocol capability before reporting success.
 Keep the shim out of normal builds and release packages' module search paths.
 The temporary manifest omits per-executable dependency fields unsupported by

@@ -1,0 +1,5 @@
+main = do
+  scope <- asyncScopeNew 1 2
+  asyncNewCompletion scope (\cell -> do {
+    asyncResolveCompletion cell 42;
+    asyncReadCompletion cell putStrLn (ioReturn Unit) }) (ioReturn Unit)

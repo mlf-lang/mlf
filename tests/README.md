@@ -321,3 +321,26 @@ See [Async.Process](../docs/async-process.md) for semantics and limits,
 [the typed completion gate](../docs/async-typed-completion-gate.md) for separate
 compile-positive, compile-negative, and live representation evidence. A type
 signature fixture alone is not a mutable-cell or scheduler correctness proof.
+
+## Typed completions and cooperative tasks
+
+`tests/native/completion_cell_tests.c` and
+`tests/native/async_completion_primitives.c` exercise traced completion storage,
+ordinary IO-driver dispatch, quotas, cancellation, timers and forced collection.
+Required Linux/macOS native jobs and the Windows runtime job execute both.
+
+The required macOS language job bootstraps a real primitive-aware compiler with
+`scripts/bootstrap-async.sh`, then executes these fail-closed parity harnesses:
+
+- `EMLF=/path/to/stage2 tests/fixtures/async-completion/check.sh`: six source,
+  checked-target and native fixtures; nine source rejections; seven independent
+  target rejections through checking, interpreter and LLVM entrypoints.
+- `tools/release/test-async-process.sh /path/to/stage2 OUTPUT`: 13 process
+  contracts, panic cleanup and opaque-handle rejections.
+- `tools/release/test-async-task.sh /path/to/stage2 OUTPUT`: 29 contracts
+  (including five explicitly white-box scheduler cases) and five source
+  rejections. Includes jobs=1/jobs=4 dynamic dependency/artifact equivalence.
+
+Each records exact source/compiler hashes, observations and completion status.
+A seed-only type surrogate is not a passing execution result. See
+[Async.Task](../docs/async-task.md) for public semantics and remaining limits.

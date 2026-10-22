@@ -317,18 +317,23 @@ static wchar_t *mlf_ps_environment_block(const char *const *env) {
  * runs while child cwd is active; absolute executables avoid search policy. */
 static wchar_t *mlf_ps_executable(const mlf_process_spec *spec) {
     wchar_t *wide=mlf_ps_wide(spec->executable),*path=NULL;
+    int path_supplied=0;
     if(!wide) return NULL;
     if(spec->environment==MLF_PROCESS_ENV_REPLACE) {
         if(spec->env) for(size_t i=0;spec->env[i];++i) if(!_strnicmp(spec->env[i],"PATH=",5)) {
-            path=mlf_ps_wide(spec->env[i]+5); break;
+            path_supplied=1; path=mlf_ps_wide(spec->env[i]+5); break;
         }
     } else {
+        SetLastError(ERROR_SUCCESS);
         DWORD n=GetEnvironmentVariableW(L"PATH",NULL,0);
         if(n) {
-            path=mlf_ps_checked_alloc((size_t)n,sizeof(wchar_t));
+            path_supplied=1; path=mlf_ps_checked_alloc((size_t)n,sizeof(wchar_t));
             if(path && GetEnvironmentVariableW(L"PATH",path,n)>=n) { free(path); path=NULL; }
+        } else if(GetLastError()==ERROR_SUCCESS) {
+            path_supplied=1; path=mlf_ps_wide("");
         }
     }
+    if(path_supplied && !path) { free(wide); SetLastError(ERROR_NOT_ENOUGH_MEMORY); return NULL; }
     /* An absent PATH uses the system binaries directory, not the coordinator's
      * inherited PATH. An explicitly empty PATH means the child cwd. */
     if(!path) {
@@ -338,9 +343,13 @@ static wchar_t *mlf_ps_executable(const mlf_process_spec *spec) {
     }
     if(!path) { free(wide); SetLastError(ERROR_NOT_ENOUGH_MEMORY); return NULL; }
     DWORD n=SearchPathW(*path ? path : L".",wide,L".exe",0,NULL,NULL);
+    DWORD error=n ? ERROR_NOT_ENOUGH_MEMORY : GetLastError();
     wchar_t *full=n ? mlf_ps_checked_alloc((size_t)n+1,sizeof(wchar_t)) : NULL;
-    if(full && !SearchPathW(*path ? path : L".",wide,L".exe",n+1,full,NULL)) { free(full); full=NULL; }
-    free(wide); free(path); return full;
+    if(full) {
+        DWORD written=SearchPathW(*path ? path : L".",wide,L".exe",n+1,full,NULL);
+        if(!written || written>n) { error=written ? ERROR_INSUFFICIENT_BUFFER : GetLastError(); free(full); full=NULL; }
+    }
+    free(wide); free(path); if(!full) SetLastError(error); return full;
 }
 /* K32 is available on the supported Windows 7+ baseline; resolving from the
  * already-loaded system DLL avoids a new psapi import for every MLF binary. */
@@ -742,12 +751,19 @@ mlf_process_status mlf_process_await(mlf_process_scope id,mlf_process_handle han
         mlf_ps_pause_loop();
     }
 }
-mlf_process_status mlf_process_cancel(mlf_process_scope id,mlf_process_handle handle,int reason) {
+mlf_process_status mlf_process_request_cancel(mlf_process_scope id,mlf_process_handle handle,int reason) {
     struct mlf_ps_scope *scope=mlf_ps_find_scope(id);
     if(!scope) return MLF_PROCESS_INVALID_SCOPE;
     struct mlf_ps_entry *entry=mlf_ps_find_entry(scope,handle);
     if(!entry) return MLF_PROCESS_INVALID_HANDLE;
     mlf_ps_request_cancel(scope,handle.slot,MLF_PROCESS_CANCELLED,reason);
+    return MLF_PROCESS_OK;
+}
+mlf_process_status mlf_process_cancel(mlf_process_scope id,mlf_process_handle handle,int reason) {
+    mlf_process_status requested=mlf_process_request_cancel(id,handle,reason);
+    if(requested!=MLF_PROCESS_OK) return requested;
+    struct mlf_ps_scope *scope=mlf_ps_find_scope(id);
+    struct mlf_ps_entry *entry=mlf_ps_find_entry(scope,handle);
     while(entry->state!=MLF_PS_FINISHED) { mlf_ps_pump_all(); if(entry->state!=MLF_PS_FINISHED) mlf_ps_pause_loop(); }
     return entry->outcome.cleanup_error ? MLF_PROCESS_SYSTEM_ERROR : MLF_PROCESS_OK;
 }
