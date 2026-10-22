@@ -163,9 +163,14 @@ syntax, builds the checkout compiler and manager with the verified v0.3.0 seed
 in `.github/smoke-seed.env`, and runs eight direct CLI smoke cases plus three
 package build/cache states. The extended native harness remains available with
 `tools/release/native-ci.sh extended-pr-smoke`; full release coverage is unchanged.
-The separate Windows runtime job
-also runs. The aggregate **PR gate** succeeds only when all three jobs succeed;
-configure it as a required status check on `main` to enforce merge blocking.
+A separate package-distribution job builds the checkout manager and test campaign
+with the published compiler pinned in `.github/package-seed.env`, then requires
+18 resolver checks, 29
+package integration cases and 28 checked-release/distribution cases with
+structural coverage. Metadata also runs eight publishing regression checks.
+The Windows runtime job also runs. The aggregate **PR gate** succeeds only
+when all four jobs succeed; configure it as a required status check on `main`
+to enforce merge blocking.
 See [PR checks](ci.md) for exact coverage, local commands and required-check setup.
 Dispatch **CI** with `self_host` enabled for a fresh compiler build and fixed
 point, or **Native release** for all six compiler groups. These full checks are

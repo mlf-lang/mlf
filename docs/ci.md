@@ -7,10 +7,14 @@ The `CI` workflow runs on every pull request, merge queue group and push to
   provenance and checksum-pinned actionlint 1.7.12 workflow validation.
 - **Native compiler smoke**: a checkout compiler/manager build followed by eight
   direct CLI cases and three package/cache states on macOS arm64.
+- **Native package distribution**: checkout manager and test-campaign builds
+  followed by source-package and checked-release/distribution tests with the
+  pinned published compiler.
 - **Native Windows runtime**: compact-GC runtime, filesystem and reproducible
   object/executable checks on Windows.
 
-The aggregate runs even when a prerequisite fails and accepts only `success`.
+The aggregate runs even when a prerequisite fails and requires all four jobs
+to report `success`.
 Failed, cancelled or skipped prerequisites cannot produce a passing gate.
 There are no path filters on the required workflow. Manual dispatches retain
 the existing optional self-host and Windows-only modes. Their skipped aggregate
@@ -52,6 +56,21 @@ frozen independent target checker, framework/process contracts, or full backend
 and state-mutation matrices. Those checks remain in the extended campaign and
 full release groups; their test cases and evidence validation are unchanged.
 
+## Package distribution coverage
+
+The separate package job verifies the published compiler pinned in
+`.github/package-seed.env`, then builds the checkout `mlfpkg` and
+`compiler-tests` executables with the checked lockfile. The campaign receives
+that manager explicitly and runs 18 resolver checks, 29 package integration
+cases and 28 checked-release/distribution cases. Completed cases must match
+the reviewed structural inventory. The metadata job also runs eight publishing
+regression checks without creating releases.
+
+The workflow retains `package-distribution-evidence` on success or failure,
+including build and verification reports, command diagnostics, coverage,
+reviewed inventory and cache metadata. The package job has a 90-minute hard
+limit and is required by **PR gate** alongside compiler smoke.
+
 ## Run locally
 
 On Apple Silicon macOS with LLVM, GMP, BDWGC, pkg-config, jq and GitHub CLI:
@@ -81,13 +100,19 @@ release qualification are unchanged.
 
 ## Timing and evidence
 
-In CI run [39768304978](https://github.com/mlf-lang/mlf/actions/runs/39768304978),
-the earlier native job took 37m39s: the checkout tools took 17m51s, the smoke
-executable took about 15 minutes, and two backend drivers took about three
-minutes. The test assertions and package cases took less than a minute. The
-smaller gate removes those auxiliary builds; cutting only the fixture count
-would save little. Cold runs still need to build the checkout tools, so a target
-near 20 minutes is an estimate until measured on the hosted runner.
+In CI run [39798088020](https://github.com/mlf-lang/mlf/actions/runs/39798088020),
+the smaller smoke command completed in **16m49s** (1,009 seconds): checkout tool
+building took **16m17s** (977 seconds), and the remaining smoke checks and
+evidence recording took **32 seconds**. In the earlier
+[run 39768304978](https://github.com/mlf-lang/mlf/actions/runs/39768304978), the
+command took 36m42s and the native job took 37m39s. That campaign built a smoke
+executable and two backend drivers; the smaller gate removes those auxiliary
+builds. Cold runs remain dominated by building the checkout tools.
+
+These are individual hosted observations at different source revisions, not a
+controlled benchmark. The 16m49s run predates integration of package-distribution
+support. The separately required package job may determine overall CI duration;
+the smoke measurement does not establish the combined gate's completion time.
 
 The workflow uploads `pr-smoke-evidence` on success or failure, including build
 reports, command logs, output and completion receipts. Local evidence is under

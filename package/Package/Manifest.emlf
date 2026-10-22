@@ -4,6 +4,8 @@ import qualified Bootstrap.Std as S
 import qualified Bootstrap.Parser as P
 import qualified Package.OS as O
 import qualified Package.Json as J
+import qualified Package.Release as R
+import qualified Package.Distribution as Distribution
 
 data Package = Package String J.Json (List Module)
 data Module = Module String String String (List String)
@@ -12,6 +14,7 @@ packageRoot (Package path _ _) = O.parent path
 packagePath (Package path _ _) = path
 packageData (Package _ value _) = value
 packageName p = J.getText "name" "" (packageData p)
+isRelease p = J.has "release-sha256" (packageData p)
 crateIdentity p kind = packageName p ++ "/" ++ J.getText "version" "" (packageData p) ++ "/" ++ kind
 packageModules (Package _ _ modules) = modules
 moduleName (Module name _ _ _) = name
@@ -65,8 +68,16 @@ readPackage path = do
   let deps = J.getObject "dependencies" value
   S.mapM_ (\entry -> do
     O.require (validName (S.fst entry)) "invalid dependency name"
-    fields (S.snd entry) "path" ("dependency " ++ S.fst entry)
-    O.require (stringLength (J.getText "path" "" (S.snd entry)) > 0) "dependency requires a local path") (J.items deps)
+    let dep = S.snd entry
+    fields dep "path release github sha256 asset_sha256" ("dependency " ++ S.fst entry)
+    O.require (S.length (S.filter (\key -> J.has key dep) (O.words "path release github")) == 1) "dependency must select exactly one of path, release, or github"
+    if J.has "github" dep then Distribution.validateDependency dep else if J.has "release" dep then do
+      O.require (S.not (J.has "asset_sha256" dep)) "asset_sha256 requires a GitHub release dependency"
+      O.require (stringLength (J.getText "release" "" dep) > 0) "dependency requires a release directory"
+      O.require (validDigest (J.getText "sha256" "" dep)) "release dependency requires a lowercase SHA-256 pin"
+    else do
+      O.require (S.not (J.has "sha256" dep || J.has "asset_sha256" dep)) "sha256 requires a release dependency"
+      O.require (stringLength (J.getText "path" "" dep) > 0) "dependency requires a local path") (J.items deps)
   fields (J.getObject "library" value) "modules" "library"
   ms <- readModules (O.parent path) name (J.getObject "modules" (J.getObject "library" value))
   let p = Package path value ms
@@ -74,6 +85,25 @@ readPackage path = do
   S.mapM_ (validateTarget p true) (J.items (J.getObject "tests" value))
   O.require (S.not (S.null ms) || S.not (S.null (keys (J.getObject "executables" value))) || S.not (S.null (keys (J.getObject "tests" value)))) "package contains no targets"
   ioReturn p
+validDigest text = stringLength text == 64 && S.all (\c -> digit c || (c >= 97 && c <= 102)) (codes text)
+readRelease path digest = do
+  value <- R.readPinnedManifest (O.parent path) digest
+  let name = J.getText "name" "" value
+  O.require (validName name && validVersion (J.getText "version" "" value)) "invalid release package identity"
+  let names = J.getStrings "modules" value
+  O.require (S.not (S.null names) && S.all validModule names && S.length names == S.length (S.nubBy eqString names)) "invalid release module inventory"
+  let releaseData = J.set "release-sha256" (J.str digest) (J.set "version" (J.get "version" value) (J.set "name" (J.str name) J.empty))
+  ioReturn (Package path releaseData (S.map (\moduleName -> Module moduleName name "" Nil) names))
+visitRelease path digest done = visitReleaseFrom path digest J.Null done
+visitReleaseFrom path digest origin done = do
+  original <- readRelease path digest
+  let p = case original of { Package source value modules -> if J.equal origin J.Null then original else Package source (J.set "github-source" origin value) modules }
+  case S.find (\q -> eqString (packageName p) (packageName q)) done of
+    Just q -> do
+      O.require (isRelease q && eqString digest (J.getText "release-sha256" "" (packageData q))) ("conflicting release for package " ++ packageName p)
+      O.require (J.equal origin (J.getOr "github-source" J.Null (packageData q))) ("conflicting release source for package " ++ packageName p)
+      ioReturn done
+    Nothing -> ioReturn (S.snoc done p)
 validateTarget p testing entry = do
   let name = S.fst entry
   let target = S.snd entry
@@ -95,7 +125,9 @@ validateTarget p testing entry = do
     O.require (stringLength (J.getText "stdin" "" target) >= 0 && stringLength (J.getText "stdout" "" target) >= 0) "invalid test streams"
     O.require (S.not testing || J.has "stdout" target) "expected stdout is required"
 visit : String -> List String -> List Package -> IO (List Package)
-visit path trail done = do
+visit path trail done = visitWith J.empty path trail done
+visitWith : J.Json -> String -> List String -> List Package -> IO (List Package)
+visitWith options path trail done = do
   canonical <- canonicalPath path
   O.require (S.not (S.elem eqString canonical trail)) ("dependency cycle: " ++ S.intercalate " -> " (S.snoc trail canonical))
   case S.find (\p -> eqString canonical (packagePath p)) done of
@@ -103,18 +135,20 @@ visit path trail done = do
     Nothing -> do
       p <- readPackage canonical
       O.require (S.not (S.any (\q -> eqString (packageName p) (packageName q)) done)) ("package " ++ packageName p ++ " resolves to multiple local paths")
-      children <- visitDependencies p (S.snoc trail canonical) done (S.sortBy (\a b -> compareString (S.fst a) (S.fst b)) (J.items (J.getObject "dependencies" (packageData p))))
+      children <- visitDependencies options p (S.snoc trail canonical) done (S.sortBy (\a b -> compareString (S.fst a) (S.fst b)) (J.items (J.getObject "dependencies" (packageData p))))
       O.require (S.not (S.any (\q -> eqString (packageName p) (packageName q)) children)) ("package " ++ packageName p ++ " resolves to multiple local paths")
       ioReturn (S.snoc children p)
-visitDependencies : Package -> List String -> List Package -> List (Pair String J.Json) -> IO (List Package)
-visitDependencies p trail done deps = case deps of
+visitDependencies : J.Json -> Package -> List String -> List Package -> List (Pair String J.Json) -> IO (List Package)
+visitDependencies options p trail done deps = case deps of
   Nil -> ioReturn done
   Cons (Pair name dep) rest -> do
-    path <- canonicalPath (O.join (O.join (packageRoot p) (J.getText "path" "" dep)) "mlf-package.json")
-    next <- visit path trail done
-    let child = S.fromMaybe (panic "missing dependency") (S.find (\q -> eqString path (packagePath q)) next)
+    let remote = J.has "github" dep
+    let released = remote || J.has "release" dep
+    path <- if remote then Distribution.fetch options dep else canonicalPath (O.join (O.join (packageRoot p) (J.getText (if released then "release" else "path") "" dep)) (if released then "release.json" else "mlf-package.json"))
+    next <- if released then visitReleaseFrom path (J.getText "sha256" "" dep) (if remote then dep else J.Null) done else visitWith options path trail done
+    let child = if released then S.fromMaybe (panic "missing release dependency") (S.find (\q -> isRelease q && eqString (J.getText "release-sha256" "" (packageData q)) (J.getText "sha256" "" dep)) next) else S.fromMaybe (panic "missing dependency") (S.find (\q -> eqString path (packagePath q)) next)
     O.require (eqString name (packageName child)) ("dependency " ++ name ++ " resolves to package " ++ packageName child)
-    visitDependencies p trail next rest
+    visitDependencies options p trail next rest
 visible ps p = S.concat (Cons (S.map moduleName (packageModules p)) (S.map (\name -> S.map moduleName (packageModules (lookupPackage name ps))) (keys (J.getObject "dependencies" (packageData p)))))
 checkImports ps p local = S.mapM_ (\m -> S.mapM_ (\name -> O.require (S.elem eqString name (S.append (visible ps p) (S.map moduleName local))) (packageName p ++ ":" ++ moduleName m ++ ": import " ++ name ++ " is not declared in this package or a direct dependency")) (moduleImports m)) local
 moduleClosure ms names = discoverMany ms Nil Nil names
@@ -139,8 +173,10 @@ targetCrateModules graph p target = do
   O.require (S.not (S.any (\m -> S.any (\n -> eqString (moduleName m) (moduleName n)) (modules graph)) private)) "entry/private module conflicts with a library module"
   checkImports (packages graph) p private
   ioReturn (Pair (moduleName entry) private)
-load path = do
-  ps <- visit path Nil Nil
+load path = loadWith path J.empty
+loadWith path options = do
+  let selected = J.set "cache-dir" (J.getOr "cache-dir" (J.str (O.parent path ++ "/.mlf-build/cache")) options) options
+  ps <- visitWith selected path Nil Nil
   let p = S.last ps
   let ms = S.concatMap packageModules ps
   O.require (S.length (S.nubBy eqString (S.map moduleName ms)) == S.length ms) "module is provided by multiple packages"
@@ -159,7 +195,7 @@ cratePlan graph = do
   executables <- S.mapM (\(Pair name target) -> do { Pair entry ms <- targetCrateModules graph p target; ioReturn (cratePlanRow (crateIdentity p ("target-" ++ name)) entry ms dependencies) }) (J.items (J.getObject "executables" (packageData p)))
   tests <- S.mapM (\(Pair name target) -> do { Pair entry ms <- targetCrateModules graph p target; ioReturn (cratePlanRow (crateIdentity p ("target-test-" ++ name)) entry ms dependencies) }) (S.filter (\entry -> J.has "main" (S.snd entry)) (J.items (J.getObject "tests" (packageData p))))
   ioReturn (J.Array (S.append libraries (S.append executables tests)))
-sourceFiles p = do
+sourceFiles p = if isRelease p then ioReturn Nil else do
   nested <- S.mapM (\target -> if J.has "main" target then do
     source <- localFile (packageRoot p) (J.get "main" target)
     ms <- readModules (packageRoot p) (packageName p) (J.getObject "modules" target)
@@ -168,8 +204,12 @@ sourceFiles p = do
   ioReturn (S.sortBy compareString (S.nubBy eqString (S.append (S.map moduleSource (packageModules p)) (S.concat nested))))
 snapshot graph = do
   rows <- S.mapM (\p -> do
+    if isRelease p then do { ignored <- readRelease (packagePath p) (J.getText "release-sha256" "" (packageData p)); ioReturn Unit } else ioReturn Unit
     paths <- sourceFiles p
     hashes <- S.mapM (\path -> do { hash <- fileDigest path; ioReturn (Pair (O.relative (packageRoot p) path) (J.str hash)) }) paths
     manifest <- fileDigest (packagePath p)
-    ioReturn (J.Object (Cons (Pair "name" (J.str (packageName p))) (Cons (Pair "version" (J.get "version" (packageData p))) (Cons (Pair "path" (J.str (O.relative (packageRoot (rootPackage graph)) (packageRoot p)))) (Cons (Pair "manifest" (J.str manifest)) (Cons (Pair "sources" (J.Object hashes)) Nil))))))) (packages graph)
+    let row = J.Object (Cons (Pair "name" (J.str (packageName p))) (Cons (Pair "version" (J.get "version" (packageData p))) (Cons (Pair "path" (J.str (O.relative (packageRoot (rootPackage graph)) (packageRoot p)))) (Cons (Pair "manifest" (J.str manifest)) (Cons (Pair "sources" (J.Object hashes)) Nil)))))
+    let released = if isRelease p then J.set "release" (J.str manifest) row else row
+    let source = J.getOr "github-source" J.Null (packageData p)
+    ioReturn (if J.equal source J.Null then released else J.set "source" source (J.Object (S.filter (\entry -> S.not (eqString (S.fst entry) "path")) (J.items released))))) (packages graph)
   ioReturn (J.Object (Cons (Pair "format" (J.num 1)) (Cons (Pair "packages" (J.Array rows)) Nil)))
