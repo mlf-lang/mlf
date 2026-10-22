@@ -37,7 +37,7 @@ jobs:
       - name: Fetch verified native seed
         env:
           GH_TOKEN: ${{ github.token }}
-        run: tools/release/fetch-seed.sh .mlf-build/seed
+        run: tools/release/fetch-seed.sh .mlf-build/seed .github/smoke-seed.env
       - name: Exercise checkout packages on both backends without GHC or Python
         run: tools/release/native-ci.sh smoke
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6

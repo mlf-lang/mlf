@@ -115,7 +115,8 @@ unit : TestContext -> IO Unit
 unit c = do
  transports c
  -- Check native toolchain and runtime probes before the longer compiler suites.
- suite c "harness" (Cons "58 native benchmark/bootstrap/release harness tests passed" Nil)
+ suite c "regex" (Cons "regular-expression tests passed" Nil)
+ suite c "harness" (Cons "Native benchmark/bootstrap/release harness tests passed" Nil)
  suite c "core" (Cons "686 checks; 0 failures" (Cons "Oracle: 6712 cases; 6703 executions" Nil))
  suite c "figure12" (Cons "43/43 expressions match regression expectations; 0 failures" (Cons "41 distinct Figure12 executions" (Cons "36 supplementary checks; 0 failures" Nil)))
 packages : TestContext -> IO Unit

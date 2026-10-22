@@ -86,6 +86,58 @@ nucleotideLines text =
   else let key = S.fromMaybe (panic "missing nucleotide query") (S.find (\q -> stringLength q == width) queries) in Cons (Cons (showInt (S.fromMaybe 0 (M.lookup compareString key table)) ++ "\t" ++ key ++ "\n") Nil) Nil) (Cons 1 (Cons 2 (Cons 3 (Cons 4 (Cons 6 (Cons 12 (Cons 18 Nil)))))))
 nucleotideCounts : String -> String
 nucleotideCounts text = S.concatStrings (S.map S.head (nucleotideLines text))
+-- Independent regex-redux oracle: direct fixed-width DNA comparisons and
+-- literal/delimiter scans. No regular-expression parser or matcher is shared
+-- with the measured implementation, including the five sequential rewrites.
+regexPatterns = O.words "agggtaaa|tttaccct [cgt]gggtaaa|tttaccc[acg] a[act]ggtaaa|tttacc[agt]t ag[act]gtaaa|tttac[agt]ct agg[act]taaa|ttta[agt]cct aggg[acg]aaa|ttt[cgt]ccct agggt[cgt]aa|tt[acg]accct agggta[cgt]a|t[acg]taccct agggtaa[cgt]|[acg]ttaccct"
+regexFindCode : Int -> String -> Int -> Int
+regexFindCode code text i = if i >= stringLength text then -1 else if stringCodeAt text i == code then i else regexFindCode code text (i + 1)
+regexClean : String -> String
+regexClean text = S.concatStrings (regexCleanAt text 0)
+regexCleanAt : String -> Int -> List String
+regexCleanAt text i = if i >= stringLength text then Nil else
+ let code = stringCodeAt text i in
+ if code == 10 then regexCleanAt text (i + 1) else
+ if code == 62 then let end = regexFindCode 10 text (i + 1) in
+  if end < 0 then Cons (O.drop i text) Nil else regexCleanAt text (end + 1)
+ else Cons (O.char text i) (regexCleanAt text (i + 1))
+regexMer : Int -> Bool -> String -> Int -> Bool
+regexMer variant forward text offset =
+ let literal = if forward then "agggtaaa" else "tttaccct" in
+ let changed = if forward then variant - 1 else 8 - variant in
+ let letters = if variant == 1 || variant >= 6 then (if forward then "cgt" else "acg") else if variant <= 4 then (if forward then "act" else "agt") else (if forward then "acg" else "cgt") in
+ S.all (\position -> let code = stringCodeAt text (offset + position) in
+  if variant > 0 && position == changed then regexFindCode code letters 0 >= 0 else code == stringCodeAt literal position) (S.range 0 7)
+regexCount : Int -> String -> Int
+regexCount variant text = regexCountAt variant text 0 0
+regexCountAt : Int -> String -> Int -> Int -> Int
+regexCountAt variant text i count = seq count (if i + 8 > stringLength text then count else
+ if regexMer variant true text i || regexMer variant false text i then regexCountAt variant text (i + 8) (count + 1) else regexCountAt variant text (i + 1) count)
+regexReplaceWords : List String -> String -> String -> String
+regexReplaceWords words replacement text = S.concatStrings (regexWordsAt words replacement text 0)
+regexWordsAt : List String -> String -> String -> Int -> List String
+regexWordsAt words replacement text i = if i >= stringLength text then Nil else
+ case S.find (\word -> i + stringLength word <= stringLength text && eqString word (stringSlice text i (stringLength word))) words of
+  Just word -> Cons replacement (regexWordsAt words replacement text (i + stringLength word))
+  Nothing -> Cons (O.char text i) (regexWordsAt words replacement text (i + 1))
+regexReplaceDelimited : Int -> Int -> Int -> String -> String -> String
+regexReplaceDelimited open close minimum replacement text = S.concatStrings (regexDelimitedAt open close minimum replacement text 0)
+regexDelimitedAt : Int -> Int -> Int -> String -> String -> Int -> List String
+regexDelimitedAt open close minimum replacement text i = if i >= stringLength text then Nil else
+ let end = if stringCodeAt text i == open then regexFindCode close text (i + 1) else -1 in
+ if end >= i + 1 + minimum then Cons replacement (regexDelimitedAt open close minimum replacement text (end + 1))
+ else Cons (O.char text i) (regexDelimitedAt open close minimum replacement text (i + 1))
+regexSubstitute : String -> String
+regexSubstitute text =
+ let first = regexReplaceWords (O.words "tHaN tHat") "<4>" text in
+ let second = regexReplaceWords (O.words "aND caN HaD HaS WaS") "<3>" first in
+ let third = regexReplaceWords (O.words "aN aS at BY") "<2>" second in
+ regexReplaceDelimited 124 124 1 "-" (regexReplaceDelimited 60 62 0 "|" third)
+regexRedux : String -> String
+regexRedux text =
+ let sequence = regexClean text in
+ S.concatStrings (S.zipWith (\pattern variant -> pattern ++ " " ++ showInt (regexCount variant sequence) ++ "\n") regexPatterns (S.range 0 8)) ++
+ "\n" ++ showInt (stringLength text) ++ "\n" ++ showInt (stringLength sequence) ++ "\n" ++ showInt (stringLength (regexSubstitute sequence)) ++ "\n"
 -- Scalar pair state, unlike the measured mutable-array n-body implementation.
 data Vector = Vector Double Double Double
 data Body = Body Vector Vector Double
@@ -158,7 +210,7 @@ textBytes : String -> List Int
 textBytes text = S.concatMap (\i -> let c = stringCodeAt text i in if c < 128 then Cons c Nil else panic "benchmark oracle expects ASCII") (S.range 0 (stringLength text - 1))
 expectedOutput : String -> Int -> List Int
 expectedOutput name size = if eqString name "mandelbrot" then S.append (textBytes ("P4\n" ++ showInt size ++ " " ++ showInt size ++ "\n")) (mandelbrot size) else
- textBytes (if eqString name "binary-trees" then binaryTrees size else if eqString name "pidigits" then pidigits size else if eqString name "fasta" then fasta size else if eqString name "reverse-complement" then reverseComplement (fasta size) else if eqString name "k-nucleotide" then nucleotideCounts (fasta size) else if eqString name "n-body" then case nbodyEnergy size of { Pair a b -> formatDouble 9 a ++ "\n" ++ formatDouble 9 b } else if eqString name "spectral-norm" then formatDouble 9 (spectralNorm size) else if eqString name "fannkuch-redux" then case fannkuch size of { Pair a b -> showInt a ++ "\nPfannkuchen(" ++ showInt size ++ ") = " ++ showInt b } else panic "unknown correctness oracle")
+ textBytes (if eqString name "binary-trees" then binaryTrees size else if eqString name "pidigits" then pidigits size else if eqString name "fasta" then fasta size else if eqString name "reverse-complement" then reverseComplement (fasta size) else if eqString name "k-nucleotide" then nucleotideCounts (fasta size) else if eqString name "regex-redux" then regexRedux (fasta size) else if eqString name "n-body" then case nbodyEnergy size of { Pair a b -> formatDouble 9 a ++ "\n" ++ formatDouble 9 b } else if eqString name "spectral-norm" then formatDouble 9 (spectralNorm size) else if eqString name "fannkuch-redux" then case fannkuch size of { Pair a b -> showInt a ++ "\nPfannkuchen(" ++ showInt size ++ ") = " ++ showInt b } else panic "unknown correctness oracle")
 validateOutput : String -> Int -> List Int -> Bool
 validateOutput name size output =
  if eqString name "n-body" || eqString name "spectral-norm" then
@@ -166,7 +218,7 @@ validateOutput name size output =
   let actual = S.map (\token -> V.number (J.Number token)) (O.words (S.concatStrings (S.map stringFromCode output))) in
   S.length actual == S.length reference && S.all S.isJust actual && S.all (\(Pair a b) -> V.finite a && S.not (ltDouble 0.00000001 (if ltDouble a b then subDouble b a else subDouble a b))) (S.zip (S.catMaybes actual) reference)
  else if eqString name "k-nucleotide" then validateNucleotide (nucleotideLines (fasta size)) (S.concatStrings (S.map stringFromCode output)) else
- if S.elem eqString name (O.words "fasta mandelbrot reverse-complement") then S.eqList eqInt output (expectedOutput name size) else
+ if S.elem eqString name (O.words "fasta mandelbrot reverse-complement regex-redux") then S.eqList eqInt output (expectedOutput name size) else
  S.eqList eqString (O.words (S.concatStrings (S.map stringFromCode output))) (O.words (S.concatStrings (S.map stringFromCode (expectedOutput name size))))
 validateNucleotide : List (List String) -> String -> Bool
 validateNucleotide allowed text = let actual = O.lines text in let complete = if O.ends "\n" text then S.init actual else actual in
@@ -192,6 +244,32 @@ measure directory argv input timeout = do
   value <- J.read sample
   let status = V.int "exit_code" value
   return (if status == 0 && S.maybe false V.positive (V.number (J.get "wall_seconds" value)) then Right value else Left ("measured command failed (" ++ showInt status ++ ")"))
+-- Resolve the manifest's explicitly pinned native dependency before measuring.
+-- Save the .pc file, tool, headers and linked library identity with the flags.
+benchmarkPackage : String -> String -> String -> List String -> IO J.Json
+benchmarkPackage directory name expected headers = do
+ O.mkdir directory
+ tool <- Build.tool "pkg-config"
+ let command = V.text "path" tool
+ version <- Build.raw directory (Cons command (Cons "--modversion" (Cons name Nil)))
+ O.require (stringLength expected > 0 && eqString (O.trim version) expected) ("benchmark library version differs: " ++ name ++ "; expected " ++ expected ++ ", found " ++ O.trim version)
+ text <- Build.raw directory (Cons command (Cons "--cflags" (Cons "--libs" (Cons name Nil))))
+ libdir <- Build.raw directory (Cons command (Cons "--variable=libdir" (Cons name Nil)))
+ pcdir <- Build.raw directory (Cons command (Cons "--variable=pcfiledir" (Cons name Nil)))
+ includedir <- Build.raw directory (Cons command (Cons "--variable=includedir" (Cons name Nil)))
+ O.require (S.not (S.null headers) && stringLength (O.trim includedir) > 0) ("benchmark library headers missing: " ++ name)
+ let selected = S.append (if eqString (O.trim libdir) "" then Nil else Cons ("-L" ++ O.trim libdir) Nil) (Build.flags text)
+ identity <- Build.flagIdentity selected
+ -- pkg-config suppresses system -I paths. Explicit public headers still bind
+ -- those installations without recursively hashing all of /usr/include.
+ requiredHeaders <- Build.hashFiles (S.map (\header -> O.trim includedir ++ "/" ++ header) headers)
+ let completeHeaders = S.foldlStrict (\result entry -> J.set (S.fst entry) (S.snd entry) result) (J.get "headers" identity) (J.items requiredHeaders)
+ let complete = J.set "headers" completeHeaders identity
+ let definition = O.trim pcdir ++ "/" ++ name ++ ".pc"
+ hash <- fileDigest definition
+ return (J.set "package" (J.str name) (J.set "version" (J.str (O.trim version)) (J.set "pkg_config" tool (J.set "definition" (Build.obj1 definition (J.str hash)) complete))))
+benchmarkPackageFiles : J.Json -> List String
+benchmarkPackageFiles identity = Cons (V.text "path" (J.get "pkg_config" identity)) (S.map S.fst (S.concatMap (\key -> J.items (J.get key identity)) (O.words "headers libraries definition")))
 collectorFlags : String -> IO (List String)
 collectorFlags directory = do
  prefix <- getEnv "MLF_GC_PREFIX"
@@ -259,7 +337,7 @@ runGuarded reportPath configuration action = do
    return result
 stdinMetadata : String -> String -> Int -> String -> IO J.Json
 stdinMetadata directory name size language = do
- let inputText = if S.elem eqString name (O.words "reverse-complement k-nucleotide") then fasta size else showInt size ++ "\n"
+ let inputText = if S.elem eqString name (O.words "reverse-complement k-nucleotide regex-redux") then fasta size else showInt size ++ "\n"
  writeFile (directory ++ "/stdin") inputText
  hash <- fileDigest (directory ++ "/stdin")
  return (J.Object (Cons (Pair "stdin_bytes" (J.num (stringLength inputText))) (Cons (Pair "stdin_sha256" (J.str hash)) Nil)))
@@ -290,7 +368,9 @@ runPipeline directory timeout commands = do
   return (if V.int "exit_code" value == 0 && V.int "remaining_children" value == 0 then Right value else Left "compiler pipeline failed or timed out")
 
 buildParallel : String -> String -> String -> String -> String -> List String -> Double -> IO (Either String (Pair String J.Json))
-buildParallel directory compiler clang source runtime flags timeout = do
+buildParallel directory compiler clang source runtime flags timeout = buildParallelWithIncludes directory compiler clang source runtime flags Nil timeout
+buildParallelWithIncludes : String -> String -> String -> String -> String -> List String -> List String -> Double -> IO (Either String (Pair String J.Json))
+buildParallelWithIncludes directory compiler clang source runtime flags includes timeout = do
  present <- directoryExists directory
  files <- if present then O.entries directory else return Nil
  if S.not (S.null files) then return (Left "build directory must be fresh") else do
@@ -306,7 +386,8 @@ buildParallel directory compiler clang source runtime flags timeout = do
   linking <- getEnv "MLF_BENCH_STREAM_LINK"
   O.require (eqString linking "" || (eqString linking "1" && stream)) "streaming link requires streaming LLVM"
   let streamLink = eqString linking "1"
-  let frontend = if stream then Cons "/bin/bash" (Cons "-o" (Cons "pipefail" (Cons "-c" (Cons "fifo=$1; shift; \"$@\" | /bin/cat > \"$fifo\"" (Cons "mlf-stream" (Cons (ir ++ ".pipe") (Cons compiler (Cons mode (Cons source (Nil)))))))))) else Cons compiler (Cons mode (Cons source Nil))
+  let emit = Cons compiler (S.append (S.concatMap (\path -> Cons "-i" (Cons path Nil)) includes) (Cons mode (Cons source Nil)))
+  let frontend = if stream then Cons "/bin/bash" (Cons "-o" (Cons "pipefail" (Cons "-c" (Cons "fifo=$1; shift; \"$@\" | /bin/cat > \"$fifo\"" (Cons "mlf-stream" (Cons (ir ++ ".pipe") emit)))))) else emit
   let runtimeCommand = S.append (Cons clang (O.words "-O2 -std=c11 -c")) (S.append (Cons runtime flags) (Cons "-o" (Cons object Nil)))
   let llvmCommand = S.append (Cons clang (S.append (if stream then Cons "--mlf-stream-ir" Nil else Nil) (O.words "-O2 -Wno-override-module -c"))) (Cons ir (Cons "-o" (Cons code Nil)))
   let linkCommand = S.append (Cons clang (S.append (if streamLink then Cons "--mlf-wait-objects" Nil else Nil) (Cons code (Cons object flags)))) (Cons "-lm" (Cons "-o" (Cons binary Nil)))

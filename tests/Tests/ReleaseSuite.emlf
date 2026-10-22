@@ -76,6 +76,8 @@ main = do
   (Cons (entry "input" (\_ -> J.num 1))
   (Cons (path "benchmarks configuration runtime_only" (\_ -> J.Boolean true))
   (Cons (path "benchmarks toolchain emlf sha256" (\_ -> J.str "seed")) Nil)))))))))))
+ reject (first (\xs -> J.Array (S.filter (\row -> S.not (eqString (V.text "benchmark" row) "regex-redux")) (J.values xs))) evidence) manifest
+ reject (path "benchmarks performance_checks" (\xs -> J.Array (S.filter (\row -> S.not (eqString (V.text "benchmark" row) "regex-redux")) (J.values xs))) evidence) manifest
  putStrLn "PASS test_benchmark_coverage_and_samples_cannot_be_faked_by_pass_status"
  let samples n = J.Array (S.replicate 5 (J.Object (Cons (Pair "wall_seconds" n) Nil)))
  reject (entry "languages mlf compilation" (\row -> set "median_wall_seconds" (J.num 6) (set "samples" (samples (J.num 6)) row)) evidence) manifest
