@@ -195,5 +195,6 @@ itself. Supply the second generation to `build-pgo.sh`:
 ```
 
 Use fresh directories. Build the current `mlfpkg` executable as well before
-running the six `compiler-test` groups, so their coverage checks come from the
+running the six root `mlfpkg test --target GROUP` campaigns. Each campaign builds
+the test-owned `compiler-tests` executable, so its coverage checks come from the
 same source snapshot as the compiler and tests.

@@ -1,5 +1,6 @@
 module Tests.BenchmarkSuite where
 import Bootstrap.Types
+import qualified Tests.Coverage as Coverage
 import qualified Bootstrap.Std as S
 import qualified Package.OS as O
 import qualified Package.Json as J
@@ -9,7 +10,7 @@ import qualified Tests.Basic as H
 import qualified Tests.Bytes as Bytes
 import qualified Tests.NativeABI as ABI
 check : String -> IO Unit -> IO Unit
-check label action = do { action; putStrLn ("PASS " ++ label) }
+check label action = do { action; Coverage.passed "harness" label; putStrLn ("PASS " ++ label) }
 rejectOutput : String -> Int -> String -> IO Unit
 rejectOutput name size wrong = H.assert (S.not (B.validateOutput name size (B.textBytes wrong))) ("bad benchmark output accepted: " ++ name)
 firstReplace old new text = let pieces = O.split 10 text in O.replace old new text

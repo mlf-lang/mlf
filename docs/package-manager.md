@@ -72,8 +72,13 @@ searching `PATH`. Explicit compiler selections take precedence. Other packages
 default to `emlf` on `PATH`.
 
 Compiler tests are written in MLF under `tests/` and built as the local
-`mlf-tests` package. The root commands use the selected native compiler and MLF
-package manager. GHC, Cabal, and Python are not test prerequisites. Clang builds
+`mlf-tests` package. The root's private `compiler-tests` executable uses
+`tests/CompilerTestsMain.emlf` and `Tests.CompilerTests` to coordinate the six
+compiler campaigns. The package manager provides generic build, cache and
+command execution; it does not import the compiler campaign. Root test commands
+pass the selected compiler and package manager explicitly, and the campaign
+records and rechecks both binaries plus its own runner identity. GHC, Cabal, and
+Python are not test prerequisites. Clang builds
 the retained C ABI probes and binary/process transports. The probes retain
 their low-level ABI checks; MLF runs them and checks their status, output,
 error modes, and allocation accounting.

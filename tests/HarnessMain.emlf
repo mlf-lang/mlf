@@ -1,5 +1,6 @@
 module HarnessMain where
 import Bootstrap.Types
+import qualified Tests.Coverage as Coverage
 import qualified Bootstrap.Std as S
 import qualified Package.OS as O
 import qualified Tests.Basic as H
@@ -78,5 +79,5 @@ main = do
   Cons "--check-clean-environment" names -> do
    values <- S.mapM getEnv names
    H.assert (S.all (\value -> eqString value "") values) "gate inherited compiler or collector overrides"
-  Nil -> do { Boot.main; Release.main; Bench.main; putStrLn "58 native benchmark/bootstrap/release harness tests passed" }
+  Nil -> do { Coverage.begin "harness" true; Boot.main; Release.main; Bench.main; putStrLn "58 native benchmark/bootstrap/release harness tests passed"; Coverage.finish "harness" }
   _ -> exitWith 2

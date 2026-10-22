@@ -76,7 +76,7 @@ jobs:
           build=.mlf-build/bootstrap-stage1
           jq -e '.complete == true and .implementation == "MLF"' "$build/build-report.json"
           mkdir -p .mlf-build/portable-llvm .mlf-build/mac-candidate
-          for tool in emlf mlfpkg; do
+          for tool in emlf mlfpkg compiler-tests; do
             key=$(jq -er --arg kind "executable mlf-compiler:$tool" '[.builds[] | select(.kind == $kind) | .key] | if length == 1 then .[0] else error("missing unique native tool") end' "$build/build-report.json")
             cmp "$build/cache/$key/program" "$build/bin/$tool"
             cp "$build/cache/$key/program.ll" ".mlf-build/portable-llvm/$tool.ll"
@@ -168,12 +168,12 @@ jobs:
           TEST_GROUP: ${{ matrix.group }}
         run: |
           mkdir -p .mlf-build/release-evidence/bin .mlf-build/release-evidence/compiler-tests .mlf-build/release-evidence/diagnostics
-          for tool in emlf mlfpkg; do
+          for tool in emlf mlfpkg compiler-tests; do
             if test -f ".mlf-build/bin/$tool"; then cp ".mlf-build/bin/$tool" .mlf-build/release-evidence/bin/; fi
           done
           if test -d ".mlf-build/compiler-tests/$TEST_GROUP"; then
             cp -R ".mlf-build/compiler-tests/$TEST_GROUP" .mlf-build/release-evidence/compiler-tests/
-            find .mlf-build/release-evidence/compiler-tests -type f ! -name verification.json ! -name '*.log' ! -name '*.stderr' ! -name '*.err' ! -name '*.status.json' ! -name rows.jsonl ! -name current-label ! -path '*/port-*/matrix-*/case-14-interpreter.stdout' ! -path '*/port-*/matrix-*/case-19-interpreter.stdout' ! -path '*/port-*/matrix-*/case-23-interpreter.stdout' -delete
+            find .mlf-build/release-evidence/compiler-tests -type f ! -name verification.json ! -name '*.coverage.jsonl' ! -name '*.log' ! -name '*.stderr' ! -name '*.err' ! -name '*.status.json' ! -name rows.jsonl ! -name current-label ! -path '*/port-*/matrix-*/case-14-interpreter.stdout' ! -path '*/port-*/matrix-*/case-19-interpreter.stdout' ! -path '*/port-*/matrix-*/case-23-interpreter.stdout' -delete
           fi
           log_group=$TEST_GROUP
           case "$TEST_GROUP" in port-*) log_group=port ;; esac

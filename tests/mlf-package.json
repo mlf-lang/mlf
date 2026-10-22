@@ -11,6 +11,9 @@
     },
     "mlf-test": {
       "path": "../testing"
+    },
+    "mlf-test-tools": {
+      "path": "../testing/tools"
     }
   },
   "library": {
@@ -22,7 +25,8 @@
       "Tests.IndependentCheck": "Tests/IndependentCheck.emlf",
       "Tests.IndependentType": "Tests/IndependentType.emlf",
       "Tests.Map": "Tests/Map.emlf",
-      "Tests.Set": "Tests/Set.emlf"
+      "Tests.Set": "Tests/Set.emlf",
+      "Tests.Coverage": "Tests/Coverage.emlf"
     }
   },
   "executables": {
@@ -175,7 +179,26 @@
       "modules": {
         "Tests.TestFramework": "Tests/TestFramework.emlf",
         "Tests.IntSetUnions": "Tests/IntSetUnions.emlf",
-        "Tests.TestFrameworkCLI": "Tests/TestFrameworkCLI.emlf"
+        "Tests.TestFrameworkCLI": "Tests/TestFrameworkCLI.emlf",
+        "Tests.CoverageChecks": "Tests/CoverageChecks.emlf",
+        "Tests.TestProcess": "Tests/TestProcess.emlf"
+      }
+    },
+    "pr-smoke": {
+      "main": "PRSmokeMain.emlf",
+      "profile": "compiler",
+      "modules": {
+        "Tests.PRSmoke": "Tests/PRSmoke.emlf",
+        "Tests.Figure12": "Tests/Figure12.emlf",
+        "Tests.Figure12Suite": "Tests/Figure12Suite.emlf",
+        "Tests.IOTests": "Tests/IOTests.emlf",
+        "Tests.NativeOptimization": "Tests/NativeOptimization.emlf",
+        "Tests.BackendCases": "Tests/BackendCases.emlf",
+        "Tests.Readability": "Tests/Readability.emlf",
+        "Tests.System": "Tests/System.emlf",
+        "Tests.StateCases": "Tests/StateCases.emlf",
+        "Tests.StateRuntime": "Tests/StateRuntime.emlf",
+        "Tests.StateTypes": "Tests/StateTypes.emlf"
       }
     }
   },

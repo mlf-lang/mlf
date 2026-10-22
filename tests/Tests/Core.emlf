@@ -1,5 +1,6 @@
 module Tests.Core where
 import Bootstrap.Types
+import qualified Tests.Coverage as Coverage
 import Bootstrap.Compiler
 import Bootstrap.Constraint (generate, solve, generalization, skeleton)
 import Bootstrap.Parser
@@ -94,15 +95,20 @@ oracleTest = do
  H.assert (S.length exhaustive == 1712 && S.length seeded == 5000 && S.length unique == 4991) "independent HM corpus coverage changed"
  let typed = S.length (S.filter (\(Triple _ _ expected) -> expected) cases)
  H.assert (typed > 100 && typed < S.length cases) "oracle corpus lacks positive or negative cases"
- H.forM_ cases (\(Triple i e expected) -> case compileExpr e of
+ Coverage.forCounted "core" "hm-executed" cases (\(Triple i e expected) -> case compileExpr e of
   Right _ -> H.assert expected ("accepted non-ML term " ++ H.show i ++ ": " ++ H.show e)
   Left err -> do
    H.assert (H.eq (phase err) Inference) ("compiler failure on " ++ H.show e ++ ": " ++ H.show err)
    H.assert (S.not expected) ("rejected ML term " ++ H.show i ++ ": " ++ H.show e ++ "\n" ++ H.show err))
  putStrLn ("Oracle: 6712 cases; 6703 executions (1712 exhaustive, 4991 distinct of 5000 seeded); " ++ H.show typed ++ " typable")
+ Coverage.metric "core" "hm-prescribed" (S.length exhaustive + S.length seeded)
+ Coverage.metric "core" "hm-exhaustive" (S.length exhaustive)
+ Coverage.metric "core" "hm-generated" (S.length seeded)
+ Coverage.metric "core" "hm-distinct-generated" (S.length unique)
+ Coverage.metric "core" "hm-typable" typed
 
 annotationCorpus : IO Unit
-annotationCorpus = (let { identityExpr = (SLam "x" Nothing (SVar "x")) } in (let { identityType = (SForall Flexible "a" SBottom (SArrow (STVar "a") (STVar "a"))) } in (let { types = (Cons SBottom (Cons (SCon "Int" Nil) (Cons (SCon "Bool" Nil) (Cons identityType (Cons (SForall Flexible "a" SBottom (SCon "List" (Cons (STVar "a") Nil))) (Cons (SForall Flexible "a" identityType (SArrow (STVar "a") (STVar "a"))) Nil)))))) } in (let { nested = (H.append types (S.concatMap (\a -> (S.concatMap (\b -> (Cons (SArrow a b) Nil)) types)) types)) } in (let { programs = (S.concat (S.concatMap (\t -> (Cons (Cons (SAnn identityExpr (SAnnotation Nil (SArrow t t))) (Cons (SLam "x" (Just (SAnnotation Nil t)) (SVar "x")) (Cons (SLet "f" (SAnn identityExpr (SAnnotation Nil (SArrow t t))) (SVar "f")) Nil))) Nil)) nested)) } in do { ((H.forM_ programs) (\e -> (case (compileExpr e) of { (Left err) -> (H.fail (H.append "failed annotated identity " (H.append (H.show e) (H.append "\n" (H.show err))))); (Right r) -> do { parsed <- (H.right (XP.parseTerm "<annotation xMLF>" (prettyTerm (compiledTerm r)))); do { ty <- (H.right (C.checkClosed parsed)); (sameType ty (inferredType r)) } } }))); (putStrLn (H.append "Annotations: " (H.append (H.show (H.length programs)) " typed programs"))) })))))
+annotationCorpus = (let { identityExpr = (SLam "x" Nothing (SVar "x")) } in (let { identityType = (SForall Flexible "a" SBottom (SArrow (STVar "a") (STVar "a"))) } in (let { types = (Cons SBottom (Cons (SCon "Int" Nil) (Cons (SCon "Bool" Nil) (Cons identityType (Cons (SForall Flexible "a" SBottom (SCon "List" (Cons (STVar "a") Nil))) (Cons (SForall Flexible "a" identityType (SArrow (STVar "a") (STVar "a"))) Nil)))))) } in (let { nested = (H.append types (S.concatMap (\a -> (S.concatMap (\b -> (Cons (SArrow a b) Nil)) types)) types)) } in (let { programs = (S.concat (S.concatMap (\t -> (Cons (Cons (SAnn identityExpr (SAnnotation Nil (SArrow t t))) (Cons (SLam "x" (Just (SAnnotation Nil t)) (SVar "x")) (Cons (SLet "f" (SAnn identityExpr (SAnnotation Nil (SArrow t t))) (SVar "f")) Nil))) Nil)) nested)) } in do { ((Coverage.forCounted "core" "annotation-executed" programs) (\e -> (case (compileExpr e) of { (Left err) -> (H.fail (H.append "failed annotated identity " (H.append (H.show e) (H.append "\n" (H.show err))))); (Right r) -> do { parsed <- (H.right (XP.parseTerm "<annotation xMLF>" (prettyTerm (compiledTerm r)))); do { ty <- (H.right (C.checkClosed parsed)); (sameType ty (inferredType r)) } } }))); (putStrLn (H.append "Annotations: " (H.append (H.show (H.length programs)) " typed programs"))) })))))
 
 examplesTest : IO Unit
 examplesTest = do { files <- (H.fmap (S.compose H.sort (S.filter (\section1 -> (H.contains ".emlf" section1)))) (listDirectory "examples")); do { (H.assert ((H.length files) >= 6) "example files are missing"); ((H.forM_ files) (\file -> (bind (bind (readFile (H.append "examples/" file)) compileOK) (\ignored -> (return Unit))))) } }

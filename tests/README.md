@@ -3,6 +3,10 @@
 The local `mlf-tests` package preserves the original assertions, input corpora,
 runtime event traces, generated graph properties, and harness fault injections.
 Root `mlfpkg test` builds these executables through the MLF package manager.
+The test-owned `compiler-tests` runner is a private root executable; its sources
+live in `tests/CompilerTestsMain.emlf` and `Tests/CompilerTests.emlf`. It receives
+the real package manager through `--manager`, keeps the existing six root groups
+and report paths, and fingerprints the manager and runner separately.
 The old Haskell/Python suites and Haskell compiler have been removed.
 No GHC, Cabal, or Python executable is needed. C fixtures live in `tests/native/`;
 benchmark baselines and golden oracle data remain unchanged.
@@ -14,8 +18,8 @@ target; its existing Core entry still runs the same sorted-list oracle and all
 inventory validation, JSON diagnostics and legacy adapters. The root `unit` group runs both the library and CLI contract checks in addition
 to the existing 686 Core checks.
 
-The shared test library contains eight helper, transport, collection-wrapper
-and independent-checker modules. Each executable explicitly lists the private
+The shared test library contains the eight original helper, transport,
+collection-wrapper and independent-checker modules plus `Tests.Coverage`. Each executable explicitly lists the private
 test modules imported by its entry point. All original 77 test modules remain reachable
 across those entries. Building `port` and its six reference programs now compiles
 21 test modules including their two entries, instead of compiling all 79 first.
@@ -61,7 +65,7 @@ wrapper chooses 4 for port on hosts with at most 8 GiB RAM, while preserving the
 | backends | BackendSuiteMain | 523 fixtures and 575 execution rows on interpreter and LLVM, compact-GC layout |
 | port | PortMain, ReferencesMain | 25 LLVM fixtures with compact-GC, six reference programs, generated inference input equality |
 | parity | CorpusMain, CheckTarget | All 7086 prescribed acceptance/type/rejection cases, 7075 distinct source compilations, and 80 runtime rows on both backends |
-| self-host | Package.CompilerTests | Fresh next-stage compiler build and LLVM/native binary fixed point |
+| self-host | Tests.CompilerTests | Fresh next-stage compiler build and LLVM/native binary fixed point |
 
 `Tests.Oracle` has its own monotypes, substitution, and generalization. It imports
 no compiler, graph solver, or target checker. `Tests.GraphUnificationReference`
@@ -80,6 +84,26 @@ acceptance overlays for crate compilation. Their prescribed type is `Int`,
 checked against the independent literal target `42`; the archive itself is
 unchanged. The resulting corpus has 3,204 accepted cases. See the
 [oracle migration record](../docs/crate-migration.md#oracle-migration).
+The `unit` and `packages` groups now validate structured execution evidence
+against [`golden/unit-inventory.json`](golden/unit-inventory.json). Completed
+callbacks emit case IDs, explicit aliases and measured execution counts. The
+parent requires a full start, one terminal completion, the exact reviewed ID
+sets, and matching metric counts; partial, duplicate, missing and stale reports
+fail the gate. Each receipt hashes the report and reviewed inventory alongside
+the compiler, manager, runner and source snapshot. Text logs remain diagnostic.
+
+The inventory was transcribed from the verified baseline and existing source
+registries. A deliberate coverage change must update it separately with a
+reviewable explanation of added or removed executions and aliases. Never
+regenerate expectations from the candidate's output to make a run pass. The
+framework includes literal report mutation tests for these rules; the compiler
+oracles and frozen corpus remain independent of the runner.
+
+The optional [`mlf-test-tools`](../testing/tools/README.md) package supervises
+individual `Test.Case` actions in fresh processes using the existing POSIX
+measurement helper. Native framework checks exercise failure continuation,
+crashes, timeouts, log capture, workspace freshness and malformed reports.
+
 The [coverage audit](coverage-overlap.md) maps retained and consolidated cases.
 The 17 duplicate unit checks now run in the port matrix, whose runtime smoke
 case is merged into RuntimeCases. Shared ST input data retains separate

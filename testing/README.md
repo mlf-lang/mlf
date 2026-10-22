@@ -36,8 +36,10 @@ both rendered values. `A.right display result` unwraps an `Either`, and
 `C.toLegacy` adapts a case back to `Pair String (IO Unit)`, preserving its name
 and exiting unsuccessfully on failure. `C.fromIO` adapts an existing named IO
 action. It cannot recover a legacy action that calls `exitWith` or panics.
-This first runner executes sequentially in one process: crashes and hangs
-require an external process supervisor and timeout, as with existing suites.
+The core runner executes sequentially in one process. The optional
+[`mlf-test-tools` package](tools/README.md) supplies `Test.Process` and the
+`mlf-test` executable for per-case process isolation, monotonic timings and
+timeouts, with separate results for assertions, crashes and protocol failures.
 
 ## Selection and reporting
 
@@ -85,7 +87,8 @@ repository README:
 ./mlfpkg --manifest tests/mlf-package.json run int-set-unions -- \
   --exact int-set/union-sorted-list --format json
 ./mlfpkg --manifest tests/mlf-package.json run test-framework
-./mlfpkg --manifest tests/mlf-package.json test --target framework-cli
+MLF_TEST_HOST_SUPPORT=/absolute/path/to/host-support \
+  ./mlfpkg --manifest tests/mlf-package.json test --target framework-cli
 ./mlfpkg --timeout 21600 test --target unit
 ```
 

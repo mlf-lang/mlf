@@ -1,0 +1,5 @@
+module PRSmokeMain where
+import Bootstrap.Types
+import qualified Tests.PRSmoke as T
+main : IO Unit
+main = T.main

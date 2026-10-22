@@ -1,5 +1,6 @@
 module Tests.ReleaseSuite where
 import Bootstrap.Types
+import qualified Tests.Coverage as Coverage
 import qualified Bootstrap.Std as S
 import qualified Package.Json as J
 import qualified Package.OS as O
@@ -44,8 +45,10 @@ main = do
  evidence <- J.read "tests/golden/release-evidence.json"
  manifest <- J.read "benchmarks/manifest.json"
  H.right (validate evidence manifest)
+ Coverage.passed "harness" "test_complete_stage3_evidence_passes"
  putStrLn "PASS test_complete_stage3_evidence_passes"
  reject (path "bootstrap parity compiler" (\_ -> J.str "/verified/emlf-stage2") evidence) manifest
+ Coverage.passed "harness" "test_stage2_parity_cannot_certify_stage3"
  putStrLn "PASS test_stage2_parity_cannot_certify_stage3"
  S.mapM_ (\mutation -> reject (mutation evidence) manifest)
   (Cons (path "bootstrap fixed_point" (\_ -> J.Boolean false))
@@ -53,6 +56,7 @@ main = do
   (Cons (path "bootstrap stages" (replaceHead (set "reused_seed_compilation" (J.Boolean true))))
   (Cons (path "bootstrap stages" (\xs -> J.Array (S.map (\row -> if V.int "stage" row == 2 then set "llvm_sha256" (J.str "different") row else row) (J.values xs))))
   (Cons (path "bootstrap candidate stage" (\_ -> J.num 2)) Nil)))))
+ Coverage.passed "harness" "test_fixed_point_and_fresh_stages_are_required"
  putStrLn "PASS test_fixed_point_and_fresh_stages_are_required"
  S.mapM_ (\mutation -> reject (mutation evidence) manifest)
   (Cons (path "backends matrices" (V.remove "compact-gc"))
@@ -61,6 +65,7 @@ main = do
   (Cons (path "backends matrices compact-gc cli_compiler" (\_ -> J.str "seed"))
   (Cons (path "backends matrices compact-gc environment MLF_LLVM_TEST_ABI" (\_ -> J.str "standard")) Nil)))))
  reject (path "backends matrices standard" (\_ -> J.empty) evidence) manifest
+ Coverage.passed "harness" "test_compact_matrix_and_both_backends_are_required"
  putStrLn "PASS test_compact_matrix_and_both_backends_are_required"
  let first = path "benchmarks results"
  let entry = \keys f -> first (replaceHead (path keys f))
@@ -76,11 +81,14 @@ main = do
   (Cons (entry "input" (\_ -> J.num 1))
   (Cons (path "benchmarks configuration runtime_only" (\_ -> J.Boolean true))
   (Cons (path "benchmarks toolchain emlf sha256" (\_ -> J.str "seed")) Nil)))))))))))
+ Coverage.passed "harness" "test_benchmark_coverage_and_samples_cannot_be_faked_by_pass_status"
  putStrLn "PASS test_benchmark_coverage_and_samples_cannot_be_faked_by_pass_status"
  let samples n = J.Array (S.replicate 5 (J.Object (Cons (Pair "wall_seconds" n) Nil)))
  reject (entry "languages mlf compilation" (\row -> set "median_wall_seconds" (J.num 6) (set "samples" (samples (J.num 6)) row)) evidence) manifest
+ Coverage.passed "harness" "test_ratios_are_recomputed_from_measurements"
  putStrLn "PASS test_ratios_are_recomputed_from_measurements"
  S.mapM_ (\value -> reject (entry "languages c compilation samples" (\_ -> samples value) evidence) manifest) (Cons (J.num 6) (Cons (J.num 0) (Cons (J.num (-1)) (Cons (J.Number "NaN") (Cons (J.Number "Infinity") Nil)))))
+ Coverage.passed "harness" "test_medians_are_recomputed_and_bad_samples_fail"
  putStrLn "PASS test_medians_are_recomputed_and_bad_samples_fail"
  H.withScratch (\directory -> do
   let report = J.Object (Cons (Pair "complete" (J.Boolean false)) (Cons (Pair "steps" (J.Array Nil)) Nil))
@@ -89,6 +97,7 @@ main = do
   saved <- J.read (directory ++ "/verification.json")
   log <- fileExists (directory ++ "/failure.log")
   H.assert (S.not (J.getBool "complete" true saved) && V.int "exit_code" (S.head (V.array "steps" saved)) == 9 && log) "failed step lost its evidence")
+ Coverage.passed "harness" "test_failed_step_preserves_failure_and_never_completes_release"
  putStrLn "PASS test_failed_step_preserves_failure_and_never_completes_release"
  H.withScratch (\directory -> do
   let names = O.words "MLF_BOOTSTRAP_COMPILER MLF_LLVM_TEST_ABI MLF_TEST_FAIL_WRITE GC_INITIAL_HEAP_SIZE MLF_TEST_UNKNOWN_OVERRIDE"
@@ -97,6 +106,7 @@ main = do
   passed <- V.step directory (J.Object (Cons (Pair "complete" (J.Boolean false)) (Cons (Pair "steps" (J.Array Nil)) Nil))) "environment" (Cons exe (Cons "--check-clean-environment" names))
   H.assert (S.isRight passed) "release gate inherited compiler or collector override"
   S.mapM_ (\(Pair name value) -> if eqString value "" then unsetEnv name else setEnv name value) prior)
+ Coverage.passed "harness" "test_gate_does_not_inherit_compiler_or_collector_overrides"
  putStrLn "PASS test_gate_does_not_inherit_compiler_or_collector_overrides"
  H.withScratch (\directory -> do
   report <- fixture directory evidence manifest
@@ -110,6 +120,7 @@ main = do
   invalid <- V.installWithSmoke directory (directory ++ "/prefix") (\_ -> return Unit)
   present <- directoryExists (directory ++ "/prefix")
   H.assert (S.isLeft invalid && S.not present) "changed release was installed")
+ Coverage.passed "harness" "test_incomplete_or_changed_packages_are_not_installable"
  putStrLn "PASS test_incomplete_or_changed_packages_are_not_installable"
  H.withScratch (\directory -> do
   fixture directory evidence manifest
@@ -134,4 +145,5 @@ main = do
   rejected <- V.installWithSmoke directory moved smoke
   original <- readFile (moved ++ "/bin/emlf")
   H.assert (S.isLeft rejected && eqString original "other compiler") "unrelated installed command overwritten")
+ Coverage.passed "harness" "test_installation_is_relocatable_and_does_not_replace_unrelated_files"
  putStrLn "PASS test_installation_is_relocatable_and_does_not_replace_unrelated_files"

@@ -28,28 +28,42 @@ package_artifact="$artifact_root/native-$platform-packages"
 for part in $parts; do
   artifact="$artifact_root/native-$platform-$part"
   test -f "$artifact/compiler-tests/$part/verification.json"
-  for tool in emlf mlfpkg; do cmp "$package_artifact/bin/$tool" "$artifact/bin/$tool"; done
+  for tool in emlf mlfpkg compiler-tests; do cmp "$package_artifact/bin/$tool" "$artifact/bin/$tool"; done
 done
 build="$artifact_root/assembled"
 test ! -e "$build" || { printf '%s\n' 'Use new artifact staging directories.' >&2; exit 1; }
 mkdir -p "$build/bin" "$build/compiler-tests"
-cp "$package_artifact/bin/emlf" "$package_artifact/bin/mlfpkg" "$build/bin/"
+cp "$package_artifact/bin/emlf" "$package_artifact/bin/mlfpkg" "$package_artifact/bin/compiler-tests" "$build/bin/"
 chmod 755 "$build/bin/"*
 for part in $parts; do
   cp -R "$artifact_root/native-$platform-$part/compiler-tests/$part" "$build/compiler-tests/"
 done
 compiler_hash=$(sha256 "$build/bin/emlf" | awk '{print $1}')
 manager_hash=$(sha256 "$build/bin/mlfpkg" | awk '{print $1}')
+runner_hash=$(sha256 "$build/bin/compiler-tests" | awk '{print $1}')
 base="$build/compiler-tests/unit/verification.json"
 groups='unit packages self-host parity backends port'
 for group in $groups; do
   report="$build/compiler-tests/$group/verification.json"
-  jq -e --arg group "$group" --arg hash "$compiler_hash" --arg manager "$manager_hash" \
-    '.complete == true and .implementation == "MLF" and .group == $group and .compiler_sha256 == $hash and .manager_sha256 == $manager' "$report" >/dev/null
+  jq -e --arg group "$group" --arg hash "$compiler_hash" --arg manager "$manager_hash" --arg runner "$runner_hash" \
+    '.complete == true and .implementation == "MLF" and .group == $group and .compiler_sha256 == $hash and .manager_sha256 == $manager and .runner_sha256 == $runner' "$report" >/dev/null
   cmp <(jq -S .sources "$base") <(jq -S .sources "$report")
   while IFS=$'\t' read -r suite expected; do
     test "$(sha256 "$build/compiler-tests/$group/$suite.log" | awk '{print $1}')" = "$expected"
   done < <(jq -r '(.suites // {}) | to_entries[] | [.key,.value.log_sha256] | @tsv' "$report")
+  case "$group" in
+    unit) coverage_suites='harness core figure12 test-framework' ;;
+    packages) coverage_suites='packages' ;;
+    *) coverage_suites='' ;;
+  esac
+  if [ -n "$coverage_suites" ]; then
+    inventory_hash=$(sha256 tests/golden/unit-inventory.json | awk '{print $1}')
+    for suite in $coverage_suites; do
+      expected=$(jq -er --arg suite "$suite" --arg inventory "$inventory_hash" \
+        '.suites[$suite] | select(.coverage_inventory_sha256 == $inventory) | .coverage_report_sha256 | select(type == "string" and test("^[0-9a-f]{64}$"))' "$report")
+      test "$(sha256 "$build/compiler-tests/$group/$suite.coverage.jsonl" | awk '{print $1}')" = "$expected"
+    done
+  fi
   while IFS=$'\t' read -r abi expected; do
     test "$(sha256 "$build/compiler-tests/$group/$abi.log" | awk '{print $1}')" = "$expected"
   done < <(jq -r '(.matrices // {}) | to_entries[] | [.key,.value.log_sha256] | @tsv' "$report")
@@ -86,6 +100,12 @@ for group in $groups; do
   cp "$build/compiler-tests/$group/verification.json" "$bundle/evidence/$group/"
   while IFS= read -r log; do cp "$log" "$bundle/evidence/$group/"; done < <(find "$build/compiler-tests/$group" -maxdepth 1 -name '*.log' -type f)
 done
+for suite in harness core figure12 test-framework; do
+  cp "$build/compiler-tests/unit/$suite.coverage.jsonl" "$bundle/evidence/unit/"
+done
+cp tests/golden/unit-inventory.json "$bundle/evidence/unit/"
+cp "$build/compiler-tests/packages/packages.coverage.jsonl" "$bundle/evidence/packages/"
+cp tests/golden/unit-inventory.json "$bundle/evidence/packages/"
 minimum_macos=""
 build_glibc=""
 if [ "$platform" = macos-arm64 ]; then
@@ -93,7 +113,7 @@ if [ "$platform" = macos-arm64 ]; then
 else
   build_glibc=$(getconf GNU_LIBC_VERSION)
 fi
-jq -n --arg version "$version" --arg commit "$commit" --arg compiler "$compiler_hash" --arg manager "$manager_hash" \
+jq -n --arg version "$version" --arg commit "$commit" --arg compiler "$compiler_hash" --arg manager "$manager_hash" --arg runner "$runner_hash" \
   --arg platform "$platform" --arg minos "$minimum_macos" --arg glibc "$build_glibc" \
   '{schema_version:1,version:$version,commit:$commit,platform:$platform,compiler_sha256:$compiler,manager_sha256:$manager,test_implementation:"MLF",test_groups:["unit","packages","self-host","parity","backends","port"],port_profiles:["compact-gc"],performance_gate:"not rerun for this preview"} + (if $platform == "macos-arm64" then {minimum_macos:$minos} else {build_glibc:$glibc} end)' > "$bundle/release.json"
 if [ "$platform" = macos-arm64 ]; then

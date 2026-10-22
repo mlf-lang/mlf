@@ -1,0 +1,75 @@
+module Tests.PRSmoke where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Bootstrap.Compiler as C
+import qualified Bootstrap.X.Parser as Parser
+import qualified Bootstrap.X.Pretty as Pretty
+import qualified Package.OS as O
+import qualified Tests.Helpers as H
+import qualified Tests.Backends as B
+import qualified Tests.BackendCases as Backend
+import qualified Tests.IOTests as IOTests
+import qualified Tests.NativeOptimization as Native
+import qualified Tests.StateRuntime as State
+import qualified Tests.Figure12Suite as Figure12
+import qualified Tests.IndependentCheck as Independent
+import qualified Tests.IndependentType as IndependentType
+
+-- Keep this selection explicit: missing, renamed or duplicate fixtures must
+-- fail the gate rather than silently reduce the number of exercised paths.
+labels : List String
+labels =
+ Cons "IO: greeting and input order"
+ (Cons "IO: integer arithmetic is signed and unbounded"
+ (Cons "IO: conditional does not force an unselected pure branch"
+ (Cons "IO: an action can be executed more than once"
+ (Cons "IO: constructor and case evaluation"
+ (Cons "native optimization: function captures and mutual recursion"
+ (Cons "native optimization: partial workers stay lazy"
+ (Cons "backend: unicode-input"
+ (Cons "backend: nul"
+ (Cons "ST runtime: snapshot"
+ (Cons "ST runtime: repeated-read-action"
+ (Cons "IO: target verification happens before any effects" Nil)))))))))))
+
+select : B.Backends -> IO (List (Pair String (IO Unit)))
+select backends = do
+ let available = S.concat (Cons (IOTests.ioTests backends)
+       (Cons (Native.nativeOptimizationTests backends)
+       (Cons (Backend.backendTests backends)
+       (Cons (State.stateRuntimeTests backends) Nil))))
+ H.assert (S.length labels == 12 && S.length (S.nubBy eqString labels) == 12) "PR smoke fixture selection changed"
+ S.mapM (\label -> case S.filter (\entry -> eqString label (S.fst entry)) available of
+   Cons entry Nil -> return entry
+   _ -> H.fail ("missing or duplicate PR smoke fixture: " ++ label)) labels
+
+independentType : String -> XType -> IO Unit
+independentType source expected = do
+ compiled <- H.right (C.compile "<PR smoke independent target>" source)
+ term <- H.right (Parser.parseTerm "<PR smoke serialized target>" (Pretty.prettyTerm (C.compiledTerm compiled)))
+ actual <- H.right (Independent.checkClosed term)
+ H.assert (IndependentType.alphaEq actual expected) ("independent target type mismatch: " ++ Pretty.prettyType actual)
+
+independentControls : IO Unit
+independentControls = do
+ independentType "\\x -> x" Figure12.identity
+ independentType "let id = \\x -> x in if id true then id 42 else 0" (XCon "Int" Nil)
+ independentType "putStrLn \"checked\"" (XCon "IO" (Cons (XCon "Unit" Nil) Nil))
+ let malformed = XApp (XPrimitive PPutStrLn Nil) (XIntTerm 42)
+ case Independent.checkClosed malformed of
+  Left error -> H.assert (H.contains "application type mismatch" error) error
+  Right _ -> H.fail "independent checker accepted a malformed target"
+ putStrLn "4 independent target controls; 0 failures"
+
+main : IO Unit
+main = do
+ args <- O.allArguments
+ H.assert (S.null args) "pr-smoke accepts no filters"
+ Figure12.main
+ independentControls
+ B.withBackends (\backends -> do
+  cases <- select backends
+  S.mapM_ (\(Pair label action) -> B.inCase backends label (do { putStrLn label; action })) cases
+  count <- B.auditBackends backends
+  H.assert (count == 12) "PR smoke backend execution count changed"
+  putStrLn "12 PR smoke backend fixtures; 0 failures")
