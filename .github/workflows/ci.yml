@@ -62,6 +62,9 @@ jobs:
             .mlf-build/pr-smoke/candidate/cache/*/artifact.json
             .mlf-build/pr-smoke/tests/verification.json
             .mlf-build/pr-smoke/tests/*.log*
+            .mlf-build/pr-smoke/tests/*.coverage.jsonl
+            .mlf-build/pr-smoke/tests/framework-cli/
+            tests/golden/unit-inventory.json
             .mlf-build/pr-smoke/tests/suite-build/build-report.json
             .mlf-build/pr-smoke/tests/driver-build/build-report.json
             .mlf-build/pr-smoke/tests/driver-build/commands/*.stderr

@@ -5,7 +5,7 @@ The `CI` workflow runs on every pull request, merge queue group and push to
 
 - **Release metadata**: version/manifest consistency, shell syntax, benchmark
   provenance and checksum-pinned actionlint 1.7.12 workflow validation.
-- **Native compiler smoke**: a checkout compiler/manager build followed by the
+- **Native compiler smoke**: a checkout compiler/manager/campaign build followed by the
   bounded native MLF suite below on macOS arm64.
 - **Native Windows runtime**: compact-GC runtime, filesystem and reproducible
   object/executable checks on Windows.
@@ -28,13 +28,19 @@ not make its checks mandatory.
 ## Native smoke coverage
 
 The pinned v0.3.0 seed is only a bootstrap input. CI verifies its archive and both
-executables, then builds the checkout compiler and manager with the current C
-runtime and checked lockfile. The resulting manager invokes `compiler-test
-pr-smoke` with the resulting compiler. The ordinary six root groups are unchanged;
+executables and source commit, then builds the checkout compiler, manager and
+test-owned `compiler-tests` executable with the current C runtime and checked
+lockfile. That executable runs `pr-smoke` with the resulting compiler and an
+explicit `--manager` pointing to the resulting manager. The ordinary six root groups are unchanged;
 smoke is an explicit additional group and is not duplicated in a full root test.
 
 The suite reuses existing assertions and fixtures:
 
+- Framework assertion, case-selection and report contracts, the fixed coverage
+  validator, and the `int-set-unions` suite through the full runner CLI probes.
+  Process supervision probes cover crashes, timeouts, isolated work directories,
+  captured output and rejected incomplete or contradictory child reports. The
+  framework's three completed checkpoints must match the reviewed inventory.
 - Figure 12: all 43 regression labels, 41 distinct executions and 36 controls,
   with expected rejection phases/reasons and checked xMLF round trips.
 - Four frozen independent target-checker controls: identity, polymorphic let,
@@ -49,7 +55,8 @@ The suite reuses existing assertions and fixtures:
   Mutation uses a private copy; the checkout stays unchanged.
 
 Missing or duplicate fixture labels, unexpected arguments, wrong matrix counts,
-missing summaries, failed commands, source/tool changes and incomplete package
+missing structural framework evidence, missing summaries, failed commands,
+source/tool changes and incomplete package
 reports fail the suite. The full parity corpus, full backend/port matrices and
 fresh self-host fixed point remain part of release qualification.
 
@@ -69,7 +76,11 @@ source/tool fingerprints validate cache reuse. Each invocation clears its succes
 receipt before building. GHC, Cabal and Python are blocked on the native CI path.
 
 The workflow uploads `pr-smoke-evidence` on success or failure, including build
-and verification reports, logs, backend statuses and output. Local evidence is
+and verification reports, framework coverage and its reviewed inventory, suite
+logs, backend statuses and output. Detailed process-probe reports and logs are
+also retained on failure; successful probes clean up their scratch directories.
+Local evidence is
 under `.mlf-build/pr-smoke/`; `result.json` records integer wall-clock seconds
-for tool building and the complete command. The native job has a 60-minute hard
+for tool building and the complete command, plus compiler, manager, campaign,
+framework and coverage fingerprints. The native job has a 60-minute hard
 limit; this is a failure bound, not a promised runtime.

@@ -137,7 +137,7 @@ macOS require all six native compiler groups and a fresh self-host fixed point.
 Windows requires fresh compiler and manager LLVM fixed points, 7,086 independent
 parity cases and 160 interpreter/native executions, compact-GC runtime tests,
 18 native resolver checks, 29 native package integration cases, and SDK relocation and native
-executable checks. Its internal POSIX `compiler-test` transports and historical
+executable checks. Its internal POSIX `compiler-tests` transports and historical
 performance gates are not claimed as Windows qualification. Each archive
 retains the exact source/tool hashes and platform evidence.
 
@@ -159,10 +159,11 @@ used the following sequence:
    then uploads a new developer-preview release with SHA-256 checksums.
 
 CI on `main`, pull requests and merge queues checks release metadata and workflow
-syntax, builds the checkout compiler and manager with the verified v0.3.0 seed
+syntax, builds the checkout compiler, manager and test-owned campaign with the verified v0.3.0 seed
 in `.github/smoke-seed.env`, and runs the bounded `pr-smoke` compiler group. It
-retains Figure 12 regressions, selected interpreter/LLVM fixtures, independent
-target checks and package cache invalidation. The separate Windows runtime job
+retains framework/coverage/process contracts, the focused `int-set-unions` suite,
+Figure 12 regressions, selected interpreter/LLVM fixtures, independent target
+checks and package cache invalidation. The separate Windows runtime job
 also runs. The aggregate **PR gate** succeeds only when all three jobs succeed;
 configure it as a required status check on `main` to enforce merge blocking.
 See [PR checks](ci.md) for exact coverage, local commands and required-check setup.

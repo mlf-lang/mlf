@@ -1,4 +1,4 @@
-module Package.TestSources where
+module Tests.TestSources where
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Bootstrap.Parser as Parser
