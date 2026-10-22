@@ -69,7 +69,8 @@ separate new-primitive bootstrap and MLF-level suite; the C jobs alone do not
 claim it. The separate required async language job supplies that evidence using
 `scripts/bootstrap-async.sh`, `tests/fixtures/async-completion/check.sh`,
 `tools/release/test-async-process.sh` and `tools/release/test-async-task.sh`.
-Its two-generation native bootstrap has a separate 120-minute job bound; the
+Its two-generation native bootstrap also builds an interface-compatible package
+manager and has a separate 120-minute job bound; the
 existing compiler source-smoke job and its 480-second command watchdog are
 unchanged. A source-smoke timeout remains a failing prerequisite even when all
 async checks pass. The language job uploads immutable snapshot identities,

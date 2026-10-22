@@ -282,6 +282,7 @@ jobs:
             .mlf-build/async-bootstrap/capability.txt
             .mlf-build/async-bootstrap/source-identity.txt
             .mlf-build/async-bootstrap/compilers.sha256
+            .mlf-build/async-bootstrap/manager.sha256
             .mlf-build/async-bootstrap/build-*/**/build-report.json
             .mlf-build/async-bootstrap/build-*/**/commands/
             .mlf-build/async-bootstrap/source-*/inputs.sha256

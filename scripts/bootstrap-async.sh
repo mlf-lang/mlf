@@ -28,7 +28,7 @@ trap 'exit 143' TERM
 record_inputs() {
   (
     cd "$1"
-    { find bootstrap libraries runtime -type f; printf '%s\n' VERSION; } |
+    { find bootstrap libraries package runtime -type f; printf '%s\n' VERSION; } |
       LC_ALL=C sort | while IFS= read -r file; do shasum -a 256 "$file"; done
   )
 }
@@ -37,7 +37,7 @@ identity=$({ cat "$inputs"; shasum -a 256 scripts/bootstrap-async.sh; } | shasum
 snapshot="$build/source-$identity"
 if [ ! -d "$snapshot" ]; then
   temporary=$(mktemp -d "$build/source.XXXXXX")
-  cp -R "$root/bootstrap" "$root/libraries" "$root/runtime" "$temporary/"
+  cp -R "$root/bootstrap" "$root/libraries" "$root/package" "$root/runtime" "$temporary/"
   cp "$root/VERSION" "$temporary/VERSION"
   record_inputs "$temporary" > "$temporary/inputs.sha256"
   cmp "$inputs" "$temporary/inputs.sha256" >/dev/null || {
@@ -73,6 +73,20 @@ if [ ! -d "$snapshot-stage1" ]; then
   cp -R "$snapshot/." "$temporary/"
   cp "$temporary/bootstrap/seed-compat/Bootstrap/ProcessHost.emlf" \
     "$temporary/libraries/mlf-interpreter/Bootstrap/ProcessHost.emlf"
+  # The released manager independently decodes every generated interface.
+  # It cannot validate the new stage-1 prelude's appended primitive inventory.
+  # Build its replacement with the released compiler, sharing stage-1 library
+  # paths/cache entries; do not weaken the dependency-closure validator.
+  cat > "$temporary/package/mlf-package.json" <<MANAGER
+{
+  "format": 1, "name": "mlf-async-manager-bootstrap", "version": "$version",
+  "dependencies": {
+    "mlf-foundation": {"path": "../libraries/mlf-foundation"},
+    "mlf-package-core": {"path": "../libraries/mlf-package-core"}
+  },
+  "executables": {"mlfpkg": {"main": "Main.emlf", "profile": "compiler"}}
+}
+MANAGER
   record_inputs "$temporary" > "$temporary/inputs.sha256"
   mv "$temporary" "$snapshot-stage1"
   temporary=
@@ -91,6 +105,23 @@ for stage in 1 2; do
   (cd "$source"; shasum -a 256 -c inputs.sha256 >/dev/null)
   cp "$stage_build/bin/emlf" "$build/stage$stage.new"
   mv "$build/stage$stage.new" "$build/stage$stage"
+  if [ "$stage" = 1 ]; then
+    manager_build="$build/build-$identity/manager"
+    set -- --manifest "$source/package/mlf-package.json" --compiler "$compiler" \
+      --runtime "$source/runtime/mlf_runtime.c" --timeout 21600 \
+      --build-dir "$manager_build" --cache-dir "$build/cache"
+    if [ -n "${MLF_GC_PREFIX:-}" ]; then set -- "$@" --gc-prefix "$MLF_GC_PREFIX"; fi
+    if [ -n "${CC:-}" ]; then set -- "$@" --clang "$CC"; fi
+    printf 'Building async-compatible manager with %s\n' "$compiler" >&2
+    "$manager" "$@" build --target mlfpkg
+    (cd "$source"; shasum -a 256 -c inputs.sha256 >/dev/null)
+    "${CC:-clang}" -O2 -std=c11 -Wall -Wextra -Werror \
+      "$source/runtime/mlf_build_runner.c" -o "$manager_build/bin/mlf-build-runner.new"
+    test "$("$manager_build/bin/mlf-build-runner.new" --protocol-version)" = 1
+    mv "$manager_build/bin/mlf-build-runner.new" "$manager_build/bin/mlf-build-runner"
+    manager="$manager_build/bin/mlfpkg"
+    shasum -a 256 "$manager" "$manager_build/bin/mlf-build-runner" > "$build/manager.sha256"
+  fi
   compiler="$build/stage$stage"
 done
 # This must exercise the real checked interpreter, not the stage-1 shim.

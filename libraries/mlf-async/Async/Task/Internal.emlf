@@ -106,7 +106,7 @@ preserveCleanup external original = case original of
   _ -> stopAs external
 
 finish : forall a. Context -> Completion (Outcome a) -> Outcome a -> IO Unit
-finish (Context (Scope _ metadata edges failure _ drained _ (Limits _ _ _ shared cleanup _)) identity _) cell outcome = do
+finish (Context (Scope _ metadata edges failure scopeStop drained _ (Limits _ _ _ shared cleanup _)) identity _) cell outcome = do
   accepted <- asyncResolveCompletion cell outcome
   if accepted == 0 then do
     writeIntTable edges identity 0
@@ -120,6 +120,7 @@ finish (Context (Scope _ metadata edges failure _ drained _ (Limits _ _ _ shared
     if active == 1 then ioBind (asyncResolveCompletion drained Unit) (\_ -> unit) else unit
     case outcome of
       Failed error -> ioBind (asyncResolveCompletion failure error) (\_ -> unit)
+      Cancelled reason -> if identity == 0 then ioBind (asyncResolveCompletion scopeStop reason) (\_ -> unit) else unit
       _ -> unit
   else unit
 

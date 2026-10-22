@@ -153,8 +153,8 @@ done
 jq -n --arg compiler_sha256 "$compiler_hash" --arg work "$work" \
  --arg overlay_sha256 "$(sha256 "$work/whitebox/Async/Task/Internal.emlf")" \
  --slurpfile inputs "$work/inputs.json" --slurpfile observations "$work/observations.json" --slurpfile artifacts "$work/artifacts.json" \
- '{complete:true,cases:29,source_rejections:5,backends:["interpreter","llvm"],whitebox_cases:5,
+ '{complete:true,cases:30,source_rejections:5,backends:["interpreter","llvm"],whitebox_cases:6,
  compiler_sha256:$compiler_sha256,work:$work,whitebox_source_sha256:$overlay_sha256,
  inputs:$inputs[0],observations:$observations[0],artifacts:$artifacts[0]}' > "$output/result.tmp"
 mv "$output/result.tmp" "$output/result.json"
-echo 'Async.Task language parity passed: 29 contracts (5 white-box), 5 source rejections.'
+echo 'Async.Task language parity passed: 30 contracts (6 white-box), 5 source rejections.'

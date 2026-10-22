@@ -122,6 +122,11 @@ scopeCancel = do
  assert (cancelled 25 outcome) "scope cancellation did not join"
  negative <- T.run T.defaultOptions (T.cancelScope (T.CancelReason (0 - 1) "negative reason"))
  assert (cancelled (0 - 1) negative) "task reason leaked into bounded process protocol"
+ root <- T.run T.defaultOptions (T.bind (T.spawn (after 60000 1)) (\_ ->
+   T.bind (T.spawn (after 60000 2)) (\victim ->
+   T.bind T.yield (\_ ->
+   T.bind (T.cancel victim (T.CancelReason 26 "root await")) (\_ -> T.await victim)))))
+ assert (cancelled 26 root) "cancelled root did not cancel-and-join sibling"
  putStrLn "PASS scope-cancellation"
 
 jobsOne = do
