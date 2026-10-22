@@ -89,7 +89,8 @@ jobs:
             .mlf-build/windows-runtime/*.json
             .mlf-build/windows-runtime/*.log
   pr-gate:
-    name: PR gate
+    # A skipped manual job must not satisfy the required check on the same SHA.
+    name: ${{ github.event_name == 'workflow_dispatch' && 'Manual CI summary' || 'PR gate' }}
     if: always() && github.event_name != 'workflow_dispatch'
     needs: [metadata, native, windows-runtime]
     runs-on: ubuntu-24.04

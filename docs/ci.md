@@ -13,7 +13,8 @@ The `CI` workflow runs on every pull request, merge queue group and push to
 The aggregate runs even when a prerequisite fails and accepts only `success`.
 Failed, cancelled or skipped prerequisites cannot produce a passing gate.
 There are no path filters on the required workflow. Manual dispatches retain
-the existing optional self-host and Windows-only modes and do not emit PR gate.
+the existing optional self-host and Windows-only modes. Their skipped aggregate
+is named **Manual CI summary**, so it cannot satisfy the required **PR gate**.
 
 ## Enforce before merging
 

@@ -27,8 +27,10 @@ jq -e '.complete == true and .group == "pr-smoke"' "$build/tests/verification.js
 jq -e '
   [.builds[] | select(.kind == "crate message/0.1.0/library" or
     .kind == "crate greeting/0.1.0/library" or
-    .kind == "crate local-packages-example/0.1.0/target-test-hello")] |
-  length == 3 and all(.[]; .cached == false)
+    .kind == "crate local-packages-example/0.1.0/target-test-hello")] as $rows |
+  ($rows | map(.kind) | sort) == ["crate greeting/0.1.0/library",
+    "crate local-packages-example/0.1.0/target-test-hello", "crate message/0.1.0/library"]
+  and all($rows[]; .cached == false)
 ' "$build/tests/package-smoke/build/build-report.json" >/dev/null
 jq -n --arg commit "$(git rev-parse HEAD)" --argjson build_seconds "$build_seconds" \
   --argjson total_seconds "$((SECONDS - started))" \
