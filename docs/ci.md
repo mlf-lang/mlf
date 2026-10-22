@@ -7,10 +7,14 @@ The `CI` workflow runs on every pull request, merge queue group and push to
   provenance and checksum-pinned actionlint 1.7.12 workflow validation.
 - **Native compiler smoke**: a checkout compiler/manager/campaign build followed by the
   bounded native MLF suite below on macOS arm64.
+- **Native package distribution**: checkout manager and test-campaign builds
+  followed by source-package and checked-release/distribution tests with the
+  pinned published compiler.
 - **Native Windows runtime**: compact-GC runtime, filesystem and reproducible
   object/executable checks on Windows.
 
-The aggregate runs even when a prerequisite fails and accepts only `success`.
+The aggregate runs even when a prerequisite fails and requires all four jobs
+to report `success`.
 Failed, cancelled or skipped prerequisites cannot produce a passing gate.
 There are no path filters on the required workflow. Manual dispatches retain
 the existing optional self-host and Windows-only modes. Their skipped aggregate
@@ -59,6 +63,21 @@ missing structural framework evidence, missing summaries, failed commands,
 source/tool changes and incomplete package
 reports fail the suite. The full parity corpus, full backend/port matrices and
 fresh self-host fixed point remain part of release qualification.
+
+## Package distribution coverage
+
+The separate package job verifies the published compiler pinned in
+`.github/package-seed.env`, then builds the checkout `mlfpkg` and
+`compiler-tests` executables with the checked lockfile. The campaign receives
+that manager explicitly and runs 18 resolver checks, 29 package integration
+cases and 28 checked-release/distribution cases. Completed cases must match
+the reviewed structural inventory. The metadata job also runs eight publishing
+regression checks without creating releases.
+
+The workflow retains `package-distribution-evidence` on success or failure,
+including build and verification reports, command diagnostics, coverage,
+reviewed inventory and cache metadata. The package job has a 90-minute hard
+limit and is required by **PR gate** alongside compiler smoke.
 
 ## Run locally
 

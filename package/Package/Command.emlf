@@ -5,12 +5,14 @@ import qualified Package.OS as O
 import qualified Package.Json as J
 import qualified Package.Manifest as M
 import qualified Package.Build as B
+import qualified Package.Distribution as Distribution
 
 usage : String
-usage = "Usage: mlfpkg [--manifest FILE] [--build-dir DIR] [--cache-dir DIR] [--compiler TOOL] [--clang TOOL]\n              [--pkg-config TOOL] [--runtime FILE] [--gc-prefix DIR] [--timeout SECONDS] [--locked]\n              [--pgo-generate TARGET | --pgo-target TARGET --pgo-use FILE]\n              plan | lock | build [--target NAME ...] | test [--target NAME ...] | run NAME [-- ARGS...]\nLocal package manifests: mlf-package.json. All package orchestration is implemented in MLF.\n"
+usage = "Usage: mlfpkg [--manifest FILE] [--build-dir DIR] [--cache-dir DIR] [--compiler TOOL] [--clang TOOL]\n              [--pkg-config TOOL] [--runtime FILE] [--gc-prefix DIR] [--timeout SECONDS] [--locked] [--offline]\n              [--pgo-generate TARGET | --pgo-target TARGET --pgo-use FILE]\n              plan | lock | build [--target NAME ...] | test [--target NAME ...] | run NAME [-- ARGS...]\n              release DIRECTORY | pack RELEASE_DIRECTORY ASSET_FILE\nPackage manifests: mlf-package.json. Dependencies select local source, checked directories, or pinned GitHub release assets.\n"
 options : J.Json -> List String -> IO (Pair J.Json (List String))
 options config args = case args of
   Cons "--locked" rest -> options (J.set "locked" (J.Boolean true) config) rest
+  Cons "--offline" rest -> options (J.set "offline" (J.Boolean true) config) rest
   Cons option (Cons value rest) -> if S.elem eqString option (O.words "--manifest --build-dir --cache-dir --compiler --clang --pkg-config --runtime --gc-prefix --timeout --pgo-generate --pgo-target --pgo-use") then options (J.set (O.drop 2 option) (J.str value) config) rest else ioReturn (Pair config args)
   _ -> ioReturn (Pair config args)
 selections : List String -> List String -> IO (List String)
@@ -110,18 +112,21 @@ run args = do
   Pair config command <- options (B.info (Cons (Pair "compiler" (J.str compiler)) (Cons (Pair "clang" (J.str clang)) (Cons (Pair "gc-prefix" (J.str gc)) Nil)))) args
   case command of
     Cons "--help" Nil -> putStr usage
+    Cons "pack" (Cons directory (Cons output Nil)) -> do
+      pins <- Distribution.pack directory output
+      putStrLn (J.render pins)
     Cons action rest -> do
-      O.require (S.elem eqString action (O.words "plan lock build test run")) usage
+      O.require (S.elem eqString action (O.words "plan lock build test run release")) usage
       let manifest = J.getText "manifest" "mlf-package.json" config
       path <- canonicalPath manifest
       let packageDir = O.parent path
       let buildDir = J.getText "build-dir" (packageDir ++ "/.mlf-build") config
-      let building = S.elem eqString action (O.words "build test run")
+      let building = S.elem eqString action (O.words "build test run release")
       if building then O.mkdir buildDir else ioReturn Unit
       dir <- if building then canonicalPath buildDir else ioReturn buildDir
       lock <- if building then acquireFileLock (dir ++ "/.lock") else ioReturn (0 - 1)
       if building then J.write (dir ++ "/build-report.json") (B.obj2 "complete" (J.Boolean false) "implementation" (J.str "MLF")) else ioReturn Unit
-      graph <- M.load path
+      graph <- M.loadWith path (J.set "cache-dir" (J.getOr "cache-dir" (J.str (dir ++ "/cache")) config) config)
       snapshot <- M.snapshot graph
       let p = M.rootPackage graph
       let lockPath = M.packageRoot p ++ "/mlf.lock"
@@ -131,6 +136,16 @@ run args = do
         crates <- M.cratePlan graph
         putStrLn (J.render (J.set "crates" crates (J.set "modules" (J.stringArray (S.map M.moduleName (M.modules graph))) (J.set "executables" (J.stringArray (M.keys (J.getObject "executables" (M.packageData p)))) (J.set "tests" (J.stringArray (M.keys (J.getObject "tests" (M.packageData p)))) snapshot)))))
       else if eqString action "lock" then do { O.require (S.null rest) usage; J.write lockPath snapshot; putStrLn lockPath }
+      else if eqString action "release" then case rest of
+        Cons destination Nil -> do
+          compilerSettings <- configureCompiler p dir config
+          settings <- configureGC (M.packageRoot p) compilerSettings
+          b <- B.create graph settings dir
+          B.releasePackage b destination
+          B.finish b
+          releaseFileLock lock
+          putStrLn ("release passed: " ++ destination)
+        _ -> O.fatal usage
       else do
         let targets = J.getObject (if eqString action "test" then "tests" else "executables") (M.packageData p)
         selected <- if eqString action "run" then case rest of { Cons name _ -> ioReturn (Cons name Nil); Nil -> O.fatal usage } else selections Nil rest

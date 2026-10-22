@@ -6,6 +6,7 @@ import qualified Bootstrap.Host as Host
 import qualified Package.OS as O
 import qualified Package.Json as J
 import qualified Package.Manifest as M
+import qualified Package.Release as R
 
 data Builder = Builder M.PackageGraph J.Json String J.Json J.Json
 config : Builder -> J.Json
@@ -380,8 +381,21 @@ libraryLoop : Builder -> Bool -> List (Pair String String) -> List M.Package -> 
 libraryLoop b noPrelude done pending = case pending of
   Nil -> ioReturn done
   Cons p rest -> if S.null (M.packageModules p) then libraryLoop b noPrelude done rest else do
-    artifact <- compileCrate b p "library" "" (M.packageModules p) (directLibraries p done) noPrelude
+    artifact <- if M.isRelease p then do
+      path <- R.materializePinned (M.packageRoot p) (J.getText "release-sha256" "" (M.packageData p)) (cacheDirectory b) (J.getText "sha256" "" (J.get "compiler" (tools b))) noPrelude
+      digest <- fileDigest (M.packagePath p)
+      O.require (eqString digest (J.getText "release-sha256" "" (M.packageData p))) "release manifest SHA-256 changed during import"
+      record b "releases" (info (Cons (Pair "crate" (J.str (M.crateIdentity p "library"))) (Cons (Pair "sha256" (J.get "release-sha256" (M.packageData p))) (Cons (Pair "metadata" (J.str (path ++ "/unit.mlfci"))) (Cons (Pair "inferred_groups" (J.num 0)) Nil)))))
+      ioReturn path
+      else compileCrate b p "library" "" (M.packageModules p) (directLibraries p done) noPrelude
     libraryLoop b noPrelude (S.snoc done (Pair (M.packageName p) artifact)) rest
+releasePackage b destination = do
+  let p = M.rootPackage (graph b)
+  O.require (S.not (S.null (M.packageModules p))) "release requires a package library"
+  built <- libraries b false
+  let artifact = S.fromMaybe (panic "missing release library") (S.lookup eqString (M.packageName p) built)
+  verifyInputs b
+  R.publish (artifact ++ "/unit.mlfci") (J.getText "sha256" "" (J.get "compiler" (tools b))) false (M.packageName p) (J.getText "version" "" (M.packageData p)) destination
 runtimeObject : Builder -> J.Json -> IO String
 runtimeObject b gc = runtimeObjectWithPgo b gc J.empty
 runtimeObjectWithPgo : Builder -> J.Json -> J.Json -> IO String
@@ -474,8 +488,8 @@ buildTarget b p name target publish = do
   ioReturn (Pair (if publish then binary else executable b (artifact ++ "/program")) artifact)
 verifyHashes : J.Json -> IO Unit
 verifyHashes values = S.mapM_ (\entry -> do { actual <- fileDigest (S.fst entry); O.require (eqString actual (J.text (S.snd entry))) ("input changed during build/test: " ++ S.fst entry) }) (J.items values)
-finish : Builder -> IO Unit
-finish b = do
+verifyInputs : Builder -> IO Unit
+verifyInputs b = do
   verifyPgo (J.getObject "native-pgo" (config b))
   snapshot <- M.snapshot (graph b)
   O.require (J.equal snapshot (initial b)) "package sources or manifests changed during build/test"
@@ -491,4 +505,8 @@ finish b = do
   else ioReturn Unit
   report <- J.read (reportPath b)
   S.mapM_ (\value -> do { verifyHashes (J.get "libraries" value); verifyHashes (J.get "headers" value) }) (J.values (J.getOr "native_inputs" (J.Array Nil) report))
+finish : Builder -> IO Unit
+finish b = do
+  verifyInputs b
+  report <- J.read (reportPath b)
   J.write (reportPath b) (J.set "complete" (J.Boolean true) report)
