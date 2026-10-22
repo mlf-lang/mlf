@@ -55,8 +55,8 @@ digestKey directory key = do
   fileDigest (directory ++ "/query-key.new")
 saltedKey compiler key = Separate.pack (Cons "MLF-CODEGEN-QUERY-1" (Cons compiler (Cons key Nil)))
 reportJSON result = "{\"format\":1,\"input_reused\":" ++ Query.boolean (inputReused result) ++ ",\"optimized_reused\":" ++ Query.boolean (optimizedReused result) ++ ",\"compiler\":" ++ Query.jsonString (compilerDigest result) ++ ",\"input_key\":" ++ Query.jsonString (inputDigest result) ++ ",\"optimized_key\":" ++ Query.jsonString (optimizedDigest result) ++ "}\n"
-saveReport directory result = do
-  saved <- Query.writeCache (directory ++ "/last-query.json") (reportJSON result)
+saveReport path result = do
+  saved <- Query.writeCache path (reportJSON result)
   ioReturn (mapEither (\_ -> result) saved)
 
 emitLocked directory compiler requireIO checked inputKey = do
@@ -65,7 +65,7 @@ emitLocked directory compiler requireIO checked inputKey = do
   let inputPath = directory ++ "/inputs/" ++ inputId ++ ".mlfcg"
   cached <- readCached directory inputPath input
   case cached of
-    Right (Triple chunks _ optimizedId) -> saveReport directory (CodegenResult chunks true false inputId optimizedId compiler)
+    Right (Triple chunks _ optimizedId) -> ioReturn (Right (CodegenResult chunks true false inputId optimizedId compiler))
     Left _ -> case LLVM.prepareChecked requireIO checked of
       Left error -> ioReturn (Left error)
       Right prepared -> do
@@ -93,7 +93,7 @@ emitLocked directory compiler requireIO checked inputKey = do
             saved <- Query.writeCache inputPath (encodeCached input hash optimizedId)
             case saved of
               Left error -> ioReturn (Left error)
-              Right _ -> saveReport directory (CodegenResult chunks false hit inputId optimizedId compiler)
+              Right _ -> ioReturn (Right (CodegenResult chunks false hit inputId optimizedId compiler))
 
 emitChecked : String -> Bool -> Checked.CheckedTerm -> IO (Either String CodegenResult)
 emitChecked directory requireIO checked = emitWithKey directory requireIO checked (LLVM.checkedInputKey requireIO checked)
@@ -115,10 +115,22 @@ emitWithKey directory requireIO checked key = case key of
 emitCheckedChunks directory requireIO checked = do
   result <- emitChecked directory requireIO checked
   ioReturn (mapEither codeChunks result)
-emitFile directory requireIO path = do
+-- Reports are explicit invocation outputs. They are never mutable cache-wide
+-- state: callers can emit different targets concurrently without attribution
+-- races after the emission lock has been released.
+emitFileResult directory requireIO path = do
   checked <- Artifact.linkCheckedFile path
   case checked of
     Left error -> ioReturn (Left error)
     Right term -> do
-      result <- emitCrateChecked directory requireIO term
-      ioReturn (mapEither codeChunks result)
+      emitCrateChecked directory requireIO term
+emitFile directory requireIO path = do
+  result <- emitFileResult directory requireIO path
+  ioReturn (mapEither codeChunks result)
+emitFileReport directory requireIO path report = do
+  result <- emitFileResult directory requireIO path
+  case result of
+    Left error -> ioReturn (Left error)
+    Right generated -> do
+      saved <- saveReport report generated
+      ioReturn (mapEither codeChunks saved)

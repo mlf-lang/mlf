@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Relocation must discover the packaged helper without a checkout override.
+unset MLF_BUILD_RUNNER MLF_BUILD_REPORT
 package=$(cd -- "${1:?package directory required}" && pwd)
 work=$(mktemp -d "${TMPDIR:-/tmp}/mlf release smoke.XXXXXX")
 trap 'rm -rf "$work"' EXIT
@@ -8,6 +10,8 @@ bin="$work/prefix with ' quote/bin"
 cd "$work"
 "$bin/emlf" --version
 "$bin/mlfpkg" --version
+runner=$(find "$work/prefix with ' quote/lib/mlf" -name mlf-build-runner -type f)
+test "$("$runner" --protocol-version)" = 1
 "$bin/emlf" --type --expr '\x -> x' | grep -q -- '->'
 cat > Main.emlf <<'MLF'
 module Main where
@@ -33,7 +37,7 @@ cmp expected compiled
 cat > mlf-package.json <<'JSON'
 {"format":1,"name":"release-smoke","version":"0.1.0","library":{"modules":{"Message":"Message.emlf"}},"executables":{"hello":{"main":"Main.emlf"}},"tests":{"hello":{"main":"Main.emlf","stdout":"native release\n"}}}
 JSON
-MLF_COMPILER="$bin/emlf" "$bin/mlfpkg" test > package.log
+MLF_COMPILER="$bin/emlf" "$bin/mlfpkg" --jobs 2 test > package.log
 grep -q 'test passed' package.log
 # A second install is safe, and an unrelated existing command is preserved.
 "$package/install.sh" "$work/prefix with ' quote" >/dev/null

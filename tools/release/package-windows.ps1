@@ -21,7 +21,7 @@ Assert-Release ($LASTEXITCODE -eq 0 -and $status.Count -eq 0) 'Commit release so
 $commit = (& git -C $root rev-parse HEAD).Trim()
 $version = (Get-Content "$root/VERSION" -Raw).Trim()
 Assert-Release ($version -match '^\d+\.\d+\.\d+$') 'Invalid release VERSION'
-foreach ($path in @('mlf-package.json','bootstrap/mlf-package.json','package/mlf-package.json','tests/mlf-package.json')) {
+foreach ($path in (@('mlf-package.json','tests/mlf-package.json') + @(Get-ChildItem "$root/libraries/*/mlf-package.json" | ForEach-Object { [IO.Path]::GetRelativePath($root,$_.FullName) }))) {
     Assert-Release ((Read-ReleaseJson "$root/$path").version -eq $version) "Version mismatch: $path"
 }
 Assert-Release ((Get-Content "$root/CHANGELOG.md" -Raw) -match "(?m)^## $([regex]::Escape($version)) ") 'Missing versioned changelog entry'
@@ -31,6 +31,8 @@ $compilerHash = Get-ReleaseHash "$Build/bin/emlf.exe"
 $managerHash = Get-ReleaseHash "$Build/bin/mlfpkg.exe"
 Assert-Release ($qualification.compiler_sha256 -eq $compilerHash -and $qualification.manager_sha256 -eq $managerHash) 'Release tools differ from the qualified binaries'
 Assert-Release ($qualification.helper_sha256 -eq (Get-ReleaseHash "$Build/bin/mlf-host.exe")) 'Release host helper differs from qualification'
+Assert-Release ($qualification.build_runner_sha256 -eq (Get-ReleaseHash "$Build/bin/mlf-build-runner.exe")) 'Release build runner differs from qualification'
+Assert-Release ($qualification.build_runner_protocol -eq 1) 'Unsupported qualified build runner protocol'
 Assert-Release ($qualification.clang_sha256 -eq (Get-ReleaseHash $Clang)) 'Release smoke must use the qualified Clang'
 Assert-ReleaseSources $root $qualification.sources
 foreach ($entry in $qualification.dependencies.GetEnumerator()) { Assert-Release ((Get-ReleaseHash (Join-Path $NativePrefix $entry.Key)) -eq $entry.Value) "Native dependency changed after qualification: $($entry.Key)" }
@@ -40,7 +42,9 @@ foreach ($entry in $qualification.evidence.GetEnumerator()) {
 }
 Assert-Release ($qualification.tests.fixed_point.complete -eq $true -and $qualification.tests.fixed_point.reused_candidate_build -eq $false) 'Fresh native compiler and manager fixed point required'
 Assert-Release ($qualification.tests.fixed_point.stages -eq 2 -and $qualification.tests.fixed_point.tools.emlf.binary_sha256 -eq $compilerHash -and $qualification.tests.fixed_point.tools.mlfpkg.binary_sha256 -eq $managerHash) 'Fixed point report does not identify the released tools'
-Assert-Release ($qualification.tests.resolver.passed -eq 18 -and $qualification.tests.integration.passed -eq 29) 'All 47 native Windows package checks are required'
+Assert-Release ($qualification.tests.resolver.passed -eq 22 -and $qualification.tests.integration.passed -eq 29) 'All 51 native Windows package checks are required'
+Assert-Release ($qualification.tests.target_dependencies.passed -eq 1 -and $qualification.tests.target_dependencies.compiler_sha256 -eq $compilerHash -and $qualification.tests.target_dependencies.manager_sha256 -eq $managerHash) 'Target dependency namespace and instance checks are required'
+Assert-Release ($qualification.tests.build_runner.passed -eq 22 -and $qualification.tests.build_runner.sha256 -eq $qualification.build_runner_sha256 -and $qualification.tests.build_runner.protocol -eq 1) 'All 22 native build runner lifecycle checks are required'
 Assert-Release ($qualification.tests.resolver.manager_sha256 -eq $managerHash -and $qualification.tests.integration.compiler_sha256 -eq $compilerHash -and $qualification.tests.integration.manager_sha256 -eq $managerHash) 'Package tests identify different tools'
 Assert-Release ($qualification.tests.parity.cases -eq 7086 -and $qualification.tests.parity.source_compilations -eq 7075 -and $qualification.tests.parity.shared_source_cases -eq 11 -and $qualification.tests.parity.runtime_executions -eq 160) 'Full independent compiler parity is required'
 Assert-Release ($qualification.tests.parity.compiler_sha256 -eq $compilerHash) 'Parity report identifies a different compiler'
@@ -52,7 +56,7 @@ foreach ($path in @('licenses/gmp-6.3.0/COPYING','licenses/gmp-6.3.0/COPYING.LES
 $name = "mlf-$version-windows-x64"
 $bundle = "$Output/$name"
 New-Item -ItemType Directory -Path "$bundle/bin","$bundle/runtime","$bundle/evidence","$bundle/licenses","$bundle/examples" -Force | Out-Null
-Copy-Item -LiteralPath "$Build/bin/emlf.exe","$Build/bin/mlfpkg.exe","$Build/bin/mlf-host.exe" -Destination "$bundle/bin"
+Copy-Item -LiteralPath "$Build/bin/emlf.exe","$Build/bin/mlfpkg.exe","$Build/bin/mlf-host.exe","$Build/bin/mlf-build-runner.exe" -Destination "$bundle/bin"
 foreach ($file in @('libgmp-10.dll','libgc-1.dll','libwinpthread-1.dll','pkg-config.exe','libpkgconf-8.dll')) { Copy-Item -LiteralPath "$NativePrefix/bin/$file" -Destination "$bundle/bin" }
 Copy-Item -LiteralPath "$NativePrefix/include","$NativePrefix/lib","$NativePrefix/licenses","$NativePrefix/sources" -Destination $bundle -Recurse -Force
 Copy-Item -Path "$root/runtime/*.c","$root/runtime/*.h" -Destination "$bundle/runtime"
@@ -71,7 +75,7 @@ foreach ($relative in @('examples/io-hello.emlf','examples/modules/Main.emlf','e
 }
 Copy-Item -LiteralPath "$Evidence/release-validation.json" -Destination "$bundle/evidence"
 foreach ($file in $qualification.evidence.Keys) { Copy-Item -LiteralPath (Join-Path $Evidence $file) -Destination "$bundle/evidence" }
-$release = [ordered]@{schema_version=1;version=$version;commit=$commit;platform='windows-x64';compiler_sha256=$compilerHash;manager_sha256=$managerHash;host_helper_sha256=$qualification.helper_sha256;qualification='evidence/release-validation.json';compiler_parity_cases=7086;compiler_source_compilations=7075;compiler_shared_source_cases=11;compiler_runtime_executions=160;package_resolver_tests=18;package_integration_cases=29;native_fixed_point=@('emlf','mlfpkg');runtime_profiles=@('compact-gc');internal_compiler_release_groups='POSIX transports; not qualified on Windows';external_tools=@('PowerShell 7 for helper scripts','MinGW-targeting Clang for native compilation')}
+$release = [ordered]@{schema_version=1;version=$version;commit=$commit;platform='windows-x64';compiler_sha256=$compilerHash;manager_sha256=$managerHash;host_helper_sha256=$qualification.helper_sha256;build_runner_sha256=$qualification.build_runner_sha256;build_runner_protocol=1;qualification='evidence/release-validation.json';compiler_parity_cases=7086;compiler_source_compilations=7075;compiler_shared_source_cases=11;compiler_runtime_executions=160;package_resolver_tests=22;package_integration_cases=29;target_dependency_cases=1;build_runner_lifecycle_cases=22;native_fixed_point=@('emlf','mlfpkg');runtime_profiles=@('compact-gc');internal_compiler_release_groups='POSIX transports; not qualified on Windows';external_tools=@('PowerShell 7 for helper scripts','MinGW-targeting Clang for native compilation')}
 Write-ReleaseJson "$bundle/release.json" $release
 [IO.File]::WriteAllText("$bundle/README.md", @'
 # MLF native Windows developer preview
@@ -92,7 +96,7 @@ Build-Program.ps1 compiles a standalone .emlf source into a native .exe.
 release.json identifies the source commit and unchanged qualified executables.
 CHECKSUMS covers every bundled file. evidence/ records a native fixed point for
 both tools, all 7,086 independent parity cases, 160 compiler runtime executions,
-the compact-GC runtime, and 47 package cases. The compiler repository's six
+the compact-GC runtime, 52 package cases, and 22 build runner lifecycle cases. The compiler repository's six
 internal POSIX release/benchmark groups are not qualified on Windows.
 
 MLF is BSD-3-Clause. Dependency notices and redistribution sources are bundled

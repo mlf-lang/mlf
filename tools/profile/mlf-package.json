@@ -3,8 +3,20 @@
   "name": "mlf-phase-profile",
   "version": "0.1.0",
   "dependencies": {
-    "mlf-bootstrap": {
-      "path": "../../bootstrap"
+    "mlf-foundation": {
+      "path": "../../libraries/mlf-foundation"
+    },
+    "mlf-frontend": {
+      "path": "../../libraries/mlf-frontend"
+    },
+    "mlf-inference": {
+      "path": "../../libraries/mlf-inference"
+    },
+    "mlf-llvm": {
+      "path": "../../libraries/mlf-llvm"
+    },
+    "mlf-xmlf": {
+      "path": "../../libraries/mlf-xmlf"
     }
   },
   "library": {

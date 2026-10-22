@@ -52,7 +52,7 @@ walk path = do
     ioReturn (S.concat nested)
 sources : String -> IO J.Json
 sources r = do
-  nested <- S.mapM (\dir -> walk (r ++ "/" ++ dir)) (O.words "scripts runtime bootstrap package examples benchmarks tests")
+  nested <- S.mapM (\dir -> walk (r ++ "/" ++ dir)) (O.words "scripts runtime bootstrap package libraries examples benchmarks tests")
   let paths = S.filter (\p -> O.starts (r ++ "/benchmarks/") p || S.any (\suffix -> O.ends suffix p) (O.words ".hs .emlf .c .h .ps1 .sh .expected .json .gz")) (S.concat nested)
   hashes <- B.hashFiles (S.append paths (Cons (r ++ "/mlfpkg") (Cons (r ++ "/mlf-package.json") Nil)))
   ioReturn (J.Object (S.map (\entry -> Pair (O.relative r (S.fst entry)) (S.snd entry)) (J.items hashes)))
@@ -118,11 +118,30 @@ unit c = do
  suite c "harness" (Cons "58 native benchmark/bootstrap/release harness tests passed" Nil)
  suite c "core" (Cons "686 checks; 0 failures" (Cons "Oracle: 6712 cases; 6703 executions" Nil))
  suite c "figure12" (Cons "43/43 expressions match regression expectations; 0 failures" (Cons "41 distinct Figure12 executions" (Cons "36 supplementary checks; 0 failures" Nil)))
+buildRunnerTests : TestContext -> IO Unit
+buildRunnerTests c = do
+ windows <- O.isWindows
+ let suffix = if windows then ".exe" else ""
+ let flags = if windows then Cons "-municode" Nil else Nil
+ S.mapM_ (\name -> run c (S.append (O.words "clang -O2 -std=c11 -Wall -Wextra -Werror") (S.append flags (Cons (root c ++ "/tests/native/" ++ O.replace "-" "_" name ++ ".c") (Cons "-o" (Cons (output c ++ "/" ++ name ++ suffix) Nil)))))) (O.words "build-runner-fixture build-runner-tests")
+ manager <- getExecutablePath
+ configuredRunner <- O.envDefault "MLF_BUILD_RUNNER" (O.parent manager ++ "/mlf-build-runner")
+ runner <- O.executable configuredRunner
+ let log = output c ++ "/build-runner.log"
+ capture c (Cons (output c ++ "/build-runner-tests" ++ suffix) (Cons runner (Cons (output c ++ "/build-runner-fixture" ++ suffix) (Cons (output c ++ "/build-runner-work") Nil)))) log
+ text <- readFile log
+ let expectation = "22 native build runner tests passed"
+ O.require (contains expectation text) "build runner lifecycle coverage summary is missing"
+ hash <- fileDigest log
+ saved <- J.read (report c)
+ record c "suites" (J.set "build-runner" (B.obj2 "log_sha256" (J.str hash) "coverage" (J.stringArray (Cons expectation Nil))) (J.getObject "suites" saved))
+ putStr text
 packages : TestContext -> IO Unit
 packages c = do
+ buildRunnerTests c
  setEnv "MLF_TEST_WORK" (output c)
  setEnv "MLF_TEST_ROOT" (output c)
- suite c "packages" (Cons "18 package resolver tests passed" (Cons "29 package integration cases passed" Nil))
+ suite c "packages" (Cons "22 package resolver tests passed" (Cons "29 package integration cases passed" (Cons "1 target dependency integration test passed" Nil)))
 testBuilder : TestContext -> String -> IO B.Builder
 testBuilder c name = do
  graph <- M.load (root c ++ "/mlf-package.json")
@@ -137,7 +156,7 @@ driverIR c builder name = do
  -- Share the verified source frontend output. The crate-linked interpreter
  -- regressed the nested compiler workloads despite identical fixture targets.
  B.cached builder ("source " ++ name ++ " LLVM") identity (\work -> do
-  ignored <- B.capture builder (root c) (Cons (compiler c) (Cons "-i" (Cons (root c ++ "/bootstrap") (Cons "--emit-llvm-gc" (Cons entry Nil))))) "" (work ++ "/program.ll")
+  ignored <- B.capture builder (root c) (S.append (Cons (compiler c) Nil) (S.append (S.concatMap (\p -> Cons "-i" (Cons (M.packageRoot p) Nil)) (M.packages (B.graph builder))) (Cons "--emit-llvm-gc" (Cons entry Nil)))) "" (work ++ "/program.ll")
   text <- readFile (work ++ "/program.ll")
   O.require (stringLength text > 0) "test driver emitted empty LLVM")
 prepareDrivers : TestContext -> Bool -> IO (List String)
@@ -396,7 +415,7 @@ selfHost c = do
   hash <- fileDigest (compiler c)
   -- A shared store can contain equal native binaries from different LLVM
   -- inputs. Select the candidate's actual producer, not the first hash match.
-  let producer = O.parent (O.parent (compiler c)) ++ "/build-report.json"
+  producer <- O.envDefault "MLF_BUILD_REPORT" (O.parent (O.parent (compiler c)) ++ "/build-report.json")
   present <- fileExists producer
   O.require present "candidate package build report is missing"
   let provenance = output c ++ "/candidate-build-report.json"
@@ -462,8 +481,11 @@ main args = case args of
     hash <- fileDigest compiler
     manager <- getExecutablePath
     managerHash <- fileDigest manager
+    configuredRunner <- O.envDefault "MLF_BUILD_RUNNER" (O.parent manager ++ "/mlf-build-runner")
+    runner <- O.executable configuredRunner
+    runnerHash <- fileDigest runner
     let identity = B.info (Cons (Pair "complete" (J.Boolean false)) (Cons (Pair "implementation" (J.str "MLF")) (Cons (Pair "group" (J.str group)) (Cons (Pair "compiler" (J.str compiler)) (Cons (Pair "compiler_sha256" (J.str hash)) (Cons (Pair "sources" sourceHashes) Nil))))))
-    J.write (report c) (J.set "requested_profiles" (J.stringArray profiles) (J.set "manager_sha256" (J.str managerHash) (J.set "manager" (J.str manager) identity)))
+    J.write (report c) (J.set "build_runner_sha256" (J.str runnerHash) (J.set "requested_profiles" (J.stringArray profiles) (J.set "manager_sha256" (J.str managerHash) (J.set "manager" (J.str manager) identity))))
     setEnv "MLF_PACKAGE_MANAGER" manager
     clearDrivers
     setEnv "MLF_BOOTSTRAP_COMPILER" compiler
@@ -478,6 +500,8 @@ main args = case args of
     O.require (eqString hash current) "compiler changed during validation"
     currentManager <- fileDigest manager
     O.require (eqString managerHash currentManager) "package manager changed during validation"
+    currentRunner <- fileDigest runner
+    O.require (eqString runnerHash currentRunner) "build runner changed during validation"
     record c "complete" (J.Boolean true)
     putStrLn ("Compiler package " ++ group ++ " passed")
   Nil -> O.fatal "missing compiler test group"

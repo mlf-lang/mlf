@@ -6,6 +6,7 @@ import qualified Bootstrap.CrateArtifact as Artifact
 import qualified Package.OS as O
 import qualified Package.Json as J
 import qualified Package.Build as B
+import qualified Package.Manifest as M
 import qualified Tests.Basic as H
 import qualified Tests.Basic as Sys
 
@@ -34,6 +35,11 @@ expect c args success reason = do
 manifest c = J.read (work c ++ "/app/mlf-package.json")
 edit c f = do { before <- manifest c; J.write (work c ++ "/app/mlf-package.json") (f before) }
 report c = J.read (output c ++ "/build-report.json")
+buildRow kind saved = S.fromMaybe (panic ("missing build action " ++ kind)) (S.find (\row -> eqString (J.getText "kind" "" row) kind) (J.values (J.get "builds" saved)))
+crateRow identity saved = S.fromMaybe (panic ("missing crate action " ++ identity)) (S.find (\row -> eqString (J.getText "crate" "" row) identity) (J.values (J.get "crates" saved)))
+codegenRow identity saved =
+ let metadata = J.getText "metadata" "" (crateRow identity saved) in
+ S.fromMaybe (panic ("missing codegen action " ++ identity)) (S.find (\row -> eqString (J.getText "metadata" "" row) metadata) (J.values (J.get "codegen" saved)))
 runBinary c expected = do
  code <- O.exec (work c) (Cons (program c) Nil) "" (work c ++ "/program.out") (work c ++ "/program.err") 60
  out <- readFile (work c ++ "/program.out")
@@ -53,9 +59,109 @@ dependencyPathShapes = do
  S.mapM_ (\path -> do
   H.assert (S.not (B.validDependencyShape (receipt path))) ("relative dependency path accepted: " ++ path)
   case B.mergeDependencyProof J.empty (receipt path) of {Left _ -> ioReturn Unit; Right _ -> H.fail "relative path entered a dependency proof"}) relative
+-- The result belongs to the action that produced it even after another
+-- worker records a different cache hit. Reports merge only when requested by
+-- the coordinator, in the order supplied rather than completion order.
+isolatedActionResults directory = do
+ let cache = directory ++ "/isolated-cache"
+ O.mkdir (cache ++ "/.locks")
+ let p = M.Package (directory ++ "/mlf-package.json") J.empty Nil
+ let graph = M.PackageGraph p (Cons p Nil) Nil
+ let base = B.Builder graph (B.obj1 "cache-dir" (J.str cache)) directory J.empty J.empty
+ coordinator <- B.isolate base (directory ++ "/coordinator")
+ first <- B.isolate coordinator (directory ++ "/worker-first")
+ second <- B.isolate coordinator (directory ++ "/worker-second")
+ one <- B.cachedResult first "isolation fixture" J.empty (\path -> writeFile (path ++ "/value") "checked artifact")
+ two <- B.cachedResult second "isolation fixture" J.empty (\_ -> H.fail "shared checked cache unexpectedly rebuilt")
+ H.assert (eqString (B.artifactPath one) (B.artifactPath two) && S.not (J.getBool "cached" true one) && J.getBool "cached" false two) "isolated actions lost their own cache provenance"
+ H.assert (J.has "value" (J.get "files" one) && J.equal (J.get "files" one) (J.get "files" two)) "action results omitted artifact checksums"
+ originalValid <- B.validActionResult one
+ H.assert originalValid "fresh action receipt failed final validation"
+ before <- J.read (B.reportPath coordinator)
+ H.assert (S.null (J.values (J.get "builds" before))) "worker wrote the coordinator report"
+ B.mergeReports coordinator (Cons second (Cons first Nil))
+ merged <- J.read (B.reportPath coordinator)
+ H.assert (J.equal (J.Array (S.map (J.get "cached") (J.values (J.get "builds" merged)))) (J.Array (Cons (J.Boolean true) (Cons (J.Boolean false) Nil)))) "coordinator report did not retain the requested logical order"
+ writeFile (B.artifactPath one ++ "/value") "corrupted"
+ corruptValid <- B.validActionResult one
+ H.assert (S.not corruptValid) "final validation accepted a changed action artifact"
+ three <- B.cachedResult first "isolation fixture" J.empty (\path -> writeFile (path ++ "/value") "checked artifact")
+ H.assert (S.not (J.getBool "cached" true three) && J.equal (J.get "files" one) (J.get "files" three)) "isolated action accepted corruption or changed repaired bytes"
+ let path = B.artifactPath three
+ stamp <- J.read (path ++ "/artifact.json")
+ writeFile (path ++ "/value") "replacement with a new receipt"
+ replacementHash <- fileDigest (path ++ "/value")
+ J.write (path ++ "/artifact.json") (J.set "files" (J.set "value" (J.str replacementHash) (J.get "files" stamp)) stamp)
+ ownValid <- B.cacheValid path (J.getText "key" "" three)
+ replacementValid <- B.validActionResult three
+ H.assert (ownValid && S.not replacementValid) "final validation accepted bytes different from the completed worker receipt"
+ writeFile (path ++ "/value") "checked artifact"
+ J.write (path ++ "/artifact.json") stamp
+ let dependency = directory ++ "/publication-dependency"
+ writeFile dependency "original dependency"
+ dependencyHash <- fileDigest dependency
+ artifact <- B.cachedResult first "publication fixture" J.empty (\work -> do
+  writeFile (work ++ "/program") "program"
+  writeFile (work ++ "/unit.mlfci") "metadata"
+  writeFile (work ++ "/unit.mlfco") "object"
+  J.write (work ++ "/dependency-files.json") (B.obj1 dependency (J.str dependencyHash)))
+ let publication = J.set "binary" (J.str (B.artifactPath artifact ++ "/program")) artifact
+ publicationValid <- B.validActionResult publication
+ H.assert publicationValid "valid executable closure failed final validation"
+ writeFile dependency "changed during command tests"
+ changedClosure <- B.validActionResult publication
+ H.assert (S.not changedClosure) "final validation accepted an executable with a changed dependency closure"
+-- Fail a later rename after replacing an executable and a companion and adding
+-- a new file. Also replay a journal left between renames, as after interruption.
+publicationTransactions directory = do
+ let build = directory ++ "/publication transaction  spaces"
+ let bin = build ++ "/bin"
+ let source = directory ++ "/publication-sources"
+ O.mkdir bin
+ O.mkdir source
+ S.mapM_ (\name -> writeFile (bin ++ "/" ++ name) ("old " ++ name)) (O.words "alpha beta companion.dll unrelated")
+ rows <- S.mapM (\name -> do
+  let path = source ++ "/" ++ name
+  writeFile path ("new " ++ name)
+  digest <- fileDigest path
+  ioReturn (B.publicationFile name path digest)) (O.words "alpha companion.dll added beta")
+ let failLater from to = if eqString (O.base to) "beta" then do
+       first <- readFile (bin ++ "/alpha")
+       H.assert (eqString first "new alpha") "publication failure did not occur after a real replacement"
+       ioReturn 1
+       else B.publicationMove from to
+ published <- B.publishFilesUsing build failLater rows
+ H.assert (S.not published) "publication accepted a failed later rename"
+ S.mapM_ (\name -> do
+  actual <- readFile (bin ++ "/" ++ name)
+  H.assert (eqString actual ("old " ++ name)) ("publication rollback changed " ++ name)) (O.words "alpha beta companion.dll unrelated")
+ added <- fileExists (bin ++ "/added")
+ H.assert (S.not added) "publication rollback retained a newly published file"
+ transaction <- B.preparePublications build rows
+ firstMove <- B.publicationMove (transaction ++ "/new/alpha") (bin ++ "/alpha")
+ addedMove <- B.publicationMove (transaction ++ "/new/added") (bin ++ "/added")
+ H.assert (firstMove == 0 && addedMove == 0) "interrupted publication fixture did not rename files"
+ B.recoverPublications build
+ S.mapM_ (\name -> do
+  actual <- readFile (bin ++ "/" ++ name)
+  H.assert (eqString actual ("old " ++ name)) ("interrupted publication recovery changed " ++ name)) (O.words "alpha beta companion.dll unrelated")
+ recoveredAdded <- fileExists (bin ++ "/added")
+ H.assert (S.not recoveredAdded) "interrupted publication recovery retained a new file"
+ committed <- B.preparePublications build rows
+ entries <- B.publicationEntries committed
+ success <- B.commitPublicationFiles build committed B.publicationMove entries
+ H.assert success "publication transaction failed without an injected error"
+ B.recoverPublications build
+ S.mapM_ (\name -> do
+  actual <- readFile (bin ++ "/" ++ name)
+  H.assert (eqString actual ("new " ++ name)) ("committed publication recovery reverted " ++ name)) (O.words "alpha beta companion.dll added")
+ unrelated <- readFile (bin ++ "/unrelated")
+ H.assert (eqString unrelated "old unrelated") "publication transaction changed an unrelated file"
 integration : IO Unit
 integration = Sys.withScratch (\dir -> do
  dependencyPathShapes
+ isolatedActionResults dir
+ publicationTransactions dir
  root <- canonicalPath "."
  manager <- getEnv "MLF_PACKAGE_MANAGER"
  compiler <- getEnv "MLF_BOOTSTRAP_COMPILER"
@@ -81,8 +187,9 @@ integration = Sys.withScratch (\dir -> do
  tested <- report c
  H.assert (J.equal (J.get "backends" (S.head (J.values (J.get "tests" tested)))) (J.stringArray (Cons "interpreter" (Cons "llvm" Nil)))) "package test missed a backend"
  passed "expected output checked on interpreter and LLVM"
- let rows = J.values (J.get "builds" initial)
- let artifact = output c ++ "/cache/" ++ J.getText "key" "" (S.last rows)
+ currentManifest <- manifest c
+ let executableKind = "executable " ++ J.getText "name" "" currentManifest ++ ":hello"
+ let artifact = output c ++ "/cache/" ++ J.getText "key" "" (buildRow executableKind initial)
  let source = work c ++ "/app/message/Message.emlf"
  original <- readFile source
  Sys.removeFile source
@@ -94,7 +201,7 @@ integration = Sys.withScratch (\dir -> do
  writeFile source (O.replace "render (Message text) = text" "render (Message text) = text ++ \" updated\"" original)
  expect c (Cons "build" Nil) true ""
  changed <- report c
- H.assert (S.not (J.getBool "cached" true (S.last (J.values (J.get "builds" changed))))) "dependency implementation edit did not relink"
+ H.assert (S.not (J.getBool "cached" true (buildRow executableKind changed))) "dependency implementation edit did not relink"
  let downstream = S.filter (\row -> S.not (eqString (J.getText "crate" "" row) "message/0.1.0/library")) (J.values (J.get "crates" changed))
  H.assert (S.length downstream >= 2 && S.all (\row -> J.equal (J.get "inferred_groups" (J.get "queries" row)) (J.num 0)) downstream) "implementation-only change re-inferred downstream declarations"
  S.mapM_ (\row -> do
@@ -117,19 +224,19 @@ integration = Sys.withScratch (\dir -> do
  writeFile source original
  expect c (Cons "build" Nil) true ""
  passed "failed compilation preserves the last successful binary"
- let object = output c ++ "/cache/" ++ J.getText "key" "" (S.head rows) ++ "/unit.mlfco"
+ let object = output c ++ "/cache/" ++ J.getText "key" "" (buildRow "crate message/0.1.0/library" initial) ++ "/unit.mlfco"
  writeFile object "corrupted"
  expect c (Cons "build" Nil) true ""
  repaired <- report c
- H.assert (S.not (J.getBool "cached" true (S.head (J.values (J.get "builds" repaired))))) "tampered object reused"
+ H.assert (S.not (J.getBool "cached" true (buildRow "crate message/0.1.0/library" repaired))) "tampered object reused"
  runBinary c "Hello, local packages!\n"
  passed "tampered object is rebuilt and checked"
  O.remove (output c ++ "/cache/.queries/builtin-prelude")
  expect c (Cons "build" Nil) true ""
  restored <- report c
- H.assert (S.not (J.getBool "cached" true (S.head (J.values (J.get "builds" restored))))) "missing shared Prelude dependency reused an outer crate artifact"
+ H.assert (S.not (J.getBool "cached" true (buildRow "crate message/0.1.0/library" restored))) "missing shared Prelude dependency reused an outer crate artifact"
  runBinary c "Hello, local packages!\n"
- checkDependencyReceipts (output c ++ "/cache/" ++ J.getText "key" "" (S.head rows) ++ "/dependency-files.json")
+ checkDependencyReceipts (output c ++ "/cache/" ++ J.getText "key" "" (buildRow "crate message/0.1.0/library" initial) ++ "/dependency-files.json")
  passed "outer cache validates and repairs the shared Prelude dependency closure"
  O.copy compiler (exe c (dir ++ "/other compiler"))
  expect c (Cons "--compiler" (Cons (exe c (dir ++ "/other compiler")) (Cons "build" Nil))) true ""
@@ -198,24 +305,26 @@ sharedCacheCases parent root = do
  H.assert (eqString hash actual) "shared artifacts changed the executable"
  runBinary second "Hello, local packages!\n"
  passed "shared checked cache survives removal of the producing build directory"
- let row = S.head (J.values (J.get "crates" original))
+ let row = crateRow "message/0.1.0/library" original
  let metadata = J.getText "metadata" "" row
  writeFile (Artifact.objectPath metadata) "corrupted shared object"
  expect second args true ""
  repaired <- report second
- H.assert (S.not (J.getBool "cached" true (S.head (J.values (J.get "builds" repaired))))) "shared corrupt object reused"
+ H.assert (S.not (J.getBool "cached" true (buildRow "crate message/0.1.0/library" repaired))) "shared corrupt object reused"
  runBinary second "Hello, local packages!\n"
  O.remove (O.parent metadata ++ "/dependency-files.json")
  expect second args true ""
  repairedProof <- report second
- H.assert (S.not (J.getBool "cached" true (S.head (J.values (J.get "builds" repairedProof))))) "shared missing dependency receipt reused"
+ H.assert (S.not (J.getBool "cached" true (buildRow "crate message/0.1.0/library" repairedProof))) "shared missing dependency receipt reused"
  passed "shared object corruption and missing dependency proof trigger checked rebuilding"
  let source = directory ++ "/app/message/Message.emlf"
  originalSource <- readFile source
  writeFile source (O.replace "render (Message text) = text" "render (Message text) = text ++ \" shared\"" originalSource)
  expect first args true ""
  changed <- report first
- H.assert (S.not (J.getBool "cached" true (S.last (J.values (J.get "builds" changed))))) "shared cache ignored changed source"
+ currentManifest <- manifest first
+ let executableKind = "executable " ++ J.getText "name" "" currentManifest ++ ":hello"
+ H.assert (S.not (J.getBool "cached" true (buildRow executableKind changed))) "shared cache ignored changed source"
  runBinary first "Hello, local packages! shared\n"
  writeFile source originalSource
  expect first args true ""
@@ -316,7 +425,7 @@ crateCases parent = do
  erased <- report c
  let stages = J.values (J.get "builds" erased)
  H.assert (S.any (\row -> eqString (J.getText "kind" "" row) "LLVM emission" && S.not (J.getBool "cached" true row)) stages) "metadata-only edit did not exercise new LLVM emission"
- let generated = J.get "queries" (S.head (J.values (J.get "codegen" erased)))
+ let generated = J.get "queries" (codegenRow "crate-composition/0.1.0/target-hello" erased)
  H.assert (S.not (J.getBool "outer_cached" true generated) && J.getBool "input_reused" false generated) "type-only annotation change reran MLF code generation"
  S.mapM_ (\kind -> H.assert (S.any (\row -> eqString (J.getText "kind" "" row) kind && J.getBool "cached" false row) stages) ("unchanged emitted LLVM rebuilt " ++ kind)) (Cons "LLVM object" (Cons "native link" Nil))
  after <- fileDigest (program c)
@@ -326,7 +435,7 @@ crateCases parent = do
  writeFile (directory ++ "/app/A.emlf") (O.replace "unchanged = 7" "unchanged = 9" (O.replace "privateIdentity x = x" "privateIdentity x = if x then false else true" annotatedA))
  expect c (Cons "build" Nil) true ""
  irrelevant <- report c
- let entryQueries = J.get "queries" (S.head (J.values (J.get "codegen" irrelevant)))
+ let entryQueries = J.get "queries" (codegenRow "crate-composition/0.1.0/target-hello" irrelevant)
  let entryStages = J.values (J.get "builds" irrelevant)
  H.assert (S.not (J.getBool "outer_cached" true entryQueries) && J.getBool "input_reused" false entryQueries) "entry-independent implementation changes reran MLF optimization"
  H.assert (S.any (\row -> eqString (J.getText "kind" "" row) "LLVM emission" && S.not (J.getBool "cached" true row)) entryStages) "entry dependency test used an outer artifact hit"
@@ -414,10 +523,14 @@ pgoCase parent = do
  original <- fileDigest (program c)
  let nativeRows saved = S.filter (\row -> S.any (\kind -> eqString (J.getText "kind" "" row) kind) (Cons "LLVM object" (Cons "runtime object" (Cons "native link" Nil)))) (J.values (J.get "builds" saved))
  let nativeKeys saved = S.map (J.get "key") (nativeRows saved)
+ let selectedRuntime saved = J.getText "id" "" (S.fromMaybe (panic "missing selected runtime action") (S.find (\row -> eqString (J.getText "kind" "" row) "runtime" && eqString (J.getText "target" "" (J.getObject "profile" row)) "hello") (J.values (J.get "jobs" (S.head (J.values (J.get "scheduler" saved)))))))
+ let isSelected saved row = let identity = J.getText "job_id" "" row in eqString identity "object-e-hello" || eqString identity "link-e-hello" || eqString identity (selectedRuntime saved)
+ let selectedRows saved = S.filter (isSelected saved) (nativeRows saved)
+ let otherRows saved = S.filter (\row -> S.not (isSelected saved row)) (nativeRows saved)
  let emitted saved = S.map (J.get "key") (S.filter (\row -> eqString (J.getText "kind" "" row) "LLVM emission") (J.values (J.get "builds" saved)))
  expect c (O.words "--pgo-generate hello build") true ""
  instrumented <- report c
- H.assert (S.length (nativeRows instrumented) == 6 && S.all (J.getBool "cached" false) (S.drop 3 (nativeRows instrumented))) "PGO generation changed the unselected executable"
+ H.assert (S.length (selectedRows instrumented) == 3 && S.length (otherRows instrumented) == 3 && S.all (J.getBool "cached" false) (otherRows instrumented)) "PGO generation changed the unselected executable"
  H.assert (S.eqList J.equal (emitted initial) (emitted instrumented)) "native PGO changed MLF LLVM emission"
  let train name input expected = do
        let raw = directory ++ "/" ++ name ++ ".profraw"
@@ -444,8 +557,8 @@ pgoCase parent = do
  let use = S.append (O.words "--pgo-target hello --pgo-use") (Cons profile (Cons "build" Nil))
  expect c use true ""
  used <- report c
- H.assert (S.eqList J.equal (emitted initial) (emitted used) && S.all (J.getBool "cached" false) (S.drop 3 (nativeRows used))) "profile-use changed LLVM or the unselected target"
- let selected = S.head (nativeRows used)
+ H.assert (S.eqList J.equal (emitted initial) (emitted used) && S.all (J.getBool "cached" false) (otherRows used)) "profile-use changed LLVM or the unselected target"
+ let selected = S.fromMaybe (panic "missing selected native object") (S.find (\row -> eqString (J.getText "job_id" "" row) "object-e-hello") (nativeRows used))
  stamp <- J.read (output c ++ "/cache/" ++ J.getText "key" "" selected ++ "/artifact.json")
  H.assert (J.equal (J.get "sha256" (J.get "profile" (J.get "native-pgo" (J.get "inputs" stamp)))) (J.str firstHash)) "profile contents are absent from native cache provenance"
  expect c use true ""
@@ -459,8 +572,8 @@ pgoCase parent = do
  O.copy second profile
  expect c use true ""
  changed <- report c
- H.assert (S.all (\row -> S.not (J.getBool "cached" true row)) (S.take 3 (nativeRows changed)) && S.all (J.getBool "cached" false) (S.drop 3 (nativeRows changed))) "profile-content change failed to invalidate only the selected native stages"
- H.assert (S.not (S.eqList J.equal (S.take 3 (nativeKeys used)) (S.take 3 (nativeKeys changed)))) "profile content is absent from native keys"
+ H.assert (S.length (selectedRows changed) == 3 && S.length (otherRows changed) == 3 && S.all (\row -> S.not (J.getBool "cached" true row)) (selectedRows changed) && S.all (J.getBool "cached" false) (otherRows changed)) "profile-content change failed to invalidate only the selected native stages"
+ H.assert (S.not (S.eqList J.equal (S.map (J.get "key") (selectedRows used)) (S.map (J.get "key") (selectedRows changed)))) "profile content is absent from native keys"
  expect c (Cons "build" Nil) true ""
  ordinary <- report c
  restored <- fileDigest (program c)

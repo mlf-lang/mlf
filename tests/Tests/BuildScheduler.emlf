@@ -1,0 +1,179 @@
+module Tests.BuildScheduler where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+import qualified Package.Json as J
+import qualified Package.Build as B
+import qualified Tests.Basic as H
+import qualified Tests.Packages as P
+
+integer key value = case J.get key value of { J.Number n -> readInt n; _ -> -1 }
+seconds key value = case J.get key value of { J.Number n -> readDouble n; _ -> panic ("missing scheduler time " ++ key) }
+rows key saved = J.values (J.get key saved)
+identity row = J.getText "id" "" row
+findTask tasks name = S.fromMaybe (panic ("missing scheduler task " ++ name)) (S.find (\row -> eqString (identity row) name) tasks)
+keys saved = J.Object (S.map (\row -> Pair (J.getText "job_id" "" row) (J.get "key" row)) (rows "builds" saved))
+context parent suffix = P.Context (P.work parent) (P.manager parent) (P.compiler parent) (P.work parent ++ "/" ++ suffix) (P.windows parent)
+arguments cache jobs = Cons "--cache-dir" (Cons cache (Cons "--jobs" (Cons (showInt jobs) (Cons "build" Nil))))
+binary c name = P.exe c (P.output c ++ "/bin/" ++ name)
+runBinary c name expected = do
+ let stem = P.work c ++ "/program-" ++ name
+ code <- O.exec (P.work c) (Cons (binary c name) Nil) "" (stem ++ ".out") (stem ++ ".err") 60
+ out <- readFile (stem ++ ".out")
+ err <- readFile (stem ++ ".err")
+ H.assert (code == 0 && eqString out expected && eqString err "") ("scheduler executable output differs: " ++ name ++ ": " ++ out ++ err)
+digests c = S.mapM (\name -> do { hash <- fileDigest (binary c name); return (Pair name (J.str hash)) }) (O.words "normal bare")
+invocationDirectory saved = O.parent (J.getText "plan" "" (S.head (rows "scheduler" saved)))
+evidencePaths saved =
+ let scheduler = S.head (rows "scheduler" saved) in
+ let directory = invocationDirectory saved in
+ Cons (J.getText "plan" "" scheduler) (Cons (directory ++ "/context.json") (S.map (\job -> directory ++ "/jobs/" ++ identity job ++ "/result.json") (rows "jobs" scheduler)))
+hashEvidence paths = do
+ hashes <- S.mapM (\path -> do
+  present <- fileExists path
+  H.assert present ("earlier invocation evidence was removed: " ++ path)
+  digest <- fileDigest path
+  return (Pair path (J.str digest))) paths
+ return (J.Object hashes)
+checkGraph jobs saved = do
+ H.assert (J.getBool "complete" false saved) "scheduler build report is incomplete"
+ let plan = rows "jobs" (S.head (rows "scheduler" saved))
+ let outcome = S.head (rows "scheduler_results" saved)
+ let tasks = rows "tasks" outcome
+ let identifiers = S.map identity tasks
+ H.assert (J.getBool "complete" false outcome && integer "exit_code" outcome == 0 && integer "jobs" outcome == jobs) "scheduler result did not complete with the requested limit"
+ H.assert (integer "maximum_parallel_jobs" outcome > 0 && integer "maximum_parallel_jobs" outcome <= jobs) "scheduler exceeded its global worker limit"
+ H.assert (S.length plan == 19 && S.length tasks == 19 && S.length (S.nubBy eqString identifiers) == 19 && S.length (rows "builds" saved) == 19) "diamond graph did not deduplicate shared prerequisites"
+ H.assert (S.all (\task -> eqString (J.getText "state" "" task) "succeeded" && integer "exit_code" task == 0) tasks) "scheduler left an unsuccessful task"
+ let library = S.filter (\job -> eqString (J.getText "kind" "" job) "library") plan
+ H.assert (S.length library == 8 && S.length (S.filter (\job -> eqString (J.getText "kind" "" job) "runtime") plan) == 1) "prelude variants or shared runtime were merged incorrectly"
+ S.mapM_ (\name -> S.mapM_ (\variant -> do
+  let expected = "library-" ++ variant ++ "-" ++ name
+  H.assert (S.length (S.filter (\job -> eqString (identity job) expected) library) == 1) ("missing unique library variant " ++ expected)) (O.words "prelude no-prelude")) (O.words "base left base-no diamond")
+ S.mapM_ (\job -> S.mapM_ (\dependency -> do
+  let parent = findTask tasks dependency
+  let child = findTask tasks (identity job)
+  H.assert (S.not (ltDouble (seconds "started_seconds" child) (seconds "finished_seconds" parent))) ("scheduler ran before dependency completed: " ++ identity job)) (J.getStrings "dependencies" job)) plan
+
+leftSource = "module Left where\nimport Base\nleft = addInt value 1\n"
+-- The branch name base-no deliberately collides with base plus the no-prelude
+-- suffix under the old ambiguous job-ID encoding.
+fixture directory = do
+ S.mapM_ (\name -> O.mkdir (directory ++ "/app/" ++ name)) (O.words "base left base-no diamond")
+ writeFile (directory ++ "/app/base/mlf-package.json") "{\"format\":1,\"name\":\"base\",\"version\":\"0.1.0\",\"library\":{\"modules\":{\"Base\":\"Base.emlf\"}}}"
+ writeFile (directory ++ "/app/base/Base.emlf") "module Base where\nvalue = 20\n"
+ writeFile (directory ++ "/app/left/mlf-package.json") "{\"format\":1,\"name\":\"left\",\"version\":\"0.1.0\",\"dependencies\":{\"base\":{\"path\":\"../base\"}},\"library\":{\"modules\":{\"Left\":\"Left.emlf\"}}}"
+ writeFile (directory ++ "/app/left/Left.emlf") leftSource
+ writeFile (directory ++ "/app/base-no/mlf-package.json") "{\"format\":1,\"name\":\"base-no\",\"version\":\"0.1.0\",\"dependencies\":{\"base\":{\"path\":\"../base\"}},\"library\":{\"modules\":{\"Right\":\"Right.emlf\"}}}"
+ writeFile (directory ++ "/app/base-no/Right.emlf") "module Right where\nimport Base\nright = addInt value 1\n"
+ writeFile (directory ++ "/app/diamond/mlf-package.json") "{\"format\":1,\"name\":\"diamond\",\"version\":\"0.1.0\",\"dependencies\":{\"left\":{\"path\":\"../left\"},\"base-no\":{\"path\":\"../base-no\"}},\"library\":{\"modules\":{\"Diamond\":\"Diamond.emlf\"}}}"
+ writeFile (directory ++ "/app/diamond/Diamond.emlf") "module Diamond where\nimport Left\nimport Right\nanswer = addInt left right\n"
+ writeFile (directory ++ "/app/Main.emlf") "module Main where\nimport Diamond\nmain = printInt answer\n"
+ writeFile (directory ++ "/app/mlf-package.json") "{\"format\":1,\"name\":\"scheduler-diamond\",\"version\":\"0.1.0\",\"dependencies\":{\"diamond\":{\"path\":\"diamond\"}},\"executables\":{\"normal\":{\"main\":\"Main.emlf\"},\"bare\":{\"main\":\"Main.emlf\",\"no-prelude\":true}}}"
+
+-- These are independent coordinators, each with its own build lock and logs.
+-- Only their content-addressed artifact cache is shared.
+coordinatorTask c cache name =
+ let argv = S.append (Cons (P.manager c) (Cons "--manifest" (Cons (P.work c ++ "/app/mlf-package.json") (Cons "--compiler" (Cons (P.compiler c) (Cons "--build-dir" (Cons (P.output c) Nil))))))) (arguments cache 2) in
+ S.append (Cons name (Cons "1800" (Cons "0" (Cons (P.work c) (Cons "" (Cons (P.work c ++ "/" ++ name ++ ".out") (Cons (P.work c ++ "/" ++ name ++ ".err") (Cons (showInt (S.length argv)) Nil)))))))) argv
+concurrentCache parent = do
+ let directory = P.work parent
+ let cache = directory ++ "/concurrent cache"
+ let first = context parent "coordinator one"
+ let second = context parent "coordinator two"
+ selected <- O.envDefault "MLF_BUILD_RUNNER" (O.parent (P.manager parent) ++ "/mlf-build-runner")
+ runner <- O.executable selected
+ nonceStatus <- O.exec directory (Cons runner (Cons "--new-invocation-id" Nil)) "" (directory ++ "/nonce.out") (directory ++ "/nonce.err") 60
+ nonce <- readFile (directory ++ "/nonce.out")
+ H.assert (nonceStatus == 0 && stringLength (O.trim nonce) == 64) "native helper did not supply an invocation ID"
+ let invocation = O.trim nonce
+ let plan = directory ++ "/coordinators.plan"
+ let result = directory ++ "/coordinators.json"
+ let header = Cons "MLF_BUILD_PLAN" (Cons "1" (Cons invocation (Cons "2" (Cons "2" Nil))))
+ writeFile plan (O.pack (S.append header (S.append (coordinatorTask first cache "first") (coordinatorTask second cache "second"))))
+ digest <- fileDigest plan
+ status <- O.exec directory (Cons runner (Cons plan (Cons result Nil))) "" (directory ++ "/coordinators.out") (directory ++ "/coordinators.err") 1800
+ outcome <- J.read result
+ H.assert (status == 0 && J.getBool "complete" false outcome && integer "exit_code" outcome == 0 && J.equal (J.get "protocol_version" outcome) (J.num 1) && eqString (J.getText "invocation_id" "" outcome) invocation && eqString (J.getText "plan_digest" "" outcome) digest) "concurrent coordinators failed or returned an unbound result"
+ H.assert (integer "maximum_parallel_jobs" outcome == 2 && S.length (rows "tasks" outcome) == 2 && S.all (\task -> eqString (J.getText "state" "" task) "succeeded") (rows "tasks" outcome)) "independent coordinators did not overlap successfully"
+ a <- P.report first
+ b <- P.report second
+ checkGraph 2 a
+ checkGraph 2 b
+ H.assert (J.equal (keys a) (keys b)) "concurrent coordinators produced different artifact keys"
+ hashesA <- digests first
+ hashesB <- digests second
+ H.assert (J.equal (J.Object hashesA) (J.Object hashesB)) "concurrent coordinators produced different binaries"
+ let completed = S.append (rows "builds" a) (rows "builds" b)
+ let artifactKeys = S.nubBy eqString (S.map (J.getText "key" "") completed)
+ S.mapM_ (\key -> do
+  valid <- B.cacheValid (cache ++ "/" ++ key) key
+  let producers = S.filter (\row -> eqString (J.getText "key" "" row) key && S.not (J.getBool "cached" true row)) completed
+  H.assert (valid && S.length producers == 1) "shared cache published an invalid artifact or built one key more than once") artifactKeys
+ S.mapM_ (\c -> S.mapM_ (\name -> runBinary c name "42\n") (O.words "normal bare")) (Cons first (Cons second Nil))
+
+edgeCases parent = do
+ let directory = P.work parent ++ "/empty graph"
+ O.mkdir (directory ++ "/app")
+ let empty = P.Context directory (P.manager parent) (P.compiler parent) (directory ++ "/build") (P.windows parent)
+ let command = J.set "command" (J.stringArray (Cons (P.manager parent) (Cons "--version" Nil))) J.empty
+ let manifest = J.set "tests" (J.set "command-only" command J.empty) (J.set "library" (J.set "modules" (J.set "Unused" (J.str "Unused.emlf") J.empty) J.empty) (J.set "format" (J.num 1) (J.set "name" (J.str "empty-graph") (J.set "version" (J.str "0.1.0") J.empty))))
+ J.write (directory ++ "/app/mlf-package.json") manifest
+ writeFile (directory ++ "/app/Unused.emlf") "module Unused where\nbroken : Int\nbroken = true\n"
+ O.mkdir (directory ++ "/missing collector")
+ P.expect empty (Cons "--gc-prefix" (Cons (directory ++ "/missing collector") (O.words "--jobs 4 test"))) true ""
+ saved <- P.report empty
+ H.assert (J.getBool "complete" false saved && S.null (rows "builds" saved) && S.null (rows "jobs" (S.head (rows "scheduler" saved))) && S.null (rows "tasks" (S.head (rows "scheduler_results" saved)))) "command-only test compiled unused code or required the collector"
+ let collision = P.Context directory (P.manager parent) (P.compiler parent) (directory ++ "/collision") (P.windows parent)
+ let executable = J.set "main" (J.str "Main.emlf") J.empty
+ let native = J.set "main" (J.str "Other.emlf") (J.set "stdout" (J.str "43\n") J.empty)
+ let required = J.set "requires" (J.stringArray (Cons "test-foo" Nil)) command
+ let targets = J.set "executables" (J.set "test-foo" executable J.empty) (J.set "tests" (J.set "foo" native (J.set "needs" required J.empty)) (J.set "library" J.empty manifest))
+ J.write (directory ++ "/app/mlf-package.json") targets
+ writeFile (directory ++ "/app/Main.emlf") "module Main where\nmain = printInt 42\n"
+ writeFile (directory ++ "/app/Other.emlf") "module Other where\nmain = printInt 43\n"
+ P.expect collision (O.words "--jobs 4 test") true ""
+ tested <- P.report collision
+ let tasks = rows "tasks" (S.head (rows "scheduler_results" tested))
+ H.assert (S.length tasks == 11 && S.any (\task -> eqString (identity task) "target-e-test-foo") tasks && S.any (\task -> eqString (identity task) "target-t-test-foo") tasks && S.length (rows "tests" tested) == 2 && S.all (J.getBool "passed" false) (rows "tests" tested)) "executable and native test target names collided"
+ runBinary collision "test-foo" "42\n"
+
+integration : IO Unit
+integration = H.withScratch (\directory -> do
+ manager <- getEnv "MLF_PACKAGE_MANAGER"
+ compiler <- getEnv "MLF_BOOTSTRAP_COMPILER"
+ windows <- O.isWindows
+ let serial = P.Context directory manager compiler (directory ++ "/serial") windows
+ let cache = directory ++ "/shared cache"
+ fixture directory
+ P.expect serial (arguments cache 1) true ""
+ initial <- P.report serial
+ checkGraph 1 initial
+ evidence <- hashEvidence (evidencePaths initial)
+ original <- digests serial
+ S.mapM_ (\name -> runBinary serial name "42\n") (O.words "normal bare")
+ S.mapM_ (\jobs -> do
+  let parallel = context serial ("parallel-" ++ showInt jobs)
+  P.expect parallel (arguments cache jobs) true ""
+  saved <- P.report parallel
+  checkGraph jobs saved
+  hashes <- digests parallel
+  H.assert (J.equal (keys initial) (keys saved) && J.equal (J.Object original) (J.Object hashes)) "worker count changed artifact keys or binary bytes"
+  H.assert (S.all (J.getBool "cached" false) (rows "builds" saved)) "warm scheduler invocation rebuilt an artifact"
+  S.mapM_ (\name -> runBinary parallel name "42\n") (O.words "normal bare")) (Cons 2 (Cons 4 Nil))
+ writeFile (directory ++ "/app/left/Left.emlf") "module Left where\nimport Base\nleft : Int\nleft = true\n"
+ P.expect serial (arguments cache 4) false ""
+ failed <- P.report serial
+ preserved <- digests serial
+ let tasks = rows "tasks" (S.head (rows "scheduler_results" failed))
+ H.assert (S.not (J.getBool "complete" true failed) && S.any (\task -> eqString (J.getText "state" "" task) "failed") tasks && S.any (\task -> eqString (J.getText "state" "" task) "blocked") tasks && J.equal (J.Object original) (J.Object preserved)) "failed scheduler invocation published binaries or started blocked dependents"
+ writeFile (directory ++ "/app/left/Left.emlf") leftSource
+ P.expect serial (arguments cache 4) true ""
+ recovered <- P.report serial
+ checkGraph 4 recovered
+ H.assert (J.equal (keys initial) (keys recovered)) "failed invocation poisoned the recoverable cache"
+ retained <- hashEvidence (evidencePaths initial)
+ let directories = S.map invocationDirectory (Cons initial (Cons failed (Cons recovered Nil)))
+ H.assert (S.length (S.nubBy eqString directories) == 3 && J.equal evidence retained) "later invocations reused worker paths or overwrote earlier plan, context or receipts"
+ concurrentCache serial
+ edgeCases serial)

@@ -3,11 +3,14 @@
   "name": "mlf-native-bench",
   "version": "0.1.0",
   "dependencies": {
-    "mlf-package-tools": {
-      "path": "../../package"
+    "mlf-developer-tools": {
+      "path": "../../libraries/mlf-developer-tools"
     },
-    "mlf-bootstrap": {
-      "path": "../../bootstrap"
+    "mlf-foundation": {
+      "path": "../../libraries/mlf-foundation"
+    },
+    "mlf-package-core": {
+      "path": "../../libraries/mlf-package-core"
     }
   },
   "executables": {

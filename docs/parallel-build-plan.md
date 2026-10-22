@@ -1,6 +1,25 @@
 # Parallel package build plan
 
-Status: proposed; no implementation is included.
+Status: implemented in this branch; release qualification remains a separate gate.
+
+`mlfpkg --jobs N build`, `test`, and `run` share one invocation graph, with
+`--jobs 1` as the default. `Package.Scheduler` resolves and deduplicates actions,
+serializes the graph once, and launches one-action workers through
+`mlf-build-runner`. Worker receipts and reports live under
+`<build>/invocation/jobs/`; the coordinator validates them and the original
+inputs before publishing binaries. Test commands still execute serially.
+
+The ten libraries now live under `libraries/`. Targets may select an explicit
+`dependencies` array; omission retains every direct package dependency.
+The original 63 modules retain their names, and `Package.Scheduler` adds one
+package-core module. See [the package guide](package-manager.md) and
+[runner protocol](build-runner-protocol.md) for the implemented interfaces.
+
+The checklist below records the design and its acceptance requirements.
+Native Windows execution, all six compiler test groups, fresh self-hosting,
+and performance measurements must be assessed from their actual test evidence;
+implementation or cross-compilation alone does not establish those results.
+No full-toolchain speedup is claimed.
 
 ## Implementation plan
 

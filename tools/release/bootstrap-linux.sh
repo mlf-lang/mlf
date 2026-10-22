@@ -24,6 +24,8 @@ cc=${CC:-clang}
 # shellcheck disable=SC2046
 "$cc" -O2 -std=c11 \
   $(pkg-config --cflags gmp bdw-gc) -c runtime/mlf_runtime.c -o "$build/seed/runtime.o"
+"$cc" -O2 -std=c11 -Wall -Wextra -Werror runtime/mlf_build_runner.c -o "$build/seed/mlf-build-runner"
+test "$("$build/seed/mlf-build-runner" --protocol-version)" = 1
 for tool in emlf mlfpkg; do
   # shellcheck disable=SC2046
   "$cc" -O2 -Wno-override-module "$seed_input/$tool.ll" "$build/seed/runtime.o" \

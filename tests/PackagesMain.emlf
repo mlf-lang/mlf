@@ -3,11 +3,12 @@ import Bootstrap.Types
 import qualified Package.OS as O
 import qualified Tests.Packages as P
 import qualified Tests.PackageResolver as R
+import qualified Tests.TargetDependencies as D
 main : IO Unit
 main = do
  args <- O.allArguments
  case args of
   Cons "--fail-command" Nil -> exitWith 17
   Cons "--package-gc-check" (Cons prefix (Cons binary Nil)) -> P.checkGC prefix binary
-  Nil -> do { R.main; P.integration }
+  Nil -> do { R.main; P.integration; D.integration }
   _ -> O.fatal "invalid package test arguments"

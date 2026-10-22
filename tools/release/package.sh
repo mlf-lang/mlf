@@ -28,24 +28,26 @@ package_artifact="$artifact_root/native-$platform-packages"
 for part in $parts; do
   artifact="$artifact_root/native-$platform-$part"
   test -f "$artifact/compiler-tests/$part/verification.json"
-  for tool in emlf mlfpkg; do cmp "$package_artifact/bin/$tool" "$artifact/bin/$tool"; done
+  for tool in emlf mlfpkg mlf-build-runner; do cmp "$package_artifact/bin/$tool" "$artifact/bin/$tool"; done
 done
 build="$artifact_root/assembled"
 test ! -e "$build" || { printf '%s\n' 'Use new artifact staging directories.' >&2; exit 1; }
 mkdir -p "$build/bin" "$build/compiler-tests"
-cp "$package_artifact/bin/emlf" "$package_artifact/bin/mlfpkg" "$build/bin/"
+cp "$package_artifact/bin/emlf" "$package_artifact/bin/mlfpkg" "$package_artifact/bin/mlf-build-runner" "$build/bin/"
 chmod 755 "$build/bin/"*
 for part in $parts; do
   cp -R "$artifact_root/native-$platform-$part/compiler-tests/$part" "$build/compiler-tests/"
 done
 compiler_hash=$(sha256 "$build/bin/emlf" | awk '{print $1}')
 manager_hash=$(sha256 "$build/bin/mlfpkg" | awk '{print $1}')
+runner_hash=$(sha256 "$build/bin/mlf-build-runner" | awk '{print $1}')
+test "$("$build/bin/mlf-build-runner" --protocol-version)" = 1
 base="$build/compiler-tests/unit/verification.json"
 groups='unit packages self-host parity backends port'
 for group in $groups; do
   report="$build/compiler-tests/$group/verification.json"
-  jq -e --arg group "$group" --arg hash "$compiler_hash" --arg manager "$manager_hash" \
-    '.complete == true and .implementation == "MLF" and .group == $group and .compiler_sha256 == $hash and .manager_sha256 == $manager' "$report" >/dev/null
+  jq -e --arg group "$group" --arg hash "$compiler_hash" --arg manager "$manager_hash" --arg runner "$runner_hash" \
+    '.complete == true and .implementation == "MLF" and .group == $group and .compiler_sha256 == $hash and .manager_sha256 == $manager and .build_runner_sha256 == $runner' "$report" >/dev/null
   cmp <(jq -S .sources "$base") <(jq -S .sources "$report")
   while IFS=$'\t' read -r suite expected; do
     test "$(sha256 "$build/compiler-tests/$group/$suite.log" | awk '{print $1}')" = "$expected"
@@ -57,7 +59,7 @@ done
 # Check every recorded source and detect newly added or removed inputs as well.
 jq -r '.sources | to_entries[] | "\(.value)  \(.key)"' "$base" | sha256 -c - >/dev/null
 cmp <(jq -r '.sources | keys[]' "$base" | LC_ALL=C sort) <(
-  { find scripts runtime bootstrap package examples benchmarks tests \
+  { find scripts runtime bootstrap package libraries examples benchmarks tests \
     -type d \( -name .mlf-build -o -name .git -o -name dist-newstyle -o -name __pycache__ \) -prune -o \
     -type f \( -path 'benchmarks/*' -o -name '*.hs' -o -name '*.emlf' -o -name '*.c' -o -name '*.h' -o -name '*.ps1' -o -name '*.sh' -o -name '*.expected' -o -name '*.json' -o -name '*.gz' \) -print
     printf '%s\n' mlfpkg mlf-package.json; } | LC_ALL=C sort
@@ -71,7 +73,7 @@ output=$(cd "$output" && pwd)
 name="mlf-$version-$platform"
 bundle="$output/$name"
 mkdir -p "$bundle/bin" "$bundle/libexec" "$bundle/runtime" "$bundle/evidence" "$bundle/licenses"
-cp "$build/bin/emlf" "$build/bin/mlfpkg" "$bundle/libexec/"
+cp "$build/bin/emlf" "$build/bin/mlfpkg" "$build/bin/mlf-build-runner" "$bundle/libexec/"
 cp tools/release/command.sh "$bundle/bin/emlf"
 cp tools/release/command.sh "$bundle/bin/mlfpkg"
 cp tools/release/install.sh "$bundle/install.sh"
@@ -93,9 +95,9 @@ if [ "$platform" = macos-arm64 ]; then
 else
   build_glibc=$(getconf GNU_LIBC_VERSION)
 fi
-jq -n --arg version "$version" --arg commit "$commit" --arg compiler "$compiler_hash" --arg manager "$manager_hash" \
+jq -n --arg version "$version" --arg commit "$commit" --arg compiler "$compiler_hash" --arg manager "$manager_hash" --arg runner "$runner_hash" \
   --arg platform "$platform" --arg minos "$minimum_macos" --arg glibc "$build_glibc" \
-  '{schema_version:1,version:$version,commit:$commit,platform:$platform,compiler_sha256:$compiler,manager_sha256:$manager,test_implementation:"MLF",test_groups:["unit","packages","self-host","parity","backends","port"],port_profiles:["compact-gc"],performance_gate:"not rerun for this preview"} + (if $platform == "macos-arm64" then {minimum_macos:$minos} else {build_glibc:$glibc} end)' > "$bundle/release.json"
+  '{schema_version:1,version:$version,commit:$commit,platform:$platform,compiler_sha256:$compiler,manager_sha256:$manager,build_runner_sha256:$runner,build_runner_protocol:1,test_implementation:"MLF",test_groups:["unit","packages","self-host","parity","backends","port"],port_profiles:["compact-gc"],performance_gate:"not rerun for this preview"} + (if $platform == "macos-arm64" then {minimum_macos:$minos} else {build_glibc:$glibc} end)' > "$bundle/release.json"
 if [ "$platform" = macos-arm64 ]; then
 cat > "$bundle/README.md" <<'README'
 # MLF native developer preview

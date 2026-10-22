@@ -1,0 +1,20 @@
+{
+  "format": 1,
+  "name": "mlf-developer-tools",
+  "version": "0.3.0",
+  "dependencies": {
+    "mlf-foundation": {
+      "path": "../mlf-foundation"
+    },
+    "mlf-package-core": {
+      "path": "../mlf-package-core"
+    }
+  },
+  "library": {
+    "modules": {
+      "Package.Benchmark": "Package/Benchmark.emlf",
+      "Package.CompilerTests": "Package/CompilerTests.emlf",
+      "Package.Verification": "Package/Verification.emlf"
+    }
+  }
+}

@@ -63,7 +63,7 @@ unchanged. Keep the whole package when using its `bin` directory directly.
 ## Prepare the next release
 
 For a release on all three platforms, update `VERSION`,
-`bootstrap/Bootstrap/Version.emlf`, the four toolchain manifests,
+`libraries/mlf-foundation/Bootstrap/Version.emlf`, the toolchain manifests,
 and `CHANGELOG.md`, then regenerate `mlf.lock`. Change the version in
 `.github/release-request.json` and commit the reviewed candidate on `main`.
 The **Cross-platform release** workflow checks out that immutable commit,

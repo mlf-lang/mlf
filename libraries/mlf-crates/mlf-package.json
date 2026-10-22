@@ -1,0 +1,36 @@
+{
+  "format": 1,
+  "name": "mlf-crates",
+  "version": "0.3.0",
+  "dependencies": {
+    "mlf-foundation": {
+      "path": "../mlf-foundation"
+    },
+    "mlf-frontend": {
+      "path": "../mlf-frontend"
+    },
+    "mlf-inference": {
+      "path": "../mlf-inference"
+    },
+    "mlf-language-core": {
+      "path": "../mlf-language-core"
+    },
+    "mlf-llvm": {
+      "path": "../mlf-llvm"
+    },
+    "mlf-xmlf": {
+      "path": "../mlf-xmlf"
+    }
+  },
+  "library": {
+    "modules": {
+      "Bootstrap.Crate": "Bootstrap/Crate.emlf",
+      "Bootstrap.CrateArtifact": "Bootstrap/CrateArtifact.emlf",
+      "Bootstrap.CrateCodegen": "Bootstrap/CrateCodegen.emlf",
+      "Bootstrap.CrateQuery": "Bootstrap/CrateQuery.emlf",
+      "Bootstrap.InferenceUnit": "Bootstrap/InferenceUnit.emlf",
+      "Bootstrap.Separate": "Bootstrap/Separate.emlf",
+      "Bootstrap.SourceEquality": "Bootstrap/SourceEquality.emlf"
+    }
+  }
+}

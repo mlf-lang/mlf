@@ -85,7 +85,10 @@ validateTarget p testing entry = do
     let required = J.getStrings "requires" target
     O.require (S.all (\n -> J.has n (J.getObject "executables" (packageData p))) required) "unknown required executable"
   else do
-    fields target "main modules link profile no-prelude arguments stdin stdout" ("target " ++ name)
+    fields target "main modules dependencies link profile no-prelude arguments stdin stdout" ("target " ++ name)
+    let dependencies = targetDependencyNames p target
+    O.require (S.length (S.nubBy eqString dependencies) == S.length dependencies) "duplicate target dependency"
+    O.require (S.all (\name -> J.has name (J.getObject "dependencies" (packageData p))) dependencies) "target dependency is not a direct package dependency"
     source <- localFile (packageRoot p) (J.get "main" target)
     ms <- readModules (packageRoot p) (packageName p) (J.getObject "modules" target)
     O.require (S.elem eqString (J.getText "link" "separate" target) (O.words "separate source")) "invalid link mode"
@@ -115,6 +118,9 @@ visitDependencies p trail done deps = case deps of
     let child = S.fromMaybe (panic "missing dependency") (S.find (\q -> eqString path (packagePath q)) next)
     O.require (eqString name (packageName child)) ("dependency " ++ name ++ " resolves to package " ++ packageName child)
     visitDependencies p trail next rest
+targetDependencyNames p target = S.sortBy compareString (if J.has "dependencies" target then J.getStrings "dependencies" target else keys (J.getObject "dependencies" (packageData p)))
+targetDependencies graph p target = S.map (\name -> lookupPackage name (packages graph)) (targetDependencyNames p target)
+visibleWith ps p dependencies = S.concat (Cons (S.map moduleName (packageModules p)) (S.map (\name -> S.map moduleName (packageModules (lookupPackage name ps))) dependencies))
 visible ps p = S.concat (Cons (S.map moduleName (packageModules p)) (S.map (\name -> S.map moduleName (packageModules (lookupPackage name ps))) (keys (J.getObject "dependencies" (packageData p)))))
 checkImports ps p local = S.mapM_ (\m -> S.mapM_ (\name -> O.require (S.elem eqString name (S.append (visible ps p) (S.map moduleName local))) (packageName p ++ ":" ++ moduleName m ++ ": import " ++ name ++ " is not declared in this package or a direct dependency")) (moduleImports m)) local
 moduleClosure ms names = discoverMany ms Nil Nil names
@@ -137,7 +143,8 @@ targetCrateModules graph p target = do
   O.require (S.not (S.any (\m -> eqString (moduleName m) (moduleName entry)) local)) "entry module also appears in target modules"
   let private = Cons entry local
   O.require (S.not (S.any (\m -> S.any (\n -> eqString (moduleName m) (moduleName n)) (modules graph)) private)) "entry/private module conflicts with a library module"
-  checkImports (packages graph) p private
+  let visible = S.append (visibleWith (packages graph) p (targetDependencyNames p target)) (S.map moduleName private)
+  S.mapM_ (\m -> S.mapM_ (\name -> O.require (S.elem eqString name visible) (packageName p ++ ":" ++ moduleName m ++ ": import " ++ name ++ " is not declared in this target or a selected direct dependency")) (moduleImports m)) private
   ioReturn (Pair (moduleName entry) private)
 load path = do
   ps <- visit path Nil Nil
@@ -150,14 +157,14 @@ load path = do
   S.mapM_ (\q -> S.mapM_ (\target -> if J.has "main" target then do { ignored <- targetCrateModules graph q target; ioReturn Unit } else ioReturn Unit) (S.map S.snd (S.append (J.items (J.getObject "executables" (packageData q))) (J.items (J.getObject "tests" (packageData q)))))) ps
   ioReturn graph
 libraryDependencies graph p = S.map (\q -> crateIdentity q "library") (S.filter (\q -> S.not (S.null (packageModules q))) (S.map (\name -> lookupPackage name (packages graph)) (S.sortBy compareString (keys (J.getObject "dependencies" (packageData p))))))
+targetLibraryDependencies graph p target = S.map (\q -> crateIdentity q "library") (S.filter (\q -> S.not (S.null (packageModules q))) (targetDependencies graph p target))
+targetCrateDependencies graph p target = S.append (targetLibraryDependencies graph p target) (if S.null (packageModules p) then Nil else Cons (crateIdentity p "library") Nil)
 cratePlanRow identity entry ms deps = J.Object (Cons (Pair "crate" (J.str identity)) (Cons (Pair "entry" (J.str entry)) (Cons (Pair "modules" (J.stringArray (S.sortBy compareString (S.map moduleName ms)))) (Cons (Pair "dependencies" (J.stringArray deps)) Nil))))
 cratePlan graph = do
   let p = rootPackage graph
   let libraries = S.map (\q -> cratePlanRow (crateIdentity q "library") "" (packageModules q) (libraryDependencies graph q)) (S.filter (\q -> S.not (S.null (packageModules q))) (packages graph))
-  let own = if S.null (packageModules p) then Nil else Cons (crateIdentity p "library") Nil
-  let dependencies = S.append (libraryDependencies graph p) own
-  executables <- S.mapM (\(Pair name target) -> do { Pair entry ms <- targetCrateModules graph p target; ioReturn (cratePlanRow (crateIdentity p ("target-" ++ name)) entry ms dependencies) }) (J.items (J.getObject "executables" (packageData p)))
-  tests <- S.mapM (\(Pair name target) -> do { Pair entry ms <- targetCrateModules graph p target; ioReturn (cratePlanRow (crateIdentity p ("target-test-" ++ name)) entry ms dependencies) }) (S.filter (\entry -> J.has "main" (S.snd entry)) (J.items (J.getObject "tests" (packageData p))))
+  executables <- S.mapM (\(Pair name target) -> do { Pair entry ms <- targetCrateModules graph p target; ioReturn (cratePlanRow (crateIdentity p ("target-" ++ name)) entry ms (targetCrateDependencies graph p target)) }) (J.items (J.getObject "executables" (packageData p)))
+  tests <- S.mapM (\(Pair name target) -> do { Pair entry ms <- targetCrateModules graph p target; ioReturn (cratePlanRow (crateIdentity p ("target-test-" ++ name)) entry ms (targetCrateDependencies graph p target)) }) (S.filter (\entry -> J.has "main" (S.snd entry)) (J.items (J.getObject "tests" (packageData p))))
   ioReturn (J.Array (S.append libraries (S.append executables tests)))
 sourceFiles p = do
   nested <- S.mapM (\target -> if J.has "main" target then do

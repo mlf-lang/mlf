@@ -1,6 +1,7 @@
 module Tests.CrateCodegen where
 
 import Bootstrap.Types
+import qualified Package.OS as O
 import qualified Bootstrap.Std as S
 import qualified Bootstrap.Compiler as Compiler
 import qualified Bootstrap.Parser as Parser
@@ -186,7 +187,7 @@ opaque : IO Unit
 opaque = System.withScratch (\directory -> do
   let path = directory ++ "/Main.emlf"
   writeFile path "module Main where\nimport qualified Bootstrap.LLVM as Private\nmain = Private.PreparedEntry\n"
-  result <- Compiler.compileFile (Cons "bootstrap" Nil) path
+  result <- Compiler.compileFile (O.words "libraries/mlf-foundation libraries/mlf-language-core libraries/mlf-frontend libraries/mlf-xmlf libraries/mlf-inference libraries/mlf-interpreter libraries/mlf-llvm libraries/mlf-crates") path
   case result of
     Left (CompileError ModuleResolution message) -> H.assert (H.contains "not in scope" message || H.contains "not exported" message) message
     _ -> H.fail "private prepared entry constructor escaped module resolution"

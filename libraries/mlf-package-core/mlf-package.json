@@ -1,22 +1,26 @@
 {
   "format": 1,
-  "name": "mlf-package-tools",
+  "name": "mlf-package-core",
   "version": "0.3.0",
   "dependencies": {
-    "mlf-bootstrap": {
-      "path": "../bootstrap"
+    "mlf-crates": {
+      "path": "../mlf-crates"
+    },
+    "mlf-foundation": {
+      "path": "../mlf-foundation"
+    },
+    "mlf-frontend": {
+      "path": "../mlf-frontend"
     }
   },
   "library": {
     "modules": {
       "Package.Build": "Package/Build.emlf",
       "Package.Command": "Package/Command.emlf",
-      "Package.CompilerTests": "Package/CompilerTests.emlf",
       "Package.Json": "Package/Json.emlf",
       "Package.Manifest": "Package/Manifest.emlf",
       "Package.OS": "Package/OS.emlf",
-      "Package.Verification": "Package/Verification.emlf",
-      "Package.Benchmark": "Package/Benchmark.emlf"
+      "Package.Scheduler": "Package/Scheduler.emlf"
     }
   }
 }
