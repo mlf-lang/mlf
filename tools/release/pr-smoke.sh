@@ -1,134 +1,60 @@
 #!/usr/bin/env bash
-# Build the checkout once, then exercise its compiler, manager and C runtime.
+# Build only the checkout tools, then exercise their public CLI directly.
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../.."
-test "$#" -eq 0
 build="$PWD/.mlf-build/pr-smoke"
 mkdir -p "$build"
-# Clear the success receipt before any command can fail on a rerun.
 printf '{"complete":false}\n' > "$build/result.json"
+test "$#" -eq 0
 seed_compiler=${MLF_COMPILER:?verified native seed compiler required}
 started=$SECONDS
 # Released managers predate target dependency fields in the current manifests.
-# Build its source libraries separately before reading the current root manifest.
+# Build the current manager before selecting the two public checkout tools.
 tools/release/bootstrap-manager.sh "$build/manager-bootstrap" 2>&1 | tee "$build/manager-bootstrap.log"
 "$build/manager-bootstrap/bin/mlfpkg" --compiler "$seed_compiler" --runtime "$PWD/runtime/mlf_runtime.c" \
-  --jobs 2 --timeout 1800 --locked --build-dir "$build/candidate" build 2>&1 | tee "$build/build.log"
+  --jobs 2 --timeout 1800 --locked --build-dir "$build/candidate" \
+  build --target emlf --target mlfpkg 2>&1 | tee "$build/build.log"
 jq -e '
   .complete == true and .implementation == "MLF" and
   ([.builds[] | select(.kind | startswith("executable mlf-compiler:")) | .kind] | sort) ==
-    ["executable mlf-compiler:compiler-tests","executable mlf-compiler:emlf","executable mlf-compiler:mlfpkg"]
+    ["executable mlf-compiler:emlf","executable mlf-compiler:mlfpkg"]
 ' "$build/candidate/build-report.json" >/dev/null
 tools/release/ensure-build-runner.sh "$build/candidate/bin"
-build_seconds=$((SECONDS - started))
-export MLF_COMPILER="$build/candidate/bin/emlf"
-export MLF_PACKAGE_MANAGER="$build/candidate/bin/mlfpkg"
 export MLF_BUILD_RUNNER="$build/candidate/bin/mlf-build-runner"
-runner="$build/candidate/bin/compiler-tests"
-test -x "$MLF_COMPILER" && test -x "$MLF_PACKAGE_MANAGER" && test -x "$runner"
-# Compile the shared smoke fixtures together so independent work can overlap.
-# The campaign reuses these artifacts with the same compiler, manager and cache.
-"$MLF_PACKAGE_MANAGER" --manifest "$PWD/tests/mlf-package.json" \
-  --compiler "$MLF_COMPILER" --runtime "$PWD/runtime/mlf_runtime.c" \
-  --jobs 2 --timeout 1800 --build-dir "$build/tests/suite-build" \
-  --cache-dir "$build/candidate/cache" build \
-  --target int-set-unions --target test-framework --target pr-smoke \
-  2>&1 | tee "$build/tests-prebuild.log"
-jq -e '
-  .complete == true and .implementation == "MLF" and
-  ([.builds[] | select(.kind | startswith("executable mlf-tests:")) | .kind] | sort) ==
-    ["executable mlf-tests:int-set-unions","executable mlf-tests:pr-smoke","executable mlf-tests:test-framework"]
-' "$build/tests/suite-build/build-report.json" >/dev/null
-cp "$build/tests/suite-build/build-report.json" "$build/tests-prebuild-report.json"
-# Direct invocation avoids building another root generation just to run tests.
-# The suite still compiles its tests and backend drivers with the new compiler.
-"$runner" pr-smoke --manager "$MLF_PACKAGE_MANAGER" --compiler "$MLF_COMPILER" \
-  --build-dir "$build/tests" --cache-dir "$build/candidate/cache" 2>&1 | tee "$build/tests.log"
+build_seconds=$((SECONDS - started))
+compiler="$build/candidate/bin/emlf"
+manager="$build/candidate/bin/mlfpkg"
+test -x "$compiler" && test -x "$manager"
 sha256() { shasum -a 256 "$1" | awk '{print $1}'; }
-compiler_sha256=$(sha256 "$MLF_COMPILER")
-manager_sha256=$(sha256 "$MLF_PACKAGE_MANAGER")
-runner_sha256=$(sha256 "$runner")
+compiler_sha256=$(sha256 "$compiler")
+manager_sha256=$(sha256 "$manager")
 build_runner_sha256=$(sha256 "$MLF_BUILD_RUNNER")
-framework_sha256=$(sha256 "$build/tests/suite-build/bin/test-framework")
-unions_sha256=$(sha256 "$build/tests/suite-build/bin/int-set-unions")
-coverage_sha256=$(sha256 "$build/tests/test-framework.coverage.jsonl")
-inventory_sha256=$(sha256 tests/golden/unit-inventory.json)
-framework_log_sha256=$(sha256 "$build/tests/test-framework.log")
+# No extra compiler generation, test executable, or backend drivers are built.
+tools/release/pr-smoke-cli.sh "$compiler" "$build/cli" 2>&1 | tee "$build/cli.log"
+tools/release/pr-smoke-packages.sh "$compiler" "$manager" "$build/packages" 2>&1 | tee "$build/packages.log"
+jq -e --arg compiler "$compiler_sha256" '
+  .complete == true and .compiler_sha256 == $compiler and .cases == 8 and
+  .accepted == 2 and .rejected == 2 and .runtime == 3 and .invalid_target == 1 and
+  .backends == ["interpreter","llvm"]
+' "$build/cli/result.json" >/dev/null
 jq -e --arg compiler "$compiler_sha256" --arg manager "$manager_sha256" \
-  --arg runner "$runner_sha256" --arg build_runner "$build_runner_sha256" --arg framework "$framework_sha256" \
-  --arg unions "$unions_sha256" --arg coverage "$coverage_sha256" \
-  --arg inventory "$inventory_sha256" --arg framework_log "$framework_log_sha256" '
-  .complete == true and .implementation == "MLF" and .group == "pr-smoke" and
-  .compiler_sha256 == $compiler and .manager_sha256 == $manager and
-  .runner_sha256 == $runner and .build_runner_sha256 == $build_runner and
-  .sources["tests/golden/unit-inventory.json"] == $inventory and
-  .focused_suite == {name:"int-set-unions",binary_sha256:$unions} and
-  (.suites["test-framework"] | .binary_sha256 == $framework and
-    .log_sha256 == $framework_log and .coverage_report_sha256 == $coverage and
-    .coverage_inventory_sha256 == $inventory and
-    .coverage_result == {schema_version:1,suite:"test-framework",executions:3,aliases:0,metrics:{}}) and
-  (.matrices["compact-gc"] | .rows == 12 and .backend_names == ["interpreter","llvm"]) and
-  (.package_smoke | .cases == 3 and .backends == ["interpreter","llvm"])
-' "$build/tests/verification.json" >/dev/null
-# Retain and validate the checked driver cache decisions for this campaign.
-driver_report="$build/tests/driver-build/build-report.json"
-driver_hash=$(sha256 "$driver_report")
-# Builder.manager is the executing compiler-tests binary, not mlfpkg.
-jq -se --arg group pr-smoke --arg driver_hash "$driver_hash" '
-    def digest: type == "string" and test("^[0-9a-f]{64}$");
-    .[0] as $v | .[1] as $b |
-    $v.group == $group and $v.driver_build.sha256 == $driver_hash and
-    ($v.driver_build.sha256 | digest) and
-    ($v.compiler_sha256 | digest) and ($v.runner_sha256 | digest) and
-    all([$v.compiler,$v.runner,$b.cache_directory][]; type == "string" and startswith("/")) and
-    $b.format == 1 and $b.complete == true and $b.implementation == "MLF" and
-    $b.toolchain.compiler.path == $v.compiler and
-    $b.toolchain.compiler.sha256 == $v.compiler_sha256 and
-    $b.toolchain.manager.path == $v.runner and
-    $b.toolchain.manager.sha256 == $v.runner_sha256 and
-    ($b.builds | type == "array" and length > 0) and
-    ($v.drivers | keys) == (if $group == "port" then ["LLVMDriver"] else ["LLVMDriver","RuntimeDriver"] end) and
-    all($v.drivers | to_entries[];
-      .key as $name | .value as $driver |
-      $driver.frontend == "source" and
-      ($driver.sha256 | digest) and ($driver.llvm_sha256 | digest) and
-      ($driver.artifacts | keys) ==
-        (if $name == "RuntimeDriver" then ["linked","llvm","object","runtime","trace"] else ["linked","llvm","object","runtime"] end) and
-      all($driver.artifacts | to_entries[];
-        .key as $stage | .value as $receipt |
-        ($receipt | keys) == ["artifact_sha256","cached","directory","files","key","kind"] and
-        ($receipt.key | digest) and ($receipt.artifact_sha256 | digest) and
-        ($receipt.cached | type == "boolean") and
-        $receipt.directory == ($b.cache_directory + "/" + $receipt.key) and
-        $receipt.kind ==
-          (if $stage == "llvm" then "source " + $name + " LLVM" elif $stage == "object" then "LLVM object" elif $stage == "linked" then "test driver native link" else "test driver C object" end) and
-        any($b.builds[]; . == ($receipt | {kind,key,cached})) and
-        ($receipt.files | keys) ==
-          [if $stage == "llvm" then "program.ll" elif $stage == "object" then "program.o" elif $stage == "linked" then "program" else "object.o" end] and
-        all($receipt.files[]; digest)) and
-      $driver.artifacts.llvm.files["program.ll"] == $driver.llvm_sha256 and
-      $driver.artifacts.linked.files.program == $driver.sha256)
-' "$build/tests/verification.json" "$driver_report" >/dev/null
-# Changing expected stdout also changes the executable key. Require misses for
-# the dependency and downstream crates, whose keys do not contain test stdout.
-jq -e '
-  [.builds[] | select(.kind == "crate message/0.1.0/library" or
-    .kind == "crate greeting/0.1.0/library" or
-    .kind == "crate local-packages-example/0.1.0/target-test-hello")] as $rows |
-  ($rows | map(.kind) | sort) == ["crate greeting/0.1.0/library",
-    "crate local-packages-example/0.1.0/target-test-hello", "crate message/0.1.0/library"]
-  and all($rows[]; .cached == false)
-' "$build/tests/package-smoke/build/build-report.json" >/dev/null
+  --arg runner "$build_runner_sha256" '
+  .complete == true and .compiler_sha256 == $compiler and .manager_sha256 == $manager and
+  .build_runner_sha256 == $runner and .build_runner_protocol == 1 and .jobs == 2 and
+  .cases == 3 and .backends == ["interpreter","llvm"]
+' "$build/packages/result.json" >/dev/null
+test "$(sha256 "$compiler")" = "$compiler_sha256"
+test "$(sha256 "$manager")" = "$manager_sha256"
+test "$(sha256 "$MLF_BUILD_RUNNER")" = "$build_runner_sha256"
 jq -n --arg commit "$(git rev-parse HEAD)" --argjson build_seconds "$build_seconds" \
   --argjson total_seconds "$((SECONDS - started))" \
   --arg compiler_sha256 "$compiler_sha256" --arg manager_sha256 "$manager_sha256" \
-  --arg runner_sha256 "$runner_sha256" --arg framework_sha256 "$framework_sha256" \
-  --arg coverage_sha256 "$coverage_sha256" --arg inventory_sha256 "$inventory_sha256" \
-  --arg verification_sha256 "$(sha256 "$build/tests/verification.json")" \
-  --arg driver_build_sha256 "$driver_hash" --arg build_runner_sha256 "$build_runner_sha256" \
+  --arg build_runner_sha256 "$build_runner_sha256" \
+  --arg build_report_sha256 "$(sha256 "$build/candidate/build-report.json")" \
+  --arg cli_sha256 "$(sha256 "$build/cli/result.json")" \
+  --arg packages_sha256 "$(sha256 "$build/packages/result.json")" \
   '{complete:true,commit:$commit,build_seconds:$build_seconds,total_seconds:$total_seconds,
-    compiler_sha256:$compiler_sha256,manager_sha256:$manager_sha256,runner_sha256:$runner_sha256,
-    framework_sha256:$framework_sha256,coverage_sha256:$coverage_sha256,
-    inventory_sha256:$inventory_sha256,verification_sha256:$verification_sha256,
-    driver_build_sha256:$driver_build_sha256,build_runner_sha256:$build_runner_sha256,build_runner_protocol:1}' > "$build/result.json"
+    compiler_sha256:$compiler_sha256,manager_sha256:$manager_sha256,
+    build_runner_sha256:$build_runner_sha256,build_runner_protocol:1,
+    build_report_sha256:$build_report_sha256,cli_sha256:$cli_sha256,packages_sha256:$packages_sha256}' > "$build/result.json"
 cat "$build/result.json"

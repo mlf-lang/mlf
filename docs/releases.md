@@ -136,8 +136,9 @@ toolchain natively. No compiler inference/checking is bypassed. Linux and
 macOS require all six native compiler groups and a fresh self-host fixed point.
 Windows requires fresh compiler and manager LLVM fixed points, 7,086 independent
 parity cases and 160 interpreter/native executions, compact-GC runtime tests,
-18 native resolver checks, 29 native package integration cases, and SDK relocation and native
-executable checks. Its internal POSIX `compiler-tests` transports and historical
+22 native resolver checks, 29 native package integration cases, the separate
+target-dependency/scheduler fixture, and SDK relocation and native executable
+checks. Its internal POSIX `compiler-tests` transports and historical
 performance gates are not claimed as Windows qualification. Each archive
 retains the exact source/tool hashes and platform evidence.
 
@@ -159,18 +160,25 @@ used the following sequence:
    then uploads a new developer-preview release with SHA-256 checksums.
 
 CI on `main`, pull requests and merge queues checks release metadata and workflow
-syntax, builds the checkout compiler, manager and test-owned campaign with the verified v0.3.0 seed
-in `.github/smoke-seed.env`, and runs the bounded `pr-smoke` compiler group. It
-retains framework/coverage/process contracts, the focused `int-set-unions` suite,
-Figure 12 regressions, selected interpreter/LLVM fixtures, independent target
-checks and package cache invalidation. A separate package-distribution job
-builds the checkout manager and test campaign with the published compiler
-pinned in `.github/package-seed.env`, then requires 18 resolver checks, 29
-package integration cases and 28 checked-release/distribution cases with
-structural coverage. Metadata also checks eight publishing regression checks.
-The Windows runtime job also runs. The aggregate **PR gate** succeeds only
-when all four jobs succeed; configure it as a required status check on `main`
-to enforce merge blocking.
+syntax and runs five current-source compiler cases with the verified v0.3.0 seed
+in `.github/smoke-seed.env`. The seed interprets the checkout frontend and current
+and frozen target checkers; this check does not build fresh tools or execute the
+checkout LLVM backend. The Windows runtime job also runs. The aggregate
+**PR gate** succeeds only when all three jobs succeed; configure it as a required
+status check on `main` to enforce merge blocking.
+
+Pushes to `main` and manual CI dispatches with `full_validation` enabled also run
+two separate jobs after the source check. **Fresh native compiler smoke** builds
+the checkout compiler and manager through the seed-compatible manager bridge,
+then runs eight direct CLI cases and three package build/cache states. **Native package distribution** builds the checkout
+manager and test campaign with the published compiler pinned in
+`.github/package-seed.env`, then requires all 22 resolver checks, 29 package
+integration cases and 28 checked-release/distribution cases with structural
+coverage, plus the separate target-dependency/scheduler fixture and 22 native
+runner checks. These slower jobs are not merge prerequisites. Metadata retains eight
+required publishing regression checks. The extended native harness remains
+available with `tools/release/native-ci.sh extended-pr-smoke`; all six release
+groups retain their coverage.
 See [PR checks](ci.md) for exact coverage, local commands and required-check setup.
 Dispatch **CI** with `self_host` enabled for a fresh compiler build and fixed
 point, or **Native release** for all six compiler groups. These full checks are

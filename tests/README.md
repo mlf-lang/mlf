@@ -1,9 +1,19 @@
 # Native MLF compiler tests
 
-Pull requests use the explicit [PR smoke group](../docs/ci.md): Figure 12,
-four independent checker controls, 12 selected interpreter/LLVM fixtures and
-three package/cache checks. It builds and tests checkout tools. The six full
-root groups below retain their existing coverage and do not repeat smoke.
+Pull requests require the small [compiler source smoke suite](../docs/ci.md):
+the verified seed interprets `PRQuickMain.emlf` against the checkout frontend and
+current/frozen target checkers through the split library roots, with two accepted
+cases, two source rejections
+and one malformed target. This does not build fresh tools or test current LLVM
+execution. Fresh native tools, eight CLI cases, three package/cache states and
+the complete 79-case package distribution suite, separate target-dependency/
+scheduler fixture and 22 native runner checks run separately on pushes to
+`main` or manual CI dispatches with `full_validation` enabled.
+
+The broader campaign remains available as `tools/release/native-ci.sh extended-pr-smoke`:
+framework/process contracts, Figure 12, four independent checker controls,
+12 interpreter/LLVM fixtures and package/cache checks. The six full root groups
+below retain their existing coverage.
 
 The local `mlf-tests` package preserves the original assertions, input corpora,
 runtime event traces, generated graph properties, and harness fault injections.
@@ -121,8 +131,9 @@ sets, and matching metric counts; partial, duplicate, missing and stale reports
 fail the gate. Each receipt hashes the report and reviewed inventory alongside
 the compiler, manager, runner and source snapshot. Text logs remain diagnostic.
 
-The checked-package release amendment adds 28 `checked release: ` IDs from
-`Tests.PackageReleases` to the existing 47 package executions, for 75 total.
+The original checked-package release amendment added 28 `checked release: ` IDs
+from `Tests.PackageReleases` to the then-existing 47 package executions, for 75
+total. The parallel-build integration below extends that reviewed inventory to79.
 The target-dependency/scheduler integration fixture runs in addition to the 79 structured cases and must report its separate successful completion. Each ID is emitted only after its scenario assertions complete. The full package
 entry wraps resolver, source-package and release scenarios in one coverage
 report; `--releases` and the fake `gh` helper remain focused entry points and

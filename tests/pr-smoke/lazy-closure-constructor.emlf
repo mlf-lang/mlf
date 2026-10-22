@@ -1,0 +1,5 @@
+data Pair = Pair Int Int;
+let make = \saved -> \n -> Pair (addInt saved n) (panic "unused field") in
+case make 19 23 of {
+ Pair answer _ -> printInt (ifThenElse true answer (panic "unused branch"))
+}

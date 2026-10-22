@@ -2,11 +2,28 @@
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../.."
 group=${1:-smoke}
+# Invalidate rerun evidence before argument checks or native environment setup.
+# Whitelist groups before using their names in an output path.
+case "$group" in
+  source-smoke|pr-smoke|extended-pr-smoke)
+    mkdir -p ".mlf-build/$group"
+    printf '{"complete":false}\n' > ".mlf-build/$group/result.json"
+    ;;
+esac
 test "$#" -le 1 || { printf '%s\n' 'Expected one test group.' >&2; exit 2; }
-case "$group" in smoke|pr-smoke|unit|packages|self-host|parity|backends|port) ;; *) exit 2 ;; esac
+case "$group" in smoke|source-smoke|pr-smoke|extended-pr-smoke|unit|packages|self-host|parity|backends|port) ;; *) exit 2 ;; esac
 test -z "${MLF_TEST_RUNTIME_PROFILE:-}" || test "$MLF_TEST_RUNTIME_PROFILE" = compact-gc || exit 2
 evidence_group=$group
-. tools/release/native-environment.sh
+if [ "$group" = source-smoke ]; then
+  # Interpreting sources does not build native code or discover development libraries.
+  case "$(uname -s):$(uname -m)" in
+    Darwin:arm64) ;;
+    Linux:x86_64) ulimit -s unlimited ;;
+    *) printf '%s\n' 'Unsupported native test host.' >&2; exit 2 ;;
+  esac
+else
+  . tools/release/native-environment.sh
+fi
 if [ "$group" = packages ]; then
   command -v llvm-profdata >/dev/null || {
     printf '%s\n' 'Package PGO tests require llvm-profdata from the matching LLVM installation on PATH.' >&2
@@ -45,8 +62,8 @@ SH
   chmod 755 ".mlf-build/forbidden-tools/$command_name"
 done
 export PATH="$PWD/.mlf-build/forbidden-tools:$PATH"
-if [ "$group" = pr-smoke ]; then
-  tools/release/pr-smoke.sh
+if [ "$group" = source-smoke ] || [ "$group" = pr-smoke ] || [ "$group" = extended-pr-smoke ]; then
+  "tools/release/$group.sh"
 elif [ "$group" = smoke ]; then
   "$MLF_COMPILER" --type --expr '\x -> x'
   ./mlfpkg --compiler "$MLF_COMPILER" --runtime "$PWD/runtime/mlf_runtime.c" --manifest examples/packages/mlf-package.json --timeout 21600 test
