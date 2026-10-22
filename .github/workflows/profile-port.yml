@@ -1,0 +1,89 @@
+name: Profile checked port preparation
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_run:
+        description: Completed or active producer run containing the checked macOS candidate
+        required: true
+        type: string
+      candidate_source:
+        description: Exact source SHA bound to that candidate artifact
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  prepare:
+    name: ${{ matrix.fixture }} GC ${{ matrix.divisor }}
+    runs-on: macos-26
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        fixture: [SolverReuse, InferenceConformance]
+        divisor: [1, 2, 4]
+    env:
+      CANDIDATE_RUN: ${{ inputs.candidate_run }}
+      SOURCE_COMMIT: ${{ inputs.candidate_source }}
+      FIXTURE: ${{ matrix.fixture }}
+      GC_FREE_SPACE_DIVISOR: ${{ matrix.divisor }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.candidate_source }}
+      - name: Native dependencies
+        run: |
+          brew install llvm gmp pkg-config bdw-gc
+          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+          echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
+      - name: Import exact authenticated candidate and genuine prerequisites
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_RUN" =~ ^[0-9]+$ && "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          . tools/release/native-environment.sh
+          tools/release/download-artifact.sh "$CANDIDATE_RUN" candidate-macos-arm64 .mlf-build/shared-candidate "$SOURCE_COMMIT"
+          tools/release/shared-candidate.sh import
+      - name: Materialize the original checked port executable through ordinary cache gates
+        run: |
+          set -euo pipefail
+          . tools/release/native-environment.sh
+          ./mlfpkg --manifest tests/mlf-package.json --compiler "$MLF_COMPILER" \
+            --runtime "$PWD/runtime/mlf_runtime.c" --timeout 21600 \
+            --cache-dir "$PWD/.mlf-build/cache" \
+            --build-dir "$PWD/.mlf-build/port-profile" build --target port
+          jq -e '.complete and ([.builds[].cached] | all)' .mlf-build/port-profile/build-report.json
+      - name: Measure fresh preparation with every independent check
+        run: |
+          set -euo pipefail
+          mkdir -p .mlf-build/port-profile/measurement
+          target="$PWD/.mlf-build/port-profile/measurement/unit.xmlf"
+          test ! -e "$target" && test ! -e "$target.checks.json"
+          start=$(date +%s)
+          /usr/bin/time -l .mlf-build/port-profile/bin/port --prepare "$FIXTURE" "$target" \
+            > .mlf-build/port-profile/measurement/prepare.log \
+            2> .mlf-build/port-profile/measurement/time.log
+          end=$(date +%s)
+          cat .mlf-build/port-profile/measurement/prepare.log .mlf-build/port-profile/measurement/time.log
+          jq -e --arg fixture "$FIXTURE" '.fixture == $fixture and .entry_type == "IO Unit"' "$target.checks.json"
+          rss=$(awk '/maximum resident set size/ {print $1}' .mlf-build/port-profile/measurement/time.log)
+          jq -n --arg source "$SOURCE_COMMIT" --arg run "$CANDIDATE_RUN" --arg fixture "$FIXTURE" \
+            --arg divisor "$GC_FREE_SPACE_DIVISOR" --argjson start "$start" --argjson end "$end" --argjson rss "$rss" \
+            --arg port "$(shasum -a 256 .mlf-build/port-profile/bin/port | awk '{print $1}')" \
+            --arg target "$(shasum -a 256 "$target" | awk '{print $1}')" \
+            --arg checks "$(shasum -a 256 "$target.checks.json" | awk '{print $1}')" \
+            '{complete:true,source:$source,candidate_run:$run,fixture:$fixture,gc_free_space_divisor:$divisor,seconds:($end-$start),maximum_resident_bytes:$rss,port_sha256:$port,target_sha256:$target,checks_sha256:$checks}' \
+            > .mlf-build/port-profile/measurement/timing.json
+          tools/release/shared-candidate.sh verify
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: port-profile-${{ matrix.fixture }}-${{ matrix.divisor }}
+          include-hidden-files: true
+          path: |
+            .mlf-build/port-profile/measurement/*.json
+            .mlf-build/port-profile/measurement/*.log
+            .mlf-build/port-profile/build-report.json
+            .mlf-build/shared-candidate/manifest.json
+          retention-days: 14
