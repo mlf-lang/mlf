@@ -52,6 +52,8 @@ jobs:
         run: tools/release/fetch-seed.sh .mlf-build/package-seed .github/package-seed.env
       - name: Build updated manager while retaining the published compiler
         run: |
+          tools/release/bootstrap-manager.sh .mlf-build/package-manager-bootstrap
+          export MLF_PACKAGE_MANAGER="$PWD/.mlf-build/package-manager-bootstrap/bin/mlfpkg"
           "$MLF_PACKAGE_MANAGER" --compiler "$MLF_COMPILER" --runtime "$PWD/runtime/mlf_runtime.c" \
             --build-dir .mlf-build/package-tools --timeout 5400 --locked build --target mlfpkg
           echo "MLF_PACKAGE_MANAGER=$PWD/.mlf-build/package-tools/bin/mlfpkg" >> "$GITHUB_ENV"

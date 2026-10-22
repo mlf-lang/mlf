@@ -154,11 +154,10 @@ Build reports embed compact query summaries and retain paths to full per-group
 reports. The package manager stamps the saved summary alongside the crate
 artifact; outer cache hits read that summary rather than the detailed inventory.
 
-The current driver schedules crates and inference SCCs serially. Independent
-ready crates, and SCCs whose predecessor schemes are closed, provide possible
-process-level parallelism without changing generalization. Cache locks already
-serialize writers to the same inference namespace. No parallel speedup is
-included in the migration's performance claims.
+The package driver schedules independent ready crates with a bounded process
+pool selected by `--jobs` (default 1). Inference SCCs inside each crate remain
+serial, preserving generalization and existing inference-namespace locks.
+No parallel speedup is included in the migration's performance claims.
 
 LLVM currently optimizes the linked erased program. Nominal constructor tags,
 global optimization and closure layouts remain code-generation inputs.

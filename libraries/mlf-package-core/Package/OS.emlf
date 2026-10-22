@@ -76,6 +76,20 @@ exec cwd argv input output errors timeout = do
 run cwd argv = do
   code <- exec cwd argv "" "" "" 1800
   require (code == 0) ("command failed (" ++ showInt code ++ "): " ++ S.intercalate " " argv)
+-- The caller owns scratch (privately or under its cache lock). Never reuse a
+-- work directory after an interrupted owner: an old child may still write it.
+-- Allocate on the destination filesystem so final publication is a rename.
+temporaryDirectory : String -> String -> IO String
+temporaryDirectory scratch prefix = do
+  let output = scratch ++ "/query.out"
+  let errors = scratch ++ "/query.err"
+  code <- exec "" (Cons "mktemp" (Cons "-d" (Cons (prefix ++ "XXXXXXXX") Nil))) "" output errors 1800
+  if code /= 0 then do { message <- readFile errors; fatal ("temporary directory allocation failed: " ++ message) } else ioReturn Unit
+  temporary <- readFile output
+  let line = S.head (lines temporary)
+  let path = normalize (if ends "\r" line then stringSlice line 0 (stringLength line - 1) else line)
+  require (eqString (parent path) (parent prefix) && starts (base prefix) (base path)) "invalid temporary directory"
+  ioReturn path
 mkdir path = run "" (Cons "/bin/mkdir" (Cons "-p" (Cons path Nil)))
 copy source destination = do
   mkdir (parent destination)

@@ -82,6 +82,13 @@ static MlfValue *os_runProcess(MlfValue *directory, MlfValue *specification) {
     char *end; errno=0;
     long seconds = strtol(parts[0],&end,10);
     if (errno || *end || seconds <= 0 || seconds > 2147483647 || !*parts[4]) { free(parts); fail("IO error: invalid process specification"); }
+    /* Build workers belong to a runner-owned lifetime. Descendants must stay
+     * in that process group so the guardian can clean them after worker,
+     * coordinator, or runner death. The exact group check rejects stale env. */
+    const char *scope = getenv("MLF_BUILD_SCOPE");
+    char *scope_end = NULL;
+    long scope_id = scope && *scope ? strtol(scope,&scope_end,10) : 0;
+    int supervised = scope_id > 0 && scope_end && !*scope_end && scope_id == (long)getpgrp();
     fflush(NULL);
     pid_t pid = fork();
     if (pid < 0) { free(parts); fail("IO error: runProcess failed"); }
@@ -89,7 +96,7 @@ static MlfValue *os_runProcess(MlfValue *directory, MlfValue *specification) {
         /* Only the child establishes its group. Concurrent parent/child
          * setpgid calls can fail with EPERM on Darwin. Verify the required
          * postcondition if the group was already established by the host. */
-        if (setpgid(0,0) && getpgrp()!=getpid()) _exit(126);
+        if (!supervised && setpgid(0,0) && getpgrp()!=getpid()) _exit(126);
         if (*cwd && chdir(cwd)) _exit(126);
         for (int i=0;i<3;++i) {
             if (i==2 && *parts[3] && !strcmp(parts[2],parts[3])) { if (dup2(1,2)<0) _exit(126); continue; }
@@ -111,7 +118,9 @@ static MlfValue *os_runProcess(MlfValue *directory, MlfValue *specification) {
         if (done<0 && errno!=EINTR) fail("IO error: runProcess failed");
         clock_gettime(CLOCK_MONOTONIC,&now);
         if (now.tv_sec-start.tv_sec >= seconds && (now.tv_sec-start.tv_sec>seconds || now.tv_nsec>=start.tv_nsec)) {
-            kill(-pid,SIGKILL); kill(pid,SIGKILL); while (waitpid(pid,&status,0)<0 && errno==EINTR) {}
+            /* A timed-out supervised subprocess invalidates the whole action.
+             * Killing its enclosing scope also stops grandchildren. */
+            kill(supervised ? -getpgrp() : -pid,SIGKILL); kill(pid,SIGKILL); while (waitpid(pid,&status,0)<0 && errno==EINTR) {}
             return small(124);
         }
         nanosleep(&pause,NULL);

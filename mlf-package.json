@@ -3,21 +3,54 @@
   "name": "mlf-compiler",
   "version": "0.3.0",
   "dependencies": {
-    "mlf-bootstrap": {
-      "path": "bootstrap"
+    "mlf-crates": {
+      "path": "libraries/mlf-crates"
     },
-    "mlf-package-tools": {
-      "path": "package"
+    "mlf-developer-tools": {
+      "path": "libraries/mlf-developer-tools"
+    },
+    "mlf-foundation": {
+      "path": "libraries/mlf-foundation"
+    },
+    "mlf-frontend": {
+      "path": "libraries/mlf-frontend"
+    },
+    "mlf-inference": {
+      "path": "libraries/mlf-inference"
+    },
+    "mlf-interpreter": {
+      "path": "libraries/mlf-interpreter"
+    },
+    "mlf-llvm": {
+      "path": "libraries/mlf-llvm"
+    },
+    "mlf-package-core": {
+      "path": "libraries/mlf-package-core"
+    },
+    "mlf-xmlf": {
+      "path": "libraries/mlf-xmlf"
     }
   },
   "executables": {
     "emlf": {
       "main": "bootstrap/Main.emlf",
-      "profile": "compiler"
+      "profile": "compiler",
+      "dependencies": [
+        "mlf-crates",
+        "mlf-foundation",
+        "mlf-inference",
+        "mlf-interpreter",
+        "mlf-llvm",
+        "mlf-xmlf"
+      ]
     },
     "mlfpkg": {
       "main": "package/Main.emlf",
-      "profile": "compiler"
+      "profile": "compiler",
+      "dependencies": [
+        "mlf-foundation",
+        "mlf-package-core"
+      ]
     },
     "compiler-tests": {
       "main": "tests/CompilerTestsMain.emlf",
@@ -27,7 +60,13 @@
         "Tests.Coverage": "tests/Tests/Coverage.emlf",
         "Tests.TestDrivers": "tests/Tests/TestDrivers.emlf",
         "Tests.TestSources": "tests/Tests/TestSources.emlf"
-      }
+      },
+      "dependencies": [
+        "mlf-developer-tools",
+        "mlf-foundation",
+        "mlf-frontend",
+        "mlf-package-core"
+      ]
     }
   },
   "tests": {

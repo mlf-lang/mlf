@@ -1,0 +1,26 @@
+{
+  "format": 1,
+  "name": "mlf-xmlf",
+  "version": "0.3.0",
+  "dependencies": {
+    "mlf-foundation": {
+      "path": "../mlf-foundation"
+    },
+    "mlf-frontend": {
+      "path": "../mlf-frontend"
+    },
+    "mlf-language-core": {
+      "path": "../mlf-language-core"
+    }
+  },
+  "library": {
+    "modules": {
+      "Bootstrap.X.Check": "Bootstrap/X/Check.emlf",
+      "Bootstrap.X.Checked": "Bootstrap/X/Checked.emlf",
+      "Bootstrap.X.Parser": "Bootstrap/X/Parser.emlf",
+      "Bootstrap.X.Pretty": "Bootstrap/X/Pretty.emlf",
+      "Bootstrap.X.Syntax": "Bootstrap/X/Syntax.emlf",
+      "Bootstrap.X.Type": "Bootstrap/X/Type.emlf"
+    }
+  }
+}

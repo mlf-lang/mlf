@@ -1,0 +1,26 @@
+{
+  "format": 1,
+  "name": "mlf-frontend",
+  "version": "0.3.0",
+  "dependencies": {
+    "mlf-foundation": {
+      "path": "../mlf-foundation"
+    },
+    "mlf-language-core": {
+      "path": "../mlf-language-core"
+    }
+  },
+  "library": {
+    "modules": {
+      "Bootstrap.Dependency": "Bootstrap/Dependency.emlf",
+      "Bootstrap.Desugar": "Bootstrap/Desugar.emlf",
+      "Bootstrap.Layout": "Bootstrap/Layout.emlf",
+      "Bootstrap.Lexer": "Bootstrap/Lexer.emlf",
+      "Bootstrap.Module": "Bootstrap/Module.emlf",
+      "Bootstrap.Parsec": "Bootstrap/Parsec.emlf",
+      "Bootstrap.Parser": "Bootstrap/Parser.emlf",
+      "Bootstrap.Prelude": "Bootstrap/Prelude.emlf",
+      "Bootstrap.Surface": "Bootstrap/Surface.emlf"
+    }
+  }
+}

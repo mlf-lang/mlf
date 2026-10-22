@@ -3,14 +3,25 @@
   "name": "mlf-test-tools",
   "version": "0.1.0",
   "dependencies": {
-    "mlf-test": { "path": ".." },
-    "mlf-package-tools": { "path": "../../package" },
-    "mlf-bootstrap": { "path": "../../bootstrap" }
+    "mlf-foundation": {
+      "path": "../../libraries/mlf-foundation"
+    },
+    "mlf-package-core": {
+      "path": "../../libraries/mlf-package-core"
+    },
+    "mlf-test": {
+      "path": ".."
+    }
   },
   "library": {
-    "modules": { "Test.Process": "Test/Process.emlf" }
+    "modules": {
+      "Test.Process": "Test/Process.emlf"
+    }
   },
   "executables": {
-    "mlf-test": { "main": "Main.emlf", "profile": "compiler" }
+    "mlf-test": {
+      "main": "Main.emlf",
+      "profile": "compiler"
+    }
   }
 }

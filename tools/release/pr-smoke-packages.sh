@@ -17,6 +17,12 @@ cd -- "$root"
 sha256() { shasum -a 256 "$1" | awk '{print $1}'; }
 compiler_sha256=$(sha256 "$compiler")
 manager_sha256=$(sha256 "$manager")
+build_runner=${MLF_BUILD_RUNNER:-"$(dirname -- "$manager")/mlf-build-runner"}
+build_runner=$(cd -- "$(dirname -- "$build_runner")" && printf '%s/%s\n' "$PWD" "$(basename -- "$build_runner")")
+test -x "$build_runner"
+test "$("$build_runner" --protocol-version)" = 1
+build_runner_sha256=$(sha256 "$build_runner")
+export MLF_BUILD_RUNNER="$build_runner"
 runtime_sha256=$(sha256 "$root/runtime/mlf_runtime.c")
 started=$SECONDS
 
@@ -39,7 +45,7 @@ run_stage() {
   printf '%s' "$expected" > "$output/$stage.expected"
   "$manager" --manifest "$app/mlf-package.json" --compiler "$compiler" \
     --runtime "$root/runtime/mlf_runtime.c" --build-dir "$build" \
-    --timeout 120 test --target hello > "$output/$stage.log" 2> "$output/$stage.log.stderr" || status=$?
+    --jobs 2 --timeout 120 test --target hello > "$output/$stage.log" 2> "$output/$stage.log.stderr" || status=$?
   if [ -f "$build/build-report.json" ]; then
     cp "$build/build-report.json" "$output/$stage.build-report.json"
   fi
@@ -47,9 +53,17 @@ run_stage() {
     cat "$output/$stage.log" "$output/$stage.log.stderr" >&2
     return "$status"
   fi
-  jq -e --arg compiler "$compiler_sha256" --arg manager "$manager_sha256" '
+  jq -e --arg compiler "$compiler_sha256" --arg manager "$manager_sha256" --arg runner "$build_runner_sha256" '
     .format == 1 and .complete == true and .implementation == "MLF" and
     .toolchain.compiler.sha256 == $compiler and .toolchain.manager.sha256 == $manager and
+    (.scheduler | type == "array" and length == 1) and
+    .scheduler[0].helper.sha256 == $runner and
+    (.scheduler_results | type == "array" and length == 1) and
+    (.scheduler_results[0] | .complete == true and .exit_code == 0 and .jobs == 2 and
+      .maximum_parallel_jobs > 0 and .maximum_parallel_jobs <= 2 and
+      all(.tasks[]; .state == "succeeded" and .exit_code == 0)) and
+    .scheduler[0].invocation_id == .scheduler_results[0].invocation_id and
+    .scheduler[0].plan_digest == .scheduler_results[0].plan_digest and
     (.builds | type == "array" and length > 0) and
     (.tests | type == "array" and length == 1 and
       all(.[]; .name == "hello" and .passed == true and .backends == ["interpreter","llvm"]))
@@ -91,6 +105,7 @@ jq -e '
 
 test "$(sha256 "$compiler")" = "$compiler_sha256"
 test "$(sha256 "$manager")" = "$manager_sha256"
+test "$(sha256 "$build_runner")" = "$build_runner_sha256"
 test "$(sha256 "$root/runtime/mlf_runtime.c")" = "$runtime_sha256"
 stages='{}'
 for stage in initial cached changed; do
@@ -103,10 +118,12 @@ for stage in initial cached changed; do
 done
 jq -n --arg compiler "$compiler" --arg compiler_sha256 "$compiler_sha256" \
   --arg manager "$manager" --arg manager_sha256 "$manager_sha256" \
+  --arg build_runner "$build_runner" --arg build_runner_sha256 "$build_runner_sha256" \
   --arg runtime_sha256 "$runtime_sha256" --arg helper_sha256 "$(sha256 "$root/tools/release/pr-smoke-packages.sh")" \
   --arg work "$work" --argjson elapsed "$((SECONDS - started))" --argjson stages "$stages" \
   '{complete:true,cases:3,backends:["interpreter","llvm"],
     compiler:$compiler,compiler_sha256:$compiler_sha256,manager:$manager,manager_sha256:$manager_sha256,
+    build_runner:$build_runner,build_runner_sha256:$build_runner_sha256,build_runner_protocol:1,jobs:2,
     runtime_sha256:$runtime_sha256,helper_sha256:$helper_sha256,
     work_directory:$work,total_seconds:$elapsed,stages:$stages}' > "$output/result.json.new"
 mv "$output/result.json.new" "$output/result.json"

@@ -1,7 +1,7 @@
 # Native Windows toolchain
 
 The Windows x64 preview contains native `emlf.exe`, `mlfpkg.exe`, a small Win32
-filesystem helper, runtime sources, GMP/BDWGC DLLs, headers and import libraries.
+filesystem helper, the `mlf-build-runner.exe` process supervisor, runtime sources, GMP/BDWGC DLLs, headers and import libraries.
 It does not require GHC, Cabal, Python, WSL or an MSYS shell.
 
 Download the Windows zip and `SHA256SUMS` from the release, verify the archive,
@@ -19,7 +19,10 @@ Native compilation requires a MinGW-targeting Clang. Set `MLF_CLANG` to its
 absolute path. The SDK includes `Build-Program.ps1` for standalone sources;
 the native package manager handles crate metadata, inference/cache decisions,
 LLVM compilation and linking. Published executables carry their required DLLs
-in the package build's `bin` directory.
+in the package build's `bin` directory. `mlfpkg --jobs 4 build` bounds active
+build actions; the default is 1. Keep the build runner beside the manager when
+moving the SDK. The supervisor uses Windows Job Objects to clean up descendants
+when work fails, times out, or its owner exits.
 
 ## Reproduce a release build
 
@@ -54,9 +57,13 @@ Qualification binds the exact source snapshot, native tools, Clang, helper
 and dependency hashes. It requires:
 
 - Fresh compiler and manager LLVM fixed points across the two native builds.
-- The native MLF package harness: 18 resolver checks and 26 integration cases,
+- The native MLF package harness: 22 resolver checks, 29 package integration cases, and one target dependency
+  namespace/instance case,
   including crate cache invalidation, source-free metadata, command failure
   propagation, compiler selection and native PGO isolation.
+- The native build runner suite: 22 protocol, bounded scheduling, redirection,
+  failure, timeout, and owner/runner lifetime checks. Qualification records the
+  tested helper hash and verifies protocol 1 after SDK relocation.
 - The native MLF parity harness: 7,086 frozen cases, independently checked
   targets, prescribed rejection diagnostics and 160 interpreter/native runtime
   executions. The two reviewed crate import-cycle overlays are shared with
