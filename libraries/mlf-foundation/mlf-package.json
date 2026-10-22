@@ -9,6 +9,7 @@
       "Bootstrap.IntMap": "Bootstrap/IntMap.emlf",
       "Bootstrap.IntSet": "Bootstrap/IntSet.emlf",
       "Bootstrap.Map": "Bootstrap/Map.emlf",
+      "Bootstrap.Regex": "Bootstrap/Regex.emlf",
       "Bootstrap.ST": "Bootstrap/ST.emlf",
       "Bootstrap.Set": "Bootstrap/Set.emlf",
       "Bootstrap.Std": "Bootstrap/Std.emlf",

@@ -39,9 +39,10 @@ export MLF_PACKAGE_MANAGER="$build/seed/mlfpkg"
 "$MLF_COMPILER" --type --expr '\x -> x'
 "$MLF_PACKAGE_MANAGER" --compiler "$MLF_COMPILER" --clang "$cc" \
   --runtime "$PWD/runtime/mlf_runtime.c" --timeout 21600 --locked \
-  --build-dir "$build/candidate" build
+  --build-dir "${3:-$build/candidate}" build
+candidate=$(cd "${3:-$build/candidate}" && pwd)
 if [ -n "${GITHUB_ENV:-}" ]; then
   printf 'MLF_COMPILER=%s\nMLF_PACKAGE_MANAGER=%s\nGC_FREE_SPACE_DIVISOR=%s\n' \
-    "$build/candidate/bin/emlf" "$build/candidate/bin/mlfpkg" "$GC_FREE_SPACE_DIVISOR" >> "$GITHUB_ENV"
+    "$candidate/bin/emlf" "$candidate/bin/mlfpkg" "$GC_FREE_SPACE_DIVISOR" >> "$GITHUB_ENV"
 fi
-printf 'Native Linux candidate: %s/candidate/bin\n' "$build"
+printf 'Native Linux candidate: %s/bin\n' "$candidate"

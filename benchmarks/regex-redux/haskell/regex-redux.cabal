@@ -1,0 +1,14 @@
+cabal-version: 2.4
+name: mlf-benchmark-regex-redux
+version: 0.1.0.0
+build-type: Simple
+license: BSD-3-Clause
+
+executable regex-redux
+  main-is: main.hs
+  build-depends: base >=4.14 && <5, vector ==0.13.2.0
+  default-language: Haskell2010
+  default-extensions: BangPatterns, ForeignFunctionInterface, CApiFFI
+  ghc-options: -O2 -fforce-recomp
+  cc-options: -DPCRE2_CODE_UNIT_WIDTH=8
+  pkgconfig-depends: libpcre2-8 ==10.49

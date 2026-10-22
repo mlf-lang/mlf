@@ -21,7 +21,7 @@ matrices use the compact-GC layout. These are different execution paths.
 | ST source/target inputs copied into StateTypes | Import Tests.StateCases as the single input table. All 56 source strings and 12 target strings, including order and labels, were compared before replacement. Unit type assertions, port nested compilation/roundtrip/output assertions and CLI parity frozen independent oracles remain separate. |
 | One library containing all 77 test modules | Keep eight shared support modules and assign each entry's remaining imports to its private target. Every original module remains reachable. Port plus references compiles 21 test modules including entries, instead of 79; it no longer has to infer unrelated unit and backend cases. |
 
-The resulting inventory is **686 unit checks**, **523 backend fixtures / 575
+The current inventory is **684 unit checks**, **523 backend fixtures / 575
 execution rows per layout**, and **25 port fixtures / 25 execution rows per
 layout**. Seventeen duplicate unit cases and one port row were consolidated;
 one unit regression adds POSIX and Windows crate paths, rejection of relative
@@ -29,6 +29,16 @@ paths and structured native cache commands. The later reductions below preserve
 the full logical parity, Figure 12 and independent Algorithm W inventories.
 Native Windows also runs the same 18 resolver and 29 package integration checks,
 plus the native 7,086-case parity harness.
+
+Core's exact choose-id source, expected principal bound and target roundtrip
+checks are owned by Figure 12's existing A2 principal-type control. The canonical
+and renamed graph-unification methods are combined so that each of the first 80
+canonical outcomes is used immediately for its four original renamings. Every
+canonical graph/equation input, both reference comparisons, all 320 renamed
+executions, the success/rejection controls and scoped expansions remain. These
+two consolidations reduce the prior 686 method labels to 684 and avoid 80
+repeated canonical comparisons plus one repeated source compilation. Figure 12
+still has all 43 labels, 41 distinct case executions and 36 supplementary checks.
 
 ## Smaller witnesses and exact execution sharing
 

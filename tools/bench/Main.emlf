@@ -9,15 +9,17 @@ import qualified Package.Benchmark as B
 import qualified Package.Build as Build
 import qualified Package.Verification as V
 
-data Context = Context String String String String String (List String) (List String) Int
-out (Context d _ _ _ _ _ _ _) = d
-candidate (Context _ c _ _ _ _ _ _) = c
-baseline (Context _ _ b _ _ _ _ _) = b
-clang (Context _ _ _ c _ _ _ _) = c
-flags (Context _ _ _ _ _ fs _ _) = fs
-runs (Context _ _ _ _ _ _ _ n) = n
-backend (Context _ _ _ _ tool _ _ _) = tool
-collector (Context _ _ _ _ _ _ gc _) = gc
+data Context = Context String String String String String (List String) (List String) J.Json Int
+out (Context d _ _ _ _ _ _ _ _) = d
+candidate (Context _ c _ _ _ _ _ _ _) = c
+baseline (Context _ _ b _ _ _ _ _ _) = b
+clang (Context _ _ _ c _ _ _ _ _) = c
+flags (Context _ _ _ _ _ fs _ _ _) = fs
+runs (Context _ _ _ _ _ _ _ _ n) = n
+backend (Context _ _ _ _ tool _ _ _ _) = tool
+collector (Context _ _ _ _ _ _ gc _ _) = gc
+packages (Context _ _ _ _ _ _ _ ps _) = ps
+packageFlags c work language = S.concatMap (\name -> J.getStrings "flags" (J.get name (packages c))) (J.getStrings language (J.get "pkg_config" work))
 right : forall a. Either String a -> IO a
 right result = case result of { Left message -> O.fatal message; Right a -> return a }
 object = J.Object
@@ -44,7 +46,7 @@ build c work language directory = do
  O.mkdir directory
  if eqString language "c" then do
   source <- canonicalPath (V.text "c" (J.get "sources" work))
-  let libraries = if S.elem eqString "c" (J.getStrings "gmp_languages" work) then flags c else Nil
+  let libraries = S.append (if S.elem eqString "c" (J.getStrings "gmp_languages" work) then flags c else Nil) (packageFlags c work "c")
   let argv = S.concat (Cons (one (clang c)) (Cons (J.getStrings "c" (J.get "flags" work)) (Cons (one source) (Cons libraries (Cons (O.words "-lm -o") (Cons (one (directory ++ "/program")) Nil))))))
   sample <- measure directory argv ""
   return (Pair (directory ++ "/program") sample)
@@ -52,7 +54,8 @@ build c work language directory = do
   source <- canonicalPath (V.text "mlf" (J.get "sources" work))
   runtime <- canonicalPath "runtime/mlf_runtime.c"
   -- buildParallel requires a fresh empty directory, including a fresh runtime.o.
-  result <- B.buildParallel directory (if eqString language "mlf" then candidate c else baseline c) (backend c) source runtime (S.append (flags c) (collector c)) 1800.0
+  includes <- S.mapM canonicalPath (J.getStrings "mlf_include_dirs" work)
+  result <- B.buildParallelWithIncludes directory (if eqString language "mlf" then candidate c else baseline c) (backend c) source runtime (S.append (S.append (flags c) (collector c)) (packageFlags c work "mlf")) includes 1800.0
   right result
 
 -- Byte transport is shared with the native test harness. No binary data is
@@ -184,19 +187,29 @@ main = do
    gc <- B.collectorFlags directory
    gcIdentity <- Build.flagIdentity gc
    J.write (directory ++ "/collector.json") gcIdentity
-   let c = Context directory candidate baseline clang backend (Build.flags gmp) gc n
+   let workloads = S.filter (\work -> S.null selected || S.elem eqString (V.text "name" work) selected) (V.array "workloads" manifest)
+   let packageNames = S.nubBy eqString (S.concatMap (\work -> S.concatMap (\language -> J.getStrings language (J.get "pkg_config" work)) (O.words "c mlf")) workloads)
+   packageEntries <- S.mapM (\name -> do
+    let versions = S.nubBy eqString (S.map (\work -> V.text name (J.get "pkg_config_versions" work)) (S.filter (\work -> S.any (\language -> S.elem eqString name (J.getStrings language (J.get "pkg_config" work))) (O.words "c mlf")) workloads))
+    O.require (S.length versions == 1 && stringLength (S.head versions) > 0) ("missing or conflicting benchmark library pin: " ++ name)
+    let headers = S.nubBy eqString (S.concatMap (\work -> J.getStrings name (J.get "pkg_config_headers" work)) workloads)
+    identity <- B.benchmarkPackage (directory ++ "/native-dependencies/" ++ name) name (S.head versions) headers
+    return (Pair name identity)) packageNames
+   let nativePackages = row packageEntries
+   J.write (directory ++ "/native-dependencies.json") nativePackages
+   let c = Context directory candidate baseline clang backend (Build.flags gmp) gc nativePackages n
    O.run "" (Cons clang (S.append (O.words "-O3 benchmarks/fasta/c/upstream.c -lm -o") (one (directory ++ "/fasta-generator"))))
    let files = S.append (Cons candidate (Cons baseline (Cons clang (Cons "runtime/mlf_runtime.c" (Cons "runtime/mlf_runtime.h" (Cons "runtime/khash.h" (Cons "benchmarks/manifest.json" (Cons "tools/bench/Main.emlf" Nil)))))))) (S.concatMap (\w -> S.map (\l -> V.text l (J.get "sources" w)) (O.words "c mlf")) (V.array "workloads" manifest))
    runner <- getExecutablePath
    let dependencies = S.append (S.append (two runner backend) (S.map S.fst (S.append (J.items (J.get "headers" gcIdentity)) (J.items (J.get "libraries" gcIdentity))))) (O.words "runtime/mlf_system.h tests/native/host_support.c tests/native/binary_files.c libraries/mlf-developer-tools/Package/Benchmark.emlf libraries/mlf-package-core/Package/Build.emlf libraries/mlf-developer-tools/Package/Verification.emlf libraries/mlf-package-core/Package/Json.emlf libraries/mlf-package-core/Package/OS.emlf tools/bench/mlf-package.json")
-   fingerprints <- S.mapM (\path -> do { hash <- fileDigest path; return (Pair path hash) }) (S.nubBy eqString (S.append files dependencies))
-   let workloads = S.filter (\work -> S.null selected || S.elem eqString (V.text "name" work) selected) (V.array "workloads" manifest)
+   let extraFiles = S.append (S.concatMap (\entry -> B.benchmarkPackageFiles (S.snd entry)) packageEntries) (S.concatMap (J.getStrings "mlf_dependencies") workloads)
+   fingerprints <- S.mapM (\path -> do { hash <- fileDigest path; return (Pair path hash) }) (S.nubBy eqString (S.append extraFiles (S.append files dependencies)))
    rows <- S.mapM (workload c) workloads
    integrity <- B.checkIntegrity fingerprints
    _ <- right integrity
    let checks = B.performanceChecks rows limits
    let passed = S.all (J.getBool "passed" false) checks
-   J.write report (J.set "limits" limits (J.set "workload_selection" (J.stringArray (S.map (V.text "name") workloads)) (row (Cons (pair "status" (J.str (if passed then "passed" else "failed"))) (Cons (pair "implementation" (J.str "MLF")) (Cons (pair "runs" (J.num n)) (Cons (pair "fingerprints" (row (S.map (\(Pair path hash) -> Pair path (J.str hash)) fingerprints))) (Cons (pair "benchmarks" (J.Array rows)) (one (pair "performance_checks" (J.Array checks)))))))))))
+   J.write report (J.set "native_dependencies" nativePackages (J.set "limits" limits (J.set "workload_selection" (J.stringArray (S.map (V.text "name") workloads)) (row (Cons (pair "status" (J.str (if passed then "passed" else "failed"))) (Cons (pair "implementation" (J.str "MLF")) (Cons (pair "runs" (J.num n)) (Cons (pair "fingerprints" (row (S.map (\(Pair path hash) -> Pair path (J.str hash)) fingerprints))) (Cons (pair "benchmarks" (J.Array rows)) (one (pair "performance_checks" (J.Array checks))))))))))))
    O.require passed "performance limits exceeded; see results.json"
    putStrLn ("All " ++ showInt (S.length rows) ++ " selected workloads pass the requested compilation and runtime limits.")
   _ -> O.fatal "bench COMPILER BASELINE OUTPUT RUNS CLANG [MAX_COMPILE MAX_RUNTIME [WORKLOAD...]] (run from repository root)"

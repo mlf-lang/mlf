@@ -71,6 +71,50 @@ builds and verifies all three packages, and only then creates the annotated
 version tag and publishes one developer preview. Manual runs accept an existing
 version tag. Existing releases and assets are never replaced.
 
+To qualify a CI change without publishing, push its feature branch and dispatch
+**Cross-platform release** on that branch with `validation_only=true` and no
+`tag` input:
+
+```sh
+gh workflow run platform-release.yml --repo mlf-lang/mlf \
+  --ref YOUR_FEATURE_BRANCH -f validation_only=true
+```
+
+Validation checks out the dispatch's exact `github.sha`, runs every POSIX and
+Windows qualification and all three package relocation checks, and verifies
+the packaged commits. The publishing job is skipped. The final
+`validation-summary` artifact records the source, run and archive hashes. This
+mode never creates a release or changes a tag.
+
+Linux bootstraps one candidate pair per run. macOS prepares its qualification
+pair once. Each platform then builds the shared test libraries and port
+executable once, and archives their actual content-addressed artifacts with the
+unchanged producer reports and dependency receipts. Consumers authenticate the
+artifact's workflow run, source and ZIP digest, then check its platform, absolute
+workspace, compiler/manager, native toolchain, runtime and dependency hashes.
+Ordinary package builds still validate artifact bytes and transitive crate
+proofs; a source, flag, ABI or toolchain difference cannot authorize a cache hit.
+No native outputs cross platform boundaries and no test execution verdict is
+shared. All six groups execute independently against the same candidate pair,
+and self-host uses a fresh cache for the next stage.
+
+The macOS port and unit groups obtain runners before a small Ubuntu start
+barrier admits the other four groups. The barrier accepts started or completed
+jobs regardless of their verdicts, so every group still executes independently;
+matrix ordering alone does not provide runner priority. Each platform packages
+as soon as its own six groups finish. Port preparation
+uses the same host memory collection policy as its matrix execution, retaining
+all independent target checks. Small transport builds remain local because their
+subsecond cost does not justify another artifact transfer.
+
+For measurements, save the run and jobs REST responses and download the run's
+logs, then run `node tools/release/measure-ci.mjs RUN.json JOBS.json LOG_DIRECTORY`.
+The report separates runner and queue time, candidate/prerequisite builds,
+execution, packaging and artifact work. It reports aggregate runner seconds
+without OS billing multipliers; parallel build or queue durations must not be
+subtracted directly from workflow wall time. Historical benchmark sources,
+measurements, pins and thresholds remain separate and unchanged.
+
 Qualification artifacts are downloaded individually, checked against their
 recorded SHA-256 digest and workflow source, then extracted sequentially. This
 also supports parity archives containing thousands of diagnostic files on
@@ -97,6 +141,11 @@ executable checks. Its internal POSIX `compiler-test` transports and historical
 performance gates are not claimed as Windows qualification. Each archive
 retains the exact source/tool hashes and platform evidence.
 
+The PR compiler smoke uses the separate `.github/smoke-seed.env` pin for
+released compact-GC tools compatible with the current runtime. Its archive,
+source commit and both executables are checked. `.github/seed.env` remains the
+historical cold-bootstrap anchor for release qualification and comparisons.
+
 The **Native release** manual entry delegates to the same three-platform
 workflow, so it cannot publish a macOS-only release. Historical macOS previews
 used the following sequence:
@@ -109,10 +158,14 @@ used the following sequence:
    verifies a fresh self-host fixed point, tests relocation and installation,
    then uploads a new developer-preview release with SHA-256 checksums.
 
-CI on `main` and pull requests checks release metadata, downloads the pinned
-native seed in `.github/seed.env`, and builds checkout example packages on both
-interpreter and LLVM. This fast check verifies installation and local package
-integration; it does not rebuild or validate modified compiler implementations.
+CI on `main`, pull requests and merge queues checks release metadata and workflow
+syntax, builds the checkout compiler and manager with the verified v0.3.0 seed
+in `.github/smoke-seed.env`, and runs the bounded `pr-smoke` compiler group. It
+retains Figure 12 regressions, selected interpreter/LLVM fixtures, independent
+target checks and package cache invalidation. The separate Windows runtime job
+also runs. The aggregate **PR gate** succeeds only when all three jobs succeed;
+configure it as a required status check on `main` to enforce merge blocking.
+See [PR checks](ci.md) for exact coverage, local commands and required-check setup.
 Dispatch **CI** with `self_host` enabled for a fresh compiler build and fixed
 point, or **Native release** for all six compiler groups. These full checks are
 manual because compilation on hosted M1 runners can exceed 30 minutes per stage.
@@ -124,7 +177,8 @@ unchanged. Native release publication still requires every group to pass.
 No workflow installs GHC or invokes Python. Compiler, parity and package
 qualification runs in native MLF on every supported platform. Seed
 downloads check the selected published archive checksum and both
-independently pinned native executable hashes. CI now pins v0.1.1. Release jobs
+independently pinned native executable hashes. Full release/self-host bootstraps
+retain v0.1.1 in `.github/seed.env`. Release jobs
 read seed pins and verification/timing tools from the workflow's immutable
 commit, so an older target tag cannot silently select its old seed. The checksum
 file can also cover supplementary validation archives that are not downloaded

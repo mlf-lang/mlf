@@ -1,0 +1,114 @@
+module Tests.TestDriverCache where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+import qualified Package.Json as J
+import qualified Package.CompilerTests as CT
+import qualified Tests.Basic as H
+
+-- Exercise the real driver construction path with small source programs. A
+-- second output directory shares only checked artifacts, never test results.
+main : IO Unit
+main = H.withScratch (\scratch -> do
+ let directory = scratch ++ "/driver cache's λ"
+ O.mkdir directory
+ root <- canonicalPath "."
+ compiler <- getEnv "MLF_BOOTSTRAP_COMPILER"
+ self <- getExecutablePath
+ O.run "" (Cons "/bin/cp" (Cons "-R" (Cons (root ++ "/runtime") (Cons (directory ++ "/runtime") Nil))))
+ O.mkdir (directory ++ "/runtime/sub")
+ writeFile (directory ++ "/runtime/sub/cache.h") "/* nested dependency version 1 */\n"
+ runtime <- readFile (directory ++ "/runtime/mlf_runtime.c")
+ writeFile (directory ++ "/runtime/mlf_runtime.c") ("#include \"sub/cache.h\"\n" ++ runtime)
+ O.mkdir (directory ++ "/tests/native")
+ O.copy (root ++ "/tests/native/native_trace.c") (directory ++ "/tests/native/native_trace.c")
+ O.mkdir (directory ++ "/bootstrap")
+ O.mkdir (directory ++ "/dependency")
+ writeFile (directory ++ "/dependency/DriverCacheImported.emlf") "module DriverCacheImported where\nimported = 1\n"
+ writeFile (directory ++ "/dependency/mlf-package.json") "{\"format\":1,\"name\":\"driver-cache-dependency\",\"version\":\"0.1.0\",\"library\":{\"modules\":{\"DriverCacheImported\":\"DriverCacheImported.emlf\"}}}\n"
+ writeFile (directory ++ "/bootstrap/DriverCacheShared.emlf") "module DriverCacheShared where\nimport DriverCacheImported\nshared = imported\n"
+ writeFile (directory ++ "/bootstrap/LLVMDriver.emlf") "module LLVMDriver where\nimport DriverCacheShared\nmain = printInt shared\n"
+ writeFile (directory ++ "/bootstrap/RuntimeDriver.emlf") "module RuntimeDriver where\nimport DriverCacheShared\nmain = printInt (shared + 10)\n"
+ writeFile (directory ++ "/mlf-package.json") "{\"format\":1,\"name\":\"driver-cache-probe\",\"version\":\"0.1.0\",\"dependencies\":{\"driver-cache-dependency\":{\"path\":\"dependency\"}},\"library\":{\"modules\":{\"DriverCacheShared\":\"bootstrap/DriverCacheShared.emlf\"}},\"executables\":{\"llvm\":{\"main\":\"bootstrap/LLVMDriver.emlf\"},\"runtime\":{\"main\":\"bootstrap/RuntimeDriver.emlf\"}}}\n"
+ code <- O.exec directory (Cons self (Cons "--driver-cache-case" (Cons compiler Nil))) "" (directory ++ "/case.out") (directory ++ "/case.err") 1800
+ out <- readFile (directory ++ "/case.out")
+ err <- readFile (directory ++ "/case.err")
+ H.assert (code == 0 && H.contains "PASS checked native driver cache" out) ("driver cache regression failed: " ++ out ++ err)
+ putStrLn "PASS checked native driver cache")
+
+build : String -> String -> Bool -> IO J.Json
+build root compiler portOnly = do
+ let directory = root ++ "/current"
+ O.mkdir directory
+ J.write (directory ++ "/verification.json") J.empty
+ ignored <- CT.prepareDrivers (CT.TestContext root directory compiler Nil (root ++ "/shared-cache")) portOnly
+ report <- J.read (directory ++ "/verification.json")
+ saved <- J.read (J.getText "path" "" (J.get "driver_build" report))
+ H.assert (J.getBool "complete" false saved) "driver builder did not finish input verification"
+ return report
+
+artifact : J.Json -> String -> String -> J.Json
+artifact report driver stage = J.get stage (J.get "artifacts" (J.get driver (J.get "drivers" report)))
+hit report driver stage = J.getBool "cached" false (artifact report driver stage)
+sameKey first second driver stage = eqString (J.getText "key" "" (artifact first driver stage)) (J.getText "key" "" (artifact second driver stage))
+runDriver root name expected = do
+ let stem = root ++ "/run-" ++ name
+ binary <- O.executable (root ++ "/current/" ++ name)
+ setEnv "MLF_TEST_TRACE" (stem ++ ".trace")
+ code <- O.exec root (Cons binary Nil) "" (stem ++ ".out") (stem ++ ".err") 60
+ unsetEnv "MLF_TEST_TRACE"
+ out <- readFile (stem ++ ".out")
+ err <- readFile (stem ++ ".err")
+ H.assert (code == 0 && eqString out expected && eqString err "") ("cached driver output changed: " ++ out ++ err)
+
+run : String -> IO Unit
+run compiler = do
+ root <- canonicalPath "."
+ cold <- build root compiler true
+ S.mapM_ (\stage -> H.assert (S.not (hit cold "LLVMDriver" stage)) ("cold driver cache hit: " ++ stage)) (O.words "llvm object linked runtime")
+ runDriver root "LLVMDriver" "1\n"
+ -- Remove the entire local output, so a hit has to survive group relocation.
+ O.move (root ++ "/current") (root ++ "/first-group")
+ warm <- build root compiler true
+ S.mapM_ (\stage -> H.assert (hit warm "LLVMDriver" stage && sameKey cold warm "LLVMDriver" stage) ("cross-group driver cache miss: " ++ stage)) (O.words "llvm object linked runtime")
+ runDriver root "LLVMDriver" "1\n"
+ O.mkdir (root ++ "/examples")
+ writeFile (root ++ "/examples/unrelated.emlf") "42\n"
+ unrelated <- build root compiler true
+ S.mapM_ (\stage -> H.assert (hit unrelated "LLVMDriver" stage && sameKey warm unrelated "LLVMDriver" stage) ("unrelated input invalidated driver: " ++ stage)) (O.words "llvm object linked runtime")
+ writeFile (root ++ "/dependency/DriverCacheImported.emlf") "module DriverCacheImported where\nimported = 2\n"
+ changed <- build root compiler true
+ H.assert (S.not (hit changed "LLVMDriver" "llvm") && S.not (sameKey unrelated changed "LLVMDriver" "llvm") && hit changed "LLVMDriver" "runtime") "transitive source edit did not invalidate only the dependent driver stages"
+ runDriver root "LLVMDriver" "2\n"
+ let object = J.getText "directory" "" (artifact changed "LLVMDriver" "object")
+ writeFile (object ++ "/program.o") "corrupt object"
+ repaired <- build root compiler true
+ H.assert (hit repaired "LLVMDriver" "llvm" && S.not (hit repaired "LLVMDriver" "object")) "corrupt native driver object was reused"
+ runDriver root "LLVMDriver" "2\n"
+ let linked = J.getText "directory" "" (artifact repaired "LLVMDriver" "linked")
+ binary <- O.executable (linked ++ "/program")
+ writeFile binary "corrupt executable"
+ relinked <- build root compiler true
+ H.assert (hit relinked "LLVMDriver" "object" && S.not (hit relinked "LLVMDriver" "linked")) "corrupt driver executable was reused"
+ runDriver root "LLVMDriver" "2\n"
+ traced <- build root compiler false
+ H.assert (hit traced "LLVMDriver" "linked" && S.not (hit traced "RuntimeDriver" "runtime")) "backend preparation rebuilt the ordinary driver or reused an untraced runtime"
+ H.assert (S.not (eqString (J.getText "key" "" (artifact traced "RuntimeDriver" "runtime")) (J.getText "key" "" (artifact traced "LLVMDriver" "runtime")))) "traced and ordinary runtime objects shared a cache entry"
+ runDriver root "RuntimeDriver" "12\n"
+ trace <- readFile (root ++ "/run-RuntimeDriver.trace")
+ H.assert (H.contains "W 31320a\n" trace && H.contains "U \n" trace) "cached runtime lost stdio interposition"
+ -- This header is outside B.create's immediate runtime/*.h inventory. Only
+ -- Clang's actual transitive dependency scan can invalidate its C object.
+ writeFile (root ++ "/runtime/sub/cache.h") "/* nested dependency version 2 */\n"
+ headerChanged <- build root compiler true
+ H.assert (hit headerChanged "LLVMDriver" "llvm" && hit headerChanged "LLVMDriver" "object" && S.not (hit headerChanged "LLVMDriver" "runtime")) "changed transitive C header reused a cached runtime object"
+ runDriver root "LLVMDriver" "2\n"
+ previousInclude <- getEnv "CPATH"
+ let include = root ++ "/additional headers"
+ O.mkdir include
+ setEnv "CPATH" include
+ environmentChanged <- build root compiler true
+ if eqString previousInclude "" then unsetEnv "CPATH" else setEnv "CPATH" previousInclude
+ H.assert (hit environmentChanged "LLVMDriver" "llvm" && S.not (hit environmentChanged "LLVMDriver" "object") && S.not (hit environmentChanged "LLVMDriver" "linked")) "native environment change reused an old object/link or discarded source LLVM"
+ runDriver root "LLVMDriver" "2\n"
+ putStrLn "PASS checked native driver cache"

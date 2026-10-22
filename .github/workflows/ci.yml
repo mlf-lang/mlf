@@ -3,6 +3,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  merge_group:
   workflow_dispatch:
     inputs:
       self_host:
@@ -22,14 +23,22 @@ jobs:
   metadata:
     name: Release metadata
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - run: tools/release/check.sh
+      - name: Validate GitHub Actions workflows
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz -o "$RUNNER_TEMP/actionlint.tar.gz"
+          printf '%s  %s\n' 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8 "$RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -shellcheck= -pyflakes=
   native:
-    name: Native package smoke
+    name: Native compiler smoke
     if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only
     runs-on: macos-26
-    timeout-minutes: 90
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Native dependencies
@@ -37,17 +46,31 @@ jobs:
       - name: Fetch verified native seed
         env:
           GH_TOKEN: ${{ github.token }}
-        run: tools/release/fetch-seed.sh .mlf-build/seed
-      - name: Exercise checkout packages on both backends without GHC or Python
-        run: tools/release/native-ci.sh smoke
+        run: tools/release/fetch-seed.sh .mlf-build/seed .github/smoke-seed.env
+      - name: Build checkout tools and run bounded compiler regressions
+        run: tools/release/native-ci.sh pr-smoke
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
-          name: native-smoke-evidence
+          name: pr-smoke-evidence
           include-hidden-files: true
+          retention-days: 14
           path: |
-            examples/packages/.mlf-build/build-report.json
-            examples/packages/.mlf-build/tests/**/*.stdout
+            .mlf-build/pr-smoke/result.json
+            .mlf-build/pr-smoke/*.log
+            .mlf-build/pr-smoke/candidate/build-report.json
+            .mlf-build/pr-smoke/candidate/cache/*/artifact.json
+            .mlf-build/pr-smoke/tests/verification.json
+            .mlf-build/pr-smoke/tests/*.log*
+            .mlf-build/pr-smoke/tests/suite-build/build-report.json
+            .mlf-build/pr-smoke/tests/driver-build/build-report.json
+            .mlf-build/pr-smoke/tests/driver-build/commands/*.stderr
+            .mlf-build/pr-smoke/tests/driver-build/commands/*.stdout
+            .mlf-build/pr-smoke/tests/**/matrix-compact-gc/*.status.json
+            .mlf-build/pr-smoke/tests/**/matrix-compact-gc/*.stdout
+            .mlf-build/pr-smoke/tests/**/matrix-compact-gc/*.stderr
+            .mlf-build/pr-smoke/tests/package-smoke/*.log*
+            .mlf-build/pr-smoke/tests/package-smoke/build/build-report.json
   windows-runtime:
     name: Native Windows runtime
     runs-on: windows-2025
@@ -59,7 +82,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Install pinned native Windows dependencies
         run: tools/release/setup-windows.ps1 -Output .mlf-build/windows-dependencies
-      - name: Test both runtime layouts and native filesystem operations
+      - name: Test compact-GC runtime and native filesystem operations
         run: tools/release/test-windows-runtime.ps1 -NativePrefix $env:MLF_NATIVE_PREFIX -Clang $env:MLF_CLANG -Output .mlf-build/windows-runtime
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
@@ -69,6 +92,19 @@ jobs:
           path: |
             .mlf-build/windows-runtime/*.json
             .mlf-build/windows-runtime/*.log
+  pr-gate:
+    # A skipped manual job must not satisfy the required check on the same SHA.
+    name: ${{ github.event_name == 'workflow_dispatch' && 'Manual CI summary' || 'PR gate' }}
+    if: always() && github.event_name != 'workflow_dispatch'
+    needs: [metadata, native, windows-runtime]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every merge check to succeed
+        env:
+          CHECKS: ${{ toJSON(needs) }}
+        run: |
+          printf '%s\n' "$CHECKS" | jq -e 'length == 3 and all(.[]; .result == "success")'
   self-host:
     name: Fresh self-host
     if: github.event_name == 'workflow_dispatch' && inputs.self_host && !inputs.windows_runtime_only

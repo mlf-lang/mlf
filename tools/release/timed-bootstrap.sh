@@ -70,6 +70,7 @@ trap finish EXIT
 "$MLF_TIMING_DRIVER" "$MLF_TIMING_DIR" package-manager "$PWD/mlfpkg" \
   --compiler "$MLF_TIMING_DIR/bin/emlf" --clang "$MLF_TIMING_DIR/bin/clang" \
   --runtime "$PWD/runtime/mlf_runtime.c" --timeout 21600 --locked --build-dir "$build" build
+"$MLF_TIMING_DRIVER" "$MLF_TIMING_DIR" native-helper "$scripts/ensure-build-runner.sh" "$build/bin" "$MLF_TIMING_CLANG"
 # The resource gate must succeed before later CI steps receive this candidate.
 summarized=1
 "$scripts/summarize-bootstrap.sh" "$build"

@@ -90,6 +90,23 @@
         "Tests.Figure12Suite": "Tests/Figure12Suite.emlf"
       }
     },
+    "pr-smoke": {
+      "main": "PRSmokeMain.emlf",
+      "profile": "compiler",
+      "modules": {
+        "Tests.PRSmoke": "Tests/PRSmoke.emlf",
+        "Tests.Figure12": "Tests/Figure12.emlf",
+        "Tests.Figure12Suite": "Tests/Figure12Suite.emlf",
+        "Tests.IOTests": "Tests/IOTests.emlf",
+        "Tests.NativeOptimization": "Tests/NativeOptimization.emlf",
+        "Tests.BackendCases": "Tests/BackendCases.emlf",
+        "Tests.Readability": "Tests/Readability.emlf",
+        "Tests.System": "Tests/System.emlf",
+        "Tests.StateCases": "Tests/StateCases.emlf",
+        "Tests.StateRuntime": "Tests/StateRuntime.emlf",
+        "Tests.StateTypes": "Tests/StateTypes.emlf"
+      }
+    },
     "backends": {
       "main": "BackendSuiteMain.emlf",
       "profile": "compiler",
@@ -179,7 +196,17 @@
         "Tests.BenchmarkSuite": "Tests/BenchmarkSuite.emlf",
         "Tests.BootstrapSuite": "Tests/BootstrapSuite.emlf",
         "Tests.NativeABI": "Tests/NativeABI.emlf",
-        "Tests.ReleaseSuite": "Tests/ReleaseSuite.emlf"
+        "Tests.ReleaseSuite": "Tests/ReleaseSuite.emlf",
+        "Tests.RegexRedux": "Tests/RegexRedux.emlf",
+        "Tests.TestDriverCache": "Tests/TestDriverCache.emlf",
+        "Tests.TestSourceCache": "Tests/TestSourceCache.emlf"
+      }
+    },
+    "regex": {
+      "main": "RegexMain.emlf",
+      "profile": "compiler",
+      "modules": {
+        "Tests.Regex": "Tests/Regex.emlf"
       }
     }
   }

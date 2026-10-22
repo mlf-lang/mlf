@@ -146,11 +146,15 @@ For example, `./mlfpkg test --target unit --target packages` selects two groups.
 Plain `test` runs every declared group. Every selected test command executes;
 test-group results are not cached. Checked build artifacts and port preparation
 can be shared, while the compact-GC layout and backend executions still run.
+Port preparation and source driver LLVM track their resolved import closures
+rather than the complete repository inventory. Driver native objects and links
+are cached with their native toolchain, headers, libraries and ordered flags;
+each group's verification report records the actual artifact keys and reuse.
 Commands, tool/source hashes, cache decisions, and test
 results are recorded in `.mlf-build/build-report.json`; compiler groups also
 write their detailed evidence under `.mlf-build/compiler-tests/`.
-The full port matrix includes large graph programs running inside the native
-interpreter. The timeout above allows the complete suite to finish while each
+The full port matrix executes large compiled compiler and graph probes through
+LLVM. The timeout above allows the complete suite to finish while each
 fixture keeps its original execution limit. See
 [the verified native coverage](../tests/README.md).
 

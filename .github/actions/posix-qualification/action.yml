@@ -1,0 +1,84 @@
+name: Qualify native candidate
+description: Independently execute one group against authenticated native build outputs
+inputs:
+  platform:
+    required: true
+    description: Native platform
+  group:
+    required: true
+    description: Preserved qualification group
+  source:
+    required: true
+    description: Exact source SHA
+runs:
+  using: composite
+  steps:
+    - name: Native dependencies
+      shell: bash
+      env:
+        PLATFORM: ${{ inputs.platform }}
+      run: |
+        tools/release/time-stage.sh dependencies bash -e -o pipefail <<'SH'
+        if [ "$PLATFORM" = macos-arm64 ]; then
+          brew install llvm gmp pkg-config bdw-gc
+          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+          echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
+        else
+          sudo apt-get update
+          sudo apt-get install -y clang llvm libgmp-dev libgc-dev pkg-config jq
+          llvm_bin=$(llvm-config --bindir)
+          test -x "$llvm_bin/clang"
+          test -x "$llvm_bin/llvm-profdata"
+          echo "$llvm_bin" >> "$GITHUB_PATH"
+        fi
+        SH
+    - name: Import authenticated native candidate and prerequisites
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PLATFORM: ${{ inputs.platform }}
+        SOURCE_COMMIT: ${{ inputs.source }}
+      run: |
+        tools/release/time-stage.sh artifact-import bash -e -o pipefail <<'SH'
+        . tools/release/native-environment.sh
+        tools/release/download-artifact.sh "$GITHUB_RUN_ID" "candidate-$PLATFORM" .mlf-build/shared-candidate "$SOURCE_COMMIT"
+        tools/release/shared-candidate.sh import
+        SH
+    - name: Run complete native compiler group
+      shell: bash
+      env:
+        TEST_GROUP: ${{ inputs.group }}
+      run: |
+        tools/release/time-stage.sh qualification tools/release/native-ci.sh "$TEST_GROUP"
+    - name: Collect exact candidate and primary evidence
+      shell: bash
+      if: always()
+      env:
+        TEST_GROUP: ${{ inputs.group }}
+      run: |
+        tools/release/time-stage.sh evidence bash -e -o pipefail <<'SH'
+        mkdir -p .mlf-build/release-evidence/bin .mlf-build/release-evidence/compiler-tests .mlf-build/release-evidence/diagnostics
+        if test -f .mlf-build/shared-candidate/manifest.json; then
+          cp .mlf-build/shared-candidate/manifest.json .mlf-build/release-evidence/candidate-manifest.json
+        fi
+        for tool in emlf mlfpkg mlf-build-runner; do
+          if test -f ".mlf-build/bin/$tool"; then cp ".mlf-build/bin/$tool" .mlf-build/release-evidence/bin/; fi
+        done
+        if test -d ".mlf-build/compiler-tests/$TEST_GROUP"; then
+          cp -R ".mlf-build/compiler-tests/$TEST_GROUP" .mlf-build/release-evidence/compiler-tests/
+          find .mlf-build/release-evidence/compiler-tests -type f ! -name verification.json ! -name build-report.json ! -name '*.log' ! -name '*.stderr' ! -name '*.err' ! -name '*.status.json' ! -name rows.jsonl ! -name current-label ! -path '*/port-*/matrix-*/case-14-interpreter.stdout' ! -path '*/port-*/matrix-*/case-19-interpreter.stdout' ! -path '*/port-*/matrix-*/case-23-interpreter.stdout' -delete
+        fi
+        log_group=$TEST_GROUP
+        case "$TEST_GROUP" in port-*) log_group=port ;; esac
+        if test -f ".mlf-build/tests/$log_group.log"; then
+          cp ".mlf-build/tests/$log_group.log" ".mlf-build/release-evidence/diagnostics/$TEST_GROUP.log"
+          tail -n 50 ".mlf-build/tests/$log_group.log"
+        fi
+        SH
+    - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      if: always()
+      with:
+        name: native-${{ inputs.platform }}-${{ inputs.group }}
+        include-hidden-files: true
+        path: .mlf-build/release-evidence/
+        retention-days: 14

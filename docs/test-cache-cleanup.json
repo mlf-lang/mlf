@@ -1,0 +1,666 @@
+{
+  "format": 1,
+  "recorded_at": "2026-10-22T10:11:16.004Z",
+  "purpose": "Duplicate-test consolidation and checked port/driver artifact caching",
+  "complete_for_affected_groups": true,
+  "base_commit": "ad299fa17296945ca0cf34d6fc4ac35dc5eb0924",
+  "state": "Local uncommitted changes; no commit or publication performed",
+  "modified_code_inputs": {
+    "package/Package/CompilerTests.emlf": "ba48995789c4539538af9523bdbb892deacc41c34c0a0030c420378dd1783b6e",
+    "package/Package/TestSources.emlf": "52b0494f872abe57908cfd4417156f1d083160d5286ba6f3f49825e661c3284b",
+    "package/Package/TestDrivers.emlf": "3f44766336f3ba208d08d08c0863a0ff1832e96e909a58536a1b11acf6192284",
+    "package/mlf-package.json": "5ad6099ef87c2077406f674d0804ecef5cc26d78db850b8645ff36d8d58fe0cd",
+    "tests/CoreMain.emlf": "3ad0889a8e602d388d97503950b23ef07d4ab3d4ebf4c869ffbd9c14dc33689e",
+    "tests/HarnessMain.emlf": "594d71bde70487ccc1792aef115d7bb1dc4f8585af5fec32d86345f7532b5372",
+    "tests/Tests/Core.emlf": "798705864c0037b75882357f5504a45313cc124f9954f62d6c8f7d5ade73a691",
+    "tests/Tests/Figure12Suite.emlf": "0449203e15602fd9572f3aa9916218b8383377015ce8b06d2d21d268840f518d",
+    "tests/Tests/GraphUnification.emlf": "8426976eee443988f030925a8af81ec37f1b4256bdc8a892c65a3dd4d6efb2ba",
+    "tests/Tests/TestSourceCache.emlf": "7b7ab4df4ef0228ad271c663baf613873c0c2d2de1abde59c97ea48f00a4ddfa",
+    "tests/Tests/TestDriverCache.emlf": "88292dd6d90e0f2c21debe221c609fdb43ddc0d0ad966ff8e04bd06c8137e044",
+    "tests/mlf-package.json": "943bd25e6b4cbc27a9a081ed02360f950202f6a70a788bae11bb092a7a768348",
+    "mlf.lock": "a3c1bedad1df717e164e47e7b9fea4900225efc31a9bcd381880c58dc39be287"
+  },
+  "compiler": {
+    "path": ".mlf-build/compact-only/r3/build/bin/emlf",
+    "sha256": "a49467d37e89720485a95414543d925c8906aa5d1dac0c1233817c5796723afd"
+  },
+  "manager": {
+    "path": ".mlf-build/test-cache-cleanup/build/bin/mlfpkg",
+    "sha256": "4c4690ea2dec79533eaba550804cc2abdc95833eb0cfd437652ac167bf062bcc"
+  },
+  "cache_directory": ".mlf-build/shared-test-artifacts/r2/build/cache",
+  "package_native_environment": {
+    "MLF_GC_PREFIX": "/opt/homebrew/Cellar/bdw-gc/8.2.12"
+  },
+  "launcher_installation": {
+    "path": ".mlf-build/package-manager/mlfpkg",
+    "previous_sha256": "e1823e7479a0a3a0fc376505cdae351c05518d6b6b1d01721b4606866b982017",
+    "backup": ".mlf-build/test-cache-cleanup/launcher-manager-before",
+    "sha256": "4c4690ea2dec79533eaba550804cc2abdc95833eb0cfd437652ac167bf062bcc",
+    "version": "mlfpkg 0.3.0",
+    "matches_validated_manager_bytes": true,
+    "locked_root_plan": {
+      "path": ".mlf-build/test-cache-cleanup/launcher-locked-plan.json",
+      "sha256": "65d7bc37331759b23592613e1f111f76b0b3455f5e3920adb6d9bb08d90a9d5c",
+      "exit_code": 0
+    },
+    "test_manifest_plan": {
+      "path": ".mlf-build/test-cache-cleanup/launcher-test-plan.json",
+      "sha256": "77599a3b66a6bf2881bca8201b9e836c279e1b11b1f6f6ac3d6082dbb5c2d09a",
+      "exit_code": 0
+    }
+  },
+  "duplicate_consolidation": {
+    "core_methods_before": 686,
+    "core_methods_after": 684,
+    "canonical_graph_cases": 5616,
+    "canonical_reexecutions_removed": 80,
+    "renamed_graph_executions_retained": 320,
+    "choose_id_duplicate_removed": 1,
+    "retained_owner": "Figure12 A2 principal type and target roundtrip",
+    "independent_reference_comparisons_retained": true
+  },
+  "groups": [
+    {
+      "name": "unit-r2",
+      "command": {
+        "path": ".mlf-build/test-cache-cleanup/unit-r2-command.json",
+        "sha256": "42cc75ade0bd0d6aa43b7fad846c70593c851cc13d6d3a56026d7d0f1e5d46c9"
+      },
+      "verification": {
+        "path": ".mlf-build/test-cache-cleanup/validation/unit-r2/verification.json",
+        "sha256": "98341acb270d52077b59c71bac3988b3db402135ca6a0422fb9ed699c4b4f648"
+      },
+      "exit_code": 0,
+      "wall_seconds": 2506.199018875,
+      "current_source_hashes_verified": 399,
+      "suites": {
+        "core": {
+          "coverage": [
+            "684 checks; 0 failures",
+            "Oracle: 6712 cases; 6703 executions"
+          ],
+          "log_sha256": "c468177c47d2f915397e4a6a6369381f576e49bc06bef0794727e2db524573ff"
+        },
+        "figure12": {
+          "coverage": [
+            "43/43 expressions match regression expectations; 0 failures",
+            "41 distinct Figure12 executions",
+            "36 supplementary checks; 0 failures"
+          ],
+          "log_sha256": "e77a29fbf793b76979bf406695a3cb65201e209d651bf89c139b7ac8d3002159"
+        },
+        "harness": {
+          "coverage": [
+            "58 native benchmark/bootstrap/release harness tests passed",
+            "2 native cache regression checks passed"
+          ],
+          "log_sha256": "61642c3c256a4dcf3061f414ab18faba467628c9b8fad09eef9e502915d1019e"
+        }
+      }
+    },
+    {
+      "name": "packages-r2",
+      "command": {
+        "path": ".mlf-build/test-cache-cleanup/packages-r2-command.json",
+        "sha256": "392f335596c643a49f4766d4f355f4390c061227ec8cbbdb20bfbe8f05489fbf"
+      },
+      "verification": {
+        "path": ".mlf-build/test-cache-cleanup/validation/packages-r2/verification.json",
+        "sha256": "a7d20476b4abc42462d0c974c3217e9349a14397efd48bc79c2c37cbb0a11c15"
+      },
+      "exit_code": 0,
+      "wall_seconds": 126.91975725,
+      "current_source_hashes_verified": 399,
+      "suites": {
+        "packages": {
+          "coverage": [
+            "18 package resolver tests passed",
+            "29 package integration cases passed"
+          ],
+          "log_sha256": "764a1f1ecfc65bf766e03ccf03e948f82ea86dd7b658c5de4ff8fc70f8959176"
+        }
+      }
+    },
+    {
+      "name": "backends",
+      "command": {
+        "path": ".mlf-build/test-cache-cleanup/backends-command.json",
+        "sha256": "cee700216f3168b669e6eebee7b97fcfdb1202a130af065f4a170d920948aba6"
+      },
+      "verification": {
+        "path": ".mlf-build/test-cache-cleanup/validation/backends/verification.json",
+        "sha256": "aa9e276a2eed472bed09e57baaf09ea9d1d2fc6801f5aef1917e406c3edb1279"
+      },
+      "exit_code": 0,
+      "wall_seconds": 1016.560680583,
+      "current_source_hashes_verified": 399,
+      "matrices": {
+        "compact-gc": {
+          "backend_names": [
+            "interpreter",
+            "llvm"
+          ],
+          "backends": 2,
+          "cli_compiler": "/Volumes/src/mlf/.mlf-build/compact-only/r3/build/bin/emlf",
+          "gc_free_space_divisor": 1,
+          "gc_initial_heap_bytes": 8388608,
+          "log_sha256": "1fffb594969081772db3d4cdcfd5c95418d5dd68f13bdb1a45a85eea9247e21b",
+          "rows": 575
+        }
+      }
+    },
+    {
+      "name": "port",
+      "command": {
+        "path": ".mlf-build/test-cache-cleanup/port-command.json",
+        "sha256": "f78ec99c51c3abca689fe74d6aa05d25975ce4ccf0ca7cc6da1934e075f29ffe"
+      },
+      "verification": {
+        "path": ".mlf-build/test-cache-cleanup/validation/port/verification.json",
+        "sha256": "538ee29fa4744850de52dcdf73cd92d12a4001ba279626c671bf68b0a1dbf329"
+      },
+      "exit_code": 0,
+      "wall_seconds": 1506.004560834,
+      "current_source_hashes_verified": 399,
+      "matrices": {
+        "compact-gc": {
+          "backend_names": [
+            "llvm"
+          ],
+          "backends": 1,
+          "cli_compiler": "/Volumes/src/mlf/.mlf-build/compact-only/r3/build/bin/emlf",
+          "gc_free_space_divisor": 1,
+          "gc_initial_heap_bytes": 8388608,
+          "log_sha256": "cb95251b34f81643eae2556cebcd385e9611d8ff904b8cab6672e642b46de735",
+          "prepared_targets_sha256": "c895864f3de33c8d9a1b61194d78c4c4c7e2fdafaae17326d1e45b1cf63f7e93",
+          "rows": 25
+        }
+      }
+    },
+    {
+      "name": "port-warm",
+      "command": {
+        "path": ".mlf-build/test-cache-cleanup/port-warm-command.json",
+        "sha256": "e90bcc42db39d9c236de694f416096cd2feb15db90660ccd09b38ebc8dd45943"
+      },
+      "verification": {
+        "path": ".mlf-build/test-cache-cleanup/validation/port-warm/verification.json",
+        "sha256": "45f58ecbc9a80bfd695982c06f5530469d5793ca82bf33b2b3b575cd1daf3d09"
+      },
+      "exit_code": 0,
+      "wall_seconds": 312.759068209,
+      "current_source_hashes_verified": 399,
+      "matrices": {
+        "compact-gc": {
+          "backend_names": [
+            "llvm"
+          ],
+          "backends": 1,
+          "cli_compiler": "/Volumes/src/mlf/.mlf-build/compact-only/r3/build/bin/emlf",
+          "gc_free_space_divisor": 1,
+          "gc_initial_heap_bytes": 8388608,
+          "log_sha256": "cb95251b34f81643eae2556cebcd385e9611d8ff904b8cab6672e642b46de735",
+          "prepared_targets_sha256": "cd7ae076e183b67584719b9ffcb24f16ada6e5b8d29b5c35008417b5faf7a9f7",
+          "rows": 25
+        }
+      }
+    }
+  ],
+  "port_preparation": {
+    "cold": {
+      "path": ".mlf-build/test-cache-cleanup/validation/port/port-preparation/build-report.json",
+      "sha256": "717bad01692770c8d5c1967f08e0078741d5ca4ab0fcdbd149ac01a6dedb524a",
+      "complete": true,
+      "hits": 0,
+      "misses": 25,
+      "builds": [
+        {
+          "cached": false,
+          "key": "c7f05d417301d4d2ec0f70f5bf2017df468c5f1666f74d3cbdecaba91f833902",
+          "kind": "checked port target foundation"
+        },
+        {
+          "cached": false,
+          "key": "d3311bf647c0c55b8e36ed02b70be67a7b4227b35feffdb7c988344c7db6169b",
+          "kind": "checked port target MapFolds"
+        },
+        {
+          "cached": false,
+          "key": "a3ba28bae6138e9b68642b60ec46a726e625464be0579c84f7da7f1fb01d8d2c",
+          "kind": "checked port target IntegerContainers"
+        },
+        {
+          "cached": false,
+          "key": "f7a89f15476089c5fb9aaf8b14b46b677fe5f00e0c71d1006959136e7931a640",
+          "kind": "checked port target OptimizerQueries"
+        },
+        {
+          "cached": false,
+          "key": "f699bee79f07f5c35c06b3e56c6ba9e128a1f405b7d6a539798b17260419b6a8",
+          "kind": "checked port target ConstructorProjection"
+        },
+        {
+          "cached": false,
+          "key": "84d67082b30c12b744b0aa8cc549fac70b914319a7df360c7429cc883a34a85a",
+          "kind": "checked port target ForceReuse"
+        },
+        {
+          "cached": false,
+          "key": "b4790a959860918d2548df8fa07968e996692062fb2d1eb0447977c079ece725",
+          "kind": "checked port target StrictFields"
+        },
+        {
+          "cached": false,
+          "key": "6c23ebeea10f9d32743e3a60b4a7ac6f59af9ee01938c1d6d42bd73ee469c296",
+          "kind": "checked port target prelude"
+        },
+        {
+          "cached": false,
+          "key": "6f35befc509aab1853b35168d34269e9c226fde32c2a79eaa982144f8b3b643b",
+          "kind": "checked port target Target"
+        },
+        {
+          "cached": false,
+          "key": "d274ee49e06a2bc7c572b4f715f8ffe1abdc081eb8fcd64747f4078c57411afa",
+          "kind": "checked port target frontend"
+        },
+        {
+          "cached": false,
+          "key": "e5a8e93e49774bcecb55babb0c28abb6b10fdfa8014a886f2506ed6e52af1a5b",
+          "kind": "checked port target LexerCounters"
+        },
+        {
+          "cached": false,
+          "key": "7d38943cb9f05ac422e0360b596acc038e37b8924fb38b84dbd6a55a3802ff83",
+          "kind": "checked port target LLVMBuild"
+        },
+        {
+          "cached": false,
+          "key": "0b76df0baaa1d88d4d2667c5184a59965ce97edf0e711ab4cc44a4e7c70e747f",
+          "kind": "checked port target RuntimeCases"
+        },
+        {
+          "cached": false,
+          "key": "a34a690e76408997195c3af7d76f5afbf10310d527328baf30543e36c64f4a90",
+          "kind": "checked port target StateRuntime"
+        },
+        {
+          "cached": false,
+          "key": "d492bda2e3b2dde1630c9963c46a7b1574989f43ce1959bba70a7a7357a9cc05",
+          "kind": "checked port target StateTypes"
+        },
+        {
+          "cached": false,
+          "key": "2a45da2e5a170af70366dc3cada4e309349da6c65b6c55a898d51bc7a267542c",
+          "kind": "checked port target GraphConformance"
+        },
+        {
+          "cached": false,
+          "key": "1fc743cbd27ee216ae0ab4e9481729fc593e425e5f46a7631deeb84d6e692d55",
+          "kind": "checked port target GraphScopes"
+        },
+        {
+          "cached": false,
+          "key": "920253629dfa652754eb6578da29752f5c598b82d73ce09355ed5722e84cc91d",
+          "kind": "checked port target GraphDense"
+        },
+        {
+          "cached": false,
+          "key": "66d30ef5495a61cc2ac69e3d119cacbf8d7d5dfbc287274a324e778c90c02985",
+          "kind": "checked port target OrderedTraversal"
+        },
+        {
+          "cached": false,
+          "key": "7bc6a633fd06023826cf5e38077d1e625b3e7c2dba8dc644ffad667ad505c060",
+          "kind": "checked port target SolverReuse"
+        },
+        {
+          "cached": false,
+          "key": "aa0b168c1dbe7f55082749e83eaac58166e8fe277776aa4ce2f20180f86e3e35",
+          "kind": "checked port target TypeCache"
+        },
+        {
+          "cached": false,
+          "key": "4737c86ca25c1d7b02089a7ba33fc7d9dab6acc15d1c5a6d6981619801b9ce3a",
+          "kind": "checked port target GraphStack"
+        },
+        {
+          "cached": false,
+          "key": "1463b28430d86a210729f9f9bd9320fb90f3ed28f9021d0b586f61f1c662eb61",
+          "kind": "checked port target EmbeddingPruning"
+        },
+        {
+          "cached": false,
+          "key": "d1da810a691dc835fa6efc06d65faab85615a722976fa59e51eaebb99060a2a6",
+          "kind": "checked port target InferenceConformance"
+        },
+        {
+          "cached": false,
+          "key": "f8d38e54a75f265e082e9f4b7043deb6200ff21bc23810ca2335fd77c4c1547a",
+          "kind": "checked port target PrimitiveMetadata"
+        }
+      ]
+    },
+    "warm": {
+      "path": ".mlf-build/test-cache-cleanup/validation/port-warm/port-preparation/build-report.json",
+      "sha256": "ab194dbbfe7a6c9b359b92768aac775f49c825e51c7c242d6989d778ab4f4cd1",
+      "complete": true,
+      "hits": 24,
+      "misses": 1,
+      "builds": [
+        {
+          "cached": false,
+          "key": "c7f05d417301d4d2ec0f70f5bf2017df468c5f1666f74d3cbdecaba91f833902",
+          "kind": "checked port target foundation"
+        },
+        {
+          "cached": true,
+          "key": "d3311bf647c0c55b8e36ed02b70be67a7b4227b35feffdb7c988344c7db6169b",
+          "kind": "checked port target MapFolds"
+        },
+        {
+          "cached": true,
+          "key": "a3ba28bae6138e9b68642b60ec46a726e625464be0579c84f7da7f1fb01d8d2c",
+          "kind": "checked port target IntegerContainers"
+        },
+        {
+          "cached": true,
+          "key": "f7a89f15476089c5fb9aaf8b14b46b677fe5f00e0c71d1006959136e7931a640",
+          "kind": "checked port target OptimizerQueries"
+        },
+        {
+          "cached": true,
+          "key": "f699bee79f07f5c35c06b3e56c6ba9e128a1f405b7d6a539798b17260419b6a8",
+          "kind": "checked port target ConstructorProjection"
+        },
+        {
+          "cached": true,
+          "key": "84d67082b30c12b744b0aa8cc549fac70b914319a7df360c7429cc883a34a85a",
+          "kind": "checked port target ForceReuse"
+        },
+        {
+          "cached": true,
+          "key": "b4790a959860918d2548df8fa07968e996692062fb2d1eb0447977c079ece725",
+          "kind": "checked port target StrictFields"
+        },
+        {
+          "cached": true,
+          "key": "6c23ebeea10f9d32743e3a60b4a7ac6f59af9ee01938c1d6d42bd73ee469c296",
+          "kind": "checked port target prelude"
+        },
+        {
+          "cached": true,
+          "key": "6f35befc509aab1853b35168d34269e9c226fde32c2a79eaa982144f8b3b643b",
+          "kind": "checked port target Target"
+        },
+        {
+          "cached": true,
+          "key": "d274ee49e06a2bc7c572b4f715f8ffe1abdc081eb8fcd64747f4078c57411afa",
+          "kind": "checked port target frontend"
+        },
+        {
+          "cached": true,
+          "key": "e5a8e93e49774bcecb55babb0c28abb6b10fdfa8014a886f2506ed6e52af1a5b",
+          "kind": "checked port target LexerCounters"
+        },
+        {
+          "cached": true,
+          "key": "7d38943cb9f05ac422e0360b596acc038e37b8924fb38b84dbd6a55a3802ff83",
+          "kind": "checked port target LLVMBuild"
+        },
+        {
+          "cached": true,
+          "key": "0b76df0baaa1d88d4d2667c5184a59965ce97edf0e711ab4cc44a4e7c70e747f",
+          "kind": "checked port target RuntimeCases"
+        },
+        {
+          "cached": true,
+          "key": "a34a690e76408997195c3af7d76f5afbf10310d527328baf30543e36c64f4a90",
+          "kind": "checked port target StateRuntime"
+        },
+        {
+          "cached": true,
+          "key": "d492bda2e3b2dde1630c9963c46a7b1574989f43ce1959bba70a7a7357a9cc05",
+          "kind": "checked port target StateTypes"
+        },
+        {
+          "cached": true,
+          "key": "2a45da2e5a170af70366dc3cada4e309349da6c65b6c55a898d51bc7a267542c",
+          "kind": "checked port target GraphConformance"
+        },
+        {
+          "cached": true,
+          "key": "1fc743cbd27ee216ae0ab4e9481729fc593e425e5f46a7631deeb84d6e692d55",
+          "kind": "checked port target GraphScopes"
+        },
+        {
+          "cached": true,
+          "key": "920253629dfa652754eb6578da29752f5c598b82d73ce09355ed5722e84cc91d",
+          "kind": "checked port target GraphDense"
+        },
+        {
+          "cached": true,
+          "key": "66d30ef5495a61cc2ac69e3d119cacbf8d7d5dfbc287274a324e778c90c02985",
+          "kind": "checked port target OrderedTraversal"
+        },
+        {
+          "cached": true,
+          "key": "7bc6a633fd06023826cf5e38077d1e625b3e7c2dba8dc644ffad667ad505c060",
+          "kind": "checked port target SolverReuse"
+        },
+        {
+          "cached": true,
+          "key": "aa0b168c1dbe7f55082749e83eaac58166e8fe277776aa4ce2f20180f86e3e35",
+          "kind": "checked port target TypeCache"
+        },
+        {
+          "cached": true,
+          "key": "4737c86ca25c1d7b02089a7ba33fc7d9dab6acc15d1c5a6d6981619801b9ce3a",
+          "kind": "checked port target GraphStack"
+        },
+        {
+          "cached": true,
+          "key": "1463b28430d86a210729f9f9bd9320fb90f3ed28f9021d0b586f61f1c662eb61",
+          "kind": "checked port target EmbeddingPruning"
+        },
+        {
+          "cached": true,
+          "key": "d1da810a691dc835fa6efc06d65faab85615a722976fa59e51eaebb99060a2a6",
+          "kind": "checked port target InferenceConformance"
+        },
+        {
+          "cached": true,
+          "key": "f8d38e54a75f265e082e9f4b7043deb6200ff21bc23810ca2335fd77c4c1547a",
+          "kind": "checked port target PrimitiveMetadata"
+        }
+      ]
+    },
+    "control": {
+      "path": ".mlf-build/test-cache-cleanup/warm-control-after.json",
+      "sha256": "d8b79a708956e8cc68b95575a225f8b0bbc14521925d306194ac87de3c38f48f"
+    },
+    "unrelated_probe_removed": true,
+    "deliberately_corrupted_fixture": "foundation",
+    "all_25_target_hashes_restored": true
+  },
+  "driver_builds": {
+    "backends": {
+      "path": ".mlf-build/test-cache-cleanup/validation/backends/driver-build/build-report.json",
+      "sha256": "495dc1e6c908d37ba1a8a98dcd929eee906856bee19bb6f32721b5b8e5365581",
+      "complete": true,
+      "builds": [
+        {
+          "cached": false,
+          "key": "0659e6c21b6eee73a01adbe6d9826a5ed1c0f46a9033facc6ffce2b199c78c13",
+          "kind": "test driver C object"
+        },
+        {
+          "cached": false,
+          "key": "4c320542c1fe9705a7885f3e7f4f63e0098f1126a84e9f32aa93fb09c08e5b8c",
+          "kind": "test driver C object"
+        },
+        {
+          "cached": false,
+          "key": "082ecdf5c85ea94f19c29c3043edf9862e063201f1f801e580e901ce5cb18386",
+          "kind": "test driver C object"
+        },
+        {
+          "cached": false,
+          "key": "72701a6aba9a13155657113fbe3bba77c366a244404d6272877470fdc2b137dc",
+          "kind": "source RuntimeDriver LLVM"
+        },
+        {
+          "cached": false,
+          "key": "f69a3def22ebcb59214e52a3a5adbd85ada5fbbbba6baebc257386ba1e605773",
+          "kind": "LLVM object"
+        },
+        {
+          "cached": false,
+          "key": "889ae8142273477359c37c99f76f5c1cf3e4d161f6d1327d257c31c45d1509a0",
+          "kind": "test driver native link"
+        },
+        {
+          "cached": false,
+          "key": "45f06690bf196cf2be92b8bc8c9dc77c196656c7e23d02d94130f02d11bd9463",
+          "kind": "source LLVMDriver LLVM"
+        },
+        {
+          "cached": false,
+          "key": "76043c3aaa0f12d36197d6c02b936f71594776dc6af72fa4156a6fa38f0558f6",
+          "kind": "LLVM object"
+        },
+        {
+          "cached": false,
+          "key": "bb355de663b42ff1d7892d4bb58e499b177a652a7c657fd131daf2ceab599510",
+          "kind": "test driver native link"
+        }
+      ]
+    },
+    "port": {
+      "path": ".mlf-build/test-cache-cleanup/validation/port/driver-build/build-report.json",
+      "sha256": "7e5ad6f260e1dbd9422160044df0a6552fa186b8290cd21b5cb13721adecd027",
+      "complete": true,
+      "builds": [
+        {
+          "cached": true,
+          "key": "0659e6c21b6eee73a01adbe6d9826a5ed1c0f46a9033facc6ffce2b199c78c13",
+          "kind": "test driver C object"
+        },
+        {
+          "cached": true,
+          "key": "082ecdf5c85ea94f19c29c3043edf9862e063201f1f801e580e901ce5cb18386",
+          "kind": "test driver C object"
+        },
+        {
+          "cached": true,
+          "key": "45f06690bf196cf2be92b8bc8c9dc77c196656c7e23d02d94130f02d11bd9463",
+          "kind": "source LLVMDriver LLVM"
+        },
+        {
+          "cached": true,
+          "key": "76043c3aaa0f12d36197d6c02b936f71594776dc6af72fa4156a6fa38f0558f6",
+          "kind": "LLVM object"
+        },
+        {
+          "cached": true,
+          "key": "bb355de663b42ff1d7892d4bb58e499b177a652a7c657fd131daf2ceab599510",
+          "kind": "test driver native link"
+        }
+      ]
+    },
+    "port_warm": {
+      "path": ".mlf-build/test-cache-cleanup/validation/port-warm/driver-build/build-report.json",
+      "sha256": "6bc237c0206e4336c20121e64f292a815d478e18e71c671b770fff14059719f3",
+      "complete": true,
+      "builds": [
+        {
+          "cached": true,
+          "key": "0659e6c21b6eee73a01adbe6d9826a5ed1c0f46a9033facc6ffce2b199c78c13",
+          "kind": "test driver C object"
+        },
+        {
+          "cached": true,
+          "key": "082ecdf5c85ea94f19c29c3043edf9862e063201f1f801e580e901ce5cb18386",
+          "kind": "test driver C object"
+        },
+        {
+          "cached": true,
+          "key": "45f06690bf196cf2be92b8bc8c9dc77c196656c7e23d02d94130f02d11bd9463",
+          "kind": "source LLVMDriver LLVM"
+        },
+        {
+          "cached": true,
+          "key": "76043c3aaa0f12d36197d6c02b936f71594776dc6af72fa4156a6fa38f0558f6",
+          "kind": "LLVM object"
+        },
+        {
+          "cached": true,
+          "key": "bb355de663b42ff1d7892d4bb58e499b177a652a7c657fd131daf2ceab599510",
+          "kind": "test driver native link"
+        }
+      ]
+    }
+  },
+  "port_execution": {
+    "path": ".mlf-build/test-cache-cleanup/port-execution-comparison.json",
+    "sha256": "a43d8201084ac87b6b230aeb9bc997f014188a906519531be34eb75bb41a376c",
+    "cold_children": 25,
+    "warm_children": 25,
+    "all_exit_zero": true,
+    "distinct_process_ids": 25,
+    "equal_emitted_llvm_files": 25,
+    "test_results_reexecuted": true
+  },
+  "historical_port_target_comparison": {
+    "complete": true,
+    "prior_manifest": "/Volumes/src/mlf/.mlf-build/compact-only/r3/build/compiler-tests/port/prepared-port.json",
+    "prior_manifest_sha256": "d2f73d07069476f0d7126a28a4a9ecef83b0394fed3fc22e00166d646931cda6",
+    "current_manifest": "/Volumes/src/mlf/.mlf-build/test-cache-cleanup/validation/port/prepared-port.json",
+    "current_manifest_sha256": "c895864f3de33c8d9a1b61194d78c4c4c7e2fdafaae17326d1e45b1cf63f7e93",
+    "current_targets": 25,
+    "prior_targets": 25,
+    "matching": 25,
+    "differences": []
+  },
+  "persistent_regressions": [
+    "resolved import closure and file hashes",
+    "transitive edit and restoration",
+    "new higher-priority module shadow and fallback",
+    "ordered include roots and entry-adjacent resolution",
+    "cycles, unused missing roots and built-in Prelude",
+    "real native driver construction and cross-output checked reuse",
+    "unrelated source stability",
+    "native object and executable corruption repair",
+    "traced versus ordinary runtime separation and actual stdio trace",
+    "nested C header dependency outside the runtime inventory",
+    "native CPATH environment invalidation",
+    "apostrophe and Unicode dependency paths"
+  ],
+  "failed_attempts_retained": [
+    {
+      "command": {
+        "path": ".mlf-build/test-cache-cleanup/unit-command.json",
+        "sha256": "faa4da8bb5fde1eb16cd37fc246e0c2f0c480d1b4a5fc8696d2612062c53b552"
+      },
+      "reason": "The new regression caught a missing libraries object in a native_inputs record. Fixed before manager rebuild and the successful full unit-r2 run."
+    },
+    {
+      "command": {
+        "path": ".mlf-build/test-cache-cleanup/packages-command.json",
+        "sha256": "3dda05c06874aa9daf70fd50233634559cf74010127785eabe76e9ccc20b003e"
+      },
+      "reason": "Validation setup omitted MLF_GC_PREFIX required by existing environment-inheritance controls. Reran with the collector prefix; no source workaround."
+    }
+  ],
+  "limitations": [
+    "Timings are single observations under concurrent host load, not a controlled before/after speed benchmark.",
+    "Cold port preparation had 25 misses, but its already checked suite and driver artifacts could reuse the shared store.",
+    "Self-host and parity were not rerun; this record qualifies unit, packages, backends and cold/warm port only.",
+    "Native execution was on this macOS host; Windows and Linux were not executed."
+  ],
+  "detailed_evidence": {
+    "path": ".mlf-build/test-cache-cleanup/remaining-validation-summary.json",
+    "sha256": "cb6da6f104bd4ef4eb5977ec2cd0d191022f5b408c4a217f40cfb316d76b759a"
+  }
+}

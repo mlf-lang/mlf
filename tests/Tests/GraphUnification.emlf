@@ -13,8 +13,54 @@ import Tests.GraphValidation (smallGraphs)
 import Tests.GraphUnificationReference (referenceUnify)
 import qualified Tests.Graph as G
 
-graphUnificationTests : (List ( (Pair (String) (IO Unit)) ))
-graphUnificationTests = (let { step result edge = (case result of { (Left err) -> (return (Left err)); (Right g) -> (let { target = (resolve g (toNode edge)) } in do { destination <- (S.maybe (H.fail "missing target binder") return (binder (nodeAt g target))); do { (Pair (Triple root _ frontier) expanded) <- (S.either H.fail return (runBuild g (expand (fromGen edge) destination))); (compareUnifiers expanded (H.append frontier (Cons (Pair root target) Nil))) } }) }) } in (Cons (Pair "indexed unification agrees with map-based reference" do { outcomes <- ((S.forM cases) (\(Pair g eqs) -> (compareUnifiers g eqs))); (let { successes = (H.length (S.filter S.isRight outcomes)) } in do { (S.unless ((successes > 100) && (successes < ((H.length cases) - 100))) (H.fail "unification corpus lacks successful and rejected merges")); (putStrLn (H.append "Graph unification: " (H.append (H.show (H.length cases)) (H.append " cases; " (H.append (H.show successes) " accepted"))))) }) }) (Cons (Pair "indexed graph analysis preserves sparse and negative identities" ((H.forM_ (S.take 80 cases)) (\(Pair g eqs) -> do { expected <- (compareUnifiers g eqs); ((H.forM_ (Cons (\n -> (n * 100000)) (Cons (H.subtract 30) (Cons (\section2 -> (section2 + (9223372036854775807 - 20))) (Cons (\section1 -> (section1 + ((0 - 9223372036854775808) + 1))) Nil))))) (\rename -> (let { shifted = (renameGraph rename g) } in do { actual <- (compareUnifiers shifted (S.concatMap (\(Pair a b) -> (Cons (Pair (rename a) (rename b)) Nil)) eqs)); (S.unless ((H.eq (H.fmap (renameGraph rename) expected) actual) || ((S.not (S.isRight expected)) && (S.not (S.isRight actual)))) (H.fail "unification depends on numeric identity layout")) }))) }))) (Cons (Pair "indexed unification agrees on successive scoped expansions" ((H.forM_ programs) (\(Pair source accepted) -> do { c <- (S.either H.fail return (bind (parseExpr "<unification reference>" source) generate)); do { initial <- (compareUnifiers (initialGraph c) (equalities c)); do { result <- (S.foldM step initial (instances c)); (S.unless (H.eq (S.isRight result) accepted) (H.fail (H.append "unexpected reference outcome: " source))) } } }))) (Cons (Pair "dependency traversal rejects structural cycles created by merging" (let { g = (Graph (IM.fromList (Cons (Pair 0 (Node (GGen 1) Nothing Flexible)) (Cons (Pair 1 (Node (GArr 2 3) (Just 0) Flexible)) (Cons (Pair 2 (Node GBot (Just 1) Flexible)) (Cons (Pair 3 (Node GBot (Just 1) Flexible)) Nil))))) IM.empty 4) } in do { result <- (compareUnifiers g (Cons (Pair 1 2) Nil)); (S.unless (S.not (S.isRight result)) (H.fail "occurs check accepted a self-cycle")) })) Nil)))))
+graphUnificationTests : List (Pair String (IO Unit))
+graphUnificationTests =
+ Cons (Pair "indexed unification and identity renaming agree with map-based reference" unificationAndRenaming)
+ (Cons (Pair "indexed unification agrees on successive scoped expansions" (H.forM_ programs (\(Pair source accepted) -> do
+  c <- H.right (bind (parseExpr "<unification reference>" source) generate)
+  initial <- compareUnifiers (initialGraph c) (equalities c)
+  result <- S.foldM expansionStep initial (instances c)
+  H.assert (H.eq (S.isRight result) accepted) ("unexpected reference outcome: " ++ source))))
+ (Cons (Pair "dependency traversal rejects structural cycles created by merging" (let
+  g = Graph (IM.fromList (Cons (Pair 0 (Node (GGen 1) Nothing Flexible))
+      (Cons (Pair 1 (Node (GArr 2 3) (Just 0) Flexible))
+      (Cons (Pair 2 (Node GBot (Just 1) Flexible))
+      (Cons (Pair 3 (Node GBot (Just 1) Flexible)) Nil))))) IM.empty 4
+  in do
+   result <- compareUnifiers g (Cons (Pair 1 2) Nil)
+   H.assert (S.not (S.isRight result)) "occurs check accepted a self-cycle")) Nil))
+
+-- Each canonical result has already passed both reference comparisons. Reuse
+-- it for the same 80 identity cases, then release the graph and retain a Bool.
+unificationAndRenaming : IO Unit
+unificationAndRenaming = do
+ outcomes <- S.forM (S.zip (S.range 0 (H.length cases - 1)) cases) (\(Pair index (Pair g eqs)) -> do
+  expected <- compareUnifiers g eqs
+  if index < 80 then checkRenamings g eqs expected else return Unit
+  return (S.isRight expected))
+ let successes = H.length (S.filter S.id outcomes)
+ H.assert (successes > 100 && successes < H.length cases - 100) "unification corpus lacks successful and rejected merges"
+ putStrLn ("Graph unification: " ++ H.show (H.length cases) ++ " cases; " ++ H.show successes ++ " accepted")
+ putStrLn "Graph identity renaming: 80 canonical results reused; 320 renamed executions"
+
+checkRenamings : Graph -> List (Pair Int Int) -> Either String Graph -> IO Unit
+checkRenamings g eqs expected =
+ H.forM_ (Cons (\n -> n * 100000)
+  (Cons (H.subtract 30)
+  (Cons (\n -> n + (9223372036854775807 - 20))
+  (Cons (\n -> n + ((0 - 9223372036854775808) + 1)) Nil)))) (\rename -> do
+   let shifted = renameGraph rename g
+   actual <- compareUnifiers shifted (S.map (\(Pair a b) -> Pair (rename a) (rename b)) eqs)
+   H.assert (H.eq (H.fmap (renameGraph rename) expected) actual || (S.not (S.isRight expected) && S.not (S.isRight actual))) "unification depends on numeric identity layout")
+
+expansionStep : Either String Graph -> Edge -> IO (Either String Graph)
+expansionStep result edge = case result of
+ Left err -> return (Left err)
+ Right g -> do
+  let target = resolve g (toNode edge)
+  destination <- S.maybe (H.fail "missing target binder") return (binder (nodeAt g target))
+  Pair (Triple root _ frontier) expanded <- H.right (runBuild g (expand (fromGen edge) destination))
+  compareUnifiers expanded (H.append frontier (Cons (Pair root target) Nil))
 
 compareUnifiers : Graph -> (List ( (Pair (Int) (Int)) )) -> IO ( Either String Graph )
 compareUnifiers g eqs = (let { actual = (H.fmap S.snd (runBuild g (unify eqs))) } in (let { expected = (H.fmap S.snd (runBuild g (referenceUnify eqs))) } in (let { incremental = (bind (bind (Solver.prepare g) (Solver.unify eqs)) Solver.finish) } in do { (let guardSubject3 = (Pair actual expected) in (let guardNext6 = \ignored -> (let guardNext5 = \ignored -> (let guardNext4 = \ignored -> (panic "non-exhaustive test case") in (case guardSubject3 of { _ -> (H.fail (H.append "unification differs\n" (H.append (H.show g) (H.append "\n" (H.append (H.show eqs) (H.append "\nactual: " (H.append (H.show actual) (H.append "\nreference: " (H.show expected))))))))) })) in (case guardSubject3 of { (Pair (Right a) (Right b)) -> (if (H.eq a b) then (return Unit) else (guardNext5 Unit)); _ -> (guardNext5 Unit) })) in (case guardSubject3 of { (Pair (Left _) (Left _)) -> (return Unit); _ -> (guardNext6 Unit) }))); do { (let guardSubject7 = (Pair incremental expected) in (let guardNext10 = \ignored -> (let guardNext9 = \ignored -> (let guardNext8 = \ignored -> (panic "non-exhaustive test case") in (case guardSubject7 of { _ -> (H.fail (H.append "component unification differs\n" (H.append (H.show g) (H.append "\n" (H.append (H.show eqs) (H.append "\nactual: " (H.append (H.show incremental) (H.append "\nreference: " (H.show expected))))))))) })) in (case guardSubject7 of { (Pair (Right a) (Right b)) -> (if (H.eq a b) then (return Unit) else (guardNext9 Unit)); _ -> (guardNext9 Unit) })) in (case guardSubject7 of { (Pair (Left _) (Left _)) -> (return Unit); _ -> (guardNext10 Unit) }))); (return actual) } })))

@@ -1,0 +1,3 @@
+module RegexMain where
+import qualified Tests.Regex as Regex
+main = Regex.main

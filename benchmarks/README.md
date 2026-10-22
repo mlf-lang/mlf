@@ -2,7 +2,9 @@
 
 Use the [native C/MLF benchmark runner](../tools/bench/README.md), built through
 the MLF package manager, for current measurements. It needs native MLF, Clang,
-GMP, pkg-config, and BDWGC; no GHC, Cabal, or Python runs in that workflow.
+GMP, pkg-config, BDWGC, and PCRE2 (`libpcre2-8`) for the regex-redux C baseline;
+no GHC, Cabal, or Python runs in that workflow. MLF regex support is implemented
+in MLF and has no additional native dependency.
 
 The pinned C/Rust/Haskell baseline sources, adaptation patches, manifest hashes,
 fixtures, provenance, and archived measurements are preserved.
@@ -15,9 +17,9 @@ below describes that archived four-language workflow; its old command examples
 and source paths identify historical runs and are not current entry points.
 Use the native guide above to reproduce current C/MLF comparisons.
 
-## Historical four-language methodology
+## Workloads
 
-The suite contains nine workloads, all with pinned C/Rust/Haskell
+The suite contains all ten current Benchmarks Game workloads, with pinned C/Rust/Haskell
 baselines and an MLF implementation:
 
 | Workload | Default input | What it exercises | Source selection |
@@ -31,15 +33,27 @@ baselines and an MLF implementation:
 | mandelbrot | 4096×4096 pixels | Floating branches, bit packing, binary PBM output | [Provenance](mandelbrot/PROVENANCE.md) |
 | reverse-complement | FASTA n = 10,000,000 | Raw input, growing records, indexed bytes, buffered output | [Provenance](reverse-complement/PROVENANCE.md) |
 | k-nucleotide | FASTA n = 1,000,000 | Integer hash tables, substring counting, sorting | [Provenance](k-nucleotide/PROVENANCE.md) |
+| regex-redux | FASTA n = 1,000,000 | Regex matching, nonoverlapping counts, ordered substitutions | [Provenance](regex-redux/PROVENANCE.md) |
 
-See [candidate investigation and remaining work](INVESTIGATION.md). Four source
+See [workload investigation](INVESTIGATION.md). Four source
 languages are necessary to compare practical language/compiler pipelines;
 one shared frontend would answer a different question.
 
 The [measured results](RESULTS.md) include the current-machine table and an
-archived JSON report with all raw samples.
+archived JSON report with all raw samples. Those nine-workload measurements
+predate regex-redux and do not certify its performance.
 
-All nine MLF sources use the current surface syntax: function declarations,
+Regex-redux reads the same FASTA bytes in every language. Its MLF program uses
+[`Bootstrap.Regex`](../libraries/mlf-foundation/Bootstrap/Regex.emlf) for cleanup, all nine
+counts, and all five substitutions in the prescribed order. The independent
+MLF oracle uses explicit character tests and delimiter scans, without that
+regex engine. Tests check exact upstream output, malformed results, and actual
+native/interpreted workload executions. See [regex support](../docs/regex.md)
+for the reusable API and supported syntax.
+
+## Historical four-language methodology
+
+The original nine MLF sources use the current surface syntax: function declarations,
 typed recursion, indentation, conditionals, and infix integer/string operators.
 Binary-trees also uses constructor equations and a local `let rec`;
 k-nucleotide uses literal equations. There is no hand-written `Rec`/`fix`

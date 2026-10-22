@@ -87,11 +87,11 @@ Proposed interface:
 
 ### 5. Split libraries, then shorten executable dependency paths
 
-Apply the proposed library split after the scheduler passes validation, first checking the new layout with `--jobs 1`. The committed baseline contains 63 library modules: 55 bootstrap modules and 8 package-tool modules.
+The original baseline contained 63 library modules: 55 bootstrap modules and 8 package-tool modules. The implemented split contains 67 after adding the scheduler, regex library, and two test-cache helpers. Validate the layout first with `--jobs 1`.
 
-| Proposed library | Responsibility | Baseline modules |
+| Library | Responsibility | Modules |
 | --- | --- | ---: |
-| `mlf-foundation` | Shared representations, collections, host utilities | 11 |
+| `mlf-foundation` | Shared representations, collections, host utilities, regex | 12 |
 | `mlf-language-core` | Kinds, datatypes, primitives | 4 |
 | `mlf-frontend` | Lexer, parser, syntax, module resolution | 9 |
 | `mlf-xmlf` | xMLF syntax, parsing, independent checking | 6 |
@@ -99,10 +99,10 @@ Apply the proposed library split after the scheduler passes validation, first ch
 | `mlf-interpreter` | Checked-program interpreter | 1 |
 | `mlf-llvm` | LLVM optimization and emission | 9 |
 | `mlf-crates` | Crate artifacts, queries, linking, codegen integration | 7 |
-| `mlf-package-core` | Manifests, builds, package commands | 5 |
-| `mlf-developer-tools` | Test orchestration, verification, benchmarks | 3 |
+| `mlf-package-core` | Manifests, builds, package commands, scheduling | 6 |
+| `mlf-developer-tools` | Test orchestration, verification, benchmarks, test caches | 5 |
 
-All committed library modules are accounted for and this proposed group graph is acyclic. Its main chain is `foundation -> language-core -> frontend -> xmlf`; inference, interpreter, and LLVM can then run concurrently. Crates waits for inference and LLVM, followed by package-core and developer-tools. The maximum independent library width of this grouping is three, not ten.
+All committed library modules are accounted for and the library graph is acyclic. Its main chain is `foundation -> language-core -> frontend -> xmlf`; inference, interpreter, and LLVM can then run concurrently. Crates waits for inference and LLVM, followed by package-core and developer-tools. The maximum independent library width of this grouping is three, not ten.
 
 Use one package manifest per library, retain globally unique module names and explicit direct dependencies, and keep sources within their declaring package roots. Update bootstrap paths, test manifests, and lock data with the split.
 
