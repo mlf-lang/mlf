@@ -60,6 +60,7 @@ clearDrivers : IO Unit
 clearDrivers = S.mapM_ unsetEnv (O.words "MLF_BENCH_STREAM_LINK MLF_MOCK_FAIL_RUNTIME MLF_BENCH_STREAM_LLVM MLF_BENCH_MLF_CLANG MLF_MOCK_FAST_FRONTEND MLF_BOOTSTRAP_INTERPRETER MLF_BOOTSTRAP_LLVM MLF_BOOTSTRAP_TIMEOUT_SECONDS MLF_TEST_TRACE MLF_TEST_FAIL_WRITE MLF_LLVM_TEST_ABI MLF_LLVM_TEST_CFLAGS MLF_LLVM_TEST_LIBS MLF_LLVM_TEST_OPT MLF_TEST_PORT_TARGETS MLF_TEST_PORT_TARGETS_SHA256")
 nativeFlags : TestContext -> IO (List String)
 nativeFlags c = do
+  windows <- O.isWindows
   text <- query c (Cons "pkg-config" (O.words "--cflags --libs gmp"))
   extra <- do
     prefix <- getEnv "MLF_GC_PREFIX"
@@ -67,8 +68,8 @@ nativeFlags c = do
       else do
         actual <- canonicalPath prefix
         system <- query c (O.words "uname -s")
-        ioReturn (Cons ("-I" ++ actual ++ "/include") (Cons (actual ++ "/lib/libgc.a") (if eqString (O.trim system) "Linux" then Cons "-ldl" Nil else Nil)))
-  windows <- O.isWindows
+        let library = actual ++ (if windows then "/lib/libgc.dll.a" else "/lib/libgc.a")
+        ioReturn (Cons ("-I" ++ actual ++ "/include") (Cons library (if eqString (O.trim system) "Linux" then Cons "-ldl" Nil else Nil)))
   ioReturn (S.append (B.flags text) (S.append extra (if windows then O.words "-lshell32 -Wl,--stack,268435456" else Nil)))
 stack : TestContext -> IO (List String)
 stack c = do { system <- query c (O.words "uname -s"); ioReturn (if eqString (O.trim system) "Darwin" then Cons "-Wl,-stack_size,0x10000000" Nil else Nil) }
