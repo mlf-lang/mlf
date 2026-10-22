@@ -38,7 +38,7 @@ jobs:
     name: Native compiler smoke
     if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only
     runs-on: macos-26
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Native dependencies
@@ -59,6 +59,7 @@ jobs:
             .mlf-build/pr-smoke/result.json
             .mlf-build/pr-smoke/*.log
             .mlf-build/pr-smoke/candidate/build-report.json
+            .mlf-build/pr-smoke/candidate/cache/*/artifact.json
             .mlf-build/pr-smoke/tests/verification.json
             .mlf-build/pr-smoke/tests/*.log*
             .mlf-build/pr-smoke/tests/*.coverage.jsonl
@@ -66,6 +67,8 @@ jobs:
             tests/golden/unit-inventory.json
             .mlf-build/pr-smoke/tests/suite-build/build-report.json
             .mlf-build/pr-smoke/tests/driver-build/build-report.json
+            .mlf-build/pr-smoke/tests/driver-build/commands/*.stderr
+            .mlf-build/pr-smoke/tests/driver-build/commands/*.stdout
             .mlf-build/pr-smoke/tests/**/matrix-compact-gc/*.status.json
             .mlf-build/pr-smoke/tests/**/matrix-compact-gc/*.stdout
             .mlf-build/pr-smoke/tests/**/matrix-compact-gc/*.stderr

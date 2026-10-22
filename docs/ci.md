@@ -82,5 +82,5 @@ also retained on failure; successful probes clean up their scratch directories.
 Local evidence is
 under `.mlf-build/pr-smoke/`; `result.json` records integer wall-clock seconds
 for tool building and the complete command, plus compiler, manager, campaign,
-framework and coverage fingerprints. The native job has a 45-minute hard
+framework and coverage fingerprints. The native job has a 60-minute hard
 limit; this is a failure bound, not a promised runtime.
