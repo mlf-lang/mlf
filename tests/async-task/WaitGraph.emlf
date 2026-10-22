@@ -99,6 +99,22 @@ ancestorStop = do
     _ -> exitWith 1
   putStrLn "PASS synchronous-ancestor-stop-before-notification"
 
+rootCancellation = do
+  observed <- newIntArray 1 0
+  let sibling = I.Task (\context complete -> case context of
+        I.Context (I.Scope _ _ _ _ stop _ _ _) _ _ -> do
+          asyncSubscribeCompletion stop (\reason -> do
+            writeIntArray observed 0 1
+            complete (I.Cancelled reason))
+          ioReturn Unit)
+  outcome <- I.run I.defaultOptions (I.taskBind (I.spawn sibling) (\_ ->
+    I.taskBind I.yield (\_ -> I.Task (\_ complete -> complete (I.Cancelled (I.CancelReason 716 "root"))))))
+  joined <- readIntArray observed 0
+  case outcome of
+    I.Cancelled (I.CancelReason code _) -> if code == 716 && joined == 1 then ioReturn Unit else exitWith 1
+    _ -> exitWith 1
+  putStrLn "PASS cancelled-root-signals-and-joins-sibling"
+
 cleanupErrors = do
   let failed = I.processStopped (I.Failed (P.AsyncError 600 "primary")) (P.Exited 0 5)
   let cancelled = I.processStopped (I.Cancelled (I.CancelReason 601 "stop")) (P.Cancelled 601 6)
@@ -117,3 +133,4 @@ main = do
   cleanupErrors
   nestedCleanup
   ancestorStop
+  rootCancellation

@@ -25,7 +25,12 @@ bootstrap hosts, while honoring an explicitly selected value.
 
 Stage 1 uses the ordinary source catalogue and native backend, with only
 `Bootstrap.ProcessHost` replaced in that snapshot by `bootstrap/seed-compat`. Its interpreter
-returns an explicit unsupported error for the new primitive. Stage 2 is built
+returns an explicit unsupported error for the new primitive. Before stage 2,
+the released compiler and manager also build a matching `mlfpkg` from the
+snapshot. The released manager cannot decode the stage-1 prelude's new
+primitive inventory, so it cannot validate stage-2 dependency closures. The
+matching manager retains those validation checks and uses a protocol-1 native
+build runner compiled from the same snapshot. Stage 2 is built
 from the unchanged native snapshot and uses the actual in-process supervisor. The script
 checks the stage-2 interpreter's protocol capability before reporting success.
 Keep the shim out of normal builds and release packages' module search paths.

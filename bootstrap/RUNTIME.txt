@@ -187,6 +187,9 @@ Bootstrap transition: scripts/bootstrap-async.sh uses the released seed to
 compile stage 1 in an isolated snapshot with the bootstrap/seed-compat host
 bridge and a seed-schema manifest.
 That host bridge explicitly returns unsupported for process interpretation.
+The released compiler also builds a matching package manager before stage 2:
+the released manager's independent interface decoder rejects newly appended
+primitives in the stage-1 prelude. Dependency-closure validation stays enabled.
 Stage 1 can compile primitive-82-bearing code, and rebuilds stage 2 using the
 separate native-source snapshot. Stage 2 is required for checked-interpreter/native async parity.
 The existing source-smoke import closure and package-manager sources do not

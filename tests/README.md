@@ -337,8 +337,8 @@ The required macOS language job bootstraps a real primitive-aware compiler with
   target rejections through checking, interpreter and LLVM entrypoints.
 - `tools/release/test-async-process.sh /path/to/stage2 OUTPUT`: 13 process
   contracts, panic cleanup and opaque-handle rejections.
-- `tools/release/test-async-task.sh /path/to/stage2 OUTPUT`: 29 contracts
-  (including five explicitly white-box scheduler cases) and five source
+- `tools/release/test-async-task.sh /path/to/stage2 OUTPUT`: 30 contracts
+  (including six explicitly white-box scheduler cases) and five source
   rejections. Includes jobs=1/jobs=4 dynamic dependency/artifact equivalence.
 
 Each records exact source/compiler hashes, observations and completion status.

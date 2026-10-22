@@ -16,4 +16,5 @@ tools/release/test-package-publishing.sh
 tools/release/test-smoke-receipts.sh
 tools/release/test-source-smoke-diagnostics.sh
 tools/release/test-pr-smoke-cli-watchdog.sh
+tools/release/test-async-bootstrap.sh
 printf 'Release metadata and shell syntax passed for %s.\n' "$version"
