@@ -156,7 +156,15 @@
         "Tests.BenchmarkSuite": "Tests/BenchmarkSuite.emlf",
         "Tests.BootstrapSuite": "Tests/BootstrapSuite.emlf",
         "Tests.NativeABI": "Tests/NativeABI.emlf",
-        "Tests.ReleaseSuite": "Tests/ReleaseSuite.emlf"
+        "Tests.ReleaseSuite": "Tests/ReleaseSuite.emlf",
+        "Tests.RegexRedux": "Tests/RegexRedux.emlf"
+      }
+    },
+    "regex": {
+      "main": "RegexMain.emlf",
+      "profile": "compiler",
+      "modules": {
+        "Tests.Regex": "Tests/Regex.emlf"
       }
     }
   }

@@ -1,0 +1,46 @@
+-- The Benchmarks Game regex-redux workload. All matching and replacement use
+-- the reusable MLF regex engine, including FASTA cleanup and the five ordered
+-- substitutions. The correctness oracle is a separate implementation.
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Bootstrap.Regex as R
+
+regex : String -> R.Regex
+regex pattern = case R.compile pattern of
+  Left message -> panic message
+  Right compiled -> compiled
+
+patterns : List String
+patterns = Cons "agggtaaa|tttaccct"
+  (Cons "[cgt]gggtaaa|tttaccc[acg]"
+  (Cons "a[act]ggtaaa|tttacc[agt]t"
+  (Cons "ag[act]gtaaa|tttac[agt]ct"
+  (Cons "agg[act]taaa|ttta[agt]cct"
+  (Cons "aggg[acg]aaa|ttt[cgt]ccct"
+  (Cons "agggt[cgt]aa|tt[acg]accct"
+  (Cons "agggta[cgt]a|t[acg]taccct"
+  (Cons "agggtaa[cgt]|[acg]ttaccct" Nil))))))))
+
+substitutions : List (Pair String String)
+substitutions = Cons (Pair "tHa[Nt]" "<4>")
+  (Cons (Pair "aND|caN|Ha[DS]|WaS" "<3>")
+  (Cons (Pair "a[NSt]|BY" "<2>")
+  (Cons (Pair "<[^>]*>" "|")
+  (Cons (Pair "\\|[^|][^|]*\\|" "-") Nil))))
+
+main : IO Unit
+main = do
+  source <- getContents
+  let originalLength = stringLength source
+  seq originalLength (return Unit)
+  let sequence = R.replaceAll (regex ">.*\n|\n") "" source
+  let cleanedLength = stringLength sequence
+  seq cleanedLength (return Unit)
+  S.mapM_ (\pattern -> putStrLn (pattern ++ " " ++ showInt (R.countMatches (regex pattern) sequence))) patterns
+  let replaced = S.foldlStrict (\text entry -> case entry of
+        Pair pattern replacement -> R.replaceAll (regex pattern) replacement text) sequence substitutions
+  putStrLn ""
+  printInt originalLength
+  printInt cleanedLength
+  printInt (stringLength replaced)
