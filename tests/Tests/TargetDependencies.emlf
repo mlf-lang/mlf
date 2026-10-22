@@ -1,0 +1,41 @@
+module Tests.TargetDependencies where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+import qualified Package.Json as J
+import qualified Tests.Basic as H
+import qualified Tests.Packages as P
+import qualified Tests.BuildScheduler as Scheduler
+
+integration : IO Unit
+integration = H.withScratch (\directory -> do
+ manager <- getEnv "MLF_PACKAGE_MANAGER"
+ compiler <- getEnv "MLF_BOOTSTRAP_COMPILER"
+ windows <- O.isWindows
+ let c = P.Context directory manager compiler (directory ++ "/build output") windows
+ S.mapM_ (\name -> O.mkdir (directory ++ "/app/" ++ name)) (O.words "classes provider unrelated")
+ writeFile (directory ++ "/app/classes/mlf-package.json") "{\"format\":1,\"name\":\"classes\",\"version\":\"0.1.0\",\"library\":{\"modules\":{\"Render\":\"Render.emlf\"}}}"
+ writeFile (directory ++ "/app/classes/Render.emlf") "module Render where\nclass Render a where { render : a -> String }\n"
+ writeFile (directory ++ "/app/provider/mlf-package.json") "{\"format\":1,\"name\":\"provider\",\"version\":\"0.1.0\",\"dependencies\":{\"classes\":{\"path\":\"../classes\"}},\"library\":{\"modules\":{\"Provider\":\"Provider.emlf\"}}}"
+ writeFile (directory ++ "/app/provider/Provider.emlf") "module Provider where\nimport Render\ninstance Render Int where { render = showInt }\nprovided = 42\n"
+ writeFile (directory ++ "/app/unrelated/mlf-package.json") "{\"format\":1,\"name\":\"unrelated\",\"version\":\"0.1.0\",\"library\":{\"modules\":{\"Unrelated\":\"Unrelated.emlf\"}}}"
+ writeFile (directory ++ "/app/unrelated/Unrelated.emlf") "module Unrelated where\nunused = 1\n"
+ writeFile (directory ++ "/app/mlf-package.json") "{\"format\":1,\"name\":\"target-selection\",\"version\":\"0.1.0\",\"dependencies\":{\"classes\":{\"path\":\"classes\"},\"provider\":{\"path\":\"provider\"},\"unrelated\":{\"path\":\"unrelated\"}},\"executables\":{\"hello\":{\"main\":\"Main.emlf\"}}}"
+ writeFile (directory ++ "/app/Main.emlf") "module Main where\nimport Render\nimport Provider\nmain = putStrLn (render provided)\n"
+ P.expect c (O.words "--jobs 1 build") true ""
+ original <- P.report c
+ H.assert (S.any (\row -> eqString (J.getText "crate" "" row) "unrelated/0.1.0/library") (J.values (J.get "crates" original))) "default target omitted a package dependency"
+ P.runBinary c "42\n"
+ P.edit c (\doc -> J.set "executables" (J.set "hello" (J.set "dependencies" (J.stringArray (O.words "classes provider")) (J.get "hello" (J.get "executables" doc))) (J.get "executables" doc)) doc)
+ -- The unselected package remains part of resolution and the source snapshot,
+ -- but an invalid body there must not enter this target's compilation closure.
+ writeFile (directory ++ "/app/unrelated/Unrelated.emlf") "module Unrelated where\nunused : Int\nunused = true\n"
+ P.expect c (O.words "--jobs 4 build") true ""
+ selected <- P.report c
+ H.assert (S.not (S.any (\row -> eqString (J.getText "crate" "" row) "unrelated/0.1.0/library") (J.values (J.get "crates" selected)))) "unselected package was compiled"
+ P.runBinary c "42\n"
+ -- Selecting a dependency never makes another dependency's namespace visible.
+ writeFile (directory ++ "/app/Main.emlf") "module Main where\nimport Unrelated\nmain = printInt unused\n"
+ P.expect c (O.words "build") false "selected direct dependency"
+ Scheduler.integration
+ putStrLn "1 target dependency integration test passed")

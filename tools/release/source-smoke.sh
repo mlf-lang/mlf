@@ -14,9 +14,14 @@ seed_sha256=$(sha256 "$seed")
 # local peak near 4.3 GB, below the hosted runner's 7 GiB memory capacity.
 export GC_FREE_SPACE_DIVISOR=2
 started=$SECONDS
+include_args=(-i "$PWD/tests")
+for manifest in "$PWD"/libraries/*/mlf-package.json; do
+  test -f "$manifest"
+  include_args+=(-i "$(dirname -- "$manifest")")
+done
 snapshot() {
   {
-    find bootstrap -type f -name '*.emlf'
+    find bootstrap libraries -type f \( -name '*.emlf' -o -name 'mlf-package.json' \)
     printf '%s\n' tests/PRQuickMain.emlf tests/Tests/IndependentCheck.emlf \
       tests/Tests/IndependentType.emlf tools/release/source-smoke.sh
     find tests/pr-smoke -type f
@@ -72,7 +77,7 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-"$seed" -i "$PWD/bootstrap" -i "$PWD/tests" --run "$PWD/tests/PRQuickMain.emlf" \
+"$seed" "${include_args[@]}" --run "$PWD/tests/PRQuickMain.emlf" \
   -- "$PWD/tests/pr-smoke" "$build" > "$build/tests.log" 2> "$build/tests.stderr.log" &
 command_pid=$!
 (

@@ -23,10 +23,13 @@ main = H.withScratch (\scratch -> do
  O.mkdir (directory ++ "/tests/native")
  O.copy (root ++ "/tests/native/native_trace.c") (directory ++ "/tests/native/native_trace.c")
  O.mkdir (directory ++ "/bootstrap")
- writeFile (directory ++ "/bootstrap/DriverCacheShared.emlf") "module DriverCacheShared where\nshared = 1\n"
+ O.mkdir (directory ++ "/dependency")
+ writeFile (directory ++ "/dependency/DriverCacheImported.emlf") "module DriverCacheImported where\nimported = 1\n"
+ writeFile (directory ++ "/dependency/mlf-package.json") "{\"format\":1,\"name\":\"driver-cache-dependency\",\"version\":\"0.1.0\",\"library\":{\"modules\":{\"DriverCacheImported\":\"DriverCacheImported.emlf\"}}}\n"
+ writeFile (directory ++ "/bootstrap/DriverCacheShared.emlf") "module DriverCacheShared where\nimport DriverCacheImported\nshared = imported\n"
  writeFile (directory ++ "/bootstrap/LLVMDriver.emlf") "module LLVMDriver where\nimport DriverCacheShared\nmain = printInt shared\n"
  writeFile (directory ++ "/bootstrap/RuntimeDriver.emlf") "module RuntimeDriver where\nimport DriverCacheShared\nmain = printInt (shared + 10)\n"
- writeFile (directory ++ "/mlf-package.json") "{\"format\":1,\"name\":\"driver-cache-probe\",\"version\":\"0.1.0\",\"library\":{\"modules\":{\"DriverCacheShared\":\"bootstrap/DriverCacheShared.emlf\"}},\"executables\":{\"llvm\":{\"main\":\"bootstrap/LLVMDriver.emlf\"},\"runtime\":{\"main\":\"bootstrap/RuntimeDriver.emlf\"}}}\n"
+ writeFile (directory ++ "/mlf-package.json") "{\"format\":1,\"name\":\"driver-cache-probe\",\"version\":\"0.1.0\",\"dependencies\":{\"driver-cache-dependency\":{\"path\":\"dependency\"}},\"library\":{\"modules\":{\"DriverCacheShared\":\"bootstrap/DriverCacheShared.emlf\"}},\"executables\":{\"llvm\":{\"main\":\"bootstrap/LLVMDriver.emlf\"},\"runtime\":{\"main\":\"bootstrap/RuntimeDriver.emlf\"}}}\n"
  code <- O.exec directory (Cons self (Cons "--driver-cache-case" (Cons compiler Nil))) "" (directory ++ "/case.out") (directory ++ "/case.err") 1800
  out <- readFile (directory ++ "/case.out")
  err <- readFile (directory ++ "/case.err")
@@ -78,7 +81,7 @@ run compiler = do
  writeFile (root ++ "/examples/unrelated.emlf") "42\n"
  unrelated <- build root compiler true
  S.mapM_ (\stage -> H.assert (hit unrelated "LLVMDriver" stage && sameKey warm unrelated "LLVMDriver" stage) ("unrelated input invalidated driver: " ++ stage)) (O.words "llvm object linked runtime")
- writeFile (root ++ "/bootstrap/DriverCacheShared.emlf") "module DriverCacheShared where\nshared = 2\n"
+ writeFile (root ++ "/dependency/DriverCacheImported.emlf") "module DriverCacheImported where\nimported = 2\n"
  changed <- build root compiler true
  H.assert (S.not (hit changed "LLVMDriver" "llvm") && S.not (sameKey unrelated changed "LLVMDriver" "llvm") && hit changed "LLVMDriver" "runtime") "transitive source edit did not invalidate only the dependent driver stages"
  runDriver root "LLVMDriver" "2\n"

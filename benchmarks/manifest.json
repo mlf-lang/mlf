@@ -845,15 +845,15 @@
         "vector"
       ],
       "mlf_include_dirs": [
-        "bootstrap"
+        "libraries/mlf-foundation"
       ],
       "mlf_dependencies": [
-        "bootstrap/Bootstrap/Regex.emlf",
-        "bootstrap/Bootstrap/Types.emlf",
-        "bootstrap/Bootstrap/Std.emlf",
-        "bootstrap/Bootstrap/IntMap.emlf",
-        "bootstrap/Bootstrap/IntSet.emlf",
-        "bootstrap/Bootstrap/Map.emlf"
+        "libraries/mlf-foundation/Bootstrap/Regex.emlf",
+        "libraries/mlf-foundation/Bootstrap/Types.emlf",
+        "libraries/mlf-foundation/Bootstrap/Std.emlf",
+        "libraries/mlf-foundation/Bootstrap/IntMap.emlf",
+        "libraries/mlf-foundation/Bootstrap/IntSet.emlf",
+        "libraries/mlf-foundation/Bootstrap/Map.emlf"
       ],
       "output_comparison": "Exact bytes: nine ordered pattern/count lines, separator, and all three lengths against independent MLF scanner oracle and pinned upstream fixture",
       "haskell_lockfile": "benchmarks/regex-redux/haskell/cabal.project.freeze"

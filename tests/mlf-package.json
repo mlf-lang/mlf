@@ -3,17 +3,38 @@
   "name": "mlf-tests",
   "version": "0.3.0",
   "dependencies": {
-    "mlf-bootstrap": {
-      "path": "../bootstrap"
+    "mlf-crates": {
+      "path": "../libraries/mlf-crates"
     },
-    "mlf-package-tools": {
-      "path": "../package"
+    "mlf-developer-tools": {
+      "path": "../libraries/mlf-developer-tools"
+    },
+    "mlf-foundation": {
+      "path": "../libraries/mlf-foundation"
+    },
+    "mlf-frontend": {
+      "path": "../libraries/mlf-frontend"
+    },
+    "mlf-inference": {
+      "path": "../libraries/mlf-inference"
+    },
+    "mlf-language-core": {
+      "path": "../libraries/mlf-language-core"
+    },
+    "mlf-llvm": {
+      "path": "../libraries/mlf-llvm"
+    },
+    "mlf-package-core": {
+      "path": "../libraries/mlf-package-core"
     },
     "mlf-test": {
       "path": "../testing"
     },
     "mlf-test-tools": {
       "path": "../testing/tools"
+    },
+    "mlf-xmlf": {
+      "path": "../libraries/mlf-xmlf"
     }
   },
   "library": {
@@ -134,9 +155,11 @@
       "main": "PackagesMain.emlf",
       "profile": "compiler",
       "modules": {
-        "Tests.PackageResolver": "Tests/PackageResolver.emlf",
+        "Tests.BuildScheduler": "Tests/BuildScheduler.emlf",
         "Tests.PackageReleases": "Tests/PackageReleases.emlf",
-        "Tests.Packages": "Tests/Packages.emlf"
+        "Tests.PackageResolver": "Tests/PackageResolver.emlf",
+        "Tests.Packages": "Tests/Packages.emlf",
+        "Tests.TargetDependencies": "Tests/TargetDependencies.emlf"
       }
     },
     "port": {

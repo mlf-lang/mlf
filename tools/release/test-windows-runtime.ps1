@@ -34,6 +34,23 @@ try {
     $HostHelper = (Resolve-Path -LiteralPath $HostHelper).Path
     $env:MLF_WINDOWS_HOST = $HostHelper
     $report.helper_sha256 = Get-ReleaseHash $HostHelper
+    # Exercise the production helper on native Windows, including Job Object
+    # cleanup when its coordinator or the runner itself is forcibly terminated.
+    $BuildRunner = "$Output/mlf-build-runner.exe"
+    $RunnerFixture = "$Output/build-runner-fixture.exe"
+    $RunnerTests = "$Output/build-runner-tests.exe"
+    $runnerFlags = @('-O2','-std=c11','-Wall','-Wextra','-Werror','-municode','-mno-incremental-linker-compatible','-Wl,--no-insert-timestamp')
+    $null = Invoke-ReleaseCommand $Clang ($runnerFlags + @("$root/runtime/mlf_build_runner.c",'-lpsapi','-o',$BuildRunner)) "$Output/build-runner-build.log" $root
+    $null = Invoke-ReleaseCommand $Clang ($runnerFlags + @("$root/tests/native/build_runner_fixture.c",'-o',$RunnerFixture)) "$Output/build-runner-fixture-build.log" $root
+    $null = Invoke-ReleaseCommand $Clang ($runnerFlags + @("$root/tests/native/build_runner_tests.c",'-o',$RunnerTests)) "$Output/build-runner-tests-build.log" $root
+    $text = Invoke-ReleaseCommand $RunnerTests @($BuildRunner,$RunnerFixture,"$Output/build-runner") "$Output/build-runner.log" $Output
+    Assert-Release ($text -match '22 native build runner tests passed') 'Missing build runner lifecycle success marker'
+    $report.build_runner = @{
+        passed=$true; tests=22; binary_sha256=(Get-ReleaseHash $BuildRunner)
+        fixture_sha256=(Get-ReleaseHash $RunnerFixture); tests_sha256=(Get-ReleaseHash $RunnerTests)
+        log_sha256=(Get-ReleaseHash "$Output/build-runner.log")
+    }
+    Write-Output 'Windows native build runner lifecycle tests passed'
     # Independently compile C and LLVM twice, across a timestamp boundary and
     # into different directories. Compare real object/PE bytes, never a hash
     # with headers removed or rewritten after compilation.

@@ -200,8 +200,7 @@ installObject prefix object = do
   O.writeAtomic (prefix ++ ".mlfco") (Artifact.encodeObject object)
   O.writeAtomic (prefix ++ ".mlfci") (Artifact.encodeInterface (Artifact.objectInterface object))
   releaseFileLock lock
--- The release lock owns this digest-named staging directory. Decode only this
--- private copy: hashing a producer's file and subsequently reopening that file
+-- Decode only this private copy: hashing a producer's file and reopening it
 -- must not allow changed bytes to acquire a local validation receipt.
 stageBundle bundle destination manifest = do
   O.remove destination
@@ -231,12 +230,14 @@ materializePinned directory digest cacheDirectory compiler noPrelude = do
   O.mkdir (cache ++ "/.releases/verified")
   lock <- acquireFileLock (cache ++ "/.locks/release-" ++ digest)
   let receipt = cache ++ "/.releases/verified/" ++ digest ++ "-" ++ validator ++ ".json"
-  let staging = cache ++ "/.releases/staging/" ++ digest ++ "-" ++ validator
+  let scratch = cache ++ "/.releases/staging/" ++ digest ++ "-" ++ validator
   let expected = localPaths cache compiler manifest
   let rootRow = S.fromMaybe (panic "validated release root is absent") (S.find (\row -> eqString (rowKey row) (rootKey manifest)) (rows manifest))
   let root = localPrefix cache compiler rootRow
   reusable <- receiptValid receipt digest validator expected
   if reusable then ioReturn Unit else do
+    O.mkdir scratch
+    staging <- O.temporaryDirectory scratch (scratch ++ "/work-")
     stageBundle bundle staging manifest
     stagedManifest <- readPinnedManifest staging digest
     interfaces <- bundleInterfaces staging stagedManifest

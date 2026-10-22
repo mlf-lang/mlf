@@ -23,17 +23,18 @@ New-Item -ItemType Directory -Path $Output,"$Output/temp" | Out-Null
 $compiler = "$Stage2/bin/emlf.exe"
 $manager = "$Stage2/bin/mlfpkg.exe"
 $helper = "$Stage2/bin/mlf-host.exe"
+$buildRunner = "$Stage2/bin/mlf-build-runner.exe"
 $version = (Get-Content "$root/VERSION" -Raw).Trim()
 $report = [ordered]@{
     schema_version=1; complete=$false; platform='windows-x64'; version=$version
     compiler_sha256=(Get-ReleaseHash $compiler); manager_sha256=(Get-ReleaseHash $manager)
-    helper_sha256=(Get-ReleaseHash $helper); clang_sha256=(Get-ReleaseHash $Clang)
+    helper_sha256=(Get-ReleaseHash $helper); build_runner_sha256=(Get-ReleaseHash $buildRunner); build_runner_protocol=1; clang_sha256=(Get-ReleaseHash $Clang)
     sources=(Get-ReleaseSources $root); dependencies=[ordered]@{}; tests=[ordered]@{}; evidence=[ordered]@{}
 }
 $reportPath = "$Output/release-validation.json"
 Write-ReleaseJson $reportPath $report
 $saved = @{}
-$variables = @('PATH','TEMP','TMP','CC','MLF_COMPILER','MLF_PACKAGE_MANAGER','MLF_NATIVE_PREFIX','MLF_GC_PREFIX','MLF_WINDOWS_HOST','MLF_CLANG')
+$variables = @('PATH','TEMP','TMP','CC','MLF_COMPILER','MLF_PACKAGE_MANAGER','MLF_NATIVE_PREFIX','MLF_GC_PREFIX','MLF_WINDOWS_HOST','MLF_CLANG','MLF_BUILD_RUNNER','MLF_BUILD_REPORT')
 foreach ($name in $variables) { $saved[$name] = [Environment]::GetEnvironmentVariable($name,'Process') }
 try {
     $env:PATH = "$Stage2/bin;$NativePrefix/bin;$(Split-Path $Clang);" + $env:PATH
@@ -41,7 +42,10 @@ try {
     $env:MLF_COMPILER = $compiler; $env:MLF_PACKAGE_MANAGER = $manager
     $env:MLF_NATIVE_PREFIX = $NativePrefix; $env:MLF_GC_PREFIX = $NativePrefix
     $env:MLF_WINDOWS_HOST = $helper; $env:MLF_CLANG = $Clang
+    $env:MLF_BUILD_RUNNER = $buildRunner; $env:MLF_BUILD_REPORT = $null
     $env:CC = $Clang
+    $protocol = Invoke-ReleaseCommand $buildRunner @('--protocol-version') "$Output/build-runner-protocol.log" $root
+    Assert-Release ($protocol.Trim() -eq '1') 'Unsupported build runner protocol'
     $builds = @()
     foreach ($directory in @($Stage1,$Stage2)) {
         $build = Read-ReleaseJson "$directory/build-report.json"
@@ -94,11 +98,16 @@ try {
     $runner = "$Output/campaign-build/bin/compiler-tests.exe"
     $runnerHash = Get-ReleaseHash $runner
     $report.runner_sha256 = $runnerHash
-    Write-Output 'Windows qualification: native 18 resolver checks and 29 package integration cases'
+    Write-Output 'Windows qualification: native 22 resolver checks and 29 package integration cases'
     $null = Invoke-ReleaseCommand $runner @('packages','--manager',$manager,'--compiler',$compiler,'--build-dir',"$Output/packages") "$Output/package-integration.log" $root
     $integration = Read-ReleaseJson "$Output/packages/verification.json"
     Assert-Release ($integration.complete -eq $true -and $integration.implementation -eq 'MLF' -and $integration.compiler_sha256 -eq $report.compiler_sha256 -and $integration.manager_sha256 -eq $report.manager_sha256 -and $integration.runner_sha256 -eq $runnerHash) 'Native package qualification failed or tested different tools'
-    Assert-Release ($integration.suites.packages.coverage -contains '18 package resolver tests passed' -and $integration.suites.packages.coverage -contains '29 package integration cases passed') 'Native package coverage changed'
+    Assert-Release ($integration.suites.packages.coverage -contains '22 package resolver tests passed' -and $integration.suites.packages.coverage -contains '29 package integration cases passed') 'Native package coverage changed'
+    Assert-Release ($integration.suites.packages.coverage -contains '1 target dependency integration test passed') 'Target dependency qualification missing'
+    Assert-Release ($integration.build_runner_sha256 -eq $report.build_runner_sha256 -and $integration.suites.'build-runner'.coverage -contains '22 native build runner tests passed') 'Native build runner lifecycle qualification missing'
+    Copy-Item -LiteralPath "$Output/packages/build-runner.log" -Destination "$Output/build-runner.log"
+    $report.tests.target_dependencies = @{passed=1;compiler_sha256=$report.compiler_sha256;manager_sha256=$report.manager_sha256}
+    $report.tests.build_runner = @{passed=22;sha256=$report.build_runner_sha256;protocol=1}
     $inventoryHash = Get-ReleaseHash "$root/tests/golden/unit-inventory.json"
     $coverageHash = Get-ReleaseHash "$Output/packages/packages.coverage.jsonl"
     Assert-Release ($integration.suites.packages.coverage_inventory_sha256 -eq $inventoryHash -and $integration.suites.packages.coverage_report_sha256 -eq $coverageHash) 'Native package completion evidence changed'
@@ -106,7 +115,7 @@ try {
     Copy-Item -LiteralPath "$Output/packages/packages.log" -Destination "$Output/packages-primary.log"
     Copy-Item -LiteralPath "$Output/packages/packages.coverage.jsonl" -Destination "$Output/packages.coverage.jsonl"
     Copy-Item -LiteralPath "$root/tests/golden/unit-inventory.json" -Destination "$Output/unit-inventory.json"
-    $report.tests.resolver = @{passed=18;manager_sha256=$report.manager_sha256;runner_sha256=$runnerHash;implementation='MLF'}
+    $report.tests.resolver = @{passed=22;manager_sha256=$report.manager_sha256;runner_sha256=$runnerHash;implementation='MLF'}
     $report.tests.integration = @{passed=29;compiler_sha256=$report.compiler_sha256;manager_sha256=$report.manager_sha256;runner_sha256=$runnerHash;coverage_report_sha256=$coverageHash;coverage_inventory_sha256=$inventoryHash;implementation='MLF'}
     Assert-Release (!$Checker -and !$Manifest) 'Native parity builds and verifies its own independent checker and corpus'
     Write-Output 'Windows qualification: native 7,086 parity cases and 160 interpreter/native runtime executions'
@@ -125,13 +134,13 @@ try {
         $report.dependencies["bin/$name"] = Get-ReleaseHash "$NativePrefix/bin/$name"
     }
     $imports = [ordered]@{}
-    foreach ($file in @($compiler,$manager,$helper,"$NativePrefix/bin/pkg-config.exe","$NativePrefix/bin/libgmp-10.dll","$NativePrefix/bin/libgc-1.dll","$NativePrefix/bin/libwinpthread-1.dll","$NativePrefix/bin/libpkgconf-8.dll")) {
+    foreach ($file in @($compiler,$manager,$helper,$buildRunner,$runner,"$NativePrefix/bin/pkg-config.exe","$NativePrefix/bin/libgmp-10.dll","$NativePrefix/bin/libgc-1.dll","$NativePrefix/bin/libwinpthread-1.dll","$NativePrefix/bin/libpkgconf-8.dll")) {
         $imports[[IO.Path]::GetFileName($file)] = Get-PeImports $file
     }
     Write-ReleaseJson "$Output/pe-imports.json" $imports
     Assert-ReleaseSources $root $report.sources
     Assert-Release ((Get-ReleaseHash $runner) -eq $runnerHash) 'Compiler test runner changed during qualification'
-    Assert-Release ((Get-ReleaseHash $compiler) -eq $report.compiler_sha256 -and (Get-ReleaseHash $manager) -eq $report.manager_sha256 -and (Get-ReleaseHash $helper) -eq $report.helper_sha256) 'Qualified tools changed during validation'
+    Assert-Release ((Get-ReleaseHash $compiler) -eq $report.compiler_sha256 -and (Get-ReleaseHash $manager) -eq $report.manager_sha256 -and (Get-ReleaseHash $helper) -eq $report.helper_sha256 -and (Get-ReleaseHash $buildRunner) -eq $report.build_runner_sha256) 'Qualified tools changed during validation'
     foreach ($file in (Get-ChildItem -LiteralPath $Output -File | Where-Object Name -ne 'release-validation.json')) { $report.evidence[$file.Name] = Get-ReleaseHash $file.FullName }
     $report.complete = $true
     Write-ReleaseJson $reportPath $report

@@ -75,7 +75,7 @@ else
   logs=(".mlf-build/tests/$group.log")
   case "$group" in
     unit) suites='core figure12 harness test-framework regex' ;;
-    packages) suites='packages' ;;
+    packages) suites='build-runner packages' ;;
     backends|port) suites='compact-gc' ;;
     *) suites='' ;;
   esac

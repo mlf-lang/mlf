@@ -119,15 +119,15 @@ fetch options dependency = do
   cache <- canonicalPath requested
   O.mkdir (cache ++ "/.locks")
   let destination = cache ++ "/.downloads/" ++ digest
-  let work = destination ++ ".work"
+  let scratch = destination ++ ".staging"
   let asset = destination ++ "/package.mlfr"
   lock <- acquireFileLock (cache ++ "/.locks/download-" ++ digest)
   retained <- validAsset asset digest
   complete <- if retained then validBundle destination expected else ioReturn false
   if complete then do { R.readPinnedManifest (destination ++ "/bundle") expected; ioReturn Unit } else do
     O.require (retained || S.not (J.getBool "offline" false options)) "offline cache miss or corrupt GitHub release asset"
-    O.remove work
-    O.mkdir work
+    O.mkdir scratch
+    work <- O.temporaryDirectory scratch (destination ++ ".work-")
     let downloaded = work ++ "/package.mlfr"
     if retained then O.copy asset downloaded else do
       gh <- O.which "gh"

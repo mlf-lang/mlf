@@ -3,7 +3,9 @@
   "name": "mlf-test",
   "version": "0.1.0",
   "dependencies": {
-    "mlf-bootstrap": { "path": "../bootstrap" }
+    "mlf-foundation": {
+      "path": "../libraries/mlf-foundation"
+    }
   },
   "library": {
     "modules": {
