@@ -1,5 +1,13 @@
 name: Profile checked port preparation
 on:
+  workflow_call:
+    inputs:
+      candidate_run:
+        required: true
+        type: string
+      candidate_source:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       candidate_run:
