@@ -159,11 +159,11 @@ used the following sequence:
    then uploads a new developer-preview release with SHA-256 checksums.
 
 CI on `main`, pull requests and merge queues checks release metadata and workflow
-syntax, builds the checkout compiler, manager and test-owned campaign with the verified v0.3.0 seed
-in `.github/smoke-seed.env`, and runs the bounded `pr-smoke` compiler group. It
-retains framework/coverage/process contracts, the focused `int-set-unions` suite,
-Figure 12 regressions, selected interpreter/LLVM fixtures, independent target
-checks and package cache invalidation. The separate Windows runtime job
+syntax, builds the checkout compiler and manager with the verified v0.3.0 seed
+in `.github/smoke-seed.env`, and runs eight direct CLI smoke cases plus three
+package build/cache states. The extended native harness remains available with
+`tools/release/native-ci.sh extended-pr-smoke`; full release coverage is unchanged.
+The separate Windows runtime job
 also runs. The aggregate **PR gate** succeeds only when all three jobs succeed;
 configure it as a required status check on `main` to enforce merge blocking.
 See [PR checks](ci.md) for exact coverage, local commands and required-check setup.

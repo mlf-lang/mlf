@@ -5,8 +5,8 @@ The `CI` workflow runs on every pull request, merge queue group and push to
 
 - **Release metadata**: version/manifest consistency, shell syntax, benchmark
   provenance and checksum-pinned actionlint 1.7.12 workflow validation.
-- **Native compiler smoke**: a checkout compiler/manager/campaign build followed by the
-  bounded native MLF suite below on macOS arm64.
+- **Native compiler smoke**: a checkout compiler/manager build followed by eight
+  direct CLI cases and three package/cache states on macOS arm64.
 - **Native Windows runtime**: compact-GC runtime, filesystem and reproducible
   object/executable checks on Windows.
 
@@ -18,47 +18,39 @@ is named **Manual CI summary**, so it cannot satisfy the required **PR gate**.
 
 ## Enforce before merging
 
-After the workflow has reported **PR gate**, add that exact check from GitHub
-Actions to the required status checks for `main` in its branch protection rule
-or branch ruleset. Enable the requirement for branches to be up to date, or use
-the merge queue (`merge_group` is already supported). A workflow file cannot
-itself configure repository branch protection; merging this change alone does
-not make its checks mandatory.
+Require **PR gate** from GitHub Actions in the branch protection rule or ruleset
+for `main`. Enable the requirement for branches to be up to date, or use the
+merge queue (`merge_group` is already supported). A workflow file cannot itself
+configure repository branch protection.
 
-## Native smoke coverage
+## Required native smoke coverage
 
-The pinned v0.3.0 seed is only a bootstrap input. CI verifies its archive and both
-executables and source commit, then builds the checkout compiler, manager and
-test-owned `compiler-tests` executable with the current C runtime and checked
-lockfile. That executable runs `pr-smoke` with the resulting compiler and an
-explicit `--manager` pointing to the resulting manager. The ordinary six root groups are unchanged;
-smoke is an explicit additional group and is not duplicated in a full root test.
+The pinned v0.3.0 seed is only a bootstrap input. CI verifies its archive,
+executables and source commit, then builds only the checkout `emlf` and `mlfpkg`
+targets with the current C runtime and checked lockfile. The smoke scripts invoke
+these new binaries directly, avoiding a second compiler-library build, native
+test executables and backend drivers.
 
-The suite reuses existing assertions and fixtures:
+Eight fixed CLI cases exercise:
 
-- Framework assertion, case-selection and report contracts, the fixed coverage
-  validator, and the `int-set-unions` suite through the full runner CLI probes.
-  Process supervision probes cover crashes, timeouts, isolated work directories,
-  captured output and rejected incomplete or contradictory child reports. The
-  framework's three completed checkpoints must match the reviewed inventory.
-- Figure 12: all 43 regression labels, 41 distinct executions and 36 controls,
-  with expected rejection phases/reasons and checked xMLF round trips.
-- Four frozen independent target-checker controls: identity, polymorphic let,
-  IO and rejection of an ill-typed application.
-- Exactly 12 selected backend fixtures on interpreter and compact-GC LLVM:
-  input/output order, unbounded integers, unused-branch laziness, repeated IO,
-  constructors, captured mutual recursion, partial-application laziness,
-  Unicode/NUL, two state-mutation cases and rejection before effects. Each keeps
-  its explicit output/event oracle in addition to backend agreement.
-- The local-package example on both backends in three states: fresh build,
-  unchanged cache reuse and a dependency implementation edit with changed output.
-  Mutation uses a private copy; the checkout stays unchanged.
+- Two accepted programs: polymorphic let and self-application, compiled to xMLF
+  and checked against literal expected types.
+- Two rejected source programs, each requiring its expected diagnostic.
+- Three IO programs on the interpreter and compact-GC LLVM: signed/unbounded
+  arithmetic, lazy branches/constructors/closures, and repeated input with
+  Unicode. Each backend must match a checked-in literal output oracle.
+- One malformed xMLF program rejected before effects by both execution paths.
 
-Missing or duplicate fixture labels, unexpected arguments, wrong matrix counts,
-missing structural framework evidence, missing summaries, failed commands,
-source/tool changes and incomplete package
-reports fail the suite. The full parity corpus, full backend/port matrices and
-fresh self-host fixed point remain part of release qualification.
+The local-package example runs on both backends in three states: a fresh build,
+unchanged cache reuse, and a dependency implementation edit with changed output.
+The last state must rebuild the dependency and both downstream crates. Mutation
+uses a private copy; the checkout stays unchanged. Reports from all three states
+are retained, and empty or incomplete reports cannot pass.
+
+This is a small integration gate. It does not run the full Figure 12 corpus,
+frozen independent target checker, framework/process contracts, or full backend
+and state-mutation matrices. Those checks remain in the extended campaign and
+full release groups; their test cases and evidence validation are unchanged.
 
 ## Run locally
 
@@ -75,12 +67,30 @@ Use an unused seed-download directory. The smoke build can be repeated; ordinary
 source/tool fingerprints validate cache reuse. Each invocation clears its success
 receipt before building. GHC, Cabal and Python are blocked on the native CI path.
 
+For the previous, broader smoke campaign, use the same seed environment and run:
+
+```sh
+tools/release/native-ci.sh extended-pr-smoke
+```
+
+It retains the native `compiler-tests` runner, framework and process probes,
+focused `int-set-unions` suite, all Figure 12 regressions, four frozen independent
+checker controls, 12 backend fixtures and three package/cache states. Its evidence
+is separate under `.mlf-build/extended-pr-smoke/`. The six full root groups and
+release qualification are unchanged.
+
+## Timing and evidence
+
+In CI run [39768304978](https://github.com/mlf-lang/mlf/actions/runs/39768304978),
+the earlier native job took 37m39s: the checkout tools took 17m51s, the smoke
+executable took about 15 minutes, and two backend drivers took about three
+minutes. The test assertions and package cases took less than a minute. The
+smaller gate removes those auxiliary builds; cutting only the fixture count
+would save little. Cold runs still need to build the checkout tools, so a target
+near 20 minutes is an estimate until measured on the hosted runner.
+
 The workflow uploads `pr-smoke-evidence` on success or failure, including build
-and verification reports, framework coverage and its reviewed inventory, suite
-logs, backend statuses and output. Detailed process-probe reports and logs are
-also retained on failure; successful probes clean up their scratch directories.
-Local evidence is
-under `.mlf-build/pr-smoke/`; `result.json` records integer wall-clock seconds
-for tool building and the complete command, plus compiler, manager, campaign,
-framework and coverage fingerprints. The native job has a 60-minute hard
-limit; this is a failure bound, not a promised runtime.
+reports, command logs, output and completion receipts. Local evidence is under
+`.mlf-build/pr-smoke/`; `result.json` records integer wall-clock seconds for tool
+building and the complete command, plus tool and report SHA-256 fingerprints.
+The native job retains a 60-minute hard failure bound.

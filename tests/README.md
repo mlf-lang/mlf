@@ -1,9 +1,11 @@
 # Native MLF compiler tests
 
-Pull requests use the explicit [PR smoke group](../docs/ci.md): Figure 12,
-four independent checker controls, 12 selected interpreter/LLVM fixtures and
-three package/cache checks. It builds and tests checkout tools. The six full
-root groups below retain their existing coverage and do not repeat smoke.
+Pull requests use the small [PR CLI smoke suite](../docs/ci.md): eight direct
+compiler cases and three package/cache states, after building checkout tools.
+The broader campaign remains available as `tools/release/native-ci.sh extended-pr-smoke`:
+framework/process contracts, Figure 12, four independent checker controls,
+12 interpreter/LLVM fixtures and package/cache checks. The six full root groups
+below retain their existing coverage.
 
 The local `mlf-tests` package preserves the original assertions, input corpora,
 runtime event traces, generated graph properties, and harness fault injections.

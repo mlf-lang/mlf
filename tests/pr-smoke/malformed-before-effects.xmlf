@@ -1,0 +1,1 @@
+primitive ioBind(Unit, Unit) (primitive putStrLn() "must not print") (\(x_0 : Unit) -> 42)
