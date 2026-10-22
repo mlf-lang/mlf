@@ -58,19 +58,28 @@ rejectTarget label result = case result of
  Left message -> require (eqString message "application type mismatch") (label ++ ": wrong target rejection: " ++ message)
  Right _ -> fatal (label ++ ": malformed target was accepted")
 
+progress : String -> String -> IO Unit
+progress output stage = writeFile (output ++ "/progress.log") (stage ++ "\n")
+
 main : IO Unit
 main = do
  count <- getArgCount
  require (count == 2) "expected FIXTURE-DIRECTORY OUTPUT-DIRECTORY"
  fixtures <- getArg 0
  output <- getArg 1
+ progress output "Checking accepted polymorphic-let"
  accepted fixtures output "polymorphic-let"
+ progress output "Checking accepted impredicative-self-application"
  accepted fixtures output "impredicative-self-application"
+ progress output "Checking rejected monomorphic-mismatch"
  rejected fixtures "monomorphic-mismatch"
+ progress output "Checking rejected invalid-universal-annotation"
  rejected fixtures "invalid-universal-annotation"
+ progress output "Checking malformed target"
  source <- readFile (fixtures ++ "/malformed-before-effects.xmlf")
  target <- right (Parser.parseTerm "malformed-before-effects.xmlf" source)
  rejectTarget "current checker" (Check.checkClosed target)
  rejectTarget "independent checker" (Independent.checkClosed target)
+ progress output "Completed all five current-source cases"
  putStrLn "PASS current-source malformed target"
  putStrLn "PR current-source smoke passed: 2 accepted, 2 rejected, 1 malformed target."

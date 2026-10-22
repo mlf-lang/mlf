@@ -14,4 +14,5 @@ git diff --check
 tools/release/check-benchmark-provenance.sh
 tools/release/test-package-publishing.sh
 tools/release/test-smoke-receipts.sh
+tools/release/test-source-smoke-diagnostics.sh
 printf 'Release metadata and shell syntax passed for %s.\n' "$version"

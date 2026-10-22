@@ -24,7 +24,19 @@ snapshot() {
   done
 }
 snapshot > "$build/sources.before.log"
-rm -f "$build/timed-out.log" "$build/polymorphic-let.xmlf" "$build/impredicative-self-application.xmlf"
+rm -f "$build/timed-out.log" "$build/progress.log" "$build/polymorphic-let.xmlf" "$build/impredicative-self-application.xmlf"
+{
+  date -u +%Y-%m-%dT%H:%M:%SZ
+  uname -a
+  case "$(uname -s)" in
+    Darwin) sysctl hw.memsize hw.ncpu hw.physicalcpu hw.logicalcpu machdep.cpu.brand_string ;;
+    Linux)
+      printf 'online processors: %s\n' "$(getconf _NPROCESSORS_ONLN)"
+      awk '/^MemTotal:/ {print}' /proc/meminfo
+      ;;
+  esac
+} > "$build/host.log" 2>&1
+: > "$build/memory.log"
 cat > "$build/expected.log" <<'EXPECTED'
 PASS current-source accepted polymorphic-let
 PASS current-source accepted impredicative-self-application
@@ -35,8 +47,16 @@ PR current-source smoke passed: 2 accepted, 2 rejected, 1 malformed target.
 EXPECTED
 command_pid=
 watchdog_pid=
+sampler_pid=
+stop_background() {
+  if [ -n "$1" ]; then
+    kill "$1" 2>/dev/null || true
+    wait "$1" 2>/dev/null || true
+  fi
+}
 cleanup() {
-  if [ -n "$watchdog_pid" ]; then kill "$watchdog_pid" 2>/dev/null || true; fi
+  stop_background "$watchdog_pid"
+  stop_background "$sampler_pid"
   if [ -n "$command_pid" ]; then kill "$command_pid" 2>/dev/null || true; fi
 }
 trap cleanup EXIT
@@ -47,7 +67,37 @@ trap 'exit 143' TERM
 command_pid=$!
 (
   sleep_pid=
-  trap 'if [ -n "$sleep_pid" ]; then kill "$sleep_pid" 2>/dev/null || true; fi; exit 0' TERM INT
+  trap 'if [ -n "$sleep_pid" ]; then kill "$sleep_pid" 2>/dev/null || true; wait "$sleep_pid" 2>/dev/null || true; fi; exit 0' TERM INT
+  printf 'Seed PID: %s; columns: PID elapsed CPU-time CPU-percent RSS-KiB\n' "$command_pid"
+  while kill -0 "$command_pid" 2>/dev/null; do
+    date -u +%Y-%m-%dT%H:%M:%SZ
+    if [ -f "$build/progress.log" ]; then
+      printf 'Stage: '
+      cat "$build/progress.log" || true
+    else
+      printf 'Stage: awaiting harness progress\n'
+    fi
+    ps -p "$command_pid" -o pid=,etime=,time=,%cpu=,rss= || true
+    {
+      date -u +%Y-%m-%dT%H:%M:%SZ
+      case "$(uname -s)" in
+        Darwin) sysctl vm.swapusage vm.loadavg; vm_stat ;;
+        Linux)
+          cat /proc/loadavg
+          awk '/^(MemAvailable|SwapTotal|SwapFree):/ {print}' /proc/meminfo
+          awk '/^(pgfault|pgmajfault|pswpin|pswpout) / {print}' /proc/vmstat
+          ;;
+      esac
+    } >> "$build/memory.log" 2>&1 || true
+    sleep 30 & sleep_pid=$!
+    wait "$sleep_pid" || exit 0
+    sleep_pid=
+  done
+) > "$build/process.log" 2>&1 &
+sampler_pid=$!
+(
+  sleep_pid=
+  trap 'if [ -n "$sleep_pid" ]; then kill "$sleep_pid" 2>/dev/null || true; wait "$sleep_pid" 2>/dev/null || true; fi; exit 0' TERM INT
   sleep 480 & sleep_pid=$!
   wait "$sleep_pid" || exit 0
   printf 'Current-source smoke exceeded 480 seconds.\n' > "$build/timed-out.log"
@@ -60,11 +110,20 @@ watchdog_pid=$!
 status=0
 wait "$command_pid" || status=$?
 command_pid=
-kill "$watchdog_pid" 2>/dev/null || true
-wait "$watchdog_pid" 2>/dev/null || true
+stop_background "$watchdog_pid"
 watchdog_pid=
+stop_background "$sampler_pid"
+sampler_pid=
 cat "$build/tests.log" "$build/tests.stderr.log"
-test ! -e "$build/timed-out.log"
+if [ -e "$build/timed-out.log" ]; then
+  cat "$build/timed-out.log" >&2
+  if [ -e "$build/progress.log" ]; then
+    cat "$build/progress.log" >&2
+  else
+    printf 'No harness progress was recorded.\n' >&2
+  fi
+  exit 1
+fi
 test "$status" -eq 0
 test ! -s "$build/tests.stderr.log"
 cmp "$build/expected.log" "$build/tests.log"

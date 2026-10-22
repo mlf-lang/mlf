@@ -107,10 +107,14 @@ checks cover these early failures and missing seeds across all three smoke group
 
 ```sh
 tools/release/test-smoke-receipts.sh
+tools/release/test-source-smoke-diagnostics.sh
 ```
 
-The release metadata check runs these regressions too. GHC, Cabal and Python are
-blocked on the native CI path.
+Four additional supervision checks exercise successful completion, failed
+optional memory probes and timeouts before and after harness progress, including
+child-process cleanup. The release
+metadata check runs these regressions too. GHC, Cabal and Python are blocked on
+the native CI path.
 
 To build fresh checkout tools and run the eight CLI and three package checks:
 
@@ -147,6 +151,12 @@ metadata, Native Windows runtime and the aggregate PR gate also passed. The
 [source evidence artifact](https://github.com/mlf-lang/mlf/actions/runs/39804551882/artifacts/12437892242)
 records the tested merge commit and source/seed/output fingerprints.
 
+A later [run 39816731269](https://github.com/mlf-lang/mlf/actions/runs/39816731269)
+reached the 480-second command deadline before producing case output, with the
+same compiler sources, seed and runner image. Host, process and case-progress
+logs were added afterward to distinguish future slowdowns; the successful run
+alone does not establish a stable hosted duration.
+
 In CI run [39798088020](https://github.com/mlf-lang/mlf/actions/runs/39798088020),
 the fresh-native smoke command completed in **16m49s** (1,009 seconds): checkout
 tool building took **16m17s** (977 seconds), and the remaining smoke checks and
@@ -164,7 +174,15 @@ the complete native and package validation jobs.
 
 The source job uploads `source-smoke-evidence` on success or failure: source,
 tool and output hashes, logs, emitted targets and its completion receipt under
-`.mlf-build/source-smoke/`. The fresh-native job uploads `pr-smoke-evidence`,
+`.mlf-build/source-smoke/`. `host.log` records CPU and memory capacity;
+`process.log` samples the seed's elapsed time, CPU time/utilization and RSS every
+30 seconds, while `memory.log` records host load, swap and paging counters.
+`progress.log` records which case the interpreted harness is running.
+Its absence means the harness has not reached the first case. Timeouts print the
+last recorded stage (or its absence) and leave the receipt incomplete. The
+eight-minute command deadline and ten-minute job limit remain unchanged.
+
+The fresh-native job uploads `pr-smoke-evidence`,
 including build reports, command logs, output and completion receipts. Local evidence is under
 `.mlf-build/pr-smoke/`; `result.json` records integer wall-clock seconds for tool
 building and the complete command, plus tool and report SHA-256 fingerprints.
