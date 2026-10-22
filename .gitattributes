@@ -12,3 +12,7 @@ tools/profile/results/** -text
 benchmarks/** -text
 # Unified-diff data lines preserve their source's significant whitespace.
 benchmarks/**/adaptation.patch -whitespace
+# Preserve whitespace in pinned regex-redux sources and their minimal adaptations.
+benchmarks/regex-redux/c/*.c -whitespace
+benchmarks/regex-redux/rust/*.rs -whitespace
+benchmarks/regex-redux/haskell/*.hs -whitespace

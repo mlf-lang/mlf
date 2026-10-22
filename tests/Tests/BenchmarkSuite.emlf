@@ -8,6 +8,7 @@ import qualified Package.Benchmark as B
 import qualified Tests.Basic as H
 import qualified Tests.Bytes as Bytes
 import qualified Tests.NativeABI as ABI
+import qualified Tests.RegexRedux as RegexRedux
 check : String -> IO Unit -> IO Unit
 check label action = do { action; putStrLn ("PASS " ++ label) }
 rejectOutput : String -> Int -> String -> IO Unit
@@ -24,7 +25,7 @@ main = do
   let rows = S.map (\name -> J.Object (Cons (Pair "benchmark" (J.str name)) (Cons (Pair "languages" entries) Nil))) V.workloads
   let targets = J.Object (Cons (Pair "compilation" (J.num 5)) (Cons (Pair "runtime" (J.num 2)) Nil))
   let checks = B.performanceChecks rows targets
-  H.assert (S.length checks == 18 && S.all (J.getBool "passed" false) checks) "limits omitted a workload or excluded boundary"
+  H.assert (S.length V.workloads == 10 && S.length checks == 20 && S.all (J.getBool "passed" false) checks) "limits omitted a workload or excluded boundary"
   let slower = S.map (V.update (O.words "languages mlf runtime median_wall_seconds") (\_ -> J.num 3)) rows
   H.assert (S.any (\check -> S.not (J.getBool "passed" true check)) (B.performanceChecks slower targets)) "above-limit timing passed")
  check "test_invalid_performance_limits_fail_before_tools" (S.mapM_ (\value -> H.assert (S.not (B.validateLimits (J.Object (Cons (Pair "runtime" value) Nil)))) "invalid limit accepted") (Cons (J.num 0) (Cons (J.num (-1)) (Cons (J.Number "NaN") (Cons (J.Number "Infinity") Nil)))))
@@ -55,6 +56,20 @@ main = do
   H.assert (eqString (B.nucleotideCounts ">ONE\nGGT\n>THREE description\naCgT\n>FOUR\nGGT\n") ("A 25.000\nC 25.000\nG 25.000\nT 25.000\n\nAC 33.333\nCG 33.333\nGT 33.333\n\n" ++ zero) && eqString (B.nucleotideCounts ">THREE\nAAAA") ("A 100.000\n\nAA 100.000\n\n" ++ zero) && eqString (B.nucleotideCounts ">THREE\n") ("\n\n" ++ zero)) "nucleotide window or record semantics changed"
   let output = B.nucleotideCounts (B.fasta 1000)
   S.mapM_ (rejectOutput "k-nucleotide" 1000) (Cons (O.replace "GGT\n" "GGA\n" output) (Cons (stringSlice output 0 (stringLength output - 1)) (Cons (O.replace "54\t" "55\t" output) (Cons (S.intercalate "\n" (S.reverse (O.lines output))) Nil)))))
+ check "test_regex_redux_oracle_counts_each_variant_and_nonoverlapping_matches" (do
+  let forward = O.words "agggtaaa cgggtaaa aaggtaaa agagtaaa aggataaa agggaaaa agggtcaa agggtaca agggtaac"
+  let reverse = O.words "tttaccct tttaccca tttaccat tttacact tttaacct tttcccct ttaaccct tataccct attaccct"
+  S.mapM_ (\variant -> H.assert (B.regexCount variant (S.index forward variant ++ "#" ++ S.index reverse variant) == 2 && B.regexCount variant "AGGGTAAATTTACCCT" == 0) "DNA variant class or case changed") (S.range 0 8)
+  H.assert (B.regexCount 0 "agggtaaagggtaaa" == 1 && B.regexCount 0 "agggtaaaagggtaaa" == 2 && B.regexCount 0 "agggtaa" == 0) "DNA matches overlap or partial match accepted")
+ check "test_regex_redux_cleanup_follows_header_and_linefeed_pattern" (do
+  H.assert (eqString (B.regexClean ">h\naggg\ntaaa\n>x\nTTTACCCT\n") "agggtaaaTTTACCCT" && eqString (B.regexClean "a>x\nb\n") "ab" && eqString (B.regexClean "aa>unfinished") "aa>unfinished" && eqString (B.regexClean ">h\r\na\r\n") "a\r" && eqString (B.regexClean "") "") "FASTA cleanup changed")
+ check "test_regex_redux_replacements_are_ordered_and_delimiter_matches_exact" (do
+  H.assert (eqString (B.regexSubstitute "tHaNxBY") "-" && eqString (B.regexSubstitute "tHaNaNDcaNHaDHaSWaSaNaSatBY") "||||||||||" && eqString (B.regexSubstitute "tHaTANDby") "tHaTANDby") "ordered case-sensitive substitutions changed"
+  H.assert (eqString (B.regexSubstitute "<x><>|a|") "||-" && eqString (B.regexSubstitute "|a|b|c|") "-b-" && eqString (B.regexSubstitute "||") "||" && eqString (B.regexSubstitute "<unfinished") "<unfinished" && eqString (B.regexSubstitute "") "") "delimiter replacement greediness or minimum changed")
+ check "test_regex_redux_requires_all_counts_lengths_order_and_exact_bytes" (do
+  let output = B.regexRedux (B.fasta 1000)
+  H.assert (B.validateOutput "regex-redux" 1000 (B.textBytes output)) "valid regex-redux rejected"
+  S.mapM_ (rejectOutput "regex-redux" 1000) (Cons "" (Cons (O.replace "agggtaaa|tttaccct 1" "agggtaaa|tttaccct 0" output) (Cons (O.replace "10245" "10246" output) (Cons (O.replace "10000\n" "10001\n" output) (Cons (O.replace "5262\n" "5261\n" output) (Cons (stringSlice output 0 (stringLength output - 1)) (Cons (output ++ "\n") (Cons (O.replace "\n" "\r\n" output) (Cons (S.intercalate "\n" (S.reverse (O.lines output))) Nil))))))))))
  check "test_nucleotide_rounding_accepts_only_exact_midpoint_neighbours" (do
   let lines = B.nucleotideLines (">THREE\nA" ++ S.concatStrings (S.replicate 319 "C"))
   let options = S.fromMaybe (panic "missing midpoint row") (S.find (\options -> O.starts "A " (S.head options)) lines)
@@ -94,6 +109,7 @@ main = do
  provenance manifest
  operational manifest
  S.mapM_ (\(Pair label action) -> check label action) ABI.suite
+ RegexRedux.main
 abs : Double -> Double
 abs x = if ltDouble x 0.0 then subDouble 0.0 x else x
 
@@ -142,10 +158,10 @@ operational manifest = do
  check "test_stdin_workloads_share_bytes_and_record_hash_without_embedding_input" (H.withScratch (\directory -> do
   writeFile (directory ++ "/expected") (B.fasta 31)
   hash <- fileDigest (directory ++ "/expected")
-  S.mapM_ (\language -> do
-   metadata <- B.stdinMetadata directory "reverse-complement" 31 language
+  S.mapM_ (\name -> S.mapM_ (\language -> do
+   metadata <- B.stdinMetadata directory name 31 language
    input <- readFile (directory ++ "/stdin")
-   H.assert (eqString input (B.fasta 31) && V.int "stdin_bytes" metadata == stringLength input && eqString (V.text "stdin_sha256" metadata) hash && S.not (J.has "stdin" metadata)) "languages received different or embedded input") V.languages))
+   H.assert (eqString input (B.fasta 31) && V.int "stdin_bytes" metadata == stringLength input && eqString (V.text "stdin_sha256" metadata) hash && S.not (J.has "stdin" metadata)) "languages received different or embedded input") V.languages) (O.words "reverse-complement k-nucleotide regex-redux")))
  check "test_four_languages_are_mandatory" (S.mapM_ (\language -> H.assert (S.isLeft (B.validateConfiguration (V.update (O.words "languages") (V.remove language) configuration))) "benchmark silently omitted a language") V.languages)
  check "test_changes_during_measurement_invalidate_the_run" (H.withScratch (\directory -> do
   writeFile (directory ++ "/source") "before"
@@ -155,6 +171,31 @@ operational manifest = do
   writeFile (directory ++ "/source") "after"
   after <- B.checkIntegrity (Cons (Pair (directory ++ "/source") hash) Nil)
   H.assert (S.isLeft after) "measurement ignored changed sources"))
+ check "test_native_dependency_headers_survive_suppressed_system_flags" (H.withScratch (\directory -> do
+  let include = directory ++ "/include"
+  let library = directory ++ "/lib"
+  let pc = directory ++ "/pc"
+  S.mapM_ O.mkdir (Cons include (Cons library (Cons pc Nil)))
+  let header = include ++ "/pcre2.h"
+  writeFile header "before"
+  writeFile (library ++ "/libmock.a") "mock library identity"
+  writeFile (pc ++ "/mlf-benchmark-header-test.pc") ("prefix=" ++ directory ++ "\nincludedir=${prefix}/include\nlibdir=${prefix}/lib\nName: mlf-benchmark-header-test\nDescription: Header integrity test\nVersion: 1.0\nCflags: -I${includedir}\nLibs: -L${libdir} -lmock\n")
+  oldPath <- getEnv "PKG_CONFIG_PATH"
+  oldSystem <- getEnv "PKG_CONFIG_SYSTEM_INCLUDE_PATH"
+  oldAllow <- getEnv "PKG_CONFIG_ALLOW_SYSTEM_CFLAGS"
+  setEnv "PKG_CONFIG_PATH" pc
+  setEnv "PKG_CONFIG_SYSTEM_INCLUDE_PATH" include
+  unsetEnv "PKG_CONFIG_ALLOW_SYSTEM_CFLAGS"
+  identity <- B.benchmarkPackage (directory ++ "/identity") "mlf-benchmark-header-test" "1.0" (Cons "pcre2.h" Nil)
+  S.mapM_ (\(Pair name value) -> if eqString value "" then unsetEnv name else setEnv name value) (Cons (Pair "PKG_CONFIG_PATH" oldPath) (Cons (Pair "PKG_CONFIG_SYSTEM_INCLUDE_PATH" oldSystem) (Cons (Pair "PKG_CONFIG_ALLOW_SYSTEM_CFLAGS" oldAllow) Nil)))
+  hash <- fileDigest header
+  H.assert (S.not (S.elem eqString ("-I" ++ include) (J.getStrings "flags" identity)) && eqString (V.text header (J.get "headers" identity)) hash) "suppressed system header was not fingerprinted"
+  fingerprints <- S.mapM (\path -> do { digest <- fileDigest path; return (Pair path digest) }) (B.benchmarkPackageFiles identity)
+  before <- B.checkIntegrity fingerprints
+  H.assert (S.isRight before) "fresh native dependency snapshot rejected"
+  writeFile header "after"
+  after <- B.checkIntegrity fingerprints
+  H.assert (S.isLeft after) "measurement ignored changed system header"))
  check "test_failed_and_timed_out_children_are_not_samples" (H.withScratch (\directory -> do
   failed <- B.measure directory (Cons "/bin/sh" (Cons "-c" (Cons "exit 9" Nil))) "" 2
   timed <- B.measure directory (Cons "/bin/sleep" (Cons "10" Nil)) "" 1
@@ -256,9 +297,11 @@ buildFailures = do
   setEnv "MLF_MOCK_BUILD" "1"
   setEnv "MLF_BENCH_STREAM_LLVM" "1"
   let compiler = directory ++ "/mock"
-  result <- B.buildParallel (directory ++ "/normal") compiler compiler (directory ++ "/Main.emlf") (directory ++ "/runtime.c") Nil 10.0
+  result <- B.buildParallelWithIncludes (directory ++ "/normal") compiler compiler (directory ++ "/Main.emlf") (directory ++ "/runtime.c") Nil (Cons (directory ++ "/include with spaces") Nil) 10.0
   Pair binary sample <- H.right result
   let stages = V.array "stages" sample
+  let frontend = J.getStrings "command" (S.index stages 1)
+  H.assert (S.eqList eqString (S.drop 7 frontend) (Cons compiler (Cons "-i" (Cons (directory ++ "/include with spaces") (Cons "--emit-llvm-gc" (Cons (directory ++ "/Main.emlf") Nil)))))) "streamed source include roots changed"
   H.assert (S.eqList eqString (S.map (V.text "phase") stages) (O.words "setup frontend runtime llvm link") && V.int "maximum_parallel_compilers" sample == 3) "streaming stage inventory changed"
   let started index = V.double 0.0 (J.get "started_seconds" (S.index stages index))
   let finished index = V.double 0.0 (J.get "finished_seconds" (S.index stages index))
@@ -302,9 +345,10 @@ buildFailures = do
   let runtime = directory ++ "/runtime.c"
   writeFile source "source"
   writeFile runtime "runtime"
-  first <- B.buildParallel (directory ++ "/first") compiler compiler source runtime Nil 10.0
+  first <- B.buildParallelWithIncludes (directory ++ "/first") compiler compiler source runtime Nil (Cons (directory ++ "/include with spaces") Nil) 10.0
   Pair binary sample <- H.right first
   let stages = V.array "stages" sample
+  H.assert (S.eqList eqString (J.getStrings "command" (S.head stages)) (Cons compiler (Cons "-i" (Cons (directory ++ "/include with spaces") (Cons "--emit-llvm-gc" (Cons source Nil)))))) "source include roots changed"
   H.assert (S.eqList eqString (S.map (V.text "phase") stages) (O.words "frontend runtime llvm link") && V.int "maximum_parallel_compilers" sample == 2 && S.not (ltDouble (V.double 0.0 (J.get "started_seconds" (S.index stages 2))) (V.double 0.0 (J.get "finished_seconds" (S.index stages 0)))) && ltDouble (V.double 0.0 (J.get "started_seconds" (S.index stages 2))) (V.double 0.0 (J.get "finished_seconds" (S.index stages 1))) && S.not (ltDouble (V.double 0.0 (J.get "started_seconds" (S.index stages 3))) (V.double 0.0 (J.get "finished_seconds" (S.index stages 1)))) && S.not (ltDouble (V.double 0.0 (J.get "started_seconds" (S.index stages 3))) (V.double 0.0 (J.get "finished_seconds" (S.index stages 2)))) && S.not (ltDouble (V.double 0.0 (J.get "wall_seconds" sample)) 0.1) && S.all (\row -> S.not (ltDouble (V.double 0.0 (J.get "wall_seconds" sample)) (V.double 0.0 (J.get "wall_seconds" row)))) stages) "parallel phases or emission timing missing"
   let totalCPU = S.foldl addDouble 0.0 (S.map (\row -> V.double 0.0 (J.get "cpu_seconds" row)) stages)
   H.assert (S.not (ltDouble 0.00000001 (abs (subDouble totalCPU (V.double 0.0 (J.get "cpu_seconds" sample)))))) "phase CPU not summed"

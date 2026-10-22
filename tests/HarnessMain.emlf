@@ -78,5 +78,5 @@ main = do
   Cons "--check-clean-environment" names -> do
    values <- S.mapM getEnv names
    H.assert (S.all (\value -> eqString value "") values) "gate inherited compiler or collector overrides"
-  Nil -> do { Boot.main; Release.main; Bench.main; putStrLn "58 native benchmark/bootstrap/release harness tests passed" }
+  Nil -> do { Boot.main; Release.main; Bench.main; putStrLn "Native benchmark/bootstrap/release harness tests passed" }
   _ -> exitWith 2
