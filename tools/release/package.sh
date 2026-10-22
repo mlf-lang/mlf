@@ -115,7 +115,7 @@ else
 fi
 jq -n --arg version "$version" --arg commit "$commit" --arg compiler "$compiler_hash" --arg manager "$manager_hash" --arg runner "$runner_hash" \
   --arg platform "$platform" --arg minos "$minimum_macos" --arg glibc "$build_glibc" \
-  '{schema_version:1,version:$version,commit:$commit,platform:$platform,compiler_sha256:$compiler,manager_sha256:$manager,test_implementation:"MLF",test_groups:["unit","packages","self-host","parity","backends","port"],port_profiles:["compact-gc"],performance_gate:"not rerun for this preview"} + (if $platform == "macos-arm64" then {minimum_macos:$minos} else {build_glibc:$glibc} end)' > "$bundle/release.json"
+  '{schema_version:1,version:$version,commit:$commit,platform:$platform,compiler_sha256:$compiler,manager_sha256:$manager,runner_sha256:$runner,test_implementation:"MLF",test_groups:["unit","packages","self-host","parity","backends","port"],port_profiles:["compact-gc"],performance_gate:"not rerun for this preview"} + (if $platform == "macos-arm64" then {minimum_macos:$minos} else {build_glibc:$glibc} end)' > "$bundle/release.json"
 if [ "$platform" = macos-arm64 ]; then
 cat > "$bundle/README.md" <<'README'
 # MLF native developer preview
