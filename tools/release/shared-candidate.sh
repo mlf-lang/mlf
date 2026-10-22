@@ -10,6 +10,21 @@ case "$(uname -s):$(uname -m)" in
   *) exit 2 ;;
 esac
 shared=.mlf-build/shared-candidate
+dependency_inputs() {
+  for receipt in .mlf-build/cache/*/dependency-files.json; do
+    test -f "$receipt" || continue
+    jq -e 'type == "object"' "$receipt" >/dev/null
+    jq -r 'to_entries[] | [.key,.value] | @tsv' "$receipt"
+  done | LC_ALL=C sort -u
+}
+verify_dependencies() {
+  while IFS=$'\t' read -r path expected; do
+    case "/$path/" in *'/../'*|*'/./'*|*'\'*) exit 1 ;; esac
+    case "$path" in "$PWD/.mlf-build/cache/"*) ;; *) echo 'Dependency escaped the shared native store.' >&2; exit 1 ;; esac
+    [[ "$expected" =~ ^[0-9a-f]{64}$ ]]
+    test "$(sha256 "$path" | awk '{print $1}')" = "$expected" || { printf 'Missing or changed crate dependency: %s\n' "$path" >&2; exit 1; }
+  done < "$1"
+}
 verify() {
   jq -e --arg source "$(git rev-parse HEAD)" --arg platform "$platform" --arg root "$PWD" \
     '.format == 1 and .source == $source and .platform == $platform and .root == $root' "$shared/manifest.json" >/dev/null
@@ -24,6 +39,8 @@ verify() {
     [[ "$key" =~ ^[0-9a-f]{64}$ ]]
     cmp ".mlf-build/bin/$tool" ".mlf-build/cache/$key/program"
   done
+  dependency_inputs > "$shared/dependency-inputs.tsv"
+  verify_dependencies "$shared/dependency-inputs.tsv"
 }
 case "$mode" in
   export)
@@ -49,7 +66,9 @@ case "$mode" in
     done
     verify
     # Keep the candidate's own fixed-point artifacts and the prerequisite build
-    # closure. Do not ship unused seed-stage builds or mutable query histories.
+    # closure. Builtin-prelude files are genuine outputs named by the ordinary
+    # dependency receipts, even though they live under .queries. Keep their
+    # original paths and hashes, without rewriting receipts or inference data.
     printf '%s\n' .mlf-build/bin .mlf-build/build-report.json \
       .mlf-build/prerequisites/tests/build-report.json > "$shared/archive-inputs.txt"
     jq -sr '[ (.[0].builds[] | select(.kind | startswith("executable mlf-compiler:"))), .[1].builds[] ] | map(.key) | unique[]' \
@@ -57,7 +76,11 @@ case "$mode" in
         [[ "$key" =~ ^[0-9a-f]{64}$ ]]
         printf '.mlf-build/cache/%s\n' "$key"
       done >> "$shared/archive-inputs.txt"
-    COPYFILE_DISABLE=1 tar -czf "$shared/outputs.tar.gz" -T "$shared/archive-inputs.txt"
+    while IFS=$'\t' read -r path expected; do
+      printf '%s\n' "${path#"$PWD/"}"
+    done < "$shared/dependency-inputs.tsv" >> "$shared/archive-inputs.txt"
+    LC_ALL=C sort -u "$shared/archive-inputs.txt" > "$shared/archive-inputs.sorted"
+    COPYFILE_DISABLE=1 tar -czf "$shared/outputs.tar.gz" -T "$shared/archive-inputs.sorted"
     (cd "$shared" && sha256 outputs.tar.gz manifest.json > SHA256SUMS)
     ;;
   import)
