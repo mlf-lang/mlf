@@ -87,8 +87,8 @@ the packaged commits. The publishing job is skipped. The final
 mode never creates a release or changes a tag.
 
 Linux bootstraps one candidate pair per run. macOS prepares its qualification
-pair once. Each platform then builds the shared test libraries and parity
-checker once, and archives their actual content-addressed artifacts with the
+pair once. Each platform then builds the shared test libraries and port
+executable once, and archives their actual content-addressed artifacts with the
 unchanged producer reports and dependency receipts. Consumers authenticate the
 artifact's workflow run, source and ZIP digest, then check its platform, absolute
 workspace, compiler/manager, native toolchain, runtime and dependency hashes.
