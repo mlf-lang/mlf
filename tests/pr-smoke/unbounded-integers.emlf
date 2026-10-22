@@ -1,0 +1,5 @@
+do {
+ printInt (-42);
+ printInt (addInt 999999999999999999999999999999 1);
+ printInt (subInt (-4611686018427387904) 1)
+}
