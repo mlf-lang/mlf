@@ -1,0 +1,15 @@
+{
+  "format": 1,
+  "name": "mlf-test",
+  "version": "0.1.0",
+  "dependencies": {
+    "mlf-bootstrap": { "path": "../bootstrap" }
+  },
+  "library": {
+    "modules": {
+      "Test.Assert": "Test/Assert.emlf",
+      "Test.Case": "Test/Case.emlf",
+      "Test.Runner": "Test/Runner.emlf"
+    }
+  }
+}

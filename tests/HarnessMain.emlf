@@ -1,5 +1,6 @@
 module HarnessMain where
 import Bootstrap.Types
+import qualified Tests.Coverage as Coverage
 import qualified Bootstrap.Std as S
 import qualified Package.OS as O
 import qualified Tests.Basic as H
@@ -81,5 +82,16 @@ main = do
    values <- S.mapM getEnv names
    H.assert (S.all (\value -> eqString value "") values) "gate inherited compiler or collector overrides"
   Cons "--driver-cache-case" (Cons compiler Nil) -> DriverCache.run compiler
-  Nil -> do { Boot.main; SourceCache.main; DriverCache.main; putStrLn "2 native cache regression checks passed"; Release.main; Bench.main; putStrLn "Native benchmark/bootstrap/release harness tests passed" }
+  Nil -> do
+   Coverage.begin "harness" true
+   Boot.main
+   SourceCache.main
+   Coverage.passed "harness" "test_source_dependency_cache_controls"
+   DriverCache.main
+   Coverage.passed "harness" "test_checked_native_driver_cache"
+   putStrLn "2 native cache regression checks passed"
+   Release.main
+   Bench.main
+   putStrLn "Native benchmark/bootstrap/release harness tests passed"
+   Coverage.finish "harness"
   _ -> exitWith 2

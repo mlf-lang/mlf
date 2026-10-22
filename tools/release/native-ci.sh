@@ -57,7 +57,7 @@ else
   mkdir -p .mlf-build/tests ".mlf-build/compiler-tests/$evidence_group"
   logs=(".mlf-build/tests/$group.log")
   case "$group" in
-    unit) suites='core figure12 harness' ;;
+    unit) suites='core figure12 harness test-framework regex' ;;
     packages) suites='packages' ;;
     backends|port) suites='compact-gc' ;;
     *) suites='' ;;
@@ -77,7 +77,15 @@ else
   if [ "${MLF_CI_SHARED_CANDIDATE:-0}" = 1 ]; then
     tools/release/shared-candidate.sh verify
     ./mlfpkg --locked plan > .mlf-build/tests/source-plan.json
-    ./mlfpkg compiler-test "$group" --compiler "$MLF_COMPILER" \
+    # Keep the shared producer report intact while materializing the test-owned
+    # campaign against the verified candidate and its authenticated cache.
+    ./mlfpkg --compiler "$MLF_COMPILER" --runtime "$PWD/runtime/mlf_runtime.c" \
+      --timeout 21600 --locked --build-dir "$PWD/.mlf-build/campaign-runner" \
+      --cache-dir "$PWD/.mlf-build/cache" build --target compiler-tests
+    rm -f .mlf-build/bin/compiler-tests
+    cp .mlf-build/campaign-runner/bin/compiler-tests .mlf-build/bin/compiler-tests
+    "$PWD/.mlf-build/bin/compiler-tests" "$group" \
+      --manager "$MLF_PACKAGE_MANAGER" --compiler "$MLF_COMPILER" \
       --build-dir "$PWD/.mlf-build/compiler-tests/$evidence_group" \
       --cache-dir "$PWD/.mlf-build/cache" > ".mlf-build/tests/$group.log" 2>&1
     tools/release/shared-candidate.sh verify

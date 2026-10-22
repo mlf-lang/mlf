@@ -16,7 +16,7 @@ function Get-ReleaseSources([string]$Root) {
     $files = @(& git -C $Root ls-files --cached --others --exclude-standard)
     if ($LASTEXITCODE) { throw 'Cannot enumerate release source inputs' }
     foreach ($relative in ($files | Sort-Object -Unique)) {
-        if ($relative -match '^(bootstrap|package|runtime|scripts|tests|examples|benchmarks)/' -or
+        if ($relative -match '^(bootstrap|package|runtime|scripts|tests|testing|examples|benchmarks)/' -or
             $relative -in @('VERSION','mlf-package.json','mlfpkg','mlfpkg.cmd','mlfpkg.ps1')) {
             $path = Join-Path $Root $relative
             if (Test-Path -LiteralPath $path -PathType Leaf) { $snapshot[$relative] = Get-ReleaseHash $path }

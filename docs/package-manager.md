@@ -72,14 +72,23 @@ searching `PATH`. Explicit compiler selections take precedence. Other packages
 default to `emlf` on `PATH`.
 
 Compiler tests are written in MLF under `tests/` and built as the local
-`mlf-tests` package. The root commands use the selected native compiler and MLF
-package manager. GHC, Cabal, and Python are not test prerequisites. Clang builds
+`mlf-tests` package. The root's private `compiler-tests` executable uses
+`tests/CompilerTestsMain.emlf` and `Tests.CompilerTests` to coordinate the six
+compiler campaigns. The package manager provides generic build, cache and
+command execution; it does not import the compiler campaign. Root test commands
+pass the selected compiler and package manager explicitly, and the campaign
+records and rechecks both binaries plus its own runner identity. GHC, Cabal, and
+Python are not test prerequisites. Clang builds
 the retained C ABI probes and binary/process transports. The probes retain
 their low-level ABI checks; MLF runs them and checks their status, output,
 error modes, and allocation accounting.
 The test package shares only its support modules; each executable's `modules`
 map lists its own test-case dependencies. This keeps unrelated test cases out
 of individual test builds while retaining the complete root test inventory.
+Source discovery and native driver caching live in the test-owned
+`Tests.TestSources` and `Tests.TestDrivers` support modules. The root campaign
+maps them privately, and the harness privately imports the same campaign to
+exercise its real driver construction path.
 
 The Haskell compiler and old Haskell/Python harnesses have been removed.
 Shared C fixtures live in `tests/native/`. Expected parity types remain
@@ -107,6 +116,10 @@ Port preparation and source driver LLVM track their resolved import closures
 rather than the complete repository inventory. Driver native objects and links
 are cached with their native toolchain, headers, libraries and ordered flags;
 each group's verification report records the actual artifact keys and reuse.
+The retained `driver-build/build-report.json` is bound by its SHA-256 in that
+verification report. Release packaging checks this report and the embedded
+stage receipts before preserving them as evidence; native cache objects remain
+build artifacts rather than cached test verdicts.
 Commands, tool/source hashes, cache decisions, and test
 results are recorded in `.mlf-build/build-report.json`; compiler groups also
 write their detailed evidence under `.mlf-build/compiler-tests/`.

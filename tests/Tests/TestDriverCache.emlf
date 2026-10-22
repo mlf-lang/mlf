@@ -3,7 +3,7 @@ import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Package.OS as O
 import qualified Package.Json as J
-import qualified Package.CompilerTests as CT
+import qualified Tests.CompilerTests as CT
 import qualified Tests.Basic as H
 
 -- Exercise the real driver construction path with small source programs. A
@@ -38,7 +38,12 @@ build root compiler portOnly = do
  let directory = root ++ "/current"
  O.mkdir directory
  J.write (directory ++ "/verification.json") J.empty
- ignored <- CT.prepareDrivers (CT.TestContext root directory compiler Nil (root ++ "/shared-cache")) portOnly
+ manager <- getEnv "MLF_PACKAGE_MANAGER"
+ H.assert (stringLength manager > 0) "driver cache regression requires the selected package manager"
+ actualManager <- canonicalPath manager
+ -- The context carries the real CLI manager. Build.create still records this
+ -- executing harness as the owner of its direct build/cache operations.
+ ignored <- CT.prepareDrivers (CT.TestContext root directory compiler Nil (root ++ "/shared-cache") actualManager) portOnly
  report <- J.read (directory ++ "/verification.json")
  saved <- J.read (J.getText "path" "" (J.get "driver_build" report))
  H.assert (J.getBool "complete" false saved) "driver builder did not finish input verification"
