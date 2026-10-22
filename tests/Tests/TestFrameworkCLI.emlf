@@ -1,0 +1,65 @@
+module Tests.TestFrameworkCLI where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+import qualified Package.Json as J
+import qualified Tests.Basic as H
+
+rows text = S.mapM (\line -> H.right (J.parse line)) (S.filter (\line -> stringLength line > 0) (O.lines text))
+check directory binary name args expected = do
+ let out = directory ++ "/" ++ name ++ ".stdout"
+ let err = directory ++ "/" ++ name ++ ".stderr"
+ code <- O.exec "" (Cons binary args) "" out err 120
+ H.assert (code == expected) (name ++ ": unexpected exit status " ++ showInt code)
+ readFile out
+summary records count failures scope = do
+ let value = S.last records
+ H.assert (eqString (J.getText "event" "" value) "summary" && J.getBool "complete" false value &&
+  J.equal (J.get "executed" value) (J.num count) && J.equal (J.get "failed" value) (J.num failures) &&
+  J.equal (J.get "passed" value) (J.num (count - failures)) && eqString (J.getText "scope" "" value) scope) "CLI summary differs from executed cases"
+ let executed = S.filter (\row -> eqString (J.getText "event" "" row) "case") records
+ H.assert (S.length executed == count && S.eqList eqString (J.getStrings "ids" (S.head records)) (S.map (J.getText "id" "") executed)) "CLI selected IDs and results differ"
+main work unions = do
+ O.mkdir work
+ setEnv "MLF_TEST_WORK" work
+ self <- getExecutablePath
+ H.withScratch (\directory -> do
+  let report = directory ++ "/report.jsonl"
+  text <- check directory unions "unions" (O.words "--format json") 0
+  records <- rows text
+  summary records 1 0 "full"
+  H.assert (S.eqList eqString (J.getStrings "ids" (S.head records)) (Cons "int-set/union-sorted-list" Nil)) "migrated case ID changed"
+  let result = S.index records 1
+  H.assert (eqString (J.getText "name" "" result) "size-biased set unions agree with independent sorted lists") "migrated case label changed"
+  selected <- check directory unions "exact" (O.words "--exact int-set/union-sorted-list --tag oracle --format json") 0
+  H.assert (eqString selected text) "focused selection changed the migrated case"
+  check directory unions "missing" (O.words "--exact missing") 2
+  check directory unions "invalid" (O.words "--unknown") 2
+  check directory self "legacy-failure" (O.words "--legacy-fail-probe") 1
+  legacyError <- readFile (directory ++ "/legacy-failure.stderr")
+  H.assert (H.contains "TEST FAILURE: legacy assertion failure" legacyError) "legacy adapter swallowed assertion failure"
+  text <- check directory self "failures" (O.words "--probe --format json") 1
+  records <- rows text
+  summary records 3 2 "full"
+  H.assert (S.eqList eqString (S.map (J.getText "status" "") (S.filter (J.has "status") records)) (O.words "failed passed failed")) "runner stopped after a failed case"
+  text <- check directory self "partial" (O.words "--probe --exact probe/middle --format json") 0
+  records <- rows text
+  summary records 1 0 "partial"
+  text <- check directory self "listing" (O.words "--list-probe --list --format json") 0
+  records <- rows text
+  H.assert (S.length records == 1 && eqString (J.getText "event" "" (S.head records)) "inventory") "listing ran tests or emitted execution results"
+  text <- check directory self "noisy" (S.append (O.words "--noisy-probe --report") (Cons report Nil)) 0
+  H.assert (H.contains "test action output" text) "noisy action did not execute"
+  saved <- readFile report
+  records <- rows saved
+  summary records 1 0 "full"
+  -- Reuse a completed report path and deliberately crash. It must no longer
+  -- contain the previous successful summary.
+  code <- O.exec "" (S.append (Cons self (O.words "--list-probe --report")) (Cons report Nil)) "" (directory ++ "/crash.out") (directory ++ "/crash.err") 120
+  H.assert (code /= 0) "panic probe succeeded"
+  crashError <- readFile (directory ++ "/crash.err")
+  H.assert (H.contains "listing executed an action" crashError) "crash probe failed for an unrelated reason"
+  incomplete <- readFile report
+  records <- rows incomplete
+  H.assert (S.length records == 1 && eqString (J.getText "event" "" (S.head records)) "start") "crash retained a completed report"
+  putStrLn "Test framework CLI contracts passed")

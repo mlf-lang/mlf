@@ -7,7 +7,7 @@ export MLF_COMPILER="$PWD/.mlf-build/bin/emlf"
 export MLF_PACKAGE_MANAGER="$PWD/.mlf-build/bin/mlfpkg"
 test -x "$MLF_COMPILER" && test -x "$MLF_PACKAGE_MANAGER"
 ./mlfpkg --locked plan > .mlf-build/qualification-source-plan.json
-# This builds the three shared libraries and the port executable. All consumers
+# This builds the shared libraries and the port executable. All consumers
 # re-enter the ordinary content-addressed builder, including dependency proofs.
 # Keep unique parity work out of the longer port dependency chain.
 ./mlfpkg --manifest tests/mlf-package.json --compiler "$MLF_COMPILER" \

@@ -3,7 +3,7 @@ import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Package.Json as J
 import qualified Package.OS as O
-import qualified Package.TestSources as TS
+import qualified Tests.TestSources as TS
 import qualified Tests.Basic as H
 
 assertFiles : J.Json -> List String -> IO Unit

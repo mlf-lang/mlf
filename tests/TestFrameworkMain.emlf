@@ -1,0 +1,64 @@
+module TestFrameworkMain where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+import qualified Test.Assert as A
+import qualified Test.Case as C
+import qualified Test.Runner as R
+import qualified Tests.TestFramework as T
+import qualified Tests.TestFrameworkCLI as CLI
+import qualified Test.Process as P
+import qualified Tests.TestProcess as ProcessChecks
+import qualified Tests.Coverage as Coverage
+import qualified Tests.CoverageChecks as CoverageChecks
+
+-- An IO loop, without spawned descendants, exercises the actual timeout path.
+spin : IO Unit
+spin = do { value <- getEnv "MLF_TEST_CASE_WORK"; if stringLength value >= 0 then spin else ioReturn Unit }
+cleanCase : Bool -> A.Test Unit
+cleanCase noisy = A.liftIO (do
+ directory <- getEnv "MLF_TEST_CASE_WORK"
+ O.require (stringLength directory > 0) "missing isolated case directory"
+ present <- fileExists (directory ++ "/marker")
+ O.require (S.not present) "isolated cases shared a working directory"
+ writeFile (directory ++ "/marker") "executed"
+ if noisy then do { putStrLn "isolated child output"; putErr "isolated child diagnostic\n" } else ioReturn Unit)
+isolatedCases : List C.Case
+isolatedCases =
+ Cons (C.test "isolation/assertion" "ordinary failed assertion" Nil (A.fail "expected assertion failure"))
+ (Cons (C.test "isolation/crash" "panic" Nil (A.liftIO (panic "expected isolated panic" : IO Unit)))
+ (Cons (C.test "isolation/exit" "legacy process exit" Nil (A.liftIO (exitWith 7)))
+ (Cons (C.test "isolation/timeout" "nonterminating action" Nil (A.liftIO spin))
+ (Cons (C.test "isolation/noisy" "captured output" Nil (cleanCase true))
+ (Cons (C.test "isolation/clean" "continued with fresh state" Nil (cleanCase false)) Nil)))))
+main : IO Unit
+main = do
+ args <- O.allArguments
+ case args of
+  Nil -> T.checks
+  Cons "--legacy-fail-probe" Nil -> case C.toLegacy (C.test "probe/legacy" "legacy failure" Nil (A.fail "legacy assertion failure")) of { Pair _ action -> action }
+  Cons "--verify-cli" (Cons directory (Cons unions Nil)) -> do
+   Coverage.begin "test-framework" true
+   T.checks
+   Coverage.passed "test-framework" "framework/contracts"
+   CoverageChecks.main
+   Coverage.passed "test-framework" "framework/coverage-validator"
+   CLI.main directory unions
+   ProcessChecks.main directory
+   Coverage.passed "test-framework" "framework/cli-contracts"
+   Coverage.finish "test-framework"
+  Cons "--supervise" rest -> do { code <- P.run rest; exitWith code }
+  Cons "--isolated-probe" rest -> do { code <- R.run rest isolatedCases; exitWith code }
+  Cons "--discovery-crash-probe" _ -> exitWith 9
+  Cons "--forged-report-probe" rest -> do
+   Pair options _ <- case R.plan rest (Cons (C.test "forged/case" "forged completion" Nil (A.succeed Unit)) Nil) of { Left message -> O.fatal message; Right value -> return value }
+   if R.listing options then do { code <- R.run rest (Cons (C.test "forged/case" "forged completion" Nil (A.succeed Unit)) Nil); exitWith code }
+   else writeFile (R.report options) "{\"schema_version\":1,\"event\":\"start\",\"total\":1,\"selected\":1,\"scope\":\"full\",\"ids\":[\"forged/case\"]}\n"
+  Cons "--probe" rest -> do { code <- R.run rest T.probeCases; exitWith code }
+  Cons "--noisy-probe" rest -> do
+   code <- R.run rest (Cons (C.test "probe/noisy" "stdout logging" Nil (A.liftIO (putStrLn "test action output"))) Nil)
+   exitWith code
+  Cons "--list-probe" rest -> do
+   code <- R.run rest (Cons (C.test "probe/unexecuted" "listing must not execute" Nil (A.liftIO (panic "listing executed an action" : IO Unit))) Nil)
+   exitWith code
+  _ -> O.fatal "test-framework [--probe ARGS... | --list-probe --list ARGS...]"

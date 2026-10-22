@@ -1,4 +1,4 @@
-module Package.TestDrivers where
+module Tests.TestDrivers where
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Package.OS as O

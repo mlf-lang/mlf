@@ -1,0 +1,16 @@
+{
+  "format": 1,
+  "name": "mlf-test-tools",
+  "version": "0.1.0",
+  "dependencies": {
+    "mlf-test": { "path": ".." },
+    "mlf-package-tools": { "path": "../../package" },
+    "mlf-bootstrap": { "path": "../../bootstrap" }
+  },
+  "library": {
+    "modules": { "Test.Process": "Test/Process.emlf" }
+  },
+  "executables": {
+    "mlf-test": { "main": "Main.emlf", "profile": "compiler" }
+  }
+}

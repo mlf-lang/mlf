@@ -4,6 +4,7 @@ import qualified Bootstrap.Std as S
 import qualified Package.OS as O
 import qualified Package.Json as J
 import qualified Tests.Basic as H
+import qualified Tests.Coverage as Coverage
 
 data Context = Context String String String
 directory : Context -> String
@@ -32,7 +33,9 @@ setDependencies path entries = do
  value <- J.read path
  J.write path (J.set "dependencies" (obj entries) value)
 checked : String -> IO Unit
-checked label = putStrLn ("PASS checked release: " ++ label)
+checked label = do
+ Coverage.passed "packages" ("checked release: " ++ label)
+ putStrLn ("PASS checked release: " ++ label)
 githubDependency : String -> String -> String -> String -> J.Json
 githubDependency manifest asset tag name = obj (Cons (pair "github" (obj (Cons (pair "repository" (J.str "mlf-tests/fixtures")) (Cons (pair "tag" (J.str tag)) (Cons (pair "asset" (J.str name)) Nil))))) (Cons (pair "sha256" (J.str manifest)) (Cons (pair "asset_sha256" (J.str asset)) Nil)))
 githubFixture : List String -> IO Unit

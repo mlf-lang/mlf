@@ -3,7 +3,7 @@ set -euo pipefail
 cd -- "$(dirname -- "$0")/../.."
 group=${1:-smoke}
 test "$#" -le 1 || { printf '%s\n' 'Expected one test group.' >&2; exit 2; }
-case "$group" in smoke|unit|packages|self-host|parity|backends|port) ;; *) exit 2 ;; esac
+case "$group" in smoke|pr-smoke|unit|packages|self-host|parity|backends|port) ;; *) exit 2 ;; esac
 test -z "${MLF_TEST_RUNTIME_PROFILE:-}" || test "$MLF_TEST_RUNTIME_PROFILE" = compact-gc || exit 2
 evidence_group=$group
 . tools/release/native-environment.sh
@@ -45,7 +45,9 @@ SH
   chmod 755 ".mlf-build/forbidden-tools/$command_name"
 done
 export PATH="$PWD/.mlf-build/forbidden-tools:$PATH"
-if [ "$group" = smoke ]; then
+if [ "$group" = pr-smoke ]; then
+  tools/release/pr-smoke.sh
+elif [ "$group" = smoke ]; then
   "$MLF_COMPILER" --type --expr '\x -> x'
   ./mlfpkg --compiler "$MLF_COMPILER" --runtime "$PWD/runtime/mlf_runtime.c" --manifest examples/packages/mlf-package.json --timeout 21600 test
 else
@@ -55,7 +57,7 @@ else
   mkdir -p .mlf-build/tests ".mlf-build/compiler-tests/$evidence_group"
   logs=(".mlf-build/tests/$group.log")
   case "$group" in
-    unit) suites='core figure12 harness' ;;
+    unit) suites='core figure12 harness test-framework regex' ;;
     packages) suites='packages' ;;
     backends|port) suites='compact-gc' ;;
     *) suites='' ;;
@@ -75,7 +77,15 @@ else
   if [ "${MLF_CI_SHARED_CANDIDATE:-0}" = 1 ]; then
     tools/release/shared-candidate.sh verify
     ./mlfpkg --locked plan > .mlf-build/tests/source-plan.json
-    ./mlfpkg compiler-test "$group" --compiler "$MLF_COMPILER" \
+    # Keep the shared producer report intact while materializing the test-owned
+    # campaign against the verified candidate and its authenticated cache.
+    ./mlfpkg --compiler "$MLF_COMPILER" --runtime "$PWD/runtime/mlf_runtime.c" \
+      --timeout 21600 --locked --build-dir "$PWD/.mlf-build/campaign-runner" \
+      --cache-dir "$PWD/.mlf-build/cache" build --target compiler-tests
+    rm -f .mlf-build/bin/compiler-tests
+    cp .mlf-build/campaign-runner/bin/compiler-tests .mlf-build/bin/compiler-tests
+    "$PWD/.mlf-build/bin/compiler-tests" "$group" \
+      --manager "$MLF_PACKAGE_MANAGER" --compiler "$MLF_COMPILER" \
       --build-dir "$PWD/.mlf-build/compiler-tests/$evidence_group" \
       --cache-dir "$PWD/.mlf-build/cache" > ".mlf-build/tests/$group.log" 2>&1
     tools/release/shared-candidate.sh verify
