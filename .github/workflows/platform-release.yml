@@ -223,16 +223,57 @@ jobs:
             .mlf-build/prerequisites/tests/build-report.json
             .mlf-build/prerequisites/tests/commands/*.stderr
           retention-days: 14
+  mac-port:
+    name: macos-arm64 port
+    needs: [metadata, mac-prerequisites]
+    runs-on: macos-26
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.metadata.outputs.source }}
+      - uses: ./.github/actions/posix-qualification
+        with:
+          platform: macos-arm64
+          group: port
+          source: ${{ needs.metadata.outputs.source }}
+  mac-unit:
+    name: macos-arm64 unit
+    needs: [metadata, mac-prerequisites]
+    runs-on: macos-26
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.metadata.outputs.source }}
+      - uses: ./.github/actions/posix-qualification
+        with:
+          platform: macos-arm64
+          group: unit
+          source: ${{ needs.metadata.outputs.source }}
+  mac-started:
+    name: Admit macOS groups after priority jobs start
+    needs: [metadata, mac-prerequisites]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.metadata.outputs.source }}
+      - name: Wait for port and unit runner allocation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: tools/release/wait-for-priority-jobs.sh
   mac-tests:
     name: macos-arm64 ${{ matrix.group }}
-    needs: [metadata, mac-prerequisites]
+    needs: [metadata, mac-prerequisites, mac-started]
+    if: ${{ !cancelled() && needs.metadata.result == 'success' && needs.mac-prerequisites.result == 'success' }}
     runs-on: macos-26
     timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
-        # Submit the long groups first while macOS runner capacity is limited.
-        group: [port, unit, backends, parity, packages, self-host]
+        group: [backends, parity, packages, self-host]
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -250,7 +291,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Submit the long groups first while macOS runner capacity is limited.
         group: [port, unit, backends, parity, packages, self-host]
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -263,7 +303,7 @@ jobs:
           source: ${{ needs.metadata.outputs.source }}
   mac-package:
     name: posix-package (macos-arm64, macos-26)
-    needs: [metadata, mac-tests]
+    needs: [metadata, mac-port, mac-unit, mac-tests, mac-started]
     permissions:
       contents: read
       actions: read
