@@ -12,6 +12,8 @@
       "Package.Build": "Package/Build.emlf",
       "Package.Command": "Package/Command.emlf",
       "Package.CompilerTests": "Package/CompilerTests.emlf",
+      "Package.TestDrivers": "Package/TestDrivers.emlf",
+      "Package.TestSources": "Package/TestSources.emlf",
       "Package.Json": "Package/Json.emlf",
       "Package.Manifest": "Package/Manifest.emlf",
       "Package.OS": "Package/OS.emlf",
