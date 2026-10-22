@@ -141,6 +141,11 @@ executable checks. Its internal POSIX `compiler-test` transports and historical
 performance gates are not claimed as Windows qualification. Each archive
 retains the exact source/tool hashes and platform evidence.
 
+The quick PR package smoke uses the separate `.github/smoke-seed.env` pin for
+released compact-GC tools compatible with the current runtime. Its archive,
+source commit and both executables are checked. `.github/seed.env` remains the
+historical cold-bootstrap anchor for release qualification and comparisons.
+
 The **Native release** manual entry delegates to the same three-platform
 workflow, so it cannot publish a macOS-only release. Historical macOS previews
 used the following sequence:
