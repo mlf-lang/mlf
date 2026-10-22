@@ -110,14 +110,17 @@ dependencies and still blocks forbidden tools:
 ```sh
 tools/release/test-smoke-receipts.sh
 tools/release/test-source-smoke-diagnostics.sh
+tools/release/test-pr-smoke-cli-watchdog.sh
 ```
 
 Four additional supervision checks exercise successful completion, failed
 optional memory probes and timeouts before and after harness progress, including
 cancellation between launching a watchdog sleep and recording its PID. Watchers
-terminate and reap their owned background jobs even in that launch window. The release
-metadata check runs these regressions too. GHC, Cabal and Python are blocked on
-the native CI path.
+terminate and reap their owned background jobs even in that launch window. Two
+CLI supervision checks exercise cancellation while launching the initial and
+grace-period watchdog sleeps, preventing orphan children from keeping the CLI
+output pipe open. The release metadata check runs these regressions too.
+GHC, Cabal and Python are blocked on the native CI path.
 
 To build fresh checkout tools and run the eight CLI and three package checks,
 also install LLVM, BDWGC and pkg-config:

@@ -20,6 +20,15 @@ timeout_seconds=60
 command_pid=
 watchdog_pid=
 command_labels=()
+stop_sleep_jobs() {
+  # Cancellation may arrive after fork but before a child PID is assigned.
+  # The watchdog's job table owns its sleep throughout that launch window.
+  trap '' TERM INT
+  local child_pid
+  for child_pid in $(jobs -p); do kill "$child_pid" 2>/dev/null || true; done
+  wait 2>/dev/null || true
+  exit 0
+}
 cleanup() {
   if [ -n "$watchdog_pid" ]; then kill "$watchdog_pid" 2>/dev/null || true; fi
   if [ -n "$command_pid" ]; then kill "$command_pid" 2>/dev/null || true; fi
@@ -41,14 +50,13 @@ run() {
   "$@" < "$input" > "$work/$label.stdout" 2> "$work/$label.stderr" &
   command_pid=$!
   (
-    sleep_pid=
-    trap 'if [ -n "$sleep_pid" ]; then kill "$sleep_pid" 2>/dev/null || true; fi; exit 0' TERM INT
-    sleep "$timeout_seconds" & sleep_pid=$!
-    wait "$sleep_pid" || exit 0
+    trap stop_sleep_jobs TERM INT
+    sleep "$timeout_seconds" &
+    wait "$!" || exit 0
     printf 'Command exceeded %s seconds.\n' "$timeout_seconds" > "$work/$label.timed-out"
     kill -TERM "$command_pid" 2>/dev/null || true
-    sleep 2 & sleep_pid=$!
-    wait "$sleep_pid" || exit 0
+    sleep 2 &
+    wait "$!" || exit 0
     kill -KILL "$command_pid" 2>/dev/null || true
   ) &
   watchdog_pid=$!
