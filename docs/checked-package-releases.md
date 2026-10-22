@@ -26,10 +26,9 @@ mlfpkg --manifest greeting/mlf-package.json --compiler /tools/emlf \
 The output directory must not already exist. The release includes `release.json`
 and checked artifact pairs, including the shared Prelude when needed. It
 contains no dependency source, build scripts, native code, or producer receipts.
-Archive and distribute this directory through the release hosting of your
-choice; unpack it before use. This first version deliberately keeps transport
-separate from package resolution: there is no HTTP client, registry, install
-hook, version solver, or implicit network access.
+Use the directory directly, or pack it into one deterministic `.mlfr` asset and
+distribute it through GitHub Releases. The transport preserves the same checked
+package boundary; there is no install hook or version solver.
 
 Pin the SHA-256 of the exact `release.json` bytes in the consumer:
 
@@ -45,11 +44,113 @@ Pin the SHA-256 of the exact `release.json` bytes in the consumer:
 ```
 
 Paths are relative to the declaring manifest. Each dependency selects exactly
-one of `path` (source) or `release` plus `sha256` (checked release). Missing,
+one of `path` (source), `release` plus `sha256` (local checked release), or
+`github` with both digest pins (downloaded checked release). Missing,
 incompatible, or damaged releases fail explicitly; switching to a source
 dependency is the explicit fallback. `plan` and `lock` inspect the bundle without
 executing a compiler. `--locked` pins the bundle inventory as well as source
 dependencies. Native tests and `run` retain their existing behavior.
+
+## GitHub distribution
+
+Pack an exported directory without loading a source manifest or invoking a compiler:
+
+```sh
+mlfpkg pack ./greeting-release ./greeting.mlfr
+```
+
+The command refuses an existing asset and prints its `asset_sha256` and the
+manifest's `sha256` as JSON. A `.mlfr` is a format-1 JSON envelope containing the
+exact `release.json` text and checked metadata/object text for each crate. There
+are no arbitrary filenames, executable permissions, links, or extraction hooks.
+The importer only writes `release.json` and fixed `crates/<128-hex-key>/unit.*`
+paths after validating the entire inventory. The first version is uncompressed;
+large libraries therefore trade download size for a small native implementation.
+
+After uploading that asset to an exact version tag, a consumer can declare:
+
+```json
+{
+  "dependencies": {
+    "greeting": {
+      "github": {
+        "repository": "owner/greeting",
+        "tag": "v1.2.3",
+        "asset": "greeting.mlfr"
+      },
+      "sha256": "<release.json SHA-256>",
+      "asset_sha256": "<.mlfr SHA-256>"
+    }
+  }
+}
+```
+
+Both pins are mandatory lowercase 64-digit hex values. Repository, tag, and
+asset are validated literal selectors; no wildcard or `latest` lookup is used.
+The GitHub CLI (`gh`) handles downloads and authentication, including private
+repositories. Authenticate it with `gh auth login` or `GH_TOKEN`; credentials
+never appear in the manifest or lockfile. Fetches explicitly target github.com,
+independently of `GH_HOST`.
+
+`plan`, `lock`, and builds may download an explicitly declared GitHub dependency
+when its pinned asset is absent. `--offline` prohibits that access. The download
+store is `<cache-dir>/.downloads/<asset_sha256>`, separate from the checked crate
+store. Without `--cache-dir`, it lives in the selected build directory's `cache`.
+Use a shared explicit cache for reuse across projects:
+
+```sh
+mlfpkg --cache-dir /shared/mlf-cache lock
+mlfpkg --cache-dir /shared/mlf-cache --offline --locked build
+```
+
+Cache publication uses private staging and a per-asset lock. The asset digest is
+checked before parsing, followed by the embedded manifest pin and artifact
+digests. A failed or partial download cannot become a usable cache entry. Warm
+loads recheck cached bytes; an intact asset can restore damaged extracted files
+without network access. A missing or corrupt asset requires a new download and
+fails in offline mode. `gh` is needed only when a download is actually required.
+GitHub dependency lock rows record the locator and pins rather than a physical
+cache path, so relocating the cache does not invalidate a lock. `--locked`
+still rejects changed declarations and never chooses another version.
+
+## Publishing a library
+
+The [Checked package release workflow](../.github/workflows/package-release.yml)
+is manually dispatched with an existing source tag and a library manifest path.
+Use a distinct package tag such as `packages/greeting/0.1.0-macos-arm64`; an
+existing compiler release or any other existing release is never modified.
+The tagged checkout must contain the updated tools from this change.
+
+The workflow fetches the published macOS ARM64 MLF 0.3.0 tool pair using the
+archive and executable pins in [package-seed.env](../.github/package-seed.env).
+It builds the updated manager while keeping the downloaded compiler unchanged,
+exports the selected library with a locked input snapshot, and packs the result.
+Declared package tests run before export.
+If the library already has a lockfile it must match; otherwise the workflow
+generates one before export. This first publishing workflow creates one compiler
+variant per release. The package manager's transport is usable on any supported
+host with `gh`, but consumers must select the exact compiler identified by the
+bundle. Additional compiler variants need separate package tags or a workflow
+that assembles all variants before publishing an immutable release.
+
+Preparation and remote publication are separate scripts:
+
+```sh
+MLF_PACKAGE_MANAGER=/tools/mlfpkg tools/release/prepare-package-release.sh \
+  ./greeting-release owner/greeting packages/greeting/0.1.0-macos-arm64 ./upload
+tools/release/publish-package-release.sh ./upload owner/greeting \
+  packages/greeting/0.1.0-macos-arm64 <source-commit-sha>
+```
+
+Preparation makes a compiler-qualified `.mlfr`, `dependency.json`, `SHA256SUMS`,
+and release notes. Publication verifies these pins, confirms that the remote tag
+still resolves to the expected source commit, and refuses an existing release.
+It creates a draft with all assets before publishing. Only the publication job
+has `contents: write`. Enable [GitHub release immutability](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases)
+to protect published tags and assets; consumer digest verification is always
+required. Failed uploads leave the draft unpublished for inspection.
+
+## Compiler compatibility
 
 Release format 1 requires the exact producing compiler SHA-256 and the same
 implicit-Prelude mode. Export currently uses the ordinary implicit-Prelude mode.
@@ -111,4 +212,11 @@ deterministic export, source-free downstream builds, both execution backends,
 multiple releases sharing transitive crates, explicit direct-import visibility,
 repeated cache reuse, local cache repair, manifest/artifact corruption, incompatible
 compiler or Prelude mode, and lock invalidation. Existing source package tests
-must continue to pass. No performance percentage is claimed without measurement.
+must continue to pass. Distribution cases additionally cover exact GitHub argv,
+download failures, both digest pins, deterministic packing, warm/offline reuse,
+extraction repair, malformed envelopes, and cache-independent lock snapshots.
+Publisher checks exercise local preparation, existing releases, moved tags,
+failed uploads, and damaged assets without publishing test releases.
+The CI package job builds the candidate manager with the pinned published
+compiler and runs the complete package suite, including the distribution cases.
+No performance percentage is claimed without measurement.

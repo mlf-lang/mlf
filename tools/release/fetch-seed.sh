@@ -3,12 +3,15 @@ set -euo pipefail
 root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 # Version and both executable hashes are reviewed in source control.
 # shellcheck source=.github/seed.env
-source "$root/.github/seed.env"
+source "${2:-$root/.github/seed.env}"
 destination=${1:?seed destination required}
 mkdir -p "$destination"
 destination=$(cd "$destination" && pwd)
 archive="mlf-$MLF_SEED_VERSION-macos-arm64.tar.gz"
 gh release download "v$MLF_SEED_VERSION" --repo mlf-lang/mlf --pattern "$archive" --pattern SHA256SUMS --dir "$destination"
+if [ -n "${MLF_SEED_ARCHIVE_SHA256:-}" ]; then
+  test "$(shasum -a 256 "$destination/$archive" | awk '{print $1}')" = "$MLF_SEED_ARCHIVE_SHA256"
+fi
 # A release can also publish supplementary validation archives. Verify the
 # archive downloaded here; both native executable hashes are checked below.
 awk -v archive="$archive" '$2 == archive { print; found++ } END { if (found != 1) exit 1 }' \

@@ -11,5 +11,6 @@ main = do
   Cons "--fail-command" Nil -> exitWith 17
   Cons "--package-gc-check" (Cons prefix (Cons binary Nil)) -> P.checkGC prefix binary
   Cons "--releases" Nil -> Releases.main
+  Cons "release" _ -> Releases.githubFixture args
   Nil -> do { R.main; P.integration; Releases.main }
   _ -> O.fatal "invalid package test arguments"

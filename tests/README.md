@@ -50,7 +50,7 @@ wrapper chooses 4 for port on hosts with at most 8 GiB RAM, while preserving the
 | Root group | MLF entry | Preserved coverage |
 | --- | --- | --- |
 | unit | CoreMain, Figure12SuiteMain, HarnessMain | 686 compiler checks; 6712 Algorithm W cases represented by 6703 executions; annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks; all 43 Figure 12 labels with 41 distinct executions and 36 controls; 58 benchmark/bootstrap/release harness methods |
-| packages | PackagesMain | 15 original resolver methods plus three additional checks; 29 compiler integration cases, including native PGO isolation, shared cache survival, corruption recovery and source invalidation; 16 checked-release cases covering source-free builds, relocation, shared dependencies, compatibility, pins and damaged artifacts |
+| packages | PackagesMain | 15 original resolver methods plus three additional checks; 29 compiler integration cases, including native PGO isolation, shared cache survival, corruption recovery and source invalidation; 28 checked-release cases covering source-free builds, relocation, shared dependencies, compatibility, pins, damaged artifacts, GitHub fetching, offline cache repair and packed asset validation |
 | backends | BackendSuiteMain | 523 fixtures and 575 execution rows on interpreter and LLVM, compact-GC layout |
 | port | PortMain, ReferencesMain | 25 LLVM fixtures with compact-GC, six reference programs, generated inference input equality |
 | parity | CorpusMain, CheckTarget | All 7086 prescribed acceptance/type/rejection cases, 7075 distinct source compilations, and 80 runtime rows on both backends |

@@ -48,6 +48,40 @@ jobs:
           path: |
             examples/packages/.mlf-build/build-report.json
             examples/packages/.mlf-build/tests/**/*.stdout
+  packages:
+    name: Native package distribution
+    if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Native dependencies
+        run: |
+          brew install llvm gmp pkg-config bdw-gc
+          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+          echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
+      - name: Fetch pinned published package compiler
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: tools/release/fetch-seed.sh .mlf-build/package-seed .github/package-seed.env
+      - name: Build candidate manager
+        run: |
+          "$MLF_PACKAGE_MANAGER" --compiler "$MLF_COMPILER" --runtime "$PWD/runtime/mlf_runtime.c" \
+            --build-dir .mlf-build/package-tools --timeout 5400 --locked build --target mlfpkg
+      - name: Test source packages and checked GitHub distribution
+        run: |
+          .mlf-build/package-tools/bin/mlfpkg compiler-test packages --compiler "$MLF_COMPILER" \
+            --build-dir .mlf-build/package-tests --cache-dir .mlf-build/package-tools/cache
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: package-distribution-evidence
+          include-hidden-files: true
+          path: |
+            .mlf-build/package-tools/build-report.json
+            .mlf-build/package-tests/verification.json
+            .mlf-build/package-tests/*.log
+            .mlf-build/package-tests/*.stderr
   windows-runtime:
     name: Native Windows runtime
     runs-on: windows-2025
