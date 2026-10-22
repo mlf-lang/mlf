@@ -130,6 +130,9 @@ times were 25m 6s and 5m 13s under concurrent host load; these are not a
 controlled before/after speed benchmark. Self-host and parity were not rerun.
 These results predate the upstream regex additions and do not validate the
 combined source tree.
+The subsequent [integration record](../docs/test-cache-cleanup-integration.json)
+records a rebuilt manager and a passing full unit group on the merged tree,
+including regex, both cache regressions, Core and Figure 12.
 
 The C files `tests/native/binary_files.c` and `tests/native/host_support.c` provide binary file transport,
 environment-name enumeration, and per-process measurements/process groups.
