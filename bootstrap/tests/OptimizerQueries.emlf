@@ -32,7 +32,7 @@ checkSize nodes =
 checkUses uses =
   let f = name 100 in
   let body = L.foldr pair (XEInt 42) (L.replicate uses (XEVar f)) in
-  assert (lets (O.optimize (XELet f (function 80) body)) == (if uses <= 1 then 0 else 1)) "zero, one, and multiple lambda uses"
+  assert (lets (O.optimize (XELet f (function 25) body)) == (if uses <= 1 then 0 else 1)) "zero, one, and multiple lambda uses"
 
 main = do
   L.mapM_ checkSize (L.range 20 28)
@@ -44,9 +44,9 @@ main = do
   let loop = name 101
   let argument = name 102
   let rhs = XEAbs argument (pair (XEVar f) (XEApp (XEVar loop) (XEVar argument)))
-  let captured = XELet f (function 80) (XELetRec (Cons (Pair loop rhs) Nil) (pair (XEVar f) (XEVar loop)))
+  let captured = XELet f (function 25) (XELetRec (Cons (Pair loop rhs) Nil) (pair (XEVar f) (XEVar loop)))
   assert (lets (O.optimize captured) == 2) "captured recursive uses remain shared"
-  let patterned = XELet n (function 80) (XECase (XEVar (name 1))
+  let patterned = XELet n (function 25) (XECase (XEVar (name 1))
         (Cons (XErasedAlternative (XConstructorPattern "Keep" (Cons (Just n) Nil)) (XEVar n)) Nil))
   assert (lets (O.optimize patterned) == 0) "pattern binders keep their own identity"
   let tooLarge = L.foldr (\i b -> XEAbs (name i) b) (panic "size query traversed past its budget") (L.range 1 25)

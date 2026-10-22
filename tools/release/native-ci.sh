@@ -2,17 +2,10 @@
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../.."
 group=${1:-smoke}
-profile=${2:-${MLF_TEST_RUNTIME_PROFILE:-}}
-test "$#" -le 2 || { printf '%s\n' 'Expected a group and optional port profile.' >&2; exit 2; }
+test "$#" -le 1 || { printf '%s\n' 'Expected one test group.' >&2; exit 2; }
 case "$group" in smoke|unit|packages|self-host|parity|backends|port) ;; *) exit 2 ;; esac
-if [ "$group" = port ]; then
-  case "$profile" in ''|standard|compact-gc) ;; *) printf '%s\n' 'Invalid port runtime profile.' >&2; exit 2 ;; esac
-  export MLF_TEST_RUNTIME_PROFILE="$profile"
-else
-  test -z "$profile" || { printf '%s\n' 'Runtime profiles are only supported for port tests.' >&2; exit 2; }
-fi
+test -z "${MLF_TEST_RUNTIME_PROFILE:-}" || test "$MLF_TEST_RUNTIME_PROFILE" = compact-gc || exit 2
 evidence_group=$group
-if [ -n "$profile" ]; then evidence_group="port-$profile"; fi
 case "$(uname -s):$(uname -m)" in
   Darwin:arm64)
     export MLF_GC_PREFIX=${MLF_GC_PREFIX:-"$(brew --prefix bdw-gc)"}
@@ -55,7 +48,7 @@ if [ "$group" = port ]; then
     Linux) matrix_memory_bytes=$(awk '/^MemTotal:/ {printf "%.0f\n", $2 * 1024}' /proc/meminfo) ;;
   esac
   if [ -z "${MLF_TEST_MATRIX_GC_DIVISOR:-}" ]; then
-    # The interpreted solver probe peaks near 6.5 GB with divisor 1, before
+    # Native compiler workloads may need a larger collector allowance, before
     # accounting for its parent test process and the OS. Small CI hosts trade
     # extra collection work for a measured peak near 3.4 GB with divisor 4.
     if [ "$matrix_memory_bytes" -le 8589934592 ]; then
@@ -88,21 +81,10 @@ else
   case "$group" in
     unit) suites='core figure12 harness' ;;
     packages) suites='packages' ;;
-    backends) suites='standard compact-gc' ;;
-    port) suites=${profile:-'standard compact-gc'} ;;
+    backends|port) suites='compact-gc' ;;
     *) suites='' ;;
   esac
   for suite in $suites; do logs+=(".mlf-build/compiler-tests/$evidence_group/$suite.log"); done
-  if [ "$group" = port ]; then
-    # These three bounded fixture outputs expose progress inside expensive
-    # interpreted compiler workloads. The native supervisor truncates them
-    # before each run; following the same files does not change validation.
-    for suite in $suites; do
-      matrix=".mlf-build/compiler-tests/$evidence_group/matrix-$suite"
-      mkdir -p "$matrix"
-      for index in 14 19 23; do logs+=("$matrix/case-$index-interpreter.stdout"); done
-    done
-  fi
   touch "${logs[@]}"
   tail -n +1 -f "${logs[@]}" &
   log_pid=$!

@@ -8,7 +8,7 @@ infers, elaborates, checks, interprets, and emits LLVM.
 
 Use the root MLF package manager to run all six groups, including the fresh
 self-host fixed point, frozen parity corpus, independent reference algorithms,
-and interpreter/LLVM matrices in both runtime layouts. A self-rebuild alone is
+and interpreter/LLVM matrices in the compact-GC layout. A self-rebuild alone is
 not sufficient validation. See README.md and ../tests/README.md.
 
 Source uses the CURRENT supported .emlf syntax: modules, ordinary ADTs,

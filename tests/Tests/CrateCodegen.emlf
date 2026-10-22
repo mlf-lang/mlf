@@ -17,13 +17,13 @@ suite : List (Pair String (IO Unit))
 suite = Cons (Pair "code generation query agrees with uncached checked emission" agreement)
   (Cons (Pair "erased query reuses alpha and annotation changes" annotationReuse)
   (Cons (Pair "optimized query reuses changed unused bodies" unusedReuse)
-  (Cons (Pair "code generation cache separates GC, IO and constructor ABIs" abiSeparation)
+  (Cons (Pair "code generation cache separates IO and constructor ABIs" abiSeparation)
   (Cons (Pair "corrupt cached LLVM is rebuilt" corruption)
   (Cons (Pair "prepared entries and stale crate dependencies retain visibility" opaque) Nil)))))
 
-emit : String -> Bool -> Bool -> Checked.CheckedTerm -> IO Cache.CodegenResult
-emit directory compact requireIO checked = do
-  result <- Cache.emitChecked directory compact requireIO checked
+emit : String -> Bool -> Checked.CheckedTerm -> IO Cache.CodegenResult
+emit directory requireIO checked = do
+  result <- Cache.emitChecked directory requireIO checked
   H.right result
 sameCode : List String -> Cache.CodegenResult -> IO Unit
 sameCode expected actual = H.assert (eqString (S.concatStrings expected) (S.concatStrings (Cache.codeChunks actual))) "cached LLVM differs from checked emission"
@@ -36,13 +36,12 @@ agreement : IO Unit
 agreement = System.withScratch (\directory -> do
   keyCompatibility
   checked <- H.right (Checked.check (identityTerm 10 (XCon "Int" Nil)))
-  S.mapM_ (\compact -> do
-    expected <- H.right (LLVM.emitCheckedChunks compact false checked)
-    first <- emit directory compact false checked
-    second <- emit directory compact false checked
-    sameCode expected first
-    sameCode expected second
-    H.assert (Cache.inputReused second) "repeat checked emission did not reuse its erased query") (Cons false (Cons true Nil)))
+  expected <- H.right (LLVM.emitCheckedChunks false checked)
+  first <- emit directory false checked
+  second <- emit directory false checked
+  sameCode expected first
+  sameCode expected second
+  H.assert (Cache.inputReused second) "repeat checked emission did not reuse its erased query")
 
 -- Fixed wire-format examples predate the chunk serializer. Their scalar
 -- lengths include an astral character and NUL; the large golden crosses
@@ -68,8 +67,8 @@ annotationReuse : IO Unit
 annotationReuse = System.withScratch (\directory -> do
   original <- H.right (Checked.check (identityTerm 10 (XCon "Int" Nil)))
   annotated <- H.right (Checked.check (identityTerm 1000 (XCon "Bool" Nil)))
-  first <- emit directory false false original
-  second <- emit directory false false annotated
+  first <- emit directory false original
+  second <- emit directory false annotated
   H.assert (Cache.inputReused second) "alpha-equivalent erasure reran code generation"
   H.assert (eqString (Cache.inputDigest first) (Cache.inputDigest second)) "type annotations changed the erased runtime key"
   sameCode (Cache.codeChunks first) second)
@@ -78,8 +77,8 @@ unusedReuse : IO Unit
 unusedReuse = System.withScratch (\directory -> do
   original <- H.right (Checked.check (deadTerm 1))
   changed <- H.right (Checked.check (deadTerm 2))
-  first <- emit directory false false original
-  second <- emit directory false false changed
+  first <- emit directory false original
+  second <- emit directory false changed
   H.assert (S.not (Cache.inputReused second)) "changed runtime input incorrectly reused its first query"
   H.assert (Cache.optimizedReused second) "unchanged optimized program reran LLVM generation"
   sameCode (Cache.codeChunks first) second
@@ -88,7 +87,7 @@ unusedReuse = System.withScratch (\directory -> do
 crateKey : XTerm -> IO String
 crateKey term = do
   checked <- H.right (Checked.check term)
-  H.right (LLVM.crateInputKey false false checked)
+  H.right (LLVM.crateInputKey false checked)
 crateKeyAgreement : String -> Bool -> XTerm -> XTerm -> IO Unit
 crateKeyAgreement label equal original changed = do
   before <- crateKey original
@@ -134,56 +133,53 @@ crateInputDependencies directory = do
   crateKeyAgreement "branch capture is omitted from the entry key" false (branchCapture 1) (branchCapture 2)
   original <- H.right (Checked.check (entryRecursive 1 false))
   changed <- H.right (Checked.check (entryRecursive 2 false))
-  firstResult <- Cache.emitCrateChecked directory false false original
+  firstResult <- Cache.emitCrateChecked directory false original
   first <- H.right firstResult
-  expected <- H.right (LLVM.emitCheckedChunks false false original)
+  expected <- H.right (LLVM.emitCheckedChunks false original)
   sameCode expected first
-  secondResult <- Cache.emitCrateChecked directory false false changed
+  secondResult <- Cache.emitCrateChecked directory false changed
   second <- H.right secondResult
   H.assert (Cache.inputReused second) "entry-independent recursive body reran the optimizer"
   sameCode (Cache.codeChunks first) second
-  ordinary <- H.right (LLVM.crateInputKey false false original)
-  compact <- H.right (LLVM.crateInputKey true false original)
-  H.assert (S.not (eqString ordinary compact)) "entry key omits the runtime ABI"
-  H.reject (LLVM.crateInputKey false true original)
+  key <- H.right (LLVM.crateInputKey false original)
+  H.assert (H.contains "MLF-CODEGEN-CRATE-INPUT-COMPACT-2" key && H.contains "compact-bdwgc-v1" key) "entry key omits the fixed compact ABI"
+  H.reject (LLVM.crateInputKey true original)
   let withData = \name -> XWithData (Cons (DataDecl name Nil (Cons (ConstructorDecl name Nil) Nil)) Nil) (XIntTerm 42)
   crateKeyAgreement "entry key omits unused constructor ABI entries" false (withData "First") (withData "Second")
   writeFile (directory ++ "/objects/" ++ Cache.optimizedDigest first ++ ".ll") "corrupted LLVM output"
-  repairedResult <- Cache.emitCrateChecked directory false false changed
+  repairedResult <- Cache.emitCrateChecked directory false changed
   repaired <- H.right repairedResult
   H.assert (S.not (Cache.inputReused repaired)) "entry query trusted corrupt LLVM"
-  direct <- H.right (LLVM.emitCheckedChunks false false changed)
+  direct <- H.right (LLVM.emitCheckedChunks false changed)
   sameCode direct repaired
 
 abiSeparation : IO Unit
 abiSeparation = System.withScratch (\directory -> do
   pure <- H.right (Checked.check (XApp (XPrimitive PPanic (Cons (XCon "Int" Nil) Nil)) (XStringTerm "entry")))
   action <- H.right (Checked.check (XApp (XPrimitive PPanic (Cons (XCon "IO" (Cons (XCon "Int" Nil) Nil)) Nil)) (XStringTerm "entry")))
-  ordinary <- emit directory false false pure
-  compact <- emit directory true false pure
-  io <- emit directory false true action
-  H.assert (S.not (Cache.inputReused compact) && S.not (Cache.optimizedReused compact)) "GC ABI reused standard generated code"
+  ordinary <- emit directory false pure
+  io <- emit directory true action
   H.assert (S.not (Cache.inputReused io) && S.not (Cache.optimizedReused io)) "IO execution ABI reused a pure entry"
   H.assert (S.not (eqString (S.concatStrings (Cache.codeChunks ordinary)) (S.concatStrings (Cache.codeChunks io)))) "IO execution flag did not affect emitted entry"
-  rejected <- Cache.emitChecked directory false true pure
+  rejected <- Cache.emitChecked directory true pure
   H.reject rejected
   let declaration = \name -> DataDecl name Nil (Cons (ConstructorDecl name Nil) Nil)
   firstLayout <- H.right (Checked.check (XWithData (Cons (declaration "First") Nil) (XConstructor "Unit" Nil)))
   secondLayout <- H.right (Checked.check (XWithData (Cons (declaration "Second") Nil) (XConstructor "Unit" Nil)))
-  _ <- emit directory false false firstLayout
-  different <- emit directory false false secondLayout
+  _ <- emit directory false firstLayout
+  different <- emit directory false secondLayout
   H.assert (S.not (Cache.inputReused different) && S.not (Cache.optimizedReused different)) "different nominal constructor tables reused a code generation ABI")
 
 corruption : IO Unit
 corruption = System.withScratch (\directory -> do
   checked <- H.right (Checked.check (XIntTerm 42))
-  first <- emit directory false false checked
+  first <- emit directory false checked
   writeFile (directory ++ "/objects/" ++ Cache.optimizedDigest first ++ ".ll") "corrupted LLVM output"
-  second <- emit directory false false checked
+  second <- emit directory false checked
   H.assert (S.not (Cache.inputReused second) && S.not (Cache.optimizedReused second)) "corrupted output was accepted by a cache query"
-  expected <- H.right (LLVM.emitCheckedChunks false false checked)
+  expected <- H.right (LLVM.emitCheckedChunks false checked)
   sameCode expected second
-  repaired <- emit directory false false checked
+  repaired <- emit directory false checked
   H.assert (Cache.inputReused repaired) "rebuilt cache output was not reusable")
 
 opaque : IO Unit

@@ -19,11 +19,11 @@ esac
 sha256() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$@"; else shasum -a 256 "$@"; fi; }
 version=$(cat VERSION)
 commit=$(git rev-parse HEAD)
-parts='unit packages self-host parity backends port-standard port-compact-gc'
+parts='unit packages self-host parity backends port'
 # Keep artifact directories distinct until every actual tool pair has been
 # compared with the pair that passed native package-manager integration tests.
 artifact_root=$build
-test "$(find "$artifact_root" -mindepth 1 -maxdepth 1 | wc -l)" -eq 7
+test "$(find "$artifact_root" -mindepth 1 -maxdepth 1 | wc -l)" -eq 6
 package_artifact="$artifact_root/native-$platform-packages"
 for part in $parts; do
   artifact="$artifact_root/native-$platform-$part"
@@ -40,7 +40,6 @@ for part in $parts; do
 done
 compiler_hash=$(sha256 "$build/bin/emlf" | awk '{print $1}')
 manager_hash=$(sha256 "$build/bin/mlfpkg" | awk '{print $1}')
-bash tools/release/merge-port-profiles.sh "$build" "$compiler_hash" "$manager_hash"
 base="$build/compiler-tests/unit/verification.json"
 groups='unit packages self-host parity backends port'
 for group in $groups; do
@@ -64,9 +63,9 @@ cmp <(jq -r '.sources | keys[]' "$base" | LC_ALL=C sort) <(
     printf '%s\n' mlfpkg mlf-package.json; } | LC_ALL=C sort
 )
 jq -e --arg hash "$compiler_hash" '.fixed_point.reused_candidate_build == false and .fixed_point.next_compiler_sha256 == $hash' "$build/compiler-tests/self-host/verification.json" >/dev/null
-jq -e '.parity.cases >= 7086 and .parity.runtime_executions >= 160' "$build/compiler-tests/parity/verification.json" >/dev/null
-jq -e '(.matrices | keys) == ["compact-gc","standard"] and all(.matrices[]; .backends == 2 and .rows == 575)' "$build/compiler-tests/backends/verification.json" >/dev/null
-jq -e '.requested_profiles == ["standard","compact-gc"] and (.matrices | keys) == ["compact-gc","standard"] and all(.matrices[]; .backends == 2 and .rows == 25)' "$build/compiler-tests/port/verification.json" >/dev/null
+jq -e '.parity.cases == 7086 and .parity.source_compilations == 7075 and .parity.shared_source_cases == 11 and .parity.runtime_executions == 160' "$build/compiler-tests/parity/verification.json" >/dev/null
+jq -e '(.matrices | keys) == ["compact-gc"] and all(.matrices[]; .backends == 2 and .rows == 575)' "$build/compiler-tests/backends/verification.json" >/dev/null
+jq -e '.requested_profiles == ["compact-gc"] and (.matrices | keys) == ["compact-gc"] and all(.matrices[]; .backends == 1 and .backend_names == ["llvm"] and .rows == 25)' "$build/compiler-tests/port/verification.json" >/dev/null
 mkdir -p "$output"
 output=$(cd "$output" && pwd)
 name="mlf-$version-$platform"
@@ -82,7 +81,7 @@ cp VERSION LICENSE CHANGELOG.md "$bundle/"
 printf '%s\n' "$commit" > "$bundle/COMMIT"
 cp "$notice" "$bundle/licenses/BDWGC.txt"
 cp runtime/khash.h "$bundle/licenses/khash.h"
-for group in $groups port-standard port-compact-gc; do
+for group in $groups; do
   mkdir -p "$bundle/evidence/$group"
   cp "$build/compiler-tests/$group/verification.json" "$bundle/evidence/$group/"
   while IFS= read -r log; do cp "$log" "$bundle/evidence/$group/"; done < <(find "$build/compiler-tests/$group" -maxdepth 1 -name '*.log' -type f)
@@ -96,7 +95,7 @@ else
 fi
 jq -n --arg version "$version" --arg commit "$commit" --arg compiler "$compiler_hash" --arg manager "$manager_hash" \
   --arg platform "$platform" --arg minos "$minimum_macos" --arg glibc "$build_glibc" \
-  '{schema_version:1,version:$version,commit:$commit,platform:$platform,compiler_sha256:$compiler,manager_sha256:$manager,test_implementation:"MLF",test_groups:["unit","packages","self-host","parity","backends","port"],port_profiles:["standard","compact-gc"],performance_gate:"not rerun for this preview"} + (if $platform == "macos-arm64" then {minimum_macos:$minos} else {build_glibc:$glibc} end)' > "$bundle/release.json"
+  '{schema_version:1,version:$version,commit:$commit,platform:$platform,compiler_sha256:$compiler,manager_sha256:$manager,test_implementation:"MLF",test_groups:["unit","packages","self-host","parity","backends","port"],port_profiles:["compact-gc"],performance_gate:"not rerun for this preview"} + (if $platform == "macos-arm64" then {minimum_macos:$minos} else {build_glibc:$glibc} end)' > "$bundle/release.json"
 if [ "$platform" = macos-arm64 ]; then
 cat > "$bundle/README.md" <<'README'
 # MLF native developer preview
@@ -130,7 +129,7 @@ needs the bundled runtime sources. No GHC, Cabal, or Python is required.
 
 release.json identifies the exact commit and executable hashes. CHECKSUMS covers
 all bundled files. evidence/ contains all six compiler qualification reports,
-their primary logs, and both original native port profile reports. Historical
+their primary logs, including the compact-GC native matrices. Historical
 absolute paths in those reports identify the
 validation run; they are not runtime dependencies. The raw native executables
 are unchanged from validation; installed shell launchers add --version support.

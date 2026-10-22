@@ -6,11 +6,11 @@ import qualified Bootstrap.IntMap as IM
 import qualified Bootstrap.Graph as G
 import qualified Bootstrap.Graph.Solver as S
 import qualified Tests.Helpers as H
-ranks : IO Unit
-ranks = do
- L.mapM_ (\count -> L.mapM_ (\offset -> L.mapM_ (\stride -> do
+checkRanks count offset stride = do
   let supplied = L.map (\n -> offset + stride * n) (L.range 0 (count - 1))
   let keys = IS.fromList (L.append supplied (L.reverse supplied))
+  let filtered = L.filter (\key -> remInt key 2 /= 0) supplied
+  let selections = if L.eqList eqInt supplied filtered then Cons keys Nil else Cons keys (Cons (IS.fromList filtered) Nil)
   L.mapM_ (\selected -> do
    let ordered = IS.toList selected
    let indices = L.range 0 (L.length ordered - 1)
@@ -22,7 +22,17 @@ ranks = do
    L.mapM_ (\index -> H.assert (H.eq (S.selectIdentity index nodeTree) (case IM.lookup index backward of {Nothing -> Left "scope placeholder escaped local unification"; Just key -> Right key})) "node-map inverse rank disagrees with independent renaming map") (L.append indices (Cons (-1) (Cons (L.length ordered) Nil)))
    L.mapM_ (\key -> H.assert (S.compactIdentity G.emptyGraph selected key == IM.get key forward) "projection rank disagrees with independent map") ordered
    L.mapM_ (\key -> let alias = Graph IM.empty (IM.singleton (key + 1) key) 0 in H.assert (S.compactIdentity alias selected (key + 1) == IM.get key forward) "projection did not resolve an external alias") ordered
-   L.mapM_ (\index -> H.assert (H.eq (S.originalIdentity selected index) (case IM.lookup index backward of { Nothing -> Left "scope placeholder escaped local unification"; Just key -> Right key })) "projection selection disagrees with independent map") (L.append indices (Cons (-1) (Cons (L.length ordered) (Cons (L.length ordered + 100) Nil))))) (Cons keys (Cons (IS.difference keys (IS.fromList (L.filter (\key -> remInt key 2 == 0) supplied))) Nil))) (Cons 1 (Cons 17 Nil))) (Cons 0 (Cons (-10000) (Cons 1000000000000000000000000000000000000000000000000000000000000001 Nil)))) (Cons 0 (Cons 1 (Cons 2 (Cons 3 (Cons 5 (Cons 17 (Cons 65 (Cons 257 Nil))))))))
+   L.mapM_ (\index -> H.assert (H.eq (S.originalIdentity selected index) (case IM.lookup index backward of { Nothing -> Left "scope placeholder escaped local unification"; Just key -> Right key })) "projection selection disagrees with independent map") (L.append indices (Cons (-1) (Cons (L.length ordered) (Cons (L.length ordered + 100) Nil))))) selections
+
+ranks : IO Unit
+ranks = do
+ -- Empty has no identity renaming or distinct filtered-set variant.
+ checkRanks 0 0 1
+ L.mapM_ (\count -> L.mapM_ (\offset -> L.mapM_ (checkRanks count offset) (Cons 1 (Cons 17 Nil))) (Cons 0 (Cons (-10000) (Cons 1000000000000000000000000000000000000000000000000000000000000001 Nil)))) (Cons 1 (Cons 2 (Cons 3 (Cons 5 (Cons 17 Nil)))))
+ checkRanks 65 0 1
+ checkRanks 257 0 1
+ checkRanks 257 1000000000000000000000000000000000000000000000000000000000000001 17
+
 
 
 suite : List (Pair String (IO Unit))

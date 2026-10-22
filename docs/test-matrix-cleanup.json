@@ -1,0 +1,503 @@
+{
+  "schema_version": 1,
+  "complete": true,
+  "validated_at": "2026-10-21T19:47:03.049Z",
+  "client_timezone": "Asia/Shanghai",
+  "working_tree_base": "cb16a87fcceb9d0d4c1a37aaffb322beb809e780",
+  "committed_or_published": false,
+  "source_files": 3207,
+  "live_source_matches_snapshot_before_document_closeout": true,
+  "source_snapshot": "/Volumes/src/mlf/.mlf-build/test-matrix-cleanup/r3/inputs.json",
+  "source_snapshot_sha256": "9770b26c1b0f1204250c180e0a6ed279066c58bf128ef0ef1014a76de46b9cf5",
+  "tools": {
+    "emlf": {
+      "path": "/Volumes/src/mlf/.mlf-build/test-matrix-cleanup/r3/build/bin/emlf",
+      "sha256": "4d7f426223f2c840fe8ab66b21a231f761d7def80f4c9ddfeb43a11dc7ce2d36"
+    },
+    "mlfpkg": {
+      "path": "/Volumes/src/mlf/.mlf-build/test-matrix-cleanup/r3/build/bin/mlfpkg",
+      "sha256": "cdfdd09ecba24e5eeaef04b5401a3a7061772930d91044cb74a2f440e8445db0"
+    }
+  },
+  "compiler_unchanged": true,
+  "groups": [
+    {
+      "group": "unit",
+      "wall_seconds": 871.6104990829999,
+      "previous_wall_seconds": 880.831595209
+    },
+    {
+      "group": "packages",
+      "wall_seconds": 222.88371033399994,
+      "previous_wall_seconds": 224.17507295799987
+    },
+    {
+      "group": "self-host",
+      "wall_seconds": 527.6286945000002,
+      "previous_wall_seconds": 538.6512585
+    },
+    {
+      "group": "parity",
+      "wall_seconds": 513.1896813749997,
+      "previous_wall_seconds": 518.5214421670003
+    },
+    {
+      "group": "backends",
+      "wall_seconds": 1157.310197708,
+      "previous_wall_seconds": 1216.6109254159996
+    },
+    {
+      "group": "port",
+      "wall_seconds": 1415.3168022080004,
+      "previous_wall_seconds": 3649.8836493750005
+    }
+  ],
+  "total_test_wall_seconds": 4709.850671125,
+  "previous_total_test_wall_seconds": 7030.1497925,
+  "initial_tool_build_wall_seconds": 332.200150625,
+  "initial_overhead_seconds": 1.911085917,
+  "reports": {
+    "unit": {
+      "path": "/Volumes/src/mlf/.mlf-build/test-matrix-cleanup/r3/build/compiler-tests/unit/verification.json",
+      "sha256": "22eae7b5796df54f33a86ea80060a4dfa5e6c7a29936029b4fa334cf398842e0"
+    },
+    "packages": {
+      "path": "/Volumes/src/mlf/.mlf-build/test-matrix-cleanup/r3/build/compiler-tests/packages/verification.json",
+      "sha256": "f88b654b68c400ec6d31028e7e07d892d5c64c08ebb4441f5d8909d8cf2a6343"
+    },
+    "self-host": {
+      "path": "/Volumes/src/mlf/.mlf-build/test-matrix-cleanup/r3/build/compiler-tests/self-host/verification.json",
+      "sha256": "47eec46b2b0d7d21c8ba2166f76b4c55e42b0f8c0f27ec9c2eed0bddf8fa63a8"
+    },
+    "parity": {
+      "path": "/Volumes/src/mlf/.mlf-build/test-matrix-cleanup/r3/build/compiler-tests/parity/verification.json",
+      "sha256": "eb8a6a5547e68ecd69898e9af0dd7875f1b1b7ef7a0724192f64c4f271bfff27"
+    },
+    "backends": {
+      "path": "/Volumes/src/mlf/.mlf-build/test-matrix-cleanup/r3/build/compiler-tests/backends/verification.json",
+      "sha256": "61baa635c425377b4f4bfdbbffd88bf404946f2017cbad4f914f2e14fe5e286c"
+    },
+    "port": {
+      "path": "/Volumes/src/mlf/.mlf-build/test-matrix-cleanup/r3/build/compiler-tests/port/verification.json",
+      "sha256": "801723dc916161f12441fa5f86281cb8108389677e44c9830d83aee0b967b228"
+    }
+  },
+  "selection_review": {
+    "complete": true,
+    "protected_paths": 2716,
+    "protected_paths_unchanged": true,
+    "changed_since_r6": [
+      "docs/shared-test-artifacts.json",
+      "docs/shared-test-artifacts.md",
+      "docs/shared-test-execution-times.json",
+      "docs/test-matrix-cleanup.md",
+      "mlf.lock",
+      "package/Package/CompilerTests.emlf",
+      "package/Package/Verification.emlf",
+      "tests/README.md",
+      "tests/Tests/Backends.emlf",
+      "tests/Tests/BootstrapSuite.emlf",
+      "tests/Tests/ComponentProjection.emlf",
+      "tests/Tests/GraphSolver.emlf",
+      "tests/Tests/IndexEdges.emlf",
+      "tests/Tests/PortSuite.emlf",
+      "tests/Tests/ProjectionChanges.emlf",
+      "tests/Tests/ProjectionRanks.emlf",
+      "tests/Tests/SolverAllocation.emlf",
+      "tests/coverage-overlap.md",
+      "tools/release/merge-port-profiles.sh",
+      "tools/release/package.sh"
+    ],
+    "selection_review": {
+      "component_scopes": {
+        "old_graphs": 42,
+        "new_graphs": 28,
+        "all_start_categories": true,
+        "identity_renamings_on_small_graphs": 6,
+        "large_chains": [
+          31,
+          33,
+          127,
+          257
+        ]
+      },
+      "component_projection": {
+        "old_graphs": 30,
+        "new_graphs": 26,
+        "large_chains": [
+          17,
+          65
+        ]
+      },
+      "restoration": {
+        "old_configurations": 384,
+        "new_configurations": 272,
+        "all_modes_on_small_and_large": true,
+        "raw_empty_solved_duplicate_removed": true
+      },
+      "projection_ranks": {
+        "old_configurations": 48,
+        "new_configurations": 34,
+        "large_counts": [
+          65,
+          257
+        ],
+        "large_integer_scale": true,
+        "empty_once": true
+      },
+      "projection_changes": {
+        "old_generated": 672,
+        "old_unique": 571,
+        "new_generated": 528,
+        "new_unique": 427,
+        "all_mode_pairs_retained": true
+      },
+      "index_transitions": {
+        "old_configurations": 192,
+        "new_configurations": 160,
+        "both_directions_and_patch_paths": true
+      },
+      "index_updates": {
+        "old_generated_steps": 3072,
+        "new_generated_steps": 912,
+        "explicit_edit_steps": 40,
+        "long_sequences_retained": 2,
+        "long_prefixes_not_replayed": true
+      },
+      "sorted_builder": {
+        "old_configurations": 21,
+        "new_configurations": 15,
+        "largest_count": 4096
+      },
+      "branching_solver": {
+        "old_deep_pairs": 55,
+        "new_small_pairs": 36,
+        "new_deep_pairs": 10,
+        "original_1002_nodes_retained": true
+      },
+      "scope_audit": {
+        "exhaustive_small_mutations": true,
+        "scope_pair_scale": [
+          15,
+          16,
+          17,
+          255,
+          256,
+          257
+        ],
+        "each_jump_level_corrupted": true
+      },
+      "copy_allocation": {
+        "raw_input_deduplication": true,
+        "small_counts": [
+          0,
+          1,
+          2,
+          7
+        ],
+        "scale_counts": [
+          31,
+          257
+        ],
+        "word_boundary_crossing": true
+      }
+    },
+    "scope": "Static selection review; the subsequent native suite supplies execution evidence. Reduced cross-products intentionally do not claim identical exhaustive input coverage.",
+    "previous_incomplete_run": {
+      "directory": "../r1",
+      "build_exit": 0,
+      "test_exit": 1,
+      "reason": "Recursive test helper lacked an explicit closed signature; no native test execution qualified."
+    },
+    "previous_launch_failure": {
+      "directory": "../r2",
+      "complete": false,
+      "successful_groups": [
+        "unit",
+        "packages",
+        "self-host",
+        "parity"
+      ],
+      "backend_standard_completed": true,
+      "backend_compact_completed_rows": 86,
+      "failed_next_index": 86,
+      "host_child_exit": 71,
+      "output_files_created": false,
+      "helper_binary_sha256": "ecd5bad153ca30cce6207ba4e57858766f89acaacaae926e305022bab5d761f7",
+      "helper_byte_identical_to_r6": true,
+      "exact_case_replay_passed": true,
+      "diagnostic_launch_stress": {
+        "complete": true,
+        "successful_launches": 2000,
+        "wall_seconds": 7.7354045,
+        "diagnostic_helper_only": true,
+        "scope": "Pre-exec process-group setup stress; no test qualification and no automatic retry of failures."
+      },
+      "cause": "Pre-exec process-group setup; underlying OS cause not confirmed. No launch checks relaxed and no failures automatically retried."
+    },
+    "final_source_code_identical_to_r2": true,
+    "documentation_changes_since_r2": [
+      "tests/coverage-overlap.md"
+    ]
+  },
+  "port": {
+    "outer_interpreter_executions": 0,
+    "llvm_executions": 50,
+    "layouts": 2,
+    "fixtures": 25,
+    "all_targets_unchanged_from_r6": true,
+    "targets": [
+      {
+        "fixture": "foundation",
+        "target_sha256": "9472711bc54d8ba8ed6739f7e70f23389a1c4859b408f11f624de55811548ce7",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "MapFolds",
+        "target_sha256": "385b7dc033a44e37e6dc4007ea771e92d33e24c5a902ced6cab0303bbe496894",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "IntegerContainers",
+        "target_sha256": "58dc530701aca217b0bdad99102d8adfdee1fc963d8e86b81073d44d881d82ed",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "OptimizerQueries",
+        "target_sha256": "f69fe9174c8910c27aa9bde638f0438befb52e657c3ea05716d8597c5f29c3bb",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "ConstructorProjection",
+        "target_sha256": "05f5a2b8f7485f33b318380067f94a19cd09a84a80965051130825f6f1f6328b",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "ForceReuse",
+        "target_sha256": "8dbffe8061fadc6887e7550d93974b2f75ece87721aa3e22a567616b44480abc",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "StrictFields",
+        "target_sha256": "071690d2c20a7b60174796549373e4c961a75e4a18141251baa436642733ad35",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "prelude",
+        "target_sha256": "44d72402a470800f8ab0076bebb0cd54a0527fab9095791d0956817bb73c73c6",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "Target",
+        "target_sha256": "f47c6040fa385200504871adf9a158a00fcd9f960a667867bb61b7bc772d59a0",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "frontend",
+        "target_sha256": "f535b7b75a0c89ea569a18779896ab0f281adf08cf1ff43bb0cc3a9c8fc8aa70",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "LexerCounters",
+        "target_sha256": "262825dfa3abc6d255ee944e491bf0eafb48074e7ce05be0927c2c86af511849",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "LLVMBuild",
+        "target_sha256": "1e73551025c8867e9bac94b1ad71fee68258e2d26a0b288ef16f615a1f8d9198",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "RuntimeCases",
+        "target_sha256": "c1325eaa9d4973c592f288bd60e518b5db01de9c11c4280e3b49f5bcea348dbe",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "StateRuntime",
+        "target_sha256": "c7a20ae2bf3084124efb0496a8fd2c24bfeec330632a9cc7e141096d54cc0000",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "StateTypes",
+        "target_sha256": "58e492e88311186d13e2febc132babd21f812b059001256de9723c084ccfe07c",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "GraphConformance",
+        "target_sha256": "c716686b54bc84ca7bb4d929e582160a47b26d2156d593542de222a6672b3770",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "GraphScopes",
+        "target_sha256": "e16fb8e52ff3276f4964da4ed5334de46bd5bd53f2da4fc62af3241a5dd75566",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "GraphDense",
+        "target_sha256": "00cf3eee7805f02f12b6ae21b9f5fe753a12c1df11d6508c0228fbd395f3bca9",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "OrderedTraversal",
+        "target_sha256": "b29e1b0685b5414140b4e24d64a2372e319609c2cc58662486f7851d01b71af4",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "SolverReuse",
+        "target_sha256": "1c891e55acef4f1de3b9859581496cd62f2dba44a1eb8f1de7c1ee4191c8b0f9",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "TypeCache",
+        "target_sha256": "e2eb793aa7691388d2c304d7537f57418a8bcd989873f862ce8161d9007421f9",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "GraphStack",
+        "target_sha256": "49878d86a6070b9c509afc4359a2859d9c66a3f426561c2cb9946ebbfd27f3fe",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "EmbeddingPruning",
+        "target_sha256": "e10fe3101d1709f88863f5cec99f9ac02596851a8fac274093945ed02f1988a0",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "InferenceConformance",
+        "target_sha256": "e1a215b1618a03e0c12e3acf7bb3bb8a8367bdfca9239954072061d360bde524",
+        "same_as_r6": true
+      },
+      {
+        "fixture": "PrimitiveMetadata",
+        "target_sha256": "bdfab3304b5c345f3107f356f400affaedcce9e4ff9382898252296f899c9703",
+        "same_as_r6": true
+      }
+    ],
+    "preparation_cache_hits": 0,
+    "preparation_cache_misses": 25,
+    "native_child_execution_seconds": 24.807705,
+    "other_group_seconds": 1390.5090972080004
+  },
+  "execution_inventory": {
+    "checked_paths": 2350,
+    "measured_child_executions": 2314,
+    "llvm_target_rejections": 36
+  },
+  "expected_counts": {
+    "unit_checks": 686,
+    "harness_methods": 58,
+    "hm_cases": 6712,
+    "hm_executions": 6703,
+    "figure12_labels": 43,
+    "figure12_executions": 41,
+    "figure12_controls": 36,
+    "resolver_checks": 18,
+    "package_integration_cases": 29,
+    "parity_rows": 7086,
+    "backend_rows_per_layout": 575,
+    "backend_names": [
+      "interpreter",
+      "llvm"
+    ],
+    "port_rows_per_layout": 25,
+    "port_backend_names": [
+      "llvm"
+    ]
+  },
+  "notes": [
+    "One observation per revision on the same host; genuine valid shared artifacts are reused. This is not an empty-cache controlled benchmark.",
+    "Actual serial locked root test command; initial tool build measured separately.",
+    "Reduced matrices deliberately retain explicit semantic and scale witnesses; exhaustive cross-product input coverage is intentionally reduced.",
+    "Compiler-scale outer interpreter stress is removed; focused interpreter, differential backends and CLI/package coverage remain.",
+    "Both port native layouts rerun target generation/linking, traced execution, six references and regenerated inference inputs. All 25 checked target bytes match R6.",
+    "No new Windows/Linux execution or publication is claimed."
+  ],
+  "release_helper_controls": {
+    "complete": true,
+    "helper_source": "/Volumes/src/mlf/tools/release/merge-port-profiles.sh",
+    "helper_sha256": "9529002465cde8f946b884b64853648f3fadd5cb9af3ec5b6f5a6307fcd1a8c3",
+    "native_parent_report_sha256": "801723dc916161f12441fa5f86281cb8108389677e44c9830d83aee0b967b228",
+    "checks": [
+      {
+        "name": "valid",
+        "exit_code": 0,
+        "expected_success": true
+      },
+      {
+        "name": "refuse-overwrite",
+        "exit_code": 1,
+        "expected_success": false
+      },
+      {
+        "name": "different-target",
+        "exit_code": 1,
+        "expected_success": false
+      },
+      {
+        "name": "missing-target",
+        "exit_code": 1,
+        "expected_success": false
+      },
+      {
+        "name": "manifest-binding",
+        "exit_code": 1,
+        "expected_success": false
+      },
+      {
+        "name": "changed-log",
+        "exit_code": 1,
+        "expected_success": false
+      },
+      {
+        "name": "changed-sources",
+        "exit_code": 1,
+        "expected_success": false
+      },
+      {
+        "name": "missing-matrix",
+        "exit_code": 1,
+        "expected_success": false
+      },
+      {
+        "name": "wrong-backend-count",
+        "exit_code": 1,
+        "expected_success": false
+      },
+      {
+        "name": "wrong-backend-names",
+        "exit_code": 1,
+        "expected_success": false
+      }
+    ],
+    "per_profile_preparation_provenance_preserved": true,
+    "scope": "Standalone helper tests using explicitly labeled projections of the actual completed two-layout native report. These derived fixture reports are not release qualification and do not create or modify cache receipts."
+  },
+  "benchmark_pins": {
+    "complete": true,
+    "pins": 72,
+    "manifest_sha256": "f5868100e366a6716e165c88392c8107bbe4fc413c28fb5da6dda1d475b81bdb"
+  },
+  "forbidden_tool_log_bytes": 0,
+  "execution_times": {
+    "path": "test-matrix-cleanup-execution-times.json",
+    "sha256": "bdba1d9657100f30ceca2276fad89b32b186b756559a60ebf06841559d9f881f",
+    "checked_paths": 2350,
+    "measured_child_executions": 2314,
+    "llvm_target_rejections": 36
+  },
+  "source_code_matches_validated_snapshot": true,
+  "documentation_changes_after_validation": {
+    "docs/test-matrix-cleanup.md": {
+      "tested_sha256": "ba7bd06bfeb19fe0102515eed39311843f42bd12868dfddcd723218f06bd0a4a",
+      "current_sha256": "7ee429e2b7ba4d4dcd7438b68051683f0b6d51dfd2906fd629898b49247e1a10"
+    },
+    "README.md": {
+      "tested_sha256": "f87956088300ba111703f3d51e491f819d2b6418b01f8d4104b4155687f449c4",
+      "current_sha256": "e2354c72af098715605e25bac4d06b700d1363069472a4980ef0ab55a5cb26ac"
+    }
+  },
+  "final_audit": {
+    "path": "/Volumes/src/mlf/.mlf-build/test-matrix-cleanup/r3/final-audit.json",
+    "sha256": "e079980e6504093de8ba195817627b68fa42cd8f7661d63be2ed6c3d70ed5d0d"
+  }
+}

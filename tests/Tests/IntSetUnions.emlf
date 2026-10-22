@@ -10,12 +10,17 @@ check a b = do
  let left = IS.fromList (L.append a (L.reverse a))
  let right = IS.fromList (L.append b (L.reverse b))
  let expected = L.sortBy L.compareInt (L.nubBy eqInt (L.append a b))
- L.mapM_ (\result -> case result of { IntSet tree -> assert (L.eqList eqInt (IS.toList result) expected && IS.size result == L.length expected && M.valid L.compareInt tree) }) (Cons (IS.union left right) (Cons (IS.union right left) Nil))
+ let result = IS.union left right
+ case result of { IntSet tree -> assert (L.eqList eqInt (IS.toList result) expected && IS.size result == L.length expected && M.valid L.compareInt tree) }
 
 unions = do
  let counts = Cons 0 (Cons 1 (Cons 2 (Cons 5 (Cons 17 (Cons 65 Nil)))))
  let offsets = Cons (-1000000000000000000000000000000000000) (Cons (-1000) (Cons 0 (Cons 3 (Cons 1000000000000000000000000000000000000 Nil))))
- L.mapM_ (\n -> L.mapM_ (\m -> L.mapM_ (\offset -> check (L.map (\i -> 17 * i) (L.range 0 (n - 1))) (L.map (\i -> offset + 17 * i) (L.range 0 (m - 1)))) offsets) counts) counts
+ let pairs = L.concatMap (\n -> L.concatMap (\m -> L.map (\offset -> Pair (L.map (\i -> 17 * i) (L.range 0 (n - 1))) (L.map (\i -> offset + 17 * i) (L.range 0 (m - 1)))) offsets) counts) counts
+ let ordered = L.concatMap (\(Pair a b) -> Cons (Pair a b) (Cons (Pair b a) Nil)) pairs
+ let unique = H.distinctListPairs eqInt ordered
+ H.assert (L.length ordered == 360 && L.length unique == 276) "ordered union stimulus coverage changed"
+ L.mapM_ (\(Pair a b) -> check a b) unique
  return Unit
 
 suite = Cons (Pair "size-biased set unions agree with independent sorted lists" unions) Nil

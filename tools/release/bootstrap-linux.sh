@@ -22,7 +22,7 @@ cc=${CC:-clang}
 # These flags come from the host's pkg-config metadata; paths with spaces are
 # handled by the native package manager once the initial seed exists.
 # shellcheck disable=SC2046
-"$cc" -O2 -std=c11 -DMLF_USE_BDWGC -DMLF_COMPACT_BDWGC -DMLF_GC_THRESHOLD=1048576 \
+"$cc" -O2 -std=c11 \
   $(pkg-config --cflags gmp bdw-gc) -c runtime/mlf_runtime.c -o "$build/seed/runtime.o"
 for tool in emlf mlfpkg; do
   # shellcheck disable=SC2046

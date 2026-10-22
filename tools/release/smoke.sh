@@ -25,9 +25,9 @@ cmp expected interpreted
 runtime=$("$bin/emlf" --llvm-runtime)
 # pkg-config emits native linker flags, as in the seed bootstrap script.
 # shellcheck disable=SC2046
-clang -O2 -std=c11 $(pkg-config --cflags gmp) -c "$runtime" -o runtime.o
+clang -O2 -std=c11 $(pkg-config --cflags gmp bdw-gc) -c "$runtime" -o runtime.o
 # shellcheck disable=SC2046
-clang -O2 -Wno-override-module main.ll runtime.o $(pkg-config --libs gmp) -lm -o native
+clang -O2 -Wno-override-module main.ll runtime.o $(pkg-config --libs gmp bdw-gc) -lm -o native
 ./native > compiled
 cmp expected compiled
 cat > mlf-package.json <<'JSON'

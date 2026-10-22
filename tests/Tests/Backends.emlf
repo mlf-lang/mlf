@@ -1,7 +1,7 @@
 module Tests.Backends
  (Backends, Entry(..), Event(..), Input(..), Observation(..), RuntimeError(..),
-  withBackends, withExecutionTimeout, withInterpreterTimeout, inCase, auditBackends, execute,
-  executeWithArguments, executeSerialized, capture, outcome, events, remaining,
+  withBackends, withExecutionTimeout, withInterpreterTimeout, inCase, auditBackends, auditNativeBackends, execute,
+  executeWithArguments, executeSerialized, executeNativeSerialized, serializeTerm, capture, outcome, events, remaining,
   output, outputBytes, stderrOutput) where
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
@@ -19,7 +19,7 @@ data Event = ReadLine | Write String | WriteBytes Bytes.Bytes | WriteError Strin
 data Input = Input String Bool | RawInput Bytes.Bytes Bool
 data RuntimeError = RuntimeError String
 data Observation = Observation (Either RuntimeError Unit) (List Event) String
-data Backends = Backends String Bool IntArray Int Int Int
+data Backends = Backends String IntArray Int Int Int
 instance H.Eq RuntimeError where { eq (RuntimeError a) (RuntimeError b) = eqString a b }
 instance H.Show RuntimeError where { show (RuntimeError a) = a }
 instance H.Eq Event where
@@ -46,22 +46,21 @@ stderrOutput observed = S.concatStrings (S.map (\event -> case event of { WriteE
 encodedInput input = case input of { Input text _ -> Bytes.encode text; RawInput bytes _ -> bytes }
 failWrites input = case input of { Input _ fail -> fail; RawInput _ fail -> fail }
 decodeInput input bytes = case input of { Input _ _ -> Bytes.decodeText bytes; RawInput _ _ -> Bytes.latin1 bytes }
-directory (Backends d _ _ _ _ _) = d
-compact (Backends _ b _ _ _ _) = b
-serial (Backends _ _ s _ _ _) = s
-budget (Backends _ _ _ n _ _) = n
-candidateBudget (Backends _ _ _ _ n _) = n
-interpreterBudget (Backends _ _ _ _ _ n) = n
-withExecutionTimeout seconds (Backends d b s _ candidate interpreter) = Backends d b s seconds candidate interpreter
-withInterpreterTimeout seconds (Backends d b s native candidate _) = Backends d b s native candidate seconds
+directory (Backends d _ _ _ _) = d
+serial (Backends _ s _ _ _) = s
+budget (Backends _ _ n _ _) = n
+candidateBudget (Backends _ _ _ n _) = n
+interpreterBudget (Backends _ _ _ _ n) = n
+withExecutionTimeout seconds (Backends d s _ candidate interpreter) = Backends d s seconds candidate interpreter
+withInterpreterTimeout seconds (Backends d s native candidate _) = Backends d s native candidate seconds
 withBackends : forall a. (Backends -> IO a) -> IO a
 withBackends action = do
   work <- getEnv "MLF_TEST_WORK"
-  abi <- O.envDefault "MLF_LLVM_TEST_ABI" "standard"
+  abi <- O.envDefault "MLF_LLVM_TEST_ABI" "compact-gc"
   seconds <- O.envDefault "MLF_BOOTSTRAP_TIMEOUT_SECONDS" "60"
   let candidate = readInt seconds
   O.require (candidate > 0 && candidate <= 2147483647) "invalid bootstrap candidate timeout"
-  O.require (stringLength work > 0 && (eqString abi "standard" || eqString abi "compact-gc")) "invalid backend configuration"
+  O.require (stringLength work > 0 && eqString abi "compact-gc") "invalid backend configuration"
   let dir = work ++ "/matrix-" ++ abi
   O.mkdir dir
   names <- O.entries dir
@@ -73,47 +72,63 @@ withBackends action = do
   writeFile (dir ++ "/rows.jsonl") ""
   writeFile (dir ++ "/current-label") "<unlabelled>"
   count <- newIntArray 1 0
-  action (Backends dir (eqString abi "compact-gc") count 60 candidate candidate)
+  action (Backends dir count 60 candidate candidate)
 inCase context label action = do { writeFile (directory context ++ "/current-label") label; action }
-auditBackends context = do
+auditBackends context = auditMatrix context (O.words "interpreter llvm")
+auditNativeBackends context = auditMatrix context (Cons "llvm" Nil)
+auditMatrix context expected = do
   count <- readIntArray (serial context) 0
   text <- readFile (directory context ++ "/rows.jsonl")
   rows <- S.mapM (\line -> H.right (J.parse line)) (O.nonempty (H.lines text))
   H.assert (count > 0 && S.length rows == count) "missing backend executions"
-  H.assert (S.all (\row -> J.equal (J.get "backends" row) (J.stringArray (Cons "interpreter" (Cons "llvm" Nil)))) rows) "incomplete backend row"
+  H.assert (S.all (\row -> J.equal (J.get "backends" row) (J.stringArray expected)) rows) "incomplete backend row"
   H.assert (S.length (S.nubBy eqInt (S.map ((\row -> readInt (case J.get "index" row of { J.Number text -> text; _ -> "-1" }))) rows)) == count) "duplicate backend row"
-  putStrLn ("Backend matrix: " ++ showInt count ++ " rows x 2 backends; no missing executions")
+  putStrLn ("Backend matrix: " ++ showInt count ++ " rows x " ++ showInt (S.length expected) ++ " backends; no missing executions")
   ioReturn count
 capture context term inputs = do
   observed <- execute context IOEntry (Input (S.unlines inputs) false) term
   H.assert (eqString (remaining observed) "") ("unused input: " ++ remaining observed)
   ioReturn (Pair (outcome observed) (events observed))
 execute context entry input term = executeWithArguments context Nil entry input term
-executeWithArguments context arguments entry input term = executeSerializedWithArguments context arguments entry input (Pretty.prettyTerm (transportNames term))
+serializeTerm term = Pretty.prettyTerm (transportNames term)
+executeWithArguments context arguments entry input term = executeSerializedWithArguments context arguments entry input (serializeTerm term)
 -- Invalid scalar literals cannot inhabit a native MLF String. Inject their
 -- escaped target representation at the transport boundary and exercise both
 -- drivers, including the ordinary status, trace, and coverage checks.
 executeSerialized : Backends -> Entry -> Input -> String -> IO Observation
 executeSerialized context entry input source = executeSerializedWithArguments context Nil entry input source
-executeSerializedWithArguments context arguments entry input source = do
+-- Port probes exercise compiled compiler libraries. Their expected outputs and
+-- independent references remain the oracle; no outer interpretation is needed.
+executeNativeSerialized : Backends -> Entry -> Input -> String -> IO Observation
+executeNativeSerialized context entry input source = do
+  index <- beginExecution context source
+  observed <- native context (directory context ++ "/case-" ++ showInt index) Nil entry input
+  recordExecution context index (Cons "llvm" Nil)
+  ioReturn observed
+beginExecution context source = do
   index <- readIntArray (serial context) 0
   writeIntArray (serial context) 0 (index + 1)
+  writeFile (directory context ++ "/case-" ++ showInt index ++ ".xmlf") source
+  ioReturn index
+recordExecution context index backends = do
+  label <- readFile (directory context ++ "/current-label")
+  log <- readFile (directory context ++ "/rows.jsonl")
+  let row = J.Object (Cons (Pair "label" (J.str label)) (Cons (Pair "index" (J.num index)) (Cons (Pair "backends" (J.stringArray backends)) Nil)))
+  writeFile (directory context ++ "/rows.jsonl") (log ++ J.render row ++ "\n")
+executeSerializedWithArguments context arguments entry input source = do
+  index <- beginExecution context source
   let stem = directory context ++ "/case-" ++ showInt index
-  writeFile (stem ++ ".xmlf") source
   interpreter <- getEnv "MLF_BOOTSTRAP_INTERPRETER"
   let mode = case entry of { IOEntry -> "--run-xmlf"; ProgramEntry -> "--run-program-xmlf" }
   first <- observe (withExecutionTimeout (interpreterBudget context) context) (stem ++ "-interpreter") (S.append (Cons interpreter (Cons mode (Cons (stem ++ ".xmlf") (Cons "--" Nil)))) arguments) input
   second <- native context stem arguments entry input
   H.assert (H.eq first second) ("backend mismatch\ninterpreter: " ++ H.show first ++ "\nLLVM: " ++ H.show second)
-  label <- readFile (directory context ++ "/current-label")
-  log <- readFile (directory context ++ "/rows.jsonl")
-  let row = J.Object (Cons (Pair "label" (J.str label)) (Cons (Pair "index" (J.num index)) (Cons (Pair "backends" (J.stringArray (Cons "interpreter" (Cons "llvm" Nil)))) Nil)))
-  writeFile (directory context ++ "/rows.jsonl") (log ++ J.render row ++ "\n")
+  recordExecution context index (O.words "interpreter llvm")
   ioReturn first
 native : Backends -> String -> List String -> Entry -> Input -> IO Observation
 native context stem arguments entry input = do
   emitter <- getEnv "MLF_BOOTSTRAP_LLVM"
-  let mode = (case entry of { IOEntry -> "--xmlf-to-llvm-io"; ProgramEntry -> "--xmlf-to-llvm" }) ++ (if compact context then "-gc" else "")
+  let mode = (case entry of { IOEntry -> "--xmlf-to-llvm-io"; ProgramEntry -> "--xmlf-to-llvm" })
   code <- O.exec "" (Cons emitter (Cons mode (Cons (stem ++ ".xmlf") Nil))) "" (stem ++ ".ll") (stem ++ ".emit.err") (candidateBudget context)
   error <- readFile (stem ++ ".emit.err")
   if code == 1 then ioReturn (Observation (Left (RuntimeError (normalize (stripFinalNewline error)))) Nil (decodeInput input (encodedInput input))) else do

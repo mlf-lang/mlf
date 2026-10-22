@@ -10,6 +10,7 @@ import Bootstrap.X.Pretty (prettyTerm, prettyType)
 import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Type as T
 import qualified Package.OS as O
+import qualified Bootstrap.Map as Map
 checkOutput : Compilation -> IO Unit
 checkOutput result = do
  parsed <- H.right (Parser.parseTerm "<Figure12 xMLF>" (prettyTerm (compiledTerm result)))
@@ -34,6 +35,20 @@ testCase c = do
    return "accepted; checked xMLF roundtrip"
 runTest : Pair String (IO String) -> IO Unit
 runTest (Pair label action) = do { result <- action; putStrLn ("PASS " ++ label ++ "  " ++ result) }
+runCases : Map String (Pair String String) -> List (Pair String String) -> List Case -> IO (List (Pair String String))
+runCases seen reused pending = case pending of
+ Nil -> return (S.reverse reused)
+ Cons c rest -> do
+  source <- H.right (program c)
+  let key = (if expectedAcceptance c then "accept:" else "reject:") ++ source
+  case Map.lookup compareString key seen of
+   Just (Pair original result) -> do
+    putStrLn ("PASS " ++ caseId c ++ "  " ++ expression c ++ "  " ++ result ++ "; shared with " ++ original)
+    runCases seen (Cons (Pair (caseId c) original) reused) rest
+   Nothing -> do
+    result <- testCase c
+    putStrLn ("PASS " ++ caseId c ++ "  " ++ expression c ++ "  " ++ result)
+    runCases (Map.insert compareString key (Pair (caseId c) result) seen) reused rest
 typed : String -> XType -> IO String
 typed source expected = do { result <- (H.right (compile "<Figure 12 type assertion>" source)); do { (checkOutput result); do { (H.assert (T.alphaEq (inferredType result) expected) (H.append "expected " (H.append (prettyType expected) (H.append ", got " (prettyType (inferredType result)))))); (return (prettyType (inferredType result))) } } }
 
@@ -66,7 +81,9 @@ main = do
   let repaired = Case (caseId c) expression (paperAcceptance c) true (localSignatures c)
   runTest (Pair (label ++ " explicit annotation control") (testCase repaired))) (O.words "A11 C1a C1c")
  putStrLn "Figure12: 34 rows / 43 expressions; explicit-signature regression expectations"
- S.mapM_ (\c -> runTest (Pair (caseId c ++ "  " ++ expression c) (testCase c))) cases
+ shared <- runCases Map.empty Nil cases
+ H.assert (S.eqList (S.eqPair eqString eqString) shared (Cons (Pair "A12.1" "A10.1") (Cons (Pair "E3a" "A12.2") Nil))) "Figure12 execution sharing changed"
  H.assert (S.length signatures + S.length typeChecks + 3 == 36) "Figure12 supplementary coverage changed"
  putStrLn "43/43 expressions match regression expectations; 0 failures"
+ putStrLn "41 distinct Figure12 executions; 2 repeated paper labels share checked results"
  putStrLn "36 supplementary checks; 0 failures"

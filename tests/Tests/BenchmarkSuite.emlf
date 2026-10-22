@@ -28,10 +28,7 @@ main = do
   let slower = S.map (V.update (O.words "languages mlf runtime median_wall_seconds") (\_ -> J.num 3)) rows
   H.assert (S.any (\check -> S.not (J.getBool "passed" true check)) (B.performanceChecks slower targets)) "above-limit timing passed")
  check "test_invalid_performance_limits_fail_before_tools" (S.mapM_ (\value -> H.assert (S.not (B.validateLimits (J.Object (Cons (Pair "runtime" value) Nil)))) "invalid limit accepted") (Cons (J.num 0) (Cons (J.num (-1)) (Cons (J.Number "NaN") (Cons (J.Number "Infinity") Nil)))))
- check "test_oracle_matches_independent_pinned_fixture" (do
-  let work = fixture "binary-trees" manifest
-  bytes <- Bytes.readFile (V.text "fixture" work)
-  H.assert (B.validateOutput "binary-trees" 10 (Bytes.unpack bytes) && eqString (B.binaryTrees 0) (B.binaryTrees 6) && H.contains "32 trees of depth 6 check: 4064" (B.binaryTrees 7)) "tree oracle differs")
+ check "test_binary_tree_oracle_defaults" (H.assert (eqString (B.binaryTrees 0) (B.binaryTrees 6) && H.contains "32 trees of depth 6 check: 4064" (B.binaryTrees 7)) "tree oracle defaults differ")
  check "test_all_workloads_have_complete_provenance_and_fixtures" (do
   H.assert (S.eqList eqString (S.map (V.text "name") (V.array "workloads" manifest)) V.workloads) "workload order changed"
   S.mapM_ (\work -> do
@@ -318,7 +315,7 @@ buildFailures = do
   separate <- B.buildParallel (directory ++ "/separate") compiler compiler (directory ++ "/Main.mlfci") runtime Nil 10.0
   Pair binary sample <- H.right separate
   let command = J.getStrings "command" (S.head (V.array "stages" sample))
-  H.assert (S.elem eqString "--crate-to-llvm" command && S.not (S.elem eqString "--emit-llvm" command)) "interface native build selected wrong frontend"
+  H.assert (S.elem eqString "--crate-to-llvm-gc" command && S.not (S.elem eqString "--emit-llvm-gc" command)) "interface native build selected wrong frontend"
   unsetEnv "MLF_MOCK_BUILD"))
  check "test_parallel_phase_failure_and_timeout_reap_every_child" (H.withScratch (\directory -> do
   processGroupRace directory

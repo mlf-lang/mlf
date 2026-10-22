@@ -9,12 +9,12 @@ fatal message = do
   putErr (message ++ "\n")
   exitWith 1
 
-compileTarget : Bool -> Bool -> String -> IO Unit
-compileTarget compact requireIO path = do
+compileTarget : Bool -> String -> IO Unit
+compileTarget requireIO path = do
   input <- readFile path
   case Parser.parseTerm "<target>" input of
     Left message -> fatal message
-    Right term -> case (if compact then (if requireIO then LLVM.emitLLVMIOGCChunks term else LLVM.emitLLVMGCChunks term) else (if requireIO then LLVM.emitLLVMIOChunks term else LLVM.emitLLVMChunks term)) of
+    Right term -> case (if requireIO then LLVM.emitLLVMIOChunks term else LLVM.emitLLVMChunks term) of
       Left message -> fatal message
       Right chunks -> printChunks chunks
 
@@ -28,8 +28,8 @@ printChunks chunks = case chunks of
 main : IO Unit
 main = do
   command <- getArg 0
-  let compact = eqString command "--xmlf-to-llvm-gc" || eqString command "--xmlf-to-llvm-io-gc"
-  if compact || eqString command "--xmlf-to-llvm" || eqString command "--xmlf-to-llvm-io" then do
+  let alias = eqString command "--xmlf-to-llvm-gc" || eqString command "--xmlf-to-llvm-io-gc"
+  if alias || eqString command "--xmlf-to-llvm" || eqString command "--xmlf-to-llvm-io" then do
     path <- getArg 1
-    compileTarget compact (eqString command "--xmlf-to-llvm-io" || eqString command "--xmlf-to-llvm-io-gc") path
+    compileTarget (eqString command "--xmlf-to-llvm-io" || eqString command "--xmlf-to-llvm-io-gc") path
   else fatal "Usage: llvm-driver --xmlf-to-llvm[-io][-gc] FILE"

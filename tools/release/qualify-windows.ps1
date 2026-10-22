@@ -82,27 +82,27 @@ try {
         $text = Invoke-ReleaseCommand "$Stage2/bin/$name.exe" @('--version') "$Output/$name-version.log" $Output
         Assert-Release ($text.Trim() -eq "$name $version") "Embedded $name version does not match VERSION"
     }
-    Write-Output 'Windows qualification: standard and compact runtime regressions'
+    Write-Output 'Windows qualification: compact-GC runtime regressions'
     & "$PSScriptRoot/test-windows-runtime.ps1" -NativePrefix $NativePrefix -Clang $Clang -HostHelper $helper -Output "$Output/runtime"
     $runtime = Read-ReleaseJson "$Output/runtime/runtime-verification.json"
     Copy-Item -LiteralPath "$Output/runtime/runtime-verification.json" -Destination "$Output/runtime-verification.json"
     foreach ($file in (Get-ChildItem "$Output/runtime/*.log")) { Copy-Item -LiteralPath $file.FullName -Destination "$Output/runtime-$($file.Name)" }
     Assert-Release ($runtime.complete -eq $true -and $runtime.helper_sha256 -eq $report.helper_sha256) 'Runtime regressions did not use the qualified filesystem helper'
     $report.tests.runtime = $runtime
-    Write-Output 'Windows qualification: native 18 resolver checks and 26 package integration cases'
+    Write-Output 'Windows qualification: native 18 resolver checks and 29 package integration cases'
     $null = Invoke-ReleaseCommand $manager @('compiler-test','packages','--compiler',$compiler,'--build-dir',"$Output/packages") "$Output/package-integration.log" $root
     $integration = Read-ReleaseJson "$Output/packages/verification.json"
     Assert-Release ($integration.complete -eq $true -and $integration.implementation -eq 'MLF' -and $integration.compiler_sha256 -eq $report.compiler_sha256 -and $integration.manager_sha256 -eq $report.manager_sha256) 'Native package qualification failed or tested different tools'
-    Assert-Release ($integration.suites.packages.coverage -contains '18 package resolver tests passed' -and $integration.suites.packages.coverage -contains '26 package integration cases passed') 'Native package coverage changed'
+    Assert-Release ($integration.suites.packages.coverage -contains '18 package resolver tests passed' -and $integration.suites.packages.coverage -contains '29 package integration cases passed') 'Native package coverage changed'
     Copy-Item -LiteralPath "$Output/packages/verification.json" -Destination "$Output/package-integration.json"
     Copy-Item -LiteralPath "$Output/packages/packages.log" -Destination "$Output/packages-primary.log"
     $report.tests.resolver = @{passed=18;manager_sha256=$report.manager_sha256;implementation='MLF'}
-    $report.tests.integration = @{passed=26;compiler_sha256=$report.compiler_sha256;manager_sha256=$report.manager_sha256;implementation='MLF'}
+    $report.tests.integration = @{passed=29;compiler_sha256=$report.compiler_sha256;manager_sha256=$report.manager_sha256;implementation='MLF'}
     Assert-Release (!$Checker -and !$Manifest) 'Native parity builds and verifies its own independent checker and corpus'
     Write-Output 'Windows qualification: native 7,086 parity cases and 160 interpreter/native runtime executions'
     $null = Invoke-ReleaseCommand $manager @('compiler-test','parity','--compiler',$compiler,'--build-dir',"$Output/parity") "$Output/parity.log" $root
     $parity = Read-ReleaseJson "$Output/parity/verification.json"
-    Assert-Release ($parity.complete -eq $true -and $parity.implementation -eq 'MLF' -and $parity.compiler_sha256 -eq $report.compiler_sha256 -and $parity.manager_sha256 -eq $report.manager_sha256 -and $parity.parity.cases -eq 7086 -and $parity.parity.runtime_executions -eq 160) 'Native compiler parity qualification failed or coverage changed'
+    Assert-Release ($parity.complete -eq $true -and $parity.implementation -eq 'MLF' -and $parity.compiler_sha256 -eq $report.compiler_sha256 -and $parity.manager_sha256 -eq $report.manager_sha256 -and $parity.parity.cases -eq 7086 -and $parity.parity.source_compilations -eq 7075 -and $parity.parity.shared_source_cases -eq 11 -and $parity.parity.runtime_executions -eq 160) 'Native compiler parity qualification failed or coverage changed'
     Copy-Item -LiteralPath "$Output/parity/verification.json" -Destination "$Output/parity-verification.json"
     $report.tests.parity = $parity.parity
     $report.tests.parity.compiler_sha256 = $parity.compiler_sha256

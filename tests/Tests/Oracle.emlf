@@ -85,6 +85,27 @@ terms n env = if n == 1 then Cons (SIntLit 0) (Cons (SBoolLit true) (S.map SVar 
     (Cons (S.concatMap (\k -> S.concatMap (\a -> S.map (SLet x a) (terms (n - 1 - k) (Cons x env))) (terms k env)) (S.range 1 (n - 2))) Nil)))
 pick size seed = let next = remInt (seed * 48271) 2147483647 in Pair (remInt next size) next
 generatedTerms count = S.map (\seed -> S.fst (gen (7 + remInt seed 19) Nil seed)) (S.range 1 count)
+-- An injective structural encoding of this oracle's unannotated input language.
+-- Keep the full seeded stream for archive reproduction; unit execution uses
+-- the first occurrence of each AST rather than repeating identical programs.
+termField text = showInt (stringLength text) ++ ":" ++ text
+termKey : SExpr -> String
+termKey expression = case expression of
+ SVar name -> "v" ++ termField name
+ SLam name Nothing body -> "l" ++ termField name ++ termField (termKey body)
+ SApp f a -> "a" ++ termField (termKey f) ++ termField (termKey a)
+ SLet name rhs body -> "e" ++ termField name ++ termField (termKey rhs) ++ termField (termKey body)
+ SIntLit n -> "i" ++ termField (showInt n)
+ SBoolLit b -> if b then "t" else "f"
+ _ -> panic "annotated expression outside the independent HM generator"
+distinctTermCases : List SExpr -> List (Pair Int SExpr)
+distinctTermCases expressions =
+ let add (Triple position seen kept) expression =
+       let key = termKey expression in
+       let next = position + 1 in
+       seq next (if M.member compareString key seen then Triple next seen kept
+       else Triple next (M.insert compareString key Unit seen) (Cons (Pair position expression) kept)) in
+ case S.foldlStrict add (Triple 1 M.empty Nil) expressions of { Triple _ _ kept -> S.reverse kept }
 gen : Int -> List String -> Int -> Pair SExpr Int
 gen n env seed = if n <= 1 then case pick (2 + S.length env) seed of
   Pair i next -> Pair (if i == 0 then SIntLit 0 else if i == 1 then SBoolLit true else SVar (S.index env (i - 2))) next

@@ -4,8 +4,15 @@ import qualified Bootstrap.Std as L
 import qualified Bootstrap.IntMap as IM
 import qualified Bootstrap.Graph as G
 import qualified Bootstrap.Graph.Solver as S
+import qualified Tests.Helpers as H
 
-equalEntries = L.eqList (\(Pair n v) (Pair m w) -> n == m && G.equalNode v w)
+equalEntry (Pair n v) (Pair m w) = n == m && G.equalNode v w
+equalEntries = L.eqList equalEntry
+-- Stimulus sharing does not depend on the graph implementation's equality.
+sameInputTag GBot GBot = true
+sameInputTag (GArr a b) (GArr c d) = a == c && b == d
+sameInputTag _ _ = false
+sameInputEntry (Pair n (Node a b c)) (Pair m (Node x y z)) = n == m && sameInputTag a x && H.eq b y && H.eq c z
 same (Triple a b c) (Triple d e f) = equalEntries a d && equalEntries b e && L.eqList eqInt c f
 oracle before after =
  let old = IM.fromList before in
@@ -14,13 +21,17 @@ oracle before after =
    (L.filter (\(Pair n v) -> L.not (S.matchesNode old n v)) after)
    (L.filter (\n -> L.not (IM.member n next)) (L.map L.fst before))
 entries count offset stride mode = L.map (\n -> Pair (offset + n * stride) (G.mkNode (if remInt (n + mode) 3 == 0 then GBot else GArr (n + mode) (n + mode + 1)) (if remInt mode 2 == 0 then Nothing else Just mode) (if remInt n 2 == 0 then Flexible else Rigid))) (L.filter (\n -> remInt (n + mode) 4 /= 0) (L.range 0 (count - 1)))
-check count offset stride a b =
- let before = entries count offset stride a in
- let after = entries (count + b) offset stride b in
+check (Pair before after) =
  if same (S.projectionChanges before after) (oracle before after) then ioReturn Unit else do { putErr "projection patch disagrees with independent maps\n"; exitWith 1 }
 patches : IO Unit
 patches = do
- L.mapM_ (\count -> L.mapM_ (\offset -> L.mapM_ (\stride -> L.mapM_ (\a -> L.mapM_ (\b -> check count offset stride a b) (L.range 0 3)) (L.range 0 3)) (Cons 1 (Cons 17 Nil))) (Cons (-10000) (Cons 0 (Cons 1000000000000000000000000000000000000000000000001 Nil)))) (Cons 0 (Cons 1 (Cons 2 (Cons 5 (Cons 17 (Cons 65 (Cons 257 Nil)))))))
+ let fullInputs = L.concatMap (\count -> L.concatMap (\offset -> L.concatMap (\stride -> L.concatMap (\a -> L.map (\b -> Pair (entries count offset stride a) (entries (count + b) offset stride b)) (L.range 0 3)) (L.range 0 3)) (Cons 1 (Cons 17 Nil))) (Cons (-10000) (Cons 0 (Cons 1000000000000000000000000000000000000000000000001 Nil)))) (Cons 0 (Cons 1 (Cons 2 (Cons 5 (Cons 17 Nil)))))
+ -- Keep every mode at both former large sizes, and one large-identity scale.
+ let scaleInputs = L.concatMap (\(Triple count offset stride) -> L.concatMap (\a -> L.map (\b -> Pair (entries count offset stride a) (entries (count + b) offset stride b)) (L.range 0 3)) (L.range 0 3)) (Cons (Triple 65 0 1) (Cons (Triple 257 0 1) (Cons (Triple 257 1000000000000000000000000000000000000000000000001 17) Nil)))
+ let inputs = L.append fullInputs scaleInputs
+ let unique = H.distinctListPairs sameInputEntry inputs
+ H.assert (L.length inputs == 528 && L.length unique == 427) "projection stimulus coverage changed"
+ L.mapM_ check unique
  ioReturn Unit
 
 suite : List (Pair String (IO Unit))

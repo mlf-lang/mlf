@@ -40,7 +40,7 @@ jobs:
           jq -e --arg source "$SOURCE_COMMIT" '.head_sha == $source and .status == "completed" and .path == ".github/workflows/platform-release.yml"' run.json
           gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/actions/runs/$QUALIFICATION_RUN/jobs?per_page=100" > jobs.json
           for platform in macos-arm64 linux-x64; do
-            for group in unit packages self-host parity backends port-standard port-compact-gc; do
+            for group in unit packages self-host parity backends port; do
               jq -e --arg name "$platform $group" '[.[].jobs[] | select(.name == $name)] | length == 1 and all(.[]; .status == "completed" and .conclusion == "success")' jobs.json
             done
           done
@@ -73,7 +73,7 @@ jobs:
           SOURCE_COMMIT: ${{ needs.metadata.outputs.source }}
         run: |
           set -euo pipefail
-          for part in unit packages self-host parity backends port-standard port-compact-gc; do
+          for part in unit packages self-host parity backends port; do
             name="native-macos-arm64-$part"
             bash .mlf-build/release-infra/tools/release/download-artifact.sh "$QUALIFICATION_RUN" "$name" ".mlf-build/release-input/$name" "$SOURCE_COMMIT"
           done

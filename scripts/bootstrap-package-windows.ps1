@@ -29,7 +29,7 @@ foreach ($entry in @(@('gmp','6.3.0','gmp'),@('bdw-gc','8.2.12','gc'))) {
 }
 & $Clang -O2 -std=c11 -Wall -Wextra -Werror -municode "$root/runtime/mlf_windows_host.c" -o "$Output/bin/mlf-host.exe"
 if ($LASTEXITCODE) { throw 'Windows filesystem helper build failed' }
-& $Clang -O2 -std=c11 -DMLF_USE_BDWGC -DMLF_COMPACT_BDWGC -DMLF_GC_THRESHOLD=1048576 "-I$Output/include" -c "$Output/runtime/mlf_runtime.c" -o "$Output/evidence/runtime.o"
+& $Clang -O2 -std=c11 "-I$Output/include" -c "$Output/runtime/mlf_runtime.c" -o "$Output/evidence/runtime.o"
 if ($LASTEXITCODE) { throw 'Windows runtime build failed' }
 $version = (& $Clang --version | Out-String)
 if ($LASTEXITCODE) { throw 'Cannot identify Clang' }

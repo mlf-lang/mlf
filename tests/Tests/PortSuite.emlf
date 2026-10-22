@@ -2,6 +2,8 @@ module Tests.PortSuite where
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Package.OS as O
+import qualified Package.Json as J
+import qualified Package.Verification as V
 import qualified Tests.Helpers as H
 import qualified Tests.Backends as B
 import qualified Tests.Bytes as Bytes
@@ -13,10 +15,57 @@ import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Type as T
 import qualified Bootstrap.Primitive as Primitive
 import qualified Bootstrap.Data as D
+names : List String
 names = O.words "foundation MapFolds IntegerContainers OptimizerQueries ConstructorProjection ForceReuse StrictFields prelude Target frontend LexerCounters LLVMBuild RuntimeCases StateRuntime StateTypes GraphConformance GraphScopes GraphDense OrderedTraversal SolverReuse TypeCache GraphStack EmbeddingPruning InferenceConformance PrimitiveMetadata"
+references : List (Pair String String)
 references = Cons (Pair "GraphConformance" "GraphReference") (Cons (Pair "GraphScopes" "GraphScopesReference") (Cons (Pair "GraphDense" "GraphDenseReference") (Cons (Pair "OrderedTraversal" "OrderedTraversalReference") (Cons (Pair "EmbeddingPruning" "EmbeddingPruningReference") (Cons (Pair "InferenceConformance" "InferenceReference") Nil)))))
+metadata : String
 metadata = S.unlines (S.map (\primitive -> case Primitive.primitiveSignature primitive of
  Pair variables field -> showInt (Primitive.primitiveCode primitive) ++ "\t" ++ Primitive.primitiveName primitive ++ "\t" ++ showInt (Primitive.primitiveArity primitive) ++ "\t" ++ (if Primitive.primitiveStrict primitive then "strict" else "lazy") ++ "\t" ++ D.prettyDeclaration (DataDeclK "Sig" variables (Cons (ConstructorDecl "M" (Cons field Nil)) Nil))) Primitive.allPrimitives)
+-- Preparation runs once for a source/tool identity. The immutable target bytes
+-- can then be executed natively and independently by each runtime layout.
+prepareFixture : String -> String -> IO Unit
+prepareFixture name destination = do
+ H.assert (S.elem eqString name names) "unknown port fixture"
+ let source = "bootstrap/tests/" ++ name ++ ".emlf"
+ result <- C.compileFile (Cons "bootstrap" (Cons "tests" Nil)) source
+ compilation <- H.right result
+ ty <- H.right (Check.checkClosed (C.compiledTerm compilation))
+ expected <- H.right (P.parseType "IO Unit")
+ H.assert (T.alphaEq ty (C.inferredType compilation) && T.alphaEq ty expected) "port inferred/target type differs"
+ parsed <- H.right (P.parseTerm source (Pretty.prettyTerm (C.compiledTerm compilation)))
+ parsedType <- H.right (Check.checkClosed parsed)
+ H.assert (T.alphaEq parsedType ty && X.equalErased (X.erase parsed) (X.erase (C.compiledTerm compilation))) "port target serialization changed"
+ let serialized = B.serializeTerm parsed
+ transported <- H.right (P.parseTerm source serialized)
+ transportedType <- H.right (Check.checkClosed transported)
+ H.assert (T.alphaEq transportedType ty) "port transport changed the target type"
+ writeFile destination serialized
+ hash <- fileDigest destination
+ J.write (destination ++ ".checks.json") (J.Object (Cons (Pair "format" (J.num 1)) (Cons (Pair "fixture" (J.str name)) (Cons (Pair "target_sha256" (J.str hash)) (Cons (Pair "entry_type" (J.str "IO Unit")) (Cons (Pair "inferred_type" (J.str (Pretty.prettyType ty))) (Cons (Pair "checks" V.portTargetChecks) Nil)))))))
+ putStrLn ("CHECKED " ++ name)
+preparedSource : String -> IO String
+preparedSource name = do
+ path <- getEnv "MLF_TEST_PORT_TARGETS"
+ expected <- getEnv "MLF_TEST_PORT_TARGETS_SHA256"
+ H.assert (stringLength path > 0 && stringLength expected == 64) "missing prepared port targets"
+ actual <- fileDigest path
+ H.assert (eqString actual expected) "prepared port manifest changed"
+ manifest <- J.read path
+ let rows = J.values (J.get "targets" manifest)
+ H.assert (J.equal (J.get "format" manifest) (J.num 1) && S.length rows == 25 && S.eqList eqString (S.sortBy compareString names) (S.sortBy compareString (S.map (J.getText "fixture" "") rows))) "prepared port coverage changed"
+ row <- case S.find (\row -> eqString name (J.getText "fixture" "" row)) rows of {Just row -> return row; Nothing -> H.fail "prepared port target missing"}
+ let target = J.getText "target" "" row
+ digest <- fileDigest target
+ H.assert (eqString digest (J.getText "target_sha256" "" row)) "prepared port target changed"
+ checks <- J.read (target ++ ".checks.json")
+ checksHash <- fileDigest (target ++ ".checks.json")
+ H.assert (eqString checksHash (J.getText "checks_sha256" "" row) && V.validPortTargetChecks name digest checks) "prepared port check receipt changed"
+ source <- readFile target
+ after <- fileDigest target
+ H.assert (eqString digest after) "prepared port target changed while reading"
+ return source
+runFixture : B.Backends -> String -> IO Unit
 runFixture backends name = do
  let source = "bootstrap/tests/" ++ name ++ ".emlf"
  expected <- if eqString name "PrimitiveMetadata" then return (Bytes.encode metadata) else Bytes.readFile ("bootstrap/tests/" ++ name ++ ".expected")
@@ -36,25 +85,22 @@ runFixture backends name = do
     original <- Bytes.readFile source
     H.assert (code == 0 && H.eq generated original && H.contains "Fig12-A8\tREJECT Inference\n" (Bytes.decodeText expected)) "inference input generation or A8 coverage differs"
     else return Unit
- result <- C.compileFile (Cons "bootstrap" (Cons "tests" Nil)) source
- compilation <- H.right result
- ty <- H.right (Check.checkClosed (C.compiledTerm compilation))
- H.assert (T.alphaEq ty (C.inferredType compilation)) "port inferred/target type differs"
- parsed <- H.right (P.parseTerm source (Pretty.prettyTerm (C.compiledTerm compilation)))
- parsedType <- H.right (Check.checkClosed parsed)
- H.assert (T.alphaEq parsedType ty && X.equalErased (X.erase parsed) (X.erase (C.compiledTerm compilation))) "port target serialization changed"
+ serialized <- preparedSource name
  let heavy = S.elem eqString name (O.words "GraphConformance GraphDense InferenceConformance SolverReuse StateTypes")
  let execution = B.withExecutionTimeout (if heavy then 1800 else 60) backends
- -- These nested compiler/graph workloads exhausted the macOS interpreter's
- -- 30-minute limit. Keep every fixture and exact output; bound interpretation
- -- separately without extending native execution or LLVM emission limits.
- let context = if heavy then B.withInterpreterTimeout 7200 execution else execution
- observed <- B.execute context B.IOEntry (B.Input "" false) parsed
+ observed <- B.executeNativeSerialized execution B.IOEntry (B.Input "" false) serialized
  H.right (B.outcome observed)
  H.assert (H.eq (B.outputBytes observed) expected && eqString (B.stderrOutput observed) "" && eqString (B.remaining observed) "") ("port runtime output differs: " ++ name)
+main : IO Unit
 main = do
  H.assert (S.length names == 25 && S.length (S.nubBy eqString names) == 25 && S.length references == 6 && S.all (\(Pair name _) -> S.elem eqString name names) references) "port fixture or independent-reference coverage changed"
  args <- O.allArguments
+ case args of
+  Cons "--list" Nil -> putStr (S.unlines names)
+  Cons "--prepare" (Cons name (Cons destination Nil)) -> prepareFixture name destination
+  _ -> executeFixtures args
+executeFixtures : List String -> IO Unit
+executeFixtures args = do
  selected <- case args of
   Nil -> return names
   Cons "--only" names' -> do
@@ -63,5 +109,5 @@ main = do
   _ -> H.fail "invalid port arguments"
  B.withBackends (\backends -> do
   S.mapM_ (\name -> B.inCase backends ("MLF compiler port: " ++ name) (do { runFixture backends name; putStrLn ("PASS " ++ name) })) selected
-  B.auditBackends backends
+  B.auditNativeBackends backends
   putStrLn (showInt (S.length selected) ++ " MLF port fixtures; 0 failures"))

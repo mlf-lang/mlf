@@ -25,7 +25,7 @@ mockCompiler args = do
 outputPath args = case S.dropWhile (\arg -> S.not (eqString arg "-o")) args of
  Cons _ (Cons path _) -> path
  _ -> panic "mock tool missing output argument"
-mockBuild args = if S.elem eqString "--emit-llvm" args || S.elem eqString "--crate-to-llvm" args then do
+mockBuild args = if S.any (\flag -> S.elem eqString flag args) (O.words "--emit-llvm --emit-llvm-gc --crate-to-llvm --crate-to-llvm-gc") then do
  writeFile "frontend.started" ""
  fast <- getEnv "MLF_MOCK_FAST_FRONTEND"
  streaming <- getEnv "MLF_BENCH_STREAM_LLVM"
@@ -78,5 +78,5 @@ main = do
   Cons "--check-clean-environment" names -> do
    values <- S.mapM getEnv names
    H.assert (S.all (\value -> eqString value "") values) "gate inherited compiler or collector overrides"
-  Nil -> do { Boot.main; Release.main; Bench.main; putStrLn "57 native benchmark/bootstrap/release harness tests passed" }
+  Nil -> do { Boot.main; Release.main; Bench.main; putStrLn "58 native benchmark/bootstrap/release harness tests passed" }
   _ -> exitWith 2

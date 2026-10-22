@@ -6,16 +6,18 @@ import qualified Bootstrap.Std as S
 import qualified Package.OS as O
 import qualified Package.Json as J
 import qualified Package.Benchmark as B
+import qualified Package.Build as Build
 import qualified Package.Verification as V
 
-data Context = Context String String String String String (List String) Int
-out (Context d _ _ _ _ _ _) = d
-candidate (Context _ c _ _ _ _ _) = c
-baseline (Context _ _ b _ _ _ _) = b
-clang (Context _ _ _ c _ _ _) = c
-flags (Context _ _ _ _ _ fs _) = fs
-runs (Context _ _ _ _ _ _ n) = n
-backend (Context _ _ _ _ tool _ _) = tool
+data Context = Context String String String String String (List String) (List String) Int
+out (Context d _ _ _ _ _ _ _) = d
+candidate (Context _ c _ _ _ _ _ _) = c
+baseline (Context _ _ b _ _ _ _ _) = b
+clang (Context _ _ _ c _ _ _ _) = c
+flags (Context _ _ _ _ _ fs _ _) = fs
+runs (Context _ _ _ _ _ _ _ n) = n
+backend (Context _ _ _ _ tool _ _ _) = tool
+collector (Context _ _ _ _ _ _ gc _) = gc
 right : forall a. Either String a -> IO a
 right result = case result of { Left message -> O.fatal message; Right a -> return a }
 object = J.Object
@@ -50,7 +52,7 @@ build c work language directory = do
   source <- canonicalPath (V.text "mlf" (J.get "sources" work))
   runtime <- canonicalPath "runtime/mlf_runtime.c"
   -- buildParallel requires a fresh empty directory, including a fresh runtime.o.
-  result <- B.buildParallel directory (if eqString language "mlf" then candidate c else baseline c) (backend c) source runtime (flags c) 1800.0
+  result <- B.buildParallel directory (if eqString language "mlf" then candidate c else baseline c) (backend c) source runtime (S.append (flags c) (collector c)) 1800.0
   right result
 
 -- Byte transport is shared with the native test harness. No binary data is
@@ -179,11 +181,14 @@ main = do
    code <- O.exec "" (O.words "pkg-config --cflags --libs gmp") "" (directory ++ "/gmp.flags") (directory ++ "/gmp.err") 60
    O.require (code == 0) "GMP flags missing"
    gmp <- readFile (directory ++ "/gmp.flags")
-   let c = Context directory candidate baseline clang backend (O.words gmp) n
+   gc <- B.collectorFlags directory
+   gcIdentity <- Build.flagIdentity gc
+   J.write (directory ++ "/collector.json") gcIdentity
+   let c = Context directory candidate baseline clang backend (Build.flags gmp) gc n
    O.run "" (Cons clang (S.append (O.words "-O3 benchmarks/fasta/c/upstream.c -lm -o") (one (directory ++ "/fasta-generator"))))
    let files = S.append (Cons candidate (Cons baseline (Cons clang (Cons "runtime/mlf_runtime.c" (Cons "runtime/mlf_runtime.h" (Cons "runtime/khash.h" (Cons "benchmarks/manifest.json" (Cons "tools/bench/Main.emlf" Nil)))))))) (S.concatMap (\w -> S.map (\l -> V.text l (J.get "sources" w)) (O.words "c mlf")) (V.array "workloads" manifest))
    runner <- getExecutablePath
-   let dependencies = S.append (two runner backend) (O.words "runtime/mlf_system.h tests/native/host_support.c tests/native/binary_files.c package/Package/Benchmark.emlf package/Package/Verification.emlf package/Package/Json.emlf package/Package/OS.emlf tools/bench/mlf-package.json")
+   let dependencies = S.append (S.append (two runner backend) (S.map S.fst (S.append (J.items (J.get "headers" gcIdentity)) (J.items (J.get "libraries" gcIdentity))))) (O.words "runtime/mlf_system.h tests/native/host_support.c tests/native/binary_files.c package/Package/Benchmark.emlf package/Package/Build.emlf package/Package/Verification.emlf package/Package/Json.emlf package/Package/OS.emlf tools/bench/mlf-package.json")
    fingerprints <- S.mapM (\path -> do { hash <- fileDigest path; return (Pair path hash) }) (S.nubBy eqString (S.append files dependencies))
    let workloads = S.filter (\work -> S.null selected || S.elem eqString (V.text "name" work) selected) (V.array "workloads" manifest)
    rows <- S.mapM (workload c) workloads

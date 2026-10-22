@@ -56,11 +56,12 @@ main = do
  putStrLn "PASS test_fixed_point_and_fresh_stages_are_required"
  S.mapM_ (\mutation -> reject (mutation evidence) manifest)
   (Cons (path "backends matrices" (V.remove "compact-gc"))
-  (Cons (path "backends matrices standard backends" (\_ -> J.num 1))
-  (Cons (path "backends matrices standard rows" (\_ -> J.num 0))
-  (Cons (path "backends matrices standard cli_compiler" (\_ -> J.str "seed"))
+  (Cons (path "backends matrices compact-gc backends" (\_ -> J.num 1))
+  (Cons (path "backends matrices compact-gc rows" (\_ -> J.num 0))
+  (Cons (path "backends matrices compact-gc cli_compiler" (\_ -> J.str "seed"))
   (Cons (path "backends matrices compact-gc environment MLF_LLVM_TEST_ABI" (\_ -> J.str "standard")) Nil)))))
- putStrLn "PASS test_neither_layout_nor_backend_can_be_skipped"
+ reject (path "backends matrices standard" (\_ -> J.empty) evidence) manifest
+ putStrLn "PASS test_compact_matrix_and_both_backends_are_required"
  let first = path "benchmarks results"
  let entry = \keys f -> first (replaceHead (path keys f))
  S.mapM_ (\mutation -> reject (mutation evidence) manifest)

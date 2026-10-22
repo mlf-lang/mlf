@@ -4,6 +4,21 @@ import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Package.Json as J
 import qualified Package.OS as O
+-- A target receipt describes checks actually performed before these exact
+-- bytes entered the cache. The caller binds it to source/tool/cache identity.
+portTargetChecks = J.stringArray (O.words "independent-type inferred-type serialization-erasure transported-type")
+validPortTargetChecks name hash value =
+ J.equal (J.get "format" value) (J.num 1) &&
+ eqString (J.getText "fixture" "" value) name &&
+ eqString (J.getText "target_sha256" "" value) hash &&
+ eqString (J.getText "entry_type" "" value) "IO Unit" &&
+ stringLength (J.getText "inferred_type" "" value) > 0 &&
+ J.equal (J.get "checks" value) portTargetChecks
+-- Only pure generated programs may share an execution. Every configuration
+-- and prescribed-oracle field participates; only descriptive identities and
+-- the entry filename differ. The source bytes are always part of the key.
+canShareParity row = S.elem eqString (J.getText "category" "" row) (O.words "hm-generated figure12") && S.null (J.getStrings "include_dirs" row) && S.not (J.has "expected_stdout" row)
+parityExecutionKey row source = J.render (J.Object (Cons (Pair "source" (J.str source)) (Cons (Pair "case" (J.Object (S.filter (\(Pair key _) -> S.not (S.elem eqString key (O.words "id label source_path"))) (J.items row)))) Nil)))
 ensure : Bool -> String -> Either String Unit
 ensure ok reason = if ok then Right Unit else Left reason
 integer : Int -> J.Json -> Int
@@ -48,6 +63,12 @@ measurement value = do
  let times = S.catMaybes values
  ensure (S.all positive times && eqDouble (double (-1.0) (J.get "median_wall_seconds" value)) (median times)) "Invalid or inconsistent benchmark timing"
  return Unit
+validateMatrixAudit : Int -> List String -> String -> Either String Unit
+validateMatrixAudit count backends log = do
+ let rows = S.filter (O.starts "Backend matrix: ") (O.lines log)
+ ensure (count > 0 && (S.eqList eqString backends (Cons "llvm" Nil) || S.eqList eqString backends (O.words "interpreter llvm"))) "invalid matrix inventory"
+ ensure (S.length rows == 1 && eqString (S.head rows) ("Backend matrix: " ++ showInt count ++ " rows x " ++ showInt (S.length backends) ++ " backends; no missing executions")) "native execution row coverage changed"
+ return Unit
 matrixSummary : String -> String -> Either String J.Json
 matrixSummary log candidate = do
  let lines = O.nonempty (O.lines log)
@@ -72,12 +93,12 @@ matrixCollectionDivisor requested =
  else Left "matrix GC free-space divisor must be 1, 2 or 4"
 matrixEnvironment : J.Json -> String -> String -> String -> String -> J.Json -> Either String J.Json
 matrixEnvironment inherited drivers seed candidate abi collector = do
- ensure (eqString abi "standard" || eqString abi "compact-gc") "unknown native ABI"
- ensure (eqString abi "standard" || J.has "libs" collector && J.has "cflags" collector) "compact matrix requires collector"
+ ensure (eqString abi "compact-gc") "unknown native ABI"
+ ensure (J.has "libs" collector && J.has "cflags" collector) "compact matrix requires collector"
  divisor <- matrixCollectionDivisor (text "MLF_TEST_MATRIX_GC_DIVISOR" inherited)
  let clean = J.Object (S.filter (\entry -> S.not (S.any (\prefix -> O.starts prefix (S.fst entry)) (O.words "MLF_BOOTSTRAP_ MLF_LLVM_TEST_ MLF_TEST_ GC_"))) (J.items inherited))
- let common = J.set "MLF_BOOTSTRAP_COMPILER" (J.str candidate) (J.set "MLF_BOOTSTRAP_INTERPRETER" (J.str (drivers ++ "/RuntimeDriver")) (J.set "MLF_BOOTSTRAP_LLVM" (J.str (drivers ++ "/LLVMDriver")) (J.set "MLF_LLVM_TEST_ABI" (J.str abi) (J.set "GC_INITIAL_HEAP_SIZE" (J.str (if eqString abi "compact-gc" then "8388608" else "536870912")) (J.set "GC_FREE_SPACE_DIVISOR" (J.str divisor) clean)))))
- return (if eqString abi "standard" then common else J.set "MLF_LLVM_TEST_CFLAGS" (J.str (S.intercalate " " (S.map quote (J.getStrings "cflags" collector)))) (J.set "MLF_LLVM_TEST_LIBS" (J.str (S.intercalate " " (S.map quote (J.getStrings "libs" collector)))) common))
+ let common = J.set "MLF_BOOTSTRAP_COMPILER" (J.str candidate) (J.set "MLF_BOOTSTRAP_INTERPRETER" (J.str (drivers ++ "/RuntimeDriver")) (J.set "MLF_BOOTSTRAP_LLVM" (J.str (drivers ++ "/LLVMDriver")) (J.set "MLF_LLVM_TEST_ABI" (J.str abi) (J.set "GC_INITIAL_HEAP_SIZE" (J.str "8388608") (J.set "GC_FREE_SPACE_DIVISOR" (J.str divisor) clean)))))
+ return (J.set "MLF_LLVM_TEST_CFLAGS" (J.str (S.intercalate " " (S.map quote (J.getStrings "cflags" collector)))) (J.set "MLF_LLVM_TEST_LIBS" (J.str (S.intercalate " " (S.map quote (J.getStrings "libs" collector)))) common))
 layoutPlan : List String -> List String
 layoutPlan layouts = S.append (O.words "RuntimeDriver LLVMDriver") (S.map (\abi -> "matrix:" ++ abi) layouts)
 validateManifest : List J.Json -> Either String Unit
@@ -115,7 +136,7 @@ validateEvidence bootstrap backends benchmark compilerHash manifest = do
  ensure (int "cases" parity >= 7083 && int "accepted" parity >= 3199 && int "rejected" parity >= 3884 && int "runtime_rows" parity >= 80 && int "runtime_executions" parity == 2 * int "runtime_rows" parity) "Incomplete parity coverage"
  ensure (J.getBool "complete" false backends && eqString (text "compiler_sha256" backends) compilerHash && eqString (text "compiler" backends) path) "Native matrices used different compiler"
  let matrices = J.get "matrices" backends
- ensure (sameKeys (O.words "standard compact-gc") matrices) "Both native layouts must pass"
+ ensure (sameKeys (Cons "compact-gc" Nil) matrices) "The compact-GC native matrix must pass"
  S.mapM_ (\(Pair abi matrix) -> ensure (int "rows" matrix >= 475 && int "fixtures" matrix >= 428 && int "backends" matrix == 2 && eqString (text "cli_compiler" matrix) path && eqString (text "MLF_LLVM_TEST_ABI" (J.get "environment" matrix)) abi) "Incomplete or misdirected native matrix") (J.items matrices)
  let tool = J.get "emlf" (J.get "toolchain" benchmark)
  ensure (eqString (text "status" benchmark) "passed" && eqString (text "sha256" tool) compilerHash && eqString (text "path" tool) path) "Benchmark did not validate candidate"

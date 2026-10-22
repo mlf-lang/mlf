@@ -1,19 +1,12 @@
 /* Runtime ABI and call-by-need checks independent of generated LLVM.
- * Compile with MLF_USE_BDWGC to collect while update roots are live. */
+ * BDWGC collection runs while update roots are live. */
 #include "mlf_runtime.h"
-#ifdef MLF_COMPACT_BDWGC
-#define HEADER_BYTES 0
-#else
-#define HEADER_BYTES 16
-#endif
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifdef MLF_USE_BDWGC
 #include <gc/gc.h>
 #include <gc/gc_mark.h>
-#endif
 
 static unsigned calls, expected_calls;
 static MlfValue *saved_alias, *self;
@@ -32,18 +25,14 @@ static MlfValue *counted(MlfEnv *env, MlfValue *argument) {
     (void)argument;
     ++calls;
     MlfValue *answer = mlf_env_get(env, 0);
-#ifdef MLF_USE_BDWGC
     if (calls == expected_calls) GC_gcollect();
-#endif
     return answer;
 }
 
 static MlfValue *identity(MlfEnv *env, MlfValue *argument) {
     (void)env;
     ++calls;
-#ifdef MLF_USE_BDWGC
     if (calls == expected_calls) GC_gcollect();
-#endif
     return argument;
 }
 
@@ -90,22 +79,14 @@ static void general_fields(MlfValue *entry, MlfValue **expected, unsigned count)
     /* Use the public generated-code ABI, independently of runtime accessors.
      * memcpy avoids adding alignment or C aliasing assumptions to the test. */
     MlfEnv *env;
-#ifdef MLF_COMPACT_BDWGC
     uint32_t tag;
     memcpy(&tag, entry, sizeof tag);
     require(tag == 9 || tag == 28, "unexpected general constructor tag");
     if (tag == 28) env = (MlfEnv *)((unsigned char *)entry + 24);
     else memcpy(&env, (const unsigned char *)entry + 24, sizeof env);
-#else
-    memcpy(&env, (const unsigned char *)entry + 40, sizeof env);
-#endif
     for (unsigned i = 0; i < count; ++i) {
         MlfValue *field;
-#ifdef MLF_COMPACT_BDWGC
         memcpy(&field, (const unsigned char *)env + (tag == 28 ? 0 : 8) + 8 * i, sizeof field);
-#else
-        memcpy(&field, (const unsigned char *)env + 24 + 8 * i, sizeof field);
-#endif
         require(field == expected[i], "general constructor field layout changed");
         require(field == mlf_field(entry, i), "direct field load disagrees with accessor");
     }
@@ -133,9 +114,7 @@ static void constructor(unsigned arity, int partial) {
         entry = mlf_constructor_fields(73, env);
     }
     mlf_fill(hole, entry);
-#ifdef MLF_USE_BDWGC
     GC_gcollect();
-#endif
     if (arity > 2) {
         general_fields(entry, fields, arity);
         if (prefix) general_fields(prefix, fields, 1);
@@ -189,10 +168,8 @@ static MlfValue *consume_captures(MlfEnv *env, MlfValue *argument) {
     MlfValue *last = mlf_env_get(env, private_count - 1);
     /* Model the generated callback: retain loaded values, then clear slots
      * before allocating/collecting. Unused captures remain unevaluated. */
-    memset((unsigned char *)env + HEADER_BYTES + 8, 0, private_count * sizeof(MlfValue *));
-#ifdef MLF_USE_BDWGC
+    memset((unsigned char *)env + 8, 0, private_count * sizeof(MlfValue *));
     GC_gcollect();
-#endif
     return mlf_constructor2(73, first, last);
 }
 
@@ -202,20 +179,18 @@ static void private_thunks(void) {
         private_count = counts[c]; calls = 0;
         MlfValue *entry = mlf_thunk_new(consume_captures, private_count);
         MlfEnv *env;
-        memcpy(&env, (const unsigned char *)entry + HEADER_BYTES + 16, sizeof env);
+        memcpy(&env, (const unsigned char *)entry + 16, sizeof env);
         MlfValue *answer = mlf_integer("340282366920938463463374607431768211456");
         for (unsigned i = 0; i < private_count; ++i)
             mlf_env_set(env, i, i == 0 || i + 1 == private_count ? answer : mlf_thunk(poison, NULL));
-#ifdef MLF_USE_BDWGC
         GC_gcollect();
-#endif
         MlfValue *result = mlf_force(entry);
         require(calls == 1 && mlf_force(entry) == result, "private thunk was reexecuted");
         if (private_count) {
             require(mlf_field(result, 0) == answer && mlf_field(result, 1) == answer, "private captures lost across collection");
             for (unsigned i = 0; i < private_count; ++i) {
                 MlfValue *slot;
-                memcpy(&slot, (const unsigned char *)env + HEADER_BYTES + 8 + i * sizeof slot, sizeof slot);
+                memcpy(&slot, (const unsigned char *)env + 8 + i * sizeof slot, sizeof slot);
                 require(slot == NULL, "consumed private capture retained");
             }
         }
@@ -224,7 +199,7 @@ static void private_thunks(void) {
 
 static size_t *string_index_storage(MlfValue *entry) {
     size_t *indices;
-    memcpy(&indices, (const unsigned char *)entry + HEADER_BYTES + 24, sizeof indices);
+    memcpy(&indices, (const unsigned char *)entry + 24, sizeof indices);
     return indices;
 }
 
@@ -279,10 +254,8 @@ static void sparse_strings(void) {
             require(mlf_prim2(47, text, scalar_index(i)) == scalar_index(sparse_scalar(i)), "sparse Unicode random index changed");
         }
         require(mlf_prim1(46, mlf_prim3(48, text, scalar_index(SPARSE_SCALARS), mlf_integer("0"))) == mlf_integer("0"), "sparse Unicode end slice changed");
-#ifdef MLF_USE_BDWGC
         GC_clear_stack(NULL);
         GC_gcollect();
-#endif
     }
 }
 
@@ -326,14 +299,14 @@ static void strings(void) {
                 mlf_prim2(47, joined, mlf_integer("5")) == mlf_integer("955"), "concatenation cached incorrect scalar offsets");
         require(mlf_prim2(47, mlf_prim1(49, mlf_integer("127")), mlf_integer("0")) == mlf_integer("127") &&
                 mlf_prim2(47, mlf_prim1(49, mlf_integer("128512")), mlf_integer("0")) == mlf_integer("128512"), "scalar construction changed");
-#ifdef MLF_USE_BDWGC
         GC_clear_stack(NULL);
         GC_gcollect();
-#endif
     }
 }
 
 static void string_failure(const char *mode) {
+    /* Bounds failures need the sparse representation, not a million scalars. */
+    static const char sparse_bytes[] = "012345678901234567890123456789\xce\xbb";
     static const struct {
         const char *name, *bytes;
         uint64_t length;
@@ -341,10 +314,10 @@ static void string_failure(const char *mode) {
         const char *offset, *count;
     } failures[] = {
         {"string-sparse-negative-index", NULL, 0, 47, "-1", NULL},
-        {"string-sparse-past-index", NULL, 0, 47, "1048576", NULL},
+        {"string-sparse-past-index", NULL, 0, 47, "31", NULL},
         {"string-sparse-huge-index", NULL, 0, 47, "18446744073709551616", NULL},
-        {"string-sparse-past-offset", NULL, 0, 48, "1048577", "0"},
-        {"string-sparse-past-count", NULL, 0, 48, "1048575", "2"},
+        {"string-sparse-past-offset", NULL, 0, 48, "32", "0"},
+        {"string-sparse-past-count", NULL, 0, 48, "30", "2"},
         {"string-ascii-negative-index", "abc", 3, 47, "-1", NULL},
         {"string-ascii-past-index", "abc", 3, 47, "3", NULL},
         {"string-ascii-huge-index", "abc", 3, 47, "18446744073709551616", NULL},
@@ -374,7 +347,13 @@ static void string_failure(const char *mode) {
     };
     for (size_t i = 0; i < sizeof failures / sizeof *failures; ++i) {
         if (strcmp(mode, failures[i].name)) continue;
-        MlfValue *text = failures[i].bytes ? mlf_string(failures[i].bytes, failures[i].length) : sparse_string();
+        MlfValue *text = failures[i].bytes ? mlf_string(failures[i].bytes, failures[i].length) : mlf_string(sparse_bytes, sizeof sparse_bytes - 1);
+        if (!failures[i].bytes) {
+            require(mlf_prim1(46, text) == mlf_integer("31"), "small sparse scalar length changed");
+            size_t *indices = string_index_storage(text);
+            require(indices && indices[0] == SIZE_MAX && indices[1] == 31 && indices[2] == 1,
+                    "bounds probe did not select sparse Unicode indexing");
+        }
         if (failures[i].operation == 46) (void)mlf_prim1(46, text);
         else if (failures[i].operation == 47) (void)mlf_prim2(47, text, mlf_integer(failures[i].offset));
         else (void)mlf_prim3(48, text, mlf_integer(failures[i].offset), mlf_integer(failures[i].count));
@@ -383,7 +362,6 @@ static void string_failure(const char *mode) {
     require(0, "unknown string failure mode");
 }
 
-#ifdef MLF_COMPACT_BDWGC
 /* The generated compact string ABI permits writable static values. Their
  * Unicode index must remain rooted even when no evaluated MLF value owns it. */
 static struct LiteralString {
@@ -419,11 +397,8 @@ static void static_strings(void) {
         GC_gcollect();
     }
 }
-#else
-static void static_strings(void) {}
-#endif
 
-#ifdef MLF_ALLOCATION_AUDIT
+#if defined(MLF_ALLOCATION_AUDIT)
 static size_t constructor_audits;
 void mlf_bench_constructed_node(int64_t identity) {
     (void)identity;
@@ -431,7 +406,6 @@ void mlf_bench_constructed_node(int64_t identity) {
 }
 #endif
 
-#ifdef MLF_COMPACT_BDWGC
 /* Independently exercise the emitted allocation protocol, including its last
  * size class, the first oversized object, and debug/audit refill fallbacks. */
 static MlfValue *generated_constructor(int64_t identity, size_t count) {
@@ -458,7 +432,7 @@ static void inline_constructors(void) {
     static const size_t widths[] = {1, 2, 3, 4, 5, 17, 28, 29, 30, 31, 32, 513};
     for (size_t i = 0; i < sizeof widths / sizeof widths[0]; ++i) {
         size_t count = widths[i];
-#ifdef MLF_ALLOCATION_AUDIT
+#if defined(MLF_ALLOCATION_AUDIT)
         size_t before = constructor_audits;
 #endif
         for (size_t repeat = 0; repeat < 140; ++repeat) {
@@ -472,24 +446,19 @@ static void inline_constructors(void) {
                         "inline constructor field survived collection");
             }
         }
-#ifdef MLF_ALLOCATION_AUDIT
+#if defined(MLF_ALLOCATION_AUDIT)
         require(constructor_audits == before + 140 * (count + 1), "inline constructor audit coverage");
         for (size_t head = 0; head < 33; ++head)
             require(mlf_constructor_pending[head] == NULL, "audited constructor bypassed hook");
 #endif
     }
 }
-#else
-static void inline_constructors(void) {}
-#endif
 
 int main(int argc, char **argv) {
     require(argc == 2, "expected one probe mode");
     const char *mode = argv[1];
-#ifdef MLF_USE_BDWGC
     GC_set_max_heap_size(8 * 1024 * 1024);
     if (!strcmp(mode, "no-interior")) GC_set_all_interior_pointers(0);
-#endif
     if (!strcmp(mode, "success") || !strcmp(mode, "no-interior")) {
         const unsigned lengths[] = {0, 1, 2, 3, 4, 5, 16, 17, 64, 65, 1025};
         for (unsigned mode = 0; mode < 3; ++mode)

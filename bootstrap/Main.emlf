@@ -14,7 +14,7 @@ import qualified Bootstrap.Crate as Crate
 import qualified Bootstrap.CrateArtifact as CrateArtifact
 import qualified Bootstrap.CrateCodegen as CrateCodegen
 
-data Command = PrintSource Bool | RunSource | EmitSource Bool | CheckTarget | RunTarget | RunProgramTarget | EmitTarget Bool | EmitIOTarget Bool
+data Command = PrintSource Bool | RunSource | EmitSource | CheckTarget | RunTarget | RunProgramTarget | EmitTarget | EmitIOTarget
 data Source = SourceFile String | SourceText String String | SourceStdin
 
 fatal : forall a. String -> IO a
@@ -52,22 +52,22 @@ runArgs mode paths arguments = case arguments of
   Cons "--show-crate" (Cons file Nil) -> do
     result <- CrateArtifact.showInterfaceFile file
     case result of {Left message -> fatal message; Right text -> putStr text}
-  Cons "--crate-to-llvm" (Cons file Nil) -> crateCommand (EmitSource false) Nil file
-  Cons "--crate-to-llvm-gc" (Cons file Nil) -> crateCommand (EmitSource true) Nil file
-  Cons "--crate-to-llvm" (Cons file (Cons "--cache" (Cons cache Nil))) -> cachedCrateCommand cache false file
-  Cons "--crate-to-llvm-gc" (Cons file (Cons "--cache" (Cons cache Nil))) -> cachedCrateCommand cache true file
+  Cons "--crate-to-llvm" (Cons file Nil) -> crateCommand EmitSource Nil file
+  Cons "--crate-to-llvm-gc" (Cons file Nil) -> crateCommand EmitSource Nil file
+  Cons "--crate-to-llvm" (Cons file (Cons "--cache" (Cons cache Nil))) -> cachedCrateCommand cache file
+  Cons "--crate-to-llvm-gc" (Cons file (Cons "--cache" (Cons cache Nil))) -> cachedCrateCommand cache file
   Cons "--link-crate" (Cons file Nil) -> crateCommand (PrintSource false) Nil file
   Cons "--run-crate" rest -> case splitArguments rest of
     Pair (Cons file Nil) args -> crateCommand RunSource args file
     _ -> fatal usage
   Cons "--type" rest -> sourceCommand mode paths (PrintSource true) Nil rest
-  Cons "--emit-llvm" rest -> sourceCommand mode paths (EmitSource false) Nil rest
-  Cons "--emit-llvm-gc" rest -> sourceCommand mode paths (EmitSource true) Nil rest
+  Cons "--emit-llvm" rest -> sourceCommand mode paths EmitSource Nil rest
+  Cons "--emit-llvm-gc" rest -> sourceCommand mode paths EmitSource Nil rest
   Cons "--check" rest -> targetCommand CheckTarget Nil rest
-  Cons "--xmlf-to-llvm" rest -> targetCommand (EmitTarget false) Nil rest
-  Cons "--xmlf-to-llvm-gc" rest -> targetCommand (EmitTarget true) Nil rest
-  Cons "--xmlf-to-llvm-io" rest -> targetCommand (EmitIOTarget false) Nil rest
-  Cons "--xmlf-to-llvm-io-gc" rest -> targetCommand (EmitIOTarget true) Nil rest
+  Cons "--xmlf-to-llvm" rest -> targetCommand EmitTarget Nil rest
+  Cons "--xmlf-to-llvm-gc" rest -> targetCommand EmitTarget Nil rest
+  Cons "--xmlf-to-llvm-io" rest -> targetCommand EmitIOTarget Nil rest
+  Cons "--xmlf-to-llvm-io-gc" rest -> targetCommand EmitIOTarget Nil rest
   Cons "--run" rest -> case splitArguments rest of
     Pair source arguments -> sourceCommand mode paths RunSource arguments source
   Cons "--run-xmlf" rest -> case splitArguments rest of
@@ -76,8 +76,8 @@ runArgs mode paths arguments = case arguments of
     Pair source arguments -> targetCommand RunProgramTarget arguments source
   _ -> sourceCommand mode paths (PrintSource false) Nil arguments
 
-cachedCrateCommand cache compact file = do
-  chunks <- CrateCodegen.emitFile cache compact false file
+cachedCrateCommand cache file = do
+  chunks <- CrateCodegen.emitFile cache false file
   printLLVM chunks
 
 crateCommand command args file = do
@@ -87,7 +87,7 @@ crateCommand command args file = do
     Right checked -> case command of
       PrintSource _ -> putStrLn (Pretty.prettyTerm (Checked.term checked))
       RunSource -> execute args (Checked.term checked)
-      EmitSource compact -> printLLVM (LLVM.emitCheckedChunks compact false checked)
+      EmitSource -> printLLVM (LLVM.emitCheckedChunks false checked)
       _ -> fatal "invalid crate command"
 
 splitArguments : List String -> Pair (List String) (List String)
@@ -122,7 +122,7 @@ sourceCommand mode paths command programArguments arguments = case parseSource t
           putStrLn ((if onlyType then "" else "-- type: ") ++ C.sourceType result)
           if onlyType then ioReturn Unit else putStrLn (Pretty.prettyTerm (C.compiledTerm result))
         RunSource -> execute programArguments (C.compiledTerm result)
-        EmitSource compact -> printLLVM (LLVM.emitCheckedChunks compact false (C.checkedTerm result))
+        EmitSource -> printLLVM (LLVM.emitCheckedChunks false (C.checkedTerm result))
         _ -> fatal "invalid source command"
 
 load : Source -> IO (Pair String String)
@@ -155,8 +155,8 @@ targetCommand command programArguments arguments = case parseSource false argume
           case result of
             Left message -> panic message
             Right ignored -> ioReturn Unit
-        EmitTarget compact -> printLLVM ((if compact then LLVM.emitLLVMGCChunks else LLVM.emitLLVMChunks) term)
-        EmitIOTarget compact -> printLLVM ((if compact then LLVM.emitLLVMIOGCChunks else LLVM.emitLLVMIOChunks) term)
+        EmitTarget -> printLLVM (LLVM.emitLLVMChunks term)
+        EmitIOTarget -> printLLVM (LLVM.emitLLVMIOChunks term)
         _ -> fatal "invalid target command"
 
 execute : List String -> XTerm -> IO Unit
@@ -201,4 +201,4 @@ chooseRuntime paths = case paths of
 
 usage = "emlf --version\n" ++ crateUsage ++ baseUsage
 crateUsage = "Crate compilation: emlf --compile-crate SPEC -o PREFIX\n       emlf --show-crate FILE.mlfci\n       emlf --link-crate FILE.mlfci\n       emlf --run-crate FILE.mlfci [-- ARGS...]\n       emlf --crate-to-llvm[-gc] FILE.mlfci\n"
-baseUsage = "Usage: emlf [--no-prelude] [-i DIR ...] [--type] [FILE | --expr SOURCE]\n       emlf --check [XMLF_FILE]\n       emlf [--no-prelude] [-i DIR ...] --run [FILE | --expr SOURCE] [-- ARG ...]\n       emlf --run-xmlf [XMLF_FILE] [-- ARG ...]\n       emlf [--no-prelude] [-i DIR ...] --emit-llvm [FILE | --expr SOURCE]\n       emlf --xmlf-to-llvm [XMLF_FILE]\n       emlf [--no-prelude] [-i DIR ...] --emit-llvm-gc [FILE | --expr SOURCE]\n       emlf --xmlf-to-llvm[-io]-gc [XMLF_FILE]\n       emlf --llvm-runtime\nWith no FILE, read eMLF from standard input.\nImports load Foo.Bar from Foo/Bar.emlf beside the entry or in -i search roots.\nThe standard prelude supplies Monad and Monad IO; --no-prelude disables it.\nLink LLVM IR with clang, runtime/mlf_runtime.c, and GMP.\nThe -gc commands require the runtime built with MLF_USE_BDWGC and MLF_COMPACT_BDWGC.\n"
+baseUsage = "Usage: emlf [--no-prelude] [-i DIR ...] [--type] [FILE | --expr SOURCE]\n       emlf --check [XMLF_FILE]\n       emlf [--no-prelude] [-i DIR ...] --run [FILE | --expr SOURCE] [-- ARG ...]\n       emlf --run-xmlf [XMLF_FILE] [-- ARG ...]\n       emlf [--no-prelude] [-i DIR ...] --emit-llvm [FILE | --expr SOURCE]\n       emlf --xmlf-to-llvm [XMLF_FILE]\n       emlf [--no-prelude] [-i DIR ...] --emit-llvm-gc [FILE | --expr SOURCE]\n       emlf --xmlf-to-llvm[-io]-gc [XMLF_FILE]\n       emlf --llvm-runtime\nWith no FILE, read eMLF from standard input.\nImports load Foo.Bar from Foo/Bar.emlf beside the entry or in -i search roots.\nThe standard prelude supplies Monad and Monad IO; --no-prelude disables it.\nAll LLVM commands emit the compact BDWGC ABI; -gc spellings are aliases.\nLink LLVM IR with clang, runtime/mlf_runtime.c, GMP and BDWGC.\n"
