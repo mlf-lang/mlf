@@ -35,6 +35,7 @@
       "Bootstrap.Parser": "Bootstrap/Parser.emlf",
       "Bootstrap.Prelude": "Bootstrap/Prelude.emlf",
       "Bootstrap.Primitive": "Bootstrap/Primitive.emlf",
+      "Bootstrap.Regex": "Bootstrap/Regex.emlf",
       "Bootstrap.Runtime": "Bootstrap/Runtime.emlf",
       "Bootstrap.ST": "Bootstrap/ST.emlf",
       "Bootstrap.Separate": "Bootstrap/Separate.emlf",

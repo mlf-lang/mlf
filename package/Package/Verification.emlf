@@ -45,7 +45,7 @@ positive : Double -> Bool
 positive n = finite n && ltDouble 0.0 n
 sameKeys : List String -> J.Json -> Bool
 sameKeys expected value = S.eqList eqString (S.sortBy compareString expected) (S.sortBy compareString (S.map S.fst (J.items value)))
-workloads = O.words "binary-trees pidigits n-body fannkuch-redux spectral-norm fasta mandelbrot reverse-complement k-nucleotide"
+workloads = O.words "binary-trees pidigits n-body fannkuch-redux spectral-norm fasta mandelbrot reverse-complement k-nucleotide regex-redux"
 languages = O.words "c rust haskell mlf"
 limit : String -> Double
 limit dimension = if eqString dimension "compilation" then 5.0 else 2.0
@@ -146,7 +146,7 @@ validateEvidence bootstrap backends benchmark compilerHash manifest = do
  let expected = array "workloads" manifest
  ensure (S.eqList eqString (S.sortBy compareString (S.map (text "name") expected)) (S.sortBy compareString workloads)) "Unexpected benchmark manifest"
  let results = array "results" benchmark
- ensure (S.eqList eqString (S.sortBy compareString (S.map (text "benchmark") results)) (S.sortBy compareString workloads)) "must cover all nine workloads"
+ ensure (S.eqList eqString (S.sortBy compareString (S.map (text "benchmark") results)) (S.sortBy compareString workloads)) "must cover all ten workloads"
  let checks = array "performance_checks" benchmark
  let identities = S.map (\row -> text "benchmark" row ++ ":" ++ text "dimension" row) checks
  let wanted = S.concatMap (\name -> S.map (\dimension -> name ++ ":" ++ dimension) (O.words "compilation runtime")) workloads

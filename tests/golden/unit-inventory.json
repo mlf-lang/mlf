@@ -763,10 +763,20 @@
         "test_runtime_constructor_fields_and_update_spines",
         "test_real_console_raw_input_matches_native_bytes_and_eof",
         "test_mlf_counts_every_window_and_distinct_key_in_all_seven_tables",
-        "test_mlf_allocates_every_tree_node"
+        "test_mlf_allocates_every_tree_node",
+        "test_regex_redux_oracle_counts_each_variant_and_nonoverlapping_matches",
+        "test_regex_redux_cleanup_follows_header_and_linefeed_pattern",
+        "test_regex_redux_replacements_are_ordered_and_delimiter_matches_exact",
+        "test_regex_redux_requires_all_counts_lengths_order_and_exact_bytes",
+        "test_native_dependency_headers_survive_suppressed_system_flags",
+        "test_regex_redux_measured_native_source_matches_independent_oracle",
+        "test_regex_redux_measured_interpreter_source_matches_independent_oracle"
       ],
       "aliases": {},
-      "metrics": {}
+      "metrics": {
+        "regex-redux-native-executed": 7,
+        "regex-redux-interpreted-executed": 2
+      }
     },
     "figure12": {
       "executions": [
@@ -918,6 +928,157 @@
       ],
       "aliases": {},
       "metrics": {}
+    },
+    "regex": {
+      "executions": [
+        "regex/invalid/open-class",
+        "regex/invalid/open-group",
+        "regex/invalid/unmatched-close-group",
+        "regex/invalid/leading-repeat",
+        "regex/invalid/repeated-star",
+        "regex/invalid/lazy-quantifier",
+        "regex/invalid/reversed-range",
+        "regex/invalid/empty-class",
+        "regex/invalid/trailing-escape",
+        "regex/invalid/backreference",
+        "regex/invalid/word-boundary",
+        "regex/invalid/lookahead",
+        "regex/invalid/reversed-bound",
+        "regex/invalid/oversized-bound",
+        "regex/invalid/malformed-bound",
+        "regex/invalid/class-range-escape",
+        "regex/invalid/nested-repeat-size",
+        "regex/invalid/nested-empty-repeat-size",
+        "regex/match/left-alternative-long",
+        "regex/match/left-alternative-short",
+        "regex/match/leftmost-long",
+        "regex/match/later-alternative",
+        "regex/match/greedy-backtrack",
+        "regex/match/one-or-more",
+        "regex/match/optional",
+        "regex/match/bounded-repeat",
+        "regex/match/unbounded-repeat",
+        "regex/match/exact-repeat",
+        "regex/match/range",
+        "regex/match/negated-range",
+        "regex/match/escape-class",
+        "regex/match/negated-escape-class",
+        "regex/match/predefined-classes",
+        "regex/match/escaped-class-delimiters",
+        "regex/match/anchors",
+        "regex/match/nullable-star",
+        "regex/match/nested-star",
+        "regex/match/empty-alternative-before-required",
+        "regex/match/empty-alternative-star",
+        "regex/match/nullable-alternative-priority",
+        "regex/match/anchor-alternative-star",
+        "regex/match/nullable-dot-alternative",
+        "regex/match/ambiguous-success",
+        "regex/match/ambiguous-failure-terminates",
+        "regex/match/unicode-range",
+        "regex/match/nul",
+        "regex/match/dot-excludes-newline",
+        "regex/match/offset-preserves-anchor",
+        "regex/match/reject-past-end-offset",
+        "regex/match/reject-negative-offset",
+        "regex/count/nonoverlap",
+        "regex/count/empty-advancement",
+        "regex/replace/literal",
+        "regex/replace/empty-advancement",
+        "regex/replace/alternative-priority",
+        "regex/replace/fasta-clean"
+      ],
+      "aliases": {},
+      "metrics": {
+        "invalid-patterns-executed": 17
+      }
     }
-  }
+  },
+  "reviewed_amendments": [
+    {
+      "commit": "91962c2bdc16988b28779a1ff02d0c892e7e4fb8",
+      "basis": "Source-reviewed regex and benchmark assertions from main; these additions were not part of the 5b930cb execution report. Candidate output never supplies expectations.",
+      "added_harness_ids": [
+        "test_regex_redux_oracle_counts_each_variant_and_nonoverlapping_matches",
+        "test_regex_redux_cleanup_follows_header_and_linefeed_pattern",
+        "test_regex_redux_replacements_are_ordered_and_delimiter_matches_exact",
+        "test_regex_redux_requires_all_counts_lengths_order_and_exact_bytes",
+        "test_native_dependency_headers_survive_suppressed_system_flags",
+        "test_regex_redux_measured_native_source_matches_independent_oracle",
+        "test_regex_redux_measured_interpreter_source_matches_independent_oracle"
+      ],
+      "added_regex_ids": [
+        "regex/invalid/open-class",
+        "regex/invalid/open-group",
+        "regex/invalid/unmatched-close-group",
+        "regex/invalid/leading-repeat",
+        "regex/invalid/repeated-star",
+        "regex/invalid/lazy-quantifier",
+        "regex/invalid/reversed-range",
+        "regex/invalid/empty-class",
+        "regex/invalid/trailing-escape",
+        "regex/invalid/backreference",
+        "regex/invalid/word-boundary",
+        "regex/invalid/lookahead",
+        "regex/invalid/reversed-bound",
+        "regex/invalid/oversized-bound",
+        "regex/invalid/malformed-bound",
+        "regex/invalid/class-range-escape",
+        "regex/invalid/nested-repeat-size",
+        "regex/invalid/nested-empty-repeat-size",
+        "regex/match/left-alternative-long",
+        "regex/match/left-alternative-short",
+        "regex/match/leftmost-long",
+        "regex/match/later-alternative",
+        "regex/match/greedy-backtrack",
+        "regex/match/one-or-more",
+        "regex/match/optional",
+        "regex/match/bounded-repeat",
+        "regex/match/unbounded-repeat",
+        "regex/match/exact-repeat",
+        "regex/match/range",
+        "regex/match/negated-range",
+        "regex/match/escape-class",
+        "regex/match/negated-escape-class",
+        "regex/match/predefined-classes",
+        "regex/match/escaped-class-delimiters",
+        "regex/match/anchors",
+        "regex/match/nullable-star",
+        "regex/match/nested-star",
+        "regex/match/empty-alternative-before-required",
+        "regex/match/empty-alternative-star",
+        "regex/match/nullable-alternative-priority",
+        "regex/match/anchor-alternative-star",
+        "regex/match/nullable-dot-alternative",
+        "regex/match/ambiguous-success",
+        "regex/match/ambiguous-failure-terminates",
+        "regex/match/unicode-range",
+        "regex/match/nul",
+        "regex/match/dot-excludes-newline",
+        "regex/match/offset-preserves-anchor",
+        "regex/match/reject-past-end-offset",
+        "regex/match/reject-negative-offset",
+        "regex/count/nonoverlap",
+        "regex/count/empty-advancement",
+        "regex/replace/literal",
+        "regex/replace/empty-advancement",
+        "regex/replace/alternative-priority",
+        "regex/replace/fasta-clean"
+      ],
+      "added_metrics": {
+        "harness": {
+          "regex-redux-native-executed": 7,
+          "regex-redux-interpreted-executed": 2
+        },
+        "regex": {
+          "invalid-patterns-executed": 17
+        }
+      },
+      "reviewed_source_sha256": {
+        "tests/Tests/BenchmarkSuite.emlf": "924c830419714c957e4ab9db491bc1acc81fa9844fee0eb0a579177c6d06f875",
+        "tests/Tests/RegexRedux.emlf": "f409f229e19d115ff2c5b23aac2c9443e4b0c1bc8318c7d9517d1d4007805414",
+        "tests/Tests/Regex.emlf": "b209422f83f58741e7290950e46ce7550ed70d3573a02d3a6f267c84b9074cdc"
+      }
+    }
+  ]
 }

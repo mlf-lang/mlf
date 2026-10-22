@@ -52,7 +52,7 @@ for group in $groups; do
     test "$(sha256 "$build/compiler-tests/$group/$suite.log" | awk '{print $1}')" = "$expected"
   done < <(jq -r '(.suites // {}) | to_entries[] | [.key,.value.log_sha256] | @tsv' "$report")
   case "$group" in
-    unit) coverage_suites='harness core figure12 test-framework' ;;
+    unit) coverage_suites='harness core figure12 test-framework regex' ;;
     packages) coverage_suites='packages' ;;
     *) coverage_suites='' ;;
   esac
@@ -100,7 +100,7 @@ for group in $groups; do
   cp "$build/compiler-tests/$group/verification.json" "$bundle/evidence/$group/"
   while IFS= read -r log; do cp "$log" "$bundle/evidence/$group/"; done < <(find "$build/compiler-tests/$group" -maxdepth 1 -name '*.log' -type f)
 done
-for suite in harness core figure12 test-framework; do
+for suite in harness core figure12 test-framework regex; do
   cp "$build/compiler-tests/unit/$suite.coverage.jsonl" "$bundle/evidence/unit/"
 done
 cp tests/golden/unit-inventory.json "$bundle/evidence/unit/"

@@ -1,5 +1,10 @@
 # Native MLF compiler tests
 
+Pull requests use the explicit [PR smoke group](../docs/ci.md): Figure 12,
+four independent checker controls, 12 selected interpreter/LLVM fixtures and
+three package/cache checks. It builds and tests checkout tools. The six full
+root groups below retain their existing coverage and do not repeat smoke.
+
 The local `mlf-tests` package preserves the original assertions, input corpora,
 runtime event traces, generated graph properties, and harness fault injections.
 Root `mlfpkg test` builds these executables through the MLF package manager.
@@ -15,12 +20,14 @@ The reusable [`mlf-test` library](../testing/README.md) provides `Test.Case`,
 `Test.Assert` and `Test.Runner`. `int-set-unions` is the first focused runner
 target; its existing Core entry still runs the same sorted-list oracle and all
 276 distinct inputs. `test-framework` checks failure continuation, selection,
-inventory validation, JSON diagnostics and legacy adapters. The root `unit` group runs both the library and CLI contract checks in addition
-to the existing 686 Core checks.
+inventory validation, JSON diagnostics and legacy adapters. The root `unit`
+group runs both the library and CLI contract checks in addition to the existing
+686 Core checks.
 
 The shared test library contains the eight original helper, transport,
-collection-wrapper and independent-checker modules plus `Tests.Coverage`. Each executable explicitly lists the private
-test modules imported by its entry point. All original 77 test modules remain reachable
+collection-wrapper and independent-checker modules plus `Tests.Coverage`.
+Each executable explicitly lists the private test modules imported by its
+entry point. The original modules and added framework and regex checks remain reachable
 across those entries. Building `port` and its six reference programs now compiles
 21 test modules including their two entries, instead of compiling all 79 first.
 `mlfpkg --manifest tests/mlf-package.json plan` checks those import boundaries;
@@ -60,12 +67,19 @@ wrapper chooses 4 for port on hosts with at most 8 GiB RAM, while preserving the
 
 | Root group | MLF entry | Preserved coverage |
 | --- | --- | --- |
-| unit | CoreMain, Figure12SuiteMain, HarnessMain, TestFrameworkMain | framework API/CLI contracts; 686 compiler checks; 6712 Algorithm W cases represented by 6703 executions; annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks; all 43 Figure 12 labels with 41 distinct executions and 36 controls; 58 benchmark/bootstrap/release harness methods |
+| unit | CoreMain, Figure12SuiteMain, HarnessMain, TestFrameworkMain, RegexMain | framework API/CLI contracts; 686 compiler checks; 6712 Algorithm W cases represented by 6703 executions; annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks; all 43 Figure 12 labels with 41 distinct executions and 36 controls; 65 benchmark/bootstrap/release harness methods; 56 regex actions |
 | packages | PackagesMain | 15 original resolver methods plus three additional checks; 29 compiler integration cases, including native PGO isolation, shared cache survival, corruption recovery and source invalidation |
 | backends | BackendSuiteMain | 523 fixtures and 575 execution rows on interpreter and LLVM, compact-GC layout |
 | port | PortMain, ReferencesMain | 25 LLVM fixtures with compact-GC, six reference programs, generated inference input equality |
 | parity | CorpusMain, CheckTarget | All 7086 prescribed acceptance/type/rejection cases, 7075 distinct source compilations, and 80 runtime rows on both backends |
 | self-host | Tests.CompilerTests | Fresh next-stage compiler build and LLVM/native binary fixed point |
+
+The unit group also runs `RegexMain`, covering the portable regex parser and
+ordered matcher. The benchmark harness checks all ten workload manifests and
+fixtures, including regex-redux with an independent scanner oracle. It compiles
+and runs the actual regex-redux MLF source on native boundary/adversarial inputs
+and exercises the same source in the interpreter. C/Rust/Haskell baseline
+toolchains are not required for these compiler correctness tests.
 
 `Tests.Oracle` has its own monotypes, substitution, and generalization. It imports
 no compiler, graph solver, or target checker. `Tests.GraphUnificationReference`
@@ -96,8 +110,30 @@ The inventory was transcribed from the verified baseline and existing source
 registries. A deliberate coverage change must update it separately with a
 reviewable explanation of added or removed executions and aliases. Never
 regenerate expectations from the candidate's output to make a run pass. The
-framework includes literal report mutation tests for these rules; the compiler
-oracles and frozen corpus remain independent of the runner.
+reviewed `91962c2` source amendment extends the previous 58 harness IDs with five
+benchmark checks and two regex-redux checks. Their inner native and interpreter
+loops must complete seven and two oracle comparisons respectively. The separate
+regex inventory pins 56 completed actions, including 18 invalid-pattern
+rejections (17 counted batch callbacks plus one expansion-limit regression),
+27 match cases and 11 other assertions. These additions come from the reviewed
+source assertions, not a previously completed baseline run or candidate output.
+The harness IDs added by this amendment are:
+
+- `test_regex_redux_oracle_counts_each_variant_and_nonoverlapping_matches`
+- `test_regex_redux_cleanup_follows_header_and_linefeed_pattern`
+- `test_regex_redux_replacements_are_ordered_and_delimiter_matches_exact`
+- `test_regex_redux_requires_all_counts_lengths_order_and_exact_bytes`
+- `test_native_dependency_headers_survive_suppressed_system_flags`
+- `test_regex_redux_measured_native_source_matches_independent_oracle`
+- `test_regex_redux_measured_interpreter_source_matches_independent_oracle`
+
+The required new metrics are `harness.regex-redux-native-executed = 7`,
+`harness.regex-redux-interpreted-executed = 2`, and
+`regex.invalid-patterns-executed = 17`. The regex IDs and the source hashes
+reviewed for this amendment are recorded in the inventory metadata.
+The framework includes literal report
+mutation tests for these rules; compiler oracles and the frozen corpus remain
+independent of the runner.
 
 The optional [`mlf-test-tools`](../testing/tools/README.md) package supervises
 individual `Test.Case` actions in fresh processes using the existing POSIX

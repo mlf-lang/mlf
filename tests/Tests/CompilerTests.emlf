@@ -110,7 +110,7 @@ suiteArgs c target args expectations = do
  binary <- nativeTest c target
  binaryHash <- fileDigest binary
  let log = output c ++ "/" ++ target ++ ".log"
- let structural = S.elem eqString target (O.words "harness test-framework core figure12 packages")
+ let structural = S.elem eqString target (O.words "harness test-framework core figure12 packages regex")
  let coverage = output c ++ "/" ++ target ++ ".coverage.jsonl"
  if structural then do
   writeFile coverage ""
@@ -140,7 +140,8 @@ unit : TestContext -> IO Unit
 unit c = do
  transports c
  -- Check native toolchain and runtime probes before the longer compiler suites.
- suite c "harness" (Cons "58 native benchmark/bootstrap/release harness tests passed" Nil)
+ suite c "regex" (Cons "regular-expression tests passed" Nil)
+ suite c "harness" (Cons "Native benchmark/bootstrap/release harness tests passed" Nil)
  unions <- nativeTest c "int-set-unions"
  suiteArgs c "test-framework" (Cons "--verify-cli" (Cons (output c ++ "/framework-cli") (Cons unions Nil)))
   (Cons "Test framework contracts passed" (Cons "Test framework CLI contracts passed" Nil))

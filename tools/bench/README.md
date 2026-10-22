@@ -1,8 +1,11 @@
 # Native C/MLF benchmark comparison
 
 The runner is written in MLF and builds with the native package manager. It
-compares a candidate compiler, a baseline compiler and C on all nine pinned
+compares a candidate compiler, a baseline compiler and C on all ten pinned
 Benchmarks Game workloads. It does not run the Haskell or Rust baselines.
+The regex-redux C baseline requires PCRE2, discoverable as `libpcre2-8` through
+pkg-config. The MLF program imports the portable `Bootstrap.Regex` module;
+its source dependencies participate in the integrity checks.
 
 ```sh
 export MLF_GC_PREFIX=/path/to/bdwgc-install
@@ -48,7 +51,7 @@ executables and output. The report records input and tool/source hashes. Sample
 order alternates to reduce ordering bias. The final two arguments set the per-workload compilation and runtime limits.
 Omitting both retains the historical 5x/2x defaults. The command above explicitly
 requires **3x C compilation and 2x C runtime**. Optional workload names may follow
-the limits for investigation; omit them for the complete nine-workload gate.
+the limits for investigation; omit them for the complete ten-workload gate.
 Decisions use the unrounded ratio. Any failed limit exits nonzero. Reports retain
 every sample, medians, extrema, median absolute deviation, and hashes of each
 executable, LLVM module and object.

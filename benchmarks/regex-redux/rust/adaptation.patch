@@ -1,0 +1,34 @@
+--- upstream.rs
++++ main.rs
+@@ -5,10 +5,8 @@
+ // contributed by Tom Kaitchuck
+ // contributed by Andre Bogus
+ 
+-extern crate crossbeam_utils;
+ extern crate regex;
+ 
+-use crossbeam_utils::thread::scope;
+ use regex::bytes::Regex;
+ use std::{
+     borrow::Cow,
+@@ -65,17 +63,8 @@
+     let mut input = Vec::with_capacity(51 * (1 << 20));
+     io::stdin().read_to_end(&mut input).unwrap();
+     let sequence = regex(">[^\n]*\n|\n").replace_all(&input, &b""[..]).into_owned();
+-    scope(|s| {
+-        let result = s.spawn(|_| find_replaced_sequence_length(&sequence));
+-
+-        println!(
+-            "{}\n{}\n{}\n{}",
+-            count_reverse_complements(&sequence[..]),
+-            input.len(),
+-            sequence.len(),
+-            result.join().unwrap()
+-        );
+-    })
+-    .unwrap();
++    let counts = count_reverse_complements(&sequence);
++    let replaced_length = find_replaced_sequence_length(&sequence);
++    println!("{}\n{}\n{}\n{}", counts, input.len(), sequence.len(), replaced_length);
+ }
+     

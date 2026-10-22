@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Add portable MLF regular expressions and regex-redux, completing coverage of
+  all ten current Benchmarks Game workloads. Pin sequential C/Rust/Haskell
+  baselines and their regex dependencies, and check exact output with an
+  independent oracle and native/interpreter regressions. Historical performance
+  results cover nine workloads; regex-redux performance is not yet qualified.
+
 ## 0.3.0 — 2026-10-22
 
 - Use compact-GC as the sole native LLVM/runtime layout. Remove the standard

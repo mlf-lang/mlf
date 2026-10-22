@@ -1,0 +1,42 @@
+--- upstream.c
++++ main.c
+@@ -107,7 +107,6 @@
+             input.data=realloc(input.data, input.capacity*=2);
+ 
+ 
+-    #pragma omp parallel
+     {
+         pcre2_match_context * mcontext=pcre2_match_context_create(NULL);
+         pcre2_jit_stack * const stack=pcre2_jit_stack_create(16384, 16384, NULL);
+@@ -117,7 +116,6 @@
+ 
+         // Find all sequence descriptions and new lines in input, replace them
+         // with empty strings, and store the result in the sequences string.
+-        #pragma omp single
+         {
+             replace(">.*\\n|\\n", "", &input, &sequences, mcontext, mdata);
+ 
+@@ -127,7 +125,6 @@
+ 
+         // Have one thread start working on performing all the replacements
+         // serially.
+-        #pragma omp single nowait
+         {
+             // We'll use two strings when doing all the replacements, searching
+             // for patterns in prereplace_String and using postreplace_String to
+@@ -171,7 +168,6 @@
+ 
+         // Iterate through all the count patterns in count_Info[] and perform
+         // the counting for each one on a different thread if available.
+-        #pragma omp for schedule(dynamic) ordered
+         for(int i=0; i<sizeof(count_Info)/sizeof(char *); i++){
+ 
+             int errorcode, count=0;
+@@ -197,7 +193,6 @@
+             pcre2_code_free(regex);
+ 
+             // Print the count for each pattern in the correct order.
+-            #pragma omp ordered
+             printf("%s %d\n", count_Info[i], count);
+         }
+ 
