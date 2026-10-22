@@ -86,7 +86,8 @@ tools/profile/build.sh /path/to/native/emlf "$PWD" "$PWD/.mlf-build/profile"
 /usr/bin/time -l .mlf-build/profile/profile \
   "$PWD/bootstrap/Main.emlf" "$PWD/bootstrap" \
   > .mlf-build/profile/self.ll 2> .mlf-build/profile/phases.jsonl
-/path/to/native/emlf -i bootstrap --emit-llvm-gc bootstrap/Main.emlf \
+args=(); for library in libraries/*; do args+=( -i "$library" ); done
+/path/to/native/emlf "${args[@]}" --emit-llvm-gc bootstrap/Main.emlf \
   > .mlf-build/profile/ordinary.ll
 cmp .mlf-build/profile/self.ll .mlf-build/profile/ordinary.ll
 ```
@@ -195,5 +196,6 @@ itself. Supply the second generation to `build-pgo.sh`:
 ```
 
 Use fresh directories. Build the current `mlfpkg` executable as well before
-running the six `compiler-test` groups, so their coverage checks come from the
+running the six root `mlfpkg test --target GROUP` campaigns. Each campaign builds
+the test-owned `compiler-tests` executable, so its coverage checks come from the
 same source snapshot as the compiler and tests.

@@ -1,5 +1,6 @@
 module Tests.Figure12Suite where
 import Bootstrap.Types
+import qualified Tests.Coverage as Coverage
 import Bootstrap.Compiler
 import Tests.Figure12
 import qualified Bootstrap.Std as S
@@ -34,7 +35,7 @@ testCase c = do
    checkOutput result
    return "accepted; checked xMLF roundtrip"
 runTest : Pair String (IO String) -> IO Unit
-runTest (Pair label action) = do { result <- action; putStrLn ("PASS " ++ label ++ "  " ++ result) }
+runTest (Pair label action) = do { result <- action; Coverage.passed "figure12" label; putStrLn ("PASS " ++ label ++ "  " ++ result) }
 runCases : Map String (Pair String String) -> List (Pair String String) -> List Case -> IO (List (Pair String String))
 runCases seen reused pending = case pending of
  Nil -> return (S.reverse reused)
@@ -43,10 +44,12 @@ runCases seen reused pending = case pending of
   let key = (if expectedAcceptance c then "accept:" else "reject:") ++ source
   case Map.lookup compareString key seen of
    Just (Pair original result) -> do
+    Coverage.alias "figure12" (caseId c) original
     putStrLn ("PASS " ++ caseId c ++ "  " ++ expression c ++ "  " ++ result ++ "; shared with " ++ original)
     runCases seen (Cons (Pair (caseId c) original) reused) rest
    Nothing -> do
     result <- testCase c
+    Coverage.passed "figure12" (caseId c)
     putStrLn ("PASS " ++ caseId c ++ "  " ++ expression c ++ "  " ++ result)
     runCases (Map.insert compareString key (Pair (caseId c) result) seen) reused rest
 typed : String -> XType -> IO String
@@ -56,9 +59,12 @@ identity : XType
 identity = (XForall (XTyVar 0) XBot (XArrow (XVar (XTyVar 0)) (XVar (XTyVar 0))))
 
 typeChecks : (List ( (Pair (String) (IO String)) ))
+-- A2 owns the choose-id principal bound and target roundtrip checks; Core's
+-- former byte-identical source and expected type no longer compile separately.
 typeChecks = (Cons (Pair "A1 principal type" (typed "\\x y -> y" (XForall (XTyVar 1) XBot (XForall (XTyVar 2) identity (XArrow (XVar (XTyVar 1)) (XVar (XTyVar 2))))))) (Cons (Pair "A2 principal type" (typed "let choose = ((\\x y -> x) : forall a. a -> a -> a) in let id = \\x -> x in choose id" (XForall (XTyVar 1) identity (XArrow (XVar (XTyVar 1)) (XVar (XTyVar 1)))))) (Cons (Pair "A4 inferred result bound" (typed "\\(x : forall a. a -> a) -> x x" (XForall (XTyVar 1) identity (XArrow identity (XVar (XTyVar 1)))))) (Cons (Pair "A4 admits paper signature" (typed "(\\(x : forall a. a -> a) -> x x) : (forall a. a -> a) -> (forall a. a -> a)" (XArrow identity identity))) Nil))))
 main : IO Unit
 main = do
+ Coverage.begin "figure12" true
  let names = S.map caseId cases
  let rows = S.nubBy eqString (S.map (\name -> H.stringTakeWhile (\c -> S.not (c == 46)) name) names)
  let wanted = S.concat (Cons (S.map (\i -> "A" ++ showInt i) (S.range 1 13)) (Cons (S.map (\i -> "B" ++ showInt i) (S.range 1 7)) (Cons (O.words "C1a C1b C1c C2") (Cons (S.concatMap (\i -> S.map (\suffix -> "E" ++ showInt i ++ suffix) (Cons "a" (Cons "b" Nil))) (S.range 1 5)) Nil))))
@@ -87,3 +93,6 @@ main = do
  putStrLn "43/43 expressions match regression expectations; 0 failures"
  putStrLn "41 distinct Figure12 executions; 2 repeated paper labels share checked results"
  putStrLn "36 supplementary checks; 0 failures"
+ Coverage.metric "figure12" "paper-rows" (S.length rows)
+ Coverage.metric "figure12" "paper-expressions" (S.length names)
+ Coverage.finish "figure12"

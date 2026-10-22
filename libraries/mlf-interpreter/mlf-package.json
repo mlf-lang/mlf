@@ -1,0 +1,21 @@
+{
+  "format": 1,
+  "name": "mlf-interpreter",
+  "version": "0.3.0",
+  "dependencies": {
+    "mlf-foundation": {
+      "path": "../mlf-foundation"
+    },
+    "mlf-language-core": {
+      "path": "../mlf-language-core"
+    },
+    "mlf-xmlf": {
+      "path": "../mlf-xmlf"
+    }
+  },
+  "library": {
+    "modules": {
+      "Bootstrap.Runtime": "Bootstrap/Runtime.emlf"
+    }
+  }
+}

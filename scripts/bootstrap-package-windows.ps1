@@ -29,6 +29,10 @@ foreach ($entry in @(@('gmp','6.3.0','gmp'),@('bdw-gc','8.2.12','gc'))) {
 }
 & $Clang -O2 -std=c11 -Wall -Wextra -Werror -municode "$root/runtime/mlf_windows_host.c" -o "$Output/bin/mlf-host.exe"
 if ($LASTEXITCODE) { throw 'Windows filesystem helper build failed' }
+& $Clang -O2 -std=c11 -Wall -Wextra -Werror -municode "$root/runtime/mlf_build_runner.c" -lpsapi -o "$Output/bin/mlf-build-runner.exe"
+if ($LASTEXITCODE) { throw 'Windows build runner build failed' }
+$protocol = (& "$Output/bin/mlf-build-runner.exe" --protocol-version | Out-String).Trim()
+if ($LASTEXITCODE -or $protocol -ne '1') { throw 'Unsupported build runner protocol' }
 & $Clang -O2 -std=c11 "-I$Output/include" -c "$Output/runtime/mlf_runtime.c" -o "$Output/evidence/runtime.o"
 if ($LASTEXITCODE) { throw 'Windows runtime build failed' }
 $version = (& $Clang --version | Out-String)
@@ -36,7 +40,7 @@ if ($LASTEXITCODE) { throw 'Cannot identify Clang' }
 $irFlags = @()
 if ($version -match 'clang version (\d+)' -and [int]$Matches[1] -lt 15) { $irFlags = @('-mllvm','-opaque-pointers') }
 $identity = [ordered]@{complete=$false;implementation='MLF';compiler_sha256=(Get-FileHash -LiteralPath $Compiler).Hash.ToLower();clang=$version;sources=@{}}
-foreach ($source in (Get-ChildItem "$root/package" -Recurse -File -Filter '*.emlf')) {
+foreach ($source in (Get-ChildItem "$root/package","$root/libraries" -Recurse -File -Filter '*.emlf')) {
     $identity.sources[[IO.Path]::GetRelativePath($root,$source.FullName)] = (Get-FileHash -LiteralPath $source.FullName).Hash.ToLower()
 }
 $report = "$Output/evidence/package-manager-bootstrap.json"
@@ -47,7 +51,8 @@ $start.CreateNoWindow = $true
 $start.WorkingDirectory = $root
 $start.RedirectStandardOutput = $true
 $start.RedirectStandardError = $true
-foreach ($arg in @('-i','bootstrap','-i','package','--emit-llvm-gc','package/Main.emlf')) { $start.ArgumentList.Add($arg) }
+foreach ($library in (Get-ChildItem "$root/libraries" -Directory | Sort-Object Name)) { $start.ArgumentList.Add('-i'); $start.ArgumentList.Add($library.FullName) }
+foreach ($arg in @('--emit-llvm-gc','package/Main.emlf')) { $start.ArgumentList.Add($arg) }
 $process = [Diagnostics.Process]::Start($start)
 $errors = $process.StandardError.ReadToEndAsync()
 $stream = [IO.File]::Create("$Output/evidence/mlfpkg.ll")
@@ -62,6 +67,8 @@ foreach ($entry in $identity.sources.GetEnumerator()) {
 }
 $identity.complete = $true
 $identity.manager_sha256 = (Get-FileHash "$Output/bin/mlfpkg.exe").Hash.ToLower()
+$identity.build_runner_sha256 = (Get-FileHash "$Output/bin/mlf-build-runner.exe").Hash.ToLower()
+$identity.build_runner_protocol = 1
 $identity.helper_sha256 = (Get-FileHash "$Output/bin/mlf-host.exe").Hash.ToLower()
 $identity.llvm_sha256 = (Get-FileHash "$Output/evidence/mlfpkg.ll").Hash.ToLower()
 $identity | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8NoBOM $report

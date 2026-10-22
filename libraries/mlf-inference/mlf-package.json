@@ -1,0 +1,31 @@
+{
+  "format": 1,
+  "name": "mlf-inference",
+  "version": "0.3.0",
+  "dependencies": {
+    "mlf-foundation": {
+      "path": "../mlf-foundation"
+    },
+    "mlf-frontend": {
+      "path": "../mlf-frontend"
+    },
+    "mlf-language-core": {
+      "path": "../mlf-language-core"
+    },
+    "mlf-xmlf": {
+      "path": "../mlf-xmlf"
+    }
+  },
+  "library": {
+    "modules": {
+      "Bootstrap.Classes": "Bootstrap/Classes.emlf",
+      "Bootstrap.Compiler": "Bootstrap/Compiler.emlf",
+      "Bootstrap.CompilerCore": "Bootstrap/CompilerCore.emlf",
+      "Bootstrap.Constraint": "Bootstrap/Constraint.emlf",
+      "Bootstrap.Elaborate": "Bootstrap/Elaborate.emlf",
+      "Bootstrap.Evidence": "Bootstrap/Evidence.emlf",
+      "Bootstrap.Graph": "Bootstrap/Graph.emlf",
+      "Bootstrap.Graph.Solver": "Bootstrap/Graph/Solver.emlf"
+    }
+  }
+}

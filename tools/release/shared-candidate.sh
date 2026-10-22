@@ -39,6 +39,13 @@ verify() {
     [[ "$key" =~ ^[0-9a-f]{64}$ ]]
     cmp ".mlf-build/bin/$tool" ".mlf-build/cache/$key/program"
   done
+  # The native runner travels with the exact compiler/manager pair. It has no
+  # MLF artifact key, so bind its published bytes directly to the manifest.
+  jq -e --arg path "$PWD/.mlf-build/bin/mlf-build-runner" '.inputs[$path] | test("^[0-9a-f]{64}$")' "$shared/manifest.json" >/dev/null
+  test "$(.mlf-build/bin/mlf-build-runner --protocol-version)" = 1
+  runner_hash=$(sha256 .mlf-build/bin/mlf-build-runner | awk '{print $1}')
+  jq -se --arg hash "$runner_hash" 'all(.[]; all(.scheduler[]?; .helper.sha256 == $hash))' \
+    .mlf-build/build-report.json .mlf-build/prerequisites/tests/build-report.json >/dev/null
   dependency_inputs > "$shared/dependency-inputs.tsv"
   verify_dependencies "$shared/dependency-inputs.tsv"
 }
@@ -58,7 +65,7 @@ case "$mode" in
           ($t.runtime | hashes[]), ($t.gmp.libraries | hashes[]), ($t.gmp.headers | hashes[]),
           (.native_inputs[]? | (.libraries | hashes[]), (.headers | hashes[])) ] | from_entries)}
     ' .mlf-build/build-report.json .mlf-build/prerequisites/tests/build-report.json > "$shared/manifest.json"
-    for item in bin/emlf bin/mlfpkg build-report.json prerequisites/tests/build-report.json; do
+    for item in bin/emlf bin/mlfpkg bin/mlf-build-runner build-report.json prerequisites/tests/build-report.json; do
       path="$PWD/.mlf-build/$item"
       hash=$(sha256 "$path" | awk '{print $1}')
       jq --arg path "$path" --arg hash "$hash" '.inputs[$path] = $hash' "$shared/manifest.json" > "$shared/manifest.tmp"
@@ -96,7 +103,7 @@ case "$mode" in
     done < "$shared/entries.txt"
     tar -xzf "$shared/outputs.tar.gz"
     verify
-    printf 'MLF_COMPILER=%s/.mlf-build/bin/emlf\nMLF_PACKAGE_MANAGER=%s/.mlf-build/bin/mlfpkg\nMLF_CI_SHARED_CANDIDATE=1\n' "$PWD" "$PWD" >> "${GITHUB_ENV:?}"
+    printf 'MLF_COMPILER=%s/.mlf-build/bin/emlf\nMLF_PACKAGE_MANAGER=%s/.mlf-build/bin/mlfpkg\nMLF_BUILD_RUNNER=%s/.mlf-build/bin/mlf-build-runner\nMLF_CI_SHARED_CANDIDATE=1\n' "$PWD" "$PWD" "$PWD" >> "${GITHUB_ENV:?}"
     ;;
   verify) verify ;;
   *) exit 2 ;;

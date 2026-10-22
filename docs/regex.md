@@ -1,7 +1,7 @@
 # Regular expressions
 
-`Bootstrap.Regex` is a reusable MLF module. Import it from the `mlf-bootstrap`
-package, or add `-i bootstrap` when compiling a source file directly. It runs
+`Bootstrap.Regex` is a reusable MLF module. Import it from the `mlf-foundation`
+package, or add `-i libraries/mlf-foundation` when compiling a source file directly. It runs
 unchanged in the interpreter and native backend and needs no foreign library.
 
 The public API is:

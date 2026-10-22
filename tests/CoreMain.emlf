@@ -1,14 +1,17 @@
 module CoreMain where
 import Bootstrap.Types
+import qualified Tests.Coverage as Coverage
 import qualified Bootstrap.Std as S
 import qualified Tests.Core as T
 import qualified Tests.Helpers as H
 import qualified Package.OS as O
 main : IO Unit
 main = do
+ args <- O.allArguments
+ Coverage.begin "core" (S.null args)
  -- The port's String adapter must retain empty, overlapping, Unicode and NUL
  -- substring semantics independently of the compiler's diagnostic strings.
- S.mapM_ (\(Triple needle text expected) -> O.require (H.eq (H.contains needle text) expected) "substring adapter differs from scalar substring semantics")
+ Coverage.mapCounted "core" "substring-executed" (\(Triple needle text expected) -> O.require (H.eq (H.contains needle text) expected) "substring adapter differs from scalar substring semantics")
   (Cons (Triple "" "" true)
   (Cons (Triple "" "abc" true)
   (Cons (Triple "a" "" false)
@@ -22,15 +25,15 @@ main = do
   (Cons (Triple "😀λ" "λ😀" false)
   (Cons (Triple "a\0b" "xa\0by" true)
   (Cons (Triple "a\0c" "xa\0by" false) Nil)))))))))))))
- args <- O.allArguments
  cases <- case args of
   Nil -> do
-   O.require (S.length T.suite == 686) "preserved core test coverage changed"
+   O.require (S.length T.suite == 684) "preserved core test coverage changed"
    return T.suite
   Cons "--from" (Cons prefix Nil) -> do
    let selected = S.dropWhile (\entry -> S.not (O.starts prefix (S.fst entry))) T.suite
    O.require (S.not (S.null selected)) ("unknown test prefix: " ++ prefix)
    return selected
   _ -> O.fatal "core [--from LABEL-PREFIX]"
- S.mapM_ (\(Pair label action) -> do { action; putStrLn ("PASS " ++ label) }) cases
+ S.mapM_ (\(Pair label action) -> do { action; Coverage.passed "core" label; putStrLn ("PASS " ++ label) }) cases
  putStrLn (showInt (S.length cases) ++ " checks; 0 failures")
+ Coverage.finish "core"

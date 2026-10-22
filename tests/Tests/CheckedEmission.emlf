@@ -48,7 +48,7 @@ opaque : IO Unit
 opaque = System.withScratch (\directory -> S.mapM_ (\(Pair moduleName constructor) -> do
   let file = directory ++ "/Main.emlf"
   writeFile file ("module Main where\nimport qualified " ++ moduleName ++ " as Private\nmain = Private." ++ constructor ++ "\n")
-  result <- C.compileFile (Cons "bootstrap" Nil) file
+  result <- C.compileFile (O.words "libraries/mlf-foundation libraries/mlf-language-core libraries/mlf-frontend libraries/mlf-xmlf libraries/mlf-inference libraries/mlf-interpreter libraries/mlf-llvm libraries/mlf-crates") file
   case result of
     Left (CompileError ModuleResolution message) -> H.assert (H.contains "not in scope" message || H.contains "not exported" message) ("unexpected privacy error: " ++ message)
     _ -> H.fail "private checked constructor escaped module resolution")

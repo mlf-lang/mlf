@@ -10,10 +10,11 @@ right result = case result of
   Right value -> ioReturn value
 main = do
   file <- getArg 0
-  root <- getArg 1
+  count <- getArgCount
+  paths <- S.mapM getArg (S.range 1 (count - 1))
   source <- readFile file
   parsed <- right (P.parseModule file source)
-  loaded <- Modules.loadModuleFiles (Cons root (Cons "tools/profile" Nil)) parsed
+  loaded <- Modules.loadModuleFiles (S.snoc paths "tools/profile") parsed
   modules <- right loaded
   LinkedModule _ names _ _ <- right (Modules.linkModules ImplicitPrelude modules)
   S.mapM_ (\(Pair internal display) -> putStrLn (internal ++ "\t" ++ display)) (M.toList names)

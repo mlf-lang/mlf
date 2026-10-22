@@ -1,0 +1,59 @@
+module Tests.CoverageChecks where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.Json as J
+import qualified Tests.Basic as H
+import qualified Tests.Coverage as C
+
+-- Independent, literal fixtures: neither the reporter nor a candidate suite
+-- supplies this validator's expected inventory or its successful report.
+inventoryText = "{\"schema_version\":1,\"suites\":{\"probe\":{\"executions\":[\"first\",\"second\"],\"aliases\":{\"repeated\":\"first\"},\"metrics\":{\"oracle-executed\":3}}}}"
+reportText = "{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"start\",\"scope\":\"full\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"case\",\"id\":\"first\",\"status\":\"passed\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"case\",\"id\":\"second\",\"status\":\"passed\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"alias\",\"id\":\"repeated\",\"canonical\":\"first\",\"status\":\"passed\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"metric\",\"name\":\"oracle-executed\",\"value\":3}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"summary\",\"complete\":true,\"executions\":2,\"aliases\":1,\"metrics\":1}\n"
+render rows = S.intercalate "\n" (S.map J.render rows) ++ "\n"
+change index f rows = S.map (\(Pair i row) -> if i == index then f row else row) (S.zip (S.range 0 (S.length rows - 1)) rows)
+without index rows = S.map S.snd (S.filter (\(Pair i _) -> i /= index) (S.zip (S.range 0 (S.length rows - 1)) rows))
+rejected inventory text = case C.validate inventory "probe" text of
+ Left _ -> return Unit
+ Right _ -> H.fail "damaged structural coverage evidence was accepted"
+main : IO Unit
+main = do
+ callbacks <- newIntArray 1 0
+ completed <- C.count (\value -> do { before <- readIntArray callbacks 0; writeIntArray callbacks 0 (before + value) }) (Cons 2 (Cons 4 (Cons 8 Nil))) 0
+ observed <- readIntArray callbacks 0
+ H.assert (completed == 3 && observed == 14) "coverage counter skipped or repeated callback execution"
+ inventory <- H.right (J.parse inventoryText)
+ evidence <- H.right (C.parse reportText)
+ accepted <- H.right (C.validate inventory "probe" reportText)
+ H.assert (J.equal (J.get "executions" accepted) (J.num 2) && J.equal (J.get "aliases" accepted) (J.num 1) && J.equal (J.get "oracle-executed" (J.get "metrics" accepted)) (J.num 3)) "structural coverage result lost observed counts"
+ -- Missing, duplicate and substituted IDs still fail after making the summary
+ -- agree with the damaged event stream: counts alone cannot certify coverage.
+ let missing = change 4 (J.set "executions" (J.num 1)) (without 1 evidence)
+ let duplicate = change 1 (J.set "id" (J.str "second")) evidence
+ let unknown = change 1 (J.set "id" (J.str "unknown")) evidence
+ S.mapM_ (\rows -> rejected inventory (render rows)) (Cons missing (Cons duplicate (Cons unknown Nil)))
+ S.mapM_ (\status -> rejected inventory (render (change 1 (J.set "status" (J.str status)) evidence))) (Cons "failed" (Cons "skipped" (Cons "unknown" Nil)))
+ rejected inventory (render (change 0 (J.set "scope" (J.str "partial")) evidence))
+ rejected inventory (render (S.init evidence))
+ rejected inventory ""
+ rejected inventory (reportText ++ "truncated {\n")
+ rejected inventory (render (S.snoc evidence (S.last evidence)))
+ rejected inventory (render (change 5 (J.set "complete" (J.Boolean false)) evidence))
+ rejected inventory (render (change 5 (J.set "executions" (J.num 7)) evidence))
+ rejected inventory (render (change 2 (J.set "schema_version" (J.num 2)) evidence))
+ rejected inventory (render (change 2 (J.set "suite" (J.str "other")) evidence))
+ rejected inventory (render (change 2 (J.set "extra" (J.Boolean true)) evidence))
+ -- An alias must name the reviewed canonical execution, which must have
+ -- actually completed earlier. Aliases cannot certify one another or a cycle.
+ S.mapM_ (\target -> rejected inventory (render (change 3 (J.set "canonical" (J.str target)) evidence))) (Cons "second" (Cons "missing" (Cons "repeated" Nil)))
+ rejected inventory (render (Cons (S.head evidence) (Cons (S.index evidence 3) (Cons (S.index evidence 1) (Cons (S.index evidence 2) (S.drop 4 evidence))))))
+ rejected inventory (render (change 3 (J.set "id" (J.str "first")) evidence))
+ rejected inventory (render (change 4 (J.set "aliases" (J.num 0)) (without 3 evidence)))
+ rejected inventory (render (change 4 (J.set "value" (J.num 2)) evidence))
+ rejected inventory (render (change 4 (J.set "value" (J.str "3")) evidence))
+ rejected inventory (render (change 4 (J.set "name" (J.str "unreviewed")) evidence))
+ rejected inventory (render (without 4 evidence))
+ rejected inventory (render (S.append (S.take 5 evidence) (Cons (S.index evidence 4) (S.drop 5 evidence))))
+ let changedSuite = J.set "executions" (J.stringArray (Cons "first" Nil)) (J.get "probe" (J.get "suites" inventory))
+ let changedInventory = J.set "suites" (J.Object (Cons (Pair "probe" changedSuite) Nil)) inventory
+ rejected changedInventory reportText
+ putStrLn "Structural coverage validator contracts passed"

@@ -33,7 +33,7 @@ build and test path needs no GHC, Cabal, or Python.
 
 The seed used with the current manager must support `--compile-crate`. When
 migrating from the earlier module compiler, keep its matching native `mlfpkg`
-and use that manager for the first generation:
+and use that manager in its matching earlier source checkout for the first generation:
 
 ```sh
 /path/to/previous/mlfpkg --compiler /path/to/previous/emlf --timeout 21600 \
@@ -67,7 +67,19 @@ and `.mlf-build/bin/mlfpkg`. Keep the stage-1 tools selected as the package
 manager's inputs, in their separate directory, when rebuilding or testing the
 repository. Use `EMLF_BIN` to run the candidate compiler. Global package-manager
 options go before `build`, `test`, or `run`; `--build-dir DIR` selects the output
-directory.
+directory. `--jobs N` bounds concurrent build actions; the initial default is 1.
+For example, `./mlfpkg --jobs 4 build --target emlf` builds the compiler with
+at most four active actions. Arbitrary test commands still run serially.
+
+The bootstrap also builds `mlf-build-runner` beside the manager. Keep that helper
+with the manager when moving native tools. The compiler and package libraries
+now live under `libraries/mlf-*/`, with one manifest per library and unchanged
+`Bootstrap.*` / `Package.*` names. `bootstrap/` and `package/` retain entry
+points and compiler drivers. The root targets explicitly select their library
+dependencies, so `emlf` does not wait for developer tooling. Rebuild the manager
+with the current bootstrap script before using these manifests with an older
+installed manager. See the [package manager guide](docs/package-manager.md) for
+the ten-library layout, dependency selection, and scheduling evidence.
 
 The package manager compiles each library and executable as a crate. Modules
 inside a crate are namespaces and may import one another cyclically. Value
@@ -680,7 +692,7 @@ case structure while removing declarations and type arguments.
 ## Standard prelude
 
 Every compiler entry point imports a small standard prelude from
-[`Bootstrap.Prelude`](bootstrap/Bootstrap/Prelude.emlf). It supplies this class, its `IO` instance,
+[`Bootstrap.Prelude`](libraries/mlf-frontend/Bootstrap/Prelude.emlf). It supplies this class, its `IO` instance,
 and an instance for local state, `Monad (ST s)`:
 
 ```haskell

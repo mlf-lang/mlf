@@ -11,9 +11,15 @@ if [[ -e "$out/profile" || -e "$out/profile.ll" ]]; then
 fi
 mkdir -p "$out"
 gc=${MLF_GC_PREFIX:-$root/dist-newstyle/bootstrap-deps/bdwgc-8.2.12-install}
+source_args=()
+source_paths=()
+for library in "$source_root"/libraries/*; do
+  source_args+=( -i "$library" )
+  source_paths+=( "$library" )
+done
 stack=()
 if [[ $(uname -s) == Darwin ]]; then stack=("-Wl,-stack_size,0x10000000"); fi
-"$seed" -i "$source_root/bootstrap" -i "$root/tools/profile" --emit-llvm-gc "$root/tools/profile/Main.emlf" > "$out/profile.ll"
+"$seed" "${source_args[@]}" -i "$root/tools/profile" --emit-llvm-gc "$root/tools/profile/Main.emlf" > "$out/profile.ll"
 # shellcheck disable=SC2046
 clang -O2 -std=c11 -DMLF_USE_BDWGC -DMLF_COMPACT_BDWGC -DMLF_GC_THRESHOLD=1048576 -I"$source_root/runtime" -I"$gc/include" $(pkg-config --cflags gmp) -c "$root/tools/profile/runtime.c" -o "$out/runtime.o"
 # shellcheck disable=SC2046

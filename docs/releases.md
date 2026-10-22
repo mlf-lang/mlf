@@ -63,7 +63,7 @@ unchanged. Keep the whole package when using its `bin` directory directly.
 ## Prepare the next release
 
 For a release on all three platforms, update `VERSION`,
-`bootstrap/Bootstrap/Version.emlf`, the four toolchain manifests,
+`libraries/mlf-foundation/Bootstrap/Version.emlf`, the toolchain manifests,
 and `CHANGELOG.md`, then regenerate `mlf.lock`. Change the version in
 `.github/release-request.json` and commit the reviewed candidate on `main`.
 The **Cross-platform release** workflow checks out that immutable commit,
@@ -160,12 +160,13 @@ toolchain natively. No compiler inference/checking is bypassed. Linux and
 macOS require all six native compiler groups and a fresh self-host fixed point.
 Windows requires fresh compiler and manager LLVM fixed points, 7,086 independent
 parity cases and 160 interpreter/native executions, compact-GC runtime tests,
-18 native resolver checks, 29 native package integration cases, and SDK relocation and native
-executable checks. Its internal POSIX `compiler-test` transports and historical
+22 native resolver checks, 29 native package integration cases, the separate
+target-dependency/scheduler fixture, and SDK relocation and native executable
+checks. Its internal POSIX `compiler-tests` transports and historical
 performance gates are not claimed as Windows qualification. Each archive
 retains the exact source/tool hashes and platform evidence.
 
-The quick PR package smoke uses the separate `.github/smoke-seed.env` pin for
+The PR compiler smoke uses the separate `.github/smoke-seed.env` pin for
 released compact-GC tools compatible with the current runtime. Its archive,
 source commit and both executables are checked. `.github/seed.env` remains the
 historical cold-bootstrap anchor for release qualification and comparisons.
@@ -182,10 +183,29 @@ used the following sequence:
    verifies a fresh self-host fixed point, tests relocation and installation,
    then uploads a new developer-preview release with SHA-256 checksums.
 
-CI on `main` and pull requests checks release metadata, downloads the pinned
-native seed in `.github/seed.env`, and builds checkout example packages on both
-interpreter and LLVM. This fast check verifies installation and local package
-integration; it does not rebuild or validate modified compiler implementations.
+CI on `main`, pull requests and merge queues checks release metadata and workflow
+syntax and runs five current-source compiler cases with the verified v0.3.0 seed
+in `.github/smoke-seed.env`. The seed interprets the checkout frontend and current
+and frozen target checkers; this check does not build fresh tools or execute the
+checkout LLVM backend. The Windows runtime job also runs, and the native build
+runner's 22 scheduling and lifecycle tests run on both Linux and macOS. The
+aggregate **PR gate** requires metadata, source smoke, Windows runtime, and both
+build-runner matrix jobs to succeed; configure it as a required status check on
+`main` to enforce merge blocking.
+
+Pushes to `main` and manual CI dispatches with `full_validation` enabled also run
+two separate jobs after the source check. **Fresh native compiler smoke** builds
+the checkout compiler and manager through the seed-compatible manager bridge,
+then runs eight direct CLI cases and three package build/cache states. **Native package distribution** builds the checkout
+manager and test campaign with the published compiler pinned in
+`.github/package-seed.env`, then requires all 22 resolver checks, 29 package
+integration cases and 28 checked-release/distribution cases with structural
+coverage, plus the separate target-dependency/scheduler fixture and 22 native
+runner checks. These slower jobs are not merge prerequisites. Metadata retains eight
+required publishing regression checks. The extended native harness remains
+available with `tools/release/native-ci.sh extended-pr-smoke`; all six release
+groups retain their coverage.
+See [PR checks](ci.md) for exact coverage, local commands and required-check setup.
 Dispatch **CI** with `self_host` enabled for a fresh compiler build and fixed
 point, or **Native release** for all six compiler groups. These full checks are
 manual because compilation on hosted M1 runners can exceed 30 minutes per stage.
@@ -197,7 +217,8 @@ unchanged. Native release publication still requires every group to pass.
 No workflow installs GHC or invokes Python. Compiler, parity and package
 qualification runs in native MLF on every supported platform. Seed
 downloads check the selected published archive checksum and both
-independently pinned native executable hashes. CI now pins v0.1.1. Release jobs
+independently pinned native executable hashes. Full release/self-host bootstraps
+retain v0.1.1 in `.github/seed.env`. Release jobs
 read seed pins and verification/timing tools from the workflow's immutable
 commit, so an older target tag cannot silently select its old seed. The checksum
 file can also cover supplementary validation archives that are not downloaded

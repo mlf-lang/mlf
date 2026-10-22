@@ -1,0 +1,20 @@
+module Test.Case where
+import Bootstrap.Types
+import qualified Test.Assert as A
+
+-- IDs are stable machine identities; names remain human-readable labels.
+data Case = Case String String (List String) (A.Test Unit)
+test : String -> String -> List String -> A.Test Unit -> Case
+test identity label labels body = Case identity label labels body
+id : Case -> String
+id (Case identity _ _ _) = identity
+name : Case -> String
+name (Case _ label _ _) = label
+tags : Case -> List String
+tags (Case _ _ labels _) = labels
+action : Case -> A.Test Unit
+action (Case _ _ _ body) = body
+fromIO : String -> List String -> Pair String (IO Unit) -> Case
+fromIO identity labels (Pair label body) = test identity label labels (A.liftIO body)
+toLegacy : Case -> Pair String (IO Unit)
+toLegacy entry = Pair (name entry) (A.orExit (action entry))
