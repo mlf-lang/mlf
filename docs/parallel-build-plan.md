@@ -6,7 +6,7 @@ Status: implemented in this branch; release qualification remains a separate gat
 `--jobs 1` as the default. `Package.Scheduler` resolves and deduplicates actions,
 serializes the graph once, and launches one-action workers through
 `mlf-build-runner`. Worker receipts and reports live under
-`<build>/invocation/jobs/`; the coordinator validates them and the original
+`<build>/invocations/<nonce>/jobs/`; the coordinator validates them and the original
 inputs before publishing binaries. Test commands still execute serially.
 
 The ten libraries now live under `libraries/`. Targets may select an explicit
