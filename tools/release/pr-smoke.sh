@@ -51,6 +51,45 @@ jq -e --arg compiler "$compiler_sha256" --arg manager "$manager_sha256" \
   (.matrices["compact-gc"] | .rows == 12 and .backend_names == ["interpreter","llvm"]) and
   (.package_smoke | .cases == 3 and .backends == ["interpreter","llvm"])
 ' "$build/tests/verification.json" >/dev/null
+# Retain and validate the checked driver cache decisions for this campaign.
+driver_report="$build/tests/driver-build/build-report.json"
+driver_hash=$(sha256 "$driver_report")
+# Builder.manager is the executing compiler-tests binary, not mlfpkg.
+jq -se --arg group pr-smoke --arg driver_hash "$driver_hash" '
+    def digest: type == "string" and test("^[0-9a-f]{64}$");
+    .[0] as $v | .[1] as $b |
+    $v.group == $group and $v.driver_build.sha256 == $driver_hash and
+    ($v.driver_build.sha256 | digest) and
+    ($v.compiler_sha256 | digest) and ($v.runner_sha256 | digest) and
+    all([$v.compiler,$v.runner,$b.cache_directory][]; type == "string" and startswith("/")) and
+    $b.format == 1 and $b.complete == true and $b.implementation == "MLF" and
+    $b.toolchain.compiler.path == $v.compiler and
+    $b.toolchain.compiler.sha256 == $v.compiler_sha256 and
+    $b.toolchain.manager.path == $v.runner and
+    $b.toolchain.manager.sha256 == $v.runner_sha256 and
+    ($b.builds | type == "array" and length > 0) and
+    ($v.drivers | keys) == (if $group == "port" then ["LLVMDriver"] else ["LLVMDriver","RuntimeDriver"] end) and
+    all($v.drivers | to_entries[];
+      .key as $name | .value as $driver |
+      $driver.frontend == "source" and
+      ($driver.sha256 | digest) and ($driver.llvm_sha256 | digest) and
+      ($driver.artifacts | keys) ==
+        (if $name == "RuntimeDriver" then ["linked","llvm","object","runtime","trace"] else ["linked","llvm","object","runtime"] end) and
+      all($driver.artifacts | to_entries[];
+        .key as $stage | .value as $receipt |
+        ($receipt | keys) == ["artifact_sha256","cached","directory","files","key","kind"] and
+        ($receipt.key | digest) and ($receipt.artifact_sha256 | digest) and
+        ($receipt.cached | type == "boolean") and
+        $receipt.directory == ($b.cache_directory + "/" + $receipt.key) and
+        $receipt.kind ==
+          (if $stage == "llvm" then "source " + $name + " LLVM" elif $stage == "object" then "LLVM object" elif $stage == "linked" then "test driver native link" else "test driver C object" end) and
+        any($b.builds[]; . == ($receipt | {kind,key,cached})) and
+        ($receipt.files | keys) ==
+          [if $stage == "llvm" then "program.ll" elif $stage == "object" then "program.o" elif $stage == "linked" then "program" else "object.o" end] and
+        all($receipt.files[]; digest)) and
+      $driver.artifacts.llvm.files["program.ll"] == $driver.llvm_sha256 and
+      $driver.artifacts.linked.files.program == $driver.sha256)
+' "$build/tests/verification.json" "$driver_report" >/dev/null
 # Changing expected stdout also changes the executable key. Require misses for
 # the dependency and downstream crates, whose keys do not contain test stdout.
 jq -e '
@@ -67,8 +106,10 @@ jq -n --arg commit "$(git rev-parse HEAD)" --argjson build_seconds "$build_secon
   --arg runner_sha256 "$runner_sha256" --arg framework_sha256 "$framework_sha256" \
   --arg coverage_sha256 "$coverage_sha256" --arg inventory_sha256 "$inventory_sha256" \
   --arg verification_sha256 "$(sha256 "$build/tests/verification.json")" \
+  --arg driver_build_sha256 "$driver_hash" \
   '{complete:true,commit:$commit,build_seconds:$build_seconds,total_seconds:$total_seconds,
     compiler_sha256:$compiler_sha256,manager_sha256:$manager_sha256,runner_sha256:$runner_sha256,
     framework_sha256:$framework_sha256,coverage_sha256:$coverage_sha256,
-    inventory_sha256:$inventory_sha256,verification_sha256:$verification_sha256}' > "$build/result.json"
+    inventory_sha256:$inventory_sha256,verification_sha256:$verification_sha256,
+    driver_build_sha256:$driver_build_sha256}' > "$build/result.json"
 cat "$build/result.json"

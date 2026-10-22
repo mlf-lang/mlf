@@ -55,7 +55,6 @@
         "let RHS sees outer binding",
         "application under an unannotated lambda",
         "K preserves its polymorphic return bound",
-        "choose id retains an MLF bound",
         "g g",
         "g g applied to identity",
         "g g retains its identity lower bound",
@@ -121,8 +120,7 @@
         "graph validation agrees with uncached reference",
         "graph validation checks deeply nested binding scopes",
         "graph validation checks shared higher-kinded subgraphs",
-        "indexed unification agrees with map-based reference",
-        "indexed graph analysis preserves sparse and negative identities",
+        "indexed unification and identity renaming agree with map-based reference",
         "indexed unification agrees on successive scoped expansions",
         "dependency traversal rejects structural cycles created by merging",
         "component solver matches every full-graph inference step",
@@ -770,7 +768,9 @@
         "test_regex_redux_requires_all_counts_lengths_order_and_exact_bytes",
         "test_native_dependency_headers_survive_suppressed_system_flags",
         "test_regex_redux_measured_native_source_matches_independent_oracle",
-        "test_regex_redux_measured_interpreter_source_matches_independent_oracle"
+        "test_regex_redux_measured_interpreter_source_matches_independent_oracle",
+        "test_source_dependency_cache_controls",
+        "test_checked_native_driver_cache"
       ],
       "aliases": {},
       "metrics": {
@@ -1078,6 +1078,73 @@
         "tests/Tests/BenchmarkSuite.emlf": "924c830419714c957e4ab9db491bc1acc81fa9844fee0eb0a579177c6d06f875",
         "tests/Tests/RegexRedux.emlf": "f409f229e19d115ff2c5b23aac2c9443e4b0c1bc8318c7d9517d1d4007805414",
         "tests/Tests/Regex.emlf": "b209422f83f58741e7290950e46ce7550ed70d3573a02d3a6f267c84b9074cdc"
+      }
+    },
+    {
+      "commit": "4af369df8d224563dfc05a7c16c16f0267ed710b",
+      "basis": "Source-reviewed upstream duplicate consolidation and two cache controls. The original inventory remains based on 5b930cb and the prior 91962c2 amendment. Candidate output never supplies expectations.",
+      "removed_core_ids": [
+        "choose id retains an MLF bound",
+        "indexed unification agrees with map-based reference",
+        "indexed graph analysis preserves sparse and negative identities"
+      ],
+      "added_core_ids": [
+        "indexed unification and identity renaming agree with map-based reference"
+      ],
+      "added_harness_ids": [
+        "test_source_dependency_cache_controls",
+        "test_checked_native_driver_cache"
+      ],
+      "canonical_owners": [
+        {
+          "removed_core_id": "choose id retains an MLF bound",
+          "suite": "figure12",
+          "id": "A2 principal type",
+          "preserved_assertions": "Identical choose-id source and expected principal bound; inferred type, target parsing, erased roundtrip equality and closed target checking."
+        },
+        {
+          "removed_core_id": "indexed unification agrees with map-based reference",
+          "suite": "core",
+          "id": "indexed unification and identity renaming agree with map-based reference"
+        },
+        {
+          "removed_core_id": "indexed graph analysis preserves sparse and negative identities",
+          "suite": "core",
+          "id": "indexed unification and identity renaming agree with map-based reference"
+        }
+      ],
+      "required_execution_counts": {
+        "core": {
+          "before": 686,
+          "after": 684
+        },
+        "harness": {
+          "before": 65,
+          "after": 67
+        }
+      },
+      "retained_graph_inputs": {
+        "canonical_cases": 5616,
+        "renamed_executions": 320,
+        "canonical_results_reused": 80,
+        "reference_comparisons": "Both existing map-reference comparisons remain in compareUnifiers; only repeat canonical execution is removed."
+      },
+      "unchanged_expectations": "All Figure12 IDs, aliases and counts, all other suite inventories and all required numeric oracle metrics remain unchanged. Canonical owners document consolidations and are not report aliases.",
+      "harness_completion_boundary": "HarnessMain records each added ID only after the complete parent control returns. The driver-cache child branch emits no structural completion.",
+      "upstream_validation": {
+        "record_commit": "71c47ee51b358add6722ae7ee72d1b78835f6a74",
+        "path": "docs/test-cache-cleanup-integration.json",
+        "tested_commit": "4af369df8d224563dfc05a7c16c16f0267ed710b",
+        "scope": "Historical upstream full-unit validation, including regex and the two cache controls. This record does not validate the merged framework tree."
+      },
+      "reviewed_source_sha256": {
+        "tests/CoreMain.emlf": "3ad0889a8e602d388d97503950b23ef07d4ab3d4ebf4c869ffbd9c14dc33689e",
+        "tests/HarnessMain.emlf": "af06692ed8cd7a6a8f59299da2f57f4d0d7758bee0503dc656b2078b254b5db5",
+        "tests/Tests/Core.emlf": "798705864c0037b75882357f5504a45313cc124f9954f62d6c8f7d5ade73a691",
+        "tests/Tests/GraphUnification.emlf": "8426976eee443988f030925a8af81ec37f1b4256bdc8a892c65a3dd4d6efb2ba",
+        "tests/Tests/Figure12Suite.emlf": "0449203e15602fd9572f3aa9916218b8383377015ce8b06d2d21d268840f518d",
+        "tests/Tests/TestSourceCache.emlf": "7b7ab4df4ef0228ad271c663baf613873c0c2d2de1abde59c97ea48f00a4ddfa",
+        "tests/Tests/TestDriverCache.emlf": "88292dd6d90e0f2c21debe221c609fdb43ddc0d0ad966ff8e04bd06c8137e044"
       }
     }
   ]

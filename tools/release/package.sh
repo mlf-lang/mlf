@@ -64,6 +64,49 @@ for group in $groups; do
       test "$(sha256 "$build/compiler-tests/$group/$suite.coverage.jsonl" | awk '{print $1}')" = "$expected"
     done
   fi
+  case "$group" in
+    backends|port)
+      # Read the retained local report, never the producer workspace path.
+      driver_report="$build/compiler-tests/$group/driver-build/build-report.json"
+      driver_hash=$(sha256 "$driver_report" | awk '{print $1}')
+      # Builder.manager identifies the executing campaign, not its nested CLI.
+      jq -se --arg group "$group" --arg driver_hash "$driver_hash" '
+    def digest: type == "string" and test("^[0-9a-f]{64}$");
+    .[0] as $v | .[1] as $b |
+    $v.group == $group and $v.driver_build.sha256 == $driver_hash and
+    ($v.driver_build.sha256 | digest) and
+    ($v.compiler_sha256 | digest) and ($v.runner_sha256 | digest) and
+    all([$v.compiler,$v.runner,$b.cache_directory][]; type == "string" and startswith("/")) and
+    $b.format == 1 and $b.complete == true and $b.implementation == "MLF" and
+    $b.toolchain.compiler.path == $v.compiler and
+    $b.toolchain.compiler.sha256 == $v.compiler_sha256 and
+    $b.toolchain.manager.path == $v.runner and
+    $b.toolchain.manager.sha256 == $v.runner_sha256 and
+    ($b.builds | type == "array" and length > 0) and
+    ($v.drivers | keys) == (if $group == "port" then ["LLVMDriver"] else ["LLVMDriver","RuntimeDriver"] end) and
+    all($v.drivers | to_entries[];
+      .key as $name | .value as $driver |
+      $driver.frontend == "source" and
+      ($driver.sha256 | digest) and ($driver.llvm_sha256 | digest) and
+      ($driver.artifacts | keys) ==
+        (if $name == "RuntimeDriver" then ["linked","llvm","object","runtime","trace"] else ["linked","llvm","object","runtime"] end) and
+      all($driver.artifacts | to_entries[];
+        .key as $stage | .value as $receipt |
+        ($receipt | keys) == ["artifact_sha256","cached","directory","files","key","kind"] and
+        ($receipt.key | digest) and ($receipt.artifact_sha256 | digest) and
+        ($receipt.cached | type == "boolean") and
+        $receipt.directory == ($b.cache_directory + "/" + $receipt.key) and
+        $receipt.kind ==
+          (if $stage == "llvm" then "source " + $name + " LLVM" elif $stage == "object" then "LLVM object" elif $stage == "linked" then "test driver native link" else "test driver C object" end) and
+        any($b.builds[]; . == ($receipt | {kind,key,cached})) and
+        ($receipt.files | keys) ==
+          [if $stage == "llvm" then "program.ll" elif $stage == "object" then "program.o" elif $stage == "linked" then "program" else "object.o" end] and
+        all($receipt.files[]; digest)) and
+      $driver.artifacts.llvm.files["program.ll"] == $driver.llvm_sha256 and
+      $driver.artifacts.linked.files.program == $driver.sha256)
+      ' "$report" "$driver_report" >/dev/null
+      ;;
+  esac
   while IFS=$'\t' read -r abi expected; do
     test "$(sha256 "$build/compiler-tests/$group/$abi.log" | awk '{print $1}')" = "$expected"
   done < <(jq -r '(.matrices // {}) | to_entries[] | [.key,.value.log_sha256] | @tsv' "$report")
@@ -98,6 +141,12 @@ cp runtime/khash.h "$bundle/licenses/khash.h"
 for group in $groups; do
   mkdir -p "$bundle/evidence/$group"
   cp "$build/compiler-tests/$group/verification.json" "$bundle/evidence/$group/"
+  case "$group" in
+    backends|port)
+      mkdir -p "$bundle/evidence/$group/driver-build"
+      cp "$build/compiler-tests/$group/driver-build/build-report.json" "$bundle/evidence/$group/driver-build/"
+      ;;
+  esac
   while IFS= read -r log; do cp "$log" "$bundle/evidence/$group/"; done < <(find "$build/compiler-tests/$group" -maxdepth 1 -name '*.log' -type f)
 done
 for suite in harness core figure12 test-framework regex; do

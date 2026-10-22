@@ -69,6 +69,7 @@ jobs:
             .mlf-build/pr-smoke/tests/framework-cli/**/*.stderr
             tests/golden/unit-inventory.json
             .mlf-build/pr-smoke/tests/suite-build/build-report.json
+            .mlf-build/pr-smoke/tests/driver-build/build-report.json
             .mlf-build/pr-smoke/tests/**/matrix-compact-gc/*.status.json
             .mlf-build/pr-smoke/tests/**/matrix-compact-gc/*.stdout
             .mlf-build/pr-smoke/tests/**/matrix-compact-gc/*.stderr

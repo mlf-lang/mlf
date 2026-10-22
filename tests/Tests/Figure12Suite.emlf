@@ -59,6 +59,8 @@ identity : XType
 identity = (XForall (XTyVar 0) XBot (XArrow (XVar (XTyVar 0)) (XVar (XTyVar 0))))
 
 typeChecks : (List ( (Pair (String) (IO String)) ))
+-- A2 owns the choose-id principal bound and target roundtrip checks; Core's
+-- former byte-identical source and expected type no longer compile separately.
 typeChecks = (Cons (Pair "A1 principal type" (typed "\\x y -> y" (XForall (XTyVar 1) XBot (XForall (XTyVar 2) identity (XArrow (XVar (XTyVar 1)) (XVar (XTyVar 2))))))) (Cons (Pair "A2 principal type" (typed "let choose = ((\\x y -> x) : forall a. a -> a -> a) in let id = \\x -> x in choose id" (XForall (XTyVar 1) identity (XArrow (XVar (XTyVar 1)) (XVar (XTyVar 1)))))) (Cons (Pair "A4 inferred result bound" (typed "\\(x : forall a. a -> a) -> x x" (XForall (XTyVar 1) identity (XArrow identity (XVar (XTyVar 1)))))) (Cons (Pair "A4 admits paper signature" (typed "(\\(x : forall a. a -> a) -> x x) : (forall a. a -> a) -> (forall a. a -> a)" (XArrow identity identity))) Nil))))
 main : IO Unit
 main = do

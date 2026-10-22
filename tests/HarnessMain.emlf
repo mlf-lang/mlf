@@ -7,6 +7,8 @@ import qualified Tests.Basic as H
 import qualified Tests.BootstrapSuite as Boot
 import qualified Tests.ReleaseSuite as Release
 import qualified Tests.BenchmarkSuite as Bench
+import qualified Tests.TestSourceCache as SourceCache
+import qualified Tests.TestDriverCache as DriverCache
 waitFor : String -> Int -> IO Unit
 waitFor path attempts = do
  present <- fileExists path
@@ -79,5 +81,17 @@ main = do
   Cons "--check-clean-environment" names -> do
    values <- S.mapM getEnv names
    H.assert (S.all (\value -> eqString value "") values) "gate inherited compiler or collector overrides"
-  Nil -> do { Coverage.begin "harness" true; Boot.main; Release.main; Bench.main; putStrLn "Native benchmark/bootstrap/release harness tests passed"; Coverage.finish "harness" }
+  Cons "--driver-cache-case" (Cons compiler Nil) -> DriverCache.run compiler
+  Nil -> do
+   Coverage.begin "harness" true
+   Boot.main
+   SourceCache.main
+   Coverage.passed "harness" "test_source_dependency_cache_controls"
+   DriverCache.main
+   Coverage.passed "harness" "test_checked_native_driver_cache"
+   putStrLn "2 native cache regression checks passed"
+   Release.main
+   Bench.main
+   putStrLn "Native benchmark/bootstrap/release harness tests passed"
+   Coverage.finish "harness"
   _ -> exitWith 2

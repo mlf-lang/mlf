@@ -74,8 +74,9 @@ cases that happen to run.
 
 `Tests.IntSetUnions` exposes `cases` to the runner and retains `suite` for Core.
 Its original label, sorted-list oracle, size/balancing assertions and all 360
-ordered stimuli / 276 distinct executions are preserved. Core retains its 686
-registered checks. The root `unit` group runs the framework's library and CLI
+ordered stimuli / 276 distinct executions are preserved. Core has 684 registered
+checks after the separately reviewed [duplicate consolidation](../tests/README.md);
+the migrated IntSetUnions action is unchanged. The root `unit` group runs the framework's library and CLI
 contract checks separately, outside that existing count. Framework sources are
 included in the group's before/after source fingerprints.
 

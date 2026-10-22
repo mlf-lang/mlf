@@ -26,7 +26,9 @@
       "Tests.IndependentType": "Tests/IndependentType.emlf",
       "Tests.Map": "Tests/Map.emlf",
       "Tests.Set": "Tests/Set.emlf",
-      "Tests.Coverage": "Tests/Coverage.emlf"
+      "Tests.Coverage": "Tests/Coverage.emlf",
+      "Tests.TestDrivers": "Tests/TestDrivers.emlf",
+      "Tests.TestSources": "Tests/TestSources.emlf"
     }
   },
   "executables": {
@@ -181,7 +183,10 @@
         "Tests.BootstrapSuite": "Tests/BootstrapSuite.emlf",
         "Tests.NativeABI": "Tests/NativeABI.emlf",
         "Tests.ReleaseSuite": "Tests/ReleaseSuite.emlf",
-        "Tests.RegexRedux": "Tests/RegexRedux.emlf"
+        "Tests.RegexRedux": "Tests/RegexRedux.emlf",
+        "Tests.TestDriverCache": "Tests/TestDriverCache.emlf",
+        "Tests.TestSourceCache": "Tests/TestSourceCache.emlf",
+        "Tests.CompilerTests": "Tests/CompilerTests.emlf"
       }
     },
     "regex": {

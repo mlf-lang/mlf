@@ -24,7 +24,9 @@
       "profile": "compiler",
       "modules": {
         "Tests.CompilerTests": "tests/Tests/CompilerTests.emlf",
-        "Tests.Coverage": "tests/Tests/Coverage.emlf"
+        "Tests.Coverage": "tests/Tests/Coverage.emlf",
+        "Tests.TestDrivers": "tests/Tests/TestDrivers.emlf",
+        "Tests.TestSources": "tests/Tests/TestSources.emlf"
       }
     }
   },
