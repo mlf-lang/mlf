@@ -11,7 +11,9 @@
   independent references, semantic regressions, GC debug/audit coverage,
   575 backend rows and 25 native port fixtures.
 - Consolidate CI and release qualification on one compact-GC profile, including
-  native SDK linking and Windows collector DLL deployment.
+  native SDK linking and Windows collector DLL deployment. Use the collector
+  import library for Windows native parity links, matching ordinary package
+  builds and avoiding unresolved static pthread dependencies.
 - Reduce optional LLVM backend compilation overhead through a generic lite
   pipeline while retaining input/output verification and O1 register allocation.
   Nine pinned workloads pass unchanged compilation/runtime limits; n-body
