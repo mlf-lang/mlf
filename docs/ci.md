@@ -5,19 +5,17 @@ The `CI` workflow runs on every pull request, merge queue group and push to
 
 - **Release metadata**: version/manifest consistency, shell syntax, benchmark
   provenance and checksum-pinned actionlint 1.7.12 workflow validation.
-- **Native compiler smoke**: a checkout compiler/manager build followed by eight
-  direct CLI cases and three package/cache states on macOS arm64.
-- **Native package distribution**: checkout manager and test-campaign builds
-  followed by source-package and checked-release/distribution tests with the
-  pinned published compiler.
+- **Compiler source smoke**: five cases against the checkout compiler frontend
+  and target checkers, interpreted by the verified published seed on macOS arm64.
 - **Native Windows runtime**: compact-GC runtime, filesystem and reproducible
   object/executable checks on Windows.
 
-The aggregate runs even when a prerequisite fails and requires all four jobs
+The aggregate runs even when a prerequisite fails and requires all three jobs
 to report `success`.
 Failed, cancelled or skipped prerequisites cannot produce a passing gate.
 There are no path filters on the required workflow. Manual dispatches retain
-the existing optional self-host and Windows-only modes. Their skipped aggregate
+the optional self-host and Windows-only modes, plus `full_validation` for fresh
+native builds and the complete package suite. Their skipped aggregate
 is named **Manual CI summary**, so it cannot satisfy the required **PR gate**.
 
 ## Enforce before merging
@@ -27,38 +25,56 @@ for `main`. Enable the requirement for branches to be up to date, or use the
 merge queue (`merge_group` is already supported). A workflow file cannot itself
 configure repository branch protection.
 
-## Required native smoke coverage
+## Required compiler source coverage
 
-The pinned v0.3.0 seed is only a bootstrap input. CI verifies its archive,
-executables and source commit, then builds only the checkout `emlf` and `mlfpkg`
-targets with the current C runtime and checked lockfile. The smoke scripts invoke
-these new binaries directly, avoiding a second compiler-library build, native
-test executables and backend drivers.
+CI verifies the pinned v0.3.0 seed archive, executables and source commit. That
+seed interprets `tests/PRQuickMain.emlf`, importing the checkout's
+`Bootstrap.Compiler`, current xMLF checker and frozen independent checker. It
+does not build new compiler, package-manager or campaign executables.
 
-Eight fixed CLI cases exercise:
+Five fixed cases exercise:
 
 - Two accepted programs: polymorphic let and self-application, compiled to xMLF
-  and checked against literal expected types.
-- Two rejected source programs, each requiring its expected diagnostic.
+  with literal expected types. Serialized targets must pass both checkers and
+  preserve erasure.
+- Two rejected source programs, each requiring its exact inference-phase
+  diagnostic.
+- One malformed xMLF program rejected by both target checkers.
+
+The required job therefore tests current frontend and target-checking sources.
+It does not establish that the checkout builds native tools or that its current
+LLVM backend and POSIX runtime execute programs correctly. Those checks, fresh
+native package tests, the full Figure 12 corpus, framework/process contracts and
+complete backend/state matrices remain in the separate jobs and full campaigns
+below. The required Windows job still exercises the checkout's Windows runtime.
+
+## Separate native and package validation
+
+**Fresh native compiler smoke** and **Native package distribution** run after
+the source check on pushes to `main`, or when a manual CI dispatch enables
+`full_validation`. They do not run on ordinary pull requests or merge queue
+groups and are not prerequisites of **PR gate**. Windows-only dispatches skip
+both. Waiting for the source check prevents these slower macOS jobs from queuing
+ahead of it within the same workflow run.
+
+The fresh-native job builds the checkout `emlf` and `mlfpkg` targets with the
+verified seed, current C runtime and checked lockfile. It then runs eight direct
+CLI cases:
+
+- Two accepted programs with checked xMLF and literal expected types.
+- Two source rejections with expected diagnostics.
 - Three IO programs on the interpreter and compact-GC LLVM: signed/unbounded
   arithmetic, lazy branches/constructors/closures, and repeated input with
   Unicode. Each backend must match a checked-in literal output oracle.
 - One malformed xMLF program rejected before effects by both execution paths.
 
-The local-package example runs on both backends in three states: a fresh build,
+Its local-package example runs on both backends in three states: a fresh build,
 unchanged cache reuse, and a dependency implementation edit with changed output.
 The last state must rebuild the dependency and both downstream crates. Mutation
 uses a private copy; the checkout stays unchanged. Reports from all three states
 are retained, and empty or incomplete reports cannot pass.
 
-This is a small integration gate. It does not run the full Figure 12 corpus,
-frozen independent target checker, framework/process contracts, or full backend
-and state-mutation matrices. Those checks remain in the extended campaign and
-full release groups; their test cases and evidence validation are unchanged.
-
-## Package distribution coverage
-
-The separate package job verifies the published compiler pinned in
+The package-distribution job verifies the published compiler pinned in
 `.github/package-seed.env`, then builds the checkout `mlfpkg` and
 `compiler-tests` executables with the checked lockfile. The campaign receives
 that manager explicitly and runs 18 resolver checks, 29 package integration
@@ -69,7 +85,8 @@ regression checks without creating releases.
 The workflow retains `package-distribution-evidence` on success or failure,
 including build and verification reports, command diagnostics, coverage,
 reviewed inventory and cache metadata. The package job has a 90-minute hard
-limit and is required by **PR gate** alongside compiler smoke.
+limit. All 75 package cases remain intact; this job runs separately from the
+required checks.
 
 ## Run locally
 
@@ -79,12 +96,19 @@ On Apple Silicon macOS with LLVM, GMP, BDWGC, pkg-config, jq and GitHub CLI:
 tools/release/fetch-seed.sh .mlf-build/pr-seed .github/smoke-seed.env
 export MLF_COMPILER="$PWD/.mlf-build/pr-seed/mlf-0.3.0-macos-arm64/libexec/emlf"
 export MLF_PACKAGE_MANAGER="$PWD/.mlf-build/pr-seed/mlf-0.3.0-macos-arm64/libexec/mlfpkg"
+tools/release/native-ci.sh source-smoke
+```
+
+Use an unused seed-download directory. Each invocation clears its success receipt
+before validation. GHC, Cabal and Python are blocked on the native CI path.
+
+To build fresh checkout tools and run the eight CLI and three package checks:
+
+```sh
 tools/release/native-ci.sh pr-smoke
 ```
 
-Use an unused seed-download directory. The smoke build can be repeated; ordinary
-source/tool fingerprints validate cache reuse. Each invocation clears its success
-receipt before building. GHC, Cabal and Python are blocked on the native CI path.
+That build can be repeated; ordinary source/tool fingerprints validate cache reuse.
 
 For the previous, broader smoke campaign, use the same seed environment and run:
 
@@ -100,22 +124,31 @@ release qualification are unchanged.
 
 ## Timing and evidence
 
+The required **Compiler source smoke** job has a ten-minute hard limit, including
+dependency setup, seed verification and evidence upload. A local run with the
+fixed collector setting passed in 130 seconds with a 3.17 GB peak resident set.
+Hosted timing is recorded in each run's evidence; the job limit is a failure
+bound, not a promised duration.
+
 In CI run [39798088020](https://github.com/mlf-lang/mlf/actions/runs/39798088020),
-the smaller smoke command completed in **16m49s** (1,009 seconds): checkout tool
-building took **16m17s** (977 seconds), and the remaining smoke checks and
+the fresh-native smoke command completed in **16m49s** (1,009 seconds): checkout
+tool building took **16m17s** (977 seconds), and the remaining smoke checks and
 evidence recording took **32 seconds**. In the earlier
 [run 39768304978](https://github.com/mlf-lang/mlf/actions/runs/39768304978), the
 command took 36m42s and the native job took 37m39s. That campaign built a smoke
 executable and two backend drivers; the smaller gate removes those auxiliary
-builds. Cold runs remain dominated by building the checkout tools.
+builds. Fresh native runs remain dominated by building the checkout tools, which
+is why they run separately from the required source check.
 
 These are individual hosted observations at different source revisions, not a
 controlled benchmark. The 16m49s run predates integration of package-distribution
-support. The separately required package job may determine overall CI duration;
-the smoke measurement does not establish the combined gate's completion time.
+support. It is not a timing measurement of the new required source check or of
+the complete native and package validation jobs.
 
-The workflow uploads `pr-smoke-evidence` on success or failure, including build
-reports, command logs, output and completion receipts. Local evidence is under
+The source job uploads `source-smoke-evidence` on success or failure: source,
+tool and output hashes, logs, emitted targets and its completion receipt under
+`.mlf-build/source-smoke/`. The fresh-native job uploads `pr-smoke-evidence`,
+including build reports, command logs, output and completion receipts. Local evidence is under
 `.mlf-build/pr-smoke/`; `result.json` records integer wall-clock seconds for tool
 building and the complete command, plus tool and report SHA-256 fingerprints.
-The native job retains a 60-minute hard failure bound.
+The fresh-native job retains a 60-minute hard failure bound.

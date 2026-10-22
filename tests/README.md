@@ -1,7 +1,13 @@
 # Native MLF compiler tests
 
-Pull requests use the small [PR CLI smoke suite](../docs/ci.md): eight direct
-compiler cases and three package/cache states, after building checkout tools.
+Pull requests require the small [compiler source smoke suite](../docs/ci.md):
+the verified seed interprets `PRQuickMain.emlf` against the checkout frontend and
+current/frozen target checkers, with two accepted cases, two source rejections
+and one malformed target. This does not build fresh tools or test current LLVM
+execution. Fresh native tools, eight CLI cases, three package/cache states and
+the complete 75-case package distribution suite run separately on pushes to
+`main` or manual CI dispatches with `full_validation` enabled.
+
 The broader campaign remains available as `tools/release/native-ci.sh extended-pr-smoke`:
 framework/process contracts, Figure 12, four independent checker controls,
 12 interpreter/LLVM fixtures and package/cache checks. The six full root groups
