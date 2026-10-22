@@ -13,7 +13,7 @@ started=$SECONDS
 # Build its source libraries separately before reading the current root manifest.
 tools/release/bootstrap-manager.sh "$build/manager-bootstrap" 2>&1 | tee "$build/manager-bootstrap.log"
 "$build/manager-bootstrap/bin/mlfpkg" --compiler "$seed_compiler" --runtime "$PWD/runtime/mlf_runtime.c" \
-  --timeout 1800 --locked --build-dir "$build/candidate" build 2>&1 | tee "$build/build.log"
+  --jobs 2 --timeout 1800 --locked --build-dir "$build/candidate" build 2>&1 | tee "$build/build.log"
 jq -e '
   .complete == true and .implementation == "MLF" and
   ([.builds[] | select(.kind | startswith("executable mlf-compiler:")) | .kind] | sort) ==
@@ -26,6 +26,20 @@ export MLF_PACKAGE_MANAGER="$build/candidate/bin/mlfpkg"
 export MLF_BUILD_RUNNER="$build/candidate/bin/mlf-build-runner"
 runner="$build/candidate/bin/compiler-tests"
 test -x "$MLF_COMPILER" && test -x "$MLF_PACKAGE_MANAGER" && test -x "$runner"
+# Compile the shared smoke fixtures together so independent work can overlap.
+# The campaign reuses these artifacts with the same compiler, manager and cache.
+"$MLF_PACKAGE_MANAGER" --manifest "$PWD/tests/mlf-package.json" \
+  --compiler "$MLF_COMPILER" --runtime "$PWD/runtime/mlf_runtime.c" \
+  --jobs 2 --timeout 1800 --build-dir "$build/tests/suite-build" \
+  --cache-dir "$build/candidate/cache" build \
+  --target int-set-unions --target test-framework --target pr-smoke \
+  2>&1 | tee "$build/tests-prebuild.log"
+jq -e '
+  .complete == true and .implementation == "MLF" and
+  ([.builds[] | select(.kind | startswith("executable mlf-tests:")) | .kind] | sort) ==
+    ["executable mlf-tests:int-set-unions","executable mlf-tests:pr-smoke","executable mlf-tests:test-framework"]
+' "$build/tests/suite-build/build-report.json" >/dev/null
+cp "$build/tests/suite-build/build-report.json" "$build/tests-prebuild-report.json"
 # Direct invocation avoids building another root generation just to run tests.
 # The suite still compiles its tests and backend drivers with the new compiler.
 "$runner" pr-smoke --manager "$MLF_PACKAGE_MANAGER" --compiler "$MLF_COMPILER" \
