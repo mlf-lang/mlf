@@ -18,6 +18,7 @@ Inspection covered source algorithms and dependencies, not leaderboard ranks.
 | fasta | `fasta-gcc-1`, Rust #1, #3–4, `fasta-ghc-1` | Implemented with C #1, Rust #4 and GHC #1 unchanged. MLF uses cumulative Double probabilities, the required fresh LCG update for every base, indexed ByteArray storage and buffered raw output. Rust #1/#3 scale probabilities and were not selected. See [provenance](fasta/PROVENANCE.md). |
 | reverse-complement | C #4–5, Rust #1–3, GHC #2/#4 | Implemented with scalar C #4, sequential Rust #2, and GHC #4's growing byte buffers with a line-reader correction. MLF uses raw `getByteLine`, growing ByteArray records and buffered output. See [provenance](reverse-complement/PROVENANCE.md). |
 | k-nucleotide | C #1, Rust #1–9, GHC #1–3 | Implemented with serialized C #1, Rust #1 and GHC #2. General IntTable operations use library hash tables in both MLF backends. Every substring of all seven lengths is counted; an independent work audit checks actual writes and distinct keys. See [provenance](k-nucleotide/PROVENANCE.md). |
+| regex-redux | C #5, Rust #5, GHC #3 | Implemented using the reusable MLF regex engine and sequential pinned baselines. Cleanup, nine pattern counts, and five ordered substitutions all use regex operations. An independent scanner oracle checks exact bytes and lengths. See [provenance](regex-redux/PROVENANCE.md). |
 
 Capability evidence is the exhaustive primitive set in `bootstrap/Bootstrap/Primitive.emlf`,
 the parser/ADT examples, and the interpreter/native runtime implementations.
@@ -28,13 +29,14 @@ Unbounded `andInt` supports rolling integer keys; native table updates retain
 complete counts while using the library's lookup/insertion operations.
 We have not replaced missing operations with
 unary arithmetic, list indexing in numeric kernels, a foreign helper doing
-the workload, or hardcoded answers. All nine implemented workloads enter
+the workload, or hardcoded answers. All ten implemented workloads enter
 summary ratios. Deferred candidates
 are not treated as zero-time or skipped rows.
 
-A remaining candidate is regex-redux, which needs general regular-expression
-support and pinned sequential baselines with their libraries. That work is
-not represented as a skipped or zero-time row. Current measurements and the
-per-workload compile/runtime limits are recorded in [RESULTS.md](RESULTS.md);
-workload completion alone is not evidence of performance parity on other
-inputs or machines.
+All ten tasks on the current Benchmarks Game index are represented. Regex-redux
+adds portable MLF regular-expression support; the foreign baselines use their
+documented regex libraries. Historical measurements and per-workload
+compile/runtime limits are recorded in [RESULTS.md](RESULTS.md); the archived
+nine-workload results do not establish regex-redux performance. Workload
+completion alone is not evidence of performance parity on other inputs or
+machines.
