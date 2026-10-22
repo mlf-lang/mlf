@@ -58,7 +58,7 @@ fresh self-host fixed point remain part of release qualification.
 On Apple Silicon macOS with LLVM, GMP, BDWGC, pkg-config, jq and GitHub CLI:
 
 ```sh
-tools/release/fetch-seed.sh .mlf-build/pr-seed .github/pr-seed.env
+tools/release/fetch-seed.sh .mlf-build/pr-seed .github/smoke-seed.env
 export MLF_COMPILER="$PWD/.mlf-build/pr-seed/mlf-0.3.0-macos-arm64/libexec/emlf"
 export MLF_PACKAGE_MANAGER="$PWD/.mlf-build/pr-seed/mlf-0.3.0-macos-arm64/libexec/mlfpkg"
 tools/release/native-ci.sh pr-smoke

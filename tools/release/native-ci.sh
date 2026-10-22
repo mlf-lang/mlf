@@ -6,35 +6,7 @@ test "$#" -le 1 || { printf '%s\n' 'Expected one test group.' >&2; exit 2; }
 case "$group" in smoke|pr-smoke|unit|packages|self-host|parity|backends|port) ;; *) exit 2 ;; esac
 test -z "${MLF_TEST_RUNTIME_PROFILE:-}" || test "$MLF_TEST_RUNTIME_PROFILE" = compact-gc || exit 2
 evidence_group=$group
-case "$(uname -s):$(uname -m)" in
-  Darwin:arm64)
-    export MLF_GC_PREFIX=${MLF_GC_PREFIX:-"$(brew --prefix bdw-gc)"}
-    llvm_prefix=$(brew --prefix llvm)
-    export PATH="$llvm_prefix/bin:$PATH"
-    ;;
-  Linux:x86_64)
-    # Linux defaults to a small stack. Native compiler recursion and child
-    # compiler tests inherit the job's unrestricted stack allowance.
-    ulimit -s unlimited
-    # Package discovery tests also exercise an explicit collector prefix.
-    # Debian installs its archive in a multiarch directory; expose the same
-    # include/lib layout used by explicit local installations on every host.
-    if [ -z "${MLF_GC_PREFIX:-}" ]; then
-      gc_include=$(pkg-config --variable=includedir bdw-gc)
-      gc_library=$(pkg-config --variable=libdir bdw-gc)/libgc.a
-      test -d "$gc_include/gc"
-      test -f "$gc_include/gc.h"
-      test -f "$gc_library"
-      export MLF_GC_PREFIX="$PWD/.mlf-build/native-dependencies/bdw-gc"
-      mkdir -p "$MLF_GC_PREFIX/include" "$MLF_GC_PREFIX/lib"
-      # Keep the fingerprinted header tree limited to the collector itself.
-      cp -R "$gc_include/gc" "$MLF_GC_PREFIX/include/"
-      cp "$gc_include/gc.h" "$MLF_GC_PREFIX/include/"
-      ln -sfn "$gc_library" "$MLF_GC_PREFIX/lib/libgc.a"
-    fi
-    ;;
-  *) printf '%s\n' 'Unsupported native test host.' >&2; exit 2 ;;
-esac
+. tools/release/native-environment.sh
 if [ "$group" = packages ]; then
   command -v llvm-profdata >/dev/null || {
     printf '%s\n' 'Package PGO tests require llvm-profdata from the matching LLVM installation on PATH.' >&2
@@ -57,6 +29,10 @@ if [ "$group" = port ]; then
       export MLF_TEST_MATRIX_GC_DIVISOR=1
     fi
   fi
+  # Preparation holds several independently checked forms of large targets.
+  # Apply the same host memory policy before those forms are constructed.
+  case "$MLF_TEST_MATRIX_GC_DIVISOR" in 1|2|4) ;; *) exit 2 ;; esac
+  export GC_FREE_SPACE_DIVISOR=$MLF_TEST_MATRIX_GC_DIVISOR
   printf 'Port matrix host memory: %s bytes; GC free-space divisor: %s\n' "$matrix_memory_bytes" "$MLF_TEST_MATRIX_GC_DIVISOR"
 fi
 mkdir -p .mlf-build/forbidden-tools
@@ -98,5 +74,14 @@ else
     exit "$status"
   }
   trap finish_logs EXIT
-  ./mlfpkg --runtime "$PWD/runtime/mlf_runtime.c" --timeout 21600 --locked test --target "$group"
+  if [ "${MLF_CI_SHARED_CANDIDATE:-0}" = 1 ]; then
+    tools/release/shared-candidate.sh verify
+    ./mlfpkg --locked plan > .mlf-build/tests/source-plan.json
+    ./mlfpkg compiler-test "$group" --compiler "$MLF_COMPILER" \
+      --build-dir "$PWD/.mlf-build/compiler-tests/$evidence_group" \
+      --cache-dir "$PWD/.mlf-build/cache" > ".mlf-build/tests/$group.log" 2>&1
+    tools/release/shared-candidate.sh verify
+  else
+    ./mlfpkg --runtime "$PWD/runtime/mlf_runtime.c" --timeout 21600 --locked test --target "$group"
+  fi
 fi

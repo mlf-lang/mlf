@@ -1,0 +1,63 @@
+--- upstream.hs
++++ main.hs
+@@ -17,7 +17,6 @@
+ import Control.Monad
+ import Foreign.Storable
+ import System.IO
+-import Control.Concurrent
+ import Data.Foldable
+ import Data.Char
+ 
+@@ -216,10 +215,7 @@
+     replace (f ">.*\\n|\\n") (f "") input' sequences mcontext mdata
+ 
+   -- Work on performing all the replacements serially.
+-  replaceVar <- newEmptyMVar
+-  -- Fork this thread explicitely to capability 0 to discourage the scheduler
+-  -- from interrupting this thread.
+-  forkOn 0 $ do
++  siz <- do
+     -- We'll use two strings when doing all the replacements, searching for
+     -- patterns in prereplaceString and using postreplaceString to store the
+     -- string after the replacements have been made. After each iteration these
+@@ -248,15 +244,10 @@
+     c_pcre2_jit_stack_free stack
+     c_pcre2_match_data_free mdata
+ 
+-    putMVar replaceVar siz
+-
+-  -- Iterate through all the count patterns in countInfo and perform the
+-  -- counting for each one on a different thread if available.
+-  first <- newMVar ()
+-  rest <- replicateM (length countInfo) newEmptyMVar
+-
+-  for_ (zip3 countInfo (first : rest) rest) $ \(pattern, prev, next) ->
+-    forkIO $ do
++    return siz
++
++  -- Count each pattern sequentially, preserving the upstream PCRE2 calls.
++  for_ countInfo $ \pattern -> do
+       (mcontext, stack, mdata) <- threadInit
+       match <- c_pcre2_get_ovector_pointer mdata
+ 
+@@ -285,20 +276,14 @@
+       c_pcre2_code_free regex
+ 
+       -- Print the count for each pattern in the correct order.
+-      takeMVar prev
+       V.unsafeWith pattern $ \patternPtr ->
+         hPutBuf stdout patternPtr (V.length pattern)
+       putStr " "
+       print count
+-      putMVar next ()
+ 
+       c_pcre2_match_context_free mcontext
+       c_pcre2_jit_stack_free stack
+       c_pcre2_match_data_free mdata
+-
+-  siz <- takeMVar (replaceVar)
+-
+-  takeMVar (last rest)
+ 
+   -- Print the size of the original input, the size of the input without the
+   -- sequence descriptions & new lines, and the size after having made all the

@@ -78,7 +78,23 @@
     "benchmarks/k-nucleotide/haskell/adaptation.patch": "03af6baaed5c83dca7a4a601c7f744cdc8f99f594e328e56551a86b233d1e5aa",
     "benchmarks/k-nucleotide/expected-1000.txt": "baa63c46addb89c63e68ea0055952847fbccf450e89997b2b62234c90e66f500",
     "benchmarks/k-nucleotide/input-1000.txt": "62d1e8d0df7938d2aefda9a37887e0389231ea72c099c29a51afb6edca1bdc73",
-    "runtime/khash.h": "4582c7fd4b98f61339ce677bb1daa7a45a53075b112a494a335525c4bda72074"
+    "runtime/khash.h": "4582c7fd4b98f61339ce677bb1daa7a45a53075b112a494a335525c4bda72074",
+    "benchmarks/regex-redux/c/adaptation.patch": "da7cf21c6d16d53c7db989aaeb35ec7ee6d39782e97ed218ce7884de736b524e",
+    "benchmarks/regex-redux/c/main.c": "a89a01801ab5a85121cb98fb819d3d787cbee667eef237d89b47fbe1c6c8e5e1",
+    "benchmarks/regex-redux/c/upstream.c": "9d153e7ef427123a2cb2b417f3164fe704d80a9bbd5e2158a7652cb78e95c6f1",
+    "benchmarks/regex-redux/expected-1000.txt": "9f417691b946e86f2a86df4340c17f8b5c7bd5f977df525072c66c89b8a656f1",
+    "benchmarks/regex-redux/haskell/adaptation.patch": "7f2cbb3ada65137d3a80b8e142c6f32ce074fe5a35b04d95bac8a517eeb0a6fc",
+    "benchmarks/regex-redux/haskell/cabal.project": "4b77b5ec1c1bb4bf8e00b4079640bdf0e64bf4caa805e81d68ac9bbb9e2ac7a5",
+    "benchmarks/regex-redux/haskell/main.hs": "a0cd33308f780f2b7b35659e398bb51a2cf8aa0fa901bf6cd969f3012ee38d90",
+    "benchmarks/regex-redux/haskell/regex-redux.cabal": "b319d7db34778972f80ee291087b1f3ef50a8f0f51b12c6b32732f291fb354f5",
+    "benchmarks/regex-redux/haskell/upstream.hs": "7818bec3dc21a43efd83277ff56c7f07719c80281de75be110952b32e0ae11b0",
+    "benchmarks/regex-redux/input-1000.txt": "62d1e8d0df7938d2aefda9a37887e0389231ea72c099c29a51afb6edca1bdc73",
+    "benchmarks/regex-redux/rust/Cargo.lock": "2da695112ced4d25e30c2f7598518d5cc2b9265b88df9d9253f0b8e949075701",
+    "benchmarks/regex-redux/rust/Cargo.toml": "84f7d9df34d80f6beab3a71c7cef7e5717cbfd4fa281f1ed966d17273b0c2bb1",
+    "benchmarks/regex-redux/rust/adaptation.patch": "54c84b02c1849f9e8253fa02f8da083996c412a5c17725a7ddbd43c77a6a020f",
+    "benchmarks/regex-redux/rust/main.rs": "57c4c99caa58a20008c7ce35d42497edd881e80ba7e51b523c14bc46db34393d",
+    "benchmarks/regex-redux/rust/upstream.rs": "4c6b9ac11ef0f5044532388ae18c97e2ba70e19f904405d2fd974bfa5055c6a5",
+    "benchmarks/regex-redux/haskell/cabal.project.freeze": "086a4595bc0130b4f19d49d25b686f94cfb7166365ba2ce233506ef4fdaad345"
   },
   "workloads": [
     {
@@ -731,6 +747,116 @@
         "hashtables",
         "hashable"
       ]
+    },
+    {
+      "name": "regex-redux",
+      "default_input": 1000000,
+      "minimum_input": 1,
+      "maximum_input": 5000000,
+      "check_inputs": [
+        1,
+        7,
+        31,
+        1000
+      ],
+      "fixture_input": 1000,
+      "post_build_input": 31,
+      "fixture": "benchmarks/regex-redux/expected-1000.txt",
+      "fixture_upstream_path": "public/download/regexredux-output.txt",
+      "input_kind": "fasta",
+      "input_fixture": "benchmarks/regex-redux/input-1000.txt",
+      "input_fixture_upstream_path": "public/download/regexredux-input.txt",
+      "provenance": {
+        "c": {
+          "implementation": "regexredux-gcc-5",
+          "authors": "Jeremy Zerfas; Zoltan Herczeg",
+          "upstream_path": "public/program/regexredux-gcc-5.html",
+          "upstream_git_blob": "fe92ccff109e67a871e6660c4f5af7d8d783ff76",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/regexredux-gcc-5.html",
+          "original_source": "benchmarks/regex-redux/c/upstream.c",
+          "build_source": "benchmarks/regex-redux/c/main.c"
+        },
+        "rust": {
+          "implementation": "regexredux-rust-5",
+          "authors": "Tom Kaitchuck; Andre Bogus",
+          "upstream_path": "public/program/regexredux-rust-5.html",
+          "upstream_git_blob": "ef14f4ebaf8bdf13eea19ea2a30889c6c42c7a68",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/regexredux-rust-5.html",
+          "original_source": "benchmarks/regex-redux/rust/upstream.rs",
+          "build_source": "benchmarks/regex-redux/rust/main.rs"
+        },
+        "haskell": {
+          "implementation": "regexredux-ghc-3",
+          "authors": "Jaro Reinders; Jeremy Zerfas; Zoltan Herczeg",
+          "upstream_path": "public/program/regexredux-ghc-3.html",
+          "upstream_git_blob": "07b6593bb91dde9bcb4c75aefee628d2d6cd3abf",
+          "url": "https://salsa.debian.org/benchmarksgame-team/benchmarksgame/-/blob/40296663ed350d5fe4a6ab5e367bab61cb77c219/public/program/regexredux-ghc-3.html",
+          "original_source": "benchmarks/regex-redux/haskell/upstream.hs",
+          "build_source": "benchmarks/regex-redux/haskell/main.hs"
+        }
+      },
+      "sources": {
+        "mlf": "benchmarks/regex-redux/mlf/main.emlf",
+        "c": "benchmarks/regex-redux/c/main.c",
+        "rust": "benchmarks/regex-redux/rust/main.rs",
+        "haskell": "benchmarks/regex-redux/haskell/main.hs"
+      },
+      "flags": {
+        "c": [
+          "-O3"
+        ],
+        "rust": [
+          "-O",
+          "--edition=2021"
+        ],
+        "haskell": [
+          "-O2",
+          "-XBangPatterns",
+          "-XForeignFunctionInterface",
+          "-XCApiFFI",
+          "-fforce-recomp",
+          "-optc-DPCRE2_CODE_UNIT_WIDTH=8"
+        ],
+        "mlf": [
+          "-O2",
+          "-Wno-override-module"
+        ]
+      },
+      "pkg_config": {
+        "c": [
+          "libpcre2-8"
+        ],
+        "haskell": [
+          "libpcre2-8"
+        ]
+      },
+      "pkg_config_versions": {
+        "libpcre2-8": "10.49"
+      },
+      "pkg_config_headers": {
+        "libpcre2-8": [
+          "pcre2.h"
+        ]
+      },
+      "rust_manifest": "benchmarks/regex-redux/rust/Cargo.toml",
+      "rust_lockfile": "benchmarks/regex-redux/rust/Cargo.lock",
+      "haskell_project": "benchmarks/regex-redux/haskell/cabal.project",
+      "haskell_packages": [
+        "vector"
+      ],
+      "mlf_include_dirs": [
+        "bootstrap"
+      ],
+      "mlf_dependencies": [
+        "bootstrap/Bootstrap/Regex.emlf",
+        "bootstrap/Bootstrap/Types.emlf",
+        "bootstrap/Bootstrap/Std.emlf",
+        "bootstrap/Bootstrap/IntMap.emlf",
+        "bootstrap/Bootstrap/IntSet.emlf",
+        "bootstrap/Bootstrap/Map.emlf"
+      ],
+      "output_comparison": "Exact bytes: nine ordered pattern/count lines, separator, and all three lengths against independent MLF scanner oracle and pinned upstream fixture",
+      "haskell_lockfile": "benchmarks/regex-redux/haskell/cabal.project.freeze"
     }
   ],
   "libraries": {
@@ -740,6 +866,28 @@
       "source": "runtime/khash.h",
       "url": "https://github.com/attractivechaos/klib/blob/97a0fcb790b43b9e5da8994f4671021fec036f19/khash.h",
       "license": "MIT, included in header"
+    },
+    "regex-redux-pcre2": {
+      "version": "10.49",
+      "pkg_config": "libpcre2-8",
+      "languages": [
+        "c",
+        "haskell"
+      ],
+      "url": "https://github.com/PCRE2Project/pcre2/tree/pcre2-10.49",
+      "license": "BSD-3-Clause"
+    },
+    "regex-redux-rust": {
+      "version": "1.12.2",
+      "lockfile": "benchmarks/regex-redux/rust/Cargo.lock",
+      "url": "https://crates.io/crates/regex/1.12.2",
+      "license": "MIT OR Apache-2.0"
+    },
+    "regex-redux-vector": {
+      "version": "0.13.2.0",
+      "lockfile": "benchmarks/regex-redux/haskell/cabal.project.freeze",
+      "url": "https://hackage.haskell.org/package/vector-0.13.2.0",
+      "license": "BSD-3-Clause"
     }
   }
 }
