@@ -98,8 +98,11 @@ No native outputs cross platform boundaries and no test execution verdict is
 shared. All six groups execute independently against the same candidate pair,
 and self-host uses a fresh cache for the next stage.
 
-The longer POSIX groups are submitted first to reduce macOS runner queue delays;
-each platform packages as soon as its own six groups finish. Port preparation
+The macOS port and unit groups obtain runners before a small Ubuntu start
+barrier admits the other four groups. The barrier accepts started or completed
+jobs regardless of their verdicts, so every group still executes independently;
+matrix ordering alone does not provide runner priority. Each platform packages
+as soon as its own six groups finish. Port preparation
 uses the same host memory collection policy as its matrix execution, retaining
 all independent target checks. Small transport builds remain local because their
 subsecond cost does not justify another artifact transfer.
