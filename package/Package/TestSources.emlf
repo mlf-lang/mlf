@@ -1,0 +1,31 @@
+module Package.TestSources where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Bootstrap.Parser as Parser
+import qualified Bootstrap.Module as Modules
+import qualified Package.Json as J
+import qualified Package.OS as O
+
+-- Re-run the compiler's module discovery before every cache lookup. Hashing a
+-- previously saved dependency list would miss a newly introduced shadow module.
+-- Prelude is built in: loadModuleFiles skips it, and the compiler identity
+-- supplied by the caller accounts for its semantics.
+sourceInputs : List String -> String -> IO J.Json
+sourceInputs includes entry = do
+ working <- canonicalPath "."
+ text <- readFile entry
+ source <- case Parser.parseModule entry text of
+  Left message -> O.fatal message
+  Right value -> ioReturn value
+ discovered <- Modules.loadModuleFiles includes source
+ modules <- case discovered of
+  Left message -> O.fatal message
+  Right values -> ioReturn values
+ files <- S.mapM (\loaded -> do
+  path <- canonicalPath (Modules.sourcePath loaded)
+  hash <- fileDigest path
+  ioReturn (Pair path (J.str hash))) modules
+ ioReturn (J.Object (Cons (Pair "cwd" (J.str working))
+  (Cons (Pair "entry" (J.str entry))
+  (Cons (Pair "includes" (J.stringArray includes))
+  (Cons (Pair "files" (J.Object files)) Nil)))))

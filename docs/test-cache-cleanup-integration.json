@@ -1,0 +1,119 @@
+{
+  "format": 1,
+  "recorded_at": "2026-10-22T10:56:05.562Z",
+  "purpose": "Validation after rebasing test/cache cleanup onto remote main",
+  "tested_commit": "4af369df8d224563dfc05a7c16c16f0267ed710b",
+  "upstream_commit": "91962c2bdc16988b28779a1ff02d0c892e7e4fb8",
+  "remote_default_branch": "main",
+  "remote_master_branch_exists": false,
+  "complete_for_merged_unit": true,
+  "modified_code_inputs": {
+    "mlf.lock": "3e3ddc72f111f3580bcfe0a1599380acee0e3f44073d71c8c5a7016bd87e0496",
+    "package/Package/CompilerTests.emlf": "530c5fdf10ccb62c65dada271d0d83633f7d304cd00fa4034076c41118298dc6",
+    "package/Package/TestDrivers.emlf": "3f44766336f3ba208d08d08c0863a0ff1832e96e909a58536a1b11acf6192284",
+    "package/Package/TestSources.emlf": "52b0494f872abe57908cfd4417156f1d083160d5286ba6f3f49825e661c3284b",
+    "package/mlf-package.json": "5ad6099ef87c2077406f674d0804ecef5cc26d78db850b8645ff36d8d58fe0cd",
+    "tests/CoreMain.emlf": "3ad0889a8e602d388d97503950b23ef07d4ab3d4ebf4c869ffbd9c14dc33689e",
+    "tests/HarnessMain.emlf": "af06692ed8cd7a6a8f59299da2f57f4d0d7758bee0503dc656b2078b254b5db5",
+    "tests/Tests/Core.emlf": "798705864c0037b75882357f5504a45313cc124f9954f62d6c8f7d5ade73a691",
+    "tests/Tests/Figure12Suite.emlf": "0449203e15602fd9572f3aa9916218b8383377015ce8b06d2d21d268840f518d",
+    "tests/Tests/GraphUnification.emlf": "8426976eee443988f030925a8af81ec37f1b4256bdc8a892c65a3dd4d6efb2ba",
+    "tests/Tests/TestDriverCache.emlf": "88292dd6d90e0f2c21debe221c609fdb43ddc0d0ad966ff8e04bd06c8137e044",
+    "tests/Tests/TestSourceCache.emlf": "7b7ab4df4ef0228ad271c663baf613873c0c2d2de1abde59c97ea48f00a4ddfa",
+    "tests/mlf-package.json": "8bc405ad54efa8e740559a57d92a3dd8bceaa5a4fdfd578abf26273a554598d3"
+  },
+  "current_source_hashes_verified": 421,
+  "compiler": {
+    "path": ".mlf-build/compact-only/r3/build/bin/emlf",
+    "sha256": "a49467d37e89720485a95414543d925c8906aa5d1dac0c1233817c5796723afd"
+  },
+  "manager": {
+    "path": ".mlf-build/test-cache-cleanup/integration/build/bin/mlfpkg",
+    "sha256": "959846114597fc010a43c578599e8c269c0d7bb06539727f1f4a494de9167271"
+  },
+  "build": {
+    "command": {
+      "path": ".mlf-build/test-cache-cleanup/integration/build-command.json",
+      "sha256": "28c67d45497bc472f72894f994247348a1eac8f78374ee4b579593c619bafcd2"
+    },
+    "report": {
+      "path": ".mlf-build/test-cache-cleanup/integration/build/build-report.json",
+      "sha256": "05f65bb732fee1e59a913be2958467e3144a300e30362ff0553498c7f341a7c2"
+    },
+    "exit_code": 0,
+    "wall_seconds": 289.208899833
+  },
+  "unit": {
+    "command": {
+      "path": ".mlf-build/test-cache-cleanup/integration/unit-command.json",
+      "sha256": "c77f21ec406792e5acea800f327be5dfbaf786b3ae24ac14d1b7c2c4b68b5da1"
+    },
+    "verification": {
+      "path": ".mlf-build/test-cache-cleanup/integration/unit/verification.json",
+      "sha256": "ea50cdc71bf631d454b69d0da64489dfbc88c7b8be01564ef5831d7f381ad4a8"
+    },
+    "exit_code": 0,
+    "wall_seconds": 1194.9427935,
+    "suites": {
+      "core": {
+        "coverage": [
+          "684 checks; 0 failures",
+          "Oracle: 6712 cases; 6703 executions"
+        ],
+        "log_sha256": "c468177c47d2f915397e4a6a6369381f576e49bc06bef0794727e2db524573ff"
+      },
+      "figure12": {
+        "coverage": [
+          "43/43 expressions match regression expectations; 0 failures",
+          "41 distinct Figure12 executions",
+          "36 supplementary checks; 0 failures"
+        ],
+        "log_sha256": "e77a29fbf793b76979bf406695a3cb65201e209d651bf89c139b7ac8d3002159"
+      },
+      "harness": {
+        "coverage": [
+          "Native benchmark/bootstrap/release harness tests passed",
+          "2 native cache regression checks passed"
+        ],
+        "log_sha256": "32c8eb116b4c65edc1e30d201fe3abcca51bcaee571afa50ca6419378ed8f5f4"
+      },
+      "regex": {
+        "coverage": [
+          "regular-expression tests passed"
+        ],
+        "log_sha256": "bffb6793c09503aa72dadf9a502e0616d28e385a38101d7795e8bd86ebdaa716"
+      }
+    }
+  },
+  "merge_checks": {
+    "upstream_regex_suite_retained": true,
+    "upstream_unnumbered_harness_summary_retained": true,
+    "cache_regressions_retained": 2,
+    "core_methods": 684,
+    "test_modules": 81,
+    "merged_lock_regenerated": true
+  },
+  "historical_validation": {
+    "path": "docs/test-cache-cleanup.json",
+    "sha256": "34fe96e31ce3898af843d4e006b0fb82f3e44331276cc57e354d572ab74a1a20",
+    "scope": "Earlier unit, packages, backends and cold/warm port validation predates this integration; it is preserved without relabeling."
+  },
+  "launcher_installation": {
+    "path": ".mlf-build/package-manager/mlfpkg",
+    "previous_sha256": "4c4690ea2dec79533eaba550804cc2abdc95833eb0cfd437652ac167bf062bcc",
+    "backup": ".mlf-build/test-cache-cleanup/integration/launcher-manager-before",
+    "sha256": "959846114597fc010a43c578599e8c269c0d7bb06539727f1f4a494de9167271",
+    "matches_validated_manager_bytes": true,
+    "locked_root_plan": {
+      "path": ".mlf-build/test-cache-cleanup/integration/launcher-locked-plan.json",
+      "sha256": "a88d826f0ba19664953d800f9f7f75b13bd71004ce9b0ec683dfa1705c8c8059",
+      "exit_code": 0
+    }
+  },
+  "limitations": [
+    "Merged-tree validation ran the full unit group; packages, backends and port evidence is from the pre-integration cleanup snapshot.",
+    "Self-host and parity were not rerun.",
+    "Native validation ran on this macOS host only.",
+    "The final evidence/documentation commit changes no tested compiler, package or test source."
+  ]
+}

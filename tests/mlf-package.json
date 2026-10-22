@@ -158,7 +158,9 @@
         "Tests.BootstrapSuite": "Tests/BootstrapSuite.emlf",
         "Tests.NativeABI": "Tests/NativeABI.emlf",
         "Tests.ReleaseSuite": "Tests/ReleaseSuite.emlf",
-        "Tests.RegexRedux": "Tests/RegexRedux.emlf"
+        "Tests.RegexRedux": "Tests/RegexRedux.emlf",
+        "Tests.TestDriverCache": "Tests/TestDriverCache.emlf",
+        "Tests.TestSourceCache": "Tests/TestSourceCache.emlf"
       }
     },
     "regex": {
