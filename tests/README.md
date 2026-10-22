@@ -14,9 +14,10 @@ benchmark baselines and golden oracle data remain unchanged.
 
 The shared test library contains eight helper, transport, collection-wrapper
 and independent-checker modules. Each executable explicitly lists the private
-test modules imported by its entry point. All 80 test modules remain reachable
+test modules imported by its entry point. All 82 test modules remain reachable
 across those entries. Building `port` and its six reference programs now compiles
-21 test modules including their two entries, instead of compiling all 79 first.
+21 test modules including their two entries, instead of pulling all 82 test
+modules into those targets.
 `mlfpkg --manifest tests/mlf-package.json plan` checks those import boundaries;
 adding a test module also requires adding it to each importing target's
 `modules` map, or to the shared library when it is common support.
@@ -25,6 +26,17 @@ Root builds and nested test builds share a checked artifact store through
 `{cache}` and `--cache-dir`. Each test group keeps its own `suite-build` report
 and logs. Source/tool identities, artifact checksums and recursive dependency
 receipts still control reuse; a fresh self-host stage keeps a new store.
+Prepared port targets and source driver LLVM now use the compiler module loader's
+current import closure, including ordered search roots and newly introduced
+module shadows. Unrelated example, benchmark and test files remain in the full
+verification snapshot without invalidating these artifacts. Port targets retain
+their independent checking and serialization receipts.
+Driver LLVM objects, native links, runtime objects and trace objects also share
+checked artifacts. Their keys include actual native inputs, resolved C headers,
+library bytes, compiler/environment identities and ordered flags. Group reports
+identify each reused artifact and its checksums. The two new cache regressions
+exercise source resolution, cross-group reuse, invalidation, corruption repair
+and traced runtime behavior with small programs; every selected matrix still runs.
 Self-host selects the candidate artifact from its actual package build report,
 checks that report's source snapshot and retains a copy. Equal native binary
 hashes elsewhere in the shared store do not identify the producing LLVM input.
@@ -54,7 +66,7 @@ wrapper chooses 4 for port on hosts with at most 8 GiB RAM, while preserving the
 
 | Root group | MLF entry | Preserved coverage |
 | --- | --- | --- |
-| unit | CoreMain, Figure12SuiteMain, HarnessMain | 686 compiler checks; 6712 Algorithm W cases represented by 6703 executions; annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks; all 43 Figure 12 labels with 41 distinct executions and 36 controls; benchmark/bootstrap/release harness methods and regex library checks |
+| unit | CoreMain, Figure12SuiteMain, HarnessMain, RegexMain | 684 compiler checks; 6712 Algorithm W cases represented by 6703 executions; annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks; all 43 Figure 12 labels with 41 distinct executions and 36 controls; benchmark/bootstrap/release harness methods, regex library checks and two native cache regression checks |
 | packages | PackagesMain | 15 original resolver methods plus three additional checks; 29 compiler integration cases, including native PGO isolation, shared cache survival, corruption recovery and source invalidation |
 | backends | BackendSuiteMain | 523 fixtures and 575 execution rows on interpreter and LLVM, compact-GC layout |
 | port | PortMain, ReferencesMain | 25 LLVM fixtures with compact-GC, six reference programs, generated inference input equality |
@@ -103,6 +115,29 @@ source and all configuration/oracle fields except descriptive identity and sourc
 filename. Runtime and module cases never share parity executions. The independent
 unit and parity oracles remain separate. The audit lists the 17 implemented
 reductions and the stress and boundary cases retained alongside smaller witnesses.
+
+The two graph-unification methods now run as one check: the first 80 canonical
+results also supply the identity-renaming comparisons, avoiding 80 repeated
+canonical executions while retaining all 320 renamed executions and both graph
+reference comparisons. Figure 12's A2 principal-type control owns the exact
+choose-id source/type/roundtrip check previously repeated in Core. These changes
+reduce Core's method count from 686 to 684; they preserve the underlying graph
+inputs, principal-type assertion, Figure 12 labels and independent parity oracle.
+
+The historical [cache-cleanup validation record](../docs/test-cache-cleanup.json)
+covers unit, packages, backends and cold/warm port execution on the source
+snapshot before upstream integration. The warm port control
+changed an unrelated inventory file and corrupted one prepared target: 24
+targets were reused, the damaged target was rebuilt, and all driver artifacts
+were reused while all 25 fixtures executed again. All prepared target bytes
+match the cold run and the prior compact-only baseline. Observed cold/warm port
+times were 25m 6s and 5m 13s under concurrent host load; these are not a
+controlled before/after speed benchmark. Self-host and parity were not rerun.
+These results predate the upstream regex additions and do not validate the
+combined source tree.
+The subsequent [integration record](../docs/test-cache-cleanup-integration.json)
+records a rebuilt manager and a passing full unit group on the merged tree,
+including regex, both cache regressions, Core and Figure 12.
 
 The C files `tests/native/binary_files.c` and `tests/native/host_support.c` provide binary file transport,
 environment-name enumeration, and per-process measurements/process groups.

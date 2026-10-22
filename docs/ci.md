@@ -71,5 +71,5 @@ receipt before building. GHC, Cabal and Python are blocked on the native CI path
 The workflow uploads `pr-smoke-evidence` on success or failure, including build
 and verification reports, logs, backend statuses and output. Local evidence is
 under `.mlf-build/pr-smoke/`; `result.json` records integer wall-clock seconds
-for tool building and the complete command. The native job has a 45-minute hard
+for tool building and the complete command. The native job has a 60-minute hard
 limit; this is a failure bound, not a promised runtime.
