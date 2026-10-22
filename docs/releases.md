@@ -163,9 +163,11 @@ CI on `main`, pull requests and merge queues checks release metadata and workflo
 syntax and runs five current-source compiler cases with the verified v0.3.0 seed
 in `.github/smoke-seed.env`. The seed interprets the checkout frontend and current
 and frozen target checkers; this check does not build fresh tools or execute the
-checkout LLVM backend. The Windows runtime job also runs. The aggregate
-**PR gate** succeeds only when all three jobs succeed; configure it as a required
-status check on `main` to enforce merge blocking.
+checkout LLVM backend. The Windows runtime job also runs, and the native build
+runner's 22 scheduling and lifecycle tests run on both Linux and macOS. The
+aggregate **PR gate** requires metadata, source smoke, Windows runtime, and both
+build-runner matrix jobs to succeed; configure it as a required status check on
+`main` to enforce merge blocking.
 
 Pushes to `main` and manual CI dispatches with `full_validation` enabled also run
 two separate jobs after the source check. **Fresh native compiler smoke** builds

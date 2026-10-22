@@ -9,10 +9,13 @@ The `CI` workflow runs on every pull request, merge queue group and push to
 - **Compiler source smoke**: five cases against the checkout compiler frontend
   and target checkers, interpreted by the verified published seed on macOS arm64.
 - **Native Windows runtime**: compact-GC runtime, filesystem and reproducible
-  object/executable checks on Windows.
+  object/executable checks, plus 22 native build-runner lifecycle cases on Windows.
+- **Native build runner**: 22 scheduler and process-lifecycle cases on each of
+  Linux and macOS.
 
-The aggregate runs even when a prerequisite fails and requires all three jobs
-to report `success`.
+The aggregate runs even when a prerequisite fails and requires all four
+prerequisites to report `success`. Both Linux and macOS matrix entries must pass
+for the build-runner prerequisite to succeed.
 Failed, cancelled or skipped prerequisites cannot produce a passing gate.
 There are no path filters on the required workflow. Manual dispatches retain
 the optional self-host and Windows-only modes, plus `full_validation` for fresh
@@ -50,6 +53,11 @@ native package tests, the full Figure 12 corpus, framework/process contracts and
 complete backend/state matrices remain in the separate jobs and full campaigns
 below. The required Windows job still exercises the checkout's Windows runtime.
 
+The separate required build-runner matrix compiles the C scheduler and fixtures
+with strict warnings on Ubuntu 24.04 and macOS 26. It checks bounded scheduling,
+protocol validation, deadlines, cancellation and descendant cleanup. These
+process checks do not require bootstrapping the compiler or package manager.
+
 ## Separate native and package validation
 
 **Fresh native compiler smoke** and **Native package distribution** run after
@@ -80,8 +88,9 @@ uses a private copy; the checkout stays unchanged. Reports from all three states
 are retained, and empty or incomplete reports cannot pass.
 
 The package-distribution job verifies the published compiler pinned in
-`.github/package-seed.env`, then builds the checkout `mlfpkg` and
-`compiler-tests` executables with the checked lockfile. The campaign receives
+`.github/package-seed.env`, uses the same manager bridge before reading the root
+manifest, then builds the checkout `mlfpkg` and `compiler-tests` executables with
+the checked lockfile. The campaign receives
 that manager explicitly and runs 22 resolver checks, 29 package integration
 cases, the target-dependency/scheduler fixture and 28 checked-release/distribution
 cases. Completed cases must match
@@ -135,7 +144,9 @@ also install LLVM, BDWGC and pkg-config:
 tools/release/native-ci.sh pr-smoke
 ```
 
-That build can be repeated; ordinary source/tool fingerprints validate cache reuse.
+Each full smoke invocation requires a fresh manager bootstrap directory. Before
+repeating it, move the previous `.mlf-build/pr-smoke/` directory aside or use a
+clean worktree. The three package checks verify cache reuse within the invocation.
 
 For the previous, broader smoke campaign, use the same seed environment and run:
 
@@ -215,3 +226,10 @@ including build reports, command logs, output and completion receipts. Local evi
 `.mlf-build/pr-smoke/`; `result.json` records integer wall-clock seconds for tool
 building and the complete command, plus tool and report SHA-256 fingerprints.
 The fresh-native job retains a 60-minute hard failure bound.
+
+Each required build-runner matrix entry has a ten-minute limit and retains its
+log, task plans and results in `build-runner-evidence-ubuntu-24.04` or
+`build-runner-evidence-macos-26`. Windows retains the corresponding task plans
+and results alongside its runtime verification report. Fresh-native and package
+artifacts also retain the manager bootstrap reports and command diagnostics;
+fresh-native artifacts include scheduler invocation diagnostics.
