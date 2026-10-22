@@ -12,6 +12,8 @@ void mlf_require_compact_gc_abi(void);
 /* Append-only primitive 82 and process transport v1. New compiler output
  * requires this symbol; released-seed output keeps the compact ABI above. */
 void mlf_require_process_supervisor_v1_abi(void);
+/* Append-only completion primitives 83 through 94, with scoped queues and timers. */
+void mlf_require_async_completion_v2_abi(void);
 
 typedef struct MlfValue MlfValue;
 typedef struct MlfEnv MlfEnv;

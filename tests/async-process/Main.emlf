@@ -43,6 +43,10 @@ capability = do
  assert (eqString (stringSlice unsupported 0 3) ("11" ++ nul)) "unsupported transport version accepted"
  malformed <- processSupervisor "MLF-PROCESS-1"
  assert (eqString (stringSlice malformed 0 2) ("1" ++ nul)) "unterminated request accepted"
+ negativeJobs <- processSupervisor ("MLF-PROCESS-1" ++ nul ++ "create" ++ nul ++ "-1" ++ nul ++ "1" ++ nul ++ "1" ++ nul)
+ assert (eqString (stringSlice negativeJobs 0 2) ("1" ++ nul)) "negative transport option accepted"
+ invalidMode <- processSupervisor ("MLF-PROCESS-1" ++ nul ++ "close" ++ nul ++ "0" ++ nul ++ "9" ++ nul)
+ assert (eqString (stringSlice invalidMode 0 2) ("1" ++ nul)) "out-of-range close mode accepted"
  putStrLn "PASS capability-v1"
 
 dynamic helper work = do
@@ -64,6 +68,15 @@ dynamic helper work = do
   right ignored
   committed <- await scope a
   assert (exited 23 committed) "late cancellation changed committed outcome"
+  pending <- launch scope (spec helper work "request-cancel" (args3 "hold" (work ++ "/request.ready") (work ++ "/request.release")))
+  ready scope pending (work ++ "/request.ready")
+  independent <- launch scope (spec helper work "request-independent" (args2 "exit" "0"))
+  requested <- requestCancel scope pending 61
+  right requested
+  progressed <- await scope independent
+  assert (exited 0 progressed) "unrelated child failed after requestCancel"
+  requestedOutcome <- await scope pending
+  assert (cancelled 61 requestedOutcome) "requestCancel lost cancellation reason"
   ioReturn (Right Unit))
  right result
  assertFile (work ++ "/dynamic-b.out") "B saw A=23 while C was waiting\n"
@@ -103,13 +116,18 @@ queue helper work = do
   right cancelResult
   outcome <- await scope queued
   assert (cancelled 41 outcome) "queued cancellation outcome"
+  writeFile (work ++ "/queue.release") "release\n"
+  completed <- await scope running
+  assert (exited 0 completed) "queued cancellation affected running sibling"
+  scopeChild <- launch scope (spec helper work "scope-running" (args3 "hold" (work ++ "/scope.ready") (work ++ "/scope.release")))
+  ready scope scopeChild (work ++ "/scope.ready")
   stop <- cancelScope scope 42
   right stop
-  stopped <- await scope running
+  stopped <- await scope scopeChild
   assert (cancelled 42 stopped) "scope cancellation reason"
   again <- cancelScope scope 43
   right again
-  unchanged <- await scope running
+  unchanged <- await scope scopeChild
   assert (cancelled 42 unchanged) "repeated cancel changed outcome"
   refused <- submit scope (spec helper work "queue-after-stop" (args2 "exit" "0"))
   assert (errorIs 5 refused) "cancelled scope accepted submission"
@@ -215,7 +233,7 @@ transport helper work = do
  assertFile (work ++ "/transport.err") "stderr λ\n"
  putStrLn "PASS transport-argv-env-cwd-stdin"
 
-snapshot helper work = do
+inheritedEnvironment helper work = do
  result <- withProcessScope (ScopeOptions 1 1 3) (\scope -> do
   blocker <- launch scope (spec helper work "snapshot-blocker" (args3 "hold" (work ++ "/snapshot.ready") (work ++ "/snapshot.release")))
   ready scope blocker (work ++ "/snapshot.ready")
@@ -228,8 +246,8 @@ snapshot helper work = do
   ioReturn (Right Unit))
  right result
  unsetEnv "ASYNC_SNAPSHOT"
- assertFile (work ++ "/snapshot.out") "submitted value\n"
- putStrLn "PASS inherited-environment-snapshot"
+ assertFile (work ++ "/snapshot.out") "changed after submit\n"
+ putStrLn "PASS inherited-environment-at-launch"
 
 logs helper work = do
  result <- withProcessScope (ScopeOptions 1 1 1) (\scope -> do
@@ -266,7 +284,7 @@ main = do
  crossScope helper work
  timeouts helper work
  transport helper work
- snapshot helper work
+ inheritedEnvironment helper work
  logs helper work
  launchFailure work
  putStrLn "Async.Process: 13 interpreter/native contract cases passed"

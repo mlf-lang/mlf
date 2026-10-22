@@ -81,6 +81,6 @@ main = do
   expect (IM.valid (IM.fromList (L.map (\i -> Pair i i) (L.range 0 300)))) "IntMap wrapper"
   expect (IS.size (IS.union (IS.fromList (L.range 1 30)) (IS.fromList (L.range 20 50))) == 50) "IntSet union"
   expect (S.size (S.fromList compareString (Cons "z" (Cons "a" (Cons "z" Nil)))) == 2) "generic Set"
-  expect (listEquals (L.map P.primitiveCode P.allPrimitives) (L.range 0 82)) "primitive ABI sequence"
+  expect (listEquals (L.map P.primitiveCode P.allPrimitives) (L.range 0 94)) "primitive ABI sequence"
   expect (P.primitiveArity PStringSlice == 3 && P.primitiveArity PGetArgCount == 0 && L.not (P.primitiveStrict PSeq)) "primitive metadata"
   putStrLn "foundation-ok"

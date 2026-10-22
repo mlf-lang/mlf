@@ -1,0 +1,22 @@
+make : forall a. AsyncScope -> IO (Completion a)
+make scope = asyncNewCompletion scope ioReturn (panic "unexpected cell capacity")
+
+main = do
+  scope <- asyncScopeNew 1 1
+  cell <- make scope
+  asyncNewCompletion scope (\_ -> panic "cell bound bypassed") (putStrLn "cell-full")
+  waiting <- asyncSubscribeCompletion cell (\_ -> panic "cancelled waiter ran")
+  full <- asyncEnqueue scope (panic "rejected action ran")
+  ioBind (asyncSubscriptionStatus full) printInt
+  ioBind (asyncCancelSubscription waiting) printInt
+  ioBind (asyncCancelSubscription waiting) printInt
+  ioBind (asyncResolveCompletion cell 42) printInt
+  first <- asyncSubscribeCompletion cell printInt
+  ioBind (asyncCancelSubscription first) printInt
+  second <- asyncSubscribeCompletion cell printInt
+  ioBind (asyncStep scope) printInt
+  ioBind (asyncSubscriptionStatus second) printInt
+  ioBind (asyncStep scope) printInt
+  asyncScopeClose scope
+  rejected <- asyncEnqueue scope (panic "late action ran")
+  ioBind (asyncSubscriptionStatus rejected) printInt

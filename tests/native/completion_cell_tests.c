@@ -228,7 +228,36 @@ static void remove_pending_and_reuse(void) {
     }
     mlf_completion_scope_close(scope);
 }
+static void bounded_timers(void) {
+    MlfCompletionScope *scope = mlf_completion_scope_new(0, 3);
+    MlfCompletionResume *late = NULL, *first = NULL, *second = NULL, *out = NULL;
+    MlfValue *action = unit_action(), *callback = NULL, *payload = NULL;
+    expect(mlf_completion_delay(scope, 30, action, &late), MLF_COMPLETION_OK, "late timer");
+    expect(mlf_completion_delay(scope, 10, action, &first), MLF_COMPLETION_OK, "earlier timer");
+    expect(mlf_completion_delay(scope, 10, action, &second), MLF_COMPLETION_OK, "equal deadline timer");
+    expect(mlf_completion_delay(scope, 0, action, &out), MLF_COMPLETION_FULL, "timers reserve quota");
+    require(out == NULL && scope->callbacks == 3, "rejected timer retains nothing");
+    GC_gcollect();
+    mlf_completion_mature(scope, 9);
+    expect(mlf_completion_dequeue(scope, &out), MLF_COMPLETION_EMPTY, "timer not early");
+    mlf_completion_mature(scope, 10);
+    expect(mlf_completion_dequeue(scope, &out), MLF_COMPLETION_OK, "first timer ready");
+    require(out == first, "equal deadlines retain registration order");
+    expect(mlf_completion_take(scope, out, &callback, &payload), MLF_COMPLETION_OK, "take timer");
+    require(callback == action && payload == NULL, "timer keeps only IO action");
+    expect(mlf_completion_unsubscribe(scope, second), MLF_COMPLETION_OK, "cancel ready timer");
+    expect(mlf_completion_unsubscribe(scope, late), MLF_COMPLETION_OK, "cancel pending timer");
+    require(scope->callbacks == 0 && !scope->timer_head && !scope->timer_tail && !scope->ready_head,
+            "timer cancellation removes all roots and reservations");
+    expect(mlf_completion_delay(scope, 40, action, &late), MLF_COMPLETION_OK, "reuse timer slot");
+    mlf_completion_scope_close(scope);
+    require(!scope->timer_head && !scope->timer_tail && !late->continuation,
+            "scope closure removes pending timer roots");
+    mlf_completion_mature(scope, 100);
+    expect(mlf_completion_dequeue(scope, &out), MLF_COMPLETION_CLOSED, "closed timer cannot fire");
+}
 int main(void) {
+    bounded_timers();
     mixed_gc_and_lazy();
     once_and_bounds();
     owner_teardown();

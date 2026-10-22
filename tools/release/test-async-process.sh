@@ -81,7 +81,8 @@ record_inputs() {
   for file in "$fixtures"/* "$root/tools/release/test-async-process.sh" \
     "$root/libraries/mlf-foundation/Bootstrap/Types.emlf" "$root/libraries/mlf-foundation/Bootstrap/Std.emlf" \
     "$root/libraries/mlf-async/Async/Process.emlf" "$root/libraries/mlf-async/Async/Process/Internal.emlf" \
-    "$root/runtime/mlf_runtime.c" "$root/runtime/mlf_runtime.h" "$root"/runtime/mlf_process*; do
+    "$root"/runtime/*; do
+    test -f "$file" || continue
     jq --arg path "${file#"$root"/}" --arg hash "$(sha256 "$file")" '. + {($path):$hash}' "$destination" > "$destination.tmp"
     mv "$destination.tmp" "$destination"
   done
@@ -124,7 +125,7 @@ success compile "$compiler" "${include_args[@]}" "$fixtures/Main.emlf"
 success check "$compiler" --check "$work/compile.stdout"
 cmp "$fixtures/io-unit.type" "$work/check.stdout" || fail 'checked target does not have type IO Unit'
 success emit "$compiler" --xmlf-to-llvm-io-gc "$work/compile.stdout"
-grep -F 'mlf_require_process_supervisor_v1_abi' "$work/emit.stdout" >/dev/null || fail 'native target lacks the new primitive capability guard'
+grep -F 'mlf_require_async_completion_v2_abi' "$work/emit.stdout" >/dev/null || fail 'native target lacks the current async primitive capability guard'
 success link "$clang" -O2 -Wno-override-module -x ir "$work/emit.stdout" -x none "$work/runtime.o" "${libs[@]}" -o "$work/suite.native"
 export MLF_ASYNC_FIXTURE="$work/fixture"
 for backend in interpreter llvm; do

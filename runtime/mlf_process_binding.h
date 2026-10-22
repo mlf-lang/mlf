@@ -93,6 +93,12 @@ static MlfValue *mlf_process_request(MlfValue *request) {
     const char *op = fields[1];
     if (!strcmp(op,"version") && count==2) {
         status=MLF_PROCESS_OK; mlf_ps_reply_int(&reply,status); mlf_ps_reply_int(&reply,1);
+    } else if (!strcmp(op,"clock") && count==2) {
+        status=MLF_PROCESS_OK; mlf_ps_reply_int(&reply,status); mlf_ps_reply_uint(&reply,async_clock_ms());
+    } else if (!strcmp(op,"pause") && count==3) {
+        uint64_t milliseconds;
+        if (!mlf_ps_parse_uint(fields[2],1000,&milliseconds)) goto finished;
+        async_pause_ms((uint32_t)milliseconds); status=MLF_PROCESS_OK;
     } else if (!strcmp(op,"checkpoint") && count==2) {
         status=MLF_PROCESS_OK; mlf_ps_reply_int(&reply,status); mlf_ps_reply_uint(&reply,mlf_ps_serial);
     } else if (!strcmp(op,"finish") && count==4) {
@@ -139,7 +145,7 @@ static MlfValue *mlf_process_request(MlfValue *request) {
             if (count==4 && !mlf_ps_parse_wait(fields[3],&wait)) goto finished;
             status=mlf_process_wait_next(scope,wait,&event);
             if (!status) { mlf_ps_reply_int(&reply,status); mlf_ps_reply_handle(&reply,event.handle); mlf_ps_reply_outcome(&reply,&event.outcome); }
-        } else if ((!strcmp(op,"await") || !strcmp(op,"cancel")) && count==7) {
+        } else if ((!strcmp(op,"await") || !strcmp(op,"cancel") || !strcmp(op,"request-cancel")) && count==7) {
             mlf_process_handle handle;
             if (!mlf_ps_parse_handle(fields+3,&handle)) goto finished;
             if (!strcmp(op,"await")) {
@@ -150,7 +156,7 @@ static MlfValue *mlf_process_request(MlfValue *request) {
             } else {
                 uint64_t reason;
                 if (!mlf_ps_parse_uint(fields[6],INT_MAX,&reason)) goto finished;
-                status=mlf_process_cancel(scope,handle,(int)reason);
+                status=!strcmp(op,"request-cancel") ? mlf_process_request_cancel(scope,handle,(int)reason) : mlf_process_cancel(scope,handle,(int)reason);
             }
         } else if (!strcmp(op,"submit") && count>=14) {
             uint64_t environment,running,total,argc,envc;

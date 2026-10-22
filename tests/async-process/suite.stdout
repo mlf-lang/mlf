@@ -8,7 +8,7 @@ PASS normal-scope-join-closed-handle
 PASS cross-scope-handle
 PASS running-and-queued-timeout
 PASS transport-argv-env-cwd-stdin
-PASS inherited-environment-snapshot
+PASS inherited-environment-at-launch
 PASS file-backed-large-logs
 PASS explicit-launch-failure
 Async.Process: 13 interpreter/native contract cases passed

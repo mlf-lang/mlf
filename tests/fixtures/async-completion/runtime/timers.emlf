@@ -1,0 +1,28 @@
+main = do
+  scope <- asyncScopeNew 0 3
+  cancelled <- asyncDelay scope 4294967295 (panic "cancelled timer fired")
+  ioBind (asyncSubscriptionStatus cancelled) printInt
+  ioBind (asyncCancelSubscription cancelled) printInt
+  ioBind (asyncWait scope (-1)) printInt
+  first <- asyncDelay scope 0 (putStrLn "timer-zero")
+  asyncEnqueue scope (do { putStrLn "ready-first"; ioBind (asyncWait scope 0) printInt })
+  ioBind (asyncWait scope (-1)) printInt
+  ioBind (asyncStep scope) printInt
+  ioBind (asyncStep scope) printInt
+  ioBind (asyncSubscriptionStatus first) printInt
+  asyncDelay scope 10 (putStrLn "timer-later")
+  ioBind (asyncWait scope (-1)) printInt
+  ioBind (asyncStep scope) printInt
+  ioBind (asyncWait scope (-1)) printInt
+  asyncEnqueue scope (do {
+    asyncDelay scope 0 (putStrLn "nested timer");
+    ioBind (asyncStep scope) printInt;
+    asyncEnqueue scope (putStrLn "nested ready");
+    ioReturn Unit })
+  ioBind (asyncStep scope) printInt
+  ioBind (asyncStep scope) printInt
+  ioBind (asyncStep scope) printInt
+  stale <- asyncDelay scope 4294967295 (panic "closed timer fired")
+  asyncScopeClose scope
+  ioBind (asyncSubscriptionStatus stale) printInt
+  ioBind (asyncWait scope (-1)) printInt

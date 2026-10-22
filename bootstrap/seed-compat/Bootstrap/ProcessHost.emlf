@@ -9,3 +9,8 @@ begin : IO String
 begin = ioReturn "0"
 finish : forall a. String -> Either String a -> IO (Either String a)
 finish checkpoint result = ioReturn result
+
+clock : IO Int
+clock = panic "monotonic clock requires the stage-2 compiler"
+pause : Int -> IO Unit
+pause milliseconds = panic "monotonic pause requires the stage-2 compiler"

@@ -12,10 +12,16 @@ The `CI` workflow runs on every pull request, merge queue group and push to
   object/executable checks, plus the 22 native build-runner cases and dynamic process-scope lifecycle suite on Windows.
 - **Native build runner**: 22 scheduler and process-lifecycle cases on each of
   Linux and macOS, plus the dynamic process-scope suite on both.
+- **Native async completions**: traced completion storage, the real IO-driver
+  primitive ABI, forced collection and timers on Linux and macOS. The Windows
+  runtime job also executes these probes with its pinned native dependencies.
+- **Async interpreter and native parity**: a two-stage, primitive-aware macOS
+  compiler bootstrap followed by typed completion, process and Task language
+  suites on the interpreter and LLVM runtime.
 
-The aggregate runs even when a prerequisite fails and requires all four
+The aggregate runs even when a prerequisite fails and requires all six
 prerequisites to report `success`. Both Linux and macOS matrix entries must pass
-for the build-runner prerequisite to succeed.
+for each native matrix prerequisite to succeed.
 Failed, cancelled or skipped prerequisites cannot produce a passing gate.
 There are no path filters on the required workflow. Manual dispatches retain
 the optional self-host and Windows-only modes, plus `full_validation` for fresh
@@ -60,7 +66,16 @@ process checks do not require bootstrapping the compiler or package manager. The
 suite compiles the reusable supervisor directly and covers the scope API as well
 as the preserved static adapter. Compiler/interpreter parity requires the
 separate new-primitive bootstrap and MLF-level suite; the C jobs alone do not
-claim it.
+claim it. The separate required async language job supplies that evidence using
+`scripts/bootstrap-async.sh`, `tests/fixtures/async-completion/check.sh`,
+`tools/release/test-async-process.sh` and `tools/release/test-async-task.sh`.
+Its two-generation native bootstrap has a separate 120-minute job bound; the
+existing compiler source-smoke job and its 480-second command watchdog are
+unchanged. A source-smoke timeout remains a failing prerequisite even when all
+async checks pass. The language job uploads immutable snapshot identities,
+compiler hashes, build reports and per-suite command/observation receipts.
+It requires every suite's fail-closed `complete` field and backend inventory.
+Windows native probes do not claim Windows MLF language or bootstrap parity.
 
 ## Separate native and package validation
 

@@ -1,0 +1,17 @@
+make : forall a. AsyncScope -> IO (Completion a)
+make scope = asyncNewCompletion scope ioReturn (panic "unexpected cell capacity")
+
+useIdentity : (forall a. a -> a) -> IO Unit
+useIdentity identity = do { printInt (identity 42); putStrLn (identity "polymorphic") }
+
+main = do
+  scope <- asyncScopeNew 2 4
+  identityCell <- (make scope : IO (Completion (forall a. a -> a)))
+  asyncSubscribeCompletion identityCell useIdentity
+  asyncResolveCompletion identityCell ((\x -> x) : forall a. a -> a)
+  ioBind (asyncStep scope) printInt
+  cell <- make scope
+  asyncSubscribeCompletion cell (\_ -> putStrLn "lazy")
+  asyncResolveCompletion cell (panic "unused result forced")
+  ioBind (asyncStep scope) printInt
+  asyncScopeClose scope

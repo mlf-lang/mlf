@@ -109,6 +109,12 @@ mlf_process_status mlf_process_submit(mlf_process_scope, const mlf_process_spec 
 mlf_process_status mlf_process_poll(mlf_process_scope, mlf_process_event *);
 mlf_process_status mlf_process_wait_next(mlf_process_scope, double wait_seconds, mlf_process_event *);
 mlf_process_status mlf_process_await(mlf_process_scope, mlf_process_handle, double wait_seconds, mlf_process_outcome *);
+/* request_cancel accepts cancellation without pumping or joining. A queued
+ * child commits immediately; a running child's terminal event follows cleanup
+ * in later supervisor calls. The first accepted cancellation reason wins.
+ * Already committed outcomes stay unchanged. Cleanup errors are in the final
+ * outcome, not the request status. This is suitable for cooperative schedulers. */
+mlf_process_status mlf_process_request_cancel(mlf_process_scope, mlf_process_handle, int reason);
 /* cancel(handle) accepts cancellation and joins that child. cancel_scope stops
  * admission, cancels queued/running work and joins every child. Already
  * committed outcomes do not change. Both are idempotent for valid handles. */

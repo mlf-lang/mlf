@@ -28,6 +28,9 @@ Import `Async.Process` and `Bootstrap.Types`. Errors use the existing
 - `awaitWithin scope handle wait` also bounds the wait. A wait timeout does not
   cancel its child.
 - `cancel scope handle reason` accepts cancellation and joins that child.
+- `requestCancel scope handle reason` accepts cancellation without waiting for
+  cleanup. Keep polling or awaiting the handle; its terminal outcome is not
+  published until cleanup completes. Cooperative task schedulers use this form.
 - `cancelScope scope reason` stops admission, cancels queued and running work,
   and joins cleanup. Outcomes remain inspectable until scope closure.
 
@@ -94,6 +97,11 @@ cancel then join. Native shutdown also closes outstanding scopes. Output uses
 files rather than undrained capture pipes, avoiding the wait-before-drain
 problem for large stdout and stderr. The native API bounds aggregate copied
 submission metadata and retained outcomes separately from child resources.
+
+Subprocess cancellation uses forceful OS termination (SIGKILL containment
+cleanup on POSIX, Job Object termination on Windows). It does not currently
+offer a graceful signal/timeout escalation phase. Cooperative cancellation of
+MLF tasks is a separate scheduler contract.
 
 ## Compatibility
 

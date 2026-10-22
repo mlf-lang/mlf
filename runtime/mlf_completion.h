@@ -1,7 +1,7 @@
 #ifndef MLF_COMPLETION_H
 #define MLF_COMPLETION_H
 
-/* Internal representation prototype. This is not a public MLF primitive.
+/* Private representation for the opaque typed completion primitives.
  * One coordinator thread owns every operation, including draining resumptions.
  * All objects containing MlfValue pointers use scanned BDWGC allocations.
  * Cells and claimed callbacks retain their owner; no reachable object is freed.
@@ -25,18 +25,19 @@ typedef enum {
     MLF_COMPLETION_FULL,
     MLF_COMPLETION_WRONG_OWNER,
     MLF_COMPLETION_CONSUMED,
-    MLF_COMPLETION_NO_MEMORY
+    MLF_COMPLETION_NO_MEMORY,
+    MLF_COMPLETION_BUSY
 } MlfCompletionStatus;
 
 enum { MLF_CELL_PENDING, MLF_CELL_RESOLVED, MLF_CELL_CLOSED };
 enum { MLF_RESUME_PENDING, MLF_RESUME_READY, MLF_RESUME_CLAIMED,
-       MLF_RESUME_CONSUMED, MLF_RESUME_CANCELLED };
+       MLF_RESUME_TIMER, MLF_RESUME_CONSUMED, MLF_RESUME_CANCELLED };
 
 struct MlfCompletionScope {
-    int closed;
+    int closed, dispatching;
     size_t cell_limit, callback_limit, cells, callbacks;
     MlfCompletion *all_cells;
-    MlfCompletionResume *all_callbacks, *ready_head, *ready_tail;
+    MlfCompletionResume *all_callbacks, *ready_head, *ready_tail, *timer_head, *timer_tail;
 };
 struct MlfCompletion {
     MlfCompletionScope *owner;
@@ -48,7 +49,8 @@ struct MlfCompletion {
 struct MlfCompletionResume {
     MlfCompletionScope *owner;
     MlfCompletion *cell;
-    int state;
+    int state, is_action;
+    uint64_t deadline_ms;
     MlfValue *continuation, *result;
     MlfCompletionResume *all_prev, *all_next;
     MlfCompletionResume *wait_prev, *wait_next;
@@ -154,11 +156,32 @@ static inline MlfCompletionStatus mlf_completion_subscribe(MlfCompletionScope *s
     *out = resume;
     return MLF_COMPLETION_OK;
 }
+static inline MlfCompletionStatus mlf_completion_enqueue(MlfCompletionScope *scope,
+                                                         MlfValue *action,
+                                                         MlfCompletionResume **out) {
+    *out = NULL;
+    if (!scope || scope->closed) return MLF_COMPLETION_CLOSED;
+    if (scope->callbacks >= scope->callback_limit) return MLF_COMPLETION_FULL;
+    MlfCompletionResume *resume = mlf_completion_allocate(sizeof(*resume));
+    if (!resume) return MLF_COMPLETION_NO_MEMORY;
+    resume->owner = scope;
+    resume->is_action = 1;
+    resume->continuation = action;
+    resume->all_next = scope->all_callbacks;
+    if (scope->all_callbacks) scope->all_callbacks->all_prev = resume;
+    scope->all_callbacks = resume;
+    ++scope->callbacks;
+    mlf_completion_append_ready(scope, resume);
+    *out = resume;
+    return MLF_COMPLETION_OK;
+}
 static inline void mlf_completion_unlink_wait(MlfCompletionScope *scope,
                                              MlfCompletionResume *resume) {
     MlfCompletionResume **head, **tail;
     if (resume->state == MLF_RESUME_PENDING) {
         head = &resume->cell->waiting_head; tail = &resume->cell->waiting_tail;
+    } else if (resume->state == MLF_RESUME_TIMER) {
+        head = &scope->timer_head; tail = &scope->timer_tail;
     } else {
         head = &scope->ready_head; tail = &scope->ready_tail;
     }
@@ -167,6 +190,36 @@ static inline void mlf_completion_unlink_wait(MlfCompletionScope *scope,
     if (resume->wait_next) resume->wait_next->wait_prev = resume->wait_prev;
     else *tail = resume->wait_prev;
     resume->wait_prev = resume->wait_next = NULL;
+}
+/* Timer registrations reserve the same bounded callback capacity. The sorted
+ * timer list is FIFO for equal deadlines; maturation never invokes user code. */
+static inline MlfCompletionStatus mlf_completion_delay(MlfCompletionScope *scope,
+                                                       uint64_t deadline_ms,
+                                                       MlfValue *action,
+                                                       MlfCompletionResume **out) {
+    MlfCompletionStatus status = mlf_completion_enqueue(scope, action, out);
+    if (status != MLF_COMPLETION_OK) return status;
+    MlfCompletionResume *resume = *out;
+    mlf_completion_unlink_wait(scope, resume);
+    resume->state = MLF_RESUME_TIMER;
+    resume->deadline_ms = deadline_ms;
+    MlfCompletionResume *before = scope->timer_head;
+    while (before && before->deadline_ms <= deadline_ms) before = before->wait_next;
+    resume->wait_next = before;
+    resume->wait_prev = before ? before->wait_prev : scope->timer_tail;
+    if (resume->wait_prev) resume->wait_prev->wait_next = resume;
+    else scope->timer_head = resume;
+    if (before) before->wait_prev = resume;
+    else scope->timer_tail = resume;
+    return MLF_COMPLETION_OK;
+}
+static inline void mlf_completion_mature(MlfCompletionScope *scope, uint64_t now_ms) {
+    if (!scope || scope->closed) return;
+    while (scope->timer_head && scope->timer_head->deadline_ms <= now_ms) {
+        MlfCompletionResume *resume = scope->timer_head;
+        mlf_completion_unlink_wait(scope, resume);
+        mlf_completion_append_ready(scope, resume);
+    }
 }
 static inline void mlf_completion_retire(MlfCompletionScope *scope,
                                          MlfCompletionResume *resume,
@@ -239,6 +292,7 @@ static inline void mlf_completion_scope_close(MlfCompletionScope *scope) {
     }
     scope->all_cells = NULL;
     scope->all_callbacks = scope->ready_head = scope->ready_tail = NULL;
+    scope->timer_head = scope->timer_tail = NULL;
     scope->cells = scope->callbacks = 0;
 }
 #endif
