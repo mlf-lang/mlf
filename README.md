@@ -81,6 +81,10 @@ with the current bootstrap script before using these manifests with an older
 installed manager. See the [package manager guide](docs/package-manager.md) for
 the ten-library layout, dependency selection, and scheduling evidence.
 
+The separate [Async.Process utility](docs/async-process.md) adds structured,
+dynamic subprocess scopes for programs that need to submit work as results
+arrive. Generic typed tasks remain subject to the completion-storage gate.
+
 The package manager compiles each library and executable as a crate. Modules
 inside a crate are namespaces and may import one another cyclically. Value
 declarations are inferred in dependency SCCs, with closed schemes and checked

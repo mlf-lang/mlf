@@ -5,6 +5,7 @@ import Bootstrap.Std
 import qualified Bootstrap.Map as M
 import qualified Bootstrap.Data as D
 import qualified Bootstrap.Primitive as P
+import qualified Bootstrap.ProcessHost as ProcessHost
 import qualified Bootstrap.X.Check as C
 import qualified Bootstrap.X.Syntax as X
 
@@ -59,7 +60,7 @@ runEntry requireIO args term = case prepare requireIO term of
   Left message -> ioReturn (Left message)
   Right (Pair ds action) ->
     let value = evaluate ds (REnv M.empty) (X.erase term)
-    in if action then ioBind (runAction args ds value) (\result -> ioReturn (mapEither (\ignored -> Unit) result))
+    in if action then ioBind ProcessHost.begin (\checkpoint -> ioBind (runAction args ds value) (\result -> ioBind (ProcessHost.finish checkpoint result) (\cleaned -> ioReturn (mapEither (\ignored -> Unit) cleaned))))
        else ioReturn (mapEither (\v -> seq (forceValue v) Unit) value)
 
 envLookup : XName -> REnv -> Maybe (Either String RValue)
@@ -211,7 +212,7 @@ divide f a b = do
 
 isAction primitive =
   let n = P.primitiveCode primitive in
-  n <= 5 || (n >= 27 && n <= 44) || (n >= 56 && n <= 65) || (n >= 73 && n <= 81)
+  n <= 5 || (n >= 27 && n <= 44) || (n >= 56 && n <= 65) || (n >= 73 && n <= 82)
 
 isSTAction primitive = case primitive of
   PSTReturn -> true
@@ -487,6 +488,7 @@ perform args ds primitive arguments =
     PFileDigest -> checkedIO (path a) (\x -> wrapIO (fileDigest x) RString)
     PAcquireFileLock -> checkedIO (path a) (\x -> wrapIO (acquireFileLock x) RInteger)
     PReleaseFileLock -> checkedIO (integer a) (\x -> finishIO (releaseFileLock x))
+    PProcessSupervisor -> checkedIO (string a) (\request -> wrapIO (ProcessHost.request request) RString)
     _ -> ioReturn (Left "runtime action primitive arity mismatch")
 
 arraySize a = do

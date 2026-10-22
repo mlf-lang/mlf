@@ -164,6 +164,7 @@ forcePrimitive value = case value of
   PFileDigest -> Unit
   PAcquireFileLock -> Unit
   PReleaseFileLock -> Unit
+  PProcessSupervisor -> Unit
 
 forceSType : SType -> Unit
 forceSType value = case value of

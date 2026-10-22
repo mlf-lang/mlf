@@ -1,0 +1,10 @@
+{
+  "format": 1,
+  "name": "mlf-async",
+  "version": "0.3.0",
+  "dependencies": {"mlf-foundation": {"path": "../mlf-foundation"}},
+  "library": {"modules": {
+    "Async.Process": "Async/Process.emlf",
+    "Async.Process.Internal": "Async/Process/Internal.emlf"
+  }}
+}

@@ -3,6 +3,8 @@
  * The IO driver and explicitly rooted native IO entries collect. Ordinary
  * lazy evaluation and scalar primitives never collect on the native stack.
  */
+#define _DEFAULT_SOURCE 1
+#define _DARWIN_C_SOURCE 1
 #define _POSIX_C_SOURCE 200809L
 #define _XOPEN_SOURCE 700
 #include "mlf_runtime.h"
@@ -18,6 +20,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "mlf_integer64.h"
+#define MLF_PROCESS_SUPERVISOR_IMPLEMENTATION
+#include "mlf_process_supervisor.h"
 #if defined(_WIN32)
 #include "mlf_windows.h"
 #endif
@@ -113,6 +117,7 @@ static void gc_free(void *memory) {
 /* Generated modules reference exactly one ABI symbol. Linking against a
  * runtime with incompatible field offsets must fail before execution. */
 void mlf_require_compact_gc_abi(void) {}
+void mlf_require_process_supervisor_v1_abi(void) {}
 
 typedef enum {
     HOLE, BUSY, INDIRECT, THUNK, APPLICATION, CLOSURE,
@@ -140,7 +145,7 @@ typedef enum {
     READ_FILE, WRITE_FILE, FILE_EXISTS, CANONICAL_PATH, GET_ARG_COUNT, GET_ARG, PUT_ERR, EXIT_WITH,
     GET_EXECUTABLE_PATH, GET_CONTENTS,
     ST_RETURN, ST_BIND, RUN_ST, NEW_ST_ARRAY, READ_ST_ARRAY, WRITE_ST_ARRAY, LENGTH_ST_ARRAY,
-    GET_ENV, SET_ENV, UNSET_ENV, RUN_PROCESS, LIST_DIRECTORY, DIRECTORY_EXISTS, FILE_DIGEST, ACQUIRE_FILE_LOCK, RELEASE_FILE_LOCK,
+    GET_ENV, SET_ENV, UNSET_ENV, RUN_PROCESS, LIST_DIRECTORY, DIRECTORY_EXISTS, FILE_DIGEST, ACQUIRE_FILE_LOCK, RELEASE_FILE_LOCK, PROCESS_SUPERVISOR,
     PRIMITIVE_COUNT
 } Primitive;
 
@@ -213,6 +218,7 @@ typedef struct Stack {
 static Stack *active_stacks;
 static MlfRoots *native_roots;
 static void cleanup(void);
+static void mlf_process_binding_clear(void);
 static int valid_utf8(const unsigned char *bytes, size_t length);
 static int argument_count;
 static char **argument_values;
@@ -1051,7 +1057,7 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
     case READ_FILE: case WRITE_FILE: case FILE_EXISTS: case CANONICAL_PATH:
     case GET_ARG_COUNT: case GET_ARG: case PUT_ERR: case EXIT_WITH:
     case GET_EXECUTABLE_PATH: case GET_CONTENTS:
-    case GET_ENV: case SET_ENV: case UNSET_ENV: case RUN_PROCESS: case LIST_DIRECTORY: case DIRECTORY_EXISTS: case FILE_DIGEST: case ACQUIRE_FILE_LOCK: case RELEASE_FILE_LOCK:
+    case GET_ENV: case SET_ENV: case UNSET_ENV: case RUN_PROCESS: case LIST_DIRECTORY: case DIRECTORY_EXISTS: case FILE_DIGEST: case ACQUIRE_FILE_LOCK: case RELEASE_FILE_LOCK: case PROCESS_SUPERVISOR:
         return action(p, a, b);
     case WRITE_INT_ARRAY: return array_write_action(WRITE_INT_ACTION,a,b,c);
     case WRITE_DOUBLE_ARRAY: return array_write_action(WRITE_DOUBLE_ACTION,a,b,c);
@@ -1123,7 +1129,7 @@ static MlfValue *primitive(Primitive p, MlfEnv *arguments) {
         2,2,2,2,1,2,2,1,2,2,2,3,1,2,2,3,1,2,2,3,1,1,3,0,0,2,3,2,
         1,2,3,1,2,1,1,1,2,1,1,2,1,1,0,1,1,1,0,0,
         1,2,1,2,2,3,1,
-        1,2,1,2,1,1,1,1,1
+        1,2,1,2,1,1,1,1,1,1
     };
     if (arguments->count < arities[p]) {
         MlfValue *result = value(PRIMITIVE);
@@ -1232,7 +1238,7 @@ MlfValue *mlf_prim1(int64_t p, MlfValue *a) {
     case LENGTH_BYTE_ARRAY: case BYTE_ARRAY_FROM_STRING:
     case STRING_LENGTH: case STRING_FROM_CODE: case READ_DOUBLE: case DOUBLE_TO_BITS: case DOUBLE_FROM_BITS:
     case PANIC: case READ_FILE: case FILE_EXISTS: case CANONICAL_PATH: case GET_ARG: case PUT_ERR: case EXIT_WITH:
-    case GET_ENV: case UNSET_ENV: case LIST_DIRECTORY: case DIRECTORY_EXISTS: case FILE_DIGEST: case ACQUIRE_FILE_LOCK: case RELEASE_FILE_LOCK:
+    case GET_ENV: case UNSET_ENV: case LIST_DIRECTORY: case DIRECTORY_EXISTS: case FILE_DIGEST: case ACQUIRE_FILE_LOCK: case RELEASE_FILE_LOCK: case PROCESS_SUPERVISOR:
     case ST_RETURN: case RUN_ST: case LENGTH_ST_ARRAY:
         return primitive_result((Primitive)p,a,NULL,NULL);
     default: fail("unary primitive arity mismatch");
@@ -1263,6 +1269,8 @@ MlfValue *mlf_prim3(int64_t p, MlfValue *a, MlfValue *b, MlfValue *c) {
 }
 
 static void cleanup(void) {
+    mlf_process_shutdown();
+    mlf_process_binding_clear();
     while (active_stacks) {
         Stack *next = active_stacks->next;
         free(active_stacks->items);
@@ -1760,6 +1768,8 @@ MlfValue *mlf_new_int_table(void) {
     return result;
 }
 
+#include "mlf_process_binding.h"
+
 int32_t mlf_run(MlfValue *root, int64_t is_io) {
     if (!is_io) { (void)force(root); cleanup(); return 0; }
     Stack continuations = {0};
@@ -1808,6 +1818,7 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
         case FILE_DIGEST: result = os_fileDigest(operation->as.action.first); break;
         case ACQUIRE_FILE_LOCK: result = os_acquireFileLock(operation->as.action.first); break;
         case RELEASE_FILE_LOCK: result = os_releaseFileLock(operation->as.action.first); break;
+        case PROCESS_SUPERVISOR: result = mlf_process_request(operation->as.action.first); break;
 
         case PUT_ERR:
             write_error(operation->as.action.first);

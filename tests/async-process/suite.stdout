@@ -1,0 +1,14 @@
+PASS capability-v1
+PASS dynamic-nonzero-repeat-await
+PASS event-exactly-once
+PASS queued-cancel-and-bound
+PASS retained-bound
+PASS scope-left-cancel-and-join
+PASS normal-scope-join-closed-handle
+PASS cross-scope-handle
+PASS running-and-queued-timeout
+PASS transport-argv-env-cwd-stdin
+PASS inherited-environment-snapshot
+PASS file-backed-large-logs
+PASS explicit-launch-failure
+Async.Process: 13 interpreter/native contract cases passed

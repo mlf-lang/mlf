@@ -88,6 +88,7 @@ primitiveCode p = case p of
   PFileDigest -> 79
   PAcquireFileLock -> 80
   PReleaseFileLock -> 81
+  PProcessSupervisor -> 82
 
 primitiveName : Primitive -> String
 primitiveName p = case p of
@@ -174,9 +175,10 @@ primitiveName p = case p of
   PFileDigest -> "fileDigest"
   PAcquireFileLock -> "acquireFileLock"
   PReleaseFileLock -> "releaseFileLock"
+  PProcessSupervisor -> "processSupervisor"
 
 allPrimitives : List Primitive
-allPrimitives = (Cons PIOReturn (Cons PIOBind (Cons PPutStr (Cons PPutStrLn (Cons PGetLine (Cons PPrintInt (Cons PConcatString (Cons PShowInt (Cons PAddInt (Cons PSubInt (Cons PEqInt (Cons PLtInt (Cons PEqString (Cons PIfThenElse (Cons PMulInt (Cons PQuotInt (Cons PRemInt (Cons PReadInt (Cons PAddDouble (Cons PSubDouble (Cons PMulDouble (Cons PDivDouble (Cons PSqrtDouble (Cons PEqDouble (Cons PLtDouble (Cons PIntToDouble (Cons PFormatDouble (Cons PNewIntArray (Cons PReadIntArray (Cons PWriteIntArray (Cons PLengthIntArray (Cons PNewDoubleArray (Cons PReadDoubleArray (Cons PWriteDoubleArray (Cons PLengthDoubleArray (Cons PNewByteArray (Cons PReadByteArray (Cons PWriteByteArray (Cons PLengthByteArray (Cons PByteArrayFromString (Cons PPutBytes (Cons PGetByteLine (Cons PNewIntTable (Cons PReadIntTable (Cons PWriteIntTable (Cons PAndInt (Cons PStringLength (Cons PStringCodeAt (Cons PStringSlice (Cons PStringFromCode (Cons PCompareString (Cons PReadDouble (Cons PDoubleToBits (Cons PDoubleFromBits (Cons PSeq (Cons PPanic (Cons PReadFile (Cons PWriteFile (Cons PFileExists (Cons PCanonicalPath (Cons PGetArgCount (Cons PGetArg (Cons PPutErr (Cons PExitWith (Cons PGetExecutablePath (Cons PGetContents (Cons PSTReturn (Cons PSTBind (Cons PRunST (Cons PNewSTArray (Cons PReadSTArray (Cons PWriteSTArray (Cons PLengthSTArray (Cons PGetEnv (Cons PSetEnv (Cons PUnsetEnv (Cons PRunProcess (Cons PListDirectory (Cons PDirectoryExists (Cons PFileDigest (Cons PAcquireFileLock (Cons PReleaseFileLock Nil))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+allPrimitives = (Cons PIOReturn (Cons PIOBind (Cons PPutStr (Cons PPutStrLn (Cons PGetLine (Cons PPrintInt (Cons PConcatString (Cons PShowInt (Cons PAddInt (Cons PSubInt (Cons PEqInt (Cons PLtInt (Cons PEqString (Cons PIfThenElse (Cons PMulInt (Cons PQuotInt (Cons PRemInt (Cons PReadInt (Cons PAddDouble (Cons PSubDouble (Cons PMulDouble (Cons PDivDouble (Cons PSqrtDouble (Cons PEqDouble (Cons PLtDouble (Cons PIntToDouble (Cons PFormatDouble (Cons PNewIntArray (Cons PReadIntArray (Cons PWriteIntArray (Cons PLengthIntArray (Cons PNewDoubleArray (Cons PReadDoubleArray (Cons PWriteDoubleArray (Cons PLengthDoubleArray (Cons PNewByteArray (Cons PReadByteArray (Cons PWriteByteArray (Cons PLengthByteArray (Cons PByteArrayFromString (Cons PPutBytes (Cons PGetByteLine (Cons PNewIntTable (Cons PReadIntTable (Cons PWriteIntTable (Cons PAndInt (Cons PStringLength (Cons PStringCodeAt (Cons PStringSlice (Cons PStringFromCode (Cons PCompareString (Cons PReadDouble (Cons PDoubleToBits (Cons PDoubleFromBits (Cons PSeq (Cons PPanic (Cons PReadFile (Cons PWriteFile (Cons PFileExists (Cons PCanonicalPath (Cons PGetArgCount (Cons PGetArg (Cons PPutErr (Cons PExitWith (Cons PGetExecutablePath (Cons PGetContents (Cons PSTReturn (Cons PSTBind (Cons PRunST (Cons PNewSTArray (Cons PReadSTArray (Cons PWriteSTArray (Cons PLengthSTArray (Cons PGetEnv (Cons PSetEnv (Cons PUnsetEnv (Cons PRunProcess (Cons PListDirectory (Cons PDirectoryExists (Cons PFileDigest (Cons PAcquireFileLock (Cons PReleaseFileLock (Cons PProcessSupervisor Nil)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
 
 lookupTargetPrimitive : String -> Maybe Primitive
 lookupTargetPrimitive name = S.find (\p -> eqString (primitiveName p) name) allPrimitives
@@ -269,6 +271,7 @@ primitiveSignature p = case p of
   PFileDigest -> Pair Nil (Function (Applied "String" Nil) (Applied "IO" (Cons (Applied "String" Nil) Nil)))
   PAcquireFileLock -> Pair Nil (Function (Applied "String" Nil) (Applied "IO" (Cons (Applied "Int" Nil) Nil)))
   PReleaseFileLock -> Pair Nil (Function (Applied "Int" Nil) (Applied "IO" (Cons (Applied "Unit" Nil) Nil)))
+  PProcessSupervisor -> Pair Nil (Function (Applied "String" Nil) (Applied "IO" (Cons (Applied "String" Nil) Nil)))
 
 primitiveArity : Primitive -> Int
 -- Runtime application asks for arity on every partial and saturated call.
@@ -357,6 +360,7 @@ primitiveArity p = case p of
   PFileDigest -> 1
   PAcquireFileLock -> 1
   PReleaseFileLock -> 1
+  PProcessSupervisor -> 1
 fieldArity : Field -> Int
 fieldArity field = case field of
   Function a b -> 1 + fieldArity b
