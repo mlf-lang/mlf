@@ -1,0 +1,159 @@
+module Tests.PackageReleases where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+import qualified Package.Json as J
+import qualified Tests.Basic as H
+
+data Context = Context String String String
+directory (Context d _ _) = d
+manager (Context _ m _) = m
+compiler (Context _ _ c) = c
+obj = J.Object
+pair = Pair
+invoke c manifest build args success reason = do
+ let stem = directory c ++ "/release-command"
+ let prefix = Cons (manager c) (Cons "--manifest" (Cons manifest (Cons "--compiler" (Cons (compiler c) (Cons "--build-dir" (Cons build Nil))))))
+ code <- O.exec (directory c) (S.append prefix args) "" (stem ++ ".out") (stem ++ ".err") 1800
+ out <- readFile (stem ++ ".out")
+ err <- readFile (stem ++ ".err")
+ H.assert (H.eq (code == 0) success && (success || stringLength err > 0) && (eqString reason "" || H.contains reason err)) ("release command failed (" ++ showInt code ++ "): " ++ err)
+ ioReturn out
+export c source build destination = invoke c (source ++ "/mlf-package.json") build (Cons "release" (Cons destination Nil)) true ""
+dependency path digest = obj (Cons (pair "release" (J.str path)) (Cons (pair "sha256" (J.str digest)) Nil))
+setDependencies path entries = do
+ value <- J.read path
+ J.write path (J.set "dependencies" (obj entries) value)
+checked label = putStrLn ("PASS checked release: " ++ label)
+main : IO Unit
+main = H.withScratch (\dir -> do
+ root <- canonicalPath "."
+ tool <- getEnv "MLF_PACKAGE_MANAGER"
+ seed <- getEnv "MLF_BOOTSTRAP_COMPILER"
+ let c = Context dir tool seed
+ let producer = dir ++ "/producer"
+ let consumer = dir ++ "/consumer"
+ let bundle = dir ++ "/published greeting"
+ let message = dir ++ "/published message"
+ let build = dir ++ "/consumer build"
+ let app = consumer ++ "/mlf-package.json"
+ O.run "" (S.append (O.words "/bin/cp -R") (Cons (root ++ "/examples/packages") (Cons producer Nil)))
+ O.run "" (S.append (O.words "/bin/cp -R") (Cons producer (Cons consumer Nil)))
+ export c (producer ++ "/greeting") (dir ++ "/producer build") bundle
+ export c (producer ++ "/message") (dir ++ "/message build") message
+ digest <- fileDigest (bundle ++ "/release.json")
+ messageDigest <- fileDigest (message ++ "/release.json")
+ let savedGreeting = dependency "../published greeting" digest
+ setDependencies app (Cons (pair "greeting" savedGreeting) Nil)
+ -- A different source location must produce the same portable release bytes.
+ export c (consumer ++ "/greeting") (dir ++ "/other producer build") (dir ++ "/second release")
+ secondDigest <- fileDigest (dir ++ "/second release/release.json")
+ H.assert (eqString digest secondDigest) "release depends on producer source/build paths"
+ checked "deterministic export from another source/build directory"
+ invoke c (producer ++ "/greeting/mlf-package.json") (dir ++ "/producer build") (Cons "release" (Cons bundle Nil)) false ""
+ afterRefusal <- fileDigest (bundle ++ "/release.json")
+ H.assert (eqString digest afterRefusal) "existing immutable release was replaced"
+ refusedReport <- J.read (dir ++ "/producer build/build-report.json")
+ H.assert (S.not (J.getBool "complete" true refusedReport)) "failed release publication reported success"
+ checked "existing release is preserved"
+ O.remove producer
+ O.remove (dir ++ "/producer build")
+ O.remove (dir ++ "/message build")
+ O.remove (dir ++ "/other producer build")
+ O.remove (consumer ++ "/greeting")
+ O.remove (consumer ++ "/message")
+ invoke c app build (Cons "plan" Nil) true ""
+ invoke c app build (Cons "lock" Nil) true ""
+ invoke c app build (O.words "--locked test") true ""
+ initial <- J.read (build ++ "/build-report.json")
+ H.assert (S.length (J.values (J.get "releases" initial)) == 1) "release import missing from build report"
+ H.assert (S.all (\row -> S.not (H.contains "greeting/" (J.getText "crate" "" row)) && S.not (H.contains "message/" (J.getText "crate" "" row))) (J.values (J.get "crates" initial))) "dependency source was recompiled"
+ H.assert (J.equal (J.get "backends" (S.head (J.values (J.get "tests" initial)))) (J.stringArray (O.words "interpreter llvm"))) "release missed an execution backend"
+ checked "source-free locked consumer executes through interpreter and LLVM"
+ invoke c app build (Cons "test" Nil) true ""
+ reused <- J.read (build ++ "/build-report.json")
+ H.assert (S.all (J.getBool "cached" false) (J.values (J.get "builds" reused))) "unchanged release consumer missed the artifact cache"
+ checked "unchanged consumer reuses all build artifacts"
+ -- This source crate is built before the imported release and generates the
+ -- ordinary shared Prelude location first.
+ O.mkdir (consumer ++ "/helper")
+ writeFile (consumer ++ "/helper/Helper.emlf") "module Helper where\nidentity x = x\n"
+ writeFile (consumer ++ "/helper/mlf-package.json") "{\"format\":1,\"name\":\"a-helper\",\"version\":\"0.1.0\",\"library\":{\"modules\":{\"Helper\":\"Helper.emlf\"}}}\n"
+ setDependencies app (Cons (pair "a-helper" (obj (Cons (pair "path" (J.str "helper")) Nil))) (Cons (pair "greeting" savedGreeting) Nil))
+ invoke c app (dir ++ "/mixed source build") (Cons "test" Nil) true ""
+ checked "source and release dependencies share the canonical Prelude"
+ O.run "" (S.append (O.words "/bin/cp -R") (Cons (root ++ "/examples/packages/message") (Cons (consumer ++ "/source-message") Nil)))
+ setDependencies app (Cons (pair "greeting" savedGreeting) (Cons (pair "message" (obj (Cons (pair "path" (J.str "source-message")) Nil))) Nil))
+ invoke c app build (Cons "build" Nil) false "duplicate crate identity"
+ checked "conflicting source and bundled crate identities are rejected"
+ -- Independent release bundles carry the same Message and Prelude crates.
+ setDependencies app (Cons (pair "greeting" savedGreeting) (Cons (pair "message" (dependency "../published message" messageDigest)) Nil))
+ invoke c app build (Cons "test" Nil) true ""
+ checked "two releases share their transitive checked dependencies"
+ source <- readFile (consumer ++ "/Main.emlf")
+ writeFile (consumer ++ "/Main.emlf") ("module Main where\nimport Message\nmain = putStrLn (render (Message \"Hello, local packages!\"))\n")
+ invoke c app build (Cons "test" Nil) true ""
+ setDependencies app (Cons (pair "greeting" savedGreeting) Nil)
+ invoke c app build (Cons "plan" Nil) false "direct dependency"
+ writeFile (consumer ++ "/Main.emlf") source
+ checked "bundled transitive dependencies do not widen import visibility"
+ invoke c app build (Cons "lock" Nil) true ""
+ setDependencies app (Cons (pair "greeting" savedGreeting) (Cons (pair "message" (dependency "../published message" messageDigest)) Nil))
+ invoke c app build (O.words "--locked build") false "mlf.lock is stale"
+ setDependencies app (Cons (pair "greeting" savedGreeting) Nil)
+ checked "locked builds reject changed release dependencies"
+ -- Corruption of a local installation must be repaired from the verified bundle.
+ let metadata = J.getText "metadata" "" (S.head (J.values (J.get "releases" reused)))
+ writeFile (O.parent metadata ++ "/unit.mlfco") "corrupt local object"
+ invoke c app build (Cons "test" Nil) true ""
+ checked "corrupt installed objects are repaired"
+ let wrong = S.concatMapString (\_ -> "0") (S.range 0 63)
+ setDependencies app (Cons (pair "greeting" (dependency "../published greeting" wrong)) Nil)
+ invoke c app build (Cons "build" Nil) false "SHA-256"
+ setDependencies app (Cons (pair "greeting" savedGreeting) Nil)
+ checked "manifest digest pin is mandatory and checked"
+ originalManifest <- readFile (bundle ++ "/release.json")
+ release <- J.read (bundle ++ "/release.json")
+ J.write (bundle ++ "/release.json") (J.set "compiler_sha256" (J.str wrong) release)
+ incompatible <- fileDigest (bundle ++ "/release.json")
+ setDependencies app (Cons (pair "greeting" (dependency "../published greeting" incompatible)) Nil)
+ invoke c app build (Cons "build" Nil) false "compiler"
+ writeFile (bundle ++ "/release.json") originalManifest
+ setDependencies app (Cons (pair "greeting" savedGreeting) Nil)
+ checked "incompatible compiler releases are rejected"
+ appData <- J.read app
+ let hello = J.get "hello" (J.get "executables" appData)
+ J.write app (J.set "executables" (J.set "hello" (J.set "no-prelude" (J.Boolean true) hello) (J.get "executables" appData)) appData)
+ invoke c app build (Cons "build" Nil) false "Prelude"
+ J.write app appData
+ checked "incompatible Prelude modes are rejected"
+ -- A producer-controlled manifest and new pin cannot turn malformed object
+ -- bytes into a locally checked receipt.
+ let rootKey = J.getText "root" "" release
+ let crates = bundle ++ "/crates/"
+ let rootRow = S.fromMaybe (panic "missing release root") (S.find (\row -> eqString (J.getText "key" "" row) rootKey) (J.values (J.get "crates" release)))
+ let objectPath = crates ++ rootKey ++ "/unit.mlfco"
+ savedObject <- readFile objectPath
+ writeFile objectPath "forged release object"
+ invoke c app build (Cons "build" Nil) false "digest mismatch"
+ checked "bundle artifact hashes are verified even after a cache hit"
+ forgedHash <- fileDigest objectPath
+ let forgedKey = J.getText "metadata_sha256" "" rootRow ++ forgedHash
+ O.move (crates ++ rootKey) (crates ++ forgedKey)
+ let forgedRow = J.set "key" (J.str forgedKey) (J.set "object_sha256" (J.str forgedHash) rootRow)
+ let forgedManifest = J.set "root" (J.str forgedKey) (J.set "crates" (J.Array (S.map (\row -> if eqString (J.getText "key" "" row) rootKey then forgedRow else row) (J.values (J.get "crates" release)))) release)
+ J.write (bundle ++ "/release.json") forgedManifest
+ forgedDigest <- fileDigest (bundle ++ "/release.json")
+ setDependencies app (Cons (pair "greeting" (dependency "../published greeting" forgedDigest)) Nil)
+ invoke c app build (Cons "build" Nil) false "malformed crate object framing"
+ O.move (crates ++ forgedKey) (crates ++ rootKey)
+ writeFile objectPath savedObject
+ writeFile (bundle ++ "/release.json") originalManifest
+ setDependencies app (Cons (pair "greeting" savedGreeting) Nil)
+ checked "recomputed producer digests cannot bypass object checking"
+ -- Moving the entire bundle must not retain producer or installation paths.
+ O.move bundle (dir ++ "/relocated greeting")
+ setDependencies app (Cons (pair "greeting" (dependency "../relocated greeting" digest)) Nil)
+ invoke c app (dir ++ "/fresh relocated build") (Cons "test" Nil) true ""
+ checked "bundle and cache relocation preserve source-free execution"
+ putStrLn "16 checked package release cases passed")

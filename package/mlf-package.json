@@ -14,6 +14,7 @@
       "Package.CompilerTests": "Package/CompilerTests.emlf",
       "Package.Json": "Package/Json.emlf",
       "Package.Manifest": "Package/Manifest.emlf",
+      "Package.Release": "Package/Release.emlf",
       "Package.OS": "Package/OS.emlf",
       "Package.Verification": "Package/Verification.emlf",
       "Package.Benchmark": "Package/Benchmark.emlf"

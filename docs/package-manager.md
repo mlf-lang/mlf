@@ -5,8 +5,9 @@ written in MLF under `package/`. JSON parsing, local dependency resolution,
 content-addressed caching, compilation, linking, and test orchestration all run
 in the native MLF executable. The source-tree `mlfpkg` is a thin shell launcher;
 it never invokes a Python package-manager implementation. Parsing, inference,
-checked xMLF linking, and LLVM generation use the selected MLF compiler. It uses only local dependencies
-and installed tools. It never downloads a compiler or a dependency.
+checked xMLF linking, and LLVM generation use the selected MLF compiler. It uses
+local source dependencies or pinned checked release directories and installed
+tools. It never downloads a compiler or a dependency.
 
 On Windows, use native `mlfpkg.exe` with `mlf-host.exe`, native `pkg-config`,
 MinGW Clang and the GMP/BDWGC SDK described in the
@@ -250,6 +251,14 @@ in the package you selected.
 
 ## Caching and locks
 
+`mlfpkg --manifest LIBRARY/mlf-package.json release DIRECTORY` exports a
+source-free checked library and its complete dependency closure. A dependency
+can select `{"release":"../DIRECTORY","sha256":"<release.json SHA-256>"}`
+instead of `{"path":"../SOURCE"}`. Release directories are relocatable and
+require the producing compiler's exact digest. Their objects are independently
+checked on import and reused through the selected cache. See the
+[design, compatibility policy, and examples](checked-package-releases.md).
+
 Builds use explicit crate source inventories. Ambient source directories cannot
 satisfy undeclared imports. Libraries compile in crate dependency order;
 modules within a crate resolve together without a compilation order. Downstream
@@ -294,8 +303,9 @@ without executing compilers or test commands.
 
 Artifacts default to `.mlf-build` beside the selected manifest; `--build-dir`
 chooses another directory. This first version supports POSIX hosts, local source
-packages, executable/library builds, and tests. Registry publishing, remote
-dependencies, dependency version solving, installation, cross compilation,
+packages, checked release directories, executable/library builds, and tests.
+Registry publishing, automatic remote fetching, dependency version solving,
+installation, cross compilation,
 and native object-per-module linking are outside format 1. `--timeout` accepts
 positive integer seconds and applies to build commands and test processes.
 A timed-out process group is killed and returns status 124.
