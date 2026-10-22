@@ -242,10 +242,10 @@ preparePortShard c binary shard = do
  saved <- J.read (report c)
  let identity = B.info (Cons (Pair "format" (J.num 1)) (Cons (Pair "compiler" (J.get "compiler" (B.tools builder))) (Cons (Pair "manager" (J.get "manager" (B.tools builder))) (Cons (Pair "checker_sha256" (J.str checkerHash)) (Cons (Pair "sources" (J.get "sources" saved)) Nil)))))
  targets <- S.mapM (\name -> do
-  -- StateTypes retains several large, independently checked target forms.
-  -- The trial reduced its preparation from 749s to 410s with divisor 4 on a
-  -- small host; other fixtures and native builds regressed under that policy.
-  let collection = if eqString name "StateTypes" then memoryCollection else baselineCollection
+  -- These three fixtures retain large, independently checked target forms.
+  -- Fresh small-host profiling reduced SolverReuse from 2531s to 943s with
+  -- divisor 4; keep the ordinary policy for the other fixtures and builds.
+  let collection = if S.elem eqString name heavy then memoryCollection else baselineCollection
   setEnv "GC_FREE_SPACE_DIVISOR" collection
   let fixtureIdentity = J.set "gc_free_space_divisor" (J.str collection) (J.set "fixture" (J.str name) identity)
   artifact <- B.cachedChecked builder ("checked port target " ++ name) fixtureIdentity (\directory -> do
