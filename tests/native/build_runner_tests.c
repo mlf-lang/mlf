@@ -30,7 +30,7 @@ static char *finish(test_process p,int code) {
 static void state(const char *text,const char *id,const char *expected) {
     char needle[300]; snprintf(needle,sizeof(needle),"{\"id\":\"%s\",\"state\":\"%s\"",id,expected); check(strstr(text,needle)!=NULL,needle);
 }
-static long read_pid(const char *file) { check(test_await(file,10),"process marker created"); char *text=test_read(file); check(text!=NULL,"read process marker"); long pid=strtol(text,NULL,10); free(text); check(pid>0,"valid process pid"); return pid; }
+static long read_pid(const char *file) { if(!test_await(file,10)) { fprintf(stderr,"missing process marker: %s\n",file); check(0,"process marker created"); } char *text=test_read(file); check(text!=NULL,"read process marker"); long pid=strtol(text,NULL,10); free(text); check(pid>0,"valid process pid"); return pid; }
 static void stopped(long pid) { double start=test_now(); while(test_alive(pid) && test_now()-start<10) test_pause(); check(!test_alive(pid),"descendant stopped"); }
 static void tree_pids(const char *file,long pids[3]) {
     char nested[4200]; pids[0]=read_pid(file); snprintf(nested,sizeof(nested),"%s.child",file); pids[1]=read_pid(nested); snprintf(nested,sizeof(nested),"%s.grandchild",file); pids[2]=read_pid(nested);
@@ -63,8 +63,10 @@ static void failure(void) {
     char *text=finish(start(f),23); state(text,"bad","failed"); state(text,"dependent","blocked"); state(text,"transitive","blocked"); state(text,"independent","cancelled"); check(!test_exists(marker),"no launch after failure"); free(text); ++checks;
 }
 static void active_failure(void) {
-    char pidfile[4096],ready[4200]; path(pidfile,sizeof(pidfile),"active-failure-tree"); snprintf(ready,sizeof(ready),"%s.grandchild",pidfile);
-    FILE *f=begin("active-failure",2,2); char *tree[]={(char *)fixture,"tree",pidfile,NULL},*bad[]={(char *)fixture,"waitfail",ready,"23",NULL};
+    char pidfile[4096]; path(pidfile,sizeof(pidfile),"active-failure-tree");
+    /* The tree publishes its own PID only after both descendants are ready.
+     * A descendant marker alone can cancel the tree before that publication. */
+    FILE *f=begin("active-failure",2,2); char *tree[]={(char *)fixture,"tree",pidfile,NULL},*bad[]={(char *)fixture,"waitfail",pidfile,"23",NULL};
     task(f,"tree",10,NULL,NULL,NULL,NULL,tree); task(f,"bad",10,NULL,NULL,NULL,NULL,bad);
     test_process p=start(f); long pids[3]; tree_pids(pidfile,pids); char *text=finish(p,23); state(text,"tree","cancelled"); state(text,"bad","failed"); tree_stopped(pids); free(text); ++checks;
 }

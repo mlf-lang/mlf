@@ -8,9 +8,12 @@ mkdir -p "$build"
 # Clear the success receipt before any command can fail on a rerun.
 printf '{"complete":false}\n' > "$build/result.json"
 seed_compiler=${MLF_COMPILER:?verified native seed compiler required}
-seed_manager=${MLF_PACKAGE_MANAGER:?verified native seed manager required}
 started=$SECONDS
-"$seed_manager" --compiler "$seed_compiler" --runtime "$PWD/runtime/mlf_runtime.c" \
+# Released managers predate target dependency fields in the current manifests.
+# Materialize the current manager directly from source before reading them.
+MLF_COMPILER="$seed_compiler" MLF_PACKAGE_BOOTSTRAP_DIR="$build/manager-bootstrap" \
+  scripts/bootstrap-package.sh 2>&1 | tee "$build/manager-bootstrap.log"
+"$build/manager-bootstrap/mlfpkg" --compiler "$seed_compiler" --runtime "$PWD/runtime/mlf_runtime.c" \
   --timeout 1800 --locked --build-dir "$build/candidate" build 2>&1 | tee "$build/build.log"
 jq -e '.complete == true and .implementation == "MLF"' "$build/candidate/build-report.json" >/dev/null
 tools/release/ensure-build-runner.sh "$build/candidate/bin"

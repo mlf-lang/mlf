@@ -89,7 +89,20 @@ static inline int test_wait(test_process p,double bound) {
 }
 static inline int test_exists(const char *path) { FILE *f=test_open(path,"rb"); if(!f) return 0; fclose(f); return 1; }
 static inline void test_touch(const char *path) { FILE *f=test_open(path,"wb"); if(!f) abort(); fclose(f); }
-static inline void test_write_pid(const char *path) { FILE *f=test_open(path,"wb"); if(!f) abort(); fprintf(f,"%ld\n",test_pid()); fclose(f); }
+static inline void test_write_pid(const char *path) {
+    /* Readiness must never expose an empty/partially written process ID. */
+    size_t size=strlen(path)+40; char *temporary=malloc(size); if(!temporary) abort();
+    snprintf(temporary,size,"%s.%ld.tmp",path,test_pid());
+    FILE *f=test_open(temporary,"wb"); if(!f) abort();
+    if(fprintf(f,"%ld\n",test_pid())<0 || fclose(f)) abort();
+#ifdef _WIN32
+    wchar_t *from=test_wide(temporary),*to=test_wide(path);
+    if(!from || !to || _wrename(from,to)) abort(); free(from); free(to);
+#else
+    if(rename(temporary,path)) abort();
+#endif
+    free(temporary);
+}
 static inline int test_await(const char *path,double bound) { double start=test_now(); while(!test_exists(path)) { if(test_now()-start>bound) return 0; test_pause(); } return 1; }
 static inline char *test_read(const char *path) {
     FILE *f=test_open(path,"rb"); if(!f) return NULL;

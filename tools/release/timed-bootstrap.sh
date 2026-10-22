@@ -52,7 +52,7 @@ jq -n --arg commit "$(git rev-parse HEAD)" \
   --arg clang "$MLF_TIMING_CLANG" --arg clang_hash "$(shasum -a 256 "$MLF_TIMING_CLANG" | awk '{print $1}')" \
   --arg divisor "$GC_FREE_SPACE_DIVISOR" --arg initial "${GC_INITIAL_HEAP_SIZE:-}" --arg maximum "${GC_MAXIMUM_HEAP_SIZE:-}" \
   --argjson budget "$MLF_BOOTSTRAP_MAX_RSS_BYTES" \
-  '{commit:$commit,compiler:{path:$compiler,sha256:$compiler_hash},manager:{path:$manager,sha256:$manager_hash},clang:{path:$clang,sha256:$clang_hash},gc_environment:{GC_FREE_SPACE_DIVISOR:$divisor,GC_INITIAL_HEAP_SIZE:$initial,GC_MAXIMUM_HEAP_SIZE:$maximum},memory_budget_bytes:$budget,rss_units:"bytes",time_resolution_seconds:0.01}' > "$MLF_TIMING_DIR/context.json"
+  '{commit:$commit,compiler:{path:$compiler,sha256:$compiler_hash},seed_manager:{path:$manager,sha256:$manager_hash},clang:{path:$clang,sha256:$clang_hash},gc_environment:{GC_FREE_SPACE_DIVISOR:$divisor,GC_INITIAL_HEAP_SIZE:$initial,GC_MAXIMUM_HEAP_SIZE:$maximum},memory_budget_bytes:$budget,rss_units:"bytes",time_resolution_seconds:0.01}' > "$MLF_TIMING_DIR/context.json"
 tail -n +1 -f "$MLF_TIMING_DIR/events.log" &
 logger=$!
 summarized=0
@@ -67,6 +67,16 @@ finish() {
   exit "$code"
 }
 trap finish EXIT
+# The released seed manager cannot parse target dependency declarations. Build
+# the current manager from source first, retaining this cold stage and its child
+# compiler/linker measurements in the same bootstrap timing and memory budget.
+MLF_COMPILER="$MLF_TIMING_DIR/bin/emlf" CC="$MLF_TIMING_DIR/bin/clang" \
+  MLF_PACKAGE_BOOTSTRAP_DIR="$build/manager-bootstrap" \
+  "$MLF_TIMING_DRIVER" "$MLF_TIMING_DIR" manager-bootstrap "$PWD/scripts/bootstrap-package.sh"
+export MLF_PACKAGE_MANAGER="$build/manager-bootstrap/mlfpkg"
+jq --arg path "$MLF_PACKAGE_MANAGER" --arg hash "$(shasum -a 256 "$MLF_PACKAGE_MANAGER" | awk '{print $1}')" \
+  '.manager = {path:$path,sha256:$hash}' "$MLF_TIMING_DIR/context.json" > "$MLF_TIMING_DIR/context.tmp"
+mv "$MLF_TIMING_DIR/context.tmp" "$MLF_TIMING_DIR/context.json"
 "$MLF_TIMING_DRIVER" "$MLF_TIMING_DIR" package-manager "$PWD/mlfpkg" \
   --compiler "$MLF_TIMING_DIR/bin/emlf" --clang "$MLF_TIMING_DIR/bin/clang" \
   --runtime "$PWD/runtime/mlf_runtime.c" --timeout 21600 --locked --build-dir "$build" build
