@@ -4,8 +4,12 @@ on:
     inputs:
       tag:
         description: Existing immutable tag matching VERSION
-        required: true
+        required: false
         type: string
+      validation_only:
+        description: Qualify and package this exact workflow commit without publishing
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths: [.github/release-request.json]
@@ -13,14 +17,19 @@ on:
     inputs:
       tag:
         description: Existing immutable tag matching VERSION
-        required: true
+        required: false
         type: string
+      validation_only:
+        description: Qualify and package this exact workflow commit without publishing
+        type: boolean
+        default: false
 permissions:
   contents: read
+  actions: read
 env:
   GC_FREE_SPACE_DIVISOR: '1'
 concurrency:
-  group: platform-release-${{ inputs.tag || github.sha }}
+  group: platform-release-${{ inputs.validation_only && github.sha || inputs.tag || github.sha }}
   cancel-in-progress: false
 jobs:
   metadata:
@@ -32,20 +41,24 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          ref: ${{ inputs.tag || github.sha }}
+          ref: ${{ inputs.validation_only && github.sha || inputs.tag || github.sha }}
           fetch-depth: 0
       - name: Validate immutable source and requested platforms
         id: version
         env:
           REQUESTED_TAG: ${{ inputs.tag }}
           EVENT_NAME: ${{ github.event_name }}
+          VALIDATION_ONLY: ${{ inputs.validation_only }}
         run: |
           set -euo pipefail
           tools/release/check.sh
           version=$(cat VERSION)
           tag="v$version"
           source=$(git rev-parse HEAD)
-          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+          if [ "$VALIDATION_ONLY" = true ]; then
+            test -z "$REQUESTED_TAG"
+            test "$source" = "$GITHUB_SHA"
+          elif [ "$EVENT_NAME" = workflow_dispatch ] || [ -n "$REQUESTED_TAG" ]; then
             test "$REQUESTED_TAG" = "$tag"
             test "$(git rev-parse "$tag^{commit}")" = "$source"
           else
@@ -103,28 +116,17 @@ jobs:
             .mlf-build/bootstrap-stage1/build-report.json
             .mlf-build/bootstrap-stage1/timing/
           retention-days: 14
-  posix-tests:
-    name: ${{ matrix.platform }} ${{ matrix.group }}
+  mac-prerequisites:
     needs: [metadata, mac-bootstrap]
-    runs-on: ${{ matrix.runner }}
+    runs-on: macos-26
     timeout-minutes: 360
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [macos-arm64, linux-x64]
-        group: [unit, packages, self-host, parity, backends, port]
-        include:
-          - platform: macos-arm64
-            runner: macos-26
-          - platform: linux-x64
-            runner: ubuntu-24.04
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ needs.metadata.outputs.source }}
       - name: Native dependencies
         env:
-          PLATFORM: ${{ matrix.platform }}
+          PLATFORM: macos-arm64
         run: |
           if [ "$PLATFORM" = macos-arm64 ]; then
             brew install llvm gmp pkg-config bdw-gc
@@ -139,76 +141,141 @@ jobs:
             echo "$llvm_bin" >> "$GITHUB_PATH"
           fi
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
-        if: matrix.platform == 'macos-arm64'
         with:
           name: mac-candidate
           path: .mlf-build/mac-candidate
-      - name: Select identical macOS candidate
-        if: matrix.platform == 'macos-arm64'
+      - name: Build the macOS qualification candidate once
         run: |
           tar -xzf .mlf-build/mac-candidate/tools.tar.gz -C .mlf-build/mac-candidate
-          echo "MLF_COMPILER=$PWD/.mlf-build/mac-candidate/bin/emlf" >> "$GITHUB_ENV"
-          echo "MLF_PACKAGE_MANAGER=$PWD/.mlf-build/mac-candidate/bin/mlfpkg" >> "$GITHUB_ENV"
-      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
-        if: matrix.platform == 'linux-x64'
+          export MLF_COMPILER="$PWD/.mlf-build/mac-candidate/bin/emlf"
+          export MLF_PACKAGE_MANAGER="$PWD/.mlf-build/mac-candidate/bin/mlfpkg"
+          . tools/release/native-environment.sh
+          ./mlfpkg --runtime "$PWD/runtime/mlf_runtime.c" --timeout 21600 --locked build
+      - name: Build shared qualification libraries and checker
+        run: tools/release/prepare-qualification.sh
+      - name: Verify and archive genuine native outputs
+        run: tools/release/shared-candidate.sh export
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: portable-llvm
-          path: .mlf-build/portable-llvm
-      - name: Bootstrap native Linux tools from verified LLVM
-        if: matrix.platform == 'linux-x64'
-        run: tools/release/bootstrap-linux.sh .mlf-build/portable-llvm
-      - name: Run complete native compiler group
-        env:
-          TEST_GROUP: ${{ matrix.group }}
-        run: |
-          tools/release/native-ci.sh "$TEST_GROUP"
-      - name: Collect exact candidate and primary evidence
-        if: always()
-        env:
-          TEST_GROUP: ${{ matrix.group }}
-        run: |
-          mkdir -p .mlf-build/release-evidence/bin .mlf-build/release-evidence/compiler-tests .mlf-build/release-evidence/diagnostics
-          for tool in emlf mlfpkg; do
-            if test -f ".mlf-build/bin/$tool"; then cp ".mlf-build/bin/$tool" .mlf-build/release-evidence/bin/; fi
-          done
-          if test -d ".mlf-build/compiler-tests/$TEST_GROUP"; then
-            cp -R ".mlf-build/compiler-tests/$TEST_GROUP" .mlf-build/release-evidence/compiler-tests/
-            find .mlf-build/release-evidence/compiler-tests -type f ! -name verification.json ! -name '*.log' ! -name '*.stderr' ! -name '*.err' ! -name '*.status.json' ! -name rows.jsonl ! -name current-label ! -path '*/port-*/matrix-*/case-14-interpreter.stdout' ! -path '*/port-*/matrix-*/case-19-interpreter.stdout' ! -path '*/port-*/matrix-*/case-23-interpreter.stdout' -delete
-          fi
-          log_group=$TEST_GROUP
-          case "$TEST_GROUP" in port-*) log_group=port ;; esac
-          if test -f ".mlf-build/tests/$log_group.log"; then
-            cp ".mlf-build/tests/$log_group.log" ".mlf-build/release-evidence/diagnostics/$TEST_GROUP.log"
-            tail -n 50 ".mlf-build/tests/$log_group.log"
-          fi
+          name: candidate-macos-arm64
+          path: .mlf-build/shared-candidate/
+          compression-level: 0
+          retention-days: 14
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
-          name: native-${{ matrix.platform }}-${{ matrix.group }}
+          name: candidate-macos-arm64-diagnostics
           include-hidden-files: true
-          path: .mlf-build/release-evidence/
+          path: |
+            .mlf-build/build-report.json
+            .mlf-build/prerequisites/tests/build-report.json
+            .mlf-build/prerequisites/tests/commands/*.stderr
           retention-days: 14
-  posix-package:
-    needs: [metadata, posix-tests]
+  linux-candidate:
+    needs: [metadata, mac-bootstrap]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.metadata.outputs.source }}
+      - name: Native dependencies
+        env:
+          PLATFORM: linux-x64
+        run: |
+          if [ "$PLATFORM" = macos-arm64 ]; then
+            brew install llvm gmp pkg-config bdw-gc
+            echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+            echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
+          else
+            sudo apt-get update
+            sudo apt-get install -y clang llvm libgmp-dev libgc-dev pkg-config jq
+            llvm_bin=$(llvm-config --bindir)
+            test -x "$llvm_bin/clang"
+            test -x "$llvm_bin/llvm-profdata"
+            echo "$llvm_bin" >> "$GITHUB_PATH"
+          fi
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: portable-llvm
+          path: .mlf-build/portable-llvm
+      - name: Build the Linux candidate once from verified LLVM
+        run: |
+          . tools/release/native-environment.sh
+          tools/release/bootstrap-linux.sh .mlf-build/portable-llvm .mlf-build/linux-bootstrap .mlf-build
+      - name: Build shared qualification libraries and checker
+        run: tools/release/prepare-qualification.sh
+      - name: Verify and archive genuine native outputs
+        run: tools/release/shared-candidate.sh export
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: candidate-linux-x64
+          path: .mlf-build/shared-candidate/
+          compression-level: 0
+          retention-days: 14
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: candidate-linux-x64-diagnostics
+          include-hidden-files: true
+          path: |
+            .mlf-build/build-report.json
+            .mlf-build/prerequisites/tests/build-report.json
+            .mlf-build/prerequisites/tests/commands/*.stderr
+          retention-days: 14
+  mac-tests:
+    name: macos-arm64 ${{ matrix.group }}
+    needs: [metadata, mac-prerequisites]
+    runs-on: macos-26
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        # Submit the long groups first while macOS runner capacity is limited.
+        group: [port, unit, backends, parity, packages, self-host]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.metadata.outputs.source }}
+      - uses: ./.github/actions/posix-qualification
+        with:
+          platform: macos-arm64
+          group: ${{ matrix.group }}
+          source: ${{ needs.metadata.outputs.source }}
+  linux-tests:
+    name: linux-x64 ${{ matrix.group }}
+    needs: [metadata, linux-candidate]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        # Submit the long groups first while macOS runner capacity is limited.
+        group: [port, unit, backends, parity, packages, self-host]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.metadata.outputs.source }}
+      - uses: ./.github/actions/posix-qualification
+        with:
+          platform: linux-x64
+          group: ${{ matrix.group }}
+          source: ${{ needs.metadata.outputs.source }}
+  mac-package:
+    name: posix-package (macos-arm64, macos-26)
+    needs: [metadata, mac-tests]
     permissions:
       contents: read
       actions: read
-    runs-on: ${{ matrix.runner }}
+    runs-on: macos-26
     timeout-minutes: 30
-    strategy:
-      matrix:
-        include:
-          - platform: macos-arm64
-            runner: macos-26
-          - platform: linux-x64
-            runner: ubuntu-24.04
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ needs.metadata.outputs.source }}
       - name: Native linking dependencies
         env:
-          PLATFORM: ${{ matrix.platform }}
+          PLATFORM: macos-arm64
         run: |
           if [ "$PLATFORM" = macos-arm64 ]; then
             brew install llvm gmp pkg-config bdw-gc
@@ -225,7 +292,7 @@ jobs:
       - name: Download digest-checked qualification archives sequentially
         env:
           GH_TOKEN: ${{ github.token }}
-          PLATFORM: ${{ matrix.platform }}
+          PLATFORM: macos-arm64
           SOURCE_COMMIT: ${{ needs.metadata.outputs.source }}
         run: |
           for part in unit packages self-host parity backends port; do
@@ -237,7 +304,53 @@ jobs:
           tools/release/package.sh .mlf-build/release-input .mlf-build/release tools/release/licenses/BDWGC.txt
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: release-${{ matrix.platform }}
+          name: release-macos-arm64
+          path: .mlf-build/release/*.tar.gz
+          retention-days: 30
+  linux-package:
+    name: posix-package (linux-x64, ubuntu-24.04)
+    needs: [metadata, linux-tests]
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.metadata.outputs.source }}
+      - name: Native linking dependencies
+        env:
+          PLATFORM: linux-x64
+        run: |
+          if [ "$PLATFORM" = macos-arm64 ]; then
+            brew install llvm gmp pkg-config bdw-gc
+            echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+            echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
+          else
+            sudo apt-get update
+            sudo apt-get install -y clang llvm libgmp-dev libgc-dev pkg-config jq
+            llvm_bin=$(llvm-config --bindir)
+            test -x "$llvm_bin/clang"
+            test -x "$llvm_bin/llvm-profdata"
+            echo "$llvm_bin" >> "$GITHUB_PATH"
+          fi
+      - name: Download digest-checked qualification archives sequentially
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PLATFORM: linux-x64
+          SOURCE_COMMIT: ${{ needs.metadata.outputs.source }}
+        run: |
+          for part in unit packages self-host parity backends port; do
+            name="native-$PLATFORM-$part"
+            bash tools/release/download-artifact.sh "$GITHUB_RUN_ID" "$name" ".mlf-build/release-input/$name" "$SOURCE_COMMIT"
+          done
+      - name: Verify six groups and test the relocated installation
+        run: |
+          tools/release/package.sh .mlf-build/release-input .mlf-build/release tools/release/licenses/BDWGC.txt
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: release-linux-x64
           path: .mlf-build/release/*.tar.gz
           retention-days: 30
   windows:
@@ -282,7 +395,8 @@ jobs:
             .mlf-build/windows-native/*.log
           retention-days: 14
   publish:
-    needs: [metadata, posix-package, windows]
+    if: ${{ !inputs.validation_only }}
+    needs: [metadata, mac-package, linux-package, windows]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -326,3 +440,36 @@ jobs:
           awk -v version="$RELEASE_VERSION" '$0 ~ "^## " version " " {active=1;next} /^## / {if(active)exit} active' CHANGELOG.md > .mlf-build/publish/NOTES.md
           gh release create "$RELEASE_TAG" --verify-tag --draft --prerelease --latest=false --title "MLF $RELEASE_VERSION — Windows, macOS and Linux preview" --notes-file .mlf-build/publish/NOTES.md .mlf-build/publish/*.tar.gz .mlf-build/publish/*.zip .mlf-build/publish/SHA256SUMS
           gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+  validation:
+    if: ${{ inputs.validation_only }}
+    needs: [metadata, mac-package, linux-package, windows]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.metadata.outputs.source }}
+      - name: Check all three packaged source commits without publishing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_COMMIT: ${{ needs.metadata.outputs.source }}
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+          for platform in macos-arm64 linux-x64 windows-x64; do
+            tools/release/download-artifact.sh "$GITHUB_RUN_ID" "release-$platform" ".mlf-build/validation/$platform" "$SOURCE_COMMIT"
+            name="mlf-$RELEASE_VERSION-$platform"
+            if [ "$platform" = windows-x64 ]; then
+              test "$(unzip -p ".mlf-build/validation/$platform/$name.zip" "$name/COMMIT")" = "$SOURCE_COMMIT"
+            else
+              test "$(tar -xOf ".mlf-build/validation/$platform/$name.tar.gz" "$name/COMMIT")" = "$SOURCE_COMMIT"
+            fi
+          done
+          find .mlf-build/validation -type f \( -name '*.tar.gz' -o -name '*.zip' \) -exec sha256sum {} + > .mlf-build/validation/SHA256SUMS
+          jq -n --arg source "$SOURCE_COMMIT" --arg run "$GITHUB_RUN_ID" '{complete:true,published:false,source:$source,run:$run,platforms:["macos-arm64","linux-x64","windows-x64"]}' > .mlf-build/validation/validation.json
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: validation-summary
+          path: |
+            .mlf-build/validation/validation.json
+            .mlf-build/validation/SHA256SUMS
+          retention-days: 30
