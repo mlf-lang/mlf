@@ -71,7 +71,9 @@ isolatedActionResults directory = do
  coordinator <- B.isolate base (directory ++ "/coordinator")
  first <- B.isolate coordinator (directory ++ "/worker-first")
  second <- B.isolate coordinator (directory ++ "/worker-second")
- one <- B.cachedResult first "isolation fixture" J.empty (\path -> writeFile (path ++ "/value") "checked artifact")
+ one <- B.cachedResult first "isolation fixture" J.empty (\path -> do
+  writeFile (directory ++ "/first-cache-work") path
+  writeFile (path ++ "/value") "checked artifact")
  two <- B.cachedResult second "isolation fixture" J.empty (\_ -> H.fail "shared checked cache unexpectedly rebuilt")
  H.assert (eqString (B.artifactPath one) (B.artifactPath two) && S.not (J.getBool "cached" true one) && J.getBool "cached" false two) "isolated actions lost their own cache provenance"
  H.assert (J.has "value" (J.get "files" one) && J.equal (J.get "files" one) (J.get "files" two)) "action results omitted artifact checksums"
@@ -85,7 +87,14 @@ isolatedActionResults directory = do
  writeFile (B.artifactPath one ++ "/value") "corrupted"
  corruptValid <- B.validActionResult one
  H.assert (S.not corruptValid) "final validation accepted a changed action artifact"
- three <- B.cachedResult first "isolation fixture" J.empty (\path -> writeFile (path ++ "/value") "checked artifact")
+ three <- B.cachedResult first "isolation fixture" J.empty (\path -> do
+  earlier <- readFile (directory ++ "/first-cache-work")
+  H.assert (S.not (eqString path earlier) && eqString (O.parent path) cache && eqString (O.parent earlier) cache) "cache rebuild reused staging owned by an earlier action"
+  -- Model late output from a compiler whose lock-owning worker has died.
+  O.mkdir earlier
+  writeFile (earlier ++ "/stale-owner-output") "late compiler output"
+  writeFile (path ++ "/value") "checked artifact")
+ H.assert (S.not (J.has "stale-owner-output" (J.get "files" three))) "cache rebuild published output from an earlier staging owner"
  H.assert (S.not (J.getBool "cached" true three) && J.equal (J.get "files" one) (J.get "files" three)) "isolated action accepted corruption or changed repaired bytes"
  let path = B.artifactPath three
  stamp <- J.read (path ++ "/artifact.json")

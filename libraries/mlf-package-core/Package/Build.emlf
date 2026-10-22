@@ -48,6 +48,16 @@ raw directory argv = do
   let errors = directory ++ "/query.err"
   code <- O.exec "" argv "" output errors 1800
   if code /= 0 then do { error <- readFile errors; O.fatal ("command failed (" ++ showInt code ++ "): " ++ S.intercalate " " argv ++ "\n" ++ error) } else readFile output
+-- Keep temporary directories on the destination filesystem. Each allocation
+-- has a new owner identity: a child surviving a killed lock owner cannot write
+-- into staging that a later owner publishes. Preserve whitespace in paths.
+temporaryDirectory : String -> String -> IO String
+temporaryDirectory scratch prefix = do
+  temporary <- raw scratch (Cons "mktemp" (Cons "-d" (Cons (prefix ++ "XXXXXXXX") Nil)))
+  let line = S.head (O.lines temporary)
+  let path = O.normalize (if O.ends "\r" line then stringSlice line 0 (stringLength line - 1) else line)
+  O.require (eqString (O.parent path) (O.parent prefix) && O.starts (O.base prefix) (O.base path)) "invalid temporary directory"
+  ioReturn path
 -- pkg-config uses shell-style quoting in its output; decode words without
 -- executing them. In particular, escaped spaces remain in one argv entry.
 flags : String -> List String
@@ -243,9 +253,7 @@ cachedCheckedResult b kind inputs validate action = do
   reusable <- if ownValid then validate destination else ioReturn false
   if reusable then ioReturn Unit else do
     putErr ("Building " ++ kind ++ "\n")
-    let work = destination ++ ".work"
-    O.remove work
-    O.mkdir work
+    work <- temporaryDirectory (directory b) (destination ++ ".work-")
     action work
     paths <- O.files work
     hashes <- S.mapM (\path -> do { hash <- fileDigest path; ioReturn (Pair (O.relative work path) (J.str hash)) }) paths
@@ -609,10 +617,7 @@ preparePublications : String -> List J.Json -> IO String
 preparePublications buildDirectory files = do
   let base = publicationRoot buildDirectory
   O.mkdir base
-  temporary <- raw base (Cons "mktemp" (Cons "-d" (Cons (base ++ "/transaction.XXXXXXXX") Nil)))
-  let line = S.head (O.lines temporary)
-  let transaction = O.normalize (if O.ends "\r" line then stringSlice line 0 (stringLength line - 1) else line)
-  O.require (eqString (O.parent transaction) (O.normalize base) && O.starts "transaction." (O.base transaction)) "invalid publication staging directory"
+  transaction <- temporaryDirectory base (base ++ "/transaction.")
   O.mkdir (transaction ++ "/new")
   O.mkdir (transaction ++ "/old")
   O.mkdir (transaction ++ "/restore")
