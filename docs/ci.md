@@ -4,7 +4,8 @@ The `CI` workflow runs on every pull request, merge queue group and push to
 `main`. Its stable aggregate check is **PR gate**. It requires all of:
 
 - **Release metadata**: version/manifest consistency, shell syntax, benchmark
-  provenance and checksum-pinned actionlint 1.7.12 workflow validation.
+  provenance, smoke-receipt failure regressions and checksum-pinned actionlint
+  1.7.12 workflow validation.
 - **Compiler source smoke**: five cases against the checkout compiler frontend
   and target checkers, interpreted by the verified published seed on macOS arm64.
 - **Native Windows runtime**: compact-GC runtime, filesystem and reproducible
@@ -99,8 +100,17 @@ export MLF_PACKAGE_MANAGER="$PWD/.mlf-build/pr-seed/mlf-0.3.0-macos-arm64/libexe
 tools/release/native-ci.sh source-smoke
 ```
 
-Use an unused seed-download directory. Each invocation clears its success receipt
-before validation. GHC, Cabal and Python are blocked on the native CI path.
+Use an unused seed-download directory. Each smoke invocation clears its success
+receipt before argument, runtime-profile or native environment validation,
+including when a smoke helper is invoked directly. Fifteen isolated regression
+checks cover these early failures and missing seeds across all three smoke groups:
+
+```sh
+tools/release/test-smoke-receipts.sh
+```
+
+The release metadata check runs these regressions too. GHC, Cabal and Python are
+blocked on the native CI path.
 
 To build fresh checkout tools and run the eight CLI and three package checks:
 
@@ -130,13 +140,20 @@ fixed collector setting passed in 130 seconds with a 3.17 GB peak resident set.
 Hosted timing is recorded in each run's evidence; the job limit is a failure
 bound, not a promised duration.
 
+In CI run [39804551882](https://github.com/mlf-lang/mlf/actions/runs/39804551882),
+the required source-smoke command passed in **4m47s** (287 seconds), and its
+complete job took about **5m38s**, including setup and evidence upload. Release
+metadata, Native Windows runtime and the aggregate PR gate also passed. The
+[source evidence artifact](https://github.com/mlf-lang/mlf/actions/runs/39804551882/artifacts/12437892242)
+records the tested merge commit and source/seed/output fingerprints.
+
 In CI run [39798088020](https://github.com/mlf-lang/mlf/actions/runs/39798088020),
 the fresh-native smoke command completed in **16m49s** (1,009 seconds): checkout
 tool building took **16m17s** (977 seconds), and the remaining smoke checks and
 evidence recording took **32 seconds**. In the earlier
 [run 39768304978](https://github.com/mlf-lang/mlf/actions/runs/39768304978), the
 command took 36m42s and the native job took 37m39s. That campaign built a smoke
-executable and two backend drivers; the smaller gate removes those auxiliary
+executable and two backend drivers; the smaller native suite removes those auxiliary
 builds. Fresh native runs remain dominated by building the checkout tools, which
 is why they run separately from the required source check.
 

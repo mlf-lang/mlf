@@ -2,11 +2,11 @@
 # Optional expanded campaign, including the native test harness and drivers.
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../.."
-test "$#" -eq 0
 build="$PWD/.mlf-build/extended-pr-smoke"
 mkdir -p "$build"
 # Clear the success receipt before any command can fail on a rerun.
 printf '{"complete":false}\n' > "$build/result.json"
+test "$#" -eq 0
 seed_compiler=${MLF_COMPILER:?verified native seed compiler required}
 seed_manager=${MLF_PACKAGE_MANAGER:?verified native seed manager required}
 started=$SECONDS

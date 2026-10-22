@@ -2,10 +2,10 @@
 # Interpret checkout compiler sources with the verified published seed.
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../.."
-test "$#" -eq 0
 build="$PWD/.mlf-build/source-smoke"
 mkdir -p "$build"
 printf '{"complete":false}\n' > "$build/result.json"
+test "$#" -eq 0
 seed=${MLF_COMPILER:?verified native seed compiler required}
 test -x "$seed"
 sha256() { shasum -a 256 "$1" | awk '{print $1}'; }

@@ -2,6 +2,14 @@
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../.."
 group=${1:-smoke}
+# Invalidate rerun evidence before argument checks or native environment setup.
+# Whitelist groups before using their names in an output path.
+case "$group" in
+  source-smoke|pr-smoke|extended-pr-smoke)
+    mkdir -p ".mlf-build/$group"
+    printf '{"complete":false}\n' > ".mlf-build/$group/result.json"
+    ;;
+esac
 test "$#" -le 1 || { printf '%s\n' 'Expected one test group.' >&2; exit 2; }
 case "$group" in smoke|source-smoke|pr-smoke|extended-pr-smoke|unit|packages|self-host|parity|backends|port) ;; *) exit 2 ;; esac
 test -z "${MLF_TEST_RUNTIME_PROFILE:-}" || test "$MLF_TEST_RUNTIME_PROFILE" = compact-gc || exit 2

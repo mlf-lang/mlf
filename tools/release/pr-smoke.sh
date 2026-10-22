@@ -2,10 +2,10 @@
 # Build only the checkout tools, then exercise their public CLI directly.
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../.."
-test "$#" -eq 0
 build="$PWD/.mlf-build/pr-smoke"
 mkdir -p "$build"
 printf '{"complete":false}\n' > "$build/result.json"
+test "$#" -eq 0
 seed_compiler=${MLF_COMPILER:?verified native seed compiler required}
 seed_manager=${MLF_PACKAGE_MANAGER:?verified native seed manager required}
 started=$SECONDS
