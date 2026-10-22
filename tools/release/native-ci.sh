@@ -79,7 +79,7 @@ else
   mkdir -p .mlf-build/tests ".mlf-build/compiler-tests/$evidence_group"
   logs=(".mlf-build/tests/$group.log")
   case "$group" in
-    unit) suites='core figure12 harness' ;;
+    unit) suites='core figure12 harness test-framework' ;;
     packages) suites='packages' ;;
     backends|port) suites='compact-gc' ;;
     *) suites='' ;;

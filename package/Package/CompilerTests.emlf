@@ -52,7 +52,7 @@ walk path = do
     ioReturn (S.concat nested)
 sources : String -> IO J.Json
 sources r = do
-  nested <- S.mapM (\dir -> walk (r ++ "/" ++ dir)) (O.words "scripts runtime bootstrap package examples benchmarks tests")
+  nested <- S.mapM (\dir -> walk (r ++ "/" ++ dir)) (O.words "scripts runtime bootstrap package examples benchmarks tests testing")
   let paths = S.filter (\p -> O.starts (r ++ "/benchmarks/") p || S.any (\suffix -> O.ends suffix p) (O.words ".hs .emlf .c .h .ps1 .sh .expected .json .gz")) (S.concat nested)
   hashes <- B.hashFiles (S.append paths (Cons (r ++ "/mlfpkg") (Cons (r ++ "/mlf-package.json") Nil)))
   ioReturn (J.Object (S.map (\entry -> Pair (O.relative r (S.fst entry)) (S.snd entry)) (J.items hashes)))
@@ -101,10 +101,12 @@ transports c = do
  setEnv "MLF_TEST_WORK" (output c)
  setEnv "MLF_TEST_ROOT" (output c)
 suite : TestContext -> String -> List String -> IO Unit
-suite c target expectations = do
+suite c target expectations = suiteArgs c target Nil expectations
+suiteArgs : TestContext -> String -> List String -> List String -> IO Unit
+suiteArgs c target args expectations = do
  binary <- nativeTest c target
  let log = output c ++ "/" ++ target ++ ".log"
- capture c (Cons binary Nil) log
+ capture c (Cons binary args) log
  text <- readFile log
  O.require (S.all (\expected -> contains expected text) expectations) (target ++ ": preserved coverage summary is missing")
  hash <- fileDigest log
@@ -116,6 +118,9 @@ unit c = do
  transports c
  -- Check native toolchain and runtime probes before the longer compiler suites.
  suite c "harness" (Cons "58 native benchmark/bootstrap/release harness tests passed" Nil)
+ unions <- nativeTest c "int-set-unions"
+ suiteArgs c "test-framework" (Cons "--verify-cli" (Cons (output c ++ "/framework-cli") (Cons unions Nil)))
+  (Cons "Test framework contracts passed" (Cons "Test framework CLI contracts passed" Nil))
  suite c "core" (Cons "686 checks; 0 failures" (Cons "Oracle: 6712 cases; 6703 executions" Nil))
  suite c "figure12" (Cons "43/43 expressions match regression expectations; 0 failures" (Cons "41 distinct Figure12 executions" (Cons "36 supplementary checks; 0 failures" Nil)))
 packages : TestContext -> IO Unit

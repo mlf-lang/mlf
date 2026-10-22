@@ -8,6 +8,9 @@
     },
     "mlf-package-tools": {
       "path": "../package"
+    },
+    "mlf-test": {
+      "path": "../testing"
     }
   },
   "library": {
@@ -158,6 +161,36 @@
         "Tests.NativeABI": "Tests/NativeABI.emlf",
         "Tests.ReleaseSuite": "Tests/ReleaseSuite.emlf"
       }
+    },
+    "int-set-unions": {
+      "main": "IntSetUnionsMain.emlf",
+      "profile": "compiler",
+      "modules": {
+        "Tests.IntSetUnions": "Tests/IntSetUnions.emlf"
+      }
+    },
+    "test-framework": {
+      "main": "TestFrameworkMain.emlf",
+      "profile": "compiler",
+      "modules": {
+        "Tests.TestFramework": "Tests/TestFramework.emlf",
+        "Tests.IntSetUnions": "Tests/IntSetUnions.emlf",
+        "Tests.TestFrameworkCLI": "Tests/TestFrameworkCLI.emlf"
+      }
+    }
+  },
+  "tests": {
+    "framework-cli": {
+      "requires": [
+        "test-framework",
+        "int-set-unions"
+      ],
+      "command": [
+        "{bin:test-framework}",
+        "--verify-cli",
+        "{build}/framework-cli",
+        "{bin:int-set-unions}"
+      ]
     }
   }
 }

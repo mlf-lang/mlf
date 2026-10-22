@@ -1,0 +1,22 @@
+module TestFrameworkMain where
+import Bootstrap.Types
+import qualified Package.OS as O
+import qualified Test.Assert as A
+import qualified Test.Case as C
+import qualified Test.Runner as R
+import qualified Tests.TestFramework as T
+import qualified Tests.TestFrameworkCLI as CLI
+main = do
+ args <- O.allArguments
+ case args of
+  Nil -> T.checks
+  Cons "--legacy-fail-probe" Nil -> case C.toLegacy (C.test "probe/legacy" "legacy failure" Nil (A.fail "legacy assertion failure")) of { Pair _ action -> action }
+  Cons "--verify-cli" (Cons directory (Cons unions Nil)) -> do { T.checks; CLI.main directory unions }
+  Cons "--probe" rest -> do { code <- R.run rest T.probeCases; exitWith code }
+  Cons "--noisy-probe" rest -> do
+   code <- R.run rest (Cons (C.test "probe/noisy" "stdout logging" Nil (A.liftIO (putStrLn "test action output"))) Nil)
+   exitWith code
+  Cons "--list-probe" rest -> do
+   code <- R.run rest (Cons (C.test "probe/unexecuted" "listing must not execute" Nil (A.liftIO (panic "listing executed an action" : IO Unit))) Nil)
+   exitWith code
+  _ -> O.fatal "test-framework [--probe ARGS... | --list-probe --list ARGS...]"

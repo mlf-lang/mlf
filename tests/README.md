@@ -7,9 +7,16 @@ The old Haskell/Python suites and Haskell compiler have been removed.
 No GHC, Cabal, or Python executable is needed. C fixtures live in `tests/native/`;
 benchmark baselines and golden oracle data remain unchanged.
 
+The reusable [`mlf-test` library](../testing/README.md) provides `Test.Case`,
+`Test.Assert` and `Test.Runner`. `int-set-unions` is the first focused runner
+target; its existing Core entry still runs the same sorted-list oracle and all
+276 distinct inputs. `test-framework` checks failure continuation, selection,
+inventory validation, JSON diagnostics and legacy adapters. The root `unit` group runs both the library and CLI contract checks in addition
+to the existing 686 Core checks.
+
 The shared test library contains eight helper, transport, collection-wrapper
 and independent-checker modules. Each executable explicitly lists the private
-test modules imported by its entry point. All 77 test modules remain reachable
+test modules imported by its entry point. All original 77 test modules remain reachable
 across those entries. Building `port` and its six reference programs now compiles
 21 test modules including their two entries, instead of compiling all 79 first.
 `mlfpkg --manifest tests/mlf-package.json plan` checks those import boundaries;
@@ -49,7 +56,7 @@ wrapper chooses 4 for port on hosts with at most 8 GiB RAM, while preserving the
 
 | Root group | MLF entry | Preserved coverage |
 | --- | --- | --- |
-| unit | CoreMain, Figure12SuiteMain, HarnessMain | 686 compiler checks; 6712 Algorithm W cases represented by 6703 executions; annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks; all 43 Figure 12 labels with 41 distinct executions and 36 controls; 58 benchmark/bootstrap/release harness methods |
+| unit | CoreMain, Figure12SuiteMain, HarnessMain, TestFrameworkMain | framework API/CLI contracts; 686 compiler checks; 6712 Algorithm W cases represented by 6703 executions; annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks; all 43 Figure 12 labels with 41 distinct executions and 36 controls; 58 benchmark/bootstrap/release harness methods |
 | packages | PackagesMain | 15 original resolver methods plus three additional checks; 29 compiler integration cases, including native PGO isolation, shared cache survival, corruption recovery and source invalidation |
 | backends | BackendSuiteMain | 523 fixtures and 575 execution rows on interpreter and LLVM, compact-GC layout |
 | port | PortMain, ReferencesMain | 25 LLVM fixtures with compact-GC, six reference programs, generated inference input equality |

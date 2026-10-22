@@ -57,7 +57,7 @@ done
 # Check every recorded source and detect newly added or removed inputs as well.
 jq -r '.sources | to_entries[] | "\(.value)  \(.key)"' "$base" | sha256 -c - >/dev/null
 cmp <(jq -r '.sources | keys[]' "$base" | LC_ALL=C sort) <(
-  { find scripts runtime bootstrap package examples benchmarks tests \
+  { find scripts runtime bootstrap package examples benchmarks tests testing \
     -type d \( -name .mlf-build -o -name .git -o -name dist-newstyle -o -name __pycache__ \) -prune -o \
     -type f \( -path 'benchmarks/*' -o -name '*.hs' -o -name '*.emlf' -o -name '*.c' -o -name '*.h' -o -name '*.ps1' -o -name '*.sh' -o -name '*.expected' -o -name '*.json' -o -name '*.gz' \) -print
     printf '%s\n' mlfpkg mlf-package.json; } | LC_ALL=C sort

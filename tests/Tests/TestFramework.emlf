@@ -1,0 +1,80 @@
+module Tests.TestFramework where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.Json as J
+import qualified Tests.Basic as H
+import qualified Test.Assert as A
+import qualified Test.Case as C
+import qualified Test.Runner as R
+import qualified Tests.IntSetUnions as Unions
+
+ok value = H.assert value "test framework contract changed"
+rejected value = case value of { Left _ -> return Unit; Right _ -> H.fail "invalid test selection accepted" }
+selected args cases expected = do
+ Pair _ entries <- H.right (R.plan args cases)
+ ok (S.eqList eqString (S.map C.id entries) expected)
+entry identity label tags = C.test identity label tags (A.succeed Unit)
+sample = Cons (entry "map/empty" "empty map" (Cons "fast" Nil))
+ (Cons (entry "map/insert" "insert Unicode λ" (Cons "slow" Nil))
+ (Cons (entry "list/empty" "empty list" (Cons "fast" Nil)) Nil))
+probeCases = Cons (C.test "probe/first" "first failure" Nil (A.fail "first failure"))
+ (Cons (entry "probe/middle" "continued after failure" Nil)
+ (Cons (C.test "probe/last" "last failure" Nil (A.equal eqInt showInt "different numbers" 1 2)) Nil))
+
+checks : IO Unit
+checks = do
+ -- Independent IO assertions inspect results instead of using the API under test.
+ success <- A.run (do { n <- A.liftIO (return 41); A.equal eqInt showInt "addition" 42 (n + 1); return n })
+ case success of { Right n -> ok (n == 41); Left _ -> H.fail "successful assertion failed" }
+ failure <- A.run (do { A.assert false "short circuit"; A.liftIO (panic "failed assertion continued" : IO Unit) })
+ case failure of { Left error -> ok (eqString (A.message error) "short circuit"); Right _ -> H.fail "failed assertion passed" }
+ unequal <- A.run (A.equal eqInt showInt "numbers" 7 9)
+ case unequal of
+  Left (A.Failure message (Just (Pair expected actual))) -> ok (eqString message "numbers" && eqString expected "7" && eqString actual "9")
+  _ -> H.fail "equality failure lost its expected/actual values"
+ conversion <- A.run (A.right (\text -> "error: " ++ text) (Left "bad" : Either String Unit))
+ case conversion of { Left error -> ok (eqString (A.message error) "error: bad"); Right _ -> H.fail "right accepted Left" }
+
+ selected Nil sample (S.map C.id sample)
+ selected (Cons "--filter" (Cons "empty" Nil)) sample (Cons "map/empty" (Cons "list/empty" Nil))
+ selected (Cons "--exact" (Cons "map/insert" Nil)) sample (Cons "map/insert" Nil)
+ selected (Cons "--tag" (Cons "fast" (Cons "--filter" (Cons "map/" Nil)))) sample (Cons "map/empty" Nil)
+ selected (Cons "--filter" (Cons "λ" Nil)) sample (Cons "map/insert" Nil)
+ S.mapM_ (\args -> rejected (R.plan args sample))
+  (Cons (Cons "--exact" (Cons "absent" Nil))
+  (Cons (Cons "--filter" (Cons "" Nil))
+  (Cons (Cons "--tag" Nil)
+  (Cons (Cons "--format" (Cons "xml" Nil))
+  (Cons (Cons "--unknown" Nil) Nil)))))
+ rejected (R.plan Nil Nil)
+ rejected (R.plan (Cons "--exact" (Cons "list/empty" Nil)) (S.append sample (Cons (S.head sample) Nil)))
+ S.mapM_ (\identity -> rejected (R.plan Nil (Cons (entry identity "bad" Nil) Nil))) (Cons "" (Cons "bad id" (Cons "bad\nidentity" Nil)))
+ rejected (R.plan Nil (Cons (entry "empty-name" "" Nil) Nil))
+
+ results <- R.execute probeCases
+ ok (S.eqList eqString (S.map R.identity results) (S.map C.id probeCases))
+ ok (S.eqList H.eq (S.map R.passed results) (Cons false (Cons true (Cons false Nil))))
+ let escaped = "quote\" slash\\ newline\n NUL\0 λ😀"
+ let weird = C.test "json/escaped" escaped (Cons escaped Nil) (A.fail escaped)
+ encoded <- R.execute (Cons weird Nil)
+ row <- H.right (J.parse (R.resultJson (S.head encoded)))
+ ok (eqString (J.getText "name" "" row) escaped && eqString (J.getText "message" "" row) escaped &&
+  S.eqList eqString (J.getStrings "tags" row) (Cons escaped Nil) && eqString (J.getText "status" "" row) "failed")
+ detail <- H.right (J.parse (R.resultJson (S.last results)))
+ ok (eqString (J.getText "expected" "" detail) "1" && eqString (J.getText "actual" "" detail) "2")
+ summary <- H.right (J.parse (R.summaryJson 5 3 results))
+ ok (J.equal (J.get "executed" summary) (J.num 3) && J.equal (J.get "passed" summary) (J.num 1) &&
+  J.equal (J.get "failed" summary) (J.num 2) && J.getBool "complete" false summary && eqString (J.getText "scope" "" summary) "partial")
+
+ let original = Pair "legacy label" (return Unit)
+ let adapted = C.fromIO "legacy/case" (Cons "legacy" Nil) original
+ let legacy = C.toLegacy adapted
+ let label = S.fst legacy
+ let action = S.snd legacy
+ ok (eqString label "legacy label" && S.eqList eqString (C.tags adapted) (Cons "legacy" Nil))
+ action
+ -- Reviewed separately from the migrated registry: dropping/renaming this case
+ -- must not redefine the expected inventory or the existing Core label.
+ ok (S.eqList eqString (S.map C.id Unions.cases) (Cons "int-set/union-sorted-list" Nil))
+ ok (S.eqList eqString (S.map S.fst Unions.suite) (Cons "size-biased set unions agree with independent sorted lists" Nil))
+ putStrLn "Test framework contracts passed"
