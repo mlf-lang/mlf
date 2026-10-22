@@ -66,11 +66,11 @@ try {
     $text = Invoke-ReleaseCommand "$Output/path-test.exe" @() "$Output/paths.log" $Output
     Assert-Release ($text -match 'Windows path guards passed') 'Missing path guard success marker'
     $report.path_guards = @{passed=$true;source_sha256=(Get-ReleaseHash "$root/tests/native/windows_paths.c");binary_sha256=(Get-ReleaseHash "$Output/path-test.exe")}
-    foreach ($profile in @('standard','compact-gc')) {
+    foreach ($profile in @('compact-gc')) {
         $directory = "$Output/$profile"
         New-Item -ItemType Directory -Path $directory | Out-Null
         $arguments = @('-O2','-std=c11','-mno-incremental-linker-compatible','-Wl,--no-insert-timestamp',"-I$NativePrefix/include","$root/tests/native/windows_runtime.c")
-        if ($profile -eq 'compact-gc') { $arguments += @('-DMLF_USE_BDWGC','-DMLF_COMPACT_BDWGC',"$NativePrefix/lib/libgc.dll.a") }
+        $arguments += @("$NativePrefix/lib/libgc.dll.a")
         $arguments += @("$NativePrefix/lib/libgmp.dll.a",'-lshell32','-lm','-Wl,--stack,268435456','-o',"$directory/runtime-test.exe")
         $null = Invoke-ReleaseCommand $Clang $arguments "$Output/$profile-build.log" $directory
         $text = Invoke-ReleaseCommand "$directory/runtime-test.exe" @() "$Output/$profile.log" $directory

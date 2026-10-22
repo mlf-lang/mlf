@@ -13,8 +13,7 @@ From the repository root, follow the two native generations in the
 `scripts/bootstrap-package.sh` builds the initial MLF package manager;
 subsequent builds and tests use `./mlfpkg`. The manager never downloads a
 compiler or native library. Set `MLF_GC_PREFIX` to your BDWGC installation,
-or provide its `bdw-gc.pc` metadata. Compiler-profile builds use compact
-BDWGC allocation; ordinary generated programs retain their runtime profile.
+or provide its `bdw-gc.pc` metadata. All native builds use compact BDWGC allocation.
 See [RUNTIME.txt](RUNTIME.txt) for the host primitives and allocator contract.
 
 Keep the input compiler and manager outside the candidate output directory:
@@ -30,11 +29,10 @@ export MLF_GC_PREFIX=/absolute/path/to/bdwgc-install
 The six root groups are `unit`, `packages`, `self-host`, `parity`,
 `backends`, and `port`. The self-host gate makes a fresh next-stage build
 and compares LLVM for a fixed point. Parity checks 7,086 prescribed outcomes
-using frozen oracle data and an independent MLF target checker. Backend and
-port fixtures run on the interpreter and LLVM, with standard and compact GC
-layouts. All source snapshots, commands, hashes, coverage audits, and completion
+using frozen oracle data and an independent MLF target checker. Backend fixtures run on the interpreter and LLVM; port fixtures run through
+LLVM. Native code uses the compact-GC layout. All source snapshots, commands, hashes, coverage audits, and completion
 flags are recorded under `.mlf-build/compiler-tests/`. Individual fixture
-timeouts are preserved; large interpreted graph fixtures need substantial RAM
+timeouts are preserved; large compiler graph fixtures need substantial RAM
 and the full suite uses the longer package timeout shown above.
 
 Port fixtures and their expected output remain in `bootstrap/tests/`. The six

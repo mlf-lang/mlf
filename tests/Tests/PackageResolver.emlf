@@ -40,7 +40,13 @@ main = Sys.withScratch (\directory -> do
   H.assert (J.equal (J.get "modules" doc) (J.stringArray (Cons "Base" (Cons "App" Nil)))) "package ordering changed")
  check "test_dependency_paths_are_manifest_relative" (do
   app <- make r "relative" "Relative" (Cons (Pair "base" "../base") Nil) "import Base"
-  plan r app true "")
+  let elsewhere = directory ++ "/elsewhere"
+  let away = Resolver (elsewhere ++ "/current") manager
+  O.mkdir (root away)
+  ignored <- make (Resolver elsewhere manager) "base" "Decoy" Nil ""
+  text <- plan away app true ""
+  doc <- H.right (J.parse text)
+  H.assert (J.equal (J.get "modules" doc) (J.stringArray (Cons "Base" (Cons "Relative" Nil)))) "dependency resolved relative to the working directory")
  check "test_diamond_and_canonical_symlink" (do
   left <- make r "left" "Left" (Cons (Pair "base" "../base") Nil) "import Base"
   O.run "" (Cons "/bin/ln" (Cons "-s" (Cons (directory ++ "/base") (Cons (directory ++ "/base-link") Nil))))

@@ -6,7 +6,7 @@ import qualified Bootstrap.Map as M
 import qualified Bootstrap.Set as S
 
 initial : B.Output
-initial = B.Output 0 Nil "entry" Nil Nil M.empty M.empty S.empty M.empty S.empty S.empty S.empty M.empty true M.empty M.empty M.empty M.empty M.empty S.empty 16
+initial = B.Output 0 Nil "entry" Nil Nil M.empty M.empty S.empty M.empty S.empty S.empty S.empty M.empty true M.empty M.empty M.empty M.empty M.empty S.empty
 
 -- Keep only each next Output: discarded names must not be needed to force its
 -- numeric counter. The former lazy update overflows the ordinary native stack.

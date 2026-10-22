@@ -21,7 +21,7 @@ mv "$build/mlfpkg.ll.new" "$build/mlfpkg.ll"
 # the MLF argv parser and supports spaces in all explicit tool/source paths.
 # This seed-only launcher requires a GC prefix without whitespace.
 # shellcheck disable=SC2046,SC2086
-"$cc" -O2 -std=c11 -DMLF_USE_BDWGC -DMLF_COMPACT_BDWGC -DMLF_GC_THRESHOLD=1048576 \
+"$cc" -O2 -std=c11 \
   $(pkg-config --cflags gmp) $gc_cflags -c runtime/mlf_runtime.c -o "$build/runtime.o"
 stack=""
 if [ "$(uname -s)" = Darwin ]; then stack="-Wl,-stack_size,0x10000000"; fi

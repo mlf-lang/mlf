@@ -146,8 +146,8 @@ stack. No argument points into the caller's stack. The reverse-complement
 
 The array length and buffer pointer are immutable for the array's lifetime.
 Codegen reuses their SSA loads only on dominating paths within one native
-function. It does not mark pooled storage globally invariant or reuse cell
-loads across mutations. The array header offsets (length 24, cells 32) are
+function. It does not mark managed storage globally invariant or reuse cell
+loads across mutations. The array header offsets (length 8, cells 16) are
 guarded by C static assertions. Aliases, read snapshots, bounds failures,
 and write order follow the same IO semantics as the fallback.
 LLVM TBAA distinguishes managed object storage from separately allocated
@@ -193,18 +193,17 @@ truncate toward zero, checking for division by zero before invoking GMP.
 Large-operand GMP calls read immutable operands directly, avoiding full
 operand copies; mixed operations use GMP's machine-integer entry points
 where applicable. A newly allocated result that fits the tagged range
-immediately releases its GMP storage and returns its node to the free list.
+returns an immediate value; BDWGC reclaims the unreachable boxed allocation.
 readInt validates the full length-delimited decimal input before conversion.
 Unary/binary constructors store their fields inline. Larger constructors
-retain the general environment representation. Constructor identity is at
-byte 24 and packed fields start at byte 32, as specified in mlf_runtime.h.
+use a contiguous tail. Constructor identity is at byte 8, packed fields start
+at byte 16, and wide fields start at byte 24, as specified in mlf_runtime.h.
 Only checked, evaluated constructor cases use those offsets.
 
-Fixed-size values allocate from reusable pages, not individual libc calls.
-Each node remains a separately traced object. Sweeping returns dead objects
-to the general free list; pages remain available until runtime cleanup.
-Environment and external string/GMP/array storage retain their separate allocation.
-This is a general runtime allocator, not a benchmark-specific tree arena.
+All native code uses the compact BDWGC ABI. Cleared batch allocation handles
+small values/environments; the collector traces each allocated object and
+native stack roots. Strings, GMP limbs and unboxed buffers use atomic storage.
+There is no custom object header, page pool or IO-boundary collector.
 
 Forcing a thunk updates its indirection to the resulting value. Reentrant
 demand reports a black hole. Tail applications and IO binds use explicit
@@ -220,10 +219,9 @@ values in khash. Tagged-key tables use pointer equality and promote all their
 entries to the general integer representation on the first large key. Values
 remain arbitrary integers in either representation. Repeated fused updates
 use khash lookup before its insertion path; no resize is needed for a hit.
-The mark phase retains managed keys/values and releases the library table
-at collection/exit. All indices and lengths are checked before access.
+BDWGC traces managed keys/values and reclaims unreachable tables. All indices and lengths are checked before access.
 Three-argument writes and raw slice output use dedicated tags, keeping managed
-values at 48 bytes; the mark phase retains all three operands until execution.
+values at 32 bytes; the collector retains all three operands until execution.
 No mutable read occurs while
 constructing an action, and every write forces its numeric value at execution.
 
@@ -234,26 +232,14 @@ argument list does not reset the buffer. The backend matrix checks raw lines
 on either side of the buffer boundary, mixed Unicode text reads, retained
 earlier byte arrays, and unused trailing input.
 
-Mark/sweep collection occurs at the top of the IO driver and at explicitly
-rooted allocating-native-IO entries. Roots include the current action, pending
-continuations, entry arguments and registered caller frames. Conservative
-native stack scanning is unnecessary; the collector is nonmoving.
-Marking handles cyclic recursive data, dictionaries, and boxed IntArray cells.
-Double and byte buffers contain no managed pointers. Dead strings, arrays and GMP values
-release their owned storage. All allocations and auxiliary stacks are
-released at normal exit or a reported runtime error. Long pure computations
-and numeric-only regions retain allocations until the next rooted IO entry,
-return to the driver or exit. Besides the object-count threshold, collection considers
-used GMP limb bytes, with a default budget of 8 MiB above twice the live limb
-bytes at the last collection. This is an allocation-pressure estimate, not
-total reserved GMP capacity or an RSS limit. MLF_GC_INTEGER_BYTES overrides
-the budget for testing. Neither threshold introduces collection outside an
-explicitly rooted safe point. The runtime is single
-threaded; it is not an embedding API for concurrent callers.
-The collector's mark helper remains out of line: duplicating its growable
-work-stack code for every object field caused disproportionate backend
-optimization time. Numeric native workers retain their existing inlining
-policy. Every benchmark build still compiles the complete runtime afresh.
+BDWGC is nonmoving and scans native stack frames as well as global and heap
+roots. Collection can occur during long pure computations. Pointer-bearing
+objects include boxed arrays, environments and hash tables; scalar buffers and
+GMP limbs are atomic allocations. Memoized thunks and consumed continuation
+slots clear obsolete references. Auxiliary evaluation stacks are released at
+normal exit or a reported runtime error. The runtime is single threaded and
+is not an embedding API for concurrent callers. GC_DEBUG and allocation-audit
+builds exercise the same ABI. Every benchmark sample builds fresh runtime C.
 
 Input/output uses POSIX getline and stdio. getLine preserves a final partial
 line, fails at EOF with no data, and rejects malformed UTF-8. Output preserves
@@ -273,12 +259,12 @@ target AST and scripted input to both the xMLF interpreter and LLVM native
 code. Frontend-only type and source-rejection assertions still run once.
 There is no per-fixture backend selector. A coverage audit checks that both
 backends completed every matrix row; missing executions or toolchain
-dependencies fail the suite. The current suite has 216 fixtures containing
-214 execution rows, each run on both backends. Some fixtures contain multiple
+dependencies fail the suite. The current suite has 523 fixtures containing
+575 execution rows, each run on both backends. Some fixtures contain multiple
 rows, while others check only parsing or types.
 
-The suite requires POSIX processes, clang, and pkg-config/GMP. It compiles
-the runtime with warnings as errors and a low GC threshold of 32, then
+The suite requires POSIX processes, clang, and pkg-config, GMP and BDWGC. It compiles
+the runtime with warnings as errors, then
 compiles and links emitted IR with Clang. It includes:
 
 - Rejection of malformed terms, primitive signatures, and computations.
@@ -350,7 +336,7 @@ serializes and independently checks caller-constructed target terms before
 execution. Native executables are reused for identical IR; observations are
 never cached.
 
-Run ./mlfpkg --timeout 21600 test --target backends for both complete layouts.
+Run ./mlfpkg --timeout 21600 test --target backends for the complete compact-GC differential matrix.
 The compiler/graph/annotation/oracle/Figure 12 suites run in the unit group;
 plain ./mlfpkg --timeout 21600 test includes all six groups. Runtime tracing,
 ABI probes, and transport fixtures live in tests/native/. No GHC, Cabal, or

@@ -1,6 +1,8 @@
 /* One-process LLVM optimizer and object emitter. No source-language shortcuts:
  * the independent MLF checks run before this program receives LLVM IR.
- * Verification runs on both sides of the same generic lite pass pipeline. */
+ * Verification runs on both sides of the same generic lite pass pipeline.
+ * Keep helpers out of line to bound code expansion; run CSE before combining.
+ * O1 keeps optimized register allocation without instruction scheduling cost. */
 #include <llvm-c/Analysis.h>
 #include <llvm-c/Core.h>
 #include <llvm-c/Error.h>
@@ -37,8 +39,8 @@ int main(int argc, char **argv) {
         fprintf(stderr, "usage: mlf-llvm INPUT OUTPUT TRIPLE CPU TUNE FEATURES ABI [ARCHIVE_IR]\n");
         return 2;
     }
-    const char *options_argv[] = {"mlf-llvm", "-global-isel=true", "-global-isel-abort=2"};
-    LLVMParseCommandLineOptions(3, options_argv, "");
+    const char *options_argv[] = {"mlf-llvm", "-global-isel=true", "-global-isel-abort=2", "-enable-misched=false"};
+    LLVMParseCommandLineOptions(4, options_argv, "");
     if (LLVMInitializeNativeTarget() || LLVMInitializeNativeAsmPrinter())
         fail("initialize", "native target unavailable");
     LLVMContextRef context = LLVMContextCreate();
@@ -63,7 +65,7 @@ int main(int argc, char **argv) {
     verify(module, "input verification");
     LLVMPassBuilderOptionsRef passes = LLVMCreatePassBuilderOptions();
     LLVMErrorRef pass_error = LLVMRunPasses(module,
-        "always-inline,function(instcombine,simplifycfg,early-cse,tailcallelim),globaldce",
+        "globaldce,function(early-cse,instcombine,simplifycfg,tailcallelim),globaldce",
         NULL, passes);
     if (pass_error) fail("optimize", LLVMGetErrorMessage(pass_error));
     LLVMDisposePassBuilderOptions(passes);

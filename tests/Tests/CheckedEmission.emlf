@@ -20,19 +20,17 @@ agreement = S.mapM_ (\source -> do
   compiled <- H.right (C.compile "<checked-emission>" source)
   expected <- H.right (Check.checkClosed (C.compiledTerm compiled))
   H.assert (H.eq expected (Checked.typeOf (C.checkedTerm compiled))) "witness type differs"
-  S.mapM_ (\compact -> do
-    raw <- H.right (LLVM.emitEntryChunks compact false (C.compiledTerm compiled))
-    reused <- H.right (LLVM.emitCheckedChunks compact false (C.checkedTerm compiled))
-    H.assert (S.eqList eqString raw reused) "LLVM changed when sharing the successful check")
-    (Cons false (Cons true Nil)))
+  raw <- H.right (LLVM.emitEntryChunks false (C.compiledTerm compiled))
+  reused <- H.right (LLVM.emitCheckedChunks false (C.checkedTerm compiled))
+  H.assert (S.eqList eqString raw reused) "LLVM changed when sharing the successful check")
   (Cons "42" (Cons "let id = \\x -> x in id id"
   (Cons "data Box a = Box a; case Box 42 of { Box x -> x }"
   (Cons "do { putStrLn \"checked\"; return 42 }" Nil))))
 
 rejects : IO Unit
-rejects = S.mapM_ (\term -> S.mapM_ (\compact -> do
-  H.reject (LLVM.emitEntryChunks compact false term)
-  H.reject (LLVM.emitEntryChunks compact true term)) (Cons false (Cons true Nil)))
+rejects = S.mapM_ (\term -> do
+  H.reject (LLVM.emitEntryChunks false term)
+  H.reject (LLVM.emitEntryChunks true term))
   (Cons (XVarTerm (XName 0 "free"))
   (Cons (XApp (XIntTerm 1) (XIntTerm 2))
   (Cons (XTypeApp (XIntTerm 1) XElim)
@@ -42,10 +40,9 @@ ioEntry : IO Unit
 ioEntry = do
   pure <- H.right (C.compile "<pure>" "42")
   action <- H.right (C.compile "<action>" "return 42 : IO Int")
-  S.mapM_ (\compact -> do
-    H.reject (LLVM.emitCheckedChunks compact true (C.checkedTerm pure))
-    _ <- H.right (LLVM.emitCheckedChunks compact true (C.checkedTerm action))
-    return Unit) (Cons false (Cons true Nil))
+  H.reject (LLVM.emitCheckedChunks true (C.checkedTerm pure))
+  _ <- H.right (LLVM.emitCheckedChunks true (C.checkedTerm action))
+  return Unit
 
 opaque : IO Unit
 opaque = System.withScratch (\directory -> S.mapM_ (\(Pair moduleName constructor) -> do

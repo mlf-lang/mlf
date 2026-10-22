@@ -13,19 +13,13 @@ import qualified Bootstrap.LLVM.Optimize as O
 import qualified Bootstrap.LLVM.Native as N
 
 generate : Map String (Pair Int Int) -> XErased -> Either String (Pair String (List String))
-generate cs term = generateWithHeader 16 cs term
-
-generateForGC : Map String (Pair Int Int) -> XErased -> Either String (Pair String (List String))
-generateForGC cs term = generateWithHeader 0 cs term
-
-generateWithHeader : Int -> Map String (Pair Int Int) -> XErased -> Either String (Pair String (List String))
-generateWithHeader headerBytes cs term =
+generate cs term =
   let fs = A.analyze term in
   let ks = K.kernels fs in
-  let output = Output 0 Nil "entry" Nil Nil cs fs S.empty M.empty ks S.empty (K.collecting fs ks) M.empty true M.empty M.empty M.empty M.empty (F.infer (M.map L.snd cs) fs term) S.empty headerBytes in
+  let output = Output 0 Nil "entry" Nil Nil cs fs S.empty M.empty ks S.empty (K.collecting fs ks) M.empty true M.empty M.empty M.empty M.empty (F.infer (M.map L.snd cs) fs term) S.empty in
   case runBuild (callback Nil Nothing term) output of
-    Left message -> Left message
-    Right (Pair entry out) -> Right (Pair entry (L.concat (Cons (if headerBytes == 0 then Cons "declare ptr @mlf_thunk_new(ptr, i64)" runtimeDeclarations else runtimeDeclarations) (args4 (L.append (allocationDefinition headerBytes) (L.append (thunkAllocationDefinition headerBytes) (forceDefinition headerBytes))) aliasMetadata (L.reverse (constants out)) (L.reverse (definitions out))))))
+    Left error -> Left error
+    Right (Pair entry out) -> Right (Pair entry (L.concat (Cons (Cons "declare ptr @mlf_thunk_new(ptr, i64)" runtimeDeclarations) (args4 (L.append allocationDefinition (L.append thunkAllocationDefinition forceDefinition)) aliasMetadata (L.reverse (constants out)) (L.reverse (definitions out))))))
 
 lookupName : Map XName CGBinding -> XName -> Build CGBinding
 lookupName scope name = case M.lookup O.compareName name scope of
@@ -69,8 +63,7 @@ callbackWithClear private captures argument body = do
   name <- fresh "@mlf.code."
   definition name (args2 "ptr %env" "ptr %arg") (do
     scope <- readEnvironment captures
-    header <- gets objectHeaderBytes
-    if private && header == 0 then L.mapM_ (\index -> storeEnvironment "%env" index "null") (L.range 0 (L.length captures - 1)) else cgPure Unit
+    if private then L.mapM_ (\index -> storeEnvironment "%env" index "null") (L.range 0 (L.length captures - 1)) else cgPure Unit
     let local = case argument of
           Nothing -> scope
           Just n -> M.insert O.compareName n (CGBinding "%arg" false) scope
@@ -170,13 +163,12 @@ suspended scope expression = do
   fs <- gets functions
   let captures = S.toList (A.needed fs expression)
   code <- callbackWithClear true captures Nothing expression
-  header <- gets objectHeaderBytes
-  if header /= 0 || L.null captures then do
+  if L.null captures then do
     env <- environment scope captures
     call "@mlf_thunk" (args2 (pointer code) (pointer env))
   else do
     value <- call (if L.length captures <= 28 then "@mlf.allocate.thunk" else "@mlf_thunk_new") (args2 (pointer code) (number (L.length captures)))
-    env <- loadAt "ptr" value 32
+    env <- loadAt "ptr" value 16
     L.mapM_ (\entry -> case entry of
       Pair index name -> do
         binding <- lookupName scope name
@@ -213,16 +205,13 @@ evaluate scope expression = case expression of
   XEBool b -> cgPure (immediate (if b then 6 else 2))
   XEString text -> do
     literal <- stringConstant text
-    header <- gets objectHeaderBytes
-    if header == 0 then do
-      -- Compact strings have immutable bytes and a lazily initialized Unicode
-      -- index. A writable global value is itself a BDWGC root for that index;
-      -- repeated evaluation needs no allocation or byte copying.
-      let name = L.fst literal ++ ".value"
-      let value = name ++ " = private global { i32, i32, i64, ptr, ptr } { i32 8, i32 0, i64 " ++ showInt (L.snd literal) ++ ", ptr " ++ L.fst literal ++ ", ptr null }, align 8"
-      modify (\state -> withConstants (Cons value (constants state)) state)
-      cgPure name
-    else call "@mlf_string" (args2 (pointer (L.fst literal)) (number (L.snd literal)))
+    -- Compact strings have immutable bytes and a lazily initialized Unicode
+    -- index. A writable global value is itself a BDWGC root for that index;
+    -- repeated evaluation needs no allocation or byte copying.
+    let name = L.fst literal ++ ".value"
+    let value = name ++ " = private global { i32, i32, i64, ptr, ptr } { i32 8, i32 0, i64 " ++ showInt (L.snd literal) ++ ", ptr " ++ L.fst literal ++ ", ptr null }, align 8"
+    modify (\state -> withConstants (Cons value (constants state)) state)
+    cgPure name
   XEPrimitive p -> call "@mlf_primitive" (args1 (number (P.primitiveCode p)))
   XEConstructor c -> do
     constructor <- lookupConstructor c
@@ -331,9 +320,7 @@ caseScope scope value pattern body = case pattern of
       Pair tag arity -> if L.null fields then cgPure scope else do
         -- The selected checked constructor is already a saturated WHNF.
         -- One environment lookup suffices; field values remain lazy.
-        header <- gets objectHeaderBytes
-        base <- if arity <= 2 || header == 0 then cgPure value else loadAt "ptr" value 40
-        L.foldM (bindField flags base (if arity <= 2 then 32 else if header == 0 then 40 else 24)) scope fields
+        L.foldM (bindField flags value (if arity <= 2 then 16 else 24)) scope fields
 
 fieldNeeded : Set XName -> Pair Int (Maybe XName) -> Bool
 fieldNeeded needed (Pair index optional) = case optional of
@@ -651,7 +638,7 @@ primitiveApplication scope p args = do
       _ -> primitiveCall p values
     Cons a Nil -> case p of
       PSqrtDouble -> do
-        x <- loadAt "double" a 24
+        x <- loadAt "double" a 8
         n <- result ("call double @llvm.sqrt.f64(double " ++ x ++ ")")
         call "@mlf_double" (args1 ("double " ++ n))
       _ -> primitiveCall p values
@@ -673,8 +660,8 @@ genericApplication scope expression = case expression of
 -- A single thunk can use its own update root directly. Mark it busy before
 -- calling, clear captures through its callback, then force and memoize its
 -- result. Runtime fallback preserves null/cycle errors and longer spines.
-forceDefinition : Int -> List String
-forceDefinition header = if header /= 0 then Nil else
+forceDefinition : List String
+forceDefinition =
   Cons "define private ptr @mlf.force(ptr %value) alwaysinline {" (
   Cons "entry:" (
   Cons "  %null = icmp eq ptr %value, null" (
@@ -796,8 +783,8 @@ runtimeDeclarations =
   Nil)))))))))))))))))))))))))))))))))))))))))))))))))))))))))
 
 -- Shared helpers keep emitted modules small; LLVM inlines their fast paths.
-allocationDefinition : Int -> List String
-allocationDefinition header = if header /= 0 then Nil else
+allocationDefinition : List String
+allocationDefinition =
   Cons "@mlf_constructor_pending = external global [33 x ptr]" (
   Cons "declare ptr @mlf_constructor_allocate(i64, i64)" (
   Cons "define private ptr @mlf.allocate.constructor(i64 %identity, i64 %count, i64 %size) alwaysinline {" (
@@ -857,8 +844,8 @@ allocationDefinition header = if header /= 0 then Nil else
 -- Only positive capture counts up to 28 reach this helper. They use the
 -- same rounded, traced allocation class as gc_malloc; captures start clear.
 -- The slow path handles initialization, refill and debug allocations.
-thunkAllocationDefinition : Int -> List String
-thunkAllocationDefinition header = if header /= 0 then Nil else
+thunkAllocationDefinition : List String
+thunkAllocationDefinition =
   Cons "@mlf_compact_pending = external global [17 x ptr]" (
   Cons "define private ptr @mlf.allocate.thunk(ptr %code, i64 %count) alwaysinline {" (
   Cons "entry:" (

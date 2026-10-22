@@ -7,7 +7,9 @@ must never be replaced; make a new patch release to correct a package.
 Before 1.0, patch releases preserve documented behavior and minor releases may
 change language or package interfaces. Version 0.1.1 is a developer preview.
 It has no stability or cross-platform performance guarantee. Version 0.2.0
-adds native Windows x64 and Linux x64 packages alongside macOS ARM64.
+adds native Windows x64 and Linux x64 packages alongside macOS ARM64. Version
+0.3.0 uses compact-GC for every native build and requires BDWGC; regenerate
+LLVM/object files previously built with the removed standard layout.
 
 ## Install a release
 
@@ -19,7 +21,7 @@ immutable. Download the archive matching the host and verify its checksum.
 Windows users extract the complete ZIP and, in PowerShell 7, run:
 
 ```powershell
-. ./mlf-0.2.0-windows-x64/Activate.ps1 -Clang C:/path/to/mingw/bin/clang.exe
+. ./mlf-0.3.0-windows-x64/Activate.ps1 -Clang C:/path/to/mingw/bin/clang.exe
 emlf --version
 mlfpkg --version
 ```
@@ -40,11 +42,11 @@ For Apple Silicon on macOS 26+, use:
 ```sh
 brew install gmp llvm pkg-config bdw-gc
 mkdir mlf-download && cd mlf-download
-gh release download v0.2.0 --repo mlf-lang/mlf \
-  --pattern 'mlf-0.2.0-macos-arm64.tar.gz' --pattern SHA256SUMS
-grep '  mlf-0.2.0-macos-arm64.tar.gz$' SHA256SUMS | shasum -a 256 -c -
-tar -xzf mlf-0.2.0-macos-arm64.tar.gz
-./mlf-0.2.0-macos-arm64/install.sh "$HOME/.local"
+gh release download v0.3.0 --repo mlf-lang/mlf \
+  --pattern 'mlf-0.3.0-macos-arm64.tar.gz' --pattern SHA256SUMS
+grep '  mlf-0.3.0-macos-arm64.tar.gz$' SHA256SUMS | shasum -a 256 -c -
+tar -xzf mlf-0.3.0-macos-arm64.tar.gz
+./mlf-0.3.0-macos-arm64/install.sh "$HOME/.local"
 export PATH="$HOME/.local/bin:$PATH"
 emlf --version
 mlfpkg --version
@@ -53,7 +55,7 @@ emlf --type --expr '\x -> x'
 
 The compiler and package manager do not need GHC, Cabal, or Python. GMP is a
 dynamic dependency. Clang, GMP headers, and pkg-config are needed for native
-linking; compiler-profile package builds also need BDWGC. The installer keeps
+linking; all native package builds also need BDWGC. The installer keeps
 versioned directories, validates file checksums, and preserves unrelated commands.
 Installed launchers provide `--version`; the validated native binaries remain
 unchanged. Keep the whole package when using its `bin` directory directly.
@@ -76,7 +78,7 @@ macOS hosts with a small open-file limit.
 
 If qualification succeeds but macOS artifact extraction fails, the manual
 **Recover qualified release packaging** workflow accepts the original run ID
-and exact source commit. It requires successful jobs for all fourteen POSIX
+and exact source commit. It requires successful jobs for all twelve POSIX
 groups, Windows qualification/packaging and the Linux package. It preserves
 those original binaries and reports, repeats all macOS package evidence and
 relocation checks, then publishes the original qualified source with the
@@ -89,8 +91,8 @@ Linux and Windows compile it with their native C runtimes, then rebuild the
 toolchain natively. No compiler inference/checking is bypassed. Linux and
 macOS require all six native compiler groups and a fresh self-host fixed point.
 Windows requires fresh compiler and manager LLVM fixed points, 7,086 independent
-parity cases and 160 interpreter/native executions, both runtime layout tests,
-18 native resolver checks, 26 native package integration cases, and SDK relocation and native
+parity cases and 160 interpreter/native executions, compact-GC runtime tests,
+18 native resolver checks, 29 native package integration cases, and SDK relocation and native
 executable checks. Its internal POSIX `compiler-test` transports and historical
 performance gates are not claimed as Windows qualification. Each archive
 retains the exact source/tool hashes and platform evidence.

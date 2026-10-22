@@ -5,3 +5,26 @@
 __pycache__/
 .mlf-build/
 /dist-windows/
+
+# Native compiler and debugger outputs
+*.obj
+*.mlfci
+*.mlfco
+*.pdb
+*.ilk
+*.dSYM/
+/dist-linux/
+/dist-macos/
+
+# Local system and editor files
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+*~
+*.swp
+*.swo
+
+# GitHub release workflow scratch files
+/run.json
+/jobs.json

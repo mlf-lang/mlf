@@ -3,6 +3,7 @@ import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Package.OS as O
 import qualified Package.Json as J
+import qualified Package.Verification as V
 import qualified Tests.Basic as H
 import qualified Package.Benchmark as B
 import qualified Tests.Bytes as Bytes
@@ -19,7 +20,9 @@ flags directory = do
  return (O.words output)
 compile : String -> String -> List String -> IO String
 compile directory source macros = do
- gmp <- flags directory
+ gmpOnly <- flags directory
+ gc <- collectorFlags directory
+ let gmp = S.append gmpOnly gc
  let binary = directory ++ "/probe"
  O.run "" (S.append (O.words "clang -O2 -std=c11 -Wall -Wextra -Werror -Iruntime") (S.append (Cons source (Cons "runtime/mlf_runtime.c" Nil)) (S.append macros (S.append gmp (Cons "-lm" (Cons "-o" (Cons binary Nil)))))))
  return binary
@@ -29,7 +32,7 @@ check directory binary mode status output errors = do
  H.assert (code == status && eqString out output && eqString err errors) ("native ABI " ++ mode ++ " mismatch: " ++ showInt code ++ out ++ err)
 st : IO Unit
 st = H.withScratch (\directory -> do
- binary <- compile directory "tests/native/runtime_st.c" (Cons "-DMLF_GC_THRESHOLD=32" Nil)
+ binary <- compile directory "tests/native/runtime_st.c" Nil
  check directory binary "success" 0 "runtime ST: laziness, snapshots, repetition, nesting, WHNF, and GC passed\n" ""
  S.mapM_ (\(Pair mode reason) -> check directory binary mode (if eqString mode "demand-poison" then 91 else 1) "" ((if eqString mode "demand-poison" then "" else "Runtime: ") ++ reason ++ "\n")) stErrors
  H.assert (S.length stErrors + 1 == 35) "ST ABI mode coverage changed")
@@ -37,10 +40,10 @@ stErrors = Cons (Pair "negative-size" "invalid array length") (Cons (Pair "huge-
 allocation : IO Unit
 allocation = H.withScratch (\directory -> do
  binary <- compile directory "tests/native/runtime_allocation.c" Nil
- Triple code out err <- capture directory (Cons binary (Cons "success" Nil)) ""
- value <- H.right (J.parse out)
- expected <- H.right (J.parse "{\"constructor_arities\":7,\"field_evaluations\":8,\"zero_environments\":4100,\"retained_bytes\":0}")
- H.assert (code == 0 && eqString err "" && J.equal value expected) "constructor allocation accounting mismatch"
+ S.mapM_ (\mode -> do
+  Triple code out err <- capture directory (Cons binary (Cons mode Nil)) ""
+  value <- H.right (J.parse out)
+  H.assert (code == 0 && eqString err "" && V.integer 0 (J.get "constructor_arities" value) == 7 && V.integer 0 (J.get "field_evaluations" value) == 8 && V.integer 0 (J.get "zero_environments" value) == 4100 && V.integer (-1) (J.get "retained_bytes" value) >= 0 && V.integer 4194304 (J.get "retained_bytes" value) < 4194304) "constructor allocation accounting mismatch") (O.words "success no-interior incremental")
  S.mapM_ (\mode -> check directory binary mode 1 "" ("Runtime: " ++ (if eqString mode "unset-slot" then "invalid environment read" else "invalid constructor descriptor") ++ "\n")) (O.words "negative-tag short overflow unset-slot"))
 collectorFlags : String -> IO (List String)
 collectorFlags directory = do
@@ -59,8 +62,7 @@ stringErrors = S.append
  (S.map (\mode -> Pair mode "invalid Unicode scalar") (O.words "string-invalid-prefix string-invalid-surrogate-index string-invalid-surrogate-slice string-invalid-overlong string-invalid-truncated string-invalid-stray string-invalid-range string-invalid-after-nul")))
 values : IO Unit
 values = H.withScratch (\directory -> do
- gc <- collectorFlags directory
- let profiles = Cons Nil (S.map (\macros -> S.append (O.words macros) gc) (Cons "-DMLF_USE_BDWGC" (Cons "-DMLF_USE_BDWGC -DMLF_COMPACT_BDWGC" (Cons "-DMLF_USE_BDWGC -DMLF_COMPACT_BDWGC -DGC_DEBUG" (Cons "-DMLF_USE_BDWGC -DMLF_COMPACT_BDWGC -DMLF_ALLOCATION_AUDIT" Nil)))))
+ let profiles = Cons Nil (Cons (Cons "-DGC_DEBUG" Nil) (Cons (Cons "-DMLF_ALLOCATION_AUDIT" Nil) Nil))
  S.mapM_ (\macros -> do
   binary <- compile directory "tests/native/runtime_values.c" macros
   S.mapM_ (\mode -> check directory binary mode 0 "runtime values: sharing, lazy fields, recursive data, and spill boundaries passed\n" "") (O.words "success no-interior")
@@ -71,7 +73,9 @@ compileLLVM directory source runtime macros objects = do
  Triple code out err <- capture directory (Cons compiler (Cons "--emit-llvm" (Cons source Nil))) ""
  H.assert (code == 0 && eqString err "") "selected compiler failed LLVM emission"
  writeFile (directory ++ "/program.ll") out
- gmp <- flags directory
+ gmpOnly <- flags directory
+ gc <- collectorFlags directory
+ let gmp = S.append gmpOnly gc
  let object = directory ++ "/runtime.o"
  O.run "" (S.append (O.words "clang -O2 -std=c11 -Iruntime") (S.append macros (S.append (S.filter (O.starts "-I") gmp) (Cons "-c" (Cons runtime (Cons "-o" (Cons object Nil)))))))
  let binary = directory ++ "/program"
@@ -93,7 +97,7 @@ rawConsole = H.withScratch (\directory -> do
 
 allTables : IO Unit
 allTables = H.withScratch (\directory -> do
- binary <- compileLLVM directory "benchmarks/k-nucleotide/mlf/main.emlf" "runtime/mlf_runtime.c" (O.words "-DMLF_TABLE_AUDIT -DMLF_GC_THRESHOLD=32 -Dmlf_run=mlf_original_run") (Cons "tests/native/benchmark_tables.c" Nil)
+ binary <- compileLLVM directory "benchmarks/k-nucleotide/mlf/main.emlf" "runtime/mlf_runtime.c" (O.words "-DMLF_TABLE_AUDIT -Dmlf_run=mlf_original_run") (Cons "tests/native/benchmark_tables.c" Nil)
  S.mapM_ (\size -> do
   let input = B.fasta size
   writeFile (directory ++ "/input") input
@@ -127,7 +131,7 @@ generatedForce = H.withScratch (\directory -> do
  setEnv "GC_INITIAL_HEAP_SIZE" "8388608"
  S.mapM_ (\(Pair name macros) -> do
   let binary = directory ++ "/" ++ name
-  let options = S.append (O.words "-O2 -std=c11 -Wno-override-module -Iruntime -DMLF_USE_BDWGC -DMLF_COMPACT_BDWGC") macros
+  let options = S.append (O.words "-O2 -std=c11 -Wno-override-module -Iruntime") macros
   let inputs = Cons source (Cons "runtime/mlf_runtime.c" Nil)
   -- GNU ld resolves static archives against preceding object inputs.
   -- Keep both native sources and generated LLVM before GC, GMP and libm.

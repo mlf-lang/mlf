@@ -96,6 +96,16 @@ notElem : forall a. Eq a => a -> List a -> Bool
 notElem x xs = S.not (elem x xs)
 nub : forall a. Eq a => List a -> List a
 nub xs = S.nubBy eq xs
+-- Compare actual ordered stimuli. Length buckets only avoid unrelated scans;
+-- full element equality decides whether a pair can share one execution.
+distinctListPairs : forall a. (a -> a -> Bool) -> List (Pair (List a) (List a)) -> List (Pair (List a) (List a))
+distinctListPairs equal inputs =
+ let add (Pair buckets kept) input =
+       let size = S.length (S.fst input) + S.length (S.snd input) in
+       let previous = IM.findWithDefault Nil size buckets in
+       if S.any (S.eqPair (S.eqList equal) (S.eqList equal) input) previous then Pair buckets kept
+       else Pair (IM.insert size (Cons input previous) buckets) (Cons input kept) in
+ S.reverse (S.snd (S.foldlStrict add (Pair IM.empty Nil) inputs))
 -- Match Haskell's scalar substring search without constructing every suffix.
 contains needle text = containsAt needle text (stringLength needle) (stringLength text) 0
 containsAt : String -> String -> Int -> Int -> Int -> Bool

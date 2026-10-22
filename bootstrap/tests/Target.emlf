@@ -74,6 +74,8 @@ main = do
   assert (rejectNonFinite 9218868437227405312) "Infinity reaches independent checker"
   assert (rejectNonFinite 18442240474082181120) "negative Infinity reaches independent checker"
   assert (T.alphaEq (T.substitute v (XVar w) (XForall w XBot (XArrow (XVar v) (XVar w)))) (XForall (XTyVar 2) XBot (XArrow (XVar w) (XVar (XTyVar 2))))) "capture-avoiding substitution"
-  assert (T.alphaEq (quantified 512 0 (XVar (XTyVar 512))) (quantified 512 1000 (XVar (XTyVar 1512)))) "nested binder depths survive unused binders"
-  assert (L.not (T.alphaEq (quantified 512 0 (XVar (XTyVar 512))) (quantified 512 1000 (XVar (XTyVar 1001))))) "nested binder depths distinguish inner and outer references"
-  putStrLn "target port: 20 checks passed"
+  assert (T.alphaEq (quantified 2 0 (XVar (XTyVar 2))) (quantified 2 1000 (XVar (XTyVar 1002)))) "nested binder depths survive unused binders"
+  assert (L.not (T.alphaEq (quantified 2 0 (XVar (XTyVar 2))) (quantified 2 1000 (XVar (XTyVar 1001))))) "nested binder depths distinguish inner and outer references"
+  -- Retain one separate scale regression for the alpha-comparison traversal.
+  assert (T.alphaEq (quantified 512 0 (XVar (XTyVar 512))) (quantified 512 1000 (XVar (XTyVar 1512)))) "deep binder alpha comparison"
+  putStrLn "target port: 21 checks passed"

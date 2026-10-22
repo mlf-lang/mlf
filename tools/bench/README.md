@@ -19,7 +19,12 @@ or measured jobs running. An odd sample count of at least three is required.
 Each measured compilation uses a new directory and runtime object. MLF source
 compilation overlaps runtime compilation. LLVM compilation starts when emission
 finishes; linking waits for both objects. The full boundary includes all four
-stages. C uses the manifest's unchanged flags. The critical path is approximately
+stages. Both candidate and baseline emit compact-GC using the historical -gc
+CLI spelling and link BDWGC. Collector flags and library/header identities are
+recorded in collector.json and the integrity fingerprints. Older compilers used
+as a baseline must support -gc. C uses the manifest's unchanged flags.
+Historical standard-layout measurements remain historical; new compact-GC
+measurements are a separate comparison series. The critical path is approximately
 `max(frontend + LLVM, runtime C) + link`, plus process and scheduling overhead;
 summing all four phase durations double-counts overlapping work.
 Process creation, IO, collection and exit remain in runtime measurements.
@@ -97,7 +102,11 @@ node tools/bench/configure-backend.cjs \
 
 The helper parses and verifies input IR, runs the same recorded passes, verifies
 the optimized IR, and emits an object with LLVM's O1 machine-code pipeline
-using GlobalISel.
+using GlobalISel with instruction scheduling disabled. The lite IR pipeline
+removes dead functions, runs early CSE before instruction combining, simplifies
+control flow and eliminates tail recursion. It leaves helper calls out of line
+to avoid forced expansion at every call site. O1 retains optimized register
+allocation; O0 showed substantial runtime regressions in the compact-GC audit.
 Clang supplies the target triple, CPU, tuning, features and ABI. Both the helper
 and linked LLVM library are fingerprinted in `build.json`. Runtime C compilation
 and linking remain separate timed stages, with fresh objects on every build.

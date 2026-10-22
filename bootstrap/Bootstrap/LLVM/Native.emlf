@@ -26,7 +26,7 @@ floating value = case value of
     case old of
       Just x -> cgPure x
       Nothing -> do
-        x <- loadAt "double" v 24
+        x <- loadAt "double" v 8
         modify (\state -> withUnboxedDoubles (M.insert compareString v x (unboxedDoubles state)) state)
         cgPure x
 

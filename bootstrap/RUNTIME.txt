@@ -98,35 +98,33 @@ pure frames; BDWGC traces such frames automatically. Both reference interpreters
 use independent persistent stores with lazy cells and no unsafe host IO.
 StateCases/StateTypes/StateRuntime and bootstrap/tests/StateRuntime check region
 typing, independent target checking, semantics and both backends. runtime_st.c
-also checks the public ABI and retained roots under ordinary and BDWGC allocation.
+also checks the public ABI and retained roots under compact BDWGC allocation.
 
-Bootstrap allocator profile
+Native allocator and ABI
 
-The ordinary runtime retains its pooled allocator and precise collection at
-rooted IO boundaries. A compiler performs long pure computations between those
-boundaries. Bootstrap executables therefore opt into MLF_USE_BDWGC, using the
-Boehm-Demers-Weiser collector to scan native stacks and reclaim unreachable
-values during pure evaluation. This profile adds no compiler-specific primitive
-or subprocess support and does not alter the ordinary benchmark allocator.
+All native executables use the compact Boehm-Demers-Weiser collector layout.
+The collector scans native stacks and reclaims unreachable values during pure
+evaluation. Small integers, booleans and nullary constructors are immediate
+values. Heap values have no custom collector object header; unary/binary
+constructors store inline fields and wider constructors use a contiguous tail.
 
 Install BDWGC locally and set MLF_GC_PREFIX, or supply bdw-gc.pc through
-PKG_CONFIG_PATH. Compiler-profile package builds select its include flags and
-libraries automatically; the package manager does not download dependencies.
-Manual builds compile mlf_runtime.c with -DMLF_USE_BDWGC and the selected
-include flags, then link BDWGC in addition to GMP/libm. Do not combine this
-profile with manually initialized GMP memory hooks.
+PKG_CONFIG_PATH. All package builds select its include flags and libraries;
+the package manager does not download dependencies. Manual builds compile
+mlf_runtime.c with BDWGC/GMP include flags and link BDWGC, GMP and libm.
+MLF_USE_BDWGC and MLF_COMPACT_BDWGC are no longer mode switches. Do not install
+GMP memory hooks before runtime initialization.
 
-Every pointer-bearing runtime allocation, including closure environments,
-evaluation stacks, arrays and hash tables, belongs to the collector in this
-profile. GMP limbs use atomic collector allocations. The custom global object
-list and value pool are disabled so they cannot retain unreachable objects;
-memoized thunks and popped continuation slots clear obsolete references. The
-collector's native stack support preserves suspended evaluations and recursive
-binding holes without requiring a language-specific stack scanner.
+Every pointer-bearing allocation, including closure environments, evaluation
+stacks, arrays and hash tables, belongs to the collector. GMP limbs use atomic
+collector allocations. Memoized thunks and popped continuation slots clear
+obsolete references. Native stack support preserves suspended evaluations and
+recursive binding holes. GC_DEBUG and MLF_ALLOCATION_AUDIT remain supported.
 
-The shared backend matrix can also validate this profile: set
-MLF_LLVM_TEST_CFLAGS to -DMLF_USE_BDWGC plus the selected BDWGC include flags, and
-MLF_LLVM_TEST_LIBS to its libraries when running native backend tests. Link libraries
-are appended after generated objects. The stress fixture retains suspended
-dynamic applications, cyclic data, GMP integers, arrays and table entries
-across a long pure allocation interval and checks their results independently.
+All LLVM command spellings emit compact-GC; -gc spellings are aliases. Old
+standard-layout LLVM and objects fail to link against this runtime's ABI guard
+and must be regenerated. There is no standard allocator/collector fallback.
+The shared backend matrix compares interpreter and compact native execution;
+port executes 25 checked compiler probes through LLVM. Stress coverage retains
+suspended applications, cyclic data, GMP integers, arrays and tables across
+long pure allocation intervals and checks results with independent references.

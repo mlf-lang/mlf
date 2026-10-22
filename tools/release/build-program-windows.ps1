@@ -38,19 +38,22 @@ if ($clangVersion -match 'clang version (\d+)' -and [int]$Matches[1] -lt 15) { $
 $include = Join-Path $PSScriptRoot 'include'
 $runtime = Join-Path $PSScriptRoot 'runtime/mlf_runtime.c'
 $gmp = Join-Path $PSScriptRoot 'lib/libgmp.dll.a'
+$gc = Join-Path $PSScriptRoot 'lib/libgc.dll.a'
 $runtimeObject = [IO.Path]::ChangeExtension($outputPath, '.runtime.o')
 # LLVM 14's opaque-pointer switch is only for the IR input. Applying it to
 # the C frontend can crash that compiler's loop vectorizer.
 & $Clang -O2 -std=c11 -mno-incremental-linker-compatible "-I$include" -c $runtime -o $runtimeObject
 if ($LASTEXITCODE) { throw 'Runtime compilation failed' }
-& $Clang -O2 -Wno-override-module -mno-incremental-linker-compatible @irFlags $irPath $runtimeObject $gmp -lshell32 -lm '-Wl,--stack,268435456' '-Wl,--no-insert-timestamp' -o $outputPath
+& $Clang -O2 -Wno-override-module -mno-incremental-linker-compatible @irFlags $irPath $runtimeObject $gmp $gc -lshell32 -lm '-Wl,--stack,268435456' '-Wl,--no-insert-timestamp' -o $outputPath
 if ($LASTEXITCODE) { throw 'Native linking failed' }
-$dll = Join-Path $PSScriptRoot 'bin/libgmp-10.dll'
-$destination = Join-Path $outputDirectory 'libgmp-10.dll'
-if ([IO.Path]::GetFullPath($dll) -ne $destination) {
-    if ((Test-Path -LiteralPath $destination) -and (Get-FileHash -LiteralPath $dll).Hash -ne (Get-FileHash -LiteralPath $destination).Hash) {
-        throw "A different GMP DLL already exists at $destination; keep the program in a separate directory."
+foreach ($name in @('libgmp-10.dll','libgc-1.dll','libwinpthread-1.dll')) {
+    $dll = Join-Path $PSScriptRoot "bin/$name"
+    $destination = Join-Path $outputDirectory $name
+    if ([IO.Path]::GetFullPath($dll) -ne $destination) {
+        if ((Test-Path -LiteralPath $destination) -and (Get-FileHash -LiteralPath $dll).Hash -ne (Get-FileHash -LiteralPath $destination).Hash) {
+            throw "A different $name already exists at $destination; keep the program in a separate directory."
+        }
+        Copy-Item -LiteralPath $dll -Destination $destination -Force
     }
-    Copy-Item -LiteralPath $dll -Destination $destination -Force
 }
 Write-Output $outputPath

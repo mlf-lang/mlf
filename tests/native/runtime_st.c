@@ -4,9 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifdef MLF_USE_BDWGC
 #include <gc/gc.h>
-#endif
 
 enum { IO_RETURN = 0, IO_BIND = 1, ST_RETURN = 66, ST_BIND = 67, RUN_ST = 68,
        NEW_ST_ARRAY = 69, READ_ST_ARRAY = 70, WRITE_ST_ARRAY = 71, LENGTH_ST_ARRAY = 72 };
@@ -40,16 +38,12 @@ static MlfValue *poison(MlfEnv *env, MlfValue *argument) {
 static MlfValue *bad(void) { return mlf_thunk(poison,mlf_env_new(0)); }
 static MlfValue *counted(MlfEnv *env, MlfValue *argument) {
     (void)argument; ++calls;
-#ifdef MLF_USE_BDWGC
     GC_gcollect();
-#endif
     return mlf_env_get(env,0);
 }
 static MlfValue *return_argument(MlfEnv *env, MlfValue *argument) {
     (void)env; ++calls;
-#ifdef MLF_USE_BDWGC
     if (calls % 257 == 0) GC_gcollect();
-#endif
     return ret(argument);
 }
 static MlfValue *ignore_argument(MlfEnv *env, MlfValue *argument) {
@@ -71,9 +65,7 @@ static MlfValue *nested(MlfEnv *env, MlfValue *argument) {
     MlfValue *outer=mlf_env_get(env,0);
     MlfValue *inner=run(mlf_prim2(NEW_ST_ARRAY,integer("1"),integer("17")));
     run(write_at(inner,"0",integer("19")));
-#ifdef MLF_USE_BDWGC
     GC_gcollect();
-#endif
     number(run(read_at(outer,"0")),"7");
     return ret(mlf_add_int(run(read_at(inner,"0")),run(read_at(outer,"0"))));
 }
@@ -218,9 +210,7 @@ static void direct_cases(void) {
     require(mlf_execute_st_lazy(ret(io))==io,"executor changed an IO description result");
     mlf_st_write_array(fresh,integer("0"),bad());
     number(mlf_st_length_array(fresh),"1");
-#ifdef MLF_USE_BDWGC
     GC_gcollect();
-#endif
     number(mlf_st_read_array(array,integer("0")),"53");
 }
 

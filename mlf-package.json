@@ -1,7 +1,7 @@
 {
   "format": 1,
   "name": "mlf-compiler",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "dependencies": {
     "mlf-bootstrap": {
       "path": "bootstrap"
@@ -33,7 +33,9 @@
         "--compiler",
         "{bin:emlf}",
         "--build-dir",
-        "{build}/compiler-tests/unit"
+        "{build}/compiler-tests/unit",
+        "--cache-dir",
+        "{cache}"
       ]
     },
     "packages": {
@@ -48,7 +50,9 @@
         "--compiler",
         "{bin:emlf}",
         "--build-dir",
-        "{build}/compiler-tests/packages"
+        "{build}/compiler-tests/packages",
+        "--cache-dir",
+        "{cache}"
       ]
     },
     "self-host": {
@@ -63,7 +67,9 @@
         "--compiler",
         "{bin:emlf}",
         "--build-dir",
-        "{build}/compiler-tests/self-host"
+        "{build}/compiler-tests/self-host",
+        "--cache-dir",
+        "{cache}"
       ]
     },
     "parity": {
@@ -78,7 +84,9 @@
         "--compiler",
         "{bin:emlf}",
         "--build-dir",
-        "{build}/compiler-tests/parity"
+        "{build}/compiler-tests/parity",
+        "--cache-dir",
+        "{cache}"
       ]
     },
     "backends": {
@@ -93,7 +101,9 @@
         "--compiler",
         "{bin:emlf}",
         "--build-dir",
-        "{build}/compiler-tests/backends"
+        "{build}/compiler-tests/backends",
+        "--cache-dir",
+        "{cache}"
       ]
     },
     "port": {
@@ -108,7 +118,9 @@
         "--compiler",
         "{bin:emlf}",
         "--build-dir",
-        "{build}/compiler-tests/port"
+        "{build}/compiler-tests/port",
+        "--cache-dir",
+        "{cache}"
       ]
     }
   }

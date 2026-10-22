@@ -9,14 +9,14 @@ import qualified Bootstrap.LLVM.Codegen as C
 import qualified Bootstrap.LLVM.Optimize as O
 
 initial : B.Output
-initial = B.Output 0 Nil "entry" Nil Nil M.empty M.empty S.empty M.empty S.empty S.empty S.empty M.empty true M.empty M.empty M.empty M.empty M.empty S.empty 16
+initial = B.Output 0 Nil "entry" Nil Nil M.empty M.empty S.empty M.empty S.empty S.empty S.empty M.empty true M.empty M.empty M.empty M.empty M.empty S.empty
 
 contains : String -> String -> Bool
 contains needle text = L.any (\index -> eqString needle (stringSlice text index (stringLength needle)))
   (L.range 0 (stringLength text - stringLength needle))
 
 forceCount : List String -> Int
-forceCount code = L.length (L.filter (contains "call ptr @mlf_force(") code)
+forceCount code = L.length (L.filter (contains "call ptr @mlf.force(") code)
 
 assert good message = if good then putStrLn message else panic message
 

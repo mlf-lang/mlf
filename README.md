@@ -93,8 +93,12 @@ Run all six native test groups, or select groups for development:
 
 The groups are `unit`, `packages`, `self-host`, `parity`, `backends`, and `port`.
 They include a fresh self-host LLVM fixed point and interpreter/LLVM execution
-in both standard and compact-GC layouts. The full port suite contains large
-interpreted graph programs; its complete run needs the longer timeout above.
+in the backend group under the compact-GC layout. Port runs all
+25 compiler-library probes through compact-GC LLVM, with independent
+references and checked targets. It no longer interprets those complete probes;
+focused interpreter tests remain. The full gate includes source preparation and
+fresh self-hosting and needs the longer timeout above. See the
+[test matrix cleanup and timings](docs/test-matrix-cleanup.md).
 The retained local full-suite verification used 32 GiB RAM.
 Build reports are written to `.mlf-build/build-report.json`, with detailed
 compiler-test evidence under `.mlf-build/compiler-tests/`.
@@ -140,7 +144,7 @@ as MLF programs; frozen Haskell-seed expectations remain parity oracle data.
   --target self-host --target parity
 ```
 
-Compiler-profile builds use the compact BDWGC runtime for long pure compilation
+All native builds use the compact BDWGC runtime for long pure compilation
 phases. For reproducible PGO construction with profile-aware native caches, see
 [the package build instructions](docs/package-manager.md#native-profile-guided-construction).
 For two native generations and historical compiler-only PGO, see
@@ -169,7 +173,7 @@ Compile a saved xMLF program to LLVM IR, then link it with the runtime:
 "$EMLF_BIN" --xmlf-to-llvm .mlf-build/snake.xmlf > .mlf-build/snake.ll
 MLF_RUNTIME="$("$EMLF_BIN" --llvm-runtime)"
 clang -O2 -std=c11 .mlf-build/snake.ll "$MLF_RUNTIME" \
-  $(pkg-config --cflags --libs gmp) -lm -o .mlf-build/snake
+  $(pkg-config --cflags --libs gmp bdw-gc) -lm -o .mlf-build/snake
 .mlf-build/snake
 ```
 
@@ -209,16 +213,15 @@ GMP preserves the language's unbounded `Int`; strings use length-delimited
 UTF-8, including embedded NULs. Invalid Unicode scalar literals are rejected.
 
 The runtime memoizes pure thunks and executes shared IO actions afresh on
-each bind. The standard collector runs between IO steps, retaining the current action
-and pending continuations. Managed values use reusable allocation pages,
-with reachability-based reclamation. Long pure computations can retain allocations
-until the next IO step or program exit. This is a single-threaded POSIX
-runtime with a 64-bit ABI. Compiler-profile builds use compact BDWGC allocation
-and collection during pure evaluation. The latest native validation used macOS
-ARM64, Clang 23.1.3, GMP 6.3.0, and BDWGC 8.2.12.
+each bind. All native programs use compact BDWGC allocation and collection during
+pure evaluation. Pointer-bearing values, environments and arrays are traced;
+GMP limbs use atomic collector allocations. The runtime requires a 64-bit ABI.
+Both default LLVM commands and their `-gc` aliases emit this single ABI; link
+GMP, BDWGC and libm. Old standard-layout LLVM/object files must be regenerated.
+See [the migration record](docs/compact-only.md) for dependencies and validation.
 
 The native `backends` group runs every backend behavior test through both the
-xMLF interpreter and LLVM native code, in both runtime layouts. It compares
+xMLF interpreter and LLVM native code, using compact-GC. It compares
 results, ordered read/write events, write boundaries, and unused input.
 It includes all 16 standalone examples, the multi-file module example,
 IO and Prelude behavior,

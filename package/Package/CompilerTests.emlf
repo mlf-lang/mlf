@@ -1,23 +1,29 @@
 module Package.CompilerTests where
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
+import qualified Bootstrap.Map as Map
 import qualified Package.OS as O
 import qualified Package.Json as J
 import qualified Package.Build as B
 import qualified Package.Command as C
 import qualified Package.Verification as V
+import qualified Package.Manifest as M
 
 -- Build and execute native MLF tests; preserved oracle data and test-only
 -- checking modules remain independent of the candidate compiler.
-data TestContext = TestContext String String String (List String)
+data TestContext = TestContext String String String (List String) String
 root : TestContext -> String
-root (TestContext r _ _ _) = r
+root (TestContext r _ _ _ _) = r
 output : TestContext -> String
-output (TestContext _ d _ _) = d
+output (TestContext _ d _ _ _) = d
 compiler : TestContext -> String
-compiler (TestContext _ _ c _) = c
+compiler (TestContext _ _ c _ _) = c
 runtimeProfiles : TestContext -> List String
-runtimeProfiles (TestContext _ _ _ profiles) = profiles
+runtimeProfiles (TestContext _ _ _ profiles _) = profiles
+sharedCache : TestContext -> String
+sharedCache (TestContext _ _ _ _ cache) = cache
+cacheOptions : TestContext -> List String
+cacheOptions c = if eqString (sharedCache c) "" then Nil else Cons "--cache-dir" (Cons (sharedCache c) Nil)
 report : TestContext -> String
 report c = output c ++ "/verification.json"
 record : TestContext -> String -> J.Json -> IO Unit
@@ -51,39 +57,37 @@ sources r = do
   hashes <- B.hashFiles (S.append paths (Cons (r ++ "/mlfpkg") (Cons (r ++ "/mlf-package.json") Nil)))
   ioReturn (J.Object (S.map (\entry -> Pair (O.relative r (S.fst entry)) (S.snd entry)) (J.items hashes)))
 clearDrivers : IO Unit
-clearDrivers = S.mapM_ unsetEnv (O.words "MLF_BENCH_STREAM_LINK MLF_MOCK_FAIL_RUNTIME MLF_BENCH_STREAM_LLVM MLF_BENCH_MLF_CLANG MLF_MOCK_FAST_FRONTEND MLF_BOOTSTRAP_INTERPRETER MLF_BOOTSTRAP_LLVM MLF_BOOTSTRAP_TIMEOUT_SECONDS MLF_TEST_TRACE MLF_TEST_FAIL_WRITE MLF_LLVM_TEST_ABI MLF_LLVM_TEST_CFLAGS MLF_LLVM_TEST_LIBS MLF_LLVM_TEST_OPT")
-nativeFlags : TestContext -> Bool -> IO (List String)
-nativeFlags c compact = do
+clearDrivers = S.mapM_ unsetEnv (O.words "MLF_BENCH_STREAM_LINK MLF_MOCK_FAIL_RUNTIME MLF_BENCH_STREAM_LLVM MLF_BENCH_MLF_CLANG MLF_MOCK_FAST_FRONTEND MLF_BOOTSTRAP_INTERPRETER MLF_BOOTSTRAP_LLVM MLF_BOOTSTRAP_TIMEOUT_SECONDS MLF_TEST_TRACE MLF_TEST_FAIL_WRITE MLF_LLVM_TEST_ABI MLF_LLVM_TEST_CFLAGS MLF_LLVM_TEST_LIBS MLF_LLVM_TEST_OPT MLF_TEST_PORT_TARGETS MLF_TEST_PORT_TARGETS_SHA256")
+nativeFlags : TestContext -> IO (List String)
+nativeFlags c = do
   text <- query c (Cons "pkg-config" (O.words "--cflags --libs gmp"))
-  extra <- if compact then do
+  extra <- do
     prefix <- getEnv "MLF_GC_PREFIX"
     if eqString prefix "" then do { flags <- query c (Cons "pkg-config" (O.words "--cflags --libs bdw-gc")); ioReturn (B.flags flags) }
       else do
         actual <- canonicalPath prefix
         system <- query c (O.words "uname -s")
         ioReturn (Cons ("-I" ++ actual ++ "/include") (Cons (actual ++ "/lib/libgc.a") (if eqString (O.trim system) "Linux" then Cons "-ldl" Nil else Nil)))
-    else ioReturn Nil
   windows <- O.isWindows
   ioReturn (S.append (B.flags text) (S.append extra (if windows then O.words "-lshell32 -Wl,--stack,268435456" else Nil)))
 stack : TestContext -> IO (List String)
 stack c = do { system <- query c (O.words "uname -s"); ioReturn (if eqString (O.trim system) "Darwin" then Cons "-Wl,-stack_size,0x10000000" Nil else Nil) }
-compileRuntime : TestContext -> List String -> Bool -> Bool -> String -> IO Unit
-compileRuntime c flags compact trace name = do
-  let macros = if compact then B.profileFlags else Nil
+compileRuntime : TestContext -> List String -> Bool -> String -> IO Unit
+compileRuntime c flags trace name = do
   let interpose = if trace then O.words "-Dgetline=mlf_test_getline -Dfwrite=mlf_test_fwrite -Dfputc=mlf_test_fputc -Dfflush=mlf_test_fflush" else Nil
-  run c (S.append (O.words "clang -O2 -std=c11 -Wall -Wextra -Werror") (S.append (S.filter (O.starts "-I") flags) (S.append macros (S.append interpose (Cons "-c" (Cons (root c ++ "/runtime/mlf_runtime.c") (Cons "-o" (Cons (output c ++ "/" ++ name) Nil))))))))
+  run c (S.append (O.words "clang -O2 -std=c11 -Wall -Wextra -Werror") (S.append (S.filter (O.starts "-I") flags) (S.append Nil (S.append interpose (Cons "-c" (Cons (root c ++ "/runtime/mlf_runtime.c") (Cons "-o" (Cons (output c ++ "/" ++ name) Nil))))))))
 link : TestContext -> String -> List String -> List String -> String -> List String -> IO Unit
 link c ir objects flags binary extra = run c (S.append (O.words "clang -O2 -Wno-override-module") (S.append (Cons ir objects) (S.append flags (S.append (Cons "-lm" extra) (Cons "-o" (Cons binary Nil))))))
 nativeTest : TestContext -> String -> IO String
 nativeTest c target = do
  manager <- getExecutablePath
- let build = O.parent (output c) ++ "/mlf-test-suite"
+ let build = output c ++ "/suite-build"
  let args = S.concat (Cons (Cons manager Nil)
   (Cons (Cons "--manifest" (Cons (root c ++ "/tests/mlf-package.json") Nil))
   (Cons (Cons "--compiler" (Cons (compiler c) Nil))
   (Cons (Cons "--runtime" (Cons (root c ++ "/runtime/mlf_runtime.c") Nil))
   (Cons (Cons "--build-dir" (Cons build Nil))
-  (Cons (S.snoc (O.words "--timeout 21600 build --target") target) Nil))))))
+  (Cons (S.append (cacheOptions c) (S.snoc (O.words "--timeout 21600 build --target") target)) Nil))))))
  putStrLn ("+ " ++ S.intercalate " " args)
  code <- O.exec (root c) args "" "" "" 21600
  O.require (code == 0) ("native test build failed (" ++ showInt code ++ ")")
@@ -110,30 +114,50 @@ unit : TestContext -> IO Unit
 unit c = do
  transports c
  -- Check native toolchain and runtime probes before the longer compiler suites.
- suite c "harness" (Cons "57 native benchmark/bootstrap/release harness tests passed" Nil)
- suite c "core" (Cons "686 checks; 0 failures" (Cons "Oracle: 6712 closed terms" Nil))
- suite c "figure12" (Cons "43/43 expressions match regression expectations; 0 failures" (Cons "36 supplementary checks; 0 failures" Nil))
+ suite c "harness" (Cons "58 native benchmark/bootstrap/release harness tests passed" Nil)
+ suite c "core" (Cons "686 checks; 0 failures" (Cons "Oracle: 6712 cases; 6703 executions" Nil))
+ suite c "figure12" (Cons "43/43 expressions match regression expectations; 0 failures" (Cons "41 distinct Figure12 executions" (Cons "36 supplementary checks; 0 failures" Nil)))
 packages : TestContext -> IO Unit
 packages c = do
  setEnv "MLF_TEST_WORK" (output c)
  setEnv "MLF_TEST_ROOT" (output c)
- suite c "packages" (Cons "18 package resolver tests passed" (Cons "26 package integration cases passed" Nil))
-prepareDrivers : TestContext -> IO (List String)
-prepareDrivers c = do
- flags <- nativeFlags c true
- compileRuntime c flags true false "runtime.o"
- compileRuntime c flags true true "runtime-traced.o"
+ suite c "packages" (Cons "18 package resolver tests passed" (Cons "29 package integration cases passed" Nil))
+testBuilder : TestContext -> String -> IO B.Builder
+testBuilder c name = do
+ graph <- M.load (root c ++ "/mlf-package.json")
+ let options = B.info (Cons (Pair "compiler" (J.str (compiler c))) (Cons (Pair "runtime" (J.str (root c ++ "/runtime/mlf_runtime.c"))) (Cons (Pair "cache-dir" (J.str (sharedCache c))) (Cons (Pair "timeout" (J.str "21600")) Nil))))
+ configured <- C.configureGC (root c) options
+ B.create graph configured (output c ++ "/" ++ name)
+driverIR : TestContext -> B.Builder -> String -> IO String
+driverIR c builder name = do
+ saved <- J.read (report c)
+ let entry = root c ++ "/bootstrap/" ++ name ++ ".emlf"
+ let identity = B.info (Cons (Pair "format" (J.num 1)) (Cons (Pair "compiler" (J.get "compiler" (B.tools builder))) (Cons (Pair "manager" (J.get "manager" (B.tools builder))) (Cons (Pair "sources" (J.get "sources" saved)) (Cons (Pair "entry" (J.str entry)) (Cons (Pair "frontend" (J.str "source --emit-llvm-gc")) Nil))))))
+ -- Share the verified source frontend output. The crate-linked interpreter
+ -- regressed the nested compiler workloads despite identical fixture targets.
+ B.cached builder ("source " ++ name ++ " LLVM") identity (\work -> do
+  ignored <- B.capture builder (root c) (Cons (compiler c) (Cons "-i" (Cons (root c ++ "/bootstrap") (Cons "--emit-llvm-gc" (Cons entry Nil))))) "" (work ++ "/program.ll")
+  text <- readFile (work ++ "/program.ll")
+  O.require (stringLength text > 0) "test driver emitted empty LLVM")
+prepareDrivers : TestContext -> Bool -> IO (List String)
+prepareDrivers c portFixtures = do
+ builder <- testBuilder c "driver-build"
+ flags <- nativeFlags c
+ compileRuntime c flags false "runtime.o"
+ if portFixtures then ioReturn Unit else compileRuntime c flags true "runtime-traced.o"
  run c (S.append (O.words "clang -O2 -std=c11 -Wall -Wextra -Werror -c") (Cons (root c ++ "/tests/native/native_trace.c") (Cons "-o" (Cons (output c ++ "/trace.o") Nil))))
  extra <- stack c
  drivers <- S.mapM (\name -> do
   let ir = output c ++ "/" ++ name ++ ".ll"
-  captureWithin c (Cons (compiler c) (Cons "-i" (Cons (root c ++ "/bootstrap") (Cons "--emit-llvm-gc" (Cons (root c ++ "/bootstrap/" ++ name ++ ".emlf") Nil))))) ir 21600
+  emitted <- driverIR c builder name
+  O.copy (emitted ++ "/program.ll") ir
   let objects = if eqString name "RuntimeDriver" then Cons (output c ++ "/runtime-traced.o") (Cons (output c ++ "/trace.o") Nil) else Cons (output c ++ "/runtime.o") Nil
   let binary = output c ++ "/" ++ name
   link c ir objects flags binary extra
   hash <- fileDigest binary
   llvm <- fileDigest ir
-  return (Pair name (B.obj2 "sha256" (J.str hash) "llvm_sha256" (J.str llvm)))) (O.words "RuntimeDriver LLVMDriver")
+  return (Pair name (J.set "frontend" (J.str "source") (B.obj2 "sha256" (J.str hash) "llvm_sha256" (J.str llvm))))) (if portFixtures then Cons "LLVMDriver" Nil else O.words "RuntimeDriver LLVMDriver")
+ B.finish builder
  record c "drivers" (J.Object drivers)
  return (S.append flags extra)
 matrices : TestContext -> String -> Bool -> IO Unit
@@ -142,15 +166,14 @@ matrices c binary portFixtures = do
  divisor <- case V.matrixCollectionDivisor requestedDivisor of
   Left message -> O.fatal message
   Right value -> ioReturn value
- flags <- prepareDrivers c
- setEnv "MLF_BOOTSTRAP_INTERPRETER" (output c ++ "/RuntimeDriver")
+ flags <- prepareDrivers c portFixtures
+ if portFixtures then unsetEnv "MLF_BOOTSTRAP_INTERPRETER" else setEnv "MLF_BOOTSTRAP_INTERPRETER" (output c ++ "/RuntimeDriver")
  setEnv "MLF_BOOTSTRAP_LLVM" (output c ++ "/LLVMDriver")
  setEnv "MLF_BOOTSTRAP_COMPILER" (compiler c)
  setEnv "MLF_BOOTSTRAP_TIMEOUT_SECONDS" "1800"
  S.mapM_ (\abi -> do
-  let compact = eqString abi "compact-gc"
   setEnv "MLF_LLVM_TEST_ABI" abi
-  let initialHeap = if compact then "8388608" else "536870912"
+  let initialHeap = "8388608"
   setEnv "GC_INITIAL_HEAP_SIZE" initialHeap
   setEnv "GC_FREE_SPACE_DIVISOR" divisor
   let flagsFile = output c ++ "/link-flags.bin"
@@ -158,21 +181,26 @@ matrices c binary portFixtures = do
   setEnv "MLF_TEST_LINK_FLAGS_FILE" flagsFile
   let directory = output c ++ "/matrix-" ++ abi
   O.mkdir directory
-  compileRuntime c flags compact true ("matrix-" ++ abi ++ "/runtime.o")
+  compileRuntime c flags true ("matrix-" ++ abi ++ "/runtime.o")
   let log = output c ++ "/" ++ abi ++ ".log"
   -- Each fixture retains its own execution limit. The complete matrix also
   -- includes native candidate emission, linking, and graph reference workloads.
+  if portFixtures then validatePreparedPort c else ioReturn Unit
   captureWithin c (Cons binary Nil) log (if portFixtures then 18000 else 14400)
+  if portFixtures then validatePreparedPort c else ioReturn Unit
   text <- readFile log
   let rows = S.filter (O.starts "Backend matrix: ") (O.lines text)
-  O.require (S.length rows == 1 && contains "rows x 2 backends; no missing executions" text) "missing native backend audit"
-  O.require (readInt (S.index (O.words (S.head rows)) 2) == (if portFixtures then 25 else 575)) "native execution row coverage changed"
+  let backendNames = if portFixtures then Cons "llvm" Nil else O.words "interpreter llvm"
+  case V.validateMatrixAudit (if portFixtures then 25 else 575) backendNames text of
+   Left message -> O.fatal message
+   Right _ -> ioReturn Unit
   let expected = if portFixtures then "25 MLF port fixtures; 0 failures" else "523 shared IO/prelude/backend fixtures; 0 failures"
   O.require (contains expected text) "native fixture coverage changed"
   hash <- fileDigest log
-  let row = B.info (Cons (Pair "rows" (J.num (readInt (S.index (O.words (S.head rows)) 2)))) (Cons (Pair "backends" (J.num 2)) (Cons (Pair "cli_compiler" (J.str (compiler c))) (Cons (Pair "log_sha256" (J.str hash)) (Cons (Pair "gc_initial_heap_bytes" (J.num (readInt initialHeap))) (Cons (Pair "gc_free_space_divisor" (J.num (readInt divisor))) Nil))))))
+  let row = J.set "backend_names" (J.stringArray backendNames) (B.info (Cons (Pair "rows" (J.num (readInt (S.index (O.words (S.head rows)) 2)))) (Cons (Pair "backends" (J.num (S.length backendNames))) (Cons (Pair "cli_compiler" (J.str (compiler c))) (Cons (Pair "log_sha256" (J.str hash)) (Cons (Pair "gc_initial_heap_bytes" (J.num (readInt initialHeap))) (Cons (Pair "gc_free_space_divisor" (J.num (readInt divisor))) Nil)))))))
   saved <- J.read (report c)
-  record c "matrices" (J.set abi row (J.getObject "matrices" saved))
+  preparedHash <- getEnv "MLF_TEST_PORT_TARGETS_SHA256"
+  record c "matrices" (J.set abi (if portFixtures then J.set "prepared_targets_sha256" (J.str preparedHash) row else row) (J.getObject "matrices" saved))
   putStr (O.drop (S.max 0 (stringLength text - 2000)) text)) (runtimeProfiles c)
  clearDrivers
 backends : TestContext -> IO Unit
@@ -186,7 +214,55 @@ port c = do
  references <- nativeTest c "references"
  setEnv "MLF_TEST_REFERENCES" references
  binary <- nativeTest c "port"
+ preparePort c binary
  matrices c binary true
+preparePort : TestContext -> String -> IO Unit
+preparePort c binary = do
+ builder <- testBuilder c "port-preparation"
+ let listing = output c ++ "/port-fixtures.txt"
+ capture c (Cons binary (Cons "--list" Nil)) listing
+ listingText <- readFile listing
+ let names = O.words listingText
+ O.require (S.length names == 25 && S.length (S.nubBy eqString names) == 25) "port fixture preparation coverage changed"
+ checkerHash <- fileDigest binary
+ saved <- J.read (report c)
+ let identity = B.info (Cons (Pair "format" (J.num 1)) (Cons (Pair "compiler" (J.get "compiler" (B.tools builder))) (Cons (Pair "manager" (J.get "manager" (B.tools builder))) (Cons (Pair "checker_sha256" (J.str checkerHash)) (Cons (Pair "sources" (J.get "sources" saved)) Nil)))))
+ targets <- S.mapM (\name -> do
+  artifact <- B.cachedChecked builder ("checked port target " ++ name) (J.set "fixture" (J.str name) identity) (\directory -> do
+   let target = directory ++ "/unit.xmlf"
+   present <- fileExists target
+   receipt <- fileExists (target ++ ".checks.json")
+   if present && receipt then do { hash <- fileDigest target; checks <- J.read (target ++ ".checks.json"); ioReturn (V.validPortTargetChecks name hash checks) } else ioReturn false) (\work -> do
+    ignored <- B.capture builder (root c) (Cons binary (Cons "--prepare" (Cons name (Cons (work ++ "/unit.xmlf") Nil)))) "" ""
+    ioReturn Unit)
+  let target = artifact ++ "/unit.xmlf"
+  hash <- fileDigest target
+  checksHash <- fileDigest (target ++ ".checks.json")
+  ioReturn (B.info (Cons (Pair "fixture" (J.str name)) (Cons (Pair "target" (J.str target)) (Cons (Pair "target_sha256" (J.str hash)) (Cons (Pair "checks_sha256" (J.str checksHash)) Nil)))))) names
+ B.finish builder
+ let manifest = output c ++ "/prepared-port.json"
+ J.write manifest (J.set "targets" (J.Array targets) identity)
+ hash <- fileDigest manifest
+ setEnv "MLF_TEST_PORT_TARGETS" manifest
+ setEnv "MLF_TEST_PORT_TARGETS_SHA256" hash
+ let targetHashes = J.Object (S.map (\row -> Pair (J.getText "fixture" "" row) (J.get "target_sha256" row)) targets)
+ record c "prepared_port" (J.set "target_hashes" targetHashes (B.info (Cons (Pair "manifest" (J.str manifest)) (Cons (Pair "sha256" (J.str hash)) (Cons (Pair "targets" (J.num (S.length targets))) (Cons (Pair "build_report" (J.str (B.reportPath builder))) Nil))))))
+ validatePreparedPort c
+validatePreparedPort : TestContext -> IO Unit
+validatePreparedPort c = do
+ path <- getEnv "MLF_TEST_PORT_TARGETS"
+ expected <- getEnv "MLF_TEST_PORT_TARGETS_SHA256"
+ hash <- fileDigest path
+ O.require (eqString hash expected) "prepared port manifest changed between layouts"
+ manifest <- J.read path
+ let targets = J.values (J.get "targets" manifest)
+ O.require (S.length targets == 25) "prepared port targets missing"
+ S.mapM_ (\row -> do
+  let target = J.getText "target" "" row
+  hash <- fileDigest target
+  checksHash <- fileDigest (target ++ ".checks.json")
+  checks <- J.read (target ++ ".checks.json")
+  O.require (eqString hash (J.getText "target_sha256" "" row) && eqString checksHash (J.getText "checks_sha256" "" row) && V.validPortTargetChecks (J.getText "fixture" "" row) hash checks) "prepared port target/check receipt changed between layouts") targets
 shellQuote : String -> String
 shellQuote text = "'" ++ O.replace "'" "'\\''" text ++ "'"
 contains : String -> String -> Bool
@@ -211,16 +287,21 @@ parity c = do
   O.require (S.length moduleRows == 60 && S.length (S.filter (J.getBool "expected_accept" false) moduleRows) == 23 && S.length (S.filter (\row -> S.not (J.getBool "expected_accept" false row)) moduleRows) == 37) "module corpus differs from the two prescribed crate-cycle oracle migrations"
   O.require (S.any (\row -> J.getBool "no_prelude" false row && J.getBool "expected_accept" false row) moduleRows) "module corpus lacks explicit prelude coverage"
   O.require (S.all (\row -> J.getBool "expected_accept" false row || (stringLength (J.getText "expected_phase" "" row) > 0 && stringLength (O.trim (J.getText "expected_error_contains" "" row)) > 0)) moduleRows) "module rejection lacks a prescribed phase or diagnostic"
-  flags <- nativeFlags c false
-  compileRuntime c flags false false "runtime.o"
+  flags <- nativeFlags c
+  compileRuntime c flags false "runtime.o"
   O.mkdir (output c ++ "/parity")
   checkCrateCycleOracles c corpus checker rows
-  parityLoop c corpus checker flags 0 rows
+  shared <- parityLoop c corpus checker flags 0 Map.empty Nil rows
+  O.require (S.length shared == 11 && S.length (S.filter (\row -> O.starts "hm-generated-" (J.getText "id" "" row)) shared) == 9 && S.length (S.filter (\row -> O.starts "figure12-" (J.getText "id" "" row)) shared) == 2) "parity execution sharing changed"
   let accepted = S.length (S.filter (J.getBool "expected_accept" false) rows)
   let runtime = S.length (S.filter (J.has "expected_stdout") rows)
   O.require (S.length rows == 7086 && accepted == 3204 && runtime == 80) "preserved parity coverage changed"
   hash <- fileDigest (corpus ++ "/manifest.jsonl")
-  record c "parity" (B.info (Cons (Pair "cases" (J.num (S.length rows))) (Cons (Pair "accepted" (J.num accepted)) (Cons (Pair "rejected" (J.num (S.length rows - accepted))) (Cons (Pair "runtime_rows" (J.num runtime)) (Cons (Pair "runtime_executions" (J.num (runtime * 2))) (Cons (Pair "manifest_sha256" (J.str hash)) Nil)))))))
+  let sourceCompilations = S.length rows - S.length shared
+  let sharedAccepted = S.length (S.filter (J.getBool "expected_accept" false) shared)
+  let details = B.info (Cons (Pair "source_compilations" (J.num sourceCompilations)) (Cons (Pair "shared_source_cases" (J.num (S.length shared))) (Cons (Pair "shared_cases" (J.Array shared)) (Cons (Pair "independent_target_checks" (J.num (accepted - sharedAccepted + 2))) Nil))))
+  record c "parity" (J.Object (S.append (J.items details) (J.items (B.info (Cons (Pair "cases" (J.num (S.length rows))) (Cons (Pair "accepted" (J.num accepted)) (Cons (Pair "rejected" (J.num (S.length rows - accepted))) (Cons (Pair "runtime_rows" (J.num runtime)) (Cons (Pair "runtime_executions" (J.num (runtime * 2))) (Cons (Pair "manifest_sha256" (J.str hash)) Nil))))))))))
+  putStrLn ("Parity: 7086 cases; " ++ showInt sourceCompilations ++ " source compilations; " ++ showInt (S.length shared) ++ " identical input/oracle cases shared")
 -- The expected result is a fixed integer literal, never a type obtained from
 -- the candidate. Check both the reference xMLF and every emitted candidate
 -- target against the independently prescribed Int oracle.
@@ -241,10 +322,25 @@ checkCrateCycleOracles c corpus checker rows = do
     status <- O.exec (root c) (Cons checker (Cons (corpus ++ "/oracle/crate-module-cycles/int42.xmlf") (Cons (stem ++ ".type") Nil))) "" (stem ++ ".out") (stem ++ ".err") 1800
     O.require (status == 0) "independent crate-cycle reference typing failed")
     (Cons (Pair "module-reject-000025" "Main -> A -> B -> A") (Cons (Pair "module-reject-000026" "Main -> Main") Nil))
-parityLoop : TestContext -> String -> String -> List String -> Int -> List J.Json -> IO Unit
-parityLoop c corpus checker flags number rows = case rows of
-  Nil -> ioReturn Unit
+parityLoop : TestContext -> String -> String -> List String -> Int -> Map String (Pair Int String) -> List J.Json -> List J.Json -> IO (List J.Json)
+parityLoop c corpus checker flags number seen shared rows = case rows of
+  Nil -> ioReturn (S.reverse shared)
   Cons row rest -> do
+    let shareable = V.canShareParity row
+    source <- if shareable then readFile (corpus ++ "/" ++ J.getText "source_path" "" row) else ioReturn ""
+    let key = V.parityExecutionKey row source
+    Pair next aliases <- case (if shareable then Map.lookup compareString key seen else Nothing) of
+      Just (Pair canonicalIndex canonicalId) -> do
+        sourceHash <- fileDigest (corpus ++ "/" ++ J.getText "source_path" "" row)
+        let alias = B.info (Cons (Pair "id" (J.get "id" row)) (Cons (Pair "index" (J.num number)) (Cons (Pair "canonical_id" (J.str canonicalId)) (Cons (Pair "canonical_index" (J.num canonicalIndex)) (Cons (Pair "source_sha256" (J.str sourceHash)) (Cons (Pair "expected_accept" (J.get "expected_accept" row)) Nil))))))
+        ioReturn (Pair seen (Cons alias shared))
+      Nothing -> do
+        parityCase c corpus checker flags number row
+        ioReturn (Pair (if shareable then Map.insert compareString key (Pair number (J.getText "id" "" row)) seen else seen) shared)
+    if remInt (number + 1) 100 == 0 then putStrLn ("Parity: " ++ showInt (number + 1)) else ioReturn Unit
+    parityLoop c corpus checker flags (number + 1) next aliases rest
+parityCase : TestContext -> String -> String -> List String -> Int -> J.Json -> IO Unit
+parityCase c corpus checker flags number row = do
     let stem = output c ++ "/parity/" ++ showInt number
     let prefix = S.append (Cons (compiler c) (if J.getBool "no_prelude" false row then Cons "--no-prelude" Nil else Nil)) (S.concatMap (\path -> Cons "-i" (Cons (corpus ++ "/" ++ path) Nil)) (J.getStrings "include_dirs" row))
     let source = corpus ++ "/" ++ J.getText "source_path" "" row
@@ -275,8 +371,6 @@ parityLoop c corpus checker flags number rows = case rows of
       link c (stem ++ ".ll") (Cons (output c ++ "/runtime.o") Nil) flags binary Nil
       checkOutput c row (Cons binary Nil) stem "llvm"
     else ioReturn Unit
-    if remInt (number + 1) 100 == 0 then putStrLn ("Parity: " ++ showInt (number + 1)) else ioReturn Unit
-    parityLoop c corpus checker flags (number + 1) rest
 checkOutput : TestContext -> J.Json -> List String -> String -> String -> IO Unit
 checkOutput c row argv stem backend = do
   code <- O.exec (root c) argv (stem ++ ".stdin") (stem ++ "." ++ backend ++ ".out") (stem ++ "." ++ backend ++ ".err") 1800
@@ -291,14 +385,30 @@ findArtifact hash cache names = case names of
     present <- fileExists binary
     irPresent <- fileExists (O.parent binary ++ "/program.ll")
     valid <- if present && irPresent then B.cacheValid (O.parent binary) name else ioReturn false
-    if valid then do { actual <- fileDigest binary; if eqString actual hash then ioReturn (O.parent binary) else findArtifact hash cache rest } else findArtifact hash cache rest
+    if valid then do
+      actual <- fileDigest binary
+      if eqString actual hash then ioReturn (O.parent binary) else findArtifact hash cache rest
+    else findArtifact hash cache rest
 selfHost : TestContext -> IO Unit
 selfHost c = do
   manager <- getExecutablePath
   hash <- fileDigest (compiler c)
-  let cache = O.parent (O.parent (compiler c)) ++ "/cache"
-  names <- O.entries cache
+  -- A shared store can contain equal native binaries from different LLVM
+  -- inputs. Select the candidate's actual producer, not the first hash match.
+  let producer = O.parent (O.parent (compiler c)) ++ "/build-report.json"
+  present <- fileExists producer
+  O.require present "candidate package build report is missing"
+  let provenance = output c ++ "/candidate-build-report.json"
+  O.copy producer provenance
+  produced <- J.read provenance
+  graph <- M.load (root c ++ "/mlf-package.json")
+  snapshot <- M.snapshot graph
+  O.require (eqString (J.getText "implementation" "" produced) "MLF" && J.equal snapshot (J.get "packages" produced)) "candidate build source provenance differs"
+  let cache = J.getText "cache_directory" (sharedCache c) produced
+  let names = S.nubBy eqString (S.map (J.getText "key" "") (S.filter (\row -> eqString (J.getText "kind" "" row) "executable mlf-compiler:emlf") (J.values (J.get "builds" produced))))
   original <- findArtifact hash cache names
+  provenanceHash <- fileDigest provenance
+  record c "candidate_artifact" (B.info (Cons (Pair "directory" (J.str original)) (Cons (Pair "key" (J.str (O.relative cache original))) (Cons (Pair "build_report" (J.str provenance)) (Cons (Pair "build_report_sha256" (J.str provenanceHash)) Nil)))))
   stamp <- J.read (original ++ "/artifact.json")
   let inputs = J.get "inputs" stamp
   let profile = J.getObject "native-pgo" inputs
@@ -335,15 +445,18 @@ main args = case args of
     Pair options remaining <- C.options J.empty rest
     O.require (S.null remaining && J.has "compiler" options && J.has "build-dir" options) "compiler-test GROUP --compiler TOOL --build-dir DIRECTORY"
     profile <- getEnv "MLF_TEST_RUNTIME_PROFILE"
-    O.require (eqString profile "" || eqString group "port") "runtime profile selection is supported only for the port group"
-    O.require (eqString profile "" || S.elem eqString profile (O.words "standard compact-gc")) "invalid runtime profile; expected standard or compact-gc"
-    let profiles = if eqString group "port" || eqString group "backends" then (if eqString profile "" then O.words "standard compact-gc" else Cons profile Nil) else Nil
-    let directory = J.getText "build-dir" "" options ++ (if eqString profile "" then "" else "-" ++ profile)
+    O.require (eqString profile "" || S.elem eqString profile (Cons "compact-gc" Nil)) "invalid runtime profile; expected compact-gc"
+    let profiles = if eqString group "port" || eqString group "backends" then Cons "compact-gc" Nil else Nil
+    let directory = J.getText "build-dir" "" options
     root <- canonicalPath "."
     O.mkdir directory
     out <- canonicalPath directory
     compiler <- canonicalPath (J.getText "compiler" "" options)
-    let c = TestContext root out compiler profiles
+    let defaultCache = if eqString group "self-host" then O.parent (O.parent compiler) ++ "/cache" else O.parent out ++ "/mlf-test-suite/cache"
+    let requestedCache = J.getText "cache-dir" defaultCache options
+    O.mkdir requestedCache
+    cache <- canonicalPath requestedCache
+    let c = TestContext root out compiler profiles cache
     sourceHashes <- sources root
     hash <- fileDigest compiler
     manager <- getExecutablePath

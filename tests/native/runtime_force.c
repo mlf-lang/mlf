@@ -5,9 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifdef MLF_USE_BDWGC
 #include <gc/gc.h>
-#endif
 
 extern MlfValue *mlf_force_generated(MlfValue *);
 static unsigned thunk_calls, application_calls;
@@ -69,9 +67,7 @@ static void success(void) {
         mlf_fill(hole, chain);
         chain = hole;
     }
-#ifdef MLF_USE_BDWGC
     GC_gcollect();
-#endif
     check(mlf_force_generated(chain) == values[6], "long lazy spine changed");
     check(mlf_force_generated(thunk) == values[6], "memoized thunk changed");
     check(mlf_force_generated(application) == values[6], "memoized application changed");

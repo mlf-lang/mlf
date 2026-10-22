@@ -86,7 +86,7 @@ Shared C fixtures live in `tests/native/`. Expected parity types remain
 immutable Haskell-seed oracle data; benchmark baselines are preserved. Exhaustive and seeded
 input generators and independent Algorithm W execute in MLF. A frozen test
 module checks target terms. Execution uses native interpreter and LLVM drivers
-for both runtime layouts.
+for the compact-GC layout.
 
 The root manifest defines these selectable tests:
 
@@ -96,12 +96,14 @@ The root manifest defines these selectable tests:
 | `packages` | Real compiler tests of local packages, cache invalidation, failures, and both backends |
 | `self-host` | Rebuild the compiler with the newly built compiler and compare LLVM and the complete native binary for a fixed point |
 | `parity` | Fresh independent corpus export and target checker; full acceptance/rejection and runtime parity |
-| `backends` | Full interpreter/LLVM matrix for both standard and compact GC layouts |
-| `port` | All compiler-port fixtures on native interpreter/LLVM backends, with ported reference oracles |
+| `backends` | Full interpreter/LLVM matrix with compact-GC |
+| `port` | All compiler-port fixtures through native LLVM, with ported reference oracles |
 
 For example, `./mlfpkg test --target unit --target packages` selects two groups.
-Plain `test` runs every declared group. Tests are always executed; successful
-results are not cached. Commands, tool/source hashes, cache decisions, and test
+Plain `test` runs every declared group. Every selected test command executes;
+test-group results are not cached. Checked build artifacts and port preparation
+can be shared, while the compact-GC layout and backend executions still run.
+Commands, tool/source hashes, cache decisions, and test
 results are recorded in `.mlf-build/build-report.json`; compiler groups also
 write their detailed evidence under `.mlf-build/compiler-tests/`.
 The full port matrix includes large graph programs running inside the native
@@ -224,7 +226,7 @@ redefined. Module names in manifests use ASCII Haskell-style names, such as
 declaring package. Local dependency paths can point outside the root package.
 
 Executables and native tests can declare private `modules` using the same map,
-and accept `link` (`separate` or `source`), `profile` (`standard` or `compiler`),
+and accept `link` (`separate` or `source`), `profile` (`compact-gc`, the default, or compatibility alias `compiler`),
 and `no-prelude` (boolean). `no-prelude` applies to the complete target build.
 Native tests require `stdout` and optionally accept `stdin` and `arguments`.
 They execute through both the interpreter and LLVM and assert the prescribed
@@ -240,7 +242,7 @@ Command tests are useful for an existing oracle or test harness:
 ```
 
 Commands run from the package directory as argument arrays, without shell
-expansion. `{root}`, `{build}`, and `{bin:NAME}` are supported; each
+expansion. `{root}`, `{build}`, `{cache}`, and `{bin:NAME}` are supported; each
 binary placeholder must be listed in `requires`. A nonzero exit fails the test.
 Only the selected root package's tests execute; dependency test hooks are not
 run implicitly. As with running a local program, command tests execute the code
@@ -255,9 +257,15 @@ inference reads metadata only. Final linking checks the implementation objects.
 
 The outer artifact cache records source content, dependency metadata/objects,
 compiler and build-tool identities, runtime sources, native library fingerprints,
-and options. Persistent inference queries live separately under
-`query-cache/<crate>/<compiler-sha>/`: their keys record resolved syntax and
+and options. `--cache-dir DIR` shares these verified artifacts between build
+directories; its default is `BUILD/cache`. Reports and command logs remain in
+each build directory, and `cache_directory` records the resolved store. Each
+artifact key has a process lock, so concurrent producers publish one complete
+artifact. Persistent inference queries live under
+`CACHE/.queries/<crate>/<compiler-sha>/`: their keys record resolved syntax and
 consumed semantic schemes/layouts, excluding upstream implementation hashes.
+The implicit prelude also lives in this store, so deleting a producing build
+directory does not remove a shared library's checked dependencies.
 Reports distinguish outer artifact hits from actual checked query reuse.
 The main build report contains counters, semantic fingerprints and group counts;
 its `query_report` paths retain complete per-SCC detail. Each crate artifact also
@@ -296,7 +304,7 @@ A timed-out process group is killed and returns status 124.
 
 The language now provides `getEnv`, `setEnv`, `unsetEnv`, `directoryExists`,
 `listDirectory`, `fileDigest`, `acquireFileLock`, `releaseFileLock`, and
-`runProcess`. The checked interpreter and both native runtime layouts implement
+`runProcess`. The checked interpreter and the compact-GC runtime implement
 them. `fileDigest` streams arbitrary binary files and returns lowercase SHA-256.
 Directory listing returns NUL-terminated names; `Package.OS.entries` sorts them.
 Locks use POSIX advisory file locks, are released on process exit, and do not

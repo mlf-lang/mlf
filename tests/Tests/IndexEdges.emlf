@@ -27,21 +27,40 @@ check count offset mode = do
   let changed = case S.projectionChanges first second of Triple removed added deleted -> S.patchIndexedNodes initial removed added
   L.mapM_ (\result -> if same (S.structuralParents result) (reference true second) && same (S.bindingChildren result) (reference false second) then return Unit else panic "incremental edge patches disagree with independent reverse-edge enumeration") (Cons full (Cons changed Nil)) }) (Cons (Pair before after) (Cons (Pair after before) Nil))
 transitions = do
- L.mapM_ (\count -> L.mapM_ (\offset -> L.mapM_ (check count offset) (L.range 0 7)) (Cons (-1000000000000000000000000000000) (Cons (-7) (Cons 0 (Cons 1000000000000000000000000000000 Nil))))) (Cons 0 (Cons 1 (Cons 2 (Cons 5 (Cons 17 (Cons 33 Nil))))))
+ L.mapM_ (\count -> L.mapM_ (\offset -> L.mapM_ (check count offset) (L.range 0 7)) (Cons (-1000000000000000000000000000000) (Cons (-7) (Cons 0 (Cons 1000000000000000000000000000000 Nil))))) (Cons 0 (Cons 1 (Cons 2 (Cons 5 Nil))))
+ L.mapM_ (\count -> L.mapM_ (check count 0) (L.range 0 7)) (Cons 17 (Cons 33 Nil))
+ L.mapM_ (\offset -> L.mapM_ (check 33 offset) (L.range 0 7)) (Cons (-1000000000000000000000000000000) (Cons 1000000000000000000000000000000 Nil))
  return Unit
 
 
 referenceEdges entries =
  let keys = L.nubBy eqInt (L.map L.fst entries) in
  IM.fromList (L.map (\key -> Pair key (IS.fromList (L.map L.snd (L.filter (\entry -> L.fst entry == key) entries)))) keys)
-indexSteps : Int -> Int -> Int -> List (Pair Int Int) -> IntMap IntSet -> IO Unit
-indexSteps offset seed step entries index = if step >= 96 then return Unit else do
+indexSteps : Int -> Int -> Int -> Int -> List (Pair Int Int) -> IntMap IntSet -> IO Unit
+indexSteps limit offset seed step entries index = if step >= limit then return Unit else do
  let key = offset + remInt (step * 17 + seed * 13) 19
  let value = offset + remInt (step * 11 + seed) 7
  let adding = remInt (step + seed) 5 < 3
  let nextEntries = if adding then Cons (Pair key value) entries else L.filter (\entry -> L.not (L.fst entry == key && L.snd entry == value)) entries
  let next = if adding then S.insertIndex key value index else S.removeIndex key value index
- if same next (referenceEdges nextEntries) then indexSteps offset seed (step + 1) nextEntries next else panic "single-traversal index disagrees with edge-list oracle"
-directUpdates = L.mapM_ (\offset -> L.mapM_ (\seed -> indexSteps offset seed 0 Nil IM.empty) (L.range 0 7)) (Cons (-1000000000000000000000000000000) (Cons (-7) (Cons 0 (Cons 1000000000000000000000000000000 Nil))))
+ if same next (referenceEdges nextEntries) then indexSteps limit offset seed (step + 1) nextEntries next else panic "single-traversal index disagrees with edge-list oracle"
+-- Explicit witnesses ensure shortened random sequences do not accidentally
+-- lose duplicate insertion, absent removal or final-bucket deletion coverage.
+editWitnesses offset = do
+ let edits = Cons (Triple false 1 2) (Cons (Triple true 1 2) (Cons (Triple true 1 2) (Cons (Triple true 1 3) (Cons (Triple false 1 2) (Cons (Triple false 1 99) (Cons (Triple false 1 3) (Cons (Triple false 1 3) (Cons (Triple true 2 4) (Cons (Triple false 2 4) Nil)))))))))
+ Pair entries index <- L.foldM (\(Pair entries index) (Triple adding a b) -> do
+  let key = offset + a
+  let value = offset + b
+  let nextEntries = if adding then Cons (Pair key value) entries else L.filter (\entry -> L.not (L.fst entry == key && L.snd entry == value)) entries
+  let next = if adding then S.insertIndex key value index else S.removeIndex key value index
+  H.assert (same next (referenceEdges nextEntries)) "explicit index edit changed duplicate, absent or final-edge behavior"
+  return (Pair nextEntries next)) (Pair Nil IM.empty) edits
+ H.assert (L.null entries && IM.null index) "final edge removal retained an empty bucket"
+directUpdates = do
+ let offsets = Cons (-1000000000000000000000000000000) (Cons (-7) (Cons 0 (Cons 1000000000000000000000000000000 Nil)))
+ L.mapM_ editWitnesses offsets
+ L.mapM_ (\offset -> L.mapM_ (\seed -> indexSteps 24 offset seed 0 Nil IM.empty) (L.filter (\seed -> offset /= 0 || (seed /= 0 && seed /= 7)) (L.range 0 7))) offsets
+ L.mapM_ (\seed -> indexSteps 96 0 seed 0 Nil IM.empty) (Cons 0 (Cons 7 Nil))
+
 
 suite = Cons (Pair "incremental reverse indices agree with independent edge enumeration" transitions) (Cons (Pair "reverse-index edits agree with independent edge lists" directUpdates) Nil)

@@ -49,7 +49,7 @@ lowering =
   case CG.generate constructors expression of
     Left message -> panic message
     Right (Pair entry code) -> case L.filter (contains ("define private ptr " ++ entry ++ "(")) code of
-      Cons body Nil -> if contains "call ptr @mlf_force(" body then panic "proven constructor field was forced" else 1
+      Cons body Nil -> if contains "call ptr @mlf.force(" body then panic "proven constructor field was forced" else 1
       _ -> panic "missing strict-field lowering entry"
 
 main = printInt (lowering + L.sum (L.map check cases))

@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "complete": true,
+  "validated_at": "2026-10-22T00:56:41.891Z",
+  "core_validated_at": "2026-10-22T00:26:17.345Z",
+  "client_timezone": "Asia/Shanghai",
+  "source_files": 3209,
+  "source_snapshot": "/Volumes/src/mlf/.mlf-build/compact-only/performance-final2/inputs.json",
+  "source_snapshot_sha256": "b9b6587a6169362566527d629b2a42041b55f4c5465deba2406a0ea16e25aa86",
+  "core_source_snapshot": "/Volumes/src/mlf/.mlf-build/compact-only/r3/inputs.json",
+  "core_validation_bridge": {
+    "path": "/Volumes/src/mlf/.mlf-build/compact-only/performance-final2/core-validation-bridge.json",
+    "sha256": "881490d355a68417c8f1d7bf53440c0dd459b0ea79ed8d696ea3cc6ddf5905f0"
+  },
+  "live_source_matches_snapshot_before_document_closeout": true,
+  "working_tree_base": "cb16a87fcceb9d0d4c1a37aaffb322beb809e780",
+  "committed_or_published": false,
+  "tools": {
+    "emlf": {
+      "path": "/Volumes/src/mlf/.mlf-build/compact-only/r3/build/bin/emlf",
+      "sha256": "a49467d37e89720485a95414543d925c8906aa5d1dac0c1233817c5796723afd"
+    },
+    "mlfpkg": {
+      "path": "/Volumes/src/mlf/.mlf-build/compact-only/r3/build/bin/mlfpkg",
+      "sha256": "cc5deebd1711d8e25382844042fb6b0e84233638b329dd5825b9380f61e59095"
+    }
+  },
+  "groups": [
+    {
+      "group": "unit",
+      "wall_seconds": 861.591133625,
+      "previous_wall_seconds": 871.6104990829999
+    },
+    {
+      "group": "packages",
+      "wall_seconds": 222.63180150000005,
+      "previous_wall_seconds": 222.88371033399994
+    },
+    {
+      "group": "self-host",
+      "wall_seconds": 526.338359959,
+      "previous_wall_seconds": 527.6286945000002
+    },
+    {
+      "group": "parity",
+      "wall_seconds": 513.1107095,
+      "previous_wall_seconds": 513.1896813749997
+    },
+    {
+      "group": "backends",
+      "wall_seconds": 740.4863662910002,
+      "previous_wall_seconds": 1157.310197708
+    },
+    {
+      "group": "port",
+      "wall_seconds": 1266.2140748749994,
+      "previous_wall_seconds": 1415.3168022080004
+    }
+  ],
+  "reports": {
+    "unit": {
+      "path": "/Volumes/src/mlf/.mlf-build/compact-only/r3/build/compiler-tests/unit/verification.json",
+      "sha256": "b3900ce945cbf6a9fab4addc3da3e9097598bbf9da26368cd93667c7bc41eb9b"
+    },
+    "packages": {
+      "path": "/Volumes/src/mlf/.mlf-build/compact-only/r3/build/compiler-tests/packages/verification.json",
+      "sha256": "7855a0d88d6b6daa6c688c20a710101913ed61c1c662db5b8510bf09a7f061a3"
+    },
+    "self-host": {
+      "path": "/Volumes/src/mlf/.mlf-build/compact-only/r3/build/compiler-tests/self-host/verification.json",
+      "sha256": "0c05e85cfe312e36a1b64abecb5962bb6a5d62dbbcb543d2421e68bd7d7d0f93"
+    },
+    "parity": {
+      "path": "/Volumes/src/mlf/.mlf-build/compact-only/r3/build/compiler-tests/parity/verification.json",
+      "sha256": "b5779e84efeda30079c8965935646533b7d92e3a9d563adb743c5521cd4b6107"
+    },
+    "backends": {
+      "path": "/Volumes/src/mlf/.mlf-build/compact-only/r3/build/compiler-tests/backends/verification.json",
+      "sha256": "ebe91637e2b5337646391fe10d6161ea3151e08e936744e9785f5e9cc9a27aed"
+    },
+    "port": {
+      "path": "/Volumes/src/mlf/.mlf-build/compact-only/r3/build/compiler-tests/port/verification.json",
+      "sha256": "18e5cee004f6bd30e36ec0db8362d830ee7fb3d2ca2ac850e8b8285188630774"
+    }
+  },
+  "total_test_wall_seconds": 4132.25159725,
+  "previous_total_test_wall_seconds": 4709.850671125,
+  "initial_build_wall_seconds": 333.174351291,
+  "root_prerequisite_span_seconds_approx": 222.380967917,
+  "previous_root_prerequisite_span_seconds_approx": 224.343654375,
+  "previous_initial_build_wall_seconds": 332.200150625,
+  "port_fixtures": [
+    "foundation",
+    "MapFolds",
+    "IntegerContainers",
+    "OptimizerQueries",
+    "ConstructorProjection",
+    "ForceReuse",
+    "StrictFields",
+    "prelude",
+    "Target",
+    "frontend",
+    "LexerCounters",
+    "LLVMBuild",
+    "RuntimeCases",
+    "StateRuntime",
+    "StateTypes",
+    "GraphConformance",
+    "GraphScopes",
+    "GraphDense",
+    "OrderedTraversal",
+    "SolverReuse",
+    "TypeCache",
+    "GraphStack",
+    "EmbeddingPruning",
+    "InferenceConformance",
+    "PrimitiveMetadata"
+  ],
+  "port_outer_interpreter_executions": 0,
+  "native_profiles": [
+    "compact-gc"
+  ],
+  "execution_inventory": {
+    "checked_paths": 1175,
+    "measured_child_executions": 1157,
+    "llvm_target_rejections": 18
+  },
+  "notes": [
+    "One observation on the same host with genuine content-addressed cache reuse; not a controlled cold-cache comparison.",
+    "Group timers include target builds, preparation and execution. The first unit group also includes required root tool builds in both runs. Matrix log spans and prerequisite spans are approximate.",
+    "Initial compiler/manager build is separate. Historical sources, benchmark pins and measurements are preserved."
+  ],
+  "performance": {
+    "complete": true,
+    "series": "compact-GC for both compilers; C unchanged",
+    "runs": 3,
+    "limits": {
+      "compilation": 3,
+      "runtime": 2
+    },
+    "runner": "/Volumes/src/mlf/.mlf-build/compact-only/performance-final2/driver/bin/bench",
+    "runner_sha256": "dd3bbfb129d304957853f3ccc6c3f7aff2ba8ba58281f8bb9475a7f59f551907",
+    "runner_reused": false,
+    "helper_build": "/Volumes/src/mlf/.mlf-build/compact-only/performance-final2/helper/build.json",
+    "core_validation_bridge": "/Volumes/src/mlf/.mlf-build/compact-only/performance-final2/core-validation-bridge.json",
+    "source_snapshot": "/Volumes/src/mlf/.mlf-build/compact-only/performance-final2/inputs.json",
+    "source_snapshot_unchanged": true,
+    "result_path": "/Volumes/src/mlf/.mlf-build/compact-only/performance-final2/results/results.json",
+    "sha256": "2adbd5787e145d1ba88aacbbdb2953ec0095ccee0daeaa519eb5e29f853e1ad7"
+  },
+  "performance_collector": {
+    "path": "/Volumes/src/mlf/.mlf-build/compact-only/performance-final2/results/collector.json",
+    "sha256": "2b907f8b1c26d124d4c473b46876615580610ca6fcce6916dc1c74ee65b75afb"
+  },
+  "backend_mode_controls": {
+    "path": "/Volumes/src/mlf/.mlf-build/compact-only/backend-mode-controls/complete.json",
+    "sha256": "3c80db44ae7864f360cf91ff1b3bc8beec5b7ba9825bb9fe4516cc2533eda415"
+  },
+  "compact_field_access_analysis": {
+    "path": "/Volumes/src/mlf/.mlf-build/compact-only/ir-inspect/field-analysis.json",
+    "sha256": "39501586933c4cb219278a1ea31809195f94530063b81d30737eafe5e8aca1f5"
+  },
+  "controls": {
+    "path": "/Volumes/src/mlf/.mlf-build/compact-only/r3/controls/complete.json",
+    "sha256": "f2a0905aa11f77b4514de15495efe708909793607a3261ba2a6fb66225cf8abe",
+    "release_gate_cases": 12
+  },
+  "protected_paths": 2729,
+  "protected_paths_unchanged": true,
+  "benchmark_pins": 72,
+  "forbidden_tools_log_bytes": 0,
+  "platform_scope": "macOS ARM64 native validation; Windows/Linux source and script changes have not been executed on those hosts",
+  "execution_times": {
+    "path": "compact-only-execution-times.json",
+    "sha256": "d423445942136f8dc7fb034a2c4c67f9f908090e708edb79be945ab2a05991f7"
+  }
+}

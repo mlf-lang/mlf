@@ -13,14 +13,17 @@ suite = Cons (Pair "strict graph builder agrees with independent insertion" buil
  (Cons (Pair "node forcing preserves arbitrary identities and lazy constructor fields" nodeDemand)
  (Cons (Pair "graph expansion preserves independent allocation and frontier identities" expansions) Nil))
 
-builders : IO Unit
-builders = S.mapM_ (\count -> S.mapM_ (\offset -> do
+checkBuilder count offset = do
  let entries = S.map (\i -> Pair (offset + i * 3) (Node (GArr (offset + i) (offset - i)) (Just (offset + i + 1)) (if remInt i 2 == 0 then Flexible else Rigid))) (S.range 0 (count - 1))
  let expected = S.foldlStrict (\table (Pair key value) -> IM.insert key value table) IM.empty entries
  let actual = G.nodesFromDistinctAscList entries
- H.assert (IM.valid actual && IM.eqIntMap G.equalNode actual expected) "strict sorted graph construction changed nodes or map balance")
- (Cons (-340282366920938463463374607431768211456) (Cons 0 (Cons 340282366920938463463374607431768211456 Nil))))
- (Cons 0 (Cons 1 (Cons 2 (Cons 3 (Cons 17 (Cons 257 (Cons 4096 Nil)))))))
+ H.assert (IM.valid actual && IM.eqIntMap G.equalNode actual expected) "strict sorted graph construction changed nodes or map balance"
+builders : IO Unit
+builders = do
+ checkBuilder 0 0
+ S.mapM_ (\count -> S.mapM_ (checkBuilder count) (Cons (-340282366920938463463374607431768211456) (Cons 0 (Cons 340282366920938463463374607431768211456 Nil)))) (Cons 1 (Cons 2 (Cons 3 (Cons 17 Nil))))
+ checkBuilder 257 0
+ checkBuilder 4096 0
 
 nodeDemand : IO Unit
 nodeDemand = do

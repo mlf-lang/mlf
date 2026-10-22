@@ -89,7 +89,7 @@ validateTarget p testing entry = do
     source <- localFile (packageRoot p) (J.get "main" target)
     ms <- readModules (packageRoot p) (packageName p) (J.getObject "modules" target)
     O.require (S.elem eqString (J.getText "link" "separate" target) (O.words "separate source")) "invalid link mode"
-    O.require (S.elem eqString (J.getText "profile" "standard" target) (O.words "standard compiler")) "invalid runtime profile"
+    O.require (S.elem eqString (J.getText "profile" "compact-gc" target) (O.words "compact-gc compiler")) "invalid runtime profile; expected compact-gc (compiler is a compatibility alias)"
     O.require (J.getBool "no-prelude" false target || S.not (J.getBool "no-prelude" false target)) "invalid no-prelude"
     O.require (S.all (\x -> stringLength x >= 0) (J.getStrings "arguments" target)) "invalid arguments"
     O.require (stringLength (J.getText "stdin" "" target) >= 0 && stringLength (J.getText "stdout" "" target) >= 0) "invalid test streams"

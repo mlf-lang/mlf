@@ -41,7 +41,12 @@ audits = L.mapM_ (\scale -> L.mapM_ (\shift -> do
  let parents = S.structuralParents prepared
  let descendants = S.bindingChildren prepared
  let scopes = S.scopeIndex prepared
- L.mapM_ (\p -> L.mapM_ (\d -> check (Solver graph p d scopes)) (variants descendants)) (variants parents)
+ let parentVariants = variants parents
+ let descendantVariants = variants descendants
+ H.assert (L.length parentVariants == 8 && L.length descendantVariants == 8) "index corruption classes changed"
+ check (Solver graph parents descendants scopes)
+ L.mapM_ (\p -> check (Solver graph p descendants scopes)) (L.tail parentVariants)
+ L.mapM_ (\d -> check (Solver graph parents d scopes)) (L.tail descendantVariants)
  check (Solver graph parents descendants (ScopeIndex IM.empty Nil))
  check (Solver (Graph IM.empty IM.empty 0) parents descendants scopes))
  (Cons 0 (Cons 340282366920938463463374607431768211456 (Cons (-340282366920938463463374607431768211456) Nil)))) (Cons 1 (Cons 100003 Nil))

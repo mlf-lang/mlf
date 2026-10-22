@@ -112,7 +112,7 @@ jobs:
       fail-fast: false
       matrix:
         platform: [macos-arm64, linux-x64]
-        group: [unit, packages, self-host, parity, backends, port-standard, port-compact-gc]
+        group: [unit, packages, self-host, parity, backends, port]
         include:
           - platform: macos-arm64
             runner: macos-26
@@ -161,10 +161,7 @@ jobs:
         env:
           TEST_GROUP: ${{ matrix.group }}
         run: |
-          case "$TEST_GROUP" in
-            port-standard|port-compact-gc) tools/release/native-ci.sh port "${TEST_GROUP#port-}" ;;
-            *) tools/release/native-ci.sh "$TEST_GROUP" ;;
-          esac
+          tools/release/native-ci.sh "$TEST_GROUP"
       - name: Collect exact candidate and primary evidence
         if: always()
         env:
@@ -231,7 +228,7 @@ jobs:
           PLATFORM: ${{ matrix.platform }}
           SOURCE_COMMIT: ${{ needs.metadata.outputs.source }}
         run: |
-          for part in unit packages self-host parity backends port-standard port-compact-gc; do
+          for part in unit packages self-host parity backends port; do
             name="native-$PLATFORM-$part"
             bash tools/release/download-artifact.sh "$GITHUB_RUN_ID" "$name" ".mlf-build/release-input/$name" "$SOURCE_COMMIT"
           done

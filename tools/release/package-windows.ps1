@@ -40,11 +40,11 @@ foreach ($entry in $qualification.evidence.GetEnumerator()) {
 }
 Assert-Release ($qualification.tests.fixed_point.complete -eq $true -and $qualification.tests.fixed_point.reused_candidate_build -eq $false) 'Fresh native compiler and manager fixed point required'
 Assert-Release ($qualification.tests.fixed_point.stages -eq 2 -and $qualification.tests.fixed_point.tools.emlf.binary_sha256 -eq $compilerHash -and $qualification.tests.fixed_point.tools.mlfpkg.binary_sha256 -eq $managerHash) 'Fixed point report does not identify the released tools'
-Assert-Release ($qualification.tests.resolver.passed -eq 18 -and $qualification.tests.integration.passed -eq 26) 'All 44 native Windows package checks are required'
+Assert-Release ($qualification.tests.resolver.passed -eq 18 -and $qualification.tests.integration.passed -eq 29) 'All 47 native Windows package checks are required'
 Assert-Release ($qualification.tests.resolver.manager_sha256 -eq $managerHash -and $qualification.tests.integration.compiler_sha256 -eq $compilerHash -and $qualification.tests.integration.manager_sha256 -eq $managerHash) 'Package tests identify different tools'
-Assert-Release ($qualification.tests.parity.cases -ge 7086 -and $qualification.tests.parity.runtime_executions -ge 160) 'Full independent compiler parity is required'
+Assert-Release ($qualification.tests.parity.cases -eq 7086 -and $qualification.tests.parity.source_compilations -eq 7075 -and $qualification.tests.parity.shared_source_cases -eq 11 -and $qualification.tests.parity.runtime_executions -eq 160) 'Full independent compiler parity is required'
 Assert-Release ($qualification.tests.parity.compiler_sha256 -eq $compilerHash) 'Parity report identifies a different compiler'
-Assert-Release ($qualification.tests.runtime.complete -eq $true -and $qualification.tests.runtime.profiles.standard.passed -eq $true -and $qualification.tests.runtime.profiles.'compact-gc'.passed -eq $true) 'Both native runtime profiles are required'
+Assert-Release ($qualification.tests.runtime.complete -eq $true -and $qualification.tests.runtime.profiles.Count -eq 1 -and $qualification.tests.runtime.profiles.'compact-gc'.passed -eq $true) 'The compact-GC runtime profile is required'
 # Redistributable LGPL dependencies include their notices and exact source.
 foreach ($path in @('licenses/gmp-6.3.0/COPYING','licenses/gmp-6.3.0/COPYING.LESSERv3','licenses/libwinpthread/COPYING','licenses/pkgconf/COPYING','sources/gmp-6.3.0.tar.xz','sources/gc-8.2.12.tar.gz','sources/msys2-package-provenance.json')) {
     Assert-Release (Test-Path -LiteralPath "$NativePrefix/$path" -PathType Leaf) "Missing dependency redistribution material: $path"
@@ -71,7 +71,7 @@ foreach ($relative in @('examples/io-hello.emlf','examples/modules/Main.emlf','e
 }
 Copy-Item -LiteralPath "$Evidence/release-validation.json" -Destination "$bundle/evidence"
 foreach ($file in $qualification.evidence.Keys) { Copy-Item -LiteralPath (Join-Path $Evidence $file) -Destination "$bundle/evidence" }
-$release = [ordered]@{schema_version=1;version=$version;commit=$commit;platform='windows-x64';compiler_sha256=$compilerHash;manager_sha256=$managerHash;host_helper_sha256=$qualification.helper_sha256;qualification='evidence/release-validation.json';compiler_parity_cases=7086;compiler_runtime_executions=160;package_resolver_tests=18;package_integration_cases=26;native_fixed_point=@('emlf','mlfpkg');runtime_profiles=@('standard','compact-gc');internal_compiler_release_groups='POSIX transports; not qualified on Windows';external_tools=@('PowerShell 7 for helper scripts','MinGW-targeting Clang for native compilation')}
+$release = [ordered]@{schema_version=1;version=$version;commit=$commit;platform='windows-x64';compiler_sha256=$compilerHash;manager_sha256=$managerHash;host_helper_sha256=$qualification.helper_sha256;qualification='evidence/release-validation.json';compiler_parity_cases=7086;compiler_source_compilations=7075;compiler_shared_source_cases=11;compiler_runtime_executions=160;package_resolver_tests=18;package_integration_cases=29;native_fixed_point=@('emlf','mlfpkg');runtime_profiles=@('compact-gc');internal_compiler_release_groups='POSIX transports; not qualified on Windows';external_tools=@('PowerShell 7 for helper scripts','MinGW-targeting Clang for native compilation')}
 Write-ReleaseJson "$bundle/release.json" $release
 [IO.File]::WriteAllText("$bundle/README.md", @'
 # MLF native Windows developer preview
@@ -92,7 +92,7 @@ Build-Program.ps1 compiles a standalone .emlf source into a native .exe.
 release.json identifies the source commit and unchanged qualified executables.
 CHECKSUMS covers every bundled file. evidence/ records a native fixed point for
 both tools, all 7,086 independent parity cases, 160 compiler runtime executions,
-both native runtime layouts, and 44 package cases. The compiler repository's six
+the compact-GC runtime, and 47 package cases. The compiler repository's six
 internal POSIX release/benchmark groups are not qualified on Windows.
 
 MLF is BSD-3-Clause. Dependency notices and redistribution sources are bundled

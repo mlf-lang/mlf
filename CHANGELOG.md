@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.0 — 2026-10-22
+
+- Use compact-GC as the sole native LLVM/runtime layout. Remove the standard
+  object header, pooled allocator and IO-boundary collector. All native builds
+  require BDWGC; explicit `standard` package profiles are rejected and old
+  standard LLVM/object files must be regenerated. Preserve `-gc` CLI aliases.
+- Share verified library and test artifacts, remove exact duplicate executions,
+  reduce oversized matrices and drop the outer port interpreter pass. Preserve
+  independent references, semantic regressions, GC debug/audit coverage,
+  575 backend rows and 25 native port fixtures.
+- Consolidate CI and release qualification on one compact-GC profile, including
+  native SDK linking and Windows collector DLL deployment.
+- Reduce optional LLVM backend compilation overhead through a generic lite
+  pipeline while retaining input/output verification and O1 register allocation.
+  Nine pinned workloads pass unchanged compilation/runtime limits; n-body
+  compilation is close to the 3x C limit. Retain historical measurements and pins.
+- Record complete native test timings and ignore local compiler/debugger outputs,
+  system files and release workflow scratch files.
+
 ## 0.2.0 — 2026-10-20
 
 - Compile libraries and targets as crates with cycle-tolerant module namespaces,

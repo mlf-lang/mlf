@@ -124,7 +124,7 @@ integration = Sys.withScratch (\dir -> do
  H.assert (S.not (J.getBool "cached" true (S.head (J.values (J.get "builds" repaired))))) "tampered object reused"
  runBinary c "Hello, local packages!\n"
  passed "tampered object is rebuilt and checked"
- O.remove (output c ++ "/query-cache/builtin-prelude")
+ O.remove (output c ++ "/cache/.queries/builtin-prelude")
  expect c (Cons "build" Nil) true ""
  restored <- report c
  H.assert (S.not (J.getBool "cached" true (S.head (J.values (J.get "builds" restored))))) "missing shared Prelude dependency reused an outer crate artifact"
@@ -175,7 +175,54 @@ integration = Sys.withScratch (\dir -> do
  crateCases c
  nonEntryBodyCase c
  pgoCase c
- putStrLn "26 package integration cases passed")
+ sharedCacheCases c root
+ putStrLn "29 package integration cases passed")
+sharedCacheCases parent root = do
+ let directory = work parent ++ "/shared cache checks"
+ O.mkdir directory
+ O.run "" (Cons "/bin/cp" (Cons "-R" (Cons (root ++ "/examples/packages") (Cons (directory ++ "/app") Nil))))
+ let cache = directory ++ "/shared artifacts"
+ let first = Context directory (manager parent) (compiler parent) (directory ++ "/first build") (windows parent)
+ let second = Context directory (manager parent) (compiler parent) (directory ++ "/second build") (windows parent)
+ let args = Cons "--cache-dir" (Cons cache (Cons "build" Nil))
+ expect first args true ""
+ original <- report first
+ hash <- fileDigest (program first)
+ O.remove (output first)
+ expect second args true ""
+ reused <- report second
+ actualCache <- canonicalPath cache
+ H.assert (eqString (J.getText "cache_directory" "" reused) actualCache && S.all (J.getBool "cached" false) (J.values (J.get "builds" reused))) "another output directory failed to reuse checked artifacts"
+ H.assert (S.all (\row -> J.equal (J.get "inferred_groups" (J.get "queries" row)) (J.num 0)) (J.values (J.get "crates" reused))) "shared libraries were re-inferred"
+ actual <- fileDigest (program second)
+ H.assert (eqString hash actual) "shared artifacts changed the executable"
+ runBinary second "Hello, local packages!\n"
+ passed "shared checked cache survives removal of the producing build directory"
+ let row = S.head (J.values (J.get "crates" original))
+ let metadata = J.getText "metadata" "" row
+ writeFile (Artifact.objectPath metadata) "corrupted shared object"
+ expect second args true ""
+ repaired <- report second
+ H.assert (S.not (J.getBool "cached" true (S.head (J.values (J.get "builds" repaired))))) "shared corrupt object reused"
+ runBinary second "Hello, local packages!\n"
+ O.remove (O.parent metadata ++ "/dependency-files.json")
+ expect second args true ""
+ repairedProof <- report second
+ H.assert (S.not (J.getBool "cached" true (S.head (J.values (J.get "builds" repairedProof))))) "shared missing dependency receipt reused"
+ passed "shared object corruption and missing dependency proof trigger checked rebuilding"
+ let source = directory ++ "/app/message/Message.emlf"
+ originalSource <- readFile source
+ writeFile source (O.replace "render (Message text) = text" "render (Message text) = text ++ \" shared\"" originalSource)
+ expect first args true ""
+ changed <- report first
+ H.assert (S.not (J.getBool "cached" true (S.last (J.values (J.get "builds" changed))))) "shared cache ignored changed source"
+ runBinary first "Hello, local packages! shared\n"
+ writeFile source originalSource
+ expect first args true ""
+ restored <- report first
+ H.assert (S.all (J.getBool "cached" false) (J.values (J.get "builds" restored))) "returning to original source missed the shared artifacts"
+ runBinary first "Hello, local packages!\n"
+ passed "shared cache separates changed source and restores the original checked targets"
 nonEntryBodyCase parent = do
  let directory = work parent ++ "/library-expression"
  O.mkdir (directory ++ "/app")

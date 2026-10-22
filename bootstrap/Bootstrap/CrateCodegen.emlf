@@ -59,14 +59,14 @@ saveReport directory result = do
   saved <- Query.writeCache (directory ++ "/last-query.json") (reportJSON result)
   ioReturn (mapEither (\_ -> result) saved)
 
-emitLocked directory compiler compact requireIO checked inputKey = do
+emitLocked directory compiler requireIO checked inputKey = do
   let input = saltedKey compiler inputKey
   inputId <- digestKey directory input
   let inputPath = directory ++ "/inputs/" ++ inputId ++ ".mlfcg"
   cached <- readCached directory inputPath input
   case cached of
     Right (Triple chunks _ optimizedId) -> saveReport directory (CodegenResult chunks true false inputId optimizedId compiler)
-    Left _ -> case LLVM.prepareChecked compact requireIO checked of
+    Left _ -> case LLVM.prepareChecked requireIO checked of
       Left error -> ioReturn (Left error)
       Right prepared -> do
         let optimized = saltedKey compiler (LLVM.preparedKey prepared)
@@ -95,12 +95,12 @@ emitLocked directory compiler compact requireIO checked inputKey = do
               Left error -> ioReturn (Left error)
               Right _ -> saveReport directory (CodegenResult chunks false hit inputId optimizedId compiler)
 
-emitChecked : String -> Bool -> Bool -> Checked.CheckedTerm -> IO (Either String CodegenResult)
-emitChecked directory compact requireIO checked = emitWithKey directory compact requireIO checked (LLVM.checkedInputKey compact requireIO checked)
-emitCrateChecked : String -> Bool -> Bool -> Checked.CheckedTerm -> IO (Either String CodegenResult)
-emitCrateChecked directory compact requireIO checked = emitWithKey directory compact requireIO checked (LLVM.crateInputKey compact requireIO checked)
-emitWithKey : String -> Bool -> Bool -> Checked.CheckedTerm -> Either String String -> IO (Either String CodegenResult)
-emitWithKey directory compact requireIO checked key = case key of
+emitChecked : String -> Bool -> Checked.CheckedTerm -> IO (Either String CodegenResult)
+emitChecked directory requireIO checked = emitWithKey directory requireIO checked (LLVM.checkedInputKey requireIO checked)
+emitCrateChecked : String -> Bool -> Checked.CheckedTerm -> IO (Either String CodegenResult)
+emitCrateChecked directory requireIO checked = emitWithKey directory requireIO checked (LLVM.crateInputKey requireIO checked)
+emitWithKey : String -> Bool -> Checked.CheckedTerm -> Either String String -> IO (Either String CodegenResult)
+emitWithKey directory requireIO checked key = case key of
   Left error -> ioReturn (Left error)
   Right inputKey -> if stringLength directory == 0 then ioReturn (Left "code generation cache directory is empty") else do
     let cache = Query.cachePath directory
@@ -109,16 +109,16 @@ emitWithKey directory compact requireIO checked key = case key of
       executable <- getExecutablePath
       compiler <- fileDigest executable
       lock <- acquireFileLock (cache ++ "/.lock")
-      result <- emitLocked cache compiler compact requireIO checked inputKey
+      result <- emitLocked cache compiler requireIO checked inputKey
       releaseFileLock lock
       ioReturn result
-emitCheckedChunks directory compact requireIO checked = do
-  result <- emitChecked directory compact requireIO checked
+emitCheckedChunks directory requireIO checked = do
+  result <- emitChecked directory requireIO checked
   ioReturn (mapEither codeChunks result)
-emitFile directory compact requireIO path = do
+emitFile directory requireIO path = do
   checked <- Artifact.linkCheckedFile path
   case checked of
     Left error -> ioReturn (Left error)
     Right term -> do
-      result <- emitCrateChecked directory compact requireIO term
+      result <- emitCrateChecked directory requireIO term
       ioReturn (mapEither codeChunks result)

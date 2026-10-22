@@ -1,25 +1,14 @@
-#ifndef MLF_RUNTIME_H
+#if !defined(MLF_RUNTIME_H)
 #define MLF_RUNTIME_H
 
 #include <stdint.h>
 
-/* 64-bit ABI used by MLF.LLVM.Codegen. Low bits: odd = signed 63-bit
- * integer, 2/6 = false/true, (tag << 3)|4 = nullary constructor. Heap
- * pointers are aligned to 8 bytes. Evaluated constructors store their tag
- * at byte 24; fully applied unary/binary constructors have inline fields
- * at byte 32. General constructors store an environment pointer at byte 40;
- * its field slots start at byte 24. Compact BDWGC subtracts 16 from each
- * offset except that saturated arity >= 3 values store their fields inline
- * starting at byte 24. Static assertions guard both layouts. */
-/* The default ABI includes 16 bytes of pool metadata per value/environment.
- * --emit-llvm-gc omits that metadata: compile this runtime with both
- * MLF_USE_BDWGC and MLF_COMPACT_BDWGC. Generated entry points reference the
- * corresponding guard so mixing layouts fails during linking. */
-#ifdef MLF_COMPACT_BDWGC
+/* Compact 64-bit BDWGC ABI. Low bits encode immediate integers, booleans
+ * and nullary constructors. Heap value tags start at byte 0; payloads at
+ * byte 8, packed fields at byte 16, wide fields at byte 24 and environment
+ * slots at byte 8. The runtime requires GMP and BDWGC. Old standard-layout
+ * LLVM/object files must be regenerated; their ABI guard is not exported. */
 void mlf_require_compact_gc_abi(void);
-#else
-void mlf_require_standard_abi(void);
-#endif
 
 typedef struct MlfValue MlfValue;
 typedef struct MlfEnv MlfEnv;
@@ -44,7 +33,7 @@ void mlf_env_set(MlfEnv *env, uint64_t index, MlfValue *value);
 MlfValue *mlf_env_get(MlfEnv *env, uint64_t index);
 /* Private captures for a single-entry callback. The caller initializes every
  * slot before publishing the thunk. The callback loads, then clears its slots
- * before evaluating its body. Environment pointer: byte 32 / compact byte 16. */
+ * before evaluating its body. Environment pointer: byte 16. */
 MlfValue *mlf_thunk_new(MlfCode code, uint64_t count);
 MlfValue *mlf_thunk(MlfCode code, MlfEnv *env);
 MlfValue *mlf_closure(MlfCode code, MlfEnv *env);
@@ -98,7 +87,6 @@ _Noreturn void mlf_match_failure(void);
 void mlf_set_args(int32_t argc, char **argv);
 int32_t mlf_run(MlfValue *root, int64_t is_io);
 
-#ifdef MLF_COMPACT_BDWGC
 /* Reserved for generated small captured thunks. These are the runtime's own
  * traced batches, indexed by requested bytes / 16; debug heads stay empty. */
 extern void *mlf_compact_pending[17];
@@ -106,6 +94,5 @@ extern void *mlf_compact_pending[17];
  * already-cleared object immediately; the heads are collector roots. */
 extern void *mlf_constructor_pending[33];
 void *mlf_constructor_allocate(int64_t identity, uint64_t count);
-#endif
 
 #endif
