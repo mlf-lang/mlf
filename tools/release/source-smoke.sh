@@ -10,8 +10,9 @@ seed=${MLF_COMPILER:?verified native seed compiler required}
 test -x "$seed"
 sha256() { shasum -a 256 "$1" | awk '{print $1}'; }
 seed_sha256=$(sha256 "$seed")
-# Leave room for the OS on the smaller hosted macOS runners.
-export GC_FREE_SPACE_DIVISOR=4
+# Divisor 2 reduces pre-harness collection work while keeping the measured
+# local peak near 4.3 GB, below the hosted runner's 7 GiB memory capacity.
+export GC_FREE_SPACE_DIVISOR=2
 started=$SECONDS
 snapshot() {
   {
@@ -139,7 +140,7 @@ jq -n --arg commit "$(git rev-parse HEAD)" --arg seed_sha256 "$seed_sha256" \
   --arg self_application_sha256 "$(sha256 "$build/impredicative-self-application.xmlf")" \
   --argjson total_seconds "$((SECONDS - started))" \
   '{complete:true,mode:"interpreted-checkout-source",commit:$commit,cases:5,
-    accepted:2,rejected:2,malformed_target:1,total_seconds:$total_seconds,gc_free_space_divisor:4,
+    accepted:2,rejected:2,malformed_target:1,total_seconds:$total_seconds,gc_free_space_divisor:2,
     seed_sha256:$seed_sha256,sources_sha256:$sources_sha256,log_sha256:$log_sha256,
     targets:{polymorphic_let:$let_sha256,self_application:$self_application_sha256}}' > "$build/result.json.new"
 mv "$build/result.json.new" "$build/result.json"

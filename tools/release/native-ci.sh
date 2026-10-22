@@ -14,7 +14,16 @@ test "$#" -le 1 || { printf '%s\n' 'Expected one test group.' >&2; exit 2; }
 case "$group" in smoke|source-smoke|pr-smoke|extended-pr-smoke|unit|packages|self-host|parity|backends|port) ;; *) exit 2 ;; esac
 test -z "${MLF_TEST_RUNTIME_PROFILE:-}" || test "$MLF_TEST_RUNTIME_PROFILE" = compact-gc || exit 2
 evidence_group=$group
-. tools/release/native-environment.sh
+if [ "$group" = source-smoke ]; then
+  # Interpreting sources does not build native code or discover development libraries.
+  case "$(uname -s):$(uname -m)" in
+    Darwin:arm64) ;;
+    Linux:x86_64) ulimit -s unlimited ;;
+    *) printf '%s\n' 'Unsupported native test host.' >&2; exit 2 ;;
+  esac
+else
+  . tools/release/native-environment.sh
+fi
 if [ "$group" = packages ]; then
   command -v llvm-profdata >/dev/null || {
     printf '%s\n' 'Package PGO tests require llvm-profdata from the matching LLVM installation on PATH.' >&2

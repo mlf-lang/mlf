@@ -91,7 +91,7 @@ required checks.
 
 ## Run locally
 
-On Apple Silicon macOS with LLVM, GMP, BDWGC, pkg-config, jq and GitHub CLI:
+On Apple Silicon macOS with GMP, jq and GitHub CLI:
 
 ```sh
 tools/release/fetch-seed.sh .mlf-build/pr-seed .github/smoke-seed.env
@@ -103,7 +103,9 @@ tools/release/native-ci.sh source-smoke
 Use an unused seed-download directory. Each smoke invocation clears its success
 receipt before argument, runtime-profile or native environment validation,
 including when a smoke helper is invoked directly. Fifteen isolated regression
-checks cover these early failures and missing seeds across all three smoke groups:
+checks cover these early failures and missing seeds across all three smoke groups.
+One further check verifies that the source wrapper needs no native build
+dependencies and still blocks forbidden tools:
 
 ```sh
 tools/release/test-smoke-receipts.sh
@@ -116,7 +118,8 @@ child-process cleanup. The release
 metadata check runs these regressions too. GHC, Cabal and Python are blocked on
 the native CI path.
 
-To build fresh checkout tools and run the eight CLI and three package checks:
+To build fresh checkout tools and run the eight CLI and three package checks,
+also install LLVM, BDWGC and pkg-config:
 
 ```sh
 tools/release/native-ci.sh pr-smoke
@@ -139,8 +142,12 @@ release qualification are unchanged.
 ## Timing and evidence
 
 The required **Compiler source smoke** job has a ten-minute hard limit, including
-dependency setup, seed verification and evidence upload. A local run with the
-fixed collector setting passed in 130 seconds with a 3.17 GB peak resident set.
+dependency setup, seed verification and evidence upload. It installs only GMP;
+interpreting the harness does not need LLVM, BDWGC development files or pkg-config.
+The collector uses `GC_FREE_SPACE_DIVISOR=2`. A local run passed in 115 seconds
+(67 user CPU seconds) with a 4.27 GB peak resident set. Divisor 4 used about
+100 user CPU seconds and 3.1 GB on the same host. These runs support trading
+some memory for less collection work within the hosted runner's 7 GiB capacity.
 Hosted timing is recorded in each run's evidence; the job limit is a failure
 bound, not a promised duration.
 
@@ -155,7 +162,13 @@ A later [run 39816731269](https://github.com/mlf-lang/mlf/actions/runs/398167312
 reached the 480-second command deadline before producing case output, with the
 same compiler sources, seed and runner image. Host, process and case-progress
 logs were added afterward to distinguish future slowdowns; the successful run
-alone does not establish a stable hosted duration.
+alone does not establish a stable hosted duration. The instrumented
+[run 39832295778](https://github.com/mlf-lang/mlf/actions/runs/39832295778)
+also timed out before the first case: the seed accumulated over seven minutes
+of CPU time, sampled RSS reached 3 GB, and no host swap activity was recorded.
+Both timeouts used divisor 4. This motivated divisor 2 without increasing the
+command deadline or reducing case coverage; hosted validation of the new setting
+is still pending.
 
 In CI run [39798088020](https://github.com/mlf-lang/mlf/actions/runs/39798088020),
 the fresh-native smoke command completed in **16m49s** (1,009 seconds): checkout

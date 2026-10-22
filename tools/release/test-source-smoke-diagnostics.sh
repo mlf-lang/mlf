@@ -67,6 +67,7 @@ cat > "$MLF_COMPILER" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 output=${!#}
+test "$GC_FREE_SPACE_DIVISOR" = 2
 printf '%s\n' "$$" > "$TEST_SMOKE_SCRATCH/seed.pid"
 test ! -e "$output/progress.log"
 touch "$TEST_SMOKE_SCRATCH/stale-progress-cleared"
@@ -112,7 +113,7 @@ for mode in success timeout progress telemetry; do
   while read -r pid seconds; do assert_stopped "$pid"; done < "$scratch/sleep-pids.log"
   if [ "$mode" = success ] || [ "$mode" = telemetry ]; then
     test "$status" -eq 0
-    jq -e '.complete == true and .cases == 5' "$build/result.json" >/dev/null
+    jq -e '.complete == true and .cases == 5 and .gc_free_space_divisor == 2' "$build/result.json" >/dev/null
     test ! -e "$build/timed-out.log"
     cmp "$build/expected.log" "$build/tests.log"
     if [ "$mode" = telemetry ]; then

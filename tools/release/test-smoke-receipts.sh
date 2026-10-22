@@ -10,9 +10,14 @@ for script in native-ci native-environment source-smoke pr-smoke extended-pr-smo
   cp "$scripts/$script.sh" "$checkout/tools/release/"
 done
 # Force environment setup to fail before dependencies or native tools are used.
+export TEST_SMOKE_HOST=unsupported
 cat > "$scratch/bin/uname" <<'SH'
 #!/usr/bin/env bash
-printf '%s\n' UnsupportedSmokeReceiptTestHost
+if [ "$TEST_SMOKE_HOST" = macos ]; then
+  case "$1" in -s) printf 'Darwin\n' ;; -m) printf 'arm64\n' ;; *) exit 99 ;; esac
+else
+  printf '%s\n' UnsupportedSmokeReceiptTestHost
+fi
 SH
 chmod +x "$scratch/bin/uname"
 export PATH="$scratch/bin:$PATH"
@@ -58,4 +63,29 @@ for group in source-smoke pr-smoke extended-pr-smoke; do
     "$helper"
 done
 test "$checks" -eq 15
+export TEST_SMOKE_HOST=macos TEST_SMOKE_DEPENDENCIES="$scratch/dependencies.log"
+for command in brew pkg-config; do
+  cat > "$scratch/bin/$command" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$0 $*" >> "$TEST_SMOKE_DEPENDENCIES"
+exit 99
+SH
+  chmod +x "$scratch/bin/$command"
+done
+cat > "$checkout/tools/release/source-smoke.sh" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+test "$#" -eq 0
+jq -e '.complete == false' .mlf-build/source-smoke/result.json >/dev/null
+for command in ghc ghc-pkg runghc runhaskell cabal python python3; do
+  status=0
+  "$command" > .mlf-build/forbidden.log 2>&1 || status=$?
+  test "$status" -eq 97
+  grep -Fq 'Forbidden build dependency:' .mlf-build/forbidden.log
+done
+SH
+"$checkout/tools/release/native-ci.sh" source-smoke
+test ! -e "$TEST_SMOKE_DEPENDENCIES"
+checks=$((checks + 1))
+printf 'PASS smoke receipt: source wrapper needs no native build dependencies and blocks forbidden tools\n'
 printf '%s smoke receipt checks passed\n' "$checks"
