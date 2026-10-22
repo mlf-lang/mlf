@@ -55,6 +55,15 @@ stop_background() {
     wait "$1" 2>/dev/null || true
   fi
 }
+stop_sleep_jobs() {
+  # A signal can arrive after a child is forked but before $! is assigned.
+  # The subshell job table owns that child throughout this launch window.
+  trap '' TERM INT
+  local child_pid
+  for child_pid in $(jobs -p); do kill "$child_pid" 2>/dev/null || true; done
+  wait 2>/dev/null || true
+  exit 0
+}
 cleanup() {
   stop_background "$watchdog_pid"
   stop_background "$sampler_pid"
@@ -67,8 +76,7 @@ trap 'exit 143' TERM
   -- "$PWD/tests/pr-smoke" "$build" > "$build/tests.log" 2> "$build/tests.stderr.log" &
 command_pid=$!
 (
-  sleep_pid=
-  trap 'if [ -n "$sleep_pid" ]; then kill "$sleep_pid" 2>/dev/null || true; wait "$sleep_pid" 2>/dev/null || true; fi; exit 0' TERM INT
+  trap stop_sleep_jobs TERM INT
   printf 'Seed PID: %s; columns: PID elapsed CPU-time CPU-percent RSS-KiB\n' "$command_pid"
   while kill -0 "$command_pid" 2>/dev/null; do
     date -u +%Y-%m-%dT%H:%M:%SZ
@@ -90,21 +98,19 @@ command_pid=$!
           ;;
       esac
     } >> "$build/memory.log" 2>&1 || true
-    sleep 30 & sleep_pid=$!
-    wait "$sleep_pid" || exit 0
-    sleep_pid=
+    sleep 30 &
+    wait "$!" || exit 0
   done
 ) > "$build/process.log" 2>&1 &
 sampler_pid=$!
 (
-  sleep_pid=
-  trap 'if [ -n "$sleep_pid" ]; then kill "$sleep_pid" 2>/dev/null || true; wait "$sleep_pid" 2>/dev/null || true; fi; exit 0' TERM INT
-  sleep 480 & sleep_pid=$!
-  wait "$sleep_pid" || exit 0
+  trap stop_sleep_jobs TERM INT
+  sleep 480 &
+  wait "$!" || exit 0
   printf 'Current-source smoke exceeded 480 seconds.\n' > "$build/timed-out.log"
   kill -TERM "$command_pid" 2>/dev/null || true
-  sleep 2 & sleep_pid=$!
-  wait "$sleep_pid" || exit 0
+  sleep 2 &
+  wait "$!" || exit 0
   kill -KILL "$command_pid" 2>/dev/null || true
 ) &
 watchdog_pid=$!

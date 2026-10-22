@@ -114,7 +114,8 @@ tools/release/test-source-smoke-diagnostics.sh
 
 Four additional supervision checks exercise successful completion, failed
 optional memory probes and timeouts before and after harness progress, including
-child-process cleanup. The release
+cancellation between launching a watchdog sleep and recording its PID. Watchers
+terminate and reap their owned background jobs even in that launch window. The release
 metadata check runs these regressions too. GHC, Cabal and Python are blocked on
 the native CI path.
 
@@ -167,8 +168,11 @@ alone does not establish a stable hosted duration. The instrumented
 also timed out before the first case: the seed accumulated over seven minutes
 of CPU time, sampled RSS reached 3 GB, and no host swap activity was recorded.
 Both timeouts used divisor 4. This motivated divisor 2 without increasing the
-command deadline or reducing case coverage; hosted validation of the new setting
-is still pending.
+command deadline or reducing case coverage. The source job in
+[run 39834466286](https://github.com/mlf-lang/mlf/actions/runs/39834466286/job/120018993499)
+passed all five cases in **5m30s** (330 seconds) at divisor 2 with identical output
+hashes. That run's metadata check exposed the watchdog cleanup race, now covered
+by the deterministic supervision regression above.
 
 In CI run [39798088020](https://github.com/mlf-lang/mlf/actions/runs/39798088020),
 the fresh-native smoke command completed in **16m49s** (1,009 seconds): checkout

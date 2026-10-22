@@ -53,7 +53,10 @@ case "$1" in
     exec "$TEST_SMOKE_REAL_SLEEP" 0.5
     ;;
   30) touch "$TEST_SMOKE_SCRATCH/sampler.started"; exec "$TEST_SMOKE_REAL_SLEEP" 60 ;;
-  2) exec "$TEST_SMOKE_REAL_SLEEP" 0.1 ;;
+  2)
+    touch "$TEST_SMOKE_SCRATCH/grace.started"
+    exec "$TEST_SMOKE_REAL_SLEEP" 60
+    ;;
   *) exit 99 ;;
 esac
 SH
@@ -74,6 +77,11 @@ touch "$TEST_SMOKE_SCRATCH/stale-progress-cleared"
 if [ "$TEST_SMOKE_MODE" = progress ]; then
   printf 'Checking accepted polymorphic-let\n' > "$output/progress.log"
 fi
+if [ "$TEST_SMOKE_MODE" = timeout ]; then
+  # Let the watchdog launch its grace-period sleep before this child exits.
+  trap 'while [ ! -e "$TEST_SMOKE_SCRATCH/grace.started" ]; do "$TEST_SMOKE_REAL_SLEEP" 0.01; done; exit 143' TERM
+  while :; do :; done
+fi
 if [ "$TEST_SMOKE_MODE" != success ] && [ "$TEST_SMOKE_MODE" != telemetry ]; then exec "$TEST_SMOKE_REAL_SLEEP" 60; fi
 while [ ! -e "$TEST_SMOKE_SCRATCH/watchdog.started" ] || [ ! -e "$TEST_SMOKE_SCRATCH/sampler.started" ]; do
   "$TEST_SMOKE_REAL_SLEEP" 0.01
@@ -91,12 +99,26 @@ assert_stopped() {
   local pid=$1
   if kill -0 "$pid" 2>/dev/null; then
     printf 'Source smoke left process %s running.\n' "$pid" >&2
+    ps -p "$pid" -o pid,ppid,state,etime,command >&2 || true
     exit 1
   fi
 }
+# Interrupt after the grace sleep is forked, before any following PID assignment.
+# This deterministically recreates the launch-window cancellation seen on Linux.
+cat > "$scratch/interrupt-watchdog.sed" <<'SED'
+s/^\(  sleep 2 &\)\(.*\)$/\1\
+  while [ ! -e "$TEST_SMOKE_SCRATCH\/grace.started" ]; do :; done\
+  \/bin\/sh -c 'kill -TERM "$PPID"'\
+ \2/
+SED
 for mode in success timeout progress telemetry; do
   export TEST_SMOKE_MODE=$mode
-  rm -f "$scratch/sleep-pids.log" "$scratch/seed.pid" "$scratch/watchdog.started" "$scratch/sampler.started" "$scratch/stale-progress-cleared"
+  cp "$scripts/source-smoke.sh" "$checkout/tools/release/source-smoke.sh"
+  if [ "$mode" = timeout ]; then
+    sed -f "$scratch/interrupt-watchdog.sed" "$scripts/source-smoke.sh" > "$checkout/tools/release/source-smoke.sh"
+    grep -Fq '/bin/sh -c' "$checkout/tools/release/source-smoke.sh"
+  fi
+  rm -f "$scratch/sleep-pids.log" "$scratch/seed.pid" "$scratch/watchdog.started" "$scratch/sampler.started" "$scratch/stale-progress-cleared" "$scratch/grace.started"
   printf '{"complete":true}\n' > "$build/result.json"
   printf 'stale progress\n' > "$build/progress.log"
   printf 'stale timeout\n' > "$build/timed-out.log"
