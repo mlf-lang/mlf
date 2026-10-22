@@ -1,6 +1,7 @@
 -- Black-box local package tests: invoke the native MLF manager, never an installer.
 module Tests.Packages where
 import Bootstrap.Types
+import qualified Tests.Coverage as Coverage
 import qualified Bootstrap.Std as S
 import qualified Bootstrap.CrateArtifact as Artifact
 import qualified Package.OS as O
@@ -45,7 +46,7 @@ runBinary c expected = do
  out <- readFile (work c ++ "/program.out")
  err <- readFile (work c ++ "/program.err")
  H.assert (code == 0 && eqString out expected && eqString err "") ("package program output mismatch: " ++ out ++ err)
-passed label = putStrLn ("PASS " ++ label)
+passed label = do { Coverage.passed "packages" label; putStrLn ("PASS " ++ label) }
 dependencyPathShapes = do
  let digest = J.str (S.concatMapString (\_ -> "a") (S.range 0 63))
  let receipt path = J.Object (Cons (Pair path digest) Nil)

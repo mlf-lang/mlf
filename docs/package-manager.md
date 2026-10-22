@@ -1,4 +1,4 @@
-# Local package manager (format 1)
+# Package manager (format 1)
 
 `mlfpkg` builds MLF packages and runs their tests without invoking Cabal. It is
 written in MLF under `libraries/mlf-package-core/` and
@@ -6,8 +6,12 @@ written in MLF under `libraries/mlf-package-core/` and
 content-addressed caching, compilation, linking, and test orchestration all run
 in the native MLF executable. The source-tree `mlfpkg` is a thin shell launcher;
 it never invokes a Python package-manager implementation. Parsing, inference,
-checked xMLF linking, and LLVM generation use the selected MLF compiler. It uses only local dependencies
-and installed tools. It never downloads a compiler or a dependency.
+checked xMLF linking, and LLVM generation use the selected MLF compiler. It uses
+local source dependencies, pinned checked release directories, or pinned GitHub
+release assets and installed tools. GitHub downloads use `gh`; `--offline`
+prohibits downloads. It never downloads a compiler automatically. See
+[checked package releases](checked-package-releases.md#github-distribution)
+for the dependency schema, shared cache, and publishing workflow.
 
 On Windows, use native `mlfpkg.exe` with `mlf-host.exe`,
 `mlf-build-runner.exe`, native `pkg-config`,
@@ -115,14 +119,23 @@ manifests have been replaced. Rebuild the manager using the current bootstrap
 script before building this layout with an older installed manager.
 
 Compiler tests are written in MLF under `tests/` and built as the local
-`mlf-tests` package. The root commands use the selected native compiler and MLF
-package manager. GHC, Cabal, and Python are not test prerequisites. Clang builds
+`mlf-tests` package. The root's private `compiler-tests` executable uses
+`tests/CompilerTestsMain.emlf` and `Tests.CompilerTests` to coordinate the six
+compiler campaigns. The package manager provides generic build, cache and
+command execution; it does not import the compiler campaign. Root test commands
+pass the selected compiler and package manager explicitly, and the campaign
+records and rechecks both binaries plus its own runner identity. GHC, Cabal, and
+Python are not test prerequisites. Clang builds
 the retained C ABI probes and binary/process transports. The probes retain
 their low-level ABI checks; MLF runs them and checks their status, output,
 error modes, and allocation accounting.
 The test package shares only its support modules; each executable's `modules`
 map lists its own test-case dependencies. This keeps unrelated test cases out
 of individual test builds while retaining the complete root test inventory.
+Source discovery and native driver caching live in the test-owned
+`Tests.TestSources` and `Tests.TestDrivers` support modules. The root campaign
+maps them privately, and the harness privately imports the same campaign to
+exercise its real driver construction path.
 
 The Haskell compiler and old Haskell/Python harnesses have been removed.
 Shared C fixtures live in `tests/native/`. Expected parity types remain
@@ -150,6 +163,10 @@ Port preparation and source driver LLVM track their resolved import closures
 rather than the complete repository inventory. Driver native objects and links
 are cached with their native toolchain, headers, libraries and ordered flags;
 each group's verification report records the actual artifact keys and reuse.
+The retained `driver-build/build-report.json` is bound by its SHA-256 in that
+verification report. Release packaging checks this report and the embedded
+stage receipts before preserving them as evidence; native cache objects remain
+build artifacts rather than cached test verdicts.
 Commands, tool/source hashes, cache decisions, and test
 results are recorded in `.mlf-build/build-report.json`; compiler groups also
 write their detailed evidence under `.mlf-build/compiler-tests/`.
@@ -304,6 +321,18 @@ in the package you selected.
 
 ## Caching and locks
 
+`mlfpkg --manifest LIBRARY/mlf-package.json release DIRECTORY` exports a
+source-free checked library and its complete dependency closure. A dependency
+can select `{"release":"../DIRECTORY","sha256":"<release.json SHA-256>"}`
+instead of `{"path":"../SOURCE"}`. Release directories are relocatable and
+require the producing compiler's exact digest. Their objects are independently
+checked on import and reused through the selected cache. See the
+[design, compatibility policy, and examples](checked-package-releases.md).
+`mlfpkg pack DIRECTORY FILE.mlfr` prepares a deterministic GitHub release asset.
+A `github` dependency pins both its `asset_sha256` and release-manifest `sha256`.
+Verified downloads are shared under `CACHE/.downloads/`; `--offline` requires
+them to be present and intact. Cache locations do not enter GitHub lock rows.
+
 Builds use explicit crate source inventories. Ambient source directories cannot
 satisfy undeclared imports. Libraries compile in crate dependency order;
 modules within a crate resolve together without a compilation order. Downstream
@@ -347,9 +376,9 @@ they do not silently rewrite a checked-in lock. `plan` resolves and validates
 without executing compilers or test commands.
 
 Artifacts default to `.mlf-build` beside the selected manifest; `--build-dir`
-chooses another directory. POSIX and native Windows implementations support local
-source packages, executable/library builds, and tests. Registry publishing, remote
-dependencies, dependency version solving, installation, cross compilation,
+chooses another directory. POSIX and native Windows implementations support local source packages, checked
+release directories, pinned GitHub release assets, executable/library builds,
+and tests. Registry indexing, dependency version solving, installation, cross compilation,
 and native object-per-module linking are outside format 1. `--timeout` accepts
 positive integer seconds and applies to build commands and test processes.
 A timed-out process group is killed and returns status 124.

@@ -11,8 +11,9 @@ inputs before publishing binaries. Test commands still execute serially.
 
 The ten libraries now live under `libraries/`. Targets may select an explicit
 `dependencies` array; omission retains every direct package dependency.
-The original 63 modules retain their names, and `Package.Scheduler` adds one
-package-core module. See [the package guide](package-manager.md) and
+Compiler module names remain stable. The upstream test-framework change moves
+the three campaign/cache helpers into `Tests.*` and builds a separate
+`compiler-tests` executable. See [the package guide](package-manager.md) and
 [runner protocol](build-runner-protocol.md) for the implemented interfaces.
 
 The checklist below records the design and its acceptance requirements.
@@ -87,7 +88,7 @@ Proposed interface:
 
 ### 5. Split libraries, then shorten executable dependency paths
 
-The original baseline contained 63 library modules: 55 bootstrap modules and 8 package-tool modules. The implemented split contains 67 after adding the scheduler, regex library, and two test-cache helpers. Validate the layout first with `--jobs 1`.
+The original baseline contained 63 library modules: 55 bootstrap modules and 8 package-tool modules. The integrated split contains 66 compiler/tool library modules after adding the scheduler, regex and checked-release support, and moving the test campaign/cache helpers into the test tree. The reusable testing packages remain separate. Validate the layout first with `--jobs 1`.
 
 | Library | Responsibility | Modules |
 | --- | --- | ---: |
@@ -99,14 +100,14 @@ The original baseline contained 63 library modules: 55 bootstrap modules and 8 p
 | `mlf-interpreter` | Checked-program interpreter | 1 |
 | `mlf-llvm` | LLVM optimization and emission | 9 |
 | `mlf-crates` | Crate artifacts, queries, linking, codegen integration | 7 |
-| `mlf-package-core` | Manifests, builds, package commands, scheduling | 6 |
-| `mlf-developer-tools` | Test orchestration, verification, benchmarks, test caches | 5 |
+| `mlf-package-core` | Manifests, builds, package commands, scheduling, checked releases | 8 |
+| `mlf-developer-tools` | Verification and benchmarks | 2 |
 
 All committed library modules are accounted for and the library graph is acyclic. Its main chain is `foundation -> language-core -> frontend -> xmlf`; inference, interpreter, and LLVM can then run concurrently. Crates waits for inference and LLVM, followed by package-core and developer-tools. The maximum independent library width of this grouping is three, not ten.
 
 Use one package manifest per library, retain globally unique module names and explicit direct dependencies, and keep sources within their declaring package roots. Update bootstrap paths, test manifests, and lock data with the split.
 
-In a separate compatibility-preserving schema change, add explicit per-target dependency selection with today's all-package-dependencies behavior as the default. Both root executables currently inherit every direct package dependency; otherwise `emlf` would still wait for package-manager tooling. Validate target dependency visibility and instance/namespace behavior rather than inferring a narrower dependency set silently.
+Explicit per-target dependency selection retains all-package-dependencies behavior as the default. The root compiler, manager, and test-campaign executable select their required direct dependencies, so `emlf` does not wait for package-manager or test tooling. Validate target dependency visibility and instance/namespace behavior rather than inferring a narrower dependency set silently.
 
 ### 6. Validate correctness and measure the gain
 

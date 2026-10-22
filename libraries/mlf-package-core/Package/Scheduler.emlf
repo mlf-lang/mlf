@@ -78,10 +78,9 @@ artifactOf directory invocation identity = do
   let result = J.get "result" value
   let artifact = J.getText "artifact" "" result
   O.require (O.absolute artifact) "worker returned a relative artifact"
-  valid <- B.cacheValid artifact (J.getText "key" "" result)
+  valid <- B.validActionResult result
   O.require valid ("worker artifact failed validation: " ++ identity)
-  if J.has "metadata" result then do { checked <- B.validCrateClosure artifact; O.require checked ("worker crate closure failed validation: " ++ identity) } else ioReturn Unit
-  ioReturn artifact
+  ioReturn (B.importPath result)
 worker contextPath invocation identity = do
   digest <- fileDigest contextPath
   O.require (eqString digest invocation) "worker context does not match invocation"
@@ -104,7 +103,7 @@ worker contextPath invocation identity = do
   result <- case J.getText "kind" "" selected of
     "library" -> do
       let q = M.lookupPackage (J.getText "package" "" selected) (M.packages graph)
-      B.compileCrateResult b q "library" "" (M.packageModules q) dependencies (J.getBool "no-prelude" false selected)
+      B.libraryResult b q dependencies (J.getBool "no-prelude" false selected)
     "target" -> B.compileCrateResult b p ("target-" ++ J.getText "name" "" selected) (J.getText "entry" "" selected) (S.map moduleFrom (J.values (J.get "modules" selected))) dependencies (J.getBool "no-prelude" false selected)
     "runtime" -> B.runtimeObjectWithPgoResult b gc profile
     "emit" -> do
@@ -139,7 +138,7 @@ runner b = do
   O.require (eqString (O.trim capability) "1") "incompatible mlf-build-runner protocol (expected 1)"
   ioReturn identity
 mergeReport b identity report = S.mapM_ (\(Pair key value) ->
-  if S.elem eqString key (O.words "commands builds crates codegen native_inputs") then
+  if S.elem eqString key (O.words "commands builds crates releases codegen native_inputs") then
     S.mapM_ (\row -> B.record b key (J.set "job_id" (J.str identity) row)) (J.values value)
   else ioReturn Unit) (J.items report)
 execute b libraryOnly requests = do

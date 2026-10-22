@@ -27,6 +27,12 @@
     "mlf-package-core": {
       "path": "../libraries/mlf-package-core"
     },
+    "mlf-test": {
+      "path": "../testing"
+    },
+    "mlf-test-tools": {
+      "path": "../testing/tools"
+    },
     "mlf-xmlf": {
       "path": "../libraries/mlf-xmlf"
     }
@@ -40,7 +46,10 @@
       "Tests.IndependentCheck": "Tests/IndependentCheck.emlf",
       "Tests.IndependentType": "Tests/IndependentType.emlf",
       "Tests.Map": "Tests/Map.emlf",
-      "Tests.Set": "Tests/Set.emlf"
+      "Tests.Set": "Tests/Set.emlf",
+      "Tests.Coverage": "Tests/Coverage.emlf",
+      "Tests.TestDrivers": "Tests/TestDrivers.emlf",
+      "Tests.TestSources": "Tests/TestSources.emlf"
     }
   },
   "executables": {
@@ -147,6 +156,7 @@
       "profile": "compiler",
       "modules": {
         "Tests.BuildScheduler": "Tests/BuildScheduler.emlf",
+        "Tests.PackageReleases": "Tests/PackageReleases.emlf",
         "Tests.PackageResolver": "Tests/PackageResolver.emlf",
         "Tests.Packages": "Tests/Packages.emlf",
         "Tests.TargetDependencies": "Tests/TargetDependencies.emlf"
@@ -199,7 +209,8 @@
         "Tests.ReleaseSuite": "Tests/ReleaseSuite.emlf",
         "Tests.RegexRedux": "Tests/RegexRedux.emlf",
         "Tests.TestDriverCache": "Tests/TestDriverCache.emlf",
-        "Tests.TestSourceCache": "Tests/TestSourceCache.emlf"
+        "Tests.TestSourceCache": "Tests/TestSourceCache.emlf",
+        "Tests.CompilerTests": "Tests/CompilerTests.emlf"
       }
     },
     "regex": {
@@ -208,6 +219,38 @@
       "modules": {
         "Tests.Regex": "Tests/Regex.emlf"
       }
+    },
+    "int-set-unions": {
+      "main": "IntSetUnionsMain.emlf",
+      "profile": "compiler",
+      "modules": {
+        "Tests.IntSetUnions": "Tests/IntSetUnions.emlf"
+      }
+    },
+    "test-framework": {
+      "main": "TestFrameworkMain.emlf",
+      "profile": "compiler",
+      "modules": {
+        "Tests.TestFramework": "Tests/TestFramework.emlf",
+        "Tests.IntSetUnions": "Tests/IntSetUnions.emlf",
+        "Tests.TestFrameworkCLI": "Tests/TestFrameworkCLI.emlf",
+        "Tests.CoverageChecks": "Tests/CoverageChecks.emlf",
+        "Tests.TestProcess": "Tests/TestProcess.emlf"
+      }
+    }
+  },
+  "tests": {
+    "framework-cli": {
+      "requires": [
+        "test-framework",
+        "int-set-unions"
+      ],
+      "command": [
+        "{bin:test-framework}",
+        "--verify-cli",
+        "{build}/framework-cli",
+        "{bin:int-set-unions}"
+      ]
     }
   }
 }

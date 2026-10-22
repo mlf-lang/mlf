@@ -5,6 +5,7 @@ import qualified Package.OS as O
 import qualified Package.Benchmark as B
 import qualified Tests.Basic as H
 import qualified Tests.NativeABI as ABI
+import qualified Tests.Coverage as Coverage
 
 -- Compile the measured source itself. These executions check the library and
 -- workload together against the independent scanner oracle, outside timing.
@@ -26,12 +27,14 @@ main = H.withScratch (\directory -> do
   H.assert (eqString (B.regexRedux pinnedInput) pinnedOutput) "independent regex-redux oracle disagrees with upstream"
   let adversarial = ">agggtaaa hidden\nagggtaaaagggtaaa\ntttacccttttaccct\ntHaNaNDcaNHaDHaSWaSaNaSa tBY\n<x><>||a|b|c||\n>last header without newline"
   let boundary = Cons "" (Cons (B.fasta 0) (Cons (B.fasta 1) (Cons (B.fasta 7) (Cons (B.fasta 31) (Cons pinnedInput (Cons adversarial Nil))))))
-  S.mapM_ (runCase directory (Cons binary Nil)) boundary
+  Coverage.mapCounted "harness" "regex-redux-native-executed" (runCase directory (Cons binary Nil)) boundary
+  Coverage.passed "harness" "test_regex_redux_measured_native_source_matches_independent_oracle"
   putStrLn "PASS test_regex_redux_measured_native_source_matches_independent_oracle"
   -- Small but non-vacuous cases exercise interpreted matching and replacement;
   -- the larger pinned fixture is checked by the native execution above.
   let interpreted = Cons compiler (S.append (O.words "-i libraries/mlf-foundation --run") (Cons source Nil))
-  S.mapM_ (runCase directory interpreted) (Cons (B.fasta 1) (Cons adversarial Nil))
+  Coverage.mapCounted "harness" "regex-redux-interpreted-executed" (runCase directory interpreted) (Cons (B.fasta 1) (Cons adversarial Nil))
+  Coverage.passed "harness" "test_regex_redux_measured_interpreter_source_matches_independent_oracle"
   putStrLn "PASS test_regex_redux_measured_interpreter_source_matches_independent_oracle")
 
 runCase : String -> List String -> String -> IO Unit

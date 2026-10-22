@@ -1,0 +1,107 @@
+module Tests.Coverage where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.Json as J
+import qualified Package.OS as O
+
+-- Execution evidence never reads the reviewed inventory. The parent validates
+-- the completed report against that separate file and the child's exit status.
+fields values = J.Object values
+pair key value = Pair key value
+event suite kind values = fields (Cons (pair "schema_version" (J.num 1)) (Cons (pair "suite" (J.str suite)) (Cons (pair "event" (J.str kind)) values)))
+append suite kind values = do
+ path <- getEnv "MLF_TEST_COVERAGE_REPORT"
+ if eqString path "" then return Unit else do
+  previous <- readFile path
+  writeFile path (previous ++ J.render (event suite kind values) ++ "\n")
+begin suite full = do
+ path <- getEnv "MLF_TEST_COVERAGE_REPORT"
+ if eqString path "" then return Unit else
+  writeFile path (J.render (event suite "start" (Cons (pair "scope" (J.str (if full then "full" else "partial"))) Nil)) ++ "\n")
+passed suite identity = append suite "case" (Cons (pair "id" (J.str identity)) (Cons (pair "status" (J.str "passed")) Nil))
+alias suite identity canonical = append suite "alias" (Cons (pair "id" (J.str identity)) (Cons (pair "canonical" (J.str canonical)) (Cons (pair "status" (J.str "passed")) Nil)))
+metric suite name value = append suite "metric" (Cons (pair "name" (J.str name)) (Cons (pair "value" (J.num value)) Nil))
+parse text = S.mapM J.parse (S.filter (\line -> stringLength line > 0) (O.lines text))
+kind name row = eqString (J.getText "event" "" row) name
+finish suite = do
+ path <- getEnv "MLF_TEST_COVERAGE_REPORT"
+ if eqString path "" then return Unit else do
+  text <- readFile path
+  rows <- case parse text of { Left error -> O.fatal error; Right rows -> return rows }
+  append suite "summary" (Cons (pair "complete" (J.Boolean true))
+   (Cons (pair "executions" (J.num (S.length (S.filter (kind "case") rows))))
+   (Cons (pair "aliases" (J.num (S.length (S.filter (kind "alias") rows))))
+   (Cons (pair "metrics" (J.num (S.length (S.filter (kind "metric") rows)))) Nil))))
+
+-- Count completed callback invocations, not the length of the planned inputs.
+count : forall a. (a -> IO Unit) -> List a -> Int -> IO Int
+count action inputs total = case inputs of
+ Nil -> return total
+ Cons value rest -> do { action value; let next = total + 1; seq next (count action rest next) }
+mapCounted : forall a. String -> String -> (a -> IO Unit) -> List a -> IO Unit
+mapCounted suite name action inputs = do { completed <- count action inputs 0; metric suite name completed }
+forCounted : forall a. String -> String -> List a -> (a -> IO Unit) -> IO Unit
+forCounted suite name inputs action = mapCounted suite name action inputs
+
+ensure condition message = if condition then Right Unit else Left message
+sameStrings a b = S.eqList eqString (S.sortBy compareString a) (S.sortBy compareString b)
+unique values = S.length values == S.length (S.nubBy eqString values)
+keys wanted value = sameStrings wanted (S.map S.fst (J.items value))
+strictStrings value = case value of
+ J.Array entries -> S.all (\entry -> case entry of { J.String text -> stringLength text > 0; _ -> false }) entries
+ _ -> false
+natural value = case value of
+ J.Number text -> stringLength text > 0 && S.all (\i -> let code = stringCodeAt text i in code >= 48 && code <= 57) (S.range 0 (stringLength text - 1))
+ _ -> false
+validShape row =
+ let common = O.words "schema_version suite event" in
+ let extra = if kind "start" row then O.words "scope" else
+       if kind "case" row then O.words "id status" else
+       if kind "alias" row then O.words "id canonical status" else
+       if kind "metric" row then O.words "name value" else
+       if kind "summary" row then O.words "complete executions aliases metrics" else Nil in
+ S.not (S.null extra) && keys (S.append common extra) row
+aliasOrder : List String -> List J.Json -> Either String Unit
+aliasOrder completed rows = case rows of
+ Nil -> Right Unit
+ Cons row rest ->
+  if kind "case" row then aliasOrder (Cons (J.getText "id" "" row) completed) rest else
+  if kind "alias" row then do
+   ensure (S.elem eqString (J.getText "canonical" "" row) completed) "coverage alias lacks an earlier completed canonical execution"
+   aliasOrder completed rest
+  else aliasOrder completed rest
+
+validate : J.Json -> String -> String -> Either String J.Json
+validate inventory suite text = do
+ ensure (J.equal (J.get "schema_version" inventory) (J.num 1) && J.has suite (J.get "suites" inventory)) "missing or unsupported reviewed coverage inventory"
+ let expected = J.get suite (J.get "suites" inventory)
+ let wanted = J.getStrings "executions" expected
+ let wantedAliases = J.getObject "aliases" expected
+ let wantedMetrics = J.getObject "metrics" expected
+ ensure (keys (O.words "executions aliases metrics") expected && strictStrings (J.get "executions" expected) && unique wanted) "invalid reviewed execution inventory"
+ ensure (case J.get "aliases" expected of { J.Object _ -> true; _ -> false }) "invalid reviewed alias inventory"
+ ensure (case J.get "metrics" expected of { J.Object _ -> true; _ -> false }) "invalid reviewed metric inventory"
+ ensure (S.all (\(Pair name value) -> stringLength name > 0 && natural value) (J.items wantedMetrics)) "reviewed metrics must be natural numbers"
+ ensure (S.all (\(Pair name value) -> stringLength name > 0 && S.not (S.elem eqString name wanted) && case value of { J.String canonical -> S.elem eqString canonical wanted; _ -> false }) (J.items wantedAliases)) "invalid reviewed canonical aliases"
+ rows <- parse text
+ ensure (S.length rows >= 2) "coverage report is empty or truncated"
+ ensure (S.all (\row -> validShape row && J.equal (J.get "schema_version" row) (J.num 1) && eqString (J.getText "suite" "" row) suite) rows) "coverage row has wrong schema, suite or fields"
+ let first = S.head rows
+ let last = S.last rows
+ ensure (kind "start" first && eqString (J.getText "scope" "" first) "full" && S.length (S.filter (kind "start") rows) == 1) "coverage report is partial or has an invalid start"
+ ensure (kind "summary" last && J.equal (J.get "complete" last) (J.Boolean true) && S.length (S.filter (kind "summary") rows) == 1) "coverage report is incomplete or has multiple summaries"
+ let executed = S.filter (kind "case") rows
+ let aliases = S.filter (kind "alias") rows
+ let metrics = S.filter (kind "metric") rows
+ let identities = S.map (J.getText "id" "") executed
+ let aliasIds = S.map (J.getText "id" "") aliases
+ let metricNames = S.map (J.getText "name" "") metrics
+ ensure (unique (S.append identities aliasIds) && sameStrings identities wanted) "missing, duplicate or unknown executed case"
+ ensure (S.all (\row -> eqString (J.getText "status" "" row) "passed") (S.append executed aliases)) "coverage contains a failed or unknown outcome"
+ ensure (sameStrings aliasIds (S.map S.fst (J.items wantedAliases)) && S.all (\row -> J.equal (J.get "canonical" row) (J.get (J.getText "id" "" row) wantedAliases)) aliases) "coverage alias inventory changed"
+ aliasOrder Nil rows
+ ensure (unique metricNames && sameStrings metricNames (S.map S.fst (J.items wantedMetrics)) && S.all (\row -> J.equal (J.get "value" row) (J.get (J.getText "name" "" row) wantedMetrics)) metrics) "coverage metrics changed or are missing or duplicated"
+ ensure (J.equal (J.get "executions" last) (J.num (S.length executed)) && J.equal (J.get "aliases" last) (J.num (S.length aliases)) && J.equal (J.get "metrics" last) (J.num (S.length metrics))) "coverage summary differs from actual events"
+ return (fields (Cons (pair "schema_version" (J.num 1)) (Cons (pair "suite" (J.str suite))
+  (Cons (pair "executions" (J.num (S.length executed))) (Cons (pair "aliases" (J.num (S.length aliases)))
+  (Cons (pair "metrics" (fields (S.map (\row -> pair (J.getText "name" "" row) (J.get "value" row)) metrics))) Nil))))))

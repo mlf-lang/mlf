@@ -5,7 +5,7 @@ import qualified Package.OS as O
 import qualified Package.Json as J
 import qualified Package.Verification as V
 import qualified Package.Manifest as M
-import qualified Package.TestSources as TS
+import qualified Tests.TestSources as TS
 import qualified Tests.Helpers as H
 import qualified Tests.Backends as B
 import qualified Tests.Bytes as Bytes

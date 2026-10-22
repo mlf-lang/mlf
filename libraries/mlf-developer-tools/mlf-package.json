@@ -6,9 +6,6 @@
     "mlf-foundation": {
       "path": "../mlf-foundation"
     },
-    "mlf-frontend": {
-      "path": "../mlf-frontend"
-    },
     "mlf-package-core": {
       "path": "../mlf-package-core"
     }
@@ -16,9 +13,6 @@
   "library": {
     "modules": {
       "Package.Benchmark": "Package/Benchmark.emlf",
-      "Package.CompilerTests": "Package/CompilerTests.emlf",
-      "Package.TestDrivers": "Package/TestDrivers.emlf",
-      "Package.TestSources": "Package/TestSources.emlf",
       "Package.Verification": "Package/Verification.emlf"
     }
   }

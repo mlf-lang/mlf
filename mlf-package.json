@@ -12,6 +12,9 @@
     "mlf-foundation": {
       "path": "libraries/mlf-foundation"
     },
+    "mlf-frontend": {
+      "path": "libraries/mlf-frontend"
+    },
     "mlf-inference": {
       "path": "libraries/mlf-inference"
     },
@@ -45,8 +48,23 @@
       "main": "package/Main.emlf",
       "profile": "compiler",
       "dependencies": [
+        "mlf-foundation",
+        "mlf-package-core"
+      ]
+    },
+    "compiler-tests": {
+      "main": "tests/CompilerTestsMain.emlf",
+      "profile": "compiler",
+      "modules": {
+        "Tests.CompilerTests": "tests/Tests/CompilerTests.emlf",
+        "Tests.Coverage": "tests/Tests/Coverage.emlf",
+        "Tests.TestDrivers": "tests/Tests/TestDrivers.emlf",
+        "Tests.TestSources": "tests/Tests/TestSources.emlf"
+      },
+      "dependencies": [
         "mlf-developer-tools",
         "mlf-foundation",
+        "mlf-frontend",
         "mlf-package-core"
       ]
     }
@@ -55,12 +73,14 @@
     "unit": {
       "requires": [
         "emlf",
-        "mlfpkg"
+        "mlfpkg",
+        "compiler-tests"
       ],
       "command": [
-        "{bin:mlfpkg}",
-        "compiler-test",
+        "{bin:compiler-tests}",
         "unit",
+        "--manager",
+        "{bin:mlfpkg}",
         "--compiler",
         "{bin:emlf}",
         "--build-dir",
@@ -72,12 +92,14 @@
     "packages": {
       "requires": [
         "emlf",
-        "mlfpkg"
+        "mlfpkg",
+        "compiler-tests"
       ],
       "command": [
-        "{bin:mlfpkg}",
-        "compiler-test",
+        "{bin:compiler-tests}",
         "packages",
+        "--manager",
+        "{bin:mlfpkg}",
         "--compiler",
         "{bin:emlf}",
         "--build-dir",
@@ -89,12 +111,14 @@
     "self-host": {
       "requires": [
         "emlf",
-        "mlfpkg"
+        "mlfpkg",
+        "compiler-tests"
       ],
       "command": [
-        "{bin:mlfpkg}",
-        "compiler-test",
+        "{bin:compiler-tests}",
         "self-host",
+        "--manager",
+        "{bin:mlfpkg}",
         "--compiler",
         "{bin:emlf}",
         "--build-dir",
@@ -106,12 +130,14 @@
     "parity": {
       "requires": [
         "emlf",
-        "mlfpkg"
+        "mlfpkg",
+        "compiler-tests"
       ],
       "command": [
-        "{bin:mlfpkg}",
-        "compiler-test",
+        "{bin:compiler-tests}",
         "parity",
+        "--manager",
+        "{bin:mlfpkg}",
         "--compiler",
         "{bin:emlf}",
         "--build-dir",
@@ -123,12 +149,14 @@
     "backends": {
       "requires": [
         "emlf",
-        "mlfpkg"
+        "mlfpkg",
+        "compiler-tests"
       ],
       "command": [
-        "{bin:mlfpkg}",
-        "compiler-test",
+        "{bin:compiler-tests}",
         "backends",
+        "--manager",
+        "{bin:mlfpkg}",
         "--compiler",
         "{bin:emlf}",
         "--build-dir",
@@ -140,12 +168,14 @@
     "port": {
       "requires": [
         "emlf",
-        "mlfpkg"
+        "mlfpkg",
+        "compiler-tests"
       ],
       "command": [
-        "{bin:mlfpkg}",
-        "compiler-test",
+        "{bin:compiler-tests}",
         "port",
+        "--manager",
+        "{bin:mlfpkg}",
         "--compiler",
         "{bin:emlf}",
         "--build-dir",

@@ -43,6 +43,8 @@ foreach ($name in @('emlf','mlfpkg')) {
 Copy-Item -LiteralPath "$Seed/SHA256SUMS" -Destination "$Output/seed/LLVM-SHA256SUMS"
 $compiler = "$Output/seed/bin/emlf.exe"
 $manager = "$Output/seed/bin/mlfpkg.exe"
+& "$PSScriptRoot/bootstrap-manager.ps1" -Compiler $compiler -Manager $manager -Clang $Clang -Output "$Output/manager-bootstrap"
+$manager = "$Output/manager-bootstrap/bin/mlfpkg.exe"
 foreach ($stage in @('stage1','stage2')) {
     Write-Host "Native Windows $stage"
     $arguments = @('--compiler',$compiler,'--clang',$Clang,'--manifest',"$root/mlf-package.json",'--runtime',"$root/runtime/mlf_runtime.c",'--timeout','21600','--locked','--build-dir',"$Output/$stage",'build')

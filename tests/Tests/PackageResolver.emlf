@@ -1,5 +1,6 @@
 module Tests.PackageResolver where
 import Bootstrap.Types
+import qualified Tests.Coverage as Coverage
 import qualified Bootstrap.Std as S
 import qualified Package.OS as O
 import qualified Package.Json as J
@@ -27,7 +28,7 @@ command r path args success reason = do
  H.assert (H.eq (code == 0) success && (success || stringLength stderr > 0) && (eqString reason "" || H.contains reason stderr)) ("resolver command failed: " ++ stderr)
  return stdout
 plan r path success reason = command r path (Cons "plan" Nil) success reason
-check name action = do { action; putStrLn ("PASS test_packages." ++ name) }
+check name action = do { action; Coverage.passed "packages" ("test_packages." ++ name); putStrLn ("PASS test_packages." ++ name) }
 main : IO Unit
 main = Sys.withScratch (\directory -> do
  manager <- getEnv "MLF_PACKAGE_MANAGER"

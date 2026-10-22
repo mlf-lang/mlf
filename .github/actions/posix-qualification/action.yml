@@ -61,12 +61,12 @@ runs:
         if test -f .mlf-build/shared-candidate/manifest.json; then
           cp .mlf-build/shared-candidate/manifest.json .mlf-build/release-evidence/candidate-manifest.json
         fi
-        for tool in emlf mlfpkg mlf-build-runner; do
+        for tool in emlf mlfpkg compiler-tests mlf-build-runner; do
           if test -f ".mlf-build/bin/$tool"; then cp ".mlf-build/bin/$tool" .mlf-build/release-evidence/bin/; fi
         done
         if test -d ".mlf-build/compiler-tests/$TEST_GROUP"; then
           cp -R ".mlf-build/compiler-tests/$TEST_GROUP" .mlf-build/release-evidence/compiler-tests/
-          find .mlf-build/release-evidence/compiler-tests -type f ! -name verification.json ! -name build-report.json ! -name '*.log' ! -name '*.stderr' ! -name '*.err' ! -name '*.status.json' ! -name rows.jsonl ! -name current-label ! -path '*/port-*/matrix-*/case-14-interpreter.stdout' ! -path '*/port-*/matrix-*/case-19-interpreter.stdout' ! -path '*/port-*/matrix-*/case-23-interpreter.stdout' -delete
+          find .mlf-build/release-evidence/compiler-tests -type f ! -path '*/framework-cli/*' ! -name verification.json ! -name build-report.json ! -name '*.coverage.jsonl' ! -name '*.log' ! -name '*.stderr' ! -name '*.err' ! -name '*.status.json' ! -name rows.jsonl ! -name current-label ! -path '*/port-*/matrix-*/case-14-interpreter.stdout' ! -path '*/port-*/matrix-*/case-19-interpreter.stdout' ! -path '*/port-*/matrix-*/case-23-interpreter.stdout' -delete
         fi
         log_group=$TEST_GROUP
         case "$TEST_GROUP" in port-*) log_group=port ;; esac

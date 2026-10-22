@@ -28,30 +28,87 @@ package_artifact="$artifact_root/native-$platform-packages"
 for part in $parts; do
   artifact="$artifact_root/native-$platform-$part"
   test -f "$artifact/compiler-tests/$part/verification.json"
-  for tool in emlf mlfpkg mlf-build-runner; do cmp "$package_artifact/bin/$tool" "$artifact/bin/$tool"; done
+  for tool in emlf mlfpkg compiler-tests mlf-build-runner; do cmp "$package_artifact/bin/$tool" "$artifact/bin/$tool"; done
 done
 build="$artifact_root/assembled"
 test ! -e "$build" || { printf '%s\n' 'Use new artifact staging directories.' >&2; exit 1; }
 mkdir -p "$build/bin" "$build/compiler-tests"
-cp "$package_artifact/bin/emlf" "$package_artifact/bin/mlfpkg" "$package_artifact/bin/mlf-build-runner" "$build/bin/"
+cp "$package_artifact/bin/emlf" "$package_artifact/bin/mlfpkg" "$package_artifact/bin/compiler-tests" "$package_artifact/bin/mlf-build-runner" "$build/bin/"
 chmod 755 "$build/bin/"*
 for part in $parts; do
   cp -R "$artifact_root/native-$platform-$part/compiler-tests/$part" "$build/compiler-tests/"
 done
 compiler_hash=$(sha256 "$build/bin/emlf" | awk '{print $1}')
 manager_hash=$(sha256 "$build/bin/mlfpkg" | awk '{print $1}')
-runner_hash=$(sha256 "$build/bin/mlf-build-runner" | awk '{print $1}')
+runner_hash=$(sha256 "$build/bin/compiler-tests" | awk '{print $1}')
+build_runner_hash=$(sha256 "$build/bin/mlf-build-runner" | awk '{print $1}')
 test "$("$build/bin/mlf-build-runner" --protocol-version)" = 1
 base="$build/compiler-tests/unit/verification.json"
 groups='unit packages self-host parity backends port'
 for group in $groups; do
   report="$build/compiler-tests/$group/verification.json"
-  jq -e --arg group "$group" --arg hash "$compiler_hash" --arg manager "$manager_hash" --arg runner "$runner_hash" \
-    '.complete == true and .implementation == "MLF" and .group == $group and .compiler_sha256 == $hash and .manager_sha256 == $manager and .build_runner_sha256 == $runner' "$report" >/dev/null
+  jq -e --arg group "$group" --arg hash "$compiler_hash" --arg manager "$manager_hash" --arg runner "$runner_hash" --arg build_runner "$build_runner_hash" \
+    '.complete == true and .implementation == "MLF" and .group == $group and .compiler_sha256 == $hash and .manager_sha256 == $manager and .runner_sha256 == $runner and .build_runner_sha256 == $build_runner' "$report" >/dev/null
   cmp <(jq -S .sources "$base") <(jq -S .sources "$report")
   while IFS=$'\t' read -r suite expected; do
     test "$(sha256 "$build/compiler-tests/$group/$suite.log" | awk '{print $1}')" = "$expected"
   done < <(jq -r '(.suites // {}) | to_entries[] | [.key,.value.log_sha256] | @tsv' "$report")
+  case "$group" in
+    unit) coverage_suites='harness core figure12 test-framework regex' ;;
+    packages) coverage_suites='packages' ;;
+    *) coverage_suites='' ;;
+  esac
+  if [ -n "$coverage_suites" ]; then
+    inventory_hash=$(sha256 tests/golden/unit-inventory.json | awk '{print $1}')
+    for suite in $coverage_suites; do
+      expected=$(jq -er --arg suite "$suite" --arg inventory "$inventory_hash" \
+        '.suites[$suite] | select(.coverage_inventory_sha256 == $inventory) | .coverage_report_sha256 | select(type == "string" and test("^[0-9a-f]{64}$"))' "$report")
+      test "$(sha256 "$build/compiler-tests/$group/$suite.coverage.jsonl" | awk '{print $1}')" = "$expected"
+    done
+  fi
+  case "$group" in
+    backends|port)
+      # Read the retained local report, never the producer workspace path.
+      driver_report="$build/compiler-tests/$group/driver-build/build-report.json"
+      driver_hash=$(sha256 "$driver_report" | awk '{print $1}')
+      # Builder.manager identifies the executing campaign, not its nested CLI.
+      jq -se --arg group "$group" --arg driver_hash "$driver_hash" '
+    def digest: type == "string" and test("^[0-9a-f]{64}$");
+    .[0] as $v | .[1] as $b |
+    $v.group == $group and $v.driver_build.sha256 == $driver_hash and
+    ($v.driver_build.sha256 | digest) and
+    ($v.compiler_sha256 | digest) and ($v.runner_sha256 | digest) and
+    all([$v.compiler,$v.runner,$b.cache_directory][]; type == "string" and startswith("/")) and
+    $b.format == 1 and $b.complete == true and $b.implementation == "MLF" and
+    $b.toolchain.compiler.path == $v.compiler and
+    $b.toolchain.compiler.sha256 == $v.compiler_sha256 and
+    $b.toolchain.manager.path == $v.runner and
+    $b.toolchain.manager.sha256 == $v.runner_sha256 and
+    ($b.builds | type == "array" and length > 0) and
+    ($v.drivers | keys) == (if $group == "port" then ["LLVMDriver"] else ["LLVMDriver","RuntimeDriver"] end) and
+    all($v.drivers | to_entries[];
+      .key as $name | .value as $driver |
+      $driver.frontend == "source" and
+      ($driver.sha256 | digest) and ($driver.llvm_sha256 | digest) and
+      ($driver.artifacts | keys) ==
+        (if $name == "RuntimeDriver" then ["linked","llvm","object","runtime","trace"] else ["linked","llvm","object","runtime"] end) and
+      all($driver.artifacts | to_entries[];
+        .key as $stage | .value as $receipt |
+        ($receipt | keys) == ["artifact_sha256","cached","directory","files","key","kind"] and
+        ($receipt.key | digest) and ($receipt.artifact_sha256 | digest) and
+        ($receipt.cached | type == "boolean") and
+        $receipt.directory == ($b.cache_directory + "/" + $receipt.key) and
+        $receipt.kind ==
+          (if $stage == "llvm" then "source " + $name + " LLVM" elif $stage == "object" then "LLVM object" elif $stage == "linked" then "test driver native link" else "test driver C object" end) and
+        any($b.builds[]; . == ($receipt | {kind,key,cached})) and
+        ($receipt.files | keys) ==
+          [if $stage == "llvm" then "program.ll" elif $stage == "object" then "program.o" elif $stage == "linked" then "program" else "object.o" end] and
+        all($receipt.files[]; digest)) and
+      $driver.artifacts.llvm.files["program.ll"] == $driver.llvm_sha256 and
+      $driver.artifacts.linked.files.program == $driver.sha256)
+      ' "$report" "$driver_report" >/dev/null
+      ;;
+  esac
   while IFS=$'\t' read -r abi expected; do
     test "$(sha256 "$build/compiler-tests/$group/$abi.log" | awk '{print $1}')" = "$expected"
   done < <(jq -r '(.matrices // {}) | to_entries[] | [.key,.value.log_sha256] | @tsv' "$report")
@@ -59,7 +116,7 @@ done
 # Check every recorded source and detect newly added or removed inputs as well.
 jq -r '.sources | to_entries[] | "\(.value)  \(.key)"' "$base" | sha256 -c - >/dev/null
 cmp <(jq -r '.sources | keys[]' "$base" | LC_ALL=C sort) <(
-  { find scripts runtime bootstrap package libraries examples benchmarks tests \
+  { find scripts runtime bootstrap package libraries examples benchmarks tests testing \
     -type d \( -name .mlf-build -o -name .git -o -name dist-newstyle -o -name __pycache__ \) -prune -o \
     -type f \( -path 'benchmarks/*' -o -name '*.hs' -o -name '*.emlf' -o -name '*.c' -o -name '*.h' -o -name '*.ps1' -o -name '*.sh' -o -name '*.expected' -o -name '*.json' -o -name '*.gz' \) -print
     printf '%s\n' mlfpkg mlf-package.json; } | LC_ALL=C sort
@@ -86,8 +143,20 @@ cp runtime/khash.h "$bundle/licenses/khash.h"
 for group in $groups; do
   mkdir -p "$bundle/evidence/$group"
   cp "$build/compiler-tests/$group/verification.json" "$bundle/evidence/$group/"
+  case "$group" in
+    backends|port)
+      mkdir -p "$bundle/evidence/$group/driver-build"
+      cp "$build/compiler-tests/$group/driver-build/build-report.json" "$bundle/evidence/$group/driver-build/"
+      ;;
+  esac
   while IFS= read -r log; do cp "$log" "$bundle/evidence/$group/"; done < <(find "$build/compiler-tests/$group" -maxdepth 1 -name '*.log' -type f)
 done
+for suite in harness core figure12 test-framework regex; do
+  cp "$build/compiler-tests/unit/$suite.coverage.jsonl" "$bundle/evidence/unit/"
+done
+cp tests/golden/unit-inventory.json "$bundle/evidence/unit/"
+cp "$build/compiler-tests/packages/packages.coverage.jsonl" "$bundle/evidence/packages/"
+cp tests/golden/unit-inventory.json "$bundle/evidence/packages/"
 minimum_macos=""
 build_glibc=""
 if [ "$platform" = macos-arm64 ]; then
@@ -95,9 +164,9 @@ if [ "$platform" = macos-arm64 ]; then
 else
   build_glibc=$(getconf GNU_LIBC_VERSION)
 fi
-jq -n --arg version "$version" --arg commit "$commit" --arg compiler "$compiler_hash" --arg manager "$manager_hash" --arg runner "$runner_hash" \
+jq -n --arg version "$version" --arg commit "$commit" --arg compiler "$compiler_hash" --arg manager "$manager_hash" --arg runner "$runner_hash" --arg build_runner "$build_runner_hash" \
   --arg platform "$platform" --arg minos "$minimum_macos" --arg glibc "$build_glibc" \
-  '{schema_version:1,version:$version,commit:$commit,platform:$platform,compiler_sha256:$compiler,manager_sha256:$manager,build_runner_sha256:$runner,build_runner_protocol:1,test_implementation:"MLF",test_groups:["unit","packages","self-host","parity","backends","port"],port_profiles:["compact-gc"],performance_gate:"not rerun for this preview"} + (if $platform == "macos-arm64" then {minimum_macos:$minos} else {build_glibc:$glibc} end)' > "$bundle/release.json"
+  '{schema_version:1,version:$version,commit:$commit,platform:$platform,compiler_sha256:$compiler,manager_sha256:$manager,runner_sha256:$runner,build_runner_sha256:$build_runner,build_runner_protocol:1,test_implementation:"MLF",test_groups:["unit","packages","self-host","parity","backends","port"],port_profiles:["compact-gc"],performance_gate:"not rerun for this preview"} + (if $platform == "macos-arm64" then {minimum_macos:$minos} else {build_glibc:$glibc} end)' > "$bundle/release.json"
 if [ "$platform" = macos-arm64 ]; then
 cat > "$bundle/README.md" <<'README'
 # MLF native developer preview

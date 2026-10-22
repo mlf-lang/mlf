@@ -1,0 +1,4 @@
+module IntSetUnionsMain where
+import qualified Test.Runner as Runner
+import qualified Tests.IntSetUnions as Unions
+main = Runner.main Unions.cases

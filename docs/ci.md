@@ -5,12 +5,16 @@ The `CI` workflow runs on every pull request, merge queue group and push to
 
 - **Release metadata**: version/manifest consistency, shell syntax, benchmark
   provenance and checksum-pinned actionlint 1.7.12 workflow validation.
-- **Native compiler smoke**: a checkout compiler/manager build followed by the
+- **Native compiler smoke**: a checkout compiler/manager/campaign build followed by the
   bounded native MLF suite below on macOS arm64.
+- **Native package distribution**: checkout manager and test-campaign builds
+  followed by source-package and checked-release/distribution tests with the
+  pinned published compiler.
 - **Native Windows runtime**: compact-GC runtime, filesystem and reproducible
   object/executable checks on Windows.
 
-The aggregate runs even when a prerequisite fails and accepts only `success`.
+The aggregate runs even when a prerequisite fails and requires all four jobs
+to report `success`.
 Failed, cancelled or skipped prerequisites cannot produce a passing gate.
 There are no path filters on the required workflow. Manual dispatches retain
 the existing optional self-host and Windows-only modes. Their skipped aggregate
@@ -28,13 +32,21 @@ not make its checks mandatory.
 ## Native smoke coverage
 
 The pinned v0.3.0 seed is only a bootstrap input. CI verifies its archive and both
-executables, then builds the checkout compiler and manager with the current C
-runtime and checked lockfile. The resulting manager invokes `compiler-test
-pr-smoke` with the resulting compiler. The ordinary six root groups are unchanged;
+executables and source commit, then uses `tools/release/bootstrap-manager.sh` to compile the checkout manager
+from library crates with a seed-compatible manifest. The resulting manager builds
+the checkout compiler, manager and
+test-owned `compiler-tests` executable with the current C runtime and checked
+lockfile. That executable runs `pr-smoke` with the resulting compiler and an
+explicit `--manager` pointing to the resulting manager. The ordinary six root groups are unchanged;
 smoke is an explicit additional group and is not duplicated in a full root test.
 
 The suite reuses existing assertions and fixtures:
 
+- Framework assertion, case-selection and report contracts, the fixed coverage
+  validator, and the `int-set-unions` suite through the full runner CLI probes.
+  Process supervision probes cover crashes, timeouts, isolated work directories,
+  captured output and rejected incomplete or contradictory child reports. The
+  framework's three completed checkpoints must match the reviewed inventory.
 - Figure 12: all 43 regression labels, 41 distinct executions and 36 controls,
   with expected rejection phases/reasons and checked xMLF round trips.
 - Four frozen independent target-checker controls: identity, polymorphic let,
@@ -49,9 +61,26 @@ The suite reuses existing assertions and fixtures:
   Mutation uses a private copy; the checkout stays unchanged.
 
 Missing or duplicate fixture labels, unexpected arguments, wrong matrix counts,
-missing summaries, failed commands, source/tool changes and incomplete package
+missing structural framework evidence, missing summaries, failed commands,
+source/tool changes and incomplete package
 reports fail the suite. The full parity corpus, full backend/port matrices and
 fresh self-host fixed point remain part of release qualification.
+
+## Package distribution coverage
+
+The separate package job verifies the published compiler pinned in
+`.github/package-seed.env`, then builds the checkout `mlfpkg` and
+`compiler-tests` executables with the checked lockfile. The campaign receives
+that manager explicitly and runs 22 resolver checks, 29 package integration
+cases, the target-dependency/scheduler fixture and 28 checked-release/distribution
+cases. Completed cases must match
+the reviewed structural inventory. The metadata job also runs eight publishing
+regression checks without creating releases.
+
+The workflow retains `package-distribution-evidence` on success or failure,
+including build and verification reports, command diagnostics, coverage,
+reviewed inventory and cache metadata. The package job has a 90-minute hard
+limit and is required by **PR gate** alongside compiler smoke.
 
 ## Run locally
 
@@ -69,7 +98,11 @@ source/tool fingerprints validate cache reuse. Each invocation clears its succes
 receipt before building. GHC, Cabal and Python are blocked on the native CI path.
 
 The workflow uploads `pr-smoke-evidence` on success or failure, including build
-and verification reports, logs, backend statuses and output. Local evidence is
+and verification reports, framework coverage and its reviewed inventory, suite
+logs, backend statuses and output. Detailed process-probe reports and logs are
+also retained on failure; successful probes clean up their scratch directories.
+Local evidence is
 under `.mlf-build/pr-smoke/`; `result.json` records integer wall-clock seconds
-for tool building and the complete command. The native job has a 60-minute hard
+for tool building and the complete command, plus compiler, manager, campaign,
+framework and coverage fingerprints. The native job has a 60-minute hard
 limit; this is a failure bound, not a promised runtime.

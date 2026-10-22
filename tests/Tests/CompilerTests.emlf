@@ -1,4 +1,4 @@
-module Package.CompilerTests where
+module Tests.CompilerTests where
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Bootstrap.Map as Map
@@ -8,22 +8,25 @@ import qualified Package.Build as B
 import qualified Package.Command as C
 import qualified Package.Verification as V
 import qualified Package.Manifest as M
-import qualified Package.TestDrivers as TD
-import qualified Package.TestSources as TS
+import qualified Tests.Coverage as Coverage
+import qualified Tests.TestDrivers as TD
+import qualified Tests.TestSources as TS
 
 -- Build and execute native MLF tests; preserved oracle data and test-only
 -- checking modules remain independent of the candidate compiler.
-data TestContext = TestContext String String String (List String) String
+data TestContext = TestContext String String String (List String) String String
 root : TestContext -> String
-root (TestContext r _ _ _ _) = r
+root (TestContext r _ _ _ _ _) = r
 output : TestContext -> String
-output (TestContext _ d _ _ _) = d
+output (TestContext _ d _ _ _ _) = d
 compiler : TestContext -> String
-compiler (TestContext _ _ c _ _) = c
+compiler (TestContext _ _ c _ _ _) = c
 runtimeProfiles : TestContext -> List String
-runtimeProfiles (TestContext _ _ _ profiles _) = profiles
+runtimeProfiles (TestContext _ _ _ profiles _ _) = profiles
 sharedCache : TestContext -> String
-sharedCache (TestContext _ _ _ _ cache) = cache
+sharedCache (TestContext _ _ _ _ cache _) = cache
+packageManager : TestContext -> String
+packageManager (TestContext _ _ _ _ _ manager) = manager
 cacheOptions : TestContext -> List String
 cacheOptions c = if eqString (sharedCache c) "" then Nil else Cons "--cache-dir" (Cons (sharedCache c) Nil)
 report : TestContext -> String
@@ -54,7 +57,7 @@ walk path = do
     ioReturn (S.concat nested)
 sources : String -> IO J.Json
 sources r = do
-  nested <- S.mapM (\dir -> walk (r ++ "/" ++ dir)) (O.words "scripts runtime bootstrap package libraries examples benchmarks tests")
+  nested <- S.mapM (\dir -> walk (r ++ "/" ++ dir)) (O.words "scripts runtime bootstrap package libraries examples benchmarks tests testing")
   let paths = S.filter (\p -> O.starts (r ++ "/benchmarks/") p || S.any (\suffix -> O.ends suffix p) (O.words ".hs .emlf .c .h .ps1 .sh .expected .json .gz")) (S.concat nested)
   hashes <- B.hashFiles (S.append paths (Cons (r ++ "/mlfpkg") (Cons (r ++ "/mlf-package.json") Nil)))
   ioReturn (J.Object (S.map (\entry -> Pair (O.relative r (S.fst entry)) (S.snd entry)) (J.items hashes)))
@@ -83,7 +86,7 @@ link : TestContext -> String -> List String -> List String -> String -> List Str
 link c ir objects flags binary extra = run c (S.append (O.words "clang -O2 -Wno-override-module") (S.append (Cons ir objects) (S.append flags (S.append (Cons "-lm" extra) (Cons "-o" (Cons binary Nil))))))
 nativeTest : TestContext -> String -> IO String
 nativeTest c target = do
- manager <- getExecutablePath
+ let manager = packageManager c
  let build = output c ++ "/suite-build"
  let args = S.concat (Cons (Cons manager Nil)
   (Cons (Cons "--manifest" (Cons (root c ++ "/tests/mlf-package.json") Nil))
@@ -103,15 +106,37 @@ transports c = do
  setEnv "MLF_TEST_WORK" (output c)
  setEnv "MLF_TEST_ROOT" (output c)
 suite : TestContext -> String -> List String -> IO Unit
-suite c target expectations = do
+suite c target expectations = suiteArgs c target Nil expectations
+suiteArgs : TestContext -> String -> List String -> List String -> IO Unit
+suiteArgs c target args expectations = do
  binary <- nativeTest c target
+ binaryHash <- fileDigest binary
  let log = output c ++ "/" ++ target ++ ".log"
- capture c (Cons binary Nil) log
+ let structural = S.elem eqString target (O.words "harness test-framework core figure12 packages regex")
+ let coverage = output c ++ "/" ++ target ++ ".coverage.jsonl"
+ if structural then do
+  writeFile coverage ""
+  setEnv "MLF_TEST_COVERAGE_REPORT" coverage
+  else unsetEnv "MLF_TEST_COVERAGE_REPORT"
+ capture c (Cons binary args) log
+ currentBinaryHash <- fileDigest binary
+ O.require (eqString binaryHash currentBinaryHash) (target ++ ": test executable changed during validation")
+ unsetEnv "MLF_TEST_COVERAGE_REPORT"
  text <- readFile log
- O.require (S.all (\expected -> contains expected text) expectations) (target ++ ": preserved coverage summary is missing")
+ evidence <- if structural then do
+  let inventoryPath = root c ++ "/tests/golden/unit-inventory.json"
+  inventory <- J.read inventoryPath
+  actual <- readFile coverage
+  checked <- case Coverage.validate inventory target actual of { Left error -> O.fatal (target ++ ": " ++ error); Right value -> return value }
+  digest <- fileDigest coverage
+  inventoryDigest <- fileDigest inventoryPath
+  return (J.set "coverage_report_sha256" (J.str digest) (J.set "coverage_inventory_sha256" (J.str inventoryDigest) (J.set "coverage_result" checked J.empty)))
+  else do
+   O.require (S.all (\expected -> contains expected text) expectations) (target ++ ": preserved coverage summary is missing")
+   return J.empty
  hash <- fileDigest log
  saved <- J.read (report c)
- record c "suites" (J.set target (B.obj2 "log_sha256" (J.str hash) "coverage" (J.stringArray expectations)) (J.getObject "suites" saved))
+ record c "suites" (J.set target (J.set "binary_sha256" (J.str binaryHash) (J.set "log_sha256" (J.str hash) (J.set "coverage" (J.stringArray expectations) evidence))) (J.getObject "suites" saved))
  putStr (O.drop (S.max 0 (stringLength text - 2000)) text)
 unit : TestContext -> IO Unit
 unit c = do
@@ -119,6 +144,9 @@ unit c = do
  -- Check native toolchain and runtime probes before the longer compiler suites.
  suite c "regex" (Cons "regular-expression tests passed" Nil)
  suite c "harness" (Cons "Native benchmark/bootstrap/release harness tests passed" (Cons "2 native cache regression checks passed" Nil))
+ unions <- nativeTest c "int-set-unions"
+ suiteArgs c "test-framework" (Cons "--verify-cli" (Cons (output c ++ "/framework-cli") (Cons unions Nil)))
+  (Cons "Test framework contracts passed" (Cons "Test framework CLI contracts passed" Nil))
  suite c "core" (Cons "684 checks; 0 failures" (Cons "Oracle: 6712 cases; 6703 executions" Nil))
  suite c "figure12" (Cons "43/43 expressions match regression expectations; 0 failures" (Cons "41 distinct Figure12 executions" (Cons "36 supplementary checks; 0 failures" Nil)))
 buildRunnerTests : TestContext -> IO Unit
@@ -127,7 +155,7 @@ buildRunnerTests c = do
  let suffix = if windows then ".exe" else ""
  let flags = if windows then Cons "-municode" Nil else Nil
  S.mapM_ (\name -> run c (S.append (O.words "clang -O2 -std=c11 -Wall -Wextra -Werror") (S.append flags (Cons (root c ++ "/tests/native/" ++ O.replace "-" "_" name ++ ".c") (Cons "-o" (Cons (output c ++ "/" ++ name ++ suffix) Nil)))))) (O.words "build-runner-fixture build-runner-tests")
- manager <- getExecutablePath
+ let manager = packageManager c
  configuredRunner <- O.envDefault "MLF_BUILD_RUNNER" (O.parent manager ++ "/mlf-build-runner")
  runner <- O.executable configuredRunner
  let log = output c ++ "/build-runner.log"
@@ -144,12 +172,15 @@ packages c = do
  buildRunnerTests c
  setEnv "MLF_TEST_WORK" (output c)
  setEnv "MLF_TEST_ROOT" (output c)
- suite c "packages" (Cons "22 package resolver tests passed" (Cons "29 package integration cases passed" (Cons "1 target dependency integration test passed" Nil)))
+ suite c "packages" (Cons "22 package resolver tests passed" (Cons "29 package integration cases passed" (Cons "1 target dependency integration test passed" (Cons "28 checked package release cases passed" Nil))))
 testBuilder : TestContext -> String -> IO B.Builder
 testBuilder c name = do
  graph <- M.load (root c ++ "/mlf-package.json")
  let options = B.info (Cons (Pair "compiler" (J.str (compiler c))) (Cons (Pair "runtime" (J.str (root c ++ "/runtime/mlf_runtime.c"))) (Cons (Pair "cache-dir" (J.str (sharedCache c))) (Cons (Pair "timeout" (J.str "21600")) Nil))))
  configured <- C.configureGC (root c) options
+ -- Build.create fingerprints the executable actually running its build/cache
+ -- code. Here that is the campaign runner, distinct from the package manager
+ -- used for nested CLI builds and recorded separately in verification.json.
  B.create graph configured (output c ++ "/" ++ name)
 driverIR : TestContext -> B.Builder -> String -> IO String
 driverIR c builder name = do
@@ -255,6 +286,13 @@ backends c = do
 prSmoke : TestContext -> IO Unit
 prSmoke c = do
  transports c
+ unions <- nativeTest c "int-set-unions"
+ unionHash <- fileDigest unions
+ suiteArgs c "test-framework" (Cons "--verify-cli" (Cons (output c ++ "/framework-cli") (Cons unions Nil)))
+  (Cons "Test framework contracts passed" (Cons "Test framework CLI contracts passed" Nil))
+ currentUnionHash <- fileDigest unions
+ O.require (eqString unionHash currentUnionHash) "focused test executable changed during validation"
+ record c "focused_suite" (B.info (Cons (Pair "name" (J.str "int-set-unions")) (Cons (Pair "binary_sha256" (J.str unionHash)) Nil)))
  binary <- nativeTest c "pr-smoke"
  matrixSuite c binary false 12
   (Cons "43/43 expressions match regression expectations; 0 failures"
@@ -272,7 +310,7 @@ smokePackage c = do
  let app = directory ++ "/app"
  run c (Cons "/bin/cp" (Cons "-R" (Cons (root c ++ "/examples/packages") (Cons app Nil))))
  O.remove (app ++ "/.mlf-build")
- manager <- getExecutablePath
+ let manager = packageManager c
  let build = directory ++ "/build"
  let argv = Cons manager (Cons "--manifest" (Cons (app ++ "/mlf-package.json")
   (Cons "--compiler" (Cons (compiler c) (Cons "--runtime" (Cons (root c ++ "/runtime/mlf_runtime.c")
@@ -506,7 +544,7 @@ findArtifact hash cache names = case names of
     else findArtifact hash cache rest
 selfHost : TestContext -> IO Unit
 selfHost c = do
-  manager <- getExecutablePath
+  let manager = packageManager c
   hash <- fileDigest (compiler c)
   -- A shared store can contain equal native binaries from different LLVM
   -- inputs. Select the candidate's actual producer, not the first hash match.
@@ -554,33 +592,44 @@ selfHost c = do
   B.verifyPgo profile
   record c "native_pgo" profile
   record c "fixed_point" (B.info (Cons (Pair "llvm_sha256" (J.str new)) (Cons (Pair "next_compiler_sha256" (J.str binary)) (Cons (Pair "reused_candidate_build" (J.get "cached" row)) Nil))))
+-- Campaign-specific options stay outside the generic package-manager CLI.
+options : J.Json -> List String -> IO (Pair J.Json (List String))
+options config args = do
+  Pair configured remaining <- C.options config args
+  case remaining of
+    Cons "--manager" (Cons value rest) -> options (J.set "manager" (J.str value) configured) rest
+    _ -> ioReturn (Pair configured remaining)
 main : List String -> IO Unit
 main args = case args of
   Cons group rest -> do
-    Pair options remaining <- C.options J.empty rest
-    O.require (S.null remaining && J.has "compiler" options && J.has "build-dir" options) "compiler-test GROUP --compiler TOOL --build-dir DIRECTORY"
+    Pair settings remaining <- options J.empty rest
+    O.require (S.null remaining && J.has "compiler" settings && J.has "manager" settings && J.has "build-dir" settings) "compiler-tests GROUP --compiler TOOL --manager TOOL --build-dir DIRECTORY"
+    O.require (S.elem eqString group (O.words "unit packages self-host parity backends port pr-smoke")) "unknown compiler test group"
     profile <- getEnv "MLF_TEST_RUNTIME_PROFILE"
     O.require (eqString profile "" || S.elem eqString profile (Cons "compact-gc" Nil)) "invalid runtime profile; expected compact-gc"
     let profiles = if eqString group "port" || eqString group "backends" || eqString group "pr-smoke" then Cons "compact-gc" Nil else Nil
-    let directory = J.getText "build-dir" "" options
+    let directory = J.getText "build-dir" "" settings
     root <- canonicalPath "."
     O.mkdir directory
     out <- canonicalPath directory
-    compiler <- canonicalPath (J.getText "compiler" "" options)
+    compiler <- canonicalPath (J.getText "compiler" "" settings)
+    manager <- canonicalPath (J.getText "manager" "" settings)
     let defaultCache = if eqString group "self-host" then O.parent (O.parent compiler) ++ "/cache" else O.parent out ++ "/mlf-test-suite/cache"
-    let requestedCache = J.getText "cache-dir" defaultCache options
+    let requestedCache = J.getText "cache-dir" defaultCache settings
     O.mkdir requestedCache
     cache <- canonicalPath requestedCache
-    let c = TestContext root out compiler profiles cache
+    let c = TestContext root out compiler profiles cache manager
     sourceHashes <- sources root
     hash <- fileDigest compiler
-    manager <- getExecutablePath
     managerHash <- fileDigest manager
-    configuredRunner <- O.envDefault "MLF_BUILD_RUNNER" (O.parent manager ++ "/mlf-build-runner")
-    runner <- O.executable configuredRunner
+    runner <- getExecutablePath
     runnerHash <- fileDigest runner
+    configuredBuildRunner <- O.envDefault "MLF_BUILD_RUNNER" (O.parent manager ++ "/mlf-build-runner")
+    buildRunner <- O.executable configuredBuildRunner
+    buildRunnerHash <- fileDigest buildRunner
     let identity = B.info (Cons (Pair "complete" (J.Boolean false)) (Cons (Pair "implementation" (J.str "MLF")) (Cons (Pair "group" (J.str group)) (Cons (Pair "compiler" (J.str compiler)) (Cons (Pair "compiler_sha256" (J.str hash)) (Cons (Pair "sources" sourceHashes) Nil))))))
-    J.write (report c) (J.set "build_runner_sha256" (J.str runnerHash) (J.set "requested_profiles" (J.stringArray profiles) (J.set "manager_sha256" (J.str managerHash) (J.set "manager" (J.str manager) identity))))
+    let campaignIdentity = J.set "runner_sha256" (J.str runnerHash) (J.set "runner" (J.str runner) (J.set "requested_profiles" (J.stringArray profiles) (J.set "manager_sha256" (J.str managerHash) (J.set "manager" (J.str manager) identity))))
+    J.write (report c) (J.set "build_runner_sha256" (J.str buildRunnerHash) campaignIdentity)
     setEnv "MLF_PACKAGE_MANAGER" manager
     clearDrivers
     setEnv "MLF_BOOTSTRAP_COMPILER" compiler
@@ -596,7 +645,9 @@ main args = case args of
     currentManager <- fileDigest manager
     O.require (eqString managerHash currentManager) "package manager changed during validation"
     currentRunner <- fileDigest runner
-    O.require (eqString runnerHash currentRunner) "build runner changed during validation"
+    O.require (eqString runnerHash currentRunner) "compiler test runner changed during validation"
+    currentBuildRunner <- fileDigest buildRunner
+    O.require (eqString buildRunnerHash currentBuildRunner) "build runner changed during validation"
     record c "complete" (J.Boolean true)
     putStrLn ("Compiler package " ++ group ++ " passed")
   Nil -> O.fatal "missing compiler test group"

@@ -71,9 +71,8 @@ trap finish EXIT
 # the current manager from source first, retaining this cold stage and its child
 # compiler/linker measurements in the same bootstrap timing and memory budget.
 MLF_COMPILER="$MLF_TIMING_DIR/bin/emlf" CC="$MLF_TIMING_DIR/bin/clang" \
-  MLF_PACKAGE_BOOTSTRAP_DIR="$build/manager-bootstrap" \
-  "$MLF_TIMING_DRIVER" "$MLF_TIMING_DIR" manager-bootstrap "$PWD/scripts/bootstrap-package.sh"
-export MLF_PACKAGE_MANAGER="$build/manager-bootstrap/mlfpkg"
+  "$MLF_TIMING_DRIVER" "$MLF_TIMING_DIR" manager-bootstrap "$scripts/bootstrap-manager.sh" "$build/manager-bootstrap"
+export MLF_PACKAGE_MANAGER="$build/manager-bootstrap/bin/mlfpkg"
 jq --arg path "$MLF_PACKAGE_MANAGER" --arg hash "$(shasum -a 256 "$MLF_PACKAGE_MANAGER" | awk '{print $1}')" \
   '.manager = {path:$path,sha256:$hash}' "$MLF_TIMING_DIR/context.json" > "$MLF_TIMING_DIR/context.tmp"
 mv "$MLF_TIMING_DIR/context.tmp" "$MLF_TIMING_DIR/context.json"

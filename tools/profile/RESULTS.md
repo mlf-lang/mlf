@@ -166,11 +166,16 @@ MLF_BENCH_STREAM_LINK=1 MLF_BENCH_STREAM_LLVM=1 MLF_BENCH_MLF_CLANG="/Volumes/sr
   /opt/homebrew/Cellar/llvm/23.1.3/bin/clang-23 3 2
 ```
 
-Use [the benchmark README](../bench/README.md) to build the native benchmark driver and generic LLVM helper/configuration, and [the profiling README](README.md) for two native generations, compiler-only PGO, diagnostic phases and alternating ordinary measurements. Build the current native package manager and run its groups serially:
+Use [the benchmark README](../bench/README.md) to build the native benchmark driver and generic LLVM helper/configuration, and [the profiling README](README.md) for two native generations, compiler-only PGO, diagnostic phases and alternating ordinary measurements. Build the current native package manager and the test-owned campaign runner, then run its groups serially:
 
 ```sh
+/absolute/path/to/current/native/mlfpkg \
+  --compiler "/Volumes/src/mlf/.mlf-build/compile3/pgo7/candidate/bin/emlf" \
+  --build-dir "$PWD/.mlf-build/repeat-checks/runner" --timeout 21600 \
+  build --target compiler-tests
 for group in unit packages self-host parity backends port; do
-  /absolute/path/to/current/native/mlfpkg compiler-test "$group" \
+  "$PWD/.mlf-build/repeat-checks/runner/bin/compiler-tests" "$group" \
+    --manager /absolute/path/to/current/native/mlfpkg \
     --compiler "/Volumes/src/mlf/.mlf-build/compile3/pgo7/candidate/bin/emlf" \
     --build-dir "$PWD/.mlf-build/repeat-checks/compiler-tests/$group"
 done

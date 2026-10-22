@@ -6,6 +6,7 @@ import qualified Bootstrap.Host as Host
 import qualified Package.OS as O
 import qualified Package.Json as J
 import qualified Package.Manifest as M
+import qualified Package.Release as R
 
 data Builder = Builder M.PackageGraph J.Json String J.Json J.Json
 config : Builder -> J.Json
@@ -52,12 +53,7 @@ raw directory argv = do
 -- has a new owner identity: a child surviving a killed lock owner cannot write
 -- into staging that a later owner publishes. Preserve whitespace in paths.
 temporaryDirectory : String -> String -> IO String
-temporaryDirectory scratch prefix = do
-  temporary <- raw scratch (Cons "mktemp" (Cons "-d" (Cons (prefix ++ "XXXXXXXX") Nil)))
-  let line = S.head (O.lines temporary)
-  let path = O.normalize (if O.ends "\r" line then stringSlice line 0 (stringLength line - 1) else line)
-  O.require (eqString (O.parent path) (O.parent prefix) && O.starts (O.base prefix) (O.base path)) "invalid temporary directory"
-  ioReturn path
+temporaryDirectory scratch prefix = O.temporaryDirectory scratch prefix
 -- pkg-config uses shell-style quoting in its output; decode words without
 -- executing them. In particular, escaped spaces remain in one argv entry.
 flags : String -> List String
@@ -169,13 +165,17 @@ isolate b path = do
   J.write (reportPath worker) (info (Cons (Pair "complete" (J.Boolean false)) (Cons (Pair "commands" (J.Array Nil)) (Cons (Pair "builds" (J.Array Nil)) Nil))))
   ioReturn worker
 reportKeys : List String
-reportKeys = O.words "commands builds crates codegen native_inputs tests pending-publications"
+reportKeys = O.words "commands builds crates releases codegen native_inputs tests pending-publications"
 mergeReport : Builder -> J.Json -> IO Unit
 mergeReport b saved = S.mapM_ (\key -> S.mapM_ (record b key) (J.values (J.getOr key (J.Array Nil) saved))) reportKeys
 mergeReports : Builder -> List Builder -> IO Unit
 mergeReports b workers = S.mapM_ (\worker -> do { saved <- J.read (reportPath worker); mergeReport b saved }) workers
 artifactPath : J.Json -> String
 artifactPath result = J.getText "artifact" "" result
+-- Released roots keep their canonical installed paths so a directly selected
+-- release and another release's bundled copy share one compiler identity.
+importPath : J.Json -> String
+importPath result = J.getText "import_artifact" (artifactPath result) result
 capture : Builder -> String -> List String -> String -> String -> IO String
 capture b cwd argv input output = do
   report <- J.read (reportPath b)
@@ -416,12 +416,50 @@ compileCrateResult b p kind entry modules dependencies noPrelude = do
   ioReturn (J.set "crates" (J.Array (Cons row Nil)) (J.set "metadata" (J.str (artifact ++ "/unit.mlfci")) (J.set "validation" validationNow result)))
 libraries : Builder -> Bool -> IO (List (Pair String String))
 libraries b noPrelude = libraryLoop b noPrelude Nil (M.packages (graph b))
+-- A checked release is a library action too. Wrap its relocated root in an
+-- ordinary artifact receipt so workers and final validation use one contract.
+-- Materialization still runs on a cache hit to verify the pinned producer
+-- bundle and repair any damaged installed dependency before receipt reuse.
+libraryResult : Builder -> M.Package -> List String -> Bool -> IO J.Json
+libraryResult b p dependencies noPrelude = if S.not (M.isRelease p) then
+  compileCrateResult b p "library" "" (M.packageModules p) dependencies noPrelude
+  else do
+    let digest = J.getText "release-sha256" "" (M.packageData p)
+    let identity = M.crateIdentity p "library"
+    path <- R.materializePinned (M.packageRoot p) digest (cacheDirectory b) (J.getText "sha256" "" (J.get "compiler" (tools b))) noPrelude
+    current <- fileDigest (M.packagePath p)
+    O.require (eqString current digest) "release manifest SHA-256 changed during import"
+    metadata <- fileDigest (path ++ "/unit.mlfci")
+    object <- fileDigest (path ++ "/unit.mlfco")
+    let inputs = info (Cons (Pair "compiler" (J.get "compiler" (tools b))) (Cons (Pair "manager" (J.get "manager" (tools b))) (Cons (Pair "crate" (J.str identity)) (Cons (Pair "release" (J.str digest)) (Cons (Pair "no-prelude" (J.Boolean noPrelude)) (Cons (Pair "metadata" (J.str metadata)) (Cons (Pair "object" (J.str object)) Nil)))))))
+    result <- cachedCheckedResult b ("release " ++ identity) inputs validCrateClosure (\work -> do
+      O.copy (path ++ "/unit.mlfci") (work ++ "/unit.mlfci")
+      O.copy (path ++ "/unit.mlfco") (work ++ "/unit.mlfco")
+      copiedMetadata <- fileDigest (work ++ "/unit.mlfci")
+      copiedObject <- fileDigest (work ++ "/unit.mlfco")
+      O.require (eqString metadata copiedMetadata && eqString object copiedObject) "installed release changed during import"
+      saveCrateClosure work Nil
+      closure <- J.read (work ++ "/dependency-files.json")
+      let installed = obj2 (path ++ "/unit.mlfci") (J.str metadata) (path ++ "/unit.mlfco") (J.str object)
+      case mergeDependencyProof closure installed of
+        Left message -> O.fatal message
+        Right proof -> J.write (work ++ "/dependency-files.json") proof)
+    let row = info (Cons (Pair "crate" (J.str identity)) (Cons (Pair "sha256" (J.str digest)) (Cons (Pair "metadata" (J.str (path ++ "/unit.mlfci"))) (Cons (Pair "artifact" (J.str (artifactPath result))) (Cons (Pair "outer_cached" (J.get "cached" result)) (Cons (Pair "inferred_groups" (J.num 0)) Nil))))))
+    record b "releases" row
+    ioReturn (J.set "import_artifact" (J.str path) (J.set "releases" (J.Array (Cons row Nil)) (J.set "metadata" (J.str (path ++ "/unit.mlfci")) result)))
 libraryLoop : Builder -> Bool -> List (Pair String String) -> List M.Package -> IO (List (Pair String String))
 libraryLoop b noPrelude done pending = case pending of
   Nil -> ioReturn done
   Cons p rest -> if S.null (M.packageModules p) then libraryLoop b noPrelude done rest else do
-    artifact <- compileCrate b p "library" "" (M.packageModules p) (directLibraries p done) noPrelude
-    libraryLoop b noPrelude (S.snoc done (Pair (M.packageName p) artifact)) rest
+    result <- libraryResult b p (directLibraries p done) noPrelude
+    libraryLoop b noPrelude (S.snoc done (Pair (M.packageName p) (importPath result))) rest
+releasePackage b destination = do
+  let p = M.rootPackage (graph b)
+  O.require (S.not (S.null (M.packageModules p))) "release requires a package library"
+  built <- libraries b false
+  let artifact = S.fromMaybe (panic "missing release library") (S.lookup eqString (M.packageName p) built)
+  verifyInputs b
+  R.publish (artifact ++ "/unit.mlfci") (J.getText "sha256" "" (J.get "compiler" (tools b))) false (M.packageName p) (J.getText "version" "" (M.packageData p)) destination
 runtimeObject : Builder -> J.Json -> IO String
 runtimeObject b gc = runtimeObjectWithPgo b gc J.empty
 runtimeObjectWithPgo : Builder -> J.Json -> J.Json -> IO String
@@ -560,8 +598,19 @@ validActionResult result = do
     own <- cacheValid artifact key
     if S.not own then ioReturn false else do
       stamp <- J.read (artifact ++ "/artifact.json")
-      if S.not (J.equal (J.get "files" result) (J.get "files" stamp)) then ioReturn false else
-        if J.has "metadata" result || J.has "binary" result then validCrateClosure artifact else ioReturn true
+      if S.not (J.equal (J.get "files" result) (J.get "files" stamp)) then ioReturn false else do
+        imported <- validImportResult result
+        if S.not imported then ioReturn false else
+          if J.has "metadata" result || J.has "binary" result then validCrateClosure artifact else ioReturn true
+validImportResult result = if S.not (J.has "import_artifact" result) then ioReturn true else do
+  let path = importPath result
+  if S.not (Host.absolutePath path && eqString (J.getText "metadata" "" result) (path ++ "/unit.mlfci")) then ioReturn false else do
+    saved <- readProofJson (artifactPath result ++ "/dependency-files.json")
+    case saved of
+      Nothing -> ioReturn false
+      Just proof -> do
+        let files = J.get "files" result
+        ioReturn (validDependencyShape proof && J.has (path ++ "/unit.mlfci") proof && J.has (path ++ "/unit.mlfco") proof && J.equal (J.get (path ++ "/unit.mlfci") proof) (J.get "unit.mlfci" files) && J.equal (J.get (path ++ "/unit.mlfco") proof) (J.get "unit.mlfco" files))
 validateWorkerResults : J.Json -> IO Unit
 validateWorkerResults scheduled = do
   let directory = O.parent (J.getText "plan" "" scheduled)
@@ -741,6 +790,8 @@ complete : Builder -> IO Unit
 complete b = do
   report <- J.read (reportPath b)
   J.write (reportPath b) (J.set "complete" (J.Boolean true) report)
+verifyInputs : Builder -> IO Unit
+verifyInputs b = validate b
 validate : Builder -> IO Unit
 validate b = do
   verifyPgo (J.getObject "native-pgo" (config b))
