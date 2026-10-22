@@ -153,7 +153,7 @@ packages : TestContext -> IO Unit
 packages c = do
  setEnv "MLF_TEST_WORK" (output c)
  setEnv "MLF_TEST_ROOT" (output c)
- suite c "packages" (Cons "18 package resolver tests passed" (Cons "29 package integration cases passed" Nil))
+ suite c "packages" (Cons "18 package resolver tests passed" (Cons "29 package integration cases passed" (Cons "28 checked package release cases passed" Nil)))
 testBuilder : TestContext -> String -> IO B.Builder
 testBuilder c name = do
  graph <- M.load (root c ++ "/mlf-package.json")

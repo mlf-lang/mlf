@@ -11,8 +11,10 @@
     "modules": {
       "Package.Build": "Package/Build.emlf",
       "Package.Command": "Package/Command.emlf",
+      "Package.Distribution": "Package/Distribution.emlf",
       "Package.Json": "Package/Json.emlf",
       "Package.Manifest": "Package/Manifest.emlf",
+      "Package.Release": "Package/Release.emlf",
       "Package.OS": "Package/OS.emlf",
       "Package.Verification": "Package/Verification.emlf",
       "Package.Benchmark": "Package/Benchmark.emlf"

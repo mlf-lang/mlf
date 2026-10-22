@@ -83,7 +83,7 @@ wrapper chooses 4 for port on hosts with at most 8 GiB RAM, while preserving the
 | Root group | MLF entry | Preserved coverage |
 | --- | --- | --- |
 | unit | CoreMain, Figure12SuiteMain, HarnessMain, TestFrameworkMain, RegexMain | framework API/CLI contracts; 684 compiler checks; 6712 Algorithm W cases represented by 6703 executions; annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks; all 43 Figure 12 labels with 41 distinct executions and 36 controls; 67 benchmark/bootstrap/release/cache harness methods including two cache regressions; 56 regex actions |
-| packages | PackagesMain | 15 original resolver methods plus three additional checks; 29 compiler integration cases, including native PGO isolation, shared cache survival, corruption recovery and source invalidation |
+| packages | PackagesMain | 75 completed cases: 15 original resolver methods plus three additional checks; 29 compiler integration cases, including native PGO isolation, shared cache survival, corruption recovery and source invalidation; 28 checked-release cases covering source-free builds, relocation, shared dependencies, compatibility, pins, damaged artifacts, GitHub fetching, offline cache repair and packed asset validation |
 | backends | BackendSuiteMain | 523 fixtures and 575 execution rows on interpreter and LLVM, compact-GC layout |
 | port | PortMain, ReferencesMain | 25 LLVM fixtures with compact-GC, six reference programs, generated inference input equality |
 | parity | CorpusMain, CheckTarget | All 7086 prescribed acceptance/type/rejection cases, 7075 distinct source compilations, and 80 runtime rows on both backends |
@@ -120,6 +120,14 @@ parent requires a full start, one terminal completion, the exact reviewed ID
 sets, and matching metric counts; partial, duplicate, missing and stale reports
 fail the gate. Each receipt hashes the report and reviewed inventory alongside
 the compiler, manager, runner and source snapshot. Text logs remain diagnostic.
+
+The checked-package release amendment adds 28 `checked release: ` IDs from
+`Tests.PackageReleases` to the existing 47 package executions, for 75 total.
+Each ID is emitted only after its scenario assertions complete. The full package
+entry wraps resolver, source-package and release scenarios in one coverage
+report; `--releases` and the fake `gh` helper remain focused entry points and
+cannot substitute for the complete campaign. These additions come from the
+reviewed release source, not candidate output.
 
 The inventory was transcribed from the verified baseline and existing source
 registries. A deliberate coverage change must update it separately with a

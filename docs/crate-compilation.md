@@ -71,6 +71,11 @@ pair preserves that sibling relationship; moving dependencies requires rebuildin
 the metadata locations. Checksums detect damaged or mismatched artifacts and
 are not signatures. There is no source fallback.
 
+Package [checked releases](checked-package-releases.md) provide a portable
+transport above this format: they replace dependency locations with content
+identities, verify the complete closure, and reconstruct local absolute paths
+on import. Ordinary compiler artifact paths retain the contract above.
+
 The built-in Prelude has one canonical generated crate identity and artifact
 location shared by sibling dependencies. It cannot be redefined by user source.
 

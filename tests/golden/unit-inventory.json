@@ -924,7 +924,35 @@
         "explicit BDWGC prefix overrides the environment and reaches test subprocesses",
         "checkout compiler selection takes precedence over an older compiler on PATH",
         "explicit compiler selection overrides a locally built compiler",
-        "native PGO generation, content-addressed reuse, invalidation, failure, and target isolation"
+        "native PGO generation, content-addressed reuse, invalidation, failure, and target isolation",
+        "checked release: packed releases are deterministic and immutable",
+        "checked release: cold offline resolution fails without a partial cache",
+        "checked release: pinned GitHub download supports locked source-free execution",
+        "checked release: warm offline builds need no downloader",
+        "checked release: offline extraction repair uses the verified retained asset",
+        "checked release: corrupt retained downloads fail offline and refetch online",
+        "checked release: GitHub dependency locks survive cache relocation",
+        "checked release: locked resolution rejects changed release locators",
+        "checked release: both digest pins are enforced before cache publication",
+        "checked release: GitHub selectors reject option and glob syntax",
+        "checked release: failed partial downloads remain unusable and can be retried",
+        "checked release: unsafe keys and duplicate or incomplete inventories are rejected",
+        "checked release: deterministic export from another source/build directory",
+        "checked release: existing release is preserved",
+        "checked release: source-free locked consumer executes through interpreter and LLVM",
+        "checked release: unchanged consumer reuses all build artifacts",
+        "checked release: source and release dependencies share the canonical Prelude",
+        "checked release: conflicting source and bundled crate identities are rejected",
+        "checked release: two releases share their transitive checked dependencies",
+        "checked release: bundled transitive dependencies do not widen import visibility",
+        "checked release: locked builds reject changed release dependencies",
+        "checked release: corrupt installed objects are repaired",
+        "checked release: manifest digest pin is mandatory and checked",
+        "checked release: incompatible compiler releases are rejected",
+        "checked release: incompatible Prelude modes are rejected",
+        "checked release: bundle artifact hashes are verified even after a cache hit",
+        "checked release: recomputed producer digests cannot bypass object checking",
+        "checked release: bundle and cache relocation preserve source-free execution"
       ],
       "aliases": {},
       "metrics": {}
@@ -1145,6 +1173,50 @@
         "tests/Tests/Figure12Suite.emlf": "0449203e15602fd9572f3aa9916218b8383377015ce8b06d2d21d268840f518d",
         "tests/Tests/TestSourceCache.emlf": "7b7ab4df4ef0228ad271c663baf613873c0c2d2de1abde59c97ea48f00a4ddfa",
         "tests/Tests/TestDriverCache.emlf": "88292dd6d90e0f2c21debe221c609fdb43ddc0d0ad966ff8e04bd06c8137e044"
+      }
+    },
+    {
+      "commit": "65316fe069ebdaf08eaa2b40e1ba758f9f9d19dc",
+      "basis": "Source-reviewed checked-package release and GitHub distribution scenarios. Each new ID records completion of the existing scenario assertions; candidate output never supplies expectations.",
+      "added_package_ids": [
+        "checked release: packed releases are deterministic and immutable",
+        "checked release: cold offline resolution fails without a partial cache",
+        "checked release: pinned GitHub download supports locked source-free execution",
+        "checked release: warm offline builds need no downloader",
+        "checked release: offline extraction repair uses the verified retained asset",
+        "checked release: corrupt retained downloads fail offline and refetch online",
+        "checked release: GitHub dependency locks survive cache relocation",
+        "checked release: locked resolution rejects changed release locators",
+        "checked release: both digest pins are enforced before cache publication",
+        "checked release: GitHub selectors reject option and glob syntax",
+        "checked release: failed partial downloads remain unusable and can be retried",
+        "checked release: unsafe keys and duplicate or incomplete inventories are rejected",
+        "checked release: deterministic export from another source/build directory",
+        "checked release: existing release is preserved",
+        "checked release: source-free locked consumer executes through interpreter and LLVM",
+        "checked release: unchanged consumer reuses all build artifacts",
+        "checked release: source and release dependencies share the canonical Prelude",
+        "checked release: conflicting source and bundled crate identities are rejected",
+        "checked release: two releases share their transitive checked dependencies",
+        "checked release: bundled transitive dependencies do not widen import visibility",
+        "checked release: locked builds reject changed release dependencies",
+        "checked release: corrupt installed objects are repaired",
+        "checked release: manifest digest pin is mandatory and checked",
+        "checked release: incompatible compiler releases are rejected",
+        "checked release: incompatible Prelude modes are rejected",
+        "checked release: bundle artifact hashes are verified even after a cache hit",
+        "checked release: recomputed producer digests cannot bypass object checking",
+        "checked release: bundle and cache relocation preserve source-free execution"
+      ],
+      "required_execution_counts": {
+        "packages": {
+          "before": 47,
+          "after": 75
+        }
+      },
+      "completion_boundary": "PackagesMain wraps resolver, source-package integration and checked-release scenarios in one complete report. PackageReleases.checked emits a case only after its assertions complete; focused and GitHub fixture dispatch do not emit full-campaign start or completion.",
+      "reviewed_source_sha256": {
+        "tests/Tests/PackageReleases.emlf": "a368943990e39d691c65c7fc9d11d43d7dde0a0633fb8fa93eb05b3eb58e88cf"
       }
     }
   ]
