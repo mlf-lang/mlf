@@ -219,7 +219,9 @@ port c = do
  preparePort c binary
  matrices c binary true
 preparePort : TestContext -> String -> IO Unit
-preparePort c binary = do
+preparePort c binary = preparePortShard c binary "all"
+preparePortShard : TestContext -> String -> String -> IO Unit
+preparePortShard c binary shard = do
  builder <- testBuilder c "port-preparation"
  originalCollection <- getEnv "GC_FREE_SPACE_DIVISOR"
  requestedCollection <- getEnv "MLF_TEST_MATRIX_GC_DIVISOR"
@@ -230,8 +232,12 @@ preparePort c binary = do
  let listing = output c ++ "/port-fixtures.txt"
  capture c (Cons binary (Cons "--list" Nil)) listing
  listingText <- readFile listing
- let names = O.words listingText
- O.require (S.length names == 25 && S.length (S.nubBy eqString names) == 25) "port fixture preparation coverage changed"
+ let allNames = O.words listingText
+ O.require (S.length allNames == 25 && S.length (S.nubBy eqString allNames) == 25) "port fixture preparation coverage changed"
+ O.require (S.elem eqString shard (O.words "all StateTypes SolverReuse InferenceConformance other")) "unknown port preparation shard"
+ let heavy = O.words "StateTypes SolverReuse InferenceConformance"
+ let names = if eqString shard "all" then allNames else S.filter (\name -> if eqString shard "other" then S.not (S.elem eqString name heavy) else eqString name shard) allNames
+ O.require (S.length names == (if eqString shard "all" then 25 else if eqString shard "other" then 22 else 1)) "port preparation shard coverage differs"
  checkerHash <- fileDigest binary
  saved <- J.read (report c)
  let identity = B.info (Cons (Pair "format" (J.num 1)) (Cons (Pair "compiler" (J.get "compiler" (B.tools builder))) (Cons (Pair "manager" (J.get "manager" (B.tools builder))) (Cons (Pair "checker_sha256" (J.str checkerHash)) (Cons (Pair "sources" (J.get "sources" saved)) Nil)))))
@@ -263,7 +269,7 @@ preparePort c binary = do
  let targetHashes = J.Object (S.map (\row -> Pair (J.getText "fixture" "" row) (J.get "target_sha256" row)) targets)
  let collections = J.Object (S.map (\row -> Pair (J.getText "fixture" "" row) (J.get "gc_free_space_divisor" row)) targets)
  record c "prepared_port" (J.set "collection_policies" collections (J.set "target_hashes" targetHashes (B.info (Cons (Pair "manifest" (J.str manifest)) (Cons (Pair "sha256" (J.str hash)) (Cons (Pair "targets" (J.num (S.length targets))) (Cons (Pair "build_report" (J.str (B.reportPath builder))) Nil)))))))
- validatePreparedPort c
+ if eqString shard "all" then validatePreparedPort c else ioReturn Unit
 validatePreparedPort : TestContext -> IO Unit
 validatePreparedPort c = do
  path <- getEnv "MLF_TEST_PORT_TARGETS"
@@ -486,7 +492,8 @@ main args = case args of
     windows <- O.isWindows
     setEnv "PATH" (O.parent compiler ++ (if windows then ";" else ":") ++ path)
     if eqString group "self-host" then selfHost c else do
-      if eqString group "packages" then packages c else if eqString group "unit" then unit c else if eqString group "port" then port c else if eqString group "backends" then backends c else if eqString group "parity" then parity c else O.fatal "unknown compiler test group"
+      if eqString group "packages" then packages c else if eqString group "unit" then unit c else if eqString group "port" then port c else if eqString group "backends" then backends c else if eqString group "parity" then parity c else
+       if O.starts "port-prepare-" group then do { binary <- nativeTest c "port"; preparePortShard c binary (O.drop 13 group) } else O.fatal "unknown compiler test group"
     after <- sources root
     O.require (J.equal sourceHashes after) "compiler/test sources changed during validation"
     current <- fileDigest compiler
