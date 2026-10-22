@@ -9,6 +9,9 @@
  * slots at byte 8. The runtime requires GMP and BDWGC. Old standard-layout
  * LLVM/object files must be regenerated; their ABI guard is not exported. */
 void mlf_require_compact_gc_abi(void);
+/* Append-only primitive 82 and process transport v1. New compiler output
+ * requires this symbol; released-seed output keeps the compact ABI above. */
+void mlf_require_process_supervisor_v1_abi(void);
 
 typedef struct MlfValue MlfValue;
 typedef struct MlfEnv MlfEnv;

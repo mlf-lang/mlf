@@ -306,3 +306,18 @@ The [matrix cleanup](../docs/test-matrix-cleanup.md) records the deliberate remo
 of compiler-scale outer interpretation, exact empty-input deduplication and
 small semantic matrices with separate scale regressions. The compact-GC layout,
 all 25 port fixtures and all 575 differential backend rows remain.
+
+## Dynamic process scopes
+
+The reusable supervisor has a separate native lifecycle suite at
+`tests/native/process_supervisor_tests.c`. Build it with the same strict C flags
+as the runner fixtures, linking `runtime/mlf_process_supervisor.c`, then run
+`process-supervisor-tests FIXTURE SCRATCH`,
+where FIXTURE is the existing `build-runner-fixture`. Required Linux, macOS, and
+Windows CI runs both suites; the 22 static protocol checks remain unchanged.
+
+See [Async.Process](../docs/async-process.md) for semantics and limits,
+`tests/async-process` for interpreter/native API parity, and
+[the typed completion gate](../docs/async-typed-completion-gate.md) for separate
+compile-positive, compile-negative, and live representation evidence. A type
+signature fixture alone is not a mutable-cell or scheduler correctness proof.

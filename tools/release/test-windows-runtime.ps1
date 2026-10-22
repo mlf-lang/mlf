@@ -51,6 +51,16 @@ try {
         log_sha256=(Get-ReleaseHash "$Output/build-runner.log")
     }
     Write-Output 'Windows native build runner lifecycle tests passed'
+    $SupervisorTests = "$Output/process-supervisor-tests.exe"
+    $null = Invoke-ReleaseCommand $Clang ($runnerFlags + @("$root/tests/native/process_supervisor_tests.c","$root/runtime/mlf_process_supervisor.c",'-lpsapi','-o',$SupervisorTests)) "$Output/process-supervisor-build.log" $root
+    $text = Invoke-ReleaseCommand $SupervisorTests @($RunnerFixture,"$Output/process-supervisor") "$Output/process-supervisor.log" $Output
+    Assert-Release ($text -match 'native process supervisor tests passed') 'Missing dynamic process scope success marker'
+    $report.process_supervisor = @{
+        passed=$true; tests_sha256=(Get-ReleaseHash $SupervisorTests)
+        log_sha256=(Get-ReleaseHash "$Output/process-supervisor.log")
+    }
+    Write-Output 'Windows native process supervisor lifecycle tests passed'
+
     # Independently compile C and LLVM twice, across a timestamp boundary and
     # into different directories. Compare real object/PE bytes, never a hash
     # with headers removed or rewritten after compilation.

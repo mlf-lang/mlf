@@ -128,3 +128,62 @@ The shared backend matrix compares interpreter and compact native execution;
 port executes 25 checked compiler probes through LLVM. Stress coverage retains
 suspended applications, cyclic data, GMP integers, arrays and tables across
 long pure allocation intervals and checks results with independent references.
+
+82 processSupervisor : String -> IO String
+
+This private monomorphic transport calls the dynamic subprocess supervisor in
+this process. It is not runProcess, a shell, or a task-value lookup. The public
+API is the separate mlf-async library's Async.Process module. Primitive numbers
+0..81 remain unchanged. New compiler entries require the additional compact
+runtime symbol mlf_require_process_supervisor_v1_abi; released-seed entries keep
+the old compact guard and can link to the new runtime. There is no fallback
+that silently runs a whole static runner for one dynamic operation.
+
+Request fields are NUL-terminated UTF-8 strings, headed by MLF-PROCESS-1 and an
+operation. The complete request is limited to 1 MiB and 4096 fields. Replies
+contain a decimal status followed by bounded metadata, at most 512 bytes; zero
+means success. Nonzero statuses are the mlf_process_status enum and a stable
+status name. No process stdout/stderr is returned or accumulated in memory.
+
+Operation fields after the version and operation:
+  version: no fields; success returns 1.
+  create: jobs, max_pending, max_retained; returns opaque decimal scope ID.
+  submit: scope, executable, cwd, stdin, stdout, stderr, env_mode,
+          running_ms, total_ms, argc, argv[argc], envc, NAME=VALUE[envc].
+          argv includes argv[0]. env_mode 0 inherits at launch, 1 replaces.
+          Returns scope, generation, slot, never a native pointer.
+  poll: scope; returns event or would_block/empty/wait_timeout.
+  wait: scope, wait_ms; returns one event; -1 waits indefinitely.
+  await: scope, handle_scope, generation, slot, wait_ms; returns an outcome.
+  cancel: scope, handle_scope, generation, slot, nonnegative_reason.
+  cancelScope: scope, nonnegative_reason.
+  close: scope, mode (0 join, 1 cancel-and-join); releases retained outcomes.
+
+An outcome is kind, exit_code, launch_error, cleanup_error, cancel_reason.
+Kinds are exited=0, launch_failed=1, cancelled=2, timed_out=3. An event prefixes
+these fields with scope, generation, slot. Nonzero process exit is outcome data.
+Repeated await does not consume an event or restart work. Scope IDs and handle
+generations are validated on every operation; identities are not reused.
+Timeout durations are integer milliseconds, limited to UINT32_MAX; zero disables
+child timeouts. Total time includes queuing. A wait timeout does not cancel work.
+Only supervisor calls service deadlines/admission; non-yielding MLF work can
+delay both. File output avoids pipe-buffer deadlocks, but disk use is not capped.
+
+The interpreter host bridge uses checkpoint and finish requests: checkpoint
+returns a private serial mark; finish takes mark and join/cancel mode and closes
+only scopes created after that mark. This preserves outer native/interpreted
+scopes during nested evaluation. Native panic, exitWith, and orderly runtime
+termination cancel-and-join all remaining scopes. The raw shutdown request does
+the same. POSIX guardian/Windows Job Object guarantees and containment limits
+are documented with the supervisor; runtime cleanup cannot intercept SIGKILL.
+The transport retains integer-only scope metadata. It stores no typed MLF
+outcomes, suspended MLF closures, or callbacks in untraced native memory.
+
+Bootstrap transition: scripts/bootstrap-async.sh uses the released seed to
+compile stage 1 in an isolated snapshot with the bootstrap/seed-compat host
+bridge and a seed-schema manifest.
+That host bridge explicitly returns unsupported for process interpretation.
+Stage 1 can compile primitive-82-bearing code, and rebuilds stage 2 after
+restoring the real host source. Stage 2 is required for checked-interpreter/native async parity.
+The existing source-smoke import closure and package-manager sources do not
+import the new primitive-bearing host or Async.Process modules.

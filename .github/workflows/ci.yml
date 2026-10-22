@@ -179,6 +179,7 @@ jobs:
           clang -O2 -std=c11 -Wall -Wextra -Werror runtime/mlf_build_runner.c -o "$output/mlf-build-runner"
           clang -O2 -std=c11 -Wall -Wextra -Werror tests/native/build_runner_fixture.c -o "$output/build-runner-fixture"
           clang -O2 -std=c11 -Wall -Wextra -Werror tests/native/build_runner_tests.c -o "$output/build-runner-tests"
+          clang -O2 -std=c11 -Wall -Wextra -Werror tests/native/process_supervisor_tests.c runtime/mlf_process_supervisor.c -o "$output/process-supervisor-tests"
       - name: Exercise bounded scheduling, protocols, and descendant cleanup
         shell: bash
         run: |
@@ -186,6 +187,8 @@ jobs:
           output="$PWD/.mlf-build/build-runner-ci"
           "$output/build-runner-tests" "$output/mlf-build-runner" "$output/build-runner-fixture" "$output/evidence" 2>&1 | tee "$output/build-runner.log"
           grep -q '22 native build runner tests passed' "$output/build-runner.log"
+          "$output/process-supervisor-tests" "$output/build-runner-fixture" "$output/process-evidence" 2>&1 | tee "$output/process-supervisor.log"
+          grep -q 'native process supervisor tests passed' "$output/process-supervisor.log"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:

@@ -9,9 +9,9 @@ The `CI` workflow runs on every pull request, merge queue group and push to
 - **Compiler source smoke**: five cases against the checkout compiler frontend
   and target checkers, interpreted by the verified published seed on macOS arm64.
 - **Native Windows runtime**: compact-GC runtime, filesystem and reproducible
-  object/executable checks, plus 22 native build-runner lifecycle cases on Windows.
+  object/executable checks, plus the 22 native build-runner cases and dynamic process-scope lifecycle suite on Windows.
 - **Native build runner**: 22 scheduler and process-lifecycle cases on each of
-  Linux and macOS.
+  Linux and macOS, plus the dynamic process-scope suite on both.
 
 The aggregate runs even when a prerequisite fails and requires all four
 prerequisites to report `success`. Both Linux and macOS matrix entries must pass
@@ -56,7 +56,11 @@ below. The required Windows job still exercises the checkout's Windows runtime.
 The separate required build-runner matrix compiles the C scheduler and fixtures
 with strict warnings on Ubuntu 24.04 and macOS 26. It checks bounded scheduling,
 protocol validation, deadlines, cancellation and descendant cleanup. These
-process checks do not require bootstrapping the compiler or package manager.
+process checks do not require bootstrapping the compiler or package manager. The dynamic
+suite compiles the reusable supervisor directly and covers the scope API as well
+as the preserved static adapter. Compiler/interpreter parity requires the
+separate new-primitive bootstrap and MLF-level suite; the C jobs alone do not
+claim it.
 
 ## Separate native and package validation
 
