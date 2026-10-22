@@ -102,9 +102,10 @@ The macOS port and unit groups obtain runners before a small Ubuntu start
 barrier admits the other four groups. The barrier accepts started or completed
 jobs regardless of their verdicts, so every group still executes independently;
 matrix ordering alone does not provide runner priority. Each platform packages
-as soon as its own six groups finish. Port preparation
-uses the same host memory collection policy as its matrix execution, retaining
-all independent target checks. Small transport builds remain local because their
+as soon as its own six groups finish. Port preparation applies the host memory
+collection allowance to `StateTypes`, records each fixture's policy in its build
+identity, and retains all independent target checks. Other preparation and
+native builds keep their ordinary collection policy. Small transports remain local because their
 subsecond cost does not justify another artifact transfer.
 
 For measurements, save the run and jobs REST responses and download the run's
