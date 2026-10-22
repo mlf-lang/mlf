@@ -121,7 +121,7 @@ void mlf_require_process_supervisor_v1_abi(void) {}
 
 typedef enum {
     HOLE, BUSY, INDIRECT, THUNK, APPLICATION, CLOSURE,
-    INTEGER, BOOLEAN, STRING, CONSTRUCTOR, PRIMITIVE, ACTION,
+    INTEGER, MLF_BOOLEAN, STRING, CONSTRUCTOR, PRIMITIVE, ACTION,
     CONSTRUCTOR_1, CONSTRUCTOR_2, DOUBLE, INT_ARRAY, DOUBLE_ARRAY,
     WRITE_INT_ACTION, WRITE_DOUBLE_ACTION, NATIVE_IO,
     BYTE_ARRAY, WRITE_BYTE_ACTION, PUT_BYTES_ACTION, INT_TABLE, WRITE_TABLE_ACTION,
@@ -140,7 +140,7 @@ typedef enum {
     NEW_BYTE_ARRAY, READ_BYTE_ARRAY, WRITE_BYTE_ARRAY, LENGTH_BYTE_ARRAY,
     BYTE_ARRAY_FROM_STRING, PUT_BYTES, GET_BYTE_LINE, NEW_INT_TABLE, READ_INT_TABLE, WRITE_INT_TABLE,
     AND_INT,
-    STRING_LENGTH, STRING_CODE_AT, STRING_SLICE, STRING_FROM_CODE, COMPARE_STRING,
+    STRING_LENGTH, STRING_CODE_AT, STRING_SLICE, STRING_FROM_CODE, MLF_COMPARE_STRING,
     READ_DOUBLE, DOUBLE_TO_BITS, DOUBLE_FROM_BITS, SEQ, PANIC,
     READ_FILE, WRITE_FILE, FILE_EXISTS, CANONICAL_PATH, GET_ARG_COUNT, GET_ARG, PUT_ERR, EXIT_WITH,
     GET_EXECUTABLE_PATH, GET_CONTENTS,
@@ -590,7 +590,7 @@ static MlfValue *expect(MlfValue *entry, Tag tag) {
     MlfValue *result = mlf_force(entry);
     if (immediate(result)) {
         if ((tag == INTEGER && small_integer(result)) ||
-            (tag == BOOLEAN && boolean_value(result)) ||
+            (tag == MLF_BOOLEAN && boolean_value(result)) ||
             (tag == CONSTRUCTOR && nullary(result))) return result;
         fail("invalid value for runtime operation");
     }
@@ -783,7 +783,7 @@ MlfValue *mlf_eq_int(MlfValue *a, MlfValue *b) { return mlf_boolean(integer_comp
 MlfValue *mlf_lt_int(MlfValue *a, MlfValue *b) { return mlf_boolean(integer_compare(a,b) < 0); }
 
 int64_t mlf_truth(MlfValue *entry) {
-    MlfValue *b = expect(entry, BOOLEAN);
+    MlfValue *b = expect(entry, MLF_BOOLEAN);
     return boolean_value(b) ? ((uintptr_t)b == 6) : b->as.boolean;
 }
 
@@ -1085,7 +1085,7 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
     case STRING_CODE_AT: return string_code_at(a,b);
     case STRING_SLICE: return string_slice(a,b,c);
     case STRING_FROM_CODE: return string_from_code(a);
-    case COMPARE_STRING: return compare_string(a,b);
+    case MLF_COMPARE_STRING: return compare_string(a,b);
     case READ_DOUBLE: return read_double(a);
     case DOUBLE_TO_BITS: return double_to_bits(a);
     case DOUBLE_FROM_BITS: return double_from_bits(a);
@@ -1251,7 +1251,7 @@ MlfValue *mlf_prim2(int64_t p, MlfValue *a, MlfValue *b) {
     case ADD_DOUBLE: case SUB_DOUBLE: case MUL_DOUBLE: case DIV_DOUBLE: case EQ_DOUBLE: case LT_DOUBLE:
     case FORMAT_DOUBLE: case NEW_INT_ARRAY: case READ_INT_ARRAY: case NEW_DOUBLE_ARRAY: case READ_DOUBLE_ARRAY:
     case NEW_BYTE_ARRAY: case READ_BYTE_ARRAY: case READ_INT_TABLE:
-    case STRING_CODE_AT: case COMPARE_STRING: case SEQ: case WRITE_FILE:
+    case STRING_CODE_AT: case MLF_COMPARE_STRING: case SEQ: case WRITE_FILE:
     case SET_ENV: case RUN_PROCESS:
     case ST_BIND: case NEW_ST_ARRAY: case READ_ST_ARRAY:
         return primitive_result((Primitive)p,a,b,NULL);
