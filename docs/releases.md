@@ -109,10 +109,14 @@ used the following sequence:
    verifies a fresh self-host fixed point, tests relocation and installation,
    then uploads a new developer-preview release with SHA-256 checksums.
 
-CI on `main` and pull requests checks release metadata, downloads the pinned
-native seed in `.github/seed.env`, and builds checkout example packages on both
-interpreter and LLVM. This fast check verifies installation and local package
-integration; it does not rebuild or validate modified compiler implementations.
+CI on `main`, pull requests and merge queues checks release metadata and workflow
+syntax, builds the checkout compiler and manager with the verified v0.3.0 seed
+in `.github/pr-seed.env`, and runs the bounded `pr-smoke` compiler group. It
+retains Figure 12 regressions, selected interpreter/LLVM fixtures, independent
+target checks and package cache invalidation. The separate Windows runtime job
+also runs. The aggregate **PR gate** succeeds only when all three jobs succeed;
+configure it as a required status check on `main` to enforce merge blocking.
+See [PR checks](ci.md) for exact coverage, local commands and required-check setup.
 Dispatch **CI** with `self_host` enabled for a fresh compiler build and fixed
 point, or **Native release** for all six compiler groups. These full checks are
 manual because compilation on hosted M1 runners can exceed 30 minutes per stage.
@@ -124,7 +128,8 @@ unchanged. Native release publication still requires every group to pass.
 No workflow installs GHC or invokes Python. Compiler, parity and package
 qualification runs in native MLF on every supported platform. Seed
 downloads check the selected published archive checksum and both
-independently pinned native executable hashes. CI now pins v0.1.1. Release jobs
+independently pinned native executable hashes. Full release/self-host bootstraps
+retain v0.1.1 in `.github/seed.env`. Release jobs
 read seed pins and verification/timing tools from the workflow's immutable
 commit, so an older target tag cannot silently select its old seed. The checksum
 file can also cover supplementary validation archives that are not downloaded

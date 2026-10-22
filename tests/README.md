@@ -1,5 +1,10 @@
 # Native MLF compiler tests
 
+Pull requests use the explicit [PR smoke group](../docs/ci.md): Figure 12,
+four independent checker controls, 12 selected interpreter/LLVM fixtures and
+three package/cache checks. It builds and tests checkout tools. The six full
+root groups below retain their existing coverage and do not repeat smoke.
+
 The local `mlf-tests` package preserves the original assertions, input corpora,
 runtime event traces, generated graph properties, and harness fault injections.
 Root `mlfpkg test` builds these executables through the MLF package manager.
@@ -9,7 +14,7 @@ benchmark baselines and golden oracle data remain unchanged.
 
 The shared test library contains eight helper, transport, collection-wrapper
 and independent-checker modules. Each executable explicitly lists the private
-test modules imported by its entry point. All 77 test modules remain reachable
+test modules imported by its entry point. All 78 test modules remain reachable
 across those entries. Building `port` and its six reference programs now compiles
 21 test modules including their two entries, instead of compiling all 79 first.
 `mlfpkg --manifest tests/mlf-package.json plan` checks those import boundaries;
