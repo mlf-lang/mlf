@@ -29,10 +29,7 @@ if [ "$group" = port ]; then
       export MLF_TEST_MATRIX_GC_DIVISOR=1
     fi
   fi
-  # Preparation holds several independently checked forms of large targets.
-  # Apply the same host memory policy before those forms are constructed.
   case "$MLF_TEST_MATRIX_GC_DIVISOR" in 1|2|4) ;; *) exit 2 ;; esac
-  export GC_FREE_SPACE_DIVISOR=$MLF_TEST_MATRIX_GC_DIVISOR
   printf 'Port matrix host memory: %s bytes; GC free-space divisor: %s\n' "$matrix_memory_bytes" "$MLF_TEST_MATRIX_GC_DIVISOR"
 fi
 mkdir -p .mlf-build/forbidden-tools
