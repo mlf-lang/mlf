@@ -46,10 +46,10 @@ case "$1" in
  deps)
    # Homebrew uses installed runtime receipts unless explicit target flags
    # (or one of its dependency-selection flags) force formula declarations.
-   if [ "${MOCK_INSTALLED:-0}" = 1 ] && [[ " $* " != *' --os=tahoe --arch=arm64 '* ]]; then
+   if [ "${MOCK_INSTALLED:-0}" = 1 ] && [[ " $* " != *' --os=tahoe --arch=arm '* ]]; then
      echo stale-image-dependency; exit 0
    fi
-   test "$*" = 'deps --os=tahoe --arch=arm64 --formula --union --topological llvm gmp pkgconf bdw-gc'
+   test "$*" = 'deps --os=tahoe --arch=arm --formula --union --topological llvm gmp pkgconf bdw-gc'
    printf '%s\n' zstd z3 "${MOCK_EXTRA_DEP:-zstd}" ;;
  info)
    test "${HOMEBREW_NO_AUTO_UPDATE:-}" = 1

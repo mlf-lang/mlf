@@ -25,10 +25,9 @@ jobs:
             # Installer receipts, SBOM timestamps and generated Python bytecode
             # are runner-local metadata, not the installed native input bytes.
             find "$prefix" -type f ! -name INSTALL_RECEIPT.json ! -name sbom.spdx.json \
-              ! -path '*/.brew/*' ! -path '*/__pycache__/*' -print
-          done < .mlf-build/macos-dependencies/closure.txt | LC_ALL=C sort | while IFS= read -r path; do
-            shasum -a 256 "$path"
-          done > .mlf-build/macos-dependencies/files.sha256
+              ! -path '*/.brew/*' ! -path '*/__pycache__/*' -print0
+          done < .mlf-build/macos-dependencies/closure.txt | xargs -0 shasum -a 256 | LC_ALL=C sort \
+            > .mlf-build/macos-dependencies/files.sha256
           test -s .mlf-build/macos-dependencies/files.sha256
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:

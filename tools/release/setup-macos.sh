@@ -56,7 +56,7 @@ fi
 roots=(llvm gmp pkgconf bdw-gc)
 # Explicit target flags force declared dependencies. Merely selecting formula,
 # union and topological modes still permits installed receipt dependencies.
-brew deps --os=tahoe --arch=arm64 --formula --union --topological "${roots[@]}" > "$output/dependencies.txt"
+brew deps --os=tahoe --arch=arm --formula --union --topological "${roots[@]}" > "$output/dependencies.txt"
 { cat "$output/dependencies.txt"; printf '%s\n' "${roots[@]}"; } | awk 'NF && !seen[$0]++' > "$output/closure.txt"
 closure=()
 while IFS= read -r formula; do
