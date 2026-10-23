@@ -184,7 +184,7 @@ six full root groups and release qualification are unchanged.
 
 ## Timing and evidence
 
-The required **Compiler source smoke** job has a ten-minute hard limit, including
+The required **Compiler source smoke** job has a twenty-minute hard limit, including
 dependency setup, seed verification and evidence upload. It installs only GMP;
 interpreting the harness does not need LLVM, BDWGC development files or pkg-config.
 The collector uses `GC_FREE_SPACE_DIVISOR=2`. A local run passed in 115 seconds
@@ -216,6 +216,16 @@ passed all five cases in **5m30s** (330 seconds) at divisor 2 with identical out
 hashes. That run's metadata check exposed the watchdog cleanup race, now covered
 by the deterministic supervision regression above.
 
+Later source checks on [main run 39865876405](https://github.com/mlf-lang/mlf/actions/runs/39865876405)
+and [PR run 39881997979](https://github.com/mlf-lang/mlf/actions/runs/39881997979)
+reached the same 480-second deadline before harness progress at divisor 2. The
+PR smoke import closure and script were byte-identical to main. Both seeds
+accumulated over seven minutes of CPU time; the retained host logs show heavy
+memory compression without swap. The command budget was raised to 900 seconds
+for a controlled complete startup measurement, with a twenty-minute job limit
+for setup and evidence upload. A completed hosted run is still needed before
+claiming a normal duration under this budget.
+
 In CI run [39798088020](https://github.com/mlf-lang/mlf/actions/runs/39798088020),
 the fresh-native smoke command completed in **16m49s** (1,009 seconds): checkout
 tool building took **16m17s** (977 seconds), and the remaining smoke checks and
@@ -239,7 +249,9 @@ tool and output hashes, logs, emitted targets and its completion receipt under
 `progress.log` records which case the interpreted harness is running.
 Its absence means the harness has not reached the first case. Timeouts print the
 last recorded stage (or its absence) and leave the receipt incomplete. The
-eight-minute command deadline and ten-minute job limit remain unchanged.
+command deadline is 900 seconds, within the twenty-minute job limit. This bounded
+startup measurement preserves all five cases, source/seed/output hashes and
+watchdog cleanup.
 
 The fresh-native job uploads `pr-smoke-evidence`,
 including build reports, command logs, output and completion receipts. Local evidence is under
