@@ -1,4 +1,4 @@
-# Pull request checks
+# CI: pull requests, main and releases
 
 Test classification is recorded separately in
 [`tests/test-catalog.json`](../tests/test-catalog.json). Its seven primary groups
@@ -37,8 +37,8 @@ prerequisites to report `success`. Required jobs use Linux or Windows, so the
 smaller macOS runner pool cannot queue the merge gate.
 Failed, cancelled or skipped prerequisites cannot produce a passing gate.
 There are no path filters on the required workflow. Manual dispatches retain
-the optional self-host and Windows-only modes, plus `full_validation` for fresh
-native builds and the complete package suite. Their skipped aggregate
+the Windows-only mode; either `full_validation` or the compatible `self_host`
+input runs complete qualification, including Benchmark Game. Their skipped aggregate
 is named **Manual CI summary**, so it cannot satisfy the required **PR gate**.
 
 ## Enforce before merging
@@ -79,56 +79,74 @@ validation, deadlines, cancellation and descendant cleanup. These process
 checks do not require bootstrapping the compiler or package manager.
 
 macOS still executes these same 22 lifecycle cases through `buildRunnerTests`
-in the complete `packages` campaign, including **Native package distribution**
-on main/manual full CI and the macOS full qualification workflow. All six full
-campaigns and the native macOS builds remain unchanged; this moves the required
+in the complete `packages` campaign on main/manual full CI and release
+qualification. All six full campaigns and the native macOS builds are retained; this moves the required
 pre-merge execution to Linux rather than treating a skipped macOS check as a pass.
 
-## Separate native and package validation
+## Automatic complete qualification on main
 
-**Fresh native compiler smoke** and **Native package distribution** run after
-the source check on pushes to `main`, or when a manual CI dispatch enables
-`full_validation`. They do not run on ordinary pull requests or merge queue
-groups and are not prerequisites of **PR gate**. Windows-only dispatches skip
-both. They retain macOS execution outside the required merge gate; waiting for
-the Linux source check avoids starting those builds after an early source failure.
+Every push to `main` invokes `native-qualification.yml` with `build_packages=false`.
+It runs independently of the small PR gate, using read-only repository and Actions
+permissions. Pull requests and merge queue groups keep the fast gate above.
+Manual `CI` with `full_validation=true` exercises this exact complete graph on a
+feature branch without creating SDK archives or publishing anything.
 
-Fresh native builds first use `tools/release/bootstrap-manager.sh` to compile
-the checkout manager from library crates with a seed-compatible manifest. This
-bridge permits the published seed to bootstrap manifests with explicit target
-dependency selections. The resulting manager uses the current C runtime,
-checked lockfile and adjacent `mlf-build-runner` helper to build the checkout
-`emlf` and `mlfpkg` targets. The native job then runs eight direct CLI cases:
+- Linux x64 and macOS ARM64 each execute all six full campaigns: `unit`,
+  `packages`, `parity`, `backends`, `port` and `self-host`.
+- The four checked port-preparation shards remain prerequisites of each port
+  campaign. Native candidates, producer reports and original dependency receipts
+  keep the existing source/platform/toolchain authentication and release gates.
+- macOS also retains the eight direct CLI cases and three package/cache states,
+  now using its already-built final candidate instead of another tool build.
+- Windows retains its native fixed point, independent 7,086-case parity corpus,
+  160 runtime executions, 52 package cases, compact-GC runtime checks and 22
+  build-runner lifecycle cases. The six POSIX internal campaigns are not claimed
+  as Windows coverage.
+- A separate fresh macOS runner executes the complete ten-workload Benchmark
+  Game. No other builds or benchmark measurements run on that runner during
+  measurement. Other workflow jobs run on different hosted machines.
 
-- Two accepted programs with checked xMLF and literal expected types.
-- Two source rejections with expected diagnostics.
-- Three IO programs on the interpreter and compact-GC LLVM: signed/unbounded
-  arithmetic, lazy branches/constructors/closures, and repeated input with
-  Unicode. Each backend must match a checked-in literal output oracle.
-- One malformed xMLF program rejected before effects by both execution paths.
+The benchmark compares C, the exact authenticated candidate and the immutable
+v0.3.0 compiler in `.github/benchmark-baseline-macos.env`. The baseline archive,
+source commit and both binaries are independently hash-pinned. LLVM, LLD, GMP,
+BDWGC, pkg-config and PCRE2 10.49 come from the immutable Homebrew core/bottle
+closure in `.github/macos-dependencies.env`. Adding benchmark dependencies does
+not relax the shared candidate's byte-for-byte native-input checks.
 
-Its local-package example runs on both backends in three states: a fresh build,
-unchanged cache reuse, and a dependency implementation edit with changed output.
-The last state must rebuild the dependency and both downstream crates. Mutation
-uses a private copy; the checkout stays unchanged. Reports from all three states
-are retained, and empty or incomplete reports cannot pass.
+The native MLF runner executes every independent correctness size and all
+unchanged default inputs, seven samples per workload, fresh objects/binaries,
+checked runtime warm-ups and alternating compiler order. Both MLF variants use
+the same generic LLVM/linker backend; C retains its manifest flags. Explicit
+arguments enforce **3x C compilation and 2x C runtime**. No workload filtering,
+threshold relaxation or `continue-on-error` is allowed. A known regex-redux
+performance failure stays a failed gate. Historical nine-workload reports do
+not establish that the new complete ten-workload gate passes.
 
-The package-distribution job verifies the published compiler pinned in
-`.github/package-seed.env`, uses the same manager bridge before reading the root
-manifest, then builds the checkout `mlfpkg` and `compiler-tests` executables with
-the checked lockfile. The campaign receives
-that manager explicitly and runs 22 resolver checks, 29 package integration
-cases, the target-dependency/scheduler fixture and 28 checked-release/distribution
-cases. Completed cases must match
-the reviewed structural inventory. The metadata job also runs eight publishing
-regression checks without creating releases.
+`benchmark-game-macos-arm64` retains results, raw outputs, executables, LLVM and
+object hashes, commands, per-stage wall/CPU time and RSS, baseline/candidate and
+native-dependency identities, OS/hardware context and helper configurations for
+30 days, even on failure. The final report verifier rejects missing workloads,
+changed inputs, missing samples/telemetry and inconsistent performance verdicts.
+The always-running **Complete qualification gate** rejects failed, cancelled,
+skipped, missing or pending prerequisite jobs. **PR gate** alone is not evidence
+of a successful main qualification.
 
-The workflow retains `package-distribution-evidence` on success or failure,
-including build and verification reports, command diagnostics, coverage,
-reviewed inventory and cache metadata. The package job has a 90-minute hard
-limit. All 79 structured package cases, the separate target-dependency/scheduler
-fixture and 22 native runner checks remain intact; this job runs separately from
-the required checks.
+## Release-only SDK packaging and publication
+
+The explicit release entrypoint calls the same graph with `build_packages=true`.
+Only then do macOS/Linux packaging and Windows packaging/relocation execute.
+Every existing six-campaign receipt check, candidate-identity check, SDK relocation
+check and Windows source/dependency check stays in place. Publication depends on
+the whole qualification graph, including the benchmark and package results.
+Only the release wrapper grants `contents:write`.
+
+Changing `.github/release-request.json` no longer publishes from a main push.
+Dispatch **Native release** or **Cross-platform release** at the existing immutable
+version tag and pass that same tag. The tag must resolve to the workflow's exact
+SHA so artifact provenance cannot silently refer to a different source. A manual
+`platform-release.yml` run with `validation_only=true` is an explicit release
+rehearsal: it builds and relocates all SDKs but never publishes or creates tags.
+See [release instructions](releases.md). No branch-protection settings are changed.
 
 ## Run locally
 
@@ -271,15 +289,14 @@ command deadline is 900 seconds, within the twenty-minute job limit. This bounde
 startup measurement preserves all five cases, source/seed/output hashes and
 watchdog cleanup.
 
-The fresh-native job uploads `pr-smoke-evidence`,
-including build reports, command logs, output and completion receipts. Local evidence is under
-`.mlf-build/pr-smoke/`; `result.json` records integer wall-clock seconds for tool
-building and the complete command, plus tool and report SHA-256 fingerprints.
-The fresh-native job retains a 60-minute hard failure bound.
+The former fresh-native job is now covered by the complete candidate build and
+the direct CLI/package checks in `candidate-macos-arm64-diagnostics`. Local
+`pr-smoke` remains available and retains its original reports. The timings above
+are historical observations, not measurements of the new complete graph.
 
 The required Linux build-runner job has a ten-minute limit and retains its log,
 task plans and results in `build-runner-evidence-ubuntu-24.04`. macOS lifecycle
 logs remain in the full package campaign evidence. Windows retains its task
-plans and results alongside the runtime verification report. Fresh-native and package
-artifacts also retain the manager bootstrap reports and command diagnostics;
-fresh-native artifacts include scheduler invocation diagnostics.
+plans and results alongside the runtime verification report. Full qualification artifacts retain their original build reports, primary
+verification receipts, coverage and diagnostics. Bootstrap timing artifacts
+record the seed generation; benchmark samples record separate wall/CPU/RSS data.

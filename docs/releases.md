@@ -62,14 +62,21 @@ unchanged. Keep the whole package when using its `bin` directory directly.
 
 ## Prepare the next release
 
+Every push to `main` automatically runs complete native test qualification and
+the ten-workload Benchmark Game. SDK packaging and publishing happen only in
+explicit release runs. See [the CI policy](ci.md) for the exact platform coverage,
+immutable benchmark inputs and fail-closed performance gate.
+
 For a release on all three platforms, update `VERSION`,
 `libraries/mlf-foundation/Bootstrap/Version.emlf`, the toolchain manifests,
-and `CHANGELOG.md`, then regenerate `mlf.lock`. Change the version in
-`.github/release-request.json` and commit the reviewed candidate on `main`.
-The **Cross-platform release** workflow checks out that immutable commit,
-builds and verifies all three packages, and only then creates the annotated
-version tag and publishes one developer preview. Manual runs accept an existing
-version tag. Existing releases and assets are never replaced.
+and `CHANGELOG.md`, then regenerate `mlf.lock` and commit the reviewed candidate.
+After its complete qualification passes, create the immutable annotated version
+tag. Dispatch **Native release** or **Cross-platform release** at that same tag,
+passing it as `tag`. The workflow checks that its own source SHA is the tagged
+commit, reruns complete qualification and Benchmark Game, then packages and
+relocates all three SDKs before publishing. Existing tags/releases/assets are
+never replaced; the workflow does not create tags. A change to
+`.github/release-request.json` alone no longer triggers publication.
 
 To qualify a CI change without publishing, push its feature branch and dispatch
 **Cross-platform release** on that branch with `validation_only=true` and no
@@ -178,37 +185,21 @@ used the following sequence:
 1. Update `VERSION`, the four toolchain manifests, and `CHANGELOG.md`.
 2. Run `./mlfpkg lock`, review the lock changes, and commit the release candidate.
 3. Create an annotated version tag and push it. Tags are never moved.
-4. Run the **Native release** workflow on `main` with that tag. It runs all six
+4. Run the **Native release** workflow at that exact tag, passing the same tag. It runs all six
    native groups independently, checks their compiler hashes and source snapshots,
    verifies a fresh self-host fixed point, tests relocation and installation,
    then uploads a new developer-preview release with SHA-256 checksums.
 
-CI on `main`, pull requests and merge queues checks release metadata and workflow
-syntax and runs five current-source compiler cases with the verified v0.3.0 seed
-in `.github/smoke-seed.env`. The seed interprets the checkout frontend and current
-and frozen target checkers; this check does not build fresh tools or execute the
-checkout LLVM backend. The Windows runtime job also runs, and the native build
-runner's 22 scheduling and lifecycle tests run on both Linux and macOS. The
-aggregate **PR gate** requires metadata, source smoke, Windows runtime, and both
-build-runner matrix jobs to succeed; configure it as a required status check on
-`main` to enforce merge blocking.
-
-Pushes to `main` and manual CI dispatches with `full_validation` enabled also run
-two separate jobs after the source check. **Fresh native compiler smoke** builds
-the checkout compiler and manager through the seed-compatible manager bridge,
-then runs eight direct CLI cases and three package build/cache states. **Native package distribution** builds the checkout
-manager and test campaign with the published compiler pinned in
-`.github/package-seed.env`, then requires all 22 resolver checks, 29 package
-integration cases and 28 checked-release/distribution cases with structural
-coverage, plus the separate target-dependency/scheduler fixture and 22 native
-runner checks. These slower jobs are not merge prerequisites. Metadata retains eight
-required publishing regression checks. The extended native harness remains
-available with `tools/release/native-ci.sh extended-pr-smoke`; all six release
-groups retain their coverage.
-See [PR checks](ci.md) for exact coverage, local commands and required-check setup.
-Dispatch **CI** with `self_host` enabled for a fresh compiler build and fixed
-point, or **Native release** for all six compiler groups. These full checks are
-manual because compilation on hosted M1 runners can exceed 30 minutes per stage.
+Pull requests and merge queues retain the four-check **PR gate**: metadata,
+Linux source smoke, Linux native build-runner checks and Windows runtime checks.
+The macOS lifecycle checks still run inside the complete package campaign.
+Main pushes now run all six complete campaigns on Linux and macOS, Windows
+native qualification and the complete ten-workload benchmark automatically.
+`full_validation` and the compatible `self_host` CI inputs run the same complete
+graph manually. These checks are distinct from SDK packaging; only release or
+explicit release-rehearsal runs enable package/relocation steps. All primary
+receipts, candidate/source identities and SDK gates remain required.
+See [CI policy](ci.md) for the precise coverage and artifact contract.
 When the code generator changes, an intermediate native generation is built
 from the pinned seed before building the candidate tested by all six groups.
 This lets the candidate and its fresh self-build use the same updated generator.
@@ -218,7 +209,7 @@ No workflow installs GHC or invokes Python. Compiler, parity and package
 qualification runs in native MLF on every supported platform. Seed
 downloads check the selected published archive checksum and both
 independently pinned native executable hashes. Full release/self-host bootstraps
-retain v0.1.1 in `.github/seed.env`. Release jobs
+retain the independently pinned v0.3.0 in `.github/seed.env`. Release jobs
 read seed pins and verification/timing tools from the workflow's immutable
 commit, so an older target tag cannot silently select its old seed. The checksum
 file can also cover supplementary validation archives that are not downloaded

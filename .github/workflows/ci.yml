@@ -7,11 +7,11 @@ on:
   workflow_dispatch:
     inputs:
       full_validation:
-        description: Also build fresh native tools and run the full package distribution suite
+        description: Run all native qualification campaigns and the complete Benchmark Game
         type: boolean
         default: false
       self_host:
-        description: Also rebuild the compiler and check a fresh self-host fixed point
+        description: Run complete qualification (includes the fresh self-host fixed point)
         type: boolean
         default: false
       windows_runtime_only:
@@ -66,101 +66,6 @@ jobs:
             .mlf-build/source-smoke/*.log*
             .mlf-build/source-smoke/*.json
             .mlf-build/source-smoke/*.xmlf
-  fresh-native:
-    name: Fresh native compiler smoke
-    if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.full_validation)) && !inputs.windows_runtime_only
-    needs: [native]
-    runs-on: macos-26
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - name: Native dependencies
-        run: brew install llvm gmp pkg-config bdw-gc
-      - name: Fetch verified native seed
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: tools/release/fetch-seed.sh .mlf-build/seed .github/smoke-seed.env
-      - name: Build checkout tools and run small CLI smoke suite
-        run: tools/release/native-ci.sh pr-smoke
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        if: always()
-        with:
-          name: pr-smoke-evidence
-          include-hidden-files: true
-          retention-days: 14
-          path: |
-            .mlf-build/pr-smoke/result.json
-            .mlf-build/pr-smoke/*.log
-            .mlf-build/pr-smoke/manager-bootstrap/bootstrap.json
-            .mlf-build/pr-smoke/manager-bootstrap/build-report.json
-            .mlf-build/pr-smoke/manager-bootstrap/root-manifest.json
-            .mlf-build/pr-smoke/manager-bootstrap/source/mlf-package.json
-            .mlf-build/pr-smoke/manager-bootstrap/commands/
-            .mlf-build/pr-smoke/candidate/build-report.json
-            .mlf-build/pr-smoke/candidate/invocations/**/*.json
-            .mlf-build/pr-smoke/candidate/invocations/**/*.stdout
-            .mlf-build/pr-smoke/candidate/invocations/**/*.stderr
-            .mlf-build/pr-smoke/candidate/cache/*/artifact.json
-            .mlf-build/pr-smoke/cli/**/*.json
-            .mlf-build/pr-smoke/cli/**/*.stdout
-            .mlf-build/pr-smoke/cli/**/*.stderr
-            .mlf-build/pr-smoke/cli/**/*.status
-            .mlf-build/pr-smoke/cli/**/*.timed-out
-            .mlf-build/pr-smoke/packages/*.json
-            .mlf-build/pr-smoke/packages/*.log*
-            .mlf-build/pr-smoke/packages/*.stdout
-            .mlf-build/pr-smoke/packages/*.stderr
-            .mlf-build/pr-smoke/packages/*.expected
-  packages:
-    name: Native package distribution
-    if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.full_validation)) && !inputs.windows_runtime_only
-    needs: [native]
-    runs-on: macos-26
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - name: Native dependencies
-        run: |
-          brew install llvm gmp pkg-config bdw-gc
-          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
-          echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
-      - name: Fetch pinned published package compiler
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: tools/release/fetch-seed.sh .mlf-build/package-seed .github/package-seed.env
-      - name: Build candidate manager and test campaign
-        run: |
-          tools/release/bootstrap-manager.sh .mlf-build/package-manager-bootstrap
-          export MLF_PACKAGE_MANAGER="$PWD/.mlf-build/package-manager-bootstrap/bin/mlfpkg"
-          "$MLF_PACKAGE_MANAGER" --compiler "$MLF_COMPILER" --runtime "$PWD/runtime/mlf_runtime.c" \
-            --build-dir .mlf-build/package-tools --timeout 5400 --locked build --target mlfpkg --target compiler-tests
-      - name: Test source packages and checked GitHub distribution
-        run: |
-          .mlf-build/package-tools/bin/compiler-tests packages --compiler "$MLF_COMPILER" \
-            --manager "$PWD/.mlf-build/package-tools/bin/mlfpkg" \
-            --build-dir .mlf-build/package-tests --cache-dir .mlf-build/package-tools/cache
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        if: always()
-        with:
-          name: package-distribution-evidence
-          include-hidden-files: true
-          retention-days: 14
-          path: |
-            .mlf-build/package-manager-bootstrap/bootstrap.json
-            .mlf-build/package-manager-bootstrap/build-report.json
-            .mlf-build/package-manager-bootstrap/root-manifest.json
-            .mlf-build/package-manager-bootstrap/source/mlf-package.json
-            .mlf-build/package-manager-bootstrap/commands/
-            .mlf-build/package-tools/build-report.json
-            .mlf-build/package-tools/commands/
-            .mlf-build/package-tools/cache/*/artifact.json
-            .mlf-build/package-tests/verification.json
-            .mlf-build/package-tests/*.log*
-            .mlf-build/package-tests/*.stderr
-            .mlf-build/package-tests/*.coverage.jsonl
-            .mlf-build/package-tests/suite-build/build-report.json
-            .mlf-build/package-tests/suite-build/commands/
-            tests/golden/unit-inventory.json
   build-runner:
     name: Native build runner (${{ matrix.os }})
     if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only
@@ -265,43 +170,13 @@ jobs:
           CHECKS: ${{ toJSON(needs) }}
         run: |
           printf '%s\n' "$CHECKS" | jq -e 'length == 4 and all(.[]; .result == "success")'
-  self-host:
-    name: Fresh self-host
-    if: github.event_name == 'workflow_dispatch' && inputs.self_host && !inputs.windows_runtime_only
-    runs-on: macos-26
-    timeout-minutes: 360
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - run: brew install llvm gmp pkg-config bdw-gc
-      - name: Fetch verified native seed
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: tools/release/fetch-seed.sh .mlf-build/seed
-      # A seed with an older code generator cannot itself produce fixed-point
-      # LLVM for the updated compiler. Validate the next native generation.
-      - name: Bootstrap the updated native code generator
-        run: |
-          export MLF_GC_PREFIX="$(brew --prefix bdw-gc)"
-          export PATH="$(brew --prefix llvm)/bin:$PATH"
-          tools/release/timed-bootstrap.sh
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        if: always()
-        with:
-          name: native-bootstrap-evidence
-          include-hidden-files: true
-          retention-days: 30
-          path: |
-            .mlf-build/bootstrap-stage1/build-report.json
-            .mlf-build/bootstrap-stage1/commands/
-            .mlf-build/bootstrap-stage1/cache/**/artifact.json
-            .mlf-build/bootstrap-stage1/timing/
-      - name: Build and check a fresh compiler fixed point
-        run: tools/release/native-ci.sh self-host
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        if: always()
-        with:
-          name: native-self-host-evidence
-          include-hidden-files: true
-          path: |
-            .mlf-build/build-report.json
-            .mlf-build/compiler-tests/self-host/verification.json
+  qualification:
+    name: Complete main qualification
+    if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (inputs.full_validation || inputs.self_host))) && !inputs.windows_runtime_only
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/native-qualification.yml
+    with:
+      source: ${{ github.sha }}
+      build_packages: false

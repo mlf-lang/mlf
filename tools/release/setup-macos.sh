@@ -10,6 +10,13 @@ if [ "${GITHUB_ACTIONS:-}" != true ] || [ "${RUNNER_ENVIRONMENT:-}" != github-ho
   echo 'Pinned macOS setup requires a disposable GitHub-hosted macos-26 ARM64 runner.' >&2
   exit 1
 fi
+roots=(llvm gmp pkgconf bdw-gc)
+case "${1:-qualification}" in
+  qualification) ;;
+  benchmarks) roots+=(lld pcre2) ;;
+  *) echo 'Expected qualification or benchmarks dependency profile.' >&2; exit 2 ;;
+esac
+test "$#" -le 1
 source .github/macos-dependencies.env
 [[ "$MLF_HOMEBREW_CORE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
 export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_FROM_API=1
@@ -53,7 +60,6 @@ if [ ! -L "$core" ] || [ "$(readlink "$core")" != "$checkout" ]; then
   fi
   ln -s "$checkout" "$core"
 fi
-roots=(llvm gmp pkgconf bdw-gc)
 # Explicit target flags force declared dependencies. Merely selecting formula,
 # union and topological modes still permits installed receipt dependencies.
 brew deps --os=tahoe --arch=arm --formula --union --topological "${roots[@]}" > "$output/dependencies.txt"

@@ -41,11 +41,11 @@ jobs:
           gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/actions/runs/$QUALIFICATION_RUN/jobs?per_page=100" > jobs.json
           for platform in macos-arm64 linux-x64; do
             for group in unit packages self-host parity backends port; do
-              jq -e --arg name "$platform $group" '[.[].jobs[] | select(.name == $name)] | length == 1 and all(.[]; .status == "completed" and .conclusion == "success")' jobs.json
+              jq -e --arg name "$platform $group" '[.[].jobs[] | select((.name | split(" / ") | last) == $name)] | length == 1 and all(.[]; .status == "completed" and .conclusion == "success")' jobs.json
             done
           done
-          for name in windows 'posix-package (linux-x64, ubuntu-24.04)'; do
-            jq -e --arg name "$name" '[.[].jobs[] | select(.name == $name)] | length == 1 and all(.[]; .status == "completed" and .conclusion == "success")' jobs.json
+          for name in windows 'posix-package (linux-x64, ubuntu-24.04)' 'Complete Benchmark Game (macos-arm64)' 'Complete qualification gate'; do
+            jq -e --arg name "$name" '[.[].jobs[] | select((.name | split(" / ") | last) == $name)] | length == 1 and all(.[]; .status == "completed" and .conclusion == "success")' jobs.json
           done
           version=$(cat VERSION)
           printf 'source=%s\nversion=%s\ntag=v%s\n' "$SOURCE_COMMIT" "$version" "$version" >> "$GITHUB_OUTPUT"
