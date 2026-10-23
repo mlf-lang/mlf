@@ -27,5 +27,6 @@ tools/release/test-qualification-jobs.sh
 tools/release/test-source-smoke-diagnostics.sh
 tools/release/test-pr-smoke-cli-watchdog.sh
 tools/release/test-async-bootstrap.sh
+bash tools/release/test-timed-async-bootstrap.sh
 python3 tools/release/test-async-change-scope.py
 printf 'Release metadata and shell syntax passed for %s.\n' "$version"
