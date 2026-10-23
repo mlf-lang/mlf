@@ -30,6 +30,7 @@
 #include <wchar.h>
 #include <io.h>
 #include <fcntl.h>
+#include "mlf_windows_path.h"
 #else
 #include <fcntl.h>
 #include <sys/resource.h>
@@ -107,7 +108,8 @@ static wchar_t *wide(const char *s) {
     return out;
 }
 static FILE *open_file(const char *path, const char *mode) {
-    wchar_t *p=wide(path), *m=wide(mode); FILE *f=p && m ? _wfopen(p,m) : NULL; free(p); free(m); return f;
+    wchar_t *w=wide(path), *p=w ? mlf_windows_path(w) : NULL, *m=wide(mode);
+    FILE *f=p && m ? _wfopen(p,m) : NULL; free(w); free(p); free(m); return f;
 }
 static double now(void) { return (double)GetTickCount64()/1000.0; }
 static void pause_loop(void) { Sleep(5); }
