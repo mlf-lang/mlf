@@ -1,0 +1,79 @@
+name: Pinned macOS dependencies
+on:
+  pull_request:
+    paths:
+      - .github/macos-dependencies.env
+      - .github/workflows/macos-dependencies.yml
+      - tools/release/setup-macos.sh
+      - tools/release/test-setup-macos.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  producer:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Install pinned native dependencies
+        run: tools/release/setup-macos.sh
+      - name: Record native dependency files
+        run: |
+          set -euo pipefail
+          while IFS= read -r formula; do
+            prefix=$(cd "$(brew --prefix "$formula")" && pwd -P)
+            # Installer receipts, SBOM timestamps and generated Python bytecode
+            # are runner-local metadata, not the installed native input bytes.
+            find "$prefix" -type f ! -name INSTALL_RECEIPT.json ! -name sbom.spdx.json \
+              ! -path '*/.brew/*' ! -path '*/__pycache__/*' -print0
+          done < .mlf-build/macos-dependencies/closure.txt | xargs -0 shasum -a 256 | LC_ALL=C sort \
+            > .mlf-build/macos-dependencies/files.sha256
+          test -s .mlf-build/macos-dependencies/files.sha256
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: pinned-macos-dependency-hashes
+          include-hidden-files: true
+          path: |
+            .mlf-build/macos-dependencies/closure.txt
+            .mlf-build/macos-dependencies/homebrew-core-commit
+            .mlf-build/macos-dependencies/installed.json
+            .mlf-build/macos-dependencies/files.sha256
+          retention-days: 7
+  consumer:
+    needs: producer
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Install independently from the same immutable formulas
+        run: tools/release/setup-macos.sh
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: pinned-macos-dependency-hashes
+          path: .mlf-build/producer-dependencies
+      - name: Require identical native input bytes on the second runner
+        run: |
+          set -euo pipefail
+          cmp .mlf-build/macos-dependencies/homebrew-core-commit .mlf-build/producer-dependencies/homebrew-core-commit
+          cmp .mlf-build/macos-dependencies/closure.txt .mlf-build/producer-dependencies/closure.txt
+          shasum -a 256 -c .mlf-build/producer-dependencies/files.sha256 > .mlf-build/macos-dependencies/verification.log
+      - name: Compile and run with pinned LLVM, GMP and collector
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/pinned-smoke.c" <<'C'
+          #include <stdio.h>
+          #include <gmp.h>
+          #include <gc.h>
+          int main(void) {
+            GC_INIT();
+            if (GC_malloc(32) == NULL) return 1;
+            mpz_t value;
+            mpz_init_set_ui(value, 42);
+            gmp_printf("%Zd\n", value);
+            mpz_clear(value);
+            return 0;
+          }
+          C
+          clang "$RUNNER_TEMP/pinned-smoke.c" -I"$(brew --prefix gmp)/include" -I"$(brew --prefix bdw-gc)/include" \
+            "$(brew --prefix gmp)/lib/libgmp.a" "$(brew --prefix bdw-gc)/lib/libgc.a" -o "$RUNNER_TEMP/pinned-smoke"
+          test "$("$RUNNER_TEMP/pinned-smoke")" = 42
