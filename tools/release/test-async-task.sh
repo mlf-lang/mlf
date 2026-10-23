@@ -81,7 +81,9 @@ for kind in opaque-fiber opaque-task opaque-internal-fiber opaque-internal-task 
    grep -F "$constructor" "$work/$kind.stderr" >/dev/null || fail "$kind unrelated rejection"
    grep -Ei 'unknown|unbound|not (in scope|exported)|undefined|unresolved' "$work/$kind.stderr" >/dev/null || fail "$kind constructor diagnostic absent" ;;
   mixed-fiber)
-   grep -Ei 'inference|type|unif|incompatible' "$work/$kind.stderr" >/dev/null || fail "$kind unrelated rejection" ;;
+   grep -Ei 'type constructor mismatch|cannot unify|incompatible' "$work/$kind.stderr" >/dev/null || fail "$kind unrelated rejection"
+   grep -F 'String' "$work/$kind.stderr" >/dev/null || fail "$kind missing String diagnostic"
+   grep -F 'Int' "$work/$kind.stderr" >/dev/null || fail "$kind missing Int diagnostic" ;;
  esac
  echo "PASS $kind rejection"
 done

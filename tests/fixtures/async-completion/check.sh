@@ -129,7 +129,7 @@ for source in "$fixtures"/negative/*.emlf; do
   case "$name" in
     forge-*) expected='(cannot redefine|primitive type)' ;;
     wrong-kind) expected='(kind|arity)' ;;
-    generalize-allocated) expected='^(Inference:|Elaboration: unbound type variable)' ;;
+    generalize-allocated) expected='^Inference: cannot raise a protected type variable' ;;
     *) expected='^Inference:' ;;
   esac
   grep -Eq "$expected" "$work/$label.stderr" || fail "$name wrong rejection phase"

@@ -340,6 +340,11 @@ The required macOS language job bootstraps a real primitive-aware compiler with
 - `tools/release/test-async-task.sh /path/to/stage2 OUTPUT`: 30 contracts
   (including six explicitly white-box scheduler cases) and five source
   rejections. Includes jobs=1/jobs=4 dynamic dependency/artifact equivalence.
+- `tools/release/test-async-package.sh /path/to/stage2 /path/to/matching-mlfpkg OUTPUT`:
+  a fresh checked-crate consumer, two literal native executions with exact
+  cache replay, six opaque-constructor rejections and one mixed-fiber rejection
+  through the compiled library interfaces. The matching manager's adjacent
+  protocol-1 build runner is required.
 
 Each records exact source/compiler hashes, observations and completion status.
 A seed-only type surrogate is not a passing execution result. See

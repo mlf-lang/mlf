@@ -167,6 +167,24 @@ fingerprinting or atomic build-artifact publication is implemented here.
 
 ## Qualification
 
+On **2026-10-23**, the real Linux stage-2 compiler passed all **30 contracts on
+both the checked interpreter and native LLVM**, plus all **5 source rejections**.
+The six white-box cases are included in those 30. The completed receipt records
+unchanged input hashes, checked `IO Unit` targets, literal output comparisons,
+and compiler/runtime/artifact/observation hashes. No seed surrogate was used.
+The evidence artifact is
+`.mlf-build/async-production-bootstrap-20261023T0422Z/gates/task/result.json`,
+with `complete: true`. Linux language qualification uses `ulimit -s unlimited`.
+Independent checks with the same production compiler reproduced SIGSEGVs at an
+8 MiB stack while checking, emitting, or interpreting larger Task targets, and
+while checking deep non-async targets. Unlimited-stack checks pass; separately
+compiled native yield, await and bind probes each completed 100,000 iterations
+at 8 MiB. This is a known compiler-stack limitation, not evidence of a
+Task-specific regression or a claim of universal scheduler stack safety.
+
+- Compiler SHA-256: `435204ff829624ffebba7b3515c5b538bcd9548f7edc51d12e6b535451deff6a`.
+- Qualification receipt SHA-256: `a8a4754f0fdfb6adb48556ede9e5bba4a61ad5ca1dab3be29ed63da050579bde`.
+
 Run the real primitive-aware compiler through:
 
 ```sh
@@ -198,12 +216,59 @@ production module and both public-facing suites keep all constructors hidden.
 Five compile-negative fixtures cover public/internal constructor access and
 mixing a numeric fiber with a string consumer.
 
+The separate packaged-consumer gate also passed on Linux on 2026-10-23:
+`tools/release/test-async-package.sh COMPILER MANAGER OUTPUT-DIRECTORY` compiled
+real `.mlfci` library interfaces, produced native output `42`, replayed an
+unchanged build entirely from cache with an identical binary, and rejected six
+constructor-access attempts plus one mixed-fiber misuse through the cached
+interfaces. Its 12 commands completed in 201 seconds;
+`.mlf-build/async-production-bootstrap-20261023T0422Z/gates/package/result.json`
+records `complete: true`. This is package integration evidence in addition to,
+not a replacement for, direct interpreter/native parity.
+
 Primitive-level tests separately cover allocation type safety, callback roots,
 GC retention, exactly-once resolution, runtime quotas and timer cancellation.
 A seed-only type surrogate is useful during bootstrap but does not count as
-Task execution or interpreter/native parity. This document describes the
-contract and harness; consult the recorded qualification result for which
-platforms and final source hashes actually passed. Windows language-parity,
-arbitrary coordinator death during Task execution, independent hard deadline
-latency, memory-reservation admission, and a build adapter's atomic publication
-boundary are not claimed by these tests.
+Task execution or interpreter/native parity.
+
+### Measured validation cost
+
+Five additional executions of each already-built native suite passed their
+literal oracles. On this shared Linux host, with `GC_FREE_SPACE_DIVISOR=8`,
+monotonic whole-command wall times were:
+
+| Native suite | Median | Observed range |
+| --- | ---: | ---: |
+| 13 public Task contracts | 18.514 ms | 16.946–18.735 ms |
+| 11 process integration contracts | 182.010 ms | 180.072–186.548 ms |
+| 6 white-box contracts | 2.002 ms | 1.993–2.778 ms |
+
+These samples include program startup and, for the process suite, its OS child
+fixtures. They are validation execution costs, not isolated no-op scheduling,
+process-launch overhead, warm-completion throughput, cancellation-latency, CPU
+or peak-RSS benchmarks. There is no universal performance threshold or
+cross-platform speed claim.
+
+### Milestones and remaining acceptance work
+
+- **M0:** Generic completion/type safety and the interpreter/native primitive
+  bridge have their own [qualified gate](async-typed-completion-gate.md).
+- **M1–M2:** Static-runner extraction and the public dynamic process API retain
+  separate [native and language gates](async-process.md#validation). The Task
+  suite supplements them with real cancellation, joining and queue-deadline
+  integration; it does not replace the platform lifecycle matrix.
+- **M3–M4:** Typed Task/Fiber, scoped supervision, timers, ordered bounded
+  combinators, fail-fast cleanup and shared limits passed the Linux gate above.
+- **M5:** The synthetic dynamic-build proof passed, including identical values
+  and artifact bytes with jobs=1 and jobs=4. A real incremental build-engine
+  adapter, its shared-query policy and atomic publication remain separate work.
+
+The Linux async gates do not replace the broader repository/compiler regression
+groups. macOS and Windows MLF Task language parity must be established
+separately. The scheduler
+tests use deterministic queue/gate arrangements plus real monotonic timers and
+real OS process fixtures; a fully injected fake-clock/fake-process model and
+exhaustive race exploration are not supplied. Arbitrary coordinator death
+during Task execution, independent hard deadline latency, optional
+memory-reservation admission, graceful termination escalation and cancellation
+at a future build adapter's atomic publication boundary are not claimed.

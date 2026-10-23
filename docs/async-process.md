@@ -5,10 +5,11 @@ owned by a lexical IO scope. It is independent of package resolution, query
 identity, dependency caches, and artifact publication. The coordinator is one
 MLF thread; CPU-parallel work runs in isolated OS processes.
 
-This is the process increment of the async utility. It does not expose generic
-`Task a` or `Fiber a`, execute arbitrary MLF functions on threads, or make a
-blocking IO operation cooperative. The typed completion work and its evidence
-are described in [the representation gate](async-typed-completion-gate.md).
+This module is the process layer of the async utility. The separate
+[`Async.Task` module](async-task.md) provides typed cooperative tasks and fibers
+on top of it. Neither module executes arbitrary MLF functions on threads or
+makes a blocking IO operation cooperative. The typed completion work and its
+evidence are described in [the representation gate](async-typed-completion-gate.md).
 
 ## API
 
