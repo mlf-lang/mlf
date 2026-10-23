@@ -34,7 +34,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: tools/release/fetch-seed.sh .mlf-build/seed
-      - name: Time one bootstrap without tests or further generations
+      - name: Time the primitive transition and checked root bootstrap without tests
         run: |
           export MLF_GC_PREFIX="$(brew --prefix bdw-gc)"
           export PATH="$(brew --prefix llvm)/bin:$PATH"
@@ -50,3 +50,12 @@ jobs:
             .mlf-build/bootstrap-stage1/commands/
             .mlf-build/bootstrap-stage1/cache/**/artifact.json
             .mlf-build/bootstrap-stage1/timing/
+            .mlf-build/bootstrap-stage1/async-bootstrap/capability.txt
+            .mlf-build/bootstrap-stage1/async-bootstrap/source-identity.txt
+            .mlf-build/bootstrap-stage1/async-bootstrap/compilers.sha256
+            .mlf-build/bootstrap-stage1/async-bootstrap/manager.sha256
+            .mlf-build/bootstrap-stage1/async-bootstrap/manager.path
+            .mlf-build/bootstrap-stage1/async-bootstrap/build-*/**/build-report.json
+            .mlf-build/bootstrap-stage1/async-bootstrap/build-*/**/commands/
+            .mlf-build/bootstrap-stage1/async-bootstrap/source-*/inputs.sha256
+            .mlf-build/bootstrap-stage1/async-bootstrap/cache/*/artifact.json
