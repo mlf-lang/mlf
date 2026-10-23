@@ -81,6 +81,14 @@ with the current bootstrap script before using these manifests with an older
 installed manager. See the [package manager guide](docs/package-manager.md) for
 the ten-library layout, dependency selection, and scheduling evidence.
 
+The separate [async utility](docs/async-task.md) provides cold typed tasks,
+cooperative fibers, scoped cancellation, timers and bounded combinators.
+[Async.Process](docs/async-process.md) supplies dynamic subprocess scopes and
+isolated CPU-parallel work. The single MLF coordinator uses opaque typed
+completions; it does not run MLF inference on shared-memory worker threads.
+The [bootstrap and qualification](docs/async-bootstrap.md) distinguish the
+released seed from a compiler with the new checked primitives.
+
 The package manager compiles each library and executable as a crate. Modules
 inside a crate are namespaces and may import one another cyclically. Value
 declarations are inferred in dependency SCCs, with closed schemes and checked
@@ -167,9 +175,11 @@ reduction; the raw measurements and exact compiler hashes are linked there.
 The [native release workflow](docs/releases.md) requires all six native groups,
 a fresh self-host fixed point, and relocation/installation checks before
 packaging the tested executables. It records the build host and native library
-dependencies. The separate [performance report](benchmarks/RESULTS.md) verifies
-all nine workloads at **3× C compilation / 2× C runtime** using its explicit
-LLVM/linker configuration. This performance run is separate from release CI.
+dependencies. Every push to `main` now runs complete native qualification and all ten
+Benchmark Game workloads with **3× C compilation / 2× C runtime** gates; SDK
+packaging remains release-only. The historical [performance report](benchmarks/RESULTS.md)
+covers nine workloads and does not prove that the complete ten-workload gate
+passes. Failed correctness or performance checks remain failures.
 
 The Haskell compiler, Cabal project, and old Haskell/Python test and build
 harnesses have been removed. Native MLF is the supported build and test path.

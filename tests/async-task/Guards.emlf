@@ -1,0 +1,28 @@
+module Main where
+import Bootstrap.Types
+import qualified Async.Task as T
+
+wrong : T.Task Int
+wrong = T.fail (T.AsyncError 901 "unselected guard task ran")
+
+choose : Int -> T.Task Int
+choose n
+  | n >= 0 = T.bind (T.sleep 1) (\_ -> T.pure (n + 1))
+  | n >= 0 = wrong
+  | panic "unselected function guard predicate ran" = wrong
+  | otherwise = wrong
+
+main : IO Unit
+main = do
+  input <- newIntArray 1 41
+  n <- readIntArray input 0
+  outcome <- T.run T.defaultOptions (T.bind (T.spawn (choose n)) (\fiber ->
+    T.bind (T.await fiber) (\value -> if {
+      | value == 42 -> T.pure value;
+      | value > 0 -> wrong;
+      | panic "unselected expression guard predicate ran" -> wrong;
+      | otherwise -> wrong
+    })))
+  case outcome of
+    T.Succeeded 42 -> putStrLn "PASS guards-task-selection"
+    _ -> do { putErr "TASK GUARDS FAILURE: expected successful value 42\n"; exitWith 1 }

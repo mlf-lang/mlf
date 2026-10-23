@@ -3,7 +3,7 @@
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../.."
 workflow=.github/workflows/ci.yml
-grep -Fxq '    needs: [metadata, native, windows-runtime, build-runner]' "$workflow"
+grep -Fxq '    needs: [metadata, native, windows-runtime, build-runner, async-runtime, async-language]' "$workflow"
 filter=$(awk -F"'" '/CHECKS.*jq -e/ {print $4}' "$workflow")
 test -n "$filter"
 checks=0
@@ -13,9 +13,9 @@ check() {
   if [ "$expected" = pass ]; then test "$status" -eq 0; else test "$status" -ne 0; fi
   checks=$((checks + 1))
 }
-base=$(jq -n '{metadata:{result:"success"},native:{result:"success"},"windows-runtime":{result:"success"},"build-runner":{result:"success"}}')
+base=$(jq -n '{metadata:{result:"success"},native:{result:"success"},"windows-runtime":{result:"success"},"build-runner":{result:"success"},"async-runtime":{result:"success"},"async-language":{result:"success"}}')
 check pass "$base"
-for name in metadata native windows-runtime build-runner; do
+for name in metadata native windows-runtime build-runner async-runtime async-language; do
   for result in failure cancelled skipped pending; do
     check fail "$(printf '%s\n' "$base" | jq --arg name "$name" --arg result "$result" '.[$name].result=$result')"
   done
@@ -23,4 +23,4 @@ for name in metadata native windows-runtime build-runner; do
 done
 check fail '{}'
 check fail "$(printf '%s\n' "$base" | jq '.extra={result:"success"}')"
-printf '%s PR aggregate checks passed; all four required jobs must succeed.\n' "$checks"
+printf '%s PR aggregate checks passed; all six required jobs must succeed.\n' "$checks"

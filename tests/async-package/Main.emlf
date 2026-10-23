@@ -1,0 +1,21 @@
+module Main where
+import Bootstrap.Types
+import qualified Async.Process as P
+import qualified Async.Task as T
+
+answer : T.Task Int
+answer = T.bind (T.sleep 0) (\_ ->
+  T.bind (T.spawn (T.pure 41)) (\fiber ->
+    T.map (\value -> value + 1) (T.await fiber)))
+
+main : IO Unit
+main = do
+  processResult <- P.withProcessScope P.defaultOptions (\_ -> ioReturn (Right Unit))
+  case processResult of
+    Left _ -> exitWith 1
+    Right Unit -> do
+      taskResult <- T.run T.defaultOptions answer
+      case taskResult of
+        T.Succeeded value -> if value == 42 then printInt value else exitWith 1
+        T.Failed _ -> exitWith 1
+        T.Cancelled _ -> exitWith 1

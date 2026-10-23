@@ -6,6 +6,14 @@
   expressions, with a required final `otherwise` fallback. Lower guards to
   existing conditionals, preserving lazy branch selection, type checking,
   pattern scope, and ordinary `if` syntax.
+- Add structured asynchronous process scopes and cold, typed cooperative
+  tasks/fibers in the separate `mlf-async` library. Share native process
+  containment with the compatible static build runner; add traced completion
+  cells, timers, bounded fan-out, cancellation and interpreter/native parity
+  gates. CPU-parallel work remains isolated in child processes. The explicit
+  two-stage bootstrap builds the primitive-aware compiler and matching package
+  manager; released tools cannot directly execute the new async primitives.
+
 - Add portable MLF regular expressions and regex-redux, completing coverage of
   all ten current Benchmarks Game workloads. Pin sequential C/Rust/Haskell
   baselines and their regex dependencies, and check exact output with an

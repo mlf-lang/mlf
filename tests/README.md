@@ -4,11 +4,14 @@ Pull requests require the small [compiler source smoke suite](../docs/ci.md):
 the verified seed interprets `PRQuickMain.emlf` against the checkout frontend and
 current/frozen target checkers through the split library roots, with two accepted
 cases, two source rejections and one malformed target. This does not build fresh
-tools or test current LLVM execution. Fresh native tools, eight CLI cases, three
-package/cache states and
-the complete 79-case package distribution suite, separate target-dependency/
-scheduler fixture and 22 native runner checks run separately on pushes to
-`main` or manual CI dispatches with `full_validation` enabled.
+tools or test current LLVM execution. Every push to `main` automatically runs all
+six complete Linux/macOS campaigns, the native Windows qualification and the
+full ten-workload Benchmark Game with seven samples and explicit 3x C compilation
+/ 2x C runtime gates. The eight direct CLI and three package/cache checks are
+preserved against the final macOS candidate. Manual CI with `full_validation`
+(or `self_host`) enabled runs the same graph. SDK packaging and publication are
+reserved for explicit release runs; no full-test or platform coverage is silently
+replaced by a smoke result. See [the CI policy](../docs/ci.md).
 
 The broader campaign remains available as `tools/release/native-ci.sh extended-pr-smoke`:
 framework/process contracts, Figure 12, four independent checker controls,
@@ -471,3 +474,50 @@ The [matrix cleanup](../docs/test-matrix-cleanup.md) records the deliberate remo
 of compiler-scale outer interpretation, exact empty-input deduplication and
 small semantic matrices with separate scale regressions. The compact-GC layout,
 all 25 port fixtures and all 583 differential backend rows remain.
+
+## Dynamic process scopes
+
+The reusable supervisor has a separate native lifecycle suite at
+`tests/native/process_supervisor_tests.c`. Build it with the same strict C flags
+as the runner fixtures, linking `runtime/mlf_process_supervisor.c`, then run
+`process-supervisor-tests FIXTURE SCRATCH`,
+where FIXTURE is the existing `build-runner-fixture`. Required pre-merge Linux
+and Windows CI runs both suites; main/manual CI also runs them on macOS. The
+22 static protocol checks remain unchanged.
+
+See [Async.Process](../docs/async-process.md) for semantics and limits,
+`tests/async-process` for interpreter/native API parity, and
+[the typed completion gate](../docs/async-typed-completion-gate.md) for separate
+compile-positive, compile-negative, and live representation evidence. A type
+signature fixture alone is not a mutable-cell or scheduler correctness proof.
+
+## Typed completions and cooperative tasks
+
+`tests/native/completion_cell_tests.c` and
+`tests/native/async_completion_primitives.c` exercise traced completion storage,
+ordinary IO-driver dispatch, quotas, cancellation, timers and forced collection.
+The required Linux native job and Windows runtime job execute both. Main/manual
+CI additionally executes the same native probes on macOS.
+
+The required Linux language job bootstraps a real primitive-aware compiler with
+`scripts/bootstrap-async.sh`, then executes these fail-closed parity harnesses:
+
+- `EMLF=/path/to/stage2 tests/fixtures/async-completion/check.sh`: six source,
+  checked-target and native fixtures; nine source rejections; seven independent
+  target rejections through checking, interpreter and LLVM entrypoints.
+- `tools/release/test-async-process.sh /path/to/stage2 OUTPUT`: 13 process
+  contracts, panic cleanup and opaque-handle rejections.
+- `tools/release/test-async-task.sh /path/to/stage2 OUTPUT`: 31 contracts
+  (including six explicitly white-box scheduler cases) and five source
+  rejections. Includes jobs=1/jobs=4 dynamic dependency/artifact equivalence and
+  ordered guards selecting a spawned task and its awaited result.
+- `tools/release/test-async-package.sh /path/to/stage2 /path/to/matching-mlfpkg OUTPUT`:
+  a fresh checked-crate consumer, two literal native executions with exact
+  cache replay, six opaque-constructor rejections and one mixed-fiber rejection
+  through the compiled library interfaces. The matching manager's adjacent
+  protocol-1 build runner is required.
+
+Main/manual CI also runs the same bootstrap and all four gates on macOS. Each
+records exact source/compiler hashes, observations and completion status.
+A seed-only type surrogate is not a passing execution result. See
+[Async.Task](../docs/async-task.md) for public semantics and remaining limits.
