@@ -50,7 +50,8 @@
       "Tests.Coverage": "Tests/Coverage.emlf",
       "Tests.TestDrivers": "Tests/TestDrivers.emlf",
       "Tests.TestSources": "Tests/TestSources.emlf",
-      "Tests.Selection": "Tests/Selection.emlf"
+      "Tests.Selection": "Tests/Selection.emlf",
+      "Tests.CorePartitions": "Tests/CorePartitions.emlf"
     }
   },
   "executables": {
@@ -62,6 +63,12 @@
         "Tests.ComponentProjection": "Tests/ComponentProjection.emlf",
         "Tests.Computations": "Tests/Computations.emlf",
         "Tests.Core": "Tests/Core.emlf",
+        "Tests.CoreCrates": "Tests/CoreCrates.emlf",
+        "Tests.CoreHelpers": "Tests/CoreHelpers.emlf",
+        "Tests.CoreLanguage": "Tests/CoreLanguage.emlf",
+        "Tests.CoreModules": "Tests/CoreModules.emlf",
+        "Tests.CoreRunner": "Tests/CoreRunner.emlf",
+        "Tests.CoreSolver": "Tests/CoreSolver.emlf",
         "Tests.CrateCodegen": "Tests/CrateCodegen.emlf",
         "Tests.CrateQueries": "Tests/CrateQueries.emlf",
         "Tests.Datatypes": "Tests/Datatypes.emlf",
@@ -241,6 +248,73 @@
         "Tests.Catalog": "Tests/Catalog.emlf",
         "Tests.TestCatalog": "Tests/TestCatalog.emlf",
         "Tests.FamilySelectionChecks": "Tests/FamilySelectionChecks.emlf"
+      }
+    },
+    "core-crates": {
+      "main": "CoreCratesMain.emlf",
+      "profile": "compiler",
+      "modules": {
+        "Tests.CheckedEmission": "Tests/CheckedEmission.emlf",
+        "Tests.CoreCrates": "Tests/CoreCrates.emlf",
+        "Tests.CoreRunner": "Tests/CoreRunner.emlf",
+        "Tests.CrateCodegen": "Tests/CrateCodegen.emlf",
+        "Tests.CrateQueries": "Tests/CrateQueries.emlf",
+        "Tests.OptimizerUses": "Tests/OptimizerUses.emlf",
+        "Tests.StrictWrappers": "Tests/StrictWrappers.emlf",
+        "Tests.System": "Tests/System.emlf"
+      }
+    },
+    "core-solver": {
+      "main": "CoreSolverMain.emlf",
+      "profile": "compiler",
+      "modules": {
+        "Tests.ComponentProjection": "Tests/ComponentProjection.emlf",
+        "Tests.CoreHelpers": "Tests/CoreHelpers.emlf",
+        "Tests.CoreRunner": "Tests/CoreRunner.emlf",
+        "Tests.CoreSolver": "Tests/CoreSolver.emlf",
+        "Tests.DenseNormalization": "Tests/DenseNormalization.emlf",
+        "Tests.EmbeddingPruning": "Tests/EmbeddingPruning.emlf",
+        "Tests.Graph": "Tests/Graph.emlf",
+        "Tests.GraphSolver": "Tests/GraphSolver.emlf",
+        "Tests.GraphUnification": "Tests/GraphUnification.emlf",
+        "Tests.GraphUnificationReference": "Tests/GraphUnificationReference.emlf",
+        "Tests.GraphValidation": "Tests/GraphValidation.emlf",
+        "Tests.IndexEdges": "Tests/IndexEdges.emlf",
+        "Tests.IntSetUnions": "Tests/IntSetUnions.emlf",
+        "Tests.ProjectionChanges": "Tests/ProjectionChanges.emlf",
+        "Tests.ProjectionRanks": "Tests/ProjectionRanks.emlf",
+        "Tests.SolverAllocation": "Tests/SolverAllocation.emlf",
+        "Tests.SolverIndexAudit": "Tests/SolverIndexAudit.emlf"
+      }
+    },
+    "core-language": {
+      "main": "CoreLanguageMain.emlf",
+      "profile": "compiler",
+      "modules": {
+        "Tests.Computations": "Tests/Computations.emlf",
+        "Tests.CoreHelpers": "Tests/CoreHelpers.emlf",
+        "Tests.CoreLanguage": "Tests/CoreLanguage.emlf",
+        "Tests.CoreRunner": "Tests/CoreRunner.emlf",
+        "Tests.Datatypes": "Tests/Datatypes.emlf",
+        "Tests.DoNotation": "Tests/DoNotation.emlf",
+        "Tests.SurfaceSyntax": "Tests/SurfaceSyntax.emlf",
+        "Tests.Typeclasses": "Tests/Typeclasses.emlf"
+      }
+    },
+    "core-modules": {
+      "main": "CoreModulesMain.emlf",
+      "profile": "compiler",
+      "modules": {
+        "Tests.CoreHelpers": "Tests/CoreHelpers.emlf",
+        "Tests.CoreModules": "Tests/CoreModules.emlf",
+        "Tests.CoreRunner": "Tests/CoreRunner.emlf",
+        "Tests.Modules": "Tests/Modules.emlf",
+        "Tests.Oracle": "Tests/Oracle.emlf",
+        "Tests.Readability": "Tests/Readability.emlf",
+        "Tests.Separate": "Tests/Separate.emlf",
+        "Tests.StateCases": "Tests/StateCases.emlf",
+        "Tests.StateTypes": "Tests/StateTypes.emlf",
+        "Tests.System": "Tests/System.emlf"
       }
     }
   },
