@@ -1,0 +1,28 @@
+make : forall a. AsyncScope -> IO (Completion a)
+make scope = asyncNewCompletion scope ioReturn (panic "unexpected cell capacity")
+
+main = do
+  scope <- asyncScopeNew 4 8
+  let allocate = make scope
+  integers <- allocate
+  strings <- allocate
+  pending <- asyncReadCompletion integers (\_ -> ioReturn 9) (ioReturn 1)
+  printInt pending
+  one <- asyncSubscribeCompletion integers printInt
+  two <- asyncSubscribeCompletion strings putStrLn
+  ioBind (asyncSubscriptionStatus one) printInt
+  ioBind (asyncResolveCompletion integers 123456789012345678901234567890) printInt
+  ioBind (asyncResolveCompletion strings "typed string") printInt
+  ioBind (asyncResolveCompletion integers (panic "duplicate payload forced")) printInt
+  ioBind (asyncStep scope) printInt
+  ioBind (asyncStep scope) printInt
+  ioBind (asyncStep scope) printInt
+  asyncReadCompletion integers printInt (panic "lost integer")
+  asyncReadCompletion integers printInt (panic "lost repeated integer")
+  late <- asyncSubscribeCompletion strings putStrLn
+  ioBind (asyncSubscriptionStatus late) printInt
+  ioBind (asyncStep scope) printInt
+  ioBind (asyncSubscriptionStatus one) printInt
+  asyncScopeClose scope
+  ioBind (asyncResolveCompletion integers 0) printInt
+  asyncReadCompletion strings putStrLn (putStrLn "closed")

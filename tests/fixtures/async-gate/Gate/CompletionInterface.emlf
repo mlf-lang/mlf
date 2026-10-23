@@ -1,0 +1,15 @@
+module Gate.CompletionInterface (Completion, newCompletion, resolve, observe) where
+
+-- Type-only model, deliberately not an implementation. Allocation is bottom.
+-- This module is never run. Hidden, invariant fields model a typed read/write
+-- interface without introducing any unsafe conversion or primitive.
+data Completion a = Completion (a -> IO Unit) (IO a)
+
+newCompletion : forall a. IO (Completion a)
+newCompletion = panic "type-only completion allocation must not execute"
+
+resolve : forall a. Completion a -> a -> IO Unit
+resolve (Completion write read) = write
+
+observe : forall a. Completion a -> IO a
+observe (Completion write read) = read

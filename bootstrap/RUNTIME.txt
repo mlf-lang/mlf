@@ -128,3 +128,119 @@ The shared backend matrix compares interpreter and compact native execution;
 port executes 25 checked compiler probes through LLVM. Stress coverage retains
 suspended applications, cyclic data, GMP integers, arrays and tables across
 long pure allocation intervals and checks results with independent references.
+
+82 processSupervisor : String -> IO String
+
+This private monomorphic transport calls the dynamic subprocess supervisor in
+this process. It is not runProcess, a shell, or a task-value lookup. The public
+API is the separate mlf-async library's Async.Process module. Primitive numbers
+0..81 remain unchanged. New compiler entries require the additional compact
+runtime symbol mlf_require_process_supervisor_v1_abi; released-seed entries keep
+the old compact guard and can link to the new runtime. There is no fallback
+that silently runs a whole static runner for one dynamic operation.
+
+Request fields are NUL-terminated UTF-8 strings, headed by MLF-PROCESS-1 and an
+operation. The complete request is limited to 1 MiB and 4096 fields. Replies
+contain a decimal status followed by bounded metadata, at most 512 bytes; zero
+means success. Nonzero statuses are the mlf_process_status enum and a stable
+status name. No process stdout/stderr is returned or accumulated in memory.
+
+Operation fields after the version and operation:
+  version: no fields; success returns 1.
+  clock: no fields; returns monotonic milliseconds (metadata only).
+  pause: milliseconds, 0..1000; bounded host sleep for the interpreter timer driver.
+  create: jobs, max_pending, max_retained; returns opaque decimal scope ID.
+  submit: scope, executable, cwd, stdin, stdout, stderr, env_mode,
+          running_ms, total_ms, argc, argv[argc], envc, NAME=VALUE[envc].
+          argv includes argv[0]. env_mode 0 inherits at launch, 1 replaces.
+          Returns scope, generation, slot, never a native pointer.
+  poll: scope; returns event or would_block/empty/wait_timeout.
+  wait: scope, wait_ms; returns one event; -1 waits indefinitely.
+  await: scope, handle_scope, generation, slot, wait_ms; returns an outcome.
+  cancel: scope, handle_scope, generation, slot, nonnegative_reason.
+  request-cancel: same fields as cancel, accepts without joining; subsequent
+                  supervisor calls service cleanup until the outcome is terminal.
+  cancelScope: scope, nonnegative_reason.
+  close: scope, mode (0 join, 1 cancel-and-join); releases retained outcomes.
+
+An outcome is kind, exit_code, launch_error, cleanup_error, cancel_reason.
+Kinds are exited=0, launch_failed=1, cancelled=2, timed_out=3. An event prefixes
+these fields with scope, generation, slot. Nonzero process exit is outcome data.
+Repeated await does not consume an event or restart work. Scope IDs and handle
+generations are validated on every operation; identities are not reused.
+Timeout durations are integer milliseconds, limited to UINT32_MAX; zero disables
+child timeouts. Total time includes queuing. A wait timeout does not cancel work.
+Only supervisor calls service deadlines/admission; non-yielding MLF work can
+delay both. File output avoids pipe-buffer deadlocks, but disk use is not capped.
+
+The interpreter host bridge uses checkpoint and finish requests: checkpoint
+returns a private serial mark; finish takes mark and join/cancel mode and closes
+only scopes created after that mark. This preserves outer native/interpreted
+scopes during nested evaluation. Native panic, exitWith, and orderly runtime
+termination cancel-and-join all remaining scopes. The raw shutdown request does
+the same. POSIX guardian/Windows Job Object guarantees and containment limits
+are documented with the supervisor; runtime cleanup cannot intercept SIGKILL.
+The transport retains integer-only scope metadata. It stores no typed MLF
+outcomes, suspended MLF closures, or callbacks in untraced native memory.
+
+Bootstrap transition: scripts/bootstrap-async.sh uses the released seed to
+compile stage 1 in an isolated snapshot with the bootstrap/seed-compat host
+bridge and a seed-schema manifest.
+That host bridge explicitly returns unsupported for process interpretation.
+The released compiler also builds a matching package manager before stage 2:
+the released manager's independent interface decoder rejects newly appended
+primitives in the stage-1 prelude. Dependency-closure validation stays enabled.
+Stage 1 can compile primitive-82-bearing code, and rebuilds stage 2 using the
+separate native-source snapshot. Stage 2 is required for checked-interpreter/native async parity.
+The existing source-smoke import closure and package-manager sources do not
+import the new primitive-bearing host or Async.Process modules.
+
+83 asyncScopeNew : Int -> Int -> IO AsyncScope
+84 asyncScopeClose : AsyncScope -> IO Unit
+85 asyncNewCompletion : forall a b. AsyncScope -> (Completion a -> IO b) -> IO b -> IO b
+86 asyncResolveCompletion : forall a. Completion a -> a -> IO Int
+87 asyncReadCompletion : forall a b. Completion a -> (a -> IO b) -> IO b -> IO b
+88 asyncSubscribeCompletion : forall a. Completion a -> (a -> IO Unit) -> IO AsyncSubscription
+89 asyncSubscriptionStatus : AsyncSubscription -> IO Int
+90 asyncCancelSubscription : AsyncSubscription -> IO Int
+91 asyncStep : AsyncScope -> IO Int
+92 asyncEnqueue : AsyncScope -> IO Unit -> IO AsyncSubscription
+93 asyncDelay : AsyncScope -> Int -> IO Unit -> IO AsyncSubscription
+94 asyncWait : AsyncScope -> Int -> IO Int
+
+AsyncScope, Completion a and AsyncSubscription are opaque primitive types.
+Allocation quantifiers are outside the IO action; executing one cold allocator
+again creates a fresh cell. An allocated cell fixes one payload type, which may
+itself be polymorphic. No integer-to-typed-handle or consumer-to-producer cast
+exists. Library Fiber constructors must hide their underlying completion.
+
+Scope creation bounds retained cells and outstanding subscriptions separately.
+Pending waiters, ready callbacks and timers reserve callback capacity before
+resolution. Resolution commits once and never executes callbacks. Read returns
+the retained lazy value, or executes the supplied fallback while pending/closed.
+Failed allocation runs its fallback; rejected subscriptions retain a status and
+no callback. Closing a scope clears all result and callback/timer roots.
+
+Statuses: 0 OK, 1 EMPTY, 2 ALREADY_RESOLVED, 3 CLOSED, 4 FULL, 5 WRONG_OWNER,
+6 CONSUMED, 7 NO_MEMORY (fatal in public allocation), 8 BUSY. Each step dispatches
+at most one callback through the normal IO loop, without recursively entering
+mlf_run. Same-scope recursive step/wait returns BUSY without changing the queue.
+Stepping a different scope is allowed. Already running callbacks are cooperative.
+
+Delay registers a cancellable IO action for a monotonic millisecond deadline;
+0..4294967295 milliseconds are accepted. Registration never sleeps or invokes
+user IO. Step/wait mature due timers after existing ready work; equal deadlines
+retain registration order. Wait runs no callbacks and returns 0 when work is
+ready, 1 when no ready/timers remain or its bounded timeout expires, 3 if closed,
+or 8 while already dispatching. A wait limit of -1 waits for the earliest timer;
+0 is a poll, and other limits are 1..4294967295 milliseconds. Host sleeps are
+bounded to 1000 milliseconds and never exceed the nearest timer/timeout.
+Timer precision is milliseconds; execution may be delayed by non-yielding IO.
+
+The checked interpreter threads a persistent IO store through every IO bind.
+Closed scopes are removed rather than retained as tombstones; unforgeable,
+monotonic issued identities distinguish stale handles without a historical map.
+Only clock/pause metadata crosses the bootstrap host bridge. Results and resume
+closures stay in the traced typed store. Native objects are scanned BDWGC roots.
+New codegen entries require mlf_require_async_completion_v2_abi, and the cache
+key includes completion-v2; old native object IDs are not silently reused.
