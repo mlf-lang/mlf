@@ -22,28 +22,38 @@ done
 prefix=$(brew --prefix)
 test "$prefix" = /opt/homebrew || { printf 'Unexpected Homebrew prefix: %s\n' "$prefix" >&2; exit 1; }
 core=$(brew --repository)/Library/Taps/homebrew/homebrew-core
-printf 'Preparing pinned Homebrew core at %s.\n' "$core"
-if [ ! -e "$core/.git" ]; then
-  mkdir -p "$core"
-  test -z "$(find "$core" -mindepth 1 -maxdepth 1 -print -quit)" || {
-    echo 'Existing Homebrew core directory is not an empty tap or Git checkout.' >&2; exit 1;
-  }
-  git init -q "$core"
-  git -C "$core" remote add origin https://github.com/Homebrew/homebrew-core.git
-fi
-test -z "$(git -C "$core" status --porcelain)" || {
-  echo 'Existing Homebrew core checkout has uncommitted changes.' >&2; exit 1;
-}
-case "$(git -C "$core" remote get-url origin)" in
-  https://github.com/Homebrew/homebrew-core|https://github.com/Homebrew/homebrew-core.git) ;;
-  *) echo 'Unexpected Homebrew core remote.' >&2; exit 1 ;;
-esac
-git -C "$core" fetch --depth=1 https://github.com/Homebrew/homebrew-core.git "$MLF_HOMEBREW_CORE_COMMIT"
-git -C "$core" checkout --detach "$MLF_HOMEBREW_CORE_COMMIT"
-test "$(git -C "$core" rev-parse HEAD)" = "$MLF_HOMEBREW_CORE_COMMIT"
-roots=(llvm gmp pkgconf bdw-gc)
-output=.mlf-build/macos-dependencies
+output=$PWD/.mlf-build/macos-dependencies
+checkout=$output/homebrew-core
 mkdir -p "$output"
+printf 'Preparing clean pinned Homebrew core at %s.\n' "$checkout"
+if [ ! -e "$checkout/.git" ]; then
+  mkdir -p "$checkout"
+  test -z "$(find "$checkout" -mindepth 1 -maxdepth 1 -print -quit)"
+  git init -q "$checkout"
+  git -C "$checkout" remote add origin https://github.com/Homebrew/homebrew-core.git
+fi
+test -z "$(git -C "$checkout" status --porcelain)" || {
+  echo 'Owned pinned Homebrew checkout has uncommitted changes.' >&2; exit 1;
+}
+case "$(git -C "$checkout" remote get-url origin)" in
+  https://github.com/Homebrew/homebrew-core|https://github.com/Homebrew/homebrew-core.git) ;;
+  *) echo 'Unexpected pinned Homebrew core remote.' >&2; exit 1 ;;
+esac
+git -C "$checkout" fetch --depth=1 https://github.com/Homebrew/homebrew-core.git "$MLF_HOMEBREW_CORE_COMMIT"
+git -C "$checkout" checkout --detach "$MLF_HOMEBREW_CORE_COMMIT"
+test "$(git -C "$checkout" rev-parse HEAD)" = "$MLF_HOMEBREW_CORE_COMMIT"
+# Hosted images can contain a dirty core tap. Preserve it intact and select our
+# clean checkout; never reset the image's changes or let them alter the pin.
+mkdir -p "$(dirname "$core")"
+if [ ! -L "$core" ] || [ "$(readlink "$core")" != "$checkout" ]; then
+  if [ -e "$core" ] || [ -L "$core" ]; then
+    backup=$(mktemp -d "${RUNNER_TEMP:?}/mlf-homebrew-core.XXXXXXXX")
+    mv "$core" "$backup/homebrew-core"
+    printf 'Preserved original Homebrew core at %s.\n' "$backup/homebrew-core"
+  fi
+  ln -s "$checkout" "$core"
+fi
+roots=(llvm gmp pkgconf bdw-gc)
 # Explicit options select the pinned declarations, not installed runtime deps.
 brew deps --formula --union --topological "${roots[@]}" > "$output/dependencies.txt"
 { cat "$output/dependencies.txt"; printf '%s\n' "${roots[@]}"; } | awk 'NF && !seen[$0]++' > "$output/closure.txt"

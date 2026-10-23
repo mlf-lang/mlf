@@ -297,7 +297,8 @@ All macOS stages of the cross-platform qualification use
 `tools/release/setup-macos.sh` with the immutable Homebrew core revision in
 `.github/macos-dependencies.env`. The script installs the pinned formula's
 macOS 26 ARM64 bottles and their runtime dependency closure. It disables
-mutable API/automatic-update resolution and reinstalls existing packages,
+mutable API/automatic-update resolution, uses its own clean formula checkout
+while preserving the runner image's original tap, and reinstalls existing packages,
 including matching versions, because a bottle rebuild can change bytes without
 changing a package version. This setup is restricted to disposable GitHub-hosted
 runners; it must not change a developer's Homebrew installation.

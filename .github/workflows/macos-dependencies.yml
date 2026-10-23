@@ -34,7 +34,11 @@ jobs:
         with:
           name: pinned-macos-dependency-hashes
           include-hidden-files: true
-          path: .mlf-build/macos-dependencies/
+          path: |
+            .mlf-build/macos-dependencies/closure.txt
+            .mlf-build/macos-dependencies/homebrew-core-commit
+            .mlf-build/macos-dependencies/installed.json
+            .mlf-build/macos-dependencies/files.sha256
           retention-days: 7
   consumer:
     needs: producer

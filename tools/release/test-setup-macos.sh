@@ -80,25 +80,35 @@ count=0
 run_case() {
   local label=$1 expected=$2; shift 2
   count=$((count + 1))
+  local repetitions=1
+  if [ "${1:-}" = repeat ]; then repetitions=2; shift; fi
   local work="$scratch/case-$count"
   cp -R "$scratch/template" "$work"
   : > "$work/environment"; : > "$work/path"
+  mkdir -p "$work/brew/Library/Taps/homebrew/homebrew-core"
+  printf "preserve image changes\n" > "$work/brew/Library/Taps/homebrew/homebrew-core/image-marker"
   local status=0
+  for ((attempt=1; attempt<=repetitions; attempt++)); do
   env PATH="$scratch/bin:$PATH" BASH_ENV="$scratch/shell-env" MOCK_ROOT="$work" \
-    GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted GITHUB_ENV="$work/environment" GITHUB_PATH="$work/path" \
-    "$@" bash "$work/tools/release/setup-macos.sh" > "$work/output" 2>&1 || status=$?
+    GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted RUNNER_TEMP="$work" GITHUB_ENV="$work/environment" GITHUB_PATH="$work/path" \
+    "$@" bash "$work/tools/release/setup-macos.sh" >> "$work/output" 2>&1 || status=$?
+  done
   if { [ "$expected" = pass ] && [ "$status" != 0 ]; } || { [ "$expected" = fail ] && [ "$status" = 0 ]; }; then
     cat "$work/output" >&2; printf 'FAIL %s (status %s)\n' "$label" "$status" >&2; exit 1
   fi
   if [ "$expected" = pass ]; then
-    test "$(grep -Ec '^brew (reinstall|install) --force-bottle' "$work/commands")" = 6
+    test "$(grep -Ec '^brew (reinstall|install) --force-bottle' "$work/commands")" = "$((6 * repetitions))"
     test "$(cat "$work/.mlf-build/macos-dependencies/closure.txt")" = "$(printf '%s\n' zstd z3 llvm gmp pkgconf bdw-gc)"
-    test "$(grep -c '=1$' "$work/environment")" = 5
+    test "$(grep -c '=1$' "$work/environment")" = "$((5 * repetitions))"
+    test "$(readlink "$work/brew/Library/Taps/homebrew/homebrew-core")" = "$work/.mlf-build/macos-dependencies/homebrew-core"
+    test "$(find "$work" -path "*/mlf-homebrew-core.*/homebrew-core/image-marker" | wc -l | tr -d " ")" = 1
+    test "$(cat "$work"/mlf-homebrew-core.*/homebrew-core/image-marker)" = "preserve image changes"
     grep -q 'homebrew-core.git 842dec212e8602f00b8601f5791dbad263e22dd8$' "$work/commands"
   fi
   printf 'PASS macOS dependencies: %s\n' "$label"
 }
-run_case 'fresh bottle closure and revision suffix' pass
+run_case 'fresh bottle closure, revision suffix and dirty image tap preservation' pass
+run_case 'repeated setup reuses owned tap and preserves the original once' pass repeat
 run_case 'reinstall matching or newer hosted packages and bottle rebuilds' pass MOCK_INSTALLED=1
 run_case 'developer machine rejected' fail GITHUB_ACTIONS=false
 run_case 'self-hosted runner rejected' fail RUNNER_ENVIRONMENT=self-hosted
@@ -106,7 +116,7 @@ run_case 'Linux rejected' fail MOCK_OS=Linux
 run_case 'Intel rejected' fail MOCK_ARCH=x86_64
 run_case 'different macOS bottle platform rejected' fail MOCK_VERSION=27.0
 run_case 'nonstandard prefix rejected' fail MOCK_PREFIX=/usr/local
-run_case 'dirty formula checkout rejected' fail MOCK_DIRTY=1
+run_case 'dirty owned formula checkout rejected' fail MOCK_DIRTY=1
 run_case 'unexpected formula remote rejected' fail MOCK_REMOTE=https://example.invalid/core.git
 run_case 'fetch failure stops installation' fail MOCK_FETCH_FAIL=1
 run_case 'checkout failure stops installation' fail MOCK_CHECKOUT_FAIL=1
