@@ -44,7 +44,12 @@ case "$1" in
    fi ;;
  --repository) echo "$MOCK_ROOT/brew" ;;
  deps)
-   test "$*" = 'deps --formula --union --topological llvm gmp pkgconf bdw-gc'
+   # Homebrew uses installed runtime receipts unless explicit target flags
+   # (or one of its dependency-selection flags) force formula declarations.
+   if [ "${MOCK_INSTALLED:-0}" = 1 ] && [[ " $* " != *' --os=tahoe --arch=arm64 '* ]]; then
+     echo stale-image-dependency; exit 0
+   fi
+   test "$*" = 'deps --os=tahoe --arch=arm64 --formula --union --topological llvm gmp pkgconf bdw-gc'
    printf '%s\n' zstd z3 "${MOCK_EXTRA_DEP:-zstd}" ;;
  info)
    test "${HOMEBREW_NO_AUTO_UPDATE:-}" = 1
@@ -109,7 +114,7 @@ run_case() {
 }
 run_case 'fresh bottle closure, revision suffix and dirty image tap preservation' pass
 run_case 'repeated setup reuses owned tap and preserves the original once' pass repeat
-run_case 'reinstall matching or newer hosted packages and bottle rebuilds' pass MOCK_INSTALLED=1
+run_case 'ignore stale installed receipts and reinstall matching or newer bottles' pass MOCK_INSTALLED=1
 run_case 'developer machine rejected' fail GITHUB_ACTIONS=false
 run_case 'self-hosted runner rejected' fail RUNNER_ENVIRONMENT=self-hosted
 run_case 'Linux rejected' fail MOCK_OS=Linux

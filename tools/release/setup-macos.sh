@@ -54,8 +54,9 @@ if [ ! -L "$core" ] || [ "$(readlink "$core")" != "$checkout" ]; then
   ln -s "$checkout" "$core"
 fi
 roots=(llvm gmp pkgconf bdw-gc)
-# Explicit options select the pinned declarations, not installed runtime deps.
-brew deps --formula --union --topological "${roots[@]}" > "$output/dependencies.txt"
+# Explicit target flags force declared dependencies. Merely selecting formula,
+# union and topological modes still permits installed receipt dependencies.
+brew deps --os=tahoe --arch=arm64 --formula --union --topological "${roots[@]}" > "$output/dependencies.txt"
 { cat "$output/dependencies.txt"; printf '%s\n' "${roots[@]}"; } | awk 'NF && !seen[$0]++' > "$output/closure.txt"
 closure=()
 while IFS= read -r formula; do
