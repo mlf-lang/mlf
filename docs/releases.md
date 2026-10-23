@@ -98,13 +98,27 @@ No native outputs cross platform boundaries and no test execution verdict is
 shared. All six groups execute independently against the same candidate pair,
 and self-host uses a fresh cache for the next stage.
 
-The macOS port and unit groups obtain runners before a small Ubuntu start
-barrier admits the other four groups. The barrier accepts started or completed
-jobs regardless of their verdicts, so every group still executes independently;
-matrix ordering alone does not provide runner priority. Each platform packages
-as soon as its own six groups finish. Port preparation
-uses the same host memory collection policy as its matrix execution, retaining
-all independent target checks. Small transport builds remain local because their
+Port target preparation is divided into four native prerequisite jobs on each
+platform: `StateTypes`, `SolverReuse`, `InferenceConformance`, and the other 22
+fixtures. Each runs the original source inference, independent target typing,
+serialization/erasure and transported-target checks in a fresh preparation.
+Only genuine checked-target cache outputs and their original build reports are
+transported. Their archives bind the source, platform, workspace, candidate,
+checker, target bytes and check receipts. The final port group re-enters the
+ordinary checked-artifact cache gates and executes all 25 native fixtures,
+independent references and audit checks. Its evidence retains the prerequisite
+reports as well as its own fresh execution verdict.
+
+The macOS unit group and all four port preparation jobs obtain runners before
+a small Ubuntu start barrier admits the other four qualification groups. The
+barrier accepts started or completed jobs regardless of their verdicts, so every
+group still executes independently; matrix ordering alone does not provide
+runner priority. Each platform packages as soon as its own six groups finish.
+Port preparation applies the host memory
+collection allowance to `StateTypes`, `SolverReuse` and `InferenceConformance`,
+records each fixture's policy in its build
+identity, and retains all independent target checks. Other preparation and
+native builds keep their ordinary collection policy. Small transports remain local because their
 subsecond cost does not justify another artifact transfer.
 
 For measurements, save the run and jobs REST responses and download the run's
@@ -114,6 +128,16 @@ execution, packaging and artifact work. It reports aggregate runner seconds
 without OS billing multipliers; parallel build or queue durations must not be
 subtracted directly from workflow wall time. Historical benchmark sources,
 measurements, pins and thresholds remain separate and unchanged.
+
+The **Native bootstrap timing** workflow also accepts `profile_port_only=true`,
+`candidate_run` and the exact `candidate_source`. This diagnostic mode imports
+the authenticated candidate and materializes its original port executable
+through the ordinary cache gates. It measures fresh `SolverReuse` and
+`InferenceConformance` preparations with collector settings 1, 2 and 4, records
+elapsed time, peak resident memory and executable/target/check hashes, and
+retains every independent preparation check. These measurements are not
+qualification verdicts and are never reused by release gates. The default
+timing mode still performs the original cold native bootstrap.
 
 Qualification artifacts are downloaded individually, checked against their
 recorded SHA-256 digest and workflow source, then extracted sequentially. This

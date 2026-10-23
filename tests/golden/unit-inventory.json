@@ -702,6 +702,8 @@
         "guards program: function guard nested block layout",
         "guards program: expression guard inside ordinary then-do layout",
         "guards program: ordinary if identifier compatibility",
+        "guards parser: legacy annotation in RHS before bar",
+        "guards parser: legacy annotation in condition before equals",
         "guards parser: diagnostics keep original line and column",
         "guards checking: guarded values generalize",
         "guards checking: separate whole-function signature",
@@ -923,6 +925,7 @@
     "test-framework": {
       "executions": [
         "framework/contracts",
+        "framework/catalog-contracts",
         "framework/coverage-validator",
         "framework/cli-contracts"
       ],
@@ -1297,8 +1300,23 @@
       }
     },
     {
+      "basis": "Source-reviewed test catalog and classification contract checkpoint. Existing compiler/package assertions, case IDs, aliases and numeric metrics are unchanged.",
+      "added_framework_ids": [
+        "framework/catalog-contracts"
+      ],
+      "required_execution_counts": {
+        "test-framework": {
+          "before": 3,
+          "after": 4
+        }
+      },
+      "completion_boundary": "TestFrameworkMain emits the new checkpoint only after Tests.TestCatalog.main completes selection, registry integrity, package partition and partial/full coverage rejection checks.",
+      "baseline_commit": "fde9e41a9708d5e4b4e6b00acfa651d2dd865fc7",
+      "baseline_inventory_sha256": "54b1a79bcecd7d813df86a73ad81da55ac2ec632dacbf74da64265683d993797"
+    },
+    {
       "name": "ordered-boolean-guards",
-      "basis": "Authored assertions in tests/Tests/Guards.emlf; expected AST equivalence, diagnostic fragments, target types and runtime output are reviewed from source, not generated from candidate execution.",
+      "basis": "Authored assertions in tests/Tests/Guards.emlf; expected AST equivalence, hand-written annotation-boundary ASTs, diagnostic fragments, target types and runtime output are reviewed from source, not generated from candidate execution.",
       "added_core_ids": [
         "guards parser: ordered expression arms",
         "guards parser: fallback-only expression",
@@ -1313,6 +1331,8 @@
         "guards program: function guard nested block layout",
         "guards program: expression guard inside ordinary then-do layout",
         "guards program: ordinary if identifier compatibility",
+        "guards parser: legacy annotation in RHS before bar",
+        "guards parser: legacy annotation in condition before equals",
         "guards parser: diagnostics keep original line and column",
         "guards checking: guarded values generalize",
         "guards checking: separate whole-function signature",
@@ -1367,7 +1387,7 @@
       "required_execution_counts": {
         "core": {
           "before": 684,
-          "after": 737
+          "after": 739
         },
         "backend_fixtures": {
           "before": 523,

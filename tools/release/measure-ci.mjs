@@ -53,7 +53,9 @@ const rows = jobs.map(job => {
     }
     const fixtures = primary.filter(line => /^Building checked port target /.test(line.text));
     if (fixtures.length) {
-      const last = primary.find(line => line.time > fixtures.at(-1).time && /^\+ clang .*\/runtime\.o$/.test(line.text));
+      const last = primary.find(line => line.time > fixtures.at(-1).time && /^build passed; report: .*\/port-preparation\/build-report\.json$/.test(line.text))
+        || primary.find(line => line.time > fixtures.at(-1).time && /^\+ clang .*\/runtime\.o$/.test(line.text))
+        || finish;
       for (let i=0; i<fixtures.length; ++i) {
         const end = fixtures[i+1]?.time ?? last?.time;
         if (end !== undefined) portFixtures.push({fixture:fixtures[i].text.replace('Building checked port target ',''),seconds:end-fixtures[i].time});
@@ -64,7 +66,7 @@ const rows = jobs.map(job => {
   const build = sum(steps.filter(step => /^(Build current compiler|Bootstrap and self-build|Bootstrap native Linux|Build the .* candidate|Build the macOS qualification|Build shared qualification)/.test(step.name)).map(step=>step.seconds)) + candidateRebuild + testBuilds;
   const qualificationSeconds = (qualification?.seconds || 0) + sum(steps.filter(step=>step.name==='Qualify exact Windows candidate and independent oracles').map(step=>step.seconds));
   const packaging = sum(steps.filter(step=>/^(Verify six groups|Package and relocate)/.test(step.name)).map(step=>step.seconds));
-  const artifacts = sum(stages.filter(stage=>stage.name==='artifact-import' || stage.name==='evidence').map(stage=>stage.seconds)) + sum(steps.filter(step=>/artifact@|Download digest-checked|Verify and archive|Export checked LLVM|Check all three packaged/.test(step.name)).map(step=>step.seconds));
+  const artifacts = sum(stages.filter(stage=>['artifact-import','evidence','port-artifact-import','port-artifact-export'].includes(stage.name)).map(stage=>stage.seconds)) + sum(steps.filter(step=>/artifact@|Download digest-checked|Verify and archive|Export checked LLVM|Check all three packaged/.test(step.name)).map(step=>step.seconds));
   const dependencies = sum(stages.filter(stage=>stage.name==='dependencies').map(stage=>stage.seconds)) + sum(steps.filter(step=>/^(Native dependencies|Native linking dependencies|Install pinned native Windows dependencies|Run brew install|Fetch independently pinned native macOS seed)/.test(step.name)).map(step=>step.seconds));
   return {id:job.id,name:job.name,conclusion:job.conclusion,runner:job.runner_name,queue_seconds:seconds(job.created_at,job.started_at),runner_seconds:seconds(job.started_at,job.completed_at),build_seconds:build,test_seconds:Math.max(0,qualificationSeconds-candidateRebuild-testBuilds),packaging_seconds:packaging,artifact_seconds:artifacts,dependency_setup_seconds:dependencies,candidate_rebuild_seconds:candidateRebuild,test_prerequisite_build_seconds:testBuilds,port_preparation_seconds:preparation,port_fixtures:portFixtures,steps,stages};
 });
