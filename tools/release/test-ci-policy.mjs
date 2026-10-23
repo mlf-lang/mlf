@@ -49,6 +49,24 @@ for (const name of ['build-runner','async-runtime','async-language']) {
   assert.match(job,/\|\| '\["ubuntu-24.04"\]'/);
 }
 assert.match(ciJob('build-runner'),/process-supervisor-tests/);
+const asyncJob = ciJob('async-language');
+assert.match(asyncJob,/fetch-depth: 0/);
+assert.match(asyncJob,/id: scope\n        run: python3 tools\/release\/async-change-scope.py/);
+assert.match(asyncJob,/\.mlf-build\/async-change-scope\/decision.json/);
+assert.equal((asyncJob.match(/if: steps.scope.outputs.required != 'false'/g) || []).length, 5);
+for (const name of ['Native bootstrap and parity dependencies', 'Fetch verified native seed', 'Bootstrap the real primitive-aware interpreter and compiler', 'Qualify typed completions and structured process tasks', 'Qualify checked async package interfaces and cache replay']) {
+  assert.ok(asyncJob.includes(`- name: ${name}\n        if: steps.scope.outputs.required != 'false'\n`));
+}
+// Only a positive false output skips the expensive steps; unknown/missing
+// decisions never opt out. A failed selector still fails this required job.
+const selectionExpression = asyncJob.match(/if: (steps.scope.outputs.required != 'false')/)[1];
+for (const required of ['true', '', undefined, 'unknown']) {
+  assert.equal(Function('steps', `return (${selectionExpression});`)({scope:{outputs:{required}}}), true);
+}
+assert.equal(Function('steps', `return (${selectionExpression});`)({scope:{outputs:{required:'false'}}}), false);
+for (const name of ['build-runner', 'async-runtime', 'windows-runtime', 'native']) {
+  assert.doesNotMatch(ciJob(name), /steps\.scope|async-change-scope/, `${name} must stay unconditional`);
+}
 for (const command of ['scripts/bootstrap-async.sh','tests/fixtures/async-completion/check.sh','tools/release/test-async-process.sh','tools/release/test-async-task.sh','tools/release/test-async-package.sh']) {
   assert.ok(ciJob('async-language').includes(command), `Missing ${command}`);
 }

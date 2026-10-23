@@ -192,7 +192,9 @@ used the following sequence:
 
 Pull requests and merge queues retain the six-check **PR gate**: metadata,
 Linux source smoke, Linux native build-runner checks, Windows runtime checks,
-Linux async completions and bootstrapped async-language parity. Main/manual
+Linux async completions and scope-aware async-language parity. Only verified
+unrelated pull requests can omit the expensive parity steps; merge queues and
+main/manual runs always execute them. Main/manual
 runs retain direct macOS runner/supervisor and both async checks; the complete
 package campaign also executes the static lifecycle cases.
 Main pushes now run all six complete campaigns on Linux and macOS, Windows
