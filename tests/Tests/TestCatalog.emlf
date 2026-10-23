@@ -6,6 +6,7 @@ import qualified Package.OS as O
 import qualified Tests.Basic as H
 import qualified Tests.Catalog as C
 import qualified Tests.Coverage as Coverage
+import qualified Tests.CorePartitions as CorePartitions
 
 rejected : forall a. Either String a -> IO Unit
 rejected value = case value of { Left _ -> return Unit; Right _ -> H.fail "invalid catalog, selection or partial coverage was accepted" }
@@ -93,6 +94,30 @@ batchChecks catalog = do
  let mixed = Cons (C.family catalog "core/hm-oracle") (Cons (C.family catalog "package-distribution/complete") (Cons (C.family catalog "package-integration/complete") Nil))
  let mixedBatches = C.batches mixed
  H.assert (S.eqList eqString (S.map S.fst mixedBatches) (O.words "core packages") && C.sameSet (S.concatMap (\entry -> ids (S.snd entry)) mixedBatches) (ids mixed)) "mixed-axis family batches changed selected work"
+
+corePartitionChecks catalog = do
+ let reviewed = ids (C.forUnit catalog "core")
+ H.right (CorePartitions.validate reviewed)
+ H.assert (S.eqList eqString CorePartitions.targets (O.words "core-crates core-solver core-language core-modules")) "core physical target inventory changed"
+ H.assert (S.length reviewed == 34 && C.sameSet (S.concatMap S.snd CorePartitions.partitions) reviewed) "core compilation shards changed logical families"
+ H.right (CorePartitions.validateCompleted reviewed (S.concatMap S.snd CorePartitions.partitions))
+ rejected (CorePartitions.validateCompleted reviewed (S.tail reviewed))
+ rejected (CorePartitions.validateCompleted reviewed (S.snoc reviewed (S.head reviewed)))
+ rejected (CorePartitions.validateCompleted reviewed (S.snoc (S.init reviewed) "core/unknown"))
+ rejected (CorePartitions.validateCompleted (Cons "core/hm-oracle" Nil) reviewed)
+ rejected (CorePartitions.validateCompleted Nil Nil)
+ rejected (CorePartitions.validate (S.tail reviewed))
+ rejected (CorePartitions.validate (S.snoc reviewed (S.head reviewed)))
+ rejected (CorePartitions.validate (S.reverse reviewed))
+ rejected (CorePartitions.validate (S.snoc (S.init reviewed) "core/unknown"))
+ H.assert (S.eqList eqString (CorePartitions.selectedTargets (O.words "core/hm-oracle core/substring-adapter")) (O.words "core-language core-modules")) "focused core selection pulls unrelated compilation targets"
+ H.assert (S.eqList eqString (CorePartitions.selectedTargets (Cons "core/graph-solver" Nil)) (Cons "core-solver" Nil)) "graph family does not select its independent closure"
+ H.assert (S.eqList eqString (CorePartitions.selectedTargets reviewed) CorePartitions.targets) "full core selection omits a compilation target"
+ H.assert (S.null (CorePartitions.selectedTargets Nil) && S.null (CorePartitions.forTarget "unknown")) "empty or unknown core target broadened work"
+ -- All four projections must be a disjoint exact cover of the reviewed actions,
+ -- aliases and counted loops. The logical campaign/unit names remain untouched.
+ let selected = S.concatMap (\(Pair _ names) -> S.filter (\entry -> S.elem eqString (C.identity entry) names) (C.forUnit catalog "core")) CorePartitions.partitions
+ H.assert (C.unique (ids selected) && C.sameSet (ids selected) reviewed && S.all (\entry -> eqString (C.unitName entry) "core") selected) "physical core sharding changed logical unit membership"
 
 schemaChecks catalog = do
  S.mapM_ (\key -> do
@@ -202,6 +227,7 @@ main = do
  H.assert (C.sameSet (J.getStrings "groups" catalog) (O.words "language code-generation runtime-library packages-build distribution bootstrap test-infrastructure")) "seven primary groups changed"
  selectionChecks catalog
  batchChecks catalog
+ corePartitionChecks catalog
  schemaChecks catalog
  inventoryChecks catalog inventory
  -- Keep the original flat selection contract as a regression alongside the
