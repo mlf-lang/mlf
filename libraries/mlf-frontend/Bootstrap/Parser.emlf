@@ -201,7 +201,7 @@ legacyAnnotation = pTry (do
   case a of
     SAnnotation variables ty -> if null (freeTypeNames variables ty) || explicitType ty || not (null variables) then pPure Unit else pFail "list tail"
   end <- pState
-  if elem eqString (tokenText (stateToken end)) (Cons "" (Cons ")" (Cons "]" (Cons "}" (Cons "," (Cons ";" (Cons "in" (Cons "then" (Cons "else" (Cons "of" (Cons "where" Nil))))))))))) then pPure Unit else pFail "end of annotation"
+  if elem eqString (tokenText (stateToken end)) (Cons "|" (Cons "=" (Cons "" (Cons ")" (Cons "]" (Cons "}" (Cons "," (Cons ";" (Cons "in" (Cons "then" (Cons "else" (Cons "of" (Cons "where" Nil))))))))))))) then pPure Unit else pFail "end of annotation"
   pPure a)
 freeTypeNames : List String -> SType -> List String
 freeTypeNames bound ty = case ty of
