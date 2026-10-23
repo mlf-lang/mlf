@@ -119,7 +119,7 @@ nativeTests c targets = do
  let receipt = B.info (Cons (Pair "path" (J.str retained)) (Cons (Pair "sha256" (J.str digest))
   (Cons (Pair "targets" (J.stringArray targets)) (Cons (Pair "jobs" (J.num (readInt jobs)))
   (Cons (Pair "exit_code" (J.num code)) (Cons (Pair "command" (J.stringArray args)) Nil))))))
- record c "suite_builds" (J.Array (S.snoc (J.values (J.get "suite_builds" saved)) receipt))
+ record c "suite_builds" (J.Array (S.snoc (J.values (J.getOr "suite_builds" (J.Array Nil) saved)) receipt))
  O.require (code == 0 && present) ("native test build failed (" ++ showInt code ++ ")")
  binaries <- S.mapM (\target -> do
   binary <- O.executable (build ++ "/bin/" ++ target)
@@ -210,7 +210,7 @@ core c full entries = do
  -- Unit has already prepared the complete batch; focused core builds only
  -- the compilation closures that own at least one requested family.
  saved <- J.read (report c)
- if S.all (\target -> J.has target (J.get "prepared_suite_targets" saved)) targets then return Unit else nativeTests c targets
+ if S.all (\target -> J.has target (J.getObject "prepared_suite_targets" saved)) targets then return Unit else nativeTests c targets
  S.mapM_ (\target -> do
   let selected = S.filter (\entry -> S.elem eqString (Catalog.identity entry) (CorePartitions.forTarget target)) entries
   let wanted = S.map Catalog.identity selected

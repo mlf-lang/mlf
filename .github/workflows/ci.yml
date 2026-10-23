@@ -63,6 +63,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: tools/release/fetch-seed.sh .mlf-build/seed .github/smoke-seed-linux.env
+      - name: Execute suite receipt and focused-Core preparation contracts
+        run: |
+          ulimit -s unlimited
+          python3 tools/release/test-suite-build-receipts.py --compiler "$MLF_COMPILER" --output .mlf-build/suite-receipt-regression
       - name: Exercise checkout compiler sources with the verified seed
         run: tools/release/native-ci.sh source-smoke
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -76,6 +80,7 @@ jobs:
             .mlf-build/source-smoke/*.log*
             .mlf-build/source-smoke/*.json
             .mlf-build/source-smoke/*.xmlf
+            .mlf-build/suite-receipt-regression/
   fresh-native:
     name: Fresh native compiler smoke
     if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.full_validation)) && !inputs.windows_runtime_only
