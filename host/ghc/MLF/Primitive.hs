@@ -1,0 +1,361 @@
+{-# LANGUAGE NoImplicitPrelude, RankNTypes, KindSignatures #-}
+-- GHC implementation of the stable native MLF.Primitive boundary.
+-- Compiler algorithms import only this module, never MLF.Host.*.
+-- Syntax hooks are frontend interfaces; their Prelude input types are not
+-- portable callable APIs. The shared profile rejects explicit hook uses.
+module MLF.Primitive
+  ( Int, Bool(..), Double, IO, Unit(..), String, ST, STArray, Monad(..), IntArray, DoubleArray, ByteArray, IntTable, AsyncScope, Completion, AsyncSubscription
+  , ioReturn, ioBind, putStr, putStrLn, getLine, printInt, concatString
+  , showInt, addInt, subInt, eqInt, ltInt, eqString, ifThenElse
+  , mulInt, quotInt, remInt, readInt, addDouble, subDouble, mulDouble
+  , divDouble, sqrtDouble, eqDouble, ltDouble, intToDouble, formatDouble, newIntArray
+  , readIntArray, writeIntArray, lengthIntArray, newDoubleArray, readDoubleArray, writeDoubleArray, lengthDoubleArray
+  , newByteArray, readByteArray, writeByteArray, lengthByteArray, byteArrayFromString, putBytes, getByteLine
+  , newIntTable, readIntTable, writeIntTable, andInt, stringLength, stringCodeAt, stringSlice
+  , stringFromCode, compareString, readDouble, doubleToBits, doubleFromBits, seq, panic
+  , readFile, writeFile, fileExists, canonicalPath, getArgCount, getArg, putErr
+  , exitWith, getExecutablePath, getContents, stReturn, stBind, runST, newSTArray
+  , readSTArray, writeSTArray, lengthSTArray, getEnv, setEnv, unsetEnv, runProcess
+  , listDirectory, directoryExists, fileDigest, acquireFileLock, releaseFileLock, processSupervisor, asyncScopeNew
+  , asyncScopeClose, asyncNewCompletion, asyncResolveCompletion, asyncReadCompletion, asyncSubscribeCompletion, asyncSubscriptionStatus, asyncCancelSubscription
+  , asyncStep, asyncEnqueue, asyncDelay, asyncWait
+  , pure, fromInteger, fromRational, fromString, negate, otherwise
+  , (+), (-), (*), (/), (%), (==), (/=), (<), (<=), (>), (>=), (++), (&&), (||), (>>=), (>>)
+  ) where
+
+import qualified Prelude as P
+import MLF.Host.Base (Int, Bool(..), Double, IO, Unit(..), String, ST, STArray, Monad(..))
+import MLF.Host.IO (IntArray, DoubleArray, ByteArray, IntTable)
+import MLF.Host.Async (AsyncScope, Completion, AsyncSubscription)
+import qualified MLF.Host.Base as Base
+import qualified MLF.Host.IO as IO
+import qualified MLF.Host.Async as Async
+
+ioReturn :: a -> IO a
+ioReturn = Base.v_ioReturn
+
+ioBind :: IO a -> (a -> IO b) -> IO b
+ioBind = Base.v_ioBind
+
+putStr :: String -> IO Unit
+putStr = IO.v_putStr
+
+putStrLn :: String -> IO Unit
+putStrLn = IO.v_putStrLn
+
+getLine :: IO String
+getLine = IO.v_getLine
+
+printInt :: Int -> IO Unit
+printInt = IO.v_printInt
+
+concatString :: String -> String -> String
+concatString = Base.v_concatString
+
+showInt :: Int -> String
+showInt = Base.v_showInt
+
+addInt :: Int -> Int -> Int
+addInt = Base.v_addInt
+
+subInt :: Int -> Int -> Int
+subInt = Base.v_subInt
+
+eqInt :: Int -> Int -> Bool
+eqInt = Base.v_eqInt
+
+ltInt :: Int -> Int -> Bool
+ltInt = Base.v_ltInt
+
+eqString :: String -> String -> Bool
+eqString = Base.v_eqString
+
+ifThenElse :: Bool -> a -> a -> a
+ifThenElse = Base.v_ifThenElse
+
+mulInt :: Int -> Int -> Int
+mulInt = Base.v_mulInt
+
+quotInt :: Int -> Int -> Int
+quotInt = Base.v_quotInt
+
+remInt :: Int -> Int -> Int
+remInt = Base.v_remInt
+
+readInt :: String -> Int
+readInt = Base.v_readInt
+
+addDouble :: Double -> Double -> Double
+addDouble = Base.v_addDouble
+
+subDouble :: Double -> Double -> Double
+subDouble = Base.v_subDouble
+
+mulDouble :: Double -> Double -> Double
+mulDouble = Base.v_mulDouble
+
+divDouble :: Double -> Double -> Double
+divDouble = Base.v_divDouble
+
+sqrtDouble :: Double -> Double
+sqrtDouble = Base.v_sqrtDouble
+
+eqDouble :: Double -> Double -> Bool
+eqDouble = Base.v_eqDouble
+
+ltDouble :: Double -> Double -> Bool
+ltDouble = Base.v_ltDouble
+
+intToDouble :: Int -> Double
+intToDouble = Base.v_intToDouble
+
+formatDouble :: Int -> Double -> String
+formatDouble = Base.v_formatDouble
+
+newIntArray :: Int -> Int -> IO IntArray
+newIntArray = IO.v_newIntArray
+
+readIntArray :: IntArray -> Int -> IO Int
+readIntArray = IO.v_readIntArray
+
+writeIntArray :: IntArray -> Int -> Int -> IO Unit
+writeIntArray = IO.v_writeIntArray
+
+lengthIntArray :: IntArray -> IO Int
+lengthIntArray = IO.v_lengthIntArray
+
+newDoubleArray :: Int -> Double -> IO DoubleArray
+newDoubleArray = IO.v_newDoubleArray
+
+readDoubleArray :: DoubleArray -> Int -> IO Double
+readDoubleArray = IO.v_readDoubleArray
+
+writeDoubleArray :: DoubleArray -> Int -> Double -> IO Unit
+writeDoubleArray = IO.v_writeDoubleArray
+
+lengthDoubleArray :: DoubleArray -> IO Int
+lengthDoubleArray = IO.v_lengthDoubleArray
+
+newByteArray :: Int -> Int -> IO ByteArray
+newByteArray = IO.v_newByteArray
+
+readByteArray :: ByteArray -> Int -> IO Int
+readByteArray = IO.v_readByteArray
+
+writeByteArray :: ByteArray -> Int -> Int -> IO Unit
+writeByteArray = IO.v_writeByteArray
+
+lengthByteArray :: ByteArray -> IO Int
+lengthByteArray = IO.v_lengthByteArray
+
+byteArrayFromString :: String -> IO ByteArray
+byteArrayFromString = IO.v_byteArrayFromString
+
+putBytes :: ByteArray -> Int -> Int -> IO Unit
+putBytes = IO.v_putBytes
+
+getByteLine :: IO ByteArray
+getByteLine = IO.v_getByteLine
+
+newIntTable :: IO IntTable
+newIntTable = IO.v_newIntTable
+
+readIntTable :: IntTable -> Int -> IO Int
+readIntTable = IO.v_readIntTable
+
+writeIntTable :: IntTable -> Int -> Int -> IO Unit
+writeIntTable = IO.v_writeIntTable
+
+andInt :: Int -> Int -> Int
+andInt = Base.v_andInt
+
+stringLength :: String -> Int
+stringLength = Base.v_stringLength
+
+stringCodeAt :: String -> Int -> Int
+stringCodeAt = Base.v_stringCodeAt
+
+stringSlice :: String -> Int -> Int -> String
+stringSlice = Base.v_stringSlice
+
+stringFromCode :: Int -> String
+stringFromCode = Base.v_stringFromCode
+
+compareString :: String -> String -> Int
+compareString = Base.v_compareString
+
+readDouble :: String -> Double
+readDouble = Base.v_readDouble
+
+doubleToBits :: Double -> Int
+doubleToBits = Base.v_doubleToBits
+
+doubleFromBits :: Int -> Double
+doubleFromBits = Base.v_doubleFromBits
+
+seq :: a -> b -> b
+seq = Base.v_seq
+
+panic :: String -> a
+panic = Base.v_panic
+
+readFile :: String -> IO String
+readFile = IO.v_readFile
+
+writeFile :: String -> String -> IO Unit
+writeFile = IO.v_writeFile
+
+fileExists :: String -> IO Bool
+fileExists = IO.v_fileExists
+
+canonicalPath :: String -> IO String
+canonicalPath = IO.v_canonicalPath
+
+getArgCount :: IO Int
+getArgCount = IO.v_getArgCount
+
+getArg :: Int -> IO String
+getArg = IO.v_getArg
+
+putErr :: String -> IO Unit
+putErr = IO.v_putErr
+
+exitWith :: Int -> IO a
+exitWith = IO.v_exitWith
+
+getExecutablePath :: IO String
+getExecutablePath = IO.v_getExecutablePath
+
+getContents :: IO String
+getContents = IO.v_getContents
+
+stReturn :: a -> ST s a
+stReturn = Base.v_stReturn
+
+stBind :: ST s a -> (a -> ST s b) -> ST s b
+stBind = Base.v_stBind
+
+runST :: (forall s. ST s a) -> a
+runST = Base.v_runST
+
+newSTArray :: Int -> a -> ST s (STArray s a)
+newSTArray = Base.v_newSTArray
+
+readSTArray :: STArray s a -> Int -> ST s a
+readSTArray = Base.v_readSTArray
+
+writeSTArray :: STArray s a -> Int -> a -> ST s Unit
+writeSTArray = Base.v_writeSTArray
+
+lengthSTArray :: STArray s a -> ST s Int
+lengthSTArray = Base.v_lengthSTArray
+
+getEnv :: String -> IO String
+getEnv = IO.v_getEnv
+
+setEnv :: String -> String -> IO Unit
+setEnv = IO.v_setEnv
+
+unsetEnv :: String -> IO Unit
+unsetEnv = IO.v_unsetEnv
+
+runProcess :: String -> String -> IO Int
+runProcess = IO.v_runProcess
+
+listDirectory :: String -> IO String
+listDirectory = IO.v_listDirectory
+
+directoryExists :: String -> IO Bool
+directoryExists = IO.v_directoryExists
+
+fileDigest :: String -> IO String
+fileDigest = IO.v_fileDigest
+
+acquireFileLock :: String -> IO Int
+acquireFileLock = IO.v_acquireFileLock
+
+releaseFileLock :: Int -> IO Unit
+releaseFileLock = IO.v_releaseFileLock
+
+processSupervisor :: String -> IO String
+processSupervisor = IO.v_processSupervisor
+
+asyncScopeNew :: Int -> Int -> IO AsyncScope
+asyncScopeNew = Async.v_asyncScopeNew
+
+asyncScopeClose :: AsyncScope -> IO Unit
+asyncScopeClose = Async.v_asyncScopeClose
+
+asyncNewCompletion :: AsyncScope -> (Completion a -> IO b) -> IO b -> IO b
+asyncNewCompletion = Async.v_asyncNewCompletion
+
+asyncResolveCompletion :: Completion a -> a -> IO Int
+asyncResolveCompletion = Async.v_asyncResolveCompletion
+
+asyncReadCompletion :: Completion a -> (a -> IO b) -> IO b -> IO b
+asyncReadCompletion = Async.v_asyncReadCompletion
+
+asyncSubscribeCompletion :: Completion a -> (a -> IO Unit) -> IO AsyncSubscription
+asyncSubscribeCompletion = Async.v_asyncSubscribeCompletion
+
+asyncSubscriptionStatus :: AsyncSubscription -> IO Int
+asyncSubscriptionStatus = Async.v_asyncSubscriptionStatus
+
+asyncCancelSubscription :: AsyncSubscription -> IO Int
+asyncCancelSubscription = Async.v_asyncCancelSubscription
+
+asyncStep :: AsyncScope -> IO Int
+asyncStep = Async.v_asyncStep
+
+asyncEnqueue :: AsyncScope -> IO Unit -> IO AsyncSubscription
+asyncEnqueue = Async.v_asyncEnqueue
+
+asyncDelay :: AsyncScope -> Int -> IO Unit -> IO AsyncSubscription
+asyncDelay = Async.v_asyncDelay
+
+asyncWait :: AsyncScope -> Int -> IO Int
+asyncWait = Async.v_asyncWait
+-- The IO-specific native alias is intentionally not Prelude.Applicative.pure.
+pure :: a -> IO a
+pure = ioReturn
+
+fromInteger :: P.Integer -> Int
+fromInteger n = n
+fromRational :: P.Rational -> Double
+fromRational = P.fromRational
+fromString :: P.String -> String
+fromString = Base.literal
+negate :: Int -> Int
+negate = subInt 0
+otherwise :: Bool
+otherwise = True
+
+infixr 2 ||
+infixr 3 &&
+infix 4 ==, /=, <, <=, >, >=
+infixr 5 ++
+infixl 6 +, -
+infixl 7 *, /, %
+infixl 1 >>=, >>
+(+), (-), (*), (/), (%) :: Int -> Int -> Int
+(+) = addInt
+(-) = subInt
+(*) = mulInt
+(/) = quotInt
+(%) = remInt
+(==), (/=), (<), (<=), (>), (>=) :: Int -> Int -> Bool
+(==) = eqInt
+(/=) = Base.neInt
+(<) = ltInt
+(<=) = Base.leInt
+(>) = Base.gtInt
+(>=) = Base.geInt
+(++) :: String -> String -> String
+(++) = concatString
+(&&), (||) :: Bool -> Bool -> Bool
+(&&) a b = if a then b else False
+(||) a b = if a then True else b
+(>>=) :: Monad m => m a -> (a -> m b) -> m b
+(>>=) = bind
+(>>) :: Monad m => m a -> m b -> m b
+(>>) action rest = bind action (\_ -> rest)
