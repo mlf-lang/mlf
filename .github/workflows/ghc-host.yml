@@ -1,0 +1,57 @@
+name: GHC host
+on:
+  push:
+    branches: [main]
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ghc-host-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  host:
+    name: GHC host O${{ matrix.optimization }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        optimization: [0, 2]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      # Use the runner's installed GHC/Cabal package database. build.py disables
+      # repositories and writes configuration, logs and stores inside the job.
+      - name: Build the existing compiler implementation
+        run: |
+          set -euo pipefail
+          mkdir -p .mlf-build/ghc-host
+          python3 ghc-host/build.py --optimization "${{ matrix.optimization }}" 2>&1 | tee .mlf-build/ghc-host/build.log
+      - name: Converter and host laws
+        run: |
+          set -euo pipefail
+          python3 ghc-host/test.py --optimization "${{ matrix.optimization }}" 2>&1 | tee .mlf-build/ghc-host/focused.log
+          .mlf-build/ghc-host/bin/tuple-list 2>&1 | tee .mlf-build/ghc-host/tuple-list.log
+      - name: Direct GHC Async library contracts
+        run: |
+          set -euo pipefail
+          python3 ghc-host/test_async.py --optimization "${{ matrix.optimization }}" 2>&1 | tee .mlf-build/ghc-host/async.log
+      - name: Preserve build and contract receipts
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ghc-host-O${{ matrix.optimization }}-${{ github.sha }}
+          include-hidden-files: true
+          retention-days: 14
+          path: |
+            .mlf-build/ghc-host/build-evidence.json
+            .mlf-build/ghc-host/*.log
+            .mlf-build/ghc-host/ghc-info.txt
+            .mlf-build/ghc-host/ghc-packages.txt
+            .mlf-build/ghc-host/focused-tests-O*/result.json
+            .mlf-build/ghc-host/focused-tests-O*/*.stdout
+            .mlf-build/ghc-host/focused-tests-O*/*.stderr
+            .mlf-build/ghc-host/direct-async-O*/result.json
+            .mlf-build/ghc-host/direct-async-O*/run-*/*.stdout
+            .mlf-build/ghc-host/direct-async-O*/run-*/*.stderr
