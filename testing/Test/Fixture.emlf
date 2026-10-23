@@ -1,0 +1,30 @@
+module Test.Fixture where
+import Bootstrap.Types
+import qualified Test.Outcome as O
+import qualified Bootstrap.Std as S
+
+data Scope = Suite | Case
+data Retention = KeepAll | KeepFailures
+data State = Unacquired | Acquired | SetupFailed | InUse | Released | ReleaseFailed
+data Fixture = Fixture String Scope Retention State
+clean result = case result of { O.Pass -> true; _ -> false }
+identity (Fixture key _ _ _) = key
+state (Fixture _ _ _ value) = value
+create key scope retention = if stringLength key == 0 then Left "empty fixture ID" else Right (Fixture key scope retention Unacquired)
+acquire result (Fixture key scope retention current) = case current of
+ Unacquired -> Right (Fixture key scope retention (if clean result then Acquired else SetupFailed))
+ _ -> Left "fixture acquisition repeated"
+use (Fixture key scope retention current) = case current of
+ Acquired -> Right (Fixture key scope retention InUse)
+ _ -> Left "fixture used before successful acquisition"
+-- Release is mandatory after failed setup too: partial acquisition can leak.
+-- The caller must join owned children before recording this transition.
+release joined result (Fixture key scope retention current) =
+ if S.not joined then Left "fixture release before children joined" else case current of
+  Acquired -> Right (Fixture key scope retention (if clean result then Released else ReleaseFailed))
+  SetupFailed -> Right (Fixture key scope retention (if clean result then Released else ReleaseFailed))
+  InUse -> Right (Fixture key scope retention (if clean result then Released else ReleaseFailed))
+  _ -> Left "fixture release without acquisition or after release"
+retain (Fixture _ _ retention _) primary cleanup = case retention of
+ KeepAll -> true
+ KeepFailures -> S.not (O.successful primary && clean cleanup)

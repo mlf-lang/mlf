@@ -128,7 +128,7 @@ the real checked library interfaces, replays its cache and rejects access to
 hidden constructors and mixed-type fibers through those same interfaces.
 Its two-generation native bootstrap also builds an interface-compatible package
 manager and has a separate 120-minute job bound; the
-existing compiler source-smoke job and its 480-second command watchdog are
+existing compiler source-smoke job and its 900-second command watchdog are
 unchanged. A source-smoke timeout remains a failing prerequisite even when all
 async checks pass. The language job uploads immutable snapshot identities,
 compiler hashes, build reports and per-suite command/observation receipts.

@@ -10,6 +10,19 @@
   two-stage bootstrap builds the primitive-aware compiler and matching package
   manager; released tools cannot directly execute the new async primitives.
 
+- Add ordered Boolean guards on binding right-hand sides and braced guard
+  expressions, with a required final `otherwise` fallback. Lower guards to
+  existing conditionals, preserving lazy branch selection, type checking,
+  pattern scope, and ordinary `if` syntax.
+- Add tuple and list expression, pattern and type sugar, including datatype
+  fields and right-associative list cons. Lower to in-scope `Pair`, `Triple`,
+  `Quad`, `List`, `Cons` and `Nil` without new runtime representations. Preserve
+  closed single-colon annotations and add explicit `::` annotations; document
+  the constructor-tail ambiguity and the initial two-to-four tuple arity limit.
+- Add a separate `tuple-list` root test target with fixed parser expectations,
+  frozen target-checker validation, module-scope and lazy interpreter checks.
+  The POSIX `tuple-list-native` target also checks nine interpreter/native
+  fixture results through a freshly built compiler.
 - Add portable MLF regular expressions and regex-redux, completing coverage of
   all ten current Benchmarks Game workloads. Pin sequential C/Rust/Haskell
   baselines and their regex dependencies, and check exact output with an

@@ -1,0 +1,21 @@
+module TupleListMain where
+import Bootstrap.Types
+import qualified Test.Runner as Runner
+import qualified Tests.TupleList as TupleList
+import qualified Tests.TupleListLegacy as Legacy
+
+-- Preserve the frozen default until executed equivalence is established.
+-- Opt-in routes share the new leaf registry, never run both implementations.
+main : IO Unit
+main = do
+ count <- getArgCount
+ args <- Runner.arguments 0 count
+ case args of
+  Cons "--framework" rest -> finish rest
+  Cons "--framework-list" rest -> finish (Cons "--list" rest)
+  _ -> Legacy.main
+
+finish : List String -> IO Unit
+finish args = do
+ code <- Runner.run args TupleList.cases
+ if code == 0 then ioReturn Unit else exitWith code
