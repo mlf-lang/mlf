@@ -205,8 +205,10 @@ from the pinned seed before building the candidate tested by all six groups.
 This lets the candidate and its fresh self-build use the same updated generator.
 Bootstrap builds explicitly allow six hours; individual fixture limits remain
 unchanged. Native release publication still requires every group to pass.
-No workflow installs GHC or invokes Python. Compiler, parity and package
-qualification runs in native MLF on every supported platform. Seed
+No workflow installs GHC. Compiler, parity and package qualification run in
+native MLF on every supported platform. The Linux unit job uses Python only
+for external process-tree timing and memory telemetry; it is not a compiler,
+build system or test harness dependency. Seed
 downloads check the selected published archive checksum and both
 independently pinned native executable hashes. Full release/self-host bootstraps
 retain the independently pinned v0.3.0 in `.github/seed.env`. Release jobs

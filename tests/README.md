@@ -24,7 +24,8 @@ Root `mlfpkg test` builds these executables through the MLF package manager.
 The [test catalog](test-catalog.json) assigns each selectable case or family one
 primary contract group, with separate test-level, input, oracle and purpose
 metadata. The six root commands remain full-qualification campaigns. Selected
-families share their execution unit's build and setup.
+families share their execution unit's setup. Core uses four independent
+compilation targets while retaining the same logical execution unit.
 The test-owned `compiler-tests` runner is a private root executable; its sources
 live in `tests/CompilerTestsMain.emlf` and `Tests/CompilerTests.emlf`. It receives
 the real package manager through `--manager`, keeps the existing six root groups
@@ -53,6 +54,38 @@ their test dependencies without pulling unrelated suites into those targets.
 `mlfpkg --manifest tests/mlf-package.json plan` checks those import boundaries;
 adding a test module also requires adding it to each importing target's
 `modules` map, or to the shared library when it is common support.
+
+The full `unit` campaign builds nine physical executables in one package-manager
+DAG: `regex`, `harness`, `int-set-unions`, `test-framework`, `core-crates`,
+`core-solver`, `core-language`, `core-modules`, and `figure12`. The four Core
+entries import separate private test-module closures. None imports the legacy
+`Tests.Core` registry or another shard registry. Common assertion/reporting
+helpers stay shared. `MLF_TEST_BUILD_JOBS=1` is the conservative default;
+`MLF_TEST_BUILD_JOBS=2` permits two ready build nodes. Other values fail before
+building. Test execution stays sequential because suites use process-wide
+environment variables and native fixture work directories.
+
+The Core catalog is unchanged: all 34 `core/*` families still belong to logical
+unit `core`. A selected Core run builds only the physical targets owning its
+requested families. Each target always emits `scope: partial`, including when
+all its families run. The parent validates every target's exact family list,
+executed IDs, aliases and generated-loop metrics against its reviewed catalog
+projection. It then checks the disjoint family union and combines only validated
+completed-event bodies. Only the full `unit` campaign produces a full aggregate
+`core.coverage.jsonl` and `core.families.jsonl`; an explicit selection of all Core
+families remains partial. The aggregate is revalidated against the unchanged
+684-check golden inventory and binds all child receipts rather than claiming a
+single Core binary. The optional legacy `core` executable preserves direct full
+execution, `--from`, family listing and family selection.
+
+`verification.json` retains every physical binary in `prepared_suite_targets`,
+including the `int-set-unions` CLI helper. `suite_builds` records each command,
+requested targets, jobs, exit status, and the hash/path of a unique retained
+package build report. Failed invocations retain their own report when one was
+written; an older complete report cannot stand in for an invocation that failed
+before writing. A full unit batch leaves one complete `suite-build` report for
+all nine binaries. Aggregate Core evidence and each partial target's log,
+coverage and family receipts are retained separately.
 
 Root builds and nested test builds share a checked artifact store through
 `{cache}` and `--cache-dir`. Each test group keeps its own `suite-build` report
@@ -100,7 +133,7 @@ wrapper chooses 4 for port on hosts with at most 8 GiB RAM, while preserving the
 
 | Root group | MLF entry | Preserved coverage |
 | --- | --- | --- |
-| unit | CoreMain, Figure12SuiteMain, HarnessMain, TestFrameworkMain, RegexMain | framework API/CLI contracts; 684 compiler checks; 6712 Algorithm W cases represented by 6703 executions; annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks; all 43 Figure 12 labels with 41 distinct executions and 36 controls; 67 benchmark/bootstrap/release/cache harness methods including two cache regressions; 56 regex actions |
+| unit | CoreCratesMain, CoreSolverMain, CoreLanguageMain, CoreModulesMain, Figure12SuiteMain, HarnessMain, TestFrameworkMain, RegexMain | framework API/CLI contracts; 684 compiler checks; 6712 Algorithm W cases represented by 6703 executions; annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks; all 43 Figure 12 labels with 41 distinct executions and 36 controls; 67 benchmark/bootstrap/release/cache harness methods including two cache regressions; 56 regex actions |
 | packages | PackagesMain | 79 completed cases: 22 resolver checks; 29 compiler integration cases, including native PGO isolation, shared cache survival, corruption recovery and source invalidation; 28 checked-release cases covering source-free builds, relocation, shared dependencies, compatibility, pins, damaged artifacts, GitHub fetching, offline cache repair and packed asset validation; target dependency/instance selection; scheduler diamond and variant deduplication, jobs 1/2/4 equivalence, concurrent cache publication, failure recovery, empty graphs and target-name collisions; 22 native runner lifecycle and protocol checks |
 | backends | BackendSuiteMain | 523 fixtures and 575 execution rows on interpreter and LLVM, compact-GC layout |
 | port | PortMain, ReferencesMain | 25 LLVM fixtures with compact-GC, six reference programs, generated inference input equality |
@@ -187,7 +220,8 @@ reviewed golden inventory. Missing, reordered, stale or forged family evidence
 cannot satisfy that validation.
 
 Selected families are batched once per execution unit, sharing setup and
-drivers. Units keep separate output directories and hashed child reports in
+drivers. Within logical Core, the selected physical targets build in one DAG
+and run sequentially. Units keep separate output directories and hashed child reports in
 `selected_units`, retaining each matrix and driver receipt. Focused Port runs
 prepare only their selected fixtures and use a partial manifest pinned to those
 names. Full Port still requires all 25 fixtures and rejects a partial manifest.
