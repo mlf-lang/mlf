@@ -12,9 +12,12 @@ cleanup() {
 }
 trap cleanup EXIT
 checkout="$scratch/checkout with spaces"
-mkdir -p "$scratch/bin" "$checkout/tools/release" "$checkout/bootstrap" "$checkout/tests/Tests" "$checkout/tests/pr-smoke"
+mkdir -p "$scratch/bin" "$checkout/tools/release" "$checkout/bootstrap" "$checkout/tests/Tests" "$checkout/tests/pr-smoke" \
+  "$checkout/libraries/mlf-foundation/Bootstrap" "$checkout/libraries/mlf-frontend/Bootstrap"
 cp "$scripts/source-smoke.sh" "$checkout/tools/release/"
-for source in bootstrap/Fake.emlf tests/PRQuickMain.emlf tests/Tests/IndependentCheck.emlf tests/Tests/IndependentType.emlf tests/pr-smoke/fixture; do
+for source in bootstrap/Fake.emlf libraries/mlf-foundation/Bootstrap/Types.emlf libraries/mlf-frontend/Bootstrap/Compiler.emlf \
+  libraries/mlf-foundation/mlf-package.json libraries/mlf-frontend/mlf-package.json \
+  tests/PRQuickMain.emlf tests/Tests/IndependentCheck.emlf tests/Tests/IndependentType.emlf tests/pr-smoke/fixture; do
   printf 'test fixture\n' > "$checkout/$source"
 done
 export TEST_SMOKE_SCRATCH="$scratch"
@@ -71,6 +74,13 @@ cat > "$MLF_COMPILER" <<'SH'
 set -euo pipefail
 output=${!#}
 test "$GC_FREE_SPACE_DIVISOR" = 2
+checkout="$TEST_SMOKE_SCRATCH/checkout with spaces"
+test "$#" -eq 11
+test "$1" = -i && test "$2" = "$checkout/tests"
+test "$3" = -i && test "$4" = "$checkout/libraries/mlf-foundation"
+test "$5" = -i && test "$6" = "$checkout/libraries/mlf-frontend"
+test "$7" = --run && test "$8" = "$checkout/tests/PRQuickMain.emlf"
+test "$9" = -- && test "${10}" = "$checkout/tests/pr-smoke"
 printf '%s\n' "$$" > "$TEST_SMOKE_SCRATCH/seed.pid"
 test ! -e "$output/progress.log"
 touch "$TEST_SMOKE_SCRATCH/stale-progress-cleared"
@@ -127,6 +137,9 @@ for mode in success timeout progress telemetry; do
   test -e "$scratch/stale-progress-cleared"
   test -s "$build/host.log"
   test -s "$build/memory.log"
+  grep -Fq '  libraries/mlf-foundation/Bootstrap/Types.emlf' "$build/sources.before.log"
+  grep -Fq '  libraries/mlf-frontend/Bootstrap/Compiler.emlf' "$build/sources.before.log"
+  grep -Fq '  libraries/mlf-foundation/mlf-package.json' "$build/sources.before.log"
   seed_pid=$(cat "$scratch/seed.pid")
   grep -Eq "^ *$seed_pid +" "$build/process.log"
   grep -Eq ' 480$' "$scratch/sleep-pids.log"

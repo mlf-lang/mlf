@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "name": "mlf-language-core",
+  "version": "0.3.0",
+  "dependencies": {
+    "mlf-foundation": {
+      "path": "../mlf-foundation"
+    }
+  },
+  "library": {
+    "modules": {
+      "Bootstrap.Data": "Bootstrap/Data.emlf",
+      "Bootstrap.Kind": "Bootstrap/Kind.emlf",
+      "Bootstrap.Kinding": "Bootstrap/Kinding.emlf",
+      "Bootstrap.Primitive": "Bootstrap/Primitive.emlf"
+    }
+  }
+}

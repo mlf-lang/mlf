@@ -15,7 +15,12 @@ else
   gc_cflags=$(pkg-config --cflags bdw-gc)
   gc_libs=$(pkg-config --libs bdw-gc)
 fi
-"$compiler" -i bootstrap -i package --emit-llvm-gc package/Main.emlf > "$build/mlfpkg.ll.new"
+"$cc" -O2 -std=c11 -Wall -Wextra -Werror runtime/mlf_build_runner.c -o "$build/mlf-build-runner.new"
+test "$("$build/mlf-build-runner.new" --protocol-version)" = 1
+mv "$build/mlf-build-runner.new" "$build/mlf-build-runner"
+set --
+for library in "$root"/libraries/*; do set -- "$@" -i "$library"; done
+"$compiler" "$@" --emit-llvm-gc package/Main.emlf > "$build/mlfpkg.ll.new"
 mv "$build/mlfpkg.ll.new" "$build/mlfpkg.ll"
 # pkg-config supplies compiler flags; the ordinary manifest-driven build uses
 # the MLF argv parser and supports spaces in all explicit tool/source paths.

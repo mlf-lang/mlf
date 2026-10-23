@@ -63,7 +63,7 @@ unchanged. Keep the whole package when using its `bin` directory directly.
 ## Prepare the next release
 
 For a release on all three platforms, update `VERSION`,
-`bootstrap/Bootstrap/Version.emlf`, the four toolchain manifests,
+`libraries/mlf-foundation/Bootstrap/Version.emlf`, the toolchain manifests,
 and `CHANGELOG.md`, then regenerate `mlf.lock`. Change the version in
 `.github/release-request.json` and commit the reviewed candidate on `main`.
 The **Cross-platform release** workflow checks out that immutable commit,
@@ -136,8 +136,9 @@ toolchain natively. No compiler inference/checking is bypassed. Linux and
 macOS require all six native compiler groups and a fresh self-host fixed point.
 Windows requires fresh compiler and manager LLVM fixed points, 7,086 independent
 parity cases and 160 interpreter/native executions, compact-GC runtime tests,
-18 native resolver checks, 29 native package integration cases, and SDK relocation and native
-executable checks. Its internal POSIX `compiler-tests` transports and historical
+22 native resolver checks, 29 native package integration cases, the separate
+target-dependency/scheduler fixture, and SDK relocation and native executable
+checks. Its internal POSIX `compiler-tests` transports and historical
 performance gates are not claimed as Windows qualification. Each archive
 retains the exact source/tool hashes and platform evidence.
 
@@ -162,18 +163,21 @@ CI on `main`, pull requests and merge queues checks release metadata and workflo
 syntax and runs five current-source compiler cases with the verified v0.3.0 seed
 in `.github/smoke-seed.env`. The seed interprets the checkout frontend and current
 and frozen target checkers; this check does not build fresh tools or execute the
-checkout LLVM backend. The Windows runtime job also runs. The aggregate
-**PR gate** succeeds only when all three jobs succeed; configure it as a required
-status check on `main` to enforce merge blocking.
+checkout LLVM backend. The Windows runtime job also runs, and the native build
+runner's 22 scheduling and lifecycle tests run on both Linux and macOS. The
+aggregate **PR gate** requires metadata, source smoke, Windows runtime, and both
+build-runner matrix jobs to succeed; configure it as a required status check on
+`main` to enforce merge blocking.
 
 Pushes to `main` and manual CI dispatches with `full_validation` enabled also run
 two separate jobs after the source check. **Fresh native compiler smoke** builds
-the checkout compiler and manager, then runs eight direct CLI cases and three
-package build/cache states. **Native package distribution** builds the checkout
+the checkout compiler and manager through the seed-compatible manager bridge,
+then runs eight direct CLI cases and three package build/cache states. **Native package distribution** builds the checkout
 manager and test campaign with the published compiler pinned in
-`.github/package-seed.env`, then requires all 18 resolver checks, 29 package
+`.github/package-seed.env`, then requires all 22 resolver checks, 29 package
 integration cases and 28 checked-release/distribution cases with structural
-coverage. These slower jobs are not merge prerequisites. Metadata retains eight
+coverage, plus the separate target-dependency/scheduler fixture and 22 native
+runner checks. These slower jobs are not merge prerequisites. Metadata retains eight
 required publishing regression checks. The extended native harness remains
 available with `tools/release/native-ci.sh extended-pr-smoke`; all six release
 groups retain their coverage.

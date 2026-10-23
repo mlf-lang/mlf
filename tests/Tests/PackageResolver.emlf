@@ -158,4 +158,37 @@ main = Sys.withScratch (\directory -> do
   H.assert (J.equal (J.get "long" roundtrip) (J.get "long" parsed) && J.equal (J.get "escaped" roundtrip) (J.get "escaped" parsed)) "long JSON string rendering changed"
   S.mapM_ (\(Pair invalid expected) -> case J.parse invalid of {Left message -> H.assert (eqString message expected) "JSON error offset changed"; Right _ -> H.fail "invalid JSON was accepted"}) (Cons (Pair "{\"x\":\"\\ud800\"}" "invalid JSON at offset 7") (Cons (Pair "[1e+]" "invalid JSON at offset 1") (Cons (Pair "{\"x\":true,\"x\":false}" "duplicate JSON key: x") Nil)))
   S.mapM_ (\text -> do { writeFile app text; plan r app false "invalid JSON" }) (Cons "{\"format\":1,}" (Cons "{\"format\":01}" (Cons "{\"name\":\"\\ud800\"}" (Cons "[true,]" Nil)))))
- putStrLn "18 package resolver tests passed")
+ check "test_target_dependencies_default" (do
+  app <- make r "target-default" "Unused" (Cons (Pair "base" "../base") (Cons (Pair "left" "../left") Nil)) ""
+  writeFile (directory ++ "/target-default/Main.emlf") "module Main where\nimport Base\nimport Left\nmain = value\n"
+  modify app (\doc -> J.set "library" J.empty (J.set "executables" (J.Object (Cons (Pair "main" (J.Object (Cons (Pair "main" (J.str "Main.emlf")) Nil))) Nil)) doc))
+  text <- plan r app true ""
+  doc <- H.right (J.parse text)
+  let target = S.last (J.values (J.get "crates" doc))
+  H.assert (J.equal (J.get "dependencies" target) (J.stringArray (Cons "base/0.1.0/library" (Cons "left/0.1.0/library" Nil)))) "omitted target dependencies changed compatibility")
+ check "test_target_dependencies_selection" (do
+  app <- make r "target-selected" "Unused" (Cons (Pair "base" "../base") (Cons (Pair "left" "../left") Nil)) ""
+  writeFile (directory ++ "/target-selected/Main.emlf") "module Main where\nimport Base\nmain = value\n"
+  let target = J.Object (Cons (Pair "main" (J.str "Main.emlf")) (Cons (Pair "dependencies" (J.stringArray (Cons "base" Nil))) Nil))
+  modify app (\doc -> J.set "library" J.empty (J.set "executables" (J.Object (Cons (Pair "main" target) Nil)) doc))
+  text <- plan r app true ""
+  doc <- H.right (J.parse text)
+  H.assert (J.equal (J.get "dependencies" (S.last (J.values (J.get "crates" doc)))) (J.stringArray (Cons "base/0.1.0/library" Nil))) "target selected an unrelated package"
+  writeFile (directory ++ "/target-selected/Main.emlf") "module Main where\nimport Left\nmain = value\n"
+  plan r app false "selected direct dependency")
+ check "test_target_dependencies_empty" (do
+  app <- make r "target-empty" "Unused" (Cons (Pair "base" "../base") Nil) ""
+  writeFile (directory ++ "/target-empty/Main.emlf") "module Main where\nmain = 1\n"
+  let target = J.Object (Cons (Pair "main" (J.str "Main.emlf")) (Cons (Pair "dependencies" (J.Array Nil)) Nil))
+  modify app (\doc -> J.set "library" J.empty (J.set "executables" (J.Object (Cons (Pair "main" target) Nil)) doc))
+  text <- plan r app true ""
+  doc <- H.right (J.parse text)
+  H.assert (J.equal (J.get "dependencies" (S.last (J.values (J.get "crates" doc)))) (J.Array Nil)) "explicit empty target dependencies inherited package dependencies")
+ check "test_target_dependencies_validation" (do
+  app <- make r "target-invalid" "Unused" (Cons (Pair "base" "../base") Nil) ""
+  writeFile (directory ++ "/target-invalid/Main.emlf") "module Main where\nmain = 1\n"
+  S.mapM_ (\(Pair selected expected) -> do
+   let target = J.Object (Cons (Pair "main" (J.str "Main.emlf")) (Cons (Pair "dependencies" selected) Nil))
+   modify app (\doc -> J.set "library" J.empty (J.set "executables" (J.Object (Cons (Pair "main" target) Nil)) doc))
+   plan r app false expected) (Cons (Pair (J.stringArray (Cons "left" Nil)) "not a direct package dependency") (Cons (Pair (J.stringArray (Cons "base" (Cons "base" Nil))) "duplicate target dependency") (Cons (Pair (J.str "base") "expected JSON array") Nil))))
+ putStrLn "22 package resolver tests passed")

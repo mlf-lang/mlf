@@ -897,6 +897,10 @@
         "test_packages.test_real_parser_handles_multiline_imports_and_comments",
         "test_packages.test_truncated_source_rejected",
         "test_packages.test_json_unicode_and_invalid_tokens",
+        "test_packages.test_target_dependencies_default",
+        "test_packages.test_target_dependencies_selection",
+        "test_packages.test_target_dependencies_empty",
+        "test_packages.test_target_dependencies_validation",
         "transitive local dependencies, ADT, do notation, spaces in paths",
         "content-addressed no-op build",
         "expected output checked on interpreter and LLVM",
@@ -1218,6 +1222,26 @@
       "completion_boundary": "PackagesMain wraps resolver, source-package integration and checked-release scenarios in one complete report. PackageReleases.checked emits a case only after its assertions complete; focused and GitHub fixture dispatch do not emit full-campaign start or completion.",
       "reviewed_source_sha256": {
         "tests/Tests/PackageReleases.emlf": "a368943990e39d691c65c7fc9d11d43d7dde0a0633fb8fa93eb05b3eb58e88cf"
+      }
+    },
+    {
+      "amendment": "parallel-build-target-dependencies-v1",
+      "basis": "Source-reviewed existing target dependency resolver controls from PR #3, integrated with the upstream structured coverage wrapper. Expectations come from the four named scenario assertions, not candidate output.",
+      "added_package_ids": [
+        "test_packages.test_target_dependencies_default",
+        "test_packages.test_target_dependencies_selection",
+        "test_packages.test_target_dependencies_empty",
+        "test_packages.test_target_dependencies_validation"
+      ],
+      "required_execution_counts": {
+        "packages": {
+          "before": 75,
+          "after": 79
+        }
+      },
+      "completion_boundary": "PackageResolver.check emits each ID only after its assertions return. Tests.TargetDependencies and BuildScheduler additionally run before the package coverage summary and retain their separately required successful text completion.",
+      "reviewed_source_sha256": {
+        "tests/Tests/PackageResolver.emlf": "1e21284bc1c99a97eeaecf231c98e72d05ffb5dc53b3a7c4f5c5c2b4d93080c7"
       }
     },
     {

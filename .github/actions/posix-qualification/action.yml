@@ -61,7 +61,7 @@ runs:
         if test -f .mlf-build/shared-candidate/manifest.json; then
           cp .mlf-build/shared-candidate/manifest.json .mlf-build/release-evidence/candidate-manifest.json
         fi
-        for tool in emlf mlfpkg compiler-tests; do
+        for tool in emlf mlfpkg compiler-tests mlf-build-runner; do
           if test -f ".mlf-build/bin/$tool"; then cp ".mlf-build/bin/$tool" .mlf-build/release-evidence/bin/; fi
         done
         if test -d ".mlf-build/compiler-tests/$TEST_GROUP"; then

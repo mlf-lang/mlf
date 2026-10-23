@@ -1,7 +1,8 @@
 # Package manager (format 1)
 
 `mlfpkg` builds MLF packages and runs their tests without invoking Cabal. It is
-written in MLF under `package/`. JSON parsing, local dependency resolution,
+written in MLF under `libraries/mlf-package-core/` and
+`libraries/mlf-developer-tools/`, with its entry point in `package/Main.emlf`. JSON parsing, local dependency resolution,
 content-addressed caching, compilation, linking, and test orchestration all run
 in the native MLF executable. The source-tree `mlfpkg` is a thin shell launcher;
 it never invokes a Python package-manager implementation. Parsing, inference,
@@ -12,7 +13,8 @@ prohibits downloads. It never downloads a compiler automatically. See
 [checked package releases](checked-package-releases.md#github-distribution)
 for the dependency schema, shared cache, and publishing workflow.
 
-On Windows, use native `mlfpkg.exe` with `mlf-host.exe`, native `pkg-config`,
+On Windows, use native `mlfpkg.exe` with `mlf-host.exe`,
+`mlf-build-runner.exe`, native `pkg-config`,
 MinGW Clang and the GMP/BDWGC SDK described in the
 [Windows guide](windows.md). The source launchers are
 `mlfpkg.ps1` and `mlfpkg.cmd`; `scripts/bootstrap-package-windows.ps1` builds
@@ -62,9 +64,9 @@ The one-time bootstrap script still needs `MLF_GC_PREFIX` or `bdw-gc.pc`.
 `--compiler`, `--gc-prefix`, `--runtime`,
 `--clang`, and `--pkg-config` can select explicit tools. Global options precede
 the command. The build needs neither GHC nor Cabal; it compiles
-`bootstrap/Main.emlf` and `package/Main.emlf` against the local `mlf-bootstrap`
-and `mlf-package-tools` packages. The one-time shell bootstrap only compiles and
-links the manager; it has no manifest or dependency logic. Its seed must support
+`bootstrap/Main.emlf` and `package/Main.emlf` against the ten library packages
+under `libraries/`. The one-time shell bootstrap compiles and links the manager
+and its `mlf-build-runner` helper; it has no manifest or dependency logic. Its seed must support
 the host IO primitives listed below. Rerun the bootstrap script after changing
 manager sources, or select the newly built `.mlf-build/bin/mlfpkg` through
 `MLF_PACKAGE_MANAGER`. That environment variable selects an already-built manager.
@@ -74,6 +76,47 @@ the manager first uses `bin/emlf` in the selected build directory, then
 `.mlf-build/bin/emlf` and `.mlf-build/mlf-native/bin/emlf` in the checkout, before
 searching `PATH`. Explicit compiler selections take precedence. Other packages
 default to `emlf` on `PATH`.
+
+`--jobs N` bounds concurrent build actions for `build`, `test`, and `run`:
+
+```sh
+./mlfpkg --jobs 1 build
+./mlfpkg --jobs 4 build --target emlf
+```
+
+The initial default is 1. All job counts use the same dependency scheduler;
+shared library variants are built once per invocation, and ready jobs launch
+as capacity becomes available. Inference inside each crate and arbitrary test
+commands remain serial. Failed jobs stop new launches, cancel active job scopes,
+and leave the report incomplete and previously published binaries intact.
+`--timeout` applies to each build action. `build-report.json` records the plan,
+predecessors, states, artifact locations, cache results, and runner timings.
+Each invocation keeps a fresh directory under `invocations/`, so late worker
+writes after a coordinator crash cannot overwrite a subsequent build's evidence.
+Publication stages and verifies all selected binaries and companions before
+replacement. A failed rename restores the prior files; a later locked command
+recovers an interrupted publication from its checksum-checked backup journal.
+File replacements are individual operations, not an atomic directory switch.
+
+The versioned native helper lives beside the manager. Bootstrap and release
+scripts build and package it for POSIX and Windows; relocated installations
+verify protocol version 1. `MLF_BUILD_RUNNER` selects an explicit helper. Its
+identity is checked before publication, along with source and tool identities.
+The helper supervises processes; MLF still owns graph construction, cache
+validation, checked artifacts, and publication. Job count is absent from
+semantic cache keys. Higher concurrency increases memory use; this change does
+not establish a faster default or claim a measured speedup.
+
+The compiler libraries retain the `Bootstrap.*` module names across
+`mlf-foundation`, `mlf-language-core`, `mlf-frontend`, `mlf-xmlf`,
+`mlf-inference`, `mlf-interpreter`, `mlf-llvm`, and `mlf-crates`.
+`Package.*` modules live in `mlf-package-core` and `mlf-developer-tools`.
+Each library declares its direct dependencies and contains its own sources.
+The root `emlf` target explicitly selects compiler libraries, so it can finish
+without building developer tooling. `mlfpkg` selects the package and developer
+libraries. Old `bootstrap/mlf-package.json` and `package/mlf-package.json`
+manifests have been replaced. Rebuild the manager using the current bootstrap
+script before building this layout with an older installed manager.
 
 Compiler tests are written in MLF under `tests/` and built as the local
 `mlf-tests` package. The root's private `compiler-tests` executable uses
@@ -248,7 +291,14 @@ declaring package. Local dependency paths can point outside the root package.
 
 Executables and native tests can declare private `modules` using the same map,
 and accept `link` (`separate` or `source`), `profile` (`compact-gc`, the default, or compatibility alias `compiler`),
-and `no-prelude` (boolean). `no-prelude` applies to the complete target build.
+and `no-prelude` (boolean). An optional `dependencies` array selects direct package
+dependencies for that target, for example `"dependencies": ["mlf-crates"]`.
+Omitting it preserves the default of all package dependencies; `[]` selects none.
+Names must be unique and declared in the package's `dependencies` object. Target
+imports can see only these selected libraries, the package's own library, and
+private target modules. The own library always retains its declared dependencies,
+including their instances; dependency selection does not infer dependencies from
+imports or change the selected libraries' transitive instance environments. `no-prelude` applies to the complete target build.
 Native tests require `stdout` and optionally accept `stdin` and `arguments`.
 They execute through both the interpreter and LLVM and assert the prescribed
 output. `run TARGET -- ARG...` passes arguments to the native executable.
@@ -326,7 +376,7 @@ they do not silently rewrite a checked-in lock. `plan` resolves and validates
 without executing compilers or test commands.
 
 Artifacts default to `.mlf-build` beside the selected manifest; `--build-dir`
-chooses another directory. Format 1 supports local source packages, checked
+chooses another directory. POSIX and native Windows implementations support local source packages, checked
 release directories, pinned GitHub release assets, executable/library builds,
 and tests. Registry indexing, dependency version solving, installation, cross compilation,
 and native object-per-module linking are outside format 1. `--timeout` accepts

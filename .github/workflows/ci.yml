@@ -89,7 +89,15 @@ jobs:
           path: |
             .mlf-build/pr-smoke/result.json
             .mlf-build/pr-smoke/*.log
+            .mlf-build/pr-smoke/manager-bootstrap/bootstrap.json
+            .mlf-build/pr-smoke/manager-bootstrap/build-report.json
+            .mlf-build/pr-smoke/manager-bootstrap/root-manifest.json
+            .mlf-build/pr-smoke/manager-bootstrap/source/mlf-package.json
+            .mlf-build/pr-smoke/manager-bootstrap/commands/
             .mlf-build/pr-smoke/candidate/build-report.json
+            .mlf-build/pr-smoke/candidate/invocations/**/*.json
+            .mlf-build/pr-smoke/candidate/invocations/**/*.stdout
+            .mlf-build/pr-smoke/candidate/invocations/**/*.stderr
             .mlf-build/pr-smoke/candidate/cache/*/artifact.json
             .mlf-build/pr-smoke/cli/**/*.json
             .mlf-build/pr-smoke/cli/**/*.stdout
@@ -120,6 +128,8 @@ jobs:
         run: tools/release/fetch-seed.sh .mlf-build/package-seed .github/package-seed.env
       - name: Build candidate manager and test campaign
         run: |
+          tools/release/bootstrap-manager.sh .mlf-build/package-manager-bootstrap
+          export MLF_PACKAGE_MANAGER="$PWD/.mlf-build/package-manager-bootstrap/bin/mlfpkg"
           "$MLF_PACKAGE_MANAGER" --compiler "$MLF_COMPILER" --runtime "$PWD/runtime/mlf_runtime.c" \
             --build-dir .mlf-build/package-tools --timeout 5400 --locked build --target mlfpkg --target compiler-tests
       - name: Test source packages and checked GitHub distribution
@@ -134,6 +144,11 @@ jobs:
           include-hidden-files: true
           retention-days: 14
           path: |
+            .mlf-build/package-manager-bootstrap/bootstrap.json
+            .mlf-build/package-manager-bootstrap/build-report.json
+            .mlf-build/package-manager-bootstrap/root-manifest.json
+            .mlf-build/package-manager-bootstrap/source/mlf-package.json
+            .mlf-build/package-manager-bootstrap/commands/
             .mlf-build/package-tools/build-report.json
             .mlf-build/package-tools/commands/
             .mlf-build/package-tools/cache/*/artifact.json
@@ -144,6 +159,42 @@ jobs:
             .mlf-build/package-tests/suite-build/build-report.json
             .mlf-build/package-tests/suite-build/commands/
             tests/golden/unit-inventory.json
+  build-runner:
+    name: Native build runner (${{ matrix.os }})
+    if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-26]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Compile the native scheduler and lifecycle fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$PWD/.mlf-build/build-runner-ci"
+          mkdir -p "$output"
+          clang -O2 -std=c11 -Wall -Wextra -Werror runtime/mlf_build_runner.c -o "$output/mlf-build-runner"
+          clang -O2 -std=c11 -Wall -Wextra -Werror tests/native/build_runner_fixture.c -o "$output/build-runner-fixture"
+          clang -O2 -std=c11 -Wall -Wextra -Werror tests/native/build_runner_tests.c -o "$output/build-runner-tests"
+      - name: Exercise bounded scheduling, protocols, and descendant cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$PWD/.mlf-build/build-runner-ci"
+          "$output/build-runner-tests" "$output/mlf-build-runner" "$output/build-runner-fixture" "$output/evidence" 2>&1 | tee "$output/build-runner.log"
+          grep -q '22 native build runner tests passed' "$output/build-runner.log"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: build-runner-evidence-${{ matrix.os }}
+          include-hidden-files: true
+          path: |
+            .mlf-build/build-runner-ci/*.log
+            .mlf-build/build-runner-ci/evidence/**/*.plan
+            .mlf-build/build-runner-ci/evidence/**/*.result
   windows-runtime:
     name: Native Windows runtime
     runs-on: windows-2025
@@ -155,7 +206,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Install pinned native Windows dependencies
         run: tools/release/setup-windows.ps1 -Output .mlf-build/windows-dependencies
-      - name: Test compact-GC runtime and native filesystem operations
+      - name: Test native runtime, filesystem, and build runner lifecycles
         run: tools/release/test-windows-runtime.ps1 -NativePrefix $env:MLF_NATIVE_PREFIX -Clang $env:MLF_CLANG -Output .mlf-build/windows-runtime
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
@@ -165,11 +216,13 @@ jobs:
           path: |
             .mlf-build/windows-runtime/*.json
             .mlf-build/windows-runtime/*.log
+            .mlf-build/windows-runtime/build-runner/**/*.plan
+            .mlf-build/windows-runtime/build-runner/**/*.result
   pr-gate:
     # A skipped manual job must not satisfy the required check on the same SHA.
     name: ${{ github.event_name == 'workflow_dispatch' && 'Manual CI summary' || 'PR gate' }}
     if: always() && github.event_name != 'workflow_dispatch'
-    needs: [metadata, native, windows-runtime]
+    needs: [metadata, native, windows-runtime, build-runner]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -177,7 +230,7 @@ jobs:
         env:
           CHECKS: ${{ toJSON(needs) }}
         run: |
-          printf '%s\n' "$CHECKS" | jq -e 'length == 3 and all(.[]; .result == "success")'
+          printf '%s\n' "$CHECKS" | jq -e 'length == 4 and all(.[]; .result == "success")'
   self-host:
     name: Fresh self-host
     if: github.event_name == 'workflow_dispatch' && inputs.self_host && !inputs.windows_runtime_only

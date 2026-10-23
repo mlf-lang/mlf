@@ -3,8 +3,8 @@
 `mlf-test` supplies a small case, assertion and runner API in ordinary MLF.
 Its modules use only `Bootstrap.Types`, `Bootstrap.Std` and one another; they
 do not import compiler inference, graph solving, target checking or package
-orchestration. The package currently depends on `mlf-bootstrap` for its shared
-container types and utilities.
+orchestration. The package depends on `mlf-foundation` in
+`libraries/mlf-foundation` for its shared container types and utilities.
 
 ```mlf
 import Bootstrap.Types

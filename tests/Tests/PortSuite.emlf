@@ -4,6 +4,8 @@ import qualified Bootstrap.Std as S
 import qualified Package.OS as O
 import qualified Package.Json as J
 import qualified Package.Verification as V
+import qualified Package.Manifest as M
+import qualified Tests.TestSources as TS
 import qualified Tests.Helpers as H
 import qualified Tests.Backends as B
 import qualified Tests.Bytes as Bytes
@@ -31,7 +33,8 @@ prepareFixture : String -> String -> IO Unit
 prepareFixture name destination = do
  H.assert (S.elem eqString name names) "unknown port fixture"
  let source = "bootstrap/tests/" ++ name ++ ".emlf"
- result <- C.compileFile (Cons "bootstrap" (Cons "tests" Nil)) source
+ graph <- M.load "mlf-package.json"
+ result <- C.compileFile (TS.portRoots graph) source
  compilation <- H.right result
  ty <- H.right (Check.checkClosed (C.compiledTerm compilation))
  expected <- H.right (P.parseType "IO Unit")

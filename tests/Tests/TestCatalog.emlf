@@ -181,7 +181,7 @@ inventoryChecks catalog inventory = do
   H.assert (J.equal (C.projection inventory name families) (suite inventory name)) ("full projection lost reviewed aliases or metrics: " ++ name)) (O.words "core harness regex figure12 test-framework packages")
  let source = C.combine "executions" (C.forUnit catalog "package-integration")
  let releases = C.combine "executions" (C.forUnit catalog "package-distribution")
- H.assert (S.length source == 47 && S.length releases == 28 && C.sameSet (S.append source releases) (J.getStrings "executions" (suite inventory "packages")) && C.unique (S.append source releases)) "package classification changed the reviewed 75-case inventory"
+ H.assert (S.length source == 51 && S.length releases == 28 && C.sameSet (S.append source releases) (J.getStrings "executions" (suite inventory "packages")) && C.unique (S.append source releases)) "package classification changed the reviewed 79-case inventory"
  substring <- H.right (J.parse "{\"executions\":[],\"aliases\":{},\"metrics\":{\"substring-executed\":13}}")
  H.assert (J.equal (C.projection inventory "core" (Cons (C.family catalog "core/substring-adapter") Nil)) substring) "metric-only family projection broadened coverage"
  hm <- H.right (J.parse "{\"executions\":[\"independent ML typability oracle\"],\"aliases\":{},\"metrics\":{\"hm-prescribed\":6712,\"hm-exhaustive\":1712,\"hm-generated\":5000,\"hm-distinct-generated\":4991,\"hm-executed\":6703,\"hm-typable\":2901}}")

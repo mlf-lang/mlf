@@ -44,7 +44,7 @@ archived JSON report with all raw samples. Those nine-workload measurements
 predate regex-redux and do not certify its performance.
 
 Regex-redux reads the same FASTA bytes in every language. Its MLF program uses
-[`Bootstrap.Regex`](../bootstrap/Bootstrap/Regex.emlf) for cleanup, all nine
+[`Bootstrap.Regex`](../libraries/mlf-foundation/Bootstrap/Regex.emlf) for cleanup, all nine
 counts, and all five substitutions in the prescribed order. The independent
 MLF oracle uses explicit character tests and delimiter scans, without that
 regex engine. Tests check exact upstream output, malformed results, and actual

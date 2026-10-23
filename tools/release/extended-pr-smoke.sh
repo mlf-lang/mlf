@@ -8,20 +8,38 @@ mkdir -p "$build"
 printf '{"complete":false}\n' > "$build/result.json"
 test "$#" -eq 0
 seed_compiler=${MLF_COMPILER:?verified native seed compiler required}
-seed_manager=${MLF_PACKAGE_MANAGER:?verified native seed manager required}
 started=$SECONDS
-"$seed_manager" --compiler "$seed_compiler" --runtime "$PWD/runtime/mlf_runtime.c" \
-  --timeout 1800 --locked --build-dir "$build/candidate" build 2>&1 | tee "$build/build.log"
+# Released managers predate target dependency fields in the current manifests.
+# Build its source libraries separately before reading the current root manifest.
+tools/release/bootstrap-manager.sh "$build/manager-bootstrap" 2>&1 | tee "$build/manager-bootstrap.log"
+"$build/manager-bootstrap/bin/mlfpkg" --compiler "$seed_compiler" --runtime "$PWD/runtime/mlf_runtime.c" \
+  --jobs 2 --timeout 1800 --locked --build-dir "$build/candidate" build 2>&1 | tee "$build/build.log"
 jq -e '
   .complete == true and .implementation == "MLF" and
   ([.builds[] | select(.kind | startswith("executable mlf-compiler:")) | .kind] | sort) ==
     ["executable mlf-compiler:compiler-tests","executable mlf-compiler:emlf","executable mlf-compiler:mlfpkg"]
 ' "$build/candidate/build-report.json" >/dev/null
+tools/release/ensure-build-runner.sh "$build/candidate/bin"
 build_seconds=$((SECONDS - started))
 export MLF_COMPILER="$build/candidate/bin/emlf"
 export MLF_PACKAGE_MANAGER="$build/candidate/bin/mlfpkg"
+export MLF_BUILD_RUNNER="$build/candidate/bin/mlf-build-runner"
 runner="$build/candidate/bin/compiler-tests"
 test -x "$MLF_COMPILER" && test -x "$MLF_PACKAGE_MANAGER" && test -x "$runner"
+# Compile the shared smoke fixtures together so independent work can overlap.
+# The campaign reuses these artifacts with the same compiler, manager and cache.
+"$MLF_PACKAGE_MANAGER" --manifest "$PWD/tests/mlf-package.json" \
+  --compiler "$MLF_COMPILER" --runtime "$PWD/runtime/mlf_runtime.c" \
+  --jobs 2 --timeout 1800 --build-dir "$build/tests/suite-build" \
+  --cache-dir "$build/candidate/cache" build \
+  --target int-set-unions --target test-framework --target pr-smoke \
+  2>&1 | tee "$build/tests-prebuild.log"
+jq -e '
+  .complete == true and .implementation == "MLF" and
+  ([.builds[] | select(.kind | startswith("executable mlf-tests:")) | .kind] | sort) ==
+    ["executable mlf-tests:int-set-unions","executable mlf-tests:pr-smoke","executable mlf-tests:test-framework"]
+' "$build/tests/suite-build/build-report.json" >/dev/null
+cp "$build/tests/suite-build/build-report.json" "$build/tests-prebuild-report.json"
 # Direct invocation avoids building another root generation just to run tests.
 # The suite still compiles its tests and backend drivers with the new compiler.
 "$runner" pr-smoke --manager "$MLF_PACKAGE_MANAGER" --compiler "$MLF_COMPILER" \
@@ -30,18 +48,19 @@ sha256() { shasum -a 256 "$1" | awk '{print $1}'; }
 compiler_sha256=$(sha256 "$MLF_COMPILER")
 manager_sha256=$(sha256 "$MLF_PACKAGE_MANAGER")
 runner_sha256=$(sha256 "$runner")
+build_runner_sha256=$(sha256 "$MLF_BUILD_RUNNER")
 framework_sha256=$(sha256 "$build/tests/suite-build/bin/test-framework")
 unions_sha256=$(sha256 "$build/tests/suite-build/bin/int-set-unions")
 coverage_sha256=$(sha256 "$build/tests/test-framework.coverage.jsonl")
 inventory_sha256=$(sha256 tests/golden/unit-inventory.json)
 framework_log_sha256=$(sha256 "$build/tests/test-framework.log")
 jq -e --arg compiler "$compiler_sha256" --arg manager "$manager_sha256" \
-  --arg runner "$runner_sha256" --arg framework "$framework_sha256" \
+  --arg runner "$runner_sha256" --arg build_runner "$build_runner_sha256" --arg framework "$framework_sha256" \
   --arg unions "$unions_sha256" --arg coverage "$coverage_sha256" \
   --arg inventory "$inventory_sha256" --arg framework_log "$framework_log_sha256" '
   .complete == true and .implementation == "MLF" and .group == "pr-smoke" and
   .compiler_sha256 == $compiler and .manager_sha256 == $manager and
-  .runner_sha256 == $runner and
+  .runner_sha256 == $runner and .build_runner_sha256 == $build_runner and
   .sources["tests/golden/unit-inventory.json"] == $inventory and
   .focused_suite == {name:"int-set-unions",binary_sha256:$unions} and
   (.suites["test-framework"] | .binary_sha256 == $framework and
@@ -106,10 +125,10 @@ jq -n --arg commit "$(git rev-parse HEAD)" --argjson build_seconds "$build_secon
   --arg runner_sha256 "$runner_sha256" --arg framework_sha256 "$framework_sha256" \
   --arg coverage_sha256 "$coverage_sha256" --arg inventory_sha256 "$inventory_sha256" \
   --arg verification_sha256 "$(sha256 "$build/tests/verification.json")" \
-  --arg driver_build_sha256 "$driver_hash" \
+  --arg driver_build_sha256 "$driver_hash" --arg build_runner_sha256 "$build_runner_sha256" \
   '{complete:true,commit:$commit,build_seconds:$build_seconds,total_seconds:$total_seconds,
     compiler_sha256:$compiler_sha256,manager_sha256:$manager_sha256,runner_sha256:$runner_sha256,
     framework_sha256:$framework_sha256,coverage_sha256:$coverage_sha256,
     inventory_sha256:$inventory_sha256,verification_sha256:$verification_sha256,
-    driver_build_sha256:$driver_build_sha256}' > "$build/result.json"
+    driver_build_sha256:$driver_build_sha256,build_runner_sha256:$build_runner_sha256,build_runner_protocol:1}' > "$build/result.json"
 cat "$build/result.json"

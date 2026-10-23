@@ -12,8 +12,9 @@ safe text = S.concatStrings (S.map (\i -> let c = stringCodeAt text i in
  if c >= 48 && c <= 57 || c >= 65 && c <= 90 || c >= 97 && c <= 122 || c == 95 || c == 46 then stringFromCode c else "_") (S.range 0 (stringLength text - 1)))
 main = do
  file <- getArg 0
- root <- getArg 1
- result <- C.compileFile (Cons root (Cons "tools/profile" Nil)) file
+ count <- getArgCount
+ paths <- S.mapM getArg (S.range 1 (count - 1))
+ result <- C.compileFile (S.snoc paths "tools/profile") file
  case result of
   Left error -> do { putErr (C.prettyError error ++ "\n"); exitWith 1 }
   Right compiled -> do

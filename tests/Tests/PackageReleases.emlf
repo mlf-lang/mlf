@@ -120,7 +120,8 @@ githubColdWarm c app assetHash = do
  let arguments = dir ++ "/gh.arguments"
  invoke c app build (S.append args (Cons "lock" Nil)) true ""
  observed <- readFile arguments
- H.assert (eqString observed ("release\ndownload\nv1.0.0\n--repo\ngithub.com/mlf-tests/fixtures\n--pattern\ngreeting.mlfr\n--output\n" ++ downloaded ++ ".work/package.mlfr\n")) "GitHub download did not use exact repository, tag, and asset argv"
+ let expected = "release\ndownload\nv1.0.0\n--repo\ngithub.com/mlf-tests/fixtures\n--pattern\ngreeting.mlfr\n--output\n"
+ H.assert (O.starts expected observed && O.starts (expected ++ downloaded ++ ".work-") observed && O.ends "/package.mlfr\n" observed && S.length (O.nonempty (O.lines observed)) == 9) "GitHub download did not use exact repository, tag, and asset argv with private staging"
  coldCalls <- readFile calls
  H.assert (eqString coldCalls "x") "cold resolution did not download exactly once"
  lock <- J.read (O.parent app ++ "/mlf.lock")
@@ -204,10 +205,16 @@ githubRetry c app digest assetHash = do
  let failedCache = dir ++ "/failed github cache"
  setEnv "MLF_TEST_GH_FAIL" "1"
  invoke c app build (Cons "--cache-dir" (Cons failedCache (Cons "plan" Nil))) false "download failed"
+ failedArguments <- readFile (dir ++ "/gh.arguments")
+ let failedOutput = S.last (O.nonempty (O.lines failedArguments))
  failedPublished <- directoryExists (failedCache ++ "/.downloads/" ++ assetHash)
  H.assert (S.not failedPublished) "failed download published a cache entry"
  setEnv "MLF_TEST_GH_FAIL" "0"
  invoke c app build (Cons "--cache-dir" (Cons failedCache (Cons "plan" Nil))) true ""
+ retryArguments <- readFile (dir ++ "/gh.arguments")
+ let retryOutput = S.last (O.nonempty (O.lines retryArguments))
+ partial <- readFile failedOutput
+ H.assert (S.not (eqString failedOutput retryOutput) && eqString partial "partial") "download retry reused or removed a previous owner staging path"
  checked "failed partial downloads remain unusable and can be retried"
 
 githubMalformed : Context -> String -> String -> IO Unit
@@ -320,6 +327,20 @@ releaseWarm c = do
  invoke c app build (Cons "test" Nil) true ""
  reused <- J.read (build ++ "/build-report.json")
  H.assert (S.all (J.getBool "cached" false) (J.values (J.get "builds" reused))) "unchanged release consumer missed the artifact cache"
+ let keys = \report -> J.Object (S.map (\row -> Pair (J.getText "job_id" "" row) (J.get "key" row)) (J.values (J.get "builds" report)))
+ let executableRows = S.filter (\row -> O.starts "executable " (J.getText "kind" "" row)) (J.values (J.get "builds" reused))
+ programs <- S.mapM (\row -> O.executable (build ++ "/cache/" ++ J.getText "key" "" row ++ "/program")) executableRows
+ H.assert (S.not (S.null programs)) "release consumer did not build an executable"
+ original <- S.mapM fileDigest programs
+ S.mapM_ (\jobs -> do
+  invoke c app build (Cons "--jobs" (Cons (showInt jobs) (Cons "test" Nil))) true ""
+  saved <- J.read (build ++ "/build-report.json")
+  hashes <- S.mapM fileDigest programs
+  let outcome = S.head (J.values (J.get "scheduler_results" saved))
+  let maximum = case J.get "maximum_parallel_jobs" outcome of { J.Number value -> readInt value; _ -> -1 }
+  H.assert (J.equal (keys reused) (keys saved) && J.equal (J.stringArray original) (J.stringArray hashes)) "release worker count changed artifact keys or executable bytes"
+  H.assert (S.all (J.getBool "cached" false) (J.values (J.get "builds" saved)) && S.length (J.values (J.get "releases" saved)) == 1) "parallel release consumer missed the cache or release report"
+  H.assert (J.equal (J.get "jobs" outcome) (J.num jobs) && maximum > 0 && maximum <= jobs && S.all (J.getBool "passed" false) (J.values (J.get "tests" saved))) "parallel release consumer exceeded its limit or failed execution") (Cons 2 (Cons 4 Nil))
  checked "unchanged consumer reuses all build artifacts"
  ioReturn reused
 
@@ -350,7 +371,7 @@ releaseVisibility c savedGreeting messageDigest = do
  let build = dir ++ "/consumer build"
  -- Independent release bundles carry the same Message and Prelude crates.
  setDependencies app (Cons (pair "greeting" savedGreeting) (Cons (pair "message" (dependency "../published message" messageDigest)) Nil))
- invoke c app build (Cons "test" Nil) true ""
+ invoke c app (dir ++ "/parallel shared release build") (O.words "--jobs 4 test") true ""
  checked "two releases share their transitive checked dependencies"
  source <- readFile (consumer ++ "/Main.emlf")
  writeFile (consumer ++ "/Main.emlf") ("module Main where\nimport Message\nmain = putStrLn (render (Message \"Hello, local packages!\"))\n")
