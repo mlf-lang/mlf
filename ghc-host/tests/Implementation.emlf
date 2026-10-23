@@ -1,0 +1,53 @@
+module Main where
+data List a = Nil | Cons a (List a)
+data Pair a b = Pair a b
+data Either e a = Left e | Right a
+instance forall e. Monad (Either e) where
+  return = Right
+  bind = \value following -> case value of { Left message -> Left message; Right answer -> following answer }
+identity : forall a. a -> a
+identity x = x
+map : forall a b. (a -> b) -> List a -> List b
+map f xs = case xs of { Nil -> Nil; Cons x rest -> Cons (f x) (map f rest) }
+length : forall a. List a -> Int
+length xs = case xs of { Nil -> 0; Cons _ rest -> 1 + length rest }
+
+outer : Int
+outer = 10
+shadow : Int
+shadow = let outer = outer + 1 in outer
+boolean : Bool -> Int
+boolean b = case b of { false -> 0; true -> 1 }
+guarded : Int -> Int
+guarded n | n < 0 = -1 | n == 0 = 0 | otherwise = 1
+recursive : Int -> Int
+recursive n = let rec loop : Int -> Int = \x -> if x <= 0 then 0 else x + loop (x-1) in loop n
+state : Int
+state = runST stateAction
+stateAction : forall s. ST s Int
+stateAction = do
+  empty <- newSTArray 0 (panic "unused empty initializer" : Int)
+  size <- lengthSTArray empty
+  cells <- newSTArray 1 (10 + size)
+  read <- stReturn (readSTArray cells 0)
+  before <- read
+  writeSTArray cells 0 20
+  after <- read
+  stReturn (before * 100 + after)
+main : IO Unit
+main = do
+  printInt shadow
+  printInt (boolean false * 10 + boolean true)
+  printInt (guarded (-9) + guarded 0 + guarded 2)
+  printInt (recursive 10)
+  printInt (case panic "wildcard scrutinee" of { _ -> 7 })
+  printInt (case Pair 8 (panic "unused field") of { Pair x _ -> x })
+  printInt state
+  printInt (length (map identity (Cons 1 (Cons 2 Nil))))
+  printInt (case (do { a <- Right 6; b <- Right 7; Right (a*b) }) of { Left _ -> 0; Right n -> n })
+  printInt (stringLength "a😀中\0")
+  printInt (stringCodeAt "a😀中\0" 1)
+  putStrLn (stringSlice "a😀中\0" 1 2)
+  printInt ((-7) / 3)
+  printInt ((-7) % 3)
+  printInt (123456789012345678901234567890 + 1)
