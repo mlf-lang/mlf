@@ -1,0 +1,56 @@
+module Tests.CoreModules where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import Bootstrap.Compiler
+import Bootstrap.X.Pretty
+import qualified Bootstrap.X.Parser as XP
+import qualified Bootstrap.X.Check as C
+import qualified Tests.Helpers as H
+import qualified Tests.Coverage as Coverage
+import Tests.CoreHelpers
+import Tests.Oracle (hmTypable, closedTerms, generatedTerms, distinctTermCases)
+import Prelude hiding (listDirectory)
+import Tests.System
+import Tests.Readability (readabilityTests)
+import Tests.Modules (moduleTests)
+import Tests.Separate (separateTests)
+import Tests.StateTypes (stateTypeTests)
+
+oracleTest : IO Unit
+oracleTest = do
+ let exhaustive = closedTerms 6
+ let seeded = generatedTerms 5000
+ let unique = distinctTermCases seeded
+ let terms = S.append (S.zip (S.range 1 1712) exhaustive) (S.map (\(Pair seed e) -> Pair (1712 + seed) e) unique)
+ let cases = S.map (\(Pair i e) -> Triple i e (hmTypable e)) terms
+ H.assert (S.length exhaustive == 1712 && S.length seeded == 5000 && S.length unique == 4991) "independent HM corpus coverage changed"
+ let typed = S.length (S.filter (\(Triple _ _ expected) -> expected) cases)
+ H.assert (typed > 100 && typed < S.length cases) "oracle corpus lacks positive or negative cases"
+ Coverage.forCounted "core" "hm-executed" cases (\(Triple i e expected) -> case compileExpr e of
+  Right _ -> H.assert expected ("accepted non-ML term " ++ H.show i ++ ": " ++ H.show e)
+  Left err -> do
+   H.assert (H.eq (phase err) Inference) ("compiler failure on " ++ H.show e ++ ": " ++ H.show err)
+   H.assert (S.not expected) ("rejected ML term " ++ H.show i ++ ": " ++ H.show e ++ "\n" ++ H.show err))
+ putStrLn ("Oracle: 6712 cases; 6703 executions (1712 exhaustive, 4991 distinct of 5000 seeded); " ++ H.show typed ++ " typable")
+ Coverage.metric "core" "hm-prescribed" (S.length exhaustive + S.length seeded)
+ Coverage.metric "core" "hm-exhaustive" (S.length exhaustive)
+ Coverage.metric "core" "hm-generated" (S.length seeded)
+ Coverage.metric "core" "hm-distinct-generated" (S.length unique)
+ Coverage.metric "core" "hm-typable" typed
+
+annotationCorpus : IO Unit
+annotationCorpus = (let { identityExpr = (SLam "x" Nothing (SVar "x")) } in (let { identityType = (SForall Flexible "a" SBottom (SArrow (STVar "a") (STVar "a"))) } in (let { types = (Cons SBottom (Cons (SCon "Int" Nil) (Cons (SCon "Bool" Nil) (Cons identityType (Cons (SForall Flexible "a" SBottom (SCon "List" (Cons (STVar "a") Nil))) (Cons (SForall Flexible "a" identityType (SArrow (STVar "a") (STVar "a"))) Nil)))))) } in (let { nested = (H.append types (S.concatMap (\a -> (S.concatMap (\b -> (Cons (SArrow a b) Nil)) types)) types)) } in (let { programs = (S.concat (S.concatMap (\t -> (Cons (Cons (SAnn identityExpr (SAnnotation Nil (SArrow t t))) (Cons (SLam "x" (Just (SAnnotation Nil t)) (SVar "x")) (Cons (SLet "f" (SAnn identityExpr (SAnnotation Nil (SArrow t t))) (SVar "f")) Nil))) Nil)) nested)) } in do { ((Coverage.forCounted "core" "annotation-executed" programs) (\e -> (case (compileExpr e) of { (Left err) -> (H.fail (H.append "failed annotated identity " (H.append (H.show e) (H.append "\n" (H.show err))))); (Right r) -> do { parsed <- (H.right (XP.parseTerm "<annotation xMLF>" (prettyTerm (compiledTerm r)))); do { ty <- (H.right (C.checkClosed parsed)); (sameType ty (inferredType r)) } } }))); (putStrLn (H.append "Annotations: " (H.append (H.show (H.length programs)) " typed programs"))) })))))
+
+examplesTest : IO Unit
+examplesTest = do { files <- (H.fmap (S.compose H.sort (S.filter (\section1 -> (H.contains ".emlf" section1)))) (listDirectory "examples")); do { (H.assert ((H.length files) >= 6) "example files are missing"); ((H.forM_ files) (\file -> (bind (bind (readFile (H.append "examples/" file)) compileOK) (\ignored -> (return Unit))))) } }
+
+families : List (Pair String (List (Pair String (IO Unit))))
+families =
+ Cons (Pair "core/readability" readabilityTests)
+ (Cons (Pair "core/modules" moduleTests)
+ (Cons (Pair "core/separate-compilation" separateTests)
+ (Cons (Pair "core/state-types" stateTypeTests)
+ (Cons (Pair "core/hm-oracle" (Cons (Pair "independent ML typability oracle" oracleTest) Nil))
+ (Cons (Pair "core/annotation-corpus" (Cons (Pair "annotation corpus" annotationCorpus) Nil))
+ (Cons (Pair "core/example-files" (Cons (Pair "example files" examplesTest) Nil))
+ Nil))))))

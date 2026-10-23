@@ -1,0 +1,30 @@
+module Tests.CoreLanguage where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import Bootstrap.Compiler
+import Bootstrap.Parser
+import qualified Bootstrap.X.Check as C
+import qualified Tests.Helpers as H
+import Tests.CoreHelpers
+import Tests.Computations (computationTests, hygieneTests)
+import Tests.Datatypes (datatypeTests)
+import Tests.Typeclasses (typeclassTests)
+import Tests.DoNotation (doTests)
+import Tests.SurfaceSyntax (surfaceSyntaxTests)
+import Tests.Guards (guardTests)
+
+compilerTests : (List ( Pair String (IO Unit) ))
+compilerTests = (Cons (hasType "identity" "\\x -> x" identity) (Cons (hasType "constant 42" "42" int) (Cons (hasType "boolean" "true" bool) (Cons (hasType "identity self-application" "(\\x -> x) (\\y -> y)" identity) (Cons (hasType "let polymorphism" "let id = \\x -> x in let number = id 42 in id true" bool) (Cons (hasType "lambda scope is not generalized" "\\x -> let y = x in y" identity) (Cons (hasType "lexical shadowing" "let x = true in (\\x -> x) 42" int) (Cons (hasType "let RHS sees outer binding" "let x = true in let x = x in x" bool) (Cons (hasType "application under an unannotated lambda" "\\f x -> f x" (allT 0 XBot (allT 1 XBot (XArrow (XArrow (v 0) (v 1)) (XArrow (v 0) (v 1)))))) (Cons (hasType "K preserves its polymorphic return bound" "\\x y -> x" (allT 0 XBot (allT 1 (allT 2 XBot (XArrow (v 2) (v 0))) (XArrow (v 0) (v 1))))) (Cons (hasType "g g" (H.append choosePrefix "let g = choose id in g g") chooseId) (Cons (hasType "g g applied to identity" (H.append choosePrefix "let g = choose id in g g id 42") int) (Cons (rejects "g g retains its identity lower bound" (H.append choosePrefix "let g = choose id in g g 42")) (Cons (hasType "closed annotation" "(\\x -> x) : forall a. a -> a" identity) (Cons (hasType "let annotation" "let id : forall a. a -> a = \\x -> x in id" identity) (Cons (hasType "bounded annotation" "(\\x -> x) : forall (a >= forall b. b -> b). a -> a" chooseId) (Cons (hasType "annotated self-application" "\\(f : forall a. a -> a) -> f f" (allT 1 identity (XArrow identity (v 1)))) (Cons (hasType "polymorphic parameter at distinct instances" "(\\(f : forall a. a -> a) -> let a = f 42 in f true) (\\x -> x)" bool) (Cons (hasType "impredicative result" "(\\(f : forall a. a -> a) -> f f) (\\x -> x)" identity) (Cons (hasType "partial annotation" "((\\x -> \\y -> y) : exists a. a -> (forall b. b -> b)) 42" identity) (Cons (hasType "existential root" "(\\x -> x) : exists a. a" identity) (Cons (hasType "existential annotation shares both sides" "(\\x -> x) : exists a. a -> a" identity) (Cons (hasType "alias bounds normalized before xMLF" "(\\x -> x) : forall a (b >= a). b -> b" identity) (Cons (hasType "inert bounds inlined" "(\\x -> x) : forall (a >= Int). a -> a" (XArrow int int)) (Cons (hasType "unused bounds disappear" "(\\x -> x) : forall unused a. a -> a" identity) (Cons (hasType "forall a.a equivalent to its bound" "(\\x -> x) : forall (a >= forall b. b -> b). a" identity) (Cons (hasType "annotation alpha-renaming" "(\\x -> x) : forall z. z -> z" identity) (Cons (hasType "parameterized type constructor" "(\\x -> x) : forall a. List a -> List a" (allT 0 XBot (XArrow (XCon "List" (Cons (v 0) Nil)) (XCon "List" (Cons (v 0) Nil))))) (Cons (accepts "rigid polymorphic bound" "(\\x -> x) : forall (a = forall b. b -> b). a -> a") (Cons (accepts "multiple quantified variables" "(\\x y -> x) : forall a b. a -> b -> a") (Cons (accepts "shared type has independent lexical binders" "let id = let id = \\x -> x in id in \\ignored -> (\\x y -> x) (\\x -> true)") (Cons (accepts "arbitrary-rank annotation" "\\(f : ((forall a. a -> a) -> Int) -> Int) -> f (\\(id : forall a. a -> a) -> id 42)") (Cons (rejects "unannotated self-application" "\\x -> x x") (Cons (rejects "inconsistent monomorphic argument" "\\f -> let a = f 42 in f true") (Cons (rejects "integer is not a function" "42 true") (Cons (rejects "cannot satisfy universal identity with an integer result" "(\\x -> 42) : forall a. a -> a") (Cons (rejects "distinct skolems cannot merge" "(\\x -> x) : forall a b. a -> b") (Cons (rejects "wrong closed annotation" "42 : Bool") (Cons (rejects "cannot invent a polymorphic value" "42 : forall a. a") (Cons (rejects "free source variable" "missing") (Cons (rejects "recursive let is not implicit" "let x = x in x") (Cons (rejects "type annotation has a free variable" "(\\x -> x) : a -> a") (Cons (rejects "constructor arity" "42 : Int Bool") (Cons (Pair "trailing input is rejected" (H.reject (parseExpr "<test>" "42 )"))) (Cons (Pair "parser handles nested comments" do { r <- (compileOK "{- outer {- inner -} -} let id = \\x -> x in -- a comment\n id 42"); (sameType (inferredType r) int) }) (Cons (Pair "generated computations are necessary" do { r <- (compileOK "(\\x -> x) 42"); (H.reject (C.checkClosed (stripComputations (compiledTerm r)))) }) Nil))))))))))))))))))))))))))))))))))))))))))))))
+
+families : List (Pair String (List (Pair String (IO Unit))))
+families =
+ Cons (Pair "core/substring-adapter" Nil)
+ (Cons (Pair "core/inference-and-annotations" compilerTests)
+ (Cons (Pair "core/type-computations" computationTests)
+ (Cons (Pair "core/binding-hygiene" hygieneTests)
+ (Cons (Pair "core/datatypes" datatypeTests)
+ (Cons (Pair "core/typeclasses" typeclassTests)
+ (Cons (Pair "core/do-notation" doTests)
+ (Cons (Pair "core/surface-syntax" surfaceSyntaxTests)
+ (Cons (Pair "core/guards" guardTests)
+ Nil))))))))

@@ -8,15 +8,17 @@ static unsigned checks;
 static void check(int condition,const char *message) {
     if(!condition) { fprintf(stderr,"build runner test failed: %s\n",message); exit(1); }
 }
-static void path(char *out,size_t size,const char *name) { int n=snprintf(out,size,"%s/%s",scratch,name); check(n>=0 && (size_t)n<size,"test path length"); }
+static void join(char *out,size_t size,const char *directory,const char *name) { int n=snprintf(out,size,"%s/%s",directory,name); check(n>=0 && (size_t)n<size,"test path length"); }
+static void path(char *out,size_t size,const char *name) { join(out,size,scratch,name); }
 static void field(FILE *f,const char *s) { check(fwrite(s,1,strlen(s)+1,f)==strlen(s)+1,"write plan"); }
 static void integer(FILE *f,unsigned n) { char text[32]; snprintf(text,sizeof(text),"%u",n); field(f,text); }
-static FILE *begin(const char *name,unsigned jobs,unsigned count) {
-    char suffix[160]; snprintf(suffix,sizeof(suffix),"%s.plan",name); path(plan_path,sizeof(plan_path),suffix);
-    snprintf(suffix,sizeof(suffix),"%s.result",name); path(result_path,sizeof(result_path),suffix);
+static FILE *begin_at(const char *directory,const char *name,unsigned jobs,unsigned count) {
+    char suffix[160]; snprintf(suffix,sizeof(suffix),"%s.plan",name); join(plan_path,sizeof(plan_path),directory,suffix);
+    snprintf(suffix,sizeof(suffix),"%s.result",name); join(result_path,sizeof(result_path),directory,suffix);
     FILE *f=test_open(plan_path,"wb"); check(f!=NULL,"open plan");
     field(f,"MLF_BUILD_PLAN"); field(f,"1"); field(f,name); integer(f,jobs); integer(f,count); return f;
 }
+static FILE *begin(const char *name,unsigned jobs,unsigned count) { return begin_at(scratch,name,jobs,count); }
 static void task(FILE *f,const char *id,unsigned timeout,char **deps,const char *cwd,const char *out,const char *err,char **argv) {
     field(f,id); integer(f,timeout); unsigned n=0; if(deps) while(deps[n]) ++n; integer(f,n); for(unsigned i=0;i<n;++i) field(f,deps[i]);
     field(f,cwd?cwd:""); field(f,""); field(f,out?out:""); field(f,err?err:""); n=0; while(argv[n]) ++n; integer(f,n); for(unsigned i=0;i<n;++i) field(f,argv[i]);
@@ -106,11 +108,45 @@ static void unicode(void) {
     task(f,"unicode",5,NULL,dir,"merged \xe6\x97\xa5\xe5\xbf\x97.txt","merged \xe6\x97\xa5\xe5\xbf\x97.txt",args);
     char *text=finish(start(f),0); state(text,"unicode","succeeded"); free(text); text=test_read(log); check(text!=NULL,"unicode relative redirection"); check(strstr(text,"hello space\nquote\"slash\\\n\xe4\xb8\xad\xe6\x96\x87\n\n")!=NULL,"structured Unicode argv"); check(strstr(text,"stderr\n")!=NULL,"merged stdout stderr"); free(text); ++checks;
 }
+static void copy_task(FILE *f,const char *id,const char *cwd,const char *input,const char *output,const char *error) {
+    field(f,id); integer(f,5); integer(f,0); field(f,cwd); field(f,input); field(f,output); field(f,error); integer(f,2); field(f,fixture); field(f,"copy");
+}
+static void long_file_paths(void) {
+    /* Content-addressed worker logs can exceed MAX_PATH even though the task
+     * cwd and executable are short. Exercise that boundary independently of
+     * plan/result paths, then cover long protocol files and atomic publication.
+     * Five 64-byte components exceed MAX_PATH even for a short scratch root. */
+    char relative[1024]="long paths \xe4\xb8\xad\xe6\x96\x87",directory[4096];
+    path(directory,sizeof(directory),relative); test_mkdir(directory);
+    for(unsigned i=0;i<5;++i) {
+        strcat(relative,"/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+        path(directory,sizeof(directory),relative); test_mkdir(directory);
+    }
+    char input[4096],output[4096],error[4096],relative_input[1200],relative_output[1200],relative_error[1200],merged[1200];
+    join(input,sizeof(input),directory,"input.txt"); join(output,sizeof(output),directory,"output.txt"); join(error,sizeof(error),directory,"error.txt");
+    join(relative_input,sizeof(relative_input),relative,"input.txt"); join(relative_output,sizeof(relative_output),relative,"relative.txt"); join(relative_error,sizeof(relative_error),relative,"relative.stderr"); join(merged,sizeof(merged),relative,"merged.txt");
+    FILE *in=test_open(input,"wb"); check(in!=NULL,"open long input"); fputs("long path stdin\n",in); check(!fclose(in),"close long input");
+    FILE *f=begin("long-redirections",1,3);
+    copy_task(f,"absolute",scratch,input,output,error);
+    copy_task(f,"relative",scratch,relative_input,relative_output,relative_error);
+    char *args[]={(char *)fixture,"echo","long path stdout",NULL}; task(f,"merged",5,NULL,scratch,merged,merged,args);
+    char *text=finish(start(f),0); state(text,"absolute","succeeded"); state(text,"relative","succeeded"); state(text,"merged","succeeded"); free(text);
+    text=test_read(output); check(text && !strcmp(text,"long path stdin\n"),"long absolute input/output"); free(text);
+    text=test_read(error); check(text && !*text,"long absolute stderr"); free(text);
+    path(output,sizeof(output),relative_output); text=test_read(output); check(text && !strcmp(text,"long path stdin\n"),"long relative input/output"); free(text);
+    path(error,sizeof(error),relative_error); text=test_read(error); check(text && !*text,"long relative stderr"); free(text);
+    path(output,sizeof(output),merged); text=test_read(output); check(text && strstr(text,"long path stdout\n") && strstr(text,"stderr\n"),"long merged stdout/stderr"); free(text);
+    f=begin_at(directory,"long-protocol",1,1); copy_task(f,"protocol",scratch,input,output,error);
+    text=finish(start(f),0); state(text,"protocol","succeeded"); free(text);
+    text=test_read(output); check(text && !strcmp(text,"long path stdin\n"),"long protocol task output"); free(text);
+    puts("Long-path build runner file transport passed");
+}
 static void redirected_input(void) {
     char input[4096],output[4096]; path(input,sizeof(input),"stdin.txt"); path(output,sizeof(output),"copied.txt");
     FILE *in=test_open(input,"wb"); check(in!=NULL,"write input"); fputs("structured stdin\n",in); fclose(in);
-    FILE *f=begin("stdin",1,1); field(f,"copy"); integer(f,5); integer(f,0); field(f,scratch); field(f,"stdin.txt"); field(f,"copied.txt"); field(f,""); integer(f,2); field(f,fixture); field(f,"copy");
-    char *text=finish(start(f),0); free(text); text=test_read(output); check(text && !strcmp(text,"structured stdin\n"),"relative stdin redirection"); free(text); ++checks;
+    FILE *f=begin("stdin",1,1); copy_task(f,"copy",scratch,"stdin.txt","copied.txt","");
+    char *text=finish(start(f),0); free(text); text=test_read(output); check(text && !strcmp(text,"structured stdin\n"),"relative stdin redirection"); free(text);
+    long_file_paths(); ++checks;
 }
 static void nonce(void) {
     char output[4096]; path(output,sizeof(output),"nonce.txt"); char *previous=NULL;

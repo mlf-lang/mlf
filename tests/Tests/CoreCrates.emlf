@@ -1,0 +1,18 @@
+module Tests.CoreCrates where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Tests.OptimizerUses as OptimizerUses
+import qualified Tests.CrateCodegen as CrateCodegen
+import Tests.CrateQueries (crateQueryTests)
+import qualified Tests.StrictWrappers as StrictWrappers
+import qualified Tests.CheckedEmission as CheckedEmission
+
+families : List (Pair String (List (Pair String (IO Unit))))
+families =
+ Cons (Pair "core/optimizer-uses" OptimizerUses.suite)
+ (Cons (Pair "core/crate-codegen" CrateCodegen.suite)
+ (Cons (Pair "core/declaration-queries" (S.take 7 crateQueryTests))
+ (Cons (Pair "core/incremental-crate-cache" (S.drop 7 crateQueryTests))
+ (Cons (Pair "core/strict-wrappers" StrictWrappers.suite)
+ (Cons (Pair "core/checked-emission" CheckedEmission.suite)
+ Nil)))))
