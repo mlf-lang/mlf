@@ -2,6 +2,7 @@ module Tests.TestFramework where
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Package.Json as J
+import qualified Package.OS as O
 import qualified Tests.Basic as H
 import qualified Test.Assert as A
 import qualified Test.Case as C
@@ -68,6 +69,20 @@ checks = do
 
  let original = Pair "legacy label" (return Unit)
  let adapted = C.fromIO "legacy/case" (Cons "legacy" Nil) original
+ let classified = C.classified (Cons "standard-library" Nil) (O.words "property-based differential") adapted
+ let described = C.described "runtime-library" "component" (Cons "exhaustive" Nil) (Cons "independent-reference" Nil) (Cons "regression" Nil) classified
+ selected (O.words "--group runtime-library --level component --input exhaustive --oracle independent-reference --purpose regression") (Cons described Nil) (Cons "legacy/case" Nil)
+ ok (eqString (C.id described) (C.id adapted) && eqString (C.name described) (C.name adapted) && S.elem eqString "legacy" (C.tags described))
+ ok (S.eqList eqString (C.tags (C.described "runtime-library" "component" (Cons "exhaustive" Nil) (Cons "independent-reference" Nil) (Cons "regression" Nil) described)) (C.tags described))
+ rejected (R.plan (O.words "--oracle fixed-point") (Cons described Nil))
+ ok (eqString (C.id classified) (C.id adapted) && eqString (C.name classified) (C.name adapted))
+ ok (S.eqList eqString (C.tags (C.classified (Cons "standard-library" Nil) (Cons "differential" Nil) classified)) (C.tags classified))
+ selected (O.words "--category standard-library --technique property-based --technique differential") (Cons classified Nil) (Cons "legacy/case" Nil)
+ selected (O.words "--tag legacy --category standard-library") (Cons classified Nil) (Cons "legacy/case" Nil)
+ rejected (R.plan (O.words "--category compiler-components") (Cons classified Nil))
+ let failing = C.classified (Cons "test-infrastructure" Nil) (Cons "fault-injection" Nil) (C.test "retained/action" "retained action" Nil (A.fail "retained failure"))
+ retained <- A.run (C.action failing)
+ case retained of { Left error -> ok (eqString (A.message error) "retained failure"); Right _ -> H.fail "classification changed an action" }
  let legacy = C.toLegacy adapted
  let label = S.fst legacy
  let action = S.snd legacy

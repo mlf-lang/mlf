@@ -41,16 +41,18 @@ jobs:
   native:
     name: Compiler source smoke
     if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only
-    runs-on: macos-26
-    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Published seed runtime dependency
-        run: brew install gmp
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgmp10
       - name: Fetch verified native seed
         env:
           GH_TOKEN: ${{ github.token }}
-        run: tools/release/fetch-seed.sh .mlf-build/seed .github/smoke-seed.env
+        run: tools/release/fetch-seed.sh .mlf-build/seed .github/smoke-seed-linux.env
       - name: Exercise checkout compiler sources with the verified seed
         run: tools/release/native-ci.sh source-smoke
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -165,7 +167,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-26]
+        # PR and merge-queue gates stay on Linux; main/manual runs retain macOS.
+        os: ${{ fromJSON((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && '["ubuntu-24.04", "macos-26"]' || '["ubuntu-24.04"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
@@ -204,7 +207,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-26]
+        # Keep real macOS coverage without queueing the required pre-merge gate.
+        os: ${{ fromJSON((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && '["ubuntu-24.04", "macos-26"]' || '["ubuntu-24.04"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
@@ -239,22 +243,34 @@ jobs:
           include-hidden-files: true
           path: .mlf-build/async-native-ci/*.log
   async-language:
-    name: Async interpreter and native parity
+    name: Async interpreter and native parity (${{ matrix.os }})
     if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only
-    runs-on: macos-26
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && '["ubuntu-24.04", "macos-26"]' || '["ubuntu-24.04"]') }}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Native bootstrap and parity dependencies
         run: |
-          brew install llvm gmp pkg-config bdw-gc jq
-          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
-          echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo apt-get update
+            sudo apt-get install -y clang llvm libgmp-dev libgc-dev pkg-config jq
+          else
+            brew install llvm gmp pkg-config bdw-gc jq
+            echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+            echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
+          fi
           echo 'GC_FREE_SPACE_DIVISOR=8' >> "$GITHUB_ENV"
       - name: Fetch verified native seed
         env:
           GH_TOKEN: ${{ github.token }}
-        run: tools/release/fetch-seed.sh .mlf-build/async-seed .github/smoke-seed.env
+        run: |
+          pin=.github/smoke-seed.env
+          if [ "$RUNNER_OS" = Linux ]; then pin=.github/smoke-seed-linux.env; fi
+          tools/release/fetch-seed.sh .mlf-build/async-seed "$pin"
       - name: Bootstrap the real primitive-aware interpreter and compiler
         run: |
           set -euo pipefail
@@ -282,7 +298,7 @@ jobs:
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
-          name: async-language-evidence
+          name: async-language-evidence-${{ matrix.os }}
           include-hidden-files: true
           retention-days: 14
           path: |

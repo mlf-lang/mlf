@@ -1,0 +1,6120 @@
+{
+  "schema_version": 2,
+  "granularity": "verified-case-or-family",
+  "groups": [
+    "language",
+    "code-generation",
+    "runtime-library",
+    "packages-build",
+    "distribution",
+    "bootstrap",
+    "test-infrastructure"
+  ],
+  "levels": [
+    "component",
+    "integration",
+    "system"
+  ],
+  "inputs": [
+    "fixed",
+    "exhaustive",
+    "seeded-random",
+    "transformed",
+    "fault-injected"
+  ],
+  "oracles": [
+    "fixed-expected",
+    "independent-reference",
+    "differential",
+    "metamorphic",
+    "contract",
+    "fixed-point"
+  ],
+  "purposes": [
+    "regression",
+    "conformance",
+    "robustness",
+    "performance",
+    "reproducibility"
+  ],
+  "profiles": [
+    "smoke",
+    "full",
+    "stress",
+    "release"
+  ],
+  "campaigns": {
+    "unit": [
+      "regex",
+      "harness",
+      "test-framework",
+      "core",
+      "figure12"
+    ],
+    "packages": [
+      "package-integration",
+      "package-distribution"
+    ],
+    "backends": [
+      "backends"
+    ],
+    "port": [
+      "port"
+    ],
+    "parity": [
+      "parity"
+    ],
+    "self-host": [
+      "self-host"
+    ]
+  },
+  "units": [
+    {
+      "id": "core",
+      "name": "Compiler components and container reference checks"
+    },
+    {
+      "id": "figure12",
+      "name": "Figure 12 compiler regressions"
+    },
+    {
+      "id": "regex",
+      "name": "Standard library regular expressions"
+    },
+    {
+      "id": "harness",
+      "name": "Native build, benchmark, release and cache infrastructure"
+    },
+    {
+      "id": "test-framework",
+      "name": "Test framework, coverage and process contracts"
+    },
+    {
+      "id": "package-integration",
+      "name": "Source package resolution and build/cache integration"
+    },
+    {
+      "id": "package-distribution",
+      "name": "Checked package release and distribution"
+    },
+    {
+      "id": "backends",
+      "name": "Interpreter and native backend execution"
+    },
+    {
+      "id": "port",
+      "name": "Native compiler and library workloads"
+    },
+    {
+      "id": "parity",
+      "name": "Frozen language conformance regression"
+    },
+    {
+      "id": "self-host",
+      "name": "Fresh compiler bootstrap reproducibility"
+    }
+  ],
+  "families": [
+    {
+      "id": "core/substring-adapter",
+      "unit": "core",
+      "name": "String substring adapter boundaries",
+      "group": "runtime-library",
+      "level": "component",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [],
+        "aliases": {},
+        "metrics": {
+          "substring-executed": 13
+        }
+      }
+    },
+    {
+      "id": "core/optimizer-uses",
+      "unit": "core",
+      "name": "Optimizer use indices and rewrites",
+      "group": "code-generation",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "seeded-random"
+      ],
+      "oracles": [
+        "independent-reference"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "optimizer free-use indices agree with independent scoped scans",
+          "indexed optimizer agrees with legacy traversal and fresh identities"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/crate-codegen",
+      "unit": "core",
+      "name": "Checked code-generation query and cache",
+      "group": "code-generation",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "transformed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "code generation query agrees with uncached checked emission",
+          "erased query reuses alpha and annotation changes",
+          "optimized query reuses changed unused bodies",
+          "code generation cache separates IO and constructor ABIs",
+          "corrupt cached LLVM is rebuilt",
+          "prepared entries and stale crate dependencies retain visibility"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/declaration-queries",
+      "unit": "core",
+      "name": "Declaration dependencies and group inference",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "metamorphic",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "declaration SCC order and inventory permutation",
+          "recursive SCC excludes unrelated declarations",
+          "indexed SCC traversal handles 2000 declarations",
+          "term, type, class and constructor observations remain distinct",
+          "checked group inference preserves principal polymorphism",
+          "closed-signature recursion remains checked across groups",
+          "inference rejects an open imported environment"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/incremental-crate-cache",
+      "unit": "core",
+      "name": "Incremental crate query cache controls",
+      "group": "packages-build",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "transformed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "persistent no-op reuse and corrupt-cache recovery",
+          "implementation edits preserve consumer caches and clean equivalence",
+          "changed schemes invalidate actual consumers",
+          "datatype closure invalidates relevant changes only",
+          "instance candidate visibility participates in query keys",
+          "query encodings preserve semantics and normalize lexical names",
+          "cache schemes are checked against stored implementations"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/component-projection",
+      "unit": "core",
+      "name": "Solver component scope projection",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "exhaustive",
+        "transformed"
+      ],
+      "oracles": [
+        "independent-reference",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "component scopes agree with independent edge enumeration",
+          "projected nodes preserve explicit rank identities",
+          "ordered restoration preserves checked inverse identities"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/int-set-unions",
+      "unit": "core",
+      "name": "Integer set union reference checks",
+      "group": "runtime-library",
+      "level": "component",
+      "inputs": [
+        "exhaustive"
+      ],
+      "oracles": [
+        "independent-reference"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "size-biased set unions agree with independent sorted lists"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/index-edges",
+      "unit": "core",
+      "name": "Incremental solver edge indices",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "exhaustive",
+        "transformed"
+      ],
+      "oracles": [
+        "independent-reference"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "incremental reverse indices agree with independent edge enumeration",
+          "reverse-index edits agree with independent edge lists"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/projection-ranks",
+      "unit": "core",
+      "name": "Ordered component identity ranks",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "exhaustive",
+        "transformed"
+      ],
+      "oracles": [
+        "independent-reference"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "ordered component ranks agree with independent renaming maps"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/projection-changes",
+      "unit": "core",
+      "name": "Incremental component projection patches",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "exhaustive",
+        "transformed"
+      ],
+      "oracles": [
+        "independent-reference"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "linear projection patches agree with independent map differences"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/strict-wrappers",
+      "unit": "core",
+      "name": "Strict unary representation contracts",
+      "group": "code-generation",
+      "level": "component",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "strict unary representation requires whole-program evaluated fields"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/solver-index-audit",
+      "unit": "core",
+      "name": "Solver index integrity and corruption controls",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "transformed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "independent-reference"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "incremental index audit agrees with independent reconstruction"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/dense-normalization",
+      "unit": "core",
+      "name": "Dense graph identity normalization",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "exhaustive",
+        "transformed"
+      ],
+      "oracles": [
+        "independent-reference"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "dense normalization agrees with an independent list oracle"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/checked-emission",
+      "unit": "core",
+      "name": "Checked emission and malformed-input rejection",
+      "group": "code-generation",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "checked emission agrees with raw independently checked emission",
+          "external xMLF emission still rejects malformed terms",
+          "checked emission still enforces IO entry types",
+          "checked witness and compilation constructors are private"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/solver-allocation",
+      "unit": "core",
+      "name": "Solver allocation and graph expansion identities",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "exhaustive",
+        "transformed"
+      ],
+      "oracles": [
+        "independent-reference",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "strict graph builder agrees with independent insertion",
+          "node forcing preserves arbitrary identities and lazy constructor fields",
+          "graph expansion preserves independent allocation and frontier identities"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/inference-and-annotations",
+      "unit": "core",
+      "name": "Source inference and bounded annotations",
+      "group": "language",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "metamorphic",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "identity",
+          "constant 42",
+          "boolean",
+          "identity self-application",
+          "let polymorphism",
+          "lambda scope is not generalized",
+          "lexical shadowing",
+          "let RHS sees outer binding",
+          "application under an unannotated lambda",
+          "K preserves its polymorphic return bound",
+          "g g",
+          "g g applied to identity",
+          "g g retains its identity lower bound",
+          "closed annotation",
+          "let annotation",
+          "bounded annotation",
+          "annotated self-application",
+          "polymorphic parameter at distinct instances",
+          "impredicative result",
+          "partial annotation",
+          "existential root",
+          "existential annotation shares both sides",
+          "alias bounds normalized before xMLF",
+          "inert bounds inlined",
+          "unused bounds disappear",
+          "forall a.a equivalent to its bound",
+          "annotation alpha-renaming",
+          "parameterized type constructor",
+          "rigid polymorphic bound",
+          "multiple quantified variables",
+          "shared type has independent lexical binders",
+          "arbitrary-rank annotation",
+          "unannotated self-application",
+          "inconsistent monomorphic argument",
+          "integer is not a function",
+          "cannot satisfy universal identity with an integer result",
+          "distinct skolems cannot merge",
+          "wrong closed annotation",
+          "cannot invent a polymorphic value",
+          "free source variable",
+          "recursive let is not implicit",
+          "type annotation has a free variable",
+          "constructor arity",
+          "trailing input is rejected",
+          "parser handles nested comments",
+          "generated computations are necessary"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/type-computations",
+      "unit": "core",
+      "name": "Explicit type-computation calculus",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "Inst-Reflex",
+          "Inst-Bot",
+          "Inst-Hyp",
+          "Inst-Inner",
+          "Inst-Outer",
+          "Inst-Quant-Elim",
+          "Inst-Quant-Intro",
+          "Inst-Trans / System F application",
+          "outer alpha conversion",
+          "Inst-Hyp checks its bound",
+          "Inst-Hyp requires a binding",
+          "Inst-Bot requires bottom source",
+          "elimination requires a quantifier",
+          "inner does not cross arrows",
+          "introduction cannot capture",
+          "outer cannot capture",
+          "cyclic environments rejected",
+          "malformed term environment rejected"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/binding-hygiene",
+      "unit": "core",
+      "name": "Type and term binding hygiene",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "capture-avoiding substitution",
+          "quantifier does not scope over its own bound",
+          "alpha-equivalence tracks shadowing",
+          "type quantifiers have lexical scope",
+          "xMLF does not identify inert or alias bounds"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/graph-expansion",
+      "unit": "core",
+      "name": "Graph scheme expansion invariants",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "expansion resets scheme flag and binding",
+          "all inert nodes normalized",
+          "well-domination enforced"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/graph-validation",
+      "unit": "core",
+      "name": "Binding graph validation",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "exhaustive"
+      ],
+      "oracles": [
+        "independent-reference"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "graph validation agrees with uncached reference",
+          "graph validation checks deeply nested binding scopes",
+          "graph validation checks shared higher-kinded subgraphs"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/graph-unification",
+      "unit": "core",
+      "name": "Graph unification and identity renaming",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "independent-reference",
+        "metamorphic"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "indexed unification and identity renaming agree with map-based reference",
+          "indexed unification agrees on successive scoped expansions",
+          "dependency traversal rejects structural cycles created by merging"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/graph-solver",
+      "unit": "core",
+      "name": "Component solver and frontier solving",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "exhaustive",
+        "fault-injected"
+      ],
+      "oracles": [
+        "independent-reference",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "component solver matches every full-graph inference step",
+          "component witnesses preserve separate frontier solving and identities",
+          "component solver includes incoming references and protected siblings",
+          "component solver rejects malformed disconnected input",
+          "component solver preserves deep branching scopes and separate type components",
+          "expansion preserves the exact fresh identity budget across word boundaries",
+          "closed-instance optimization preserves all original schemes",
+          "closed-instance matching checks repeated, rigid and frontier variables"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/embedding-pruning",
+      "unit": "core",
+      "name": "Embedding identity and allocation history pruning",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "exhaustive"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "metamorphic",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "embedding pruning preserves identities and values over allocation histories",
+          "embedding pruning preserves old updates, aliases and allocation gaps",
+          "embedding pruning preserves source bound and existential semantics"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/datatypes",
+      "unit": "core",
+      "name": "Datatype declarations, patterns and checked targets",
+      "group": "language",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "data: nullary constructor",
+          "data: polymorphic nullary constructor",
+          "data: constructor is a first-class function",
+          "data: constructor application",
+          "data: partial constructor application",
+          "data: multiple parameters",
+          "data: let-bound constructor has independent instances",
+          "data: phantom parameter",
+          "data: exhaustive case",
+          "data: nested patterns",
+          "data: reordered alternatives",
+          "data: case constrains scrutinee",
+          "data: case returns its polymorphic scrutinee",
+          "data: case rebuilds polymorphic data",
+          "data: case generalizes an unconstrained result",
+          "data: case retains an MLF result bound",
+          "data: generalized case function",
+          "data: pattern field order",
+          "data: wildcard field",
+          "data: multiple wildcard fields",
+          "data: wildcard alternative",
+          "data: variable alternative and nested case",
+          "data: wildcard-only case",
+          "data: variable-only case",
+          "data: pattern shadows outer variable",
+          "data: recursive list",
+          "data: recursive list deconstruction",
+          "data: recursive tree",
+          "data: mutually recursive declarations",
+          "data: non-regular recursive declaration",
+          "data: function field",
+          "data: polymorphic type argument",
+          "data: polymorphic case result",
+          "data: polymorphic field used with an explicit annotation",
+          "data: declaration parameter is not a target keyword",
+          "data: explicitly polymorphic field",
+          "data: unknown constructor",
+          "data: wrong field type",
+          "data: pattern fields are not implicitly generalized",
+          "data: overapplied nullary constructor",
+          "data: wrong scrutinee type",
+          "data: inconsistent branch results",
+          "data: non-exhaustive case",
+          "data: too few pattern fields",
+          "data: too many pattern fields",
+          "data: duplicate constructor alternative",
+          "data: mixed datatype alternatives",
+          "data: default must be last",
+          "data: duplicate pattern variable",
+          "data: pattern variables do not escape",
+          "data: pattern variable unavailable in sibling branch",
+          "data: duplicate datatype",
+          "data: duplicate constructor across datatypes",
+          "data: duplicate constructor within datatype",
+          "data: duplicate type parameter",
+          "data: free field type parameter",
+          "data: unknown field type",
+          "data: recursive type arity",
+          "data: declared annotation arity",
+          "data: primitive type redefinition",
+          "data: reserved datatype name",
+          "data: primitive constructor redefinition",
+          "data: declaration and case parse tree",
+          "data: empty declaration rejected by AST API",
+          "data: constructor and case erasure",
+          "data target: independent constructor and case typing",
+          "data target: unknown constructor",
+          "data target: constructor type argument count",
+          "data target: constructor type argument is well formed",
+          "data target: constructor field type",
+          "data target: non-exhaustive case",
+          "data target: empty case",
+          "data target: case result type",
+          "data target: case scrutinee type",
+          "data target: pattern field count",
+          "data target: repeated alternative",
+          "data target: pattern binder freshness",
+          "data target: pattern scope",
+          "data target: declared arity in an annotation",
+          "data target: declared arity inside a type computation",
+          "data target: invalid declaration",
+          "data target: nested declaration scope",
+          "data syntax: declaration separator required",
+          "data syntax: lowercase constructor",
+          "data syntax: empty case",
+          "data syntax: wildcard token boundary"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/typeclasses",
+      "unit": "core",
+      "name": "Class constraints, evidence and kind checking",
+      "group": "language",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "class: concrete method",
+          "class: inferred constrained let at distinct instances",
+          "class: implicit method quantification",
+          "class: explicit qualified function",
+          "class: qualified expression in function position",
+          "class: qualified function parameter",
+          "class: two givens of the same class",
+          "class: concrete call inside a generic constraint",
+          "class: lambda shadows method",
+          "class: let shadows method",
+          "class: pattern shadows method",
+          "class: higher-kinded method",
+          "class: partial type constructor instance",
+          "class: instance definitions are order independent",
+          "class: superclass given without concrete instances",
+          "class: mutually recursive methods",
+          "class: higher-kinded datatype application",
+          "class: higher-kinded annotation",
+          "class: Monad hierarchy example",
+          "class: contextual recursive instance example",
+          "class: qualified result is displayed using its class name",
+          "class rejection: missing concrete instance",
+          "class rejection: does not pick the only instance for an unknown type",
+          "class rejection: wrong instance body",
+          "class rejection: method body is checked polymorphically",
+          "class rejection: missing method",
+          "class rejection: extra method",
+          "class rejection: duplicate method implementation",
+          "class rejection: duplicate class",
+          "class rejection: methods share a global namespace",
+          "class rejection: method must mention its class parameter",
+          "class rejection: unknown class",
+          "class rejection: duplicate instance",
+          "class rejection: overlapping generic and concrete instances",
+          "class rejection: variable instance head",
+          "class rejection: nondecreasing instance context",
+          "class rejection: instance context variable absent from head",
+          "class rejection: cyclic superclasses",
+          "class rejection: missing superclass instance",
+          "class rejection: class instance kind",
+          "class rejection: class context kind",
+          "class rejection: higher-kinded argument must have the declared kind",
+          "class rejection: ordinary type variable cannot be applied",
+          "class rejection: method constraints require supported signatures",
+          "class target: recursive dictionary body has wrong declared type",
+          "class target: recursive binders must be unique",
+          "class target: recursive binding cannot reuse an outer binder",
+          "class target: term annotation has kind star",
+          "class target: constructor checks the kind of a type argument",
+          "class target: compact and general application spines agree",
+          "class target: Inst-Bot cannot change kinds",
+          "class evidence: chooses the given by its type",
+          "class: two parameters",
+          "class: instances with the same first parameter are disjoint",
+          "class: instances with the same second parameter are disjoint",
+          "class: repeated variables are shared across instance arguments",
+          "class: class parameter substitution is simultaneous",
+          "class: inferred multiparameter constraint",
+          "class: explicit multiparameter constraint",
+          "class: three parameters",
+          "class: superclass can discard a parameter",
+          "class: superclass can reorder parameters",
+          "class: same class givens with different second arguments",
+          "class: recursive multiparameter instance example",
+          "class: multi-parameter constraint display",
+          "class rejection: instance is missing a parameter",
+          "class rejection: instance has an extra parameter",
+          "class rejection: constraint is missing a parameter",
+          "class rejection: duplicate class parameter",
+          "class rejection: method omits a class parameter",
+          "class rejection: does not infer an output parameter from the only instance",
+          "class rejection: matches every repeated parameter",
+          "class rejection: overlap needs joint unification across parameters",
+          "class rejection: overlapping variable and concrete argument",
+          "class rejection: context must decrease across the whole argument tuple",
+          "class rejection: context cannot duplicate a variable",
+          "class rejection: later parameter kind is checked",
+          "class evidence: superclass projection preserves caller variable identities"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/do-notation",
+      "unit": "core",
+      "name": "Do notation parsing and lowering",
+      "group": "language",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "metamorphic",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "do: single expression",
+          "do: local let needs no bind",
+          "do: binding",
+          "do: sequencing",
+          "do: wildcard binding",
+          "do: optional trailing semicolon",
+          "do: nested blocks",
+          "do: bind statement sees the outer binding",
+          "do: local let sees the outer binding",
+          "do: local let is generalized",
+          "do: local let annotation",
+          "do: let-in expression is an action",
+          "do: do expression used as an argument",
+          "do: do expression annotation",
+          "do: constructor pattern",
+          "do: constructor wildcard field",
+          "do: discarded action cannot capture an outer name",
+          "do: pattern temporary cannot capture an outer name",
+          "do: uses the lexical bind function",
+          "do rejection: empty block",
+          "do rejection: final statement must be an expression",
+          "do rejection: cannot end with a local declaration",
+          "do rejection: statements need separators",
+          "do rejection: default IO bind requires an action",
+          "do rejection: bound variable cannot escape",
+          "do rejection: binding is not recursive",
+          "do rejection: later binding is unavailable",
+          "do rejection: action type mismatch",
+          "do rejection: final action has the right monadic type",
+          "do rejection: refutable pattern requires an explicit case",
+          "do rejection: pattern binder duplicates",
+          "do: parser preserves statement forms",
+          "do: lowering preserves binding order and the final action",
+          "do: multiparameter MonadState example"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/surface-syntax",
+      "unit": "core",
+      "name": "Surface syntax and source checking",
+      "group": "language",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "surface parser: multiplication binds above addition",
+          "surface parser: application binds above arithmetic",
+          "surface parser: subtraction associates left",
+          "surface parser: quotient and remainder associate left",
+          "surface parser: parentheses override precedence",
+          "surface parser: Boolean precedence",
+          "surface parser: concatenation associates right",
+          "surface parser: subtraction without spaces is not signed application",
+          "surface parser: negative argument is parenthesized",
+          "surface parser: unary minus applies after function application",
+          "surface parser: signed Double exponent",
+          "surface parser: signed hexadecimal integer",
+          "surface parser: plus sign and negative right operand",
+          "surface parser: comments at operators",
+          "surface parser: nearest else",
+          "surface parser: arithmetic inside branches",
+          "surface parser: control expression as right operand",
+          "surface parser: annotation covers the infix expression",
+          "surface parser: local parameters lower to lambdas",
+          "surface program: declarations have ordered let scopes",
+          "surface program: implicit main with trailing semicolon",
+          "surface program: implicit main without trailing semicolon",
+          "surface program: explicit entry overrides main",
+          "surface program: separate signature covers the whole function",
+          "surface checking: declarations generalize",
+          "surface checking: annotated function parameter",
+          "surface checking: inline whole-function signature",
+          "surface checking: annotated local function",
+          "surface checking: do-local function generalizes",
+          "surface checking: do-local function sees outer binding",
+          "surface checking: conditional returns polymorphic function",
+          "surface checking: conditional works in a case scrutinee",
+          "surface checking: keyword prefixes remain identifiers",
+          "surface checking: instance method parameters",
+          "surface checking: qualified function declaration",
+          "surface checking: syntax needs no implicit prelude",
+          "surface rejection: recursion needs a signature",
+          "surface checking: forward value references",
+          "surface rejection: branch types must agree",
+          "surface rejection: condition must be Bool",
+          "surface rejection: arithmetic does not overload Double",
+          "surface rejection: unary plus requires a number",
+          "surface rejection: unary minus requires a number",
+          "surface rejection: comparisons do not overload String",
+          "surface rejection: whole function signature is checked",
+          "surface rejection: chained comparisons",
+          "surface rejection: mixed chained comparisons",
+          "surface rejection: missing else",
+          "surface rejection: missing then",
+          "surface checking: layout declaration separator",
+          "surface rejection: declaration-only file needs main",
+          "surface rejection: unreachable equation",
+          "surface rejection: duplicate function parameters",
+          "surface rejection: signature must name its next definition",
+          "surface rejection: duplicate signatures",
+          "surface rejection: signature without equation",
+          "surface rejection: reserved conditional word",
+          "surface rejection: reserved word in datatype parameter"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/readability",
+      "unit": "core",
+      "name": "Layout, equations and recursive source declarations",
+      "group": "language",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "metamorphic",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "layout: top-level data, signatures and equations",
+          "layout: nested do with a trailing semicolon",
+          "layout: nested case and do",
+          "layout: parenthesized implicit block",
+          "layout: implicit block in explicit block",
+          "layout: same-line else closes do",
+          "layout: local declaration layout",
+          "layout: do local group followed by another statement",
+          "layout: nested explicit let matches its own in",
+          "layout: class and instance layout",
+          "layout: explicit braces after a keyword on another line",
+          "layout: keywords in comments and strings",
+          "layout: tabs have tab-stop indentation",
+          "layout: indented file",
+          "layout: leading comment does not set the top-level column",
+          "layout: string gap ending before the closing quote",
+          "layout: explicit top-level braces",
+          "layout: parseExpr accepts an implicit do",
+          "layout: diagnostics keep original line and column",
+          "recursion: declared polymorphism is independently checked",
+          "recursion: monomorphic closure captures an outer value",
+          "recursion: explicit quantifiers preserve their declared order",
+          "recursion: unused explicit quantified variables are discharged",
+          "equations: parameter can shadow the function name",
+          "readability rejection: recursive forall cannot specialize to Int",
+          "readability rejection: mutual recursion needs every signature",
+          "readability rejection: local recursion needs a signature",
+          "readability rejection: recursive existentials are not closed signatures",
+          "readability rejection: recursive signature free variable",
+          "readability rejection: equation arity",
+          "readability rejection: equations must be contiguous",
+          "readability rejection: missing constructor equation",
+          "readability rejection: missing nested constructor",
+          "readability rejection: integer equations need fallback",
+          "readability rejection: Boolean coverage",
+          "readability rejection: mixed literal types",
+          "readability rejection: nested case duplicate binder",
+          "readability rejection: constructor arity in function pattern",
+          "readability rejection: pattern variable cannot escape an equation",
+          "readability rejection: empty implicit do",
+          "readability rejection: dedent closes do before application",
+          "readability checking: readability: factorial equations",
+          "readability checking: readability: recursive forall order",
+          "readability checking: readability: unused recursive forall",
+          "readability checking: readability: mutual recursion",
+          "readability checking: readability: recursive IO and do-local recursion",
+          "readability checking: readability: qualified recursive function",
+          "readability checking: readability: polymorphic recursion",
+          "readability checking: readability: cyclic lazy value",
+          "readability checking: readability: nested patterns and fallback",
+          "readability checking: readability: constructor equation order keeps wildcard lazy",
+          "readability checking: readability: nested lambda and do patterns",
+          "readability checking: readability: pattern annotation imports the prelude",
+          "readability checking: readability: pattern temporary hygiene",
+          "readability checking: readability: literal patterns",
+          "readability checking: readability: literal case order and wildcard laziness",
+          "readability checking: readability: instance equations",
+          "readability checking: readability: nested conditional IO layout",
+          "readability checking: readability: local equation group"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/modules",
+      "unit": "core",
+      "name": "Source module namespaces and visibility",
+      "group": "language",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "metamorphic",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "modules checking: selective and qualified imports",
+          "modules checking: unnamed entry expression imports",
+          "modules checking: qualified types, fields and nested patterns",
+          "modules checking: private names and constructor identities",
+          "modules checking: diamond reexports preserve identity",
+          "modules checking: transitive empty imports carry instances and private helpers",
+          "modules checking: qualified class, hidden methods in instance declaration",
+          "modules checking: abstract datatype used by exported functions",
+          "modules checking: local shadowing and self qualification",
+          "modules checking: explicit qualified Prelude",
+          "modules checking: explicit Prelude with implicit import disabled",
+          "modules checking: hiding Prelude method for local definition",
+          "modules checking: module lexical scope protects imported do",
+          "modules checking: polymorphic Monad function across modules",
+          "modules checking: qualified Boolean constructor patterns",
+          "modules checking: internal name hygiene",
+          "modules checking: same method name from distinct classes",
+          "modules checking: instance may recursively use an exported helper",
+          "modules checking: bare primitive fallback without implicit Prelude",
+          "modules checking: entry selects its own main",
+          "modules checking: primitive fallback permits local definitions",
+          "modules checking: cyclic imports preserve independent polymorphic values",
+          "modules checking: cross-module recursive declaration SCC",
+          "modules checking: cross-module recursive nominal types",
+          "modules checking: cyclic reexports retain the originating identity",
+          "modules checking: cyclic type reexports preserve selective member hiding",
+          "modules checking: cyclic empty imports carry defining-module instances",
+          "modules checking: self import is a namespace edge",
+          "modules rejection: private function",
+          "modules rejection: qualified private function",
+          "modules rejection: selected imports exclude others",
+          "modules rejection: qualified-only is not unqualified",
+          "modules rejection: alias replaces qualified module name",
+          "modules rejection: hiding also affects qualification",
+          "modules rejection: unknown import selection",
+          "modules rejection: unknown hidden name",
+          "modules rejection: private constructor",
+          "modules rejection: type-only selective import",
+          "modules rejection: member belongs to selected type",
+          "modules rejection: private type annotation",
+          "modules rejection: hidden members cannot be reexported",
+          "modules rejection: default exports exclude imports",
+          "modules rejection: transitive names are not imported",
+          "modules rejection: distinct imports are ambiguous",
+          "modules rejection: top-level import collision requires hiding",
+          "modules rejection: explicit reexport conflict",
+          "modules rejection: unknown module reexport",
+          "modules rejection: qualified-only module reexport has no unqualified names",
+          "modules rejection: empty exports",
+          "modules rejection: missing module",
+          "modules rejection: mismatched module header",
+          "modules rejection: unnamed library",
+          "modules rejection: cyclic import still checks invalid declarations",
+          "modules rejection: self import still checks invalid declarations",
+          "modules rejection: module header followed by bare expression",
+          "modules rejection: imports must precede definitions",
+          "modules rejection: definitions cannot be qualified",
+          "modules rejection: explicit empty Prelude removes value names",
+          "modules rejection: qualified Prelude suppresses implicit Prelude",
+          "modules rejection: Prelude cannot be redefined",
+          "modules rejection: primitive constructor cannot be redefined",
+          "modules rejection: primitive type cannot be redefined",
+          "modules rejection: unused private definitions still checked",
+          "modules rejection: export list cannot name missing value",
+          "modules rejection: recursive signature error names the source function",
+          "modules rejection: instance not visible in imported signed definition",
+          "modules rejection: instance not visible in another instance",
+          "modules rejection: cyclic private constructor remains hidden",
+          "modules rejection: cyclic reexports cannot invent a missing identity",
+          "modules rejection: cross-module recursion retains existing signature requirement",
+          "modules rejection: downstream orphan cannot leak into an import cycle",
+          "modules: original source type names",
+          "modules: unit syntax is intrinsic",
+          "modules: empty libraries and multiline headers",
+          "modules: explicit braces and layout parse identically",
+          "modules: libraries can be parsed without main",
+          "modules: unused imports do not cause value ambiguity",
+          "modules: legacy compile path preserves checked output",
+          "modules: file loader, includes, hierarchy and errors",
+          "crate namespaces resolve recursive declarations before inference",
+          "crate namespace resolution preserves external ownership and mangling",
+          "cyclic export fixed point is invariant under source order"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/separate-compilation",
+      "unit": "core",
+      "name": "Checked separate compilation and crate transport",
+      "group": "packages-build",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "crate checking: selective and qualified imports",
+          "crate checking: unnamed entry expression imports",
+          "crate checking: qualified types, fields and nested patterns",
+          "crate checking: private names and constructor identities",
+          "crate checking: diamond reexports preserve identity",
+          "crate checking: transitive empty imports carry instances and private helpers",
+          "crate checking: qualified class, hidden methods in instance declaration",
+          "crate checking: abstract datatype used by exported functions",
+          "crate checking: local shadowing and self qualification",
+          "crate checking: explicit qualified Prelude",
+          "crate checking: explicit Prelude with implicit import disabled",
+          "crate checking: hiding Prelude method for local definition",
+          "crate checking: module lexical scope protects imported do",
+          "crate checking: polymorphic Monad function across modules",
+          "crate checking: qualified Boolean constructor patterns",
+          "crate checking: internal name hygiene",
+          "crate checking: same method name from distinct classes",
+          "crate checking: instance may recursively use an exported helper",
+          "crate checking: bare primitive fallback without implicit Prelude",
+          "crate checking: entry selects its own main",
+          "crate checking: primitive fallback permits local definitions",
+          "crate checking: cyclic imports preserve independent polymorphic values",
+          "crate checking: cross-module recursive declaration SCC",
+          "crate checking: cross-module recursive nominal types",
+          "crate checking: cyclic reexports retain the originating identity",
+          "crate checking: cyclic type reexports preserve selective member hiding",
+          "crate checking: cyclic empty imports carry defining-module instances",
+          "crate checking: self import is a namespace edge",
+          "crate checking: inferred overloaded export",
+          "crate checking: rank-n constructor field",
+          "crate checking: class-free bounded annotation rules",
+          "crate checking: unexported nominal type in inferred signature",
+          "crate checking: mutually recursive module values",
+          "crate checking: Unicode interface identity",
+          "crate checking: nominal global cannot capture local binder",
+          "crate checking: imported entry binding",
+          "crate checking: crate local and dictionary fresh names avoid user globals",
+          "crate rejects: private function",
+          "crate rejects: qualified private function",
+          "crate rejects: selected imports exclude others",
+          "crate rejects: qualified-only is not unqualified",
+          "crate rejects: alias replaces qualified module name",
+          "crate rejects: hiding also affects qualification",
+          "crate rejects: unknown import selection",
+          "crate rejects: unknown hidden name",
+          "crate rejects: private constructor",
+          "crate rejects: type-only selective import",
+          "crate rejects: member belongs to selected type",
+          "crate rejects: private type annotation",
+          "crate rejects: hidden members cannot be reexported",
+          "crate rejects: default exports exclude imports",
+          "crate rejects: transitive names are not imported",
+          "crate rejects: distinct imports are ambiguous",
+          "crate rejects: top-level import collision requires hiding",
+          "crate rejects: explicit reexport conflict",
+          "crate rejects: unknown module reexport",
+          "crate rejects: qualified-only module reexport has no unqualified names",
+          "crate rejects: empty exports",
+          "crate rejects: missing module",
+          "crate rejects: mismatched module header",
+          "crate rejects: unnamed library",
+          "crate rejects: cyclic import still checks invalid declarations",
+          "crate rejects: self import still checks invalid declarations",
+          "crate rejects: module header followed by bare expression",
+          "crate rejects: imports must precede definitions",
+          "crate rejects: definitions cannot be qualified",
+          "crate rejects: explicit empty Prelude removes value names",
+          "crate rejects: qualified Prelude suppresses implicit Prelude",
+          "crate rejects: Prelude cannot be redefined",
+          "crate rejects: primitive constructor cannot be redefined",
+          "crate rejects: primitive type cannot be redefined",
+          "crate rejects: unused private definitions still checked",
+          "crate rejects: export list cannot name missing value",
+          "crate rejects: recursive signature error names the source function",
+          "crate rejects: instance not visible in imported signed definition",
+          "crate rejects: instance not visible in another instance",
+          "crate rejects: cyclic private constructor remains hidden",
+          "crate rejects: cyclic reexports cannot invent a missing identity",
+          "crate rejects: cross-module recursion retains existing signature requirement",
+          "crate rejects: downstream orphan cannot leak into an import cycle",
+          "crate paths and native cache commands",
+          "crate metadata version rejection",
+          "crate object binding schemes are independently checked",
+          "crate datatype metadata is independently reconstructed",
+          "crate unused import parameters retain checked schemes"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/state-types",
+      "unit": "core",
+      "name": "ST source and target region typing",
+      "group": "language",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "ST source type: return",
+          "ST source type: bind",
+          "ST source type: array-read",
+          "ST source type: array-write",
+          "ST source type: array-length",
+          "ST source type: implicit-do",
+          "ST source type: implicit-return",
+          "ST source type: explicit-action-signature",
+          "ST source type: polymorphic-result",
+          "ST source type: impredicative-array-functions",
+          "ST source type: nested-independent",
+          "ST source type: reuse-independent-allocation",
+          "ST source type: pure-io-description-result",
+          "ST source type: unused-poisoned-cell",
+          "ST source type: snapshot",
+          "ST source type: repeated-read-action",
+          "ST source type: higher-order-runner",
+          "ST source type: primitive-shadowing",
+          "ST source type: qualified-prelude-import",
+          "ST source type: explicit-prelude-types",
+          "ST source type: opaque-existential-package",
+          "ST source type: opaque-parametric-callback",
+          "ST source type: escape-array",
+          "ST source type: escape-through-bind",
+          "ST source type: escape-through-data",
+          "ST source type: escape-read-action",
+          "ST source type: escape-write-action",
+          "ST source type: escape-reader-closure",
+          "ST source type: nested-read-outer-region",
+          "ST source type: nested-write-outer-region",
+          "ST source type: cross-region-read-signature",
+          "ST source type: cross-region-write-signature",
+          "ST source type: monomorphic-argument",
+          "ST source type: monomorphic-bound-argument",
+          "ST source type: monomorphic-runner-signature",
+          "ST source type: io-as-st",
+          "ST source type: bind-io-action",
+          "ST source type: bind-io-continuation",
+          "ST source type: io-bind-st-action",
+          "ST source type: io-array-as-st-array",
+          "ST source type: wrong-array-value-type",
+          "ST source type: polymorphic-reference-attack",
+          "ST source type: impredicative-reference-attack",
+          "ST source type: repackage-action-as-region-polymorphic",
+          "ST source type: existential-coercion-escape",
+          "ST source type: opaque-package-read-attack",
+          "ST source type: opaque-package-write-attack",
+          "ST source type: redefine-st",
+          "ST source type: redefine-array",
+          "ST source type: construct-opaque-st",
+          "ST source type: construct-opaque-array",
+          "ST source type: pattern-opaque-st",
+          "ST source type: st-wrong-arity",
+          "ST source type: array-wrong-arity",
+          "ST source type: st-region-wrong-kind",
+          "ST source type: array-element-wrong-kind",
+          "ST target type: rank2-runner",
+          "ST target type: monomorphic-action-value",
+          "ST target type: rank2-region-action",
+          "ST target type: monomorphic-runST-input",
+          "ST target type: outer-forall-cannot-replace-inner",
+          "ST target type: io-to-st-cast",
+          "ST target type: cross-region-read",
+          "ST target type: cross-region-write",
+          "ST target type: unbound-region",
+          "ST target type: runST-extra-type-argument",
+          "ST target type: higher-kind-region",
+          "ST target type: unexecuted-array-action",
+          "ST primitive ABI is appended and action construction stays lazy",
+          "ST primitives work with implicit prelude disabled"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "core/hm-oracle",
+      "unit": "core",
+      "name": "Independent Hindley-Milner typability corpus",
+      "group": "language",
+      "level": "integration",
+      "inputs": [
+        "exhaustive",
+        "seeded-random"
+      ],
+      "oracles": [
+        "independent-reference"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "independent ML typability oracle"
+        ],
+        "aliases": {},
+        "metrics": {
+          "hm-prescribed": 6712,
+          "hm-exhaustive": 1712,
+          "hm-generated": 5000,
+          "hm-distinct-generated": 4991,
+          "hm-executed": 6703,
+          "hm-typable": 2901
+        }
+      }
+    },
+    {
+      "id": "core/annotation-corpus",
+      "unit": "core",
+      "name": "Exhaustive annotated identity corpus",
+      "group": "language",
+      "level": "integration",
+      "inputs": [
+        "exhaustive"
+      ],
+      "oracles": [
+        "metamorphic",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "annotation corpus"
+        ],
+        "aliases": {},
+        "metrics": {
+          "annotation-executed": 126
+        }
+      }
+    },
+    {
+      "id": "core/example-files",
+      "unit": "core",
+      "name": "Repository source example checking",
+      "group": "language",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "metamorphic",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "example files"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "figure12/complete",
+      "unit": "figure12",
+      "name": "Figure 12 compiler regressions",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "metamorphic"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "assumption choose : forall a. a -> a -> a",
+          "assumption id : forall a. a -> a",
+          "assumption ids : List (forall a. a -> a)",
+          "assumption nil : forall p. List p",
+          "assumption auto : (forall a. a -> a) -> (forall a. a -> a)",
+          "assumption auto' : forall b. (forall a. a -> a) -> b -> b",
+          "assumption f : forall a. (a -> a) -> List a -> a",
+          "assumption poly : (forall a. a -> a) -> Pair Int Bool",
+          "assumption k : forall a. a -> List a -> Int",
+          "assumption pair : forall a b. a -> b -> Pair a b",
+          "assumption xs : List ((forall a. a -> a) -> Pair Int Bool)",
+          "assumption app : forall a b. (a -> b) -> a -> b",
+          "assumption revapp : forall a b. a -> (a -> b) -> b",
+          "assumption argST : forall s. ST s Int",
+          "assumption runST : forall d. (forall s. ST s d) -> d",
+          "assumption length : forall p. List p -> Int",
+          "assumption tail : forall p. List p -> List p",
+          "assumption head : forall p. List p -> p",
+          "assumption single : forall p. p -> List p",
+          "assumption cons : forall p. p -> List p -> List p",
+          "assumption append : forall p. List p -> List p -> List p",
+          "assumption inc : Int -> Int",
+          "assumption map : forall p q. (p -> q) -> List p -> List q",
+          "assumption g : ((forall a. a -> a) -> Pair Int Bool) -> Char",
+          "assumption r : (forall a. a -> (forall b. b -> b)) -> Int",
+          "assumption h : Int -> (forall a. a -> a)",
+          "assumption k : forall a. a -> List a -> a",
+          "assumption lst : List (forall a. Int -> a -> a)",
+          "assumption compose : forall a b c. (b -> c) -> (a -> b) -> a -> c",
+          "A1 principal type",
+          "A2 principal type",
+          "A4 inferred result bound",
+          "A4 admits paper signature",
+          "A11 explicit annotation control",
+          "C1a explicit annotation control",
+          "C1c explicit annotation control",
+          "A1",
+          "A2",
+          "A3",
+          "A4",
+          "A5",
+          "A6",
+          "A7",
+          "A8",
+          "A9",
+          "A10.1",
+          "A10.2",
+          "A10.3",
+          "A11",
+          "A12.2",
+          "A12.3",
+          "A13.1",
+          "A13.2",
+          "B1.1",
+          "B1.2",
+          "B1.3",
+          "B1.4",
+          "B2",
+          "B3",
+          "B4",
+          "B5",
+          "B6",
+          "B7.1",
+          "B7.2",
+          "C1a",
+          "C1b",
+          "C1c",
+          "C2",
+          "E1a",
+          "E1b",
+          "E2a",
+          "E2b",
+          "E3b",
+          "E4a",
+          "E4b",
+          "E5a",
+          "E5b"
+        ],
+        "aliases": {
+          "A12.1": "A10.1",
+          "E3a": "A12.2"
+        },
+        "metrics": {
+          "paper-rows": 34,
+          "paper-expressions": 43
+        }
+      }
+    },
+    {
+      "id": "regex/complete",
+      "unit": "regex",
+      "name": "Standard library regular expressions",
+      "group": "runtime-library",
+      "level": "component",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "regex/invalid/open-class",
+          "regex/invalid/open-group",
+          "regex/invalid/unmatched-close-group",
+          "regex/invalid/leading-repeat",
+          "regex/invalid/repeated-star",
+          "regex/invalid/lazy-quantifier",
+          "regex/invalid/reversed-range",
+          "regex/invalid/empty-class",
+          "regex/invalid/trailing-escape",
+          "regex/invalid/backreference",
+          "regex/invalid/word-boundary",
+          "regex/invalid/lookahead",
+          "regex/invalid/reversed-bound",
+          "regex/invalid/oversized-bound",
+          "regex/invalid/malformed-bound",
+          "regex/invalid/class-range-escape",
+          "regex/invalid/nested-repeat-size",
+          "regex/invalid/nested-empty-repeat-size",
+          "regex/match/left-alternative-long",
+          "regex/match/left-alternative-short",
+          "regex/match/leftmost-long",
+          "regex/match/later-alternative",
+          "regex/match/greedy-backtrack",
+          "regex/match/one-or-more",
+          "regex/match/optional",
+          "regex/match/bounded-repeat",
+          "regex/match/unbounded-repeat",
+          "regex/match/exact-repeat",
+          "regex/match/range",
+          "regex/match/negated-range",
+          "regex/match/escape-class",
+          "regex/match/negated-escape-class",
+          "regex/match/predefined-classes",
+          "regex/match/escaped-class-delimiters",
+          "regex/match/anchors",
+          "regex/match/nullable-star",
+          "regex/match/nested-star",
+          "regex/match/empty-alternative-before-required",
+          "regex/match/empty-alternative-star",
+          "regex/match/nullable-alternative-priority",
+          "regex/match/anchor-alternative-star",
+          "regex/match/nullable-dot-alternative",
+          "regex/match/ambiguous-success",
+          "regex/match/ambiguous-failure-terminates",
+          "regex/match/unicode-range",
+          "regex/match/nul",
+          "regex/match/dot-excludes-newline",
+          "regex/match/offset-preserves-anchor",
+          "regex/match/reject-past-end-offset",
+          "regex/match/reject-negative-offset",
+          "regex/count/nonoverlap",
+          "regex/count/empty-advancement",
+          "regex/replace/literal",
+          "regex/replace/empty-advancement",
+          "regex/replace/alternative-priority",
+          "regex/replace/fasta-clean"
+        ],
+        "aliases": {},
+        "metrics": {
+          "invalid-patterns-executed": 17
+        }
+      }
+    },
+    {
+      "id": "harness/matrix-evidence",
+      "unit": "harness",
+      "name": "Compiler identity, collector configuration and native matrix evidence",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_native_matrix_requires_the_selected_cli_compiler",
+          "test_native_matrix_overrides_inherited_compiler_selection",
+          "test_compact_matrix_requires_collector_and_small_heap",
+          "test_compact_plan_builds_drivers_once_and_runs_native_matrix"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/corpus-evidence",
+      "unit": "harness",
+      "name": "Parity sharing, corpus completeness and rejection evidence",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_parity_sharing_requires_identical_source_configuration_and_oracle",
+          "test_module_corpus_cannot_drop_rejections_or_prelude_modes",
+          "test_crashes_partial_targets_and_wrong_diagnostics_are_not_rejections"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/source-dependency-cache",
+      "unit": "harness",
+      "name": "Transitive source dependency cache controls",
+      "group": "packages-build",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "transformed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract",
+        "metamorphic"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_source_dependency_cache_controls"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/native-driver-cache",
+      "unit": "harness",
+      "name": "Checked driver build and native artifact cache controls",
+      "group": "packages-build",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "transformed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract",
+        "metamorphic"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_checked_native_driver_cache"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/release-evidence",
+      "unit": "harness",
+      "name": "Complete, fresh and measured release evidence",
+      "group": "distribution",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_complete_stage3_evidence_passes",
+          "test_stage2_parity_cannot_certify_stage3",
+          "test_fixed_point_and_fresh_stages_are_required",
+          "test_compact_matrix_and_both_backends_are_required",
+          "test_benchmark_coverage_and_samples_cannot_be_faked_by_pass_status",
+          "test_ratios_are_recomputed_from_measurements",
+          "test_medians_are_recomputed_and_bad_samples_fail"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/release-steps",
+      "unit": "harness",
+      "name": "Failed release steps and clean gate environment",
+      "group": "distribution",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_failed_step_preserves_failure_and_never_completes_release",
+          "test_gate_does_not_inherit_compiler_or_collector_overrides"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/release-installation",
+      "unit": "harness",
+      "name": "Verified installation, smoke, relocation and unrelated-file preservation",
+      "group": "distribution",
+      "level": "system",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_incomplete_or_changed_packages_are_not_installable",
+          "test_installation_is_relocatable_and_does_not_replace_unrelated_files"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/performance-limits-apply-to-every-workload-and-include-boundary",
+      "unit": "harness",
+      "name": "performance limits apply to every workload and include boundary",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_performance_limits_apply_to_every_workload_and_include_boundary"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/invalid-performance-limits-fail-before-tools",
+      "unit": "harness",
+      "name": "invalid performance limits fail before tools",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_invalid_performance_limits_fail_before_tools"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/binary-tree-oracle-defaults",
+      "unit": "harness",
+      "name": "binary tree oracle defaults",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_binary_tree_oracle_defaults"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/all-workloads-have-complete-provenance-and-fixtures",
+      "unit": "harness",
+      "name": "all workloads have complete provenance and fixtures",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_all_workloads_have_complete_provenance_and_fixtures"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/dna-inputs-match-pinned-fasta-fixtures",
+      "unit": "harness",
+      "name": "dna inputs match pinned fasta fixtures",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_dna_inputs_match_pinned_fasta_fixtures"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/reverse-complement-checks-headers-ambiguity-and-line-wrapping",
+      "unit": "harness",
+      "name": "reverse complement checks headers ambiguity and line wrapping",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_reverse_complement_checks_headers_ambiguity_and_line_wrapping"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/nucleotide-counts-include-overlaps-ties-and-only-record-three",
+      "unit": "harness",
+      "name": "nucleotide counts include overlaps ties and only record three",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_nucleotide_counts_include_overlaps_ties_and_only_record_three"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/regex-redux-oracle-counts-each-variant-and-nonoverlapping-matches",
+      "unit": "harness",
+      "name": "regex redux oracle counts each variant and nonoverlapping matches",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_regex_redux_oracle_counts_each_variant_and_nonoverlapping_matches"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/regex-redux-cleanup-follows-header-and-linefeed-pattern",
+      "unit": "harness",
+      "name": "regex redux cleanup follows header and linefeed pattern",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_regex_redux_cleanup_follows_header_and_linefeed_pattern"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/regex-redux-replacements-are-ordered-and-delimiter-matches-exact",
+      "unit": "harness",
+      "name": "regex redux replacements are ordered and delimiter matches exact",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_regex_redux_replacements_are_ordered_and_delimiter_matches_exact"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/regex-redux-requires-all-counts-lengths-order-and-exact-bytes",
+      "unit": "harness",
+      "name": "regex redux requires all counts lengths order and exact bytes",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_regex_redux_requires_all_counts_lengths_order_and_exact_bytes"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/nucleotide-rounding-accepts-only-exact-midpoint-neighbours",
+      "unit": "harness",
+      "name": "nucleotide rounding accepts only exact midpoint neighbours",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_nucleotide_rounding_accepts_only_exact_midpoint_neighbours"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/spectral-norm-checks-single-finite-result",
+      "unit": "harness",
+      "name": "spectral norm checks single finite result",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_spectral_norm_checks_single_finite_result"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/fasta-requires-exact-bases-wrapping-and-rng-continuity",
+      "unit": "harness",
+      "name": "fasta requires exact bases wrapping and rng continuity",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_fasta_requires_exact_bases_wrapping_and_rng_continuity"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/mandelbrot-requires-exact-pixels-header-and-zero-padding",
+      "unit": "harness",
+      "name": "mandelbrot requires exact pixels header and zero padding",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_mandelbrot_requires_exact_pixels_header_and_zero_padding"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/pidigits-oracle-and-partial-row-checks",
+      "unit": "harness",
+      "name": "pidigits oracle and partial row checks",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_pidigits_oracle_and_partial_row_checks"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/nbody-tolerance-rejects-nonfinite-missing-and-wrong-values",
+      "unit": "harness",
+      "name": "nbody tolerance rejects nonfinite missing and wrong values",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_nbody_tolerance_rejects_nonfinite_missing_and_wrong_values"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/fannkuch-unranking-checks-checksum-and-maximum",
+      "unit": "harness",
+      "name": "fannkuch unranking checks checksum and maximum",
+      "group": "test-infrastructure",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_fannkuch_unranking_checks_checksum_and_maximum"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/vendored-adaptation-patches-reconstruct-build-sources",
+      "unit": "harness",
+      "name": "vendored adaptation patches reconstruct build sources",
+      "group": "test-infrastructure",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_vendored_adaptation_patches_reconstruct_build_sources"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/only-whitespace-is-normalized",
+      "unit": "harness",
+      "name": "only whitespace is normalized",
+      "group": "test-infrastructure",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_only_whitespace_is_normalized"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/pin-tampering-fails",
+      "unit": "harness",
+      "name": "pin tampering fails",
+      "group": "test-infrastructure",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_pin_tampering_fails"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/native-compiler-identification-uses-public-cli-and-exact-binary",
+      "unit": "harness",
+      "name": "native compiler identification uses public cli and exact binary",
+      "group": "test-infrastructure",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_native_compiler_identification_uses_public_cli_and_exact_binary"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/stdin-workloads-share-bytes-and-record-hash-without-embedding-input",
+      "unit": "harness",
+      "name": "stdin workloads share bytes and record hash without embedding input",
+      "group": "test-infrastructure",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_stdin_workloads_share_bytes_and_record_hash_without_embedding_input"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/four-languages-are-mandatory",
+      "unit": "harness",
+      "name": "four languages are mandatory",
+      "group": "test-infrastructure",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_four_languages_are_mandatory"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/changes-during-measurement-invalidate-the-run",
+      "unit": "harness",
+      "name": "changes during measurement invalidate the run",
+      "group": "test-infrastructure",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_changes_during_measurement_invalidate_the_run"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/native-dependency-headers-survive-suppressed-system-flags",
+      "unit": "harness",
+      "name": "native dependency headers survive suppressed system flags",
+      "group": "packages-build",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_native_dependency_headers_survive_suppressed_system_flags"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/failed-and-timed-out-children-are-not-samples",
+      "unit": "harness",
+      "name": "failed and timed out children are not samples",
+      "group": "test-infrastructure",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_failed_and_timed_out_children_are_not_samples"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/rss-is-per-process-not-cumulative-high-water",
+      "unit": "harness",
+      "name": "rss is per process not cumulative high water",
+      "group": "test-infrastructure",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_rss_is_per_process_not_cumulative_high_water"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/medians-and-ratios-allow-c-to-lose",
+      "unit": "harness",
+      "name": "medians and ratios allow c to lose",
+      "group": "test-infrastructure",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_medians_and_ratios_allow_c_to_lose"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/failure-replaces-stale-success-and-no-measurement-starts",
+      "unit": "harness",
+      "name": "failure replaces stale success and no measurement starts",
+      "group": "test-infrastructure",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_failure_replaces_stale_success_and_no_measurement_starts"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/invalid-cli-inputs-fail-before-tools",
+      "unit": "harness",
+      "name": "invalid cli inputs fail before tools",
+      "group": "test-infrastructure",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_invalid_cli_inputs_fail_before_tools"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/prestarted-link-waits-for-complete-objects-and-reaps-failed-producers",
+      "unit": "harness",
+      "name": "prestarted link waits for complete objects and reaps failed producers",
+      "group": "packages-build",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_prestarted_link_waits_for_complete_objects_and_reaps_failed_producers"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/streaming-build-overlaps-startup-and-archives-exact-ir",
+      "unit": "harness",
+      "name": "streaming build overlaps startup and archives exact ir",
+      "group": "packages-build",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_streaming_build_overlaps_startup_and_archives_exact_ir"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/blocked-fifo-failure-and-timeout-reap-process-groups",
+      "unit": "harness",
+      "name": "blocked fifo failure and timeout reap process groups",
+      "group": "packages-build",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_blocked_fifo_failure_and_timeout_reap_process_groups"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/llvm-emission-time-is-included-and-build-directory-is-fresh",
+      "unit": "harness",
+      "name": "llvm emission time is included and build directory is fresh",
+      "group": "packages-build",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_llvm_emission_time_is_included_and_build_directory_is_fresh"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/parallel-phase-failure-and-timeout-reap-every-child",
+      "unit": "harness",
+      "name": "parallel phase failure and timeout reap every child",
+      "group": "packages-build",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_parallel_phase_failure_and_timeout_reap_every_child"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/native-driver-preserves-existing-executable-on-failure",
+      "unit": "harness",
+      "name": "native driver preserves existing executable on failure",
+      "group": "packages-build",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_native_driver_preserves_existing_executable_on_failure"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/interruption-cannot-leave-a-stale-success",
+      "unit": "harness",
+      "name": "interruption cannot leave a stale success",
+      "group": "packages-build",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_interruption_cannot_leave_a_stale_success"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/generated-force-preserves-memoization-and-errors",
+      "unit": "harness",
+      "name": "generated force preserves memoization and errors",
+      "group": "code-generation",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "transformed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_generated_force_preserves_memoization_and_errors"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/runtime-state-actions-preserve-laziness-and-roots",
+      "unit": "harness",
+      "name": "runtime state actions preserve laziness and roots",
+      "group": "runtime-library",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_runtime_state_actions_preserve_laziness_and_roots"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/runtime-constructor-allocation-and-cleanup",
+      "unit": "harness",
+      "name": "runtime constructor allocation and cleanup",
+      "group": "runtime-library",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_runtime_constructor_allocation_and_cleanup"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/runtime-constructor-fields-and-update-spines",
+      "unit": "harness",
+      "name": "runtime constructor fields and update spines",
+      "group": "runtime-library",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_runtime_constructor_fields_and_update_spines"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/real-console-raw-input-matches-native-bytes-and-eof",
+      "unit": "harness",
+      "name": "real console raw input matches native bytes and eof",
+      "group": "runtime-library",
+      "level": "system",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_real_console_raw_input_matches_native_bytes_and_eof"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/mlf-counts-every-window-and-distinct-key-in-all-seven-tables",
+      "unit": "harness",
+      "name": "mlf counts every window and distinct key in all seven tables",
+      "group": "code-generation",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "independent-reference"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_mlf_counts_every_window_and_distinct_key_in_all_seven_tables"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/mlf-allocates-every-tree-node",
+      "unit": "harness",
+      "name": "mlf allocates every tree node",
+      "group": "code-generation",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "independent-reference"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_mlf_allocates_every_tree_node"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/regex-redux-execution",
+      "unit": "harness",
+      "name": "Measured regex-redux source against independent scanner on native and interpreter paths",
+      "group": "runtime-library",
+      "level": "system",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "independent-reference",
+        "differential"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_regex_redux_measured_native_source_matches_independent_oracle",
+          "test_regex_redux_measured_interpreter_source_matches_independent_oracle"
+        ],
+        "aliases": {},
+        "metrics": {
+          "regex-redux-native-executed": 7,
+          "regex-redux-interpreted-executed": 2
+        }
+      }
+    },
+    {
+      "id": "test-framework/complete",
+      "unit": "test-framework",
+      "name": "Test framework, coverage and process contracts",
+      "group": "test-infrastructure",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "framework/contracts",
+          "framework/catalog-contracts",
+          "framework/coverage-validator",
+          "framework/cli-contracts"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "package-integration/complete",
+      "unit": "package-integration",
+      "name": "Source package resolution and build/cache integration",
+      "group": "packages-build",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "transformed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_packages.test_local_dependency_plan",
+          "test_packages.test_dependency_paths_are_manifest_relative",
+          "test_packages.test_diamond_and_canonical_symlink",
+          "test_packages.test_package_cycle",
+          "test_packages.test_symlink_dependency_cycle",
+          "test_packages.test_missing_dependency",
+          "test_packages.test_dependency_key_must_match_identity",
+          "test_packages.test_duplicate_module_and_package_identity",
+          "test_packages.test_direct_dependency_visibility",
+          "test_packages.test_module_cycle",
+          "test_packages.test_manifest_module_identity",
+          "test_packages.test_source_escape_and_symlink",
+          "test_packages.test_lock_tracks_content",
+          "test_packages.test_unknown_and_duplicate_fields",
+          "test_packages.test_invalid_manifest_shapes",
+          "test_packages.test_real_parser_handles_multiline_imports_and_comments",
+          "test_packages.test_truncated_source_rejected",
+          "test_packages.test_json_unicode_and_invalid_tokens",
+          "test_packages.test_target_dependencies_default",
+          "test_packages.test_target_dependencies_selection",
+          "test_packages.test_target_dependencies_empty",
+          "test_packages.test_target_dependencies_validation",
+          "transitive local dependencies, ADT, do notation, spaces in paths",
+          "content-addressed no-op build",
+          "expected output checked on interpreter and LLVM",
+          "interface/object executable works without dependency source",
+          "transitive implementation edit invalidates the executable",
+          "test output mismatch fails the package test",
+          "failed compilation preserves the last successful binary",
+          "tampered object is rebuilt and checked",
+          "outer cache validates and repairs the shared Prelude dependency closure",
+          "compiler identity participates in cache keys",
+          "locked build rejects changed local sources",
+          "undeclared ambient imports fail before compilation",
+          "legacy source link setting uses crate metadata on both backends",
+          "private target modules, program arguments, and stdin on both backends",
+          "run forwards arguments and keeps program stdout clean",
+          "external test exit status is propagated",
+          "shared checked cache survives removal of the producing build directory",
+          "shared object corruption and missing dependency proof trigger checked rebuilding",
+          "shared cache separates changed source and restores the original checked targets",
+          "library expressions cannot be silently discarded during crate compilation",
+          "cyclic module namespaces and own-library target composition on both backends",
+          "declaration caches preserve unaffected groups and downstream schemes",
+          "identical emitted LLVM reuses native code generation and linking",
+          "clean and incremental crate compilation equivalence",
+          "checkout BDWGC discovery and command-test inheritance without an exported prefix",
+          "explicit BDWGC prefix overrides the environment and reaches test subprocesses",
+          "checkout compiler selection takes precedence over an older compiler on PATH",
+          "explicit compiler selection overrides a locally built compiler",
+          "native PGO generation, content-addressed reuse, invalidation, failure, and target isolation"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "package-distribution/complete",
+      "unit": "package-distribution",
+      "name": "Checked package release and distribution",
+      "group": "distribution",
+      "level": "system",
+      "inputs": [
+        "fixed",
+        "transformed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "checked release: packed releases are deterministic and immutable",
+          "checked release: cold offline resolution fails without a partial cache",
+          "checked release: pinned GitHub download supports locked source-free execution",
+          "checked release: warm offline builds need no downloader",
+          "checked release: offline extraction repair uses the verified retained asset",
+          "checked release: corrupt retained downloads fail offline and refetch online",
+          "checked release: GitHub dependency locks survive cache relocation",
+          "checked release: locked resolution rejects changed release locators",
+          "checked release: both digest pins are enforced before cache publication",
+          "checked release: GitHub selectors reject option and glob syntax",
+          "checked release: failed partial downloads remain unusable and can be retried",
+          "checked release: unsafe keys and duplicate or incomplete inventories are rejected",
+          "checked release: deterministic export from another source/build directory",
+          "checked release: existing release is preserved",
+          "checked release: source-free locked consumer executes through interpreter and LLVM",
+          "checked release: unchanged consumer reuses all build artifacts",
+          "checked release: source and release dependencies share the canonical Prelude",
+          "checked release: conflicting source and bundled crate identities are rejected",
+          "checked release: two releases share their transitive checked dependencies",
+          "checked release: bundled transitive dependencies do not widen import visibility",
+          "checked release: locked builds reject changed release dependencies",
+          "checked release: corrupt installed objects are repaired",
+          "checked release: manifest digest pin is mandatory and checked",
+          "checked release: incompatible compiler releases are rejected",
+          "checked release: incompatible Prelude modes are rejected",
+          "checked release: bundle artifact hashes are verified even after a cache hit",
+          "checked release: recomputed producer digests cannot bypass object checking",
+          "checked release: bundle and cache relocation preserve source-free execution"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "backends/strict-wrappers",
+      "unit": "backends",
+      "name": "Strict unary representation",
+      "group": "code-generation",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 4,
+        "fixtures": 4,
+        "labels": [
+          "strict unary representation: evaluated recursive producer",
+          "strict unary representation: lazy poison remains unforced",
+          "strict unary representation: mixed and escaping constructor",
+          "strict unary representation: recursive lazy field"
+        ]
+      }
+    },
+    {
+      "id": "backends/io-language",
+      "unit": "backends",
+      "name": "IO types, signatures and rejection",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 0,
+        "fixtures": 26,
+        "labels": [
+          "IO type: string literal",
+          "IO type: unit literal",
+          "IO type: unit constructor",
+          "IO type: unit type alias",
+          "IO type: getLine",
+          "IO type: putStrLn",
+          "IO type: return",
+          "IO type: IO-specific return",
+          "IO type: pure",
+          "IO rejection: IO cannot be redefined",
+          "IO rejection: String cannot be redefined",
+          "IO rejection: Unit cannot be redefined",
+          "IO rejection: Unit constructor cannot be forged",
+          "IO rejection: putStrLn expects a string",
+          "IO rejection: arithmetic expects integers",
+          "IO rejection: comparison expects integers",
+          "IO rejection: string equality expects strings",
+          "IO rejection: conditional requires a Boolean",
+          "IO rejection: conditional branches must agree",
+          "IO rejection: printInt expects an integer",
+          "IO rejection: getLine is an action rather than a function",
+          "IO rejection: IO action cannot be used as a pure string",
+          "IO rejection: bind continuation must return an action",
+          "IO rejection: IO has a fixed arity",
+          "IO rejection: IO cannot take two parameters",
+          "IO: unknown target primitive is rejected"
+        ]
+      }
+    },
+    {
+      "id": "backends/io-runtime",
+      "unit": "backends",
+      "name": "IO sequencing, effects and entry results",
+      "group": "runtime-library",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 24,
+        "fixtures": 24,
+        "labels": [
+          "IO: greeting and input order",
+          "IO: integer printing and string conversion",
+          "IO: integer arithmetic is signed and unbounded",
+          "IO: integer equality and strict ordering",
+          "IO: string equality respects case, empty strings, and Unicode",
+          "IO: primitives are curried ordinary values",
+          "IO: conditional executes only the chosen IO branch",
+          "IO: conditional preserves a polymorphic branch",
+          "IO: local bindings shadow arithmetic primitives",
+          "IO: conditional does not force an unselected pure branch",
+          "IO: string escapes and unicode",
+          "IO: an action can be executed more than once",
+          "IO: constructing unused actions has no effects",
+          "IO: return does not execute its argument",
+          "IO: extracting a nested action still needs sequencing",
+          "IO: unit pattern",
+          "IO: polymorphic function returned by IO",
+          "IO: local bindings shadow IO primitives",
+          "IO: data fields can contain IO actions",
+          "IO: unselected case branch has no effects",
+          "IO: constructor and case evaluation",
+          "IO: recursive dictionary methods",
+          "IO: generic Monad IO bind",
+          "IO: generic Monad IO input"
+        ]
+      }
+    },
+    {
+      "id": "backends/io-target-validation",
+      "unit": "backends",
+      "name": "IO target verification before effects",
+      "group": "code-generation",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 10,
+        "fixtures": 10,
+        "labels": [
+          "IO target: primitive type arity",
+          "IO target: primitive type kind",
+          "IO target: primitive type scope",
+          "IO target: primitive value argument type",
+          "IO target: conditional type argument arity",
+          "IO target: conditional branch type checked independently",
+          "IO target: no IO constructor",
+          "IO target: target IO type cannot be forged",
+          "IO: pure programs are not executable entry points",
+          "IO: target verification happens before any effects"
+        ]
+      }
+    },
+    {
+      "id": "backends/io-monad-laws",
+      "unit": "backends",
+      "name": "IO monad laws",
+      "group": "runtime-library",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "metamorphic"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 6,
+        "fixtures": 3,
+        "labels": [
+          "IO monad law: left identity",
+          "IO monad law: right identity",
+          "IO monad law: associativity"
+        ]
+      }
+    },
+    {
+      "id": "backends/io-failures",
+      "unit": "backends",
+      "name": "IO EOF and write failures",
+      "group": "runtime-library",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential"
+      ],
+      "purposes": [
+        "regression",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 2,
+        "fixtures": 2,
+        "labels": [
+          "IO: EOF is reported and stops the continuation",
+          "IO: backend output errors are reported"
+        ]
+      }
+    },
+    {
+      "id": "backends/prelude-language",
+      "unit": "backends",
+      "name": "Prelude types, scope and classes",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 0,
+        "fixtures": 12,
+        "labels": [
+          "prelude: user Monad instance needs no class declaration",
+          "prelude: inferred constraints use the imported methods",
+          "prelude: qualified annotation alone imports the class",
+          "prelude: superclass alone imports Monad",
+          "prelude: instance context alone imports Monad",
+          "prelude rejection: import shadowing does not allow duplicate local methods",
+          "prelude: local Monad declaration shadows the imported class",
+          "prelude rejection: local Monad also hides imported IO instance",
+          "prelude rejection: duplicate imported instance",
+          "prelude rejection: user instance is still checked",
+          "prelude rejection: missing user instance",
+          "prelude rejection: no implicit monad defaulting"
+        ]
+      }
+    },
+    {
+      "id": "backends/prelude-import-equivalence",
+      "unit": "backends",
+      "name": "Prelude import and opt-out equivalence",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "metamorphic",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 0,
+        "fixtures": 10,
+        "labels": [
+          "prelude: every compiler API imports the prelude",
+          "prelude: every compiler API supports explicit opt-out",
+          "prelude: opt-out removes implicit class declarations",
+          "prelude: unused imports preserve pure programs",
+          "prelude: unused imports preserve lambda shadowing",
+          "prelude: unused imports preserve pattern shadowing",
+          "prelude: unused imports preserve do-let shadowing",
+          "prelude: unused imports preserve do-pattern shadowing",
+          "prelude: unused imports preserve single-expression do",
+          "prelude: unused imports preserve unrelated class method"
+        ]
+      }
+    },
+    {
+      "id": "backends/prelude-runtime",
+      "unit": "backends",
+      "name": "Prelude runtime class dispatch",
+      "group": "runtime-library",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 6,
+        "fixtures": 6,
+        "labels": [
+          "prelude runtime: IO sequencing without declarations",
+          "prelude runtime: qualified generic IO function",
+          "prelude runtime: one generic function at IO and a user instance",
+          "prelude runtime: prelude implementation uses primitive identities",
+          "prelude runtime: given dictionary and lexical shadowing coexist",
+          "prelude runtime: local class method shadows only the imported method"
+        ]
+      }
+    },
+    {
+      "id": "backends/snake",
+      "unit": "backends",
+      "name": "Snake sessions and independent rule model",
+      "group": "runtime-library",
+      "level": "system",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "independent-reference",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 9,
+        "fixtures": 2,
+        "labels": [
+          "Snake: playable source and xMLF sessions",
+          "Snake: pure rules, departing tail, food search, and full-board win"
+        ]
+      }
+    },
+    {
+      "id": "backends/surface-language",
+      "unit": "backends",
+      "name": "Executable surface language conformance",
+      "group": "language",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 30,
+        "fixtures": 30,
+        "labels": [
+          "backend: readability: factorial equations",
+          "backend: readability: recursive forall order",
+          "backend: readability: unused recursive forall",
+          "backend: readability: mutual recursion",
+          "backend: readability: recursive IO and do-local recursion",
+          "backend: readability: qualified recursive function",
+          "backend: readability: polymorphic recursion",
+          "backend: readability: cyclic lazy value",
+          "backend: readability: nested patterns and fallback",
+          "backend: readability: constructor equation order keeps wildcard lazy",
+          "backend: readability: nested lambda and do patterns",
+          "backend: readability: pattern annotation imports the prelude",
+          "backend: readability: pattern temporary hygiene",
+          "backend: readability: literal patterns",
+          "backend: readability: literal case order and wildcard laziness",
+          "backend: readability: instance equations",
+          "backend: readability: nested conditional IO layout",
+          "backend: readability: local equation group",
+          "backend: surface: declarations, signatures and precedence",
+          "backend: surface: ordered scope and polymorphic functions",
+          "backend: surface: signed literals, negation and arbitrary precision",
+          "backend: surface: operator and conditional hygiene",
+          "backend: surface: all integer comparisons",
+          "backend: surface: dynamic short circuit true",
+          "backend: surface: dynamic short circuit false",
+          "backend: surface: nested conditionals and Boolean precedence",
+          "backend: surface: do-local annotated function",
+          "backend: surface: instance method equations and qualified declaration",
+          "backend: state dictionary result",
+          "backend: superclass dictionary result"
+        ]
+      }
+    },
+    {
+      "id": "backends/target-validation",
+      "unit": "backends",
+      "name": "Rejected erased target programs",
+      "group": "code-generation",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 4,
+        "fixtures": 4,
+        "labels": [
+          "backend target: non-function",
+          "backend target: bad computation",
+          "backend target: bad unused branch",
+          "backend target: free identity"
+        ]
+      }
+    },
+    {
+      "id": "backends/target-runtime-input",
+      "unit": "backends",
+      "name": "Text, Unicode and retained input",
+      "group": "runtime-library",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 5,
+        "fixtures": 5,
+        "labels": [
+          "backend: unicode-input",
+          "backend: unicode",
+          "backend: nul",
+          "backend: final line without newline",
+          "backend: unused input is retained"
+        ]
+      }
+    },
+    {
+      "id": "backends/target-semantics",
+      "unit": "backends",
+      "name": "Lazy target execution semantics",
+      "group": "code-generation",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 11,
+        "fixtures": 11,
+        "labels": [
+          "backend: curried-closure",
+          "backend: lazy-field",
+          "backend: selected-case",
+          "backend: identity capture",
+          "backend: cyclic data",
+          "backend: 10000 IO steps",
+          "backend: mutual recursion",
+          "backend: pure program entry does not print",
+          "backend: lazy default case",
+          "backend: lazy returned value",
+          "backend: recursive demand fails"
+        ]
+      }
+    },
+    {
+      "id": "backends/example-corpus",
+      "unit": "backends",
+      "name": "Complete shipped example corpus",
+      "group": "language",
+      "level": "system",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 16,
+        "fixtures": 1,
+        "labels": [
+          "backend: all examples execute"
+        ]
+      }
+    },
+    {
+      "id": "backends/tree-workload",
+      "unit": "backends",
+      "name": "Binary trees workload correctness",
+      "group": "runtime-library",
+      "level": "system",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 2,
+        "fixtures": 1,
+        "labels": [
+          "backend: binary-trees benchmark"
+        ]
+      }
+    },
+    {
+      "id": "backends/native-arithmetic-boundaries",
+      "unit": "backends",
+      "name": "Native integer representation boundaries",
+      "group": "code-generation",
+      "level": "integration",
+      "inputs": [
+        "exhaustive"
+      ],
+      "oracles": [
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 2,
+        "fixtures": 2,
+        "labels": [
+          "native optimization: tagged integer boundaries",
+          "native optimization: ordinary products and division preserve Integer boundaries"
+        ]
+      }
+    },
+    {
+      "id": "backends/native-optimization",
+      "unit": "backends",
+      "name": "Native workers, demand and constructor lowering",
+      "group": "code-generation",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 20,
+        "fixtures": 19,
+        "labels": [
+          "native optimization: partial workers stay lazy",
+          "native optimization: seq propagates saturated worker demands",
+          "native optimization: seq worker forces both operands after preceding effects",
+          "native optimization: partial seq stays lazy",
+          "native optimization: function captures and mutual recursion",
+          "native optimization: identities reused in disjoint scopes",
+          "native optimization: packed and general constructor layouts",
+          "native optimization: wide constructors keep fields lazy and recursive",
+          "native optimization: five-field constructor returned from numeric region",
+          "native optimization: general fields retain captured worker values",
+          "native optimization: dead and wildcard fields need no environment",
+          "native optimization: recursive encoding is structural",
+          "native optimization: escaping recursive function",
+          "native optimization: captured closures survive collection",
+          "native optimization: lazy recursive fields and conditional demands",
+          "native optimization: seq demands stay inside the chosen branch",
+          "native optimization: seq preserves ignored arguments and unused results",
+          "native optimization: three-field constructor partially applied",
+          "native optimization: generic arithmetic crosses immediate range"
+        ]
+      }
+    },
+    {
+      "id": "backends/constructor-projection",
+      "unit": "backends",
+      "name": "Constructor projection and binding preservation",
+      "group": "code-generation",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 9,
+        "fixtures": 9,
+        "labels": [
+          "constructor projections: demanded field fails after preceding effects",
+          "constructor projections: shared fields and lazy poison",
+          "constructor projections: captured function becomes a known worker",
+          "constructor projections: recursive data keeps its knot",
+          "constructor projections: mutually recursive dictionary methods",
+          "constructor projections: partial constructors remain lazy",
+          "constructor projections: same spelling in disjoint scopes",
+          "constructor projections: escaping constructor shares its fields",
+          "constructor projections: default branch preserves its bound constructor"
+        ]
+      }
+    },
+    {
+      "id": "backends/force-reuse",
+      "unit": "backends",
+      "name": "Forced-value reuse",
+      "group": "code-generation",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 5,
+        "fixtures": 5,
+        "labels": [
+          "force reuse: dominated uses emit one force",
+          "force reuse: selected exceptions follow preceding IO",
+          "force reuse: branch joins retain conditional laziness",
+          "force reuse: case alternatives isolate forced operands",
+          "force reuse: escaping closures preserve forcing and repeated actions"
+        ]
+      }
+    },
+    {
+      "id": "backends/boolean-lowering",
+      "unit": "backends",
+      "name": "Boolean condition lowering",
+      "group": "code-generation",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 5,
+        "fixtures": 5,
+        "labels": [
+          "Boolean conditions: checked ordinary branches compare forced canonical Bool",
+          "Boolean conditions: runtime producers agree on both branches",
+          "Boolean conditions: lazy fields captures and partial primitives",
+          "Boolean conditions: condition failure follows preceding IO",
+          "Boolean conditions: selected branch failure follows preceding IO"
+        ]
+      }
+    },
+    {
+      "id": "backends/environment-slots",
+      "unit": "backends",
+      "name": "Closure and thunk environment slots",
+      "group": "code-generation",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 4,
+        "fixtures": 4,
+        "labels": [
+          "environment slots: curried captures and constructor fields remain lazy",
+          "environment slots: repeated native action preserves captures and laziness",
+          "environment slots: captured thunk boundary 28",
+          "environment slots: captured thunk boundary 29"
+        ]
+      }
+    },
+    {
+      "id": "backends/strict-fields",
+      "unit": "backends",
+      "name": "Strict constructor field lowering",
+      "group": "code-generation",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 2,
+        "fixtures": 2,
+        "labels": [
+          "strict constructor fields: checked lowering uses the pointer proof",
+          "strict constructor fields: lazy, partial, mixed and recursive values"
+        ]
+      }
+    },
+    {
+      "id": "backends/numeric-language",
+      "unit": "backends",
+      "name": "Numeric and array type rejection",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 0,
+        "fixtures": 1,
+        "labels": [
+          "numeric: types reject invalid numeric and array programs"
+        ]
+      }
+    },
+    {
+      "id": "backends/numeric-specialization",
+      "unit": "backends",
+      "name": "Unboxed numeric worker specialization",
+      "group": "code-generation",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "exhaustive"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 15,
+        "fixtures": 15,
+        "labels": [
+          "native scalar arguments: captured doubles and nonnegative countdown",
+          "native scalar arguments: IEEE values survive recursive calls",
+          "native scalar arguments: payload reads stay within their branch",
+          "native scalar arguments: unused failing floating arguments remain lazy",
+          "native numeric region: specialized integer ranges permit negative results and GMP promotion",
+          "native numeric region: reused actions execute and snapshots stay immutable",
+          "native numeric region: unforced unused arguments take the lazy boundary",
+          "native numeric region: aliased Double arrays preserve write and read order",
+          "native numeric region: range facts do not escape a conditional branch",
+          "native numeric region: lazy write operands retain bounds-error ordering",
+          "native numeric region: negative native index",
+          "native numeric region: GMP native index",
+          "native numeric region: empty native array",
+          "native numeric region: multiplication and division retain arbitrary precision",
+          "native scalar arguments: recursive permutations bound specialization"
+        ]
+      }
+    },
+    {
+      "id": "backends/numeric-target-validation",
+      "unit": "backends",
+      "name": "Non-finite numeric target rejection",
+      "group": "code-generation",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 3,
+        "fixtures": 1,
+        "labels": [
+          "numeric: non-finite target literal rejected by both backends"
+        ]
+      }
+    },
+    {
+      "id": "backends/numeric-runtime",
+      "unit": "backends",
+      "name": "Numeric operations, arrays and failures",
+      "group": "runtime-library",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "exhaustive"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 41,
+        "fixtures": 40,
+        "labels": [
+          "numeric: read unbounded signed decimals",
+          "numeric: curried GMP primitives",
+          "numeric: curried unbounded bitwise AND",
+          "numeric: unused bitwise arguments remain lazy",
+          "numeric: binary64 arithmetic and scientific literals",
+          "numeric: rounding ties and signed zero",
+          "numeric: generic floating primitives and IEEE comparisons",
+          "numeric: IEEE non-finite results",
+          "numeric: large integer conversion rounds to nearest",
+          "numeric: IntArray aliasing and repeated action reads",
+          "numeric: allocation actions produce distinct arrays",
+          "numeric: DoubleArray values are copied at read time",
+          "numeric: generic ternary writes",
+          "numeric: unused actions and unselected arithmetic remain lazy",
+          "numeric: empty arrays have zero length",
+          "numeric: array roots and boxed cells survive collection",
+          "numeric failure: quotient by zero",
+          "numeric failure: remainder by zero",
+          "numeric failure: bitwise zero mask still demands its argument",
+          "numeric failure: direct bitwise arguments are ordered",
+          "numeric failure: curried bitwise arguments are ordered",
+          "numeric failure: empty integer input",
+          "numeric failure: signed empty input",
+          "numeric failure: whitespace integer input",
+          "numeric failure: embedded NUL input",
+          "numeric failure: fractional integer input",
+          "numeric failure: negative precision",
+          "numeric failure: large precision",
+          "numeric failure: negative array length",
+          "numeric failure: huge array length",
+          "numeric failure: negative read index",
+          "numeric failure: huge read index",
+          "numeric failure: empty array read",
+          "numeric failure: integer write past end",
+          "numeric failure: negative Double write",
+          "numeric failure: writes force stored values",
+          "numeric failure: direct floating arguments are ordered",
+          "numeric failure: curried floating arguments are ordered",
+          "numeric: multiplication and signed quotient boundaries",
+          "numeric: direct and curried formatting force the same arguments"
+        ]
+      }
+    },
+    {
+      "id": "backends/numeric-workloads",
+      "unit": "backends",
+      "name": "Numeric benchmark workload correctness",
+      "group": "runtime-library",
+      "level": "system",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 13,
+        "fixtures": 4,
+        "labels": [
+          "numeric: pidigits benchmark partial and full rows",
+          "numeric: n-body benchmark initialization and integration",
+          "numeric: spectral-norm benchmark small and odd matrices",
+          "numeric: fannkuch-redux benchmark checksum and flips"
+        ]
+      }
+    },
+    {
+      "id": "backends/byte-language",
+      "unit": "backends",
+      "name": "Byte array nominal types and signatures",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 0,
+        "fixtures": 1,
+        "labels": [
+          "bytes: nominal types reject invalid operations"
+        ]
+      }
+    },
+    {
+      "id": "backends/byte-specialization",
+      "unit": "backends",
+      "name": "Native byte storage, copy and conversion",
+      "group": "code-generation",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "exhaustive"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 16,
+        "fixtures": 4,
+        "labels": [
+          "bytes: native loop emits every byte without Unicode conversion",
+          "bytes: bulk copy preserves offsets, empty ranges and forward overlap",
+          "bytes: native stores check bounds before byte range",
+          "numeric region: integer-to-Double conversion preserves rounding"
+        ]
+      }
+    },
+    {
+      "id": "backends/byte-target-validation",
+      "unit": "backends",
+      "name": "Forged Unicode target rejection",
+      "group": "code-generation",
+      "level": "integration",
+      "inputs": [
+        "fault-injected",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "bytes: forged surrogate is rejected before encoding by both backends"
+        ]
+      }
+    },
+    {
+      "id": "backends/byte-io-failure",
+      "unit": "backends",
+      "name": "Byte output write failure",
+      "group": "runtime-library",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential"
+      ],
+      "purposes": [
+        "regression",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "bytes: write failures stop continuation and preserve raw output"
+        ]
+      }
+    },
+    {
+      "id": "backends/byte-runtime",
+      "unit": "backends",
+      "name": "Byte arrays, conversion and bounds failures",
+      "group": "runtime-library",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 26,
+        "fixtures": 23,
+        "labels": [
+          "bytes: raw high bytes, NUL and text retain order",
+          "bytes: UTF-8 source strings produce byte lengths and fresh mutable buffers",
+          "bytes: shared reads are snapshots and shared outputs read current contents",
+          "bytes: generic primitive applications preserve slicing",
+          "bytes: empty slices and unused failing actions remain lazy",
+          "bytes: byte buffers and pending slices survive collection",
+          "byte failure: negative length",
+          "byte failure: huge length",
+          "byte failure: negative initial value",
+          "byte failure: initial value outside byte",
+          "byte failure: huge write value",
+          "byte failure: negative write value",
+          "byte failure: negative read",
+          "byte failure: GMP index",
+          "byte failure: write checks bounds before value",
+          "byte failure: empty array still demands index",
+          "byte failure: negative slice",
+          "byte failure: negative count",
+          "byte failure: slice past end",
+          "byte failure: huge count",
+          "byte failure: offset checked before count",
+          "byte failure: write demands value",
+          "bytes: bulk copy fallback retains bounds failures"
+        ]
+      }
+    },
+    {
+      "id": "backends/byte-workloads",
+      "unit": "backends",
+      "name": "Byte benchmark workload correctness",
+      "group": "runtime-library",
+      "level": "system",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 9,
+        "fixtures": 2,
+        "labels": [
+          "bytes: fasta empty, single-base and upstream fixture",
+          "bytes: mandelbrot packed pixels, partial rows and upstream fixture"
+        ]
+      }
+    },
+    {
+      "id": "backends/table-language",
+      "unit": "backends",
+      "name": "Integer table types and signatures",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 0,
+        "fixtures": 1,
+        "labels": [
+          "table: nominal types and IO signatures are checked"
+        ]
+      }
+    },
+    {
+      "id": "backends/byte-input-runtime",
+      "unit": "backends",
+      "name": "Raw input, buffer boundaries and text decoding",
+      "group": "runtime-library",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 8,
+        "fixtures": 6,
+        "labels": [
+          "byte input: raw bytes, blank lines, final line and repeated EOF",
+          "byte input: shared reads execute again and mix with getLine",
+          "byte input: long raw line grows without decoding",
+          "byte input: buffer boundaries preserve mixed reads and retained lines",
+          "byte input: discarded action does not consume input",
+          "byte input: invalid UTF-8 still fails for text input"
+        ]
+      }
+    },
+    {
+      "id": "backends/table-specialization",
+      "unit": "backends",
+      "name": "Native table fusion and IO roots",
+      "group": "code-generation",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 3,
+        "fixtures": 3,
+        "labels": [
+          "table: native counting loop grows and updates collision-prone keys",
+          "native IO: nested collections preserve caller values and prior results",
+          "table fusion: snapshots, large signed keys and promotion across updates"
+        ]
+      }
+    },
+    {
+      "id": "backends/table-runtime",
+      "unit": "backends",
+      "name": "Integer table effects, keys and collection",
+      "group": "runtime-library",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 9,
+        "fixtures": 7,
+        "labels": [
+          "table: fresh actions, aliasing, overwrite and snapshot reads",
+          "table: generic applications and unbounded signed keys and values",
+          "table fusion: intervening writes and unequal keys retain their order",
+          "table: GMP keys and values and pending IO survive collection",
+          "table: unused actions do not demand failing operands",
+          "table: small keys retain GMP values through collection and promotion",
+          "table: demanded operands fail after preceding effects"
+        ]
+      }
+    },
+    {
+      "id": "backends/dna-workloads",
+      "unit": "backends",
+      "name": "DNA benchmark workload correctness",
+      "group": "runtime-library",
+      "level": "system",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 12,
+        "fixtures": 3,
+        "labels": [
+          "DNA: reverse-complement ambiguity codes, records and growing buffers",
+          "DNA: both upstream fixtures",
+          "DNA: k-nucleotide short inputs, ties, mixed case and record termination"
+        ]
+      }
+    },
+    {
+      "id": "backends/module-execution",
+      "unit": "backends",
+      "name": "Module import and interface execution",
+      "group": "language",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 29,
+        "fixtures": 29,
+        "labels": [
+          "modules runtime: selective and qualified imports",
+          "modules runtime: unnamed entry expression imports",
+          "modules runtime: qualified types, fields and nested patterns",
+          "modules runtime: private names and constructor identities",
+          "modules runtime: diamond reexports preserve identity",
+          "modules runtime: transitive empty imports carry instances and private helpers",
+          "modules runtime: qualified class, hidden methods in instance declaration",
+          "modules runtime: abstract datatype used by exported functions",
+          "modules runtime: local shadowing and self qualification",
+          "modules runtime: explicit qualified Prelude",
+          "modules runtime: explicit Prelude with implicit import disabled",
+          "modules runtime: hiding Prelude method for local definition",
+          "modules runtime: module lexical scope protects imported do",
+          "modules runtime: polymorphic Monad function across modules",
+          "modules runtime: qualified Boolean constructor patterns",
+          "modules runtime: internal name hygiene",
+          "modules runtime: same method name from distinct classes",
+          "modules runtime: instance may recursively use an exported helper",
+          "modules runtime: bare primitive fallback without implicit Prelude",
+          "modules runtime: entry selects its own main",
+          "modules runtime: primitive fallback permits local definitions",
+          "modules runtime: cyclic imports preserve independent polymorphic values",
+          "modules runtime: cross-module recursive declaration SCC",
+          "modules runtime: cross-module recursive nominal types",
+          "modules runtime: cyclic reexports retain the originating identity",
+          "modules runtime: cyclic type reexports preserve selective member hiding",
+          "modules runtime: cyclic empty imports carry defining-module instances",
+          "modules runtime: self import is a namespace edge",
+          "modules runtime: multi-file example"
+        ]
+      }
+    },
+    {
+      "id": "backends/module-cli",
+      "unit": "backends",
+      "name": "Module compiler CLI and search paths",
+      "group": "packages-build",
+      "level": "system",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract",
+        "metamorphic"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 3,
+        "fixtures": 1,
+        "labels": [
+          "modules runtime: CLI imports and output paths"
+        ]
+      }
+    },
+    {
+      "id": "backends/crate-linking",
+      "unit": "backends",
+      "name": "Separate crate artifact linking",
+      "group": "packages-build",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 37,
+        "fixtures": 37,
+        "labels": [
+          "crate runtime: selective and qualified imports",
+          "crate runtime: unnamed entry expression imports",
+          "crate runtime: qualified types, fields and nested patterns",
+          "crate runtime: private names and constructor identities",
+          "crate runtime: diamond reexports preserve identity",
+          "crate runtime: transitive empty imports carry instances and private helpers",
+          "crate runtime: qualified class, hidden methods in instance declaration",
+          "crate runtime: abstract datatype used by exported functions",
+          "crate runtime: local shadowing and self qualification",
+          "crate runtime: explicit qualified Prelude",
+          "crate runtime: explicit Prelude with implicit import disabled",
+          "crate runtime: hiding Prelude method for local definition",
+          "crate runtime: module lexical scope protects imported do",
+          "crate runtime: polymorphic Monad function across modules",
+          "crate runtime: qualified Boolean constructor patterns",
+          "crate runtime: internal name hygiene",
+          "crate runtime: same method name from distinct classes",
+          "crate runtime: instance may recursively use an exported helper",
+          "crate runtime: bare primitive fallback without implicit Prelude",
+          "crate runtime: entry selects its own main",
+          "crate runtime: primitive fallback permits local definitions",
+          "crate runtime: cyclic imports preserve independent polymorphic values",
+          "crate runtime: cross-module recursive declaration SCC",
+          "crate runtime: cross-module recursive nominal types",
+          "crate runtime: cyclic reexports retain the originating identity",
+          "crate runtime: cyclic type reexports preserve selective member hiding",
+          "crate runtime: cyclic empty imports carry defining-module instances",
+          "crate runtime: self import is a namespace edge",
+          "crate runtime: inferred overloaded export",
+          "crate runtime: rank-n constructor field",
+          "crate runtime: class-free bounded annotation rules",
+          "crate runtime: unexported nominal type in inferred signature",
+          "crate runtime: mutually recursive module values",
+          "crate runtime: Unicode interface identity",
+          "crate runtime: nominal global cannot capture local binder",
+          "crate runtime: imported entry binding",
+          "crate runtime: crate local and dictionary fresh names avoid user globals"
+        ]
+      }
+    },
+    {
+      "id": "backends/crate-cli",
+      "unit": "backends",
+      "name": "Source-free crate compiler CLI",
+      "group": "packages-build",
+      "level": "system",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 37,
+        "fixtures": 37,
+        "labels": [
+          "crate CLI: selective and qualified imports",
+          "crate CLI: unnamed entry expression imports",
+          "crate CLI: qualified types, fields and nested patterns",
+          "crate CLI: private names and constructor identities",
+          "crate CLI: diamond reexports preserve identity",
+          "crate CLI: transitive empty imports carry instances and private helpers",
+          "crate CLI: qualified class, hidden methods in instance declaration",
+          "crate CLI: abstract datatype used by exported functions",
+          "crate CLI: local shadowing and self qualification",
+          "crate CLI: explicit qualified Prelude",
+          "crate CLI: explicit Prelude with implicit import disabled",
+          "crate CLI: hiding Prelude method for local definition",
+          "crate CLI: module lexical scope protects imported do",
+          "crate CLI: polymorphic Monad function across modules",
+          "crate CLI: qualified Boolean constructor patterns",
+          "crate CLI: internal name hygiene",
+          "crate CLI: same method name from distinct classes",
+          "crate CLI: instance may recursively use an exported helper",
+          "crate CLI: bare primitive fallback without implicit Prelude",
+          "crate CLI: entry selects its own main",
+          "crate CLI: primitive fallback permits local definitions",
+          "crate CLI: cyclic imports preserve independent polymorphic values",
+          "crate CLI: cross-module recursive declaration SCC",
+          "crate CLI: cross-module recursive nominal types",
+          "crate CLI: cyclic reexports retain the originating identity",
+          "crate CLI: cyclic type reexports preserve selective member hiding",
+          "crate CLI: cyclic empty imports carry defining-module instances",
+          "crate CLI: self import is a namespace edge",
+          "crate CLI: inferred overloaded export",
+          "crate CLI: rank-n constructor field",
+          "crate CLI: class-free bounded annotation rules",
+          "crate CLI: unexported nominal type in inferred signature",
+          "crate CLI: mutually recursive module values",
+          "crate CLI: Unicode interface identity",
+          "crate CLI: nominal global cannot capture local binder",
+          "crate CLI: imported entry binding",
+          "crate CLI: crate local and dictionary fresh names avoid user globals"
+        ]
+      }
+    },
+    {
+      "id": "backends/crate-invalidation",
+      "unit": "backends",
+      "name": "Crate metadata, corruption and invalidation",
+      "group": "packages-build",
+      "level": "system",
+      "inputs": [
+        "fixed",
+        "transformed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 3,
+        "fixtures": 1,
+        "labels": [
+          "crate runtime: source-free metadata and semantic invalidation"
+        ]
+      }
+    },
+    {
+      "id": "backends/primitive-language",
+      "unit": "backends",
+      "name": "Bootstrap primitive signature rejection",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 0,
+        "fixtures": 1,
+        "labels": [
+          "bootstrap primitives: signatures reject mismatched types"
+        ]
+      }
+    },
+    {
+      "id": "backends/primitive-runtime",
+      "unit": "backends",
+      "name": "Bootstrap primitive runtime behavior",
+      "group": "runtime-library",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 69,
+        "fixtures": 43,
+        "labels": [
+          "bootstrap primitives: scalar indexing counts characters and preserves NUL",
+          "bootstrap primitives: string comparison follows Unicode scalar order",
+          "bootstrap primitives: floating bit representation includes signed zero and nonfinite values",
+          "bootstrap primitives: seq forces only weak head and unused panic stays lazy",
+          "bootstrap primitives: escaping primitives follow the same runtime ABI",
+          "bootstrap primitives: empty arguments and lazy file operations",
+          "bootstrap primitive failure: empty index",
+          "bootstrap primitive failure: negative index",
+          "bootstrap primitive failure: huge index",
+          "bootstrap primitive failure: negative slice",
+          "bootstrap primitive failure: oversize slice",
+          "bootstrap primitive failure: negative slice count",
+          "bootstrap primitive failure: surrogate",
+          "bootstrap primitive failure: past maximum scalar",
+          "bootstrap primitive failure: negative scalar",
+          "bootstrap primitive failure: negative double bits",
+          "bootstrap primitive failure: oversize double bits",
+          "bootstrap primitive failure: seq demands first",
+          "bootstrap primitive failure: panic preserves embedded NUL and newline",
+          "bootstrap primitive failure: missing argument",
+          "bootstrap primitive failure: invalid negative exit",
+          "bootstrap primitive failure: invalid large exit",
+          "bootstrap primitive failure: NUL path",
+          "bootstrap primitives: Unicode scalar boundaries",
+          "bootstrap primitives: strict decimal input",
+          "bootstrap primitives: arguments exclude executable and preserve Unicode",
+          "bootstrap primitives: diagnostics are ordered and separate from stdout",
+          "bootstrap primitives: diagnostic write failures stop continuation",
+          "bootstrap primitives: executable path is canonical and names this process",
+          "bootstrap primitives: complete input preserves UTF-8, lines and NUL",
+          "bootstrap primitives: complete input rejects invalid UTF-8",
+          "bootstrap primitives: exit status stops pending effects",
+          "bootstrap primitives: UTF-8 files and canonical paths",
+          "host IO: environment mutation and inheritance",
+          "host IO: binary SHA-256 vectors",
+          "host IO: directory listing and lock lifecycle",
+          "host IO: literal argv, cwd, redirects and exit status",
+          "host IO: process launch failures return status",
+          "host IO: repeated launches retain process-group isolation",
+          "host IO: process timeout returns 124",
+          "bootstrap primitives: file errors retain effect order",
+          "bootstrap primitives: cached Unicode offsets survive collection",
+          "bootstrap primitives: collection preserves suspended pure work and cyclic data"
+        ]
+      }
+    },
+    {
+      "id": "backends/state-workers",
+      "unit": "backends",
+      "name": "Bounded native state workers and aliases",
+      "group": "code-generation",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 4,
+        "fixtures": 4,
+        "labels": [
+          "ST runtime: bounded-non-tail-state-worker",
+          "ST runtime: bounded-tail-state-worker",
+          "ST runtime: bounded-mixed-tail-state-worker",
+          "ST runtime: single-use-action-alias"
+        ]
+      }
+    },
+    {
+      "id": "backends/state-runtime",
+      "unit": "backends",
+      "name": "State isolation, arrays and failures",
+      "group": "runtime-library",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 49,
+        "fixtures": 49,
+        "labels": [
+          "ST runtime: return",
+          "ST runtime: write-read",
+          "ST runtime: length-zero-lazy-initial",
+          "ST runtime: length-lazy-initial",
+          "ST runtime: snapshot",
+          "ST runtime: repeated-read-action",
+          "ST runtime: allocation-actions-repeat",
+          "ST runtime: array-aliases",
+          "ST runtime: separate-regions",
+          "ST runtime: nested-regions",
+          "ST runtime: large-integer",
+          "ST runtime: unused-written-poison",
+          "ST runtime: unused-return-poison",
+          "ST runtime: unused-actions",
+          "ST runtime: prelude-do",
+          "ST runtime: polymorphic-elements",
+          "ST runtime: constructor-elements",
+          "ST runtime: recursive-elements",
+          "ST runtime: opaque-package",
+          "ST runtime: io-description-result",
+          "ST runtime: order",
+          "ST runtime: nested-poison-order",
+          "ST runtime: negative-size",
+          "ST runtime: huge-size",
+          "ST runtime: negative-index",
+          "ST runtime: past-end",
+          "ST runtime: huge-index",
+          "ST runtime: empty-array-read",
+          "ST runtime: negative-write-index",
+          "ST runtime: past-end-write",
+          "ST runtime: huge-write-index",
+          "ST runtime: bool-whnf",
+          "ST runtime: int-whnf",
+          "ST runtime: double-whnf",
+          "ST runtime: lazy-data-result",
+          "ST runtime: polymorphic-function-result",
+          "ST runtime: primitive-laziness",
+          "ST runtime: ignored-bind-result",
+          "ST runtime: recursive-state-worker",
+          "ST runtime: case-state-worker",
+          "ST runtime: lazy-default-case",
+          "ST runtime: strict-worker-constructor",
+          "ST runtime: strict-captured-constructor",
+          "ST runtime: strict-let-constructor",
+          "ST runtime: partial-continuation",
+          "ST runtime: dynamic-continuation",
+          "ST runtime: deferred-state-poison",
+          "ST runtime: branch-laziness",
+          "ST runtime: sequence-in-state"
+        ]
+      }
+    },
+    {
+      "id": "backends/higher-order-specialization",
+      "unit": "backends",
+      "name": "Higher order worker specialization",
+      "group": "code-generation",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 11,
+        "fixtures": 11,
+        "labels": [
+          "higher-order specialization: primitive-callback",
+          "higher-order specialization: captured-callback",
+          "higher-order specialization: partial-callback",
+          "higher-order specialization: empty-lazy-capture",
+          "higher-order specialization: discarded-callback-argument",
+          "higher-order specialization: changing-callback",
+          "higher-order specialization: recursive-capture-scope",
+          "higher-order specialization: unbounded-callback-integers",
+          "higher-order specialization: constructor-callback",
+          "higher-order specialization: lazy-constructor-callback",
+          "higher-order specialization: escaping-original-worker"
+        ]
+      }
+    },
+    {
+      "id": "port/foundation",
+      "unit": "port",
+      "name": "Runtime foundation lists, containers and primitive ABI",
+      "group": "runtime-library",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "seeded-random",
+        "transformed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "independent-reference",
+        "metamorphic",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "fixture": "foundation",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "foundation"
+        ]
+      }
+    },
+    {
+      "id": "port/MapFolds",
+      "unit": "port",
+      "name": "Ordered-map folds and set algebra",
+      "group": "runtime-library",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "exhaustive",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "independent-reference",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "fixture": "MapFolds",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "MapFolds"
+        ]
+      }
+    },
+    {
+      "id": "port/IntegerContainers",
+      "unit": "port",
+      "name": "Integer map/set arbitrary-key semantics",
+      "group": "runtime-library",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "seeded-random",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "independent-reference",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "fixture": "IntegerContainers",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "IntegerContainers"
+        ]
+      }
+    },
+    {
+      "id": "port/OptimizerQueries",
+      "unit": "port",
+      "name": "Optimizer size and occurrence queries",
+      "group": "code-generation",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "fixture": "OptimizerQueries",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "OptimizerQueries"
+        ]
+      }
+    },
+    {
+      "id": "port/ConstructorProjection",
+      "unit": "port",
+      "name": "Constructor projection sharing and identities",
+      "group": "code-generation",
+      "level": "component",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "fixture": "ConstructorProjection",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "ConstructorProjection"
+        ]
+      }
+    },
+    {
+      "id": "port/ForceReuse",
+      "unit": "port",
+      "name": "LLVM successful-force reuse and branch boundaries",
+      "group": "code-generation",
+      "level": "component",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "fixture": "ForceReuse",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "ForceReuse"
+        ]
+      }
+    },
+    {
+      "id": "port/StrictFields",
+      "unit": "port",
+      "name": "Strict constructor-field inference and lowering",
+      "group": "code-generation",
+      "level": "component",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "fixture": "StrictFields",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "StrictFields"
+        ]
+      }
+    },
+    {
+      "id": "port/prelude",
+      "unit": "port",
+      "name": "Implicit prelude and source equality",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "fixture": "prelude",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "prelude"
+        ]
+      }
+    },
+    {
+      "id": "port/Target",
+      "unit": "port",
+      "name": "Checked target typing and serialization",
+      "group": "language",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "metamorphic",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "fixture": "Target",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "Target"
+        ]
+      }
+    },
+    {
+      "id": "port/frontend",
+      "unit": "port",
+      "name": "Source frontend parsing, lowering and hygiene",
+      "group": "language",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "fixture": "frontend",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "frontend"
+        ]
+      }
+    },
+    {
+      "id": "port/LexerCounters",
+      "unit": "port",
+      "name": "Lexer/layout strict counters and demand",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "fixture": "LexerCounters",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "LexerCounters"
+        ]
+      }
+    },
+    {
+      "id": "port/LLVMBuild",
+      "unit": "port",
+      "name": "LLVM builder counters and lazy discarded fields",
+      "group": "code-generation",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "fixture": "LLVMBuild",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "LLVMBuild"
+        ]
+      }
+    },
+    {
+      "id": "port/RuntimeCases",
+      "unit": "port",
+      "name": "Interpreter primitive applications and IO execution",
+      "group": "runtime-library",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "fixture": "RuntimeCases",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "RuntimeCases"
+        ]
+      }
+    },
+    {
+      "id": "port/StateRuntime",
+      "unit": "port",
+      "name": "State-region interpreter actions and arrays",
+      "group": "runtime-library",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "fixture": "StateRuntime",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "StateRuntime"
+        ]
+      }
+    },
+    {
+      "id": "port/StateTypes",
+      "unit": "port",
+      "name": "State source/target typing conformance",
+      "group": "language",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "metamorphic",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "fixture": "StateTypes",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "StateTypes"
+        ]
+      }
+    },
+    {
+      "id": "port/GraphConformance",
+      "unit": "port",
+      "name": "Graph validation and incremental solver conformance",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "exhaustive"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "independent-reference",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "fixture": "GraphConformance",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "GraphConformance"
+        ]
+      }
+    },
+    {
+      "id": "port/GraphScopes",
+      "unit": "port",
+      "name": "Graph scopes, expansion, witness and containment",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "seeded-random",
+        "transformed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "independent-reference",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "fixture": "GraphScopes",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "GraphScopes"
+        ]
+      }
+    },
+    {
+      "id": "port/GraphDense",
+      "unit": "port",
+      "name": "Dense graph normalization and sparse fallback",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "exhaustive",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "independent-reference",
+        "differential",
+        "metamorphic",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "fixture": "GraphDense",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "GraphDense"
+        ]
+      }
+    },
+    {
+      "id": "port/OrderedTraversal",
+      "unit": "port",
+      "name": "Ordered graph traversal and lazy demand",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "seeded-random",
+        "transformed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "independent-reference",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "fixture": "OrderedTraversal",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "OrderedTraversal"
+        ]
+      }
+    },
+    {
+      "id": "port/SolverReuse",
+      "unit": "port",
+      "name": "Reused checked solver and normalization contracts",
+      "group": "language",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "independent-reference",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "fixture": "SolverReuse",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "SolverReuse"
+        ]
+      }
+    },
+    {
+      "id": "port/TypeCache",
+      "unit": "port",
+      "name": "Cached graph type translation against recursion",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "independent-reference",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "fixture": "TypeCache",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "TypeCache"
+        ]
+      }
+    },
+    {
+      "id": "port/GraphStack",
+      "unit": "port",
+      "name": "Wide graph solver stack safety",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "fixture": "GraphStack",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "GraphStack"
+        ]
+      }
+    },
+    {
+      "id": "port/EmbeddingPruning",
+      "unit": "port",
+      "name": "Embedding liveness, identities and allocation histories",
+      "group": "language",
+      "level": "component",
+      "inputs": [
+        "fixed",
+        "exhaustive"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "metamorphic",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "fixture": "EmbeddingPruning",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "EmbeddingPruning"
+        ]
+      }
+    },
+    {
+      "id": "port/InferenceConformance",
+      "unit": "port",
+      "name": "Generated source inference conformance",
+      "group": "language",
+      "level": "system",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "fixture": "InferenceConformance",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "InferenceConformance"
+        ]
+      }
+    },
+    {
+      "id": "port/PrimitiveMetadata",
+      "unit": "port",
+      "name": "Primitive signature and ABI metadata",
+      "group": "runtime-library",
+      "level": "component",
+      "inputs": [
+        "exhaustive"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "fixture": "PrimitiveMetadata",
+      "evidence": {
+        "kind": "matrix",
+        "rows": 1,
+        "fixtures": 1,
+        "labels": [
+          "PrimitiveMetadata"
+        ]
+      }
+    },
+    {
+      "id": "parity/complete",
+      "unit": "parity",
+      "name": "Frozen language conformance regression",
+      "group": "language",
+      "level": "system",
+      "inputs": [
+        "fixed",
+        "exhaustive",
+        "seeded-random"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "independent-reference",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "unit"
+      }
+    },
+    {
+      "id": "self-host/complete",
+      "unit": "self-host",
+      "name": "Fresh compiler bootstrap reproducibility",
+      "group": "bootstrap",
+      "level": "system",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-point",
+        "contract"
+      ],
+      "purposes": [
+        "reproducibility"
+      ],
+      "evidence": {
+        "kind": "unit"
+      }
+    }
+  ]
+}

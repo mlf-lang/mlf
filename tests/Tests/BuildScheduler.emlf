@@ -176,4 +176,5 @@ integration = H.withScratch (\directory -> do
  let directories = S.map invocationDirectory (Cons initial (Cons failed (Cons recovered Nil)))
  H.assert (S.length (S.nubBy eqString directories) == 3 && J.equal evidence retained) "later invocations reused worker paths or overwrote earlier plan, context or receipts"
  concurrentCache serial
- edgeCases serial)
+ edgeCases serial
+ putStrLn "Build scheduler integration tests passed")

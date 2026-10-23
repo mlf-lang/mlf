@@ -64,7 +64,7 @@ dependencyPathShapes = do
 -- worker records a different cache hit. Reports merge only when requested by
 -- the coordinator, in the order supplied rather than completion order.
 isolatedActionResults directory = do
- let cache = directory ++ "/isolated-cache"
+ let cache = O.normalize directory ++ "/isolated-cache"
  O.mkdir (cache ++ "/.locks")
  let p = M.Package (directory ++ "/mlf-package.json") J.empty Nil
  let graph = M.PackageGraph p (Cons p Nil) Nil

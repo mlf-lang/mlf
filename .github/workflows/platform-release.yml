@@ -223,9 +223,27 @@ jobs:
             .mlf-build/prerequisites/tests/build-report.json
             .mlf-build/prerequisites/tests/commands/*.stderr
           retention-days: 14
+  mac-port-preparation:
+    name: macos-arm64 prepare port ${{ matrix.shard }}
+    needs: [metadata, mac-prerequisites]
+    runs-on: macos-26
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [StateTypes, SolverReuse, InferenceConformance, other]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.metadata.outputs.source }}
+      - uses: ./.github/actions/posix-qualification
+        with:
+          platform: macos-arm64
+          group: port-prepare-${{ matrix.shard }}
+          source: ${{ needs.metadata.outputs.source }}
   mac-port:
     name: macos-arm64 port
-    needs: [metadata, mac-prerequisites]
+    needs: [metadata, mac-prerequisites, mac-port-preparation]
     runs-on: macos-26
     timeout-minutes: 360
     steps:
@@ -260,9 +278,10 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ needs.metadata.outputs.source }}
-      - name: Wait for port and unit runner allocation
+      - name: Wait for unit and checked port preparation runner allocation
         env:
           GH_TOKEN: ${{ github.token }}
+          MLF_PRIORITY_JOBS: '["macos-arm64 unit","macos-arm64 prepare port StateTypes","macos-arm64 prepare port SolverReuse","macos-arm64 prepare port InferenceConformance","macos-arm64 prepare port other"]'
         run: tools/release/wait-for-priority-jobs.sh
   mac-tests:
     name: macos-arm64 ${{ matrix.group }}
@@ -283,6 +302,38 @@ jobs:
           platform: macos-arm64
           group: ${{ matrix.group }}
           source: ${{ needs.metadata.outputs.source }}
+  linux-port-preparation:
+    name: linux-x64 prepare port ${{ matrix.shard }}
+    needs: [metadata, linux-candidate]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [StateTypes, SolverReuse, InferenceConformance, other]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.metadata.outputs.source }}
+      - uses: ./.github/actions/posix-qualification
+        with:
+          platform: linux-x64
+          group: port-prepare-${{ matrix.shard }}
+          source: ${{ needs.metadata.outputs.source }}
+  linux-port:
+    name: linux-x64 port
+    needs: [metadata, linux-candidate, linux-port-preparation]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.metadata.outputs.source }}
+      - uses: ./.github/actions/posix-qualification
+        with:
+          platform: linux-x64
+          group: port
+          source: ${{ needs.metadata.outputs.source }}
   linux-tests:
     name: linux-x64 ${{ matrix.group }}
     needs: [metadata, linux-candidate]
@@ -291,7 +342,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: [port, unit, backends, parity, packages, self-host]
+        group: [unit, backends, parity, packages, self-host]
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -349,7 +400,7 @@ jobs:
           retention-days: 30
   linux-package:
     name: posix-package (linux-x64, ubuntu-24.04)
-    needs: [metadata, linux-tests]
+    needs: [metadata, linux-tests, linux-port]
     permissions:
       contents: read
       actions: read

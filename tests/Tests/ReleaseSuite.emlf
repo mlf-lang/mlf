@@ -44,6 +44,12 @@ main : IO Unit
 main = do
  evidence <- J.read "tests/golden/release-evidence.json"
  manifest <- J.read "benchmarks/manifest.json"
+ evidenceChecks evidence manifest
+ stepChecks
+ installationChecks evidence manifest
+
+evidenceChecks : J.Json -> J.Json -> IO Unit
+evidenceChecks evidence manifest = do
  H.right (validate evidence manifest)
  Coverage.passed "harness" "test_complete_stage3_evidence_passes"
  putStrLn "PASS test_complete_stage3_evidence_passes"
@@ -92,6 +98,9 @@ main = do
  S.mapM_ (\value -> reject (entry "languages c compilation samples" (\_ -> samples value) evidence) manifest) (Cons (J.num 6) (Cons (J.num 0) (Cons (J.num (-1)) (Cons (J.Number "NaN") (Cons (J.Number "Infinity") Nil)))))
  Coverage.passed "harness" "test_medians_are_recomputed_and_bad_samples_fail"
  putStrLn "PASS test_medians_are_recomputed_and_bad_samples_fail"
+
+stepChecks : IO Unit
+stepChecks = do
  H.withScratch (\directory -> do
   let report = J.Object (Cons (Pair "complete" (J.Boolean false)) (Cons (Pair "steps" (J.Array Nil)) Nil))
   failed <- V.step directory report "failure" (S.append (O.words "/bin/sh -c") (Cons "exit 9" Nil))
@@ -110,6 +119,9 @@ main = do
   S.mapM_ (\(Pair name value) -> if eqString value "" then unsetEnv name else setEnv name value) prior)
  Coverage.passed "harness" "test_gate_does_not_inherit_compiler_or_collector_overrides"
  putStrLn "PASS test_gate_does_not_inherit_compiler_or_collector_overrides"
+
+installationChecks : J.Json -> J.Json -> IO Unit
+installationChecks evidence manifest = do
  H.withScratch (\directory -> do
   report <- fixture directory evidence manifest
   checked <- V.verify directory

@@ -27,6 +27,8 @@ unions = do
  return Unit
 
 cases : List C.Case
-cases = Cons (C.test "int-set/union-sorted-list" "size-biased set unions agree with independent sorted lists" (Cons "containers" (Cons "oracle" Nil)) unions) Nil
+cases = Cons (C.described "runtime-library" "component" (Cons "exhaustive" Nil) (Cons "independent-reference" Nil) (Cons "regression" (Cons "conformance" Nil))
+ (C.classified (Cons "standard-library" Nil) (Cons "regression" (Cons "property-based" (Cons "differential" Nil)))
+ (C.test "int-set/union-sorted-list" "size-biased set unions agree with independent sorted lists" (Cons "containers" (Cons "oracle" Nil)) unions))) Nil
 
 suite = L.map C.toLegacy cases
