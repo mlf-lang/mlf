@@ -8,6 +8,7 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 from pathlib import Path
 import shutil
 import subprocess
@@ -19,6 +20,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def tool_identity(name, version_args):
+    found = shutil.which(name)
+    if not found:
+        raise RuntimeError('required installed tool is missing: '+name)
+    path = Path(found).resolve()
+    return {'path':str(path),'sha256':sha(path),
+            'version':subprocess.check_output([str(path),*version_args],text=True).strip()}
 
 
 def run(args, cwd=ROOT):
@@ -109,6 +119,14 @@ def main():
                 'converter_sha256': sha(converter),
                 'generated': {str(p.relative_to(output)): sha(p) for p in (output/'generated').rglob('*.hs')},
                 'executables': {}}
+    evidence['platform']={'system':platform.system(),'machine':platform.machine(),'release':platform.release()}
+    evidence['toolchain']={name:tool_identity(name,args) for name,args in
+                          [('ghc',['--numeric-version']),('cabal',['--numeric-version']),
+                           (os.environ.get('CC','clang'),['--version']),('python3',['--version'])]}
+    for label,command in [('ghc-info',['ghc','--info']),('ghc-packages',['ghc-pkg','dump','--global'])]:
+        destination=output/(label+'.txt')
+        destination.write_bytes(subprocess.check_output(command))
+        evidence[label]={'path':str(destination),'sha256':sha(destination),'command':command}
     evidence_path = output/'build-evidence.json'
     evidence_path.write_text(json.dumps(evidence, indent=2)+'\n')
     if options.generate_only:
@@ -131,6 +149,9 @@ def main():
     for relative, expected in inputs.items():
         if sha(ROOT/relative) != expected:
             raise RuntimeError('input changed during build: '+relative)
+    for tool in evidence['toolchain'].values():
+        if sha(Path(tool['path'])) != tool['sha256']:
+            raise RuntimeError('tool changed during build: '+tool['path'])
     evidence.update(complete=True, build_seconds=time.monotonic()-start)
     evidence_path.write_text(json.dumps(evidence, indent=2)+'\n')
     print('Build receipt:', evidence_path)

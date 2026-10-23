@@ -1,8 +1,8 @@
 -- Type-only counterexample. NEVER run this fixture or provide this signature.
 -- IO returns an already polymorphic CELL, admitting unrelated instantiations.
-data Completion a = Completion (a -> IO Unit) (IO a);
-let newCompletion : IO (forall a. Completion a) = panic "invalid contract" in
-let resolve : forall a. Completion a -> a -> IO Unit = \(Completion write read) -> write in
-let observe : forall a. Completion a -> IO a = \(Completion write read) -> read in
-ioBind newCompletion (\(cell : forall a. Completion a) ->
+data GateCell a = GateCell (a -> IO Unit) (IO a);
+let newCompletion : IO (forall a. GateCell a) = panic "invalid contract" in
+let resolve : forall a. GateCell a -> a -> IO Unit = \(GateCell write read) -> write in
+let observe : forall a. GateCell a -> IO a = \(GateCell write read) -> read in
+ioBind newCompletion (\(cell : forall a. GateCell a) ->
   ioBind (resolve cell 42) (\_ -> ioBind (observe cell) putStrLn))

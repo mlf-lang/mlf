@@ -1,7 +1,7 @@
 module Main where
 import Gate.CompletionInterface
 -- One fixed payload type may itself be a polymorphic function type.
-main = ioBind (newCompletion : IO (Completion (forall a. a -> a))) (\cell ->
+main = ioBind (newCompletion : IO (GateCell (forall a. a -> a))) (\cell ->
   ioBind (resolve cell ((\x -> x) : forall a. a -> a)) (\_ ->
   ioBind (observe cell) (\(identity : forall a. a -> a) ->
     ioBind (printInt (identity 42)) (\_ -> putStrLn (identity "ok")))))
