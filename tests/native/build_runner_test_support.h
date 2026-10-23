@@ -17,6 +17,7 @@
 #include <direct.h>
 #include <io.h>
 #include <fcntl.h>
+#include "../../runtime/mlf_windows_path.h"
 typedef struct { HANDLE handle; DWORD id; } test_process;
 static inline wchar_t *test_wide(const char *s) {
     int n=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,s,-1,NULL,0);
@@ -25,12 +26,13 @@ static inline wchar_t *test_wide(const char *s) {
     return w;
 }
 static inline FILE *test_open(const char *path,const char *mode) {
-    wchar_t *p=test_wide(path),*m=test_wide(mode); FILE *f=p&&m ? _wfopen(p,m) : NULL; free(p); free(m); return f;
+    wchar_t *w=test_wide(path),*p=w ? mlf_windows_path(w) : NULL,*m=test_wide(mode);
+    FILE *f=p&&m ? _wfopen(p,m) : NULL; free(w); free(p); free(m); return f;
 }
 static inline double test_now(void) { return (double)GetTickCount64()/1000.; }
 static inline void test_pause(void) { Sleep(5); }
 static inline long test_pid(void) { return (long)GetCurrentProcessId(); }
-static inline void test_mkdir(const char *path) { wchar_t *w=test_wide(path); if(!w || (_wmkdir(w) && errno!=EEXIST)) abort(); free(w); }
+static inline void test_mkdir(const char *path) { wchar_t *w=test_wide(path); if(!w || (!CreateDirectoryW(w,NULL) && GetLastError()!=ERROR_ALREADY_EXISTS)) abort(); free(w); }
 static inline test_process test_spawn(char **argv) {
     size_t capacity=1; for(char **a=argv;*a;++a) capacity+=2*strlen(*a)+3;
     wchar_t *line=calloc(capacity,sizeof(wchar_t)),*out=line;
