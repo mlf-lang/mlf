@@ -146,6 +146,13 @@ version tag and pass that same tag. The tag must resolve to the workflow's exact
 SHA so artifact provenance cannot silently refer to a different source. A manual
 `platform-release.yml` run with `validation_only=true` is an explicit release
 rehearsal: it builds and relocates all SDKs but never publishes or creates tags.
+Main CI already supersedes older runs on the same branch, including its complete
+qualification workflow. Release rehearsals also cancel older rehearsals on the
+same branch, even across different commits; other branches remain independent.
+Actual releases are serialized by immutable tag and do not cancel an active
+release. The reusable qualification workflow has no separate concurrency group,
+so it cannot collide with its caller. Cancellation is not instantaneous: bounded
+summary and diagnostic-upload steps may finish while workers clean up.
 See [release instructions](releases.md). No branch-protection settings are changed.
 
 ## Run locally
