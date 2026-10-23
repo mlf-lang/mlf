@@ -19,6 +19,12 @@ failureIs label expected value = do
     Right _ -> error (label++": expected failure")
 main :: IO ()
 main = do
+  -- Native getArg checks during the action, even if its returned String is
+  -- discarded. A lazy `pure (args !! index)` incorrectly defers this failure.
+  argument <- try (H.v_getArg (-1) >> pure ())
+  case argument of
+    Left (B.HostError message) -> assertEqual "discarded invalid argument" "argument index out of bounds" message
+    Right _ -> error "discarded invalid getArg did not fail during IO"
   failureIs "integer argument order" "left" (B.v_addInt (B.failure "left") (B.failure "right"))
   failureIs "formatDouble forces value before range check" "value" (B.v_formatDouble 99 (B.failure "value"))
   failureIs "formatDouble left operand" "precision" (B.v_formatDouble (B.failure "precision") (B.failure "value"))

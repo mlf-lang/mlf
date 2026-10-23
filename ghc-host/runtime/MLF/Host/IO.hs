@@ -91,8 +91,8 @@ v_getArgCount = toInteger . length <$> E.getArgs
 v_getArg :: Int -> IO String
 v_getArg n = do
   args <- E.getArgs
-  let i=bounded "argument index out of bounds" (toInteger (length args)-1) n
-  pure (literal (args!!i))
+  i <- evaluate (bounded "argument index out of bounds" (toInteger (length args)-1) n)
+  evaluate (literal (args!!i))
 write :: H.Handle -> String -> IO Unit
 write handle text = ioErrorAs "IO error: output failed" $ do
   B.hPut handle (utf8 text)
