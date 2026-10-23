@@ -9,6 +9,8 @@ targets='["core-crates","core-language","core-modules","core-solver","figure12",
 shards='["core-crates","core-solver","core-language","core-modules"]'
 jq -e --argjson targets "$targets" --argjson shards "$shards" '
   def digest: type == "string" and test("^[0-9a-f]{64}$");
+  # Bind the report before the predicate: jq 1.8 changed `as` precedence.
+  . as $v |
   .complete == true and .implementation == "MLF" and .group == "unit" and .scope == "full" and
   (.prepared_suite_targets | keys) == $targets and
   all(.prepared_suite_targets[]; (.sha256 | digest)) and
@@ -18,7 +20,7 @@ jq -e --argjson targets "$targets" --argjson shards "$shards" '
   .suites.core.aggregate == true and .suites.core.scope == "full" and
   (.suites.core | has("binary_sha256") | not) and .suites.core.targets == $shards and
   (.suites.core.components | keys) == ($shards | sort) and
-  . as $v | all($shards[]; . as $name |
+  all($shards[]; . as $name |
     $v.suites[$name].scope == "partial" and
     $v.suites[$name] == $v.suites.core.components[$name] and
     $v.suites[$name].binary_sha256 == $v.prepared_suite_targets[$name].sha256 and
