@@ -4,11 +4,14 @@ Pull requests require the small [compiler source smoke suite](../docs/ci.md):
 the verified seed interprets `PRQuickMain.emlf` against the checkout frontend and
 current/frozen target checkers through the split library roots, with two accepted
 cases, two source rejections and one malformed target. This does not build fresh
-tools or test current LLVM execution. Fresh native tools, eight CLI cases, three
-package/cache states and
-the complete 79-case package distribution suite, separate target-dependency/
-scheduler fixture and 22 native runner checks run separately on pushes to
-`main` or manual CI dispatches with `full_validation` enabled.
+tools or test current LLVM execution. Every push to `main` automatically runs all
+six complete Linux/macOS campaigns, the native Windows qualification and the
+full ten-workload Benchmark Game with seven samples and explicit 3x C compilation
+/ 2x C runtime gates. The eight direct CLI and three package/cache checks are
+preserved against the final macOS candidate. Manual CI with `full_validation`
+(or `self_host`) enabled runs the same graph. SDK packaging and publication are
+reserved for explicit release runs; no full-test or platform coverage is silently
+replaced by a smoke result. See [the CI policy](../docs/ci.md).
 
 The broader campaign remains available as `tools/release/native-ci.sh extended-pr-smoke`:
 framework/process contracts, Figure 12, four independent checker controls,
