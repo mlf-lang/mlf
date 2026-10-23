@@ -153,6 +153,9 @@ Actual releases are serialized by immutable tag and do not cancel an active
 release. The reusable qualification workflow has no separate concurrency group,
 so it cannot collide with its caller. Cancellation is not instantaneous: bounded
 summary and diagnostic-upload steps may finish while workers clean up.
+The explicit recovery publisher also requires an existing version tag pointing
+to the qualified source, and checks it again before publication; it never
+creates a missing tag.
 See [release instructions](releases.md). No branch-protection settings are changed.
 
 ## Run locally

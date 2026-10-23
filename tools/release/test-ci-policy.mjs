@@ -32,6 +32,9 @@ assert.deepEqual(publishing('', 'a'.repeat(40)), {group:`platform-release-${'a'.
 assert.notEqual(publishing('', 'a'.repeat(40)).group, publishing('', 'b'.repeat(40)).group);
 assert.match(ci,/concurrency:\n  group: ci-\$\{\{ github.workflow \}\}-\$\{\{ github.ref \}\}\n  cancel-in-progress: true/);
 assert.doesNotMatch(qualify,/^\s*concurrency:/m, 'The reusable workflow must not collide with its caller');
+assert.match(qualify,/MLF_TEST_BUILD_JOBS: '1'/);
+assert.equal((qualify.match(/build-jobs: '1'/g) || []).length, 7, 'All qualification consumers remain serial');
+assert.equal((qualify.match(/\.mlf-build\/prerequisites\/compiler-tests\/build-report.json/g) || []).length, 2, 'Both producers preserve authentic campaign-runner reports');
 assert.match(ci,/push:\n    branches: \[main\]/);
 assert.match(ci,/if: \(github.event_name == 'push'.*inputs.full_validation.*inputs.self_host/);
 assert.match(ci,/uses: \.\/\.github\/workflows\/native-qualification.yml\n    with:\n      source: \$\{\{ github.sha \}\}\n      build_packages: false/);

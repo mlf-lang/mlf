@@ -48,6 +48,7 @@ jobs:
             jq -e --arg name "$name" '[.[].jobs[] | select((.name | split(" / ") | last) == $name)] | length == 1 and all(.[]; .status == "completed" and .conclusion == "success")' jobs.json
           done
           version=$(cat VERSION)
+          test "$(git rev-parse "refs/tags/v$version^{commit}")" = "$SOURCE_COMMIT"
           printf 'source=%s\nversion=%s\ntag=v%s\n' "$SOURCE_COMMIT" "$version" "$version" >> "$GITHUB_OUTPUT"
   macos-package:
     needs: metadata
@@ -136,14 +137,7 @@ jobs:
             exit 1
           fi
           cd ../..
-          if git rev-parse "$RELEASE_TAG^{commit}" >/dev/null 2>&1; then
-            test "$(git rev-parse "$RELEASE_TAG^{commit}")" = "$SOURCE_COMMIT"
-          else
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git tag -a "$RELEASE_TAG" "$SOURCE_COMMIT" -m "MLF $RELEASE_VERSION native developer preview"
-            git push origin "refs/tags/$RELEASE_TAG"
-          fi
+          test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$SOURCE_COMMIT"
           awk -v version="$RELEASE_VERSION" '$0 ~ "^## " version " " {active=1;next} /^## / {if(active)exit} active' CHANGELOG.md > .mlf-build/publish/NOTES.md
           gh release create "$RELEASE_TAG" --verify-tag --draft --prerelease --latest=false --title "MLF $RELEASE_VERSION — Windows, macOS and Linux preview" --notes-file .mlf-build/publish/NOTES.md .mlf-build/publish/*.tar.gz .mlf-build/publish/*.zip .mlf-build/publish/SHA256SUMS
           gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
