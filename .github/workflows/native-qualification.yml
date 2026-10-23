@@ -87,6 +87,15 @@ jobs:
           path: |
             .mlf-build/bootstrap-stage1/build-report.json
             .mlf-build/bootstrap-stage1/timing/
+            .mlf-build/bootstrap-stage1/async-bootstrap/capability.txt
+            .mlf-build/bootstrap-stage1/async-bootstrap/source-identity.txt
+            .mlf-build/bootstrap-stage1/async-bootstrap/compilers.sha256
+            .mlf-build/bootstrap-stage1/async-bootstrap/manager.sha256
+            .mlf-build/bootstrap-stage1/async-bootstrap/manager.path
+            .mlf-build/bootstrap-stage1/async-bootstrap/build-*/**/build-report.json
+            .mlf-build/bootstrap-stage1/async-bootstrap/build-*/**/commands/
+            .mlf-build/bootstrap-stage1/async-bootstrap/source-*/inputs.sha256
+            .mlf-build/bootstrap-stage1/async-bootstrap/cache/*/artifact.json
           retention-days: 14
   mac-prerequisites:
     needs: [metadata, mac-bootstrap]
