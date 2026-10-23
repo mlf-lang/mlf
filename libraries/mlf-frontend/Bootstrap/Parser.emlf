@@ -104,7 +104,7 @@ topDeclaration = pChoices (Cons (pMap DataTop dataDeclaration) (Cons (pMap Class
 valueDeclaration : Parser Value
 valueDeclaration = pChoice (pTry (do
   name <- lowerIdentifier
-  pToken ":"
+  annotationSymbol
   ty <- annotation
   pLook (pToken ";")
   pPure (Signature name ty))) equation
@@ -118,7 +118,7 @@ bindingHead = do
   result <- pTry (do
     name <- lowerIdentifier
     args <- pMany patternAtom
-    ty <- pOptional (pThen (pToken ":") annotation)
+    ty <- pOptional (pThen annotationSymbol annotation)
     pToken "="
     pPure (Triple name args ty))
   case result of
@@ -168,7 +168,7 @@ classDeclaration = do
   name <- upperIdentifier
   params <- pSome parameter
   pToken "where"
-  methods <- pBraces (pSepEndBy (do {n <- lowerIdentifier; pToken ":"; t <- typ; pPure (Pair n t)}) (pToken ";"))
+  methods <- pBraces (pSepEndBy (do {n <- lowerIdentifier; annotationSymbol; t <- typ; pPure (Pair n t)}) (pToken ";"))
   pPure (SClassDecl name params supers methods)
 instanceDeclaration : Parser SInstanceDecl
 instanceDeclaration = do
@@ -187,7 +187,41 @@ instanceMethods declarations = if all (\v -> case v of {Equation _ Nil _ _ -> tr
   else case groupValues declarations of {Left e -> Left e; Right values -> Right (map (\(Triple n a e) -> Pair n (annotateMaybe e a)) values)}
 
 expr : Parser SExpr
-expr = do {e <- disjunction; pOption e (pMap (SAnn e) (pThen (pToken ":") annotation))}
+expr = do {e <- disjunction; pOption e (pMap (SAnn e) (pThen annotationSymbol annotation))}
+annotationSymbol : Parser String
+annotationSymbol = pChoice (pToken "::") (pToken ":")
+
+-- A single colon historically introduces a closed annotation. Keep that
+-- meaning when the complete right-hand side is a closed type, or contains
+-- syntax specific to types. Otherwise it can introduce a list tail. In
+-- particular, x : Nil remains an annotation; write x : [] or Cons x Nil.
+legacyAnnotation : Parser SAnnotation
+legacyAnnotation = pTry (do
+  a <- annotation
+  case a of
+    SAnnotation variables ty -> if null (freeTypeNames variables ty) || explicitType ty || not (null variables) then pPure Unit else pFail "list tail"
+  end <- pState
+  if elem eqString (tokenText (stateToken end)) (Cons "" (Cons ")" (Cons "]" (Cons "}" (Cons "," (Cons ";" (Cons "in" (Cons "then" (Cons "else" (Cons "of" (Cons "where" Nil))))))))))) then pPure Unit else pFail "end of annotation"
+  pPure a)
+freeTypeNames : List String -> SType -> List String
+freeTypeNames bound ty = case ty of
+  STVar n -> if elem eqString n bound then Nil else Cons n Nil
+  SArrow a b -> append (freeTypeNames bound a) (freeTypeNames bound b)
+  STypeApp a b -> append (freeTypeNames bound a) (freeTypeNames bound b)
+  SCon _ args -> concatMap (freeTypeNames bound) args
+  SForall _ n lower body -> append (freeTypeNames bound lower) (freeTypeNames (Cons n bound) body)
+  SQualified predicates body -> append (concatMap (\(SPredicate _ args) -> concatMap (freeTypeNames bound) args) predicates) (freeTypeNames bound body)
+  _ -> Nil
+explicitType : SType -> Bool
+explicitType ty = case ty of
+  SArrow _ _ -> true
+  SForall _ _ _ _ -> true
+  SQualified _ _ -> true
+  SBottom -> true
+  SBottomKind _ -> true
+  SCon _ args -> any explicitType args
+  STypeApp a b -> explicitType a || explicitType b
+  _ -> false
 disjunction : Parser SExpr
 disjunction = pChainr conjunction (pMap (\_ a b -> conditional a (SBoolLit true) b) (pToken "||"))
 conjunction : Parser SExpr
@@ -209,7 +243,11 @@ comparisonOperator = pChoices (Cons (pMap (\_ -> primitive2 PEqInt) (pToken "=="
   (Cons (pMap (\_ a b -> primitive2 PLtInt b a) (pToken ">"))
   (Cons (pMap (\_ a b -> notValue (primitive2 PLtInt a b)) (pToken ">=")) Nil))))))
 concatenation : Parser SExpr
-concatenation = pChainr addition (pMap (\_ -> primitive2 PConcatString) (pToken "++"))
+concatenation = pChainr addition (pChoice (pMap (\_ -> primitive2 PConcatString) (pToken "++")) (do
+  pTry (pThen (pToken ":") (pNot legacyAnnotation))
+  pPure consExpression))
+consExpression : SExpr -> SExpr -> SExpr
+consExpression a b = SApp (SApp (SConstructor "Cons") a) b
 addition : Parser SExpr
 addition = pChainl multiplication (pChoice (pMap (\_ -> primitive2 PAddInt) (pToken "+")) (pMap (\_ -> primitive2 PSubInt) (pToken "-")))
 multiplication : Parser SExpr
@@ -251,24 +289,30 @@ caseExpr = do {pToken "case"; scrutinee <- expr; pToken "of"; alternatives <- pB
 alternative : Parser SAlternative
 alternative = do {pattern <- patternP; pToken "->"; value <- expr; pPure (SAlternative pattern value)}
 patternP : Parser SPattern
-patternP = pChoice (pTry (do {name <- upperReference; fields <- pMany patternAtom; pPure (constructorPattern name fields)})) patternAtom
+patternP = pChainr patternApplication (pMap (\_ a b -> constructorPattern "Cons" (Cons a (Cons b Nil))) (pToken ":"))
+patternApplication : Parser SPattern
+patternApplication = pChoice (pTry (do {name <- upperReference; fields <- pMany patternAtom; pPure (constructorPattern name fields)})) patternAtom
 constructorPattern : String -> List SPattern -> SPattern
 constructorPattern name fields = if eqString name "True" && null fields then SBoolPattern true
   else if eqString name "False" && null fields then SBoolPattern false
   else if all (\p -> case p of {SDefaultPattern _ -> true; _ -> false}) fields then SConstructorPattern name (map (\p -> case p of {SDefaultPattern n -> n; _ -> Nothing}) fields)
   else SNestedPattern name fields
 patternAtom : Parser SPattern
-patternAtom = pChoices (Cons (pParens (pOption (SConstructorPattern "Unit" Nil) (do
-  pattern <- patternP
-  ty <- pOptional (pThen (pToken ":") annotation)
-  case ty of
-    Nothing -> pPure pattern
-    Just a -> case pattern of {SDefaultPattern (Just n) -> pPure (SAnnotatedPattern n a); _ -> pFail "only variable patterns can be annotated"})))
+patternAtom = pChoices (Cons (pParens (pChoice annotatedVariable (pBind (collectionItems ")" patternP) (tupleValue (SConstructorPattern "Unit" Nil) constructorPattern))))
+  (Cons (pMap (foldr (\a b -> constructorPattern "Cons" (Cons a (Cons b Nil))) (constructorPattern "Nil" Nil)) (pThen (pToken "[") (pBefore (collectionItems "]" patternP) (pToken "]"))))
   (Cons (pMap SBoolPattern booleanLiteral)
   (Cons (pMap SIntPattern (pTry integerLiteral))
   (Cons (pMap SStringPattern stringLiteral)
   (Cons (pMap (\n -> SConstructorPattern n Nil) upperReference)
-  (Cons (pMap SDefaultPattern patternField) Nil))))))
+  (Cons (pMap SDefaultPattern patternField) Nil)))))))
+annotatedVariable : Parser SPattern
+annotatedVariable = pTry (do
+  n <- annotatedName
+  a <- pChoice (pThen (pToken "::") annotation) (pThen (pToken ":") legacyAnnotation)
+  pLook (pToken ")")
+  pPure (SAnnotatedPattern n a))
+annotatedName : Parser String
+annotatedName = pChoice lowerIdentifier (pParens annotatedName)
 patternField : Parser (Maybe String)
 patternField = pChoice (pMap (\_ -> Nothing) (pToken "_")) (pMap Just lowerIdentifier)
 doExpr : Parser SExpr
@@ -289,10 +333,42 @@ doLet = do
   pLook (pChoice (pToken ";") (pToken "}"))
   if recursive then pMap (\ds -> Cons (SDoLetRec ds) Nil) (pEither (Surface.recursiveValues values)) else pPure (map (\(Triple n a e) -> SDoLet n a e) values)
 atom : Parser SExpr
-atom = pChoices (Cons (pParens (pOption (SConstructor "Unit") expr)) (Cons doExpr
+atom = pChoices (Cons (pParens (pBind (collectionItems ")" expr) (tupleValue (SConstructor "Unit") (\name fields -> foldl SApp (SConstructor name) fields))))
+  (Cons (pMap (foldr consExpression (SConstructor "Nil")) (pThen (pToken "[") (pBefore (collectionItems "]" expr) (pToken "]")))) (Cons doExpr
   (Cons (pMap SBoolLit booleanLiteral) (Cons (pMap SDoubleLit doubleLiteral)
   (Cons (pMap SIntLit naturalLiteral) (Cons (pMap SStringLit stringLiteral)
-  (Cons (pMap SVar lowerReference) (Cons (pMap SConstructor upperReference) Nil))))))))
+  (Cons (pMap SVar lowerReference) (Cons (pMap SConstructor upperReference) Nil)))))))))
+
+-- Nonempty collections never admit a trailing comma or tuple sections.
+-- The separator check also gives ranges/comprehensions a direct diagnostic.
+collectionItems : forall a. String -> Parser a -> Parser (List a)
+collectionItems closing item = pChoice (pThen (pLook (pToken closing)) (pPure Nil)) (do
+  first <- item
+  rest <- collectionRest closing item
+  pPure (Cons first rest))
+collectionRest : forall a. String -> Parser a -> Parser (List a)
+collectionRest closing item = do
+  state <- pState
+  let next = tokenText (stateToken state)
+  if eqString next "|" then pFail "list comprehensions are not supported"
+  else if eqString next ".." then pFail "list ranges are not supported"
+  else if eqString next "," then do
+    pToken ","
+    end <- pState
+    if eqString (tokenText (stateToken end)) closing then pFail "trailing comma or missing collection element" else pPure Unit
+    value <- item
+    rest <- collectionRest closing item
+    pPure (Cons value rest)
+  else pPure Nil
+tupleValue : forall a. a -> (String -> List a -> a) -> List a -> Parser a
+tupleValue unit construct values = case values of
+  Nil -> pPure unit
+  Cons value Nil -> pPure value
+  _ -> case length values of
+    2 -> pPure (construct "Pair" values)
+    3 -> pPure (construct "Triple" values)
+    4 -> pPure (construct "Quad" values)
+    _ -> pFail "tuple syntax supports two, three or four components"
 booleanLiteral : Parser Bool
 booleanLiteral = pChoice (pMap (\_ -> true) (pChoice (pToken "true") (pToken "True"))) (pMap (\_ -> false) (pChoice (pToken "false") (pToken "False")))
 naturalLiteral : Parser Int
@@ -327,9 +403,10 @@ typeApp = pMap (\types -> case types of {Nil -> SBottom; Cons first rest -> fold
 applyType : SType -> SType -> SType
 applyType f a = case f of {SCon n args -> SCon n (append args (Cons a Nil)); _ -> STypeApp f a}
 typeAtom : Parser SType
-typeAtom = pChoices (Cons (pParens (pOption (SCon "Unit" Nil) typ))
+typeAtom = pChoices (Cons (pParens (pBind (collectionItems ")" typ) (tupleValue (SCon "Unit" Nil) SCon)))
+  (Cons (pMap (\ty -> SCon "List" (Cons ty Nil)) (pThen (pToken "[") (pBefore typ (pToken "]"))))
   (Cons (pMap (\_ -> SBottom) (pChoice (pToken "bot") (pToken "⊥")))
-  (Cons (pMap STVar lowerIdentifier) (Cons (pMap (\n -> SCon n Nil) upperReference) Nil))))
+  (Cons (pMap STVar lowerIdentifier) (Cons (pMap (\n -> SCon n Nil) upperReference) Nil)))))
 
 -- Reserved Boolean spellings are parsed in declarations so semantic validation
 -- can report the same inference rejection as the maintained seed compiler.
@@ -353,4 +430,6 @@ fieldApplication = pMap (\fields -> case fields of {Nil -> Parameter ""; Cons fi
 applyField : Field -> Field -> Field
 applyField f a = case f of {Applied n fields -> Applied n (append fields (Cons a Nil)); _ -> Application f a}
 fieldAtom : Parser Field
-fieldAtom = pChoices (Cons (pParens fieldType) (Cons (pMap (\n -> Applied n Nil) upperReference) (Cons (pMap Parameter lowerIdentifier) Nil)))
+fieldAtom = pChoices (Cons (pParens (pBind (collectionItems ")" fieldType) (tupleValue (Applied "Unit" Nil) Applied)))
+  (Cons (pMap (\ty -> Applied "List" (Cons ty Nil)) (pThen (pToken "[") (pBefore fieldType (pToken "]"))))
+  (Cons (pMap (\n -> Applied n Nil) upperReference) (Cons (pMap Parameter lowerIdentifier) Nil))))

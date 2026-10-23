@@ -273,21 +273,23 @@ e ::= x | integer | double | string | true | false | ()
     | if e then e else e | e operator e | -e | +e
     | Constructor | case e of { pattern -> e; ... }
     | do { statement; ...; e }
+    | (e, e [, e [, e]]) | [e, ...] | e : e | (e :: annotation)
 
 statement ::= pattern <- e | e | let [rec] binding-block
 
 data-declaration ::= data TypeName parameter ... = Constructor field ... | ...
 parameter ::= a | (a : kind)
 kind ::= * | kind -> kind
-pattern ::= Constructor pattern-atom ... | pattern-atom
+pattern ::= Constructor pattern-atom ... | pattern-atom | pattern : pattern
 pattern-atom ::= x | _ | Constructor | integer | string | true | false | ()
                | (pattern) | (x : annotation)
+               | (pattern, pattern [, pattern [, pattern]]) | [pattern, ...]
 
 class-declaration ::= class [context =>] ClassName parameter ... where { method : type; ... }
 instance-declaration ::= instance [forall parameter ... .] [context =>]
                          ClassName type-atom ... where { value-declaration; ... }
 context ::= ClassName type-atom ... | (ClassName type-atom ..., ...)
-type-atom ::= a | Constructor | (type)
+type-atom ::= a | Constructor | (type) | (type, type [, type [, type]]) | [type]
 
 annotation ::= type | exists a ... . type
 
@@ -566,7 +568,7 @@ Operators have the following precedence, from highest to lowest:
 | Prefix `-`, `+` | Prefix | Negation and unary plus |
 | `*`, `/`, `%` | Left | Integer multiplication, quotient, remainder |
 | `+`, `-` | Left | Integer addition, subtraction |
-| `++` | Right | String concatenation |
+| `++`, `:` | Right | String concatenation, list cons |
 | `==`, `/=`, `<`, `<=`, `>`, `>=` | None | Integer comparisons |
 | `&&` | Right | Short-circuit Boolean conjunction |
 | `\|\|` | Right | Short-circuit Boolean disjunction |
@@ -575,6 +577,8 @@ For example, `f x * 4 + y` means `(f x * 4) + y`, and
 `x < 0 || x >= width && enabled` means `x < 0 || (x >= width && enabled)`.
 Comparisons cannot be chained: write `x < y && y < z`. An expression annotation
 binds below the operators, so `x + 1 : Int` annotates the sum.
+The annotation/cons distinction for `:` is described below; `::` always
+introduces an annotation.
 
 Arithmetic and comparisons use the existing arbitrary-precision `Int`
 primitives. `/` truncates toward zero and `%` has the dividend's sign.
@@ -1031,6 +1035,63 @@ using `ioReturn` and `ioBind`.
 Strings use double quotes, Unicode characters, and Haskell-style escapes such
 as `\n`, `\t`, `\"`, and `\\`. `()` is an alias for the `Unit` constructor
 in expressions and patterns, and for the `Unit` type in annotations.
+
+### Tuple and list syntax
+
+Tuple and list notation is sugar for ordinary algebraic datatypes. The names
+must be declared or imported into unqualified scope; the implicit Prelude does
+not supply them. Existing constructor declarations and their lazy evaluation,
+type checking, module visibility and pattern coverage rules still apply.
+
+```haskell
+data Pair a b = Pair a b
+data List a = Nil | Cons a (List a)
+
+first : forall a b. (a, b) -> a
+first (x, _) = x
+
+sum : [Int] -> Int
+sum [] = 0
+sum (x : xs) = x + sum xs
+
+main = printInt (first (sum [10, 20, 12], true))
+```
+
+`(x, y)`, `(x, y, z)` and `(w, x, y, z)` mean applications of `Pair`,
+`Triple` and `Quad`, respectively. Their type and pattern forms use the same
+names. `(x)` remains grouping and `()` remains `Unit`. This initial version
+supports two through four components; larger tuples, tuple sections and trailing
+commas are rejected. It does not add singleton tuples or tuple-constructor
+sections such as `(,)`.
+
+`[]` means `Nil`; `[x, y]` means `Cons x (Cons y Nil)`. A list type `[A]`
+means `List A`. List and tuple types also work in datatype fields, for example
+`data Batch a = Batch [a] (a, a)`. List patterns have exact length; `(x : xs)`
+matches a nonempty list and binds its tail. Cons patterns associate right and
+bind less tightly than constructor application. Parenthesize cons patterns in
+function or lambda parameters. Nested patterns and do-bind patterns use the
+same ordinary pattern compiler. List comprehensions and ranges are outside this
+version's scope and have explicit rejection diagnostics.
+
+MLF already uses `:` for annotations. To preserve valid existing annotations,
+an expression's single colon retains that meaning when its complete right side
+is syntactically a closed type (including explicit existential variables), or
+contains type-only syntax such as an arrow, `forall`, a constraint or `bot`.
+Otherwise it is cons. Thus `x : xs` is cons, `1 : 2 : []` associates right,
+and `1 + 2 : []` means `(1 + 2) : []`. But `x : Nil` retains its historical
+annotation meaning, even if a constructor named `Nil` exists; use `x : []` or
+`Cons x Nil` for that tail. Similarly, use explicit `Cons` when a constructor
+tail also spells a closed type. This decision uses syntax, never inferred types
+or constructor lookup.
+
+Use `expression :: annotation` to request an annotation explicitly. Both `:`
+and `::` work in value signatures, inline signatures, class method signatures
+and parenthesized variable annotations. Kind signatures retain `:`. For
+parenthesized patterns the same legacy annotation rule applies to a variable;
+`(x : Int)` is an annotated parameter and `(x : xs)` is a cons pattern.
+Unparenthesized case and do-bind patterns interpret `:` as cons. Expression
+annotations bind below every infix operator, so `1 : [] :: [Int]` annotates the
+whole list. `++` remains string concatenation; it is not list append.
 
 Use a file or `--expr` when the program reads interactive input:
 
