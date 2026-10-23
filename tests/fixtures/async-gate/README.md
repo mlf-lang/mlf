@@ -15,3 +15,8 @@ for provenance, interpretation and the separate native storage proof.
   to typecheck, demonstrating why it must not be implemented. Never run it.
 - `runtime/`: executable ST one-shot storage and CPS homogeneous-queue probes,
   with exact expected output. Neither is the full IO completion implementation.
+
+The representation-only model is named `GateCell` so it does not redefine the
+`Completion` primitive introduced by the live completion implementation. This
+is a fixture alpha-renaming; quantifier scopes, acceptance/rejection oracles,
+and the prohibition on executing the bad-contract counterexample are unchanged.

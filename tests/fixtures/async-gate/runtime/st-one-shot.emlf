@@ -1,19 +1,19 @@
 -- Executable storage probe confined to ST. This does not implement IO cells.
 data CellState a = Pending | Resolved a
-data Completion s a = Completion (STArray s (CellState a))
+data GateCell s a = GateCell (STArray s (CellState a))
 data Results = Results Int String Int Bool Bool
 
-newCompletion : forall s a. ST s (Completion s a)
-newCompletion = stBind (newSTArray 1 Pending) (\array -> stReturn (Completion array))
+newCompletion : forall s a. ST s (GateCell s a)
+newCompletion = stBind (newSTArray 1 Pending) (\array -> stReturn (GateCell array))
 
-resolve : forall s a. Completion s a -> a -> ST s Bool
-resolve (Completion array) value = stBind (readSTArray array 0) (\state ->
+resolve : forall s a. GateCell s a -> a -> ST s Bool
+resolve (GateCell array) value = stBind (readSTArray array 0) (\state ->
   case state of
     Pending -> stBind (writeSTArray array 0 (Resolved value)) (\_ -> stReturn true)
     Resolved _ -> stReturn false)
 
-observe : forall s a. Completion s a -> ST s (CellState a)
-observe (Completion array) = readSTArray array 0
+observe : forall s a. GateCell s a -> ST s (CellState a)
+observe (GateCell array) = readSTArray array 0
 
 probe : forall s. ST s Results
 probe = do
