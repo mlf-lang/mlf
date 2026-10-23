@@ -59,5 +59,22 @@
     "No fresh integrated full campaign, parity or self-host result is claimed.",
     "The 900-second source-smoke watchdog and twenty-minute job budget are headroom, not a measured speedup.",
     "A whole-runner typecheck using the published Linux seed was terminated with exit 137. A lower-memory collector retry is supplementary, not a merge prerequisite."
-  ]
+  ],
+  "linux_standard_gate": {
+    "parent_commit": "30f844c44ba5234ed36c8f339acdec0f3b375514",
+    "change": "Move required source smoke and native build-runner checks to Ubuntu 24.04; retain full macOS packages and all six campaigns.",
+    "official_release": "https://github.com/mlf-lang/mlf/releases/tag/v0.3.0",
+    "archive": "mlf-0.3.0-linux-x64.tar.gz",
+    "archive_sha256": "ecfa16763745144c7b859354620d9fcad5bbedf4efe14972300b1ec1dacb8aeb",
+    "archive_verification": "Fresh official download matched release API digest and SHA256SUMS; extracted compiler, manager and COMMIT matched committed pin.",
+    "pin_sha256": "d7963c160bc372edbc907920a72a3c7d41949b71236e018c4c334a6583592d70",
+    "checks": {
+      "actionlint": "passed",
+      "release_metadata_and_shell_regressions": "passed",
+      "seed_platform_pin_regressions": 11,
+      "pr_aggregate_negative_and_success_regressions": 23
+    },
+    "hosted_linux_source_smoke": "pending; no green hosted Linux source result claimed before publication",
+    "full_macos_qualification": "preserved, not rerun for this workflow-only change"
+  }
 }
