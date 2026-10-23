@@ -73,7 +73,7 @@ runs:
         if [ "$PLATFORM" = linux-x64 ] && [ "$TEST_GROUP" = unit ]; then
           . tools/release/native-environment.sh
           tools/release/time-stage.sh qualification python3 tools/profile/measure-process-tree.py \
-            --output .mlf-build/qualification-profile --source-root "$PWD" \
+            --tee --output .mlf-build/qualification-profile --source-root "$PWD" \
             --report-root .mlf-build/compiler-tests/unit --cache-dir .mlf-build/cache \
             --label "linux-unit-jobs-$MLF_TEST_BUILD_JOBS" \
             --tool .mlf-build/bin/emlf --tool .mlf-build/bin/mlfpkg \

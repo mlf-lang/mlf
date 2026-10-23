@@ -38,9 +38,13 @@ jq -se --argjson targets "$targets" '
   ($b.scheduler | length) == 1 and ($b.scheduler_results | length) == 1 and
   $b.scheduler[0].helper.sha256 == $v.build_runner_sha256 and
   $b.scheduler_results[0].complete == true and
+  $b.scheduler_results[0].exit_code == 0 and
   $b.scheduler[0].invocation_id == $b.scheduler_results[0].invocation_id and
   $b.scheduler_results[0].jobs == $v.suite_builds[0].jobs and
+  ($b.scheduler_results[0].maximum_parallel_jobs >= 0 and
+   $b.scheduler_results[0].maximum_parallel_jobs <= $v.suite_builds[0].jobs) and
   ([$b."pending-publications"[].name] | sort) == $targets and
+  ([$b."pending-publications"[].key] | unique | length) == ($targets | length) and
   all($targets[]; . as $name |
     [$b.builds[] | select(.kind == "executable mlf-tests:" + $name) | .key] as $keys |
     ($keys | length) == 1 and ($keys[0] | test("^[0-9a-f]{64}$")) and

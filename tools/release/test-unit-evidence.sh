@@ -63,13 +63,13 @@ while IFS= read -r name; do
   mv "$scratch/report.tmp" "$report"
 done < <(jq -rn --argjson targets "$targets" '$targets[]')
 build="$unit/suite-build-invocation-fixture/build-report.json"
-jq --arg key "$(printf '%064d' 1)" '
+jq '
   . as $v | {format:1,complete:true,implementation:"MLF",
    toolchain:{compiler:{path:$v.compiler,sha256:$v.compiler_sha256},manager:{path:$v.manager,sha256:$v.manager_sha256}},
    scheduler:[{invocation_id:"fixture",helper:{sha256:$v.build_runner_sha256}}],
-   scheduler_results:[{complete:true,invocation_id:"fixture",jobs:1}],
-   builds:[$v.prepared_suite_targets|keys[]|{kind:("executable mlf-tests:"+.),key:$key}],
-   "pending-publications":[$v.prepared_suite_targets|to_entries[]|{name:.key,key:$key,files:{program:.value.sha256}}]}' "$report" > "$build"
+   scheduler_results:[{complete:true,exit_code:0,invocation_id:"fixture",jobs:1,maximum_parallel_jobs:1}],
+   builds:[$v.prepared_suite_targets|to_entries[]|{kind:("executable mlf-tests:"+.key),key:.value.sha256}],
+   "pending-publications":[$v.prepared_suite_targets|to_entries[]|{name:.key,key:.value.sha256,files:{program:.value.sha256}}]}' "$report" > "$build"
 jq --arg path "$build" --arg hash "$(sha256 "$build")" --argjson targets "$targets" --argjson shards "$shards" '
   .suite_builds=[{path:$path,sha256:$hash,targets:$targets,jobs:1,exit_code:0}] |
   . as $v | .suites.core.components=([$shards[]|{key:.,value:$v.suites[.]}]|from_entries)' "$report" > "$scratch/report.tmp"
@@ -104,6 +104,16 @@ reject 'changed original invocation report rejected'
 jq '.toolchain.compiler.path="/other-compiler"' "$build" > "$scratch/build.tmp"; mv "$scratch/build.tmp" "$build"
 jq --arg hash "$(sha256 "$build")" '.suite_builds[0].sha256=$hash' "$report" > "$scratch/report.tmp"; mv "$scratch/report.tmp" "$report"
 reject 'different compile tool rejected despite report rehash'
+for mutation in failed-scheduler repeated-key over-parallel; do
+  case "$mutation" in
+    failed-scheduler) edit='.scheduler_results[0].exit_code=7' ;;
+    repeated-key) edit='."pending-publications"[1].key=."pending-publications"[0].key | .builds[1].key=.builds[0].key' ;;
+    over-parallel) edit='.scheduler_results[0].maximum_parallel_jobs=3' ;;
+  esac
+  jq "$edit" "$build" > "$scratch/build.tmp"; mv "$scratch/build.tmp" "$build"
+  jq --arg hash "$(sha256 "$build")" '.suite_builds[0].sha256=$hash' "$report" > "$scratch/report.tmp"; mv "$scratch/report.tmp" "$report"
+  reject "$mutation rejected despite report rehash"
+done
 # A consistently rehashed child+aggregate must still match the independent
 # reviewed inventory; jq false must be a failing process, not just printed false.
 altered=$(jq -sr '[.[] | select(.event == "case")][0].id' "$unit/core-crates.coverage.jsonl")

@@ -62,13 +62,15 @@ Implemented:
 
 Validation so far:
 
-- 16 transport/provenance fault-injection checks pass, including pre-export
+- 17 transport/provenance fault-injection checks pass, including pre-export
   mutation of both published/cache bytes, missing dependency proof, stale
   compiler/source, root/platform/toolchain drift and no-rebuild execution.
-- 11 split-unit evidence checks pass, including all physical binaries, missing
+- 14 split-unit evidence checks pass, including all physical binaries, missing
   receipts/targets, duplicated targets, false full scope and consistently
   rehashed child/aggregate inventory corruption.
-- 10 bounded-parallelism policy checks and four process-tree sampler tests pass.
+- 10 bounded-parallelism policy checks and nine process-tree sampler tests pass.
+  Cancellation/error controls prove descendant cleanup before the shared lock is
+  released; queued runs snapshot their command inputs after acquiring that lock.
 - Shell/release checks and Actionlint pass. Independent source review confirms
   all 18 moved Core declarations/helpers are byte-for-byte unchanged. Static
   plans preserve 34 families, 684 execution IDs and exact aliases/metrics, and
@@ -96,3 +98,10 @@ their production sources are unchanged through the merged baseline. All paired
 samples will use those exact tools and GC settings, restoring recorded snapshots
 at the same physical source/cache paths without rewriting dependency receipts.
 The native-candidate qualification remains a separate required validation.
+
+The approved macOS dependency pin and Windows long-path fixes from #14/#15 are
+integrated as correctness prerequisites, with no performance credit assigned to
+them. The Windows helper change produces identical Linux preprocessed source
+and identical native binaries when both versions are compiled at the same source
+path with the same Clang 19.1.7 command. Component A/B samples continue to use the
+same archived native helper binary throughout.

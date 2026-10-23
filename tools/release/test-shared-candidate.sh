@@ -56,7 +56,7 @@ jq -n --arg root "$PWD" --arg compiler "$(sha256 .mlf-build/bin/emlf)" --arg man
    toolchain:{compiler:{path:($root+"/.mlf-build/bin/emlf"),sha256:$compiler},manager:{path:($root+"/.mlf-build/bin/mlfpkg"),sha256:$manager},
     clang:{path:$clang,sha256:$clang_hash},"pkg-config":{path:$pkg,sha256:$pkg_hash},runtime:{},gmp:{libraries:{},headers:{}},native_environment:{CPATH:""}},
    scheduler:[{invocation_id:"fixture",helper:{path:($root+"/.mlf-build/bin/mlf-build-runner"),sha256:$helper}}],
-   scheduler_results:[{complete:true,invocation_id:"fixture",jobs:1,maximum_parallel_jobs:1}]}' > "$scratch/base.json"
+   scheduler_results:[{complete:true,exit_code:0,invocation_id:"fixture",jobs:1,maximum_parallel_jobs:1}]}' > "$scratch/base.json"
 jq --arg compiler "$compiler_key" --arg manager "$manager_key" '. + {builds:[{kind:"executable mlf-compiler:emlf",key:$compiler},{kind:"executable mlf-compiler:mlfpkg",key:$manager}]}' "$scratch/base.json" > .mlf-build/build-report.json
 jq --arg key "$port_key" '. + {builds:[{kind:"executable mlf-tests:port",key:$key}]}' "$scratch/base.json" > .mlf-build/prerequisites/tests/build-report.json
 jq --arg key "$runner_key" '. + {builds:[{kind:"executable mlf-compiler:compiler-tests",key:$key}]}' "$scratch/base.json" > .mlf-build/prerequisites/compiler-tests/build-report.json
@@ -128,6 +128,12 @@ jq '.toolchain.compiler.path = "/stale/bootstrap/compiler"' "$scratch/runner-rep
 jq --arg path "$PWD/$report" --arg relative "$report" --arg hash "$(sha256 "$report")" \
   '.inputs[$path]=$hash | .files[$relative]=$hash | .campaign_runner.report_sha256=$hash' "$scratch/manifest.json" > .mlf-build/shared-candidate/manifest.json
 reject 'seed-built runner rejected even with matching transport hashes'
+cp "$scratch/runner-report.json" "$report"
+cp "$scratch/manifest.json" .mlf-build/shared-candidate/manifest.json
+jq '.scheduler_results[0].exit_code=7' "$scratch/runner-report.json" > "$report"
+jq --arg path "$PWD/$report" --arg relative "$report" --arg hash "$(sha256 "$report")" \
+  '.inputs[$path]=$hash | .files[$relative]=$hash | .campaign_runner.report_sha256=$hash' "$scratch/manifest.json" > .mlf-build/shared-candidate/manifest.json
+reject 'failed scheduler rejected despite completed envelope and matching hashes'
 cp "$scratch/runner-report.json" "$report"
 cp "$scratch/manifest.json" .mlf-build/shared-candidate/manifest.json
 printf 'changed\n' >> ".mlf-build/cache/$runner_key/dependency-files.json"

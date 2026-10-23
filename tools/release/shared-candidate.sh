@@ -89,6 +89,10 @@ verify_runner() {
     ($b.scheduler | length) == 1 and ($b.scheduler_results | length) == 1 and
     $b.scheduler[0].helper == {path:($root + "/.mlf-build/bin/mlf-build-runner"),sha256:$helper} and
     $b.scheduler_results[0].complete == true and
+    $b.scheduler_results[0].exit_code == 0 and
+    ($b.scheduler_results[0].jobs == 1 or $b.scheduler_results[0].jobs == 2) and
+    ($b.scheduler_results[0].maximum_parallel_jobs >= 0 and
+     $b.scheduler_results[0].maximum_parallel_jobs <= $b.scheduler_results[0].jobs) and
     $b.scheduler[0].invocation_id == $b.scheduler_results[0].invocation_id and
     $r.report == ".mlf-build/prerequisites/compiler-tests/build-report.json" and
     $r.report_sha256 == $report and $r.sha256 == $runner and
@@ -134,7 +138,8 @@ verify() {
     test "$(digest "$path")" = "$expected" || { printf 'Changed shared candidate output: %s\n' "$path" >&2; exit 1; }
   done < <(jq -r '.files | to_entries[] | [.key,.value] | @tsv' "$shared/manifest.json")
   for report in "${reports[@]}"; do
-    jq -e '.complete == true and .implementation == "MLF"' "$report" >/dev/null
+    jq -e '.complete == true and .implementation == "MLF" and
+      all(.scheduler_results[]; .complete == true and .exit_code == 0)' "$report" >/dev/null
   done
   verify_artifacts
   for tool in emlf mlfpkg; do
