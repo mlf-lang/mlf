@@ -173,7 +173,13 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+      - name: Decide whether this PR needs expensive async parity
+        id: scope
+        run: python3 tools/release/async-change-scope.py --output .mlf-build/async-change-scope/decision.json
       - name: Native bootstrap and parity dependencies
+        if: steps.scope.outputs.required != 'false'
         run: |
           if [ "$RUNNER_OS" = Linux ]; then
             sudo apt-get update
@@ -185,6 +191,7 @@ jobs:
           fi
           echo 'GC_FREE_SPACE_DIVISOR=8' >> "$GITHUB_ENV"
       - name: Fetch verified native seed
+        if: steps.scope.outputs.required != 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -192,11 +199,13 @@ jobs:
           if [ "$RUNNER_OS" = Linux ]; then pin=.github/smoke-seed-linux.env; fi
           tools/release/fetch-seed.sh .mlf-build/async-seed "$pin"
       - name: Bootstrap the real primitive-aware interpreter and compiler
+        if: steps.scope.outputs.required != 'false'
         run: |
           set -euo pipefail
           mkdir -p .mlf-build/async-bootstrap
           scripts/bootstrap-async.sh 2>&1 | tee .mlf-build/async-bootstrap/bootstrap.log
       - name: Qualify typed completions and structured process tasks
+        if: steps.scope.outputs.required != 'false'
         run: |
           set -euo pipefail
           compiler="$PWD/.mlf-build/async-bootstrap/stage2"
@@ -208,6 +217,7 @@ jobs:
             jq -e '.complete == true and .backends == ["interpreter", "llvm"]' ".mlf-build/$suite/result.json"
           done
       - name: Qualify checked async package interfaces and cache replay
+        if: steps.scope.outputs.required != 'false'
         run: |
           set -euo pipefail
           compiler="$PWD/.mlf-build/async-bootstrap/stage2"
@@ -222,6 +232,7 @@ jobs:
           include-hidden-files: true
           retention-days: 14
           path: |
+            .mlf-build/async-change-scope/decision.json
             .mlf-build/async-bootstrap/bootstrap.log
             .mlf-build/async-bootstrap/capability.txt
             .mlf-build/async-bootstrap/source-identity.txt
