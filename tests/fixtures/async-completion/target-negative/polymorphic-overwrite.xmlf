@@ -1,0 +1,1 @@
+\(cell_0 : Completion (forall a0. a0 -> a0)) -> primitive asyncResolveCompletion(Int -> Int) cell_0 (\(x_1 : Int) -> primitive addInt() x_1 1)

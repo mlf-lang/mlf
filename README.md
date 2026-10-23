@@ -81,6 +81,14 @@ with the current bootstrap script before using these manifests with an older
 installed manager. See the [package manager guide](docs/package-manager.md) for
 the ten-library layout, dependency selection, and scheduling evidence.
 
+The separate [async utility](docs/async-task.md) provides cold typed tasks,
+cooperative fibers, scoped cancellation, timers and bounded combinators.
+[Async.Process](docs/async-process.md) supplies dynamic subprocess scopes and
+isolated CPU-parallel work. The single MLF coordinator uses opaque typed
+completions; it does not run MLF inference on shared-memory worker threads.
+The [bootstrap and qualification](docs/async-bootstrap.md) distinguish the
+released seed from a compiler with the new checked primitives.
+
 The package manager compiles each library and executable as a crate. Modules
 inside a crate are namespaces and may import one another cyclically. Value
 declarations are inferred in dependency SCCs, with closed schemes and checked
@@ -167,9 +175,11 @@ reduction; the raw measurements and exact compiler hashes are linked there.
 The [native release workflow](docs/releases.md) requires all six native groups,
 a fresh self-host fixed point, and relocation/installation checks before
 packaging the tested executables. It records the build host and native library
-dependencies. The separate [performance report](benchmarks/RESULTS.md) verifies
-all nine workloads at **3× C compilation / 2× C runtime** using its explicit
-LLVM/linker configuration. This performance run is separate from release CI.
+dependencies. Every push to `main` now runs complete native qualification and all ten
+Benchmark Game workloads with **3× C compilation / 2× C runtime** gates; SDK
+packaging remains release-only. The historical [performance report](benchmarks/RESULTS.md)
+covers nine workloads and does not prove that the complete ten-workload gate
+passes. Failed correctness or performance checks remain failures.
 
 The Haskell compiler, Cabal project, and old Haskell/Python test and build
 harnesses have been removed. Native MLF is the supported build and test path.
@@ -264,30 +274,34 @@ program ::= (declaration ";")* e
           | (declaration ";")* value-declaration [";"]
 declaration ::= data-declaration | class-declaration | instance-declaration
               | value-declaration
-value-declaration ::= [x ":" annotation ";"] x pattern-atom ... [":" annotation] = e
+value-declaration ::= [x ":" annotation ";"] x pattern-atom ... [":" annotation] rhs
+rhs ::= = e | ("|" e = e)* "|" otherwise = e
 binding-block ::= value-declaration | { value-declaration; ... }
 
 e ::= x | integer | double | string | true | false | ()
     | \pattern-atom ... -> e
     | e e | let [rec] binding-block in e | (e : annotation)
     | if e then e else e | e operator e | -e | +e
+    | if { ("|" e -> e;)* "|" otherwise -> e [;] }
     | Constructor | case e of { pattern -> e; ... }
     | do { statement; ...; e }
+    | (e, e [, e [, e]]) | [e, ...] | e : e | (e :: annotation)
 
 statement ::= pattern <- e | e | let [rec] binding-block
 
 data-declaration ::= data TypeName parameter ... = Constructor field ... | ...
 parameter ::= a | (a : kind)
 kind ::= * | kind -> kind
-pattern ::= Constructor pattern-atom ... | pattern-atom
+pattern ::= Constructor pattern-atom ... | pattern-atom | pattern : pattern
 pattern-atom ::= x | _ | Constructor | integer | string | true | false | ()
                | (pattern) | (x : annotation)
+               | (pattern, pattern [, pattern [, pattern]]) | [pattern, ...]
 
 class-declaration ::= class [context =>] ClassName parameter ... where { method : type; ... }
 instance-declaration ::= instance [forall parameter ... .] [context =>]
                          ClassName type-atom ... where { value-declaration; ... }
 context ::= ClassName type-atom ... | (ClassName type-atom ..., ...)
-type-atom ::= a | Constructor | (type)
+type-atom ::= a | Constructor | (type) | (type, type [, type [, type]]) | [type]
 
 annotation ::= type | exists a ... . type
 
@@ -558,6 +572,54 @@ branch types. It evaluates only the selected branch, including when the
 branches are IO actions. An `else` belongs to the nearest unmatched `if`.
 Use parentheses to pass a conditional as a function argument.
 
+Guarded right-hand sides avoid repeating nested conditionals:
+
+```haskell
+sign n
+  | n < 0 = -1
+  | n == 0 = 0
+  | otherwise = 1
+
+main = printInt (sign (-5))
+```
+
+Each `|` starts a branch; function guards use `=` and need no semicolons
+between branches. They work on top-level bindings, local `let`/`let rec`
+bindings, `do`-local bindings, and instance methods. Existing signature and
+recursion rules still apply. A binding without parameters can use guards too.
+
+The expression form uses explicit braces, semicolon-separated branches, and
+`->`, like `case`. Its braces are required, even across lines:
+
+```haskell
+printInt (if { | score >= 90 -> 3; | score >= 70 -> 2; | otherwise -> 1 })
+```
+
+Conditions have type `Bool` and are tested in source order. The first true
+condition selects its result; later conditions and all unselected results are
+not evaluated. Each reached condition occurs once in the nested conditional
+translation. Results follow ordinary lazy evaluation, and an IO result executes
+only when sequenced. All results, including the fallback, must have compatible
+types and are checked even if an earlier condition is literally `true`.
+
+Every guard block requires exactly one final `otherwise` branch, including a
+block whose Boolean conditions appear exhaustive. An `otherwise`-only block
+is allowed. There is no implicit error, unit result, or fallthrough to another
+function equation. Function argument patterns select the equation first; its
+guard block is total within that equation. Existing pattern coverage and
+unreachable-equation checks still apply: a fallback within `f (Just x)` does
+not cover `f Nothing`. Pattern-bound variables are available in that equation's
+conditions and results, and cannot escape into another equation.
+
+`otherwise` is contextual syntax only when bare and immediately followed by
+the branch's `=` or `->`. It cannot be shadowed in that position. Elsewhere it
+remains an ordinary identifier; use `(otherwise)` to test an existing Boolean
+variable with that name. Guards do not introduce bindings, pattern guards
+(`p <- e`), comma-separated qualifiers, or guarded `case` alternatives. Use
+`&&`, `let`, or `case` inside a condition when needed. Both guard forms lower
+to the same primitive conditional as ordinary `if`, preserving its type rules
+and resistance to shadowing of `ifThenElse`.
+
 Operators have the following precedence, from highest to lowest:
 
 | Operators | Associativity | Meaning |
@@ -566,7 +628,7 @@ Operators have the following precedence, from highest to lowest:
 | Prefix `-`, `+` | Prefix | Negation and unary plus |
 | `*`, `/`, `%` | Left | Integer multiplication, quotient, remainder |
 | `+`, `-` | Left | Integer addition, subtraction |
-| `++` | Right | String concatenation |
+| `++`, `:` | Right | String concatenation, list cons |
 | `==`, `/=`, `<`, `<=`, `>`, `>=` | None | Integer comparisons |
 | `&&` | Right | Short-circuit Boolean conjunction |
 | `\|\|` | Right | Short-circuit Boolean disjunction |
@@ -575,6 +637,8 @@ For example, `f x * 4 + y` means `(f x * 4) + y`, and
 `x < 0 || x >= width && enabled` means `x < 0 || (x >= width && enabled)`.
 Comparisons cannot be chained: write `x < y && y < z`. An expression annotation
 binds below the operators, so `x + 1 : Int` annotates the sum.
+The annotation/cons distinction for `:` is described below; `::` always
+introduces an annotation.
 
 Arithmetic and comparisons use the existing arbitrary-precision `Int`
 primitives. `/` truncates toward zero and `%` has the dividend's sign.
@@ -1031,6 +1095,63 @@ using `ioReturn` and `ioBind`.
 Strings use double quotes, Unicode characters, and Haskell-style escapes such
 as `\n`, `\t`, `\"`, and `\\`. `()` is an alias for the `Unit` constructor
 in expressions and patterns, and for the `Unit` type in annotations.
+
+### Tuple and list syntax
+
+Tuple and list notation is sugar for ordinary algebraic datatypes. The names
+must be declared or imported into unqualified scope; the implicit Prelude does
+not supply them. Existing constructor declarations and their lazy evaluation,
+type checking, module visibility and pattern coverage rules still apply.
+
+```haskell
+data Pair a b = Pair a b
+data List a = Nil | Cons a (List a)
+
+first : forall a b. (a, b) -> a
+first (x, _) = x
+
+sum : [Int] -> Int
+sum [] = 0
+sum (x : xs) = x + sum xs
+
+main = printInt (first (sum [10, 20, 12], true))
+```
+
+`(x, y)`, `(x, y, z)` and `(w, x, y, z)` mean applications of `Pair`,
+`Triple` and `Quad`, respectively. Their type and pattern forms use the same
+names. `(x)` remains grouping and `()` remains `Unit`. This initial version
+supports two through four components; larger tuples, tuple sections and trailing
+commas are rejected. It does not add singleton tuples or tuple-constructor
+sections such as `(,)`.
+
+`[]` means `Nil`; `[x, y]` means `Cons x (Cons y Nil)`. A list type `[A]`
+means `List A`. List and tuple types also work in datatype fields, for example
+`data Batch a = Batch [a] (a, a)`. List patterns have exact length; `(x : xs)`
+matches a nonempty list and binds its tail. Cons patterns associate right and
+bind less tightly than constructor application. Parenthesize cons patterns in
+function or lambda parameters. Nested patterns and do-bind patterns use the
+same ordinary pattern compiler. List comprehensions and ranges are outside this
+version's scope and have explicit rejection diagnostics.
+
+MLF already uses `:` for annotations. To preserve valid existing annotations,
+an expression's single colon retains that meaning when its complete right side
+is syntactically a closed type (including explicit existential variables), or
+contains type-only syntax such as an arrow, `forall`, a constraint or `bot`.
+Otherwise it is cons. Thus `x : xs` is cons, `1 : 2 : []` associates right,
+and `1 + 2 : []` means `(1 + 2) : []`. But `x : Nil` retains its historical
+annotation meaning, even if a constructor named `Nil` exists; use `x : []` or
+`Cons x Nil` for that tail. Similarly, use explicit `Cons` when a constructor
+tail also spells a closed type. This decision uses syntax, never inferred types
+or constructor lookup.
+
+Use `expression :: annotation` to request an annotation explicitly. Both `:`
+and `::` work in value signatures, inline signatures, class method signatures
+and parenthesized variable annotations. Kind signatures retain `:`. For
+parenthesized patterns the same legacy annotation rule applies to a variable;
+`(x : Int)` is an annotated parameter and `(x : xs)` is a cons pattern.
+Unparenthesized case and do-bind patterns interpret `:` as cons. Expression
+annotations bind below every infix operator, so `1 : [] :: [Int]` annotates the
+whole list. `++` remains string concatenation; it is not list append.
 
 Use a file or `--expr` when the program reads interactive input:
 

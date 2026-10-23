@@ -51,6 +51,31 @@ try {
         log_sha256=(Get-ReleaseHash "$Output/build-runner.log")
     }
     Write-Output 'Windows native build runner lifecycle tests passed'
+    $SupervisorTests = "$Output/process-supervisor-tests.exe"
+    $null = Invoke-ReleaseCommand $Clang ($runnerFlags + @("$root/tests/native/process_supervisor_tests.c","$root/runtime/mlf_process_supervisor.c",'-lpsapi','-o',$SupervisorTests)) "$Output/process-supervisor-build.log" $root
+    $text = Invoke-ReleaseCommand $SupervisorTests @($RunnerFixture,"$Output/process-supervisor") "$Output/process-supervisor.log" $Output
+    Assert-Release ($text -match 'native process supervisor tests passed') 'Missing dynamic process scope success marker'
+    $report.process_supervisor = @{
+        passed=$true; tests_sha256=(Get-ReleaseHash $SupervisorTests)
+        log_sha256=(Get-ReleaseHash "$Output/process-supervisor.log")
+    }
+    Write-Output 'Windows native process supervisor lifecycle tests passed'
+
+    $report.async_completions = [ordered]@{}
+    foreach ($case in @('completion_cell_tests','async_completion_primitives')) {
+        $binary = "$Output/$case.exe"
+        $arguments = @('-O2','-std=c11','-Wall','-Wextra','-Werror','-mno-incremental-linker-compatible','-Wl,--no-insert-timestamp',"-I$NativePrefix/include","$root/tests/native/$case.c","$root/runtime/mlf_runtime.c","$NativePrefix/lib/libgc.dll.a","$NativePrefix/lib/libgmp.dll.a",'-lshell32','-lm','-o',$binary)
+        $null = Invoke-ReleaseCommand $Clang $arguments "$Output/$case-build.log" $root
+        $text = Invoke-ReleaseCommand $binary @() "$Output/$case.log" $Output
+        Assert-Release ($text -match 'Native completion (representation|primitives): [0-9]+ checks, [0-9]+ callbacks passed') "Missing $case success marker"
+        $report.async_completions[$case] = @{
+            passed=$true; binary_sha256=(Get-ReleaseHash $binary)
+            source_sha256=(Get-ReleaseHash "$root/tests/native/$case.c")
+            log_sha256=(Get-ReleaseHash "$Output/$case.log")
+        }
+    }
+    Write-Output 'Windows native typed completion and timer tests passed'
+
     # Independently compile C and LLVM twice, across a timestamp boundary and
     # into different directories. Compare real object/PE bytes, never a hash
     # with headers removed or rewritten after compilation.

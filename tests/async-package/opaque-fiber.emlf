@@ -1,0 +1,3 @@
+module Main where
+import qualified Async.Task as T
+main = T.Fiber

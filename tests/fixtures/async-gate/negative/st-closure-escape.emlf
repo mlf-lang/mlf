@@ -1,0 +1,2 @@
+main = runST (stBind (newSTArray 1 0) (\array ->
+  stReturn (\index -> readSTArray array index)))

@@ -122,7 +122,7 @@ jq -se --slurpfile catalog "$root/tests/test-catalog.json" '
   ([.[] | select(.event == "start")] | length) == 1 and
   ([.[] | select(.event == "summary")] | length) == 1 and
   all(.[]; .event == "start" or .event == "family" or .event == "summary") and
-  .[-1].event == "summary" and .[-1].complete == true and .[-1].families == 34 and
+  .[-1].event == "summary" and .[-1].complete == true and .[-1].families == 35 and
   all(.[]; .schema_version == 1 and .unit == "core") and
   [.[] | select(.event == "family") | select(.status == "passed") | .id] ==
     [$catalog[0].families[] | select(.unit == "core") | .id]

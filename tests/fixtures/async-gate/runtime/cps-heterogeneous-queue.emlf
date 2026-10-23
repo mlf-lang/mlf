@@ -1,0 +1,23 @@
+-- Executable representation probe, not a scheduler: resumptions have a common
+-- type, but each typed task captures its own correctly typed continuation.
+data Task a = Task ((a -> IO Unit) -> IO Unit)
+data Ready = Empty | More (IO Unit) Ready
+
+pureTask : forall a. a -> Task a
+pureTask value = Task (\complete -> complete value)
+
+bindTask : forall a b. Task a -> (a -> Task b) -> Task b
+bindTask (Task start) next = Task (\complete ->
+  start (\value -> case next value of Task continue -> continue complete))
+
+resume : forall a. Task a -> (a -> IO Unit) -> IO Unit
+resume (Task start) complete = start complete
+
+runReady : Ready -> IO Unit
+runReady ready = case ready of
+  Empty -> ioReturn Unit
+  More action rest -> ioBind action (\_ -> runReady rest)
+
+main = runReady (More
+  (resume (bindTask (pureTask 40) (\n -> pureTask (n + 2))) printInt)
+  (More (resume (pureTask "ok") putStrLn) Empty))

@@ -1,0 +1,5 @@
+module Main where
+import Gate.CompletionInterface
+main = ioBind (newCompletion : IO (Completion (forall a. a -> a))) (\cell ->
+  ioBind (resolve cell (\x -> x + 1)) (\_ ->
+  ioBind (observe cell) (\(f : forall a. a -> a) -> putStrLn (f "wrong"))))
