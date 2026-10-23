@@ -78,12 +78,31 @@ cp -R "$unit" "$scratch/original"
 passed=0
 check() { passed=$((passed+1)); printf 'ok %d - %s\n' "$passed" "$1"; }
 reject() {
-  if "$scripts/verify-unit-evidence.sh" "$unit" > "$scratch/verify.log" 2>&1; then printf 'Unexpected acceptance: %s\n' "$1" >&2; exit 1; fi
+  local status=0
+  "$scripts/verify-unit-evidence.sh" "$unit" > "$scratch/verify.log" 2>&1 || status=$?
+  if [ "$status" = 0 ]; then printf 'Unexpected acceptance: %s\n' "$1" >&2; exit 1; fi
+  if [ -n "${2:-}" ] && [ "$status" != "$2" ]; then
+    cat "$scratch/verify.log" >&2
+    printf 'Wrong rejection status for %s: expected %s, got %s\n' "$1" "$2" "$status" >&2
+    exit 1
+  fi
   check "$1"
   rm -rf "$unit"; cp -R "$scratch/original" "$unit"
 }
 "$scripts/verify-unit-evidence.sh" "$unit"
 check 'authentic complete fixture checks all nine binaries and exact union'
+# These leading predicates must reject as boolean false, not lose the input
+# report at the later shard binding (jq 1.7 versus 1.8 precedence differs).
+for mutation in incomplete wrong-implementation wrong-group partial-unit; do
+  case "$mutation" in
+    incomplete) edit='.complete=false' ;;
+    wrong-implementation) edit='.implementation="other"' ;;
+    wrong-group) edit='.group="other"' ;;
+    partial-unit) edit='.scope="partial"' ;;
+  esac
+  jq "$edit" "$report" > "$scratch/report.tmp"; mv "$scratch/report.tmp" "$report"
+  reject "$mutation envelope is rejected as false" 1
+done
 printf 'corrupt\n' >> "$unit/suite-build/bin/core-modules"
 reject 'changed shard binary rejected'
 printf 'corrupt\n' >> "$unit/suite-build/bin/int-set-unions"
