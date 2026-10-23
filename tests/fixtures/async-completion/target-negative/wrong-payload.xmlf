@@ -1,0 +1,1 @@
+\(cell_0 : Completion Int) -> primitive asyncResolveCompletion(String) cell_0 "wrong"

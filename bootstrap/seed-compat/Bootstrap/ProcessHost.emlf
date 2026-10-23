@@ -1,0 +1,16 @@
+module Bootstrap.ProcessHost where
+import Bootstrap.Types
+
+-- Stage-1-only bridge. It can compile the new primitive but must not claim
+-- it can interpret it. Rebuild stage 2 without this include root.
+request : String -> IO String
+request ignored = ioReturn "11\0process supervisor requires the stage-2 compiler\0"
+begin : IO String
+begin = ioReturn "0"
+finish : forall a. String -> Either String a -> IO (Either String a)
+finish checkpoint result = ioReturn result
+
+clock : IO Int
+clock = panic "monotonic clock requires the stage-2 compiler"
+pause : Int -> IO Unit
+pause milliseconds = panic "monotonic pause requires the stage-2 compiler"

@@ -15,6 +15,7 @@
   },
   "library": {
     "modules": {
+      "Bootstrap.ProcessHost": "Bootstrap/ProcessHost.emlf",
       "Bootstrap.Runtime": "Bootstrap/Runtime.emlf"
     }
   }

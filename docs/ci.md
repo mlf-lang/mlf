@@ -29,12 +29,24 @@ The `CI` workflow runs on every pull request, merge queue group and push to
 - **Compiler source smoke**: five cases against the checkout compiler frontend
   and target checkers, interpreted by the verified published seed on Linux x64.
 - **Native Windows runtime**: compact-GC runtime, filesystem and reproducible
-  object/executable checks, plus 22 native build-runner lifecycle cases on Windows.
-- **Native build runner**: all 22 scheduler and process-lifecycle cases on Linux.
+  object/executable checks, plus the 22 native build-runner cases and dynamic
+  process-scope lifecycle suite on Windows.
+- **Native build runner**: all 22 scheduler and process-lifecycle cases on Linux,
+  plus the dynamic process-scope suite.
+- **Native async completions**: traced completion storage, the real IO-driver
+  primitive ABI, forced collection and timers on Linux. The Windows runtime job
+  also executes these probes with its pinned native dependencies.
+- **Async interpreter and native parity**: a two-stage, primitive-aware Linux
+  compiler bootstrap followed by typed completion, process and Task language
+  suites on the interpreter and LLVM runtime, plus a fresh checked-package
+  consumer, exact cache replay and interface-opacity rejections.
 
-The aggregate runs even when a prerequisite fails and requires all four
-prerequisites to report `success`. Required jobs use Linux or Windows, so the
-smaller macOS runner pool cannot queue the merge gate.
+The aggregate runs even when a prerequisite fails and requires all six
+prerequisites to report `success`. Required pull-request and merge-queue jobs
+use Linux or Windows, so the smaller macOS runner pool cannot queue the merge
+gate. Main pushes and non-Windows-only manual runs additionally execute the
+runner, native async and complete async-language gates on macOS; every selected
+matrix entry must pass.
 Failed, cancelled or skipped prerequisites cannot produce a passing gate.
 There are no path filters on the required workflow. Manual dispatches retain
 the Windows-only mode; either `full_validation` or the compatible `self_host`
@@ -74,20 +86,41 @@ complete backend/state matrices remain in the separate jobs and full campaigns
 below. The required Windows job still exercises the checkout's Windows runtime.
 
 The separate required build-runner job compiles the C scheduler and fixtures
-with strict warnings on Ubuntu 24.04. It checks bounded scheduling, protocol
-validation, deadlines, cancellation and descendant cleanup. These process
-checks do not require bootstrapping the compiler or package manager.
+with strict warnings on Ubuntu 24.04. It checks bounded scheduling,
+protocol validation, deadlines, cancellation and descendant cleanup. These
+process checks do not require bootstrapping the compiler or package manager. The dynamic
+suite compiles the reusable supervisor directly and covers the scope API as well
+as the preserved static adapter. Compiler/interpreter parity requires the
+separate new-primitive bootstrap and MLF-level suite; the C jobs alone do not
+claim it. The separate required async language job supplies that evidence using
+`scripts/bootstrap-async.sh`, `tests/fixtures/async-completion/check.sh`,
+`tools/release/test-async-process.sh` and `tools/release/test-async-task.sh`.
+`tools/release/test-async-package.sh` separately builds a native consumer through
+the real checked library interfaces, replays its cache and rejects access to
+hidden constructors and mixed-type fibers through those same interfaces.
+Its two-generation native bootstrap also builds an interface-compatible package
+manager and has a separate 120-minute job bound; the
+existing compiler source-smoke job and its 480-second command watchdog are
+unchanged. A source-smoke timeout remains a failing prerequisite even when all
+async checks pass. The language job uploads immutable snapshot identities,
+compiler hashes, build reports and per-suite command/observation receipts.
+It requires every suite's fail-closed `complete` field and backend inventory,
+plus the package gate's cache-replay and rejection inventory.
+Windows native probes do not claim Windows MLF language or bootstrap parity.
 
-macOS still executes these same 22 lifecycle cases through `buildRunnerTests`
-in the complete `packages` campaign on main/manual full CI and release
-qualification. All six full campaigns and the native macOS builds are retained; this moves the required
-pre-merge execution to Linux rather than treating a skipped macOS check as a pass.
+Main pushes and non-Windows-only manual runs retain the direct macOS
+runner/dynamic-supervisor, native-completion and async-language gates. macOS
+also executes the 22 static-runner lifecycle cases through `buildRunnerTests`
+in the complete `packages` campaign. All six full campaigns and the native
+macOS builds remain separate requirements; no skipped macOS job is used as a
+passing pre-merge prerequisite.
 
 ## Automatic complete qualification on main
 
 Every push to `main` invokes `native-qualification.yml` with `build_packages=false`.
-It runs independently of the small PR gate, using read-only repository and Actions
-permissions. Pull requests and merge queue groups keep the fast gate above.
+It runs independently of the narrower PR gate, using read-only repository and
+Actions permissions. Pull requests and merge queue groups keep the six checks
+above, including the independently bootstrapped async-language gate.
 Manual `CI` with `full_validation=true` exercises this exact complete graph on a
 feature branch without creating SDK archives or publishing anything.
 
@@ -305,8 +338,12 @@ the direct CLI/package checks in `candidate-macos-arm64-diagnostics`. Local
 are historical observations, not measurements of the new complete graph.
 
 The required Linux build-runner job has a ten-minute limit and retains its log,
-task plans and results in `build-runner-evidence-ubuntu-24.04`. macOS lifecycle
-logs remain in the full package campaign evidence. Windows retains its task
-plans and results alongside the runtime verification report. Full qualification artifacts retain their original build reports, primary
-verification receipts, coverage and diagnostics. Bootstrap timing artifacts
-record the seed generation; benchmark samples record separate wall/CPU/RSS data.
+task plans and results in `build-runner-evidence-ubuntu-24.04`. Main/manual macOS
+runs retain the equivalent `build-runner-evidence-macos-26`, and the static
+lifecycle logs also remain in the full package campaign evidence. Async language
+receipts use `async-language-evidence-ubuntu-24.04` and, on main/manual macOS runs,
+`async-language-evidence-macos-26`. Windows retains its task plans and results
+alongside the runtime verification report. Full qualification artifacts retain
+their original build reports, primary verification receipts, coverage and
+diagnostics. Bootstrap timing artifacts record the seed generation; benchmark
+samples record separate wall/CPU/RSS data.

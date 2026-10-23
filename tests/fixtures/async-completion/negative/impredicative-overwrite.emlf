@@ -1,0 +1,8 @@
+useIdentity : (forall a. a -> a) -> IO Unit
+useIdentity identity = putStrLn (identity "wrong")
+main = do
+  scope <- asyncScopeNew 1 2
+  asyncNewCompletion scope (\(cell : Completion (forall a. a -> a)) -> do {
+    asyncResolveCompletion cell (\x -> x + 1);
+    asyncSubscribeCompletion cell useIdentity;
+    ioReturn Unit }) (ioReturn Unit)

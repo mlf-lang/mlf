@@ -124,8 +124,8 @@ checkedInputKey : Bool -> Checked.CheckedTerm -> Either String String
 checkedInputKey requireIO checked =
   if requireIO && L.not (ioType (Checked.typeOf checked)) then Left "program must have type IO a to run" else
     let declarations = case Checked.term checked of {XWithData ds _ -> ds; _ -> Nil} in
-    Right (runtimePack (Cons "MLF-CODEGEN-INPUT-COMPACT-2" (Cons "compact-bdwgc-v1" (Cons (runtimeBool (ioType (Checked.typeOf checked))) (Cons (constructorKey (entryConstructors declarations)) (Cons (runtimePack (L.map D.prettyDeclaration declarations)) (Cons (canonicalErasedKey (X.erase (Checked.term checked))) Nil)))))))
-preparedKey (PreparedEntry executeIO constructors lowered) = runtimePack (Cons "MLF-CODEGEN-PREPARED-COMPACT-2" (Cons "compact-bdwgc-v1" (Cons (runtimeBool executeIO) (Cons (constructorKey constructors) (Cons (canonicalErasedKey lowered) Nil)))))
+    Right (runtimePack (Cons "MLF-CODEGEN-INPUT-COMPACT-2" (Cons "compact-bdwgc-v1-process-v1-completion-v2" (Cons (runtimeBool (ioType (Checked.typeOf checked))) (Cons (constructorKey (entryConstructors declarations)) (Cons (runtimePack (L.map D.prettyDeclaration declarations)) (Cons (canonicalErasedKey (X.erase (Checked.term checked))) Nil)))))))
+preparedKey (PreparedEntry executeIO constructors lowered) = runtimePack (Cons "MLF-CODEGEN-PREPARED-COMPACT-2" (Cons "compact-bdwgc-v1-process-v1-completion-v2" (Cons (runtimeBool executeIO) (Cons (constructorKey constructors) (Cons (canonicalErasedKey lowered) Nil)))))
 
 -- A crate links all checked fragments, including declarations outside the
 -- entry's dependency closure. Their bodies are not inputs to its execution.
@@ -173,11 +173,11 @@ crateInputKey : Bool -> Checked.CheckedTerm -> Either String String
 crateInputKey requireIO checked =
   if requireIO && L.not (ioType (Checked.typeOf checked)) then Left "program must have type IO a to run" else
     let declarations = case Checked.term checked of {XWithData ds _ -> ds; _ -> Nil} in
-    Right (runtimePack (Cons "MLF-CODEGEN-CRATE-INPUT-COMPACT-2" (Cons "compact-bdwgc-v1" (Cons (runtimeBool (ioType (Checked.typeOf checked))) (Cons (constructorKey (entryConstructors declarations)) (Cons (runtimePack (L.map D.prettyDeclaration declarations)) (Cons (entryRuntimeKey (X.erase (Checked.term checked))) Nil)))))))
+    Right (runtimePack (Cons "MLF-CODEGEN-CRATE-INPUT-COMPACT-2" (Cons "compact-bdwgc-v1-process-v1-completion-v2" (Cons (runtimeBool (ioType (Checked.typeOf checked))) (Cons (constructorKey (entryConstructors declarations)) (Cons (runtimePack (L.map D.prettyDeclaration declarations)) (Cons (entryRuntimeKey (X.erase (Checked.term checked))) Nil)))))))
 
 entryCode : String -> Bool -> List String
 entryCode entry executeIO =
-  let abi = "mlf_require_compact_gc_abi" in
+  let abi = "mlf_require_async_completion_v2_abi" in
   Cons ("declare void @" ++ abi ++ "()") (
   Cons "define ptr @mlf_entry() {" (
   Cons ("  call void @" ++ abi ++ "()") (

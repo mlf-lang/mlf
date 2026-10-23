@@ -38,7 +38,20 @@ assert.equal((qualify.match(/\.mlf-build\/prerequisites\/compiler-tests\/build-r
 assert.match(ci,/push:\n    branches: \[main\]/);
 assert.match(ci,/if: \(github.event_name == 'push'.*inputs.full_validation.*inputs.self_host/);
 assert.match(ci,/uses: \.\/\.github\/workflows\/native-qualification.yml\n    with:\n      source: \$\{\{ github.sha \}\}\n      build_packages: false/);
-assert.match(ci,/needs: \[metadata, native, windows-runtime, build-runner\]/);
+assert.match(ci,/needs: \[metadata, native, windows-runtime, build-runner, async-runtime, async-language\]/);
+assert.match(ci,/length == 6 and all/);
+const ciJob = name => ci.match(new RegExp(`^  ${name}:\\n[\\s\\S]*?(?=^  [a-z][a-z-]*:\\n|(?![\\s\\S]))`, 'm'))?.[0];
+for (const name of ['build-runner','async-runtime','async-language']) {
+  const job = ciJob(name);
+  assert.ok(job, `Missing ${name} coverage`);
+  assert.match(job,/github.event_name == 'push' \|\| github.event_name == 'workflow_dispatch'/);
+  assert.match(job,/\["ubuntu-24.04", "macos-26"\]/);
+  assert.match(job,/\|\| '\["ubuntu-24.04"\]'/);
+}
+assert.match(ciJob('build-runner'),/process-supervisor-tests/);
+for (const command of ['scripts/bootstrap-async.sh','tests/fixtures/async-completion/check.sh','tools/release/test-async-process.sh','tools/release/test-async-task.sh','tools/release/test-async-package.sh']) {
+  assert.ok(ciJob('async-language').includes(command), `Missing ${command}`);
+}
 assert.doesNotMatch(ci,/contents: write|continue-on-error/);
 assert.doesNotMatch(qualify,/contents: write|continue-on-error/);
 assert.match(qualify,/group: \[unit, backends, parity, packages, self-host\]/);
