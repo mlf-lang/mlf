@@ -49,7 +49,10 @@ case "$1" in
    if [ "${MOCK_INSTALLED:-0}" = 1 ] && [[ " $* " != *' --os=tahoe --arch=arm '* ]]; then
      echo stale-image-dependency; exit 0
    fi
-   test "$*" = 'deps --os=tahoe --arch=arm --formula --union --topological llvm gmp pkgconf bdw-gc'
+   case "$*" in
+    'deps --os=tahoe --arch=arm --formula --union --topological llvm gmp pkgconf bdw-gc'|'deps --os=tahoe --arch=arm --formula --union --topological llvm gmp pkgconf bdw-gc lld pcre2') ;;
+    *) exit 89 ;;
+   esac
    printf '%s\n' zstd z3 "${MOCK_EXTRA_DEP:-zstd}" ;;
  info)
    test "${HOMEBREW_NO_AUTO_UPDATE:-}" = 1
@@ -85,7 +88,8 @@ count=0
 run_case() {
   local label=$1 expected=$2; shift 2
   count=$((count + 1))
-  local repetitions=1
+  local repetitions=1 profile=qualification roots="llvm gmp pkgconf bdw-gc" installed=6
+  if [ "${1:-}" = benchmarks ]; then profile=benchmarks; roots="$roots lld pcre2"; installed=8; shift; fi
   if [ "${1:-}" = repeat ]; then repetitions=2; shift; fi
   local work="$scratch/case-$count"
   cp -R "$scratch/template" "$work"
@@ -96,14 +100,14 @@ run_case() {
   for ((attempt=1; attempt<=repetitions; attempt++)); do
   env PATH="$scratch/bin:$PATH" BASH_ENV="$scratch/shell-env" MOCK_ROOT="$work" \
     GITHUB_ACTIONS=true RUNNER_ENVIRONMENT=github-hosted RUNNER_TEMP="$work" GITHUB_ENV="$work/environment" GITHUB_PATH="$work/path" \
-    "$@" bash "$work/tools/release/setup-macos.sh" >> "$work/output" 2>&1 || status=$?
+    "$@" bash "$work/tools/release/setup-macos.sh" "$profile" >> "$work/output" 2>&1 || status=$?
   done
   if { [ "$expected" = pass ] && [ "$status" != 0 ]; } || { [ "$expected" = fail ] && [ "$status" = 0 ]; }; then
     cat "$work/output" >&2; printf 'FAIL %s (status %s)\n' "$label" "$status" >&2; exit 1
   fi
   if [ "$expected" = pass ]; then
-    test "$(grep -Ec '^brew (reinstall|install) --force-bottle' "$work/commands")" = "$((6 * repetitions))"
-    test "$(cat "$work/.mlf-build/macos-dependencies/closure.txt")" = "$(printf '%s\n' zstd z3 llvm gmp pkgconf bdw-gc)"
+    test "$(grep -Ec '^brew (reinstall|install) --force-bottle' "$work/commands")" = "$((installed * repetitions))"
+    test "$(cat "$work/.mlf-build/macos-dependencies/closure.txt")" = "$(printf '%s\n' zstd z3 $roots)"
     test "$(grep -c '=1$' "$work/environment")" = "$((5 * repetitions))"
     test "$(readlink "$work/brew/Library/Taps/homebrew/homebrew-core")" = "$work/.mlf-build/macos-dependencies/homebrew-core"
     test "$(find "$work" -path "*/mlf-homebrew-core.*/homebrew-core/image-marker" | wc -l | tr -d " ")" = 1
@@ -115,6 +119,8 @@ run_case() {
 run_case 'fresh bottle closure, revision suffix and dirty image tap preservation' pass
 run_case 'repeated setup reuses owned tap and preserves the original once' pass repeat
 run_case 'ignore stale installed receipts and reinstall matching or newer bottles' pass MOCK_INSTALLED=1
+run_case 'benchmark closure includes pinned linker and PCRE2' pass benchmarks
+run_case 'benchmark closure rejects missing PCRE2 bottle' fail benchmarks MOCK_MISSING_BOTTLE=pcre2
 run_case 'developer machine rejected' fail GITHUB_ACTIONS=false
 run_case 'self-hosted runner rejected' fail RUNNER_ENVIRONMENT=self-hosted
 run_case 'Linux rejected' fail MOCK_OS=Linux
