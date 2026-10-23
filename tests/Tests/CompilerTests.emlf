@@ -261,7 +261,7 @@ aggregateCore c full entries targets inventory = do
  writeFile familyPath (S.unlines (S.map J.render (Cons familyStart (S.snoc familyBody familyFinish))))
  familyReport c "core" "core" full identities familyPath
  let summary = showInt executions ++ " checks; 0 failures"
- let log = S.concatMap (\(Triple _ _ text) -> text) pieces ++ "Core aggregate: " ++ summary ++ "\n"
+ let log = S.intercalate "" (S.map (\(Triple _ _ text) -> text) pieces) ++ "Core aggregate: " ++ summary ++ "\n"
  writeFile (output c ++ "/core.log") log
  logHash <- fileDigest (output c ++ "/core.log")
  let components = J.Object (S.map (\target -> Pair target (J.get target (J.get "suites" saved))) targets)
