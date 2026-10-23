@@ -213,7 +213,7 @@ uniqueInterface context env = do
   mapM_ (\entry -> unless (Set.size (snd entry) == 1) (Left (context ++ ": conflicting declarations or exports for " ++ snd (fst entry)))) (interfaceEntries env)
   Right env
 
-primitiveTypeNames = Cons "ST" (Cons "STArray" (Cons "Int" (Cons "Double" (Cons "Bool" (Cons "String" (Cons "Unit" (Cons "IO" (Cons "IntArray" (Cons "DoubleArray" (Cons "ByteArray" (Cons "IntTable" Nil)))))))))))
+primitiveTypeNames = Cons "AsyncScope" (Cons "Completion" (Cons "AsyncSubscription" (Cons "ST" (Cons "STArray" (Cons "Int" (Cons "Double" (Cons "Bool" (Cons "String" (Cons "Unit" (Cons "IO" (Cons "IntArray" (Cons "DoubleArray" (Cons "ByteArray" (Cons "IntTable" Nil))))))))))))))
 primitiveEntities = append (map (\p -> Entity "Prelude" (P.primitiveName p) (Primitive p)) P.allPrimitives) (Cons (Entity "Prelude" "pure" (Primitive PIOReturn)) (append (map (\name -> Entity "Prelude" name BuiltinType) primitiveTypeNames) (Cons (Entity "Prelude" "Unit" (Constructor "Unit")) (Cons (Entity "Prelude" "True" (Boolean true)) (Cons (Entity "Prelude" "False" (Boolean false)) Nil)))))
 primitiveScope = interface (append primitiveEntities (Cons (Entity "Prelude" "return" (Primitive PIOReturn)) (Cons (Entity "Prelude" "bind" (Primitive PIOBind)) Nil)))
 preludeSource = SourceModule "<Prelude>" (Just "Prelude") Nothing Nil Nil (Cons Prelude.monadClass Nil) (Cons Prelude.ioInstance (Cons Prelude.stInstance Nil)) Nil Nothing

@@ -3,6 +3,8 @@
  * The IO driver and explicitly rooted native IO entries collect. Ordinary
  * lazy evaluation and scalar primitives never collect on the native stack.
  */
+#define _DEFAULT_SOURCE 1
+#define _DARWIN_C_SOURCE 1
 #define _POSIX_C_SOURCE 200809L
 #define _XOPEN_SOURCE 700
 #include "mlf_runtime.h"
@@ -18,6 +20,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "mlf_integer64.h"
+#define MLF_PROCESS_SUPERVISOR_IMPLEMENTATION
+#include "mlf_process_supervisor.h"
 #if defined(_WIN32)
 #include "mlf_windows.h"
 #endif
@@ -28,6 +32,7 @@
 /* Compact BDWGC is the only native ABI. Every pointer-bearing allocation
  * uses the collector; GMP limbs use atomic allocations. */
 #include <gc/gc.h>
+#include "mlf_completion.h"
 static void gc_register_layout(void);
 static void *gc_integer_malloc(size_t size) {
     void *memory = GC_MALLOC_ATOMIC(size ? size : 1);
@@ -113,14 +118,17 @@ static void gc_free(void *memory) {
 /* Generated modules reference exactly one ABI symbol. Linking against a
  * runtime with incompatible field offsets must fail before execution. */
 void mlf_require_compact_gc_abi(void) {}
+void mlf_require_process_supervisor_v1_abi(void) {}
+void mlf_require_async_completion_v2_abi(void) {}
 
 typedef enum {
     HOLE, BUSY, INDIRECT, THUNK, APPLICATION, CLOSURE,
-    INTEGER, BOOLEAN, STRING, CONSTRUCTOR, PRIMITIVE, ACTION,
+    INTEGER, MLF_BOOLEAN, STRING, CONSTRUCTOR, PRIMITIVE, ACTION,
     CONSTRUCTOR_1, CONSTRUCTOR_2, DOUBLE, INT_ARRAY, DOUBLE_ARRAY,
     WRITE_INT_ACTION, WRITE_DOUBLE_ACTION, NATIVE_IO,
     BYTE_ARRAY, WRITE_BYTE_ACTION, PUT_BYTES_ACTION, INT_TABLE, WRITE_TABLE_ACTION,
-    SMALL_INT_TABLE, ST_ACTION, ST_ARRAY, CONSTRUCTOR_WIDE
+    SMALL_INT_TABLE, ST_ACTION, ST_ARRAY, CONSTRUCTOR_WIDE,
+    ASYNC_SCOPE, COMPLETION, ASYNC_SUBSCRIPTION, ASYNC_ACTION
 } Tag;
 
 /* These numbers are shared with primitiveCode in MLF.LLVM. */
@@ -135,12 +143,15 @@ typedef enum {
     NEW_BYTE_ARRAY, READ_BYTE_ARRAY, WRITE_BYTE_ARRAY, LENGTH_BYTE_ARRAY,
     BYTE_ARRAY_FROM_STRING, PUT_BYTES, GET_BYTE_LINE, NEW_INT_TABLE, READ_INT_TABLE, WRITE_INT_TABLE,
     AND_INT,
-    STRING_LENGTH, STRING_CODE_AT, STRING_SLICE, STRING_FROM_CODE, COMPARE_STRING,
+    STRING_LENGTH, STRING_CODE_AT, STRING_SLICE, STRING_FROM_CODE, MLF_COMPARE_STRING,
     READ_DOUBLE, DOUBLE_TO_BITS, DOUBLE_FROM_BITS, SEQ, PANIC,
     READ_FILE, WRITE_FILE, FILE_EXISTS, CANONICAL_PATH, GET_ARG_COUNT, GET_ARG, PUT_ERR, EXIT_WITH,
     GET_EXECUTABLE_PATH, GET_CONTENTS,
     ST_RETURN, ST_BIND, RUN_ST, NEW_ST_ARRAY, READ_ST_ARRAY, WRITE_ST_ARRAY, LENGTH_ST_ARRAY,
-    GET_ENV, SET_ENV, UNSET_ENV, RUN_PROCESS, LIST_DIRECTORY, DIRECTORY_EXISTS, FILE_DIGEST, ACQUIRE_FILE_LOCK, RELEASE_FILE_LOCK,
+    GET_ENV, SET_ENV, UNSET_ENV, RUN_PROCESS, LIST_DIRECTORY, DIRECTORY_EXISTS, FILE_DIGEST, ACQUIRE_FILE_LOCK, RELEASE_FILE_LOCK, PROCESS_SUPERVISOR,
+    ASYNC_SCOPE_NEW, ASYNC_SCOPE_CLOSE, ASYNC_NEW_COMPLETION, ASYNC_RESOLVE_COMPLETION,
+    ASYNC_READ_COMPLETION, ASYNC_SUBSCRIBE_COMPLETION, ASYNC_SUBSCRIPTION_STATUS,
+    ASYNC_CANCEL_SUBSCRIPTION, ASYNC_STEP, ASYNC_ENQUEUE, ASYNC_DELAY, ASYNC_WAIT,
     PRIMITIVE_COUNT
 } Primitive;
 
@@ -178,6 +189,9 @@ struct MlfValue {
         struct { int64_t identity; MlfValue *fields[2]; } packed;
         struct { Primitive identity; MlfEnv *arguments; } primitive;
         struct { Primitive operation; MlfValue *first, *second; } action;
+        MlfCompletionScope *async_scope;
+        MlfCompletion *completion;
+        struct { MlfCompletionResume *resume; MlfCompletionStatus rejected; } subscription;
     } as;
 };
 
@@ -213,6 +227,7 @@ typedef struct Stack {
 static Stack *active_stacks;
 static MlfRoots *native_roots;
 static void cleanup(void);
+static void mlf_process_binding_clear(void);
 static int valid_utf8(const unsigned char *bytes, size_t length);
 static int argument_count;
 static char **argument_values;
@@ -364,6 +379,7 @@ static MlfValue *value(Tag tag) {
     case CLOSURE: case INTEGER: case DOUBLE: case PRIMITIVE: case NATIVE_IO:
     case CONSTRUCTOR_1: case INT_ARRAY: case DOUBLE_ARRAY: case BYTE_ARRAY:
     case INT_TABLE: case SMALL_INT_TABLE: case ST_ARRAY:
+    case ASYNC_SCOPE: case COMPLETION: case ASYNC_SUBSCRIPTION: case ASYNC_ACTION:
         result = allocate(offsetof(MlfValue, as) + 2 * sizeof(void *));
         break;
     default: result = allocate(sizeof(*result)); break;
@@ -584,7 +600,7 @@ static MlfValue *expect(MlfValue *entry, Tag tag) {
     MlfValue *result = mlf_force(entry);
     if (immediate(result)) {
         if ((tag == INTEGER && small_integer(result)) ||
-            (tag == BOOLEAN && boolean_value(result)) ||
+            (tag == MLF_BOOLEAN && boolean_value(result)) ||
             (tag == CONSTRUCTOR && nullary(result))) return result;
         fail("invalid value for runtime operation");
     }
@@ -777,7 +793,7 @@ MlfValue *mlf_eq_int(MlfValue *a, MlfValue *b) { return mlf_boolean(integer_comp
 MlfValue *mlf_lt_int(MlfValue *a, MlfValue *b) { return mlf_boolean(integer_compare(a,b) < 0); }
 
 int64_t mlf_truth(MlfValue *entry) {
-    MlfValue *b = expect(entry, BOOLEAN);
+    MlfValue *b = expect(entry, MLF_BOOLEAN);
     return boolean_value(b) ? ((uintptr_t)b == 6) : b->as.boolean;
 }
 
@@ -1033,10 +1049,22 @@ static MlfValue *st_action(Primitive operation, size_t count,
     return result;
 }
 
+static MlfValue *async_action(Primitive operation, size_t count,
+                              MlfValue *a, MlfValue *b, MlfValue *c) {
+    MlfValue *result = st_action(operation, count, a, b, c);
+    result->tag = ASYNC_ACTION;
+    return result;
+}
+
 static MlfValue *run_st(MlfValue *root);
 
 static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValue *c) {
     switch (p) {
+    case ASYNC_SCOPE_CLOSE: case ASYNC_SUBSCRIPTION_STATUS: case ASYNC_CANCEL_SUBSCRIPTION:
+    case ASYNC_STEP: return async_action(p,1,a,NULL,NULL);
+    case ASYNC_SCOPE_NEW: case ASYNC_RESOLVE_COMPLETION: case ASYNC_SUBSCRIBE_COMPLETION:
+    case ASYNC_ENQUEUE: case ASYNC_WAIT: return async_action(p,2,a,b,NULL);
+    case ASYNC_NEW_COMPLETION: case ASYNC_READ_COMPLETION: case ASYNC_DELAY: return async_action(p,3,a,b,c);
     case ST_RETURN: case LENGTH_ST_ARRAY: return st_action(p,1,a,NULL,NULL);
     case ST_BIND: case NEW_ST_ARRAY: case READ_ST_ARRAY: return st_action(p,2,a,b,NULL);
     case WRITE_ST_ARRAY: return st_action(p,3,a,b,c);
@@ -1051,7 +1079,7 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
     case READ_FILE: case WRITE_FILE: case FILE_EXISTS: case CANONICAL_PATH:
     case GET_ARG_COUNT: case GET_ARG: case PUT_ERR: case EXIT_WITH:
     case GET_EXECUTABLE_PATH: case GET_CONTENTS:
-    case GET_ENV: case SET_ENV: case UNSET_ENV: case RUN_PROCESS: case LIST_DIRECTORY: case DIRECTORY_EXISTS: case FILE_DIGEST: case ACQUIRE_FILE_LOCK: case RELEASE_FILE_LOCK:
+    case GET_ENV: case SET_ENV: case UNSET_ENV: case RUN_PROCESS: case LIST_DIRECTORY: case DIRECTORY_EXISTS: case FILE_DIGEST: case ACQUIRE_FILE_LOCK: case RELEASE_FILE_LOCK: case PROCESS_SUPERVISOR:
         return action(p, a, b);
     case WRITE_INT_ARRAY: return array_write_action(WRITE_INT_ACTION,a,b,c);
     case WRITE_DOUBLE_ARRAY: return array_write_action(WRITE_DOUBLE_ACTION,a,b,c);
@@ -1079,7 +1107,7 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
     case STRING_CODE_AT: return string_code_at(a,b);
     case STRING_SLICE: return string_slice(a,b,c);
     case STRING_FROM_CODE: return string_from_code(a);
-    case COMPARE_STRING: return compare_string(a,b);
+    case MLF_COMPARE_STRING: return compare_string(a,b);
     case READ_DOUBLE: return read_double(a);
     case DOUBLE_TO_BITS: return double_to_bits(a);
     case DOUBLE_FROM_BITS: return double_from_bits(a);
@@ -1123,7 +1151,7 @@ static MlfValue *primitive(Primitive p, MlfEnv *arguments) {
         2,2,2,2,1,2,2,1,2,2,2,3,1,2,2,3,1,2,2,3,1,1,3,0,0,2,3,2,
         1,2,3,1,2,1,1,1,2,1,1,2,1,1,0,1,1,1,0,0,
         1,2,1,2,2,3,1,
-        1,2,1,2,1,1,1,1,1
+        1,2,1,2,1,1,1,1,1,1, 2,1,3,2,3,2,1,1,1,2,3,2
     };
     if (arguments->count < arities[p]) {
         MlfValue *result = value(PRIMITIVE);
@@ -1232,7 +1260,8 @@ MlfValue *mlf_prim1(int64_t p, MlfValue *a) {
     case LENGTH_BYTE_ARRAY: case BYTE_ARRAY_FROM_STRING:
     case STRING_LENGTH: case STRING_FROM_CODE: case READ_DOUBLE: case DOUBLE_TO_BITS: case DOUBLE_FROM_BITS:
     case PANIC: case READ_FILE: case FILE_EXISTS: case CANONICAL_PATH: case GET_ARG: case PUT_ERR: case EXIT_WITH:
-    case GET_ENV: case UNSET_ENV: case LIST_DIRECTORY: case DIRECTORY_EXISTS: case FILE_DIGEST: case ACQUIRE_FILE_LOCK: case RELEASE_FILE_LOCK:
+    case GET_ENV: case UNSET_ENV: case LIST_DIRECTORY: case DIRECTORY_EXISTS: case FILE_DIGEST: case ACQUIRE_FILE_LOCK: case RELEASE_FILE_LOCK: case PROCESS_SUPERVISOR:
+    case ASYNC_SCOPE_CLOSE: case ASYNC_SUBSCRIPTION_STATUS: case ASYNC_CANCEL_SUBSCRIPTION: case ASYNC_STEP:
     case ST_RETURN: case RUN_ST: case LENGTH_ST_ARRAY:
         return primitive_result((Primitive)p,a,NULL,NULL);
     default: fail("unary primitive arity mismatch");
@@ -1245,8 +1274,9 @@ MlfValue *mlf_prim2(int64_t p, MlfValue *a, MlfValue *b) {
     case ADD_DOUBLE: case SUB_DOUBLE: case MUL_DOUBLE: case DIV_DOUBLE: case EQ_DOUBLE: case LT_DOUBLE:
     case FORMAT_DOUBLE: case NEW_INT_ARRAY: case READ_INT_ARRAY: case NEW_DOUBLE_ARRAY: case READ_DOUBLE_ARRAY:
     case NEW_BYTE_ARRAY: case READ_BYTE_ARRAY: case READ_INT_TABLE:
-    case STRING_CODE_AT: case COMPARE_STRING: case SEQ: case WRITE_FILE:
+    case STRING_CODE_AT: case MLF_COMPARE_STRING: case SEQ: case WRITE_FILE:
     case SET_ENV: case RUN_PROCESS:
+    case ASYNC_SCOPE_NEW: case ASYNC_RESOLVE_COMPLETION: case ASYNC_SUBSCRIBE_COMPLETION: case ASYNC_ENQUEUE: case ASYNC_WAIT:
     case ST_BIND: case NEW_ST_ARRAY: case READ_ST_ARRAY:
         return primitive_result((Primitive)p,a,b,NULL);
     default: fail("binary primitive arity mismatch");
@@ -1256,6 +1286,7 @@ MlfValue *mlf_prim2(int64_t p, MlfValue *a, MlfValue *b) {
 MlfValue *mlf_prim3(int64_t p, MlfValue *a, MlfValue *b, MlfValue *c) {
     switch (p) {
     case IF_THEN_ELSE: case WRITE_INT_ARRAY: case WRITE_DOUBLE_ARRAY: case WRITE_BYTE_ARRAY: case PUT_BYTES: case WRITE_INT_TABLE: case STRING_SLICE:
+    case ASYNC_NEW_COMPLETION: case ASYNC_READ_COMPLETION: case ASYNC_DELAY:
     case WRITE_ST_ARRAY:
         return primitive_result((Primitive)p,a,b,c);
     default: fail("ternary primitive arity mismatch");
@@ -1263,6 +1294,8 @@ MlfValue *mlf_prim3(int64_t p, MlfValue *a, MlfValue *b, MlfValue *c) {
 }
 
 static void cleanup(void) {
+    mlf_process_shutdown();
+    mlf_process_binding_clear();
     while (active_stacks) {
         Stack *next = active_stacks->next;
         free(active_stacks->items);
@@ -1760,6 +1793,58 @@ MlfValue *mlf_new_int_table(void) {
     return result;
 }
 
+/* Shared monotonic metadata bridge for native and interpreted timers. Each
+ * host sleep is bounded; the coordinator only sleeps with an empty ready queue. */
+static uint64_t async_clock_ms(void) {
+    return (uint64_t)(mlf_process_monotonic_seconds() * 1000.0);
+}
+static void async_pause_ms(uint32_t milliseconds) {
+    if (milliseconds > 1000) fail("async host pause exceeds 1000 milliseconds");
+#ifdef _WIN32
+    Sleep(milliseconds);
+#else
+    struct timespec delay = { milliseconds / 1000, (long)(milliseconds % 1000) * 1000000 };
+    while (nanosleep(&delay, &delay) && errno == EINTR) {}
+#endif
+}
+#include "mlf_process_binding.h"
+
+/* Completion handles never contain user-visible numeric identities. */
+static MlfValue *async_scope_value(MlfCompletionScope *scope) {
+    MlfValue *result = value(ASYNC_SCOPE);
+    result->as.async_scope = scope;
+    return result;
+}
+static MlfValue *async_cell_value(MlfCompletion *cell) {
+    MlfValue *result = value(COMPLETION);
+    result->as.completion = cell;
+    return result;
+}
+static MlfValue *async_subscription_value(MlfCompletionResume *resume,
+                                         MlfCompletionStatus rejected) {
+    if (rejected == MLF_COMPLETION_NO_MEMORY) fail("out of memory");
+    MlfValue *result = value(ASYNC_SUBSCRIPTION);
+    result->as.subscription.resume = resume;
+    result->as.subscription.rejected = rejected;
+    return result;
+}
+static MlfCompletionStatus async_subscription_status(MlfValue *entry) {
+    entry = expect(entry, ASYNC_SUBSCRIPTION);
+    if (entry->as.subscription.rejected != MLF_COMPLETION_OK)
+        return entry->as.subscription.rejected;
+    MlfCompletionResume *resume = entry->as.subscription.resume;
+    if (resume->owner->closed) return MLF_COMPLETION_CLOSED;
+    if (resume->state >= MLF_RESUME_CONSUMED) return MLF_COMPLETION_CONSUMED;
+    return MLF_COMPLETION_OK;
+}
+static MlfValue *async_step_finished(MlfEnv *env, MlfValue *ignored) {
+    (void)ignored;
+    MlfValue *scope_value = mlf_env_get(env, 0);
+    expect(scope_value, ASYNC_SCOPE)->as.async_scope->dispatching = 0;
+    return action(IO_RETURN, small(MLF_COMPLETION_OK), NULL);
+}
+
+
 int32_t mlf_run(MlfValue *root, int64_t is_io) {
     if (!is_io) { (void)force(root); cleanup(); return 0; }
     Stack continuations = {0};
@@ -1767,11 +1852,134 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
     for (;;) {
         MlfValue *operation = force(current);
         MlfValue *result;
+        if (!immediate(operation) && operation->tag == ASYNC_ACTION) {
+            MlfEnv *arguments = operation->as.primitive.arguments;
+            MlfValue *a = mlf_env_get(arguments, 0);
+            switch (operation->as.primitive.identity) {
+            case ASYNC_SCOPE_NEW: {
+                size_t cells = (size_t)bounded_integer(a, INT64_MAX / 8, "invalid async cell limit");
+                size_t callbacks = (size_t)bounded_integer(mlf_env_get(arguments, 1), INT64_MAX / 8,
+                                                          "invalid async callback limit");
+                MlfCompletionScope *scope = mlf_completion_scope_new(cells, callbacks);
+                if (!scope) fail("out of memory");
+                result = async_scope_value(scope);
+                break;
+            }
+            case ASYNC_SCOPE_CLOSE:
+                mlf_completion_scope_close(expect(a, ASYNC_SCOPE)->as.async_scope);
+                result = mlf_constructor(0, 0);
+                break;
+            case ASYNC_NEW_COMPLETION: {
+                MlfCompletionScope *scope = expect(a, ASYNC_SCOPE)->as.async_scope;
+                MlfCompletion *cell = NULL;
+                MlfCompletionStatus status = mlf_completion_new(scope, &cell);
+                if (status == MLF_COMPLETION_NO_MEMORY) fail("out of memory");
+                current = status == MLF_COMPLETION_OK
+                    ? mlf_application(mlf_env_get(arguments, 1), async_cell_value(cell))
+                    : mlf_env_get(arguments, 2);
+                continue;
+            }
+            case ASYNC_RESOLVE_COMPLETION: {
+                MlfCompletion *cell = expect(a, COMPLETION)->as.completion;
+                result = small(mlf_completion_resolve(cell->owner, cell, mlf_env_get(arguments, 1)));
+                break;
+            }
+            case ASYNC_READ_COMPLETION: {
+                MlfCompletion *cell = expect(a, COMPLETION)->as.completion;
+                MlfValue *payload = NULL;
+                MlfCompletionStatus status = mlf_completion_read(cell->owner, cell, &payload);
+                current = status == MLF_COMPLETION_OK
+                    ? mlf_application(mlf_env_get(arguments, 1), payload)
+                    : mlf_env_get(arguments, 2);
+                continue;
+            }
+            case ASYNC_SUBSCRIBE_COMPLETION: {
+                MlfCompletion *cell = expect(a, COMPLETION)->as.completion;
+                MlfCompletionResume *resume = NULL;
+                MlfCompletionStatus status = mlf_completion_subscribe(cell->owner, cell,
+                                                        mlf_env_get(arguments, 1), &resume);
+                result = async_subscription_value(resume, status);
+                break;
+            }
+            case ASYNC_SUBSCRIPTION_STATUS:
+                result = small(async_subscription_status(a));
+                break;
+            case ASYNC_CANCEL_SUBSCRIPTION: {
+                MlfCompletionStatus status = async_subscription_status(a);
+                if (status == MLF_COMPLETION_OK) {
+                    MlfCompletionResume *resume = expect(a, ASYNC_SUBSCRIPTION)->as.subscription.resume;
+                    status = mlf_completion_unsubscribe(resume->owner, resume);
+                }
+                result = small(status);
+                break;
+            }
+            case ASYNC_ENQUEUE: {
+                MlfCompletionScope *scope = expect(a, ASYNC_SCOPE)->as.async_scope;
+                MlfCompletionResume *resume = NULL;
+                MlfCompletionStatus status = mlf_completion_enqueue(scope,
+                                                        mlf_env_get(arguments, 1), &resume);
+                result = async_subscription_value(resume, status);
+                break;
+            }
+            case ASYNC_DELAY: {
+                MlfCompletionScope *scope = expect(a, ASYNC_SCOPE)->as.async_scope;
+                uint64_t delay = bounded_integer(mlf_env_get(arguments, 1), UINT32_MAX,
+                                                 "invalid async delay");
+                MlfCompletionResume *resume = NULL;
+                MlfCompletionStatus status = mlf_completion_delay(scope, async_clock_ms() + delay,
+                                                          mlf_env_get(arguments, 2), &resume);
+                result = async_subscription_value(resume, status);
+                break;
+            }
+            case ASYNC_WAIT: {
+                MlfCompletionScope *scope = expect(a, ASYNC_SCOPE)->as.async_scope;
+                MlfValue *limit_value = expect(mlf_env_get(arguments, 1), INTEGER);
+                int indefinite = small_integer(limit_value) && small_value(limit_value) == -1;
+                uint64_t limit = indefinite ? 0 : bounded_integer(limit_value, UINT32_MAX,
+                                                                  "invalid async wait");
+                uint64_t start = async_clock_ms();
+                for (;;) {
+                    if (scope->closed) { result = small(MLF_COMPLETION_CLOSED); break; }
+                    if (scope->dispatching) { result = small(MLF_COMPLETION_BUSY); break; }
+                    uint64_t now = async_clock_ms();
+                    mlf_completion_mature(scope, now);
+                    if (scope->ready_head) { result = small(MLF_COMPLETION_OK); break; }
+                    if (!scope->timer_head || (!indefinite && now - start >= limit)) {
+                        result = small(MLF_COMPLETION_EMPTY); break;
+                    }
+                    uint64_t pause = scope->timer_head->deadline_ms - now;
+                    if (!indefinite && pause > limit - (now - start)) pause = limit - (now - start);
+                    async_pause_ms((uint32_t)(pause > 1000 ? 1000 : pause));
+                }
+                break;
+            }
+            case ASYNC_STEP: {
+                MlfCompletionScope *scope = expect(a, ASYNC_SCOPE)->as.async_scope;
+                if (scope->closed) { result = small(MLF_COMPLETION_CLOSED); break; }
+                if (scope->dispatching) { result = small(MLF_COMPLETION_BUSY); break; }
+                mlf_completion_mature(scope, async_clock_ms());
+                MlfCompletionResume *resume = NULL;
+                MlfCompletionStatus status = mlf_completion_dequeue(scope, &resume);
+                if (status != MLF_COMPLETION_OK) { result = small(status); break; }
+                int is_action = resume->is_action;
+                MlfValue *callback = NULL, *payload = NULL;
+                status = mlf_completion_take(scope, resume, &callback, &payload);
+                if (status != MLF_COMPLETION_OK) { result = small(status); break; }
+                scope->dispatching = 1;
+                MlfEnv *finish = mlf_env_new(1);
+                mlf_env_set(finish, 0, a);
+                push(&continuations, mlf_closure(async_step_finished, finish));
+                current = is_action ? callback : mlf_application(callback, payload);
+                continue;
+            }
+            default: fail("invalid async action");
+            }
+        } else
         if (!immediate(operation) && operation->tag == NATIVE_IO) {
             current = operation->as.closure.code(operation->as.closure.env,NULL);
             continue;
         }
-        if (!immediate(operation) && operation->tag == PUT_BYTES_ACTION) {
+        else if (!immediate(operation) && operation->tag == PUT_BYTES_ACTION) {
             result = mlf_put_bytes(operation->as.array_write.array,operation->as.array_write.index,
                                    operation->as.array_write.entry);
         } else if (!immediate(operation) && operation->tag == WRITE_TABLE_ACTION) {
@@ -1808,6 +2016,7 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
         case FILE_DIGEST: result = os_fileDigest(operation->as.action.first); break;
         case ACQUIRE_FILE_LOCK: result = os_acquireFileLock(operation->as.action.first); break;
         case RELEASE_FILE_LOCK: result = os_releaseFileLock(operation->as.action.first); break;
+        case PROCESS_SUPERVISOR: result = mlf_process_request(operation->as.action.first); break;
 
         case PUT_ERR:
             write_error(operation->as.action.first);

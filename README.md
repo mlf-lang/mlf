@@ -81,6 +81,14 @@ with the current bootstrap script before using these manifests with an older
 installed manager. See the [package manager guide](docs/package-manager.md) for
 the ten-library layout, dependency selection, and scheduling evidence.
 
+The separate [async utility](docs/async-task.md) provides cold typed tasks,
+cooperative fibers, scoped cancellation, timers and bounded combinators.
+[Async.Process](docs/async-process.md) supplies dynamic subprocess scopes and
+isolated CPU-parallel work. The single MLF coordinator uses opaque typed
+completions; it does not run MLF inference on shared-memory worker threads.
+The [bootstrap and qualification](docs/async-bootstrap.md) distinguish the
+released seed from a compiler with the new checked primitives.
+
 The package manager compiles each library and executable as a crate. Modules
 inside a crate are namespaces and may import one another cyclically. Value
 declarations are inferred in dependency SCCs, with closed schemes and checked

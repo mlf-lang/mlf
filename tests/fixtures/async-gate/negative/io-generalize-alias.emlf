@@ -1,0 +1,5 @@
+module Main where
+import Gate.CompletionInterface
+main = ioBind newCompletion (\cell ->
+  let alias : forall a. Completion a = cell in
+  ioBind (resolve alias 42) (\_ -> ioBind (observe alias) putStrLn))

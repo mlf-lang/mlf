@@ -1,0 +1,20 @@
+cycleScopes : Int -> IO Unit
+cycleScopes n = if n <= 0 then ioReturn Unit else do
+  scope <- asyncScopeNew 0 1
+  ticket <- asyncDelay scope 4294967295 (panic "stale timer fired")
+  asyncScopeClose scope
+  asyncScopeClose scope
+  status <- asyncSubscriptionStatus ticket
+  if status == 3 then cycleScopes (n - 1) else panic "closed subscription status"
+main = do
+  old <- asyncScopeNew 1 1
+  cell <- asyncNewCompletion old ioReturn (panic "allocation failed")
+  asyncResolveCompletion cell 42
+  asyncScopeClose old
+  cycleScopes 2000
+  scope <- asyncScopeNew 1 1
+  asyncEnqueue scope (putStrLn "fresh scope")
+  ioBind (asyncStep scope) printInt
+  ioBind (asyncResolveCompletion cell 0) printInt
+  asyncReadCompletion cell printInt (putStrLn "stale cell")
+  asyncScopeClose scope
