@@ -17,7 +17,7 @@ jq -n --argjson shards "$shards" --arg digest "$(printf '%064d' 7)" \
     prepared_suite_targets:{},suite_builds:[],family_reports:{},suites:{core:{aggregate:true,scope:"full",targets:$shards,components:{}}}}' > "$report"
 # Fixture shards partition real catalog metadata. They are synthetic reports;
 # they never claim that the compiler actions ran.
-jq '[.families[] | select(.unit == "core")] | [.[0:9],.[9:18],.[18:26],.[26:34]]' "$root/tests/test-catalog.json" > "$scratch/families.json"
+jq '[.families[] | select(.unit == "core")] | [.[0:9],.[9:18],.[18:26],.[26:35]]' "$root/tests/test-catalog.json" > "$scratch/families.json"
 index=0
 for name in core-crates core-solver core-language core-modules; do
   jq -c --argjson index "$index" '

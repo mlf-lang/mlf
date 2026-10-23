@@ -99,7 +99,7 @@ corePartitionChecks catalog = do
  let reviewed = ids (C.forUnit catalog "core")
  H.right (CorePartitions.validate reviewed)
  H.assert (S.eqList eqString CorePartitions.targets (O.words "core-crates core-solver core-language core-modules")) "core physical target inventory changed"
- H.assert (S.length reviewed == 34 && C.sameSet (S.concatMap S.snd CorePartitions.partitions) reviewed) "core compilation shards changed logical families"
+ H.assert (S.length reviewed == 35 && C.sameSet (S.concatMap S.snd CorePartitions.partitions) reviewed) "core compilation shards changed logical families"
  H.right (CorePartitions.validateCompleted reviewed (S.concatMap S.snd CorePartitions.partitions))
  rejected (CorePartitions.validateCompleted reviewed (S.tail reviewed))
  rejected (CorePartitions.validateCompleted reviewed (S.snoc reviewed (S.head reviewed)))

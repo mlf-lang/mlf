@@ -43,7 +43,14 @@ arrange frames pending previous tokens finish = case tokens of
     Just (Open kind) -> if eqString (tokenText t) "{" then Cons t (nextToken t ts finish (pushToken t frames)) else opened kind frames previous t ts finish
     Nothing -> normal frames previous t ts finish
 nextToken : Token -> List Token -> Token -> List Frame -> List Token
-nextToken token rest finish stack = arrange stack (keyword token) (Just token) rest finish
+nextToken token rest finish stack =
+  -- A braced guard-if closes at }, so it must not intercept an enclosing
+  -- ordinary if's then/else (which may also close an implicit do block).
+  let scoped = if eqString (tokenText token) "if" then case rest of
+        Cons next _ -> if eqString (tokenText next) "{" then case stack of {Cons (Marker IfMark _) outer -> outer; _ -> stack} else stack
+        _ -> stack
+      else stack in
+  arrange scoped (keyword token) (Just token) rest finish
 previousText : Maybe Token -> String
 previousText previous = case previous of {Nothing -> ""; Just t -> tokenText t}
 continuation : String -> String -> Bool
