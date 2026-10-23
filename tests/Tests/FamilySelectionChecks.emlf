@@ -1,0 +1,134 @@
+module Tests.FamilySelectionChecks where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.Json as J
+import qualified Package.OS as O
+import qualified Tests.Basic as H
+import qualified Tests.Selection as F
+import qualified Tests.Coverage as C
+
+-- These protocol fixtures and expected IDs are literal independent evidence;
+-- neither the reporter nor a candidate family registry constructs them.
+familyFull = "{\"schema_version\":1,\"unit\":\"probe\",\"event\":\"start\",\"scope\":\"full\",\"selected\":[\"probe/first\",\"probe/second\"]}\n{\"schema_version\":1,\"unit\":\"probe\",\"event\":\"family\",\"id\":\"probe/first\",\"status\":\"passed\"}\n{\"schema_version\":1,\"unit\":\"probe\",\"event\":\"family\",\"id\":\"probe/second\",\"status\":\"passed\"}\n{\"schema_version\":1,\"unit\":\"probe\",\"event\":\"summary\",\"complete\":true,\"families\":2}\n"
+familyPartial = "{\"schema_version\":1,\"unit\":\"probe\",\"event\":\"start\",\"scope\":\"partial\",\"selected\":[\"probe/first\"]}\n{\"schema_version\":1,\"unit\":\"probe\",\"event\":\"family\",\"id\":\"probe/first\",\"status\":\"passed\"}\n{\"schema_version\":1,\"unit\":\"probe\",\"event\":\"summary\",\"complete\":true,\"families\":1}\n"
+inventoryText = "{\"schema_version\":1,\"suites\":{\"probe\":{\"executions\":[\"first\",\"second\"],\"aliases\":{\"repeated\":\"first\"},\"metrics\":{\"oracle-executed\":3}}}}"
+projectionText = "{\"executions\":[\"first\"],\"aliases\":{\"repeated\":\"first\"},\"metrics\":{\"oracle-executed\":3}}"
+coverageFull = "{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"start\",\"scope\":\"full\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"case\",\"id\":\"first\",\"status\":\"passed\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"case\",\"id\":\"second\",\"status\":\"passed\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"alias\",\"id\":\"repeated\",\"canonical\":\"first\",\"status\":\"passed\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"metric\",\"name\":\"oracle-executed\",\"value\":3}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"summary\",\"complete\":true,\"executions\":2,\"aliases\":1,\"metrics\":1}\n"
+coveragePartial = "{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"start\",\"scope\":\"partial\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"case\",\"id\":\"first\",\"status\":\"passed\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"alias\",\"id\":\"repeated\",\"canonical\":\"first\",\"status\":\"passed\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"metric\",\"name\":\"oracle-executed\",\"value\":3}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"summary\",\"complete\":true,\"executions\":1,\"aliases\":1,\"metrics\":1}\n"
+coverageMetric = "{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"start\",\"scope\":\"partial\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"metric\",\"name\":\"oracle-executed\",\"value\":3}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"summary\",\"complete\":true,\"executions\":0,\"aliases\":0,\"metrics\":1}\n"
+coverageUnknown = "{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"start\",\"scope\":\"partial\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"case\",\"id\":\"unknown\",\"status\":\"passed\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"summary\",\"complete\":true,\"executions\":1,\"aliases\":0,\"metrics\":0}\n"
+coverageEmpty = "{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"start\",\"scope\":\"partial\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"summary\",\"complete\":true,\"executions\":0,\"aliases\":0,\"metrics\":0}\n"
+render rows = S.intercalate "\n" (S.map J.render rows) ++ "\n"
+change index action rows = S.map (\(Pair position row) -> if position == index then action row else row) (S.zip (S.range 0 (S.length rows - 1)) rows)
+without index rows = S.map S.snd (S.filter (\(Pair position _) -> position /= index) (S.zip (S.range 0 (S.length rows - 1)) rows))
+rejected : forall a. Either String a -> IO Unit
+rejected result = case result of { Left _ -> return Unit; Right _ -> H.fail "damaged family selection or projected coverage was accepted" }
+plan available args full identities = do
+ Pair actualFull actual <- H.right (F.choose available args)
+ H.assert (H.eq actualFull full && S.eqList eqString actual identities) "family plan changed selection, order or scope"
+
+main : IO Unit
+main = do
+ let identities = O.words "probe/first probe/second"
+ let first = Cons "probe/first" Nil
+ H.assert (F.listing (Cons "--list-families" Nil) && S.not (F.listing Nil) && S.not (F.listing (O.words "--list-families extra"))) "family discovery accepts execution arguments"
+ plan identities Nil true identities
+ plan identities (O.words "--families probe/second probe/first") false identities
+ plan identities (O.words "--families probe/second") false (Cons "probe/second" Nil)
+ rejected (F.choose Nil Nil)
+ rejected (F.choose (O.words "probe/first probe/first") Nil)
+ rejected (F.choose (Cons "bad identity" Nil) Nil)
+ rejected (F.choose identities (O.words "--families"))
+ rejected (F.choose identities (O.words "--families probe/first probe/first"))
+ rejected (F.choose identities (O.words "--families probe/unknown"))
+ rejected (F.choose identities (Cons "--families" (Cons "" Nil)))
+ rejected (F.choose identities (O.words "--list-families"))
+ rejected (F.choose identities (O.words "--unknown probe/first"))
+ full <- H.right (F.parse familyFull)
+ partial <- H.right (F.parse familyPartial)
+ checked <- H.right (F.validate "probe" true identities familyFull)
+ H.assert (J.equal (J.get "families" checked) (J.num 2) && S.eqList eqString (J.getStrings "ids" checked) identities) "family result lost completed identities"
+ H.right (F.validate "probe" false first familyPartial)
+ rejected (F.validate "probe" true first familyPartial)
+ rejected (F.validate "probe" false identities familyFull)
+ rejected (F.validate "probe" true first familyFull)
+ rejected (F.validate "probe" true Nil familyFull)
+ rejected (F.validate "probe" true (O.words "probe/first probe/first") familyFull)
+ rejected (F.validate "probe" true identities "")
+ rejected (F.validate "probe" true identities (familyFull ++ "truncated {\n"))
+ rejected (F.validate "probe" true identities (familyFull ++ familyFull))
+ rejected (F.validate "probe" true identities (render (S.init full)))
+ rejected (F.validate "probe" true identities (render (change 2 (J.set "families" (J.num 1)) (without 1 full))))
+ rejected (F.validate "probe" true identities (render (change 1 (J.set "id" (J.str "probe/second")) full)))
+ rejected (F.validate "probe" true identities (render (change 1 (J.set "id" (J.str "probe/unknown")) full)))
+ rejected (F.validate "probe" true identities (render (Cons (S.head full) (Cons (S.index full 2) (Cons (S.index full 1) (S.drop 3 full))))))
+ rejected (F.validate "probe" true identities (render (change 0 (J.set "selected" (J.stringArray (S.reverse identities))) full)))
+ let malformedSelected = J.Array (Cons (J.num 1) (Cons (J.str "probe/second") Nil))
+ rejected (F.validate "probe" true identities (render (change 0 (J.set "selected" malformedSelected) full)))
+ rejected (F.validate "probe" true identities (render (change 1 (J.set "unit" (J.str "other")) full)))
+ rejected (F.validate "probe" true identities (render (change 1 (J.set "schema_version" (J.num 2)) full)))
+ rejected (F.validate "probe" true identities (render (change 1 (J.set "extra" (J.Boolean true)) full)))
+ rejected (F.validate "probe" true identities (render (change 3 (J.set "complete" (J.Boolean false)) full)))
+ rejected (F.validate "probe" true identities (render (change 3 (J.set "families" (J.num 1)) full)))
+ rejected (F.validate "probe" true identities (render (change 3 (J.set "families" (J.str "2")) full)))
+ S.mapM_ (\status -> rejected (F.validate "probe" true identities (render (change 1 (J.set "status" (J.str status)) full)))) (O.words "failed skipped unknown")
+ -- A self-consistent truncated stream must not satisfy the two-family plan.
+ rejected (F.validate "probe" false identities familyPartial)
+ rejected (F.validate "probe" false first (render (S.snoc partial (S.last partial))))
+ -- Wrong JSON types at every typed-getter boundary must reject, not panic.
+ rejected (F.validate "probe" true identities (render (change 1 (\_ -> J.Null) full)))
+ S.mapM_ (\name -> rejected (F.validate "probe" true identities (render (change 1 (J.set name (J.num 1)) full)))) (O.words "unit event id status")
+ rejected (F.validate "probe" true identities (render (change 0 (J.set "scope" J.Null) full)))
+ rejected (F.validate "probe" true identities (render (change 0 (J.set "selected" J.Null) full)))
+
+ inventory <- H.right (J.parse inventoryText)
+ projection <- H.right (J.parse projectionText)
+ coverage <- H.right (C.parse coveragePartial)
+ fullCoverage <- H.right (C.parse coverageFull)
+ accepted <- H.right (C.validateProjection inventory "probe" projection coveragePartial)
+ H.assert (J.equal (J.get "executions" accepted) (J.num 1) && J.equal (J.get "aliases" accepted) (J.num 1) && J.equal (J.get "oracle-executed" (J.get "metrics" accepted)) (J.num 3)) "projection lost actual aliases or counted inputs"
+ rejected (C.validate inventory "probe" coveragePartial)
+ rejected (C.validateProjection inventory "probe" projection (render (change 0 (J.set "scope" (J.str "full")) coverage)))
+ -- Explicitly selecting every family is still partial qualification.
+ let all = J.get "probe" (J.get "suites" inventory)
+ let allPartial = render (change 0 (J.set "scope" (J.str "partial")) fullCoverage)
+ H.right (C.validateProjection inventory "probe" all allPartial)
+ rejected (C.validate inventory "probe" allPartial)
+ -- A metric-only family is legitimate; an empty evidence projection is not.
+ metricOnly <- H.right (J.parse "{\"executions\":[],\"aliases\":{},\"metrics\":{\"oracle-executed\":3}}")
+ H.right (C.validateProjection inventory "probe" metricOnly coverageMetric)
+ empty <- H.right (J.parse "{\"executions\":[],\"aliases\":{},\"metrics\":{}}")
+ rejected (C.validateProjection inventory "probe" empty coverageEmpty)
+ unknown <- H.right (J.parse "{\"executions\":[\"unknown\"],\"aliases\":{},\"metrics\":{}}")
+ rejected (C.validateProjection inventory "probe" unknown coverageUnknown)
+ rejected (C.validateProjection inventory "probe" (J.set "executions" (J.stringArray (O.words "first first")) projection) coveragePartial)
+ rejected (C.validateProjection inventory "probe" (J.set "executions" (J.stringArray (Cons "second" Nil)) projection) coveragePartial)
+ rejected (C.validateProjection inventory "probe" (J.set "aliases" J.Null projection) coveragePartial)
+ rejected (C.validateProjection inventory "probe" (J.set "metrics" J.Null projection) coveragePartial)
+ rejected (C.validateProjection inventory "probe" (J.set "extra" (J.num 1) projection) coveragePartial)
+ -- These forged projections agree with their forged reports. Only comparison
+ -- with the independent full inventory can reject the changed oracle claims.
+ let wrongAlias = J.set "aliases" (J.Object (Cons (Pair "repeated" (J.str "second")) Nil)) all
+ rejected (C.validateProjection inventory "probe" wrongAlias (render (change 3 (J.set "canonical" (J.str "second")) (change 0 (J.set "scope" (J.str "partial")) fullCoverage))))
+ let wrongMetric = J.set "metrics" (J.Object (Cons (Pair "oracle-executed" (J.num 2)) Nil)) projection
+ rejected (C.validateProjection inventory "probe" wrongMetric (render (change 3 (J.set "value" (J.num 2)) coverage)))
+ let unreviewedMetric = J.set "metrics" (J.Object (Cons (Pair "unreviewed" (J.num 3)) Nil)) projection
+ rejected (C.validateProjection inventory "probe" unreviewedMetric (render (change 3 (J.set "name" (J.str "unreviewed")) coverage)))
+ rejected (C.validateProjection inventory "probe" projection (render (Cons (S.head coverage) (Cons (S.index coverage 2) (Cons (S.index coverage 1) (S.drop 3 coverage))))))
+ rejected (C.validateProjection inventory "probe" projection (render (without 3 coverage)))
+ rejected (C.validateProjection inventory "probe" projection (render (change 4 (J.set "complete" (J.Boolean false)) coverage)))
+ rejected (C.validateProjection inventory "probe" projection (render (change 4 (J.set "executions" (J.num 7)) coverage)))
+ rejected (C.validateProjection (J.set "schema_version" (J.num 2) inventory) "probe" projection coveragePartial)
+ rejected (C.validateProjection inventory "unknown" projection coveragePartial)
+ rejected (C.validateProjection J.Null "probe" projection coveragePartial)
+ rejected (C.validateProjection (J.set "suites" J.Null inventory) "probe" projection coveragePartial)
+ rejected (C.validateProjection (J.set "suites" (J.set "probe" J.Null (J.get "suites" inventory)) inventory) "probe" projection coveragePartial)
+ rejected (C.validateProjection inventory "probe" J.Null coveragePartial)
+ rejected (C.validateProjection inventory "probe" (J.set "executions" J.Null projection) coveragePartial)
+ rejected (C.validateProjection inventory "probe" (J.set "executions" (J.Array (Cons (J.num 1) Nil)) projection) coveragePartial)
+ rejected (C.validateProjection inventory "probe" projection (render (change 1 (\_ -> J.Null) coverage)))
+ S.mapM_ (\name -> rejected (C.validateProjection inventory "probe" projection (render (change 1 (J.set name (J.num 1)) coverage)))) (O.words "suite event id status")
+ rejected (C.validateProjection inventory "probe" projection (render (change 0 (J.set "scope" J.Null) coverage)))
+ rejected (C.validateProjection inventory "probe" projection (render (change 2 (J.set "canonical" J.Null) coverage)))
+ rejected (C.validateProjection inventory "probe" projection (render (change 3 (J.set "name" J.Null) coverage)))
+ putStrLn "Family selection and projected coverage contracts passed"

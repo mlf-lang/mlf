@@ -20,7 +20,7 @@ runs:
       run: |
         tools/release/time-stage.sh dependencies bash -e -o pipefail <<'SH'
         if [ "$PLATFORM" = macos-arm64 ]; then
-          brew install llvm gmp pkg-config bdw-gc
+          tools/release/setup-macos.sh
           echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
           echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
         else
@@ -44,15 +44,56 @@ runs:
         tools/release/download-artifact.sh "$GITHUB_RUN_ID" "candidate-$PLATFORM" .mlf-build/shared-candidate "$SOURCE_COMMIT"
         tools/release/shared-candidate.sh import
         SH
+    - name: Import authenticated checked port prerequisites
+      if: inputs.group == 'port'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PLATFORM: ${{ inputs.platform }}
+        SOURCE_COMMIT: ${{ inputs.source }}
+      run: |
+        tools/release/time-stage.sh port-artifact-import bash -e -o pipefail <<'SH'
+        . tools/release/native-environment.sh
+        for shard in StateTypes SolverReuse InferenceConformance other; do
+          tools/release/download-artifact.sh "$GITHUB_RUN_ID" "prepared-$PLATFORM-port-prepare-$shard" ".mlf-build/shared-port/$shard" "$SOURCE_COMMIT"
+          tools/release/shared-port.sh import "$shard"
+        done
+        SH
     - name: Run complete native compiler group
       shell: bash
       env:
         TEST_GROUP: ${{ inputs.group }}
       run: |
         tools/release/time-stage.sh qualification tools/release/native-ci.sh "$TEST_GROUP"
+    - name: Export genuine checked port build artifacts
+      if: startsWith(inputs.group, 'port-prepare-')
+      id: port-export
+      shell: bash
+      env:
+        TEST_GROUP: ${{ inputs.group }}
+      run: tools/release/time-stage.sh port-artifact-export tools/release/shared-port.sh export "${TEST_GROUP#port-prepare-}"
+    - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      if: startsWith(inputs.group, 'port-prepare-') && success()
+      with:
+        name: prepared-${{ inputs.platform }}-${{ inputs.group }}
+        include-hidden-files: true
+        compression-level: 0
+        path: ${{ steps.port-export.outputs.archive }}/
+        retention-days: 14
+    - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      if: always() && startsWith(inputs.group, 'port-prepare-')
+      with:
+        name: preparation-diagnostics-${{ inputs.platform }}-${{ inputs.group }}
+        include-hidden-files: true
+        path: |
+          .mlf-build/compiler-tests/${{ inputs.group }}/verification.json
+          .mlf-build/compiler-tests/${{ inputs.group }}/**/build-report.json
+          .mlf-build/compiler-tests/${{ inputs.group }}/**/*.stderr
+          .mlf-build/tests/${{ inputs.group }}.log
+        retention-days: 14
     - name: Collect exact candidate and primary evidence
       shell: bash
-      if: always()
+      if: always() && !startsWith(inputs.group, 'port-prepare-')
       env:
         TEST_GROUP: ${{ inputs.group }}
       run: |
@@ -66,7 +107,19 @@ runs:
         done
         if test -d ".mlf-build/compiler-tests/$TEST_GROUP"; then
           cp -R ".mlf-build/compiler-tests/$TEST_GROUP" .mlf-build/release-evidence/compiler-tests/
-          find .mlf-build/release-evidence/compiler-tests -type f ! -path '*/framework-cli/*' ! -name verification.json ! -name build-report.json ! -name '*.coverage.jsonl' ! -name '*.log' ! -name '*.stderr' ! -name '*.err' ! -name '*.status.json' ! -name rows.jsonl ! -name current-label ! -path '*/port-*/matrix-*/case-14-interpreter.stdout' ! -path '*/port-*/matrix-*/case-19-interpreter.stdout' ! -path '*/port-*/matrix-*/case-23-interpreter.stdout' -delete
+          if test "$TEST_GROUP" = port; then
+            for shard in StateTypes SolverReuse InferenceConformance other; do
+              proof=".mlf-build/release-evidence/compiler-tests/port/prerequisites/$shard"
+              mkdir -p "$proof/preparation" "$proof/suite-build"
+              producer=".mlf-build/compiler-tests/port-prepare-$shard"
+              if test ! -f "$producer/verification.json"; then continue; fi
+              cp "$producer/verification.json" "$proof/verification.json"
+              cp "$producer/port-preparation/build-report.json" "$proof/preparation/build-report.json"
+              cp "$producer/suite-build/build-report.json" "$proof/suite-build/build-report.json"
+              cp ".mlf-build/shared-port/$shard/manifest.json" "$proof/port-shard-manifest.json"
+            done
+          fi
+          find .mlf-build/release-evidence/compiler-tests -type f ! -path '*/framework-cli/*' ! -name verification.json ! -name build-report.json ! -name port-shard-manifest.json ! -name '*.coverage.jsonl' ! -name '*.log' ! -name '*.stderr' ! -name '*.err' ! -name '*.status.json' ! -name rows.jsonl ! -name current-label ! -path '*/port-*/matrix-*/case-14-interpreter.stdout' ! -path '*/port-*/matrix-*/case-19-interpreter.stdout' ! -path '*/port-*/matrix-*/case-23-interpreter.stdout' -delete
         fi
         log_group=$TEST_GROUP
         case "$TEST_GROUP" in port-*) log_group=port ;; esac
@@ -76,7 +129,7 @@ runs:
         fi
         SH
     - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-      if: always()
+      if: always() && !startsWith(inputs.group, 'port-prepare-')
       with:
         name: native-${{ inputs.platform }}-${{ inputs.group }}
         include-hidden-files: true

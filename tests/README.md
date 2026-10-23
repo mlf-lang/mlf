@@ -22,9 +22,9 @@ logs and generated LLVM default to `.mlf-build/tuple-list-runtime/`.
 Pull requests require the small [compiler source smoke suite](../docs/ci.md):
 the verified seed interprets `PRQuickMain.emlf` against the checkout frontend and
 current/frozen target checkers through the split library roots, with two accepted
-cases, two source rejections
-and one malformed target. This does not build fresh tools or test current LLVM
-execution. Fresh native tools, eight CLI cases, three package/cache states and
+cases, two source rejections and one malformed target. This does not build fresh
+tools or test current LLVM execution. Fresh native tools, eight CLI cases, three
+package/cache states and
 the complete 79-case package distribution suite, separate target-dependency/
 scheduler fixture and 22 native runner checks run separately on pushes to
 `main` or manual CI dispatches with `full_validation` enabled.
@@ -37,6 +37,10 @@ below retain their existing coverage.
 The local `mlf-tests` package preserves the original assertions, input corpora,
 runtime event traces, generated graph properties, and harness fault injections.
 Root `mlfpkg test` builds these executables through the MLF package manager.
+The [test catalog](test-catalog.json) assigns each selectable case or family one
+primary contract group, with separate test-level, input, oracle and purpose
+metadata. The six root commands remain full-qualification campaigns. Selected
+families share their execution unit's build and setup.
 The test-owned `compiler-tests` runner is a private root executable; its sources
 live in `tests/CompilerTestsMain.emlf` and `Tests/CompilerTests.emlf`. It receives
 the real package manager through `--manager`, keeps the existing six root groups
@@ -54,15 +58,14 @@ group runs both the library and CLI contract checks in addition to the current
 684 Core checks. The separately reviewed duplicate consolidation below accounts
 for the reduction from the original 686 checks.
 
-The shared test library contains eleven modules: the eight original helper,
-transport, collection-wrapper and independent-checker modules, `Tests.Coverage`,
-`Tests.TestDrivers` and `Tests.TestSources`. The private root campaign explicitly
-maps the last three support modules alongside `Tests.CompilerTests`.
+The shared test library contains helper, transport, collection-wrapper and
+independent-checker modules, plus `Tests.Coverage`, `Tests.TestDrivers`,
+`Tests.TestSources` and `Tests.Selection`. The private root campaign explicitly
+maps its support modules alongside `Tests.CompilerTests` and `Tests.Catalog`.
 Each executable explicitly lists the private test modules imported by its
 entry point. The original modules and added framework and regex checks remain reachable
-across those entries. Building `port` and its six reference programs now compiles
-21 test modules including their two entries, instead of pulling unrelated test
-modules into those targets.
+across those entries. Building `port` and its six reference programs includes
+their test dependencies without pulling unrelated suites into those targets.
 `mlfpkg --manifest tests/mlf-package.json plan` checks those import boundaries;
 adding a test module also requires adding it to each importing target's
 `modules` map, or to the shared library when it is common support.
@@ -73,7 +76,9 @@ and logs. Source/tool identities, artifact checksums and recursive dependency
 receipts still control reuse; a fresh self-host stage keeps a new store.
 Prepared port targets and source driver LLVM now use the compiler module loader's
 current import closure, including ordered search roots and newly introduced
-module shadows. Unrelated example, benchmark and test files remain in the full
+module shadows. Search roots come from the resolved package graph, including
+the compiler libraries under `libraries/`; Port also includes `tests/`.
+Unrelated example, benchmark and test files remain in the full
 verification snapshot without invalidating these artifacts. Port targets retain
 their independent checking and serialization receipts.
 Driver LLVM objects, native links, runtime objects and trace objects also share
@@ -118,6 +123,121 @@ wrapper chooses 4 for port on hosts with at most 8 GiB RAM, while preserving the
 | parity | CorpusMain, CheckTarget | All 7086 prescribed acceptance/type/rejection cases, 7075 distinct source compilations, and 80 runtime rows on both backends |
 | self-host | Tests.CompilerTests | Fresh next-stage compiler build and LLVM/native binary fixed point |
 
+The seven primary groups describe the contract under test:
+
+| Group | Contract |
+| --- | --- |
+| `language` | Source syntax, resolution, inference and checked-term rules |
+| `code-generation` | Lowering, optimization and target-code behavior |
+| `runtime-library` | Runtime primitives, effects, data structures and library operations |
+| `packages-build` | Dependency resolution, build inputs, artifacts and cache behavior |
+| `distribution` | Packaged releases, installation, relocation and delivery evidence |
+| `bootstrap` | Compiler stage construction and reproducibility |
+| `test-infrastructure` | Test runners, supervision, manifests and validation evidence |
+
+Each case or family has exactly one primary group and one level. The other
+axes allow multiple labels; they describe the methods inside the complete
+family, rather than asserting that every contained assertion uses every label.
+
+| Metadata axis | Values |
+| --- | --- |
+| `level` | `component`, `integration`, `system` |
+| `inputs` | `fixed`, `exhaustive`, `seeded-random`, `transformed`, `fault-injected` |
+| `oracles` | `fixed-expected`, `independent-reference`, `differential`, `metamorphic`, `contract`, `fixed-point` |
+| `purposes` | `regression`, `conformance`, `robustness`, `performance`, `reproducibility` |
+
+Catalog schema 2 declares `granularity: verified-case-or-family`. Core, Harness,
+Backends and Port expose independent families, including individual existing
+cases where their setup permits it. A family retains its complete original
+action, assertions, generated loops and applicable metrics. Selection does not
+sample inputs inside a family. The other execution units retain their existing
+whole-suite or package-phase boundaries.
+The catalog has 168 families: Core exposes 34, Harness 53, Backends 49 and
+Port 25; the remaining seven execution units retain one complete family each.
+
+With the compiler and package manager configured, discover the catalog without
+executing tests:
+
+```sh
+./mlfpkg run compiler-tests -- catalog --format json
+./mlfpkg run compiler-tests -- catalog --group runtime-library
+./mlfpkg run compiler-tests -- catalog --campaign unit --oracle independent-reference
+./mlfpkg --manifest tests/mlf-package.json run core -- --list-families
+```
+
+Each of `core`, `harness`, `backends` and `port` accepts `--list-families` without
+executing test actions, preparing targets or starting backend drivers. Direct
+suite execution accepts `--families ID...`; no arguments retain the original
+full behavior. Existing suite helper and legacy CLI modes remain available.
+
+Run focused families through the same build and assertion paths:
+
+```sh
+./mlfpkg run compiler-tests -- select --family core/hm-oracle \
+  --family core/substring-adapter \
+  --compiler /path/to/emlf --manager /path/to/mlfpkg \
+  --build-dir .mlf-build/core-oracles
+./mlfpkg run compiler-tests -- select --group distribution \
+  --compiler /path/to/emlf --manager /path/to/mlfpkg \
+  --build-dir .mlf-build/distribution-checks
+```
+
+`--group`, `--level`, `--unit` and `--campaign` each accept one value. Repeated
+`--family` options select the union of those IDs in registry order; duplicate
+IDs fail. Metadata constraints combine with AND, including repeated `--input`,
+`--oracle` and `--purpose` options. Unknown labels, malformed selectors and empty
+selections fail. The catalog's `--category` is a compatibility alias for
+`--group`; its old broad category names are replaced by the seven names above.
+`--technique` remains a compatibility query derived from the separate axes.
+Use `--input`, `--oracle` and `--purpose` for explicit method selection.
+
+`select` requires at least one selector. The full `unit`, `packages`, `backends`,
+`port`, `parity` and `self-host` commands reject metadata and family selectors.
+Reports bind the catalog hash, exact families and execution units. Focused
+campaigns and explicit suite `--families` runs carry `scope: partial`, including
+when all families are requested. Original full commands retain `scope: full`.
+Each family completion is recorded only after its original actions return.
+The parent checks those completions against the reviewed catalog and checks
+structural IDs, aliases and metrics against the selected projection of the
+reviewed golden inventory. Missing, reordered, stale or forged family evidence
+cannot satisfy that validation.
+
+Selected families are batched once per execution unit, sharing setup and
+drivers. Units keep separate output directories and hashed child reports in
+`selected_units`, retaining each matrix and driver receipt. Focused Port runs
+prepare only their selected fixtures and use a partial manifest pinned to those
+names. Full Port still requires all 25 fixtures and rejects a partial manifest.
+Some Backends families exercise compiler/type/rejection contracts without
+runtime rows. They require nonempty completed-family evidence; the full backend
+matrix still requires all 575 rows on both backends.
+
+Package integration and distribution have separate execution units: source
+integration retains 51 reviewed IDs and distribution retains 28. Integration
+also runs the target-dependency/scheduler fixture and 22 native build-runner
+checks. Selecting both phases runs the ordinary 79-case package campaign once,
+including those additional checks once. Individual phases emit partial
+coverage, checked against the corresponding projection of the reviewed package
+inventory. A partial report cannot satisfy the full validator.
+
+`smoke`, `full`, `stress` and `release` remain execution-profile concepts. The
+existing CI definitions own their actual selections; listing the vocabulary in
+the catalog does not expand or reduce those checks. Fixed expectations, backend
+variants, independent implementations, fixture limits and generated-loop counts
+are not derived from classification metadata.
+
+The pre-merge family-selection validation record is
+[`test-family-selection-validation.json`](../docs/test-family-selection-validation.json).
+Earlier execution-unit classification results remain separately recorded in
+[`test-classification-validation.json`](../docs/test-classification-validation.json).
+Each record states its tested source/tool identities, scope and command wall
+times. Both describe historical snapshots before integration of the split
+libraries and parallel-build changes from `main`. The 161 individual-family
+timings in the family-selection record apply to that pre-merge snapshot.
+Fresh integration results are recorded separately in
+[`test-family-pr-integration-validation.json`](../docs/test-family-pr-integration-validation.json).
+Shared-cache measurements are not a performance comparison against a
+previous layout, and a focused pass does not establish a full-campaign pass.
+
 The unit group also runs `RegexMain`, covering the portable regex parser and
 ordered matcher. The benchmark harness checks all ten workload manifests and
 fixtures, including regex-redux with an independent scanner oracle. It compiles
@@ -152,8 +272,10 @@ the compiler, manager, runner and source snapshot. Text logs remain diagnostic.
 
 The original checked-package release amendment added 28 `checked release: ` IDs
 from `Tests.PackageReleases` to the then-existing 47 package executions, for 75
-total. The parallel-build integration below extends that reviewed inventory to79.
-The target-dependency/scheduler integration fixture runs in addition to the 79 structured cases and must report its separate successful completion. Each ID is emitted only after its scenario assertions complete. The full package
+total. The parallel-build integration below extends that reviewed inventory to 79.
+The target-dependency/scheduler integration fixture runs in addition to the 79
+structured cases and must report its separate successful completion. Each ID is
+emitted only after its scenario assertions complete. The full package
 entry wraps resolver, source-package and release scenarios in one coverage
 report; `--releases` and the fake `gh` helper remain focused entry points and
 cannot substitute for the complete campaign. These additions come from the

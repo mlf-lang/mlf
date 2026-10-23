@@ -12,8 +12,11 @@ for script in tools/release/*.sh; do bash -n "$script"; done
 test -s LICENSE
 git diff --check
 tools/release/check-benchmark-provenance.sh
+tools/release/test-setup-macos.sh
 tools/release/test-package-publishing.sh
 tools/release/test-smoke-receipts.sh
+tools/release/test-fetch-seed.sh
+tools/release/test-pr-gate.sh
 tools/release/test-source-smoke-diagnostics.sh
 tools/release/test-pr-smoke-cli-watchdog.sh
 printf 'Release metadata and shell syntax passed for %s.\n' "$version"
