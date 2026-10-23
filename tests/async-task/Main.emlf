@@ -1,0 +1,160 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as L
+import qualified Async.Task as T
+import qualified Async.Process as P
+
+bad : forall a. String -> IO a
+bad message = do { putErr ("TASK TEST FAILURE: " ++ message ++ "\n"); exitWith 1 }
+assert : Bool -> String -> IO Unit
+assert condition message = if condition then ioReturn Unit else bad message
+success : forall a. T.Outcome a -> IO a
+success outcome = case outcome of
+  T.Succeeded value -> ioReturn value
+  T.Failed error -> bad (P.errorMessage error)
+  T.Cancelled (T.CancelReason _ message) -> bad message
+failed : forall a. Int -> T.Outcome a -> Bool
+failed code outcome = case outcome of { T.Failed error -> P.errorCode error == code; _ -> false }
+cancelled : forall a. Int -> T.Outcome a -> Bool
+cancelled code outcome = case outcome of { T.Cancelled (T.CancelReason actual _) -> actual == code; _ -> false }
+integers : List Int -> List Int -> Bool
+integers xs ys = case xs of
+  Nil -> case ys of { Nil -> true; _ -> false }
+  Cons x rest -> case ys of { Cons y more -> x == y && integers rest more; _ -> false }
+run : forall a. T.Task a -> IO a
+run task = do { outcome <- T.run T.defaultOptions task; success outcome }
+after : forall a. Int -> a -> T.Task a
+after delay value = T.bind (T.sleep delay) (\_ -> T.pure value)
+list3 a b c = Cons a (Cons b (Cons c Nil))
+
+mixed = do
+ result <- run (T.bind (T.spawn (after 1 41)) (\number ->
+   T.bind (T.spawn (after 0 "typed")) (\text ->
+   T.bind (T.spawn (after 2 (\n -> n + 1))) (\function ->
+   T.bind (T.await number) (\n ->
+   T.bind (T.await text) (\s ->
+   T.bind (T.await function) (\f ->
+   T.bind (T.await number) (\again -> T.pure (Triple (f n) s again)))))))))
+ case result of Triple n s again -> assert (n == 42 && eqString s "typed" && again == 41) "heterogeneous retained results"
+ putStrLn "PASS mixed-values-functions-repeat-await"
+
+queuedCancel = do
+ result <- run (T.bind (T.spawn (T.fail (P.AsyncError 201 "must never start"))) (\fiber ->
+   T.bind (T.cancel fiber (T.CancelReason 7 "queued")) (\_ -> T.awaitOutcome fiber)))
+ assert (cancelled 7 result) "cancelled queued child ran"
+ putStrLn "PASS queued-cancellation"
+
+sleepCancel = do
+ result <- run (T.bind (T.spawn (after 60000 8)) (\fiber ->
+   T.bind T.yield (\_ ->
+   T.bind (T.cancel fiber (T.CancelReason 8 "sleeping")) (\_ -> T.awaitOutcome fiber))))
+ assert (cancelled 8 result) "sleep cancellation did not win"
+ putStrLn "PASS sleeping-cancellation"
+
+completedCancel = do
+ value <- run (T.bind (T.spawn (T.pure 9)) (\fiber ->
+   T.bind (T.await fiber) (\_ ->
+   T.bind (T.cancel fiber (T.CancelReason 9 "late")) (\_ -> T.await fiber))))
+ assert (value == 9) "late cancellation changed committed success"
+ putStrLn "PASS completed-cancellation"
+
+waitingCancel = do
+ value <- run (T.bind (T.spawn (after 2 17)) (\shared ->
+   T.bind (T.spawn (T.await shared)) (\consumer ->
+   T.bind T.yield (\_ ->
+   T.bind (T.cancel consumer (T.CancelReason 10 "consumer")) (\_ ->
+   T.bind (T.awaitOutcome consumer) (\cancelledConsumer ->
+   T.bind (T.await shared) (\answer -> T.pure (Pair cancelledConsumer answer))))))))
+ case value of Pair stopped answer -> assert (cancelled 10 stopped && answer == 17) "consumer cancelled shared prerequisite"
+ putStrLn "PASS waiting-cancellation-shared-prerequisite"
+
+captureErrors = do
+ outcome <- run (T.bind (T.spawn (T.capture (T.fail (P.AsyncError 202 "expected")))) T.await)
+ assert (failed 202 outcome) "capture inside child did not recover"
+ escaped <- T.run T.defaultOptions (T.bind (T.spawn (T.fail (P.AsyncError 203 "unhandled"))) T.awaitOutcome)
+ assert (failed 203 escaped) "awaitOutcome undid fail-fast supervision"
+ putStrLn "PASS capture-and-fail-fast"
+
+nested = do
+ result <- run (T.capture (T.withScope (T.bind (T.spawn (T.fail (P.AsyncError 204 "nested"))) (\_ -> after 60000 1))))
+ assert (failed 204 result) "nested failure escaped capture or join hung"
+ values <- run (T.withScope (T.all 2 (list3 (after 2 1) (T.pure 2) (after 0 3))))
+ assert (integers values (list3 1 2 3)) "nested result order"
+ putStrLn "PASS nested-failure-isolation"
+
+ordered = do
+ values <- run (T.all 2 (list3 (after 3 10) (after 0 20) (after 1 30)))
+ assert (integers values (list3 10 20 30)) "all result order"
+ collected <- run (T.collect 2 (list3 (T.pure 1) (T.fail (P.AsyncError 205 "collected")) (T.pure 3)))
+ assert (case collected of
+   Cons (T.Succeeded 1) (Cons failure (Cons (T.Succeeded 3) Nil)) -> failed 205 failure
+   _ -> false) "collect did not preserve failure data and order"
+ let limited = T.Options 4096 64 3 (P.ScopeOptions 1 4 100)
+ bounded <- T.run limited (T.mapConcurrentlyN 2 (\n -> after 0 (n + 1)) (L.replicate 40 4))
+ boundedValues <- success bounded
+ assert (L.length boundedValues == 40 && L.all (\n -> n == 5) boundedValues) "bounded fan-out exceeded live fiber limit"
+ putStrLn "PASS bounded-ordered-combinators"
+
+invalid = do
+ width <- T.run T.defaultOptions (T.all 0 (Cons (T.pure 1) Nil))
+ assert (failed 101 width) "zero width was accepted"
+ duration <- T.run T.defaultOptions (T.sleep (0 - 1))
+ assert (failed 101 duration) "negative sleep was accepted"
+ limit <- T.run (T.Options 7 4 1 P.defaultOptions) (T.spawn (T.pure 1))
+ assert (failed 104 limit) "live limit did not reject"
+ callback <- T.run (T.Options 128 4 8 P.defaultOptions) (T.all 2 (Cons (after 1 1) (Cons (after 1 2) Nil)))
+ assert (failed 104 callback) "callback bound did not reject"
+ nestedLimit <- T.run (T.Options 1024 64 2 P.defaultOptions) (T.withScope (T.spawn (T.pure 1)))
+ assert (failed 104 nestedLimit) "nested group bypassed invocation live limit"
+ putStrLn "PASS explicit-admission-errors"
+
+deadlines = do
+ expired <- T.run T.defaultOptions (T.withTimeout 0 (after 60000 1))
+ assert (failed 124 expired) "deadline did not expire"
+ value <- run (T.withTimeout 60000 (T.pure 24))
+ assert (value == 24) "completed deadline task changed outcome"
+ joins <- T.run T.defaultOptions (T.withTimeout 1 (T.bind (T.spawn (after 60000 1)) (\_ -> T.pure 2)))
+ assert (failed 124 joins) "deadline failed to include child joins"
+ putStrLn "PASS monotonic-deadline-and-join"
+
+scopeCancel = do
+ outcome <- T.run T.defaultOptions (T.bind (T.spawn (after 60000 1)) (\_ -> T.cancelScope (T.CancelReason 25 "scope")))
+ assert (cancelled 25 outcome) "scope cancellation did not join"
+ negative <- T.run T.defaultOptions (T.cancelScope (T.CancelReason (0 - 1) "negative reason"))
+ assert (cancelled (0 - 1) negative) "task reason leaked into bounded process protocol"
+ root <- T.run T.defaultOptions (T.bind (T.spawn (after 60000 1)) (\_ ->
+   T.bind (T.spawn (after 60000 2)) (\victim ->
+   T.bind T.yield (\_ ->
+   T.bind (T.cancel victim (T.CancelReason 26 "root await")) (\_ -> T.await victim)))))
+ assert (cancelled 26 root) "cancelled root did not cancel-and-join sibling"
+ putStrLn "PASS scope-cancellation"
+
+jobsOne = do
+ let options = T.Options 8192 256 100 (P.ScopeOptions 1 8 100)
+ outcome <- T.run options (T.bind (T.spawn (T.bind (T.spawn (after 1 40)) (\child -> T.map (\n -> n + 2) (T.await child)))) T.await)
+ value <- success outcome
+ assert (value == 42) "jobs=1 logical dependency deadlocked"
+ putStrLn "PASS jobs-one-dynamic-dependencies"
+
+escaped = do
+ fiber <- run (T.withScope (T.spawn (T.pure 1)))
+ outcome <- T.run T.defaultOptions (T.await fiber)
+ assert (failed 105 outcome) "escaped fiber was usable in a new scope"
+ cross <- run (T.capture (T.bind (T.spawn (T.pure 2)) (\fiber -> T.withScope (T.await fiber))))
+ assert (failed 105 cross) "cross-scope fiber was accepted"
+ putStrLn "PASS escaped-and-cross-scope-rejection"
+
+main = do
+ mixed
+ queuedCancel
+ sleepCancel
+ completedCancel
+ waitingCancel
+ captureErrors
+ nested
+ ordered
+ invalid
+ deadlines
+ scopeCancel
+ jobsOne
+ escaped

@@ -1,0 +1,43 @@
+-- Executable storage probe confined to ST. This does not implement IO cells.
+data CellState a = Pending | Resolved a
+data Completion s a = Completion (STArray s (CellState a))
+data Results = Results Int String Int Bool Bool
+
+newCompletion : forall s a. ST s (Completion s a)
+newCompletion = stBind (newSTArray 1 Pending) (\array -> stReturn (Completion array))
+
+resolve : forall s a. Completion s a -> a -> ST s Bool
+resolve (Completion array) value = stBind (readSTArray array 0) (\state ->
+  case state of
+    Pending -> stBind (writeSTArray array 0 (Resolved value)) (\_ -> stReturn true)
+    Resolved _ -> stReturn false)
+
+observe : forall s a. Completion s a -> ST s (CellState a)
+observe (Completion array) = readSTArray array 0
+
+probe : forall s. ST s Results
+probe = do
+  let allocation = newCompletion
+  intCell <- allocation
+  stringCell <- allocation
+  accepted <- resolve intCell 41
+  duplicate <- resolve intCell 99
+  resolve stringCell "ready"
+  first <- observe intCell
+  text <- observe stringCell
+  repeated <- observe intCell
+  case first of
+    Pending -> panic "missing integer"
+    Resolved n -> case text of
+      Pending -> panic "missing string"
+      Resolved s -> case repeated of
+        Pending -> panic "lost result"
+        Resolved m -> stReturn (Results n s m accepted duplicate)
+
+main = case runST probe of
+  Results n s m accepted duplicate -> do
+    printInt n
+    putStrLn s
+    printInt m
+    printInt (if accepted then 1 else 0)
+    printInt (if duplicate then 1 else 0)

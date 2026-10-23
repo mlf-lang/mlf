@@ -1,0 +1,3 @@
+module Main where
+import qualified Async.Task.Internal as T
+main = T.Task

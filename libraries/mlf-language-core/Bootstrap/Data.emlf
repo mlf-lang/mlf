@@ -24,7 +24,7 @@ constructorName (ConstructorDecl n _) = n
 constructorFields (ConstructorDecl _ fs) = fs
 
 primitiveKinds : Map String Kind
-primitiveKinds = M.fromList compareString (Cons (Pair "ST" (KArrow Star (KArrow Star Star))) (Cons (Pair "STArray" (KArrow Star (KArrow Star Star))) (Cons (Pair "Int" Star) (Cons (Pair "Double" Star) (Cons (Pair "Bool" Star) (Cons (Pair "String" Star) (Cons (Pair "Unit" Star) (Cons (Pair "IntArray" Star) (Cons (Pair "DoubleArray" Star) (Cons (Pair "ByteArray" Star) (Cons (Pair "IntTable" Star) (Cons (Pair "IO" (KArrow Star Star)) Nil))))))))))))
+primitiveKinds = M.fromList compareString (Cons (Pair "AsyncScope" Star) (Cons (Pair "Completion" (KArrow Star Star)) (Cons (Pair "AsyncSubscription" Star) (Cons (Pair "ST" (KArrow Star (KArrow Star Star))) (Cons (Pair "STArray" (KArrow Star (KArrow Star Star))) (Cons (Pair "Int" Star) (Cons (Pair "Double" Star) (Cons (Pair "Bool" Star) (Cons (Pair "String" Star) (Cons (Pair "Unit" Star) (Cons (Pair "IntArray" Star) (Cons (Pair "DoubleArray" Star) (Cons (Pair "ByteArray" Star) (Cons (Pair "IntTable" Star) (Cons (Pair "IO" (KArrow Star Star)) Nil)))))))))))))))
 
 unitDeclaration = DataDecl "Unit" Nil (Cons (ConstructorDecl "Unit" Nil) Nil)
 
