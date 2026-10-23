@@ -1,0 +1,6 @@
+module CoreSolverMain where
+import Bootstrap.Types
+import qualified Tests.CoreSolver as T
+import qualified Tests.CoreRunner as R
+main : IO Unit
+main = R.main "core-solver" false 33 T.families

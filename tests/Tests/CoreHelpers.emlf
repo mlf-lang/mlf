@@ -1,0 +1,50 @@
+module Tests.CoreHelpers where
+import Bootstrap.Types
+import Bootstrap.Compiler
+import Bootstrap.Parser
+import Bootstrap.X.Pretty
+import qualified Bootstrap.Std as S
+import qualified Tests.Helpers as H
+import qualified Bootstrap.X.Check as C
+import qualified Bootstrap.X.Syntax as X
+import qualified Bootstrap.X.Type as T
+import qualified Bootstrap.X.Parser as XP
+
+v : Int -> XType
+v = (S.compose XVar XTyVar)
+
+allT : Int -> XType -> XType -> XType
+allT = (S.compose XForall XTyVar)
+
+int : XType
+int = (XCon "Int" Nil)
+
+bool : XType
+bool = (XCon "Bool" Nil)
+
+identity : XType
+identity = (allT 0 XBot (XArrow (v 0) (v 0)))
+
+chooseId : XType
+chooseId = (allT 1 identity (XArrow (v 1) (v 1)))
+
+choosePrefix : String
+choosePrefix = "let choose = ((\\x y -> x) : forall a. a -> a -> a) in let id = \\x -> x in "
+
+sameType : XType -> XType -> IO Unit
+sameType actual expected = (H.assert (T.alphaEq actual expected) (H.append "expected " (H.append (prettyType expected) (H.append ", got " (prettyType actual)))))
+
+compileOK : String -> IO Compilation
+compileOK source = do { result <- (H.right (compile "<test>" source)); do { parsed <- (H.right (XP.parseTerm "<generated xMLF>" (prettyTerm (compiledTerm result)))); do { (H.assert (H.eq (X.erase parsed) (X.erase (compiledTerm result))) "printed output changed erasure"); do { ty <- (H.right (C.checkClosed parsed)); do { (sameType ty (inferredType result)); (return result) } } } } }
+
+hasType : String -> String -> XType -> Pair String (IO Unit)
+hasType label source ty = (Pair label (bind (compileOK source) (\r -> (sameType (inferredType r) ty))))
+
+accepts : String -> String -> Pair String (IO Unit)
+accepts label source = (Pair label (bind (compileOK source) (\ignored -> (return Unit))))
+
+rejects : String -> String -> Pair String (IO Unit)
+rejects label source = (Pair label (case (compile "<test>" source) of { (Left (CompileError Inference _)) -> (return Unit); (Left err) -> (H.fail (H.append "error at the wrong phase: " (H.show err))); (Right r) -> (H.fail (H.append "unexpected type: " (prettyType (inferredType r)))) }))
+
+stripComputations : XTerm -> XTerm
+stripComputations t = (case t of { (XTypeApp a _) -> (stripComputations a); (XAbs n ty b) -> (XAbs n ty (stripComputations b)); (XApp a b) -> (XApp (stripComputations a) (stripComputations b)); (XTypeAbs a ty b) -> (XTypeAbs a ty (stripComputations b)); (XLet n a b) -> (XLet n (stripComputations a) (stripComputations b)); (XLetRec ds b) -> (XLetRec (S.concatMap (\(Triple n ty a) -> (Cons (Triple n ty (stripComputations a)) Nil)) ds) (stripComputations b)); (XWithData ds b) -> (XWithData ds (stripComputations b)); (XCase a ty bs) -> (XCase (stripComputations a) ty (S.concatMap (\comprehension2 -> case comprehension2 of { (XAlternative p b) -> (Cons (XAlternative p (stripComputations b)) Nil); _ -> Nil }) bs)); _ -> t })
