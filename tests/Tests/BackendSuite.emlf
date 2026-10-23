@@ -31,7 +31,7 @@ main = do
  B.withBackends (\backends -> do
   let allCases = suite backends
   let labels = S.map S.fst allCases
-  H.assert (S.length allCases == 523) "preserved backend fixture coverage changed"
+  H.assert (S.length allCases == 531) "preserved backend fixture coverage changed"
   H.assert (S.length labels == S.length (S.nubBy eqString labels)) "duplicate backend fixture labels"
   cases <- case args of
    Nil -> return allCases

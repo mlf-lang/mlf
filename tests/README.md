@@ -32,8 +32,13 @@ target; its existing Core entry still runs the same sorted-list oracle and all
 276 distinct inputs. `test-framework` checks failure continuation, selection,
 inventory validation, JSON diagnostics and legacy adapters. The root `unit`
 group runs both the library and CLI contract checks in addition to the current
-684 Core checks. The separately reviewed duplicate consolidation below accounts
-for the reduction from the original 686 checks.
+737 Core checks. The separately reviewed duplicate consolidation below accounts
+for the reduction from the original 686 to 684 checks; the guards amendment adds
+53 checks and eight interpreter/LLVM runtime rows. These cover first-match
+selection, skipped guards and results, contextual `otherwise`, pattern scope,
+required fallbacks, existing conditional/layout compatibility, diagnostics, and
+independently checked target round trips. The inventory additions are transcribed
+from the authored assertions in `Tests.Guards`, without changing existing oracles.
 
 The shared test library contains eleven modules: the eight original helper,
 transport, collection-wrapper and independent-checker modules, `Tests.Coverage`,
@@ -92,9 +97,9 @@ wrapper chooses 4 for port on hosts with at most 8 GiB RAM, while preserving the
 
 | Root group | MLF entry | Preserved coverage |
 | --- | --- | --- |
-| unit | CoreMain, Figure12SuiteMain, HarnessMain, TestFrameworkMain, RegexMain | framework API/CLI contracts; 684 compiler checks; 6712 Algorithm W cases represented by 6703 executions; annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks; all 43 Figure 12 labels with 41 distinct executions and 36 controls; 67 benchmark/bootstrap/release/cache harness methods including two cache regressions; 56 regex actions |
+| unit | CoreMain, Figure12SuiteMain, HarnessMain, TestFrameworkMain, RegexMain | framework API/CLI contracts; 737 compiler checks; 6712 Algorithm W cases represented by 6703 executions; annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks; all 43 Figure 12 labels with 41 distinct executions and 36 controls; 67 benchmark/bootstrap/release/cache harness methods including two cache regressions; 56 regex actions |
 | packages | PackagesMain | 79 completed cases: 22 resolver checks; 29 compiler integration cases, including native PGO isolation, shared cache survival, corruption recovery and source invalidation; 28 checked-release cases covering source-free builds, relocation, shared dependencies, compatibility, pins, damaged artifacts, GitHub fetching, offline cache repair and packed asset validation; target dependency/instance selection; scheduler diamond and variant deduplication, jobs 1/2/4 equivalence, concurrent cache publication, failure recovery, empty graphs and target-name collisions; 22 native runner lifecycle and protocol checks |
-| backends | BackendSuiteMain | 523 fixtures and 575 execution rows on interpreter and LLVM, compact-GC layout |
+| backends | BackendSuiteMain | 531 fixtures and 583 execution rows on interpreter and LLVM, compact-GC layout |
 | port | PortMain, ReferencesMain | 25 LLVM fixtures with compact-GC, six reference programs, generated inference input equality |
 | parity | CorpusMain, CheckTarget | All 7086 prescribed acceptance/type/rejection cases, 7075 distinct source compilations, and 80 runtime rows on both backends |
 | self-host | Tests.CompilerTests | Fresh next-stage compiler build and LLVM/native binary fixed point |

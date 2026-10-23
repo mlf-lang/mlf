@@ -61,6 +61,7 @@
         "Tests.ComponentProjection": "Tests/ComponentProjection.emlf",
         "Tests.Computations": "Tests/Computations.emlf",
         "Tests.Core": "Tests/Core.emlf",
+        "Tests.Guards": "Tests/Guards.emlf",
         "Tests.CrateCodegen": "Tests/CrateCodegen.emlf",
         "Tests.CrateQueries": "Tests/CrateQueries.emlf",
         "Tests.Datatypes": "Tests/Datatypes.emlf",
@@ -109,6 +110,7 @@
         "Tests.IOTests": "Tests/IOTests.emlf",
         "Tests.NativeOptimization": "Tests/NativeOptimization.emlf",
         "Tests.BackendCases": "Tests/BackendCases.emlf",
+        "Tests.Guards": "Tests/Guards.emlf",
         "Tests.Readability": "Tests/Readability.emlf",
         "Tests.System": "Tests/System.emlf",
         "Tests.StateCases": "Tests/StateCases.emlf",
@@ -121,6 +123,7 @@
       "profile": "compiler",
       "modules": {
         "Tests.BackendCases": "Tests/BackendCases.emlf",
+        "Tests.Guards": "Tests/Guards.emlf",
         "Tests.BackendSuite": "Tests/BackendSuite.emlf",
         "Tests.BoolConditions": "Tests/BoolConditions.emlf",
         "Tests.BootstrapPrimitives": "Tests/BootstrapPrimitives.emlf",

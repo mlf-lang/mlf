@@ -1,0 +1,221 @@
+module Tests.Guards where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Tests.Helpers as H
+import Bootstrap.Compiler
+import Bootstrap.Parser (parseExpr, parseProgram)
+import qualified Bootstrap.X.Check as C
+import qualified Bootstrap.X.Parser as XP
+import Bootstrap.X.Pretty (prettyTerm)
+import qualified Bootstrap.X.Syntax as X
+import qualified Bootstrap.X.Type as T
+
+sameExpr : String -> String -> String -> Pair String (IO Unit)
+sameExpr label guarded ordinary = Pair ("guards parser: " ++ label) (do
+  actual <- H.right (parseExpr "<guards expression>" guarded)
+  expected <- H.right (parseExpr "<ordinary conditional>" ordinary)
+  H.assert (H.eq actual expected) ("guard lowering changed AST: " ++ H.show actual))
+
+sameProgram : String -> String -> String -> Pair String (IO Unit)
+sameProgram label guarded ordinary = Pair ("guards program: " ++ label) (do
+  actual <- H.right (parseProgram "<guards program>" guarded)
+  expected <- H.right (parseProgram "<ordinary program>" ordinary)
+  H.assert (H.eq actual expected) ("guard lowering changed program: " ++ H.show actual))
+
+hasType : String -> String -> XType -> Pair String (IO Unit)
+hasType label source expected = Pair ("guards checking: " ++ label) (do
+  result <- H.right (compile "<guards test>" source)
+  term <- H.right (XP.parseTerm "<guards xMLF>" (prettyTerm (compiledTerm result)))
+  actual <- H.right (C.checkClosed term)
+  H.assert (T.alphaEq actual expected && T.alphaEq actual (inferredType result)) ("wrong type: " ++ sourceType result)
+  H.assert (H.eq (X.erase term) (X.erase (compiledTerm result))) "xMLF round trip changed erasure")
+
+rejects : String -> String -> Phase -> String -> Pair String (IO Unit)
+rejects label source expectedPhase reason = Pair ("guards rejection: " ++ label) (case compile "<invalid guards>" source of
+  Left err -> H.assert (H.eq (phase err) expectedPhase && H.contains reason (diagnostic err)) ("wrong rejection: " ++ H.show err)
+  Right result -> H.fail ("unexpected acceptance: " ++ sourceType result))
+
+int : XType
+int = XCon "Int" Nil
+
+bool : XType
+bool = XCon "Bool" Nil
+
+ioUnit : XType
+ioUnit = XCon "IO" (Cons (XCon "Unit" Nil) Nil)
+
+guardTests : List (Pair String (IO Unit))
+guardTests = S.append parserTests (S.append checkingTests (S.append rejectionTests
+  (S.map (\(Quad label source _ _) -> hasType label source ioUnit) guardPrograms)))
+
+parserTests : List (Pair String (IO Unit))
+parserTests = Cons
+  (sameExpr "ordered expression arms" "if { | a -> x; | b -> y; | otherwise -> z }" "if a then x else if b then y else z") (Cons
+  (sameExpr "fallback-only expression" "if { | otherwise -> 42 }" "42") (Cons
+  (sameExpr "expression trailing separator" "if { | false -> 0; | otherwise -> 42; }" "if false then 0 else 42") (Cons
+  (sameExpr "nested expression arms" "if { | a -> if { | b -> x; | otherwise -> y }; | otherwise -> z }" "if a then if b then x else y else z") (Cons
+  (sameExpr "ordinary if inside guarded branches" "if { | a -> if b then x else y; | otherwise -> if c then z else w }" "if a then if b then x else y else if c then z else w") (Cons
+  (sameExpr "arithmetic and Boolean precedence" "1 + if { | a || b && c -> 2 * x; | otherwise -> y + 3 }" "1 + if a || b && c then 2 * x else y + 3") (Cons
+  (sameExpr "otherwise call remains a condition" "if { | otherwise x -> 42; | otherwise -> 0 }" "if otherwise x then 42 else 0") (Cons
+  (sameExpr "qualified otherwise remains a condition" "if { | M.otherwise x -> 42; | otherwise -> 0 }" "if M.otherwise x then 42 else 0") (Cons
+  (sameExpr "parenthesized otherwise remains a condition" "if { | (otherwise) -> 42; | otherwise -> 0 }" "if otherwise then 42 else 0") (Cons
+  (sameProgram "function guard layout" "choose x\n  | x < 0 = 0\n  | x == 0 = 1\n  | otherwise = x\nmain = choose 42\n" "choose x = if x < 0 then 0 else if x == 0 then 1 else x; main = choose 42;") (Cons
+  (sameProgram "function guard nested block layout" "choose x\n  | x > 0 = case x of\n      n -> n\n  | otherwise = 0\nmain = choose 42\n" "choose x = if x > 0 then case x of { n -> n } else 0; main = choose 42;") (Cons
+  (sameProgram "expression guard inside ordinary then-do layout" "main = if true then do\n  if { | true -> printInt 42; | otherwise -> printInt 0 }\nelse printInt 1\n" "main = if true then do { if true then printInt 42 else printInt 0 } else printInt 1;") (Cons
+  (sameProgram "ordinary if identifier compatibility" "otherwise = false; otherwiseValue = true; main = if otherwise then 0 else if otherwiseValue then 42 else 1;" "otherwise = false; otherwiseValue = true; main = if otherwise then 0 else if otherwiseValue then 42 else 1;") (Cons
+  (Pair "guards parser: diagnostics keep original line and column" (case parseExpr "guards-position.emlf" "if {\n  | true -> 1;\n  | otherwise -> )\n}" of
+    Left err -> H.assert (H.contains "guards-position.emlf:3:18:" err) err
+    Right parsed -> H.fail (H.show parsed)))
+  Nil)))))))))))))
+
+checkingTests : List (Pair String (IO Unit))
+checkingTests = Cons
+  (hasType "guarded values generalize" "pick | true = (\\x -> x) | otherwise = (\\x -> x); n = pick 1; main = pick true;" bool) (Cons
+  (hasType "separate whole-function signature" "choose : Int -> Int; choose x | x > 0 = x | otherwise = 0; main = choose 42;" int) (Cons
+  (hasType "inline whole-function signature" "choose x : Int -> Int | x > 0 = x | otherwise = 0; main = choose 42;" int) (Cons
+  (hasType "annotated parameter" "apply (f : forall a. a -> a) | true = f 42 | otherwise = f 0; main = apply (\\x -> x);" int) (Cons
+  (hasType "local guard sees outer binding" "let offset = 2 in let choose x | x > 0 = x + offset | otherwise = offset in choose 40" int) (Cons
+  (hasType "pattern binders scope over guards and results" "data Maybe a = Nothing | Just a; choose (Just n) | n > 0 = n | otherwise = 0; choose Nothing = -1; main = choose (Just 42);" int) (Cons
+  (hasType "guard condition can contain an expression guard" "if { | if { | false -> false; | otherwise -> true } -> 42; | otherwise -> 0 }" int) (Cons
+  (hasType "unselected branches preserve polymorphism" "id x = x; main = (if { | false -> id; | otherwise -> id }) 42;" int) (Cons
+  (Pair "guards checking: no implicit prelude required" (do
+    result <- H.right (compileWithPrelude NoImplicitPrelude "<guards without prelude>" "choose x | x > 0 = x | otherwise = 0; main = if { | true -> choose 42; | otherwise -> 0 };")
+    H.assert (T.alphaEq (inferredType result) int) (sourceType result)))
+  Nil))))))))
+
+rejectionTests : List (Pair String (IO Unit))
+rejectionTests = Cons
+  (rejects "expression condition requires Bool" "if { | 1 -> 42; | otherwise -> 0 }" Inference "type constructor mismatch") (Cons
+  (rejects "function condition requires Bool" "choose x | x = 42 | otherwise = 0; main = choose 1;" Inference "type constructor mismatch") (Cons
+  (rejects "all result types agree" "if { | true -> 42; | otherwise -> false }" Inference "type constructor mismatch") (Cons
+  (rejects "unselected condition is checked" "if { | true -> 42; | 1 -> 0; | otherwise -> 0 }" Inference "type constructor mismatch") (Cons
+  (rejects "pattern coverage remains exhaustive" "data Maybe a = Nothing | Just a; choose (Just n) | n > 0 = n | otherwise = 0; main = choose (Just 42);" Inference "non-exhaustive") (Cons
+  (rejects "total guards do not fall through to another equation" "choose x | x > 0 = 1 | otherwise = 2; choose y = 3; main = choose 0;" Inference "unreachable") (Cons
+  (rejects "pattern binder does not enter sibling equation" "data Maybe a = Nothing | Just a; choose (Just n) | n > 0 = n | otherwise = 0; choose Nothing | n > 0 = 1 | otherwise = 2; main = choose Nothing;" Inference "unbound variable: n") (Cons
+  (rejects "pattern binder does not escape function" "data Box = Box Int; choose (Box n) | n > 0 = n | otherwise = 0; main = n;" Inference "unbound variable: n") (Cons
+  (rejects "branch binding does not enter sibling guard" "if { | false -> let n = 1 in n; | n > 0 -> 2; | otherwise -> 0 }" Inference "unbound variable: n") (Cons
+  (rejects "expression fallback required" "if { | true -> 42 }" Parsing "guard block requires a final otherwise branch") (Cons
+  (rejects "function fallback required" "choose x | x > 0 = x; main = choose 42;" Parsing "guard block requires a final otherwise branch") (Cons
+  (rejects "expression fallback must be last" "if { | otherwise -> 42; | true -> 0 }" Parsing "otherwise must be the final guard branch") (Cons
+  (rejects "function fallback must be last" "choose x | otherwise = 42 | x > 0 = 0; main = choose 1;" Parsing "otherwise must be the final guard branch") (Cons
+  (rejects "duplicate expression fallback" "if { | false -> 0; | otherwise -> 42; | otherwise -> 1 }" Parsing "otherwise must be the final guard branch") (Cons
+  (rejects "duplicate function fallback" "choose x | false = 0 | otherwise = 42 | otherwise = 1; main = choose 1;" Parsing "otherwise must be the final guard branch") (Cons
+  (rejects "empty expression block" "if {}" Parsing "guard block requires a final otherwise branch") (Cons
+  (rejects "expression arm requires arrow" "if { | true = 42; | otherwise -> 0 }" Parsing "-> after guard condition") (Cons
+  (rejects "function arm requires equals" "choose x | true -> 42 | otherwise = 0; main = choose 1;" Parsing "= after guard condition") (Cons
+  (rejects "expression arm requires result" "if { | true -> ; | otherwise -> 0 }" Parsing "") (Cons
+  (rejects "comma guards are not accepted" "if { | true, false -> 42; | otherwise -> 0 }" Parsing "") (Cons
+  (rejects "pattern guards are not accepted" "data Maybe a = Nothing | Just a; main = if { | Just n <- Just 42 -> n; | otherwise -> 0 };" Parsing "") (Cons
+  (rejects "expression guard block needs braces" "if | true -> 42 | otherwise -> 0" Parsing "")
+  Nil)))))))))))))))))))))
+
+guardPrograms : List (Quad String String (List String) String)
+guardPrograms = Cons
+  (Quad "guards runtime: first match and short circuit" (S.unlines (Cons
+    "spinInt : Int" (Cons
+    "spinInt = spinInt" (Cons
+    "spinBool : Bool" (Cons
+    "spinBool = spinBool" (Cons
+    "choose n | n >= 0 = 10 | n > 10 = 20 | otherwise = 30" (Cons
+    "main = do" (Cons
+    "  printInt (choose 20)" (Cons
+    "  printInt (choose (-1))" (Cons
+    "  printInt (if { | true -> 42; | spinBool -> 0; | otherwise -> 1 })" (Cons
+    "  printInt (if { | false && spinBool -> 0; | true || spinBool -> 7; | otherwise -> spinInt })" (Cons
+    "  printInt (if { | false -> spinInt; | otherwise -> 9 })"
+    Nil)))))))))))) Nil "10\n30\n42\n7\n9\n") (Cons
+  (Quad "guards runtime: only selected IO executes" (S.unlines (Cons
+    "choose flag" (Cons
+    "  | flag = do" (Cons
+    "      putStrLn \"selected\"" (Cons
+    "      printInt 42" (Cons
+    "  | otherwise = do" (Cons
+    "      putStrLn \"fallback\"" (Cons
+    "      printInt 7" (Cons
+    "main = do" (Cons
+    "  choose true" (Cons
+    "  if { | false -> putStrLn \"wrong\"; | true -> putStrLn \"yes\"; | otherwise -> putStrLn \"wrong fallback\" }" (Cons
+    "  choose false"
+    Nil)))))))))))) Nil "selected\n42\nyes\nfallback\n7\n") (Cons
+  (Quad "guards runtime: local and recursive bindings" (S.unlines (Cons
+    "fact : Int -> Int" (Cons
+    "fact n | n == 0 = 1 | otherwise = n * fact (n - 1)" (Cons
+    "main = do" (Cons
+    "  let offset = 1" (Cons
+    "  let choose x | x > 0 = x + offset | otherwise = offset" (Cons
+    "  printInt (choose 41)" (Cons
+    "  let rec" (Cons
+    "    sum : Int -> Int" (Cons
+    "    sum n" (Cons
+    "      | n == 0 = 0" (Cons
+    "      | otherwise = n + sum (n - 1)" (Cons
+    "  printInt (sum 4)" (Cons
+    "  printInt (fact 5)" (Cons
+    "  printInt (let clip x | x > 10 = 10 | otherwise = x in clip 12)"
+    Nil))))))))))))))) Nil "42\n10\n120\n10\n") (Cons
+  (Quad "guards runtime: patterns and instance methods" (S.unlines (Cons
+    "data Maybe a = Nothing | Just a" (Cons
+    "class Classify a where" (Cons
+    "  classify : a -> Int" (Cons
+    "instance Classify (Maybe Int) where" (Cons
+    "  classify (Just n)" (Cons
+    "    | n > 0 = n" (Cons
+    "    | otherwise = 0" (Cons
+    "  classify Nothing = -1" (Cons
+    "main = do" (Cons
+    "  printInt (classify (Just 42))" (Cons
+    "  printInt (classify (Just (-1)))" (Cons
+    "  printInt (classify (Nothing : Maybe Int))"
+    Nil))))))))))))) Nil "42\n0\n-1\n") (Cons
+  (Quad "guards runtime: nested ordinary and guarded conditionals" (S.unlines (Cons
+    "main = do" (Cons
+    "  if true then do" (Cons
+    "    if { | false -> printInt 0; | otherwise -> printInt 42 }" (Cons
+    "  else printInt 1" (Cons
+    "  if (if { | false -> false; | otherwise -> true }) then printInt 7 else printInt 0" (Cons
+    "  printInt (if { | true -> if false then 0 else 8; | otherwise -> 0 })" (Cons
+    "  printInt (if { | false -> 0; | otherwise -> if { | false -> 1; | otherwise -> 9 } })" (Cons
+    "  if if { | false -> false; | otherwise -> true } then do" (Cons
+    "    printInt 10" (Cons
+    "  else printInt 0" (Cons
+    "  if false then printInt 0 else do" (Cons
+    "    if { | false -> printInt 0; | otherwise -> printInt 11 }" (Cons
+    "    printInt 12" (Cons
+    "  printInt 13"
+    Nil))))))))))))))) Nil "42\n7\n8\n9\n10\n11\n12\n13\n") (Cons
+  (Quad "guards runtime: case bodies and lazy wildcard" (S.unlines (Cons
+    "data Box = Box Int" (Cons
+    "spin : Box" (Cons
+    "spin = spin" (Cons
+    "choose _ flag | flag = 42 | otherwise = 0" (Cons
+    "read box" (Cons
+    "  | true = case box of" (Cons
+    "      Box n -> n" (Cons
+    "  | otherwise = 0" (Cons
+    "main = do" (Cons
+    "  printInt (choose spin true)" (Cons
+    "  printInt (read (Box 7))"
+    Nil)))))))))))) Nil "42\n7\n") (Cons
+  (Quad "guards runtime: contextual otherwise compatibility" (S.unlines (Cons
+    "otherwise x = x > 0" (Cons
+    "otherwiseValue = true" (Cons
+    "choose x | otherwise x = 42 | otherwise = 0" (Cons
+    "chooseFlag otherwise | (otherwise) = 1 | otherwise = 2" (Cons
+    "main = do" (Cons
+    "  printInt (choose 1)" (Cons
+    "  printInt (choose 0)" (Cons
+    "  printInt (if otherwiseValue then 7 else 8)" (Cons
+    "  printInt (let otherwise = false in if otherwise then 0 else 9)" (Cons
+    "  printInt (chooseFlag false)"
+    Nil))))))))))) Nil "42\n0\n7\n9\n2\n") (Cons
+  (Quad "guards runtime: dynamic selection and primitive hygiene" (S.unlines (Cons
+    "ifThenElse condition yes no = no" (Cons
+    "choose n | n < 0 = 0 | n == 20 = 42 | 1 / 0 == 0 = 1 | otherwise = 2" (Cons
+    "main = do" (Cons
+    "  line <- getLine" (Cons
+    "  let n = readInt line" (Cons
+    "  printInt (choose n)" (Cons
+    "  if { | n < 0 -> do { ignored <- getLine; putStrLn ignored }; | n == 20 -> putStrLn \"selected\"; | 1 / 0 == 0 -> putStrLn \"wrong\"; | otherwise -> do { ignored <- getLine; putStrLn ignored } }" (Cons
+    "  printInt (ifThenElse true 42 0)"
+    Nil))))))))) (Cons "20" Nil) "42\nselected\n0\n")
+  Nil)))))))

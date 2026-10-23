@@ -21,6 +21,7 @@ import Tests.Typeclasses (typeclassTests)
 import Tests.DoNotation (doTests)
 import Tests.SurfaceSyntax (surfaceSyntaxTests)
 import Tests.Readability (readabilityTests)
+import Tests.Guards (guardTests)
 import Tests.Modules (moduleTests)
 import Tests.Separate (separateTests)
 import qualified Tests.CrateCodegen as CrateCodegen
@@ -116,6 +117,7 @@ examplesTest = do { files <- (H.fmap (S.compose H.sort (S.filter (\section1 -> (
 stripComputations : XTerm -> XTerm
 stripComputations t = (case t of { (XTypeApp a _) -> (stripComputations a); (XAbs n ty b) -> (XAbs n ty (stripComputations b)); (XApp a b) -> (XApp (stripComputations a) (stripComputations b)); (XTypeAbs a ty b) -> (XTypeAbs a ty (stripComputations b)); (XLet n a b) -> (XLet n (stripComputations a) (stripComputations b)); (XLetRec ds b) -> (XLetRec (S.concatMap (\(Triple n ty a) -> (Cons (Triple n ty (stripComputations a)) Nil)) ds) (stripComputations b)); (XWithData ds b) -> (XWithData ds (stripComputations b)); (XCase a ty bs) -> (XCase (stripComputations a) ty (S.concatMap (\comprehension2 -> case comprehension2 of { (XAlternative p b) -> (Cons (XAlternative p (stripComputations b)) Nil); _ -> Nil }) bs)); _ -> t })
 suite : List (Pair String (IO Unit))
-suite = S.append OptimizerUses.suite (S.append CrateCodegen.suite (S.append crateQueryTests (S.append ComponentProjection.suite (S.append (S.append (S.append IntSetUnions.suite IndexEdges.suite) (S.append ProjectionRanks.suite ProjectionChanges.suite)) (S.append StrictWrappers.suite (S.append SolverIndexAudit.suite (S.append DenseNormalization.suite (S.append CheckedEmission.suite (S.append SolverAllocation.suite originalSuite)))))))))
+suite = S.append existingSuite guardTests
+existingSuite = S.append OptimizerUses.suite (S.append CrateCodegen.suite (S.append crateQueryTests (S.append ComponentProjection.suite (S.append (S.append (S.append IntSetUnions.suite IndexEdges.suite) (S.append ProjectionRanks.suite ProjectionChanges.suite)) (S.append StrictWrappers.suite (S.append SolverIndexAudit.suite (S.append DenseNormalization.suite (S.append CheckedEmission.suite (S.append SolverAllocation.suite originalSuite)))))))))
 
 originalSuite = S.concat (Cons compilerTests (Cons computationTests (Cons hygieneTests (Cons graphTests (Cons graphValidationTests (Cons graphUnificationTests (Cons graphSolverTests (Cons embeddingPruningTests (Cons datatypeTests (Cons typeclassTests (Cons doTests (Cons surfaceSyntaxTests (Cons readabilityTests (Cons moduleTests (Cons separateTests (Cons stateTypeTests (Cons (Cons (Pair "independent ML typability oracle" oracleTest) (Cons (Pair "annotation corpus" annotationCorpus) (Cons (Pair "example files" examplesTest) Nil))) Nil)))))))))))))))))
