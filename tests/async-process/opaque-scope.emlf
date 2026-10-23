@@ -1,0 +1,3 @@
+module Main where
+import Async.Process
+main = ProcessScope "1"

@@ -164,6 +164,19 @@ forcePrimitive value = case value of
   PFileDigest -> Unit
   PAcquireFileLock -> Unit
   PReleaseFileLock -> Unit
+  PProcessSupervisor -> Unit
+  PAsyncScopeNew -> Unit
+  PAsyncScopeClose -> Unit
+  PAsyncNewCompletion -> Unit
+  PAsyncResolveCompletion -> Unit
+  PAsyncReadCompletion -> Unit
+  PAsyncSubscribeCompletion -> Unit
+  PAsyncSubscriptionStatus -> Unit
+  PAsyncCancelSubscription -> Unit
+  PAsyncStep -> Unit
+  PAsyncEnqueue -> Unit
+  PAsyncDelay -> Unit
+  PAsyncWait -> Unit
 
 forceSType : SType -> Unit
 forceSType value = case value of

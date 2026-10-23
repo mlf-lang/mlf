@@ -1,0 +1,136 @@
+module Main where
+import Bootstrap.Types
+import qualified Async.Task.Internal as I
+import qualified Async.Process as P
+
+-- This fixture is compiled only against a test-owned export overlay. The
+-- production Internal module keeps all scheduler constructors private.
+self : I.Task Int
+self = I.Task (\context complete -> case context of
+  I.Context (I.Scope queue _ _ _ _ _ _ _) identity _ ->
+    asyncNewCompletion queue (\cell -> I.waitPending context identity cell complete)
+      (complete (I.Failed (P.AsyncError 999 "test allocation"))))
+
+mutual : I.Task Int
+mutual = I.Task (\context complete -> case context of
+  I.Context scope _ _ -> case scope of
+    I.Scope queue _ _ _ _ _ _ _ ->
+      asyncNewCompletion queue (\other ->
+        I.launch scope (I.Task (\child done -> asyncReadCompletion other
+          (\fiber -> I.start (I.await fiber) child done)
+          (done (I.Failed (P.AsyncError 999 "handshake not initialized")))))
+          (\first -> case first of
+            Left error -> complete (I.Failed error)
+            Right a -> I.launch scope (I.await a) (\second -> case second of
+              Left error -> complete (I.Failed error)
+              Right b -> do
+                asyncResolveCompletion other b
+                I.start (I.await a) context complete)))
+        (complete (I.Failed (P.AsyncError 999 "test allocation"))))
+
+check task label = do
+  outcome <- I.run I.defaultOptions task
+  case outcome of
+    I.Failed error -> if P.errorCode error == 109 then putStrLn label else do
+      putErr (P.errorMessage error ++ "\n")
+      exitWith 1
+    _ -> exitWith 1
+lateCleanup : I.Task Unit
+lateCleanup = I.Task (\context complete -> case context of
+  I.Context scope _ _ -> case scope of
+    I.Scope queue _ _ _ _ _ _ _ -> do
+      I.launch scope (I.Task (\_ done -> do
+        asyncEnqueue queue (done (I.Failed (P.CleanupFailed (P.AsyncError 610 "primary") (P.AsyncError 611 "late cleanup"))))
+        ioReturn Unit))
+        (\_ -> ioReturn Unit)
+      asyncEnqueue queue (complete (I.Failed (P.AsyncError 610 "primary")))
+      ioReturn Unit)
+
+lateParentCleanup : I.Task Unit
+lateParentCleanup = I.Task (\parent complete -> case parent of
+  I.Context (I.Scope queue _ _ _ _ _ _ _) _ stop -> do
+    I.start (I.withScope (I.Task (\context done -> case context of
+      I.Context scope _ _ -> do
+        I.launch scope (I.Task (\_ childDone -> do
+          asyncEnqueue queue (childDone (I.Failed (P.CleanupFailed (P.AsyncError 612 "child") (P.AsyncError 613 "parent-stop cleanup"))))
+          ioReturn Unit))
+          (\_ -> done (I.Succeeded Unit))))) parent complete
+    asyncEnqueue queue (do
+      asyncEnqueue queue (do
+        asyncResolveCompletion stop (I.CancelReason 614 "parent stop")
+        ioReturn Unit)
+      ioReturn Unit)
+    ioReturn Unit)
+
+nestedCleanup = do
+  result <- I.run I.defaultOptions (I.capture (I.withScope lateCleanup))
+  case result of
+    I.Succeeded (I.Failed (P.CleanupFailed primary cleanup)) ->
+      if P.errorCode primary == 610 && P.errorCode cleanup == 611 then ioReturn Unit else exitWith 1
+    _ -> exitWith 1
+  stopped <- I.run I.defaultOptions (I.capture lateParentCleanup)
+  case stopped of
+    I.Failed (P.CleanupFailed primary cleanup) ->
+      if P.errorCode primary == 122 && P.errorCode cleanup == 613 then ioReturn Unit else exitWith 1
+    _ -> exitWith 1
+  putStrLn "PASS nested-late-cleanup-after-primary-and-parent-stop"
+
+probeAncestor : IntArray -> I.Task Unit
+probeAncestor observed = I.Task (\context complete -> case context of
+  I.Context (I.Scope queue _ _ _ _ _ _ _) _ _ -> do
+    asyncEnqueue queue (do
+      stop <- I.stopped context
+      writeIntArray observed 0 (case stop of
+        Just (I.Cancelled (I.CancelReason code _)) -> if code == 715 then 1 else 2
+        _ -> 2)
+      complete (I.Succeeded Unit))
+    ioReturn Unit)
+
+ancestorStop = do
+  observed <- newIntArray 1 0
+  outcome <- I.run I.defaultOptions
+    (I.taskBind (I.spawn (I.withScope (probeAncestor observed))) (\fiber ->
+      I.taskBind I.yield (\_ -> I.taskBind I.yield (\_ ->
+      I.taskBind (I.cancel fiber (I.CancelReason 715 "ancestor")) (\_ -> I.awaitOutcome fiber)))))
+  value <- readIntArray observed 0
+  case outcome of
+    I.Succeeded (I.Cancelled (I.CancelReason code _)) ->
+      if value == 1 && code == 715 then ioReturn Unit else exitWith 1
+    _ -> exitWith 1
+  putStrLn "PASS synchronous-ancestor-stop-before-notification"
+
+rootCancellation = do
+  observed <- newIntArray 1 0
+  let sibling = I.Task (\context complete -> case context of
+        I.Context (I.Scope _ _ _ _ stop _ _ _) _ _ -> do
+          asyncSubscribeCompletion stop (\reason -> do
+            writeIntArray observed 0 1
+            complete (I.Cancelled reason))
+          ioReturn Unit)
+  outcome <- I.run I.defaultOptions (I.taskBind (I.spawn sibling) (\_ ->
+    I.taskBind I.yield (\_ -> I.Task (\_ complete -> complete (I.Cancelled (I.CancelReason 716 "root"))))))
+  joined <- readIntArray observed 0
+  case outcome of
+    I.Cancelled (I.CancelReason code _) -> if code == 716 && joined == 1 then ioReturn Unit else exitWith 1
+    _ -> exitWith 1
+  putStrLn "PASS cancelled-root-signals-and-joins-sibling"
+
+cleanupErrors = do
+  let failed = I.processStopped (I.Failed (P.AsyncError 600 "primary")) (P.Exited 0 5)
+  let cancelled = I.processStopped (I.Cancelled (I.CancelReason 601 "stop")) (P.Cancelled 601 6)
+  case failed of
+    I.Failed (P.CleanupFailed primary cleanup) ->
+      if P.errorCode primary == 600 && P.errorCode cleanup == 5 then ioReturn Unit else exitWith 1
+    _ -> exitWith 1
+  case cancelled of
+    I.Failed (P.CleanupFailed primary cleanup) ->
+      if P.errorCode primary == 122 && P.errorCode cleanup == 6 then ioReturn Unit else exitWith 1
+    _ -> exitWith 1
+  putStrLn "PASS primary-and-cleanup-errors-retained"
+main = do
+  check self "PASS self-await-rejected"
+  check mutual "PASS mutual-wait-cycle-rejected"
+  cleanupErrors
+  nestedCleanup
+  ancestorStop
+  rootCancellation

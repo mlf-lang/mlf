@@ -1,0 +1,2 @@
+data Completion a = Forged a
+main = Forged 42

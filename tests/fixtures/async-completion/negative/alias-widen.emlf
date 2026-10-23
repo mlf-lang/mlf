@@ -1,0 +1,6 @@
+main = do
+  scope <- asyncScopeNew 1 2
+  asyncNewCompletion scope (\cell -> do {
+    let alias = cell;
+    asyncResolveCompletion alias 42;
+    asyncReadCompletion cell putStrLn (ioReturn Unit) }) (ioReturn Unit)
