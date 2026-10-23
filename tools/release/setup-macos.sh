@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Install the same bottle closure in every hosted macOS qualification job.
 set -euo pipefail
+trap 'printf "Pinned macOS setup failed at line %s (status %s).\n" "$LINENO" "$?" >&2' ERR
 cd -- "$(dirname -- "$0")/../.."
 # This changes the runner's core tap and reinstalls its native dependencies.
 # Keep it restricted to disposable GitHub-hosted runners, never developer Macs.
@@ -19,15 +20,20 @@ for name in HOMEBREW_NO_AUTO_UPDATE HOMEBREW_NO_INSTALL_FROM_API HOMEBREW_NO_INS
   printf '%s=1\n' "$name" >> "${GITHUB_ENV:?}"
 done
 prefix=$(brew --prefix)
-test "$prefix" = /opt/homebrew
+test "$prefix" = /opt/homebrew || { printf 'Unexpected Homebrew prefix: %s\n' "$prefix" >&2; exit 1; }
 core=$(brew --repository)/Library/Taps/homebrew/homebrew-core
-if [ ! -d "$core/.git" ]; then
-  test ! -e "$core"
-  mkdir -p "$(dirname "$core")"
+printf 'Preparing pinned Homebrew core at %s.\n' "$core"
+if [ ! -e "$core/.git" ]; then
+  mkdir -p "$core"
+  test -z "$(find "$core" -mindepth 1 -maxdepth 1 -print -quit)" || {
+    echo 'Existing Homebrew core directory is not an empty tap or Git checkout.' >&2; exit 1;
+  }
   git init -q "$core"
   git -C "$core" remote add origin https://github.com/Homebrew/homebrew-core.git
 fi
-test -z "$(git -C "$core" status --porcelain)"
+test -z "$(git -C "$core" status --porcelain)" || {
+  echo 'Existing Homebrew core checkout has uncommitted changes.' >&2; exit 1;
+}
 case "$(git -C "$core" remote get-url origin)" in
   https://github.com/Homebrew/homebrew-core|https://github.com/Homebrew/homebrew-core.git) ;;
   *) echo 'Unexpected Homebrew core remote.' >&2; exit 1 ;;
