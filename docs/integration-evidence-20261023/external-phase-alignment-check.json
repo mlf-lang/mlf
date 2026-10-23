@@ -1,0 +1,22 @@
+{
+  "kind": "static_document_phase_alignment_only",
+  "code_commit": "8a3e69b165765931c3ff762379a78db9659b2cd8",
+  "external_entrypoints": 202,
+  "json_tsv_equal": true,
+  "docs_evidence_copies_equal": true,
+  "full_inventory_matching_rows": {
+    "entrypoints": 113,
+    "assets": 202,
+    "unresolved_entries": 104
+  },
+  "phase_mismatches": [],
+  "phase_counts": {
+    "P6": 38,
+    "P3": 22,
+    "P5": 14,
+    "P4": 28,
+    "P0": 87,
+    "P2": 13
+  },
+  "tests_run": false
+}
