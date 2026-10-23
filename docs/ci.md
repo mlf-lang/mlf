@@ -223,8 +223,11 @@ PR smoke import closure and script were byte-identical to main. Both seeds
 accumulated over seven minutes of CPU time; the retained host logs show heavy
 memory compression without swap. The command budget was raised to 900 seconds
 for a controlled complete startup measurement, with a twenty-minute job limit
-for setup and evidence upload. A completed hosted run is still needed before
-claiming a normal duration under this budget.
+for setup and evidence upload. The subsequent [hosted run 39884741365](https://github.com/mlf-lang/mlf/actions/runs/39884741365)
+completed all five cases in 454 seconds on PR #10's pre-integration tree. This
+single run finished within the previous 480-second budget; the larger bound is
+headroom for startup variability, not a measured speedup or an integrated-tree
+qualification result.
 
 In CI run [39798088020](https://github.com/mlf-lang/mlf/actions/runs/39798088020),
 the fresh-native smoke command completed in **16m49s** (1,009 seconds): checkout

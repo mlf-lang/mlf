@@ -402,30 +402,54 @@ port c = do
 preparePort : TestContext -> String -> IO Unit
 preparePort c binary = preparePortNames c binary Nothing
 preparePortNames : TestContext -> String -> Maybe (List String) -> IO Unit
-preparePortNames c binary selected = do
+preparePortNames c binary selected = preparePortSelection c binary selected "all"
+preparePortShard : TestContext -> String -> String -> IO Unit
+preparePortShard c binary shard = preparePortSelection c binary Nothing shard
+preparePortSelection : TestContext -> String -> Maybe (List String) -> String -> IO Unit
+preparePortSelection c binary selected shard = do
  builder <- testBuilder c "port-preparation"
+ originalCollection <- getEnv "GC_FREE_SPACE_DIVISOR"
+ requestedCollection <- getEnv "MLF_TEST_MATRIX_GC_DIVISOR"
+ memoryCollection <- case V.matrixCollectionDivisor requestedCollection of
+  Left message -> O.fatal message
+  Right value -> ioReturn value
+ let baselineCollection = if eqString originalCollection "" then "1" else originalCollection
  let listing = output c ++ "/port-fixtures.txt"
  capture c (Cons binary (Cons "--list" Nil)) listing
  listingText <- readFile listing
  let available = O.words listingText
  O.require (S.length available == 25 && S.length (S.nubBy eqString available) == 25) "port fixture preparation coverage changed"
- let names = case selected of { Nothing -> available; Just chosen -> chosen }
+ O.require (S.elem eqString shard (O.words "all StateTypes SolverReuse InferenceConformance other")) "unknown port preparation shard"
+ let heavy = O.words "StateTypes SolverReuse InferenceConformance"
+ let names = if eqString shard "all" then case selected of { Nothing -> available; Just chosen -> chosen }
+  else S.filter (\name -> if eqString shard "other" then S.not (S.elem eqString name heavy) else eqString name shard) available
  O.require (S.not (S.null names) && Catalog.unique names && S.all (\name -> S.elem eqString name available) names) "invalid focused port preparation"
+ O.require (eqString shard "all" || S.length names == (if eqString shard "other" then 22 else 1)) "port preparation shard coverage differs"
+ let selectedScope = if eqString shard "all" then selected else Just names
  saved <- J.read (report c)
  identity <- portTargetIdentity builder binary
- targets <- S.mapM (preparePortTarget c builder binary) names
+ targets <- S.mapM (\name -> do
+  -- These three fixtures retain large, independently checked target forms.
+  -- Fresh small-host profiling reduced SolverReuse from 2531s to 943s with
+  -- divisor 4; keep the ordinary policy for the other fixtures and builds.
+  let collection = if S.elem eqString name heavy then memoryCollection else baselineCollection
+  setEnv "GC_FREE_SPACE_DIVISOR" collection
+  target <- preparePortTarget c builder binary name
+  ioReturn (J.set "gc_free_space_divisor" (J.str collection) target)) names
+ if eqString originalCollection "" then unsetEnv "GC_FREE_SPACE_DIVISOR" else setEnv "GC_FREE_SPACE_DIVISOR" originalCollection
  B.finish builder
  let manifest = output c ++ "/prepared-port.json"
  -- The transport manifest keeps its stable schema and full source provenance;
  -- only the cache identity above uses the new dependency-specific format.
  let prepared = J.set "format" (J.num 1) (J.set "sources" (J.get "sources" saved) (J.set "targets" (J.Array targets) identity))
- J.write manifest (case selected of { Nothing -> prepared; Just names -> J.set "scope" (J.str "partial") (J.set "selected_fixtures" (J.stringArray names) prepared) })
+ J.write manifest (case selectedScope of { Nothing -> prepared; Just names -> J.set "scope" (J.str "partial") (J.set "selected_fixtures" (J.stringArray names) prepared) })
  hash <- fileDigest manifest
  setEnv "MLF_TEST_PORT_TARGETS" manifest
  setEnv "MLF_TEST_PORT_TARGETS_SHA256" hash
  let targetHashes = J.Object (S.map (\row -> Pair (J.getText "fixture" "" row) (J.get "target_sha256" row)) targets)
- record c "prepared_port" (J.set "target_hashes" targetHashes (B.info (Cons (Pair "manifest" (J.str manifest)) (Cons (Pair "sha256" (J.str hash)) (Cons (Pair "targets" (J.num (S.length targets))) (Cons (Pair "build_report" (J.str (B.reportPath builder))) Nil))))))
- validatePreparedPortNames c selected
+ let collections = J.Object (S.map (\row -> Pair (J.getText "fixture" "" row) (J.get "gc_free_space_divisor" row)) targets)
+ record c "prepared_port" (J.set "collection_policies" collections (J.set "target_hashes" targetHashes (B.info (Cons (Pair "manifest" (J.str manifest)) (Cons (Pair "sha256" (J.str hash)) (Cons (Pair "targets" (J.num (S.length targets))) (Cons (Pair "build_report" (J.str (B.reportPath builder))) Nil)))))))
+ validatePreparedPortNames c selectedScope
 portTargetIdentity : B.Builder -> String -> IO J.Json
 portTargetIdentity builder binary = do
  checkerHash <- fileDigest binary
@@ -439,7 +463,8 @@ preparePortTarget c builder binary name = do
  O.require (eqString working (root c)) "port source discovery must run from the preparation working directory"
  identity <- portTargetIdentity builder binary
  inputs <- TS.sourceInputs (TS.portRoots (B.graph builder)) ("bootstrap/tests/" ++ name ++ ".emlf")
- let targetIdentity = J.set "source_inputs" inputs (J.set "fixture" (J.str name) identity)
+ collection <- getEnv "GC_FREE_SPACE_DIVISOR"
+ let targetIdentity = J.set "gc_free_space_divisor" (J.str collection) (J.set "source_inputs" inputs (J.set "fixture" (J.str name) identity))
  artifact <- B.cachedChecked builder ("checked port target " ++ name) targetIdentity (\directory -> do
   let target = directory ++ "/unit.xmlf"
   present <- fileExists target
@@ -718,7 +743,7 @@ main args = case args of
   Cons group rest -> do
     Pair settings remaining <- options J.empty rest
     O.require (S.null remaining && J.has "compiler" settings && J.has "manager" settings && J.has "build-dir" settings) "compiler-tests GROUP --compiler TOOL --manager TOOL --build-dir DIRECTORY"
-    O.require (S.elem eqString group (O.words "unit packages self-host parity backends port pr-smoke select")) "unknown compiler test group"
+    O.require (S.elem eqString group (O.words "unit packages self-host parity backends port pr-smoke select port-prepare-StateTypes port-prepare-SolverReuse port-prepare-InferenceConformance port-prepare-other")) "unknown compiler test group"
     let hasSelection = Catalog.hasSelection settings
     O.require (if eqString group "select" then hasSelection else S.not hasSelection) "metadata/family selectors require select; select requires at least one selector"
     root <- canonicalPath "."
@@ -752,7 +777,7 @@ main args = case args of
     let campaignIdentity = J.set "runner_sha256" (J.str runnerHash) (J.set "runner" (J.str runner) (J.set "requested_profiles" (J.stringArray profiles) (J.set "manager_sha256" (J.str managerHash) (J.set "manager" (J.str manager) identity))))
     J.write (report c) (J.set "build_runner_sha256" (J.str buildRunnerHash) campaignIdentity)
     catalogHash <- fileDigest (root ++ "/tests/test-catalog.json")
-    record c "scope" (J.str (if eqString group "select" then "partial" else if eqString group "pr-smoke" then "smoke" else "full"))
+    record c "scope" (J.str (if eqString group "select" then "partial" else if eqString group "pr-smoke" then "smoke" else if O.starts "port-prepare-" group then "preparation" else "full"))
     record c "test_catalog" (J.set "path" (J.str (root ++ "/tests/test-catalog.json")) (J.set "sha256" (J.str catalogHash) (Catalog.selection catalog selected)))
     setEnv "MLF_PACKAGE_MANAGER" manager
     clearDrivers
@@ -763,7 +788,8 @@ main args = case args of
     windows <- O.isWindows
     setEnv "PATH" (O.parent compiler ++ (if windows then ";" else ":") ++ path)
     if eqString group "select" then selectedUnits c selected else if eqString group "self-host" then selfHost c else do
-      if eqString group "packages" then packages c else if eqString group "unit" then unit c else if eqString group "port" then port c else if eqString group "backends" then backends c else if eqString group "pr-smoke" then prSmoke c else if eqString group "parity" then parity c else O.fatal "unknown compiler test group"
+      if eqString group "packages" then packages c else if eqString group "unit" then unit c else if eqString group "port" then port c else if eqString group "backends" then backends c else if eqString group "pr-smoke" then prSmoke c else if eqString group "parity" then parity c else
+       if O.starts "port-prepare-" group then do { binary <- nativeTest c "port"; preparePortShard c binary (O.drop 13 group) } else O.fatal "unknown compiler test group"
     after <- sources root
     O.require (J.equal sourceHashes after) "compiler/test sources changed during validation"
     current <- fileDigest compiler

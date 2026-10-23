@@ -1,10 +1,29 @@
 name: Native bootstrap timing
 on:
   workflow_dispatch:
+    inputs:
+      profile_port_only:
+        description: Profile checked port fixtures instead of a cold bootstrap
+        type: boolean
+        default: false
+      candidate_run:
+        description: Producer run containing the exact checked macOS candidate
+        type: string
+      candidate_source:
+        description: Exact candidate source SHA for port profiling
+        type: string
 permissions:
   contents: read
+  actions: read
 jobs:
+  profile-port:
+    if: ${{ inputs.profile_port_only }}
+    uses: ./.github/workflows/profile-port.yml
+    with:
+      candidate_run: ${{ inputs.candidate_run }}
+      candidate_source: ${{ inputs.candidate_source }}
   bootstrap:
+    if: ${{ !inputs.profile_port_only }}
     name: One cold native bootstrap
     runs-on: macos-26
     timeout-minutes: 360
