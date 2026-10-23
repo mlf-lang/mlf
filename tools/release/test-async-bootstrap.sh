@@ -119,10 +119,12 @@ for line in 1 2 3; do
   test "$first" = "$(sed -n "$((line + 6))p" "$TEST_INVOCATIONS")"
 done
 test "$(cut -d '|' -f 4 "$TEST_INVOCATIONS" | head -3 | tr '\n' ' ')" = 'emlf mlfpkg emlf '
+test "$(sed -n '1p' "$TEST_INVOCATIONS" | cut -d '|' -f 2)" != "$(sed -n '3p' "$TEST_INVOCATIONS" | cut -d '|' -f 2)"
 test "$(sort -u "$TEST_RUNNER_INPUTS" | wc -l | tr -d ' ')" -eq 1
 cmp "$TEST_NATIVE_HOST" "$project/libraries/mlf-interpreter/Bootstrap/ProcessHost.emlf"
 test -s "$work/build/compilers.sha256"
 test -s "$work/build/manager.sha256"
+test -x "$(cat "$work/build/manager.path")"
 test -s "$work/build/source-identity.txt"
 printf '%s\n' 'PASS mock/control bootstrap transition: manager replacement, stable retry, isolated bridge, frozen adjacent runner.'
 printf '%s\n' 'This control test does not qualify MLF compilers, interpreter behavior, or native runtime parity.'

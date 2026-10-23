@@ -271,6 +271,14 @@ jobs:
           for suite in async-process-parity async-task-parity; do
             jq -e '.complete == true and .backends == ["interpreter", "llvm"]' ".mlf-build/$suite/result.json"
           done
+      - name: Qualify checked async package interfaces and cache replay
+        run: |
+          set -euo pipefail
+          compiler="$PWD/.mlf-build/async-bootstrap/stage2"
+          manager="$(cat .mlf-build/async-bootstrap/manager.path)"
+          tools/release/test-async-package.sh "$compiler" "$manager" .mlf-build/async-package-parity
+          jq -e '.complete == true and .backend == "llvm" and .cache_replay == true and .opaque_rejections == 6 and .type_rejections == 1' \
+            .mlf-build/async-package-parity/result.json
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
@@ -283,6 +291,7 @@ jobs:
             .mlf-build/async-bootstrap/source-identity.txt
             .mlf-build/async-bootstrap/compilers.sha256
             .mlf-build/async-bootstrap/manager.sha256
+            .mlf-build/async-bootstrap/manager.path
             .mlf-build/async-bootstrap/build-*/**/build-report.json
             .mlf-build/async-bootstrap/build-*/**/commands/
             .mlf-build/async-bootstrap/source-*/inputs.sha256
@@ -302,6 +311,11 @@ jobs:
             .mlf-build/async-task-parity/**/*.stderr
             .mlf-build/async-task-parity/**/*.status
             .mlf-build/async-task-parity/**/*.timed-out
+            .mlf-build/async-package-parity/**/*.json
+            .mlf-build/async-package-parity/**/*.stdout
+            .mlf-build/async-package-parity/**/*.stderr
+            .mlf-build/async-package-parity/**/*.status
+            .mlf-build/async-package-parity/**/*.timed-out
   windows-runtime:
     name: Native Windows runtime
     runs-on: windows-2025

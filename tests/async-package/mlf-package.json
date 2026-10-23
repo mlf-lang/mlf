@@ -1,0 +1,39 @@
+{
+  "format": 1,
+  "name": "mlf-async-package-consumer",
+  "version": "0.1.0",
+  "dependencies": {
+    "mlf-foundation": {
+      "path": "../../libraries/mlf-foundation"
+    },
+    "mlf-async": {
+      "path": "../../libraries/mlf-async"
+    }
+  },
+  "executables": {
+    "answer": {
+      "main": "Main.emlf"
+    },
+    "mixed-fiber": {
+      "main": "mixed-fiber.emlf"
+    },
+    "opaque-fiber": {
+      "main": "opaque-fiber.emlf"
+    },
+    "opaque-handle": {
+      "main": "opaque-handle.emlf"
+    },
+    "opaque-internal-fiber": {
+      "main": "opaque-internal-fiber.emlf"
+    },
+    "opaque-internal-task": {
+      "main": "opaque-internal-task.emlf"
+    },
+    "opaque-scope": {
+      "main": "opaque-scope.emlf"
+    },
+    "opaque-task": {
+      "main": "opaque-task.emlf"
+    }
+  }
+}

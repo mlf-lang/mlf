@@ -17,7 +17,8 @@ The `CI` workflow runs on every pull request, merge queue group and push to
   runtime job also executes these probes with its pinned native dependencies.
 - **Async interpreter and native parity**: a two-stage, primitive-aware macOS
   compiler bootstrap followed by typed completion, process and Task language
-  suites on the interpreter and LLVM runtime.
+  suites on the interpreter and LLVM runtime, plus a fresh checked-package
+  consumer, exact cache replay and interface-opacity rejections.
 
 The aggregate runs even when a prerequisite fails and requires all six
 prerequisites to report `success`. Both Linux and macOS matrix entries must pass
@@ -69,13 +70,17 @@ separate new-primitive bootstrap and MLF-level suite; the C jobs alone do not
 claim it. The separate required async language job supplies that evidence using
 `scripts/bootstrap-async.sh`, `tests/fixtures/async-completion/check.sh`,
 `tools/release/test-async-process.sh` and `tools/release/test-async-task.sh`.
+`tools/release/test-async-package.sh` separately builds a native consumer through
+the real checked library interfaces, replays its cache and rejects access to
+hidden constructors and mixed-type fibers through those same interfaces.
 Its two-generation native bootstrap also builds an interface-compatible package
 manager and has a separate 120-minute job bound; the
 existing compiler source-smoke job and its 480-second command watchdog are
 unchanged. A source-smoke timeout remains a failing prerequisite even when all
 async checks pass. The language job uploads immutable snapshot identities,
 compiler hashes, build reports and per-suite command/observation receipts.
-It requires every suite's fail-closed `complete` field and backend inventory.
+It requires every suite's fail-closed `complete` field and backend inventory,
+plus the package gate's cache-replay and rejection inventory.
 Windows native probes do not claim Windows MLF language or bootstrap parity.
 
 ## Separate native and package validation

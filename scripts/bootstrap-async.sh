@@ -120,6 +120,7 @@ for stage in 1 2; do
     test "$("$manager_build/bin/mlf-build-runner.new" --protocol-version)" = 1
     mv "$manager_build/bin/mlf-build-runner.new" "$manager_build/bin/mlf-build-runner"
     manager="$manager_build/bin/mlfpkg"
+    printf '%s\n' "$manager" > "$build/manager.path"
     shasum -a 256 "$manager" "$manager_build/bin/mlf-build-runner" > "$build/manager.sha256"
   fi
   compiler="$build/stage$stage"

@@ -1,6 +1,7 @@
 # Bootstrapping the process utility
 
-The released v0.3.0 seed does not recognize primitive 82 (`processSupervisor`).
+The released v0.3.0 seed does not recognize primitive 82 (`processSupervisor`)
+or the typed completion/timer primitives 83–94.
 Do not build the final compiler directly with that seed and claim async support.
 Use the explicit two-stage transition on POSIX:
 
@@ -10,6 +11,7 @@ export MLF_PACKAGE_MANAGER=/absolute/path/to/released-seed/libexec/mlfpkg
 export MLF_GC_PREFIX=/absolute/path/to/bdwgc
 scripts/bootstrap-async.sh
 export MLF_COMPILER="$PWD/.mlf-build/async-bootstrap/stage2"
+export MLF_PACKAGE_MANAGER="$(cat "$PWD/.mlf-build/async-bootstrap/manager.path")"
 ```
 
 The script requires Clang, GMP, BDWGC, pkg-config and `shasum`.
@@ -36,6 +38,8 @@ checks the stage-2 interpreter's protocol capability before reporting success.
 Keep the shim out of normal builds and release packages' module search paths.
 The temporary manifest omits per-executable dependency fields unsupported by
 the released manager; it changes no production package metadata.
+Use the matching manager for subsequent package builds with the new compiler;
+switching back to the released manager would reintroduce the interface mismatch.
 
 The compiler emits a new runtime ABI guard. Linking new output with an old
 runtime fails rather than indexing past the old primitive table. Old seed
@@ -48,6 +52,15 @@ workflows. The new `mlf-async` package is separate from compiler/package-manager
 runtime dependencies. A new seed must be qualified before removing this
 transition path. POSIX stage-2 qualification does not establish Windows
 bootstrap qualification; that remains part of platform validation.
+
+On 2026-10-23, the exact production bootstrap completed on Linux from the
+released v0.3.0 seed with a fresh output and cache. Its stage-2 compiler and
+matching manager then passed the typed completion, Process, Task and
+checked-package gates. The stage-2 SHA-256 is
+`435204ff829624ffebba7b3515c5b538bcd9548f7edc51d12e6b535451deff6a`.
+This qualifies the Linux bootstrap path; other platforms and broader compiler
+regressions are reported separately. The completed receipt is
+`.mlf-build/async-production-bootstrap-20261023T0422Z/qualification.json`.
 
 See [the public API and lifetime contract](async-process.md),
 [the primitive transport specification](../bootstrap/RUNTIME.txt), and

@@ -17,13 +17,32 @@ Verified locally so far:
 - A separate **real native primitive/IO-driver integration test passes 20 checks
   and 5 callbacks**, with forced GC, large integers, String captures, reused cold
   allocation, duplicate resolution, non-reentrant dispatch and timer wait/cancel.
+- The real stage-2 compiler passes **6 source/interpreter/native parity
+  fixtures, 9 source rejections, and 7 independent target rejections**. Each
+  target attack is rejected by checking, execution and LLVM emission. All six
+  positives independently check as exactly `IO Unit` and produce the literal
+  expected output through both interpreter entry paths and native LLVM.
 
 The complete new source/native/interpreter parity runner is
-`tests/fixtures/async-completion/check.sh`. Its execution against the bootstrapped
-stage-2 compiler is still pending at this checkpoint. Native C integration and
-source typechecking do not substitute for this remaining gate. The original
-four-positive/ten-negative type-only experiments remain recorded below as
-historical evidence; they are not the actual primitive suite.
+`tests/fixtures/async-completion/check.sh`. It completed on Linux on
+**2026-10-23**: **78 commands in 17 seconds**, with unchanged input hashes and a
+`complete: true` receipt. Higher-level Task/Fiber lifecycle and other platforms
+are separate gates. The original four-positive/ten-negative type-only
+experiments remain recorded below as historical evidence; they are not the
+actual primitive suite.
+
+The tested stage-2 compiler SHA-256 is
+`435204ff829624ffebba7b3515c5b538bcd9548f7edc51d12e6b535451deff6a`.
+The local evidence is
+`.mlf-build/async-production-bootstrap-20261023T0422Z/gates/completion/result.json`,
+including source/compiler/runtime hashes and per-command output/status hashes. Reproduce
+with a real bootstrapped compiler, without a seed shim:
+
+```sh
+EMLF="$PWD/.mlf-build/async-bootstrap/stage2" \
+  MLF_GC_PREFIX=/path/to/collector \
+  tests/fixtures/async-completion/check.sh
+```
 
 ## Reproduction and provenance
 
@@ -96,8 +115,10 @@ fails closed with `Elaboration: unbound type variable ...` on the release seed.
 Its inline equivalent fails earlier with `Inference: cannot raise a protected
 type variable`. The fixture runner records this specific alternative; it does
 not count an arbitrary parsing or module-loading failure as a typing success.
-This must be investigated in the real primitive gate. No executable xMLF is
-produced for that rejected program.
+The actual primitive fixture now rejects the explicit allocated-cell
+generalization attack during inference with `cannot raise a protected type
+variable`. The historical imported-model diagnostic gap is not generalized to
+that result. No executable xMLF is produced for either rejected program.
 
 The deliberately wrong signature is:
 
@@ -162,8 +183,8 @@ test exercises IDs 83–94 through one ordinary `mlf_run` invocation.
   the callback, then runs its ordinary MLF IO application.
 - Taking a callback is its execution-start boundary. The coordinator must
   invoke it immediately, without interleaving scope closure. Already executing
-  IO is not preempted. Full runtime integration needs a guarded driver enforcing
-  this sequencing rather than relying on callers to do it.
+  IO is not preempted. The integrated primitive driver enforces this sequencing
+  with its same-scope dispatch guard and ordinary IO continuation loop.
 - Unsubscribe removes pending, ready or claimed work and clears its roots.
   Consumed nodes are unlinked, so a bounded queue does not retain an unbounded
   history of callbacks.
@@ -172,7 +193,7 @@ test exercises IDs 83–94 through one ordinary `mlf_run` invocation.
   manually freed; a cell's owner pointer also prevents identity reuse while
   that handle is reachable.
 - There are no native worker threads and no callback execution from a foreign
-  thread. This prototype is deliberately single-coordinator, not thread-safe.
+  thread. This implementation is deliberately single-coordinator, not thread-safe.
 
 The test forces collection before and during dispatch, retains a large GMP
 integer and String with captured closures, verifies lazy poison is never forced,
@@ -253,7 +274,11 @@ prove its allocation/signature rather than exposing a consumer-to-producer cast.
 5. **LLVM/ABI/cache:** generated entries require
    `mlf_require_async_completion_v2_abi`; cache keys include `completion-v2`.
    The released compact ABI and primitive-82 guard remain for bootstrap inputs.
-6. **Remaining evidence:** run the real stage-2 source suite, compare both
-   interpreter entry paths with native output, and qualify the higher-level
-   Task/Fiber structured lifecycle independently. The current C proofs cannot
-   establish inference safety or whole-Task cancellation on their own.
+6. **Qualified source/runtime slice:** the real stage-2 suite passed all six
+   positives on both interpreter entry paths and native LLVM, plus nine source
+   and seven target negatives. This includes the impredicative identity payload,
+   fresh allocation at different types, lazy poison, stale scopes, 2,000 scope
+   creation/closure iterations and the reentrant timer-order regression.
+   Higher-level Task/Fiber structured lifecycle and cross-platform execution
+   remain independently qualified gates; primitive success does not substitute
+   for whole-Task cancellation evidence.
