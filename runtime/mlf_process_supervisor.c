@@ -28,6 +28,7 @@
 #include <tlhelp32.h>
 #include <psapi.h>
 #include <wchar.h>
+#include "mlf_windows_path.h"
 #else
 #include <fcntl.h>
 #include <sys/resource.h>
@@ -289,7 +290,7 @@ static HANDLE mlf_ps_redirect_stream(const char *path,int stream) {
     }
     wchar_t *w=mlf_ps_wide(path); SECURITY_ATTRIBUTES sa={sizeof(sa),NULL,TRUE};
     if(w) handle=CreateFileW(w,stream ? GENERIC_WRITE : GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,&sa,stream ? CREATE_ALWAYS : OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
-    free(w); return handle;
+    DWORD error=GetLastError(); free(w); SetLastError(error); return handle;
 }
 static int mlf_ps_environment_compare(const void *a,const void *b) {
     return _wcsicmp(*(const wchar_t *const *)a,*(const wchar_t *const *)b);

@@ -26,6 +26,10 @@ static void path(char *out, size_t size, const char *name) {
     int n = snprintf(out, size, "%s/%s", scratch, name);
     check(n >= 0 && (size_t)n < size, "test path length");
 }
+static void join_path(char *out, size_t size, const char *directory, const char *name) {
+    int n = snprintf(out, size, "%s/%s", directory, name);
+    check(n >= 0 && (size_t)n < size, "joined test path length");
+}
 static mlf_process_scope scope(unsigned jobs, unsigned pending, unsigned retained) {
     mlf_process_options options = {jobs, pending, retained};
     mlf_process_scope result = 0;
@@ -527,6 +531,64 @@ static void unicode_and_streams(void) {
     check(text && strstr(text, "hello space\nquote\"slash\\\n\xe4\xb8\xad\xe6\x96\x87\n\n") && strstr(text, "stderr\n"), "Unicode cwd, literal argv and merged relative streams");
     free(text); close_scope(s);
 }
+static void long_stream_paths(void) {
+    /* Exercise the standalone supervisor, not just the build runner that
+     * includes it. Stream paths exceed MAX_PATH while cwd/executable stay short. */
+    char relative[1024] = "long streams \xe4\xb8\xad\xe6\x96\x87", directory[4096];
+#ifdef _WIN32
+    wchar_t before[4096], after[4096];
+    DWORD length = GetCurrentDirectoryW(4096, before);
+    check(length > 0 && length < 4096, "capture parent working directory");
+#endif
+    path(directory, sizeof(directory), relative); test_mkdir(directory);
+    for (unsigned i = 0; i < 5; ++i) {
+        strcat(relative, "/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+        path(directory, sizeof(directory), relative); test_mkdir(directory);
+    }
+    char input[4096], output[4096], error[4096], relative_input[1200], relative_output[1200], relative_error[1200], merged[1200];
+    join_path(input, sizeof(input), directory, "input.txt");
+    join_path(output, sizeof(output), directory, "output.txt");
+    join_path(error, sizeof(error), directory, "error.txt");
+    join_path(relative_input, sizeof(relative_input), relative, "input.txt");
+    join_path(relative_output, sizeof(relative_output), relative, "relative.txt");
+    join_path(relative_error, sizeof(relative_error), relative, "relative.stderr");
+    join_path(merged, sizeof(merged), relative, "merged.txt");
+    FILE *f = test_open(input, "wb"); check(f != NULL, "create long stream input");
+    check(fputs("binary\r\nlong input\n", f) >= 0 && !fclose(f), "write long stream input");
+    mlf_process_scope s = scope(1, 1, 5);
+    const char *copy[] = {fixture, "copy", NULL};
+    mlf_process_spec p = spec(copy); p.cwd = scratch; p.input = input; p.output = output; p.error = error;
+    exited(await(s, submit_spec(s, &p)), 0);
+    char *text = test_read(output); check(text && !strcmp(text, "binary\r\nlong input\n"), "long absolute stream transport"); free(text);
+    text = test_read(error); check(text && !*text, "long absolute stderr"); free(text);
+    p.input = relative_input; p.output = relative_output; p.error = relative_error;
+    exited(await(s, submit_spec(s, &p)), 0);
+    path(output, sizeof(output), relative_output); text = test_read(output);
+    check(text && !strcmp(text, "binary\r\nlong input\n"), "long relative stream transport"); free(text);
+    path(error, sizeof(error), relative_error); text = test_read(error); check(text && !*text, "long relative stderr"); free(text);
+    const char *echo[] = {fixture, "echo", "long supervisor stdout", NULL};
+    p = spec(echo); p.cwd = scratch; p.output = merged; p.error = merged;
+    exited(await(s, submit_spec(s, &p)), 0);
+    path(output, sizeof(output), merged); text = test_read(output);
+    check(text && strstr(text, "long supervisor stdout\n") && strstr(text, "stderr\n"), "long merged stream transport"); free(text);
+    join_path(input, sizeof(input), directory, "missing-input.txt");
+    p = spec(copy); p.cwd = scratch; p.input = input;
+    mlf_process_outcome missing = await(s, submit_spec(s, &p));
+    check(missing.kind == MLF_PROCESS_LAUNCH_FAILED, "missing long input is a launch failure");
+#ifdef _WIN32
+    check(missing.pid == 0 && missing.launch_error == ERROR_FILE_NOT_FOUND, "missing long input preserves Win32 error before process creation");
+    length = GetCurrentDirectoryW(4096, after);
+    check(length > 0 && length < 4096 && !wcscmp(before, after), "stream setup restores parent cwd after success and failure");
+    p = spec(copy); p.cwd = scratch; p.input = "NUL"; p.output = "NUL"; p.error = "NUL";
+    exited(await(s, submit_spec(s, &p)), 0);
+    length = GetCurrentDirectoryW(4096, after);
+    check(length > 0 && length < 4096 && !wcscmp(before, after), "NUL stream setup restores parent cwd");
+#else
+    check(missing.launch_error == ENOENT, "missing long input preserves POSIX error");
+#endif
+    close_scope(s);
+    puts("Long-path process supervisor stream transport passed");
+}
 static void redirected_input(void) {
     char input[4096], output[4096]; path(input, sizeof(input), "input"); path(output, sizeof(output), "output");
     FILE *f = test_open(input, "wb"); check(f != NULL, "create input file"); check(fputs("binary\r\ninput\n", f) >= 0 && !fclose(f), "write input file");
@@ -534,6 +596,7 @@ static void redirected_input(void) {
     p.cwd = scratch; p.input = "input"; p.output = "output";
     exited(await(s, submit_spec(s, &p)), 0);
     char *text = test_read(output); check(text && !strcmp(text, "binary\r\ninput\n"), "binary stdin redirection relative to cwd"); free(text); close_scope(s);
+    long_stream_paths();
 }
 static void environment_policy(void) {
     char ready[4096], release[4096]; path(ready, sizeof(ready), "running"); path(release, sizeof(release), "release");
