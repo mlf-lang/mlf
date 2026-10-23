@@ -26,8 +26,9 @@ permissions:
 env:
   GC_FREE_SPACE_DIVISOR: '1'
 concurrency:
-  group: platform-release-${{ inputs.validation_only && github.sha || inputs.tag || github.sha }}
-  cancel-in-progress: false
+  # Supersede stale branch rehearsals, but never interrupt an actual release.
+  group: ${{ inputs.validation_only && format('platform-validation-{0}', github.ref) || format('platform-release-{0}', inputs.tag || github.sha) }}
+  cancel-in-progress: ${{ inputs.validation_only }}
 jobs:
   metadata:
     runs-on: ubuntu-24.04
