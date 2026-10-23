@@ -114,7 +114,7 @@ nativeTests c targets = do
  -- package-manager invocation can replace the canonical report.
  let retained = invocation ++ "/build-report.json"
  present <- fileExists current
- digest <- if present then do { copyFile current retained; fileDigest retained } else return ""
+ digest <- if present then do { O.copy current retained; fileDigest retained } else return ""
  saved <- J.read (report c)
  let receipt = B.info (Cons (Pair "path" (J.str retained)) (Cons (Pair "sha256" (J.str digest))
   (Cons (Pair "targets" (J.stringArray targets)) (Cons (Pair "jobs" (J.num (readInt jobs)))
