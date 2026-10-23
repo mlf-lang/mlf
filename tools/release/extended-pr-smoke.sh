@@ -47,7 +47,7 @@ jq -e --arg compiler "$compiler_sha256" --arg manager "$manager_sha256" \
   (.suites["test-framework"] | .binary_sha256 == $framework and
     .log_sha256 == $framework_log and .coverage_report_sha256 == $coverage and
     .coverage_inventory_sha256 == $inventory and
-    .coverage_result == {schema_version:1,suite:"test-framework",executions:3,aliases:0,metrics:{}}) and
+    .coverage_result == {schema_version:1,suite:"test-framework",executions:4,aliases:0,metrics:{}}) and
   (.matrices["compact-gc"] | .rows == 12 and .backend_names == ["interpreter","llvm"]) and
   (.package_smoke | .cases == 3 and .backends == ["interpreter","llvm"])
 ' "$build/tests/verification.json" >/dev/null

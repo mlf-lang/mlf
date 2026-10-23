@@ -33,6 +33,17 @@ with subsequent cases. `A.equal same display message expected actual` retains
 both rendered values. `A.right display result` unwraps an `Either`, and
 `A.liftIO action` embeds an IO operation.
 
+`C.described group level inputs oracles purposes entry` adds separate namespaced
+`group:NAME`, `level:NAME`, `input:NAME`, `oracle:NAME` and `purpose:NAME` tags.
+It preserves the case's ID, name, action and existing tags, removing duplicates.
+The generic library does not prescribe a vocabulary. The compiler repository
+reviews its seven primary groups and metadata axes in
+[`tests/test-catalog.json`](../tests/test-catalog.json).
+
+`C.classified categories techniques entry` remains available for existing
+`category:NAME` and `technique:NAME` tags. It preserves the same case identity
+and action; adding metadata does not create another execution.
+
 `C.toLegacy` adapts a case back to `Pair String (IO Unit)`, preserving its name
 and exiting unsuccessfully on failure. `C.fromIO` adapts an existing named IO
 action. It cannot recover a legacy action that calls `exitWith` or panics.
@@ -44,9 +55,16 @@ timeouts, with separate results for assertions, crashes and protocol failures.
 ## Selection and reporting
 
 The runner accepts `--list`, `--filter TEXT`, `--exact ID`, `--tag TAG`,
+`--group NAME`, `--level NAME`, `--input NAME`, `--oracle NAME`, `--purpose NAME`,
+`--category NAME`, `--technique NAME`,
 `--format text|json`, and `--report FILE`. Filters match substrings of IDs or
 names, exact selection matches IDs only, and tags match exactly. Repeated selectors are combined with
-AND. Listing never executes actions. Invalid arguments, duplicate/invalid IDs,
+AND. Metadata options match the corresponding namespaced tags; they do not
+change test actions or the selected/full scope. In this generic runner,
+`--category` and `--technique` still match their legacy namespaces. The compiler
+campaign catalog separately provides compatibility queries over its reviewed
+metadata.
+Listing never executes actions. Invalid arguments, duplicate/invalid IDs,
 empty inventories and selections with no matches exit with status 2. Completed
 runs exit 0 when all selected cases pass, or 1 when any assertion fails.
 
@@ -87,6 +105,9 @@ repository README:
 ./mlfpkg --manifest tests/mlf-package.json run int-set-unions -- --list
 ./mlfpkg --manifest tests/mlf-package.json run int-set-unions -- \
   --exact int-set/union-sorted-list --format json
+./mlfpkg --manifest tests/mlf-package.json run int-set-unions -- \
+  --group runtime-library --level component --input exhaustive \
+  --oracle independent-reference --purpose conformance --format json
 ./mlfpkg --manifest tests/mlf-package.json run test-framework
 MLF_TEST_HOST_SUPPORT=/absolute/path/to/host-support \
   ./mlfpkg --manifest tests/mlf-package.json test --target framework-cli
@@ -97,3 +118,11 @@ MLF_TEST_HOST_SUPPORT=/absolute/path/to/host-support \
 around a passing case and exits 1. It exercises continuation and failure reports.
 `test-framework --list-probe --list --format json` lists an action that would
 panic if executed, to check the listing boundary.
+
+Core, Harness, Backends and Port also expose their original IO actions through
+the compiler campaign's case/family protocol: `--list-families` discovers IDs,
+and `--families ID...` selects complete actions in registry order. This protocol
+uses `Tests.Selection` and strict partial receipts; it is separate from the
+generic `Test.Runner` case protocol above. See the
+[compiler test selection guide](../tests/README.md) for batching, coverage
+projections and full-campaign commands.

@@ -7,6 +7,7 @@ import qualified Package.Verification as V
 import qualified Tests.Helpers as H
 import qualified Tests.Backends as B
 import qualified Tests.Bytes as Bytes
+import qualified Tests.Selection as Selection
 import qualified Bootstrap.Compiler as C
 import qualified Tests.IndependentCheck as Check
 import qualified Bootstrap.X.Parser as P
@@ -17,6 +18,8 @@ import qualified Bootstrap.Primitive as Primitive
 import qualified Bootstrap.Data as D
 names : List String
 names = O.words "foundation MapFolds IntegerContainers OptimizerQueries ConstructorProjection ForceReuse StrictFields prelude Target frontend LexerCounters LLVMBuild RuntimeCases StateRuntime StateTypes GraphConformance GraphScopes GraphDense OrderedTraversal SolverReuse TypeCache GraphStack EmbeddingPruning InferenceConformance PrimitiveMetadata"
+familyId name = "port/" ++ name
+familyIds = S.map familyId names
 references : List (Pair String String)
 references = Cons (Pair "GraphConformance" "GraphReference") (Cons (Pair "GraphScopes" "GraphScopesReference") (Cons (Pair "GraphDense" "GraphDenseReference") (Cons (Pair "OrderedTraversal" "OrderedTraversalReference") (Cons (Pair "EmbeddingPruning" "EmbeddingPruningReference") (Cons (Pair "InferenceConformance" "InferenceReference") Nil)))))
 metadata : String
@@ -45,7 +48,9 @@ prepareFixture name destination = do
  J.write (destination ++ ".checks.json") (J.Object (Cons (Pair "format" (J.num 1)) (Cons (Pair "fixture" (J.str name)) (Cons (Pair "target_sha256" (J.str hash)) (Cons (Pair "entry_type" (J.str "IO Unit")) (Cons (Pair "inferred_type" (J.str (Pretty.prettyType ty))) (Cons (Pair "checks" V.portTargetChecks) Nil)))))))
  putStrLn ("CHECKED " ++ name)
 preparedSource : String -> IO String
-preparedSource name = do
+preparedSource name = preparedSourceFor names true name
+preparedSourceFor : List String -> Bool -> String -> IO String
+preparedSourceFor selected full name = do
  path <- getEnv "MLF_TEST_PORT_TARGETS"
  expected <- getEnv "MLF_TEST_PORT_TARGETS_SHA256"
  H.assert (stringLength path > 0 && stringLength expected == 64) "missing prepared port targets"
@@ -53,7 +58,10 @@ preparedSource name = do
  H.assert (eqString actual expected) "prepared port manifest changed"
  manifest <- J.read path
  let rows = J.values (J.get "targets" manifest)
- H.assert (J.equal (J.get "format" manifest) (J.num 1) && S.length rows == 25 && S.eqList eqString (S.sortBy compareString names) (S.sortBy compareString (S.map (J.getText "fixture" "") rows))) "prepared port coverage changed"
+ let actualNames = S.map (J.getText "fixture" "") rows
+ let fullCoverage = eqString (J.getText "scope" "full" manifest) "full" && S.length rows == 25 && S.eqList eqString (S.sortBy compareString names) (S.sortBy compareString actualNames)
+ let partialCoverage = eqString (J.getText "scope" "" manifest) "partial" && S.not (S.null selected) && S.length selected == S.length (S.nubBy eqString selected) && S.all (\fixture -> S.elem eqString fixture names) selected && J.equal (J.get "selected_fixtures" manifest) (J.stringArray selected) && S.length rows == S.length selected && S.eqList eqString (S.sortBy compareString selected) (S.sortBy compareString actualNames)
+ H.assert (J.equal (J.get "format" manifest) (J.num 1) && (if full then fullCoverage else partialCoverage)) "prepared port coverage changed"
  row <- case S.find (\row -> eqString name (J.getText "fixture" "" row)) rows of {Just row -> return row; Nothing -> H.fail "prepared port target missing"}
  let target = J.getText "target" "" row
  digest <- fileDigest target
@@ -66,7 +74,9 @@ preparedSource name = do
  H.assert (eqString digest after) "prepared port target changed while reading"
  return source
 runFixture : B.Backends -> String -> IO Unit
-runFixture backends name = do
+runFixture backends name = runPreparedFixture backends names true name
+runPreparedFixture : B.Backends -> List String -> Bool -> String -> IO Unit
+runPreparedFixture backends selected full name = do
  let source = "bootstrap/tests/" ++ name ++ ".emlf"
  expected <- if eqString name "PrimitiveMetadata" then return (Bytes.encode metadata) else Bytes.readFile ("bootstrap/tests/" ++ name ++ ".expected")
  H.assert (S.not (Bytes.null expected)) "empty port fixture expectation"
@@ -85,7 +95,7 @@ runFixture backends name = do
     original <- Bytes.readFile source
     H.assert (code == 0 && H.eq generated original && H.contains "Fig12-A8\tREJECT Inference\n" (Bytes.decodeText expected)) "inference input generation or A8 coverage differs"
     else return Unit
- serialized <- preparedSource name
+ serialized <- preparedSourceFor selected full name
  let heavy = S.elem eqString name (O.words "GraphConformance GraphDense InferenceConformance SolverReuse StateTypes")
  let execution = B.withExecutionTimeout (if heavy then 1800 else 60) backends
  observed <- B.executeNativeSerialized execution B.IOEntry (B.Input "" false) serialized
@@ -93,21 +103,29 @@ runFixture backends name = do
  H.assert (H.eq (B.outputBytes observed) expected && eqString (B.stderrOutput observed) "" && eqString (B.remaining observed) "") ("port runtime output differs: " ++ name)
 main : IO Unit
 main = do
- H.assert (S.length names == 25 && S.length (S.nubBy eqString names) == 25 && S.length references == 6 && S.all (\(Pair name _) -> S.elem eqString name names) references) "port fixture or independent-reference coverage changed"
  args <- O.allArguments
- case args of
-  Cons "--list" Nil -> putStr (S.unlines names)
-  Cons "--prepare" (Cons name (Cons destination Nil)) -> prepareFixture name destination
-  _ -> executeFixtures args
+ if Selection.listing args then putStr (S.unlines familyIds) else do
+  H.assert (S.length names == 25 && S.length (S.nubBy eqString names) == 25 && S.length references == 6 && S.all (\(Pair name _) -> S.elem eqString name names) references) "port fixture or independent-reference coverage changed"
+  case args of
+   Cons "--list" Nil -> putStr (S.unlines names)
+   Cons "--prepare" (Cons name (Cons destination Nil)) -> prepareFixture name destination
+   _ -> executeFixtures args
 executeFixtures : List String -> IO Unit
 executeFixtures args = do
- selected <- case args of
-  Nil -> return names
+ Pair full selected <- case args of
   Cons "--only" names' -> do
    H.assert (S.not (S.null names') && S.length names' == S.length (S.nubBy eqString names') && S.all (\name -> S.elem eqString name names) names') "invalid port fixture selection"
-   return names'
-  _ -> H.fail "invalid port arguments"
+   return (Pair false names')
+  _ -> do
+   Pair full identities <- H.right (Selection.choose familyIds args)
+   return (Pair full (S.filter (\name -> S.elem eqString (familyId name) identities) names))
+ let focused = case args of { Cons "--families" _ -> true; _ -> false }
+ let expectedPrepared = if focused then selected else names
+ Selection.begin "port" full (S.map familyId selected)
  B.withBackends (\backends -> do
-  S.mapM_ (\name -> B.inCase backends ("MLF compiler port: " ++ name) (do { runFixture backends name; putStrLn ("PASS " ++ name) })) selected
+  S.mapM_ (\name -> do
+   B.inCase backends ("MLF compiler port: " ++ name) (do { runPreparedFixture backends expectedPrepared (S.not focused) name; putStrLn ("PASS " ++ name) })
+   Selection.passed "port" (familyId name)) selected
   B.auditNativeBackends backends
   putStrLn (showInt (S.length selected) ++ " MLF port fixtures; 0 failures"))
+ Selection.finish "port"

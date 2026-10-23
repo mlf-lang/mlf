@@ -870,6 +870,7 @@
     "test-framework": {
       "executions": [
         "framework/contracts",
+        "framework/catalog-contracts",
         "framework/coverage-validator",
         "framework/cli-contracts"
       ],
@@ -1218,6 +1219,21 @@
       "reviewed_source_sha256": {
         "tests/Tests/PackageReleases.emlf": "a368943990e39d691c65c7fc9d11d43d7dde0a0633fb8fa93eb05b3eb58e88cf"
       }
+    },
+    {
+      "basis": "Source-reviewed test catalog and classification contract checkpoint. Existing compiler/package assertions, case IDs, aliases and numeric metrics are unchanged.",
+      "added_framework_ids": [
+        "framework/catalog-contracts"
+      ],
+      "required_execution_counts": {
+        "test-framework": {
+          "before": 3,
+          "after": 4
+        }
+      },
+      "completion_boundary": "TestFrameworkMain emits the new checkpoint only after Tests.TestCatalog.main completes selection, registry integrity, package partition and partial/full coverage rejection checks.",
+      "baseline_commit": "fde9e41a9708d5e4b4e6b00acfa651d2dd865fc7",
+      "baseline_inventory_sha256": "54b1a79bcecd7d813df86a73ad81da55ac2ec632dacbf74da64265683d993797"
     }
   ]
 }

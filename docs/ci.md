@@ -1,5 +1,22 @@
 # Pull request checks
 
+Test classification is recorded separately in
+[`tests/test-catalog.json`](../tests/test-catalog.json). Its seven primary groups
+are `language`, `code-generation`, `runtime-library`, `packages-build`,
+`distribution`, `bootstrap` and `test-infrastructure`. Test level, inputs,
+oracles and purposes are separate discovery/selection axes. The catalog selects
+complete cases or families within Core, Harness, Backends and Port, batching
+them by execution unit. The existing smoke commands and six full qualification
+campaigns retain their selection boundaries and full evidence requirements.
+Focused catalog selections produce partial reports and cannot stand in for a
+complete qualification campaign. The extended framework receipt includes a
+fourth, separately reviewed catalog-contract checkpoint, including selection
+and evidence-mutation checks. The
+[selection guide](../tests/README.md) and
+[family validation record](test-family-selection-validation.json) describe the
+protocol and its verified scope. `smoke`, `full`, `stress` and `release` remain
+execution-profile concepts; this workflow owns its actual CI selections.
+
 The `CI` workflow runs on every pull request, merge queue group and push to
 `main`. Its stable aggregate check is **PR gate**. It requires all of:
 

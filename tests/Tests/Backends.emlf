@@ -1,6 +1,6 @@
 module Tests.Backends
  (Backends, Entry(..), Event(..), Input(..), Observation(..), RuntimeError(..),
-  withBackends, withExecutionTimeout, withInterpreterTimeout, inCase, auditBackends, auditNativeBackends, execute,
+  withBackends, withExecutionTimeout, withInterpreterTimeout, inCase, auditBackends, auditSelectedBackends, auditNativeBackends, execute,
   executeWithArguments, executeSerialized, executeNativeSerialized, serializeTerm, capture, outcome, events, remaining,
   output, outputBytes, stderrOutput) where
 import Bootstrap.Types
@@ -74,13 +74,16 @@ withBackends action = do
   count <- newIntArray 1 0
   action (Backends dir count 60 candidate candidate)
 inCase context label action = do { writeFile (directory context ++ "/current-label") label; action }
-auditBackends context = auditMatrix context (O.words "interpreter llvm")
-auditNativeBackends context = auditMatrix context (Cons "llvm" Nil)
-auditMatrix context expected = do
+auditBackends context = auditMatrix false context (O.words "interpreter llvm")
+-- Explicit family selections can consist entirely of source/type assertions.
+-- A reviewed zero-row selection still checks that no execution rows occurred.
+auditSelectedBackends context = auditMatrix true context (O.words "interpreter llvm")
+auditNativeBackends context = auditMatrix false context (Cons "llvm" Nil)
+auditMatrix allowEmpty context expected = do
   count <- readIntArray (serial context) 0
   text <- readFile (directory context ++ "/rows.jsonl")
   rows <- S.mapM (\line -> H.right (J.parse line)) (O.nonempty (H.lines text))
-  H.assert (count > 0 && S.length rows == count) "missing backend executions"
+  H.assert ((allowEmpty || count > 0) && count >= 0 && S.length rows == count) "missing backend executions"
   H.assert (S.all (\row -> J.equal (J.get "backends" row) (J.stringArray expected)) rows) "incomplete backend row"
   H.assert (S.length (S.nubBy eqInt (S.map ((\row -> readInt (case J.get "index" row of { J.Number text -> text; _ -> "-1" }))) rows)) == count) "duplicate backend row"
   putStrLn ("Backend matrix: " ++ showInt count ++ " rows x " ++ showInt (S.length expected) ++ " backends; no missing executions")

@@ -26,7 +26,9 @@
         "Tests.CompilerTests": "tests/Tests/CompilerTests.emlf",
         "Tests.Coverage": "tests/Tests/Coverage.emlf",
         "Tests.TestDrivers": "tests/Tests/TestDrivers.emlf",
-        "Tests.TestSources": "tests/Tests/TestSources.emlf"
+        "Tests.TestSources": "tests/Tests/TestSources.emlf",
+        "Tests.Catalog": "tests/Tests/Catalog.emlf",
+        "Tests.Selection": "tests/Tests/Selection.emlf"
       }
     }
   },
