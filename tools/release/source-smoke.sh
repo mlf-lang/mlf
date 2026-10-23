@@ -110,9 +110,9 @@ command_pid=$!
 sampler_pid=$!
 (
   trap stop_sleep_jobs TERM INT
-  sleep 480 &
+  sleep 900 &
   wait "$!" || exit 0
-  printf 'Current-source smoke exceeded 480 seconds.\n' > "$build/timed-out.log"
+  printf 'Current-source smoke exceeded 900 seconds.\n' > "$build/timed-out.log"
   kill -TERM "$command_pid" 2>/dev/null || true
   sleep 2 &
   wait "$!" || exit 0

@@ -1,0 +1,587 @@
+{
+  "format": 1,
+  "recorded_at": "2026-10-22T21:49:44.994Z",
+  "purpose": "Validation of the test category catalog, technique tags and preserved qualification campaigns",
+  "tested_base_commit": "fde9e41a9708d5e4b4e6b00acfa651d2dd865fc7",
+  "remote_default_branch": "main",
+  "remote_master_branch_exists": false,
+  "merge": "Fast-forwarded origin/main before test reorganization",
+  "worktree_changes": "uncommitted",
+  "complete_for_affected_paths": true,
+  "classification": {
+    "catalog": {
+      "path": "tests/test-catalog.json",
+      "sha256": "70792e0746352f3d18cad66bba501ba5fa225b5abc209d70b3577022891ae823"
+    },
+    "categories": [
+      "compiler-components",
+      "standard-library",
+      "test-infrastructure",
+      "package-integration",
+      "package-distribution",
+      "backend-execution",
+      "native-compiler-workloads",
+      "language-conformance-regression",
+      "bootstrap-reproducibility"
+    ],
+    "techniques": [
+      "regression",
+      "property-based",
+      "differential",
+      "metamorphic",
+      "fault-injection",
+      "fixed-point"
+    ],
+    "granularity": "verified-execution-unit",
+    "execution_units": 11,
+    "full_campaigns": [
+      "unit",
+      "packages",
+      "backends",
+      "port",
+      "parity",
+      "self-host"
+    ]
+  },
+  "modified_inputs": {
+    "docs/ci.md": "e3a81decb6e2661c245e2e26bfdba8cc586547a90be83bfb66ee0291972f57e6",
+    "mlf-package.json": "f7aa2e11f7029f641e882535a8c8cc9140756c1b4a1bd08c4ce492a294993872",
+    "mlf.lock": "66acd7c660cfefd1777170d244584772de383d50857f37f6fa71af73fc7172ec",
+    "testing/README.md": "341f542e0c08639c8bc05ce3bd25e246dc7ca98d36e38784a157e866bfa570c5",
+    "testing/Test/Case.emlf": "25bf211f7cb101900ab407b85fb2f5b6e4b18a847bc40dee83e8bd98156269c3",
+    "testing/Test/Runner.emlf": "7e2be667194a4a06db4ff61b790039f0719cd505cb35fbcf99c8512b4580e7ff",
+    "tests/PackagesMain.emlf": "7803795857d94a04896fc928394397b802cddb840d583dcce3d4421ad75f156f",
+    "tests/README.md": "119b13000f2f7f077c508329efd27c3c594d668596c6c1a4cf6822957fffb291",
+    "tests/TestFrameworkMain.emlf": "187e352e716265b356aa3c3410f87356fff74375f44fbd9acfd0b474c41cd187",
+    "tests/Tests/Catalog.emlf": "bb85a94f02e9148ace656a7a2c2a3eac1a65212e8ea8d6f3fa5cb90d9ddd7b0f",
+    "tests/Tests/CompilerTests.emlf": "ea03a42548947a46de57ceda182152a28fe9d5913e21fff1d0b2b2960ac6c70c",
+    "tests/Tests/Coverage.emlf": "50eaafbaae63b98bf1c17b5a249d511840a79aed496edca3e92a2dc0f83a0ee9",
+    "tests/Tests/IntSetUnions.emlf": "119928ca35e87ae55c49e4e6dba4e8a6153933efddd2fbb489fa0156f3fbbc04",
+    "tests/Tests/TestCatalog.emlf": "91e9e9871655f7cf36698d84c8c7257f936a6c8b34c96c977428a5d78a9ba780",
+    "tests/Tests/TestFramework.emlf": "333e739fb374f57ed985cf9ecda98babe27a9f39b5850b3abf70048f3b51c715",
+    "tests/Tests/TestFrameworkCLI.emlf": "7a4a5ee9173ca40a37e8b4716fefae9ac76a1bd0b12dddc51eab5fb448ecc942",
+    "tests/golden/unit-inventory.json": "c45a46d1303d340289fcb6e7b77ce3dc9042f3c32d4d2c6ae452eb9c85d5f9ae",
+    "tests/mlf-package.json": "11dac7d38dc130c54ce31d80b41150e909f3cada982890a8698f9854ec7c7c24",
+    "tests/test-catalog.json": "70792e0746352f3d18cad66bba501ba5fa225b5abc209d70b3577022891ae823",
+    "tools/release/extended-pr-smoke.sh": "cfee91986d7a1238d7b5ab9132579c6b36805216f9fd6e43f2db205243cf68be"
+  },
+  "tools": {
+    "compiler": {
+      "path": ".mlf-build/compact-only/r3/build/bin/emlf",
+      "sha256": "a49467d37e89720485a95414543d925c8906aa5d1dac0c1233817c5796723afd"
+    },
+    "manager": {
+      "path": ".mlf-build/test-classification/build/bin/mlfpkg",
+      "sha256": "9f09a96bbf074468383041797280480e62c69d072124a945006fb9b82f77d2ab"
+    },
+    "runner": {
+      "path": ".mlf-build/test-classification/build/bin/compiler-tests",
+      "sha256": "0510c384c34df42f14acf60a1dec2a0d5d52fc98b8820efb99a7fd2ef65e394c"
+    }
+  },
+  "build": {
+    "record": {
+      "path": ".mlf-build/test-classification/build-r3-command.json",
+      "sha256": "bcc7d71d495845ef3c8cdc1afa01fee3027ff6e17f22a6f4c9b158b9210cffa3"
+    },
+    "exit_code": 0,
+    "wall_seconds": 132.652145208,
+    "report": {
+      "path": ".mlf-build/test-classification/build/build-report.json",
+      "sha256": "a9787fbfeea02dd19e09a4c1f74a8405f345cb84d43f63d1a69c61fe385dcd95"
+    }
+  },
+  "catalog_cli": {
+    "checks": 17,
+    "result": {
+      "path": ".mlf-build/test-classification/catalog-cli-results.json",
+      "sha256": "5844a41a8482dc892f5ef9ce368d897661bad669358ce569d2f2f48e4768e7c0"
+    },
+    "runner_hash_matches": true
+  },
+  "preservation": {
+    "baseline_commit": "fde9e41a9708d5e4b4e6b00acfa651d2dd865fc7",
+    "baseline_inventory_sha256": "54b1a79bcecd7d813df86a73ad81da55ac2ec632dacbf74da64265683d993797",
+    "current_inventory": {
+      "path": "tests/golden/unit-inventory.json",
+      "sha256": "c45a46d1303d340289fcb6e7b77ce3dc9042f3c32d4d2c6ae452eb9c85d5f9ae"
+    },
+    "all_existing_suite_ids_aliases_and_metrics_unchanged": true,
+    "added_execution": "framework/catalog-contracts",
+    "package_phase_counts": {
+      "integration": 47,
+      "distribution": 28,
+      "total": 75
+    },
+    "combined_package_child_invocations": 1,
+    "comparison": {
+      "path": ".mlf-build/test-classification/inventory-preservation.json",
+      "sha256": "2a9bf2ce19a08124c13bcc410ecf6cdc01964b8d9c61c78687b8d2037e8e00ec"
+    }
+  },
+  "validation": [
+    {
+      "name": "distribution-r3",
+      "record": {
+        "path": ".mlf-build/test-classification/distribution-r3-command.json",
+        "sha256": "88869a4b787e14270d4e73164f10ceeb84a30a49dcff75d758b98987c7ec39a0"
+      },
+      "exit_code": 0,
+      "wall_seconds": 52.979792459,
+      "verification": {
+        "path": ".mlf-build/test-classification/validation/distribution-r3/verification.json",
+        "sha256": "e4a25afbe4e8835a92f6091b813f8e395a521dac505ee455f671148e5971fbaa"
+      },
+      "scope": "partial",
+      "catalog_units": [
+        "package-distribution"
+      ],
+      "selected_units": {
+        "package-distribution": {
+          "path": "/Volumes/src/mlf/.mlf-build/test-classification/validation/distribution-r3/selected/package-distribution/verification.json",
+          "sha256": "1c29f55c3f4d43f03ac499275b742fb648843fa2630f044dc5af2e0719c38e46",
+          "units": [
+            "package-distribution"
+          ]
+        }
+      },
+      "suites": {
+        "packages": {
+          "scope": "partial",
+          "coverage": {
+            "aliases": 0,
+            "executions": 28,
+            "metrics": {},
+            "schema_version": 1,
+            "suite": "packages"
+          }
+        }
+      }
+    },
+    {
+      "name": "integration-r3",
+      "record": {
+        "path": ".mlf-build/test-classification/integration-r3-command.json",
+        "sha256": "56994cfb10e6ba10656d35436c7d7942c776d4d2599c305933700ea420ee976b"
+      },
+      "exit_code": 0,
+      "wall_seconds": 100.271876125,
+      "verification": {
+        "path": ".mlf-build/test-classification/validation/integration-r3/verification.json",
+        "sha256": "c42a6821ba7a375512def7be392d133417860911f1ad6dd508d276d14b51ba7c"
+      },
+      "scope": "partial",
+      "catalog_units": [
+        "package-integration"
+      ],
+      "selected_units": {
+        "package-integration": {
+          "path": "/Volumes/src/mlf/.mlf-build/test-classification/validation/integration-r3/selected/package-integration/verification.json",
+          "sha256": "9364dd946b54bc59c4e4554ea22a673c2ab1b5fe1ae4cec2dd76d2361347b441",
+          "units": [
+            "package-integration"
+          ]
+        }
+      },
+      "suites": {
+        "packages": {
+          "scope": "partial",
+          "coverage": {
+            "aliases": 0,
+            "executions": 47,
+            "metrics": {},
+            "schema_version": 1,
+            "suite": "packages"
+          }
+        }
+      }
+    },
+    {
+      "name": "unit-r3",
+      "record": {
+        "path": ".mlf-build/test-classification/unit-r3-command.json",
+        "sha256": "c0f2f30725b034d7c734f8a9051fb589a32acb6595b3dfa6cef738fdeb3f08fe"
+      },
+      "exit_code": 0,
+      "wall_seconds": 556.206116458,
+      "verification": {
+        "path": ".mlf-build/test-classification/validation/unit-r3/verification.json",
+        "sha256": "bc0ccb12b10070f198c5a1d93f001529151a35d81249e67e548127b58780a25e"
+      },
+      "scope": "full",
+      "catalog_units": [
+        "regex",
+        "harness",
+        "test-framework",
+        "core",
+        "figure12"
+      ],
+      "selected_units": {},
+      "suites": {
+        "core": {
+          "scope": "full",
+          "coverage": {
+            "aliases": 0,
+            "executions": 684,
+            "metrics": {
+              "annotation-executed": 126,
+              "hm-distinct-generated": 4991,
+              "hm-executed": 6703,
+              "hm-exhaustive": 1712,
+              "hm-generated": 5000,
+              "hm-prescribed": 6712,
+              "hm-typable": 2901,
+              "substring-executed": 13
+            },
+            "schema_version": 1,
+            "suite": "core"
+          }
+        },
+        "figure12": {
+          "scope": "full",
+          "coverage": {
+            "aliases": 2,
+            "executions": 77,
+            "metrics": {
+              "paper-expressions": 43,
+              "paper-rows": 34
+            },
+            "schema_version": 1,
+            "suite": "figure12"
+          }
+        },
+        "harness": {
+          "scope": "full",
+          "coverage": {
+            "aliases": 0,
+            "executions": 67,
+            "metrics": {
+              "regex-redux-interpreted-executed": 2,
+              "regex-redux-native-executed": 7
+            },
+            "schema_version": 1,
+            "suite": "harness"
+          }
+        },
+        "regex": {
+          "scope": "full",
+          "coverage": {
+            "aliases": 0,
+            "executions": 56,
+            "metrics": {
+              "invalid-patterns-executed": 17
+            },
+            "schema_version": 1,
+            "suite": "regex"
+          }
+        },
+        "test-framework": {
+          "scope": "full",
+          "coverage": {
+            "aliases": 0,
+            "executions": 4,
+            "metrics": {},
+            "schema_version": 1,
+            "suite": "test-framework"
+          }
+        }
+      }
+    },
+    {
+      "name": "packages-r3",
+      "record": {
+        "path": ".mlf-build/test-classification/packages-r3-command.json",
+        "sha256": "53ec85c62fdce9b554eaab4faa7ea8b306a722a552f68bb8eb8cdd75b7e73992"
+      },
+      "exit_code": 0,
+      "wall_seconds": 139.808418125,
+      "verification": {
+        "path": ".mlf-build/test-classification/validation/packages-r3/verification.json",
+        "sha256": "f6a24a344c2cf135153c8c3b792f5476ac379eeee4327ca0d5721c08810dbe08"
+      },
+      "scope": "full",
+      "catalog_units": [
+        "package-integration",
+        "package-distribution"
+      ],
+      "selected_units": {},
+      "suites": {
+        "packages": {
+          "scope": "full",
+          "coverage": {
+            "aliases": 0,
+            "executions": 75,
+            "metrics": {},
+            "schema_version": 1,
+            "suite": "packages"
+          }
+        }
+      }
+    },
+    {
+      "name": "package-selection-r3",
+      "record": {
+        "path": ".mlf-build/test-classification/package-selection-r3-command.json",
+        "sha256": "ea46af38b7fccb157f95cb4a78bc50be82816f4a8dc402e6b87fdd7f81d05167"
+      },
+      "exit_code": 0,
+      "wall_seconds": 141.922193125,
+      "verification": {
+        "path": ".mlf-build/test-classification/validation/package-selection-r3/verification.json",
+        "sha256": "747926692dddde7020d16a38ff34afd47de8bed5ebb7057791410d88c4613c87"
+      },
+      "scope": "partial",
+      "catalog_units": [
+        "package-integration",
+        "package-distribution"
+      ],
+      "selected_units": {
+        "packages": {
+          "path": "/Volumes/src/mlf/.mlf-build/test-classification/validation/package-selection-r3/selected/packages/verification.json",
+          "sha256": "2e69ccd3c6c1a5aeaa3377d10950c48127d7874e36aba10f67608e026cf467e9",
+          "units": [
+            "package-integration",
+            "package-distribution"
+          ]
+        }
+      },
+      "suites": {
+        "packages": {
+          "scope": "full",
+          "coverage": {
+            "aliases": 0,
+            "executions": 75,
+            "metrics": {},
+            "schema_version": 1,
+            "suite": "packages"
+          }
+        }
+      }
+    },
+    {
+      "name": "smoke-r3",
+      "record": {
+        "path": ".mlf-build/test-classification/smoke-r3-command.json",
+        "sha256": "f3955d376cec236878de8964991b2e1cb43dd942ed35d7c94a8bfb7d25e444bb"
+      },
+      "exit_code": 0,
+      "wall_seconds": 120.533128083,
+      "verification": {
+        "path": ".mlf-build/test-classification/validation/smoke-r3/verification.json",
+        "sha256": "8734a3d668dcb0da29b29ee161dd3fcf9ded7a66ad6f1ca2a60e13c787c434a5"
+      },
+      "scope": "smoke",
+      "catalog_units": [],
+      "selected_units": {},
+      "suites": {
+        "test-framework": {
+          "scope": "full",
+          "coverage": {
+            "aliases": 0,
+            "executions": 4,
+            "metrics": {},
+            "schema_version": 1,
+            "suite": "test-framework"
+          }
+        }
+      },
+      "matrices": {
+        "compact-gc": {
+          "backend_names": [
+            "interpreter",
+            "llvm"
+          ],
+          "backends": 2,
+          "cli_compiler": "/Volumes/src/mlf/.mlf-build/compact-only/r3/build/bin/emlf",
+          "gc_free_space_divisor": 1,
+          "gc_initial_heap_bytes": 8388608,
+          "log_sha256": "62e1ad29375390ef4ab3dc91fac8fb200ca8a4799a526b61d825483a2e3ef8a9",
+          "rows": 12
+        }
+      },
+      "package_smoke": {
+        "backends": [
+          "interpreter",
+          "llvm"
+        ],
+        "cached": "2aa57172bb5590fa0354a8992f8d69827387198fb58cb141b37499e7fffe4333",
+        "cases": 3,
+        "changed": "2aa57172bb5590fa0354a8992f8d69827387198fb58cb141b37499e7fffe4333",
+        "initial": "2aa57172bb5590fa0354a8992f8d69827387198fb58cb141b37499e7fffe4333"
+      }
+    },
+    {
+      "name": "infrastructure-selection-r3",
+      "record": {
+        "path": ".mlf-build/test-classification/infrastructure-selection-r3-command.json",
+        "sha256": "9531614cda70e5c44c9c593e19aa72bf35feb387ec66d4017d02d70d8c778fe9"
+      },
+      "exit_code": 0,
+      "wall_seconds": 135.762389125,
+      "verification": {
+        "path": ".mlf-build/test-classification/validation/infrastructure-selection-r3/verification.json",
+        "sha256": "8d1126b0735b7df0d2075a756ef87b2c0f037ea8e34ed89f51fa981aed0624cb"
+      },
+      "scope": "partial",
+      "catalog_units": [
+        "harness",
+        "test-framework"
+      ],
+      "selected_units": {
+        "harness": {
+          "path": "/Volumes/src/mlf/.mlf-build/test-classification/validation/infrastructure-selection-r3/selected/harness/verification.json",
+          "sha256": "cf8dc826dcd1f5df05cf57dbcd58fde19f4b0b08f936fa247c99a42367a622f8",
+          "units": [
+            "harness"
+          ]
+        },
+        "test-framework": {
+          "path": "/Volumes/src/mlf/.mlf-build/test-classification/validation/infrastructure-selection-r3/selected/test-framework/verification.json",
+          "sha256": "17b5f5fb18779de7c973cbc3a4a4eab944ccfb86272e2bddaceccb8725a0896e",
+          "units": [
+            "test-framework"
+          ]
+        }
+      },
+      "suites": {
+        "harness": {
+          "scope": "full",
+          "coverage": {
+            "aliases": 0,
+            "executions": 67,
+            "metrics": {
+              "regex-redux-interpreted-executed": 2,
+              "regex-redux-native-executed": 7
+            },
+            "schema_version": 1,
+            "suite": "harness"
+          }
+        },
+        "test-framework": {
+          "scope": "full",
+          "coverage": {
+            "aliases": 0,
+            "executions": 4,
+            "metrics": {},
+            "schema_version": 1,
+            "suite": "test-framework"
+          }
+        }
+      }
+    }
+  ],
+  "source_hash_comparisons": 3171,
+  "static_checks": {
+    "result": {
+      "path": ".mlf-build/test-classification/final-static-checks.json",
+      "sha256": "ecaef3c66e6b1df83006780ee669f2e5366f1b2d2ab2eb1e7d108d346bc1fb87"
+    },
+    "checks": [
+      {
+        "name": "locked-root-plan",
+        "executable": "/Volumes/src/mlf/.mlf-build/test-classification/build/bin/mlfpkg",
+        "args": [
+          "--locked",
+          "plan"
+        ],
+        "exit_code": 0
+      },
+      {
+        "name": "tests-plan",
+        "executable": "/Volumes/src/mlf/.mlf-build/test-classification/build/bin/mlfpkg",
+        "args": [
+          "--manifest",
+          "tests/mlf-package.json",
+          "plan"
+        ],
+        "exit_code": 0
+      },
+      {
+        "name": "extended-smoke-shell-syntax",
+        "executable": "bash",
+        "args": [
+          "-n",
+          "tools/release/extended-pr-smoke.sh"
+        ],
+        "exit_code": 0
+      },
+      {
+        "name": "whitespace",
+        "executable": "git",
+        "args": [
+          "diff",
+          "--check"
+        ],
+        "exit_code": 0
+      },
+      {
+        "name": "json:mlf-package.json",
+        "sha256": "f7aa2e11f7029f641e882535a8c8cc9140756c1b4a1bd08c4ce492a294993872"
+      },
+      {
+        "name": "json:mlf.lock",
+        "sha256": "66acd7c660cfefd1777170d244584772de383d50857f37f6fa71af73fc7172ec"
+      },
+      {
+        "name": "json:tests/mlf-package.json",
+        "sha256": "11dac7d38dc130c54ce31d80b41150e909f3cada982890a8698f9854ec7c7c24"
+      },
+      {
+        "name": "json:tests/test-catalog.json",
+        "sha256": "70792e0746352f3d18cad66bba501ba5fa225b5abc209d70b3577022891ae823"
+      },
+      {
+        "name": "json:tests/golden/unit-inventory.json",
+        "sha256": "c45a46d1303d340289fcb6e7b77ce3dc9042f3c32d4d2c6ae452eb9c85d5f9ae"
+      }
+    ]
+  },
+  "package_cwd_regression": {
+    "before": {
+      "record": {
+        "path": ".mlf-build/test-classification/framework-package-cwd-before-command.json",
+        "sha256": "bca02a6d030d2d79f2d7ba6bc15f73966565af8057cbcf490a0b6ecce2f88839"
+      },
+      "exit_code": 1,
+      "diagnostic": "mlfpkg: missing JSON file: tests/test-catalog.json"
+    },
+    "after": {
+      "record": {
+        "path": ".mlf-build/test-classification/framework-package-cwd-after-r3-command.json",
+        "sha256": "d8060a2051f0d3d2ddf56877bb3eb681f1b9dd55d90c9bd6a638776817ca989e"
+      },
+      "exit_code": 0,
+      "wall_seconds": 0.015946792
+    }
+  },
+  "extended_smoke_receipt": {
+    "result": {
+      "path": ".mlf-build/test-classification/extended-receipt-results.json",
+      "sha256": "c91353698f5442de716d6ba6a1467650b3c6dd669399cfb1d1d6cf0b0259c711"
+    },
+    "validation": "exact modified jq receipt predicate against actual smoke artifacts and mutations; the complete shell bootstrap was not rerun",
+    "checks": [
+      {
+        "name": "actual",
+        "code": 0,
+        "signal": null
+      },
+      {
+        "name": "missing-catalog-checkpoint",
+        "code": 1,
+        "signal": null
+      },
+      {
+        "name": "truncated-framework",
+        "code": 1,
+        "signal": null
+      }
+    ]
+  },
+  "limits": [
+    "Full backend, port, parity and self-host campaigns were not rerun for this reorganization; the smoke path exercised the existing native driver and two-backend execution paths.",
+    "Selection runs complete catalog execution units. Existing case-level migration remains the IntSet union case; generated-loop input selection is unchanged.",
+    "Wall times include builds and execution, with a shared cache warmed by preceding commands. These observations are not an apples-to-apples performance comparison.",
+    "The complete extended-pr-smoke.sh bootstrap was not rerun; its exact modified receipt predicate was tested against real smoke artifacts and failing mutations."
+  ]
+}

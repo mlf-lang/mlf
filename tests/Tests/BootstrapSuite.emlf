@@ -8,12 +8,18 @@ import qualified Package.Verification as V
 import qualified Tests.Basic as H
 rejected : forall a. Either String a -> IO Unit
 rejected result = H.assert (S.isLeft result) "damaged bootstrap evidence accepted"
+collector = J.Object (Cons (Pair "cflags" (J.stringArray (Cons "-I/path with spaces/include" Nil))) (Cons (Pair "libs" (J.stringArray (Cons "/path with spaces/libgc.a" Nil))) Nil))
+candidate = "/selected compiler/emlf-stage3"
+selected = "Module CLI compiler: " ++ candidate ++ "\n"
+matrix = "Backend matrix: 468 rows x 2 backends; no missing executions\n423 shared IO/prelude/backend fixtures; 0 failures\n"
+
 main : IO Unit
 main = do
- let collector = J.Object (Cons (Pair "cflags" (J.stringArray (Cons "-I/path with spaces/include" Nil))) (Cons (Pair "libs" (J.stringArray (Cons "/path with spaces/libgc.a" Nil))) Nil))
- let candidate = "/selected compiler/emlf-stage3"
- let selected = "Module CLI compiler: " ++ candidate ++ "\n"
- let matrix = "Backend matrix: 468 rows x 2 backends; no missing executions\n423 shared IO/prelude/backend fixtures; 0 failures\n"
+ matrixChecks
+ parityChecks
+
+matrixChecks : IO Unit
+matrixChecks = do
  value <- H.right (V.matrixSummary (selected ++ matrix) candidate)
  H.assert (eqString (J.getText "cli_compiler" "" value) candidate) "matrix compiler identity changed"
  S.mapM_ (\log -> rejected (V.matrixSummary log candidate)) (Cons matrix (Cons (selected ++ selected ++ matrix) (Cons ("Module CLI compiler: /seed/emlf\n" ++ matrix) (Cons (selected ++ O.replace "468 rows" "0 rows" matrix) (Cons (selected ++ O.replace "0 failures" "1 failures" matrix) Nil)))))
@@ -39,6 +45,9 @@ main = do
  S.mapM_ (\damaged -> H.assert (S.not (V.validPortTargetChecks "foundation" hash damaged)) "incomplete or mismatched target checks accepted") (Cons (J.set "format" (J.num 0) receipt) (Cons (J.set "fixture" (J.str "another") receipt) (Cons (J.set "target_sha256" (J.str "changed") receipt) (Cons (J.set "entry_type" (J.str "Int") receipt) (Cons (J.set "inferred_type" (J.str "") receipt) (Cons (J.set "checks" (J.Array Nil) receipt) Nil))))))
  Coverage.passed "harness" "test_compact_plan_builds_drivers_once_and_runs_native_matrix"
  putStrLn "PASS test_compact_plan_builds_drivers_once_and_runs_native_matrix"
+
+parityChecks : IO Unit
+parityChecks = do
  let nativePort = "Backend matrix: 25 rows x 1 backends; no missing executions\n"
  H.right (V.validateMatrixAudit 25 (Cons "llvm" Nil) nativePort)
  H.right (V.validateMatrixAudit 468 (O.words "interpreter llvm") matrix)
