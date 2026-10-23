@@ -1,5 +1,24 @@
 # Native MLF compiler tests
 
+The root `tuple-list` test target checks tuple/list sugar through the checkout
+frontend: fixed ASTs and types, malformed syntax, current and frozen target
+checking, serialized-target round trips, module scope and lazy interpretation.
+Run `./mlfpkg --timeout 21600 test --target tuple-list` with the configured
+native input tools. It also runs as part of the ordinary root `mlfpkg test`.
+Its harness deliberately uses the previously released source syntax so a seed
+compiler can build it while its string fixtures exercise the new parser.
+It is separate from the existing Core inventory and does not change the six
+full compiler qualification campaigns. These focused checks do not establish
+LLVM execution parity or a self-hosting fixed point.
+The POSIX root `tuple-list-native` target builds the checkout compiler and runs
+the actual interpreter/native fixture. Run
+`./mlfpkg --timeout 21600 test --target tuple-list-native`, or use an already
+built compiler with `bash tools/release/test-tuple-list.sh /absolute/path/to/emlf`. With
+Clang, GMP and BDWGC configured, it checks nine independently specified output
+lines on both paths, including recursion, tuple arities, do patterns and lazy
+fields. Its source and expected output are `fixtures/tuple-list-runtime.*`;
+logs and generated LLVM default to `.mlf-build/tuple-list-runtime/`.
+
 Pull requests require the small [compiler source smoke suite](../docs/ci.md):
 the verified seed interprets `PRQuickMain.emlf` against the checkout frontend and
 current/frozen target checkers through the split library roots, with two accepted
