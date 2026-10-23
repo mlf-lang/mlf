@@ -47,7 +47,11 @@ build disables package repositories and uses workspace-local configuration.
 ```sh
 python3 ghc-host/build.py --optimization 2
 python3 ghc-host/test.py
+python3 ghc-host/test.py --optimization 2 --native-reference /absolute/path/to/native-n1/bin/emlf
+python3 ghc-host/test_async.py
 .mlf-build/ghc-host/bin/tuple-list
+# Run serially in a fresh directory after focused tests; this can take hours.
+MLF_GC_PREFIX=/path/to/bdwgc python3 ghc-host/qualify.py --output "$PWD/.mlf-build/ghc-qualification"
 ```
 
 The generated Haskell, Cabal package, binaries and hash receipts live under

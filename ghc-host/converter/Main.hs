@@ -4,6 +4,9 @@ import System.Environment (getArgs)
 import System.Exit (die)
 import MLF.Host.Parser
 import MLF.Host.Emit
+import MLF.Host.Syntax (Module(..), Import(..))
+import Data.Graph (SCC(..), stronglyConnComp)
+import Data.List (intercalate)
 import Control.Monad (forM, forM_)
 
 main :: IO ()
@@ -19,6 +22,14 @@ main = do
           pure (source,target,name,ast)
         _ -> die "batch manifest expects SOURCE<TAB>OUTPUT<TAB>MODULE per line"
       let modules=[ast | (_,_,_,ast) <- jobs]
+      -- The implementation graph is acyclic. Guest module-cycle semantics are
+      -- handled by the original MLF compiler, not by this host translation.
+      -- Reject host cycles before following transitive module re-exports.
+      let graph=[(source,name,[n | Import _ n _ _ <- imports])
+                | (source,_,name,Module _ _ imports _) <- jobs]
+      forM_ (stronglyConnComp graph) $ \component -> case component of
+        AcyclicSCC _ -> pure ()
+        CyclicSCC sources -> die ("implementation dialect requires acyclic modules: "++intercalate ", " sources)
       forM_ jobs $ \(source,target,name,ast) -> either die (writeFile target) (emitModule modules source (Just name) ast)
     [source,target] -> convert source target Nothing
     [source,target,name] -> convert source target (Just name)
