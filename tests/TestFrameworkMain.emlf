@@ -11,6 +11,8 @@ import qualified Test.Process as P
 import qualified Tests.TestProcess as ProcessChecks
 import qualified Tests.Coverage as Coverage
 import qualified Tests.CoverageChecks as CoverageChecks
+import qualified Tests.TestCatalog as CatalogChecks
+import qualified Tests.FamilySelectionChecks as FamilyChecks
 
 -- An IO loop, without spawned descendants, exercises the actual timeout path.
 spin : IO Unit
@@ -35,12 +37,15 @@ main : IO Unit
 main = do
  args <- O.allArguments
  case args of
-  Nil -> T.checks
+  Nil -> do { T.checks; CatalogChecks.main; FamilyChecks.main }
   Cons "--legacy-fail-probe" Nil -> case C.toLegacy (C.test "probe/legacy" "legacy failure" Nil (A.fail "legacy assertion failure")) of { Pair _ action -> action }
   Cons "--verify-cli" (Cons directory (Cons unions Nil)) -> do
    Coverage.begin "test-framework" true
    T.checks
    Coverage.passed "test-framework" "framework/contracts"
+   CatalogChecks.main
+   FamilyChecks.main
+   Coverage.passed "test-framework" "framework/catalog-contracts"
    CoverageChecks.main
    Coverage.passed "test-framework" "framework/coverage-validator"
    CLI.main directory unions

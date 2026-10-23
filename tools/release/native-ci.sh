@@ -11,7 +11,7 @@ case "$group" in
     ;;
 esac
 test "$#" -le 1 || { printf '%s\n' 'Expected one test group.' >&2; exit 2; }
-case "$group" in smoke|source-smoke|pr-smoke|extended-pr-smoke|unit|packages|self-host|parity|backends|port) ;; *) exit 2 ;; esac
+case "$group" in smoke|source-smoke|pr-smoke|extended-pr-smoke|unit|packages|self-host|parity|backends|port|port-prepare-StateTypes|port-prepare-SolverReuse|port-prepare-InferenceConformance|port-prepare-other) ;; *) exit 2 ;; esac
 test -z "${MLF_TEST_RUNTIME_PROFILE:-}" || test "$MLF_TEST_RUNTIME_PROFILE" = compact-gc || exit 2
 evidence_group=$group
 if [ "$group" = source-smoke ]; then
@@ -31,7 +31,7 @@ if [ "$group" = packages ]; then
   }
   llvm-profdata --version
 fi
-if [ "$group" = port ]; then
+if [[ "$group" = port || "$group" = port-prepare-* ]]; then
   case "$(uname -s)" in
     Darwin) matrix_memory_bytes=$(sysctl -n hw.memsize) ;;
     Linux) matrix_memory_bytes=$(awk '/^MemTotal:/ {printf "%.0f\n", $2 * 1024}' /proc/meminfo) ;;
@@ -46,10 +46,7 @@ if [ "$group" = port ]; then
       export MLF_TEST_MATRIX_GC_DIVISOR=1
     fi
   fi
-  # Preparation holds several independently checked forms of large targets.
-  # Apply the same host memory policy before those forms are constructed.
   case "$MLF_TEST_MATRIX_GC_DIVISOR" in 1|2|4) ;; *) exit 2 ;; esac
-  export GC_FREE_SPACE_DIVISOR=$MLF_TEST_MATRIX_GC_DIVISOR
   printf 'Port matrix host memory: %s bytes; GC free-space divisor: %s\n' "$matrix_memory_bytes" "$MLF_TEST_MATRIX_GC_DIVISOR"
 fi
 mkdir -p .mlf-build/forbidden-tools
@@ -68,7 +65,7 @@ elif [ "$group" = smoke ]; then
   "$MLF_COMPILER" --type --expr '\x -> x'
   ./mlfpkg --compiler "$MLF_COMPILER" --runtime "$PWD/runtime/mlf_runtime.c" --manifest examples/packages/mlf-package.json --timeout 21600 test
 else
-  case "$group" in unit|packages|self-host|parity|backends|port) ;; *) exit 2 ;; esac
+  case "$group" in unit|packages|self-host|parity|backends|port|port-prepare-*) ;; *) exit 2 ;; esac
   # Native test commands retain their primary logs for the release evidence.
   # Follow those same files while tests run so CI also shows suite progress.
   mkdir -p .mlf-build/tests ".mlf-build/compiler-tests/$evidence_group"

@@ -22,6 +22,14 @@ sameProgram label guarded ordinary = Pair ("guards program: " ++ label) (do
   expected <- H.right (parseProgram "<ordinary program>" ordinary)
   H.assert (H.eq actual expected) ("guard lowering changed program: " ++ H.show actual))
 
+programAST : String -> String -> SExpr -> Pair String (IO Unit)
+programAST label source expected = Pair ("guards parser: " ++ label) (do
+  actual <- H.right (parseProgram "<guards annotation boundary>" source)
+  H.assert (H.eq actual (SProgram Nil expected)) (H.show actual))
+
+conditional : SExpr -> SExpr -> SExpr -> SExpr
+conditional condition yes no = SApp (SApp (SApp (SPrimitive PIfThenElse) condition) yes) no
+
 hasType : String -> String -> XType -> Pair String (IO Unit)
 hasType label source expected = Pair ("guards checking: " ++ label) (do
   result <- H.right (compile "<guards test>" source)
@@ -63,10 +71,18 @@ parserTests = Cons
   (sameProgram "function guard nested block layout" "choose x\n  | x > 0 = case x of\n      n -> n\n  | otherwise = 0\nmain = choose 42\n" "choose x = if x > 0 then case x of { n -> n } else 0; main = choose 42;") (Cons
   (sameProgram "expression guard inside ordinary then-do layout" "main = if true then do\n  if { | true -> printInt 42; | otherwise -> printInt 0 }\nelse printInt 1\n" "main = if true then do { if true then printInt 42 else printInt 0 } else printInt 1;") (Cons
   (sameProgram "ordinary if identifier compatibility" "otherwise = false; otherwiseValue = true; main = if otherwise then 0 else if otherwiseValue then 42 else 1;" "otherwise = false; otherwiseValue = true; main = if otherwise then 0 else if otherwiseValue then 42 else 1;") (Cons
+  (programAST "legacy annotation in RHS before bar" "f x | true = x : Int | otherwise = 0; f 42"
+    (SLet "f" (SLam "x" Nothing (conditional (SBoolLit true)
+      (SAnn (SVar "x") (SAnnotation Nil (SCon "Int" Nil))) (SIntLit 0)))
+      (SApp (SVar "f") (SIntLit 42)))) (Cons
+  (programAST "legacy annotation in condition before equals" "g flag | flag : Bool = 1 | otherwise = 0; g true"
+    (SLet "g" (SLam "flag" Nothing (conditional
+      (SAnn (SVar "flag") (SAnnotation Nil (SCon "Bool" Nil))) (SIntLit 1) (SIntLit 0)))
+      (SApp (SVar "g") (SBoolLit true)))) (Cons
   (Pair "guards parser: diagnostics keep original line and column" (case parseExpr "guards-position.emlf" "if {\n  | true -> 1;\n  | otherwise -> )\n}" of
     Left err -> H.assert (H.contains "guards-position.emlf:3:18:" err) err
     Right parsed -> H.fail (H.show parsed)))
-  Nil)))))))))))))
+  Nil)))))))))))))))
 
 checkingTests : List (Pair String (IO Unit))
 checkingTests = Cons

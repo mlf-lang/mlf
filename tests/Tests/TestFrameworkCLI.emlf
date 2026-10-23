@@ -33,8 +33,23 @@ main work unions = do
   H.assert (eqString (J.getText "name" "" result) "size-biased set unions agree with independent sorted lists") "migrated case label changed"
   selected <- check directory unions "exact" (O.words "--exact int-set/union-sorted-list --tag oracle --format json") 0
   H.assert (eqString selected text) "focused selection changed the migrated case"
+  categorized <- check directory unions "classified" (O.words "--category standard-library --technique property-based --technique differential --format json") 0
+  H.assert (eqString categorized text) "category or technique selection changed the migrated case"
+  metadata <- check directory unions "metadata" (O.words "--group runtime-library --level component --input exhaustive --oracle independent-reference --purpose conformance --format json") 0
+  H.assert (eqString metadata text) "separate metadata selectors changed the migrated case"
+  check directory unions "oracle-missing" (O.words "--oracle fixed-point") 2
+  check directory unions "category-missing" (O.words "--category compiler-components") 2
+  check directory unions "technique-missing" (O.words "--technique fixed-point") 2
   check directory unions "missing" (O.words "--exact missing") 2
   check directory unions "invalid" (O.words "--unknown") 2
+  -- Package-manager run/test commands execute from the tests package root.
+  -- Exercise that real directory independently of the campaign runner's cwd.
+  current <- canonicalPath "."
+  checkout <- fileExists (current ++ "/tests/mlf-package.json")
+  code <- O.exec (if checkout then current ++ "/tests" else current) (Cons self Nil) "" (directory ++ "/package-cwd.stdout") (directory ++ "/package-cwd.stderr") 120
+  H.assert (code == 0) "framework failed from the tests package directory"
+  packageOutput <- readFile (directory ++ "/package-cwd.stdout")
+  H.assert (H.contains "Test catalog classification and selection contracts passed" packageOutput) "package-directory launch omitted catalog contracts"
   check directory self "legacy-failure" (O.words "--legacy-fail-probe") 1
   legacyError <- readFile (directory ++ "/legacy-failure.stderr")
   H.assert (H.contains "TEST FAILURE: legacy assertion failure" legacyError) "legacy adapter swallowed assertion failure"

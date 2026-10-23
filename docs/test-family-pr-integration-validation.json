@@ -1,0 +1,80 @@
+{
+  "format": 1,
+  "recorded_at": "2026-10-23T08:47:30Z",
+  "purpose": "PR #10 integration with main after PR #7; targeted checks, not full qualification",
+  "integration_parents": {
+    "pr10": "64b78813a7a7b366dbb0322851dddb191fa36d2b",
+    "main": "55d4bd08c72e2b7c850cbdedd8c42ec82f0ea8d2"
+  },
+  "validation_scope": "targeted",
+  "full_qualification_rerun": false,
+  "preservation": {
+    "migrated_selectable_families": 161,
+    "total_catalog_families": 168,
+    "primary_groups": 7,
+    "full_campaigns": [
+      "unit",
+      "packages",
+      "backends",
+      "port",
+      "parity",
+      "self-host"
+    ],
+    "original_coverage_ids_aliases_metrics_preserved": true,
+    "added_framework_checkpoint": "framework/catalog-contracts",
+    "port_preparation_shards": [
+      "StateTypes",
+      "SolverReuse",
+      "InferenceConformance",
+      "other"
+    ],
+    "full_port_fixtures": 25
+  },
+  "checks": {
+    "native_manager_lock_regeneration": "passed",
+    "native_manager_locked_plan": "passed",
+    "release_metadata_and_shell_regressions": "passed",
+    "actionlint": "passed",
+    "catalog_coverage_partition_preservation": "passed",
+    "runner_typecheck": "terminated with exit 137 and no compiler diagnostic; no pass claimed",
+    "synthetic_port_transport_with_partial_shard_metadata": "52 passed; transport only, not compiler qualification",
+    "priority_barrier_protocol": "9 passed",
+    "workflow_timing_javascript_syntax": "passed"
+  },
+  "source_sha256": {
+    "tests/Tests/CompilerTests.emlf": "8cf7d7fc55c35d399a663a5485ed4b7ade2dcad4df15f02514b466d84075ea90",
+    "tests/test-catalog.json": "4a4545cf660ade9f64f76e31ead67e9a3092be80527d6c1cbd3e9fbe9899923d",
+    "tests/golden/unit-inventory.json": "54310d1ea5fddd4ca00254af0ed8f340c2b249538a1864515a90d74b1559ba19",
+    "mlf.lock": "ad4fb3ee8802cb3548ad23ed5d2106ec7e4defd80c5491ef4a8bb7fcf9432d0f"
+  },
+  "historical_standard_ci": {
+    "run": "https://github.com/mlf-lang/mlf/actions/runs/39884741365",
+    "head": "64b78813a7a7b366dbb0322851dddb191fa36d2b",
+    "result": "passed",
+    "source_smoke_seconds": 454,
+    "validates_this_integration": false
+  },
+  "limits": [
+    "The 161-family executions and prior full Unit, Packages, Backends, Port and PR-smoke results in test-family-selection-validation.json predate this integration.",
+    "No fresh integrated full campaign, parity or self-host result is claimed.",
+    "The 900-second source-smoke watchdog and twenty-minute job budget are headroom, not a measured speedup.",
+    "A whole-runner typecheck using the published Linux seed was terminated with exit 137. A lower-memory collector retry is supplementary, not a merge prerequisite."
+  ],
+  "linux_standard_gate": {
+    "parent_commit": "30f844c44ba5234ed36c8f339acdec0f3b375514",
+    "change": "Move required source smoke and native build-runner checks to Ubuntu 24.04; retain full macOS packages and all six campaigns.",
+    "official_release": "https://github.com/mlf-lang/mlf/releases/tag/v0.3.0",
+    "archive": "mlf-0.3.0-linux-x64.tar.gz",
+    "archive_sha256": "ecfa16763745144c7b859354620d9fcad5bbedf4efe14972300b1ec1dacb8aeb",
+    "archive_verification": "Fresh official download matched release API digest and SHA256SUMS; extracted compiler, manager and COMMIT matched committed pin.",
+    "pin_sha256": "d7963c160bc372edbc907920a72a3c7d41949b71236e018c4c334a6583592d70",
+    "checks": {
+      "actionlint": "passed",
+      "release_metadata_and_shell_regressions": "passed",
+      "seed_platform_pin_regressions": 11,
+      "pr_aggregate_negative_and_success_regressions": 23
+    },
+    "hosted_linux_source_smoke": "pending; no green hosted Linux source result claimed before publication",
+    "full_macos_qualification": "preserved, not rerun for this workflow-only change"
+  }
+}
