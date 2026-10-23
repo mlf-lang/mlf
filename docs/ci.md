@@ -81,6 +81,25 @@ the event, exact commits, changed paths, diff hash and reason. `not-executed` is
 selection result, never evidence that interpreter/native parity passed. A failed
 selector or any selected failing/cancelled/skipped required job blocks PR gate.
 
+### Released-seed primitive transition
+
+The complete qualification producer starts from the independently pinned seed,
+but that released compiler predates `processSupervisor`. `timed-bootstrap.sh`
+therefore runs the same isolated stage-1 bridge and real stage-2 compiler
+transition as the async-language gate before its locked root build. It verifies
+the capability receipt and compiler/manager/helper hashes, then uses the real
+stage-2 compiler and current manager to produce the ordinary root build report,
+native tools and checked portable LLVM. A stage-1 shim is never the exported
+qualification candidate. The later authenticated candidate rebuild, shared
+runner preparation and six-campaign receipts remain unchanged.
+
+The cold transition is included in the existing bootstrap RSS budget and timing
+summary, together with the checked root build and native helper. Its enclosing
+timing row includes stage-2 child calls; it must not be added to overlapping
+per-command totals. Both bootstrap callers retain the transition's source input
+hashes, capability and tool identities, build reports, command diagnostics and
+cache proof records, including on failure.
+
 ## Enforce before merging
 
 Require **PR gate** from GitHub Actions in the branch protection rule or ruleset
