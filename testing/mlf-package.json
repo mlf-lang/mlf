@@ -11,7 +11,18 @@
     "modules": {
       "Test.Assert": "Test/Assert.emlf",
       "Test.Case": "Test/Case.emlf",
-      "Test.Runner": "Test/Runner.emlf"
+      "Test.Runner": "Test/Runner.emlf",
+      "Test.Descriptor": "Test/Descriptor.emlf",
+      "Test.Registry": "Test/Registry.emlf",
+      "Test.Outcome": "Test/Outcome.emlf",
+      "Test.Expectation": "Test/Expectation.emlf",
+      "Test.Evidence": "Test/Evidence.emlf",
+      "Test.Adapter": "Test/Adapter.emlf",
+      "Test.Fixture": "Test/Fixture.emlf",
+      "Test.Plan": "Test/Plan.emlf",
+      "Test.Resources": "Test/Resources.emlf",
+      "Test.Capability": "Test/Capability.emlf",
+      "Test.Diagnostics": "Test/Diagnostics.emlf"
     }
   }
 }

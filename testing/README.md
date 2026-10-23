@@ -126,3 +126,51 @@ uses `Tests.Selection` and strict partial receipts; it is separate from the
 generic `Test.Runner` case protocol above. See the
 [compiler test selection guide](../tests/README.md) for batching, coverage
 projections and full-campaign commands.
+
+## Typed migration contracts (envelope v2)
+
+The existing `Case` constructor, `Runner.Result`, CLI, and Runner JSONL schema
+v1 remain compatible for one migration cycle; no removal date is set before
+all existing consumers are migrated and reviewed. `Case.descriptor` is the
+explicit v1-to-descriptor bridge and does not execute the case. `Runner.typedOutcome`
+retains assertion failures, and `Assert.expect` checks typed observations.
+The count-only `Runner.summaryJson` helper cannot authenticate identities;
+`Runner.run` now uses `summaryJsonFor` to check the actual selected IDs as well.
+
+- `Test.Descriptor` owns stable IDs, positive contract revisions, metadata,
+  required/optional policy and expectations. Source hashes are not IDs.
+- `Test.Registry` rejects duplicate, missing and unknown IDs without silently
+  converting inventories to sets. Registry selection cannot be empty.
+- `Test.Outcome` distinguishes assertions, expected rejection, crash, timeout,
+  cancellation, protocol/infrastructure failures, unsupported and skip.
+- `Test.Expectation` binds rejection to an exact phase, diagnostic code,
+  nonzero exit code and independent verification. Expected signals likewise
+  require an explicit phase/reason/signal. Deadline and interruption never pass.
+  An expected child timeout must be validated as data by an adapter whose
+  outer observation completes normally; it is not a timeout of that case.
+- `Test.Evidence` validates typed version-2 envelopes against a trusted plan.
+  Run/attempt and catalog/plan/source/tools/config/manifest/lock/runtime/
+  dependencies/platform identities must match exactly. Source identity must
+  include dirty-tree content. Start/terminal events are paired per ID, with
+  duplicate, unknown and out-of-order events rejected. Sealing requires the
+  exact selected terminal inventory and a finished cleanup operation.
+
+`Evidence.assess` is pure: adapters must obtain actual input identities and read
+raw artifacts to compute `RawEvidence`'s actual digest independently of the
+recorded digest. Supplying two copies of an untrusted claimed hash does not
+verify bytes. No raw payload or independent oracle is replaced by this envelope.
+Legacy receipts missing identities or cleanup evidence cannot be promoted to
+v2 qualification by filling in assumed values.
+
+A plan explicitly declares `FullQualification` or `SelectedCoverage` intent.
+An exact physical shard inventory is not a logical full universe. Reserved
+`logical-scope:partial` and `qualification:ineligible` tags conservatively block
+full scope or qualification respectively, including through the v1 bridge.
+
+Completion, success and full selection are independent. A full failed run may
+be complete; a partial successful run cannot qualify. Optional, explained
+skip/unsupported observations may satisfy a development selection's policy,
+but never make qualification eligible. Required skips, failed cleanup, stale
+bindings, corrupt evidence and unfinished receipts cannot pass a gate.
+Compiler-specific oracles remain outside the generic library. Focused controls
+live in `Tests.TestFramework` under its existing reviewed coverage inventory.

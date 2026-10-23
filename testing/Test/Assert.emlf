@@ -1,5 +1,7 @@
 module Test.Assert where
 import Bootstrap.Types
+import qualified Test.Expectation as E
+import qualified Test.Outcome as O
 
 -- Ordinary assertion failures are values. IO exits, panics and crashes are not
 -- caught; callers that need that isolation must supervise a separate process.
@@ -44,3 +46,10 @@ orExit action = do
  case result of
   Right value -> ioReturn value
   Left failure -> do { putErr ("TEST FAILURE: " ++ describe failure ++ "\n"); exitWith 1 }
+
+-- Typed observations retain phase-specific rejection semantics. Timeouts and
+-- cancellation are failures of the outer case, never generic expected failures.
+expect : E.Expectation -> E.Observation -> Test O.Outcome
+expect expected observation =
+ let outcome = E.match expected observation in
+ if O.successful outcome then succeed outcome else fail (O.status outcome ++ ": " ++ O.message outcome)
