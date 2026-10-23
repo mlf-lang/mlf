@@ -167,9 +167,11 @@ reduction; the raw measurements and exact compiler hashes are linked there.
 The [native release workflow](docs/releases.md) requires all six native groups,
 a fresh self-host fixed point, and relocation/installation checks before
 packaging the tested executables. It records the build host and native library
-dependencies. The separate [performance report](benchmarks/RESULTS.md) verifies
-all nine workloads at **3× C compilation / 2× C runtime** using its explicit
-LLVM/linker configuration. This performance run is separate from release CI.
+dependencies. Every push to `main` now runs complete native qualification and all ten
+Benchmark Game workloads with **3× C compilation / 2× C runtime** gates; SDK
+packaging remains release-only. The historical [performance report](benchmarks/RESULTS.md)
+covers nine workloads and does not prove that the complete ten-workload gate
+passes. Failed correctness or performance checks remain failures.
 
 The Haskell compiler, Cabal project, and old Haskell/Python test and build
 harnesses have been removed. Native MLF is the supported build and test path.
