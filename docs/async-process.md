@@ -124,7 +124,7 @@ lifecycle scenarios. `tests/native/process_supervisor_tests.c` covers dynamic
 admission, single-job progress, queue and retention limits, environment/argv
 ownership, repeated await and event delivery, launch failures, cancellation,
 deadlines, logs, and forced owner death. The same native suite is required on
-Linux, macOS, and Windows CI.
+Linux and Windows before merging, and also runs on macOS in main/manual CI.
 
 Run the MLF-level suite with
 `tools/release/test-async-process.sh COMPILER OUTPUT-DIRECTORY` after qualifying
