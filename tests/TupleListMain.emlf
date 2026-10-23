@@ -6,6 +6,7 @@ import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Bootstrap.Map as M
 import qualified Bootstrap.Parser as Parser
+import qualified Bootstrap.Parsec as Parsec
 import qualified Bootstrap.SourceEquality as Equality
 import qualified Bootstrap.Compiler as Compiler
 import qualified Bootstrap.Runtime as Runtime
@@ -60,6 +61,21 @@ sameExpression label source expected = do
  actual <- right (Parser.parseExpr "tuple-list.emlf" source)
  require (Equality.eqExpr actual expected) (label ++ ": unexpected expression AST")
  passed label
+sameBoundary : String -> String -> String -> SExpr -> IO Unit
+sameBoundary label delimiter source expected = do
+ actual <- right (Parser.parseLayout false (Parsec.pBefore Parser.expr (Parsec.pToken delimiter)) "tuple-list-boundary.emlf" source)
+ require (Equality.eqExpr actual expected) (label ++ ": unexpected expression before delimiter")
+ passed label
+-- A surrounding parser owns these delimiters; no guards grammar is needed.
+boundaryChecks : IO Unit
+boundaryChecks = do
+ sameBoundary "colon annotation before bar" "|" "x : Int |" (SAnn (SVar "x") (SAnnotation Nil intType))
+ sameBoundary "colon annotation before equals" "=" "flag : Bool =" (SAnn (SVar "flag") (SAnnotation Nil boolType))
+ sameBoundary "explicit annotation before bar" "|" "x :: Int |" (SAnn (SVar "x") (SAnnotation Nil intType))
+ sameBoundary "explicit annotation before equals" "=" "flag :: Bool =" (SAnn (SVar "flag") (SAnnotation Nil boolType))
+ sameBoundary "lowercase tail remains cons before bar" "|" "x : xs |" (cons (SVar "x") (SVar "xs"))
+ sameBoundary "empty tail remains cons before equals" "=" "1 : [] =" (cons (SIntLit 1) nil)
+ sameBoundary "closed constructor annotation before bar" "|" "x : Nil |" (SAnn (SVar "x") (SAnnotation Nil (SCon "Nil" Nil)))
 sameAnnotation : String -> String -> SType -> IO Unit
 sameAnnotation label source expected = do
  actual <- right (Parser.parseAnnotation source)
@@ -231,6 +247,7 @@ scopeChecks = do
 main : IO Unit
 main = do
  parserChecks
+ boundaryChecks
  checkingChecks
  runtimeChecks
  scopeChecks
