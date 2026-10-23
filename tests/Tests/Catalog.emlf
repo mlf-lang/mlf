@@ -98,7 +98,7 @@ validate catalog = do
  let mapping = J.get "campaigns" catalog
  ensure (keys campaigns mapping) "catalog campaign inventory changed"
  S.mapM_ (\name -> ensure (stringList (J.get name mapping) && S.eqList eqString (J.getStrings name mapping) (campaignIds name)) ("catalog changed preserved campaign: " ++ name)) campaigns
- ensure (matrixRows (forUnit catalog "backends") == 575 && S.sum (S.map (\entry -> readInt (case J.get "fixtures" (J.get "evidence" entry) of { J.Number text -> text; _ -> "0" })) (forUnit catalog "backends")) == 523) "backend family partition changed"
+ ensure (matrixRows (forUnit catalog "backends") == 583 && S.sum (S.map (\entry -> readInt (case J.get "fixtures" (J.get "evidence" entry) of { J.Number text -> text; _ -> "0" })) (forUnit catalog "backends")) == 531) "backend family partition changed"
  ensure (unique (combine "labels" (forUnit catalog "backends"))) "duplicate backend fixture label"
  ensure (S.length (forUnit catalog "port") == 25 && matrixRows (forUnit catalog "port") == 25 && unique (fixtures (forUnit catalog "port"))) "port family partition changed"
 
