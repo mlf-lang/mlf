@@ -23,23 +23,90 @@ import qualified Tests.BootstrapPrimitives as Bs
 import qualified Tests.StateRuntime as Sr
 import qualified Tests.HigherOrderSpecialization as Hi
 import qualified Package.OS as O
+import qualified Tests.Selection as Selection
 suite : B.Backends -> List (Pair String (IO Unit))
 suite backends = S.append (Wr.backendTests backends) (S.concat (Cons (Io.ioTests backends) (Cons (Pr.preludeTests backends) (Cons (Sn.snakeTests backends) (Cons (Ba.backendTests backends) (Cons (Na.nativeOptimizationTests backends) (Cons (Co.constructorProjectionTests backends) (Cons (Fo.forceReuseTests backends) (Cons (Bo.boolConditionTests backends) (Cons (En.environmentAccessTests backends) (Cons (St.strictFieldTests backends) (Cons (Nu.numericArrayTests backends) (Cons (By.byteArrayTests backends) (Cons (Dn.dnaTests backends) (Cons (Mo.moduleBackendTests backends) (Cons (Se.separateBackendTests backends) (Cons (Bs.bootstrapPrimitiveTests backends) (Cons (Sr.stateRuntimeTests backends) (Cons (Hi.higherOrderTests backends) Nil)))))))))))))))))))
+-- Each family is a contract boundary over existing fixture actions. Selection
+-- filters the original suite, preserving its exact full and partial ordering.
+familyNames : List String
+familyNames = O.words "backends/strict-wrappers backends/io-language backends/io-runtime backends/io-target-validation backends/io-monad-laws backends/io-failures backends/prelude-language backends/prelude-import-equivalence backends/prelude-runtime backends/snake backends/surface-language backends/target-validation backends/target-runtime-input backends/target-semantics backends/example-corpus backends/tree-workload backends/native-arithmetic-boundaries backends/native-optimization backends/constructor-projection backends/force-reuse backends/boolean-lowering backends/environment-slots backends/strict-fields backends/numeric-language backends/numeric-specialization backends/numeric-target-validation backends/numeric-runtime backends/numeric-workloads backends/byte-language backends/byte-specialization backends/byte-target-validation backends/byte-io-failure backends/byte-runtime backends/byte-workloads backends/table-language backends/byte-input-runtime backends/table-specialization backends/table-runtime backends/dna-workloads backends/module-execution backends/module-cli backends/crate-linking backends/crate-cli backends/crate-invalidation backends/primitive-language backends/primitive-runtime backends/state-workers backends/state-runtime backends/higher-order-specialization"
+casesWith predicate cases = S.filter (\entry -> predicate (S.fst entry)) cases
+isIOLanguage label = O.starts "IO type: " label || O.starts "IO rejection: " label || eqString label "IO: unknown target primitive is rejected"
+isIOTarget label = O.starts "IO target: " label || eqString label "IO: pure programs are not executable entry points" || eqString label "IO: target verification happens before any effects"
+isIOLaw label = O.starts "IO monad law: " label
+isIOFailure label = eqString label "IO: EOF is reported and stops the continuation" || eqString label "IO: backend output errors are reported"
+isPreludeRuntime label = O.starts "prelude runtime: " label
+isPreludeImports label = O.starts "prelude: every compiler API " label || O.starts "prelude: unused imports preserve " label || eqString label "prelude: opt-out removes implicit class declarations"
+isNumericLanguage label = eqString label "numeric: types reject invalid numeric and array programs"
+isNumericNative label = O.starts "native scalar arguments: " label || O.starts "native numeric region: " label
+isByteLanguage label = eqString label "bytes: nominal types reject invalid operations"
+isByteNative label = S.elem eqString label (Cons "bytes: native loop emits every byte without Unicode conversion" (Cons "bytes: bulk copy preserves offsets, empty ranges and forward overlap" (Cons "bytes: native stores check bounds before byte range" (Cons "numeric region: integer-to-Double conversion preserves rounding" Nil))))
+isCrateCLI label = O.starts "crate CLI: " label
+isCrateInvalidation label = eqString label "crate runtime: source-free metadata and semantic invalidation"
+isPrimitiveLanguage label = eqString label "bootstrap primitives: signatures reject mismatched types"
+isStateWorker label = S.elem eqString label (S.map (\name -> "ST runtime: " ++ name) (O.words "bounded-non-tail-state-worker bounded-tail-state-worker bounded-mixed-tail-state-worker single-use-action-alias"))
+isBackendLanguage label = O.starts "backend: readability: " label || O.starts "backend: surface: " label || S.elem eqString label (Cons "backend: state dictionary result" (Cons "backend: superclass dictionary result" Nil))
+isBackendTarget label = O.starts "backend target: " label
+isBackendInput label = S.elem eqString label (Cons "backend: unicode-input" (Cons "backend: unicode" (Cons "backend: nul" (Cons "backend: final line without newline" (Cons "backend: unused input is retained" Nil)))))
+isBackendExample label = eqString label "backend: all examples execute"
+isBackendWorkload label = eqString label "backend: binary-trees benchmark"
+isNativeArithmetic label = S.elem eqString label (Cons "native optimization: tagged integer boundaries" (Cons "native optimization: ordinary products and division preserve Integer boundaries" Nil))
+isNumericTarget label = eqString label "numeric: non-finite target literal rejected by both backends"
+isNumericWorkload label = S.any (\prefix -> O.starts prefix label) (Cons "numeric: pidigits benchmark " (Cons "numeric: n-body benchmark " (Cons "numeric: spectral-norm benchmark " (Cons "numeric: fannkuch-redux benchmark " Nil))))
+isByteTarget label = eqString label "bytes: forged surrogate is rejected before encoding by both backends"
+isByteFailure label = eqString label "bytes: write failures stop continuation and preserve raw output"
+isByteWorkload label = S.any (\prefix -> O.starts prefix label) (Cons "bytes: fasta " (Cons "bytes: mandelbrot " Nil))
+isTableLanguage label = eqString label "table: nominal types and IO signatures are checked"
+isTableNative label = S.elem eqString label (Cons "table: native counting loop grows and updates collision-prone keys" (Cons "native IO: nested collections preserve caller values and prior results" (Cons "table fusion: snapshots, large signed keys and promotion across updates" Nil)))
+isModuleCLI label = eqString label "modules runtime: CLI imports and output paths"
+families : B.Backends -> List (Pair String (List (Pair String (IO Unit))))
+families backends =
+ let base = Ba.backendTests backends in
+ let native = Na.nativeOptimizationTests backends in
+ let dna = Dn.dnaTests backends in
+ let modules = Mo.moduleBackendTests backends in
+ let io = Io.ioTests backends in
+ let prelude = Pr.preludeTests backends in
+ let numeric = Nu.numericArrayTests backends in
+ let bytes = By.byteArrayTests backends in
+ let crates = Se.separateBackendTests backends in
+ let primitives = Bs.bootstrapPrimitiveTests backends in
+ let state = Sr.stateRuntimeTests backends in
+ (Cons (Pair "backends/strict-wrappers" (Wr.backendTests backends)) (Cons (Pair "backends/io-language" (casesWith isIOLanguage io)) (Cons (Pair "backends/io-runtime" (casesWith (\label -> S.not (isIOLanguage label || isIOTarget label || isIOLaw label || isIOFailure label)) io)) (Cons (Pair "backends/io-target-validation" (casesWith isIOTarget io)) (Cons (Pair "backends/io-monad-laws" (casesWith isIOLaw io)) (Cons (Pair "backends/io-failures" (casesWith isIOFailure io)) (Cons (Pair "backends/prelude-language" (casesWith (\label -> S.not (isPreludeRuntime label || isPreludeImports label)) prelude)) (Cons (Pair "backends/prelude-import-equivalence" (casesWith isPreludeImports prelude)) (Cons (Pair "backends/prelude-runtime" (casesWith isPreludeRuntime prelude)) (Cons (Pair "backends/snake" (Sn.snakeTests backends)) (Cons (Pair "backends/surface-language" (casesWith isBackendLanguage base)) (Cons (Pair "backends/target-validation" (casesWith isBackendTarget base)) (Cons (Pair "backends/target-runtime-input" (casesWith isBackendInput base)) (Cons (Pair "backends/target-semantics" (casesWith (\label -> S.not (isBackendLanguage label || isBackendTarget label || isBackendInput label || isBackendExample label || isBackendWorkload label)) base)) (Cons (Pair "backends/example-corpus" (casesWith isBackendExample base)) (Cons (Pair "backends/tree-workload" (casesWith isBackendWorkload base)) (Cons (Pair "backends/native-arithmetic-boundaries" (casesWith isNativeArithmetic native)) (Cons (Pair "backends/native-optimization" (casesWith (\label -> S.not (isNativeArithmetic label)) native)) (Cons (Pair "backends/constructor-projection" (Co.constructorProjectionTests backends)) (Cons (Pair "backends/force-reuse" (Fo.forceReuseTests backends)) (Cons (Pair "backends/boolean-lowering" (Bo.boolConditionTests backends)) (Cons (Pair "backends/environment-slots" (En.environmentAccessTests backends)) (Cons (Pair "backends/strict-fields" (St.strictFieldTests backends)) (Cons (Pair "backends/numeric-language" (casesWith isNumericLanguage numeric)) (Cons (Pair "backends/numeric-specialization" (casesWith isNumericNative numeric)) (Cons (Pair "backends/numeric-target-validation" (casesWith isNumericTarget numeric)) (Cons (Pair "backends/numeric-runtime" (casesWith (\label -> S.not (isNumericLanguage label || isNumericNative label || isNumericTarget label || isNumericWorkload label)) numeric)) (Cons (Pair "backends/numeric-workloads" (casesWith isNumericWorkload numeric)) (Cons (Pair "backends/byte-language" (casesWith isByteLanguage bytes)) (Cons (Pair "backends/byte-specialization" (casesWith isByteNative bytes)) (Cons (Pair "backends/byte-target-validation" (casesWith isByteTarget bytes)) (Cons (Pair "backends/byte-io-failure" (casesWith isByteFailure bytes)) (Cons (Pair "backends/byte-runtime" (casesWith (\label -> S.not (isByteLanguage label || isByteNative label || isByteTarget label || isByteFailure label || isByteWorkload label)) bytes)) (Cons (Pair "backends/byte-workloads" (casesWith isByteWorkload bytes)) (Cons (Pair "backends/table-language" (casesWith isTableLanguage dna)) (Cons (Pair "backends/byte-input-runtime" (casesWith (O.starts "byte input: ") dna)) (Cons (Pair "backends/table-specialization" (casesWith isTableNative dna)) (Cons (Pair "backends/table-runtime" (casesWith (\label -> S.not (isTableLanguage label || O.starts "byte input: " label || isTableNative label || O.starts "DNA: " label)) dna)) (Cons (Pair "backends/dna-workloads" (casesWith (O.starts "DNA: ") dna)) (Cons (Pair "backends/module-execution" (casesWith (\label -> S.not (isModuleCLI label)) modules)) (Cons (Pair "backends/module-cli" (casesWith isModuleCLI modules)) (Cons (Pair "backends/crate-linking" (casesWith (\label -> S.not (isCrateCLI label || isCrateInvalidation label)) crates)) (Cons (Pair "backends/crate-cli" (casesWith isCrateCLI crates)) (Cons (Pair "backends/crate-invalidation" (casesWith isCrateInvalidation crates)) (Cons (Pair "backends/primitive-language" (casesWith isPrimitiveLanguage primitives)) (Cons (Pair "backends/primitive-runtime" (casesWith (\label -> S.not (isPrimitiveLanguage label)) primitives)) (Cons (Pair "backends/state-workers" (casesWith isStateWorker state)) (Cons (Pair "backends/state-runtime" (casesWith (\label -> S.not (isStateWorker label)) state)) (Cons (Pair "backends/higher-order-specialization" (Hi.higherOrderTests backends)) Nil)))))))))))))))))))))))))))))))))))))))))))))))))
+validateFamilies allCases entries = do
+ let labels = S.map S.fst allCases
+ let partitioned = S.concatMap (\entry -> S.map S.fst (S.snd entry)) entries
+ H.assert (S.eqList eqString (S.map S.fst entries) familyNames) "backend family registry differs from discovery"
+ H.assert (S.all (\entry -> S.not (S.null (S.snd entry))) entries && S.length partitioned == S.length labels && S.length partitioned == S.length (S.nubBy eqString partitioned) && S.eqList eqString (S.sortBy compareString partitioned) (S.sortBy compareString labels)) "backend families do not partition the preserved fixture actions"
+validateSuite allCases = do
+ let labels = S.map S.fst allCases
+ H.assert (S.length allCases == 523) "preserved backend fixture coverage changed"
+ H.assert (S.length labels == S.length (S.nubBy eqString labels)) "duplicate backend fixture labels"
+runCases backends cases = S.mapM_ (\(Pair label action) -> B.inCase backends label (do { putStrLn label; action })) cases
 main : IO Unit
 main = do
  args <- O.allArguments
- B.withBackends (\backends -> do
-  let allCases = suite backends
-  let labels = S.map S.fst allCases
-  H.assert (S.length allCases == 523) "preserved backend fixture coverage changed"
-  H.assert (S.length labels == S.length (S.nubBy eqString labels)) "duplicate backend fixture labels"
-  cases <- case args of
-   Nil -> return allCases
-   Cons "--from" (Cons prefix Nil) -> do
-    let selected = S.dropWhile (\entry -> S.not (O.starts prefix (S.fst entry))) allCases
-    H.assert (S.not (S.null selected)) ("unknown backend fixture prefix: " ++ prefix)
-    return selected
-   _ -> H.fail "backends [--from FIXTURE-PREFIX]"
-  S.mapM_ (\(Pair label action) -> B.inCase backends label (do { putStrLn label; action })) cases
-  count <- B.auditBackends backends
-  putStrLn (showInt (S.length cases) ++ " shared IO/prelude/backend fixtures; 0 failures"))
+ if Selection.listing args then putStr (S.unlines familyNames) else case args of
+  Cons "--from" (Cons prefix Nil) -> B.withBackends (\backends -> do
+   let allCases = suite backends
+   validateSuite allCases
+   let cases = S.dropWhile (\entry -> S.not (O.starts prefix (S.fst entry))) allCases
+   H.assert (S.not (S.null cases)) ("unknown backend fixture prefix: " ++ prefix)
+   runCases backends cases
+   count <- B.auditBackends backends
+   putStrLn (showInt (S.length cases) ++ " shared IO/prelude/backend fixtures; 0 failures"))
+  _ -> do
+   Pair full selected <- H.right (Selection.choose familyNames args)
+   Selection.begin "backends" full selected
+   B.withBackends (\backends -> do
+    let allCases = suite backends
+    let entries = families backends
+    validateSuite allCases
+    validateFamilies allCases entries
+    let labels = S.concatMap (\entry -> if S.elem eqString (S.fst entry) selected then S.map S.fst (S.snd entry) else Nil) entries
+    let cases = S.filter (\entry -> S.elem eqString (S.fst entry) labels) allCases
+    runCases backends cases
+    count <- if full then B.auditBackends backends else B.auditSelectedBackends backends
+    S.mapM_ (Selection.passed "backends") selected
+    putStrLn (showInt (S.length cases) ++ " shared IO/prelude/backend fixtures; 0 failures"))
+   Selection.finish "backends"

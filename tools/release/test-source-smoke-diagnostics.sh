@@ -44,13 +44,13 @@ if [ "$TEST_SMOKE_MODE" = telemetry ]; then
 fi
 exec "$TEST_SMOKE_REAL_VM_STAT" "$@"
 SH
-# Accelerate only the watchdog in timeout cases. Production still requests 480s.
+# Accelerate only the watchdog in timeout cases. Production still requests 900s.
 cat > "$scratch/bin/sleep" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s %s\n' "$$" "$1" >> "$TEST_SMOKE_SCRATCH/sleep-pids.log"
 case "$1" in
-  480)
+  900)
     touch "$TEST_SMOKE_SCRATCH/watchdog.started"
     if [ "$TEST_SMOKE_MODE" = success ] || [ "$TEST_SMOKE_MODE" = telemetry ]; then exec "$TEST_SMOKE_REAL_SLEEP" 60; fi
     exec "$TEST_SMOKE_REAL_SLEEP" 0.5
@@ -142,7 +142,7 @@ for mode in success timeout progress telemetry; do
   grep -Fq '  libraries/mlf-foundation/mlf-package.json' "$build/sources.before.log"
   seed_pid=$(cat "$scratch/seed.pid")
   grep -Eq "^ *$seed_pid +" "$build/process.log"
-  grep -Eq ' 480$' "$scratch/sleep-pids.log"
+  grep -Eq ' 900$' "$scratch/sleep-pids.log"
   grep -Eq ' 30$' "$scratch/sleep-pids.log"
   assert_stopped "$seed_pid"
   while read -r pid seconds; do assert_stopped "$pid"; done < "$scratch/sleep-pids.log"
@@ -157,7 +157,7 @@ for mode in success timeout progress telemetry; do
   else
     test "$status" -eq 1
     jq -e '.complete == false' "$build/result.json" >/dev/null
-    grep -Fxq 'Current-source smoke exceeded 480 seconds.' "$scratch/run.log"
+    grep -Fxq 'Current-source smoke exceeded 900 seconds.' "$scratch/run.log"
     if [ "$mode" = progress ]; then
       grep -Fxq 'Checking accepted polymorphic-let' "$scratch/run.log"
     else
