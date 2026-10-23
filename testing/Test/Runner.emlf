@@ -3,6 +3,9 @@ import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Test.Assert as A
 import qualified Test.Case as C
+import qualified Test.Descriptor as D
+import qualified Test.Registry as Registry
+import qualified Test.Outcome as Outcome
 
 data Selector = Filter String | Exact String | Tag String
 data Options = Options Bool Bool String (List Selector)
@@ -44,17 +47,10 @@ matches selector entry = case selector of
  Filter text -> contains text (C.id entry) || contains text (C.name entry)
  Exact identity -> eqString identity (C.id entry)
  Tag label -> S.elem eqString label (C.tags entry)
-validId identity = stringLength identity > 0 && S.all (\i ->
- let c = stringCodeAt identity i in
- c >= 48 && c <= 57 || c >= 65 && c <= 90 || c >= 97 && c <= 122 || c == 45 || c == 46 || c == 47 || c == 95)
- (S.range 0 (stringLength identity - 1))
+-- Share one identity contract with typed descriptors; preserve the v1 API.
+validId = D.validId
 validate : List C.Case -> Either String Unit
-validate cases =
- let identities = S.map C.id cases in
- if S.null cases then Left "empty test inventory" else
- if S.not (S.all validId identities) then Left "test IDs must use letters, digits, '.', '_', '-' or '/'" else
- if S.length identities /= S.length (S.nubBy eqString identities) then Left "duplicate test ID" else
- if S.any (\entry -> stringLength (C.name entry) == 0) cases then Left "empty test name" else Right Unit
+validate cases = Registry.validate (S.map C.descriptor cases)
 plan : List String -> List C.Case -> Either String (Pair Options (List C.Case))
 plan args cases = do
  options <- parse args
@@ -62,6 +58,10 @@ plan args cases = do
  let selected = S.filter (\entry -> S.all (\selector -> matches selector entry) (selectors options)) cases
  if S.null selected then Left "no tests matched selection" else Right (Pair options selected)
 
+typedOutcome : Result -> Outcome.Outcome
+typedOutcome (Result _ result) = case result of
+ Right Unit -> Outcome.Pass
+ Left failure -> Outcome.AssertionFailure (A.describe failure)
 passed (Result _ outcome) = case outcome of { Right _ -> true; Left _ -> false }
 identity (Result entry _) = C.id entry
 executeWith : (Result -> IO Unit) -> List C.Case -> IO (List Result)
@@ -95,9 +95,17 @@ resultJson (Result entry outcome) = prefix "case" ++ "," ++ descriptor entry ++ 
 resultText (Result entry outcome) = case outcome of
  Right _ -> "PASS " ++ C.id entry ++ "  " ++ C.name entry
  Left failure -> "FAIL " ++ C.id entry ++ "  " ++ C.name entry ++ ": " ++ A.describe failure
-summaryJson total selected results =
+-- The count-only v1 helper remains readable for callers with no plan. It is
+-- not an identity verifier. Actual execution uses summaryJsonFor below.
+summaryJson total selected results = summaryJsonWith (countComplete total selected results) total selected results
+countComplete total selected results = total >= selected && selected > 0 && S.length results == selected && Registry.unique (S.map identity results)
+summaryJsonFor total selected results =
+ let count = S.length selected in
+ let exact = case Registry.exactInventory (S.map C.id selected) (S.map identity results) of { Right Unit -> true; Left _ -> false } in
+ summaryJsonWith (exact && countComplete total count results) total count results
+summaryJsonWith complete total selected results =
  let successes = S.length (S.filter passed results) in
- prefix "summary" ++ selectionFields total selected ++ ",\"complete\":true,\"executed\":" ++ showInt (S.length results) ++
+ prefix "summary" ++ selectionFields total selected ++ ",\"complete\":" ++ (if complete then "true" else "false") ++ ",\"executed\":" ++ showInt (S.length results) ++
  ",\"passed\":" ++ showInt successes ++ ",\"failed\":" ++ showInt (S.length results - successes) ++ "}"
 run : List String -> List C.Case -> IO Int
 run args cases = case plan args cases of
@@ -119,11 +127,13 @@ run args cases = case plan args cases of
    if json options then putStrLn start else ioReturn Unit
    results <- executeWith (\result -> putStrLn (if json options then resultJson result else resultText result)) selected
    let failures = S.length (S.filter (\result -> S.not (passed result)) results)
-   let summary = summaryJson total count results
+   -- Compare actual IDs to the plan, not merely their counts.
+   let exact = case Registry.exactInventory (S.map C.id selected) (S.map identity results) of { Right Unit -> true; Left _ -> false }
+   let summary = summaryJsonFor total selected results
    saveReport options (S.intercalate "\n" (Cons start (S.append (S.map resultJson results) (Cons summary Nil))) ++ "\n")
    if json options then putStrLn summary else
     putStrLn (showInt count ++ " checks; " ++ showInt failures ++ " failures (" ++ scope total count ++ " inventory)")
-   ioReturn (if failures == 0 then 0 else 1)
+   ioReturn (if exact && failures == 0 then 0 else 1)
 saveReport options text = if eqString (report options) "" then ioReturn Unit else writeFile (report options) text
 arguments : Int -> Int -> IO (List String)
 arguments index count = if index >= count then ioReturn Nil else do

@@ -32,6 +32,9 @@
     },
     "mlf-xmlf": {
       "path": "libraries/mlf-xmlf"
+    },
+    "mlf-test": {
+      "path": "testing"
     }
   },
   "executables": {
@@ -40,7 +43,9 @@
       "profile": "compiler",
       "modules": {
         "Tests.IndependentCheck": "tests/Tests/IndependentCheck.emlf",
-        "Tests.IndependentType": "tests/Tests/IndependentType.emlf"
+        "Tests.IndependentType": "tests/Tests/IndependentType.emlf",
+        "Tests.TupleList": "tests/Tests/TupleList.emlf",
+        "Tests.TupleListLegacy": "tests/Tests/TupleListLegacy.emlf"
       },
       "dependencies": [
         "mlf-crates",
@@ -49,6 +54,7 @@
         "mlf-inference",
         "mlf-interpreter",
         "mlf-language-core",
+        "mlf-test",
         "mlf-xmlf"
       ]
     },
