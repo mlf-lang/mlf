@@ -49,7 +49,8 @@
       "Tests.Set": "Tests/Set.emlf",
       "Tests.Coverage": "Tests/Coverage.emlf",
       "Tests.TestDrivers": "Tests/TestDrivers.emlf",
-      "Tests.TestSources": "Tests/TestSources.emlf"
+      "Tests.TestSources": "Tests/TestSources.emlf",
+      "Tests.Selection": "Tests/Selection.emlf"
     }
   },
   "executables": {
@@ -210,7 +211,8 @@
         "Tests.RegexRedux": "Tests/RegexRedux.emlf",
         "Tests.TestDriverCache": "Tests/TestDriverCache.emlf",
         "Tests.TestSourceCache": "Tests/TestSourceCache.emlf",
-        "Tests.CompilerTests": "Tests/CompilerTests.emlf"
+        "Tests.CompilerTests": "Tests/CompilerTests.emlf",
+        "Tests.Catalog": "Tests/Catalog.emlf"
       }
     },
     "regex": {
@@ -235,7 +237,10 @@
         "Tests.IntSetUnions": "Tests/IntSetUnions.emlf",
         "Tests.TestFrameworkCLI": "Tests/TestFrameworkCLI.emlf",
         "Tests.CoverageChecks": "Tests/CoverageChecks.emlf",
-        "Tests.TestProcess": "Tests/TestProcess.emlf"
+        "Tests.TestProcess": "Tests/TestProcess.emlf",
+        "Tests.Catalog": "Tests/Catalog.emlf",
+        "Tests.TestCatalog": "Tests/TestCatalog.emlf",
+        "Tests.FamilySelectionChecks": "Tests/FamilySelectionChecks.emlf"
       }
     }
   },

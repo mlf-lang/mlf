@@ -6,9 +6,15 @@ root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 # shellcheck source=.github/seed.env
 source "${2:-$root/.github/seed.env}"
 destination=${1:?seed destination required}
+# Existing bootstrap callers retain their historical macOS archive by default.
+platform=${MLF_SEED_PLATFORM:-macos-arm64}
+case "$platform" in
+  macos-arm64|linux-x64) ;;
+  *) printf 'Unsupported seed platform: %s\n' "$platform" >&2; exit 2 ;;
+esac
 mkdir -p "$destination"
 destination=$(cd "$destination" && pwd)
-archive="mlf-$MLF_SEED_VERSION-macos-arm64.tar.gz"
+archive="mlf-$MLF_SEED_VERSION-$platform.tar.gz"
 gh release download "v$MLF_SEED_VERSION" --repo mlf-lang/mlf --pattern "$archive" --pattern SHA256SUMS --dir "$destination"
 # A release can also publish supplementary validation archives. Verify the
 # archive downloaded here; both native executable hashes are checked below.
@@ -19,7 +25,7 @@ if [ -n "${MLF_SEED_ARCHIVE_SHA256:-}" ]; then
   test "$(shasum -a 256 "$destination/$archive" | awk '{print $1}')" = "$MLF_SEED_ARCHIVE_SHA256"
 fi
 tar -xzf "$destination/$archive" -C "$destination"
-package="$destination/mlf-$MLF_SEED_VERSION-macos-arm64"
+package="$destination/mlf-$MLF_SEED_VERSION-$platform"
 if [ -n "${MLF_SEED_SOURCE_COMMIT:-}" ]; then
   test "$(cat "$package/COMMIT")" = "$MLF_SEED_SOURCE_COMMIT"
 fi

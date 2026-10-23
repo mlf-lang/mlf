@@ -1,5 +1,25 @@
 # Pull request checks
 
+Test classification is recorded separately in
+[`tests/test-catalog.json`](../tests/test-catalog.json). Its seven primary groups
+are `language`, `code-generation`, `runtime-library`, `packages-build`,
+`distribution`, `bootstrap` and `test-infrastructure`. Test level, inputs,
+oracles and purposes are separate discovery/selection axes. The catalog selects
+complete cases or families within Core, Harness, Backends and Port, batching
+them by execution unit. The existing smoke commands and six full qualification
+campaigns retain their selection boundaries and full evidence requirements.
+Focused catalog selections produce partial reports and cannot stand in for a
+complete qualification campaign. The extended framework receipt includes a
+fourth, separately reviewed catalog-contract checkpoint, including selection
+and evidence-mutation checks. The
+[selection guide](../tests/README.md) and
+[pre-merge family validation record](test-family-selection-validation.json)
+describe the protocol and its verified historical scope. Fresh checks after
+integrating the split libraries and parallel-build changes are recorded in the
+[PR integration validation record](test-family-pr-integration-validation.json).
+`smoke`, `full`, `stress` and `release` remain
+execution-profile concepts; this workflow owns its actual CI selections.
+
 The `CI` workflow runs on every pull request, merge queue group and push to
 `main`. Its stable aggregate check is **PR gate**. It requires all of:
 
@@ -7,15 +27,14 @@ The `CI` workflow runs on every pull request, merge queue group and push to
   provenance, smoke-receipt failure regressions and checksum-pinned actionlint
   1.7.12 workflow validation.
 - **Compiler source smoke**: five cases against the checkout compiler frontend
-  and target checkers, interpreted by the verified published seed on macOS arm64.
+  and target checkers, interpreted by the verified published seed on Linux x64.
 - **Native Windows runtime**: compact-GC runtime, filesystem and reproducible
   object/executable checks, plus 22 native build-runner lifecycle cases on Windows.
-- **Native build runner**: 22 scheduler and process-lifecycle cases on each of
-  Linux and macOS.
+- **Native build runner**: all 22 scheduler and process-lifecycle cases on Linux.
 
 The aggregate runs even when a prerequisite fails and requires all four
-prerequisites to report `success`. Both Linux and macOS matrix entries must pass
-for the build-runner prerequisite to succeed.
+prerequisites to report `success`. Required jobs use Linux or Windows, so the
+smaller macOS runner pool cannot queue the merge gate.
 Failed, cancelled or skipped prerequisites cannot produce a passing gate.
 There are no path filters on the required workflow. Manual dispatches retain
 the optional self-host and Windows-only modes, plus `full_validation` for fresh
@@ -31,8 +50,9 @@ configure repository branch protection.
 
 ## Required compiler source coverage
 
-CI verifies the pinned v0.3.0 seed archive, executables and source commit. That
-seed interprets `tests/PRQuickMain.emlf`, importing the checkout's
+CI verifies the Linux x64 v0.3.0 seed archive, executables and source commit
+from `.github/smoke-seed-linux.env`. Existing macOS jobs retain their separate
+pin and the historical bootstrap default is unchanged. That seed interprets `tests/PRQuickMain.emlf`, importing the checkout's
 `Bootstrap.Compiler`, current xMLF checker and frozen independent checker through
 the split library search roots. It does not build new compiler, package-manager
 or campaign executables.
@@ -53,10 +73,16 @@ native package tests, the full Figure 12 corpus, framework/process contracts and
 complete backend/state matrices remain in the separate jobs and full campaigns
 below. The required Windows job still exercises the checkout's Windows runtime.
 
-The separate required build-runner matrix compiles the C scheduler and fixtures
-with strict warnings on Ubuntu 24.04 and macOS 26. It checks bounded scheduling,
-protocol validation, deadlines, cancellation and descendant cleanup. These
-process checks do not require bootstrapping the compiler or package manager.
+The separate required build-runner job compiles the C scheduler and fixtures
+with strict warnings on Ubuntu 24.04. It checks bounded scheduling, protocol
+validation, deadlines, cancellation and descendant cleanup. These process
+checks do not require bootstrapping the compiler or package manager.
+
+macOS still executes these same 22 lifecycle cases through `buildRunnerTests`
+in the complete `packages` campaign, including **Native package distribution**
+on main/manual full CI and the macOS full qualification workflow. All six full
+campaigns and the native macOS builds remain unchanged; this moves the required
+pre-merge execution to Linux rather than treating a skipped macOS check as a pass.
 
 ## Separate native and package validation
 
@@ -64,8 +90,8 @@ process checks do not require bootstrapping the compiler or package manager.
 the source check on pushes to `main`, or when a manual CI dispatch enables
 `full_validation`. They do not run on ordinary pull requests or merge queue
 groups and are not prerequisites of **PR gate**. Windows-only dispatches skip
-both. Waiting for the source check prevents these slower macOS jobs from queuing
-ahead of it within the same workflow run.
+both. They retain macOS execution outside the required merge gate; waiting for
+the Linux source check avoids starting those builds after an early source failure.
 
 Fresh native builds first use `tools/release/bootstrap-manager.sh` to compile
 the checkout manager from library crates with a seed-compatible manifest. This
@@ -106,7 +132,16 @@ the required checks.
 
 ## Run locally
 
-On Apple Silicon macOS with GMP, jq and GitHub CLI:
+On Linux x64 with GMP, jq and GitHub CLI, run the same source check as PR CI:
+
+```sh
+tools/release/fetch-seed.sh .mlf-build/pr-seed-linux .github/smoke-seed-linux.env
+export MLF_COMPILER="$PWD/.mlf-build/pr-seed-linux/mlf-0.3.0-linux-x64/libexec/emlf"
+export MLF_PACKAGE_MANAGER="$PWD/.mlf-build/pr-seed-linux/mlf-0.3.0-linux-x64/libexec/mlfpkg"
+tools/release/native-ci.sh source-smoke
+```
+
+The existing Apple Silicon macOS local check remains available:
 
 ```sh
 tools/release/fetch-seed.sh .mlf-build/pr-seed .github/smoke-seed.env
@@ -164,7 +199,7 @@ six full root groups and release qualification are unchanged.
 
 ## Timing and evidence
 
-The required **Compiler source smoke** job has a ten-minute hard limit, including
+The required **Compiler source smoke** job has a twenty-minute hard limit, including
 dependency setup, seed verification and evidence upload. It installs only GMP;
 interpreting the harness does not need LLVM, BDWGC development files or pkg-config.
 The collector uses `GC_FREE_SPACE_DIVISOR=2`. A local run passed in 115 seconds
@@ -196,6 +231,19 @@ passed all five cases in **5m30s** (330 seconds) at divisor 2 with identical out
 hashes. That run's metadata check exposed the watchdog cleanup race, now covered
 by the deterministic supervision regression above.
 
+Later source checks on [main run 39865876405](https://github.com/mlf-lang/mlf/actions/runs/39865876405)
+and [PR run 39881997979](https://github.com/mlf-lang/mlf/actions/runs/39881997979)
+reached the same 480-second deadline before harness progress at divisor 2. The
+PR smoke import closure and script were byte-identical to main. Both seeds
+accumulated over seven minutes of CPU time; the retained host logs show heavy
+memory compression without swap. The command budget was raised to 900 seconds
+for a controlled complete startup measurement, with a twenty-minute job limit
+for setup and evidence upload. The subsequent [hosted run 39884741365](https://github.com/mlf-lang/mlf/actions/runs/39884741365)
+completed all five cases in 454 seconds on PR #10's pre-integration tree. This
+single run finished within the previous 480-second budget; the larger bound is
+headroom for startup variability, not a measured speedup or an integrated-tree
+qualification result.
+
 In CI run [39798088020](https://github.com/mlf-lang/mlf/actions/runs/39798088020),
 the fresh-native smoke command completed in **16m49s** (1,009 seconds): checkout
 tool building took **16m17s** (977 seconds), and the remaining smoke checks and
@@ -219,7 +267,9 @@ tool and output hashes, logs, emitted targets and its completion receipt under
 `progress.log` records which case the interpreted harness is running.
 Its absence means the harness has not reached the first case. Timeouts print the
 last recorded stage (or its absence) and leave the receipt incomplete. The
-eight-minute command deadline and ten-minute job limit remain unchanged.
+command deadline is 900 seconds, within the twenty-minute job limit. This bounded
+startup measurement preserves all five cases, source/seed/output hashes and
+watchdog cleanup.
 
 The fresh-native job uploads `pr-smoke-evidence`,
 including build reports, command logs, output and completion receipts. Local evidence is under
@@ -227,9 +277,9 @@ including build reports, command logs, output and completion receipts. Local evi
 building and the complete command, plus tool and report SHA-256 fingerprints.
 The fresh-native job retains a 60-minute hard failure bound.
 
-Each required build-runner matrix entry has a ten-minute limit and retains its
-log, task plans and results in `build-runner-evidence-ubuntu-24.04` or
-`build-runner-evidence-macos-26`. Windows retains the corresponding task plans
-and results alongside its runtime verification report. Fresh-native and package
+The required Linux build-runner job has a ten-minute limit and retains its log,
+task plans and results in `build-runner-evidence-ubuntu-24.04`. macOS lifecycle
+logs remain in the full package campaign evidence. Windows retains its task
+plans and results alongside the runtime verification report. Fresh-native and package
 artifacts also retain the manager bootstrap reports and command diagnostics;
 fresh-native artifacts include scheduler invocation diagnostics.

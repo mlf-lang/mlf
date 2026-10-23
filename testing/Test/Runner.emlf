@@ -7,7 +7,7 @@ import qualified Test.Case as C
 data Selector = Filter String | Exact String | Tag String
 data Options = Options Bool Bool String (List Selector)
 data Result = Result C.Case (Either A.Failure Unit)
-usage = "test [--list] [--filter TEXT] [--exact ID] [--tag TAG] [--format text|json] [--report FILE]"
+usage = "test [--list] [--filter TEXT] [--exact ID] [--tag TAG] [--group NAME] [--level NAME] [--input NAME] [--oracle NAME] [--purpose NAME] [--category NAME] [--technique NAME] [--format text|json] [--report FILE]"
 listing (Options value _ _ _) = value
 json (Options _ value _ _) = value
 report (Options _ _ path _) = path
@@ -25,7 +25,14 @@ parseWith (Options list machine path selected) args = case args of
   if eqString flag "--report" then parseWith (Options list machine value selected) rest else
   if eqString flag "--filter" then parseWith (Options list machine path (Cons (Filter value) selected)) rest else
   if eqString flag "--exact" then parseWith (Options list machine path (Cons (Exact value) selected)) rest else
-  if eqString flag "--tag" then parseWith (Options list machine path (Cons (Tag value) selected)) rest else Left usage
+  if eqString flag "--tag" then parseWith (Options list machine path (Cons (Tag value) selected)) rest else
+  if eqString flag "--group" then parseWith (Options list machine path (Cons (Tag ("group:" ++ value)) selected)) rest else
+  if eqString flag "--level" then parseWith (Options list machine path (Cons (Tag ("level:" ++ value)) selected)) rest else
+  if eqString flag "--input" then parseWith (Options list machine path (Cons (Tag ("input:" ++ value)) selected)) rest else
+  if eqString flag "--oracle" then parseWith (Options list machine path (Cons (Tag ("oracle:" ++ value)) selected)) rest else
+  if eqString flag "--purpose" then parseWith (Options list machine path (Cons (Tag ("purpose:" ++ value)) selected)) rest else
+  if eqString flag "--category" then parseWith (Options list machine path (Cons (Tag ("category:" ++ value)) selected)) rest else
+  if eqString flag "--technique" then parseWith (Options list machine path (Cons (Tag ("technique:" ++ value)) selected)) rest else Left usage
  _ -> Left usage
 
 contains : String -> String -> Bool

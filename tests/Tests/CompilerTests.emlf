@@ -11,6 +11,8 @@ import qualified Package.Manifest as M
 import qualified Tests.Coverage as Coverage
 import qualified Tests.TestDrivers as TD
 import qualified Tests.TestSources as TS
+import qualified Tests.Catalog as Catalog
+import qualified Tests.Selection as Selection
 
 -- Build and execute native MLF tests; preserved oracle data and test-only
 -- checking modules remain independent of the candidate compiler.
@@ -108,32 +110,51 @@ transports c = do
 suite : TestContext -> String -> List String -> IO Unit
 suite c target expectations = suiteArgs c target Nil expectations
 suiteArgs : TestContext -> String -> List String -> List String -> IO Unit
-suiteArgs c target args expectations = do
+suiteArgs c target args expectations = suiteArgsChecked c target args expectations Nothing
+familyReport : TestContext -> String -> String -> Bool -> List String -> String -> IO Unit
+familyReport c key unit full expected path = do
+ text <- readFile path
+ checked <- case Selection.validate unit full expected text of { Left error -> O.fatal (unit ++ ": " ++ error); Right value -> return value }
+ hash <- fileDigest path
+ saved <- J.read (report c)
+ record c "family_reports" (J.set key (J.set "path" (J.str path) (J.set "sha256" (J.str hash) (J.set "result" checked J.empty))) (J.getObject "family_reports" saved))
+suiteArgsChecked : TestContext -> String -> List String -> List String -> Maybe J.Json -> IO Unit
+suiteArgsChecked c target args expectations selected = suiteArgsEvidence c target args expectations selected Nothing
+suiteArgsEvidence : TestContext -> String -> List String -> List String -> Maybe J.Json -> Maybe (List String) -> IO Unit
+suiteArgsEvidence c target args expectations selected wantedFamilies = do
  binary <- nativeTest c target
  binaryHash <- fileDigest binary
  let log = output c ++ "/" ++ target ++ ".log"
  let structural = S.elem eqString target (O.words "harness test-framework core figure12 packages regex")
  let coverage = output c ++ "/" ++ target ++ ".coverage.jsonl"
- if structural then do
-  writeFile coverage ""
-  setEnv "MLF_TEST_COVERAGE_REPORT" coverage
-  else unsetEnv "MLF_TEST_COVERAGE_REPORT"
+ if structural then do { writeFile coverage ""; setEnv "MLF_TEST_COVERAGE_REPORT" coverage } else unsetEnv "MLF_TEST_COVERAGE_REPORT"
+ let familyPath = output c ++ "/" ++ target ++ ".families.jsonl"
+ let tracked = S.elem eqString target (O.words "core harness")
+ expectedFamilies <- if tracked then do
+  catalog <- Catalog.load (root c)
+  writeFile familyPath ""
+  setEnv "MLF_TEST_FAMILY_REPORT" familyPath
+  return (case wantedFamilies of { Just names -> names; Nothing -> S.map Catalog.identity (Catalog.forUnit catalog target) })
+  else do { unsetEnv "MLF_TEST_FAMILY_REPORT"; return Nil }
  capture c (Cons binary args) log
  currentBinaryHash <- fileDigest binary
  O.require (eqString binaryHash currentBinaryHash) (target ++ ": test executable changed during validation")
  unsetEnv "MLF_TEST_COVERAGE_REPORT"
+ unsetEnv "MLF_TEST_FAMILY_REPORT"
+ if tracked then familyReport c target target (case selected of { Nothing -> true; Just _ -> false }) expectedFamilies familyPath else ioReturn Unit
  text <- readFile log
+ O.require (S.all (\expected -> contains expected text) expectations) (target ++ ": preserved coverage summary is missing")
  evidence <- if structural then do
   let inventoryPath = root c ++ "/tests/golden/unit-inventory.json"
   inventory <- J.read inventoryPath
   actual <- readFile coverage
-  checked <- case Coverage.validate inventory target actual of { Left error -> O.fatal (target ++ ": " ++ error); Right value -> return value }
+  let validation = case selected of { Nothing -> Coverage.validate inventory target actual; Just projection -> Coverage.validateProjection inventory target projection actual }
+  checked <- case validation of { Left error -> O.fatal (target ++ ": " ++ error); Right value -> return value }
   digest <- fileDigest coverage
   inventoryDigest <- fileDigest inventoryPath
-  return (J.set "coverage_report_sha256" (J.str digest) (J.set "coverage_inventory_sha256" (J.str inventoryDigest) (J.set "coverage_result" checked J.empty)))
-  else do
-   O.require (S.all (\expected -> contains expected text) expectations) (target ++ ": preserved coverage summary is missing")
-   return J.empty
+  let result = J.set "scope" (J.str (case selected of { Nothing -> "full"; Just _ -> "partial" })) (J.set "coverage_report_sha256" (J.str digest) (J.set "coverage_inventory_sha256" (J.str inventoryDigest) (J.set "coverage_result" checked J.empty)))
+  return (case selected of { Nothing -> result; Just projection -> J.set "selected_coverage" projection result })
+  else return J.empty
  hash <- fileDigest log
  saved <- J.read (report c)
  record c "suites" (J.set target (J.set "binary_sha256" (J.str binaryHash) (J.set "log_sha256" (J.str hash) (J.set "coverage" (J.stringArray expectations) evidence))) (J.getObject "suites" saved))
@@ -172,7 +193,7 @@ packages c = do
  buildRunnerTests c
  setEnv "MLF_TEST_WORK" (output c)
  setEnv "MLF_TEST_ROOT" (output c)
- suite c "packages" (Cons "22 package resolver tests passed" (Cons "29 package integration cases passed" (Cons "1 target dependency integration test passed" (Cons "28 checked package release cases passed" Nil))))
+ suite c "packages" (Cons "22 package resolver tests passed" (Cons "29 package integration cases passed" (Cons "Build scheduler integration tests passed" (Cons "1 target dependency integration test passed" (Cons "28 checked package release cases passed" Nil)))))
 testBuilder : TestContext -> String -> IO B.Builder
 testBuilder c name = do
  graph <- M.load (root c ++ "/mlf-package.json")
@@ -237,12 +258,19 @@ matrices : TestContext -> String -> Bool -> IO Unit
 matrices c binary portFixtures = matrixSuite c binary portFixtures (if portFixtures then 25 else 575)
  (Cons (if portFixtures then "25 MLF port fixtures; 0 failures" else "523 shared IO/prelude/backend fixtures; 0 failures") Nil)
 matrixSuite : TestContext -> String -> Bool -> Int -> List String -> IO Unit
-matrixSuite c binary portFixtures expectedRows expectations = do
+matrixSuite c binary portFixtures expectedRows expectations = matrixSuiteArgs c binary portFixtures expectedRows expectations Nil Nothing
+matrixSuiteArgs : TestContext -> String -> Bool -> Int -> List String -> List String -> Maybe (List J.Json) -> IO Unit
+matrixSuiteArgs c binary portFixtures expectedRows expectations arguments selected = do
+ previousHeap <- getEnv "GC_INITIAL_HEAP_SIZE"
+ previousDivisor <- getEnv "GC_FREE_SPACE_DIVISOR"
  requestedDivisor <- getEnv "MLF_TEST_MATRIX_GC_DIVISOR"
- divisor <- case V.matrixCollectionDivisor requestedDivisor of
-  Left message -> O.fatal message
-  Right value -> ioReturn value
- flags <- prepareDrivers c portFixtures
+ divisor <- case V.matrixCollectionDivisor requestedDivisor of { Left message -> O.fatal message; Right value -> ioReturn value }
+ let unit = if portFixtures then "port" else if expectedRows == 575 || S.isJust selected then "backends" else ""
+ expectedEntries <- if eqString unit "" then return Nil else case selected of
+  Just entries -> return entries
+  Nothing -> do { catalog <- Catalog.load (root c); return (Catalog.forUnit catalog unit) }
+ let expectedFamilies = S.map Catalog.identity expectedEntries
+ flags <- if expectedRows == 0 then return Nil else prepareDrivers c portFixtures
  if portFixtures then unsetEnv "MLF_BOOTSTRAP_INTERPRETER" else setEnv "MLF_BOOTSTRAP_INTERPRETER" (output c ++ "/RuntimeDriver")
  setEnv "MLF_BOOTSTRAP_LLVM" (output c ++ "/LLVMDriver")
  setEnv "MLF_BOOTSTRAP_COMPILER" (compiler c)
@@ -257,27 +285,44 @@ matrixSuite c binary portFixtures expectedRows expectations = do
   setEnv "MLF_TEST_LINK_FLAGS_FILE" flagsFile
   let directory = output c ++ "/matrix-" ++ abi
   O.mkdir directory
-  compileRuntime c flags true ("matrix-" ++ abi ++ "/runtime.o")
+  if expectedRows == 0 then ioReturn Unit else compileRuntime c flags true ("matrix-" ++ abi ++ "/runtime.o")
   let log = output c ++ "/" ++ abi ++ ".log"
-  -- Each fixture retains its own execution limit. The complete matrix also
-  -- includes native candidate emission, linking, and graph reference workloads.
-  if portFixtures then validatePreparedPort c else ioReturn Unit
-  captureWithin c (Cons binary Nil) log (if portFixtures then 18000 else 14400)
-  if portFixtures then validatePreparedPort c else ioReturn Unit
+  let familyPath = output c ++ "/" ++ abi ++ ".families.jsonl"
+  if eqString unit "" then unsetEnv "MLF_TEST_FAMILY_REPORT" else do { writeFile familyPath ""; setEnv "MLF_TEST_FAMILY_REPORT" familyPath }
+  let selectedFixtures = case selected of { Nothing -> Nothing; Just entries -> Just (Catalog.fixtures entries) }
+  if portFixtures then validatePreparedPortNames c selectedFixtures else ioReturn Unit
+  captureWithin c (Cons binary arguments) log (if portFixtures then 18000 else 14400)
+  if portFixtures then validatePreparedPortNames c selectedFixtures else ioReturn Unit
+  unsetEnv "MLF_TEST_FAMILY_REPORT"
+  if eqString unit "" then ioReturn Unit else familyReport c (unit ++ ":" ++ abi) unit (S.not (S.isJust selected)) expectedFamilies familyPath
   text <- readFile log
   let rows = S.filter (O.starts "Backend matrix: ") (O.lines text)
   let backendNames = if portFixtures then Cons "llvm" Nil else O.words "interpreter llvm"
-  case V.validateMatrixAudit expectedRows backendNames text of
-   Left message -> O.fatal message
-   Right _ -> ioReturn Unit
+  let validation = if expectedRows > 0 then V.validateMatrixAudit expectedRows backendNames text else do
+   case selected of { Nothing -> Left "empty full backend matrix"; Just entries -> do
+    Catalog.ensure (S.not (S.null entries) && Catalog.matrixRows entries == 0 && S.all (\entry -> eqString (Catalog.unitName entry) "backends") entries) "invalid zero-row family selection"
+    Catalog.ensure (S.eqList eqString rows (Cons "Backend matrix: 0 rows x 2 backends; no missing executions" Nil)) "component-only backend matrix differs" }
+  case validation of { Left message -> O.fatal message; Right _ -> ioReturn Unit }
+  rowEvidence <- if eqString unit "" then return J.empty else do
+   let path = directory ++ "/rows.jsonl"
+   raw <- readFile path
+   actual <- case S.mapM J.parse (O.nonempty (O.lines raw)) of { Left error -> O.fatal error; Right value -> return value }
+   let labels = if portFixtures then S.map (\name -> "MLF compiler port: " ++ name) (Catalog.fixtures expectedEntries) else Catalog.combine "labels" expectedEntries
+   O.require (S.length actual == expectedRows && S.all (\entry -> Catalog.keys (O.words "label index backends") entry && Catalog.nonemptyString (J.get "label" entry) && Catalog.natural (J.get "index" entry) && J.equal (J.get "backends" entry) (J.stringArray backendNames)) actual) "matrix row report differs from the reviewed selection"
+   O.require (S.all (\entry -> S.elem eqString (J.getText "label" "" entry) labels) actual) "matrix executed a fixture outside the selected families"
+   if portFixtures then O.require (Catalog.sameSet (S.map (J.getText "label" "") actual) labels) "port matrix omitted a selected fixture" else return Unit
+   digest <- fileDigest path
+   return (J.set "row_report" (J.str path) (J.set "row_report_sha256" (J.str digest) J.empty))
   O.require (S.all (\expected -> contains expected text) expectations) "native fixture coverage changed"
   hash <- fileDigest log
-  let row = J.set "backend_names" (J.stringArray backendNames) (B.info (Cons (Pair "rows" (J.num (readInt (S.index (O.words (S.head rows)) 2)))) (Cons (Pair "backends" (J.num (S.length backendNames))) (Cons (Pair "cli_compiler" (J.str (compiler c))) (Cons (Pair "log_sha256" (J.str hash)) (Cons (Pair "gc_initial_heap_bytes" (J.num (readInt initialHeap))) (Cons (Pair "gc_free_space_divisor" (J.num (readInt divisor))) Nil)))))))
+  let row = J.set "scope" (J.str (if S.isJust selected then "partial" else "full")) (J.set "backend_names" (J.stringArray backendNames) (J.Object (S.append (J.items rowEvidence) (J.items (B.info (Cons (Pair "rows" (J.num (readInt (S.index (O.words (S.head rows)) 2)))) (Cons (Pair "backends" (J.num (S.length backendNames))) (Cons (Pair "cli_compiler" (J.str (compiler c))) (Cons (Pair "log_sha256" (J.str hash)) (Cons (Pair "gc_initial_heap_bytes" (J.num (readInt initialHeap))) (Cons (Pair "gc_free_space_divisor" (J.num (readInt divisor))) Nil)))))))))))
   saved <- J.read (report c)
   preparedHash <- getEnv "MLF_TEST_PORT_TARGETS_SHA256"
   record c "matrices" (J.set abi (if portFixtures then J.set "prepared_targets_sha256" (J.str preparedHash) row else row) (J.getObject "matrices" saved))
   putStr (O.drop (S.max 0 (stringLength text - 2000)) text)) (runtimeProfiles c)
  clearDrivers
+ S.mapM_ (\(Pair name value) -> if eqString value "" then unsetEnv name else setEnv name value)
+  (Cons (Pair "GC_INITIAL_HEAP_SIZE" previousHeap) (Cons (Pair "GC_FREE_SPACE_DIVISOR" previousDivisor) Nil))
 backends : TestContext -> IO Unit
 backends c = do
  transports c
@@ -355,9 +400,13 @@ port c = do
  preparePort c binary
  matrices c binary true
 preparePort : TestContext -> String -> IO Unit
-preparePort c binary = preparePortShard c binary "all"
+preparePort c binary = preparePortNames c binary Nothing
+preparePortNames : TestContext -> String -> Maybe (List String) -> IO Unit
+preparePortNames c binary selected = preparePortSelection c binary selected "all"
 preparePortShard : TestContext -> String -> String -> IO Unit
-preparePortShard c binary shard = do
+preparePortShard c binary shard = preparePortSelection c binary Nothing shard
+preparePortSelection : TestContext -> String -> Maybe (List String) -> String -> IO Unit
+preparePortSelection c binary selected shard = do
  builder <- testBuilder c "port-preparation"
  originalCollection <- getEnv "GC_FREE_SPACE_DIVISOR"
  requestedCollection <- getEnv "MLF_TEST_MATRIX_GC_DIVISOR"
@@ -368,12 +417,15 @@ preparePortShard c binary shard = do
  let listing = output c ++ "/port-fixtures.txt"
  capture c (Cons binary (Cons "--list" Nil)) listing
  listingText <- readFile listing
- let allNames = O.words listingText
- O.require (S.length allNames == 25 && S.length (S.nubBy eqString allNames) == 25) "port fixture preparation coverage changed"
+ let available = O.words listingText
+ O.require (S.length available == 25 && S.length (S.nubBy eqString available) == 25) "port fixture preparation coverage changed"
  O.require (S.elem eqString shard (O.words "all StateTypes SolverReuse InferenceConformance other")) "unknown port preparation shard"
  let heavy = O.words "StateTypes SolverReuse InferenceConformance"
- let names = if eqString shard "all" then allNames else S.filter (\name -> if eqString shard "other" then S.not (S.elem eqString name heavy) else eqString name shard) allNames
- O.require (S.length names == (if eqString shard "all" then 25 else if eqString shard "other" then 22 else 1)) "port preparation shard coverage differs"
+ let names = if eqString shard "all" then case selected of { Nothing -> available; Just chosen -> chosen }
+  else S.filter (\name -> if eqString shard "other" then S.not (S.elem eqString name heavy) else eqString name shard) available
+ O.require (S.not (S.null names) && Catalog.unique names && S.all (\name -> S.elem eqString name available) names) "invalid focused port preparation"
+ O.require (eqString shard "all" || S.length names == (if eqString shard "other" then 22 else 1)) "port preparation shard coverage differs"
+ let selectedScope = if eqString shard "all" then selected else Just names
  saved <- J.read (report c)
  identity <- portTargetIdentity builder binary
  targets <- S.mapM (\name -> do
@@ -389,14 +441,15 @@ preparePortShard c binary shard = do
  let manifest = output c ++ "/prepared-port.json"
  -- The transport manifest keeps its stable schema and full source provenance;
  -- only the cache identity above uses the new dependency-specific format.
- J.write manifest (J.set "format" (J.num 1) (J.set "sources" (J.get "sources" saved) (J.set "targets" (J.Array targets) identity)))
+ let prepared = J.set "format" (J.num 1) (J.set "sources" (J.get "sources" saved) (J.set "targets" (J.Array targets) identity))
+ J.write manifest (case selectedScope of { Nothing -> prepared; Just names -> J.set "scope" (J.str "partial") (J.set "selected_fixtures" (J.stringArray names) prepared) })
  hash <- fileDigest manifest
  setEnv "MLF_TEST_PORT_TARGETS" manifest
  setEnv "MLF_TEST_PORT_TARGETS_SHA256" hash
  let targetHashes = J.Object (S.map (\row -> Pair (J.getText "fixture" "" row) (J.get "target_sha256" row)) targets)
  let collections = J.Object (S.map (\row -> Pair (J.getText "fixture" "" row) (J.get "gc_free_space_divisor" row)) targets)
  record c "prepared_port" (J.set "collection_policies" collections (J.set "target_hashes" targetHashes (B.info (Cons (Pair "manifest" (J.str manifest)) (Cons (Pair "sha256" (J.str hash)) (Cons (Pair "targets" (J.num (S.length targets))) (Cons (Pair "build_report" (J.str (B.reportPath builder))) Nil)))))))
- if eqString shard "all" then validatePreparedPort c else ioReturn Unit
+ validatePreparedPortNames c selectedScope
 portTargetIdentity : B.Builder -> String -> IO J.Json
 portTargetIdentity builder binary = do
  checkerHash <- fileDigest binary
@@ -424,14 +477,20 @@ preparePortTarget c builder binary name = do
  checksHash <- fileDigest (target ++ ".checks.json")
  ioReturn (J.set "source_inputs" inputs (B.info (Cons (Pair "fixture" (J.str name)) (Cons (Pair "target" (J.str target)) (Cons (Pair "target_sha256" (J.str hash)) (Cons (Pair "checks_sha256" (J.str checksHash)) Nil))))))
 validatePreparedPort : TestContext -> IO Unit
-validatePreparedPort c = do
+validatePreparedPort c = validatePreparedPortNames c Nothing
+validatePreparedPortNames : TestContext -> Maybe (List String) -> IO Unit
+validatePreparedPortNames c selected = do
  path <- getEnv "MLF_TEST_PORT_TARGETS"
  expected <- getEnv "MLF_TEST_PORT_TARGETS_SHA256"
  hash <- fileDigest path
  O.require (eqString hash expected) "prepared port manifest changed between layouts"
  manifest <- J.read path
  let targets = J.values (J.get "targets" manifest)
- O.require (S.length targets == 25) "prepared port targets missing"
+ let names = S.map (J.getText "fixture" "") targets
+ O.require (Catalog.unique names && J.equal (J.get "format" manifest) (J.num 1)) "invalid prepared port manifest"
+ case selected of
+  Nothing -> O.require (S.length targets == 25 && eqString (J.getText "scope" "full" manifest) "full") "prepared full port targets missing"
+  Just expected -> O.require (S.not (S.null expected) && Catalog.sameSet names expected && J.equal (J.get "selected_fixtures" manifest) (J.stringArray expected) && eqString (J.getText "scope" "" manifest) "partial") "prepared focused port targets differ"
  S.mapM_ (\row -> do
   let target = J.getText "target" "" row
   hash <- fileDigest target
@@ -615,23 +674,88 @@ selfHost c = do
   record c "native_pgo" profile
   record c "fixed_point" (B.info (Cons (Pair "llvm_sha256" (J.str new)) (Cons (Pair "next_compiler_sha256" (J.str binary)) (Cons (Pair "reused_candidate_build" (J.get "cached" row)) Nil))))
 -- Campaign-specific options stay outside the generic package-manager CLI.
+selectedUnit : TestContext -> String -> List J.Json -> IO Unit
+selectedUnit c name entries =
+ if eqString name "backends" then do
+  transports c
+  binary <- nativeTest c "backends"
+  matrixSuiteArgs c binary false (Catalog.matrixRows entries) Nil (Cons "--families" (S.map Catalog.identity entries)) (Just entries)
+ else if eqString name "port" then do
+  transports c
+  references <- nativeTest c "references"
+  setEnv "MLF_TEST_REFERENCES" references
+  binary <- nativeTest c "port"
+  preparePortNames c binary (Just (Catalog.fixtures entries))
+  matrixSuiteArgs c binary true (Catalog.matrixRows entries) Nil (Cons "--families" (S.map Catalog.identity entries)) (Just entries)
+ else if eqString name "parity" then parity c else
+ if eqString name "self-host" then selfHost c else
+ if S.elem eqString name (O.words "package-integration package-distribution") then do
+  inventory <- J.read (root c ++ "/tests/golden/unit-inventory.json")
+  let distribution = eqString name "package-distribution"
+  if distribution then ioReturn Unit else buildRunnerTests c
+  setEnv "MLF_TEST_WORK" (output c)
+  setEnv "MLF_TEST_ROOT" (output c)
+  let expectations = if distribution then Cons "28 checked package release cases passed" Nil else Cons "22 package resolver tests passed" (Cons "29 package integration cases passed" (Cons "Build scheduler integration tests passed" (Cons "1 target dependency integration test passed" Nil)))
+  suiteArgsChecked c "packages" (Cons (if distribution then "--releases" else "--integration") Nil) expectations (Just (Catalog.projection inventory "packages" entries))
+ else do
+  transports c
+  if S.elem eqString name (O.words "core harness") then do
+   inventory <- J.read (root c ++ "/tests/golden/unit-inventory.json")
+   let ids = S.map Catalog.identity entries
+   suiteArgsEvidence c name (Cons "--families" ids) Nil (Just (Catalog.projection inventory name entries)) (Just ids)
+  else if eqString name "test-framework" then do
+   unions <- nativeTest c "int-set-unions"
+   suiteArgs c "test-framework" (Cons "--verify-cli" (Cons (output c ++ "/framework-cli") (Cons unions Nil))) Nil
+  else suite c name Nil
+selectedUnits : TestContext -> List J.Json -> IO Unit
+selectedUnits c selected = S.mapM_ (\(Pair name entries) -> do
+ let directory = output c ++ "/selected/" ++ name
+ O.mkdir directory
+ let child = TestContext (root c) directory (compiler c) (runtimeProfiles c) (sharedCache c) (packageManager c)
+ parent <- J.read (report c)
+ let identity = J.Object (S.filter (\(Pair key _) -> S.elem eqString key (O.words "implementation compiler compiler_sha256 manager manager_sha256 runner runner_sha256 build_runner_sha256 sources requested_profiles")) (J.items parent))
+ let metadata = J.set "families" (J.Array (S.map Catalog.descriptor entries)) (J.set "units" (J.stringArray (S.nubBy eqString (S.map Catalog.unitName entries))) (J.get "test_catalog" parent))
+ J.write (report child) (J.set "test_catalog" metadata (J.set "scope" (J.str "partial") (J.set "group" (J.str "selected-unit") (J.set "complete" (J.Boolean false) identity))))
+ if eqString name "packages" then packages child else selectedUnit child name entries
+ record child "complete" (J.Boolean true)
+ result <- J.read (report child)
+ digest <- fileDigest (report child)
+ current <- J.read (report c)
+ let receipt = J.set "families" (J.stringArray (S.map Catalog.identity entries)) (B.info (Cons (Pair "path" (J.str (report child))) (Cons (Pair "sha256" (J.str digest)) (Cons (Pair "units" (J.stringArray (S.nubBy eqString (S.map Catalog.unitName entries)))) Nil))))
+ record c "selected_units" (J.set name receipt (J.getObject "selected_units" current))
+ if J.has "suites" result then do
+  let merged = S.foldl (\saved (Pair suite evidence) -> J.set suite (J.set "directory" (J.str directory) evidence) saved) (J.getObject "suites" current) (J.items (J.get "suites" result))
+  record c "suites" merged
+  else ioReturn Unit) (Catalog.batches selected)
 options : J.Json -> List String -> IO (Pair J.Json (List String))
 options config args = do
   Pair configured remaining <- C.options config args
   case remaining of
     Cons "--manager" (Cons value rest) -> options (J.set "manager" (J.str value) configured) rest
+    Cons flag (Cons value rest) -> if Catalog.selector flag then do
+      next <- case Catalog.option configured flag value of { Left error -> O.fatal error; Right value -> return value }
+      options next rest
+      else ioReturn (Pair configured remaining)
     _ -> ioReturn (Pair configured remaining)
 main : List String -> IO Unit
 main args = case args of
+  Cons "catalog" rest -> Catalog.main rest
   Cons group rest -> do
     Pair settings remaining <- options J.empty rest
     O.require (S.null remaining && J.has "compiler" settings && J.has "manager" settings && J.has "build-dir" settings) "compiler-tests GROUP --compiler TOOL --manager TOOL --build-dir DIRECTORY"
-    O.require (S.elem eqString group (O.words "unit packages self-host parity backends port pr-smoke port-prepare-StateTypes port-prepare-SolverReuse port-prepare-InferenceConformance port-prepare-other")) "unknown compiler test group"
+    O.require (S.elem eqString group (O.words "unit packages self-host parity backends port pr-smoke select port-prepare-StateTypes port-prepare-SolverReuse port-prepare-InferenceConformance port-prepare-other")) "unknown compiler test group"
+    let hasSelection = Catalog.hasSelection settings
+    O.require (if eqString group "select" then hasSelection else S.not hasSelection) "metadata/family selectors require select; select requires at least one selector"
+    root <- canonicalPath "."
+    catalog <- Catalog.load root
+    selected <- if eqString group "select" then case Catalog.select catalog settings of
+      Left error -> O.fatal error
+      Right value -> return value
+     else return (if eqString group "pr-smoke" then Nil else Catalog.forCampaign catalog group)
     profile <- getEnv "MLF_TEST_RUNTIME_PROFILE"
     O.require (eqString profile "" || S.elem eqString profile (Cons "compact-gc" Nil)) "invalid runtime profile; expected compact-gc"
-    let profiles = if eqString group "port" || eqString group "backends" || eqString group "pr-smoke" then Cons "compact-gc" Nil else Nil
+    let profiles = if S.elem eqString group (O.words "port backends pr-smoke") || S.any (\entry -> S.elem eqString (Catalog.unitName entry) (O.words "port backends")) selected then Cons "compact-gc" Nil else Nil
     let directory = J.getText "build-dir" "" settings
-    root <- canonicalPath "."
     O.mkdir directory
     out <- canonicalPath directory
     compiler <- canonicalPath (J.getText "compiler" "" settings)
@@ -652,13 +776,18 @@ main args = case args of
     let identity = B.info (Cons (Pair "complete" (J.Boolean false)) (Cons (Pair "implementation" (J.str "MLF")) (Cons (Pair "group" (J.str group)) (Cons (Pair "compiler" (J.str compiler)) (Cons (Pair "compiler_sha256" (J.str hash)) (Cons (Pair "sources" sourceHashes) Nil))))))
     let campaignIdentity = J.set "runner_sha256" (J.str runnerHash) (J.set "runner" (J.str runner) (J.set "requested_profiles" (J.stringArray profiles) (J.set "manager_sha256" (J.str managerHash) (J.set "manager" (J.str manager) identity))))
     J.write (report c) (J.set "build_runner_sha256" (J.str buildRunnerHash) campaignIdentity)
+    catalogHash <- fileDigest (root ++ "/tests/test-catalog.json")
+    record c "scope" (J.str (if eqString group "select" then "partial" else if eqString group "pr-smoke" then "smoke" else if O.starts "port-prepare-" group then "preparation" else "full"))
+    record c "test_catalog" (J.set "path" (J.str (root ++ "/tests/test-catalog.json")) (J.set "sha256" (J.str catalogHash) (Catalog.selection catalog selected)))
     setEnv "MLF_PACKAGE_MANAGER" manager
     clearDrivers
+    unsetEnv "MLF_TEST_COVERAGE_REPORT"
+    unsetEnv "MLF_TEST_FAMILY_REPORT"
     setEnv "MLF_BOOTSTRAP_COMPILER" compiler
     path <- getEnv "PATH"
     windows <- O.isWindows
     setEnv "PATH" (O.parent compiler ++ (if windows then ";" else ":") ++ path)
-    if eqString group "self-host" then selfHost c else do
+    if eqString group "select" then selectedUnits c selected else if eqString group "self-host" then selfHost c else do
       if eqString group "packages" then packages c else if eqString group "unit" then unit c else if eqString group "port" then port c else if eqString group "backends" then backends c else if eqString group "pr-smoke" then prSmoke c else if eqString group "parity" then parity c else
        if O.starts "port-prepare-" group then do { binary <- nativeTest c "port"; preparePortShard c binary (O.drop 13 group) } else O.fatal "unknown compiler test group"
     after <- sources root
