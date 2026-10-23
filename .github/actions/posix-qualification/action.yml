@@ -20,7 +20,7 @@ runs:
       run: |
         tools/release/time-stage.sh dependencies bash -e -o pipefail <<'SH'
         if [ "$PLATFORM" = macos-arm64 ]; then
-          brew install llvm gmp pkg-config bdw-gc
+          tools/release/setup-macos.sh
           echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
           echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
         else
