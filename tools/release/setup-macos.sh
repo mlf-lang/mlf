@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Install the same bottle closure in every hosted macOS qualification job.
+set -euo pipefail
+cd -- "$(dirname -- "$0")/../.."
+# This changes the runner's core tap and reinstalls its native dependencies.
+# Keep it restricted to disposable GitHub-hosted runners, never developer Macs.
+if [ "${GITHUB_ACTIONS:-}" != true ] || [ "${RUNNER_ENVIRONMENT:-}" != github-hosted ] ||
+   [ "$(uname -s):$(uname -m)" != Darwin:arm64 ] || [[ "$(sw_vers -productVersion)" != 26.* ]]; then
+  echo 'Pinned macOS setup requires a disposable GitHub-hosted macos-26 ARM64 runner.' >&2
+  exit 1
+fi
+source .github/macos-dependencies.env
+[[ "$MLF_HOMEBREW_CORE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_FROM_API=1
+export HOMEBREW_NO_INSTALL_CLEANUP=1 HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1
+export HOMEBREW_NO_ASK=1
+# Persist the immutable resolution policy for later workflow steps as well.
+for name in HOMEBREW_NO_AUTO_UPDATE HOMEBREW_NO_INSTALL_FROM_API HOMEBREW_NO_INSTALL_CLEANUP HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK HOMEBREW_NO_ASK; do
+  printf '%s=1\n' "$name" >> "${GITHUB_ENV:?}"
+done
+prefix=$(brew --prefix)
+test "$prefix" = /opt/homebrew
+core=$(brew --repository)/Library/Taps/homebrew/homebrew-core
+if [ ! -d "$core/.git" ]; then
+  test ! -e "$core"
+  mkdir -p "$(dirname "$core")"
+  git init -q "$core"
+  git -C "$core" remote add origin https://github.com/Homebrew/homebrew-core.git
+fi
+test -z "$(git -C "$core" status --porcelain)"
+case "$(git -C "$core" remote get-url origin)" in
+  https://github.com/Homebrew/homebrew-core|https://github.com/Homebrew/homebrew-core.git) ;;
+  *) echo 'Unexpected Homebrew core remote.' >&2; exit 1 ;;
+esac
+git -C "$core" fetch --depth=1 https://github.com/Homebrew/homebrew-core.git "$MLF_HOMEBREW_CORE_COMMIT"
+git -C "$core" checkout --detach "$MLF_HOMEBREW_CORE_COMMIT"
+test "$(git -C "$core" rev-parse HEAD)" = "$MLF_HOMEBREW_CORE_COMMIT"
+roots=(llvm gmp pkgconf bdw-gc)
+output=.mlf-build/macos-dependencies
+mkdir -p "$output"
+# Explicit options select the pinned declarations, not installed runtime deps.
+brew deps --formula --union --topological "${roots[@]}" > "$output/dependencies.txt"
+{ cat "$output/dependencies.txt"; printf '%s\n' "${roots[@]}"; } | awk 'NF && !seen[$0]++' > "$output/closure.txt"
+closure=()
+while IFS= read -r formula; do
+  [[ "$formula" =~ ^[a-z0-9][a-z0-9@+_.-]*$ ]]
+  closure+=("$formula")
+  brew info --json=v2 --formula "$formula" > "$output/$formula.json"
+  expected=$(jq -er '.formulae | if length == 1 then .[0] else error("ambiguous formula") end |
+    select(.bottle.stable.files.arm64_tahoe.sha256 | test("^[0-9a-f]{64}$")) |
+    .versions.stable + (if .revision > 0 then "_" + (.revision | tostring) else "" end)' "$output/$formula.json")
+  # Reinstall even a matching version: bottle rebuilds can change bytes without
+  # changing the version, and hosted images may contain an older bottle rebuild.
+  if brew list --versions "$formula" >/dev/null 2>&1; then
+    brew reinstall --force-bottle "$formula"
+  else
+    brew install --force-bottle "$formula"
+  fi
+  actual=$(cd -- "$(brew --prefix "$formula")" && pwd -P)
+  test "$actual" = "$prefix/Cellar/$formula/$expected" || {
+    printf 'Pinned dependency %s resolved to unexpected keg: %s\n' "$formula" "$actual" >&2
+    exit 1
+  }
+done < "$output/closure.txt"
+brew info --json=v2 --formula "${closure[@]}" > "$output/installed.json"
+printf '%s\n' "$MLF_HOMEBREW_CORE_COMMIT" > "$output/homebrew-core-commit"
+# The shared-candidate importer still checks every actual native input byte.
+printf '%s/bin\n' "$(brew --prefix llvm)" >> "${GITHUB_PATH:?}"
+printf 'MLF_GC_PREFIX=%s\n' "$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
+printf 'Pinned macOS native dependencies installed from Homebrew core %s.\n' "$MLF_HOMEBREW_CORE_COMMIT"

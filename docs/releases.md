@@ -290,3 +290,22 @@ C/MLF performance comparisons. The native developer-preview workflow above
 validates compiler correctness and self-hosting; performance remains a separate
 gate. Pinned C/Rust/Haskell baseline sources remain available.
 Existing benchmark reports retain their original source, binary, and host scope.
+
+### Stable macOS qualification dependencies
+
+All macOS stages of the cross-platform qualification use
+`tools/release/setup-macos.sh` with the immutable Homebrew core revision in
+`.github/macos-dependencies.env`. The script installs the pinned formula's
+macOS 26 ARM64 bottles and their runtime dependency closure. It disables
+mutable API/automatic-update resolution and reinstalls existing packages,
+including matching versions, because a bottle rebuild can change bytes without
+changing a package version. This setup is restricted to disposable GitHub-hosted
+runners; it must not change a developer's Homebrew installation.
+
+To update dependencies, review and update the core commit pin. The path-filtered
+`Pinned macOS dependencies` workflow must then pass: it installs independently
+on two hosted runners, compares every installed native dependency file, and
+compiles and runs a small LLVM/GMP/BDWGC program. Shell fault tests run with
+release metadata checks. Full qualification remains required evidence for the
+compiler itself. Shared-candidate native input hashes and path checks stay
+unchanged and still reject any mismatch.
