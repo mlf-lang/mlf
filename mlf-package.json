@@ -21,6 +21,9 @@
     "mlf-interpreter": {
       "path": "libraries/mlf-interpreter"
     },
+    "mlf-language-core": {
+      "path": "libraries/mlf-language-core"
+    },
     "mlf-llvm": {
       "path": "libraries/mlf-llvm"
     },
@@ -32,6 +35,23 @@
     }
   },
   "executables": {
+    "tuple-list": {
+      "main": "tests/TupleListMain.emlf",
+      "profile": "compiler",
+      "modules": {
+        "Tests.IndependentCheck": "tests/Tests/IndependentCheck.emlf",
+        "Tests.IndependentType": "tests/Tests/IndependentType.emlf"
+      },
+      "dependencies": [
+        "mlf-crates",
+        "mlf-foundation",
+        "mlf-frontend",
+        "mlf-inference",
+        "mlf-interpreter",
+        "mlf-language-core",
+        "mlf-xmlf"
+      ]
+    },
     "emlf": {
       "main": "bootstrap/Main.emlf",
       "profile": "compiler",
@@ -70,6 +90,25 @@
     }
   },
   "tests": {
+    "tuple-list": {
+      "requires": [
+        "tuple-list"
+      ],
+      "command": [
+        "{bin:tuple-list}"
+      ]
+    },
+    "tuple-list-native": {
+      "requires": [
+        "emlf"
+      ],
+      "command": [
+        "bash",
+        "{root}/tools/release/test-tuple-list.sh",
+        "{bin:emlf}",
+        "{build}/tuple-list-runtime"
+      ]
+    },
     "unit": {
       "requires": [
         "emlf",

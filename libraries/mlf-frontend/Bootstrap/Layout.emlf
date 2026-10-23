@@ -48,8 +48,8 @@ previousText : Maybe Token -> String
 previousText previous = case previous of {Nothing -> ""; Just t -> tokenText t}
 continuation : String -> String -> Bool
 continuation token previous = elem eqString token continuationTokens || elem eqString previous continuationPrevious
-continuationTokens = Cons "in" (Cons "then" (Cons "else" (Cons "of" (Cons "where" (Cons "|" (Cons ")" (Cons "}" (Cons ";" Nil))))))))
-continuationPrevious = Cons "in" (Cons "then" (Cons "else" (Cons "=" (Cons "->" (Cons "<-" (Cons ":" (Cons "|" (Cons "+" (Cons "-" (Cons "*" (Cons "/" (Cons "%" (Cons "++" (Cons "&&" (Cons "||" (Cons "==" (Cons "/=" (Cons "<" (Cons "<=" (Cons ">" (Cons ">=" Nil)))))))))))))))))))))
+continuationTokens = Cons "]" (Cons "," (Cons "in" (Cons "then" (Cons "else" (Cons "of" (Cons "where" (Cons "|" (Cons ")" (Cons "}" (Cons ";" Nil))))))))))
+continuationPrevious = Cons "::" (Cons "," (Cons "in" (Cons "then" (Cons "else" (Cons "=" (Cons "->" (Cons "<-" (Cons ":" (Cons "|" (Cons "+" (Cons "-" (Cons "*" (Cons "/" (Cons "%" (Cons "++" (Cons "&&" (Cons "||" (Cons "==" (Cons "/=" (Cons "<" (Cons "<=" (Cons ">" (Cons ">=" Nil)))))))))))))))))))))))
 opened : LayoutKind -> List Frame -> Maybe Token -> Token -> List Token -> Token -> List Token
 opened kind stack previous token rest finish = let column = tokenColumn token in
   if not (isTop kind) && not (deeper column stack) then
@@ -65,19 +65,21 @@ normal stack previous token rest finish =
       else if eqString text "then" then closeMark IfMark true stack
       else if eqString text "else" then closeMark IfMark false stack
       else if eqString text ")" then closeExplicit "(" stack
+      else if eqString text "]" then closeExplicit "[" stack
+      else if eqString text "," then closeCollection stack
       else if eqString text "}" then closeExplicit "{" stack
       else if eqString text ";" then Pair "" (dropInline stack)
       else Pair "" stack in
   case closing of
     Pair ending closed ->
       let newLine = case previous of {Nothing -> false; Just old -> tokenEndLine old < tokenLine token} in
-      let closingToken = eqString text ")" || eqString text "}" in
+      let closingToken = eqString text ")" || eqString text "]" || eqString text "}" in
       let result = if newLine && not closingToken then offside (tokenColumn token) (continuation text (previousText previous)) (previousText previous) closed else Pair "" closed in
       case result of
         Pair separator scoped -> append (punctuation (ending ++ separator) token) (Cons token (nextToken token rest finish (if closingToken then scoped else pushToken token scoped)))
 pushToken : Token -> List Frame -> List Frame
 pushToken token frames = let text = tokenText token in
-  if eqString text "(" || eqString text "{" then Cons (Explicit text) frames
+  if eqString text "(" || eqString text "[" || eqString text "{" then Cons (Explicit text) frames
   else if eqString text "let" then Cons (Marker LetMark (tokenColumn token)) frames
   else if eqString text "if" then Cons (Marker IfMark (tokenColumn token)) frames
   else frames
@@ -115,6 +117,14 @@ searchExplicit wanted frames = case frames of
   Cons (Explicit delimiter) rest -> if eqString delimiter wanted then Just (Pair "" rest) else Nothing
   Cons (Layout _ _) rest -> case searchExplicit wanted rest of {Nothing -> Nothing; Just (Pair prefix remaining) -> Just (Pair ("}" ++ prefix) remaining)}
   Cons (Marker _ _) rest -> searchExplicit wanted rest
+  _ -> Nothing
+closeCollection : List Frame -> Pair String (List Frame)
+closeCollection frames = case searchCollection frames of {Nothing -> Pair "" frames; Just result -> result}
+searchCollection : List Frame -> Maybe (Pair String (List Frame))
+searchCollection frames = case frames of
+  Cons (Explicit delimiter) _ -> if eqString delimiter "(" || eqString delimiter "[" then Just (Pair "" frames) else Nothing
+  Cons (Layout _ _) rest -> case searchCollection rest of {Nothing -> Nothing; Just (Pair prefix remaining) -> Just (Pair ("}" ++ prefix) remaining)}
+  Cons (Marker _ _) rest -> searchCollection rest
   _ -> Nothing
 closes : List Frame -> String
 closes frames = case frames of {Nil -> ""; Cons (Layout _ _) rest -> "}" ++ closes rest; Cons _ rest -> closes rest}
