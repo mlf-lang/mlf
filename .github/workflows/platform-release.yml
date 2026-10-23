@@ -28,6 +28,8 @@ permissions:
   actions: read
 env:
   GC_FREE_SPACE_DIVISOR: '1'
+  # Remains serial until paired measurements establish a safe jobs=2 budget.
+  MLF_TEST_BUILD_JOBS: '1'
 concurrency:
   group: platform-release-${{ inputs.validation_only && github.sha || inputs.tag || github.sha }}
   cancel-in-progress: false
@@ -151,7 +153,7 @@ jobs:
           export MLF_PACKAGE_MANAGER="$PWD/.mlf-build/mac-candidate/bin/mlfpkg"
           . tools/release/native-environment.sh
           ./mlfpkg --runtime "$PWD/runtime/mlf_runtime.c" --timeout 21600 --locked build
-      - name: Build shared qualification libraries and port executable
+      - name: Build final-compiler campaign runner and shared prerequisites
         run: tools/release/prepare-qualification.sh
       - name: Verify and archive genuine native outputs
         run: tools/release/shared-candidate.sh export
@@ -168,6 +170,8 @@ jobs:
           include-hidden-files: true
           path: |
             .mlf-build/build-report.json
+            .mlf-build/prerequisites/compiler-tests/build-report.json
+            .mlf-build/prerequisites/compiler-tests/commands/*.stderr
             .mlf-build/prerequisites/tests/build-report.json
             .mlf-build/prerequisites/tests/commands/*.stderr
           retention-days: 14
@@ -203,7 +207,7 @@ jobs:
         run: |
           . tools/release/native-environment.sh
           tools/release/bootstrap-linux.sh .mlf-build/portable-llvm .mlf-build/linux-bootstrap .mlf-build
-      - name: Build shared qualification libraries and port executable
+      - name: Build final-compiler campaign runner and shared prerequisites
         run: tools/release/prepare-qualification.sh
       - name: Verify and archive genuine native outputs
         run: tools/release/shared-candidate.sh export
@@ -220,6 +224,8 @@ jobs:
           include-hidden-files: true
           path: |
             .mlf-build/build-report.json
+            .mlf-build/prerequisites/compiler-tests/build-report.json
+            .mlf-build/prerequisites/compiler-tests/commands/*.stderr
             .mlf-build/prerequisites/tests/build-report.json
             .mlf-build/prerequisites/tests/commands/*.stderr
           retention-days: 14
@@ -239,6 +245,7 @@ jobs:
       - uses: ./.github/actions/posix-qualification
         with:
           platform: macos-arm64
+          build-jobs: '1'
           group: port-prepare-${{ matrix.shard }}
           source: ${{ needs.metadata.outputs.source }}
   mac-port:
@@ -253,6 +260,7 @@ jobs:
       - uses: ./.github/actions/posix-qualification
         with:
           platform: macos-arm64
+          build-jobs: '1'
           group: port
           source: ${{ needs.metadata.outputs.source }}
   mac-unit:
@@ -267,6 +275,7 @@ jobs:
       - uses: ./.github/actions/posix-qualification
         with:
           platform: macos-arm64
+          build-jobs: '1'
           group: unit
           source: ${{ needs.metadata.outputs.source }}
   mac-started:
@@ -300,6 +309,7 @@ jobs:
       - uses: ./.github/actions/posix-qualification
         with:
           platform: macos-arm64
+          build-jobs: '1'
           group: ${{ matrix.group }}
           source: ${{ needs.metadata.outputs.source }}
   linux-port-preparation:
@@ -318,6 +328,7 @@ jobs:
       - uses: ./.github/actions/posix-qualification
         with:
           platform: linux-x64
+          build-jobs: '1'
           group: port-prepare-${{ matrix.shard }}
           source: ${{ needs.metadata.outputs.source }}
   linux-port:
@@ -332,6 +343,7 @@ jobs:
       - uses: ./.github/actions/posix-qualification
         with:
           platform: linux-x64
+          build-jobs: '1'
           group: port
           source: ${{ needs.metadata.outputs.source }}
   linux-tests:
@@ -350,6 +362,7 @@ jobs:
       - uses: ./.github/actions/posix-qualification
         with:
           platform: linux-x64
+          build-jobs: '1'
           group: ${{ matrix.group }}
           source: ${{ needs.metadata.outputs.source }}
   mac-package:

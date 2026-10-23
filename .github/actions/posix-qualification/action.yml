@@ -10,6 +10,10 @@ inputs:
   source:
     required: true
     description: Exact source SHA
+  build-jobs:
+    required: false
+    default: '1'
+    description: Measured, memory-bounded native build parallelism
 runs:
   using: composite
   steps:
@@ -63,6 +67,7 @@ runs:
       shell: bash
       env:
         TEST_GROUP: ${{ inputs.group }}
+        MLF_TEST_BUILD_JOBS: ${{ inputs.build-jobs }}
       run: |
         tools/release/time-stage.sh qualification tools/release/native-ci.sh "$TEST_GROUP"
     - name: Export genuine checked port build artifacts
@@ -105,6 +110,10 @@ runs:
         for tool in emlf mlfpkg compiler-tests mlf-build-runner; do
           if test -f ".mlf-build/bin/$tool"; then cp ".mlf-build/bin/$tool" .mlf-build/release-evidence/bin/; fi
         done
+        if test -f .mlf-build/prerequisites/compiler-tests/build-report.json; then
+          mkdir -p .mlf-build/release-evidence/campaign-runner
+          cp .mlf-build/prerequisites/compiler-tests/build-report.json .mlf-build/release-evidence/campaign-runner/build-report.json
+        fi
         if test -d ".mlf-build/compiler-tests/$TEST_GROUP"; then
           cp -R ".mlf-build/compiler-tests/$TEST_GROUP" .mlf-build/release-evidence/compiler-tests/
           if test "$TEST_GROUP" = port; then
@@ -119,7 +128,7 @@ runs:
               cp ".mlf-build/shared-port/$shard/manifest.json" "$proof/port-shard-manifest.json"
             done
           fi
-          find .mlf-build/release-evidence/compiler-tests -type f ! -path '*/framework-cli/*' ! -name verification.json ! -name build-report.json ! -name port-shard-manifest.json ! -name '*.coverage.jsonl' ! -name '*.log' ! -name '*.stderr' ! -name '*.err' ! -name '*.status.json' ! -name rows.jsonl ! -name current-label ! -path '*/port-*/matrix-*/case-14-interpreter.stdout' ! -path '*/port-*/matrix-*/case-19-interpreter.stdout' ! -path '*/port-*/matrix-*/case-23-interpreter.stdout' -delete
+          find .mlf-build/release-evidence/compiler-tests -type f ! -path '*/framework-cli/*' ! -name verification.json ! -name build-report.json ! -name port-shard-manifest.json ! -name '*.coverage.jsonl' ! -name '*.families.jsonl' ! -path '*/suite-build/bin/*' ! -name '*.log' ! -name '*.stderr' ! -name '*.err' ! -name '*.status.json' ! -name rows.jsonl ! -name current-label ! -path '*/port-*/matrix-*/case-14-interpreter.stdout' ! -path '*/port-*/matrix-*/case-19-interpreter.stdout' ! -path '*/port-*/matrix-*/case-23-interpreter.stdout' -delete
         fi
         log_group=$TEST_GROUP
         case "$TEST_GROUP" in port-*) log_group=port ;; esac

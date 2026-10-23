@@ -34,5 +34,44 @@ implementation has its own validation and independent review.
 
 ## Results
 
-Implementation and measurements are in progress. No performance improvement
-or full qualification pass is claimed yet.
+Implemented:
+
+- Candidate manifest format 2 carries the final-compiler campaign producer
+  report, original publication key and file hashes, full native artifact store
+  closure, and exact source/platform/root/native-tool identities. Both producer
+  export and consumer import/verification validate the original artifact and
+  publication receipts; merely hashing changed files at export is insufficient.
+- Consumers verify the shared runner before and after executing their own
+  campaign. They never invoke a local runner build and never import a campaign
+  execution verdict. The package aggregator compares producer proofs across
+  all six groups.
+- Core has four physical targets: `core-crates`, `core-solver`, `core-language`
+  and `core-modules`. The legacy `core` CLI remains available. Full unit builds
+  nine physical targets in one DAG and executes them sequentially. Partial
+  child reports stay partial; the logical full `core` result is formed from
+  validated actual completion events, then checked against the unchanged full
+  inventory. Packaging hashes all nine binaries and the retained build report.
+- `MLF_TEST_BUILD_JOBS` accepts 1 or 2. CI remains at 1 pending measured memory
+  and timing evidence. The shell admission policy currently permits 2 only on
+  Linux hosts with at least 14 GiB RAM; that check alone is not a memory proof.
+- Every nested suite invocation retains its unmodified build report and records
+  its hash, command, target set, exit code and requested parallelism.
+
+Validation so far:
+
+- 16 transport/provenance fault-injection checks pass, including pre-export
+  mutation of both published/cache bytes, missing dependency proof, stale
+  compiler/source, root/platform/toolchain drift and no-rebuild execution.
+- 11 split-unit evidence checks pass, including all physical binaries, missing
+  receipts/targets, duplicated targets, false full scope and consistently
+  rehashed child/aggregate inventory corruption.
+- 10 bounded-parallelism policy checks and three process-tree sampler tests pass.
+- Shell/release checks and Actionlint pass. Independent source review confirms
+  all 18 moved Core declarations/helpers are byte-for-byte unchanged. Static
+  plans preserve 34 families, 684 execution IDs and exact aliases/metrics, and
+  exclude the unrelated Core registries from each physical compile closure.
+
+These are structural and contract checks, not a full native qualification.
+Native runner/unit execution, paired performance evidence, macOS/Windows and
+full SDK qualification remain in progress. No performance improvement or full
+qualification pass is claimed yet.
