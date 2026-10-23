@@ -147,7 +147,7 @@ unit c = do
  unions <- nativeTest c "int-set-unions"
  suiteArgs c "test-framework" (Cons "--verify-cli" (Cons (output c ++ "/framework-cli") (Cons unions Nil)))
   (Cons "Test framework contracts passed" (Cons "Test framework CLI contracts passed" Nil))
- suite c "core" (Cons "684 checks; 0 failures" (Cons "Oracle: 6712 cases; 6703 executions" Nil))
+ suite c "core" (Cons "737 checks; 0 failures" (Cons "Oracle: 6712 cases; 6703 executions" Nil))
  suite c "figure12" (Cons "43/43 expressions match regression expectations; 0 failures" (Cons "41 distinct Figure12 executions" (Cons "36 supplementary checks; 0 failures" Nil)))
 buildRunnerTests : TestContext -> IO Unit
 buildRunnerTests c = do
@@ -234,8 +234,8 @@ prepareDrivers c portFixtures = do
  record c "drivers" (J.Object drivers)
  return (S.append flags extra)
 matrices : TestContext -> String -> Bool -> IO Unit
-matrices c binary portFixtures = matrixSuite c binary portFixtures (if portFixtures then 25 else 575)
- (Cons (if portFixtures then "25 MLF port fixtures; 0 failures" else "523 shared IO/prelude/backend fixtures; 0 failures") Nil)
+matrices c binary portFixtures = matrixSuite c binary portFixtures (if portFixtures then 25 else 583)
+ (Cons (if portFixtures then "25 MLF port fixtures; 0 failures" else "531 shared IO/prelude/backend fixtures; 0 failures") Nil)
 matrixSuite : TestContext -> String -> Bool -> Int -> List String -> IO Unit
 matrixSuite c binary portFixtures expectedRows expectations = do
  requestedDivisor <- getEnv "MLF_TEST_MATRIX_GC_DIVISOR"
