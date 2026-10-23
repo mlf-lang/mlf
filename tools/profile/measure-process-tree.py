@@ -36,6 +36,19 @@ def available_memory():
     raise RuntimeError("Linux /proc/meminfo MemAvailable is required")
 
 
+def cache_inventory(root):
+    """Describe the exact build-cache starting state, without altering receipts."""
+    root = Path(root).resolve()
+    files = {}
+    for file in sorted(root.rglob("*")) if root.exists() else []:
+        name = str(file.relative_to(root))
+        if file.is_symlink():
+            files[name] = {"symlink": os.readlink(file)}
+        elif file.is_file():
+            files[name] = {"bytes": file.stat().st_size, "sha256": digest(file)}
+    return {"path": str(root), "existed": root.exists(), "files": files}
+
+
 def processes():
     found = {}
     page = os.sysconf("SC_PAGE_SIZE")
@@ -157,6 +170,11 @@ def run(args):
         fcntl.flock(lock, fcntl.LOCK_EX)
         if available_memory() < args.minimum_available_mib * 1024 ** 2:
             raise RuntimeError("Insufficient available memory before command start")
+        # Hashing is outside the timed interval. Capture after acquiring the
+        # shared lock, so a queued experiment cannot report stale cache state.
+        caches = [cache_inventory(path) for path in args.cache_dir]
+        (output / "initial-caches.json").write_text(json.dumps(caches, indent=2) + "\n")
+        context["initial_caches_sha256"] = digest(output / "initial-caches.json")
         start = time.monotonic()
         context["started_utc"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         (output / "context.json").write_text(json.dumps(context, indent=2) + "\n")
@@ -218,6 +236,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", required=True)
     parser.add_argument("--source-root", required=True)
     parser.add_argument("--report-root")
+    parser.add_argument("--cache-dir", action="append", default=[])
     parser.add_argument("--label", required=True)
     parser.add_argument("--tool", action="append", default=[])
     parser.add_argument("--interval", type=float, default=0.2)

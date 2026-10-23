@@ -24,7 +24,7 @@ runs:
       run: |
         tools/release/time-stage.sh dependencies bash -e -o pipefail <<'SH'
         if [ "$PLATFORM" = macos-arm64 ]; then
-          brew install llvm gmp pkg-config bdw-gc
+          tools/release/setup-macos.sh
           echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
           echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
         else
@@ -68,8 +68,21 @@ runs:
       env:
         TEST_GROUP: ${{ inputs.group }}
         MLF_TEST_BUILD_JOBS: ${{ inputs.build-jobs }}
+        PLATFORM: ${{ inputs.platform }}
       run: |
-        tools/release/time-stage.sh qualification tools/release/native-ci.sh "$TEST_GROUP"
+        if [ "$PLATFORM" = linux-x64 ] && [ "$TEST_GROUP" = unit ]; then
+          . tools/release/native-environment.sh
+          tools/release/time-stage.sh qualification python3 tools/profile/measure-process-tree.py \
+            --output .mlf-build/qualification-profile --source-root "$PWD" \
+            --report-root .mlf-build/compiler-tests/unit --cache-dir .mlf-build/cache \
+            --label "linux-unit-jobs-$MLF_TEST_BUILD_JOBS" \
+            --tool .mlf-build/bin/emlf --tool .mlf-build/bin/mlfpkg \
+            --tool .mlf-build/bin/mlf-build-runner --tool .mlf-build/bin/compiler-tests \
+            --tool "$(command -v clang)" \
+            -- tools/release/native-ci.sh "$TEST_GROUP"
+        else
+          tools/release/time-stage.sh qualification tools/release/native-ci.sh "$TEST_GROUP"
+        fi
     - name: Export genuine checked port build artifacts
       if: startsWith(inputs.group, 'port-prepare-')
       id: port-export
@@ -104,6 +117,9 @@ runs:
       run: |
         tools/release/time-stage.sh evidence bash -e -o pipefail <<'SH'
         mkdir -p .mlf-build/release-evidence/bin .mlf-build/release-evidence/compiler-tests .mlf-build/release-evidence/diagnostics
+        if test -d .mlf-build/qualification-profile; then
+          cp -R .mlf-build/qualification-profile .mlf-build/release-evidence/diagnostics/process-tree
+        fi
         if test -f .mlf-build/shared-candidate/manifest.json; then
           cp .mlf-build/shared-candidate/manifest.json .mlf-build/release-evidence/candidate-manifest.json
         fi

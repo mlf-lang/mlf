@@ -56,6 +56,9 @@ Implemented:
   Linux hosts with at least 14 GiB RAM; that check alone is not a memory proof.
 - Every nested suite invocation retains its unmodified build report and records
   its hash, command, target set, exit code and requested parallelism.
+- Linux unit qualification also retains a sampled process-tree RSS trace, its
+  exact initial cache inventory, native tool hashes, scheduler parallelism and
+  every observed build-report version. The same sampler is used locally.
 
 Validation so far:
 
@@ -65,7 +68,7 @@ Validation so far:
 - 11 split-unit evidence checks pass, including all physical binaries, missing
   receipts/targets, duplicated targets, false full scope and consistently
   rehashed child/aggregate inventory corruption.
-- 10 bounded-parallelism policy checks and three process-tree sampler tests pass.
+- 10 bounded-parallelism policy checks and four process-tree sampler tests pass.
 - Shell/release checks and Actionlint pass. Independent source review confirms
   all 18 moved Core declarations/helpers are byte-for-byte unchanged. Static
   plans preserve 34 families, 684 execution IDs and exact aliases/metrics, and
@@ -75,3 +78,21 @@ These are structural and contract checks, not a full native qualification.
 Native runner/unit execution, paired performance evidence, macOS/Windows and
 full SDK qualification remain in progress. No performance improvement or full
 qualification pass is claimed yet.
+
+### Initial cold-runner diagnostic
+
+The uncontended Linux baseline at `e7da00f` completed on 2026-10-23:
+907.17 seconds wall, 898.92 seconds child-tree CPU, sampled process-tree peak
+3,183,001,600 bytes, and minimum host available memory 5,472,858,112 bytes.
+Requested and observed scheduler parallelism were both one. Its 15 executed
+tasks include nine libraries, runtime and the runner's entire native build.
+Aggregate scheduler task wall was 894.79 seconds; its dependency critical-path
+lower bound was 831.89 seconds. These values are distinct from command wall.
+
+This is an empty-build-cache diagnostic, not a typical dependency-warm consumer
+build or a speedup comparison. OS page caches were not dropped. It uses frozen
+native compiler/manager/helper binaries from the earlier full qualification;
+their production sources are unchanged through the merged baseline. All paired
+samples will use those exact tools and GC settings, restoring recorded snapshots
+at the same physical source/cache paths without rewriting dependency receipts.
+The native-candidate qualification remains a separate required validation.

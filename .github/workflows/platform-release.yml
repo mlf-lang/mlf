@@ -75,7 +75,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ needs.metadata.outputs.source }}
-      - run: brew install llvm gmp pkg-config bdw-gc
+      - run: tools/release/setup-macos.sh
       - name: Fetch independently pinned native macOS seed
         env:
           GH_TOKEN: ${{ github.token }}
@@ -131,7 +131,7 @@ jobs:
           PLATFORM: macos-arm64
         run: |
           if [ "$PLATFORM" = macos-arm64 ]; then
-            brew install llvm gmp pkg-config bdw-gc
+            tools/release/setup-macos.sh
             echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
             echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
           else
@@ -188,7 +188,7 @@ jobs:
           PLATFORM: linux-x64
         run: |
           if [ "$PLATFORM" = macos-arm64 ]; then
-            brew install llvm gmp pkg-config bdw-gc
+            tools/release/setup-macos.sh
             echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
             echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
           else
@@ -382,7 +382,7 @@ jobs:
           PLATFORM: macos-arm64
         run: |
           if [ "$PLATFORM" = macos-arm64 ]; then
-            brew install llvm gmp pkg-config bdw-gc
+            tools/release/setup-macos.sh
             echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
             echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
           else
@@ -428,7 +428,7 @@ jobs:
           PLATFORM: linux-x64
         run: |
           if [ "$PLATFORM" = macos-arm64 ]; then
-            brew install llvm gmp pkg-config bdw-gc
+            tools/release/setup-macos.sh
             echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
             echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
           else

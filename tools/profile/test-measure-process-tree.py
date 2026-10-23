@@ -4,6 +4,7 @@ import importlib.util
 from pathlib import Path
 import os
 import subprocess
+import tempfile
 import unittest
 
 spec = importlib.util.spec_from_file_location("measure", Path(__file__).with_name("measure-process-tree.py"))
@@ -12,6 +13,18 @@ spec.loader.exec_module(measure)
 
 
 class MeasurementTests(unittest.TestCase):
+    def test_cache_inventory_distinguishes_absent_empty_and_populated(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "cache"
+            self.assertFalse(measure.cache_inventory(root)["existed"])
+            root.mkdir()
+            self.assertEqual(measure.cache_inventory(root)["files"], {})
+            (root / "artifact.json").write_text("original receipt\n")
+            (root / "link").symlink_to("artifact.json")
+            files = measure.cache_inventory(root)["files"]
+            self.assertEqual(files["artifact.json"]["sha256"], measure.digest(root / "artifact.json"))
+            self.assertEqual(files["link"], {"symlink": "artifact.json"})
+
     def test_dependency_work_is_distinct_from_critical_path(self):
         report = {
             "scheduler": [{"invocation_id": "sample", "jobs": [
