@@ -105,6 +105,7 @@ class Figure12Data(unittest.TestCase):
 
     def test_semantic_oracle_mutations_fail_closed(self):
         mutations = [
+            ('Figure12.emlf', 'import Prelude hiding (Monad, return, bind)\nimport MLF.Primitive (Monad, return, bind)\n', ''),
             ('Figure12Suite.emlf', 'T.alphaEq (inferredType result) expected', 'true'),
             ('Figure12Suite.emlf', 'S.find (\\c -> eqString label (caseId c)) cases',
              'S.find (\\c -> eqString "A11" (caseId c)) cases'),

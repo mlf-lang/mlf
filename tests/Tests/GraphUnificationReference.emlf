@@ -1,5 +1,8 @@
 -- Frozen persistent-map unifier, independently ported from the historical Haskell reference.
 module Tests.GraphUnificationReference (referenceUnify) where
+-- Use standard classes for shared values and the test graph state action.
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Bootstrap.IntMap as IM

@@ -1,4 +1,7 @@
 module Tests.GraphDenseReference where
+-- Select the standard Monad used by shared Either; retain legacy guest syntax.
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Tests.Helpers as H
@@ -46,7 +49,7 @@ validation : (List ( Either String Unit ))
 validation = (S.map validateGraph smallGraphs)
 
 unification : (List ( Either String Graph ))
-unification = (S.concatMap (\(Pair g eqs) -> (Cons (H.fmap S.snd (runBuild g (unify eqs))) Nil)) unificationInputs)
+unification = (S.concatMap (\(Pair g eqs) -> (Cons (S.mapEither S.snd (runBuild g (unify eqs))) Nil)) unificationInputs)
 
 normalization : (List ( Either String Graph ))
 normalization = (let { checked g = do { solver <- (Solver.prepare g); do { original <- (Solver.finish solver); (let { result = (normalize original) } in do { (validateGraph result); (return result) }) } } } in (S.concatMap (\(Pair g eqs) -> (if (H.null eqs) then (Cons (checked g) Nil) else Nil)) unificationInputs))

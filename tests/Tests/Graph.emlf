@@ -3,6 +3,9 @@ module Tests.Graph
   children, reachable, underBinder, inert, permission, unify, expand,
   expandWithScopes, normalize, validateGraph, orderedBelow, genRoot, kindAt,
   bottomTag, nodes, links, nextId, tag, binder, flag, get, put, lift) where
+-- Use standard classes for shared values and the test graph state action.
+import Prelude hiding (Monad, return, bind, pure)
+import MLF.Primitive (Functor, fmap, Applicative, pure, (<*>), Monad, (>>=), return, bind)
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Bootstrap.Graph as G
@@ -13,7 +16,12 @@ runBuild g (Build f) = f g
 returnBuild x = Build (\g -> Right (Pair x g))
 bindBuild : forall a b. Build a -> (a -> Build b) -> Build b
 bindBuild (Build f) next = Build (\g -> S.eitherBind (f g) (\(Pair a changed) -> runBuild changed (next a)))
-instance Monad Build where { return = returnBuild; bind = bindBuild }
+instance Functor Build where { fmap f action = bindBuild action (\x -> returnBuild (f x)) }
+instance Applicative Build where {
+ pure = returnBuild;
+ (<*>) functions arguments = bindBuild functions (\f -> bindBuild arguments (\x -> returnBuild (f x)))
+}
+instance Monad Build where { (>>=) = bindBuild }
 get : Build Graph
 get = Build (\g -> Right (Pair g g))
 put : Graph -> Build Unit
