@@ -190,9 +190,13 @@ used the following sequence:
    verifies a fresh self-host fixed point, tests relocation and installation,
    then uploads a new developer-preview release with SHA-256 checksums.
 
-Pull requests and merge queues retain the four-check **PR gate**: metadata,
-Linux source smoke, Linux native build-runner checks and Windows runtime checks.
-The macOS lifecycle checks still run inside the complete package campaign.
+Pull requests and merge queues retain the six-check **PR gate**: metadata,
+Linux source smoke, Linux native build-runner checks, Windows runtime checks,
+Linux async completions and scope-aware async-language parity. Only verified
+unrelated pull requests can omit the expensive parity steps; merge queues and
+main/manual runs always execute them. Main/manual
+runs retain direct macOS runner/supervisor and both async checks; the complete
+package campaign also executes the static lifecycle cases.
 Main pushes now run all six complete campaigns on Linux and macOS, Windows
 native qualification and the complete ten-workload benchmark automatically.
 `full_validation` and the compatible `self_host` CI inputs run the same complete

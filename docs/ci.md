@@ -39,7 +39,9 @@ The `CI` workflow runs on every pull request, merge queue group and push to
 - **Async interpreter and native parity**: a two-stage, primitive-aware Linux
   compiler bootstrap followed by typed completion, process and Task language
   suites on the interpreter and LLVM runtime, plus a fresh checked-package
-  consumer, exact cache replay and interface-opacity rejections.
+  consumer, exact cache replay and interface-opacity rejections. Pull requests
+  omit these expensive steps by default and record `not-executed`. Maintainers
+  explicitly opt in by applying the `ci:async-parity` label.
 
 The aggregate runs even when a prerequisite fails and requires all six
 prerequisites to report `success`. Required pull-request and merge-queue jobs
@@ -48,10 +50,30 @@ gate. Main pushes and non-Windows-only manual runs additionally execute the
 runner, native async and complete async-language gates on macOS; every selected
 matrix entry must pass.
 Failed, cancelled or skipped prerequisites cannot produce a passing gate.
-There are no path filters on the required workflow. Manual dispatches retain
+There are no path filters on the required workflow or lightweight native
+checks. The async-language job itself always participates in the six-job gate;
+only its expensive steps can be omitted after a successful explicit policy decision.
+Manual dispatches retain
 the Windows-only mode; either `full_validation` or the compatible `self_host`
 input runs complete qualification, including Benchmark Game. Their skipped aggregate
 is named **Manual CI summary**, so it cannot satisfy the required **PR gate**.
+
+### Explicit PR async parity
+
+Expensive async interpreter/native parity is off for every PR by default,
+including compiler, runtime and async changes. Add the `ci:async-parity` label to
+explicitly request it; label addition/removal triggers CI again. Opt-in runs the
+campaign even for documentation-only changes. Main pushes, merge queues and
+non-Windows-only manual runs retain async coverage. Fast runtime, build-runner,
+metadata and source-smoke checks are unchanged.
+
+The cheap async policy job remains part of the strict six-job aggregate gate.
+Malformed or missing PR event/commit/label metadata fails the cheap selector
+without executing parity; the strict aggregate then fails.
+Its uploaded decision states `not-executed` when parity is omitted; this is not
+an async pass or full qualification. See [the exact policy](ci-async-policy.md).
+The older dated change-scope census is historical; its checker reports current
+selector identities separately and requires the current policy controls.
 
 ## Enforce before merging
 
@@ -108,19 +130,20 @@ It requires every suite's fail-closed `complete` field and backend inventory,
 plus the package gate's cache-replay and rejection inventory.
 Windows native probes do not claim Windows MLF language or bootstrap parity.
 
-Main pushes and non-Windows-only manual runs retain the same direct macOS
+Main pushes and non-Windows-only manual runs retain the direct macOS
 runner/dynamic-supervisor, native-completion and async-language gates. macOS
 also executes the 22 static-runner lifecycle cases through `buildRunnerTests`
-in the complete `packages` campaign on main/manual full CI and release
-qualification. All six full campaigns and the native macOS builds remain
-separate requirements; no skipped macOS job is used as a passing pre-merge
-prerequisite.
+in the complete `packages` campaign. All six full campaigns and the native
+macOS builds remain separate requirements; no skipped macOS job is used as a
+passing pre-merge prerequisite.
 
 ## Automatic complete qualification on main
 
 Every push to `main` invokes `native-qualification.yml` with `build_packages=false`.
-It runs independently of the small PR gate, using read-only repository and Actions
-permissions. Pull requests and merge queue groups keep the fast gate above.
+It runs independently of the narrower PR gate, using read-only repository and
+Actions permissions. Pull requests and merge queue groups keep the six checks
+above, including the policy-aware async-language gate (always bootstrapped for
+merge queues; pull requests run its heavy steps only with explicit opt-in).
 Manual `CI` with `full_validation=true` exercises this exact complete graph on a
 feature branch without creating SDK archives or publishing anything.
 

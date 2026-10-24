@@ -1,5 +1,7 @@
 # Shared implementation source cutover
 
+Current integration follow-on: [103-module framework reconciliation and exact qualification boundary](Framework-Reconciliation.md). Earlier 94-module checkpoint reports below remain historical.
+
 This draft is one coordinated migration of implementation syntax, primitive
 facade, compiler sources, native packaging, bootstrap and qualification.
 It is not a staged feature rollout. The guest MLF language and inference engine

@@ -1,0 +1,106 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Test.Assert as A
+import qualified Test.Case as C
+import qualified Test.Runner as Runner
+import qualified Test.Outcome as O
+import qualified Test.Expectation as Expectation
+import qualified Test.Adapter as Adapter
+import qualified Test.Capability as Capability
+import qualified Test.Fixture as Fixture
+import qualified Test.Resources as Resources
+import qualified Test.Plan as Plan
+import qualified Test.Diagnostics as Diagnostics
+import qualified Test.Process as Process
+import qualified Test.NativeProcess as Native
+import qualified Async.Process as Async
+
+rejected result = case result of { Left _ -> true; Right _ -> false }
+check name condition = C.test ("lifecycle/" ++ name) name Nil (A.assert condition name)
+fixtureFailure = do
+ fixture <- Fixture.create "workspace" Fixture.Case Fixture.KeepFailures
+ partial <- Fixture.acquire (O.InfrastructureError "setup") fixture
+ Fixture.release false O.Pass partial
+sealed join cleanup = do
+ planned <- Adapter.plan Adapter.initial
+ prepared <- Adapter.prepare O.Pass planned
+ executed <- Adapter.execute O.Pass prepared
+ collected <- Adapter.collect executed
+ validated <- Adapter.validate O.Pass collected
+ cleaning <- Adapter.beginCleanup validated
+ finished <- Adapter.finishCleanup join cleanup cleaning
+ Adapter.seal finished
+accepted result = case result of { Right attempt -> Adapter.successful attempt; Left _ -> false }
+leaseControl = do
+ budget <- Resources.create Resources.serial
+ first <- Resources.acquire "first" Resources.serial budget
+ case first of
+  Nothing -> Left "first lease unavailable"
+  Just held -> do
+   second <- Resources.acquire "second" Resources.serial held
+   case second of { Nothing -> Right Unit; Just _ -> Left "nested oversubscription" }
+compileOnly = Plan.Plan "catalog" "inputs" (Cons "forbidden" Nil)
+ (Cons (Plan.Node "execute" Plan.Execute Nil (Cons "forbidden" Nil) O.Runtime Plan.CompileOnly) Nil)
+ Nil Resources.serial (Plan.Deadlines 1 1 1)
+compileOnlyValid = Plan.Plan "catalog" "inputs" (Cons "typecheck" Nil)
+ (Cons (Plan.Node "check" Plan.Execute Nil (Cons "typecheck" Nil) O.TypeCheck Plan.CompileOnly) Nil)
+ Nil Resources.serial (Plan.Deadlines 1 1 1)
+compileOnlyLaundered = Plan.Plan "catalog" "inputs" (Cons "runtime" Nil)
+ (Cons (Plan.Node "input" Plan.Prepare Nil Nil O.Source Plan.CompileOnly)
+ (Cons (Plan.Node "compile" Plan.Build (Cons "input" Nil) Nil O.Emission Plan.MayExecute)
+ (Cons (Plan.Node "run" Plan.Execute (Cons "compile" Nil) (Cons "runtime" Nil) O.Runtime Plan.MayExecute) Nil)))
+ Nil Resources.serial (Plan.Deadlines 1 1 1)
+prepareRejection = do
+ planned <- Adapter.plan Adapter.initial
+ cleaning <- Adapter.prepare (O.ExpectedRejection O.Setup "missing-fixture" 1) planned
+ finished <- Adapter.finishCleanup Adapter.Joined O.Pass cleaning
+ Adapter.seal finished
+cancelCleanup = do
+ planned <- Adapter.plan Adapter.initial
+ prepared <- Adapter.prepare O.Pass planned
+ executed <- Adapter.execute O.Pass prepared
+ collected <- Adapter.collect executed
+ validated <- Adapter.validate O.Pass collected
+ cleaning <- Adapter.beginCleanup validated
+ cancelled <- Adapter.cancel "requested during cleanup" cleaning
+ finished <- Adapter.finishCleanup Adapter.Joined O.Pass cancelled
+ Adapter.seal finished
+rejectionValidationFailure = do
+ planned <- Adapter.plan Adapter.initial
+ prepared <- Adapter.prepare O.Pass planned
+ executed <- Adapter.execute (O.ExpectedRejection O.TypeCheck "diagnostic" 1) prepared
+ collected <- Adapter.collect executed
+ validated <- Adapter.validate (O.AssertionFailure "oracle mismatch") collected
+ cleaning <- Adapter.beginCleanup validated
+ finished <- Adapter.finishCleanup Adapter.Joined O.Pass cleaning
+ Adapter.seal finished
+signalNotRejection = case Native.validate (Expectation.Reject O.Runtime "signal" 137) O.Runtime "signal" true (Native.Completed (Async.Exited 137 0) O.Pass) of
+ Pair outcome _ -> S.not (O.successful outcome)
+summaryEntry = C.test "summary/expected" "expected" Nil (A.succeed Unit)
+summaryOther = C.test "summary/other" "other" Nil (A.succeed Unit)
+cases =
+ Cons (check "native-signal-not-rejection" signalNotRejection)
+ (Cons (check "process-summary-missing" (S.not (Process.summaryComplete 1 (Cons summaryEntry Nil) Nil)))
+ (Cons (check "process-summary-duplicate" (S.not (Process.summaryComplete 1 (Cons summaryEntry Nil) (Cons (Process.descriptorJson summaryEntry) (Cons (Process.descriptorJson summaryEntry) Nil)))))
+ (Cons (check "process-summary-substituted" (S.not (Process.summaryComplete 1 (Cons summaryEntry Nil) (Cons (Process.descriptorJson summaryOther) Nil))))
+ ( Cons (check "prepare-rejection-is-not-execution" (S.not (accepted prepareRejection)))
+ (Cons (check "cancel-during-cleanup" (S.not (accepted cancelCleanup)))
+ (Cons (check "rejection-still-needs-validation" (S.not (accepted rejectionValidationFailure)))
+ ( Cons (check "compile-only-typecheck" (case Plan.validate compileOnlyValid of { Right Unit -> true; _ -> false }))
+ (Cons (check "compile-only-transitive-runtime" (rejected (Plan.validate compileOnlyLaundered)))
+ ( Cons (check "execute-before-prepare" (rejected (Adapter.execute O.Pass Adapter.initial)))
+ (Cons (check "unverified-join-cannot-seal" (rejected (sealed Adapter.Unverified O.Pass)))
+ (Cons (check "cleanup-failure-cannot-pass" (S.not (accepted (sealed Adapter.Joined (O.InfrastructureError "cleanup")))))
+ (Cons (check "join-failure-cannot-pass" (S.not (accepted (sealed (Adapter.JoinFailed "remaining child") O.Pass))))
+ (Cons (check "normal-lifecycle" (accepted (sealed Adapter.Joined O.Pass)))
+ (Cons (check "partial-setup-needs-join" (rejected fixtureFailure))
+ (Cons (check "nested-budget" (case leaseControl of { Right Unit -> true; _ -> false }))
+ (Cons (check "unknown-capability" (rejected (Capability.check (Capability.Requirement "native" Capability.Required) Nil)))
+ (Cons (check "required-capability" (case Capability.check (Capability.Requirement "native" Capability.Required) (Cons (Capability.Missing "native" "not installed") Nil) of { Right (O.Unsupported _) -> true; _ -> false }))
+ (Cons (check "compile-only-execution" (rejected (Plan.validate compileOnly)))
+ (Cons (check "display-limit" (rejected (Diagnostics.preview (0 - 1) "raw")))
+ (Cons (check "native-unbounded-process" (S.not (Native.bounded (Async.command "child" Nil "stdout" "stderr"))))
+ (Cons (check "legacy-cancellation-status" (eqString (Process.status (Process.legacyOutcome (O.Cancelled "cancel"))) "crashed"))
+ Nil)))))))))))))))))))))
+main = Runner.main cases

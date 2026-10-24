@@ -32,6 +32,9 @@
     },
     "mlf-xmlf": {
       "path": "libraries/mlf-xmlf"
+    },
+    "mlf-test": {
+      "path": "testing"
     }
   },
   "executables": {
@@ -40,7 +43,9 @@
       "profile": "compiler",
       "modules": {
         "Tests.IndependentCheck": "tests/Tests/IndependentCheck.hs",
-        "Tests.IndependentType": "tests/Tests/IndependentType.hs"
+        "Tests.IndependentType": "tests/Tests/IndependentType.hs",
+        "Tests.TupleList": "tests/Tests/TupleList.hs",
+        "Tests.TupleListLegacy": "tests/Tests/TupleListLegacy.hs"
       },
       "dependencies": [
         "mlf-crates",
@@ -49,6 +54,7 @@
         "mlf-inference",
         "mlf-interpreter",
         "mlf-language-core",
+        "mlf-test",
         "mlf-xmlf"
       ],
       "source-syntax": "shared-haskell-v1"

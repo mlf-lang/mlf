@@ -11,17 +11,35 @@
     },
     "mlf-test": {
       "path": ".."
+    },
+    "mlf-async": {
+      "path": "../../libraries/mlf-async"
     }
   },
   "library": {
     "modules": {
-      "Test.Process": "Test/Process.emlf"
+      "Test.Process": "Test/Process.emlf",
+      "Test.NativeProcess": "Test/NativeProcess.emlf"
     }
   },
   "executables": {
     "mlf-test": {
       "main": "Main.emlf",
       "profile": "compiler"
+    },
+    "test-lifecycle": {
+      "main": "LifecycleMain.emlf",
+      "profile": "compiler"
+    }
+  },
+  "tests": {
+    "lifecycle": {
+      "requires": [
+        "test-lifecycle"
+      ],
+      "command": [
+        "{bin:test-lifecycle}"
+      ]
     }
   }
 }

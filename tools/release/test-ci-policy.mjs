@@ -39,6 +39,57 @@ assert.match(ci,/push:\n    branches: \[main\]/);
 assert.match(ci,/if: \(github.event_name == 'push'.*inputs.full_validation.*inputs.self_host/);
 assert.match(ci,/uses: \.\/\.github\/workflows\/native-qualification.yml\n    with:\n      source: \$\{\{ github.sha \}\}\n      build_packages: false/);
 assert.match(ci,/needs: \[metadata, native, windows-runtime, build-runner, async-runtime, async-language\]/);
+assert.match(ci,/length == 6 and all/);
+const ciJob = name => ci.match(new RegExp(`^  ${name}:\\n[\\s\\S]*?(?=^  [a-z][a-z-]*:\\n|(?![\\s\\S]))`, 'm'))?.[0];
+assert.match(ciJob('metadata'), /fetch-depth: 0/, 'Historical migration audits require full Git history');
+const requireHistoricalCheckouts = workflow => {
+  const jobs = workflow.match(/^  [a-z][a-z-]*:\n[\s\S]*?(?=^  [a-z][a-z-]*:\n|(?![\s\S]))/gm) || [];
+  for (const job of jobs) {
+    if (job.includes('tools/release/check.sh') || job.includes('tools/shared/test_framework_direct.py')) {
+      assert.match(job, /fetch-depth: 0/, 'Historical audits require a full-history checkout in their own job');
+    }
+  }
+};
+for (const workflow of [ci, qualify, release, read('recover-release')]) {
+  requireHistoricalCheckouts(workflow);
+  assert.throws(() => requireHistoricalCheckouts(workflow.replaceAll('fetch-depth: 0', 'fetch-depth: 1')));
+}
+assert.match(ciJob('native'), /python3 tools\/shared\/test_framework_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/framework-direct/);
+assert.match(ciJob('native'), /python3 tools\/shared\/test_figure12_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json/);
+assert.match(ciJob('native'), /\.mlf-build\/framework-direct\/\*\.json\*/);
+assert.match(ciJob('native'), /\.mlf-build\/figure12-direct\/\*\.json/);
+
+for (const name of ['build-runner','async-runtime','async-language']) {
+  const job = ciJob(name);
+  assert.ok(job, `Missing ${name} coverage`);
+  assert.match(job,/github.event_name == 'push' \|\| github.event_name == 'workflow_dispatch'/);
+  assert.match(job,/\["ubuntu-24.04", "macos-26"\]/);
+  assert.match(job,/\|\| '\["ubuntu-24.04"\]'/);
+}
+assert.match(ciJob('build-runner'),/process-supervisor-tests/);
+const asyncJob = ciJob('async-language');
+assert.match(asyncJob,/fetch-depth: 0/);
+assert.match(ci,/pull_request:\n    types: \[opened, synchronize, reopened, labeled, unlabeled\]/);
+assert.match(fs.readFileSync('tools/release/async-change-scope.py','utf8'), /OPT_IN_LABEL = "ci:async-parity"/);
+assert.match(asyncJob,/id: scope\n        run: python3 tools\/release\/async-change-scope.py/);
+assert.match(asyncJob,/\.mlf-build\/async-change-scope\/decision.json/);
+assert.equal((asyncJob.match(/if: steps.scope.outputs.required != 'false'/g) || []).length, 5);
+for (const name of ['Native bootstrap and parity dependencies', 'Fetch verified native seed', 'Bootstrap released seed through frozen bridge to shared native tools', 'Qualify typed completions and structured process tasks', 'Qualify checked async package interfaces and cache replay']) {
+  assert.ok(asyncJob.includes(`- name: ${name}\n        if: steps.scope.outputs.required != 'false'\n`));
+}
+// Only a positive false output skips the expensive steps; unknown/missing
+// decisions never opt out. A failed selector still fails this required job.
+const selectionExpression = asyncJob.match(/if: (steps.scope.outputs.required != 'false')/)[1];
+for (const required of ['true', '', undefined, 'unknown']) {
+  assert.equal(Function('steps', `return (${selectionExpression});`)({scope:{outputs:{required}}}), true);
+}
+assert.equal(Function('steps', `return (${selectionExpression});`)({scope:{outputs:{required:'false'}}}), false);
+for (const name of ['build-runner', 'async-runtime', 'windows-runtime', 'native']) {
+  assert.doesNotMatch(ciJob(name), /steps\.scope|async-change-scope/, `${name} must stay unconditional`);
+}
+for (const command of ['scripts/bootstrap-async.sh','tests/fixtures/async-completion/check.sh','tools/release/test-async-process.sh','tools/release/test-async-task.sh','tools/release/test-async-package.sh']) {
+  assert.ok(ciJob('async-language').includes(command), `Missing ${command}`);
+}
 assert.doesNotMatch(ci,/contents: write|continue-on-error/);
 assert.doesNotMatch(qualify,/contents: write|continue-on-error/);
 assert.match(qualify,/group: \[unit, backends, parity, packages, self-host\]/);

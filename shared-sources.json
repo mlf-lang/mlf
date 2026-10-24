@@ -19,6 +19,7 @@
     "package",
     "tests",
     "tests/shared",
+    "testing",
     "host/ghc"
   ],
   "modules": [
@@ -443,6 +444,41 @@
       "role": "implementation"
     },
     {
+      "module": "Test.Assert",
+      "path": "testing/Test/Assert.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Test.Case",
+      "path": "testing/Test/Case.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Test.Descriptor",
+      "path": "testing/Test/Descriptor.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Test.Expectation",
+      "path": "testing/Test/Expectation.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Test.Outcome",
+      "path": "testing/Test/Outcome.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Test.Registry",
+      "path": "testing/Test/Registry.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Test.Runner",
+      "path": "testing/Test/Runner.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Tests.BuildReceipts",
       "path": "tests/Tests/BuildReceipts.hs",
       "role": "implementation"
@@ -490,6 +526,16 @@
     {
       "module": "Tests.TestSources",
       "path": "tests/Tests/TestSources.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Tests.TupleList",
+      "path": "tests/Tests/TupleList.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Tests.TupleListLegacy",
+      "path": "tests/Tests/TupleListLegacy.hs",
       "role": "implementation"
     }
   ],

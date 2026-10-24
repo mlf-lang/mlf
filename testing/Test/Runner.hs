@@ -1,0 +1,490 @@
+-- mlf:syntax shared-haskell-v1
+{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
+             KindSignatures, FlexibleContexts, FlexibleInstances,
+             MultiParamTypeClasses, OverloadedStrings #-}
+module Test.Runner where {
+  import MLF.Primitive;
+  import Bootstrap.Types;
+  import qualified Bootstrap.Std as S;
+  import qualified Test.Assert as A;
+  import qualified Test.Case as C;
+  import qualified Test.Descriptor as D;
+  import qualified Test.Registry as Registry;
+  import qualified Test.Outcome as Outcome;
+  data Selector = Filter String | Exact String | Tag String;
+  data Options = Options Bool Bool String (List Selector);
+  data Result = Result C.Case (Either A.Failure Unit);
+  usage :: String;
+  usage =
+    "test [--list] [--filter TEXT] [--exact ID] [--tag TAG] [--group NAME] [--level NAME] [--input NAME] [--oracle NAME] [--purpose NAME] [--category NAME] [--technique NAME] [--format text|json] [--report FILE]";
+  listing (Options value _ _ _) = value;
+  json (Options _ value _ _) = value;
+  report (Options _ _ path _) = path;
+  selectors (Options _ _ _ values) = values;
+  parse :: List String -> Either String Options;
+  parse args = parseWith (Options False False "" Nil) args;
+  parseWith :: Options -> List String -> Either String Options;
+  parseWith (Options list machine path selected) args =
+    let {
+      matchValueShared1 = args
+    } in
+    case matchValueShared1 of {
+      Nil -> Right (Options list machine path (S.reverse selected));
+      Cons matchValueShared2 matchValueShared3 ->
+        if MLF.Primitive.eqString matchValueShared2 "--list"
+        then let {
+               rest = matchValueShared3
+             } in
+             parseWith (Options True machine path selected) rest
+        else if MLF.Primitive.eqString matchValueShared2 "--format"
+             then case matchValueShared3 of {
+                    Cons matchValueShared6 matchValueShared7 ->
+                      if MLF.Primitive.eqString matchValueShared6 "text"
+                      then let {
+                             rest = matchValueShared7
+                           } in
+                           parseWith (Options list False path selected) rest
+                      else if MLF.Primitive.eqString matchValueShared6 "json"
+                           then let {
+                                  rest = matchValueShared7
+                                } in
+                                parseWith (Options list True path selected) rest
+                           else let {
+                                  rest = matchValueShared7
+                                } in
+                                let {
+                                  value = matchValueShared6
+                                } in
+                                let {
+                                  flag = matchValueShared2
+                                } in
+                                if (stringLength value == 0)
+                                then Left "empty test selector or format"
+                                else if eqString flag "--report"
+                                     then parseWith (Options list machine value selected) rest
+                                     else if eqString flag "--filter"
+                                          then parseWith
+                                                 (Options list machine path
+                                                    (Cons (Filter value) selected))
+                                                 rest
+                                          else if eqString flag "--exact"
+                                               then parseWith
+                                                      (Options list machine path
+                                                         (Cons (Exact value) selected))
+                                                      rest
+                                               else if eqString flag "--tag"
+                                                    then parseWith
+                                                           (Options list machine path
+                                                              (Cons (Tag value) selected))
+                                                           rest
+                                                    else if eqString flag "--group"
+                                                         then parseWith
+                                                                (Options list machine path
+                                                                   (Cons (Tag ("group:" ++ value))
+                                                                      selected))
+                                                                rest
+                                                         else if eqString flag "--level"
+                                                              then parseWith
+                                                                     (Options list machine path
+                                                                        (Cons
+                                                                           (Tag ("level:" ++ value))
+                                                                           selected))
+                                                                     rest
+                                                              else if eqString flag "--input"
+                                                                   then parseWith
+                                                                          (Options list machine path
+                                                                             (Cons
+                                                                                (Tag
+                                                                                   ("input:" ++
+                                                                                    value))
+                                                                                selected))
+                                                                          rest
+                                                                   else if eqString flag "--oracle"
+                                                                        then parseWith
+                                                                               (Options list machine
+                                                                                  path
+                                                                                  (Cons
+                                                                                     (Tag
+                                                                                        ("oracle:" ++
+                                                                                         value))
+                                                                                     selected))
+                                                                               rest
+                                                                        else if eqString flag
+                                                                                  "--purpose"
+                                                                             then parseWith
+                                                                                    (Options list
+                                                                                       machine
+                                                                                       path
+                                                                                       (Cons
+                                                                                          (Tag
+                                                                                             ("purpose:" ++
+                                                                                              value))
+                                                                                          selected))
+                                                                                    rest
+                                                                             else if eqString flag
+                                                                                       "--category"
+                                                                                  then parseWith
+                                                                                         (Options
+                                                                                            list
+                                                                                            machine
+                                                                                            path
+                                                                                            (Cons
+                                                                                               (Tag
+                                                                                                  ("category:" ++
+                                                                                                   value))
+                                                                                               selected))
+                                                                                         rest
+                                                                                  else if eqString
+                                                                                            flag
+                                                                                            "--technique"
+                                                                                       then parseWith
+                                                                                              (Options
+                                                                                                 list
+                                                                                                 machine
+                                                                                                 path
+                                                                                                 (Cons
+                                                                                                    (Tag
+                                                                                                       ("technique:" ++
+                                                                                                        value))
+                                                                                                    selected))
+                                                                                              rest
+                                                                                       else Left
+                                                                                              usage;
+                    _ -> Left usage
+                  }
+             else case matchValueShared3 of {
+                    Cons matchValueShared4 matchValueShared5 ->
+                      let {
+                        value = matchValueShared4
+                      } in
+                      let {
+                        rest = matchValueShared5
+                      } in
+                      let {
+                        flag = matchValueShared2
+                      } in
+                      if (stringLength value == 0)
+                      then Left "empty test selector or format"
+                      else if eqString flag "--report"
+                           then parseWith (Options list machine value selected) rest
+                           else if eqString flag "--filter"
+                                then parseWith
+                                       (Options list machine path (Cons (Filter value) selected))
+                                       rest
+                                else if eqString flag "--exact"
+                                     then parseWith
+                                            (Options list machine path
+                                               (Cons (Exact value) selected))
+                                            rest
+                                     else if eqString flag "--tag"
+                                          then parseWith
+                                                 (Options list machine path
+                                                    (Cons (Tag value) selected))
+                                                 rest
+                                          else if eqString flag "--group"
+                                               then parseWith
+                                                      (Options list machine path
+                                                         (Cons (Tag ("group:" ++ value)) selected))
+                                                      rest
+                                               else if eqString flag "--level"
+                                                    then parseWith
+                                                           (Options list machine path
+                                                              (Cons (Tag ("level:" ++ value))
+                                                                 selected))
+                                                           rest
+                                                    else if eqString flag "--input"
+                                                         then parseWith
+                                                                (Options list machine path
+                                                                   (Cons (Tag ("input:" ++ value))
+                                                                      selected))
+                                                                rest
+                                                         else if eqString flag "--oracle"
+                                                              then parseWith
+                                                                     (Options list machine path
+                                                                        (Cons
+                                                                           (Tag
+                                                                              ("oracle:" ++ value))
+                                                                           selected))
+                                                                     rest
+                                                              else if eqString flag "--purpose"
+                                                                   then parseWith
+                                                                          (Options list machine path
+                                                                             (Cons
+                                                                                (Tag
+                                                                                   ("purpose:" ++
+                                                                                    value))
+                                                                                selected))
+                                                                          rest
+                                                                   else if eqString flag
+                                                                             "--category"
+                                                                        then parseWith
+                                                                               (Options list machine
+                                                                                  path
+                                                                                  (Cons
+                                                                                     (Tag
+                                                                                        ("category:" ++
+                                                                                         value))
+                                                                                     selected))
+                                                                               rest
+                                                                        else if eqString flag
+                                                                                  "--technique"
+                                                                             then parseWith
+                                                                                    (Options list
+                                                                                       machine
+                                                                                       path
+                                                                                       (Cons
+                                                                                          (Tag
+                                                                                             ("technique:" ++
+                                                                                              value))
+                                                                                          selected))
+                                                                                    rest
+                                                                             else Left usage;
+                    _ -> Left usage
+                  };
+      _ -> Left usage
+    };
+  contains :: String -> String -> Bool;
+  contains needle text = containsAt needle text 0;
+  containsAt :: String -> String -> Int -> Bool;
+  containsAt needle text offset =
+    if ((offset + stringLength needle) > stringLength text)
+    then False
+    else if eqString needle (stringSlice text offset (stringLength needle))
+         then True
+         else containsAt needle text (offset + 1);
+  matches selector entry =
+    case selector of {
+      Filter text -> (contains text (C.id entry) || contains text (C.name entry));
+      Exact identity -> eqString identity (C.id entry);
+      Tag label -> S.elem eqString label (C.tags entry)
+    };
+  -- Share one identity contract with typed descriptors; preserve the v1 API.
+  validId = D.validId;
+  validate :: List C.Case -> Either String Unit;
+  validate cases = Registry.validate (S.map C.descriptor cases);
+  plan :: List String -> List C.Case -> Either String (Pair Options (List C.Case));
+  plan args cases =
+    do {
+      options <- parse args;
+      validate cases;
+      let {
+        selected =
+          S.filter (\entry -> S.all (\selector -> matches selector entry) (selectors options)) cases
+      };
+      if S.null selected then Left "no tests matched selection" else Right (Pair options selected)
+    };
+  typedOutcome :: Result -> Outcome.Outcome;
+  typedOutcome (Result _ result) =
+    case result of {
+      Right Unit -> Outcome.Pass;
+      Left failure -> Outcome.AssertionFailure (A.describe failure)
+    };
+  passed (Result _ outcome) =
+    case outcome of {
+      Right _ -> True;
+      Left _ -> False
+    };
+  identity (Result entry _) = C.id entry;
+  executeWith :: (Result -> IO Unit) -> List C.Case -> IO (List Result);
+  executeWith observe cases =
+    case cases of {
+      Nil -> ioReturn Nil;
+      Cons entry rest ->
+        do {
+          outcome <- A.run (C.action entry);
+          let {
+            result = Result entry outcome
+          };
+          observe result;
+          remaining <- executeWith observe rest;
+          ioReturn (Cons result remaining)
+        }
+    };
+  execute :: List C.Case -> IO (List Result);
+  execute = executeWith (\_ -> ioReturn Unit);
+  -- Only encoding is needed for the wire protocol. Preserve Unicode and escape
+  -- every JSON control character, including NUL; never mix test labels into JSON.
+  quote text =
+    ("\"" ++
+     (S.concatMapString
+        (\i ->
+           let {
+             code = stringCodeAt text i
+           } in
+           if (code == 34)
+           then "\\\""
+           else if (code == 92)
+                then "\\\\"
+                else if (code < 32)
+                     then ("\\u00" ++
+                           (stringSlice "0123456789abcdef" (quotInt code 16) 1 ++
+                            stringSlice "0123456789abcdef" (remInt code 16) 1))
+                     else stringSlice text i 1)
+        (S.range 0 (stringLength text - 1)) ++
+      "\""));
+  strings values = ("[" ++ (S.intercalate "," (S.map quote values) ++ "]"));
+  descriptor entry =
+    ("\"id\":" ++
+     (quote (C.id entry) ++
+      (",\"name\":" ++ (quote (C.name entry) ++ (",\"tags\":" ++ strings (C.tags entry))))));
+  prefix event = ("{\"schema_version\":1,\"event\":" ++ quote event);
+  scope :: Int -> Int -> String;
+  scope total selected = if (total == selected) then "full" else "partial";
+  selectionFields total selected =
+    (",\"total\":" ++
+     (showInt total ++
+      (",\"selected\":" ++ (showInt selected ++ (",\"scope\":" ++ quote (scope total selected))))));
+  resultJson (Result entry outcome) =
+    (prefix "case" ++
+     ("," ++
+      (descriptor entry ++
+       (case outcome of {
+          Right _ -> ",\"status\":\"passed\"}";
+          Left failure ->
+            (",\"status\":\"failed\",\"message\":" ++
+             (quote (A.message failure) ++
+              ((case A.details failure of {
+                  Nothing -> "";
+                  Just (Pair expected actual) ->
+                    (",\"expected\":" ++ (quote expected ++ (",\"actual\":" ++ quote actual)))
+                }) ++
+               "}")))
+        }))));
+  resultText (Result entry outcome) =
+    case outcome of {
+      Right _ -> ("PASS " ++ (C.id entry ++ ("  " ++ C.name entry)));
+      Left failure ->
+        ("FAIL " ++ (C.id entry ++ ("  " ++ (C.name entry ++ (": " ++ A.describe failure)))))
+    };
+  -- The count-only v1 helper remains readable for callers with no plan. It is
+  -- not an identity verifier. Actual execution uses summaryJsonFor below.
+  summaryJson total selected results =
+    summaryJsonWith (countComplete total selected results) total selected results;
+  countComplete total selected results =
+    ((total >= selected) &&
+     ((selected > 0) &&
+      ((S.length results == selected) && Registry.unique (S.map identity results))));
+  summaryJsonFor total selected results =
+    let {
+      count = S.length selected
+    } in
+    let {
+      exact =
+        case Registry.exactInventory (S.map C.id selected) (S.map identity results) of {
+          Right Unit -> True;
+          Left _ -> False
+        }
+    } in
+    summaryJsonWith (exact && countComplete total count results) total count results;
+  summaryJsonWith complete total selected results =
+    let {
+      successes = S.length (S.filter passed results)
+    } in
+    (prefix "summary" ++
+     (selectionFields total selected ++
+      (",\"complete\":" ++
+       ((if complete then "true" else "false") ++
+        (",\"executed\":" ++
+         (showInt (S.length results) ++
+          (",\"passed\":" ++
+           (showInt successes ++
+            (",\"failed\":" ++ (showInt (S.length results - successes) ++ "}"))))))))));
+  run :: List String -> List C.Case -> IO Int;
+  -- Replace a previous report before actions run. A crash leaves an incomplete
+  -- start record; only a returned run may publish a complete summary.
+  -- Compare actual IDs to the plan, not merely their counts.
+  run args cases =
+    case plan args cases of {
+      Left error ->
+        do {
+          putErr ("test: " ++ (error ++ "\n"));
+          ioReturn 2
+        };
+      Right (Pair options selected) ->
+        do {
+          let {
+            total = S.length cases
+          };
+          let {
+            count = S.length selected
+          };
+          if listing options
+          then do {
+                 let {
+                   inventory =
+                     (prefix "inventory" ++
+                      (selectionFields total count ++
+                       (",\"cases\":[" ++
+                        (S.intercalate ","
+                           (S.map (\entry -> ("{" ++ (descriptor entry ++ "}"))) selected) ++
+                         "]}"))))
+                 };
+                 saveReport options (inventory ++ "\n");
+                 if json options
+                 then putStrLn inventory
+                 else S.mapM_ (\entry -> putStrLn (C.id entry ++ ("  " ++ C.name entry))) selected;
+                 ioReturn 0
+               }
+          else do {
+                 let {
+                   start =
+                     (prefix "start" ++
+                      (selectionFields total count ++
+                       (",\"ids\":" ++ (strings (S.map C.id selected) ++ "}"))))
+                 };
+                 saveReport options (start ++ "\n");
+                 if json options then putStrLn start else ioReturn Unit;
+                 results <-
+                   executeWith
+                     (\result ->
+                        putStrLn (if json options then resultJson result else resultText result))
+                     selected;
+                 let {
+                   failures = S.length (S.filter (\result -> S.not (passed result)) results)
+                 };
+                 let {
+                   exact =
+                     case Registry.exactInventory (S.map C.id selected)
+                            (S.map identity results) of {
+                       Right Unit -> True;
+                       Left _ -> False
+                     }
+                 };
+                 let {
+                   summary = summaryJsonFor total selected results
+                 };
+                 saveReport options
+                   (S.intercalate "\n"
+                      (Cons start (S.append (S.map resultJson results) (Cons summary Nil))) ++
+                    "\n");
+                 if json options
+                 then putStrLn summary
+                 else putStrLn
+                        (showInt count ++
+                         (" checks; " ++
+                          (showInt failures ++
+                           (" failures (" ++ (scope total count ++ " inventory)")))));
+                 ioReturn (if (exact && (failures == 0)) then 0 else 1)
+               }
+        }
+    };
+  saveReport options text =
+    if eqString (report options) "" then ioReturn Unit else writeFile (report options) text;
+  arguments :: Int -> Int -> IO (List String);
+  arguments index count =
+    if (index >= count)
+    then ioReturn Nil
+    else do {
+           value <- getArg index;
+           rest <- arguments (index + 1) count;
+           ioReturn (Cons value rest)
+         };
+  main :: List C.Case -> IO Unit;
+  main cases =
+    do {
+      count <- getArgCount;
+      args <- arguments 0 count;
+      code <- run args cases;
+      if (code == 0) then ioReturn Unit else exitWith code
+    }
+}

@@ -50,9 +50,9 @@ class ManifestParity(unittest.TestCase):
         mutation(data)
         path.write_text(json.dumps(data))
 
-    def test_closed_corpus_has_matching_94_modules_12_executables(self):
+    def test_closed_corpus_has_matching_103_modules_12_executables(self):
         manifest = self.check()
-        self.assertEqual(len(manifest['modules']), 94)
+        self.assertEqual(len(manifest['modules']), 103)
         self.assertEqual(len(manifest['executables']), 12)
 
     def test_cabal_wrong_wrapper_rejected(self):

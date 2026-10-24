@@ -1,0 +1,6 @@
+PASS current-source accepted polymorphic-let
+PASS current-source accepted impredicative-self-application
+PASS current-source rejected monomorphic-mismatch
+PASS current-source rejected invalid-universal-annotation
+PASS current-source malformed target
+PR current-source smoke passed: 2 accepted, 2 rejected, 1 malformed target.
