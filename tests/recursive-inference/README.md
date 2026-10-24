@@ -19,3 +19,9 @@ The direct GHC `shared-frontend --recursive-inference` executable separately
 executes the 53 focused source cases, finite-origin planner checks, and current
 plus frozen target/evidence checks. The discovery harness does not substitute
 for those checks or claim that all 742 Core actions have been executed.
+
+`runtime/*.emlf` are three terminating host-interpreter checks. Run each with
+`emlf --run FILE` and compare exact stdout with its `.stdout` sibling. They
+exercise factorial, a mutual recursive knot, and explicit inferred dictionary
+arguments over repeated recursive calls. They are separate from the 742-case
+Core inventory and require no LLVM/GC/native compilation.
