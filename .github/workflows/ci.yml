@@ -7,11 +7,11 @@ on:
   workflow_dispatch:
     inputs:
       full_validation:
-        description: Also build fresh native tools and run the full package distribution suite
+        description: Run all native qualification campaigns and the complete Benchmark Game
         type: boolean
         default: false
       self_host:
-        description: Also rebuild the compiler and check a fresh self-host fixed point
+        description: Run complete qualification (includes the fresh self-host fixed point)
         type: boolean
         default: false
       windows_runtime_only:
@@ -31,6 +31,16 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - run: tools/release/check.sh
+      - name: Verify unit evidence with jq 1.8.2
+        run: |
+          set -euo pipefail
+          jq --version
+          mkdir -p "$RUNNER_TEMP/jq-1.8.2"
+          curl -fsSL https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-linux-amd64 -o "$RUNNER_TEMP/jq-1.8.2/jq"
+          printf '%s  %s\n' b1c22172dd303f3be49e935aa56aa48a8b7a46e0bc838b4997d3bb451495870f "$RUNNER_TEMP/jq-1.8.2/jq" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/jq-1.8.2/jq"
+          test "$("$RUNNER_TEMP/jq-1.8.2/jq" --version)" = jq-1.8.2
+          PATH="$RUNNER_TEMP/jq-1.8.2:$PATH" tools/release/test-unit-evidence.sh
       - name: Validate GitHub Actions workflows
         run: |
           set -euo pipefail
@@ -53,6 +63,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: tools/release/fetch-seed.sh .mlf-build/seed .github/smoke-seed-linux.env
+      - name: Execute suite receipt and focused-Core preparation contracts
+        run: |
+          ulimit -s unlimited
+          python3 tools/release/test-suite-build-receipts.py --compiler "$MLF_COMPILER" --output .mlf-build/suite-receipt-regression
       - name: Exercise checkout compiler sources with the verified seed
         run: tools/release/native-ci.sh source-smoke
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -66,110 +80,15 @@ jobs:
             .mlf-build/source-smoke/*.log*
             .mlf-build/source-smoke/*.json
             .mlf-build/source-smoke/*.xmlf
-  fresh-native:
-    name: Fresh native compiler smoke
-    if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.full_validation)) && !inputs.windows_runtime_only
-    needs: [native]
-    runs-on: macos-26
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - name: Native dependencies
-        run: brew install llvm gmp pkg-config bdw-gc
-      - name: Fetch verified native seed
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: tools/release/fetch-seed.sh .mlf-build/seed .github/smoke-seed.env
-      - name: Build checkout tools and run small CLI smoke suite
-        run: tools/release/native-ci.sh pr-smoke
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        if: always()
-        with:
-          name: pr-smoke-evidence
-          include-hidden-files: true
-          retention-days: 14
-          path: |
-            .mlf-build/pr-smoke/result.json
-            .mlf-build/pr-smoke/*.log
-            .mlf-build/pr-smoke/manager-bootstrap/bootstrap.json
-            .mlf-build/pr-smoke/manager-bootstrap/build-report.json
-            .mlf-build/pr-smoke/manager-bootstrap/root-manifest.json
-            .mlf-build/pr-smoke/manager-bootstrap/source/mlf-package.json
-            .mlf-build/pr-smoke/manager-bootstrap/commands/
-            .mlf-build/pr-smoke/candidate/build-report.json
-            .mlf-build/pr-smoke/candidate/invocations/**/*.json
-            .mlf-build/pr-smoke/candidate/invocations/**/*.stdout
-            .mlf-build/pr-smoke/candidate/invocations/**/*.stderr
-            .mlf-build/pr-smoke/candidate/cache/*/artifact.json
-            .mlf-build/pr-smoke/cli/**/*.json
-            .mlf-build/pr-smoke/cli/**/*.stdout
-            .mlf-build/pr-smoke/cli/**/*.stderr
-            .mlf-build/pr-smoke/cli/**/*.status
-            .mlf-build/pr-smoke/cli/**/*.timed-out
-            .mlf-build/pr-smoke/packages/*.json
-            .mlf-build/pr-smoke/packages/*.log*
-            .mlf-build/pr-smoke/packages/*.stdout
-            .mlf-build/pr-smoke/packages/*.stderr
-            .mlf-build/pr-smoke/packages/*.expected
-  packages:
-    name: Native package distribution
-    if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.full_validation)) && !inputs.windows_runtime_only
-    needs: [native]
-    runs-on: macos-26
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - name: Native dependencies
-        run: |
-          brew install llvm gmp pkg-config bdw-gc
-          echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
-          echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
-      - name: Fetch pinned published package compiler
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: tools/release/fetch-seed.sh .mlf-build/package-seed .github/package-seed.env
-      - name: Build candidate manager and test campaign
-        run: |
-          tools/release/bootstrap-manager.sh .mlf-build/package-manager-bootstrap
-          export MLF_PACKAGE_MANAGER="$PWD/.mlf-build/package-manager-bootstrap/bin/mlfpkg"
-          "$MLF_PACKAGE_MANAGER" --compiler "$MLF_COMPILER" --runtime "$PWD/runtime/mlf_runtime.c" \
-            --build-dir .mlf-build/package-tools --timeout 5400 --locked build --target mlfpkg --target compiler-tests
-      - name: Test source packages and checked GitHub distribution
-        run: |
-          .mlf-build/package-tools/bin/compiler-tests packages --compiler "$MLF_COMPILER" \
-            --manager "$PWD/.mlf-build/package-tools/bin/mlfpkg" \
-            --build-dir .mlf-build/package-tests --cache-dir .mlf-build/package-tools/cache
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        if: always()
-        with:
-          name: package-distribution-evidence
-          include-hidden-files: true
-          retention-days: 14
-          path: |
-            .mlf-build/package-manager-bootstrap/bootstrap.json
-            .mlf-build/package-manager-bootstrap/build-report.json
-            .mlf-build/package-manager-bootstrap/root-manifest.json
-            .mlf-build/package-manager-bootstrap/source/mlf-package.json
-            .mlf-build/package-manager-bootstrap/commands/
-            .mlf-build/package-tools/build-report.json
-            .mlf-build/package-tools/commands/
-            .mlf-build/package-tools/cache/*/artifact.json
-            .mlf-build/package-tests/verification.json
-            .mlf-build/package-tests/*.log*
-            .mlf-build/package-tests/*.stderr
-            .mlf-build/package-tests/*.coverage.jsonl
-            .mlf-build/package-tests/suite-build/build-report.json
-            .mlf-build/package-tests/suite-build/commands/
-            tests/golden/unit-inventory.json
+            .mlf-build/suite-receipt-regression/
   build-runner:
     name: Native build runner (${{ matrix.os }})
     if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only
     strategy:
       fail-fast: false
       matrix:
-        # macOS runs the same 22 lifecycle checks in the full packages campaign.
-        # Keep the required PR gate independent of the smaller macOS runner pool.
-        os: [ubuntu-24.04]
+        # PR and merge-queue gates stay on Linux; main/manual runs retain macOS.
+        os: ${{ fromJSON((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && '["ubuntu-24.04", "macos-26"]' || '["ubuntu-24.04"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
@@ -183,6 +102,7 @@ jobs:
           clang -O2 -std=c11 -Wall -Wextra -Werror runtime/mlf_build_runner.c -o "$output/mlf-build-runner"
           clang -O2 -std=c11 -Wall -Wextra -Werror tests/native/build_runner_fixture.c -o "$output/build-runner-fixture"
           clang -O2 -std=c11 -Wall -Wextra -Werror tests/native/build_runner_tests.c -o "$output/build-runner-tests"
+          clang -O2 -std=c11 -Wall -Wextra -Werror tests/native/process_supervisor_tests.c runtime/mlf_process_supervisor.c -o "$output/process-supervisor-tests"
       - name: Exercise bounded scheduling, protocols, and descendant cleanup
         shell: bash
         run: |
@@ -190,6 +110,8 @@ jobs:
           output="$PWD/.mlf-build/build-runner-ci"
           "$output/build-runner-tests" "$output/mlf-build-runner" "$output/build-runner-fixture" "$output/evidence" 2>&1 | tee "$output/build-runner.log"
           grep -q '22 native build runner tests passed' "$output/build-runner.log"
+          "$output/process-supervisor-tests" "$output/build-runner-fixture" "$output/process-evidence" 2>&1 | tee "$output/process-supervisor.log"
+          grep -q 'native process supervisor tests passed' "$output/process-supervisor.log"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
@@ -199,6 +121,148 @@ jobs:
             .mlf-build/build-runner-ci/*.log
             .mlf-build/build-runner-ci/evidence/**/*.plan
             .mlf-build/build-runner-ci/evidence/**/*.result
+  async-runtime:
+    name: Native async completions (${{ matrix.os }})
+    if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only
+    strategy:
+      fail-fast: false
+      matrix:
+        # Keep real macOS coverage without queueing the required pre-merge gate.
+        os: ${{ fromJSON((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && '["ubuntu-24.04", "macos-26"]' || '["ubuntu-24.04"]') }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Native runtime test dependencies
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo apt-get update
+            sudo apt-get install -y libgc-dev libgmp-dev pkg-config
+          else
+            brew install bdw-gc gmp pkg-config
+          fi
+      - name: Exercise traced completions, primitive dispatch, and timers
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$PWD/.mlf-build/async-native-ci"
+          mkdir -p "$output"
+          read -r -a cflags <<< "$(pkg-config --cflags bdw-gc gmp)"
+          read -r -a libs <<< "$(pkg-config --libs bdw-gc gmp)"
+          for test in completion_cell_tests async_completion_primitives; do
+            clang -O2 -std=c11 -Wall -Wextra -Werror "${cflags[@]}" "tests/native/$test.c" runtime/mlf_runtime.c "${libs[@]}" -lm -o "$output/$test"
+            "$output/$test" 2>&1 | tee "$output/$test.log"
+          done
+          grep -q 'Native completion representation: .* checks, .* callbacks passed' "$output/completion_cell_tests.log"
+          grep -q 'Native completion primitives: .* checks, .* callbacks passed' "$output/async_completion_primitives.log"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: async-native-evidence-${{ matrix.os }}
+          include-hidden-files: true
+          path: .mlf-build/async-native-ci/*.log
+  async-language:
+    name: Async interpreter and native parity (${{ matrix.os }})
+    if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && '["ubuntu-24.04", "macos-26"]' || '["ubuntu-24.04"]') }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+      - name: Decide whether this PR needs expensive async parity
+        id: scope
+        run: python3 tools/release/async-change-scope.py --output .mlf-build/async-change-scope/decision.json
+      - name: Native bootstrap and parity dependencies
+        if: steps.scope.outputs.required != 'false'
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo apt-get update
+            sudo apt-get install -y clang llvm libgmp-dev libgc-dev pkg-config jq
+          else
+            brew install llvm gmp pkg-config bdw-gc jq
+            echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+            echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
+          fi
+          echo 'GC_FREE_SPACE_DIVISOR=8' >> "$GITHUB_ENV"
+      - name: Fetch verified native seed
+        if: steps.scope.outputs.required != 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pin=.github/smoke-seed.env
+          if [ "$RUNNER_OS" = Linux ]; then pin=.github/smoke-seed-linux.env; fi
+          tools/release/fetch-seed.sh .mlf-build/async-seed "$pin"
+      - name: Bootstrap the real primitive-aware interpreter and compiler
+        if: steps.scope.outputs.required != 'false'
+        run: |
+          set -euo pipefail
+          mkdir -p .mlf-build/async-bootstrap
+          scripts/bootstrap-async.sh 2>&1 | tee .mlf-build/async-bootstrap/bootstrap.log
+      - name: Qualify typed completions and structured process tasks
+        if: steps.scope.outputs.required != 'false'
+        run: |
+          set -euo pipefail
+          compiler="$PWD/.mlf-build/async-bootstrap/stage2"
+          EMLF="$compiler" tests/fixtures/async-completion/check.sh
+          tools/release/test-async-process.sh "$compiler" .mlf-build/async-process-parity
+          tools/release/test-async-task.sh "$compiler" .mlf-build/async-task-parity
+          jq -e '.complete == true and .backends == ["source-interpreter", "target-interpreter", "llvm"]' .mlf-build/async-completion-gate/result.json
+          for suite in async-process-parity async-task-parity; do
+            jq -e '.complete == true and .backends == ["interpreter", "llvm"]' ".mlf-build/$suite/result.json"
+          done
+      - name: Qualify checked async package interfaces and cache replay
+        if: steps.scope.outputs.required != 'false'
+        run: |
+          set -euo pipefail
+          compiler="$PWD/.mlf-build/async-bootstrap/stage2"
+          manager="$(cat .mlf-build/async-bootstrap/manager.path)"
+          tools/release/test-async-package.sh "$compiler" "$manager" .mlf-build/async-package-parity
+          jq -e '.complete == true and .backend == "llvm" and .cache_replay == true and .opaque_rejections == 6 and .type_rejections == 1' \
+            .mlf-build/async-package-parity/result.json
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: async-language-evidence-${{ matrix.os }}
+          include-hidden-files: true
+          retention-days: 14
+          path: |
+            .mlf-build/async-change-scope/decision.json
+            .mlf-build/async-bootstrap/bootstrap.log
+            .mlf-build/async-bootstrap/capability.txt
+            .mlf-build/async-bootstrap/source-identity.txt
+            .mlf-build/async-bootstrap/compilers.sha256
+            .mlf-build/async-bootstrap/manager.sha256
+            .mlf-build/async-bootstrap/manager.path
+            .mlf-build/async-bootstrap/build-*/**/build-report.json
+            .mlf-build/async-bootstrap/build-*/**/commands/
+            .mlf-build/async-bootstrap/source-*/inputs.sha256
+            .mlf-build/async-bootstrap/cache/*/artifact.json
+            .mlf-build/async-completion-gate/**/*.json
+            .mlf-build/async-completion-gate/**/*.stdout
+            .mlf-build/async-completion-gate/**/*.stderr
+            .mlf-build/async-completion-gate/**/*.status
+            .mlf-build/async-completion-gate/**/*.timed-out
+            .mlf-build/async-process-parity/**/*.json
+            .mlf-build/async-process-parity/**/*.stdout
+            .mlf-build/async-process-parity/**/*.stderr
+            .mlf-build/async-process-parity/**/*.status
+            .mlf-build/async-process-parity/**/*.timed-out
+            .mlf-build/async-task-parity/**/*.json
+            .mlf-build/async-task-parity/**/*.stdout
+            .mlf-build/async-task-parity/**/*.stderr
+            .mlf-build/async-task-parity/**/*.status
+            .mlf-build/async-task-parity/**/*.timed-out
+            .mlf-build/async-package-parity/**/*.json
+            .mlf-build/async-package-parity/**/*.stdout
+            .mlf-build/async-package-parity/**/*.stderr
+            .mlf-build/async-package-parity/**/*.status
+            .mlf-build/async-package-parity/**/*.timed-out
   windows-runtime:
     name: Native Windows runtime
     runs-on: windows-2025
@@ -212,6 +276,36 @@ jobs:
         run: tools/release/setup-windows.ps1 -Output .mlf-build/windows-dependencies
       - name: Test native runtime, filesystem, and build runner lifecycles
         run: tools/release/test-windows-runtime.ps1 -NativePrefix $env:MLF_NATIVE_PREFIX -Clang $env:MLF_CLANG -Output .mlf-build/windows-runtime
+      - name: Require long-path regression to reject the pre-fix runner
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . ./tools/release/windows-common.ps1
+          $baseline = 'e7da00f201bfb66bf6e26d59e56184dd37a83abd'
+          git fetch --no-tags --depth=1 origin $baseline
+          Assert-Release ($LASTEXITCODE -eq 0) 'Cannot fetch the immutable pre-fix runner'
+          $source = git show "${baseline}:runtime/mlf_build_runner.c"
+          Assert-Release ($LASTEXITCODE -eq 0) 'Cannot read the immutable pre-fix runner'
+          $output = [IO.Path]::GetFullPath('.mlf-build/windows-runtime')
+          $oldSource = "$output/pre-fix-build-runner.c"
+          [IO.File]::WriteAllText($oldSource, ($source -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
+          $oldRunner = "$output/pre-fix-build-runner.exe"
+          $flags = @('-O2','-std=c11','-Wall','-Wextra','-Werror','-municode',"-I$PWD/runtime",$oldSource,'-lpsapi','-o',$oldRunner)
+          $null = Invoke-ReleaseCommand $env:MLF_CLANG $flags "$output/pre-fix-build-runner-build.log" $PWD.Path
+          $negative = "$output/build-runner/negative-control"
+          Assert-Release (!(Test-Path -LiteralPath $negative)) 'Negative control needs a fresh directory'
+          $rejected = $false
+          try {
+            $null = Invoke-ReleaseCommand "$output/build-runner-tests.exe" @($oldRunner,"$output/build-runner-fixture.exe",$negative) "$output/long-path-negative.log" $PWD.Path
+          } catch { $rejected = $true }
+          Assert-Release $rejected 'Regression unexpectedly accepted the pre-fix runner'
+          $results = @(Get-ChildItem -Path "$negative/build-runner-*/long-redirections.result" -File)
+          Assert-Release ($results.Count -eq 1) 'Missing unique long-path negative result'
+          $result = Read-ReleaseJson $results[0].FullName
+          Assert-Release ($result.complete -eq $true -and $result.exit_code -eq 126) 'Negative control did not reach the expected launch failure'
+          $task = @($result.tasks | Where-Object { $_.id -eq 'absolute' })
+          Assert-Release ($task.Count -eq 1 -and $task[0].state -eq 'failed' -and $task[0].exit_code -eq 126 -and $task[0].pid -eq 0) 'Negative control failed for a different reason'
+          Write-ReleaseJson "$output/long-path-negative.json" @{passed=$true;baseline=$baseline;pre_fix_runner_sha256=(Get-ReleaseHash $oldRunner);result=$result}
+          Write-Output 'Pre-fix runner rejected long stream paths with exit 126 and PID 0'
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
@@ -226,7 +320,7 @@ jobs:
     # A skipped manual job must not satisfy the required check on the same SHA.
     name: ${{ github.event_name == 'workflow_dispatch' && 'Manual CI summary' || 'PR gate' }}
     if: always() && github.event_name != 'workflow_dispatch'
-    needs: [metadata, native, windows-runtime, build-runner]
+    needs: [metadata, native, windows-runtime, build-runner, async-runtime, async-language]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -234,44 +328,14 @@ jobs:
         env:
           CHECKS: ${{ toJSON(needs) }}
         run: |
-          printf '%s\n' "$CHECKS" | jq -e 'length == 4 and all(.[]; .result == "success")'
-  self-host:
-    name: Fresh self-host
-    if: github.event_name == 'workflow_dispatch' && inputs.self_host && !inputs.windows_runtime_only
-    runs-on: macos-26
-    timeout-minutes: 360
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - run: brew install llvm gmp pkg-config bdw-gc
-      - name: Fetch verified native seed
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: tools/release/fetch-seed.sh .mlf-build/seed
-      # A seed with an older code generator cannot itself produce fixed-point
-      # LLVM for the updated compiler. Validate the next native generation.
-      - name: Bootstrap the updated native code generator
-        run: |
-          export MLF_GC_PREFIX="$(brew --prefix bdw-gc)"
-          export PATH="$(brew --prefix llvm)/bin:$PATH"
-          tools/release/timed-bootstrap.sh
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        if: always()
-        with:
-          name: native-bootstrap-evidence
-          include-hidden-files: true
-          retention-days: 30
-          path: |
-            .mlf-build/bootstrap-stage1/build-report.json
-            .mlf-build/bootstrap-stage1/commands/
-            .mlf-build/bootstrap-stage1/cache/**/artifact.json
-            .mlf-build/bootstrap-stage1/timing/
-      - name: Build and check a fresh compiler fixed point
-        run: tools/release/native-ci.sh self-host
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        if: always()
-        with:
-          name: native-self-host-evidence
-          include-hidden-files: true
-          path: |
-            .mlf-build/build-report.json
-            .mlf-build/compiler-tests/self-host/verification.json
+          printf '%s\n' "$CHECKS" | jq -e 'length == 6 and all(.[]; .result == "success")'
+  qualification:
+    name: Complete main qualification
+    if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (inputs.full_validation || inputs.self_host))) && !inputs.windows_runtime_only
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/native-qualification.yml
+    with:
+      source: ${{ github.sha }}
+      build_packages: false

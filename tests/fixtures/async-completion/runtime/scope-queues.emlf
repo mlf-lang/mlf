@@ -1,0 +1,17 @@
+main = do
+  outer <- asyncScopeNew 1 4
+  inner <- asyncScopeNew 1 4
+  asyncEnqueue inner (putStrLn "inner")
+  asyncEnqueue outer (do {
+    putStrLn "outer-start";
+    ioBind (asyncStep outer) printInt;
+    ioBind (asyncStep inner) printInt;
+    putStrLn "outer-end" })
+  ioBind (asyncStep outer) printInt
+  asyncEnqueue outer (do { putStrLn "closing"; asyncScopeClose outer })
+  dropped <- asyncEnqueue outer (panic "closed callback executed")
+  ioBind (asyncStep outer) printInt
+  ioBind (asyncStep outer) printInt
+  ioBind (asyncSubscriptionStatus dropped) printInt
+  asyncScopeClose outer
+  asyncScopeClose inner

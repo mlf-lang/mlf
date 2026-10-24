@@ -1,0 +1,9 @@
+module Main where
+import Gate.CompletionInterface
+-- Generalizing the allocation ACTION is safe if each execution allocates anew.
+main = let allocation = newCompletion in
+  ioBind allocation (\intCell -> ioBind allocation (\stringCell ->
+    ioBind (resolve intCell 42) (\_ ->
+    ioBind (resolve stringCell "ok") (\_ ->
+    ioBind (observe intCell) (\n -> ioBind (observe stringCell) (\s ->
+      ioBind (printInt n) (\_ -> putStrLn s)))))))

@@ -1,67 +1,6 @@
 module CoreMain where
 import Bootstrap.Types
-import qualified Tests.Coverage as Coverage
-import qualified Bootstrap.Std as S
 import qualified Tests.Core as T
-import qualified Tests.Helpers as H
-import qualified Package.OS as O
-import qualified Tests.Selection as Selection
-substringChecks : IO Unit
-substringChecks = do
- -- The port's String adapter must retain empty, overlapping, Unicode and NUL
- -- substring semantics independently of the compiler's diagnostic strings.
- Coverage.mapCounted "core" "substring-executed" (\(Triple needle text expected) -> O.require (H.eq (H.contains needle text) expected) "substring adapter differs from scalar substring semantics")
-  (Cons (Triple "" "" true)
-  (Cons (Triple "" "abc" true)
-  (Cons (Triple "a" "" false)
-  (Cons (Triple "abcd" "abc" false)
-  (Cons (Triple "ab" "abc" true)
-  (Cons (Triple "bc" "abcd" true)
-  (Cons (Triple "cd" "abcd" true)
-  (Cons (Triple "aaab" "aaaab" true)
-  (Cons (Triple "aaab" "aaaa" false)
-  (Cons (Triple "λ😀" "aλ😀z" true)
-  (Cons (Triple "😀λ" "λ😀" false)
-  (Cons (Triple "a\0b" "xa\0by" true)
-  (Cons (Triple "a\0c" "xa\0by" false) Nil)))))))))))))
-familyNames : List String
-familyNames = Cons "core/substring-adapter" (S.map S.fst T.families)
-validateRegistry : IO Unit
-validateRegistry = do
- O.require (S.length T.suite == 684) "preserved core test coverage changed"
- O.require (S.eqList eqString (S.map S.fst (S.concatMap S.snd T.families)) (S.map S.fst T.suite)) "core family registry changed the complete suite or its order"
- O.require (S.length familyNames == S.length (S.nubBy eqString familyNames)) "duplicate core family identity"
-runCases : List (Pair String (IO Unit)) -> IO Unit
-runCases cases =
- S.mapM_ (\(Pair label action) -> do { action; Coverage.passed "core" label; putStrLn ("PASS " ++ label) }) cases
-legacyFrom : String -> IO Unit
-legacyFrom prefix = do
- Coverage.begin "core" false
- substringChecks
- let cases = S.dropWhile (\entry -> S.not (O.starts prefix (S.fst entry))) T.suite
- O.require (S.not (S.null cases)) ("unknown test prefix: " ++ prefix)
- runCases cases
- putStrLn (showInt (S.length cases) ++ " checks; 0 failures")
- Coverage.finish "core"
-runFamily : String -> IO Unit
-runFamily identity = do
- if eqString identity "core/substring-adapter" then substringChecks else
-  case S.lookup eqString identity T.families of
-   Just cases -> runCases cases
-   Nothing -> O.fatal "unknown core family"
- Selection.passed "core" identity
+import qualified Tests.CoreRunner as R
 main : IO Unit
-main = do
- args <- O.allArguments
- validateRegistry
- if Selection.listing args then putStr (S.unlines familyNames) else case args of
-  Cons "--from" (Cons prefix Nil) -> legacyFrom prefix
-  _ -> do
-   Pair full selected <- case Selection.choose familyNames args of { Left message -> O.fatal message; Right value -> return value }
-   Selection.begin "core" full selected
-   Coverage.begin "core" full
-   S.mapM_ runFamily selected
-   let cases = S.concatMap S.snd (S.filter (\entry -> S.elem eqString (S.fst entry) selected) T.families)
-   putStrLn (showInt (S.length cases) ++ " checks; 0 failures")
-   Coverage.finish "core"
-   Selection.finish "core"
+main = R.main "core" true 739 (Cons (Pair "core/substring-adapter" Nil) T.families)

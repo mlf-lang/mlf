@@ -1,0 +1,42 @@
+module Tests.CoreSolver where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import Bootstrap.Compiler
+import Bootstrap.Constraint (generate, solve, generalization, skeleton)
+import Bootstrap.Parser
+import qualified Bootstrap.IntMap as IM
+import qualified Tests.Helpers as H
+import Tests.CoreHelpers
+import qualified Tests.Graph as G
+import qualified Tests.ComponentProjection as ComponentProjection
+import qualified Tests.IntSetUnions as IntSetUnions
+import qualified Tests.IndexEdges as IndexEdges
+import qualified Tests.ProjectionRanks as ProjectionRanks
+import qualified Tests.ProjectionChanges as ProjectionChanges
+import qualified Tests.SolverIndexAudit as SolverIndexAudit
+import qualified Tests.DenseNormalization as DenseNormalization
+import qualified Tests.SolverAllocation as SolverAllocation
+import Tests.GraphValidation (graphValidationTests)
+import Tests.GraphUnification (graphUnificationTests)
+import Tests.GraphSolver (graphSolverTests)
+import Tests.EmbeddingPruning (embeddingPruningTests)
+
+graphTests : (List ( Pair String (IO Unit) ))
+graphTests = (Cons (Pair "expansion resets scheme flag and binding" do { c <- (H.right (bind (parseExpr "<test>" "\\x -> x") generate)); do { g <- (H.right (solve c)); (let { gen = (generalization (skeleton c)) } in (let { s = (G.genRoot g gen) } in do { (Pair (Triple r _ es) expanded) <- (H.right (G.runBuild g (G.expand gen gen))); do { (H.assert (H.eq (G.flag (G.nodeAt g s)) Rigid) "scheme root not normalized"); do { (H.assert (H.eq (G.flag (G.nodeAt expanded r)) Flexible) "flag was not reset"); do { (H.assert (H.null es) "closed identity has a frontier"); (let { locals = (S.concatMap (\(Pair n vn) -> (if (H.eq (G.binder vn) (Just r)) then (Cons n Nil) else Nil)) (IM.toList (G.nodes expanded))) } in (H.assert (H.eq (H.length locals) 1) "generalized variable was not rebound to expansion root")) } } } })) } }) (Cons (Pair "all inert nodes normalized" do { r <- (compileOK "\\f x -> f x"); (let { g = (presolution r) } in ((H.forM_ (IM.toList (G.nodes g))) (\(Pair n vn) -> (case (G.tag vn) of { (GGen _) -> (return Unit); _ -> (S.when (G.inert g n) (H.assert (H.eq (G.flag vn) Rigid) "inert flexible node escaped")) })))) }) (Cons (Pair "well-domination enforced" (let { g = (Graph (IM.fromList (Cons (Pair 0 (Node (GGen 1) Nothing Flexible)) (Cons (Pair 1 (Node (GArr 2 3) (Just 0) Rigid)) (Cons (Pair 2 (Node (GArr 3 3) (Just 1) Rigid)) (Cons (Pair 3 (Node GBot (Just 2) Flexible)) Nil))))) IM.empty 4) } in (H.reject (G.validateGraph g)))) Nil)))
+
+families : List (Pair String (List (Pair String (IO Unit))))
+families =
+ Cons (Pair "core/component-projection" ComponentProjection.suite)
+ (Cons (Pair "core/int-set-unions" IntSetUnions.suite)
+ (Cons (Pair "core/index-edges" IndexEdges.suite)
+ (Cons (Pair "core/projection-ranks" ProjectionRanks.suite)
+ (Cons (Pair "core/projection-changes" ProjectionChanges.suite)
+ (Cons (Pair "core/solver-index-audit" SolverIndexAudit.suite)
+ (Cons (Pair "core/dense-normalization" DenseNormalization.suite)
+ (Cons (Pair "core/solver-allocation" SolverAllocation.suite)
+ (Cons (Pair "core/graph-expansion" graphTests)
+ (Cons (Pair "core/graph-validation" graphValidationTests)
+ (Cons (Pair "core/graph-unification" graphUnificationTests)
+ (Cons (Pair "core/graph-solver" graphSolverTests)
+ (Cons (Pair "core/embedding-pruning" embeddingPruningTests)
+ Nil))))))))))))

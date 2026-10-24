@@ -23,11 +23,14 @@ Pull requests require the small [compiler source smoke suite](../docs/ci.md):
 the verified seed interprets `PRQuickMain.emlf` against the checkout frontend and
 current/frozen target checkers through the split library roots, with two accepted
 cases, two source rejections and one malformed target. This does not build fresh
-tools or test current LLVM execution. Fresh native tools, eight CLI cases, three
-package/cache states and
-the complete 79-case package distribution suite, separate target-dependency/
-scheduler fixture and 22 native runner checks run separately on pushes to
-`main` or manual CI dispatches with `full_validation` enabled.
+tools or test current LLVM execution. Every push to `main` automatically runs all
+six complete Linux/macOS campaigns, the native Windows qualification and the
+full ten-workload Benchmark Game with seven samples and explicit 3x C compilation
+/ 2x C runtime gates. The eight direct CLI and three package/cache checks are
+preserved against the final macOS candidate. Manual CI with `full_validation`
+(or `self_host`) enabled runs the same graph. SDK packaging and publication are
+reserved for explicit release runs; no full-test or platform coverage is silently
+replaced by a smoke result. See [the CI policy](../docs/ci.md).
 
 The broader campaign remains available as `tools/release/native-ci.sh extended-pr-smoke`:
 framework/process contracts, Figure 12, four independent checker controls,
@@ -40,7 +43,8 @@ Root `mlfpkg test` builds these executables through the MLF package manager.
 The [test catalog](test-catalog.json) assigns each selectable case or family one
 primary contract group, with separate test-level, input, oracle and purpose
 metadata. The six root commands remain full-qualification campaigns. Selected
-families share their execution unit's build and setup.
+families share their execution unit's setup. Core uses four independent
+compilation targets while retaining the same logical execution unit.
 The test-owned `compiler-tests` runner is a private root executable; its sources
 live in `tests/CompilerTestsMain.emlf` and `Tests/CompilerTests.emlf`. It receives
 the real package manager through `--manager`, keeps the existing six root groups
@@ -55,8 +59,13 @@ target; its existing Core entry still runs the same sorted-list oracle and all
 276 distinct inputs. `test-framework` checks failure continuation, selection,
 inventory validation, JSON diagnostics and legacy adapters. The root `unit`
 group runs both the library and CLI contract checks in addition to the current
-684 Core checks. The separately reviewed duplicate consolidation below accounts
-for the reduction from the original 686 checks.
+739 Core checks. The separately reviewed duplicate consolidation below accounts
+for the reduction from the original 686 to 684 checks; the guards amendment adds
+55 checks and eight interpreter/LLVM runtime rows. These cover first-match
+selection, skipped guards and results, contextual `otherwise`, pattern scope,
+required fallbacks, existing conditional/layout compatibility, diagnostics, and
+independently checked target round trips. The inventory additions are transcribed
+from the authored assertions in `Tests.Guards`, without changing existing oracles.
 
 The shared test library contains helper, transport, collection-wrapper and
 independent-checker modules, plus `Tests.Coverage`, `Tests.TestDrivers`,
@@ -69,6 +78,38 @@ their test dependencies without pulling unrelated suites into those targets.
 `mlfpkg --manifest tests/mlf-package.json plan` checks those import boundaries;
 adding a test module also requires adding it to each importing target's
 `modules` map, or to the shared library when it is common support.
+
+The full `unit` campaign builds nine physical executables in one package-manager
+DAG: `regex`, `harness`, `int-set-unions`, `test-framework`, `core-crates`,
+`core-solver`, `core-language`, `core-modules`, and `figure12`. The four Core
+entries import separate private test-module closures. None imports the legacy
+`Tests.Core` registry or another shard registry. Common assertion/reporting
+helpers stay shared. `MLF_TEST_BUILD_JOBS=1` is the conservative default;
+`MLF_TEST_BUILD_JOBS=2` permits two ready build nodes. Other values fail before
+building. Test execution stays sequential because suites use process-wide
+environment variables and native fixture work directories.
+
+All 35 `core/*` families belong to logical unit `core`; `core/guards` is owned
+by `core-language`. A selected Core run builds only the physical targets owning its
+requested families. Each target always emits `scope: partial`, including when
+all its families run. The parent validates every target's exact family list,
+executed IDs, aliases and generated-loop metrics against its reviewed catalog
+projection. It then checks the disjoint family union and combines only validated
+completed-event bodies. Only the full `unit` campaign produces a full aggregate
+`core.coverage.jsonl` and `core.families.jsonl`; an explicit selection of all Core
+families remains partial. The aggregate is revalidated against the reviewed
+739-check golden inventory and binds all child receipts rather than claiming a
+single Core binary. The optional legacy `core` executable preserves direct full
+execution, `--from`, family listing and family selection.
+
+`verification.json` retains every physical binary in `prepared_suite_targets`,
+including the `int-set-unions` CLI helper. `suite_builds` records each command,
+requested targets, jobs, exit status, and the hash/path of a unique retained
+package build report. Failed invocations retain their own report when one was
+written; an older complete report cannot stand in for an invocation that failed
+before writing. A full unit batch leaves one complete `suite-build` report for
+all nine binaries. Aggregate Core evidence and each partial target's log,
+coverage and family receipts are retained separately.
 
 Root builds and nested test builds share a checked artifact store through
 `{cache}` and `--cache-dir`. Each test group keeps its own `suite-build` report
@@ -116,9 +157,9 @@ wrapper chooses 4 for port on hosts with at most 8 GiB RAM, while preserving the
 
 | Root group | MLF entry | Preserved coverage |
 | --- | --- | --- |
-| unit | CoreMain, Figure12SuiteMain, HarnessMain, TestFrameworkMain, RegexMain | framework API/CLI contracts; 684 compiler checks; 6712 Algorithm W cases represented by 6703 executions; annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks; all 43 Figure 12 labels with 41 distinct executions and 36 controls; 67 benchmark/bootstrap/release/cache harness methods including two cache regressions; 56 regex actions |
+| unit | CoreCratesMain, CoreSolverMain, CoreLanguageMain, CoreModulesMain, Figure12SuiteMain, HarnessMain, TestFrameworkMain, RegexMain | framework API/CLI contracts; 739 compiler checks; 6712 Algorithm W cases represented by 6703 executions; annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks; all 43 Figure 12 labels with 41 distinct executions and 36 controls; 67 benchmark/bootstrap/release/cache harness methods including two cache regressions; 56 regex actions |
 | packages | PackagesMain | 79 completed cases: 22 resolver checks; 29 compiler integration cases, including native PGO isolation, shared cache survival, corruption recovery and source invalidation; 28 checked-release cases covering source-free builds, relocation, shared dependencies, compatibility, pins, damaged artifacts, GitHub fetching, offline cache repair and packed asset validation; target dependency/instance selection; scheduler diamond and variant deduplication, jobs 1/2/4 equivalence, concurrent cache publication, failure recovery, empty graphs and target-name collisions; 22 native runner lifecycle and protocol checks |
-| backends | BackendSuiteMain | 523 fixtures and 575 execution rows on interpreter and LLVM, compact-GC layout |
+| backends | BackendSuiteMain | 531 fixtures and 583 execution rows on interpreter and LLVM, compact-GC layout |
 | port | PortMain, ReferencesMain | 25 LLVM fixtures with compact-GC, six reference programs, generated inference input equality |
 | parity | CorpusMain, CheckTarget | All 7086 prescribed acceptance/type/rejection cases, 7075 distinct source compilations, and 80 runtime rows on both backends |
 | self-host | Tests.CompilerTests | Fresh next-stage compiler build and LLVM/native binary fixed point |
@@ -152,7 +193,7 @@ cases where their setup permits it. A family retains its complete original
 action, assertions, generated loops and applicable metrics. Selection does not
 sample inputs inside a family. The other execution units retain their existing
 whole-suite or package-phase boundaries.
-The catalog has 168 families: Core exposes 34, Harness 53, Backends 49 and
+The catalog has 170 families: Core exposes 35, Harness 53, Backends 50 and
 Port 25; the remaining seven execution units retain one complete family each.
 
 With the compiler and package manager configured, discover the catalog without
@@ -180,6 +221,10 @@ Run focused families through the same build and assertion paths:
 ./mlfpkg run compiler-tests -- select --group distribution \
   --compiler /path/to/emlf --manager /path/to/mlfpkg \
   --build-dir .mlf-build/distribution-checks
+./mlfpkg run compiler-tests -- select --family core/guards \
+  --family backends/guards \
+  --compiler /path/to/emlf --manager /path/to/mlfpkg \
+  --build-dir .mlf-build/guards-checks
 ```
 
 `--group`, `--level`, `--unit` and `--campaign` each accept one value. Repeated
@@ -203,13 +248,14 @@ reviewed golden inventory. Missing, reordered, stale or forged family evidence
 cannot satisfy that validation.
 
 Selected families are batched once per execution unit, sharing setup and
-drivers. Units keep separate output directories and hashed child reports in
+drivers. Within logical Core, the selected physical targets build in one DAG
+and run sequentially. Units keep separate output directories and hashed child reports in
 `selected_units`, retaining each matrix and driver receipt. Focused Port runs
 prepare only their selected fixtures and use a partial manifest pinned to those
 names. Full Port still requires all 25 fixtures and rejects a partial manifest.
 Some Backends families exercise compiler/type/rejection contracts without
 runtime rows. They require nonempty completed-family evidence; the full backend
-matrix still requires all 575 rows on both backends.
+matrix still requires all 583 rows on both backends.
 
 Package integration and distribution have separate execution units: source
 integration retains 51 reviewed IDs and distribution retains 28. Integration
@@ -446,4 +492,51 @@ coverage checks still apply.
 The [matrix cleanup](../docs/test-matrix-cleanup.md) records the deliberate removal
 of compiler-scale outer interpretation, exact empty-input deduplication and
 small semantic matrices with separate scale regressions. The compact-GC layout,
-all 25 port fixtures and all 575 differential backend rows remain.
+all 25 port fixtures and all 583 differential backend rows remain.
+
+## Dynamic process scopes
+
+The reusable supervisor has a separate native lifecycle suite at
+`tests/native/process_supervisor_tests.c`. Build it with the same strict C flags
+as the runner fixtures, linking `runtime/mlf_process_supervisor.c`, then run
+`process-supervisor-tests FIXTURE SCRATCH`,
+where FIXTURE is the existing `build-runner-fixture`. Required pre-merge Linux
+and Windows CI runs both suites; main/manual CI also runs them on macOS. The
+22 static protocol checks remain unchanged.
+
+See [Async.Process](../docs/async-process.md) for semantics and limits,
+`tests/async-process` for interpreter/native API parity, and
+[the typed completion gate](../docs/async-typed-completion-gate.md) for separate
+compile-positive, compile-negative, and live representation evidence. A type
+signature fixture alone is not a mutable-cell or scheduler correctness proof.
+
+## Typed completions and cooperative tasks
+
+`tests/native/completion_cell_tests.c` and
+`tests/native/async_completion_primitives.c` exercise traced completion storage,
+ordinary IO-driver dispatch, quotas, cancellation, timers and forced collection.
+The required Linux native job and Windows runtime job execute both. Main/manual
+CI additionally executes the same native probes on macOS.
+
+The required Linux language job bootstraps a real primitive-aware compiler with
+`scripts/bootstrap-async.sh`, then executes these fail-closed parity harnesses:
+
+- `EMLF=/path/to/stage2 tests/fixtures/async-completion/check.sh`: six source,
+  checked-target and native fixtures; nine source rejections; seven independent
+  target rejections through checking, interpreter and LLVM entrypoints.
+- `tools/release/test-async-process.sh /path/to/stage2 OUTPUT`: 13 process
+  contracts, panic cleanup and opaque-handle rejections.
+- `tools/release/test-async-task.sh /path/to/stage2 OUTPUT`: 31 contracts
+  (including six explicitly white-box scheduler cases) and five source
+  rejections. Includes jobs=1/jobs=4 dynamic dependency/artifact equivalence and
+  ordered guards selecting a spawned task and its awaited result.
+- `tools/release/test-async-package.sh /path/to/stage2 /path/to/matching-mlfpkg OUTPUT`:
+  a fresh checked-crate consumer, two literal native executions with exact
+  cache replay, six opaque-constructor rejections and one mixed-fiber rejection
+  through the compiled library interfaces. The matching manager's adjacent
+  protocol-1 build runner is required.
+
+Main/manual CI also runs the same bootstrap and all four gates on macOS. Each
+records exact source/compiler hashes, observations and completion status.
+A seed-only type surrogate is not a passing execution result. See
+[Async.Task](../docs/async-task.md) for public semantics and remaining limits.

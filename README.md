@@ -81,6 +81,14 @@ with the current bootstrap script before using these manifests with an older
 installed manager. See the [package manager guide](docs/package-manager.md) for
 the ten-library layout, dependency selection, and scheduling evidence.
 
+The separate [async utility](docs/async-task.md) provides cold typed tasks,
+cooperative fibers, scoped cancellation, timers and bounded combinators.
+[Async.Process](docs/async-process.md) supplies dynamic subprocess scopes and
+isolated CPU-parallel work. The single MLF coordinator uses opaque typed
+completions; it does not run MLF inference on shared-memory worker threads.
+The [bootstrap and qualification](docs/async-bootstrap.md) distinguish the
+released seed from a compiler with the new checked primitives.
+
 The package manager compiles each library and executable as a crate. Modules
 inside a crate are namespaces and may import one another cyclically. Value
 declarations are inferred in dependency SCCs, with closed schemes and checked
@@ -167,9 +175,11 @@ reduction; the raw measurements and exact compiler hashes are linked there.
 The [native release workflow](docs/releases.md) requires all six native groups,
 a fresh self-host fixed point, and relocation/installation checks before
 packaging the tested executables. It records the build host and native library
-dependencies. The separate [performance report](benchmarks/RESULTS.md) verifies
-all nine workloads at **3× C compilation / 2× C runtime** using its explicit
-LLVM/linker configuration. This performance run is separate from release CI.
+dependencies. Every push to `main` now runs complete native qualification and all ten
+Benchmark Game workloads with **3× C compilation / 2× C runtime** gates; SDK
+packaging remains release-only. The historical [performance report](benchmarks/RESULTS.md)
+covers nine workloads and does not prove that the complete ten-workload gate
+passes. Failed correctness or performance checks remain failures.
 
 The Haskell compiler, Cabal project, and old Haskell/Python test and build
 harnesses have been removed. Native MLF is the supported build and test path.
@@ -264,13 +274,15 @@ program ::= (declaration ";")* e
           | (declaration ";")* value-declaration [";"]
 declaration ::= data-declaration | class-declaration | instance-declaration
               | value-declaration
-value-declaration ::= [x ":" annotation ";"] x pattern-atom ... [":" annotation] = e
+value-declaration ::= [x ":" annotation ";"] x pattern-atom ... [":" annotation] rhs
+rhs ::= = e | ("|" e = e)* "|" otherwise = e
 binding-block ::= value-declaration | { value-declaration; ... }
 
 e ::= x | integer | double | string | true | false | ()
     | \pattern-atom ... -> e
     | e e | let [rec] binding-block in e | (e : annotation)
     | if e then e else e | e operator e | -e | +e
+    | if { ("|" e -> e;)* "|" otherwise -> e [;] }
     | Constructor | case e of { pattern -> e; ... }
     | do { statement; ...; e }
     | (e, e [, e [, e]]) | [e, ...] | e : e | (e :: annotation)
@@ -559,6 +571,54 @@ verified by the existing independent checker.
 branch types. It evaluates only the selected branch, including when the
 branches are IO actions. An `else` belongs to the nearest unmatched `if`.
 Use parentheses to pass a conditional as a function argument.
+
+Guarded right-hand sides avoid repeating nested conditionals:
+
+```haskell
+sign n
+  | n < 0 = -1
+  | n == 0 = 0
+  | otherwise = 1
+
+main = printInt (sign (-5))
+```
+
+Each `|` starts a branch; function guards use `=` and need no semicolons
+between branches. They work on top-level bindings, local `let`/`let rec`
+bindings, `do`-local bindings, and instance methods. Existing signature and
+recursion rules still apply. A binding without parameters can use guards too.
+
+The expression form uses explicit braces, semicolon-separated branches, and
+`->`, like `case`. Its braces are required, even across lines:
+
+```haskell
+printInt (if { | score >= 90 -> 3; | score >= 70 -> 2; | otherwise -> 1 })
+```
+
+Conditions have type `Bool` and are tested in source order. The first true
+condition selects its result; later conditions and all unselected results are
+not evaluated. Each reached condition occurs once in the nested conditional
+translation. Results follow ordinary lazy evaluation, and an IO result executes
+only when sequenced. All results, including the fallback, must have compatible
+types and are checked even if an earlier condition is literally `true`.
+
+Every guard block requires exactly one final `otherwise` branch, including a
+block whose Boolean conditions appear exhaustive. An `otherwise`-only block
+is allowed. There is no implicit error, unit result, or fallthrough to another
+function equation. Function argument patterns select the equation first; its
+guard block is total within that equation. Existing pattern coverage and
+unreachable-equation checks still apply: a fallback within `f (Just x)` does
+not cover `f Nothing`. Pattern-bound variables are available in that equation's
+conditions and results, and cannot escape into another equation.
+
+`otherwise` is contextual syntax only when bare and immediately followed by
+the branch's `=` or `->`. It cannot be shadowed in that position. Elsewhere it
+remains an ordinary identifier; use `(otherwise)` to test an existing Boolean
+variable with that name. Guards do not introduce bindings, pattern guards
+(`p <- e`), comma-separated qualifiers, or guarded `case` alternatives. Use
+`&&`, `let`, or `case` inside a condition when needed. Both guard forms lower
+to the same primitive conditional as ordinary `if`, preserving its type rules
+and resistance to shadowing of `ifThenElse`.
 
 Operators have the following precedence, from highest to lowest:
 

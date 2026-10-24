@@ -1,0 +1,4 @@
+module Main where
+import Bootstrap.Types
+import qualified Async.Task as T
+main = T.run T.defaultOptions (T.bind (T.spawn (T.pure 41)) (\fiber -> T.map (\n -> n + 1) (T.await fiber)))

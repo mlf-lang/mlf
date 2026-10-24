@@ -13,6 +13,7 @@ import qualified Tests.TestDrivers as TD
 import qualified Tests.TestSources as TS
 import qualified Tests.Catalog as Catalog
 import qualified Tests.Selection as Selection
+import qualified Tests.CorePartitions as CorePartitions
 
 -- Build and execute native MLF tests; preserved oracle data and test-only
 -- checking modules remain independent of the candidate compiler.
@@ -86,20 +87,57 @@ compileRuntime c flags trace name = do
   run c (S.append (O.words "clang -O2 -std=c11 -Wall -Wextra -Werror") (S.append (S.filter (O.starts "-I") flags) (S.append Nil (S.append interpose (Cons "-c" (Cons (root c ++ "/runtime/mlf_runtime.c") (Cons "-o" (Cons (output c ++ "/" ++ name) Nil))))))))
 link : TestContext -> String -> List String -> List String -> String -> List String -> IO Unit
 link c ir objects flags binary extra = run c (S.append (O.words "clang -O2 -Wno-override-module") (S.append (Cons ir objects) (S.append flags (S.append (Cons "-lm" extra) (Cons "-o" (Cons binary Nil))))))
-nativeTest : TestContext -> String -> IO String
-nativeTest c target = do
+-- Build each selected target set once so shared dependencies form one DAG.
+-- Execution remains sequential because suites deliberately mutate process-wide
+-- environment variables and use shared native fixture work directories.
+nativeTests : TestContext -> List String -> IO Unit
+nativeTests c targets = do
+ O.require (S.not (S.null targets) && Selection.unique targets) "invalid native test target batch"
+ jobs <- O.envDefault "MLF_TEST_BUILD_JOBS" "1"
+ O.require (S.elem eqString jobs (O.words "1 2")) "MLF_TEST_BUILD_JOBS must be 1 or 2"
  let manager = packageManager c
  let build = output c ++ "/suite-build"
+ invocation <- O.temporaryDirectory (output c) (output c ++ "/suite-build-invocation-")
  let args = S.concat (Cons (Cons manager Nil)
   (Cons (Cons "--manifest" (Cons (root c ++ "/tests/mlf-package.json") Nil))
   (Cons (Cons "--compiler" (Cons (compiler c) Nil))
   (Cons (Cons "--runtime" (Cons (root c ++ "/runtime/mlf_runtime.c") Nil))
   (Cons (Cons "--build-dir" (Cons build Nil))
-  (Cons (S.append (cacheOptions c) (S.snoc (O.words "--timeout 21600 build --target") target)) Nil))))))
+  (Cons (S.append (cacheOptions c) (S.append (O.words "--timeout 21600")
+   (Cons "--jobs" (Cons jobs (Cons "build" (S.concatMap (\target -> Cons "--target" (Cons target Nil)) targets)))))) Nil))))))
+ let current = build ++ "/build-report.json"
+ -- A failure before the manager writes a report must not retain an older pass.
+ O.remove current
  putStrLn ("+ " ++ S.intercalate " " args)
  code <- O.exec (root c) args "" "" "" 21600
- O.require (code == 0) ("native test build failed (" ++ showInt code ++ ")")
- O.executable (build ++ "/bin/" ++ target)
+ -- Keep every invocation's report, including a failed build, before another
+ -- package-manager invocation can replace the canonical report.
+ let retained = invocation ++ "/build-report.json"
+ present <- fileExists current
+ digest <- if present then do { O.copy current retained; fileDigest retained } else return ""
+ saved <- J.read (report c)
+ let receipt = B.info (Cons (Pair "path" (J.str retained)) (Cons (Pair "sha256" (J.str digest))
+  (Cons (Pair "targets" (J.stringArray targets)) (Cons (Pair "jobs" (J.num (readInt jobs)))
+  (Cons (Pair "exit_code" (J.num code)) (Cons (Pair "command" (J.stringArray args)) Nil))))))
+ record c "suite_builds" (J.Array (S.snoc (J.values (J.getOr "suite_builds" (J.Array Nil) saved)) receipt))
+ O.require (code == 0 && present) ("native test build failed (" ++ showInt code ++ ")")
+ binaries <- S.mapM (\target -> do
+  binary <- O.executable (build ++ "/bin/" ++ target)
+  hash <- fileDigest binary
+  return (Pair target (B.obj2 "path" (J.str binary) "sha256" (J.str hash)))) targets
+ currentReport <- J.read (report c)
+ let prepared = S.foldl (\all (Pair name value) -> J.set name value all) (J.getObject "prepared_suite_targets" currentReport) binaries
+ record c "prepared_suite_targets" prepared
+nativeTest : TestContext -> String -> IO String
+nativeTest c target = do
+ saved <- J.read (report c)
+ if J.has target (J.getObject "prepared_suite_targets" saved) then return Unit else nativeTests c (Cons target Nil)
+ current <- J.read (report c)
+ let prepared = J.get target (J.get "prepared_suite_targets" current)
+ let binary = J.getText "path" "" prepared
+ hash <- fileDigest binary
+ O.require (eqString hash (J.getText "sha256" "" prepared)) (target ++ ": prepared test executable changed")
+ return binary
 transports : TestContext -> IO Unit
 transports c = do
  S.mapM_ (\(Pair source target) -> run c (S.append (O.words "clang -O2 -std=c11 -Wall -Wextra -Werror") (Cons (root c ++ "/tests/native/" ++ source) (Cons "-o" (Cons (output c ++ "/" ++ target) Nil))))) (Cons (Pair "binary_files.c" "binary-files") (Cons (Pair "host_support.c" "host-support") Nil))
@@ -125,30 +163,32 @@ suiteArgsEvidence c target args expectations selected wantedFamilies = do
  binary <- nativeTest c target
  binaryHash <- fileDigest binary
  let log = output c ++ "/" ++ target ++ ".log"
- let structural = S.elem eqString target (O.words "harness test-framework core figure12 packages regex")
+ let shard = S.elem eqString target CorePartitions.targets
+ let unit = if shard then "core" else target
+ let structural = shard || S.elem eqString target (O.words "harness test-framework core figure12 packages regex")
  let coverage = output c ++ "/" ++ target ++ ".coverage.jsonl"
  if structural then do { writeFile coverage ""; setEnv "MLF_TEST_COVERAGE_REPORT" coverage } else unsetEnv "MLF_TEST_COVERAGE_REPORT"
  let familyPath = output c ++ "/" ++ target ++ ".families.jsonl"
- let tracked = S.elem eqString target (O.words "core harness")
+ let tracked = shard || S.elem eqString target (O.words "core harness")
  expectedFamilies <- if tracked then do
   catalog <- Catalog.load (root c)
   writeFile familyPath ""
   setEnv "MLF_TEST_FAMILY_REPORT" familyPath
-  return (case wantedFamilies of { Just names -> names; Nothing -> S.map Catalog.identity (Catalog.forUnit catalog target) })
+  return (case wantedFamilies of { Just names -> names; Nothing -> S.map Catalog.identity (Catalog.forUnit catalog unit) })
   else do { unsetEnv "MLF_TEST_FAMILY_REPORT"; return Nil }
  capture c (Cons binary args) log
  currentBinaryHash <- fileDigest binary
  O.require (eqString binaryHash currentBinaryHash) (target ++ ": test executable changed during validation")
  unsetEnv "MLF_TEST_COVERAGE_REPORT"
  unsetEnv "MLF_TEST_FAMILY_REPORT"
- if tracked then familyReport c target target (case selected of { Nothing -> true; Just _ -> false }) expectedFamilies familyPath else ioReturn Unit
+ if tracked then familyReport c target unit (case selected of { Nothing -> true; Just _ -> false }) expectedFamilies familyPath else ioReturn Unit
  text <- readFile log
  O.require (S.all (\expected -> contains expected text) expectations) (target ++ ": preserved coverage summary is missing")
  evidence <- if structural then do
   let inventoryPath = root c ++ "/tests/golden/unit-inventory.json"
   inventory <- J.read inventoryPath
   actual <- readFile coverage
-  let validation = case selected of { Nothing -> Coverage.validate inventory target actual; Just projection -> Coverage.validateProjection inventory target projection actual }
+  let validation = case selected of { Nothing -> Coverage.validate inventory unit actual; Just projection -> Coverage.validateProjection inventory unit projection actual }
   checked <- case validation of { Left error -> O.fatal (target ++ ": " ++ error); Right value -> return value }
   digest <- fileDigest coverage
   inventoryDigest <- fileDigest inventoryPath
@@ -159,16 +199,92 @@ suiteArgsEvidence c target args expectations selected wantedFamilies = do
  saved <- J.read (report c)
  record c "suites" (J.set target (J.set "binary_sha256" (J.str binaryHash) (J.set "log_sha256" (J.str hash) (J.set "coverage" (J.stringArray expectations) evidence))) (J.getObject "suites" saved))
  putStr (O.drop (S.max 0 (stringLength text - 2000)) text)
+core : TestContext -> Bool -> List J.Json -> IO Unit
+core c full entries = do
+ catalog <- Catalog.load (root c)
+ case CorePartitions.validate (S.map Catalog.identity (Catalog.forUnit catalog "core")) of { Left error -> O.fatal error; Right _ -> return Unit }
+ let identities = S.map Catalog.identity entries
+ let targets = CorePartitions.selectedTargets identities
+ O.require (S.not (S.null targets) && (S.not full || S.eqList eqString identities CorePartitions.familyNames)) "invalid core aggregate selection"
+ inventory <- J.read (root c ++ "/tests/golden/unit-inventory.json")
+ -- Unit has already prepared the complete batch; focused core builds only
+ -- the compilation closures that own at least one requested family.
+ saved <- J.read (report c)
+ if S.all (\target -> J.has target (J.getObject "prepared_suite_targets" saved)) targets then return Unit else nativeTests c targets
+ S.mapM_ (\target -> do
+  let selected = S.filter (\entry -> S.elem eqString (Catalog.identity entry) (CorePartitions.forTarget target)) entries
+  let wanted = S.map Catalog.identity selected
+  suiteArgsEvidence c target (Cons "--families" wanted) Nil (Just (Catalog.projection inventory "core" selected)) (Just wanted)) targets
+ aggregateCore c full entries targets inventory
+aggregateCore : TestContext -> Bool -> List J.Json -> List String -> J.Json -> IO Unit
+aggregateCore c full entries targets inventory = do
+ saved <- J.read (report c)
+ let identities = S.map Catalog.identity entries
+ -- The aggregate is derived from the validated child bodies, never planned
+ -- case IDs. Retain and bind every partial receipt before creating full scope.
+ pieces <- S.mapM (\target -> do
+  let evidence = J.get target (J.get "suites" saved)
+  let coveragePath = output c ++ "/" ++ target ++ ".coverage.jsonl"
+  let familiesPath = output c ++ "/" ++ target ++ ".families.jsonl"
+  coverageHash <- fileDigest coveragePath
+  familyHash <- fileDigest familiesPath
+  O.require (eqString coverageHash (J.getText "coverage_report_sha256" "" evidence) &&
+   eqString familyHash (J.getText "sha256" "" (J.get target (J.get "family_reports" saved)))) "core partial evidence changed before aggregation"
+  coverageText <- readFile coveragePath
+  familyText <- readFile familiesPath
+  coverageRows <- case Coverage.parse coverageText of { Left error -> O.fatal error; Right rows -> return rows }
+  familyRows <- case Selection.parse familyText of { Left error -> O.fatal error; Right rows -> return rows }
+  log <- readFile (output c ++ "/" ++ target ++ ".log")
+  return (Triple (S.filter (\row -> S.not (Coverage.kind "start" row || Coverage.kind "summary" row)) coverageRows)
+   (S.map (J.getText "id" "") (S.filter (Selection.kind "family") familyRows)) log)) targets
+ let body = S.concatMap (\(Triple rows _ _) -> rows) pieces
+ let completed = S.concatMap (\(Triple _ names _) -> names) pieces
+ case CorePartitions.validateCompleted identities completed of { Left error -> O.fatal error; Right _ -> return Unit }
+ let executions = S.length (S.filter (Coverage.kind "case") body)
+ let aliases = S.length (S.filter (Coverage.kind "alias") body)
+ let metrics = S.length (S.filter (Coverage.kind "metric") body)
+ let start = Coverage.event "core" "start" (Cons (Pair "scope" (J.str (Selection.scope full))) Nil)
+ let finish = Coverage.event "core" "summary" (Cons (Pair "complete" (J.Boolean true))
+  (Cons (Pair "executions" (J.num executions)) (Cons (Pair "aliases" (J.num aliases)) (Cons (Pair "metrics" (J.num metrics)) Nil))))
+ let coverage = S.unlines (S.map J.render (Cons start (S.snoc body finish)))
+ let projection = Catalog.projection inventory "core" entries
+ checked <- case (if full then Coverage.validate inventory "core" coverage else Coverage.validateProjection inventory "core" projection coverage) of { Left error -> O.fatal error; Right value -> return value }
+ let coveragePath = output c ++ "/core.coverage.jsonl"
+ writeFile coveragePath coverage
+ coverageHash <- fileDigest coveragePath
+ inventoryHash <- fileDigest (root c ++ "/tests/golden/unit-inventory.json")
+ let familyPath = output c ++ "/core.families.jsonl"
+ let familyStart = Selection.event "core" "start" (Cons (Pair "scope" (J.str (Selection.scope full))) (Cons (Pair "selected" (J.stringArray identities)) Nil))
+ let orderedCompleted = S.concatMap (\expected -> S.filter (eqString expected) completed) identities
+ let familyBody = S.map (\identity -> Selection.event "core" "family" (Cons (Pair "id" (J.str identity)) (Cons (Pair "status" (J.str "passed")) Nil))) orderedCompleted
+ let familyFinish = Selection.event "core" "summary" (Cons (Pair "complete" (J.Boolean true)) (Cons (Pair "families" (J.num (S.length completed))) Nil))
+ writeFile familyPath (S.unlines (S.map J.render (Cons familyStart (S.snoc familyBody familyFinish))))
+ familyReport c "core" "core" full identities familyPath
+ let summary = showInt executions ++ " checks; 0 failures"
+ let log = S.intercalate "" (S.map (\(Triple _ _ text) -> text) pieces) ++ "Core aggregate: " ++ summary ++ "\n"
+ writeFile (output c ++ "/core.log") log
+ logHash <- fileDigest (output c ++ "/core.log")
+ let components = J.Object (S.map (\target -> Pair target (J.get target (J.get "suites" saved))) targets)
+ let evidence = B.info (Cons (Pair "scope" (J.str (Selection.scope full))) (Cons (Pair "aggregate" (J.Boolean true))
+  (Cons (Pair "targets" (J.stringArray targets)) (Cons (Pair "components" components)
+  (Cons (Pair "log_sha256" (J.str logHash)) (Cons (Pair "coverage_report_sha256" (J.str coverageHash))
+  (Cons (Pair "coverage_inventory_sha256" (J.str inventoryHash)) (Cons (Pair "coverage_result" checked)
+  (Cons (Pair "coverage" (J.stringArray (Cons summary Nil))) Nil)))))))))
+ current <- J.read (report c)
+ record c "suites" (J.set "core" (if full then evidence else J.set "selected_coverage" projection evidence) (J.getObject "suites" current))
+ putStrLn ("Core aggregate: " ++ summary)
 unit : TestContext -> IO Unit
 unit c = do
  transports c
- -- Check native toolchain and runtime probes before the longer compiler suites.
+ nativeTests c (S.append (O.words "regex harness int-set-unions test-framework") (S.snoc CorePartitions.targets "figure12"))
+ -- Run native toolchain/runtime probes first, then every original suite action.
  suite c "regex" (Cons "regular-expression tests passed" Nil)
  suite c "harness" (Cons "Native benchmark/bootstrap/release harness tests passed" (Cons "2 native cache regression checks passed" Nil))
  unions <- nativeTest c "int-set-unions"
  suiteArgs c "test-framework" (Cons "--verify-cli" (Cons (output c ++ "/framework-cli") (Cons unions Nil)))
   (Cons "Test framework contracts passed" (Cons "Test framework CLI contracts passed" Nil))
- suite c "core" (Cons "684 checks; 0 failures" (Cons "Oracle: 6712 cases; 6703 executions" Nil))
+ catalog <- Catalog.load (root c)
+ core c true (Catalog.forUnit catalog "core")
  suite c "figure12" (Cons "43/43 expressions match regression expectations; 0 failures" (Cons "41 distinct Figure12 executions" (Cons "36 supplementary checks; 0 failures" Nil)))
 buildRunnerTests : TestContext -> IO Unit
 buildRunnerTests c = do
@@ -255,8 +371,8 @@ prepareDrivers c portFixtures = do
  record c "drivers" (J.Object drivers)
  return (S.append flags extra)
 matrices : TestContext -> String -> Bool -> IO Unit
-matrices c binary portFixtures = matrixSuite c binary portFixtures (if portFixtures then 25 else 575)
- (Cons (if portFixtures then "25 MLF port fixtures; 0 failures" else "523 shared IO/prelude/backend fixtures; 0 failures") Nil)
+matrices c binary portFixtures = matrixSuite c binary portFixtures (if portFixtures then 25 else 583)
+ (Cons (if portFixtures then "25 MLF port fixtures; 0 failures" else "531 shared IO/prelude/backend fixtures; 0 failures") Nil)
 matrixSuite : TestContext -> String -> Bool -> Int -> List String -> IO Unit
 matrixSuite c binary portFixtures expectedRows expectations = matrixSuiteArgs c binary portFixtures expectedRows expectations Nil Nothing
 matrixSuiteArgs : TestContext -> String -> Bool -> Int -> List String -> List String -> Maybe (List J.Json) -> IO Unit
@@ -265,7 +381,7 @@ matrixSuiteArgs c binary portFixtures expectedRows expectations arguments select
  previousDivisor <- getEnv "GC_FREE_SPACE_DIVISOR"
  requestedDivisor <- getEnv "MLF_TEST_MATRIX_GC_DIVISOR"
  divisor <- case V.matrixCollectionDivisor requestedDivisor of { Left message -> O.fatal message; Right value -> ioReturn value }
- let unit = if portFixtures then "port" else if expectedRows == 575 || S.isJust selected then "backends" else ""
+ let unit = if portFixtures then "port" else if expectedRows == 583 || S.isJust selected then "backends" else ""
  expectedEntries <- if eqString unit "" then return Nil else case selected of
   Just entries -> return entries
   Nothing -> do { catalog <- Catalog.load (root c); return (Catalog.forUnit catalog unit) }
@@ -699,7 +815,8 @@ selectedUnit c name entries =
   suiteArgsChecked c "packages" (Cons (if distribution then "--releases" else "--integration") Nil) expectations (Just (Catalog.projection inventory "packages" entries))
  else do
   transports c
-  if S.elem eqString name (O.words "core harness") then do
+  if eqString name "core" then core c false entries else
+  if eqString name "harness" then do
    inventory <- J.read (root c ++ "/tests/golden/unit-inventory.json")
    let ids = S.map Catalog.identity entries
    suiteArgsEvidence c name (Cons "--families" ids) Nil (Just (Catalog.projection inventory name entries)) (Just ids)

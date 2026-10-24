@@ -29,6 +29,8 @@ for part in $parts; do
   artifact="$artifact_root/native-$platform-$part"
   test -f "$artifact/compiler-tests/$part/verification.json"
   for tool in emlf mlfpkg compiler-tests mlf-build-runner; do cmp "$package_artifact/bin/$tool" "$artifact/bin/$tool"; done
+  cmp "$package_artifact/candidate-manifest.json" "$artifact/candidate-manifest.json"
+  cmp "$package_artifact/campaign-runner/build-report.json" "$artifact/campaign-runner/build-report.json"
 done
 build="$artifact_root/assembled"
 test ! -e "$build" || { printf '%s\n' 'Use new artifact staging directories.' >&2; exit 1; }
@@ -43,6 +45,21 @@ manager_hash=$(sha256 "$build/bin/mlfpkg" | awk '{print $1}')
 runner_hash=$(sha256 "$build/bin/compiler-tests" | awk '{print $1}')
 build_runner_hash=$(sha256 "$build/bin/mlf-build-runner" | awk '{print $1}')
 test "$("$build/bin/mlf-build-runner" --protocol-version)" = 1
+producer="$package_artifact/campaign-runner/build-report.json"
+producer_hash=$(sha256 "$producer" | awk '{print $1}')
+jq -se --arg compiler "$compiler_hash" --arg manager "$manager_hash" --arg runner "$runner_hash" \
+  --arg helper "$build_runner_hash" --arg producer "$producer_hash" --arg source "$commit" '
+  .[0] as $m | .[1] as $b |
+  $m.format == 2 and $m.source == $source and
+  $m.campaign_runner.report_sha256 == $producer and $m.campaign_runner.sha256 == $runner and
+  $m.campaign_runner.compiler_sha256 == $compiler and $m.campaign_runner.manager_sha256 == $manager and
+  $m.campaign_runner.build_runner_sha256 == $helper and
+  $b.complete == true and $b.implementation == "MLF" and
+  $b.toolchain.compiler == {path:($m.root + "/.mlf-build/bin/emlf"),sha256:$compiler} and
+  $b.toolchain.manager == {path:($m.root + "/.mlf-build/bin/mlfpkg"),sha256:$manager} and
+  [$b.builds[] | select(.kind == "executable mlf-compiler:compiler-tests") | .key] == [$m.campaign_runner.executable_key] and
+  [$b."pending-publications"[] | select(.name == "compiler-tests" and .key == $m.campaign_runner.executable_key) | .files.program] == [$runner]
+' "$package_artifact/candidate-manifest.json" "$producer" >/dev/null
 base="$build/compiler-tests/unit/verification.json"
 groups='unit packages self-host parity backends port'
 for group in $groups; do
@@ -113,6 +130,9 @@ for group in $groups; do
     test "$(sha256 "$build/compiler-tests/$group/$abi.log" | awk '{print $1}')" = "$expected"
   done < <(jq -r '(.matrices // {}) | to_entries[] | [.key,.value.log_sha256] | @tsv' "$report")
 done
+# Split-unit qualification binds all nine physical executables, not a made-up
+# aggregate binary. Validate the retained build DAG and exact subreceipt union.
+tools/release/verify-unit-evidence.sh "$build/compiler-tests/unit"
 # Check every recorded source and detect newly added or removed inputs as well.
 jq -r '.sources | to_entries[] | "\(.value)  \(.key)"' "$base" | sha256 -c - >/dev/null
 cmp <(jq -r '.sources | keys[]' "$base" | LC_ALL=C sort) <(
@@ -123,7 +143,7 @@ cmp <(jq -r '.sources | keys[]' "$base" | LC_ALL=C sort) <(
 )
 jq -e --arg hash "$compiler_hash" '.fixed_point.reused_candidate_build == false and .fixed_point.next_compiler_sha256 == $hash' "$build/compiler-tests/self-host/verification.json" >/dev/null
 jq -e '.parity.cases == 7086 and .parity.source_compilations == 7075 and .parity.shared_source_cases == 11 and .parity.runtime_executions == 160' "$build/compiler-tests/parity/verification.json" >/dev/null
-jq -e '(.matrices | keys) == ["compact-gc"] and all(.matrices[]; .backends == 2 and .rows == 575)' "$build/compiler-tests/backends/verification.json" >/dev/null
+jq -e '(.matrices | keys) == ["compact-gc"] and all(.matrices[]; .backends == 2 and .rows == 583)' "$build/compiler-tests/backends/verification.json" >/dev/null
 jq -e '.requested_profiles == ["compact-gc"] and (.matrices | keys) == ["compact-gc"] and all(.matrices[]; .backends == 1 and .backend_names == ["llvm"] and .rows == 25)' "$build/compiler-tests/port/verification.json" >/dev/null
 mkdir -p "$output"
 output=$(cd "$output" && pwd)
@@ -139,6 +159,9 @@ cp runtime/*.c runtime/*.h "$bundle/runtime/"
 cp VERSION LICENSE CHANGELOG.md "$bundle/"
 printf '%s\n' "$commit" > "$bundle/COMMIT"
 cp "$notice" "$bundle/licenses/BDWGC.txt"
+mkdir -p "$bundle/evidence/campaign-runner"
+cp "$producer" "$bundle/evidence/campaign-runner/build-report.json"
+cp "$package_artifact/candidate-manifest.json" "$bundle/evidence/candidate-manifest.json"
 cp runtime/khash.h "$bundle/licenses/khash.h"
 for group in $groups; do
   mkdir -p "$bundle/evidence/$group"
@@ -151,9 +174,15 @@ for group in $groups; do
   esac
   while IFS= read -r log; do cp "$log" "$bundle/evidence/$group/"; done < <(find "$build/compiler-tests/$group" -maxdepth 1 -name '*.log' -type f)
 done
-for suite in harness core figure12 test-framework regex; do
+for suite in harness core core-crates core-solver core-language core-modules figure12 test-framework regex; do
   cp "$build/compiler-tests/unit/$suite.coverage.jsonl" "$bundle/evidence/unit/"
 done
+for family in "$build/compiler-tests/unit/"*.families.jsonl; do cp "$family" "$bundle/evidence/unit/"; done
+mkdir -p "$bundle/evidence/unit/builds"
+while IFS= read -r report; do
+  name=$(basename "$(dirname "$report")")
+  cp "$report" "$bundle/evidence/unit/builds/$name.json"
+done < <(find "$build/compiler-tests/unit" -path '*/suite-build-invocation-*/build-report.json' -type f)
 cp tests/golden/unit-inventory.json "$bundle/evidence/unit/"
 cp "$build/compiler-tests/packages/packages.coverage.jsonl" "$bundle/evidence/packages/"
 cp tests/golden/unit-inventory.json "$bundle/evidence/packages/"

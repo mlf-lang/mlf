@@ -111,7 +111,7 @@ valueDeclaration = pChoice (pTry (do
 equation : Parser Value
 equation = do
   Triple name args ty <- bindingHead
-  body <- expr
+  body <- pChoice (pThen (pToken "=") expr) (pBind (pSome (guardBranch "=")) (\rows -> pEither (guarded rows)))
   pPure (Equation name args ty body)
 bindingHead : Parser (Triple String (List SPattern) (Maybe SAnnotation))
 bindingHead = do
@@ -119,7 +119,7 @@ bindingHead = do
     name <- lowerIdentifier
     args <- pMany patternAtom
     ty <- pOptional (pThen annotationSymbol annotation)
-    pToken "="
+    pLook (pChoice (pToken "=") (pToken "|"))
     pPure (Triple name args ty))
   case result of
     Triple _ args _ -> let names = concatMap Surface.patternVariables args in
@@ -272,7 +272,28 @@ negateValue a = case a of {SIntLit n -> SIntLit (0-n); SDoubleLit n -> SDoubleLi
 positiveValue : SExpr -> SExpr
 positiveValue a = case a of {SIntLit _ -> a; SDoubleLit _ -> a; _ -> primitive2 PAddInt (SIntLit 0) a}
 ifExpr : Parser SExpr
-ifExpr = do {pToken "if"; condition <- expr; pToken "then"; yes <- expr; pToken "else"; no <- expr; pPure (conditional condition yes no)}
+ifExpr = do
+  pToken "if"
+  pChoice (pBind (pBraces (pSepEndBy (guardBranch "->") (pToken ";"))) (\rows -> pEither (guarded rows)))
+    (do {condition <- expr; pToken "then"; yes <- expr; pToken "else"; no <- expr; pPure (conditional condition yes no)})
+-- Guards are total Boolean decisions within one RHS, not pattern-matrix rows.
+-- Recognize otherwise only immediately before the delimiter: existing names
+-- and applications such as otherwise x remain ordinary Boolean expressions.
+guardBranch : String -> Parser (Pair (Maybe SExpr) SExpr)
+guardBranch delimiter = do
+  pToken "|"
+  condition <- pChoice
+    (pMap (\_ -> Nothing) (pTry (pBefore (pToken "otherwise") (pLook (pToken delimiter)))))
+    (pMap Just expr)
+  pSatisfy (eqString delimiter) (delimiter ++ " after guard condition")
+  body <- expr
+  pPure (Pair condition body)
+guarded : List (Pair (Maybe SExpr) SExpr) -> Either String SExpr
+guarded rows = case rows of
+  Nil -> Left "guard block requires a final otherwise branch"
+  Cons (Pair Nothing body) Nil -> Right body
+  Cons (Pair Nothing _) _ -> Left "otherwise must be the final guard branch"
+  Cons (Pair (Just condition) body) rest -> mapEither (conditional condition body) (guarded rest)
 letExpr : Parser SExpr
 letExpr = do {pToken "let"; recursive <- pOption false (pMap (\_ -> true) (pToken "rec")); values <- valueBlock; pToken "in"; body <- expr; bindLocal recursive values body}
 lambda : Parser SExpr
