@@ -135,6 +135,7 @@ module Bootstrap.Types where {
     SForall Flag String SType SType |
     SQualified (List SPredicate) SType;
   data SAnnotation = SAnnotation (List String) SType;
+  data RecursiveMode = InferRecursive | CheckRecursive SAnnotation;
   data SExpr =
     SVar String |
     SConstructor String |
@@ -150,7 +151,7 @@ module Bootstrap.Types where {
     SCase SExpr (List SAlternative) |
     SDo (List SStatement) SExpr |
     SEquations (List (Pair (List SPattern) SExpr)) |
-    SLetRec (List (Triple String SAnnotation SExpr)) SExpr |
+    SLetRec (List (Triple String RecursiveMode SExpr)) SExpr |
     SWanted String (List (Pair EvidenceRole String)) |
     SChecked SType SExpr;
   data SPattern =
@@ -166,7 +167,7 @@ module Bootstrap.Types where {
     SDoBind SPattern SExpr |
     SDoThen SExpr |
     SDoLet String (Maybe SAnnotation) SExpr |
-    SDoLetRec (List (Triple String SAnnotation SExpr));
+    SDoLetRec (List (Triple String RecursiveMode SExpr));
   data SPredicate = SPredicate String (List SType);
   data SClassDecl =
     SClassDecl String (List (Pair String Kind)) (List SPredicate) (List (Pair String SType));
@@ -297,7 +298,7 @@ module Bootstrap.Types where {
     CPrimitive Primitive |
     CConstructor String |
     CCase Core (List (Pair SPattern Core)) |
-    CRec (List (Triple String SAnnotation Core)) Core |
+    CRec (List (Triple String RecursiveMode Core)) Core |
     CWanted String (List (Pair EvidenceRole String)) |
     CChecked SType SExpr;
   data Binding = Mono XName Int | Poly XName Int;

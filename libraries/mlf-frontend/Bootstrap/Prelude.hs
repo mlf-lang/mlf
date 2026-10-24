@@ -112,10 +112,10 @@ module Bootstrap.Prelude where {
   alternativeNames :: SAlternative -> Set String;
   alternativeNames (SAlternative pattern body) =
     Set.difference compareString (freeNames body) (patternNames pattern);
-  recursiveNames :: Triple String SAnnotation SExpr -> Set String;
-  recursiveNames (Triple name annotation body) = freeNames body;
-  recursiveName :: Triple String SAnnotation SExpr -> String;
-  recursiveName (Triple name annotation body) = name;
+  recursiveNames :: Triple String RecursiveMode SExpr -> Set String;
+  recursiveNames (Triple name mode body) = freeNames body;
+  recursiveName :: Triple String RecursiveMode SExpr -> String;
+  recursiveName (Triple name mode body) = name;
   statementNames :: SStatement -> Set String -> Set String;
   statementNames statement rest =
     case statement of {
@@ -181,9 +181,15 @@ module Bootstrap.Prelude where {
   equationMentionsMonad :: Pair (List SPattern) SExpr -> Bool;
   equationMentionsMonad (Pair patterns body) =
     (L.any patternMentionsMonad patterns || exprMentionsMonad body);
-  recursiveMentionsMonad :: Triple String SAnnotation SExpr -> Bool;
-  recursiveMentionsMonad (Triple name annotation body) =
-    (annotationMentionsMonad annotation || exprMentionsMonad body);
+  recursiveModeMentionsMonad :: RecursiveMode -> Bool;
+  recursiveModeMentionsMonad mode =
+    case mode of {
+      InferRecursive -> False;
+      CheckRecursive annotation -> annotationMentionsMonad annotation
+    };
+  recursiveMentionsMonad :: Triple String RecursiveMode SExpr -> Bool;
+  recursiveMentionsMonad (Triple name mode body) =
+    (recursiveModeMentionsMonad mode || exprMentionsMonad body);
   statementMentionsMonad :: SStatement -> Bool;
   statementMentionsMonad statement =
     case statement of {

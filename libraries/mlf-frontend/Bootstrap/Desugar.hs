@@ -131,11 +131,11 @@ module Bootstrap.Desugar where {
         };
       _ -> freshPure expression
     };
-  goDefinition :: Triple String SAnnotation SExpr -> Fresh (Triple String SAnnotation SExpr);
-  goDefinition (Triple n t a) =
+  goDefinition :: Triple String RecursiveMode SExpr -> Fresh (Triple String RecursiveMode SExpr);
+  goDefinition (Triple n mode a) =
     do {
       value <- go a;
-      freshPure (Triple n t value)
+      freshPure (Triple n mode value)
     };
   block :: List SStatement -> SExpr -> Fresh SExpr;
   block statements result =

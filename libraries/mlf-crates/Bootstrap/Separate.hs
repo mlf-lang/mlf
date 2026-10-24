@@ -133,10 +133,10 @@ module Bootstrap.Separate where {
           scope <- hygieneBind env (map (\(Triple n _ _) -> n) ds);
           definitions <-
             mapM
-              (\(Triple n t a) ->
+              (\(Triple n mode a) ->
                  do {
                    x <- hygieneIn scope a;
-                   freshPure (Triple (hygieneName scope n) t x)
+                   freshPure (Triple (hygieneName scope n) mode x)
                  })
               ds;
           body <- hygieneIn scope b;

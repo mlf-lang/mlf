@@ -60,12 +60,12 @@ module Bootstrap.Surface where {
       _ -> body
     };
   recursiveValues :: List (Triple String (Maybe SAnnotation) SExpr) ->
-                     Either String (List (Triple String SAnnotation SExpr));
+                     Either String (List (Triple String RecursiveMode SExpr));
   recursiveValues values =
     traverseEither
       (\(Triple n a e) ->
          case a of {
-           Just (SAnnotation Nil ty) -> Right (Triple n (SAnnotation Nil ty) e);
+           Just (SAnnotation Nil ty) -> Right (Triple n (CheckRecursive (SAnnotation Nil ty)) e);
            _ -> Left ("recursive definition " ++ (n ++ " requires an explicit closed signature"))
          })
       values;
@@ -179,10 +179,10 @@ module Bootstrap.Surface where {
         do {
           ds <-
             mapM
-              (\(Triple n t a) ->
+              (\(Triple n mode a) ->
                  do {
                    value <- lower a;
-                   freshPure (Triple n t value)
+                   freshPure (Triple n mode value)
                  })
               definitions;
           b <- lower body;

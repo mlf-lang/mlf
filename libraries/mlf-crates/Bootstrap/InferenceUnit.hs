@@ -28,6 +28,12 @@ module Bootstrap.InferenceUnit where {
   loweredData (LoweredDeclarations ds _ _) = ds;
   loweredValues (LoweredDeclarations _ values _) = values;
   loweredNames (LoweredDeclarations _ _ names) = names;
+  recursiveAnnotation :: RecursiveMode -> Maybe SAnnotation;
+  recursiveAnnotation mode =
+    case mode of {
+      InferRecursive -> Nothing;
+      CheckRecursive annotation -> Just annotation
+    };
   extractLoweredDeclarations :: SExpr ->
                                 Either String (List (Triple String (Maybe SAnnotation) SExpr));
   extractLoweredDeclarations expression = extractDeclarations expression Nil;
@@ -66,7 +72,7 @@ module Bootstrap.InferenceUnit where {
           body = matchValueShared6
         } in
         extractDeclarations body
-          (foldlStrict (\acc (Triple n a rhs) -> Cons (Triple n (Just a) rhs) acc) reversed
+          (foldlStrict (\acc (Triple n mode rhs) -> Cons (Triple n (recursiveAnnotation mode) rhs) acc) reversed
              definitions);
       SConstructor matchValueShared7 ->
         if MLF.Primitive.eqString matchValueShared7 "Unit"

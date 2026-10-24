@@ -163,10 +163,10 @@ module Bootstrap.Constraint where {
   samePredicates (Cons (SPredicate n xs) ps) (Cons (SPredicate m ys) qs) =
     (eqString n m && (sameTypes xs ys && samePredicates ps qs));
   samePredicates _ _ = False;
-  recursiveRHS :: SAnnotation -> SExpr -> Core;
-  recursiveRHS annotation expression =
-    case annotation of {
-      SAnnotation Nil ty ->
+  recursiveRHS :: RecursiveMode -> SExpr -> Core;
+  recursiveRHS mode expression =
+    case mode of {
+      CheckRecursive (SAnnotation Nil ty) ->
         case expression of {
           SChecked other _ ->
             if sameType ty other then desugar expression else CChecked ty expression;
@@ -547,10 +547,10 @@ module Bootstrap.Constraint where {
         }
     };
   declareRecursive :: DataEnv ->
-                      Int -> Triple String SAnnotation Core -> Generate (Quad String XName Int Int);
+                      Int -> Triple String RecursiveMode Core -> Generate (Quad String XName Int Int);
   declareRecursive datatypes gen definition =
     case definition of {
-      Triple x (SAnnotation Nil ty) _ ->
+      Triple x (CheckRecursive (SAnnotation Nil ty)) _ ->
         do {
           name <- freshName x;
           declarationGen <- newNode (GGen (-1)) (Just gen) Flexible;
@@ -559,6 +559,7 @@ module Bootstrap.Constraint where {
           setNode declarationGen (Node (GGen root) (Just gen) Flexible);
           return (Quad x name declarationGen root)
         };
+      Triple _ InferRecursive _ -> failGenerate "unsigned recursive inference is not implemented";
       _ -> failGenerate "recursive definitions require a closed signature"
     };
   outermost :: Graph -> Int -> Int;
@@ -765,7 +766,7 @@ module Bootstrap.Constraint where {
                case definition of {
                  Triple _ annotation value ->
                    do {
-                     validateAnnotation datatypes scope annotation;
+                     validateRecursiveMode datatypes scope annotation;
                      validateIn datatypes scope value
                    }
                })
@@ -779,6 +780,12 @@ module Bootstrap.Constraint where {
           local <- validateBinders datatypes scope ty;
           validateIn datatypes local body
         }
+    };
+  validateRecursiveMode :: DataEnv -> Map String Kind -> RecursiveMode -> Either String Unit;
+  validateRecursiveMode datatypes scope mode =
+    case mode of {
+      InferRecursive -> Right Unit;
+      CheckRecursive annotation -> validateAnnotation datatypes scope annotation
     };
   attach parent flag identity =
     do {

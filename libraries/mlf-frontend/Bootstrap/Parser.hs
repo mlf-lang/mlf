@@ -1429,12 +1429,10 @@ module Bootstrap.Parser where {
       SLetRec definitions body ->
         do {
           mapM_
-            (\(Triple name (SAnnotation variables ty) value) ->
+            (\(Triple name mode value) ->
                do {
                  validateSharedBinding name;
-                 unless (null variables)
-                   (Left "existential annotations are outside shared-haskell-v1");
-                 validateSharedScheme ty;
+                 validateSharedRecursiveMode mode;
                  validateSharedExpression value
                })
             definitions;
@@ -1442,6 +1440,16 @@ module Bootstrap.Parser where {
         };
       SDo _ _ -> Left "internal error: shared do was not normalized";
       _ -> Right Unit
+    };
+  validateSharedRecursiveMode :: RecursiveMode -> Either String Unit;
+  validateSharedRecursiveMode mode =
+    case mode of {
+      InferRecursive -> Right Unit;
+      CheckRecursive (SAnnotation variables ty) ->
+        do {
+          unless (null variables) (Left "existential annotations are outside shared-haskell-v1");
+          validateSharedScheme ty
+        }
     };
   sharedDoExpr :: Parser SExpr;
   sharedDoExpr =

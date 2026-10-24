@@ -118,10 +118,15 @@ module Bootstrap.CrateQuery where {
   encodeEquation :: Pair (List SPattern) SExpr -> String;
   encodeEquation (Pair patterns body) =
     node "equation" (Cons (list encodePattern patterns) (Cons (encodeExpression body) Nil));
-  encodeRecursive :: Triple String SAnnotation SExpr -> String;
-  encodeRecursive (Triple n annotation body) =
-    node "recursive"
-      (Cons n (Cons (encodeAnnotation annotation) (Cons (encodeExpression body) Nil)));
+  encodeRecursive :: Triple String RecursiveMode SExpr -> String;
+  encodeRecursive (Triple n mode body) =
+    case mode of {
+      InferRecursive -> node "recursive-infer" (Cons n (Cons (encodeExpression body) Nil));
+      -- Preserve the signed representation used by existing query keys.
+      CheckRecursive annotation ->
+        node "recursive"
+          (Cons n (Cons (encodeAnnotation annotation) (Cons (encodeExpression body) Nil)))
+    };
   encodeStatement :: SStatement -> String;
   encodeStatement statement =
     case statement of {
@@ -353,19 +358,26 @@ module Bootstrap.CrateQuery where {
   canonicalRecursive :: Map String String ->
                         Int ->
                         Map String String ->
-                        Int -> Triple String SAnnotation SExpr -> Triple String SAnnotation SExpr;
-  canonicalRecursive env depth types typeDepth (Triple n annotation body) =
-    let {
-      names =
-        case annotation of {
-          SAnnotation Nil ty -> leadingTypes ty;
-          _ -> Nil
-        }
-    } in
-    Triple (canonicalReference env n) (canonicalAnnotation types typeDepth annotation)
-      (canonicalExpression env depth (canonicalScope "type:" types typeDepth names)
-         (typeDepth + length names)
-         body);
+                        Int -> Triple String RecursiveMode SExpr -> Triple String RecursiveMode SExpr;
+  canonicalRecursive env depth types typeDepth (Triple n mode body) =
+    case mode of {
+      InferRecursive ->
+        Triple (canonicalReference env n) InferRecursive
+          (canonicalExpression env depth types typeDepth body);
+      CheckRecursive annotation ->
+        let {
+          names =
+            case annotation of {
+              SAnnotation Nil ty -> leadingTypes ty;
+              _ -> Nil
+            }
+        } in
+        Triple (canonicalReference env n)
+          (CheckRecursive (canonicalAnnotation types typeDepth annotation))
+          (canonicalExpression env depth (canonicalScope "type:" types typeDepth names)
+             (typeDepth + length names)
+             body)
+    };
   canonicalMember (Triple n annotation body) =
     Triple n (Separate.mapMaybeValue (canonicalAnnotation M.empty 0) annotation)
       (canonicalExpression M.empty 0 M.empty 0 body);

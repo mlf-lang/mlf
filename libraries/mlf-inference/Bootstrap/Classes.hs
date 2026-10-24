@@ -210,7 +210,7 @@ module Bootstrap.Classes where {
             parameters =
               map
                 (\(Pair n ty) ->
-                   Triple n (SAnnotation Nil ty)
+                   Triple n (CheckRecursive (SAnnotation Nil ty))
                      (SChecked ty
                         (SApp (SPrimitive PPanic) (SStringLit "unlinked module parameter"))))
                 (M.toList externals)
@@ -244,7 +244,7 @@ module Bootstrap.Classes where {
             parameters =
               map
                 (\(Pair n ty) ->
-                   Triple n (SAnnotation Nil ty)
+                   Triple n (CheckRecursive (SAnnotation Nil ty))
                      (SChecked ty
                         (SApp (SPrimitive PPanic) (SStringLit "unlinked crate parameter"))))
                 (M.toList externals)
@@ -480,7 +480,7 @@ module Bootstrap.Classes where {
                 map
                   (\(Triple n annotation rhs) ->
                      case annotation of {
-                       SAnnotation _ ty -> Triple n annotation (SChecked ty rhs)
+                       SAnnotation _ ty -> Triple n (CheckRecursive annotation) (SChecked ty rhs)
                      })
                   (append (concat selectorGroups) definitions)
             };
@@ -497,7 +497,7 @@ module Bootstrap.Classes where {
                    do {
                      translated <- freshLift (translateScheme ds infos ty);
                      freshPure
-                       (Triple n (SAnnotation Nil translated)
+                       (Triple n (CheckRecursive (SAnnotation Nil translated))
                           (SChecked translated
                              (SApp (SPrimitive PPanic) (SStringLit "unlinked module parameter"))))
                    })
@@ -1105,7 +1105,7 @@ module Bootstrap.Classes where {
               (traverseEither
                  (\(Triple n annotation rhs) ->
                     case annotation of {
-                      SAnnotation Nil ty -> Right (Triple n ty rhs);
+                      CheckRecursive (SAnnotation Nil ty) -> Right (Triple n ty rhs);
                       _ ->
                         Left
                           ("recursive definition " ++
@@ -1136,7 +1136,7 @@ module Bootstrap.Classes where {
                        scope
                        rhs
                        ty;
-                   freshPure (Triple n (SAnnotation Nil translated) rhs2)
+                   freshPure (Triple n (CheckRecursive (SAnnotation Nil translated)) rhs2)
                  })
               signatures;
           boundValueShared19 <- lowerExpr valueScopes ds infos scope candidates body;

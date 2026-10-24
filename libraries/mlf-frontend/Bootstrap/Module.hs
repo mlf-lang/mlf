@@ -1015,6 +1015,13 @@ module Bootstrap.Module where {
           Right (Just value')
         }
     };
+  resolveRecursiveMode :: Names -> Interface -> RecursiveMode -> Either String RecursiveMode;
+  resolveRecursiveMode names env mode =
+    case mode of {
+      InferRecursive -> Right InferRecursive;
+      CheckRecursive annotation ->
+        mapEither CheckRecursive (resolveAnnotation names env annotation)
+    };
   resolveVariable names entity =
     case role entity of {
       Primitive p -> Right (SPrimitive p);
@@ -1224,11 +1231,11 @@ module Bootstrap.Module where {
             mapM
               (\definition ->
                  case definition of {
-                   Triple variable annotation value ->
+                   Triple variable mode value ->
                      do {
-                       annotation' <- resolveAnnotation names env annotation;
+                       mode' <- resolveRecursiveMode names env mode;
                        value' <- resolveBound names env local value;
-                       Right (Triple variable annotation' value')
+                       Right (Triple variable mode' value')
                      }
                  })
               definitions;
