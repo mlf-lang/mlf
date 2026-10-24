@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add ordered Boolean guards on binding right-hand sides and braced guard
+  expressions, with a required final `otherwise` fallback. Lower guards to
+  existing conditionals, preserving lazy branch selection, type checking,
+  pattern scope, and ordinary `if` syntax.
 - Add structured asynchronous process scopes and cold, typed cooperative
   tasks/fibers in the separate `mlf-async` library. Share native process
   containment with the compatible static build runner; add traced completion

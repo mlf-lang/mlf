@@ -1701,6 +1701,89 @@
       }
     },
     {
+      "id": "core/guards",
+      "unit": "core",
+      "name": "Ordered Boolean guard syntax and checking",
+      "group": "language",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "transformed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "metamorphic",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "guards parser: ordered expression arms",
+          "guards parser: fallback-only expression",
+          "guards parser: expression trailing separator",
+          "guards parser: nested expression arms",
+          "guards parser: ordinary if inside guarded branches",
+          "guards parser: arithmetic and Boolean precedence",
+          "guards parser: otherwise call remains a condition",
+          "guards parser: qualified otherwise remains a condition",
+          "guards parser: parenthesized otherwise remains a condition",
+          "guards program: function guard layout",
+          "guards program: function guard nested block layout",
+          "guards program: expression guard inside ordinary then-do layout",
+          "guards program: ordinary if identifier compatibility",
+          "guards parser: legacy annotation in RHS before bar",
+          "guards parser: legacy annotation in condition before equals",
+          "guards parser: diagnostics keep original line and column",
+          "guards checking: guarded values generalize",
+          "guards checking: separate whole-function signature",
+          "guards checking: inline whole-function signature",
+          "guards checking: annotated parameter",
+          "guards checking: local guard sees outer binding",
+          "guards checking: pattern binders scope over guards and results",
+          "guards checking: guard condition can contain an expression guard",
+          "guards checking: unselected branches preserve polymorphism",
+          "guards checking: no implicit prelude required",
+          "guards rejection: expression condition requires Bool",
+          "guards rejection: function condition requires Bool",
+          "guards rejection: all result types agree",
+          "guards rejection: unselected condition is checked",
+          "guards rejection: pattern coverage remains exhaustive",
+          "guards rejection: total guards do not fall through to another equation",
+          "guards rejection: pattern binder does not enter sibling equation",
+          "guards rejection: pattern binder does not escape function",
+          "guards rejection: branch binding does not enter sibling guard",
+          "guards rejection: expression fallback required",
+          "guards rejection: function fallback required",
+          "guards rejection: expression fallback must be last",
+          "guards rejection: function fallback must be last",
+          "guards rejection: duplicate expression fallback",
+          "guards rejection: duplicate function fallback",
+          "guards rejection: empty expression block",
+          "guards rejection: expression arm requires arrow",
+          "guards rejection: function arm requires equals",
+          "guards rejection: expression arm requires result",
+          "guards rejection: comma guards are not accepted",
+          "guards rejection: pattern guards are not accepted",
+          "guards rejection: expression guard block needs braces",
+          "guards checking: guards runtime: first match and short circuit",
+          "guards checking: guards runtime: only selected IO executes",
+          "guards checking: guards runtime: local and recursive bindings",
+          "guards checking: guards runtime: patterns and instance methods",
+          "guards checking: guards runtime: nested ordinary and guarded conditionals",
+          "guards checking: guards runtime: case bodies and lazy wildcard",
+          "guards checking: guards runtime: contextual otherwise compatibility",
+          "guards checking: guards runtime: dynamic selection and primitive hygiene"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
       "id": "figure12/complete",
       "unit": "figure12",
       "name": "Figure 12 compiler regressions",
@@ -3949,6 +4032,40 @@
           "backend: surface: instance method equations and qualified declaration",
           "backend: state dictionary result",
           "backend: superclass dictionary result"
+        ]
+      }
+    },
+    {
+      "id": "backends/guards",
+      "unit": "backends",
+      "name": "Ordered Boolean guard execution",
+      "group": "language",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "differential",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "matrix",
+        "rows": 8,
+        "fixtures": 8,
+        "labels": [
+          "backend: guards runtime: first match and short circuit",
+          "backend: guards runtime: only selected IO executes",
+          "backend: guards runtime: local and recursive bindings",
+          "backend: guards runtime: patterns and instance methods",
+          "backend: guards runtime: nested ordinary and guarded conditionals",
+          "backend: guards runtime: case bodies and lazy wildcard",
+          "backend: guards runtime: contextual otherwise compatibility",
+          "backend: guards runtime: dynamic selection and primitive hygiene"
         ]
       }
     },
