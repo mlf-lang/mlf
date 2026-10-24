@@ -1,0 +1,587 @@
+{
+  "format": 1,
+  "source_syntax": "shared-haskell-v1",
+  "frontend_semantics": "mlf-frontend/shared-haskell-v1/3",
+  "primitive_abi": "mlf-primitive-95-v1",
+  "source_roots": [
+    "libraries/mlf-async",
+    "libraries/mlf-crates",
+    "libraries/mlf-developer-tools",
+    "libraries/mlf-foundation",
+    "libraries/mlf-frontend",
+    "libraries/mlf-inference",
+    "libraries/mlf-interpreter",
+    "libraries/mlf-language-core",
+    "libraries/mlf-llvm",
+    "libraries/mlf-package-core",
+    "libraries/mlf-xmlf",
+    "bootstrap",
+    "package",
+    "tests",
+    "tests/shared",
+    "host/ghc"
+  ],
+  "modules": [
+    {
+      "module": "Async.Process",
+      "path": "libraries/mlf-async/Async/Process.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Async.Process.Internal",
+      "path": "libraries/mlf-async/Async/Process/Internal.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Async.Task",
+      "path": "libraries/mlf-async/Async/Task.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Async.Task.Core",
+      "path": "libraries/mlf-async/Async/Task/Core.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Async.Task.Internal",
+      "path": "libraries/mlf-async/Async/Task/Internal.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Classes",
+      "path": "libraries/mlf-inference/Bootstrap/Classes.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Compiler",
+      "path": "libraries/mlf-inference/Bootstrap/Compiler.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.CompilerCore",
+      "path": "libraries/mlf-inference/Bootstrap/CompilerCore.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Constraint",
+      "path": "libraries/mlf-inference/Bootstrap/Constraint.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Crate",
+      "path": "libraries/mlf-crates/Bootstrap/Crate.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.CrateArtifact",
+      "path": "libraries/mlf-crates/Bootstrap/CrateArtifact.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.CrateCodegen",
+      "path": "libraries/mlf-crates/Bootstrap/CrateCodegen.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.CrateQuery",
+      "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Data",
+      "path": "libraries/mlf-language-core/Bootstrap/Data.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Dependency",
+      "path": "libraries/mlf-frontend/Bootstrap/Dependency.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Desugar",
+      "path": "libraries/mlf-frontend/Bootstrap/Desugar.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Elaborate",
+      "path": "libraries/mlf-inference/Bootstrap/Elaborate.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Evidence",
+      "path": "libraries/mlf-inference/Bootstrap/Evidence.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Fresh",
+      "path": "libraries/mlf-foundation/Bootstrap/Fresh.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Graph",
+      "path": "libraries/mlf-inference/Bootstrap/Graph.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Graph.Solver",
+      "path": "libraries/mlf-inference/Bootstrap/Graph/Solver.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Host",
+      "path": "libraries/mlf-foundation/Bootstrap/Host.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.InferenceUnit",
+      "path": "libraries/mlf-crates/Bootstrap/InferenceUnit.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.IntMap",
+      "path": "libraries/mlf-foundation/Bootstrap/IntMap.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.IntSet",
+      "path": "libraries/mlf-foundation/Bootstrap/IntSet.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Kind",
+      "path": "libraries/mlf-language-core/Bootstrap/Kind.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Kinding",
+      "path": "libraries/mlf-language-core/Bootstrap/Kinding.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.LLVM",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.LLVM.Analysis",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/Analysis.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.LLVM.Build",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/Build.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.LLVM.Codegen",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.LLVM.Kernel",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/Kernel.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.LLVM.Native",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/Native.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.LLVM.Optimize",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.LLVM.StrictFields",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/StrictFields.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.LLVM.StrictWrappers",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/StrictWrappers.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Layout",
+      "path": "libraries/mlf-frontend/Bootstrap/Layout.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Lexer",
+      "path": "libraries/mlf-frontend/Bootstrap/Lexer.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Map",
+      "path": "libraries/mlf-foundation/Bootstrap/Map.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Module",
+      "path": "libraries/mlf-frontend/Bootstrap/Module.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Parsec",
+      "path": "libraries/mlf-frontend/Bootstrap/Parsec.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Parser",
+      "path": "libraries/mlf-frontend/Bootstrap/Parser.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Prelude",
+      "path": "libraries/mlf-frontend/Bootstrap/Prelude.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Primitive",
+      "path": "libraries/mlf-language-core/Bootstrap/Primitive.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.ProcessHost",
+      "path": "libraries/mlf-interpreter/Bootstrap/ProcessHost.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Regex",
+      "path": "libraries/mlf-foundation/Bootstrap/Regex.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Runtime",
+      "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.ST",
+      "path": "libraries/mlf-foundation/Bootstrap/ST.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Separate",
+      "path": "libraries/mlf-crates/Bootstrap/Separate.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Set",
+      "path": "libraries/mlf-foundation/Bootstrap/Set.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.SourceEquality",
+      "path": "libraries/mlf-crates/Bootstrap/SourceEquality.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Std",
+      "path": "libraries/mlf-foundation/Bootstrap/Std.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Surface",
+      "path": "libraries/mlf-frontend/Bootstrap/Surface.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Types",
+      "path": "libraries/mlf-foundation/Bootstrap/Types.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Unicode",
+      "path": "libraries/mlf-foundation/Bootstrap/Unicode.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Version",
+      "path": "libraries/mlf-foundation/Bootstrap/Version.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.X.Check",
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Check.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.X.Checked",
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Checked.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.X.Parser",
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Parser.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.X.Pretty",
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Pretty.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.X.Syntax",
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Syntax.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.X.Type",
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Type.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "MLF.Entry.CompilerTests",
+      "path": "tests/MLF/Entry/CompilerTests.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "path": "bootstrap/MLF/Entry/Emlf.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "MLF.Entry.Mlfpkg",
+      "path": "package/MLF/Entry/Mlfpkg.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "MLF.Entry.TupleList",
+      "path": "tests/MLF/Entry/TupleList.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "MLF.Tests.Async.ProcessMain",
+      "path": "tests/shared/MLF/Tests/Async/ProcessMain.hs",
+      "role": "direct-test"
+    },
+    {
+      "module": "MLF.Tests.Async.ProcessPanic",
+      "path": "tests/shared/MLF/Tests/Async/ProcessPanic.hs",
+      "role": "direct-test"
+    },
+    {
+      "module": "MLF.Tests.Async.TaskMain",
+      "path": "tests/shared/MLF/Tests/Async/TaskMain.hs",
+      "role": "direct-test"
+    },
+    {
+      "module": "MLF.Tests.Async.TaskProcesses",
+      "path": "tests/shared/MLF/Tests/Async/TaskProcesses.hs",
+      "role": "direct-test"
+    },
+    {
+      "module": "MLF.Tests.Async.TaskWaitGraph",
+      "path": "tests/shared/MLF/Tests/Async/TaskWaitGraph.hs",
+      "role": "direct-test"
+    },
+    {
+      "module": "MLF.Tests.BuildReceipts",
+      "path": "tests/shared/MLF/Tests/BuildReceipts.hs",
+      "role": "direct-test"
+    },
+    {
+      "module": "MLF.Tests.PRQuickMain",
+      "path": "tests/shared/MLF/Tests/PRQuickMain.hs",
+      "role": "direct-test"
+    },
+    {
+      "module": "MLF.Tests.SharedFrontend",
+      "path": "tests/shared/MLF/Tests/SharedFrontend.hs",
+      "role": "direct-test"
+    },
+    {
+      "module": "Package.Benchmark",
+      "path": "libraries/mlf-developer-tools/Package/Benchmark.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Package.Build",
+      "path": "libraries/mlf-package-core/Package/Build.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Package.Command",
+      "path": "libraries/mlf-package-core/Package/Command.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Package.Distribution",
+      "path": "libraries/mlf-package-core/Package/Distribution.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Package.Json",
+      "path": "libraries/mlf-package-core/Package/Json.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Package.Manifest",
+      "path": "libraries/mlf-package-core/Package/Manifest.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Package.OS",
+      "path": "libraries/mlf-package-core/Package/OS.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Package.Release",
+      "path": "libraries/mlf-package-core/Package/Release.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Package.Scheduler",
+      "path": "libraries/mlf-package-core/Package/Scheduler.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Package.Verification",
+      "path": "libraries/mlf-developer-tools/Package/Verification.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Tests.BuildReceipts",
+      "path": "tests/Tests/BuildReceipts.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Tests.Catalog",
+      "path": "tests/Tests/Catalog.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Tests.CompilerTests",
+      "path": "tests/Tests/CompilerTests.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Tests.CorePartitions",
+      "path": "tests/Tests/CorePartitions.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Tests.Coverage",
+      "path": "tests/Tests/Coverage.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Tests.IndependentCheck",
+      "path": "tests/Tests/IndependentCheck.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Tests.IndependentType",
+      "path": "tests/Tests/IndependentType.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Tests.Selection",
+      "path": "tests/Tests/Selection.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Tests.TestDrivers",
+      "path": "tests/Tests/TestDrivers.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Tests.TestSources",
+      "path": "tests/Tests/TestSources.hs",
+      "role": "implementation"
+    }
+  ],
+  "executables": [
+    {
+      "name": "emlf",
+      "module": "MLF.Entry.Emlf",
+      "wrapper": "host/ghc/app/emlf/Main.hs"
+    },
+    {
+      "name": "mlfpkg",
+      "module": "MLF.Entry.Mlfpkg",
+      "wrapper": "host/ghc/app/mlfpkg/Main.hs"
+    },
+    {
+      "name": "compiler-tests",
+      "module": "MLF.Entry.CompilerTests",
+      "wrapper": "host/ghc/app/compiler-tests/Main.hs"
+    },
+    {
+      "name": "tuple-list",
+      "module": "MLF.Entry.TupleList",
+      "wrapper": "host/ghc/app/tuple-list/Main.hs"
+    },
+    {
+      "name": "shared-frontend",
+      "module": "MLF.Tests.SharedFrontend",
+      "wrapper": "host/ghc/app/shared-frontend/Main.hs",
+      "role": "direct-test"
+    },
+    {
+      "name": "async-task",
+      "module": "MLF.Tests.Async.TaskMain",
+      "wrapper": "host/ghc/app/async-task/Main.hs",
+      "role": "direct-test"
+    },
+    {
+      "name": "async-task-processes",
+      "module": "MLF.Tests.Async.TaskProcesses",
+      "wrapper": "host/ghc/app/async-task-processes/Main.hs",
+      "role": "direct-test"
+    },
+    {
+      "name": "async-task-wait-graph",
+      "module": "MLF.Tests.Async.TaskWaitGraph",
+      "wrapper": "host/ghc/app/async-task-wait-graph/Main.hs",
+      "role": "direct-test"
+    },
+    {
+      "name": "async-process",
+      "module": "MLF.Tests.Async.ProcessMain",
+      "wrapper": "host/ghc/app/async-process/Main.hs",
+      "role": "direct-test"
+    },
+    {
+      "name": "async-process-panic",
+      "module": "MLF.Tests.Async.ProcessPanic",
+      "wrapper": "host/ghc/app/async-process-panic/Main.hs",
+      "role": "direct-test"
+    },
+    {
+      "name": "build-receipts",
+      "module": "MLF.Tests.BuildReceipts",
+      "wrapper": "host/ghc/app/build-receipts/Main.hs",
+      "role": "direct-test"
+    },
+    {
+      "name": "source-smoke",
+      "module": "MLF.Tests.PRQuickMain",
+      "wrapper": "host/ghc/app/source-smoke/Main.hs",
+      "role": "direct-test"
+    }
+  ],
+  "host_only": [
+    "host/ghc/MLF/Primitive.hs",
+    "host/ghc/MLF/Host/Base.hs",
+    "host/ghc/MLF/Host/IO.hs",
+    "host/ghc/MLF/Host/Async.hs",
+    "host/ghc/cbits/host.c",
+    "runtime/mlf_process_supervisor.c",
+    "host/ghc/app/emlf/Main.hs",
+    "host/ghc/app/mlfpkg/Main.hs",
+    "host/ghc/app/compiler-tests/Main.hs",
+    "host/ghc/app/tuple-list/Main.hs",
+    "host/ghc/app/shared-frontend/Main.hs",
+    "host/ghc/app/async-task/Main.hs",
+    "host/ghc/app/async-task-processes/Main.hs",
+    "host/ghc/app/async-task-wait-graph/Main.hs",
+    "host/ghc/app/async-process/Main.hs",
+    "host/ghc/app/async-process-panic/Main.hs",
+    "host/ghc/app/build-receipts/Main.hs",
+    "host/ghc/app/source-smoke/Main.hs"
+  ],
+  "builtin_interface": "mlf-primitive/shared-haskell-v1/4"
+}

@@ -3,7 +3,7 @@ set -euo pipefail
 cd -- "$(dirname -- "$0")/../.."
 version=$(cat VERSION)
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-grep -Fxq "version = \"$version\"" libraries/mlf-foundation/Bootstrap/Version.emlf
+grep -Eq "^[[:space:]]*version = \"$version\";?[[:space:]]*$" libraries/mlf-foundation/Bootstrap/Version.hs
 for manifest in mlf-package.json libraries/*/mlf-package.json tests/mlf-package.json; do
   test "$(jq -r .version "$manifest")" = "$version"
 done
@@ -20,6 +20,7 @@ tools/release/test-pr-gate.sh
 tools/release/test-qualification-gate.sh
 node tools/release/test-benchmark-gate.mjs
 node tools/release/test-ci-policy.mjs
+python3 tools/shared/test_provenance.py
 node tools/release/test-release-tag.mjs
 tools/release/test-shared-candidate.sh
 tools/release/test-unit-evidence.sh
@@ -27,4 +28,7 @@ tools/release/test-qualification-jobs.sh
 tools/release/test-source-smoke-diagnostics.sh
 tools/release/test-pr-smoke-cli-watchdog.sh
 tools/release/test-async-bootstrap.sh
+tools/release/test-shared-bootstrap-dispatch.sh
+tools/release/test-shared-bootstrap-orchestration.sh
+tools/release/test-direct-source-smoke.sh
 printf 'Release metadata and shell syntax passed for %s.\n' "$version"

@@ -1,10 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude, RankNTypes, KindSignatures #-}
 -- GHC implementation of the stable native MLF.Primitive boundary.
 -- Compiler algorithms import only this module, never MLF.Host.*.
--- Syntax hooks are frontend interfaces; their Prelude input types are not
--- portable callable APIs. The shared profile rejects explicit hook uses.
+-- Ordinary Haskell syntax uses the standard class identities and desugaring.
+-- Only value representations and primitive operations are host adaptations.
 module MLF.Primitive
-  ( Int, Bool(..), Double, IO, Unit(..), String, ST, STArray, Monad(..), IntArray, DoubleArray, ByteArray, IntTable, AsyncScope, Completion, AsyncSubscription
+  ( Int, Bool(..), Double, IO, Unit(..), String, ST, STArray, Functor(..), Applicative(..), Monad(..), IntArray, DoubleArray, ByteArray, IntTable, AsyncScope, Completion, AsyncSubscription
   , ioReturn, ioBind, putStr, putStrLn, getLine, printInt, concatString
   , showInt, addInt, subInt, eqInt, ltInt, eqString, ifThenElse
   , mulInt, quotInt, remInt, readInt, addDouble, subDouble, mulDouble
@@ -19,12 +19,13 @@ module MLF.Primitive
   , listDirectory, directoryExists, fileDigest, acquireFileLock, releaseFileLock, processSupervisor, asyncScopeNew
   , asyncScopeClose, asyncNewCompletion, asyncResolveCompletion, asyncReadCompletion, asyncSubscribeCompletion, asyncSubscriptionStatus, asyncCancelSubscription
   , asyncStep, asyncEnqueue, asyncDelay, asyncWait
-  , pure, fromInteger, fromRational, fromString, negate, otherwise
-  , (+), (-), (*), (/), (%), (==), (/=), (<), (<=), (>), (>=), (++), (&&), (||), (>>=), (>>)
+  , implementationHost, bind, negate, otherwise
+  , (+), (-), (*), (/), (%), (==), (/=), (<), (<=), (>), (>=), (++), (&&), (||)
   ) where
 
 import qualified Prelude as P
-import MLF.Host.Base (Int, Bool(..), Double, IO, Unit(..), String, ST, STArray, Monad(..))
+import Prelude (Functor(..), Applicative(..), Monad(..))
+import MLF.Host.Base (Int, Bool(..), Double, IO, Unit(..), String, ST, STArray)
 import MLF.Host.IO (IntArray, DoubleArray, ByteArray, IntTable)
 import MLF.Host.Async (AsyncScope, Completion, AsyncSubscription)
 import qualified MLF.Host.Base as Base
@@ -315,16 +316,13 @@ asyncDelay = Async.v_asyncDelay
 
 asyncWait :: AsyncScope -> Int -> IO Int
 asyncWait = Async.v_asyncWait
--- The IO-specific native alias is intentionally not Prelude.Applicative.pure.
-pure :: a -> IO a
-pure = ioReturn
+implementationHost :: String
+implementationHost = Base.literal "GHC"
 
-fromInteger :: P.Integer -> Int
-fromInteger n = n
-fromRational :: P.Rational -> Double
-fromRational = P.fromRational
-fromString :: P.String -> String
-fromString = Base.literal
+-- Compatibility spelling is an ordinary value, not a do-notation hook.
+bind :: Monad m => m a -> (a -> m b) -> m b
+bind = (P.>>=)
+
 negate :: Int -> Int
 negate = subInt 0
 otherwise :: Bool
@@ -336,7 +334,6 @@ infix 4 ==, /=, <, <=, >, >=
 infixr 5 ++
 infixl 6 +, -
 infixl 7 *, /, %
-infixl 1 >>=, >>
 (+), (-), (*), (/), (%) :: Int -> Int -> Int
 (+) = addInt
 (-) = subInt
@@ -355,7 +352,3 @@ infixl 1 >>=, >>
 (&&), (||) :: Bool -> Bool -> Bool
 (&&) a b = if a then b else False
 (||) a b = if a then True else b
-(>>=) :: Monad m => m a -> (a -> m b) -> m b
-(>>=) = bind
-(>>) :: Monad m => m a -> m b -> m b
-(>>) action rest = bind action (\_ -> rest)

@@ -1,0 +1,60 @@
+-- mlf:syntax shared-haskell-v1
+{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
+             KindSignatures, FlexibleContexts, FlexibleInstances,
+             MultiParamTypeClasses, OverloadedStrings #-}
+module MLF.Tests.Async.ProcessPanic where {
+  import MLF.Primitive;
+  import Bootstrap.Types;
+  import Async.Process;
+  fail :: forall a. String -> IO a;
+  fail message =
+    do {
+      putErr (message ++ "\n");
+      exitWith 1
+    };
+  right :: forall a. Either AsyncError a -> IO a;
+  right result =
+    case result of {
+      Right value -> ioReturn value;
+      Left error -> fail (errorMessage error)
+    };
+  ready :: ProcessScope -> ProcessHandle -> String -> IO Unit;
+  ready scope handle path =
+    do {
+      found <- fileExists path;
+      if found
+      then ioReturn Unit
+      else do {
+             result <- awaitWithin scope handle (ForMilliseconds 10);
+             case result of {
+               Left error ->
+                 if (errorCode error == 10)
+                 then ready scope handle path
+                 else fail (errorMessage error);
+               Right _ -> fail "panic child exited before readiness"
+             }
+           }
+    };
+  main =
+    do {
+      helper <- getEnv "MLF_ASYNC_FIXTURE";
+      work <- getEnv "MLF_ASYNC_WORK";
+      result <-
+        withProcessScope (ScopeOptions 1 1 1)
+          (\scope ->
+             do {
+               submitted <-
+                 submit scope
+                   (command helper
+                      (Cons "hold"
+                         (Cons (work ++ "/panic.pid") (Cons (work ++ "/panic.release") Nil)))
+                      (work ++ "/panic.out")
+                      (work ++ "/panic.err"));
+               handle <- right submitted;
+               ready scope handle (work ++ "/panic.pid");
+               putStrLn (panic "async-scope-panic");
+               ioReturn (Right Unit)
+             });
+      right result
+    }
+}

@@ -9,11 +9,14 @@ printf '{"complete":false}\n' > "$build/result.json"
 test "$#" -eq 0
 seed_compiler=${MLF_COMPILER:?verified native seed compiler required}
 started=$SECONDS
-# Released managers predate target dependency fields in the current manifests.
-# Build its source libraries separately before reading the current root manifest.
+# Bootstrap the matching compiler and manager before reading shared source.
+# Legacy checkouts retain the older manager-only transition.
 tools/release/bootstrap-manager.sh "$build/manager-bootstrap" 2>&1 | tee "$build/manager-bootstrap.log"
+if [ -f shared-sources.json ] || [ -f "$build/manager-bootstrap/compiler.path" ]; then
+  seed_compiler=$(cat "$build/manager-bootstrap/compiler.path")
+fi
 "$build/manager-bootstrap/bin/mlfpkg" --compiler "$seed_compiler" --runtime "$PWD/runtime/mlf_runtime.c" \
-  --jobs 2 --timeout 1800 --locked --build-dir "$build/candidate" build 2>&1 | tee "$build/build.log"
+  --jobs 2 --timeout 21600 --locked --build-dir "$build/candidate" build --target emlf --target mlfpkg --target compiler-tests 2>&1 | tee "$build/build.log"
 jq -e '
   .complete == true and .implementation == "MLF" and
   ([.builds[] | select(.kind | startswith("executable mlf-compiler:")) | .kind] | sort) ==

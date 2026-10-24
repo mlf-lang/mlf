@@ -1,0 +1,7 @@
+{
+  "scope": "Release controls and mocks only; no real native build or fixed point",
+  "exit_code": 0,
+  "log_sha256": "9e870ffe2b43465e915099a9758123b649011c50adc7a71154fbfb0d5cc3663d",
+  "driver_sha256": "0b91de161aa411799aec20f7a99ef275d76d9c49837af7aebcbce8d9ff7e46d2",
+  "provenance_tests": 34
+}

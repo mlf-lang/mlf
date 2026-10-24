@@ -1,7 +1,7 @@
 {-# LANGUAGE RankNTypes, KindSignatures, FlexibleInstances, ForeignFunctionInterface #-}
 module MLF.Host.Base
   ( Int, Bool(..), Double, IO, Unit(..), String, ST, STArray
-  , Monad(..), literal, unpack, utf8, fromUtf8, matchString, neInt, leInt, gtInt, geInt
+  , literal, unpack, utf8, fromUtf8, matchString, neInt, leInt, gtInt, geInt
   , v_ioReturn, v_ioBind, v_stReturn, v_stBind, v_runST
   , v_newSTArray, v_readSTArray, v_writeSTArray, v_lengthSTArray
   , v_addInt, v_subInt, v_mulInt, v_quotInt, v_remInt, v_eqInt, v_ltInt, v_andInt
@@ -12,12 +12,13 @@ module MLF.Host.Base
   , v_ifThenElse, v_seq, v_panic, HostError(..), failure, bounded, strict2
   ) where
 
-import Prelude hiding (Int, String, Monad, return)
+import Prelude hiding (Int, String)
 import qualified Prelude as P
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.ByteString as BS
 import Data.Char (ord, chr)
+import qualified Data.String as TextLiteral
 import qualified Data.Array as Array
 import Data.Bits ((.&.))
 import Data.Typeable (Typeable)
@@ -47,7 +48,7 @@ instance Exception HostError
 failure :: P.String -> a
 failure = throw . HostError
 v_panic :: String -> a
-v_panic s = failure (unpack s)
+v_panic s = s `pseq` failure (unpack s)
 
 literal :: P.String -> String
 literal chars = if any (\c -> let n=ord c in n>=0xd800 && n<=0xdfff) chars
@@ -63,15 +64,10 @@ fromUtf8 bytes = case TE.decodeUtf8' bytes of
 matchString :: P.String -> String -> Bool
 matchString chars value = v_eqString value (literal chars)
 
-class Monad (m :: * -> *) where
-  return :: a -> m a
-  bind :: m a -> (a -> m b) -> m b
-instance Monad IO where
-  return = pure
-  bind = (>>=)
-instance Monad (ST s) where
-  return = pure
-  bind = (>>=)
+-- Ordinary Haskell overloaded string literals use the standard class.  This
+-- instance is representation adaptation, not a source-language syntax hook.
+instance TextLiteral.IsString String where
+  fromString = literal
 v_ioReturn :: a -> IO a
 v_ioReturn = pure
 v_ioBind :: IO a -> (a -> IO b) -> IO b

@@ -1,0 +1,2 @@
+PASS shared bootstrap control: seed isolation, native-only path, both tools, truthful receipt, retry invalidation, source mutation rejection.
+No real compiler, bridge build, native runtime or fixed point is qualified by this test.

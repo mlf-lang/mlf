@@ -19,7 +19,11 @@ static MlfValue *os_getEnv(MlfValue *name) {
     return mlf_string(text,strlen(text));
 }
 static MlfValue *os_setEnv(MlfValue *name, MlfValue *contents) {
-    if (setenv(file_path(name),file_path(contents),1)) fail("IO error: setEnv failed");
+    /* Sequence the language operands explicitly; C argument evaluation order
+     * must not choose which panic or path-validation failure is observed. */
+    const char *key = file_path(name);
+    const char *text = file_path(contents);
+    if (setenv(key,text,1)) fail("IO error: setEnv failed");
     return mlf_constructor(0,0);
 }
 static MlfValue *os_unsetEnv(MlfValue *name) {

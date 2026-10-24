@@ -4,18 +4,19 @@
   "version": "0.3.0",
   "library": {
     "modules": {
-      "Bootstrap.Fresh": "Bootstrap/Fresh.emlf",
-      "Bootstrap.Host": "Bootstrap/Host.emlf",
-      "Bootstrap.IntMap": "Bootstrap/IntMap.emlf",
-      "Bootstrap.IntSet": "Bootstrap/IntSet.emlf",
-      "Bootstrap.Map": "Bootstrap/Map.emlf",
-      "Bootstrap.Regex": "Bootstrap/Regex.emlf",
-      "Bootstrap.ST": "Bootstrap/ST.emlf",
-      "Bootstrap.Set": "Bootstrap/Set.emlf",
-      "Bootstrap.Std": "Bootstrap/Std.emlf",
-      "Bootstrap.Types": "Bootstrap/Types.emlf",
-      "Bootstrap.Unicode": "Bootstrap/Unicode.emlf",
-      "Bootstrap.Version": "Bootstrap/Version.emlf"
+      "Bootstrap.Fresh": "Bootstrap/Fresh.hs",
+      "Bootstrap.Host": "Bootstrap/Host.hs",
+      "Bootstrap.IntMap": "Bootstrap/IntMap.hs",
+      "Bootstrap.IntSet": "Bootstrap/IntSet.hs",
+      "Bootstrap.Map": "Bootstrap/Map.hs",
+      "Bootstrap.Regex": "Bootstrap/Regex.hs",
+      "Bootstrap.ST": "Bootstrap/ST.hs",
+      "Bootstrap.Set": "Bootstrap/Set.hs",
+      "Bootstrap.Std": "Bootstrap/Std.hs",
+      "Bootstrap.Types": "Bootstrap/Types.hs",
+      "Bootstrap.Unicode": "Bootstrap/Unicode.hs",
+      "Bootstrap.Version": "Bootstrap/Version.hs"
     }
-  }
+  },
+  "source-syntax": "shared-haskell-v1"
 }

@@ -1,0 +1,86 @@
+{
+  "complete": true,
+  "command": [
+    "nice",
+    "-n",
+    "15",
+    "ionice",
+    "-c",
+    "3",
+    "tools/release/source-smoke.sh"
+  ],
+  "limits": {
+    "wall_seconds": 600,
+    "address_space_per_process": 1073741824,
+    "process_tree_rss_bytes": 1073741824,
+    "host_available_floor": 3221225472,
+    "disk_free_floor": 805306368
+  },
+  "samples": [
+    {
+      "seconds": 0.0018170080002164468,
+      "group_rss": 94208,
+      "host_available": 6360879104,
+      "disk_free": 1246355456
+    },
+    {
+      "seconds": 1.0041251760121668,
+      "group_rss": 9056256,
+      "host_available": 6342320128,
+      "disk_free": 1246343168
+    },
+    {
+      "seconds": 2.0052325520082377,
+      "group_rss": 10387456,
+      "host_available": 6328668160,
+      "disk_free": 1246343168
+    },
+    {
+      "seconds": 3.006243138006539,
+      "group_rss": 7356416,
+      "host_available": 6318292992,
+      "disk_free": 1245523968
+    },
+    {
+      "seconds": 4.007119764006347,
+      "group_rss": 7499776,
+      "host_available": 6341189632,
+      "disk_free": 1245515776
+    },
+    {
+      "seconds": 5.008279570000013,
+      "group_rss": 8212480,
+      "host_available": 6339858432,
+      "disk_free": 1245511680
+    },
+    {
+      "seconds": 6.009218803999829,
+      "group_rss": 9080832,
+      "host_available": 6333341696,
+      "disk_free": 1245466624
+    },
+    {
+      "seconds": 7.010239880008157,
+      "group_rss": 6389760,
+      "host_available": 6297579520,
+      "disk_free": 1245462528
+    },
+    {
+      "seconds": 8.011496695005917,
+      "group_rss": 11546624,
+      "host_available": 6300372992,
+      "disk_free": 1245458432
+    },
+    {
+      "seconds": 9.012771396999597,
+      "group_rss": 10579968,
+      "host_available": 6303748096,
+      "disk_free": 1245454336
+    }
+  ],
+  "process_group": 5,
+  "exit_code": 0,
+  "reason": null,
+  "elapsed_seconds": 10.014261014002841,
+  "peak_group_rss": 11546624
+}

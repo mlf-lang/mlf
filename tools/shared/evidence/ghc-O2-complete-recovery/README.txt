@@ -1,0 +1,1 @@
+Exact unchanged implementation checkpoint 98d6df3914f888c635181c31c5d27752647d659b; GHC O2 complete: 94 modules, 12 links, whole-corpus grammar/name resolution. Authenticated direct, TupleList and source smoke passed separately. Full unit/Core/guest campaign and native bootstrap/fixed point remain pending. No upload.

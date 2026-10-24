@@ -12,15 +12,16 @@
   },
   "library": {
     "modules": {
-      "Bootstrap.Dependency": "Bootstrap/Dependency.emlf",
-      "Bootstrap.Desugar": "Bootstrap/Desugar.emlf",
-      "Bootstrap.Layout": "Bootstrap/Layout.emlf",
-      "Bootstrap.Lexer": "Bootstrap/Lexer.emlf",
-      "Bootstrap.Module": "Bootstrap/Module.emlf",
-      "Bootstrap.Parsec": "Bootstrap/Parsec.emlf",
-      "Bootstrap.Parser": "Bootstrap/Parser.emlf",
-      "Bootstrap.Prelude": "Bootstrap/Prelude.emlf",
-      "Bootstrap.Surface": "Bootstrap/Surface.emlf"
+      "Bootstrap.Dependency": "Bootstrap/Dependency.hs",
+      "Bootstrap.Desugar": "Bootstrap/Desugar.hs",
+      "Bootstrap.Layout": "Bootstrap/Layout.hs",
+      "Bootstrap.Lexer": "Bootstrap/Lexer.hs",
+      "Bootstrap.Module": "Bootstrap/Module.hs",
+      "Bootstrap.Parsec": "Bootstrap/Parsec.hs",
+      "Bootstrap.Parser": "Bootstrap/Parser.hs",
+      "Bootstrap.Prelude": "Bootstrap/Prelude.hs",
+      "Bootstrap.Surface": "Bootstrap/Surface.hs"
     }
-  }
+  },
+  "source-syntax": "shared-haskell-v1"
 }

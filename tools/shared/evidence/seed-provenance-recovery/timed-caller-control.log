@@ -1,0 +1,2 @@
+PASS exact timed-bootstrap and bootstrap-manager callers preserve real seed provenance and enclosing timing.
+Darwin host probes and timing driver are control fixtures; no macOS/native bootstrap or timing performance is qualified.

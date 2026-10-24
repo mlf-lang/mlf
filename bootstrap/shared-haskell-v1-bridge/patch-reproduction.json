@@ -1,0 +1,20 @@
+{
+  "format": 1,
+  "base_commit": "2f8584423fa3055ca96d1479734357f742c9b3df",
+  "source_checkpoint": "e0b719e02c3df334f0abbfb447c8d2921f86a365",
+  "archive_sha256": "c83bfa0801e1af0e042b6e2053eebf66af9b54b28cb8ed6f1f874483dfa4cbae",
+  "patch_sha256": "5017963208d622a6970d9d05dad9143264a1bfddeaf935b8a764b368cb3875ba",
+  "raw_files_reproduced": 171,
+  "all_raw_file_hashes_match": true,
+  "bootstrap_qualified": false,
+  "previous_archive_sha256": "46042269373e9965eb742555d16a5a763f45edb6baf4b75f634734bfaa1f74ae",
+  "changed_raw_files": [
+    "libraries/mlf-crates/Bootstrap/CrateArtifact.emlf",
+    "libraries/mlf-crates/Bootstrap/Separate.emlf",
+    "libraries/mlf-frontend/Bootstrap/Lexer.emlf",
+    "libraries/mlf-inference/Bootstrap/Constraint.emlf"
+  ],
+  "deterministic_refreeze": true,
+  "archive_members": 172,
+  "archive_bytes": 444247
+}

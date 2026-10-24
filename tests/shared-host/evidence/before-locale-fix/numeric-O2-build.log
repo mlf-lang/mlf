@@ -1,0 +1,31 @@
+[1 of 6] Compiling MLF.Host.Base    ( host/ghc/MLF/Host/Base.hs, /workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/numeric-O2/MLF/Host/Base.o )
+host/ghc/MLF/Host/Base.hs:66:19: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+   |
+66 | class Monad (m :: * -> *) where
+   |                   ^
+
+host/ghc/MLF/Host/Base.hs:66:24: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+   |
+66 | class Monad (m :: * -> *) where
+   |                        ^
+
+[2 of 6] Compiling MLF.Host.Async   ( host/ghc/MLF/Host/Async.hs, /workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/numeric-O2/MLF/Host/Async.o )
+[3 of 6] Compiling MLF.Host.IO      ( host/ghc/MLF/Host/IO.hs, /workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/numeric-O2/MLF/Host/IO.o )
+host/ghc/MLF/Host/IO.hs:118:82: warning: [GHC-68441] [-Wdeprecations]
+    In the use of ‘hGetLine’ (imported from Data.ByteString):
+    Deprecated: "Deprecated since @bytestring-0.12@. Use 'Data.ByteString.Char8.hGetLine' instead. (Functions that rely on ASCII encodings belong in "Data.ByteString.Char8")"
+    |
+118 |   if end then throwIO (HostError "IO error: getLine reached EOF or failed") else B.hGetLine H.stdin >>= evaluate . fromUtf8
+    |                                                                                  ^^^^^^^^^^
+
+[4 of 6] Compiling MLF.Primitive    ( host/ghc/MLF/Primitive.hs, /workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/numeric-O2/MLF/Primitive.o )
+[5 of 6] Compiling Main             ( /workspace/shared/mlf-shared-source-migration/tests/shared-host/NumericProbe.hs, /workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/numeric-O2/Main.o )
+[6 of 6] Linking /workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/numeric-O2/probe
