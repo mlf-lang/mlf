@@ -21,8 +21,8 @@ module Bootstrap.Data where {
   datatypeConstructors (DataDeclK _ _ cs) = cs;
   constructorName (ConstructorDecl n _) = n;
   constructorFields (ConstructorDecl _ fs) = fs;
-  primitiveKinds :: Map String Kind;
-  primitiveKinds =
+  scalarPrimitiveKinds :: Map String Kind;
+  scalarPrimitiveKinds =
     M.fromList compareString
       (Cons (Pair "AsyncScope" Star)
          (Cons (Pair "Completion" (KArrow Star Star))
@@ -40,10 +40,56 @@ module Bootstrap.Data where {
                                              (Cons (Pair "IntTable" Star)
                                                 (Cons (Pair "IO" (KArrow Star Star))
                                                    Nil)))))))))))))));
+  -- Wired source identities are independent of Bootstrap.Types' temporary
+  -- List/Pair/Unit implementation ADTs. Never normalize a user ADT to these.
+  sourceUnitDeclaration :: DataDecl;
+  sourceUnitDeclaration = DataDecl "()" Nil (Cons (ConstructorDecl "()" Nil) Nil);
+  sourceListDeclaration :: DataDecl;
+  sourceListDeclaration =
+    DataDecl "[]" (Cons "a" Nil)
+      (Cons (ConstructorDecl "[]" Nil)
+         (Cons (ConstructorDecl ":"
+                  (Cons (Parameter "a")
+                     (Cons (Applied "[]" (Cons (Parameter "a") Nil)) Nil))) Nil));
+  sourceTupleDeclaration :: String -> List String -> DataDecl;
+  sourceTupleDeclaration name parameters =
+    DataDecl name parameters
+      (Cons (ConstructorDecl name (map Parameter parameters)) Nil);
+  sourceBuiltinDeclarations :: List DataDecl;
+  sourceBuiltinDeclarations =
+    Cons sourceUnitDeclaration
+      (Cons sourceListDeclaration
+         (Cons (sourceTupleDeclaration "(,)" (Cons "a" (Cons "b" Nil)))
+            (Cons (sourceTupleDeclaration "(,,)" (Cons "a" (Cons "b" (Cons "c" Nil))))
+               (Cons (sourceTupleDeclaration "(,,,)"
+                        (Cons "a" (Cons "b" (Cons "c" (Cons "d" Nil))))) Nil))));
+  sourceBuiltinType :: String -> Bool;
+  sourceBuiltinType name = any (\d -> eqString (datatypeName d) name) sourceBuiltinDeclarations;
+  sourceBuiltinConstructor :: String -> Bool;
+  sourceBuiltinConstructor name =
+    any (\d -> any (\c -> eqString (constructorName c) name) (datatypeConstructors d))
+      sourceBuiltinDeclarations;
+  primitiveKinds :: Map String Kind;
+  primitiveKinds =
+    M.union compareString scalarPrimitiveKinds
+      (M.fromList compareString
+         (Cons (Pair "IOError" Star) (Cons (Pair "Char" Star)
+            (map (\d -> Pair (datatypeName d)
+                           (foldr (\_ k -> KArrow Star k) Star (datatypeParameters d)))
+               sourceBuiltinDeclarations))));
   unitDeclaration = DataDecl "Unit" Nil (Cons (ConstructorDecl "Unit" Nil) Nil);
+  builtinDeclarations :: List DataDecl;
+  builtinDeclarations = Cons unitDeclaration sourceBuiltinDeclarations;
+  builtinDatatypes :: Map String DataDecl;
+  builtinDatatypes =
+    M.fromList compareString (map (\d -> Pair (datatypeName d) d) builtinDeclarations);
+  builtinConstructors :: Map String (Pair DataDecl ConstructorDecl);
+  builtinConstructors =
+    M.fromList compareString
+      (concatMap (\d -> map (\c -> Pair (constructorName c) (Pair d c))
+                           (datatypeConstructors d)) builtinDeclarations);
   withKinds ks =
-    DataEnv (M.singleton "Unit" unitDeclaration)
-      (M.singleton "Unit" (Pair unitDeclaration (ConstructorDecl "Unit" Nil)))
+    DataEnv builtinDatatypes builtinConstructors
       (M.union compareString primitiveKinds (M.fromList compareString ks));
   emptyDataEnv = withKinds Nil;
   lookupDatatype :: DataEnv -> String -> Either String DataDecl;
@@ -190,7 +236,7 @@ module Bootstrap.Data where {
       distinct "data constructor"
         (concatMap (\d -> map constructorName (datatypeConstructors d)) ds);
       let {
-        declarations = Cons unitDeclaration ds
+        declarations = append builtinDeclarations ds
       };
       let {
         env =

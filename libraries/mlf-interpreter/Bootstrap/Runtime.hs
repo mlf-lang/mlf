@@ -23,6 +23,8 @@ module Bootstrap.Runtime where {
     RDouble Double |
     RBoolean Bool |
     RString String |
+    RChar Int |
+    RIOError (Either String RValue) |
     RIntArray IntArray |
     RDoubleArray DoubleArray |
     RByteArray ByteArray |
@@ -37,6 +39,12 @@ module Bootstrap.Runtime where {
     RAsyncScopeHandle Int |
     RCompletionHandle Int Int |
     RAsyncSubscriptionHandle Int Int Int;
+  -- Catchable IO failure is distinct from fatal evaluator errors and from a
+  -- successfully returned value whose demand may fail later. Messages retain
+  -- their canonical lazy [Char] representation, including surrogate codepoints.
+  data RIOOutcome =
+    RIOSuccess (Either String RValue) |
+    RIOFailure (Either String RValue);
   -- Primitive payloads represent the language value itself. Forcing only the
   -- interpreter's wrapper would leave strict numeric accumulators suspended.
   -- Algebraic fields, closures and actions retain their ordinary lazy behavior.
@@ -47,6 +55,7 @@ module Bootstrap.Runtime where {
       RDouble n -> seq n value;
       RBoolean b -> seq b value;
       RString text -> seq text value;
+      RChar n -> seq n value;
       RIntArray array -> seq array value;
       RDoubleArray array -> seq array value;
       RByteArray array -> seq array value;
@@ -328,6 +337,52 @@ module Bootstrap.Runtime where {
            RIntTable a -> Right a;
            _ -> Left "runtime primitive expected IntTable"
          });
+  character :: Either String RValue -> Either String Int;
+  character thunk =
+    bindEither thunk
+      (\value -> case value of {
+         RChar n -> Right n;
+         _ -> Left "runtime primitive expected Char"
+       });
+  runtimeIOError :: Either String RValue -> Either String (Either String RValue);
+  runtimeIOError thunk =
+    bindEither thunk
+      (\value -> case value of {
+         RIOError message -> Right message;
+         _ -> Left "runtime primitive expected IOError"
+       });
+  runtimeTextChars :: String -> Int -> RValue;
+  runtimeTextChars text index =
+    if index == stringLength text
+    then RConstructor "[]" Nil
+    else RConstructor ":"
+           (Cons (Right (RChar (stringCodeAt text index)))
+              (Cons (Right (runtimeTextChars text (index + 1))) Nil));
+  runtimeCharsText :: Either String RValue -> Either String String;
+  runtimeCharsText thunk =
+    bindEither (runtimeCharsChunks False thunk) (\chunks -> Right (concatStrings chunks));
+  runtimeCharsChunks :: Bool -> Either String RValue -> Either String (List String);
+  runtimeCharsChunks diagnostic thunk =
+    bindEither thunk
+      (\value -> case value of {
+         RConstructor name fields ->
+           case fields of {
+             Nil -> if eqString name "[]" then Right Nil
+                    else Left "runtime primitive expected [Char]";
+             Cons first (Cons rest Nil) ->
+               if eqString name ":"
+               then do {
+                 code <- character first;
+                 let { scalar = ((code < 55296) || (code > 57343)) };
+                 ensure (diagnostic || scalar) "invalid Unicode scalar";
+                 chunks <- runtimeCharsChunks diagnostic rest;
+                 Right (Cons (if scalar then stringFromCode code else ("\\" ++ showInt code)) chunks)
+               }
+               else Left "runtime primitive expected [Char]";
+             _ -> Left "runtime primitive expected [Char]"
+           };
+         _ -> Left "runtime primitive expected [Char]"
+       });
   integer2 f a b =
     do {
       x <- integer a;
@@ -363,8 +418,8 @@ module Bootstrap.Runtime where {
     let {
       n = P.primitiveCode primitive
     } in
-    ((n <= 5) ||
-     (((n >= 27) && (n <= 44)) || (((n >= 56) && (n <= 65)) || ((n >= 73) && (n <= 94)))));
+    ((n == 100) || ((n == 101) || ((n <= 5) ||
+     (((n >= 27) && (n <= 44)) || (((n >= 56) && (n <= 65)) || ((n >= 73) && (n <= 94)))))));
   isSTAction primitive =
     case primitive of {
       PSTReturn -> True;
@@ -401,6 +456,16 @@ module Bootstrap.Runtime where {
       c = head (tail (tail arguments))
     } in
     case primitive of {
+      PTextToChars -> mapEither (\text -> runtimeTextChars text 0) (string a);
+      PTextFromChars -> mapEither RString (runtimeCharsText a);
+      PCharCode -> mapEither RInteger (character a);
+      PCharFromCode -> do {
+        code <- integer a;
+        ensure ((code >= 0) && (code <= 1114111)) "invalid Char codepoint";
+        Right (RChar code)
+      };
+      PUserError -> Right (RIOError a);
+      PIOErrorString -> bindEither (runtimeIOError a) (\message -> message);
       PRunST -> runStateRegion ds a;
       PConcatString ->
         do {
@@ -687,12 +752,22 @@ module Bootstrap.Runtime where {
                DataEnv -> Either String RValue -> IO (Either String (Either String RValue));
   runAction args ds thunk =
     ioBind (runActionState args ds rAsyncEmpty thunk)
-      (\result -> ioReturn (mapEither (\(Pair _ value) -> value) result));
+      (\result -> ioReturn
+         (bindEither result
+            (\(Pair _ outcome) -> case outcome of {
+               RIOSuccess value -> Right value;
+               RIOFailure message ->
+                 bindEither (runtimeCharsChunks True message)
+                   (\chunks -> Left ("user error (" ++ concatStrings chunks ++ ")"))
+             })));
   perform :: List String ->
              DataEnv ->
              Primitive -> List (Either String RValue) -> IO (Either String (Either String RValue));
   perform args ds primitive arguments =
-    let {
+    if ((P.primitiveCode primitive == 1) ||
+        ((P.primitiveCode primitive == 100) || (P.primitiveCode primitive == 101)))
+    then runAction args ds (Right (RAction primitive arguments))
+    else let {
       a = head arguments
     } in
     let {
@@ -1032,7 +1107,7 @@ module Bootstrap.Runtime where {
            RAsyncSubscriptionHandle owner identity status -> Right (Triple owner identity status);
            _ -> Left "runtime primitive expected AsyncSubscription"
          });
-  rAsyncFinished store value = ioReturn (Right (Pair store (Right value)));
+  rAsyncFinished store value = ioReturn (Right (Pair store (RIOSuccess (Right value))));
   rAsyncNewScope (RAsyncStore ns nc nt scopes cells tickets) cellLimit callbackLimit =
     let {
       scope = RAsyncScopeState False False cellLimit callbackLimit Nil Nil Nil Nil
@@ -1371,7 +1446,7 @@ module Bootstrap.Runtime where {
       }
     };
   rAsyncWait :: RAsyncStore ->
-                Int -> Int -> Int -> IO (Either String (Pair RAsyncStore (Either String RValue)));
+                Int -> Int -> Int -> IO (Either String (Pair RAsyncStore RIOOutcome));
   rAsyncWait store owner limit start =
     checkedIO (rAsyncLookupScope store owner)
       (\initial ->
@@ -1422,7 +1497,7 @@ module Bootstrap.Runtime where {
                     DataEnv ->
                     RAsyncStore ->
                     Either String RValue ->
-                    IO (Either String (Pair RAsyncStore (Either String RValue)));
+                    IO (Either String (Pair RAsyncStore RIOOutcome));
   runActionState args ds store thunk =
     case thunk of {
       Left message -> ioReturn (Left message);
@@ -1435,16 +1510,36 @@ module Bootstrap.Runtime where {
                   (\result ->
                      case result of {
                        Left message -> ioReturn (Left message);
-                       Right (Pair updated value) ->
-                         runActionState args ds updated
-                           (bindEither (head (tail arguments))
-                              (\function -> apply ds function value))
+                       Right (Pair updated outcome) ->
+                         case outcome of {
+                           RIOFailure message -> ioReturn (Right (Pair updated (RIOFailure message)));
+                           RIOSuccess value ->
+                             runActionState args ds updated
+                               (bindEither (head (tail arguments))
+                                  (\function -> apply ds function value))
+                         }
                      });
+              PIOError ->
+                checkedIO (runtimeIOError (head arguments))
+                  (\message -> ioReturn (Right (Pair store (RIOFailure message))));
+              PCatchIOError ->
+                ioBind (runActionState args ds store (head arguments))
+                  (\result -> case result of {
+                     Left message -> ioReturn (Left message);
+                     Right (Pair updated outcome) ->
+                       case outcome of {
+                         RIOSuccess value -> ioReturn (Right (Pair updated (RIOSuccess value)));
+                         RIOFailure message ->
+                           runActionState args ds updated
+                             (bindEither (head (tail arguments))
+                                (\handler -> apply ds handler (Right (RIOError message))))
+                       }
+                   });
               _ ->
                 if ((P.primitiveCode primitive >= 83) && (P.primitiveCode primitive <= 94))
                 then performAsync args ds store primitive arguments
                 else ioBind (perform args ds primitive arguments)
-                       (\result -> ioReturn (mapEither (\value -> Pair store value) result))
+                       (\result -> ioReturn (mapEither (\value -> Pair store (RIOSuccess value)) result))
             };
           _ -> ioReturn (Left "runtime expected an IO action")
         }
@@ -1454,7 +1549,7 @@ module Bootstrap.Runtime where {
                   RAsyncStore ->
                   Primitive ->
                   List (Either String RValue) ->
-                  IO (Either String (Pair RAsyncStore (Either String RValue)));
+                  IO (Either String (Pair RAsyncStore RIOOutcome));
   performAsync args ds store primitive arguments =
     let {
       a = head arguments
@@ -1653,15 +1748,18 @@ module Bootstrap.Runtime where {
                                                                        case result of {
                                                                          Left message ->
                                                                            ioReturn (Left message);
-                                                                         Right (Pair after _) ->
+                                                                         Right (Pair after outcome) ->
                                                                            checkedIO
                                                                              (rAsyncSetBusy after
                                                                                 owner
                                                                                 False)
                                                                              (\finished ->
-                                                                                rAsyncFinished
-                                                                                  finished
-                                                                                  (RInteger 0))
+                                                                                case outcome of {
+                                                                                  RIOSuccess _ ->
+                                                                                    rAsyncFinished finished (RInteger 0);
+                                                                                  RIOFailure message ->
+                                                                                    ioReturn (Right (Pair finished (RIOFailure message)))
+                                                                                })
                                                                        }))
                                                          }
                                                      })))));

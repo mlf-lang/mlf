@@ -1,7 +1,8 @@
 {-# LANGUAGE RankNTypes, KindSignatures, FlexibleInstances, ForeignFunctionInterface #-}
 module MLF.Host.Base
-  ( Int, Bool(..), Double, IO, Unit(..), String, ST, STArray
+  ( Int, Bool(..), Double, Char, IO, Unit(..), String, ST, STArray
   , literal, unpack, utf8, fromUtf8, matchString, neInt, leInt, gtInt, geInt
+  , v_textToChars, v_textFromChars, v_charCode, v_charFromCode
   , v_ioReturn, v_ioBind, v_stReturn, v_stBind, v_runST
   , v_newSTArray, v_readSTArray, v_writeSTArray, v_lengthSTArray
   , v_addInt, v_subInt, v_mulInt, v_quotInt, v_remInt, v_eqInt, v_ltInt, v_andInt
@@ -64,8 +65,22 @@ fromUtf8 bytes = case TE.decodeUtf8' bytes of
 matchString :: P.String -> String -> Bool
 matchString chars value = v_eqString value (literal chars)
 
+-- Canonical Haskell character lists are distinct from our opaque UTF-8 text.
+-- Char includes surrogate codepoints; converting those to text rejects them.
+v_textToChars :: String -> [Char]
+v_textToChars = unpack
+v_textFromChars :: [Char] -> String
+v_textFromChars = literal
+v_charCode :: Char -> Int
+v_charCode = toInteger . ord
+v_charFromCode :: Int -> Char
+v_charFromCode n = chr (bounded "invalid Char codepoint" 0x10ffff n)
+
 -- Ordinary Haskell overloaded string literals use the standard class.  This
 -- instance is representation adaptation, not a source-language syntax hook.
+instance Eq String where
+  (==) = v_eqString
+
 instance TextLiteral.IsString String where
   fromString = literal
 v_ioReturn :: a -> IO a

@@ -1,0 +1,183 @@
+#!/usr/bin/env python3
+"""Bounded item-4 checked xMLF -> LLVM -> native O0/O2 contract probe.
+
+Includes a SYNTHETIC missing-ABI-symbol link control, not a historical runtime
+qualification. This is not a full corpus, guest inference or fixed-point suite.
+Every run records source/tool hashes, exact commands, logs, and output hashes.
+"""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import signal
+import subprocess
+import time
+
+ROOT = Path(__file__).resolve().parents[2]
+FIXTURE = ROOT / 'tools/shared/fixtures/item4/EmitIO.hs'
+GUARD = 'mlf_require_haskell_boundary_v1_abi'
+EXPECTED = 'roundtrip λ😀\n65\n0\ncaught λ😀\nDONE\n'
+
+
+def sha(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def sources():
+    paths = {Path(__file__).resolve(), FIXTURE, ROOT / 'shared-sources.json'}
+    for folder in ['libraries', 'host/ghc', 'runtime']:
+        paths.update(p for p in (ROOT / folder).rglob('*')
+                     if p.is_file() and p.suffix in {'.hs', '.h', '.c'})
+    return {str(p.relative_to(ROOT)): sha(p) for p in sorted(paths)}
+
+
+def memory(group):
+    rss = 0
+    for path in Path('/proc').glob('[0-9]*/stat'):
+        try:
+            if os.getpgid(int(path.parent.name)) == group:
+                fields = path.read_text().rsplit(')', 1)[1].split()
+                rss += int(fields[21]) * os.sysconf('SC_PAGE_SIZE')
+        except (OSError, ValueError, ProcessLookupError):
+            pass
+    available = next(int(line.split()[1]) * 1024 for line in
+                     Path('/proc/meminfo').read_text().splitlines()
+                     if line.startswith('MemAvailable:'))
+    return rss, available
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--build-dir', required=True, type=Path)
+    parser.add_argument('--ghc', default='ghc')
+    parser.add_argument('--clang', default='clang')
+    parser.add_argument('--cc', default='cc')
+    parser.add_argument('--gc-prefix', type=Path, default=os.environ.get('MLF_GC_PREFIX'))
+    parser.add_argument('--timeout', type=int, default=300, help='per-command seconds')
+    args = parser.parse_args()
+    out = args.build_dir.resolve()
+    if out == ROOT or ROOT.is_relative_to(out):
+        parser.error('build directory must not contain the checkout')
+    if out.exists() and any(out.iterdir()):
+        parser.error('use a new or empty build directory; previous evidence is never overwritten')
+    if args.gc_prefix is None or args.timeout <= 0:
+        parser.error('--gc-prefix and a positive --timeout are required')
+    out.mkdir(parents=True, exist_ok=True)
+    before = sources()
+    receipt = {'scope': 'focused-item4-checked-llvm-native', 'status': 'running',
+               'synthetic_control': 'new runtime with ONLY new ABI guard renamed; not historical runtime',
+               'inputs': before, 'tools': {}, 'commands': [], 'outputs': {},
+               'environment': {k: os.environ.get(k) for k in ['PATH', 'LD_LIBRARY_PATH', 'MLF_GC_PREFIX']}}
+
+    def save():
+        (out / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+
+    def tool(name):
+        path = Path(shutil.which(name) or name).resolve(strict=True)
+        receipt['tools'][str(path)] = sha(path)
+        return str(path)
+
+    def run(command, label, reject=False, contains=None, exact=None):
+        log = out / (label + '.log')
+        entry = {'argv': list(map(str, command)), 'log': str(log),
+                 'expected': 'nonzero' if reject else 0}
+        receipt['commands'].append(entry)
+        save()
+        start = time.monotonic()
+        peak = 0
+        with log.open('w') as stream:
+            proc = subprocess.Popen(entry['argv'], cwd=ROOT, stdout=stream, stderr=subprocess.STDOUT,
+                                    env={**os.environ, 'GHC_ENVIRONMENT': '-',
+                                         'GC_INITIAL_HEAP_SIZE': '16777216'}, start_new_session=True)
+            try:
+                while proc.poll() is None:
+                    rss, available = memory(proc.pid)
+                    peak = max(peak, rss)
+                    if rss > 1536 * 1024**2 or available < 3 * 1024**3 or time.monotonic() - start > args.timeout:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                        proc.wait()
+                        entry['guard_stopped'] = True
+                        break
+                    time.sleep(.2)
+            except BaseException:
+                if proc.poll() is None:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                    proc.wait()
+                raise
+        entry.update(exit=proc.returncode, seconds=time.monotonic() - start,
+                     peak_rss_bytes=peak, log_sha256=sha(log))
+        save()
+        text = log.read_text()
+        if entry.get('guard_stopped') or (proc.returncode == 0 if reject else proc.returncode != 0):
+            raise RuntimeError(label + ' unexpected exit; see ' + str(log))
+        if contains is not None and contains not in text:
+            raise RuntimeError(label + ' lacks required diagnostic: ' + contains)
+        if exact is not None and text != exact:
+            raise RuntimeError(label + ' output differs from expected; see ' + str(log))
+        return text
+
+    try:
+        ghc, clang, cc = tool(args.ghc), tool(args.clang), tool(args.cc)
+        gc = args.gc_prefix.resolve(strict=True)
+        archive = gc / 'lib/libgc.a'
+        receipt['external_inputs'] = {str(archive): sha(archive)}
+        receipt['external_inputs'].update({str(p): sha(p) for p in sorted((gc / 'include').rglob('*.h'))})
+        for name, executable in [('ghc', ghc), ('clang', clang), ('cc', cc)]:
+            run([executable, '--version'], name + '-version')
+        version = run([ghc, '--numeric-version'], 'ghc-numeric-version').strip()
+        if version != '9.14.1':
+            raise RuntimeError('expected pinned GHC 9.14.1, got ' + version)
+        libdir = Path(run([ghc, '--print-libdir'], 'ghc-libdir').strip())
+        actual = libdir.parent / 'bin' / ('ghc-' + version)
+        receipt['tools'][str(actual)] = sha(actual)
+        receipt['tools'][str(libdir / 'settings')] = sha(libdir / 'settings')
+        manifest = json.loads((ROOT / 'shared-sources.json').read_text())
+        objects = out / 'objects'
+        objects.mkdir()
+        c_objects = []
+        for label, source in [('host', 'host/ghc/cbits/host.c'), ('supervisor', 'runtime/mlf_process_supervisor.c')]:
+            obj = out / (label + '.o')
+            run([cc, '-O0', '-std=c11', '-I' + str(ROOT / 'runtime'), '-c', ROOT / source, '-o', obj], 'compile-' + label)
+            c_objects.append(obj)
+        flags = ['--make', '-j1', '-O0', '-fpedantic-bottoms', '-fno-state-hack', '-package-env', '-', '-i']
+        flags += ['-i' + str(ROOT / root) for root in manifest['source_roots']]
+        emitter = out / 'emit-item4-io'
+        run([ghc, *flags, '-odir', objects, '-hidir', objects, FIXTURE, *c_objects, '-o', emitter], 'build-emitter')
+        llvm = out / 'program.ll'
+        run([emitter, llvm], 'emit-llvm')
+        if GUARD not in llvm.read_text():
+            raise RuntimeError('emitted LLVM lacks new ABI guard')
+        libraries = [archive, '-lgmp', '-lm', '-lpthread', '-ldl']
+        common = ['-std=c11', '-I' + str(ROOT / 'runtime'), '-I' + str(gc / 'include')]
+        for level in ['0', '2']:
+            binary = out / ('program-O' + level)
+            run([clang, '-O' + level, *common, llvm, ROOT / 'runtime/mlf_runtime.c', *libraries, '-o', binary], 'native-O' + level + '-build')
+            run([binary], 'native-O' + level + '-run', exact=EXPECTED)
+            receipt['outputs'][binary.name] = sha(binary)
+        original = (ROOT / 'runtime/mlf_runtime.c').read_text()
+        if original.count(GUARD) != 1:
+            raise RuntimeError('synthetic-control assumption failed: guard must occur exactly once in runtime C')
+        synthetic = out / 'synthetic-stale-runtime.c'
+        synthetic.write_text(original.replace(GUARD, 'mlf_synthetic_legacy_dummy_abi'))
+        rejection = run([clang, '-O0', *common, llvm, synthetic, *libraries, '-o', out / 'must-not-link'],
+                        'synthetic-stale-link', reject=True, contains=GUARD)
+        if not any(word in rejection for word in ['undefined reference', 'undefined symbol', 'Undefined symbols']):
+            raise RuntimeError('synthetic control failed for a reason other than an undefined symbol')
+        receipt['outputs'].update({'program.ll': sha(llvm), 'synthetic-stale-runtime.c': sha(synthetic)})
+        if sources() != before:
+            raise RuntimeError('source inputs changed during run; evidence invalidated')
+        receipt['status'] = 'passed'
+        save()
+        print('PASS item4 LLVM O0/O2 and synthetic missing-ABI-symbol control: ' + str(out / 'receipt.json'))
+    except BaseException as exc:
+        receipt['status'] = 'failed'
+        receipt['error'] = str(exc)
+        receipt['inputs_unchanged'] = sources() == before
+        save()
+        raise
+
+
+if __name__ == '__main__':
+    main()

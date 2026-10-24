@@ -243,6 +243,12 @@ module Bootstrap.SourceEquality where {
           SStringPattern y0 -> eqString x0 y0;
           _ -> False
         };
+      SOverloadedStringPattern x0 x1 x2 ->
+        case b of {
+          SOverloadedStringPattern y0 y1 y2 ->
+            (eqString x0 y0 && (eqString x1 y1 && eqString x2 y2));
+          _ -> False
+        };
       SBoolPattern x0 ->
         case b of {
           SBoolPattern y0 -> eqBool x0 y0;
@@ -458,6 +464,11 @@ module Bootstrap.SourceEquality where {
       LegacyEmlfV1 ->
         case b of {
           LegacyEmlfV1 -> True;
+          _ -> False
+        };
+      MetadataSyntax ->
+        case b of {
+          MetadataSyntax -> True;
           _ -> False
         };
       SharedHaskellV1 ->

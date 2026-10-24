@@ -465,13 +465,15 @@ module Bootstrap.Lexer where {
   sourceSyntaxName syntax =
     case syntax of {
       LegacyEmlfV1 -> "legacy-emlf-v1";
-      SharedHaskellV1 -> "shared-haskell-v1"
+      SharedHaskellV1 -> "shared-haskell-v1";
+      MetadataSyntax -> "internal-metadata-v2"
     };
   isSharedSyntax :: SourceSyntax -> Bool;
   isSharedSyntax syntax =
     case syntax of {
       SharedHaskellV1 -> True;
-      LegacyEmlfV1 -> False
+      LegacyEmlfV1 -> False;
+      MetadataSyntax -> False
     };
   textStartsAt :: String -> Int -> String -> Bool;
   textStartsAt text index prefix =
@@ -752,7 +754,7 @@ module Bootstrap.Lexer where {
   sharedValueOperators :: List String;
   sharedValueOperators = Cons ("+") (Cons ("-") (Cons ("*") (Cons ("/") (Cons ("%") (Cons ("++") (Cons ("==") (Cons ("/=") (Cons ("<") (Cons ("<=") (Cons (">") (Cons (">=") (Cons ("&&") (Cons ("||") (Cons (">>=") (Cons (">>") (Cons ("<*>") (Cons ("<$") (Cons ("*>") (Cons ("<*") (Nil))))))))))))))))))));
   sharedPunctuation :: List String;
-  sharedPunctuation = append sharedValueOperators (Cons ("::") (Cons ("->") (Cons ("<-") (Cons ("=>") (Cons ("=") (Cons ("|") (Cons (".") (Cons ("..") (Cons ("\\") (Cons ("(") (Cons (")") (Cons ("{") (Cons ("}") (Cons (";") (Cons (",") (Cons ("_") (Nil)))))))))))))))));
+  sharedPunctuation = append (Cons "[" (Cons "]" (Cons ":" sharedValueOperators))) (Cons ("::") (Cons ("->") (Cons ("<-") (Cons ("=>") (Cons ("=") (Cons ("|") (Cons (".") (Cons ("..") (Cons ("\\") (Cons ("(") (Cons (")") (Cons ("{") (Cons ("}") (Cons (";") (Cons (",") (Cons ("_") (Nil)))))))))))))))));
   sharedQualifiedOperator text =
     stringLength text > 1 && stringCodeAt text 0 == 46 && elem eqString (stringSlice text 1 (stringLength text - 1)) sharedValueOperators;
   validateSharedTokens :: String -> List Token -> Either String Unit;
@@ -800,7 +802,7 @@ module Bootstrap.Lexer where {
     };
   -- Cache consumers must bind this semantic identity as well as raw source bytes.
   frontendSemanticVersion :: String;
-  frontendSemanticVersion = "mlf-frontend/shared-haskell-v1/3";
+  frontendSemanticVersion = "mlf-frontend/shared-haskell-v1/4";
   builtinInterfaceVersion :: String;
-  builtinInterfaceVersion = "mlf-primitive/shared-haskell-v1/4"
+  builtinInterfaceVersion = "mlf-primitive/shared-haskell-v1/5"
 }

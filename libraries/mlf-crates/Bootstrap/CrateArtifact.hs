@@ -149,7 +149,7 @@ module Bootstrap.CrateArtifact where {
     } in
     let {
       fields =
-        Cons "MLF-CRATE-SEMANTICS-1"
+        Cons "MLF-CRATE-SEMANTICS-2"
           (Cons (crateId iface)
              (Cons (encodeExports (crateExports iface))
                 (Cons (encodeImports (crateImports iface))
@@ -162,7 +162,7 @@ module Bootstrap.CrateArtifact where {
     } in
     Separate.fingerprint (Separate.pack fields);
   interfaceFields iface =
-    Cons "MLFCI-1"
+    Cons "MLFCI-2"
       (Cons (crateId iface)
          (Cons (Separate.pack (map encodeDependency (sortDependencies (crateDependencies iface))))
             (Cons (Separate.pack (sortStrings (crateModules iface)))
@@ -346,7 +346,7 @@ module Bootstrap.CrateArtifact where {
       } in
       case matchValueShared4 of {
         Cons matchValueShared5 matchValueShared6 ->
-          if MLF.Primitive.eqString matchValueShared5 "MLFCI-1"
+          if MLF.Primitive.eqString matchValueShared5 "MLFCI-2"
           then case matchValueShared6 of {
                  Cons matchValueShared7 matchValueShared8 ->
                    case matchValueShared8 of {
@@ -429,12 +429,12 @@ module Bootstrap.CrateArtifact where {
                                                                        decodeExports exports;
                                                                      reach <- decodeImports imports;
                                                                      source <-
-                                                                       Parser.parseModule
+                                                                       Parser.parseMetadataModule
                                                                          "<crate metadata>"
                                                                          ("module CrateMetadata where {\n" ++
                                                                           (metadata ++ "\n}"));
                                                                      lowered <-
-                                                                       Parser.parseModule
+                                                                       Parser.parseMetadataModule
                                                                          "<crate layout metadata>"
                                                                          ("module CrateLayouts where {\n" ++
                                                                           (layouts ++ "\n}"));
@@ -500,49 +500,49 @@ module Bootstrap.CrateArtifact where {
                                                                    };
                                                                  _ ->
                                                                    Left
-                                                                     "unsupported or malformed crate metadata (expected MLFCI-1)"
+                                                                     "unsupported or malformed crate metadata (expected MLFCI-2)"
                                                                };
                                                              _ ->
                                                                Left
-                                                                 "unsupported or malformed crate metadata (expected MLFCI-1)"
+                                                                 "unsupported or malformed crate metadata (expected MLFCI-2)"
                                                            };
                                                          _ ->
                                                            Left
-                                                             "unsupported or malformed crate metadata (expected MLFCI-1)"
+                                                             "unsupported or malformed crate metadata (expected MLFCI-2)"
                                                        };
                                                      _ ->
                                                        Left
-                                                         "unsupported or malformed crate metadata (expected MLFCI-1)"
+                                                         "unsupported or malformed crate metadata (expected MLFCI-2)"
                                                    };
                                                  _ ->
                                                    Left
-                                                     "unsupported or malformed crate metadata (expected MLFCI-1)"
+                                                     "unsupported or malformed crate metadata (expected MLFCI-2)"
                                                };
                                              _ ->
                                                Left
-                                                 "unsupported or malformed crate metadata (expected MLFCI-1)"
+                                                 "unsupported or malformed crate metadata (expected MLFCI-2)"
                                            };
                                          _ ->
                                            Left
-                                             "unsupported or malformed crate metadata (expected MLFCI-1)"
+                                             "unsupported or malformed crate metadata (expected MLFCI-2)"
                                        };
                                      _ ->
                                        Left
-                                         "unsupported or malformed crate metadata (expected MLFCI-1)"
+                                         "unsupported or malformed crate metadata (expected MLFCI-2)"
                                    };
                                  _ ->
-                                   Left "unsupported or malformed crate metadata (expected MLFCI-1)"
+                                   Left "unsupported or malformed crate metadata (expected MLFCI-2)"
                                };
-                             _ -> Left "unsupported or malformed crate metadata (expected MLFCI-1)"
+                             _ -> Left "unsupported or malformed crate metadata (expected MLFCI-2)"
                            };
-                         _ -> Left "unsupported or malformed crate metadata (expected MLFCI-1)"
+                         _ -> Left "unsupported or malformed crate metadata (expected MLFCI-2)"
                        };
-                     _ -> Left "unsupported or malformed crate metadata (expected MLFCI-1)"
+                     _ -> Left "unsupported or malformed crate metadata (expected MLFCI-2)"
                    };
-                 _ -> Left "unsupported or malformed crate metadata (expected MLFCI-1)"
+                 _ -> Left "unsupported or malformed crate metadata (expected MLFCI-2)"
                }
-          else Left "unsupported or malformed crate metadata (expected MLFCI-1)";
-        _ -> Left "unsupported or malformed crate metadata (expected MLFCI-1)"
+          else Left "unsupported or malformed crate metadata (expected MLFCI-2)";
+        _ -> Left "unsupported or malformed crate metadata (expected MLFCI-2)"
       }
     };
   interfacePrefix :: List String -> List String;
@@ -684,7 +684,7 @@ module Bootstrap.CrateArtifact where {
   builtinPrelude =
     do {
       let {
-        identity = "mlf:builtin-shared-haskell-v1:4"
+        identity = "mlf:builtin-shared-haskell-v1:5"
       };
       resolution <-
         Modules.resolveCrate NoImplicitPrelude M.empty (definitionName identity)
@@ -954,7 +954,7 @@ module Bootstrap.CrateArtifact where {
       texts <- canonicalFields input;
       ensure (eqList eqString texts (sortStrings texts)) "noncanonical crate datatype pool order";
       source <-
-        Parser.parseModule "<crate datatype pool>"
+        Parser.parseMetadataModule "<crate datatype pool>"
           ("module CrateDataPool where {\n" ++ (unlines texts ++ "\n}"));
       ensure
         (null (Modules.sourceValues source) &&

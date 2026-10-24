@@ -104,7 +104,15 @@ module Bootstrap.Primitive where {
       PAsyncStep -> 91;
       PAsyncEnqueue -> 92;
       PAsyncDelay -> 93;
-      PAsyncWait -> 94
+      PAsyncWait -> 94;
+      PTextToChars -> 95;
+      PTextFromChars -> 96;
+      PCharCode -> 97;
+      PCharFromCode -> 98;
+      PUserError -> 99;
+      PIOError -> 100;
+      PCatchIOError -> 101;
+      PIOErrorString -> 102
     };
   primitiveName :: Primitive -> String;
   primitiveName p =
@@ -203,10 +211,18 @@ module Bootstrap.Primitive where {
       PAsyncStep -> "asyncStep";
       PAsyncEnqueue -> "asyncEnqueue";
       PAsyncDelay -> "asyncDelay";
-      PAsyncWait -> "asyncWait"
+      PAsyncWait -> "asyncWait";
+      PTextToChars -> "textToChars";
+      PTextFromChars -> "textFromChars";
+      PCharCode -> "charCode";
+      PCharFromCode -> "charFromCode";
+      PUserError -> "userError";
+      PIOError -> "ioError";
+      PCatchIOError -> "catchIOError";
+      PIOErrorString -> "ioeGetErrorString"
     };
-  allPrimitives :: List Primitive;
-  allPrimitives =
+  legacyPrimitives :: List Primitive;
+  legacyPrimitives =
     Cons PIOReturn
       (Cons PIOBind
          (Cons PPutStr
@@ -371,6 +387,9 @@ module Bootstrap.Primitive where {
                                                                                                                                                                                                                                                                                              (Cons
                                                                                                                                                                                                                                                                                                 PAsyncWait
                                                                                                                                                                                                                                                                                                 Nil))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))));
+  allPrimitives :: List Primitive;
+  allPrimitives = S.append legacyPrimitives
+    (Cons PTextToChars (Cons PTextFromChars (Cons PCharCode (Cons PCharFromCode (Cons PUserError (Cons PIOError (Cons PCatchIOError (Cons PIOErrorString (Nil)))))))));
   lookupTargetPrimitive :: String -> Maybe Primitive;
   lookupTargetPrimitive name = S.find (\p -> eqString (primitiveName p) name) allPrimitives;
   lookupPrimitive :: String -> Maybe Primitive;
@@ -378,6 +397,8 @@ module Bootstrap.Primitive where {
     if (eqString name "return" || eqString name "pure")
     then Just PIOReturn
     else if eqString name "bind" then Just PIOBind else lookupTargetPrimitive name;
+  charListField :: Field;
+  charListField = Applied "[]" (Cons (Applied "Char" Nil) Nil);
   primitiveSignature :: Primitive -> Pair (List (Pair String Kind)) Field;
   primitiveSignature p =
     case p of {
@@ -675,7 +696,19 @@ module Bootstrap.Primitive where {
       PAsyncWait ->
         Pair Nil
           (Function (Applied "AsyncScope" Nil)
-             (Function (Applied "Int" Nil) (Applied "IO" (Cons (Applied "Int" Nil) Nil))))
+             (Function (Applied "Int" Nil) (Applied "IO" (Cons (Applied "Int" Nil) Nil))));
+      PTextToChars -> Pair Nil (Function (Applied "String" Nil) charListField);
+      PTextFromChars -> Pair Nil (Function charListField (Applied "String" Nil));
+      PCharCode -> Pair Nil (Function (Applied "Char" Nil) (Applied "Int" Nil));
+      PCharFromCode -> Pair Nil (Function (Applied "Int" Nil) (Applied "Char" Nil));
+      PUserError -> Pair Nil (Function charListField (Applied "IOError" Nil));
+      PIOError -> Pair (Cons (Pair "a" Star) Nil)
+        (Function (Applied "IOError" Nil) (Applied "IO" (Cons (Parameter "a") Nil)));
+      PCatchIOError -> Pair (Cons (Pair "a" Star) Nil)
+        (Function (Applied "IO" (Cons (Parameter "a") Nil))
+          (Function (Function (Applied "IOError" Nil) (Applied "IO" (Cons (Parameter "a") Nil)))
+            (Applied "IO" (Cons (Parameter "a") Nil))));
+      PIOErrorString -> Pair Nil (Function (Applied "IOError" Nil) charListField)
     };
   primitiveArity :: Primitive -> Int;
   -- Runtime application asks for arity on every partial and saturated call.
@@ -777,7 +810,15 @@ module Bootstrap.Primitive where {
       PAsyncStep -> 1;
       PAsyncEnqueue -> 2;
       PAsyncDelay -> 3;
-      PAsyncWait -> 2
+      PAsyncWait -> 2;
+      PTextToChars -> 1;
+      PTextFromChars -> 1;
+      PCharCode -> 1;
+      PCharFromCode -> 1;
+      PUserError -> 1;
+      PIOError -> 1;
+      PCatchIOError -> 2;
+      PIOErrorString -> 1
     };
   fieldArity :: Field -> Int;
   fieldArity field =
@@ -787,7 +828,8 @@ module Bootstrap.Primitive where {
     };
   primitiveStrict :: Primitive -> Bool;
   primitiveStrict p =
-    ((primitiveCode p == 68) ||
+    (((primitiveCode p >= 95) && (primitiveCode p <= 98)) ||
+     (primitiveCode p == 68) ||
      S.elem eqInt (primitiveCode p)
        (Cons 6
           (Cons 7

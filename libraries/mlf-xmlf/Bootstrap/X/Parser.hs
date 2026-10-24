@@ -63,7 +63,23 @@ module Bootstrap.X.Parser where {
           (U.isAlpha (stringCodeAt s 0) && L.not (L.elem eqString s reservedWords))))
       "identifier";
   upperIdentifier :: Parser String;
-  upperIdentifier =
+  upperIdentifier = pChoice (pTry builtinConstructorName) ordinaryUpperIdentifier;
+  builtinConstructorName :: Parser String;
+  builtinConstructorName =
+    pChoice (pThen (pToken "[") (pThen (pToken "]") (pPure "[]")))
+      (pChoice (pToken ":")
+        (pParens (do {
+          commas <- pMany (pToken ",");
+          case L.length commas of {
+            0 -> pPure "()";
+            1 -> pPure "(,)";
+            2 -> pPure "(,,)";
+            3 -> pPure "(,,,)";
+            _ -> pFail "unsupported builtin tuple arity"
+          }
+        })));
+  ordinaryUpperIdentifier :: Parser String;
+  ordinaryUpperIdentifier =
     pTry
       (do {
          s <- pLook identifier;
@@ -149,13 +165,14 @@ module Bootstrap.X.Parser where {
     };
   typeAtom :: Parser XType;
   typeAtom =
-    pChoice (pParens typ)
+    pChoice (pTry (pMap (\c -> XCon c Nil) builtinConstructorName))
+      (pChoice (pParens typ)
       (pChoice
          (do {
             pToken "bot";
             pOption XBot (pBetween (pToken "[") (pToken "]") (pMap T.bottomKind kindParser))
           })
-         (pChoice (pMap (\c -> XCon c Nil) upperIdentifier) (pMap XVar typeVariable)));
+         (pChoice (pMap (\c -> XCon c Nil) ordinaryUpperIdentifier) (pMap XVar typeVariable))));
   kindParser :: Parser Kind;
   kindParser =
     pChainr (pChoice (pMap (\_ -> Star) (pToken "*")) (pParens kindParser))

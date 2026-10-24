@@ -62,10 +62,16 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
   data PreparedEntry = PreparedEntry Bool (Map String (Pair Int Int)) XErased;
   entryConstructors declarations =
     let {
-      all = L.concatMap dataConstructors declarations
+      -- The first seven tags are a stable runtime ABI: legacy Unit, (), [],
+      -- (:), and tuples of arity 2..4. Conversion primitives construct lists.
+      builtins = L.concatMap dataConstructors D.builtinDeclarations;
+      builtinNames = L.map D.constructorName builtins;
+      users = L.filter (\c -> L.not (L.elem eqString (D.constructorName c) builtinNames))
+                (L.concatMap dataConstructors declarations);
+      all = L.append builtins users
     } in
     M.fromList compareString
-      (Cons (Pair "Unit" (Pair 0 0)) (L.zipWith constructorEntry (L.range 1 (L.length all)) all));
+      (L.zipWith constructorEntry (L.range 0 (L.length all - 1)) all);
   prepareChecked :: Bool -> Checked.CheckedTerm -> Either String PreparedEntry;
   prepareChecked requireIO checked =
     let {
@@ -233,7 +239,7 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
          Right
            (runtimePack
               (Cons "MLF-CODEGEN-INPUT-COMPACT-2"
-                 (Cons "compact-bdwgc-v1-process-v1-completion-v2"
+                 (Cons "compact-bdwgc-v1-process-v1-completion-v2-haskell-boundary-v1"
                     (Cons (runtimeBool (ioType (Checked.typeOf checked)))
                        (Cons (constructorKey (entryConstructors declarations))
                           (Cons (runtimePack (L.map D.prettyDeclaration declarations))
@@ -241,7 +247,7 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
   preparedKey (PreparedEntry executeIO constructors lowered) =
     runtimePack
       (Cons "MLF-CODEGEN-PREPARED-COMPACT-2"
-         (Cons "compact-bdwgc-v1-process-v1-completion-v2"
+         (Cons "compact-bdwgc-v1-process-v1-completion-v2-haskell-boundary-v1"
             (Cons (runtimeBool executeIO)
                (Cons (constructorKey constructors) (Cons (canonicalErasedKey lowered) Nil)))));
   -- A crate links all checked fragments, including declarations outside the
@@ -325,7 +331,7 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
          Right
            (runtimePack
               (Cons "MLF-CODEGEN-CRATE-INPUT-COMPACT-2"
-                 (Cons "compact-bdwgc-v1-process-v1-completion-v2"
+                 (Cons "compact-bdwgc-v1-process-v1-completion-v2-haskell-boundary-v1"
                     (Cons (runtimeBool (ioType (Checked.typeOf checked)))
                        (Cons (constructorKey (entryConstructors declarations))
                           (Cons (runtimePack (L.map D.prettyDeclaration declarations))
@@ -333,7 +339,7 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
   entryCode :: String -> Bool -> List String;
   entryCode entry executeIO =
     let {
-      abi = "mlf_require_async_completion_v2_abi"
+      abi = "mlf_require_haskell_boundary_v1_abi"
     } in
     Cons ("declare void @" ++ (abi ++ "()"))
       (Cons "define ptr @mlf_entry() {"

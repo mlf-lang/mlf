@@ -98,6 +98,28 @@ module Bootstrap.Parser where {
       syntax <- sourceSyntax file source;
       parseModuleWithProfile syntax file source
     };
+  -- Artifact metadata uses legacy quantification/annotation grammar but wired
+  -- canonical type names. This profile is never selected by a source marker.
+  parseMetadataModule :: String -> String -> Either String SourceModule;
+  parseMetadataModule file source = do {
+    tokens <- layoutTokensWithProfile MetadataSyntax True file source;
+    runParserWithProfile MetadataSyntax (sourceModule file) file tokens
+  };
+  metadataAtom :: forall a. (String -> a) -> Parser a -> Parser a;
+  metadataAtom construct fallback = do {
+    syntax <- pSourceSyntax;
+    case syntax of {
+      MetadataSyntax -> pChoice (pTry (pMap construct metadataBuiltinName)) fallback;
+      _ -> fallback
+    }
+  };
+  metadataBuiltinName :: Parser String;
+  metadataBuiltinName =
+    pChoice (pThen (pToken "[") (pThen (pToken "]") (pPure "[]")))
+      (pParens (do {
+        commas <- pMany (pToken ",");
+        if null commas then pPure "()" else sourceTupleName (1 + length commas)
+      }));
   parseModuleWithProfile :: SourceSyntax -> String -> String -> Either String SourceModule;
   parseModuleWithProfile syntax file source =
     do {
@@ -783,7 +805,10 @@ module Bootstrap.Parser where {
       pPure (SAlternative pattern value)
     };
   patternP :: Parser SPattern;
-  patternP = pBySyntax patternApplication legacyPattern;
+  patternP = pBySyntax
+    (pChainr patternApplication
+      (pMap (\_ a b -> constructorPattern ":" (Cons a (Cons b Nil))) (pToken ":")))
+    legacyPattern;
   legacyPattern :: Parser SPattern;
   legacyPattern =
     pChainr patternApplication
@@ -828,11 +853,17 @@ module Bootstrap.Parser where {
       (Cons
          (pParens
             (pChoice (pMap SIntPattern (pThen (pToken "-") (pMap (\n -> (0 - n)) naturalLiteral)))
-               patternP))
-         (Cons (pMap (\b -> SConstructorPattern (sharedSourceName (if b then "True" else "False")) Nil) booleanLiteral)
-            (Cons (pMap SIntPattern naturalLiteral)
-               (Cons (pMap (\n -> SConstructorPattern (sharedSourceName n) Nil) upperReference)
-                  (Cons (pMap SDefaultPattern patternField) Nil)))));
+               (pBind (collectionItems ")" patternP)
+                  (sourceTupleValue (SConstructorPattern "()" Nil) constructorPattern))))
+         (Cons
+            (pMap (foldr (\a b -> constructorPattern ":" (Cons a (Cons b Nil)))
+                         (constructorPattern "[]" Nil))
+               (pThen (pToken "[") (pBefore (collectionItems "]" patternP) (pToken "]"))))
+            (Cons (pMap (\b -> SConstructorPattern (sharedSourceName (if b then "True" else "False")) Nil) booleanLiteral)
+               (Cons (pMap (\text -> SOverloadedStringPattern text "$MLF.Primitive.==" "$MLF.Primitive.fromString") stringLiteral)
+               (Cons (pMap SIntPattern naturalLiteral)
+                  (Cons (pMap (\n -> SConstructorPattern (sharedSourceName n) Nil) upperReference)
+                     (Cons (pMap SDefaultPattern patternField) Nil)))))));
   legacyPatternAtom :: Parser SPattern;
   legacyPatternAtom =
     pChoices
@@ -906,14 +937,28 @@ module Bootstrap.Parser where {
     pChoices
       (Cons
          (pParens
-            (pChoices (Cons (pTry (pMap SVar (pBefore operatorReference (pLook (pToken ")"))))) (Cons (pMap SIntLit (pThen (pToken "-") (pMap (\n -> (0 - n)) naturalLiteral))) (Cons expr Nil)))))
-         (Cons doExpr
-            (Cons (pMap (\b -> SConstructor (sharedSourceName (if b then "True" else "False"))) booleanLiteral)
-               (Cons (pMap SDoubleLit doubleLiteral)
-                  (Cons (pMap SIntLit naturalLiteral)
-                     (Cons (pMap SStringLit stringLiteral)
-                        (Cons (pMap SVar lowerReference)
-                           (Cons (pThen (pNot (pTry operatorReference)) (pMap (\name -> SConstructor (sharedSourceName name)) upperReference)) Nil))))))));
+            (pChoices
+               (Cons (pMap (\_ -> SConstructor ":") (pToken ":"))
+                  (Cons (pBind (pSome (pToken ","))
+                           (\commas -> pMap SConstructor (sourceTupleName (1 + length commas))))
+                     (Cons (pTry (pMap SVar (pBefore operatorReference (pLook (pToken ")")))))
+                        (Cons (pMap SIntLit (pThen (pToken "-") (pMap (\n -> (0 - n)) naturalLiteral)))
+                           (Cons (pBind (collectionItems ")" expr)
+                                    (sourceTupleValue (SConstructor "()")
+                                       (\name fields -> foldl SApp (SConstructor name) fields))) Nil)))))))
+         (Cons
+            (pMap (foldr sourceConsExpression (SConstructor "[]"))
+               (pThen (pToken "[") (pBefore (collectionItems "]" expr) (pToken "]"))))
+            (Cons doExpr
+               (Cons (pMap (\b -> SConstructor (sharedSourceName (if b then "True" else "False"))) booleanLiteral)
+                  (Cons (pMap SDoubleLit doubleLiteral)
+                     (Cons (pMap SIntLit naturalLiteral)
+                        (Cons (pMap (\text -> SApp (SVar "$MLF.Primitive.fromString")
+                                  (SApp (SPrimitive PTextToChars) (SStringLit text))) stringLiteral)
+                           (Cons (pMap SVar lowerReference)
+                              (Cons (pThen (pNot (pTry operatorReference)) (pMap (\name -> SConstructor (sharedSourceName name)) upperReference)) Nil)))))))));
+  sourceConsExpression :: SExpr -> SExpr -> SExpr;
+  sourceConsExpression a b = SApp (SApp (SConstructor ":") a) b;
   legacyAtom :: Parser SExpr;
   legacyAtom =
     pChoices
@@ -965,6 +1010,21 @@ module Bootstrap.Parser where {
                        pPure (Cons value rest)
                      }
                 else pPure Nil
+    };
+  sourceTupleName :: Int -> Parser String;
+  sourceTupleName arity =
+    case arity of {
+      2 -> pPure "(,)";
+      3 -> pPure "(,,)";
+      4 -> pPure "(,,,)";
+      _ -> pFail "tuple syntax supports two, three or four components"
+    };
+  sourceTupleValue :: forall a. a -> (String -> List a -> a) -> List a -> Parser a;
+  sourceTupleValue unit construct values =
+    case values of {
+      Nil -> pPure unit;
+      Cons value Nil -> pPure value;
+      _ -> pMap (\name -> construct name values) (sourceTupleName (length values))
     };
   tupleValue :: forall a. a -> (String -> List a -> a) -> List a -> Parser a;
   tupleValue unit construct values =
@@ -1135,12 +1195,19 @@ module Bootstrap.Parser where {
       _ -> STypeApp f a
     };
   typeAtom :: Parser SType;
-  typeAtom =
+  typeAtom = metadataAtom (\name -> SCon name Nil) ordinaryTypeAtom;
+  ordinaryTypeAtom :: Parser SType;
+  ordinaryTypeAtom =
     pBySyntax
       (pChoices
-         (Cons (pParens typ)
-            (Cons (pMap STVar lowerIdentifier)
-               (Cons (pMap (\n -> SCon (sharedSourceName n) Nil) upperReference) Nil))))
+         (Cons (pParens (pChoice
+                          (pBind (pSome (pToken ",")) (\commas -> pMap (\n -> SCon n Nil) (sourceTupleName (1 + length commas))))
+                          (pBind (collectionItems ")" typ) (sourceTupleValue (SCon "()" Nil) SCon))))
+            (Cons (pThen (pToken "[") (pBefore
+                      (pChoice (pThen (pLook (pToken "]")) (pPure (SCon "[]" Nil)))
+                         (pMap (\ty -> SCon "[]" (Cons ty Nil)) typ)) (pToken "]")))
+               (Cons (pMap STVar lowerIdentifier)
+                  (Cons (pMap (\n -> SCon (sharedSourceName n) Nil) upperReference) Nil)))))
       legacyTypeAtom;
   legacyTypeAtom :: Parser SType;
   legacyTypeAtom =
@@ -1217,12 +1284,17 @@ module Bootstrap.Parser where {
       _ -> Application f a
     };
   fieldAtom :: Parser Field;
-  fieldAtom =
+  fieldAtom = metadataAtom (\name -> Applied name Nil) ordinaryFieldAtom;
+  ordinaryFieldAtom :: Parser Field;
+  ordinaryFieldAtom =
     pBySyntax
       (pChoices
-         (Cons (pParens fieldType)
-            (Cons (pMap (\n -> Applied (sharedSourceName n) Nil) upperReference)
-               (Cons (pMap Parameter lowerIdentifier) Nil))))
+         (Cons (pParens (pBind (collectionItems ")" fieldType)
+                         (sourceTupleValue (Applied "()" Nil) Applied)))
+            (Cons (pMap (\ty -> Applied "[]" (Cons ty Nil))
+                     (pThen (pToken "[") (pBefore fieldType (pToken "]"))))
+               (Cons (pMap (\n -> Applied (sharedSourceName n) Nil) upperReference)
+                  (Cons (pMap Parameter lowerIdentifier) Nil)))))
       legacyFieldAtom;
   legacyFieldAtom :: Parser Field;
   legacyFieldAtom =
@@ -1588,7 +1660,9 @@ module Bootstrap.Parser where {
     pPure (foldl (\left entry -> namedOperator (fst entry) left (snd entry)) first rest)
   };
   sharedConcatExpr :: Parser SExpr;
-  sharedConcatExpr = pChainr sharedAddExpr (sharedOperatorParser (Cons "++" Nil));
+  sharedConcatExpr = pChainr sharedAddExpr
+    (pChoice (pMap (\_ -> sourceConsExpression) (pToken ":"))
+       (sharedOperatorParser (Cons "++" Nil)));
   sharedAddExpr :: Parser SExpr;
   sharedAddExpr = pChainl sharedMultiplyExpr (sharedOperatorParser (Cons "+" (Cons "-" Nil)));
   sharedMultiplyExpr :: Parser SExpr;

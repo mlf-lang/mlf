@@ -65,9 +65,15 @@ module Bootstrap.Separate where {
     then ""
     else (showInt (stringCodeAt text i) ++ ("_" ++ encodedFrom text (i + 1)));
   encoded text = encodedFrom text 0;
+  canonicalPreludeConstructor entity =
+    (eqString (Modules.owner entity) "Prelude" &&
+     (case Modules.role entity of { Modules.Constructor _ -> True; _ -> False }) &&
+     any (\d -> any (\c -> eqString (Modules.spelling entity) (D.constructorName c))
+                       (D.datatypeConstructors d)) D.sourceBuiltinDeclarations);
   stableName entity =
     if (Modules.isRole Modules.BuiltinType entity ||
-        (eqString (Modules.owner entity) "Prelude" && eqString (Modules.spelling entity) "Unit"))
+        (canonicalPreludeConstructor entity ||
+         (eqString (Modules.owner entity) "Prelude" && eqString (Modules.spelling entity) "Unit")))
     then Modules.spelling entity
     else ((if ((Modules.compareSpace (Modules.space entity) Modules.Types == 0) ||
                (case Modules.role entity of {
@@ -98,6 +104,8 @@ module Bootstrap.Separate where {
       SConstructorPattern c ns -> SConstructorPattern c (map (mapMaybeValue (hygieneName env)) ns);
       SNestedPattern c ps -> SNestedPattern c (map (hygienePattern env) ps);
       SAnnotatedPattern n a -> SAnnotatedPattern (hygieneName env n) a;
+      SOverloadedStringPattern s equal fromString ->
+        SOverloadedStringPattern s (hygieneName env equal) (hygieneName env fromString);
       _ -> p
     };
   hygieneIn :: Map String String -> SExpr -> Fresh SExpr;
@@ -583,7 +591,7 @@ module Bootstrap.Separate where {
           (map (\(Pair n t) -> pairEncoding (Pair n (Pretty.prettyType (normalType t))))
              (unitBindings i))
     } in
-    Cons "MLFI-1"
+    Cons "MLFI-2"
       (Cons (unitName i)
          (Cons (pack (map pairEncoding (unitDependencies i)))
             (Cons (pack (map entityEncoding (unitExports i)))
@@ -606,7 +614,7 @@ module Bootstrap.Separate where {
       } in
       case matchValueShared11 of {
         Cons matchValueShared12 matchValueShared13 ->
-          if MLF.Primitive.eqString matchValueShared12 "MLFI-1"
+          if MLF.Primitive.eqString matchValueShared12 "MLFI-2"
           then case matchValueShared13 of {
                  Cons matchValueShared14 matchValueShared15 ->
                    case matchValueShared15 of {
@@ -650,7 +658,7 @@ module Bootstrap.Separate where {
                                                  rawExports <- unpack exports;
                                                  es <- traverseEither decodeEntity rawExports;
                                                  source <-
-                                                   Parser.parseModule "<module interface>"
+                                                   Parser.parseMetadataModule "<module interface>"
                                                      ("module InterfaceMetadata where {\n" ++
                                                       (metadata ++ "\n}"));
                                                  ns <- unpack instanceNames;
@@ -711,30 +719,30 @@ module Bootstrap.Separate where {
                                                };
                                              _ ->
                                                Left
-                                                 "unsupported or malformed module interface (expected MLFI-1)"
+                                                 "unsupported or malformed module interface (expected MLFI-2)"
                                            };
                                          _ ->
                                            Left
-                                             "unsupported or malformed module interface (expected MLFI-1)"
+                                             "unsupported or malformed module interface (expected MLFI-2)"
                                        };
                                      _ ->
                                        Left
-                                         "unsupported or malformed module interface (expected MLFI-1)"
+                                         "unsupported or malformed module interface (expected MLFI-2)"
                                    };
                                  _ ->
                                    Left
-                                     "unsupported or malformed module interface (expected MLFI-1)"
+                                     "unsupported or malformed module interface (expected MLFI-2)"
                                };
-                             _ -> Left "unsupported or malformed module interface (expected MLFI-1)"
+                             _ -> Left "unsupported or malformed module interface (expected MLFI-2)"
                            };
-                         _ -> Left "unsupported or malformed module interface (expected MLFI-1)"
+                         _ -> Left "unsupported or malformed module interface (expected MLFI-2)"
                        };
-                     _ -> Left "unsupported or malformed module interface (expected MLFI-1)"
+                     _ -> Left "unsupported or malformed module interface (expected MLFI-2)"
                    };
-                 _ -> Left "unsupported or malformed module interface (expected MLFI-1)"
+                 _ -> Left "unsupported or malformed module interface (expected MLFI-2)"
                }
-          else Left "unsupported or malformed module interface (expected MLFI-1)";
-        _ -> Left "unsupported or malformed module interface (expected MLFI-1)"
+          else Left "unsupported or malformed module interface (expected MLFI-2)";
+        _ -> Left "unsupported or malformed module interface (expected MLFI-2)"
       }
     };
   validModuleName name =

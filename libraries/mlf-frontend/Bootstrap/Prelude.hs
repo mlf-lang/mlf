@@ -203,13 +203,57 @@ module Bootstrap.Prelude where {
 
   -- Standard Haskell class identities are owned by the reserved shared facade.
   -- Legacy Prelude.Monad remains an independent guest API.
+  hierarchyClasses :: List SClassDecl;
+  hierarchyClasses = Cons (SClassDecl "Functor" (Cons (Pair "f" (KArrow Star Star)) Nil) (Nil) (Cons (Pair "fmap" (forallType "a" (forallType "b" (SArrow (SArrow (STVar "a") (STVar "b")) (SArrow (STypeApp (STVar "f") (STVar "a")) (STypeApp (STVar "f") (STVar "b"))))))) (Cons (Pair "<$" (forallType "a" (forallType "b" (SArrow (STVar "a") (SArrow (STypeApp (STVar "f") (STVar "b")) (STypeApp (STVar "f") (STVar "a"))))))) (Nil)))) (Cons (SClassDecl "Applicative" (Cons (Pair "f" (KArrow Star Star)) Nil) (Cons (SPredicate "Functor" (Cons (STVar "f") Nil)) (Nil)) (Cons (Pair "pure" (forallType "a" (SArrow (STVar "a") (STypeApp (STVar "f") (STVar "a"))))) (Cons (Pair "<*>" (forallType "a" (forallType "b" (SArrow (STypeApp (STVar "f") (SArrow (STVar "a") (STVar "b"))) (SArrow (STypeApp (STVar "f") (STVar "a")) (STypeApp (STVar "f") (STVar "b"))))))) (Cons (Pair "liftA2" (forallType "a" (forallType "b" (forallType "c" (SArrow (SArrow (STVar "a") (SArrow (STVar "b") (STVar "c"))) (SArrow (STypeApp (STVar "f") (STVar "a")) (SArrow (STypeApp (STVar "f") (STVar "b")) (STypeApp (STVar "f") (STVar "c"))))))))) (Cons (Pair "*>" (forallType "a" (forallType "b" (SArrow (STypeApp (STVar "f") (STVar "a")) (SArrow (STypeApp (STVar "f") (STVar "b")) (STypeApp (STVar "f") (STVar "b"))))))) (Cons (Pair "<*" (forallType "a" (forallType "b" (SArrow (STypeApp (STVar "f") (STVar "a")) (SArrow (STypeApp (STVar "f") (STVar "b")) (STypeApp (STVar "f") (STVar "a"))))))) (Nil))))))) (Cons (SClassDecl "Monad" (Cons (Pair "f" (KArrow Star Star)) Nil) (Cons (SPredicate "Applicative" (Cons (STVar "f") Nil)) (Nil)) (Cons (Pair ">>=" (forallType "a" (forallType "b" (SArrow (STypeApp (STVar "f") (STVar "a")) (SArrow (SArrow (STVar "a") (STypeApp (STVar "f") (STVar "b"))) (STypeApp (STVar "f") (STVar "b"))))))) (Cons (Pair ">>" (forallType "a" (forallType "b" (SArrow (STypeApp (STVar "f") (STVar "a")) (SArrow (STypeApp (STVar "f") (STVar "b")) (STypeApp (STVar "f") (STVar "b"))))))) (Cons (Pair "return" (forallType "a" (SArrow (STVar "a") (STypeApp (STVar "f") (STVar "a"))))) (Nil))))) (Nil)));
+  hierarchyInstances :: List SInstanceDecl;
+  hierarchyInstances = Cons (SInstanceDecl (Nil) Nil "Functor" (Cons (SCon "IO" Nil) Nil) (Cons (Pair "fmap" (SLam "$f" Nothing (SLam "$xs" Nothing (SApp (SApp (SPrimitive PIOBind) (SVar "$xs")) (SLam "$x" Nothing (SApp (SPrimitive PIOReturn) (SApp (SVar "$f") (SVar "$x")))))))) (Nil))) (Cons (SInstanceDecl (Nil) Nil "Applicative" (Cons (SCon "IO" Nil) Nil) (Cons (Pair "pure" (SPrimitive PIOReturn)) (Cons (Pair "<*>" (SLam "$fs" Nothing (SLam "$xs" Nothing (SApp (SApp (SPrimitive PIOBind) (SVar "$fs")) (SLam "$f" Nothing (SApp (SApp (SPrimitive PIOBind) (SVar "$xs")) (SLam "$x" Nothing (SApp (SPrimitive PIOReturn) (SApp (SVar "$f") (SVar "$x")))))))))) (Nil)))) (Cons (SInstanceDecl (Nil) Nil "Monad" (Cons (SCon "IO" Nil) Nil) (Cons (Pair ">>=" (SPrimitive PIOBind)) (Nil))) (Cons (SInstanceDecl (Cons (Pair "s" Star) Nil) Nil "Functor" (Cons (SCon "ST" (Cons (STVar "s") Nil)) Nil) (Cons (Pair "fmap" (SLam "$f" Nothing (SLam "$xs" Nothing (SApp (SApp (SPrimitive PSTBind) (SVar "$xs")) (SLam "$x" Nothing (SApp (SPrimitive PSTReturn) (SApp (SVar "$f") (SVar "$x")))))))) (Nil))) (Cons (SInstanceDecl (Cons (Pair "s" Star) Nil) Nil "Applicative" (Cons (SCon "ST" (Cons (STVar "s") Nil)) Nil) (Cons (Pair "pure" (SPrimitive PSTReturn)) (Cons (Pair "<*>" (SLam "$fs" Nothing (SLam "$xs" Nothing (SApp (SApp (SPrimitive PSTBind) (SVar "$fs")) (SLam "$f" Nothing (SApp (SApp (SPrimitive PSTBind) (SVar "$xs")) (SLam "$x" Nothing (SApp (SPrimitive PSTReturn) (SApp (SVar "$f") (SVar "$x")))))))))) (Nil)))) (Cons (SInstanceDecl (Cons (Pair "s" Star) Nil) Nil "Monad" (Cons (SCon "ST" (Cons (STVar "s") Nil)) Nil) (Cons (Pair ">>=" (SPrimitive PSTBind)) (Nil))) (Nil))))));
+  -- Standard class signatures retain [Char] at the conversion boundary;
+  -- the implementation's opaque String is an ordinary IsString instance.
+  charListType :: SType;
+  charListType = SCon "[]" (Cons (SCon "Char" Nil) Nil);
+  equalityClass :: SClassDecl;
+  equalityClass =
+    SClassDecl "Eq" (Cons (Pair "a" Star) Nil) Nil
+      (Cons (Pair "==" (SArrow (STVar "a") (SArrow (STVar "a") (SCon "Bool" Nil))))
+         (Cons (Pair "/=" (SArrow (STVar "a") (SArrow (STVar "a") (SCon "Bool" Nil)))) Nil));
+  stringClass :: SClassDecl;
+  stringClass = SClassDecl "IsString" (Cons (Pair "a" Star) Nil) Nil
+    (Cons (Pair "fromString" (SArrow charListType (STVar "a"))) Nil);
   sharedClasses :: List SClassDecl;
-  sharedClasses = Cons (SClassDecl "Functor" (Cons (Pair "f" (KArrow Star Star)) Nil) (Nil) (Cons (Pair "fmap" (forallType "a" (forallType "b" (SArrow (SArrow (STVar "a") (STVar "b")) (SArrow (STypeApp (STVar "f") (STVar "a")) (STypeApp (STVar "f") (STVar "b"))))))) (Cons (Pair "<$" (forallType "a" (forallType "b" (SArrow (STVar "a") (SArrow (STypeApp (STVar "f") (STVar "b")) (STypeApp (STVar "f") (STVar "a"))))))) (Nil)))) (Cons (SClassDecl "Applicative" (Cons (Pair "f" (KArrow Star Star)) Nil) (Cons (SPredicate "Functor" (Cons (STVar "f") Nil)) (Nil)) (Cons (Pair "pure" (forallType "a" (SArrow (STVar "a") (STypeApp (STVar "f") (STVar "a"))))) (Cons (Pair "<*>" (forallType "a" (forallType "b" (SArrow (STypeApp (STVar "f") (SArrow (STVar "a") (STVar "b"))) (SArrow (STypeApp (STVar "f") (STVar "a")) (STypeApp (STVar "f") (STVar "b"))))))) (Cons (Pair "liftA2" (forallType "a" (forallType "b" (forallType "c" (SArrow (SArrow (STVar "a") (SArrow (STVar "b") (STVar "c"))) (SArrow (STypeApp (STVar "f") (STVar "a")) (SArrow (STypeApp (STVar "f") (STVar "b")) (STypeApp (STVar "f") (STVar "c"))))))))) (Cons (Pair "*>" (forallType "a" (forallType "b" (SArrow (STypeApp (STVar "f") (STVar "a")) (SArrow (STypeApp (STVar "f") (STVar "b")) (STypeApp (STVar "f") (STVar "b"))))))) (Cons (Pair "<*" (forallType "a" (forallType "b" (SArrow (STypeApp (STVar "f") (STVar "a")) (SArrow (STypeApp (STVar "f") (STVar "b")) (STypeApp (STVar "f") (STVar "a"))))))) (Nil))))))) (Cons (SClassDecl "Monad" (Cons (Pair "f" (KArrow Star Star)) Nil) (Cons (SPredicate "Applicative" (Cons (STVar "f") Nil)) (Nil)) (Cons (Pair ">>=" (forallType "a" (forallType "b" (SArrow (STypeApp (STVar "f") (STVar "a")) (SArrow (SArrow (STVar "a") (STypeApp (STVar "f") (STVar "b"))) (STypeApp (STVar "f") (STVar "b"))))))) (Cons (Pair ">>" (forallType "a" (forallType "b" (SArrow (STypeApp (STVar "f") (STVar "a")) (SArrow (STypeApp (STVar "f") (STVar "b")) (STypeApp (STVar "f") (STVar "b"))))))) (Cons (Pair "return" (forallType "a" (SArrow (STVar "a") (STypeApp (STVar "f") (STVar "a"))))) (Nil))))) (Nil)));
+  sharedClasses = Cons equalityClass (Cons stringClass hierarchyClasses);
+  simpleInstance :: String -> SType -> String -> SExpr -> SInstanceDecl;
+  simpleInstance klass ty method body =
+    SInstanceDecl Nil Nil klass (Cons ty Nil) (Cons (Pair method body) Nil);
+  booleanEquality :: SExpr;
+  booleanEquality = SLam "$a" Nothing (SLam "$b" Nothing
+    (SCase (SVar "$a")
+      (Cons (SAlternative (SBoolPattern True) (SVar "$b"))
+        (Cons (SAlternative (SBoolPattern False) (negated (SVar "$b"))) Nil))));
+  negated :: SExpr -> SExpr;
+  negated value = SApp (SApp (SApp (SPrimitive PIfThenElse) value) (SBoolLit False)) (SBoolLit True);
+  charEquality :: SExpr;
+  charEquality = SLam "$a" Nothing (SLam "$b" Nothing
+    (SApp (SApp (SPrimitive PEqInt) (SApp (SPrimitive PCharCode) (SVar "$a")))
+      (SApp (SPrimitive PCharCode) (SVar "$b"))));
   sharedInstances :: List SInstanceDecl;
-  sharedInstances = Cons (SInstanceDecl (Nil) Nil "Functor" (Cons (SCon "IO" Nil) Nil) (Cons (Pair "fmap" (SLam "$f" Nothing (SLam "$xs" Nothing (SApp (SApp (SPrimitive PIOBind) (SVar "$xs")) (SLam "$x" Nothing (SApp (SPrimitive PIOReturn) (SApp (SVar "$f") (SVar "$x")))))))) (Nil))) (Cons (SInstanceDecl (Nil) Nil "Applicative" (Cons (SCon "IO" Nil) Nil) (Cons (Pair "pure" (SPrimitive PIOReturn)) (Cons (Pair "<*>" (SLam "$fs" Nothing (SLam "$xs" Nothing (SApp (SApp (SPrimitive PIOBind) (SVar "$fs")) (SLam "$f" Nothing (SApp (SApp (SPrimitive PIOBind) (SVar "$xs")) (SLam "$x" Nothing (SApp (SPrimitive PIOReturn) (SApp (SVar "$f") (SVar "$x")))))))))) (Nil)))) (Cons (SInstanceDecl (Nil) Nil "Monad" (Cons (SCon "IO" Nil) Nil) (Cons (Pair ">>=" (SPrimitive PIOBind)) (Nil))) (Cons (SInstanceDecl (Cons (Pair "s" Star) Nil) Nil "Functor" (Cons (SCon "ST" (Cons (STVar "s") Nil)) Nil) (Cons (Pair "fmap" (SLam "$f" Nothing (SLam "$xs" Nothing (SApp (SApp (SPrimitive PSTBind) (SVar "$xs")) (SLam "$x" Nothing (SApp (SPrimitive PSTReturn) (SApp (SVar "$f") (SVar "$x")))))))) (Nil))) (Cons (SInstanceDecl (Cons (Pair "s" Star) Nil) Nil "Applicative" (Cons (SCon "ST" (Cons (STVar "s") Nil)) Nil) (Cons (Pair "pure" (SPrimitive PSTReturn)) (Cons (Pair "<*>" (SLam "$fs" Nothing (SLam "$xs" Nothing (SApp (SApp (SPrimitive PSTBind) (SVar "$fs")) (SLam "$f" Nothing (SApp (SApp (SPrimitive PSTBind) (SVar "$xs")) (SLam "$x" Nothing (SApp (SPrimitive PSTReturn) (SApp (SVar "$f") (SVar "$x")))))))))) (Nil)))) (Cons (SInstanceDecl (Cons (Pair "s" Star) Nil) Nil "Monad" (Cons (SCon "ST" (Cons (STVar "s") Nil)) Nil) (Cons (Pair ">>=" (SPrimitive PSTBind)) (Nil))) (Nil))))));
+  sharedInstances =
+    L.append
+      (Cons (simpleInstance "Eq" (SCon "Int" Nil) "==" (SPrimitive PEqInt))
+        (Cons (simpleInstance "Eq" (SCon "Double" Nil) "==" (SPrimitive PEqDouble))
+          (Cons (simpleInstance "Eq" (SCon "String" Nil) "==" (SPrimitive PEqString))
+            (Cons (simpleInstance "Eq" (SCon "Bool" Nil) "==" booleanEquality)
+              (Cons (simpleInstance "Eq" (SCon "Char" Nil) "==" charEquality)
+                (Cons (simpleInstance "Eq" (SCon "()" Nil) "=="
+                         (SLam "$a" Nothing (SLam "$b" Nothing (SBoolLit True))))
+                  (Cons (simpleInstance "IsString" (SCon "String" Nil) "fromString" (SPrimitive PTextFromChars))
+                    (Cons (simpleInstance "IsString" charListType "fromString" (SLam "$chars" Nothing (SVar "$chars"))) Nil))))))))
+      hierarchyInstances;
   standardMethodClass :: String -> String;
   standardMethodClass name =
-    if L.elem eqString name (Cons "fmap" (Cons "<$" Nil)) then "Functor"
+    if L.elem eqString name (Cons "==" (Cons "/=" Nil)) then "Eq"
+    else if eqString name "fromString" then "IsString"
+    else if eqString name "fail" then "MonadFail"
+    else if L.elem eqString name (Cons "fmap" (Cons "<$" Nil)) then "Functor"
     else if L.elem eqString name (Cons "pure" (Cons "<*>" (Cons "liftA2" (Cons "*>" (Cons "<*" Nil))))) then "Applicative"
     else "Monad";
   providedMethod name methods =
@@ -221,7 +265,18 @@ module Bootstrap.Prelude where {
   addDefault name body methods = if hasMethod name methods then methods else L.append methods (Cons (Pair name body) Nil);
   standardDefaults :: String -> List (Pair String SExpr) -> Either String (List (Pair String SExpr));
   standardDefaults klass methods =
-    if eqString klass "Functor" then
+    if eqString klass "Eq" then
+      if hasMethod "==" methods then
+        Right (addDefault "/=" (SLam "$a" Nothing (SLam "$b" Nothing
+          (negated (SApp (SApp (providedMethod "==" methods) (SVar "$a")) (SVar "$b"))))) methods)
+      else if hasMethod "/=" methods then
+        Right (addDefault "==" (SLam "$a" Nothing (SLam "$b" Nothing
+          (negated (SApp (SApp (providedMethod "/=" methods) (SVar "$a")) (SVar "$b"))))) methods)
+      else Left "Eq instance requires == or /="
+    else if eqString klass "IsString" then
+      if hasMethod "fromString" methods then Right methods
+      else Left "IsString instance requires fromString"
+    else if eqString klass "Functor" then
       if hasMethod "fmap" methods then Right (addDefault "<$" (SLam "$defaultX" Nothing (SApp (providedMethod "fmap" methods) (SLam "$defaultIgnored" Nothing (SVar "$defaultX")))) methods)
       else Left "Functor instance requires fmap"
     else if eqString klass "Applicative" then

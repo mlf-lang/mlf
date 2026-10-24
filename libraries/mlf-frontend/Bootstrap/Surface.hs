@@ -12,6 +12,13 @@ module Bootstrap.Surface where {
   import qualified Bootstrap.Map as M;
   patternVariables :: SPattern -> List String;
   patternVariables = Desugar.patternVariables;
+  patternReferences :: SPattern -> List String;
+  patternReferences pattern =
+    case pattern of {
+      SOverloadedStringPattern _ equality conversion -> Cons equality (Cons conversion Nil);
+      SNestedPattern _ patterns -> concatMap patternReferences patterns;
+      _ -> Nil
+    };
   freeNames :: SExpr -> List String;
   freeNames e = nubBy eqString (freeNamesRaw e);
   without :: List String -> List String -> List String;
@@ -26,10 +33,10 @@ module Bootstrap.Surface where {
       SAnn a _ -> freeNamesRaw a;
       SCase a branches ->
         append (freeNamesRaw a)
-          (concatMap (\(SAlternative p b) -> without (freeNamesRaw b) (patternVariables p))
+          (concatMap (\(SAlternative p b) -> append (patternReferences p) (without (freeNamesRaw b) (patternVariables p)))
              branches);
       SEquations rows ->
-        concatMap (\(Pair ps b) -> without (freeNamesRaw b) (concatMap patternVariables ps)) rows;
+        concatMap (\(Pair ps b) -> append (concatMap patternReferences ps) (without (freeNamesRaw b) (concatMap patternVariables ps))) rows;
       SLetRec definitions body ->
         without
           (append (freeNamesRaw body) (concatMap (\(Triple _ _ a) -> freeNamesRaw a) definitions))
@@ -356,14 +363,16 @@ module Bootstrap.Surface where {
                              }
                            };
                     SIntPattern _ ->
-                      literalMatrix column values rows defaults patterns isInt PEqInt
+                      literalMatrix column values rows defaults patterns isInt (SPrimitive PEqInt)
                         (\p ->
                            case p of {
                              SIntPattern n -> SIntLit n;
                              _ -> value
                            });
+                    SOverloadedStringPattern _ _ _ ->
+                      overloadedStringMatrix column values rows;
                     SStringPattern _ ->
-                      literalMatrix column values rows defaults patterns isString PEqString
+                      literalMatrix column values rows defaults patterns isString (SPrimitive PEqString)
                         (\p ->
                            case p of {
                              SStringPattern s -> SStringLit s;
@@ -487,12 +496,54 @@ module Bootstrap.Surface where {
       SStringPattern _ -> True;
       _ -> False
     };
+  -- Unlike primitive literals, two distinct overloaded string spellings can
+  -- compare equal. Preserve row order and retry ALL later rows when another
+  -- column fails; lexical partitioning here silently changes user Eq behavior.
+  overloadedStringMatrix :: Int -> List SExpr -> List MatchRow -> Fresh (Pair SExpr (List Int));
+  overloadedStringMatrix column values rows =
+    case rows of {
+      Nil -> freshFail "non-exhaustive patterns";
+      Cons (MatchRow patterns body rowIndex) rest ->
+        case index patterns column of {
+          SOverloadedStringPattern text equality conversion -> do {
+            fallbackResult <- matrix values rest;
+            case fallbackResult of {
+              Pair fallback usedRest -> do {
+                matchedResult <- matrix values
+                  (Cons (MatchRow (replace column (Cons wild Nil) patterns) body rowIndex)
+                    (Cons (MatchRow (replicate (length values) wild) fallback (-1)) Nil));
+                case matchedResult of {
+                  Pair matched usedMatch ->
+                    freshPure (Pair
+                      (choose (SApp (SApp (SVar equality) (index values column))
+                                (SApp (SVar conversion) (SApp (SPrimitive PTextToChars) (SStringLit text))))
+                         matched fallback)
+                      (append (filter (\i -> i /= (-1)) usedMatch) usedRest))
+                }
+              }
+            }
+          };
+          _ -> freshFail "invalid overloaded string pattern row"
+        }
+    };
+  isOverloadedString :: SPattern -> Bool;
+  isOverloadedString p =
+    case p of {
+      SOverloadedStringPattern _ _ _ -> True;
+      _ -> False
+    };
   eqLiteral :: SPattern -> SPattern -> Bool;
   eqLiteral p q =
     case p of {
       SIntPattern n ->
         case q of {
           SIntPattern m -> (n == m);
+          _ -> False
+        };
+      SOverloadedStringPattern n eq from ->
+        case q of {
+          SOverloadedStringPattern m eq2 from2 ->
+            (eqString n m && (eqString eq eq2 && eqString from from2));
           _ -> False
         };
       SStringPattern n ->
@@ -528,8 +579,8 @@ module Bootstrap.Surface where {
                    List MatchRow ->
                    List SPattern ->
                    (SPattern -> Bool) ->
-                   Primitive -> (SPattern -> SExpr) -> Fresh (Pair SExpr (List Int));
-  literalMatrix column values rows defaults patterns predicate primitive literalValue =
+                   SExpr -> (SPattern -> SExpr) -> Fresh (Pair SExpr (List Int));
+  literalMatrix column values rows defaults patterns predicate equality literalValue =
     if not (all predicate patterns)
     then freshFail "mixed literal pattern types"
     else do {
@@ -543,7 +594,7 @@ module Bootstrap.Surface where {
                       do {
                         let {
                           condition =
-                            SApp (SApp (SPrimitive primitive) (index values column))
+                            SApp (SApp equality (index values column))
                               (literalValue pattern)
                         };
                         freshPure (Pair (choose condition body rest) (append used nextUsed))

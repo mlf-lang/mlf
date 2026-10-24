@@ -241,6 +241,7 @@ module Bootstrap.Parsec where {
       (\syntax ->
          case syntax of {
            SharedHaskellV1 -> shared;
-           LegacyEmlfV1 -> legacy
+           LegacyEmlfV1 -> legacy;
+           MetadataSyntax -> legacy
          })
 }

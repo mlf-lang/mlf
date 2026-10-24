@@ -124,7 +124,15 @@ module Bootstrap.Types where {
     PAsyncStep |
     PAsyncEnqueue |
     PAsyncDelay |
-    PAsyncWait;
+    PAsyncWait |
+    PTextToChars |
+    PTextFromChars |
+    PCharCode |
+    PCharFromCode |
+    PUserError |
+    PIOError |
+    PCatchIOError |
+    PIOErrorString;
   data SType =
     STVar String |
     SBottom |
@@ -160,6 +168,7 @@ module Bootstrap.Types where {
     SAnnotatedPattern String SAnnotation |
     SIntPattern Int |
     SStringPattern String |
+    SOverloadedStringPattern String String String |
     SBoolPattern Bool;
   data SAlternative = SAlternative SPattern SExpr;
   data SStatement =
@@ -178,7 +187,7 @@ module Bootstrap.Types where {
   data SProgram =
     SProgram (List DataDecl) SExpr |
     SClassProgram (List DataDecl) (List SClassDecl) (List SInstanceDecl) SExpr;
-  data SourceSyntax = LegacyEmlfV1 | SharedHaskellV1;
+  data SourceSyntax = LegacyEmlfV1 | SharedHaskellV1 | MetadataSyntax;
   data SourceModule =
     SourceModule String (Maybe String) (Maybe (List Export)) (List Import) (List DataDecl) (List
                                                                                             SClassDecl) (List

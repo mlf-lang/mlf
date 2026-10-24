@@ -4,7 +4,9 @@
 -- Ordinary Haskell syntax uses the standard class identities and desugaring.
 -- Only value representations and primitive operations are host adaptations.
 module MLF.Primitive
-  ( Int, Bool(..), Double, IO, Unit(..), String, ST, STArray, Functor(..), Applicative(..), Monad(..), IntArray, DoubleArray, ByteArray, IntTable, AsyncScope, Completion, AsyncSubscription
+  ( Int, Bool(..), Double, Char, IO, IOError, Unit(..), String, ST, STArray, Functor(..), Applicative(..), Monad(..), MonadFail(..), IsString(..), Eq(..), IntArray, DoubleArray, ByteArray, IntTable, AsyncScope, Completion, AsyncSubscription
+  , textToChars, textFromChars, charCode, charFromCode
+  , userError, ioError, catchIOError, ioeGetErrorString
   , ioReturn, ioBind, putStr, putStrLn, getLine, printInt, concatString
   , showInt, addInt, subInt, eqInt, ltInt, eqString, ifThenElse
   , mulInt, quotInt, remInt, readInt, addDouble, subDouble, mulDouble
@@ -20,17 +22,38 @@ module MLF.Primitive
   , asyncScopeClose, asyncNewCompletion, asyncResolveCompletion, asyncReadCompletion, asyncSubscribeCompletion, asyncSubscriptionStatus, asyncCancelSubscription
   , asyncStep, asyncEnqueue, asyncDelay, asyncWait
   , implementationHost, bind, negate, otherwise
-  , (+), (-), (*), (/), (%), (==), (/=), (<), (<=), (>), (>=), (++), (&&), (||)
+  , (+), (-), (*), (/), (%), (<), (<=), (>), (>=), (++), (&&), (||)
   ) where
 
 import qualified Prelude as P
-import Prelude (Functor(..), Applicative(..), Monad(..))
+import Prelude (Functor(..), Applicative(..), Monad(..), Eq(..), Char, IOError)
+import Control.Monad.Fail (MonadFail(..))
+import Data.String (IsString(..))
 import MLF.Host.Base (Int, Bool(..), Double, IO, Unit(..), String, ST, STArray)
 import MLF.Host.IO (IntArray, DoubleArray, ByteArray, IntTable)
 import MLF.Host.Async (AsyncScope, Completion, AsyncSubscription)
 import qualified MLF.Host.Base as Base
 import qualified MLF.Host.IO as IO
 import qualified MLF.Host.Async as Async
+
+-- The standard classes above are imported unchanged, including the pinned
+-- MonadFail HasCallStack method constraint. Native stack parity is separate.
+textToChars :: String -> [Char]
+textToChars = Base.v_textToChars
+textFromChars :: [Char] -> String
+textFromChars = Base.v_textFromChars
+charCode :: Char -> Int
+charCode = Base.v_charCode
+charFromCode :: Int -> Char
+charFromCode = Base.v_charFromCode
+userError :: [Char] -> IOError
+userError = IO.v_userError
+ioError :: IOError -> IO a
+ioError = IO.v_ioError
+catchIOError :: IO a -> (IOError -> IO a) -> IO a
+catchIOError = IO.v_catchIOError
+ioeGetErrorString :: IOError -> [Char]
+ioeGetErrorString = IO.v_ioeGetErrorString
 
 ioReturn :: a -> IO a
 ioReturn = Base.v_ioReturn
@@ -330,7 +353,7 @@ otherwise = True
 
 infixr 2 ||
 infixr 3 &&
-infix 4 ==, /=, <, <=, >, >=
+infix 4 <, <=, >, >=
 infixr 5 ++
 infixl 6 +, -
 infixl 7 *, /, %
@@ -340,9 +363,7 @@ infixl 7 *, /, %
 (*) = mulInt
 (/) = quotInt
 (%) = remInt
-(==), (/=), (<), (<=), (>), (>=) :: Int -> Int -> Bool
-(==) = eqInt
-(/=) = Base.neInt
+(<), (<=), (>), (>=) :: Int -> Int -> Bool
 (<) = ltInt
 (<=) = Base.leInt
 (>) = Base.gtInt

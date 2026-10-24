@@ -386,7 +386,9 @@ module Bootstrap.Module where {
       Right env
     };
   primitiveTypeNames :: List String;
-  primitiveTypeNames =
+  primitiveTypeNames = Cons "Char" (Cons "IOError" legacyPrimitiveTypeNames);
+  legacyPrimitiveTypeNames :: List String;
+  legacyPrimitiveTypeNames =
     Cons "AsyncScope"
       (Cons "Completion"
          (Cons "AsyncSubscription"
@@ -426,7 +428,8 @@ module Bootstrap.Module where {
   primitiveSource =
     SourceModule "<MLF.Primitive>" (Just "MLF.Primitive") Nothing Nil Nil
       Prelude.sharedClasses Prelude.sharedInstances
-      (Cons (Triple "otherwise" Nothing (SBoolLit True)) (Cons (Triple "implementationHost" Nothing (SStringLit "native-MLF")) (Cons (Triple "bind" Nothing (SVar "$MLF.Primitive.>>=")) (Cons (Triple "negate" Nothing (SLam "$x" Nothing (SApp (SApp (SPrimitive PSubInt) (SIntLit 0)) (SVar "$x")))) (Cons (Triple "+" Nothing (SPrimitive PAddInt)) (Cons (Triple "-" Nothing (SPrimitive PSubInt)) (Cons (Triple "*" Nothing (SPrimitive PMulInt)) (Cons (Triple "/" Nothing (SPrimitive PQuotInt)) (Cons (Triple "%" Nothing (SPrimitive PRemInt)) (Cons (Triple "==" Nothing (SPrimitive PEqInt)) (Cons (Triple "<" Nothing (SPrimitive PLtInt)) (Cons (Triple "++" Nothing (SPrimitive PConcatString)) (Cons (Triple "/=" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.notValue (SApp (SApp (SPrimitive PEqInt) (SVar "$a")) (SVar "$b")))))) (Cons (Triple "<=" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.notValue (SApp (SApp (SPrimitive PLtInt) (SVar "$b")) (SVar "$a")))))) (Cons (Triple ">" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (SApp (SApp (SPrimitive PLtInt) (SVar "$b")) (SVar "$a"))))) (Cons (Triple ">=" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.notValue (SApp (SApp (SPrimitive PLtInt) (SVar "$a")) (SVar "$b")))))) (Cons (Triple "&&" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.conditional (SVar "$a") (SVar "$b") (SBoolLit False))))) (Cons (Triple "||" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.conditional (SVar "$a") (SBoolLit True) (SVar "$b"))))) (Nil))))))))))))))))))) Nothing LegacyEmlfV1;
+      (filter (\(Triple name _ _) -> not (eqString name "==" || eqString name "/="))
+(Cons (Triple "otherwise" Nothing (SBoolLit True)) (Cons (Triple "implementationHost" Nothing (SStringLit "native-MLF")) (Cons (Triple "bind" Nothing (SVar "$MLF.Primitive.>>=")) (Cons (Triple "negate" Nothing (SLam "$x" Nothing (SApp (SApp (SPrimitive PSubInt) (SIntLit 0)) (SVar "$x")))) (Cons (Triple "+" Nothing (SPrimitive PAddInt)) (Cons (Triple "-" Nothing (SPrimitive PSubInt)) (Cons (Triple "*" Nothing (SPrimitive PMulInt)) (Cons (Triple "/" Nothing (SPrimitive PQuotInt)) (Cons (Triple "%" Nothing (SPrimitive PRemInt)) (Cons (Triple "==" Nothing (SPrimitive PEqInt)) (Cons (Triple "<" Nothing (SPrimitive PLtInt)) (Cons (Triple "++" Nothing (SPrimitive PConcatString)) (Cons (Triple "/=" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.notValue (SApp (SApp (SPrimitive PEqInt) (SVar "$a")) (SVar "$b")))))) (Cons (Triple "<=" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.notValue (SApp (SApp (SPrimitive PLtInt) (SVar "$b")) (SVar "$a")))))) (Cons (Triple ">" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (SApp (SApp (SPrimitive PLtInt) (SVar "$b")) (SVar "$a"))))) (Cons (Triple ">=" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.notValue (SApp (SApp (SPrimitive PLtInt) (SVar "$a")) (SVar "$b")))))) (Cons (Triple "&&" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.conditional (SVar "$a") (SVar "$b") (SBoolLit False))))) (Cons (Triple "||" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.conditional (SVar "$a") (SBoolLit True) (SVar "$b"))))) (Nil)))))))))))))))))))) Nothing LegacyEmlfV1;
   locals :: SourceModule -> Either String Interface;
   locals source =
     do {
@@ -955,8 +958,8 @@ module Bootstrap.Module where {
       SCon constructor arguments ->
         do {
           name <-
-            if eqString constructor "Unit"
-            then Right "Unit"
+            if (eqString constructor "Unit" || D.sourceBuiltinType constructor)
+            then Right constructor
             else do {
                    entity <- lookupEntity Types constructor env;
                    if isRole Class entity
@@ -1030,6 +1033,23 @@ module Bootstrap.Module where {
     };
   resolvePattern :: Names -> Interface -> SPattern -> Either String SPattern;
   resolvePattern names env pattern =
+    case pattern of {
+      SOverloadedStringPattern text _ _ -> do {
+        equality <- resolvedName names (Entity "MLF.Primitive" "==" (Method "Eq"));
+        conversion <- resolvedName names (Entity "MLF.Primitive" "fromString" (Method "IsString"));
+        Right (SOverloadedStringPattern text equality conversion)
+      };
+      SConstructorPattern name fields ->
+        if D.sourceBuiltinConstructor name then Right pattern
+        else resolveOrdinaryPattern names env pattern;
+      SNestedPattern name patterns ->
+        if D.sourceBuiltinConstructor name
+        then mapEither (SNestedPattern name) (mapM (resolvePattern names env) patterns)
+        else resolveOrdinaryPattern names env pattern;
+      _ -> resolveOrdinaryPattern names env pattern
+    };
+  resolveOrdinaryPattern :: Names -> Interface -> SPattern -> Either String SPattern;
+  resolveOrdinaryPattern names env pattern =
     let {
       matchValueShared1 = pattern
     } in
@@ -1138,7 +1158,7 @@ module Bootstrap.Module where {
                     resolveVariable names entity
                   };
       SConstructor matchValueShared10 ->
-        if MLF.Primitive.eqString matchValueShared10 "Unit"
+        if (MLF.Primitive.eqString matchValueShared10 "Unit" || D.sourceBuiltinConstructor matchValueShared10)
         then Right expression
         else let {
                name = matchValueShared10

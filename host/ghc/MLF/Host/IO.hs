@@ -14,6 +14,7 @@ import Foreign.C
 import Control.Concurrent.MVar
 import Control.Exception
 import System.IO.Unsafe (unsafePerformIO)
+import qualified System.IO.Error as E
 import qualified System.IO as H
 import qualified System.Exit as X
 
@@ -72,6 +73,17 @@ v_runProcess :: String -> String -> IO Int
 v_runProcess directory specification = do
   _ <- evaluate (path directory)
   snd <$> host 7 directory specification 0
+
+-- Narrow standard IOException boundary. Existing HostError/panic adapters
+-- deliberately remain outside this catch; this is not a universal exception API.
+v_userError :: [Char] -> IOError
+v_userError = E.userError
+v_ioError :: IOError -> IO a
+v_ioError = E.ioError
+v_catchIOError :: IO a -> (IOError -> IO a) -> IO a
+v_catchIOError = E.catchIOError
+v_ioeGetErrorString :: IOError -> [Char]
+v_ioeGetErrorString = E.ioeGetErrorString
 
 ioErrorAs :: P.String -> IO a -> IO a
 ioErrorAs message action = action `catch` (\(_::IOException) -> throwIO (HostError message))

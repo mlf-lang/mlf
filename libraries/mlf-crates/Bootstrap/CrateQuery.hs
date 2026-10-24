@@ -74,6 +74,8 @@ module Bootstrap.CrateQuery where {
       SAnnotatedPattern n a -> node "annotated-pattern" (Cons n (Cons (encodeAnnotation a) Nil));
       SIntPattern n -> node "integer-pattern" (Cons (showInt n) Nil);
       SStringPattern s -> node "string-pattern" (Cons s Nil);
+      SOverloadedStringPattern s equal fromString ->
+        node "overloaded-string-pattern" (Cons s (Cons equal (Cons fromString Nil)));
       SBoolPattern b -> node "boolean-pattern" (Cons (boolean b) Nil)
     };
   encodeRole :: EvidenceRole -> String;
@@ -272,6 +274,8 @@ module Bootstrap.CrateQuery where {
       SAnnotatedPattern n annotation ->
         SAnnotatedPattern (canonicalReference env n)
           (canonicalAnnotation types typeDepth annotation);
+      SOverloadedStringPattern s equal fromString ->
+        SOverloadedStringPattern s (canonicalReference env equal) (canonicalReference env fromString);
       _ -> pattern
     };
   canonicalExpression :: Map String String -> Int -> Map String String -> Int -> SExpr -> SExpr;
@@ -481,12 +485,16 @@ module Bootstrap.CrateQuery where {
              members)
     } in
     M.toList (M.filterWithKey (\n _ -> S.member compareString n used) available);
+  -- Builtin families are reconstructed rather than written as user declarations.
+  -- Include them explicitly: constructor count and nested fields affect whether
+  -- a patterned do bind requires MonadFail, even with identical user layouts.
+  encodeDatatypeContext datatypes = list encodeDatatype (append D.builtinDeclarations datatypes);
   queryKey crateId compilerHash members bindings datatypes =
-    node "MLF-CRATE-QUERY-1"
+    node "MLF-CRATE-QUERY-2"
       (Cons crateId
          (Cons compilerHash
             (Cons (list (\member -> encodeMember (canonicalMember member)) members)
-               (Cons (list encodeBinding bindings) (Cons (list encodeDatatype datatypes) Nil)))));
+               (Cons (list encodeBinding bindings) (Cons (encodeDatatypeContext datatypes) Nil)))));
   dependencyInterface bindings =
     Separate.UnitInterface "QueryInputs" Nil Nil Nil Nil Nil bindings "parameters";
   peelParameters :: XTerm -> Pair (List (Pair XName XType)) XTerm;
@@ -667,7 +675,7 @@ module Bootstrap.CrateQuery where {
       Right matchValueShared15 ->
         case matchValueShared15 of {
           Cons matchValueShared16 matchValueShared17 ->
-            if MLF.Primitive.eqString matchValueShared16 "MLF-CRATE-QUERY-1"
+            if MLF.Primitive.eqString matchValueShared16 "MLF-CRATE-QUERY-2"
             then case matchValueShared17 of {
                    Cons matchValueShared18 matchValueShared19 ->
                      case matchValueShared19 of {
@@ -684,11 +692,11 @@ module Bootstrap.CrateQuery where {
                                            expected = matchValueShared26
                                          } in
                                          (eqString expected
-                                            (list encodeDatatype
+                                            (encodeDatatypeContext
                                                (Separate.unitData
                                                   (Separate.objectInterface object))) &&
                                           eqString expected
-                                            (list encodeDatatype (Separate.objectContext object)));
+                                            (encodeDatatypeContext (Separate.objectContext object)));
                                        _ -> False
                                      };
                                    _ -> False

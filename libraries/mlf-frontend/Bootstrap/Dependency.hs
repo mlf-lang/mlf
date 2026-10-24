@@ -51,6 +51,8 @@ module Bootstrap.Dependency where {
   observePattern :: SPattern -> Observation;
   observePattern pattern =
     case pattern of {
+      SOverloadedStringPattern _ equality conversion ->
+        Observation (Cons (lexicalValueName equality) (Cons (lexicalValueName conversion) Nil)) Nil Nil Nil;
       SConstructorPattern n _ -> Observation Nil Nil (Cons n Nil) Nil;
       SNestedPattern n ps ->
         merge (Observation Nil Nil (Cons n Nil) Nil) (mergeMany (map observePattern ps));

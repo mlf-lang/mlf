@@ -120,6 +120,8 @@ static void gc_free(void *memory) {
 void mlf_require_compact_gc_abi(void) {}
 void mlf_require_process_supervisor_v1_abi(void) {}
 void mlf_require_async_completion_v2_abi(void) {}
+/* Canonical source constructor tags and Char/typed-IOError primitives 95..102. */
+void mlf_require_haskell_boundary_v1_abi(void) {}
 
 typedef enum {
     HOLE, BUSY, INDIRECT, THUNK, APPLICATION, CLOSURE,
@@ -128,7 +130,8 @@ typedef enum {
     WRITE_INT_ACTION, WRITE_DOUBLE_ACTION, NATIVE_IO,
     BYTE_ARRAY, WRITE_BYTE_ACTION, PUT_BYTES_ACTION, INT_TABLE, WRITE_TABLE_ACTION,
     SMALL_INT_TABLE, ST_ACTION, ST_ARRAY, CONSTRUCTOR_WIDE,
-    ASYNC_SCOPE, COMPLETION, ASYNC_SUBSCRIPTION, ASYNC_ACTION
+    ASYNC_SCOPE, COMPLETION, ASYNC_SUBSCRIPTION, ASYNC_ACTION,
+    IO_ERROR_VALUE, IO_CATCH_FRAME, IO_ASYNC_FINISH_FRAME
 } Tag;
 
 /* These numbers are shared with primitiveCode in MLF.LLVM. */
@@ -152,6 +155,8 @@ typedef enum {
     ASYNC_SCOPE_NEW, ASYNC_SCOPE_CLOSE, ASYNC_NEW_COMPLETION, ASYNC_RESOLVE_COMPLETION,
     ASYNC_READ_COMPLETION, ASYNC_SUBSCRIBE_COMPLETION, ASYNC_SUBSCRIPTION_STATUS,
     ASYNC_CANCEL_SUBSCRIPTION, ASYNC_STEP, ASYNC_ENQUEUE, ASYNC_DELAY, ASYNC_WAIT,
+    TEXT_TO_CHARS, TEXT_FROM_CHARS, CHAR_CODE, CHAR_FROM_CODE,
+    USER_ERROR, IO_ERROR, CATCH_IO_ERROR, IO_ERROR_STRING,
     PRIMITIVE_COUNT
 } Primitive;
 
@@ -984,6 +989,70 @@ static MlfValue *string_from_code(MlfValue *entry) {
     return mlf_string((const char *)bytes,count);
 }
 
+/* Fixed canonical constructor ABI, shared with LLVM.entryConstructors.
+ * Legacy Unit stays 0; source ()=1, []=2, (:)=3, tuples=4..6. */
+enum { SOURCE_NIL = 2, SOURCE_CONS = 3 };
+static MlfValue *text_chars_step(MlfEnv *env, MlfValue *ignored) {
+    (void)ignored;
+    MlfValue *text = mlf_env_get(env, 0);
+    uint64_t index = bounded_integer(mlf_env_get(env, 1), INT64_MAX, "text index overflow");
+    if (index == string_length(text)) return mlf_constructor(SOURCE_NIL, 0);
+    MlfEnv *next = mlf_env_new(2);
+    mlf_env_set(next, 0, text);
+    mlf_env_set(next, 1, small((int64_t)index + 1));
+    return mlf_constructor2(SOURCE_CONS, string_code_at(text, small((int64_t)index)),
+                            mlf_thunk(text_chars_step, next));
+}
+static MlfValue *text_to_chars(MlfValue *text) {
+    MlfEnv *env = mlf_env_new(2);
+    mlf_env_set(env, 0, expect(text, STRING));
+    mlf_env_set(env, 1, small(0));
+    return text_chars_step(env, NULL);
+}
+static MlfValue *text_from_chars(MlfValue *chars) {
+    size_t size = 0, capacity = 64;
+    char *bytes = allocate(capacity);
+    while (mlf_tag(chars) != SOURCE_NIL) {
+        if (mlf_tag(chars) != SOURCE_CONS) fail("expected canonical character list");
+        MlfValue *piece = string_from_code(mlf_field(chars, 0));
+        size_t n = piece->as.string.length;
+        if (size > SIZE_MAX - n) fail("string too large");
+        if (size + n > capacity) {
+            if (capacity > SIZE_MAX / 2) fail("string too large");
+            capacity *= 2;
+            bytes = realloc(bytes, capacity);
+            if (!bytes) fail("out of memory");
+        }
+        memcpy(bytes + size, piece->as.string.bytes, n);
+        size += n;
+        chars = mlf_field(chars, 1);
+    }
+    MlfValue *result = mlf_string(bytes, size);
+    free(bytes);
+    return result;
+}
+/* Error messages remain lazy [Char], including valid surrogate Char values.
+ * Only opaque-text conversion rejects surrogates. Fatal diagnostics escape
+ * those values rather than changing a user error into a conversion error. */
+static _Noreturn void uncaught_io_error(MlfValue *error) {
+    MlfValue *chars = expect(error, IO_ERROR_VALUE)->as.indirect;
+    fputs("Runtime: user error (", stderr);
+    while (mlf_tag(chars) != SOURCE_NIL) {
+        if (mlf_tag(chars) != SOURCE_CONS) fail("expected canonical character list");
+        MlfValue *ch = mlf_field(chars, 0);
+        unsigned code = (unsigned)bounded_integer(ch, 0x10ffff, "invalid Char codepoint");
+        if (code >= 0xd800 && code <= 0xdfff) fprintf(stderr, "\\u%04x", code);
+        else {
+            MlfValue *piece = string_from_code(ch);
+            fwrite(piece->as.string.bytes, 1, piece->as.string.length, stderr);
+        }
+        chars = mlf_field(chars, 1);
+    }
+    fputs(")\n", stderr);
+    cleanup();
+    exit(1);
+}
+
 static MlfValue *compare_string(MlfValue *a, MlfValue *b) {
     a = expect(a,STRING); b = expect(b,STRING);
     size_t left = a->as.string.length, right = b->as.string.length;
@@ -1071,6 +1140,7 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
     /* Codegen.evaluate promises canonical WHNF for a saturated pure result.
      * The executor itself preserves the laziness of values passed to binds. */
     case RUN_ST: return force(run_st(a));
+    case IO_ERROR: case CATCH_IO_ERROR:
     case IO_RETURN: case IO_BIND: case PUT_STR: case PUT_STR_LN: case GET_LINE: case PRINT_INT:
     case NEW_INT_ARRAY: case READ_INT_ARRAY: case LENGTH_INT_ARRAY:
     case NEW_DOUBLE_ARRAY: case READ_DOUBLE_ARRAY: case LENGTH_DOUBLE_ARRAY:
@@ -1086,6 +1156,16 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
     case WRITE_BYTE_ARRAY: return array_write_action(WRITE_BYTE_ACTION,a,b,c);
     case PUT_BYTES: return array_write_action(PUT_BYTES_ACTION,a,b,c);
     case WRITE_INT_TABLE: return array_write_action(WRITE_TABLE_ACTION,a,b,c);
+    case TEXT_TO_CHARS: return text_to_chars(a);
+    case TEXT_FROM_CHARS: return text_from_chars(a);
+    case CHAR_CODE: case CHAR_FROM_CODE:
+        return small((int64_t)bounded_integer(a, 0x10ffff, "invalid Char codepoint"));
+    case USER_ERROR: {
+        MlfValue *error = value(IO_ERROR_VALUE);
+        error->as.indirect = a;
+        return error;
+    }
+    case IO_ERROR_STRING: return force(expect(a, IO_ERROR_VALUE)->as.indirect);
     case SHOW_INT: return show_integer(a);
     case CONCAT_STRING: {
         a = expect(a, STRING); b = expect(b, STRING);
@@ -1151,7 +1231,7 @@ static MlfValue *primitive(Primitive p, MlfEnv *arguments) {
         2,2,2,2,1,2,2,1,2,2,2,3,1,2,2,3,1,2,2,3,1,1,3,0,0,2,3,2,
         1,2,3,1,2,1,1,1,2,1,1,2,1,1,0,1,1,1,0,0,
         1,2,1,2,2,3,1,
-        1,2,1,2,1,1,1,1,1,1, 2,1,3,2,3,2,1,1,1,2,3,2
+        1,2,1,2,1,1,1,1,1,1, 2,1,3,2,3,2,1,1,1,2,3,2, 1,1,1,1,1,1,2,1
     };
     if (arguments->count < arities[p]) {
         MlfValue *result = value(PRIMITIVE);
@@ -1255,6 +1335,8 @@ MlfValue *mlf_force(MlfValue *entry) {
  * IO actions; only the ordinary strict primitives demand their operands. */
 MlfValue *mlf_prim1(int64_t p, MlfValue *a) {
     switch (p) {
+    case TEXT_TO_CHARS: case TEXT_FROM_CHARS: case CHAR_CODE: case CHAR_FROM_CODE:
+    case USER_ERROR: case IO_ERROR: case IO_ERROR_STRING:
     case IO_RETURN: case PUT_STR: case PUT_STR_LN: case PRINT_INT: case SHOW_INT: case READ_INT:
     case SQRT_DOUBLE: case INT_TO_DOUBLE: case LENGTH_INT_ARRAY: case LENGTH_DOUBLE_ARRAY:
     case LENGTH_BYTE_ARRAY: case BYTE_ARRAY_FROM_STRING:
@@ -1269,6 +1351,7 @@ MlfValue *mlf_prim1(int64_t p, MlfValue *a) {
 }
 MlfValue *mlf_prim2(int64_t p, MlfValue *a, MlfValue *b) {
     switch (p) {
+    case CATCH_IO_ERROR:
     case IO_BIND: case CONCAT_STRING: case ADD_INT: case SUB_INT: case EQ_INT: case LT_INT: case EQ_STRING:
     case MUL_INT: case QUOT_INT: case REM_INT: case AND_INT:
     case ADD_DOUBLE: case SUB_DOUBLE: case MUL_DOUBLE: case DIV_DOUBLE: case EQ_DOUBLE: case LT_DOUBLE:
@@ -1837,13 +1920,13 @@ static MlfCompletionStatus async_subscription_status(MlfValue *entry) {
     if (resume->state >= MLF_RESUME_CONSUMED) return MLF_COMPLETION_CONSUMED;
     return MLF_COMPLETION_OK;
 }
-static MlfValue *async_step_finished(MlfEnv *env, MlfValue *ignored) {
-    (void)ignored;
-    MlfValue *scope_value = mlf_env_get(env, 0);
-    expect(scope_value, ASYNC_SCOPE)->as.async_scope->dispatching = 0;
-    return action(IO_RETURN, small(MLF_COMPLETION_OK), NULL);
+/* Executor frames are distinct from user continuations. Both normal return
+ * and typed-error unwind reset async dispatch state; arbitrary panic is fatal. */
+static MlfValue *io_frame(Tag tag, MlfValue *payload) {
+    MlfValue *frame = value(tag);
+    frame->as.indirect = payload;
+    return frame;
 }
-
 
 int32_t mlf_run(MlfValue *root, int64_t is_io) {
     if (!is_io) { (void)force(root); cleanup(); return 0; }
@@ -1966,9 +2049,7 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
                 status = mlf_completion_take(scope, resume, &callback, &payload);
                 if (status != MLF_COMPLETION_OK) { result = small(status); break; }
                 scope->dispatching = 1;
-                MlfEnv *finish = mlf_env_new(1);
-                mlf_env_set(finish, 0, a);
-                push(&continuations, mlf_closure(async_step_finished, finish));
+                push(&continuations, io_frame(IO_ASYNC_FINISH_FRAME, a));
                 current = is_action ? callback : mlf_application(callback, payload);
                 continue;
             }
@@ -1991,6 +2072,27 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
         } else {
         operation = expect(operation,ACTION);
         switch (operation->as.action.operation) {
+        case CATCH_IO_ERROR:
+            push(&continuations, io_frame(IO_CATCH_FRAME, operation->as.action.second));
+            current = operation->as.action.first;
+            continue;
+        case IO_ERROR: {
+            MlfValue *error = expect(operation->as.action.first, IO_ERROR_VALUE);
+            MlfValue *handler = NULL;
+            while (continuations.count) {
+                MlfValue *frame = continuations.items[--continuations.count];
+                continuations.items[continuations.count] = NULL;
+                if (!immediate(frame) && frame->tag == IO_ASYNC_FINISH_FRAME)
+                    expect(frame->as.indirect, ASYNC_SCOPE)->as.async_scope->dispatching = 0;
+                else if (!immediate(frame) && frame->tag == IO_CATCH_FRAME) {
+                    handler = frame->as.indirect;
+                    break;
+                }
+            }
+            if (!handler) uncaught_io_error(error);
+            current = mlf_application(handler, error);
+            continue;
+        }
         case IO_BIND:
             push(&continuations, operation->as.action.second);
             current = operation->as.action.first;
@@ -2064,9 +2166,20 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
         default: fail("invalid IO action");
         }
         }
-        if (!continuations.count) break;
-        MlfValue *next = continuations.items[--continuations.count];
-        continuations.items[continuations.count] = NULL;
+        MlfValue *next = NULL;
+        while (continuations.count) {
+            MlfValue *frame = continuations.items[--continuations.count];
+            continuations.items[continuations.count] = NULL;
+            if (!immediate(frame) && frame->tag == IO_CATCH_FRAME) continue;
+            if (!immediate(frame) && frame->tag == IO_ASYNC_FINISH_FRAME) {
+                expect(frame->as.indirect, ASYNC_SCOPE)->as.async_scope->dispatching = 0;
+                result = small(MLF_COMPLETION_OK);
+                continue;
+            }
+            next = frame;
+            break;
+        }
+        if (!next) break;
         current = mlf_application(next, result);
     }
     release_stack(&continuations);
