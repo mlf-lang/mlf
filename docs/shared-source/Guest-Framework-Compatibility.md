@@ -69,3 +69,27 @@ The latter helper change received independent oracle-equivalence review before
 the Figure12 semantic digest was deliberately updated. Old-pin rejection,
 mutation controls, and fresh O0/O2 faithful Figure12 passes are retained. Shared
 compiler producer inputs and the frozen bridge archive are unchanged.
+
+The separately recorded [small-target batch](../../tools/shared/evidence/guest-small-targets/README.md)
+checks Figure12, int-set-unions, check-target and pr-smoke through actual MLF
+source inference: 19 module entries **including overlap**, 153 fresh groups,
+zero reuse. Figure12 needed the same explicit guest class selection in its
+assumption/program builders. Only imports changed; reviewed semantic-pin and
+negative-control updates plus fresh O0/O2 host Figure12 passes preserve the
+original fixture/oracle contract. These source checks do not execute the named
+guest campaigns or complete native/bootstrap qualification.
+
+## Core/backend checkpoint and next semantic revision
+
+The [Core/backend compatibility checkpoint](../../tools/shared/evidence/core-guest-class-recovery/README.md)
+adds six actual source checks (124 module entries including overlap, 1,627 fresh
+groups), a reviewed standard-class test Graph state action, and a narrow
+independent Oracle traversal repair. Existing strings, expected outcomes and the
+frozen 35-family/739-action composition are preserved. An authenticated O2 CI
+runner now checks the actual guest implementations with 18 focused behaviors
+and two expected-failure controls; these do not execute the full campaigns.
+
+This remains the current representation checkpoint. Standard list/tuple/unit
+identities, overloaded-string patterns and MonadFail alignment are the next
+semantic revision, not already-established properties of these receipts. Native
+bootstrap/fixed-point work is held until that next contract is stable.

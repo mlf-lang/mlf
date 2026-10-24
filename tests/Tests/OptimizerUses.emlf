@@ -1,4 +1,7 @@
 module Tests.OptimizerUses where
+-- Select the standard Monad used by the shared optimizer Fresh action.
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
 import qualified Bootstrap.Std as L
 import qualified Bootstrap.Map as M

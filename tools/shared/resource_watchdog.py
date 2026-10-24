@@ -5,9 +5,9 @@ Tracks descendant identities as well as process groups. It does not modify
 producer receipts; resource failure is never a successful negative control."""
 import argparse,json,os,resource,shutil,signal,subprocess,time
 from pathlib import Path
-p=argparse.ArgumentParser();p.add_argument('--seconds',type=int,default=600);p.add_argument('--address-space-mib',type=int,default=1024);p.add_argument('--rss-mib',type=int,default=1024);p.add_argument('--max-output-mib',type=int,default=0);p.add_argument('out',type=Path);p.add_argument('command',nargs=argparse.REMAINDER);a=p.parse_args();a.out.mkdir(parents=True,exist_ok=True)
-if not a.command or min(a.seconds,a.address_space_mib,a.rss_mib)<=0 or a.max_output_mib<0:p.error('positive limits and a command are required')
-address_limit=a.address_space_mib*1024**2;limit=a.rss_mib*1024**2;floor=3*1024**3;disk_floor=768*1024**2
+p=argparse.ArgumentParser();p.add_argument('--seconds',type=int,default=600);p.add_argument('--address-space-mib',type=int,default=1024);p.add_argument('--rss-mib',type=int,default=1024);p.add_argument('--max-output-mib',type=int,default=0);p.add_argument('--disk-free-mib',type=int,default=768);p.add_argument('out',type=Path);p.add_argument('command',nargs=argparse.REMAINDER);a=p.parse_args();a.out.mkdir(parents=True,exist_ok=True)
+if not a.command or min(a.seconds,a.address_space_mib,a.rss_mib,a.disk_free_mib)<=0 or a.max_output_mib<0:p.error('positive limits and a command are required')
+address_limit=a.address_space_mib*1024**2;limit=a.rss_mib*1024**2;floor=3*1024**3;disk_floor=a.disk_free_mib*1024**2
 receipt={'complete':False,'command':a.command,'limits':{'wall_seconds':a.seconds,'address_space_per_process':address_limit,'process_tree_rss_bytes':limit,'host_available_floor':floor,'disk_free_floor':disk_floor,'max_output_bytes':a.max_output_mib*1024**2 if a.max_output_mib else None},'samples':[]}
 proc=None;start=time.monotonic();reason=None
 

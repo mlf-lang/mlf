@@ -1,0 +1,31 @@
+{
+  "complete": false,
+  "command": [
+    "nice",
+    "-n",
+    "19",
+    "ionice",
+    "-c",
+    "3",
+    "python3",
+    ".mlf-build/integration-modular/core-crates/run.py"
+  ],
+  "limits": {
+    "wall_seconds": 900,
+    "address_space_per_process": 3221225472,
+    "process_tree_rss_bytes": 1610612736,
+    "host_available_floor": 3221225472,
+    "disk_free_floor": 3221225472,
+    "max_output_bytes": 536870912
+  },
+  "process_group": 8,
+  "exit_code": 1,
+  "reason": null,
+  "elapsed_seconds": 21.778699496997433,
+  "peak_group_rss": 285507584,
+  "raw_receipt_sha256": "6a7b18ec97f7ea1b10c89688d4e46f2cb9baa9e473ff822a43ff6c68e1f92b7a",
+  "sample_count": 109,
+  "min_host_available": 6475227136,
+  "min_disk_free": 19302625280,
+  "max_output_bytes": 13790822
+}

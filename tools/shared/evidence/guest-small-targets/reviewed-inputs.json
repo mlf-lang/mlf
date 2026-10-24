@@ -1,0 +1,11 @@
+{
+  "base": "ee49a0584a36846fa96b901f450fba8c23f770ba",
+  "source_sha256": {
+    "tests/Tests/Figure12.emlf": "bd7e8b61d3ece85856238424d71ec52bd1929eee090eae526fa0bbf16edd6a30",
+    "tools/shared/figure12_data.py": "3906373205d7b860b6ee107a680b6dfe376da33f7fa8ffb53eebea9344efc4c0",
+    "tools/shared/test_figure12_data.py": "b39d8c4b6551a6615a53a68dbbfa69dec9144f5cea0846a3fd7f93fe18599402"
+  },
+  "compiler_implementation_changed": false,
+  "full_guest_execution": false,
+  "native_llvm_bootstrap": false
+}

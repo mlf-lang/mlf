@@ -15,6 +15,11 @@ returnW x = W (\s -> Right (Pair x s))
 bindW : forall a b. W a -> (a -> W b) -> W b
 bindW (W f) next = W (\s -> S.eitherBind (f s) (\(Pair x changed) -> runW (next x) changed))
 instance Monad W where { return = returnW; bind = bindW }
+-- Keep this independent legacy oracle's W API; shared Std.mapM uses a different class.
+mapW : forall a b. (a -> W b) -> List a -> W (List b)
+mapW f xs = case xs of
+ Nil -> returnW Nil
+ Cons x rest -> bindW (f x) (\y -> bindW (mapW f rest) (\ys -> returnW (Cons y ys)))
 get : W WState
 get = W (\s -> Right (Pair s s))
 put s = W (\old -> Right (Pair Unit s))
@@ -51,7 +56,7 @@ infer env expression = case expression of
   SVar x -> case M.lookup compareString x env of
     Nothing -> fail "unbound"
     Just (Scheme variables ty) -> do
-      replacements <- S.mapM (\ignored -> fresh) variables
+      replacements <- mapW (\ignored -> fresh) variables
       WState n subst <- get
       return (apply (IM.fromList (S.zip variables replacements)) (apply subst ty))
   SLam x Nothing body -> do
