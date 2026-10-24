@@ -62,17 +62,21 @@ def authenticate_gate(path, digest, producer_digest):
             'foundational gate is not passed for this producer')
     expected = {'mlf-foundation/0.3.0/library', 'mlf-async/0.3.0/library',
                 'mlf-language-core/0.3.0/library', 'mlf-frontend/0.3.0/library'}
-    require(set(gate.get('results', {})) == expected, 'incomplete foundational gate')
-    require(sum(v['module_count'] for v in gate['results'].values()) == 31,
+    require(expected <= set(gate.get('results', {})), 'incomplete foundational gate')
+    require(sum(gate['results'][name]['module_count'] for name in expected) == 31,
             'unexpected foundational module inventory')
     require(all(v.get('reused_groups') == 0 for v in gate['results'].values()), 'foundational gate is not cold')
     for section in ('inputs', 'artifacts'):
         require(bool(gate.get(section)), 'missing gate ' + section)
         for name, value in gate[section].items():
             verified(name, value)
-    require(len(gate.get('commands', [])) == 4 and all(
+    commands = gate.get('commands', [])
+    require(len(commands) == len(gate['results']) and
+            {c.get('crate') for c in commands} == set(gate['results']),
+            'gate commands do not match crate results')
+    require(all(
         c.get('status') == 'passed' and c.get('resource', {}).get('complete') is True
-        for c in gate['commands']), 'failed foundational command')
+        for c in commands), 'failed foundational command')
     return gate
 
 

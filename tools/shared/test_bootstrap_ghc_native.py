@@ -17,6 +17,77 @@ b = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(b)
 
 
+class GateControls(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        evidence = self.root / 'evidence'
+        evidence.write_text('original execution evidence')
+        self.gate = {'status': 'passed', 'producer_receipt_sha256': 'producer',
+                     'inputs': {str(evidence): b.sha(evidence)},
+                     'artifacts': {str(evidence): b.sha(evidence)}, 'results': {}, 'commands': []}
+        for name, count in [('foundation', 12), ('async', 5), ('language-core', 4), ('frontend', 10)]:
+            self.add_crate(name, count)
+
+    def add_crate(self, name, count):
+        crate = 'mlf-' + name + '/0.3.0/library'
+        self.gate['results'][crate] = {'module_count': count, 'reused_groups': 0}
+        self.gate['commands'].append({'crate': crate, 'status': 'passed', 'resource': {'complete': True}})
+
+    def check(self):
+        path = self.root / 'receipt.json'
+        path.write_text(json.dumps(self.gate))
+        return b.authenticate_gate(path, b.sha(path), 'producer')
+
+    def test_four_only(self):
+        self.check()
+
+    def test_combined(self):
+        self.add_crate('inference', 6)
+        self.check()
+
+    def test_missing_required(self):
+        del self.gate['results']['mlf-frontend/0.3.0/library']
+        with self.assertRaises(Exception): self.check()
+
+    def test_wrong_producer(self):
+        self.gate['producer_receipt_sha256'] = 'old-producer'
+        with self.assertRaises(Exception): self.check()
+
+    def test_failed_extra_command(self):
+        self.add_crate('inference', 6)
+        self.gate['commands'][-1]['status'] = 'failed'
+        with self.assertRaises(Exception): self.check()
+
+    def test_failed_or_running_parent(self):
+        for status in ['failed', 'running']:
+            self.gate['status'] = status
+            with self.assertRaises(Exception): self.check()
+
+    def test_extra_command_not_complete(self):
+        self.add_crate('inference', 6)
+        self.gate['commands'][-1]['resource']['complete'] = False
+        with self.assertRaises(Exception): self.check()
+
+    def test_duplicate_command(self):
+        self.gate['commands'][-1] = self.gate['commands'][0]
+        with self.assertRaises(Exception): self.check()
+
+    def test_reused_extra_row(self):
+        self.add_crate('inference', 6)
+        self.gate['results']['mlf-inference/0.3.0/library']['reused_groups'] = 1
+        with self.assertRaises(Exception): self.check()
+
+    def test_extra_evidence_drift(self):
+        self.add_crate('inference', 6)
+        extra = self.root / 'extra'
+        extra.write_text('original')
+        self.gate['artifacts'][str(extra)] = b.sha(extra)
+        extra.write_text('modified')
+        with self.assertRaises(Exception): self.check()
+
+
 class StageControls(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
