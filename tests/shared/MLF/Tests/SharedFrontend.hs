@@ -35,8 +35,32 @@ module MLF.Tests.SharedFrontend where {
     };
   forwardScope =
     case parse "main = let { x = y; y = 3 } in x" of {
-      Right (SourceModule _ _ _ _ _ _ _ ((:) ((,,) _ _ (SLet y (SIntLit 3) (SLet x (SVar reference) (SVar result)))) []) _ SharedHaskellV1) ->
-        (eqString y "y" && (eqString x "x" && (eqString reference "y" && eqString result "x")));
+      Right (SourceModule _ _ _ _ _ _ _ ((:) ((,,) _ _ (SLet y (SIntLit 3)
+        (SLet x (SCallSite yLabel (SourceSpan yPackage yModule yFile 5 18 5 19) (SVar reference))
+          (SCallSite xLabel (SourceSpan xPackage xModule xFile 5 32 5 33) (SVar result))))) []) _ SharedHaskellV1) ->
+        eqString y "y" && eqString x "x" && eqString reference "y" && eqString result "x" &&
+        eqString yLabel "y" && eqString xLabel "x" &&
+        eqString yPackage "main" && eqString xPackage "main" &&
+        eqString yModule "Example" && eqString xModule "Example" &&
+        eqString yFile "Example.hs" && eqString xFile "Example.hs";
+      _ -> False
+    };
+  refutableDo =
+    case parse "data Maybe a = Nothing | Just a\nmain = do { Just x <- ioReturn (Just 3); ioReturn x }" of {
+      Right (SourceModule _ _ _ _ _ _ _ ((:) ((,,) _ _
+        (SSharedBind (SConstructorPattern constructor ((:) (Just binder) []))
+          (SApp (SCallSite actionLabel _ (SVar action)) (SApp (SConstructor valueConstructor) (SIntLit 3)))
+          (SApp (SCallSite continuationLabel _ (SVar continuation)) (SCallSite resultLabel _ (SVar result)))
+          (SVar bindMethod)
+          (SApp (SCallSite failureLabel _ (SVar failureMethod))
+            (SApp (SPrimitive PTextToChars) (SStringLit message))))) []) _ SharedHaskellV1) ->
+        eqString constructor "Just" && eqString valueConstructor "Just" &&
+        eqString binder "x" && eqString result "x" && eqString resultLabel "x" &&
+        eqString action "ioReturn" && eqString actionLabel "ioReturn" &&
+        eqString continuation "ioReturn" && eqString continuationLabel "ioReturn" &&
+        eqString bindMethod "$MLF.Primitive.>>=" &&
+        eqString failureMethod "$MLF.Primitive.fail" && eqString failureLabel "a do statement" &&
+        eqString message "Pattern match failure in do expression";
       _ -> False
     };
   fixedDo =
@@ -187,7 +211,7 @@ module MLF.Tests.SharedFrontend where {
       check "fixed do identity" fixedDo;
       check "mixed per-file profiles" mixedGraph;
       check "imported hook identity" importedHook;
-      check "primitive facade link" (linked "main = do { printInt 42; ioReturn Unit }");
+      check "primitive facade link" (linked "main = do { printInt 42; ioReturn () }");
       check "facade implementation host" (linked "main = implementationHost");
       check "ordinary bind binding"
         (case P.parseModule "Example.hs"
@@ -202,8 +226,7 @@ module MLF.Tests.SharedFrontend where {
       check "mixed signed cycle"
         (reject "main = let { f :: Int -> Int; f x = g x; g x = f x } in 1");
       check "do let forward scope" (accept "main = do { let { x = y; y = 3 }; ioReturn x }");
-      check "refutable do forbidden"
-        (reject "main = do { Pair x y <- ioReturn (Pair 1 2); ioReturn x }");
+      check "refutable do preserves pattern and canonical failure hooks" refutableDo;
       check "wildcard do bind" (accept "main = do { _ <- ioReturn 1; ioReturn 2 }");
       check "same-indent operator continuation rejected" (reject "main = 1 +\n2");
       check "same-indent RHS rejected" (reject "main =\n1");

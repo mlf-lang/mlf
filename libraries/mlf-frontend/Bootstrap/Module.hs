@@ -379,6 +379,14 @@ module Bootstrap.Module where {
   lookupEntities namespace name (Interface entries) =
     M.findWithDefault compareKey Set.empty ((,) namespace name) entries;
   visible (Interface entries) = Set.unions compareEntity (M.elems entries);
+  -- Compiler-only intrinsic reach supplies generated evidence, not source method visibility.
+  -- Ordinary qualified imports remain visible for instance method declarations.
+  sourceMethodVisible (Interface entries) =
+    visible
+      (Interface
+         (M.filterWithKey
+            (\key _ -> not (Lexer.textStartsAt (snd key) 0 "$MLF.Intrinsics."))
+            entries));
   uniqueInterface context env =
     do {
       mapM_
@@ -1398,7 +1406,7 @@ module Bootstrap.Module where {
     do {
       klass <- lookupEntity Types (instanceClass inst) env;
       unless (isRole Class klass) (Left ("not a class: " ++ instanceClass inst));
-      when shared (mapM_ (\method -> unless (Set.member compareEntity (Entity (owner klass) (fst method) (Method (spelling klass))) (visible env)) (Left ("instance method is not visible: " ++ fst method))) (instanceMethods inst));
+      when shared (mapM_ (\method -> unless (Set.member compareEntity (Entity (owner klass) (fst method) (Method (spelling klass))) (sourceMethodVisible env)) (Left ("instance method is not visible: " ++ fst method))) (instanceMethods inst));
       originals <- if eqString (owner klass) "MLF.Primitive" then Prelude.standardDefaults (spelling klass) (instanceMethods inst) else Right (instanceMethods inst);
       methods <-
         mapM
