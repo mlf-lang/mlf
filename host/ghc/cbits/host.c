@@ -1,6 +1,9 @@
 /* Byte/integer-only FFI adapter. These private transport objects never contain
  * a Haskell or MLF heap pointer. Reuse the native OS and process protocol code
  * without linking mlf_runtime.c, GMP allocator hooks, or BDWGC. */
+#ifndef _XOPEN_SOURCE
+#define _XOPEN_SOURCE 700
+#endif
 #include <stdint.h>
 #include <inttypes.h>
 #include <limits.h>
@@ -12,6 +15,9 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <setjmp.h>
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#endif
 #include "mlf_process_supervisor.h"
 
 typedef struct MlfValue {
@@ -24,7 +30,9 @@ static _Noreturn void fail(const char *message) { host_error=message; longjmp(ho
 static void *allocate(size_t size) { void *p=calloc(size ? size : 1,1); if (!p) fail("out of memory"); return p; }
 static MlfValue *expect(MlfValue *v, int tag) { (void)tag; return v; }
 static MlfValue *mlf_string(const char *bytes, uint64_t n) {
-  MlfValue *v=allocate(sizeof(*v)); char *copy=allocate(n+1);
+  if (n>=SIZE_MAX) fail("string too large");
+  MlfValue *v=allocate(sizeof(*v)); char *copy=calloc((size_t)n+1,1);
+  if (!copy) { free(v); fail("out of memory"); }
   memcpy(copy,bytes,n); v->as.string.bytes=copy; v->as.string.length=n; return v;
 }
 static MlfValue *small(int64_t n) { MlfValue *v=allocate(sizeof(*v)); v->as.integer=n; return v; }
@@ -58,6 +66,92 @@ static int valid_utf8(const unsigned char *bytes, size_t length) {
 }
 
 #include "mlf_system.h"
+/* Filesystem strings use native UTF-8 bytes, including validation during the
+ * action even if its returned String is discarded. Directory.doesFileExist
+ * accepts non-directory special files, unlike the native regular-file test. */
+static MlfValue *host_owned_bytes(char *bytes, size_t length) {
+  if (!valid_utf8((const unsigned char *)bytes,length)) {
+    free(bytes); fail("IO error: invalid UTF-8 input");
+  }
+  MlfValue *result=calloc(1,sizeof(*result));
+  if (!result) { free(bytes); fail("out of memory"); }
+  result->as.string.bytes=bytes; result->as.string.length=length;
+  return result;
+}
+static MlfValue *host_owned_string(char *bytes, const char *missing) {
+  if (!bytes) fail(missing);
+  return host_owned_bytes(bytes,strlen(bytes));
+}
+static MlfValue *host_file_exists(MlfValue *name) {
+  const char *path=file_path(name);
+#if defined(_WIN32)
+  DWORD attributes=mlf_windows_attributes(path);
+  return mlf_boolean(attributes!=INVALID_FILE_ATTRIBUTES && !(attributes&FILE_ATTRIBUTE_DIRECTORY));
+#else
+  struct stat status;
+  return mlf_boolean(stat(path,&status)==0 && S_ISREG(status.st_mode));
+#endif
+}
+static MlfValue *host_canonical_path(MlfValue *name) {
+  return host_owned_string(realpath(file_path(name),NULL),"IO error: canonical path failed");
+}
+static MlfValue *host_executable_path(void) {
+  char *buffer=NULL;
+#if defined(__APPLE__)
+  uint32_t capacity=0;
+  (void)_NSGetExecutablePath(NULL,&capacity);
+  if (!capacity) fail("IO error: executable path failed");
+  buffer=allocate(capacity);
+  if (_NSGetExecutablePath(buffer,&capacity)) { free(buffer); fail("IO error: executable path failed"); }
+#elif defined(__linux__)
+  size_t capacity=256;
+  for (;;) {
+    buffer=allocate(capacity+1);
+    ssize_t size=readlink("/proc/self/exe",buffer,capacity);
+    if (size<0) { free(buffer); fail("IO error: executable path failed"); }
+    if ((size_t)size<capacity) { buffer[size]=0; break; }
+    free(buffer);
+    if (capacity>SIZE_MAX/2-1) fail("IO error: executable path failed");
+    capacity*=2;
+  }
+#else
+  fail("IO error: executable path failed");
+#endif
+  char *resolved=realpath(buffer,NULL);
+  free(buffer);
+  return host_owned_string(resolved,"IO error: executable path failed");
+}
+static MlfValue *host_read_file(MlfValue *name) {
+  FILE *file=fopen(file_path(name),"rb");
+  if (!file) fail("IO error: file read failed");
+  size_t length=0, capacity=4096;
+  char *buffer=calloc(capacity,1);
+  if (!buffer) { fclose(file); fail("out of memory"); }
+  for (;;) {
+    size_t n=fread(buffer+length,1,capacity-length,file);
+    length+=n;
+    if (ferror(file)) { free(buffer); fclose(file); fail("IO error: file read failed"); }
+    if (feof(file)) break;
+    if (length==capacity) {
+      if (capacity>SIZE_MAX/2) { free(buffer); fclose(file); fail("string too large"); }
+      capacity*=2;
+      char *next=realloc(buffer,capacity);
+      if (!next) { free(buffer); fclose(file); fail("out of memory"); }
+      buffer=next;
+    }
+  }
+  if (fclose(file)) { free(buffer); fail("IO error: file read failed"); }
+  return host_owned_bytes(buffer,length);
+}
+static MlfValue *host_write_file(MlfValue *name, MlfValue *contents) {
+  const char *path=file_path(name);
+  FILE *file=fopen(path,"wb");
+  if (!file) fail("IO error: file write failed");
+  int failed=fwrite(contents->as.string.bytes,1,contents->as.string.length,file)!=contents->as.string.length;
+  if (fclose(file)) failed=1;
+  if (failed) fail("IO error: file write failed");
+  return mlf_constructor(0,0);
+}
 static uint64_t async_clock_ms(void) { return (uint64_t)(mlf_process_monotonic_seconds()*1000.0); }
 static void async_pause_ms(uint32_t ms) {
   if (ms>1000) fail("async host pause exceeds 1000 milliseconds");
@@ -92,6 +186,11 @@ int mlf_ghc_host(int operation,const char *a,size_t na,const char *b,size_t nb,
     case 7: value=os_runProcess(&first,&second);break;
     case 8: value=os_fileDigest(&first);text=1;break;
     case 9: value=mlf_process_request(&first);text=1;break;
+    case 10: value=host_file_exists(&first);break;
+    case 11: value=host_canonical_path(&first);text=1;break;
+    case 12: value=host_executable_path();text=1;break;
+    case 13: value=host_read_file(&first);text=1;break;
+    case 14: value=host_write_file(&first,&second);break;
     default: fail("invalid GHC host operation");
   }
   if (text) { *output=(char *)value->as.string.bytes; *length=value->as.string.length; }

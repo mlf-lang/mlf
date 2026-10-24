@@ -1,0 +1,12 @@
+PASS exact official launcher binds native executable and bundle inventory
+PASS direct libexec inputs bind bundle inventory
+PASS seed provenance rejects standalone-manager
+PASS seed provenance rejects mixed-bundles
+PASS seed provenance rejects undeclared-file
+PASS seed provenance rejects changed-bytes
+PASS seed provenance rejects symlink
+PASS seed provenance rejects parent-traversal
+PASS seed provenance rejects inconsistent-metadata
+PASS seed provenance rejects unknown-wrapper
+PASS unknown wrapper was not executed
+No bootstrap, native compiler correctness or fixed point is qualified by these checks.

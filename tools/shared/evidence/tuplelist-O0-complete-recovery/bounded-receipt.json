@@ -1,0 +1,38 @@
+{
+  "complete": true,
+  "command": [
+    "nice",
+    "-n",
+    "15",
+    "ionice",
+    "-c",
+    "3",
+    ".mlf-build/recovery-ghc-O0/bin/tuple-list"
+  ],
+  "limits": {
+    "wall_seconds": 600,
+    "address_space_per_process": 1073741824,
+    "process_tree_rss_bytes": 1073741824,
+    "host_available_floor": 3221225472,
+    "disk_free_floor": 805306368
+  },
+  "samples": [
+    {
+      "seconds": 0.001565072001540102,
+      "group_rss": 454656,
+      "host_available": 6364221440,
+      "disk_free": 1286295552
+    },
+    {
+      "seconds": 1.0022967900004005,
+      "group_rss": 11837440,
+      "host_available": 6575005696,
+      "disk_free": 1285750784
+    }
+  ],
+  "process_group": 5,
+  "exit_code": 0,
+  "reason": null,
+  "elapsed_seconds": 2.003660407004645,
+  "peak_group_rss": 11837440
+}

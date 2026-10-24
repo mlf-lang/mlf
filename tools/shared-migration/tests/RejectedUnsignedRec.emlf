@@ -1,0 +1,2 @@
+module RejectedUnsignedRec where
+unsignedRecursion = let rec {identity x = identity x} in identity 1

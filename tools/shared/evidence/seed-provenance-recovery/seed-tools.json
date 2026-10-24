@@ -1,0 +1,37 @@
+{
+  "format": 1,
+  "control_only": false,
+  "compiler": {
+    "kind": "official-bundle-launcher",
+    "command": {
+      "path": "/workspace/shared/mlf-toolchain/seed-linux/bin/emlf",
+      "sha256": "f3097897e94de4693a730752156ebf04e1d551621bb2efa95bf2afe33b844abd"
+    },
+    "actual_executable": {
+      "path": "/workspace/shared/mlf-toolchain/seed-linux/libexec/emlf",
+      "sha256": "064e9ee2d5e9a8df38a8d3a56c0595e8aa7757a41d63c46e818c4cd24af0d3a6"
+    },
+    "bundle": {
+      "path": "/workspace/shared/mlf-toolchain/seed-linux",
+      "checksums_sha256": "636ce0b137f43d4f4b3d70c9e66048618fbf968c8c559046e1b20c23b0a14dc7",
+      "release_json_sha256": "72c9d563a9cbd8c261f3cd7cabe3aea2644ef74d421d9a6bd4cf391ed7a2a114"
+    }
+  },
+  "manager": {
+    "kind": "official-bundle-launcher",
+    "command": {
+      "path": "/workspace/shared/mlf-toolchain/seed-linux/bin/mlfpkg",
+      "sha256": "f3097897e94de4693a730752156ebf04e1d551621bb2efa95bf2afe33b844abd"
+    },
+    "actual_executable": {
+      "path": "/workspace/shared/mlf-toolchain/seed-linux/libexec/mlfpkg",
+      "sha256": "182ad0b4e918421dc7e6c1e3bddbb04bb60148273bbbc81655c92f4233e06f20"
+    },
+    "bundle": {
+      "path": "/workspace/shared/mlf-toolchain/seed-linux",
+      "checksums_sha256": "636ce0b137f43d4f4b3d70c9e66048618fbf968c8c559046e1b20c23b0a14dc7",
+      "release_json_sha256": "72c9d563a9cbd8c261f3cd7cabe3aea2644ef74d421d9a6bd4cf391ed7a2a114"
+    }
+  },
+  "inputs_sha256": "52ceda2d465cddaf50475ae0f9a014af707760ee9dfd0b2494fd015e37a83202"
+}

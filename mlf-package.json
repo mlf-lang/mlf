@@ -36,11 +36,11 @@
   },
   "executables": {
     "tuple-list": {
-      "main": "tests/TupleListMain.emlf",
+      "main": "tests/MLF/Entry/TupleList.hs",
       "profile": "compiler",
       "modules": {
-        "Tests.IndependentCheck": "tests/Tests/IndependentCheck.emlf",
-        "Tests.IndependentType": "tests/Tests/IndependentType.emlf"
+        "Tests.IndependentCheck": "tests/Tests/IndependentCheck.hs",
+        "Tests.IndependentType": "tests/Tests/IndependentType.hs"
       },
       "dependencies": [
         "mlf-crates",
@@ -50,46 +50,52 @@
         "mlf-interpreter",
         "mlf-language-core",
         "mlf-xmlf"
-      ]
+      ],
+      "source-syntax": "shared-haskell-v1"
     },
     "emlf": {
-      "main": "bootstrap/Main.emlf",
+      "main": "bootstrap/MLF/Entry/Emlf.hs",
       "profile": "compiler",
       "dependencies": [
         "mlf-crates",
         "mlf-foundation",
+        "mlf-frontend",
         "mlf-inference",
         "mlf-interpreter",
         "mlf-llvm",
         "mlf-xmlf"
-      ]
+      ],
+      "source-syntax": "shared-haskell-v1"
     },
     "mlfpkg": {
-      "main": "package/Main.emlf",
+      "main": "package/MLF/Entry/Mlfpkg.hs",
       "profile": "compiler",
       "dependencies": [
         "mlf-foundation",
         "mlf-package-core"
-      ]
+      ],
+      "source-syntax": "shared-haskell-v1"
     },
     "compiler-tests": {
-      "main": "tests/CompilerTestsMain.emlf",
+      "main": "tests/MLF/Entry/CompilerTests.hs",
       "profile": "compiler",
       "modules": {
-        "Tests.CompilerTests": "tests/Tests/CompilerTests.emlf",
-        "Tests.CorePartitions": "tests/Tests/CorePartitions.emlf",
-        "Tests.Coverage": "tests/Tests/Coverage.emlf",
-        "Tests.TestDrivers": "tests/Tests/TestDrivers.emlf",
-        "Tests.TestSources": "tests/Tests/TestSources.emlf",
-        "Tests.Catalog": "tests/Tests/Catalog.emlf",
-        "Tests.Selection": "tests/Tests/Selection.emlf"
+        "Tests.CompilerTests": "tests/Tests/CompilerTests.hs",
+        "Tests.CorePartitions": "tests/Tests/CorePartitions.hs",
+        "Tests.Coverage": "tests/Tests/Coverage.hs",
+        "Tests.TestDrivers": "tests/Tests/TestDrivers.hs",
+        "Tests.TestSources": "tests/Tests/TestSources.hs",
+        "Tests.Catalog": "tests/Tests/Catalog.hs",
+        "Tests.Selection": "tests/Tests/Selection.hs",
+        "Tests.BuildReceipts": "tests/Tests/BuildReceipts.hs"
       },
       "dependencies": [
         "mlf-developer-tools",
         "mlf-foundation",
         "mlf-frontend",
         "mlf-package-core"
-      ]
+      ],
+      "source-syntax": "shared-haskell-v1"
     }
   },
   "tests": {
@@ -226,5 +232,6 @@
         "{cache}"
       ]
     }
-  }
+  },
+  "source-syntax": "shared-haskell-v1"
 }

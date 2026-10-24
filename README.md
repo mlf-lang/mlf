@@ -31,24 +31,18 @@ local BDWGC installation. An installed [native release](docs/releases.md) can
 supply the seed. The compiler and package manager are written in MLF; this
 build and test path needs no GHC, Cabal, or Python.
 
-The seed used with the current manager must support `--compile-crate`. When
-migrating from the earlier module compiler, keep its matching native `mlfpkg`
-and use that manager in its matching earlier source checkout for the first generation:
+This shared-source checkout has two native bootstrap routes. For a released
+0.3.0 seed, keep the complete verified release bundle intact and select its
+matching compiler and manager. The old seed cannot parse the new `.hs` sources;
+the committed frozen bridge performs that transition without GHC:
 
 ```sh
-/path/to/previous/mlfpkg --compiler /path/to/previous/emlf --timeout 21600 \
-  --build-dir "$PWD/.mlf-build/crate-seed" build
-```
-
-Then select `.mlf-build/crate-seed/bin/emlf` and its sibling `mlfpkg` as the
-input tools and proceed with the second generation below. The earlier manager
-is only a bootstrap input; the resulting tools use crate compilation.
-
-```sh
-export MLF_COMPILER=/absolute/path/to/native/emlf
+export MLF_COMPILER=/absolute/path/to/verified-release/bin/emlf
+export MLF_PACKAGE_MANAGER=/absolute/path/to/verified-release/bin/mlfpkg
 export MLF_GC_PREFIX=/absolute/path/to/bdwgc-install
-./scripts/bootstrap-package.sh
-export MLF_PACKAGE_MANAGER="$PWD/.mlf-build/package-manager/mlfpkg"
+./scripts/bootstrap-shared.sh
+export MLF_COMPILER="$PWD/.mlf-build/shared-bootstrap/stage2"
+export MLF_PACKAGE_MANAGER="$(cat .mlf-build/shared-bootstrap/manager.path)"
 ./mlfpkg --compiler "$MLF_COMPILER" --timeout 21600 \
   --build-dir "$PWD/.mlf-build/native-stage1" build
 
@@ -61,11 +55,20 @@ printf 'Ada\n' | "$EMLF_BIN" --run examples/io-hello.emlf
 "$EMLF_BIN" --run examples/modules/Main.emlf
 ```
 
-The bootstrap script builds the initial package manager. The first native
-stage updates the code generator; the second produces `.mlf-build/bin/emlf`
-and `.mlf-build/bin/mlfpkg`. Keep the stage-1 tools selected as the package
-manager's inputs, in their separate directory, when rebuilding or testing the
-repository. Use `EMLF_BIN` to run the candidate compiler. Global package-manager
+For a qualified locally built shared-aware native compiler, its
+`--implementation-identity` must report `MLF/shared-haskell-v1 native-MLF`.
+`scripts/bootstrap-package.sh` can build a matching native manager directly;
+that manager must report the same host identity before it is used by the native
+manager-bootstrap route. These local shared-aware pairs do not require release
+bundle layout. Identity strings distinguish supported producer paths; they are
+not cryptographic publisher authentication. See the
+[bootstrap contract](docs/shared-source/Bootstrap-and-CI.md).
+
+The released bridge produces a current compiler and matching package manager.
+The following native generations qualify the code generator and produce
+`.mlf-build/bin/emlf` and `.mlf-build/bin/mlfpkg`. Keep the stage-1 tools selected
+as the package manager's inputs, in their separate directory, when rebuilding or
+testing the repository. Use `EMLF_BIN` to run the candidate compiler. Global package-manager
 options go before `build`, `test`, or `run`; `--build-dir DIR` selects the output
 directory. `--jobs N` bounds concurrent build actions; the initial default is 1.
 For example, `./mlfpkg --jobs 4 build --target emlf` builds the compiler with

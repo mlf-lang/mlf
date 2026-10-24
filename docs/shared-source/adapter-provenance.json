@@ -4,8 +4,18 @@
   "primitive_abi": "mlf-primitive-95-v1",
   "syntax": "shared-haskell-v1",
   "changes": [
-    "Base Monad methods renamed v_return/v_bind to return/bind; Prelude return explicitly hidden",
-    "MLF.Primitive facade added; no compiler algorithm source in host adapters"
+    "MLF.Primitive facade replaces the generated-prefixed API; primitive IDs0\u201394 unchanged",
+    "Actual Prelude Functor/Applicative/Monad replace the earlier custom class; pure is standard and bind ordinary compatibility value",
+    "Standard IsString instance for opaque String; no RebindableSyntax or source-local literal hooks",
+    "Async completion action arguments forced only when their IO action executes",
+    "IntArray/DoubleArray/ByteArray have distinct abstract newtype identities",
+    "Raw UTF8 argv and file/path operations are locale-independent, preserve NUL contents, and validate native error boundaries",
+    "fileExists follows native regular-file semantics; getContents leaves stdin open",
+    "SafeFFI result ownership remains masked through copy/free; allocation failure frees intermediate wrapper",
+    "panic message has explicit demand barrier and diagnostics render as UTF8 bytes; exit bounds diagnostic matches native",
+    "runProcess cwd is validated before its specification; native setEnv validates name then content explicitly",
+    "Executable links use -rtsopts=ignoreAll so RTS arguments remain application argv",
+    "Target display hints encode non-identifier synthetic names at fresh numeric identity allocation; source hygiene/environment keys unchanged; frontend3/builtin4"
   ],
   "reference_files": {
     "runtime/MLF/Host/Async.hs": "62b9dd5dd32614fbaf48b086710b569ecc618d7a6019ecd19f972cf732c9ebe2",
@@ -585,5 +595,17 @@
       "host_module": "MLF.Host.Async",
       "signature": "AsyncScope -> Int -> IO Int"
     }
-  ]
+  ],
+  "builtin_interface": "mlf-primitive/shared-haskell-v1/4",
+  "current_files": {
+    "host/ghc/MLF/Primitive.hs": "ffe9fd2106149e664e5ca22e1e1eae51cf4b0a1541cee090f1e7bc9185efa031",
+    "host/ghc/MLF/Host/Base.hs": "6d60cb8f2349293f2a797348b202577267df5f69d334cc936df6be455e547a4d",
+    "host/ghc/MLF/Host/IO.hs": "6779594885592e3661f0070c0a1f2244d7563d5e3b19bcb1a0b47c6af934adf8",
+    "host/ghc/MLF/Host/Async.hs": "d576fb9829c9d7eed49c728bc67a05266f74850f5a38bde346783d269013d0c3",
+    "host/ghc/cbits/host.c": "bfcf4b400902afaa89e0d6cbe0de5901a4e1e89c6100d203e50c3099ba7fc694",
+    "runtime/mlf_system.h": "eb1f0f97ece2bd95a60a75e4c7445b5c2cbd2ff75c75545e2ac673f2f3157cff"
+  },
+  "focused_evidence": "tests/shared-host/evidence/latest/receipt.json",
+  "independent_review": "docs/shared-source/independent-runtime-adapter-review.md",
+  "qualification_scope": "Bounded Linux adapter probes only; whole-compiler/native-fixed-point gates separate"
 }

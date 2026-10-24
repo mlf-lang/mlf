@@ -1,0 +1,72 @@
+Migrated and reparsed 5 modules; expression string spellings retained byte-for-byte.
+PASS lexical comment preservation
+[1 of 8] Compiling MLF.Primitive    ( /workspace/shared/mlf-shared-source-migration/tools/shared-migration/tests/support/MLF/Primitive.hs, /tmp/mlf-migration-fixtures-final2/objects/MLF/Primitive.o )
+/workspace/shared/mlf-shared-source-migration/tools/shared-migration/tests/support/MLF/Primitive.hs:15:19: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+   |
+15 | class Monad (m :: * -> *) where
+   |                   ^
+
+/workspace/shared/mlf-shared-source-migration/tools/shared-migration/tests/support/MLF/Primitive.hs:15:24: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+   |
+15 | class Monad (m :: * -> *) where
+   |                        ^
+
+[2 of 8] Compiling DemandScope      ( /tmp/mlf-migration-fixtures-final2/generated/DemandScope.hs, /tmp/mlf-migration-fixtures-final2/objects/DemandScope.o )
+/tmp/mlf-migration-fixtures-final2/generated/DemandScope.hs:177:7: warning: [GHC-53633] [-Woverlapping-patterns]
+    Pattern match is redundant
+    In a case alternative: _ -> ...
+    |
+177 |       _ -> 3
+    |       ^^^^^^
+
+[3 of 8] Compiling Comments         ( /tmp/mlf-migration-fixtures-final2/generated/Comments.hs, /tmp/mlf-migration-fixtures-final2/objects/Comments.o )
+[4 of 8] Compiling Bootstrap.Std    ( /tmp/mlf-migration-fixtures-final2/generated/Bootstrap/Std.hs, /tmp/mlf-migration-fixtures-final2/objects/Bootstrap/Std.o )
+[5 of 8] Compiling NegativeDouble   ( /tmp/mlf-migration-fixtures-final2/generated/NegativeDouble.hs, /tmp/mlf-migration-fixtures-final2/objects/NegativeDouble.o )
+[6 of 8] Compiling PrimitiveShadow  ( /tmp/mlf-migration-fixtures-final2/generated/PrimitiveShadow.hs, /tmp/mlf-migration-fixtures-final2/objects/PrimitiveShadow.o )
+/tmp/mlf-migration-fixtures-final2/generated/PrimitiveShadow.hs:52:7: warning: [GHC-53633] [-Woverlapping-patterns]
+    Pattern match is redundant
+    In a case alternative: _ -> ...
+   |
+52 |       _ -> 3
+   |       ^^^^^^
+
+[7 of 8] Compiling Main             ( /workspace/shared/mlf-shared-source-migration/tools/shared-migration/tests/Runner.hs, /tmp/mlf-migration-fixtures-final2/objects/Main.o )
+[8 of 8] Linking /tmp/mlf-migration-fixtures-final2/check
+PASS poison-case = 2
+PASS poison-equation = 2
+PASS poison-lambda = 2
+PASS first-row-demand = 1
+PASS fallback-alias = 2
+PASS nested-outer = 2
+PASS outer-capture = 42
+PASS function-capture = 12
+PASS repeated-shadows = 3
+PASS sequential-forward = 7
+PASS inner-binder = 7
+PASS case-binder = 8
+PASS do-shadow = 42
+PASS do-continuation = 42
+PASS do-ignored-payload = 42
+PASS closed-recursion = 42
+PASS mutual-recursion = 42
+PASS required-tail-demand
+PASS shadow-string-equality = 2
+PASS shadow-int-equality = 2
+PASS comment/string preservation
+PASS negative-zero-bits = 9223372036854775808
+PASS negative-one-bits = 13830554455654793216
+PASS negative-zero-roundtrip = 0
+PASS renamed-negateInt = -42
+PASS rejected RejectedLambda
+PASS rejected RejectedUnreachable
+PASS rejected RejectedOpenRec
+PASS rejected RejectedUnsignedRec
+Fixture output: /tmp/mlf-migration-fixtures-final2

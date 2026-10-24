@@ -1,0 +1,755 @@
+{
+  "baseline": "2f85844",
+  "inventory_source": "/workspace/shared/mlf-shared-syntax-design/repo/ghc-host/build.py",
+  "module_count": 84,
+  "string_pattern_leaves": 89,
+  "modules_with_string_patterns": 17,
+  "string_patterns_by_module": {
+    "Async.Process.Internal": 1,
+    "Bootstrap.Crate": 3,
+    "Bootstrap.CrateArtifact": 3,
+    "Bootstrap.CrateCodegen": 1,
+    "Bootstrap.CrateQuery": 3,
+    "Bootstrap.InferenceUnit": 1,
+    "Bootstrap.Module": 2,
+    "Bootstrap.Separate": 13,
+    "MLF.Entry.Emlf": 37,
+    "MLF.Entry.Mlfpkg": 1,
+    "Package.Build": 3,
+    "Package.Command": 7,
+    "Package.Distribution": 2,
+    "Package.Scheduler": 7,
+    "Tests.Catalog": 2,
+    "Tests.CompilerTests": 2,
+    "Tests.Selection": 1
+  },
+  "string_pattern_leaves_ast": [
+    {
+      "module": "Async.Process.Internal",
+      "source": "libraries/mlf-async/Async/Process/Internal.emlf",
+      "ast_path": "Async.Process.Internal/request:24/do1/argument/case0/field0",
+      "token_spelling": "\"0\""
+    },
+    {
+      "module": "Bootstrap.Crate",
+      "source": "libraries/mlf-crates/Bootstrap/Crate.emlf",
+      "ast_path": "Bootstrap.Crate/decodeSpec:29/do1/case0/field0",
+      "token_spelling": "\"MLF-CRATE-1\""
+    },
+    {
+      "module": "Bootstrap.Crate",
+      "source": "libraries/mlf-crates/Bootstrap/Crate.emlf",
+      "ast_path": "Bootstrap.Crate/decodeSpec:29/do1/case0-body/do1/case0",
+      "token_spelling": "\"true\""
+    },
+    {
+      "module": "Bootstrap.Crate",
+      "source": "libraries/mlf-crates/Bootstrap/Crate.emlf",
+      "ast_path": "Bootstrap.Crate/decodeSpec:29/do1/case0-body/do1/case1",
+      "token_spelling": "\"false\""
+    },
+    {
+      "module": "Bootstrap.CrateArtifact",
+      "source": "libraries/mlf-crates/Bootstrap/CrateArtifact.emlf",
+      "ast_path": "Bootstrap.CrateArtifact/decodeInterface:153/do1/case0/field0",
+      "token_spelling": "\"MLFCI-1\""
+    },
+    {
+      "module": "Bootstrap.CrateArtifact",
+      "source": "libraries/mlf-crates/Bootstrap/CrateArtifact.emlf",
+      "ast_path": "Bootstrap.CrateArtifact/decodeObjectFields:373/do0/case0/field0",
+      "token_spelling": "\"MLFCO-2\""
+    },
+    {
+      "module": "Bootstrap.CrateArtifact",
+      "source": "libraries/mlf-crates/Bootstrap/CrateArtifact.emlf",
+      "ast_path": "Bootstrap.CrateArtifact/decodeObjectFields:373/do0/case1/field0",
+      "token_spelling": "\"MLFCO-1\""
+    },
+    {
+      "module": "Bootstrap.CrateCodegen",
+      "source": "libraries/mlf-crates/Bootstrap/CrateCodegen.emlf",
+      "ast_path": "Bootstrap.CrateCodegen/decodeCached:29/do1/case0/field0",
+      "token_spelling": "\"MLF-CODEGEN-CACHE-1\""
+    },
+    {
+      "module": "Bootstrap.CrateQuery",
+      "source": "libraries/mlf-crates/Bootstrap/CrateQuery.emlf",
+      "ast_path": "Bootstrap.CrateQuery/decodeCached:281/do1/case0/field0",
+      "token_spelling": "\"MLF-QUERY-CACHE-2\""
+    },
+    {
+      "module": "Bootstrap.CrateQuery",
+      "source": "libraries/mlf-crates/Bootstrap/CrateQuery.emlf",
+      "ast_path": "Bootstrap.CrateQuery/decodeCached:281/do1/case1/field0",
+      "token_spelling": "\"MLF-QUERY-CACHE-1\""
+    },
+    {
+      "module": "Bootstrap.CrateQuery",
+      "source": "libraries/mlf-crates/Bootstrap/CrateQuery.emlf",
+      "ast_path": "Bootstrap.CrateQuery/contextualCache:299/case0/field0/field0",
+      "token_spelling": "\"MLF-CRATE-QUERY-1\""
+    },
+    {
+      "module": "Bootstrap.InferenceUnit",
+      "source": "libraries/mlf-crates/Bootstrap/InferenceUnit.emlf",
+      "ast_path": "Bootstrap.InferenceUnit/extractDeclarations:30/case2/field0",
+      "token_spelling": "\"Unit\""
+    },
+    {
+      "module": "Bootstrap.Module",
+      "source": "libraries/mlf-frontend/Bootstrap/Module.emlf",
+      "ast_path": "Bootstrap.Module/resolvePattern:472/case0/field0",
+      "token_spelling": "\"Unit\""
+    },
+    {
+      "module": "Bootstrap.Module",
+      "source": "libraries/mlf-frontend/Bootstrap/Module.emlf",
+      "ast_path": "Bootstrap.Module/resolveBound:496/case1/field0",
+      "token_spelling": "\"Unit\""
+    },
+    {
+      "module": "Bootstrap.Separate",
+      "source": "libraries/mlf-crates/Bootstrap/Separate.emlf",
+      "ast_path": "Bootstrap.Separate/collectBindingsIn:158/case2/field0",
+      "token_spelling": "\"Unit\""
+    },
+    {
+      "module": "Bootstrap.Separate",
+      "source": "libraries/mlf-crates/Bootstrap/Separate.emlf",
+      "ast_path": "Bootstrap.Separate/decodeEntity:229/do1/case0-body/do0/case0",
+      "token_spelling": "\"value\""
+    },
+    {
+      "module": "Bootstrap.Separate",
+      "source": "libraries/mlf-crates/Bootstrap/Separate.emlf",
+      "ast_path": "Bootstrap.Separate/decodeEntity:229/do1/case0-body/do0/case1",
+      "token_spelling": "\"data\""
+    },
+    {
+      "module": "Bootstrap.Separate",
+      "source": "libraries/mlf-crates/Bootstrap/Separate.emlf",
+      "ast_path": "Bootstrap.Separate/decodeEntity:229/do1/case0-body/do0/case2",
+      "token_spelling": "\"class\""
+    },
+    {
+      "module": "Bootstrap.Separate",
+      "source": "libraries/mlf-crates/Bootstrap/Separate.emlf",
+      "ast_path": "Bootstrap.Separate/decodeEntity:229/do1/case0-body/do0/case3",
+      "token_spelling": "\"constructor\""
+    },
+    {
+      "module": "Bootstrap.Separate",
+      "source": "libraries/mlf-crates/Bootstrap/Separate.emlf",
+      "ast_path": "Bootstrap.Separate/decodeEntity:229/do1/case0-body/do0/case4",
+      "token_spelling": "\"method\""
+    },
+    {
+      "module": "Bootstrap.Separate",
+      "source": "libraries/mlf-crates/Bootstrap/Separate.emlf",
+      "ast_path": "Bootstrap.Separate/decodeEntity:229/do1/case0-body/do0/case5",
+      "token_spelling": "\"builtin\""
+    },
+    {
+      "module": "Bootstrap.Separate",
+      "source": "libraries/mlf-crates/Bootstrap/Separate.emlf",
+      "ast_path": "Bootstrap.Separate/decodeEntity:229/do1/case0-body/do0/case6",
+      "token_spelling": "\"primitive\""
+    },
+    {
+      "module": "Bootstrap.Separate",
+      "source": "libraries/mlf-crates/Bootstrap/Separate.emlf",
+      "ast_path": "Bootstrap.Separate/decodeEntity:229/do1/case0-body/do0/case7",
+      "token_spelling": "\"bool\""
+    },
+    {
+      "module": "Bootstrap.Separate",
+      "source": "libraries/mlf-crates/Bootstrap/Separate.emlf",
+      "ast_path": "Bootstrap.Separate/decodeInterface:273/do1/case0/field0",
+      "token_spelling": "\"MLFI-1\""
+    },
+    {
+      "module": "Bootstrap.Separate",
+      "source": "libraries/mlf-crates/Bootstrap/Separate.emlf",
+      "ast_path": "Bootstrap.Separate/decodeContextualObjectAfter:318/do1/case0/field0",
+      "token_spelling": "\"MLFF-2\""
+    },
+    {
+      "module": "Bootstrap.Separate",
+      "source": "libraries/mlf-crates/Bootstrap/Separate.emlf",
+      "ast_path": "Bootstrap.Separate/decodeObject:334/do1/case0/field0",
+      "token_spelling": "\"MLFO-1\""
+    },
+    {
+      "module": "Bootstrap.Separate",
+      "source": "libraries/mlf-crates/Bootstrap/Separate.emlf",
+      "ast_path": "Bootstrap.Separate/graft:430/case2/field0",
+      "token_spelling": "\"Unit\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/options:35/case0/field0",
+      "token_spelling": "\"--no-prelude\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/options:35/case1/field0",
+      "token_spelling": "\"-i\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/options:35/case2/field0",
+      "token_spelling": "\"-i\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case0/field0",
+      "token_spelling": "\"--version\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case1/field0",
+      "token_spelling": "\"--help\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case2/field0",
+      "token_spelling": "\"--llvm-runtime\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case3/field0",
+      "token_spelling": "\"--compile-crate\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case3/field1/field1/field0",
+      "token_spelling": "\"-o\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case4/field0",
+      "token_spelling": "\"--show-crate\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case5/field0",
+      "token_spelling": "\"--crate-to-llvm\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case6/field0",
+      "token_spelling": "\"--crate-to-llvm-gc\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case7/field0",
+      "token_spelling": "\"--crate-to-llvm\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case7/field1/field1/field0",
+      "token_spelling": "\"--cache\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case8/field0",
+      "token_spelling": "\"--crate-to-llvm-gc\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case8/field1/field1/field0",
+      "token_spelling": "\"--cache\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case9/field0",
+      "token_spelling": "\"--crate-to-llvm\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case9/field1/field1/field0",
+      "token_spelling": "\"--cache\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case9/field1/field1/field1/field1/field0",
+      "token_spelling": "\"--query-report\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case10/field0",
+      "token_spelling": "\"--crate-to-llvm-gc\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case10/field1/field1/field0",
+      "token_spelling": "\"--cache\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case10/field1/field1/field1/field1/field0",
+      "token_spelling": "\"--query-report\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case11/field0",
+      "token_spelling": "\"--link-crate\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case12/field0",
+      "token_spelling": "\"--run-crate\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case13/field0",
+      "token_spelling": "\"--type\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case14/field0",
+      "token_spelling": "\"--emit-llvm\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case15/field0",
+      "token_spelling": "\"--emit-llvm-gc\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case16/field0",
+      "token_spelling": "\"--check\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case17/field0",
+      "token_spelling": "\"--xmlf-to-llvm\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case18/field0",
+      "token_spelling": "\"--xmlf-to-llvm-gc\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case19/field0",
+      "token_spelling": "\"--xmlf-to-llvm-io\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case20/field0",
+      "token_spelling": "\"--xmlf-to-llvm-io-gc\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case21/field0",
+      "token_spelling": "\"--run\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case22/field0",
+      "token_spelling": "\"--run-xmlf\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/runArgs:43/case23/field0",
+      "token_spelling": "\"--run-program-xmlf\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/splitArguments:100/case1/field0",
+      "token_spelling": "\"--\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/parseSource:107/case1/field0",
+      "token_spelling": "\"-\""
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "source": "bootstrap/Main.emlf",
+      "ast_path": "Main/parseSource:107/case2/field0",
+      "token_spelling": "\"--expr\""
+    },
+    {
+      "module": "MLF.Entry.Mlfpkg",
+      "source": "package/Main.emlf",
+      "ast_path": "Main/main:6/do1/case0/field0",
+      "token_spelling": "\"--version\""
+    },
+    {
+      "module": "Package.Build",
+      "source": "libraries/mlf-package-core/Package/Build.emlf",
+      "ast_path": "Package.Build/pgoFlags:109/case0",
+      "token_spelling": "\"\""
+    },
+    {
+      "module": "Package.Build",
+      "source": "libraries/mlf-package-core/Package/Build.emlf",
+      "ast_path": "Package.Build/pgoFlags:109/case1",
+      "token_spelling": "\"generate\""
+    },
+    {
+      "module": "Package.Build",
+      "source": "libraries/mlf-package-core/Package/Build.emlf",
+      "ast_path": "Package.Build/pgoFlags:109/case2",
+      "token_spelling": "\"use\""
+    },
+    {
+      "module": "Package.Command",
+      "source": "libraries/mlf-package-core/Package/Command.emlf",
+      "ast_path": "Package.Command/options:14/case0/field0",
+      "token_spelling": "\"--locked\""
+    },
+    {
+      "module": "Package.Command",
+      "source": "libraries/mlf-package-core/Package/Command.emlf",
+      "ast_path": "Package.Command/options:14/case1/field0",
+      "token_spelling": "\"--offline\""
+    },
+    {
+      "module": "Package.Command",
+      "source": "libraries/mlf-package-core/Package/Command.emlf",
+      "ast_path": "Package.Command/selections:20/case1/field0",
+      "token_spelling": "\"--target\""
+    },
+    {
+      "module": "Package.Command",
+      "source": "libraries/mlf-package-core/Package/Command.emlf",
+      "ast_path": "Package.Command/run:117/do6/case0/field0",
+      "token_spelling": "\"__build-worker\""
+    },
+    {
+      "module": "Package.Command",
+      "source": "libraries/mlf-package-core/Package/Command.emlf",
+      "ast_path": "Package.Command/run:117/do6/case1/field0",
+      "token_spelling": "\"--help\""
+    },
+    {
+      "module": "Package.Command",
+      "source": "libraries/mlf-package-core/Package/Command.emlf",
+      "ast_path": "Package.Command/run:117/do6/case2/field0",
+      "token_spelling": "\"pack\""
+    },
+    {
+      "module": "Package.Command",
+      "source": "libraries/mlf-package-core/Package/Command.emlf",
+      "ast_path": "Package.Command/run:117/do6/case3-body/do16/do13/case0-body/do0/forwarded:178/case0/field0",
+      "token_spelling": "\"--\""
+    },
+    {
+      "module": "Package.Distribution",
+      "source": "libraries/mlf-package-core/Package/Distribution.emlf",
+      "ast_path": "Package.Distribution/validCachedPath:92/case0/field0",
+      "token_spelling": "\"bundle\""
+    },
+    {
+      "module": "Package.Distribution",
+      "source": "libraries/mlf-package-core/Package/Distribution.emlf",
+      "ast_path": "Package.Distribution/validCachedPath:92/case0/field1/field0",
+      "token_spelling": "\"crates\""
+    },
+    {
+      "module": "Package.Scheduler",
+      "source": "libraries/mlf-package-core/Package/Scheduler.emlf",
+      "ast_path": "Package.Scheduler/worker:84/do16/case0",
+      "token_spelling": "\"library\""
+    },
+    {
+      "module": "Package.Scheduler",
+      "source": "libraries/mlf-package-core/Package/Scheduler.emlf",
+      "ast_path": "Package.Scheduler/worker:84/do16/case1",
+      "token_spelling": "\"target\""
+    },
+    {
+      "module": "Package.Scheduler",
+      "source": "libraries/mlf-package-core/Package/Scheduler.emlf",
+      "ast_path": "Package.Scheduler/worker:84/do16/case2",
+      "token_spelling": "\"runtime\""
+    },
+    {
+      "module": "Package.Scheduler",
+      "source": "libraries/mlf-package-core/Package/Scheduler.emlf",
+      "ast_path": "Package.Scheduler/worker:84/do16/case3",
+      "token_spelling": "\"emit\""
+    },
+    {
+      "module": "Package.Scheduler",
+      "source": "libraries/mlf-package-core/Package/Scheduler.emlf",
+      "ast_path": "Package.Scheduler/worker:84/do16/case4",
+      "token_spelling": "\"object\""
+    },
+    {
+      "module": "Package.Scheduler",
+      "source": "libraries/mlf-package-core/Package/Scheduler.emlf",
+      "ast_path": "Package.Scheduler/worker:84/do16/case5",
+      "token_spelling": "\"link\""
+    },
+    {
+      "module": "Package.Scheduler",
+      "source": "libraries/mlf-package-core/Package/Scheduler.emlf",
+      "ast_path": "Package.Scheduler/worker:84/do16/case6",
+      "token_spelling": "\"assemble\""
+    },
+    {
+      "module": "Tests.Catalog",
+      "source": "tests/Tests/Catalog.emlf",
+      "ast_path": "Tests.Catalog/parse:172/case1/field0",
+      "token_spelling": "\"--list\""
+    },
+    {
+      "module": "Tests.Catalog",
+      "source": "tests/Tests/Catalog.emlf",
+      "ast_path": "Tests.Catalog/parse:172/case2/field0",
+      "token_spelling": "\"--format\""
+    },
+    {
+      "module": "Tests.CompilerTests",
+      "source": "tests/Tests/CompilerTests.emlf",
+      "ast_path": "Tests.CompilerTests/options:848/do1/case0/field0",
+      "token_spelling": "\"--manager\""
+    },
+    {
+      "module": "Tests.CompilerTests",
+      "source": "tests/Tests/CompilerTests.emlf",
+      "ast_path": "Tests.CompilerTests/main:858/case0/field0",
+      "token_spelling": "\"catalog\""
+    },
+    {
+      "module": "Tests.Selection",
+      "source": "tests/Tests/Selection.emlf",
+      "ast_path": "Tests.Selection/choose:19/do1/case1/field0",
+      "token_spelling": "\"--families\""
+    }
+  ],
+  "negative_double_count": 13,
+  "negative_doubles": [
+    {
+      "module": "Bootstrap.Parser",
+      "source": "libraries/mlf-frontend/Bootstrap/Parser.emlf",
+      "ast_path": "Bootstrap.Parser/negateValue:271/case1-body/argument/function/argument",
+      "literal": "-1.0"
+    },
+    {
+      "module": "Package.Benchmark",
+      "source": "libraries/mlf-developer-tools/Package/Benchmark.emlf",
+      "ast_path": "Package.Benchmark/initialBodies:163/bodies:164/argument/function/argument/function/function/function/function/function/argument",
+      "literal": "-1.16032004402742839"
+    },
+    {
+      "module": "Package.Benchmark",
+      "source": "libraries/mlf-developer-tools/Package/Benchmark.emlf",
+      "ast_path": "Package.Benchmark/initialBodies:163/bodies:164/argument/function/argument/function/function/function/function/argument",
+      "literal": "-0.103622044471123109"
+    },
+    {
+      "module": "Package.Benchmark",
+      "source": "libraries/mlf-developer-tools/Package/Benchmark.emlf",
+      "ast_path": "Package.Benchmark/initialBodies:163/bodies:164/argument/function/argument/function/argument",
+      "literal": "-0.0000690460016972063023"
+    },
+    {
+      "module": "Package.Benchmark",
+      "source": "libraries/mlf-developer-tools/Package/Benchmark.emlf",
+      "ast_path": "Package.Benchmark/initialBodies:163/bodies:164/argument/argument/function/argument/function/function/function/function/argument",
+      "literal": "-0.403523417114321381"
+    },
+    {
+      "module": "Package.Benchmark",
+      "source": "libraries/mlf-developer-tools/Package/Benchmark.emlf",
+      "ast_path": "Package.Benchmark/initialBodies:163/bodies:164/argument/argument/function/argument/function/function/function/argument",
+      "literal": "-0.00276742510726862411"
+    },
+    {
+      "module": "Package.Benchmark",
+      "source": "libraries/mlf-developer-tools/Package/Benchmark.emlf",
+      "ast_path": "Package.Benchmark/initialBodies:163/bodies:164/argument/argument/argument/function/argument/function/function/function/function/function/argument",
+      "literal": "-15.1111514016986312"
+    },
+    {
+      "module": "Package.Benchmark",
+      "source": "libraries/mlf-developer-tools/Package/Benchmark.emlf",
+      "ast_path": "Package.Benchmark/initialBodies:163/bodies:164/argument/argument/argument/function/argument/function/function/function/function/argument",
+      "literal": "-0.223307578892655734"
+    },
+    {
+      "module": "Package.Benchmark",
+      "source": "libraries/mlf-developer-tools/Package/Benchmark.emlf",
+      "ast_path": "Package.Benchmark/initialBodies:163/bodies:164/argument/argument/argument/function/argument/function/argument",
+      "literal": "-0.0000296589568540237556"
+    },
+    {
+      "module": "Package.Benchmark",
+      "source": "libraries/mlf-developer-tools/Package/Benchmark.emlf",
+      "ast_path": "Package.Benchmark/initialBodies:163/bodies:164/argument/argument/argument/argument/function/argument/function/function/function/function/function/argument",
+      "literal": "-25.9193146099879641"
+    },
+    {
+      "module": "Package.Benchmark",
+      "source": "libraries/mlf-developer-tools/Package/Benchmark.emlf",
+      "ast_path": "Package.Benchmark/initialBodies:163/bodies:164/argument/argument/argument/argument/function/argument/function/argument",
+      "literal": "-0.0000951592254519715870"
+    },
+    {
+      "module": "Package.Benchmark",
+      "source": "libraries/mlf-developer-tools/Package/Benchmark.emlf",
+      "ast_path": "Package.Benchmark/initialBodies:163/let-body/let-body/function/argument/function/argument/function/argument/function/argument",
+      "literal": "-1.0"
+    },
+    {
+      "module": "Package.Verification",
+      "source": "libraries/mlf-developer-tools/Package/Verification.emlf",
+      "ast_path": "Package.Verification/measurement:58/do5/function/argument/function/argument/function/argument",
+      "literal": "-1.0"
+    }
+  ],
+  "double_pattern_count": 0,
+  "ordinary_expression_lets": 728,
+  "ordinary_do_lets": 1015,
+  "recursive_lets": 2,
+  "multi_binding_local_groups": 0,
+  "ordinary_self_capture_hazards": 0,
+  "reserved_hook_logical_bindings": [
+    {
+      "module": "Bootstrap.Std",
+      "name": "negate",
+      "lines": [
+        43,
+        44
+      ],
+      "value_uses_in_inventory": 0
+    }
+  ],
+  "hard_haskell2010_reserved_binders": 0,
+  "contextual_names_by_occurrence": {
+    "qualified": 8,
+    "as": 8,
+    "pattern": 60,
+    "role": 12,
+    "hiding": 2,
+    "family": 1
+  },
+  "hashes": {
+    "libraries/mlf-async/Async/Process.emlf": "b13397d9eb158991fcd4efa8086592757516a2277924af114160fede52f4fc23",
+    "libraries/mlf-async/Async/Process/Internal.emlf": "52e32e7d7741dd88bc1310dfc4558944984608c62c612975c428b5e6645f40a2",
+    "libraries/mlf-async/Async/Task.emlf": "d679d3e4d5f25188369e8b5a08297712c1785ce4ddde5273efa822fb07544b80",
+    "libraries/mlf-async/Async/Task/Internal.emlf": "72b490078c2dd76c2073c52d5899f28ddfda5682cc21e1057c697f520d550fa3",
+    "libraries/mlf-crates/Bootstrap/Crate.emlf": "d5838f5fff8893446e2f83146c2da27310685abc811e7d14ddff0edb2ead93ea",
+    "libraries/mlf-crates/Bootstrap/CrateArtifact.emlf": "c822bd47335a4eb6f96ac5dd3f1d1c81b0abccfa3331bb6b8192b78dec90ab32",
+    "libraries/mlf-crates/Bootstrap/CrateCodegen.emlf": "67419a28a112f876fc2d38338f95a71a4bb3711999c0ef4bad5397d4ff7532fb",
+    "libraries/mlf-crates/Bootstrap/CrateQuery.emlf": "21a2965f49c6d1a0797ecf7af7f199c957e859cc862d81b7114ce62957d7affa",
+    "libraries/mlf-crates/Bootstrap/InferenceUnit.emlf": "4938b3defa1e35dd280d9dc8aba61d144b2ebfc8d338a7e0866c7bab91637284",
+    "libraries/mlf-crates/Bootstrap/Separate.emlf": "98454ee7a3d912654a837caaeecfd680eb700ffb749325983f54c866c34f46f0",
+    "libraries/mlf-crates/Bootstrap/SourceEquality.emlf": "5fc11a57d42b85d7776ff76dee9872a7264ff7f920121833f221c277ec37f4af",
+    "libraries/mlf-developer-tools/Package/Benchmark.emlf": "137932b818c2761f1eac2305a4642842dd4c7c55e90e13371bfa6f98ec1d5cce",
+    "libraries/mlf-developer-tools/Package/Verification.emlf": "b424ee9102c0e6e16e4cbe0ea53c297c5af95ea183ec6574035b8a75dd0b431f",
+    "libraries/mlf-foundation/Bootstrap/Fresh.emlf": "b6af7da1aceb0e81b68ee6a1100616b71f6558fa8f551de62dbddecc4d7483a0",
+    "libraries/mlf-foundation/Bootstrap/Host.emlf": "91ae3200a2bc55185d95ffff8265372b78bb91405a04c3a26eec76b8375b3b8a",
+    "libraries/mlf-foundation/Bootstrap/IntMap.emlf": "a5cce880a0cac66d07c9b4e30e981766b80da8e5e4e6b311f235c03997d14dfa",
+    "libraries/mlf-foundation/Bootstrap/IntSet.emlf": "4518b334a25b31325d90012a99480a376d804e9c73cfb459ff0febf906bcf4d1",
+    "libraries/mlf-foundation/Bootstrap/Map.emlf": "b7d5921dbae083f227e4562a257efaaac2f1b7e6f270073857c8ba43b674e08a",
+    "libraries/mlf-foundation/Bootstrap/Regex.emlf": "35f229b615a82e2ad9540a8209fd929d93f5c700f4c951ec7fc6da7f00c4a474",
+    "libraries/mlf-foundation/Bootstrap/ST.emlf": "657c2b7f3958a8b14ed7a336908689f951480b45ff50059b242cfe3f3df7d7b0",
+    "libraries/mlf-foundation/Bootstrap/Set.emlf": "bac505cf121011b0b325d5ea59d1bd8c2abd919a8158516540d707a813abbc77",
+    "libraries/mlf-foundation/Bootstrap/Std.emlf": "50c455982728484d3e3cc0359f4314f5bfeef0706e051701979fd529779428f7",
+    "libraries/mlf-foundation/Bootstrap/Types.emlf": "d1a91daafa57b3737bc740341c298d055d2a9fddd6b4e07df0ccaa02e6bf7b6f",
+    "libraries/mlf-foundation/Bootstrap/Unicode.emlf": "fdde8c09d3cd1bdddcbc6a3c65c6ab7668c8d60b6795d9a0c106a098c1b647b4",
+    "libraries/mlf-foundation/Bootstrap/Version.emlf": "793ce9332bcc00860936a346d7de7be3092d2df908a5f960aec6e6ede675fa6e",
+    "libraries/mlf-frontend/Bootstrap/Dependency.emlf": "5db1223af39c496ea7e3a408cc0d99f0f3bd2af155a37e24c342d56bc8b92ef1",
+    "libraries/mlf-frontend/Bootstrap/Desugar.emlf": "d668bfb3dd66693907e72a087abffc6af35beab6e251ee4d1028b15ecb9da6c6",
+    "libraries/mlf-frontend/Bootstrap/Layout.emlf": "b9a9c36c58ecc464b4d5c2a7b71d030c144b405ba3ccb97d19c7bbaca857da5c",
+    "libraries/mlf-frontend/Bootstrap/Lexer.emlf": "702c67d0d3377ddc438b242762e1505945b91a959c94c737e117f0bafcee4161",
+    "libraries/mlf-frontend/Bootstrap/Module.emlf": "20fa7505bffaa6adde3a6b81c04d9d2331db4d5c97483b16d1548670922893b0",
+    "libraries/mlf-frontend/Bootstrap/Parsec.emlf": "6954761e3cc04fa7f07ddb2baaf9f30e2393908414e078d15c0dbdd0b6bc38c5",
+    "libraries/mlf-frontend/Bootstrap/Parser.emlf": "46f53ac936865958d33fd10631912938345a6f533353926c1448d85c637e320e",
+    "libraries/mlf-frontend/Bootstrap/Prelude.emlf": "e4908ab88f9cc3350e09ca09196db60abdfabb035055ff0ceff9a10a732c21d5",
+    "libraries/mlf-frontend/Bootstrap/Surface.emlf": "0439769f483688d5b57aeb3250179d81fb8aa696ecb62b5c474946f4e6a321da",
+    "libraries/mlf-inference/Bootstrap/Classes.emlf": "935a17ae9c26558c4be60158b6853b18fbc8f70d30aff845bf88a31eeaf5b132",
+    "libraries/mlf-inference/Bootstrap/Compiler.emlf": "e64e57abca6d9a76b494efeb2a6678235b4d0addd1e691409e704af8f9fa7541",
+    "libraries/mlf-inference/Bootstrap/CompilerCore.emlf": "c4062225d11aa65b8b14d4870d2620b226278a0ae38ac1d1ae6f1138a96751e9",
+    "libraries/mlf-inference/Bootstrap/Constraint.emlf": "9bd0875707a58662a4e5335f543997329b0d042179fe55ce8aadc20d5da9d05a",
+    "libraries/mlf-inference/Bootstrap/Elaborate.emlf": "479ffdbc081928375d1486d047e9a7f6a4ff77ce1a8ba5773dcc3520294c8c79",
+    "libraries/mlf-inference/Bootstrap/Evidence.emlf": "7e031bf638d709ac84822901cc3436223e2aaf0ec76aad46beb8ec2952c6d14d",
+    "libraries/mlf-inference/Bootstrap/Graph.emlf": "b7e9a41e7ae6a52b4aa0ce66f6caed1a5f3d597240e36ed2c836636aab63c0e9",
+    "libraries/mlf-inference/Bootstrap/Graph/Solver.emlf": "855dd4fef634d54cea98079aa7d51a42330ebfd8dd43c152286dd4323cf8a574",
+    "libraries/mlf-interpreter/Bootstrap/ProcessHost.emlf": "03cd10e0616d3404fb82b6f120279cdc206f7e2bde79f38e39532af6dea00b78",
+    "libraries/mlf-interpreter/Bootstrap/Runtime.emlf": "2b63421735d8df2ae8e25370734714f3c7aa859453cd4b8bd9e6d0840fc941cc",
+    "libraries/mlf-language-core/Bootstrap/Data.emlf": "46583e684ccab3d0fc4c7df39d8d3b107c424ff1022e9554b813b8bf8a3d297d",
+    "libraries/mlf-language-core/Bootstrap/Kind.emlf": "4195e17517b2eb3a6b12c0c96112b1b5b6d1119ef3e9f1ba0a1ecf043c831772",
+    "libraries/mlf-language-core/Bootstrap/Kinding.emlf": "517aec41c9260a6a463a3042717d589b97df175670ada755fd45fcdbc6f0d36c",
+    "libraries/mlf-language-core/Bootstrap/Primitive.emlf": "657ee8de16c2a00b8ac8f573340d125bf46af4a72605923b7ec1e8c55fc2dece",
+    "libraries/mlf-llvm/Bootstrap/LLVM.emlf": "e032138f3ba29e2164ae344cfe5a80df11defba8f641c1cc2ebd50f7fc1b0192",
+    "libraries/mlf-llvm/Bootstrap/LLVM/Analysis.emlf": "f86332d7c52df947bcd0a339de94956248ec7d05715f75fb81e2fb383e6f0717",
+    "libraries/mlf-llvm/Bootstrap/LLVM/Build.emlf": "d084a367c4c342b08b5a0c1b3b126c8ccd60c35e81e8dae28d8846cb14b4dc7f",
+    "libraries/mlf-llvm/Bootstrap/LLVM/Codegen.emlf": "77c9520d732fac519551ffe2858ded08d86a9a695754f7fbd68facf6bfe6d187",
+    "libraries/mlf-llvm/Bootstrap/LLVM/Kernel.emlf": "fa7a94be851dfc285786712060fed906bdf81270552f870c066d5303c580e434",
+    "libraries/mlf-llvm/Bootstrap/LLVM/Native.emlf": "5bd4bb7385588bd2c1456f7b403a073ae86d6aa3a9821b62a4656a4c4de5e9ed",
+    "libraries/mlf-llvm/Bootstrap/LLVM/Optimize.emlf": "d8f2b8610a18869651ae2fcb093f4d33fcd2c4541cd6a293561df6711e2b7c90",
+    "libraries/mlf-llvm/Bootstrap/LLVM/StrictFields.emlf": "f682768d57541fc748e3d3108235fbb51e9c479e4782d9b2c79732fb526afa72",
+    "libraries/mlf-llvm/Bootstrap/LLVM/StrictWrappers.emlf": "694b71d2e2740224ec3f13bc92eedc064084ae0002dd7ce8f387058e4e588696",
+    "libraries/mlf-package-core/Package/Build.emlf": "61d7b5a7adbcde41898c206816b1f1ec5717b99be2af81d78765c5470162310e",
+    "libraries/mlf-package-core/Package/Command.emlf": "95d0978744f4c6b4ae99cdbabd7b42e93e4d6aeb8eaf5bcf8a7996e0ab8ce1df",
+    "libraries/mlf-package-core/Package/Distribution.emlf": "ec0c7481ea595ccee5d4d21456201fc8c13a0f40feb9f5a85a8d41112d6fd1cd",
+    "libraries/mlf-package-core/Package/Json.emlf": "1773f620773d6ad42f53e254961212f4edb2c7c998edd22e688d995fc0816e6f",
+    "libraries/mlf-package-core/Package/Manifest.emlf": "7f3f9be8bc3e52f951b74e7f902d1cfa383f08285c2c7f90d7481dcef779fc80",
+    "libraries/mlf-package-core/Package/OS.emlf": "2c9bba00a2a194e87270dd97f2c90ba8727a0859170c07cbdf4f3caed1a77283",
+    "libraries/mlf-package-core/Package/Release.emlf": "01c5c7982ea7a5e88bb4b6c95ce41ddb67efbf0b4747fd861eb90daa4b7ac211",
+    "libraries/mlf-package-core/Package/Scheduler.emlf": "eb1e8407625844e0f82c70048024f24068f550d4f51c0fa8d4ed7d3fcdcf902b",
+    "libraries/mlf-xmlf/Bootstrap/X/Check.emlf": "b20e256bdc4d25ddfc3c76dc0c91083957133c3cf973de5a8244e40285defee6",
+    "libraries/mlf-xmlf/Bootstrap/X/Checked.emlf": "3c7070655b23fa04b0cdce11541c27dc5bb6dfb2924ce8099ab57cc798ab8cd8",
+    "libraries/mlf-xmlf/Bootstrap/X/Parser.emlf": "3ea0d9cb15c9d08c2ca76c0c1f5d903d34978b6476075c0ebfa9655aa8841f03",
+    "libraries/mlf-xmlf/Bootstrap/X/Pretty.emlf": "a7c23152c6297315e4ef0bf1dbba9685688cb68010c0194fa544c2c39f48f0e4",
+    "libraries/mlf-xmlf/Bootstrap/X/Syntax.emlf": "40ef760efb420654dcc7f5c05334eafea81f21d0bc269f8e0d1de9ee5c5eda70",
+    "libraries/mlf-xmlf/Bootstrap/X/Type.emlf": "ac916c2902d99edfce443f96930cdc52bdf341eff3007c38d203450400b9446c",
+    "tests/TupleListMain.emlf": "17679f297f15966d52774ca927f857f980b46ee0337aa94921c3b9514c2ed2f9",
+    "tests/Tests/IndependentCheck.emlf": "df690d2d3c1c647b4b509fd16c80316c8bc659c8f24e6b6c3efc84c93bf0d57a",
+    "tests/Tests/IndependentType.emlf": "60e5ea9c795f793e196fe51f1b613edb4eb629f8e116406361ed44188a5eb1e2",
+    "bootstrap/Main.emlf": "2600a48d0ba33dda74c39583a9563cead7efc98fe9eeb60b36a798e6536e4fa7",
+    "package/Main.emlf": "da6114c893bf6ee46e04d0f1da9cc70da9fac34ff3918aba52754f6fc52f6922",
+    "tests/CompilerTestsMain.emlf": "9c561f2093707ff916ca33bfd85cdd8860b689f7adf0389ae2dcf60985f0369f",
+    "tests/Tests/CompilerTests.emlf": "b20f33c4fb833f25b534567068e1ae24bc5e783472d17efdbdc6a772ff841ad6",
+    "tests/Tests/CorePartitions.emlf": "030dd77f0aa59fff51760f9310273d720bd48ebda1b8eee533539c132aee6aa1",
+    "tests/Tests/Coverage.emlf": "829ec5c1716b46584a53996932a4c48c60831b375d53a995c5baccf61b10e49e",
+    "tests/Tests/TestDrivers.emlf": "f2d5c272e9c9a859f2db630c10c7fe496bd9e03f351a32fc652ef4d693f9443d",
+    "tests/Tests/TestSources.emlf": "83cebaa9152894f1d7123f77a50cabdc39ed4ce00967083e8cb4fa3c5f12410c",
+    "tests/Tests/Catalog.emlf": "aa5d9f9ea8c97b8b0b4220abcff1c5fd5507b49398db937d5154617a69a38f80",
+    "tests/Tests/Selection.emlf": "d3394a6fc01fa350ffbd5741a89bf3c0a77bf7f4e01cc3580a97f44f07e60cc2"
+  }
+}

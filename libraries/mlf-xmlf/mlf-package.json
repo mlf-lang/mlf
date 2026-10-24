@@ -15,12 +15,13 @@
   },
   "library": {
     "modules": {
-      "Bootstrap.X.Check": "Bootstrap/X/Check.emlf",
-      "Bootstrap.X.Checked": "Bootstrap/X/Checked.emlf",
-      "Bootstrap.X.Parser": "Bootstrap/X/Parser.emlf",
-      "Bootstrap.X.Pretty": "Bootstrap/X/Pretty.emlf",
-      "Bootstrap.X.Syntax": "Bootstrap/X/Syntax.emlf",
-      "Bootstrap.X.Type": "Bootstrap/X/Type.emlf"
+      "Bootstrap.X.Check": "Bootstrap/X/Check.hs",
+      "Bootstrap.X.Checked": "Bootstrap/X/Checked.hs",
+      "Bootstrap.X.Parser": "Bootstrap/X/Parser.hs",
+      "Bootstrap.X.Pretty": "Bootstrap/X/Pretty.hs",
+      "Bootstrap.X.Syntax": "Bootstrap/X/Syntax.hs",
+      "Bootstrap.X.Type": "Bootstrap/X/Type.hs"
     }
-  }
+  },
+  "source-syntax": "shared-haskell-v1"
 }

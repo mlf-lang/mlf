@@ -1,0 +1,747 @@
+{
+  "schema_version": 1,
+  "signatures": [
+    [
+      "id",
+      "forall a. a -> a"
+    ],
+    [
+      "choose",
+      "forall a. a -> a -> a"
+    ],
+    [
+      "nil",
+      "forall p. List p"
+    ],
+    [
+      "ids",
+      "List (forall a. a -> a)"
+    ],
+    [
+      "auto",
+      "(forall a. a -> a) -> (forall a. a -> a)"
+    ],
+    [
+      "auto'",
+      "forall b. (forall a. a -> a) -> b -> b"
+    ],
+    [
+      "poly",
+      "(forall a. a -> a) -> Pair Int Bool"
+    ],
+    [
+      "app",
+      "forall a b. (a -> b) -> a -> b"
+    ],
+    [
+      "revapp",
+      "forall a b. a -> (a -> b) -> b"
+    ],
+    [
+      "runST",
+      "forall d. (forall s. ST s d) -> d"
+    ],
+    [
+      "argST",
+      "forall s. ST s Int"
+    ],
+    [
+      "length",
+      "forall p. List p -> Int"
+    ],
+    [
+      "tail",
+      "forall p. List p -> List p"
+    ],
+    [
+      "head",
+      "forall p. List p -> p"
+    ],
+    [
+      "single",
+      "forall p. p -> List p"
+    ],
+    [
+      "cons",
+      "forall p. p -> List p -> List p"
+    ],
+    [
+      "append",
+      "forall p. List p -> List p -> List p"
+    ],
+    [
+      "inc",
+      "Int -> Int"
+    ],
+    [
+      "map",
+      "forall p q. (p -> q) -> List p -> List q"
+    ],
+    [
+      "compose",
+      "forall a b c. (b -> c) -> (a -> b) -> a -> c"
+    ],
+    [
+      "pair",
+      "forall a b. a -> b -> Pair a b"
+    ]
+  ],
+  "cases": [
+    {
+      "id": "A1",
+      "expression": "\\x y -> y",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A2",
+      "expression": "choose id",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A3",
+      "expression": "choose nil ids",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A4",
+      "expression": "\\(x : forall a. a -> a) -> x x",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A5",
+      "expression": "id auto",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A6",
+      "expression": "id auto'",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A7",
+      "expression": "choose id auto",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A8",
+      "expression": "choose id auto'",
+      "paper_acceptance": true,
+      "expected_acceptance": false,
+      "local_signatures": []
+    },
+    {
+      "id": "A9",
+      "expression": "f (choose id) ids",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": [
+        [
+          "f",
+          "forall a. (a -> a) -> List a -> a"
+        ]
+      ]
+    },
+    {
+      "id": "A10.1",
+      "expression": "poly id",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A10.2",
+      "expression": "poly (\\x -> x)",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A10.3",
+      "expression": "id poly (\\x -> x)",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A11",
+      "expression": "k (\\f -> pair (f 1) (f True)) xs",
+      "paper_acceptance": false,
+      "expected_acceptance": false,
+      "local_signatures": [
+        [
+          "k",
+          "forall a. a -> List a -> Int"
+        ],
+        [
+          "xs",
+          "List ((forall a. a -> a) -> Pair Int Bool)"
+        ]
+      ]
+    },
+    {
+      "id": "A12.1",
+      "expression": "poly id",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A12.2",
+      "expression": "app poly id",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A12.3",
+      "expression": "revapp id poly",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A13.1",
+      "expression": "app runST argST",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "A13.2",
+      "expression": "revapp argST runST",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "B1.1",
+      "expression": "length ids",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "B1.2",
+      "expression": "tail ids",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "B1.3",
+      "expression": "head ids",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "B1.4",
+      "expression": "single id",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "B2",
+      "expression": "cons id ids",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "B3",
+      "expression": "cons (\\x -> x) ids",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "B4",
+      "expression": "append (single inc) (single id)",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "B5",
+      "expression": "append (single id) ids",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "B6",
+      "expression": "map poly (single id)",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "B7.1",
+      "expression": "map head (single ids)",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "B7.2",
+      "expression": "head ids True",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "C1a",
+      "expression": "\\f -> pair (f 1) (f True)",
+      "paper_acceptance": false,
+      "expected_acceptance": false,
+      "local_signatures": []
+    },
+    {
+      "id": "C1b",
+      "expression": "\\(f : forall a. a -> a) -> pair (f 1) (f True)",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "C1c",
+      "expression": "g (\\f -> pair (f 1) (f True))",
+      "paper_acceptance": false,
+      "expected_acceptance": false,
+      "local_signatures": [
+        [
+          "g",
+          "((forall a. a -> a) -> Pair Int Bool) -> Char"
+        ]
+      ]
+    },
+    {
+      "id": "C2",
+      "expression": "r (\\x y -> y)",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": [
+        [
+          "r",
+          "(forall a. a -> (forall b. b -> b)) -> Int"
+        ]
+      ]
+    },
+    {
+      "id": "E1a",
+      "expression": "k h lst",
+      "paper_acceptance": false,
+      "expected_acceptance": false,
+      "local_signatures": [
+        [
+          "k",
+          "forall a. a -> List a -> a"
+        ],
+        [
+          "h",
+          "Int -> (forall a. a -> a)"
+        ],
+        [
+          "lst",
+          "List (forall a. Int -> a -> a)"
+        ]
+      ]
+    },
+    {
+      "id": "E1b",
+      "expression": "k (\\x -> h x) lst",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": [
+        [
+          "k",
+          "forall a. a -> List a -> a"
+        ],
+        [
+          "h",
+          "Int -> (forall a. a -> a)"
+        ],
+        [
+          "lst",
+          "List (forall a. Int -> a -> a)"
+        ]
+      ]
+    },
+    {
+      "id": "E2a",
+      "expression": "\\x -> poly x",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "E2b",
+      "expression": "(\\x -> poly x) : (forall a. a -> a) -> Pair Int Bool",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "E3a",
+      "expression": "app poly id",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "E3b",
+      "expression": "app (\\x -> poly x) id",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "E4a",
+      "expression": "map poly ids",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "E4b",
+      "expression": "map (\\x -> poly x) ids",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "E5a",
+      "expression": "compose poly head",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    },
+    {
+      "id": "E5b",
+      "expression": "\\xs -> poly (head xs)",
+      "paper_acceptance": true,
+      "expected_acceptance": true,
+      "local_signatures": []
+    }
+  ],
+  "type_checks": [
+    {
+      "label": "A1 principal type",
+      "source": "\\x y -> y",
+      "expected": [
+        "XForall",
+        [
+          "XTyVar",
+          1
+        ],
+        [
+          "XBot"
+        ],
+        [
+          "XForall",
+          [
+            "XTyVar",
+            2
+          ],
+          [
+            "XForall",
+            [
+              "XTyVar",
+              0
+            ],
+            [
+              "XBot"
+            ],
+            [
+              "XArrow",
+              [
+                "XVar",
+                [
+                  "XTyVar",
+                  0
+                ]
+              ],
+              [
+                "XVar",
+                [
+                  "XTyVar",
+                  0
+                ]
+              ]
+            ]
+          ],
+          [
+            "XArrow",
+            [
+              "XVar",
+              [
+                "XTyVar",
+                1
+              ]
+            ],
+            [
+              "XVar",
+              [
+                "XTyVar",
+                2
+              ]
+            ]
+          ]
+        ]
+      ]
+    },
+    {
+      "label": "A2 principal type",
+      "source": "let choose = ((\\x y -> x) : forall a. a -> a -> a) in let id = \\x -> x in choose id",
+      "expected": [
+        "XForall",
+        [
+          "XTyVar",
+          1
+        ],
+        [
+          "XForall",
+          [
+            "XTyVar",
+            0
+          ],
+          [
+            "XBot"
+          ],
+          [
+            "XArrow",
+            [
+              "XVar",
+              [
+                "XTyVar",
+                0
+              ]
+            ],
+            [
+              "XVar",
+              [
+                "XTyVar",
+                0
+              ]
+            ]
+          ]
+        ],
+        [
+          "XArrow",
+          [
+            "XVar",
+            [
+              "XTyVar",
+              1
+            ]
+          ],
+          [
+            "XVar",
+            [
+              "XTyVar",
+              1
+            ]
+          ]
+        ]
+      ]
+    },
+    {
+      "label": "A4 inferred result bound",
+      "source": "\\(x : forall a. a -> a) -> x x",
+      "expected": [
+        "XForall",
+        [
+          "XTyVar",
+          1
+        ],
+        [
+          "XForall",
+          [
+            "XTyVar",
+            0
+          ],
+          [
+            "XBot"
+          ],
+          [
+            "XArrow",
+            [
+              "XVar",
+              [
+                "XTyVar",
+                0
+              ]
+            ],
+            [
+              "XVar",
+              [
+                "XTyVar",
+                0
+              ]
+            ]
+          ]
+        ],
+        [
+          "XArrow",
+          [
+            "XForall",
+            [
+              "XTyVar",
+              0
+            ],
+            [
+              "XBot"
+            ],
+            [
+              "XArrow",
+              [
+                "XVar",
+                [
+                  "XTyVar",
+                  0
+                ]
+              ],
+              [
+                "XVar",
+                [
+                  "XTyVar",
+                  0
+                ]
+              ]
+            ]
+          ],
+          [
+            "XVar",
+            [
+              "XTyVar",
+              1
+            ]
+          ]
+        ]
+      ]
+    },
+    {
+      "label": "A4 admits paper signature",
+      "source": "(\\(x : forall a. a -> a) -> x x) : (forall a. a -> a) -> (forall a. a -> a)",
+      "expected": [
+        "XArrow",
+        [
+          "XForall",
+          [
+            "XTyVar",
+            0
+          ],
+          [
+            "XBot"
+          ],
+          [
+            "XArrow",
+            [
+              "XVar",
+              [
+                "XTyVar",
+                0
+              ]
+            ],
+            [
+              "XVar",
+              [
+                "XTyVar",
+                0
+              ]
+            ]
+          ]
+        ],
+        [
+          "XForall",
+          [
+            "XTyVar",
+            0
+          ],
+          [
+            "XBot"
+          ],
+          [
+            "XArrow",
+            [
+              "XVar",
+              [
+                "XTyVar",
+                0
+              ]
+            ],
+            [
+              "XVar",
+              [
+                "XTyVar",
+                0
+              ]
+            ]
+          ]
+        ]
+      ]
+    }
+  ],
+  "repairs": [
+    {
+      "id": "A11",
+      "expression": "k (\\(f : forall a. a -> a) -> pair (f 1) (f True)) xs",
+      "paper_acceptance": false,
+      "expected_acceptance": true,
+      "local_signatures": [
+        [
+          "k",
+          "forall a. a -> List a -> Int"
+        ],
+        [
+          "xs",
+          "List ((forall a. a -> a) -> Pair Int Bool)"
+        ]
+      ],
+      "label": "A11 explicit annotation control"
+    },
+    {
+      "id": "C1a",
+      "expression": "\\(f : forall a. a -> a) -> pair (f 1) (f True)",
+      "paper_acceptance": false,
+      "expected_acceptance": true,
+      "local_signatures": [],
+      "label": "C1a explicit annotation control"
+    },
+    {
+      "id": "C1c",
+      "expression": "g (\\(f : forall a. a -> a) -> pair (f 1) (f True))",
+      "paper_acceptance": false,
+      "expected_acceptance": true,
+      "local_signatures": [
+        [
+          "g",
+          "((forall a. a -> a) -> Pair Int Bool) -> Char"
+        ]
+      ],
+      "label": "C1c explicit annotation control"
+    }
+  ],
+  "fixture_sha256": {
+    "tests/Tests/Figure12.emlf": "457ee5cfbb36eee2a3670efb582d56057f3ef906b97355502e85c9f84cfaeeea",
+    "tests/Tests/Figure12Suite.emlf": "8f91eaecf14a0e72bdf9eee9b6915cc93c54abc03264f7712f3d9efaa1147bdc",
+    "tests/Tests/Helpers.emlf": "e469496b071069d027e8779d36b75f3bc9bf41db6fbbbbd6dad0890f98a388c3",
+    "tests/Tests/Map.emlf": "e25205f125fdc00a8e8c09f255779f3b293b50116f8eeb5b7d715a89417e0026",
+    "tests/Tests/Set.emlf": "156c8cd12a13cad2d164821b63246e4f3ded13979243fd2efcc40f32ff6e9cfa"
+  }
+}

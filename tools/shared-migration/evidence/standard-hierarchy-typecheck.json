@@ -1,0 +1,1274 @@
+{
+  "builtin_interface": "mlf-primitive/shared-haskell-v1/3",
+  "cc": {
+    "path": "/usr/bin/x86_64-linux-gnu-gcc-14",
+    "sha256": "a23ecab8ff08f09ad8c80602c2c5df7f49e09c25905cb8975902e101bf72635f"
+  },
+  "commands": [
+    {
+      "argv": [
+        "/workspace/shared/mlf-ghcup/.ghcup/ghc/9.14.1/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-fforce-recomp",
+        "-v",
+        "-fno-code",
+        "-XHaskell2010",
+        "-package-env",
+        "-",
+        "-hide-all-packages",
+        "-O0",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-i",
+        "-i/workspace/shared/mlf-shared-source-migration/libraries/mlf-async",
+        "-i/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates",
+        "-i/workspace/shared/mlf-shared-source-migration/libraries/mlf-developer-tools",
+        "-i/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation",
+        "-i/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend",
+        "-i/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference",
+        "-i/workspace/shared/mlf-shared-source-migration/libraries/mlf-interpreter",
+        "-i/workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core",
+        "-i/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm",
+        "-i/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core",
+        "-i/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf",
+        "-i/workspace/shared/mlf-shared-source-migration/bootstrap",
+        "-i/workspace/shared/mlf-shared-source-migration/package",
+        "-i/workspace/shared/mlf-shared-source-migration/tests",
+        "-i/workspace/shared/mlf-shared-source-migration/tests/shared",
+        "-i/workspace/shared/mlf-shared-source-migration/host/ghc",
+        "-odir",
+        "/tmp/mlf-standard-hierarchy-typecheck/objects",
+        "-hidir",
+        "/tmp/mlf-standard-hierarchy-typecheck/objects",
+        "-package",
+        "base",
+        "-package",
+        "array",
+        "-package",
+        "bytestring",
+        "-package",
+        "text",
+        "-package",
+        "containers",
+        "-package",
+        "directory",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Process.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Process/Internal.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Task.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Task/Core.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Task/Internal.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Classes.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Compiler.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/CompilerCore.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Constraint.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/Crate.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/CrateArtifact.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/CrateCodegen.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Data.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Dependency.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Desugar.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Elaborate.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Evidence.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Fresh.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Graph.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Graph/Solver.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Host.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/InferenceUnit.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/IntMap.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/IntSet.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Kind.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Kinding.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Analysis.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Build.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Kernel.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Native.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/StrictFields.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/StrictWrappers.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Layout.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Lexer.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Map.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Module.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Parsec.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Parser.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Prelude.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Primitive.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-interpreter/Bootstrap/ProcessHost.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Regex.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/ST.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/Separate.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Set.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/SourceEquality.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Std.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Surface.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Types.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Unicode.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Version.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Check.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Checked.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Parser.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Pretty.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Syntax.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Type.hs",
+        "/workspace/shared/mlf-shared-source-migration/tests/MLF/Entry/CompilerTests.hs",
+        "/workspace/shared/mlf-shared-source-migration/bootstrap/MLF/Entry/Emlf.hs",
+        "/workspace/shared/mlf-shared-source-migration/package/MLF/Entry/Mlfpkg.hs",
+        "/workspace/shared/mlf-shared-source-migration/tests/MLF/Entry/TupleList.hs",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/ProcessMain.hs",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/ProcessPanic.hs",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/TaskMain.hs",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/TaskProcesses.hs",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/TaskWaitGraph.hs",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/BuildReceipts.hs",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/SharedFrontend.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-developer-tools/Package/Benchmark.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Build.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Command.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Distribution.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Json.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Manifest.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/OS.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Release.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Scheduler.hs",
+        "/workspace/shared/mlf-shared-source-migration/libraries/mlf-developer-tools/Package/Verification.hs",
+        "/workspace/shared/mlf-shared-source-migration/tests/Tests/BuildReceipts.hs",
+        "/workspace/shared/mlf-shared-source-migration/tests/Tests/Catalog.hs",
+        "/workspace/shared/mlf-shared-source-migration/tests/Tests/CompilerTests.hs",
+        "/workspace/shared/mlf-shared-source-migration/tests/Tests/CorePartitions.hs",
+        "/workspace/shared/mlf-shared-source-migration/tests/Tests/Coverage.hs",
+        "/workspace/shared/mlf-shared-source-migration/tests/Tests/IndependentCheck.hs",
+        "/workspace/shared/mlf-shared-source-migration/tests/Tests/IndependentType.hs",
+        "/workspace/shared/mlf-shared-source-migration/tests/Tests/Selection.hs",
+        "/workspace/shared/mlf-shared-source-migration/tests/Tests/TestDrivers.hs",
+        "/workspace/shared/mlf-shared-source-migration/tests/Tests/TestSources.hs"
+      ],
+      "cwd": "/workspace/shared/mlf-shared-source-migration",
+      "exit_code": 0,
+      "log": "/tmp/mlf-standard-hierarchy-typecheck/shared-compile.log",
+      "log_sha256": "6662fd7e74bf46e776a25bcdce726680023c4054c2b425b202e420b5f7b1f8bc",
+      "seconds": 5.5348241329193115,
+      "started": 1792790150.42706
+    }
+  ],
+  "complete": true,
+  "flags": [
+    "-XHaskell2010",
+    "-package-env",
+    "-",
+    "-hide-all-packages",
+    "-O0",
+    "-fpedantic-bottoms",
+    "-fno-state-hack",
+    "-i",
+    "-i/workspace/shared/mlf-shared-source-migration/libraries/mlf-async",
+    "-i/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates",
+    "-i/workspace/shared/mlf-shared-source-migration/libraries/mlf-developer-tools",
+    "-i/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation",
+    "-i/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend",
+    "-i/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference",
+    "-i/workspace/shared/mlf-shared-source-migration/libraries/mlf-interpreter",
+    "-i/workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core",
+    "-i/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm",
+    "-i/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core",
+    "-i/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf",
+    "-i/workspace/shared/mlf-shared-source-migration/bootstrap",
+    "-i/workspace/shared/mlf-shared-source-migration/package",
+    "-i/workspace/shared/mlf-shared-source-migration/tests",
+    "-i/workspace/shared/mlf-shared-source-migration/tests/shared",
+    "-i/workspace/shared/mlf-shared-source-migration/host/ghc",
+    "-odir",
+    "/tmp/mlf-standard-hierarchy-typecheck/objects",
+    "-hidir",
+    "/tmp/mlf-standard-hierarchy-typecheck/objects",
+    "-package",
+    "base",
+    "-package",
+    "array",
+    "-package",
+    "bytestring",
+    "-package",
+    "text",
+    "-package",
+    "containers",
+    "-package",
+    "directory"
+  ],
+  "format": 1,
+  "frontend_semantics": "mlf-frontend/shared-haskell-v1/2",
+  "ghc": {
+    "path": "/workspace/shared/mlf-ghcup/.ghcup/ghc/9.14.1/bin/ghc-9.14.1",
+    "sha256": "c2002ccc36c07bfd88dc20736b6391fb41df37a9e536d299d714519ca9cf2f68",
+    "version": "9.14.1"
+  },
+  "host_inputs": {
+    "host/ghc/MLF/Host/Async.hs": {
+      "path": "/workspace/shared/mlf-shared-source-migration/host/ghc/MLF/Host/Async.hs",
+      "sha256": "d576fb9829c9d7eed49c728bc67a05266f74850f5a38bde346783d269013d0c3"
+    },
+    "host/ghc/MLF/Host/Base.hs": {
+      "path": "/workspace/shared/mlf-shared-source-migration/host/ghc/MLF/Host/Base.hs",
+      "sha256": "6d60cb8f2349293f2a797348b202577267df5f69d334cc936df6be455e547a4d"
+    },
+    "host/ghc/MLF/Host/IO.hs": {
+      "path": "/workspace/shared/mlf-shared-source-migration/host/ghc/MLF/Host/IO.hs",
+      "sha256": "6779594885592e3661f0070c0a1f2244d7563d5e3b19bcb1a0b47c6af934adf8"
+    },
+    "host/ghc/MLF/Primitive.hs": {
+      "path": "/workspace/shared/mlf-shared-source-migration/host/ghc/MLF/Primitive.hs",
+      "sha256": "ffe9fd2106149e664e5ca22e1e1eae51cf4b0a1541cee090f1e7bc9185efa031"
+    },
+    "host/ghc/app/async-process-panic/Main.hs": {
+      "path": "/workspace/shared/mlf-shared-source-migration/host/ghc/app/async-process-panic/Main.hs",
+      "sha256": "48badddd5a36322c9951a3748fd1969061172d84b92e19c385e772d1547a68a3"
+    },
+    "host/ghc/app/async-process/Main.hs": {
+      "path": "/workspace/shared/mlf-shared-source-migration/host/ghc/app/async-process/Main.hs",
+      "sha256": "c889c5a273ec1539dbf299139722071efa3de2e1590fb929266e75ec4a3b16f6"
+    },
+    "host/ghc/app/async-task-processes/Main.hs": {
+      "path": "/workspace/shared/mlf-shared-source-migration/host/ghc/app/async-task-processes/Main.hs",
+      "sha256": "a2e16710521b6a1d77c3275cc2f3c0e56160e087eeb4431700b69368857c1ce9"
+    },
+    "host/ghc/app/async-task-wait-graph/Main.hs": {
+      "path": "/workspace/shared/mlf-shared-source-migration/host/ghc/app/async-task-wait-graph/Main.hs",
+      "sha256": "cf0f59fb35b72879f26331611e41d74d1dba36fd1dca052e11069bec1a6cbe03"
+    },
+    "host/ghc/app/async-task/Main.hs": {
+      "path": "/workspace/shared/mlf-shared-source-migration/host/ghc/app/async-task/Main.hs",
+      "sha256": "7e7222232f45bebc64dc62af928a455455d6ba85a148270b8ae099e38088f467"
+    },
+    "host/ghc/app/build-receipts/Main.hs": {
+      "path": "/workspace/shared/mlf-shared-source-migration/host/ghc/app/build-receipts/Main.hs",
+      "sha256": "599861ed887c9b3afa2cd9f2dac9e47becc8412e5c83a2f5404b39e32921f1ee"
+    },
+    "host/ghc/app/compiler-tests/Main.hs": {
+      "path": "/workspace/shared/mlf-shared-source-migration/host/ghc/app/compiler-tests/Main.hs",
+      "sha256": "a56de13a32142ead9cadbbe8f658486d7ab267acc6026cbfd888f6ec6d5e7e7c"
+    },
+    "host/ghc/app/emlf/Main.hs": {
+      "path": "/workspace/shared/mlf-shared-source-migration/host/ghc/app/emlf/Main.hs",
+      "sha256": "72d926eedd4e5abc40b8f0bc925a39d20995397f0d4144b4abd932ef2aaa6d79"
+    },
+    "host/ghc/app/mlfpkg/Main.hs": {
+      "path": "/workspace/shared/mlf-shared-source-migration/host/ghc/app/mlfpkg/Main.hs",
+      "sha256": "5f1acf5faa8530f1d66bcf00bd9f6ea4eb82596c53164c54304a6ce11f30cfab"
+    },
+    "host/ghc/app/shared-frontend/Main.hs": {
+      "path": "/workspace/shared/mlf-shared-source-migration/host/ghc/app/shared-frontend/Main.hs",
+      "sha256": "f0fac1e7c6bffa967895f787bba8f54fbb252440a7f720c4140c5890cbd72dc7"
+    },
+    "host/ghc/app/tuple-list/Main.hs": {
+      "path": "/workspace/shared/mlf-shared-source-migration/host/ghc/app/tuple-list/Main.hs",
+      "sha256": "dec238795da4b899f6797f645893e93670f0a450babfe2f6249cb16a15962c34"
+    },
+    "host/ghc/cbits/host.c": {
+      "path": "/workspace/shared/mlf-shared-source-migration/host/ghc/cbits/host.c",
+      "sha256": "bfcf4b400902afaa89e0d6cbe0de5901a4e1e89c6100d203e50c3099ba7fc694"
+    },
+    "runtime/khash.h": {
+      "path": "/workspace/shared/mlf-shared-source-migration/runtime/khash.h",
+      "sha256": "4582c7fd4b98f61339ce677bb1daa7a45a53075b112a494a335525c4bda72074"
+    },
+    "runtime/mlf_build_runner_hash.h": {
+      "path": "/workspace/shared/mlf-shared-source-migration/runtime/mlf_build_runner_hash.h",
+      "sha256": "cbbdfd06eb43324dceef594e42b21621559df3e3d4e91d62f2b73e2b04d9e778"
+    },
+    "runtime/mlf_build_runner_posix.h": {
+      "path": "/workspace/shared/mlf-shared-source-migration/runtime/mlf_build_runner_posix.h",
+      "sha256": "bc35cc65f2002b2f455a524c2a1c3bc12ea8637fc63bb88e3d49185e91448e27"
+    },
+    "runtime/mlf_completion.h": {
+      "path": "/workspace/shared/mlf-shared-source-migration/runtime/mlf_completion.h",
+      "sha256": "7eb127736e53948a324b58715abdea3f8df98900ca4724a94f59ca66b79388c5"
+    },
+    "runtime/mlf_integer64.h": {
+      "path": "/workspace/shared/mlf-shared-source-migration/runtime/mlf_integer64.h",
+      "sha256": "fab1c2bc3116aeec5de2934a7c97d388ac7b0f950eaeea36009fdc440bb9a867"
+    },
+    "runtime/mlf_process_binding.h": {
+      "path": "/workspace/shared/mlf-shared-source-migration/runtime/mlf_process_binding.h",
+      "sha256": "cce45265d51657e674e7f68d08f0bf33f8d2f26913a53977d2158fcaf92903de"
+    },
+    "runtime/mlf_process_supervisor.c": {
+      "path": "/workspace/shared/mlf-shared-source-migration/runtime/mlf_process_supervisor.c",
+      "sha256": "a96b93a30f8ade5cebbfca070ad36bd77ef5bcbd9560ac371a3d36c5c45d22e9"
+    },
+    "runtime/mlf_process_supervisor.h": {
+      "path": "/workspace/shared/mlf-shared-source-migration/runtime/mlf_process_supervisor.h",
+      "sha256": "808e2b68f101b03f6250d448b2e1100e1bdde2e060c669d783a0513b21d8fc05"
+    },
+    "runtime/mlf_process_supervisor_posix.h": {
+      "path": "/workspace/shared/mlf-shared-source-migration/runtime/mlf_process_supervisor_posix.h",
+      "sha256": "fd0d199345e9d6310aaabe3dbab858a121a03c5cfafd28de50042d78ae0438ac"
+    },
+    "runtime/mlf_runtime.h": {
+      "path": "/workspace/shared/mlf-shared-source-migration/runtime/mlf_runtime.h",
+      "sha256": "2cd1904ede9187e7299f171950b43e2f457945f4a506a3a4c4966e865ab73e6b"
+    },
+    "runtime/mlf_system.h": {
+      "path": "/workspace/shared/mlf-shared-source-migration/runtime/mlf_system.h",
+      "sha256": "eb1f0f97ece2bd95a60a75e4c7445b5c2cbd2ff75c75545e2ac673f2f3157cff"
+    },
+    "runtime/mlf_system_windows.h": {
+      "path": "/workspace/shared/mlf-shared-source-migration/runtime/mlf_system_windows.h",
+      "sha256": "579be9ae3318afb6d70eadc8a1465d11a101673c6f5f982e50669889a419eb24"
+    },
+    "runtime/mlf_windows.h": {
+      "path": "/workspace/shared/mlf-shared-source-migration/runtime/mlf_windows.h",
+      "sha256": "618fb88b0c854fcbe8dffee5b961a74025d79b89c00d7158dc540b15066e4b56"
+    },
+    "runtime/mlf_windows_path.h": {
+      "path": "/workspace/shared/mlf-shared-source-migration/runtime/mlf_windows_path.h",
+      "sha256": "e52b718c63e0603cb653a3874ae1a6130cd5a184121dde7868c4d03376c84e05"
+    }
+  },
+  "implementation_language": "MLF/shared-haskell-v1",
+  "manifest_sha256": "be4c3a2080dd6bc252bed3ee2a533201af668567b923a8d9fdd5725afd317482",
+  "object_inputs": {},
+  "optimization": "0",
+  "outputs": {},
+  "package_database_sha256": "8a5cdc0ae9182daa56c8f7abf57953fab607597aada56c1e02c9c9af3e6b6775",
+  "primitive_abi": "mlf-primitive-95-v1",
+  "producer_host": "GHC",
+  "resolved_modules": {
+    "Async.Process": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Process.hs",
+      "sha256": "70d466818728f7b80ee732df654e083006cc33f6038623d22f52086bd9613b87"
+    },
+    "Async.Process.Internal": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Process/Internal.hs",
+      "sha256": "03e65dccf009af52f072a7fc0ef8d5eee555e9452962dd254f453bc3afc42e42"
+    },
+    "Async.Task": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Task.hs",
+      "sha256": "1f4ae8f633e3cf78dfadeaa9bde2999a9bc31c7c37769a8f30351a3f99b4afca"
+    },
+    "Async.Task.Core": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Task/Core.hs",
+      "sha256": "33e30b6c2f055619b8da163b39621b08eaab1b77eda39bf3bbaf61a77c4bcdce"
+    },
+    "Async.Task.Internal": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Task/Internal.hs",
+      "sha256": "a87ab11e316ec7c4ff28a5f9974b61ecb58aebeeb3f3227646d02ed3e7416e00"
+    },
+    "Bootstrap.Classes": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Classes.hs",
+      "sha256": "3c028c4e7c5d94a42e67674f74ce492869e00926c39af2806f3205cd67ac15ca"
+    },
+    "Bootstrap.Compiler": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Compiler.hs",
+      "sha256": "8cbc5c40ca5af2928434cf4331d3bd8e40f88d8919ae84aab193ef5b93ced933"
+    },
+    "Bootstrap.CompilerCore": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/CompilerCore.hs",
+      "sha256": "ba168375f092a060bee2973baec578bd2ce3506d125d9c7760330dc78b8dd924"
+    },
+    "Bootstrap.Constraint": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Constraint.hs",
+      "sha256": "83efd6c2a2bf72cee2e608e8ed627194c006c60f780cd58225e465d3fe83e451"
+    },
+    "Bootstrap.Crate": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/Crate.hs",
+      "sha256": "45af761abd4835ec6adff8be909bf21bc8f43e981d2e9f41327b03630acc88db"
+    },
+    "Bootstrap.CrateArtifact": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/CrateArtifact.hs",
+      "sha256": "f6bf0615d05a299f9f711143ce89f0285e78849626487db2b6a48c62a4210d2b"
+    },
+    "Bootstrap.CrateCodegen": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/CrateCodegen.hs",
+      "sha256": "f27d23156701fb2bc1aa0d53b3d3d130b255e47a2230b306e47df26b18e2cdb3"
+    },
+    "Bootstrap.CrateQuery": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+      "sha256": "9045d0e0b4615c85e642d49230520d86070e8a116c3dc3eb5c7adf5c4f807980"
+    },
+    "Bootstrap.Data": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Data.hs",
+      "sha256": "9c414bdf4a699c001e953e42842f3904491ce7af7e2a5e36001a65216bda8c68"
+    },
+    "Bootstrap.Dependency": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Dependency.hs",
+      "sha256": "516ea1e67b423df4fb708536aa783ec468b7228a0e65c487ac2baafd19c7c385"
+    },
+    "Bootstrap.Desugar": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Desugar.hs",
+      "sha256": "b0322dafbf6664a4ad377006e5d62852972899de634d3e9ddbeec1e1d5d1b4bf"
+    },
+    "Bootstrap.Elaborate": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Elaborate.hs",
+      "sha256": "ea6425f74d83ed02ba4c07f9e9d960a5ab2c0bf7ccf7e3d596bcf10f75f54dae"
+    },
+    "Bootstrap.Evidence": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Evidence.hs",
+      "sha256": "27fd8a246d9792ac950e15ae0b4187c8513d0cf455f259bbfb34407b83359361"
+    },
+    "Bootstrap.Fresh": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Fresh.hs",
+      "sha256": "7eeec3f65a6b8172bc76b3acb09f699642e4e6d93cb0c6e0bc6ae3d88c3b1869"
+    },
+    "Bootstrap.Graph": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Graph.hs",
+      "sha256": "d72a6d404403efa3956ce25ac686638b4075ad91983049b29910899d43d01a0f"
+    },
+    "Bootstrap.Graph.Solver": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Graph/Solver.hs",
+      "sha256": "c62a62585213527149e5ea8a0f322a8f7e8e7c985e8fd632f26ee3f50eae8ade"
+    },
+    "Bootstrap.Host": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Host.hs",
+      "sha256": "5b1bd1f2a05ec496981630665df70190990420b27d5b4d288c471d3ea3ac42bf"
+    },
+    "Bootstrap.InferenceUnit": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/InferenceUnit.hs",
+      "sha256": "9272b04b47378fc69a97dc70a05ce6383febaa359dfa20898498835b984a832d"
+    },
+    "Bootstrap.IntMap": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/IntMap.hs",
+      "sha256": "4f7039cc12fd0bd038b3e73b23700a3add88f5c827502c3360d48b79b8e303b8"
+    },
+    "Bootstrap.IntSet": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/IntSet.hs",
+      "sha256": "30ea33591d154b771067fe8c2c6c20eac4b3be3d86f1f5ebf3d91642ca6d8836"
+    },
+    "Bootstrap.Kind": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Kind.hs",
+      "sha256": "453aebe46c80250d50a32ae84b9f5d1bb56f2effbe94018d0e67742fbffb4f3b"
+    },
+    "Bootstrap.Kinding": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Kinding.hs",
+      "sha256": "ced9814986923d0eb1c238ccaaf6ccd749da5a64f42e42a1418c6e2774d0bec4"
+    },
+    "Bootstrap.LLVM": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM.hs",
+      "sha256": "014859a83ddc9e609a3952300f19cc2a8c65974c829767ae1531fc73e60b1d56"
+    },
+    "Bootstrap.LLVM.Analysis": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Analysis.hs",
+      "sha256": "c446473e3ec46a328cd48e7c3643571a83782b6be150342e1d4333b3560eb6cd"
+    },
+    "Bootstrap.LLVM.Build": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Build.hs",
+      "sha256": "4dae2f7ab77d9bb92bc727b1bf2569c3b7e47ae757ef5bd86faaa41afa0f3bc3"
+    },
+    "Bootstrap.LLVM.Codegen": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs",
+      "sha256": "482ccb1fc88fba35616a18e61f194a27300b1e69231c1c51272496dad548c55f"
+    },
+    "Bootstrap.LLVM.Kernel": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Kernel.hs",
+      "sha256": "890810e3fd44ea437c4254a17534e3c7c4a4f13861f03fcea5a2966992835bd7"
+    },
+    "Bootstrap.LLVM.Native": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Native.hs",
+      "sha256": "47156210ae912eceb52f8768a3069bef31f34e7da7a062486a9ecdcf2ee6cded"
+    },
+    "Bootstrap.LLVM.Optimize": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs",
+      "sha256": "a609aa8c42c02cfabf256ba46d296991718718d7381c04d34c7b0d0fea75e840"
+    },
+    "Bootstrap.LLVM.StrictFields": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/StrictFields.hs",
+      "sha256": "ce722363d7fd2ac3a029526a1639c190e932a2fa0d4e60bd418802599ad869b9"
+    },
+    "Bootstrap.LLVM.StrictWrappers": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/StrictWrappers.hs",
+      "sha256": "1f911ca7714bdfe48be24a2306a8cd8d8fc295f8e8a8207c8f4420a3ed465a99"
+    },
+    "Bootstrap.Layout": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Layout.hs",
+      "sha256": "0d7557a5d37824bdf8801f02d0c4b15cff393cd6aa1832c9bc01d78363b567e0"
+    },
+    "Bootstrap.Lexer": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Lexer.hs",
+      "sha256": "c056d1788ef8190d48d43199035e5d77ed253c8f95a275de6620ee06f28eff2a"
+    },
+    "Bootstrap.Map": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Map.hs",
+      "sha256": "625bcced6d11149505155cd2bcb22d10ee176c87f4513146af6536dd941afa8d"
+    },
+    "Bootstrap.Module": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Module.hs",
+      "sha256": "f96fb7dd85e94b746228ced54332d23bf42d212b503b49128b393016b1488afb"
+    },
+    "Bootstrap.Parsec": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Parsec.hs",
+      "sha256": "f0ec8b4c711d4e45a6754746ed08058caf010756165b7764143f55803deed2d2"
+    },
+    "Bootstrap.Parser": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Parser.hs",
+      "sha256": "ae64cf0b406f4776e0be2d25545047bffb2549ea32dde9927ec81630707172b9"
+    },
+    "Bootstrap.Prelude": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Prelude.hs",
+      "sha256": "2ebe13bdb4af50be50a4391bcd893697c89caadf839dde1c48de24dce6887596"
+    },
+    "Bootstrap.Primitive": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Primitive.hs",
+      "sha256": "cce71f5a56a9d33be85857d743d11bcd73df8feba898a1f2ea106d4d30ed3279"
+    },
+    "Bootstrap.ProcessHost": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-interpreter/Bootstrap/ProcessHost.hs",
+      "sha256": "792cf2f725e7d6a5bd629feef085ffed71d5bedbe80205fd0d2181f952d680ac"
+    },
+    "Bootstrap.Regex": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Regex.hs",
+      "sha256": "3dbfc4a497c506fbcc7fead39ba5b0dbcb4113ef54ee89d7f78e13f5f001e403"
+    },
+    "Bootstrap.Runtime": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+      "sha256": "3e325c475293e50b7021b017ac934770ae59f2144c86cc59605d4d376ef245f0"
+    },
+    "Bootstrap.ST": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/ST.hs",
+      "sha256": "b57dfe7a9a89fd6edda046445342c47c649d1b4f9ea3dd6c9acfc7aae925302f"
+    },
+    "Bootstrap.Separate": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/Separate.hs",
+      "sha256": "02ad26d81acf5d380f2cc2096be5087ea9cf239b791589944a988caa7599c8a5"
+    },
+    "Bootstrap.Set": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Set.hs",
+      "sha256": "94cc73baef625734a9f76a4702eb9fb7f1b8ff6266d3ff1cbf61ac4efaae3509"
+    },
+    "Bootstrap.SourceEquality": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/SourceEquality.hs",
+      "sha256": "7688f1910dbb10a98a8440baf8cae8dc498d04ebf41d5ee56d41cd317653bf08"
+    },
+    "Bootstrap.Std": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Std.hs",
+      "sha256": "edf7d3c66565b6c11639236d5d9f54ffdaac871137c07c68e3c8be0c6a75892d"
+    },
+    "Bootstrap.Surface": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Surface.hs",
+      "sha256": "5d392a69ef4c9335d0de3bc26a8b18121d4ba302b42e83e4e44fa4ae3cff2b1a"
+    },
+    "Bootstrap.Types": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Types.hs",
+      "sha256": "94df8a8cb1e1c1fdb23c638631b42e99ad29d30490f149e6df676fd2f405f771"
+    },
+    "Bootstrap.Unicode": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Unicode.hs",
+      "sha256": "a20db5c9ba597befc1c8be873b5845b765fbd53b7f9977e3948c4d5349c36541"
+    },
+    "Bootstrap.Version": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Version.hs",
+      "sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479"
+    },
+    "Bootstrap.X.Check": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Check.hs",
+      "sha256": "f804113af862fd2eb213eea1644e6f731255ce8625f637ea4ae824e8061b9ef3"
+    },
+    "Bootstrap.X.Checked": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Checked.hs",
+      "sha256": "b732c7a65dbf2aebf1eb5213a10613ccade422626b90bd7d693e66398b22ef63"
+    },
+    "Bootstrap.X.Parser": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Parser.hs",
+      "sha256": "1dafad97a593ae1c32928b696c0753559870e713a11ddd609a4cc57468fba9c7"
+    },
+    "Bootstrap.X.Pretty": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Pretty.hs",
+      "sha256": "67120bd5eadc00d3e191c6a56e8e81f5f240f05b42a2e6356b2e277959c53a2c"
+    },
+    "Bootstrap.X.Syntax": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Syntax.hs",
+      "sha256": "85e34ce735f11a31d1ebe66b5e89a8cb235a659842d897f5898fc738acb643c2"
+    },
+    "Bootstrap.X.Type": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Type.hs",
+      "sha256": "dc0eab061cbd7a28dad2d130667649330c552eb8f15b76897682208cdf1592c1"
+    },
+    "MLF.Entry.CompilerTests": {
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/MLF/Entry/CompilerTests.hs",
+      "sha256": "5882d522ed92d66b28a08c9c94f1db0f560cfc7c46a873a685554e89187ff440"
+    },
+    "MLF.Entry.Emlf": {
+      "path": "/workspace/shared/mlf-shared-source-migration/bootstrap/MLF/Entry/Emlf.hs",
+      "sha256": "67345c82aadfc57dbf460a34b7ee956df559b3818f782fbc61c8b3138a751940"
+    },
+    "MLF.Entry.Mlfpkg": {
+      "path": "/workspace/shared/mlf-shared-source-migration/package/MLF/Entry/Mlfpkg.hs",
+      "sha256": "97d9ec1a4ecc909947902d4edb95296134a39d2f94cc6dc34762bea01d298be6"
+    },
+    "MLF.Entry.TupleList": {
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/MLF/Entry/TupleList.hs",
+      "sha256": "f5115f6ea00af7ef14a3b84c76e4f2a13844cb4b5db387d1a9cccc85f06cbd2f"
+    },
+    "MLF.Tests.Async.ProcessMain": {
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/ProcessMain.hs",
+      "sha256": "91af4f62f386ef8051ae5cf7d37543a6a9719f856b0d424dcfce07f769fdacb6"
+    },
+    "MLF.Tests.Async.ProcessPanic": {
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/ProcessPanic.hs",
+      "sha256": "9674059e6d96e88c3680b9cf7d95988d25734c73a534f29ae5c0983fbb00dae4"
+    },
+    "MLF.Tests.Async.TaskMain": {
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/TaskMain.hs",
+      "sha256": "f4b853644d94dd3ff78ea99f93f569c68a8d8124f98892657e5d8dc0c45fa3a8"
+    },
+    "MLF.Tests.Async.TaskProcesses": {
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/TaskProcesses.hs",
+      "sha256": "a201af5e8a209ce05d81217684504064fd9824257f7c1bb43f008e8d2f34c6b9"
+    },
+    "MLF.Tests.Async.TaskWaitGraph": {
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/TaskWaitGraph.hs",
+      "sha256": "2e6ff3b3786f800d0afb2c534eafbc36cae0f87df46d70f4f1337ffd973fcb94"
+    },
+    "MLF.Tests.BuildReceipts": {
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/BuildReceipts.hs",
+      "sha256": "340fb1cc2b7b7f1949bcd458715b8465fb8084549b5e144b4a919e2131bd6176"
+    },
+    "MLF.Tests.SharedFrontend": {
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/SharedFrontend.hs",
+      "sha256": "aec1dc6b1c94c610be0b5a17f0db18a6163f55334156e8b9cd38ff637c4e5dbe"
+    },
+    "Package.Benchmark": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-developer-tools/Package/Benchmark.hs",
+      "sha256": "e5d16234525d26107515b9ea1f2b7af3f69cac38fc7401c2086bab9664712f4d"
+    },
+    "Package.Build": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Build.hs",
+      "sha256": "23a2b196f3e14e8d938c61e10bd91ad8935d03dcabce2a6f9d794c5e2949596b"
+    },
+    "Package.Command": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Command.hs",
+      "sha256": "065836466ad242a0d5c12487d5c457c6d6323a33cb5c5459af43fecefd1ac07a"
+    },
+    "Package.Distribution": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Distribution.hs",
+      "sha256": "ffe329d4fe8289622635b8dc79add6b594874d3ccaba628883adaf04960af04c"
+    },
+    "Package.Json": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Json.hs",
+      "sha256": "2be8fca3db0cc3ebe39032abab1294b7578530cf9d97bb9654ba0e4c33a00f74"
+    },
+    "Package.Manifest": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Manifest.hs",
+      "sha256": "553e42e787cb1cf1b1ae2b2cfe572aab9a8a4319e46ba3e47c56ace5cc165c5b"
+    },
+    "Package.OS": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/OS.hs",
+      "sha256": "42db40981c9a9c1b145b4b91da51a48369feebe0578208e4ec9a5237f4f54555"
+    },
+    "Package.Release": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Release.hs",
+      "sha256": "1d98f341903ae04028a99509affbe7585dfeaecd688886f7b14fe9128cd8f938"
+    },
+    "Package.Scheduler": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Scheduler.hs",
+      "sha256": "3b2fce51037c376f9908948684b5bfbbe96f355b5dd9ece3e527dec63dce98b0"
+    },
+    "Package.Verification": {
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-developer-tools/Package/Verification.hs",
+      "sha256": "47a262d16477e82dcd6a42086a072a10e8fd8a10eaf47378644da363718bc37a"
+    },
+    "Tests.BuildReceipts": {
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/Tests/BuildReceipts.hs",
+      "sha256": "4a767a44500b9dcf923ebc348d4ae6fdb4dd0c661929b87daf9b6250d3db781c"
+    },
+    "Tests.Catalog": {
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/Tests/Catalog.hs",
+      "sha256": "fe36a761496d2c333cd7e185cc6a0e1afc31dae5ba7deb2811664f9578f0f9c2"
+    },
+    "Tests.CompilerTests": {
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/Tests/CompilerTests.hs",
+      "sha256": "6707f5874e40a8159f6295fc271397ac71c4aacf73e1447881ee9c281c931310"
+    },
+    "Tests.CorePartitions": {
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/Tests/CorePartitions.hs",
+      "sha256": "074ec18485fc1fb79a4186cbf6b9eb9bfe9ad9e8d87c7e9b1ea97699e8590aab"
+    },
+    "Tests.Coverage": {
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/Tests/Coverage.hs",
+      "sha256": "9df0991ce71f93dfb75af10157b42cd404629bae7b13628580c0e9fc8c7ccc6d"
+    },
+    "Tests.IndependentCheck": {
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/Tests/IndependentCheck.hs",
+      "sha256": "e6cff46f37c86cf5f5eb28eb4c38cf8f7d1233bacd9140bc0af1e54b38f40528"
+    },
+    "Tests.IndependentType": {
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/Tests/IndependentType.hs",
+      "sha256": "94d1397fd6621668f534078375fbd507fd5d41434ae885aed0a4fb8ff18dbdd8"
+    },
+    "Tests.Selection": {
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/Tests/Selection.hs",
+      "sha256": "1b7bbdc0616c7f34d8119304e82ccc8e798b75a270bde0e544ec514af048a52f"
+    },
+    "Tests.TestDrivers": {
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/Tests/TestDrivers.hs",
+      "sha256": "68de0d943a5e38d0337b9946bfe68d2b197d195aa181fac6482f065d06768ece"
+    },
+    "Tests.TestSources": {
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/Tests/TestSources.hs",
+      "sha256": "feeb124ab106347c35854c0c7888f80ca0de4e20b951caccaef63de775d344e5"
+    }
+  },
+  "shared_inputs": {
+    "Async.Process": {
+      "module": "Async.Process",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Process.hs",
+      "role": "implementation",
+      "sha256": "70d466818728f7b80ee732df654e083006cc33f6038623d22f52086bd9613b87"
+    },
+    "Async.Process.Internal": {
+      "module": "Async.Process.Internal",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Process/Internal.hs",
+      "role": "implementation",
+      "sha256": "03e65dccf009af52f072a7fc0ef8d5eee555e9452962dd254f453bc3afc42e42"
+    },
+    "Async.Task": {
+      "module": "Async.Task",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Task.hs",
+      "role": "implementation",
+      "sha256": "1f4ae8f633e3cf78dfadeaa9bde2999a9bc31c7c37769a8f30351a3f99b4afca"
+    },
+    "Async.Task.Core": {
+      "module": "Async.Task.Core",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Task/Core.hs",
+      "role": "implementation",
+      "sha256": "33e30b6c2f055619b8da163b39621b08eaab1b77eda39bf3bbaf61a77c4bcdce"
+    },
+    "Async.Task.Internal": {
+      "module": "Async.Task.Internal",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Task/Internal.hs",
+      "role": "implementation",
+      "sha256": "a87ab11e316ec7c4ff28a5f9974b61ecb58aebeeb3f3227646d02ed3e7416e00"
+    },
+    "Bootstrap.Classes": {
+      "module": "Bootstrap.Classes",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Classes.hs",
+      "role": "implementation",
+      "sha256": "3c028c4e7c5d94a42e67674f74ce492869e00926c39af2806f3205cd67ac15ca"
+    },
+    "Bootstrap.Compiler": {
+      "module": "Bootstrap.Compiler",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Compiler.hs",
+      "role": "implementation",
+      "sha256": "8cbc5c40ca5af2928434cf4331d3bd8e40f88d8919ae84aab193ef5b93ced933"
+    },
+    "Bootstrap.CompilerCore": {
+      "module": "Bootstrap.CompilerCore",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/CompilerCore.hs",
+      "role": "implementation",
+      "sha256": "ba168375f092a060bee2973baec578bd2ce3506d125d9c7760330dc78b8dd924"
+    },
+    "Bootstrap.Constraint": {
+      "module": "Bootstrap.Constraint",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Constraint.hs",
+      "role": "implementation",
+      "sha256": "83efd6c2a2bf72cee2e608e8ed627194c006c60f780cd58225e465d3fe83e451"
+    },
+    "Bootstrap.Crate": {
+      "module": "Bootstrap.Crate",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/Crate.hs",
+      "role": "implementation",
+      "sha256": "45af761abd4835ec6adff8be909bf21bc8f43e981d2e9f41327b03630acc88db"
+    },
+    "Bootstrap.CrateArtifact": {
+      "module": "Bootstrap.CrateArtifact",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/CrateArtifact.hs",
+      "role": "implementation",
+      "sha256": "f6bf0615d05a299f9f711143ce89f0285e78849626487db2b6a48c62a4210d2b"
+    },
+    "Bootstrap.CrateCodegen": {
+      "module": "Bootstrap.CrateCodegen",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/CrateCodegen.hs",
+      "role": "implementation",
+      "sha256": "f27d23156701fb2bc1aa0d53b3d3d130b255e47a2230b306e47df26b18e2cdb3"
+    },
+    "Bootstrap.CrateQuery": {
+      "module": "Bootstrap.CrateQuery",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+      "role": "implementation",
+      "sha256": "9045d0e0b4615c85e642d49230520d86070e8a116c3dc3eb5c7adf5c4f807980"
+    },
+    "Bootstrap.Data": {
+      "module": "Bootstrap.Data",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Data.hs",
+      "role": "implementation",
+      "sha256": "9c414bdf4a699c001e953e42842f3904491ce7af7e2a5e36001a65216bda8c68"
+    },
+    "Bootstrap.Dependency": {
+      "module": "Bootstrap.Dependency",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Dependency.hs",
+      "role": "implementation",
+      "sha256": "516ea1e67b423df4fb708536aa783ec468b7228a0e65c487ac2baafd19c7c385"
+    },
+    "Bootstrap.Desugar": {
+      "module": "Bootstrap.Desugar",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Desugar.hs",
+      "role": "implementation",
+      "sha256": "b0322dafbf6664a4ad377006e5d62852972899de634d3e9ddbeec1e1d5d1b4bf"
+    },
+    "Bootstrap.Elaborate": {
+      "module": "Bootstrap.Elaborate",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Elaborate.hs",
+      "role": "implementation",
+      "sha256": "ea6425f74d83ed02ba4c07f9e9d960a5ab2c0bf7ccf7e3d596bcf10f75f54dae"
+    },
+    "Bootstrap.Evidence": {
+      "module": "Bootstrap.Evidence",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Evidence.hs",
+      "role": "implementation",
+      "sha256": "27fd8a246d9792ac950e15ae0b4187c8513d0cf455f259bbfb34407b83359361"
+    },
+    "Bootstrap.Fresh": {
+      "module": "Bootstrap.Fresh",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Fresh.hs",
+      "role": "implementation",
+      "sha256": "7eeec3f65a6b8172bc76b3acb09f699642e4e6d93cb0c6e0bc6ae3d88c3b1869"
+    },
+    "Bootstrap.Graph": {
+      "module": "Bootstrap.Graph",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Graph.hs",
+      "role": "implementation",
+      "sha256": "d72a6d404403efa3956ce25ac686638b4075ad91983049b29910899d43d01a0f"
+    },
+    "Bootstrap.Graph.Solver": {
+      "module": "Bootstrap.Graph.Solver",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Graph/Solver.hs",
+      "role": "implementation",
+      "sha256": "c62a62585213527149e5ea8a0f322a8f7e8e7c985e8fd632f26ee3f50eae8ade"
+    },
+    "Bootstrap.Host": {
+      "module": "Bootstrap.Host",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Host.hs",
+      "role": "implementation",
+      "sha256": "5b1bd1f2a05ec496981630665df70190990420b27d5b4d288c471d3ea3ac42bf"
+    },
+    "Bootstrap.InferenceUnit": {
+      "module": "Bootstrap.InferenceUnit",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/InferenceUnit.hs",
+      "role": "implementation",
+      "sha256": "9272b04b47378fc69a97dc70a05ce6383febaa359dfa20898498835b984a832d"
+    },
+    "Bootstrap.IntMap": {
+      "module": "Bootstrap.IntMap",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/IntMap.hs",
+      "role": "implementation",
+      "sha256": "4f7039cc12fd0bd038b3e73b23700a3add88f5c827502c3360d48b79b8e303b8"
+    },
+    "Bootstrap.IntSet": {
+      "module": "Bootstrap.IntSet",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/IntSet.hs",
+      "role": "implementation",
+      "sha256": "30ea33591d154b771067fe8c2c6c20eac4b3be3d86f1f5ebf3d91642ca6d8836"
+    },
+    "Bootstrap.Kind": {
+      "module": "Bootstrap.Kind",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Kind.hs",
+      "role": "implementation",
+      "sha256": "453aebe46c80250d50a32ae84b9f5d1bb56f2effbe94018d0e67742fbffb4f3b"
+    },
+    "Bootstrap.Kinding": {
+      "module": "Bootstrap.Kinding",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Kinding.hs",
+      "role": "implementation",
+      "sha256": "ced9814986923d0eb1c238ccaaf6ccd749da5a64f42e42a1418c6e2774d0bec4"
+    },
+    "Bootstrap.LLVM": {
+      "module": "Bootstrap.LLVM",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM.hs",
+      "role": "implementation",
+      "sha256": "014859a83ddc9e609a3952300f19cc2a8c65974c829767ae1531fc73e60b1d56"
+    },
+    "Bootstrap.LLVM.Analysis": {
+      "module": "Bootstrap.LLVM.Analysis",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Analysis.hs",
+      "role": "implementation",
+      "sha256": "c446473e3ec46a328cd48e7c3643571a83782b6be150342e1d4333b3560eb6cd"
+    },
+    "Bootstrap.LLVM.Build": {
+      "module": "Bootstrap.LLVM.Build",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Build.hs",
+      "role": "implementation",
+      "sha256": "4dae2f7ab77d9bb92bc727b1bf2569c3b7e47ae757ef5bd86faaa41afa0f3bc3"
+    },
+    "Bootstrap.LLVM.Codegen": {
+      "module": "Bootstrap.LLVM.Codegen",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs",
+      "role": "implementation",
+      "sha256": "482ccb1fc88fba35616a18e61f194a27300b1e69231c1c51272496dad548c55f"
+    },
+    "Bootstrap.LLVM.Kernel": {
+      "module": "Bootstrap.LLVM.Kernel",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Kernel.hs",
+      "role": "implementation",
+      "sha256": "890810e3fd44ea437c4254a17534e3c7c4a4f13861f03fcea5a2966992835bd7"
+    },
+    "Bootstrap.LLVM.Native": {
+      "module": "Bootstrap.LLVM.Native",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Native.hs",
+      "role": "implementation",
+      "sha256": "47156210ae912eceb52f8768a3069bef31f34e7da7a062486a9ecdcf2ee6cded"
+    },
+    "Bootstrap.LLVM.Optimize": {
+      "module": "Bootstrap.LLVM.Optimize",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs",
+      "role": "implementation",
+      "sha256": "a609aa8c42c02cfabf256ba46d296991718718d7381c04d34c7b0d0fea75e840"
+    },
+    "Bootstrap.LLVM.StrictFields": {
+      "module": "Bootstrap.LLVM.StrictFields",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/StrictFields.hs",
+      "role": "implementation",
+      "sha256": "ce722363d7fd2ac3a029526a1639c190e932a2fa0d4e60bd418802599ad869b9"
+    },
+    "Bootstrap.LLVM.StrictWrappers": {
+      "module": "Bootstrap.LLVM.StrictWrappers",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/StrictWrappers.hs",
+      "role": "implementation",
+      "sha256": "1f911ca7714bdfe48be24a2306a8cd8d8fc295f8e8a8207c8f4420a3ed465a99"
+    },
+    "Bootstrap.Layout": {
+      "module": "Bootstrap.Layout",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Layout.hs",
+      "role": "implementation",
+      "sha256": "0d7557a5d37824bdf8801f02d0c4b15cff393cd6aa1832c9bc01d78363b567e0"
+    },
+    "Bootstrap.Lexer": {
+      "module": "Bootstrap.Lexer",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Lexer.hs",
+      "role": "implementation",
+      "sha256": "c056d1788ef8190d48d43199035e5d77ed253c8f95a275de6620ee06f28eff2a"
+    },
+    "Bootstrap.Map": {
+      "module": "Bootstrap.Map",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Map.hs",
+      "role": "implementation",
+      "sha256": "625bcced6d11149505155cd2bcb22d10ee176c87f4513146af6536dd941afa8d"
+    },
+    "Bootstrap.Module": {
+      "module": "Bootstrap.Module",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Module.hs",
+      "role": "implementation",
+      "sha256": "f96fb7dd85e94b746228ced54332d23bf42d212b503b49128b393016b1488afb"
+    },
+    "Bootstrap.Parsec": {
+      "module": "Bootstrap.Parsec",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Parsec.hs",
+      "role": "implementation",
+      "sha256": "f0ec8b4c711d4e45a6754746ed08058caf010756165b7764143f55803deed2d2"
+    },
+    "Bootstrap.Parser": {
+      "module": "Bootstrap.Parser",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Parser.hs",
+      "role": "implementation",
+      "sha256": "ae64cf0b406f4776e0be2d25545047bffb2549ea32dde9927ec81630707172b9"
+    },
+    "Bootstrap.Prelude": {
+      "module": "Bootstrap.Prelude",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Prelude.hs",
+      "role": "implementation",
+      "sha256": "2ebe13bdb4af50be50a4391bcd893697c89caadf839dde1c48de24dce6887596"
+    },
+    "Bootstrap.Primitive": {
+      "module": "Bootstrap.Primitive",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Primitive.hs",
+      "role": "implementation",
+      "sha256": "cce71f5a56a9d33be85857d743d11bcd73df8feba898a1f2ea106d4d30ed3279"
+    },
+    "Bootstrap.ProcessHost": {
+      "module": "Bootstrap.ProcessHost",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-interpreter/Bootstrap/ProcessHost.hs",
+      "role": "implementation",
+      "sha256": "792cf2f725e7d6a5bd629feef085ffed71d5bedbe80205fd0d2181f952d680ac"
+    },
+    "Bootstrap.Regex": {
+      "module": "Bootstrap.Regex",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Regex.hs",
+      "role": "implementation",
+      "sha256": "3dbfc4a497c506fbcc7fead39ba5b0dbcb4113ef54ee89d7f78e13f5f001e403"
+    },
+    "Bootstrap.Runtime": {
+      "module": "Bootstrap.Runtime",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+      "role": "implementation",
+      "sha256": "3e325c475293e50b7021b017ac934770ae59f2144c86cc59605d4d376ef245f0"
+    },
+    "Bootstrap.ST": {
+      "module": "Bootstrap.ST",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/ST.hs",
+      "role": "implementation",
+      "sha256": "b57dfe7a9a89fd6edda046445342c47c649d1b4f9ea3dd6c9acfc7aae925302f"
+    },
+    "Bootstrap.Separate": {
+      "module": "Bootstrap.Separate",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/Separate.hs",
+      "role": "implementation",
+      "sha256": "02ad26d81acf5d380f2cc2096be5087ea9cf239b791589944a988caa7599c8a5"
+    },
+    "Bootstrap.Set": {
+      "module": "Bootstrap.Set",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Set.hs",
+      "role": "implementation",
+      "sha256": "94cc73baef625734a9f76a4702eb9fb7f1b8ff6266d3ff1cbf61ac4efaae3509"
+    },
+    "Bootstrap.SourceEquality": {
+      "module": "Bootstrap.SourceEquality",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/SourceEquality.hs",
+      "role": "implementation",
+      "sha256": "7688f1910dbb10a98a8440baf8cae8dc498d04ebf41d5ee56d41cd317653bf08"
+    },
+    "Bootstrap.Std": {
+      "module": "Bootstrap.Std",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Std.hs",
+      "role": "implementation",
+      "sha256": "edf7d3c66565b6c11639236d5d9f54ffdaac871137c07c68e3c8be0c6a75892d"
+    },
+    "Bootstrap.Surface": {
+      "module": "Bootstrap.Surface",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Surface.hs",
+      "role": "implementation",
+      "sha256": "5d392a69ef4c9335d0de3bc26a8b18121d4ba302b42e83e4e44fa4ae3cff2b1a"
+    },
+    "Bootstrap.Types": {
+      "module": "Bootstrap.Types",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Types.hs",
+      "role": "implementation",
+      "sha256": "94df8a8cb1e1c1fdb23c638631b42e99ad29d30490f149e6df676fd2f405f771"
+    },
+    "Bootstrap.Unicode": {
+      "module": "Bootstrap.Unicode",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Unicode.hs",
+      "role": "implementation",
+      "sha256": "a20db5c9ba597befc1c8be873b5845b765fbd53b7f9977e3948c4d5349c36541"
+    },
+    "Bootstrap.Version": {
+      "module": "Bootstrap.Version",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Version.hs",
+      "role": "implementation",
+      "sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479"
+    },
+    "Bootstrap.X.Check": {
+      "module": "Bootstrap.X.Check",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Check.hs",
+      "role": "implementation",
+      "sha256": "f804113af862fd2eb213eea1644e6f731255ce8625f637ea4ae824e8061b9ef3"
+    },
+    "Bootstrap.X.Checked": {
+      "module": "Bootstrap.X.Checked",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Checked.hs",
+      "role": "implementation",
+      "sha256": "b732c7a65dbf2aebf1eb5213a10613ccade422626b90bd7d693e66398b22ef63"
+    },
+    "Bootstrap.X.Parser": {
+      "module": "Bootstrap.X.Parser",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Parser.hs",
+      "role": "implementation",
+      "sha256": "1dafad97a593ae1c32928b696c0753559870e713a11ddd609a4cc57468fba9c7"
+    },
+    "Bootstrap.X.Pretty": {
+      "module": "Bootstrap.X.Pretty",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Pretty.hs",
+      "role": "implementation",
+      "sha256": "67120bd5eadc00d3e191c6a56e8e81f5f240f05b42a2e6356b2e277959c53a2c"
+    },
+    "Bootstrap.X.Syntax": {
+      "module": "Bootstrap.X.Syntax",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Syntax.hs",
+      "role": "implementation",
+      "sha256": "85e34ce735f11a31d1ebe66b5e89a8cb235a659842d897f5898fc738acb643c2"
+    },
+    "Bootstrap.X.Type": {
+      "module": "Bootstrap.X.Type",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Type.hs",
+      "role": "implementation",
+      "sha256": "dc0eab061cbd7a28dad2d130667649330c552eb8f15b76897682208cdf1592c1"
+    },
+    "MLF.Entry.CompilerTests": {
+      "module": "MLF.Entry.CompilerTests",
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/MLF/Entry/CompilerTests.hs",
+      "role": "implementation",
+      "sha256": "5882d522ed92d66b28a08c9c94f1db0f560cfc7c46a873a685554e89187ff440"
+    },
+    "MLF.Entry.Emlf": {
+      "module": "MLF.Entry.Emlf",
+      "path": "/workspace/shared/mlf-shared-source-migration/bootstrap/MLF/Entry/Emlf.hs",
+      "role": "implementation",
+      "sha256": "67345c82aadfc57dbf460a34b7ee956df559b3818f782fbc61c8b3138a751940"
+    },
+    "MLF.Entry.Mlfpkg": {
+      "module": "MLF.Entry.Mlfpkg",
+      "path": "/workspace/shared/mlf-shared-source-migration/package/MLF/Entry/Mlfpkg.hs",
+      "role": "implementation",
+      "sha256": "97d9ec1a4ecc909947902d4edb95296134a39d2f94cc6dc34762bea01d298be6"
+    },
+    "MLF.Entry.TupleList": {
+      "module": "MLF.Entry.TupleList",
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/MLF/Entry/TupleList.hs",
+      "role": "implementation",
+      "sha256": "f5115f6ea00af7ef14a3b84c76e4f2a13844cb4b5db387d1a9cccc85f06cbd2f"
+    },
+    "MLF.Tests.Async.ProcessMain": {
+      "module": "MLF.Tests.Async.ProcessMain",
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/ProcessMain.hs",
+      "role": "direct-test",
+      "sha256": "91af4f62f386ef8051ae5cf7d37543a6a9719f856b0d424dcfce07f769fdacb6"
+    },
+    "MLF.Tests.Async.ProcessPanic": {
+      "module": "MLF.Tests.Async.ProcessPanic",
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/ProcessPanic.hs",
+      "role": "direct-test",
+      "sha256": "9674059e6d96e88c3680b9cf7d95988d25734c73a534f29ae5c0983fbb00dae4"
+    },
+    "MLF.Tests.Async.TaskMain": {
+      "module": "MLF.Tests.Async.TaskMain",
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/TaskMain.hs",
+      "role": "direct-test",
+      "sha256": "f4b853644d94dd3ff78ea99f93f569c68a8d8124f98892657e5d8dc0c45fa3a8"
+    },
+    "MLF.Tests.Async.TaskProcesses": {
+      "module": "MLF.Tests.Async.TaskProcesses",
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/TaskProcesses.hs",
+      "role": "direct-test",
+      "sha256": "a201af5e8a209ce05d81217684504064fd9824257f7c1bb43f008e8d2f34c6b9"
+    },
+    "MLF.Tests.Async.TaskWaitGraph": {
+      "module": "MLF.Tests.Async.TaskWaitGraph",
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/TaskWaitGraph.hs",
+      "role": "direct-test",
+      "sha256": "2e6ff3b3786f800d0afb2c534eafbc36cae0f87df46d70f4f1337ffd973fcb94"
+    },
+    "MLF.Tests.BuildReceipts": {
+      "module": "MLF.Tests.BuildReceipts",
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/BuildReceipts.hs",
+      "role": "direct-test",
+      "sha256": "340fb1cc2b7b7f1949bcd458715b8465fb8084549b5e144b4a919e2131bd6176"
+    },
+    "MLF.Tests.SharedFrontend": {
+      "module": "MLF.Tests.SharedFrontend",
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/SharedFrontend.hs",
+      "role": "direct-test",
+      "sha256": "aec1dc6b1c94c610be0b5a17f0db18a6163f55334156e8b9cd38ff637c4e5dbe"
+    },
+    "Package.Benchmark": {
+      "module": "Package.Benchmark",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-developer-tools/Package/Benchmark.hs",
+      "role": "implementation",
+      "sha256": "e5d16234525d26107515b9ea1f2b7af3f69cac38fc7401c2086bab9664712f4d"
+    },
+    "Package.Build": {
+      "module": "Package.Build",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Build.hs",
+      "role": "implementation",
+      "sha256": "23a2b196f3e14e8d938c61e10bd91ad8935d03dcabce2a6f9d794c5e2949596b"
+    },
+    "Package.Command": {
+      "module": "Package.Command",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Command.hs",
+      "role": "implementation",
+      "sha256": "065836466ad242a0d5c12487d5c457c6d6323a33cb5c5459af43fecefd1ac07a"
+    },
+    "Package.Distribution": {
+      "module": "Package.Distribution",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Distribution.hs",
+      "role": "implementation",
+      "sha256": "ffe329d4fe8289622635b8dc79add6b594874d3ccaba628883adaf04960af04c"
+    },
+    "Package.Json": {
+      "module": "Package.Json",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Json.hs",
+      "role": "implementation",
+      "sha256": "2be8fca3db0cc3ebe39032abab1294b7578530cf9d97bb9654ba0e4c33a00f74"
+    },
+    "Package.Manifest": {
+      "module": "Package.Manifest",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Manifest.hs",
+      "role": "implementation",
+      "sha256": "553e42e787cb1cf1b1ae2b2cfe572aab9a8a4319e46ba3e47c56ace5cc165c5b"
+    },
+    "Package.OS": {
+      "module": "Package.OS",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/OS.hs",
+      "role": "implementation",
+      "sha256": "42db40981c9a9c1b145b4b91da51a48369feebe0578208e4ec9a5237f4f54555"
+    },
+    "Package.Release": {
+      "module": "Package.Release",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Release.hs",
+      "role": "implementation",
+      "sha256": "1d98f341903ae04028a99509affbe7585dfeaecd688886f7b14fe9128cd8f938"
+    },
+    "Package.Scheduler": {
+      "module": "Package.Scheduler",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Scheduler.hs",
+      "role": "implementation",
+      "sha256": "3b2fce51037c376f9908948684b5bfbbe96f355b5dd9ece3e527dec63dce98b0"
+    },
+    "Package.Verification": {
+      "module": "Package.Verification",
+      "path": "/workspace/shared/mlf-shared-source-migration/libraries/mlf-developer-tools/Package/Verification.hs",
+      "role": "implementation",
+      "sha256": "47a262d16477e82dcd6a42086a072a10e8fd8a10eaf47378644da363718bc37a"
+    },
+    "Tests.BuildReceipts": {
+      "module": "Tests.BuildReceipts",
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/Tests/BuildReceipts.hs",
+      "role": "implementation",
+      "sha256": "4a767a44500b9dcf923ebc348d4ae6fdb4dd0c661929b87daf9b6250d3db781c"
+    },
+    "Tests.Catalog": {
+      "module": "Tests.Catalog",
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/Tests/Catalog.hs",
+      "role": "implementation",
+      "sha256": "fe36a761496d2c333cd7e185cc6a0e1afc31dae5ba7deb2811664f9578f0f9c2"
+    },
+    "Tests.CompilerTests": {
+      "module": "Tests.CompilerTests",
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/Tests/CompilerTests.hs",
+      "role": "implementation",
+      "sha256": "6707f5874e40a8159f6295fc271397ac71c4aacf73e1447881ee9c281c931310"
+    },
+    "Tests.CorePartitions": {
+      "module": "Tests.CorePartitions",
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/Tests/CorePartitions.hs",
+      "role": "implementation",
+      "sha256": "074ec18485fc1fb79a4186cbf6b9eb9bfe9ad9e8d87c7e9b1ea97699e8590aab"
+    },
+    "Tests.Coverage": {
+      "module": "Tests.Coverage",
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/Tests/Coverage.hs",
+      "role": "implementation",
+      "sha256": "9df0991ce71f93dfb75af10157b42cd404629bae7b13628580c0e9fc8c7ccc6d"
+    },
+    "Tests.IndependentCheck": {
+      "module": "Tests.IndependentCheck",
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/Tests/IndependentCheck.hs",
+      "role": "implementation",
+      "sha256": "e6cff46f37c86cf5f5eb28eb4c38cf8f7d1233bacd9140bc0af1e54b38f40528"
+    },
+    "Tests.IndependentType": {
+      "module": "Tests.IndependentType",
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/Tests/IndependentType.hs",
+      "role": "implementation",
+      "sha256": "94d1397fd6621668f534078375fbd507fd5d41434ae885aed0a4fb8ff18dbdd8"
+    },
+    "Tests.Selection": {
+      "module": "Tests.Selection",
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/Tests/Selection.hs",
+      "role": "implementation",
+      "sha256": "1b7bbdc0616c7f34d8119304e82ccc8e798b75a270bde0e544ec514af048a52f"
+    },
+    "Tests.TestDrivers": {
+      "module": "Tests.TestDrivers",
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/Tests/TestDrivers.hs",
+      "role": "implementation",
+      "sha256": "68de0d943a5e38d0337b9946bfe68d2b197d195aa181fac6482f065d06768ece"
+    },
+    "Tests.TestSources": {
+      "module": "Tests.TestSources",
+      "path": "/workspace/shared/mlf-shared-source-migration/tests/Tests/TestSources.hs",
+      "role": "implementation",
+      "sha256": "feeb124ab106347c35854c0c7888f80ca0de4e20b951caccaef63de775d344e5"
+    }
+  },
+  "source_syntax": "shared-haskell-v1",
+  "typecheck_only": true
+}

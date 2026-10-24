@@ -7,7 +7,7 @@ module MLF.Host.Async
 
 import Prelude hiding (Int, String)
 import qualified Prelude as P
-import MLF.Host.Base hiding (Monad(..))
+import MLF.Host.Base
 import Data.IORef
 import qualified Data.Sequence as Q
 import Data.Foldable (toList)
@@ -63,24 +63,30 @@ v_asyncNewCompletion scope success rejected = do
     writeIORef (cellCount scope) (count+1)
     success (Completion scope value waiting)
 v_asyncResolveCompletion :: Completion a -> a -> IO Int
-v_asyncResolveCompletion (Completion scope value waiting) payload = do
-  isClosed <- readIORef (closed scope)
-  current <- readIORef value
-  if isClosed then pure 3 else case current of
-    Just _ -> pure 2
-    Nothing -> do
-      writeIORef value (Just payload)
-      rs <- readIORef waiting
-      writeIORef waiting []
-      modifyIORef' (ready scope) (Q.>< Q.fromList rs)
-      pure 0
+v_asyncResolveCompletion cell payload = do
+  forced <- evaluate cell
+  case forced of
+    Completion scope value waiting -> do
+      isClosed <- readIORef (closed scope)
+      current <- readIORef value
+      if isClosed then pure 3 else case current of
+        Just _ -> pure 2
+        Nothing -> do
+          writeIORef value (Just payload)
+          rs <- readIORef waiting
+          writeIORef waiting []
+          modifyIORef' (ready scope) (Q.>< Q.fromList rs)
+          pure 0
 v_asyncReadCompletion :: Completion a -> (a -> IO b) -> IO b -> IO b
-v_asyncReadCompletion (Completion scope value _) success pending = do
-  isClosed <- readIORef (closed scope)
-  current <- readIORef value
-  if isClosed then pending else case current of
-    Nothing -> pending
-    Just payload -> success payload
+v_asyncReadCompletion cell success pending = do
+  forced <- evaluate cell
+  case forced of
+    Completion scope value _ -> do
+      isClosed <- readIORef (closed scope)
+      current <- readIORef value
+      if isClosed then pending else case current of
+        Nothing -> pending
+        Just payload -> success payload
 
 same :: Resume -> Resume -> Bool
 same (Resume _ a _ _) (Resume _ b _ _) = a==b
@@ -97,18 +103,25 @@ reserve scope action remove register = do
     register resume
     pure (Accepted resume)
 v_asyncSubscribeCompletion :: Completion a -> (a -> IO Unit) -> IO AsyncSubscription
-v_asyncSubscribeCompletion cell@(Completion scope value waiting) callback = do
-  current <- readIORef value
-  reserve scope (v_asyncReadCompletion cell callback (pure Unit)) (\r -> modifyIORef' waiting (filter (not . same r))) $ \resume ->
-    case current of
-      Just _ -> modifyIORef' (ready scope) (Q.|> resume)
-      Nothing -> modifyIORef' waiting (++[resume])
+v_asyncSubscribeCompletion cell callback = do
+  forced <- evaluate cell
+  case forced of
+    Completion scope value waiting -> do
+      current <- readIORef value
+      reserve scope (v_asyncReadCompletion cell callback (pure Unit)) (\r -> modifyIORef' waiting (filter (not . same r))) $ \resume ->
+        case current of
+          Just _ -> modifyIORef' (ready scope) (Q.|> resume)
+          Nothing -> modifyIORef' waiting (++[resume])
+
 v_asyncSubscriptionStatus :: AsyncSubscription -> IO Int
-v_asyncSubscriptionStatus (Rejected n) = pure n
-v_asyncSubscriptionStatus (Accepted (Resume scope active _ _)) = do
-  isClosed <- readIORef (closed scope)
-  isActive <- readIORef active
-  pure (if isClosed then 3 else if isActive then 0 else 6)
+v_asyncSubscriptionStatus subscription = do
+  forced <- evaluate subscription
+  case forced of
+    Rejected n -> pure n
+    Accepted (Resume scope active _ _) -> do
+      isClosed <- readIORef (closed scope)
+      isActive <- readIORef active
+      pure (if isClosed then 3 else if isActive then 0 else 6)
 retire :: Resume -> IO ()
 retire resume@(Resume scope active action unlink) = do
   writeIORef active False

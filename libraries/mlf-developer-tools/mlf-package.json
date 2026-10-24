@@ -12,8 +12,9 @@
   },
   "library": {
     "modules": {
-      "Package.Benchmark": "Package/Benchmark.emlf",
-      "Package.Verification": "Package/Verification.emlf"
+      "Package.Benchmark": "Package/Benchmark.hs",
+      "Package.Verification": "Package/Verification.hs"
     }
-  }
+  },
+  "source-syntax": "shared-haskell-v1"
 }

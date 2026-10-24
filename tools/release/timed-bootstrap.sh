@@ -68,13 +68,28 @@ finish() {
 }
 trap finish EXIT
 # The released seed manager cannot parse target dependency declarations. Build
-# the current manager from source first, retaining this cold stage and its child
-# compiler/linker measurements in the same bootstrap timing and memory budget.
-MLF_COMPILER="$MLF_TIMING_DIR/bin/emlf" CC="$MLF_TIMING_DIR/bin/clang" \
+# the current manager from source first, retaining the complete cold stage in
+# the same timing/RSS budget. Shared frozen transitions pass actual seed bytes;
+# only their enclosing stage and linker wrapper are timed, not each seed call.
+bootstrap_compiler="$MLF_TIMING_DIR/bin/emlf"
+if [ -f shared-sources.json ]; then
+  # The frozen bridge verifies real seed bytes and bundle provenance. Never
+  # disguise that input with the timing wrapper. Its whole transition is still
+  # measured by the enclosing manager-bootstrap command and RSS supervisor.
+  bootstrap_compiler="$MLF_TIMING_COMPILER"
+fi
+MLF_COMPILER="$bootstrap_compiler" CC="$MLF_TIMING_DIR/bin/clang" \
   "$MLF_TIMING_DRIVER" "$MLF_TIMING_DIR" manager-bootstrap "$scripts/bootstrap-manager.sh" "$build/manager-bootstrap"
 export MLF_PACKAGE_MANAGER="$build/manager-bootstrap/bin/mlfpkg"
+# Subsequent calls must use the shared-aware native compiler produced alongside
+# the manager. Keep the timing wrapper, but point it at this next generation.
+next_compiler=$(cat "$build/manager-bootstrap/compiler.path")
+if [ "$next_compiler" != "$MLF_TIMING_DIR/bin/emlf" ]; then
+  export MLF_TIMING_COMPILER="$next_compiler"
+fi
 jq --arg path "$MLF_PACKAGE_MANAGER" --arg hash "$(shasum -a 256 "$MLF_PACKAGE_MANAGER" | awk '{print $1}')" \
-  '.manager = {path:$path,sha256:$hash}' "$MLF_TIMING_DIR/context.json" > "$MLF_TIMING_DIR/context.tmp"
+  --arg compiler "$MLF_TIMING_COMPILER" --arg compiler_hash "$(shasum -a 256 "$MLF_TIMING_COMPILER" | awk '{print $1}')" \
+  '.manager = {path:$path,sha256:$hash} | .current_compiler = {path:$compiler,sha256:$compiler_hash}' "$MLF_TIMING_DIR/context.json" > "$MLF_TIMING_DIR/context.tmp"
 mv "$MLF_TIMING_DIR/context.tmp" "$MLF_TIMING_DIR/context.json"
 "$MLF_TIMING_DRIVER" "$MLF_TIMING_DIR" package-manager "$PWD/mlfpkg" \
   --compiler "$MLF_TIMING_DIR/bin/emlf" --clang "$MLF_TIMING_DIR/bin/clang" \

@@ -49,38 +49,65 @@ jobs:
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
           "$RUNNER_TEMP/actionlint" -shellcheck= -pyflakes=
   native:
-    name: Compiler source smoke
+    # Preserve the required-check job ID, but label the producer honestly.
+    name: Shared compiler source smoke (GHC O${{ matrix.optimization }})
     if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        optimization: ['0', '2']
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - name: Published seed runtime dependency
+      - name: Install pinned direct-host GHC 9.14.1
         run: |
+          set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y libgmp10
-      - name: Fetch verified native seed
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: tools/release/fetch-seed.sh .mlf-build/seed .github/smoke-seed-linux.env
-      - name: Execute suite receipt and focused-Core preparation contracts
+          sudo apt-get install -y build-essential clang libgmp-dev libnuma-dev libncurses-dev xz-utils
+          archive="$RUNNER_TEMP/ghc-9.14.1.tar.xz"
+          curl -fsSL https://downloads.haskell.org/~ghc/9.14.1/ghc-9.14.1-x86_64-deb12-linux.tar.xz -o "$archive"
+          printf '%s  %s\n' 60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841 "$archive" | sha256sum -c -
+          tar -xJf "$archive" -C "$RUNNER_TEMP"
+          (cd "$RUNNER_TEMP/ghc-9.14.1-x86_64-unknown-linux" && ./configure --prefix="$RUNNER_TEMP/ghc" && make install)
+          test "$("$RUNNER_TEMP/ghc/bin/ghc" --numeric-version)" = 9.14.1
+          echo "$RUNNER_TEMP/ghc/bin" >> "$GITHUB_PATH"
+      - name: Build exact committed shared sources and direct test runners
         run: |
-          ulimit -s unlimited
-          python3 tools/release/test-suite-build-receipts.py --compiler "$MLF_COMPILER" --output .mlf-build/suite-receipt-regression
-      - name: Exercise checkout compiler sources with the verified seed
-        run: tools/release/native-ci.sh source-smoke
+          python3 tools/shared/build.py --optimization '${{ matrix.optimization }}' --build-dir .mlf-build/shared-ghc
+          jq -e '.complete == true and .producer_host == "GHC" and .typecheck_only == false' .mlf-build/shared-ghc/receipt.json
+      - name: Execute the actual shared suite-receipt helpers
+        run: |
+          python3 tools/release/test-suite-build-receipts.py --executable .mlf-build/shared-ghc/bin/build-receipts --output .mlf-build/suite-receipt-regression
+      - name: Execute source-bound shared smoke runner
+        env:
+          MLF_SOURCE_SMOKE_RUNNER: .mlf-build/shared-ghc/bin/source-smoke
+          MLF_SOURCE_SMOKE_RECEIPT: .mlf-build/shared-ghc/receipt.json
+        run: tools/release/source-smoke.sh
+      - name: Qualify authenticated direct async, frontend and TupleList execution
+        run: |
+          set -euo pipefail
+          python3 tools/shared/test_direct.py --bin-dir .mlf-build/shared-ghc/bin \
+            --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/direct-host-tests
+          .mlf-build/shared-ghc/bin/tuple-list | tee .mlf-build/direct-host-tests/tuple-list.log
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
-          name: source-smoke-evidence
+          name: source-smoke-evidence-ghc-O${{ matrix.optimization }}
           include-hidden-files: true
           retention-days: 14
           path: |
-            .mlf-build/source-smoke/result.json
+            .mlf-build/shared-ghc/receipt.json
+            .mlf-build/shared-ghc/*.log
+            .mlf-build/shared-ghc/packages.txt
             .mlf-build/source-smoke/*.log*
             .mlf-build/source-smoke/*.json
             .mlf-build/source-smoke/*.xmlf
             .mlf-build/suite-receipt-regression/
+            .mlf-build/direct-host-tests/**/*.json
+            .mlf-build/direct-host-tests/**/*.stdout
+            .mlf-build/direct-host-tests/**/*.stderr
+            .mlf-build/direct-host-tests/*.log
   build-runner:
     name: Native build runner (${{ matrix.os }})
     if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only
@@ -170,7 +197,7 @@ jobs:
       matrix:
         os: ${{ fromJSON((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && '["ubuntu-24.04", "macos-26"]' || '["ubuntu-24.04"]') }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 120
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Native bootstrap and parity dependencies
@@ -191,7 +218,7 @@ jobs:
           pin=.github/smoke-seed.env
           if [ "$RUNNER_OS" = Linux ]; then pin=.github/smoke-seed-linux.env; fi
           tools/release/fetch-seed.sh .mlf-build/async-seed "$pin"
-      - name: Bootstrap the real primitive-aware interpreter and compiler
+      - name: Bootstrap released seed through frozen bridge to shared native tools
         run: |
           set -euo pipefail
           mkdir -p .mlf-build/async-bootstrap
@@ -223,6 +250,23 @@ jobs:
           retention-days: 14
           path: |
             .mlf-build/async-bootstrap/bootstrap.log
+            .mlf-build/async-bootstrap/bootstrap.json
+            .mlf-build/async-bootstrap/shared-inputs.*.sha256
+            .mlf-build/async-bootstrap/source-contract.json
+            .mlf-build/async-bootstrap/bridge-source-identity.txt
+            .mlf-build/async-bootstrap/bridge-identity.txt
+            .mlf-build/async-bootstrap/implementation-identity.txt
+            .mlf-build/async-bootstrap/completion-capability.txt
+            .mlf-build/async-bootstrap/compiler.path
+            .mlf-build/async-bootstrap/native/build-report.json
+            .mlf-build/async-bootstrap/native/commands/
+            .mlf-build/async-bootstrap/native-cache/*/artifact.json
+            .mlf-build/async-bootstrap/bridge/build-*/**/build-report.json
+            .mlf-build/async-bootstrap/bridge/build-*/**/commands/
+            .mlf-build/async-bootstrap/bridge/*.sha256
+            .mlf-build/async-bootstrap/bridge/*.txt
+            .mlf-build/async-bootstrap/bridge/cache/*/artifact.json
+            .mlf-build/async-bootstrap/bridge-source-*/bridge-inputs.sha256
             .mlf-build/async-bootstrap/capability.txt
             .mlf-build/async-bootstrap/source-identity.txt
             .mlf-build/async-bootstrap/compilers.sha256

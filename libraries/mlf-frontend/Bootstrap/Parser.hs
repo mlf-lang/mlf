@@ -1,0 +1,1596 @@
+-- mlf:syntax shared-haskell-v1
+{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
+             KindSignatures, FlexibleContexts, FlexibleInstances,
+             MultiParamTypeClasses, OverloadedStrings #-}
+module Bootstrap.Parser where {
+  import MLF.Primitive;
+  import Bootstrap.Types;
+  import Bootstrap.Std;
+  import Bootstrap.Lexer;
+  import Bootstrap.Parsec;
+  import Bootstrap.Layout;
+  import qualified Bootstrap.Unicode as U;
+  import qualified Bootstrap.Surface as Surface;
+  import qualified Bootstrap.Desugar as Desugar;
+  import Bootstrap.Fresh;
+  import qualified Bootstrap.Std as SharedSyntax;
+  data Top = DataTop DataDecl | ClassTop SClassDecl | InstanceTop SInstanceDecl | ValueTop Value;
+  data SharedStatement =
+    SharedBind (Maybe String) SExpr |
+    SharedThen SExpr |
+    SharedLet (List (Triple String (Maybe SAnnotation) SExpr));
+  data Value =
+    Signature String SAnnotation | Equation String (List SPattern) (Maybe SAnnotation) SExpr;
+  reservedWords :: List String;
+  reservedWords =
+    Cons "data"
+      (Cons "class"
+         (Cons "instance"
+            (Cons "where"
+               (Cons "case"
+                  (Cons "of"
+                     (Cons "do"
+                        (Cons "let"
+                           (Cons "rec"
+                              (Cons "in"
+                                 (Cons "if"
+                                    (Cons "then"
+                                       (Cons "else"
+                                          (Cons "forall"
+                                             (Cons "exists"
+                                                (Cons "true"
+                                                   (Cons "false"
+                                                      (Cons "True"
+                                                         (Cons "False"
+                                                            (Cons "bot"
+                                                               (Cons "module"
+                                                                  (Cons "import"
+                                                                     Nil)))))))))))))))))))));
+  identifier :: Parser String;
+  identifier = namedIdentifier U.isAlpha "identifier";
+  upperIdentifier :: Parser String;
+  upperIdentifier = namedIdentifier U.isUpper "constructor name";
+  lowerIdentifier :: Parser String;
+  lowerIdentifier = namedIdentifier U.isLower "variable name";
+  namedIdentifier :: (Int -> Bool) -> String -> Parser String;
+  namedIdentifier predicate expected =
+    pTry
+      (do {
+         name <- pSatisfy (\n -> ((stringLength n > 0) && predicate (stringCodeAt n 0))) expected;
+         shared <- pBySyntax (pPure True) (pPure False);
+         if ((elem eqString name reservedWords && (not shared || not (elem eqString name sharedOrdinaryLegacyWords))) || (shared && elem eqString name sharedReservedWords))
+         then pFail ("unexpected reserved word " ++ name)
+         else if (shared && not (sharedIdentifier name))
+              then pFail "shared source identifiers must be ASCII"
+              else pPure name
+       });
+  upperReference :: Parser String;
+  upperReference =
+    qualified (pChoices (Cons upperIdentifier (Cons (pToken "True") (Cons (pToken "False") Nil))));
+  lowerReference :: Parser String;
+  lowerReference = pTry (qualified lowerIdentifier);
+  qualified :: Parser String -> Parser String;
+  qualified final =
+    do {
+      prefixes <- pMany (pTry (pBefore upperIdentifier (pToken ".")));
+      name <- final;
+      pPure (foldr (\prefix suffix -> (prefix ++ ("." ++ suffix))) name prefixes)
+    };
+  moduleName :: Parser String;
+  moduleName = pMap (intercalate ".") (pSepBy1 upperIdentifier (pToken "."));
+  parseExpr :: String -> String -> Either String SExpr;
+  parseExpr file source = parseLayout False expr file source;
+  parseAnnotation :: String -> Either String SAnnotation;
+  parseAnnotation source =
+    case scanTokens "<type>" source of {
+      Left e -> Left e;
+      Right tokens -> runParser annotation "<type>" tokens
+    };
+  parseLayout :: forall a. Bool -> Parser a -> String -> String -> Either String a;
+  parseLayout program parser file source =
+    case layoutTokens program file source of {
+      Left e -> Left e;
+      Right tokens -> runParser parser file tokens
+    };
+  parseModule :: String -> String -> Either String SourceModule;
+  parseModule file source =
+    do {
+      syntax <- sourceSyntax file source;
+      parseModuleWithProfile syntax file source
+    };
+  parseModuleWithProfile :: SourceSyntax -> String -> String -> Either String SourceModule;
+  parseModuleWithProfile syntax file source =
+    do {
+      validateProfileSelection syntax file source;
+      tokens <- layoutTokensWithProfile syntax True file source;
+      result <- runParserWithProfile syntax (sourceModule file) file tokens;
+      when (eqString (moduleIdentity result) "MLF.Primitive")
+        (Left "MLF.Primitive is a reserved native builtin module");
+      if isSharedSyntax syntax
+      then do {
+             when (eqString (moduleIdentity result) "Prelude") (Left "Prelude is reserved for the legacy guest builtin; shared source uses MLF.Primitive");
+             validateSharedModule result;
+             Right result
+           }
+      else Right result
+    };
+  parseProgram :: String -> String -> Either String SProgram;
+  parseProgram file source =
+    case parseModule file source of {
+      Left e -> Left e;
+      Right m ->
+        case m of {
+          SourceModule _ name _ imports _ _ _ _ _ _ ->
+            case name of {
+              Just _ ->
+                Left
+                  "use parseModule and module-aware compilation for module declarations or imports";
+              Nothing ->
+                if null imports
+                then standaloneProgram m
+                else Left
+                       "use parseModule and module-aware compilation for module declarations or imports"
+            }
+        }
+    };
+  moduleIdentity :: SourceModule -> String;
+  moduleIdentity (SourceModule _ name _ _ _ _ _ _ _ _) =
+    case name of {
+      Nothing -> "Main";
+      Just n -> n
+    };
+  standaloneProgram :: SourceModule -> Either String SProgram;
+  standaloneProgram (SourceModule _ _ _ _ datatypes classes instances values body _) =
+    let {
+      entry =
+        case body of {
+          Just e -> Right e;
+          Nothing ->
+            if any (\(Triple n _ _) -> eqString n "main") values
+            then Right (SVar "main")
+            else Left "a declaration-only program needs a main binding"
+        }
+    } in
+    case entry of {
+      Left e -> Left e;
+      Right e ->
+        case Surface.bindValues values e of {
+          Left error -> Left error;
+          Right expression ->
+            Right
+              (if (null classes && null instances)
+               then SProgram datatypes expression
+               else SClassProgram datatypes classes instances expression)
+        }
+    };
+  sourceModule :: String -> Parser SourceModule;
+  sourceModule file =
+    do {
+      syntax <- pSourceSyntax;
+      header <-
+        pOptional
+          (pThen (pToken "module")
+             (do {
+                name <- moduleName;
+                exports <- pOptional (pParens (pSepEndBy (exportItem True) (pToken ",")));
+                pToken "where";
+                pPure (Pair name exports)
+              }));
+      pBraces
+        (do {
+           imports <- pMany (pBefore importDeclaration separator);
+           declarations <- pMany (pBefore topDeclaration separator);
+           values <-
+             pEither
+               (groupValues
+                  (concatMap
+                     (\d ->
+                        case d of {
+                          ValueTop value -> Cons value Nil;
+                          _ -> Nil
+                        })
+                     declarations));
+           body <- pOptional expr;
+           let {
+             hasHeader =
+               case header of {
+                 Just _ -> True;
+                 Nothing -> False
+               }
+           };
+           let {
+             hasBody =
+               case body of {
+                 Just _ -> True;
+                 Nothing -> False
+               }
+           };
+           if (hasHeader && hasBody)
+           then pFail "named modules contain declarations only; define main for the entry point"
+           else pPure
+                  (SourceModule file
+                     (case header of {
+                        Nothing -> Nothing;
+                        Just (Pair name _) -> Just name
+                      })
+                     (case header of {
+                        Nothing -> Nothing;
+                        Just (Pair _ exports) -> exports
+                      })
+                     imports
+                     (concatMap
+                        (\d ->
+                           case d of {
+                             DataTop a -> Cons a Nil;
+                             _ -> Nil
+                           })
+                        declarations)
+                     (concatMap
+                        (\d ->
+                           case d of {
+                             ClassTop a -> Cons a Nil;
+                             _ -> Nil
+                           })
+                        declarations)
+                     (concatMap
+                        (\d ->
+                           case d of {
+                             InstanceTop a -> Cons a Nil;
+                             _ -> Nil
+                           })
+                        declarations)
+                     values
+                     body
+                     syntax)
+         })
+    };
+  separator :: Parser String;
+  separator = pChoice (pToken ";") (pLook (pToken "}"));
+  exportItem :: Bool -> Parser Export;
+  exportItem exporting =
+    pChoices
+      (Cons
+         (if exporting
+          then pMap ExportModule (pThen (pToken "module") moduleName)
+          else pFail "module export")
+         (Cons (pMap ExportValue (if exporting then valueReference else bindingName))
+            (Cons
+               (do {
+                  name <- if exporting then upperReference else upperIdentifier;
+                  members <-
+                    pOption Abstract
+                      (pParens
+                         (pChoice (pMap (\_ -> AllMembers) (pToken ".."))
+                            (pMap Members (pSepEndBy exportMember (pToken ",")))));
+                  pPure (ExportType name members)
+                })
+               Nil)));
+  exportMember :: Parser String;
+  exportMember = pChoices (Cons identifier (Cons (pParens operatorName) (Cons (pToken "True") (Cons (pToken "False") Nil))));
+  importDeclaration :: Parser Import;
+  importDeclaration =
+    do {
+      pToken "import";
+      onlyQualified <- pOption False (pMap (\_ -> True) (pToken "qualified"));
+      name <- moduleName;
+      alias <- pOptional (pThen (pToken "as") moduleName);
+      selection <-
+        pOption Everything
+          (pChoice (pMap Hiding (pThen (pToken "hiding") importItems)) (pMap Only importItems));
+      pPure (Import name onlyQualified alias selection)
+    };
+  importItems :: Parser (List Export);
+  importItems = pParens (pSepEndBy (exportItem False) (pToken ","));
+  topDeclaration :: Parser Top;
+  topDeclaration =
+    pChoices
+      (Cons (pMap DataTop dataDeclaration)
+         (Cons (pMap ClassTop classDeclaration)
+            (Cons (pMap InstanceTop instanceDeclaration)
+               (Cons (pMap ValueTop valueDeclaration) Nil))));
+  valueDeclaration :: Parser Value;
+  valueDeclaration =
+    pChoice
+      (pTry
+         (do {
+            name <- bindingName;
+            annotationSymbol;
+            ty <- annotation;
+            pLook (pChoice (pToken ";") (pToken "}"));
+            pPure (Signature name ty)
+          }))
+      equation;
+  equation :: Parser Value;
+  equation =
+    do {
+      boundValueShared1 <- bindingHead;
+      case boundValueShared1 of {
+        Triple name args ty ->
+          do {
+            body <-
+              pChoice (pThen (pToken "=") expr)
+                (pBySyntax (pFail "guarded equations are outside shared-haskell-v1; use ordinary if/case") (pBind (pSome (guardBranch "=")) (\rows -> pEither (guarded rows))));
+            pPure (Equation name args ty body)
+          }
+      }
+    };
+  bindingHead :: Parser (Triple String (List SPattern) (Maybe SAnnotation));
+  bindingHead =
+    do {
+      result <-
+        pTry
+          (do {
+             name <- bindingName;
+             args <- pMany patternAtom;
+             ty <- pBySyntax (pPure Nothing) (pOptional (pThen annotationSymbol annotation));
+             pLook (pChoice (pToken "=") (pToken "|"));
+             pPure (Triple name args ty)
+           });
+      case result of {
+        Triple _ args _ ->
+          let {
+            names = concatMap Surface.patternVariables args
+          } in
+          if (length names == length (nubBy eqString names))
+          then pPure result
+          else pFail "duplicate function parameter"
+      }
+    };
+  groupValues :: List Value -> Either String (List (Triple String (Maybe SAnnotation) SExpr));
+  groupValues declarations =
+    case collectValues Nothing declarations of {
+      Left e -> Left e;
+      Right values ->
+        let {
+          names = map (\(Triple n _ _) -> n) values
+        } in
+        if (length names == length (nubBy eqString names))
+        then Right values
+        else Left "function equations must be contiguous; duplicate value declaration"
+    };
+  collectValues :: Maybe (Pair String SAnnotation) ->
+                   List Value -> Either String (List (Triple String (Maybe SAnnotation) SExpr));
+  collectValues signature values =
+    case values of {
+      Nil ->
+        case signature of {
+          Nothing -> Right Nil;
+          Just (Pair n _) ->
+            Left ("unexpected end of declarations; signature without a definition: " ++ n)
+        };
+      Cons (Signature n ty) rest ->
+        case signature of {
+          Just _ -> Left ("duplicate signature for " ++ n);
+          Nothing -> collectValues (Just (Pair n ty)) rest
+        };
+      Cons (Equation name args inline body) rest ->
+        let {
+          ty =
+            case signature of {
+              Nothing -> Right inline;
+              Just (Pair signedName signedType) ->
+                if not (eqString signedName name)
+                then Left ("expected a definition of " ++ signedName)
+                else case inline of {
+                       Just _ -> Left ("duplicate signature for " ++ name);
+                       Nothing -> Right (Just signedType)
+                     }
+            }
+        } in
+        case ty of {
+          Left e -> Left e;
+          Right resultType ->
+            case span
+                   (\v ->
+                      case v of {
+                        Equation n _ _ _ -> eqString n name;
+                        _ -> False
+                      })
+                   rest of {
+              Pair more remaining ->
+                let {
+                  rows =
+                    Cons (Pair args body)
+                      (map
+                         (\v ->
+                            case v of {
+                              Equation _ ps _ rhs -> Pair ps rhs;
+                              _ -> Pair Nil body
+                            })
+                         more)
+                } in
+                if any
+                     (\v ->
+                        case v of {
+                          Equation _ _ (Just _) _ -> True;
+                          _ -> False
+                        })
+                     more
+                then Left ("duplicate signature for " ++ name)
+                else if (not (null more) && null args)
+                     then Left "multiple equations require function parameters"
+                     else if any (\(Pair ps _) -> (length ps /= length args)) rows
+                          then Left "function equations have different arities"
+                          else case collectValues Nothing remaining of {
+                                 Left e -> Left e;
+                                 Right suffix ->
+                                   Right
+                                     (Cons (Triple name resultType (Surface.function rows)) suffix)
+                               }
+            }
+        }
+    };
+  valueBlock :: Parser (List (Triple String (Maybe SAnnotation) SExpr));
+  valueBlock =
+    pBind
+      (pBySyntax (pBraces (pSepEndBy1 valueDeclaration (pToken ";")))
+         (pChoice (pBraces (pSepEndBy1 valueDeclaration (pToken ";")))
+            (pMap (\v -> Cons v Nil) equation)))
+      (\values -> pEither (groupValues values));
+  bindLocal :: Bool -> List (Triple String (Maybe SAnnotation) SExpr) -> SExpr -> Parser SExpr;
+  bindLocal recursive values body =
+    if recursive
+    then pMap (\ds -> SLetRec ds body) (pEither (Surface.recursiveValues values))
+    else pPure (foldr (\(Triple n a e) b -> SLet n (annotateMaybe e a) b) body values);
+  annotateMaybe :: SExpr -> Maybe SAnnotation -> SExpr;
+  annotateMaybe expression ty =
+    case ty of {
+      Nothing -> expression;
+      Just a -> SAnn expression a
+    };
+  parameter :: Parser (Pair String Kind);
+  parameter =
+    pChoice
+      (pParens
+         (do {
+            n <- lowerIdentifier;
+            annotationSymbol;
+            k <- kindParser;
+            pPure (Pair n k)
+          }))
+      (pMap (\n -> Pair n Star) lowerIdentifier);
+  kindParser :: Parser Kind;
+  kindParser =
+    pChainr (pChoice (pMap (\_ -> Star) (pToken "*")) (pParens kindParser))
+      (pMap (\_ -> KArrow) (pToken "->"));
+  predicate :: Parser SPredicate;
+  predicate =
+    do {
+      n <- upperReference;
+      args <- pSome typeAtom;
+      pPure (SPredicate n args)
+    };
+  context :: Parser (List SPredicate);
+  context =
+    pTry
+      (pBefore
+         (pChoice (pParens (pSepBy1 predicate (pToken ","))) (pMap (\p -> Cons p Nil) predicate))
+         (pToken "=>"));
+  classDeclaration :: Parser SClassDecl;
+  classDeclaration =
+    do {
+      pToken "class";
+      supers <- pOption Nil context;
+      name <- upperIdentifier;
+      params <- pSome parameter;
+      pToken "where";
+      methods <-
+        pBraces
+          (pSepEndBy
+             (do {
+                n <- bindingName;
+                annotationSymbol;
+                t <- typ;
+                pPure (Pair n t)
+              })
+             (pToken ";"));
+      pPure (SClassDecl name params supers methods)
+    };
+  instanceDeclaration :: Parser SInstanceDecl;
+  instanceDeclaration =
+    do {
+      pToken "instance";
+      vars <- pOption Nil (pThen (pToken "forall") (pBefore (pSome parameter) (pToken ".")));
+      givens <- pOption Nil context;
+      name <- upperReference;
+      headType <- pSome typeAtom;
+      pToken "where";
+      declarations <- pBraces (pSepEndBy valueDeclaration (pToken ";"));
+      pBySyntax
+        (if any
+              (\declaration ->
+                 case declaration of {
+                   Signature _ _ -> True;
+                   _ -> False
+                 })
+              declarations
+         then pFail "instance signatures are outside shared-haskell-v1"
+         else pPure Unit)
+        (pPure Unit);
+      methods <- pEither (instanceMethods declarations);
+      pPure (SInstanceDecl vars givens name headType methods)
+    };
+  instanceMethods :: List Value -> Either String (List (Pair String SExpr));
+  instanceMethods declarations =
+    if all
+         (\v ->
+            case v of {
+              Equation _ Nil _ _ -> True;
+              _ -> False
+            })
+         declarations
+    then Right
+           (map
+              (\v ->
+                 case v of {
+                   Equation n _ a e -> Pair n (annotateMaybe e a);
+                   _ -> Pair "" (SVar "")
+                 })
+              declarations)
+    else case groupValues declarations of {
+           Left e -> Left e;
+           Right values -> Right (map (\(Triple n a e) -> Pair n (annotateMaybe e a)) values)
+         };
+  expr :: Parser SExpr;
+  expr =
+    do {
+      e <- pBySyntax sharedBindExpr disjunction;
+      pOption e (pMap (SAnn e) (pThen annotationSymbol annotation))
+    };
+  annotationSymbol :: Parser String;
+  annotationSymbol = pBySyntax (pToken "::") (pChoice (pToken "::") (pToken ":"));
+  -- A single colon historically introduces a closed annotation. Keep that
+  -- meaning when the complete right-hand side is a closed type, or contains
+  -- syntax specific to types. Otherwise it can introduce a list tail. In
+  -- particular, x : Nil remains an annotation; write x : [] or Cons x Nil.
+  legacyAnnotation :: Parser SAnnotation;
+  legacyAnnotation =
+    pTry
+      (do {
+         a <- annotation;
+         case a of {
+           SAnnotation variables ty ->
+             if (null (freeTypeNames variables ty) || (explicitType ty || not (null variables)))
+             then pPure Unit
+             else pFail "list tail"
+         };
+         end <- pState;
+         if elem eqString (tokenText (stateToken end))
+              (Cons "|"
+                 (Cons "="
+                    (Cons ""
+                       (Cons ")"
+                          (Cons "]"
+                             (Cons "}"
+                                (Cons ","
+                                   (Cons ";"
+                                      (Cons "in"
+                                         (Cons "then"
+                                            (Cons "else" (Cons "of" (Cons "where" Nil)))))))))))))
+         then pPure Unit
+         else pFail "end of annotation";
+         pPure a
+       });
+  freeTypeNames :: List String -> SType -> List String;
+  freeTypeNames bound ty =
+    case ty of {
+      STVar n -> if elem eqString n bound then Nil else Cons n Nil;
+      SArrow a b -> append (freeTypeNames bound a) (freeTypeNames bound b);
+      STypeApp a b -> append (freeTypeNames bound a) (freeTypeNames bound b);
+      SCon _ args -> concatMap (freeTypeNames bound) args;
+      SForall _ n lower body ->
+        append (freeTypeNames bound lower) (freeTypeNames (Cons n bound) body);
+      SQualified predicates body ->
+        append (concatMap (\(SPredicate _ args) -> concatMap (freeTypeNames bound) args) predicates)
+          (freeTypeNames bound body);
+      _ -> Nil
+    };
+  explicitType :: SType -> Bool;
+  explicitType ty =
+    case ty of {
+      SArrow _ _ -> True;
+      SForall _ _ _ _ -> True;
+      SQualified _ _ -> True;
+      SBottom -> True;
+      SBottomKind _ -> True;
+      SCon _ args -> any explicitType args;
+      STypeApp a b -> (explicitType a || explicitType b);
+      _ -> False
+    };
+  disjunction :: Parser SExpr;
+  disjunction =
+    pChainr conjunction (pMap (\_ a b -> conditional a (SBoolLit True) b) (pToken "||"));
+  conjunction :: Parser SExpr;
+  conjunction =
+    pChainr comparison (pMap (\_ a b -> conditional a b (SBoolLit False)) (pToken "&&"));
+  comparison :: Parser SExpr;
+  comparison =
+    do {
+      a <- concatenation;
+      pOption a
+        (do {
+           operator <- comparisonOperator;
+           b <- concatenation;
+           next <- pOptional (pLook comparisonOperator);
+           case next of {
+             Nothing -> pPure Unit;
+             Just _ -> pFail "ambiguous use of a non-associative comparison operator"
+           };
+           pPure (operator a b)
+         })
+    };
+  comparisonOperator :: Parser (SExpr -> SExpr -> SExpr);
+  comparisonOperator =
+    pChoices
+      (Cons (pMap (\_ -> primitive2 PEqInt) (pToken "=="))
+         (Cons (pMap (\_ a b -> notValue (primitive2 PEqInt a b)) (pToken "/="))
+            (Cons (pMap (\_ -> primitive2 PLtInt) (pToken "<"))
+               (Cons (pMap (\_ a b -> notValue (primitive2 PLtInt b a)) (pToken "<="))
+                  (Cons (pMap (\_ a b -> primitive2 PLtInt b a) (pToken ">"))
+                     (Cons (pMap (\_ a b -> notValue (primitive2 PLtInt a b)) (pToken ">="))
+                        Nil))))));
+  concatenation :: Parser SExpr;
+  concatenation =
+    pChainr addition
+      (pChoice (pMap (\_ -> primitive2 PConcatString) (pToken "++"))
+         (pBySyntax (pFail "shared list-tail syntax is not supported")
+            (do {
+               pTry (pThen (pToken ":") (pNot legacyAnnotation));
+               pPure consExpression
+             })));
+  consExpression :: SExpr -> SExpr -> SExpr;
+  consExpression a b = SApp (SApp (SConstructor "Cons") a) b;
+  addition :: Parser SExpr;
+  addition =
+    pChainl multiplication
+      (pChoice (pMap (\_ -> primitive2 PAddInt) (pToken "+"))
+         (pMap (\_ -> primitive2 PSubInt) (pToken "-")));
+  multiplication :: Parser SExpr;
+  multiplication =
+    pChainl prefixed
+      (pChoices
+         (Cons (pMap (\_ -> primitive2 PMulInt) (pToken "*"))
+            (Cons (pMap (\_ -> primitive2 PQuotInt) (pToken "/"))
+               (Cons (pMap (\_ -> primitive2 PRemInt) (pToken "%")) Nil))));
+  prefixed :: Parser SExpr;
+  prefixed = pBySyntax operand legacyPrefixed;
+  legacyPrefixed :: Parser SExpr;
+  legacyPrefixed =
+    do {
+      sign <-
+        pOptional
+          (pChoice (pMap (\_ -> negateValue) (pToken "-"))
+             (pMap (\_ -> positiveValue) (pToken "+")));
+      value <- operand;
+      pPure
+        (case sign of {
+           Nothing -> value;
+           Just f -> f value
+         })
+    };
+  operand :: Parser SExpr;
+  operand =
+    pChoices (Cons letExpr (Cons lambda (Cons caseExpr (Cons ifExpr (Cons application Nil)))));
+  application :: Parser SExpr;
+  application =
+    pMap
+      (\values ->
+         case values of {
+           Nil -> SVar "";
+           Cons first rest -> foldl SApp first rest
+         })
+      (pSome atom);
+  primitive2 :: Primitive -> SExpr -> SExpr -> SExpr;
+  primitive2 primitive a b = SApp (SApp (SPrimitive primitive) a) b;
+  conditional :: SExpr -> SExpr -> SExpr -> SExpr;
+  conditional condition yes no = SApp (primitive2 PIfThenElse condition yes) no;
+  notValue :: SExpr -> SExpr;
+  notValue a = conditional a (SBoolLit False) (SBoolLit True);
+  negateValue :: SExpr -> SExpr;
+  negateValue a =
+    case a of {
+      SIntLit n -> SIntLit (0 - n);
+      SDoubleLit n -> SDoubleLit (mulDouble (SharedSyntax.negateDouble 1.0) n);
+      _ -> primitive2 PSubInt (SIntLit 0) a
+    };
+  positiveValue :: SExpr -> SExpr;
+  positiveValue a =
+    case a of {
+      SIntLit _ -> a;
+      SDoubleLit _ -> a;
+      _ -> primitive2 PAddInt (SIntLit 0) a
+    };
+  ifExpr :: Parser SExpr;
+  ifExpr =
+    do {
+      pToken "if";
+      pChoice
+        (pBySyntax (pFail "shared guard-if syntax is not supported")
+           (pBind (pBraces (pSepEndBy (guardBranch "->") (pToken ";")))
+              (\rows -> pEither (guarded rows))))
+        (do {
+           condition <- expr;
+           pToken "then";
+           yes <- expr;
+           pToken "else";
+           no <- expr;
+           pPure (conditional condition yes no)
+         })
+    };
+  -- Guards are total Boolean decisions within one RHS, not pattern-matrix rows.
+  -- Recognize otherwise only immediately before the delimiter: existing names
+  -- and applications such as otherwise x remain ordinary Boolean expressions.
+  guardBranch :: String -> Parser (Pair (Maybe SExpr) SExpr);
+  guardBranch delimiter =
+    do {
+      pToken "|";
+      condition <-
+        pChoice
+          (pMap (\_ -> Nothing) (pTry (pBefore (pToken "otherwise") (pLook (pToken delimiter)))))
+          (pMap Just expr);
+      pSatisfy (eqString delimiter) (delimiter ++ " after guard condition");
+      body <- expr;
+      pPure (Pair condition body)
+    };
+  guarded :: List (Pair (Maybe SExpr) SExpr) -> Either String SExpr;
+  guarded rows =
+    case rows of {
+      Nil -> Left "guard block requires a final otherwise branch";
+      Cons (Pair Nothing body) Nil -> Right body;
+      Cons (Pair Nothing _) _ -> Left "otherwise must be the final guard branch";
+      Cons (Pair (Just condition) body) rest ->
+        mapEither (conditional condition body) (guarded rest)
+    };
+  letExpr :: Parser SExpr;
+  letExpr =
+    do {
+      pToken "let";
+      recursive <- pBySyntax (pPure True) (pOption False (pMap (\_ -> True) (pToken "rec")));
+      values <- valueBlock;
+      pToken "in";
+      body <- expr;
+      pBySyntax (pEither (Surface.bindValues values body)) (bindLocal recursive values body)
+    };
+  lambda :: Parser SExpr;
+  lambda =
+    do {
+      pBySyntax (pToken "\\") (pChoice (pSymbolPrefix "\\") (pSymbolPrefix "λ"));
+      args <- pSome patternAtom;
+      pBySyntax (pToken "->") (pChoice (pSymbolPrefix "->") (pSymbolPrefix "."));
+      body <- expr;
+      let {
+        names = concatMap Surface.patternVariables args
+      };
+      if (length names == length (nubBy eqString names))
+      then pPure (Surface.function (Cons (Pair args body) Nil))
+      else pFail "duplicate pattern variable"
+    };
+  caseExpr :: Parser SExpr;
+  caseExpr =
+    do {
+      pToken "case";
+      scrutinee <- expr;
+      pToken "of";
+      alternatives <- pBraces (pSepEndBy1 alternative (pToken ";"));
+      pPure (SCase scrutinee alternatives)
+    };
+  alternative :: Parser SAlternative;
+  alternative =
+    do {
+      pattern <- patternP;
+      pToken "->";
+      value <- expr;
+      pPure (SAlternative pattern value)
+    };
+  patternP :: Parser SPattern;
+  patternP = pBySyntax patternApplication legacyPattern;
+  legacyPattern :: Parser SPattern;
+  legacyPattern =
+    pChainr patternApplication
+      (pMap (\_ a b -> constructorPattern "Cons" (Cons a (Cons b Nil))) (pToken ":"));
+  patternApplication :: Parser SPattern;
+  patternApplication =
+    pChoice
+      (pTry
+         (do {
+            name <- upperReference;
+            fields <- pMany patternAtom;
+            pBySyntax (pPure (constructorPattern (sharedSourceName name) fields)) (pPure (constructorPattern name fields))
+          }))
+      patternAtom;
+  constructorPattern :: String -> List SPattern -> SPattern;
+  constructorPattern name fields =
+    if (eqString name "True" && null fields)
+    then SBoolPattern True
+    else if (eqString name "False" && null fields)
+         then SBoolPattern False
+         else if all
+                   (\p ->
+                      case p of {
+                        SDefaultPattern _ -> True;
+                        _ -> False
+                      })
+                   fields
+              then SConstructorPattern name
+                     (map
+                        (\p ->
+                           case p of {
+                             SDefaultPattern n -> n;
+                             _ -> Nothing
+                           })
+                        fields)
+              else SNestedPattern name fields;
+  patternAtom :: Parser SPattern;
+  patternAtom = pBySyntax sharedPatternAtom legacyPatternAtom;
+  sharedPatternAtom :: Parser SPattern;
+  sharedPatternAtom =
+    pChoices
+      (Cons
+         (pParens
+            (pChoice (pMap SIntPattern (pThen (pToken "-") (pMap (\n -> (0 - n)) naturalLiteral)))
+               patternP))
+         (Cons (pMap (\b -> SConstructorPattern (sharedSourceName (if b then "True" else "False")) Nil) booleanLiteral)
+            (Cons (pMap SIntPattern naturalLiteral)
+               (Cons (pMap (\n -> SConstructorPattern (sharedSourceName n) Nil) upperReference)
+                  (Cons (pMap SDefaultPattern patternField) Nil)))));
+  legacyPatternAtom :: Parser SPattern;
+  legacyPatternAtom =
+    pChoices
+      (Cons
+         (pParens
+            (pChoice annotatedVariable
+               (pBind (collectionItems ")" patternP)
+                  (tupleValue (SConstructorPattern "Unit" Nil) constructorPattern))))
+         (Cons
+            (pMap
+               (foldr (\a b -> constructorPattern "Cons" (Cons a (Cons b Nil)))
+                  (constructorPattern "Nil" Nil))
+               (pThen (pToken "[") (pBefore (collectionItems "]" patternP) (pToken "]"))))
+            (Cons (pMap SBoolPattern booleanLiteral)
+               (Cons (pMap SIntPattern (pTry integerLiteral))
+                  (Cons (pMap SStringPattern stringLiteral)
+                     (Cons (pMap (\n -> SConstructorPattern n Nil) upperReference)
+                        (Cons (pMap SDefaultPattern patternField) Nil)))))));
+  annotatedVariable :: Parser SPattern;
+  annotatedVariable =
+    pTry
+      (do {
+         n <- annotatedName;
+         a <- pChoice (pThen (pToken "::") annotation) (pThen (pToken ":") legacyAnnotation);
+         pLook (pToken ")");
+         pPure (SAnnotatedPattern n a)
+       });
+  annotatedName :: Parser String;
+  annotatedName = pChoice lowerIdentifier (pParens annotatedName);
+  patternField :: Parser (Maybe String);
+  patternField = pChoice (pMap (\_ -> Nothing) (pToken "_")) (pMap Just lowerIdentifier);
+  doExpr :: Parser SExpr;
+  doExpr = pBySyntax sharedDoExpr legacyDoExpr;
+  legacyDoExpr :: Parser SExpr;
+  legacyDoExpr =
+    do {
+      pToken "do";
+      statements <- pMap concat (pBraces (pSepEndBy1 statement (pToken ";")));
+      case reverse statements of {
+        Cons (SDoThen result) rest -> pPure (SDo (reverse rest) result);
+        _ -> pFail "a do block must end with an expression"
+      }
+    };
+  statement :: Parser (List SStatement);
+  statement =
+    pChoices
+      (Cons
+         (pTry
+            (do {
+               p <- patternP;
+               pToken "<-";
+               e <- expr;
+               pPure (Cons (SDoBind p e) Nil)
+             }))
+         (Cons (pTry doLet) (Cons (pMap (\e -> Cons (SDoThen e) Nil) expr) Nil)));
+  doLet :: Parser (List SStatement);
+  doLet =
+    do {
+      pToken "let";
+      recursive <- pOption False (pMap (\_ -> True) (pToken "rec"));
+      values <- valueBlock;
+      pLook (pChoice (pToken ";") (pToken "}"));
+      if recursive
+      then pMap (\ds -> Cons (SDoLetRec ds) Nil) (pEither (Surface.recursiveValues values))
+      else pPure (map (\(Triple n a e) -> SDoLet n a e) values)
+    };
+  atom :: Parser SExpr;
+  atom = pBySyntax sharedAtom legacyAtom;
+  sharedAtom :: Parser SExpr;
+  sharedAtom =
+    pChoices
+      (Cons
+         (pParens
+            (pChoices (Cons (pTry (pMap SVar (pBefore operatorReference (pLook (pToken ")"))))) (Cons (pMap SIntLit (pThen (pToken "-") (pMap (\n -> (0 - n)) naturalLiteral))) (Cons expr Nil)))))
+         (Cons doExpr
+            (Cons (pMap (\b -> SConstructor (sharedSourceName (if b then "True" else "False"))) booleanLiteral)
+               (Cons (pMap SDoubleLit doubleLiteral)
+                  (Cons (pMap SIntLit naturalLiteral)
+                     (Cons (pMap SStringLit stringLiteral)
+                        (Cons (pMap SVar lowerReference)
+                           (Cons (pThen (pNot (pTry operatorReference)) (pMap (\name -> SConstructor (sharedSourceName name)) upperReference)) Nil))))))));
+  legacyAtom :: Parser SExpr;
+  legacyAtom =
+    pChoices
+      (Cons
+         (pParens
+            (pChoice (pTry (pMap SVar (pBefore operatorReference (pLook (pToken ")"))))) (pBind (collectionItems ")" expr)
+               (tupleValue (SConstructor "Unit")
+                  (\name fields -> foldl SApp (SConstructor name) fields)))))
+         (Cons
+            (pMap (foldr consExpression (SConstructor "Nil"))
+               (pThen (pToken "[") (pBefore (collectionItems "]" expr) (pToken "]"))))
+            (Cons doExpr
+               (Cons (pMap SBoolLit booleanLiteral)
+                  (Cons (pMap SDoubleLit doubleLiteral)
+                     (Cons (pMap SIntLit naturalLiteral)
+                        (Cons (pMap SStringLit stringLiteral)
+                           (Cons (pMap SVar lowerReference)
+                              (Cons (pMap SConstructor upperReference) Nil)))))))));
+  -- Nonempty collections never admit a trailing comma or tuple sections.
+  -- The separator check also gives ranges/comprehensions a direct diagnostic.
+  collectionItems :: forall a. String -> Parser a -> Parser (List a);
+  collectionItems closing item =
+    pChoice (pThen (pLook (pToken closing)) (pPure Nil))
+      (do {
+         first <- item;
+         rest <- collectionRest closing item;
+         pPure (Cons first rest)
+       });
+  collectionRest :: forall a. String -> Parser a -> Parser (List a);
+  collectionRest closing item =
+    do {
+      state <- pState;
+      let {
+        next = tokenText (stateToken state)
+      };
+      if eqString next "|"
+      then pFail "list comprehensions are not supported"
+      else if eqString next ".."
+           then pFail "list ranges are not supported"
+           else if eqString next ","
+                then do {
+                       pToken ",";
+                       end <- pState;
+                       if eqString (tokenText (stateToken end)) closing
+                       then pFail "trailing comma or missing collection element"
+                       else pPure Unit;
+                       value <- item;
+                       rest <- collectionRest closing item;
+                       pPure (Cons value rest)
+                     }
+                else pPure Nil
+    };
+  tupleValue :: forall a. a -> (String -> List a -> a) -> List a -> Parser a;
+  tupleValue unit construct values =
+    case values of {
+      Nil -> pPure unit;
+      Cons value Nil -> pPure value;
+      _ ->
+        case length values of {
+          2 -> pPure (construct "Pair" values);
+          3 -> pPure (construct "Triple" values);
+          4 -> pPure (construct "Quad" values);
+          _ -> pFail "tuple syntax supports two, three or four components"
+        }
+    };
+  booleanLiteral :: Parser Bool;
+  booleanLiteral =
+    pBySyntax (pChoice (pMap (\_ -> True) (pToken "True")) (pMap (\_ -> False) (pToken "False")))
+      legacyBooleanLiteral;
+  legacyBooleanLiteral :: Parser Bool;
+  legacyBooleanLiteral =
+    pChoice (pMap (\_ -> True) (pChoice (pToken "true") (pToken "True")))
+      (pMap (\_ -> False) (pChoice (pToken "false") (pToken "False")));
+  naturalLiteral :: Parser Int;
+  naturalLiteral =
+    pBind
+      (pSatisfy
+         (\s ->
+            ((stringLength s > 0) &&
+             (isDigit (stringCodeAt s 0) &&
+              not
+                (isFloating s &&
+                 not
+                   ((stringLength s > 1) &&
+                    ((stringCodeAt s 1 == 120) || (stringCodeAt s 1 == 88)))))))
+         "integer")
+      (\s -> pEither (naturalValue s));
+  integerLiteral :: Parser Int;
+  integerLiteral =
+    do {
+      sign <- pOption 1 (pChoice (pMap (\_ -> (-1)) (pToken "-")) (pMap (\_ -> 1) (pToken "+")));
+      value <- naturalLiteral;
+      pPure (sign * value)
+    };
+  doubleLiteral :: Parser Double;
+  doubleLiteral =
+    pTry
+      (do {
+         spelling <-
+           pSatisfy
+             (\s ->
+                ((stringLength s > 0) &&
+                 (isDigit (stringCodeAt s 0) &&
+                  (isFloating s &&
+                   not
+                     ((stringLength s > 1) &&
+                      ((stringCodeAt s 1 == 120) || (stringCodeAt s 1 == 88)))))))
+             "Double";
+         let {
+           value = readDouble spelling
+         };
+         if (((doubleToBits value / 4503599627370496) % 2048) == 2047)
+         then pFail "non-finite Double literal"
+         else pPure value
+       });
+  stringLiteral :: Parser String;
+  stringLiteral =
+    pBind (pSatisfy (\s -> ((stringLength s > 0) && (stringCodeAt s 0 == 34))) "string literal")
+      (\s -> pEither (stringValue s));
+  annotation :: Parser SAnnotation;
+  annotation =
+    pBySyntax
+      (do {
+         ty <- typ;
+         pEither (validateSharedScheme ty);
+         pPure (SAnnotation Nil ty)
+       })
+      legacyAnnotationParser;
+  legacyAnnotationParser :: Parser SAnnotation;
+  legacyAnnotationParser =
+    do {
+      variables <- pOption Nil (pThen (pToken "exists") (pBefore (pSome identifier) (pToken ".")));
+      if (length variables /= length (nubBy eqString variables))
+      then pFail "duplicate existential variable"
+      else pMap (SAnnotation variables) typ
+    };
+  typ :: Parser SType;
+  typ =
+    pChoices
+      (Cons quantified
+         (Cons
+            (do {
+               ps <- context;
+               body <- typ;
+               pPure (SQualified ps body)
+             })
+            (Cons (pChainr typeApp (pMap (\_ -> SArrow) (pToken "->"))) Nil)));
+  quantified :: Parser SType;
+  quantified =
+    do {
+      pToken "forall";
+      binders <- pSome typeBinder;
+      pToken ".";
+      body <- typ;
+      pPure (foldr (\(Triple f n b) t -> SForall f n b t) body binders)
+    };
+  typeBinder :: Parser (Triple Flag String SType);
+  typeBinder =
+    pBySyntax
+      (pChoice
+         (pParens
+            (do {
+               name <- lowerIdentifier;
+               pToken "::";
+               k <- kindParser;
+               pPure
+                 (Triple Flexible name
+                    (case k of {
+                       Star -> SBottom;
+                       _ -> SBottomKind k
+                     }))
+             }))
+         (pMap (\name -> Triple Flexible name SBottom) lowerIdentifier))
+      legacyTypeBinder;
+  legacyTypeBinder :: Parser (Triple Flag String SType);
+  legacyTypeBinder =
+    pChoice
+      (pParens
+         (do {
+            name <- identifier;
+            bound <-
+              pOptional
+                (pChoice
+                   (pMap
+                      (\k ->
+                         Pair Flexible
+                           (case k of {
+                              Star -> SBottom;
+                              _ -> SBottomKind k
+                            }))
+                      (pThen annotationSymbol kindParser))
+                   (do {
+                      flag <-
+                        pChoice (pMap (\_ -> Flexible) (pChoice (pToken ">=") (pToken ">")))
+                          (pMap (\_ -> Rigid) (pToken "="));
+                      ty <- typ;
+                      pPure (Pair flag ty)
+                    }));
+            pPure
+              (case bound of {
+                 Nothing -> Triple Flexible name SBottom;
+                 Just (Pair flag ty) -> Triple flag name ty
+               })
+          }))
+      (pMap (\name -> Triple Flexible name SBottom) identifier);
+  typeApp :: Parser SType;
+  typeApp =
+    pMap
+      (\types ->
+         case types of {
+           Nil -> SBottom;
+           Cons first rest -> foldl applyType first rest
+         })
+      (pSome typeAtom);
+  applyType :: SType -> SType -> SType;
+  applyType f a =
+    case f of {
+      SCon n args -> SCon n (append args (Cons a Nil));
+      _ -> STypeApp f a
+    };
+  typeAtom :: Parser SType;
+  typeAtom =
+    pBySyntax
+      (pChoices
+         (Cons (pParens typ)
+            (Cons (pMap STVar lowerIdentifier)
+               (Cons (pMap (\n -> SCon (sharedSourceName n) Nil) upperReference) Nil))))
+      legacyTypeAtom;
+  legacyTypeAtom :: Parser SType;
+  legacyTypeAtom =
+    pChoices
+      (Cons (pParens (pBind (collectionItems ")" typ) (tupleValue (SCon "Unit" Nil) SCon)))
+         (Cons
+            (pMap (\ty -> SCon "List" (Cons ty Nil))
+               (pThen (pToken "[") (pBefore typ (pToken "]"))))
+            (Cons (pMap (\_ -> SBottom) (pChoice (pToken "bot") (pToken "⊥")))
+               (Cons (pMap STVar lowerIdentifier)
+                  (Cons (pMap (\n -> SCon n Nil) upperReference) Nil)))));
+  -- Reserved Boolean spellings are parsed in declarations so semantic validation
+  -- can report the same inference rejection as the maintained seed compiler.
+  declarationIdentifier :: Parser String;
+  declarationIdentifier =
+    pChoices (Cons upperIdentifier (Cons (pToken "True") (Cons (pToken "False") Nil)));
+  dataDeclaration :: Parser DataDecl;
+  dataDeclaration =
+    do {
+      pToken "data";
+      name <- declarationIdentifier;
+      parameters <- pMany parameter;
+      state <- pState;
+      let {
+        next = tokenText (stateToken state)
+      };
+      if elem eqString next reservedWords
+      then pFail ("unexpected reserved word " ++ next)
+      else pPure Unit;
+      pToken "=";
+      constructors <-
+        pSepBy1
+          (do {
+             n <- declarationIdentifier;
+             fields <- pMany fieldAtom;
+             pPure (ConstructorDecl n fields)
+           })
+          (pToken "|");
+      pPure
+        (if all
+              (\(Pair _ k) ->
+                 case k of {
+                   Star -> True;
+                   _ -> False
+                 })
+              parameters
+         then DataDecl name (map (\(Pair n _) -> n) parameters) constructors
+         else DataDeclK name parameters constructors)
+    };
+  fieldType :: Parser Field;
+  fieldType =
+    pChoice
+      (do {
+         pToken "forall";
+         binders <- pSome parameter;
+         pToken ".";
+         body <- fieldType;
+         pPure (foldr (\(Pair n k) b -> Quantified n k b) body binders)
+       })
+      (pChainr fieldApplication (pMap (\_ -> Function) (pToken "->")));
+  fieldApplication :: Parser Field;
+  fieldApplication =
+    pMap
+      (\fields ->
+         case fields of {
+           Nil -> Parameter "";
+           Cons first rest -> foldl applyField first rest
+         })
+      (pSome fieldAtom);
+  applyField :: Field -> Field -> Field;
+  applyField f a =
+    case f of {
+      Applied n fields -> Applied n (append fields (Cons a Nil));
+      _ -> Application f a
+    };
+  fieldAtom :: Parser Field;
+  fieldAtom =
+    pBySyntax
+      (pChoices
+         (Cons (pParens fieldType)
+            (Cons (pMap (\n -> Applied (sharedSourceName n) Nil) upperReference)
+               (Cons (pMap Parameter lowerIdentifier) Nil))))
+      legacyFieldAtom;
+  legacyFieldAtom :: Parser Field;
+  legacyFieldAtom =
+    pChoices
+      (Cons
+         (pParens (pBind (collectionItems ")" fieldType) (tupleValue (Applied "Unit" Nil) Applied)))
+         (Cons
+            (pMap (\ty -> Applied "List" (Cons ty Nil))
+               (pThen (pToken "[") (pBefore fieldType (pToken "]"))))
+            (Cons (pMap (\n -> Applied n Nil) upperReference)
+               (Cons (pMap Parameter lowerIdentifier) Nil))));
+  sharedOrdinaryLegacyWords :: List String;
+  sharedOrdinaryLegacyWords = Cons "rec" (Cons "exists" (Cons "true" (Cons "false" (Cons "bot" Nil))));
+  sharedReservedWords :: List String;
+  sharedReservedWords =
+    Cons "type"
+      (Cons "newtype"
+         (Cons "deriving"
+            (Cons "default" (Cons "infix" (Cons "infixl" (Cons "infixr" (Cons "foreign" Nil)))))));
+  referenceLeaf :: String -> String;
+  referenceLeaf name = referenceLeafAt name (stringLength name - 1);
+  referenceLeafAt :: String -> Int -> String;
+  referenceLeafAt name i =
+    if (i < 0)
+    then name
+    else if (stringCodeAt name i == 46)
+         then stringSlice name (i + 1) ((stringLength name - i) - 1)
+         else referenceLeafAt name (i - 1);
+  validateSharedBinding :: String -> Either String Unit;
+  validateSharedBinding _ = Right Unit;
+  validateSharedScheme :: SType -> Either String Unit;
+  validateSharedScheme ty =
+    do {
+      unless (null (freeTypeNames Nil ty))
+        (Left "shared signatures require explicit forall for every free type variable");
+      validateSharedType True ty
+    };
+  validateSharedType :: Bool -> SType -> Either String Unit;
+  validateSharedType outer ty =
+    case ty of {
+      SForall flag name bound body ->
+        do {
+          case flag of {
+            Rigid -> Left "rigid quantifiers are outside shared-haskell-v1";
+            Flexible -> Right Unit
+          };
+          case bound of {
+            SBottom -> Right Unit;
+            SBottomKind _ -> Right Unit;
+            _ -> Left "bounded quantifiers are outside shared-haskell-v1"
+          };
+          validateSharedType outer body
+        };
+      SQualified predicates body ->
+        do {
+          unless outer (Left "nested qualified types are outside shared-haskell-v1");
+          mapM_ (\(SPredicate _ arguments) -> mapM_ validateSharedMonotype arguments) predicates;
+          validateSharedType False body
+        };
+      SArrow a b ->
+        do {
+          validateSharedType False a;
+          validateSharedType False b
+        };
+      SCon _ arguments -> mapM_ validateSharedMonotype arguments;
+      STypeApp f a ->
+        do {
+          validateSharedType False f;
+          validateSharedMonotype a
+        };
+      STVar _ -> Right Unit;
+      _ -> Left "bottom types are outside shared-haskell-v1"
+    };
+  validateSharedMonotype :: SType -> Either String Unit;
+  validateSharedMonotype ty =
+    case ty of {
+      SForall _ _ _ _ -> Left "impredicative type arguments are outside shared-haskell-v1";
+      SQualified _ _ -> Left "qualified type arguments are outside shared-haskell-v1";
+      SArrow a b ->
+        do {
+          validateSharedMonotype a;
+          validateSharedMonotype b
+        };
+      STypeApp a b ->
+        do {
+          validateSharedMonotype a;
+          validateSharedMonotype b
+        };
+      SCon _ arguments -> mapM_ validateSharedMonotype arguments;
+      STVar _ -> Right Unit;
+      _ -> Left "bottom types are outside shared-haskell-v1"
+    };
+  validateSharedModule :: SourceModule -> Either String Unit;
+  validateSharedModule (SourceModule file name exports imports datatypes classes instances values body _) =
+    do {
+      unless (isJust name && not (isJust body))
+        (Left (file ++ ": shared source requires a named declaration-only module"));
+      mapM_ validateSharedImport imports;
+      case exports of {
+        Nothing -> Right Unit;
+        Just items -> mapM_ validateSharedExport items
+      };
+      mapM_ validateSharedDatatype datatypes;
+      mapM_
+        (\(Triple n _ expression) ->
+           do {
+             validateSharedBinding n;
+             validateSharedExpression expression
+           })
+        values;
+      mapM_
+        (\(SClassDecl _ parameters supers methods) ->
+           do {
+             mapM_ (\(SPredicate _ args) -> mapM_ validateSharedMonotype args) supers;
+             mapM_
+               (\(Pair n ty) ->
+                  do {
+                    validateSharedBinding n;
+                    validateSharedType False ty;
+                    unless (null (freeTypeNames (map fst parameters) ty))
+                      (Left "unbound type variable in shared class method")
+                  })
+               methods
+           })
+        classes;
+      mapM_
+        (\(SInstanceDecl _ context _ head methods) ->
+           do {
+             mapM_ (\(SPredicate _ args) -> mapM_ validateSharedMonotype args) context;
+             mapM_ validateSharedMonotype head;
+             mapM_ (\(Pair _ expression) -> validateSharedExpression expression) methods
+           })
+        instances;
+      Surface.bindValues values (SConstructor "Unit");
+      Right Unit
+    };
+  validateSharedImportItem :: Export -> Either String Unit;
+  validateSharedImportItem _ = Right Unit;
+  validateSharedImport :: Import -> Either String Unit;
+  validateSharedImport (Import name _ _ _) = do {
+    when (eqString name "Prelude") (Left "shared source uses the standard MLF.Primitive facade; legacy Prelude is outside shared-haskell-v1");
+    when (textStartsAt name 0 "MLF.Host.")
+      (Left "shared modules use MLF.Primitive rather than host adapter internals")
+  };
+  validateSharedExport :: Export -> Either String Unit;
+  validateSharedExport _ = Right Unit;
+  validateSharedPattern :: SPattern -> Either String Unit;
+  validateSharedPattern pattern =
+    do {
+      mapM_ validateSharedBinding (Surface.patternVariables pattern);
+      case pattern of {
+        SStringPattern _ -> Left "string patterns are outside shared-haskell-v1";
+        SAnnotatedPattern _ _ -> Left "typed patterns are outside shared-haskell-v1";
+        SNestedPattern _ patterns -> mapM_ validateSharedPattern patterns;
+        _ -> Right Unit
+      }
+    };
+  validateSharedExpression :: SExpr -> Either String Unit;
+  validateSharedExpression expression =
+    case expression of {
+      SVar _ -> Right Unit;
+      SLam name annotation body ->
+        do {
+          validateSharedBinding name;
+          when (isJust annotation) (Left "typed lambda patterns are outside shared-haskell-v1");
+          validateSharedExpression body
+        };
+      SApp a b ->
+        do {
+          validateSharedExpression a;
+          validateSharedExpression b
+        };
+      SLet name a b ->
+        do {
+          validateSharedBinding name;
+          validateSharedExpression a;
+          validateSharedExpression b
+        };
+      SAnn e (SAnnotation variables ty) ->
+        do {
+          unless (null variables) (Left "existential annotations are outside shared-haskell-v1");
+          validateSharedScheme ty;
+          validateSharedExpression e
+        };
+      SCase value branches ->
+        do {
+          validateSharedExpression value;
+          mapM_
+            (\(SAlternative pattern body) ->
+               do {
+                 validateSharedPattern pattern;
+                 validateSharedExpression body
+               })
+            branches
+        };
+      SEquations rows ->
+        mapM_
+          (\(Pair patterns body) ->
+             do {
+               mapM_ validateSharedPattern patterns;
+               validateSharedExpression body
+             })
+          rows;
+      SLetRec definitions body ->
+        do {
+          mapM_
+            (\(Triple name (SAnnotation variables ty) value) ->
+               do {
+                 validateSharedBinding name;
+                 unless (null variables)
+                   (Left "existential annotations are outside shared-haskell-v1");
+                 validateSharedScheme ty;
+                 validateSharedExpression value
+               })
+            definitions;
+          validateSharedExpression body
+        };
+      SDo _ _ -> Left "internal error: shared do was not normalized";
+      _ -> Right Unit
+    };
+  sharedDoExpr :: Parser SExpr;
+  sharedDoExpr =
+    do {
+      pToken "do";
+      statements <- pBraces (pSepEndBy1 sharedStatement (pToken ";"));
+      case reverse statements of {
+        Cons (SharedThen result) rest ->
+          pEither
+            (runFresh (append (Desugar.allNames result) (concatMap sharedStatementNames rest))
+               (lowerSharedStatements (reverse rest) result));
+        _ -> pFail "a shared do block must end with an expression"
+      }
+    };
+  sharedStatement :: Parser SharedStatement;
+  sharedStatement =
+    pChoices
+      (Cons
+         (pTry
+            (do {
+               name <- patternField;
+               pToken "<-";
+               value <- expr;
+               pPure (SharedBind name value)
+             }))
+         (Cons
+            (pTry
+               (do {
+                  pToken "let";
+                  values <- valueBlock;
+                  pLook (pChoice (pToken ";") (pToken "}"));
+                  pPure (SharedLet values)
+                }))
+            (Cons (pMap SharedThen expr) Nil)));
+  sharedStatementNames :: SharedStatement -> List String;
+  sharedStatementNames statement =
+    case statement of {
+      SharedBind name value ->
+        append
+          (case name of {
+             Nothing -> Nil;
+             Just n -> Cons n Nil
+           })
+          (Desugar.allNames value);
+      SharedThen value -> Desugar.allNames value;
+      SharedLet values -> concatMap (\(Triple n _ value) -> Cons n (Desugar.allNames value)) values
+    };
+  lowerSharedStatements :: List SharedStatement -> SExpr -> Fresh SExpr;
+  lowerSharedStatements statements result =
+    case statements of {
+      Nil -> freshPure result;
+      Cons statement rest ->
+        do {
+          continuation <- lowerSharedStatements rest result;
+          case statement of {
+            SharedLet values ->
+              case Surface.bindValues values continuation of {
+                Left error -> freshFail error;
+                Right body -> freshPure body
+              };
+            SharedBind name value ->
+              do {
+                binder <-
+                  case name of {
+                    Just n -> freshPure n;
+                    Nothing -> freshName "sharedDoValue"
+                  };
+                freshPure
+                  (SApp (SApp (SVar "$MLF.Primitive.>>=") value)
+                     (SLam binder Nothing continuation))
+              };
+            SharedThen value ->
+              freshPure (SApp (SApp (SVar "$MLF.Primitive.>>") value) continuation)
+          }
+        }
+    };
+  validateSharedDatatype :: DataDecl -> Either String Unit;
+  validateSharedDatatype declaration =
+    case declaration of {
+      DataDecl _ _ constructors -> mapM_ validateSharedConstructor constructors;
+      DataDeclK _ _ constructors -> mapM_ validateSharedConstructor constructors
+    };
+  validateSharedConstructor :: ConstructorDecl -> Either String Unit;
+  validateSharedConstructor (ConstructorDecl _ fields) = mapM_ (validateSharedField True) fields;
+  validateSharedField :: Bool -> Field -> Either String Unit;
+  validateSharedField polymorphic field =
+    case field of {
+      Quantified _ _ body ->
+        if polymorphic
+        then validateSharedField True body
+        else Left "impredicative datatype fields are outside shared-haskell-v1";
+      Function a b ->
+        do {
+          validateSharedField polymorphic a;
+          validateSharedField polymorphic b
+        };
+      Applied _ fields -> mapM_ (validateSharedField False) fields;
+      Application a b ->
+        do {
+          validateSharedField False a;
+          validateSharedField False b
+        };
+      Parameter _ -> Right Unit
+    };
+
+  -- Only this fixed operator vocabulary is supported. The bindings themselves
+  -- resolve normally; these are the ordinary facade fixities, not primitives.
+  operatorName :: Parser String;
+  operatorName = pSatisfy (\name -> elem eqString name sharedValueOperators) "supported value operator";
+  operatorReference :: Parser String;
+  operatorReference = do {
+    prefixes <- pMany (pTry (pBefore upperIdentifier (pSymbolPrefix ".")));
+    name <- operatorName;
+    pPure (foldr (\prefix suffix -> prefix ++ ("." ++ suffix)) name prefixes)
+  };
+  bindingName :: Parser String;
+  bindingName = pChoice lowerIdentifier (pParens operatorName);
+  valueReference :: Parser String;
+  valueReference = pChoice lowerReference (pParens operatorReference);
+  sharedInfix :: List String -> Parser String;
+  sharedInfix choices = pTry (do {
+    name <- operatorReference;
+    if elem eqString (referenceLeaf name) choices then pPure name else pFail "operator at another precedence"
+  });
+  namedOperator name a b = SApp (SApp (SVar ("$MLF.Infix." ++ name)) a) b;
+  sharedSourceName name = if elem eqString name (Cons "Unit" (Cons "True" (Cons "False" Nil))) then "$MLF.Source." ++ name else name;
+  sharedOperatorParser choices = pMap namedOperator (sharedInfix choices);
+  sharedBindExpr :: Parser SExpr;
+  sharedBindExpr = pChainl sharedOrExpr (sharedOperatorParser (Cons ">>=" (Cons ">>" Nil)));
+  sharedOrExpr :: Parser SExpr;
+  sharedOrExpr = pChainr sharedAndExpr (sharedOperatorParser (Cons "||" Nil));
+  sharedAndExpr :: Parser SExpr;
+  sharedAndExpr = pChainr sharedLevel4 (sharedOperatorParser (Cons "&&" Nil));
+  sharedComparisons :: List String;
+  sharedComparisons = Cons ("==") (Cons ("/=") (Cons ("<") (Cons ("<=") (Cons (">") (Cons (">=") (Nil))))));
+  sharedLevel4Operators :: List String;
+  sharedLevel4Operators = append sharedComparisons (Cons "<*>" (Cons "<$" (Cons "*>" (Cons "<*" Nil))));
+  sharedLevel4 :: Parser SExpr;
+  sharedLevel4 = do {
+    first <- sharedConcatExpr;
+    rest <- pMany (do { op <- sharedInfix sharedLevel4Operators; value <- sharedConcatExpr; pPure (Pair op value) });
+    when (length rest > 1 && any (\entry -> elem eqString (referenceLeaf (fst entry)) sharedComparisons) rest)
+      (pFail "ambiguous use of a non-associative comparison operator");
+    pPure (foldl (\left entry -> namedOperator (fst entry) left (snd entry)) first rest)
+  };
+  sharedConcatExpr :: Parser SExpr;
+  sharedConcatExpr = pChainr sharedAddExpr (sharedOperatorParser (Cons "++" Nil));
+  sharedAddExpr :: Parser SExpr;
+  sharedAddExpr = pChainl sharedMultiplyExpr (sharedOperatorParser (Cons "+" (Cons "-" Nil)));
+  sharedMultiplyExpr :: Parser SExpr;
+  sharedMultiplyExpr = pChainl operand (sharedOperatorParser (Cons "*" (Cons "/" (Cons "%" Nil))));
+}

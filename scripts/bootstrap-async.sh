@@ -5,6 +5,14 @@
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
+# Shared sources require the frozen native bridge before either seed tool can
+# read them. Keep the legacy branch below for immutable old checkouts and mocks.
+if [ -f "$root/shared-sources.json" ]; then
+  export MLF_COMPILER=${MLF_COMPILER:-emlf}
+  export MLF_PACKAGE_MANAGER=${MLF_PACKAGE_MANAGER:-mlfpkg}
+  export MLF_ASYNC_BOOTSTRAP_DIR=${MLF_ASYNC_BOOTSTRAP_DIR:-"$root/.mlf-build/async-bootstrap"}
+  exec "$root/scripts/bootstrap-shared.sh" "$@"
+fi
 build=${MLF_ASYNC_BOOTSTRAP_DIR:-"$root/.mlf-build/async-bootstrap"}
 mkdir -p "$build"
 build=$(CDPATH= cd -- "$build" && pwd)
@@ -58,6 +66,7 @@ cat > "$manifest" <<MANIFEST
   "dependencies": {
     "mlf-crates": {"path": "libraries/mlf-crates"},
     "mlf-foundation": {"path": "libraries/mlf-foundation"},
+    "mlf-frontend": {"path": "libraries/mlf-frontend"},
     "mlf-inference": {"path": "libraries/mlf-inference"},
     "mlf-interpreter": {"path": "libraries/mlf-interpreter"},
     "mlf-llvm": {"path": "libraries/mlf-llvm"},

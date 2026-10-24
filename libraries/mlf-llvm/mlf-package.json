@@ -15,15 +15,16 @@
   },
   "library": {
     "modules": {
-      "Bootstrap.LLVM": "Bootstrap/LLVM.emlf",
-      "Bootstrap.LLVM.Analysis": "Bootstrap/LLVM/Analysis.emlf",
-      "Bootstrap.LLVM.Build": "Bootstrap/LLVM/Build.emlf",
-      "Bootstrap.LLVM.Codegen": "Bootstrap/LLVM/Codegen.emlf",
-      "Bootstrap.LLVM.Kernel": "Bootstrap/LLVM/Kernel.emlf",
-      "Bootstrap.LLVM.Native": "Bootstrap/LLVM/Native.emlf",
-      "Bootstrap.LLVM.Optimize": "Bootstrap/LLVM/Optimize.emlf",
-      "Bootstrap.LLVM.StrictFields": "Bootstrap/LLVM/StrictFields.emlf",
-      "Bootstrap.LLVM.StrictWrappers": "Bootstrap/LLVM/StrictWrappers.emlf"
+      "Bootstrap.LLVM": "Bootstrap/LLVM.hs",
+      "Bootstrap.LLVM.Analysis": "Bootstrap/LLVM/Analysis.hs",
+      "Bootstrap.LLVM.Build": "Bootstrap/LLVM/Build.hs",
+      "Bootstrap.LLVM.Codegen": "Bootstrap/LLVM/Codegen.hs",
+      "Bootstrap.LLVM.Kernel": "Bootstrap/LLVM/Kernel.hs",
+      "Bootstrap.LLVM.Native": "Bootstrap/LLVM/Native.hs",
+      "Bootstrap.LLVM.Optimize": "Bootstrap/LLVM/Optimize.hs",
+      "Bootstrap.LLVM.StrictFields": "Bootstrap/LLVM/StrictFields.hs",
+      "Bootstrap.LLVM.StrictWrappers": "Bootstrap/LLVM/StrictWrappers.hs"
     }
-  }
+  },
+  "source-syntax": "shared-haskell-v1"
 }

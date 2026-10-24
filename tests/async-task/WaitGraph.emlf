@@ -1,10 +1,10 @@
 module Main where
 import Bootstrap.Types
-import qualified Async.Task.Internal as I
+import qualified Async.Task.Core as I
 import qualified Async.Process as P
 
--- This fixture is compiled only against a test-owned export overlay. The
--- production Internal module keeps all scheduler constructors private.
+-- Both hosts use the committed production Core module directly. The public
+-- and Internal facades keep scheduler constructors private; no overlay exists.
 self : I.Task Int
 self = I.Task (\context complete -> case context of
   I.Context (I.Scope queue _ _ _ _ _ _ _) identity _ ->

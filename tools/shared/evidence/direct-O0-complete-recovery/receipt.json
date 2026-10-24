@@ -1,0 +1,260 @@
+{
+  "format": 1,
+  "complete": true,
+  "source_mode": "authenticated direct committed shared source",
+  "commands": [
+    {
+      "name": "process-fixture",
+      "argv": [
+        "/usr/bin/x86_64-linux-gnu-gcc-14",
+        "-O2",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/async-process/fixture.c",
+        "-o",
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-direct-O0/process-fixture"
+      ],
+      "cwd": "/workspace/scratch/3f83e2ebe290/pr22-recovery",
+      "started": 1792794857.1307757,
+      "timeout_seconds": 180,
+      "environment_overrides": {},
+      "state": "passed",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "seconds": 0.06524173900834285
+    },
+    {
+      "name": "task-fixture",
+      "argv": [
+        "/usr/bin/x86_64-linux-gnu-gcc-14",
+        "-O2",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/async-task/fixture.c",
+        "-o",
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-direct-O0/task-fixture"
+      ],
+      "cwd": "/workspace/scratch/3f83e2ebe290/pr22-recovery",
+      "started": 1792794857.1966918,
+      "timeout_seconds": 180,
+      "environment_overrides": {},
+      "state": "passed",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "seconds": 0.08349069299583789
+    },
+    {
+      "name": "async-task",
+      "argv": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O0/bin/async-task"
+      ],
+      "cwd": "/workspace/scratch/3f83e2ebe290/pr22-recovery",
+      "started": 1792794857.281144,
+      "timeout_seconds": 180,
+      "environment_overrides": {
+        "MLF_ASYNC_FIXTURE": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-direct-O0/task-fixture",
+        "MLF_ASYNC_WORK": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-direct-O0/async-task-work"
+      },
+      "state": "passed",
+      "exit_code": 0,
+      "stdout_sha256": "46c0e346910ce907d8dd375c464e9c848d87ec6bd82d4c377207623eb41b4fcc",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "seconds": 0.025499498995486647
+    },
+    {
+      "name": "async-task-processes",
+      "argv": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O0/bin/async-task-processes"
+      ],
+      "cwd": "/workspace/scratch/3f83e2ebe290/pr22-recovery",
+      "started": 1792794857.3098936,
+      "timeout_seconds": 180,
+      "environment_overrides": {
+        "MLF_ASYNC_FIXTURE": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-direct-O0/task-fixture",
+        "MLF_ASYNC_WORK": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-direct-O0/async-task-processes-work"
+      },
+      "state": "passed",
+      "exit_code": 0,
+      "stdout_sha256": "694f21874604e86236baf637a283b8b9801875591bacd941dd7adaef898f18bf",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "seconds": 0.20081023601233028
+    },
+    {
+      "name": "async-task-wait-graph",
+      "argv": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O0/bin/async-task-wait-graph"
+      ],
+      "cwd": "/workspace/scratch/3f83e2ebe290/pr22-recovery",
+      "started": 1792794857.5139382,
+      "timeout_seconds": 180,
+      "environment_overrides": {
+        "MLF_ASYNC_FIXTURE": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-direct-O0/task-fixture",
+        "MLF_ASYNC_WORK": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-direct-O0/async-task-wait-graph-work"
+      },
+      "state": "passed",
+      "exit_code": 0,
+      "stdout_sha256": "a86f86c034512edb04d9f396ece94bf58f0d4fca2463ca4081654c75f0bbd74f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "seconds": 0.0038685589970555156
+    },
+    {
+      "name": "async-process",
+      "argv": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O0/bin/async-process"
+      ],
+      "cwd": "/workspace/scratch/3f83e2ebe290/pr22-recovery",
+      "started": 1792794857.5183208,
+      "timeout_seconds": 180,
+      "environment_overrides": {
+        "MLF_ASYNC_FIXTURE": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-direct-O0/process-fixture",
+        "MLF_ASYNC_WORK": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-direct-O0/async-process-work"
+      },
+      "state": "passed",
+      "exit_code": 0,
+      "stdout_sha256": "f19761b2c72ba1bcd5e7a196912a8f269fb250b5daea1e6ba1b686d6c33c065a",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "seconds": 0.4350926789920777
+    },
+    {
+      "name": "async-process-panic",
+      "argv": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O0/bin/async-process-panic"
+      ],
+      "cwd": "/workspace/scratch/3f83e2ebe290/pr22-recovery",
+      "started": 1792794857.9543135,
+      "timeout_seconds": 180,
+      "environment_overrides": {
+        "MLF_ASYNC_FIXTURE": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-direct-O0/process-fixture",
+        "MLF_ASYNC_WORK": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-direct-O0/panic-work"
+      },
+      "state": "passed",
+      "exit_code": 1,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "46e8692f84b5f12e267aeca0c42465ff2261a2f096008abd1a4739170315d110",
+      "seconds": 0.024180833002901636
+    },
+    {
+      "name": "panic-child-reaped",
+      "argv": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-direct-O0/process-fixture",
+        "assert-gone",
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-direct-O0/panic-work/panic.pid"
+      ],
+      "cwd": "/workspace/scratch/3f83e2ebe290/pr22-recovery",
+      "started": 1792794857.979458,
+      "timeout_seconds": 180,
+      "environment_overrides": {},
+      "state": "passed",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "seconds": 0.0015435550012625754
+    },
+    {
+      "name": "shared-frontend-frontend",
+      "argv": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O0/bin/shared-frontend",
+        "--frontend"
+      ],
+      "cwd": "/workspace/scratch/3f83e2ebe290/pr22-recovery",
+      "started": 1792794857.9824824,
+      "timeout_seconds": 120,
+      "environment_overrides": {},
+      "state": "passed",
+      "exit_code": 0,
+      "stdout_sha256": "cfb88e9e25fd7696027ca78f114baed56a30fa11ee1f8032f2608aa0c1872e9a",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "seconds": 3.7945849989919225
+    },
+    {
+      "name": "shared-frontend-native-first",
+      "argv": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O0/bin/shared-frontend",
+        "--native-first"
+      ],
+      "cwd": "/workspace/scratch/3f83e2ebe290/pr22-recovery",
+      "started": 1792794861.7782109,
+      "timeout_seconds": 120,
+      "environment_overrides": {},
+      "state": "passed",
+      "exit_code": 0,
+      "stdout_sha256": "8b983b8ab0e164eec1191cee3780bc2aedb512b49789b85defa7f622527a149d",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "seconds": 46.67594914700021
+    },
+    {
+      "name": "shared-frontend-native-second",
+      "argv": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O0/bin/shared-frontend",
+        "--native-second"
+      ],
+      "cwd": "/workspace/scratch/3f83e2ebe290/pr22-recovery",
+      "started": 1792794908.455063,
+      "timeout_seconds": 120,
+      "environment_overrides": {},
+      "state": "passed",
+      "exit_code": 0,
+      "stdout_sha256": "71acc513fabaf6b49f252428874a06c8e6b5a31edef2885abb83652b33be0b91",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "seconds": 46.05837738899572
+    },
+    {
+      "name": "build-receipts",
+      "argv": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/tools/release/test-suite-build-receipts.py",
+        "--executable",
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O0/bin/build-receipts",
+        "--output",
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-direct-O0/build-receipts"
+      ],
+      "cwd": "/workspace/scratch/3f83e2ebe290/pr22-recovery",
+      "started": 1792794954.5141175,
+      "timeout_seconds": 1800,
+      "environment_overrides": {},
+      "state": "passed",
+      "exit_code": 0,
+      "stdout_sha256": "02c55f3a083c378946ec09315c3aa509b09b4fc2f3e242d201d209e3a101d88b",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "seconds": 0.05694796699390281
+    }
+  ],
+  "inputs": {
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/async-task/suite.stdout": "46c0e346910ce907d8dd375c464e9c848d87ec6bd82d4c377207623eb41b4fcc",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/async-task/processes.stdout": "694f21874604e86236baf637a283b8b9801875591bacd941dd7adaef898f18bf",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/async-task/wait-graph.stdout": "a86f86c034512edb04d9f396ece94bf58f0d4fca2463ca4081654c75f0bbd74f",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/async-process/suite.stdout": "f19761b2c72ba1bcd5e7a196912a8f269fb250b5daea1e6ba1b686d6c33c065a",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/shared-sources.json": "0fcdcc88f6ba5c1f7b149dc7cee8d6d7025b8ca1e8e61b6888f3362d871324a1",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/async-process/fixture.c": "94fc65e46734815e80a7908ebfbb1ca3096a5964453427ceba5566ea56ac2829",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/async-task/fixture.c": "000b627560be8bcea06d973950c4eec226f6afbff6c1ed3b6927c35f0ad2f898",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/tools/shared/test_direct.py": "67df22b36bda398a389ba7798829d9dac5fc8ddd7ab72c7a814448ae8fa61bee",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/tools/release/test-suite-build-receipts.py": "4bef144548256ca2adafc24c427f73352554c185d8d81f59740baff31021ee3b",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O0/receipt.json": "90bc2b99d31d8c1bd47ef3bc43f614ca9fabf62496281caf6b5e77197ca1fca9",
+    "/usr/bin/x86_64-linux-gnu-gcc-14": "a23ecab8ff08f09ad8c80602c2c5df7f49e09c25905cb8975902e101bf72635f",
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12": "fa67443527ed9647f760d807e2a38f26340757123e643c4639cf273ed15d5ea7"
+  },
+  "producer": {
+    "path": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O0/receipt.json",
+    "sha256": "90bc2b99d31d8c1bd47ef3bc43f614ca9fabf62496281caf6b5e77197ca1fca9",
+    "host": "GHC",
+    "optimization": "0"
+  },
+  "fixture_compiler": {
+    "path": "/usr/bin/x86_64-linux-gnu-gcc-14",
+    "sha256": "a23ecab8ff08f09ad8c80602c2c5df7f49e09c25905cb8975902e101bf72635f"
+  },
+  "orchestrator": {
+    "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "sha256": "fa67443527ed9647f760d807e2a38f26340757123e643c4639cf273ed15d5ea7"
+  },
+  "helpers": {
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-direct-O0/process-fixture": "dc3849d271eb757e4150a514091e356f0de6583678dde9413849eaf5a3c491f8",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-direct-O0/task-fixture": "985e1b9343fe4bb736eed35a4e38e6d928be0ce58cbc547a1f2bf5d49f0ab412"
+  }
+}
