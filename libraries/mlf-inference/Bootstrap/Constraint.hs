@@ -19,6 +19,7 @@ module Bootstrap.Constraint where {
   import qualified Bootstrap.Unicode as Unicode;
   import qualified Bootstrap.Lexer as Lexer;
   import qualified Bootstrap.Desugar as Desugar;
+  import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.X.Syntax as X;
   -- The writer keeps edges in reverse creation order. They are reversed once at
   -- the boundary; this preserves dependency-first instantiation exactly.
@@ -115,6 +116,32 @@ module Bootstrap.Constraint where {
           }
       }
     };
+  reserveIdentity =
+    do {
+      graph <- getGraph;
+      case G.freshId graph of {
+        Pair identity next -> do { setGraph next; return identity }
+      }
+    };
+  -- All pending instance sources are completed children, closed declarations,
+  -- or frozen exports. Recursive assumptions contribute equalities only.
+  -- Keep the surrounding unfinished graph unnormalized across this boundary.
+  flushGeneration :: Generate Unit;
+  flushGeneration =
+    Generate
+      (\state ->
+         case state of {
+           Generation graph eqs es ->
+             do {
+               prepared <- Solver.prepare graph;
+               initial <- Solver.solverUnify (reverse eqs) prepared;
+               solved <-
+                 foldM (\solver e -> Solver.instantiateClosed (fromGen e) (toNode e) solver)
+                   initial (reverse es);
+               finished <- Solver.finish solved;
+               Right (Pair Unit (Generation finished Nil Nil))
+             }
+         });
   equality a b =
     Generate
       (\state ->
@@ -282,6 +309,12 @@ module Bootstrap.Constraint where {
             do {
               e <- edge source root;
               return (FVariable name (Just e))
+            };
+          Just (RecursiveMono name shared export) ->
+            do {
+              equality root shared;
+              -- This edge is evidence metadata, never solver work.
+              return (FVariable name (Just (Edge export root)))
             }
         };
       CLam x body ->
@@ -313,36 +346,7 @@ module Bootstrap.Constraint where {
           return (FBinding name a' b' e)
         };
       CRec definitions body ->
-        do {
-          declarations <- mapM (declareRecursive datatypes gen) definitions;
-          let {
-            bindings =
-              map
-                (\declaration ->
-                   case declaration of {
-                     Quad x name source _ -> Pair x (Poly name source)
-                   })
-                declarations
-          };
-          let {
-            scope = M.union compareString (M.fromList compareString bindings) env
-          };
-          definitions' <-
-            mapM
-              (\pair ->
-                 case pair of {
-                   Pair (Quad _ name source target) (Triple _ _ rhs) ->
-                     do {
-                       rhs' <- child scope rhs;
-                       e <- edge (generalization rhs') target;
-                       return (Quad name source rhs' e)
-                     }
-                 })
-              (zip declarations definitions);
-          body' <- child scope body;
-          e <- edge (generalization body') root;
-          return (FRecursive definitions' body' e)
-        };
+        buildRecursive datatypes typeScope env gen root definitions body;
       CWanted dictionary candidates ->
         do {
           declaration <- liftResult (D.lookupDatatype datatypes dictionary);
@@ -369,6 +373,8 @@ module Bootstrap.Constraint where {
                        Just (Mono name identity) ->
                          return (EvidenceBinding role name identity False);
                        Just (Poly name source) -> return (EvidenceBinding role name source True);
+                       Just (RecursiveMono _ _ _) ->
+                         failGenerate "recursive dictionary interfaces require an explicit signature";
                        Nothing -> failGenerate ("dictionary candidate is out of scope: " ++ x)
                      }
                  })
@@ -545,6 +551,154 @@ module Bootstrap.Constraint where {
             mapM (buildBranch datatypes typeScope env gen root domain parameters) alternatives;
           return (FMatch a ea branches)
         }
+    };
+  checkedRecursive :: Triple String RecursiveMode Core -> Bool;
+  checkedRecursive (Triple _ mode _) =
+    case mode of { CheckRecursive _ -> True; InferRecursive -> False };
+  recursiveCoreNames :: Core -> List String;
+  recursiveCoreNames core =
+    case core of {
+      CVar n -> Cons n Nil;
+      CLam n body -> filter (\x -> not (eqString n x)) (recursiveCoreNames body);
+      CApp a b -> append (recursiveCoreNames a) (recursiveCoreNames b);
+      CLet n a b ->
+        append (recursiveCoreNames a)
+          (filter (\x -> not (eqString n x)) (recursiveCoreNames b));
+      CCase a branches ->
+        append (recursiveCoreNames a)
+          (concatMap
+             (\(Pair pattern body) ->
+                filter (\x -> not (elem eqString x (Desugar.patternVariables pattern)))
+                  (recursiveCoreNames body)) branches);
+      CRec definitions body ->
+        let { names = map (\(Triple n _ _) -> n) definitions } in
+        filter (\x -> not (elem eqString x names))
+          (append (recursiveCoreNames body)
+             (concatMap (\(Triple _ _ rhs) -> recursiveCoreNames rhs) definitions));
+      CWanted _ candidates -> map snd candidates;
+      CChecked _ expression -> Dependency.valueNames (Dependency.observeExpression expression);
+      _ -> Nil
+    };
+  -- The spine is only a multi-root reachability anchor. It has no fresh leaf,
+  -- and none of these arrows is used by an instance/equality constraint.
+  recursiveAnchor :: Int -> List Int -> Generate Int;
+  recursiveAnchor group roots =
+    case roots of {
+      Nil -> failGenerate "empty recursive inference component";
+      Cons root Nil -> newNode (GArr root root) (Just group) Flexible;
+      Cons first (Cons second Nil) -> newNode (GArr first second) (Just group) Flexible;
+      Cons first rest ->
+        do {
+          tail <- recursiveAnchor group rest;
+          newNode (GArr first tail) (Just group) Flexible
+        }
+    };
+  buildRecursive :: DataEnv -> Map String Int -> Map String Binding -> Int -> Int ->
+                    List (Triple String RecursiveMode Core) -> Core -> Generate Form;
+  buildRecursive datatypes typeScope env gen root definitions body =
+    do {
+      let { signed = filter checkedRecursive definitions };
+      declarations <- mapM (declareRecursive datatypes gen) signed;
+      let {
+        signedScope =
+          M.union compareString
+            (M.fromList compareString
+               (map (\(Quad n name source _) -> Pair n (Poly name source)) declarations)) env
+      };
+      let {
+        unsigned = filter (\definition -> not (checkedRecursive definition)) definitions
+      };
+      let {
+        members = M.fromList compareString (map (\d -> case d of { Triple n _ _ -> Pair n d }) unsigned)
+      };
+      let {
+        groups = Dependency.components
+          (map (\(Triple n _ rhs) -> Pair n (recursiveCoreNames rhs)) unsigned)
+      };
+      inferred <-
+        foldM
+          (\state names ->
+             case state of {
+               Pair scope done ->
+                 do {
+                   result <- buildRecursiveGroup datatypes typeScope scope gen
+                     (map (\n -> M.findWithDefault compareString
+                         (Triple n InferRecursive (CVar n)) n members) names);
+                   case result of {
+                     Pair scope2 values -> return (Pair scope2 (append done values))
+                   }
+                 }
+             })
+          (Pair signedScope Nil) groups;
+      case inferred of {
+        Pair scope inferredDefinitions ->
+          do {
+            checkedDefinitions <-
+              mapM
+                (\(Pair (Quad n name source target) (Triple _ _ rhs)) ->
+                   do {
+                     value <- build datatypes typeScope (Just gen) scope rhs;
+                     proof <- edge (generalization value) target;
+                     return (Pair n (RecursiveDefinition name source value proof Nothing))
+                   })
+                (zip declarations signed);
+            let { values = M.fromList compareString (append inferredDefinitions checkedDefinitions) };
+            ordered <- mapM
+              (\(Triple n _ _) -> case M.lookup compareString n values of {
+                 Nothing -> failGenerate "recursive component lost a declaration";
+                 Just value -> return value
+               }) definitions;
+            continuation <- build datatypes typeScope (Just gen) scope body;
+            proof <- edge (generalization continuation) root;
+            return (FRecursive ordered continuation proof)
+          }
+      }
+    };
+  buildRecursiveGroup :: DataEnv -> Map String Int -> Map String Binding -> Int ->
+                         List (Triple String RecursiveMode Core) ->
+                         Generate (Pair (Map String Binding) (List (Pair String RecursiveDefinition)));
+  buildRecursiveGroup datatypes typeScope env parent definitions =
+    do {
+      group <- newNode (GGen (-1)) (Just parent) Flexible;
+      declarations <- mapM
+        (\(Triple n _ _) -> do {
+           name <- freshName n;
+           shared <- newNode GBot (Just group) Flexible;
+           export <- reserveIdentity;
+           return (Quad n name shared export)
+         }) definitions;
+      anchor <- recursiveAnchor group (map (\(Quad _ _ shared _) -> shared) declarations);
+      setNode group (Node (GGen anchor) (Just parent) Flexible);
+      let {
+        scope = M.union compareString
+          (M.fromList compareString
+             (map (\(Quad n name shared export) -> Pair n (RecursiveMono name shared export)) declarations)) env
+      };
+      bodies <- mapM
+        (\(Pair (Quad _ _ shared _) (Triple _ _ rhs)) -> do {
+           value <- build datatypes typeScope (Just group) scope rhs;
+           proof <- edge (generalization value) shared;
+           return (Pair value proof)
+         }) (zip declarations definitions);
+      flushGeneration;
+      exports <- mapM
+        (\(Pair (Quad n name shared export) (Pair value proof)) -> do {
+           graph <- getGraph;
+           materialized <- liftResult (G.materializeExport group shared export parent graph);
+           case materialized of {
+             Pair (Pair _ copies) next -> do {
+               setGraph next;
+               return (Pair n (RecursiveDefinition name export value proof
+                 (Just (RecursiveClosure group copies))))
+             }
+           }
+         }) (zip declarations bodies);
+      let {
+        exportedScope = M.union compareString
+          (M.fromList compareString
+             (map (\(Quad n name _ export) -> Pair n (Poly name export)) declarations)) env
+      };
+      return (Pair exportedScope exports)
     };
   declareRecursive :: DataEnv ->
                       Int -> Triple String RecursiveMode Core -> Generate (Quad String XName Int Int);
@@ -946,7 +1100,7 @@ module Bootstrap.Constraint where {
           (map
              (\definition ->
                 case definition of {
-                  Quad name _ rhs _ -> Pair name (eraseSourceWith evidence rhs)
+                  RecursiveDefinition name _ rhs _ _ -> Pair name (eraseSourceWith evidence rhs)
                 })
              definitions)
           (eraseSourceWith evidence body);

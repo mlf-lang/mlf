@@ -1103,9 +1103,10 @@ module Bootstrap.Classes where {
           signatures <-
             freshLift
               (traverseEither
-                 (\(Triple n annotation rhs) ->
-                    case annotation of {
-                      CheckRecursive (SAnnotation Nil ty) -> Right (Triple n ty rhs);
+                 (\(Triple n mode rhs) ->
+                    case mode of {
+                      InferRecursive -> Right (Triple n Nothing rhs);
+                      CheckRecursive (SAnnotation Nil ty) -> Right (Triple n (Just ty) rhs);
                       _ ->
                         Left
                           ("recursive definition " ++
@@ -1115,10 +1116,14 @@ module Bootstrap.Classes where {
           let {
             entries =
               map
-                (\(Triple n ty _) ->
-                   case scheme ty of {
-                     Triple _ predicates _ ->
-                       Pair n (Pair n (map (\(SPredicate c _) -> c) predicates))
+                (\(Triple n signature _) ->
+                   case signature of {
+                     Nothing -> Pair n (Pair n Nil);
+                     Just ty ->
+                       case scheme ty of {
+                         Triple _ predicates _ ->
+                           Pair n (Pair n (map (\(SPredicate c _) -> c) predicates))
+                       }
                    })
                 signatures
           };
@@ -1127,16 +1132,35 @@ module Bootstrap.Classes where {
           };
           definitions2 <-
             mapM
-              (\(Triple n ty rhs) ->
-                 do {
-                   translated <- freshLift (translateScheme ds infos ty);
-                   rhs2 <-
-                     signedIn valueScopes ds infos
-                       (M.findWithDefault compareString candidates n valueScopes)
-                       scope
-                       rhs
-                       ty;
-                   freshPure (Triple n (CheckRecursive (SAnnotation Nil translated)) rhs2)
+              (\(Triple n signature rhs) ->
+                 case signature of {
+                   Nothing ->
+                     do {
+                       let {
+                         available = M.findWithDefault compareString candidates n valueScopes
+                       };
+                       lowered <- lowerExpr valueScopes ds infos scope available rhs;
+                       case lowered of {
+                         Pair rhs2 wants ->
+                           -- Unsigned recursive interfaces do not infer class contexts yet.
+                           -- Resolve wants inside this RHS, without adding dictionary
+                           -- parameters or exporting wants from the recursive group.
+                           -- Missing or ambiguous evidence remains a resolution error.
+                           freshPure
+                             (Triple n InferRecursive (closeWants infos available wants rhs2))
+                       }
+                     };
+                   Just ty ->
+                     do {
+                       translated <- freshLift (translateScheme ds infos ty);
+                       rhs2 <-
+                         signedIn valueScopes ds infos
+                           (M.findWithDefault compareString candidates n valueScopes)
+                           scope
+                           rhs
+                           ty;
+                       freshPure (Triple n (CheckRecursive (SAnnotation Nil translated)) rhs2)
+                     }
                  })
               signatures;
           boundValueShared19 <- lowerExpr valueScopes ds infos scope candidates body;

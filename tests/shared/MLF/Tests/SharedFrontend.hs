@@ -15,12 +15,18 @@ module MLF.Tests.SharedFrontend where {
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Compiler as C;
   import qualified Bootstrap.Constraint as Constraint;
+  import qualified Bootstrap.Elaborate as Elaborate;
+  import qualified Bootstrap.Graph as Graph;
+  import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.Data as Data;
   import qualified Bootstrap.X.Parser as XP;
   import qualified Bootstrap.X.Pretty as Pretty;
   import qualified Bootstrap.X.Check as Check;
   import qualified Bootstrap.X.Type as XT;
   import qualified Bootstrap.Runtime as Runtime;
   import qualified Bootstrap.X.Syntax as X;
+  import qualified Tests.IndependentCheck as Independent;
+  import qualified Tests.IndependentType as IndependentType;
   prologue :: String;
   prologue =
     "-- mlf:syntax shared-haskell-v1\n{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}\n";
@@ -127,6 +133,17 @@ module MLF.Tests.SharedFrontend where {
            putErr ("shared frontend failure: " ++ (name ++ "\n"));
            exitWith 1
          };
+  -- Unsigned groups now pass parsing. The negative operator case belongs to
+  -- module resolution: shadowed infix uses must still select the canonical
+  -- primitive binding, independently of recursive signature availability.
+  recursiveInfixRejected body =
+    case C.compile "Example.hs" (source body) of {
+      Left error ->
+        (case C.phase error of { ModuleResolution -> True; _ -> False }) &&
+        eqString (C.diagnostic error)
+          "Example.hs: shared infix use requires a canonical MLF.Primitive binding; use the symbolic binding in prefix form";
+      Right _ -> False
+    };
   captureDefaults :: String;
   captureDefaults = "data Box a = Box a\ndefaultX f (Box x) = Box (f x)\ninstance Functor Box where { fmap = defaultX }\nunBox (Box x) = x\nmain = let { mlfInternal_36_102 = 40 } in unBox (mlfInternal_36_102 <$ Box 2)\n";
   targetRoundTrip term =
@@ -166,6 +183,214 @@ module MLF.Tests.SharedFrontend where {
             }
         }
     };
+  -- These are direct host calls into the current source compiler, not guest
+  -- tests interpreted by a prebuilt compiler. Expected types are authored here;
+  -- neither the current checker nor inferred output supplies the oracle.
+  recursiveInt :: XType;
+  recursiveInt = XCon "Int" Nil;
+  recursiveBool :: XType;
+  recursiveBool = XCon "Bool" Nil;
+  recursiveIdentity :: XType;
+  recursiveIdentity =
+    XForall (XTyVar 0) XBot (XArrow (XVar (XTyVar 0)) (XVar (XTyVar 0)));
+  recursiveRight :: forall a. String -> Either String a -> IO a;
+  recursiveRight label result =
+    case result of {
+      Right value -> ioReturn value;
+      Left message -> do {
+        putErr ("shared frontend failure: " ++ (label ++ (": " ++ (message ++ "\n"))));
+        exitWith 1
+      }
+    };
+  recursiveCheckedType :: String -> XType -> Either String XType -> IO Unit;
+  recursiveCheckedType label expected result = do {
+    actual <- recursiveRight label result;
+    check label (IndependentType.alphaEq actual expected)
+  };
+  recursiveAccepted :: String -> String -> XType -> IO XTerm;
+  recursiveAccepted label program expected = do {
+    result <- recursiveRight (label ++ " source compilation")
+      (mapLeft C.prettyError (C.compile "RecursiveInference.emlf" program));
+    let { term = C.compiledTerm result };
+    check (label ++ " inferred type") (IndependentType.alphaEq (C.inferredType result) expected);
+    recursiveCheckedType (label ++ " current target") expected (Check.checkClosed term);
+    recursiveCheckedType (label ++ " independent target") expected (Independent.checkClosed term);
+    decoded <- recursiveRight (label ++ " target parse")
+      (XP.parseTerm "RecursiveInference.xmlf" (Pretty.prettyTerm term));
+    recursiveCheckedType (label ++ " current roundtrip") expected (Check.checkClosed decoded);
+    recursiveCheckedType (label ++ " independent roundtrip") expected (Independent.checkClosed decoded);
+    check (label ++ " roundtrip erasure") (X.equalErased (X.erase term) (X.erase decoded));
+    -- C.compile also checks source-skeleton erasure against this same target.
+    ioReturn term
+  };
+  recursiveRejected :: String -> String -> String -> IO Unit;
+  recursiveRejected label program diagnostic =
+    case C.compile "RecursiveInference.emlf" program of {
+      Left error -> do {
+        check (label ++ " inference phase")
+          (case C.phase error of { Inference -> True; _ -> False });
+        check (label ++ " diagnostic")
+          (eqString (stringSlice (C.diagnostic error) 0 (stringLength diagnostic)) diagnostic)
+      };
+      Right _ -> check (label ++ " unexpectedly accepted") False
+    };
+  recursiveGroups :: XErased -> List (List String);
+  recursiveGroups term =
+    case term of {
+      XEAbs _ body -> recursiveGroups body;
+      XEApp function argument -> append (recursiveGroups function) (recursiveGroups argument);
+      XELet _ value body -> append (recursiveGroups value) (recursiveGroups body);
+      XELetRec definitions body ->
+        Cons (map (\(Pair name _) -> X.nameHint name) definitions)
+          (append (concatMap (\(Pair _ rhs) -> recursiveGroups rhs) definitions) (recursiveGroups body));
+      XECase scrutinee alternatives -> append (recursiveGroups scrutinee)
+        (concatMap (\(XErasedAlternative _ body) -> recursiveGroups body) alternatives);
+      _ -> Nil
+    };
+  recursiveOrder :: String -> List String -> XTerm -> IO Unit;
+  recursiveOrder label names term =
+    check label
+      (length (filter (X.equalList eqString names) (recursiveGroups (X.erase term))) == 1);
+  recursiveProjection :: String -> Elaborate.TypeContext -> IntMap Int ->
+                         List (Pair XTyVar XType) -> XType -> XType -> IO Unit;
+  recursiveProjection label context copies bounds source expected = do {
+    proof <- recursiveRight (label ++ " evidence")
+      (Elaborate.proveInstanceUsing Data.emptyDataEnv
+        (Elaborate.recursiveReplacementIn context copies bounds) M.empty source expected);
+    recursiveCheckedType (label ++ " current computation") expected
+      (Check.checkComputation M.empty proof source);
+    recursiveCheckedType (label ++ " independent computation") expected
+      (Independent.checkComputation M.empty proof source)
+  };
+  recursiveProjectionChecks :: IO Unit;
+  recursiveProjectionChecks = do {
+    let {
+      a = XTyVar 1;
+      b = XTyVar 2;
+      c = XTyVar 3;
+      dependent = XForall c XBot (XArrow (XVar c) (XVar a));
+      bounds = Cons (Pair a XBot) (Cons (Pair b dependent) Nil);
+      source = XForall a XBot (XForall b dependent recursiveInt);
+      empty = Elaborate.prepareTypes Graph.emptyGraph;
+      copied = Elaborate.prepareTypes
+        (Graph.mkGraph (IM.singleton 100 (Node GBot Nothing Flexible)) IM.empty 101)
+    };
+    recursiveProjection "recursive projection drops dependent peer bound"
+      empty IM.empty bounds source recursiveInt;
+    recursiveProjection "recursive projection retains renamed dependency"
+      copied (IM.singleton 1 100) bounds source
+      (XForall (XTyVar 100) XBot recursiveInt);
+    recursiveProjection "recursive projection drops higher kind bottom"
+      empty IM.empty (Cons (Pair a (XBotKind (KArrow Star Star))) Nil)
+      (XForall a (XBotKind (KArrow Star Star)) recursiveInt) recursiveInt
+  };
+  recursiveInferenceChecks :: IO Unit;
+  recursiveInferenceChecks = do {
+    recursiveAccepted "ordinary unsigned factorial"
+      "let rec { fact n = if eqInt n 0 then 1 else mulInt n (fact (subInt n 1)) } in fact"
+      (XArrow recursiveInt recursiveInt);
+    let {
+      evenDefinition = "even n = if eqInt n 0 then true else odd (subInt n 1)";
+      oddDefinition = "odd n = if eqInt n 0 then false else even (subInt n 1)"
+    };
+    mutual <- recursiveAccepted "mutual unsigned even odd"
+      ("let rec { " ++ (evenDefinition ++ ("; " ++ (oddDefinition ++ " } in even"))))
+      (XArrow recursiveInt recursiveBool);
+    recursiveOrder "mutual source order retains one runtime knot"
+      (Cons "even" (Cons "odd" Nil)) mutual;
+    reordered <- recursiveAccepted "mutual declaration reordering"
+      ("let rec { " ++ (oddDefinition ++ ("; " ++ (evenDefinition ++ " } in even"))))
+      (XArrow recursiveInt recursiveBool);
+    recursiveOrder "reordered source retains one runtime knot"
+      (Cons "odd" (Cons "even" Nil)) reordered;
+    recursiveAccepted "recursive identity generalized export"
+      "let rec { f x = if true then x else f x } in f" recursiveIdentity;
+    recursiveAccepted "recursive export used at Int and Bool"
+      "let rec { f x = if true then x else f x } in let n : Int = f 1 in (f true : Bool)"
+      recursiveBool;
+    recursiveAccepted "mutual SCC generalized only after solving"
+      "let rec { f x = if true then x else g x; g y = f y } in let n : Int = f 1 in (g true : Bool)"
+      recursiveBool;
+    recursiveAccepted "mutual SCC exports independent instances"
+      "let rec { f x = if true then x else g x; g y = f y } in let n : Int = g 1 in (f true : Bool)"
+      recursiveBool;
+    mixed <- recursiveAccepted "mixed signed polymorphic cycle"
+      "let rec { f : forall a. a -> a; f x = g x; g x = f x } in let n : Int = f 1 in (g true : Bool)"
+      recursiveBool;
+    recursiveOrder "mixed signed source order retains one runtime knot"
+      (Cons "f" (Cons "g" Nil)) mixed;
+    recursiveAccepted "mixed signed cycle exports unsigned polymorphism"
+      "let rec { g x = f x; f : forall a. a -> a; f x = g x } in g"
+      recursiveIdentity;
+    let {
+      nest = "data Nest a = Tip a | Step (Nest (Nest a)); ";
+      depth = "depth n = case n of { Tip x -> 0; Step ns -> addInt 1 (depth ns) }"
+    };
+    recursiveAccepted "signed Nest polymorphic recursion preserved"
+      (nest ++ ("let rec { depth : forall a. Nest a -> Int; " ++ (depth ++ " } in depth")))
+      (XForall (XTyVar 0) XBot
+        (XArrow (XCon "Nest" (Cons (XVar (XTyVar 0)) Nil)) recursiveInt));
+    recursiveRejected "unsigned Nest polymorphic recursion rejected"
+      (nest ++ ("let rec { " ++ (depth ++ " } in depth"))) "cyclic structure/binding dependencies";
+    recursiveAccepted "nonrecursive capture still generalizes independent argument"
+      "\\z -> let f = \\n -> z in let i = f 0 in f true" recursiveIdentity;
+    recursiveRejected "nonrecursive capture cannot generalize environment"
+      "\\z -> let f = \\n -> z in let i : Int = f 0 in (f true : Bool)"
+      "type constructor mismatch";
+    recursiveAccepted "recursive entire root remains environment owned"
+      "\\z -> let rec { f = if true then z else f } in f" recursiveIdentity;
+    recursiveRejected "recursive entire root cannot generalize environment"
+      "\\z -> let rec { f = if true then z else f } in let i : Int = f in (f : Bool)"
+      "type constructor mismatch";
+    recursiveAccepted "recursive capture generalizes independent argument"
+      "\\z -> let rec { f n y = if eqInt n 0 then z else f (subInt n 1) y } in let i = f 0 true in f 1 0"
+      recursiveIdentity;
+    recursiveRejected "recursive capture cannot generalize environment"
+      "\\z -> let rec { f n = if eqInt n 0 then z else f (subInt n 1) } in let i : Int = f 0 in (f 1 : Bool)"
+      "type constructor mismatch";
+    recursiveAccepted "mutual capture preserves environment sharing"
+      "\\z -> let rec { f n = if eqInt n 0 then g n else f (subInt n 1); g n = if eqInt n 0 then z else f (subInt n 1) } in f 1"
+      recursiveIdentity;
+    recursiveRejected "indirect recursive capture cannot generalize environment"
+      "\\z -> let rec { f n = if eqInt n 0 then g n else f (subInt n 1); g n = if eqInt n 0 then z else f (subInt n 1) } in let i : Int = f 0 in (g 1 : Bool)"
+      "type constructor mismatch";
+    recursiveRejected "recursive self application occurs check"
+      "let rec { f x = f f } in f" "cyclic structure/binding dependencies";
+    recursiveRejected "recursive shared uses conflict at Int and Bool"
+      "let rec { f x = if true then x else let n : Int = f 1 in (f true : Bool) } in f"
+      "type constructor mismatch";
+    recursiveRejected "mutual SCC cannot generalize early"
+      "let rec { f x = if true then x else g x; g y = let n : Int = f 1 in (f true : Bool) } in f"
+      "type constructor mismatch";
+    recursiveRejected "mixed signed universal contract still checked"
+      "let rec { f : forall a. a -> a; f x = g x; g y = if true then 1 else f y } in f"
+      "type constructor mismatch: Skolem";
+    recursiveAccepted "nested group captures outer recursive binder"
+      "let rec { f n = let rec { g m = if eqInt m 0 then f 0 else g (subInt m 1) } in if eqInt n 0 then 0 else g (subInt n 1) } in f"
+      (XArrow recursiveInt recursiveInt);
+    recursiveAccepted "peer only variables retain recursive evidence scope"
+      "let rec { f x y = if g x then y else f x y; g x = let k = f x in true } in let b : Bool = f 0 true in let n : Int = f true 0 in g 0"
+      recursiveBool;
+    -- Both wants are concrete, but belong to distinct instances of one class.
+    -- This does not ask the unsigned SCC to invent a generalized dictionary API.
+    recursiveAccepted "recursive concrete class wants retain distinct instances"
+      ("class Inspect a where { inspect : a -> Bool }; " ++
+       "instance Inspect Int where { inspect = \\x -> true }; " ++
+       "instance Inspect Bool where { inspect = \\x -> x }; " ++
+       "let rec { f n = if eqInt n 0 then inspect n else if inspect true then f (subInt n 1) else false } in f")
+      (XArrow recursiveInt recursiveBool);
+    recursiveProjectionChecks;
+    let {
+      f = XName 1 "f";
+      x = XName 2 "x";
+      malformed = XLetRec
+        (Cons (Triple f (XArrow recursiveInt recursiveInt)
+          (XAbs x recursiveInt (XBoolTerm True))) Nil) (XVarTerm f)
+    };
+    check "current checker rejects recursive RHS type mismatch" (isLeft (Check.checkClosed malformed));
+    check "independent checker rejects recursive RHS type mismatch" (isLeft (Independent.checkClosed malformed));
+    putStrLn "shared frontend: recursive inference checks passed"
+  };
   frontendChecks :: IO Unit;
   frontendChecks =
     do {
@@ -198,9 +423,9 @@ module MLF.Tests.SharedFrontend where {
          });
       check "closed recursive group"
         (accept "main = let { f :: Int -> Int; f x = g x; g :: Int -> Int; g x = f x } in 1");
-      check "unsigned recursive group" (reject "main = let { f x = f x } in 1");
+      check "unsigned recursive group" (accept "main = let { f x = f x } in 1");
       check "mixed signed cycle"
-        (reject "main = let { f :: Int -> Int; f x = g x; g x = f x } in 1");
+        (accept "main = let { f :: Int -> Int; f x = g x; g x = f x } in 1");
       check "do let forward scope" (accept "main = do { let { x = y; y = 3 }; ioReturn x }");
       check "refutable do forbidden"
         (reject "main = do { Pair x y <- ioReturn (Pair 1 2); ioReturn x }");
@@ -315,8 +540,8 @@ module MLF.Tests.SharedFrontend where {
     check "standard hierarchy defaults" (linked "data Box a = Box a\ninstance Functor Box where { fmap f (Box x) = Box (f x) }\ninstance Applicative Box where { pure = Box; (<*>) (Box f) (Box x) = Box (f x) }\ninstance Monad Box where { (>>=) (Box x) f = f x }\nmain = do { Box 1; return 2 }");
     check "standard liftA2 minimum" (linked "data Box a = Box a\ninstance Functor Box where { fmap f (Box x) = Box (f x) }\ninstance Applicative Box where { pure = Box; liftA2 f (Box x) (Box y) = Box (f x y) }\nmain = pure 1");
     check "standard missing minimum rejected" (not (linked "data Box a = Box a\ninstance Functor Box where { (<$) x y = Box x }\nmain = Box 1"));
-      check "recursive local infix rejected" (reject "main = let { (+) x y = x + y } in (+) 1 2");
-      check "signed recursive local infix rejected" (not (linked "main = let { (+) :: Int -> Int -> Int; (+) x y = x + y } in (+) 1 2"));
+      check "recursive local infix rejected" (recursiveInfixRejected "main = let { (+) x y = x + y } in (+) 1 2");
+      check "signed recursive local infix rejected" (recursiveInfixRejected "main = let { (+) :: Int -> Int -> Int; (+) x y = x + y } in (+) 1 2");
       check "qualified operator whitespace rejected" (reject "main = 1 MLF.Primitive . + 2");
       check "legacy Prelude excluded" (isLeft (P.parseModule "Example.hs" (prologue ++ "module Example where\nimport Prelude\nmain = 1\n")));
       check "legacy Prelude identity excluded" (isLeft (P.parseModule "Prelude.hs" (prologue ++ "module Prelude where\nmain = 1\n")));
@@ -346,6 +571,7 @@ module MLF.Tests.SharedFrontend where {
       check "valid hint preserved mlfInternal_36_102" (eqString (Constraint.targetNameHint "mlfInternal_36_102") "mlfInternal_36_102");
       check "default and generated-name capture roundtrip" (sourceRoundTrip captureDefaults);
 
+      recursiveInferenceChecks;
       putStrLn "shared frontend: parser and namespace checks passed"
     };
   nativeFirst :: IO Unit;
@@ -383,7 +609,8 @@ module MLF.Tests.SharedFrontend where {
     if count == 0 then do { frontendChecks; nativeFirst; nativeSecond }
     else do {
       mode <- getArg 0;
-      if eqString mode "--frontend" then frontendChecks
+      if eqString mode "--recursive-inference" then recursiveInferenceChecks
+      else if eqString mode "--frontend" then frontendChecks
       else if eqString mode "--native-first" then nativeFirst
       else if eqString mode "--native-second" then nativeSecond
       else checkFiles 0 count

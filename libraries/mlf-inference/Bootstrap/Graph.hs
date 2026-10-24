@@ -2271,6 +2271,128 @@ module Bootstrap.Graph where {
                       result)
              })
     };
+  -- Freeze one solved recursive member without instantiating its environment.
+  -- Unlike expansion, the traversal's outer frontier retains its identities:
+  -- copying it to fresh bottoms would let later uses generalize captured types.
+  -- The destination identity has been reserved with freshId, but has no node
+  -- yet. Install its GGen atomically with the completed root, so intermediate
+  -- solver flushes never have to validate an unfinished export scheme.
+  materializeExport :: Int ->
+                       Int ->
+                       Int ->
+                       Int ->
+                       Graph -> Either String (Pair (Pair Int (IntMap Int)) Graph);
+  materializeExport generalization selected destination parent graph =
+    bindE (validateGraph graph)
+      (\valid ->
+         bindE (require graph generalization)
+           (\groupNode ->
+              bindE (require graph parent)
+                (\parentNode ->
+                   bindE (require graph selected)
+                     (\sourceNode ->
+                        let {
+                          group = resolve graph generalization;
+                          source = resolve graph selected;
+                          outer = resolve graph parent
+                        } in
+                        bindE
+                          (check
+                             (isGen (tag groupNode) && isGen (tag parentNode) &&
+                              equalMaybeInt (mapMaybeInt (resolve graph) (binder groupNode)) (Just outer))
+                             "recursive export requires a group under its parent gen")
+                          (\scopeChecked ->
+                             bindE
+                               (check
+                                  (IM.notMember destination (nodes graph) &&
+                                   IM.notMember destination (links graph) &&
+                                   (destination < nextId graph) &&
+                                   L.all (\n -> (n < nextId graph))
+                                     (L.append (IM.keys (nodes graph)) (IM.keys (links graph))))
+                                  "recursive export requires a reserved destination and valid fresh counter")
+                               (\destinationChecked ->
+                                  bindE
+                                    (check (L.not (isGen (tag sourceNode)))
+                                       "recursive export root must be a type node")
+                                    (\sourceChecked ->
+                                       materializeExportIn graph group source destination outer)))))));
+  materializeExportIn :: Graph ->
+                         Int ->
+                         Int ->
+                         Int ->
+                         Int -> Either String (Pair (Pair Int (IntMap Int)) Graph);
+  materializeExportIn graph generalization source destination parent =
+    case expansionVisitCached graph generalization IM.empty (Pair IS.empty IM.empty)
+           (Cons source Nil) of {
+      Pair visited scopes ->
+        let {
+          originals = L.filter (\n -> IM.findWithDefault False n scopes) (IS.toList visited)
+        } in
+        -- Shared member roots start directly group-bound; solving can only
+        -- raise their binder. A nested root is not a completed member interface.
+        bindE
+          (check
+             (L.not (IM.findWithDefault False source scopes) ||
+              equalMaybeInt (mapMaybeInt (resolve graph) (binder (nodeAt graph source)))
+                (Just generalization))
+             "recursive export root must be group-bound or external")
+          (\rootChecked ->
+             case allocateCopies graph originals of {
+               Pair copies allocated ->
+                 bindE (mapE_ (validateExportCopy graph generalization source copies) originals)
+                   (\copiesChecked ->
+                      let {
+                        copy = copyIdentity graph copies;
+                        result =
+                          L.foldlStrict
+                            (\current ->
+                               \n ->
+                                 setNode (copy n)
+                                   (exportNode graph generalization destination source copies n)
+                                   current)
+                            allocated
+                            originals;
+                        exported =
+                          setNode destination (mkNode (GGen (copy source)) (Just parent) Flexible)
+                            result
+                      } in
+                      bindE (validateGraph exported)
+                        (\verified -> Right (Pair (Pair (copy source) copies) exported)))
+             })
+    };
+  validateExportCopy :: Graph -> Int -> Int -> IntMap Int -> Int -> Either String Unit;
+  validateExportCopy graph generalization source copies identity =
+    let {
+      copy = IM.get identity copies
+    } in
+    bindE
+      (check (IM.notMember copy (nodes graph) && IM.notMember copy (links graph))
+         "recursive export fresh identities overlap the source graph")
+      (\freshChecked ->
+         if (identity == source)
+         then Right Unit
+         else case binder (nodeAt graph identity) of {
+                Nothing -> Left "recursive export lost a local binder";
+                Just owner ->
+                  let {
+                    canonical = resolve graph owner
+                  } in
+                  check ((canonical == generalization) || IM.member canonical copies)
+                    "recursive export is not closed under local binders"
+              });
+  exportNode :: Graph -> Int -> Int -> Int -> IntMap Int -> Int -> Node;
+  exportNode graph generalization destination source copies identity =
+    let {
+      node = nodeAt graph identity;
+      copy = copyIdentity graph copies;
+      owner =
+        if (identity == source)
+        then Just destination
+        else mapMaybeInt
+               (\p -> if (resolve graph p == generalization) then copy source else copy p)
+               (binder node)
+    } in
+    mkNode (mapTag copy (tag node)) owner (flag node);
   schemeOrExistential :: Graph -> Int -> Node -> Bool;
   schemeOrExistential graph identity node =
     case binder node of {

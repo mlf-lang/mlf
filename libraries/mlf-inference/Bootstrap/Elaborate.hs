@@ -367,16 +367,19 @@ module Bootstrap.Elaborate where {
         };
       FRecursive definitions body _ ->
         do {
-          results <-
-            mapM child
-              (Cons body
-                 (map
-                    (\definition ->
-                       case definition of {
-                         Quad _ _ rhs _ -> rhs
-                       })
-                    definitions));
-          Right (mergeEvidence results)
+          continuation <- child body;
+          results <- mapM
+            (\definition ->
+               case definition of {
+                 RecursiveDefinition _ _ rhs _ closure ->
+                   case closure of {
+                     Nothing -> child rhs;
+                     Just (RecursiveClosure group _) ->
+                       resolveWithinIn context datatypes
+                         (extendEnvironment env (boundsAtIn context group)) rhs
+                   }
+               }) definitions;
+          Right (mergeEvidence (Cons continuation results))
         };
       FChecked variables body _ ->
         resolveWithinIn context datatypes
@@ -520,9 +523,14 @@ module Bootstrap.Elaborate where {
                 mapM
                   (\definition ->
                      case definition of {
-                       Quad name declaration rhs rhsEdge ->
+                       RecursiveDefinition name declaration rhs rhsEdge closure ->
                          do {
-                           rhs' <- childEdge rhs rhsEdge;
+                           rhs' <- case closure of {
+                             Nothing -> childEdge rhs rhsEdge;
+                             Just (RecursiveClosure group copies) ->
+                               elaborateRecursiveIn context datatypes evidence solver env
+                                 group copies declaration rhs rhsEdge
+                           };
                            Right (Triple name (schemeTypeIn context declaration) rhs')
                          }
                      })
@@ -575,6 +583,43 @@ module Bootstrap.Elaborate where {
             }
         };
       Right (foldr (\bound inner -> XTypeAbs (fst bound) (snd bound) inner) body bounds)
+    };
+  -- Projection replacements are planned in telescope order. In particular,
+  -- dropping a peer-only bounded variable uses its CURRENT substituted bound,
+  -- not a graph readback containing already-eliminated variables.
+  recursiveReplacementIn context copies bounds gamma variable =
+    do {
+      replacements <- foldM
+        (\known bound -> do {
+           let { name = fst bound };
+           value <- case IM.lookup (T.tyVarId name) copies of {
+             Just target -> graphReplacementIn context (\_ -> target) gamma name;
+             Nothing -> Right (foldl
+               (\ty entry -> T.substitute (fst entry) (snd entry) ty) (snd bound) known)
+           };
+           Right (append known (Cons (Pair name value) Nil))
+         }) Nil bounds;
+      case M.lookup T.compareTyVar variable (M.fromList T.compareTyVar replacements) of {
+        Just value -> Right value;
+        Nothing -> graphReplacementIn context
+          (\identity -> IM.findWithDefault identity identity copies) gamma variable
+      }
+    };
+  elaborateRecursiveIn context datatypes evidence solver env group copies declaration rhs edge =
+    do {
+      let { bounds = boundsAtIn context group };
+      let { local = extendEnvironment env bounds };
+      value <- elaborateEdgeIn context datatypes evidence solver local rhs edge;
+      let {
+        source = foldr (\bound body -> XForall (fst bound) (snd bound) body)
+          (referenceIn context (C.toNode edge)) bounds
+      };
+      let {
+        abstracted = foldr (\bound body -> XTypeAbs (fst bound) (snd bound) body) value bounds
+      };
+      proof <- proveInstanceUsing datatypes (recursiveReplacementIn context copies bounds) env
+        source (schemeTypeIn context declaration);
+      Right (X.instantiate abstracted proof)
     };
   checkedReplacementIn context positions kinds gamma variable =
     let {

@@ -279,9 +279,11 @@ module Bootstrap.Types where {
     FPrimitive Primitive (List Int) |
     FConstructor String (List Int) |
     FMatch Typed Edge (List Branch) |
-    FRecursive (List (Quad XName Int Typed Edge)) Typed Edge |
+    FRecursive (List RecursiveDefinition) Typed Edge |
     FEvidence (List EvidenceBinding) |
     FChecked (List (Pair XTyVar Kind)) Typed Edge;
+  data RecursiveClosure = RecursiveClosure Int (IntMap Int);
+  data RecursiveDefinition = RecursiveDefinition XName Int Typed Edge (Maybe RecursiveClosure);
   data Branch = Branch XPattern Typed Edge;
   data EvidenceBinding = EvidenceBinding EvidenceRole XName Int Bool;
   data Constraints = Constraints Graph Typed (List (Pair Int Int)) (List Edge);
@@ -301,7 +303,7 @@ module Bootstrap.Types where {
     CRec (List (Triple String RecursiveMode Core)) Core |
     CWanted String (List (Pair EvidenceRole String)) |
     CChecked SType SExpr;
-  data Binding = Mono XName Int | Poly XName Int;
+  data Binding = Mono XName Int | Poly XName Int | RecursiveMono XName Int Int;
   data Phase = Parsing | ModuleResolution | Inference | Resolution | Elaboration | Verification;
   data CompileError = CompileError Phase String
 }

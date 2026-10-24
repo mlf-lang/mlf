@@ -65,6 +65,7 @@ module Bootstrap.Surface where {
     traverseEither
       (\(Triple n a e) ->
          case a of {
+           Nothing -> Right (Triple n InferRecursive e);
            Just (SAnnotation Nil ty) -> Right (Triple n (CheckRecursive (SAnnotation Nil ty)) e);
            _ -> Left ("recursive definition " ++ (n ++ " requires an explicit closed signature"))
          })

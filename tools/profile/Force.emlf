@@ -434,9 +434,15 @@ forceForm value = case value of
   FPrimitive x0 x1 -> seq ((forcePrimitive) x0) (seq ((forceList scalar) x1) (Unit))
   FConstructor x0 x1 -> seq (scalar x0) (seq ((forceList scalar) x1) (Unit))
   FMatch x0 x1 x2 -> seq ((forceTyped) x0) (seq ((forceEdge) x1) (seq ((forceList (forceBranch)) x2) (Unit)))
-  FRecursive x0 x1 x2 -> seq ((forceList (forceQuad (forceXName) scalar (forceTyped) (forceEdge))) x0) (seq ((forceTyped) x1) (seq ((forceEdge) x2) (Unit)))
+  FRecursive x0 x1 x2 -> seq ((forceList forceRecursiveDefinition) x0) (seq ((forceTyped) x1) (seq ((forceEdge) x2) (Unit)))
   FEvidence x0 -> seq ((forceList (forceEvidenceBinding)) x0) (Unit)
   FChecked x0 x1 x2 -> seq ((forceList (forcePair (forceXTyVar) (forceKind))) x0) (seq ((forceTyped) x1) (seq ((forceEdge) x2) (Unit)))
+
+forceRecursiveClosure : RecursiveClosure -> Unit
+forceRecursiveClosure (RecursiveClosure group copies) = seq group ((forceIntMap scalar) copies)
+
+forceRecursiveDefinition : RecursiveDefinition -> Unit
+forceRecursiveDefinition (RecursiveDefinition name declaration rhs edge closure) = seq (forceXName name) (seq declaration (seq (forceTyped rhs) (seq (forceEdge edge) ((forceMaybe forceRecursiveClosure) closure))))
 
 forceBranch : Branch -> Unit
 forceBranch value = case value of
@@ -472,6 +478,7 @@ forceBinding : Binding -> Unit
 forceBinding value = case value of
   Mono x0 x1 -> seq ((forceXName) x0) (seq (scalar x1) (Unit))
   Poly x0 x1 -> seq ((forceXName) x0) (seq (scalar x1) (Unit))
+  RecursiveMono x0 x1 x2 -> seq (forceXName x0) (seq x1 (seq x2 Unit))
 
 forcePhase : Phase -> Unit
 forcePhase value = case value of

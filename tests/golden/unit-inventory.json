@@ -114,6 +114,7 @@
         "alpha-equivalence tracks shadowing",
         "type quantifiers have lexical scope",
         "xMLF does not identify inert or alias bounds",
+        "recursive exports preserve scoped identities and independent copies",
         "expansion resets scheme flag and binding",
         "all inert nodes normalized",
         "well-domination enforced",
@@ -415,8 +416,8 @@
         "recursion: unused explicit quantified variables are discharged",
         "equations: parameter can shadow the function name",
         "readability rejection: recursive forall cannot specialize to Int",
-        "readability rejection: mutual recursion needs every signature",
-        "readability rejection: local recursion needs a signature",
+        "recursion: mixed signed and inferred group",
+        "recursion: unsigned local group",
         "readability rejection: recursive existentials are not closed signatures",
         "readability rejection: recursive signature free variable",
         "readability rejection: equation arity",
@@ -1399,6 +1400,30 @@
         }
       },
       "unchanged_expectations": "All existing IDs, independent parity/Algorithm W oracles and metrics are retained. Each of the eight runtime sources adds one Core type/target-roundtrip case and one differential interpreter/LLVM matrix row."
+    },
+    {
+      "name": "ordinary unsigned recursive inference",
+      "basis": "Manually reviewed new graph export test and two old early-signature rejections whose programs are now supported; no oracle answers regenerated.",
+      "added_core_ids": [
+        "recursive exports preserve scoped identities and independent copies"
+      ],
+      "replaced_core_ids": [
+        {
+          "before": "readability rejection: mutual recursion needs every signature",
+          "after": "recursion: mixed signed and inferred group"
+        },
+        {
+          "before": "readability rejection: local recursion needs a signature",
+          "after": "recursion: unsigned local group"
+        }
+      ],
+      "required_execution_counts": {
+        "core": {
+          "before": 739,
+          "after": 740
+        }
+      },
+      "unchanged_expectations": "All other case IDs and metrics, independent target/Algorithm W oracles and backend inventories remain unchanged. No full native campaign is claimed by the focused host validation."
     }
   ]
 }

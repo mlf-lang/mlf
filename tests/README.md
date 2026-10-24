@@ -539,3 +539,23 @@ Main/manual CI also runs the same bootstrap and all four gates on macOS. Each
 records exact source/compiler hashes, observations and completion status.
 A seed-only type surrogate is not a passing execution result. See
 [Async.Task](../docs/async-task.md) for public semantics and remaining limits.
+
+## Focused ordinary recursion inference
+
+The direct shared-frontend runner accepts `--recursive-inference` to run the
+unsigned-recursion source and frozen-target checks without the native campaign.
+Its accepted cases prescribe types independently, check the original and
+serialized xMLF with both checkers, and compare erasure. It also covers shared
+recursive rejection constraints, whole-group bounded evidence projection,
+environment capture and malformed recursive target bindings.
+
+The new `recursive exports preserve scoped identities and independent copies`
+Core case tests graph export ownership, outer frontiers, nested bounds/kinds,
+copy provenance and scaffold-order invariance. The reviewed Core inventory is
+740 cases. The two former unsigned/mixed-signature rejection programs are now
+positive cases; recursive existential signatures and actual type errors remain
+negative tests. Existing oracle implementations are unchanged.
+
+These focused tests do not constitute full native qualification. Newly inferred
+recursive class contexts are a separate implementation phase; explicit closed
+qualified signatures remain supported. See `docs/inference/Unsigned-Recursion-Implementation-Plan.md`.

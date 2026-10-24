@@ -76,7 +76,9 @@ recursiveInference = do
   object <- H.right (Inference.compileLoweredGroup "Recursive" Nil Nil members)
   H.assert (length (Separate.unitBindings (Separate.objectInterface object)) == 2 && T.alphaEq (scheme "f" object) identityType && T.alphaEq (scheme "g" object) identityType) "signed recursive schemes changed across a group boundary"
   let unsigned = map (\(Triple n _ body) -> Triple n Nothing body) members
-  H.assert (case Inference.compileLoweredGroup "Unsigned" Nil Nil unsigned of {Left message -> H.contains "requires an explicit closed signature" message; Right _ -> false}) "unsupported unsigned recursion escaped its documented diagnostic"
+  inferred <- H.right (Inference.compileLoweredGroup "Unsigned" Nil Nil unsigned)
+  let divergent = XForall (XTyVar 0) XBot (XForall (XTyVar 1) XBot (XArrow (XVar (XTyVar 0)) (XVar (XTyVar 1))))
+  H.assert (T.alphaEq (scheme "f" inferred) divergent && T.alphaEq (scheme "g" inferred) divergent) "unsigned recursive schemes were not generalized after the component"
   converted <- H.right (Surface.recursiveValues members)
   H.assert (all (\(Triple _ mode _) -> case mode of {CheckRecursive (SAnnotation Nil _) -> true; _ -> false}) converted) "closed signatures lost their explicit recursive checking mode"
   H.reject (Surface.recursiveValues (Cons (Triple "f" (Just (SAnnotation (Cons "a" Nil) (STVar "a"))) (SVar "f")) Nil))

@@ -8,9 +8,14 @@ import Bootstrap.Compiler
 import Bootstrap.Constraint (generate, solve, generalization, skeleton)
 import Bootstrap.Parser
 import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.IntSet as IS
 import qualified Tests.Helpers as H
 import Tests.CoreHelpers
 import qualified Tests.Graph as G
+import qualified Bootstrap.Graph as NativeGraph
+import Bootstrap.Elaborate (schemeType, boundsAt)
+import qualified Bootstrap.X.Type as XType
+import qualified Tests.GraphValidation as GraphValidation
 import qualified Tests.ComponentProjection as ComponentProjection
 import qualified Tests.IntSetUnions as IntSetUnions
 import qualified Tests.IndexEdges as IndexEdges
@@ -25,7 +30,229 @@ import Tests.GraphSolver (graphSolverTests)
 import Tests.EmbeddingPruning (embeddingPruningTests)
 
 graphTests : (List ( Pair String (IO Unit) ))
-graphTests = (Cons (Pair "expansion resets scheme flag and binding" do { c <- (H.right (bind (parseExpr "<test>" "\\x -> x") generate)); do { g <- (H.right (solve c)); (let { gen = (generalization (skeleton c)) } in (let { s = (G.genRoot g gen) } in do { (Pair (Triple r _ es) expanded) <- (H.right (G.runBuild g (G.expand gen gen))); do { (H.assert (H.eq (G.flag (G.nodeAt g s)) Rigid) "scheme root not normalized"); do { (H.assert (H.eq (G.flag (G.nodeAt expanded r)) Flexible) "flag was not reset"); do { (H.assert (H.null es) "closed identity has a frontier"); (let { locals = (S.concatMap (\(Pair n vn) -> (if (H.eq (G.binder vn) (Just r)) then (Cons n Nil) else Nil)) (IM.toList (G.nodes expanded))) } in (H.assert (H.eq (H.length locals) 1) "generalized variable was not rebound to expansion root")) } } } })) } }) (Cons (Pair "all inert nodes normalized" do { r <- (compileOK "\\f x -> f x"); (let { g = (presolution r) } in ((H.forM_ (IM.toList (G.nodes g))) (\(Pair n vn) -> (case (G.tag vn) of { (GGen _) -> (return Unit); _ -> (S.when (G.inert g n) (H.assert (H.eq (G.flag vn) Rigid) "inert flexible node escaped")) })))) }) (Cons (Pair "well-domination enforced" (let { g = (Graph (IM.fromList (Cons (Pair 0 (Node (GGen 1) Nothing Flexible)) (Cons (Pair 1 (Node (GArr 2 3) (Just 0) Rigid)) (Cons (Pair 2 (Node (GArr 3 3) (Just 1) Rigid)) (Cons (Pair 3 (Node GBot (Just 2) Flexible)) Nil))))) IM.empty 4) } in (H.reject (G.validateGraph g)))) Nil)))
+graphTests = (Cons (Pair "recursive exports preserve scoped identities and independent copies" recursiveExportChecks) (Cons (Pair "expansion resets scheme flag and binding" do { c <- (H.right (bind (parseExpr "<test>" "\\x -> x") generate)); do { g <- (H.right (solve c)); (let { gen = (generalization (skeleton c)) } in (let { s = (G.genRoot g gen) } in do { (Pair (Triple r _ es) expanded) <- (H.right (G.runBuild g (G.expand gen gen))); do { (H.assert (H.eq (G.flag (G.nodeAt g s)) Rigid) "scheme root not normalized"); do { (H.assert (H.eq (G.flag (G.nodeAt expanded r)) Flexible) "flag was not reset"); do { (H.assert (H.null es) "closed identity has a frontier"); (let { locals = (S.concatMap (\(Pair n vn) -> (if (H.eq (G.binder vn) (Just r)) then (Cons n Nil) else Nil)) (IM.toList (G.nodes expanded))) } in (H.assert (H.eq (H.length locals) 1) "generalized variable was not rebound to expansion root")) } } } })) } }) (Cons (Pair "all inert nodes normalized" do { r <- (compileOK "\\f x -> f x"); (let { g = (presolution r) } in ((H.forM_ (IM.toList (G.nodes g))) (\(Pair n vn) -> (case (G.tag vn) of { (GGen _) -> (return Unit); _ -> (S.when (G.inert g n) (H.assert (H.eq (G.flag vn) Rigid) "inert flexible node escaped")) })))) }) (Cons (Pair "well-domination enforced" (let { g = (Graph (IM.fromList (Cons (Pair 0 (Node (GGen 1) Nothing Flexible)) (Cons (Pair 1 (Node (GArr 2 3) (Just 0) Rigid)) (Cons (Pair 2 (Node (GArr 3 3) (Just 1) Rigid)) (Cons (Pair 3 (Node GBot (Just 2) Flexible)) Nil))))) IM.empty 4) } in (H.reject (G.validateGraph g)))) Nil))))
+
+
+-- Reserved export IDs 7 and 8 are deliberately absent. The shared parameter 5
+-- belongs to both members, whereas 6 is owned by their surrounding environment.
+-- Aliases exercise canonical provenance and unchanged external representatives.
+recursiveExportGraph : Graph
+recursiveExportGraph = Graph (IM.fromList
+ (Cons (Pair 0 (Node (GGen 1) Nothing Flexible))
+ (Cons (Pair 1 (Node (GArr 6 6) (Just 0) Rigid))
+ (Cons (Pair 2 (Node (GGen 3) (Just 0) Flexible))
+ (Cons (Pair 3 (Node (GArr 4 9) (Just 2) Flexible))
+ (Cons (Pair 4 (Node (GArr 5 13) (Just 2) Flexible))
+ (Cons (Pair 5 (Node GBot (Just 2) Flexible))
+ (Cons (Pair 6 (Node GBot (Just 0) Flexible))
+ (Cons (Pair 9 (Node (GArr 5 6) (Just 2) Flexible)) Nil)))))))))
+ (IM.fromList (Cons (Pair 12 4) (Cons (Pair 13 6) Nil))) 14
+
+checkExportGraph : Graph -> IO Unit
+checkExportGraph graph = do
+ H.right (NativeGraph.validateGraph graph)
+ H.right (NativeGraph.validateSparse graph)
+ H.right (GraphValidation.referenceValidation graph)
+ H.assert (H.eq (NativeGraph.normalize graph) (NativeGraph.normalizeSparse graph))
+   "export graph normalization differs between dense and sparse paths"
+
+unchangedExportSource : Graph -> Graph -> IO Unit
+unchangedExportSource before after = do
+ S.mapM_ (\(Pair n node) -> H.assert (H.eq node (NativeGraph.nodeAt after n))
+   "export changed an original node, binder or flag") (IM.toList (NativeGraph.nodes before))
+ H.assert (H.eq (NativeGraph.links before) (NativeGraph.links after))
+   "export changed original aliases"
+
+recursiveExportChecks : IO Unit
+recursiveExportChecks = do
+ sharedExportChecks
+ outerExportChecks
+ dependentExportChecks
+ nestedExportChecks
+ scaffoldExportChecks
+ rejectedExportChecks
+
+sharedExportChecks : IO Unit
+sharedExportChecks = do
+ let original = recursiveExportGraph
+ checkExportGraph original
+ Pair (Pair first firstCopies) frozen <- H.right (NativeGraph.materializeExport 2 12 7 0 original)
+ Pair (Pair second secondCopies) both <- H.right (NativeGraph.materializeExport 2 9 8 0 frozen)
+ checkExportGraph frozen
+ checkExportGraph both
+ unchangedExportSource original both
+ unchangedExportSource frozen both
+ H.assert (H.eq (IM.keys firstCopies) (Cons 4 (Cons 5 Nil)) &&
+   H.eq (IM.keys secondCopies) (Cons 5 (Cons 9 Nil)))
+   "export copied a frontier, alias, scaffold or unrelated member"
+ H.assert (H.eq (NativeGraph.tag (NativeGraph.nodeAt both first)) (GArr (IM.get 5 firstCopies) 6) &&
+   H.eq (NativeGraph.tag (NativeGraph.nodeAt both second)) (GArr (IM.get 5 secondCopies) 6))
+   "exports lost their common outer frontier identity"
+ H.assert (first /= second && IM.get 5 firstCopies /= IM.get 5 secondCopies &&
+   NativeGraph.nextId both == NativeGraph.nextId original + 4)
+   "exports did not allocate disjoint, exact internal copies"
+ H.assert (H.eq (NativeGraph.binder (NativeGraph.nodeAt both first)) (Just 7) &&
+   H.eq (NativeGraph.binder (NativeGraph.nodeAt both (IM.get 5 firstCopies))) (Just first) &&
+   H.eq (NativeGraph.binder (NativeGraph.nodeAt both 7)) (Just 0))
+   "export did not reconstruct its binder hierarchy"
+ H.assert (NativeGraph.genRoot both 7 == first && NativeGraph.genRoot both 8 == second)
+   "reserved export generalizations have the wrong roots"
+ let normalized = NativeGraph.normalize both
+ H.assert (H.eq (NativeGraph.flag (NativeGraph.nodeAt normalized first)) Rigid &&
+   H.eq (NativeGraph.flag (NativeGraph.nodeAt normalized 5)) Flexible &&
+   H.eq (NativeGraph.flag (NativeGraph.nodeAt normalized (IM.get 5 firstCopies))) Flexible)
+   "export normalization rigidified a shared or generalized parameter"
+ H.assert (XType.alphaEq (schemeType normalized 7)
+   (XForall (XTyVar 100) XBot (XArrow (XVar (XTyVar 100)) (XVar (XTyVar 6)))))
+   "export did not generalize its independent parameter relative to the environment"
+ -- The immutable source-side solution cannot alter frozen local structure.
+ let changed = NativeGraph.setNode 5 (Node (GCon "Bool" Nil) (Just 2) Rigid) both
+ H.assert (H.eq (NativeGraph.tag (NativeGraph.nodeAt changed (IM.get 5 firstCopies))) GBot &&
+   H.eq (NativeGraph.tag (NativeGraph.nodeAt changed (IM.get 5 secondCopies))) GBot)
+   "a source-side update changed frozen export parameters"
+ -- Conversely, solving an environment frontier after export must affect both.
+ let frontierChanged = NativeGraph.setNode 6 (Node (GCon "Int" Nil) (Just 0) Rigid) both
+ checkExportGraph frontierChanged
+ S.mapM_ (\export -> H.assert (XType.alphaEq (schemeType (NativeGraph.normalize frontierChanged) export)
+   (XForall (XTyVar 100) XBot (XArrow (XVar (XTyVar 100)) (XCon "Int" Nil))))
+   "later environment constraints did not reach every export") (Cons 7 (Cons 8 Nil))
+
+outerExportChecks : IO Unit
+outerExportChecks = do
+ let original = recursiveExportGraph
+ Pair (Pair root copies) exported <- H.right (NativeGraph.materializeExport 2 13 7 0 original)
+ checkExportGraph exported
+ unchangedExportSource original exported
+ H.assert (root == 6 && IM.null copies && NativeGraph.nextId exported == NativeGraph.nextId original)
+   "an entirely external member was copied or generalized"
+ H.assert (H.eq (NativeGraph.binder (NativeGraph.nodeAt exported 6)) (Just 0) &&
+   NativeGraph.genRoot exported 7 == 6 &&
+   H.eq (schemeType (NativeGraph.normalize exported) 7) (XVar (XTyVar 6)))
+   "an entirely external member lost the surrounding type identity"
+
+-- A flexible bound may mention an external variable without making its own
+-- quantifier external. Its nested parameter must remain bound inside the bound.
+dependentExportChecks : IO Unit
+dependentExportChecks = do
+ let original = NativeGraph.setNode 10 (Node GBot (Just 5) Flexible)
+       (NativeGraph.setNode 9 (Node (GArr 6 6) (Just 2) Flexible)
+       (NativeGraph.setNode 5 (Node (GArr 6 10) (Just 2) Flexible)
+       (NativeGraph.setNode 4 (Node (GArr 5 5) (Just 2) Flexible) recursiveExportGraph)))
+ checkExportGraph original
+ Pair (Pair root copies) exported <- H.right (NativeGraph.materializeExport 2 4 7 0 original)
+ checkExportGraph exported
+ unchangedExportSource original exported
+ H.assert (H.eq (IM.keys copies) (Cons 4 (Cons 5 (Cons 10 Nil))) && IM.notMember 6 copies)
+   "dependent bound copying lost its internal closure or copied its environment"
+ H.assert (H.eq (NativeGraph.binder (NativeGraph.nodeAt exported (IM.get 10 copies))) (Just (IM.get 5 copies)))
+   "dependent bound lost its nested quantifier owner"
+ let expected = XForall (XTyVar 100)
+       (XForall (XTyVar 101) XBot (XArrow (XVar (XTyVar 6)) (XVar (XTyVar 101))))
+       (XArrow (XVar (XTyVar 100)) (XVar (XTyVar 100)))
+ H.assert (XType.alphaEq (schemeType (NativeGraph.normalize exported) 7) expected)
+   "an internal dependent bound mentioning an outer variable did not generalize"
+
+nestedExportChecks : IO Unit
+nestedExportChecks = do
+ let original = NativeGraph.setNode 11 (Node GBot (Just 5) Flexible)
+       (NativeGraph.setNode 10 (Node (GBotK (KArrow Star Star)) (Just 5) Flexible)
+       (NativeGraph.setNode 9 (Node (GArr 6 6) (Just 2) Flexible)
+       (NativeGraph.setNode 5 (Node (GTyApp 10 11) (Just 4) Rigid)
+       (NativeGraph.setNode 4 (Node (GArr 5 5) (Just 2) Flexible) recursiveExportGraph))))
+ checkExportGraph original
+ Pair (Pair root copies) exported <- H.right (NativeGraph.materializeExport 2 4 7 0 original)
+ checkExportGraph exported
+ unchangedExportSource original exported
+ H.assert (IM.size copies == 4 && H.eq (NativeGraph.tag (NativeGraph.nodeAt exported root))
+   (GArr (IM.get 5 copies) (IM.get 5 copies))) "export lost internal structural sharing"
+ S.mapM_ (\(Pair origin copy) -> do
+  H.assert (H.eq (NativeGraph.flag (NativeGraph.nodeAt original origin))
+    (NativeGraph.flag (NativeGraph.nodeAt exported copy))) "export changed a source flag"
+  H.assert (H.eq (NativeGraph.kindAt original origin) (NativeGraph.kindAt exported copy))
+    "export changed a source kind") (IM.toList copies)
+ H.assert (H.eq (NativeGraph.binder (NativeGraph.nodeAt exported (IM.get 5 copies))) (Just root) &&
+   H.eq (NativeGraph.binder (NativeGraph.nodeAt exported (IM.get 10 copies))) (Just (IM.get 5 copies)) &&
+   H.eq (NativeGraph.binder (NativeGraph.nodeAt exported (IM.get 11 copies))) (Just (IM.get 5 copies)))
+   "export flattened nested binders"
+
+-- Reordering a three-member structural spine must not change its telescope
+-- or any public interface. Every arrow is group-bound, never a binder owner;
+-- after normalization none of these reachability-only nodes is a quantifier.
+scaffoldExportGraph : Int -> Int -> Int -> Graph
+scaffoldExportGraph first middle last =
+ let graph = NativeGraph.setNode 14 (Node (GArr middle last) (Just 2) Flexible)
+       (NativeGraph.setNode 11 (Node GBot (Just 2) Flexible)
+       (NativeGraph.setNode 10 (Node (GArr 11 5) (Just 2) Flexible)
+       (NativeGraph.setNode 3 (Node (GArr first 14) (Just 2) Flexible) recursiveExportGraph))) in
+ Graph (NativeGraph.nodes graph) (NativeGraph.links graph) 16
+
+checkScaffoldOwnership : Graph -> IO Unit
+checkScaffoldOwnership graph = do
+ let scaffold = IS.fromList (Cons 3 (Cons 14 Nil))
+ S.mapM_ (\n -> do
+  H.assert (H.eq (NativeGraph.binder (NativeGraph.nodeAt graph n)) (Just 2))
+    "a recursive scaffold arrow is not directly group-bound"
+  H.assert (case NativeGraph.tag (NativeGraph.nodeAt graph n) of
+    GArr _ _ -> true
+    _ -> false) "a recursive scaffold contains a non-arrow sentinel") (IS.toList scaffold)
+ S.mapM_ (\node -> H.assert (case NativeGraph.binder node of
+    Nothing -> true
+    Just owner -> IS.notMember owner scaffold)
+   "a recursive scaffold arrow owns a binding child") (IM.elems (NativeGraph.nodes graph))
+ let normalized = NativeGraph.normalize graph
+ let variables = IS.fromList (S.map (\(Pair (XTyVar n) _) -> n) (boundsAt normalized 2))
+ S.mapM_ (\n -> H.assert (H.eq (NativeGraph.flag (NativeGraph.nodeAt normalized n)) Rigid &&
+   IS.notMember n variables) "a structural scaffold leaked into the group telescope") (IS.toList scaffold)
+ H.assert (H.eq variables (IS.fromList (Cons 5 (Cons 11 Nil))))
+   "reordering recursive roots changed the shared variable set"
+
+freezeScaffoldMembers : Graph -> IO Graph
+freezeScaffoldMembers graph = do
+ Pair _ first <- H.right (NativeGraph.materializeExport 2 4 7 0 graph)
+ Pair _ second <- H.right (NativeGraph.materializeExport 2 9 8 0 first)
+ Pair _ final <- H.right (NativeGraph.materializeExport 2 10 15 0 second)
+ return final
+
+scaffoldExportChecks : IO Unit
+scaffoldExportChecks = do
+ let baseline = scaffoldExportGraph 4 9 10
+ checkExportGraph baseline
+ checkScaffoldOwnership baseline
+ expected <- freezeScaffoldMembers baseline
+ checkExportGraph expected
+ checkScaffoldOwnership expected
+ S.mapM_ (\original -> do
+  checkExportGraph original
+  checkScaffoldOwnership original
+  result <- freezeScaffoldMembers original
+  checkExportGraph result
+  checkScaffoldOwnership result
+  unchangedExportSource original result
+  S.mapM_ (\export -> H.assert
+    (XType.alphaEq (schemeType (NativeGraph.normalize expected) export)
+      (schemeType (NativeGraph.normalize result) export))
+    "recursive spine order changed a member export scheme") (Cons 7 (Cons 8 (Cons 15 Nil))))
+  (Cons (scaffoldExportGraph 10 4 9) (Cons (scaffoldExportGraph 9 10 4) Nil))
+
+rejectedExportChecks : IO Unit
+rejectedExportChecks = do
+ let original = recursiveExportGraph
+ H.reject (NativeGraph.materializeExport 2 4 2 0 original)
+ H.reject (NativeGraph.materializeExport 2 4 12 0 original)
+ H.reject (NativeGraph.materializeExport 2 4 14 0 original)
+ H.reject (NativeGraph.materializeExport 2 4 7 2 original)
+ H.reject (NativeGraph.materializeExport 2 2 7 0 original)
+ -- A valid nested type is not a solved, directly group-bound member root.
+ let nested = NativeGraph.setNode 5 (Node GBot (Just 4) Flexible)
+       (NativeGraph.setNode 9 (Node (GArr 6 6) (Just 2) Flexible) original)
+ checkExportGraph nested
+ H.reject (NativeGraph.materializeExport 2 5 7 0 nested)
+ -- A forged fresh counter may not overwrite original nodes during copying.
+ let occupied = Graph (NativeGraph.nodes original) (NativeGraph.links original) 9
+ H.reject (NativeGraph.materializeExport 2 4 7 0 occupied)
+ -- Even an unused allocation gap is invalid when aliases lie above nextId.
+ let gap = Graph (NativeGraph.nodes original) (NativeGraph.links original) 10
+ H.reject (NativeGraph.materializeExport 2 4 7 0 gap)
 
 families : List (Pair String (List (Pair String (IO Unit))))
 families =
