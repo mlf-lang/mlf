@@ -175,3 +175,24 @@ mislabeling old executable runs as new ones. Rebuilt runtime/managed checks and
 exact-head CI are separate required gates. The interrupted local O0 rebuild
 is not a completed producer; final O0 coverage must be established by the new
 CI legs or a complete authenticated local rerun.
+
+### Further upstream update observed before publication
+
+A fresh remote check on 2026-10-24 at 22:56 UTC found PR22 advanced from `8d953f9`
+to `13ba7558e6711fcbabe5739ed312dfc0b23b7042`. Its two commits affect only the
+framework host syntax and test execution budgets. The framework syntax is
+already byte-identical to this branch. The budget change has the same
+source-authenticated optimization intent but a serial 180-minute O0 job and
+uniform 1800-second mode budget. The integration retains the independently
+reviewed parallel/per-mode design above rather than stacking both mechanisms.
+All four upstream budget-control methods are preserved with the corresponding
+per-mode and four-row assertions, including every unknown/untyped optimization
+negative. No inference or target-checker source changes are needed for this
+additional merge.
+
+On the regenerated O2 producer, the exact uninstrumented `SourceSCC` fixture
+again passes all 29 upstream assertions (receipt
+`19c4f0f17970c13cba85eab7e8761b7e8f115267cbd0063609e1a494847863ef`).
+The regenerated managed fixture also completes all 17 raw, six parsed and
+source-contract checks with strict empty successful stderr. The longer
+framework rerun and final exact-head O0/O2 CI remain distinct completion gates.
