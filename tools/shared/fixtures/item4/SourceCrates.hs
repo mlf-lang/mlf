@@ -68,8 +68,9 @@ main=do
  builtin<-expect "builtin compile" A.builtinPrelude >>=roundtrip
  let bp=B.literal(base++"/builtin.mlfci")
  writeFile(B.unpack bp)(B.unpack(A.encodeInterface(A.objectInterface builtin)))
- (pp,provider,_)<-compileMetadata base "Provider" "" "who = let { ignored = callStack } in 42\nordinary = 21\nequal = (42 :: Int) == 42" [bp]
+ (pp,provider,_)<-compileMetadata base "Provider" "" "who = let { ignored = callStack } in 42\nordinary = 21\nequal = (42 :: Int) == 42\nsignedOrdinary :: Int\nsignedOrdinary = if (1 :: Int) == 1 then 42 else 0" [bp]
  check "ordinary source helper remains unprotected"(not(flag(A.objectInterface provider)"ordinary"))
+ check "signed compareInt-like helper ignores visible managed instances"(not(flag(A.objectInterface provider)"signedOrdinary"))
  check "provider protected helper has exact plain Int target"(XT.alphaEq(scheme(A.objectInterface provider)"who")(T.XCon "Int" []))
  check "unsigned managed helper plain-type retains protection"(flag(A.objectInterface provider)"who")
  let facadeText=source "Facade" " (module P)" "import Provider as P"
@@ -77,12 +78,13 @@ main=do
  let fp=B.literal(base++"/Facade.mlfci")
  writeFile(B.unpack fp)(B.unpack(A.encodeInterface(A.objectInterface facade)))
  removeFile(base++"/Provider.hs")
- (cp,consumer,_)<-compileMetadata base "Consumer" "Consumer" "import Facade\nmain = who" [fp,bp]
+ (cp,consumer,_)<-compileMetadata base "Consumer" "Consumer" "import Facade\nmain = who\nordinaryCopy = signedOrdinary" [fp,bp]
+ check "metadata reexport preserves ordinary signed helper nonprotection"(not(flag(A.objectInterface consumer)"ordinaryCopy"))
  check "consumer has exact plain Int target"(XT.alphaEq(scheme(A.objectInterface consumer)"main")(T.XCon "Int" []))
  check "metadata-only facade preserves empty-overload managed protection"(flag(A.objectInterface consumer)"main")
  (_,result)<-value[builtin,provider,facade,consumer]consumer
  check "decoded final objects link and run"(case result of R.RInteger 42->True;_->False)
- (_,warm,warmReport)<-compileMetadata base "Consumer" "Consumer" "import Facade\nmain = who" [fp,bp]
+ (_,warm,warmReport)<-compileMetadata base "Consumer" "Consumer" "import Facade\nmain = who\nordinaryCopy = signedOrdinary" [fp,bp]
  check "actual crate warm all raw hits"(Q.inferredCount warmReport==0&&Q.reusedCount warmReport>0)
  check "actual crate warm artifact exact parity"(A.encodeObject consumer==A.encodeObject warm)
  putStrLn "PASS actual metadata-only protected facade source SCC"

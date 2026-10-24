@@ -52,9 +52,30 @@ module Bootstrap.SourceInference where {
       Nothing -> True;
       Just contract -> contractProtected contract
     }) names;
-  rawDependencyProtected contracts members =
-    not (null (protectedCandidateNames contracts
-      (map fst (selectedBindings members (contractTypes contracts)))));
+  checkedDependencyProtected :: [] ((,) String Bool) -> Separate.UnitObject -> Either String Bool;
+  checkedDependencyProtected flags object = do {
+    let { term = case Separate.objectTerm object of { XWithData _ body -> body; body -> body } };
+    let { split = Separate.splitParameters term };
+    let { parameters = fst split };
+    let { used = Boundary.nubNames (Boundary.freeNames (snd split)) };
+    protected <- traverseEither (\name -> do {
+      parameter <- case find (\((,) binder _) -> X.equalName binder name) parameters of {
+        Nothing -> Left "checked raw implementation has an unowned free parameter";
+        Just value -> Right (fst value)
+      };
+      case find (\((,) hint _) -> eqString hint (X.nameHint parameter)) flags of {
+        Nothing -> Left "used checked predecessor lacks protection authority";
+        Just entry -> Right (snd entry)
+      }
+    }) used;
+    Right (any (\flag -> flag) protected)
+  };
+  parameterProtection contracts bindings = map
+    (\((,) name _) -> (,) name (case M.lookup compareString name contracts of {
+      Nothing -> True;
+      Just contract -> contractProtected contract
+    })) bindings;
+
   -- The validated lowerer derives source/selector/transitive protection;
   -- callers cannot obtain eligibility merely by passing a false flag.
   prepareUnsignedRoot :: Classes.ClassInventory -> Map String SourceContract ->
@@ -81,8 +102,10 @@ module Bootstrap.SourceInference where {
                 Nothing -> Left ("definition evidence support has not been checked: " ++ candidate);
                 Just contract -> Right ((,,) role candidate (contractType contract))
               }) candidates);
+            usedProtected <- freshLift
+              (checkedDependencyProtected (parameterProtection contracts selected) object);
             freshPure (ProvisionalRoot name object labels candidates
-              (protected || rawDependencyProtected contracts members)
+              (protected || usedProtected)
               (Classes.inventoryOrdinaryRegistry inventory) typedCandidates
               (protectedCandidateNames contracts (map snd candidates)))
           }
@@ -340,23 +363,25 @@ module Bootstrap.SourceInference where {
     ([] ((,,) String (Maybe SAnnotation) SExpr))
     ([] ((,,) String (Maybe SAnnotation) SExpr))
     ([] ((,) String XType)) (Map String String)
-    ([] ((,,) String ([] String) Bool)) (Maybe RootAuthority);
+    ([] ((,,) String ([] String) Bool)) (Maybe RootAuthority) ([] ((,) String Bool));
   data RootAuthority = RootAuthority String ([] ((,,) String String String)) Bool
     ([] ((,,) EvidenceRole String XType)) ([] String);
-  groupOriginal (PreparedGroup original _ _ _ _ _) = original;
-  groupMembers (PreparedGroup _ members _ _ _ _) = members;
-  groupBindings (PreparedGroup _ _ bindings _ _ _) = bindings;
-  groupRegistry (PreparedGroup _ _ _ registry _ _) = registry;
-  groupContracts (PreparedGroup _ _ _ _ contracts _) = contracts;
-  groupAuthority (PreparedGroup _ _ _ _ _ authority) = authority;
+  groupOriginal (PreparedGroup original _ _ _ _ _ _) = original;
+  groupMembers (PreparedGroup _ members _ _ _ _ _) = members;
+  groupBindings (PreparedGroup _ _ bindings _ _ _ _) = bindings;
+  groupRegistry (PreparedGroup _ _ _ registry _ _ _) = registry;
+  groupContracts (PreparedGroup _ _ _ _ contracts _ _) = contracts;
+  groupAuthority (PreparedGroup _ _ _ _ _ authority _) = authority;
+  groupParameterProtection (PreparedGroup _ _ _ _ _ _ flags) = flags;
   groupCandidateBindings group = case groupAuthority group of {
     Nothing -> [];
     Just (RootAuthority _ _ _ candidates _) ->
       map (\((,,) _ name ty) -> (,) name ty) candidates
   };
   makePrepared original lowered registry specs authority contracts =
-    PreparedGroup original lowered (selectedBindings lowered (contractTypes contracts))
-      registry specs authority;
+    let { bindings = selectedBindings lowered (contractTypes contracts) } in
+    PreparedGroup original lowered bindings registry specs authority
+      (parameterProtection contracts bindings);
   eligibleSource :: [] ((,,) String (Maybe SAnnotation) SExpr) -> Bool;
   eligibleSource members = case members of {
     (:) ((,,) name Nothing rhs) [] ->
@@ -376,8 +401,7 @@ module Bootstrap.SourceInference where {
       specs <- traverseEither (\name -> case M.lookup compareString name supportProtection of {
         Nothing -> Left ("generated support lacks source protection provenance: " ++ name);
         Just protected -> Right ((,,) name []
-          (protected || any (\peer -> M.findWithDefault compareString True peer supportProtection) names ||
-           rawDependencyProtected contracts support))
+          (protected || any (\peer -> M.findWithDefault compareString True peer supportProtection) names))
       }) names;
       Right (makePrepared support support registry specs Nothing contracts)
     } else do {
@@ -393,7 +417,7 @@ module Bootstrap.SourceInference where {
                   Just contract -> Right ((,,) role candidate (contractType contract))
                 }) candidates);
               let { loweredMembers = (:) ((,,) name Nothing body) [] };
-              let { protectedNow = protected || rawDependencyProtected contracts loweredMembers };
+              let { protectedNow = protected };
               freshPure (makePrepared original loweredMembers registry
                 ((:) ((,,) name (map (\((,,) _ cls _) -> cls) labels) protectedNow) [])
                 (Just (RootAuthority name labels protectedNow typed
@@ -406,10 +430,7 @@ module Bootstrap.SourceInference where {
             (M.map contractProtected contracts) original;
           case lowered of { (,) body specs -> do {
             values <- freshLift (Inference.extractLoweredDeclarations body);
-            let { rawProtected = rawDependencyProtected contracts values };
-            freshPure (makePrepared original values registry
-              (map (\((,,) name classes protected) -> (,,) name classes (protected || rawProtected)) specs)
-              Nothing contracts)
+            freshPure (makePrepared original values registry specs Nothing contracts)
           } }
         }) count used;
       case outcome of { (,,) prepared _ _ -> Right prepared }
@@ -445,13 +466,14 @@ module Bootstrap.SourceInference where {
   finishGroup :: PreparedGroup -> Separate.UnitObject -> Either String FinalGroup;
   finishGroup prepared object = do {
     validatePreparedRaw prepared object;
+    usedProtected <- checkedDependencyProtected (groupParameterProtection prepared) object;
     let { expected = sortBy compareString (map sourceName (groupMembers prepared)) };
     ensure (eqList eqString expected (map fst (Separate.unitBindings (Separate.objectInterface object))))
       "raw group changed source ownership";
     case groupAuthority prepared of {
       Just (RootAuthority name labels protected candidates protectedCandidates) -> do {
         root <- finishUnsignedRoot (ProvisionalRoot name object labels
-          (map (\((,,) role candidate _) -> (,) role candidate) candidates) protected
+          (map (\((,,) role candidate _) -> (,) role candidate) candidates) (protected || usedProtected)
           (groupRegistry prepared) candidates protectedCandidates);
         Right (FinalGroup (finalObject root)
           (M.fromList compareString ((:) ((,) name (finalContract root)) [])))
@@ -460,7 +482,7 @@ module Bootstrap.SourceInference where {
         contracts <- traverseEither
           (\((,) name ty) -> case find (\((,,) n _ _) -> eqString n name) (groupContracts prepared) of {
             Nothing -> Left "final source group lacks calling-convention metadata";
-            Just ((,,) _ classes protected) -> Right ((,) name (SourceContract ty classes protected))
+            Just ((,,) _ classes protected) -> Right ((,) name (SourceContract ty classes (protected || usedProtected)))
           }) (Separate.unitBindings (Separate.objectInterface object));
         Right (FinalGroup object (M.fromList compareString contracts))
       }

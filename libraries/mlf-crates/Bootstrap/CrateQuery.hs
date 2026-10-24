@@ -933,7 +933,8 @@ module Bootstrap.CrateQuery where {
             (\((,,) role candidate ty) -> node "typed-definition-candidate"
               ((:) (encodeRole role) ((:) (encodeBinding ((,) candidate ty))
                 ((:) (boolean (elem eqString candidate protectedCandidates)) [])))) candidates) []))))
-      }) []))));
+      }) ((:) (list (\((,) name flag) -> node "raw-parameter-protection"
+        ((:) name ((:) (boolean flag) []))) (Source.groupParameterProtection prepared)) [])))));
   sourceQueryKey crateId compilerHash prepared contracts datatypes =
     let { observed = S.fromList compareString
       (append (map fst (Source.groupBindings prepared))

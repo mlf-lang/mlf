@@ -26,6 +26,7 @@ import qualified Bootstrap.SourceEquality as E
 import qualified Bootstrap.Data as D
 import qualified Bootstrap.X.Pretty as Pretty
 import SourceMetadataReview(runMetadataReview)
+import RawProtectionReview(runRawProtectionReview)
 expect label x=case x of T.Left e->error(label++": "++B.unpack e);T.Right y->pure y
 assert label p=unless p(error label)
 pass s=putStrLn("PASS "++s)
@@ -108,6 +109,7 @@ main=do
  proofLayoutChecks (cache++"-proof")
  originChecks
  runMetadataReview
+ runRawProtectionReview
  pass "production source dispatcher cold/warm terminal"
 collect values object=do
  let (ds,term)=case U.objectTerm object of { T.XWithData ds b->(ds,b);b->([],b) }
@@ -169,7 +171,7 @@ supportProtectionChecks cache=do
      goalInt=T.SInstanceDecl [] [] "Goal" [int] [("goal",T.SLam "x" T.Nothing(tag(T.SVar "x")))]
      box=T.DataDecl "ManagedBox" ["a"] [T.ConstructorDecl "ManagedBox" [T.Parameter "a"]]
      goalBox=T.SInstanceDecl [("a",T.Star)] [T.SPredicate "Tag" [T.STVar "a"]] "Goal" [T.SCon "ManagedBox" [T.STVar "a"]] [("goal",T.SLam "x" T.Nothing(T.SIntLit 21))]
-     members=[("nested",T.Nothing,T.SApp(T.SVar "goal")(T.SIntLit 1)),("contextual",T.Nothing,T.SApp(T.SVar "goal")(T.SApp(T.SConstructor "ManagedBox")(T.SIntLit 1))),("guarded",T.Nothing,tag(T.SIntLit 21)),("guardedUse",T.Nothing,T.SVar "guarded"),("safeBool",T.Nothing,tag(T.SBoolLit True)),("rawKnown",T.Nothing,T.SLet "known" (T.SAnn(tag(T.SIntLit 21))(T.SAnnotation [] int))(T.SVar "known")),("sink",T.Just(T.SAnnotation [] int),T.SVar "guarded")]
+     members=[("signedSafe",T.Just(T.SAnnotation [] int),tag(T.SBoolLit True)),("signedSafeUse",T.Nothing,add(T.SVar "signedSafe")(tag(T.SBoolLit True))),("nested",T.Nothing,T.SApp(T.SVar "goal")(T.SIntLit 1)),("contextual",T.Nothing,T.SApp(T.SVar "goal")(T.SApp(T.SConstructor "ManagedBox")(T.SIntLit 1))),("guarded",T.Nothing,tag(T.SIntLit 21)),("guardedUse",T.Nothing,T.SVar "guarded"),("safeBool",T.Nothing,tag(T.SBoolLit True)),("rawKnown",T.Nothing,T.SLet "known" (T.SAnn(tag(T.SIntLit 21))(T.SAnnotation [] int))(T.SVar "known")),("sink",T.Just(T.SAnnotation [] int),T.SVar "guarded")]
      scope=M.fromList Prim.compareString[(n,IS.fromList[0,1,2,3])|(n,_,_)<-members]
  pm<-expect "managed instance support plan"(SI.prepareSourcePlan M.empty [box] [cls,goalClass] [("tagInt",managedInt),("tagBool",instBool),("goalInt",goalInt),("goalBox",goalBox)] scope (replicate 4(IS.fromList[0,1,2,3])) members)
  plan<-case pm of T.Just p->pure p;_->error "managed instance fallback"
@@ -177,6 +179,8 @@ supportProtectionChecks cache=do
  let get n=case M.lookup Prim.compareString n contracts of T.Just c->c;_->error "missing managed contract"
  assert "managed instance support classified"(SI.contractProtected(get "tagInt"))
  assert "nested concrete support inherits actual lowered selected support protection"(SI.contractProtected(get "goalInt"))
+ assert "signed ordinary helper ignores unused protected candidate inventory"(not(SI.contractProtected(get "signedSafe")))
+ assert "signed helper successor can contract"(not(SI.contractProtected(get "signedSafeUse"))&&null(SI.contractClasses(get "signedSafeUse")))
  assert "ordinary instance support not tainted"(not(SI.contractProtected(get "tagBool")))
  mapM_ (\n->assert "selected managed proof and transitive successor protected"(SI.contractProtected(get n))) ["guarded","guardedUse","rawKnown","sink","nested","contextual"]
  let predecessors=M.filterWithKey (\name _->name/="guarded") contracts
@@ -197,7 +201,9 @@ supportProtectionChecks cache=do
  values<-foldM collect [] objects
  evaluate(vb(lookupValue values "safeBool"))>>=assert "safe proof runtime".(==42)
  evaluate(vb(lookupValue values "sink"))>>=assert "managed proof baseline runtime".(==21)
- pass "selected managed support protection and unrelated-candidate control"
+ (warmObjects,warm,warmContracts)<-Q.compileSourceGroups "managed-support" (B.literal cache) [] M.empty plan >>=expect "managed protection warm cache"
+ assert "protection uses checked raw dependencies identically after warm hit"(Q.inferredCount warm==0&&map U.encodeObject warmObjects==map U.encodeObject objects&&map(\(n,c)->(n,SI.contractProtected c))(M.toList warmContracts)==map(\(n,c)->(n,SI.contractProtected c))(M.toList contracts))
+ pass "selected managed support protection and irrelevant signed-candidate control"
 
 supportCycleChecks cache=do
  let ac=T.SClassDecl "A" [("a",T.Star)] [] [("a",T.SArrow(T.STVar "a")int)]
