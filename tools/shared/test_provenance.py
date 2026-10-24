@@ -24,6 +24,25 @@ def load(name):
 build, direct = load('build'), load('test_direct')
 
 
+class FrontendExecutionBudget(unittest.TestCase):
+    def test_authenticated_o0_budget_is_bounded(self):
+        self.assertEqual(direct.frontend_timeout_seconds('0'), 1800)
+
+    def test_o2_budget_is_unchanged(self):
+        self.assertEqual(direct.frontend_timeout_seconds('2'), 120)
+
+    def test_ci_only_expands_o0_job_budget(self):
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        shared_job = workflow.split('  native:\n', 1)[1].split('\n  native-', 1)[0]
+        self.assertIn("timeout-minutes: ${{ matrix.optimization == '0' && 180 || 120 }}", shared_job)
+        self.assertIn("optimization: ['0', '2']", shared_job)
+
+    def test_unknown_or_untyped_optimization_is_rejected(self):
+        for value in ['1', '', None, 0, 2, False, {}, {'optimization': '0'}]:
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                direct.frontend_timeout_seconds(value)
+
+
 class ManifestParity(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix='mlf-parity-control-')

@@ -22,6 +22,19 @@ ORACLES = ['tests/async-task/suite.stdout', 'tests/async-task/processes.stdout',
            'tests/async-task/wait-graph.stdout', 'tests/async-process/suite.stdout']
 
 
+def frontend_timeout_seconds(optimization):
+    """Budget only after producer authentication; do not weaken any test oracle.
+
+    Current O0 frontend measured 302.7s versus O2 34.9s. The larger O0
+    margin also covers the still-unmeasured semantic modes; CI checks them.
+    """
+    if optimization == '0':
+        return 1800
+    if optimization == '2':
+        return 120
+    raise ValueError('unsupported authenticated frontend optimization')
+
+
 def sha(path):
     digest = hashlib.sha256()
     with Path(path).open('rb') as stream:
@@ -255,8 +268,10 @@ def main():
         if b'async-scope-panic' not in result.stderr:
             raise RuntimeError('panic failed for unrelated reason')
         runner.run('panic-child-reaped', [process_helper, 'assert-gone', work / 'panic.pid'])
+        frontend_timeout = frontend_timeout_seconds(producer['optimization'])
+        receipt['frontend_timeout_seconds'] = frontend_timeout
         for name, option, expected in FRONTEND_CASES:
-            runner.run('shared-frontend-' + name, [binaries / 'shared-frontend', option], expected=expected, timeout=120)
+            runner.run('shared-frontend-' + name, [binaries / 'shared-frontend', option], expected=expected, timeout=frontend_timeout)
         runner.run('build-receipts', [sys.executable, ROOT / 'tools/release/test-suite-build-receipts.py',
                    '--executable', binaries / 'build-receipts', '--output', output / 'build-receipts'], timeout=1800)
         for collection in [receipt['inputs'], receipt['helpers']]:

@@ -56,7 +56,8 @@ jobs:
     name: Shared compiler source smoke (GHC O${{ matrix.optimization }})
     if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    # O0 has three bounded 30-minute frontend modes plus build/framework work.
+    timeout-minutes: ${{ matrix.optimization == '0' && 180 || 120 }}
     strategy:
       fail-fast: false
       matrix:
