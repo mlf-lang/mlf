@@ -1,0 +1,25 @@
+PASS current-source accepted polymorphic-let
+PASS current-source accepted impredicative-self-application
+PASS current-source rejected monomorphic-mismatch
+PASS current-source rejected invalid-universal-annotation
+PASS current-source malformed target
+PR current-source smoke passed: 2 accepted, 2 rejected, 1 malformed target.
+{
+  "complete": true,
+  "mode": "direct-GHC-checkout-source",
+  "producer_receipt_sha256": "10e53201d03f795cb7c0fe2f40376a3c8dbe198955c3e01a0e56d5b5999b372a",
+  "commit": "351e95d8d6d8bb572def5ceb3f1e2f4f3ec30aff",
+  "cases": 5,
+  "accepted": 2,
+  "rejected": 2,
+  "malformed_target": 1,
+  "total_seconds": 7,
+  "gc_free_space_divisor": 2,
+  "seed_sha256": "d7316e6312b7a8ec5be5fb6b39199dcf253ab2d44896cf39c16ebb29779640d2",
+  "sources_sha256": "13b8c43adf1475a174aa69058468ee9b51ae8672fb04c3b78b6877919c133ea9",
+  "log_sha256": "e0e9f91f42aa2ab34a283b50ba8ea70b017ff7428fb2ccf9e8059c49753cfefc",
+  "targets": {
+    "polymorphic_let": "92f19efcbb25c3a48bdc74881a84b4c021eedefb48374cdeac144eacbf2a4c80",
+    "self_application": "e6d6253719ef0bb03f8781e1fb909356e1aa0b6458ac0155a747db4ffa5bbfb8"
+  }
+}

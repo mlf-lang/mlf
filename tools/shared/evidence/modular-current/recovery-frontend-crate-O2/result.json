@@ -1,0 +1,24 @@
+{
+  "complete": true,
+  "source_unchanged": true,
+  "producer_reauthenticated": true,
+  "producer_receipt_sha256": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+  "spec_sha256": "5719d23cd60b1daade32c986a171dd6095becd2ecb03599d9306f232678db57b",
+  "artifacts": {
+    "artifact/unit.mlfci": {
+      "current": "1731ce8c40d781502f8380c8b8659f6cc1c6c817ca84558fb1305823f1a0706d",
+      "historical": "1731ce8c40d781502f8380c8b8659f6cc1c6c817ca84558fb1305823f1a0706d",
+      "identical": true
+    },
+    "artifact/unit.mlfco": {
+      "current": "349cbc6f8cbe0c4f78abff04c5ae48b32e03691fbf9295735eb27267494cf798",
+      "historical": "349cbc6f8cbe0c4f78abff04c5ae48b32e03691fbf9295735eb27267494cf798",
+      "identical": true
+    }
+  },
+  "inferred_groups": 473,
+  "reused_groups": 0,
+  "native_or_llvm": false,
+  "elapsed_seconds": 44.9429791879993,
+  "peak_rss": 258568192
+}

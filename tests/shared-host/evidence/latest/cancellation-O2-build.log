@@ -1,0 +1,11 @@
+[1 of 4] Compiling MLF.Host.Base    ( host/ghc/MLF/Host/Base.hs, /workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T211159Z/cancellation-O2/MLF/Host/Base.o )
+[2 of 4] Compiling MLF.Host.IO      ( host/ghc/MLF/Host/IO.hs, /workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T211159Z/cancellation-O2/MLF/Host/IO.o )
+host/ghc/MLF/Host/IO.hs:128:82: warning: [GHC-68441] [-Wdeprecations]
+    In the use of ‘hGetLine’ (imported from Data.ByteString):
+    Deprecated: "Deprecated since @bytestring-0.12@. Use 'Data.ByteString.Char8.hGetLine' instead. (Functions that rely on ASCII encodings belong in "Data.ByteString.Char8")"
+    |
+128 |   if end then throwIO (HostError "IO error: getLine reached EOF or failed") else B.hGetLine H.stdin >>= evaluate . fromUtf8
+    |                                                                                  ^^^^^^^^^^
+
+[3 of 4] Compiling Main             ( /workspace/shared/mlf-shared-source-migration/tests/shared-host/CancellationProbe.hs, /workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T211159Z/cancellation-O2/Main.o )
+[4 of 4] Linking /workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T211159Z/cancellation-O2/probe

@@ -1,0 +1,61 @@
+{
+  "lock": "mlf.lock",
+  "stale": [
+    {
+      "package": "mlf-foundation",
+      "manifest_mismatch": true,
+      "missing_renamed_source_paths": 12
+    },
+    {
+      "package": "mlf-language-core",
+      "manifest_mismatch": true,
+      "missing_renamed_source_paths": 4
+    },
+    {
+      "package": "mlf-frontend",
+      "manifest_mismatch": true,
+      "missing_renamed_source_paths": 9
+    },
+    {
+      "package": "mlf-xmlf",
+      "manifest_mismatch": true,
+      "missing_renamed_source_paths": 6
+    },
+    {
+      "package": "mlf-inference",
+      "manifest_mismatch": true,
+      "missing_renamed_source_paths": 8
+    },
+    {
+      "package": "mlf-llvm",
+      "manifest_mismatch": true,
+      "missing_renamed_source_paths": 9
+    },
+    {
+      "package": "mlf-crates",
+      "manifest_mismatch": true,
+      "missing_renamed_source_paths": 7
+    },
+    {
+      "package": "mlf-package-core",
+      "manifest_mismatch": true,
+      "missing_renamed_source_paths": 8
+    },
+    {
+      "package": "mlf-developer-tools",
+      "manifest_mismatch": true,
+      "missing_renamed_source_paths": 2
+    },
+    {
+      "package": "mlf-interpreter",
+      "manifest_mismatch": true,
+      "missing_renamed_source_paths": 2
+    },
+    {
+      "package": "mlf-compiler",
+      "manifest_mismatch": true,
+      "missing_renamed_source_paths": 13
+    }
+  ],
+  "required_action": "Regenerate with newly qualified mlfpkg lock after final canonical source edits, then verify --locked plan. Historical lock is not a valid cutover snapshot."
+}

@@ -1,0 +1,56 @@
+{
+  "path": "tests/mlf-package.json",
+  "updates": [
+    [
+      "Tests.IndependentCheck",
+      "Tests/IndependentCheck.emlf",
+      "Tests/IndependentCheck.hs"
+    ],
+    [
+      "Tests.IndependentType",
+      "Tests/IndependentType.emlf",
+      "Tests/IndependentType.hs"
+    ],
+    [
+      "Tests.Coverage",
+      "Tests/Coverage.emlf",
+      "Tests/Coverage.hs"
+    ],
+    [
+      "Tests.TestDrivers",
+      "Tests/TestDrivers.emlf",
+      "Tests/TestDrivers.hs"
+    ],
+    [
+      "Tests.TestSources",
+      "Tests/TestSources.emlf",
+      "Tests/TestSources.hs"
+    ],
+    [
+      "Tests.Selection",
+      "Tests/Selection.emlf",
+      "Tests/Selection.hs"
+    ],
+    [
+      "Tests.CorePartitions",
+      "Tests/CorePartitions.emlf",
+      "Tests/CorePartitions.hs"
+    ],
+    [
+      "Tests.CompilerTests",
+      "Tests/CompilerTests.emlf",
+      "Tests/CompilerTests.hs"
+    ],
+    [
+      "Tests.Catalog",
+      "Tests/Catalog.emlf",
+      "Tests/Catalog.hs"
+    ],
+    [
+      "Tests.Catalog",
+      "Tests/Catalog.emlf",
+      "Tests/Catalog.hs"
+    ]
+  ],
+  "source_syntax": "unspecified; each file selects its own marker"
+}

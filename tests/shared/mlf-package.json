@@ -1,0 +1,114 @@
+{
+  "format": 1,
+  "name": "mlf-shared-tests",
+  "version": "0.3.0",
+  "source-syntax": "shared-haskell-v1",
+  "dependencies": {
+    "mlf-foundation": {
+      "path": "../../libraries/mlf-foundation"
+    },
+    "mlf-frontend": {
+      "path": "../../libraries/mlf-frontend"
+    },
+    "mlf-async": {
+      "path": "../../libraries/mlf-async"
+    },
+    "mlf-package-core": {
+      "path": "../../libraries/mlf-package-core"
+    },
+    "mlf-inference": {
+      "path": "../../libraries/mlf-inference"
+    },
+    "mlf-xmlf": {
+      "path": "../../libraries/mlf-xmlf"
+    },
+    "mlf-language-core": {
+      "path": "../../libraries/mlf-language-core"
+    },
+    "mlf-interpreter": {
+      "path": "../../libraries/mlf-interpreter"
+    },
+    "mlf-crates": {
+      "path": "../../libraries/mlf-crates"
+    }
+  },
+  "executables": {
+    "shared-frontend": {
+      "main": "MLF/Tests/SharedFrontend.hs",
+      "profile": "compiler",
+      "dependencies": [
+        "mlf-foundation",
+        "mlf-frontend",
+        "mlf-inference",
+        "mlf-interpreter",
+        "mlf-xmlf",
+        "mlf-crates"
+      ]
+    },
+    "async-task": {
+      "main": "MLF/Tests/Async/TaskMain.hs",
+      "profile": "compiler",
+      "dependencies": [
+        "mlf-foundation",
+        "mlf-async"
+      ]
+    },
+    "async-task-processes": {
+      "main": "MLF/Tests/Async/TaskProcesses.hs",
+      "profile": "compiler",
+      "dependencies": [
+        "mlf-foundation",
+        "mlf-async"
+      ]
+    },
+    "async-task-wait-graph": {
+      "main": "MLF/Tests/Async/TaskWaitGraph.hs",
+      "profile": "compiler",
+      "dependencies": [
+        "mlf-foundation",
+        "mlf-async"
+      ]
+    },
+    "async-process": {
+      "main": "MLF/Tests/Async/ProcessMain.hs",
+      "profile": "compiler",
+      "dependencies": [
+        "mlf-foundation",
+        "mlf-async"
+      ]
+    },
+    "async-process-panic": {
+      "main": "MLF/Tests/Async/ProcessPanic.hs",
+      "profile": "compiler",
+      "dependencies": [
+        "mlf-foundation",
+        "mlf-async"
+      ]
+    },
+    "build-receipts": {
+      "main": "MLF/Tests/BuildReceipts.hs",
+      "profile": "compiler",
+      "dependencies": [
+        "mlf-foundation",
+        "mlf-package-core"
+      ],
+      "modules": {
+        "Tests.BuildReceipts": "../Tests/BuildReceipts.hs"
+      }
+    },
+    "source-smoke": {
+      "main": "MLF/Tests/PRQuickMain.hs",
+      "profile": "compiler",
+      "dependencies": [
+        "mlf-foundation",
+        "mlf-inference",
+        "mlf-xmlf",
+        "mlf-language-core"
+      ],
+      "modules": {
+        "Tests.IndependentCheck": "../Tests/IndependentCheck.hs",
+        "Tests.IndependentType": "../Tests/IndependentType.hs"
+      }
+    }
+  }
+}

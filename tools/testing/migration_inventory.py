@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import check_tuple_list_migration as tuple_audit
 
 ROOT = Path(__file__).resolve().parents[2]
 INVENTORY = 'docs/testing-migration-inventory-20261023.json'
@@ -211,7 +212,7 @@ def build():
         if role in ('external-publication', 'provisioning-helper'):
             row['test_invocation_policy'] = 'mock-or-isolated-contract-only'
         if e['entry_kind'] == 'source-authored-tuple-list-observation':
-            row['implementation_source'] = 'tests/Tests/TupleList.emlf'
+            row['implementation_source'] = tuple_audit.IMPLEMENTATION
             row['active_implementation'] = 'legacy'
             row['opt_in_implementation'] = 'framework'
             row['opt_in_selector'] = '--framework'
@@ -219,23 +220,15 @@ def build():
             row['legacy_label'] = e['owner_provenance']['legacy_label']
             row['expectation_kind'] = TUPLE_EXPECTATIONS[e['owner_provenance']['helper']]
         rows.append(row)
-    tuple_source = (ROOT / 'tests/Tests/TupleList.emlf').read_bytes()
-    tuple_ids = re.findall(r'leaf \"(tuple-list/focused/[^\"]+)\"', tuple_source.decode())
+    current = tuple_audit.verify_current_sources(ROOT)
+    tuple_source = current[tuple_audit.IMPLEMENTATION].encode()
+    tuple_ids = re.findall(r'leaf\s+\"(tuple-list/focused/[^\"]+)\"', tuple_source.decode())
     expected_tuple_ids = [e['id'] for e in rows if e['original_kind'] == 'source-authored-tuple-list-observation']
     if collections.Counter(tuple_ids) != collections.Counter(expected_tuple_ids):
         raise ValueError('Tuple registration multiset differs from frozen 90 observations')
-    dispatcher = (ROOT / 'tests/TupleListMain.emlf').read_text()
-    if ('Runner.run args TupleList.cases' not in dispatcher or
-        'Cons "--framework" rest -> finish rest' not in dispatcher or
-        '_ -> Legacy.main' not in dispatcher):
-        raise ValueError('Tuple facade must retain legacy default and explicit framework opt-in')
-    legacy = (ROOT / 'tests/Tests/TupleListLegacy.emlf').read_bytes()
-    frozen_legacy = subprocess.check_output(['git', 'show', BASELINE + ':tests/TupleListMain.emlf'], cwd=ROOT)
-    if legacy != frozen_legacy.replace(b'module TupleListMain where', b'module Tests.TupleListLegacy where', 1):
-        raise ValueError('Tuple legacy implementation differs from frozen source')
     return {'schema_version': 1, 'kind': 'source-reviewed-migration-ledger',
             'source_commit': BASELINE, 'not_execution_evidence': True,
-            'implementation_inputs': {'tests/Tests/TupleList.emlf': digest(tuple_source), 'tests/TupleListMain.emlf': digest(dispatcher.encode()), 'tests/Tests/TupleListLegacy.emlf': digest(legacy)},
+            'implementation_inputs': {path: digest(source.encode()) for path, source in current.items()},
             'qualification_complete': False,
             'scope': 'Frozen role/owner review only. Legacy means the frozen implementation; this ledger does not attest current-tree runtime migration.',
             'frozen_inputs': FROZEN_INPUTS,

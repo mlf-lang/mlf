@@ -1,0 +1,18 @@
+{
+  "full_local_inventory_sha256": "0efffc0d3fe9fe25b2475578b7a8f815fb74e42cd7c4ff6ab9e251509cccb416",
+  "full_local_inventory_files": 617,
+  "checked_outputs": {
+    "artifact/unit.mlfci": {
+      "bytes": 805246,
+      "sha256": "4ff5440117de2751b4750828da100231dbaf719968400c6e820c1a5d81256127"
+    },
+    "artifact/unit.mlfco": {
+      "bytes": 27200183,
+      "sha256": "7ecdd5383a840ee3b903dfee91ea8aaef1fe5d779d41ba13c667aabb80d399b7"
+    },
+    "artifact/unit.queries": {
+      "bytes": 790756,
+      "sha256": "5434cf897ce6f410fcbe2349818f235a5816e39769edac084cf7c63dd0cd6d4b"
+    }
+  }
+}

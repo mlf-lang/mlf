@@ -1,0 +1,91 @@
+PASS tuple/list pair AST
+PASS tuple/list triple AST
+PASS tuple/list quad AST
+PASS tuple/list grouping remains grouping
+PASS tuple/list unit remains intrinsic
+PASS tuple/list empty list AST
+PASS tuple/list singleton list AST
+PASS tuple/list nested list and tuple AST
+PASS tuple/list cons associates right
+PASS tuple/list cons follows addition
+PASS tuple/list cons and concatenation share right precedence
+PASS tuple/list concatenation and cons share right precedence
+PASS tuple/list legacy annotation covers addition
+PASS tuple/list legacy uppercase tail is an annotation
+PASS tuple/list explicit annotation
+PASS tuple/list explicit free annotation still parses
+PASS tuple/list case tuple pattern AST
+PASS tuple/list case cons pattern AST
+PASS tuple/list empty pattern AST
+PASS tuple/list list pattern AST
+PASS tuple/list pair type AST
+PASS tuple/list triple type AST
+PASS tuple/list list type AST
+PASS tuple/list function tuple component
+PASS tuple/list datatype field ASTs
+PASS tuple/list malformed (a,)
+PASS tuple/list malformed (,a)
+PASS tuple/list malformed (a,b,c,d,e)
+PASS tuple/list malformed [a,]
+PASS tuple/list malformed [,a]
+PASS tuple/list malformed [a
+PASS tuple/list malformed [1..3]
+PASS tuple/list malformed [a | a <- b]
+PASS tuple/list malformed a :
+PASS tuple/list ranges have a targeted diagnostic
+PASS tuple/list comprehensions have a targeted diagnostic
+PASS tuple/list tuple arity has a targeted diagnostic
+PASS tuple/list malformed list retains exact source position
+PASS tuple/list colon annotation before bar
+PASS tuple/list colon annotation before equals
+PASS tuple/list explicit annotation before bar
+PASS tuple/list explicit annotation before equals
+PASS tuple/list lowercase tail remains cons before bar
+PASS tuple/list empty tail remains cons before equals
+PASS tuple/list closed constructor annotation before bar
+PASS tuple/list pair inferred and independently checked
+PASS tuple/list triple inferred and independently checked
+PASS tuple/list quad inferred and independently checked
+PASS tuple/list homogeneous list
+PASS tuple/list empty list annotation
+PASS tuple/list cons spine
+PASS tuple/list nested pair/list patterns
+PASS tuple/list equations and cons parameters
+PASS tuple/list tuple lambda
+PASS tuple/list legacy annotated parameter
+PASS tuple/list legacy grouped annotated parameter
+PASS tuple/list explicit annotated parameter
+PASS tuple/list explicit grouped annotated parameter
+PASS tuple/list explicit declaration signature
+PASS tuple/list type sugar in datatype fields
+PASS tuple/list do tuple pattern
+PASS tuple/list multiline list closes inner case layout
+PASS tuple/list multiline list and tuple
+PASS tuple/list list sugar works without implicit Prelude
+PASS tuple/list heterogeneous list
+PASS tuple/list duplicate tuple variable
+PASS tuple/list nonexhaustive cons pattern
+PASS tuple/list duplicate list pattern variable
+PASS tuple/list missing tuple declaration
+PASS tuple/list legacy free arrow annotation stays rejected
+PASS tuple/list tuple projection
+PASS tuple/list tuple projection runtime
+PASS tuple/list list pattern result
+PASS tuple/list list pattern result runtime
+PASS tuple/list cons associativity result
+PASS tuple/list cons associativity result runtime
+PASS tuple/list tuple ignored field stays lazy
+PASS tuple/list tuple ignored field stays lazy runtime
+PASS tuple/list list ignored head stays lazy
+PASS tuple/list list ignored head stays lazy runtime
+PASS tuple/list cons ignored tail stays lazy
+PASS tuple/list cons ignored tail stays lazy runtime
+PASS tuple/list typed recursive list traversal
+PASS tuple/list typed recursive list traversal runtime
+PASS tuple/list imported ordinary constructors
+PASS tuple/list qualified explicit constructors interoperate
+PASS tuple/list qualified-only import does not supply sugar names
+PASS tuple/list hidden constructor stays hidden
+PASS tuple/list abstract tuple import stays abstract
+PASS tuple/list ambiguous tuple constructor stays ambiguous
+Tuple/list focused checks passed.

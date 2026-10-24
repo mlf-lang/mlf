@@ -1,4 +1,7 @@
 module Tests.CrateCodegen where
+-- Select the standard Monad used by shared Either; retain legacy guest syntax.
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
 
 import Bootstrap.Types
 import qualified Package.OS as O

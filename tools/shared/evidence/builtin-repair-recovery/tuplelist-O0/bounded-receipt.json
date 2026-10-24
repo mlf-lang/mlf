@@ -1,0 +1,93 @@
+{
+  "complete": true,
+  "command": [
+    "nice",
+    "-n",
+    "15",
+    "ionice",
+    "-c",
+    "3",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O0/bin/tuple-list"
+  ],
+  "limits": {
+    "wall_seconds": 600,
+    "address_space_per_process": 2147483648,
+    "process_tree_rss_bytes": 1073741824,
+    "host_available_floor": 3221225472,
+    "disk_free_floor": 805306368,
+    "max_output_bytes": null
+  },
+  "samples": [
+    {
+      "seconds": 0.001706137991277501,
+      "group_rss": 733184,
+      "host_available": 7680446464,
+      "disk_free": 864722944
+    },
+    {
+      "seconds": 0.20261685800505802,
+      "group_rss": 11128832,
+      "host_available": 7672606720,
+      "disk_free": 864714752
+    },
+    {
+      "seconds": 0.4040008599986322,
+      "group_rss": 11886592,
+      "host_available": 7672610816,
+      "disk_free": 864714752
+    },
+    {
+      "seconds": 0.6050578799913637,
+      "group_rss": 12943360,
+      "host_available": 7672610816,
+      "disk_free": 864714752
+    },
+    {
+      "seconds": 0.8059816599998157,
+      "group_rss": 12947456,
+      "host_available": 7672610816,
+      "disk_free": 864714752
+    },
+    {
+      "seconds": 1.0070334619958885,
+      "group_rss": 12947456,
+      "host_available": 7672610816,
+      "disk_free": 864714752
+    },
+    {
+      "seconds": 1.2078965209948365,
+      "group_rss": 12947456,
+      "host_available": 7672610816,
+      "disk_free": 864714752
+    },
+    {
+      "seconds": 1.408795041992562,
+      "group_rss": 12947456,
+      "host_available": 7672610816,
+      "disk_free": 864714752
+    },
+    {
+      "seconds": 1.6096369190054247,
+      "group_rss": 12947456,
+      "host_available": 7672610816,
+      "disk_free": 864714752
+    },
+    {
+      "seconds": 1.8104870020033559,
+      "group_rss": 12947456,
+      "host_available": 7672610816,
+      "disk_free": 864714752
+    },
+    {
+      "seconds": 2.011342379002599,
+      "group_rss": 12947456,
+      "host_available": 7672610816,
+      "disk_free": 864714752
+    }
+  ],
+  "process_group": 142,
+  "exit_code": 0,
+  "reason": null,
+  "elapsed_seconds": 2.2127150599990273,
+  "peak_group_rss": 12947456
+}

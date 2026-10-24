@@ -1,0 +1,8 @@
+fileExists /dev/null (native expects False):
+True
+canonicalPath invalid UTF8 target discarded (native expects IO invalid UTF8 failure):
+Right ()
+canonicalPath invalid UTF8 target forced:
+Left (HostError "invalid Unicode scalar")
+getContents then getByteLine at EOF (native expects length zero):
+Left (HostError "IO error: byte input failed")

@@ -26,6 +26,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ inputs.source }}
+          fetch-depth: 0 # Release checks inspect exact frozen migration history.
       - name: Bind every candidate and artifact to this exact workflow commit
         id: source
         env:
@@ -86,6 +87,10 @@ jobs:
           include-hidden-files: true
           path: |
             .mlf-build/bootstrap-stage1/build-report.json
+            .mlf-build/bootstrap-stage1/manager-bootstrap/**/*.json
+            .mlf-build/bootstrap-stage1/manager-bootstrap/**/*.sha256
+            .mlf-build/bootstrap-stage1/manager-bootstrap/**/*.txt
+            .mlf-build/bootstrap-stage1/manager-bootstrap/**/commands/
             .mlf-build/bootstrap-stage1/timing/
           retention-days: 14
   mac-prerequisites:

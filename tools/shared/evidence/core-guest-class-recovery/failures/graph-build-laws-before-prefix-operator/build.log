@@ -1,0 +1,7 @@
+Parsing: /workspace/scratch/3f83e2ebe290/pr22-recovery/tools/shared/fixtures/GraphBuildLaws.emlf:41:67: unexpected <*>; expected )
+Traceback (most recent call last):
+  File "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/graph-build-laws-positive/run.py", line 4, in <module>
+    subprocess.run(json.loads((Path(__file__).parent/"command.json").read_text()),env=env,check=True)
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O2/bin/emlf', '-i', '/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation', '-i', '/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-language-core', '-i', '/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-inference', '-i', '/workspace/scratch/3f83e2ebe290/pr22-recovery/tests', '--run', '/workspace/scratch/3f83e2ebe290/pr22-recovery/tools/shared/fixtures/GraphBuildLaws.emlf']' returned non-zero exit status 1.

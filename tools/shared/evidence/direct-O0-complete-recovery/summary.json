@@ -1,0 +1,17 @@
+{
+  "source_checkpoint": "98d6df3914f888c635181c31c5d27752647d659b",
+  "producer_receipt": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O0/receipt.json",
+  "producer_receipt_sha256": "90bc2b99d31d8c1bd47ef3bc43f614ca9fabf62496281caf6b5e77197ca1fca9",
+  "producer_reauthenticated_after_tests": true,
+  "producer_complete": true,
+  "producer_host": "GHC",
+  "optimization": "0",
+  "shared_modules": 94,
+  "executables": 12,
+  "direct_commands_passed": 12,
+  "tuplelist_explicit_passes": 90,
+  "native_bootstrap_run": false,
+  "O2_run": false,
+  "full_guest_campaign_run": false,
+  "PR_source_smoke_run": false
+}

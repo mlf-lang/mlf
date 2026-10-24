@@ -1,0 +1,59 @@
+{
+  "complete": true,
+  "scope": "four source targets, not whole tests manifest or execution",
+  "manager_plan_equals_independent_snapshot": true,
+  "manifest_packages": 13,
+  "manifest_source_hashes": 212,
+  "qualified_module_entries_including_overlap": 19,
+  "qualified_fresh_groups": 153,
+  "qualified": [
+    {
+      "crate": "mlf-tests/0.3.0/target-figure12",
+      "entry": "Figure12SuiteMain",
+      "modules": [
+        "Figure12SuiteMain",
+        "Tests.Figure12",
+        "Tests.Figure12Suite"
+      ],
+      "inferred_groups": 20
+    },
+    {
+      "crate": "mlf-tests/0.3.0/target-int-set-unions",
+      "entry": "IntSetUnionsMain",
+      "modules": [
+        "IntSetUnionsMain",
+        "Tests.IntSetUnions"
+      ],
+      "inferred_groups": 7
+    },
+    {
+      "crate": "mlf-tests/0.3.0/target-check-target",
+      "entry": "Main",
+      "modules": [
+        "Main"
+      ],
+      "inferred_groups": 2
+    },
+    {
+      "crate": "mlf-tests/0.3.0/target-pr-smoke",
+      "entry": "PRSmokeMain",
+      "modules": [
+        "PRSmokeMain",
+        "Tests.BackendCases",
+        "Tests.Figure12",
+        "Tests.Figure12Suite",
+        "Tests.Guards",
+        "Tests.IOTests",
+        "Tests.NativeOptimization",
+        "Tests.PRSmoke",
+        "Tests.Readability",
+        "Tests.StateCases",
+        "Tests.StateRuntime",
+        "Tests.StateTypes",
+        "Tests.System"
+      ],
+      "inferred_groups": 124
+    }
+  ],
+  "native_execution": false
+}

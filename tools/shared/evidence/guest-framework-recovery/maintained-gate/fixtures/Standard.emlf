@@ -1,0 +1,7 @@
+module Standard where
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+main : Either String Int
+main = do { x <- Right 1; Right x }

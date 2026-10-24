@@ -1,0 +1,670 @@
+-- mlf:syntax shared-haskell-v1
+{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
+             KindSignatures, FlexibleContexts, FlexibleInstances,
+             MultiParamTypeClasses, OverloadedStrings #-}
+module Bootstrap.LLVM.Build where {
+  import MLF.Primitive;
+  import Bootstrap.Types;
+  import qualified Bootstrap.Std as L;
+  import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.Set as S;
+  import qualified Bootstrap.Primitive as P;
+  import qualified Bootstrap.LLVM.Analysis as A;
+  import qualified Bootstrap.LLVM.Optimize as O;
+  data CGBinding = CGBinding String Bool;
+  data Scalar = Boxed String | Floating String;
+  data NativeMode = General | UnboxedDouble | NonnegativeInt | SmallIndex;
+  data Output =
+    Output Int (List String) String (List String) (List String) (Map String (Pair Int Int)) (Map
+                                                                                             XName
+                                                                                             A.WorkerFunction) (Set
+                                                                                                                XName) (Map
+                                                                                                                        XName
+                                                                                                                        String) (Set
+                                                                                                                                 XName) (Set
+                                                                                                                                         (Pair
+                                                                                                                                          XName
+                                                                                                                                          (List
+                                                                                                                                           NativeMode))) (Set
+                                                                                                                                                          XName) (Map
+                                                                                                                                                                  XName
+                                                                                                                                                                  String) Bool (Map
+                                                                                                                                                                                String
+                                                                                                                                                                                (Pair
+                                                                                                                                                                                 Int
+                                                                                                                                                                                 Int)) (Map
+                                                                                                                                                                                        String
+                                                                                                                                                                                        (Pair
+                                                                                                                                                                                         String
+                                                                                                                                                                                         String)) (Map
+                                                                                                                                                                                                   String
+                                                                                                                                                                                                   String) (Map
+                                                                                                                                                                                                            String
+                                                                                                                                                                                                            String) (Map
+                                                                                                                                                                                                                     String
+                                                                                                                                                                                                                     (List
+                                                                                                                                                                                                                      Bool)) (Set
+                                                                                                                                                                                                                              XName);
+  serial :: Output -> Int;
+  serial (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f0;
+  withSerial :: Int -> Output -> Output;
+  withSerial value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    seq value (Output value f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19);
+  instructions :: Output -> List String;
+  instructions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f1;
+  withInstructions :: List String -> Output -> Output;
+  withInstructions value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    Output f0 value f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
+  block :: Output -> String;
+  block (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f2;
+  withBlock :: String -> Output -> Output;
+  withBlock value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    Output f0 f1 value f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
+  definitions :: Output -> List String;
+  definitions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f3;
+  withDefinitions :: List String -> Output -> Output;
+  withDefinitions value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    Output f0 f1 f2 value f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
+  constants :: Output -> List String;
+  constants (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f4;
+  withConstants :: List String -> Output -> Output;
+  withConstants value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    Output f0 f1 f2 f3 value f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
+  constructors :: Output -> Map String (Pair Int Int);
+  constructors (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f5;
+  withConstructors :: Map String (Pair Int Int) -> Output -> Output;
+  withConstructors value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    Output f0 f1 f2 f3 f4 value f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
+  functions :: Output -> Map XName A.WorkerFunction;
+  functions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f6;
+  withFunctions :: Map XName A.WorkerFunction -> Output -> Output;
+  withFunctions value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    Output f0 f1 f2 f3 f4 f5 value f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
+  workers :: Output -> Set XName;
+  workers (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f7;
+  withWorkers :: Set XName -> Output -> Output;
+  withWorkers value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    Output f0 f1 f2 f3 f4 f5 f6 value f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
+  wrappers :: Output -> Map XName String;
+  wrappers (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f8;
+  withWrappers :: Map XName String -> Output -> Output;
+  withWrappers value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    Output f0 f1 f2 f3 f4 f5 f6 f7 value f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
+  numericKernels :: Output -> Set XName;
+  numericKernels (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    f9;
+  withNumericKernels :: Set XName -> Output -> Output;
+  withNumericKernels value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 value f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
+  kernelWorkers :: Output -> Set (Pair XName (List NativeMode));
+  kernelWorkers (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    f10;
+  withKernelWorkers :: Set (Pair XName (List NativeMode)) -> Output -> Output;
+  withKernelWorkers value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 value f11 f12 f13 f14 f15 f16 f17 f18 f19;
+  collectingKernels :: Output -> Set XName;
+  collectingKernels (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    f11;
+  withCollectingKernels :: Set XName -> Output -> Output;
+  withCollectingKernels value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 value f12 f13 f14 f15 f16 f17 f18 f19;
+  kernelEntries :: Output -> Map XName String;
+  kernelEntries (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    f12;
+  withKernelEntries :: Map XName String -> Output -> Output;
+  withKernelEntries value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 value f13 f14 f15 f16 f17 f18 f19;
+  inlinePrimitives :: Output -> Bool;
+  inlinePrimitives (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    f13;
+  withInlinePrimitives :: Bool -> Output -> Output;
+  withInlinePrimitives value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 value f14 f15 f16 f17 f18 f19;
+  scalarRanges :: Output -> Map String (Pair Int Int);
+  scalarRanges (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f14;
+  withScalarRanges :: Map String (Pair Int Int) -> Output -> Output;
+  withScalarRanges value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 value f15 f16 f17 f18 f19;
+  arrayViews :: Output -> Map String (Pair String String);
+  arrayViews (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f15;
+  withArrayViews :: Map String (Pair String String) -> Output -> Output;
+  withArrayViews value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 value f16 f17 f18 f19;
+  unboxedDoubles :: Output -> Map String String;
+  unboxedDoubles (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    f16;
+  withUnboxedDoubles :: Map String String -> Output -> Output;
+  withUnboxedDoubles value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 value f17 f18 f19;
+  forcedValues :: Output -> Map String String;
+  forcedValues (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f17;
+  withForcedValues :: Map String String -> Output -> Output;
+  withForcedValues value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 value f18 f19;
+  constructorFacts :: Output -> Map String (List Bool);
+  constructorFacts (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    f18;
+  stateWorkers :: Output -> Set XName;
+  stateWorkers (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f19;
+  withStateWorkers :: Set XName -> Output -> Output;
+  withStateWorkers value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 value;
+  data Build a = Build (Output -> Either String (Pair a Output));
+  runBuild :: forall a. Build a -> Output -> Either String (Pair a Output);
+  runBuild (Build run) state = run state;
+  cgPure :: forall a. a -> Build a;
+  cgPure value = Build (\state -> Right (Pair value state));
+  cgBind :: forall a b. Build a -> (a -> Build b) -> Build b;
+  cgBind action next =
+    Build
+      (\state ->
+         case runBuild action state of {
+           Left error -> Left error;
+           Right (Pair value after) -> runBuild (next value) after
+         });
+  instance Functor Build where {
+    fmap function action = cgBind action (\value -> cgPure (function value))
+  };
+  instance Applicative Build where {
+    pure = cgPure;
+    (<*>) action argument =
+      cgBind action (\function -> cgBind argument (\value -> cgPure (function value)))
+  };
+  instance Monad Build where {
+    (>>=) = cgBind
+  };
+  failure :: forall a. String -> Build a;
+  failure message = Build (\state -> Left message);
+  liftBuild :: forall a. Either String a -> Build a;
+  liftBuild value =
+    case value of {
+      Left error -> failure error;
+      Right result -> cgPure result
+    };
+  get :: Build Output;
+  get = Build (\state -> Right (Pair state state));
+  put :: Output -> Build Unit;
+  put state = Build (\ignored -> Right (Pair Unit state));
+  gets :: forall a. (Output -> a) -> Build a;
+  gets f = Build (\state -> Right (Pair (f state) state));
+  modify :: (Output -> Output) -> Build Unit;
+  -- Match the seed's modify' and strict serial field without forcing the lazy
+  -- instruction and definition streams stored in the remaining Output fields.
+  modify f =
+    Build
+      (\state ->
+         let {
+           after = f state
+         } in
+         seq after (Right (Pair Unit after)));
+  modeCode :: NativeMode -> Int;
+  modeCode mode =
+    case mode of {
+      General -> 0;
+      UnboxedDouble -> 1;
+      NonnegativeInt -> 2;
+      SmallIndex -> 3
+    };
+  compareMode :: NativeMode -> NativeMode -> Int;
+  compareMode a b = L.compareInt (modeCode a) (modeCode b);
+  compareKernel :: Pair XName (List NativeMode) -> Pair XName (List NativeMode) -> Int;
+  compareKernel = L.comparePair O.compareName (L.compareList compareMode);
+  operand :: CGBinding -> String;
+  operand (CGBinding value forced) = value;
+  evaluated :: CGBinding -> Bool;
+  evaluated (CGBinding value forced) = forced;
+  fresh :: String -> Build String;
+  fresh prefix =
+    do {
+      n <- gets serial;
+      modify (withSerial (n + 1));
+      cgPure (prefix ++ showInt n)
+    };
+  emit :: String -> Build Unit;
+  emit line = modify (\state -> withInstructions (Cons line (instructions state)) state);
+  label :: String -> Build Unit;
+  label name =
+    do {
+      emit (name ++ ":");
+      modify (withBlock name)
+    };
+  result :: String -> Build String;
+  result expression =
+    do {
+      register <- fresh "%v";
+      emit ("  " ++ (register ++ (" = " ++ expression)));
+      cgPure register
+    };
+  call :: String -> List String -> Build String;
+  call name arguments =
+    result ("call ptr " ++ (name ++ ("(" ++ (L.intercalate ", " arguments ++ ")"))));
+  pointer :: String -> String;
+  pointer value = ("ptr " ++ value);
+  number :: Int -> String;
+  number value = ("i64 " ++ showInt value);
+  immediate :: Int -> String;
+  immediate value = ("inttoptr (i64 " ++ (showInt value ++ " to ptr)"));
+  -- Environments use exact layouts shared by their producer and callback.
+  -- Loading or storing a known slot does not evaluate its lazy field pointer.
+  environmentSlot :: String -> Int -> Build String;
+  environmentSlot env index =
+    do {
+      result ("getelementptr i8, ptr " ++ (env ++ (", i64 " ++ showInt (8 + (8 * index)))))
+    };
+  loadEnvironment :: String -> Int -> Build String;
+  loadEnvironment env index =
+    do {
+      address <- environmentSlot env index;
+      result ("load ptr, ptr " ++ (address ++ ", align 8, !tbaa !3"))
+    };
+  storeEnvironment :: String -> Int -> String -> Build Unit;
+  storeEnvironment env index value =
+    do {
+      address <- environmentSlot env index;
+      emit ("  store ptr " ++ (value ++ (", ptr " ++ (address ++ ", align 8, !tbaa !3"))))
+    };
+  -- Store all fields at saturation without evaluating their lazy pointers.
+  -- Both ordinary workers and numeric regions use the same constructor ABI.
+  constructorValue :: Int -> List String -> Build String;
+  constructorValue tag fields =
+    if L.null fields then cgPure (immediate ((tag * 8) + 4)) else compactConstructor tag fields;
+  args1 :: forall a. a -> List a;
+  args1 a = Cons a Nil;
+  args2 :: forall a. a -> a -> List a;
+  args2 a b = Cons a (Cons b Nil);
+  args3 :: forall a. a -> a -> a -> List a;
+  args3 a b c = Cons a (Cons b (Cons c Nil));
+  args4 :: forall a. a -> a -> a -> a -> List a;
+  args4 a b c d = Cons a (Cons b (Cons c (Cons d Nil)));
+  lookupConstructor :: String -> Build (Pair Int Int);
+  lookupConstructor name =
+    do {
+      cs <- gets constructors;
+      case M.lookup compareString name cs of {
+        Nothing -> failure ("LLVM unknown constructor: " ++ name);
+        Just result -> cgPure result
+      }
+    };
+  -- Keep the returned WHNF pointer, not the original updated thunk/hole.
+  -- Definition and branch boundaries below restrict facts to dominated uses.
+  forceBinding :: CGBinding -> Build String;
+  forceBinding (CGBinding value forced) =
+    if forced
+    then cgPure value
+    else do {
+           previous <- gets (\state -> M.lookup compareString value (forcedValues state));
+           case previous of {
+             Just result -> cgPure result;
+             Nothing ->
+               do {
+                 result <- forceValue value;
+                 modify
+                   (\state ->
+                      withForcedValues
+                        (M.insert compareString value result
+                           (M.insert compareString result result (forcedValues state)))
+                        state);
+                 cgPure result
+               }
+           }
+         };
+  forceValue :: String -> Build String;
+  forceValue value =
+    do {
+      call "@mlf.force" (args1 (pointer value))
+    };
+  bindingOperand :: CGBinding -> Build String;
+  bindingOperand (CGBinding value forced) =
+    gets (\state -> L.fromMaybe value (M.lookup compareString value (forcedValues state)));
+  definition :: String -> List String -> Build String -> Build Unit;
+  definition name args body =
+    definitionBody name args
+      (do {
+         value <- body;
+         emit ("  ret ptr " ++ value)
+       });
+  definitionBody :: String -> List String -> Build Unit -> Build Unit;
+  definitionBody name args body =
+    do {
+      saved <- get;
+      modify
+        (\state ->
+           withInstructions Nil
+             (withBlock "entry"
+                (withScalarRanges M.empty
+                   (withArrayViews M.empty
+                      (withUnboxedDoubles M.empty (withForcedValues M.empty state))))));
+      body;
+      code <- gets (\state -> L.reverse (instructions state));
+      collectors <- gets collectingKernels;
+      let {
+        collectingWorker =
+          L.any (\n -> eqString (showInt (O.nameId n)) (symbolIdentity name)) (S.toList collectors)
+      };
+      let {
+        attributes =
+          if (startsWith "@mlf.numeric." name &&
+              (L.not (startsWith "@mlf.numeric.entry." name) && L.not collectingWorker))
+          then " alwaysinline"
+          else ""
+      };
+      let {
+        text =
+          L.unlines
+            (L.append
+               (args2
+                  ("define private ptr " ++
+                   (name ++ ("(" ++ (L.intercalate ", " args ++ (")" ++ (attributes ++ " {"))))))
+                  "entry:")
+               (L.snoc code "}"))
+      };
+      modify
+        (\state ->
+           withInstructions (instructions saved)
+             (withBlock (block saved)
+                (withScalarRanges (scalarRanges saved)
+                   (withArrayViews (arrayViews saved)
+                      (withUnboxedDoubles (unboxedDoubles saved)
+                         (withForcedValues (forcedValues saved)
+                            (withDefinitions (Cons text (definitions state)) state)))))))
+    };
+  startsWith :: String -> String -> Bool;
+  startsWith prefix value =
+    ((stringLength prefix <= stringLength value) &&
+     eqString prefix (stringSlice value 0 (stringLength prefix)));
+  symbolIdentity :: String -> String;
+  symbolIdentity name = if (stringLength name < 13) then "" else symbolIdentityAt name 13 13;
+  symbolIdentityAt :: String -> Int -> Int -> String;
+  symbolIdentityAt name begin index =
+    if (index == stringLength name)
+    then stringSlice name begin (index - begin)
+    else if (stringCodeAt name index == 46)
+         then stringSlice name begin (index - begin)
+         else symbolIdentityAt name begin (index + 1);
+  phi :: String -> List (Pair String String) -> Build String;
+  phi ty incoming =
+    result
+      ("phi " ++
+       (ty ++
+        (" " ++
+         L.intercalate ", "
+           (L.map
+              (\entry ->
+                 case entry of {
+                   Pair value label -> ("[ " ++ (value ++ (", %" ++ (label ++ " ]"))))
+                 })
+              incoming))));
+  rangeUnion :: Pair Int Int -> Pair Int Int -> Pair Int Int;
+  rangeUnion (Pair lo hi) (Pair lo2 hi2) = Pair (L.min lo lo2) (L.max hi hi2);
+  rangeIntersection :: Pair Int Int -> Pair Int Int -> Pair Int Int;
+  rangeIntersection (Pair lo hi) (Pair lo2 hi2) = Pair (L.max lo lo2) (L.min hi hi2);
+  sameView :: Pair String String -> Pair String String -> Bool;
+  sameView (Pair a b) (Pair x y) = (eqString a x && eqString b y);
+  choose :: String -> String -> Build String -> Build String -> Build String;
+  choose ty condition yes no =
+    do {
+      before <- get;
+      yesLabel <- fresh "yes.";
+      noLabel <- fresh "no.";
+      join <- fresh "join.";
+      emit ("  br i1 " ++ (condition ++ (", label %" ++ (yesLabel ++ (", label %" ++ noLabel)))));
+      label yesLabel;
+      a <- yes;
+      afterYes <- get;
+      emit ("  br label %" ++ join);
+      label noLabel;
+      modify
+        (\state ->
+           withScalarRanges (scalarRanges before)
+             (withArrayViews (arrayViews before)
+                (withUnboxedDoubles (unboxedDoubles before)
+                   (withForcedValues (forcedValues before) state))));
+      b <- no;
+      afterNo <- get;
+      emit ("  br label %" ++ join);
+      label join;
+      let {
+        ranges =
+          M.intersectionWith compareString rangeUnion (scalarRanges afterYes) (scalarRanges afterNo)
+      };
+      let {
+        views =
+          M.filterWithKey
+            (\key value ->
+               L.eqMaybe sameView (M.lookup compareString key (arrayViews afterNo)) (Just value))
+            (arrayViews afterYes)
+      };
+      let {
+        doubles =
+          M.filterWithKey
+            (\key value ->
+               L.eqMaybe eqString (M.lookup compareString key (unboxedDoubles afterNo))
+                 (Just value))
+            (unboxedDoubles afterYes)
+      };
+      modify
+        (\state ->
+           withScalarRanges ranges
+             (withArrayViews views
+                (withUnboxedDoubles doubles (withForcedValues (forcedValues before) state))));
+      value <- phi ty (args2 (Pair a (block afterYes)) (Pair b (block afterNo)));
+      if eqString ty "ptr"
+      then case M.lookup compareString a (scalarRanges afterYes) of {
+             Nothing -> cgPure Unit;
+             Just bounds ->
+               case M.lookup compareString b (scalarRanges afterNo) of {
+                 Nothing -> cgPure Unit;
+                 Just bounds2 -> recordRange value (rangeUnion bounds bounds2)
+               }
+           }
+      else cgPure Unit;
+      cgPure value
+    };
+  recordRange :: String -> Pair Int Int -> Build Unit;
+  recordRange value bounds =
+    modify
+      (\state ->
+         withScalarRanges
+           (M.insertWith compareString rangeIntersection value bounds (scalarRanges state))
+           state);
+  loadAt :: String -> String -> Int -> Build String;
+  loadAt ty value offset =
+    do {
+      address <- result ("getelementptr i8, ptr " ++ (value ++ (", i64 " ++ showInt offset)));
+      result ("load " ++ (ty ++ (", ptr " ++ (address ++ ", align 8, !tbaa !3"))))
+    };
+  arrayView :: String -> Build (Pair String String);
+  arrayView array =
+    do {
+      known <- gets (\state -> M.lookup compareString array (arrayViews state));
+      case known of {
+        Just view -> cgPure view;
+        Nothing ->
+          do {
+            len <- loadAt "i64" array 8;
+            cells <- loadAt "ptr" array 16;
+            let {
+              view = Pair len cells
+            };
+            modify
+              (\state ->
+                 withArrayViews (M.insert compareString array view (arrayViews state)) state);
+            cgPure view
+          }
+      }
+    };
+  constructorTag :: String -> Build String;
+  constructorTag value =
+    do {
+      bits <- result ("ptrtoint ptr " ++ (value ++ " to i64"));
+      low <- result ("and i64 " ++ (bits ++ ", 7"));
+      nullary <- result ("icmp eq i64 " ++ (low ++ ", 4"));
+      choose "i64" nullary (result ("lshr i64 " ++ (bits ++ ", 3"))) (loadAt "i64" value 8)
+    };
+  integerOperation :: Primitive -> String -> String -> Build String;
+  integerOperation p a b =
+    do {
+      x <- result ("ptrtoint ptr " ++ (a ++ " to i64"));
+      y <- result ("ptrtoint ptr " ++ (b ++ " to i64"));
+      both <- result ("and i64 " ++ (x ++ (", " ++ y)));
+      low <- result ("and i64 " ++ (both ++ ", 1"));
+      small <- result ("icmp ne i64 " ++ (low ++ ", 0"));
+      choose "ptr" small (integerFast p a b x y) (integerSlow p a b)
+    };
+  integerSlow :: Primitive -> String -> String -> Build String;
+  integerSlow p a b =
+    let {
+      symbol =
+        case p of {
+          PAddInt -> "@mlf_add_int";
+          PSubInt -> "@mlf_sub_int";
+          PEqInt -> "@mlf_eq_int";
+          _ -> "@mlf_lt_int"
+        }
+    } in
+    call symbol (args2 (pointer a) (pointer b));
+  integerFast :: Primitive -> String -> String -> String -> String -> Build String;
+  integerFast p a b x y =
+    if ((P.primitiveCode p == 10) || (P.primitiveCode p == 11))
+    then do {
+           comparison <-
+             result
+               ("icmp " ++
+                ((if (P.primitiveCode p == 10) then "eq" else "slt") ++
+                 (" i64 " ++ (x ++ (", " ++ y)))));
+           result
+             ("select i1 " ++
+              (comparison ++ (", ptr " ++ (immediate 6 ++ (", ptr " ++ immediate 2)))))
+         }
+    else do {
+           untagged <- result ("sub i64 " ++ (y ++ ", 1"));
+           pair <-
+             result
+               ("call { i64, i1 } @llvm.s" ++
+                ((if (P.primitiveCode p == 8) then "add" else "sub") ++
+                 (".with.overflow.i64(i64 " ++ (x ++ (", i64 " ++ (untagged ++ ")"))))));
+           sum <- result ("extractvalue { i64, i1 } " ++ (pair ++ ", 0"));
+           overflow <- result ("extractvalue { i64, i1 } " ++ (pair ++ ", 1"));
+           choose "ptr" overflow (integerSlow p a b)
+             (result ("inttoptr i64 " ++ (sum ++ " to ptr")))
+         };
+  doubleOperation :: Primitive -> String -> String -> Build String;
+  doubleOperation p a b =
+    do {
+      x <- loadAt "double" a 8;
+      y <- loadAt "double" b 8;
+      if ((P.primitiveCode p == 23) || (P.primitiveCode p == 24))
+      then do {
+             comparison <-
+               result
+                 ("fcmp " ++
+                  ((if (P.primitiveCode p == 23) then "oeq" else "olt") ++
+                   (" double " ++ (x ++ (", " ++ y)))));
+             result
+               ("select i1 " ++
+                (comparison ++ (", ptr " ++ (immediate 6 ++ (", ptr " ++ immediate 2)))))
+           }
+      else do {
+             let {
+               opcode =
+                 case p of {
+                   PAddDouble -> "fadd";
+                   PSubDouble -> "fsub";
+                   PMulDouble -> "fmul";
+                   _ -> "fdiv"
+                 }
+             };
+             n <- result (opcode ++ (" double " ++ (x ++ (", " ++ y))));
+             call "@mlf_double" (args1 ("double " ++ n))
+           }
+    };
+  hexDigit :: Int -> String;
+  hexDigit n = stringSlice "0123456789abcdef" n 1;
+  hex :: Int -> String;
+  hex n = if (n < 16) then hexDigit n else (hex (quotInt n 16) ++ hexDigit (remInt n 16));
+  hexByte :: Int -> String;
+  hexByte n = ("\\" ++ ((if (n < 16) then "0" else "") ++ hex n));
+  repeatString :: Int -> String -> String;
+  repeatString n value = if (n <= 0) then "" else (value ++ repeatString (n - 1) value);
+  doubleLiteral :: Double -> String;
+  doubleLiteral value =
+    let {
+      bits = hex (doubleToBits value)
+    } in
+    ("0x" ++ (repeatString (16 - stringLength bits) "0" ++ bits));
+  utf8 :: Int -> Either String (List Int);
+  utf8 n =
+    if ((n < 0) || ((n > 1114111) || ((n >= 55296) && (n <= 57343))))
+    then Left "LLVM string contains an invalid Unicode scalar"
+    else if (n < 128)
+         then Right (args1 n)
+         else if (n < 2048)
+              then Right (args2 (192 + quotInt n 64) (128 + remInt n 64))
+              else if (n < 65536)
+                   then Right
+                          (args3 (224 + quotInt n 4096) (128 + remInt (quotInt n 64) 64)
+                             (128 + remInt n 64))
+                   else Right
+                          (args4 (240 + quotInt n 262144) (128 + remInt (quotInt n 4096) 64)
+                             (128 + remInt (quotInt n 64) 64)
+                             (128 + remInt n 64));
+  stringConstant :: String -> Build (Pair String Int);
+  stringConstant text =
+    do {
+      encoded <-
+        liftBuild
+          (L.traverseEither (\index -> utf8 (stringCodeAt text index))
+             (L.range 0 (stringLength text - 1)));
+      let {
+        bytes = L.concat encoded
+      };
+      name <- fresh "@mlf.bytes.";
+      let {
+        textNext =
+          (name ++
+           (" = private unnamed_addr constant [" ++
+            (showInt (L.length bytes + 1) ++
+             (" x i8] c\"" ++
+              (L.concatStrings (L.map hexByte (L.snoc bytes 0)) ++ "\", align 1")))))
+      };
+      modify (\state -> withConstants (Cons textNext (constants state)) state);
+      cgPure (Pair name (L.length bytes))
+    };
+  literalInteger :: Int -> Build String;
+  literalInteger value =
+    if ((value >= (0 - 4611686018427387904)) && (value < 4611686018427387904))
+    then cgPure (immediate ((2 * value) + 1))
+    else do {
+           literal <- stringConstant (showInt value);
+           call "@mlf_integer" (args1 (pointer (L.fst literal)))
+         };
+  -- Compact allocation inlines only the cleared-batch fast path. Refill,
+  -- allocator debugging and constructor audits remain runtime responsibilities.
+  compactConstructor :: Int -> List String -> Build String;
+  compactConstructor tag fields =
+    case fields of {
+      Nil -> cgPure (immediate ((tag * 8) + 4));
+      Cons a Nil -> call "@mlf.construct.1" (args2 (number tag) (pointer a));
+      Cons a (Cons b Nil) -> call "@mlf.construct.2" (args3 (number tag) (pointer a) (pointer b));
+      _ ->
+        do {
+          value <- call "@mlf.construct.wide" (args2 (number tag) (number (L.length fields)));
+          L.mapM_
+            (\entry ->
+               case entry of {
+                 Pair index field ->
+                   do {
+                     address <-
+                       result
+                         ("getelementptr i8, ptr " ++
+                          (value ++ (", i64 " ++ showInt (24 + (8 * index)))));
+                     emit
+                       ("  store ptr " ++
+                        (field ++ (", ptr " ++ (address ++ ", align 8, !tbaa !3"))))
+                   }
+               })
+            (L.zip (L.range 0 (L.length fields - 1)) fields);
+          cgPure value
+        }
+    }
+}

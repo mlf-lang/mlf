@@ -1,0 +1,14 @@
+{
+  "artifact/unit.mlfci": {
+    "bytes": 92402,
+    "sha256": "ba4029258fc04e38fe5d975c8f325a03a583fbd9ed8ee2dbde5ac2e1af2feb41"
+  },
+  "artifact/unit.mlfco": {
+    "bytes": 2388162,
+    "sha256": "afe65f2b317504dfc447d035895c22b911482abc64adcb8de601817b509fb1b4"
+  },
+  "artifact/unit.queries": {
+    "bytes": 175230,
+    "sha256": "81ed89489c705310166bcb063054e0e5bef874dc2bec37f5be07dd498ace0083"
+  }
+}

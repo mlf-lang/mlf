@@ -1,0 +1,34 @@
+{
+  "source_checkpoint": "351e95d",
+  "producers": {
+    "O0": {
+      "complete": true,
+      "producer_receipt_sha256": "10e53201d03f795cb7c0fe2f40376a3c8dbe198955c3e01a0e56d5b5999b372a",
+      "object_files_reauthenticated": 198,
+      "frontend_semantics": "mlf-frontend/shared-haskell-v1/3",
+      "builtin_interface": "mlf-primitive/shared-haskell-v1/4"
+    },
+    "O2": {
+      "complete": true,
+      "producer_receipt_sha256": "e48447617b94b38c5615c95f83a835576ae46d5161e330f162093ecef575cf8f",
+      "object_files_reauthenticated": 198,
+      "frontend_semantics": "mlf-frontend/shared-haskell-v1/3",
+      "builtin_interface": "mlf-primitive/shared-haskell-v1/4"
+    }
+  },
+  "full_native_unit": false,
+  "native_bootstrap": false,
+  "fixed_point": false,
+  "modular_mlf_accepted_modules": 25,
+  "total_library_modules": 72,
+  "remaining_library_crates": [
+    "mlf-async",
+    "mlf-xmlf",
+    "mlf-inference",
+    "mlf-interpreter",
+    "mlf-llvm",
+    "mlf-crates",
+    "mlf-package-core",
+    "mlf-developer-tools"
+  ]
+}

@@ -1,0 +1,2 @@
+Unverified seed input: standalone mlfpkg has no release-bundle provenance; use bundle/bin/mlfpkg or bundle/libexec/mlfpkg
+Shared native bootstrap failed during verify-seed; evidence: /workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-mixed-seed

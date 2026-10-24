@@ -1,0 +1,12 @@
+{
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-language-core/mlf-package.json": "9d653cc825134f8d98919874e6b6d7e58cbd614751bfa0562af6e58f7a30366b",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-language-core/Bootstrap/Data.hs": "a681598a968509ae820f05d8e6a10a8179b892e327ff0ee6ca8b52d6d8802f9b",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-language-core/Bootstrap/Kind.hs": "453aebe46c80250d50a32ae84b9f5d1bb56f2effbe94018d0e67742fbffb4f3b",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-language-core/Bootstrap/Kinding.hs": "ced9814986923d0eb1c238ccaaf6ccd749da5a64f42e42a1418c6e2774d0bec4",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-language-core/Bootstrap/Primitive.hs": "cce71f5a56a9d33be85857d743d11bcd73df8feba898a1f2ea106d4d30ed3279",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O2/receipt.json": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/artifact/unit.mlfci": "caa83e4396eee57d327f5bd15b6fe95af21e83539d26e3068a9b28a0b96db6d2",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/artifact/unit.mlfco": "6358bfce412ef5b0194c99bb435401fc0ac04e697c5bddd9c5decf20307b149f",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/builtin/unit.mlfci": "bdedaed6c4c59d5840dd575272289a14bda0515c31e5d32dc9ad6e0be760fad4",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/builtin/unit.mlfco": "c659d3249678b26ff815aed6ab768378b12401cdba3720ea08db09f6431b8276"
+}

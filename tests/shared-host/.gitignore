@@ -1,0 +1,11 @@
+/.runs/
+/build-O*/
+/numeric-O*/
+/identity-O*/
+/filesystem-O*/
+/cancel-*/
+/c-ownership-probe
+/native-filesystem-oracle
+/invalid-*
+
+/*.tmp

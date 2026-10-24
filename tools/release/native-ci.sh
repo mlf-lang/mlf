@@ -14,6 +14,17 @@ test "$#" -le 1 || { printf '%s\n' 'Expected one test group.' >&2; exit 2; }
 case "$group" in smoke|source-smoke|pr-smoke|extended-pr-smoke|unit|packages|self-host|parity|backends|port|port-prepare-StateTypes|port-prepare-SolverReuse|port-prepare-InferenceConformance|port-prepare-other) ;; *) exit 2 ;; esac
 test -z "${MLF_TEST_RUNTIME_PROFILE:-}" || test "$MLF_TEST_RUNTIME_PROFILE" = compact-gc || exit 2
 evidence_group=$group
+if [ -n "${MLF_SOURCE_SMOKE_RUNNER:-}" ]; then
+  printf '%s\n' 'The direct GHC source-smoke route is separate from native CI; invoke tools/release/source-smoke.sh directly.' >&2
+  exit 2
+fi
+if [ -f shared-sources.json ] && [ -n "${MLF_COMPILER:-}" ]; then
+  identity=$("$MLF_COMPILER" --implementation-identity 2>/dev/null) || identity=
+  if [ "$identity" = 'MLF/shared-haskell-v1 GHC' ]; then
+    printf '%s\n' 'Native CI requires a native MLF compiler; the GHC source-smoke route is separately labeled.' >&2
+    exit 2
+  fi
+fi
 if [ "$group" = source-smoke ]; then
   # Interpreting sources does not build native code or discover development libraries.
   case "$(uname -s):$(uname -m)" in

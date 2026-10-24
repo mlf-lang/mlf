@@ -40,8 +40,8 @@ The `CI` workflow runs on every pull request, merge queue group and push to
   compiler bootstrap followed by typed completion, process and Task language
   suites on the interpreter and LLVM runtime, plus a fresh checked-package
   consumer, exact cache replay and interface-opacity rejections. Pull requests
-  run these expensive steps when related modules or dependencies change; a
-  verified unrelated-only PR records an explicit `not-executed` decision.
+  omit these expensive steps by default and record `not-executed`. Maintainers
+  explicitly opt in by applying the `ci:async-parity` label.
 
 The aggregate runs even when a prerequisite fails and requires all six
 prerequisites to report `success`. Required pull-request and merge-queue jobs
@@ -52,34 +52,28 @@ matrix entry must pass.
 Failed, cancelled or skipped prerequisites cannot produce a passing gate.
 There are no path filters on the required workflow or lightweight native
 checks. The async-language job itself always participates in the six-job gate;
-only its expensive steps can be omitted after a successful scope decision.
+only its expensive steps can be omitted after a successful explicit policy decision.
 Manual dispatches retain
 the Windows-only mode; either `full_validation` or the compatible `self_host`
 input runs complete qualification, including Benchmark Game. Their skipped aggregate
 is named **Manual CI summary**, so it cannot satisfy the required **PR gate**.
 
-### Async parity change scope
+### Explicit PR async parity
 
-`tools/release/async-change-scope.py` compares a PR's exact event base/head using
-their unique Git merge base, with full local history and a checkout proven to
-contain both commits. It uses a complete NUL-delimited Git diff, not a paginated
-changed-files API. Renames expose both old and new paths, and deletions count.
-Compiler modules, all libraries (including async), the package manager, runtime,
-bootstrap/build scripts, manifests/locks, CI and test fixtures require parity.
-Unknown paths also require it. The initial unrelated allowlist is only root
-README/changelog/contributing/license prose and the independent `docs/`,
-`papers/`, `benchmarks/` and `examples/` trees, which are outside the bootstrap
-snapshot and async fixture inputs. A mixed change still runs the full gate.
+Expensive async interpreter/native parity is off for every PR by default,
+including compiler, runtime and async changes. Add the `ci:async-parity` label to
+explicitly request it; label addition/removal triggers CI again. Opt-in runs the
+campaign even for documentation-only changes. Main pushes, merge queues and
+non-Windows-only manual runs retain async coverage. Fast runtime, build-runner,
+metadata and source-smoke checks are unchanged.
 
-Missing commits, a stale checkout, ambiguous ancestry, malformed or oversized
-diffs, type changes, and selector uncertainty all default to running parity.
-Main pushes, every non-Windows-only manual dispatch (including full validation),
-and merge queues always run it; merge queues do not reuse a PR-only diff.
-The normal read-only pull-request workflow is used for forks, without privileged
-events or elevated tokens. The uploaded `async-change-scope/decision.json` records
-the event, exact commits, changed paths, diff hash and reason. `not-executed` is a
-selection result, never evidence that interpreter/native parity passed. A failed
-selector or any selected failing/cancelled/skipped required job blocks PR gate.
+The cheap async policy job remains part of the strict six-job aggregate gate.
+Malformed or missing PR event/commit/label metadata fails the cheap selector
+without executing parity; the strict aggregate then fails.
+Its uploaded decision states `not-executed` when parity is omitted; this is not
+an async pass or full qualification. See [the exact policy](ci-async-policy.md).
+The older dated change-scope census is historical; its checker reports current
+selector identities separately and requires the current policy controls.
 
 ## Enforce before merging
 
@@ -148,8 +142,8 @@ passing pre-merge prerequisite.
 Every push to `main` invokes `native-qualification.yml` with `build_packages=false`.
 It runs independently of the narrower PR gate, using read-only repository and
 Actions permissions. Pull requests and merge queue groups keep the six checks
-above, including the scope-aware async-language gate (always bootstrapped for
-merge queues; only verified unrelated pull requests can omit its heavy steps).
+above, including the policy-aware async-language gate (always bootstrapped for
+merge queues; pull requests run its heavy steps only with explicit opt-in).
 Manual `CI` with `full_validation=true` exercises this exact complete graph on a
 feature branch without creating SDK archives or publishing anything.
 

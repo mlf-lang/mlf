@@ -79,8 +79,8 @@ record_inputs() {
   local destination=$1 file
   printf '{}\n' > "$destination"
   for file in "$fixtures"/* "$root/tools/release/test-async-process.sh" \
-    "$root/libraries/mlf-foundation/Bootstrap/Types.emlf" "$root/libraries/mlf-foundation/Bootstrap/Std.emlf" \
-    "$root/libraries/mlf-async/Async/Process.emlf" "$root/libraries/mlf-async/Async/Process/Internal.emlf" \
+    "$root/libraries/mlf-foundation/Bootstrap/Types.hs" "$root/libraries/mlf-foundation/Bootstrap/Std.hs" \
+    "$root/libraries/mlf-async/Async/Process.hs" "$root/libraries/mlf-async/Async/Process/Internal.hs" \
     "$root"/runtime/*; do
     test -f "$file" || continue
     jq --arg path "${file#"$root"/}" --arg hash "$(sha256 "$file")" '. + {($path):$hash}' "$destination" > "$destination.tmp"

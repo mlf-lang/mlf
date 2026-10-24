@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Static Core opt-in registration/isolation controls; no semantic test runs."""
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -16,6 +17,24 @@ def frozen(path):
 def require(condition, message):
     if not condition:
         raise ValueError(message)
+
+
+
+CORE_SOLVER_IMPORTS = ("-- Select the standard Monad used by shared Either; retain legacy guest syntax.\n"
+                       "import Prelude hiding (Monad, return, bind)\n"
+                       "import MLF.Primitive (Monad, return, bind)\n")
+
+
+def verify_family_source(path, current, original):
+    # This one reviewed import insertion selects the class already used by
+    # parseExpr/generate. Every original byte (including all family bodies)
+    # remains required; never normalize arbitrary imports or update BASELINE.
+    expected = original
+    if path == "tests/Tests/CoreSolver.emlf":
+        header = "module Tests.CoreSolver where\n"
+        require(original.startswith(header), "frozen CoreSolver header changed")
+        expected = header + CORE_SOLVER_IMPORTS + original[len(header):]
+    require(current == expected, f"original Core family composition changed: {path}")
 
 
 def expected_bindings():
@@ -83,6 +102,50 @@ def verify(registry, runner, original, expected):
             "default campaign no longer uses legacy implementation")
 
 
+SHARED_REVIEW = "65e9e66680ee65f5e24745240dfe7ec8706e3e3b"
+PARTITIONS = "tests/Tests/CorePartitions.hs"
+PARTITIONS_SHA256 = "074ec18485fc1fb79a4186cbf6b9eb9bfe9ad9e8d87c7e9b1ea97699e8590aab"
+
+
+def verify_shared_partitions(raw):
+    # Fail closed against the published reviewed source, not candidate-derived
+    # expectations. The frozen family oracle above remains BASELINE's catalog.
+    require(hashlib.sha256(raw).hexdigest() == PARTITIONS_SHA256,
+            "reviewed shared Core partition algorithm changed")
+
+
+def verify_partition_provenance():
+    original = frozen("tests/Tests/CorePartitions.emlf").encode()
+    evidence = []
+    for name in ("migration-manifest.json", "standard-hierarchy-adjustment.json"):
+        path = "tools/shared-migration/evidence/" + name
+        pinned = subprocess.check_output(["git", "show", SHARED_REVIEW + ":" + path], cwd=ROOT)
+        require((ROOT / path).read_bytes() == pinned, "historical migration evidence changed: " + path)
+        records = json.loads(pinned)["files"]
+        evidence.append(next(r for r in records if r["module"] == "Tests.CorePartitions"))
+    migration, hierarchy = evidence
+    require(migration["old_sha256"] == hashlib.sha256(original).hexdigest(), "frozen Core migration preimage changed")
+    require(migration["new_sha256"] == hierarchy["old_sha256"] and
+            hierarchy["new_sha256"] == PARTITIONS_SHA256 and
+            hierarchy["legacy_instances"] == 0 and
+            hierarchy["expression_string_tokens"] == 11, "Core migration evidence chain changed")
+    published = subprocess.check_output(["git", "show", SHARED_REVIEW + ":" + PARTITIONS], cwd=ROOT)
+    verify_shared_partitions(published)
+    raw = (ROOT / PARTITIONS).read_bytes()
+    verify_shared_partitions(raw)
+    require(not (ROOT / "tests/Tests/CorePartitions.emlf").exists(), "duplicate live legacy CorePartitions")
+    mutants = [raw.replace(b'core/guards', b'core/invented', 1),
+               raw.replace(b'if ((S.length flat', b'if ((S.length familyNames', 1),
+               raw.replace(b'then Right Unit', b'then Left "weakened"', 1)]
+    for mutant in mutants:
+        require(mutant != raw, "inactive shared Core partition mutation")
+        try:
+            verify_shared_partitions(mutant)
+        except ValueError:
+            continue
+        raise ValueError("shared Core partition mutant accepted")
+
+
 def main():
     expected = expected_bindings()
     registry = (ROOT / "tests/Tests/CoreRegistry.emlf").read_text()
@@ -108,11 +171,27 @@ def main():
         except ValueError:
             continue
         raise ValueError(f"failed to reject {name}")
-    for path in ("tests/Tests/Core.emlf", "tests/Tests/CoreCrates.emlf", "tests/Tests/CoreSolver.emlf", "tests/Tests/CoreLanguage.emlf", "tests/Tests/CoreModules.emlf", "tests/Tests/CorePartitions.emlf"):
-        require((ROOT / path).read_text() == frozen(path), f"original Core family composition changed: {path}")
+    for path in ("tests/Tests/Core.emlf", "tests/Tests/CoreCrates.emlf", "tests/Tests/CoreSolver.emlf", "tests/Tests/CoreLanguage.emlf", "tests/Tests/CoreModules.emlf"):
+        verify_family_source(path, (ROOT / path).read_text(), frozen(path))
+    solver_path = "tests/Tests/CoreSolver.emlf"
+    solver = (ROOT / solver_path).read_text()
+    solver_original = frozen(solver_path)
+    for mutated in (solver.replace(CORE_SOLVER_IMPORTS, "", 1),
+                    solver.replace("import MLF.Primitive (Monad, return, bind)", "import MLF.Primitive (Monad, return)", 1),
+                    solver + "\nchangedBody = 0\n"):
+        require(mutated != solver, "inactive CoreSolver import/body mutation")
+        try:
+            verify_family_source(solver_path, mutated, solver_original)
+        except ValueError:
+            continue
+        raise ValueError("accepted unreviewed CoreSolver source mutation")
+    verify_partition_provenance()
     print(json.dumps({"kind": "static-core-opt-in-controls", "baseline": BASELINE,
                       "family_count": len(expected), "legacy_actions": 739,
                       "named_substring_observations": 13, "mutation_controls": len(mutations),
+                      "shared_partition_mutation_controls": 3,
+                      "guest_class_import_mutation_controls": 3,
+                      "shared_partition_sha256": PARTITIONS_SHA256,
                       "default_campaign": "legacy", "qualification_eligible": False,
                       "compilation_verified": False, "semantic_execution_verified": False}, indent=2))
 

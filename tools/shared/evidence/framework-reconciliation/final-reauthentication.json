@@ -1,0 +1,44 @@
+{
+  "source_mode": "same103-module maintained source, GHC O0/O2",
+  "same_source_host_configuration": true,
+  "producer": {
+    "O0": {
+      "producer_receipt_sha256": "f24552afdbb0bc1f29c8c4a4275516ff8bc1e1ee30fef422e3cffc7eca9ede8f",
+      "shared_modules": 103,
+      "binaries": 12,
+      "objects": 216,
+      "authenticated_after_runtime": true
+    },
+    "O2": {
+      "producer_receipt_sha256": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+      "shared_modules": 103,
+      "binaries": 12,
+      "objects": 216,
+      "authenticated_after_runtime": true
+    }
+  },
+  "passed_per_optimization": {
+    "direct_commands": 12,
+    "tuple_default_checks": 90,
+    "tuple_framework_checks": 90,
+    "framework_class_demand_IO_discovery_ID_report_controls": true,
+    "figure12_unique_checks": 77,
+    "smoke_cases": 5
+  },
+  "full_native_qualification": false,
+  "remaining": [
+    "remaining modular MLF source acceptance",
+    "full guest Core/unit/lifecycle campaign",
+    "native frozen bridge/current compiler+manager",
+    "native compiler+manager fixedpoints"
+  ],
+  "review_repairs": [
+    "explicit local Phase import hiding",
+    "seven concrete original literal-domain signatures",
+    "layout-aware static import scanner",
+    "full Git history for historical audit callers",
+    "framework/Figure12 CI runtime wiring",
+    "All PR expensive async default-off unless ci:async-parity; malformed PR metadata fails cheap without execution"
+  ],
+  "archive_unchanged_sha256": "c83bfa0801e1af0e042b6e2053eebf66af9b54b28cb8ed6f1f874483dfa4cbae"
+}

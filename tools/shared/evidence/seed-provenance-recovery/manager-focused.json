@@ -1,0 +1,38 @@
+{
+  "scope": "focused changed-manager entry and host identity only",
+  "full_source_qualified": false,
+  "native_bootstrap_run": false,
+  "source": {
+    "path": "package/MLF/Entry/Mlfpkg.hs",
+    "sha256": "334dc4a30ad7cfe0d925a71d1d833d01c9a3c51e72e65aa01bae1533a147b73e"
+  },
+  "executable": {
+    "path": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-manager-identity/mlfpkg",
+    "sha256": "556198a5326668a730b7d4af719abd09ed7c192de804b0a5c06fcfd1cc6de64b"
+  },
+  "identity_stdout": "MLF/shared-haskell-v1 GHC\n",
+  "version_stdout": "mlfpkg 0.3.0\n",
+  "lock_unchanged": false,
+  "locked_plan_exit": 0,
+  "bounded_build": {
+    "command": [
+      "bash",
+      ".mlf-build/recovery-manager-identity/command.sh"
+    ],
+    "complete": true,
+    "limits": {
+      "address_space_per_process": 1073741824,
+      "group_rss_watchdog": 1073741824,
+      "host_available_floor": 3221225472,
+      "wall_seconds": 120
+    },
+    "process_group": 7,
+    "exit_code": 0,
+    "reason": null,
+    "elapsed": 1.368904321003356,
+    "peak_group_rss": 455364608
+  },
+  "locked_plan_status": "completed",
+  "lock_change": "only package/MLF/Entry/Mlfpkg.hs source digest changed after intentional CLI edit",
+  "lock_sha256": "703c28ac61b8cc8a29ff0df114b59d45a8561c6afb4ec3202613dd600ead6b62"
+}

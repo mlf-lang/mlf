@@ -1,0 +1,17 @@
+{
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-xmlf/mlf-package.json": "6f9a6c0a2d703ba884dd256fd494665c580ed028db04dedc3c7b748ec393f6f3",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-xmlf/Bootstrap/X/Check.hs": "f804113af862fd2eb213eea1644e6f731255ce8625f637ea4ae824e8061b9ef3",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-xmlf/Bootstrap/X/Checked.hs": "b732c7a65dbf2aebf1eb5213a10613ccade422626b90bd7d693e66398b22ef63",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-xmlf/Bootstrap/X/Parser.hs": "e7a530bf8bf067530750fc31678d6455fb5cd370703f0733470c75e4d6f64eac",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-xmlf/Bootstrap/X/Pretty.hs": "67120bd5eadc00d3e191c6a56e8e81f5f240f05b42a2e6356b2e277959c53a2c",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-xmlf/Bootstrap/X/Syntax.hs": "85e34ce735f11a31d1ebe66b5e89a8cb235a659842d897f5898fc738acb643c2",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-xmlf/Bootstrap/X/Type.hs": "dc0eab061cbd7a28dad2d130667649330c552eb8f15b76897682208cdf1592c1",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/artifact/unit.mlfci": "caa83e4396eee57d327f5bd15b6fe95af21e83539d26e3068a9b28a0b96db6d2",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-frontend-crate-O2/artifact/unit.mlfci": "1731ce8c40d781502f8380c8b8659f6cc1c6c817ca84558fb1305823f1a0706d",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-language-core-crate-O2/artifact/unit.mlfci": "9f2ed03e6394abb7907c69e80cfb318354dbd226596e2260f4d753a80f58fb7f",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/artifact/unit.mlfco": "6358bfce412ef5b0194c99bb435401fc0ac04e697c5bddd9c5decf20307b149f",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-frontend-crate-O2/artifact/unit.mlfco": "349cbc6f8cbe0c4f78abff04c5ae48b32e03691fbf9295735eb27267494cf798",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-language-core-crate-O2/artifact/unit.mlfco": "2a636b292794f990c685452d4744a27d8750ffcd279561ee719a09df67222630",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O2/receipt.json": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/xmlf/crate.spec": "1f23fcd0ecc3db168e95da15712a39af9e76f86650d128aa3f1352c484e6364d"
+}

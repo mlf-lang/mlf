@@ -55,7 +55,7 @@ instanceSize : SInstanceDecl -> Int
 instanceSize (SInstanceDecl _ _ _ _ methods) = sumBy (\entry -> case entry of Pair _ body -> sourceSize body) methods
 
 moduleSize : SourceModule -> Int
-moduleSize (SourceModule _ _ _ imports declarations classes instances definitions body) =
+moduleSize (SourceModule _ _ _ imports declarations classes instances definitions body _) =
   L.length imports + L.length declarations + L.length classes + sumBy instanceSize instances +
     sumBy (\definition -> case definition of Triple _ _ rhs -> sourceSize rhs) definitions +
     (case body of Nothing -> 0; Just expression -> sourceSize expression)
@@ -119,7 +119,7 @@ finish (Pair program names) = case program of
       putStrLn ("type\t" ++ Classes.prettyQualified names ty)
 
 standalone : SourceModule -> Bool
-standalone (SourceModule _ name _ imports _ _ _ _ _) = case name of
+standalone (SourceModule _ name _ imports _ _ _ _ _ _) = case name of
   Nothing -> L.null imports
   Just _ -> false
 

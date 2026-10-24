@@ -1,6 +1,8 @@
 module Tests.Bytes where
 import Bootstrap.Types
-import Prelude hiding (readFile, writeFile)
+-- Select the standard Monad used by shared Either; retain legacy guest syntax.
+import Prelude hiding (readFile, writeFile, Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
 import qualified Bootstrap.Std as S
 import qualified Tests.Helpers as H
 import qualified Package.OS as O

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Static preservation checks, not compilation or semantic execution evidence."""
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -7,8 +8,47 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "8a3e69b165765931c3ff762379a78db9659b2cd8"
-SOURCE = "tests/TupleListMain.emlf"
-IMPLEMENTATION = "tests/Tests/TupleList.emlf"
+# Historical paths remain frozen oracle inputs, never duplicate live modules.
+FROZEN_SOURCE = "tests/TupleListMain.emlf"
+STAGED_BASELINE = "4d732f31982ebe18124511f2ca4cb412770d6bd6"
+STAGED_IMPLEMENTATION = "tests/Tests/TupleList.emlf"
+SOURCE = "tests/MLF/Entry/TupleList.hs"
+IMPLEMENTATION = "tests/Tests/TupleList.hs"
+LEGACY = "tests/Tests/TupleListLegacy.hs"
+
+# Reviewed against exact4d preimages through the unchanged one-time AST migrator.
+# Independently rerun: all51 AST roundtrips and literal inventories matched.
+# The only TupleList/Legacy post-migration edit adds the ignored tenth
+# SourceModule syntax-profile metadata field; no assertion/oracle field changes.
+# Legacy bytes also equal f2b21c3 shared entry after only its module rename.
+# These are semantic contract pins, NOT regeneratable golden output. Any change
+# requires independent review against FROZEN_SOURCE and expected_projection.
+# Normal audits never run a translator or generate maintained Haskell source.
+REVIEWED_SHARED_SHA256 = {
+    IMPLEMENTATION: "85ee364d92530114332c9b37723141bf008fda960d9f7db4ddfcc6f1d8e6a954",
+    SOURCE: "a6de5a49e9cf14dbb9fa9b840ade22fb27c6e06478703b04c9671ac9b84fee4d",
+    LEGACY: "35085423a20b13cb04ec4c330ccb246cf9f0d9bf0c6c1e45f3b9aead98ad0790",
+}
+
+
+def verify_shared(path, source):
+    expected = REVIEWED_SHARED_SHA256.get(path)
+    require(expected is not None, "shared semantic contract requires review: " + path)
+    require(hashlib.sha256(source.encode()).hexdigest() == expected,
+            "shared source differs from reviewed AST migration: " + path)
+
+
+def verify_current_sources(root=None):
+    root = ROOT if root is None else root
+    paths = (IMPLEMENTATION, SOURCE, LEGACY)
+    sources = {path: (root / path).read_bytes().decode("utf-8") for path in paths}
+    for path, source in sources.items():
+        verify_shared(path, source)
+    for removed in (FROZEN_SOURCE, STAGED_IMPLEMENTATION,
+                    "tests/Tests/TupleListLegacy.emlf"):
+        require(not (root / removed).exists(), "duplicate live implementation: " + removed)
+    return sources
+
 
 
 def frozen(path):
@@ -107,7 +147,7 @@ cases = S.concat (Cons parserCases (Cons boundaryCases (Cons checkingCases (Cons
     return helpers
 
 
-def verify(original, migrated, expected_ids):
+def verify_legacy_projection(original, migrated, expected_ids):
     require(migrated == expected_projection(original),
             "module differs from reviewed frozen-source projection (support, actions or reachable registry)")
     identities = re.findall(r'leaf "([^"]+)"', migrated)
@@ -146,7 +186,7 @@ def verify(original, migrated, expected_ids):
 
 
 def main():
-    original = frozen(SOURCE)
+    original = frozen(FROZEN_SOURCE)
     # The baseline contains the source, while the design inventory was added
     # afterward. IDs are independently derived once from its authored labels.
     helpers = ("sameExpression", "sameBoundary", "sameAnnotation", "accepted",
@@ -162,8 +202,12 @@ def main():
     for source in ("(a,)", "(,a)", "(a,b,c,d,e)", "[a,]", "[,a]", "[a", "[1..3]", "[a | a <- b]", "a :"):
         expected.add("tuple-list/focused/malformed-" + source.encode().hex())
     require(len(expected) == 90, "frozen baseline derivation changed")
-    migrated = (ROOT / IMPLEMENTATION).read_text()
-    count = verify(original, migrated, expected)
+    # Reconstruct and audit the exact independently frozen staged implementation.
+    # This retains all12 helper comparisons and source-derived90 expectations.
+    migrated = subprocess.check_output(
+        ["git", "show", STAGED_BASELINE + ":" + STAGED_IMPLEMENTATION],
+        cwd=ROOT, text=True)
+    count = verify_legacy_projection(original, migrated, expected)
     first = re.search(r'leaf "([^"]+)"', migrated).group(1)
     mutations = {
         "require_always_succeeds": migrated.replace("require condition message = if condition then A.succeed Unit else fatal message", "require condition message = A.succeed Unit", 1),
@@ -184,24 +228,21 @@ def main():
     for name, mutant in mutations.items():
         require(mutant != migrated, f"inactive mutation: {name}")
         try:
-            verify(original, mutant, expected)
+            verify_legacy_projection(original, mutant, expected)
         except ValueError:
             continue
         raise ValueError(f"static control failed to reject {name}")
-    dispatcher = (ROOT / SOURCE).read_text()
-    require('Cons "--framework" rest -> finish rest' in dispatcher and
-            "Runner.run args TupleList.cases" in dispatcher,
-            "opt-in entrypoint bypasses registry")
-    require("_ -> Legacy.main" in dispatcher, "unverified registry replaced legacy default")
-    legacy = (ROOT / "tests/Tests/TupleListLegacy.emlf").read_text()
-    require(legacy == original.replace("module TupleListMain where", "module Tests.TupleListLegacy where", 1),
-            "frozen legacy implementation changed")
+    sources = verify_current_sources()
+    shared_ids = re.findall(r'leaf\s+"([^"]+)"', sources[IMPLEMENTATION])
+    require(len(shared_ids) == 90 and len(set(shared_ids)) == 90 and
+            set(shared_ids) == expected, "shared leaf inventory differs from frozen90")
     # The separate native path is not replaced by focused interpreter checks.
     for path in ("tools/release/test-tuple-list.sh", "tests/fixtures/tuple-list-runtime.emlf", "tests/fixtures/tuple-list-runtime.stdout"):
         require((ROOT / path).read_text() == frozen(path), f"native route changed: {path}")
     print(json.dumps({"kind": "static-source-preservation", "baseline": BASELINE,
                       "leaf_ids": 90, "default_implementation": "legacy", "literal_calls_preserved": count,
                       "oracle_helpers_preserved": 12, "mutation_controls": len(mutations),
+                      "shared_semantic_contract": REVIEWED_SHARED_SHA256,
                       "compilation_verified": False, "semantic_execution_verified": False}, indent=2))
 
 

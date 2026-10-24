@@ -1,0 +1,17 @@
+{
+  "Test.Outcome": {
+    "phaseName": "Phase -> String",
+    "status": "Outcome -> String"
+  },
+  "Test.Expectation": {
+    "nonemptyReason": "String -> Either String Unit",
+    "validObservation": "Termination -> Either String Unit"
+  },
+  "Test.Registry": {
+    "validIds": "List String -> Either String Unit"
+  },
+  "Test.Runner": {
+    "scope": "Int -> Int -> String",
+    "usage": "String"
+  }
+}

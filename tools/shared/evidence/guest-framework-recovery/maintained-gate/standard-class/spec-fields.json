@@ -1,0 +1,10 @@
+[
+  "MLF-CRATE-1",
+  "guest-class-control/standard-class",
+  "",
+  "false",
+  "123:8:Standard109:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/fixtures/Standard.emlf",
+  "117:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/foundation/artifact/unit.mlfci",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/standard-class/queries",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/foundation/builtin/unit"
+]

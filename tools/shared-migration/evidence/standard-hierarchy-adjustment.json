@@ -1,0 +1,767 @@
+{
+  "format": 1,
+  "operation": "post-cutover-haskell-standard-hierarchy",
+  "historical_migration_receipt": "tools/shared-migration/evidence/migration-manifest.json",
+  "scope": "Remove RebindableSyntax from implementation pragmas and replace legacy Monad instances with Functor/Applicative/Monad. Preserve legacy method computations; standard Monad defines only (>>=).",
+  "checks": {
+    "AST_roundtrip": true,
+    "exact_expression_string_token_multiset": true,
+    "edits_limited_to_header_and_legacy_instance_spans": true
+  },
+  "files": [
+    {
+      "module": "Async.Process",
+      "path": "libraries/mlf-async/Async/Process.hs",
+      "old_sha256": "e76ceafbdea1ecf68286d2f8026f1474da63dfdf76b7d34a67e1b5beacc4f877",
+      "new_sha256": "70d466818728f7b80ee732df654e083006cc33f6038623d22f52086bd9613b87",
+      "legacy_instances": 0,
+      "expression_string_tokens": 24
+    },
+    {
+      "module": "Async.Process.Internal",
+      "path": "libraries/mlf-async/Async/Process/Internal.hs",
+      "old_sha256": "0d010bcf9ef385c156e119e6e3a1304f5b7004f2ce0c959ff4e0e560fd8e9811",
+      "new_sha256": "03e65dccf009af52f072a7fc0ef8d5eee555e9452962dd254f453bc3afc42e42",
+      "legacy_instances": 0,
+      "expression_string_tokens": 6
+    },
+    {
+      "module": "Async.Task",
+      "path": "libraries/mlf-async/Async/Task.hs",
+      "old_sha256": "da795f28d4f73a6c23ab49712f5bdb95ef892ec7fe103832125d27f7e817b895",
+      "new_sha256": "1f4ae8f633e3cf78dfadeaa9bde2999a9bc31c7c37769a8f30351a3f99b4afca",
+      "legacy_instances": 0,
+      "expression_string_tokens": 0
+    },
+    {
+      "module": "Async.Task.Core",
+      "path": "libraries/mlf-async/Async/Task/Core.hs",
+      "old_sha256": "34f3ae99e492e17fd5f74705b18cab74f00c685eb3e085eb0819e3c15f14676a",
+      "new_sha256": "33e30b6c2f055619b8da163b39621b08eaab1b77eda39bf3bbaf61a77c4bcdce",
+      "legacy_instances": 0,
+      "expression_string_tokens": 49
+    },
+    {
+      "module": "Async.Task.Internal",
+      "path": "libraries/mlf-async/Async/Task/Internal.hs",
+      "old_sha256": "cbadc39a6ef2ee448f072da84c4a8d8bed411fffa25f88a136192020733dcffd",
+      "new_sha256": "a87ab11e316ec7c4ff28a5f9974b61ecb58aebeeb3f3227646d02ed3e7416e00",
+      "legacy_instances": 0,
+      "expression_string_tokens": 0
+    },
+    {
+      "module": "Bootstrap.Classes",
+      "path": "libraries/mlf-inference/Bootstrap/Classes.hs",
+      "old_sha256": "6153005b9f313ca1b312717237fa7b3ecf01cca23f314f585550f51712c23046",
+      "new_sha256": "3c028c4e7c5d94a42e67674f74ce492869e00926c39af2806f3205cd67ac15ca",
+      "legacy_instances": 0,
+      "expression_string_tokens": 85
+    },
+    {
+      "module": "Bootstrap.Compiler",
+      "path": "libraries/mlf-inference/Bootstrap/Compiler.hs",
+      "old_sha256": "1f2f1909802bbe87e0ec06f3856ea20f50fe05863365f78a018369e3c60e5157",
+      "new_sha256": "8cbc5c40ca5af2928434cf4331d3bd8e40f88d8919ae84aab193ef5b93ced933",
+      "legacy_instances": 0,
+      "expression_string_tokens": 1
+    },
+    {
+      "module": "Bootstrap.CompilerCore",
+      "path": "libraries/mlf-inference/Bootstrap/CompilerCore.hs",
+      "old_sha256": "32a6733340920dcedc985ab225e9c0d7db112867d09fb1d9de1db3a68b85372b",
+      "new_sha256": "ba168375f092a060bee2973baec578bd2ce3506d125d9c7760330dc78b8dd924",
+      "legacy_instances": 0,
+      "expression_string_tokens": 10
+    },
+    {
+      "module": "Bootstrap.Constraint",
+      "path": "libraries/mlf-inference/Bootstrap/Constraint.hs",
+      "old_sha256": "4c527fef8d7258b351e44bd4b26f3f7e94d0f868ef668c49ac66e53b7ffcec6f",
+      "new_sha256": "83efd6c2a2bf72cee2e608e8ed627194c006c60f780cd58225e465d3fe83e451",
+      "legacy_instances": 1,
+      "expression_string_tokens": 17
+    },
+    {
+      "module": "Bootstrap.Crate",
+      "path": "libraries/mlf-crates/Bootstrap/Crate.hs",
+      "old_sha256": "b0ef06fafdbed4b15fb1999dbf97b4f4ae29aad2f028942ff581ae09c421da61",
+      "new_sha256": "45af761abd4835ec6adff8be909bf21bc8f43e981d2e9f41327b03630acc88db",
+      "legacy_instances": 0,
+      "expression_string_tokens": 52
+    },
+    {
+      "module": "Bootstrap.CrateArtifact",
+      "path": "libraries/mlf-crates/Bootstrap/CrateArtifact.hs",
+      "old_sha256": "cc3f9d48a4d1ab06857ed4f3a5c7791a8344fa8918d7adbbeb3527aa0afad8d4",
+      "new_sha256": "f6bf0615d05a299f9f711143ce89f0285e78849626487db2b6a48c62a4210d2b",
+      "legacy_instances": 0,
+      "expression_string_tokens": 172
+    },
+    {
+      "module": "Bootstrap.CrateCodegen",
+      "path": "libraries/mlf-crates/Bootstrap/CrateCodegen.hs",
+      "old_sha256": "7b4e7e88499afd2f0caeb6986fea49b085caf4371fa965ce7a3a8636771018d1",
+      "new_sha256": "f27d23156701fb2bc1aa0d53b3d3d130b255e47a2230b306e47df26b18e2cdb3",
+      "legacy_instances": 0,
+      "expression_string_tokens": 39
+    },
+    {
+      "module": "Bootstrap.CrateQuery",
+      "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+      "old_sha256": "36d134efcc1fec63974c7b808bc7f409a8f4025108628b986fe7b974c449fad4",
+      "new_sha256": "9045d0e0b4615c85e642d49230520d86070e8a116c3dc3eb5c7adf5c4f807980",
+      "legacy_instances": 0,
+      "expression_string_tokens": 160
+    },
+    {
+      "module": "Bootstrap.Data",
+      "path": "libraries/mlf-language-core/Bootstrap/Data.hs",
+      "old_sha256": "c29372d02d878695878f86a178546dc469313174a5c9b1ee37bb35fd6ed85679",
+      "new_sha256": "9c414bdf4a699c001e953e42842f3904491ce7af7e2a5e36001a65216bda8c68",
+      "legacy_instances": 0,
+      "expression_string_tokens": 84
+    },
+    {
+      "module": "Bootstrap.Dependency",
+      "path": "libraries/mlf-frontend/Bootstrap/Dependency.hs",
+      "old_sha256": "6d0e85173411db7eda42d6c711792cb7f5e9b59fb80ccb8ebf280d67c1ca058b",
+      "new_sha256": "516ea1e67b423df4fb708536aa783ec468b7228a0e65c487ac2baafd19c7c385",
+      "legacy_instances": 0,
+      "expression_string_tokens": 1
+    },
+    {
+      "module": "Bootstrap.Desugar",
+      "path": "libraries/mlf-frontend/Bootstrap/Desugar.hs",
+      "old_sha256": "204940b5050730c0cff7a41f9a536af9d497ef49a3d4ab99cdc0e399d9cd3d7e",
+      "new_sha256": "b0322dafbf6664a4ad377006e5d62852972899de634d3e9ddbeec1e1d5d1b4bf",
+      "legacy_instances": 0,
+      "expression_string_tokens": 4
+    },
+    {
+      "module": "Bootstrap.Elaborate",
+      "path": "libraries/mlf-inference/Bootstrap/Elaborate.hs",
+      "old_sha256": "16cc88b5a46116ec607eebe7f779f8260552d3ba313d4d4544522e75b6867011",
+      "new_sha256": "ea6425f74d83ed02ba4c07f9e9d960a5ab2c0bf7ccf7e3d596bcf10f75f54dae",
+      "legacy_instances": 0,
+      "expression_string_tokens": 8
+    },
+    {
+      "module": "Bootstrap.Evidence",
+      "path": "libraries/mlf-inference/Bootstrap/Evidence.hs",
+      "old_sha256": "3a223d19bbfb0c4c7da162d21935e2d72bc4e2059cd1cf21cfd6f731d6c99e2b",
+      "new_sha256": "27fd8a246d9792ac950e15ae0b4187c8513d0cf455f259bbfb34407b83359361",
+      "legacy_instances": 0,
+      "expression_string_tokens": 11
+    },
+    {
+      "module": "Bootstrap.Fresh",
+      "path": "libraries/mlf-foundation/Bootstrap/Fresh.hs",
+      "old_sha256": "02c8894d30483d8d9961ebb5b6ba1cbb2121052329b1b25c67222abf507131b9",
+      "new_sha256": "7eeec3f65a6b8172bc76b3acb09f699642e4e6d93cb0c6e0bc6ae3d88c3b1869",
+      "legacy_instances": 1,
+      "expression_string_tokens": 0
+    },
+    {
+      "module": "Bootstrap.Graph",
+      "path": "libraries/mlf-inference/Bootstrap/Graph.hs",
+      "old_sha256": "89231ec2ce7e9c626aebf4978e78b2e92a411a40acfc16f432d6e853d0780ddc",
+      "new_sha256": "d72a6d404403efa3956ce25ac686638b4075ad91983049b29910899d43d01a0f",
+      "legacy_instances": 0,
+      "expression_string_tokens": 87
+    },
+    {
+      "module": "Bootstrap.Graph.Solver",
+      "path": "libraries/mlf-inference/Bootstrap/Graph/Solver.hs",
+      "old_sha256": "4e671fe79d94e1b808e158e8bfc430f51ca90a985df9bf8de4496da9d0234792",
+      "new_sha256": "c62a62585213527149e5ea8a0f322a8f7e8e7c985e8fd632f26ee3f50eae8ade",
+      "legacy_instances": 0,
+      "expression_string_tokens": 20
+    },
+    {
+      "module": "Bootstrap.Host",
+      "path": "libraries/mlf-foundation/Bootstrap/Host.hs",
+      "old_sha256": "7d585a184c6605068f03b6852d33a5aafdd7b3b83d5044853e356bb6ad882b2b",
+      "new_sha256": "5b1bd1f2a05ec496981630665df70190990420b27d5b4d288c471d3ea3ac42bf",
+      "legacy_instances": 0,
+      "expression_string_tokens": 24
+    },
+    {
+      "module": "Bootstrap.InferenceUnit",
+      "path": "libraries/mlf-crates/Bootstrap/InferenceUnit.hs",
+      "old_sha256": "17d368658a19bf839d5f0f60def18a7c79ea780b419b2829f23088ce5cd9b3df",
+      "new_sha256": "9272b04b47378fc69a97dc70a05ce6383febaa359dfa20898498835b984a832d",
+      "legacy_instances": 0,
+      "expression_string_tokens": 14
+    },
+    {
+      "module": "Bootstrap.IntMap",
+      "path": "libraries/mlf-foundation/Bootstrap/IntMap.hs",
+      "old_sha256": "463fd2c343596c5882083f32dd7ddca9845368c3532106a9e0c8dd48cca144e6",
+      "new_sha256": "4f7039cc12fd0bd038b3e73b23700a3add88f5c827502c3360d48b79b8e303b8",
+      "legacy_instances": 0,
+      "expression_string_tokens": 1
+    },
+    {
+      "module": "Bootstrap.IntSet",
+      "path": "libraries/mlf-foundation/Bootstrap/IntSet.hs",
+      "old_sha256": "3e897a9132923b34f37df0be4b55e232c67291139c00931c33fae3be4f294625",
+      "new_sha256": "30ea33591d154b771067fe8c2c6c20eac4b3be3d86f1f5ebf3d91642ca6d8836",
+      "legacy_instances": 0,
+      "expression_string_tokens": 0
+    },
+    {
+      "module": "Bootstrap.Kind",
+      "path": "libraries/mlf-language-core/Bootstrap/Kind.hs",
+      "old_sha256": "f842e96336a39f58a1f39b7386ee22335c39145eecb63b075d118bb614c1f63c",
+      "new_sha256": "453aebe46c80250d50a32ae84b9f5d1bb56f2effbe94018d0e67742fbffb4f3b",
+      "legacy_instances": 0,
+      "expression_string_tokens": 8
+    },
+    {
+      "module": "Bootstrap.Kinding",
+      "path": "libraries/mlf-language-core/Bootstrap/Kinding.hs",
+      "old_sha256": "9e895fce28c70860b48ebe77fa7d6da402196506d6560797e4c13e6e203bf7c6",
+      "new_sha256": "ced9814986923d0eb1c238ccaaf6ccd749da5a64f42e42a1418c6e2774d0bec4",
+      "legacy_instances": 0,
+      "expression_string_tokens": 4
+    },
+    {
+      "module": "Bootstrap.LLVM",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM.hs",
+      "old_sha256": "36b34b743e95468e9ade70db6c4461dd675f12d2b0322d18e390c4076e42d42f",
+      "new_sha256": "014859a83ddc9e609a3952300f19cc2a8c65974c829767ae1531fc73e60b1d56",
+      "legacy_instances": 0,
+      "expression_string_tokens": 56
+    },
+    {
+      "module": "Bootstrap.LLVM.Analysis",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/Analysis.hs",
+      "old_sha256": "e0f8350524c10c07b114628825878858803c418e6b274a121f36ed530497e970",
+      "new_sha256": "c446473e3ec46a328cd48e7c3643571a83782b6be150342e1d4333b3560eb6cd",
+      "legacy_instances": 0,
+      "expression_string_tokens": 0
+    },
+    {
+      "module": "Bootstrap.LLVM.Build",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/Build.hs",
+      "old_sha256": "a1f6ba4e99b96fce8da20c331dcc1781ec727fa242cb5059eb28510db8ec26ad",
+      "new_sha256": "4dae2f7ab77d9bb92bc727b1bf2569c3b7e47ae757ef5bd86faaa41afa0f3bc3",
+      "legacy_instances": 1,
+      "expression_string_tokens": 144
+    },
+    {
+      "module": "Bootstrap.LLVM.Codegen",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs",
+      "old_sha256": "8504e50e3a5c28e96750dd4c6fae079bd3944308f7ab5b4c3f6905aca8892439",
+      "new_sha256": "482ccb1fc88fba35616a18e61f194a27300b1e69231c1c51272496dad548c55f",
+      "legacy_instances": 0,
+      "expression_string_tokens": 359
+    },
+    {
+      "module": "Bootstrap.LLVM.Kernel",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/Kernel.hs",
+      "old_sha256": "106f468c8c3aac9190aed7b2332781805a763e503ce013ed988a428d86fe610d",
+      "new_sha256": "890810e3fd44ea437c4254a17534e3c7c4a4f13861f03fcea5a2966992835bd7",
+      "legacy_instances": 0,
+      "expression_string_tokens": 1
+    },
+    {
+      "module": "Bootstrap.LLVM.Native",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/Native.hs",
+      "old_sha256": "c41c2fe2a19b4497d191a0dfe8f29ca8be6bc3795477f2b42d78d045fe04ddc5",
+      "new_sha256": "47156210ae912eceb52f8768a3069bef31f34e7da7a062486a9ecdcf2ee6cded",
+      "legacy_instances": 0,
+      "expression_string_tokens": 337
+    },
+    {
+      "module": "Bootstrap.LLVM.Optimize",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs",
+      "old_sha256": "5f99edab9b621081db7c0495d6855b2e9e11ac2af9085e02d5966e4b13fc0dd8",
+      "new_sha256": "a609aa8c42c02cfabf256ba46d296991718718d7381c04d34c7b0d0fea75e840",
+      "legacy_instances": 1,
+      "expression_string_tokens": 1
+    },
+    {
+      "module": "Bootstrap.LLVM.StrictFields",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/StrictFields.hs",
+      "old_sha256": "47aa22a26464e82257f71573db6f193270f57701de0bb12cd15c00d647be086d",
+      "new_sha256": "ce722363d7fd2ac3a029526a1639c190e932a2fa0d4e60bd418802599ad869b9",
+      "legacy_instances": 0,
+      "expression_string_tokens": 0
+    },
+    {
+      "module": "Bootstrap.LLVM.StrictWrappers",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/StrictWrappers.hs",
+      "old_sha256": "7fcaab8d7ac89f7b92978825b28a9a2d5fce88d38fe5d742e8f01be07f7102e1",
+      "new_sha256": "1f911ca7714bdfe48be24a2306a8cd8d8fc295f8e8a8207c8f4420a3ed465a99",
+      "legacy_instances": 0,
+      "expression_string_tokens": 0
+    },
+    {
+      "module": "Bootstrap.Layout",
+      "path": "libraries/mlf-frontend/Bootstrap/Layout.hs",
+      "old_sha256": "425e467db4d20dd2fac84c22cec917f6bf142a6870c67333283f94db5e01933e",
+      "new_sha256": "0d7557a5d37824bdf8801f02d0c4b15cff393cd6aa1832c9bc01d78363b567e0",
+      "legacy_instances": 0,
+      "expression_string_tokens": 133
+    },
+    {
+      "module": "Bootstrap.Lexer",
+      "path": "libraries/mlf-frontend/Bootstrap/Lexer.hs",
+      "old_sha256": "951ea83945c879fc5126f0730497454e04e72cf2fb09b5de4822609b52657648",
+      "new_sha256": "bcd7b5f8ad136056ba918bbab1b86f03e3a1161c9143899e3d1f75245cee80e7",
+      "legacy_instances": 0,
+      "expression_string_tokens": 138
+    },
+    {
+      "module": "Bootstrap.Map",
+      "path": "libraries/mlf-foundation/Bootstrap/Map.hs",
+      "old_sha256": "33874bf97989a677e37baad9388fc8b677372fe6ea5a7d60fa860c68e62ab19b",
+      "new_sha256": "625bcced6d11149505155cd2bcb22d10ee176c87f4513146af6536dd941afa8d",
+      "legacy_instances": 0,
+      "expression_string_tokens": 3
+    },
+    {
+      "module": "Bootstrap.Module",
+      "path": "libraries/mlf-frontend/Bootstrap/Module.hs",
+      "old_sha256": "f8a9133e51bd8a543ad9e3c08972801740fbeb3eda3d57dbc575126b397b468a",
+      "new_sha256": "f96fb7dd85e94b746228ced54332d23bf42d212b503b49128b393016b1488afb",
+      "legacy_instances": 1,
+      "expression_string_tokens": 182
+    },
+    {
+      "module": "Bootstrap.Parsec",
+      "path": "libraries/mlf-frontend/Bootstrap/Parsec.hs",
+      "old_sha256": "4f4f384d4b004f4187f187c24e974e752eaa0c18a0b7feecdeb59514c027f9bd",
+      "new_sha256": "f0ec8b4c711d4e45a6754746ed08058caf010756165b7764143f55803deed2d2",
+      "legacy_instances": 1,
+      "expression_string_tokens": 16
+    },
+    {
+      "module": "Bootstrap.Parser",
+      "path": "libraries/mlf-frontend/Bootstrap/Parser.hs",
+      "old_sha256": "bd59ee45f6e7a7ad0bbd68d09cdff0f23e807d6f0b5acf19a7061c3c23638feb",
+      "new_sha256": "4484a425b2aadb073c8a92e369dbac7223ea9c19948e35be3834759337222ab6",
+      "legacy_instances": 0,
+      "expression_string_tokens": 301
+    },
+    {
+      "module": "Bootstrap.Prelude",
+      "path": "libraries/mlf-frontend/Bootstrap/Prelude.hs",
+      "old_sha256": "c4e5cb264bbe583991a7453da67c5b4c2593ae436e7eb6c53607c5c43d4cbfcc",
+      "new_sha256": "2ebe13bdb4af50be50a4391bcd893697c89caadf839dde1c48de24dce6887596",
+      "legacy_instances": 0,
+      "expression_string_tokens": 256
+    },
+    {
+      "module": "Bootstrap.Primitive",
+      "path": "libraries/mlf-language-core/Bootstrap/Primitive.hs",
+      "old_sha256": "1b458aca177ecfea87ab92d83ca975d7090adfbe2bd53445ff00693b277df0aa",
+      "new_sha256": "cce71f5a56a9d33be85857d743d11bcd73df8feba898a1f2ea106d4d30ed3279",
+      "legacy_instances": 0,
+      "expression_string_tokens": 472
+    },
+    {
+      "module": "Bootstrap.ProcessHost",
+      "path": "libraries/mlf-interpreter/Bootstrap/ProcessHost.hs",
+      "old_sha256": "9668b2b4fd380a07d54b9b62123377995c11a72f7b1cc92f3b5df522f2133c04",
+      "new_sha256": "792cf2f725e7d6a5bd629feef085ffed71d5bedbe80205fd0d2181f952d680ac",
+      "legacy_instances": 0,
+      "expression_string_tokens": 16
+    },
+    {
+      "module": "Bootstrap.Regex",
+      "path": "libraries/mlf-foundation/Bootstrap/Regex.hs",
+      "old_sha256": "2c57d098db22b06722b70187f959b0211d9b1513b115cdc3bae59557b2acc9a7",
+      "new_sha256": "3dbfc4a497c506fbcc7fead39ba5b0dbcb4113ef54ee89d7f78e13f5f001e403",
+      "legacy_instances": 0,
+      "expression_string_tokens": 21
+    },
+    {
+      "module": "Bootstrap.Runtime",
+      "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+      "old_sha256": "d565b81a4d83a7f9c121af9d1070318ddc9997e27f50a4d6c5ab5ce58c850758",
+      "new_sha256": "3e325c475293e50b7021b017ac934770ae59f2144c86cc59605d4d376ef245f0",
+      "legacy_instances": 0,
+      "expression_string_tokens": 61
+    },
+    {
+      "module": "Bootstrap.ST",
+      "path": "libraries/mlf-foundation/Bootstrap/ST.hs",
+      "old_sha256": "afdb0d21f044d40212d695118c95d85baa86a8c8f45fe3b07cd63e0ccfd9db9f",
+      "new_sha256": "b57dfe7a9a89fd6edda046445342c47c649d1b4f9ea3dd6c9acfc7aae925302f",
+      "legacy_instances": 0,
+      "expression_string_tokens": 0
+    },
+    {
+      "module": "Bootstrap.Separate",
+      "path": "libraries/mlf-crates/Bootstrap/Separate.hs",
+      "old_sha256": "d6c02a23e1635c96723f4dc28a0639d9dbadf51fcd240dfb9787771eac3c1641",
+      "new_sha256": "95c18c6fc94b2284cd5181d1c7b57c3609b634b6d909d0e691b92266a0938fe2",
+      "legacy_instances": 0,
+      "expression_string_tokens": 158
+    },
+    {
+      "module": "Bootstrap.Set",
+      "path": "libraries/mlf-foundation/Bootstrap/Set.hs",
+      "old_sha256": "5620e450a8cc443b69c48d46bfc8467009fe32114bf21e57f358321e29bba427",
+      "new_sha256": "94cc73baef625734a9f76a4702eb9fb7f1b8ff6266d3ff1cbf61ac4efaae3509",
+      "legacy_instances": 0,
+      "expression_string_tokens": 0
+    },
+    {
+      "module": "Bootstrap.SourceEquality",
+      "path": "libraries/mlf-crates/Bootstrap/SourceEquality.hs",
+      "old_sha256": "f2ae0f38479f08973a59c164843d80034d9a825ca932b004210839414b8a79d2",
+      "new_sha256": "7688f1910dbb10a98a8440baf8cae8dc498d04ebf41d5ee56d41cd317653bf08",
+      "legacy_instances": 0,
+      "expression_string_tokens": 0
+    },
+    {
+      "module": "Bootstrap.Std",
+      "path": "libraries/mlf-foundation/Bootstrap/Std.hs",
+      "old_sha256": "d8cfc6bbb45865732b90dd970ae67992ff8ba5bb4dda947db463bb76c81fa584",
+      "new_sha256": "edf7d3c66565b6c11639236d5d9f54ffdaac871137c07c68e3c8be0c6a75892d",
+      "legacy_instances": 2,
+      "expression_string_tokens": 10
+    },
+    {
+      "module": "Bootstrap.Surface",
+      "path": "libraries/mlf-frontend/Bootstrap/Surface.hs",
+      "old_sha256": "7ae6e67fa5205da16cc90fde1dac1fea12b2fb856c8610d3d821e806f3615f7f",
+      "new_sha256": "5d392a69ef4c9335d0de3bc26a8b18121d4ba302b42e83e4e44fa4ae3cff2b1a",
+      "legacy_instances": 0,
+      "expression_string_tokens": 19
+    },
+    {
+      "module": "Bootstrap.Types",
+      "path": "libraries/mlf-foundation/Bootstrap/Types.hs",
+      "old_sha256": "4c722bbbf64af07c26cb0a352a849fa1d089e1335f634392cf5dc24b2981f438",
+      "new_sha256": "94df8a8cb1e1c1fdb23c638631b42e99ad29d30490f149e6df676fd2f405f771",
+      "legacy_instances": 0,
+      "expression_string_tokens": 0
+    },
+    {
+      "module": "Bootstrap.Unicode",
+      "path": "libraries/mlf-foundation/Bootstrap/Unicode.hs",
+      "old_sha256": "291c8cd0c6a67840aa9583208102b93e79b8893ce39d61136f65022caeb5b78b",
+      "new_sha256": "a20db5c9ba597befc1c8be873b5845b765fbd53b7f9977e3948c4d5349c36541",
+      "legacy_instances": 0,
+      "expression_string_tokens": 5
+    },
+    {
+      "module": "Bootstrap.Version",
+      "path": "libraries/mlf-foundation/Bootstrap/Version.hs",
+      "old_sha256": "fc465fb3ad31816253045c591ef5be139677eb59f9371efd7aab23d8158ca975",
+      "new_sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479",
+      "legacy_instances": 0,
+      "expression_string_tokens": 1
+    },
+    {
+      "module": "Bootstrap.X.Check",
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Check.hs",
+      "old_sha256": "c99132c75274bdf724755dc1df24b11da11db179acf8003fe4693d3bae7cd8c7",
+      "new_sha256": "f804113af862fd2eb213eea1644e6f731255ce8625f637ea4ae824e8061b9ef3",
+      "legacy_instances": 0,
+      "expression_string_tokens": 38
+    },
+    {
+      "module": "Bootstrap.X.Checked",
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Checked.hs",
+      "old_sha256": "8519e41ab9f45c3d5fda01eb7f9daeebafe425ed122cd658fd6bb54ff5832297",
+      "new_sha256": "b732c7a65dbf2aebf1eb5213a10613ccade422626b90bd7d693e66398b22ef63",
+      "legacy_instances": 0,
+      "expression_string_tokens": 0
+    },
+    {
+      "module": "Bootstrap.X.Parser",
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Parser.hs",
+      "old_sha256": "94cee4a66334a9c40d4079c7bdc9593c0baa4e75c57df5af34768453f6f700fe",
+      "new_sha256": "1dafad97a593ae1c32928b696c0753559870e713a11ddd609a4cc57468fba9c7",
+      "legacy_instances": 0,
+      "expression_string_tokens": 120
+    },
+    {
+      "module": "Bootstrap.X.Pretty",
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Pretty.hs",
+      "old_sha256": "8338d67750cb71ff26c560935efad896b7f4c0168859c1dad78792fe2c5b6a3c",
+      "new_sha256": "67120bd5eadc00d3e191c6a56e8e81f5f240f05b42a2e6356b2e277959c53a2c",
+      "legacy_instances": 0,
+      "expression_string_tokens": 92
+    },
+    {
+      "module": "Bootstrap.X.Syntax",
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Syntax.hs",
+      "old_sha256": "67d22a54544dd19eca6a98ad19a3ad5c9e21393c2501d110dd004d727bdaa6d2",
+      "new_sha256": "85e34ce735f11a31d1ebe66b5e89a8cb235a659842d897f5898fc738acb643c2",
+      "legacy_instances": 0,
+      "expression_string_tokens": 0
+    },
+    {
+      "module": "Bootstrap.X.Type",
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Type.hs",
+      "old_sha256": "4d3f87a415a5350b1014c4fdb19d8a3e6948683925f16e866f1fc1661ed9a016",
+      "new_sha256": "dc0eab061cbd7a28dad2d130667649330c552eb8f15b76897682208cdf1592c1",
+      "legacy_instances": 0,
+      "expression_string_tokens": 5
+    },
+    {
+      "module": "MLF.Entry.CompilerTests",
+      "path": "tests/MLF/Entry/CompilerTests.hs",
+      "old_sha256": "11fe3c1cf7fc0f6f88c325b58af57eb172a7d43dbf46cbfa26228e078bf160c4",
+      "new_sha256": "5882d522ed92d66b28a08c9c94f1db0f560cfc7c46a873a685554e89187ff440",
+      "legacy_instances": 0,
+      "expression_string_tokens": 0
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "path": "bootstrap/MLF/Entry/Emlf.hs",
+      "old_sha256": "d6c774e550722213b1a2c8bdf0a72018c3de350a59e4c9af5291db19e341c152",
+      "new_sha256": "67345c82aadfc57dbf460a34b7ee956df559b3818f782fbc61c8b3138a751940",
+      "legacy_instances": 0,
+      "expression_string_tokens": 62
+    },
+    {
+      "module": "MLF.Entry.Mlfpkg",
+      "path": "package/MLF/Entry/Mlfpkg.hs",
+      "old_sha256": "c01ed142f212a5468922f2fb6c6666e34d26f8fe8b3b56034bd964c6c19892d5",
+      "new_sha256": "97d9ec1a4ecc909947902d4edb95296134a39d2f94cc6dc34762bea01d298be6",
+      "legacy_instances": 0,
+      "expression_string_tokens": 2
+    },
+    {
+      "module": "MLF.Entry.TupleList",
+      "path": "tests/MLF/Entry/TupleList.hs",
+      "old_sha256": "e9896a6f0c060c3f627b628c4f3aa4417e84136c21c37dd42983db936ae52ab8",
+      "new_sha256": "f5115f6ea00af7ef14a3b84c76e4f2a13844cb4b5db387d1a9cccc85f06cbd2f",
+      "legacy_instances": 0,
+      "expression_string_tokens": 286
+    },
+    {
+      "module": "MLF.Tests.Async.ProcessMain",
+      "path": "tests/shared/MLF/Tests/Async/ProcessMain.hs",
+      "old_sha256": "454c0e272b579c356a0d141d4f698d4ffab3f6be4eeb5ad90cedf6061f60c9b0",
+      "new_sha256": "91af4f62f386ef8051ae5cf7d37543a6a9719f856b0d424dcfce07f769fdacb6",
+      "legacy_instances": 0,
+      "expression_string_tokens": 231
+    },
+    {
+      "module": "MLF.Tests.Async.ProcessPanic",
+      "path": "tests/shared/MLF/Tests/Async/ProcessPanic.hs",
+      "old_sha256": "06bac268b0534e31e657184b7bd25546321b2003caa0da165dac0ff673d08b47",
+      "new_sha256": "9674059e6d96e88c3680b9cf7d95988d25734c73a534f29ae5c0983fbb00dae4",
+      "legacy_instances": 0,
+      "expression_string_tokens": 11
+    },
+    {
+      "module": "MLF.Tests.Async.TaskMain",
+      "path": "tests/shared/MLF/Tests/Async/TaskMain.hs",
+      "old_sha256": "2935774ad472b29e82e0a84b6cff2e306acf8d7694ff0ca24f50731fa1221769",
+      "new_sha256": "f4b853644d94dd3ff78ea99f93f569c68a8d8124f98892657e5d8dc0c45fa3a8",
+      "legacy_instances": 0,
+      "expression_string_tokens": 55
+    },
+    {
+      "module": "MLF.Tests.Async.TaskProcesses",
+      "path": "tests/shared/MLF/Tests/Async/TaskProcesses.hs",
+      "old_sha256": "d01ab80523e362c6dfa00fc9cf90906a7bb4dd03a18bbd8c4e1a1938b777331d",
+      "new_sha256": "a201af5e8a209ce05d81217684504064fd9824257f7c1bb43f008e8d2f34c6b9",
+      "legacy_instances": 0,
+      "expression_string_tokens": 175
+    },
+    {
+      "module": "MLF.Tests.Async.TaskWaitGraph",
+      "path": "tests/shared/MLF/Tests/Async/TaskWaitGraph.hs",
+      "old_sha256": "d8410eb1c49992255a73e1c1f8273fddb593e28e6d8596e315b229cb4d95d412",
+      "new_sha256": "2e6ff3b3786f800d0afb2c534eafbc36cae0f87df46d70f4f1337ffd973fcb94",
+      "legacy_instances": 0,
+      "expression_string_tokens": 20
+    },
+    {
+      "module": "MLF.Tests.BuildReceipts",
+      "path": "tests/shared/MLF/Tests/BuildReceipts.hs",
+      "old_sha256": "340fb1cc2b7b7f1949bcd458715b8465fb8084549b5e144b4a919e2131bd6176",
+      "new_sha256": "340fb1cc2b7b7f1949bcd458715b8465fb8084549b5e144b4a919e2131bd6176",
+      "legacy_instances": 0,
+      "expression_string_tokens": 26
+    },
+    {
+      "module": "MLF.Tests.SharedFrontend",
+      "path": "tests/shared/MLF/Tests/SharedFrontend.hs",
+      "old_sha256": "2cc99e618fa2b580d9e07ef8e5caadd6e47826cacd438abda27757c9cd3f9078",
+      "new_sha256": "aec1dc6b1c94c610be0b5a17f0db18a6163f55334156e8b9cd38ff637c4e5dbe",
+      "legacy_instances": 0,
+      "expression_string_tokens": 197
+    },
+    {
+      "module": "Package.Benchmark",
+      "path": "libraries/mlf-developer-tools/Package/Benchmark.hs",
+      "old_sha256": "3ff82005852a2a317adf67668a9845a70698b28fd23ea1af451861bdd0ee1c9e",
+      "new_sha256": "e5d16234525d26107515b9ea1f2b7af3f69cac38fc7401c2086bab9664712f4d",
+      "legacy_instances": 0,
+      "expression_string_tokens": 343
+    },
+    {
+      "module": "Package.Build",
+      "path": "libraries/mlf-package-core/Package/Build.hs",
+      "old_sha256": "5d6d13e68aa32465532b9644cf26ef90ef22b53791fda3f15cd7af9c0b231ced",
+      "new_sha256": "23a2b196f3e14e8d938c61e10bd91ad8935d03dcabce2a6f9d794c5e2949596b",
+      "legacy_instances": 0,
+      "expression_string_tokens": 787
+    },
+    {
+      "module": "Package.Command",
+      "path": "libraries/mlf-package-core/Package/Command.hs",
+      "old_sha256": "139ceda4bae6d6ca7fb357c9cbcffcdc9ec6665bffb7473024e024e62e75729b",
+      "new_sha256": "065836466ad242a0d5c12487d5c457c6d6323a33cb5c5459af43fecefd1ac07a",
+      "legacy_instances": 0,
+      "expression_string_tokens": 568
+    },
+    {
+      "module": "Package.Distribution",
+      "path": "libraries/mlf-package-core/Package/Distribution.hs",
+      "old_sha256": "fa1869cb0e8d971df5b93886a23ad8c842a465321ee307cd8aeea55d87167ec9",
+      "new_sha256": "ffe329d4fe8289622635b8dc79add6b594874d3ccaba628883adaf04960af04c",
+      "legacy_instances": 0,
+      "expression_string_tokens": 121
+    },
+    {
+      "module": "Package.Json",
+      "path": "libraries/mlf-package-core/Package/Json.hs",
+      "old_sha256": "1a8ff9b5b5fe62121228c573488d5c3fa2bd1f8927a66ef2f079033b1ee7e8bf",
+      "new_sha256": "2be8fca3db0cc3ebe39032abab1294b7578530cf9d97bb9654ba0e4c33a00f74",
+      "legacy_instances": 0,
+      "expression_string_tokens": 34
+    },
+    {
+      "module": "Package.Manifest",
+      "path": "libraries/mlf-package-core/Package/Manifest.hs",
+      "old_sha256": "ded10ff1d28db70711ac2e29999fe34b635aba6526dfcf5afc65449514e9625c",
+      "new_sha256": "553e42e787cb1cf1b1ae2b2cfe572aab9a8a4319e46ba3e47c56ace5cc165c5b",
+      "legacy_instances": 0,
+      "expression_string_tokens": 204
+    },
+    {
+      "module": "Package.OS",
+      "path": "libraries/mlf-package-core/Package/OS.hs",
+      "old_sha256": "62d0e629c785c16061c6c5f5c100008c3de1f3d4d313ae0170a86e6463deca3f",
+      "new_sha256": "42db40981c9a9c1b145b4b91da51a48369feebe0578208e4ec9a5237f4f54555",
+      "legacy_instances": 0,
+      "expression_string_tokens": 92
+    },
+    {
+      "module": "Package.Release",
+      "path": "libraries/mlf-package-core/Package/Release.hs",
+      "old_sha256": "1b119502eab553aa56cff2b8ab177a8086aecbf1b29fdeafe3bc1ed60c92dc92",
+      "new_sha256": "1d98f341903ae04028a99509affbe7585dfeaecd688886f7b14fe9128cd8f938",
+      "legacy_instances": 0,
+      "expression_string_tokens": 160
+    },
+    {
+      "module": "Package.Scheduler",
+      "path": "libraries/mlf-package-core/Package/Scheduler.hs",
+      "old_sha256": "490a030cee5cc121470532b8a4aaaf2d42614e27e319c989660976c70799bb6c",
+      "new_sha256": "3b2fce51037c376f9908948684b5bfbbe96f355b5dd9ece3e527dec63dce98b0",
+      "legacy_instances": 0,
+      "expression_string_tokens": 244
+    },
+    {
+      "module": "Package.Verification",
+      "path": "libraries/mlf-developer-tools/Package/Verification.hs",
+      "old_sha256": "daa942443554c093e7db28743bedfde8645cbdb3ddc724c2d6c6b6b5fe187d44",
+      "new_sha256": "47a262d16477e82dcd6a42086a072a10e8fd8a10eaf47378644da363718bc37a",
+      "legacy_instances": 0,
+      "expression_string_tokens": 319
+    },
+    {
+      "module": "Tests.BuildReceipts",
+      "path": "tests/Tests/BuildReceipts.hs",
+      "old_sha256": "4a767a44500b9dcf923ebc348d4ae6fdb4dd0c661929b87daf9b6250d3db781c",
+      "new_sha256": "4a767a44500b9dcf923ebc348d4ae6fdb4dd0c661929b87daf9b6250d3db781c",
+      "legacy_instances": 0,
+      "expression_string_tokens": 2
+    },
+    {
+      "module": "Tests.Catalog",
+      "path": "tests/Tests/Catalog.hs",
+      "old_sha256": "b8b55dd6d1daad141af8f40c6a51a86e2a030ca33ddd89ece046db76b32f9d0c",
+      "new_sha256": "fe36a761496d2c333cd7e185cc6a0e1afc31dae5ba7deb2811664f9578f0f9c2",
+      "legacy_instances": 0,
+      "expression_string_tokens": 291
+    },
+    {
+      "module": "Tests.CompilerTests",
+      "path": "tests/Tests/CompilerTests.hs",
+      "old_sha256": "305c818b62aaecba5f91d7390a9eee6c7c8db60d1ea952f1a5a8ebaab510920e",
+      "new_sha256": "6707f5874e40a8159f6295fc271397ac71c4aacf73e1447881ee9c281c931310",
+      "legacy_instances": 0,
+      "expression_string_tokens": 1059
+    },
+    {
+      "module": "Tests.CorePartitions",
+      "path": "tests/Tests/CorePartitions.hs",
+      "old_sha256": "dd47cf42dc58eef582a1005627210eeccb4a22c3aa38777504be80cbcedc57ff",
+      "new_sha256": "074ec18485fc1fb79a4186cbf6b9eb9bfe9ad9e8d87c7e9b1ea97699e8590aab",
+      "legacy_instances": 0,
+      "expression_string_tokens": 11
+    },
+    {
+      "module": "Tests.Coverage",
+      "path": "tests/Tests/Coverage.hs",
+      "old_sha256": "9ea84ee0d003f396aa2f8ab57e872ba70fd4d516f02cfad979cdd3ae81f0798b",
+      "new_sha256": "9df0991ce71f93dfb75af10157b42cd404629bae7b13628580c0e9fc8c7ccc6d",
+      "legacy_instances": 0,
+      "expression_string_tokens": 184
+    },
+    {
+      "module": "Tests.IndependentCheck",
+      "path": "tests/Tests/IndependentCheck.hs",
+      "old_sha256": "51fca95680cf77dab70d9e9cc1312682832462433eedc7466b25da3558bd5fc8",
+      "new_sha256": "e6cff46f37c86cf5f5eb28eb4c38cf8f7d1233bacd9140bc0af1e54b38f40528",
+      "legacy_instances": 0,
+      "expression_string_tokens": 38
+    },
+    {
+      "module": "Tests.IndependentType",
+      "path": "tests/Tests/IndependentType.hs",
+      "old_sha256": "fdb9b6ef454b4ed3ac83836187d8f2388d0595b40735d0e6f47f57797c8d00f3",
+      "new_sha256": "94d1397fd6621668f534078375fbd507fd5d41434ae885aed0a4fb8ff18dbdd8",
+      "legacy_instances": 0,
+      "expression_string_tokens": 5
+    },
+    {
+      "module": "Tests.Selection",
+      "path": "tests/Tests/Selection.hs",
+      "old_sha256": "2224c81cf99c284ce40a559179ce7f73020ddb16292e3755f33bf3fedc88b4bd",
+      "new_sha256": "1b7bbdc0616c7f34d8119304e82ccc8e798b75a270bde0e544ec514af048a52f",
+      "legacy_instances": 0,
+      "expression_string_tokens": 80
+    },
+    {
+      "module": "Tests.TestDrivers",
+      "path": "tests/Tests/TestDrivers.hs",
+      "old_sha256": "9102df074f9f2d19c2f4acd92ce09f1354bb34c84897387fe9d0f140ed59dd03",
+      "new_sha256": "68de0d943a5e38d0337b9946bfe68d2b197d195aa181fac6482f065d06768ece",
+      "legacy_instances": 0,
+      "expression_string_tokens": 67
+    },
+    {
+      "module": "Tests.TestSources",
+      "path": "tests/Tests/TestSources.hs",
+      "old_sha256": "0a12dd165bd0a2c66b9e6f6429ba38d455df5d9a636ea1873ff05b1209494ad6",
+      "new_sha256": "feeb124ab106347c35854c0c7888f80ca0de4e20b951caccaef63de775d344e5",
+      "legacy_instances": 0,
+      "expression_string_tokens": 6
+    }
+  ],
+  "tool_sources": {
+    "tools/shared-migration/Hierarchy.hs": "e0e5542af2945de57f0ff9bdf1f89f82bce98317df576fe17318a1fc862f7373",
+    "tools/shared-migration/Main.hs": "b4ff70c5bb185f85cb53a4ee37f3d952beb9f418c1e47ede818a562ee3d667fb",
+    "tools/shared-migration/Audit.hs": "9ee950a31c9e21f0544ccc7ee5c2313f9ed9f1bfed5eb9b186901d8cd321394b",
+    "tools/shared-migration/audit-scope.py": "991fae64e243e663b54c88aeda7012a689ae459be97448ea9b6766c15adacd97",
+    "tools/shared-migration/Migrate.hs": "06a0db823fcaffbcd3d596b6ba2ca7edc4c8e3f41b94acffdd49c58a407f2b49",
+    "tools/shared-migration/adjust.py": "1248548b554f641a9d30aecdb60957b82f777530d51fe7abfec9ada8c665629e",
+    "tools/shared-migration/migrate.py": "e6c86d418e359cfcc468793132aee4f499869ae828c4c8d7f8af0453453869f3",
+    "tools/shared-migration/Adjust.hs": "0b2fdba6c2f11c398d022bcd3456f50b6290030b2e32bb579c08214657defa46"
+  }
+}
