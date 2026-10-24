@@ -13,6 +13,8 @@ import qualified Bootstrap.X.Check as C
 import qualified Bootstrap.X.Parser as XP
 import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Type as T
+import qualified Tests.IndependentCheck as Independent
+import qualified Tests.IndependentType as IndependentType
 import Bootstrap.X.Pretty (prettyTerm)
 import Tests.System
 import qualified Package.OS as O
@@ -27,6 +29,36 @@ build mode libraries = (compileModulesWithPrelude mode (sources libraries) "Main
 
 checkModule : PreludeMode -> List (Pair String String) -> String -> IO Compilation
 checkModule mode libraries input = do { result <- (H.right (build mode libraries input)); do { parsed <- (H.right (XP.parseTerm "<module xMLF>" (prettyTerm (compiledTerm result)))); do { ty <- (H.right (C.checkClosed parsed)); do { (H.assert (T.alphaEq ty (inferredType result)) "module target round trip changed type"); do { (H.assert (H.eq (X.erase parsed) (X.erase (compiledTerm result))) "module target round trip changed erasure"); (return result) } } } } }
+
+-- Type-only fixtures never enter modulePrograms or a runtime campaign. The
+-- unsigned cycle below preserves the former rejection's exact divergent source.
+data ModuleTyping = ModuleTyping String (List (Pair String String)) String XType
+
+moduleTypings : List ModuleTyping
+moduleTypings = Cons
+  (ModuleTyping "cross-module recursion infers unsigned cycle"
+    (Cons (Pair "A" "module A where\nimport qualified B\nf x = B.g x\n")
+    (Cons (Pair "B" "module B where\nimport qualified A\ng x = A.f x\n") Nil))
+    "module Main where\nimport A\nmain = f 0\n" XBot) Nil
+
+checkTypedModuleTarget : XType -> XTerm -> IO Unit
+checkTypedModuleTarget expected term = do
+  current <- H.right (C.checkClosed term)
+  frozen <- H.right (Independent.checkClosed term)
+  H.assert (IndependentType.alphaEq current expected) "module current target has wrong prescribed type"
+  H.assert (IndependentType.alphaEq frozen expected) "module independent target has wrong prescribed type"
+  decoded <- H.right (XP.parseTerm "<type-only module xMLF>" (prettyTerm term))
+  currentRoundtrip <- H.right (C.checkClosed decoded)
+  frozenRoundtrip <- H.right (Independent.checkClosed decoded)
+  H.assert (IndependentType.alphaEq currentRoundtrip expected) "module current roundtrip has wrong prescribed type"
+  H.assert (IndependentType.alphaEq frozenRoundtrip expected) "module independent roundtrip has wrong prescribed type"
+  H.assert (X.equalErased (X.erase term) (X.erase decoded)) "module type-only roundtrip changed erasure"
+
+checkModuleTyping : ModuleTyping -> Pair String (IO Unit)
+checkModuleTyping (ModuleTyping name libraries source expected) = Pair ("modules typing: " ++ name) do
+  result <- checkModule ImplicitPrelude libraries source
+  H.assert (IndependentType.alphaEq (inferredType result) expected) "module inference has wrong prescribed type"
+  checkTypedModuleTarget expected (compiledTerm result)
 
 numbers : List (Pair String String)
 numbers = (Cons (Pair "Math.Numbers" (S.unlines (Cons "module Math.Numbers (inc, twice, factorial) where" (Cons "inc x = x + 1" (Cons "twice f x = f (f x)" (Cons "factorial : Int -> Int" (Cons "factorial 0 = 1" (Cons "factorial n = n * factorial (n-1)" (Cons "private = 99" Nil))))))))) Nil)
@@ -90,20 +122,16 @@ cyclicModuleRejections = Cons
     (Cons (Pair "A" "module A (missing, module B) where\nimport B\n")
     (Cons (Pair "B" "module B (module A) where\nimport A\n") Nil))
     "module Main where\nimport A\nmain = 42\n" ModuleResolution "not in scope: missing")
-  (Cons (ModuleRejection "cross-module recursion retains existing signature requirement"
-    (Cons (Pair "A" "module A where\nimport qualified B\nf x = B.g x\n")
-    (Cons (Pair "B" "module B where\nimport qualified A\ng x = A.f x\n") Nil))
-    "module Main where\nimport A\nmain = f 0\n" ModuleResolution "requires an explicit closed signature")
   (Cons (ModuleRejection "downstream orphan cannot leak into an import cycle"
     (Cons (Pair "A" "module A (Render(..), text) where\nimport B ()\nclass Render a where { render : a -> String }\ntext : String\ntext = render 42\n")
     (Cons (Pair "B" "module B () where\nimport A ()\n")
     (Cons (Pair "Orphan" "module Orphan () where\nimport A (Render(..))\ninstance Render Int where { render = showInt }\n") Nil)))
-    "module Main where\nimport A\nimport Orphan ()\nmain = putStrLn text\n" Resolution "no instance or given constraint for A.Render Int") Nil)))
+    "module Main where\nimport A\nimport Orphan ()\nmain = putStrLn text\n" Resolution "no instance or given constraint for A.Render Int") Nil))
 
 legacyModuleRejections = (Cons (ModuleRejection "private function" numbers "module Main where\nimport Math.Numbers\nmain = private\n" ModuleResolution "not in scope: private") (Cons (ModuleRejection "qualified private function" numbers "module Main where\nimport qualified Math.Numbers as N\nmain = N.private\n" ModuleResolution "not in scope: N.private") (Cons (ModuleRejection "selected imports exclude others" numbers "import Math.Numbers (inc)\nfactorial 6" ModuleResolution "not in scope: factorial") (Cons (ModuleRejection "qualified-only is not unqualified" numbers "import qualified Math.Numbers\ninc 1" ModuleResolution "not in scope: inc") (Cons (ModuleRejection "alias replaces qualified module name" numbers "import Math.Numbers as N\nMath.Numbers.inc 1" ModuleResolution "not in scope: Math.Numbers.inc") (Cons (ModuleRejection "hiding also affects qualification" numbers "import Math.Numbers hiding (inc)\nMath.Numbers.inc 1" ModuleResolution "not in scope: Math.Numbers.inc") (Cons (ModuleRejection "unknown import selection" numbers "import Math.Numbers (missing)\n42" ModuleResolution "not in scope: missing") (Cons (ModuleRejection "unknown hidden name" numbers "import Math.Numbers hiding (missing)\n42" ModuleResolution "not in scope: missing") (Cons (ModuleRejection "private constructor" (Cons (Pair "A" "module A (Box, make) where\ndata Box = Box Int\nmake = Box\n") Nil) "import A\nBox 42" ModuleResolution "not in scope: Box") (Cons (ModuleRejection "type-only selective import" box "import Data.Box (Box)\nBox 42" ModuleResolution "not in scope: Box") (Cons (ModuleRejection "member belongs to selected type" box "import Data.Box (Box(Other))\n42" ModuleResolution "not a visible member") (Cons (ModuleRejection "private type annotation" (Cons (Pair "A" "module A (make) where\ndata Box = Box Int\nmake = Box\n") Nil) "import A\n(make 42 : Box)" ModuleResolution "not in scope: Box") (Cons (ModuleRejection "hidden members cannot be reexported" (Cons (Pair "A" "module A (Box) where\ndata Box = Box Int\n") (Cons (Pair "B" "module B (Box(..)) where\nimport A\n") Nil)) "import B\nBox 42" ModuleResolution "not in scope: Box") (Cons (ModuleRejection "default exports exclude imports" (Cons (Pair "A" "module A where\nx = 1\n") (Cons (Pair "B" "module B where\nimport A\ny = x\n") Nil)) "import B\nx" ModuleResolution "not in scope: x") (Cons (ModuleRejection "transitive names are not imported" rendering "import Facade\nprefix" ModuleResolution "not in scope: prefix") (Cons (ModuleRejection "distinct imports are ambiguous" (Cons (Pair "A" "module A where\nx = 1\n") (Cons (Pair "B" "module B where\nx = 2\n") Nil)) "import A\nimport B\nx" ModuleResolution "ambiguous name x") (Cons (ModuleRejection "top-level import collision requires hiding" (Cons (Pair "A" "module A where\nx = 1\n") Nil) "module Main where\nimport A\nx = 2\nmain = x\n" ModuleResolution "ambiguous name x") (Cons (ModuleRejection "explicit reexport conflict" (Cons (Pair "A" "module A where\nx = 1\n") (Cons (Pair "B" "module B where\nx = 2\n") (Cons (Pair "Both" "module Both (A.x, B.x) where\nimport qualified A\nimport qualified B\n") Nil))) "import Both\n42" ModuleResolution "conflicting declarations or exports") (Cons (ModuleRejection "unknown module reexport" Nil "module Main (module Missing) where\nmain = 42\n" ModuleResolution "unimported module") (Cons (ModuleRejection "qualified-only module reexport has no unqualified names" (Cons (Pair "A" "module A where\nx = 1\n") (Cons (Pair "B" "module B (module A) where\nimport qualified A\n") Nil)) "import B\nx" ModuleResolution "not in scope: x") (Cons (ModuleRejection "empty exports" (Cons (Pair "A" "module A () where\nx = 1\n") Nil) "import A\nx" ModuleResolution "not in scope: x") (Cons (ModuleRejection "missing module" Nil "import Missing\n42" ModuleResolution "cannot find module Missing") (Cons (ModuleRejection "mismatched module header" (Cons (Pair "A" "module B where\nx = 1\n") Nil) "import A\n42" ModuleResolution "expected module A, found B") (Cons (ModuleRejection "unnamed library" (Cons (Pair "A" "x = 1\nmain = x\n") Nil) "import A\n42" ModuleResolution "expected module A, found an unnamed script") (Cons (ModuleRejection "cyclic import still checks invalid declarations" (Cons (Pair "A" "module A where\nimport B\nx = missing\n") (Cons (Pair "B" "module B where\nimport A\ny = 2\n") Nil)) "import A\n42" ModuleResolution "not in scope: missing") (Cons (ModuleRejection "self import still checks invalid declarations" Nil "module Main where\nimport Main\nmain = missing\n" ModuleResolution "not in scope: missing") (Cons (ModuleRejection "module header followed by bare expression" Nil "module Main where\n42\n" Parsing "declarations only") (Cons (ModuleRejection "imports must precede definitions" Nil "module Main where\nmain = 42\nimport Prelude\n" Parsing "import") (Cons (ModuleRejection "definitions cannot be qualified" Nil "module Main where\nA.f = 42\n" Parsing "named modules contain declarations only") (Cons (ModuleRejection "explicit empty Prelude removes value names" Nil "module Main where\nimport Prelude ()\nmain = printInt 42\n" ModuleResolution "not in scope: printInt") (Cons (ModuleRejection "qualified Prelude suppresses implicit Prelude" Nil "module Main where\nimport qualified Prelude as P\nmain = return 42\n" ModuleResolution "not in scope: return") (Cons (ModuleRejection "Prelude cannot be redefined" Nil "module Prelude where\nmain = 42\n" ModuleResolution "built-in module") (Cons (ModuleRejection "primitive constructor cannot be redefined" Nil "module Main where\ndata Foo = Unit\nmain = Unit\n" ModuleResolution "primitive constructor") (Cons (ModuleRejection "primitive type cannot be redefined" Nil "module Main where\ndata Int = Number\nmain = Number\n" ModuleResolution "primitive type") (Cons (ModuleRejection "unused private definitions still checked" (Cons (Pair "A" "module A (x) where\nx = 42\nbad = missing\n") Nil) "import A\nx" ModuleResolution "not in scope: missing") (Cons (ModuleRejection "export list cannot name missing value" Nil "module Main (missing) where\nmain = 42\n" ModuleResolution "not in scope: missing") (Cons (ModuleRejection "recursive signature error names the source function" Nil "module Main where\nloop : exists a. a -> a\nloop x = loop x\nmain = loop 0\n" ModuleResolution "Main.loop requires an explicit closed signature") (Cons (ModuleRejection "instance not visible in imported signed definition" (Cons (Pair "Render" "module Render where\nclass Render a where\n  render : a -> String\n") (Cons (Pair "Bad" "module Bad (text) where\nimport Render\ntext : String\ntext = render 42\n") (Cons (Pair "Orphan" "module Orphan () where\nimport Render\ninstance Render Int where\n  render = showInt\n") Nil))) "module Main where\nimport Bad\nimport Orphan ()\nmain = putStrLn text\n" Resolution "no instance or given constraint for Render.Render Int") (Cons (ModuleRejection "instance not visible in another instance" (Cons (Pair "A" "module A where\nclass First a where\n  first : a -> String\nclass Second a where\n  second : a -> String\n") (Cons (Pair "Bad" "module Bad () where\nimport A\ninstance First Int where\n  first n = second n\n") (Cons (Pair "Orphan" "module Orphan () where\nimport A\ninstance Second Int where\n  second = showInt\n") Nil))) "module Main where\nimport A\nimport Bad ()\nimport Orphan ()\nmain = putStrLn (first 42)\n" Resolution "no instance or given constraint for A.Second Int") Nil)))))))))))))))))))))))))))))))))))))))
 
 moduleTests : (List ( Pair String (IO Unit) ))
-moduleTests = S.append legacyModuleTests crateResolutionTests
+moduleTests = S.append legacyModuleTests (S.append (S.map checkModuleTyping moduleTypings) crateResolutionTests)
 
 crateResolutionTests : List (Pair String (IO Unit))
 crateResolutionTests = Cons

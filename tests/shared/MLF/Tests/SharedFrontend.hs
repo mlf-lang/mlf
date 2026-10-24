@@ -27,6 +27,7 @@ module MLF.Tests.SharedFrontend where {
   import qualified Bootstrap.X.Syntax as X;
   import qualified Tests.IndependentCheck as Independent;
   import qualified Tests.IndependentType as IndependentType;
+  import qualified MLF.Tests.ClassDemand as ClassDemandTests;
   prologue :: String;
   prologue =
     "-- mlf:syntax shared-haskell-v1\n{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}\n";
@@ -211,6 +212,10 @@ module MLF.Tests.SharedFrontend where {
   recursiveAccepted label program expected = do {
     result <- recursiveRight (label ++ " source compilation")
       (mapLeft C.prettyError (C.compile "RecursiveInference.emlf" program));
+    recursiveCompilation label result expected
+  };
+  recursiveCompilation :: String -> C.Compilation -> XType -> IO XTerm;
+  recursiveCompilation label result expected = do {
     let { term = C.compiledTerm result };
     check (label ++ " inferred type") (IndependentType.alphaEq (C.inferredType result) expected);
     recursiveCheckedType (label ++ " current target") expected (Check.checkClosed term);
@@ -223,6 +228,21 @@ module MLF.Tests.SharedFrontend where {
     -- C.compile also checks source-skeleton erasure against this same target.
     ioReturn term
   };
+  recursiveModulesAccepted :: String -> Map String (Pair String String) -> String -> XType -> IO XTerm;
+  recursiveModulesAccepted label modules program expected = do {
+    result <- recursiveRight (label ++ " module compilation")
+      (mapLeft C.prettyError (C.compileModules modules "Main.emlf" program));
+    recursiveCompilation label result expected
+  };
+  recursiveStartsWith :: String -> String -> Bool;
+  recursiveStartsWith prefix text =
+    if stringLength text < stringLength prefix then False
+    else eqString (stringSlice text 0 (stringLength prefix)) prefix;
+  recursiveEndsWith :: String -> String -> Bool;
+  recursiveEndsWith suffix text =
+    if stringLength text < stringLength suffix then False
+    else eqString (stringSlice text (stringLength text - stringLength suffix)
+                   (stringLength suffix)) suffix;
   recursiveRejected :: String -> String -> String -> IO Unit;
   recursiveRejected label program diagnostic =
     case C.compile "RecursiveInference.emlf" program of {
@@ -230,7 +250,7 @@ module MLF.Tests.SharedFrontend where {
         check (label ++ " inference phase")
           (case C.phase error of { Inference -> True; _ -> False });
         check (label ++ " diagnostic")
-          (eqString (stringSlice (C.diagnostic error) 0 (stringLength diagnostic)) diagnostic)
+          (recursiveStartsWith diagnostic (C.diagnostic error))
       };
       Right _ -> check (label ++ " unexpectedly accepted") False
     };
@@ -284,8 +304,189 @@ module MLF.Tests.SharedFrontend where {
       empty IM.empty (Cons (Pair a (XBotKind (KArrow Star Star))) Nil)
       (XForall a (XBotKind (KArrow Star Star)) recursiveInt) recursiveInt
   };
+  -- Remove only a generated Inspect dictionary abstraction; its uses and the
+  -- declared recursive scheme remain, so both checkers must detect bad scope.
+  generatedInspectDictionary :: XType -> Bool;
+  generatedInspectDictionary ty = case ty of {
+    XCon name _ -> recursiveStartsWith "DictInspect" name;
+    XApply function _ -> generatedInspectDictionary function;
+    _ -> False
+  };
+  generatedDictionaryParameters :: XTerm -> List XName;
+  generatedDictionaryParameters term = case term of {
+    XAbs name ty body ->
+      let { nested = generatedDictionaryParameters body } in
+      if recursiveStartsWith "wantedDictionary" (X.nameHint name) &&
+         generatedInspectDictionary ty
+      then Cons name nested else nested;
+    XApp function argument -> append (generatedDictionaryParameters function)
+      (generatedDictionaryParameters argument);
+    XTypeAbs _ _ body -> generatedDictionaryParameters body;
+    XTypeApp body _ -> generatedDictionaryParameters body;
+    XLet _ rhs body -> append (generatedDictionaryParameters rhs)
+      (generatedDictionaryParameters body);
+    XLetRec definitions body -> append
+      (concatMap (\(Triple _ _ rhs) -> generatedDictionaryParameters rhs) definitions)
+      (generatedDictionaryParameters body);
+    XCase scrutinee _ alternatives -> append (generatedDictionaryParameters scrutinee)
+      (concatMap (\(XAlternative _ body) -> generatedDictionaryParameters body) alternatives);
+    XWithData _ body -> generatedDictionaryParameters body;
+    _ -> Nil
+  };
+  removeDictionaryAbstractions :: List XName -> XTerm -> XTerm;
+  removeDictionaryAbstractions names term = case term of {
+    XAbs name ty body ->
+      if elem X.equalName name names
+      then body
+      else XAbs name ty (removeDictionaryAbstractions names body);
+    XApp function argument -> XApp (removeDictionaryAbstractions names function)
+      (removeDictionaryAbstractions names argument);
+    XTypeAbs variable bound body -> XTypeAbs variable bound
+      (removeDictionaryAbstractions names body);
+    XTypeApp body proof -> XTypeApp (removeDictionaryAbstractions names body) proof;
+    XLet name rhs body -> XLet name (removeDictionaryAbstractions names rhs)
+      (removeDictionaryAbstractions names body);
+    XLetRec definitions body -> XLetRec
+      (map (\(Triple name ty rhs) -> Triple name ty (removeDictionaryAbstractions names rhs)) definitions)
+      (removeDictionaryAbstractions names body);
+    XCase scrutinee ty alternatives -> XCase (removeDictionaryAbstractions names scrutinee) ty
+      (map (\(XAlternative pattern body) -> XAlternative pattern (removeDictionaryAbstractions names body)) alternatives);
+    XWithData declarations body -> XWithData declarations (removeDictionaryAbstractions names body);
+    _ -> term
+  };
+  recursiveDictionaryScopeControl :: IO Unit;
+  recursiveDictionaryScopeControl = do {
+    original <- recursiveAccepted "generated recursive dictionary target"
+      ("class Inspect a where { inspect : a -> Bool }; " ++
+       "instance Inspect Int where { inspect = \\x -> true }; " ++
+       "let rec { f x = if inspect x then true else f x } in f 0") recursiveBool;
+    let { parameters = generatedDictionaryParameters original };
+    check "dictionary scope mutation has a generated parameter" (not (null parameters));
+    let { malformed = removeDictionaryAbstractions parameters original };
+    check "current checker rejects escaped recursive dictionary"
+      (isLeft (Check.checkClosed malformed));
+    check "independent checker rejects escaped recursive dictionary"
+      (isLeft (Independent.checkClosed malformed))
+  };
+  recursiveResolutionRejected :: String -> String -> IO Unit;
+  recursiveResolutionRejected label program =
+    case C.compile "RecursiveInference.emlf" program of {
+      Left error -> do {
+        check (label ++ " resolution phase")
+          (case C.phase error of { Resolution -> True; _ -> False });
+        let {
+          message = C.diagnostic error;
+          prefix = "no instance or given constraint for ";
+          suffix = "ambiguous uses need a type annotation"
+        };
+        check (label ++ " missing or ambiguous evidence")
+          (recursiveStartsWith prefix message && recursiveEndsWith suffix message)
+      };
+      Right _ -> check (label ++ " unexpectedly accepted") False
+    };
+  qualifiedRecursiveChecks :: IO Unit;
+  qualifiedRecursiveChecks = do {
+    let {
+      inspectClass = "class Inspect a where { inspect : a -> Bool }; ";
+      inspectInt = "instance Inspect Int where { inspect = \\x -> true }; ";
+      inspectBool = "instance Inspect Bool where { inspect = \\x -> x }; ";
+      inspectInstances = inspectClass ++ inspectInt ++ inspectBool;
+      strongClass = "class Inspect a => Strong a where { strong : a -> Bool }; ";
+      strongInstances = inspectInstances ++ strongClass ++
+        "instance Strong Int where { strong = \\x -> true }; " ++
+        "instance Strong Bool where { strong = \\x -> x }; "
+    };
+    recursiveAccepted "unsigned recursive class interface generalized"
+      (inspectInstances ++
+       "let rec { f x = if true then inspect x else f x } in let b = f 0 in f true")
+      recursiveBool;
+    recursiveAccepted "mutual unsigned class interfaces generalized"
+      (inspectInstances ++
+       "let rec { f x = if inspect x then true else g x; g y = f y } in let b = f 0 in g true")
+      recursiveBool;
+    recursiveAccepted "recursive qualified function passed as first class argument"
+      (inspectInstances ++
+       "let rec { f x = if inspect x then true else (\\h -> h x) f } in let b = f 0 in f true")
+      recursiveBool;
+    recursiveAccepted "recursive multiparameter demands retain argument order"
+      ("class C a b where { compareC : a -> b -> Bool }; " ++
+       "instance C Int Bool where { compareC = \\x y -> y }; " ++
+       "instance C Bool Int where { compareC = \\x y -> x }; " ++
+       "let rec { f x y = if compareC x y then compareC y x else f x y } in let b = f 0 true in f false 1")
+      recursiveBool;
+    recursiveAccepted "recursive higher kind dictionary slot varies constructor"
+      ("data Box a = Box a; data Wrap a = Wrap a; " ++
+       "class InspectF (f : * -> *) where { inspectF : forall a. f a -> Bool }; " ++
+       "instance InspectF Box where { inspectF = \\x -> true }; " ++
+       "instance InspectF Wrap where { inspectF = \\x -> false }; " ++
+       "let rec { visit x = if inspectF x then true else visit x } in let b = visit (Box 0) in visit (Wrap true)")
+      recursiveBool;
+    recursiveAccepted "recursive same class demands keep distinct arguments"
+      (inspectInstances ++
+       "let rec { f x y = if inspect x then inspect y else f x y } in let b = f 0 true in f false 1")
+      recursiveBool;
+    recursiveAccepted "recursive class planner retains no leaf demand cycle"
+      (inspectClass ++ "let rec { f x = g x; g x = f x } in true")
+      recursiveBool;
+    recursiveAccepted "recursive unused lexical let does not export peer demand"
+      (inspectClass ++
+       "let rec { f x = if inspect x then true else g x; g y = let k = f in true } in g 0")
+      recursiveBool;
+    recursiveAccepted "recursive captured predicate preserves independent argument generalization"
+      (inspectInstances ++
+       "let choose = \\y -> let rec { f x = if inspect y then true else f x } in let b = f 0 in f true in let b = choose 0 in choose true")
+      recursiveBool;
+    recursiveAccepted "nested recursive class demand feeds outer recursion"
+      (inspectInstances ++
+       "let rec { f n = let rec { h x = if inspect x then f 0 else h x } in if h true then h 0 else f n } in f 1")
+      recursiveBool;
+    let {
+      genericBox = inspectClass ++ "data Box a = Box a; " ++
+        "instance Inspect (Box a) where { inspect = \\x -> true }; ";
+      boxRecursion =
+        "let rec { f (Box x) = if inspect (Box x) then true else f (Box x) } in "
+    };
+    recursiveAccepted "recursive generic instance retains polymorphic Box export"
+      (genericBox ++ boxRecursion ++ "f")
+      (XForall (XTyVar 0) XBot
+        (XArrow (XCon "Box" (Cons (XVar (XTyVar 0)) Nil)) recursiveBool));
+    recursiveAccepted "recursive generic instance accepts Box Int and Box Bool"
+      (genericBox ++ boxRecursion ++ "let b = f (Box 0) in f (Box true)")
+      recursiveBool;
+    recursiveAccepted "mixed signed unsigned qualified recursion"
+      (inspectInstances ++
+       "let rec { f : forall a. Inspect a => a -> Bool; f x = if inspect x then true else g x; g y = f y } in let b = f 0 in g true")
+      recursiveBool;
+    recursiveAccepted "mixed qualified recursion uses superclass given"
+      (strongInstances ++
+       "let rec { f : forall a. Strong a => a -> Bool; f x = if inspect x then g x else strong x; g y = f y } in let b = f 0 in g true")
+      recursiveBool;
+    recursiveAccepted "unsigned recursion preserves captured superclass given"
+      (inspectClass ++ strongClass ++
+       "let outer : forall a. Strong a => a -> Bool = \\y -> let rec { f x = if inspect y then true else f x } in f 0 in true")
+      recursiveBool;
+    recursiveAccepted "mutual recursive demands preserve superclass and subclass"
+      (strongInstances ++
+       "let rec { f x = if strong x then true else g x; g y = if inspect y then true else f y } in let b = f 0 in g true")
+      recursiveBool;
+    recursiveResolutionRejected "recursive ambiguity never defaults to sole instance"
+      (inspectClass ++ inspectInt ++
+       "let rec { f x = if inspect x then true else f x } in f");
+    recursiveResolutionRejected "recursive class demand rejects missing concrete instance"
+      (inspectClass ++ inspectInt ++
+       "let rec { f x = if inspect x then true else f x } in f true");
+    recursiveResolutionRejected "unsigned peer cannot invent a signed given"
+      (inspectClass ++
+       "let rec { f : forall a. a -> Bool; f x = g x; g y = if inspect y then true else f y } in true");
+    recursiveResolutionRejected "recursive output ambiguity never picks sole instance"
+      ("class Convert a b where { convert : a -> b }; " ++
+       "instance Convert Int Bool where { convert = \\x -> true }; " ++
+       "let rec { f x = if true then convert x else f x } in f 0");
+    putStrLn "shared frontend: qualified recursive inference checks passed"
+  };
   recursiveInferenceChecks :: IO Unit;
   recursiveInferenceChecks = do {
+    recursiveRight "recursive class demand planner" ClassDemandTests.checkAll;
     recursiveAccepted "ordinary unsigned factorial"
       "let rec { fact n = if eqInt n 0 then 1 else mulInt n (fact (subInt n 1)) } in fact"
       (XArrow recursiveInt recursiveInt);
@@ -305,6 +506,12 @@ module MLF.Tests.SharedFrontend where {
       (Cons "odd" (Cons "even" Nil)) reordered;
     recursiveAccepted "recursive identity generalized export"
       "let rec { f x = if true then x else f x } in f" recursiveIdentity;
+    recursiveAccepted "recursive higher rank parameter annotation"
+      "let rec { f = \\(g : forall a. a -> a) -> \\n -> if eqInt n 0 then let x : Int = g 1 in (g true : Bool) else f g (subInt n 1) } in f"
+      (XArrow recursiveIdentity (XArrow recursiveInt recursiveBool));
+    recursiveRejected "recursive unannotated parameter stays monomorphic"
+      "let rec { f = \\g -> \\n -> if eqInt n 0 then let x : Int = g 1 in (g true : Bool) else f g (subInt n 1) } in f"
+      "type constructor mismatch";
     recursiveAccepted "recursive export used at Int and Bool"
       "let rec { f x = if true then x else f x } in let n : Int = f 1 in (f true : Bool)"
       recursiveBool;
@@ -379,6 +586,34 @@ module MLF.Tests.SharedFrontend where {
        "instance Inspect Bool where { inspect = \\x -> x }; " ++
        "let rec { f n = if eqInt n 0 then inspect n else if inspect true then f (subInt n 1) else false } in f")
       (XArrow recursiveInt recursiveBool);
+    let {
+      divergentModules = M.fromList compareString
+        (Cons (Pair "A" (Pair "A.emlf" "module A where\nimport qualified B\nf x = B.g x\n"))
+        (Cons (Pair "B" (Pair "B.emlf" "module B where\nimport qualified A\ng x = A.f x\n")) Nil));
+      identityModules = M.fromList compareString
+        (Cons (Pair "A" (Pair "A.emlf" "module A where\nimport qualified B\nf x = if true then x else B.g x\n"))
+        (Cons (Pair "B" (Pair "B.emlf" "module B where\nimport qualified A\ng x = A.f x\n")) Nil))
+    };
+    -- This original source diverges. Compile and check it, never evaluate it.
+    recursiveModulesAccepted "cross module unsigned divergent cycle type only"
+      divergentModules "module Main where\nimport A\nmain = f 0\n" XBot;
+    recursiveModulesAccepted "cross module unsigned identity generalized export"
+      identityModules "module Main where\nimport A\nmain = f\n" recursiveIdentity;
+    recursiveModulesAccepted "cross module unsigned exports used at Int and Bool"
+      identityModules
+      "module Main where\nimport A\nmain = let n : Int = f 1 in (f true : Bool)\n" recursiveBool;
+    let {
+      transitiveInstances = M.fromList compareString
+        (Cons (Pair "Inspect" (Pair "Inspect.emlf" "module Inspect where\nclass Inspect a where { inspect : a -> Bool }\n"))
+        (Cons (Pair "Instances" (Pair "Instances.emlf" "module Instances () where\nimport Inspect\ninstance Inspect Int where { inspect = \\x -> true }\n"))
+        (Cons (Pair "Bridge" (Pair "Bridge.emlf" "module Bridge () where\nimport Instances ()\n"))
+        (Cons (Pair "A" (Pair "A.emlf" "module A (f) where\nimport Inspect\nimport Bridge ()\nimport qualified B\nf n = if eqInt n 0 then inspect n else B.g (subInt n 1)\n"))
+        (Cons (Pair "B" (Pair "B.emlf" "module B (g) where\nimport qualified A\ng n = A.f n\n")) Nil)))))
+    };
+    recursiveModulesAccepted "cross module unsigned recursion sees transitive defining instance"
+      transitiveInstances "module Main where\nimport A\nmain = f 1\n" recursiveBool;
+    recursiveDictionaryScopeControl;
+    qualifiedRecursiveChecks;
     recursiveProjectionChecks;
     let {
       f = XName 1 "f";

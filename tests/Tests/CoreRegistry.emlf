@@ -581,7 +581,6 @@ bindings =
   Cons (Pair "modules rejection: instance not visible in another instance" "core/modules/modules-rejection-instance-not-visible-in-another-instance") (
   Cons (Pair "modules rejection: cyclic private constructor remains hidden" "core/modules/modules-rejection-cyclic-private-constructor-remains-hidden") (
   Cons (Pair "modules rejection: cyclic reexports cannot invent a missing identity" "core/modules/modules-rejection-cyclic-reexports-cannot-invent-a-missing-identity") (
-  Cons (Pair "modules rejection: cross-module recursion retains existing signature requirement" "core/modules/modules-rejection-cross-module-recursion-retains-existing-signature-requirement") (
   Cons (Pair "modules rejection: downstream orphan cannot leak into an import cycle" "core/modules/modules-rejection-downstream-orphan-cannot-leak-into-an-import-cycle") (
   Cons (Pair "modules: original source type names" "core/modules/modules-original-source-type-names") (
   Cons (Pair "modules: unit syntax is intrinsic" "core/modules/modules-unit-syntax-is-intrinsic") (
@@ -591,6 +590,7 @@ bindings =
   Cons (Pair "modules: unused imports do not cause value ambiguity" "core/modules/modules-unused-imports-do-not-cause-value-ambiguity") (
   Cons (Pair "modules: legacy compile path preserves checked output" "core/modules/modules-legacy-compile-path-preserves-checked-output") (
   Cons (Pair "modules: file loader, includes, hierarchy and errors" "core/modules/modules-file-loader-includes-hierarchy-and-errors") (
+  Cons (Pair "modules typing: cross-module recursion infers unsigned cycle" "core/modules/modules-typing-cross-module-recursion-infers-unsigned-cycle") (
   Cons (Pair "crate namespaces resolve recursive declarations before inference" "core/modules/crate-namespaces-resolve-recursive-declarations-before-inference") (
   Cons (Pair "crate namespace resolution preserves external ownership and mangling" "core/modules/crate-namespace-resolution-preserves-external-ownership-and-mangling") (
   Cons (Pair "cyclic export fixed point is invariant under source order" "core/modules/cyclic-export-fixed-point-is-invariant-under-source-order") (
@@ -674,8 +674,8 @@ bindings =
   Cons (Pair "crate rejects: instance not visible in another instance" "core/separate-compilation/crate-rejects-instance-not-visible-in-another-instance") (
   Cons (Pair "crate rejects: cyclic private constructor remains hidden" "core/separate-compilation/crate-rejects-cyclic-private-constructor-remains-hidden") (
   Cons (Pair "crate rejects: cyclic reexports cannot invent a missing identity" "core/separate-compilation/crate-rejects-cyclic-reexports-cannot-invent-a-missing-identity") (
-  Cons (Pair "crate rejects: cross-module recursion retains existing signature requirement" "core/separate-compilation/crate-rejects-cross-module-recursion-retains-existing-signature-requirement") (
   Cons (Pair "crate rejects: downstream orphan cannot leak into an import cycle" "core/separate-compilation/crate-rejects-downstream-orphan-cannot-leak-into-an-import-cycle") (
+  Cons (Pair "crate typing: cross-module recursion infers unsigned cycle" "core/separate-compilation/crate-typing-cross-module-recursion-infers-unsigned-cycle") (
   Cons (Pair "crate paths and native cache commands" "core/separate-compilation/crate-paths-and-native-cache-commands") (
   Cons (Pair "crate metadata version rejection" "core/separate-compilation/crate-metadata-version-rejection") (
   Cons (Pair "crate object binding schemes are independently checked" "core/separate-compilation/crate-object-binding-schemes-are-independently-checked") (

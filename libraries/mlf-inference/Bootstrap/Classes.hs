@@ -10,6 +10,9 @@ module Bootstrap.Classes where {
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.IntSet as I;
+  import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.ClassDemand as Q;
+  import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.Data as D;
   import qualified Bootstrap.Kinding as K;
   import qualified Bootstrap.Desugar as Desugar;
@@ -899,281 +902,391 @@ module Bootstrap.Classes where {
       SArrow x y -> (occurrences a x + occurrences a y);
       _ -> 0
     };
-  lowerExpr :: Map String (List (Pair EvidenceRole String)) ->
-               DataEnv ->
-               Map String Info ->
-               Map String (Pair String (List String)) ->
-               List (Pair EvidenceRole String) ->
-               SExpr -> Fresh (Pair SExpr (List (Pair String String)));
-  lowerExpr valueScopes ds infos env candidates expression =
+  -- Planning fixes dictionary arity/provenance, never predicate argument types.
+  -- Those remain ordinary dictionary-arrow constraints in the existing solver.
+  data QualifiedBinding = QualifiedKnown String (List String)
+                        | QualifiedTemplate String Int Int
+                        | QualifiedRecursive String Int;
+  data QualifiedExpr = QualifiedExpr Int QualifiedForm;
+  data QualifiedForm = QualifiedPlain SExpr
+                     | QualifiedVariable String (Maybe (Pair Int Int))
+                     | QualifiedApply QualifiedExpr QualifiedExpr
+                     | QualifiedContext QualifiedExpr
+                     | QualifiedLambda String (Maybe SAnnotation) QualifiedExpr
+                     | QualifiedLet String QualifiedExpr QualifiedExpr
+                     | QualifiedAnnotation QualifiedExpr SAnnotation
+                     | QualifiedCase QualifiedExpr (List (Pair SPattern QualifiedExpr))
+                     | QualifiedChecked SType (List String) (List (Pair EvidenceRole String)) QualifiedExpr
+                     | QualifiedRec (List (Triple String RecursiveMode QualifiedExpr)) QualifiedExpr;
+  data QualifiedBuild = QualifiedBuild (List Q.Frame) (List Q.Seed) (List Q.Use)
+                                      (List (Pair Int Q.Demand));
+  data QualifiedResult = QualifiedResult QualifiedExpr QualifiedBuild;
+  qualifiedEmpty :: QualifiedBuild;
+  qualifiedEmpty = QualifiedBuild Nil Nil Nil Nil;
+  qualifiedMerge :: QualifiedBuild -> QualifiedBuild -> QualifiedBuild;
+  qualifiedMerge (QualifiedBuild a b c d) (QualifiedBuild w x y z) =
+    QualifiedBuild (append a w) (append b x) (append c y) (append d z);
+  qualifiedBuilds :: List QualifiedBuild -> QualifiedBuild;
+  qualifiedBuilds = foldlStrict qualifiedMerge qualifiedEmpty;
+  qualifiedNode :: QualifiedExpr -> Int;
+  qualifiedNode (QualifiedExpr n _) = n;
+  qualifiedExpression :: QualifiedResult -> QualifiedExpr;
+  qualifiedExpression (QualifiedResult expression _) = expression;
+  qualifiedBuild :: QualifiedResult -> QualifiedBuild;
+  qualifiedBuild (QualifiedResult _ build) = build;
+  qualifiedId :: Fresh Int;
+  qualifiedId = Fresh (\count used -> Right (Triple count (count + 1) used));
+  qualifiedFinish :: Int -> Maybe Int -> QualifiedBuild -> Fresh QualifiedBuild;
+  qualifiedFinish owner parent (QualifiedBuild frames seeds uses nodes) =
+    do {
+      rank <- qualifiedId;
+      freshPure (QualifiedBuild (Cons (Q.Frame owner parent rank) frames) seeds uses nodes)
+    };
+  qualifiedMake :: QualifiedForm -> Q.Demand -> QualifiedBuild -> Fresh QualifiedResult;
+  qualifiedMake form demand build =
+    do {
+      node <- qualifiedId;
+      case build of {
+        QualifiedBuild frames seeds uses nodes ->
+          freshPure (QualifiedResult (QualifiedExpr node form)
+            (QualifiedBuild frames seeds uses (Cons (Pair node demand) nodes)))
+      }
+    };
+  qualifiedJoin :: QualifiedForm -> List QualifiedResult -> Fresh QualifiedResult;
+  qualifiedJoin form results =
+    qualifiedMake form (Q.UnionNodes (map (\result -> qualifiedNode (qualifiedExpression result)) results))
+      (qualifiedBuilds (map qualifiedBuild results));
+  qualifiedClasses :: SType -> List String;
+  qualifiedClasses ty =
+    case scheme ty of { Triple _ ps _ -> map (\(SPredicate c _) -> c) ps };
+  qualifiedSeeds :: Int -> List String -> Fresh QualifiedBuild;
+  qualifiedSeeds owner classes =
+    do {
+      seeds <- mapM (\c -> do { n <- qualifiedId; freshPure (Q.Seed n c owner) }) classes;
+      nodes <- mapM (\seed -> case seed of {
+        Q.Seed n _ _ -> do { node <- qualifiedId; freshPure (Pair node (Q.SeedNode n)) }
+      }) seeds;
+      freshPure (QualifiedBuild Nil seeds Nil nodes)
+    };
+  qualifiedKnown :: Int -> String -> List String -> Fresh QualifiedResult;
+  qualifiedKnown owner name classes =
+    do {
+      build <- qualifiedSeeds owner classes;
+      case build of {
+        QualifiedBuild _ _ _ nodes ->
+          qualifiedMake (QualifiedVariable name Nothing) (Q.UnionNodes (map fst nodes)) build
+      }
+    };
+  planQualified :: Map String (List (Pair EvidenceRole String)) -> DataEnv -> Map String Info -> Int ->
+                   Map String QualifiedBinding -> List (Pair EvidenceRole String) ->
+                   SExpr -> Fresh QualifiedResult;
+  planQualified valueScopes ds infos owner env candidates expression =
     case expression of {
       SVar x ->
         case M.lookup compareString x env of {
-          Nothing -> freshPure (Pair expression Nil);
-          Just (Pair name classes) ->
+          Nothing -> qualifiedMake (QualifiedPlain expression) Q.Empty qualifiedEmpty;
+          Just (QualifiedKnown name classes) -> qualifiedKnown owner name classes;
+          Just (QualifiedRecursive name source) ->
+            qualifiedMake (QualifiedVariable name Nothing) (Q.RefNode source) qualifiedEmpty;
+          Just (QualifiedTemplate name frame source) ->
             do {
-              wants <- wantedNames classes;
-              freshPure (Pair (foldl SApp (SVar name) (map (\(Pair n _) -> SVar n) wants)) wants)
+              use <- qualifiedId;
+              qualifiedMake (QualifiedVariable name (Just (Pair use source))) (Q.InstantiateNode use source)
+                (QualifiedBuild Nil Nil (Cons (Q.Use use frame owner) Nil) Nil)
             }
         };
-      SConstructor _ -> freshPure (Pair expression Nil);
-      SIntLit _ -> freshPure (Pair expression Nil);
-      SDoubleLit _ -> freshPure (Pair expression Nil);
-      SBoolLit _ -> freshPure (Pair expression Nil);
-      SStringLit _ -> freshPure (Pair expression Nil);
-      SPrimitive _ -> freshPure (Pair expression Nil);
       SApp a b ->
         do {
-          boundValueShared10 <-
-            case a of {
-              SAnn rhs (SAnnotation Nil ty) ->
-                case scheme ty of {
-                  Triple _ predicates _ ->
-                    if null predicates
-                    then lowerExpr valueScopes ds infos env candidates a
-                    else do {
-                           function <- signedIn valueScopes ds infos candidates env rhs ty;
-                           wants <- wantedNames (map (\(SPredicate c _) -> c) predicates);
-                           freshPure
-                             (Pair (foldl SApp function (map (\(Pair n _) -> SVar n) wants)) wants)
-                         }
-                };
-              _ -> lowerExpr valueScopes ds infos env candidates a
-            };
-          case boundValueShared10 of {
-            Pair f as ->
-              do {
-                boundValueShared9 <- lowerExpr valueScopes ds infos env candidates b;
-                case boundValueShared9 of {
-                  Pair x bs ->
-                    do {
-                      freshPure (Pair (SApp f x) (append as bs))
-                    }
+          left <- case a of {
+            SAnn rhs (SAnnotation Nil ty) ->
+              if null (qualifiedClasses ty)
+              then planQualified valueScopes ds infos owner env candidates a
+              else do {
+                checked <- planQualifiedSigned valueScopes ds infos owner env candidates rhs ty;
+                build <- qualifiedSeeds owner (qualifiedClasses ty);
+                case build of {
+                  QualifiedBuild _ _ _ nodes ->
+                    qualifiedMake (QualifiedContext (qualifiedExpression checked))
+                      (Q.UnionNodes (map fst nodes))
+                      (qualifiedMerge (qualifiedBuild checked) build)
                 }
-              }
-          }
+              };
+            _ -> planQualified valueScopes ds infos owner env candidates a
+          };
+          right <- planQualified valueScopes ds infos owner env candidates b;
+          qualifiedJoin (QualifiedApply (qualifiedExpression left) (qualifiedExpression right))
+            (Cons left (Cons right Nil))
         };
       SLam x annotation body ->
         do {
-          boundValueShared12 <-
-            case annotation of {
-              Nothing -> freshPure (Pair Nothing Nil);
-              Just (SAnnotation existential ty) ->
-                do {
-                  translated <-
-                    if null existential
-                    then freshLift (translateScheme ds infos ty)
-                    else freshPure ty;
-                  let {
-                    predicates =
-                      case scheme ty of {
-                        Triple _ ps _ -> ps
-                      }
-                  };
-                  freshPure
-                    (Pair (Just (SAnnotation existential translated))
-                       (map (\(SPredicate c _) -> c) predicates))
-                }
-            };
-          case boundValueShared12 of {
-            Pair annotation2 classes ->
+          translated <- case annotation of {
+            Nothing -> freshPure Nothing;
+            Just (SAnnotation existential ty) ->
               do {
-                boundValueShared11 <-
-                  lowerExpr valueScopes ds infos (M.insert compareString x (Pair x classes) env)
-                    candidates
-                    body;
-                case boundValueShared11 of {
-                  Pair body2 wants ->
-                    do {
-                      freshPure (Pair (SLam x annotation2 body2) wants)
-                    }
-                }
+                ty2 <- if null existential then freshLift (translateScheme ds infos ty)
+                       else freshPure ty;
+                freshPure (Just (SAnnotation existential ty2))
               }
-          }
+          };
+          let { classes = case annotation of {
+            Nothing -> Nil; Just (SAnnotation _ ty) -> qualifiedClasses ty
+          } };
+          result <- planQualified valueScopes ds infos owner
+            (M.insert compareString x (QualifiedKnown x classes) env) candidates body;
+          qualifiedJoin (QualifiedLambda x translated (qualifiedExpression result)) (Cons result Nil)
         };
       SLet x (SAnn rhs (SAnnotation Nil ty)) body ->
         do {
-          rhs2 <-
-            signedIn valueScopes ds infos (M.findWithDefault compareString candidates x valueScopes)
-              env
-              rhs
-              ty;
-          let {
-            predicates =
-              case scheme ty of {
-                Triple _ ps _ -> ps
-              }
-          };
-          boundValueShared13 <-
-            lowerExpr valueScopes ds infos
-              (M.insert compareString x (Pair x (map (\(SPredicate c _) -> c) predicates)) env)
-              candidates
-              body;
-          case boundValueShared13 of {
-            Pair body2 wants ->
-              do {
-                freshPure (Pair (SLet x rhs2 body2) wants)
-              }
-          }
+          left <- planQualifiedSigned valueScopes ds infos owner env
+            (M.findWithDefault compareString candidates x valueScopes) rhs ty;
+          right <- planQualified valueScopes ds infos owner
+            (M.insert compareString x (QualifiedKnown x (qualifiedClasses ty)) env) candidates body;
+          qualifiedMake (QualifiedLet x (qualifiedExpression left) (qualifiedExpression right))
+            (Q.RefNode (qualifiedNode (qualifiedExpression right)))
+            (qualifiedMerge (qualifiedBuild left) (qualifiedBuild right))
         };
       SLet x rhs body ->
         do {
-          boundValueShared15 <-
-            lowerExpr valueScopes ds infos env
-              (M.findWithDefault compareString candidates x valueScopes)
-              rhs;
-          case boundValueShared15 of {
-            Pair rhs2 wanted ->
-              do {
-                boundValueShared14 <-
-                  lowerExpr valueScopes ds infos
-                    (M.insert compareString x (Pair x (map snd wanted)) env)
-                    candidates
-                    body;
-                case boundValueShared14 of {
-                  Pair body2 wants ->
-                    do {
-                      freshPure
-                        (Pair (SLet x (foldr (\(Pair n _) b -> SLam n Nothing b) rhs2 wanted) body2)
-                           wants)
-                    }
-                }
-              }
-          }
+          frame <- qualifiedId;
+          left <- planQualified valueScopes ds infos frame env
+            (M.findWithDefault compareString candidates x valueScopes) rhs;
+          build <- qualifiedFinish frame (Just owner) (qualifiedBuild left);
+          right <- planQualified valueScopes ds infos owner
+            (M.insert compareString x
+              (QualifiedTemplate x frame (qualifiedNode (qualifiedExpression left))) env)
+            candidates body;
+          qualifiedMake (QualifiedLet x (qualifiedExpression left) (qualifiedExpression right))
+            (Q.RefNode (qualifiedNode (qualifiedExpression right)))
+            (qualifiedMerge build (qualifiedBuild right))
         };
-      SAnn a (SAnnotation existential ty) ->
-        let {
-          predicates =
-            case scheme ty of {
-              Triple _ ps _ -> ps
-            }
-        } in
-        if not (null predicates)
+      SAnn rhs (SAnnotation existential ty) ->
+        if not (null (qualifiedClasses ty))
         then do {
-               freshLift
-                 (ensure (null existential) "qualified annotations cannot bind existentials");
-               result <- signedIn valueScopes ds infos candidates env a ty;
-               freshPure (Pair result Nil)
-             }
+          freshLift (ensure (null existential) "qualified annotations cannot bind existentials");
+          planQualifiedSigned valueScopes ds infos owner env candidates rhs ty
+        }
         else do {
-               boundValueShared16 <- lowerExpr valueScopes ds infos env candidates a;
-               case boundValueShared16 of {
-                 Pair a2 wants ->
-                   do {
-                     translated <-
-                       if null existential
-                       then freshLift (translateScheme ds infos ty)
-                       else freshPure ty;
-                     freshPure (Pair (SAnn a2 (SAnnotation existential translated)) wants)
-                   }
-               }
-             };
-      SCase a branches ->
-        do {
-          boundValueShared18 <- lowerExpr valueScopes ds infos env candidates a;
-          case boundValueShared18 of {
-            Pair a2 as ->
-              do {
-                bs <-
-                  mapM
-                    (\(SAlternative pattern body) ->
-                       do {
-                         let {
-                           names = Surface.patternVariables pattern
-                         };
-                         let {
-                           scope = foldr (\n -> M.insert compareString n (Pair n Nil)) env names
-                         };
-                         boundValueShared17 <- lowerExpr valueScopes ds infos scope candidates body;
-                         case boundValueShared17 of {
-                           Pair body2 wants ->
-                             do {
-                               freshPure (Pair (SAlternative pattern body2) wants)
-                             }
-                         }
-                       })
-                    branches;
-                freshPure (Pair (SCase a2 (map fst bs)) (append as (concatMap snd bs)))
-              }
-          }
+          result <- planQualified valueScopes ds infos owner env candidates rhs;
+          ty2 <- if null existential then freshLift (translateScheme ds infos ty) else freshPure ty;
+          qualifiedJoin (QualifiedAnnotation (qualifiedExpression result) (SAnnotation existential ty2))
+            (Cons result Nil)
         };
-      SDo _ _ -> lowerExpr valueScopes ds infos env candidates (Desugar.desugarDo expression);
+      SCase rhs branches ->
+        do {
+          result <- planQualified valueScopes ds infos owner env candidates rhs;
+          planned <- mapM (\(SAlternative pattern body) -> do {
+            let { scope = foldr (\n -> M.insert compareString n (QualifiedKnown n Nil))
+                          env (Surface.patternVariables pattern) };
+            branch <- planQualified valueScopes ds infos owner scope candidates body;
+            freshPure (Pair pattern branch)
+          }) branches;
+          qualifiedJoin (QualifiedCase (qualifiedExpression result)
+            (map (\(Pair p r) -> Pair p (qualifiedExpression r)) planned))
+            (Cons result (map snd planned))
+        };
+      SDo _ _ -> planQualified valueScopes ds infos owner env candidates (Desugar.desugarDo expression);
       SLetRec definitions body ->
-        do {
-          signatures <-
-            freshLift
-              (traverseEither
-                 (\(Triple n mode rhs) ->
-                    case mode of {
-                      InferRecursive -> Right (Triple n Nothing rhs);
-                      CheckRecursive (SAnnotation Nil ty) -> Right (Triple n (Just ty) rhs);
-                      _ ->
-                        Left
-                          ("recursive definition " ++
-                           (n ++ " requires an explicit closed signature"))
-                    })
-                 definitions);
-          let {
-            entries =
-              map
-                (\(Triple n signature _) ->
-                   case signature of {
-                     Nothing -> Pair n (Pair n Nil);
-                     Just ty ->
-                       case scheme ty of {
-                         Triple _ predicates _ ->
-                           Pair n (Pair n (map (\(SPredicate c _) -> c) predicates))
-                       }
-                   })
-                signatures
-          };
-          let {
-            scope = M.union compareString (M.fromList compareString entries) env
-          };
-          definitions2 <-
-            mapM
-              (\(Triple n signature rhs) ->
-                 case signature of {
-                   Nothing ->
-                     do {
-                       let {
-                         available = M.findWithDefault compareString candidates n valueScopes
-                       };
-                       lowered <- lowerExpr valueScopes ds infos scope available rhs;
-                       case lowered of {
-                         Pair rhs2 wants ->
-                           -- Unsigned recursive interfaces do not infer class contexts yet.
-                           -- Resolve wants inside this RHS, without adding dictionary
-                           -- parameters or exporting wants from the recursive group.
-                           -- Missing or ambiguous evidence remains a resolution error.
-                           freshPure
-                             (Triple n InferRecursive (closeWants infos available wants rhs2))
-                       }
-                     };
-                   Just ty ->
-                     do {
-                       translated <- freshLift (translateScheme ds infos ty);
-                       rhs2 <-
-                         signedIn valueScopes ds infos
-                           (M.findWithDefault compareString candidates n valueScopes)
-                           scope
-                           rhs
-                           ty;
-                       freshPure (Triple n (CheckRecursive (SAnnotation Nil translated)) rhs2)
-                     }
-                 })
-              signatures;
-          boundValueShared19 <- lowerExpr valueScopes ds infos scope candidates body;
-          case boundValueShared19 of {
-            Pair body2 wants ->
-              do {
-                freshPure (Pair (SLetRec definitions2 body2) wants)
-              }
-          }
-        };
+        planQualifiedRecursive valueScopes ds infos owner env candidates definitions body;
       SEquations _ -> freshFail "surface equations escaped lowering";
       SWanted _ _ -> freshFail "dictionary holes are reserved for dictionary translation";
-      SChecked _ _ -> freshFail "checked source forms are reserved for dictionary translation"
+      SChecked _ _ -> freshFail "checked source forms are reserved for dictionary translation";
+      _ -> qualifiedMake (QualifiedPlain expression) Q.Empty qualifiedEmpty
+    };
+  planQualifiedSigned :: Map String (List (Pair EvidenceRole String)) -> DataEnv -> Map String Info -> Int ->
+                         Map String QualifiedBinding -> List (Pair EvidenceRole String) ->
+                         SExpr -> SType -> Fresh QualifiedResult;
+  planQualifiedSigned valueScopes ds infos owner env available expression ty =
+    do {
+      translated <- freshLift (translateScheme ds infos ty);
+      names <- mapM (\_ -> freshName "givenDictionary") (qualifiedClasses ty);
+      let { local = append (map (\n -> Pair GivenEvidence n) names) available };
+      frame <- qualifiedId;
+      result <- planQualified valueScopes ds infos frame env local expression;
+      build <- qualifiedFinish frame (Just owner) (qualifiedBuild result);
+      qualifiedMake (QualifiedChecked translated names local (qualifiedExpression result)) Q.Empty build
+    };
+  planQualifiedRecursive :: Map String (List (Pair EvidenceRole String)) -> DataEnv -> Map String Info -> Int ->
+                            Map String QualifiedBinding -> List (Pair EvidenceRole String) ->
+                            List (Triple String RecursiveMode SExpr) -> SExpr -> Fresh QualifiedResult;
+  planQualifiedRecursive valueScopes ds infos owner env candidates definitions body =
+    do {
+      freshLift (traverseEither (\(Triple n mode _) -> case mode of {
+        InferRecursive -> Right Unit;
+        CheckRecursive (SAnnotation Nil _) -> Right Unit;
+        _ -> Left ("recursive definition " ++ n ++ " requires an explicit closed signature")
+      }) definitions);
+      let {
+        unsigned = filter (\(Triple _ mode _) -> case mode of {
+          InferRecursive -> True; _ -> False
+        }) definitions;
+        signed = filter (\(Triple _ mode _) -> case mode of {
+          InferRecursive -> False; _ -> True
+        }) definitions;
+        fixed = foldr (\(Triple n mode _) scope -> case mode of {
+          CheckRecursive (SAnnotation Nil ty) ->
+            M.insert compareString n (QualifiedKnown n (qualifiedClasses ty)) scope;
+          _ -> scope
+        }) env signed;
+        groups = Dependency.components (map (\(Triple n _ rhs) ->
+          Pair n (Dependency.valueNames (Dependency.observeExpression rhs))) unsigned)
+      };
+      accumulated <- foldM (\(Triple scope previous build) group -> do {
+        frame <- qualifiedId;
+        entries <- mapM (\n -> do { node <- qualifiedId; freshPure (Pair n node) }) group;
+        let {
+          shared = foldr (\(Pair n node) -> M.insert compareString n (QualifiedRecursive n node))
+                    scope entries
+        };
+        planned <- mapM (\(Pair n node) -> do {
+          rhs <- freshLift (case find (\(Triple name _ _) -> eqString name n) unsigned of {
+            Nothing -> Left "qualified recursive declaration disappeared";
+            Just (Triple _ _ rhs) -> Right rhs
+          });
+          result <- planQualified valueScopes ds infos frame shared
+            (M.findWithDefault compareString candidates n valueScopes) rhs;
+          let {
+            link = QualifiedBuild Nil Nil Nil
+              (Cons (Pair node (Q.RefNode (qualifiedNode (qualifiedExpression result)))) Nil)
+          };
+          freshPure (Pair (Triple n InferRecursive (qualifiedExpression result))
+            (qualifiedMerge (qualifiedBuild result) link))
+        }) entries;
+        completed <- qualifiedFinish frame (Just owner) (qualifiedBuilds (map snd planned));
+        let {
+          exported = foldr (\(Pair n node) -> M.insert compareString n (QualifiedTemplate n frame node))
+                       scope entries
+        };
+        freshPure (Triple exported (append previous (map fst planned)) (qualifiedMerge build completed))
+      }) (Triple fixed Nil qualifiedEmpty) groups;
+      case accumulated of {
+        Triple scope inferred build -> do {
+          checked <- mapM (\(Triple n mode rhs) -> case mode of {
+            CheckRecursive (SAnnotation Nil ty) -> do {
+              translated <- freshLift (translateScheme ds infos ty);
+              result <- planQualifiedSigned valueScopes ds infos owner scope
+                (M.findWithDefault compareString candidates n valueScopes) rhs ty;
+              freshPure (Pair (Triple n (CheckRecursive (SAnnotation Nil translated))
+                (qualifiedExpression result)) (qualifiedBuild result))
+            };
+            _ -> freshFail "invalid signed recursive plan"
+          }) signed;
+          let { allDefinitions = append inferred (map fst checked) };
+          ordered <- freshLift (traverseEither (\(Triple n _ _) ->
+            case find (\(Triple name _ _) -> eqString name n) allDefinitions of {
+              Nothing -> Left "qualified recursive plan lost a declaration";
+              Just definition -> Right definition
+            }) definitions);
+          continuation <- planQualified valueScopes ds infos owner scope candidates body;
+          qualifiedMake (QualifiedRec ordered (qualifiedExpression continuation))
+            (Q.RefNode (qualifiedNode (qualifiedExpression continuation)))
+            (qualifiedBuilds (Cons build (Cons (qualifiedBuild continuation) (map snd checked))))
+        }
+      }
+    };
+  qualifiedParameters :: Q.Plan -> QualifiedExpr -> Fresh (List (Triple Int String String));
+  qualifiedParameters plan expression =
+    do {
+      slots <- freshLift (Q.slotsAt plan (qualifiedNode expression));
+      mapM (\slot -> do {
+        name <- freshName "wantedDictionary";
+        classId <- freshLift (Q.slotClass plan slot);
+        freshPure (Triple slot name classId)
+      }) slots
+    };
+  qualifiedParameterMap :: List (Triple Int String String) -> IntMap String;
+  qualifiedParameterMap parameters = IM.fromList (map (\(Triple slot name _) -> Pair slot name) parameters);
+  qualifiedWants :: List (Triple Int String String) -> List (Pair String String);
+  qualifiedWants parameters = map (\(Triple _ name classId) -> Pair name classId) parameters;
+  renderQualified :: Q.Plan -> Map String Info -> IntMap String -> QualifiedExpr -> Fresh SExpr;
+  renderQualified plan infos bindings expression =
+    case expression of {
+      QualifiedExpr node form ->
+        case form of {
+          QualifiedPlain source -> freshPure source;
+          QualifiedVariable name mapping -> renderQualifiedArguments plan bindings node mapping (SVar name);
+          QualifiedApply a b -> do {
+            left <- renderQualified plan infos bindings a;
+            right <- renderQualified plan infos bindings b;
+            freshPure (SApp left right)
+          };
+          QualifiedContext source -> do {
+            result <- renderQualified plan infos bindings source;
+            renderQualifiedArguments plan bindings node Nothing result
+          };
+          QualifiedLambda name annotation body -> do {
+            result <- renderQualified plan infos bindings body;
+            freshPure (SLam name annotation result)
+          };
+          QualifiedLet name rhs body -> do {
+            parameters <- qualifiedParameters plan rhs;
+            left <- renderQualified plan infos (qualifiedParameterMap parameters) rhs;
+            right <- renderQualified plan infos bindings body;
+            freshPure (SLet name (foldr (\(Triple _ n _) b -> SLam n Nothing b) left parameters) right)
+          };
+          QualifiedAnnotation source annotation -> do {
+            result <- renderQualified plan infos bindings source;
+            freshPure (SAnn result annotation)
+          };
+          QualifiedCase source branches -> do {
+            result <- renderQualified plan infos bindings source;
+            alternatives <- mapM (\(Pair pattern body) -> do {
+              branch <- renderQualified plan infos bindings body;
+              freshPure (SAlternative pattern branch)
+            }) branches;
+            freshPure (SCase result alternatives)
+          };
+          QualifiedChecked ty names candidates source -> do {
+            parameters <- qualifiedParameters plan source;
+            result <- renderQualified plan infos (qualifiedParameterMap parameters) source;
+            freshPure (SChecked ty (foldr (\n b -> SLam n Nothing b)
+              (closeWants infos candidates (qualifiedWants parameters) result) names))
+          };
+          QualifiedRec definitions body -> do {
+            lowered <- mapM (\(Triple name mode rhs) -> do {
+              parameters <- qualifiedParameters plan rhs;
+              result <- renderQualified plan infos (qualifiedParameterMap parameters) rhs;
+              freshPure (Triple name mode
+                (foldr (\(Triple _ n _) b -> SLam n Nothing b) result parameters))
+            }) definitions;
+            result <- renderQualified plan infos bindings body;
+            freshPure (SLetRec lowered result)
+          }
+        }
+    };
+  renderQualifiedArguments :: Q.Plan -> IntMap String -> Int -> Maybe (Pair Int Int) -> SExpr -> Fresh SExpr;
+  renderQualifiedArguments plan bindings node mapping source =
+    do {
+      -- Preserve formal order and multiplicity. Two callee slots can map to
+      -- one inherited caller slot; the call still passes both arguments.
+      slots <- freshLift (case mapping of {
+        Nothing -> Q.slotsAt plan node;
+        Just (Pair use input) -> do {
+          original <- Q.slotsAt plan input;
+          traverseEither (Q.instantiateSlot plan use) original
+        }
+      });
+      names <- freshLift (traverseEither (\slot -> case IM.lookup slot bindings of {
+        Nothing -> Left "qualified dictionary slot escaped its lexical abstraction";
+        Just name -> Right name
+      }) slots);
+      freshPure (foldl SApp source (map SVar names))
+    };
+  lowerExpr :: Map String (List (Pair EvidenceRole String)) -> DataEnv -> Map String Info ->
+               Map String (Pair String (List String)) -> List (Pair EvidenceRole String) ->
+               SExpr -> Fresh (Pair SExpr (List (Pair String String)));
+  lowerExpr valueScopes ds infos env candidates expression =
+    do {
+      owner <- qualifiedId;
+      result <- planQualified valueScopes ds infos owner
+        (M.map (\(Pair name classes) -> QualifiedKnown name classes) env) candidates expression;
+      build <- qualifiedFinish owner Nothing (qualifiedBuild result);
+      plan <- freshLift (case build of {
+        QualifiedBuild frames seeds uses nodes -> Q.solve frames seeds uses (IM.fromList nodes)
+      });
+      let { planned = qualifiedExpression result };
+      parameters <- qualifiedParameters plan planned;
+      lowered <- renderQualified plan infos (qualifiedParameterMap parameters) planned;
+      freshPure (Pair lowered (qualifiedWants parameters))
     };
   wantedNames :: List String -> Fresh (List (Pair String String));
   wantedNames classes =

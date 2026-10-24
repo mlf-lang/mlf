@@ -556,6 +556,21 @@ copy provenance and scaffold-order invariance. The reviewed Core inventory is
 positive cases; recursive existential signatures and actual type errors remain
 negative tests. Existing oracle implementations are unchanged.
 
-These focused tests do not constitute full native qualification. Newly inferred
-recursive class contexts are a separate implementation phase; explicit closed
-qualified signatures remain supported. See `docs/inference/Unsigned-Recursion-Implementation-Plan.md`.
+The same mode now exercises finite lexical dictionary-demand planning and
+inferred qualified recursion: 53 independently prescribed source cases, eight
+planner groups, and malformed recursive/dictionary-scope targets. Coverage
+includes local dictionary abstraction, mixed signatures, generic instances,
+first-class recursive values, multiple class parameters, higher kinds, captured
+environment variables, and transitive module-instance visibility. Both the
+current and frozen target checkers remain unchanged.
+
+The former cross-module unsigned-signature rejection retains its exact divergent
+source as a type-only `XBot` positive in both module and separately linked crate
+checks. It never enters the runtime program inventory. The reviewed Core
+inventory stays at 740 cases; no unrelated oracle is regenerated.
+
+These focused tests do not constitute full native qualification. Inferred
+contexts retain distinct origin slots rather than claiming minimal contexts or
+unrestricted polymorphic-recursion inference. See
+`docs/inference/Unsigned-Recursion-Implementation-Plan.md` and
+`docs/inference/Qualified-Recursion-Implementation-Plan.md`.

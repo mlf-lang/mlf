@@ -22,7 +22,7 @@ import qualified Bootstrap.Data as Data
 import qualified Bootstrap.X.Pretty as Pretty
 import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Type as T
-import Tests.Modules (modulePrograms, moduleRejections, ModuleRejection(..))
+import Tests.Modules (modulePrograms, moduleRejections, ModuleRejection(..), moduleTypings, ModuleTyping(..), checkTypedModuleTarget)
 import Tests.System (withScratch)
 
 separatePrograms : (List ( (Quint String PreludeMode (List (Pair String String)) String String) ))
@@ -136,6 +136,14 @@ forgeUnusedParameter fragments earlier = case fragments of
         let forged = case original of {XWithData ds term -> XWithData ds (XAbs name (XCon "Bool" Nil) term); term -> XAbs name (XCon "Bool" Nil) term} in
         Right (Cons (replaceFragmentTerm fragment forged) rest)
 
+-- Compile and link the original divergent source, but never run the target.
+checkSeparateTyping : ModuleTyping -> Pair String (IO Unit)
+checkSeparateTyping (ModuleTyping name libraries source expected) = Pair ("crate typing: " ++ name) do
+  result <- compileSeparateProgram ImplicitPrelude libraries source
+  objects <- H.right result
+  term <- H.right (Artifact.linkObjects objects fixtureIdentity)
+  checkTypedModuleTarget expected term
+
 separateTests : List (Pair String (IO Unit))
 separateTests = S.append
   (S.map (\(Quint name mode libraries source _) -> Pair ("crate checking: " ++ name) do
@@ -145,9 +153,11 @@ separateTests = S.append
     ty <- H.right (Check.checkClosed term)
     H.assert (T.alphaEq ty (XCon "IO" (Cons (XCon "Unit" Nil) Nil))) "crate entry retained unresolved arguments") separatePrograms)
   (S.append
-    (S.map (\(ModuleRejection name libraries source _ _) -> Pair ("crate rejects: " ++ name) do
-      result <- compileSeparateProgram ImplicitPrelude libraries source
-      case result of {Left _ -> return Unit; Right _ -> H.fail ("accepted invalid crate: " ++ name)}) moduleRejections)
+    (S.append
+      (S.map (\(ModuleRejection name libraries source _ _) -> Pair ("crate rejects: " ++ name) do
+        result <- compileSeparateProgram ImplicitPrelude libraries source
+        case result of {Left _ -> return Unit; Right _ -> H.fail ("accepted invalid crate: " ++ name)}) moduleRejections)
+      (S.map checkSeparateTyping moduleTypings))
     (Cons (Pair "crate paths and native cache commands" cratePaths)
     (Cons (Pair "crate metadata version rejection" (expect "MLFCI-1" (Artifact.decodeInterface "7:MLFCI-9")))
     (Cons (Pair "crate object binding schemes are independently checked" do

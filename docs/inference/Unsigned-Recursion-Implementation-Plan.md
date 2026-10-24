@@ -51,7 +51,11 @@ Final XLetRec still contains the original value binders and one original RHS eac
 - Signed-aware scheduling and class dictionary interfaces need their own end-to-end regressions.
 - Current/frozen target checking, source-erasure equality and prescribed result types remain mandatory. GHC 9.14.1 was installed locally from the official checksum-verified bindist after approval. Focused O0/O2 tests pass; exact validation evidence is recorded separately.
 
-## Qualified recursion: current boundary
+## Qualified recursion: boundary of the core-only milestone
+
+The later qualified-interface implementation is documented in
+[Qualified-Recursion-Implementation-Plan.md](Qualified-Recursion-Implementation-Plan.md).
+The following records the earlier core milestone, not the latest branch capability.
 
 Unsigned class-free recursion and unsigned recursion with wants resolved from existing concrete instances or captured givens are implemented. Distinct `Inspect Int` and `Inspect Bool` wants are tested independently. Newly generalized recursive dictionary interfaces are not implemented in this core milestone; a function requiring `forall a. Inspect a => a -> Bool` still needs an explicit recursive signature. Signed class-constrained recursion keeps its existing checking path.
 

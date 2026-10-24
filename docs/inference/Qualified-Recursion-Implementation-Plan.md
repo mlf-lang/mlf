@@ -139,3 +139,11 @@ Integrated acceptance tests must cover generic self/mutual recursion, two concre
 Positive compiler cases still need production and frozen target checking, target serialization round-trips, erasure comparison, and relevant O0/O2 execution. Negative target mutations must demonstrate rejection of missing/wrong dictionary applications or invalid scopes.
 
 The finite-rank proof depends on correct lexical collection and frame assignment. The planner validates its structural inputs, but does not independently reconstruct source scoping. Retaining redundant origins is deliberate; minimal contexts and a principal-completeness theorem are not claimed. Final runtime coverage and aggregate validation must be recorded separately when complete.
+
+## Integration checkpoint
+
+The collector/materializer in `Classes` is implemented. An incremental optimized
+GHC build passes the 53-case recursive mode and the complete direct frontend
+mode, including unchanged frozen-target checks and a generated dictionary-scope
+mutation. Final clean source-bound O0/O2 receipts and the existing interpreted
+class/module compatibility runs are still pending at this checkpoint.
