@@ -24,12 +24,20 @@ FRONTEND_CASES = [
     ('native-first', '--native-first', b'shared frontend: first native semantics checks passed\n'),
     ('native-second', '--native-second', b'shared frontend: checks passed\n'),
 ]
-# The canonical prelude makes the maintained frontend corpus larger than the
-# original 120-second smoke budget. Other modes retain their original bound.
-def frontend_case_timeout(name, frontend_seconds):
-    if not 1 <= frontend_seconds <= 1800:
-        raise ValueError("frontend timeout must be between 1 and 1800 seconds")
-    return frontend_seconds if name == "frontend" else 120
+# O0's canonical-prelude workload is substantially slower even on the upstream
+# compiler. Select limits only from the authenticated producer, never a CLI
+# optimization label. O2's existing limits are unchanged.
+def frontend_case_timeout(name, optimization, frontend_seconds=None):
+    if optimization not in ('0', '2'):
+        raise ValueError('unsupported authenticated optimization level')
+    if name not in {case[0] for case in FRONTEND_CASES}:
+        raise ValueError('unknown frontend case')
+    maximum = 3000 if optimization == '0' else 1800
+    if frontend_seconds is not None and not 1 <= frontend_seconds <= maximum:
+        raise ValueError('frontend timeout must be between 1 and ' + str(maximum) + ' seconds')
+    if name == 'frontend':
+        return frontend_seconds if frontend_seconds is not None else (2400 if optimization == '0' else 1200)
+    return 1200 if optimization == '0' else 120
 
 ORACLES = ['tests/async-task/suite.stdout', 'tests/async-task/processes.stdout',
            'tests/async-task/wait-graph.stdout', 'tests/async-process/suite.stdout']
@@ -156,6 +164,45 @@ class CommandRunner:
     def __init__(self, root, output, receipt, save):
         self.root, self.output, self.receipt, self.save = root, output, receipt, save
 
+    @staticmethod
+    def stop_group(process):
+        # start_new_session gives this command its own original process group.
+        # A dead leader (or closed capture pipes) does not mean its children died.
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        try:
+            process.communicate(timeout=2)
+        except subprocess.TimeoutExpired:
+            pass
+        finally:
+            # Always escalate, including when communicate already returned after
+            # the leader exited and a TERM-ignoring child redirected its stdio.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        cleanup = {'scope': 'original-process-group', 'capture_drained': True, 'leader_reaped': True}
+        try:
+            stdout, stderr = process.communicate(timeout=2)
+        except subprocess.TimeoutExpired as error:
+            # An escaped descendant can retain these pipes. Do not hang while
+            # draining them or signal an unrelated/new process group to fix it.
+            stdout, stderr = error.stdout or b'', error.stderr or b''
+            cleanup['capture_drained'] = False
+            for stream in (process.stdout, process.stderr):
+                if stream is not None:
+                    stream.close()
+            try:
+                process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                cleanup['leader_reaped'] = False
+        cleanup['complete'] = cleanup['capture_drained'] and cleanup['leader_reaped']
+        if not cleanup['complete']:
+            cleanup['error'] = 'original process-group cleanup could not drain captures or reap the leader within its bounds'
+        return stdout, stderr, cleanup
+
     def run(self, name, command, *, overrides=None, status=0, expected=None, timeout=180):
         command = list(map(str, command))
         overrides = overrides or {}
@@ -166,6 +213,7 @@ class CommandRunner:
         stdout, stderr = b'', b''
         started = time.monotonic()
         process = None
+        group_stopped = False
         try:
             process = subprocess.Popen(command, cwd=self.root, env={**os.environ, **overrides},
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
@@ -173,18 +221,8 @@ class CommandRunner:
                 stdout, stderr = process.communicate(timeout=timeout)
             except subprocess.TimeoutExpired:
                 entry['timed_out'] = True
-                try:
-                    os.killpg(process.pid, signal.SIGTERM)
-                except ProcessLookupError:
-                    pass
-                try:
-                    stdout, stderr = process.communicate(timeout=2)
-                except subprocess.TimeoutExpired:
-                    try:
-                        os.killpg(process.pid, signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
-                    stdout, stderr = process.communicate()
+                stdout, stderr, entry['cleanup'] = self.stop_group(process)
+                group_stopped = True
             entry['exit_code'] = process.returncode
             if entry.get('timed_out'):
                 raise RuntimeError(name + ' exceeded ' + str(timeout) + ' seconds')
@@ -195,12 +233,10 @@ class CommandRunner:
         except BaseException as error:
             entry['state'] = 'failed'
             entry['error'] = str(error)
-            if process is not None and process.poll() is None:
-                try:
-                    os.killpg(process.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                stdout, stderr = process.communicate()
+            if process is not None:
+                if not group_stopped:
+                    stdout, stderr, entry['cleanup'] = self.stop_group(process)
+                entry['exit_code'] = process.returncode
             raise
         finally:
             for suffix, data in [('stdout', stdout), ('stderr', stderr)]:
@@ -217,13 +253,11 @@ def main():
     parser.add_argument('--build-receipt', type=Path)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--cc', default=os.environ.get('CC', 'cc'))
-    parser.add_argument('--frontend-timeout', type=int, default=1200,
-                        help='frontend corpus process-tree bound in seconds (1..1800); other modes stay at 120')
+    parser.add_argument('--frontend-timeout', type=int,
+                        help='bounded frontend override: O0 1..3000, O2 1..1800; defaults come from authenticated optimization')
     args = parser.parse_args()
-    try:
-        frontend_case_timeout('frontend', args.frontend_timeout)
-    except ValueError as error:
-        parser.error(str(error))
+    if args.frontend_timeout is not None and not 1 <= args.frontend_timeout <= 3000:
+        parser.error('frontend timeout must be between 1 and 3000 seconds')
     binaries, output = args.bin_dir.resolve(), args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     receipt = {'format': 1, 'complete': False, 'source_mode': 'authenticated direct committed shared source',
@@ -240,6 +274,9 @@ def main():
             raise ValueError('direct async fixture qualification requires a POSIX host')
         build_receipt = (args.build_receipt or binaries.parent / 'receipt.json').resolve(strict=True)
         producer = authenticate_build(build_receipt, binaries)
+        budgets = {name: frontend_case_timeout(name, producer['optimization'], args.frontend_timeout)
+                   for name, _, _ in FRONTEND_CASES}
+        receipt['execution_budgets'] = budgets
         receipt['producer'] = {**identified(build_receipt), 'host': producer['producer_host'],
                                'optimization': producer['optimization']}
         compiler = shutil.which(args.cc)
@@ -276,7 +313,7 @@ def main():
         runner.run('panic-child-reaped', [process_helper, 'assert-gone', work / 'panic.pid'])
         for name, option, expected in FRONTEND_CASES:
             runner.run('shared-frontend-' + name, [binaries / 'shared-frontend', option], expected=expected,
-                       timeout=frontend_case_timeout(name, args.frontend_timeout))
+                       timeout=budgets[name])
         runner.run('build-receipts', [sys.executable, ROOT / 'tools/release/test-suite-build-receipts.py',
                    '--executable', binaries / 'build-receipts', '--output', output / 'build-receipts'], timeout=1800)
         for collection in [receipt['inputs'], receipt['helpers']]:

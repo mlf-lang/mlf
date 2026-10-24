@@ -70,3 +70,108 @@ No pre-merge or intermediate receipt is relabelled as evidence for this latest s
 ## Scope retained
 
 This merge does not claim unrestricted polymorphic recursion, arbitrary cyclic-data inference, a principal-completeness/minimal-context theorem, or a full native/LLVM/GC campaign. Previously documented field-revelation and vacuous-polymorphism residuals remain explicit. Upstream native/bootstrap tooling is preserved as source; adding that tooling does not mean its expensive campaigns were executed here.
+
+## CI integration correction after the merged checkpoint
+
+The published merge `a8c3f458b66bae4605e5bded5d5f79ded75461bf` was tested by
+CI run 162 (`40136305106`). Its O2 direct, TupleList/framework and Figure12
+checks passed. The next managed-fixture step rejected a C command which exited
+successfully but emitted two GCC 13 fortified-libc `unused-result` warnings.
+The O0 direct frontend command reached its 1200-second deadline. Neither result
+is reclassified as a successful complete run. Metadata and the ordinary runtime
+jobs passed; the opt-in native parity and full-main qualification were skipped.
+
+The correction has three narrowly scoped compatibility changes:
+
+- `SourceSCC.hs` uses `SSignature`, rather than the former overloaded `SAnn`
+  convention, for a declaration whose dictionary dependency must be closed
+  before the cache-compaction counterexample. The original upstream fixture and
+  the corrected fixture both complete the same 29 assertions. The former
+  unqualified expression coercion correctly produced a different dependency
+  context; no cache validation or assertion was relaxed.
+- Two POSIX supervisor writes store their `ssize_t` result before explicitly
+  discarding it. The original single-write, best-effort close/exit behavior is
+  unchanged. Fortified GCC controls reproduce the old warnings and compile the
+  corrected code with empty stderr, including `-Werror=unused-result`. No warning
+  suppression or successful-stderr exception was added.
+- The test watchdog always terminates the original process group after its grace
+  interval, even if the leader exited and a child redirected its streams.
+  Final capture draining and leader reaping are bounded too. An escaped group
+  is not signalled; retained pipes produce an explicitly incomplete cleanup
+  record instead of an unbounded wait. Real-process controls cover inherited
+  pipes, redirected streams, cancellation after leader exit and escaped pipes.
+  The framework wrapper now uses this same watchdog and preserves its existing
+  status, discovery, identity, count, report and expected-error assertions.
+
+### Measured O0 cost and exact coverage partition
+
+One unchanged Applicative-default workload was compiled and checked on pristine
+upstream `8d953f9` and the merged compiler. Each produced exactly `Int`, passed
+closed target checking and target serialization, and evaluated to `42` in the
+host interpreter:
+
+| Producer | Wall seconds | User CPU seconds |
+| --- | ---: | ---: |
+| Upstream O0 | 149.875 | 149.969 |
+| Merged O0 | 174.594 | 174.746 |
+| Merged O2 | 17.915 | 17.840 |
+
+The observed merged overhead is 16.5% for this one workload. The O0/O2 ratio is
+9.75, not a compiler-wide performance theorem. The upstream workload alone
+exceeds the old 120-second semantics-mode budget. Extrapolating this ratio from
+completed O2 stages suggests approximately 33 minutes for frontend, 32 minutes
+for the two semantics modes, and 61/68 minutes for the default/framework suites.
+These are planning estimates, not completed O0 measurements.
+
+CI therefore partitions exactly the existing O0 coverage into three parallel
+legs, while keeping O2's complete route and its limits unchanged:
+
+| Matrix leg | Executed coverage | Heavy command caps |
+| --- | --- | --- |
+| O0 direct | suite-receipt helpers, source smoke, async lifecycle checks, frontend/recursion/field checks, both host semantics modes, Figure12 | frontend 2400 s; each semantics mode 1200 s |
+| O0 default | shared framework semantic helper and all 305 default TupleList observations | default 4500 s |
+| O0 framework | shared semantic helper, all 105 framework actions, discovery, exact selection, report and error controls | framework 4500 s |
+| O2 all | all existing O2 routes, including managed evidence and guest checks | unchanged: frontend 1200 s; semantics 120 s each; framework 600 s each |
+
+The duplicate raw no-argument TupleList invocation is removed. The default/all
+framework gate still invokes the identical authenticated binary without
+arguments, with the stronger count and terminal-marker oracle. No case is
+removed. Partial framework receipts state the selected route and actual 305/0
+or 0/105 counts; they do not claim the combined route passed.
+
+Each leg has an independent, fail-closed 120-minute job deadline. The O0 direct
+heavy caps total 4800 seconds; all its conservative helper ceilings total 8040
+seconds, so the job deadline remains a stricter global bound, not a guarantee
+that every command can simultaneously consume its maximum. The measured helper
+costs were subsecond. The framework heavy caps each leave 45 minutes of the job
+for setup and controls. Actual final elapsed times and any timeout are retained.
+
+Each shard builds and authenticates its own producer. This deliberately adds
+two O0 producer builds: current receipts bind absolute toolchain, dependency,
+object and command-log paths, and no portable receipt-rebasing contract is
+introduced here. Unique artifact names prevent shard overwrites. The existing
+required `native` matrix dependency remains in `PR gate`, so a failed or skipped
+matrix leg cannot count as success. Independent policy controls enforce the
+four exact rows, coverage union, selectors, authentication, artifact names and
+aggregate dependency, including mutation negatives.
+
+Budgets are selected only after authenticating the producer's optimization
+level. There is no CLI or environment switch that can relabel O2 as O0.
+Explicit timeout overrides remain bounded by that authenticated level. Earlier
+local 600/1200-second failures and the interrupted 900-second retry remain
+separate incomplete attempts.
+
+### Regenerated identities and validation boundary
+
+The supervisor edit changes one authenticated host input and requires fresh
+producer identities. The regenerated O2 receipt is
+`bec63be1fdf146adf49f16e7cc415bf75621032e90a4930aa2f9ff86e3c9ab4e`.
+All 226 Haskell object/interface hashes, all 108 shared sources and all 19
+configuration inputs are identical to the previous merged O2 producer. The
+new compiler executable is
+`d5e8ce873133c93aefabe5f1dc4579edb08f2c900b16cb799c7a566cd83d299e`.
+This mapping preserves the scope of earlier inference evidence without
+mislabeling old executable runs as new ones. Rebuilt runtime/managed checks and
+exact-head CI are separate required gates. The interrupted local O0 rebuild
+is not a completed producer; final O0 coverage must be established by the new
+CI legs or a complete authenticated local rerun.

@@ -2,6 +2,7 @@
 // make the PR/main/release split and full coverage executable review assertions.
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
+import './test-native-ci-partition.mjs';
 const read = name => fs.readFileSync(`.github/workflows/${name}.yml`,'utf8');
 const ci=read('ci'), qualify=read('native-qualification'), release=read('platform-release');
 const concurrency = release.match(/^concurrency:\n(?:  #.*\n)*  group: \$\{\{ (.*) \}\}\n  cancel-in-progress: \$\{\{ (.*) \}\}$/m);

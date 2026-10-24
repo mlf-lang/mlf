@@ -7,10 +7,13 @@ import types
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import shutil
+import signal
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -360,7 +363,7 @@ class DirectProducerReceipt(unittest.TestCase):
 
 
 class FrontendTimeoutSelection(unittest.TestCase):
-    def run_dispatch(self, extra):
+    def run_dispatch(self, extra, optimization="2"):
         # Exercise the real CLI/default and dispatch loop, not a copied timeout
         # expression. Mock process execution and provenance only in this test.
         with tempfile.TemporaryDirectory(prefix='mlf-timeout-selection-') as temporary:
@@ -381,7 +384,7 @@ class FrontendTimeoutSelection(unittest.TestCase):
                     '--build-receipt', str(receipt), '--output', str(root / 'output'), *extra]
             with patch.object(sys, 'argv', argv), \
                     patch.object(direct, 'CommandRunner', RecordingRunner), \
-                    patch.object(direct, 'authenticate_build', return_value={'producer_host': 'GHC', 'optimization': '2'}), \
+                    patch.object(direct, 'authenticate_build', return_value={'producer_host': 'GHC', 'optimization': optimization}), \
                     patch.object(direct.shutil, 'which', return_value=sys.executable), \
                     patch.object(direct, 'sha', return_value='0' * 64):
                 direct.main()
@@ -402,8 +405,38 @@ class FrontendTimeoutSelection(unittest.TestCase):
             'shared-frontend-native-second': 120,
         })
 
+    def test_o0_budgets_come_from_authenticated_receipt(self):
+        self.assertEqual(self.run_dispatch([], optimization='0'), {
+            'shared-frontend-frontend': 2400,
+            'shared-frontend-native-first': 1200,
+            'shared-frontend-native-second': 1200,
+        })
+        self.assertEqual(self.run_dispatch(['--frontend-timeout', '3000'], optimization='0'), {
+            'shared-frontend-frontend': 3000,
+            'shared-frontend-native-first': 1200,
+            'shared-frontend-native-second': 1200,
+        })
+
+    def test_o2_rejects_o0_only_override(self):
+        with self.assertRaisesRegex(ValueError, '1800'):
+            self.run_dispatch(['--frontend-timeout', '1801'], optimization='2')
+
+    def test_untrusted_optimization_cannot_select_a_budget(self):
+        with self.assertRaisesRegex(ValueError, 'authenticated optimization'):
+            self.run_dispatch([], optimization='unqualified')
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / 'output'
+            argv = ['test_direct.py', '--bin-dir', temporary, '--output', str(output),
+                    '--optimization', '0']
+            with patch.object(sys, 'argv', argv), patch.object(direct, 'CommandRunner') as runner, \
+                    contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as error:
+                direct.main()
+            self.assertEqual(error.exception.code, 2)
+            runner.assert_not_called()
+            self.assertFalse(output.exists())
+
     def test_invalid_cli_budgets_fail_before_output_or_execution(self):
-        for seconds in ('0', '-1', '1801'):
+        for seconds in ('0', '-1', '3001'):
             with self.subTest(seconds=seconds), tempfile.TemporaryDirectory(prefix='mlf-timeout-invalid-') as temporary:
                 output = Path(temporary) / 'output'
                 argv = ['test_direct.py', '--bin-dir', temporary, '--output', str(output),
@@ -442,6 +475,131 @@ class CommandEvidence(unittest.TestCase):
         entry = self.receipt['commands'][0]
         self.assertTrue(entry['timed_out'])
         self.assertEqual(entry['state'], 'failed')
+        self.assertLess(entry['seconds'], 5)
+
+    def child_command(self, name, *, redirected, leader_exits=False, escaped=False):
+        marker = self.output / (name + '.pid')
+        child = ('import os,signal,sys,time; from pathlib import Path; '
+                 'signal.signal(signal.SIGTERM, signal.SIG_IGN); '
+                 'Path(sys.argv[1]).write_text(str(os.getpid())); time.sleep(60)')
+        streams = (', stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, '
+                   'stderr=subprocess.DEVNULL' if redirected else '')
+        session = ', start_new_session=True' if escaped else ''
+        parent = ('import subprocess,sys,time; from pathlib import Path\n'
+                  'marker = Path(sys.argv[1])\n'
+                  'child = subprocess.Popen([sys.executable, "-c", ' + repr(child) + ', str(marker)]' + streams + session + ')\n'
+                  'deadline = time.monotonic() + 5\n'
+                  'while not marker.exists() and time.monotonic() < deadline:\n'
+                  '    time.sleep(0.01)\n'
+                  'assert marker.exists(), "child did not install its SIGTERM handler"\n'
+                  'print("partial", flush=True)\n'
+                  'print("diagnostic", file=sys.stderr, flush=True)\n' +
+                  ('' if leader_exits else 'time.sleep(60)\n'))
+
+        def cleanup_child():
+            if marker.exists():
+                try:
+                    os.kill(int(marker.read_text()), signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+        self.addCleanup(cleanup_child)
+        return [sys.executable, '-c', parent, str(marker)], marker
+
+    def assert_child_stopped(self, marker):
+        self.assertTrue(marker.exists(), 'child must start before exercising cleanup')
+        pid = int(marker.read_text())
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            try:
+                state = Path('/proc/' + str(pid) + '/stat').read_text().rsplit(') ', 1)[1].split()[0]
+            except (FileNotFoundError, ProcessLookupError):
+                return
+            # Orphaned grandchildren can await the host init's reaper. A zombie
+            # cannot execute or keep pipes open and is not a surviving child.
+            if state == 'Z':
+                return
+            time.sleep(0.01)
+        self.fail('SIGTERM-ignoring grandchild survived command cleanup')
+
+    @unittest.skipUnless(os.name == 'posix' and Path('/proc').is_dir(), 'requires POSIX groups and /proc liveness')
+    def test_timeout_kills_grandchild_with_inherited_pipes(self):
+        self.check_timeout_child(redirected=False)
+
+    @unittest.skipUnless(os.name == 'posix' and Path('/proc').is_dir(), 'requires POSIX groups and /proc liveness')
+    def test_timeout_kills_grandchild_with_redirected_stdio(self):
+        self.check_timeout_child(redirected=True)
+
+    def check_timeout_child(self, *, redirected):
+        command, marker = self.child_command('timeout-child', redirected=redirected)
+        with self.assertRaisesRegex(RuntimeError, 'exceeded'):
+            self.runner.run('timeout-child', command, timeout=1)
+        self.assert_child_stopped(marker)
+        self.assertEqual((self.output / 'timeout-child.stdout').read_bytes(), b'partial\n')
+        self.assertEqual((self.output / 'timeout-child.stderr').read_bytes(), b'diagnostic\n')
+        entry = self.receipt['commands'][-1]
+        self.assertTrue(entry['timed_out'])
+        self.assertEqual(entry['state'], 'failed')
+        self.assertEqual(entry['exit_code'], -signal.SIGTERM)
+        self.assertTrue(entry['cleanup']['complete'])
+        self.assertLess(entry['seconds'], 5)
+
+    @unittest.skipUnless(os.name == 'posix' and Path('/proc').is_dir(), 'requires POSIX groups and /proc liveness')
+    def test_escaped_group_pipes_cannot_make_failure_cleanup_unbounded(self):
+        command, marker = self.child_command('escaped-child', redirected=False, escaped=True)
+        with self.assertRaisesRegex(RuntimeError, 'escaped-child exceeded 1 seconds'):
+            self.runner.run('escaped-child', command, timeout=1)
+        self.assertTrue(marker.exists())
+        pid = int(marker.read_text())
+        self.assertEqual(os.getpgid(pid), pid, 'escaped child must have its own process group')
+        state = Path('/proc/' + str(pid) + '/stat').read_text().rsplit(') ', 1)[1].split()[0]
+        self.assertNotEqual(state, 'Z', 'runner must not signal the escaped process group')
+        self.assertEqual((self.output / 'escaped-child.stdout').read_bytes(), b'partial\n')
+        self.assertEqual((self.output / 'escaped-child.stderr').read_bytes(), b'diagnostic\n')
+        entry = self.receipt['commands'][-1]
+        self.assertEqual(entry['state'], 'failed')
+        self.assertEqual(entry['error'], 'escaped-child exceeded 1 seconds')
+        self.assertTrue(entry['timed_out'])
+        self.assertEqual(entry['exit_code'], -signal.SIGTERM)
+        self.assertEqual(entry['cleanup']['scope'], 'original-process-group')
+        self.assertFalse(entry['cleanup']['capture_drained'])
+        self.assertTrue(entry['cleanup']['leader_reaped'])
+        self.assertFalse(entry['cleanup']['complete'])
+        self.assertIn('within its bounds', entry['cleanup']['error'])
+        self.assertLess(entry['seconds'], 8)
+
+    @unittest.skipUnless(os.name == 'posix' and Path('/proc').is_dir(), 'requires POSIX groups and /proc liveness')
+    def test_cancellation_kills_grandchild_after_leader_exit(self):
+        command, marker = self.child_command('cancelled-child', redirected=True, leader_exits=True)
+        real_popen = direct.subprocess.Popen
+
+        def cancellable_popen(*args, **kwargs):
+            process = real_popen(*args, **kwargs)
+            communicate = process.communicate
+            first = True
+
+            def cancel_once(*args, **kwargs):
+                nonlocal first
+                if first:
+                    first = False
+                    # Only inject cancellation; the leader and grandchild are
+                    # real processes, and the leader has already exited here.
+                    self.assertEqual(process.wait(timeout=5), 0)
+                    raise KeyboardInterrupt('test cancellation')
+                return communicate(*args, **kwargs)
+            process.communicate = cancel_once
+            return process
+
+        with patch.object(direct.subprocess, 'Popen', side_effect=cancellable_popen), \
+                self.assertRaisesRegex(KeyboardInterrupt, 'test cancellation'):
+            self.runner.run('cancelled-child', command)
+        self.assert_child_stopped(marker)
+        self.assertEqual((self.output / 'cancelled-child.stdout').read_bytes(), b'partial\n')
+        self.assertEqual((self.output / 'cancelled-child.stderr').read_bytes(), b'diagnostic\n')
+        entry = self.receipt['commands'][-1]
+        self.assertEqual(entry['state'], 'failed')
+        self.assertEqual(entry['exit_code'], 0)
+        self.assertEqual(entry['error'], 'test cancellation')
+        self.assertTrue(entry['cleanup']['complete'])
         self.assertLess(entry['seconds'], 5)
 
     def test_success_checks_exact_stdout(self):

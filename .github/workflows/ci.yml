@@ -53,14 +53,24 @@ jobs:
           "$RUNNER_TEMP/actionlint" -shellcheck= -pyflakes=
   native:
     # Preserve the required-check job ID, but label the producer honestly.
-    name: Shared compiler source smoke (GHC O${{ matrix.optimization }})
+    name: Shared compiler source smoke (GHC O${{ matrix.optimization }}, ${{ matrix.suite }})
     if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
-        optimization: ['0', '2']
+        # Keep the same O0 assertions, but bound the direct/default/framework
+        # work independently. O2 retains the original complete sequence.
+        include:
+          - optimization: '2'
+            suite: all
+          - optimization: '0'
+            suite: direct
+          - optimization: '0'
+            suite: default
+          - optimization: '0'
+            suite: framework
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -77,27 +87,38 @@ jobs:
           (cd "$RUNNER_TEMP/ghc-9.14.1-x86_64-unknown-linux" && ./configure --prefix="$RUNNER_TEMP/ghc" && make install)
           test "$("$RUNNER_TEMP/ghc/bin/ghc" --numeric-version)" = 9.14.1
           echo "$RUNNER_TEMP/ghc/bin" >> "$GITHUB_PATH"
+      # Each shard intentionally pays for its own toolchain and producer build.
+      # Authentication binds absolute toolchain, host, object, and command-log
+      # paths; copying/rebasing receipts would weaken that provenance contract.
       - name: Build exact committed shared sources and direct test runners
         run: |
           python3 tools/shared/build.py --optimization '${{ matrix.optimization }}' --build-dir .mlf-build/shared-ghc
           jq -e '.complete == true and .producer_host == "GHC" and .typecheck_only == false' .mlf-build/shared-ghc/receipt.json
       - name: Execute the actual shared suite-receipt helpers
+        if: matrix.suite == 'all' || matrix.suite == 'direct'
         run: |
           python3 tools/release/test-suite-build-receipts.py --executable .mlf-build/shared-ghc/bin/build-receipts --output .mlf-build/suite-receipt-regression
       - name: Execute source-bound shared smoke runner
+        if: matrix.suite == 'all' || matrix.suite == 'direct'
         env:
           MLF_SOURCE_SMOKE_RUNNER: .mlf-build/shared-ghc/bin/source-smoke
           MLF_SOURCE_SMOKE_RECEIPT: .mlf-build/shared-ghc/receipt.json
         run: tools/release/source-smoke.sh
-      - name: Qualify authenticated direct async, frontend and TupleList execution
+      - name: Qualify authenticated direct async and frontend execution
+        if: matrix.suite == 'all' || matrix.suite == 'direct'
         run: |
           set -euo pipefail
           python3 tools/shared/test_direct.py --bin-dir .mlf-build/shared-ghc/bin \
             --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/direct-host-tests
-          .mlf-build/shared-ghc/bin/tuple-list | tee .mlf-build/direct-host-tests/tuple-list.log
-      - name: Qualify framework semantics and exact maintained Figure12 fixtures
+          # The default/all framework gate executes this same no-argument
+          # TupleList binary with its exact 305-observation completion oracle.
+      - name: Qualify authenticated TupleList default and framework semantics
+        if: matrix.suite != 'direct'
         run: |
-          python3 tools/shared/test_framework_direct.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/framework-direct
+          python3 tools/shared/test_framework_direct.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/framework-direct --suite '${{ matrix.suite }}'
+      - name: Qualify exact maintained Figure12 fixtures
+        if: matrix.suite == 'all' || matrix.suite == 'direct'
+        run: |
           python3 tools/shared/test_figure12_direct.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/figure12-direct
       - name: Check recursive managed evidence and source-group contracts
         if: matrix.optimization == '2'
@@ -111,7 +132,7 @@ jobs:
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
-          name: source-smoke-evidence-ghc-O${{ matrix.optimization }}
+          name: source-smoke-evidence-ghc-O${{ matrix.optimization }}-${{ matrix.suite }}
           include-hidden-files: true
           retention-days: 14
           path: |
@@ -400,6 +421,7 @@ jobs:
     # A skipped manual job must not satisfy the required check on the same SHA.
     name: ${{ github.event_name == 'workflow_dispatch' && 'Manual CI summary' || 'PR gate' }}
     if: always() && github.event_name != 'workflow_dispatch'
+    # The native dependency covers every matrix leg, including all three O0 shards.
     needs: [metadata, native, windows-runtime, build-runner, async-runtime, async-language]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
