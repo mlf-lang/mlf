@@ -1,0 +1,20 @@
+{
+  "O0": {
+    "producer_receipt_sha256": "f24552afdbb0bc1f29c8c4a4275516ff8bc1e1ee30fef422e3cffc7eca9ede8f",
+    "objects_verified": 216,
+    "compiler_sha256": "46d673b4c151c93c2a69002cefde0d245bf16f771e5bfe5e3e4de836651e0b02",
+    "manager_sha256": "53b3d95450ca7ac545342a480f9228930783cb5f46ff94c1d3db4d7b66febbf0",
+    "complete": true
+  },
+  "O2": {
+    "producer_receipt_sha256": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+    "objects_verified": 216,
+    "compiler_sha256": "b41ce3de61090d9953000631df3879af2f18f578dc70b8a8d594a0ccf6a5a3d7",
+    "manager_sha256": "e2f400c43ba75c86782d1115c269622e5004b40bff0d449eeb49f38d45b6bfd1",
+    "complete": true
+  },
+  "maintained_gate": {
+    "receipt_sha256": "04fb413b0f53c49525828adc8418c339b15436b80c05b8a9cf3fa56e22e3dd9f",
+    "all_inputs_and_generated_files_rehashed": true
+  }
+}

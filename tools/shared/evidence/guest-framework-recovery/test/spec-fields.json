@@ -1,0 +1,10 @@
+[
+  "MLF-CRATE-1",
+  "mlf-test/0.1.0/library",
+  "",
+  "false",
+  "89:12:Test.Adapter71:/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Adapter.emlf85:11:Test.Assert68:/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Assert.hs95:15:Test.Capability74:/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Capability.emlf80:9:Test.Case66:/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Case.hs93:15:Test.Descriptor72:/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Descriptor.hs97:16:Test.Diagnostics75:/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Diagnostics.emlf91:13:Test.Evidence72:/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Evidence.emlf95:16:Test.Expectation73:/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Expectation.hs89:12:Test.Fixture71:/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Fixture.emlf87:12:Test.Outcome69:/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Outcome.hs82:9:Test.Plan68:/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Plan.emlf89:13:Test.Registry70:/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Registry.hs93:14:Test.Resources73:/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Resources.emlf85:11:Test.Runner68:/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Runner.hs",
+  "118:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/artifact/unit.mlfci",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/test/queries",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/builtin/unit"
+]

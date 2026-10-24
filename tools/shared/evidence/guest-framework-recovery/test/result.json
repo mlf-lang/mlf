@@ -1,0 +1,13 @@
+{
+  "complete": true,
+  "source_unchanged": true,
+  "producer_reauthenticated": true,
+  "producer_receipt_sha256": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+  "inferred_groups": 160,
+  "reused_groups": 0,
+  "native_or_llvm": false,
+  "elapsed_seconds": 10.290563150996604,
+  "peak_rss": 84701184,
+  "checked_artifact_bytes": 5945612,
+  "artifact_files": 163
+}

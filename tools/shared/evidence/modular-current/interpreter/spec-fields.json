@@ -1,0 +1,10 @@
+[
+  "MLF-CRATE-1",
+  "mlf-interpreter/0.3.0/library",
+  "",
+  "false",
+  "123:21:Bootstrap.ProcessHost96:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-interpreter/Bootstrap/ProcessHost.hs115:17:Bootstrap.Runtime92:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+  "118:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/artifact/unit.mlfci108:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-language-core-crate-O2/artifact/unit.mlfci101:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/xmlf/artifact/unit.mlfci",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/interpreter/queries",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/builtin/unit"
+]

@@ -1,5 +1,8 @@
 module Test.Evidence where
-import Bootstrap.Types
+-- Guest syntax explicitly selects the shared standard Monad used by Bootstrap.Std.
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
+import Bootstrap.Types hiding (Binding)
 import qualified Bootstrap.Std as S
 import qualified Test.Descriptor as D
 import qualified Test.Expectation as E
@@ -57,6 +60,7 @@ collect selected events started active terminal = case events of
   Finished identity observation -> do
    R.ensure (S.elem eqString identity active) "unknown, duplicate or out-of-order terminal event"
    collect selected rest started (S.filter (\value -> S.not (eqString value identity)) active) (Cons (Pair identity observation) terminal)
+lookupDescriptor : String -> List D.Descriptor -> Either String D.Descriptor
 lookupDescriptor identity entries = case entries of
  Nil -> Left "terminal has no registered descriptor"
  Cons entry rest -> if eqString identity (D.id entry) then Right entry else lookupDescriptor identity rest

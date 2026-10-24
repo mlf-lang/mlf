@@ -109,7 +109,9 @@ def source_builtins(source, text):
     shared = marker == '-- mlf:syntax shared-haskell-v1'
     if Path(source).suffix == '.hs' and not shared:
         raise ValueError(f'shared source requires explicit profile marker: {source}')
-    return {'Prelude', 'MLF.Primitive'} if shared else {'Prelude'}
+    # Both builtins may be explicitly imported by legacy guests. This does not
+    # change their syntax profile, implicit Prelude, or reserved-source ban.
+    return {'Prelude', 'MLF.Primitive'}
 
 
 def snapshot(manifest):

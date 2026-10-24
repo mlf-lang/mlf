@@ -1,0 +1,10 @@
+[
+  "MLF-CRATE-1",
+  "mlf-compiler/0.3.0/target-compiler-tests",
+  "MLF.Entry.CompilerTests",
+  "false",
+  "107:23:MLF.Entry.CompilerTests78:/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/MLF/Entry/CompilerTests.hs99:19:Tests.BuildReceipts74:/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/Tests/BuildReceipts.hs87:13:Tests.Catalog68:/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/Tests/Catalog.hs99:19:Tests.CompilerTests74:/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/Tests/CompilerTests.hs101:20:Tests.CorePartitions75:/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/Tests/CorePartitions.hs89:14:Tests.Coverage69:/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/Tests/Coverage.hs91:15:Tests.Selection70:/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/Tests/Selection.hs95:17:Tests.TestDrivers72:/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/Tests/TestDrivers.hs95:17:Tests.TestSources72:/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/Tests/TestSources.hs",
+  "112:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/developer-tools/artifact/unit.mlfci118:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/artifact/unit.mlfci103:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-frontend-crate-O2/artifact/unit.mlfci109:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/package-core/artifact/unit.mlfci",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/target-compiler-tests/queries",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/builtin/unit"
+]

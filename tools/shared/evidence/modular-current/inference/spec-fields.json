@@ -1,0 +1,10 @@
+[
+  "MLF-CRATE-1",
+  "mlf-inference/0.3.0/library",
+  "",
+  "false",
+  "113:17:Bootstrap.Classes90:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-inference/Bootstrap/Classes.hs115:18:Bootstrap.Compiler91:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-inference/Bootstrap/Compiler.hs123:22:Bootstrap.CompilerCore95:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-inference/Bootstrap/CompilerCore.hs119:20:Bootstrap.Constraint93:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-inference/Bootstrap/Constraint.hs117:19:Bootstrap.Elaborate92:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-inference/Bootstrap/Elaborate.hs115:18:Bootstrap.Evidence91:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-inference/Bootstrap/Evidence.hs109:15:Bootstrap.Graph88:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-inference/Bootstrap/Graph.hs123:22:Bootstrap.Graph.Solver95:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-inference/Bootstrap/Graph/Solver.hs",
+  "118:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/artifact/unit.mlfci103:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-frontend-crate-O2/artifact/unit.mlfci108:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-language-core-crate-O2/artifact/unit.mlfci101:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/xmlf/artifact/unit.mlfci",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/inference/queries",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/builtin/unit"
+]

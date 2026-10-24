@@ -32,14 +32,25 @@ class SnapshotControls(unittest.TestCase):
         (self.root / 'Main.hs').write_text('-- mlf:syntax shared-haskell-v1\nmodule Main where\nimport MLF.Primitive\nmain = 1\n')
         self.save()
 
-    def test_hs_filename_does_not_authorize_builtin(self):
+    def test_hs_filename_requires_explicit_syntax_marker(self):
         self.value['executables']['probe']['main'] = 'Main.hs'
         (self.root / 'Main.hs').write_text('module Main where\nimport MLF.Primitive\nmain = 1\n')
         with self.assertRaisesRegex(ValueError, 'explicit profile marker'):
             self.save()
 
-    def test_legacy_cannot_claim_shared_builtin(self):
-        (self.root / 'Main.emlf').write_text('module Main where\nimport MLF.Primitive\nmain = 1\n')
+    def test_legacy_explicit_standard_class_import(self):
+        (self.root / 'Main.emlf').write_text('module Main where\nimport Prelude hiding (Monad, return, bind)\nimport MLF.Primitive (Monad, return, bind)\nmain = 1\n')
+        self.save()
+
+    def test_legacy_cannot_supply_reserved_builtins(self):
+        for module in ['Prelude', 'MLF.Primitive']:
+            with self.subTest(module=module):
+                (self.root / 'Main.emlf').write_text('module '+module+' where\nmain = 1\n')
+                with self.assertRaisesRegex(ValueError, 'reserved builtin'):
+                    self.save()
+
+    def test_legacy_builtin_import_does_not_authorize_other_modules(self):
+        (self.root / 'Main.emlf').write_text('module Main where\nimport MLF.Primitive\nimport MLF.Missing\nmain = 1\n')
         with self.assertRaisesRegex(ValueError, 'undeclared direct imports'):
             self.save()
 

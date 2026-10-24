@@ -1,6 +1,6 @@
 # Shared implementation source cutover
 
-Current integration follow-on: [103-module framework reconciliation and exact qualification boundary](Framework-Reconciliation.md). Earlier 94-module checkpoint reports below remain historical.
+Current follow-on: [actual MLF source acceptance and mixed guest framework compatibility](Guest-Framework-Compatibility.md). The [103-module host reconciliation](Framework-Reconciliation.md) and earlier 94-module checkpoint reports below retain their historical scope.
 
 This draft is one coordinated migration of implementation syntax, primitive
 facade, compiler sources, native packaging, bootstrap and qualification.
@@ -177,4 +177,4 @@ This covers 25 of 72 library modules. The other eight library crates and
 executable closures, the full guest/Core/unit campaign, released-seed native
 bridge, and compiler-plus-manager native fixed point remain pending. Further
 crate/native work is held at the disk safety floor; existing checked artifacts
-are retained. Documentation/evidence publication authorization is also pending.
+are retained. At that historical checkpoint, documentation/evidence publication authorization was pending; it has since been granted and the later reports above supersede that hold.
