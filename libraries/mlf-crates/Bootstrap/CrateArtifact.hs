@@ -11,6 +11,7 @@ module Bootstrap.CrateArtifact where {
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Host as Host;
   import qualified Bootstrap.Classes as Classes;
+  import qualified Bootstrap.Fresh as Fresh;
   import qualified Bootstrap.CompilerCore as Compiler;
   import qualified Bootstrap.Parser as Parser;
   import qualified Bootstrap.Surface as Surface;
@@ -27,43 +28,49 @@ module Bootstrap.CrateArtifact where {
   -- have deliberately separate representations. Dependencies refer to metadata
   -- files, so inference never needs to open an upstream implementation object.
   data CrateInterface =
-    CrateInterface String (List (Triple String String String)) (List String) (List
-                                                                              (Pair String
-                                                                               (List
-                                                                                Modules.Entity))) (List
-                                                                                                   (Pair
+    CrateInterface String ([] ((,,) String String String)) ([] String) ([]
+                                                                              ((,) String
+                                                                               ([]
+                                                                                Modules.Entity))) ([]
+                                                                                                   ((,)
                                                                                                     String
-                                                                                                    (List
-                                                                                                     String))) (List
-                                                                                                                DataDecl) (List
-                                                                                                                           SClassDecl) (List
-                                                                                                                                        (Pair
+                                                                                                    ([]
+                                                                                                     String))) ([]
+                                                                                                                DataDecl) ([]
+                                                                                                                           SClassDecl) ([]
+                                                                                                                                        ((,)
                                                                                                                                          String
-                                                                                                                                         SInstanceDecl)) (List
-                                                                                                                                                          DataDecl) (List
-                                                                                                                                                                     (Pair
+                                                                                                                                         SInstanceDecl)) ([]
+                                                                                                                                                          DataDecl) ([]
+                                                                                                                                                                     ((,)
                                                                                                                                                                       String
-                                                                                                                                                                      XType)) String String;
+                                                                                                                                                                      XType)) String String ([] ((,) String Bool));
   data CrateObject =
-    CrateObject CrateInterface (List Separate.UnitObject) |
-    LegacyCrateObject CrateInterface (List Separate.UnitObject);
-  crateId (CrateInterface n _ _ _ _ _ _ _ _ _ _ _) = n;
-  crateDependencies (CrateInterface _ ds _ _ _ _ _ _ _ _ _ _) = ds;
-  crateModules (CrateInterface _ _ ms _ _ _ _ _ _ _ _ _) = ms;
-  crateExports (CrateInterface _ _ _ es _ _ _ _ _ _ _ _) = es;
-  crateImports (CrateInterface _ _ _ _ is _ _ _ _ _ _ _) = is;
-  crateData (CrateInterface _ _ _ _ _ ds _ _ _ _ _ _) = ds;
-  crateClasses (CrateInterface _ _ _ _ _ _ cs _ _ _ _ _) = cs;
-  crateInstances (CrateInterface _ _ _ _ _ _ _ is _ _ _ _) = is;
-  crateLoweredData (CrateInterface _ _ _ _ _ _ _ _ ds _ _ _) = ds;
-  crateBindings (CrateInterface _ _ _ _ _ _ _ _ _ bs _ _) = bs;
-  crateEntry (CrateInterface _ _ _ _ _ _ _ _ _ _ e _) = e;
-  crateObjectFingerprint (CrateInterface _ _ _ _ _ _ _ _ _ _ _ h) = h;
+    CrateObject CrateInterface ([] Separate.UnitObject) |
+    LegacyCrateObject CrateInterface ([] Separate.UnitObject);
+  crateId (CrateInterface n _ _ _ _ _ _ _ _ _ _ _ _) = n;
+  crateDependencies (CrateInterface _ ds _ _ _ _ _ _ _ _ _ _ _) = ds;
+  crateModules (CrateInterface _ _ ms _ _ _ _ _ _ _ _ _ _) = ms;
+  crateExports (CrateInterface _ _ _ es _ _ _ _ _ _ _ _ _) = es;
+  crateImports (CrateInterface _ _ _ _ is _ _ _ _ _ _ _ _) = is;
+  crateData (CrateInterface _ _ _ _ _ ds _ _ _ _ _ _ _) = ds;
+  crateClasses (CrateInterface _ _ _ _ _ _ cs _ _ _ _ _ _) = cs;
+  crateInstances (CrateInterface _ _ _ _ _ _ _ is _ _ _ _ _) = is;
+  crateLoweredData (CrateInterface _ _ _ _ _ _ _ _ ds _ _ _ _) = ds;
+  crateBindings (CrateInterface _ _ _ _ _ _ _ _ _ bs _ _ _) = bs;
+  crateEntry (CrateInterface _ _ _ _ _ _ _ _ _ _ e _ _) = e;
+  crateObjectFingerprint (CrateInterface _ _ _ _ _ _ _ _ _ _ _ h _) = h;
+  crateProtection (CrateInterface _ _ _ _ _ _ _ _ _ _ _ _ protection) = protection;
   objectInterface (CrateObject i _) = i;
   objectInterface (LegacyCrateObject i _) = i;
   objectFragments (CrateObject _ fs) = fs;
   objectFragments (LegacyCrateObject _ fs) = fs;
   definitionName identity entity =
+    case Separate.managedBuiltinName entity of {
+      Just name -> name;
+      Nothing -> ordinaryDefinitionName identity entity
+    };
+  ordinaryDefinitionName identity entity =
     if (eqString (Modules.owner entity) "Prelude" || Modules.isRole Modules.BuiltinType entity)
     then Separate.stableName entity
     else ((if ((Modules.compareSpace (Modules.space entity) Modules.Types == 0) ||
@@ -87,7 +94,7 @@ module Bootstrap.CrateArtifact where {
   instanceOwner iface symbol =
     case filter (\owner -> startsWith (instancePrefix (crateId iface) owner) symbol)
            (crateModules iface) of {
-      Cons owner Nil -> Right owner;
+      (:) owner [] -> Right owner;
       _ -> Left ("instance dictionary has no unique owning module: " ++ symbol)
     };
   entryOwner :: CrateInterface -> Either String String;
@@ -99,12 +106,12 @@ module Bootstrap.CrateArtifact where {
                    (Modules.Entity owner "<crate-entry>" Modules.Value))
                 (crateEntry iface))
            (crateModules iface) of {
-      Cons owner Nil -> Right owner;
+      (:) owner [] -> Right owner;
       _ -> Left "crate entry has no unique owning module"
     };
   sortStrings xs = sortBy compareString xs;
   sortPairs xs = sortBy (\a b -> compareString (fst a) (fst b)) xs;
-  sortDependencies xs = sortBy (\(Triple a _ _) (Triple b _ _) -> compareString a b) xs;
+  sortDependencies xs = sortBy (\((,,) a _ _) ((,,) b _ _) -> compareString a b) xs;
   sortEntities xs =
     sortBy (\a b -> compareString (Separate.entityEncoding a) (Separate.entityEncoding b)) xs;
   sortData xs = sortBy (\a b -> compareString (D.datatypeName a) (D.datatypeName b)) xs;
@@ -112,8 +119,8 @@ module Bootstrap.CrateArtifact where {
   encodeBindings bs =
     Separate.pack
       (map
-         (\(Pair n ty) ->
-            Separate.pairEncoding (Pair n (Pretty.prettyType (Separate.normalType ty))))
+         (\((,) n ty) ->
+            Separate.pairEncoding ((,) n (Pretty.prettyType (Separate.normalType ty))))
          (sortPairs bs));
   sourceMetadata ds cs instances =
     unlines
@@ -123,20 +130,20 @@ module Bootstrap.CrateArtifact where {
   encodeExports es =
     Separate.pack
       (map
-         (\(Pair n entities) ->
+         (\((,) n entities) ->
             Separate.pairEncoding
-              (Pair n (Separate.pack (map Separate.entityEncoding (sortEntities entities)))))
+              ((,) n (Separate.pack (map Separate.entityEncoding (sortEntities entities)))))
          (sortPairs es));
   encodeImports is =
     Separate.pack
       (map
-         (\(Pair n imports) -> Separate.pairEncoding (Pair n (Separate.pack (sortStrings imports))))
+         (\((,) n imports) -> Separate.pairEncoding ((,) n (Separate.pack (sortStrings imports))))
          (sortPairs is));
-  encodeDependency (Triple name path semantic) =
-    Separate.pack (Cons name (Cons path (Cons semantic Nil)));
-  -- The ABI excludes object checksums, dependency ABI digests and private value
-  -- schemes. Query keys additionally record the precise schemes they consume;
-  -- this is necessary for a facade which merely reexports a dependency entity.
+  encodeDependency ((,,) name path semantic) =
+    Separate.pack ((:) name ((:) path ((:) semantic [])));
+  -- The ABI excludes object checksums and private value contracts. Facades with
+  -- foreign exports additionally retain stable dependency semantic identities,
+  -- so protection-only changes propagate without depending on relocated paths.
   semanticFingerprint iface =
     let {
       exported = concatMap snd (crateExports iface)
@@ -149,35 +156,59 @@ module Bootstrap.CrateArtifact where {
     } in
     let {
       fields =
-        Cons "MLF-CRATE-SEMANTICS-1"
-          (Cons (crateId iface)
-             (Cons (encodeExports (crateExports iface))
-                (Cons (encodeImports (crateImports iface))
-                   (Cons
+        (:) "MLF-CRATE-SEMANTICS-5"
+          ((:) (crateId iface)
+             ((:) (encodeExports (crateExports iface))
+                ((:) (encodeImports (crateImports iface))
+                   ((:)
                       (sourceMetadata (crateData iface) (crateClasses iface) (crateInstances iface))
-                      (Cons (Separate.pack (map fst (sortPairs (crateInstances iface))))
-                         (Cons
+                      ((:) (Separate.pack (map fst (sortPairs (crateInstances iface))))
+                         ((:)
                             (unlines (map D.prettyDeclaration (sortData (crateLoweredData iface))))
-                            (Cons (encodeBindings public) Nil)))))))
+                            ((:) (encodeBindings public) [])))))))
     } in
-    Separate.fingerprint (Separate.pack fields);
+    Separate.fingerprint (Separate.pack
+      (append fields ((:) (encodeProtection
+        (filter (\entry -> Set.member compareString (fst entry) publicNames) (crateProtection iface)))
+        ((:) (Separate.pack (if any (\entity -> not (elem eqString (Modules.owner entity) (crateModules iface))) exported
+          then map (\((,,) name _ semantic) -> Separate.pack [name, semantic])
+            (sortDependencies (crateDependencies iface)) else [])) []))));
+  encodeProtection values = Separate.pack (map
+    (\((,) name protected) -> Separate.pack [name, if protected then "true" else "false"])
+    (sortPairs values));
+  decodeProtection :: String -> Either String ([] ((,) String Bool));
+  decodeProtection value = do {
+    fields <- Separate.unpack value;
+    traverseEither (\field -> do {
+      pair <- Separate.unpack field;
+      case pair of {
+        [name, flag] ->
+          if eqString flag "true" then Right ((,) name True)
+          else if eqString flag "false" then Right ((,) name False)
+          else Left "malformed crate protection flag";
+        _ -> Left "malformed crate protection entry"
+      }
+    }) fields
+  };
   interfaceFields iface =
-    Cons "MLFCI-1"
-      (Cons (crateId iface)
-         (Cons (Separate.pack (map encodeDependency (sortDependencies (crateDependencies iface))))
-            (Cons (Separate.pack (sortStrings (crateModules iface)))
-               (Cons (encodeExports (crateExports iface))
-                  (Cons (encodeImports (crateImports iface))
-                     (Cons
+    snoc (rawInterfaceFields iface) (encodeProtection (crateProtection iface));
+  rawInterfaceFields iface =
+    (:) "MLFCI-5"
+      ((:) (crateId iface)
+         ((:) (Separate.pack (map encodeDependency (sortDependencies (crateDependencies iface))))
+            ((:) (Separate.pack (sortStrings (crateModules iface)))
+               ((:) (encodeExports (crateExports iface))
+                  ((:) (encodeImports (crateImports iface))
+                     ((:)
                         (sourceMetadata (crateData iface) (crateClasses iface)
                            (crateInstances iface))
-                        (Cons (Separate.pack (map fst (sortPairs (crateInstances iface))))
-                           (Cons
+                        ((:) (Separate.pack (map fst (sortPairs (crateInstances iface))))
+                           ((:)
                               (unlines
                                  (map D.prettyDeclaration (sortData (crateLoweredData iface))))
-                              (Cons (encodeBindings (crateBindings iface))
-                                 (Cons (crateEntry iface)
-                                    (Cons (crateObjectFingerprint iface) Nil)))))))))));
+                              ((:) (encodeBindings (crateBindings iface))
+                                 ((:) (crateEntry iface)
+                                    ((:) (crateObjectFingerprint iface) [])))))))))));
   encodeInterface iface =
     let {
       fields = interfaceFields iface
@@ -187,12 +218,12 @@ module Bootstrap.CrateArtifact where {
     do {
       fields <- Separate.unpack text;
       case fields of {
-        Cons name (Cons path (Cons semantic Nil)) ->
+        (:) name ((:) path ((:) semantic [])) ->
           do {
             ensure
               ((stringLength name > 0) && ((stringLength semantic > 0) && Host.absolutePath path))
               "crate dependency metadata path must be absolute";
-            Right (Triple name path semantic)
+            Right ((,,) name path semantic)
           };
         _ -> Left "malformed crate dependency"
       }
@@ -205,14 +236,14 @@ module Bootstrap.CrateArtifact where {
            do {
              boundValueShared1 <- Separate.decodePair entry;
              case boundValueShared1 of {
-               Pair n encoded ->
+               (,) n encoded ->
                  do {
                    fields <- Separate.unpack encoded;
                    entities <- traverseEither Separate.decodeEntity fields;
                    ensure
                      (length entities == Set.size (Set.fromList Modules.compareEntity entities))
                      "duplicate crate export entity";
-                   Right (Pair n entities)
+                   Right ((,) n entities)
                  }
              }
            })
@@ -226,12 +257,12 @@ module Bootstrap.CrateArtifact where {
            do {
              boundValueShared2 <- Separate.decodePair entry;
              case boundValueShared2 of {
-               Pair n encoded ->
+               (,) n encoded ->
                  do {
                    imports <- Separate.unpack encoded;
                    ensure (length imports == length (nubBy eqString imports))
                      "duplicate crate module reach entry";
-                   Right (Pair n imports)
+                   Right ((,) n imports)
                  }
              }
            })
@@ -245,10 +276,10 @@ module Bootstrap.CrateArtifact where {
            do {
              boundValueShared3 <- Separate.decodePair entry;
              case boundValueShared3 of {
-               Pair n t ->
+               (,) n t ->
                  do {
                    ty <- XP.parseType t;
-                   Right (Pair n ty)
+                   Right ((,) n ty)
                  }
              }
            })
@@ -258,7 +289,8 @@ module Bootstrap.CrateArtifact where {
     ensure (length names == Set.size (Set.fromList compareString names))
       ("duplicate crate " ++ label);
   isPrimitiveEntity entity =
-    any (\e -> (Modules.compareEntity e entity == 0)) Modules.primitiveEntities;
+    any (\e -> (Modules.compareEntity e entity == 0))
+      (append Modules.primitiveEntities Modules.sharedPrimitiveEntities);
   data ExportInventory =
     ExportInventory (Set String) (Set String) (Set String) (Set String) (Set String);
   exportInventory iface =
@@ -271,7 +303,7 @@ module Bootstrap.CrateArtifact where {
          (concatMap (\c -> map fst (Classes.classMethods c)) (crateClasses iface)));
   validateOwnExport iface (ExportInventory values datatypes classes constructors methods) entity =
     if (isPrimitiveEntity entity || not (elem eqString (Modules.owner entity) (crateModules iface)))
-    then Right Unit
+    then Right ()
     else do {
            let {
              name = definitionName (crateId iface) entity
@@ -289,20 +321,39 @@ module Bootstrap.CrateArtifact where {
            };
            ensure declared ("crate exports an undeclared entity: " ++ Modules.label entity)
          };
+  builtinCrateIdentity :: String;
+  builtinCrateIdentity = "mlf:builtin-shared-haskell-v1:8";
+  validateBuiltinOwnership iface =
+    if (any Modules.isBuiltinModule (crateModules iface) ||
+        ((stringLength (crateId iface) >= stringLength "mlf:builtin-shared-haskell-v1:") &&
+         eqString (stringSlice (crateId iface) 0 (stringLength "mlf:builtin-shared-haskell-v1:"))
+           "mlf:builtin-shared-haskell-v1:"))
+    then do {
+           ensure (eqString (crateId iface) builtinCrateIdentity)
+             "stale or forged builtin crate identity";
+           ensure (eqList eqString (sortStrings (crateModules iface)) ["MLF.Primitive", "Prelude"])
+             "builtin crate must own exactly Prelude and MLF.Primitive"
+         }
+    else Right ();
   validateInterface iface =
     do {
+      validateBuiltinOwnership iface;
       ensure
         ((stringLength (crateId iface) > 0) && (stringLength (crateObjectFingerprint iface) > 0))
         "incomplete crate metadata";
-      uniqueNames "dependency" (map (\(Triple n _ _) -> n) (crateDependencies iface));
-      uniqueNames "dependency path" (map (\(Triple _ path _) -> path) (crateDependencies iface));
+      uniqueNames "dependency" (map (\((,,) n _ _) -> n) (crateDependencies iface));
+      uniqueNames "dependency path" (map (\((,,) _ path _) -> path) (crateDependencies iface));
       uniqueNames "module" (crateModules iface);
       uniqueNames "module exports" (map fst (crateExports iface));
       uniqueNames "module reach" (map fst (crateImports iface));
       uniqueNames "binding" (map fst (crateBindings iface));
+      uniqueNames "binding protection" (map fst (crateProtection iface));
+      ensure (eqList eqString (sortStrings (map fst (crateProtection iface)))
+        (sortStrings (map fst (crateBindings iface))))
+        "crate protection inventory differs from owned bindings";
       uniqueNames "instance" (map fst (crateInstances iface));
       uniqueNames "datatype" (map D.datatypeName (crateLoweredData iface));
-      ensure (not (any (\(Triple n _ _) -> eqString n (crateId iface)) (crateDependencies iface)))
+      ensure (not (any (\((,,) n _ _) -> eqString n (crateId iface)) (crateDependencies iface)))
         ("cyclic crate dependency: " ++ crateId iface);
       ensure
         (eqList eqString (sortStrings (map fst (crateExports iface)))
@@ -313,17 +364,17 @@ module Bootstrap.CrateArtifact where {
            (sortStrings (crateModules iface)))
         "crate module reach inventory differs from owned modules";
       traverseEither Separate.validModuleName (crateModules iface);
-      traverseEither (\(Pair _ modules) -> traverseEither Separate.validModuleName modules)
+      traverseEither (\((,) _ modules) -> traverseEither Separate.validModuleName modules)
         (crateImports iface);
       traverseEither (validateOwnExport iface (exportInventory iface))
         (concatMap snd (crateExports iface));
       traverseEither
-        (\(Pair n ty) ->
+        (\((,) n ty) ->
            ensure ((stringLength n > 0) && Set.null (T.freeVars ty))
              ("crate binding has an open type: " ++ n))
         (crateBindings iface);
       traverseEither
-        (\(Pair n inst) ->
+        (\((,) n inst) ->
            do {
              owner <- instanceOwner iface n;
              ensure (eqString n (instanceName (crateId iface) owner inst))
@@ -335,233 +386,63 @@ module Bootstrap.CrateArtifact where {
          M.member compareString (crateEntry iface) (M.fromList compareString (crateBindings iface)))
         "crate entry is not an owned binding";
       if eqString (crateEntry iface) ""
-      then Right Unit
-      else mapEither (\_ -> Unit) (entryOwner iface)
+      then Right ()
+      else mapEither (\_ -> ()) (entryOwner iface)
     };
-  decodeInterface input =
-    do {
-      fields <- Separate.unpack input;
-      let {
-        matchValueShared4 = fields
-      } in
-      case matchValueShared4 of {
-        Cons matchValueShared5 matchValueShared6 ->
-          if MLF.Primitive.eqString matchValueShared5 "MLFCI-1"
-          then case matchValueShared6 of {
-                 Cons matchValueShared7 matchValueShared8 ->
-                   case matchValueShared8 of {
-                     Cons matchValueShared9 matchValueShared10 ->
-                       case matchValueShared10 of {
-                         Cons matchValueShared11 matchValueShared12 ->
-                           case matchValueShared12 of {
-                             Cons matchValueShared13 matchValueShared14 ->
-                               case matchValueShared14 of {
-                                 Cons matchValueShared15 matchValueShared16 ->
-                                   case matchValueShared16 of {
-                                     Cons matchValueShared17 matchValueShared18 ->
-                                       case matchValueShared18 of {
-                                         Cons matchValueShared19 matchValueShared20 ->
-                                           case matchValueShared20 of {
-                                             Cons matchValueShared21 matchValueShared22 ->
-                                               case matchValueShared22 of {
-                                                 Cons matchValueShared23 matchValueShared24 ->
-                                                   case matchValueShared24 of {
-                                                     Cons matchValueShared25 matchValueShared26 ->
-                                                       case matchValueShared26 of {
-                                                         Cons matchValueShared27 matchValueShared28 ->
-                                                           case matchValueShared28 of {
-                                                             Cons matchValueShared29 matchValueShared30 ->
-                                                               case matchValueShared30 of {
-                                                                 Nil ->
-                                                                   let {
-                                                                     identity = matchValueShared7
-                                                                   } in
-                                                                   let {
-                                                                     deps = matchValueShared9
-                                                                   } in
-                                                                   let {
-                                                                     modules = matchValueShared11
-                                                                   } in
-                                                                   let {
-                                                                     exports = matchValueShared13
-                                                                   } in
-                                                                   let {
-                                                                     imports = matchValueShared15
-                                                                   } in
-                                                                   let {
-                                                                     metadata = matchValueShared17
-                                                                   } in
-                                                                   let {
-                                                                     instanceNames =
-                                                                       matchValueShared19
-                                                                   } in
-                                                                   let {
-                                                                     layouts = matchValueShared21
-                                                                   } in
-                                                                   let {
-                                                                     bindings = matchValueShared23
-                                                                   } in
-                                                                   let {
-                                                                     entry = matchValueShared25
-                                                                   } in
-                                                                   let {
-                                                                     bodyHash = matchValueShared27
-                                                                   } in
-                                                                   let {
-                                                                     checksum = matchValueShared29
-                                                                   } in
-                                                                   do {
-                                                                     ensure
-                                                                       (eqString checksum
-                                                                          (Separate.fingerprint
-                                                                             (Separate.pack
-                                                                                (interfacePrefix
-                                                                                   fields))))
-                                                                       "crate metadata checksum mismatch";
-                                                                     dependencies <-
-                                                                       bindEither
-                                                                         (Separate.unpack deps)
-                                                                         (traverseEither
-                                                                            decodeDependency);
-                                                                     owned <-
-                                                                       Separate.unpack modules;
-                                                                     exported <-
-                                                                       decodeExports exports;
-                                                                     reach <- decodeImports imports;
-                                                                     source <-
-                                                                       Parser.parseModule
-                                                                         "<crate metadata>"
-                                                                         ("module CrateMetadata where {\n" ++
-                                                                          (metadata ++ "\n}"));
-                                                                     lowered <-
-                                                                       Parser.parseModule
-                                                                         "<crate layout metadata>"
-                                                                         ("module CrateLayouts where {\n" ++
-                                                                          (layouts ++ "\n}"));
-                                                                     names <-
-                                                                       Separate.unpack
-                                                                         instanceNames;
-                                                                     schemes <-
-                                                                       decodeBindings bindings;
-                                                                     ensure
-                                                                       (length names ==
-                                                                        length
-                                                                          (Modules.sourceInstances
-                                                                             source))
-                                                                       "crate instance metadata count mismatch";
-                                                                     ensure
-                                                                       (null
-                                                                          (Modules.sourceValues
-                                                                             source) &&
-                                                                        (null
-                                                                           (Modules.sourceImports
-                                                                              source) &&
-                                                                         (null
-                                                                            (Modules.sourceValues
-                                                                               lowered) &&
-                                                                          (null
-                                                                             (Modules.sourceImports
-                                                                                lowered) &&
-                                                                           (null
-                                                                              (Modules.sourceClasses
-                                                                                 lowered) &&
-                                                                            null
-                                                                              (Modules.sourceInstances
-                                                                                 lowered))))))
-                                                                       "crate metadata contains executable declarations";
-                                                                     let {
-                                                                       iface =
-                                                                         CrateInterface identity
-                                                                           dependencies
-                                                                           owned
-                                                                           exported
-                                                                           reach
-                                                                           (Modules.sourceDatatypes
-                                                                              source)
-                                                                           (Modules.sourceClasses
-                                                                              source)
-                                                                           (zip names
-                                                                              (map
-                                                                                 Separate.stripInstance
-                                                                                 (Modules.sourceInstances
-                                                                                    source)))
-                                                                           (Modules.sourceDatatypes
-                                                                              lowered)
-                                                                           schemes
-                                                                           entry
-                                                                           bodyHash
-                                                                     };
-                                                                     validateInterface iface;
-                                                                     ensure
-                                                                       (eqString input
-                                                                          (encodeInterface iface))
-                                                                       "noncanonical crate metadata";
-                                                                     Right iface
-                                                                   };
-                                                                 _ ->
-                                                                   Left
-                                                                     "unsupported or malformed crate metadata (expected MLFCI-1)"
-                                                               };
-                                                             _ ->
-                                                               Left
-                                                                 "unsupported or malformed crate metadata (expected MLFCI-1)"
-                                                           };
-                                                         _ ->
-                                                           Left
-                                                             "unsupported or malformed crate metadata (expected MLFCI-1)"
-                                                       };
-                                                     _ ->
-                                                       Left
-                                                         "unsupported or malformed crate metadata (expected MLFCI-1)"
-                                                   };
-                                                 _ ->
-                                                   Left
-                                                     "unsupported or malformed crate metadata (expected MLFCI-1)"
-                                               };
-                                             _ ->
-                                               Left
-                                                 "unsupported or malformed crate metadata (expected MLFCI-1)"
-                                           };
-                                         _ ->
-                                           Left
-                                             "unsupported or malformed crate metadata (expected MLFCI-1)"
-                                       };
-                                     _ ->
-                                       Left
-                                         "unsupported or malformed crate metadata (expected MLFCI-1)"
-                                   };
-                                 _ ->
-                                   Left "unsupported or malformed crate metadata (expected MLFCI-1)"
-                               };
-                             _ -> Left "unsupported or malformed crate metadata (expected MLFCI-1)"
-                           };
-                         _ -> Left "unsupported or malformed crate metadata (expected MLFCI-1)"
-                       };
-                     _ -> Left "unsupported or malformed crate metadata (expected MLFCI-1)"
-                   };
-                 _ -> Left "unsupported or malformed crate metadata (expected MLFCI-1)"
-               }
-          else Left "unsupported or malformed crate metadata (expected MLFCI-1)";
-        _ -> Left "unsupported or malformed crate metadata (expected MLFCI-1)"
-      }
-    };
-  interfacePrefix :: List String -> List String;
+  decodeInterface :: String -> Either String CrateInterface;
+  decodeInterface input = do {
+    fields <- Separate.unpack input;
+    case fields of {
+      [tag, identity, deps, modules, exports, imports, metadata, instanceNames,
+       layouts, bindings, entry, bodyHash, protectionField, checksum] -> do {
+        ensure (eqString tag "MLFCI-5") "unsupported crate metadata epoch (expected MLFCI-5)";
+        ensure (eqString checksum (Separate.fingerprint (Separate.pack (interfacePrefix fields))))
+          "crate metadata checksum mismatch";
+        dependencies <- bindEither (Separate.unpack deps) (traverseEither decodeDependency);
+        owned <- Separate.unpack modules;
+        exported <- decodeExports exports;
+        reach <- decodeImports imports;
+        source <- Parser.parseMetadataModule "<crate metadata>"
+          ("module CrateMetadata where {\n" ++ metadata ++ "\n}");
+        lowered <- Parser.parseMetadataModule "<crate layout metadata>"
+          ("module CrateLayouts where {\n" ++ layouts ++ "\n}");
+        names <- Separate.unpack instanceNames;
+        schemes <- decodeBindings bindings;
+        protection <- decodeProtection protectionField;
+        ensure (length names == length (Modules.sourceInstances source))
+          "crate instance metadata count mismatch";
+        ensure (null (Modules.sourceValues source) && null (Modules.sourceImports source) &&
+          null (Modules.sourceValues lowered) && null (Modules.sourceImports lowered) &&
+          null (Modules.sourceClasses lowered) && null (Modules.sourceInstances lowered))
+          "crate metadata contains executable declarations";
+        let { iface = CrateInterface identity dependencies owned exported reach
+          (Modules.sourceDatatypes source) (Modules.sourceClasses source)
+          (zip names (map Separate.stripInstance (Modules.sourceInstances source)))
+          (Modules.sourceDatatypes lowered) schemes entry bodyHash protection };
+        validateInterface iface;
+        ensure (eqString input (encodeInterface iface)) "noncanonical crate metadata";
+        Right iface
+      };
+      _ -> Left "unsupported or malformed crate metadata (expected MLFCI-5)"
+    }
+  };
+  interfacePrefix :: [] String -> [] String;
   interfacePrefix fields =
     case fields of {
-      Nil -> Nil;
-      Cons a Nil -> Nil;
-      Cons a rest -> Cons a (interfacePrefix rest)
+      [] -> [];
+      (:) a [] -> [];
+      (:) a rest -> (:) a (interfacePrefix rest)
     };
   encodeFragment fragment =
     Separate.pairEncoding
-      (Pair (Separate.encodeInterface (Separate.objectInterface fragment))
+      ((,) (Separate.encodeInterface (Separate.objectInterface fragment))
          (Separate.encodeObject fragment));
   -- Hash the same length-framed bytes without retaining one concatenated copy
   -- of every checked fragment and its datatype context.
-  fingerprintPartFrom :: String -> Int -> Int -> Int -> Pair Int Int;
+  fingerprintPartFrom :: String -> Int -> Int -> Int -> (,) Int Int;
   fingerprintPartFrom text index a b =
     if (index == stringLength text)
-    then Pair a b
+    then (,) a b
     else let {
            code = stringCodeAt text index
          } in
@@ -572,18 +453,18 @@ module Bootstrap.CrateArtifact where {
            nextB = (((b * 131) + code) % 2147483629)
          } in
          seq nextA (seq nextB (fingerprintPartFrom text (index + 1) nextA nextB));
-  fragmentFingerprintFrom :: List Separate.UnitObject -> Int -> Int -> String;
+  fragmentFingerprintFrom :: [] Separate.UnitObject -> Int -> Int -> String;
   fragmentFingerprintFrom fragments a b =
     case fragments of {
-      Nil -> (showInt a ++ ("-" ++ showInt b));
-      Cons fragment rest ->
+      [] -> (showInt a ++ ("-" ++ showInt b));
+      (:) fragment rest ->
         let {
           text = encodeFragment fragment
         } in
         case fingerprintPartFrom (showInt (stringLength text) ++ ":") 0 a b of {
-          Pair prefixA prefixB ->
+          (,) prefixA prefixB ->
             case fingerprintPartFrom text 0 prefixA prefixB of {
-              Pair nextA nextB -> seq nextA (seq nextB (fragmentFingerprintFrom rest nextA nextB))
+              (,) nextA nextB -> seq nextA (seq nextB (fragmentFingerprintFrom rest nextA nextB))
             }
         }
     };
@@ -591,58 +472,58 @@ module Bootstrap.CrateArtifact where {
   -- Datatype contexts occur in thousands of SCC headers and payloads. Store
   -- each canonical declaration once, retaining separate ordered references for
   -- the header and payload so inconsistent objects remain invalid.
-  data PoolRecord = PoolRecord (List String) (List String) String;
-  typePoolText :: DataDecl -> List (Pair DataDecl String) -> Maybe String;
+  data PoolRecord = PoolRecord ([] String) ([] String) String;
+  typePoolText :: DataDecl -> [] ((,) DataDecl String) -> Maybe String;
   typePoolText declaration entries =
     case entries of {
-      Nil -> Nothing;
-      Cons (Pair saved text) rest ->
+      [] -> Nothing;
+      (:) ((,) saved text) rest ->
         if Equality.eqDataDecl declaration saved then Just text else typePoolText declaration rest
     };
-  rememberType :: Map String (List (Pair DataDecl String)) ->
-                  DataDecl -> Pair (Map String (List (Pair DataDecl String))) String;
+  rememberType :: Map String ([] ((,) DataDecl String)) ->
+                  DataDecl -> (,) (Map String ([] ((,) DataDecl String))) String;
   rememberType pool declaration =
     let {
       name = D.datatypeName declaration
     } in
     let {
-      entries = M.findWithDefault compareString Nil name pool
+      entries = M.findWithDefault compareString [] name pool
     } in
     case typePoolText declaration entries of {
-      Just text -> Pair pool text;
+      Just text -> (,) pool text;
       Nothing ->
         let {
           text = D.prettyDeclaration declaration
         } in
-        Pair (M.insert compareString name (Cons (Pair declaration text) entries) pool) text
+        (,) (M.insert compareString name ((:) ((,) declaration text) entries) pool) text
     };
-  rememberTypes :: Map String (List (Pair DataDecl String)) ->
-                   List DataDecl -> Pair (Map String (List (Pair DataDecl String))) (List String);
+  rememberTypes :: Map String ([] ((,) DataDecl String)) ->
+                   [] DataDecl -> (,) (Map String ([] ((,) DataDecl String))) ([] String);
   rememberTypes pool declarations =
     case declarations of {
-      Nil -> Pair pool Nil;
-      Cons declaration rest ->
+      [] -> (,) pool [];
+      (:) declaration rest ->
         case rememberType pool declaration of {
-          Pair next text ->
+          (,) next text ->
             case rememberTypes next rest of {
-              Pair final texts -> Pair final (Cons text texts)
+              (,) final texts -> (,) final ((:) text texts)
             }
         }
     };
-  poolRecords :: Map String (List (Pair DataDecl String)) ->
-                 List Separate.UnitObject ->
-                 List PoolRecord ->
-                 Pair (Map String (List (Pair DataDecl String))) (List PoolRecord);
+  poolRecords :: Map String ([] ((,) DataDecl String)) ->
+                 [] Separate.UnitObject ->
+                 [] PoolRecord ->
+                 (,) (Map String ([] ((,) DataDecl String))) ([] PoolRecord);
   poolRecords pool fragments done =
     case fragments of {
-      Nil -> Pair pool (reverse done);
-      Cons fragment rest ->
+      [] -> (,) pool (reverse done);
+      (:) fragment rest ->
         case rememberTypes pool (Separate.unitData (Separate.objectInterface fragment)) of {
-          Pair afterHeader header ->
+          (,) afterHeader header ->
             case rememberTypes afterHeader (Separate.objectContext fragment) of {
-              Pair afterBody body ->
+              (,) afterBody body ->
                 poolRecords afterBody rest
-                  (Cons (PoolRecord header body (Separate.encodeContextualObject fragment)) done)
+                  ((:) (PoolRecord header body (Separate.encodeContextualObject fragment)) done)
             }
         }
     };
@@ -652,11 +533,11 @@ module Bootstrap.CrateArtifact where {
       references =
         \texts -> Separate.pack (map (\text -> showInt (M.get compareString text numbers)) texts)
     } in
-    Separate.pack (Cons (references header) (Cons (references body) (Cons contents Nil)));
-  encodePooledPayload :: List Separate.UnitObject -> String;
+    Separate.pack ((:) (references header) ((:) (references body) ((:) contents [])));
+  encodePooledPayload :: [] Separate.UnitObject -> String;
   encodePooledPayload fragments =
-    case poolRecords M.empty fragments Nil of {
-      Pair inventory records ->
+    case poolRecords M.empty fragments [] of {
+      (,) inventory records ->
         let {
           declarations =
             Set.toList (Set.fromList compareString (concatMap (map snd) (M.elems inventory)))
@@ -665,8 +546,8 @@ module Bootstrap.CrateArtifact where {
           numbers = M.fromList compareString (zip declarations (range 0 (length declarations - 1)))
         } in
         Separate.pack
-          (Cons (Separate.pack declarations)
-             (Cons (Separate.pack (map (encodePoolRecord numbers) records)) Nil))
+          ((:) (Separate.pack declarations)
+             ((:) (Separate.pack (map (encodePoolRecord numbers) records)) []))
     };
   fragmentFingerprint fragments = Separate.fingerprint (encodePooledPayload fragments);
   objectFingerprint object =
@@ -674,8 +555,8 @@ module Bootstrap.CrateArtifact where {
       CrateObject _ fragments -> fragmentFingerprint fragments;
       LegacyCrateObject _ fragments -> legacyFragmentFingerprint fragments
     };
-  withObjectFingerprint (CrateInterface n deps modules exports imports ds cs instances lowered bindings entry _) digest =
-    CrateInterface n deps modules exports imports ds cs instances lowered bindings entry digest;
+  withObjectFingerprint (CrateInterface n deps modules exports imports ds cs instances lowered bindings entry _ protection) digest =
+    CrateInterface n deps modules exports imports ds cs instances lowered bindings entry digest protection;
   makeObject iface fragments =
     CrateObject (withObjectFingerprint iface (fragmentFingerprint fragments)) fragments;
   -- Prelude has one shared crate identity even when several independent leaf
@@ -684,11 +565,11 @@ module Bootstrap.CrateArtifact where {
   builtinPrelude =
     do {
       let {
-        identity = "mlf:builtin-shared-haskell-v1:4"
+        identity = builtinCrateIdentity
       };
       resolution <-
         Modules.resolveCrate NoImplicitPrelude M.empty (definitionName identity)
-          (Cons Modules.preludeSource (Cons Modules.primitiveSource Nil));
+          ((:) Modules.preludeSource ((:) Modules.primitiveSource []));
       let {
         modules = Modules.resolvedCrateModules resolution
       };
@@ -703,13 +584,21 @@ module Bootstrap.CrateArtifact where {
       };
       instances <-
         traverseEither
-          (\(Pair owner inst) ->
+          (\((,) owner inst) ->
              do {
                closed <- Separate.closeInstance values inst;
-               Right (Pair (instanceName identity owner inst) closed)
+               Right ((,) (instanceName identity owner inst) closed)
              })
           (Modules.resolvedCrateInstances resolution);
-      body <- Surface.bindValues values (SConstructor "Unit");
+      body <- Surface.bindValues values (SConstructor "()");
+      let { protectionConfig = Just ((,) M.empty (map fst instances)) };
+      protection <- Classes.withValidatedClasses protectionConfig Set.empty M.empty Nothing
+        sourceData classes (map snd instances) body
+        (\base declarations -> do {
+          inventory <- Classes.prepareClassesBody protectionConfig Set.empty M.empty Nothing
+            sourceData (map snd instances) base declarations;
+          Fresh.freshLift (Classes.inventorySourceProtection inventory instances values)
+        });
       lowered <-
         Classes.lowerSeparateClasses M.empty (map fst instances)
           (SClassProgram sourceData classes (map snd instances) body);
@@ -721,7 +610,7 @@ module Bootstrap.CrateArtifact where {
         datatypes =
           case term of {
             XWithData ds _ -> ds;
-            _ -> Nil
+            _ -> []
           }
       };
       let {
@@ -736,37 +625,43 @@ module Bootstrap.CrateArtifact where {
       let {
         bindings =
           Separate.sortBindings
-            (map (\(Pair n ty) -> Pair (X.nameHint n) (Separate.normalType ty)) actualBindings)
+            (map (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty)) actualBindings)
       };
+      bindingProtection <- traverseEither
+        (\((,) name _) -> case M.lookup compareString name protection of {
+          Just flag -> Right ((,) name flag);
+          Nothing -> Left ("builtin binding lacks source protection provenance: " ++ name)
+        }) bindings;
       exports <-
         traverseEither
           (\r ->
              mapEither
                (\scope ->
-                  Pair (Modules.moduleIdentity (Modules.resolvedSource r))
+                  (,) (Modules.moduleIdentity (Modules.resolvedSource r))
                     (Set.toList (Modules.visible scope)))
                (Modules.resolvedExports NoImplicitPrelude r))
           modules;
       let {
         fragmentInterface =
-          Separate.UnitInterface "Bootstrap.BuiltinPrelude" Nil Nil datatypes Nil Nil bindings
+          Separate.UnitInterface "Bootstrap.BuiltinPrelude" [] [] datatypes [] [] bindings
             (Separate.fingerprint (Pretty.prettyTerm term))
       };
       let {
         iface =
-          CrateInterface identity Nil (Cons "Prelude" (Cons "MLF.Primitive" Nil)) exports
-            (Cons (Pair "Prelude" (Cons "Prelude" Nil))
-               (Cons (Pair "MLF.Primitive" (Cons "MLF.Primitive" Nil)) Nil))
+          CrateInterface identity [] ((:) "Prelude" ((:) "MLF.Primitive" [])) exports
+            (map (\((,) name reach) -> (,) name (Set.toList reach))
+               (M.toList (Modules.resolvedCrateReach resolution)))
             sourceData
             classes
-            (map (\(Pair n inst) -> Pair n (Separate.stripInstance inst)) instances)
+            (map (\((,) n inst) -> (,) n (Separate.stripInstance inst)) instances)
             datatypes
             bindings
             ""
             "pending"
+            bindingProtection
       };
       let {
-        object = makeObject iface (Cons (Separate.UnitObject fragmentInterface term) Nil)
+        object = makeObject iface ((:) (Separate.UnitObject fragmentInterface term) [])
       };
       validateInterface (objectInterface object);
       Right object
@@ -775,20 +670,20 @@ module Bootstrap.CrateArtifact where {
     case object of {
       CrateObject iface fragments ->
         Separate.pack
-          (Cons "MLFCO-2"
-             (Cons (crateId iface)
-                (Cons (Separate.fingerprint (encodeInterface iface))
-                   (Cons (encodePooledPayload fragments) Nil))));
+          ((:) "MLFCO-2"
+             ((:) (crateId iface)
+                ((:) (Separate.fingerprint (encodeInterface iface))
+                   ((:) (encodePooledPayload fragments) []))));
       LegacyCrateObject iface fragments ->
         Separate.pack
-          (Cons "MLFCO-1"
-             (Cons (crateId iface)
-                (Cons (Separate.fingerprint (encodeInterface iface))
-                   (Cons (Separate.pack (map encodeFragment fragments)) Nil))))
+          ((:) "MLFCO-1"
+             ((:) (crateId iface)
+                ((:) (Separate.fingerprint (encodeInterface iface))
+                   ((:) (Separate.pack (map encodeFragment fragments)) []))))
     };
   -- Canonical framing can be checked at the input offsets. It does not require
   -- serializing a second copy of the complete implementation object.
-  canonicalFieldFrom :: String -> Int -> Either String (Pair String Int);
+  canonicalFieldFrom :: String -> Int -> Either String ((,) String Int);
   canonicalFieldFrom text start =
     do {
       let {
@@ -804,19 +699,19 @@ module Bootstrap.CrateArtifact where {
         count = readInt (stringSlice text start (end - start))
       };
       ensure (count <= ((stringLength text - end) - 1)) "truncated crate object";
-      Right (Pair (stringSlice text (end + 1) count) ((end + 1) + count))
+      Right ((,) (stringSlice text (end + 1) count) ((end + 1) + count))
     };
-  canonicalFieldsFrom :: String -> Int -> Either String (List String);
+  canonicalFieldsFrom :: String -> Int -> Either String ([] String);
   canonicalFieldsFrom text start =
     if (start == stringLength text)
-    then Right Nil
+    then Right []
     else do {
            boundValueShared31 <- canonicalFieldFrom text start;
            case boundValueShared31 of {
-             Pair field next ->
+             (,) field next ->
                do {
                  rest <- canonicalFieldsFrom text next;
-                 Right (Cons field rest)
+                 Right ((:) field rest)
                }
            }
          };
@@ -826,11 +721,11 @@ module Bootstrap.CrateArtifact where {
       fields <- canonicalFields text;
       boundValueShared32 <-
         case fields of {
-          Cons metadata (Cons body Nil) -> Right (Pair metadata body);
+          (:) metadata ((:) body []) -> Right ((,) metadata body);
           _ -> Left "malformed crate fragment"
         };
       case boundValueShared32 of {
-        Pair metadata body ->
+        (,) metadata body ->
           do {
             iface <- Separate.decodeInterface metadata;
             fragment <- Separate.decodeObject iface body;
@@ -842,13 +737,13 @@ module Bootstrap.CrateArtifact where {
   -- Repeated contexts share canonical declaration nodes. The interface and
   -- independently checked payload retain their own declaration lists; sharing
   -- replaces a node only after its canonical layout agrees with the pool.
-  poolDeclarations :: Map String (Pair String DataDecl) ->
-                      List DataDecl ->
-                      Either String (Pair (Map String (Pair String DataDecl)) (List DataDecl));
+  poolDeclarations :: Map String ((,) String DataDecl) ->
+                      [] DataDecl ->
+                      Either String ((,) (Map String ((,) String DataDecl)) ([] DataDecl));
   poolDeclarations pool declarations =
     case declarations of {
-      Nil -> Right (Pair pool Nil);
-      Cons declaration rest ->
+      [] -> Right ((,) pool []);
+      (:) declaration rest ->
         do {
           let {
             name = D.datatypeName declaration
@@ -860,22 +755,22 @@ module Bootstrap.CrateArtifact where {
             case M.lookup compareString name pool of {
               Nothing ->
                 Right
-                  (Pair (M.insert compareString name (Pair encoded declaration) pool) declaration);
-              Just (Pair expected shared) ->
+                  ((,) (M.insert compareString name ((,) encoded declaration) pool) declaration);
+              Just ((,) expected shared) ->
                 do {
                   ensure (eqString encoded expected)
                     ("inconsistent crate datatype context: " ++ name);
-                  Right (Pair pool shared)
+                  Right ((,) pool shared)
                 }
             };
           case boundValueShared34 of {
-            Pair next shared ->
+            (,) next shared ->
               do {
                 boundValueShared33 <- poolDeclarations next rest;
                 case boundValueShared33 of {
-                  Pair final pooled ->
+                  (,) final pooled ->
                     do {
-                      Right (Pair final (Cons shared pooled))
+                      Right ((,) final ((:) shared pooled))
                     }
                 }
               }
@@ -889,7 +784,7 @@ module Bootstrap.CrateArtifact where {
       };
       boundValueShared37 <- poolDeclarations pool (Separate.unitData iface);
       case boundValueShared37 of {
-        Pair afterHeader declarations ->
+        (,) afterHeader declarations ->
           do {
             boundValueShared36 <-
               case Separate.objectTerm fragment of {
@@ -897,16 +792,16 @@ module Bootstrap.CrateArtifact where {
                   do {
                     boundValueShared35 <- poolDeclarations afterHeader context;
                     case boundValueShared35 of {
-                      Pair afterBody shared ->
+                      (,) afterBody shared ->
                         do {
-                          Right (Pair afterBody (XWithData shared body))
+                          Right ((,) afterBody (XWithData shared body))
                         }
                     }
                   };
-                term -> Right (Pair afterHeader term)
+                term -> Right ((,) afterHeader term)
               };
             case boundValueShared36 of {
-              Pair final term ->
+              (,) final term ->
                 do {
                   let {
                     shared =
@@ -919,7 +814,7 @@ module Bootstrap.CrateArtifact where {
                         (Separate.unitBindings iface)
                         (Separate.unitObjectFingerprint iface)
                   };
-                  Right (Pair final (Separate.UnitObject shared term))
+                  Right ((,) final (Separate.UnitObject shared term))
                 }
             }
           }
@@ -927,22 +822,22 @@ module Bootstrap.CrateArtifact where {
     };
   decodeFragmentsFrom :: String ->
                          Int ->
-                         Map String (Pair String DataDecl) ->
-                         List Separate.UnitObject -> Either String (List Separate.UnitObject);
+                         Map String ((,) String DataDecl) ->
+                         [] Separate.UnitObject -> Either String ([] Separate.UnitObject);
   decodeFragmentsFrom payload start pool done =
     if (start == stringLength payload)
     then Right (reverse done)
     else do {
            boundValueShared39 <- canonicalFieldFrom payload start;
            case boundValueShared39 of {
-             Pair text next ->
+             (,) text next ->
                do {
                  decoded <- decodeFragment text;
                  boundValueShared38 <- poolFragment pool decoded;
                  case boundValueShared38 of {
-                   Pair pooled fragment ->
+                   (,) pooled fragment ->
                      do {
-                       decodeFragmentsFrom payload next pooled (Cons fragment done)
+                       decodeFragmentsFrom payload next pooled ((:) fragment done)
                      }
                  }
                }
@@ -954,7 +849,7 @@ module Bootstrap.CrateArtifact where {
       texts <- canonicalFields input;
       ensure (eqList eqString texts (sortStrings texts)) "noncanonical crate datatype pool order";
       source <-
-        Parser.parseModule "<crate datatype pool>"
+        Parser.parseMetadataModule "<crate datatype pool>"
           ("module CrateDataPool where {\n" ++ (unlines texts ++ "\n}"));
       ensure
         (null (Modules.sourceValues source) &&
@@ -969,7 +864,7 @@ module Bootstrap.CrateArtifact where {
       uniqueNames "pooled datatype" (map D.datatypeName declarations);
       Right (M.fromList compareInt (zip (range 0 (length declarations - 1)) declarations))
     };
-  decodeTypeReferences :: Map Int DataDecl -> String -> Either String (List DataDecl);
+  decodeTypeReferences :: Map Int DataDecl -> String -> Either String ([] DataDecl);
   decodeTypeReferences pool input =
     do {
       references <- canonicalFields input;
@@ -993,36 +888,36 @@ module Bootstrap.CrateArtifact where {
            })
         references
     };
-  datatypePart :: DataDecl -> Pair String (Quad Int Int Int Int);
+  datatypePart :: DataDecl -> (,) String ((,,,) Int Int Int Int);
   datatypePart declaration =
     let {
       text = D.prettyDeclaration declaration
     } in
-    Pair text (Separate.fingerprintPart (text ++ "\n"));
-  contextState :: Map String (Pair String (Quad Int Int Int Int)) -> List DataDecl -> Pair Int Int;
+    (,) text (Separate.fingerprintPart (text ++ "\n"));
+  contextState :: Map String ((,) String ((,,,) Int Int Int Int)) -> [] DataDecl -> (,) Int Int;
   contextState parts declarations =
     foldlStrict
       (\state declaration ->
          Separate.fingerprintAppend state
            (snd (M.get compareString (D.datatypeName declaration) parts)))
-      (Pair 0 1)
+      ((,) 0 1)
       declarations;
   decodePooledFragments :: Map Int DataDecl ->
-                           Map String (Pair String (Quad Int Int Int Int)) ->
+                           Map String ((,) String ((,,,) Int Int Int Int)) ->
                            String ->
                            Int ->
-                           List Separate.UnitObject -> Either String (List Separate.UnitObject);
+                           [] Separate.UnitObject -> Either String ([] Separate.UnitObject);
   decodePooledFragments pool parts payload start done =
     if (start == stringLength payload)
     then Right (reverse done)
     else do {
            boundValueShared40 <- canonicalFieldFrom payload start;
            case boundValueShared40 of {
-             Pair record next ->
+             (,) record next ->
                do {
                  fields <- canonicalFields record;
                  case fields of {
-                   Cons header (Cons body (Cons contents Nil)) ->
+                   (:) header ((:) body ((:) contents [])) ->
                      do {
                        headerData <- decodeTypeReferences pool header;
                        bodyData <- decodeTypeReferences pool body;
@@ -1031,29 +926,29 @@ module Bootstrap.CrateArtifact where {
                            headerData
                            bodyData
                            contents;
-                       decodePooledFragments pool parts payload next (Cons fragment done)
+                       decodePooledFragments pool parts payload next ((:) fragment done)
                      };
                    _ -> Left "malformed pooled crate inference fragment"
                  }
                }
            }
          };
-  decodePooledPayload :: String -> Either String (List Separate.UnitObject);
+  decodePooledPayload :: String -> Either String ([] Separate.UnitObject);
   decodePooledPayload payload =
     do {
       fields <- canonicalFields payload;
       case fields of {
-        Cons declarations (Cons bodies Nil) ->
+        (:) declarations ((:) bodies []) ->
           do {
             pool <- decodeTypePool declarations;
             let {
               parts =
                 M.fromList compareString
                   (map
-                     (\declaration -> Pair (D.datatypeName declaration) (datatypePart declaration))
+                     (\declaration -> (,) (D.datatypeName declaration) (datatypePart declaration))
                      (M.elems pool))
             };
-            fragments <- decodePooledFragments pool parts bodies 0 Nil;
+            fragments <- decodePooledFragments pool parts bodies 0 [];
             ensure (eqString payload (encodePooledPayload fragments))
               "noncanonical pooled crate object";
             Right fragments
@@ -1067,16 +962,16 @@ module Bootstrap.CrateArtifact where {
         matchValueShared42 = fields
       } in
       case matchValueShared42 of {
-        Cons matchValueShared43 matchValueShared44 ->
+        (:) matchValueShared43 matchValueShared44 ->
           if MLF.Primitive.eqString matchValueShared43 "MLFCO-2"
           then case matchValueShared44 of {
-                 Cons matchValueShared51 matchValueShared52 ->
+                 (:) matchValueShared51 matchValueShared52 ->
                    case matchValueShared52 of {
-                     Cons matchValueShared53 matchValueShared54 ->
+                     (:) matchValueShared53 matchValueShared54 ->
                        case matchValueShared54 of {
-                         Cons matchValueShared55 matchValueShared56 ->
+                         (:) matchValueShared55 matchValueShared56 ->
                            case matchValueShared56 of {
-                             Nil ->
+                             [] ->
                                let {
                                  identity = matchValueShared51
                                } in
@@ -1114,13 +1009,13 @@ module Bootstrap.CrateArtifact where {
                }
           else if MLF.Primitive.eqString matchValueShared43 "MLFCO-1"
                then case matchValueShared44 of {
-                      Cons matchValueShared45 matchValueShared46 ->
+                      (:) matchValueShared45 matchValueShared46 ->
                         case matchValueShared46 of {
-                          Cons matchValueShared47 matchValueShared48 ->
+                          (:) matchValueShared47 matchValueShared48 ->
                             case matchValueShared48 of {
-                              Cons matchValueShared49 matchValueShared50 ->
+                              (:) matchValueShared49 matchValueShared50 ->
                                 case matchValueShared50 of {
-                                  Nil ->
+                                  [] ->
                                     let {
                                       identity = matchValueShared45
                                     } in
@@ -1144,9 +1039,9 @@ module Bootstrap.CrateArtifact where {
                                       boundValueShared41 <-
                                         poolDeclarations M.empty (crateLoweredData iface);
                                       case boundValueShared41 of {
-                                        Pair pool _ ->
+                                        (,) pool _ ->
                                           do {
-                                            fragments <- decodeFragmentsFrom payload 0 pool Nil;
+                                            fragments <- decodeFragmentsFrom payload 0 pool [];
                                             Right (LegacyCrateObject iface fragments)
                                           }
                                       }
@@ -1171,17 +1066,17 @@ module Bootstrap.CrateArtifact where {
       }
     };
   decodeObject iface input = bindEither (canonicalFields input) (decodeObjectFields iface);
-  dependencyId (Triple n _ _) = n;
-  dependencyPath (Triple _ path _) = path;
-  dependencySemantic (Triple _ _ semantic) = semantic;
-  interfaceMap interfaces = M.fromList compareString (map (\i -> Pair (crateId i) i) interfaces);
+  dependencyId ((,,) n _ _) = n;
+  dependencyPath ((,,) _ path _) = path;
+  dependencySemantic ((,,) _ _ semantic) = semantic;
+  interfaceMap interfaces = M.fromList compareString (map (\i -> (,) (crateId i) i) interfaces);
   dependencyClosure :: Map String CrateInterface ->
-                       List String ->
-                       List CrateInterface -> List String -> Either String (List CrateInterface);
+                       [] String ->
+                       [] CrateInterface -> [] String -> Either String ([] CrateInterface);
   dependencyClosure interfaces trail done pending =
     case pending of {
-      Nil -> Right done;
-      Cons n rest ->
+      [] -> Right done;
+      (:) n rest ->
         if elem eqString n trail
         then Left ("cyclic crate dependencies: " ++ intercalate " -> " (snoc trail n))
         else if any (\i -> eqString n (crateId i)) done
@@ -1249,9 +1144,9 @@ module Bootstrap.CrateArtifact where {
           (concatMap (\i -> map fst (crateInstances i)) interfaces)
           (SClassProgram (concatMap crateData interfaces) (concatMap crateClasses interfaces)
              (concatMap (\i -> map snd (crateInstances i)) interfaces)
-             (SConstructor "Unit"));
+             (SConstructor "()"));
       case boundValueShared57 of {
-        Pair program _ ->
+        (,) program _ ->
           do {
             expected <-
               case program of {
@@ -1275,7 +1170,7 @@ module Bootstrap.CrateArtifact where {
     eqList eqString (sortStrings (map D.prettyDeclaration actual))
       (sortStrings (map D.prettyDeclaration expected));
   data FragmentState =
-    FragmentState Int (Map String (Pair XName XType)) (List XTerm) (List DataDecl) (Set String);
+    FragmentState Int (Map String ((,) XName XType)) ([] XTerm) ([] DataDecl) (Set String);
   fragmentBindings (FragmentState _ available _ _ _) = available;
   fragmentSerial (FragmentState serial _ _ _ _) = serial;
   fragmentBodies (FragmentState _ _ bodies _ _) = bodies;
@@ -1295,13 +1190,13 @@ module Bootstrap.CrateArtifact where {
       Separate.objectChecked fragment;
       boundValueShared59 <- Right (Separate.freshObject serial (Separate.objectTerm fragment));
       case boundValueShared59 of {
-        Pair next fresh ->
+        (,) next fresh ->
           do {
             let {
               extracted =
                 case fresh of {
-                  XWithData ds b -> Pair ds b;
-                  term -> Pair Nil term
+                  XWithData ds b -> (,) ds b;
+                  term -> (,) [] term
                 }
             };
             let {
@@ -1331,7 +1226,7 @@ module Bootstrap.CrateArtifact where {
               "inference fragment checksum mismatch";
             boundValueShared58 <- Right (Separate.splitParameters (snd extracted));
             case boundValueShared58 of {
-              Pair parameters implementation ->
+              (,) parameters implementation ->
                 do {
                   uniqueNames "fragment parameter" (map (\p -> X.nameHint (fst p)) parameters);
                   ensure
@@ -1340,14 +1235,14 @@ module Bootstrap.CrateArtifact where {
                     "crate fragment imports a symbol outside its dependency boundary";
                   replacements <-
                     traverseEither
-                      (\(Pair n ty) ->
+                      (\((,) n ty) ->
                          case M.lookup compareString (X.nameHint n) available of {
                            Nothing -> Left ("unresolved crate symbol: " ++ X.nameHint n);
-                           Just (Pair actual expected) ->
+                           Just ((,) actual expected) ->
                              do {
                                ensure (T.alphaEq ty expected)
                                  ("crate import scheme mismatch: " ++ X.nameHint n);
-                               Right (Pair n actual)
+                               Right ((,) n actual)
                              }
                          })
                       parameters;
@@ -1357,12 +1252,12 @@ module Bootstrap.CrateArtifact where {
                       (XEnv M.empty (M.fromList X.compareName parameters))
                       implementation;
                   let {
-                    actual = map (\(Pair n ty) -> Pair (X.nameHint n) (Separate.normalType ty)) own
+                    actual = map (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty)) own
                   };
                   ensure (sameSchemes actual (Separate.unitBindings recorded))
                     "crate fragment binding scheme mismatch";
                   traverseEither
-                    (\(Pair n ty) ->
+                    (\((,) n ty) ->
                        case M.lookup compareString n ownSchemes of {
                          Nothing -> Left ("fragment binding is not owned by crate: " ++ n);
                          Just expected ->
@@ -1371,7 +1266,7 @@ module Bootstrap.CrateArtifact where {
                        })
                     actual;
                   uniqueNames "fragment binding" (map fst actual);
-                  ensure (all (\(Pair n _) -> not (M.member compareString n available)) actual)
+                  ensure (all (\((,) n _) -> not (M.member compareString n available)) actual)
                     "duplicate crate symbol";
                   let {
                     substitution = M.fromList X.compareName replacements
@@ -1386,11 +1281,11 @@ module Bootstrap.CrateArtifact where {
                   let {
                     newBindings =
                       M.fromList compareString
-                        (map (\(Pair n ty) -> Pair (X.nameHint n) (Pair n ty)) own)
+                        (map (\((,) n ty) -> (,) (X.nameHint n) ((,) n ty)) own)
                   };
                   Right
                     (FragmentState next (M.union compareString newBindings available)
-                       (Cons linked bodies)
+                       ((:) linked bodies)
                        combined
                        (Set.insert compareString (Separate.unitName recorded) groups))
                 }
@@ -1410,11 +1305,11 @@ module Bootstrap.CrateArtifact where {
       ensure (eqString (objectFingerprint object) (crateObjectFingerprint iface))
         "crate fragment inventory checksum mismatch";
       dependencies <-
-        dependencyClosure interfaces (Cons (crateId iface) Nil) Nil
+        dependencyClosure interfaces ((:) (crateId iface) []) []
           (map dependencyId (crateDependencies iface));
       let {
         allowedSymbols =
-          Set.fromList compareString (map fst (concatMap crateBindings (Cons iface dependencies)))
+          Set.fromList compareString (map fst (concatMap crateBindings ((:) iface dependencies)))
       };
       let {
         before = Set.fromList compareString (M.keys (fragmentBindings state))
@@ -1433,7 +1328,7 @@ module Bootstrap.CrateArtifact where {
     };
   entrySignatures entry bindings =
     filter
-      (\(Pair name _) ->
+      (\((,) name _) ->
          (eqString name entry ||
           (startsWith "select_" name || (startsWith "super_" name || startsWith "instance_" name))))
       bindings;
@@ -1443,7 +1338,7 @@ module Bootstrap.CrateArtifact where {
   -- class translation cannot regenerate an existing support definition.
   linkEntry serial interfaces root available entry =
     if eqString entry ""
-    then Right (XConstructor "Unit" Nil)
+    then Right (XConstructor "()" [])
     else do {
            ensure (M.member compareString entry available) ("crate has no entry symbol: " ++ entry);
            let {
@@ -1452,8 +1347,8 @@ module Bootstrap.CrateArtifact where {
            owner <- entryOwner root;
            let {
              reach =
-               Cons owner
-                 (M.findWithDefault compareString Nil owner
+               (:) owner
+                 (M.findWithDefault compareString [] owner
                     (M.fromList compareString (crateImports root)))
            };
            instances <-
@@ -1464,18 +1359,18 @@ module Bootstrap.CrateArtifact where {
                        (\entry ->
                           do {
                             moduleName <- instanceOwner iface (fst entry);
-                            Right (Pair moduleName entry)
+                            Right ((,) moduleName entry)
                           })
                        (crateInstances iface))
                   interfaces);
            let {
              visibleInstances =
-               map snd (filter (\(Pair moduleName _) -> elem eqString moduleName reach) instances)
+               map snd (filter (\((,) moduleName _) -> elem eqString moduleName reach) instances)
            };
            let {
              dictionaries =
                M.fromList compareString
-                 (map (\c -> Pair ("Dict_" ++ Classes.className c) (Classes.className c)) classes)
+                 (map (\c -> (,) ("Dict_" ++ Classes.className c) (Classes.className c)) classes)
            };
            let {
              signatures =
@@ -1507,19 +1402,19 @@ module Bootstrap.CrateArtifact where {
       let {
         byName = interfaceMap interfaces
       };
-      ordered <- dependencyClosure byName Nil Nil (Cons root Nil);
+      ordered <- dependencyClosure byName [] [] ((:) root []);
       traverseEither (validateDependencies byName) ordered;
       traverseEither (validateExportBoundary byName) ordered;
       dataEnv <- validateLayouts ordered;
       let {
         layouts =
           M.fromList compareString
-            (map (\d -> Pair (D.datatypeName d) (datatypePart d))
+            (map (\d -> (,) (D.datatypeName d) (datatypePart d))
                (concatMap crateLoweredData ordered))
       };
       let {
         objectMap =
-          M.fromList compareString (map (\o -> Pair (crateId (objectInterface o)) o) objects)
+          M.fromList compareString (map (\o -> (,) (crateId (objectInterface o)) o) objects)
       };
       state <-
         foldEither
@@ -1528,7 +1423,7 @@ module Bootstrap.CrateArtifact where {
                Nothing -> Left "missing crate object";
                Just o -> linkCrate byName layouts s o
              })
-          (FragmentState 0 M.empty Nil Nil Set.empty)
+          (FragmentState 0 M.empty [] [] Set.empty)
           ordered;
       let {
         rootInterface = M.findWithDefault compareString (panic "missing root crate") root byName
@@ -1553,13 +1448,13 @@ module Bootstrap.CrateArtifact where {
       ioReturn (mapLeft (\e -> (path ++ (": " ++ e))) (bindEither input (decodeObject iface)))
     };
   objectPath path = (stringSlice path 0 (stringLength path - 6) ++ ".mlfco");
-  loadGraph :: List String ->
-               List (Pair String CrateInterface) ->
-               List String -> IO (Either String (List (Pair String CrateInterface)));
+  loadGraph :: [] String ->
+               [] ((,) String CrateInterface) ->
+               [] String -> IO (Either String ([] ((,) String CrateInterface)));
   loadGraph trail done paths =
     case paths of {
-      Nil -> ioReturn (Right done);
-      Cons requested rest ->
+      [] -> ioReturn (Right done);
+      (:) requested rest ->
         do {
           present <- fileExists requested;
           if not present
@@ -1599,7 +1494,7 @@ module Bootstrap.CrateArtifact where {
                                                   }) of {
                                           Left e -> ioReturn (Left e);
                                           Right xs ->
-                                            loadGraph trail (snoc xs (Pair path iface)) rest
+                                            loadGraph trail (snoc xs ((,) path iface)) rest
                                         }
                                       }
                              }
@@ -1607,22 +1502,22 @@ module Bootstrap.CrateArtifact where {
                }
         }
     };
-  loadInterfaces paths = loadGraph Nil Nil paths;
+  loadInterfaces paths = loadGraph [] [] paths;
   linkCheckedFile path =
     do {
-      loaded <- loadInterfaces (Cons path Nil);
+      loaded <- loadInterfaces ((:) path []);
       case loaded of {
         Left e -> ioReturn (Left e);
         Right interfaces ->
           do {
             objects <-
-              mapM (\(Pair metadata iface) -> readObject (objectPath metadata) iface) interfaces;
+              mapM (\((,) metadata iface) -> readObject (objectPath metadata) iface) interfaces;
             ioReturn
               (bindEither (sequenceEither objects)
                  (\os ->
                     case reverse interfaces of {
-                      Nil -> Left "no root crate metadata";
-                      Cons (Pair _ root) _ -> linkCheckedObjects os (crateId root)
+                      [] -> Left "no root crate metadata";
+                      (:) ((,) _ root) _ -> linkCheckedObjects os (crateId root)
                     }))
           }
       }
@@ -1636,7 +1531,7 @@ module Bootstrap.CrateArtifact where {
     do {
       writeFile (prefix ++ ".mlfco") (encodeObject object);
       writeFile (prefix ++ ".mlfci") (encodeInterface (objectInterface object));
-      ioReturn Unit
+      ioReturn ()
     };
   showInterfaceFile path =
     do {
@@ -1646,17 +1541,17 @@ module Bootstrap.CrateArtifact where {
   renderInterface iface =
     let {
       dependencies =
-        map (\(Triple n p h) -> ("dependency " ++ (n ++ (" " ++ (p ++ (" " ++ h))))))
+        map (\((,,) n p h) -> ("dependency " ++ (n ++ (" " ++ (p ++ (" " ++ h))))))
           (crateDependencies iface)
     } in
     let {
       modules =
         concatMap
-          (\(Pair n entities) ->
-             Cons ("module " ++ n) (map (\e -> ("  export " ++ Modules.label e)) entities))
+          (\((,) n entities) ->
+             (:) ("module " ++ n) (map (\e -> ("  export " ++ Modules.label e)) entities))
           (crateExports iface)
     } in
     unlines
-      (Cons ("crate " ++ crateId iface)
-         (Cons ("interface " ++ semanticFingerprint iface) (append dependencies modules)))
+      ((:) ("crate " ++ crateId iface)
+         ((:) ("interface " ++ semanticFingerprint iface) (append dependencies modules)))
 }

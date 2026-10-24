@@ -18,11 +18,11 @@ import qualified Bootstrap.X.Type as XT
 import qualified Bootstrap.X.Syntax as XS
 import qualified Package.Json as J
 
-list :: T.List a -> [a]
-list T.Nil = []
-list (T.Cons x xs) = x:list xs
-mlist :: [a] -> T.List a
-mlist = foldr T.Cons T.Nil
+list :: [] a -> [a]
+list [] = []
+list ((:) x xs) = x:list xs
+mlist :: [a] -> [] a
+mlist = foldr (:) []
 text = H.unpack . J.text
 field key = J.get (H.literal key)
 items key = list . J.values . field key
@@ -38,11 +38,22 @@ pairs = map pair . list . J.values where
     [a,b] -> (text a,text b)
     _ -> error "fixture pair arity"
 
+-- Only trusted, unlexable compiler-generated syntax hooks are constants.
+-- Ordinary source variables with the same basenames remain paper assumptions.
+referenceFreeNames :: H.String -> Set.Set String
+referenceFreeNames x =
+  if H.unpack x `elem`
+       ["$MLF.Primitive.fromString", "$MLF.Primitive.>>=", "$MLF.Primitive.>>",
+        "$MLF.Primitive.fail", "$MLF.Primitive.=="]
+  then Set.empty else Set.singleton (H.unpack x)
+
 -- Same structural free-name contract as Tests.Figure12.freeNames, including
 -- sorted set order, constructors excluded and right-biased signature bindings.
 freeNames :: T.SExpr -> Set.Set String
 freeNames expression = case expression of
-  T.SVar x -> Set.singleton (H.unpack x)
+  T.SSourceDefinition body -> freeNames body
+  T.SCallSite _ _ body -> freeNames body
+  T.SVar x -> referenceFreeNames x
   T.SConstructor _ -> Set.empty
   T.SLam x _ b -> Set.delete (H.unpack x) (freeNames b)
   T.SApp a b -> Set.union (freeNames a) (freeNames b)
@@ -54,15 +65,19 @@ freeNames expression = case expression of
   T.SBoolLit _ -> Set.empty
   T.SStringLit _ -> Set.empty
   T.SPrimitive _ -> Set.empty
-  T.SWanted _ candidates -> Set.fromList [H.unpack n | T.Pair _ n <- list candidates]
+  T.SWanted _ candidates -> Set.fromList [H.unpack n | (,) _ n <- list candidates]
   T.SChecked _ a -> freeNames a
   T.SEquations equations -> Set.unions
-    [freeNames body Set.\\ Set.unions (map bound (list ps)) | T.Pair ps body <- list equations]
+    [(freeNames body Set.\\ Set.unions (map bound (list ps))) `Set.union`
+       Set.unions (map references (list ps)) | (,) ps body <- list equations]
   T.SDo _ _ -> freeNames (Desugar.desugarDo expression)
-  T.SLetRec ds b -> Set.unions (freeNames b:[freeNames a | T.Triple _ _ a <- list ds])
-    Set.\\ Set.fromList [H.unpack n | T.Triple n _ _ <- list ds]
+  T.SSharedBind pattern action continuation binding failure -> Set.unions
+    [freeNames action, freeNames continuation Set.\\ bound pattern,
+     freeNames binding, freeNames failure, references pattern]
+  T.SLetRec ds b -> Set.unions (freeNames b:[freeNames a | (,,) _ _ a <- list ds])
+    Set.\\ Set.fromList [H.unpack n | (,,) n _ _ <- list ds]
   T.SCase a bs -> Set.union (freeNames a) (Set.unions
-    [freeNames b Set.\\ bound p | T.SAlternative p b <- list bs])
+    [(freeNames b Set.\\ bound p) `Set.union` references p | T.SAlternative p b <- list bs])
   where
     bound (T.SConstructorPattern _ ns) = Set.fromList [H.unpack n | T.Just n <- list ns]
     bound (T.SDefaultPattern n) = case n of T.Just x -> Set.singleton (H.unpack x); T.Nothing -> Set.empty
@@ -71,6 +86,15 @@ freeNames expression = case expression of
     bound (T.SIntPattern _) = Set.empty
     bound (T.SStringPattern _) = Set.empty
     bound (T.SBoolPattern _) = Set.empty
+    bound (T.SOverloadedStringPattern _ _ _) = Set.empty
+    bound (T.SAsPattern n p) = Set.insert (H.unpack n) (bound p)
+    bound (T.SLazyPattern p) = bound p
+    references (T.SOverloadedStringPattern _ equality conversion) =
+      Set.union (referenceFreeNames equality) (referenceFreeNames conversion)
+    references (T.SNestedPattern _ ps) = Set.unions (map references (list ps))
+    references (T.SAsPattern _ p) = references p
+    references (T.SLazyPattern p) = references p
+    references _ = Set.empty
 
 assumptions fixture c = do
   e <- right (Parser.parseExpr (H.literal (str "id" c)) (H.literal (str "expression" c)))
@@ -79,7 +103,7 @@ assumptions fixture c = do
     (Set.toAscList (freeNames e))
 program fixture c = do
   ss <- assumptions fixture c
-  return (foldr (\(n,s) b -> "\\(" ++ n ++ " : " ++ s ++ ") ->\n" ++ b) (str "expression" c) ss)
+  return (foldr (\(n,s) b -> "\\(" ++ n ++ " :: " ++ s ++ ") ->\n" ++ b) (str "expression" c) ss)
 checkOutput result = do
   parsed <- right (XP.parseTerm (H.literal "<Figure12 xMLF>") (Pretty.prettyTerm (C.compiledTerm result)))
   ty <- right (XC.checkClosed parsed)
@@ -112,7 +136,7 @@ xtype j = case list (J.values j) of
 jsonString = J.String . H.literal
 jsonArray = J.Array . mlist
 jsonPair (a,b) = jsonArray [jsonString a,jsonString b]
-object xs = J.Object (mlist [T.Pair (H.literal k) v | (k,v) <- xs])
+object xs = J.Object (mlist [(,) (H.literal k) v | (k,v) <- xs])
 main = do
   args <- Env.getArgs
   case args of
@@ -133,7 +157,7 @@ main = do
         "case" -> checkCase fixture (cases !! ix) >> putStrLn "PASS case"
         "assumption" -> do
           let (n,s) = ss !! ix
-          _ <- compileSource ("\\(" ++ n ++ " : " ++ s ++ ") -> " ++ n)
+          _ <- compileSource ("\\(" ++ n ++ " :: " ++ s ++ ") -> " ++ n)
           putStrLn "PASS assumption"
         "type" -> do
           let c = items "type_checks" fixture !! ix

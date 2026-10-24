@@ -6,10 +6,10 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/mlf-direct-smoke.XXXXXXXX")
 trap 'rm -rf "$work"' EXIT
 project="$work/project with spaces"
 mkdir -p "$project/tools/release" "$project/tools/shared" "$project/bootstrap" \
-  "$project/libraries/example" "$project/tests/Tests" "$project/tests/pr-smoke" "$project/host" "$project/runtime" "$work/bin"
+  "$project/libraries/example" "$project/tests/shared/Tests" "$project/tests/pr-smoke" "$project/host" "$project/runtime" "$work/bin"
 cp "$root/tools/release/source-smoke.sh" "$root/tools/release/native-ci.sh" "$project/tools/release/"
 for file in libraries/example/Main.hs libraries/example/mlf-package.json tests/PRQuickMain.emlf \
-  tests/Tests/IndependentCheck.hs tests/Tests/IndependentType.hs tests/pr-smoke/example \
+  tests/shared/Tests/IndependentCheck.hs tests/shared/Tests/IndependentType.hs tests/pr-smoke/example \
   host/Adapter.hs tools/shared/build.py; do
   printf 'test source fixture\n' > "$project/$file"
 done

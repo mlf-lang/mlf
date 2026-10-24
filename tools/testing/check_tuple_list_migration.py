@@ -31,11 +31,37 @@ REVIEWED_SHARED_SHA256 = {
 }
 
 
+# Historical source pins above remain immutable for the dated migration ledger.
+HISTORICAL_SHARED_COMMIT = "2916c477468efaa24ae2c76e8b2f41e5f15236a6"
+ACTIVE_CONTRACT_PATH = "tools/testing/tuple-list-active-contract.json"
+
+
+def active_contract():
+    contract = json.loads((ROOT / ACTIVE_CONTRACT_PATH).read_text())
+    require(contract.get("schema_version") == 1, "unknown active tuple contract schema")
+    ids = contract["framework_ids"]
+    require(len(ids) == len(set(ids)) == contract["framework_count"] == 105,
+            "reviewed active tuple inventory changed")
+    require(contract["legacy_pass_count"] == 305, "reviewed legacy observation count changed")
+    require(set(contract["source_sha256"]) == {IMPLEMENTATION, SOURCE, LEGACY},
+            "active tuple source inventory changed")
+    return contract
+
+
+def verify_historical_sources():
+    sources = {}
+    for path, expected in REVIEWED_SHARED_SHA256.items():
+        raw = subprocess.check_output(["git", "show", HISTORICAL_SHARED_COMMIT + ":" + path], cwd=ROOT)
+        require(hashlib.sha256(raw).hexdigest() == expected, "frozen shared source changed: " + path)
+        sources[path] = raw.decode("utf-8")
+    return sources
+
+
 def verify_shared(path, source):
-    expected = REVIEWED_SHARED_SHA256.get(path)
+    expected = active_contract()["source_sha256"].get(path)
     require(expected is not None, "shared semantic contract requires review: " + path)
     require(hashlib.sha256(source.encode()).hexdigest() == expected,
-            "shared source differs from reviewed AST migration: " + path)
+            "shared source differs from reviewed active semantic contract: " + path)
 
 
 def verify_current_sources(root=None):
@@ -234,15 +260,17 @@ def main():
         raise ValueError(f"static control failed to reject {name}")
     sources = verify_current_sources()
     shared_ids = re.findall(r'leaf\s+"([^"]+)"', sources[IMPLEMENTATION])
-    require(len(shared_ids) == 90 and len(set(shared_ids)) == 90 and
-            set(shared_ids) == expected, "shared leaf inventory differs from frozen90")
+    contract = active_contract()
+    require(shared_ids == contract["framework_ids"], "active ordered leaf inventory differs from reviewed contract")
     # The separate native path is not replaced by focused interpreter checks.
     for path in ("tools/release/test-tuple-list.sh", "tests/fixtures/tuple-list-runtime.emlf", "tests/fixtures/tuple-list-runtime.stdout"):
         require((ROOT / path).read_text() == frozen(path), f"native route changed: {path}")
     print(json.dumps({"kind": "static-source-preservation", "baseline": BASELINE,
-                      "leaf_ids": 90, "default_implementation": "legacy", "literal_calls_preserved": count,
+                      "historical_leaf_ids": 90, "active_leaf_ids": contract["framework_count"],
+                      "active_legacy_observations": contract["legacy_pass_count"], "default_implementation": "legacy", "literal_calls_preserved": count,
                       "oracle_helpers_preserved": 12, "mutation_controls": len(mutations),
-                      "shared_semantic_contract": REVIEWED_SHARED_SHA256,
+                      "historical_shared_semantic_contract": REVIEWED_SHARED_SHA256,
+                      "active_shared_semantic_contract": contract,
                       "compilation_verified": False, "semantic_execution_verified": False}, indent=2))
 
 

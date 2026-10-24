@@ -14,7 +14,7 @@ module Bootstrap.CrateCodegen where {
   -- Both queries start from a checked linked program. The first erases types;
   -- the second observes the existing whole-program optimizer's result. No
   -- function-level optimization facts are replayed across unrelated programs.
-  data CodegenResult = CodegenResult (List String) Bool Bool String String String;
+  data CodegenResult = CodegenResult ([] String) Bool Bool String String String;
   codeChunks (CodegenResult chunks _ _ _ _ _) = chunks;
   inputReused (CodegenResult _ reused _ _ _ _) = reused;
   optimizedReused (CodegenResult _ _ reused _ _ _) = reused;
@@ -31,9 +31,9 @@ module Bootstrap.CrateCodegen where {
          ((((code >= 48) && (code <= 57)) || ((code >= 97) && (code <= 102))) &&
           validDigestFrom value (index + 1));
   validDigest value = ((stringLength value == 64) && validDigestFrom value 0);
-  cacheFields :: String -> String -> String -> List String;
+  cacheFields :: String -> String -> String -> [] String;
   cacheFields key codeHash objectId =
-    Cons "MLF-CODEGEN-CACHE-1" (Cons key (Cons codeHash (Cons objectId Nil)));
+    (:) "MLF-CODEGEN-CACHE-1" ((:) key ((:) codeHash ((:) objectId [])));
   encodeCached key codeHash objectId =
     let {
       fields = cacheFields key codeHash objectId
@@ -46,18 +46,18 @@ module Bootstrap.CrateCodegen where {
         matchValueShared1 = fields
       } in
       case matchValueShared1 of {
-        Cons matchValueShared2 matchValueShared3 ->
+        (:) matchValueShared2 matchValueShared3 ->
           if MLF.Primitive.eqString matchValueShared2 "MLF-CODEGEN-CACHE-1"
           then case matchValueShared3 of {
-                 Cons matchValueShared4 matchValueShared5 ->
+                 (:) matchValueShared4 matchValueShared5 ->
                    case matchValueShared5 of {
-                     Cons matchValueShared6 matchValueShared7 ->
+                     (:) matchValueShared6 matchValueShared7 ->
                        case matchValueShared7 of {
-                         Cons matchValueShared8 matchValueShared9 ->
+                         (:) matchValueShared8 matchValueShared9 ->
                            case matchValueShared9 of {
-                             Cons matchValueShared10 matchValueShared11 ->
+                             (:) matchValueShared10 matchValueShared11 ->
                                case matchValueShared11 of {
-                                 Nil ->
+                                 [] ->
                                    let {
                                      savedKey = matchValueShared4
                                    } in
@@ -84,7 +84,7 @@ module Bootstrap.CrateCodegen where {
                                      ensure
                                        (eqString text (encodeCached savedKey codeHash objectId))
                                        "noncanonical code generation cache metadata";
-                                     Right (Pair codeHash objectId)
+                                     Right ((,) codeHash objectId)
                                    };
                                  _ -> Left "unsupported code generation cache metadata"
                                };
@@ -105,7 +105,7 @@ module Bootstrap.CrateCodegen where {
       input <- Separate.readStrict metadata;
       case bindEither input (decodeCached key) of {
         Left error -> ioReturn (Left error);
-        Right (Pair expected objectId) ->
+        Right ((,) expected objectId) ->
           do {
             let {
               path = (directory ++ ("/objects/" ++ (objectId ++ ".ll")))
@@ -119,7 +119,7 @@ module Bootstrap.CrateCodegen where {
                    then ioReturn (Left "cached LLVM output checksum mismatch")
                    else do {
                           code <- readFile path;
-                          ioReturn (Right (Triple (Cons code Nil) actual objectId))
+                          ioReturn (Right ((,,) ((:) code []) actual objectId))
                         }
                  }
           }
@@ -131,7 +131,7 @@ module Bootstrap.CrateCodegen where {
       fileDigest (directory ++ "/query-key.new")
     };
   saltedKey compiler key =
-    Separate.pack (Cons "MLF-CODEGEN-QUERY-1" (Cons compiler (Cons key Nil)));
+    Separate.pack ((:) "MLF-CODEGEN-QUERY-1" ((:) compiler ((:) key [])));
   reportJSON result =
     ("{\"format\":1,\"input_reused\":" ++
      (Query.boolean (inputReused result) ++
@@ -159,7 +159,7 @@ module Bootstrap.CrateCodegen where {
       };
       cached <- readCached directory inputPath input;
       case cached of {
-        Right (Triple chunks _ optimizedId) ->
+        Right ((,,) chunks _ optimizedId) ->
           ioReturn (Right (CodegenResult chunks True False inputId optimizedId compiler));
         Left _ ->
           case LLVM.prepareChecked requireIO checked of {
@@ -177,17 +177,17 @@ module Bootstrap.CrateCodegen where {
                 let {
                   prior =
                     bindEither rawPrior
-                      (\(Triple chunks hash objectId) ->
+                      (\((,,) chunks hash objectId) ->
                          do {
                            ensure (eqString objectId optimizedId)
                              "prepared code generation object identity mismatch";
-                           Right (Triple chunks hash objectId)
+                           Right ((,,) chunks hash objectId)
                          })
                 };
                 generated <-
                   case prior of {
-                    Right (Triple chunks hash objectId) ->
-                      ioReturn (Right (Triple True chunks hash));
+                    Right ((,,) chunks hash objectId) ->
+                      ioReturn (Right ((,,) True chunks hash));
                     Left _ ->
                       case LLVM.emitPreparedChunks prepared of {
                         Left error -> ioReturn (Left error);
@@ -205,7 +205,7 @@ module Bootstrap.CrateCodegen where {
                                   saved <-
                                     Query.writeCache optimizedPath
                                       (encodeCached optimized hash optimizedId);
-                                  ioReturn (mapEither (\_ -> Triple False chunks hash) saved)
+                                  ioReturn (mapEither (\_ -> (,,) False chunks hash) saved)
                                 }
                             }
                           }
@@ -213,7 +213,7 @@ module Bootstrap.CrateCodegen where {
                   };
                 case generated of {
                   Left error -> ioReturn (Left error);
-                  Right (Triple hit chunks hash) ->
+                  Right ((,,) hit chunks hash) ->
                     do {
                       saved <- Query.writeCache inputPath (encodeCached input hash optimizedId);
                       case saved of {
@@ -249,8 +249,8 @@ module Bootstrap.CrateCodegen where {
                };
                made <-
                  mapM Query.ensureDirectory
-                   (Cons (cache ++ "/inputs")
-                      (Cons (cache ++ "/prepared") (Cons (cache ++ "/objects") Nil)));
+                   ((:) (cache ++ "/inputs")
+                      ((:) (cache ++ "/prepared") ((:) (cache ++ "/objects") [])));
                if any isLeft made
                then ioReturn (Left "cannot create code generation query cache")
                else do {

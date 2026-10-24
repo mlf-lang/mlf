@@ -3,7 +3,7 @@
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
 module Async.Task (Task, Fiber, Options(..), Outcome(..), CancelReason(..), AsyncError(..), defaultOptions, pure, map, bind, fail, capture, spawn, awaitOutcome, await, yield, sleep, withTimeout, cancel, cancelScope, all, collect, mapConcurrentlyN, runProcess, checkedProcess, withScope, run) where {
-  import MLF.Primitive hiding (pure, bind, runProcess);
+  import MLF.Primitive hiding (pure, bind, runProcess, fail);
   import Async.Task.Internal (Task, Fiber, Options(..), Outcome(..), CancelReason(..), AsyncError(..), defaultOptions, capture, spawn, awaitOutcome, await, yield, sleep, withTimeout, cancel, cancelScope, all, collect, mapConcurrentlyN, runProcess, checkedProcess, withScope, run);
   import qualified Async.Task.Internal as I;
   -- Keep the scheduler's IO do-notation independent of these public names.

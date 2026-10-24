@@ -6,6 +6,7 @@ module Bootstrap.Host where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
+  separator :: Int -> Bool;
   separator code = ((code == 47) || (code == 92));
   driveRoot path =
     ((stringLength path >= 3) &&
@@ -53,25 +54,25 @@ module Bootstrap.Host where {
     if not windows
     then argv
     else case argv of {
-           Cons command rest ->
+           (:) command rest ->
              let {
                operation =
                  lookup eqString command
-                   (Cons (Pair "/bin/mkdir" "mkdir")
-                      (Cons (Pair "/bin/cp" "copy")
-                         (Cons (Pair "/bin/mv" "move")
-                            (Cons (Pair "/bin/rm" "remove")
-                               (Cons (Pair "/bin/test" "test")
-                                  (Cons (Pair "/bin/ln" "link")
-                                     (Cons (Pair "/usr/bin/uname" "uname")
-                                        (Cons (Pair "uname" "uname")
-                                           (Cons (Pair "mktemp" "mktemp") Nil)))))))))
+                   ((:) ((,) "/bin/mkdir" "mkdir")
+                      ((:) ((,) "/bin/cp" "copy")
+                         ((:) ((,) "/bin/mv" "move")
+                            ((:) ((,) "/bin/rm" "remove")
+                               ((:) ((,) "/bin/test" "test")
+                                  ((:) ((,) "/bin/ln" "link")
+                                     ((:) ((,) "/usr/bin/uname" "uname")
+                                        ((:) ((,) "uname" "uname")
+                                           ((:) ((,) "mktemp" "mktemp") [])))))))))
              } in
              case operation of {
                Nothing -> argv;
-               Just name -> Cons host (Cons name rest)
+               Just name -> (:) host ((:) name rest)
              };
-           Nil -> Nil
+           [] -> []
          };
   hostArguments argv =
     do {

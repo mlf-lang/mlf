@@ -1,7 +1,10 @@
-{-# LANGUAGE RankNTypes, KindSignatures, FlexibleInstances, ForeignFunctionInterface #-}
+{-# LANGUAGE RankNTypes, KindSignatures, FlexibleInstances, ForeignFunctionInterface, ConstraintKinds #-}
 module MLF.Host.Base
-  ( Int, Bool(..), Double, IO, Unit(..), String, ST, STArray
+  ( Int, Bool(..), Double, Char, IO, String, ST, STArray
+  , MLFCallStack, MLFHasCallStack, MLFStackFrame(..), MLFStackEvidence(..)
+  , v_emptyCallStack, v_pushCallStack, v_prettyCallStack
   , literal, unpack, utf8, fromUtf8, matchString, neInt, leInt, gtInt, geInt
+  , v_textToChars, v_textFromChars, v_charCode, v_charFromCode
   , v_ioReturn, v_ioBind, v_stReturn, v_stBind, v_runST
   , v_newSTArray, v_readSTArray, v_writeSTArray, v_lengthSTArray
   , v_addInt, v_subInt, v_mulInt, v_quotInt, v_remInt, v_eqInt, v_ltInt, v_andInt
@@ -19,6 +22,7 @@ import qualified Data.Text.Encoding as TE
 import qualified Data.ByteString as BS
 import Data.Char (ord, chr)
 import qualified Data.String as TextLiteral
+import qualified GHC.Stack as Stack
 import qualified Data.Array as Array
 import Data.Bits ((.&.))
 import Data.Typeable (Typeable)
@@ -35,7 +39,6 @@ import Text.Read (readMaybe)
 type Int = Integer
 type ST = S.ST
 type STArray s a = A.STArray s P.Int a
-data Unit = Unit
 -- Text is strict UTF-8 in the supported text-2 toolchain. String indices and
 -- lengths below count Unicode scalars, never bytes or UTF-16 code units.
 data String = String !T.Text !P.Int (Array.Array P.Int Char)
@@ -43,6 +46,25 @@ mkText :: T.Text -> String
 mkText text = mkSizedText (T.length text) text
 mkSizedText :: P.Int -> T.Text -> String
 mkSizedText count text = String text count (Array.listArray (0,count-1) (T.unpack text))
+-- Private compiler-managed evidence uses real GHC stack values on this host.
+-- These adapters do not redefine the public HasCallStack constraint.
+type MLFCallStack = Stack.CallStack
+type MLFHasCallStack = Stack.HasCallStack
+data MLFStackFrame = MLFStackFrame String String String String Int Int Int Int
+data MLFStackEvidence = MLFStackEvidence MLFCallStack
+v_emptyCallStack :: MLFCallStack
+v_emptyCallStack = Stack.emptyCallStack
+v_pushCallStack :: MLFStackFrame -> MLFCallStack -> MLFCallStack
+v_pushCallStack (MLFStackFrame name packageName moduleName file sl sc el ec) =
+  Stack.pushCallStack (unpack name, Stack.SrcLoc (unpack packageName) (unpack moduleName)
+    (unpack file) (coordinate sl) (coordinate sc) (coordinate el) (coordinate ec))
+  where coordinate n
+          | n < toInteger (minBound :: P.Int) || n > toInteger (maxBound :: P.Int)
+          = failure "source coordinate out of bounds"
+          | otherwise = fromInteger n
+v_prettyCallStack :: MLFCallStack -> [Char]
+v_prettyCallStack = Stack.prettyCallStack
+
 data HostError = HostError P.String deriving (Show, Typeable)
 instance Exception HostError
 failure :: P.String -> a
@@ -64,8 +86,22 @@ fromUtf8 bytes = case TE.decodeUtf8' bytes of
 matchString :: P.String -> String -> Bool
 matchString chars value = v_eqString value (literal chars)
 
+-- Canonical Haskell character lists are distinct from our opaque UTF-8 text.
+-- Char includes surrogate codepoints; converting those to text rejects them.
+v_textToChars :: String -> [Char]
+v_textToChars = unpack
+v_textFromChars :: [Char] -> String
+v_textFromChars = literal
+v_charCode :: Char -> Int
+v_charCode = toInteger . ord
+v_charFromCode :: Int -> Char
+v_charFromCode n = chr (bounded "invalid Char codepoint" 0x10ffff n)
+
 -- Ordinary Haskell overloaded string literals use the standard class.  This
 -- instance is representation adaptation, not a source-language syntax hook.
+instance Eq String where
+  (==) = v_eqString
+
 instance TextLiteral.IsString String where
   fromString = literal
 v_ioReturn :: a -> IO a
@@ -94,11 +130,11 @@ stIndex a n = do
   i `seq` pure i
 v_readSTArray :: STArray s a -> Int -> ST s a
 v_readSTArray a n = stIndex a n >>= A.readArray a
-v_writeSTArray :: STArray s a -> Int -> a -> ST s Unit
+v_writeSTArray :: STArray s a -> Int -> a -> ST s ()
 v_writeSTArray a n value = do
   i <- stIndex a n
   A.writeArray a i value
-  pure Unit
+  pure ()
 v_lengthSTArray :: STArray s a -> ST s Int
 v_lengthSTArray a = do
   (_,hi) <- A.getBounds a

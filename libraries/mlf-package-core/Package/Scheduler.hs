@@ -14,26 +14,26 @@ module Package.Scheduler where {
   -- action; they never acquire the build-directory lock or call ordinary build.
   moduleJson m =
     B.info
-      (Cons (Pair "name" (J.str (M.moduleName m)))
-         (Cons (Pair "owner" (J.str (M.moduleOwner m)))
-            (Cons (Pair "source" (J.str (M.moduleSource m)))
-               (Cons (Pair "imports" (J.stringArray (M.moduleImports m))) Nil))));
+      ((:) ((,) "name" (J.str (M.moduleName m)))
+         ((:) ((,) "owner" (J.str (M.moduleOwner m)))
+            ((:) ((,) "source" (J.str (M.moduleSource m)))
+               ((:) ((,) "imports" (J.stringArray (M.moduleImports m))) []))));
   moduleFrom value =
     M.Module (J.getText "name" "" value) (J.getText "owner" "" value) (J.getText "source" "" value)
       (J.getStrings "imports" value);
   packageJson p =
     B.info
-      (Cons (Pair "path" (J.str (M.packagePath p)))
-         (Cons (Pair "data" (M.packageData p))
-            (Cons (Pair "modules" (J.Array (S.map moduleJson (M.packageModules p)))) Nil)));
+      ((:) ((,) "path" (J.str (M.packagePath p)))
+         ((:) ((,) "data" (M.packageData p))
+            ((:) ((,) "modules" (J.Array (S.map moduleJson (M.packageModules p)))) [])));
   packageFrom value =
     M.Package (J.getText "path" "" value) (J.get "data" value)
       (S.map moduleFrom (J.values (J.get "modules" value)));
   graphJson graph =
     B.info
-      (Cons (Pair "root" (J.str (M.packageName (M.rootPackage graph))))
-         (Cons (Pair "packages" (J.Array (S.map packageJson (M.packages graph))))
-            (Cons (Pair "modules" (J.Array (S.map moduleJson (M.modules graph)))) Nil)));
+      ((:) ((,) "root" (J.str (M.packageName (M.rootPackage graph))))
+         ((:) ((,) "packages" (J.Array (S.map packageJson (M.packages graph))))
+            ((:) ((,) "modules" (J.Array (S.map moduleJson (M.modules graph)))) [])));
   graphFrom value =
     let {
       ps = S.map packageFrom (J.values (J.get "packages" value))
@@ -42,15 +42,15 @@ module Package.Scheduler where {
       (S.map moduleFrom (J.values (J.get "modules" value)));
   request name target publish =
     B.info
-      (Cons (Pair "name" (J.str name))
-         (Cons (Pair "target" target) (Cons (Pair "publish" (J.Boolean publish)) Nil)));
+      ((:) ((,) "name" (J.str name))
+         ((:) ((,) "target" target) ((:) ((,) "publish" (J.Boolean publish)) [])));
   requestKey selected =
     ((if J.getBool "publish" False selected then "e-" else "t-") ++ J.getText "name" "" selected);
   jobId job = J.getText "id" "" job;
   job kind identity deps =
     B.info
-      (Cons (Pair "id" (J.str identity))
-         (Cons (Pair "kind" (J.str kind)) (Cons (Pair "dependencies" (J.stringArray deps)) Nil)));
+      ((:) ((,) "id" (J.str identity))
+         ((:) ((,) "kind" (J.str kind)) ((:) ((,) "dependencies" (J.stringArray deps)) [])));
   addJob jobs next =
     case S.find (\row -> eqString (jobId row) (jobId next)) jobs of {
       Nothing -> S.snoc jobs next;
@@ -59,11 +59,11 @@ module Package.Scheduler where {
     };
   libraryId p noPrelude =
     ((if noPrelude then "library-no-prelude-" else "library-prelude-") ++ M.packageName p);
-  neededPackages :: M.PackageGraph -> List String -> List String -> List String;
+  neededPackages :: M.PackageGraph -> [] String -> [] String -> [] String;
   neededPackages graph done names =
     case names of {
-      Nil -> done;
-      Cons name rest ->
+      [] -> done;
+      (:) name rest ->
         if S.elem eqString name done
         then neededPackages graph done rest
         else let {
@@ -74,10 +74,10 @@ module Package.Scheduler where {
     };
   libraryJobs graph p target =
     let {
-      own = if S.null (M.packageModules p) then Nil else Cons (M.packageName p) Nil
+      own = if S.null (M.packageModules p) then [] else (:) (M.packageName p) []
     } in
     let {
-      needed = neededPackages graph Nil (S.append (M.targetDependencyNames p target) own)
+      needed = neededPackages graph [] (S.append (M.targetDependencyNames p target) own)
     } in
     let {
       noPrelude = J.getBool "no-prelude" False target
@@ -118,7 +118,7 @@ module Package.Scheduler where {
         noPrelude = J.getBool "no-prelude" False target
       };
       let {
-        own = if S.null (M.packageModules p) then Nil else Cons p Nil
+        own = if S.null (M.packageModules p) then [] else (:) p []
       };
       let {
         direct =
@@ -130,7 +130,7 @@ module Package.Scheduler where {
       };
       boundValueShared1 <- M.targetCrateModules graph p target;
       case boundValueShared1 of {
-        Pair entry modules ->
+        (,) entry modules ->
           do {
             let {
               profile = B.pgoForTarget b p name
@@ -155,7 +155,7 @@ module Package.Scheduler where {
               assemblyId = ("assemble-" ++ label)
             };
             let {
-              runtime = J.set "profile" profile (job "runtime" runtimeId Nil)
+              runtime = J.set "profile" profile (job "runtime" runtimeId [])
             };
             let {
               compilation =
@@ -168,19 +168,19 @@ module Package.Scheduler where {
               emission =
                 J.set "crate" (J.str compileId)
                   (J.set "identity" (J.str (M.crateIdentity p ("target-" ++ label)))
-                     (job "emit" emitId (Cons compileId Nil)))
+                     (job "emit" emitId ((:) compileId [])))
             };
             let {
               object =
                 J.set "emitted" (J.str emitId)
-                  (J.set "profile" profile (job "object" objectId (Cons emitId Nil)))
+                  (J.set "profile" profile (job "object" objectId ((:) emitId [])))
             };
             let {
               link =
                 J.set "llvm" (J.str objectId)
                   (J.set "runtime" (J.str runtimeId)
                      (J.set "profile" profile
-                        (job "link" linkId (Cons objectId (Cons runtimeId Nil)))))
+                        (job "link" linkId ((:) objectId ((:) runtimeId [])))))
             };
             let {
               assembly =
@@ -190,22 +190,22 @@ module Package.Scheduler where {
                         (J.set "linked" (J.str linkId)
                            (J.set "profile" profile
                               (job "assemble" assemblyId
-                                 (Cons compileId (Cons emitId (Cons linkId Nil))))))))
+                                 ((:) compileId ((:) emitId ((:) linkId []))))))))
             };
             ioReturn
               (S.foldl addJob jobs
                  (S.append (libraryJobs graph p target)
-                    (Cons runtime
-                       (Cons compilation
-                          (Cons emission (Cons object (Cons link (Cons assembly Nil))))))))
+                    ((:) runtime
+                       ((:) compilation
+                          ((:) emission ((:) object ((:) link ((:) assembly []))))))))
           }
       }
     };
-  planTargets :: B.Builder -> List J.Json -> List J.Json -> IO (List J.Json);
+  planTargets :: B.Builder -> [] J.Json -> [] J.Json -> IO ([] J.Json);
   planTargets b jobs selected =
     case selected of {
-      Nil -> ioReturn jobs;
-      Cons target rest ->
+      [] -> ioReturn jobs;
+      (:) target rest ->
         do {
           next <- planTarget b jobs target;
           planTargets b next rest
@@ -344,10 +344,10 @@ module Package.Scheduler where {
       report <- J.read (B.reportPath b);
       J.write (resultPath directory identity)
         (B.info
-           (Cons (Pair "complete" (J.Boolean True))
-              (Cons (Pair "id" (J.str identity))
-                 (Cons (Pair "invocation_id" (J.str invocation))
-                    (Cons (Pair "result" result) (Cons (Pair "report" report) Nil))))))
+           ((:) ((,) "complete" (J.Boolean True))
+              ((:) ((,) "id" (J.str identity))
+                 ((:) ((,) "invocation_id" (J.str invocation))
+                    ((:) ((,) "result" result) ((:) ((,) "report" report) []))))))
     };
   transportTask manager directory invocation timeout selected =
     let {
@@ -361,15 +361,15 @@ module Package.Scheduler where {
     } in
     let {
       argv =
-        Cons manager
-          (Cons "__build-worker"
-             (Cons (directory ++ "/context.json") (Cons invocation (Cons identity Nil))))
+        (:) manager
+          ((:) "__build-worker"
+             ((:) (directory ++ "/context.json") ((:) invocation ((:) identity []))))
     } in
-    S.append (Cons identity (Cons timeout (Cons (showInt (S.length deps)) deps)))
-      (Cons directory
-         (Cons ""
-            (Cons (private ++ "/worker.stdout")
-               (Cons (private ++ "/worker.stderr") (Cons (showInt (S.length argv)) argv)))));
+    S.append ((:) identity ((:) timeout ((:) (showInt (S.length deps)) deps)))
+      ((:) directory
+         ((:) ""
+            ((:) (private ++ "/worker.stdout")
+               ((:) (private ++ "/worker.stderr") ((:) (showInt (S.length argv)) argv)))));
   runner b =
     do {
       configured <- O.envDefault "MLF_BUILD_RUNNER" "";
@@ -381,18 +381,18 @@ module Package.Scheduler where {
            else configured);
       identity <- B.tool path;
       capability <-
-        B.raw (B.directory b) (Cons (J.getText "path" "" identity) (Cons "--protocol-version" Nil));
+        B.raw (B.directory b) ((:) (J.getText "path" "" identity) ((:) "--protocol-version" []));
       O.require (eqString (O.trim capability) "1")
         "incompatible mlf-build-runner protocol (expected 1)";
       ioReturn identity
     };
   mergeReport b identity report =
     S.mapM_
-      (\(Pair key value) ->
+      (\((,) key value) ->
          if S.elem eqString key (O.words "commands builds crates releases codegen native_inputs")
          then S.mapM_ (\row -> B.record b key (J.set "job_id" (J.str identity) row))
                 (J.values value)
-         else ioReturn Unit)
+         else ioReturn ())
       (J.items report);
   -- A killed coordinator releases its lock before every descendant is reaped.
   -- Fresh paths keep late writes from those workers out of the next build.
@@ -409,7 +409,7 @@ module Package.Scheduler where {
       helper <- runner b;
       setEnv "MLF_BUILD_RUNNER" (J.getText "path" "" helper);
       gc <- if S.null requests then ioReturn J.empty else B.gcFlags b;
-      planned <- planTargets b Nil requests;
+      planned <- planTargets b [] requests;
       let {
         jobs =
           if libraryOnly
@@ -417,7 +417,7 @@ module Package.Scheduler where {
           else planned
       };
       nonce <-
-        B.raw (B.directory b) (Cons (J.getText "path" "" helper) (Cons "--new-invocation-id" Nil));
+        B.raw (B.directory b) ((:) (J.getText "path" "" helper) ((:) "--new-invocation-id" []));
       O.require (B.validDigest (J.str (O.trim nonce)))
         "build runner returned invalid invocation identity";
       let {
@@ -432,12 +432,12 @@ module Package.Scheduler where {
         context =
           J.set "nonce" (J.str (O.trim nonce))
             (B.info
-               (Cons (Pair "format" (J.num 1))
-                  (Cons (Pair "graph" (graphJson (B.graph b)))
-                     (Cons (Pair "config" (B.config b))
-                        (Cons (Pair "tools" (B.tools b))
-                           (Cons (Pair "initial" (B.initial b))
-                              (Cons (Pair "gc" gc) (Cons (Pair "jobs" (J.Array jobs)) Nil))))))))
+               ((:) ((,) "format" (J.num 1))
+                  ((:) ((,) "graph" (graphJson (B.graph b)))
+                     ((:) ((,) "config" (B.config b))
+                        ((:) ((,) "tools" (B.tools b))
+                           ((:) ((,) "initial" (B.initial b))
+                              ((:) ((,) "gc" gc) ((:) ((,) "jobs" (J.Array jobs)) []))))))))
       };
       let {
         contextPath = (directory ++ "/context.json")
@@ -447,8 +447,8 @@ module Package.Scheduler where {
       manager <- getExecutablePath;
       let {
         header =
-          Cons "MLF_BUILD_PLAN"
-            (Cons "1" (Cons invocation (Cons limit (Cons (showInt (S.length jobs)) Nil))))
+          (:) "MLF_BUILD_PLAN"
+            ((:) "1" ((:) invocation ((:) limit ((:) (showInt (S.length jobs)) []))))
       };
       let {
         transport =
@@ -467,12 +467,12 @@ module Package.Scheduler where {
       B.record b "scheduler"
         (J.set "invocation_id" (J.str invocation)
            (B.info
-              (Cons (Pair "helper" helper)
-                 (Cons (Pair "plan" (J.str planPath))
-                    (Cons (Pair "plan_digest" (J.str digest))
-                       (Cons (Pair "jobs" (J.Array jobs)) Nil))))));
+              ((:) ((,) "helper" helper)
+                 ((:) ((,) "plan" (J.str planPath))
+                    ((:) ((,) "plan_digest" (J.str digest))
+                       ((:) ((,) "jobs" (J.Array jobs)) []))))));
       code <-
-        O.exec directory (Cons (J.getText "path" "" helper) (Cons planPath (Cons resultFile Nil)))
+        O.exec directory ((:) (J.getText "path" "" helper) ((:) planPath ((:) resultFile [])))
           ""
           (directory ++ "/runner.stdout")
           (directory ++ "/runner.stderr")
@@ -507,7 +507,7 @@ module Package.Scheduler where {
                     report <- J.read (jobDirectory directory identity ++ "/build-report.json");
                     mergeReport b identity report
                   }
-             else ioReturn Unit
+             else ioReturn ()
            })
         jobs;
       failures <-
@@ -533,7 +533,7 @@ module Package.Scheduler where {
         (\row ->
            do {
              ignored <- artifactOf directory invocation (jobId row);
-             ioReturn Unit
+             ioReturn ()
            })
         jobs;
       S.mapM
@@ -545,8 +545,8 @@ module Package.Scheduler where {
              artifact <- artifactOf directory invocation ("assemble-" ++ requestKey selected);
              if J.getBool "publish" False selected
              then B.queuePublication b name artifact
-             else ioReturn Unit;
-             ioReturn (Pair (requestKey selected) artifact)
+             else ioReturn ();
+             ioReturn ((,) (requestKey selected) artifact)
            })
         requests
     }

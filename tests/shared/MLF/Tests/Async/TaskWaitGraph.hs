@@ -66,7 +66,7 @@ module MLF.Tests.Async.TaskWaitGraph where {
         _ -> exitWith 1
       }
     };
-  lateCleanup :: I.Task Unit;
+  lateCleanup :: I.Task ();
   lateCleanup =
     I.Task
       (\context complete ->
@@ -84,15 +84,15 @@ module MLF.Tests.Async.TaskWaitGraph where {
                                   (I.Failed
                                      (P.CleanupFailed (P.AsyncError 610 "primary")
                                         (P.AsyncError 611 "late cleanup"))));
-                             ioReturn Unit
+                             ioReturn ()
                            }))
-                     (\_ -> ioReturn Unit);
+                     (\_ -> ioReturn ());
                    asyncEnqueue queue (complete (I.Failed (P.AsyncError 610 "primary")));
-                   ioReturn Unit
+                   ioReturn ()
                  }
              }
          });
-  lateParentCleanup :: I.Task Unit;
+  lateParentCleanup :: I.Task ();
   lateParentCleanup =
     I.Task
       (\parent complete ->
@@ -115,9 +115,9 @@ module MLF.Tests.Async.TaskWaitGraph where {
                                                (I.Failed
                                                   (P.CleanupFailed (P.AsyncError 612 "child")
                                                      (P.AsyncError 613 "parent-stop cleanup"))));
-                                          ioReturn Unit
+                                          ioReturn ()
                                         }))
-                                  (\_ -> done (I.Succeeded Unit))
+                                  (\_ -> done (I.Succeeded ()))
                               }
                           })))
                  parent
@@ -127,11 +127,11 @@ module MLF.Tests.Async.TaskWaitGraph where {
                     asyncEnqueue queue
                       (do {
                          asyncResolveCompletion stop (I.CancelReason 614 "parent stop");
-                         ioReturn Unit
+                         ioReturn ()
                        });
-                    ioReturn Unit
+                    ioReturn ()
                   });
-               ioReturn Unit
+               ioReturn ()
              }
          });
   nestedCleanup =
@@ -140,7 +140,7 @@ module MLF.Tests.Async.TaskWaitGraph where {
       case result of {
         I.Succeeded (I.Failed (P.CleanupFailed primary cleanup)) ->
           if ((P.errorCode primary == 610) && (P.errorCode cleanup == 611))
-          then ioReturn Unit
+          then ioReturn ()
           else exitWith 1;
         _ -> exitWith 1
       };
@@ -148,13 +148,13 @@ module MLF.Tests.Async.TaskWaitGraph where {
       case stopped of {
         I.Failed (P.CleanupFailed primary cleanup) ->
           if ((P.errorCode primary == 122) && (P.errorCode cleanup == 613))
-          then ioReturn Unit
+          then ioReturn ()
           else exitWith 1;
         _ -> exitWith 1
       };
       putStrLn "PASS nested-late-cleanup-after-primary-and-parent-stop"
     };
-  probeAncestor :: IntArray -> I.Task Unit;
+  probeAncestor :: IntArray -> I.Task ();
   probeAncestor observed =
     I.Task
       (\context complete ->
@@ -170,9 +170,9 @@ module MLF.Tests.Async.TaskWaitGraph where {
                            if (code == 715) then 1 else 2;
                          _ -> 2
                        });
-                    complete (I.Succeeded Unit)
+                    complete (I.Succeeded ())
                   });
-               ioReturn Unit
+               ioReturn ()
              }
          });
   ancestorStop =
@@ -191,7 +191,7 @@ module MLF.Tests.Async.TaskWaitGraph where {
       value <- readIntArray observed 0;
       case outcome of {
         I.Succeeded (I.Cancelled (I.CancelReason code _)) ->
-          if ((value == 1) && (code == 715)) then ioReturn Unit else exitWith 1;
+          if ((value == 1) && (code == 715)) then ioReturn () else exitWith 1;
         _ -> exitWith 1
       };
       putStrLn "PASS synchronous-ancestor-stop-before-notification"
@@ -212,7 +212,7 @@ module MLF.Tests.Async.TaskWaitGraph where {
                             writeIntArray observed 0 1;
                             complete (I.Cancelled reason)
                           });
-                     ioReturn Unit
+                     ioReturn ()
                    }
                })
       };
@@ -226,7 +226,7 @@ module MLF.Tests.Async.TaskWaitGraph where {
       joined <- readIntArray observed 0;
       case outcome of {
         I.Cancelled (I.CancelReason code _) ->
-          if ((code == 716) && (joined == 1)) then ioReturn Unit else exitWith 1;
+          if ((code == 716) && (joined == 1)) then ioReturn () else exitWith 1;
         _ -> exitWith 1
       };
       putStrLn "PASS cancelled-root-signals-and-joins-sibling"
@@ -242,14 +242,14 @@ module MLF.Tests.Async.TaskWaitGraph where {
       case failed of {
         I.Failed (P.CleanupFailed primary cleanup) ->
           if ((P.errorCode primary == 600) && (P.errorCode cleanup == 5))
-          then ioReturn Unit
+          then ioReturn ()
           else exitWith 1;
         _ -> exitWith 1
       };
       case cancelled of {
         I.Failed (P.CleanupFailed primary cleanup) ->
           if ((P.errorCode primary == 122) && (P.errorCode cleanup == 6))
-          then ioReturn Unit
+          then ioReturn ()
           else exitWith 1;
         _ -> exitWith 1
       };

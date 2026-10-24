@@ -15,22 +15,33 @@ class GateControls(unittest.TestCase):
     def test_standard_boundary_is_explicit(self):
         self.assertIn('import Prelude hiding (Monad, return, bind)', gate.STANDARD)
         self.assertIn('import MLF.Primitive (Monad, return, bind)', gate.STANDARD)
-        self.assertNotIn('MLF.Primitive', gate.LEGACY)
-        self.assertEqual(gate.STANDARD.split('main :')[1], gate.LEGACY.split('main :')[1])
+        self.assertNotIn('MLF.Primitive', gate.IMPLICIT)
+        self.assertEqual(gate.STANDARD.split('main :')[1], gate.IMPLICIT.split('main :')[1])
+    def test_distinct_class_control_is_nominal(self):
+        self.assertIn('class Monad (m : * -> *)', gate.DISTINCT)
+        self.assertIn('instance Monad Box', gate.DISTINCT)
+        self.assertIn('main = do { x <- Box 1; Box x }', gate.DISTINCT)
+        self.assertIn('import Prelude hiding (Monad, return, bind)', gate.DISTINCT)
+    def test_extra_error_text_cannot_satisfy_negative(self):
+        for text in [gate.NEGATIVE_DIAGNOSTIC+'\nParsing: unrelated failure',
+                     'ModuleResolution: ambiguous name Monad',
+                     'Resolution: no instance or given constraint for Monad (Bootstrap.Types.Either String)']:
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                gate.verify_run(dict(complete=False,exit_code=1,reason=None),1,text)
     def test_success_receipt(self):
         gate.verify_run({'complete':True,'exit_code':0,'reason':None},0,'')
     def test_expected_rejection(self):
         gate.verify_run({'complete':False,'exit_code':1,'reason':None},1,
-                        'Resolution: no instance or given constraint for Monad (Bootstrap.Types.Either String)')
+                        gate.NEGATIVE_DIAGNOSTIC)
     def test_resource_failure_not_rejection(self):
         for receipt in [dict(complete=False,exit_code=1,reason='wall-time limit'),
                         dict(complete=False,exit_code=-9,reason=None),
                         dict(complete=True,exit_code=1,reason=None),
                         dict(complete=False,exit_code=0,reason=None)]:
             with self.subTest(receipt=receipt), self.assertRaises(ValueError):
-                gate.verify_run(receipt,1,'Resolution: no instance or given constraint for Monad (Bootstrap.Types.Either String)')
+                gate.verify_run(receipt,1,gate.NEGATIVE_DIAGNOSTIC)
     def test_wrong_phase_or_reason_rejected(self):
-        for message in ['Parsing: no instance or given constraint for Monad (Bootstrap.Types.Either String)',
+        for message in ['Parsing: no instance or given constraint for MLF.Primitive.Monad Distinct.Box',
                         'Resolution: source missing', '']:
             with self.subTest(message=message), self.assertRaises(ValueError):
                 gate.verify_run(dict(complete=False,exit_code=1,reason=None),1,message)

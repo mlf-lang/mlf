@@ -9,839 +9,843 @@ import qualified Test.Case as C
 -- Frozen label ownership from 8a3e69b165765931c3ff762379a78db9659b2cd8.
 -- IDs are explicit semantic constants, not indices, hashes or runtime slugs.
 -- Keep legacy bodies and labels untouched; this registry only names them.
-bindings : List (Pair String (List (Pair String String)))
+bindings : [] ((,) String ([] ((,) String String)))
 bindings =
- Cons (Pair "core/substring-adapter" (
-  Nil)) (
- Cons (Pair "core/optimizer-uses" (
-  Cons (Pair "optimizer free-use indices agree with independent scoped scans" "core/optimizer-uses/optimizer-free-use-indices-agree-with-independent-scoped-scans") (
-  Cons (Pair "indexed optimizer agrees with legacy traversal and fresh identities" "core/optimizer-uses/indexed-optimizer-agrees-with-legacy-traversal-and-fresh-identities") (
-  Nil)))) (
- Cons (Pair "core/crate-codegen" (
-  Cons (Pair "code generation query agrees with uncached checked emission" "core/crate-codegen/code-generation-query-agrees-with-uncached-checked-emission") (
-  Cons (Pair "erased query reuses alpha and annotation changes" "core/crate-codegen/erased-query-reuses-alpha-and-annotation-changes") (
-  Cons (Pair "optimized query reuses changed unused bodies" "core/crate-codegen/optimized-query-reuses-changed-unused-bodies") (
-  Cons (Pair "code generation cache separates IO and constructor ABIs" "core/crate-codegen/code-generation-cache-separates-io-and-constructor-abis") (
-  Cons (Pair "corrupt cached LLVM is rebuilt" "core/crate-codegen/corrupt-cached-llvm-is-rebuilt") (
-  Cons (Pair "prepared entries and stale crate dependencies retain visibility" "core/crate-codegen/prepared-entries-and-stale-crate-dependencies-retain-visibility") (
-  Nil)))))))) (
- Cons (Pair "core/declaration-queries" (
-  Cons (Pair "declaration SCC order and inventory permutation" "core/declaration-queries/declaration-scc-order-and-inventory-permutation") (
-  Cons (Pair "recursive SCC excludes unrelated declarations" "core/declaration-queries/recursive-scc-excludes-unrelated-declarations") (
-  Cons (Pair "indexed SCC traversal handles 2000 declarations" "core/declaration-queries/indexed-scc-traversal-handles-2000-declarations") (
-  Cons (Pair "term, type, class and constructor observations remain distinct" "core/declaration-queries/term-type-class-and-constructor-observations-remain-distinct") (
-  Cons (Pair "checked group inference preserves principal polymorphism" "core/declaration-queries/checked-group-inference-preserves-principal-polymorphism") (
-  Cons (Pair "closed-signature recursion remains checked across groups" "core/declaration-queries/closed-signature-recursion-remains-checked-across-groups") (
-  Cons (Pair "inference rejects an open imported environment" "core/declaration-queries/inference-rejects-an-open-imported-environment") (
-  Nil))))))))) (
- Cons (Pair "core/incremental-crate-cache" (
-  Cons (Pair "persistent no-op reuse and corrupt-cache recovery" "core/incremental-crate-cache/persistent-no-op-reuse-and-corrupt-cache-recovery") (
-  Cons (Pair "implementation edits preserve consumer caches and clean equivalence" "core/incremental-crate-cache/implementation-edits-preserve-consumer-caches-and-clean-equivalence") (
-  Cons (Pair "changed schemes invalidate actual consumers" "core/incremental-crate-cache/changed-schemes-invalidate-actual-consumers") (
-  Cons (Pair "datatype closure invalidates relevant changes only" "core/incremental-crate-cache/datatype-closure-invalidates-relevant-changes-only") (
-  Cons (Pair "instance candidate visibility participates in query keys" "core/incremental-crate-cache/instance-candidate-visibility-participates-in-query-keys") (
-  Cons (Pair "query encodings preserve semantics and normalize lexical names" "core/incremental-crate-cache/query-encodings-preserve-semantics-and-normalize-lexical-names") (
-  Cons (Pair "cache schemes are checked against stored implementations" "core/incremental-crate-cache/cache-schemes-are-checked-against-stored-implementations") (
-  Nil))))))))) (
- Cons (Pair "core/component-projection" (
-  Cons (Pair "component scopes agree with independent edge enumeration" "core/component-projection/component-scopes-agree-with-independent-edge-enumeration") (
-  Cons (Pair "projected nodes preserve explicit rank identities" "core/component-projection/projected-nodes-preserve-explicit-rank-identities") (
-  Cons (Pair "ordered restoration preserves checked inverse identities" "core/component-projection/ordered-restoration-preserves-checked-inverse-identities") (
-  Nil))))) (
- Cons (Pair "core/int-set-unions" (
-  Cons (Pair "size-biased set unions agree with independent sorted lists" "core/int-set-unions/size-biased-set-unions-agree-with-independent-sorted-lists") (
-  Nil))) (
- Cons (Pair "core/index-edges" (
-  Cons (Pair "incremental reverse indices agree with independent edge enumeration" "core/index-edges/incremental-reverse-indices-agree-with-independent-edge-enumeration") (
-  Cons (Pair "reverse-index edits agree with independent edge lists" "core/index-edges/reverse-index-edits-agree-with-independent-edge-lists") (
-  Nil)))) (
- Cons (Pair "core/projection-ranks" (
-  Cons (Pair "ordered component ranks agree with independent renaming maps" "core/projection-ranks/ordered-component-ranks-agree-with-independent-renaming-maps") (
-  Nil))) (
- Cons (Pair "core/projection-changes" (
-  Cons (Pair "linear projection patches agree with independent map differences" "core/projection-changes/linear-projection-patches-agree-with-independent-map-differences") (
-  Nil))) (
- Cons (Pair "core/strict-wrappers" (
-  Cons (Pair "strict unary representation requires whole-program evaluated fields" "core/strict-wrappers/strict-unary-representation-requires-whole-program-evaluated-fields") (
-  Nil))) (
- Cons (Pair "core/solver-index-audit" (
-  Cons (Pair "incremental index audit agrees with independent reconstruction" "core/solver-index-audit/incremental-index-audit-agrees-with-independent-reconstruction") (
-  Nil))) (
- Cons (Pair "core/dense-normalization" (
-  Cons (Pair "dense normalization agrees with an independent list oracle" "core/dense-normalization/dense-normalization-agrees-with-an-independent-list-oracle") (
-  Nil))) (
- Cons (Pair "core/checked-emission" (
-  Cons (Pair "checked emission agrees with raw independently checked emission" "core/checked-emission/checked-emission-agrees-with-raw-independently-checked-emission") (
-  Cons (Pair "external xMLF emission still rejects malformed terms" "core/checked-emission/external-xmlf-emission-still-rejects-malformed-terms") (
-  Cons (Pair "checked emission still enforces IO entry types" "core/checked-emission/checked-emission-still-enforces-io-entry-types") (
-  Cons (Pair "checked witness and compilation constructors are private" "core/checked-emission/checked-witness-and-compilation-constructors-are-private") (
-  Nil)))))) (
- Cons (Pair "core/solver-allocation" (
-  Cons (Pair "strict graph builder agrees with independent insertion" "core/solver-allocation/strict-graph-builder-agrees-with-independent-insertion") (
-  Cons (Pair "node forcing preserves arbitrary identities and lazy constructor fields" "core/solver-allocation/node-forcing-preserves-arbitrary-identities-and-lazy-constructor-fields") (
-  Cons (Pair "graph expansion preserves independent allocation and frontier identities" "core/solver-allocation/graph-expansion-preserves-independent-allocation-and-frontier-identities") (
-  Nil))))) (
- Cons (Pair "core/inference-and-annotations" (
-  Cons (Pair "identity" "core/inference-and-annotations/identity") (
-  Cons (Pair "constant 42" "core/inference-and-annotations/constant-42") (
-  Cons (Pair "boolean" "core/inference-and-annotations/boolean") (
-  Cons (Pair "identity self-application" "core/inference-and-annotations/identity-self-application") (
-  Cons (Pair "let polymorphism" "core/inference-and-annotations/let-polymorphism") (
-  Cons (Pair "lambda scope is not generalized" "core/inference-and-annotations/lambda-scope-is-not-generalized") (
-  Cons (Pair "lexical shadowing" "core/inference-and-annotations/lexical-shadowing") (
-  Cons (Pair "let RHS sees outer binding" "core/inference-and-annotations/let-rhs-sees-outer-binding") (
-  Cons (Pair "application under an unannotated lambda" "core/inference-and-annotations/application-under-an-unannotated-lambda") (
-  Cons (Pair "K preserves its polymorphic return bound" "core/inference-and-annotations/k-preserves-its-polymorphic-return-bound") (
-  Cons (Pair "g g" "core/inference-and-annotations/g-g") (
-  Cons (Pair "g g applied to identity" "core/inference-and-annotations/g-g-applied-to-identity") (
-  Cons (Pair "g g retains its identity lower bound" "core/inference-and-annotations/g-g-retains-its-identity-lower-bound") (
-  Cons (Pair "closed annotation" "core/inference-and-annotations/closed-annotation") (
-  Cons (Pair "let annotation" "core/inference-and-annotations/let-annotation") (
-  Cons (Pair "bounded annotation" "core/inference-and-annotations/bounded-annotation") (
-  Cons (Pair "annotated self-application" "core/inference-and-annotations/annotated-self-application") (
-  Cons (Pair "polymorphic parameter at distinct instances" "core/inference-and-annotations/polymorphic-parameter-at-distinct-instances") (
-  Cons (Pair "impredicative result" "core/inference-and-annotations/impredicative-result") (
-  Cons (Pair "partial annotation" "core/inference-and-annotations/partial-annotation") (
-  Cons (Pair "existential root" "core/inference-and-annotations/existential-root") (
-  Cons (Pair "existential annotation shares both sides" "core/inference-and-annotations/existential-annotation-shares-both-sides") (
-  Cons (Pair "alias bounds normalized before xMLF" "core/inference-and-annotations/alias-bounds-normalized-before-xmlf") (
-  Cons (Pair "inert bounds inlined" "core/inference-and-annotations/inert-bounds-inlined") (
-  Cons (Pair "unused bounds disappear" "core/inference-and-annotations/unused-bounds-disappear") (
-  Cons (Pair "forall a.a equivalent to its bound" "core/inference-and-annotations/forall-a-a-equivalent-to-its-bound") (
-  Cons (Pair "annotation alpha-renaming" "core/inference-and-annotations/annotation-alpha-renaming") (
-  Cons (Pair "parameterized type constructor" "core/inference-and-annotations/parameterized-type-constructor") (
-  Cons (Pair "rigid polymorphic bound" "core/inference-and-annotations/rigid-polymorphic-bound") (
-  Cons (Pair "multiple quantified variables" "core/inference-and-annotations/multiple-quantified-variables") (
-  Cons (Pair "shared type has independent lexical binders" "core/inference-and-annotations/shared-type-has-independent-lexical-binders") (
-  Cons (Pair "arbitrary-rank annotation" "core/inference-and-annotations/arbitrary-rank-annotation") (
-  Cons (Pair "unannotated self-application" "core/inference-and-annotations/unannotated-self-application") (
-  Cons (Pair "inconsistent monomorphic argument" "core/inference-and-annotations/inconsistent-monomorphic-argument") (
-  Cons (Pair "integer is not a function" "core/inference-and-annotations/integer-is-not-a-function") (
-  Cons (Pair "cannot satisfy universal identity with an integer result" "core/inference-and-annotations/cannot-satisfy-universal-identity-with-an-integer-result") (
-  Cons (Pair "distinct skolems cannot merge" "core/inference-and-annotations/distinct-skolems-cannot-merge") (
-  Cons (Pair "wrong closed annotation" "core/inference-and-annotations/wrong-closed-annotation") (
-  Cons (Pair "cannot invent a polymorphic value" "core/inference-and-annotations/cannot-invent-a-polymorphic-value") (
-  Cons (Pair "free source variable" "core/inference-and-annotations/free-source-variable") (
-  Cons (Pair "recursive let is not implicit" "core/inference-and-annotations/recursive-let-is-not-implicit") (
-  Cons (Pair "type annotation has a free variable" "core/inference-and-annotations/type-annotation-has-a-free-variable") (
-  Cons (Pair "constructor arity" "core/inference-and-annotations/constructor-arity") (
-  Cons (Pair "trailing input is rejected" "core/inference-and-annotations/trailing-input-is-rejected") (
-  Cons (Pair "parser handles nested comments" "core/inference-and-annotations/parser-handles-nested-comments") (
-  Cons (Pair "generated computations are necessary" "core/inference-and-annotations/generated-computations-are-necessary") (
-  Nil)))))))))))))))))))))))))))))))))))))))))))))))) (
- Cons (Pair "core/type-computations" (
-  Cons (Pair "Inst-Reflex" "core/type-computations/inst-reflex") (
-  Cons (Pair "Inst-Bot" "core/type-computations/inst-bot") (
-  Cons (Pair "Inst-Hyp" "core/type-computations/inst-hyp") (
-  Cons (Pair "Inst-Inner" "core/type-computations/inst-inner") (
-  Cons (Pair "Inst-Outer" "core/type-computations/inst-outer") (
-  Cons (Pair "Inst-Quant-Elim" "core/type-computations/inst-quant-elim") (
-  Cons (Pair "Inst-Quant-Intro" "core/type-computations/inst-quant-intro") (
-  Cons (Pair "Inst-Trans / System F application" "core/type-computations/inst-trans-system-f-application") (
-  Cons (Pair "outer alpha conversion" "core/type-computations/outer-alpha-conversion") (
-  Cons (Pair "Inst-Hyp checks its bound" "core/type-computations/inst-hyp-checks-its-bound") (
-  Cons (Pair "Inst-Hyp requires a binding" "core/type-computations/inst-hyp-requires-a-binding") (
-  Cons (Pair "Inst-Bot requires bottom source" "core/type-computations/inst-bot-requires-bottom-source") (
-  Cons (Pair "elimination requires a quantifier" "core/type-computations/elimination-requires-a-quantifier") (
-  Cons (Pair "inner does not cross arrows" "core/type-computations/inner-does-not-cross-arrows") (
-  Cons (Pair "introduction cannot capture" "core/type-computations/introduction-cannot-capture") (
-  Cons (Pair "outer cannot capture" "core/type-computations/outer-cannot-capture") (
-  Cons (Pair "cyclic environments rejected" "core/type-computations/cyclic-environments-rejected") (
-  Cons (Pair "malformed term environment rejected" "core/type-computations/malformed-term-environment-rejected") (
-  Nil)))))))))))))))))))) (
- Cons (Pair "core/binding-hygiene" (
-  Cons (Pair "capture-avoiding substitution" "core/binding-hygiene/capture-avoiding-substitution") (
-  Cons (Pair "quantifier does not scope over its own bound" "core/binding-hygiene/quantifier-does-not-scope-over-its-own-bound") (
-  Cons (Pair "alpha-equivalence tracks shadowing" "core/binding-hygiene/alpha-equivalence-tracks-shadowing") (
-  Cons (Pair "type quantifiers have lexical scope" "core/binding-hygiene/type-quantifiers-have-lexical-scope") (
-  Cons (Pair "xMLF does not identify inert or alias bounds" "core/binding-hygiene/xmlf-does-not-identify-inert-or-alias-bounds") (
-  Nil))))))) (
- Cons (Pair "core/graph-expansion" (
-  Cons (Pair "recursive exports preserve scoped identities and independent copies" "core/graph-expansion/recursive-exports-preserve-scoped-identities-and-independent-copies") (
-  Cons (Pair "expansion resets scheme flag and binding" "core/graph-expansion/expansion-resets-scheme-flag-and-binding") (
-  Cons (Pair "all inert nodes normalized" "core/graph-expansion/all-inert-nodes-normalized") (
-  Cons (Pair "well-domination enforced" "core/graph-expansion/well-domination-enforced") (
-  Nil)))))) (
- Cons (Pair "core/graph-validation" (
-  Cons (Pair "graph validation agrees with uncached reference" "core/graph-validation/graph-validation-agrees-with-uncached-reference") (
-  Cons (Pair "graph validation checks deeply nested binding scopes" "core/graph-validation/graph-validation-checks-deeply-nested-binding-scopes") (
-  Cons (Pair "graph validation checks shared higher-kinded subgraphs" "core/graph-validation/graph-validation-checks-shared-higher-kinded-subgraphs") (
-  Nil))))) (
- Cons (Pair "core/graph-unification" (
-  Cons (Pair "indexed unification and identity renaming agree with map-based reference" "core/graph-unification/indexed-unification-and-identity-renaming-agree-with-map-based-reference") (
-  Cons (Pair "indexed unification agrees on successive scoped expansions" "core/graph-unification/indexed-unification-agrees-on-successive-scoped-expansions") (
-  Cons (Pair "dependency traversal rejects structural cycles created by merging" "core/graph-unification/dependency-traversal-rejects-structural-cycles-created-by-merging") (
-  Nil))))) (
- Cons (Pair "core/graph-solver" (
-  Cons (Pair "component solver matches every full-graph inference step" "core/graph-solver/component-solver-matches-every-full-graph-inference-step") (
-  Cons (Pair "component witnesses preserve separate frontier solving and identities" "core/graph-solver/component-witnesses-preserve-separate-frontier-solving-and-identities") (
-  Cons (Pair "component solver includes incoming references and protected siblings" "core/graph-solver/component-solver-includes-incoming-references-and-protected-siblings") (
-  Cons (Pair "component solver rejects malformed disconnected input" "core/graph-solver/component-solver-rejects-malformed-disconnected-input") (
-  Cons (Pair "component solver preserves deep branching scopes and separate type components" "core/graph-solver/component-solver-preserves-deep-branching-scopes-and-separate-type-components") (
-  Cons (Pair "expansion preserves the exact fresh identity budget across word boundaries" "core/graph-solver/expansion-preserves-the-exact-fresh-identity-budget-across-word-boundaries") (
-  Cons (Pair "closed-instance optimization preserves all original schemes" "core/graph-solver/closed-instance-optimization-preserves-all-original-schemes") (
-  Cons (Pair "closed-instance matching checks repeated, rigid and frontier variables" "core/graph-solver/closed-instance-matching-checks-repeated-rigid-and-frontier-variables") (
-  Nil)))))))))) (
- Cons (Pair "core/embedding-pruning" (
-  Cons (Pair "embedding pruning preserves identities and values over allocation histories" "core/embedding-pruning/embedding-pruning-preserves-identities-and-values-over-allocation-histories") (
-  Cons (Pair "embedding pruning preserves old updates, aliases and allocation gaps" "core/embedding-pruning/embedding-pruning-preserves-old-updates-aliases-and-allocation-gaps") (
-  Cons (Pair "embedding pruning preserves source bound and existential semantics" "core/embedding-pruning/embedding-pruning-preserves-source-bound-and-existential-semantics") (
-  Nil))))) (
- Cons (Pair "core/datatypes" (
-  Cons (Pair "data: nullary constructor" "core/datatypes/data-nullary-constructor") (
-  Cons (Pair "data: polymorphic nullary constructor" "core/datatypes/data-polymorphic-nullary-constructor") (
-  Cons (Pair "data: constructor is a first-class function" "core/datatypes/data-constructor-is-a-first-class-function") (
-  Cons (Pair "data: constructor application" "core/datatypes/data-constructor-application") (
-  Cons (Pair "data: partial constructor application" "core/datatypes/data-partial-constructor-application") (
-  Cons (Pair "data: multiple parameters" "core/datatypes/data-multiple-parameters") (
-  Cons (Pair "data: let-bound constructor has independent instances" "core/datatypes/data-let-bound-constructor-has-independent-instances") (
-  Cons (Pair "data: phantom parameter" "core/datatypes/data-phantom-parameter") (
-  Cons (Pair "data: exhaustive case" "core/datatypes/data-exhaustive-case") (
-  Cons (Pair "data: nested patterns" "core/datatypes/data-nested-patterns") (
-  Cons (Pair "data: reordered alternatives" "core/datatypes/data-reordered-alternatives") (
-  Cons (Pair "data: case constrains scrutinee" "core/datatypes/data-case-constrains-scrutinee") (
-  Cons (Pair "data: case returns its polymorphic scrutinee" "core/datatypes/data-case-returns-its-polymorphic-scrutinee") (
-  Cons (Pair "data: case rebuilds polymorphic data" "core/datatypes/data-case-rebuilds-polymorphic-data") (
-  Cons (Pair "data: case generalizes an unconstrained result" "core/datatypes/data-case-generalizes-an-unconstrained-result") (
-  Cons (Pair "data: case retains an MLF result bound" "core/datatypes/data-case-retains-an-mlf-result-bound") (
-  Cons (Pair "data: generalized case function" "core/datatypes/data-generalized-case-function") (
-  Cons (Pair "data: pattern field order" "core/datatypes/data-pattern-field-order") (
-  Cons (Pair "data: wildcard field" "core/datatypes/data-wildcard-field") (
-  Cons (Pair "data: multiple wildcard fields" "core/datatypes/data-multiple-wildcard-fields") (
-  Cons (Pair "data: wildcard alternative" "core/datatypes/data-wildcard-alternative") (
-  Cons (Pair "data: variable alternative and nested case" "core/datatypes/data-variable-alternative-and-nested-case") (
-  Cons (Pair "data: wildcard-only case" "core/datatypes/data-wildcard-only-case") (
-  Cons (Pair "data: variable-only case" "core/datatypes/data-variable-only-case") (
-  Cons (Pair "data: pattern shadows outer variable" "core/datatypes/data-pattern-shadows-outer-variable") (
-  Cons (Pair "data: recursive list" "core/datatypes/data-recursive-list") (
-  Cons (Pair "data: recursive list deconstruction" "core/datatypes/data-recursive-list-deconstruction") (
-  Cons (Pair "data: recursive tree" "core/datatypes/data-recursive-tree") (
-  Cons (Pair "data: mutually recursive declarations" "core/datatypes/data-mutually-recursive-declarations") (
-  Cons (Pair "data: non-regular recursive declaration" "core/datatypes/data-non-regular-recursive-declaration") (
-  Cons (Pair "data: function field" "core/datatypes/data-function-field") (
-  Cons (Pair "data: polymorphic type argument" "core/datatypes/data-polymorphic-type-argument") (
-  Cons (Pair "data: polymorphic case result" "core/datatypes/data-polymorphic-case-result") (
-  Cons (Pair "data: polymorphic field used with an explicit annotation" "core/datatypes/data-polymorphic-field-used-with-an-explicit-annotation") (
-  Cons (Pair "data: declaration parameter is not a target keyword" "core/datatypes/data-declaration-parameter-is-not-a-target-keyword") (
-  Cons (Pair "data: explicitly polymorphic field" "core/datatypes/data-explicitly-polymorphic-field") (
-  Cons (Pair "data: unknown constructor" "core/datatypes/data-unknown-constructor") (
-  Cons (Pair "data: wrong field type" "core/datatypes/data-wrong-field-type") (
-  Cons (Pair "data: pattern fields are not implicitly generalized" "core/datatypes/data-pattern-fields-are-not-implicitly-generalized") (
-  Cons (Pair "data: overapplied nullary constructor" "core/datatypes/data-overapplied-nullary-constructor") (
-  Cons (Pair "data: wrong scrutinee type" "core/datatypes/data-wrong-scrutinee-type") (
-  Cons (Pair "data: inconsistent branch results" "core/datatypes/data-inconsistent-branch-results") (
-  Cons (Pair "data: non-exhaustive case" "core/datatypes/data-non-exhaustive-case") (
-  Cons (Pair "data: too few pattern fields" "core/datatypes/data-too-few-pattern-fields") (
-  Cons (Pair "data: too many pattern fields" "core/datatypes/data-too-many-pattern-fields") (
-  Cons (Pair "data: duplicate constructor alternative" "core/datatypes/data-duplicate-constructor-alternative") (
-  Cons (Pair "data: mixed datatype alternatives" "core/datatypes/data-mixed-datatype-alternatives") (
-  Cons (Pair "data: default must be last" "core/datatypes/data-default-must-be-last") (
-  Cons (Pair "data: duplicate pattern variable" "core/datatypes/data-duplicate-pattern-variable") (
-  Cons (Pair "data: pattern variables do not escape" "core/datatypes/data-pattern-variables-do-not-escape") (
-  Cons (Pair "data: pattern variable unavailable in sibling branch" "core/datatypes/data-pattern-variable-unavailable-in-sibling-branch") (
-  Cons (Pair "data: duplicate datatype" "core/datatypes/data-duplicate-datatype") (
-  Cons (Pair "data: duplicate constructor across datatypes" "core/datatypes/data-duplicate-constructor-across-datatypes") (
-  Cons (Pair "data: duplicate constructor within datatype" "core/datatypes/data-duplicate-constructor-within-datatype") (
-  Cons (Pair "data: duplicate type parameter" "core/datatypes/data-duplicate-type-parameter") (
-  Cons (Pair "data: free field type parameter" "core/datatypes/data-free-field-type-parameter") (
-  Cons (Pair "data: unknown field type" "core/datatypes/data-unknown-field-type") (
-  Cons (Pair "data: recursive type arity" "core/datatypes/data-recursive-type-arity") (
-  Cons (Pair "data: declared annotation arity" "core/datatypes/data-declared-annotation-arity") (
-  Cons (Pair "data: primitive type redefinition" "core/datatypes/data-primitive-type-redefinition") (
-  Cons (Pair "data: reserved datatype name" "core/datatypes/data-reserved-datatype-name") (
-  Cons (Pair "data: primitive constructor redefinition" "core/datatypes/data-primitive-constructor-redefinition") (
-  Cons (Pair "data: declaration and case parse tree" "core/datatypes/data-declaration-and-case-parse-tree") (
-  Cons (Pair "data: empty declaration rejected by AST API" "core/datatypes/data-empty-declaration-rejected-by-ast-api") (
-  Cons (Pair "data: constructor and case erasure" "core/datatypes/data-constructor-and-case-erasure") (
-  Cons (Pair "data target: independent constructor and case typing" "core/datatypes/data-target-independent-constructor-and-case-typing") (
-  Cons (Pair "data target: unknown constructor" "core/datatypes/data-target-unknown-constructor") (
-  Cons (Pair "data target: constructor type argument count" "core/datatypes/data-target-constructor-type-argument-count") (
-  Cons (Pair "data target: constructor type argument is well formed" "core/datatypes/data-target-constructor-type-argument-is-well-formed") (
-  Cons (Pair "data target: constructor field type" "core/datatypes/data-target-constructor-field-type") (
-  Cons (Pair "data target: non-exhaustive case" "core/datatypes/data-target-non-exhaustive-case") (
-  Cons (Pair "data target: empty case" "core/datatypes/data-target-empty-case") (
-  Cons (Pair "data target: case result type" "core/datatypes/data-target-case-result-type") (
-  Cons (Pair "data target: case scrutinee type" "core/datatypes/data-target-case-scrutinee-type") (
-  Cons (Pair "data target: pattern field count" "core/datatypes/data-target-pattern-field-count") (
-  Cons (Pair "data target: repeated alternative" "core/datatypes/data-target-repeated-alternative") (
-  Cons (Pair "data target: pattern binder freshness" "core/datatypes/data-target-pattern-binder-freshness") (
-  Cons (Pair "data target: pattern scope" "core/datatypes/data-target-pattern-scope") (
-  Cons (Pair "data target: declared arity in an annotation" "core/datatypes/data-target-declared-arity-in-an-annotation") (
-  Cons (Pair "data target: declared arity inside a type computation" "core/datatypes/data-target-declared-arity-inside-a-type-computation") (
-  Cons (Pair "data target: invalid declaration" "core/datatypes/data-target-invalid-declaration") (
-  Cons (Pair "data target: nested declaration scope" "core/datatypes/data-target-nested-declaration-scope") (
-  Cons (Pair "data syntax: declaration separator required" "core/datatypes/data-syntax-declaration-separator-required") (
-  Cons (Pair "data syntax: lowercase constructor" "core/datatypes/data-syntax-lowercase-constructor") (
-  Cons (Pair "data syntax: empty case" "core/datatypes/data-syntax-empty-case") (
-  Cons (Pair "data syntax: wildcard token boundary" "core/datatypes/data-syntax-wildcard-token-boundary") (
-  Nil)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
- Cons (Pair "core/typeclasses" (
-  Cons (Pair "class: concrete method" "core/typeclasses/class-concrete-method") (
-  Cons (Pair "class: inferred constrained let at distinct instances" "core/typeclasses/class-inferred-constrained-let-at-distinct-instances") (
-  Cons (Pair "class: implicit method quantification" "core/typeclasses/class-implicit-method-quantification") (
-  Cons (Pair "class: explicit qualified function" "core/typeclasses/class-explicit-qualified-function") (
-  Cons (Pair "class: qualified expression in function position" "core/typeclasses/class-qualified-expression-in-function-position") (
-  Cons (Pair "class: qualified function parameter" "core/typeclasses/class-qualified-function-parameter") (
-  Cons (Pair "class: two givens of the same class" "core/typeclasses/class-two-givens-of-the-same-class") (
-  Cons (Pair "class: concrete call inside a generic constraint" "core/typeclasses/class-concrete-call-inside-a-generic-constraint") (
-  Cons (Pair "class: lambda shadows method" "core/typeclasses/class-lambda-shadows-method") (
-  Cons (Pair "class: let shadows method" "core/typeclasses/class-let-shadows-method") (
-  Cons (Pair "class: pattern shadows method" "core/typeclasses/class-pattern-shadows-method") (
-  Cons (Pair "class: higher-kinded method" "core/typeclasses/class-higher-kinded-method") (
-  Cons (Pair "class: partial type constructor instance" "core/typeclasses/class-partial-type-constructor-instance") (
-  Cons (Pair "class: instance definitions are order independent" "core/typeclasses/class-instance-definitions-are-order-independent") (
-  Cons (Pair "class: superclass given without concrete instances" "core/typeclasses/class-superclass-given-without-concrete-instances") (
-  Cons (Pair "class: mutually recursive methods" "core/typeclasses/class-mutually-recursive-methods") (
-  Cons (Pair "class: higher-kinded datatype application" "core/typeclasses/class-higher-kinded-datatype-application") (
-  Cons (Pair "class: higher-kinded annotation" "core/typeclasses/class-higher-kinded-annotation") (
-  Cons (Pair "class: Monad hierarchy example" "core/typeclasses/class-monad-hierarchy-example") (
-  Cons (Pair "class: contextual recursive instance example" "core/typeclasses/class-contextual-recursive-instance-example") (
-  Cons (Pair "class: qualified result is displayed using its class name" "core/typeclasses/class-qualified-result-is-displayed-using-its-class-name") (
-  Cons (Pair "class rejection: missing concrete instance" "core/typeclasses/class-rejection-missing-concrete-instance") (
-  Cons (Pair "class rejection: does not pick the only instance for an unknown type" "core/typeclasses/class-rejection-does-not-pick-the-only-instance-for-an-unknown-type") (
-  Cons (Pair "class rejection: wrong instance body" "core/typeclasses/class-rejection-wrong-instance-body") (
-  Cons (Pair "class rejection: method body is checked polymorphically" "core/typeclasses/class-rejection-method-body-is-checked-polymorphically") (
-  Cons (Pair "class rejection: missing method" "core/typeclasses/class-rejection-missing-method") (
-  Cons (Pair "class rejection: extra method" "core/typeclasses/class-rejection-extra-method") (
-  Cons (Pair "class rejection: duplicate method implementation" "core/typeclasses/class-rejection-duplicate-method-implementation") (
-  Cons (Pair "class rejection: duplicate class" "core/typeclasses/class-rejection-duplicate-class") (
-  Cons (Pair "class rejection: methods share a global namespace" "core/typeclasses/class-rejection-methods-share-a-global-namespace") (
-  Cons (Pair "class rejection: method must mention its class parameter" "core/typeclasses/class-rejection-method-must-mention-its-class-parameter") (
-  Cons (Pair "class rejection: unknown class" "core/typeclasses/class-rejection-unknown-class") (
-  Cons (Pair "class rejection: duplicate instance" "core/typeclasses/class-rejection-duplicate-instance") (
-  Cons (Pair "class rejection: overlapping generic and concrete instances" "core/typeclasses/class-rejection-overlapping-generic-and-concrete-instances") (
-  Cons (Pair "class rejection: variable instance head" "core/typeclasses/class-rejection-variable-instance-head") (
-  Cons (Pair "class rejection: nondecreasing instance context" "core/typeclasses/class-rejection-nondecreasing-instance-context") (
-  Cons (Pair "class rejection: instance context variable absent from head" "core/typeclasses/class-rejection-instance-context-variable-absent-from-head") (
-  Cons (Pair "class rejection: cyclic superclasses" "core/typeclasses/class-rejection-cyclic-superclasses") (
-  Cons (Pair "class rejection: missing superclass instance" "core/typeclasses/class-rejection-missing-superclass-instance") (
-  Cons (Pair "class rejection: class instance kind" "core/typeclasses/class-rejection-class-instance-kind") (
-  Cons (Pair "class rejection: class context kind" "core/typeclasses/class-rejection-class-context-kind") (
-  Cons (Pair "class rejection: higher-kinded argument must have the declared kind" "core/typeclasses/class-rejection-higher-kinded-argument-must-have-the-declared-kind") (
-  Cons (Pair "class rejection: ordinary type variable cannot be applied" "core/typeclasses/class-rejection-ordinary-type-variable-cannot-be-applied") (
-  Cons (Pair "class rejection: method constraints require supported signatures" "core/typeclasses/class-rejection-method-constraints-require-supported-signatures") (
-  Cons (Pair "class target: recursive dictionary body has wrong declared type" "core/typeclasses/class-target-recursive-dictionary-body-has-wrong-declared-type") (
-  Cons (Pair "class target: recursive binders must be unique" "core/typeclasses/class-target-recursive-binders-must-be-unique") (
-  Cons (Pair "class target: recursive binding cannot reuse an outer binder" "core/typeclasses/class-target-recursive-binding-cannot-reuse-an-outer-binder") (
-  Cons (Pair "class target: term annotation has kind star" "core/typeclasses/class-target-term-annotation-has-kind-star") (
-  Cons (Pair "class target: constructor checks the kind of a type argument" "core/typeclasses/class-target-constructor-checks-the-kind-of-a-type-argument") (
-  Cons (Pair "class target: compact and general application spines agree" "core/typeclasses/class-target-compact-and-general-application-spines-agree") (
-  Cons (Pair "class target: Inst-Bot cannot change kinds" "core/typeclasses/class-target-inst-bot-cannot-change-kinds") (
-  Cons (Pair "class evidence: chooses the given by its type" "core/typeclasses/class-evidence-chooses-the-given-by-its-type") (
-  Cons (Pair "class: two parameters" "core/typeclasses/class-two-parameters") (
-  Cons (Pair "class: instances with the same first parameter are disjoint" "core/typeclasses/class-instances-with-the-same-first-parameter-are-disjoint") (
-  Cons (Pair "class: instances with the same second parameter are disjoint" "core/typeclasses/class-instances-with-the-same-second-parameter-are-disjoint") (
-  Cons (Pair "class: repeated variables are shared across instance arguments" "core/typeclasses/class-repeated-variables-are-shared-across-instance-arguments") (
-  Cons (Pair "class: class parameter substitution is simultaneous" "core/typeclasses/class-class-parameter-substitution-is-simultaneous") (
-  Cons (Pair "class: inferred multiparameter constraint" "core/typeclasses/class-inferred-multiparameter-constraint") (
-  Cons (Pair "class: explicit multiparameter constraint" "core/typeclasses/class-explicit-multiparameter-constraint") (
-  Cons (Pair "class: three parameters" "core/typeclasses/class-three-parameters") (
-  Cons (Pair "class: superclass can discard a parameter" "core/typeclasses/class-superclass-can-discard-a-parameter") (
-  Cons (Pair "class: superclass can reorder parameters" "core/typeclasses/class-superclass-can-reorder-parameters") (
-  Cons (Pair "class: same class givens with different second arguments" "core/typeclasses/class-same-class-givens-with-different-second-arguments") (
-  Cons (Pair "class: recursive multiparameter instance example" "core/typeclasses/class-recursive-multiparameter-instance-example") (
-  Cons (Pair "class: multi-parameter constraint display" "core/typeclasses/class-multi-parameter-constraint-display") (
-  Cons (Pair "class rejection: instance is missing a parameter" "core/typeclasses/class-rejection-instance-is-missing-a-parameter") (
-  Cons (Pair "class rejection: instance has an extra parameter" "core/typeclasses/class-rejection-instance-has-an-extra-parameter") (
-  Cons (Pair "class rejection: constraint is missing a parameter" "core/typeclasses/class-rejection-constraint-is-missing-a-parameter") (
-  Cons (Pair "class rejection: duplicate class parameter" "core/typeclasses/class-rejection-duplicate-class-parameter") (
-  Cons (Pair "class rejection: method omits a class parameter" "core/typeclasses/class-rejection-method-omits-a-class-parameter") (
-  Cons (Pair "class rejection: does not infer an output parameter from the only instance" "core/typeclasses/class-rejection-does-not-infer-an-output-parameter-from-the-only-instance") (
-  Cons (Pair "class rejection: matches every repeated parameter" "core/typeclasses/class-rejection-matches-every-repeated-parameter") (
-  Cons (Pair "class rejection: overlap needs joint unification across parameters" "core/typeclasses/class-rejection-overlap-needs-joint-unification-across-parameters") (
-  Cons (Pair "class rejection: overlapping variable and concrete argument" "core/typeclasses/class-rejection-overlapping-variable-and-concrete-argument") (
-  Cons (Pair "class rejection: context must decrease across the whole argument tuple" "core/typeclasses/class-rejection-context-must-decrease-across-the-whole-argument-tuple") (
-  Cons (Pair "class rejection: context cannot duplicate a variable" "core/typeclasses/class-rejection-context-cannot-duplicate-a-variable") (
-  Cons (Pair "class rejection: later parameter kind is checked" "core/typeclasses/class-rejection-later-parameter-kind-is-checked") (
-  Cons (Pair "class evidence: superclass projection preserves caller variable identities" "core/typeclasses/class-evidence-superclass-projection-preserves-caller-variable-identities") (
-  Nil)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
- Cons (Pair "core/do-notation" (
-  Cons (Pair "do: single expression" "core/do-notation/do-single-expression") (
-  Cons (Pair "do: local let needs no bind" "core/do-notation/do-local-let-needs-no-bind") (
-  Cons (Pair "do: binding" "core/do-notation/do-binding") (
-  Cons (Pair "do: sequencing" "core/do-notation/do-sequencing") (
-  Cons (Pair "do: wildcard binding" "core/do-notation/do-wildcard-binding") (
-  Cons (Pair "do: optional trailing semicolon" "core/do-notation/do-optional-trailing-semicolon") (
-  Cons (Pair "do: nested blocks" "core/do-notation/do-nested-blocks") (
-  Cons (Pair "do: bind statement sees the outer binding" "core/do-notation/do-bind-statement-sees-the-outer-binding") (
-  Cons (Pair "do: local let sees the outer binding" "core/do-notation/do-local-let-sees-the-outer-binding") (
-  Cons (Pair "do: local let is generalized" "core/do-notation/do-local-let-is-generalized") (
-  Cons (Pair "do: local let annotation" "core/do-notation/do-local-let-annotation") (
-  Cons (Pair "do: let-in expression is an action" "core/do-notation/do-let-in-expression-is-an-action") (
-  Cons (Pair "do: do expression used as an argument" "core/do-notation/do-do-expression-used-as-an-argument") (
-  Cons (Pair "do: do expression annotation" "core/do-notation/do-do-expression-annotation") (
-  Cons (Pair "do: constructor pattern" "core/do-notation/do-constructor-pattern") (
-  Cons (Pair "do: constructor wildcard field" "core/do-notation/do-constructor-wildcard-field") (
-  Cons (Pair "do: discarded action cannot capture an outer name" "core/do-notation/do-discarded-action-cannot-capture-an-outer-name") (
-  Cons (Pair "do: pattern temporary cannot capture an outer name" "core/do-notation/do-pattern-temporary-cannot-capture-an-outer-name") (
-  Cons (Pair "do: uses the lexical bind function" "core/do-notation/do-uses-the-lexical-bind-function") (
-  Cons (Pair "do rejection: empty block" "core/do-notation/do-rejection-empty-block") (
-  Cons (Pair "do rejection: final statement must be an expression" "core/do-notation/do-rejection-final-statement-must-be-an-expression") (
-  Cons (Pair "do rejection: cannot end with a local declaration" "core/do-notation/do-rejection-cannot-end-with-a-local-declaration") (
-  Cons (Pair "do rejection: statements need separators" "core/do-notation/do-rejection-statements-need-separators") (
-  Cons (Pair "do rejection: default IO bind requires an action" "core/do-notation/do-rejection-default-io-bind-requires-an-action") (
-  Cons (Pair "do rejection: bound variable cannot escape" "core/do-notation/do-rejection-bound-variable-cannot-escape") (
-  Cons (Pair "do rejection: binding is not recursive" "core/do-notation/do-rejection-binding-is-not-recursive") (
-  Cons (Pair "do rejection: later binding is unavailable" "core/do-notation/do-rejection-later-binding-is-unavailable") (
-  Cons (Pair "do rejection: action type mismatch" "core/do-notation/do-rejection-action-type-mismatch") (
-  Cons (Pair "do rejection: final action has the right monadic type" "core/do-notation/do-rejection-final-action-has-the-right-monadic-type") (
-  Cons (Pair "do rejection: refutable pattern requires an explicit case" "core/do-notation/do-rejection-refutable-pattern-requires-an-explicit-case") (
-  Cons (Pair "do rejection: pattern binder duplicates" "core/do-notation/do-rejection-pattern-binder-duplicates") (
-  Cons (Pair "do: parser preserves statement forms" "core/do-notation/do-parser-preserves-statement-forms") (
-  Cons (Pair "do: lowering preserves binding order and the final action" "core/do-notation/do-lowering-preserves-binding-order-and-the-final-action") (
-  Cons (Pair "do: multiparameter MonadState example" "core/do-notation/do-multiparameter-monadstate-example") (
-  Nil)))))))))))))))))))))))))))))))))))) (
- Cons (Pair "core/surface-syntax" (
-  Cons (Pair "surface parser: multiplication binds above addition" "core/surface-syntax/surface-parser-multiplication-binds-above-addition") (
-  Cons (Pair "surface parser: application binds above arithmetic" "core/surface-syntax/surface-parser-application-binds-above-arithmetic") (
-  Cons (Pair "surface parser: subtraction associates left" "core/surface-syntax/surface-parser-subtraction-associates-left") (
-  Cons (Pair "surface parser: quotient and remainder associate left" "core/surface-syntax/surface-parser-quotient-and-remainder-associate-left") (
-  Cons (Pair "surface parser: parentheses override precedence" "core/surface-syntax/surface-parser-parentheses-override-precedence") (
-  Cons (Pair "surface parser: Boolean precedence" "core/surface-syntax/surface-parser-boolean-precedence") (
-  Cons (Pair "surface parser: concatenation associates right" "core/surface-syntax/surface-parser-concatenation-associates-right") (
-  Cons (Pair "surface parser: subtraction without spaces is not signed application" "core/surface-syntax/surface-parser-subtraction-without-spaces-is-not-signed-application") (
-  Cons (Pair "surface parser: negative argument is parenthesized" "core/surface-syntax/surface-parser-negative-argument-is-parenthesized") (
-  Cons (Pair "surface parser: unary minus applies after function application" "core/surface-syntax/surface-parser-unary-minus-applies-after-function-application") (
-  Cons (Pair "surface parser: signed Double exponent" "core/surface-syntax/surface-parser-signed-double-exponent") (
-  Cons (Pair "surface parser: signed hexadecimal integer" "core/surface-syntax/surface-parser-signed-hexadecimal-integer") (
-  Cons (Pair "surface parser: plus sign and negative right operand" "core/surface-syntax/surface-parser-plus-sign-and-negative-right-operand") (
-  Cons (Pair "surface parser: comments at operators" "core/surface-syntax/surface-parser-comments-at-operators") (
-  Cons (Pair "surface parser: nearest else" "core/surface-syntax/surface-parser-nearest-else") (
-  Cons (Pair "surface parser: arithmetic inside branches" "core/surface-syntax/surface-parser-arithmetic-inside-branches") (
-  Cons (Pair "surface parser: control expression as right operand" "core/surface-syntax/surface-parser-control-expression-as-right-operand") (
-  Cons (Pair "surface parser: annotation covers the infix expression" "core/surface-syntax/surface-parser-annotation-covers-the-infix-expression") (
-  Cons (Pair "surface parser: local parameters lower to lambdas" "core/surface-syntax/surface-parser-local-parameters-lower-to-lambdas") (
-  Cons (Pair "surface program: declarations have ordered let scopes" "core/surface-syntax/surface-program-declarations-have-ordered-let-scopes") (
-  Cons (Pair "surface program: implicit main with trailing semicolon" "core/surface-syntax/surface-program-implicit-main-with-trailing-semicolon") (
-  Cons (Pair "surface program: implicit main without trailing semicolon" "core/surface-syntax/surface-program-implicit-main-without-trailing-semicolon") (
-  Cons (Pair "surface program: explicit entry overrides main" "core/surface-syntax/surface-program-explicit-entry-overrides-main") (
-  Cons (Pair "surface program: separate signature covers the whole function" "core/surface-syntax/surface-program-separate-signature-covers-the-whole-function") (
-  Cons (Pair "surface checking: declarations generalize" "core/surface-syntax/surface-checking-declarations-generalize") (
-  Cons (Pair "surface checking: annotated function parameter" "core/surface-syntax/surface-checking-annotated-function-parameter") (
-  Cons (Pair "surface checking: inline whole-function signature" "core/surface-syntax/surface-checking-inline-whole-function-signature") (
-  Cons (Pair "surface checking: annotated local function" "core/surface-syntax/surface-checking-annotated-local-function") (
-  Cons (Pair "surface checking: do-local function generalizes" "core/surface-syntax/surface-checking-do-local-function-generalizes") (
-  Cons (Pair "surface checking: do-local function sees outer binding" "core/surface-syntax/surface-checking-do-local-function-sees-outer-binding") (
-  Cons (Pair "surface checking: conditional returns polymorphic function" "core/surface-syntax/surface-checking-conditional-returns-polymorphic-function") (
-  Cons (Pair "surface checking: conditional works in a case scrutinee" "core/surface-syntax/surface-checking-conditional-works-in-a-case-scrutinee") (
-  Cons (Pair "surface checking: keyword prefixes remain identifiers" "core/surface-syntax/surface-checking-keyword-prefixes-remain-identifiers") (
-  Cons (Pair "surface checking: instance method parameters" "core/surface-syntax/surface-checking-instance-method-parameters") (
-  Cons (Pair "surface checking: qualified function declaration" "core/surface-syntax/surface-checking-qualified-function-declaration") (
-  Cons (Pair "surface checking: syntax needs no implicit prelude" "core/surface-syntax/surface-checking-syntax-needs-no-implicit-prelude") (
-  Cons (Pair "surface rejection: recursion needs a signature" "core/surface-syntax/surface-rejection-recursion-needs-a-signature") (
-  Cons (Pair "surface checking: forward value references" "core/surface-syntax/surface-checking-forward-value-references") (
-  Cons (Pair "surface rejection: branch types must agree" "core/surface-syntax/surface-rejection-branch-types-must-agree") (
-  Cons (Pair "surface rejection: condition must be Bool" "core/surface-syntax/surface-rejection-condition-must-be-bool") (
-  Cons (Pair "surface rejection: arithmetic does not overload Double" "core/surface-syntax/surface-rejection-arithmetic-does-not-overload-double") (
-  Cons (Pair "surface rejection: unary plus requires a number" "core/surface-syntax/surface-rejection-unary-plus-requires-a-number") (
-  Cons (Pair "surface rejection: unary minus requires a number" "core/surface-syntax/surface-rejection-unary-minus-requires-a-number") (
-  Cons (Pair "surface rejection: comparisons do not overload String" "core/surface-syntax/surface-rejection-comparisons-do-not-overload-string") (
-  Cons (Pair "surface rejection: whole function signature is checked" "core/surface-syntax/surface-rejection-whole-function-signature-is-checked") (
-  Cons (Pair "surface rejection: chained comparisons" "core/surface-syntax/surface-rejection-chained-comparisons") (
-  Cons (Pair "surface rejection: mixed chained comparisons" "core/surface-syntax/surface-rejection-mixed-chained-comparisons") (
-  Cons (Pair "surface rejection: missing else" "core/surface-syntax/surface-rejection-missing-else") (
-  Cons (Pair "surface rejection: missing then" "core/surface-syntax/surface-rejection-missing-then") (
-  Cons (Pair "surface checking: layout declaration separator" "core/surface-syntax/surface-checking-layout-declaration-separator") (
-  Cons (Pair "surface rejection: declaration-only file needs main" "core/surface-syntax/surface-rejection-declaration-only-file-needs-main") (
-  Cons (Pair "surface rejection: unreachable equation" "core/surface-syntax/surface-rejection-unreachable-equation") (
-  Cons (Pair "surface rejection: duplicate function parameters" "core/surface-syntax/surface-rejection-duplicate-function-parameters") (
-  Cons (Pair "surface rejection: signature must name its next definition" "core/surface-syntax/surface-rejection-signature-must-name-its-next-definition") (
-  Cons (Pair "surface rejection: duplicate signatures" "core/surface-syntax/surface-rejection-duplicate-signatures") (
-  Cons (Pair "surface rejection: signature without equation" "core/surface-syntax/surface-rejection-signature-without-equation") (
-  Cons (Pair "surface rejection: reserved conditional word" "core/surface-syntax/surface-rejection-reserved-conditional-word") (
-  Cons (Pair "surface rejection: reserved word in datatype parameter" "core/surface-syntax/surface-rejection-reserved-word-in-datatype-parameter") (
-  Nil)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
- Cons (Pair "core/readability" (
-  Cons (Pair "layout: top-level data, signatures and equations" "core/readability/layout-top-level-data-signatures-and-equations") (
-  Cons (Pair "layout: nested do with a trailing semicolon" "core/readability/layout-nested-do-with-a-trailing-semicolon") (
-  Cons (Pair "layout: nested case and do" "core/readability/layout-nested-case-and-do") (
-  Cons (Pair "layout: parenthesized implicit block" "core/readability/layout-parenthesized-implicit-block") (
-  Cons (Pair "layout: implicit block in explicit block" "core/readability/layout-implicit-block-in-explicit-block") (
-  Cons (Pair "layout: same-line else closes do" "core/readability/layout-same-line-else-closes-do") (
-  Cons (Pair "layout: local declaration layout" "core/readability/layout-local-declaration-layout") (
-  Cons (Pair "layout: do local group followed by another statement" "core/readability/layout-do-local-group-followed-by-another-statement") (
-  Cons (Pair "layout: nested explicit let matches its own in" "core/readability/layout-nested-explicit-let-matches-its-own-in") (
-  Cons (Pair "layout: class and instance layout" "core/readability/layout-class-and-instance-layout") (
-  Cons (Pair "layout: explicit braces after a keyword on another line" "core/readability/layout-explicit-braces-after-a-keyword-on-another-line") (
-  Cons (Pair "layout: keywords in comments and strings" "core/readability/layout-keywords-in-comments-and-strings") (
-  Cons (Pair "layout: tabs have tab-stop indentation" "core/readability/layout-tabs-have-tab-stop-indentation") (
-  Cons (Pair "layout: indented file" "core/readability/layout-indented-file") (
-  Cons (Pair "layout: leading comment does not set the top-level column" "core/readability/layout-leading-comment-does-not-set-the-top-level-column") (
-  Cons (Pair "layout: string gap ending before the closing quote" "core/readability/layout-string-gap-ending-before-the-closing-quote") (
-  Cons (Pair "layout: explicit top-level braces" "core/readability/layout-explicit-top-level-braces") (
-  Cons (Pair "layout: parseExpr accepts an implicit do" "core/readability/layout-parseexpr-accepts-an-implicit-do") (
-  Cons (Pair "layout: diagnostics keep original line and column" "core/readability/layout-diagnostics-keep-original-line-and-column") (
-  Cons (Pair "recursion: declared polymorphism is independently checked" "core/readability/recursion-declared-polymorphism-is-independently-checked") (
-  Cons (Pair "recursion: monomorphic closure captures an outer value" "core/readability/recursion-monomorphic-closure-captures-an-outer-value") (
-  Cons (Pair "recursion: explicit quantifiers preserve their declared order" "core/readability/recursion-explicit-quantifiers-preserve-their-declared-order") (
-  Cons (Pair "recursion: unused explicit quantified variables are discharged" "core/readability/recursion-unused-explicit-quantified-variables-are-discharged") (
-  Cons (Pair "equations: parameter can shadow the function name" "core/readability/equations-parameter-can-shadow-the-function-name") (
-  Cons (Pair "readability rejection: recursive forall cannot specialize to Int" "core/readability/readability-rejection-recursive-forall-cannot-specialize-to-int") (
-  Cons (Pair "recursion: mixed signed and inferred group" "core/readability/recursion-mixed-signed-and-inferred-group") (
-  Cons (Pair "recursion: unsigned local group" "core/readability/recursion-unsigned-local-group") (
-  Cons (Pair "readability rejection: recursive existentials are not closed signatures" "core/readability/readability-rejection-recursive-existentials-are-not-closed-signatures") (
-  Cons (Pair "readability rejection: recursive signature free variable" "core/readability/readability-rejection-recursive-signature-free-variable") (
-  Cons (Pair "readability rejection: equation arity" "core/readability/readability-rejection-equation-arity") (
-  Cons (Pair "readability rejection: equations must be contiguous" "core/readability/readability-rejection-equations-must-be-contiguous") (
-  Cons (Pair "readability rejection: missing constructor equation" "core/readability/readability-rejection-missing-constructor-equation") (
-  Cons (Pair "readability rejection: missing nested constructor" "core/readability/readability-rejection-missing-nested-constructor") (
-  Cons (Pair "readability rejection: integer equations need fallback" "core/readability/readability-rejection-integer-equations-need-fallback") (
-  Cons (Pair "readability rejection: Boolean coverage" "core/readability/readability-rejection-boolean-coverage") (
-  Cons (Pair "readability rejection: mixed literal types" "core/readability/readability-rejection-mixed-literal-types") (
-  Cons (Pair "readability rejection: nested case duplicate binder" "core/readability/readability-rejection-nested-case-duplicate-binder") (
-  Cons (Pair "readability rejection: constructor arity in function pattern" "core/readability/readability-rejection-constructor-arity-in-function-pattern") (
-  Cons (Pair "readability rejection: pattern variable cannot escape an equation" "core/readability/readability-rejection-pattern-variable-cannot-escape-an-equation") (
-  Cons (Pair "readability rejection: empty implicit do" "core/readability/readability-rejection-empty-implicit-do") (
-  Cons (Pair "readability rejection: dedent closes do before application" "core/readability/readability-rejection-dedent-closes-do-before-application") (
-  Cons (Pair "readability checking: readability: factorial equations" "core/readability/readability-checking-readability-factorial-equations") (
-  Cons (Pair "readability checking: readability: recursive forall order" "core/readability/readability-checking-readability-recursive-forall-order") (
-  Cons (Pair "readability checking: readability: unused recursive forall" "core/readability/readability-checking-readability-unused-recursive-forall") (
-  Cons (Pair "readability checking: readability: mutual recursion" "core/readability/readability-checking-readability-mutual-recursion") (
-  Cons (Pair "readability checking: readability: recursive IO and do-local recursion" "core/readability/readability-checking-readability-recursive-io-and-do-local-recursion") (
-  Cons (Pair "readability checking: readability: qualified recursive function" "core/readability/readability-checking-readability-qualified-recursive-function") (
-  Cons (Pair "readability checking: readability: polymorphic recursion" "core/readability/readability-checking-readability-polymorphic-recursion") (
-  Cons (Pair "readability checking: readability: cyclic lazy value" "core/readability/readability-checking-readability-cyclic-lazy-value") (
-  Cons (Pair "readability checking: readability: nested patterns and fallback" "core/readability/readability-checking-readability-nested-patterns-and-fallback") (
-  Cons (Pair "readability checking: readability: constructor equation order keeps wildcard lazy" "core/readability/readability-checking-readability-constructor-equation-order-keeps-wildcard-lazy") (
-  Cons (Pair "readability checking: readability: nested lambda and do patterns" "core/readability/readability-checking-readability-nested-lambda-and-do-patterns") (
-  Cons (Pair "readability checking: readability: pattern annotation imports the prelude" "core/readability/readability-checking-readability-pattern-annotation-imports-the-prelude") (
-  Cons (Pair "readability checking: readability: pattern temporary hygiene" "core/readability/readability-checking-readability-pattern-temporary-hygiene") (
-  Cons (Pair "readability checking: readability: literal patterns" "core/readability/readability-checking-readability-literal-patterns") (
-  Cons (Pair "readability checking: readability: literal case order and wildcard laziness" "core/readability/readability-checking-readability-literal-case-order-and-wildcard-laziness") (
-  Cons (Pair "readability checking: readability: instance equations" "core/readability/readability-checking-readability-instance-equations") (
-  Cons (Pair "readability checking: readability: nested conditional IO layout" "core/readability/readability-checking-readability-nested-conditional-io-layout") (
-  Cons (Pair "readability checking: readability: local equation group" "core/readability/readability-checking-readability-local-equation-group") (
-  Nil))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
- Cons (Pair "core/modules" (
-  Cons (Pair "modules checking: selective and qualified imports" "core/modules/modules-checking-selective-and-qualified-imports") (
-  Cons (Pair "modules checking: unnamed entry expression imports" "core/modules/modules-checking-unnamed-entry-expression-imports") (
-  Cons (Pair "modules checking: qualified types, fields and nested patterns" "core/modules/modules-checking-qualified-types-fields-and-nested-patterns") (
-  Cons (Pair "modules checking: private names and constructor identities" "core/modules/modules-checking-private-names-and-constructor-identities") (
-  Cons (Pair "modules checking: diamond reexports preserve identity" "core/modules/modules-checking-diamond-reexports-preserve-identity") (
-  Cons (Pair "modules checking: transitive empty imports carry instances and private helpers" "core/modules/modules-checking-transitive-empty-imports-carry-instances-and-private-helpers") (
-  Cons (Pair "modules checking: qualified class, hidden methods in instance declaration" "core/modules/modules-checking-qualified-class-hidden-methods-in-instance-declaration") (
-  Cons (Pair "modules checking: abstract datatype used by exported functions" "core/modules/modules-checking-abstract-datatype-used-by-exported-functions") (
-  Cons (Pair "modules checking: local shadowing and self qualification" "core/modules/modules-checking-local-shadowing-and-self-qualification") (
-  Cons (Pair "modules checking: explicit qualified Prelude" "core/modules/modules-checking-explicit-qualified-prelude") (
-  Cons (Pair "modules checking: explicit Prelude with implicit import disabled" "core/modules/modules-checking-explicit-prelude-with-implicit-import-disabled") (
-  Cons (Pair "modules checking: hiding Prelude method for local definition" "core/modules/modules-checking-hiding-prelude-method-for-local-definition") (
-  Cons (Pair "modules checking: module lexical scope protects imported do" "core/modules/modules-checking-module-lexical-scope-protects-imported-do") (
-  Cons (Pair "modules checking: polymorphic Monad function across modules" "core/modules/modules-checking-polymorphic-monad-function-across-modules") (
-  Cons (Pair "modules checking: qualified Boolean constructor patterns" "core/modules/modules-checking-qualified-boolean-constructor-patterns") (
-  Cons (Pair "modules checking: internal name hygiene" "core/modules/modules-checking-internal-name-hygiene") (
-  Cons (Pair "modules checking: same method name from distinct classes" "core/modules/modules-checking-same-method-name-from-distinct-classes") (
-  Cons (Pair "modules checking: instance may recursively use an exported helper" "core/modules/modules-checking-instance-may-recursively-use-an-exported-helper") (
-  Cons (Pair "modules checking: bare primitive fallback without implicit Prelude" "core/modules/modules-checking-bare-primitive-fallback-without-implicit-prelude") (
-  Cons (Pair "modules checking: entry selects its own main" "core/modules/modules-checking-entry-selects-its-own-main") (
-  Cons (Pair "modules checking: primitive fallback permits local definitions" "core/modules/modules-checking-primitive-fallback-permits-local-definitions") (
-  Cons (Pair "modules checking: cyclic imports preserve independent polymorphic values" "core/modules/modules-checking-cyclic-imports-preserve-independent-polymorphic-values") (
-  Cons (Pair "modules checking: cross-module recursive declaration SCC" "core/modules/modules-checking-cross-module-recursive-declaration-scc") (
-  Cons (Pair "modules checking: cross-module recursive nominal types" "core/modules/modules-checking-cross-module-recursive-nominal-types") (
-  Cons (Pair "modules checking: cyclic reexports retain the originating identity" "core/modules/modules-checking-cyclic-reexports-retain-the-originating-identity") (
-  Cons (Pair "modules checking: cyclic type reexports preserve selective member hiding" "core/modules/modules-checking-cyclic-type-reexports-preserve-selective-member-hiding") (
-  Cons (Pair "modules checking: cyclic empty imports carry defining-module instances" "core/modules/modules-checking-cyclic-empty-imports-carry-defining-module-instances") (
-  Cons (Pair "modules checking: self import is a namespace edge" "core/modules/modules-checking-self-import-is-a-namespace-edge") (
-  Cons (Pair "modules rejection: private function" "core/modules/modules-rejection-private-function") (
-  Cons (Pair "modules rejection: qualified private function" "core/modules/modules-rejection-qualified-private-function") (
-  Cons (Pair "modules rejection: selected imports exclude others" "core/modules/modules-rejection-selected-imports-exclude-others") (
-  Cons (Pair "modules rejection: qualified-only is not unqualified" "core/modules/modules-rejection-qualified-only-is-not-unqualified") (
-  Cons (Pair "modules rejection: alias replaces qualified module name" "core/modules/modules-rejection-alias-replaces-qualified-module-name") (
-  Cons (Pair "modules rejection: hiding also affects qualification" "core/modules/modules-rejection-hiding-also-affects-qualification") (
-  Cons (Pair "modules rejection: unknown import selection" "core/modules/modules-rejection-unknown-import-selection") (
-  Cons (Pair "modules rejection: unknown hidden name" "core/modules/modules-rejection-unknown-hidden-name") (
-  Cons (Pair "modules rejection: private constructor" "core/modules/modules-rejection-private-constructor") (
-  Cons (Pair "modules rejection: type-only selective import" "core/modules/modules-rejection-type-only-selective-import") (
-  Cons (Pair "modules rejection: member belongs to selected type" "core/modules/modules-rejection-member-belongs-to-selected-type") (
-  Cons (Pair "modules rejection: private type annotation" "core/modules/modules-rejection-private-type-annotation") (
-  Cons (Pair "modules rejection: hidden members cannot be reexported" "core/modules/modules-rejection-hidden-members-cannot-be-reexported") (
-  Cons (Pair "modules rejection: default exports exclude imports" "core/modules/modules-rejection-default-exports-exclude-imports") (
-  Cons (Pair "modules rejection: transitive names are not imported" "core/modules/modules-rejection-transitive-names-are-not-imported") (
-  Cons (Pair "modules rejection: distinct imports are ambiguous" "core/modules/modules-rejection-distinct-imports-are-ambiguous") (
-  Cons (Pair "modules rejection: top-level import collision requires hiding" "core/modules/modules-rejection-top-level-import-collision-requires-hiding") (
-  Cons (Pair "modules rejection: explicit reexport conflict" "core/modules/modules-rejection-explicit-reexport-conflict") (
-  Cons (Pair "modules rejection: unknown module reexport" "core/modules/modules-rejection-unknown-module-reexport") (
-  Cons (Pair "modules rejection: qualified-only module reexport has no unqualified names" "core/modules/modules-rejection-qualified-only-module-reexport-has-no-unqualified-names") (
-  Cons (Pair "modules rejection: empty exports" "core/modules/modules-rejection-empty-exports") (
-  Cons (Pair "modules rejection: missing module" "core/modules/modules-rejection-missing-module") (
-  Cons (Pair "modules rejection: mismatched module header" "core/modules/modules-rejection-mismatched-module-header") (
-  Cons (Pair "modules rejection: unnamed library" "core/modules/modules-rejection-unnamed-library") (
-  Cons (Pair "modules rejection: cyclic import still checks invalid declarations" "core/modules/modules-rejection-cyclic-import-still-checks-invalid-declarations") (
-  Cons (Pair "modules rejection: self import still checks invalid declarations" "core/modules/modules-rejection-self-import-still-checks-invalid-declarations") (
-  Cons (Pair "modules rejection: module header followed by bare expression" "core/modules/modules-rejection-module-header-followed-by-bare-expression") (
-  Cons (Pair "modules rejection: imports must precede definitions" "core/modules/modules-rejection-imports-must-precede-definitions") (
-  Cons (Pair "modules rejection: definitions cannot be qualified" "core/modules/modules-rejection-definitions-cannot-be-qualified") (
-  Cons (Pair "modules rejection: explicit empty Prelude removes value names" "core/modules/modules-rejection-explicit-empty-prelude-removes-value-names") (
-  Cons (Pair "modules rejection: qualified Prelude suppresses implicit Prelude" "core/modules/modules-rejection-qualified-prelude-suppresses-implicit-prelude") (
-  Cons (Pair "modules rejection: Prelude cannot be redefined" "core/modules/modules-rejection-prelude-cannot-be-redefined") (
-  Cons (Pair "modules rejection: primitive constructor cannot be redefined" "core/modules/modules-rejection-primitive-constructor-cannot-be-redefined") (
-  Cons (Pair "modules rejection: primitive type cannot be redefined" "core/modules/modules-rejection-primitive-type-cannot-be-redefined") (
-  Cons (Pair "modules rejection: unused private definitions still checked" "core/modules/modules-rejection-unused-private-definitions-still-checked") (
-  Cons (Pair "modules rejection: export list cannot name missing value" "core/modules/modules-rejection-export-list-cannot-name-missing-value") (
-  Cons (Pair "modules rejection: recursive signature error names the source function" "core/modules/modules-rejection-recursive-signature-error-names-the-source-function") (
-  Cons (Pair "modules rejection: instance not visible in imported signed definition" "core/modules/modules-rejection-instance-not-visible-in-imported-signed-definition") (
-  Cons (Pair "modules rejection: instance not visible in another instance" "core/modules/modules-rejection-instance-not-visible-in-another-instance") (
-  Cons (Pair "modules rejection: cyclic private constructor remains hidden" "core/modules/modules-rejection-cyclic-private-constructor-remains-hidden") (
-  Cons (Pair "modules rejection: cyclic reexports cannot invent a missing identity" "core/modules/modules-rejection-cyclic-reexports-cannot-invent-a-missing-identity") (
-  Cons (Pair "modules rejection: downstream orphan cannot leak into an import cycle" "core/modules/modules-rejection-downstream-orphan-cannot-leak-into-an-import-cycle") (
-  Cons (Pair "modules: original source type names" "core/modules/modules-original-source-type-names") (
-  Cons (Pair "modules: unit syntax is intrinsic" "core/modules/modules-unit-syntax-is-intrinsic") (
-  Cons (Pair "modules: empty libraries and multiline headers" "core/modules/modules-empty-libraries-and-multiline-headers") (
-  Cons (Pair "modules: explicit braces and layout parse identically" "core/modules/modules-explicit-braces-and-layout-parse-identically") (
-  Cons (Pair "modules: libraries can be parsed without main" "core/modules/modules-libraries-can-be-parsed-without-main") (
-  Cons (Pair "modules: unused imports do not cause value ambiguity" "core/modules/modules-unused-imports-do-not-cause-value-ambiguity") (
-  Cons (Pair "modules: legacy compile path preserves checked output" "core/modules/modules-legacy-compile-path-preserves-checked-output") (
-  Cons (Pair "modules: file loader, includes, hierarchy and errors" "core/modules/modules-file-loader-includes-hierarchy-and-errors") (
-  Cons (Pair "modules typing: cross-module recursion infers unsigned cycle" "core/modules/modules-typing-cross-module-recursion-infers-unsigned-cycle") (
-  Cons (Pair "modules typing: cross-module qualified recursion generalizes shared exports" "core/modules/modules-typing-cross-module-qualified-recursion-generalizes-shared-exports") (
-  Cons (Pair "crate namespaces resolve recursive declarations before inference" "core/modules/crate-namespaces-resolve-recursive-declarations-before-inference") (
-  Cons (Pair "crate namespace resolution preserves external ownership and mangling" "core/modules/crate-namespace-resolution-preserves-external-ownership-and-mangling") (
-  Cons (Pair "cyclic export fixed point is invariant under source order" "core/modules/cyclic-export-fixed-point-is-invariant-under-source-order") (
-  Nil))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
- Cons (Pair "core/separate-compilation" (
-  Cons (Pair "crate checking: selective and qualified imports" "core/separate-compilation/crate-checking-selective-and-qualified-imports") (
-  Cons (Pair "crate checking: unnamed entry expression imports" "core/separate-compilation/crate-checking-unnamed-entry-expression-imports") (
-  Cons (Pair "crate checking: qualified types, fields and nested patterns" "core/separate-compilation/crate-checking-qualified-types-fields-and-nested-patterns") (
-  Cons (Pair "crate checking: private names and constructor identities" "core/separate-compilation/crate-checking-private-names-and-constructor-identities") (
-  Cons (Pair "crate checking: diamond reexports preserve identity" "core/separate-compilation/crate-checking-diamond-reexports-preserve-identity") (
-  Cons (Pair "crate checking: transitive empty imports carry instances and private helpers" "core/separate-compilation/crate-checking-transitive-empty-imports-carry-instances-and-private-helpers") (
-  Cons (Pair "crate checking: qualified class, hidden methods in instance declaration" "core/separate-compilation/crate-checking-qualified-class-hidden-methods-in-instance-declaration") (
-  Cons (Pair "crate checking: abstract datatype used by exported functions" "core/separate-compilation/crate-checking-abstract-datatype-used-by-exported-functions") (
-  Cons (Pair "crate checking: local shadowing and self qualification" "core/separate-compilation/crate-checking-local-shadowing-and-self-qualification") (
-  Cons (Pair "crate checking: explicit qualified Prelude" "core/separate-compilation/crate-checking-explicit-qualified-prelude") (
-  Cons (Pair "crate checking: explicit Prelude with implicit import disabled" "core/separate-compilation/crate-checking-explicit-prelude-with-implicit-import-disabled") (
-  Cons (Pair "crate checking: hiding Prelude method for local definition" "core/separate-compilation/crate-checking-hiding-prelude-method-for-local-definition") (
-  Cons (Pair "crate checking: module lexical scope protects imported do" "core/separate-compilation/crate-checking-module-lexical-scope-protects-imported-do") (
-  Cons (Pair "crate checking: polymorphic Monad function across modules" "core/separate-compilation/crate-checking-polymorphic-monad-function-across-modules") (
-  Cons (Pair "crate checking: qualified Boolean constructor patterns" "core/separate-compilation/crate-checking-qualified-boolean-constructor-patterns") (
-  Cons (Pair "crate checking: internal name hygiene" "core/separate-compilation/crate-checking-internal-name-hygiene") (
-  Cons (Pair "crate checking: same method name from distinct classes" "core/separate-compilation/crate-checking-same-method-name-from-distinct-classes") (
-  Cons (Pair "crate checking: instance may recursively use an exported helper" "core/separate-compilation/crate-checking-instance-may-recursively-use-an-exported-helper") (
-  Cons (Pair "crate checking: bare primitive fallback without implicit Prelude" "core/separate-compilation/crate-checking-bare-primitive-fallback-without-implicit-prelude") (
-  Cons (Pair "crate checking: entry selects its own main" "core/separate-compilation/crate-checking-entry-selects-its-own-main") (
-  Cons (Pair "crate checking: primitive fallback permits local definitions" "core/separate-compilation/crate-checking-primitive-fallback-permits-local-definitions") (
-  Cons (Pair "crate checking: cyclic imports preserve independent polymorphic values" "core/separate-compilation/crate-checking-cyclic-imports-preserve-independent-polymorphic-values") (
-  Cons (Pair "crate checking: cross-module recursive declaration SCC" "core/separate-compilation/crate-checking-cross-module-recursive-declaration-scc") (
-  Cons (Pair "crate checking: cross-module recursive nominal types" "core/separate-compilation/crate-checking-cross-module-recursive-nominal-types") (
-  Cons (Pair "crate checking: cyclic reexports retain the originating identity" "core/separate-compilation/crate-checking-cyclic-reexports-retain-the-originating-identity") (
-  Cons (Pair "crate checking: cyclic type reexports preserve selective member hiding" "core/separate-compilation/crate-checking-cyclic-type-reexports-preserve-selective-member-hiding") (
-  Cons (Pair "crate checking: cyclic empty imports carry defining-module instances" "core/separate-compilation/crate-checking-cyclic-empty-imports-carry-defining-module-instances") (
-  Cons (Pair "crate checking: self import is a namespace edge" "core/separate-compilation/crate-checking-self-import-is-a-namespace-edge") (
-  Cons (Pair "crate checking: inferred overloaded export" "core/separate-compilation/crate-checking-inferred-overloaded-export") (
-  Cons (Pair "crate checking: rank-n constructor field" "core/separate-compilation/crate-checking-rank-n-constructor-field") (
-  Cons (Pair "crate checking: class-free bounded annotation rules" "core/separate-compilation/crate-checking-class-free-bounded-annotation-rules") (
-  Cons (Pair "crate checking: unexported nominal type in inferred signature" "core/separate-compilation/crate-checking-unexported-nominal-type-in-inferred-signature") (
-  Cons (Pair "crate checking: mutually recursive module values" "core/separate-compilation/crate-checking-mutually-recursive-module-values") (
-  Cons (Pair "crate checking: Unicode interface identity" "core/separate-compilation/crate-checking-unicode-interface-identity") (
-  Cons (Pair "crate checking: nominal global cannot capture local binder" "core/separate-compilation/crate-checking-nominal-global-cannot-capture-local-binder") (
-  Cons (Pair "crate checking: imported entry binding" "core/separate-compilation/crate-checking-imported-entry-binding") (
-  Cons (Pair "crate checking: crate local and dictionary fresh names avoid user globals" "core/separate-compilation/crate-checking-crate-local-and-dictionary-fresh-names-avoid-user-globals") (
-  Cons (Pair "crate rejects: private function" "core/separate-compilation/crate-rejects-private-function") (
-  Cons (Pair "crate rejects: qualified private function" "core/separate-compilation/crate-rejects-qualified-private-function") (
-  Cons (Pair "crate rejects: selected imports exclude others" "core/separate-compilation/crate-rejects-selected-imports-exclude-others") (
-  Cons (Pair "crate rejects: qualified-only is not unqualified" "core/separate-compilation/crate-rejects-qualified-only-is-not-unqualified") (
-  Cons (Pair "crate rejects: alias replaces qualified module name" "core/separate-compilation/crate-rejects-alias-replaces-qualified-module-name") (
-  Cons (Pair "crate rejects: hiding also affects qualification" "core/separate-compilation/crate-rejects-hiding-also-affects-qualification") (
-  Cons (Pair "crate rejects: unknown import selection" "core/separate-compilation/crate-rejects-unknown-import-selection") (
-  Cons (Pair "crate rejects: unknown hidden name" "core/separate-compilation/crate-rejects-unknown-hidden-name") (
-  Cons (Pair "crate rejects: private constructor" "core/separate-compilation/crate-rejects-private-constructor") (
-  Cons (Pair "crate rejects: type-only selective import" "core/separate-compilation/crate-rejects-type-only-selective-import") (
-  Cons (Pair "crate rejects: member belongs to selected type" "core/separate-compilation/crate-rejects-member-belongs-to-selected-type") (
-  Cons (Pair "crate rejects: private type annotation" "core/separate-compilation/crate-rejects-private-type-annotation") (
-  Cons (Pair "crate rejects: hidden members cannot be reexported" "core/separate-compilation/crate-rejects-hidden-members-cannot-be-reexported") (
-  Cons (Pair "crate rejects: default exports exclude imports" "core/separate-compilation/crate-rejects-default-exports-exclude-imports") (
-  Cons (Pair "crate rejects: transitive names are not imported" "core/separate-compilation/crate-rejects-transitive-names-are-not-imported") (
-  Cons (Pair "crate rejects: distinct imports are ambiguous" "core/separate-compilation/crate-rejects-distinct-imports-are-ambiguous") (
-  Cons (Pair "crate rejects: top-level import collision requires hiding" "core/separate-compilation/crate-rejects-top-level-import-collision-requires-hiding") (
-  Cons (Pair "crate rejects: explicit reexport conflict" "core/separate-compilation/crate-rejects-explicit-reexport-conflict") (
-  Cons (Pair "crate rejects: unknown module reexport" "core/separate-compilation/crate-rejects-unknown-module-reexport") (
-  Cons (Pair "crate rejects: qualified-only module reexport has no unqualified names" "core/separate-compilation/crate-rejects-qualified-only-module-reexport-has-no-unqualified-names") (
-  Cons (Pair "crate rejects: empty exports" "core/separate-compilation/crate-rejects-empty-exports") (
-  Cons (Pair "crate rejects: missing module" "core/separate-compilation/crate-rejects-missing-module") (
-  Cons (Pair "crate rejects: mismatched module header" "core/separate-compilation/crate-rejects-mismatched-module-header") (
-  Cons (Pair "crate rejects: unnamed library" "core/separate-compilation/crate-rejects-unnamed-library") (
-  Cons (Pair "crate rejects: cyclic import still checks invalid declarations" "core/separate-compilation/crate-rejects-cyclic-import-still-checks-invalid-declarations") (
-  Cons (Pair "crate rejects: self import still checks invalid declarations" "core/separate-compilation/crate-rejects-self-import-still-checks-invalid-declarations") (
-  Cons (Pair "crate rejects: module header followed by bare expression" "core/separate-compilation/crate-rejects-module-header-followed-by-bare-expression") (
-  Cons (Pair "crate rejects: imports must precede definitions" "core/separate-compilation/crate-rejects-imports-must-precede-definitions") (
-  Cons (Pair "crate rejects: definitions cannot be qualified" "core/separate-compilation/crate-rejects-definitions-cannot-be-qualified") (
-  Cons (Pair "crate rejects: explicit empty Prelude removes value names" "core/separate-compilation/crate-rejects-explicit-empty-prelude-removes-value-names") (
-  Cons (Pair "crate rejects: qualified Prelude suppresses implicit Prelude" "core/separate-compilation/crate-rejects-qualified-prelude-suppresses-implicit-prelude") (
-  Cons (Pair "crate rejects: Prelude cannot be redefined" "core/separate-compilation/crate-rejects-prelude-cannot-be-redefined") (
-  Cons (Pair "crate rejects: primitive constructor cannot be redefined" "core/separate-compilation/crate-rejects-primitive-constructor-cannot-be-redefined") (
-  Cons (Pair "crate rejects: primitive type cannot be redefined" "core/separate-compilation/crate-rejects-primitive-type-cannot-be-redefined") (
-  Cons (Pair "crate rejects: unused private definitions still checked" "core/separate-compilation/crate-rejects-unused-private-definitions-still-checked") (
-  Cons (Pair "crate rejects: export list cannot name missing value" "core/separate-compilation/crate-rejects-export-list-cannot-name-missing-value") (
-  Cons (Pair "crate rejects: recursive signature error names the source function" "core/separate-compilation/crate-rejects-recursive-signature-error-names-the-source-function") (
-  Cons (Pair "crate rejects: instance not visible in imported signed definition" "core/separate-compilation/crate-rejects-instance-not-visible-in-imported-signed-definition") (
-  Cons (Pair "crate rejects: instance not visible in another instance" "core/separate-compilation/crate-rejects-instance-not-visible-in-another-instance") (
-  Cons (Pair "crate rejects: cyclic private constructor remains hidden" "core/separate-compilation/crate-rejects-cyclic-private-constructor-remains-hidden") (
-  Cons (Pair "crate rejects: cyclic reexports cannot invent a missing identity" "core/separate-compilation/crate-rejects-cyclic-reexports-cannot-invent-a-missing-identity") (
-  Cons (Pair "crate rejects: downstream orphan cannot leak into an import cycle" "core/separate-compilation/crate-rejects-downstream-orphan-cannot-leak-into-an-import-cycle") (
-  Cons (Pair "crate typing: cross-module recursion infers unsigned cycle" "core/separate-compilation/crate-typing-cross-module-recursion-infers-unsigned-cycle") (
-  Cons (Pair "crate typing: cross-module qualified recursion generalizes shared exports" "core/separate-compilation/crate-typing-cross-module-qualified-recursion-generalizes-shared-exports") (
-  Cons (Pair "crate paths and native cache commands" "core/separate-compilation/crate-paths-and-native-cache-commands") (
-  Cons (Pair "crate metadata version rejection" "core/separate-compilation/crate-metadata-version-rejection") (
-  Cons (Pair "crate object binding schemes are independently checked" "core/separate-compilation/crate-object-binding-schemes-are-independently-checked") (
-  Cons (Pair "crate datatype metadata is independently reconstructed" "core/separate-compilation/crate-datatype-metadata-is-independently-reconstructed") (
-  Cons (Pair "crate unused import parameters retain checked schemes" "core/separate-compilation/crate-unused-import-parameters-retain-checked-schemes") (
-  Nil)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
- Cons (Pair "core/state-types" (
-  Cons (Pair "ST source type: return" "core/state-types/st-source-type-return") (
-  Cons (Pair "ST source type: bind" "core/state-types/st-source-type-bind") (
-  Cons (Pair "ST source type: array-read" "core/state-types/st-source-type-array-read") (
-  Cons (Pair "ST source type: array-write" "core/state-types/st-source-type-array-write") (
-  Cons (Pair "ST source type: array-length" "core/state-types/st-source-type-array-length") (
-  Cons (Pair "ST source type: implicit-do" "core/state-types/st-source-type-implicit-do") (
-  Cons (Pair "ST source type: implicit-return" "core/state-types/st-source-type-implicit-return") (
-  Cons (Pair "ST source type: explicit-action-signature" "core/state-types/st-source-type-explicit-action-signature") (
-  Cons (Pair "ST source type: polymorphic-result" "core/state-types/st-source-type-polymorphic-result") (
-  Cons (Pair "ST source type: impredicative-array-functions" "core/state-types/st-source-type-impredicative-array-functions") (
-  Cons (Pair "ST source type: nested-independent" "core/state-types/st-source-type-nested-independent") (
-  Cons (Pair "ST source type: reuse-independent-allocation" "core/state-types/st-source-type-reuse-independent-allocation") (
-  Cons (Pair "ST source type: pure-io-description-result" "core/state-types/st-source-type-pure-io-description-result") (
-  Cons (Pair "ST source type: unused-poisoned-cell" "core/state-types/st-source-type-unused-poisoned-cell") (
-  Cons (Pair "ST source type: snapshot" "core/state-types/st-source-type-snapshot") (
-  Cons (Pair "ST source type: repeated-read-action" "core/state-types/st-source-type-repeated-read-action") (
-  Cons (Pair "ST source type: higher-order-runner" "core/state-types/st-source-type-higher-order-runner") (
-  Cons (Pair "ST source type: primitive-shadowing" "core/state-types/st-source-type-primitive-shadowing") (
-  Cons (Pair "ST source type: qualified-prelude-import" "core/state-types/st-source-type-qualified-prelude-import") (
-  Cons (Pair "ST source type: explicit-prelude-types" "core/state-types/st-source-type-explicit-prelude-types") (
-  Cons (Pair "ST source type: opaque-existential-package" "core/state-types/st-source-type-opaque-existential-package") (
-  Cons (Pair "ST source type: opaque-parametric-callback" "core/state-types/st-source-type-opaque-parametric-callback") (
-  Cons (Pair "ST source type: escape-array" "core/state-types/st-source-type-escape-array") (
-  Cons (Pair "ST source type: escape-through-bind" "core/state-types/st-source-type-escape-through-bind") (
-  Cons (Pair "ST source type: escape-through-data" "core/state-types/st-source-type-escape-through-data") (
-  Cons (Pair "ST source type: escape-read-action" "core/state-types/st-source-type-escape-read-action") (
-  Cons (Pair "ST source type: escape-write-action" "core/state-types/st-source-type-escape-write-action") (
-  Cons (Pair "ST source type: escape-reader-closure" "core/state-types/st-source-type-escape-reader-closure") (
-  Cons (Pair "ST source type: nested-read-outer-region" "core/state-types/st-source-type-nested-read-outer-region") (
-  Cons (Pair "ST source type: nested-write-outer-region" "core/state-types/st-source-type-nested-write-outer-region") (
-  Cons (Pair "ST source type: cross-region-read-signature" "core/state-types/st-source-type-cross-region-read-signature") (
-  Cons (Pair "ST source type: cross-region-write-signature" "core/state-types/st-source-type-cross-region-write-signature") (
-  Cons (Pair "ST source type: monomorphic-argument" "core/state-types/st-source-type-monomorphic-argument") (
-  Cons (Pair "ST source type: monomorphic-bound-argument" "core/state-types/st-source-type-monomorphic-bound-argument") (
-  Cons (Pair "ST source type: monomorphic-runner-signature" "core/state-types/st-source-type-monomorphic-runner-signature") (
-  Cons (Pair "ST source type: io-as-st" "core/state-types/st-source-type-io-as-st") (
-  Cons (Pair "ST source type: bind-io-action" "core/state-types/st-source-type-bind-io-action") (
-  Cons (Pair "ST source type: bind-io-continuation" "core/state-types/st-source-type-bind-io-continuation") (
-  Cons (Pair "ST source type: io-bind-st-action" "core/state-types/st-source-type-io-bind-st-action") (
-  Cons (Pair "ST source type: io-array-as-st-array" "core/state-types/st-source-type-io-array-as-st-array") (
-  Cons (Pair "ST source type: wrong-array-value-type" "core/state-types/st-source-type-wrong-array-value-type") (
-  Cons (Pair "ST source type: polymorphic-reference-attack" "core/state-types/st-source-type-polymorphic-reference-attack") (
-  Cons (Pair "ST source type: impredicative-reference-attack" "core/state-types/st-source-type-impredicative-reference-attack") (
-  Cons (Pair "ST source type: repackage-action-as-region-polymorphic" "core/state-types/st-source-type-repackage-action-as-region-polymorphic") (
-  Cons (Pair "ST source type: existential-coercion-escape" "core/state-types/st-source-type-existential-coercion-escape") (
-  Cons (Pair "ST source type: opaque-package-read-attack" "core/state-types/st-source-type-opaque-package-read-attack") (
-  Cons (Pair "ST source type: opaque-package-write-attack" "core/state-types/st-source-type-opaque-package-write-attack") (
-  Cons (Pair "ST source type: redefine-st" "core/state-types/st-source-type-redefine-st") (
-  Cons (Pair "ST source type: redefine-array" "core/state-types/st-source-type-redefine-array") (
-  Cons (Pair "ST source type: construct-opaque-st" "core/state-types/st-source-type-construct-opaque-st") (
-  Cons (Pair "ST source type: construct-opaque-array" "core/state-types/st-source-type-construct-opaque-array") (
-  Cons (Pair "ST source type: pattern-opaque-st" "core/state-types/st-source-type-pattern-opaque-st") (
-  Cons (Pair "ST source type: st-wrong-arity" "core/state-types/st-source-type-st-wrong-arity") (
-  Cons (Pair "ST source type: array-wrong-arity" "core/state-types/st-source-type-array-wrong-arity") (
-  Cons (Pair "ST source type: st-region-wrong-kind" "core/state-types/st-source-type-st-region-wrong-kind") (
-  Cons (Pair "ST source type: array-element-wrong-kind" "core/state-types/st-source-type-array-element-wrong-kind") (
-  Cons (Pair "ST target type: rank2-runner" "core/state-types/st-target-type-rank2-runner") (
-  Cons (Pair "ST target type: monomorphic-action-value" "core/state-types/st-target-type-monomorphic-action-value") (
-  Cons (Pair "ST target type: rank2-region-action" "core/state-types/st-target-type-rank2-region-action") (
-  Cons (Pair "ST target type: monomorphic-runST-input" "core/state-types/st-target-type-monomorphic-runst-input") (
-  Cons (Pair "ST target type: outer-forall-cannot-replace-inner" "core/state-types/st-target-type-outer-forall-cannot-replace-inner") (
-  Cons (Pair "ST target type: io-to-st-cast" "core/state-types/st-target-type-io-to-st-cast") (
-  Cons (Pair "ST target type: cross-region-read" "core/state-types/st-target-type-cross-region-read") (
-  Cons (Pair "ST target type: cross-region-write" "core/state-types/st-target-type-cross-region-write") (
-  Cons (Pair "ST target type: unbound-region" "core/state-types/st-target-type-unbound-region") (
-  Cons (Pair "ST target type: runST-extra-type-argument" "core/state-types/st-target-type-runst-extra-type-argument") (
-  Cons (Pair "ST target type: higher-kind-region" "core/state-types/st-target-type-higher-kind-region") (
-  Cons (Pair "ST target type: unexecuted-array-action" "core/state-types/st-target-type-unexecuted-array-action") (
-  Cons (Pair "ST primitive ABI is appended and action construction stays lazy" "core/state-types/st-primitive-abi-is-appended-and-action-construction-stays-lazy") (
-  Cons (Pair "ST primitives work with implicit prelude disabled" "core/state-types/st-primitives-work-with-implicit-prelude-disabled") (
-  Nil)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
- Cons (Pair "core/hm-oracle" (
-  Cons (Pair "independent ML typability oracle" "core/hm-oracle/independent-ml-typability-oracle") (
-  Nil))) (
- Cons (Pair "core/annotation-corpus" (
-  Cons (Pair "annotation corpus" "core/annotation-corpus/annotation-corpus") (
-  Nil))) (
- Cons (Pair "core/example-files" (
-  Cons (Pair "example files" "core/example-files/example-files") (
-  Nil))) (
- Cons (Pair "core/guards" (
-  Cons (Pair "guards parser: ordered expression arms" "core/guards/guards-parser-ordered-expression-arms") (
-  Cons (Pair "guards parser: fallback-only expression" "core/guards/guards-parser-fallback-only-expression") (
-  Cons (Pair "guards parser: expression trailing separator" "core/guards/guards-parser-expression-trailing-separator") (
-  Cons (Pair "guards parser: nested expression arms" "core/guards/guards-parser-nested-expression-arms") (
-  Cons (Pair "guards parser: ordinary if inside guarded branches" "core/guards/guards-parser-ordinary-if-inside-guarded-branches") (
-  Cons (Pair "guards parser: arithmetic and Boolean precedence" "core/guards/guards-parser-arithmetic-and-boolean-precedence") (
-  Cons (Pair "guards parser: otherwise call remains a condition" "core/guards/guards-parser-otherwise-call-remains-a-condition") (
-  Cons (Pair "guards parser: qualified otherwise remains a condition" "core/guards/guards-parser-qualified-otherwise-remains-a-condition") (
-  Cons (Pair "guards parser: parenthesized otherwise remains a condition" "core/guards/guards-parser-parenthesized-otherwise-remains-a-condition") (
-  Cons (Pair "guards program: function guard layout" "core/guards/guards-program-function-guard-layout") (
-  Cons (Pair "guards program: function guard nested block layout" "core/guards/guards-program-function-guard-nested-block-layout") (
-  Cons (Pair "guards program: expression guard inside ordinary then-do layout" "core/guards/guards-program-expression-guard-inside-ordinary-then-do-layout") (
-  Cons (Pair "guards program: ordinary if identifier compatibility" "core/guards/guards-program-ordinary-if-identifier-compatibility") (
-  Cons (Pair "guards parser: legacy annotation in RHS before bar" "core/guards/guards-parser-legacy-annotation-in-rhs-before-bar") (
-  Cons (Pair "guards parser: legacy annotation in condition before equals" "core/guards/guards-parser-legacy-annotation-in-condition-before-equals") (
-  Cons (Pair "guards parser: diagnostics keep original line and column" "core/guards/guards-parser-diagnostics-keep-original-line-and-column") (
-  Cons (Pair "guards checking: guarded values generalize" "core/guards/guards-checking-guarded-values-generalize") (
-  Cons (Pair "guards checking: separate whole-function signature" "core/guards/guards-checking-separate-whole-function-signature") (
-  Cons (Pair "guards checking: inline whole-function signature" "core/guards/guards-checking-inline-whole-function-signature") (
-  Cons (Pair "guards checking: annotated parameter" "core/guards/guards-checking-annotated-parameter") (
-  Cons (Pair "guards checking: local guard sees outer binding" "core/guards/guards-checking-local-guard-sees-outer-binding") (
-  Cons (Pair "guards checking: pattern binders scope over guards and results" "core/guards/guards-checking-pattern-binders-scope-over-guards-and-results") (
-  Cons (Pair "guards checking: guard condition can contain an expression guard" "core/guards/guards-checking-guard-condition-can-contain-an-expression-guard") (
-  Cons (Pair "guards checking: unselected branches preserve polymorphism" "core/guards/guards-checking-unselected-branches-preserve-polymorphism") (
-  Cons (Pair "guards checking: no implicit prelude required" "core/guards/guards-checking-no-implicit-prelude-required") (
-  Cons (Pair "guards rejection: expression condition requires Bool" "core/guards/guards-rejection-expression-condition-requires-bool") (
-  Cons (Pair "guards rejection: function condition requires Bool" "core/guards/guards-rejection-function-condition-requires-bool") (
-  Cons (Pair "guards rejection: all result types agree" "core/guards/guards-rejection-all-result-types-agree") (
-  Cons (Pair "guards rejection: unselected condition is checked" "core/guards/guards-rejection-unselected-condition-is-checked") (
-  Cons (Pair "guards rejection: pattern coverage remains exhaustive" "core/guards/guards-rejection-pattern-coverage-remains-exhaustive") (
-  Cons (Pair "guards rejection: total guards do not fall through to another equation" "core/guards/guards-rejection-total-guards-do-not-fall-through-to-another-equation") (
-  Cons (Pair "guards rejection: pattern binder does not enter sibling equation" "core/guards/guards-rejection-pattern-binder-does-not-enter-sibling-equation") (
-  Cons (Pair "guards rejection: pattern binder does not escape function" "core/guards/guards-rejection-pattern-binder-does-not-escape-function") (
-  Cons (Pair "guards rejection: branch binding does not enter sibling guard" "core/guards/guards-rejection-branch-binding-does-not-enter-sibling-guard") (
-  Cons (Pair "guards rejection: expression fallback required" "core/guards/guards-rejection-expression-fallback-required") (
-  Cons (Pair "guards rejection: function fallback required" "core/guards/guards-rejection-function-fallback-required") (
-  Cons (Pair "guards rejection: expression fallback must be last" "core/guards/guards-rejection-expression-fallback-must-be-last") (
-  Cons (Pair "guards rejection: function fallback must be last" "core/guards/guards-rejection-function-fallback-must-be-last") (
-  Cons (Pair "guards rejection: duplicate expression fallback" "core/guards/guards-rejection-duplicate-expression-fallback") (
-  Cons (Pair "guards rejection: duplicate function fallback" "core/guards/guards-rejection-duplicate-function-fallback") (
-  Cons (Pair "guards rejection: empty expression block" "core/guards/guards-rejection-empty-expression-block") (
-  Cons (Pair "guards rejection: expression arm requires arrow" "core/guards/guards-rejection-expression-arm-requires-arrow") (
-  Cons (Pair "guards rejection: function arm requires equals" "core/guards/guards-rejection-function-arm-requires-equals") (
-  Cons (Pair "guards rejection: expression arm requires result" "core/guards/guards-rejection-expression-arm-requires-result") (
-  Cons (Pair "guards rejection: comma guards are not accepted" "core/guards/guards-rejection-comma-guards-are-not-accepted") (
-  Cons (Pair "guards rejection: pattern guards are not accepted" "core/guards/guards-rejection-pattern-guards-are-not-accepted") (
-  Cons (Pair "guards rejection: expression guard block needs braces" "core/guards/guards-rejection-expression-guard-block-needs-braces") (
-  Cons (Pair "guards checking: guards runtime: first match and short circuit" "core/guards/guards-checking-guards-runtime-first-match-and-short-circuit") (
-  Cons (Pair "guards checking: guards runtime: only selected IO executes" "core/guards/guards-checking-guards-runtime-only-selected-io-executes") (
-  Cons (Pair "guards checking: guards runtime: local and recursive bindings" "core/guards/guards-checking-guards-runtime-local-and-recursive-bindings") (
-  Cons (Pair "guards checking: guards runtime: patterns and instance methods" "core/guards/guards-checking-guards-runtime-patterns-and-instance-methods") (
-  Cons (Pair "guards checking: guards runtime: nested ordinary and guarded conditionals" "core/guards/guards-checking-guards-runtime-nested-ordinary-and-guarded-conditionals") (
-  Cons (Pair "guards checking: guards runtime: case bodies and lazy wildcard" "core/guards/guards-checking-guards-runtime-case-bodies-and-lazy-wildcard") (
-  Cons (Pair "guards checking: guards runtime: contextual otherwise compatibility" "core/guards/guards-checking-guards-runtime-contextual-otherwise-compatibility") (
-  Cons (Pair "guards checking: guards runtime: dynamic selection and primitive hygiene" "core/guards/guards-checking-guards-runtime-dynamic-selection-and-primitive-hygiene") (
-  Nil))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
- Nil)))))))))))))))))))))))))))))))))))
+ (:) ((,) "core/substring-adapter" (
+  [])) (
+ (:) ((,) "core/optimizer-uses" (
+  (:) ((,) "optimizer free-use indices agree with independent scoped scans" "core/optimizer-uses/optimizer-free-use-indices-agree-with-independent-scoped-scans") (
+  (:) ((,) "indexed optimizer agrees with legacy traversal and fresh identities" "core/optimizer-uses/indexed-optimizer-agrees-with-legacy-traversal-and-fresh-identities") (
+  [])))) (
+ (:) ((,) "core/crate-codegen" (
+  (:) ((,) "code generation query agrees with uncached checked emission" "core/crate-codegen/code-generation-query-agrees-with-uncached-checked-emission") (
+  (:) ((,) "erased query reuses alpha and annotation changes" "core/crate-codegen/erased-query-reuses-alpha-and-annotation-changes") (
+  (:) ((,) "optimized query reuses changed unused bodies" "core/crate-codegen/optimized-query-reuses-changed-unused-bodies") (
+  (:) ((,) "code generation cache separates IO and constructor ABIs" "core/crate-codegen/code-generation-cache-separates-io-and-constructor-abis") (
+  (:) ((,) "corrupt cached LLVM is rebuilt" "core/crate-codegen/corrupt-cached-llvm-is-rebuilt") (
+  (:) ((,) "prepared entries and stale crate dependencies retain visibility" "core/crate-codegen/prepared-entries-and-stale-crate-dependencies-retain-visibility") (
+  [])))))))) (
+ (:) ((,) "core/declaration-queries" (
+  (:) ((,) "declaration SCC order and inventory permutation" "core/declaration-queries/declaration-scc-order-and-inventory-permutation") (
+  (:) ((,) "recursive SCC excludes unrelated declarations" "core/declaration-queries/recursive-scc-excludes-unrelated-declarations") (
+  (:) ((,) "indexed SCC traversal handles 2000 declarations" "core/declaration-queries/indexed-scc-traversal-handles-2000-declarations") (
+  (:) ((,) "term, type, class and constructor observations remain distinct" "core/declaration-queries/term-type-class-and-constructor-observations-remain-distinct") (
+  (:) ((,) "checked group inference preserves principal polymorphism" "core/declaration-queries/checked-group-inference-preserves-principal-polymorphism") (
+  (:) ((,) "closed-signature recursion remains checked across groups" "core/declaration-queries/closed-signature-recursion-remains-checked-across-groups") (
+  (:) ((,) "inference rejects an open imported environment" "core/declaration-queries/inference-rejects-an-open-imported-environment") (
+  []))))))))) (
+ (:) ((,) "core/incremental-crate-cache" (
+  (:) ((,) "persistent no-op reuse and corrupt-cache recovery" "core/incremental-crate-cache/persistent-no-op-reuse-and-corrupt-cache-recovery") (
+  (:) ((,) "implementation edits preserve consumer caches and clean equivalence" "core/incremental-crate-cache/implementation-edits-preserve-consumer-caches-and-clean-equivalence") (
+  (:) ((,) "changed schemes invalidate actual consumers" "core/incremental-crate-cache/changed-schemes-invalidate-actual-consumers") (
+  (:) ((,) "datatype closure invalidates relevant changes only" "core/incremental-crate-cache/datatype-closure-invalidates-relevant-changes-only") (
+  (:) ((,) "instance candidate visibility participates in query keys" "core/incremental-crate-cache/instance-candidate-visibility-participates-in-query-keys") (
+  (:) ((,) "query encodings preserve semantics and normalize lexical names" "core/incremental-crate-cache/query-encodings-preserve-semantics-and-normalize-lexical-names") (
+  (:) ((,) "cache schemes are checked against stored implementations" "core/incremental-crate-cache/cache-schemes-are-checked-against-stored-implementations") (
+  []))))))))) (
+ (:) ((,) "core/component-projection" (
+  (:) ((,) "component scopes agree with independent edge enumeration" "core/component-projection/component-scopes-agree-with-independent-edge-enumeration") (
+  (:) ((,) "projected nodes preserve explicit rank identities" "core/component-projection/projected-nodes-preserve-explicit-rank-identities") (
+  (:) ((,) "ordered restoration preserves checked inverse identities" "core/component-projection/ordered-restoration-preserves-checked-inverse-identities") (
+  []))))) (
+ (:) ((,) "core/int-set-unions" (
+  (:) ((,) "size-biased set unions agree with independent sorted lists" "core/int-set-unions/size-biased-set-unions-agree-with-independent-sorted-lists") (
+  []))) (
+ (:) ((,) "core/index-edges" (
+  (:) ((,) "incremental reverse indices agree with independent edge enumeration" "core/index-edges/incremental-reverse-indices-agree-with-independent-edge-enumeration") (
+  (:) ((,) "reverse-index edits agree with independent edge lists" "core/index-edges/reverse-index-edits-agree-with-independent-edge-lists") (
+  [])))) (
+ (:) ((,) "core/projection-ranks" (
+  (:) ((,) "ordered component ranks agree with independent renaming maps" "core/projection-ranks/ordered-component-ranks-agree-with-independent-renaming-maps") (
+  []))) (
+ (:) ((,) "core/projection-changes" (
+  (:) ((,) "linear projection patches agree with independent map differences" "core/projection-changes/linear-projection-patches-agree-with-independent-map-differences") (
+  []))) (
+ (:) ((,) "core/strict-wrappers" (
+  (:) ((,) "strict unary representation requires whole-program evaluated fields" "core/strict-wrappers/strict-unary-representation-requires-whole-program-evaluated-fields") (
+  []))) (
+ (:) ((,) "core/solver-index-audit" (
+  (:) ((,) "incremental index audit agrees with independent reconstruction" "core/solver-index-audit/incremental-index-audit-agrees-with-independent-reconstruction") (
+  []))) (
+ (:) ((,) "core/dense-normalization" (
+  (:) ((,) "dense normalization agrees with an independent list oracle" "core/dense-normalization/dense-normalization-agrees-with-an-independent-list-oracle") (
+  []))) (
+ (:) ((,) "core/checked-emission" (
+  (:) ((,) "checked emission agrees with raw independently checked emission" "core/checked-emission/checked-emission-agrees-with-raw-independently-checked-emission") (
+  (:) ((,) "external xMLF emission still rejects malformed terms" "core/checked-emission/external-xmlf-emission-still-rejects-malformed-terms") (
+  (:) ((,) "checked emission still enforces IO entry types" "core/checked-emission/checked-emission-still-enforces-io-entry-types") (
+  (:) ((,) "checked witness and compilation constructors are private" "core/checked-emission/checked-witness-and-compilation-constructors-are-private") (
+  [])))))) (
+ (:) ((,) "core/solver-allocation" (
+  (:) ((,) "strict graph builder agrees with independent insertion" "core/solver-allocation/strict-graph-builder-agrees-with-independent-insertion") (
+  (:) ((,) "node forcing preserves arbitrary identities and lazy constructor fields" "core/solver-allocation/node-forcing-preserves-arbitrary-identities-and-lazy-constructor-fields") (
+  (:) ((,) "graph expansion preserves independent allocation and frontier identities" "core/solver-allocation/graph-expansion-preserves-independent-allocation-and-frontier-identities") (
+  []))))) (
+ (:) ((,) "core/inference-and-annotations" (
+  (:) ((,) "identity" "core/inference-and-annotations/identity") (
+  (:) ((,) "constant 42" "core/inference-and-annotations/constant-42") (
+  (:) ((,) "boolean" "core/inference-and-annotations/boolean") (
+  (:) ((,) "identity self-application" "core/inference-and-annotations/identity-self-application") (
+  (:) ((,) "let polymorphism" "core/inference-and-annotations/let-polymorphism") (
+  (:) ((,) "lambda scope is not generalized" "core/inference-and-annotations/lambda-scope-is-not-generalized") (
+  (:) ((,) "lexical shadowing" "core/inference-and-annotations/lexical-shadowing") (
+  (:) ((,) "let RHS sees outer binding" "core/inference-and-annotations/let-rhs-sees-outer-binding") (
+  (:) ((,) "application under an unannotated lambda" "core/inference-and-annotations/application-under-an-unannotated-lambda") (
+  (:) ((,) "K preserves its polymorphic return bound" "core/inference-and-annotations/k-preserves-its-polymorphic-return-bound") (
+  (:) ((,) "g g" "core/inference-and-annotations/g-g") (
+  (:) ((,) "g g applied to identity" "core/inference-and-annotations/g-g-applied-to-identity") (
+  (:) ((,) "g g retains its identity lower bound" "core/inference-and-annotations/g-g-retains-its-identity-lower-bound") (
+  (:) ((,) "closed annotation" "core/inference-and-annotations/closed-annotation") (
+  (:) ((,) "let annotation" "core/inference-and-annotations/let-annotation") (
+  (:) ((,) "bounded annotation" "core/inference-and-annotations/bounded-annotation") (
+  (:) ((,) "annotated self-application" "core/inference-and-annotations/annotated-self-application") (
+  (:) ((,) "polymorphic parameter at distinct instances" "core/inference-and-annotations/polymorphic-parameter-at-distinct-instances") (
+  (:) ((,) "impredicative result" "core/inference-and-annotations/impredicative-result") (
+  (:) ((,) "partial annotation" "core/inference-and-annotations/partial-annotation") (
+  (:) ((,) "existential root" "core/inference-and-annotations/existential-root") (
+  (:) ((,) "existential annotation shares both sides" "core/inference-and-annotations/existential-annotation-shares-both-sides") (
+  (:) ((,) "alias bounds normalized before xMLF" "core/inference-and-annotations/alias-bounds-normalized-before-xmlf") (
+  (:) ((,) "inert bounds inlined" "core/inference-and-annotations/inert-bounds-inlined") (
+  (:) ((,) "unused bounds disappear" "core/inference-and-annotations/unused-bounds-disappear") (
+  (:) ((,) "forall a.a equivalent to its bound" "core/inference-and-annotations/forall-a-a-equivalent-to-its-bound") (
+  (:) ((,) "annotation alpha-renaming" "core/inference-and-annotations/annotation-alpha-renaming") (
+  (:) ((,) "parameterized type constructor" "core/inference-and-annotations/parameterized-type-constructor") (
+  (:) ((,) "rigid polymorphic bound" "core/inference-and-annotations/rigid-polymorphic-bound") (
+  (:) ((,) "multiple quantified variables" "core/inference-and-annotations/multiple-quantified-variables") (
+  (:) ((,) "shared type has independent lexical binders" "core/inference-and-annotations/shared-type-has-independent-lexical-binders") (
+  (:) ((,) "arbitrary-rank annotation" "core/inference-and-annotations/arbitrary-rank-annotation") (
+  (:) ((,) "unannotated self-application" "core/inference-and-annotations/unannotated-self-application") (
+  (:) ((,) "inconsistent monomorphic argument" "core/inference-and-annotations/inconsistent-monomorphic-argument") (
+  (:) ((,) "integer is not a function" "core/inference-and-annotations/integer-is-not-a-function") (
+  (:) ((,) "cannot satisfy universal identity with an integer result" "core/inference-and-annotations/cannot-satisfy-universal-identity-with-an-integer-result") (
+  (:) ((,) "distinct skolems cannot merge" "core/inference-and-annotations/distinct-skolems-cannot-merge") (
+  (:) ((,) "wrong closed annotation" "core/inference-and-annotations/wrong-closed-annotation") (
+  (:) ((,) "cannot invent a polymorphic value" "core/inference-and-annotations/cannot-invent-a-polymorphic-value") (
+  (:) ((,) "free source variable" "core/inference-and-annotations/free-source-variable") (
+  (:) ((,) "recursive let is not implicit" "core/inference-and-annotations/recursive-let-is-not-implicit") (
+  (:) ((,) "type annotation has a free variable" "core/inference-and-annotations/type-annotation-has-a-free-variable") (
+  (:) ((,) "constructor arity" "core/inference-and-annotations/constructor-arity") (
+  (:) ((,) "trailing input is rejected" "core/inference-and-annotations/trailing-input-is-rejected") (
+  (:) ((,) "parser handles nested comments" "core/inference-and-annotations/parser-handles-nested-comments") (
+  (:) ((,) "generated computations are necessary" "core/inference-and-annotations/generated-computations-are-necessary") (
+  [])))))))))))))))))))))))))))))))))))))))))))))))) (
+ (:) ((,) "core/type-computations" (
+  (:) ((,) "Inst-Reflex" "core/type-computations/inst-reflex") (
+  (:) ((,) "Inst-Bot" "core/type-computations/inst-bot") (
+  (:) ((,) "Inst-Hyp" "core/type-computations/inst-hyp") (
+  (:) ((,) "Inst-Inner" "core/type-computations/inst-inner") (
+  (:) ((,) "Inst-Outer" "core/type-computations/inst-outer") (
+  (:) ((,) "Inst-Quant-Elim" "core/type-computations/inst-quant-elim") (
+  (:) ((,) "Inst-Quant-Intro" "core/type-computations/inst-quant-intro") (
+  (:) ((,) "Inst-Trans / System F application" "core/type-computations/inst-trans-system-f-application") (
+  (:) ((,) "outer alpha conversion" "core/type-computations/outer-alpha-conversion") (
+  (:) ((,) "Inst-Hyp checks its bound" "core/type-computations/inst-hyp-checks-its-bound") (
+  (:) ((,) "Inst-Hyp requires a binding" "core/type-computations/inst-hyp-requires-a-binding") (
+  (:) ((,) "Inst-Bot requires bottom source" "core/type-computations/inst-bot-requires-bottom-source") (
+  (:) ((,) "elimination requires a quantifier" "core/type-computations/elimination-requires-a-quantifier") (
+  (:) ((,) "inner does not cross arrows" "core/type-computations/inner-does-not-cross-arrows") (
+  (:) ((,) "introduction cannot capture" "core/type-computations/introduction-cannot-capture") (
+  (:) ((,) "outer cannot capture" "core/type-computations/outer-cannot-capture") (
+  (:) ((,) "cyclic environments rejected" "core/type-computations/cyclic-environments-rejected") (
+  (:) ((,) "malformed term environment rejected" "core/type-computations/malformed-term-environment-rejected") (
+  [])))))))))))))))))))) (
+ (:) ((,) "core/binding-hygiene" (
+  (:) ((,) "capture-avoiding substitution" "core/binding-hygiene/capture-avoiding-substitution") (
+  (:) ((,) "quantifier does not scope over its own bound" "core/binding-hygiene/quantifier-does-not-scope-over-its-own-bound") (
+  (:) ((,) "alpha-equivalence tracks shadowing" "core/binding-hygiene/alpha-equivalence-tracks-shadowing") (
+  (:) ((,) "type quantifiers have lexical scope" "core/binding-hygiene/type-quantifiers-have-lexical-scope") (
+  (:) ((,) "xMLF does not identify inert or alias bounds" "core/binding-hygiene/xmlf-does-not-identify-inert-or-alias-bounds") (
+  []))))))) (
+ (:) ((,) "core/graph-expansion" (
+  (:) ((,) "recursive exports preserve scoped identities and independent copies" "core/graph-expansion/recursive-exports-preserve-scoped-identities-and-independent-copies") (
+  (:) ((,) "expansion resets scheme flag and binding" "core/graph-expansion/expansion-resets-scheme-flag-and-binding") (
+  (:) ((,) "all inert nodes normalized" "core/graph-expansion/all-inert-nodes-normalized") (
+  (:) ((,) "well-domination enforced" "core/graph-expansion/well-domination-enforced") (
+  [])))))) (
+ (:) ((,) "core/graph-validation" (
+  (:) ((,) "graph validation agrees with uncached reference" "core/graph-validation/graph-validation-agrees-with-uncached-reference") (
+  (:) ((,) "graph validation checks deeply nested binding scopes" "core/graph-validation/graph-validation-checks-deeply-nested-binding-scopes") (
+  (:) ((,) "graph validation checks shared higher-kinded subgraphs" "core/graph-validation/graph-validation-checks-shared-higher-kinded-subgraphs") (
+  []))))) (
+ (:) ((,) "core/graph-unification" (
+  (:) ((,) "indexed unification and identity renaming agree with map-based reference" "core/graph-unification/indexed-unification-and-identity-renaming-agree-with-map-based-reference") (
+  (:) ((,) "indexed unification agrees on successive scoped expansions" "core/graph-unification/indexed-unification-agrees-on-successive-scoped-expansions") (
+  (:) ((,) "dependency traversal rejects structural cycles created by merging" "core/graph-unification/dependency-traversal-rejects-structural-cycles-created-by-merging") (
+  []))))) (
+ (:) ((,) "core/graph-solver" (
+  (:) ((,) "component solver matches every full-graph inference step" "core/graph-solver/component-solver-matches-every-full-graph-inference-step") (
+  (:) ((,) "component witnesses preserve separate frontier solving and identities" "core/graph-solver/component-witnesses-preserve-separate-frontier-solving-and-identities") (
+  (:) ((,) "component solver includes incoming references and protected siblings" "core/graph-solver/component-solver-includes-incoming-references-and-protected-siblings") (
+  (:) ((,) "component solver rejects malformed disconnected input" "core/graph-solver/component-solver-rejects-malformed-disconnected-input") (
+  (:) ((,) "component solver preserves deep branching scopes and separate type components" "core/graph-solver/component-solver-preserves-deep-branching-scopes-and-separate-type-components") (
+  (:) ((,) "expansion preserves the exact fresh identity budget across word boundaries" "core/graph-solver/expansion-preserves-the-exact-fresh-identity-budget-across-word-boundaries") (
+  (:) ((,) "closed-instance optimization preserves all original schemes" "core/graph-solver/closed-instance-optimization-preserves-all-original-schemes") (
+  (:) ((,) "closed-instance matching checks repeated, rigid and frontier variables" "core/graph-solver/closed-instance-matching-checks-repeated-rigid-and-frontier-variables") (
+  [])))))))))) (
+ (:) ((,) "core/embedding-pruning" (
+  (:) ((,) "embedding pruning preserves identities and values over allocation histories" "core/embedding-pruning/embedding-pruning-preserves-identities-and-values-over-allocation-histories") (
+  (:) ((,) "embedding pruning preserves old updates, aliases and allocation gaps" "core/embedding-pruning/embedding-pruning-preserves-old-updates-aliases-and-allocation-gaps") (
+  (:) ((,) "embedding pruning preserves source bound and existential semantics" "core/embedding-pruning/embedding-pruning-preserves-source-bound-and-existential-semantics") (
+  []))))) (
+ (:) ((,) "core/datatypes" (
+  (:) ((,) "data: nullary constructor" "core/datatypes/data-nullary-constructor") (
+  (:) ((,) "data: polymorphic nullary constructor" "core/datatypes/data-polymorphic-nullary-constructor") (
+  (:) ((,) "data: constructor is a first-class function" "core/datatypes/data-constructor-is-a-first-class-function") (
+  (:) ((,) "data: constructor application" "core/datatypes/data-constructor-application") (
+  (:) ((,) "data: partial constructor application" "core/datatypes/data-partial-constructor-application") (
+  (:) ((,) "data: multiple parameters" "core/datatypes/data-multiple-parameters") (
+  (:) ((,) "data: let-bound constructor has independent instances" "core/datatypes/data-let-bound-constructor-has-independent-instances") (
+  (:) ((,) "data: phantom parameter" "core/datatypes/data-phantom-parameter") (
+  (:) ((,) "data: exhaustive case" "core/datatypes/data-exhaustive-case") (
+  (:) ((,) "data: nested patterns" "core/datatypes/data-nested-patterns") (
+  (:) ((,) "data: reordered alternatives" "core/datatypes/data-reordered-alternatives") (
+  (:) ((,) "data: case constrains scrutinee" "core/datatypes/data-case-constrains-scrutinee") (
+  (:) ((,) "data: case returns its polymorphic scrutinee" "core/datatypes/data-case-returns-its-polymorphic-scrutinee") (
+  (:) ((,) "data: case rebuilds polymorphic data" "core/datatypes/data-case-rebuilds-polymorphic-data") (
+  (:) ((,) "data: case generalizes an unconstrained result" "core/datatypes/data-case-generalizes-an-unconstrained-result") (
+  (:) ((,) "data: case retains an MLF result bound" "core/datatypes/data-case-retains-an-mlf-result-bound") (
+  (:) ((,) "data: generalized case function" "core/datatypes/data-generalized-case-function") (
+  (:) ((,) "data: pattern field order" "core/datatypes/data-pattern-field-order") (
+  (:) ((,) "data: wildcard field" "core/datatypes/data-wildcard-field") (
+  (:) ((,) "data: multiple wildcard fields" "core/datatypes/data-multiple-wildcard-fields") (
+  (:) ((,) "data: wildcard alternative" "core/datatypes/data-wildcard-alternative") (
+  (:) ((,) "data: variable alternative and nested case" "core/datatypes/data-variable-alternative-and-nested-case") (
+  (:) ((,) "data: wildcard-only case" "core/datatypes/data-wildcard-only-case") (
+  (:) ((,) "data: variable-only case" "core/datatypes/data-variable-only-case") (
+  (:) ((,) "data: pattern shadows outer variable" "core/datatypes/data-pattern-shadows-outer-variable") (
+  (:) ((,) "data: recursive list" "core/datatypes/data-recursive-list") (
+  (:) ((,) "data: recursive list deconstruction" "core/datatypes/data-recursive-list-deconstruction") (
+  (:) ((,) "data: recursive tree" "core/datatypes/data-recursive-tree") (
+  (:) ((,) "data: mutually recursive declarations" "core/datatypes/data-mutually-recursive-declarations") (
+  (:) ((,) "data: non-regular recursive declaration" "core/datatypes/data-non-regular-recursive-declaration") (
+  (:) ((,) "data: function field" "core/datatypes/data-function-field") (
+  (:) ((,) "data: polymorphic type argument" "core/datatypes/data-polymorphic-type-argument") (
+  (:) ((,) "data: polymorphic case result" "core/datatypes/data-polymorphic-case-result") (
+  (:) ((,) "data: polymorphic field used with an explicit annotation" "core/datatypes/data-polymorphic-field-used-with-an-explicit-annotation") (
+  (:) ((,) "data: declaration parameter is not a target keyword" "core/datatypes/data-declaration-parameter-is-not-a-target-keyword") (
+  (:) ((,) "data: explicitly polymorphic field" "core/datatypes/data-explicitly-polymorphic-field") (
+  (:) ((,) "data: unknown constructor" "core/datatypes/data-unknown-constructor") (
+  (:) ((,) "data: wrong field type" "core/datatypes/data-wrong-field-type") (
+  (:) ((,) "data: pattern fields are not implicitly generalized" "core/datatypes/data-pattern-fields-are-not-implicitly-generalized") (
+  (:) ((,) "data: overapplied nullary constructor" "core/datatypes/data-overapplied-nullary-constructor") (
+  (:) ((,) "data: wrong scrutinee type" "core/datatypes/data-wrong-scrutinee-type") (
+  (:) ((,) "data: inconsistent branch results" "core/datatypes/data-inconsistent-branch-results") (
+  (:) ((,) "data: non-exhaustive case" "core/datatypes/data-non-exhaustive-case") (
+  (:) ((,) "data: too few pattern fields" "core/datatypes/data-too-few-pattern-fields") (
+  (:) ((,) "data: too many pattern fields" "core/datatypes/data-too-many-pattern-fields") (
+  (:) ((,) "data: duplicate constructor alternative" "core/datatypes/data-duplicate-constructor-alternative") (
+  (:) ((,) "data: mixed datatype alternatives" "core/datatypes/data-mixed-datatype-alternatives") (
+  (:) ((,) "data: default must be last" "core/datatypes/data-default-must-be-last") (
+  (:) ((,) "data: duplicate pattern variable" "core/datatypes/data-duplicate-pattern-variable") (
+  (:) ((,) "data: pattern variables do not escape" "core/datatypes/data-pattern-variables-do-not-escape") (
+  (:) ((,) "data: pattern variable unavailable in sibling branch" "core/datatypes/data-pattern-variable-unavailable-in-sibling-branch") (
+  (:) ((,) "data: duplicate datatype" "core/datatypes/data-duplicate-datatype") (
+  (:) ((,) "data: duplicate constructor across datatypes" "core/datatypes/data-duplicate-constructor-across-datatypes") (
+  (:) ((,) "data: duplicate constructor within datatype" "core/datatypes/data-duplicate-constructor-within-datatype") (
+  (:) ((,) "data: duplicate type parameter" "core/datatypes/data-duplicate-type-parameter") (
+  (:) ((,) "data: free field type parameter" "core/datatypes/data-free-field-type-parameter") (
+  (:) ((,) "data: unknown field type" "core/datatypes/data-unknown-field-type") (
+  (:) ((,) "data: recursive type arity" "core/datatypes/data-recursive-type-arity") (
+  (:) ((,) "data: declared annotation arity" "core/datatypes/data-declared-annotation-arity") (
+  (:) ((,) "data: primitive type redefinition" "core/datatypes/data-primitive-type-redefinition") (
+  (:) ((,) "data: reserved datatype name" "core/datatypes/data-reserved-datatype-name") (
+  (:) ((,) "data: primitive constructor redefinition" "core/datatypes/data-primitive-constructor-redefinition") (
+  (:) ((,) "data: declaration and case parse tree" "core/datatypes/data-declaration-and-case-parse-tree") (
+  (:) ((,) "data: empty declaration rejected by AST API" "core/datatypes/data-empty-declaration-rejected-by-ast-api") (
+  (:) ((,) "data: constructor and case erasure" "core/datatypes/data-constructor-and-case-erasure") (
+  (:) ((,) "data target: independent constructor and case typing" "core/datatypes/data-target-independent-constructor-and-case-typing") (
+  (:) ((,) "data target: unknown constructor" "core/datatypes/data-target-unknown-constructor") (
+  (:) ((,) "data target: constructor type argument count" "core/datatypes/data-target-constructor-type-argument-count") (
+  (:) ((,) "data target: constructor type argument is well formed" "core/datatypes/data-target-constructor-type-argument-is-well-formed") (
+  (:) ((,) "data target: constructor field type" "core/datatypes/data-target-constructor-field-type") (
+  (:) ((,) "data target: non-exhaustive case" "core/datatypes/data-target-non-exhaustive-case") (
+  (:) ((,) "data target: empty case" "core/datatypes/data-target-empty-case") (
+  (:) ((,) "data target: case result type" "core/datatypes/data-target-case-result-type") (
+  (:) ((,) "data target: case scrutinee type" "core/datatypes/data-target-case-scrutinee-type") (
+  (:) ((,) "data target: pattern field count" "core/datatypes/data-target-pattern-field-count") (
+  (:) ((,) "data target: repeated alternative" "core/datatypes/data-target-repeated-alternative") (
+  (:) ((,) "data target: pattern binder freshness" "core/datatypes/data-target-pattern-binder-freshness") (
+  (:) ((,) "data target: pattern scope" "core/datatypes/data-target-pattern-scope") (
+  (:) ((,) "data target: declared arity in an annotation" "core/datatypes/data-target-declared-arity-in-an-annotation") (
+  (:) ((,) "data target: declared arity inside a type computation" "core/datatypes/data-target-declared-arity-inside-a-type-computation") (
+  (:) ((,) "data target: invalid declaration" "core/datatypes/data-target-invalid-declaration") (
+  (:) ((,) "data target: nested declaration scope" "core/datatypes/data-target-nested-declaration-scope") (
+  (:) ((,) "data syntax: declaration separator required" "core/datatypes/data-syntax-declaration-separator-required") (
+  (:) ((,) "data syntax: lowercase constructor" "core/datatypes/data-syntax-lowercase-constructor") (
+  (:) ((,) "data syntax: empty case" "core/datatypes/data-syntax-empty-case") (
+  (:) ((,) "data syntax: wildcard token boundary" "core/datatypes/data-syntax-wildcard-token-boundary") (
+  [])))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
+ (:) ((,) "core/typeclasses" (
+  (:) ((,) "class: concrete method" "core/typeclasses/class-concrete-method") (
+  (:) ((,) "class: inferred constrained let at distinct instances" "core/typeclasses/class-inferred-constrained-let-at-distinct-instances") (
+  (:) ((,) "class: implicit method quantification" "core/typeclasses/class-implicit-method-quantification") (
+  (:) ((,) "class: explicit qualified function" "core/typeclasses/class-explicit-qualified-function") (
+  (:) ((,) "class: qualified expression in function position" "core/typeclasses/class-qualified-expression-in-function-position") (
+  (:) ((,) "class: qualified function parameter" "core/typeclasses/class-qualified-function-parameter") (
+  (:) ((,) "class: two givens of the same class" "core/typeclasses/class-two-givens-of-the-same-class") (
+  (:) ((,) "class: concrete call inside a generic constraint" "core/typeclasses/class-concrete-call-inside-a-generic-constraint") (
+  (:) ((,) "class: lambda shadows method" "core/typeclasses/class-lambda-shadows-method") (
+  (:) ((,) "class: let shadows method" "core/typeclasses/class-let-shadows-method") (
+  (:) ((,) "class: pattern shadows method" "core/typeclasses/class-pattern-shadows-method") (
+  (:) ((,) "class: higher-kinded method" "core/typeclasses/class-higher-kinded-method") (
+  (:) ((,) "class: partial type constructor instance" "core/typeclasses/class-partial-type-constructor-instance") (
+  (:) ((,) "class: instance definitions are order independent" "core/typeclasses/class-instance-definitions-are-order-independent") (
+  (:) ((,) "class: superclass given without concrete instances" "core/typeclasses/class-superclass-given-without-concrete-instances") (
+  (:) ((,) "class: mutually recursive methods" "core/typeclasses/class-mutually-recursive-methods") (
+  (:) ((,) "class: higher-kinded datatype application" "core/typeclasses/class-higher-kinded-datatype-application") (
+  (:) ((,) "class: higher-kinded annotation" "core/typeclasses/class-higher-kinded-annotation") (
+  (:) ((,) "class: Monad hierarchy example" "core/typeclasses/class-monad-hierarchy-example") (
+  (:) ((,) "class: contextual recursive instance example" "core/typeclasses/class-contextual-recursive-instance-example") (
+  (:) ((,) "class: qualified result is displayed using its class name" "core/typeclasses/class-qualified-result-is-displayed-using-its-class-name") (
+  (:) ((,) "class rejection: missing concrete instance" "core/typeclasses/class-rejection-missing-concrete-instance") (
+  (:) ((,) "class rejection: does not pick the only instance for an unknown type" "core/typeclasses/class-rejection-does-not-pick-the-only-instance-for-an-unknown-type") (
+  (:) ((,) "class rejection: wrong instance body" "core/typeclasses/class-rejection-wrong-instance-body") (
+  (:) ((,) "class rejection: method body is checked polymorphically" "core/typeclasses/class-rejection-method-body-is-checked-polymorphically") (
+  (:) ((,) "class rejection: missing method" "core/typeclasses/class-rejection-missing-method") (
+  (:) ((,) "class rejection: extra method" "core/typeclasses/class-rejection-extra-method") (
+  (:) ((,) "class rejection: duplicate method implementation" "core/typeclasses/class-rejection-duplicate-method-implementation") (
+  (:) ((,) "class rejection: duplicate class" "core/typeclasses/class-rejection-duplicate-class") (
+  (:) ((,) "class rejection: methods share a global namespace" "core/typeclasses/class-rejection-methods-share-a-global-namespace") (
+  (:) ((,) "class rejection: method must mention its class parameter" "core/typeclasses/class-rejection-method-must-mention-its-class-parameter") (
+  (:) ((,) "class rejection: unknown class" "core/typeclasses/class-rejection-unknown-class") (
+  (:) ((,) "class rejection: duplicate instance" "core/typeclasses/class-rejection-duplicate-instance") (
+  (:) ((,) "class rejection: overlapping generic and concrete instances" "core/typeclasses/class-rejection-overlapping-generic-and-concrete-instances") (
+  (:) ((,) "class rejection: variable instance head" "core/typeclasses/class-rejection-variable-instance-head") (
+  (:) ((,) "class rejection: nondecreasing instance context" "core/typeclasses/class-rejection-nondecreasing-instance-context") (
+  (:) ((,) "class rejection: instance context variable absent from head" "core/typeclasses/class-rejection-instance-context-variable-absent-from-head") (
+  (:) ((,) "class rejection: cyclic superclasses" "core/typeclasses/class-rejection-cyclic-superclasses") (
+  (:) ((,) "class rejection: missing superclass instance" "core/typeclasses/class-rejection-missing-superclass-instance") (
+  (:) ((,) "class rejection: class instance kind" "core/typeclasses/class-rejection-class-instance-kind") (
+  (:) ((,) "class rejection: class context kind" "core/typeclasses/class-rejection-class-context-kind") (
+  (:) ((,) "class rejection: higher-kinded argument must have the declared kind" "core/typeclasses/class-rejection-higher-kinded-argument-must-have-the-declared-kind") (
+  (:) ((,) "class rejection: ordinary type variable cannot be applied" "core/typeclasses/class-rejection-ordinary-type-variable-cannot-be-applied") (
+  (:) ((,) "class rejection: method constraints require supported signatures" "core/typeclasses/class-rejection-method-constraints-require-supported-signatures") (
+  (:) ((,) "class target: recursive dictionary body has wrong declared type" "core/typeclasses/class-target-recursive-dictionary-body-has-wrong-declared-type") (
+  (:) ((,) "class target: recursive binders must be unique" "core/typeclasses/class-target-recursive-binders-must-be-unique") (
+  (:) ((,) "class target: recursive binding cannot reuse an outer binder" "core/typeclasses/class-target-recursive-binding-cannot-reuse-an-outer-binder") (
+  (:) ((,) "class target: term annotation has kind star" "core/typeclasses/class-target-term-annotation-has-kind-star") (
+  (:) ((,) "class target: constructor checks the kind of a type argument" "core/typeclasses/class-target-constructor-checks-the-kind-of-a-type-argument") (
+  (:) ((,) "class target: compact and general application spines agree" "core/typeclasses/class-target-compact-and-general-application-spines-agree") (
+  (:) ((,) "class target: Inst-Bot cannot change kinds" "core/typeclasses/class-target-inst-bot-cannot-change-kinds") (
+  (:) ((,) "class evidence: chooses the given by its type" "core/typeclasses/class-evidence-chooses-the-given-by-its-type") (
+  (:) ((,) "class: two parameters" "core/typeclasses/class-two-parameters") (
+  (:) ((,) "class: instances with the same first parameter are disjoint" "core/typeclasses/class-instances-with-the-same-first-parameter-are-disjoint") (
+  (:) ((,) "class: instances with the same second parameter are disjoint" "core/typeclasses/class-instances-with-the-same-second-parameter-are-disjoint") (
+  (:) ((,) "class: repeated variables are shared across instance arguments" "core/typeclasses/class-repeated-variables-are-shared-across-instance-arguments") (
+  (:) ((,) "class: class parameter substitution is simultaneous" "core/typeclasses/class-class-parameter-substitution-is-simultaneous") (
+  (:) ((,) "class: inferred multiparameter constraint" "core/typeclasses/class-inferred-multiparameter-constraint") (
+  (:) ((,) "class: explicit multiparameter constraint" "core/typeclasses/class-explicit-multiparameter-constraint") (
+  (:) ((,) "class: three parameters" "core/typeclasses/class-three-parameters") (
+  (:) ((,) "class: superclass can discard a parameter" "core/typeclasses/class-superclass-can-discard-a-parameter") (
+  (:) ((,) "class: superclass can reorder parameters" "core/typeclasses/class-superclass-can-reorder-parameters") (
+  (:) ((,) "class: same class givens with different second arguments" "core/typeclasses/class-same-class-givens-with-different-second-arguments") (
+  (:) ((,) "class: recursive multiparameter instance example" "core/typeclasses/class-recursive-multiparameter-instance-example") (
+  (:) ((,) "class: multi-parameter constraint display" "core/typeclasses/class-multi-parameter-constraint-display") (
+  (:) ((,) "class rejection: instance is missing a parameter" "core/typeclasses/class-rejection-instance-is-missing-a-parameter") (
+  (:) ((,) "class rejection: instance has an extra parameter" "core/typeclasses/class-rejection-instance-has-an-extra-parameter") (
+  (:) ((,) "class rejection: constraint is missing a parameter" "core/typeclasses/class-rejection-constraint-is-missing-a-parameter") (
+  (:) ((,) "class rejection: duplicate class parameter" "core/typeclasses/class-rejection-duplicate-class-parameter") (
+  (:) ((,) "class rejection: method omits a class parameter" "core/typeclasses/class-rejection-method-omits-a-class-parameter") (
+  (:) ((,) "class rejection: does not infer an output parameter from the only instance" "core/typeclasses/class-rejection-does-not-infer-an-output-parameter-from-the-only-instance") (
+  (:) ((,) "class rejection: matches every repeated parameter" "core/typeclasses/class-rejection-matches-every-repeated-parameter") (
+  (:) ((,) "class rejection: overlap needs joint unification across parameters" "core/typeclasses/class-rejection-overlap-needs-joint-unification-across-parameters") (
+  (:) ((,) "class rejection: overlapping variable and concrete argument" "core/typeclasses/class-rejection-overlapping-variable-and-concrete-argument") (
+  (:) ((,) "class rejection: context must decrease across the whole argument tuple" "core/typeclasses/class-rejection-context-must-decrease-across-the-whole-argument-tuple") (
+  (:) ((,) "class rejection: context cannot duplicate a variable" "core/typeclasses/class-rejection-context-cannot-duplicate-a-variable") (
+  (:) ((,) "class rejection: later parameter kind is checked" "core/typeclasses/class-rejection-later-parameter-kind-is-checked") (
+  (:) ((,) "class evidence: superclass projection preserves caller variable identities" "core/typeclasses/class-evidence-superclass-projection-preserves-caller-variable-identities") (
+  [])))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
+ (:) ((,) "core/do-notation" (
+  (:) ((,) "do: single expression" "core/do-notation/do-single-expression") (
+  (:) ((,) "do: local let needs no bind" "core/do-notation/do-local-let-needs-no-bind") (
+  (:) ((,) "do: binding" "core/do-notation/do-binding") (
+  (:) ((,) "do: sequencing" "core/do-notation/do-sequencing") (
+  (:) ((,) "do: wildcard binding" "core/do-notation/do-wildcard-binding") (
+  (:) ((,) "do: optional trailing semicolon" "core/do-notation/do-optional-trailing-semicolon") (
+  (:) ((,) "do: nested blocks" "core/do-notation/do-nested-blocks") (
+  (:) ((,) "do: bind statement sees the outer binding" "core/do-notation/do-bind-statement-sees-the-outer-binding") (
+  (:) ((,) "do: distinct do-let binder sees the outer binding" "core/do-notation/do-distinct-do-let-binder-sees-the-outer-binding") (
+  (:) ((,) "do: local let is generalized" "core/do-notation/do-local-let-is-generalized") (
+  (:) ((,) "do: local let annotation" "core/do-notation/do-local-let-annotation") (
+  (:) ((,) "do: let-in expression is an action" "core/do-notation/do-let-in-expression-is-an-action") (
+  (:) ((,) "do: do expression used as an argument" "core/do-notation/do-do-expression-used-as-an-argument") (
+  (:) ((,) "do: do expression annotation" "core/do-notation/do-do-expression-annotation") (
+  (:) ((,) "do: constructor pattern" "core/do-notation/do-constructor-pattern") (
+  (:) ((,) "do: constructor wildcard field" "core/do-notation/do-constructor-wildcard-field") (
+  (:) ((,) "do: discarded action cannot capture an outer name" "core/do-notation/do-discarded-action-cannot-capture-an-outer-name") (
+  (:) ((,) "do: pattern temporary cannot capture an outer name" "core/do-notation/do-pattern-temporary-cannot-capture-an-outer-name") (
+  (:) ((,) "do: explicit bind remains lexical" "core/do-notation/do-explicit-bind-remains-lexical") (
+  (:) ((,) "do rejection: lexical bind cannot intercept do" "core/do-notation/do-rejection-lexical-bind-cannot-intercept-do") (
+  (:) ((,) "do rejection: same-name do-let is recursive, not an outer reference" "core/do-notation/do-rejection-same-name-do-let-is-recursive-not-an-outer-reference") (
+  (:) ((,) "do: annotated recursive do-let keeps its own binding" "core/do-notation/do-annotated-recursive-do-let-keeps-its-own-binding") (
+  (:) ((,) "do rejection: empty block" "core/do-notation/do-rejection-empty-block") (
+  (:) ((,) "do rejection: final statement must be an expression" "core/do-notation/do-rejection-final-statement-must-be-an-expression") (
+  (:) ((,) "do rejection: cannot end with a local declaration" "core/do-notation/do-rejection-cannot-end-with-a-local-declaration") (
+  (:) ((,) "do rejection: statements need separators" "core/do-notation/do-rejection-statements-need-separators") (
+  (:) ((,) "do rejection: default IO bind requires an action" "core/do-notation/do-rejection-default-io-bind-requires-an-action") (
+  (:) ((,) "do rejection: bound variable cannot escape" "core/do-notation/do-rejection-bound-variable-cannot-escape") (
+  (:) ((,) "do rejection: binding is not recursive" "core/do-notation/do-rejection-binding-is-not-recursive") (
+  (:) ((,) "do rejection: later binding is unavailable" "core/do-notation/do-rejection-later-binding-is-unavailable") (
+  (:) ((,) "do rejection: action type mismatch" "core/do-notation/do-rejection-action-type-mismatch") (
+  (:) ((,) "do rejection: final action has the right monadic type" "core/do-notation/do-rejection-final-action-has-the-right-monadic-type") (
+  (:) ((,) "do rejection: refutable pattern requires canonical MonadFail" "core/do-notation/do-rejection-refutable-pattern-requires-canonical-monadfail") (
+  (:) ((,) "do rejection: pattern binder duplicates" "core/do-notation/do-rejection-pattern-binder-duplicates") (
+  (:) ((,) "do: parser preserves statement forms" "core/do-notation/do-parser-preserves-statement-forms") (
+  (:) ((,) "do: lowering preserves binding order and the final action" "core/do-notation/do-lowering-preserves-binding-order-and-the-final-action") (
+  (:) ((,) "do: multiparameter MonadState example" "core/do-notation/do-multiparameter-monadstate-example") (
+  []))))))))))))))))))))))))))))))))))))))) (
+ (:) ((,) "core/surface-syntax" (
+  (:) ((,) "surface parser: multiplication binds above addition" "core/surface-syntax/surface-parser-multiplication-binds-above-addition") (
+  (:) ((,) "surface parser: application binds above arithmetic" "core/surface-syntax/surface-parser-application-binds-above-arithmetic") (
+  (:) ((,) "surface parser: subtraction associates left" "core/surface-syntax/surface-parser-subtraction-associates-left") (
+  (:) ((,) "surface parser: quotient and remainder associate left" "core/surface-syntax/surface-parser-quotient-and-remainder-associate-left") (
+  (:) ((,) "surface parser: parentheses override precedence" "core/surface-syntax/surface-parser-parentheses-override-precedence") (
+  (:) ((,) "surface parser: Boolean precedence" "core/surface-syntax/surface-parser-boolean-precedence") (
+  (:) ((,) "surface parser: concatenation associates right" "core/surface-syntax/surface-parser-concatenation-associates-right") (
+  (:) ((,) "surface parser: subtraction without spaces is not signed application" "core/surface-syntax/surface-parser-subtraction-without-spaces-is-not-signed-application") (
+  (:) ((,) "surface parser: negative argument is parenthesized" "core/surface-syntax/surface-parser-negative-argument-is-parenthesized") (
+  (:) ((,) "surface parser: unary minus applies after function application" "core/surface-syntax/surface-parser-unary-minus-applies-after-function-application") (
+  (:) ((,) "surface parser: signed Double exponent" "core/surface-syntax/surface-parser-signed-double-exponent") (
+  (:) ((,) "surface parser: signed hexadecimal integer" "core/surface-syntax/surface-parser-signed-hexadecimal-integer") (
+  (:) ((,) "surface parser: plus sign and negative right operand" "core/surface-syntax/surface-parser-plus-sign-and-negative-right-operand") (
+  (:) ((,) "surface parser: comments at operators" "core/surface-syntax/surface-parser-comments-at-operators") (
+  (:) ((,) "surface parser: nearest else" "core/surface-syntax/surface-parser-nearest-else") (
+  (:) ((,) "surface parser: arithmetic inside branches" "core/surface-syntax/surface-parser-arithmetic-inside-branches") (
+  (:) ((,) "surface parser: control expression as right operand" "core/surface-syntax/surface-parser-control-expression-as-right-operand") (
+  (:) ((,) "surface parser: annotation covers the infix expression" "core/surface-syntax/surface-parser-annotation-covers-the-infix-expression") (
+  (:) ((,) "surface parser: local parameters lower to lambdas" "core/surface-syntax/surface-parser-local-parameters-lower-to-lambdas") (
+  (:) ((,) "surface program: declarations have ordered let scopes" "core/surface-syntax/surface-program-declarations-have-ordered-let-scopes") (
+  (:) ((,) "surface program: implicit main with trailing semicolon" "core/surface-syntax/surface-program-implicit-main-with-trailing-semicolon") (
+  (:) ((,) "surface program: implicit main without trailing semicolon" "core/surface-syntax/surface-program-implicit-main-without-trailing-semicolon") (
+  (:) ((,) "surface program: explicit entry overrides main" "core/surface-syntax/surface-program-explicit-entry-overrides-main") (
+  (:) ((,) "surface program: separate signature covers the whole function" "core/surface-syntax/surface-program-separate-signature-covers-the-whole-function") (
+  (:) ((,) "surface checking: declarations generalize" "core/surface-syntax/surface-checking-declarations-generalize") (
+  (:) ((,) "surface checking: annotated function parameter" "core/surface-syntax/surface-checking-annotated-function-parameter") (
+  (:) ((,) "surface checking: inline whole-function signature" "core/surface-syntax/surface-checking-inline-whole-function-signature") (
+  (:) ((,) "surface checking: annotated local function" "core/surface-syntax/surface-checking-annotated-local-function") (
+  (:) ((,) "surface checking: do-local function generalizes" "core/surface-syntax/surface-checking-do-local-function-generalizes") (
+  (:) ((,) "surface checking: distinct do-local function sees outer binding" "core/surface-syntax/surface-checking-distinct-do-local-function-sees-outer-binding") (
+  (:) ((,) "surface checking: conditional returns polymorphic function" "core/surface-syntax/surface-checking-conditional-returns-polymorphic-function") (
+  (:) ((,) "surface checking: conditional works in a case scrutinee" "core/surface-syntax/surface-checking-conditional-works-in-a-case-scrutinee") (
+  (:) ((,) "surface checking: keyword prefixes remain identifiers" "core/surface-syntax/surface-checking-keyword-prefixes-remain-identifiers") (
+  (:) ((,) "surface checking: instance method parameters" "core/surface-syntax/surface-checking-instance-method-parameters") (
+  (:) ((,) "surface checking: qualified function declaration" "core/surface-syntax/surface-checking-qualified-function-declaration") (
+  (:) ((,) "surface checking: syntax needs no implicit prelude" "core/surface-syntax/surface-checking-syntax-needs-no-implicit-prelude") (
+  (:) ((,) "surface checking: same-name do-local function is recursive" "core/surface-syntax/surface-checking-same-name-do-local-function-is-recursive") (
+  (:) ((,) "surface checking: unsigned recursion infers bottom" "core/surface-syntax/surface-checking-unsigned-recursion-infers-bottom") (
+  (:) ((,) "surface checking: forward value references" "core/surface-syntax/surface-checking-forward-value-references") (
+  (:) ((,) "surface rejection: branch types must agree" "core/surface-syntax/surface-rejection-branch-types-must-agree") (
+  (:) ((,) "surface rejection: condition must be Bool" "core/surface-syntax/surface-rejection-condition-must-be-bool") (
+  (:) ((,) "surface rejection: arithmetic does not overload Double" "core/surface-syntax/surface-rejection-arithmetic-does-not-overload-double") (
+  (:) ((,) "surface rejection: unary plus requires a number" "core/surface-syntax/surface-rejection-unary-plus-requires-a-number") (
+  (:) ((,) "surface rejection: unary minus requires a number" "core/surface-syntax/surface-rejection-unary-minus-requires-a-number") (
+  (:) ((,) "surface checking: equality supports annotated strings" "core/surface-syntax/surface-checking-equality-supports-annotated-strings") (
+  (:) ((,) "surface rejection: whole function signature is checked" "core/surface-syntax/surface-rejection-whole-function-signature-is-checked") (
+  (:) ((,) "surface rejection: chained comparisons" "core/surface-syntax/surface-rejection-chained-comparisons") (
+  (:) ((,) "surface rejection: mixed chained comparisons" "core/surface-syntax/surface-rejection-mixed-chained-comparisons") (
+  (:) ((,) "surface rejection: missing else" "core/surface-syntax/surface-rejection-missing-else") (
+  (:) ((,) "surface rejection: missing then" "core/surface-syntax/surface-rejection-missing-then") (
+  (:) ((,) "surface checking: layout declaration separator" "core/surface-syntax/surface-checking-layout-declaration-separator") (
+  (:) ((,) "surface rejection: declaration-only file needs main" "core/surface-syntax/surface-rejection-declaration-only-file-needs-main") (
+  (:) ((,) "surface rejection: unreachable equation" "core/surface-syntax/surface-rejection-unreachable-equation") (
+  (:) ((,) "surface rejection: duplicate function parameters" "core/surface-syntax/surface-rejection-duplicate-function-parameters") (
+  (:) ((,) "surface rejection: signature must name its next definition" "core/surface-syntax/surface-rejection-signature-must-name-its-next-definition") (
+  (:) ((,) "surface rejection: duplicate signatures" "core/surface-syntax/surface-rejection-duplicate-signatures") (
+  (:) ((,) "surface rejection: signature without equation" "core/surface-syntax/surface-rejection-signature-without-equation") (
+  (:) ((,) "surface rejection: reserved conditional word" "core/surface-syntax/surface-rejection-reserved-conditional-word") (
+  (:) ((,) "surface rejection: reserved word in datatype parameter" "core/surface-syntax/surface-rejection-reserved-word-in-datatype-parameter") (
+  []))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
+ (:) ((,) "core/readability" (
+  (:) ((,) "layout: top-level data, signatures and equations" "core/readability/layout-top-level-data-signatures-and-equations") (
+  (:) ((,) "layout: nested do with a trailing semicolon" "core/readability/layout-nested-do-with-a-trailing-semicolon") (
+  (:) ((,) "layout: nested case and do" "core/readability/layout-nested-case-and-do") (
+  (:) ((,) "layout: parenthesized implicit block" "core/readability/layout-parenthesized-implicit-block") (
+  (:) ((,) "layout: implicit block in explicit block" "core/readability/layout-implicit-block-in-explicit-block") (
+  (:) ((,) "layout: same-line else closes do" "core/readability/layout-same-line-else-closes-do") (
+  (:) ((,) "layout: local declaration layout" "core/readability/layout-local-declaration-layout") (
+  (:) ((,) "layout: do local group followed by another statement" "core/readability/layout-do-local-group-followed-by-another-statement") (
+  (:) ((,) "layout: nested explicit let matches its own in" "core/readability/layout-nested-explicit-let-matches-its-own-in") (
+  (:) ((,) "layout: class and instance layout" "core/readability/layout-class-and-instance-layout") (
+  (:) ((,) "layout: explicit braces after a keyword on another line" "core/readability/layout-explicit-braces-after-a-keyword-on-another-line") (
+  (:) ((,) "layout: keywords in comments and strings" "core/readability/layout-keywords-in-comments-and-strings") (
+  (:) ((,) "layout: tabs have tab-stop indentation" "core/readability/layout-tabs-have-tab-stop-indentation") (
+  (:) ((,) "layout: indented file" "core/readability/layout-indented-file") (
+  (:) ((,) "layout: leading comment does not set the top-level column" "core/readability/layout-leading-comment-does-not-set-the-top-level-column") (
+  (:) ((,) "layout: string gap ending before the closing quote" "core/readability/layout-string-gap-ending-before-the-closing-quote") (
+  (:) ((,) "layout: explicit top-level braces" "core/readability/layout-explicit-top-level-braces") (
+  (:) ((,) "layout: parseExpr accepts an implicit do" "core/readability/layout-parseexpr-accepts-an-implicit-do") (
+  (:) ((,) "layout: diagnostics keep original line and column" "core/readability/layout-diagnostics-keep-original-line-and-column") (
+  (:) ((,) "recursion: declared polymorphism is independently checked" "core/readability/recursion-declared-polymorphism-is-independently-checked") (
+  (:) ((,) "recursion: monomorphic closure captures an outer value" "core/readability/recursion-monomorphic-closure-captures-an-outer-value") (
+  (:) ((,) "recursion: explicit quantifiers preserve their declared order" "core/readability/recursion-explicit-quantifiers-preserve-their-declared-order") (
+  (:) ((,) "recursion: unused explicit quantified variables are discharged" "core/readability/recursion-unused-explicit-quantified-variables-are-discharged") (
+  (:) ((,) "equations: parameter can shadow the function name" "core/readability/equations-parameter-can-shadow-the-function-name") (
+  (:) ((,) "readability rejection: recursive forall cannot specialize to Int" "core/readability/readability-rejection-recursive-forall-cannot-specialize-to-int") (
+  (:) ((,) "recursion: mixed signed and inferred group" "core/readability/recursion-mixed-signed-and-inferred-group") (
+  (:) ((,) "recursion: unsigned local group" "core/readability/recursion-unsigned-local-group") (
+  (:) ((,) "readability rejection: recursive existentials are not closed signatures" "core/readability/readability-rejection-recursive-existentials-are-not-closed-signatures") (
+  (:) ((,) "readability rejection: recursive signature free variable" "core/readability/readability-rejection-recursive-signature-free-variable") (
+  (:) ((,) "readability rejection: equation arity" "core/readability/readability-rejection-equation-arity") (
+  (:) ((,) "readability rejection: equations must be contiguous" "core/readability/readability-rejection-equations-must-be-contiguous") (
+  (:) ((,) "readability rejection: missing constructor equation" "core/readability/readability-rejection-missing-constructor-equation") (
+  (:) ((,) "readability rejection: missing nested constructor" "core/readability/readability-rejection-missing-nested-constructor") (
+  (:) ((,) "readability rejection: integer equations need fallback" "core/readability/readability-rejection-integer-equations-need-fallback") (
+  (:) ((,) "readability rejection: Boolean coverage" "core/readability/readability-rejection-boolean-coverage") (
+  (:) ((,) "readability rejection: mixed literal types" "core/readability/readability-rejection-mixed-literal-types") (
+  (:) ((,) "readability rejection: nested case duplicate binder" "core/readability/readability-rejection-nested-case-duplicate-binder") (
+  (:) ((,) "readability rejection: constructor arity in function pattern" "core/readability/readability-rejection-constructor-arity-in-function-pattern") (
+  (:) ((,) "readability rejection: pattern variable cannot escape an equation" "core/readability/readability-rejection-pattern-variable-cannot-escape-an-equation") (
+  (:) ((,) "readability rejection: empty implicit do" "core/readability/readability-rejection-empty-implicit-do") (
+  (:) ((,) "readability rejection: dedent closes do before application" "core/readability/readability-rejection-dedent-closes-do-before-application") (
+  (:) ((,) "readability checking: readability: factorial equations" "core/readability/readability-checking-readability-factorial-equations") (
+  (:) ((,) "readability checking: readability: recursive forall order" "core/readability/readability-checking-readability-recursive-forall-order") (
+  (:) ((,) "readability checking: readability: unused recursive forall" "core/readability/readability-checking-readability-unused-recursive-forall") (
+  (:) ((,) "readability checking: readability: mutual recursion" "core/readability/readability-checking-readability-mutual-recursion") (
+  (:) ((,) "readability checking: readability: recursive IO and do-local recursion" "core/readability/readability-checking-readability-recursive-io-and-do-local-recursion") (
+  (:) ((,) "readability checking: readability: qualified recursive function" "core/readability/readability-checking-readability-qualified-recursive-function") (
+  (:) ((,) "readability checking: readability: polymorphic recursion" "core/readability/readability-checking-readability-polymorphic-recursion") (
+  (:) ((,) "readability checking: readability: cyclic lazy value" "core/readability/readability-checking-readability-cyclic-lazy-value") (
+  (:) ((,) "readability checking: readability: nested patterns and fallback" "core/readability/readability-checking-readability-nested-patterns-and-fallback") (
+  (:) ((,) "readability checking: readability: constructor equation order keeps wildcard lazy" "core/readability/readability-checking-readability-constructor-equation-order-keeps-wildcard-lazy") (
+  (:) ((,) "readability checking: readability: nested lambda and do patterns" "core/readability/readability-checking-readability-nested-lambda-and-do-patterns") (
+  (:) ((,) "readability checking: readability: pattern annotation imports the prelude" "core/readability/readability-checking-readability-pattern-annotation-imports-the-prelude") (
+  (:) ((,) "readability checking: readability: pattern temporary hygiene" "core/readability/readability-checking-readability-pattern-temporary-hygiene") (
+  (:) ((,) "readability checking: readability: literal patterns" "core/readability/readability-checking-readability-literal-patterns") (
+  (:) ((,) "readability checking: readability: literal case order and wildcard laziness" "core/readability/readability-checking-readability-literal-case-order-and-wildcard-laziness") (
+  (:) ((,) "readability checking: readability: instance equations" "core/readability/readability-checking-readability-instance-equations") (
+  (:) ((,) "readability checking: readability: nested conditional IO layout" "core/readability/readability-checking-readability-nested-conditional-io-layout") (
+  (:) ((,) "readability checking: readability: local equation group" "core/readability/readability-checking-readability-local-equation-group") (
+  []))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
+ (:) ((,) "core/modules" (
+  (:) ((,) "modules checking: selective and qualified imports" "core/modules/modules-checking-selective-and-qualified-imports") (
+  (:) ((,) "modules checking: unnamed entry expression imports" "core/modules/modules-checking-unnamed-entry-expression-imports") (
+  (:) ((,) "modules checking: qualified types, fields and nested patterns" "core/modules/modules-checking-qualified-types-fields-and-nested-patterns") (
+  (:) ((,) "modules checking: private names and constructor identities" "core/modules/modules-checking-private-names-and-constructor-identities") (
+  (:) ((,) "modules checking: diamond reexports preserve identity" "core/modules/modules-checking-diamond-reexports-preserve-identity") (
+  (:) ((,) "modules checking: transitive empty imports carry instances and private helpers" "core/modules/modules-checking-transitive-empty-imports-carry-instances-and-private-helpers") (
+  (:) ((,) "modules checking: qualified class, hidden methods in instance declaration" "core/modules/modules-checking-qualified-class-hidden-methods-in-instance-declaration") (
+  (:) ((,) "modules checking: abstract datatype used by exported functions" "core/modules/modules-checking-abstract-datatype-used-by-exported-functions") (
+  (:) ((,) "modules checking: local shadowing and self qualification" "core/modules/modules-checking-local-shadowing-and-self-qualification") (
+  (:) ((,) "modules checking: explicit qualified Prelude" "core/modules/modules-checking-explicit-qualified-prelude") (
+  (:) ((,) "modules checking: explicit Prelude with implicit import disabled" "core/modules/modules-checking-explicit-prelude-with-implicit-import-disabled") (
+  (:) ((,) "modules checking: hiding Prelude method for local definition" "core/modules/modules-checking-hiding-prelude-method-for-local-definition") (
+  (:) ((,) "modules checking: module lexical scope protects imported do" "core/modules/modules-checking-module-lexical-scope-protects-imported-do") (
+  (:) ((,) "modules checking: polymorphic Monad function across modules" "core/modules/modules-checking-polymorphic-monad-function-across-modules") (
+  (:) ((,) "modules checking: qualified Boolean constructor patterns" "core/modules/modules-checking-qualified-boolean-constructor-patterns") (
+  (:) ((,) "modules checking: internal name hygiene" "core/modules/modules-checking-internal-name-hygiene") (
+  (:) ((,) "modules checking: same method name from distinct classes" "core/modules/modules-checking-same-method-name-from-distinct-classes") (
+  (:) ((,) "modules checking: instance may recursively use an exported helper" "core/modules/modules-checking-instance-may-recursively-use-an-exported-helper") (
+  (:) ((,) "modules checking: bare primitive fallback without implicit Prelude" "core/modules/modules-checking-bare-primitive-fallback-without-implicit-prelude") (
+  (:) ((,) "modules checking: entry selects its own main" "core/modules/modules-checking-entry-selects-its-own-main") (
+  (:) ((,) "modules checking: primitive fallback permits local definitions" "core/modules/modules-checking-primitive-fallback-permits-local-definitions") (
+  (:) ((,) "modules checking: cyclic imports preserve independent polymorphic values" "core/modules/modules-checking-cyclic-imports-preserve-independent-polymorphic-values") (
+  (:) ((,) "modules checking: cross-module recursive declaration SCC" "core/modules/modules-checking-cross-module-recursive-declaration-scc") (
+  (:) ((,) "modules checking: cross-module recursive nominal types" "core/modules/modules-checking-cross-module-recursive-nominal-types") (
+  (:) ((,) "modules checking: cyclic reexports retain the originating identity" "core/modules/modules-checking-cyclic-reexports-retain-the-originating-identity") (
+  (:) ((,) "modules checking: cyclic type reexports preserve selective member hiding" "core/modules/modules-checking-cyclic-type-reexports-preserve-selective-member-hiding") (
+  (:) ((,) "modules checking: cyclic empty imports carry defining-module instances" "core/modules/modules-checking-cyclic-empty-imports-carry-defining-module-instances") (
+  (:) ((,) "modules checking: self import is a namespace edge" "core/modules/modules-checking-self-import-is-a-namespace-edge") (
+  (:) ((,) "modules rejection: private function" "core/modules/modules-rejection-private-function") (
+  (:) ((,) "modules rejection: qualified private function" "core/modules/modules-rejection-qualified-private-function") (
+  (:) ((,) "modules rejection: selected imports exclude others" "core/modules/modules-rejection-selected-imports-exclude-others") (
+  (:) ((,) "modules rejection: qualified-only is not unqualified" "core/modules/modules-rejection-qualified-only-is-not-unqualified") (
+  (:) ((,) "modules rejection: alias replaces qualified module name" "core/modules/modules-rejection-alias-replaces-qualified-module-name") (
+  (:) ((,) "modules rejection: hiding also affects qualification" "core/modules/modules-rejection-hiding-also-affects-qualification") (
+  (:) ((,) "modules rejection: unknown import selection" "core/modules/modules-rejection-unknown-import-selection") (
+  (:) ((,) "modules rejection: unknown hidden name" "core/modules/modules-rejection-unknown-hidden-name") (
+  (:) ((,) "modules rejection: private constructor" "core/modules/modules-rejection-private-constructor") (
+  (:) ((,) "modules rejection: type-only selective import" "core/modules/modules-rejection-type-only-selective-import") (
+  (:) ((,) "modules rejection: member belongs to selected type" "core/modules/modules-rejection-member-belongs-to-selected-type") (
+  (:) ((,) "modules rejection: private type annotation" "core/modules/modules-rejection-private-type-annotation") (
+  (:) ((,) "modules rejection: hidden members cannot be reexported" "core/modules/modules-rejection-hidden-members-cannot-be-reexported") (
+  (:) ((,) "modules rejection: default exports exclude imports" "core/modules/modules-rejection-default-exports-exclude-imports") (
+  (:) ((,) "modules rejection: transitive names are not imported" "core/modules/modules-rejection-transitive-names-are-not-imported") (
+  (:) ((,) "modules rejection: distinct imports are ambiguous" "core/modules/modules-rejection-distinct-imports-are-ambiguous") (
+  (:) ((,) "modules rejection: top-level import collision requires hiding" "core/modules/modules-rejection-top-level-import-collision-requires-hiding") (
+  (:) ((,) "modules rejection: explicit reexport conflict" "core/modules/modules-rejection-explicit-reexport-conflict") (
+  (:) ((,) "modules rejection: unknown module reexport" "core/modules/modules-rejection-unknown-module-reexport") (
+  (:) ((,) "modules rejection: qualified-only module reexport has no unqualified names" "core/modules/modules-rejection-qualified-only-module-reexport-has-no-unqualified-names") (
+  (:) ((,) "modules rejection: empty exports" "core/modules/modules-rejection-empty-exports") (
+  (:) ((,) "modules rejection: missing module" "core/modules/modules-rejection-missing-module") (
+  (:) ((,) "modules rejection: mismatched module header" "core/modules/modules-rejection-mismatched-module-header") (
+  (:) ((,) "modules rejection: unnamed library" "core/modules/modules-rejection-unnamed-library") (
+  (:) ((,) "modules rejection: cyclic import still checks invalid declarations" "core/modules/modules-rejection-cyclic-import-still-checks-invalid-declarations") (
+  (:) ((,) "modules rejection: self import still checks invalid declarations" "core/modules/modules-rejection-self-import-still-checks-invalid-declarations") (
+  (:) ((,) "modules rejection: module header followed by bare expression" "core/modules/modules-rejection-module-header-followed-by-bare-expression") (
+  (:) ((,) "modules rejection: imports must precede definitions" "core/modules/modules-rejection-imports-must-precede-definitions") (
+  (:) ((,) "modules rejection: definitions cannot be qualified" "core/modules/modules-rejection-definitions-cannot-be-qualified") (
+  (:) ((,) "modules rejection: explicit empty Prelude removes value names" "core/modules/modules-rejection-explicit-empty-prelude-removes-value-names") (
+  (:) ((,) "modules rejection: qualified Prelude suppresses implicit Prelude" "core/modules/modules-rejection-qualified-prelude-suppresses-implicit-prelude") (
+  (:) ((,) "modules rejection: Prelude cannot be redefined" "core/modules/modules-rejection-prelude-cannot-be-redefined") (
+  (:) ((,) "modules rejection: ordinary Unit constructor is not builtin unit" "core/modules/modules-rejection-ordinary-unit-constructor-is-not-builtin-unit") (
+  (:) ((,) "modules rejection: primitive type cannot be redefined" "core/modules/modules-rejection-primitive-type-cannot-be-redefined") (
+  (:) ((,) "modules rejection: unused private definitions still checked" "core/modules/modules-rejection-unused-private-definitions-still-checked") (
+  (:) ((,) "modules rejection: export list cannot name missing value" "core/modules/modules-rejection-export-list-cannot-name-missing-value") (
+  (:) ((,) "modules rejection: recursive signature error names the source function" "core/modules/modules-rejection-recursive-signature-error-names-the-source-function") (
+  (:) ((,) "modules rejection: instance not visible in imported signed definition" "core/modules/modules-rejection-instance-not-visible-in-imported-signed-definition") (
+  (:) ((,) "modules rejection: instance not visible in another instance" "core/modules/modules-rejection-instance-not-visible-in-another-instance") (
+  (:) ((,) "modules rejection: cyclic private constructor remains hidden" "core/modules/modules-rejection-cyclic-private-constructor-remains-hidden") (
+  (:) ((,) "modules rejection: cyclic reexports cannot invent a missing identity" "core/modules/modules-rejection-cyclic-reexports-cannot-invent-a-missing-identity") (
+  (:) ((,) "modules rejection: downstream orphan cannot leak into an import cycle" "core/modules/modules-rejection-downstream-orphan-cannot-leak-into-an-import-cycle") (
+  (:) ((,) "modules: original source type names" "core/modules/modules-original-source-type-names") (
+  (:) ((,) "modules: unit syntax is intrinsic" "core/modules/modules-unit-syntax-is-intrinsic") (
+  (:) ((,) "modules: empty libraries and multiline headers" "core/modules/modules-empty-libraries-and-multiline-headers") (
+  (:) ((,) "modules: explicit braces and layout parse identically" "core/modules/modules-explicit-braces-and-layout-parse-identically") (
+  (:) ((,) "modules: libraries can be parsed without main" "core/modules/modules-libraries-can-be-parsed-without-main") (
+  (:) ((,) "modules: unused imports do not cause value ambiguity" "core/modules/modules-unused-imports-do-not-cause-value-ambiguity") (
+  (:) ((,) "modules: legacy compile path preserves checked output" "core/modules/modules-legacy-compile-path-preserves-checked-output") (
+  (:) ((,) "modules: file loader, includes, hierarchy and errors" "core/modules/modules-file-loader-includes-hierarchy-and-errors") (
+  (:) ((,) "modules typing: cross-module recursion infers unsigned cycle" "core/modules/modules-typing-cross-module-recursion-infers-unsigned-cycle") (
+  (:) ((,) "modules typing: cross-module qualified recursion generalizes shared exports" "core/modules/modules-typing-cross-module-qualified-recursion-generalizes-shared-exports") (
+  (:) ((,) "crate namespaces resolve recursive declarations before inference" "core/modules/crate-namespaces-resolve-recursive-declarations-before-inference") (
+  (:) ((,) "crate namespace resolution preserves external ownership and mangling" "core/modules/crate-namespace-resolution-preserves-external-ownership-and-mangling") (
+  (:) ((,) "cyclic export fixed point is invariant under source order" "core/modules/cyclic-export-fixed-point-is-invariant-under-source-order") (
+  []))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
+ (:) ((,) "core/separate-compilation" (
+  (:) ((,) "crate checking: selective and qualified imports" "core/separate-compilation/crate-checking-selective-and-qualified-imports") (
+  (:) ((,) "crate checking: unnamed entry expression imports" "core/separate-compilation/crate-checking-unnamed-entry-expression-imports") (
+  (:) ((,) "crate checking: qualified types, fields and nested patterns" "core/separate-compilation/crate-checking-qualified-types-fields-and-nested-patterns") (
+  (:) ((,) "crate checking: private names and constructor identities" "core/separate-compilation/crate-checking-private-names-and-constructor-identities") (
+  (:) ((,) "crate checking: diamond reexports preserve identity" "core/separate-compilation/crate-checking-diamond-reexports-preserve-identity") (
+  (:) ((,) "crate checking: transitive empty imports carry instances and private helpers" "core/separate-compilation/crate-checking-transitive-empty-imports-carry-instances-and-private-helpers") (
+  (:) ((,) "crate checking: qualified class, hidden methods in instance declaration" "core/separate-compilation/crate-checking-qualified-class-hidden-methods-in-instance-declaration") (
+  (:) ((,) "crate checking: abstract datatype used by exported functions" "core/separate-compilation/crate-checking-abstract-datatype-used-by-exported-functions") (
+  (:) ((,) "crate checking: local shadowing and self qualification" "core/separate-compilation/crate-checking-local-shadowing-and-self-qualification") (
+  (:) ((,) "crate checking: explicit qualified Prelude" "core/separate-compilation/crate-checking-explicit-qualified-prelude") (
+  (:) ((,) "crate checking: explicit Prelude with implicit import disabled" "core/separate-compilation/crate-checking-explicit-prelude-with-implicit-import-disabled") (
+  (:) ((,) "crate checking: hiding Prelude method for local definition" "core/separate-compilation/crate-checking-hiding-prelude-method-for-local-definition") (
+  (:) ((,) "crate checking: module lexical scope protects imported do" "core/separate-compilation/crate-checking-module-lexical-scope-protects-imported-do") (
+  (:) ((,) "crate checking: polymorphic Monad function across modules" "core/separate-compilation/crate-checking-polymorphic-monad-function-across-modules") (
+  (:) ((,) "crate checking: qualified Boolean constructor patterns" "core/separate-compilation/crate-checking-qualified-boolean-constructor-patterns") (
+  (:) ((,) "crate checking: internal name hygiene" "core/separate-compilation/crate-checking-internal-name-hygiene") (
+  (:) ((,) "crate checking: same method name from distinct classes" "core/separate-compilation/crate-checking-same-method-name-from-distinct-classes") (
+  (:) ((,) "crate checking: instance may recursively use an exported helper" "core/separate-compilation/crate-checking-instance-may-recursively-use-an-exported-helper") (
+  (:) ((,) "crate checking: bare primitive fallback without implicit Prelude" "core/separate-compilation/crate-checking-bare-primitive-fallback-without-implicit-prelude") (
+  (:) ((,) "crate checking: entry selects its own main" "core/separate-compilation/crate-checking-entry-selects-its-own-main") (
+  (:) ((,) "crate checking: primitive fallback permits local definitions" "core/separate-compilation/crate-checking-primitive-fallback-permits-local-definitions") (
+  (:) ((,) "crate checking: cyclic imports preserve independent polymorphic values" "core/separate-compilation/crate-checking-cyclic-imports-preserve-independent-polymorphic-values") (
+  (:) ((,) "crate checking: cross-module recursive declaration SCC" "core/separate-compilation/crate-checking-cross-module-recursive-declaration-scc") (
+  (:) ((,) "crate checking: cross-module recursive nominal types" "core/separate-compilation/crate-checking-cross-module-recursive-nominal-types") (
+  (:) ((,) "crate checking: cyclic reexports retain the originating identity" "core/separate-compilation/crate-checking-cyclic-reexports-retain-the-originating-identity") (
+  (:) ((,) "crate checking: cyclic type reexports preserve selective member hiding" "core/separate-compilation/crate-checking-cyclic-type-reexports-preserve-selective-member-hiding") (
+  (:) ((,) "crate checking: cyclic empty imports carry defining-module instances" "core/separate-compilation/crate-checking-cyclic-empty-imports-carry-defining-module-instances") (
+  (:) ((,) "crate checking: self import is a namespace edge" "core/separate-compilation/crate-checking-self-import-is-a-namespace-edge") (
+  (:) ((,) "crate checking: inferred overloaded export" "core/separate-compilation/crate-checking-inferred-overloaded-export") (
+  (:) ((,) "crate checking: rank-n constructor field" "core/separate-compilation/crate-checking-rank-n-constructor-field") (
+  (:) ((,) "crate checking: class-free bounded annotation rules" "core/separate-compilation/crate-checking-class-free-bounded-annotation-rules") (
+  (:) ((,) "crate checking: unexported nominal type in inferred signature" "core/separate-compilation/crate-checking-unexported-nominal-type-in-inferred-signature") (
+  (:) ((,) "crate checking: mutually recursive module values" "core/separate-compilation/crate-checking-mutually-recursive-module-values") (
+  (:) ((,) "crate checking: Unicode interface identity" "core/separate-compilation/crate-checking-unicode-interface-identity") (
+  (:) ((,) "crate checking: nominal global cannot capture local binder" "core/separate-compilation/crate-checking-nominal-global-cannot-capture-local-binder") (
+  (:) ((,) "crate checking: imported entry binding" "core/separate-compilation/crate-checking-imported-entry-binding") (
+  (:) ((,) "crate checking: crate local and dictionary fresh names avoid user globals" "core/separate-compilation/crate-checking-crate-local-and-dictionary-fresh-names-avoid-user-globals") (
+  (:) ((,) "crate rejects: private function" "core/separate-compilation/crate-rejects-private-function") (
+  (:) ((,) "crate rejects: qualified private function" "core/separate-compilation/crate-rejects-qualified-private-function") (
+  (:) ((,) "crate rejects: selected imports exclude others" "core/separate-compilation/crate-rejects-selected-imports-exclude-others") (
+  (:) ((,) "crate rejects: qualified-only is not unqualified" "core/separate-compilation/crate-rejects-qualified-only-is-not-unqualified") (
+  (:) ((,) "crate rejects: alias replaces qualified module name" "core/separate-compilation/crate-rejects-alias-replaces-qualified-module-name") (
+  (:) ((,) "crate rejects: hiding also affects qualification" "core/separate-compilation/crate-rejects-hiding-also-affects-qualification") (
+  (:) ((,) "crate rejects: unknown import selection" "core/separate-compilation/crate-rejects-unknown-import-selection") (
+  (:) ((,) "crate rejects: unknown hidden name" "core/separate-compilation/crate-rejects-unknown-hidden-name") (
+  (:) ((,) "crate rejects: private constructor" "core/separate-compilation/crate-rejects-private-constructor") (
+  (:) ((,) "crate rejects: type-only selective import" "core/separate-compilation/crate-rejects-type-only-selective-import") (
+  (:) ((,) "crate rejects: member belongs to selected type" "core/separate-compilation/crate-rejects-member-belongs-to-selected-type") (
+  (:) ((,) "crate rejects: private type annotation" "core/separate-compilation/crate-rejects-private-type-annotation") (
+  (:) ((,) "crate rejects: hidden members cannot be reexported" "core/separate-compilation/crate-rejects-hidden-members-cannot-be-reexported") (
+  (:) ((,) "crate rejects: default exports exclude imports" "core/separate-compilation/crate-rejects-default-exports-exclude-imports") (
+  (:) ((,) "crate rejects: transitive names are not imported" "core/separate-compilation/crate-rejects-transitive-names-are-not-imported") (
+  (:) ((,) "crate rejects: distinct imports are ambiguous" "core/separate-compilation/crate-rejects-distinct-imports-are-ambiguous") (
+  (:) ((,) "crate rejects: top-level import collision requires hiding" "core/separate-compilation/crate-rejects-top-level-import-collision-requires-hiding") (
+  (:) ((,) "crate rejects: explicit reexport conflict" "core/separate-compilation/crate-rejects-explicit-reexport-conflict") (
+  (:) ((,) "crate rejects: unknown module reexport" "core/separate-compilation/crate-rejects-unknown-module-reexport") (
+  (:) ((,) "crate rejects: qualified-only module reexport has no unqualified names" "core/separate-compilation/crate-rejects-qualified-only-module-reexport-has-no-unqualified-names") (
+  (:) ((,) "crate rejects: empty exports" "core/separate-compilation/crate-rejects-empty-exports") (
+  (:) ((,) "crate rejects: missing module" "core/separate-compilation/crate-rejects-missing-module") (
+  (:) ((,) "crate rejects: mismatched module header" "core/separate-compilation/crate-rejects-mismatched-module-header") (
+  (:) ((,) "crate rejects: unnamed library" "core/separate-compilation/crate-rejects-unnamed-library") (
+  (:) ((,) "crate rejects: cyclic import still checks invalid declarations" "core/separate-compilation/crate-rejects-cyclic-import-still-checks-invalid-declarations") (
+  (:) ((,) "crate rejects: self import still checks invalid declarations" "core/separate-compilation/crate-rejects-self-import-still-checks-invalid-declarations") (
+  (:) ((,) "crate rejects: module header followed by bare expression" "core/separate-compilation/crate-rejects-module-header-followed-by-bare-expression") (
+  (:) ((,) "crate rejects: imports must precede definitions" "core/separate-compilation/crate-rejects-imports-must-precede-definitions") (
+  (:) ((,) "crate rejects: definitions cannot be qualified" "core/separate-compilation/crate-rejects-definitions-cannot-be-qualified") (
+  (:) ((,) "crate rejects: explicit empty Prelude removes value names" "core/separate-compilation/crate-rejects-explicit-empty-prelude-removes-value-names") (
+  (:) ((,) "crate rejects: qualified Prelude suppresses implicit Prelude" "core/separate-compilation/crate-rejects-qualified-prelude-suppresses-implicit-prelude") (
+  (:) ((,) "crate rejects: Prelude cannot be redefined" "core/separate-compilation/crate-rejects-prelude-cannot-be-redefined") (
+  (:) ((,) "crate rejects: ordinary Unit constructor is not builtin unit" "core/separate-compilation/crate-rejects-ordinary-unit-constructor-is-not-builtin-unit") (
+  (:) ((,) "crate rejects: primitive type cannot be redefined" "core/separate-compilation/crate-rejects-primitive-type-cannot-be-redefined") (
+  (:) ((,) "crate rejects: unused private definitions still checked" "core/separate-compilation/crate-rejects-unused-private-definitions-still-checked") (
+  (:) ((,) "crate rejects: export list cannot name missing value" "core/separate-compilation/crate-rejects-export-list-cannot-name-missing-value") (
+  (:) ((,) "crate rejects: recursive signature error names the source function" "core/separate-compilation/crate-rejects-recursive-signature-error-names-the-source-function") (
+  (:) ((,) "crate rejects: instance not visible in imported signed definition" "core/separate-compilation/crate-rejects-instance-not-visible-in-imported-signed-definition") (
+  (:) ((,) "crate rejects: instance not visible in another instance" "core/separate-compilation/crate-rejects-instance-not-visible-in-another-instance") (
+  (:) ((,) "crate rejects: cyclic private constructor remains hidden" "core/separate-compilation/crate-rejects-cyclic-private-constructor-remains-hidden") (
+  (:) ((,) "crate rejects: cyclic reexports cannot invent a missing identity" "core/separate-compilation/crate-rejects-cyclic-reexports-cannot-invent-a-missing-identity") (
+  (:) ((,) "crate rejects: downstream orphan cannot leak into an import cycle" "core/separate-compilation/crate-rejects-downstream-orphan-cannot-leak-into-an-import-cycle") (
+  (:) ((,) "crate typing: cross-module recursion infers unsigned cycle" "core/separate-compilation/crate-typing-cross-module-recursion-infers-unsigned-cycle") (
+  (:) ((,) "crate typing: cross-module qualified recursion generalizes shared exports" "core/separate-compilation/crate-typing-cross-module-qualified-recursion-generalizes-shared-exports") (
+  (:) ((,) "crate paths and native cache commands" "core/separate-compilation/crate-paths-and-native-cache-commands") (
+  (:) ((,) "crate metadata version rejection" "core/separate-compilation/crate-metadata-version-rejection") (
+  (:) ((,) "crate object binding schemes are independently checked" "core/separate-compilation/crate-object-binding-schemes-are-independently-checked") (
+  (:) ((,) "crate datatype metadata is independently reconstructed" "core/separate-compilation/crate-datatype-metadata-is-independently-reconstructed") (
+  (:) ((,) "crate unused import parameters retain checked schemes" "core/separate-compilation/crate-unused-import-parameters-retain-checked-schemes") (
+  [])))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
+ (:) ((,) "core/state-types" (
+  (:) ((,) "ST source type: return" "core/state-types/st-source-type-return") (
+  (:) ((,) "ST source type: bind" "core/state-types/st-source-type-bind") (
+  (:) ((,) "ST source type: array-read" "core/state-types/st-source-type-array-read") (
+  (:) ((,) "ST source type: array-write" "core/state-types/st-source-type-array-write") (
+  (:) ((,) "ST source type: array-length" "core/state-types/st-source-type-array-length") (
+  (:) ((,) "ST source type: implicit-do" "core/state-types/st-source-type-implicit-do") (
+  (:) ((,) "ST source type: implicit-return" "core/state-types/st-source-type-implicit-return") (
+  (:) ((,) "ST source type: explicit-action-signature" "core/state-types/st-source-type-explicit-action-signature") (
+  (:) ((,) "ST source type: polymorphic-result" "core/state-types/st-source-type-polymorphic-result") (
+  (:) ((,) "ST source type: impredicative-array-functions" "core/state-types/st-source-type-impredicative-array-functions") (
+  (:) ((,) "ST source type: nested-independent" "core/state-types/st-source-type-nested-independent") (
+  (:) ((,) "ST source type: reuse-independent-allocation" "core/state-types/st-source-type-reuse-independent-allocation") (
+  (:) ((,) "ST source type: pure-io-description-result" "core/state-types/st-source-type-pure-io-description-result") (
+  (:) ((,) "ST source type: unused-poisoned-cell" "core/state-types/st-source-type-unused-poisoned-cell") (
+  (:) ((,) "ST source type: snapshot" "core/state-types/st-source-type-snapshot") (
+  (:) ((,) "ST source type: repeated-read-action" "core/state-types/st-source-type-repeated-read-action") (
+  (:) ((,) "ST source type: higher-order-runner" "core/state-types/st-source-type-higher-order-runner") (
+  (:) ((,) "ST source type: primitive-shadowing" "core/state-types/st-source-type-primitive-shadowing") (
+  (:) ((,) "ST source type: qualified-prelude-import" "core/state-types/st-source-type-qualified-prelude-import") (
+  (:) ((,) "ST source type: explicit-prelude-types" "core/state-types/st-source-type-explicit-prelude-types") (
+  (:) ((,) "ST source type: opaque-existential-package" "core/state-types/st-source-type-opaque-existential-package") (
+  (:) ((,) "ST source type: opaque-parametric-callback" "core/state-types/st-source-type-opaque-parametric-callback") (
+  (:) ((,) "ST source type: escape-array" "core/state-types/st-source-type-escape-array") (
+  (:) ((,) "ST source type: escape-through-bind" "core/state-types/st-source-type-escape-through-bind") (
+  (:) ((,) "ST source type: escape-through-data" "core/state-types/st-source-type-escape-through-data") (
+  (:) ((,) "ST source type: escape-read-action" "core/state-types/st-source-type-escape-read-action") (
+  (:) ((,) "ST source type: escape-write-action" "core/state-types/st-source-type-escape-write-action") (
+  (:) ((,) "ST source type: escape-reader-closure" "core/state-types/st-source-type-escape-reader-closure") (
+  (:) ((,) "ST source type: nested-read-outer-region" "core/state-types/st-source-type-nested-read-outer-region") (
+  (:) ((,) "ST source type: nested-write-outer-region" "core/state-types/st-source-type-nested-write-outer-region") (
+  (:) ((,) "ST source type: cross-region-read-signature" "core/state-types/st-source-type-cross-region-read-signature") (
+  (:) ((,) "ST source type: cross-region-write-signature" "core/state-types/st-source-type-cross-region-write-signature") (
+  (:) ((,) "ST source type: monomorphic-argument" "core/state-types/st-source-type-monomorphic-argument") (
+  (:) ((,) "ST source type: monomorphic-bound-argument" "core/state-types/st-source-type-monomorphic-bound-argument") (
+  (:) ((,) "ST source type: monomorphic-runner-signature" "core/state-types/st-source-type-monomorphic-runner-signature") (
+  (:) ((,) "ST source type: io-as-st" "core/state-types/st-source-type-io-as-st") (
+  (:) ((,) "ST source type: bind-io-action" "core/state-types/st-source-type-bind-io-action") (
+  (:) ((,) "ST source type: bind-io-continuation" "core/state-types/st-source-type-bind-io-continuation") (
+  (:) ((,) "ST source type: io-bind-st-action" "core/state-types/st-source-type-io-bind-st-action") (
+  (:) ((,) "ST source type: io-array-as-st-array" "core/state-types/st-source-type-io-array-as-st-array") (
+  (:) ((,) "ST source type: wrong-array-value-type" "core/state-types/st-source-type-wrong-array-value-type") (
+  (:) ((,) "ST source type: polymorphic-reference-attack" "core/state-types/st-source-type-polymorphic-reference-attack") (
+  (:) ((,) "ST source type: impredicative-reference-attack" "core/state-types/st-source-type-impredicative-reference-attack") (
+  (:) ((,) "ST source type: repackage-action-as-region-polymorphic" "core/state-types/st-source-type-repackage-action-as-region-polymorphic") (
+  (:) ((,) "ST source type: existential-coercion-escape" "core/state-types/st-source-type-existential-coercion-escape") (
+  (:) ((,) "ST source type: opaque-package-read-attack" "core/state-types/st-source-type-opaque-package-read-attack") (
+  (:) ((,) "ST source type: opaque-package-write-attack" "core/state-types/st-source-type-opaque-package-write-attack") (
+  (:) ((,) "ST source type: redefine-st" "core/state-types/st-source-type-redefine-st") (
+  (:) ((,) "ST source type: redefine-array" "core/state-types/st-source-type-redefine-array") (
+  (:) ((,) "ST source type: construct-opaque-st" "core/state-types/st-source-type-construct-opaque-st") (
+  (:) ((,) "ST source type: construct-opaque-array" "core/state-types/st-source-type-construct-opaque-array") (
+  (:) ((,) "ST source type: pattern-opaque-st" "core/state-types/st-source-type-pattern-opaque-st") (
+  (:) ((,) "ST source type: st-wrong-arity" "core/state-types/st-source-type-st-wrong-arity") (
+  (:) ((,) "ST source type: array-wrong-arity" "core/state-types/st-source-type-array-wrong-arity") (
+  (:) ((,) "ST source type: st-region-wrong-kind" "core/state-types/st-source-type-st-region-wrong-kind") (
+  (:) ((,) "ST source type: array-element-wrong-kind" "core/state-types/st-source-type-array-element-wrong-kind") (
+  (:) ((,) "ST target type: rank2-runner" "core/state-types/st-target-type-rank2-runner") (
+  (:) ((,) "ST target type: monomorphic-action-value" "core/state-types/st-target-type-monomorphic-action-value") (
+  (:) ((,) "ST target type: rank2-region-action" "core/state-types/st-target-type-rank2-region-action") (
+  (:) ((,) "ST target type: monomorphic-runST-input" "core/state-types/st-target-type-monomorphic-runst-input") (
+  (:) ((,) "ST target type: outer-forall-cannot-replace-inner" "core/state-types/st-target-type-outer-forall-cannot-replace-inner") (
+  (:) ((,) "ST target type: io-to-st-cast" "core/state-types/st-target-type-io-to-st-cast") (
+  (:) ((,) "ST target type: cross-region-read" "core/state-types/st-target-type-cross-region-read") (
+  (:) ((,) "ST target type: cross-region-write" "core/state-types/st-target-type-cross-region-write") (
+  (:) ((,) "ST target type: unbound-region" "core/state-types/st-target-type-unbound-region") (
+  (:) ((,) "ST target type: runST-extra-type-argument" "core/state-types/st-target-type-runst-extra-type-argument") (
+  (:) ((,) "ST target type: higher-kind-region" "core/state-types/st-target-type-higher-kind-region") (
+  (:) ((,) "ST target type: unexecuted-array-action" "core/state-types/st-target-type-unexecuted-array-action") (
+  (:) ((,) "ST primitive ABI is appended and action construction stays lazy" "core/state-types/st-primitive-abi-is-appended-and-action-construction-stays-lazy") (
+  (:) ((,) "ST primitives work with implicit prelude disabled" "core/state-types/st-primitives-work-with-implicit-prelude-disabled") (
+  [])))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
+ (:) ((,) "core/hm-oracle" (
+  (:) ((,) "independent ML typability oracle" "core/hm-oracle/independent-ml-typability-oracle") (
+  []))) (
+ (:) ((,) "core/annotation-corpus" (
+  (:) ((,) "annotation corpus" "core/annotation-corpus/annotation-corpus") (
+  []))) (
+ (:) ((,) "core/example-files" (
+  (:) ((,) "example files" "core/example-files/example-files") (
+  []))) (
+ (:) ((,) "core/guards" (
+  (:) ((,) "guards parser: ordered expression arms" "core/guards/guards-parser-ordered-expression-arms") (
+  (:) ((,) "guards parser: fallback-only expression" "core/guards/guards-parser-fallback-only-expression") (
+  (:) ((,) "guards parser: expression trailing separator" "core/guards/guards-parser-expression-trailing-separator") (
+  (:) ((,) "guards parser: nested expression arms" "core/guards/guards-parser-nested-expression-arms") (
+  (:) ((,) "guards parser: ordinary if inside guarded branches" "core/guards/guards-parser-ordinary-if-inside-guarded-branches") (
+  (:) ((,) "guards parser: arithmetic and Boolean precedence" "core/guards/guards-parser-arithmetic-and-boolean-precedence") (
+  (:) ((,) "guards parser: otherwise call remains a condition" "core/guards/guards-parser-otherwise-call-remains-a-condition") (
+  (:) ((,) "guards parser: qualified otherwise remains a condition" "core/guards/guards-parser-qualified-otherwise-remains-a-condition") (
+  (:) ((,) "guards parser: parenthesized otherwise remains a condition" "core/guards/guards-parser-parenthesized-otherwise-remains-a-condition") (
+  (:) ((,) "guards program: function guard layout" "core/guards/guards-program-function-guard-layout") (
+  (:) ((,) "guards program: function guard nested block layout" "core/guards/guards-program-function-guard-nested-block-layout") (
+  (:) ((,) "guards program: expression guard inside ordinary then-do layout" "core/guards/guards-program-expression-guard-inside-ordinary-then-do-layout") (
+  (:) ((,) "guards program: ordinary if identifier compatibility" "core/guards/guards-program-ordinary-if-identifier-compatibility") (
+  (:) ((,) "guards parser: legacy annotation in RHS before bar" "core/guards/guards-parser-legacy-annotation-in-rhs-before-bar") (
+  (:) ((,) "guards parser: legacy annotation in condition before equals" "core/guards/guards-parser-legacy-annotation-in-condition-before-equals") (
+  (:) ((,) "guards parser: diagnostics keep original line and column" "core/guards/guards-parser-diagnostics-keep-original-line-and-column") (
+  (:) ((,) "guards checking: guarded values generalize" "core/guards/guards-checking-guarded-values-generalize") (
+  (:) ((,) "guards checking: separate whole-function signature" "core/guards/guards-checking-separate-whole-function-signature") (
+  (:) ((,) "guards checking: inline whole-function signature" "core/guards/guards-checking-inline-whole-function-signature") (
+  (:) ((,) "guards checking: annotated parameter" "core/guards/guards-checking-annotated-parameter") (
+  (:) ((,) "guards checking: local guard sees outer binding" "core/guards/guards-checking-local-guard-sees-outer-binding") (
+  (:) ((,) "guards checking: pattern binders scope over guards and results" "core/guards/guards-checking-pattern-binders-scope-over-guards-and-results") (
+  (:) ((,) "guards checking: guard condition can contain an expression guard" "core/guards/guards-checking-guard-condition-can-contain-an-expression-guard") (
+  (:) ((,) "guards checking: unselected branches preserve polymorphism" "core/guards/guards-checking-unselected-branches-preserve-polymorphism") (
+  (:) ((,) "guards checking: no implicit prelude required" "core/guards/guards-checking-no-implicit-prelude-required") (
+  (:) ((,) "guards rejection: expression condition requires Bool" "core/guards/guards-rejection-expression-condition-requires-bool") (
+  (:) ((,) "guards rejection: function condition requires Bool" "core/guards/guards-rejection-function-condition-requires-bool") (
+  (:) ((,) "guards rejection: all result types agree" "core/guards/guards-rejection-all-result-types-agree") (
+  (:) ((,) "guards rejection: unselected condition is checked" "core/guards/guards-rejection-unselected-condition-is-checked") (
+  (:) ((,) "guards rejection: pattern coverage remains exhaustive" "core/guards/guards-rejection-pattern-coverage-remains-exhaustive") (
+  (:) ((,) "guards rejection: total guards do not fall through to another equation" "core/guards/guards-rejection-total-guards-do-not-fall-through-to-another-equation") (
+  (:) ((,) "guards rejection: pattern binder does not enter sibling equation" "core/guards/guards-rejection-pattern-binder-does-not-enter-sibling-equation") (
+  (:) ((,) "guards rejection: pattern binder does not escape function" "core/guards/guards-rejection-pattern-binder-does-not-escape-function") (
+  (:) ((,) "guards rejection: branch binding does not enter sibling guard" "core/guards/guards-rejection-branch-binding-does-not-enter-sibling-guard") (
+  (:) ((,) "guards rejection: expression fallback required" "core/guards/guards-rejection-expression-fallback-required") (
+  (:) ((,) "guards rejection: function fallback required" "core/guards/guards-rejection-function-fallback-required") (
+  (:) ((,) "guards rejection: expression fallback must be last" "core/guards/guards-rejection-expression-fallback-must-be-last") (
+  (:) ((,) "guards rejection: function fallback must be last" "core/guards/guards-rejection-function-fallback-must-be-last") (
+  (:) ((,) "guards rejection: duplicate expression fallback" "core/guards/guards-rejection-duplicate-expression-fallback") (
+  (:) ((,) "guards rejection: duplicate function fallback" "core/guards/guards-rejection-duplicate-function-fallback") (
+  (:) ((,) "guards rejection: empty expression block" "core/guards/guards-rejection-empty-expression-block") (
+  (:) ((,) "guards rejection: expression arm requires arrow" "core/guards/guards-rejection-expression-arm-requires-arrow") (
+  (:) ((,) "guards rejection: function arm requires equals" "core/guards/guards-rejection-function-arm-requires-equals") (
+  (:) ((,) "guards rejection: expression arm requires result" "core/guards/guards-rejection-expression-arm-requires-result") (
+  (:) ((,) "guards rejection: comma guards are not accepted" "core/guards/guards-rejection-comma-guards-are-not-accepted") (
+  (:) ((,) "guards rejection: pattern guards are not accepted" "core/guards/guards-rejection-pattern-guards-are-not-accepted") (
+  (:) ((,) "guards rejection: expression guard block needs braces" "core/guards/guards-rejection-expression-guard-block-needs-braces") (
+  (:) ((,) "guards checking: guards runtime: first match and short circuit" "core/guards/guards-checking-guards-runtime-first-match-and-short-circuit") (
+  (:) ((,) "guards checking: guards runtime: only selected IO executes" "core/guards/guards-checking-guards-runtime-only-selected-io-executes") (
+  (:) ((,) "guards checking: guards runtime: local and recursive bindings" "core/guards/guards-checking-guards-runtime-local-and-recursive-bindings") (
+  (:) ((,) "guards checking: guards runtime: patterns and instance methods" "core/guards/guards-checking-guards-runtime-patterns-and-instance-methods") (
+  (:) ((,) "guards checking: guards runtime: nested ordinary and guarded conditionals" "core/guards/guards-checking-guards-runtime-nested-ordinary-and-guarded-conditionals") (
+  (:) ((,) "guards checking: guards runtime: case bodies and lazy wildcard" "core/guards/guards-checking-guards-runtime-case-bodies-and-lazy-wildcard") (
+  (:) ((,) "guards checking: guards runtime: contextual otherwise compatibility" "core/guards/guards-checking-guards-runtime-contextual-otherwise-compatibility") (
+  (:) ((,) "guards checking: guards runtime: dynamic selection and primitive hygiene" "core/guards/guards-checking-guards-runtime-dynamic-selection-and-primitive-hygiene") (
+  []))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
+ [])))))))))))))))))))))))))))))))))))
 
 familyBindings name = S.lookup eqString name bindings
 scope : String -> Bool -> C.Case -> C.Case
 scope target complete (C.Case identity label tags action) =
- C.Case identity label (S.append tags (Cons "logical-unit:core"
-  (Cons ("physical-target:" ++ target) (Cons ("logical-scope:" ++ (if complete then "full" else "partial"))
-  (Cons "qualification:ineligible" (Cons "adapter:legacy-process" Nil)))))) action
+ C.Case identity label (S.append tags ((:) "logical-unit:core"
+  ((:) ("physical-target:" ++ target) ((:) ("logical-scope:" ++ (if complete then "full" else "partial"))
+  ((:) "qualification:ineligible" ((:) "adapter:legacy-process" [])))))) action
 
-registerFamily : String -> Bool -> Pair String (List (Pair String (IO Unit))) -> Either String (List C.Case)
-registerFamily target complete (Pair family actions) = case familyBindings family of
+registerFamily : String -> Bool -> (,) String ([] ((,) String (IO ()))) -> Either String ([] C.Case)
+registerFamily target complete ((,) family actions) = case familyBindings family of
  Nothing -> Left "core family has no reviewed leaf bindings"
  Just expected ->
   if S.not (S.eqList eqString (S.map S.fst actions) (S.map S.fst expected)) then
    Left ("core action labels differ from frozen family bindings: " ++ family)
-  else Right (S.map (\(Pair label body) ->
+  else Right (S.map (\((,) label body) ->
    let identity = S.fromMaybe (panic "validated core binding disappeared") (S.lookup eqString label expected) in
-   scope target complete (C.fromIO identity (Cons ("family:" ++ family) Nil) (Pair label body))) actions)
-register : String -> Bool -> List (Pair String (List (Pair String (IO Unit)))) -> Either String (List C.Case)
+   scope target complete (C.fromIO identity ((:) ("family:" ++ family) []) ((,) label body))) actions)
+register : String -> Bool -> [] ((,) String ([] ((,) String (IO ())))) -> Either String ([] C.Case)
 register target complete families = do
  rows <- S.mapM (registerFamily target complete) families
  Right (S.concat rows)

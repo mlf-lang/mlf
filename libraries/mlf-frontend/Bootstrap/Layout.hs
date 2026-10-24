@@ -12,15 +12,18 @@ module Bootstrap.Layout where {
   data Frame = Layout LayoutKind Int | Explicit String | Marker LayoutMark Int;
   data Pending = Open LayoutKind | AfterLet Int;
   layoutTokens :: Bool -> String -> String -> Either String Scanned;
-  layoutTokens program file source =
-    case scanTokens file source of {
+  layoutTokens = layoutTokensWithScanner scanTokens;
+  layoutTokensWithScanner :: (String -> String -> Either String Scanned) ->
+                             Bool -> String -> String -> Either String Scanned;
+  layoutTokensWithScanner scanner program file source =
+    case scanner file source of {
       Left e -> Left e;
       Right (Scanned tokens finish) ->
         let {
           first =
             case tokens of {
-              Nil -> finish;
-              Cons t _ -> t
+              [] -> finish;
+              (:) t _ -> t
             }
         } in
         let {
@@ -31,13 +34,13 @@ module Bootstrap.Layout where {
         let {
           frames =
             if implicit
-            then Cons (Layout LayoutTop (lineIndent source (tokenLine first))) Nil
-            else Nil
+            then (:) (Layout LayoutTop (lineIndent source (tokenLine first))) []
+            else []
         } in
         let {
           arranged = arrange frames Nothing Nothing tokens finish
         } in
-        Right (Scanned (if implicit then Cons (virtual "{" first) arranged else arranged) finish)
+        Right (Scanned (if implicit then (:) (virtual "{" first) arranged else arranged) finish)
     };
   lineIndent :: String -> Int -> Int;
   lineIndent source line = indentAt source (stringLength source) line 0 1 1;
@@ -63,18 +66,18 @@ module Bootstrap.Layout where {
                    else column;
   virtual :: String -> Token -> Token;
   virtual text (Token _ line column _ _) = Token text line column line column;
-  punctuation :: String -> Token -> List Token;
+  punctuation :: String -> Token -> [] Token;
   punctuation text token = punctuationAt text token 0 (stringLength text);
-  punctuationAt :: String -> Token -> Int -> Int -> List Token;
+  punctuationAt :: String -> Token -> Int -> Int -> [] Token;
   punctuationAt text token i size =
     if (i >= size)
-    then Nil
-    else Cons (virtual (stringFromCode (stringCodeAt text i)) token)
+    then []
+    else (:) (virtual (stringFromCode (stringCodeAt text i)) token)
            (punctuationAt text token (i + 1) size);
-  arrange :: List Frame -> Maybe Pending -> Maybe Token -> List Token -> Token -> List Token;
+  arrange :: [] Frame -> Maybe Pending -> Maybe Token -> [] Token -> Token -> [] Token;
   arrange frames pending previous tokens finish =
     case tokens of {
-      Nil ->
+      [] ->
         let {
           opening =
             case pending of {
@@ -83,24 +86,24 @@ module Bootstrap.Layout where {
             }
         } in
         punctuation (opening ++ closes frames) finish;
-      Cons t ts ->
+      (:) t ts ->
         case pending of {
           Just (AfterLet line) ->
             if eqString (tokenText t) "rec"
-            then Cons t (arrange frames (Just (AfterLet (tokenEndLine t))) (Just t) ts finish)
+            then (:) t (arrange frames (Just (AfterLet (tokenEndLine t))) (Just t) ts finish)
             else if eqString (tokenText t) "{"
-                 then Cons t (nextToken t ts finish (pushToken t frames))
+                 then (:) t (nextToken t ts finish (pushToken t frames))
                  else if (tokenLine t > line)
                       then opened LayoutBindings frames previous t ts finish
                       else normal frames previous t ts finish;
           Just (Open kind) ->
             if eqString (tokenText t) "{"
-            then Cons t (nextToken t ts finish (pushToken t frames))
+            then (:) t (nextToken t ts finish (pushToken t frames))
             else opened kind frames previous t ts finish;
           Nothing -> normal frames previous t ts finish
         }
     };
-  nextToken :: Token -> List Token -> Token -> List Frame -> List Token;
+  nextToken :: Token -> [] Token -> Token -> [] Frame -> [] Token;
   -- A braced guard-if closes at }, so it must not intercept an enclosing
   -- ordinary if's then/else (which may also close an implicit do block).
   nextToken token rest finish stack =
@@ -108,10 +111,10 @@ module Bootstrap.Layout where {
       scoped =
         if eqString (tokenText token) "if"
         then case rest of {
-               Cons next _ ->
+               (:) next _ ->
                  if eqString (tokenText next) "{"
                  then case stack of {
-                        Cons (Marker IfMark _) outer -> outer;
+                        (:) (Marker IfMark _) outer -> outer;
                         _ -> stack
                       }
                  else stack;
@@ -129,42 +132,42 @@ module Bootstrap.Layout where {
   continuation :: String -> String -> Bool;
   continuation token previous =
     (elem eqString token continuationTokens || elem eqString previous continuationPrevious);
-  continuationTokens :: List String;
+  continuationTokens :: [] String;
   continuationTokens =
-    Cons "]"
-      (Cons ","
-         (Cons "in"
-            (Cons "then"
-               (Cons "else"
-                  (Cons "of" (Cons "where" (Cons "|" (Cons ")" (Cons "}" (Cons ";" Nil))))))))));
-  continuationPrevious :: List String;
+    (:) "]"
+      ((:) ","
+         ((:) "in"
+            ((:) "then"
+               ((:) "else"
+                  ((:) "of" ((:) "where" ((:) "|" ((:) ")" ((:) "}" ((:) ";" []))))))))));
+  continuationPrevious :: [] String;
   continuationPrevious =
-    Cons "::"
-      (Cons ","
-         (Cons "in"
-            (Cons "then"
-               (Cons "else"
-                  (Cons "="
-                     (Cons "->"
-                        (Cons "<-"
-                           (Cons ":"
-                              (Cons "|"
-                                 (Cons "+"
-                                    (Cons "-"
-                                       (Cons "*"
-                                          (Cons "/"
-                                             (Cons "%"
-                                                (Cons "++"
-                                                   (Cons "&&"
-                                                      (Cons "||"
-                                                         (Cons "=="
-                                                            (Cons "/="
-                                                               (Cons "<"
-                                                                  (Cons "<="
-                                                                     (Cons ">"
-                                                                        (Cons ">="
-                                                                           Nil)))))))))))))))))))))));
-  opened :: LayoutKind -> List Frame -> Maybe Token -> Token -> List Token -> Token -> List Token;
+    (:) "::"
+      ((:) ","
+         ((:) "in"
+            ((:) "then"
+               ((:) "else"
+                  ((:) "="
+                     ((:) "->"
+                        ((:) "<-"
+                           ((:) ":"
+                              ((:) "|"
+                                 ((:) "+"
+                                    ((:) "-"
+                                       ((:) "*"
+                                          ((:) "/"
+                                             ((:) "%"
+                                                ((:) "++"
+                                                   ((:) "&&"
+                                                      ((:) "||"
+                                                         ((:) "=="
+                                                            ((:) "/="
+                                                               ((:) "<"
+                                                                  ((:) "<="
+                                                                     ((:) ">"
+                                                                        ((:) ">="
+                                                                           [])))))))))))))))))))))));
+  opened :: LayoutKind -> [] Frame -> Maybe Token -> Token -> [] Token -> Token -> [] Token;
   opened kind stack previous token rest finish =
     let {
       column = tokenColumn token
@@ -173,20 +176,20 @@ module Bootstrap.Layout where {
     then case offside column (continuation (tokenText token) (previousText previous))
                 (previousText previous)
                 stack of {
-           Pair prefix remaining ->
+           (,) prefix remaining ->
              append (punctuation ("{}" ++ prefix) token)
-               (Cons token (nextToken token rest finish (pushToken token remaining)))
+               ((:) token (nextToken token rest finish (pushToken token remaining)))
          }
-    else Cons (virtual "{" token)
-           (Cons token
-              (nextToken token rest finish (pushToken token (Cons (Layout kind column) stack))));
+    else (:) (virtual "{" token)
+           ((:) token
+              (nextToken token rest finish (pushToken token ((:) (Layout kind column) stack))));
   isTop :: LayoutKind -> Bool;
   isTop kind =
     case kind of {
       LayoutTop -> True;
       _ -> False
     };
-  normal :: List Frame -> Maybe Token -> Token -> List Token -> Token -> List Token;
+  normal :: [] Frame -> Maybe Token -> Token -> [] Token -> Token -> [] Token;
   normal stack previous token rest finish =
     let {
       text = tokenText token
@@ -208,11 +211,11 @@ module Bootstrap.Layout where {
                                  else if eqString text "}"
                                       then closeExplicit "{" stack
                                       else if eqString text ";"
-                                           then Pair "" (dropInline stack)
-                                           else Pair "" stack
+                                           then (,) "" (dropInline stack)
+                                           else (,) "" stack
     } in
     case closing of {
-      Pair ending closed ->
+      (,) ending closed ->
         let {
           newLine =
             case previous of {
@@ -229,27 +232,27 @@ module Bootstrap.Layout where {
             then offside (tokenColumn token) (continuation text (previousText previous))
                    (previousText previous)
                    closed
-            else Pair "" closed
+            else (,) "" closed
         } in
         case result of {
-          Pair separator scoped ->
+          (,) separator scoped ->
             append (punctuation (ending ++ separator) token)
-              (Cons token
+              ((:) token
                  (nextToken token rest finish
                     (if closingToken then scoped else pushToken token scoped)))
         }
     };
-  pushToken :: Token -> List Frame -> List Frame;
+  pushToken :: Token -> [] Frame -> [] Frame;
   pushToken token frames =
     let {
       text = tokenText token
     } in
     if (eqString text "(" || (eqString text "[" || eqString text "{"))
-    then Cons (Explicit text) frames
+    then (:) (Explicit text) frames
     else if eqString text "let"
-         then Cons (Marker LetMark (tokenColumn token)) frames
+         then (:) (Marker LetMark (tokenColumn token)) frames
          else if eqString text "if"
-              then Cons (Marker IfMark (tokenColumn token)) frames
+              then (:) (Marker IfMark (tokenColumn token)) frames
               else frames;
   keyword :: Token -> Maybe Pending;
   keyword token =
@@ -259,35 +262,35 @@ module Bootstrap.Layout where {
     if (eqString text "do" || (eqString text "of" || eqString text "where"))
     then Just (Open LayoutBlock)
     else if eqString text "let" then Just (AfterLet (tokenEndLine token)) else Nothing;
-  deeper :: Int -> List Frame -> Bool;
+  deeper :: Int -> [] Frame -> Bool;
   deeper column frames =
     case frames of {
-      Cons (Layout _ indent) _ -> (column > indent);
-      Cons (Marker _ _) rest -> deeper column rest;
+      (:) (Layout _ indent) _ -> (column > indent);
+      (:) (Marker _ _) rest -> deeper column rest;
       _ -> True
     };
-  offside :: Int -> Bool -> String -> List Frame -> Pair String (List Frame);
+  offside :: Int -> Bool -> String -> [] Frame -> (,) String ([] Frame);
   offside column continued previous frames =
     case frames of {
-      Cons (Layout _ indent) rest ->
+      (:) (Layout _ indent) rest ->
         if (column < indent)
         then case offside column continued "}" rest of {
-               Pair prefix remaining -> Pair ("}" ++ prefix) remaining
+               (,) prefix remaining -> (,) ("}" ++ prefix) remaining
              }
         else if ((column == indent) &&
                  (not continued && not (eqString previous ";" || eqString previous "{")))
-             then Pair ";" frames
-             else Pair "" frames;
-      Cons (Marker _ indent) rest ->
+             then (,) ";" frames
+             else (,) "" frames;
+      (:) (Marker _ indent) rest ->
         if ((column <= indent) && not continued)
         then offside column continued previous rest
-        else Pair "" frames;
-      _ -> Pair "" frames
+        else (,) "" frames;
+      _ -> (,) "" frames
     };
-  dropInline :: List Frame -> List Frame;
+  dropInline :: [] Frame -> [] Frame;
   dropInline frames =
     case frames of {
-      Cons (Marker _ _) rest -> dropInline rest;
+      (:) (Marker _ _) rest -> dropInline rest;
       _ -> frames
     };
   eqMark :: LayoutMark -> LayoutMark -> Bool;
@@ -304,72 +307,72 @@ module Bootstrap.Layout where {
           _ -> False
         }
     };
-  closeMark :: LayoutMark -> Bool -> List Frame -> Pair String (List Frame);
+  closeMark :: LayoutMark -> Bool -> [] Frame -> (,) String ([] Frame);
   closeMark wanted keep frames =
     case searchMark wanted keep frames of {
-      Nothing -> Pair "" frames;
+      Nothing -> (,) "" frames;
       Just result -> result
     };
-  searchMark :: LayoutMark -> Bool -> List Frame -> Maybe (Pair String (List Frame));
+  searchMark :: LayoutMark -> Bool -> [] Frame -> Maybe ((,) String ([] Frame));
   searchMark wanted keep frames =
     case frames of {
-      Cons (Marker mark column) rest ->
+      (:) (Marker mark column) rest ->
         if eqMark mark wanted
-        then Just (Pair "" (if keep then frames else rest))
+        then Just ((,) "" (if keep then frames else rest))
         else searchMark wanted keep rest;
-      Cons (Layout _ _) rest ->
+      (:) (Layout _ _) rest ->
         case searchMark wanted keep rest of {
           Nothing -> Nothing;
-          Just (Pair prefix remaining) -> Just (Pair ("}" ++ prefix) remaining)
+          Just ((,) prefix remaining) -> Just ((,) ("}" ++ prefix) remaining)
         };
       _ -> Nothing
     };
-  closeExplicit :: String -> List Frame -> Pair String (List Frame);
+  closeExplicit :: String -> [] Frame -> (,) String ([] Frame);
   closeExplicit wanted frames =
     case searchExplicit wanted frames of {
-      Nothing -> Pair "" frames;
+      Nothing -> (,) "" frames;
       Just result -> result
     };
-  searchExplicit :: String -> List Frame -> Maybe (Pair String (List Frame));
+  searchExplicit :: String -> [] Frame -> Maybe ((,) String ([] Frame));
   searchExplicit wanted frames =
     case frames of {
-      Cons (Explicit delimiter) rest ->
-        if eqString delimiter wanted then Just (Pair "" rest) else Nothing;
-      Cons (Layout _ _) rest ->
+      (:) (Explicit delimiter) rest ->
+        if eqString delimiter wanted then Just ((,) "" rest) else Nothing;
+      (:) (Layout _ _) rest ->
         case searchExplicit wanted rest of {
           Nothing -> Nothing;
-          Just (Pair prefix remaining) -> Just (Pair ("}" ++ prefix) remaining)
+          Just ((,) prefix remaining) -> Just ((,) ("}" ++ prefix) remaining)
         };
-      Cons (Marker _ _) rest -> searchExplicit wanted rest;
+      (:) (Marker _ _) rest -> searchExplicit wanted rest;
       _ -> Nothing
     };
-  closeCollection :: List Frame -> Pair String (List Frame);
+  closeCollection :: [] Frame -> (,) String ([] Frame);
   closeCollection frames =
     case searchCollection frames of {
-      Nothing -> Pair "" frames;
+      Nothing -> (,) "" frames;
       Just result -> result
     };
-  searchCollection :: List Frame -> Maybe (Pair String (List Frame));
+  searchCollection :: [] Frame -> Maybe ((,) String ([] Frame));
   searchCollection frames =
     case frames of {
-      Cons (Explicit delimiter) _ ->
+      (:) (Explicit delimiter) _ ->
         if (eqString delimiter "(" || eqString delimiter "[")
-        then Just (Pair "" frames)
+        then Just ((,) "" frames)
         else Nothing;
-      Cons (Layout _ _) rest ->
+      (:) (Layout _ _) rest ->
         case searchCollection rest of {
           Nothing -> Nothing;
-          Just (Pair prefix remaining) -> Just (Pair ("}" ++ prefix) remaining)
+          Just ((,) prefix remaining) -> Just ((,) ("}" ++ prefix) remaining)
         };
-      Cons (Marker _ _) rest -> searchCollection rest;
+      (:) (Marker _ _) rest -> searchCollection rest;
       _ -> Nothing
     };
-  closes :: List Frame -> String;
+  closes :: [] Frame -> String;
   closes frames =
     case frames of {
-      Nil -> "";
-      Cons (Layout _ _) rest -> ("}" ++ closes rest);
-      Cons _ rest -> closes rest
+      [] -> "";
+      (:) (Layout _ _) rest -> ("}" ++ closes rest);
+      (:) _ rest -> closes rest
     };
   -- The shared dialect deliberately accepts canonical layout only. Local lets
   -- and inline blocks are explicit; all remaining layout blocks must begin on
@@ -378,42 +381,45 @@ module Bootstrap.Layout where {
   layoutTokensWithProfile :: SourceSyntax -> Bool -> String -> String -> Either String Scanned;
   layoutTokensWithProfile syntax program file source =
     if not (isSharedSyntax syntax)
-    then layoutTokens program file source
+    then case syntax of {
+           MetadataSyntax -> layoutTokens program file source;
+           _ -> layoutTokensWithScanner scanSourceTokens program file source
+         }
     else do {
-           boundValueShared1 <- scanTokens file source;
+           boundValueShared1 <- scanSourceTokens file source;
            case boundValueShared1 of {
              Scanned tokens finish ->
                do {
                  validateSharedTokens file tokens;
                  validateSharedLayout file tokens;
-                 arranged <- layoutTokens program file source;
+                 arranged <- layoutTokensWithScanner scanSourceTokens program file source;
                  case arranged of {
-                   Scanned ordered _ -> validateSharedArranged file Nil Nothing ordered
+                   Scanned ordered _ -> validateSharedArranged file [] Nothing ordered
                  };
                  Right arranged
                }
            }
          };
-  validateSharedLayout :: String -> List Token -> Either String Unit;
+  validateSharedLayout :: String -> [] Token -> Either String ();
   validateSharedLayout file tokens =
     case tokens of {
-      Nil -> Right Unit;
-      Cons token rest ->
+      [] -> Right ();
+      (:) token rest ->
         do {
           let {
             text = tokenText token
           };
           case rest of {
-            Cons next _ ->
+            (:) next _ ->
               if eqString text "let"
               then unless (eqString (tokenText next) "{")
                      (Left (file ++ ": shared let groups require explicit braces"))
-              else if elem eqString text (Cons "do" (Cons "of" (Cons "where" Nil)))
+              else if elem eqString text ((:) "do" ((:) "of" ((:) "where" [])))
                    then unless
                           (eqString (tokenText next) "{" || (tokenLine next > tokenEndLine token))
                           (Left (file ++ ": inline shared blocks require explicit braces"))
-                   else Right Unit;
-            _ -> Right Unit
+                   else Right ();
+            _ -> Right ()
           };
           validateSharedLayout file rest
         }
@@ -424,25 +430,25 @@ module Bootstrap.Layout where {
   sharedOperator :: String -> Bool;
   sharedOperator text =
     elem eqString text
-      (Cons "+"
-         (Cons "-"
-            (Cons "*"
-               (Cons "/"
-                  (Cons "%"
-                     (Cons "++"
-                        (Cons "=="
-                           (Cons "/="
-                              (Cons "<"
-                                 (Cons "<="
-                                    (Cons ">"
-                                       (Cons ">="
-                                          (Cons "&&"
-                                             (Cons "||" (Cons "::" (Cons "|" Nil))))))))))))))));
-  validateSharedArranged :: String -> List Frame -> Maybe Token -> List Token -> Either String Unit;
+      ((:) "+"
+         ((:) "-"
+            ((:) "*"
+               ((:) "/"
+                  ((:) "%"
+                     ((:) "++"
+                        ((:) "=="
+                           ((:) "/="
+                              ((:) "<"
+                                 ((:) "<="
+                                    ((:) ">"
+                                       ((:) ">="
+                                          ((:) "&&"
+                                             ((:) "||" ((:) "::" ((:) "|" []))))))))))))))));
+  validateSharedArranged :: String -> [] Frame -> Maybe Token -> [] Token -> Either String ();
   validateSharedArranged file frames previous tokens =
     case tokens of {
-      Nil -> Right Unit;
-      Cons token rest ->
+      [] -> Right ();
+      (:) token rest ->
         do {
           let {
             text = tokenText token
@@ -458,13 +464,13 @@ module Bootstrap.Layout where {
               }
           };
           case frames of {
-            Cons (Layout _ indent) _ ->
+            (:) (Layout _ indent) _ ->
               when
                 (not virtual && (newLine && (tokenColumn token <= indent)))
                 (Left
                    (file ++
                     ": shared continuation lines must be indented beyond their declaration or statement"));
-            _ -> Right Unit
+            _ -> Right ()
           };
           when (virtual && (eqString text "}" && closedByExplicitBrace token rest))
             (Left
@@ -473,29 +479,29 @@ module Bootstrap.Layout where {
           let {
             nextFrames =
               if eqString text "{"
-              then Cons (if virtual then Layout LayoutBlock (tokenColumn token) else Explicit "{")
+              then (:) (if virtual then Layout LayoutBlock (tokenColumn token) else Explicit "{")
                      frames
               else if eqString text "("
-                   then Cons (Explicit "(") frames
+                   then (:) (Explicit "(") frames
                    else if (eqString text "}" || eqString text ")")
                         then case frames of {
-                               Nil -> Nil;
-                               Cons _ outer -> outer
+                               [] -> [];
+                               (:) _ outer -> outer
                              }
                         else frames
           };
           validateSharedArranged file nextFrames (Just token) rest
         }
     };
-  closedByExplicitBrace :: Token -> List Token -> Bool;
+  closedByExplicitBrace :: Token -> [] Token -> Bool;
   closedByExplicitBrace closing tokens =
     case tokens of {
-      Cons next rest ->
+      (:) next rest ->
         if ((tokenLine next /= tokenLine closing) || (tokenColumn next /= tokenColumn closing))
         then False
         else if virtualToken next
              then closedByExplicitBrace closing rest
              else eqString (tokenText next) "}";
-      Nil -> False
+      [] -> False
     }
 }

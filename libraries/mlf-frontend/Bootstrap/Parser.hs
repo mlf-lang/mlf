@@ -16,36 +16,36 @@ module Bootstrap.Parser where {
   import qualified Bootstrap.Std as SharedSyntax;
   data Top = DataTop DataDecl | ClassTop SClassDecl | InstanceTop SInstanceDecl | ValueTop Value;
   data SharedStatement =
-    SharedBind (Maybe String) SExpr |
+    SharedBind SPattern SExpr SourceSpan |
     SharedThen SExpr |
-    SharedLet (List (Triple String (Maybe SAnnotation) SExpr));
+    SharedLet ([] ((,,) String (Maybe SAnnotation) SExpr));
   data Value =
-    Signature String SAnnotation | Equation String (List SPattern) (Maybe SAnnotation) SExpr;
-  reservedWords :: List String;
+    Signature String SAnnotation | Equation String ([] SPattern) (Maybe SAnnotation) SExpr;
+  reservedWords :: [] String;
   reservedWords =
-    Cons "data"
-      (Cons "class"
-         (Cons "instance"
-            (Cons "where"
-               (Cons "case"
-                  (Cons "of"
-                     (Cons "do"
-                        (Cons "let"
-                           (Cons "rec"
-                              (Cons "in"
-                                 (Cons "if"
-                                    (Cons "then"
-                                       (Cons "else"
-                                          (Cons "forall"
-                                             (Cons "exists"
-                                                (Cons "true"
-                                                   (Cons "false"
-                                                      (Cons "True"
-                                                         (Cons "False"
-                                                            (Cons "bot"
-                                                               (Cons "module"
-                                                                  (Cons "import"
-                                                                     Nil)))))))))))))))))))));
+    (:) "data"
+      ((:) "class"
+         ((:) "instance"
+            ((:) "where"
+               ((:) "case"
+                  ((:) "of"
+                     ((:) "do"
+                        ((:) "let"
+                           ((:) "rec"
+                              ((:) "in"
+                                 ((:) "if"
+                                    ((:) "then"
+                                       ((:) "else"
+                                          ((:) "forall"
+                                             ((:) "exists"
+                                                ((:) "true"
+                                                   ((:) "false"
+                                                      ((:) "True"
+                                                         ((:) "False"
+                                                            ((:) "bot"
+                                                               ((:) "module"
+                                                                  ((:) "import"
+                                                                     [])))))))))))))))))))));
   identifier :: Parser String;
   identifier = namedIdentifier U.isAlpha "identifier";
   upperIdentifier :: Parser String;
@@ -66,7 +66,18 @@ module Bootstrap.Parser where {
        });
   upperReference :: Parser String;
   upperReference =
-    qualified (pChoices (Cons upperIdentifier (Cons (pToken "True") (Cons (pToken "False") Nil))));
+    qualified (pChoices ((:) upperIdentifier ((:) (pToken "True") ((:) (pToken "False") []))));
+  locatedReference :: Parser String -> Parser SExpr;
+  locatedReference parser = do {
+    located <- pWithSpan parser;
+    syntax <- pSourceSyntax;
+    case located of {
+      (,) location name -> case syntax of {
+        MetadataSyntax -> pPure (SVar name);
+        _ -> pPure (SCallSite (referenceLeaf name) location (SVar name))
+      }
+    }
+  };
   lowerReference :: Parser String;
   lowerReference = pTry (qualified lowerIdentifier);
   qualified :: Parser String -> Parser String;
@@ -88,22 +99,53 @@ module Bootstrap.Parser where {
     };
   parseLayout :: forall a. Bool -> Parser a -> String -> String -> Either String a;
   parseLayout program parser file source =
-    case layoutTokens program file source of {
+    case layoutTokensWithScanner scanSourceTokens program file source of {
       Left e -> Left e;
       Right tokens -> runParser parser file tokens
     };
   parseModule :: String -> String -> Either String SourceModule;
-  parseModule file source =
+  parseModule = parseModuleInPackage "main";
+  parseModuleInPackage :: String -> String -> String -> Either String SourceModule;
+  parseModuleInPackage sourcePackage file source =
     do {
       syntax <- sourceSyntax file source;
-      parseModuleWithProfile syntax file source
+      parseModuleWithProfileInPackage sourcePackage syntax file source
     };
+  -- Artifact metadata uses legacy quantification/annotation grammar but wired
+  -- canonical type names. This profile is never selected by a source marker.
+  parseMetadataModule :: String -> String -> Either String SourceModule;
+  parseMetadataModule file source = do {
+    tokens <- layoutTokensWithProfile MetadataSyntax True file source;
+    runParserWithProfile MetadataSyntax (sourceModule file) file tokens
+  };
+  sourceOrMetadata :: forall a. Parser a -> Parser a -> Parser a;
+  sourceOrMetadata source metadata = do {
+    syntax <- pSourceSyntax;
+    case syntax of { MetadataSyntax -> metadata; _ -> source }
+  };
+  metadataAtom :: forall a. (String -> a) -> Parser a -> Parser a;
+  metadataAtom construct fallback = do {
+    syntax <- pSourceSyntax;
+    case syntax of {
+      MetadataSyntax -> pChoice (pTry (pMap construct metadataBuiltinName)) fallback;
+      _ -> fallback
+    }
+  };
+  metadataBuiltinName :: Parser String;
+  metadataBuiltinName =
+    pChoice (pThen (pToken "[") (pThen (pToken "]") (pPure "[]")))
+      (pParens (do {
+        commas <- pMany (pToken ",");
+        if null commas then pPure "()" else sourceTupleName (1 + length commas)
+      }));
   parseModuleWithProfile :: SourceSyntax -> String -> String -> Either String SourceModule;
-  parseModuleWithProfile syntax file source =
+  parseModuleWithProfile = parseModuleWithProfileInPackage "main";
+  parseModuleWithProfileInPackage :: String -> SourceSyntax -> String -> String -> Either String SourceModule;
+  parseModuleWithProfileInPackage sourcePackage syntax file source =
     do {
       validateProfileSelection syntax file source;
       tokens <- layoutTokensWithProfile syntax True file source;
-      result <- runParserWithProfile syntax (sourceModule file) file tokens;
+      result <- runParserWithProfileInPackage sourcePackage syntax (sourceModule file) file tokens;
       when (eqString (moduleIdentity result) "MLF.Primitive")
         (Left "MLF.Primitive is a reserved native builtin module");
       if isSharedSyntax syntax
@@ -146,7 +188,7 @@ module Bootstrap.Parser where {
         case body of {
           Just e -> Right e;
           Nothing ->
-            if any (\(Triple n _ _) -> eqString n "main") values
+            if any (\((,,) n _ _) -> eqString n "main") values
             then Right (SVar "main")
             else Left "a declaration-only program needs a main binding"
         }
@@ -157,10 +199,14 @@ module Bootstrap.Parser where {
         case Surface.bindValues values e of {
           Left error -> Left error;
           Right expression ->
-            Right
-              (if (null classes && null instances)
-               then SProgram datatypes expression
-               else SClassProgram datatypes classes instances expression)
+            case Surface.closeSourceInstances values instances of {
+              Left error -> Left error;
+              Right closed ->
+                Right
+                  (if (null classes && null closed)
+                   then SProgram datatypes expression
+                   else SClassProgram datatypes classes closed expression)
+            }
         }
     };
   sourceModule :: String -> Parser SourceModule;
@@ -174,8 +220,9 @@ module Bootstrap.Parser where {
                 name <- moduleName;
                 exports <- pOptional (pParens (pSepEndBy (exportItem True) (pToken ",")));
                 pToken "where";
-                pPure (Pair name exports)
+                pPure ((,) name exports)
               }));
+      pSetSourceModule (case header of { Just ((,) name _) -> name; Nothing -> "Main" });
       pBraces
         (do {
            imports <- pMany (pBefore importDeclaration separator);
@@ -186,8 +233,8 @@ module Bootstrap.Parser where {
                   (concatMap
                      (\d ->
                         case d of {
-                          ValueTop value -> Cons value Nil;
-                          _ -> Nil
+                          ValueTop value -> (:) value [];
+                          _ -> []
                         })
                      declarations));
            body <- pOptional expr;
@@ -211,32 +258,32 @@ module Bootstrap.Parser where {
                   (SourceModule file
                      (case header of {
                         Nothing -> Nothing;
-                        Just (Pair name _) -> Just name
+                        Just ((,) name _) -> Just name
                       })
                      (case header of {
                         Nothing -> Nothing;
-                        Just (Pair _ exports) -> exports
+                        Just ((,) _ exports) -> exports
                       })
                      imports
                      (concatMap
                         (\d ->
                            case d of {
-                             DataTop a -> Cons a Nil;
-                             _ -> Nil
+                             DataTop a -> (:) a [];
+                             _ -> []
                            })
                         declarations)
                      (concatMap
                         (\d ->
                            case d of {
-                             ClassTop a -> Cons a Nil;
-                             _ -> Nil
+                             ClassTop a -> (:) a [];
+                             _ -> []
                            })
                         declarations)
                      (concatMap
                         (\d ->
                            case d of {
-                             InstanceTop a -> Cons a Nil;
-                             _ -> Nil
+                             InstanceTop a -> (:) a [];
+                             _ -> []
                            })
                         declarations)
                      values
@@ -249,12 +296,12 @@ module Bootstrap.Parser where {
   exportItem :: Bool -> Parser Export;
   exportItem exporting =
     pChoices
-      (Cons
+      ((:)
          (if exporting
           then pMap ExportModule (pThen (pToken "module") moduleName)
           else pFail "module export")
-         (Cons (pMap ExportValue (if exporting then valueReference else bindingName))
-            (Cons
+         ((:) (pMap ExportValue (if exporting then valueReference else bindingName))
+            ((:)
                (do {
                   name <- if exporting then upperReference else upperIdentifier;
                   members <-
@@ -264,9 +311,9 @@ module Bootstrap.Parser where {
                             (pMap Members (pSepEndBy exportMember (pToken ",")))));
                   pPure (ExportType name members)
                 })
-               Nil)));
+               [])));
   exportMember :: Parser String;
-  exportMember = pChoices (Cons identifier (Cons (pParens operatorName) (Cons (pToken "True") (Cons (pToken "False") Nil))));
+  exportMember = pChoices ((:) identifier ((:) (pParens operatorName) ((:) (pToken "True") ((:) (pToken "False") []))));
   importDeclaration :: Parser Import;
   importDeclaration =
     do {
@@ -279,15 +326,15 @@ module Bootstrap.Parser where {
           (pChoice (pMap Hiding (pThen (pToken "hiding") importItems)) (pMap Only importItems));
       pPure (Import name onlyQualified alias selection)
     };
-  importItems :: Parser (List Export);
+  importItems :: Parser ([] Export);
   importItems = pParens (pSepEndBy (exportItem False) (pToken ","));
   topDeclaration :: Parser Top;
   topDeclaration =
     pChoices
-      (Cons (pMap DataTop dataDeclaration)
-         (Cons (pMap ClassTop classDeclaration)
-            (Cons (pMap InstanceTop instanceDeclaration)
-               (Cons (pMap ValueTop valueDeclaration) Nil))));
+      ((:) (pMap DataTop dataDeclaration)
+         ((:) (pMap ClassTop classDeclaration)
+            ((:) (pMap InstanceTop instanceDeclaration)
+               ((:) (pMap ValueTop valueDeclaration) []))));
   valueDeclaration :: Parser Value;
   valueDeclaration =
     pChoice
@@ -305,7 +352,7 @@ module Bootstrap.Parser where {
     do {
       boundValueShared1 <- bindingHead;
       case boundValueShared1 of {
-        Triple name args ty ->
+        (,,) name args ty ->
           do {
             body <-
               pChoice (pThen (pToken "=") expr)
@@ -314,7 +361,7 @@ module Bootstrap.Parser where {
           }
       }
     };
-  bindingHead :: Parser (Triple String (List SPattern) (Maybe SAnnotation));
+  bindingHead :: Parser ((,,) String ([] SPattern) (Maybe SAnnotation));
   bindingHead =
     do {
       result <-
@@ -324,10 +371,10 @@ module Bootstrap.Parser where {
              args <- pMany patternAtom;
              ty <- pBySyntax (pPure Nothing) (pOptional (pThen annotationSymbol annotation));
              pLook (pChoice (pToken "=") (pToken "|"));
-             pPure (Triple name args ty)
+             pPure ((,,) name args ty)
            });
       case result of {
-        Triple _ args _ ->
+        (,,) _ args _ ->
           let {
             names = concatMap Surface.patternVariables args
           } in
@@ -336,39 +383,39 @@ module Bootstrap.Parser where {
           else pFail "duplicate function parameter"
       }
     };
-  groupValues :: List Value -> Either String (List (Triple String (Maybe SAnnotation) SExpr));
+  groupValues :: [] Value -> Either String ([] ((,,) String (Maybe SAnnotation) SExpr));
   groupValues declarations =
     case collectValues Nothing declarations of {
       Left e -> Left e;
       Right values ->
         let {
-          names = map (\(Triple n _ _) -> n) values
+          names = map (\((,,) n _ _) -> n) values
         } in
         if (length names == length (nubBy eqString names))
         then Right values
         else Left "function equations must be contiguous; duplicate value declaration"
     };
-  collectValues :: Maybe (Pair String SAnnotation) ->
-                   List Value -> Either String (List (Triple String (Maybe SAnnotation) SExpr));
+  collectValues :: Maybe ((,) String SAnnotation) ->
+                   [] Value -> Either String ([] ((,,) String (Maybe SAnnotation) SExpr));
   collectValues signature values =
     case values of {
-      Nil ->
+      [] ->
         case signature of {
-          Nothing -> Right Nil;
-          Just (Pair n _) ->
+          Nothing -> Right [];
+          Just ((,) n _) ->
             Left ("unexpected end of declarations; signature without a definition: " ++ n)
         };
-      Cons (Signature n ty) rest ->
+      (:) (Signature n ty) rest ->
         case signature of {
           Just _ -> Left ("duplicate signature for " ++ n);
-          Nothing -> collectValues (Just (Pair n ty)) rest
+          Nothing -> collectValues (Just ((,) n ty)) rest
         };
-      Cons (Equation name args inline body) rest ->
+      (:) (Equation name args inline body) rest ->
         let {
           ty =
             case signature of {
               Nothing -> Right inline;
-              Just (Pair signedName signedType) ->
+              Just ((,) signedName signedType) ->
                 if not (eqString signedName name)
                 then Left ("expected a definition of " ++ signedName)
                 else case inline of {
@@ -387,15 +434,15 @@ module Bootstrap.Parser where {
                         _ -> False
                       })
                    rest of {
-              Pair more remaining ->
+              (,) more remaining ->
                 let {
                   rows =
-                    Cons (Pair args body)
+                    (:) ((,) args body)
                       (map
                          (\v ->
                             case v of {
-                              Equation _ ps _ rhs -> Pair ps rhs;
-                              _ -> Pair Nil body
+                              Equation _ ps _ rhs -> (,) ps rhs;
+                              _ -> (,) [] body
                             })
                          more)
                 } in
@@ -409,29 +456,29 @@ module Bootstrap.Parser where {
                 then Left ("duplicate signature for " ++ name)
                 else if (not (null more) && null args)
                      then Left "multiple equations require function parameters"
-                     else if any (\(Pair ps _) -> (length ps /= length args)) rows
+                     else if any (\((,) ps _) -> (length ps /= length args)) rows
                           then Left "function equations have different arities"
                           else case collectValues Nothing remaining of {
                                  Left e -> Left e;
                                  Right suffix ->
                                    Right
-                                     (Cons (Triple name resultType (Surface.function rows)) suffix)
+                                     ((:) ((,,) name resultType (Surface.function rows)) suffix)
                                }
             }
         }
     };
-  valueBlock :: Parser (List (Triple String (Maybe SAnnotation) SExpr));
+  valueBlock :: Parser ([] ((,,) String (Maybe SAnnotation) SExpr));
   valueBlock =
     pBind
       (pBySyntax (pBraces (pSepEndBy1 valueDeclaration (pToken ";")))
          (pChoice (pBraces (pSepEndBy1 valueDeclaration (pToken ";")))
-            (pMap (\v -> Cons v Nil) equation)))
+            (pMap (\v -> (:) v []) equation)))
       (\values -> pEither (groupValues values));
-  bindLocal :: Bool -> List (Triple String (Maybe SAnnotation) SExpr) -> SExpr -> Parser SExpr;
+  bindLocal :: Bool -> [] ((,,) String (Maybe SAnnotation) SExpr) -> SExpr -> Parser SExpr;
   bindLocal recursive values body =
     if recursive
     then pMap (\ds -> SLetRec ds body) (pEither (Surface.recursiveValues values))
-    else pPure (foldr (\(Triple n a e) b -> SLet n (annotateMaybe e a) b) body values);
+    else pPure (foldr (\((,,) n a e) b -> SLet n (annotateMaybe e a) b) body values);
   -- Declaration and instance-method signatures must not become expression coercions.
   annotateMaybe :: SExpr -> Maybe SAnnotation -> SExpr;
   annotateMaybe expression ty =
@@ -439,7 +486,7 @@ module Bootstrap.Parser where {
       Nothing -> expression;
       Just a -> SSignature expression a
     };
-  parameter :: Parser (Pair String Kind);
+  parameter :: Parser ((,) String Kind);
   parameter =
     pChoice
       (pParens
@@ -447,9 +494,9 @@ module Bootstrap.Parser where {
             n <- lowerIdentifier;
             annotationSymbol;
             k <- kindParser;
-            pPure (Pair n k)
+            pPure ((,) n k)
           }))
-      (pMap (\n -> Pair n Star) lowerIdentifier);
+      (pMap (\n -> (,) n Star) lowerIdentifier);
   kindParser :: Parser Kind;
   kindParser =
     pChainr (pChoice (pMap (\_ -> Star) (pToken "*")) (pParens kindParser))
@@ -458,20 +505,21 @@ module Bootstrap.Parser where {
   predicate =
     do {
       n <- upperReference;
-      args <- pSome typeAtom;
+      args <- if (eqString (referenceLeaf n) "HasCallStack" || eqString n "MLFHasCallStack")
+              then pMany typeAtom else pSome typeAtom;
       pPure (SPredicate n args)
     };
-  context :: Parser (List SPredicate);
+  context :: Parser ([] SPredicate);
   context =
     pTry
       (pBefore
-         (pChoice (pParens (pSepBy1 predicate (pToken ","))) (pMap (\p -> Cons p Nil) predicate))
+         (pChoice (pParens (pSepBy1 predicate (pToken ","))) (pMap (\p -> (:) p []) predicate))
          (pToken "=>"));
   classDeclaration :: Parser SClassDecl;
   classDeclaration =
     do {
       pToken "class";
-      supers <- pOption Nil context;
+      supers <- pOption [] context;
       name <- upperIdentifier;
       params <- pSome parameter;
       pToken "where";
@@ -482,7 +530,7 @@ module Bootstrap.Parser where {
                 n <- bindingName;
                 annotationSymbol;
                 t <- typ;
-                pPure (Pair n t)
+                pPure ((,) n t)
               })
              (pToken ";"));
       pPure (SClassDecl name params supers methods)
@@ -491,8 +539,8 @@ module Bootstrap.Parser where {
   instanceDeclaration =
     do {
       pToken "instance";
-      vars <- pOption Nil (pThen (pToken "forall") (pBefore (pSome parameter) (pToken ".")));
-      givens <- pOption Nil context;
+      vars <- pOption [] (pThen (pToken "forall") (pBefore (pSome parameter) (pToken ".")));
+      givens <- pOption [] context;
       name <- upperReference;
       headType <- pSome typeAtom;
       pToken "where";
@@ -506,17 +554,17 @@ module Bootstrap.Parser where {
                  })
               declarations
          then pFail "instance signatures are outside shared-haskell-v1"
-         else pPure Unit)
-        (pPure Unit);
+         else pPure ())
+        (pPure ());
       methods <- pEither (instanceMethods declarations);
       pPure (SInstanceDecl vars givens name headType methods)
     };
-  instanceMethods :: List Value -> Either String (List (Pair String SExpr));
+  instanceMethods :: [] Value -> Either String ([] ((,) String SExpr));
   instanceMethods declarations =
     if all
          (\v ->
             case v of {
-              Equation _ Nil _ _ -> True;
+              Equation _ [] _ _ -> True;
               _ -> False
             })
          declarations
@@ -524,26 +572,47 @@ module Bootstrap.Parser where {
            (map
               (\v ->
                  case v of {
-                   Equation n _ a e -> Pair n (annotateMaybe e a);
-                   _ -> Pair "" (SVar "")
+                   Equation n _ a e -> (,) n (annotateMaybe e a);
+                   _ -> (,) "" (SVar "")
                  })
               declarations)
     else case groupValues declarations of {
            Left e -> Left e;
-           Right values -> Right (map (\(Triple n a e) -> Pair n (annotateMaybe e a)) values)
+           Right values -> Right (map (\((,,) n a e) -> (,) n (annotateMaybe e a)) values)
          };
   expr :: Parser SExpr;
-  expr =
-    do {
+  expr = do {
+    located <- pWithSpan (do {
       e <- pBySyntax sharedBindExpr disjunction;
-      pOption e (pMap (SAnn e) (pThen annotationSymbol annotation))
-    };
+      pOption ((,) e False) (do {
+        annotationSymbol;
+        a <- annotation;
+        pPure ((,) (SAnn e a) (annotationHasManagedStack a))
+      })
+    });
+    syntax <- pSourceSyntax;
+    case located of { (,) location ((,) expression managed) ->
+      case syntax of {
+        MetadataSyntax -> pPure expression;
+        _ -> pPure (if managed then SCallSite "an expression type signature" location expression else expression)
+      }
+    }
+  };
+  annotationHasManagedStack :: SAnnotation -> Bool;
+  annotationHasManagedStack (SAnnotation _ ty) = typeHasManagedStack ty;
+  typeHasManagedStack :: SType -> Bool;
+  typeHasManagedStack ty = case ty of {
+    SForall _ _ _ body -> typeHasManagedStack body;
+    SQualified predicates body ->
+      any (\(SPredicate name _) -> eqString (referenceLeaf name) "HasCallStack" || eqString name "MLFHasCallStack") predicates || typeHasManagedStack body;
+    _ -> False
+  };
   annotationSymbol :: Parser String;
   annotationSymbol = pBySyntax (pToken "::") (pChoice (pToken "::") (pToken ":"));
-  -- A single colon historically introduces a closed annotation. Keep that
-  -- meaning when the complete right-hand side is a closed type, or contains
-  -- syntax specific to types. Otherwise it can introduce a list tail. In
-  -- particular, x : Nil remains an annotation; write x : [] or Cons x Nil.
+  -- Legacy single-colon annotations remain a fallback for syntax that cannot
+  -- form a complete canonical pattern/expression (for example forall/arrow).
+  -- Ambiguous value or pattern annotations use ::; constructor case is not a
+  -- discriminator between a type and a cons tail.
   legacyAnnotation :: Parser SAnnotation;
   legacyAnnotation =
     pTry
@@ -552,39 +621,39 @@ module Bootstrap.Parser where {
          case a of {
            SAnnotation variables ty ->
              if (null (freeTypeNames variables ty) || (explicitType ty || not (null variables)))
-             then pPure Unit
+             then pPure ()
              else pFail "list tail"
          };
          end <- pState;
          if elem eqString (tokenText (stateToken end))
-              (Cons "|"
-                 (Cons "="
-                    (Cons ""
-                       (Cons ")"
-                          (Cons "]"
-                             (Cons "}"
-                                (Cons ","
-                                   (Cons ";"
-                                      (Cons "in"
-                                         (Cons "then"
-                                            (Cons "else" (Cons "of" (Cons "where" Nil)))))))))))))
-         then pPure Unit
+              ((:) "|"
+                 ((:) "="
+                    ((:) ""
+                       ((:) ")"
+                          ((:) "]"
+                             ((:) "}"
+                                ((:) ","
+                                   ((:) ";"
+                                      ((:) "in"
+                                         ((:) "then"
+                                            ((:) "else" ((:) "of" ((:) "where" [])))))))))))))
+         then pPure ()
          else pFail "end of annotation";
          pPure a
        });
-  freeTypeNames :: List String -> SType -> List String;
+  freeTypeNames :: [] String -> SType -> [] String;
   freeTypeNames bound ty =
     case ty of {
-      STVar n -> if elem eqString n bound then Nil else Cons n Nil;
+      STVar n -> if elem eqString n bound then [] else (:) n [];
       SArrow a b -> append (freeTypeNames bound a) (freeTypeNames bound b);
       STypeApp a b -> append (freeTypeNames bound a) (freeTypeNames bound b);
       SCon _ args -> concatMap (freeTypeNames bound) args;
       SForall _ n lower body ->
-        append (freeTypeNames bound lower) (freeTypeNames (Cons n bound) body);
+        append (freeTypeNames bound lower) (freeTypeNames ((:) n bound) body);
       SQualified predicates body ->
         append (concatMap (\(SPredicate _ args) -> concatMap (freeTypeNames bound) args) predicates)
           (freeTypeNames bound body);
-      _ -> Nil
+      _ -> []
     };
   explicitType :: SType -> Bool;
   explicitType ty =
@@ -614,7 +683,7 @@ module Bootstrap.Parser where {
            b <- concatenation;
            next <- pOptional (pLook comparisonOperator);
            case next of {
-             Nothing -> pPure Unit;
+             Nothing -> pPure ();
              Just _ -> pFail "ambiguous use of a non-associative comparison operator"
            };
            pPure (operator a b)
@@ -623,24 +692,43 @@ module Bootstrap.Parser where {
   comparisonOperator :: Parser (SExpr -> SExpr -> SExpr);
   comparisonOperator =
     pChoices
-      (Cons (pMap (\_ -> primitive2 PEqInt) (pToken "=="))
-         (Cons (pMap (\_ a b -> notValue (primitive2 PEqInt a b)) (pToken "/="))
-            (Cons (pMap (\_ -> primitive2 PLtInt) (pToken "<"))
-               (Cons (pMap (\_ a b -> notValue (primitive2 PLtInt b a)) (pToken "<="))
-                  (Cons (pMap (\_ a b -> primitive2 PLtInt b a) (pToken ">"))
-                     (Cons (pMap (\_ a b -> notValue (primitive2 PLtInt a b)) (pToken ">="))
-                        Nil))))));
+      ((:) (pMap (\_ -> namedOperator "==") (pToken "=="))
+         ((:) (pMap (\_ -> namedOperator "/=") (pToken "/="))
+            ((:) (pMap (\_ -> primitive2 PLtInt) (pToken "<"))
+               ((:) (pMap (\_ a b -> notValue (primitive2 PLtInt b a)) (pToken "<="))
+                  ((:) (pMap (\_ a b -> primitive2 PLtInt b a) (pToken ">"))
+                     ((:) (pMap (\_ a b -> notValue (primitive2 PLtInt a b)) (pToken ">="))
+                        []))))));
   concatenation :: Parser SExpr;
-  concatenation =
-    pChainr addition
-      (pChoice (pMap (\_ -> primitive2 PConcatString) (pToken "++"))
-         (pBySyntax (pFail "shared list-tail syntax is not supported")
-            (do {
-               pTry (pThen (pToken ":") (pNot legacyAnnotation));
-               pPure consExpression
-             })));
+  concatenation = do {
+    first <- addition;
+    pChoice
+      (pThen (pToken "++") (pMap (primitive2 PConcatString first) concatenation))
+      (pBySyntax (pPure first)
+        (pChoice
+          (pTry (do {
+            pToken ":";
+            rest <- concatenation;
+            legacyConsBoundary;
+            pPure (consExpression first rest)
+          }))
+          (pPure first)))
+  };
+  -- A successful prefix of a type is not a complete expression: in
+  -- x : Int -> Int, for example, the arrow forces annotation fallback. The
+  -- lower-precedence expression operators are legitimate cons boundaries.
+  legacyConsBoundary :: Parser ();
+  legacyConsBoundary = do {
+    state <- pState;
+    if elem eqString (tokenText (stateToken state))
+      ((:) "" ((:) ")" ((:) "]" ((:) "}" ((:) "," ((:) ";"
+        ((:) "in" ((:) "then" ((:) "else" ((:) "of" ((:) "where"
+        ((:) "|" ((:) "=" ((:) "::" ((:) "==" ((:) "/="
+        ((:) "<" ((:) "<=" ((:) ">" ((:) ">=" ((:) "&&" ((:) "||" []))))))))))))))))))))))
+    then pPure () else pFail "end of cons expression"
+  };
   consExpression :: SExpr -> SExpr -> SExpr;
-  consExpression a b = SApp (SApp (SConstructor "Cons") a) b;
+  consExpression a b = SApp (SApp (SConstructor ":") a) b;
   addition :: Parser SExpr;
   addition =
     pChainl multiplication
@@ -650,9 +738,9 @@ module Bootstrap.Parser where {
   multiplication =
     pChainl prefixed
       (pChoices
-         (Cons (pMap (\_ -> primitive2 PMulInt) (pToken "*"))
-            (Cons (pMap (\_ -> primitive2 PQuotInt) (pToken "/"))
-               (Cons (pMap (\_ -> primitive2 PRemInt) (pToken "%")) Nil))));
+         ((:) (pMap (\_ -> primitive2 PMulInt) (pToken "*"))
+            ((:) (pMap (\_ -> primitive2 PQuotInt) (pToken "/"))
+               ((:) (pMap (\_ -> primitive2 PRemInt) (pToken "%")) []))));
   prefixed :: Parser SExpr;
   prefixed = pBySyntax operand legacyPrefixed;
   legacyPrefixed :: Parser SExpr;
@@ -671,14 +759,14 @@ module Bootstrap.Parser where {
     };
   operand :: Parser SExpr;
   operand =
-    pChoices (Cons letExpr (Cons lambda (Cons caseExpr (Cons ifExpr (Cons application Nil)))));
+    pChoices ((:) letExpr ((:) lambda ((:) caseExpr ((:) ifExpr ((:) application [])))));
   application :: Parser SExpr;
   application =
     pMap
       (\values ->
          case values of {
-           Nil -> SVar "";
-           Cons first rest -> foldl SApp first rest
+           [] -> SVar "";
+           (:) first rest -> foldl SApp first rest
          })
       (pSome atom);
   primitive2 :: Primitive -> SExpr -> SExpr -> SExpr;
@@ -721,7 +809,7 @@ module Bootstrap.Parser where {
   -- Guards are total Boolean decisions within one RHS, not pattern-matrix rows.
   -- Recognize otherwise only immediately before the delimiter: existing names
   -- and applications such as otherwise x remain ordinary Boolean expressions.
-  guardBranch :: String -> Parser (Pair (Maybe SExpr) SExpr);
+  guardBranch :: String -> Parser ((,) (Maybe SExpr) SExpr);
   guardBranch delimiter =
     do {
       pToken "|";
@@ -731,15 +819,15 @@ module Bootstrap.Parser where {
           (pMap Just expr);
       pSatisfy (eqString delimiter) (delimiter ++ " after guard condition");
       body <- expr;
-      pPure (Pair condition body)
+      pPure ((,) condition body)
     };
-  guarded :: List (Pair (Maybe SExpr) SExpr) -> Either String SExpr;
+  guarded :: [] ((,) (Maybe SExpr) SExpr) -> Either String SExpr;
   guarded rows =
     case rows of {
-      Nil -> Left "guard block requires a final otherwise branch";
-      Cons (Pair Nothing body) Nil -> Right body;
-      Cons (Pair Nothing _) _ -> Left "otherwise must be the final guard branch";
-      Cons (Pair (Just condition) body) rest ->
+      [] -> Left "guard block requires a final otherwise branch";
+      (:) ((,) Nothing body) [] -> Right body;
+      (:) ((,) Nothing _) _ -> Left "otherwise must be the final guard branch";
+      (:) ((,) (Just condition) body) rest ->
         mapEither (conditional condition body) (guarded rest)
     };
   letExpr :: Parser SExpr;
@@ -763,7 +851,7 @@ module Bootstrap.Parser where {
         names = concatMap Surface.patternVariables args
       };
       if (length names == length (nubBy eqString names))
-      then pPure (Surface.function (Cons (Pair args body) Nil))
+      then pPure (Surface.function ((:) ((,) args body) []))
       else pFail "duplicate pattern variable"
     };
   caseExpr :: Parser SExpr;
@@ -784,22 +872,29 @@ module Bootstrap.Parser where {
       pPure (SAlternative pattern value)
     };
   patternP :: Parser SPattern;
-  patternP = pBySyntax patternApplication legacyPattern;
+  patternP = sourceOrMetadata
+    (pChainr patternApplication
+      (pMap (\_ a b -> constructorPattern ":" ((:) a ((:) b []))) (pToken ":")))
+    legacyPattern;
   legacyPattern :: Parser SPattern;
   legacyPattern =
     pChainr patternApplication
-      (pMap (\_ a b -> constructorPattern "Cons" (Cons a (Cons b Nil))) (pToken ":"));
+      (pMap (\_ a b -> constructorPattern "Cons" ((:) a ((:) b []))) (pToken ":"));
   patternApplication :: Parser SPattern;
   patternApplication =
     pChoice
       (pTry
          (do {
-            name <- upperReference;
+            name <- sourceOrMetadata
+              (pChoice upperReference (pTry canonicalPatternName)) upperReference;
             fields <- pMany patternAtom;
-            pBySyntax (pPure (constructorPattern (sharedSourceName name) fields)) (pPure (constructorPattern name fields))
+            sourceOrMetadata (pPure (constructorPattern (sharedSourceName name) fields)) (pPure (constructorPattern name fields))
           }))
       patternAtom;
-  constructorPattern :: String -> List SPattern -> SPattern;
+  canonicalPatternName :: Parser String;
+  canonicalPatternName = pChoice (pTry metadataBuiltinName)
+    (pParens (pThen (pToken ":") (pPure ":")));
+  constructorPattern :: String -> [] SPattern -> SPattern;
   constructorPattern name fields =
     if (eqString name "True" && null fields)
     then SBoolPattern True
@@ -822,36 +917,54 @@ module Bootstrap.Parser where {
                         fields)
               else SNestedPattern name fields;
   patternAtom :: Parser SPattern;
-  patternAtom = pBySyntax sharedPatternAtom legacyPatternAtom;
+  patternAtom = sourceOrMetadata sharedPatternAtom legacyPatternAtom;
   sharedPatternAtom :: Parser SPattern;
   sharedPatternAtom =
+    pChoice (pTry (do {
+      name <- lowerIdentifier;
+      pToken "@";
+      pMap (SAsPattern name) sharedPatternAtom
+    }))
+    (pChoice (pThen (pToken "~") (pMap SLazyPattern sharedPatternAtom)) sharedBasicPatternAtom);
+  sharedBasicPatternAtom :: Parser SPattern;
+  sharedBasicPatternAtom =
     pChoices
-      (Cons
+      ((:)
          (pParens
-            (pChoice (pMap SIntPattern (pThen (pToken "-") (pMap (\n -> (0 - n)) naturalLiteral)))
-               patternP))
-         (Cons (pMap (\b -> SConstructorPattern (sharedSourceName (if b then "True" else "False")) Nil) booleanLiteral)
-            (Cons (pMap SIntPattern naturalLiteral)
-               (Cons (pMap (\n -> SConstructorPattern (sharedSourceName n) Nil) upperReference)
-                  (Cons (pMap SDefaultPattern patternField) Nil)))));
+            (pChoice
+              (pTry (pBefore
+                (pChoice (pMap SIntPattern (pThen (pToken "-") (pMap (\n -> (0 - n)) naturalLiteral)))
+                  (pBind (collectionItems ")" patternP)
+                    (sourceTupleValue (SConstructorPattern "()" []) constructorPattern)))
+                (pLook (pToken ")"))))
+              (pBySyntax (pFail "typed patterns are outside shared-haskell-v1") annotatedVariable)))
+         ((:)
+            (pMap (foldr (\a b -> constructorPattern ":" ((:) a ((:) b [])))
+                         (constructorPattern "[]" []))
+               (pThen (pToken "[") (pBefore (collectionItems "]" patternP) (pToken "]"))))
+            ((:) (pBySyntax (pMap (\b -> SConstructorPattern (sharedSourceName (if b then "True" else "False")) []) booleanLiteral) (pMap SBoolPattern booleanLiteral))
+               ((:) (pMap (\text -> SOverloadedStringPattern text "$MLF.Primitive.==" "$MLF.Primitive.fromString") sourceStringLiteral)
+               ((:) (pBySyntax (pMap SIntPattern naturalLiteral) (pMap SIntPattern (pTry integerLiteral)))
+                  ((:) (pMap (\n -> SConstructorPattern (sharedSourceName n) []) upperReference)
+                     ((:) (pMap SDefaultPattern patternField) [])))))));
   legacyPatternAtom :: Parser SPattern;
   legacyPatternAtom =
     pChoices
-      (Cons
+      ((:)
          (pParens
             (pChoice annotatedVariable
                (pBind (collectionItems ")" patternP)
-                  (tupleValue (SConstructorPattern "Unit" Nil) constructorPattern))))
-         (Cons
+                  (tupleValue (SConstructorPattern "()" []) constructorPattern))))
+         ((:)
             (pMap
-               (foldr (\a b -> constructorPattern "Cons" (Cons a (Cons b Nil)))
-                  (constructorPattern "Nil" Nil))
+               (foldr (\a b -> constructorPattern "Cons" ((:) a ((:) b [])))
+                  (constructorPattern "Nil" []))
                (pThen (pToken "[") (pBefore (collectionItems "]" patternP) (pToken "]"))))
-            (Cons (pMap SBoolPattern booleanLiteral)
-               (Cons (pMap SIntPattern (pTry integerLiteral))
-                  (Cons (pMap SStringPattern stringLiteral)
-                     (Cons (pMap (\n -> SConstructorPattern n Nil) upperReference)
-                        (Cons (pMap SDefaultPattern patternField) Nil)))))));
+            ((:) (pMap SBoolPattern booleanLiteral)
+               ((:) (pMap SIntPattern (pTry integerLiteral))
+                  ((:) (pMap SStringPattern stringLiteral)
+                     ((:) (pMap (\n -> SConstructorPattern n []) upperReference)
+                        ((:) (pMap SDefaultPattern patternField) [])))))));
   annotatedVariable :: Parser SPattern;
   annotatedVariable =
     pTry
@@ -866,30 +979,30 @@ module Bootstrap.Parser where {
   patternField :: Parser (Maybe String);
   patternField = pChoice (pMap (\_ -> Nothing) (pToken "_")) (pMap Just lowerIdentifier);
   doExpr :: Parser SExpr;
-  doExpr = pBySyntax sharedDoExpr legacyDoExpr;
+  doExpr = sourceOrMetadata sharedDoExpr legacyDoExpr;
   legacyDoExpr :: Parser SExpr;
   legacyDoExpr =
     do {
       pToken "do";
       statements <- pMap concat (pBraces (pSepEndBy1 statement (pToken ";")));
       case reverse statements of {
-        Cons (SDoThen result) rest -> pPure (SDo (reverse rest) result);
+        (:) (SDoThen result) rest -> pPure (SDo (reverse rest) result);
         _ -> pFail "a do block must end with an expression"
       }
     };
-  statement :: Parser (List SStatement);
+  statement :: Parser ([] SStatement);
   statement =
     pChoices
-      (Cons
+      ((:)
          (pTry
             (do {
                p <- patternP;
                pToken "<-";
                e <- expr;
-               pPure (Cons (SDoBind p e) Nil)
+               pPure ((:) (SDoBind p e) [])
              }))
-         (Cons (pTry doLet) (Cons (pMap (\e -> Cons (SDoThen e) Nil) expr) Nil)));
-  doLet :: Parser (List SStatement);
+         ((:) (pTry doLet) ((:) (pMap (\e -> (:) (SDoThen e) []) expr) [])));
+  doLet :: Parser ([] SStatement);
   doLet =
     do {
       pToken "let";
@@ -897,53 +1010,67 @@ module Bootstrap.Parser where {
       values <- valueBlock;
       pLook (pChoice (pToken ";") (pToken "}"));
       if recursive
-      then pMap (\ds -> Cons (SDoLetRec ds) Nil) (pEither (Surface.recursiveValues values))
-      else pPure (map (\(Triple n a e) -> SDoLet n a e) values)
+      then pMap (\ds -> (:) (SDoLetRec ds) []) (pEither (Surface.recursiveValues values))
+      else pPure (map (\((,,) n a e) -> SDoLet n a e) values)
     };
   atom :: Parser SExpr;
-  atom = pBySyntax sharedAtom legacyAtom;
+  atom = sourceOrMetadata sharedAtom legacyAtom;
   sharedAtom :: Parser SExpr;
   sharedAtom =
     pChoices
-      (Cons
+      ((:)
          (pParens
-            (pChoices (Cons (pTry (pMap SVar (pBefore operatorReference (pLook (pToken ")"))))) (Cons (pMap SIntLit (pThen (pToken "-") (pMap (\n -> (0 - n)) naturalLiteral))) (Cons expr Nil)))))
-         (Cons doExpr
-            (Cons (pMap (\b -> SConstructor (sharedSourceName (if b then "True" else "False"))) booleanLiteral)
-               (Cons (pMap SDoubleLit doubleLiteral)
-                  (Cons (pMap SIntLit naturalLiteral)
-                     (Cons (pMap SStringLit stringLiteral)
-                        (Cons (pMap SVar lowerReference)
-                           (Cons (pThen (pNot (pTry operatorReference)) (pMap (\name -> SConstructor (sharedSourceName name)) upperReference)) Nil))))))));
+            (pChoices
+               ((:) (pMap (\_ -> SConstructor ":") (pToken ":"))
+                  ((:) (pBind (pSome (pToken ","))
+                           (\commas -> pMap SConstructor (sourceTupleName (1 + length commas))))
+                     ((:) (pTry (locatedReference (pBefore operatorReference (pLook (pToken ")")))))
+                        ((:) (pTry (pMap SIntLit (pThen (pToken "-") (pMap (\n -> (0 - n)) naturalLiteral))))
+                           ((:) (pBind (collectionItems ")" expr)
+                                    (sourceTupleValue (SConstructor "()")
+                                       (\name fields -> foldl SApp (SConstructor name) fields))) [])))))))
+         ((:)
+            (pMap (foldr sourceConsExpression (SConstructor "[]"))
+               (pThen (pToken "[") (pBefore (collectionItems "]" expr) (pToken "]"))))
+            ((:) doExpr
+               ((:) (pBySyntax (pMap (\b -> SConstructor (sharedSourceName (if b then "True" else "False"))) booleanLiteral) (pMap SBoolLit booleanLiteral))
+                  ((:) (pMap SDoubleLit doubleLiteral)
+                     ((:) (pMap SIntLit naturalLiteral)
+                        ((:) (pMap (\text -> SApp (SVar "$MLF.Primitive.fromString")
+                                  (Surface.sourceStringExpression text)) sourceStringLiteral)
+                           ((:) (locatedReference lowerReference)
+                              ((:) (pThen (pNot (pTry operatorReference)) (pMap (\name -> SConstructor (sharedSourceName name)) upperReference)) [])))))))));
+  sourceConsExpression :: SExpr -> SExpr -> SExpr;
+  sourceConsExpression a b = SApp (SApp (SConstructor ":") a) b;
   legacyAtom :: Parser SExpr;
   legacyAtom =
     pChoices
-      (Cons
+      ((:)
          (pParens
-            (pChoice (pTry (pMap SVar (pBefore operatorReference (pLook (pToken ")"))))) (pBind (collectionItems ")" expr)
-               (tupleValue (SConstructor "Unit")
+            (pChoice (pTry (locatedReference (pBefore operatorReference (pLook (pToken ")"))))) (pBind (collectionItems ")" expr)
+               (tupleValue (SConstructor "()")
                   (\name fields -> foldl SApp (SConstructor name) fields)))))
-         (Cons
+         ((:)
             (pMap (foldr consExpression (SConstructor "Nil"))
                (pThen (pToken "[") (pBefore (collectionItems "]" expr) (pToken "]"))))
-            (Cons doExpr
-               (Cons (pMap SBoolLit booleanLiteral)
-                  (Cons (pMap SDoubleLit doubleLiteral)
-                     (Cons (pMap SIntLit naturalLiteral)
-                        (Cons (pMap SStringLit stringLiteral)
-                           (Cons (pMap SVar lowerReference)
-                              (Cons (pMap SConstructor upperReference) Nil)))))))));
+            ((:) doExpr
+               ((:) (pMap SBoolLit booleanLiteral)
+                  ((:) (pMap SDoubleLit doubleLiteral)
+                     ((:) (pMap SIntLit naturalLiteral)
+                        ((:) (pMap SStringLit stringLiteral)
+                           ((:) (locatedReference lowerReference)
+                              ((:) (pMap SConstructor upperReference) [])))))))));
   -- Nonempty collections never admit a trailing comma or tuple sections.
   -- The separator check also gives ranges/comprehensions a direct diagnostic.
-  collectionItems :: forall a. String -> Parser a -> Parser (List a);
+  collectionItems :: forall a. String -> Parser a -> Parser ([] a);
   collectionItems closing item =
-    pChoice (pThen (pLook (pToken closing)) (pPure Nil))
+    pChoice (pThen (pLook (pToken closing)) (pPure []))
       (do {
          first <- item;
          rest <- collectionRest closing item;
-         pPure (Cons first rest)
+         pPure ((:) first rest)
        });
-  collectionRest :: forall a. String -> Parser a -> Parser (List a);
+  collectionRest :: forall a. String -> Parser a -> Parser ([] a);
   collectionRest closing item =
     do {
       state <- pState;
@@ -960,26 +1087,27 @@ module Bootstrap.Parser where {
                        end <- pState;
                        if eqString (tokenText (stateToken end)) closing
                        then pFail "trailing comma or missing collection element"
-                       else pPure Unit;
+                       else pPure ();
                        value <- item;
                        rest <- collectionRest closing item;
-                       pPure (Cons value rest)
+                       pPure ((:) value rest)
                      }
-                else pPure Nil
+                else pPure []
     };
-  tupleValue :: forall a. a -> (String -> List a -> a) -> List a -> Parser a;
-  tupleValue unit construct values =
+  sourceTupleName :: Int -> Parser String;
+  sourceTupleName arity =
+    if arity >= 2 && arity <= 64
+    then pPure ("(" ++ (foldr (++) "" (replicate (arity - 1) ",") ++ ")"))
+    else pFail "tuple arity must be between 2 and 64";
+  sourceTupleValue :: forall a. a -> (String -> [] a -> a) -> [] a -> Parser a;
+  sourceTupleValue unit construct values =
     case values of {
-      Nil -> pPure unit;
-      Cons value Nil -> pPure value;
-      _ ->
-        case length values of {
-          2 -> pPure (construct "Pair" values);
-          3 -> pPure (construct "Triple" values);
-          4 -> pPure (construct "Quad" values);
-          _ -> pFail "tuple syntax supports two, three or four components"
-        }
+      [] -> pPure unit;
+      (:) value [] -> pPure value;
+      _ -> pMap (\name -> construct name values) (sourceTupleName (length values))
     };
+  tupleValue :: forall a. a -> (String -> [] a -> a) -> [] a -> Parser a;
+  tupleValue = sourceTupleValue;
   booleanLiteral :: Parser Bool;
   booleanLiteral =
     pBySyntax (pChoice (pMap (\_ -> True) (pToken "True")) (pMap (\_ -> False) (pToken "False")))
@@ -1030,6 +1158,10 @@ module Bootstrap.Parser where {
          then pFail "non-finite Double literal"
          else pPure value
        });
+  sourceStringLiteral :: Parser SourceString;
+  sourceStringLiteral =
+    pBind (pSatisfy (\s -> ((stringLength s > 0) && (stringCodeAt s 0 == 34))) "string literal")
+      (\s -> pEither (sourceStringValue s));
   stringLiteral :: Parser String;
   stringLiteral =
     pBind (pSatisfy (\s -> ((stringLength s > 0) && (stringCodeAt s 0 == 34))) "string literal")
@@ -1040,13 +1172,13 @@ module Bootstrap.Parser where {
       (do {
          ty <- typ;
          pEither (validateSharedScheme ty);
-         pPure (SAnnotation Nil ty)
+         pPure (SAnnotation [] ty)
        })
       legacyAnnotationParser;
   legacyAnnotationParser :: Parser SAnnotation;
   legacyAnnotationParser =
     do {
-      variables <- pOption Nil (pThen (pToken "exists") (pBefore (pSome identifier) (pToken ".")));
+      variables <- pOption [] (pThen (pToken "exists") (pBefore (pSome identifier) (pToken ".")));
       if (length variables /= length (nubBy eqString variables))
       then pFail "duplicate existential variable"
       else pMap (SAnnotation variables) typ
@@ -1054,14 +1186,14 @@ module Bootstrap.Parser where {
   typ :: Parser SType;
   typ =
     pChoices
-      (Cons quantified
-         (Cons
+      ((:) quantified
+         ((:)
             (do {
                ps <- context;
                body <- typ;
                pPure (SQualified ps body)
              })
-            (Cons (pChainr typeApp (pMap (\_ -> SArrow) (pToken "->"))) Nil)));
+            ((:) (pChainr typeApp (pMap (\_ -> SArrow) (pToken "->"))) [])));
   quantified :: Parser SType;
   quantified =
     do {
@@ -1069,9 +1201,9 @@ module Bootstrap.Parser where {
       binders <- pSome typeBinder;
       pToken ".";
       body <- typ;
-      pPure (foldr (\(Triple f n b) t -> SForall f n b t) body binders)
+      pPure (foldr (\((,,) f n b) t -> SForall f n b t) body binders)
     };
-  typeBinder :: Parser (Triple Flag String SType);
+  typeBinder :: Parser ((,,) Flag String SType);
   typeBinder =
     pBySyntax
       (pChoice
@@ -1081,15 +1213,15 @@ module Bootstrap.Parser where {
                pToken "::";
                k <- kindParser;
                pPure
-                 (Triple Flexible name
+                 ((,,) Flexible name
                     (case k of {
                        Star -> SBottom;
                        _ -> SBottomKind k
                      }))
              }))
-         (pMap (\name -> Triple Flexible name SBottom) lowerIdentifier))
+         (pMap (\name -> (,,) Flexible name SBottom) lowerIdentifier))
       legacyTypeBinder;
-  legacyTypeBinder :: Parser (Triple Flag String SType);
+  legacyTypeBinder :: Parser ((,,) Flag String SType);
   legacyTypeBinder =
     pChoice
       (pParens
@@ -1100,7 +1232,7 @@ module Bootstrap.Parser where {
                 (pChoice
                    (pMap
                       (\k ->
-                         Pair Flexible
+                         (,) Flexible
                            (case k of {
                               Star -> SBottom;
                               _ -> SBottomKind k
@@ -1111,53 +1243,65 @@ module Bootstrap.Parser where {
                         pChoice (pMap (\_ -> Flexible) (pChoice (pToken ">=") (pToken ">")))
                           (pMap (\_ -> Rigid) (pToken "="));
                       ty <- typ;
-                      pPure (Pair flag ty)
+                      pPure ((,) flag ty)
                     }));
             pPure
               (case bound of {
-                 Nothing -> Triple Flexible name SBottom;
-                 Just (Pair flag ty) -> Triple flag name ty
+                 Nothing -> (,,) Flexible name SBottom;
+                 Just ((,) flag ty) -> (,,) flag name ty
                })
           }))
-      (pMap (\name -> Triple Flexible name SBottom) identifier);
+      (pMap (\name -> (,,) Flexible name SBottom) identifier);
   typeApp :: Parser SType;
   typeApp =
     pMap
       (\types ->
          case types of {
-           Nil -> SBottom;
-           Cons first rest -> foldl applyType first rest
+           [] -> SBottom;
+           (:) first rest -> foldl applyType first rest
          })
       (pSome typeAtom);
   applyType :: SType -> SType -> SType;
   applyType f a =
     case f of {
-      SCon n args -> SCon n (append args (Cons a Nil));
+      SCon n args -> SCon n (append args ((:) a []));
       _ -> STypeApp f a
     };
   typeAtom :: Parser SType;
-  typeAtom =
+  typeAtom = metadataAtom (\name -> SCon name []) ordinaryTypeAtom;
+  ordinaryTypeAtom :: Parser SType;
+  ordinaryTypeAtom =
     pBySyntax
       (pChoices
-         (Cons (pParens typ)
-            (Cons (pMap STVar lowerIdentifier)
-               (Cons (pMap (\n -> SCon (sharedSourceName n) Nil) upperReference) Nil))))
+         ((:) (pParens (pChoice
+                          (pBind (pSome (pToken ",")) (\commas -> pMap (\n -> SCon n []) (sourceTupleName (1 + length commas))))
+                          (pBind (collectionItems ")" typ) (sourceTupleValue (SCon "()" []) SCon))))
+            ((:) (pThen (pToken "[") (pBefore
+                      (pChoice (pThen (pLook (pToken "]")) (pPure (SCon "[]" [])))
+                         (pMap (\ty -> SCon "[]" ((:) ty [])) typ)) (pToken "]")))
+               ((:) (pMap STVar lowerIdentifier)
+                  ((:) (pMap (\n -> SCon (sharedSourceName n) []) upperReference) [])))))
       legacyTypeAtom;
   legacyTypeAtom :: Parser SType;
   legacyTypeAtom =
-    pChoices
-      (Cons (pParens (pBind (collectionItems ")" typ) (tupleValue (SCon "Unit" Nil) SCon)))
-         (Cons
-            (pMap (\ty -> SCon "List" (Cons ty Nil))
-               (pThen (pToken "[") (pBefore typ (pToken "]"))))
-            (Cons (pMap (\_ -> SBottom) (pChoice (pToken "bot") (pToken "⊥")))
-               (Cons (pMap STVar lowerIdentifier)
-                  (Cons (pMap (\n -> SCon n Nil) upperReference) Nil)))));
+    pChoices ((:) sourceTupleTypeAtom ((:) sourceListTypeAtom
+      ((:) (pMap (\_ -> SBottom) (pChoice (pToken "bot") (pToken "⊥")))
+        ((:) (pMap STVar lowerIdentifier)
+          ((:) (pMap (\n -> SCon n []) upperReference) [])))));
+  sourceTupleTypeAtom :: Parser SType;
+  sourceTupleTypeAtom = pParens (pChoice
+    (pBind (pSome (pToken ","))
+      (\commas -> pMap (\n -> SCon n []) (sourceTupleName (1 + length commas))))
+    (pBind (collectionItems ")" typ) (sourceTupleValue (SCon "()" []) SCon)));
+  sourceListTypeAtom :: Parser SType;
+  sourceListTypeAtom = pThen (pToken "[") (pBefore
+    (pChoice (pThen (pLook (pToken "]")) (pPure (SCon "[]" [])))
+      (pMap (\ty -> SCon "[]" ((:) ty [])) typ)) (pToken "]"));
   -- Reserved Boolean spellings are parsed in declarations so semantic validation
   -- can report the same inference rejection as the maintained seed compiler.
   declarationIdentifier :: Parser String;
   declarationIdentifier =
-    pChoices (Cons upperIdentifier (Cons (pToken "True") (Cons (pToken "False") Nil)));
+    pChoices ((:) upperIdentifier ((:) (pToken "True") ((:) (pToken "False") [])));
   dataDeclaration :: Parser DataDecl;
   dataDeclaration =
     do {
@@ -1170,7 +1314,7 @@ module Bootstrap.Parser where {
       };
       if elem eqString next reservedWords
       then pFail ("unexpected reserved word " ++ next)
-      else pPure Unit;
+      else pPure ();
       pToken "=";
       constructors <-
         pSepBy1
@@ -1182,13 +1326,13 @@ module Bootstrap.Parser where {
           (pToken "|");
       pPure
         (if all
-              (\(Pair _ k) ->
+              (\((,) _ k) ->
                  case k of {
                    Star -> True;
                    _ -> False
                  })
               parameters
-         then DataDecl name (map (\(Pair n _) -> n) parameters) constructors
+         then DataDecl name (map (\((,) n _) -> n) parameters) constructors
          else DataDeclK name parameters constructors)
     };
   fieldType :: Parser Field;
@@ -1199,7 +1343,7 @@ module Bootstrap.Parser where {
          binders <- pSome parameter;
          pToken ".";
          body <- fieldType;
-         pPure (foldr (\(Pair n k) b -> Quantified n k b) body binders)
+         pPure (foldr (\((,) n k) b -> Quantified n k b) body binders)
        })
       (pChainr fieldApplication (pMap (\_ -> Function) (pToken "->")));
   fieldApplication :: Parser Field;
@@ -1207,42 +1351,49 @@ module Bootstrap.Parser where {
     pMap
       (\fields ->
          case fields of {
-           Nil -> Parameter "";
-           Cons first rest -> foldl applyField first rest
+           [] -> Parameter "";
+           (:) first rest -> foldl applyField first rest
          })
       (pSome fieldAtom);
   applyField :: Field -> Field -> Field;
   applyField f a =
     case f of {
-      Applied n fields -> Applied n (append fields (Cons a Nil));
+      Applied n fields -> Applied n (append fields ((:) a []));
       _ -> Application f a
     };
   fieldAtom :: Parser Field;
-  fieldAtom =
+  fieldAtom = sourceOrMetadata
+    (pChoice (pTry (pMap (\name -> Applied name []) metadataBuiltinName)) ordinaryFieldAtom)
+    (metadataAtom (\name -> Applied name []) ordinaryFieldAtom);
+  ordinaryFieldAtom :: Parser Field;
+  ordinaryFieldAtom =
     pBySyntax
       (pChoices
-         (Cons (pParens fieldType)
-            (Cons (pMap (\n -> Applied (sharedSourceName n) Nil) upperReference)
-               (Cons (pMap Parameter lowerIdentifier) Nil))))
+         ((:) (pParens (pBind (collectionItems ")" fieldType)
+                         (sourceTupleValue (Applied "()" []) Applied)))
+            ((:) (pMap (\ty -> Applied "[]" ((:) ty []))
+                     (pThen (pToken "[") (pBefore fieldType (pToken "]"))))
+               ((:) (pMap (\n -> Applied (sharedSourceName n) []) upperReference)
+                  ((:) (pMap Parameter lowerIdentifier) [])))))
       legacyFieldAtom;
   legacyFieldAtom :: Parser Field;
   legacyFieldAtom =
     pChoices
-      (Cons
-         (pParens (pBind (collectionItems ")" fieldType) (tupleValue (Applied "Unit" Nil) Applied)))
-         (Cons
-            (pMap (\ty -> Applied "List" (Cons ty Nil))
+      ((:)
+         (pParens (pBind (collectionItems ")" fieldType) (sourceTupleValue (Applied "()" []) Applied)))
+         ((:)
+            (pMap (\ty -> Applied "[]" ((:) ty []))
                (pThen (pToken "[") (pBefore fieldType (pToken "]"))))
-            (Cons (pMap (\n -> Applied n Nil) upperReference)
-               (Cons (pMap Parameter lowerIdentifier) Nil))));
-  sharedOrdinaryLegacyWords :: List String;
-  sharedOrdinaryLegacyWords = Cons "rec" (Cons "exists" (Cons "true" (Cons "false" (Cons "bot" Nil))));
-  sharedReservedWords :: List String;
+            ((:) (pMap (\n -> Applied n []) upperReference)
+               ((:) (pMap Parameter lowerIdentifier) []))));
+  sharedOrdinaryLegacyWords :: [] String;
+  sharedOrdinaryLegacyWords = (:) "rec" ((:) "exists" ((:) "true" ((:) "false" ((:) "bot" []))));
+  sharedReservedWords :: [] String;
   sharedReservedWords =
-    Cons "type"
-      (Cons "newtype"
-         (Cons "deriving"
-            (Cons "default" (Cons "infix" (Cons "infixl" (Cons "infixr" (Cons "foreign" Nil)))))));
+    (:) "type"
+      ((:) "newtype"
+         ((:) "deriving"
+            ((:) "default" ((:) "infix" ((:) "infixl" ((:) "infixr" ((:) "foreign" [])))))));
   referenceLeaf :: String -> String;
   referenceLeaf name = referenceLeafAt name (stringLength name - 1);
   referenceLeafAt :: String -> Int -> String;
@@ -1252,27 +1403,27 @@ module Bootstrap.Parser where {
     else if (stringCodeAt name i == 46)
          then stringSlice name (i + 1) ((stringLength name - i) - 1)
          else referenceLeafAt name (i - 1);
-  validateSharedBinding :: String -> Either String Unit;
-  validateSharedBinding _ = Right Unit;
-  validateSharedScheme :: SType -> Either String Unit;
+  validateSharedBinding :: String -> Either String ();
+  validateSharedBinding _ = Right ();
+  validateSharedScheme :: SType -> Either String ();
   validateSharedScheme ty =
     do {
-      unless (null (freeTypeNames Nil ty))
+      unless (null (freeTypeNames [] ty))
         (Left "shared signatures require explicit forall for every free type variable");
       validateSharedType True ty
     };
-  validateSharedType :: Bool -> SType -> Either String Unit;
+  validateSharedType :: Bool -> SType -> Either String ();
   validateSharedType outer ty =
     case ty of {
       SForall flag name bound body ->
         do {
           case flag of {
             Rigid -> Left "rigid quantifiers are outside shared-haskell-v1";
-            Flexible -> Right Unit
+            Flexible -> Right ()
           };
           case bound of {
-            SBottom -> Right Unit;
-            SBottomKind _ -> Right Unit;
+            SBottom -> Right ();
+            SBottomKind _ -> Right ();
             _ -> Left "bounded quantifiers are outside shared-haskell-v1"
           };
           validateSharedType outer body
@@ -1294,10 +1445,10 @@ module Bootstrap.Parser where {
           validateSharedType False f;
           validateSharedMonotype a
         };
-      STVar _ -> Right Unit;
+      STVar _ -> Right ();
       _ -> Left "bottom types are outside shared-haskell-v1"
     };
-  validateSharedMonotype :: SType -> Either String Unit;
+  validateSharedMonotype :: SType -> Either String ();
   validateSharedMonotype ty =
     case ty of {
       SForall _ _ _ _ -> Left "impredicative type arguments are outside shared-haskell-v1";
@@ -1313,22 +1464,22 @@ module Bootstrap.Parser where {
           validateSharedMonotype b
         };
       SCon _ arguments -> mapM_ validateSharedMonotype arguments;
-      STVar _ -> Right Unit;
+      STVar _ -> Right ();
       _ -> Left "bottom types are outside shared-haskell-v1"
     };
-  validateSharedModule :: SourceModule -> Either String Unit;
+  validateSharedModule :: SourceModule -> Either String ();
   validateSharedModule (SourceModule file name exports imports datatypes classes instances values body _) =
     do {
       unless (isJust name && not (isJust body))
         (Left (file ++ ": shared source requires a named declaration-only module"));
       mapM_ validateSharedImport imports;
       case exports of {
-        Nothing -> Right Unit;
+        Nothing -> Right ();
         Just items -> mapM_ validateSharedExport items
       };
       mapM_ validateSharedDatatype datatypes;
       mapM_
-        (\(Triple n _ expression) ->
+        (\((,,) n _ expression) ->
            do {
              validateSharedBinding n;
              validateSharedExpression expression
@@ -1339,7 +1490,7 @@ module Bootstrap.Parser where {
            do {
              mapM_ (\(SPredicate _ args) -> mapM_ validateSharedMonotype args) supers;
              mapM_
-               (\(Pair n ty) ->
+               (\((,) n ty) ->
                   do {
                     validateSharedBinding n;
                     validateSharedType False ty;
@@ -1354,23 +1505,23 @@ module Bootstrap.Parser where {
            do {
              mapM_ (\(SPredicate _ args) -> mapM_ validateSharedMonotype args) context;
              mapM_ validateSharedMonotype head;
-             mapM_ (\(Pair _ expression) -> validateSharedExpression expression) methods
+             mapM_ (\((,) _ expression) -> validateSharedExpression expression) methods
            })
         instances;
-      Surface.bindValues values (SConstructor "Unit");
-      Right Unit
+      Surface.bindValues values (SConstructor "()");
+      Right ()
     };
-  validateSharedImportItem :: Export -> Either String Unit;
-  validateSharedImportItem _ = Right Unit;
-  validateSharedImport :: Import -> Either String Unit;
+  validateSharedImportItem :: Export -> Either String ();
+  validateSharedImportItem _ = Right ();
+  validateSharedImport :: Import -> Either String ();
   validateSharedImport (Import name _ _ _) = do {
     when (eqString name "Prelude") (Left "shared source uses the standard MLF.Primitive facade; legacy Prelude is outside shared-haskell-v1");
     when (textStartsAt name 0 "MLF.Host.")
       (Left "shared modules use MLF.Primitive rather than host adapter internals")
   };
-  validateSharedExport :: Export -> Either String Unit;
-  validateSharedExport _ = Right Unit;
-  validateSharedPattern :: SPattern -> Either String Unit;
+  validateSharedExport :: Export -> Either String ();
+  validateSharedExport _ = Right ();
+  validateSharedPattern :: SPattern -> Either String ();
   validateSharedPattern pattern =
     do {
       mapM_ validateSharedBinding (Surface.patternVariables pattern);
@@ -1378,13 +1529,18 @@ module Bootstrap.Parser where {
         SStringPattern _ -> Left "string patterns are outside shared-haskell-v1";
         SAnnotatedPattern _ _ -> Left "typed patterns are outside shared-haskell-v1";
         SNestedPattern _ patterns -> mapM_ validateSharedPattern patterns;
-        _ -> Right Unit
+        _ -> Right ()
       }
     };
-  validateSharedExpression :: SExpr -> Either String Unit;
+  validateSharedExpression :: SExpr -> Either String ();
   validateSharedExpression expression =
     case expression of {
-      SVar _ -> Right Unit;
+      SCallSite _ _ body -> validateSharedExpression body;
+      SSharedBind pattern action continuation bind failure -> do {
+        validateSharedPattern pattern;
+        mapM_ validateSharedExpression ((:) action ((:) continuation ((:) bind ((:) failure []))))
+      };
+      SVar _ -> Right ();
       SLam name annotation body ->
         do {
           validateSharedBinding name;
@@ -1427,7 +1583,7 @@ module Bootstrap.Parser where {
         };
       SEquations rows ->
         mapM_
-          (\(Pair patterns body) ->
+          (\((,) patterns body) ->
              do {
                mapM_ validateSharedPattern patterns;
                validateSharedExpression body
@@ -1436,7 +1592,7 @@ module Bootstrap.Parser where {
       SLetRec definitions body ->
         do {
           mapM_
-            (\(Triple name mode value) ->
+            (\((,,) name mode value) ->
                do {
                  validateSharedBinding name;
                  validateSharedRecursiveMode mode;
@@ -1446,12 +1602,12 @@ module Bootstrap.Parser where {
           validateSharedExpression body
         };
       SDo _ _ -> Left "internal error: shared do was not normalized";
-      _ -> Right Unit
+      _ -> Right ()
     };
-  validateSharedRecursiveMode :: RecursiveMode -> Either String Unit;
+  validateSharedRecursiveMode :: RecursiveMode -> Either String ();
   validateSharedRecursiveMode mode =
     case mode of {
-      InferRecursive -> Right Unit;
+      InferRecursive -> Right ();
       CheckRecursive (SAnnotation variables ty) ->
         do {
           unless (null variables) (Left "existential annotations are outside shared-haskell-v1");
@@ -1464,7 +1620,7 @@ module Bootstrap.Parser where {
       pToken "do";
       statements <- pBraces (pSepEndBy1 sharedStatement (pToken ";"));
       case reverse statements of {
-        Cons (SharedThen result) rest ->
+        (:) (SharedThen result) rest ->
           pEither
             (runFresh (append (Desugar.allNames result) (concatMap sharedStatementNames rest))
                (lowerSharedStatements (reverse rest) result));
@@ -1474,15 +1630,20 @@ module Bootstrap.Parser where {
   sharedStatement :: Parser SharedStatement;
   sharedStatement =
     pChoices
-      (Cons
+      ((:)
          (pTry
             (do {
-               name <- patternField;
-               pToken "<-";
-               value <- expr;
-               pPure (SharedBind name value)
+               located <- pWithSpan (do {
+                 pattern <- patternP;
+                 pToken "<-";
+                 value <- expr;
+                 pPure ((,) pattern value)
+               });
+               case located of {
+                 (,) location ((,) pattern value) -> pPure (SharedBind pattern value location)
+               }
              }))
-         (Cons
+         ((:)
             (pTry
                (do {
                   pToken "let";
@@ -1490,25 +1651,20 @@ module Bootstrap.Parser where {
                   pLook (pChoice (pToken ";") (pToken "}"));
                   pPure (SharedLet values)
                 }))
-            (Cons (pMap SharedThen expr) Nil)));
-  sharedStatementNames :: SharedStatement -> List String;
+            ((:) (pMap SharedThen expr) [])));
+  sharedStatementNames :: SharedStatement -> [] String;
   sharedStatementNames statement =
     case statement of {
-      SharedBind name value ->
-        append
-          (case name of {
-             Nothing -> Nil;
-             Just n -> Cons n Nil
-           })
-          (Desugar.allNames value);
+      SharedBind pattern value _ ->
+        append (Desugar.patternVariables pattern) (Desugar.allNames value);
       SharedThen value -> Desugar.allNames value;
-      SharedLet values -> concatMap (\(Triple n _ value) -> Cons n (Desugar.allNames value)) values
+      SharedLet values -> concatMap (\((,,) n _ value) -> (:) n (Desugar.allNames value)) values
     };
-  lowerSharedStatements :: List SharedStatement -> SExpr -> Fresh SExpr;
+  lowerSharedStatements :: [] SharedStatement -> SExpr -> Fresh SExpr;
   lowerSharedStatements statements result =
     case statements of {
-      Nil -> freshPure result;
-      Cons statement rest ->
+      [] -> freshPure result;
+      (:) statement rest ->
         do {
           continuation <- lowerSharedStatements rest result;
           case statement of {
@@ -1517,31 +1673,25 @@ module Bootstrap.Parser where {
                 Left error -> freshFail error;
                 Right body -> freshPure body
               };
-            SharedBind name value ->
-              do {
-                binder <-
-                  case name of {
-                    Just n -> freshPure n;
-                    Nothing -> freshName "sharedDoValue"
-                  };
-                freshPure
-                  (SApp (SApp (SVar "$MLF.Primitive.>>=") value)
-                     (SLam binder Nothing continuation))
-              };
+            SharedBind pattern value location ->
+              freshPure (SSharedBind pattern value continuation
+                (SVar "$MLF.Primitive.>>=")
+                (SApp (SCallSite "a do statement" location (SVar "$MLF.Primitive.fail"))
+                  (SApp (SPrimitive PTextToChars) (SStringLit "Pattern match failure in do expression"))));
             SharedThen value ->
               freshPure (SApp (SApp (SVar "$MLF.Primitive.>>") value) continuation)
           }
         }
     };
-  validateSharedDatatype :: DataDecl -> Either String Unit;
+  validateSharedDatatype :: DataDecl -> Either String ();
   validateSharedDatatype declaration =
     case declaration of {
       DataDecl _ _ constructors -> mapM_ validateSharedConstructor constructors;
       DataDeclK _ _ constructors -> mapM_ validateSharedConstructor constructors
     };
-  validateSharedConstructor :: ConstructorDecl -> Either String Unit;
+  validateSharedConstructor :: ConstructorDecl -> Either String ();
   validateSharedConstructor (ConstructorDecl _ fields) = mapM_ (validateSharedField True) fields;
-  validateSharedField :: Bool -> Field -> Either String Unit;
+  validateSharedField :: Bool -> Field -> Either String ();
   validateSharedField polymorphic field =
     case field of {
       Quantified _ _ body ->
@@ -1559,7 +1709,7 @@ module Bootstrap.Parser where {
           validateSharedField False a;
           validateSharedField False b
         };
-      Parameter _ -> Right Unit
+      Parameter _ -> Right ()
     };
 
   -- Only this fixed operator vocabulary is supported. The bindings themselves
@@ -1576,36 +1726,49 @@ module Bootstrap.Parser where {
   bindingName = pChoice lowerIdentifier (pParens operatorName);
   valueReference :: Parser String;
   valueReference = pChoice lowerReference (pParens operatorReference);
-  sharedInfix :: List String -> Parser String;
+  sharedInfix :: [] String -> Parser String;
   sharedInfix choices = pTry (do {
     name <- operatorReference;
     if elem eqString (referenceLeaf name) choices then pPure name else pFail "operator at another precedence"
   });
-  namedOperator name a b = SApp (SApp (SVar ("$MLF.Infix." ++ name)) a) b;
-  sharedSourceName name = if elem eqString name (Cons "Unit" (Cons "True" (Cons "False" Nil))) then "$MLF.Source." ++ name else name;
-  sharedOperatorParser choices = pMap namedOperator (sharedInfix choices);
+  namedOperator name a b = SApp (SApp (SVar (sourceOperatorName name)) a) b;
+  sourceOperatorName :: String -> String;
+  sourceOperatorName name =
+    if elem eqString (referenceLeaf name) ((:) "==" ((:) "/=" []))
+    then name else "$MLF.Infix." ++ name;
+  sharedSourceName name = if elem eqString name ((:) "True" ((:) "False" [])) then "$MLF.Source." ++ name else name;
+  sharedOperatorParser choices = do {
+    located <- pWithSpan (sharedInfix choices);
+    case located of {
+      (,) location operator -> pPure (\a b ->
+        SApp (SApp (SCallSite (referenceLeaf operator) location
+                    (SVar (sourceOperatorName operator))) a) b)
+    }
+  };
   sharedBindExpr :: Parser SExpr;
-  sharedBindExpr = pChainl sharedOrExpr (sharedOperatorParser (Cons ">>=" (Cons ">>" Nil)));
+  sharedBindExpr = pChainl sharedOrExpr (sharedOperatorParser ((:) ">>=" ((:) ">>" [])));
   sharedOrExpr :: Parser SExpr;
-  sharedOrExpr = pChainr sharedAndExpr (sharedOperatorParser (Cons "||" Nil));
+  sharedOrExpr = pChainr sharedAndExpr (sharedOperatorParser ((:) "||" []));
   sharedAndExpr :: Parser SExpr;
-  sharedAndExpr = pChainr sharedLevel4 (sharedOperatorParser (Cons "&&" Nil));
-  sharedComparisons :: List String;
-  sharedComparisons = Cons ("==") (Cons ("/=") (Cons ("<") (Cons ("<=") (Cons (">") (Cons (">=") (Nil))))));
-  sharedLevel4Operators :: List String;
-  sharedLevel4Operators = append sharedComparisons (Cons "<*>" (Cons "<$" (Cons "*>" (Cons "<*" Nil))));
+  sharedAndExpr = pChainr sharedLevel4 (sharedOperatorParser ((:) "&&" []));
+  sharedComparisons :: [] String;
+  sharedComparisons = (:) ("==") ((:) ("/=") ((:) ("<") ((:) ("<=") ((:) (">") ((:) (">=") ([]))))));
+  sharedLevel4Operators :: [] String;
+  sharedLevel4Operators = append sharedComparisons ((:) "<*>" ((:) "<$" ((:) "*>" ((:) "<*" []))));
   sharedLevel4 :: Parser SExpr;
   sharedLevel4 = do {
     first <- sharedConcatExpr;
-    rest <- pMany (do { op <- sharedInfix sharedLevel4Operators; value <- sharedConcatExpr; pPure (Pair op value) });
+    rest <- pMany (do { op <- sharedInfix sharedLevel4Operators; value <- sharedConcatExpr; pPure ((,) op value) });
     when (length rest > 1 && any (\entry -> elem eqString (referenceLeaf (fst entry)) sharedComparisons) rest)
       (pFail "ambiguous use of a non-associative comparison operator");
     pPure (foldl (\left entry -> namedOperator (fst entry) left (snd entry)) first rest)
   };
   sharedConcatExpr :: Parser SExpr;
-  sharedConcatExpr = pChainr sharedAddExpr (sharedOperatorParser (Cons "++" Nil));
+  sharedConcatExpr = pChainr sharedAddExpr
+    (pChoice (pMap (\_ -> sourceConsExpression) (pToken ":"))
+       (sharedOperatorParser ((:) "++" [])));
   sharedAddExpr :: Parser SExpr;
-  sharedAddExpr = pChainl sharedMultiplyExpr (sharedOperatorParser (Cons "+" (Cons "-" Nil)));
+  sharedAddExpr = pChainl sharedMultiplyExpr (sharedOperatorParser ((:) "+" ((:) "-" [])));
   sharedMultiplyExpr :: Parser SExpr;
-  sharedMultiplyExpr = pChainl operand (sharedOperatorParser (Cons "*" (Cons "/" (Cons "%" Nil))));
+  sharedMultiplyExpr = pChainl operand (sharedOperatorParser ((:) "*" ((:) "/" ((:) "%" []))));
 }

@@ -31,30 +31,30 @@ module Bootstrap.X.Parser where {
       body <- term;
       pPure (if L.null ds then body else XWithData ds body)
     };
-  reservedWords :: List String;
+  reservedWords :: [] String;
   reservedWords =
-    Cons "data"
-      (Cons "construct"
-         (Cons "primitive"
-            (Cons "case"
-               (Cons "return"
-                  (Cons "of"
-                     (Cons "let"
-                        (Cons "letrec"
-                           (Cons "in"
-                              (Cons "forall"
-                                 (Cons "true"
-                                    (Cons "false"
-                                       (Cons "True"
-                                          (Cons "False"
-                                             (Cons "bot"
-                                                (Cons "id"
-                                                   (Cons "hyp"
-                                                      (Cons "inner"
-                                                         (Cons "outer"
-                                                            (Cons "elim"
-                                                               (Cons "intro"
-                                                                  Nil))))))))))))))))))));
+    (:) "data"
+      ((:) "construct"
+         ((:) "primitive"
+            ((:) "case"
+               ((:) "return"
+                  ((:) "of"
+                     ((:) "let"
+                        ((:) "letrec"
+                           ((:) "in"
+                              ((:) "forall"
+                                 ((:) "true"
+                                    ((:) "false"
+                                       ((:) "True"
+                                          ((:) "False"
+                                             ((:) "bot"
+                                                ((:) "id"
+                                                   ((:) "hyp"
+                                                      ((:) "inner"
+                                                         ((:) "outer"
+                                                            ((:) "elim"
+                                                               ((:) "intro"
+                                                                  []))))))))))))))))))));
   identifier :: Parser String;
   identifier =
     pSatisfy
@@ -63,7 +63,19 @@ module Bootstrap.X.Parser where {
           (U.isAlpha (stringCodeAt s 0) && L.not (L.elem eqString s reservedWords))))
       "identifier";
   upperIdentifier :: Parser String;
-  upperIdentifier =
+  upperIdentifier = pChoice (pTry builtinConstructorName) ordinaryUpperIdentifier;
+  builtinConstructorName :: Parser String;
+  builtinConstructorName =
+    pChoice (pThen (pToken "[") (pThen (pToken "]") (pPure "[]")))
+      (pChoice (pToken ":")
+        (pParens (do {
+          commas <- pMany (pToken ",");
+          if L.length commas <= 63
+          then pPure ("(" ++ (L.foldr (++) "" commas ++ ")"))
+          else pFail "tuple arity must be at most 64"
+        })));
+  ordinaryUpperIdentifier :: Parser String;
+  ordinaryUpperIdentifier =
     pTry
       (do {
          s <- pLook identifier;
@@ -129,11 +141,11 @@ module Bootstrap.X.Parser where {
                 a <- typeVariable;
                 pToken ">=";
                 b <- typ;
-                pPure (Pair a b)
+                pPure ((,) a b)
               }))
-          (pMap (\a -> Pair a XBot) typeVariable);
+          (pMap (\a -> (,) a XBot) typeVariable);
       case boundValueShared1 of {
-        Pair a bound ->
+        (,) a bound ->
           do {
             pToken ".";
             pMap (XForall a bound) typ
@@ -149,13 +161,14 @@ module Bootstrap.X.Parser where {
     };
   typeAtom :: Parser XType;
   typeAtom =
-    pChoice (pParens typ)
+    pChoice (pTry (pMap (\c -> XCon c []) builtinConstructorName))
+      (pChoice (pParens typ)
       (pChoice
          (do {
             pToken "bot";
             pOption XBot (pBetween (pToken "[") (pToken "]") (pMap T.bottomKind kindParser))
           })
-         (pChoice (pMap (\c -> XCon c Nil) upperIdentifier) (pMap XVar typeVariable)));
+         (pChoice (pMap (\c -> XCon c []) ordinaryUpperIdentifier) (pMap XVar typeVariable))));
   kindParser :: Parser Kind;
   kindParser =
     pChainr (pChoice (pMap (\_ -> Star) (pToken "*")) (pParens kindParser))
@@ -177,7 +190,7 @@ module Bootstrap.X.Parser where {
       pToken "in";
       pMap (XLetRec bs) term
     };
-  binding :: Parser (Triple XName XType XTerm);
+  binding :: Parser ((,,) XName XType XTerm);
   binding =
     do {
       n <- termVariable;
@@ -185,7 +198,7 @@ module Bootstrap.X.Parser where {
       t <- typ;
       pToken "=";
       a <- term;
-      pPure (Triple n t a)
+      pPure ((,,) n t a)
     };
   letP :: Parser XTerm;
   letP =
@@ -207,10 +220,10 @@ module Bootstrap.X.Parser where {
              a <- typeVariable;
              pToken ">=";
              b <- typ;
-             pPure (Pair a b)
+             pPure ((,) a b)
            });
       case boundValueShared2 of {
-        Pair a b ->
+        (,) a b ->
           do {
             pToken "->";
             pMap (XTypeAbs a b) term
@@ -227,10 +240,10 @@ module Bootstrap.X.Parser where {
              n <- termVariable;
              pToken ":";
              t <- typ;
-             pPure (Pair n t)
+             pPure ((,) n t)
            });
       case boundValueShared3 of {
-        Pair n t ->
+        (,) n t ->
           do {
             pToken "->";
             pMap (XAbs n t) term
@@ -383,27 +396,27 @@ module Bootstrap.X.Parser where {
           }));
   -- Data binders are schematic names, not target identities. Their reserved
   -- words intentionally differ from the computation grammar above.
-  dataReserved :: List String;
+  dataReserved :: [] String;
   dataReserved =
-    Cons "data"
-      (Cons "class"
-         (Cons "instance"
-            (Cons "where"
-               (Cons "case"
-                  (Cons "of"
-                     (Cons "let"
-                        (Cons "rec"
-                           (Cons "in"
-                              (Cons "if"
-                                 (Cons "then"
-                                    (Cons "else"
-                                       (Cons "forall"
-                                          (Cons "exists"
-                                             (Cons "true"
-                                                (Cons "false"
-                                                   (Cons "bot"
-                                                      (Cons "module"
-                                                         (Cons "import" Nil))))))))))))))))));
+    (:) "data"
+      ((:) "class"
+         ((:) "instance"
+            ((:) "where"
+               ((:) "case"
+                  ((:) "of"
+                     ((:) "let"
+                        ((:) "rec"
+                           ((:) "in"
+                              ((:) "if"
+                                 ((:) "then"
+                                    ((:) "else"
+                                       ((:) "forall"
+                                          ((:) "exists"
+                                             ((:) "true"
+                                                ((:) "false"
+                                                   ((:) "bot"
+                                                      ((:) "module"
+                                                         ((:) "import" []))))))))))))))))));
   dataName :: Parser String;
   dataName =
     pSatisfy
@@ -413,11 +426,12 @@ module Bootstrap.X.Parser where {
       "data name";
   upperDataName :: Parser String;
   upperDataName =
-    pTry
-      (do {
-         s <- pLook dataName;
-         if U.isUpper (stringCodeAt s 0) then dataName else pFail "expected uppercase data name"
-       });
+    pChoice (pTry builtinConstructorName)
+      (pTry
+        (do {
+           s <- pLook dataName;
+           if U.isUpper (stringCodeAt s 0) then dataName else pFail "expected uppercase data name"
+         }));
   lowerDataName :: Parser String;
   lowerDataName =
     pTry
@@ -446,16 +460,16 @@ module Bootstrap.X.Parser where {
       c <- upperDataName;
       pMap (ConstructorDecl c) (pMany fieldAtom)
     };
-  parameter :: Parser (Pair String Kind);
+  parameter :: Parser ((,) String Kind);
   parameter =
     pChoice
       (pParens
          (do {
             n <- lowerDataName;
             pToken ":";
-            pMap (Pair n) kindParser
+            pMap ((,) n) kindParser
           }))
-      (pMap (\n -> Pair n Star) lowerDataName);
+      (pMap (\n -> (,) n Star) lowerDataName);
   fieldType :: Parser Field;
   fieldType =
     pChoice quantifiedField (pChainr fieldApplication (pMap (\_ -> Function) (pToken "->")));
@@ -475,10 +489,11 @@ module Bootstrap.X.Parser where {
       rest <- pMany fieldAtom;
       pPure (L.foldl applyField first rest)
     };
-  applyField (Applied c args) a = Applied c (L.append args (Cons a Nil));
+  applyField (Applied c args) a = Applied c (L.append args ((:) a []));
   applyField f a = Application f a;
   fieldAtom :: Parser Field;
   fieldAtom =
-    pChoice (pParens fieldType)
-      (pChoice (pMap (\c -> Applied c Nil) upperDataName) (pMap Parameter lowerDataName))
+    pChoice (pTry (pMap (\c -> Applied c []) builtinConstructorName))
+      (pChoice (pParens fieldType)
+        (pChoice (pMap (\c -> Applied c []) upperDataName) (pMap Parameter lowerDataName)))
 }

@@ -12,8 +12,8 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
   -- position; nullable loops terminate without recursive backtracking.
   -- Offsets and character classes use Unicode scalar values, like String itself.
   data CharacterSet =
-    Ranges Bool (List (Pair Int Int)) |
-    Union (List CharacterSet) |
+    Ranges Bool ([] ((,) Int Int)) |
+    Union ([] CharacterSet) |
     Complement CharacterSet |
     AnyCharacter;
   data Pattern =
@@ -36,7 +36,7 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
   failure :: Int -> String -> Parsed;
   failure offset message = ParseError (message ++ (" at character " ++ showInt offset));
   literal :: Int -> CharacterSet;
-  literal code = Ranges False (Cons (Pair code code) Nil);
+  literal code = Ranges False ((:) ((,) code code) []);
   digit :: Int -> Bool;
   digit code = ((code >= 48) && (code <= 57));
   asciiLetter :: Int -> Bool;
@@ -49,14 +49,14 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
     let {
       ranges =
         if ((code == 100) || (code == 68))
-        then Cons (Pair 48 57) Nil
+        then (:) ((,) 48 57) []
         else if ((code == 119) || (code == 87))
-             then Cons (Pair 48 57) (Cons (Pair 65 90) (Cons (Pair 95 95) (Cons (Pair 97 122) Nil)))
-             else Cons (Pair 9 13) (Cons (Pair 32 32) Nil)
+             then (:) ((,) 48 57) ((:) ((,) 65 90) ((:) ((,) 95 95) ((:) ((,) 97 122) [])))
+             else (:) ((,) 9 13) ((:) ((,) 32 32) [])
     } in
     if (code == (-1))
     then Left "trailing regular-expression escape"
-    else if S.elem eqInt code (Cons 100 (Cons 68 (Cons 119 (Cons 87 (Cons 115 (Cons 83 Nil))))))
+    else if S.elem eqInt code ((:) 100 ((:) 68 ((:) 119 ((:) 87 ((:) 115 ((:) 83 []))))))
          then Right
                 (ClassAtom (Ranges ((code == 68) || ((code == 87) || (code == 83))) ranges) Nothing
                    (offset + 1))
@@ -78,7 +78,7 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
     else if (at text offset == (-1))
          then Left "unterminated character class"
          else Right (ClassAtom (literal (at text offset)) (Just (at text offset)) (offset + 1));
-  parseClass :: String -> Int -> Bool -> List CharacterSet -> Parsed;
+  parseClass :: String -> Int -> Bool -> [] CharacterSet -> Parsed;
   parseClass text offset inverted parts =
     if (at text offset == (-1))
     then failure offset "unterminated character class"
@@ -110,11 +110,11 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
                                    if (low > high)
                                    then failure next "descending character-class range"
                                    else parseClass text after inverted
-                                          (Cons (Ranges False (Cons (Pair low high) Nil)) parts)
+                                          ((:) (Ranges False ((:) ((,) low high) [])) parts)
                                }
                            }
                        }
-                  else parseClass text next inverted (Cons first parts)
+                  else parseClass text next inverted ((:) first parts)
               };
   parseAtom :: String -> Int -> Parsed;
   parseAtom text offset =
@@ -133,7 +133,7 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
          then let {
                 inverted = (at text (offset + 1) == 94)
               } in
-              parseClass text (offset + (if inverted then 2 else 1)) inverted Nil
+              parseClass text (offset + (if inverted then 2 else 1)) inverted []
          else if (code == 92)
               then case escaped text (offset + 1) of {
                      Left message -> ParseError message;
@@ -146,21 +146,21 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
                         else if (code == 36)
                              then Parsed End (offset + 1)
                              else if S.elem eqInt code
-                                       (Cons 42
-                                          (Cons 43 (Cons 63 (Cons 123 (Cons 125 (Cons 93 Nil))))))
+                                       ((:) 42
+                                          ((:) 43 ((:) 63 ((:) 123 ((:) 125 ((:) 93 []))))))
                                   then failure offset "unexpected regular-expression operator"
                                   else Parsed (Character (literal code)) (offset + 1);
-  number :: String -> Int -> Int -> Pair Int Int;
+  number :: String -> Int -> Int -> (,) Int Int;
   number text offset value =
     if (digit (at text offset) && (value <= 1000))
     then number text (offset + 1) (((value * 10) + at text offset) - 48)
-    else Pair value offset;
+    else (,) value offset;
   parseBound :: String -> Pattern -> Int -> Parsed;
   parseBound text body offset =
     if S.not (digit (at text offset))
     then failure offset "expected repetition count"
     else case number text offset 0 of {
-           Pair minimum next ->
+           (,) minimum next ->
              if (minimum > 1000)
              then failure offset "repetition count exceeds 1000"
              else if (at text next == 125)
@@ -172,7 +172,7 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
                             else if S.not (digit (at text (next + 1)))
                                  then failure (next + 1) "expected repetition count"
                                  else case number text (next + 1) 0 of {
-                                        Pair maximum after ->
+                                        (,) maximum after ->
                                           if ((maximum > 1000) || (maximum < minimum))
                                           then failure next "invalid repetition bounds"
                                           else if (at text after /= 125)
@@ -218,25 +218,25 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
                Parsed right after -> Parsed (Alternative left right) after
              }
     };
-  emit :: Instruction -> Build -> Pair Int Build;
+  emit :: Instruction -> Build -> (,) Int Build;
   emit instruction (Build next code) =
-    Pair next (Build (next + 1) (M.insert next instruction code));
-  assemble :: Pattern -> Int -> Build -> Pair Int Build;
+    (,) next (Build (next + 1) (M.insert next instruction code));
+  assemble :: Pattern -> Int -> Build -> (,) Int Build;
   assemble pattern continuation state =
     case pattern of {
-      Empty -> Pair continuation state;
+      Empty -> (,) continuation state;
       Character set -> emit (Consume set continuation) state;
       Begin -> emit (AtBegin continuation) state;
       End -> emit (AtEnd continuation) state;
       Sequence first second ->
         case assemble second continuation state of {
-          Pair next after -> assemble first next after
+          (,) next after -> assemble first next after
         };
       Alternative first second ->
         case assemble second continuation state of {
-          Pair right afterRight ->
+          (,) right afterRight ->
             case assemble first continuation afterRight of {
-              Pair left afterLeft -> emit (Fork left right) afterLeft
+              (,) left afterLeft -> emit (Fork left right) afterLeft
             }
         };
       Repeat body minimum maximum ->
@@ -244,24 +244,24 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
         then case assemble (Repeat body (minimum - 1) (S.mapOptional (\n -> (n - 1)) maximum))
                     continuation
                     state of {
-               Pair next after -> assemble body next after
+               (,) next after -> assemble body next after
              }
         else case maximum of {
                Just remaining ->
                  if (remaining == 0)
-                 then Pair continuation state
+                 then (,) continuation state
                  else case assemble (Repeat body 0 (Just (remaining - 1))) continuation state of {
-                        Pair next after ->
+                        (,) next after ->
                           case assemble body next after of {
-                            Pair first final -> emit (Fork first continuation) final
+                            (,) first final -> emit (Fork first continuation) final
                           }
                       };
                Nothing ->
                  case state of {
                    Build loop code ->
                      case assemble body loop (Build (loop + 1) code) of {
-                       Pair first (Build next final) ->
-                         Pair loop (Build next (M.insert loop (Loop first continuation) final))
+                       (,) first (Build next final) ->
+                         (,) loop (Build next (M.insert loop (Loop first continuation) final))
                      }
                  }
              }
@@ -276,7 +276,7 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
         else if (patternSize pattern >= 10000)
              then Left "regular expression exceeds compilation budget"
              else case assemble pattern 0 (Build 1 (M.singleton 0 Accept)) of {
-                    Pair start (Build size code) -> Right (Regex start code)
+                    (,) start (Build size code) -> Right (Regex start code)
                   }
     };
   -- This bounds construction work as well as emitted states: an empty body costs
@@ -301,7 +301,7 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
       AnyCharacter -> (code /= 10);
       Ranges inverted ranges ->
         let {
-          present = S.any (\(Pair low high) -> ((code >= low) && (code <= high))) ranges
+          present = S.any (\((,) low high) -> ((code >= low) && (code <= high))) ranges
         } in
         if inverted then S.not present else present;
       Union parts -> S.any (\part -> contains part code) parts;
@@ -310,64 +310,64 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
   closure :: IntMap Instruction ->
              Int ->
              Int ->
-             List Thread ->
-             IntSet -> List Thread -> Triple (List Thread) IntSet (Maybe (Pair Int Int));
+             [] Thread ->
+             IntSet -> [] Thread -> (,,) ([] Thread) IntSet (Maybe ((,) Int Int));
   -- Returning to a repetition without consuming a character terminates that
   -- iteration at its current priority, before alternatives still on the stack.
   closure code size offset pending seen ready =
     case pending of {
-      Nil -> Triple (S.reverse ready) seen Nothing;
-      Cons (Thread instruction start) rest ->
+      [] -> (,,) (S.reverse ready) seen Nothing;
+      (:) (Thread instruction start) rest ->
         if Set.member instruction seen
         then case M.get instruction code of {
                Loop body next ->
-                 closure code size offset (Cons (Thread next start) rest) seen ready;
+                 closure code size offset ((:) (Thread next start) rest) seen ready;
                _ -> closure code size offset rest seen ready
              }
         else let {
                visited = Set.insert instruction seen
              } in
              case M.get instruction code of {
-               Accept -> Triple (S.reverse ready) visited (Just (Pair start offset));
+               Accept -> (,,) (S.reverse ready) visited (Just ((,) start offset));
                Consume set next ->
-                 closure code size offset rest visited (Cons (Thread instruction start) ready);
+                 closure code size offset rest visited ((:) (Thread instruction start) ready);
                Fork first second ->
                  closure code size offset
-                   (Cons (Thread first start) (Cons (Thread second start) rest))
+                   ((:) (Thread first start) ((:) (Thread second start) rest))
                    visited
                    ready;
                Loop first second ->
                  closure code size offset
-                   (Cons (Thread first start) (Cons (Thread second start) rest))
+                   ((:) (Thread first start) ((:) (Thread second start) rest))
                    visited
                    ready;
                AtBegin next ->
                  closure code size offset
-                   (if (offset == 0) then Cons (Thread next start) rest else rest)
+                   (if (offset == 0) then (:) (Thread next start) rest else rest)
                    visited
                    ready;
                AtEnd next ->
                  closure code size offset
-                   (if (offset == size) then Cons (Thread next start) rest else rest)
+                   (if (offset == size) then (:) (Thread next start) rest else rest)
                    visited
                    ready
              }
     };
-  advance :: IntMap Instruction -> Int -> List Thread -> List Thread;
+  advance :: IntMap Instruction -> Int -> [] Thread -> [] Thread;
   advance code character threads =
     case threads of {
-      Nil -> Nil;
-      Cons (Thread instruction start) rest ->
+      [] -> [];
+      (:) (Thread instruction start) rest ->
         case M.get instruction code of {
           Consume set next ->
             if contains set character
-            then Cons (Thread next start) (advance code character rest)
+            then (:) (Thread next start) (advance code character rest)
             else advance code character rest;
           _ -> panic "invalid consuming regular-expression state"
         }
     };
   search :: Regex ->
-            String -> Int -> Int -> List Thread -> Maybe (Pair Int Int) -> Maybe (Pair Int Int);
+            String -> Int -> Int -> [] Thread -> Maybe ((,) Int Int) -> Maybe ((,) Int Int);
   search regex subject size offset pending fallback =
     case regex of {
       Regex start code ->
@@ -378,8 +378,8 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
               Just result -> pending
             }
         } in
-        case closure code size offset candidates Set.empty Nil of {
-          Triple ready visited accepted ->
+        case closure code size offset candidates Set.empty [] of {
+          (,,) ready visited accepted ->
             let {
               best =
                 case accepted of {
@@ -394,16 +394,16 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
                    best
         }
     };
-  find :: Regex -> String -> Int -> Maybe (Pair Int Int);
+  find :: Regex -> String -> Int -> Maybe ((,) Int Int);
   find regex subject offset =
     if ((offset < 0) || (offset > stringLength subject))
     then Nothing
-    else search regex subject (stringLength subject) offset Nil Nothing;
+    else search regex subject (stringLength subject) offset [] Nothing;
   countFrom :: Regex -> String -> Int -> Int -> Int;
   countFrom regex subject offset count =
     case find regex subject offset of {
       Nothing -> count;
-      Just (Pair start end) ->
+      Just ((,) start end) ->
         let {
           total = (count + 1)
         } in
@@ -414,15 +414,15 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
     };
   countMatches :: Regex -> String -> Int;
   countMatches regex subject = countFrom regex subject 0 0;
-  replaceFrom :: Regex -> String -> String -> Int -> Int -> List String -> String;
+  replaceFrom :: Regex -> String -> String -> Int -> Int -> [] String -> String;
   replaceFrom regex replacement subject offset copied pieces =
     case find regex subject offset of {
       Nothing ->
         S.concatStrings
-          (S.reverse (Cons (stringSlice subject copied (stringLength subject - copied)) pieces));
-      Just (Pair start end) ->
+          (S.reverse ((:) (stringSlice subject copied (stringLength subject - copied)) pieces));
+      Just ((,) start end) ->
         let {
-          next = Cons replacement (Cons (stringSlice subject copied (start - copied)) pieces)
+          next = (:) replacement ((:) (stringSlice subject copied (start - copied)) pieces)
         } in
         if ((start == end) && (end == stringLength subject))
         then S.concatStrings (S.reverse next)
@@ -430,5 +430,5 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
                next
     };
   replaceAll :: Regex -> String -> String -> String;
-  replaceAll regex replacement subject = replaceFrom regex replacement subject 0 0 Nil
+  replaceAll regex replacement subject = replaceFrom regex replacement subject 0 0 []
 }

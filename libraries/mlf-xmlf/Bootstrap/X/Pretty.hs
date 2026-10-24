@@ -21,8 +21,8 @@ module Bootstrap.X.Pretty where {
       XBot -> "bot";
       XBotKind k -> ("bot[" ++ (prettyKind k ++ "]"));
       XArrow a b -> parenthesize (p > 1) (typeAt 2 a ++ (" -> " ++ typeAt 1 b));
-      XCon c Nil -> c;
-      XCon c ts -> parenthesize (p > 2) (L.intercalate " " (Cons c (L.map (typeAt 3) ts)));
+      XCon c [] -> c;
+      XCon c ts -> parenthesize (p > 2) (L.intercalate " " ((:) c (L.map (typeAt 3) ts)));
       XApply f a -> parenthesize (p > 2) (typeAt 2 f ++ (" " ++ typeAt 3 a));
       XForall a XBot b -> parenthesize (p > 0) ("forall " ++ (variable a ++ (". " ++ typeAt 0 b)));
       XForall a bound b ->
@@ -82,12 +82,12 @@ module Bootstrap.X.Pretty where {
       XWithData ds b ->
         (L.intercalate "" (L.map (\d -> (D.prettyDeclaration d ++ "\n")) ds) ++ termAt 0 b)
     };
-  prettyBinding :: Triple XName XType XTerm -> String;
-  prettyBinding (Triple n ty a) = (name n ++ (" : " ++ (prettyType ty ++ (" = " ++ termAt 0 a))));
+  prettyBinding :: (,,) XName XType XTerm -> String;
+  prettyBinding ((,,) n ty a) = (name n ++ (" : " ++ (prettyType ty ++ (" = " ++ termAt 0 a))));
   prettyAlternative :: XAlternative -> String;
   prettyAlternative (XAlternative pat b) = (prettyPattern pat ++ (" -> " ++ termAt 0 b));
   prettyPattern :: XPattern -> String;
-  prettyPattern (XConstructorPattern c ns) = L.intercalate " " (Cons c (L.map maybeName ns));
+  prettyPattern (XConstructorPattern c ns) = L.intercalate " " ((:) c (L.map maybeName ns));
   prettyPattern (XDefaultPattern n) = maybeName n;
   maybeName Nothing = "_";
   maybeName (Just n) = name n;

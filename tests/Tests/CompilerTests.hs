@@ -22,31 +22,31 @@ module Tests.CompilerTests where {
   import qualified Tests.CorePartitions as CorePartitions;
   -- Build and execute native MLF tests; preserved oracle data and test-only
   -- checking modules remain independent of the candidate compiler.
-  data TestContext = TestContext String String String (List String) String String;
+  data TestContext = TestContext String String String ([] String) String String;
   root :: TestContext -> String;
   root (TestContext r _ _ _ _ _) = r;
   output :: TestContext -> String;
   output (TestContext _ d _ _ _ _) = d;
   compiler :: TestContext -> String;
   compiler (TestContext _ _ c _ _ _) = c;
-  runtimeProfiles :: TestContext -> List String;
+  runtimeProfiles :: TestContext -> [] String;
   runtimeProfiles (TestContext _ _ _ profiles _ _) = profiles;
   sharedCache :: TestContext -> String;
   sharedCache (TestContext _ _ _ _ cache _) = cache;
   packageManager :: TestContext -> String;
   packageManager (TestContext _ _ _ _ _ manager) = manager;
-  cacheOptions :: TestContext -> List String;
+  cacheOptions :: TestContext -> [] String;
   cacheOptions c =
-    if eqString (sharedCache c) "" then Nil else Cons "--cache-dir" (Cons (sharedCache c) Nil);
+    if eqString (sharedCache c) "" then [] else (:) "--cache-dir" ((:) (sharedCache c) []);
   report :: TestContext -> String;
   report c = (output c ++ "/verification.json");
-  record :: TestContext -> String -> J.Json -> IO Unit;
+  record :: TestContext -> String -> J.Json -> IO ();
   record c key value =
     do {
       saved <- J.read (report c);
       J.write (report c) (J.set key value saved)
     };
-  run :: TestContext -> List String -> IO Unit;
+  run :: TestContext -> [] String -> IO ();
   run c argv =
     do {
       putStrLn ("+ " ++ S.intercalate " " argv);
@@ -54,11 +54,11 @@ module Tests.CompilerTests where {
       O.require (code == 0)
         ("compiler test command failed (" ++ (showInt code ++ ("): " ++ S.intercalate " " argv)))
     };
-  query :: TestContext -> List String -> IO String;
+  query :: TestContext -> [] String -> IO String;
   query c argv = B.raw (output c) argv;
-  capture :: TestContext -> List String -> String -> IO Unit;
+  capture :: TestContext -> [] String -> String -> IO ();
   capture c argv destination = captureWithin c argv destination 1800;
-  captureWithin :: TestContext -> List String -> String -> Int -> IO Unit;
+  captureWithin :: TestContext -> [] String -> String -> Int -> IO ();
   captureWithin c argv destination seconds =
     do {
       let {
@@ -67,18 +67,18 @@ module Tests.CompilerTests where {
       putStrLn ("+ " ++ S.intercalate " " argv);
       code <- O.exec (root c) argv "" destination errors seconds;
       if (code == 0)
-      then ioReturn Unit
+      then ioReturn ()
       else do {
              text <- readFile errors;
              O.fatal ("compiler test command failed (" ++ (showInt code ++ ("): " ++ text)))
            }
     };
-  walk :: String -> IO (List String);
+  walk :: String -> IO ([] String);
   walk path =
     do {
       present <- fileExists path;
       if present
-      then ioReturn (Cons path Nil)
+      then ioReturn ((:) path [])
       else do {
              names <- O.entries path;
              nested <-
@@ -108,27 +108,27 @@ module Tests.CompilerTests where {
             (S.concat nested)
       };
       hashes <-
-        B.hashFiles (S.append paths (Cons (r ++ "/mlfpkg") (Cons (r ++ "/mlf-package.json") Nil)));
+        B.hashFiles (S.append paths ((:) (r ++ "/mlfpkg") ((:) (r ++ "/mlf-package.json") [])));
       ioReturn
         (J.Object
-           (S.map (\entry -> Pair (O.relative r (S.fst entry)) (S.snd entry)) (J.items hashes)))
+           (S.map (\entry -> (,) (O.relative r (S.fst entry)) (S.snd entry)) (J.items hashes)))
     };
-  clearDrivers :: IO Unit;
+  clearDrivers :: IO ();
   clearDrivers =
     S.mapM_ unsetEnv
       (O.words
          "MLF_BENCH_STREAM_LINK MLF_MOCK_FAIL_RUNTIME MLF_BENCH_STREAM_LLVM MLF_BENCH_MLF_CLANG MLF_MOCK_FAST_FRONTEND MLF_BOOTSTRAP_INTERPRETER MLF_BOOTSTRAP_LLVM MLF_BOOTSTRAP_TIMEOUT_SECONDS MLF_TEST_TRACE MLF_TEST_FAIL_WRITE MLF_LLVM_TEST_ABI MLF_LLVM_TEST_CFLAGS MLF_LLVM_TEST_LIBS MLF_LLVM_TEST_OPT MLF_TEST_PORT_TARGETS MLF_TEST_PORT_TARGETS_SHA256");
-  nativeFlags :: TestContext -> IO (List String);
+  nativeFlags :: TestContext -> IO ([] String);
   nativeFlags c =
     do {
       windows <- O.isWindows;
-      text <- query c (Cons "pkg-config" (O.words "--cflags --libs gmp"));
+      text <- query c ((:) "pkg-config" (O.words "--cflags --libs gmp"));
       extra <-
         do {
           prefix <- getEnv "MLF_GC_PREFIX";
           if eqString prefix ""
           then do {
-                 flags <- query c (Cons "pkg-config" (O.words "--cflags --libs bdw-gc"));
+                 flags <- query c ((:) "pkg-config" (O.words "--cflags --libs bdw-gc"));
                  ioReturn (B.flags flags)
                }
           else do {
@@ -138,23 +138,23 @@ module Tests.CompilerTests where {
                    library = (actual ++ (if windows then "/lib/libgc.dll.a" else "/lib/libgc.a"))
                  };
                  ioReturn
-                   (Cons ("-I" ++ (actual ++ "/include"))
-                      (Cons library
-                         (if eqString (O.trim system) "Linux" then Cons "-ldl" Nil else Nil)))
+                   ((:) ("-I" ++ (actual ++ "/include"))
+                      ((:) library
+                         (if eqString (O.trim system) "Linux" then (:) "-ldl" [] else [])))
                }
         };
       ioReturn
         (S.append (B.flags text)
-           (S.append extra (if windows then O.words "-lshell32 -Wl,--stack,268435456" else Nil)))
+           (S.append extra (if windows then O.words "-lshell32 -Wl,--stack,268435456" else [])))
     };
-  stack :: TestContext -> IO (List String);
+  stack :: TestContext -> IO ([] String);
   stack c =
     do {
       system <- query c (O.words "uname -s");
       ioReturn
-        (if eqString (O.trim system) "Darwin" then Cons "-Wl,-stack_size,0x10000000" Nil else Nil)
+        (if eqString (O.trim system) "Darwin" then (:) "-Wl,-stack_size,0x10000000" [] else [])
     };
-  compileRuntime :: TestContext -> List String -> Bool -> String -> IO Unit;
+  compileRuntime :: TestContext -> [] String -> Bool -> String -> IO ();
   compileRuntime c flags trace name =
     do {
       let {
@@ -162,27 +162,27 @@ module Tests.CompilerTests where {
           if trace
           then O.words
                  "-Dgetline=mlf_test_getline -Dfwrite=mlf_test_fwrite -Dfputc=mlf_test_fputc -Dfflush=mlf_test_fflush"
-          else Nil
+          else []
       };
       run c
         (S.append (O.words "clang -O2 -std=c11 -Wall -Wextra -Werror")
            (S.append (S.filter (O.starts "-I") flags)
-              (S.append Nil
+              (S.append []
                  (S.append interpose
-                    (Cons "-c"
-                       (Cons (root c ++ "/runtime/mlf_runtime.c")
-                          (Cons "-o" (Cons (output c ++ ("/" ++ name)) Nil))))))))
+                    ((:) "-c"
+                       ((:) (root c ++ "/runtime/mlf_runtime.c")
+                          ((:) "-o" ((:) (output c ++ ("/" ++ name)) []))))))))
     };
-  link :: TestContext -> String -> List String -> List String -> String -> List String -> IO Unit;
+  link :: TestContext -> String -> [] String -> [] String -> String -> [] String -> IO ();
   link c ir objects flags binary extra =
     run c
       (S.append (O.words "clang -O2 -Wno-override-module")
-         (S.append (Cons ir objects)
-            (S.append flags (S.append (Cons "-lm" extra) (Cons "-o" (Cons binary Nil))))));
+         (S.append ((:) ir objects)
+            (S.append flags (S.append ((:) "-lm" extra) ((:) "-o" ((:) binary []))))));
   -- Build each selected target set once so shared dependencies form one DAG.
   -- Execution remains sequential because suites deliberately mutate process-wide
   -- environment variables and use shared native fixture work directories.
-  nativeTests :: TestContext -> List String -> IO Unit;
+  nativeTests :: TestContext -> [] String -> IO ();
   -- A failure before the manager writes a report must not retain an older pass.
   -- Keep every invocation's report, including a failed build, before another
   -- package-manager invocation can replace the canonical report.
@@ -202,21 +202,21 @@ module Tests.CompilerTests where {
       let {
         args =
           S.concat
-            (Cons (Cons manager Nil)
-               (Cons (Cons "--manifest" (Cons (root c ++ "/tests/mlf-package.json") Nil))
-                  (Cons (Cons "--compiler" (Cons (compiler c) Nil))
-                     (Cons (Cons "--runtime" (Cons (root c ++ "/runtime/mlf_runtime.c") Nil))
-                        (Cons (Cons "--build-dir" (Cons build Nil))
-                           (Cons
+            ((:) ((:) manager [])
+               ((:) ((:) "--manifest" ((:) (root c ++ "/tests/mlf-package.json") []))
+                  ((:) ((:) "--compiler" ((:) (compiler c) []))
+                     ((:) ((:) "--runtime" ((:) (root c ++ "/runtime/mlf_runtime.c") []))
+                        ((:) ((:) "--build-dir" ((:) build []))
+                           ((:)
                               (S.append (cacheOptions c)
                                  (S.append (O.words "--timeout 21600")
-                                    (Cons "--jobs"
-                                       (Cons jobs
-                                          (Cons "build"
+                                    ((:) "--jobs"
+                                       ((:) jobs
+                                          ((:) "build"
                                              (S.concatMap
-                                                (\target -> Cons "--target" (Cons target Nil))
+                                                (\target -> (:) "--target" ((:) target []))
                                                 targets))))))
-                              Nil))))))
+                              []))))))
       };
       let {
         current = (build ++ "/build-report.json")
@@ -239,12 +239,12 @@ module Tests.CompilerTests where {
       let {
         receipt =
           B.info
-            (Cons (Pair "path" (J.str retained))
-               (Cons (Pair "sha256" (J.str digest))
-                  (Cons (Pair "targets" (J.stringArray targets))
-                     (Cons (Pair "jobs" (J.num (readInt jobs)))
-                        (Cons (Pair "exit_code" (J.num code))
-                           (Cons (Pair "command" (J.stringArray args)) Nil))))))
+            ((:) ((,) "path" (J.str retained))
+               ((:) ((,) "sha256" (J.str digest))
+                  ((:) ((,) "targets" (J.stringArray targets))
+                     ((:) ((,) "jobs" (J.num (readInt jobs)))
+                        ((:) ((,) "exit_code" (J.num code))
+                           ((:) ((,) "command" (J.stringArray args)) []))))))
       };
       record c "suite_builds"
         (BuildReceipts.appendSuiteBuildReceipt saved receipt);
@@ -255,13 +255,13 @@ module Tests.CompilerTests where {
              do {
                binary <- O.executable (build ++ ("/bin/" ++ target));
                hash <- fileDigest binary;
-               return (Pair target (B.obj2 "path" (J.str binary) "sha256" (J.str hash)))
+               return ((,) target (B.obj2 "path" (J.str binary) "sha256" (J.str hash)))
              })
           targets;
       currentReport <- J.read (report c);
       let {
         prepared =
-          S.foldl (\all (Pair name value) -> J.set name value all)
+          S.foldl (\all ((,) name value) -> J.set name value all)
             (J.getObject "prepared_suite_targets" currentReport)
             binaries
       };
@@ -272,8 +272,8 @@ module Tests.CompilerTests where {
     do {
       saved <- J.read (report c);
       if J.has target (J.getObject "prepared_suite_targets" saved)
-      then return Unit
-      else nativeTests c (Cons target Nil);
+      then return ()
+      else nativeTests c ((:) target []);
       current <- J.read (report c);
       let {
         prepared = J.get target (J.get "prepared_suite_targets" current)
@@ -286,27 +286,27 @@ module Tests.CompilerTests where {
         (target ++ ": prepared test executable changed");
       return binary
     };
-  transports :: TestContext -> IO Unit;
+  transports :: TestContext -> IO ();
   transports c =
     do {
       S.mapM_
-        (\(Pair source target) ->
+        (\((,) source target) ->
            run c
              (S.append (O.words "clang -O2 -std=c11 -Wall -Wextra -Werror")
-                (Cons (root c ++ ("/tests/native/" ++ source))
-                   (Cons "-o" (Cons (output c ++ ("/" ++ target)) Nil)))))
-        (Cons (Pair "binary_files.c" "binary-files")
-           (Cons (Pair "host_support.c" "host-support") Nil));
+                ((:) (root c ++ ("/tests/native/" ++ source))
+                   ((:) "-o" ((:) (output c ++ ("/" ++ target)) [])))))
+        ((:) ((,) "binary_files.c" "binary-files")
+           ((:) ((,) "host_support.c" "host-support") []));
       setEnv "MLF_TEST_BINARY_FILES" (output c ++ "/binary-files");
       setEnv "MLF_TEST_HOST_SUPPORT" (output c ++ "/host-support");
       setEnv "MLF_TEST_WORK" (output c);
       setEnv "MLF_TEST_ROOT" (output c)
     };
-  suite :: TestContext -> String -> List String -> IO Unit;
-  suite c target expectations = suiteArgs c target Nil expectations;
-  suiteArgs :: TestContext -> String -> List String -> List String -> IO Unit;
+  suite :: TestContext -> String -> [] String -> IO ();
+  suite c target expectations = suiteArgs c target [] expectations;
+  suiteArgs :: TestContext -> String -> [] String -> [] String -> IO ();
   suiteArgs c target args expectations = suiteArgsChecked c target args expectations Nothing;
-  familyReport :: TestContext -> String -> String -> Bool -> List String -> String -> IO Unit;
+  familyReport :: TestContext -> String -> String -> Bool -> [] String -> String -> IO ();
   familyReport c key unit full expected path =
     do {
       text <- readFile path;
@@ -324,12 +324,12 @@ module Tests.CompilerTests where {
            (J.getObject "family_reports" saved))
     };
   suiteArgsChecked :: TestContext ->
-                      String -> List String -> List String -> Maybe J.Json -> IO Unit;
+                      String -> [] String -> [] String -> Maybe J.Json -> IO ();
   suiteArgsChecked c target args expectations selected =
     suiteArgsEvidence c target args expectations selected Nothing;
   suiteArgsEvidence :: TestContext ->
                        String ->
-                       List String -> List String -> Maybe J.Json -> Maybe (List String) -> IO Unit;
+                       [] String -> [] String -> Maybe J.Json -> Maybe ([] String) -> IO ();
   suiteArgsEvidence c target args expectations selected wantedFamilies =
     do {
       binary <- nativeTest c target;
@@ -377,9 +377,9 @@ module Tests.CompilerTests where {
              }
         else do {
                unsetEnv "MLF_TEST_FAMILY_REPORT";
-               return Nil
+               return []
              };
-      capture c (Cons binary args) log;
+      capture c ((:) binary args) log;
       currentBinaryHash <- fileDigest binary;
       O.require (eqString binaryHash currentBinaryHash)
         (target ++ ": test executable changed during validation");
@@ -393,7 +393,7 @@ module Tests.CompilerTests where {
               })
              expectedFamilies
              familyPath
-      else ioReturn Unit;
+      else ioReturn ();
       text <- readFile log;
       O.require (S.all (\expected -> contains expected text) expectations)
         (target ++ ": preserved coverage summary is missing");
@@ -448,7 +448,7 @@ module Tests.CompilerTests where {
            (J.getObject "suites" saved));
       putStr (O.drop (S.max 0 (stringLength text - 2000)) text)
     };
-  core :: TestContext -> Bool -> List J.Json -> IO Unit;
+  core :: TestContext -> Bool -> [] J.Json -> IO ();
   -- Unit has already prepared the complete batch; focused core builds only
   -- the compilation closures that own at least one requested family.
   core c full entries =
@@ -456,7 +456,7 @@ module Tests.CompilerTests where {
       catalog <- Catalog.load (root c);
       case CorePartitions.validate (S.map Catalog.identity (Catalog.forUnit catalog "core")) of {
         Left error -> O.fatal error;
-        Right _ -> return Unit
+        Right _ -> return ()
       };
       let {
         identities = S.map Catalog.identity entries
@@ -471,7 +471,7 @@ module Tests.CompilerTests where {
       inventory <- J.read (root c ++ "/tests/golden/unit-inventory.json");
       saved <- J.read (report c);
       if BuildReceipts.preparedSuiteTargets saved targets
-      then return Unit
+      then return ()
       else nativeTests c targets;
       S.mapM_
         (\target ->
@@ -486,14 +486,14 @@ module Tests.CompilerTests where {
              let {
                wanted = S.map Catalog.identity selected
              };
-             suiteArgsEvidence c target (Cons "--families" wanted) Nil
+             suiteArgsEvidence c target ((:) "--families" wanted) []
                (Just (Catalog.projection inventory "core" selected))
                (Just wanted)
            })
         targets;
       aggregateCore c full entries targets inventory
     };
-  aggregateCore :: TestContext -> Bool -> List J.Json -> List String -> J.Json -> IO Unit;
+  aggregateCore :: TestContext -> Bool -> [] J.Json -> [] String -> J.Json -> IO ();
   -- The aggregate is derived from the validated child bodies, never planned
   -- case IDs. Retain and bind every partial receipt before creating full scope.
   aggregateCore c full entries targets inventory =
@@ -536,7 +536,7 @@ module Tests.CompilerTests where {
                  };
                log <- readFile (output c ++ ("/" ++ (target ++ ".log")));
                return
-                 (Triple
+                 ((,,)
                     (S.filter
                        (\row -> S.not (Coverage.kind "start" row || Coverage.kind "summary" row))
                        coverageRows)
@@ -545,14 +545,14 @@ module Tests.CompilerTests where {
              })
           targets;
       let {
-        body = S.concatMap (\(Triple rows _ _) -> rows) pieces
+        body = S.concatMap (\((,,) rows _ _) -> rows) pieces
       };
       let {
-        completed = S.concatMap (\(Triple _ names _) -> names) pieces
+        completed = S.concatMap (\((,,) _ names _) -> names) pieces
       };
       case CorePartitions.validateCompleted identities completed of {
         Left error -> O.fatal error;
-        Right _ -> return Unit
+        Right _ -> return ()
       };
       let {
         executions = S.length (S.filter (Coverage.kind "case") body)
@@ -565,18 +565,18 @@ module Tests.CompilerTests where {
       };
       let {
         start =
-          Coverage.event "core" "start" (Cons (Pair "scope" (J.str (Selection.scope full))) Nil)
+          Coverage.event "core" "start" ((:) ((,) "scope" (J.str (Selection.scope full))) [])
       };
       let {
         finish =
           Coverage.event "core" "summary"
-            (Cons (Pair "complete" (J.Boolean True))
-               (Cons (Pair "executions" (J.num executions))
-                  (Cons (Pair "aliases" (J.num aliases))
-                     (Cons (Pair "metrics" (J.num metrics)) Nil))))
+            ((:) ((,) "complete" (J.Boolean True))
+               ((:) ((,) "executions" (J.num executions))
+                  ((:) ((,) "aliases" (J.num aliases))
+                     ((:) ((,) "metrics" (J.num metrics)) []))))
       };
       let {
-        coverage = S.unlines (S.map J.render (Cons start (S.snoc body finish)))
+        coverage = S.unlines (S.map J.render ((:) start (S.snoc body finish)))
       };
       let {
         projection = Catalog.projection inventory "core" entries
@@ -600,8 +600,8 @@ module Tests.CompilerTests where {
       let {
         familyStart =
           Selection.event "core" "start"
-            (Cons (Pair "scope" (J.str (Selection.scope full)))
-               (Cons (Pair "selected" (J.stringArray identities)) Nil))
+            ((:) ((,) "scope" (J.str (Selection.scope full)))
+               ((:) ((,) "selected" (J.stringArray identities)) []))
       };
       let {
         orderedCompleted =
@@ -612,45 +612,45 @@ module Tests.CompilerTests where {
           S.map
             (\identity ->
                Selection.event "core" "family"
-                 (Cons (Pair "id" (J.str identity)) (Cons (Pair "status" (J.str "passed")) Nil)))
+                 ((:) ((,) "id" (J.str identity)) ((:) ((,) "status" (J.str "passed")) [])))
             orderedCompleted
       };
       let {
         familyFinish =
           Selection.event "core" "summary"
-            (Cons (Pair "complete" (J.Boolean True))
-               (Cons (Pair "families" (J.num (S.length completed))) Nil))
+            ((:) ((,) "complete" (J.Boolean True))
+               ((:) ((,) "families" (J.num (S.length completed))) []))
       };
       writeFile familyPath
-        (S.unlines (S.map J.render (Cons familyStart (S.snoc familyBody familyFinish))));
+        (S.unlines (S.map J.render ((:) familyStart (S.snoc familyBody familyFinish))));
       familyReport c "core" "core" full identities familyPath;
       let {
         summary = (showInt executions ++ " checks; 0 failures")
       };
       let {
         log =
-          (S.intercalate "" (S.map (\(Triple _ _ text) -> text) pieces) ++
+          (S.intercalate "" (S.map (\((,,) _ _ text) -> text) pieces) ++
            ("Core aggregate: " ++ (summary ++ "\n")))
       };
       writeFile (output c ++ "/core.log") log;
       logHash <- fileDigest (output c ++ "/core.log");
       let {
         components =
-          J.Object (S.map (\target -> Pair target (J.get target (J.get "suites" saved))) targets)
+          J.Object (S.map (\target -> (,) target (J.get target (J.get "suites" saved))) targets)
       };
       let {
         evidence =
           B.info
-            (Cons (Pair "scope" (J.str (Selection.scope full)))
-               (Cons (Pair "aggregate" (J.Boolean True))
-                  (Cons (Pair "targets" (J.stringArray targets))
-                     (Cons (Pair "components" components)
-                        (Cons (Pair "log_sha256" (J.str logHash))
-                           (Cons (Pair "coverage_report_sha256" (J.str coverageHash))
-                              (Cons (Pair "coverage_inventory_sha256" (J.str inventoryHash))
-                                 (Cons (Pair "coverage_result" checked)
-                                    (Cons (Pair "coverage" (J.stringArray (Cons summary Nil)))
-                                       Nil)))))))))
+            ((:) ((,) "scope" (J.str (Selection.scope full)))
+               ((:) ((,) "aggregate" (J.Boolean True))
+                  ((:) ((,) "targets" (J.stringArray targets))
+                     ((:) ((,) "components" components)
+                        ((:) ((,) "log_sha256" (J.str logHash))
+                           ((:) ((,) "coverage_report_sha256" (J.str coverageHash))
+                              ((:) ((,) "coverage_inventory_sha256" (J.str inventoryHash))
+                                 ((:) ((,) "coverage_result" checked)
+                                    ((:) ((,) "coverage" (J.stringArray ((:) summary [])))
+                                       [])))))))))
       };
       current <- J.read (report c);
       record c "suites"
@@ -658,7 +658,7 @@ module Tests.CompilerTests where {
            (J.getObject "suites" current));
       putStrLn ("Core aggregate: " ++ summary)
     };
-  unit :: TestContext -> IO Unit;
+  unit :: TestContext -> IO ();
   -- Run native toolchain/runtime probes first, then every original suite action.
   unit c =
     do {
@@ -666,22 +666,22 @@ module Tests.CompilerTests where {
       nativeTests c
         (S.append (O.words "regex harness int-set-unions test-framework")
            (S.snoc CorePartitions.targets "figure12"));
-      suite c "regex" (Cons "regular-expression tests passed" Nil);
+      suite c "regex" ((:) "regular-expression tests passed" []);
       suite c "harness"
-        (Cons "Native benchmark/bootstrap/release harness tests passed"
-           (Cons "2 native cache regression checks passed" Nil));
+        ((:) "Native benchmark/bootstrap/release harness tests passed"
+           ((:) "2 native cache regression checks passed" []));
       unions <- nativeTest c "int-set-unions";
       suiteArgs c "test-framework"
-        (Cons "--verify-cli" (Cons (output c ++ "/framework-cli") (Cons unions Nil)))
-        (Cons "Test framework contracts passed" (Cons "Test framework CLI contracts passed" Nil));
+        ((:) "--verify-cli" ((:) (output c ++ "/framework-cli") ((:) unions [])))
+        ((:) "Test framework contracts passed" ((:) "Test framework CLI contracts passed" []));
       catalog <- Catalog.load (root c);
       core c True (Catalog.forUnit catalog "core");
       suite c "figure12"
-        (Cons "43/43 expressions match regression expectations; 0 failures"
-           (Cons "41 distinct Figure12 executions"
-              (Cons "36 supplementary checks; 0 failures" Nil)))
+        ((:) "43/43 expressions match regression expectations; 0 failures"
+           ((:) "41 distinct Figure12 executions"
+              ((:) "36 supplementary checks; 0 failures" [])))
     };
-  buildRunnerTests :: TestContext -> IO Unit;
+  buildRunnerTests :: TestContext -> IO ();
   buildRunnerTests c =
     do {
       windows <- O.isWindows;
@@ -689,15 +689,15 @@ module Tests.CompilerTests where {
         suffix = if windows then ".exe" else ""
       };
       let {
-        flags = if windows then Cons "-municode" Nil else Nil
+        flags = if windows then (:) "-municode" [] else []
       };
       S.mapM_
         (\name ->
            run c
              (S.append (O.words "clang -O2 -std=c11 -Wall -Wextra -Werror")
                 (S.append flags
-                   (Cons (root c ++ ("/tests/native/" ++ (O.replace "-" "_" name ++ ".c")))
-                      (Cons "-o" (Cons (output c ++ ("/" ++ (name ++ suffix))) Nil))))))
+                   ((:) (root c ++ ("/tests/native/" ++ (O.replace "-" "_" name ++ ".c")))
+                      ((:) "-o" ((:) (output c ++ ("/" ++ (name ++ suffix))) []))))))
         (O.words "build-runner-fixture build-runner-tests");
       let {
         manager = packageManager c
@@ -708,10 +708,10 @@ module Tests.CompilerTests where {
         log = (output c ++ "/build-runner.log")
       };
       capture c
-        (Cons (output c ++ ("/build-runner-tests" ++ suffix))
-           (Cons runner
-              (Cons (output c ++ ("/build-runner-fixture" ++ suffix))
-                 (Cons (output c ++ "/build-runner-work") Nil))))
+        ((:) (output c ++ ("/build-runner-tests" ++ suffix))
+           ((:) runner
+              ((:) (output c ++ ("/build-runner-fixture" ++ suffix))
+                 ((:) (output c ++ "/build-runner-work") []))))
         log;
       text <- readFile log;
       let {
@@ -722,22 +722,22 @@ module Tests.CompilerTests where {
       saved <- J.read (report c);
       record c "suites"
         (J.set "build-runner"
-           (B.obj2 "log_sha256" (J.str hash) "coverage" (J.stringArray (Cons expectation Nil)))
+           (B.obj2 "log_sha256" (J.str hash) "coverage" (J.stringArray ((:) expectation [])))
            (J.getObject "suites" saved));
       putStr text
     };
-  packages :: TestContext -> IO Unit;
+  packages :: TestContext -> IO ();
   packages c =
     do {
       buildRunnerTests c;
       setEnv "MLF_TEST_WORK" (output c);
       setEnv "MLF_TEST_ROOT" (output c);
       suite c "packages"
-        (Cons "22 package resolver tests passed"
-           (Cons "29 package integration cases passed"
-              (Cons "Build scheduler integration tests passed"
-                 (Cons "1 target dependency integration test passed"
-                    (Cons "28 checked package release cases passed" Nil)))))
+        ((:) "22 package resolver tests passed"
+           ((:) "29 package integration cases passed"
+              ((:) "Build scheduler integration tests passed"
+                 ((:) "1 target dependency integration test passed"
+                    ((:) "28 checked package release cases passed" [])))))
     };
   testBuilder :: TestContext -> String -> IO B.Builder;
   -- Build.create fingerprints the executable actually running its build/cache
@@ -749,10 +749,10 @@ module Tests.CompilerTests where {
       let {
         options =
           B.info
-            (Cons (Pair "compiler" (J.str (compiler c)))
-               (Cons (Pair "runtime" (J.str (root c ++ "/runtime/mlf_runtime.c")))
-                  (Cons (Pair "cache-dir" (J.str (sharedCache c)))
-                     (Cons (Pair "timeout" (J.str "21600")) Nil))))
+            ((:) ((,) "compiler" (J.str (compiler c)))
+               ((:) ((,) "runtime" (J.str (root c ++ "/runtime/mlf_runtime.c")))
+                  ((:) ((,) "cache-dir" (J.str (sharedCache c)))
+                     ((:) ((,) "timeout" (J.str "21600")) []))))
       };
       configured <- C.configureGC (root c) options;
       B.create graph configured (output c ++ ("/" ++ name))
@@ -772,33 +772,33 @@ module Tests.CompilerTests where {
       let {
         identity =
           B.info
-            (Cons (Pair "format" (J.num 2))
-               (Cons (Pair "compiler" (J.get "compiler" (B.tools builder)))
-                  (Cons (Pair "manager" (J.get "manager" (B.tools builder)))
-                     (Cons (Pair "source_inputs" inputs)
-                        (Cons (Pair "entry" (J.str entry))
-                           (Cons (Pair "frontend" (J.str "source --emit-llvm-gc")) Nil))))))
+            ((:) ((,) "format" (J.num 2))
+               ((:) ((,) "compiler" (J.get "compiler" (B.tools builder)))
+                  ((:) ((,) "manager" (J.get "manager" (B.tools builder)))
+                     ((:) ((,) "source_inputs" inputs)
+                        ((:) ((,) "entry" (J.str entry))
+                           ((:) ((,) "frontend" (J.str "source --emit-llvm-gc")) []))))))
       };
       B.cached builder ("source " ++ (name ++ " LLVM")) identity
         (\work ->
            do {
              ignored <-
                B.capture builder (root c)
-                 (S.append (Cons (compiler c) Nil)
-                    (S.append (S.concatMap (\path -> Cons "-i" (Cons path Nil)) roots)
-                       (Cons "--emit-llvm-gc" (Cons entry Nil))))
+                 (S.append ((:) (compiler c) [])
+                    (S.append (S.concatMap (\path -> (:) "-i" ((:) path [])) roots)
+                       ((:) "--emit-llvm-gc" ((:) entry []))))
                  ""
                  (work ++ "/program.ll");
              text <- readFile (work ++ "/program.ll");
              O.require (stringLength text > 0) "test driver emitted empty LLVM"
            })
     };
-  prepareDrivers :: TestContext -> Bool -> IO (List String);
+  prepareDrivers :: TestContext -> Bool -> IO ([] String);
   prepareDrivers c portFixtures =
     do {
       builder <- testBuilder c "driver-build";
       flags <- nativeFlags c;
-      native <- TD.nativeIdentity builder (S.append flags (Cons "-lm" Nil));
+      native <- TD.nativeIdentity builder (S.append flags ((:) "-lm" []));
       let {
         cflags =
           S.append (O.words "-O2 -std=c11 -Wall -Wextra -Werror") (S.filter (O.starts "-I") flags)
@@ -828,7 +828,7 @@ module Tests.CompilerTests where {
       let {
         traceSource = (root c ++ "/tests/native/native_trace.c")
       };
-      traceInputs <- B.hashFiles (Cons traceSource Nil);
+      traceInputs <- B.hashFiles ((:) traceSource []);
       trace <-
         TD.cObject builder native traceSource traceInputs
           (O.words "-O2 -std=c11 -Wall -Wextra -Werror");
@@ -847,38 +847,38 @@ module Tests.CompilerTests where {
                let {
                  objects =
                    if eqString name "RuntimeDriver"
-                   then Cons (traced ++ "/object.o") (Cons (trace ++ "/object.o") Nil)
-                   else Cons (runtime ++ "/object.o") Nil
+                   then (:) (traced ++ "/object.o") ((:) (trace ++ "/object.o") [])
+                   else (:) (runtime ++ "/object.o") []
                };
                linked <-
-                 TD.linkObject builder native object objects (S.append flags (Cons "-lm" extra));
+                 TD.linkObject builder native object objects (S.append flags ((:) "-lm" extra));
                binary <- O.executable (output c ++ ("/" ++ name));
                O.copy (B.executable builder (linked ++ "/program")) binary;
                hash <- fileDigest binary;
                llvm <- fileDigest ir;
                receipts <-
                  S.mapM
-                   (\(Pair key artifact) ->
+                   (\((,) key artifact) ->
                       do {
                         saved <- TD.receipt builder artifact;
-                        return (Pair key saved)
+                        return ((,) key saved)
                       })
-                   (Cons (Pair "llvm" emitted)
-                      (Cons (Pair "object" object)
-                         (Cons (Pair "linked" linked)
-                            (Cons
-                               (Pair "runtime"
+                   ((:) ((,) "llvm" emitted)
+                      ((:) ((,) "object" object)
+                         ((:) ((,) "linked" linked)
+                            ((:)
+                               ((,) "runtime"
                                   (if eqString name "RuntimeDriver" then traced else runtime))
                                (if eqString name "RuntimeDriver"
-                                then Cons (Pair "trace" trace) Nil
-                                else Nil)))));
+                                then (:) ((,) "trace" trace) []
+                                else [])))));
                return
-                 (Pair name
+                 ((,) name
                     (J.set "artifacts" (J.Object receipts)
                        (J.set "frontend" (J.str "source")
                           (B.obj2 "sha256" (J.str hash) "llvm_sha256" (J.str llvm)))))
              })
-          (if portFixtures then Cons "LLVMDriver" Nil else O.words "RuntimeDriver LLVMDriver");
+          (if portFixtures then (:) "LLVMDriver" [] else O.words "RuntimeDriver LLVMDriver");
       B.copyWindowsFiles builder (output c);
       B.finish builder;
       buildHash <- fileDigest (B.reportPath builder);
@@ -887,20 +887,20 @@ module Tests.CompilerTests where {
       record c "drivers" (J.Object drivers);
       return (S.append flags extra)
     };
-  matrices :: TestContext -> String -> Bool -> IO Unit;
+  matrices :: TestContext -> String -> Bool -> IO ();
   matrices c binary portFixtures =
     matrixSuite c binary portFixtures (if portFixtures then 25 else 583)
-      (Cons
+      ((:)
          (if portFixtures
           then "25 MLF port fixtures; 0 failures"
           else "531 shared IO/prelude/backend fixtures; 0 failures")
-         Nil);
-  matrixSuite :: TestContext -> String -> Bool -> Int -> List String -> IO Unit;
+         []);
+  matrixSuite :: TestContext -> String -> Bool -> Int -> [] String -> IO ();
   matrixSuite c binary portFixtures expectedRows expectations =
-    matrixSuiteArgs c binary portFixtures expectedRows expectations Nil Nothing;
+    matrixSuiteArgs c binary portFixtures expectedRows expectations [] Nothing;
   matrixSuiteArgs :: TestContext ->
                      String ->
-                     Bool -> Int -> List String -> List String -> Maybe (List J.Json) -> IO Unit;
+                     Bool -> Int -> [] String -> [] String -> Maybe ([] J.Json) -> IO ();
   matrixSuiteArgs c binary portFixtures expectedRows expectations arguments selected =
     do {
       previousHeap <- getEnv "GC_INITIAL_HEAP_SIZE";
@@ -919,7 +919,7 @@ module Tests.CompilerTests where {
       };
       expectedEntries <-
         if eqString unit ""
-        then return Nil
+        then return []
         else case selected of {
                Just entries -> return entries;
                Nothing ->
@@ -931,7 +931,7 @@ module Tests.CompilerTests where {
       let {
         expectedFamilies = S.map Catalog.identity expectedEntries
       };
-      flags <- if (expectedRows == 0) then return Nil else prepareDrivers c portFixtures;
+      flags <- if (expectedRows == 0) then return [] else prepareDrivers c portFixtures;
       if portFixtures
       then unsetEnv "MLF_BOOTSTRAP_INTERPRETER"
       else setEnv "MLF_BOOTSTRAP_INTERPRETER" (output c ++ "/RuntimeDriver");
@@ -957,7 +957,7 @@ module Tests.CompilerTests where {
              };
              O.mkdir directory;
              if (expectedRows == 0)
-             then ioReturn Unit
+             then ioReturn ()
              else compileRuntime c flags True ("matrix-" ++ (abi ++ "/runtime.o"));
              let {
                log = (output c ++ ("/" ++ (abi ++ ".log")))
@@ -978,12 +978,12 @@ module Tests.CompilerTests where {
                    Just entries -> Just (Catalog.fixtures entries)
                  }
              };
-             if portFixtures then validatePreparedPortNames c selectedFixtures else ioReturn Unit;
-             captureWithin c (Cons binary arguments) log (if portFixtures then 18000 else 14400);
-             if portFixtures then validatePreparedPortNames c selectedFixtures else ioReturn Unit;
+             if portFixtures then validatePreparedPortNames c selectedFixtures else ioReturn ();
+             captureWithin c ((:) binary arguments) log (if portFixtures then 18000 else 14400);
+             if portFixtures then validatePreparedPortNames c selectedFixtures else ioReturn ();
              unsetEnv "MLF_TEST_FAMILY_REPORT";
              if eqString unit ""
-             then ioReturn Unit
+             then ioReturn ()
              else familyReport c (unit ++ (":" ++ abi)) unit (S.not (S.isJust selected))
                     expectedFamilies
                     familyPath;
@@ -992,7 +992,7 @@ module Tests.CompilerTests where {
                rows = S.filter (O.starts "Backend matrix: ") (O.lines text)
              };
              let {
-               backendNames = if portFixtures then Cons "llvm" Nil else O.words "interpreter llvm"
+               backendNames = if portFixtures then (:) "llvm" [] else O.words "interpreter llvm"
              };
              let {
                validation =
@@ -1011,9 +1011,9 @@ module Tests.CompilerTests where {
                                 "invalid zero-row family selection";
                               Catalog.ensure
                                 (S.eqList eqString rows
-                                   (Cons
+                                   ((:)
                                       "Backend matrix: 0 rows x 2 backends; no missing executions"
-                                      Nil))
+                                      []))
                                 "component-only backend matrix differs"
                             }
                         }
@@ -1021,7 +1021,7 @@ module Tests.CompilerTests where {
              };
              case validation of {
                Left message -> O.fatal message;
-               Right _ -> ioReturn Unit
+               Right _ -> ioReturn ()
              };
              rowEvidence <-
                if eqString unit ""
@@ -1060,7 +1060,7 @@ module Tests.CompilerTests where {
                       if portFixtures
                       then O.require (Catalog.sameSet (S.map (J.getText "label" "") actual) labels)
                              "port matrix omitted a selected fixture"
-                      else return Unit;
+                      else return ();
                       digest <- fileDigest path;
                       return
                         (J.set "row_report" (J.str path)
@@ -1077,19 +1077,19 @@ module Tests.CompilerTests where {
                          (S.append (J.items rowEvidence)
                             (J.items
                                (B.info
-                                  (Cons
-                                     (Pair "rows"
+                                  ((:)
+                                     ((,) "rows"
                                         (J.num (readInt (S.index (O.words (S.head rows)) 2))))
-                                     (Cons (Pair "backends" (J.num (S.length backendNames)))
-                                        (Cons (Pair "cli_compiler" (J.str (compiler c)))
-                                           (Cons (Pair "log_sha256" (J.str hash))
-                                              (Cons
-                                                 (Pair "gc_initial_heap_bytes"
+                                     ((:) ((,) "backends" (J.num (S.length backendNames)))
+                                        ((:) ((,) "cli_compiler" (J.str (compiler c)))
+                                           ((:) ((,) "log_sha256" (J.str hash))
+                                              ((:)
+                                                 ((,) "gc_initial_heap_bytes"
                                                     (J.num (readInt initialHeap)))
-                                                 (Cons
-                                                    (Pair "gc_free_space_divisor"
+                                                 ((:)
+                                                    ((,) "gc_free_space_divisor"
                                                        (J.num (readInt divisor)))
-                                                    Nil)))))))))))
+                                                    [])))))))))))
              };
              saved <- J.read (report c);
              preparedHash <- getEnv "MLF_TEST_PORT_TARGETS_SHA256";
@@ -1103,43 +1103,43 @@ module Tests.CompilerTests where {
            })
         (runtimeProfiles c);
       clearDrivers;
-      S.mapM_ (\(Pair name value) -> if eqString value "" then unsetEnv name else setEnv name value)
-        (Cons (Pair "GC_INITIAL_HEAP_SIZE" previousHeap)
-           (Cons (Pair "GC_FREE_SPACE_DIVISOR" previousDivisor) Nil))
+      S.mapM_ (\((,) name value) -> if eqString value "" then unsetEnv name else setEnv name value)
+        ((:) ((,) "GC_INITIAL_HEAP_SIZE" previousHeap)
+           ((:) ((,) "GC_FREE_SPACE_DIVISOR" previousDivisor) []))
     };
-  backends :: TestContext -> IO Unit;
+  backends :: TestContext -> IO ();
   backends c =
     do {
       transports c;
       binary <- nativeTest c "backends";
       matrices c binary False
     };
-  prSmoke :: TestContext -> IO Unit;
+  prSmoke :: TestContext -> IO ();
   prSmoke c =
     do {
       transports c;
       unions <- nativeTest c "int-set-unions";
       unionHash <- fileDigest unions;
       suiteArgs c "test-framework"
-        (Cons "--verify-cli" (Cons (output c ++ "/framework-cli") (Cons unions Nil)))
-        (Cons "Test framework contracts passed" (Cons "Test framework CLI contracts passed" Nil));
+        ((:) "--verify-cli" ((:) (output c ++ "/framework-cli") ((:) unions [])))
+        ((:) "Test framework contracts passed" ((:) "Test framework CLI contracts passed" []));
       currentUnionHash <- fileDigest unions;
       O.require (eqString unionHash currentUnionHash)
         "focused test executable changed during validation";
       record c "focused_suite"
         (B.info
-           (Cons (Pair "name" (J.str "int-set-unions"))
-              (Cons (Pair "binary_sha256" (J.str unionHash)) Nil)));
+           ((:) ((,) "name" (J.str "int-set-unions"))
+              ((:) ((,) "binary_sha256" (J.str unionHash)) [])));
       binary <- nativeTest c "pr-smoke";
       matrixSuite c binary False 12
-        (Cons "43/43 expressions match regression expectations; 0 failures"
-           (Cons "41 distinct Figure12 executions"
-              (Cons "36 supplementary checks; 0 failures"
-                 (Cons "4 independent target controls; 0 failures"
-                    (Cons "12 PR smoke backend fixtures; 0 failures" Nil)))));
+        ((:) "43/43 expressions match regression expectations; 0 failures"
+           ((:) "41 distinct Figure12 executions"
+              ((:) "36 supplementary checks; 0 failures"
+                 ((:) "4 independent target controls; 0 failures"
+                    ((:) "12 PR smoke backend fixtures; 0 failures" [])))));
       smokePackage c
     };
-  smokePackage :: TestContext -> IO Unit;
+  smokePackage :: TestContext -> IO ();
   -- Mutate a private copy so checkout sources and their recorded hashes stay fixed.
   smokePackage c =
     do {
@@ -1151,7 +1151,7 @@ module Tests.CompilerTests where {
       let {
         app = (directory ++ "/app")
       };
-      run c (Cons "/bin/cp" (Cons "-R" (Cons (root c ++ "/examples/packages") (Cons app Nil))));
+      run c ((:) "/bin/cp" ((:) "-R" ((:) (root c ++ "/examples/packages") ((:) app []))));
       O.remove (app ++ "/.mlf-build");
       let {
         manager = packageManager c
@@ -1161,15 +1161,15 @@ module Tests.CompilerTests where {
       };
       let {
         argv =
-          Cons manager
-            (Cons "--manifest"
-               (Cons (app ++ "/mlf-package.json")
-                  (Cons "--compiler"
-                     (Cons (compiler c)
-                        (Cons "--runtime"
-                           (Cons (root c ++ "/runtime/mlf_runtime.c")
-                              (Cons "--build-dir"
-                                 (Cons build (O.words "--timeout 1800 test --target hello")))))))))
+          (:) manager
+            ((:) "--manifest"
+               ((:) (app ++ "/mlf-package.json")
+                  ((:) "--compiler"
+                     ((:) (compiler c)
+                        ((:) "--runtime"
+                           ((:) (root c ++ "/runtime/mlf_runtime.c")
+                              ((:) "--build-dir"
+                                 ((:) build (O.words "--timeout 1800 test --target hello")))))))))
       };
       initial <- smokePackageRun c argv build (directory ++ "/initial.log");
       let {
@@ -1223,7 +1223,7 @@ module Tests.CompilerTests where {
                  path = (directory ++ ("/" ++ (name ++ ".log")))
                };
                hash <- fileDigest path;
-               ioReturn (Pair name (J.str hash))
+               ioReturn ((,) name (J.str hash))
              })
           (O.words "initial cached changed");
       record c "package_smoke"
@@ -1231,7 +1231,7 @@ module Tests.CompilerTests where {
            (J.set "cases" (J.num 3) (J.Object evidence)));
       putStrLn "3 PR smoke package checks on interpreter and LLVM; 0 failures"
     };
-  smokePackageRun :: TestContext -> List String -> String -> String -> IO J.Json;
+  smokePackageRun :: TestContext -> [] String -> String -> String -> IO J.Json;
   smokePackageRun c argv build log =
     do {
       capture c argv log;
@@ -1251,7 +1251,7 @@ module Tests.CompilerTests where {
         "smoke package test did not complete both backends";
       ioReturn saved
     };
-  port :: TestContext -> IO Unit;
+  port :: TestContext -> IO ();
   port c =
     do {
       transports c;
@@ -1261,13 +1261,13 @@ module Tests.CompilerTests where {
       preparePort c binary;
       matrices c binary True
     };
-  preparePort :: TestContext -> String -> IO Unit;
+  preparePort :: TestContext -> String -> IO ();
   preparePort c binary = preparePortNames c binary Nothing;
-  preparePortNames :: TestContext -> String -> Maybe (List String) -> IO Unit;
+  preparePortNames :: TestContext -> String -> Maybe ([] String) -> IO ();
   preparePortNames c binary selected = preparePortSelection c binary selected "all";
-  preparePortShard :: TestContext -> String -> String -> IO Unit;
+  preparePortShard :: TestContext -> String -> String -> IO ();
   preparePortShard c binary shard = preparePortSelection c binary Nothing shard;
-  preparePortSelection :: TestContext -> String -> Maybe (List String) -> String -> IO Unit;
+  preparePortSelection :: TestContext -> String -> Maybe ([] String) -> String -> IO ();
   -- These three fixtures retain large, independently checked target forms.
   -- Fresh small-host profiling reduced SolverReuse from 2531s to 943s with
   -- divisor 4; keep the ordinary policy for the other fixtures and builds.
@@ -1289,7 +1289,7 @@ module Tests.CompilerTests where {
       let {
         listing = (output c ++ "/port-fixtures.txt")
       };
-      capture c (Cons binary (Cons "--list" Nil)) listing;
+      capture c ((:) binary ((:) "--list" [])) listing;
       listingText <- readFile listing;
       let {
         available = O.words listingText
@@ -1366,22 +1366,22 @@ module Tests.CompilerTests where {
       let {
         targetHashes =
           J.Object
-            (S.map (\row -> Pair (J.getText "fixture" "" row) (J.get "target_sha256" row)) targets)
+            (S.map (\row -> (,) (J.getText "fixture" "" row) (J.get "target_sha256" row)) targets)
       };
       let {
         collections =
           J.Object
-            (S.map (\row -> Pair (J.getText "fixture" "" row) (J.get "gc_free_space_divisor" row))
+            (S.map (\row -> (,) (J.getText "fixture" "" row) (J.get "gc_free_space_divisor" row))
                targets)
       };
       record c "prepared_port"
         (J.set "collection_policies" collections
            (J.set "target_hashes" targetHashes
               (B.info
-                 (Cons (Pair "manifest" (J.str manifest))
-                    (Cons (Pair "sha256" (J.str hash))
-                       (Cons (Pair "targets" (J.num (S.length targets)))
-                          (Cons (Pair "build_report" (J.str (B.reportPath builder))) Nil)))))));
+                 ((:) ((,) "manifest" (J.str manifest))
+                    ((:) ((,) "sha256" (J.str hash))
+                       ((:) ((,) "targets" (J.num (S.length targets)))
+                          ((:) ((,) "build_report" (J.str (B.reportPath builder))) [])))))));
       validatePreparedPortNames c selectedScope
     };
   portTargetIdentity :: B.Builder -> String -> IO J.Json;
@@ -1390,10 +1390,10 @@ module Tests.CompilerTests where {
       checkerHash <- fileDigest binary;
       ioReturn
         (B.info
-           (Cons (Pair "format" (J.num 2))
-              (Cons (Pair "compiler" (J.get "compiler" (B.tools builder)))
-                 (Cons (Pair "manager" (J.get "manager" (B.tools builder)))
-                    (Cons (Pair "checker_sha256" (J.str checkerHash)) Nil)))))
+           ((:) ((,) "format" (J.num 2))
+              ((:) ((,) "compiler" (J.get "compiler" (B.tools builder)))
+                 ((:) ((,) "manager" (J.get "manager" (B.tools builder)))
+                    ((:) ((,) "checker_sha256" (J.str checkerHash)) [])))))
     };
   preparePortTarget :: TestContext -> B.Builder -> String -> String -> IO J.Json;
   -- Match PortSuite.prepareFixture's source entry and ordered include roots.
@@ -1434,10 +1434,10 @@ module Tests.CompilerTests where {
              do {
                ignored <-
                  B.capture builder (root c)
-                   (Cons binary (Cons "--prepare" (Cons name (Cons (work ++ "/unit.xmlf") Nil))))
+                   ((:) binary ((:) "--prepare" ((:) name ((:) (work ++ "/unit.xmlf") []))))
                    ""
                    "";
-               ioReturn Unit
+               ioReturn ()
              });
       let {
         target = (artifact ++ "/unit.xmlf")
@@ -1447,14 +1447,14 @@ module Tests.CompilerTests where {
       ioReturn
         (J.set "source_inputs" inputs
            (B.info
-              (Cons (Pair "fixture" (J.str name))
-                 (Cons (Pair "target" (J.str target))
-                    (Cons (Pair "target_sha256" (J.str hash))
-                       (Cons (Pair "checks_sha256" (J.str checksHash)) Nil))))))
+              ((:) ((,) "fixture" (J.str name))
+                 ((:) ((,) "target" (J.str target))
+                    ((:) ((,) "target_sha256" (J.str hash))
+                       ((:) ((,) "checks_sha256" (J.str checksHash)) []))))))
     };
-  validatePreparedPort :: TestContext -> IO Unit;
+  validatePreparedPort :: TestContext -> IO ();
   validatePreparedPort c = validatePreparedPortNames c Nothing;
-  validatePreparedPortNames :: TestContext -> Maybe (List String) -> IO Unit;
+  validatePreparedPortNames :: TestContext -> Maybe ([] String) -> IO ();
   validatePreparedPortNames c selected =
     do {
       path <- getEnv "MLF_TEST_PORT_TARGETS";
@@ -1506,7 +1506,7 @@ module Tests.CompilerTests where {
   contains needle text = S.not (eqString text (O.replace needle "" text));
   -- The exported corpus prescribes acceptance, rejection phase/diagnostic,
   -- checked target type and (where applicable) exact output for both backends.
-  parity :: TestContext -> IO Unit;
+  parity :: TestContext -> IO ();
   parity c =
     do {
       checker <- nativeTest c "check-target";
@@ -1514,7 +1514,7 @@ module Tests.CompilerTests where {
       let {
         corpus = (output c ++ "/corpus")
       };
-      run c (Cons exporter (Cons corpus Nil));
+      run c ((:) exporter ((:) corpus []));
       source <- readFile (corpus ++ "/manifest.jsonl");
       rows <-
         S.mapM
@@ -1535,14 +1535,14 @@ module Tests.CompilerTests where {
                 (S.filter (\row -> eqString (J.getText "category" "" row) (S.fst pair)) rows) >=
               S.snd pair)
              ("parity corpus lacks " ++ S.fst pair))
-        (Cons (Pair "figure12" 43)
-           (Cons (Pair "hm-exhaustive" 1712)
-              (Cons (Pair "hm-generated" 5000)
-                 (Cons (Pair "annotations" 126)
-                    (Cons (Pair "readability" 18)
-                       (Cons (Pair "state" 97)
-                          (Cons (Pair "modules" 60)
-                             (Cons (Pair "examples" 21) (Cons (Pair "benchmarks" 9) Nil)))))))));
+        ((:) ((,) "figure12" 43)
+           ((:) ((,) "hm-exhaustive" 1712)
+              ((:) ((,) "hm-generated" 5000)
+                 ((:) ((,) "annotations" 126)
+                    ((:) ((,) "readability" 18)
+                       ((:) ((,) "state" 97)
+                          ((:) ((,) "modules" 60)
+                             ((:) ((,) "examples" 21) ((:) ((,) "benchmarks" 9) [])))))))));
       let {
         a8 =
           S.fromMaybe (panic "missing Figure12 A8")
@@ -1577,7 +1577,7 @@ module Tests.CompilerTests where {
       compileRuntime c flags False "runtime.o";
       O.mkdir (output c ++ "/parity");
       checkCrateCycleOracles c corpus checker rows;
-      shared <- parityLoop c corpus checker flags 0 Map.empty Nil rows;
+      shared <- parityLoop c corpus checker flags 0 Map.empty [] rows;
       O.require
         ((S.length shared == 11) &&
          ((S.length (S.filter (\row -> O.starts "hm-generated-" (J.getText "id" "" row)) shared) ==
@@ -1602,24 +1602,24 @@ module Tests.CompilerTests where {
       let {
         details =
           B.info
-            (Cons (Pair "source_compilations" (J.num sourceCompilations))
-               (Cons (Pair "shared_source_cases" (J.num (S.length shared)))
-                  (Cons (Pair "shared_cases" (J.Array shared))
-                     (Cons
-                        (Pair "independent_target_checks" (J.num ((accepted - sharedAccepted) + 2)))
-                        Nil))))
+            ((:) ((,) "source_compilations" (J.num sourceCompilations))
+               ((:) ((,) "shared_source_cases" (J.num (S.length shared)))
+                  ((:) ((,) "shared_cases" (J.Array shared))
+                     ((:)
+                        ((,) "independent_target_checks" (J.num ((accepted - sharedAccepted) + 2)))
+                        []))))
       };
       record c "parity"
         (J.Object
            (S.append (J.items details)
               (J.items
                  (B.info
-                    (Cons (Pair "cases" (J.num (S.length rows)))
-                       (Cons (Pair "accepted" (J.num accepted))
-                          (Cons (Pair "rejected" (J.num (S.length rows - accepted)))
-                             (Cons (Pair "runtime_rows" (J.num runtime))
-                                (Cons (Pair "runtime_executions" (J.num (runtime * 2)))
-                                   (Cons (Pair "manifest_sha256" (J.str hash)) Nil))))))))));
+                    ((:) ((,) "cases" (J.num (S.length rows)))
+                       ((:) ((,) "accepted" (J.num accepted))
+                          ((:) ((,) "rejected" (J.num (S.length rows - accepted)))
+                             ((:) ((,) "runtime_rows" (J.num runtime))
+                                ((:) ((,) "runtime_executions" (J.num (runtime * 2)))
+                                   ((:) ((,) "manifest_sha256" (J.str hash)) []))))))))));
       putStrLn
         ("Parity: 7086 cases; " ++
          (showInt sourceCompilations ++
@@ -1629,7 +1629,7 @@ module Tests.CompilerTests where {
   -- The expected result is a fixed integer literal, never a type obtained from
   -- the candidate. Check both the reference xMLF and every emitted candidate
   -- target against the independently prescribed Int oracle.
-  checkCrateCycleOracles :: TestContext -> String -> String -> List J.Json -> IO Unit;
+  checkCrateCycleOracles :: TestContext -> String -> String -> [] J.Json -> IO ();
   checkCrateCycleOracles c corpus checker rows =
     do {
       O.require (S.length (S.filter (J.has "oracle_migration") rows) == 2)
@@ -1637,7 +1637,7 @@ module Tests.CompilerTests where {
       reference <- readFile (corpus ++ "/oracle/crate-module-cycles/int42.xmlf");
       O.require (eqString reference "42\n") "crate-cycle reference target changed";
       S.mapM_
-        (\(Pair identity reason) ->
+        (\((,) identity reason) ->
            do {
              let {
                matches = S.filter (\row -> eqString (J.getText "id" "" row) identity) rows
@@ -1669,28 +1669,28 @@ module Tests.CompilerTests where {
              writeFile (stem ++ ".type") "Int";
              status <-
                O.exec (root c)
-                 (Cons checker
-                    (Cons (corpus ++ "/oracle/crate-module-cycles/int42.xmlf")
-                       (Cons (stem ++ ".type") Nil)))
+                 ((:) checker
+                    ((:) (corpus ++ "/oracle/crate-module-cycles/int42.xmlf")
+                       ((:) (stem ++ ".type") [])))
                  ""
                  (stem ++ ".out")
                  (stem ++ ".err")
                  1800;
              O.require (status == 0) "independent crate-cycle reference typing failed"
            })
-        (Cons (Pair "module-reject-000025" "Main -> A -> B -> A")
-           (Cons (Pair "module-reject-000026" "Main -> Main") Nil))
+        ((:) ((,) "module-reject-000025" "Main -> A -> B -> A")
+           ((:) ((,) "module-reject-000026" "Main -> Main") []))
     };
   parityLoop :: TestContext ->
                 String ->
                 String ->
-                List String ->
+                [] String ->
                 Int ->
-                Map String (Pair Int String) -> List J.Json -> List J.Json -> IO (List J.Json);
+                Map String ((,) Int String) -> [] J.Json -> [] J.Json -> IO ([] J.Json);
   parityLoop c corpus checker flags number seen shared rows =
     case rows of {
-      Nil -> ioReturn (S.reverse shared);
-      Cons row rest ->
+      [] -> ioReturn (S.reverse shared);
+      (:) row rest ->
         do {
           let {
             shareable = V.canShareParity row
@@ -1704,45 +1704,45 @@ module Tests.CompilerTests where {
           };
           boundValueShared1 <-
             case if shareable then Map.lookup compareString key seen else Nothing of {
-              Just (Pair canonicalIndex canonicalId) ->
+              Just ((,) canonicalIndex canonicalId) ->
                 do {
                   sourceHash <- fileDigest (corpus ++ ("/" ++ J.getText "source_path" "" row));
                   let {
                     alias =
                       B.info
-                        (Cons (Pair "id" (J.get "id" row))
-                           (Cons (Pair "index" (J.num number))
-                              (Cons (Pair "canonical_id" (J.str canonicalId))
-                                 (Cons (Pair "canonical_index" (J.num canonicalIndex))
-                                    (Cons (Pair "source_sha256" (J.str sourceHash))
-                                       (Cons (Pair "expected_accept" (J.get "expected_accept" row))
-                                          Nil))))))
+                        ((:) ((,) "id" (J.get "id" row))
+                           ((:) ((,) "index" (J.num number))
+                              ((:) ((,) "canonical_id" (J.str canonicalId))
+                                 ((:) ((,) "canonical_index" (J.num canonicalIndex))
+                                    ((:) ((,) "source_sha256" (J.str sourceHash))
+                                       ((:) ((,) "expected_accept" (J.get "expected_accept" row))
+                                          []))))))
                   };
-                  ioReturn (Pair seen (Cons alias shared))
+                  ioReturn ((,) seen ((:) alias shared))
                 };
               Nothing ->
                 do {
                   parityCase c corpus checker flags number row;
                   ioReturn
-                    (Pair
+                    ((,)
                        (if shareable
-                        then Map.insert compareString key (Pair number (J.getText "id" "" row)) seen
+                        then Map.insert compareString key ((,) number (J.getText "id" "" row)) seen
                         else seen)
                        shared)
                 }
             };
           case boundValueShared1 of {
-            Pair next aliases ->
+            (,) next aliases ->
               do {
                 if (remInt (number + 1) 100 == 0)
                 then putStrLn ("Parity: " ++ showInt (number + 1))
-                else ioReturn Unit;
+                else ioReturn ();
                 parityLoop c corpus checker flags (number + 1) next aliases rest
               }
           }
         }
     };
-  parityCase :: TestContext -> String -> String -> List String -> Int -> J.Json -> IO Unit;
+  parityCase :: TestContext -> String -> String -> [] String -> Int -> J.Json -> IO ();
   parityCase c corpus checker flags number row =
     do {
       let {
@@ -1751,9 +1751,9 @@ module Tests.CompilerTests where {
       let {
         prefix =
           S.append
-            (Cons (compiler c)
-               (if J.getBool "no_prelude" False row then Cons "--no-prelude" Nil else Nil))
-            (S.concatMap (\path -> Cons "-i" (Cons (corpus ++ ("/" ++ path)) Nil))
+            ((:) (compiler c)
+               (if J.getBool "no_prelude" False row then (:) "--no-prelude" [] else []))
+            (S.concatMap (\path -> (:) "-i" ((:) (corpus ++ ("/" ++ path)) []))
                (J.getStrings "include_dirs" row))
       };
       let {
@@ -1770,14 +1770,14 @@ module Tests.CompilerTests where {
       then do {
              writeFile (stem ++ ".type") (J.getText "expected_type" "" row);
              checked <-
-               O.exec (root c) (Cons checker (Cons (stem ++ ".xmlf") (Cons (stem ++ ".type") Nil)))
+               O.exec (root c) ((:) checker ((:) (stem ++ ".xmlf") ((:) (stem ++ ".type") [])))
                  ""
                  (stem ++ ".check.out")
                  (stem ++ ".check.err")
                  1800;
              O.require (checked == 0) ("independent target check failed: " ++ stem);
              checked <-
-               O.exec (root c) (Cons (compiler c) (Cons "--check" (Cons (stem ++ ".xmlf") Nil))) ""
+               O.exec (root c) ((:) (compiler c) ((:) "--check" ((:) (stem ++ ".xmlf") []))) ""
                  (stem ++ ".self.out")
                  (stem ++ ".self.err")
                  1800;
@@ -1801,21 +1801,21 @@ module Tests.CompilerTests where {
       then do {
              O.require accept "rejected corpus row has runtime expectation";
              writeFile (stem ++ ".stdin") (J.getText "expected_stdin" "" row);
-             checkOutput c row (S.append prefix (Cons "--run" (Cons source Nil))) stem
+             checkOutput c row (S.append prefix ((:) "--run" ((:) source []))) stem
                "interpreter";
              generated <-
-               O.exec (root c) (S.append prefix (Cons "--emit-llvm" (Cons source Nil))) ""
+               O.exec (root c) (S.append prefix ((:) "--emit-llvm" ((:) source []))) ""
                  (stem ++ ".ll")
                  (stem ++ ".llvm.err")
                  1800;
              O.require (generated == 0) ("LLVM emission failed: " ++ stem);
              binary <- O.executable (stem ++ ".native");
-             link c (stem ++ ".ll") (Cons (output c ++ "/runtime.o") Nil) flags binary Nil;
-             checkOutput c row (Cons binary Nil) stem "llvm"
+             link c (stem ++ ".ll") ((:) (output c ++ "/runtime.o") []) flags binary [];
+             checkOutput c row ((:) binary []) stem "llvm"
            }
-      else ioReturn Unit
+      else ioReturn ()
     };
-  checkOutput :: TestContext -> J.Json -> List String -> String -> String -> IO Unit;
+  checkOutput :: TestContext -> J.Json -> [] String -> String -> String -> IO ();
   checkOutput c row argv stem backend =
     do {
       code <-
@@ -1830,11 +1830,11 @@ module Tests.CompilerTests where {
           eqString err (J.getText "expected_stderr" "" row)))
         (backend ++ (" output/status mismatch: " ++ stem))
     };
-  findArtifact :: String -> String -> List String -> IO String;
+  findArtifact :: String -> String -> [] String -> IO String;
   findArtifact hash cache names =
     case names of {
-      Nil -> O.fatal "cannot find the package artifact that produced the candidate";
-      Cons name rest ->
+      [] -> O.fatal "cannot find the package artifact that produced the candidate";
+      (:) name rest ->
         do {
           let {
             binary = (cache ++ ("/" ++ (name ++ "/program")))
@@ -1853,7 +1853,7 @@ module Tests.CompilerTests where {
           else findArtifact hash cache rest
         }
     };
-  selfHost :: TestContext -> IO Unit;
+  selfHost :: TestContext -> IO ();
   -- A shared store can contain equal native binaries from different LLVM
   -- inputs. Select the candidate's actual producer, not the first hash match.
   selfHost c =
@@ -1891,10 +1891,10 @@ module Tests.CompilerTests where {
       provenanceHash <- fileDigest provenance;
       record c "candidate_artifact"
         (B.info
-           (Cons (Pair "directory" (J.str original))
-              (Cons (Pair "key" (J.str (O.relative cache original)))
-                 (Cons (Pair "build_report" (J.str provenance))
-                    (Cons (Pair "build_report_sha256" (J.str provenanceHash)) Nil)))));
+           ((:) ((,) "directory" (J.str original))
+              ((:) ((,) "key" (J.str (O.relative cache original)))
+                 ((:) ((,) "build_report" (J.str provenance))
+                    ((:) ((,) "build_report_sha256" (J.str provenanceHash)) [])))));
       stamp <- J.read (original ++ "/artifact.json");
       let {
         inputs = J.get "inputs" stamp
@@ -1919,12 +1919,12 @@ module Tests.CompilerTests where {
       let {
         profileArgs =
           if S.null (J.items profile)
-          then Nil
+          then []
           else S.append (O.words "--pgo-target emlf --pgo-use")
-                 (Cons (J.getText "path" "" (J.get "profile" profile)) Nil)
+                 ((:) (J.getText "path" "" (J.get "profile" profile)) [])
       };
       let {
-        nativeArgs = Cons "--clang" (Cons (J.getText "path" "" cc) profileArgs)
+        nativeArgs = (:) "--clang" ((:) (J.getText "path" "" cc) profileArgs)
       };
       let {
         next = (output c ++ "/next-stage")
@@ -1932,13 +1932,13 @@ module Tests.CompilerTests where {
       O.remove next;
       let {
         argv =
-          Cons manager
-            (Cons "--timeout"
-               (Cons "21600"
-                  (Cons "--compiler"
-                     (Cons (compiler c)
-                        (Cons "--build-dir"
-                           (Cons next (S.append nativeArgs (O.words "build --target emlf"))))))))
+          (:) manager
+            ((:) "--timeout"
+               ((:) "21600"
+                  ((:) "--compiler"
+                     ((:) (compiler c)
+                        ((:) "--build-dir"
+                           ((:) next (S.append nativeArgs (O.words "build --target emlf"))))))))
       };
       putStrLn ("+ " ++ S.intercalate " " argv);
       code <- O.exec (root c) argv "" "" "" 21600;
@@ -1965,19 +1965,19 @@ module Tests.CompilerTests where {
       record c "native_pgo" profile;
       record c "fixed_point"
         (B.info
-           (Cons (Pair "llvm_sha256" (J.str new))
-              (Cons (Pair "next_compiler_sha256" (J.str binary))
-                 (Cons (Pair "reused_candidate_build" (J.get "cached" row)) Nil))))
+           ((:) ((,) "llvm_sha256" (J.str new))
+              ((:) ((,) "next_compiler_sha256" (J.str binary))
+                 ((:) ((,) "reused_candidate_build" (J.get "cached" row)) []))))
     };
   -- Campaign-specific options stay outside the generic package-manager CLI.
-  selectedUnit :: TestContext -> String -> List J.Json -> IO Unit;
+  selectedUnit :: TestContext -> String -> [] J.Json -> IO ();
   selectedUnit c name entries =
     if eqString name "backends"
     then do {
            transports c;
            binary <- nativeTest c "backends";
-           matrixSuiteArgs c binary False (Catalog.matrixRows entries) Nil
-             (Cons "--families" (S.map Catalog.identity entries))
+           matrixSuiteArgs c binary False (Catalog.matrixRows entries) []
+             ((:) "--families" (S.map Catalog.identity entries))
              (Just entries)
          }
     else if eqString name "port"
@@ -1987,8 +1987,8 @@ module Tests.CompilerTests where {
                 setEnv "MLF_TEST_REFERENCES" references;
                 binary <- nativeTest c "port";
                 preparePortNames c binary (Just (Catalog.fixtures entries));
-                matrixSuiteArgs c binary True (Catalog.matrixRows entries) Nil
-                  (Cons "--families" (S.map Catalog.identity entries))
+                matrixSuiteArgs c binary True (Catalog.matrixRows entries) []
+                  ((:) "--families" (S.map Catalog.identity entries))
                   (Just entries)
               }
          else if eqString name "parity"
@@ -2001,21 +2001,21 @@ module Tests.CompilerTests where {
                                let {
                                  distribution = eqString name "package-distribution"
                                };
-                               if distribution then ioReturn Unit else buildRunnerTests c;
+                               if distribution then ioReturn () else buildRunnerTests c;
                                setEnv "MLF_TEST_WORK" (output c);
                                setEnv "MLF_TEST_ROOT" (output c);
                                let {
                                  expectations =
                                    if distribution
-                                   then Cons "28 checked package release cases passed" Nil
-                                   else Cons "22 package resolver tests passed"
-                                          (Cons "29 package integration cases passed"
-                                             (Cons "Build scheduler integration tests passed"
-                                                (Cons "1 target dependency integration test passed"
-                                                   Nil)))
+                                   then (:) "28 checked package release cases passed" []
+                                   else (:) "22 package resolver tests passed"
+                                          ((:) "29 package integration cases passed"
+                                             ((:) "Build scheduler integration tests passed"
+                                                ((:) "1 target dependency integration test passed"
+                                                   [])))
                                };
                                suiteArgsChecked c "packages"
-                                 (Cons (if distribution then "--releases" else "--integration") Nil)
+                                 ((:) (if distribution then "--releases" else "--integration") [])
                                  expectations
                                  (Just (Catalog.projection inventory "packages" entries))
                              }
@@ -2030,7 +2030,7 @@ module Tests.CompilerTests where {
                                            let {
                                              ids = S.map Catalog.identity entries
                                            };
-                                           suiteArgsEvidence c name (Cons "--families" ids) Nil
+                                           suiteArgsEvidence c name ((:) "--families" ids) []
                                              (Just (Catalog.projection inventory name entries))
                                              (Just ids)
                                          }
@@ -2038,17 +2038,17 @@ module Tests.CompilerTests where {
                                          then do {
                                                 unions <- nativeTest c "int-set-unions";
                                                 suiteArgs c "test-framework"
-                                                  (Cons "--verify-cli"
-                                                     (Cons (output c ++ "/framework-cli")
-                                                        (Cons unions Nil)))
-                                                  Nil
+                                                  ((:) "--verify-cli"
+                                                     ((:) (output c ++ "/framework-cli")
+                                                        ((:) unions [])))
+                                                  []
                                               }
-                                         else suite c name Nil
+                                         else suite c name []
                              };
-  selectedUnits :: TestContext -> List J.Json -> IO Unit;
+  selectedUnits :: TestContext -> [] J.Json -> IO ();
   selectedUnits c selected =
     S.mapM_
-      (\(Pair name entries) ->
+      (\((,) name entries) ->
          do {
            let {
              directory = (output c ++ ("/selected/" ++ name))
@@ -2064,7 +2064,7 @@ module Tests.CompilerTests where {
              identity =
                J.Object
                  (S.filter
-                    (\(Pair key _) ->
+                    (\((,) key _) ->
                        S.elem eqString key
                          (O.words
                             "implementation compiler compiler_sha256 manager manager_sha256 runner runner_sha256 build_runner_sha256 sources requested_profiles"))
@@ -2090,12 +2090,12 @@ module Tests.CompilerTests where {
              receipt =
                J.set "families" (J.stringArray (S.map Catalog.identity entries))
                  (B.info
-                    (Cons (Pair "path" (J.str (report child)))
-                       (Cons (Pair "sha256" (J.str digest))
-                          (Cons
-                             (Pair "units"
+                    ((:) ((,) "path" (J.str (report child)))
+                       ((:) ((,) "sha256" (J.str digest))
+                          ((:)
+                             ((,) "units"
                                 (J.stringArray (S.nubBy eqString (S.map Catalog.unitName entries))))
-                             Nil))))
+                             []))))
            };
            record c "selected_units" (J.set name receipt (J.getObject "selected_units" current));
            if J.has "suites" result
@@ -2103,31 +2103,31 @@ module Tests.CompilerTests where {
                   let {
                     merged =
                       S.foldl
-                        (\saved (Pair suite evidence) ->
+                        (\saved ((,) suite evidence) ->
                            J.set suite (J.set "directory" (J.str directory) evidence) saved)
                         (J.getObject "suites" current)
                         (J.items (J.get "suites" result))
                   };
                   record c "suites" merged
                 }
-           else ioReturn Unit
+           else ioReturn ()
          })
       (Catalog.batches selected);
-  options :: J.Json -> List String -> IO (Pair J.Json (List String));
+  options :: J.Json -> [] String -> IO ((,) J.Json ([] String));
   options config args =
     do {
       boundValueShared9 <- C.options config args;
       case boundValueShared9 of {
-        Pair configured remaining ->
+        (,) configured remaining ->
           do {
             let {
               matchValueShared2 = remaining
             } in
             case matchValueShared2 of {
-              Cons matchValueShared3 matchValueShared4 ->
+              (:) matchValueShared3 matchValueShared4 ->
                 if MLF.Primitive.eqString matchValueShared3 "--manager"
                 then case matchValueShared4 of {
-                       Cons matchValueShared7 matchValueShared8 ->
+                       (:) matchValueShared7 matchValueShared8 ->
                          let {
                            value = matchValueShared7
                          } in
@@ -2135,10 +2135,10 @@ module Tests.CompilerTests where {
                            rest = matchValueShared8
                          } in
                          options (J.set "manager" (J.str value) configured) rest;
-                       _ -> ioReturn (Pair configured remaining)
+                       _ -> ioReturn ((,) configured remaining)
                      }
                 else case matchValueShared4 of {
-                       Cons matchValueShared5 matchValueShared6 ->
+                       (:) matchValueShared5 matchValueShared6 ->
                          let {
                            value = matchValueShared5
                          } in
@@ -2157,21 +2157,21 @@ module Tests.CompilerTests where {
                                   };
                                 options next rest
                               }
-                         else ioReturn (Pair configured remaining);
-                       _ -> ioReturn (Pair configured remaining)
+                         else ioReturn ((,) configured remaining);
+                       _ -> ioReturn ((,) configured remaining)
                      };
-              _ -> ioReturn (Pair configured remaining)
+              _ -> ioReturn ((,) configured remaining)
             }
           }
       }
     };
-  main :: List String -> IO Unit;
+  main :: [] String -> IO ();
   main args =
     let {
       matchValueShared11 = args
     } in
     case matchValueShared11 of {
-      Cons matchValueShared12 matchValueShared13 ->
+      (:) matchValueShared12 matchValueShared13 ->
         if MLF.Primitive.eqString matchValueShared12 "catalog"
         then let {
                rest = matchValueShared13
@@ -2186,7 +2186,7 @@ module Tests.CompilerTests where {
              do {
                boundValueShared10 <- options J.empty rest;
                case boundValueShared10 of {
-                 Pair settings remaining ->
+                 (,) settings remaining ->
                    do {
                      O.require
                        (S.null remaining &&
@@ -2214,11 +2214,11 @@ module Tests.CompilerTests where {
                             }
                        else return
                               (if eqString group "pr-smoke"
-                               then Nil
+                               then []
                                else Catalog.forCampaign catalog group);
                      profile <- getEnv "MLF_TEST_RUNTIME_PROFILE";
                      O.require
-                       (eqString profile "" || S.elem eqString profile (Cons "compact-gc" Nil))
+                       (eqString profile "" || S.elem eqString profile ((:) "compact-gc" []))
                        "invalid runtime profile; expected compact-gc";
                      let {
                        profiles =
@@ -2228,8 +2228,8 @@ module Tests.CompilerTests where {
                                   S.elem eqString (Catalog.unitName entry)
                                     (O.words "port backends"))
                                selected)
-                         then Cons "compact-gc" Nil
-                         else Nil
+                         then (:) "compact-gc" []
+                         else []
                      };
                      let {
                        directory = J.getText "build-dir" "" settings
@@ -2264,12 +2264,12 @@ module Tests.CompilerTests where {
                      let {
                        identity =
                          B.info
-                           (Cons (Pair "complete" (J.Boolean False))
-                              (Cons (Pair "implementation" (J.str "MLF"))
-                                 (Cons (Pair "group" (J.str group))
-                                    (Cons (Pair "compiler" (J.str compiler))
-                                       (Cons (Pair "compiler_sha256" (J.str hash))
-                                          (Cons (Pair "sources" sourceHashes) Nil))))))
+                           ((:) ((,) "complete" (J.Boolean False))
+                              ((:) ((,) "implementation" (J.str "MLF"))
+                                 ((:) ((,) "group" (J.str group))
+                                    ((:) ((,) "compiler" (J.str compiler))
+                                       ((:) ((,) "compiler_sha256" (J.str hash))
+                                          ((:) ((,) "sources" sourceHashes) []))))))
                      };
                      let {
                        campaignIdentity =
@@ -2348,6 +2348,6 @@ module Tests.CompilerTests where {
                    }
                }
              };
-      Nil -> O.fatal "missing compiler test group"
+      [] -> O.fatal "missing compiler test group"
     }
 }

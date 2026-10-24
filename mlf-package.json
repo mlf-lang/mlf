@@ -42,8 +42,8 @@
       "main": "tests/MLF/Entry/TupleList.hs",
       "profile": "compiler",
       "modules": {
-        "Tests.IndependentCheck": "tests/Tests/IndependentCheck.hs",
-        "Tests.IndependentType": "tests/Tests/IndependentType.hs",
+        "Tests.IndependentCheck": "tests/shared/Tests/IndependentCheck.hs",
+        "Tests.IndependentType": "tests/shared/Tests/IndependentType.hs",
         "Tests.TupleList": "tests/Tests/TupleList.hs",
         "Tests.TupleListLegacy": "tests/Tests/TupleListLegacy.hs"
       },
@@ -93,7 +93,7 @@
         "Tests.TestSources": "tests/Tests/TestSources.hs",
         "Tests.Catalog": "tests/Tests/Catalog.hs",
         "Tests.Selection": "tests/Tests/Selection.hs",
-        "Tests.BuildReceipts": "tests/Tests/BuildReceipts.hs"
+        "Tests.BuildReceipts": "tests/shared/Tests/BuildReceipts.hs"
       },
       "dependencies": [
         "mlf-developer-tools",

@@ -44,7 +44,7 @@ module Bootstrap.Module where {
   instanceClass (SInstanceDecl _ _ name _ _) = name;
   instanceHead (SInstanceDecl _ _ _ head _) = head;
   instanceMethods (SInstanceDecl _ _ _ _ methods) = methods;
-  valueName (Triple name _ _) = name;
+  valueName ((,,) name _ _) = name;
   linkedProgram (LinkedModule program _ _ _) = program;
   linkedNames (LinkedModule _ names _ _) = names;
   linkedValueScopes (LinkedModule _ _ scopes _) = scopes;
@@ -53,19 +53,19 @@ module Bootstrap.Module where {
   -- The same traversal serves in-memory tests and file-backed compilation.
   loadGraph :: forall (m :: (* -> *)). (Monad m) => (String -> m (Either String SourceModule)) ->
                                                     SourceModule ->
-                                                    m (Either String (List SourceModule));
+                                                    m (Either String ([] SourceModule));
   loadGraph fetch root =
     do {
-      result <- visit fetch root Set.empty Nil;
+      result <- visit fetch root Set.empty [];
       return (mapEither (\state -> reverse (snd state)) result)
     };
   visit :: forall (m :: (* -> *)). (Monad m) => (String -> m (Either String SourceModule)) ->
                                                 SourceModule ->
                                                 Set String ->
-                                                List SourceModule ->
+                                                [] SourceModule ->
                                                 m
                                                 (Either String
-                                                 (Pair (Set String) (List SourceModule)));
+                                                 ((,) (Set String) ([] SourceModule)));
   -- Discovery and namespace dependencies are not a compilation order. Mark
   -- before descending so a reference back into this crate needs no boot file.
   visit fetch source done order =
@@ -73,28 +73,28 @@ module Bootstrap.Module where {
       name = moduleIdentity source
     } in
     if Set.member compareString name done
-    then return (Right (Pair done order))
+    then return (Right ((,) done order))
     else do {
            let {
              dependencies = nubBy eqString (map importedModule (sourceImports source))
            };
            result <-
              visitDependencies fetch dependencies (Set.insert compareString name done) order;
-           return (mapEither (\state -> Pair (fst state) (Cons source (snd state))) result)
+           return (mapEither (\state -> (,) (fst state) ((:) source (snd state))) result)
          };
   visitDependencies :: forall (m :: (* -> *)). (Monad m) => (String ->
                                                              m (Either String SourceModule)) ->
-                                                            List String ->
+                                                            [] String ->
                                                             Set String ->
-                                                            List SourceModule ->
+                                                            [] SourceModule ->
                                                             m
                                                             (Either String
-                                                             (Pair (Set String)
-                                                              (List SourceModule)));
+                                                             ((,) (Set String)
+                                                              ([] SourceModule)));
   visitDependencies fetch dependencies done order =
     case dependencies of {
-      Nil -> return (Right (Pair done order));
-      Cons dependency rest ->
+      [] -> return (Right ((,) done order));
+      (:) dependency rest ->
         if isBuiltinModule dependency
         then visitDependencies fetch rest done order
         else if Set.member compareString dependency done
@@ -143,8 +143,8 @@ module Bootstrap.Module where {
   instance Monad ModuleIdentity where {
     (>>=) = identityBind
   };
-  loadModuleMap :: Map String (Pair String String) ->
-                   SourceModule -> Either String (List SourceModule);
+  loadModuleMap :: Map String ((,) String String) ->
+                   SourceModule -> Either String ([] SourceModule);
   loadModuleMap sources root =
     runIdentity
       (loadGraph
@@ -152,15 +152,15 @@ module Bootstrap.Module where {
             ModuleIdentity
               (case M.lookup compareString name sources of {
                  Nothing -> Left ("cannot find module " ++ name);
-                 Just (Pair file source) -> Parser.parseModule file source
+                 Just ((,) file source) -> Parser.parseModule file source
                }))
          root);
-  splitComponents :: String -> Int -> Int -> List String;
+  splitComponents :: String -> Int -> Int -> [] String;
   splitComponents text start position =
     if (position >= stringLength text)
-    then Cons (stringSlice text start (position - start)) Nil
+    then (:) (stringSlice text start (position - start)) []
     else if (stringCodeAt text position == 46)
-         then Cons (stringSlice text start (position - start))
+         then (:) (stringSlice text start (position - start))
                 (splitComponents text (position + 1) (position + 1))
          else splitComponents text start (position + 1);
   components name = splitComponents name 0 0;
@@ -191,13 +191,13 @@ module Bootstrap.Module where {
     if (stringLength a == 0)
     then b
     else if (stringCodeAt a (stringLength a - 1) == 47) then (a ++ b) else (a ++ ("/" ++ b));
-  findFiles :: List String -> IO (List String);
-  findFiles Nil = ioReturn Nil;
-  findFiles (Cons file rest) =
+  findFiles :: [] String -> IO ([] String);
+  findFiles [] = ioReturn [];
+  findFiles ((:) file rest) =
     do {
       present <- fileExists file;
       remaining <- findFiles rest;
-      ioReturn (if present then Cons file remaining else remaining)
+      ioReturn (if present then (:) file remaining else remaining)
     };
   fetchFile paths name =
     do {
@@ -208,7 +208,7 @@ module Bootstrap.Module where {
         files =
           concatMap
             (\path ->
-               Cons (joinPath path (stem ++ ".emlf")) (Cons (joinPath path (stem ++ ".hs")) Nil))
+               (:) (joinPath path (stem ++ ".emlf")) ((:) (joinPath path (stem ++ ".hs")) []))
             paths
       };
       found <- findFiles files;
@@ -226,18 +226,18 @@ module Bootstrap.Module where {
                   (": both .emlf and .hs candidates exist: " ++
                    (intercalate ", " found ++ "; use an explicit manifest mapping")))))
       else case found of {
-             Nil ->
+             [] ->
                ioReturn
                  (Left
                     ("cannot find module " ++ (name ++ ("; searched " ++ intercalate ", " files))));
-             Cons file _ ->
+             (:) file _ ->
                do {
                  source <- readFile file;
                  ioReturn (Parser.parseModule file source)
                }
            }
     };
-  loadModuleFiles :: List String -> SourceModule -> IO (Either String (List SourceModule));
+  loadModuleFiles :: [] String -> SourceModule -> IO (Either String ([] SourceModule));
   -- Search roots need not exist: an unused -i path must not abort loading.
   -- fileExists/readFile resolve relative paths, dot segments and symlinks
   -- through the filesystem; no canonicalPath precondition is needed here.
@@ -250,7 +250,7 @@ module Bootstrap.Module where {
         hierarchy = parentDirectory (length (components (moduleIdentity root)) - 1) directory
       };
       let {
-        paths = nubBy eqString (Cons directory (append includes (Cons hierarchy (Cons "." Nil))))
+        paths = nubBy eqString ((:) directory (append includes ((:) hierarchy ((:) "." []))))
       };
       loadGraph (fetchFile paths) root
     };
@@ -264,13 +264,14 @@ module Bootstrap.Module where {
     Method String |
     BuiltinType |
     Primitive Primitive |
-    Boolean Bool;
+    Boolean Bool |
+    ManagedConstraint;
   data Entity = Entity String String Role;
-  data Interface = Interface (Map (Pair ModuleSpace String) (Set Entity));
+  data Interface = Interface (Map ((,) ModuleSpace String) (Set Entity));
   data Names = Names (Map Entity String);
   data Renamed =
-    Renamed (List DataDecl) (List SClassDecl) (List SInstanceDecl) (List
-                                                                    (Triple String
+    Renamed ([] DataDecl) ([] SClassDecl) ([] SInstanceDecl) ([]
+                                                                    ((,,) String
                                                                      (Maybe SAnnotation)
                                                                      SExpr)) (Maybe SExpr);
   data Resolved = Resolved SourceModule Interface Renamed;
@@ -278,9 +279,9 @@ module Bootstrap.Module where {
   -- neither binds declaration groups nor invokes inference; consumers choose
   -- declaration SCCs and artifact boundaries after this stage.
   data ResolvedCrate =
-    ResolvedCrate Names (Map String String) (List Resolved) (List (Pair String SInstanceDecl)) (Map
+    ResolvedCrate Names (Map String String) ([] Resolved) ([] ((,) String SInstanceDecl)) (Map
                                                                                                 String
-                                                                                                IntSet) (List
+                                                                                                IntSet) ([]
                                                                                                          IntSet) (Map
                                                                                                                   String
                                                                                                                   (Set
@@ -300,6 +301,7 @@ module Bootstrap.Module where {
       Datatype -> Types;
       Class -> Types;
       BuiltinType -> Types;
+      ManagedConstraint -> Types;
       _ -> Terms
     };
   spaceCode :: ModuleSpace -> Int;
@@ -316,6 +318,7 @@ module Bootstrap.Module where {
   roleCode BuiltinType = 5;
   roleCode (Primitive _) = 6;
   roleCode (Boolean _) = 7;
+  roleCode ManagedConstraint = 8;
   compareRole a b =
     let {
       first = compareInt (roleCode a) (roleCode b)
@@ -358,23 +361,23 @@ module Bootstrap.Module where {
   isRole category entity = (compareRole category (role entity) == 0);
   parent entity =
     case role entity of {
-      Constructor name -> Just (Pair (owner entity) name);
-      Method name -> Just (Pair (owner entity) name);
-      Boolean _ -> Just (Pair "Prelude" "Bool");
+      Constructor name -> Just ((,) (owner entity) name);
+      Method name -> Just ((,) (owner entity) name);
+      Boolean _ -> Just ((,) "Prelude" "Bool");
       _ -> Nothing
     };
   emptyInterface = Interface M.empty;
   interface entities =
     Interface
       (M.fromListWith compareKey (Set.union compareEntity)
-         (map (\entity -> Pair (Pair (space entity) (spelling entity)) (Set.singleton entity))
+         (map (\entity -> (,) ((,) (space entity) (spelling entity)) (Set.singleton entity))
             entities));
   interfaceMap (Interface entries) = entries;
   interfaceEntries (Interface entries) = M.toList entries;
   union (Interface a) (Interface b) =
     Interface (M.unionWith compareKey (Set.union compareEntity) a b);
   lookupEntities namespace name (Interface entries) =
-    M.findWithDefault compareKey Set.empty (Pair namespace name) entries;
+    M.findWithDefault compareKey Set.empty ((,) namespace name) entries;
   visible (Interface entries) = Set.unions compareEntity (M.elems entries);
   uniqueInterface context env =
     do {
@@ -385,48 +388,37 @@ module Bootstrap.Module where {
         (interfaceEntries env);
       Right env
     };
-  primitiveTypeNames :: List String;
-  primitiveTypeNames =
-    Cons "AsyncScope"
-      (Cons "Completion"
-         (Cons "AsyncSubscription"
-            (Cons "ST"
-               (Cons "STArray"
-                  (Cons "Int"
-                     (Cons "Double"
-                        (Cons "Bool"
-                           (Cons "String"
-                              (Cons "Unit"
-                                 (Cons "IO"
-                                    (Cons "IntArray"
-                                       (Cons "DoubleArray"
-                                          (Cons "ByteArray" (Cons "IntTable" Nil))))))))))))));
+  primitiveTypeNames :: [] String;
+  primitiveTypeNames = (:) "Char" ((:) "IOError" legacyPrimitiveTypeNames);
+  legacyPrimitiveTypeNames :: [] String;
+  legacyPrimitiveTypeNames =
+    ["AsyncScope", "Completion", "AsyncSubscription", "ST", "STArray",
+     "Int", "Double", "Bool", "String", "IO", "IntArray", "DoubleArray",
+     "ByteArray", "IntTable"];
   primitiveEntities =
     append (map (\p -> Entity "Prelude" (P.primitiveName p) (Primitive p)) P.allPrimitives)
-      (Cons (Entity "Prelude" "pure" (Primitive PIOReturn))
-         (append (map (\name -> Entity "Prelude" name BuiltinType) primitiveTypeNames)
-            (Cons (Entity "Prelude" "Unit" (Constructor "Unit"))
-               (Cons (Entity "Prelude" "True" (Boolean True))
-                  (Cons (Entity "Prelude" "False" (Boolean False)) Nil)))));
-  primitiveScope =
-    interface
-      (append primitiveEntities
-         (Cons (Entity "Prelude" "return" (Primitive PIOReturn))
-            (Cons (Entity "Prelude" "bind" (Primitive PIOBind)) Nil)));
+      (append (map (\name -> Entity "Prelude" name BuiltinType) primitiveTypeNames)
+        [Entity "Prelude" "True" (Boolean True), Entity "Prelude" "False" (Boolean False)]);
+  primitiveScope = interface primitiveEntities;
+  -- Prelude is a re-export of the one standard facade, never a second Monad.
   preludeSource =
-    SourceModule "<Prelude>" (Just "Prelude") Nothing Nil Nil (Cons Prelude.monadClass Nil)
-      (Cons Prelude.ioInstance (Cons Prelude.stInstance Nil))
-      Nil
-      Nothing
-      LegacyEmlfV1;
+    SourceModule "<Prelude>" (Just "Prelude")
+      (Just ((:) (ExportModule "MLF.Primitive") []))
+      ((:) (Import "MLF.Primitive" False Nothing Everything) [])
+      [] [] [] [] Nothing LegacyEmlfV1;
   -- These are ordinary bindings with the same fixities and class identities as
   -- the GHC facade. Primitive nominal types retain their stable runtime identity.
-  sharedPrimitiveEntities = filter (\entity -> not (eqString (spelling entity) "pure")) primitiveEntities;
-  builtinEntities source = if eqString (moduleIdentity source) "MLF.Primitive" then sharedPrimitiveEntities else primitiveEntities;
+  sharedPrimitiveEntities =
+    append ((:) (Entity "MLF.Primitive" "HasCallStack" ManagedConstraint)
+      ((:) (Entity "MLF.Primitive" "CallStack" BuiltinType)
+        ((:) (Entity "MLF.Primitive" "callStack" Value) [])))
+      (filter (\entity -> not (eqString (spelling entity) "pure" || eqString (spelling entity) "ioError")) primitiveEntities);
+  builtinEntities source = if eqString (moduleIdentity source) "MLF.Primitive" then sharedPrimitiveEntities else [];
   primitiveSource =
-    SourceModule "<MLF.Primitive>" (Just "MLF.Primitive") Nothing Nil Nil
+    SourceModule "<MLF.Primitive>" (Just "MLF.Primitive") Nothing [] []
       Prelude.sharedClasses Prelude.sharedInstances
-      (Cons (Triple "otherwise" Nothing (SBoolLit True)) (Cons (Triple "implementationHost" Nothing (SStringLit "native-MLF")) (Cons (Triple "bind" Nothing (SVar "$MLF.Primitive.>>=")) (Cons (Triple "negate" Nothing (SLam "$x" Nothing (SApp (SApp (SPrimitive PSubInt) (SIntLit 0)) (SVar "$x")))) (Cons (Triple "+" Nothing (SPrimitive PAddInt)) (Cons (Triple "-" Nothing (SPrimitive PSubInt)) (Cons (Triple "*" Nothing (SPrimitive PMulInt)) (Cons (Triple "/" Nothing (SPrimitive PQuotInt)) (Cons (Triple "%" Nothing (SPrimitive PRemInt)) (Cons (Triple "==" Nothing (SPrimitive PEqInt)) (Cons (Triple "<" Nothing (SPrimitive PLtInt)) (Cons (Triple "++" Nothing (SPrimitive PConcatString)) (Cons (Triple "/=" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.notValue (SApp (SApp (SPrimitive PEqInt) (SVar "$a")) (SVar "$b")))))) (Cons (Triple "<=" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.notValue (SApp (SApp (SPrimitive PLtInt) (SVar "$b")) (SVar "$a")))))) (Cons (Triple ">" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (SApp (SApp (SPrimitive PLtInt) (SVar "$b")) (SVar "$a"))))) (Cons (Triple ">=" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.notValue (SApp (SApp (SPrimitive PLtInt) (SVar "$a")) (SVar "$b")))))) (Cons (Triple "&&" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.conditional (SVar "$a") (SVar "$b") (SBoolLit False))))) (Cons (Triple "||" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.conditional (SVar "$a") (SBoolLit True) (SVar "$b"))))) (Nil))))))))))))))))))) Nothing LegacyEmlfV1;
+      (append Prelude.stackFacadeValues (filter (\((,,) name _ _) -> not (eqString name "==" || eqString name "/="))
+((:) ((,,) "otherwise" Nothing (SBoolLit True)) ((:) ((,,) "implementationHost" Nothing (SStringLit "native-MLF")) ((:) ((,,) "bind" Nothing (SVar "$MLF.Primitive.>>=")) ((:) ((,,) "negate" Nothing (SLam "$x" Nothing (SApp (SApp (SPrimitive PSubInt) (SIntLit 0)) (SVar "$x")))) ((:) ((,,) "+" Nothing (SPrimitive PAddInt)) ((:) ((,,) "-" Nothing (SPrimitive PSubInt)) ((:) ((,,) "*" Nothing (SPrimitive PMulInt)) ((:) ((,,) "/" Nothing (SPrimitive PQuotInt)) ((:) ((,,) "%" Nothing (SPrimitive PRemInt)) ((:) ((,,) "==" Nothing (SPrimitive PEqInt)) ((:) ((,,) "<" Nothing (SPrimitive PLtInt)) ((:) ((,,) "++" Nothing (SPrimitive PConcatString)) ((:) ((,,) "/=" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.notValue (SApp (SApp (SPrimitive PEqInt) (SVar "$a")) (SVar "$b")))))) ((:) ((,,) "<=" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.notValue (SApp (SApp (SPrimitive PLtInt) (SVar "$b")) (SVar "$a")))))) ((:) ((,,) ">" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (SApp (SApp (SPrimitive PLtInt) (SVar "$b")) (SVar "$a"))))) ((:) ((,,) ">=" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.notValue (SApp (SApp (SPrimitive PLtInt) (SVar "$a")) (SVar "$b")))))) ((:) ((,,) "&&" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.conditional (SVar "$a") (SVar "$b") (SBoolLit False))))) ((:) ((,,) "||" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.conditional (SVar "$a") (SBoolLit True) (SVar "$b"))))) ([]))))))))))))))))))))) Nothing LegacyEmlfV1;
   locals :: SourceModule -> Either String Interface;
   locals source =
     do {
@@ -437,13 +429,13 @@ module Bootstrap.Module where {
                (Left
                   (moduleIdentity source ++
                    (": cannot redefine a primitive type: " ++ D.datatypeName declaration)));
-             when (elem eqString (D.datatypeName declaration) (Cons "True" (Cons "False" Nil)))
+             when (elem eqString (D.datatypeName declaration) ((:) "True" ((:) "False" [])))
                (Left (moduleIdentity source ++ ": reserved data type name"));
              mapM_
                (\constructor ->
                   when
                     (elem eqString (D.constructorName constructor)
-                       (Cons "True" (Cons "False" (Cons "Unit" Nil))))
+                       ((:) "True" ((:) "False" [])))
                     (Left
                        (moduleIdentity source ++
                         (": cannot redefine a primitive constructor: " ++
@@ -461,7 +453,7 @@ module Bootstrap.Module where {
         datatypes =
           concatMap
             (\declaration ->
-               Cons (entity (D.datatypeName declaration) Datatype)
+               (:) (entity (D.datatypeName declaration) Datatype)
                  (map
                     (\constructor ->
                        entity (D.constructorName constructor)
@@ -473,7 +465,7 @@ module Bootstrap.Module where {
         classes =
           concatMap
             (\klass ->
-               Cons (entity (className klass) Class)
+               (:) (entity (className klass) Class)
                  (map (\method -> entity (fst method) (Method (className klass)))
                     (classMethods klass)))
             (sourceClasses source)
@@ -482,7 +474,7 @@ module Bootstrap.Module where {
         entries = append values (append datatypes classes)
       };
       let {
-        keys = map (\entry -> Pair (space entry) (spelling entry)) entries
+        keys = map (\entry -> (,) (space entry) (spelling entry)) entries
       };
       unless (length keys == length (nubBy (\a b -> (compareKey a b == 0)) keys))
         (Left (moduleIdentity source ++ ": duplicate declaration"));
@@ -493,23 +485,28 @@ module Bootstrap.Module where {
   implicitMode NoImplicitPrelude = False;
   importsFor mode source =
     if isBuiltinModule (moduleIdentity source)
-    then Nil
+    then sourceImports source
     else let {
-           imports = sourceImports source
+           imports = sourceImports source;
+           -- Only compiler-generated references can use this unlexable alias.
+           -- Its dependency edge supplies genuine builtin instances even with
+           -- NoImplicitPrelude, without exposing ordinary facade names.
+           intrinsic = Import "MLF.Primitive" True (Just "$MLF.Intrinsics") Everything;
+           withIntrinsic = (:) intrinsic imports
          } in
          if (implicitMode mode &&
              (not (Lexer.isSharedSyntax (sourceSyntax source)) &&
               not (any (\entry -> eqString (importedModule entry) "Prelude") imports)))
-         then Cons (Import "Prelude" False Nothing Everything) imports
-         else imports;
+         then (:) (Import "Prelude" False Nothing Everything) withIntrinsic
+         else withIntrinsic;
   qualify name (Interface entries) =
     Interface
       (M.fromList compareKey
          (map
             (\entry ->
                case entry of {
-                 Pair (Pair namespace spelling) entities ->
-                   Pair (Pair namespace (name ++ ("." ++ spelling))) entities
+                 (,) ((,) namespace spelling) entities ->
+                   (,) ((,) namespace (name ++ ("." ++ spelling))) entities
                })
             (M.toList entries)));
   scope :: PreludeMode ->
@@ -554,8 +551,8 @@ module Bootstrap.Module where {
   label entity = (owner entity ++ ("." ++ spelling entity));
   lookupEntity namespace name env =
     case Set.toList (lookupEntities namespace (sourceReference name) env) of {
-      Nil -> Left ("name is not in scope: " ++ name);
-      Cons entity Nil -> Right entity;
+      [] -> Left ("name is not in scope: " ++ name);
+      (:) entity [] -> Right entity;
       entities ->
         Left ("ambiguous name " ++ (name ++ (": " ++ intercalate ", " (map label entities))))
     };
@@ -571,7 +568,7 @@ module Bootstrap.Module where {
       ExportValue name ->
         do {
           entity <- lookupEntity Terms name env;
-          Right (interface (Cons entity Nil))
+          Right (interface ((:) entity []))
         };
       ExportType name Abstract ->
         if hiding
@@ -596,23 +593,23 @@ module Bootstrap.Module where {
           filter
             (\entity ->
                eqMaybe (eqPair eqString eqString) (parent entity)
-                 (Just (Pair (owner ty) (spelling ty))))
+                 (Just ((,) (owner ty) (spelling ty))))
             (Set.toList (visible env))
       };
       chosen <-
         case members of {
-          Abstract -> Right Nil;
+          Abstract -> Right [];
           AllMembers -> Right children;
           Members names ->
             mapM
               (\child ->
                  case filter (\entity -> eqString child (spelling entity)) children of {
-                   Cons entity Nil -> Right entity;
+                   (:) entity [] -> Right entity;
                    _ -> Left (child ++ (" is not a visible member of " ++ name))
                  })
               names
         };
-      Right (interface (Cons ty chosen))
+      Right (interface ((:) ty chosen))
     };
   selectImport :: Interface -> Selection -> Either String Interface;
   selectImport env selection =
@@ -662,7 +659,7 @@ module Bootstrap.Module where {
         do {
           let {
             aliases =
-              Cons (moduleIdentity source)
+              (:) (moduleIdentity source)
                 (map (\entry -> fromMaybe (importedModule entry) (importAlias entry))
                    (importsFor mode source))
           };
@@ -681,9 +678,9 @@ module Bootstrap.Module where {
               concatMap
                 (\entry ->
                    case entry of {
-                     Pair (Pair namespace spelling) entities ->
+                     (,) ((,) namespace spelling) entities ->
                        if hasDot spelling 0
-                       then Nil
+                       then []
                        else filter
                               (\entity ->
                                  Set.member compareEntity entity
@@ -726,7 +723,7 @@ module Bootstrap.Module where {
           types = lookupEntities Types name env
         } in
         let {
-          parents = map (\entity -> Pair (owner entity) (spelling entity)) (Set.toList types)
+          parents = map (\entity -> (,) (owner entity) (spelling entity)) (Set.toList types)
         } in
         let {
           children =
@@ -741,7 +738,7 @@ module Bootstrap.Module where {
         let {
           chosen =
             case members of {
-              Abstract -> Nil;
+              Abstract -> [];
               AllMembers -> children;
               Members names -> filter (\entity -> elem eqString (spelling entity) names) children
             }
@@ -810,7 +807,7 @@ module Bootstrap.Module where {
                ExportModule name ->
                  let {
                    aliases =
-                     Cons (moduleIdentity source)
+                     (:) (moduleIdentity source)
                        (map (\entry -> fromMaybe (importedModule entry) (importAlias entry))
                           (importsFor mode source))
                  } in
@@ -830,7 +827,7 @@ module Bootstrap.Module where {
                    Map String Interface ->
                    Map String Interface ->
                    Map String Interface ->
-                   List SourceModule -> Map String Interface -> Map String Interface;
+                   [] SourceModule -> Map String Interface -> Map String Interface;
   settleExports mode typePhase external typeExports localMap modules current =
     let {
       entries =
@@ -844,12 +841,12 @@ module Bootstrap.Module where {
              } in
              let {
                env =
-                 if eqString name "Prelude" then local else partialScope mode current source local
+                 partialScope mode current source local
              } in
              let {
                exported = partialExports mode source local env
              } in
-             Pair name
+             (,) name
                (if typePhase
                 then namespacePart Types exported
                 else union (M.findWithDefault compareString emptyInterface name typeExports)
@@ -872,13 +869,13 @@ module Bootstrap.Module where {
       datatypes =
         concatMap
           (\declaration ->
-             Cons (D.datatypeName declaration)
+             (:) (D.datatypeName declaration)
                (map D.constructorName (D.datatypeConstructors declaration)))
           (sourceDatatypes source)
     } in
     let {
       classes =
-        concatMap (\klass -> Cons (className klass) (map fst (classMethods klass)))
+        concatMap (\klass -> (:) (className klass) (map fst (classMethods klass)))
           (sourceClasses source)
     } in
     let {
@@ -886,7 +883,7 @@ module Bootstrap.Module where {
         concatMap
           (\value ->
              case value of {
-               Triple name _ body -> Cons name (Desugar.allNames body)
+               (,,) name _ body -> (:) name (Desugar.allNames body)
              })
           (sourceValues source)
     } in
@@ -894,27 +891,33 @@ module Bootstrap.Module where {
       methods =
         concatMap
           (\inst ->
-             concatMap (\method -> Cons (fst method) (Desugar.allNames (snd method)))
+             concatMap (\method -> (:) (fst method) (Desugar.allNames (snd method)))
                (instanceMethods inst))
           (sourceInstances source)
     } in
     append datatypes
       (append classes
-         (append values (append methods (maybe Nil Desugar.allNames (sourceBody source)))));
-  chooseName :: Set String -> String -> Int -> Pair String Int;
+         (append values (append methods (maybe [] Desugar.allNames (sourceBody source)))));
+  chooseName :: Set String -> String -> Int -> (,) String Int;
   chooseName used prefix index =
     let {
       name = (prefix ++ showInt index)
     } in
     if Set.member compareString name used
     then chooseName used prefix (index + 1)
-    else Pair name (index + 1);
+    else (,) name (index + 1);
   allocateName used state entity =
     case state of {
-      Pair entries index ->
-        if (isRole BuiltinType entity ||
-            (eqString (owner entity) "Prelude" && eqString (spelling entity) "Unit"))
-        then Pair (M.insert compareEntity entity (spelling entity) entries) index
+      (,) entries index ->
+        if (eqString (owner entity) "MLF.Primitive" &&
+            ((eqString (spelling entity) "HasCallStack" && isRole ManagedConstraint entity) ||
+             (eqString (spelling entity) "CallStack" && isRole BuiltinType entity) ||
+             (eqString (spelling entity) "callStack" && isRole Value entity)))
+        then (,) (M.insert compareEntity entity
+                    (if eqString (spelling entity) "HasCallStack" then "MLFHasCallStack"
+                     else if eqString (spelling entity) "CallStack" then "MLFCallStack" else "mlfCallStack") entries) index
+        else if isRole BuiltinType entity
+        then (,) (M.insert compareEntity entity (spelling entity) entries) index
         else let {
                constructor =
                  case role entity of {
@@ -931,13 +934,25 @@ module Bootstrap.Module where {
              let {
                chosen = chooseName used prefix index
              } in
-             Pair (M.insert compareEntity entity (fst chosen) entries) (snd chosen)
+             (,) (M.insert compareEntity entity (fst chosen) entries) (snd chosen)
     };
   freshNames modules entities =
     let {
       used = Set.fromList compareString (concatMap sourceUsed modules)
     } in
-    Names (fst (foldl (allocateName used) (Pair M.empty 0) (Set.toList entities)));
+    Names (fst (foldl (allocateName used) ((,) M.empty 0) (Set.toList entities)));
+  -- Resolve the genuine facade alone, without subjecting standalone abstract
+  -- nominal annotations to module lookup. The caller supplies every user name.
+  standaloneBuiltinScope :: [] String -> Either String ((,,) Names Interface Renamed);
+  standaloneBuiltinScope userNames = do {
+    declared <- locals primitiveSource;
+    let { env = union declared (interface sharedPrimitiveEntities) };
+    let { used = Set.fromList compareString (append userNames (sourceUsed primitiveSource)) };
+    let { names = Names (fst (foldl (allocateName used) ((,) M.empty 0)
+                              (Set.toList (visible env)))) };
+    renamed <- renameModule names env env primitiveSource;
+    Right ((,,) names env renamed)
+  };
   resolvedName (Names names) entity =
     case M.lookup compareEntity entity names of {
       Nothing -> Left ("missing module identity: " ++ label entity);
@@ -955,11 +970,11 @@ module Bootstrap.Module where {
       SCon constructor arguments ->
         do {
           name <-
-            if eqString constructor "Unit"
-            then Right "Unit"
+            if D.sourceBuiltinType constructor
+            then Right constructor
             else do {
                    entity <- lookupEntity Types constructor env;
-                   if isRole Class entity
+                   if (isRole Class entity || isRole ManagedConstraint entity)
                    then Left ("class used as a type constructor: " ++ constructor)
                    else resolvedName names entity
                  };
@@ -992,7 +1007,9 @@ module Bootstrap.Module where {
       SPredicate name arguments ->
         do {
           entity <- lookupEntity Types name env;
-          unless (isRole Class entity) (Left ("not a class: " ++ name));
+          unless (isRole Class entity || isRole ManagedConstraint entity) (Left ("not a class: " ++ name));
+          when (isRole ManagedConstraint entity && not (null arguments))
+            (Left "HasCallStack does not take type arguments");
           name' <- resolvedName names entity;
           arguments' <- mapM (resolveType names env) arguments;
           Right (SPredicate name' arguments')
@@ -1025,7 +1042,9 @@ module Bootstrap.Module where {
   resolveVariable names entity =
     case role entity of {
       Primitive p -> Right (SPrimitive p);
-      Value -> mapEither SVar (resolvedName names entity);
+      Value -> if eqString (owner entity) "MLF.Primitive" && eqString (spelling entity) "callStack"
+               then Right (SVar "$MLF.Stack.callStack")
+               else mapEither SVar (resolvedName names entity);
       Method _ -> mapEither SVar (resolvedName names entity);
       _ -> Left ("not a function or value: " ++ label entity)
     };
@@ -1037,53 +1056,38 @@ module Bootstrap.Module where {
     };
   resolvePattern :: Names -> Interface -> SPattern -> Either String SPattern;
   resolvePattern names env pattern =
+    case pattern of {
+      SAsPattern name inner -> mapEither (SAsPattern name) (resolvePattern names env inner);
+      SLazyPattern inner -> mapEither SLazyPattern (resolvePattern names env inner);
+      SOverloadedStringPattern text _ _ -> do {
+        equality <- resolvedName names (Entity "MLF.Primitive" "==" (Method "Eq"));
+        conversion <- resolvedName names (Entity "MLF.Primitive" "fromString" (Method "IsString"));
+        Right (SOverloadedStringPattern text equality conversion)
+      };
+      SConstructorPattern name fields ->
+        if D.sourceBuiltinConstructor name then Right pattern
+        else resolveOrdinaryPattern names env pattern;
+      SNestedPattern name patterns ->
+        if D.sourceBuiltinConstructor name
+        then mapEither (SNestedPattern name) (mapM (resolvePattern names env) patterns)
+        else resolveOrdinaryPattern names env pattern;
+      _ -> resolveOrdinaryPattern names env pattern
+    };
+  resolveOrdinaryPattern :: Names -> Interface -> SPattern -> Either String SPattern;
+  resolveOrdinaryPattern names env pattern =
     let {
       matchValueShared1 = pattern
     } in
     case matchValueShared1 of {
-      SConstructorPattern matchValueShared2 matchValueShared3 ->
-        if MLF.Primitive.eqString matchValueShared2 "Unit"
-        then case matchValueShared3 of {
-               Nil -> Right pattern;
-               _ ->
-                 let {
-                   fields = matchValueShared3
-                 } in
-                 let {
-                   constructor = matchValueShared2
-                 } in
-                 do {
-                   entity <- lookupEntity Terms constructor env;
-                   case role entity of {
-                     Constructor _ ->
-                       mapEither (\name -> SConstructorPattern name fields)
-                         (resolvedName names entity);
-                     Boolean b ->
-                       if null fields
-                       then Right (SBoolPattern b)
+      SConstructorPattern constructor fields -> do {
+        entity <- lookupEntity Terms constructor env;
+        case role entity of {
+          Constructor _ -> mapEither (\name -> SConstructorPattern name fields) (resolvedName names entity);
+          Boolean b -> if null fields then Right (SBoolPattern b)
                        else Left ("not a constructor pattern: " ++ constructor);
-                     _ -> Left ("not a constructor pattern: " ++ constructor)
-                   }
-                 }
-             }
-        else let {
-               fields = matchValueShared3
-             } in
-             let {
-               constructor = matchValueShared2
-             } in
-             do {
-               entity <- lookupEntity Terms constructor env;
-               case role entity of {
-                 Constructor _ ->
-                   mapEither (\name -> SConstructorPattern name fields) (resolvedName names entity);
-                 Boolean b ->
-                   if null fields
-                   then Right (SBoolPattern b)
-                   else Left ("not a constructor pattern: " ++ constructor);
-                 _ -> Left ("not a constructor pattern: " ++ constructor)
-               }
-             };
+          _ -> Left ("not a constructor pattern: " ++ constructor)
+        }
+      };
       SNestedPattern matchValueShared4 matchValueShared5 ->
         let {
           constructor = matchValueShared4
@@ -1118,17 +1122,45 @@ module Bootstrap.Module where {
     };
   resolveExpr names env expression =
     resolveBound names env Set.empty (Desugar.desugarDo expression);
+  managedAnnotation :: SExpr -> Bool;
+  managedAnnotation expression = case expression of {
+    SAnn _ (SAnnotation _ ty) -> managedAnnotationType ty;
+    _ -> False
+  };
+  managedAnnotationType :: SType -> Bool;
+  managedAnnotationType ty = case ty of {
+    SForall _ _ _ body -> managedAnnotationType body;
+    SQualified predicates body -> any (\(SPredicate name _) -> eqString name "MLFHasCallStack") predicates || managedAnnotationType body;
+    _ -> False
+  };
   resolveBound :: Names -> Interface -> Set String -> SExpr -> Either String SExpr;
   resolveBound names env bound expression =
     let {
       matchValueShared8 = expression
     } in
     case matchValueShared8 of {
+      SSourceDefinition body -> mapEither SSourceDefinition (resolveBound names env bound body);
+      SCallSite display location body -> do {
+        resolved <- resolveBound names env bound body;
+        Right (if eqString display "an expression type signature" && not (managedAnnotation resolved)
+          then resolved else SCallSite display location resolved)
+      };
+      SSharedBind pattern action continuation binding failure -> do {
+        pattern' <- resolvePattern names env pattern;
+        action' <- resolveBound names env bound action;
+        continuation' <- resolveBound names env
+          (Set.union compareString bound (Set.fromList compareString (Surface.patternVariables pattern))) continuation;
+        binding' <- resolveBound names env bound binding;
+        failure' <- resolveBound names env bound failure;
+        Right (SSharedBind pattern' action' continuation' binding' failure')
+      };
       SVar matchValueShared9 ->
         let {
           name = matchValueShared9
         } in
-        if Lexer.textStartsAt name 0 "$MLF.Primitive."
+        if eqString name "$MLF.Stack.callStack"
+        then Right (SVar "$MLF.Stack.callStack")
+        else if Lexer.textStartsAt name 0 "$MLF.Primitive."
         then let { method = stringSlice name 15 (stringLength name - 15) } in
              resolveVariable names (Entity "MLF.Primitive" method (Method (Prelude.standardMethodClass method)))
         else if Lexer.textStartsAt name 0 "$MLF.Infix." then do {
@@ -1145,7 +1177,7 @@ module Bootstrap.Module where {
                     resolveVariable names entity
                   };
       SConstructor matchValueShared10 ->
-        if MLF.Primitive.eqString matchValueShared10 "Unit"
+        if D.sourceBuiltinConstructor matchValueShared10
         then Right expression
         else let {
                name = matchValueShared10
@@ -1229,7 +1261,7 @@ module Bootstrap.Module where {
                    (map
                       (\definition ->
                          case definition of {
-                           Triple variable _ _ -> variable
+                           (,,) variable _ _ -> variable
                          })
                       definitions))
           };
@@ -1237,11 +1269,11 @@ module Bootstrap.Module where {
             mapM
               (\definition ->
                  case definition of {
-                   Triple variable mode value ->
+                   (,,) variable mode value ->
                      do {
                        mode' <- resolveRecursiveMode names env mode;
                        value' <- resolveBound names env local value;
-                       Right (Triple variable mode' value')
+                       Right ((,,) variable mode' value')
                      }
                  })
               definitions;
@@ -1284,7 +1316,7 @@ module Bootstrap.Module where {
             mapM
               (\equation ->
                  case equation of {
-                   Pair patterns body ->
+                   (,) patterns body ->
                      do {
                        patterns' <- mapM (resolvePattern names env) patterns;
                        body' <-
@@ -1293,7 +1325,7 @@ module Bootstrap.Module where {
                               (Set.fromList compareString
                                  (concatMap Surface.patternVariables patterns)))
                            body;
-                       Right (Pair patterns' body')
+                       Right ((,) patterns' body')
                      }
                  })
               equations;
@@ -1318,7 +1350,7 @@ module Bootstrap.Module where {
       Parameter _ -> Right field;
       Applied constructor fields ->
         do {
-          ty <- resolveType names env (SCon constructor Nil);
+          ty <- resolveType names env (SCon constructor []);
           case ty of {
             SCon renamed _ ->
               do {
@@ -1370,7 +1402,7 @@ module Bootstrap.Module where {
              do {
                name' <- ownName names local Terms (fst method);
                ty <- resolveType names env (snd method);
-               Right (Pair name' ty)
+               Right ((,) name' ty)
              })
           (classMethods klass);
       Right (SClassDecl name (classParameters klass) supers methods)
@@ -1388,7 +1420,7 @@ module Bootstrap.Module where {
                name <-
                  resolvedName names (Entity (owner klass) (fst method) (Method (spelling klass)));
                body <- resolveExpr names env (snd method);
-               Right (Pair name body)
+               Right ((,) name body)
              })
           originals;
       context <- mapM (resolvePredicate names env) (instanceContext inst);
@@ -1405,12 +1437,12 @@ module Bootstrap.Module where {
         mapM
           (\value ->
              case value of {
-               Triple original annotation expression ->
+               (,,) original annotation expression ->
                  do {
                    name <- ownName names local Terms original;
                    annotation' <- resolveOptionalAnnotation names env annotation;
                    expression' <- resolveExpr names env expression;
-                   Right (Triple name annotation' expression')
+                   Right ((,,) name annotation' expression')
                  }
              })
           (sourceValues source);
@@ -1453,7 +1485,7 @@ module Bootstrap.Module where {
           Just env -> Right env
         };
       env <-
-        if isBuiltinModule (moduleIdentity source)
+        if eqString (moduleIdentity source) "MLF.Primitive"
         then Right local
         else scope mode exports source local;
       exported <- exportsFor mode source local env;
@@ -1471,7 +1503,7 @@ module Bootstrap.Module where {
           (\name dependencies ->
              Set.insert compareString name
                (Set.unions compareString
-                  (Cons dependencies
+                  ((:) dependencies
                      (map
                         (\dependency ->
                            M.findWithDefault compareString (Set.singleton dependency) dependency
@@ -1486,8 +1518,8 @@ module Bootstrap.Module where {
         M.fromList compareString
           (map
              (\source ->
-                Pair (moduleIdentity source)
-                  (Set.fromList compareString (append (if Lexer.isSharedSyntax (sourceSyntax source) then Cons "MLF.Primitive" Nil else Nil) (map importedModule (importsFor mode source)))))
+                (,) (moduleIdentity source)
+                  (Set.fromList compareString (append (if Lexer.isSharedSyntax (sourceSyntax source) then (:) "MLF.Primitive" [] else []) (map importedModule (importsFor mode source)))))
              modules)
     } in
     settleReach direct direct;
@@ -1501,61 +1533,24 @@ module Bootstrap.Module where {
             (\index inst ->
                if Set.member compareString (fst inst) reachable then Just index else Nothing)
             instances));
-  valueClosure :: Map String (Triple String (Maybe SAnnotation) SExpr) ->
-                  Set String -> Set String -> Set String;
-  valueClosure values seen todo =
-    case Set.minView todo of {
-      Nothing -> seen;
-      Just (Pair name rest) ->
-        if Set.member compareString name seen
-        then valueClosure values seen rest
-        else case M.lookup compareString name values of {
-               Nothing -> valueClosure values seen rest;
-               Just (Triple _ _ expression) ->
-                 valueClosure values (Set.insert compareString name seen)
-                   (Set.union compareString rest
-                      (Set.fromList compareString (Surface.freeNames expression)))
-             }
-    };
   bindValues publicNames values expression =
     mapLeft (displayNames publicNames) (Surface.bindValues values expression);
-  closeMethod publicNames values valueMap expression =
-    let {
-      needed =
-        valueClosure valueMap Set.empty (Set.fromList compareString (Surface.freeNames expression))
-    } in
-    bindValues publicNames
-      (filter (\value -> Set.member compareString (valueName value) needed) values)
-      expression;
   closeInstance publicNames values valueMap inst =
-    do {
-      methods <-
-        mapM
-          (\method ->
-             do {
-               body <- closeMethod publicNames values valueMap (snd method);
-               Right (Pair (fst method) body)
-             })
-          (instanceMethods inst);
-      Right
-        (SInstanceDecl (instanceVariables inst) (instanceContext inst) (instanceClass inst)
-           (instanceHead inst)
-           methods)
-    };
+    mapLeft (displayNames publicNames) (Surface.closeSourceInstance values valueMap inst);
   resolveCrate :: PreludeMode ->
                   Map String Interface ->
-                  (Entity -> String) -> List SourceModule -> Either String ResolvedCrate;
+                  (Entity -> String) -> [] SourceModule -> Either String ResolvedCrate;
   resolveCrate mode external mangle supplied =
     resolveCrateWithAllocator mode external
       (\_ entities ->
          Names
            (M.fromList compareEntity
-              (map (\entity -> Pair entity (mangle entity)) (Set.toList entities))))
+              (map (\entity -> (,) entity (mangle entity)) (Set.toList entities))))
       supplied;
   resolveCrateWithAllocator :: PreludeMode ->
                                Map String Interface ->
-                               (List SourceModule -> Set Entity -> Names) ->
-                               List SourceModule -> Either String ResolvedCrate;
+                               ([] SourceModule -> Set Entity -> Names) ->
+                               [] SourceModule -> Either String ResolvedCrate;
   -- An instance implements its class's methods even when those method names
   -- are intentionally omitted from the class's imported source namespace.
   resolveCrateWithAllocator mode external allocate supplied =
@@ -1602,7 +1597,7 @@ module Bootstrap.Module where {
                if (useFacade &&
                    (not (M.member compareString "MLF.Primitive" external) &&
                     not (elem eqString "MLF.Primitive" identities)))
-               then Cons primitiveSource supplied
+               then (:) primitiveSource supplied
                else supplied
            };
            let {
@@ -1610,7 +1605,7 @@ module Bootstrap.Module where {
                if (usePrelude &&
                    (not (M.member compareString "Prelude" external) &&
                     not (elem eqString "Prelude" identities)))
-               then Cons preludeSource withFacade
+               then (:) preludeSource withFacade
                else withFacade
            };
            localEntries <-
@@ -1619,7 +1614,7 @@ module Bootstrap.Module where {
                   do {
                     local <- locals source;
                     Right
-                      (Pair (moduleIdentity source)
+                      ((,) (moduleIdentity source)
                          (if isBuiltinModule (moduleIdentity source)
                           then union local (interface (builtinEntities source))
                           else local))
@@ -1662,10 +1657,10 @@ module Bootstrap.Module where {
            let {
              allEntities =
                Set.unions compareEntity
-                 (Cons (visible primitiveScope)
+                 ((:) (visible primitiveScope)
                     (append (map (\entry -> visible (snd entry)) localEntries)
                        (append (map visible (M.elems external))
-                          (Cons (Set.fromList compareEntity (concat methodEntities)) Nil))))
+                          ((:) (Set.fromList compareEntity (concat methodEntities)) []))))
            };
            let {
              names = allocate modules allEntities
@@ -1681,7 +1676,7 @@ module Bootstrap.Module where {
                M.fromList compareString
                  (map
                     (\entry ->
-                       Pair (snd entry)
+                       (,) (snd entry)
                          (if eqString (owner (fst entry)) "Prelude"
                           then spelling (fst entry)
                           else label (fst entry)))
@@ -1692,7 +1687,7 @@ module Bootstrap.Module where {
              instances =
                concatMap
                  (\entry ->
-                    map (\inst -> Pair (moduleIdentity (resolvedSource entry)) inst)
+                    map (\inst -> (,) (moduleIdentity (resolvedSource entry)) inst)
                       (renamedInstances (resolvedContents entry)))
                  resolved
            };
@@ -1709,7 +1704,7 @@ module Bootstrap.Module where {
                     (\entry ->
                        map
                          (\value ->
-                            Pair (valueName value)
+                            (,) (valueName value)
                               (candidates (moduleIdentity (resolvedSource entry))))
                          (renamedValues (resolvedContents entry)))
                     resolved)
@@ -1719,7 +1714,7 @@ module Bootstrap.Module where {
                 (map (\inst -> candidates (fst inst)) instances)
                 reach)
          };
-  linkModules :: PreludeMode -> List SourceModule -> Either String LinkedModule;
+  linkModules :: PreludeMode -> [] SourceModule -> Either String LinkedModule;
   linkModules mode supplied =
     do {
       crate <- resolveCrateWithAllocator mode M.empty freshNames supplied;
@@ -1763,7 +1758,7 @@ module Bootstrap.Module where {
         };
       body <- bindValues publicNames values entry;
       let {
-        valueMap = M.fromList compareString (map (\value -> Pair (valueName value) value) values)
+        valueMap = M.fromList compareString (map (\value -> (,) (valueName value) value) values)
       };
       instances' <- mapM (\inst -> closeInstance publicNames values valueMap (snd inst)) instances;
       let {
@@ -1798,14 +1793,14 @@ module Bootstrap.Module where {
          else (stringFromCode code ++ displayFrom names text (index + 1));
   displayNames names text = displayFrom names text 0;
   -- Ordinary Haskell imports and lexical shadowing do not rebind syntax.
-  validateSharedIdentities :: SourceModule -> Interface -> Interface -> Either String Unit;
-  validateSharedIdentities _ _ _ = Right Unit;
-  validateSharedModuleCycles :: List SourceModule -> Either String Unit;
+  validateSharedIdentities :: SourceModule -> Interface -> Interface -> Either String ();
+  validateSharedIdentities _ _ _ = Right ();
+  validateSharedModuleCycles :: [] SourceModule -> Either String ();
   validateSharedModuleCycles sources =
     let {
       groups =
         Dependency.components
-          (map (\source -> Pair (moduleIdentity source) (map importedModule (sourceImports source)))
+          (map (\source -> (,) (moduleIdentity source) (map importedModule (sourceImports source)))
              sources)
     } in
     mapM_

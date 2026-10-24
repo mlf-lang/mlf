@@ -59,7 +59,7 @@ target; its existing Core entry still runs the same sorted-list oracle and all
 276 distinct inputs. `test-framework` checks failure continuation, selection,
 inventory validation, JSON diagnostics and legacy adapters. The root `unit`
 group runs both the library and CLI contract checks in addition to the current
-742 Core checks. The separately reviewed duplicate consolidation below accounts
+746 Core checks. The separately reviewed duplicate consolidation below accounts
 for the reduction from the original 686 to 684 checks; the guards amendment adds
 55 checks and eight interpreter/LLVM runtime rows. These cover first-match
 selection, skipped guards and results, contextual `otherwise`, pattern scope,
@@ -72,7 +72,16 @@ identities to their reviewed acceptance controls and adds three graph/qualified
 module/crate leaves: 739 - 4 + 7 = 742. All 735 unaffected identities retain
 their family and order. The static migration guard compares this explicit delta
 with the registry, catalog and golden inventory; discovery is not a claim that
-all 742 actions have executed.
+all 746 actions have executed.
+
+The canonical-source cutover adds a separately reviewed 742 → 746 amendment:
+eight explicit label migrations and four upstream do/surface controls. It retains
+the original recursion migration and all unlisted family/label ordering. Canonical
+Unit, String equality and MonadFail changes have explicit oracles; unsigned
+same-name functions and divergent loops are type-only positive controls, not
+runtime fixtures. The static guard preserves the old helper and partition source
+pins and projects only reviewed canonical tokens plus two intended annotation
+strings. See the focused recursion README for scope and validation limits.
 
 The shared test library contains helper, transport, collection-wrapper and
 independent-checker modules, plus `Tests.Coverage`, `Tests.TestDrivers`,
@@ -105,7 +114,7 @@ projection. It then checks the disjoint family union and combines only validated
 completed-event bodies. Only the full `unit` campaign produces a full aggregate
 `core.coverage.jsonl` and `core.families.jsonl`; an explicit selection of all Core
 families remains partial. The aggregate is revalidated against the reviewed
-742-check golden inventory and binds all child receipts rather than claiming a
+746-check golden inventory and binds all child receipts rather than claiming a
 single Core binary. The optional legacy `core` executable preserves direct full
 execution, `--from`, family listing and family selection.
 
@@ -164,7 +173,7 @@ wrapper chooses 4 for port on hosts with at most 8 GiB RAM, while preserving the
 
 | Root group | MLF entry | Preserved coverage |
 | --- | --- | --- |
-| unit | CoreCratesMain, CoreSolverMain, CoreLanguageMain, CoreModulesMain, Figure12SuiteMain, HarnessMain, TestFrameworkMain, RegexMain | framework API/CLI contracts; 742 compiler checks; 6712 Algorithm W cases represented by 6703 executions; annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks; all 43 Figure 12 labels with 41 distinct executions and 36 controls; 67 benchmark/bootstrap/release/cache harness methods including two cache regressions; 56 regex actions |
+| unit | CoreCratesMain, CoreSolverMain, CoreLanguageMain, CoreModulesMain, Figure12SuiteMain, HarnessMain, TestFrameworkMain, RegexMain | framework API/CLI contracts; 746 compiler checks; 6712 Algorithm W cases represented by 6703 executions; annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks; all 43 Figure 12 labels with 41 distinct executions and 36 controls; 67 benchmark/bootstrap/release/cache harness methods including two cache regressions; 56 regex actions |
 | packages | PackagesMain | 79 completed cases: 22 resolver checks; 29 compiler integration cases, including native PGO isolation, shared cache survival, corruption recovery and source invalidation; 28 checked-release cases covering source-free builds, relocation, shared dependencies, compatibility, pins, damaged artifacts, GitHub fetching, offline cache repair and packed asset validation; target dependency/instance selection; scheduler diamond and variant deduplication, jobs 1/2/4 equivalence, concurrent cache publication, failure recovery, empty graphs and target-name collisions; 22 native runner lifecycle and protocol checks |
 | backends | BackendSuiteMain | 531 fixtures and 583 execution rows on interpreter and LLVM, compact-GC layout |
 | port | PortMain, ReferencesMain | 25 LLVM fixtures with compact-GC, six reference programs, generated inference input equality |
@@ -574,7 +583,8 @@ current and frozen target checkers remain unchanged.
 The former cross-module unsigned-signature rejection retains its exact divergent
 source as a type-only `XBot` positive in both module and separately linked crate
 checks. It never enters the runtime program inventory. The subsequent qualified cross-module fixture adds two checks, bringing the
-reviewed Core inventory to 742 cases; no unrelated oracle is regenerated.
+earlier reviewed Core inventory to 742 cases; the separately reviewed canonical
+cutover above brings the current inventory to 746. No oracle is regenerated.
 `tests/recursive-inference/RecursiveInventoryDiscovery.emlf` checks actual
 retained test lists against registry/catalog labels and partition totals without
 executing native or other test actions.

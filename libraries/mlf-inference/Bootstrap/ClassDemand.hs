@@ -15,7 +15,7 @@ module Bootstrap.ClassDemand where {
   data Frame = Frame Int (Maybe Int) Int;
   data Seed = Seed Int String Int;
   data Use = Use Int Int Int;
-  data Demand = Empty | SeedNode Int | UnionNodes (List Int) |
+  data Demand = Empty | SeedNode Int | UnionNodes ([] Int) |
                 RefNode Int | InstantiateNode Int Int;
   -- Origins retain the whole path as a DAG. In particular, two uses of h
   -- inside j remain distinct when both requirements are instantiated at k.
@@ -23,7 +23,7 @@ module Bootstrap.ClassDemand where {
   data Slot = Slot Int String Int Origin;
   data Universe = Universe (IntMap Slot) (IntMap Int) (IntMap (IntMap Int));
   data Plan = Plan Universe (IntMap IntSet) Int;
-  data Discovery = Discovery Universe (IntMap IntSet) (List (Pair Int Int));
+  data Discovery = Discovery Universe (IntMap IntSet) ([] ((,) Int Int));
 
   frameId :: Frame -> Int;
   frameId (Frame identity _ _) = identity;
@@ -72,7 +72,7 @@ module Bootstrap.ClassDemand where {
       Nothing -> Left ("class demand: unknown " ++ (label ++ (" " ++ showInt identity)));
       Just value -> Right value
     };
-  slotsAt :: Plan -> Int -> Either String (List Int);
+  slotsAt :: Plan -> Int -> Either String ([] Int);
   slotsAt plan identity = mapEither IS.toAscList (require "demand node" identity (nodeSets plan));
   slotAt :: Plan -> Int -> Either String Slot;
   slotAt plan identity = require "slot" identity (universeSlots (planUniverse plan));
@@ -92,7 +92,7 @@ module Bootstrap.ClassDemand where {
     };
   instantiateSlot :: Plan -> Int -> Int -> Either String Int;
   instantiateSlot plan use slot = instantiateIn (planUniverse plan) use slot;
-  selectedSlotCount :: Plan -> List Int -> Either String Int;
+  selectedSlotCount :: Plan -> [] Int -> Either String Int;
   selectedSlotCount plan nodes =
     do {
       values <- mapM (\n -> require "demand node" n (nodeSets plan)) nodes;
@@ -103,22 +103,22 @@ module Bootstrap.ClassDemand where {
     IM.foldl (\count mapping -> count + IM.size mapping) 0
       (universeTransitions (planUniverse plan));
 
-  dependencies :: Demand -> List Int;
+  dependencies :: Demand -> [] Int;
   dependencies demand =
     case demand of {
-      Empty -> Nil;
-      SeedNode _ -> Nil;
+      Empty -> [];
+      SeedNode _ -> [];
       UnionNodes nodes -> nodes;
-      RefNode node -> Cons node Nil;
-      InstantiateNode _ node -> Cons node Nil
+      RefNode node -> (:) node [];
+      InstantiateNode _ node -> (:) node []
     };
-  validateFrame :: IntMap Frame -> Frame -> Either String Unit;
+  validateFrame :: IntMap Frame -> Frame -> Either String ();
   validateFrame frames frame =
     do {
       ensure (frameId frame >= 0 && frameFinish frame >= 0)
         "class demand: negative frame identity or finish rank";
       case frameParent frame of {
-        Nothing -> Right Unit;
+        Nothing -> Right ();
         Just identity ->
           do {
             parent <- require "parent frame" identity frames;
@@ -127,15 +127,15 @@ module Bootstrap.ClassDemand where {
           }
       }
     };
-  validateSeed :: IntMap Frame -> Seed -> Either String Unit;
+  validateSeed :: IntMap Frame -> Seed -> Either String ();
   validateSeed frames seed =
     do {
       ensure (seedId seed >= 0) "class demand: negative seed identity";
       ensure (not (eqString (seedClass seed) "")) "class demand: empty class identity";
       require "seed owner frame" (seedOwner seed) frames;
-      Right Unit
+      Right ()
     };
-  validateUse :: IntMap Frame -> Use -> Either String Unit;
+  validateUse :: IntMap Frame -> Use -> Either String ();
   validateUse frames use =
     do {
       ensure (useId use >= 0) "class demand: negative use identity";
@@ -145,15 +145,15 @@ module Bootstrap.ClassDemand where {
         "class demand: instantiation receiver must finish after its binding"
     };
   validateNode :: IntMap Seed -> IntMap Use -> IntMap Demand ->
-                  Pair Int Demand -> Either String Unit;
-  validateNode seeds uses nodes (Pair identity demand) =
+                  (,) Int Demand -> Either String ();
+  validateNode seeds uses nodes ((,) identity demand) =
     do {
       ensure (identity >= 0) "class demand: negative demand node identity";
       mapM (\n -> require "demand dependency" n nodes) (dependencies demand);
       case demand of {
-        SeedNode seed -> do { require "seed" seed seeds; Right Unit };
-        InstantiateNode use _ -> do { require "use" use uses; Right Unit };
-        _ -> Right Unit
+        SeedNode seed -> do { require "seed" seed seeds; Right () };
+        InstantiateNode use _ -> do { require "use" use uses; Right () };
+        _ -> Right ()
       }
     };
   -- Parent ranks strictly increase, so this walk is acyclic after validation.
@@ -201,14 +201,14 @@ module Bootstrap.ClassDemand where {
     if IS.member slot previous
     then Discovery universe values pending
     else Discovery universe (IM.insert node (IS.insert slot previous) values)
-      (Cons (Pair node slot) pending);
-  allocateAt :: IntMap Frame -> Use -> Int -> Universe -> Either String (Pair Int Universe);
+      ((:) ((,) node slot) pending);
+  allocateAt :: IntMap Frame -> Use -> Int -> Universe -> Either String ((,) Int Universe);
   allocateAt frames use input universe =
     case universe of {
       Universe slots seeds transitions ->
         let { previous = IM.findWithDefault IM.empty (useId use) transitions } in
         case IM.lookup input previous of {
-          Just output -> Right (Pair output universe);
+          Just output -> Right ((,) output universe);
           Nothing ->
             do {
               slot <- require "discovery slot" input slots;
@@ -226,11 +226,11 @@ module Bootstrap.ClassDemand where {
                   fresh = Slot output (classOf slot) (useReceiver use)
                     (InstantiatedOrigin (useId use) input)
                 };
-                Right (Pair output
+                Right ((,) output
                   (Universe (IM.insert output fresh slots) seeds
                     (IM.insert (useId use) (IM.insert input output previous) transitions)))
               }
-              else Right (Pair input
+              else Right ((,) input
                 (Universe slots seeds
                   (IM.insert (useId use) (IM.insert input input previous) transitions)))
             }
@@ -245,27 +245,27 @@ module Bootstrap.ClassDemand where {
           transported <-
             case IM.get output nodes of {
               InstantiateNode use _ -> allocateAt frames (IM.get use uses) slot universe;
-              RefNode _ -> Right (Pair slot universe);
-              UnionNodes _ -> Right (Pair slot universe);
+              RefNode _ -> Right ((,) slot universe);
+              UnionNodes _ -> Right ((,) slot universe);
               _ -> Left "class demand: invalid reverse dependency"
             };
           case transported of {
-            Pair target next -> Right (addFact output target (Discovery next values pending))
+            (,) target next -> Right (addFact output target (Discovery next values pending))
           }
         }
     };
   discover :: IntMap Frame -> IntMap Use -> IntMap Demand -> IntMap IntSet ->
-              List (Pair Int Int) -> Discovery -> Either String Discovery;
+              [] ((,) Int Int) -> Discovery -> Either String Discovery;
   discover frames uses nodes dependents front state =
     case front of {
-      Nil ->
+      [] ->
         case state of {
-          Discovery universe values Nil -> Right state;
+          Discovery universe values [] -> Right state;
           Discovery universe values pending ->
             discover frames uses nodes dependents (reverse pending)
-              (Discovery universe values Nil)
+              (Discovery universe values [])
         };
-      Cons (Pair node slot) rest ->
+      (:) ((,) node slot) rest ->
         do {
           next <- foldM (discoverDependent frames uses nodes slot) state
             (IS.toAscList (IM.get node dependents));
@@ -283,9 +283,9 @@ module Bootstrap.ClassDemand where {
              SeedNode seed -> addFact node (IM.get seed (universeSeeds universe)) state;
              _ -> state
            })
-        (Discovery universe (IM.map (\_ -> IS.empty) nodes) Nil) nodes
+        (Discovery universe (IM.map (\_ -> IS.empty) nodes) []) nodes
     } in
-    discover frames uses nodes dependents Nil initial;
+    discover frames uses nodes dependents [] initial;
 
   -- This phase receives an immutable, already allocated universe. Every
   -- operation below is set union or transition lookup: no new origin exists
@@ -308,11 +308,11 @@ module Bootstrap.ClassDemand where {
         }
     };
   saturate :: Universe -> IntSet -> IntMap Demand -> IntMap IntSet -> IntSet ->
-              IntMap IntSet -> Int -> Either String (Pair (IntMap IntSet) Int);
+              IntMap IntSet -> Int -> Either String ((,) (IntMap IntSet) Int);
   saturate universe admissible nodes dependents pending values updates =
     case IS.minView pending of {
-      Nothing -> Right (Pair values updates);
-      Just (Pair identity rest) ->
+      Nothing -> Right ((,) values updates);
+      Just ((,) identity rest) ->
         do {
           result <- evaluate universe values (IM.get identity nodes);
           let { previous = IM.get identity values };
@@ -329,12 +329,12 @@ module Bootstrap.ClassDemand where {
           }
         }
     };
-  solve :: List Frame -> List Seed -> List Use -> IntMap Demand -> Either String Plan;
+  solve :: [] Frame -> [] Seed -> [] Use -> IntMap Demand -> Either String Plan;
   solve frameList seedList useList nodes =
     do {
-      let { frames = IM.fromList (map (\f -> Pair (frameId f) f) frameList) };
-      let { seeds = IM.fromList (map (\s -> Pair (seedId s) s) seedList) };
-      let { uses = IM.fromList (map (\u -> Pair (useId u) u) useList) };
+      let { frames = IM.fromList (map (\f -> (,) (frameId f) f) frameList) };
+      let { seeds = IM.fromList (map (\s -> (,) (seedId s) s) seedList) };
+      let { uses = IM.fromList (map (\u -> (,) (useId u) u) useList) };
       ensure (IM.size frames == length frameList) "class demand: duplicate frame identity";
       ensure (IM.size seeds == length seedList) "class demand: duplicate seed identity";
       ensure (IM.size uses == length useList) "class demand: duplicate use identity";
@@ -353,7 +353,7 @@ module Bootstrap.ClassDemand where {
               nodes dependents (IM.keysSet nodes)
               (IM.map (\_ -> IS.empty) nodes) 0;
             case fixed of {
-              Pair values updates ->
+              (,) values updates ->
                 do {
                   ensure (IM.eqIntMap IS.eqIntSet reached values)
                     "class demand: preallocation and immutable saturation disagree";

@@ -10,7 +10,7 @@ module Test.Descriptor where {
   data Requirement = Required | Optional;
   -- Revision is contract metadata, never part of the stable semantic ID.
   -- Build/prepare nodes deliberately are not descriptors and cannot earn coverage.
-  data Descriptor = Descriptor String String Int (List String) Requirement E.Expectation;
+  data Descriptor = Descriptor String String Int ([] String) Requirement E.Expectation;
   id (Descriptor value _ _ _ _ _) = value;
   name (Descriptor _ value _ _ _ _) = value;
   revision (Descriptor _ _ value _ _ _) = value;

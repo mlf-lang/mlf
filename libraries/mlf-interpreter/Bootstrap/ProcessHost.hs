@@ -43,8 +43,8 @@ module Bootstrap.ProcessHost where {
          if ((stringLength reply >= 4) && eqString (stringSlice reply 0 2) "0\0")
          then ioReturn (readInt (stringSlice reply 2 (stringLength reply - 3)))
          else panic "monotonic clock requires the stage-2 compiler");
-  pause :: Int -> IO Unit;
+  pause :: Int -> IO ();
   pause milliseconds =
     ioBind (request ("MLF-PROCESS-1\0pause\0" ++ (showInt milliseconds ++ "\0")))
-      (\reply -> if eqString reply "0\0" then ioReturn Unit else panic "invalid monotonic pause")
+      (\reply -> if eqString reply "0\0" then ioReturn () else panic "invalid monotonic pause")
 }

@@ -25,71 +25,71 @@ import qualified Bootstrap.X.Type as T
 import Tests.Modules (modulePrograms, moduleRejections, ModuleRejection(..), moduleTypings, ModuleTyping(..), checkTypedModuleTarget)
 import Tests.System (withScratch)
 
-separatePrograms : (List ( (Quint String PreludeMode (List (Pair String String)) String String) ))
-separatePrograms = S.append legacySeparatePrograms (Cons (Quint "crate local and dictionary fresh names avoid user globals" ImplicitPrelude Nil
-  "module Main where\ndata Box = Box Int\nseparateLocal0 = 39\nwantedDictionary0 = 2\nclass Add a where { add : a -> Int }\ninstance Add Int where { add x = x + wantedDictionary0 }\napply x = add x + separateLocal0\npatternValue (Box x) = apply x\nmain = printInt (patternValue (Box 1))\n" "42\n") Nil)
+separatePrograms : ([] ( (Quint String PreludeMode ([] ((,) String String)) String String) ))
+separatePrograms = S.append legacySeparatePrograms ((:) (Quint "crate local and dictionary fresh names avoid user globals" ImplicitPrelude []
+  "module Main where\ndata Box = Box Int\nseparateLocal0 = 39\nwantedDictionary0 = 2\nclass Add a where { add : a -> Int }\ninstance Add Int where { add x = x + wantedDictionary0 }\napply x = add x + separateLocal0\npatternValue (Box x) = apply x\nmain = printInt (patternValue (Box 1))\n" "42\n") [])
 
-legacySeparatePrograms = (H.append modulePrograms (H.append (Cons (Quint "inferred overloaded export" ImplicitPrelude (Cons (Pair "Render" (S.unlines (Cons "module Render (Render(..), renderTwice) where" (Cons "class Render a where" (Cons "  render : a -> String" (Cons "instance Render Int where" (Cons "  render = showInt" (Cons "renderTwice x = render x ++ render x" Nil)))))))) Nil) "module Main where\nimport Render\nmain = putStrLn (renderTwice 4)\n" "44\n") (Cons (Quint "rank-n constructor field" ImplicitPrelude (Cons (Pair "Poly" "module Poly where\ndata Poly = Poly (forall a. a -> a)\npoly = Poly (\\x -> x)\n") Nil) "module Main where\nimport Poly\nmain = case poly of\n  Poly f -> do\n    let id = (\\x -> x) (f : forall a. a -> a)\n    printInt (id 42)\n    putStrLn (id \"polymorphic\")\n" "42\npolymorphic\n") (Cons (Quint "class-free bounded annotation rules" NoImplicitPrelude (Cons (Pair "Poly" "module Poly where\ndata Poly = Poly (forall a. a -> a)\npoly = Poly (\\x -> x)\n") Nil) "module Main where\nimport Poly\nmain = case poly of\n  Poly f -> let id = f : forall a. a -> a in ioBind (printInt (id 42)) (\\ignored -> putStrLn (id \"polymorphic\"))\n" "42\npolymorphic\n") (Cons (Quint "unexported nominal type in inferred signature" ImplicitPrelude (Cons (Pair "Secret" "module Secret (make, reveal) where\ndata Hidden = Hidden Int\nmake = Hidden\nreveal (Hidden x) = x\n") Nil) "module Main where\nimport Secret\nmain = printInt (reveal (make 42))\n" "42\n") (Cons (Quint "mutually recursive module values" ImplicitPrelude (Cons (Pair "Parity" (S.unlines (Cons "module Parity (even) where" (Cons "even : Int -> Bool" (Cons "even n = if n == 0 then true else odd (n-1)" (Cons "odd : Int -> Bool" (Cons "odd n = if n == 0 then false else even (n-1)" Nil))))))) Nil) "module Main where\nimport Parity\nmain = printInt (if even 42 then 42 else 0)\n" "42\n") (Cons (Quint "Unicode interface identity" ImplicitPrelude (Cons (Pair "Unicode" "module Unicode (λ) where\nλ = 42\n") Nil) "module Main where\nimport Unicode\nmain = printInt λ\n" "42\n") (Cons (Quint "nominal global cannot capture local binder" ImplicitPrelude (Cons (Pair "A" "module A where\nx = 41\n") Nil) "module Main where\nimport A\nf module_65_z_120_ = x + module_65_z_120_\nmain = printInt (f 1)\n" "42\n") Nil))))))) (Cons (Quint "imported entry binding" ImplicitPrelude (Cons (Pair "Entry" "module Entry (main) where\nmain = printInt 42\n") Nil) "module Main where\nimport Entry\n" "42\n") Nil)))
+legacySeparatePrograms = (H.append modulePrograms (H.append ((:) (Quint "inferred overloaded export" ImplicitPrelude ((:) ((,) "Render" (S.unlines ((:) "module Render (Render(..), renderTwice) where" ((:) "class Render a where" ((:) "  render : a -> String" ((:) "instance Render Int where" ((:) "  render = showInt" ((:) "renderTwice x = render x ++ render x" [])))))))) []) "module Main where\nimport Render\nmain = putStrLn (renderTwice 4)\n" "44\n") ((:) (Quint "rank-n constructor field" ImplicitPrelude ((:) ((,) "Poly" "module Poly where\ndata Poly = Poly (forall a. a -> a)\npoly = Poly (\\x -> x)\n") []) "module Main where\nimport Poly\nmain = case poly of\n  Poly f -> do\n    let id = (\\x -> x) (f : forall a. a -> a)\n    printInt (id 42)\n    putStrLn (id \"polymorphic\")\n" "42\npolymorphic\n") ((:) (Quint "class-free bounded annotation rules" NoImplicitPrelude ((:) ((,) "Poly" "module Poly where\ndata Poly = Poly (forall a. a -> a)\npoly = Poly (\\x -> x)\n") []) "module Main where\nimport Poly\nmain = case poly of\n  Poly f -> let id = f : forall a. a -> a in ioBind (printInt (id 42)) (\\ignored -> putStrLn (id \"polymorphic\"))\n" "42\npolymorphic\n") ((:) (Quint "unexported nominal type in inferred signature" ImplicitPrelude ((:) ((,) "Secret" "module Secret (make, reveal) where\ndata Hidden = Hidden Int\nmake = Hidden\nreveal (Hidden x) = x\n") []) "module Main where\nimport Secret\nmain = printInt (reveal (make 42))\n" "42\n") ((:) (Quint "mutually recursive module values" ImplicitPrelude ((:) ((,) "Parity" (S.unlines ((:) "module Parity (even) where" ((:) "even : Int -> Bool" ((:) "even n = if n == 0 then true else odd (n-1)" ((:) "odd : Int -> Bool" ((:) "odd n = if n == 0 then false else even (n-1)" []))))))) []) "module Main where\nimport Parity\nmain = printInt (if even 42 then 42 else 0)\n" "42\n") ((:) (Quint "Unicode interface identity" ImplicitPrelude ((:) ((,) "Unicode" "module Unicode (λ) where\nλ = 42\n") []) "module Main where\nimport Unicode\nmain = printInt λ\n" "42\n") ((:) (Quint "nominal global cannot capture local binder" ImplicitPrelude ((:) ((,) "A" "module A where\nx = 41\n") []) "module Main where\nimport A\nf module_65_z_120_ = x + module_65_z_120_\nmain = printInt (f 1)\n" "42\n") []))))))) ((:) (Quint "imported entry binding" ImplicitPrelude ((:) ((,) "Entry" "module Entry (main) where\nmain = printInt 42\n") []) "module Main where\nimport Entry\n" "42\n") [])))
 
 
 fixtureIdentity = "test:crate"
 
 cratePathSpec source cache prelude = Fragment.pack
-  (Cons "MLF-CRATE-1" (Cons fixtureIdentity (Cons "Main" (Cons "true"
-  (Cons (Fragment.pack (Cons (Fragment.pairEncoding (Pair "Main" source)) Nil))
-  (Cons (Fragment.pack Nil) (Cons cache (Cons prelude Nil))))))))
+  ((:) "MLF-CRATE-1" ((:) fixtureIdentity ((:) "Main" ((:) "true"
+  ((:) (Fragment.pack ((:) (Fragment.pairEncoding ((,) "Main" source)) []))
+  ((:) (Fragment.pack []) ((:) cache ((:) prelude []))))))))
 
 cratePaths = do
   S.mapM_ (\path -> do
     spec <- H.right (Crate.decodeSpec (cratePathSpec path path path))
     H.assert (S.eqList (\a b -> eqString (S.fst a) (S.fst b) && eqString (S.snd a) (S.snd b))
-      (Crate.specSources spec) (Cons (Pair "Main" path) Nil) &&
+      (Crate.specSources spec) ((:) ((,) "Main" path) []) &&
       eqString (Crate.specCache spec) path && eqString (Crate.specPrelude spec) path &&
       eqString (Query.cachePath path) path) "absolute crate paths changed"
-    dependency <- H.right (Artifact.decodeDependency (Artifact.encodeDependency (Triple "dependency" path "semantic")))
+    dependency <- H.right (Artifact.decodeDependency (Artifact.encodeDependency ((,,) "dependency" path "semantic")))
     case dependency of
-      Triple name actual semantic -> H.assert (eqString name "dependency" && eqString actual path && eqString semantic "semantic") "dependency path changed")
-    (Cons "/tmp/λ crate/Main.emlf"
-    (Cons "D:/a/mlf/Main.emlf"
-    (Cons "c:\\a\\λ crate\\Main.emlf"
-    (Cons "//server/share/Main.emlf"
-    (Cons "\\\\server\\share\\Main.emlf" Nil)))))
+      (,,) name actual semantic -> H.assert (eqString name "dependency" && eqString actual path && eqString semantic "semantic") "dependency path changed")
+    ((:) "/tmp/λ crate/Main.emlf"
+    ((:) "D:/a/mlf/Main.emlf"
+    ((:) "c:\\a\\λ crate\\Main.emlf"
+    ((:) "//server/share/Main.emlf"
+    ((:) "\\\\server\\share\\Main.emlf" [])))))
   S.mapM_ (\path -> do
     expect "crate source path must be absolute" (Crate.decodeSpec (cratePathSpec path "/queries" "/prelude"))
     expect "crate query cache path must be absolute" (Crate.decodeSpec (cratePathSpec "/Main.emlf" path "/prelude"))
     expect "shared prelude artifact prefix must be absolute" (Crate.decodeSpec (cratePathSpec "/Main.emlf" "/queries" path))
-    expect "crate dependency metadata path must be absolute" (Artifact.decodeDependency (Artifact.encodeDependency (Triple "dependency" path "semantic"))))
-    (Cons "" (Cons "Main.emlf" (Cons "./Main.emlf" (Cons "../Main.emlf"
-    (Cons "D:Main.emlf" (Cons "D:" (Cons "\\Main.emlf" (Cons "1:/Main.emlf" Nil))))))))
-  S.mapM_ (\(Pair path parent) -> H.assert (eqString (Crate.parentDirectory path) parent) "crate parent directory changed")
-    (Cons (Pair "/unit" "/") (Cons (Pair "D:/unit" "D:/")
-    (Cons (Pair "D:\\unit" "D:\\") (Cons (Pair "D:\\cache\\unit" "D:\\cache") Nil))))
+    expect "crate dependency metadata path must be absolute" (Artifact.decodeDependency (Artifact.encodeDependency ((,,) "dependency" path "semantic"))))
+    ((:) "" ((:) "Main.emlf" ((:) "./Main.emlf" ((:) "../Main.emlf"
+    ((:) "D:Main.emlf" ((:) "D:" ((:) "\\Main.emlf" ((:) "1:/Main.emlf" []))))))))
+  S.mapM_ (\((,) path parent) -> H.assert (eqString (Crate.parentDirectory path) parent) "crate parent directory changed")
+    ((:) ((,) "/unit" "/") ((:) ((,) "D:/unit" "D:/")
+    ((:) ((,) "D:\\unit" "D:\\") ((:) ((,) "D:\\cache\\unit" "D:\\cache") []))))
   let host = "C:/native tools/mlf-host.exe"
   let source = "D:/cache/λ ;$(literal).new"
   let destination = "D:/cache/λ ;$(literal)"
-  let move = Cons "/bin/mv" (Cons "-f" (Cons source (Cons destination Nil)))
-  let moved = Cons host (Cons "move" (Cons "-f" (Cons source (Cons destination Nil))))
+  let move = (:) "/bin/mv" ((:) "-f" ((:) source ((:) destination [])))
+  let moved = (:) host ((:) "move" ((:) "-f" ((:) source ((:) destination []))))
   H.assert (S.eqList eqString (Host.argumentsFor true host move) moved) "Windows cache publication argv changed"
-  let mkdir = Cons "/bin/mkdir" (Cons "-p" (Cons destination Nil))
-  let made = Cons host (Cons "mkdir" (Cons "-p" (Cons destination Nil)))
+  let mkdir = (:) "/bin/mkdir" ((:) "-p" ((:) destination []))
+  let made = (:) host ((:) "mkdir" ((:) "-p" ((:) destination [])))
   H.assert (S.eqList eqString (Host.argumentsFor true host mkdir) made) "Windows cache directory argv changed"
   H.assert (S.eqList eqString (Host.argumentsFor false host move) move) "POSIX cache command changed"
-  let compiler = Cons "D:/compiler/emlf.exe" (Cons "--compile-crate" (Cons source Nil))
+  let compiler = (:) "D:/compiler/emlf.exe" ((:) "--compile-crate" ((:) source []))
   H.assert (S.eqList eqString (Host.argumentsFor true host compiler) compiler) "unrelated Windows executable was translated"
 
 readCrateObjects metadata = do
-  loaded <- Artifact.loadInterfaces (Cons metadata Nil)
+  loaded <- Artifact.loadInterfaces ((:) metadata [])
   case loaded of
     Left message -> return (Left message)
     Right interfaces -> do
-      objects <- S.mapM (\(Pair path iface) -> Artifact.readObject (Artifact.objectPath path) iface) interfaces
+      objects <- S.mapM (\((,) path iface) -> Artifact.readObject (Artifact.objectPath path) iface) interfaces
       return (S.sequenceEither objects)
 
 -- Every fixture is one compilation unit. Imports only establish source scopes;
 -- recursive declarations are inferred by the crate's declaration query graph.
-compileSeparateProgram : PreludeMode -> List (Pair String String) -> String -> IO (Either String (List Artifact.CrateObject))
+compileSeparateProgram : PreludeMode -> [] ((,) String String) -> String -> IO (Either String ([] Artifact.CrateObject))
 compileSeparateProgram mode libraries source = withScratch (\directory -> do
-  let inputs = Map.fromList compareString (S.map (\(Pair name text) -> Pair name (Pair (directory ++ "/" ++ name ++ ".emlf") text)) libraries)
+  let inputs = Map.fromList compareString (S.map (\((,) name text) -> (,) name ((,) (directory ++ "/" ++ name ++ ".emlf") text)) libraries)
   let parsed = do
         root <- parseModule (directory ++ "/Main.emlf") source
         modules <- loadModuleMap inputs root
@@ -100,9 +100,9 @@ compileSeparateProgram mode libraries source = withScratch (\directory -> do
       work <- getEnv "MLF_TEST_WORK"
       let builtin = work ++ "/crate-test-builtin/unit"
       O.mkdir (O.parent builtin)
-      let spec = Crate.CrateSpec fixtureIdentity "Main" mode (S.map (\m -> Pair (moduleIdentity m) (sourcePath m)) modules) Nil (directory ++ "/queries") builtin
+      let spec = Crate.CrateSpec fixtureIdentity "Main" mode (S.map (\m -> (,) (moduleIdentity m) (sourcePath m)) modules) [] (directory ++ "/queries") builtin
       let prefix = directory ++ "/crate"
-      result <- Crate.compileSources spec modules Nil prefix
+      result <- Crate.compileSources spec modules [] prefix
       case result of {Left message -> return (Left message); Right _ -> readCrateObjects (prefix ++ ".mlfci")})
 
 expect reason result = case result of
@@ -113,90 +113,90 @@ fixtureObject objects = case S.find (\object -> H.eq (Artifact.crateId (Artifact
   Nothing -> H.fail "missing fixture crate object"
   Just object -> return object
 replaceFixture object objects = S.map (\old -> if H.eq (Artifact.crateId (Artifact.objectInterface old)) fixtureIdentity then object else old) objects
-setCrateBindings (Artifact.CrateInterface a b c d e f g h i _ k l) bindings = Artifact.CrateInterface a b c d e f g h i bindings k l
-setCrateLayouts (Artifact.CrateInterface a b c d e f g h _ j k l) layouts = Artifact.CrateInterface a b c d e f g h layouts j k l
+setCrateBindings (Artifact.CrateInterface a b c d e f g h i _ k l protection) bindings = Artifact.CrateInterface a b c d e f g h i bindings k l protection
+setCrateLayouts (Artifact.CrateInterface a b c d e f g h _ j k l protection) layouts = Artifact.CrateInterface a b c d e f g h layouts j k l protection
 replaceFragmentTerm object term = case Fragment.objectInterface object of
   Fragment.UnitInterface a b c d e f g _ -> Fragment.UnitObject (Fragment.UnitInterface a b c d e f g (Fragment.fingerprint (Pretty.prettyTerm term))) term
 
 -- A closed object can contain an unused import parameter. Its scheme still
 -- must agree with the preceding definition; closed-term checking alone cannot
 -- catch the forged boundary below.
-forgeUnusedParameter : List Fragment.UnitObject -> List (Pair String XType) -> Either String (List Fragment.UnitObject)
+forgeUnusedParameter : [] Fragment.UnitObject -> [] ((,) String XType) -> Either String ([] Fragment.UnitObject)
 forgeUnusedParameter fragments earlier = case fragments of
-  Nil -> Left "fixture has no independently unused import parameter opportunity"
-  Cons fragment rest ->
+  [] -> Left "fixture has no independently unused import parameter opportunity"
+  (:) fragment rest ->
     let original = Fragment.objectTerm fragment in
     let body = case original of {XWithData _ term -> term; term -> term} in
     let parameterNames = S.map (\p -> X.nameHint (S.fst p)) (S.fst (Fragment.splitParameters body)) in
-    case S.find (\(Pair n ty) -> S.not (S.elem eqString n parameterNames) && T.alphaEq ty (XCon "Int" Nil)) earlier of
-      Nothing -> S.mapEither (Cons fragment) (forgeUnusedParameter rest (S.append earlier (Fragment.unitBindings (Fragment.objectInterface fragment))))
-      Just (Pair symbol _) ->
+    case S.find (\((,) n ty) -> S.not (S.elem eqString n parameterNames) && T.alphaEq ty (XCon "Int" [])) earlier of
+      Nothing -> S.mapEither ((:) fragment) (forgeUnusedParameter rest (S.append earlier (Fragment.unitBindings (Fragment.objectInterface fragment))))
+      Just ((,) symbol _) ->
         let serial = 1 + S.foldl S.max 0 (Set.toList (Fragment.termIdentities original Set.empty)) in
         let name = XName serial symbol in
-        let forged = case original of {XWithData ds term -> XWithData ds (XAbs name (XCon "Bool" Nil) term); term -> XAbs name (XCon "Bool" Nil) term} in
-        Right (Cons (replaceFragmentTerm fragment forged) rest)
+        let forged = case original of {XWithData ds term -> XWithData ds (XAbs name (XCon "Bool" []) term); term -> XAbs name (XCon "Bool" []) term} in
+        Right ((:) (replaceFragmentTerm fragment forged) rest)
 
 -- Compile and link the original divergent source, but never run the target.
-checkSeparateTyping : ModuleTyping -> Pair String (IO Unit)
-checkSeparateTyping (ModuleTyping name libraries source expected) = Pair ("crate typing: " ++ name) do
+checkSeparateTyping : ModuleTyping -> (,) String (IO ())
+checkSeparateTyping (ModuleTyping name libraries source expected) = (,) ("crate typing: " ++ name) do
   result <- compileSeparateProgram ImplicitPrelude libraries source
   objects <- H.right result
   term <- H.right (Artifact.linkObjects objects fixtureIdentity)
   checkTypedModuleTarget expected term
 
-separateTests : List (Pair String (IO Unit))
+separateTests : [] ((,) String (IO ()))
 separateTests = S.append
-  (S.map (\(Quint name mode libraries source _) -> Pair ("crate checking: " ++ name) do
+  (S.map (\(Quint name mode libraries source _) -> (,) ("crate checking: " ++ name) do
     result <- compileSeparateProgram mode libraries source
     objects <- H.right result
     term <- H.right (Artifact.linkObjects objects fixtureIdentity)
     ty <- H.right (Check.checkClosed term)
-    H.assert (T.alphaEq ty (XCon "IO" (Cons (XCon "Unit" Nil) Nil))) "crate entry retained unresolved arguments") separatePrograms)
+    H.assert (T.alphaEq ty (XCon "IO" ((:) (XCon "()" []) []))) "crate entry retained unresolved arguments") separatePrograms)
   (S.append
     (S.append
-      (S.map (\(ModuleRejection name libraries source _ _) -> Pair ("crate rejects: " ++ name) do
+      (S.map (\(ModuleRejection name libraries source _ _) -> (,) ("crate rejects: " ++ name) do
         result <- compileSeparateProgram ImplicitPrelude libraries source
-        case result of {Left _ -> return Unit; Right _ -> H.fail ("accepted invalid crate: " ++ name)}) moduleRejections)
+        case result of {Left _ -> return (); Right _ -> H.fail ("accepted invalid crate: " ++ name)}) moduleRejections)
       (S.map checkSeparateTyping moduleTypings))
-    (Cons (Pair "crate paths and native cache commands" cratePaths)
-    (Cons (Pair "crate metadata version rejection" (expect "MLFCI-1" (Artifact.decodeInterface "7:MLFCI-9")))
-    (Cons (Pair "crate object binding schemes are independently checked" do
+    ((:) ((,) "crate paths and native cache commands" cratePaths)
+    ((:) ((,) "crate metadata version rejection" (expect "MLFCI-5" (Artifact.decodeInterface "7:MLFCI-9")))
+    ((:) ((,) "crate object binding schemes are independently checked" do
       checkedReceipts
-      result <- compileSeparateProgram NoImplicitPrelude Nil "module Main where\nmain = printInt 42\n"
+      result <- compileSeparateProgram NoImplicitPrelude [] "module Main where\nmain = printInt 42\n"
       objects <- H.right result
       object <- fixtureObject objects
       let iface = Artifact.objectInterface object
       let fragments = Artifact.objectFragments object
-      let forged = Artifact.CrateObject (setCrateBindings iface (S.map (\(Pair n _) -> Pair n (XCon "Bool" Nil)) (Artifact.crateBindings iface))) fragments
+      let forged = Artifact.CrateObject (setCrateBindings iface (S.map (\((,) n _) -> (,) n (XCon "Bool" [])) (Artifact.crateBindings iface))) fragments
       expect "binding scheme mismatch" (Artifact.linkObjects (replaceFixture forged objects) fixtureIdentity))
-    (Cons (Pair "crate datatype metadata is independently reconstructed" do
-      result <- compileSeparateProgram NoImplicitPrelude Nil "module Main where\ndata Hidden = Hidden Int\nmain = printInt 42\n"
+    ((:) ((,) "crate datatype metadata is independently reconstructed" do
+      result <- compileSeparateProgram NoImplicitPrelude [] "module Main where\ndata Hidden = Hidden Int\nmain = printInt 42\n"
       objects <- H.right result
       object <- fixtureObject objects
       let iface = Artifact.objectInterface object
       let fragments = Artifact.objectFragments object
-      S.mapM_ (\fragment -> do {_ <- H.right (Check.checkClosed (Fragment.objectTerm fragment)); return Unit}) fragments
-      let forged = Artifact.CrateObject (setCrateLayouts iface Nil) fragments
+      S.mapM_ (\fragment -> do {_ <- H.right (Check.checkClosed (Fragment.objectTerm fragment)); return ()}) fragments
+      let forged = Artifact.CrateObject (setCrateLayouts iface []) fragments
       expect "datatype metadata mismatch" (Artifact.linkObjects (replaceFixture forged objects) fixtureIdentity))
-    (Cons (Pair "crate unused import parameters retain checked schemes" do
-      result <- compileSeparateProgram NoImplicitPrelude Nil "module Main where\na = 41\nb = 42\nmain = printInt b\n"
+    ((:) ((,) "crate unused import parameters retain checked schemes" do
+      result <- compileSeparateProgram NoImplicitPrelude [] "module Main where\na = 41\nb = 42\nmain = printInt b\n"
       objects <- H.right result
       object <- fixtureObject objects
       let iface = Artifact.objectInterface object
       let fragments = Artifact.objectFragments object
-      forgedFragments <- H.right (forgeUnusedParameter fragments Nil)
-      S.mapM_ (\fragment -> do {_ <- H.right (Check.checkClosed (Fragment.objectTerm fragment)); return Unit}) forgedFragments
+      forgedFragments <- H.right (forgeUnusedParameter fragments [])
+      S.mapM_ (\fragment -> do {_ <- H.right (Check.checkClosed (Fragment.objectTerm fragment)); return ()}) forgedFragments
       let forged = Artifact.makeObject iface forgedFragments
-      expect "crate import scheme mismatch" (Artifact.linkObjects (replaceFixture forged objects) fixtureIdentity)) Nil))))))
+      expect "crate import scheme mismatch" (Artifact.linkObjects (replaceFixture forged objects) fixtureIdentity)) []))))))
 
 
 -- Receipt reuse retains exact transport bytes, and raw callers still cross the
 -- independent checker. Test the growing environment invariant separately.
-checkedReceipts : IO Unit
+checkedReceipts : IO ()
 checkedReceipts = do
   let name = XName 1 "value"
-  let term = XLet name (XIntTerm 42) (XConstructor "Unit" Nil)
-  let header = Fragment.UnitInterface "Receipt" Nil Nil Nil Nil Nil Nil ""
+  let term = XLet name (XIntTerm 42) (XConstructor "()" [])
+  let header = Fragment.UnitInterface "Receipt" [] [] [] [] [] [] ""
   proof <- H.right (Checked.check term)
   let raw = Fragment.UnitObject header term
   let checked = Fragment.CheckedUnitObject header proof
@@ -206,21 +206,21 @@ checkedReceipts = do
   H.assert (S.isLeft (Fragment.objectChecked forged)) "body replacement reused the preceding checked proof"
   H.assert (eqString (Fragment.encodeObject raw) (Fragment.encodeObject checked)) "checked receipt changed transport bytes"
   reused <- H.right (Fragment.objectChecked checked)
-  H.assert (T.alphaEq (Checked.typeOf reused) (XCon "Unit" Nil)) "checked receipt lost its inferred type"
+  H.assert (T.alphaEq (Checked.typeOf reused) (XCon "()" [])) "checked receipt lost its inferred type"
   H.assert (S.isLeft (Fragment.objectChecked (Fragment.UnitObject header (XApp (XIntTerm 1) (XIntTerm 2))))) "raw object skipped independent checking"
   bindings <- H.right (Fragment.collectBindings Data.emptyDataEnv (XEnv Map.empty Map.empty) term)
-  H.assert (S.eqList (\a b -> X.compareName (S.fst a) (S.fst b) == 0 && T.alphaEq (S.snd a) (S.snd b)) bindings (Cons (Pair name (XCon "Int" Nil)) Nil)) "checked environment lost inferred bindings"
+  H.assert (S.eqList (\a b -> X.compareName (S.fst a) (S.fst b) == 0 && T.alphaEq (S.snd a) (S.snd b)) bindings ((:) ((,) name (XCon "Int" [])) [])) "checked environment lost inferred bindings"
   H.assert (S.isLeft (Fragment.collectBindings Data.emptyDataEnv (XEnv Map.empty (Map.singleton name (XVar (XTyVar 999)))) term)) "binding extraction accepted an open initial environment"
   -- Unknown nominal constants can have kind * in the target calculus. Use a
   -- known unsaturated constructor to test recursive signature kind checking.
-  let invalidSignature = XCon "IO" Nil
+  let invalidSignature = XCon "IO" []
   H.assert (S.isLeft (Check.termType Data.emptyDataEnv Map.empty invalidSignature)) "recursive signature fixture unexpectedly has kind *"
-  H.assert (S.isLeft (Fragment.collectBindings Data.emptyDataEnv (XEnv Map.empty Map.empty) (XLetRec (Cons (Triple name invalidSignature (XIntTerm 42)) Nil) (XConstructor "Unit" Nil)))) "binding extraction accepted an ill-kinded recursive signature"
+  H.assert (S.isLeft (Fragment.collectBindings Data.emptyDataEnv (XEnv Map.empty Map.empty) (XLetRec ((:) ((,,) name invalidSignature (XIntTerm 42)) []) (XConstructor "()" [])))) "binding extraction accepted an ill-kinded recursive signature"
   S.mapM_ (\text -> S.mapM_ (\split -> do
     let prefix = stringSlice text 0 split
     let suffix = stringSlice text split (stringLength text - split)
-    let state = Fragment.fingerprintAppend (Pair 0 1) (Fragment.fingerprintPart prefix)
+    let state = Fragment.fingerprintAppend ((,) 0 1) (Fragment.fingerprintPart prefix)
     H.assert (eqString (Fragment.fingerprint text) (Fragment.fingerprintAfter state suffix)) "prefix checksum composition differs"
     let joined = Fragment.fingerprintAppend state (Fragment.fingerprintPart suffix)
     H.assert (eqString (Fragment.fingerprint text) (Fragment.fingerprintAfter joined "")) "scalar checksum composition differs") (S.range 0 (stringLength text)))
-    (Cons "" (Cons "abc\n" (Cons "λ😀汉字\n" (Cons (S.concatStrings (S.map (\n -> showInt n ++ "λ") (S.range 0 99))) Nil))))
+    ((:) "" ((:) "abc\n" ((:) "λ😀汉字\n" ((:) (S.concatStrings (S.map (\n -> showInt n ++ "λ") (S.range 0 99))) []))))

@@ -18,7 +18,7 @@ observation phase reason verified result = E.Observation phase (case result of
  P.Cancelled code _ -> E.Interrupted
  P.TimedOut _ -> E.Deadline) reason verified
 validate expected phase reason verified (Completed result cleanupResult) =
- Pair (E.match expected (observation phase reason verified result)) cleanupResult
+ (,) (E.match expected (observation phase reason verified result)) cleanupResult
 -- Require both running and total bounds. The native total bound includes
 -- admission wait; awaitProcess services the supervisor until terminal cleanup.
 bounded (P.ProcessSpec _ _ _ _ _ _ _ running total) = running > 0 && total > 0

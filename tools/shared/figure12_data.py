@@ -21,11 +21,11 @@ ROOT = Path(__file__).resolve().parents[2]
 # regenerate these digests automatically to make a test pass. Fixture values
 # below are still decoded from the maintained files, not duplicated here.
 REVIEWED_SEMANTIC_SHA256 = {
-    'tests/Tests/Figure12.emlf': '91894a6c774ae125dbd7763977432821f688f227a0db2213fa62158ca28576d6',
-    'tests/Tests/Figure12Suite.emlf': '8f91eaecf14a0e72bdf9eee9b6915cc93c54abc03264f7712f3d9efaa1147bdc',
-    'tests/Tests/Helpers.emlf': 'b76ea12253a18916a3c76105f8d89ec7acdcadd50bd1bc3a91faf98ada94455a',
-    'tests/Tests/Map.emlf': 'e25205f125fdc00a8e8c09f255779f3b293b50116f8eeb5b7d715a89417e0026',
-    'tests/Tests/Set.emlf': '156c8cd12a13cad2d164821b63246e4f3ded13979243fd2efcc40f32ff6e9cfa',
+    'tests/Tests/Figure12.emlf': '08b77da6c872229a3234c164bc105d5cde9a16a7b2279a238e44b012f585d175',
+    'tests/Tests/Figure12Suite.emlf': '7c446bf415dcd96f21c01d6fba1a8bca537932293c63a808739818d4422436fd',
+    'tests/Tests/Helpers.emlf': 'e915d86eb800e8ec736a961ccc870d530facc64e37814acd64b1a1f832deb590',
+    'tests/Tests/Map.emlf': '104b5066749811d3c9cc106fc40e83cd406c838fbc211e42da62237f626a8d25',
+    'tests/Tests/Set.emlf': '07a3b77d3ade77e08aa7cd72e03e5a7023c3d7b3c976bbf652e35745a6989920',
 }
 
 
@@ -33,7 +33,7 @@ class FixtureError(ValueError):
     pass
 
 
-TOKEN = re.compile(r'\s+|--[^\n]*|"(?:[^"\\]|\\["\\nrt])*"|[A-Za-z_][A-Za-z_0-9\']*|[0-9]+|[(){}=;]')
+TOKEN = re.compile(r'\s+|--[^\n]*|"(?:[^"\\]|\\["\\nrt])*"|[A-Za-z_][A-Za-z_0-9\']*|[0-9]+|\[\]|\(:\)|\(,\)|[(){}=;]')
 
 
 def tokens(source):
@@ -88,7 +88,7 @@ class Parser:
                 item = ('literal', json.loads(token))
             elif token.isdigit():
                 item = ('literal', int(token))
-            elif re.fullmatch(r'[A-Za-z_][A-Za-z_0-9\']*', token):
+            elif token in ('[]', '(:)', '(,)') or re.fullmatch(r'[A-Za-z_][A-Za-z_0-9\']*', token):
                 item = ('name', token)
             else:
                 raise FixtureError(f'unsupported atom {token!r}')
@@ -126,9 +126,9 @@ def pairs(value):
 
 
 def environment():
-    env = {'true': True, 'false': False, 'Nil': [],
-           'Pair': curry(2, lambda a, b: [a, b]),
-           'Cons': curry(2, lambda a, b: [a] + b if isinstance(b, list) else fail('invalid Cons tail')),
+    env = {'true': True, 'false': False, '[]': [],
+           '(,)': curry(2, lambda a, b: [a, b]),
+           '(:)': curry(2, lambda a, b: [a] + b if isinstance(b, list) else fail('invalid canonical cons tail')),
            'Case': curry(5, case), 'XBot': ['XBot'],
            'typed': curry(2, lambda source, expected: {'source': source, 'expected': expected})}
     for name, key in [('caseId', 'id'), ('expression', 'expression'), ('paperAcceptance', 'paper_acceptance'), ('expectedAcceptance', 'expected_acceptance'), ('localSignatures', 'local_signatures')]:
@@ -219,7 +219,7 @@ def decode(root=ROOT):
     # Projections are the only fixture functions provided by the decoder.
     # Verify their maintained definitions before assigning those meanings.
     projections = [
-        'data Case = Case String String Bool Bool (List (Pair String String))',
+        'data Case = Case String String Bool Bool ([] ((,) String String))',
         'caseId (Case a _ _ _ _) = a',
         'expression (Case _ a _ _ _) = a',
         'paperAcceptance (Case _ _ a _ _) = a',
@@ -256,7 +256,7 @@ def decode(root=ROOT):
     if not match:
         raise FixtureError('unsupported repair selector')
     first, first_source, second, second_source, fallback = map(json.loads, match.groups())
-    labels = re.findall(r'^  runTest \(Pair \(label \+\+ " explicit annotation control"\) \(testCase repaired\)\)\) \(O.words ' + string + r'\)$', suite, re.M)
+    labels = re.findall(r'^  runTest \(\(,\) \(label \+\+ " explicit annotation control"\) \(testCase repaired\)\)\) \(O.words ' + string + r'\)$', suite, re.M)
     if len(labels) != 1:
         raise FixtureError('unsupported repair labels')
     repair_labels = json.loads(labels[0]).split()

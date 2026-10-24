@@ -23,7 +23,7 @@ module Bootstrap.InferenceUnit where {
   -- built. Its generated selectors/dictionaries become ordinary signed graph
   -- vertices. Inference queries consume this lowered representation directly.
   data LoweredDeclarations =
-    LoweredDeclarations (List DataDecl) (List (Triple String (Maybe SAnnotation) SExpr)) (Map String
+    LoweredDeclarations ([] DataDecl) ([] ((,,) String (Maybe SAnnotation) SExpr)) (Map String
                                                                                           String);
   loweredData (LoweredDeclarations ds _ _) = ds;
   loweredValues (LoweredDeclarations _ values _) = values;
@@ -35,11 +35,11 @@ module Bootstrap.InferenceUnit where {
       CheckRecursive annotation -> Just annotation
     };
   extractLoweredDeclarations :: SExpr ->
-                                Either String (List (Triple String (Maybe SAnnotation) SExpr));
-  extractLoweredDeclarations expression = extractDeclarations expression Nil;
+                                Either String ([] ((,,) String (Maybe SAnnotation) SExpr));
+  extractLoweredDeclarations expression = extractDeclarations expression [];
   extractDeclarations :: SExpr ->
-                         List (Triple String (Maybe SAnnotation) SExpr) ->
-                         Either String (List (Triple String (Maybe SAnnotation) SExpr));
+                         [] ((,,) String (Maybe SAnnotation) SExpr) ->
+                         Either String ([] ((,,) String (Maybe SAnnotation) SExpr));
   extractDeclarations expression reversed =
     let {
       matchValueShared1 = expression
@@ -60,11 +60,11 @@ module Bootstrap.InferenceUnit where {
           -- declaration provenance may restore a declaration signature here.
           declaration =
             case rhs of {
-              SSignature value annotation -> Triple n (Just annotation) value;
-              _ -> Triple n Nothing rhs
+              SSignature value annotation -> (,,) n (Just annotation) value;
+              _ -> (,,) n Nothing rhs
             }
         } in
-        extractDeclarations body (Cons declaration reversed);
+        extractDeclarations body ((:) declaration reversed);
       SLetRec matchValueShared5 matchValueShared6 ->
         let {
           definitions = matchValueShared5
@@ -73,31 +73,31 @@ module Bootstrap.InferenceUnit where {
           body = matchValueShared6
         } in
         extractDeclarations body
-          (foldlStrict (\acc (Triple n mode rhs) -> Cons (Triple n (recursiveAnnotation mode) rhs) acc) reversed
+          (foldlStrict (\acc ((,,) n mode rhs) -> (:) ((,,) n (recursiveAnnotation mode) rhs) acc) reversed
              definitions);
       SConstructor matchValueShared7 ->
-        if MLF.Primitive.eqString matchValueShared7 "Unit"
+        if MLF.Primitive.eqString matchValueShared7 "()"
         then Right (reverse reversed)
-        else Left "lowered crate declarations must end in Unit";
-      _ -> Left "lowered crate declarations must end in Unit"
+        else Left "lowered crate declarations must end in ()";
+      _ -> Left "lowered crate declarations must end in ()"
     };
-  lowerDeclarations :: List DataDecl ->
-                       List SClassDecl ->
-                       List (Pair String SInstanceDecl) ->
+  lowerDeclarations :: [] DataDecl ->
+                       [] SClassDecl ->
+                       [] ((,) String SInstanceDecl) ->
                        Map String IntSet ->
-                       List IntSet ->
-                       List (Triple String (Maybe SAnnotation) SExpr) ->
+                       [] IntSet ->
+                       [] ((,,) String (Maybe SAnnotation) SExpr) ->
                        Either String LoweredDeclarations;
   lowerDeclarations datatypes classes instances valueScopes instanceScopes members =
     lowerDeclarationsWithImports M.empty datatypes classes instances valueScopes instanceScopes
       members;
   lowerDeclarationsWithImports :: Map String SType ->
-                                  List DataDecl ->
-                                  List SClassDecl ->
-                                  List (Pair String SInstanceDecl) ->
+                                  [] DataDecl ->
+                                  [] SClassDecl ->
+                                  [] ((,) String SInstanceDecl) ->
                                   Map String IntSet ->
-                                  List IntSet ->
-                                  List (Triple String (Maybe SAnnotation) SExpr) ->
+                                  [] IntSet ->
+                                  [] ((,,) String (Maybe SAnnotation) SExpr) ->
                                   Either String LoweredDeclarations;
   -- Helper closures retain the existing dictionary translation of unsigned
   -- and qualified helpers used inside instance methods. Their local lets keep
@@ -105,15 +105,15 @@ module Bootstrap.InferenceUnit where {
   lowerDeclarationsWithImports externals datatypes classes instances valueScopes instanceScopes members =
     do {
       closedInstances <-
-        traverseEither (\(Pair n inst) -> mapEither (Pair n) (Separate.closeInstance members inst))
+        traverseEither (\((,) n inst) -> mapEither ((,) n) (Separate.closeInstance members inst))
           instances;
-      body <- Surface.bindValues members (SConstructor "Unit");
+      body <- Surface.bindValues members (SConstructor "()");
       boundValueShared8 <-
         Classes.lowerSeparateClassesWithScopes externals (map fst closedInstances) valueScopes
           instanceScopes
           (SClassProgram datatypes classes (map snd closedInstances) body);
       case boundValueShared8 of {
-        Pair program names ->
+        (,) program names ->
           do {
             case program of {
               SProgram ds expression ->
@@ -121,7 +121,7 @@ module Bootstrap.InferenceUnit where {
                   declarations <- extractLoweredDeclarations expression;
                   Right
                     (LoweredDeclarations ds
-                       (filter (\(Triple n _ _) -> not (M.member compareString n externals))
+                       (filter (\((,,) n _ _) -> not (M.member compareString n externals))
                           declarations)
                        names)
                 };
@@ -133,8 +133,8 @@ module Bootstrap.InferenceUnit where {
   -- Dependency closure for crate queries is indexed and works equally for
   -- source values and generated dictionary declarations. Unknown names are
   -- external semantic inputs, not vertices owned by this crate.
-  declarationClosure :: List (Triple String (Maybe SAnnotation) SExpr) ->
-                        List String -> List (Triple String (Maybe SAnnotation) SExpr);
+  declarationClosure :: [] ((,,) String (Maybe SAnnotation) SExpr) ->
+                        [] String -> [] ((,,) String (Maybe SAnnotation) SExpr);
   declarationClosure declarations roots =
     let {
       values =
@@ -142,7 +142,7 @@ module Bootstrap.InferenceUnit where {
           (map
              (\v ->
                 case v of {
-                  Triple n _ _ -> Pair n v
+                  (,,) n _ _ -> (,) n v
                 })
              declarations)
     } in
@@ -153,20 +153,20 @@ module Bootstrap.InferenceUnit where {
       wanted = closeDependencies edges S.empty roots
     } in
     map snd (filter (\entry -> S.member compareString (fst entry) wanted) (M.toList values));
-  closeDependencies :: Map String (List String) -> Set String -> List String -> Set String;
+  closeDependencies :: Map String ([] String) -> Set String -> [] String -> Set String;
   closeDependencies edges seen pending =
     case pending of {
-      Nil -> seen;
-      Cons n rest ->
+      [] -> seen;
+      (:) n rest ->
         if S.member compareString n seen
         then closeDependencies edges seen rest
         else closeDependencies edges (S.insert compareString n seen)
-               (append (M.findWithDefault compareString Nil n edges) rest)
+               (append (M.findWithDefault compareString [] n edges) rest)
     };
-  mergeExternal :: Map String XType -> Pair String XType -> Either String (Map String XType);
+  mergeExternal :: Map String XType -> (,) String XType -> Either String (Map String XType);
   mergeExternal types entry =
     case entry of {
-      Pair n ty ->
+      (,) n ty ->
         do {
           ensure (S.null (T.freeVars ty)) ("inference dependency has an open type: " ++ n);
           case M.lookup compareString n types of {
@@ -183,9 +183,9 @@ module Bootstrap.InferenceUnit where {
   -- persistent query keys; this function always performs the complete checked
   -- inference, elaboration, type-agreement and erasure-agreement pipeline.
   compileLoweredGroup :: String ->
-                         List Separate.UnitInterface ->
-                         List DataDecl ->
-                         List (Triple String (Maybe SAnnotation) SExpr) ->
+                         [] Separate.UnitInterface ->
+                         [] DataDecl ->
+                         [] ((,,) String (Maybe SAnnotation) SExpr) ->
                          Either String Separate.UnitObject;
   -- SCC fragments are parameters, not independently imported modules. The
   -- crate artifact validates the selected schemes and owns the crate DAG;
@@ -195,21 +195,23 @@ module Bootstrap.InferenceUnit where {
       ensure (not (null members)) "cannot infer an empty declaration group";
       externalTypes <- foldM mergeExternal M.empty (concatMap Separate.unitBindings dependencies);
       traverseEither
-        (\(Triple n _ _) ->
+        (\((,,) n _ _) ->
            ensure (not (M.member compareString n externalTypes))
              ("inference group also imports its own binding: " ++ n))
         members;
-      body <- Surface.bindValues members (SConstructor "Unit");
+      body <- Surface.bindValues members (SConstructor "()");
       let {
-        externals = M.map (Separate.sourceScheme M.empty) externalTypes
+        -- Members already contain explicit evidence applications. Recovering
+        -- source qualifications here would insert the managed argument twice.
+        externals = M.map (Separate.sourceSchemeIn M.empty False) externalTypes
       };
-      lowered <- Classes.lowerSeparateClasses externals Nil (SProgram datatypes body);
+      lowered <- Classes.lowerSeparateClasses externals [] (SProgram datatypes body);
       compiled <- mapLeft Compiler.prettyError (Compiler.finishCompilation lowered);
       let {
         coreAndData =
           case Compiler.compiledTerm compiled of {
-            XWithData ds term -> Pair ds term;
-            term -> Pair Nil term
+            XWithData ds term -> (,) ds term;
+            term -> (,) [] term
           }
       };
       let {
@@ -220,16 +222,16 @@ module Bootstrap.InferenceUnit where {
       };
       boundValueShared9 <-
         if M.null externalTypes
-        then Right (Pair Nil core)
+        then Right ((,) [] core)
         else case core of {
                XLetRec bindings rest ->
                  do {
                    ensure
-                     (eqList eqString (map (\(Triple n _ _) -> X.nameHint n) bindings)
+                     (eqList eqString (map (\((,,) n _ _) -> X.nameHint n) bindings)
                         (M.keys externalTypes))
                      "inference parameter order mismatch";
                    traverseEither
-                     (\(Triple n ty _) ->
+                     (\((,,) n ty _) ->
                         ensure
                           (case M.lookup compareString (X.nameHint n) externalTypes of {
                              Nothing -> False;
@@ -237,32 +239,32 @@ module Bootstrap.InferenceUnit where {
                            })
                           ("dependency scheme changed during inference: " ++ X.nameHint n))
                      bindings;
-                   Right (Pair (map (\(Triple n ty _) -> Pair n ty) bindings) rest)
+                   Right ((,) (map (\((,,) n ty _) -> (,) n ty) bindings) rest)
                  };
                _ -> Left "inference did not retain external parameters"
              };
       case boundValueShared9 of {
-        Pair parameters implementation ->
+        (,) parameters implementation ->
           do {
             dataEnv <- D.validateDeclarations declarations;
             bindings <-
               Separate.collectBindings dataEnv (XEnv M.empty (M.fromList X.compareName parameters))
                 implementation;
             ensure
-              (eqList eqString (sortBy compareString (map (\(Pair n _) -> X.nameHint n) bindings))
-                 (sortBy compareString (map (\(Triple n _ _) -> n) members)))
+              (eqList eqString (sortBy compareString (map (\((,) n _) -> X.nameHint n) bindings))
+                 (sortBy compareString (map (\((,,) n _ _) -> n) members)))
               "inference fragment changed declaration ownership";
             let {
               payload =
                 XWithData declarations
-                  (foldr (\(Pair n ty) term -> XAbs n ty term) implementation parameters)
+                  (foldr (\((,) n ty) term -> XAbs n ty term) implementation parameters)
             };
             checked <- Checked.check payload;
             let {
               iface =
-                Separate.UnitInterface name Nil Nil declarations Nil Nil
+                Separate.UnitInterface name [] [] declarations [] []
                   (Separate.sortBindings
-                     (map (\(Pair n ty) -> Pair (X.nameHint n) (Separate.normalType ty)) bindings))
+                     (map (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty)) bindings))
                   (Separate.fingerprint (Pretty.prettyTerm payload))
             };
             Right (Separate.CheckedUnitObject iface checked)

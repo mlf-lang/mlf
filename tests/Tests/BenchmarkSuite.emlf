@@ -10,41 +10,41 @@ import qualified Tests.Basic as H
 import qualified Tests.Bytes as Bytes
 import qualified Tests.NativeABI as ABI
 import qualified Tests.RegexRedux as RegexRedux
-check : String -> IO Unit -> IO Unit
+check : String -> IO () -> IO ()
 check label action = do { action; Coverage.passed "harness" label; putStrLn ("PASS " ++ label) }
-rejectOutput : String -> Int -> String -> IO Unit
+rejectOutput : String -> Int -> String -> IO ()
 rejectOutput name size wrong = H.assert (S.not (B.validateOutput name size (B.textBytes wrong))) ("bad benchmark output accepted: " ++ name)
 firstReplace old new text = let pieces = O.split 10 text in O.replace old new text
 fixture : String -> J.Json -> J.Json
 fixture name manifest = S.fromMaybe (panic "missing benchmark workload") (S.find (\w -> eqString name (V.text "name" w)) (V.array "workloads" manifest))
-main : IO Unit
+main : IO ()
 main = do
  manifest <- J.read "benchmarks/manifest.json"
- S.mapM_ (\(Pair _ action) -> action) (cases manifest)
+ S.mapM_ (\((,) _ action) -> action) (cases manifest)
  RegexRedux.main
 
 -- Each entry retains the original check and action. The final CLI case also
 -- retains its unlabelled invalid-configuration controls before family completion.
-cases : J.Json -> List (Pair String (IO Unit))
-cases manifest = S.concat (Cons (initialCases manifest) (Cons (provenanceCases manifest) (Cons (operationalCases manifest) (Cons buildFailureCases (Cons (S.map (\(Pair label action) -> Pair label (check label action)) ABI.suite) Nil)))))
+cases : J.Json -> [] ((,) String (IO ()))
+cases manifest = S.concat ((:) (initialCases manifest) ((:) (provenanceCases manifest) ((:) (operationalCases manifest) ((:) buildFailureCases ((:) (S.map (\((,) label action) -> (,) label (check label action)) ABI.suite) [])))))
 
-initialCases : J.Json -> List (Pair String (IO Unit))
+initialCases : J.Json -> [] ((,) String (IO ()))
 initialCases manifest =
- Cons (Pair "test_performance_limits_apply_to_every_workload_and_include_boundary" (do
+ (:) ((,) "test_performance_limits_apply_to_every_workload_and_include_boundary" (do
   check "test_performance_limits_apply_to_every_workload_and_include_boundary" (do
-   let measurement n = J.Object (Cons (Pair "median_wall_seconds" (J.num n)) Nil)
-   let entries = J.Object (Cons (Pair "c" (J.Object (Cons (Pair "compilation" (measurement 1)) (Cons (Pair "runtime" (measurement 1)) Nil)))) (Cons (Pair "mlf" (J.Object (Cons (Pair "compilation" (measurement 5)) (Cons (Pair "runtime" (measurement 2)) Nil)))) Nil))
-   let rows = S.map (\name -> J.Object (Cons (Pair "benchmark" (J.str name)) (Cons (Pair "languages" entries) Nil))) V.workloads
-   let targets = J.Object (Cons (Pair "compilation" (J.num 5)) (Cons (Pair "runtime" (J.num 2)) Nil))
+   let measurement n = J.Object ((:) ((,) "median_wall_seconds" (J.num n)) [])
+   let entries = J.Object ((:) ((,) "c" (J.Object ((:) ((,) "compilation" (measurement 1)) ((:) ((,) "runtime" (measurement 1)) [])))) ((:) ((,) "mlf" (J.Object ((:) ((,) "compilation" (measurement 5)) ((:) ((,) "runtime" (measurement 2)) [])))) []))
+   let rows = S.map (\name -> J.Object ((:) ((,) "benchmark" (J.str name)) ((:) ((,) "languages" entries) []))) V.workloads
+   let targets = J.Object ((:) ((,) "compilation" (J.num 5)) ((:) ((,) "runtime" (J.num 2)) []))
    let checks = B.performanceChecks rows targets
    H.assert (S.length V.workloads == 10 && S.length checks == 20 && S.all (J.getBool "passed" false) checks) "limits omitted a workload or excluded boundary"
    let slower = S.map (V.update (O.words "languages mlf runtime median_wall_seconds") (\_ -> J.num 3)) rows
    H.assert (S.any (\check -> S.not (J.getBool "passed" true check)) (B.performanceChecks slower targets)) "above-limit timing passed")
- )) (Cons (Pair "test_invalid_performance_limits_fail_before_tools" (do
-  check "test_invalid_performance_limits_fail_before_tools" (S.mapM_ (\value -> H.assert (S.not (B.validateLimits (J.Object (Cons (Pair "runtime" value) Nil)))) "invalid limit accepted") (Cons (J.num 0) (Cons (J.num (-1)) (Cons (J.Number "NaN") (Cons (J.Number "Infinity") Nil)))))
- )) (Cons (Pair "test_binary_tree_oracle_defaults" (do
+ )) ((:) ((,) "test_invalid_performance_limits_fail_before_tools" (do
+  check "test_invalid_performance_limits_fail_before_tools" (S.mapM_ (\value -> H.assert (S.not (B.validateLimits (J.Object ((:) ((,) "runtime" value) [])))) "invalid limit accepted") ((:) (J.num 0) ((:) (J.num (-1)) ((:) (J.Number "NaN") ((:) (J.Number "Infinity") [])))))
+ )) ((:) ((,) "test_binary_tree_oracle_defaults" (do
   check "test_binary_tree_oracle_defaults" (H.assert (eqString (B.binaryTrees 0) (B.binaryTrees 6) && H.contains "32 trees of depth 6 check: 4064" (B.binaryTrees 7)) "tree oracle defaults differ")
- )) (Cons (Pair "test_all_workloads_have_complete_provenance_and_fixtures" (do
+ )) ((:) ((,) "test_all_workloads_have_complete_provenance_and_fixtures" (do
   check "test_all_workloads_have_complete_provenance_and_fixtures" (do
    H.assert (S.eqList eqString (S.map (V.text "name") (V.array "workloads" manifest)) V.workloads) "workload order changed"
    S.mapM_ (\work -> do
@@ -56,129 +56,129 @@ initialCases manifest =
     S.mapM_ (\language -> do
      let provenance = J.get language (J.get "provenance" work)
      H.assert (J.equal (J.get language (J.get "sources" work)) (J.get "build_source" provenance) && J.has (V.text "build_source" provenance) (J.get "pinned_sha256" manifest) && J.has (V.text "original_source" provenance) (J.get "pinned_sha256" manifest) && stringLength (V.text "upstream_git_blob" provenance) == 40) "untracked adaptation") (O.words "c rust haskell")) (V.array "workloads" manifest))
- )) (Cons (Pair "test_dna_inputs_match_pinned_fasta_fixtures" (do
+ )) ((:) ((,) "test_dna_inputs_match_pinned_fasta_fixtures" (do
   check "test_dna_inputs_match_pinned_fasta_fixtures" (S.mapM_ (\work -> if eqString (V.text "input_kind" work) "fasta" then do
    bytes <- Bytes.readFile (V.text "input_fixture" work)
    H.assert (S.eqList eqInt (Bytes.unpack bytes) (B.textBytes (B.fasta (V.int "fixture_input" work))) && O.starts "public/download/" (V.text "input_fixture_upstream_path" work)) "shared FASTA input differs"
-   else return Unit) (V.array "workloads" manifest))
- )) (Cons (Pair "test_reverse_complement_checks_headers_ambiguity_and_line_wrapping" (do
+   else return ()) (V.array "workloads" manifest))
+ )) ((:) ((,) "test_reverse_complement_checks_headers_ambiguity_and_line_wrapping" (do
   check "test_reverse_complement_checks_headers_ambiguity_and_line_wrapping" (do
    let source = ">id description\nacgtumrwsykvhdbn\n>empty\n>last\n" ++ S.concatStrings (S.replicate 61 "a")
    let expected = ">id description\nNVHDBMRSWYKAACGT\n>empty\n>last\n" ++ S.concatStrings (S.replicate 60 "T") ++ "\nT\n"
    H.assert (eqString (B.reverseComplement source) expected && eqString (B.reverseComplement "") "") "reverse-complement semantics changed"
    let output = B.reverseComplement (B.fasta 31)
-   S.mapM_ (rejectOutput "reverse-complement" 31) (Cons (stringSlice output 0 (stringLength output - 1)) (Cons (O.replace ">ONE" ">OTHER" output) (Cons (O.replace "T" "A" output) (Cons (O.replace "\n" "\r\n" output) Nil)))))
- )) (Cons (Pair "test_nucleotide_counts_include_overlaps_ties_and_only_record_three" (do
+   S.mapM_ (rejectOutput "reverse-complement" 31) ((:) (stringSlice output 0 (stringLength output - 1)) ((:) (O.replace ">ONE" ">OTHER" output) ((:) (O.replace "T" "A" output) ((:) (O.replace "\n" "\r\n" output) [])))))
+ )) ((:) ((,) "test_nucleotide_counts_include_overlaps_ties_and_only_record_three" (do
   check "test_nucleotide_counts_include_overlaps_ties_and_only_record_three" (do
    let zero = "0\tGGT\n0\tGGTA\n0\tGGTATT\n0\tGGTATTTTAATT\n0\tGGTATTTTAATTTATAGT\n"
    H.assert (eqString (B.nucleotideCounts ">ONE\nGGT\n>THREE description\naCgT\n>FOUR\nGGT\n") ("A 25.000\nC 25.000\nG 25.000\nT 25.000\n\nAC 33.333\nCG 33.333\nGT 33.333\n\n" ++ zero) && eqString (B.nucleotideCounts ">THREE\nAAAA") ("A 100.000\n\nAA 100.000\n\n" ++ zero) && eqString (B.nucleotideCounts ">THREE\n") ("\n\n" ++ zero)) "nucleotide window or record semantics changed"
    let output = B.nucleotideCounts (B.fasta 1000)
-   S.mapM_ (rejectOutput "k-nucleotide" 1000) (Cons (O.replace "GGT\n" "GGA\n" output) (Cons (stringSlice output 0 (stringLength output - 1)) (Cons (O.replace "54\t" "55\t" output) (Cons (S.intercalate "\n" (S.reverse (O.lines output))) Nil)))))
- )) (Cons (Pair "test_regex_redux_oracle_counts_each_variant_and_nonoverlapping_matches" (do
+   S.mapM_ (rejectOutput "k-nucleotide" 1000) ((:) (O.replace "GGT\n" "GGA\n" output) ((:) (stringSlice output 0 (stringLength output - 1)) ((:) (O.replace "54\t" "55\t" output) ((:) (S.intercalate "\n" (S.reverse (O.lines output))) [])))))
+ )) ((:) ((,) "test_regex_redux_oracle_counts_each_variant_and_nonoverlapping_matches" (do
   check "test_regex_redux_oracle_counts_each_variant_and_nonoverlapping_matches" (do
    let forward = O.words "agggtaaa cgggtaaa aaggtaaa agagtaaa aggataaa agggaaaa agggtcaa agggtaca agggtaac"
    let reverse = O.words "tttaccct tttaccca tttaccat tttacact tttaacct tttcccct ttaaccct tataccct attaccct"
    S.mapM_ (\variant -> H.assert (B.regexCount variant (S.index forward variant ++ "#" ++ S.index reverse variant) == 2 && B.regexCount variant "AGGGTAAATTTACCCT" == 0) "DNA variant class or case changed") (S.range 0 8)
    H.assert (B.regexCount 0 "agggtaaagggtaaa" == 1 && B.regexCount 0 "agggtaaaagggtaaa" == 2 && B.regexCount 0 "agggtaa" == 0) "DNA matches overlap or partial match accepted")
- )) (Cons (Pair "test_regex_redux_cleanup_follows_header_and_linefeed_pattern" (do
+ )) ((:) ((,) "test_regex_redux_cleanup_follows_header_and_linefeed_pattern" (do
   check "test_regex_redux_cleanup_follows_header_and_linefeed_pattern" (do
    H.assert (eqString (B.regexClean ">h\naggg\ntaaa\n>x\nTTTACCCT\n") "agggtaaaTTTACCCT" && eqString (B.regexClean "a>x\nb\n") "ab" && eqString (B.regexClean "aa>unfinished") "aa>unfinished" && eqString (B.regexClean ">h\r\na\r\n") "a\r" && eqString (B.regexClean "") "") "FASTA cleanup changed")
- )) (Cons (Pair "test_regex_redux_replacements_are_ordered_and_delimiter_matches_exact" (do
+ )) ((:) ((,) "test_regex_redux_replacements_are_ordered_and_delimiter_matches_exact" (do
   check "test_regex_redux_replacements_are_ordered_and_delimiter_matches_exact" (do
    H.assert (eqString (B.regexSubstitute "tHaNxBY") "-" && eqString (B.regexSubstitute "tHaNaNDcaNHaDHaSWaSaNaSatBY") "||||||||||" && eqString (B.regexSubstitute "tHaTANDby") "tHaTANDby") "ordered case-sensitive substitutions changed"
    H.assert (eqString (B.regexSubstitute "<x><>|a|") "||-" && eqString (B.regexSubstitute "|a|b|c|") "-b-" && eqString (B.regexSubstitute "||") "||" && eqString (B.regexSubstitute "<unfinished") "<unfinished" && eqString (B.regexSubstitute "") "") "delimiter replacement greediness or minimum changed")
- )) (Cons (Pair "test_regex_redux_requires_all_counts_lengths_order_and_exact_bytes" (do
+ )) ((:) ((,) "test_regex_redux_requires_all_counts_lengths_order_and_exact_bytes" (do
   check "test_regex_redux_requires_all_counts_lengths_order_and_exact_bytes" (do
    let output = B.regexRedux (B.fasta 1000)
    H.assert (B.validateOutput "regex-redux" 1000 (B.textBytes output)) "valid regex-redux rejected"
-   S.mapM_ (rejectOutput "regex-redux" 1000) (Cons "" (Cons (O.replace "agggtaaa|tttaccct 1" "agggtaaa|tttaccct 0" output) (Cons (O.replace "10245" "10246" output) (Cons (O.replace "10000\n" "10001\n" output) (Cons (O.replace "5262\n" "5261\n" output) (Cons (stringSlice output 0 (stringLength output - 1)) (Cons (output ++ "\n") (Cons (O.replace "\n" "\r\n" output) (Cons (S.intercalate "\n" (S.reverse (O.lines output))) Nil))))))))))
- )) (Cons (Pair "test_nucleotide_rounding_accepts_only_exact_midpoint_neighbours" (do
+   S.mapM_ (rejectOutput "regex-redux" 1000) ((:) "" ((:) (O.replace "agggtaaa|tttaccct 1" "agggtaaa|tttaccct 0" output) ((:) (O.replace "10245" "10246" output) ((:) (O.replace "10000\n" "10001\n" output) ((:) (O.replace "5262\n" "5261\n" output) ((:) (stringSlice output 0 (stringLength output - 1)) ((:) (output ++ "\n") ((:) (O.replace "\n" "\r\n" output) ((:) (S.intercalate "\n" (S.reverse (O.lines output))) []))))))))))
+ )) ((:) ((,) "test_nucleotide_rounding_accepts_only_exact_midpoint_neighbours" (do
   check "test_nucleotide_rounding_accepts_only_exact_midpoint_neighbours" (do
    let lines = B.nucleotideLines (">THREE\nA" ++ S.concatStrings (S.replicate 319 "C"))
    let options = S.fromMaybe (panic "missing midpoint row") (S.find (\options -> O.starts "A " (S.head options)) lines)
-   H.assert (S.eqList eqString options (Cons "A 0.312\n" (Cons "A 0.313\n" Nil))) "midpoint neighbours changed"
+   H.assert (S.eqList eqString options ((:) "A 0.312\n" ((:) "A 0.313\n" []))) "midpoint neighbours changed"
    let other = B.nucleotideLines (">THREE\nA" ++ S.concatStrings (S.replicate 318 "C"))
-   H.assert (S.eqList eqString (S.fromMaybe Nil (S.find (\options -> O.starts "A " (S.head options)) other)) (Cons "A 0.313\n" Nil)) "non-midpoint received tolerance"
+   H.assert (S.eqList eqString (S.fromMaybe [] (S.find (\options -> O.starts "A " (S.head options)) other)) ((:) "A 0.313\n" [])) "non-midpoint received tolerance"
    let output = S.concatStrings (S.map S.head lines)
    H.assert (B.validateNucleotide lines output && B.validateNucleotide lines (O.replace "A 0.312" "A 0.313" output) && S.not (B.validateNucleotide lines (O.replace "A 0.312" "A 0.311" output))) "midpoint validator too permissive")
- )) (Cons (Pair "test_spectral_norm_checks_single_finite_result" (do
+ )) ((:) ((,) "test_spectral_norm_checks_single_finite_result" (do
   check "test_spectral_norm_checks_single_finite_result" (do
    H.assert (eqDouble (B.spectralNorm 1) 1.0 && S.not (ltDouble 0.00000001 (subDouble (B.spectralNorm 100) 1.274219991)) && B.validateOutput "spectral-norm" 1 (B.textBytes "1.000000000\n")) "spectral-norm reference differs"
-   S.mapM_ (rejectOutput "spectral-norm" 1) (Cons "" (Cons "NaN" (Cons "Infinity" (Cons "1 1" (Cons "1.00000002" (Cons "1 extra" Nil)))))))
- )) (Cons (Pair "test_fasta_requires_exact_bases_wrapping_and_rng_continuity" (do
+   S.mapM_ (rejectOutput "spectral-norm" 1) ((:) "" ((:) "NaN" ((:) "Infinity" ((:) "1 1" ((:) "1.00000002" ((:) "1 extra" [])))))))
+ )) ((:) ((,) "test_fasta_requires_exact_bases_wrapping_and_rng_continuity" (do
   check "test_fasta_requires_exact_bases_wrapping_and_rng_continuity" (do
    let expected = ">ONE Homo sapiens alu\nGG\n>TWO IUB ambiguity codes\nctt\n>THREE Homo sapiens frequency\ntgagc\n"
    H.assert (eqString (B.fasta 1) expected && B.validateOutput "fasta" 1 (B.textBytes expected)) "FASTA RNG continuity changed"
-   S.mapM_ (rejectOutput "fasta" 1) (Cons (O.replace "ctt" "ctg" expected) (Cons (O.replace "tgagc" "cttga" expected) (Cons (O.replace "\n" "\r\n" expected) (Cons (stringSlice expected 0 (stringLength expected - 1)) (Cons (expected ++ "\n") Nil)))))
-   H.assert (S.eqList eqInt (S.map stringLength (S.filter (\line -> S.not (O.starts ">" line) && stringLength line > 0) (O.lines (B.fasta 31)))) (Cons 60 (Cons 2 (Cons 60 (Cons 33 (Cons 60 (Cons 60 (Cons 35 Nil)))))))) "FASTA wrapping changed")
- )) (Cons (Pair "test_mandelbrot_requires_exact_pixels_header_and_zero_padding" (do
+   S.mapM_ (rejectOutput "fasta" 1) ((:) (O.replace "ctt" "ctg" expected) ((:) (O.replace "tgagc" "cttga" expected) ((:) (O.replace "\n" "\r\n" expected) ((:) (stringSlice expected 0 (stringLength expected - 1)) ((:) (expected ++ "\n") [])))))
+   H.assert (S.eqList eqInt (S.map stringLength (S.filter (\line -> S.not (O.starts ">" line) && stringLength line > 0) (O.lines (B.fasta 31)))) ((:) 60 ((:) 2 ((:) 60 ((:) 33 ((:) 60 ((:) 60 ((:) 35 [])))))))) "FASTA wrapping changed")
+ )) ((:) ((,) "test_mandelbrot_requires_exact_pixels_header_and_zero_padding" (do
   check "test_mandelbrot_requires_exact_pixels_header_and_zero_padding" (do
-   let pixels = Cons 0 (Cons 0 (Cons 2 (Cons 0 (Cons 7 (Cons 128 (Cons 15 (Cons 128 (Cons 63 (Cons 128 (Cons 63 (Cons 128 (Cons 15 (Cons 128 (Cons 7 (Cons 128 (Cons 2 (Cons 0 Nil)))))))))))))))))
+   let pixels = (:) 0 ((:) 0 ((:) 2 ((:) 0 ((:) 7 ((:) 128 ((:) 15 ((:) 128 ((:) 63 ((:) 128 ((:) 63 ((:) 128 ((:) 15 ((:) 128 ((:) 7 ((:) 128 ((:) 2 ((:) 0 [])))))))))))))))))
    let expected = S.append (B.textBytes "P4\n9 9\n") pixels
-   H.assert (S.eqList eqInt (B.expectedOutput "mandelbrot" 1) (S.snoc (B.textBytes "P4\n1 1\n") 0) && S.eqList eqInt (B.mandelbrot 8) (Cons 2 (Cons 0 (Cons 15 (Cons 47 (Cons 255 (Cons 47 (Cons 15 (Cons 0 Nil)))))))) && S.eqList eqInt (B.expectedOutput "mandelbrot" 9) expected && B.validateOutput "mandelbrot" 9 expected) "PBM oracle differs"
-   S.mapM_ (\wrong -> H.assert (S.not (B.validateOutput "mandelbrot" 9 wrong)) "corrupt PBM accepted") (Cons (S.append (B.textBytes "P1\n9 9\n") pixels) (Cons (S.append (B.textBytes "P4\n9 8\n") pixels) (Cons (S.init expected) (Cons (S.snoc expected 10) (Cons (S.snoc (S.init expected) 1) (Cons (B.replaceAt 7 128 expected) Nil)))))))
- )) (Cons (Pair "test_pidigits_oracle_and_partial_row_checks" (do
+   H.assert (S.eqList eqInt (B.expectedOutput "mandelbrot" 1) (S.snoc (B.textBytes "P4\n1 1\n") 0) && S.eqList eqInt (B.mandelbrot 8) ((:) 2 ((:) 0 ((:) 15 ((:) 47 ((:) 255 ((:) 47 ((:) 15 ((:) 0 [])))))))) && S.eqList eqInt (B.expectedOutput "mandelbrot" 9) expected && B.validateOutput "mandelbrot" 9 expected) "PBM oracle differs"
+   S.mapM_ (\wrong -> H.assert (S.not (B.validateOutput "mandelbrot" 9 wrong)) "corrupt PBM accepted") ((:) (S.append (B.textBytes "P1\n9 9\n") pixels) ((:) (S.append (B.textBytes "P4\n9 8\n") pixels) ((:) (S.init expected) ((:) (S.snoc expected 10) ((:) (S.snoc (S.init expected) 1) ((:) (B.replaceAt 7 128 expected) [])))))))
+ )) ((:) ((,) "test_pidigits_oracle_and_partial_row_checks" (do
   check "test_pidigits_oracle_and_partial_row_checks" (do
    H.assert (eqString (B.piDigits 50) "31415926535897932384626433832795028841971693993751") "Machin oracle differs"
    let expected = "3141592653\t:10\n5897932384\t:20\n6264338   \t:27\n"
    H.assert (B.validateOutput "pidigits" 27 (B.textBytes expected)) "partial pi row rejected"
-   S.mapM_ (rejectOutput "pidigits" 27) (Cons (O.replace "6264338" "6264337" expected) (Cons (O.replace ":27" ":30" expected) (Cons (stringSlice expected 0 (stringLength expected - 5)) (Cons "" Nil)))))
- )) (Cons (Pair "test_nbody_tolerance_rejects_nonfinite_missing_and_wrong_values" (do
+   S.mapM_ (rejectOutput "pidigits" 27) ((:) (O.replace "6264338" "6264337" expected) ((:) (O.replace ":27" ":30" expected) ((:) (stringSlice expected 0 (stringLength expected - 5)) ((:) "" [])))))
+ )) ((:) ((,) "test_nbody_tolerance_rejects_nonfinite_missing_and_wrong_values" (do
   check "test_nbody_tolerance_rejects_nonfinite_missing_and_wrong_values" (do
    let before = S.fst (B.nbodyEnergy 1)
    let after = S.snd (B.nbodyEnergy 1)
    H.assert (S.not (ltDouble 0.00000000000001 (abs (subDouble before (-0.16907516382852447)))) && S.not (ltDouble 0.00000000000001 (abs (subDouble after (-0.16907495402506745))))) "n-body reference differs"
    let near = formatDouble 12 (addDouble before 0.000000005) ++ " " ++ formatDouble 12 (subDouble after 0.000000005)
    H.assert (B.validateOutput "n-body" 1 (B.textBytes near)) "permitted n-body tolerance rejected"
-   S.mapM_ (rejectOutput "n-body" 1) (Cons "NaN NaN" (Cons "Infinity -Infinity" (Cons "" (Cons "-0.169075164" (Cons "-0.169075164 -0.169074954 extra" (Cons "-0.169075164 -0.169075164" (Cons "-0.169075164 -0.1690749" (Cons "0.169075164 -0.169074954" Nil)))))))))
- )) (Cons (Pair "test_fannkuch_unranking_checks_checksum_and_maximum" (do
+   S.mapM_ (rejectOutput "n-body" 1) ((:) "NaN NaN" ((:) "Infinity -Infinity" ((:) "" ((:) "-0.169075164" ((:) "-0.169075164 -0.169074954 extra" ((:) "-0.169075164 -0.169075164" ((:) "-0.169075164 -0.1690749" ((:) "0.169075164 -0.169074954" [])))))))))
+ )) ((:) ((,) "test_fannkuch_unranking_checks_checksum_and_maximum" (do
   check "test_fannkuch_unranking_checks_checksum_and_maximum" (do
-   S.mapM_ (\(Triple n checksum maximum) -> H.assert (S.eqPair eqInt eqInt (B.fannkuch n) (Pair checksum maximum)) "factoradic fannkuch oracle differs") (Cons (Triple 1 0 0) (Cons (Triple 2 (-1) 1) (Cons (Triple 3 2 2) (Cons (Triple 5 11 7) (Cons (Triple 8 1616 22) Nil)))))
-   S.mapM_ (rejectOutput "fannkuch-redux" 7) (Cons "-228\nPfannkuchen(7) = 16" (Cons "228\nPfannkuchen(7) = 15" (Cons "228\nPfannkuchen(8) = 16" (Cons "228 16" (Cons "" Nil))))))
- )) (Nil))))))))))))))))))
+   S.mapM_ (\((,,) n checksum maximum) -> H.assert (S.eqPair eqInt eqInt (B.fannkuch n) ((,) checksum maximum)) "factoradic fannkuch oracle differs") ((:) ((,,) 1 0 0) ((:) ((,,) 2 (-1) 1) ((:) ((,,) 3 2 2) ((:) ((,,) 5 11 7) ((:) ((,,) 8 1616 22) [])))))
+   S.mapM_ (rejectOutput "fannkuch-redux" 7) ((:) "-228\nPfannkuchen(7) = 16" ((:) "228\nPfannkuchen(7) = 15" ((:) "228\nPfannkuchen(8) = 16" ((:) "228 16" ((:) "" []))))))
+ )) ([]))))))))))))))))))
 
 abs : Double -> Double
 abs x = if ltDouble x 0.0 then subDouble 0.0 x else x
 
 
-provenance : J.Json -> IO Unit
-provenance manifest = S.mapM_ (\(Pair _ action) -> action) (provenanceCases manifest)
-provenanceCases : J.Json -> List (Pair String (IO Unit))
+provenance : J.Json -> IO ()
+provenance manifest = S.mapM_ (\((,) _ action) -> action) (provenanceCases manifest)
+provenanceCases : J.Json -> [] ((,) String (IO ()))
 provenanceCases manifest =
- Cons (Pair "test_vendored_adaptation_patches_reconstruct_build_sources" (do
-  check "test_vendored_adaptation_patches_reconstruct_build_sources" (S.mapM_ (\work -> S.mapM_ (\(Pair language info) ->
-   if eqString (V.text "original_source" info) (V.text "build_source" info) then return Unit else H.withScratch (\directory -> do
+ (:) ((,) "test_vendored_adaptation_patches_reconstruct_build_sources" (do
+  check "test_vendored_adaptation_patches_reconstruct_build_sources" (S.mapM_ (\work -> S.mapM_ (\((,) language info) ->
+   if eqString (V.text "original_source" info) (V.text "build_source" info) then return () else H.withScratch (\directory -> do
     let original = directory ++ "/" ++ O.base (V.text "original_source" info)
     O.copy (V.text "original_source" info) original
-    O.run "" (Cons "patch" (Cons "--batch" (Cons original (Cons (O.parent (V.text "build_source" info) ++ "/adaptation.patch") Nil))))
+    O.run "" ((:) "patch" ((:) "--batch" ((:) original ((:) (O.parent (V.text "build_source" info) ++ "/adaptation.patch") []))))
     first <- fileDigest original
     second <- fileDigest (V.text "build_source" info)
     H.assert (eqString first second) "adaptation patch does not reconstruct measured source")) (J.items (J.get "provenance" work))) (V.array "workloads" manifest))
- )) (Cons (Pair "test_only_whitespace_is_normalized" (do
+ )) ((:) ((,) "test_only_whitespace_is_normalized" (do
   check "test_only_whitespace_is_normalized" (do
    let expected = B.binaryTrees 10
    H.assert (B.validateOutput "binary-trees" 10 (B.textBytes (O.replace " " "\t  " expected ++ "\n"))) "whitespace normalization changed"
    rejectOutput "binary-trees" 10 (O.replace "check:" "check=" expected)
-   S.mapM_ (rejectOutput "binary-trees" 10) (Cons (expected ++ " extra") (Cons (O.replace "4095" "4094" expected) (Cons (O.replace "32704" "-32704" expected) (Cons "" (Cons (S.intercalate "\n" (S.init (O.lines expected))) Nil))))))
- )) (Cons (Pair "test_pin_tampering_fails" (do
+   S.mapM_ (rejectOutput "binary-trees" 10) ((:) (expected ++ " extra") ((:) (O.replace "4095" "4094" expected) ((:) (O.replace "32704" "-32704" expected) ((:) "" ((:) (S.intercalate "\n" (S.init (O.lines expected))) []))))))
+ )) ((:) ((,) "test_pin_tampering_fails" (do
   check "test_pin_tampering_fails" (do
-   S.mapM_ (\(Pair file expected) -> do { hash <- fileDigest file; H.assert (eqString hash (case expected of { J.String value -> value; _ -> "" })) ("pinned benchmark changed: " ++ file) }) (J.items (J.get "pinned_sha256" manifest))
+   S.mapM_ (\((,) file expected) -> do { hash <- fileDigest file; H.assert (eqString hash (case expected of { J.String value -> value; _ -> "" })) ("pinned benchmark changed: " ++ file) }) (J.items (J.get "pinned_sha256" manifest))
    H.withScratch (\directory -> do
     writeFile (directory ++ "/pin") "original"
     hash <- fileDigest (directory ++ "/pin")
     writeFile (directory ++ "/pin") "tampered"
-    result <- B.checkIntegrity (Cons (Pair (directory ++ "/pin") hash) Nil)
+    result <- B.checkIntegrity ((:) ((,) (directory ++ "/pin") hash) [])
     H.assert (S.isLeft result) "pin tampering passed"))
- )) (Nil)))
+ )) ([])))
 
-configuration = J.Object (Cons (Pair "runs" (J.num 5)) (Cons (Pair "timeout" (J.num 10)) (Cons (Pair "languages" (J.Object (S.map (\name -> Pair name J.empty) V.languages))) (Cons (Pair "maximum_mlf_c_ratios" (J.Object (Cons (Pair "compilation" (J.num 5)) (Cons (Pair "runtime" (J.num 2)) Nil)))) Nil))))
-operational : J.Json -> IO Unit
+configuration = J.Object ((:) ((,) "runs" (J.num 5)) ((:) ((,) "timeout" (J.num 10)) ((:) ((,) "languages" (J.Object (S.map (\name -> (,) name J.empty) V.languages))) ((:) ((,) "maximum_mlf_c_ratios" (J.Object ((:) ((,) "compilation" (J.num 5)) ((:) ((,) "runtime" (J.num 2)) [])))) []))))
+operational : J.Json -> IO ()
 operational manifest = do
- S.mapM_ (\(Pair _ action) -> action) (operationalCases manifest)
+ S.mapM_ (\((,) _ action) -> action) (operationalCases manifest)
  buildFailures
-operationalCases : J.Json -> List (Pair String (IO Unit))
+operationalCases : J.Json -> [] ((,) String (IO ()))
 operationalCases manifest =
- Cons (Pair "test_native_compiler_identification_uses_public_cli_and_exact_binary" (do
+ (:) ((,) "test_native_compiler_identification_uses_public_cli_and_exact_binary" (do
   check "test_native_compiler_identification_uses_public_cli_and_exact_binary" (H.withScratch (\directory -> do
    executable <- getExecutablePath
    O.copy executable (directory ++ "/mock compiler")
@@ -187,7 +187,7 @@ operationalCases manifest =
    setEnv "MLF_MOCK_RUNTIME" "runtime/mlf_runtime.c"
    writeFile (directory ++ "/calls") ""
    identified <- B.identifyNative directory (directory ++ "/mock compiler")
-   Pair runtime metadata <- H.right identified
+   (,) runtime metadata <- H.right identified
    hash <- fileDigest (directory ++ "/mock compiler")
    calls <- readFile (directory ++ "/calls")
    H.assert (eqString (V.text "path" metadata) (directory ++ "/mock compiler") && eqString (V.text "sha256" metadata) hash && eqString runtime "runtime/mlf_runtime.c" && eqString calls "--help\n--llvm-runtime\n") "identification changed compiler or used private version probe"
@@ -195,7 +195,7 @@ operationalCases manifest =
    failed <- B.identifyNative directory (directory ++ "/mock compiler")
    H.assert (S.isLeft failed) "failed selected compiler fell back"
    S.mapM_ unsetEnv (O.words "MLF_MOCK_COMPILER MLF_MOCK_CALLS MLF_MOCK_RUNTIME MLF_MOCK_FAIL")))
- )) (Cons (Pair "test_stdin_workloads_share_bytes_and_record_hash_without_embedding_input" (do
+ )) ((:) ((,) "test_stdin_workloads_share_bytes_and_record_hash_without_embedding_input" (do
   check "test_stdin_workloads_share_bytes_and_record_hash_without_embedding_input" (H.withScratch (\directory -> do
    writeFile (directory ++ "/expected") (B.fasta 31)
    hash <- fileDigest (directory ++ "/expected")
@@ -203,23 +203,23 @@ operationalCases manifest =
     metadata <- B.stdinMetadata directory name 31 language
     input <- readFile (directory ++ "/stdin")
     H.assert (eqString input (B.fasta 31) && V.int "stdin_bytes" metadata == stringLength input && eqString (V.text "stdin_sha256" metadata) hash && S.not (J.has "stdin" metadata)) "languages received different or embedded input") V.languages) (O.words "reverse-complement k-nucleotide regex-redux")))
- )) (Cons (Pair "test_four_languages_are_mandatory" (do
+ )) ((:) ((,) "test_four_languages_are_mandatory" (do
   check "test_four_languages_are_mandatory" (S.mapM_ (\language -> H.assert (S.isLeft (B.validateConfiguration (V.update (O.words "languages") (V.remove language) configuration))) "benchmark silently omitted a language") V.languages)
- )) (Cons (Pair "test_changes_during_measurement_invalidate_the_run" (do
+ )) ((:) ((,) "test_changes_during_measurement_invalidate_the_run" (do
   check "test_changes_during_measurement_invalidate_the_run" (H.withScratch (\directory -> do
    writeFile (directory ++ "/source") "before"
    hash <- fileDigest (directory ++ "/source")
-   before <- B.checkIntegrity (Cons (Pair (directory ++ "/source") hash) Nil)
+   before <- B.checkIntegrity ((:) ((,) (directory ++ "/source") hash) [])
    H.assert (S.isRight before) "fresh source snapshot rejected"
    writeFile (directory ++ "/source") "after"
-   after <- B.checkIntegrity (Cons (Pair (directory ++ "/source") hash) Nil)
+   after <- B.checkIntegrity ((:) ((,) (directory ++ "/source") hash) [])
    H.assert (S.isLeft after) "measurement ignored changed sources"))
- )) (Cons (Pair "test_native_dependency_headers_survive_suppressed_system_flags" (do
+ )) ((:) ((,) "test_native_dependency_headers_survive_suppressed_system_flags" (do
   check "test_native_dependency_headers_survive_suppressed_system_flags" (H.withScratch (\directory -> do
    let include = directory ++ "/include"
    let library = directory ++ "/lib"
    let pc = directory ++ "/pc"
-   S.mapM_ O.mkdir (Cons include (Cons library (Cons pc Nil)))
+   S.mapM_ O.mkdir ((:) include ((:) library ((:) pc [])))
    let header = include ++ "/pcre2.h"
    writeFile header "before"
    writeFile (library ++ "/libmock.a") "mock library identity"
@@ -230,90 +230,90 @@ operationalCases manifest =
    setEnv "PKG_CONFIG_PATH" pc
    setEnv "PKG_CONFIG_SYSTEM_INCLUDE_PATH" include
    unsetEnv "PKG_CONFIG_ALLOW_SYSTEM_CFLAGS"
-   identity <- B.benchmarkPackage (directory ++ "/identity") "mlf-benchmark-header-test" "1.0" (Cons "pcre2.h" Nil)
-   S.mapM_ (\(Pair name value) -> if eqString value "" then unsetEnv name else setEnv name value) (Cons (Pair "PKG_CONFIG_PATH" oldPath) (Cons (Pair "PKG_CONFIG_SYSTEM_INCLUDE_PATH" oldSystem) (Cons (Pair "PKG_CONFIG_ALLOW_SYSTEM_CFLAGS" oldAllow) Nil)))
+   identity <- B.benchmarkPackage (directory ++ "/identity") "mlf-benchmark-header-test" "1.0" ((:) "pcre2.h" [])
+   S.mapM_ (\((,) name value) -> if eqString value "" then unsetEnv name else setEnv name value) ((:) ((,) "PKG_CONFIG_PATH" oldPath) ((:) ((,) "PKG_CONFIG_SYSTEM_INCLUDE_PATH" oldSystem) ((:) ((,) "PKG_CONFIG_ALLOW_SYSTEM_CFLAGS" oldAllow) [])))
    hash <- fileDigest header
    H.assert (S.not (S.elem eqString ("-I" ++ include) (J.getStrings "flags" identity)) && eqString (V.text header (J.get "headers" identity)) hash) "suppressed system header was not fingerprinted"
-   fingerprints <- S.mapM (\path -> do { digest <- fileDigest path; return (Pair path digest) }) (B.benchmarkPackageFiles identity)
+   fingerprints <- S.mapM (\path -> do { digest <- fileDigest path; return ((,) path digest) }) (B.benchmarkPackageFiles identity)
    before <- B.checkIntegrity fingerprints
    H.assert (S.isRight before) "fresh native dependency snapshot rejected"
    writeFile header "after"
    after <- B.checkIntegrity fingerprints
    H.assert (S.isLeft after) "measurement ignored changed system header"))
- )) (Cons (Pair "test_failed_and_timed_out_children_are_not_samples" (do
+ )) ((:) ((,) "test_failed_and_timed_out_children_are_not_samples" (do
   check "test_failed_and_timed_out_children_are_not_samples" (H.withScratch (\directory -> do
-   failed <- B.measure directory (Cons "/bin/sh" (Cons "-c" (Cons "exit 9" Nil))) "" 2
-   timed <- B.measure directory (Cons "/bin/sleep" (Cons "10" Nil)) "" 1
+   failed <- B.measure directory ((:) "/bin/sh" ((:) "-c" ((:) "exit 9" []))) "" 2
+   timed <- B.measure directory ((:) "/bin/sleep" ((:) "10" [])) "" 1
    H.assert (S.isLeft failed && S.isLeft timed) "failed or timed-out child became sample"))
- )) (Cons (Pair "test_rss_is_per_process_not_cumulative_high_water" (do
+ )) ((:) ((,) "test_rss_is_per_process_not_cumulative_high_water" (do
   check "test_rss_is_per_process_not_cumulative_high_water" (H.withScratch (\directory -> do
    let binary = directory ++ "/measure-work"
-   O.run "" (Cons "clang" (Cons "-O2" (Cons "tests/native/measurement_fixture.c" (Cons "-o" (Cons binary Nil)))))
-   large <- B.measure directory (Cons binary (Cons "large" Nil)) "" 5
+   O.run "" ((:) "clang" ((:) "-O2" ((:) "tests/native/measurement_fixture.c" ((:) "-o" ((:) binary [])))))
+   large <- B.measure directory ((:) binary ((:) "large" [])) "" 5
    large <- H.right large
-   small <- B.measure directory (Cons binary (Cons "small" Nil)) "" 5
+   small <- B.measure directory ((:) binary ((:) "small" [])) "" 5
    small <- H.right small
    H.assert (V.int "peak_rss_bytes" large > V.int "peak_rss_bytes" small + 32 * 1024 * 1024) "RSS inherited earlier high water"))
- )) (Cons (Pair "test_medians_and_ratios_allow_c_to_lose" (do
+ )) ((:) ((,) "test_medians_and_ratios_allow_c_to_lose" (do
   check "test_medians_and_ratios_allow_c_to_lose" (do
-   H.assert (eqDouble (V.median (Cons 3.0 (Cons 1.0 (Cons 2.0 Nil)))) 2.0 && eqDouble (V.median (Cons 4.0 (Cons 2.0 (Cons 1.0 (Cons 3.0 Nil))))) 2.5) "median incorrect"
-   let times n = J.Object (Cons (Pair "compilation" (J.Object (Cons (Pair "median_wall_seconds" (J.num n)) Nil))) Nil)
-   let row = J.Object (Cons (Pair "benchmark" (J.str "binary-trees")) (Cons (Pair "languages" (J.Object (Cons (Pair "c" (times 2)) (Cons (Pair "mlf" (times 1)) Nil)))) Nil))
-   let checks = B.performanceChecks (Cons row Nil) (J.Object (Cons (Pair "compilation" (J.num 5)) Nil))
+   H.assert (eqDouble (V.median ((:) 3.0 ((:) 1.0 ((:) 2.0 [])))) 2.0 && eqDouble (V.median ((:) 4.0 ((:) 2.0 ((:) 1.0 ((:) 3.0 []))))) 2.5) "median incorrect"
+   let times n = J.Object ((:) ((,) "compilation" (J.Object ((:) ((,) "median_wall_seconds" (J.num n)) []))) [])
+   let row = J.Object ((:) ((,) "benchmark" (J.str "binary-trees")) ((:) ((,) "languages" (J.Object ((:) ((,) "c" (times 2)) ((:) ((,) "mlf" (times 1)) [])))) []))
+   let checks = B.performanceChecks ((:) row []) (J.Object ((:) ((,) "compilation" (J.num 5)) []))
    H.assert (eqDouble (V.double 0.0 (J.get "mlf_over_c" (S.head checks))) 0.5 && J.getBool "passed" false (S.head checks)) "C-relative ratio was clamped" )
- )) (Cons (Pair "test_failure_replaces_stale_success_and_no_measurement_starts" (do
+ )) ((:) ((,) "test_failure_replaces_stale_success_and_no_measurement_starts" (do
   check "test_failure_replaces_stale_success_and_no_measurement_starts" (H.withScratch (\directory -> do
    let report = directory ++ "/report.json"
-   J.write report (J.Object (Cons (Pair "status" (J.str "passed")) Nil))
+   J.write report (J.Object ((:) ((,) "status" (J.str "passed")) []))
    calls <- newIntArray 1 0
-   result <- B.runGuarded report (J.set "runs" (J.num 0) configuration) (do { writeIntArray calls 0 1; return (Right Unit) })
+   result <- B.runGuarded report (J.set "runs" (J.num 0) configuration) (do { writeIntArray calls 0 1; return (Right ()) })
    current <- J.read report
    n <- readIntArray calls 0
    H.assert (S.isLeft result && eqString (V.text "status" current) "failed" && n == 0) "stale success or tools survived invalid input"))
- )) (Cons (Pair "test_invalid_cli_inputs_fail_before_tools" (do
+ )) ((:) ((,) "test_invalid_cli_inputs_fail_before_tools" (do
   check "test_invalid_cli_inputs_fail_before_tools" (H.withScratch (\directory -> S.mapM_ (\mutation -> do
    calls <- newIntArray 1 0
-   result <- B.runGuarded (directory ++ "/report.json") (mutation configuration) (do { writeIntArray calls 0 1; return (Right Unit) })
+   result <- B.runGuarded (directory ++ "/report.json") (mutation configuration) (do { writeIntArray calls 0 1; return (Right ()) })
    n <- readIntArray calls 0
-   H.assert (S.isLeft result && n == 0) "invalid CLI called tools") (Cons (J.set "runs" (J.num 0)) (Cons (J.set "timeout" (J.num 0)) (Cons (J.set "size" (J.num 0)) (Cons (\doc -> J.set "compile_only" (J.Boolean true) (J.set "runtime_only" (J.Boolean true) doc)) Nil))))))
+   H.assert (S.isLeft result && n == 0) "invalid CLI called tools") ((:) (J.set "runs" (J.num 0)) ((:) (J.set "timeout" (J.num 0)) ((:) (J.set "size" (J.num 0)) ((:) (\doc -> J.set "compile_only" (J.Boolean true) (J.set "runtime_only" (J.Boolean true) doc)) []))))))
   H.withScratch (\directory -> S.mapM_ (\config -> do
    calls <- newIntArray 1 0
-   result <- B.runGuarded (directory ++ "/report.json") config (do { writeIntArray calls 0 1; return (Right Unit) })
+   result <- B.runGuarded (directory ++ "/report.json") config (do { writeIntArray calls 0 1; return (Right ()) })
    n <- readIntArray calls 0
    H.assert (S.isLeft result && n == 0) "invalid benchmark CLI called tools")
-   (Cons (J.set "size" (J.num 10) configuration)
-   (Cons (J.set "benchmarks" (J.stringArray (Cons "binary-trees" Nil)) (J.set "size" (J.num 21) configuration))
-   (Cons (J.set "benchmarks" (J.stringArray (Cons "pidigits" Nil)) (J.set "size" (J.num 0) configuration))
-   (Cons (J.set "benchmarks" (J.stringArray (Cons "n-body" Nil)) (J.set "size" (J.num (-1)) configuration))
-   (Cons (J.set "benchmarks" (J.stringArray (Cons "fannkuch-redux" Nil)) (J.set "size" (J.num 0) configuration))
-   (Cons (J.set "benchmarks" (J.stringArray (O.words "n-body pidigits")) (J.set "size" (J.num 10) configuration))
-   (Cons (J.set "benchmarks" (J.stringArray (Cons "unknown" Nil)) configuration) Nil))))))))
- )) (Nil))))))))))
+   ((:) (J.set "size" (J.num 10) configuration)
+   ((:) (J.set "benchmarks" (J.stringArray ((:) "binary-trees" [])) (J.set "size" (J.num 21) configuration))
+   ((:) (J.set "benchmarks" (J.stringArray ((:) "pidigits" [])) (J.set "size" (J.num 0) configuration))
+   ((:) (J.set "benchmarks" (J.stringArray ((:) "n-body" [])) (J.set "size" (J.num (-1)) configuration))
+   ((:) (J.set "benchmarks" (J.stringArray ((:) "fannkuch-redux" [])) (J.set "size" (J.num 0) configuration))
+   ((:) (J.set "benchmarks" (J.stringArray (O.words "n-body pidigits")) (J.set "size" (J.num 10) configuration))
+   ((:) (J.set "benchmarks" (J.stringArray ((:) "unknown" [])) configuration) []))))))))
+ )) ([]))))))))))
 
 -- A syscall may report EPERM even though the required process group exists.
 -- Exercise the real transport with that result injected, for both APIs.
-processGroupRace : String -> IO Unit
+processGroupRace : String -> IO ()
 processGroupRace directory = do
  let helper = directory ++ "/group-race"
- O.run "" (S.append (O.words "clang -O2 -std=c11 -Dsetpgid=mlf_test_setpgid tests/native/host_support.c tests/native/process_group_fixture.c -o") (Cons helper Nil))
+ O.run "" (S.append (O.words "clang -O2 -std=c11 -Dsetpgid=mlf_test_setpgid tests/native/host_support.c tests/native/process_group_fixture.c -o") ((:) helper []))
  original <- getEnv "MLF_TEST_HOST_SUPPORT"
  setEnv "MLF_TEST_HOST_SUPPORT" helper
- measured <- B.measure directory (Cons "/usr/bin/true" Nil) "" 5
+ measured <- B.measure directory ((:) "/usr/bin/true" []) "" 5
  sample <- H.right measured
  H.assert (V.int "exit_code" sample == 0) "redundant process group setup stopped the measured child"
- grouped <- B.runGroup directory 5.0 (Cons (Quad "" "" (directory ++ "/race.out") (Cons "/usr/bin/true" Nil)) Nil)
+ grouped <- B.runGroup directory 5.0 ((:) ((,,,) "" "" (directory ++ "/race.out") ((:) "/usr/bin/true" [])) [])
  sample <- H.right grouped
  H.assert (V.int "exit_code" sample == 0 && V.int "remaining_children" sample == 0) "redundant group setup changed execution or cleanup"
- pipelined <- B.runPipeline directory 5.0 (Cons (Pair Nil (Quad "" "" (directory ++ "/pipeline-race.out") (Cons "/usr/bin/true" Nil))) Nil)
+ pipelined <- B.runPipeline directory 5.0 ((:) ((,) [] ((,,,) "" "" (directory ++ "/pipeline-race.out") ((:) "/usr/bin/true" []))) [])
  sample <- H.right pipelined
  H.assert (V.int "exit_code" sample == 0 && V.int "remaining_children" sample == 0) "pipeline process group cleanup failed"
  setEnv "MLF_TEST_HOST_SUPPORT" original
 
-buildFailures : IO Unit
-buildFailures = S.mapM_ (\(Pair _ action) -> action) buildFailureCases
-buildFailureCases : List (Pair String (IO Unit))
+buildFailures : IO ()
+buildFailures = S.mapM_ (\((,) _ action) -> action) buildFailureCases
+buildFailureCases : [] ((,) String (IO ()))
 buildFailureCases =
- Cons (Pair "test_prestarted_link_waits_for_complete_objects_and_reaps_failed_producers" (do
+ (:) ((,) "test_prestarted_link_waits_for_complete_objects_and_reaps_failed_producers" (do
   check "test_prestarted_link_waits_for_complete_objects_and_reaps_failed_producers" (H.withScratch (\directory -> do
    exe <- getExecutablePath
    O.copy exe (directory ++ "/mock")
@@ -321,8 +321,8 @@ buildFailureCases =
    setEnv "MLF_BENCH_STREAM_LLVM" "1"
    setEnv "MLF_BENCH_STREAM_LINK" "1"
    let compiler = directory ++ "/mock"
-   result <- B.buildParallel (directory ++ "/normal") compiler compiler (directory ++ "/Main.emlf") (directory ++ "/runtime.c") Nil 10.0
-   Pair binary sample <- H.right result
+   result <- B.buildParallel (directory ++ "/normal") compiler compiler (directory ++ "/Main.emlf") (directory ++ "/runtime.c") [] 10.0
+   (,) binary sample <- H.right result
    let stages = V.array "stages" sample
    let started index = V.double 0.0 (J.get "started_seconds" (S.index stages index))
    let finished index = V.double 0.0 (J.get "finished_seconds" (S.index stages index))
@@ -335,61 +335,61 @@ buildFailureCases =
    codeReady <- fileExists (directory ++ "/normal/program.o.ready")
    H.assert (eqString contents "binary" && eqString object "object" && eqString code "code" && objectReady && codeReady) "link did not wait for complete fresh objects"
    setEnv "MLF_MOCK_FAIL_RUNTIME" "1"
-   failure <- B.buildParallel (directory ++ "/failure") compiler compiler (directory ++ "/Main.emlf") (directory ++ "/runtime.c") Nil 5.0
+   failure <- B.buildParallel (directory ++ "/failure") compiler compiler (directory ++ "/Main.emlf") (directory ++ "/runtime.c") [] 5.0
    observed <- J.read (directory ++ "/failure/pipeline.json")
    H.assert (S.isLeft failure && V.int "remaining_children" observed == 0 && ltDouble (V.double 0.0 (J.get "wall_seconds" observed)) 3.0) "failed producer left a blocked object reader alive"
    unsetEnv "MLF_MOCK_FAIL_RUNTIME"
    unsetEnv "MLF_BENCH_STREAM_LINK"
    unsetEnv "MLF_BENCH_STREAM_LLVM"
    unsetEnv "MLF_MOCK_BUILD"))
- )) (Cons (Pair "test_streaming_build_overlaps_startup_and_archives_exact_ir" (do
+ )) ((:) ((,) "test_streaming_build_overlaps_startup_and_archives_exact_ir" (do
   check "test_streaming_build_overlaps_startup_and_archives_exact_ir" (H.withScratch (\directory -> do
    exe <- getExecutablePath
    O.copy exe (directory ++ "/mock")
    setEnv "MLF_MOCK_BUILD" "1"
    setEnv "MLF_BENCH_STREAM_LLVM" "1"
    let compiler = directory ++ "/mock"
-   result <- B.buildParallelWithIncludes (directory ++ "/normal") compiler compiler (directory ++ "/Main.emlf") (directory ++ "/runtime.c") Nil (Cons (directory ++ "/include with spaces") Nil) 10.0
-   Pair binary sample <- H.right result
+   result <- B.buildParallelWithIncludes (directory ++ "/normal") compiler compiler (directory ++ "/Main.emlf") (directory ++ "/runtime.c") [] ((:) (directory ++ "/include with spaces") []) 10.0
+   (,) binary sample <- H.right result
    let stages = V.array "stages" sample
    let frontend = J.getStrings "command" (S.index stages 1)
-   H.assert (S.eqList eqString (S.drop 7 frontend) (Cons compiler (Cons "-i" (Cons (directory ++ "/include with spaces") (Cons "--emit-llvm-gc" (Cons (directory ++ "/Main.emlf") Nil)))))) "streamed source include roots changed"
+   H.assert (S.eqList eqString (S.drop 7 frontend) ((:) compiler ((:) "-i" ((:) (directory ++ "/include with spaces") ((:) "--emit-llvm-gc" ((:) (directory ++ "/Main.emlf") [])))))) "streamed source include roots changed"
    H.assert (S.eqList eqString (S.map (V.text "phase") stages) (O.words "setup frontend runtime llvm link") && V.int "maximum_parallel_compilers" sample == 3) "streaming stage inventory changed"
    let started index = V.double 0.0 (J.get "started_seconds" (S.index stages index))
    let finished index = V.double 0.0 (J.get "finished_seconds" (S.index stages index))
    H.assert (ltDouble (started 3) (finished 1)) "LLVM startup did not overlap the frontend"
-   H.assert (S.all (\index -> S.not (ltDouble (started 4) (finished index))) (Cons 1 (Cons 2 (Cons 3 Nil)))) "streaming link did not wait for all producers"
+   H.assert (S.all (\index -> S.not (ltDouble (started 4) (finished index))) ((:) 1 ((:) 2 ((:) 3 [])))) "streaming link did not wait for all producers"
    ir <- readFile (directory ++ "/normal/program.ll")
    H.assert (eqString ir "IR\n") "streaming archive changed LLVM bytes"
-   reused <- B.buildParallel (directory ++ "/normal") compiler compiler (directory ++ "/Main.emlf") (directory ++ "/runtime.c") Nil 10.0
+   reused <- B.buildParallel (directory ++ "/normal") compiler compiler (directory ++ "/Main.emlf") (directory ++ "/runtime.c") [] 10.0
    H.assert (S.isLeft reused) "streaming build reused output objects"
    setEnv "MLF_MOCK_FAST_FRONTEND" "1"
-   short <- B.buildParallel (directory ++ "/short") compiler compiler (directory ++ "/Main.emlf") (directory ++ "/runtime.c") Nil 10.0
+   short <- B.buildParallel (directory ++ "/short") compiler compiler (directory ++ "/Main.emlf") (directory ++ "/runtime.c") [] 10.0
    H.right short
    shortIR <- readFile (directory ++ "/short/program.ll")
    H.assert (eqString shortIR "IR\n") "short producer exited before the streaming reader consumed its output"
    unsetEnv "MLF_MOCK_FAST_FRONTEND"
    unsetEnv "MLF_BENCH_STREAM_LLVM"
    unsetEnv "MLF_MOCK_BUILD"))
- )) (Cons (Pair "test_blocked_fifo_failure_and_timeout_reap_process_groups" (do
+ )) ((:) ((,) "test_blocked_fifo_failure_and_timeout_reap_process_groups" (do
   check "test_blocked_fifo_failure_and_timeout_reap_process_groups" (H.withScratch (\directory -> do
    S.mapM_ (\fails -> do
     let suffix = if fails then "failure" else "timeout"
     let fifo = directory ++ "/" ++ suffix ++ ".pipe"
     let started = directory ++ "/" ++ suffix ++ ".started"
-    O.run "" (Cons "/usr/bin/mkfifo" (Cons fifo Nil))
-    let reader = Cons "/bin/sh" (Cons "-c" (Cons "echo started > \"$1\"; exec /bin/cat < \"$2\"" (Cons "fifo-reader" (Cons started (Cons fifo Nil)))))
-    let failure = Cons "/bin/sh" (Cons "-c" (Cons "while [ ! -f \"$1\" ]; do /bin/sleep 0.01; done; exit 23" (Cons "fifo-failure" (Cons started Nil))))
-    let stages = Cons (Pair Nil (Quad "" "" (directory ++ "/reader.out") reader)) (if fails then Cons (Pair Nil (Quad "" "" (directory ++ "/failure.out") failure)) Nil else Nil)
+    O.run "" ((:) "/usr/bin/mkfifo" ((:) fifo []))
+    let reader = (:) "/bin/sh" ((:) "-c" ((:) "echo started > \"$1\"; exec /bin/cat < \"$2\"" ((:) "fifo-reader" ((:) started ((:) fifo [])))))
+    let failure = (:) "/bin/sh" ((:) "-c" ((:) "while [ ! -f \"$1\" ]; do /bin/sleep 0.01; done; exit 23" ((:) "fifo-failure" ((:) started []))))
+    let stages = (:) ((,) [] ((,,,) "" "" (directory ++ "/reader.out") reader)) (if fails then (:) ((,) [] ((,,,) "" "" (directory ++ "/failure.out") failure)) [] else [])
     let blocked = directory ++ "/" ++ suffix ++ ".dependent"
-    let dependencies = if fails then Cons 0 (Cons 1 Nil) else Cons 0 Nil
-    result <- B.runPipeline directory (if fails then 5.0 else 0.2) (S.snoc stages (Pair dependencies (Quad "" "" blocked (Cons "/usr/bin/true" Nil))))
+    let dependencies = if fails then (:) 0 ((:) 1 []) else (:) 0 []
+    result <- B.runPipeline directory (if fails then 5.0 else 0.2) (S.snoc stages ((,) dependencies ((,,,) "" "" blocked ((:) "/usr/bin/true" []))))
     observed <- J.read (directory ++ "/pipeline.json")
     ran <- fileExists blocked
     let pid = V.int "pid" (S.head (V.array "stages" observed))
-    group <- O.exec "" (Cons "/bin/sh" (Cons "-c" (Cons "kill -0 -\"$1\"" (Cons "check-group" (Cons (showInt pid) Nil))))) "" (directory ++ "/group.out") (directory ++ "/group.err") 5
-    H.assert (S.isLeft result && S.not ran && V.int "remaining_children" observed == 0 && group /= 0 && ltDouble (V.double 0.0 (J.get "wall_seconds" observed)) 3.0) "blocked FIFO leaked a process group or started its dependent stage") (Cons true (Cons false Nil))))
- )) (Cons (Pair "test_llvm_emission_time_is_included_and_build_directory_is_fresh" (do
+    group <- O.exec "" ((:) "/bin/sh" ((:) "-c" ((:) "kill -0 -\"$1\"" ((:) "check-group" ((:) (showInt pid) []))))) "" (directory ++ "/group.out") (directory ++ "/group.err") 5
+    H.assert (S.isLeft result && S.not ran && V.int "remaining_children" observed == 0 && group /= 0 && ltDouble (V.double 0.0 (J.get "wall_seconds" observed)) 3.0) "blocked FIFO leaked a process group or started its dependent stage") ((:) true ((:) false []))))
+ )) ((:) ((,) "test_llvm_emission_time_is_included_and_build_directory_is_fresh" (do
   check "test_llvm_emission_time_is_included_and_build_directory_is_fresh" (H.withScratch (\directory -> do
    exe <- getExecutablePath
    O.copy exe (directory ++ "/mock")
@@ -399,38 +399,38 @@ buildFailureCases =
    let runtime = directory ++ "/runtime.c"
    writeFile source "source"
    writeFile runtime "runtime"
-   first <- B.buildParallelWithIncludes (directory ++ "/first") compiler compiler source runtime Nil (Cons (directory ++ "/include with spaces") Nil) 10.0
-   Pair binary sample <- H.right first
+   first <- B.buildParallelWithIncludes (directory ++ "/first") compiler compiler source runtime [] ((:) (directory ++ "/include with spaces") []) 10.0
+   (,) binary sample <- H.right first
    let stages = V.array "stages" sample
-   H.assert (S.eqList eqString (J.getStrings "command" (S.head stages)) (Cons compiler (Cons "-i" (Cons (directory ++ "/include with spaces") (Cons "--emit-llvm-gc" (Cons source Nil)))))) "source include roots changed"
+   H.assert (S.eqList eqString (J.getStrings "command" (S.head stages)) ((:) compiler ((:) "-i" ((:) (directory ++ "/include with spaces") ((:) "--emit-llvm-gc" ((:) source [])))))) "source include roots changed"
    H.assert (S.eqList eqString (S.map (V.text "phase") stages) (O.words "frontend runtime llvm link") && V.int "maximum_parallel_compilers" sample == 2 && S.not (ltDouble (V.double 0.0 (J.get "started_seconds" (S.index stages 2))) (V.double 0.0 (J.get "finished_seconds" (S.index stages 0)))) && ltDouble (V.double 0.0 (J.get "started_seconds" (S.index stages 2))) (V.double 0.0 (J.get "finished_seconds" (S.index stages 1))) && S.not (ltDouble (V.double 0.0 (J.get "started_seconds" (S.index stages 3))) (V.double 0.0 (J.get "finished_seconds" (S.index stages 1)))) && S.not (ltDouble (V.double 0.0 (J.get "started_seconds" (S.index stages 3))) (V.double 0.0 (J.get "finished_seconds" (S.index stages 2)))) && S.not (ltDouble (V.double 0.0 (J.get "wall_seconds" sample)) 0.1) && S.all (\row -> S.not (ltDouble (V.double 0.0 (J.get "wall_seconds" sample)) (V.double 0.0 (J.get "wall_seconds" row)))) stages) "parallel phases or emission timing missing"
    let totalCPU = S.foldl addDouble 0.0 (S.map (\row -> V.double 0.0 (J.get "cpu_seconds" row)) stages)
    H.assert (S.not (ltDouble 0.00000001 (abs (subDouble totalCPU (V.double 0.0 (J.get "cpu_seconds" sample)))))) "phase CPU not summed"
-   reused <- B.buildParallel (directory ++ "/first") compiler compiler source runtime Nil 10.0
+   reused <- B.buildParallel (directory ++ "/first") compiler compiler source runtime [] 10.0
    H.assert (S.isLeft reused) "build directory reused"
-   second <- B.buildParallel (directory ++ "/second") compiler compiler source runtime Nil 10.0
+   second <- B.buildParallel (directory ++ "/second") compiler compiler source runtime [] 10.0
    H.right second
-   separate <- B.buildParallel (directory ++ "/separate") compiler compiler (directory ++ "/Main.mlfci") runtime Nil 10.0
-   Pair binary sample <- H.right separate
+   separate <- B.buildParallel (directory ++ "/separate") compiler compiler (directory ++ "/Main.mlfci") runtime [] 10.0
+   (,) binary sample <- H.right separate
    let command = J.getStrings "command" (S.head (V.array "stages" sample))
    H.assert (S.elem eqString "--crate-to-llvm-gc" command && S.not (S.elem eqString "--emit-llvm-gc" command)) "interface native build selected wrong frontend"
    unsetEnv "MLF_MOCK_BUILD"))
- )) (Cons (Pair "test_parallel_phase_failure_and_timeout_reap_every_child" (do
+ )) ((:) ((,) "test_parallel_phase_failure_and_timeout_reap_every_child" (do
   check "test_parallel_phase_failure_and_timeout_reap_every_child" (H.withScratch (\directory -> do
    processGroupRace directory
    S.mapM_ (\fails -> do
-    let commands = Cons (Quad "" "" (directory ++ "/sleep.out") (O.words "/bin/sleep 30")) (if fails then Cons (Quad "" "" (directory ++ "/fail.out") (Cons "/bin/sh" (Cons "-c" (Cons "exit 23" Nil)))) Nil else Nil)
+    let commands = (:) ((,,,) "" "" (directory ++ "/sleep.out") (O.words "/bin/sleep 30")) (if fails then (:) ((,,,) "" "" (directory ++ "/fail.out") ((:) "/bin/sh" ((:) "-c" ((:) "exit 23" [])))) [] else [])
     result <- B.runGroup directory (if fails then 5.0 else 0.2) commands
     observed <- J.read (directory ++ "/group.json")
     H.assert (S.isLeft result && V.int "remaining_children" observed == 0 && ltDouble (V.double 0.0 (J.get "wall_seconds" observed)) 3.0) "parallel failure did not reap every child promptly"
     let dependency = if fails then O.words "0 1" else O.words "0"
     let blocked = directory ++ (if fails then "/failed-dependent.out" else "/timeout-dependent.out")
-    let pipeline = S.snoc (S.map (\command -> Pair Nil command) commands) (Pair (S.map readInt dependency) (Quad "" "" blocked (Cons "/usr/bin/true" Nil)))
+    let pipeline = S.snoc (S.map (\command -> (,) [] command) commands) ((,) (S.map readInt dependency) ((,,,) "" "" blocked ((:) "/usr/bin/true" [])))
     result <- B.runPipeline directory (if fails then 5.0 else 0.2) pipeline
     observed <- J.read (directory ++ "/pipeline.json")
     started <- fileExists blocked
-    H.assert (S.isLeft result && S.not started && V.int "remaining_children" observed == 0 && ltDouble (V.double 0.0 (J.get "wall_seconds" observed)) 3.0) "pipeline failure ran a dependent stage or leaked a child") (Cons true (Cons false Nil))))
- )) (Cons (Pair "test_native_driver_preserves_existing_executable_on_failure" (do
+    H.assert (S.isLeft result && S.not started && V.int "remaining_children" observed == 0 && ltDouble (V.double 0.0 (J.get "wall_seconds" observed)) 3.0) "pipeline failure ran a dependent stage or leaked a child") ((:) true ((:) false []))))
+ )) ((:) ((,) "test_native_driver_preserves_existing_executable_on_failure" (do
   check "test_native_driver_preserves_existing_executable_on_failure" (H.withScratch (\directory -> do
    compiler <- getEnv "MLF_BOOTSTRAP_COMPILER"
    let source = directory ++ "/bad.emlf"
@@ -442,14 +442,14 @@ buildFailureCases =
    H.assert (S.isLeft result && eqString contents "previous executable") "failed frontend replaced executable"
    present <- fileExists (directory ++ "/build/pending-executable")
    H.assert (S.not present) "link ran after frontend failure"))
- )) (Cons (Pair "test_interruption_cannot_leave_a_stale_success" (do
+ )) ((:) ((,) "test_interruption_cannot_leave_a_stale_success" (do
   check "test_interruption_cannot_leave_a_stale_success" (H.withScratch (\directory -> do
    let report = directory ++ "/report.json"
-   J.write report (J.Object (Cons (Pair "status" (J.str "passed")) Nil))
+   J.write report (J.Object ((:) ((,) "status" (J.str "passed")) []))
    result <- B.runGuarded report configuration (do
     before <- J.read report
     H.assert (eqString (V.text "status" before) "running") "old success persisted into measurement"
     return (Left "Benchmark interrupted"))
    saved <- J.read report
    H.assert (S.isLeft result && eqString (V.text "status" saved) "failed") "interruption left stale success"))
- )) (Nil)))))))
+ )) ([])))))))

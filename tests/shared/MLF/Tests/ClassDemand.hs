@@ -10,96 +10,96 @@ module MLF.Tests.ClassDemand where {
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.ClassDemand as Q;
 
-  frames :: List Q.Frame;
-  frames = Cons (Q.Frame 0 Nothing 100)
-    (Cons (Q.Frame 1 (Just 0) 90)
-      (Cons (Q.Frame 2 (Just 1) 10)
-        (Cons (Q.Frame 3 (Just 1) 20) Nil)));
-  oneSeed :: List Q.Seed;
-  oneSeed = Cons (Q.Seed 10 "Inspect" 2) Nil;
-  assertSlots :: Q.Plan -> Int -> List Int -> Either String Unit;
+  frames :: [] Q.Frame;
+  frames = (:) (Q.Frame 0 Nothing 100)
+    ((:) (Q.Frame 1 (Just 0) 90)
+      ((:) (Q.Frame 2 (Just 1) 10)
+        ((:) (Q.Frame 3 (Just 1) 20) [])));
+  oneSeed :: [] Q.Seed;
+  oneSeed = (:) (Q.Seed 10 "Inspect" 2) [];
+  assertSlots :: Q.Plan -> Int -> [] Int -> Either String ();
   assertSlots plan node expected =
     do {
       actual <- Q.slotsAt plan node;
       ensure (IS.eqIntSet (IS.fromList actual) (IS.fromList expected))
         "unexpected demand slots"
     };
-  rejects :: Either String Q.Plan -> Either String Unit;
+  rejects :: Either String Q.Plan -> Either String ();
   rejects result =
     case result of {
-      Left _ -> Right Unit;
+      Left _ -> Right ();
       Right _ -> Left "invalid planner input was accepted"
     };
-  emptyCycle :: Either String Unit;
+  emptyCycle :: Either String ();
   emptyCycle =
     do {
-      plan <- Q.solve frames Nil Nil
-        (IM.fromList (Cons (Pair 0 (Q.RefNode 1)) (Cons (Pair 1 (Q.RefNode 0)) Nil)));
-      assertSlots plan 0 Nil;
+      plan <- Q.solve frames [] []
+        (IM.fromList ((:) ((,) 0 (Q.RefNode 1)) ((:) ((,) 1 (Q.RefNode 0)) [])));
+      assertSlots plan 0 [];
       ensure (Q.universeSize plan == 0 && Q.saturationUpdates plan == 0)
         "a seedless cycle invented a dictionary"
     };
-  sameClassOrigins :: Either String Unit;
+  sameClassOrigins :: Either String ();
   sameClassOrigins =
     do {
       plan <- Q.solve frames
-        (Cons (Q.Seed 10 "Inspect" 1) (Cons (Q.Seed 11 "Inspect" 1) Nil)) Nil
-        (IM.fromList (Cons (Pair 0 (Q.SeedNode 10))
-          (Cons (Pair 1 (Q.SeedNode 11))
-            (Cons (Pair 2 (Q.UnionNodes (Cons 0 (Cons 1 Nil)))) Nil))));
+        ((:) (Q.Seed 10 "Inspect" 1) ((:) (Q.Seed 11 "Inspect" 1) [])) []
+        (IM.fromList ((:) ((,) 0 (Q.SeedNode 10))
+          ((:) ((,) 1 (Q.SeedNode 11))
+            ((:) ((,) 2 (Q.UnionNodes ((:) 0 ((:) 1 [])))) []))));
       values <- Q.slotsAt plan 2;
       ensure (length values == 2 && Q.universeSize plan == 2)
         "same-class origins were merged"
     };
-  nestedReentry :: Either String Unit;
+  nestedReentry :: Either String ();
   nestedReentry =
     do {
-      plan <- Q.solve frames oneSeed (Cons (Q.Use 100 2 1) Nil)
-        (IM.fromList (Cons (Pair 0 (Q.SeedNode 10))
-          (Cons (Pair 1 (Q.UnionNodes (Cons 0 (Cons 2 Nil))))
-            (Cons (Pair 2 (Q.InstantiateNode 100 1)) Nil))));
+      plan <- Q.solve frames oneSeed ((:) (Q.Use 100 2 1) [])
+        (IM.fromList ((:) ((,) 0 (Q.SeedNode 10))
+          ((:) ((,) 1 (Q.UnionNodes ((:) 0 ((:) 2 []))))
+            ((:) ((,) 2 (Q.InstantiateNode 100 1)) []))));
       local <- Q.seedSlot plan 10;
       promoted <- Q.instantiateSlot plan 100 local;
       inherited <- Q.instantiateSlot plan 100 promoted;
       ensure (local /= promoted && promoted == inherited)
         "nested reentry freshened an inherited origin";
-      assertSlots plan 1 (Cons local (Cons promoted Nil));
-      assertSlots plan 2 (Cons promoted Nil);
+      assertSlots plan 1 ((:) local ((:) promoted []));
+      assertSlots plan 2 ((:) promoted []);
       -- Both h parameters must still be supplied, despite one outward demand.
-      arguments <- mapM (Q.instantiateSlot plan 100) (Cons local (Cons promoted Nil));
-      ensure (eqList eqInt arguments (Cons promoted (Cons promoted Nil)))
+      arguments <- mapM (Q.instantiateSlot plan 100) ((:) local ((:) promoted []));
+      ensure (eqList eqInt arguments ((:) promoted ((:) promoted [])))
         "instantiation lost actual dictionary argument multiplicity";
       ensure (Q.universeSize plan == 2 && Q.transitionCount plan == 2)
         "nested feedback allocated an unbounded lineage"
     };
-  twoNestedUses :: Either String Unit;
+  twoNestedUses :: Either String ();
   twoNestedUses =
     do {
       plan <- Q.solve frames oneSeed
-        (Cons (Q.Use 100 2 1) (Cons (Q.Use 101 2 1) Nil))
-        (IM.fromList (Cons (Pair 0 (Q.SeedNode 10))
-          (Cons (Pair 1 (Q.UnionNodes (Cons 0 (Cons 4 Nil))))
-            (Cons (Pair 2 (Q.InstantiateNode 100 1))
-              (Cons (Pair 3 (Q.InstantiateNode 101 1))
-                (Cons (Pair 4 (Q.UnionNodes (Cons 2 (Cons 3 Nil)))) Nil))))));
+        ((:) (Q.Use 100 2 1) ((:) (Q.Use 101 2 1) []))
+        (IM.fromList ((:) ((,) 0 (Q.SeedNode 10))
+          ((:) ((,) 1 (Q.UnionNodes ((:) 0 ((:) 4 []))))
+            ((:) ((,) 2 (Q.InstantiateNode 100 1))
+              ((:) ((,) 3 (Q.InstantiateNode 101 1))
+                ((:) ((,) 4 (Q.UnionNodes ((:) 2 ((:) 3 [])))) []))))));
       local <- Q.seedSlot plan 10;
       first <- Q.instantiateSlot plan 100 local;
       second <- Q.instantiateSlot plan 101 local;
       ensure (first /= second) "distinct nested uses shared their local dictionary";
-      assertSlots plan 4 (Cons first (Cons second Nil));
+      assertSlots plan 4 ((:) first ((:) second []));
       ensure (Q.universeSize plan == 3 && Q.transitionCount plan == 6)
         "nested uses manufactured extra recursive origins"
     };
-  siblingLineage :: Either String Unit;
+  siblingLineage :: Either String ();
   siblingLineage =
     do {
       plan <- Q.solve frames oneSeed
-        (Cons (Q.Use 100 2 3) (Cons (Q.Use 101 2 3) (Cons (Q.Use 102 3 1) Nil)))
-        (IM.fromList (Cons (Pair 0 (Q.SeedNode 10))
-          (Cons (Pair 1 (Q.InstantiateNode 100 0))
-            (Cons (Pair 2 (Q.InstantiateNode 101 0))
-              (Cons (Pair 3 (Q.UnionNodes (Cons 1 (Cons 2 Nil))))
-                (Cons (Pair 4 (Q.InstantiateNode 102 3)) Nil))))));
+        ((:) (Q.Use 100 2 3) ((:) (Q.Use 101 2 3) ((:) (Q.Use 102 3 1) [])))
+        (IM.fromList ((:) ((,) 0 (Q.SeedNode 10))
+          ((:) ((,) 1 (Q.InstantiateNode 100 0))
+            ((:) ((,) 2 (Q.InstantiateNode 101 0))
+              ((:) ((,) 3 (Q.UnionNodes ((:) 1 ((:) 2 []))))
+                ((:) ((,) 4 (Q.InstantiateNode 102 3)) []))))));
       local <- Q.seedSlot plan 10;
       first <- Q.instantiateSlot plan 100 local;
       second <- Q.instantiateSlot plan 101 local;
@@ -107,68 +107,68 @@ module MLF.Tests.ClassDemand where {
       secondOuter <- Q.instantiateSlot plan 102 second;
       ensure (firstOuter /= secondOuter)
         "origin lineage was collapsed to seed and last use";
-      assertSlots plan 4 (Cons firstOuter (Cons secondOuter Nil));
+      assertSlots plan 4 ((:) firstOuter ((:) secondOuter []));
       ensure (Q.universeSize plan == 5) "completed sibling origin count changed"
     };
-  capturedOrigin :: Either String Unit;
+  capturedOrigin :: Either String ();
   capturedOrigin =
     do {
-      plan <- Q.solve frames (Cons (Q.Seed 10 "Inspect" 1) Nil)
-        (Cons (Q.Use 100 2 1) Nil)
-        (IM.fromList (Cons (Pair 0 (Q.SeedNode 10))
-          (Cons (Pair 1 (Q.InstantiateNode 100 0)) Nil)));
+      plan <- Q.solve frames ((:) (Q.Seed 10 "Inspect" 1) [])
+        ((:) (Q.Use 100 2 1) [])
+        (IM.fromList ((:) ((,) 0 (Q.SeedNode 10))
+          ((:) ((,) 1 (Q.InstantiateNode 100 0)) [])));
       local <- Q.seedSlot plan 10;
       inherited <- Q.instantiateSlot plan 100 local;
       ensure (inherited == local && Q.universeSize plan == 1)
         "captured outer dictionary was independently instantiated"
     };
-  unreachableUses :: Either String Unit;
+  unreachableUses :: Either String ();
   unreachableUses =
     do {
       plan <- Q.solve frames
-        (Cons (Q.Seed 10 "Inspect" 2) (Cons (Q.Seed 11 "Convert" 2) Nil))
-        (Cons (Q.Use 100 2 1) (Cons (Q.Use 101 2 3) Nil))
-        (IM.fromList (Cons (Pair 0 (Q.SeedNode 10))
-          (Cons (Pair 1 (Q.SeedNode 11))
-            (Cons (Pair 2 Q.Empty)
-              (Cons (Pair 3 (Q.InstantiateNode 100 2))
-                (Cons (Pair 4 (Q.InstantiateNode 101 2)) Nil))))));
+        ((:) (Q.Seed 10 "Inspect" 2) ((:) (Q.Seed 11 "Convert" 2) []))
+        ((:) (Q.Use 100 2 1) ((:) (Q.Use 101 2 3) []))
+        (IM.fromList ((:) ((,) 0 (Q.SeedNode 10))
+          ((:) ((,) 1 (Q.SeedNode 11))
+            ((:) ((,) 2 Q.Empty)
+              ((:) ((,) 3 (Q.InstantiateNode 100 2))
+                ((:) ((,) 4 (Q.InstantiateNode 101 2)) []))))));
       ensure (Q.universeSize plan == 2 && Q.transitionCount plan == 0)
         "unrelated lexical uses expanded the universe";
-      selected <- Q.selectedSlotCount plan (Cons 3 (Cons 4 Nil));
+      selected <- Q.selectedSlotCount plan ((:) 3 ((:) 4 []));
       ensure (selected == 0) "empty let continuation inherited an unused RHS demand"
     };
-  validation :: Either String Unit;
+  validation :: Either String ();
   validation =
     do {
-      rejects (Q.solve frames oneSeed (Cons (Q.Use 100 2 2) Nil) IM.empty);
-      rejects (Q.solve frames oneSeed (Cons (Q.Use 100 1 2) Nil) IM.empty);
+      rejects (Q.solve frames oneSeed ((:) (Q.Use 100 2 2) []) IM.empty);
+      rejects (Q.solve frames oneSeed ((:) (Q.Use 100 1 2) []) IM.empty);
       rejects (Q.solve
-        (Cons (Q.Frame 0 Nothing 0) (Cons (Q.Frame 1 (Just 0) 1) Nil)) Nil Nil IM.empty);
-      rejects (Q.solve frames (Cons (Q.Seed 10 "A" 2) (Cons (Q.Seed 10 "B" 2) Nil)) Nil IM.empty);
-      rejects (Q.solve frames Nil Nil (IM.singleton 0 (Q.RefNode 1)));
-      rejects (Q.solve frames Nil Nil (IM.singleton 0 (Q.InstantiateNode 99 0)));
-      rejects (Q.solve frames (Cons (Q.Seed 10 "Inspect" 3) Nil)
-        (Cons (Q.Use 100 2 1) Nil)
-        (IM.fromList (Cons (Pair 0 (Q.SeedNode 10))
-          (Cons (Pair 1 (Q.InstantiateNode 100 0)) Nil))));
-      Right Unit
+        ((:) (Q.Frame 0 Nothing 0) ((:) (Q.Frame 1 (Just 0) 1) [])) [] [] IM.empty);
+      rejects (Q.solve frames ((:) (Q.Seed 10 "A" 2) ((:) (Q.Seed 10 "B" 2) [])) [] IM.empty);
+      rejects (Q.solve frames [] [] (IM.singleton 0 (Q.RefNode 1)));
+      rejects (Q.solve frames [] [] (IM.singleton 0 (Q.InstantiateNode 99 0)));
+      rejects (Q.solve frames ((:) (Q.Seed 10 "Inspect" 3) [])
+        ((:) (Q.Use 100 2 1) [])
+        (IM.fromList ((:) ((,) 0 (Q.SeedNode 10))
+          ((:) ((,) 1 (Q.InstantiateNode 100 0)) []))));
+      Right ()
     };
-  checks :: List (Pair String (Either String Unit));
-  checks = Cons (Pair "empty recursive demand cycle" emptyCycle)
-    (Cons (Pair "same-class origin distinction" sameClassOrigins)
-      (Cons (Pair "nested owner reentry and actual multiplicity" nestedReentry)
-        (Cons (Pair "two nested polymorphic uses" twoNestedUses)
-          (Cons (Pair "completed sibling full lineage" siblingLineage)
-            (Cons (Pair "captured ancestor origin" capturedOrigin)
-              (Cons (Pair "no unreachable Cartesian expansion" unreachableUses)
-                (Cons (Pair "invalid rank and reference rejection" validation) Nil)))))));
-  checkAll :: Either String Unit;
+  checks :: [] ((,) String (Either String ()));
+  checks = (:) ((,) "empty recursive demand cycle" emptyCycle)
+    ((:) ((,) "same-class origin distinction" sameClassOrigins)
+      ((:) ((,) "nested owner reentry and actual multiplicity" nestedReentry)
+        ((:) ((,) "two nested polymorphic uses" twoNestedUses)
+          ((:) ((,) "completed sibling full lineage" siblingLineage)
+            ((:) ((,) "captured ancestor origin" capturedOrigin)
+              ((:) ((,) "no unreachable Cartesian expansion" unreachableUses)
+                ((:) ((,) "invalid rank and reference rejection" validation) [])))))));
+  checkAll :: Either String ();
   checkAll =
     foldM
-      (\_ (Pair label result) ->
+      (\_ ((,) label result) ->
          case result of {
            Left message -> Left (label ++ (": " ++ message));
-           Right Unit -> Right Unit
-         }) Unit checks
+           Right () -> Right ()
+         }) () checks
 }

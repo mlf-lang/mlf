@@ -18,20 +18,20 @@ check a b = do
  let result = IS.union left right
  case result of { IntSet tree -> assert (L.eqList eqInt (IS.toList result) expected && IS.size result == L.length expected && M.valid L.compareInt tree) }
 
-unions : A.Test Unit
+unions : A.Test ()
 unions = do
- let counts = Cons 0 (Cons 1 (Cons 2 (Cons 5 (Cons 17 (Cons 65 Nil)))))
- let offsets = Cons (-1000000000000000000000000000000000000) (Cons (-1000) (Cons 0 (Cons 3 (Cons 1000000000000000000000000000000000000 Nil))))
- let pairs = L.concatMap (\n -> L.concatMap (\m -> L.map (\offset -> Pair (L.map (\i -> 17 * i) (L.range 0 (n - 1))) (L.map (\i -> offset + 17 * i) (L.range 0 (m - 1)))) offsets) counts) counts
- let ordered = L.concatMap (\(Pair a b) -> Cons (Pair a b) (Cons (Pair b a) Nil)) pairs
+ let counts = (:) 0 ((:) 1 ((:) 2 ((:) 5 ((:) 17 ((:) 65 [])))))
+ let offsets = (:) (-1000000000000000000000000000000000000) ((:) (-1000) ((:) 0 ((:) 3 ((:) 1000000000000000000000000000000000000 []))))
+ let pairs = L.concatMap (\n -> L.concatMap (\m -> L.map (\offset -> (,) (L.map (\i -> 17 * i) (L.range 0 (n - 1))) (L.map (\i -> offset + 17 * i) (L.range 0 (m - 1)))) offsets) counts) counts
+ let ordered = L.concatMap (\((,) a b) -> (:) ((,) a b) ((:) ((,) b a) [])) pairs
  let unique = H.distinctListPairs eqInt ordered
  A.assert (L.length ordered == 360 && L.length unique == 276) "ordered union stimulus coverage changed"
- L.mapM_ (\(Pair a b) -> check a b) unique
- return Unit
+ L.mapM_ (\((,) a b) -> check a b) unique
+ return ()
 
-cases : List C.Case
-cases = Cons (C.described "runtime-library" "component" (Cons "exhaustive" Nil) (Cons "independent-reference" Nil) (Cons "regression" (Cons "conformance" Nil))
- (C.classified (Cons "standard-library" Nil) (Cons "regression" (Cons "property-based" (Cons "differential" Nil)))
- (C.test "int-set/union-sorted-list" "size-biased set unions agree with independent sorted lists" (Cons "containers" (Cons "oracle" Nil)) unions))) Nil
+cases : [] C.Case
+cases = (:) (C.described "runtime-library" "component" ((:) "exhaustive" []) ((:) "independent-reference" []) ((:) "regression" ((:) "conformance" []))
+ (C.classified ((:) "standard-library" []) ((:) "regression" ((:) "property-based" ((:) "differential" [])))
+ (C.test "int-set/union-sorted-list" "size-biased set unions agree with independent sorted lists" ((:) "containers" ((:) "oracle" [])) unions))) []
 
 suite = L.map C.toLegacy cases

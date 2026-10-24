@@ -24,8 +24,8 @@ module Tests.TupleList where {
   -- the checkout parser; fixed ASTs and types are independent expectations.
   fatal :: forall a. String -> A.Test a;
   fatal message = A.fail ("Tuple/list failure: " ++ message);
-  require :: Bool -> String -> A.Test Unit;
-  require condition message = if condition then A.succeed Unit else fatal message;
+  require :: Bool -> String -> A.Test ();
+  require condition message = if condition then A.succeed () else fatal message;
   right :: forall a. Either String a -> A.Test a;
   right result =
     case result of {
@@ -45,35 +45,89 @@ module Tests.TupleList where {
     (((offset + stringLength needle) <= stringLength text) &&
      (eqString needle (stringSlice text offset (stringLength needle)) ||
       containsAt needle text (offset + 1)));
-  one :: forall a. a -> List a;
-  one a = Cons a Nil;
-  two :: forall a. a -> a -> List a;
-  two a b = Cons a (one b);
-  three :: forall a. a -> a -> a -> List a;
-  three a b c = Cons a (two b c);
+  one :: forall a. a -> [] a;
+  one a = (:) a [];
+  two :: forall a. a -> a -> [] a;
+  two a b = (:) a (one b);
+  three :: forall a. a -> a -> a -> [] a;
+  three a b c = (:) a (two b c);
   apply2 :: SExpr -> SExpr -> SExpr -> SExpr;
   apply2 f a b = SApp (SApp f a) b;
   pair :: SExpr -> SExpr -> SExpr;
-  pair = apply2 (SConstructor "Pair");
+  pair = apply2 (SConstructor "(,)");
   cons :: SExpr -> SExpr -> SExpr;
-  cons = apply2 (SConstructor "Cons");
+  cons = apply2 (SConstructor ":");
   nil :: SExpr;
-  nil = SConstructor "Nil";
+  nil = SConstructor "[]";
   int :: XType;
-  int = XCon "Int" Nil;
+  int = XCon "Int" [];
   bool :: XType;
-  bool = XCon "Bool" Nil;
+  bool = XCon "Bool" [];
   intType :: SType;
-  intType = SCon "Int" Nil;
+  intType = SCon "Int" [];
   boolType :: SType;
-  boolType = SCon "Bool" Nil;
-  sameExpression :: String -> String -> SExpr -> A.Test Unit;
+  boolType = SCon "Bool" [];
+  -- Parser shape observations ignore call-site provenance, not syntax.
+  -- Only the expression forms used below are traversed. Other forms remain
+  -- unchanged, so a new syntax form cannot silently disappear from the oracle.
+  syntaxShape :: SExpr -> SExpr;
+  syntaxShape expression =
+    case expression of {
+      SCallSite _ _ body -> syntaxShape body;
+      SApp function argument -> SApp (syntaxShape function) (syntaxShape argument);
+      SAnn body annotation -> SAnn (syntaxShape body) annotation;
+      SCase value alternatives ->
+        SCase (syntaxShape value)
+          (S.map (\(SAlternative pattern body) -> SAlternative pattern (syntaxShape body)) alternatives);
+      _ -> expression
+    };
+  provenanceProjection :: A.Test ();
+  provenanceProjection =
+    do {
+      let { location = SourceSpan "probe" "Observer" "observer.emlf" 1 1 1 8 };
+      let { pattern = SConstructorPattern "(,)" (two (Just "x") Nothing) };
+      let { annotation = SAnnotation [] (SCon "[]" (one intType)) };
+      let { located = \function argument selected ty ->
+        SCallSite "outer" location
+          (SAnn
+            (SCallSite "case" location
+              (SCase (SApp (SCallSite "function" location function)
+                           (SCallSite "argument" location argument))
+                (one (SAlternative selected (SCallSite "result" location (SVar "x")))))) ty)
+      };
+      let { expected =
+        SAnn (SCase (SApp (SConstructor "Just") (SVar "argument"))
+          (one (SAlternative pattern (SVar "x")))) annotation
+      };
+      require
+        (Equality.eqExpr (syntaxShape (located (SConstructor "Just") (SVar "argument") pattern annotation)) expected)
+        "provenance observer changed expression shape";
+      require
+        (S.not (Equality.eqExpr (syntaxShape (located (SConstructor "Nothing") (SVar "argument") pattern annotation)) expected))
+        "provenance observer erased a constructor distinction";
+      require
+        (S.not (Equality.eqExpr (syntaxShape (located (SVar "argument") (SConstructor "Just") pattern annotation)) expected))
+        "provenance observer erased application order";
+      require
+        (S.not (Equality.eqExpr
+          (syntaxShape (located (SConstructor "Just") (SVar "argument")
+            (SConstructorPattern "(,)" (two (Just "y") Nothing)) annotation)) expected))
+        "provenance observer erased pattern binders";
+      require
+        (S.not (Equality.eqExpr
+          (syntaxShape (located (SConstructor "Just") (SVar "argument") pattern (SAnnotation [] boolType))) expected))
+        "provenance observer erased type annotations";
+      let { unsupported = SLam "x" Nothing (SCallSite "body" location (SVar "x")) };
+      require (Equality.eqExpr (syntaxShape unsupported) unsupported)
+        "provenance observer changed an unhandled expression form"
+    };
+  sameExpression :: String -> String -> SExpr -> A.Test ();
   sameExpression label source expected =
     do {
       actual <- right (Parser.parseExpr "tuple-list.emlf" source);
-      require (Equality.eqExpr actual expected) (label ++ ": unexpected expression AST")
+      require (Equality.eqExpr (syntaxShape actual) expected) (label ++ ": unexpected expression AST")
     };
-  sameBoundary :: String -> String -> String -> SExpr -> A.Test Unit;
+  sameBoundary :: String -> String -> String -> SExpr -> A.Test ();
   sameBoundary label delimiter source expected =
     do {
       actual <-
@@ -81,17 +135,17 @@ module Tests.TupleList where {
           (Parser.parseLayout False (Parsec.pBefore Parser.expr (Parsec.pToken delimiter))
              "tuple-list-boundary.emlf"
              source);
-      require (Equality.eqExpr actual expected)
+      require (Equality.eqExpr (syntaxShape actual) expected)
         (label ++ ": unexpected expression before delimiter")
     };
-  sameAnnotation :: String -> String -> SType -> A.Test Unit;
+  sameAnnotation :: String -> String -> SType -> A.Test ();
   sameAnnotation label source expected =
     do {
       actual <- right (Parser.parseAnnotation source);
-      require (Equality.eqAnnotation actual (SAnnotation Nil expected))
+      require (Equality.eqAnnotation actual (SAnnotation [] expected))
         (label ++ ": unexpected type AST")
     };
-  sameFields :: A.Test Unit;
+  sameFields :: A.Test ();
   sameFields =
     do {
       actual <-
@@ -102,28 +156,28 @@ module Tests.TupleList where {
         a = Parameter "a"
       };
       let {
-        i = Applied "Int" Nil
+        i = Applied "Int" []
       };
       let {
-        b = Applied "Bool" Nil
+        b = Applied "Bool" []
       };
       let {
         fields =
-          Cons (Applied "List" (one a))
-            (Cons (Applied "Pair" (two a i))
-               (Cons (Applied "Triple" (three a i b))
-                  (one (Applied "Quad" (Cons a (three i b (Applied "String" Nil)))))))
+          (:) (Applied "[]" (one a))
+            ((:) (Applied "(,)" (two a i))
+               ((:) (Applied "(,,)" (three a i b))
+                  (one (Applied "(,,,)" ((:) a (three i b (Applied "String" [])))))))
       };
       let {
         expected = DataDecl "Box" (one "a") (one (ConstructorDecl "Box" fields))
       };
       case actual of {
-        SourceModule _ _ _ _ (Cons declaration Nil) _ _ _ _ _ ->
+        SourceModule _ _ _ _ ((:) declaration []) _ _ _ _ _ ->
           require (Equality.eqDataDecl declaration expected) "tuple/list datatype fields";
         _ -> fatal "missing datatype fields"
       }
     };
-  checkResult :: String -> XType -> Compiler.Compilation -> A.Test Unit;
+  checkResult :: String -> XType -> Compiler.Compilation -> A.Test ();
   checkResult label expected result =
     do {
       require (IndependentType.alphaEq (Compiler.inferredType result) expected)
@@ -140,13 +194,13 @@ module Tests.TupleList where {
       require (X.equalErased (X.erase term) (X.erase original))
         (label ++ ": target round trip changed erasure")
     };
-  accepted :: String -> String -> XType -> A.Test Unit;
+  accepted :: String -> String -> XType -> A.Test ();
   accepted label source expected =
     do {
       result <- compiled (Compiler.compile "tuple-list.emlf" source);
       checkResult label expected result
     };
-  evaluates :: String -> String -> Int -> A.Test Unit;
+  evaluates :: String -> String -> Int -> A.Test ();
   evaluates label source expected =
     do {
       result <- compiled (Compiler.compile "tuple-list.emlf" source);
@@ -157,7 +211,7 @@ module Tests.TupleList where {
       let {
         environment =
           case prepared of {
-            Pair dataEnvironment _ -> dataEnvironment
+            (,) dataEnvironment _ -> dataEnvironment
           }
       };
       value <- right (Runtime.evaluate environment (Runtime.REnv M.empty) (X.erase term));
@@ -167,7 +221,7 @@ module Tests.TupleList where {
         _ -> fatal (label ++ ": runtime value was not an integer")
       }
     };
-  parseRejected :: String -> String -> A.Test Unit;
+  parseRejected :: String -> String -> A.Test ();
   parseRejected label source =
     do {
       case Parser.parseExpr "tuple-list.emlf" source of {
@@ -176,7 +230,7 @@ module Tests.TupleList where {
         Right _ -> fatal (label ++ ": malformed syntax accepted")
       }
     };
-  parseDiagnostic :: String -> String -> String -> A.Test Unit;
+  parseDiagnostic :: String -> String -> String -> A.Test ();
   parseDiagnostic label source expected =
     do {
       case Parser.parseExpr "tuple-list.emlf" source of {
@@ -184,7 +238,7 @@ module Tests.TupleList where {
         Right _ -> fatal (label ++ ": malformed syntax accepted")
       }
     };
-  rejected :: String -> String -> Phase -> String -> A.Test Unit;
+  rejected :: String -> String -> Phase -> String -> A.Test ();
   rejected label source phase reason =
     do {
       case Compiler.compile "tuple-list.emlf" source of {
@@ -199,15 +253,15 @@ module Tests.TupleList where {
   declarations :: String;
   declarations =
     "data List a = Nil | Cons a (List a); data Pair a b = Pair a b; data Triple a b c = Triple a b c; data Quad a b c d = Quad a b c d; ";
-  shapes :: Map String (Pair String String);
-  shapes = M.singleton "Shapes" (Pair "Shapes.emlf" ("module Shapes where\n" ++ declarations));
-  moduleAccepted :: String -> String -> A.Test Unit;
+  shapes :: Map String ((,) String String);
+  shapes = M.singleton "Shapes" ((,) "Shapes.emlf" ("module Shapes where\n" ++ declarations));
+  moduleAccepted :: String -> String -> A.Test ();
   moduleAccepted label source =
     do {
       result <- compiled (Compiler.compileModules shapes "Main.emlf" source);
       checkResult label int result
     };
-  moduleRejected :: String -> Map String (Pair String String) -> String -> String -> A.Test Unit;
+  moduleRejected :: String -> Map String ((,) String String) -> String -> String -> A.Test ();
   moduleRejected label libraries source reason =
     do {
       case Compiler.compileModules libraries "Main.emlf" source of {
@@ -217,23 +271,57 @@ module Tests.TupleList where {
         Right _ -> fatal (label ++ ": scope failure accepted")
       }
     };
-  -- Stable IDs are frozen from the reviewed authored observation inventory.
+  -- Unchanged contracts retain their reviewed IDs; semantic replacements use new IDs.
+  -- Historical observation ledgers remain unchanged.
   -- Assertion failures are values, so one failed leaf cannot hide later leaves.
-  leaf :: String -> String -> String -> A.Test Unit -> C.Case;
+  leaf :: String -> String -> String -> A.Test () -> C.Case;
   leaf identity label oracle body =
-    C.described "language" "integration" (Cons "fixed" Nil) (Cons oracle Nil)
-      (Cons "regression" (Cons "conformance" Nil))
-      (C.test identity label (Cons "tuple-list" Nil) body);
-  withoutPrelude :: A.Test Unit;
+    C.described "language" "integration" ((:) "fixed" []) ((:) oracle [])
+      ((:) "regression" ((:) "conformance" []))
+      (C.test identity label ((:) "tuple-list" []) body);
+  withoutPrelude :: A.Test ();
   withoutPrelude =
     do {
       result <-
         compiled
           (Compiler.compileWithPrelude NoImplicitPrelude "tuple-list.emlf"
-             (declarations ++ "case [42] of {[x] -> x; _ -> 0}"));
+             "case [42] of {[x] -> x; _ -> 0}");
       checkResult "list sugar works without implicit Prelude" int result
     };
-  parserCases :: List C.Case;
+  -- Independent Haskell tuple identities: n components use n-1 commas.
+  -- Neither names nor expected fields come from the parser or compiler result.
+  tupleName :: Int -> String;
+  tupleName arity = "(" ++ (S.concatStrings (S.replicate (arity - 1) ",") ++ ")");
+  tupleSource :: Int -> String -> String;
+  tupleSource arity component = "(" ++ (S.intercalate "," (S.replicate arity component) ++ ")");
+  tupleArityChecks :: A.Test ();
+  tupleArityChecks = S.mapM_ tupleArityCheck (S.range 2 64);
+  tupleArityCheck :: Int -> A.Test ();
+  tupleArityCheck arity =
+    do {
+      let { label = "standard tuple arity " ++ showInt arity };
+      let { name = tupleName arity };
+      let { expression = tupleSource arity "42" };
+      let { expected = XCon name (S.replicate arity int) };
+      sameExpression (label ++ " expression") expression
+        (S.foldl SApp (SConstructor name) (S.replicate arity (SIntLit 42)));
+      sameAnnotation (label ++ " type") (tupleSource arity "Int")
+        (SCon name (S.replicate arity intType));
+      sameExpression (label ++ " pattern")
+        ("case value of {" ++ (tupleSource arity "_" ++ " -> 42}"))
+        (SCase (SVar "value")
+          (one (SAlternative (SConstructorPattern name (S.replicate arity Nothing)) (SIntLit 42))));
+      -- Exhaustive parsing is cheap; independently checked targets cover boundaries.
+      if arity == 2 || arity == 3 || arity == 15 || arity == 16 || arity == 63 || arity == 64
+      then do {
+        accepted (label ++ " legacy profile") expression expected;
+        accepted (label ++ " shared profile")
+          ("-- mlf:syntax shared-haskell-v1\n{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}\nmodule TupleArity where { import MLF.Primitive; main = " ++ (expression ++ "; }"))
+          expected
+      }
+      else A.succeed ()
+    };
+  parserCases :: [] C.Case;
   parserCases =
     let {
       a = SVar "a"
@@ -247,50 +335,50 @@ module Tests.TupleList where {
     let {
       d = SVar "d"
     } in
-    Cons
+    (:)
       (leaf "tuple-list/focused/pair-ast" "pair AST" "fixed-ast"
          (sameExpression "pair AST" "(a,b)" (pair a b)))
-      (Cons
+      ((:)
          (leaf "tuple-list/focused/triple-ast" "triple AST" "fixed-ast"
-            (sameExpression "triple AST" "(a,b,c)" (SApp (apply2 (SConstructor "Triple") a b) c)))
-         (Cons
+            (sameExpression "triple AST" "(a,b,c)" (SApp (apply2 (SConstructor "(,,)") a b) c)))
+         ((:)
             (leaf "tuple-list/focused/quad-ast" "quad AST" "fixed-ast"
                (sameExpression "quad AST" "(a,b,c,d)"
-                  (SApp (SApp (apply2 (SConstructor "Quad") a b) c) d)))
-            (Cons
+                  (SApp (SApp (apply2 (SConstructor "(,,,)") a b) c) d)))
+            ((:)
                (leaf "tuple-list/focused/grouping-remains-grouping" "grouping remains grouping"
                   "fixed-ast"
                   (sameExpression "grouping remains grouping" "(a)" a))
-               (Cons
+               ((:)
                   (leaf "tuple-list/focused/unit-remains-intrinsic" "unit remains intrinsic"
                      "fixed-ast"
-                     (sameExpression "unit remains intrinsic" "()" (SConstructor "Unit")))
-                  (Cons
+                     (sameExpression "unit remains intrinsic" "()" (SConstructor "()")))
+                  ((:)
                      (leaf "tuple-list/focused/empty-list-ast" "empty list AST" "fixed-ast"
                         (sameExpression "empty list AST" "[]" nil))
-                     (Cons
+                     ((:)
                         (leaf "tuple-list/focused/singleton-list-ast" "singleton list AST"
                            "fixed-ast"
                            (sameExpression "singleton list AST" "[a]" (cons a nil)))
-                        (Cons
+                        ((:)
                            (leaf "tuple-list/focused/nested-list-and-tuple-ast"
                               "nested list and tuple AST"
                               "fixed-ast"
                               (sameExpression "nested list and tuple AST" "[(a,b), (c,d)]"
                                  (cons (pair a b) (cons (pair c d) nil))))
-                           (Cons
+                           ((:)
                               (leaf "tuple-list/focused/cons-associates-right"
                                  "cons associates right"
                                  "fixed-ast"
                                  (sameExpression "cons associates right" "a : b : c"
                                     (cons a (cons b c))))
-                              (Cons
+                              ((:)
                                  (leaf "tuple-list/focused/cons-follows-addition"
                                     "cons follows addition"
                                     "fixed-ast"
                                     (sameExpression "cons follows addition" "a + b : c"
                                        (cons (apply2 (SPrimitive PAddInt) a b) c)))
-                                 (Cons
+                                 ((:)
                                     (leaf
                                        "tuple-list/focused/cons-and-concatenation-share-right-precedence"
                                        "cons and concatenation share right precedence"
@@ -299,7 +387,7 @@ module Tests.TupleList where {
                                           "cons and concatenation share right precedence"
                                           "a : b ++ c"
                                           (cons a (apply2 (SPrimitive PConcatString) b c))))
-                                    (Cons
+                                    ((:)
                                        (leaf
                                           "tuple-list/focused/concatenation-and-cons-share-right-precedence"
                                           "concatenation and cons share right precedence"
@@ -308,34 +396,34 @@ module Tests.TupleList where {
                                              "concatenation and cons share right precedence"
                                              "a ++ b : c"
                                              (apply2 (SPrimitive PConcatString) a (cons b c))))
-                                       (Cons
+                                       ((:)
                                           (leaf
                                              "tuple-list/focused/legacy-annotation-covers-addition"
                                              "legacy annotation covers addition"
                                              "fixed-ast"
                                              (sameExpression "legacy annotation covers addition"
-                                                "a + b : Int"
+                                                "a + b :: Int"
                                                 (SAnn (apply2 (SPrimitive PAddInt) a b)
-                                                   (SAnnotation Nil intType))))
-                                          (Cons
+                                                   (SAnnotation [] intType))))
+                                          ((:)
                                              (leaf
                                                 "tuple-list/focused/legacy-uppercase-tail-is-an-annotation"
-                                                "legacy uppercase tail is an annotation"
+                                                "explicit custom type annotation"
                                                 "fixed-ast"
                                                 (sameExpression
-                                                   "legacy uppercase tail is an annotation"
-                                                   "a : Nil"
-                                                   (SAnn a (SAnnotation Nil (SCon "Nil" Nil)))))
-                                             (Cons
+                                                   "explicit custom type annotation"
+                                                   "a :: Nil"
+                                                   (SAnn a (SAnnotation [] (SCon "Nil" [])))))
+                                             ((:)
                                                 (leaf "tuple-list/focused/explicit-annotation"
                                                    "explicit annotation"
                                                    "fixed-ast"
                                                    (sameExpression "explicit annotation"
                                                       "[a] :: [Int]"
                                                       (SAnn (cons a nil)
-                                                         (SAnnotation Nil
-                                                            (SCon "List" (one intType))))))
-                                                (Cons
+                                                         (SAnnotation []
+                                                            (SCon "[]" (one intType))))))
+                                                ((:)
                                                    (leaf
                                                       "tuple-list/focused/explicit-free-annotation-still-parses"
                                                       "explicit free annotation still parses"
@@ -343,8 +431,8 @@ module Tests.TupleList where {
                                                       (sameExpression
                                                          "explicit free annotation still parses"
                                                          "a :: b"
-                                                         (SAnn a (SAnnotation Nil (STVar "b")))))
-                                                   (Cons
+                                                         (SAnn a (SAnnotation [] (STVar "b")))))
+                                                   ((:)
                                                       (leaf
                                                          "tuple-list/focused/case-tuple-pattern-ast"
                                                          "case tuple pattern AST"
@@ -354,10 +442,10 @@ module Tests.TupleList where {
                                                             (SCase a
                                                                (one
                                                                   (SAlternative
-                                                                     (SConstructorPattern "Pair"
+                                                                     (SConstructorPattern "(,)"
                                                                         (two (Just "x") (Just "y")))
                                                                      (SVar "x"))))))
-                                                      (Cons
+                                                      ((:)
                                                          (leaf
                                                             "tuple-list/focused/case-cons-pattern-ast"
                                                             "case cons pattern AST"
@@ -367,11 +455,11 @@ module Tests.TupleList where {
                                                                (SCase a
                                                                   (one
                                                                      (SAlternative
-                                                                        (SConstructorPattern "Cons"
+                                                                        (SConstructorPattern ":"
                                                                            (two (Just "x")
                                                                               (Just "xs")))
                                                                         (SVar "x"))))))
-                                                         (Cons
+                                                         ((:)
                                                             (leaf
                                                                "tuple-list/focused/empty-pattern-ast"
                                                                "empty pattern AST"
@@ -381,11 +469,10 @@ module Tests.TupleList where {
                                                                   (SCase a
                                                                      (one
                                                                         (SAlternative
-                                                                           (SConstructorPattern
-                                                                              "Nil"
-                                                                              Nil)
+                                                                           (SConstructorPattern "[]"
+                                                                              [])
                                                                            b)))))
-                                                            (Cons
+                                                            ((:)
                                                                (leaf
                                                                   "tuple-list/focused/list-pattern-ast"
                                                                   "list pattern AST"
@@ -395,30 +482,28 @@ module Tests.TupleList where {
                                                                      (SCase a
                                                                         (one
                                                                            (SAlternative
-                                                                              (SNestedPattern "Cons"
+                                                                              (SNestedPattern ":"
                                                                                  (two
                                                                                     (SDefaultPattern
                                                                                        (Just "x"))
-                                                                                    (SNestedPattern
-                                                                                       "Cons"
+                                                                                    (SNestedPattern ":"
                                                                                        (two
                                                                                           (SDefaultPattern
                                                                                              (Just
                                                                                                 "y"))
-                                                                                          (SConstructorPattern
-                                                                                             "Nil"
-                                                                                             Nil)))))
+                                                                                          (SConstructorPattern "[]"
+                                                                                             [])))))
                                                                               (SVar "x"))))))
-                                                               (Cons
+                                                               ((:)
                                                                   (leaf
                                                                      "tuple-list/focused/pair-type-ast"
                                                                      "pair type AST"
                                                                      "fixed-ast"
                                                                      (sameAnnotation "pair type AST"
                                                                         "(Int,Bool)"
-                                                                        (SCon "Pair"
+                                                                        (SCon "(,)"
                                                                            (two intType boolType))))
-                                                                  (Cons
+                                                                  ((:)
                                                                      (leaf
                                                                         "tuple-list/focused/triple-type-ast"
                                                                         "triple type AST"
@@ -426,11 +511,11 @@ module Tests.TupleList where {
                                                                         (sameAnnotation
                                                                            "triple type AST"
                                                                            "(Int,Bool,Int)"
-                                                                           (SCon "Triple"
+                                                                           (SCon "(,,)"
                                                                               (three intType
                                                                                  boolType
                                                                                  intType))))
-                                                                     (Cons
+                                                                     ((:)
                                                                         (leaf
                                                                            "tuple-list/focused/list-type-ast"
                                                                            "list type AST"
@@ -438,12 +523,12 @@ module Tests.TupleList where {
                                                                            (sameAnnotation
                                                                               "list type AST"
                                                                               "[(Int,Bool)]"
-                                                                              (SCon "List"
+                                                                              (SCon "[]"
                                                                                  (one
-                                                                                    (SCon "Pair"
+                                                                                    (SCon "(,)"
                                                                                        (two intType
                                                                                           boolType))))))
-                                                                        (Cons
+                                                                        ((:)
                                                                            (leaf
                                                                               "tuple-list/focused/function-tuple-component"
                                                                               "function tuple component"
@@ -451,21 +536,21 @@ module Tests.TupleList where {
                                                                               (sameAnnotation
                                                                                  "function tuple component"
                                                                                  "(Int -> Bool, [Int])"
-                                                                                 (SCon "Pair"
+                                                                                 (SCon "(,)"
                                                                                     (two
                                                                                        (SArrow
                                                                                           intType
                                                                                           boolType)
-                                                                                       (SCon "List"
+                                                                                       (SCon "[]"
                                                                                           (one
                                                                                              intType))))))
-                                                                           (Cons
+                                                                           ((:)
                                                                               (leaf
                                                                                  "tuple-list/focused/datatype-field-asts"
                                                                                  "datatype field ASTs"
                                                                                  "fixed-ast"
                                                                                  sameFields)
-                                                                              (Cons
+                                                                              ((:)
                                                                                  (leaf
                                                                                     "tuple-list/focused/malformed-28612c29"
                                                                                     "malformed (a,)"
@@ -473,7 +558,7 @@ module Tests.TupleList where {
                                                                                     (parseRejected
                                                                                        "malformed (a,)"
                                                                                        "(a,)"))
-                                                                                 (Cons
+                                                                                 ((:)
                                                                                     (leaf
                                                                                        "tuple-list/focused/malformed-282c6129"
                                                                                        "malformed (,a)"
@@ -481,15 +566,11 @@ module Tests.TupleList where {
                                                                                        (parseRejected
                                                                                           "malformed (,a)"
                                                                                           "(,a)"))
-                                                                                    (Cons
-                                                                                       (leaf
-                                                                                          "tuple-list/focused/malformed-28612c622c632c642c6529"
-                                                                                          "malformed (a,b,c,d,e)"
-                                                                                          "parse-rejection"
-                                                                                          (parseRejected
-                                                                                             "malformed (a,b,c,d,e)"
-                                                                                             "(a,b,c,d,e)"))
-                                                                                       (Cons
+                                                                                    ((:)
+                                                                                       (leaf "tuple-list/focused/tuple-arities-2-through-64" "tuple arities 2 through 64"
+         "independent-reference"
+         (tupleArityChecks))
+                                                                                       ((:)
                                                                                           (leaf
                                                                                              "tuple-list/focused/malformed-5b612c5d"
                                                                                              "malformed [a,]"
@@ -497,7 +578,7 @@ module Tests.TupleList where {
                                                                                              (parseRejected
                                                                                                 "malformed [a,]"
                                                                                                 "[a,]"))
-                                                                                          (Cons
+                                                                                          ((:)
                                                                                              (leaf
                                                                                                 "tuple-list/focused/malformed-5b2c615d"
                                                                                                 "malformed [,a]"
@@ -505,7 +586,7 @@ module Tests.TupleList where {
                                                                                                 (parseRejected
                                                                                                    "malformed [,a]"
                                                                                                    "[,a]"))
-                                                                                             (Cons
+                                                                                             ((:)
                                                                                                 (leaf
                                                                                                    "tuple-list/focused/malformed-5b61"
                                                                                                    "malformed [a"
@@ -513,7 +594,7 @@ module Tests.TupleList where {
                                                                                                    (parseRejected
                                                                                                       "malformed [a"
                                                                                                       "[a"))
-                                                                                                (Cons
+                                                                                                ((:)
                                                                                                    (leaf
                                                                                                       "tuple-list/focused/malformed-5b312e2e335d"
                                                                                                       "malformed [1..3]"
@@ -521,7 +602,7 @@ module Tests.TupleList where {
                                                                                                       (parseRejected
                                                                                                          "malformed [1..3]"
                                                                                                          "[1..3]"))
-                                                                                                   (Cons
+                                                                                                   ((:)
                                                                                                       (leaf
                                                                                                          "tuple-list/focused/malformed-5b61207c2061203c2d20625d"
                                                                                                          "malformed [a | a <- b]"
@@ -529,7 +610,7 @@ module Tests.TupleList where {
                                                                                                          (parseRejected
                                                                                                             "malformed [a | a <- b]"
                                                                                                             "[a | a <- b]"))
-                                                                                                      (Cons
+                                                                                                      ((:)
                                                                                                          (leaf
                                                                                                             "tuple-list/focused/malformed-61203a"
                                                                                                             "malformed a :"
@@ -537,7 +618,7 @@ module Tests.TupleList where {
                                                                                                             (parseRejected
                                                                                                                "malformed a :"
                                                                                                                "a :"))
-                                                                                                         (Cons
+                                                                                                         ((:)
                                                                                                             (leaf
                                                                                                                "tuple-list/focused/ranges-have-a-targeted-diagnostic"
                                                                                                                "ranges have a targeted diagnostic"
@@ -546,7 +627,7 @@ module Tests.TupleList where {
                                                                                                                   "ranges have a targeted diagnostic"
                                                                                                                   "[1..3]"
                                                                                                                   "list ranges are not supported"))
-                                                                                                            (Cons
+                                                                                                            ((:)
                                                                                                                (leaf
                                                                                                                   "tuple-list/focused/comprehensions-have-a-targeted-diagnostic"
                                                                                                                   "comprehensions have a targeted diagnostic"
@@ -555,16 +636,16 @@ module Tests.TupleList where {
                                                                                                                      "comprehensions have a targeted diagnostic"
                                                                                                                      "[a | a <- b]"
                                                                                                                      "list comprehensions are not supported"))
-                                                                                                               (Cons
+                                                                                                               ((:)
                                                                                                                   (leaf
                                                                                                                      "tuple-list/focused/tuple-arity-has-a-targeted-diagnostic"
                                                                                                                      "tuple arity has a targeted diagnostic"
                                                                                                                      "diagnostic"
                                                                                                                      (parseDiagnostic
                                                                                                                         "tuple arity has a targeted diagnostic"
-                                                                                                                        "(a,b,c,d,e)"
-                                                                                                                        "tuple syntax supports two, three or four components"))
-                                                                                                                  (Cons
+                                                                                                                        (tupleSource 65 "a")
+                                                                                                                        "tuple arity must be between 2 and 64"))
+                                                                                                                  ((:)
                                                                                                                      (leaf
                                                                                                                         "tuple-list/focused/malformed-list-retains-exact-source-position"
                                                                                                                         "malformed list retains exact source position"
@@ -573,93 +654,93 @@ module Tests.TupleList where {
                                                                                                                            "malformed list retains exact source position"
                                                                                                                            "[1,\n ]"
                                                                                                                            "tuple-list.emlf:2:2:"))
-                                                                                                                     Nil)))))))))))))))))))))))))))))))))))));
-  boundaryCases :: List C.Case;
+                                                                                                                     [])))))))))))))))))))))))))))))))))))));
+  boundaryCases :: [] C.Case;
   boundaryCases =
-    Cons
-      (leaf "tuple-list/focused/colon-annotation-before-bar" "colon annotation before bar"
+    (:)
+      (leaf "tuple-list/focused/constructor-cons-before-bar" "constructor cons before bar"
          "fixed-ast"
-         (sameBoundary "colon annotation before bar" "|" "x : Int |"
-            (SAnn (SVar "x") (SAnnotation Nil intType))))
-      (Cons
-         (leaf "tuple-list/focused/colon-annotation-before-equals" "colon annotation before equals"
+         (sameBoundary "constructor cons before bar" "|" "x : Int |"
+            (cons (SVar "x") (SConstructor "Int"))))
+      ((:)
+         (leaf "tuple-list/focused/constructor-cons-before-equals" "constructor cons before equals"
             "fixed-ast"
-            (sameBoundary "colon annotation before equals" "=" "flag : Bool ="
-               (SAnn (SVar "flag") (SAnnotation Nil boolType))))
-         (Cons
+            (sameBoundary "constructor cons before equals" "=" "flag : Bool ="
+               (cons (SVar "flag") (SConstructor "Bool"))))
+         ((:)
             (leaf "tuple-list/focused/explicit-annotation-before-bar"
                "explicit annotation before bar"
                "fixed-ast"
                (sameBoundary "explicit annotation before bar" "|" "x :: Int |"
-                  (SAnn (SVar "x") (SAnnotation Nil intType))))
-            (Cons
+                  (SAnn (SVar "x") (SAnnotation [] intType))))
+            ((:)
                (leaf "tuple-list/focused/explicit-annotation-before-equals"
                   "explicit annotation before equals"
                   "fixed-ast"
                   (sameBoundary "explicit annotation before equals" "=" "flag :: Bool ="
-                     (SAnn (SVar "flag") (SAnnotation Nil boolType))))
-               (Cons
+                     (SAnn (SVar "flag") (SAnnotation [] boolType))))
+               ((:)
                   (leaf "tuple-list/focused/lowercase-tail-remains-cons-before-bar"
                      "lowercase tail remains cons before bar"
                      "fixed-ast"
                      (sameBoundary "lowercase tail remains cons before bar" "|" "x : xs |"
                         (cons (SVar "x") (SVar "xs"))))
-                  (Cons
+                  ((:)
                      (leaf "tuple-list/focused/empty-tail-remains-cons-before-equals"
                         "empty tail remains cons before equals"
                         "fixed-ast"
                         (sameBoundary "empty tail remains cons before equals" "=" "1 : [] ="
                            (cons (SIntLit 1) nil)))
-                     (Cons
-                        (leaf "tuple-list/focused/closed-constructor-annotation-before-bar"
-                           "closed constructor annotation before bar"
+                     ((:)
+                        (leaf "tuple-list/focused/custom-constructor-cons-before-bar"
+                           "custom constructor cons before bar"
                            "fixed-ast"
-                           (sameBoundary "closed constructor annotation before bar" "|" "x : Nil |"
-                              (SAnn (SVar "x") (SAnnotation Nil (SCon "Nil" Nil)))))
-                        Nil))))));
-  checkingCases :: List C.Case;
+                           (sameBoundary "custom constructor cons before bar" "|" "x : Nil |"
+                              (cons (SVar "x") (SConstructor "Nil"))))
+                        []))))));
+  checkingCases :: [] C.Case;
   checkingCases =
-    Cons
+    (:)
       (leaf "tuple-list/focused/pair-inferred-and-independently-checked"
          "pair inferred and independently checked"
          "independent-reference"
          (accepted "pair inferred and independently checked" (declarations ++ "(42,true)")
-            (XCon "Pair" (two int bool))))
-      (Cons
+            (XCon "(,)" (two int bool))))
+      ((:)
          (leaf "tuple-list/focused/triple-inferred-and-independently-checked"
             "triple inferred and independently checked"
             "independent-reference"
             (accepted "triple inferred and independently checked" (declarations ++ "(42,true,42)")
-               (XCon "Triple" (three int bool int))))
-         (Cons
+               (XCon "(,,)" (three int bool int))))
+         ((:)
             (leaf "tuple-list/focused/quad-inferred-and-independently-checked"
                "quad inferred and independently checked"
                "independent-reference"
                (accepted "quad inferred and independently checked"
                   (declarations ++ "(42,true,42,true)")
-                  (XCon "Quad" (Cons int (three bool int bool)))))
-            (Cons
+                  (XCon "(,,,)" ((:) int (three bool int bool)))))
+            ((:)
                (leaf "tuple-list/focused/homogeneous-list" "homogeneous list"
                   "independent-reference"
                   (accepted "homogeneous list" (declarations ++ "[40,41,42]")
-                     (XCon "List" (one int))))
-               (Cons
+                     (XCon "[]" (one int))))
+               ((:)
                   (leaf "tuple-list/focused/empty-list-annotation" "empty list annotation"
                      "independent-reference"
-                     (accepted "empty list annotation" (declarations ++ "[] : [Int]")
-                        (XCon "List" (one int))))
-                  (Cons
+                     (accepted "empty list annotation" (declarations ++ "[] :: [Int]")
+                        (XCon "[]" (one int))))
+                  ((:)
                      (leaf "tuple-list/focused/cons-spine" "cons spine" "independent-reference"
                         (accepted "cons spine" (declarations ++ "40 : 41 : [42]")
-                           (XCon "List" (one int))))
-                     (Cons
+                           (XCon "[]" (one int))))
+                     ((:)
                         (leaf "tuple-list/focused/nested-pair-list-patterns"
                            "nested pair/list patterns"
                            "independent-reference"
                            (accepted "nested pair/list patterns"
                               (declarations ++ "case [(40,2)] of {[(x,y)] -> x+y; _ -> 0}")
                               int))
-                        (Cons
+                        ((:)
                            (leaf "tuple-list/focused/equations-and-cons-parameters"
                               "equations and cons parameters"
                               "independent-reference"
@@ -667,33 +748,33 @@ module Tests.TupleList where {
                                  (declarations ++
                                   "head [] = 0; head (x : xs) = x; main = head [42];")
                                  int))
-                           (Cons
+                           ((:)
                               (leaf "tuple-list/focused/tuple-lambda" "tuple lambda"
                                  "independent-reference"
                                  (accepted "tuple lambda"
                                     (declarations ++ "(\\(x,y) -> x+y) (40,2)")
                                     int))
-                              (Cons
+                              ((:)
                                  (leaf "tuple-list/focused/legacy-annotated-parameter"
                                     "legacy annotated parameter"
                                     "independent-reference"
-                                    (accepted "legacy annotated parameter" "(\\(x : Int) -> x+1) 41"
+                                    (accepted "legacy annotated parameter" "(\\(x :: Int) -> x+1) 41"
                                        int))
-                                 (Cons
+                                 ((:)
                                     (leaf "tuple-list/focused/legacy-grouped-annotated-parameter"
                                        "legacy grouped annotated parameter"
                                        "independent-reference"
                                        (accepted "legacy grouped annotated parameter"
-                                          "(\\((x) : Int) -> x+1) 41"
+                                          "(\\((x) :: Int) -> x+1) 41"
                                           int))
-                                    (Cons
+                                    ((:)
                                        (leaf "tuple-list/focused/explicit-annotated-parameter"
                                           "explicit annotated parameter"
                                           "independent-reference"
                                           (accepted "explicit annotated parameter"
                                              "(\\(x :: Int) -> x+1) 41"
                                              int))
-                                       (Cons
+                                       ((:)
                                           (leaf
                                              "tuple-list/focused/explicit-grouped-annotated-parameter"
                                              "explicit grouped annotated parameter"
@@ -701,7 +782,7 @@ module Tests.TupleList where {
                                              (accepted "explicit grouped annotated parameter"
                                                 "(\\((x) :: Int) -> x+1) 41"
                                                 int))
-                                          (Cons
+                                          ((:)
                                              (leaf
                                                 "tuple-list/focused/explicit-declaration-signature"
                                                 "explicit declaration signature"
@@ -710,7 +791,7 @@ module Tests.TupleList where {
                                                    (declarations ++
                                                     "head :: [Int] -> Int; head [] = 0; head (x : xs) = x; main = head [42];")
                                                    int))
-                                             (Cons
+                                             ((:)
                                                 (leaf
                                                    "tuple-list/focused/type-sugar-in-datatype-fields"
                                                    "type sugar in datatype fields"
@@ -719,7 +800,7 @@ module Tests.TupleList where {
                                                       (declarations ++
                                                        "data Box = Box [Int] (Int,Int); case Box [42] (40,2) of {Box [x] (y,z) -> x+y+z; _ -> 0}")
                                                       int))
-                                                (Cons
+                                                ((:)
                                                    (leaf "tuple-list/focused/do-tuple-pattern"
                                                       "do tuple pattern"
                                                       "independent-reference"
@@ -727,7 +808,7 @@ module Tests.TupleList where {
                                                          (declarations ++
                                                           "do {(x,y) <- (return (40,2) :: IO (Int,Int)); return (x+y)}")
                                                          (XCon "IO" (one int))))
-                                                   (Cons
+                                                   ((:)
                                                       (leaf
                                                          "tuple-list/focused/multiline-list-closes-inner-case-layout"
                                                          "multiline list closes inner case layout"
@@ -737,7 +818,7 @@ module Tests.TupleList where {
                                                             (declarations ++
                                                              "\nmain = case [case true of\n  true -> 42\n  false -> 0\n  , 1] of\n  [x,y] -> x+y\n  _ -> 0\n")
                                                             int))
-                                                      (Cons
+                                                      ((:)
                                                          (leaf
                                                             "tuple-list/focused/multiline-list-and-tuple"
                                                             "multiline list and tuple"
@@ -746,13 +827,13 @@ module Tests.TupleList where {
                                                                (declarations ++
                                                                 "\nmain = case [\n (40,\n  2)\n ] of\n [(x,y)] -> x+y\n _ -> 0\n")
                                                                int))
-                                                         (Cons
+                                                         ((:)
                                                             (leaf
                                                                "tuple-list/focused/list-sugar-works-without-implicit-prelude"
                                                                "list sugar works without implicit Prelude"
                                                                "independent-reference"
                                                                withoutPrelude)
-                                                            (Cons
+                                                            ((:)
                                                                (leaf
                                                                   "tuple-list/focused/heterogeneous-list"
                                                                   "heterogeneous list"
@@ -761,7 +842,7 @@ module Tests.TupleList where {
                                                                      (declarations ++ "[42,true]")
                                                                      Inference
                                                                      "type constructor mismatch"))
-                                                               (Cons
+                                                               ((:)
                                                                   (leaf
                                                                      "tuple-list/focused/duplicate-tuple-variable"
                                                                      "duplicate tuple variable"
@@ -772,7 +853,7 @@ module Tests.TupleList where {
                                                                          "f (x,x) = x; main = f (1,2);")
                                                                         Parsing
                                                                         "duplicate function parameter"))
-                                                                  (Cons
+                                                                  ((:)
                                                                      (leaf
                                                                         "tuple-list/focused/nonexhaustive-cons-pattern"
                                                                         "nonexhaustive cons pattern"
@@ -783,7 +864,7 @@ module Tests.TupleList where {
                                                                             "case [42] of {x : xs -> x}")
                                                                            Inference
                                                                            "non-exhaustive"))
-                                                                     (Cons
+                                                                     ((:)
                                                                         (leaf
                                                                            "tuple-list/focused/duplicate-list-pattern-variable"
                                                                            "duplicate list pattern variable"
@@ -794,17 +875,11 @@ module Tests.TupleList where {
                                                                                "case [1,2] of {[x,x] -> x; _ -> 0}")
                                                                               Inference
                                                                               "duplicate pattern variable"))
-                                                                        (Cons
-                                                                           (leaf
-                                                                              "tuple-list/focused/missing-tuple-declaration"
-                                                                              "missing tuple declaration"
-                                                                              "phase-diagnostic"
-                                                                              (rejected
-                                                                                 "missing tuple declaration"
-                                                                                 "(1,2)"
-                                                                                 Inference
-                                                                                 "unknown data constructor"))
-                                                                           (Cons
+                                                                        ((:)
+                                                                           (leaf "tuple-list/focused/tuple-needs-no-custom-declaration" "tuple needs no custom declaration"
+         "independent-reference"
+         (accepted "tuple needs no custom declaration" "(1,2)" (XCon "(,)" (two int int))))
+                                                                           ((:)
                                                                               (leaf
                                                                                  "tuple-list/focused/legacy-free-arrow-annotation-stays-rejected"
                                                                                  "legacy free arrow annotation stays rejected"
@@ -814,42 +889,42 @@ module Tests.TupleList where {
                                                                                     "(\\x -> x) : a -> a"
                                                                                     Inference
                                                                                     "unbound annotation type variable"))
-                                                                              Nil))))))))))))))))))))))));
-  runtimeCases :: List C.Case;
+                                                                              []))))))))))))))))))))))));
+  runtimeCases :: [] C.Case;
   runtimeCases =
-    Cons
+    (:)
       (leaf "tuple-list/focused/tuple-projection" "tuple projection" "independent-reference"
          (accepted "tuple projection" (declarations ++ "case (40,2) of {(x,y) -> x+y}") int))
-      (Cons
+      ((:)
          (leaf "tuple-list/focused/tuple-projection-runtime" "tuple projection runtime"
             "runtime-value"
             (evaluates "tuple projection" (declarations ++ "case (40,2) of {(x,y) -> x+y}") 42))
-         (Cons
+         ((:)
             (leaf "tuple-list/focused/list-pattern-result" "list pattern result"
                "independent-reference"
                (accepted "list pattern result"
                   (declarations ++ "case [20,22] of {[x,y] -> x+y; _ -> 0}")
                   int))
-            (Cons
+            ((:)
                (leaf "tuple-list/focused/list-pattern-result-runtime" "list pattern result runtime"
                   "runtime-value"
                   (evaluates "list pattern result"
                      (declarations ++ "case [20,22] of {[x,y] -> x+y; _ -> 0}")
                      42))
-               (Cons
+               ((:)
                   (leaf "tuple-list/focused/cons-associativity-result" "cons associativity result"
                      "independent-reference"
                      (accepted "cons associativity result"
                         (declarations ++ "case 20 : 22 : [] of {[x,y] -> x+y; _ -> 0}")
                         int))
-                  (Cons
+                  ((:)
                      (leaf "tuple-list/focused/cons-associativity-result-runtime"
                         "cons associativity result runtime"
                         "runtime-value"
                         (evaluates "cons associativity result"
                            (declarations ++ "case 20 : 22 : [] of {[x,y] -> x+y; _ -> 0}")
                            42))
-                     (Cons
+                     ((:)
                         (leaf "tuple-list/focused/tuple-ignored-field-stays-lazy"
                            "tuple ignored field stays lazy"
                            "independent-reference"
@@ -857,7 +932,7 @@ module Tests.TupleList where {
                               (declarations ++
                                "case (42, panic \"tuple field forced\") of {(x,_) -> x}")
                               int))
-                        (Cons
+                        ((:)
                            (leaf "tuple-list/focused/tuple-ignored-field-stays-lazy-runtime"
                               "tuple ignored field stays lazy runtime"
                               "runtime-value"
@@ -865,7 +940,7 @@ module Tests.TupleList where {
                                  (declarations ++
                                   "case (42, panic \"tuple field forced\") of {(x,_) -> x}")
                                  42))
-                           (Cons
+                           ((:)
                               (leaf "tuple-list/focused/list-ignored-head-stays-lazy"
                                  "list ignored head stays lazy"
                                  "independent-reference"
@@ -873,7 +948,7 @@ module Tests.TupleList where {
                                     (declarations ++
                                      "case [panic \"list head forced\",42] of {[_,x] -> x; _ -> 0}")
                                     int))
-                              (Cons
+                              ((:)
                                  (leaf "tuple-list/focused/list-ignored-head-stays-lazy-runtime"
                                     "list ignored head stays lazy runtime"
                                     "runtime-value"
@@ -881,7 +956,7 @@ module Tests.TupleList where {
                                        (declarations ++
                                         "case [panic \"list head forced\",42] of {[_,x] -> x; _ -> 0}")
                                        42))
-                                 (Cons
+                                 ((:)
                                     (leaf "tuple-list/focused/cons-ignored-tail-stays-lazy"
                                        "cons ignored tail stays lazy"
                                        "independent-reference"
@@ -889,7 +964,7 @@ module Tests.TupleList where {
                                           (declarations ++
                                            "case 42 : (panic \"list tail forced\") of {x : _ -> x; [] -> 0}")
                                           int))
-                                    (Cons
+                                    ((:)
                                        (leaf
                                           "tuple-list/focused/cons-ignored-tail-stays-lazy-runtime"
                                           "cons ignored tail stays lazy runtime"
@@ -898,7 +973,7 @@ module Tests.TupleList where {
                                              (declarations ++
                                               "case 42 : (panic \"list tail forced\") of {x : _ -> x; [] -> 0}")
                                              42))
-                                       (Cons
+                                       ((:)
                                           (leaf "tuple-list/focused/typed-recursive-list-traversal"
                                              "typed recursive list traversal"
                                              "independent-reference"
@@ -906,7 +981,7 @@ module Tests.TupleList where {
                                                 (declarations ++
                                                  "sum : [Int] -> Int; sum [] = 0; sum (x : xs) = x + sum xs; main = sum [10,12,20];")
                                                 int))
-                                          (Cons
+                                          ((:)
                                              (leaf
                                                 "tuple-list/focused/typed-recursive-list-traversal-runtime"
                                                 "typed recursive list traversal runtime"
@@ -915,58 +990,131 @@ module Tests.TupleList where {
                                                    (declarations ++
                                                     "sum : [Int] -> Int; sum [] = 0; sum (x : xs) = x + sum xs; main = sum [10,12,20];")
                                                    42))
-                                             Nil)))))))))))));
-  scopeCases :: List C.Case;
+                                             [])))))))))))));
+  scopeCases :: [] C.Case;
   scopeCases =
     let {
       ambiguous =
         M.insert compareString "Other"
-          (Pair "Other.emlf" "module Other where\ndata Pair a b = Pair a b\n")
+          ((,) "Other.emlf" "module Other where\ndata Pair a b = Pair a b\n")
           shapes
     } in
-    Cons
+    (:)
       (leaf "tuple-list/focused/imported-ordinary-constructors" "imported ordinary constructors"
          "independent-reference"
          (moduleAccepted "imported ordinary constructors"
-            "module Main where\nimport Shapes\nmain = case [(40,2)] of {[(x,y)] -> x+y; _ -> 0}\n"))
-      (Cons
-         (leaf "tuple-list/focused/qualified-explicit-constructors-interoperate"
-            "qualified explicit constructors interoperate"
-            "independent-reference"
-            (moduleAccepted "qualified explicit constructors interoperate"
-               "module Main where\nimport Shapes\nmain = case Shapes.Cons (Shapes.Pair 40 2) Shapes.Nil of {[(x,y)] -> x+y; _ -> 0}\n"))
-         (Cons
-            (leaf "tuple-list/focused/qualified-only-import-does-not-supply-sugar-names"
-               "qualified-only import does not supply sugar names"
-               "diagnostic"
-               (moduleRejected "qualified-only import does not supply sugar names" shapes
-                  "module Main where\nimport qualified Shapes\nmain = []\n"
-                  "not in scope: Nil"))
-            (Cons
+            "module Main where\nimport Shapes\nmain = case Cons (Pair 40 2) Nil of {Cons (Pair x y) Nil -> x+y; _ -> 0}\n"))
+      ((:)
+         (leaf "tuple-list/focused/qualified-explicit-constructors-interoperate" "qualified explicit constructors interoperate"
+         "independent-reference"
+         (moduleAccepted "qualified explicit constructors interoperate"
+            "module Main where\nimport Shapes\nmain = case Shapes.Cons (Shapes.Pair 40 2) Shapes.Nil of {Shapes.Cons (Shapes.Pair x y) Shapes.Nil -> x+y; _ -> 0}\n"))
+         ((:)
+            (leaf "tuple-list/focused/qualified-only-import-does-not-supply-sugar-names" "qualified-only import does not supply custom Nil"
+         "diagnostic"
+         (moduleRejected "qualified-only import does not supply custom Nil" shapes
+            "module Main where\nimport qualified Shapes\nmain = Nil\n"
+            "not in scope: Nil"))
+            ((:)
                (leaf "tuple-list/focused/hidden-constructor-stays-hidden"
                   "hidden constructor stays hidden"
                   "diagnostic"
                   (moduleRejected "hidden constructor stays hidden" shapes
-                     "module Main where\nimport Shapes hiding (List(Nil))\nmain = []\n"
+                     "module Main where\nimport Shapes hiding (List(Nil))\nmain = Nil\n"
                      "not in scope: Nil"))
-               (Cons
+               ((:)
                   (leaf "tuple-list/focused/abstract-tuple-import-stays-abstract"
                      "abstract tuple import stays abstract"
                      "diagnostic"
                      (moduleRejected "abstract tuple import stays abstract" shapes
-                        "module Main where\nimport Shapes (Pair)\nmain = (1,2)\n"
+                        "module Main where\nimport Shapes (Pair)\nmain = Pair 1 2\n"
                         "not in scope: Pair"))
-                  (Cons
+                  ((:)
                      (leaf "tuple-list/focused/ambiguous-tuple-constructor-stays-ambiguous"
                         "ambiguous tuple constructor stays ambiguous"
                         "diagnostic"
                         (moduleRejected "ambiguous tuple constructor stays ambiguous" ambiguous
-                           "module Main where\nimport Shapes\nimport Other\nmain = (1,2)\n"
+                           "module Main where\nimport Shapes\nimport Other\nmain = Pair 1 2\n"
                            "ambiguous name Pair"))
-                     Nil)))));
-  cases :: List C.Case;
+                     [])))));
+  ambiguousShapes :: Map String ((,) String String);
+  ambiguousShapes =
+    M.insert compareString "Other"
+      ((,) "Other.emlf" "module Other where\ndata Pair a b = Pair a b\n") shapes;
+  moduleAcceptedWith :: String -> Map String ((,) String String) -> String -> A.Test ();
+  moduleAcceptedWith label libraries source =
+    do {
+      result <- compiled (Compiler.compileModules libraries "Main.emlf" source);
+      checkResult label int result
+    };
+  moduleRejectedAt :: String -> Map String ((,) String String) -> String -> Phase -> String -> A.Test ();
+  moduleRejectedAt label libraries source phase reason =
+    do {
+      case Compiler.compileModules libraries "Main.emlf" source of {
+        Left error ->
+          require
+            (eqString (Compiler.prettyPhase (Compiler.phase error)) (Compiler.prettyPhase phase) &&
+             contains reason (Compiler.diagnostic error))
+            (label ++ (": " ++ Compiler.prettyError error));
+        Right _ -> fatal (label ++ ": nominally distinct datatypes accepted")
+      }
+    };
+  canonicalCases :: [] C.Case;
+  canonicalCases =
+    (:) (leaf "tuple-list/focused/parser-provenance-projection" "parser provenance projection"
+      "fixed-ast" provenanceProjection) (
+    (:) (leaf "tuple-list/focused/qualified-only-import-does-not-affect-syntax" "qualified-only import does not affect syntax"
+         "independent-reference"
+         (moduleAcceptedWith "qualified-only import does not affect syntax" shapes
+            "module Main where\nimport qualified Shapes\nmain = case [(40,2)] of {[(x,y)] -> x+y; _ -> 0}\n")) (
+    (:) (leaf "tuple-list/focused/hidden-custom-nil-does-not-affect-syntax" "hidden custom Nil does not affect syntax"
+         "independent-reference"
+         (moduleAcceptedWith "hidden custom Nil does not affect syntax" shapes
+            "module Main where\nimport Shapes hiding (List(Nil))\nmain = case [(40,2)] of {[(x,y)] -> x+y; _ -> 0}\n")) (
+    (:) (leaf "tuple-list/focused/abstract-custom-pair-does-not-affect-syntax" "abstract custom Pair does not affect syntax"
+         "independent-reference"
+         (moduleAcceptedWith "abstract custom Pair does not affect syntax" shapes
+            "module Main where\nimport Shapes (Pair)\nmain = case [(40,2)] of {[(x,y)] -> x+y; _ -> 0}\n")) (
+    (:) (leaf "tuple-list/focused/ambiguous-custom-pair-does-not-affect-syntax" "ambiguous custom Pair does not affect syntax"
+         "independent-reference"
+         (moduleAcceptedWith "ambiguous custom Pair does not affect syntax" ambiguousShapes
+            "module Main where\nimport Shapes\nimport Other\nmain = case [(40,2)] of {[(x,y)] -> x+y; _ -> 0}\n")) (
+    (:) (leaf "tuple-list/focused/standard-list-is-not-custom-list" "standard list is not custom List"
+         "phase-diagnostic"
+         (rejected "standard list is not custom List" (declarations ++ "([] :: List Int)") Inference "type constructor mismatch")) (
+    (:) (leaf "tuple-list/focused/custom-list-is-not-standard-list" "custom List is not standard list"
+         "phase-diagnostic"
+         (rejected "custom List is not standard list" (declarations ++ "(Cons 42 Nil :: [Int])") Inference "type constructor mismatch")) (
+    (:) (leaf "tuple-list/focused/standard-tuple-is-not-custom-pair" "standard tuple is not custom Pair"
+         "phase-diagnostic"
+         (rejected "standard tuple is not custom Pair" (declarations ++ "((40,2) :: Pair Int Int)") Inference "type constructor mismatch")) (
+    (:) (leaf "tuple-list/focused/custom-pair-is-not-standard-tuple" "custom Pair is not standard tuple"
+         "phase-diagnostic"
+         (rejected "custom Pair is not standard tuple" (declarations ++ "(Pair 40 2 :: (Int,Int))") Inference "type constructor mismatch")) (
+    (:) (leaf "tuple-list/focused/standard-unit-is-not-custom-unit" "standard unit is not custom Unit"
+         "phase-diagnostic"
+         (rejected "standard unit is not custom Unit" ("data Unit = Unit; (() :: Unit)") Inference "type constructor mismatch")) (
+    (:) (leaf "tuple-list/focused/custom-unit-is-not-standard-unit" "custom Unit is not standard unit"
+         "phase-diagnostic"
+         (rejected "custom Unit is not standard unit" ("data Unit = Unit; (Unit :: ())") Inference "type constructor mismatch")) (
+    (:) (leaf "tuple-list/focused/qualified-custom-list-rejects-standard-pattern" "qualified custom List rejects standard pattern"
+         "phase-diagnostic"
+         (moduleRejectedAt "qualified custom List rejects standard pattern" shapes
+            "module Main where\nimport Shapes\nmain = case Shapes.Cons (Shapes.Pair 40 2) Shapes.Nil of {[(x,y)] -> x+y; _ -> 0}\n" Inference "type constructor mismatch")) (
+    (:) (leaf "tuple-list/focused/qualified-custom-pair-rejects-standard-pattern" "qualified custom Pair rejects standard pattern"
+         "phase-diagnostic"
+         (moduleRejectedAt "qualified custom Pair rejects standard pattern" shapes
+            "module Main where\nimport Shapes\nmain = case Shapes.Pair 40 2 of {(x,y) -> x+y}\n" Inference "type constructor mismatch")) (
+    (:) (leaf "tuple-list/focused/standard-unit-with-custom-declaration" "standard unit with custom declaration"
+         "independent-reference"
+         (accepted "standard unit with custom declaration" "data Unit = Unit; (() :: ())" (XCon "()" []))) (
+    (:) (leaf "tuple-list/focused/explicit-custom-unit-remains-available" "explicit custom Unit remains available"
+         "independent-reference"
+         (accepted "explicit custom Unit remains available" "data Unit = Unit; (Unit :: Unit)" (XCon "Unit" []))) (
+      [])))))))))))))));
+  cases :: [] C.Case;
   cases =
     S.concat
-      (Cons parserCases
-         (Cons boundaryCases (Cons checkingCases (Cons runtimeCases (Cons scopeCases Nil)))))
+      ((:) parserCases
+         ((:) boundaryCases ((:) checkingCases ((:) runtimeCases ((:) scopeCases ((:) canonicalCases []))))))
 }

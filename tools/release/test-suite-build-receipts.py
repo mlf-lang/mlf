@@ -28,7 +28,7 @@ def main():
     output.mkdir(parents=True, exist_ok=False)
     source = root / 'tests/shared/MLF/Tests/BuildReceipts.hs'
     tool = (args.compiler or args.executable).resolve(strict=True)
-    inputs = [source, root/'tests/Tests/BuildReceipts.hs', root/'tests/Tests/CompilerTests.hs',
+    inputs = [source, root/'tests/shared/Tests/BuildReceipts.hs', root/'tests/Tests/CompilerTests.hs',
               root/'shared-sources.json', Path(__file__).resolve()]
     inputs += sorted((root/'libraries/mlf-foundation').rglob('*.hs'))
     inputs += sorted((root/'libraries/mlf-package-core').rglob('*.hs'))
@@ -41,7 +41,7 @@ def main():
             check = subprocess.run([str(tool),'--implementation-identity'], capture_output=True, timeout=10)
             if check.returncode or not check.stdout.startswith(b'MLF/shared-haskell-v1 '):
                 raise ValueError('A shared-aware compiler is required; build the frozen native bridge or the direct GHC compiler first.')
-            prefix = [str(tool), '-i', str(root/'tests'), '-i', str(root/'libraries/mlf-foundation'),
+            prefix = [str(tool), '-i', str(root/'tests/shared'), '-i', str(root/'tests'), '-i', str(root/'libraries/mlf-foundation'),
                       '-i', str(root/'libraries/mlf-package-core'), '--run', str(source), '--']
         else:
             prefix = [str(tool)]

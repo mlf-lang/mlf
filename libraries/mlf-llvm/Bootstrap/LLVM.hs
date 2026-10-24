@@ -19,30 +19,30 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
   emitLLVM term = emitEntry False term;
   emitLLVMIO :: XTerm -> Either String String;
   emitLLVMIO term = emitEntry True term;
-  emitLLVMChunks :: XTerm -> Either String (List String);
+  emitLLVMChunks :: XTerm -> Either String ([] String);
   emitLLVMChunks term = emitEntryChunks False term;
-  emitLLVMIOChunks :: XTerm -> Either String (List String);
+  emitLLVMIOChunks :: XTerm -> Either String ([] String);
   emitLLVMIOChunks term = emitEntryChunks True term;
   ioType :: XType -> Bool;
   ioType ty =
     case ty of {
       XForall variable bound body -> ioType body;
-      XCon name (Cons argument Nil) -> eqString name "IO";
+      XCon name ((:) argument []) -> eqString name "IO";
       _ -> False
     };
-  dataConstructors :: DataDecl -> List ConstructorDecl;
+  dataConstructors :: DataDecl -> [] ConstructorDecl;
   dataConstructors declaration =
     case declaration of {
       DataDecl name parameters constructors -> constructors;
       DataDeclK name parameters constructors -> constructors
     };
-  constructorEntry :: Int -> ConstructorDecl -> Pair String (Pair Int Int);
-  constructorEntry index (ConstructorDecl name fields) = Pair name (Pair index (L.length fields));
+  constructorEntry :: Int -> ConstructorDecl -> (,) String ((,) Int Int);
+  constructorEntry index (ConstructorDecl name fields) = (,) name ((,) index (L.length fields));
   emitEntry :: Bool -> XTerm -> Either String String;
   emitEntry requireIO term = L.mapEither L.concatStrings (emitEntryChunks requireIO term);
   -- Keep the module as output chunks for the executable driver. Streaming these
   -- through IO bounds temporary String copies and permits runtime collection.
-  emitEntryChunks :: Bool -> XTerm -> Either String (List String);
+  emitEntryChunks :: Bool -> XTerm -> Either String ([] String);
   emitEntryChunks requireIO term =
     case Checked.check term of {
       Left error -> Left ("LLVM target verification failed: " ++ error);
@@ -50,7 +50,7 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
     };
   -- Only an opaque successful check can enter this path. Raw xMLF entry points
   -- above always check, including terms deserialized from outside the compiler.
-  emitCheckedChunks :: Bool -> Checked.CheckedTerm -> Either String (List String);
+  emitCheckedChunks :: Bool -> Checked.CheckedTerm -> Either String ([] String);
   emitCheckedChunks requireIO checked =
     do {
       prepared <- prepareChecked requireIO checked;
@@ -59,13 +59,19 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
   -- The constructor remains private: a cached emission query can only prepare
   -- runtime code from an independently checked term, and cannot replace its
   -- erased program while retaining the successful check.
-  data PreparedEntry = PreparedEntry Bool (Map String (Pair Int Int)) XErased;
+  data PreparedEntry = PreparedEntry Bool (Map String ((,) Int Int)) XErased;
   entryConstructors declarations =
     let {
-      all = L.concatMap dataConstructors declarations
+      -- Boundary v3 reserves tags0..68: legacy tombstone, (), [], (:), tuples2..4,
+      -- stack frame/evidence, then tuples5..64. User constructors start at69.
+      builtins = L.concatMap dataConstructors D.builtinDeclarations;
+      builtinNames = L.map D.constructorName builtins;
+      users = L.filter (\c -> L.not (L.elem eqString (D.constructorName c) builtinNames))
+                (L.concatMap dataConstructors declarations);
+      all = L.append builtins users
     } in
     M.fromList compareString
-      (Cons (Pair "Unit" (Pair 0 0)) (L.zipWith constructorEntry (L.range 1 (L.length all)) all));
+      (L.zipWith constructorEntry (L.range 0 (L.length all - 1)) all);
   prepareChecked :: Bool -> Checked.CheckedTerm -> Either String PreparedEntry;
   prepareChecked requireIO checked =
     let {
@@ -80,7 +86,7 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
            declarations =
              case term of {
                XWithData ds body -> ds;
-               _ -> Nil
+               _ -> []
              }
          } in
          let {
@@ -93,15 +99,15 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
            lowered = Wrappers.optimize declarations constructors optimized
          } in
          Right (PreparedEntry (ioType ty) constructors lowered);
-  emitPreparedChunks :: PreparedEntry -> Either String (List String);
+  emitPreparedChunks :: PreparedEntry -> Either String ([] String);
   emitPreparedChunks (PreparedEntry executeIO constructors lowered) =
     case Codegen.generate constructors lowered of {
       Left error -> Left error;
-      Right (Pair entry code) ->
+      Right ((,) entry code) ->
         let {
           header =
-            Cons "; Generated from independently checked xMLF."
-              (Cons "source_filename = \"emlf\"" (Cons "" Nil))
+            (:) "; Generated from independently checked xMLF."
+              ((:) "source_filename = \"emlf\"" ((:) "" []))
         } in
         let {
           output = L.append header (L.append code (entryCode entry executeIO))
@@ -116,20 +122,20 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
   runtimeOptionalName name =
     case name of {
       Nothing -> "none";
-      Just n -> runtimePack (Cons "some" (Cons (runtimeName n) Nil))
+      Just n -> runtimePack ((:) "some" ((:) (runtimeName n) []))
     };
   runtimePattern pattern =
     case pattern of {
       XConstructorPattern constructor names ->
         runtimePack
-          (Cons "constructor"
-             (Cons constructor (Cons (runtimePack (L.map runtimeOptionalName names)) Nil)));
-      XDefaultPattern name -> runtimePack (Cons "default" (Cons (runtimeOptionalName name) Nil))
+          ((:) "constructor"
+             ((:) constructor ((:) (runtimePack (L.map runtimeOptionalName names)) [])));
+      XDefaultPattern name -> runtimePack ((:) "default" ((:) (runtimeOptionalName name) []))
     };
   -- Retain lengths beside a tree of fields. Flattening only once avoids copying
   -- the entire remaining crate at each nested let, while preserving the exact
   -- scalar-length framing used by existing query keys.
-  data RuntimeKey = RuntimeText String | RuntimeFields Int (List RuntimeKey);
+  data RuntimeKey = RuntimeText String | RuntimeFields Int ([] RuntimeKey);
   runtimeKeyLength key =
     case key of {
       RuntimeText text -> stringLength text;
@@ -148,14 +154,14 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
           fields
     } in
     seq size (RuntimeFields size fields);
-  runtimeKeyChunks :: RuntimeKey -> List String -> List String;
+  runtimeKeyChunks :: RuntimeKey -> [] String -> [] String;
   runtimeKeyChunks key tail =
     case key of {
-      RuntimeText text -> Cons text tail;
+      RuntimeText text -> (:) text tail;
       RuntimeFields _ fields ->
         L.foldr
           (\field rest ->
-             Cons (showInt (runtimeKeyLength field) ++ ":") (runtimeKeyChunks field rest))
+             (:) (showInt (runtimeKeyLength field) ++ ":") (runtimeKeyChunks field rest))
           tail
           fields
     };
@@ -163,61 +169,61 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
   runtimeErasedEncoding term =
     runtimeKeyFields
       (case term of {
-         XEVar n -> Cons (RuntimeText "variable") (Cons (RuntimeText (runtimeName n)) Nil);
+         XEVar n -> (:) (RuntimeText "variable") ((:) (RuntimeText (runtimeName n)) []);
          XEAbs n body ->
-           Cons (RuntimeText "lambda")
-             (Cons (RuntimeText (runtimeName n)) (Cons (runtimeErasedEncoding body) Nil));
+           (:) (RuntimeText "lambda")
+             ((:) (RuntimeText (runtimeName n)) ((:) (runtimeErasedEncoding body) []));
          XEApp f a ->
-           Cons (RuntimeText "application")
-             (Cons (runtimeErasedEncoding f) (Cons (runtimeErasedEncoding a) Nil));
+           (:) (RuntimeText "application")
+             ((:) (runtimeErasedEncoding f) ((:) (runtimeErasedEncoding a) []));
          XELet n rhs body ->
-           Cons (RuntimeText "let")
-             (Cons (RuntimeText (runtimeName n))
-                (Cons (runtimeErasedEncoding rhs) (Cons (runtimeErasedEncoding body) Nil)));
+           (:) (RuntimeText "let")
+             ((:) (RuntimeText (runtimeName n))
+                ((:) (runtimeErasedEncoding rhs) ((:) (runtimeErasedEncoding body) [])));
          XELetRec definitions body ->
-           Cons (RuntimeText "recursive")
-             (Cons
+           (:) (RuntimeText "recursive")
+             ((:)
                 (runtimeKeyFields
                    (L.map
-                      (\(Pair n rhs) ->
+                      (\((,) n rhs) ->
                          runtimeKeyFields
-                           (Cons (RuntimeText (runtimeName n))
-                              (Cons (runtimeErasedEncoding rhs) Nil)))
+                           ((:) (RuntimeText (runtimeName n))
+                              ((:) (runtimeErasedEncoding rhs) [])))
                       definitions))
-                (Cons (runtimeErasedEncoding body) Nil));
-         XEInt n -> Cons (RuntimeText "integer") (Cons (RuntimeText (showInt n)) Nil);
+                ((:) (runtimeErasedEncoding body) []));
+         XEInt n -> (:) (RuntimeText "integer") ((:) (RuntimeText (showInt n)) []);
          XEDouble n ->
-           Cons (RuntimeText "double") (Cons (RuntimeText (showInt (doubleToBits n))) Nil);
-         XEBool b -> Cons (RuntimeText "boolean") (Cons (RuntimeText (runtimeBool b)) Nil);
-         XEString text -> Cons (RuntimeText "string") (Cons (RuntimeText text) Nil);
+           (:) (RuntimeText "double") ((:) (RuntimeText (showInt (doubleToBits n))) []);
+         XEBool b -> (:) (RuntimeText "boolean") ((:) (RuntimeText (runtimeBool b)) []);
+         XEString text -> (:) (RuntimeText "string") ((:) (RuntimeText text) []);
          XEPrimitive p ->
-           Cons (RuntimeText "primitive") (Cons (RuntimeText (P.primitiveName p)) Nil);
-         XEConstructor c -> Cons (RuntimeText "constructor") (Cons (RuntimeText c) Nil);
-         XEEvidenceHole n -> Cons (RuntimeText "hole") (Cons (RuntimeText (showInt n)) Nil);
+           (:) (RuntimeText "primitive") ((:) (RuntimeText (P.primitiveName p)) []);
+         XEConstructor c -> (:) (RuntimeText "constructor") ((:) (RuntimeText c) []);
+         XEEvidenceHole n -> (:) (RuntimeText "hole") ((:) (RuntimeText (showInt n)) []);
          XECase subject branches ->
-           Cons (RuntimeText "case")
-             (Cons (runtimeErasedEncoding subject)
-                (Cons
+           (:) (RuntimeText "case")
+             ((:) (runtimeErasedEncoding subject)
+                ((:)
                    (runtimeKeyFields
                       (L.map
                          (\(XErasedAlternative pattern body) ->
                             runtimeKeyFields
-                              (Cons (RuntimeText (runtimePattern pattern))
-                                 (Cons (runtimeErasedEncoding body) Nil)))
+                              ((:) (RuntimeText (runtimePattern pattern))
+                                 ((:) (runtimeErasedEncoding body) [])))
                          branches))
-                   Nil))
+                   []))
        });
   runtimeErased :: XErased -> String;
-  runtimeErased term = L.concatStrings (runtimeKeyChunks (runtimeErasedEncoding term) Nil);
+  runtimeErased term = L.concatStrings (runtimeKeyChunks (runtimeErasedEncoding term) []);
   canonicalErasedKey expression =
     case Optimize.runFresh (Optimize.copy M.empty expression) 0 of {
-      Pair normalized _ -> runtimeErased normalized
+      (,) normalized _ -> runtimeErased normalized
     };
   constructorKey constructors =
     runtimePack
       (L.map
-         (\(Pair name (Pair tag arity)) ->
-            runtimePack (Cons name (Cons (showInt tag) (Cons (showInt arity) Nil))))
+         (\((,) name ((,) tag arity)) ->
+            runtimePack ((:) name ((:) (showInt tag) ((:) (showInt arity) []))))
          (M.toList constructors));
   checkedInputKey :: Bool -> Checked.CheckedTerm -> Either String String;
   checkedInputKey requireIO checked =
@@ -227,23 +233,23 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
            declarations =
              case Checked.term checked of {
                XWithData ds _ -> ds;
-               _ -> Nil
+               _ -> []
              }
          } in
          Right
            (runtimePack
-              (Cons "MLF-CODEGEN-INPUT-COMPACT-2"
-                 (Cons "compact-bdwgc-v1-process-v1-completion-v2"
-                    (Cons (runtimeBool (ioType (Checked.typeOf checked)))
-                       (Cons (constructorKey (entryConstructors declarations))
-                          (Cons (runtimePack (L.map D.prettyDeclaration declarations))
-                             (Cons (canonicalErasedKey (X.erase (Checked.term checked))) Nil)))))));
+              ((:) "MLF-CODEGEN-INPUT-COMPACT-2"
+                 ((:) "compact-bdwgc-v1-process-v1-completion-v2-haskell-boundary-v3"
+                    ((:) (runtimeBool (ioType (Checked.typeOf checked)))
+                       ((:) (constructorKey (entryConstructors declarations))
+                          ((:) (runtimePack (L.map D.prettyDeclaration declarations))
+                             ((:) (canonicalErasedKey (X.erase (Checked.term checked))) [])))))));
   preparedKey (PreparedEntry executeIO constructors lowered) =
     runtimePack
-      (Cons "MLF-CODEGEN-PREPARED-COMPACT-2"
-         (Cons "compact-bdwgc-v1-process-v1-completion-v2"
-            (Cons (runtimeBool executeIO)
-               (Cons (constructorKey constructors) (Cons (canonicalErasedKey lowered) Nil)))));
+      ((:) "MLF-CODEGEN-PREPARED-COMPACT-2"
+         ((:) "compact-bdwgc-v1-process-v1-completion-v2-haskell-boundary-v3"
+            ((:) (runtimeBool executeIO)
+               ((:) (constructorKey constructors) ((:) (canonicalErasedKey lowered) [])))));
   -- A crate links all checked fragments, including declarations outside the
   -- entry's dependency closure. Their bodies are not inputs to its execution.
   -- This projection is used ONLY as a whole-program cache key. The checked
@@ -251,25 +257,25 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
   -- Keep the entire declaration spine and constructor ABI. Mask only bodies
   -- which no syntactic path from the entry can demand; branches and captures
   -- conservatively contribute all their free names.
-  data EntryGroup = EntryLet XName XErased | EntryRec (List (Pair XName XErased));
-  entrySpine :: List EntryGroup -> XErased -> Pair (List EntryGroup) XErased;
+  data EntryGroup = EntryLet XName XErased | EntryRec ([] ((,) XName XErased));
+  entrySpine :: [] EntryGroup -> XErased -> (,) ([] EntryGroup) XErased;
   entrySpine groups expression =
     case expression of {
-      XELet name rhs body -> entrySpine (Cons (EntryLet name rhs) groups) body;
-      XELetRec bindings body -> entrySpine (Cons (EntryRec bindings) groups) body;
-      _ -> Pair (L.reverse groups) expression
+      XELet name rhs body -> entrySpine ((:) (EntryLet name rhs) groups) body;
+      XELetRec bindings body -> entrySpine ((:) (EntryRec bindings) groups) body;
+      _ -> (,) (L.reverse groups) expression
     };
-  entryBindings :: EntryGroup -> List (Pair XName XErased);
+  entryBindings :: EntryGroup -> [] ((,) XName XErased);
   entryBindings group =
     case group of {
-      EntryLet name rhs -> Cons (Pair name rhs) Nil;
+      EntryLet name rhs -> (:) ((,) name rhs) [];
       EntryRec bindings -> bindings
     };
-  entryReach :: Map XName XErased -> Set XName -> List XName -> Set XName;
+  entryReach :: Map XName XErased -> Set XName -> [] XName -> Set XName;
   entryReach definitions seen pending =
     case pending of {
-      Nil -> seen;
-      Cons name rest ->
+      [] -> seen;
+      (:) name rest ->
         if Set.member Optimize.compareName name seen
         then entryReach definitions seen rest
         else let {
@@ -281,15 +287,15 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
                  entryReach definitions next (L.append (Set.toList (Optimize.free rhs)) rest)
              }
     };
-  entryMask :: Set XName -> Pair XName XErased -> Pair XName XErased;
-  entryMask live (Pair name rhs) =
-    Pair name (if Set.member Optimize.compareName name live then rhs else XEInt 0);
+  entryMask :: Set XName -> (,) XName XErased -> (,) XName XErased;
+  entryMask live ((,) name rhs) =
+    (,) name (if Set.member Optimize.compareName name live then rhs else XEInt 0);
   entryGroup :: Set XName -> EntryGroup -> XErased -> XErased;
   entryGroup live group body =
     case group of {
       EntryLet name rhs ->
-        case entryMask live (Pair name rhs) of {
-          Pair n value -> XELet n value body
+        case entryMask live ((,) name rhs) of {
+          (,) n value -> XELet n value body
         };
       EntryRec bindings -> XELetRec (L.map (entryMask live) bindings) body
     };
@@ -301,8 +307,8 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
     let {
       unique = L.fst (Optimize.runFresh (Optimize.copy M.empty expression) 0)
     } in
-    case entrySpine Nil unique of {
-      Pair groups entry ->
+    case entrySpine [] unique of {
+      (,) groups entry ->
         let {
           definitions = M.fromList Optimize.compareName (L.concatMap entryBindings groups)
         } in
@@ -319,33 +325,33 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
            declarations =
              case Checked.term checked of {
                XWithData ds _ -> ds;
-               _ -> Nil
+               _ -> []
              }
          } in
          Right
            (runtimePack
-              (Cons "MLF-CODEGEN-CRATE-INPUT-COMPACT-2"
-                 (Cons "compact-bdwgc-v1-process-v1-completion-v2"
-                    (Cons (runtimeBool (ioType (Checked.typeOf checked)))
-                       (Cons (constructorKey (entryConstructors declarations))
-                          (Cons (runtimePack (L.map D.prettyDeclaration declarations))
-                             (Cons (entryRuntimeKey (X.erase (Checked.term checked))) Nil)))))));
-  entryCode :: String -> Bool -> List String;
+              ((:) "MLF-CODEGEN-CRATE-INPUT-COMPACT-2"
+                 ((:) "compact-bdwgc-v1-process-v1-completion-v2-haskell-boundary-v3"
+                    ((:) (runtimeBool (ioType (Checked.typeOf checked)))
+                       ((:) (constructorKey (entryConstructors declarations))
+                          ((:) (runtimePack (L.map D.prettyDeclaration declarations))
+                             ((:) (entryRuntimeKey (X.erase (Checked.term checked))) [])))))));
+  entryCode :: String -> Bool -> [] String;
   entryCode entry executeIO =
     let {
-      abi = "mlf_require_async_completion_v2_abi"
+      abi = "mlf_require_haskell_boundary_v3_abi"
     } in
-    Cons ("declare void @" ++ (abi ++ "()"))
-      (Cons "define ptr @mlf_entry() {"
-         (Cons ("  call void @" ++ (abi ++ "()"))
-            (Cons ("  %root = call ptr " ++ (entry ++ "(ptr null, ptr null)"))
-               (Cons "  ret ptr %root"
-                  (Cons "}"
-                     (Cons "define i32 @main(i32 %argc, ptr %argv) {"
-                        (Cons "  call void @mlf_set_args(i32 %argc, ptr %argv)"
-                           (Cons "  %root = call ptr @mlf_entry()"
-                              (Cons
+    (:) ("declare void @" ++ (abi ++ "()"))
+      ((:) "define ptr @mlf_entry() {"
+         ((:) ("  call void @" ++ (abi ++ "()"))
+            ((:) ("  %root = call ptr " ++ (entry ++ "(ptr null, ptr null)"))
+               ((:) "  ret ptr %root"
+                  ((:) "}"
+                     ((:) "define i32 @main(i32 %argc, ptr %argv) {"
+                        ((:) "  call void @mlf_set_args(i32 %argc, ptr %argv)"
+                           ((:) "  %root = call ptr @mlf_entry()"
+                              ((:)
                                  ("  %status = call i32 @mlf_run(ptr %root, i64 " ++
                                   ((if executeIO then "1" else "0") ++ ")"))
-                                 (Cons "  ret i32 %status" (Cons "}" Nil)))))))))))
+                                 ((:) "  ret i32 %status" ((:) "}" [])))))))))))
 }

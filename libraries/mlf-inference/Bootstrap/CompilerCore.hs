@@ -39,8 +39,8 @@ module Bootstrap.CompilerCore where {
       Left e -> Left (CompileError p e);
       Right a -> Right a
     };
-  finishCompilation :: Pair SProgram (Map String String) -> Either CompileError Compilation;
-  finishCompilation (Pair program names) =
+  finishCompilation :: (,) SProgram (Map String String) -> Either CompileError Compilation;
+  finishCompilation ((,) program names) =
     case program of {
       SClassProgram _ _ _ _ ->
         Left (CompileError Inference "class translation did not produce a core program");

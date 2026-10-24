@@ -3,13 +3,13 @@
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
 module Test.Assert where {
-  import MLF.Primitive;
+  import MLF.Primitive hiding (fail);
   import Bootstrap.Types;
   import qualified Test.Expectation as E;
   import qualified Test.Outcome as O;
   -- Ordinary assertion failures are values. IO exits, panics and crashes are not
   -- caught; callers that need that isolation must supervise a separate process.
-  data Failure = Failure String (Maybe (Pair String String));
+  data Failure = Failure String (Maybe ((,) String String));
   data Test a = Test (IO (Either Failure a));
   run :: forall a. Test a -> IO (Either Failure a);
   run (Test action) = action;
@@ -38,13 +38,13 @@ module Test.Assert where {
   };
   fail :: forall a. String -> Test a;
   fail message = Test (ioReturn (Left (Failure message Nothing)));
-  assert :: Bool -> String -> Test Unit;
-  assert condition message = if condition then succeed Unit else fail message;
-  equal :: forall a. (a -> a -> Bool) -> (a -> String) -> String -> a -> a -> Test Unit;
+  assert :: Bool -> String -> Test ();
+  assert condition message = if condition then succeed () else fail message;
+  equal :: forall a. (a -> a -> Bool) -> (a -> String) -> String -> a -> a -> Test ();
   equal same display message expected actual =
     if same expected actual
-    then succeed Unit
-    else Test (ioReturn (Left (Failure message (Just (Pair (display expected) (display actual))))));
+    then succeed ()
+    else Test (ioReturn (Left (Failure message (Just ((,) (display expected) (display actual))))));
   liftIO :: forall a. IO a -> Test a;
   liftIO action =
     Test
@@ -60,13 +60,13 @@ module Test.Assert where {
     };
   message :: Failure -> String;
   message (Failure text _) = text;
-  details :: Failure -> Maybe (Pair String String);
+  details :: Failure -> Maybe ((,) String String);
   details (Failure _ values) = values;
   describe :: Failure -> String;
   describe (Failure text values) =
     case values of {
       Nothing -> text;
-      Just (Pair expected actual) -> (text ++ ("; expected " ++ (expected ++ (", got " ++ actual))))
+      Just ((,) expected actual) -> (text ++ ("; expected " ++ (expected ++ (", got " ++ actual))))
     };
   -- Compatibility boundary for a legacy IO suite. Keep termination outside the
   -- assertion API so the common runner can report failures and keep running.

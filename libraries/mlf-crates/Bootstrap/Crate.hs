@@ -17,11 +17,12 @@ module Bootstrap.Crate where {
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.InferenceUnit as Inference;
   import qualified Bootstrap.CrateQuery as Query;
+  import qualified Bootstrap.SourceInference as Source;
   import qualified Bootstrap.CrateArtifact as Artifact;
   -- The package driver supplies the source inventory for exactly one crate.
   -- Dependency paths designate generated metadata, never upstream sources.
   data CrateSpec =
-    CrateSpec String String PreludeMode (List (Pair String String)) (List String) String String;
+    CrateSpec String String PreludeMode ([] ((,) String String)) ([] String) String String;
   specIdentity (CrateSpec identity _ _ _ _ _ _) = identity;
   specEntry (CrateSpec _ entry _ _ _ _ _) = entry;
   specMode (CrateSpec _ _ mode _ _ _ _) = mode;
@@ -38,24 +39,24 @@ module Bootstrap.Crate where {
         matchValueShared2 = fields
       } in
       case matchValueShared2 of {
-        Cons matchValueShared3 matchValueShared4 ->
+        (:) matchValueShared3 matchValueShared4 ->
           if MLF.Primitive.eqString matchValueShared3 "MLF-CRATE-1"
           then case matchValueShared4 of {
-                 Cons matchValueShared5 matchValueShared6 ->
+                 (:) matchValueShared5 matchValueShared6 ->
                    case matchValueShared6 of {
-                     Cons matchValueShared7 matchValueShared8 ->
+                     (:) matchValueShared7 matchValueShared8 ->
                        case matchValueShared8 of {
-                         Cons matchValueShared9 matchValueShared10 ->
+                         (:) matchValueShared9 matchValueShared10 ->
                            case matchValueShared10 of {
-                             Cons matchValueShared11 matchValueShared12 ->
+                             (:) matchValueShared11 matchValueShared12 ->
                                case matchValueShared12 of {
-                                 Cons matchValueShared13 matchValueShared14 ->
+                                 (:) matchValueShared13 matchValueShared14 ->
                                    case matchValueShared14 of {
-                                     Cons matchValueShared15 matchValueShared16 ->
+                                     (:) matchValueShared15 matchValueShared16 ->
                                        case matchValueShared16 of {
-                                         Cons matchValueShared17 matchValueShared18 ->
+                                         (:) matchValueShared17 matchValueShared18 ->
                                            case matchValueShared18 of {
-                                             Nil ->
+                                             [] ->
                                                let {
                                                  identity = matchValueShared5
                                                } in
@@ -104,7 +105,7 @@ module Bootstrap.Crate where {
                                                          paths))
                                                    "duplicate crate source module";
                                                  traverseEither
-                                                   (\(Pair name path) ->
+                                                   (\((,) name path) ->
                                                       do {
                                                         Separate.validModuleName name;
                                                         ensure (Host.absolutePath path)
@@ -160,18 +161,20 @@ module Bootstrap.Crate where {
         _ -> Left "unsupported or malformed crate specification (expected MLF-CRATE-1)"
       }
     };
-  loadSources :: List (Pair String String) -> IO (Either String (List SourceModule));
-  loadSources paths =
+  loadSources :: [] ((,) String String) -> IO (Either String ([] SourceModule));
+  loadSources = loadSourcesInPackage "main";
+  loadSourcesInPackage :: String -> [] ((,) String String) -> IO (Either String ([] SourceModule));
+  loadSourcesInPackage sourcePackage paths =
     case paths of {
-      Nil -> ioReturn (Right Nil);
-      Cons (Pair name path) rest ->
+      [] -> ioReturn (Right []);
+      (:) ((,) name path) rest ->
         do {
           present <- fileExists path;
           if not present
           then ioReturn (Left ("crate source does not exist: " ++ path))
           else do {
                  text <- readFile path;
-                 case Parser.parseModule path text of {
+                 case Parser.parseModuleInPackage sourcePackage path text of {
                    Left message -> ioReturn (Left message);
                    Right source ->
                      case do {
@@ -183,8 +186,8 @@ module Bootstrap.Crate where {
                        Left message -> ioReturn (Left message);
                        Right clean ->
                          do {
-                           remaining <- loadSources rest;
-                           ioReturn (mapEither (Cons clean) remaining)
+                           remaining <- loadSourcesInPackage sourcePackage rest;
+                           ioReturn (mapEither ((:) clean) remaining)
                          }
                      }
                  }
@@ -196,18 +199,18 @@ module Bootstrap.Crate where {
   externalNamespaces direct interfaces =
     do {
       let {
-        accessible = filter (\(Pair path iface) -> elem eqString path direct) interfaces
+        accessible = filter (\((,) path iface) -> elem eqString path direct) interfaces
       };
       let {
         exports =
           append (concatMap (\p -> Artifact.crateExports (snd p)) accessible)
             (concatMap
-               (\(Pair _ iface) ->
+               (\((,) _ iface) ->
                   filter (\p -> Modules.isBuiltinModule (fst p)) (Artifact.crateExports iface))
                interfaces)
       };
       foldM
-        (\acc (Pair name entities) ->
+        (\acc ((,) name entities) ->
            case M.lookup compareString name acc of {
              Nothing -> Right (M.insert compareString name (Modules.interface entities) acc);
              Just prior ->
@@ -224,7 +227,7 @@ module Bootstrap.Crate where {
     };
   moduleOwners identity sources interfaces =
     foldM
-      (\acc (Pair name owner) ->
+      (\acc ((,) name owner) ->
          case M.lookup compareString name acc of {
            Nothing -> Right (M.insert compareString name owner acc);
            Just earlier ->
@@ -233,28 +236,33 @@ module Bootstrap.Crate where {
              else Left ("module belongs to multiple crates: " ++ name)
          })
       M.empty
-      (append (map (\source -> Pair (Modules.moduleIdentity source) identity) sources)
+      (append (map (\source -> (,) (Modules.moduleIdentity source) identity) sources)
          (concatMap
-            (\(Pair _ iface) ->
-               map (\name -> Pair name (Artifact.crateId iface)) (Artifact.crateModules iface))
+            (\((,) _ iface) ->
+               map (\name -> (,) name (Artifact.crateId iface)) (Artifact.crateModules iface))
             interfaces));
-  data PreparedCrate =
-    PreparedCrate Modules.ResolvedCrate (List DataDecl) (List SClassDecl) (List
-                                                                           (Pair String
-                                                                            SInstanceDecl)) Inference.LoweredDeclarations String (Map
-                                                                                                                                  String
-                                                                                                                                  (Set
-                                                                                                                                   String));
-  preparedResolution (PreparedCrate r _ _ _ _ _ _) = r;
-  preparedData (PreparedCrate _ ds _ _ _ _ _) = ds;
-  preparedClasses (PreparedCrate _ _ cs _ _ _ _) = cs;
-  preparedInstances (PreparedCrate _ _ _ instances _ _ _) = instances;
-  preparedLowered (PreparedCrate _ _ _ _ lowered _ _) = lowered;
-  preparedEntry (PreparedCrate _ _ _ _ _ entry _) = entry;
-  preparedReach (PreparedCrate _ _ _ _ _ _ reach) = reach;
+  data PreparedCrate = PreparedCrate Modules.ResolvedCrate ([] DataDecl)
+    ([] SClassDecl) ([] ((,) String SInstanceDecl)) Inference.LoweredDeclarations
+    String (Map String (Set String)) (Maybe Source.SourcePlan);
+  preparedResolution (PreparedCrate r _ _ _ _ _ _ _) = r;
+  preparedData (PreparedCrate _ ds _ _ _ _ _ _) = ds;
+  preparedClasses (PreparedCrate _ _ cs _ _ _ _ _) = cs;
+  preparedInstances (PreparedCrate _ _ _ instances _ _ _ _) = instances;
+  preparedLowered (PreparedCrate _ _ _ _ lowered _ _ _) = lowered;
+  preparedEntry (PreparedCrate _ _ _ _ _ entry _ _) = entry;
+  preparedReach (PreparedCrate _ _ _ _ _ _ reach _) = reach;
+  preparedSourcePlan (PreparedCrate _ _ _ _ _ _ _ plan) = plan;
+  preparedLayouts prepared = case preparedSourcePlan prepared of {
+    Just plan -> Source.planData plan;
+    Nothing -> Inference.loweredData (preparedLowered prepared)
+  };
+  preparedNames prepared = case preparedSourcePlan prepared of {
+    Just plan -> Source.planNames plan;
+    Nothing -> Inference.loweredNames (preparedLowered prepared)
+  };
   entryDeclaration spec resolution =
     if eqString (specEntry spec) ""
-    then Right (Pair "" Nil)
+    then Right ((,) "" [])
     else do {
            entry <-
              case find
@@ -283,14 +291,14 @@ module Bootstrap.Crate where {
                Artifact.definitionName (specIdentity spec)
                  (Modules.Entity (specEntry spec) "<crate-entry>" Modules.Value)
            };
-           Right (Pair symbol (Cons (Triple symbol Nothing expression) Nil))
+           Right ((,) symbol ((:) ((,,) symbol Nothing expression) []))
          };
   externalInstanceOwners interfaces =
     concatMap
-      (\(Pair _ iface) ->
+      (\((,) _ iface) ->
          map
-           (\(Pair name inst) ->
-              mapEither (\owner -> Pair owner (Pair name inst)) (Artifact.instanceOwner iface name))
+           (\((,) name inst) ->
+              mapEither (\owner -> (,) owner ((,) name inst)) (Artifact.instanceOwner iface name))
            (Artifact.crateInstances iface))
       interfaces;
   prepareCrate spec interfaces sources =
@@ -329,7 +337,7 @@ module Bootstrap.Crate where {
       };
       boundValueShared19 <- entryDeclaration spec resolution;
       case boundValueShared19 of {
-        Pair entry extra ->
+        (,) entry extra ->
           do {
             let {
               values = append ownValues extra
@@ -337,8 +345,8 @@ module Bootstrap.Crate where {
             let {
               localInstances =
                 map
-                  (\(Pair owner inst) ->
-                     Pair owner (Pair (Artifact.instanceName (specIdentity spec) owner inst) inst))
+                  (\((,) owner inst) ->
+                     (,) owner ((,) (Artifact.instanceName (specIdentity spec) owner inst) inst))
                   (Modules.resolvedCrateInstances resolution)
             };
             inheritedInstances <- sequenceEither (externalInstanceOwners interfaces);
@@ -349,8 +357,8 @@ module Bootstrap.Crate where {
               externalReach =
                 M.fromList compareString
                   (concatMap
-                     (\(Pair _ iface) ->
-                        map (\(Pair name reach) -> Pair name (Set.fromList compareString reach))
+                     (\((,) _ iface) ->
+                        map (\((,) name reach) -> (,) name (Set.fromList compareString reach))
                           (Artifact.crateImports iface))
                      interfaces)
             };
@@ -363,7 +371,7 @@ module Bootstrap.Crate where {
             let {
               candidates =
                 Modules.candidateScope reach
-                  (map (\(Pair owner value) -> Pair owner (snd value)) instances)
+                  (map (\((,) owner value) -> (,) owner (snd value)) instances)
             };
             let {
               valueScopes =
@@ -372,14 +380,14 @@ module Bootstrap.Crate where {
                      (concatMap
                         (\r ->
                            map
-                             (\(Triple name _ _) ->
-                                Pair name
+                             (\((,,) name _ _) ->
+                                (,) name
                                   (candidates (Modules.moduleIdentity (Modules.resolvedSource r))))
                              (Modules.renamedValues (Modules.resolvedContents r)))
                         resolved)
                      (if eqString entry ""
-                      then Nil
-                      else Cons (Pair entry (candidates (specEntry spec))) Nil))
+                      then []
+                      else (:) ((,) entry (candidates (specEntry spec))) []))
             };
             let {
               allData = append (concatMap (\p -> Artifact.crateData (snd p)) interfaces) ownData
@@ -391,7 +399,7 @@ module Bootstrap.Crate where {
             let {
               dictionaries =
                 M.fromList compareString
-                  (map (\c -> Pair ("Dict_" ++ Classes.className c) (Classes.className c))
+                  (map (\c -> (,) ("Dict_" ++ Classes.className c) (Classes.className c))
                      allClasses)
             };
             let {
@@ -416,20 +424,26 @@ module Bootstrap.Crate where {
                 M.union compareString (M.map (Modules.displayNames sourceNames) dictionaries)
                   sourceNames
             };
-            lowered <-
-              mapLeft (Modules.displayNames diagnosticNames)
+            sourcePlan <- mapLeft (Modules.displayNames diagnosticNames)
+              (Source.prepareSourcePlan imported allData allClasses (map snd instances)
+                valueScopes (map (\((,) owner _) -> candidates owner) instances) values);
+            lowered <- case sourcePlan of {
+              Nothing -> mapLeft (Modules.displayNames diagnosticNames)
                 (Inference.lowerDeclarationsWithImports imported allData allClasses
-                   (map snd instances)
-                   valueScopes
-                   (map (\(Pair owner _) -> candidates owner) instances)
-                   values);
+                  (map snd instances) valueScopes
+                  (map (\((,) owner _) -> candidates owner) instances) values);
+              Just plan -> Right (case Source.planLegacy plan of {
+                Right legacy -> legacy;
+                Left message -> panic message
+              })
+            };
             Right
               (PreparedCrate resolution ownData ownClasses
-                 (map (\(Pair _ (Pair name inst)) -> Pair name (Separate.stripInstance inst))
+                 (map (\((,) _ ((,) name inst)) -> (,) name (Separate.stripInstance inst))
                     localInstances)
                  lowered
                  entry
-                 reach)
+                 reach sourcePlan)
           }
       }
     };
@@ -443,19 +457,33 @@ module Bootstrap.Crate where {
       let {
         imported =
           map
-            (\(Pair _ iface) ->
-               Separate.UnitInterface (Artifact.crateId iface) Nil Nil Nil Nil Nil
+            (\((,) _ iface) ->
+               Separate.UnitInterface (Artifact.crateId iface) [] [] [] [] []
                  (Artifact.crateBindings iface)
                  "metadata")
             interfaces
       };
-      compiled <-
-        Query.compileGroups (specIdentity spec) (specCache spec) imported
-          (Inference.loweredData lowered)
-          (Inference.loweredValues lowered);
+      let {
+        protected = foldl
+          (\acc entry -> M.insert compareString (fst entry)
+            (snd entry || M.findWithDefault compareString False (fst entry) acc) acc)
+          M.empty (concatMap (\p -> Artifact.crateProtection (snd p)) interfaces)
+      };
+      compiled <- case preparedSourcePlan prepared of {
+        Just plan -> Query.compileSourceGroups (specIdentity spec) (specCache spec)
+          imported protected plan;
+        Nothing -> do {
+          result <- Query.compileGroups (specIdentity spec) (specCache spec) imported
+            (Inference.loweredData lowered) (Inference.loweredValues lowered);
+          ioReturn (mapEither (\((,) fragments report) -> (,,) fragments report
+            (M.fromList compareString
+              (map (\((,) name ty) -> (,) name (Source.SourceContract ty [] True))
+                (concatMap (\f -> Separate.unitBindings (Separate.objectInterface f)) fragments)))) result)
+        }
+      };
       case compiled of {
         Left message -> ioReturn (Left message);
-        Right (Pair fragments report) ->
+        Right ((,,) fragments report contracts) ->
           ioReturn
             (do {
                let {
@@ -466,7 +494,7 @@ module Bootstrap.Crate where {
                    (\r ->
                       mapEither
                         (\scope ->
-                           Pair (Modules.moduleIdentity (Modules.resolvedSource r))
+                           (,) (Modules.moduleIdentity (Modules.resolvedSource r))
                              (Set.toList (Modules.visible scope)))
                         (Modules.resolvedExports (specMode spec) r))
                    resolved;
@@ -476,8 +504,8 @@ module Bootstrap.Crate where {
                      (\path ->
                         case find (\p -> eqString (fst p) path) interfaces of {
                           Nothing -> panic "missing direct crate metadata";
-                          Just (Pair _ iface) ->
-                            Triple (Artifact.crateId iface) path
+                          Just ((,) _ iface) ->
+                            (,,) (Artifact.crateId iface) path
                               (Artifact.semanticFingerprint iface)
                         })
                      (specDependencies spec)
@@ -486,13 +514,13 @@ module Bootstrap.Crate where {
                  externalLayouts =
                    Set.fromList compareString
                      (concatMap
-                        (\(Pair _ iface) -> map D.datatypeName (Artifact.crateLoweredData iface))
+                        (\((,) _ iface) -> map D.datatypeName (Artifact.crateLoweredData iface))
                         interfaces)
                };
                let {
                  layouts =
                    filter (\d -> not (Set.member compareString (D.datatypeName d) externalLayouts))
-                     (Inference.loweredData lowered)
+                     (preparedLayouts prepared)
                };
                let {
                  modules = map (\r -> Modules.moduleIdentity (Modules.resolvedSource r)) resolved
@@ -501,7 +529,7 @@ module Bootstrap.Crate where {
                  reach =
                    map
                      (\name ->
-                        Pair name
+                        (,) name
                           (Set.toList
                              (M.findWithDefault compareString Set.empty name
                                 (preparedReach prepared))))
@@ -511,6 +539,11 @@ module Bootstrap.Crate where {
                  bindings =
                    concatMap (\f -> Separate.unitBindings (Separate.objectInterface f)) fragments
                };
+               protection <- traverseEither
+                 (\((,) name _) -> case M.lookup compareString name contracts of {
+                   Just contract -> Right ((,) name (Source.contractProtected contract));
+                   Nothing -> Left ("final source binding lacks a protection contract: " ++ name)
+                 }) bindings;
                let {
                  iface =
                    Artifact.CrateInterface (specIdentity spec) dependencies modules exports reach
@@ -521,12 +554,13 @@ module Bootstrap.Crate where {
                      bindings
                      (preparedEntry prepared)
                      "pending"
+                     protection
                };
                let {
                  object = Artifact.makeObject iface fragments
                };
                Artifact.validateInterface (Artifact.objectInterface object);
-               Right (Pair object report)
+               Right ((,) object report)
              })
       }
     };
@@ -540,7 +574,7 @@ module Bootstrap.Crate where {
             metadata = (prefix ++ ".mlfci")
           };
           code <-
-            Query.cacheCommand (Cons "/bin/mkdir" (Cons "-p" (Cons (parentDirectory prefix) Nil)));
+            Query.cacheCommand ((:) "/bin/mkdir" ((:) "-p" ((:) (parentDirectory prefix) [])));
           if (code /= 0)
           then ioReturn (Left "cannot create shared Prelude directory")
           else do {
@@ -562,7 +596,7 @@ module Bootstrap.Crate where {
                  };
                  result <-
                    if valid
-                   then ioReturn (Right Unit)
+                   then ioReturn (Right ())
                    else do {
                           body <-
                             Query.writeCache (prefix ++ ".mlfco") (Artifact.encodeObject builtin);
@@ -587,11 +621,12 @@ module Bootstrap.Crate where {
     then do {
            builtin <-
              case find
-                    (\(Pair _ iface) ->
+                    (\((,) _ iface) ->
                        (elem eqString "Prelude" (Artifact.crateModules iface) &&
                         elem eqString "MLF.Primitive" (Artifact.crateModules iface)))
                     interfaces of {
-               Just (Pair metadata _) -> ioReturn (Right metadata);
+               Just ((,) metadata iface) ->
+                 ioReturn (mapEither (\_ -> metadata) (Artifact.validateInterface iface));
                Nothing -> ensureBuiltin (specPrelude spec)
              };
            case builtin of {
@@ -600,29 +635,29 @@ module Bootstrap.Crate where {
                do {
                  let {
                    updated =
-                     withDependencies spec (nubBy eqString (Cons metadata (specDependencies spec)))
+                     withDependencies spec (nubBy eqString ((:) metadata (specDependencies spec)))
                  };
                  loaded <- Artifact.loadInterfaces (specDependencies updated);
-                 ioReturn (mapEither (Pair updated) loaded)
+                 ioReturn (mapEither ((,) updated) loaded)
                }
            }
          }
-    else ioReturn (Right (Pair spec interfaces));
+    else ioReturn (Right ((,) spec interfaces));
   compileSources spec sources interfaces prefix =
     do {
       dependencies <- withPrelude spec sources interfaces;
       case do {
              boundValueShared20 <- dependencies;
              case boundValueShared20 of {
-               Pair updated loaded ->
+               (,) updated loaded ->
                  do {
                    prepared <- prepareCrate updated loaded sources;
-                   Right (Triple updated loaded prepared)
+                   Right ((,,) updated loaded prepared)
                  }
              }
            } of {
         Left message -> ioReturn (Left message);
-        Right (Triple updated loaded prepared) ->
+        Right ((,,) updated loaded prepared) ->
           do {
             result <- compilePrepared updated loaded prepared;
             case result of {
@@ -634,18 +669,18 @@ module Bootstrap.Crate where {
                   diagnostics =
                     M.union compareString
                       (M.map (Modules.displayNames names)
-                         (Inference.loweredNames (preparedLowered prepared)))
+                         (preparedNames prepared))
                       names
                 } in
                 ioReturn (Left (Modules.displayNames diagnostics message));
-              Right (Pair object report) ->
+              Right ((,) object report) ->
                 do {
                   Artifact.writeObject prefix object;
                   writeFile (prefix ++ ".queries")
                     (Query.reportJSON (specIdentity spec)
                        (Artifact.semanticFingerprint (Artifact.objectInterface object))
                        report);
-                  ioReturn (Right Unit)
+                  ioReturn (Right ())
                 }
             }
           }
@@ -662,7 +697,7 @@ module Bootstrap.Crate where {
                Left message -> ioReturn (Left message);
                Right spec ->
                  do {
-                   sourceResult <- loadSources (specSources spec);
+                   sourceResult <- loadSourcesInPackage (specIdentity spec) (specSources spec);
                    paths <- mapM canonicalPath (specDependencies spec);
                    let {
                      normalized = withDependencies spec paths
@@ -671,10 +706,10 @@ module Bootstrap.Crate where {
                    case do {
                           sources <- sourceResult;
                           interfaces <- dependencies;
-                          Right (Pair sources interfaces)
+                          Right ((,) sources interfaces)
                         } of {
                      Left message -> ioReturn (Left message);
-                     Right (Pair sources interfaces) ->
+                     Right ((,) sources interfaces) ->
                        compileSources normalized sources interfaces prefix
                    }
                  }

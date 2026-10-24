@@ -15,13 +15,13 @@ module Package.Command where {
   usage :: String;
   usage =
     "Usage: mlfpkg [--manifest FILE] [--build-dir DIR] [--cache-dir DIR] [--compiler TOOL] [--clang TOOL]\n              [--pkg-config TOOL] [--runtime FILE] [--gc-prefix DIR] [--timeout SECONDS] [--jobs N] [--locked] [--offline]\n              [--pgo-generate TARGET | --pgo-target TARGET --pgo-use FILE]\n              plan | lock | build [--target NAME ...] | test [--target NAME ...] | run NAME [-- ARGS...]\n              release DIRECTORY | pack RELEASE_DIRECTORY ASSET_FILE\nPackage manifests: mlf-package.json. Dependencies select local source, checked directories, or pinned GitHub release assets.\n";
-  options :: J.Json -> List String -> IO (Pair J.Json (List String));
+  options :: J.Json -> [] String -> IO ((,) J.Json ([] String));
   options config args =
     let {
       matchValueShared1 = args
     } in
     case matchValueShared1 of {
-      Cons matchValueShared2 matchValueShared3 ->
+      (:) matchValueShared2 matchValueShared3 ->
         if MLF.Primitive.eqString matchValueShared2 "--locked"
         then let {
                rest = matchValueShared3
@@ -33,7 +33,7 @@ module Package.Command where {
                   } in
                   options (J.set "offline" (J.Boolean True) config) rest
              else case matchValueShared3 of {
-                    Cons matchValueShared4 matchValueShared5 ->
+                    (:) matchValueShared4 matchValueShared5 ->
                       let {
                         value = matchValueShared4
                       } in
@@ -47,26 +47,26 @@ module Package.Command where {
                            (O.words
                               "--manifest --build-dir --cache-dir --compiler --clang --pkg-config --runtime --gc-prefix --timeout --jobs --pgo-generate --pgo-target --pgo-use")
                       then options (J.set (O.drop 2 option) (J.str value) config) rest
-                      else ioReturn (Pair config args);
-                    _ -> ioReturn (Pair config args)
+                      else ioReturn ((,) config args);
+                    _ -> ioReturn ((,) config args)
                   };
-      _ -> ioReturn (Pair config args)
+      _ -> ioReturn ((,) config args)
     };
-  selections :: List String -> List String -> IO (List String);
+  selections :: [] String -> [] String -> IO ([] String);
   selections acc args =
     let {
       matchValueShared6 = args
     } in
     case matchValueShared6 of {
-      Nil ->
+      [] ->
         do {
           O.require (S.length acc == S.length (S.nubBy eqString acc)) "duplicate target selection";
           ioReturn acc
         };
-      Cons matchValueShared7 matchValueShared8 ->
+      (:) matchValueShared7 matchValueShared8 ->
         if MLF.Primitive.eqString matchValueShared7 "--target"
         then case matchValueShared8 of {
-               Cons matchValueShared9 matchValueShared10 ->
+               (:) matchValueShared9 matchValueShared10 ->
                  let {
                    name = matchValueShared9
                  } in
@@ -94,10 +94,10 @@ module Package.Command where {
              let {
                candidates0 =
                  if eqString (M.packageName package) "mlf-compiler"
-                 then Cons (buildDirectory ++ "/bin/emlf")
-                        (Cons (checkout ++ "/.mlf-build/bin/emlf")
-                           (Cons (checkout ++ "/.mlf-build/mlf-native/bin/emlf") Nil))
-                 else Nil
+                 then (:) (buildDirectory ++ "/bin/emlf")
+                        ((:) (checkout ++ "/.mlf-build/bin/emlf")
+                           ((:) (checkout ++ "/.mlf-build/mlf-native/bin/emlf") []))
+                 else []
              };
              candidates <- S.mapM O.executable candidates0;
              available <-
@@ -163,10 +163,10 @@ module Package.Command where {
                                names);
                         ioReturn (S.nubBy eqString (S.catMaybes found))
                       }
-                 else ioReturn Nil;
+                 else ioReturn [];
                case candidates of {
-                 Nil -> ioReturn "";
-                 Cons prefix Nil -> ioReturn prefix;
+                 [] -> ioReturn "";
+                 (:) prefix [] -> ioReturn prefix;
                  _ ->
                    O.fatal
                      "multiple local BDWGC installations; select one with --gc-prefix or MLF_GC_PREFIX"
@@ -179,18 +179,18 @@ module Package.Command where {
              ioReturn (J.set "gc-prefix" (J.str selected) config)
            }
     };
-  expand :: List (Pair String String) -> String -> String;
+  expand :: [] ((,) String String) -> String -> String;
   expand replacements text =
     S.foldl (\acc entry -> O.replace (S.fst entry) (S.snd entry) acc) text replacements;
   commandTest :: B.Builder ->
-                 M.Package -> List (Pair String String) -> String -> J.Json -> IO J.Json;
+                 M.Package -> [] ((,) String String) -> String -> J.Json -> IO J.Json;
   commandTest b p built name target =
     do {
       let {
         binaries =
           S.map
             (\n ->
-               Pair ("{bin:" ++ (n ++ "}"))
+               (,) ("{bin:" ++ (n ++ "}"))
                  (B.executable b (builtArtifact built ("e-" ++ n) ++ "/program")))
             (J.getStrings "requires" target)
       };
@@ -200,9 +200,9 @@ module Package.Command where {
       let {
         replacements =
           S.append binaries
-            (Cons (Pair "{root}" (M.packageRoot p))
-               (Cons (Pair "{build}" (B.directory b))
-                  (Cons (Pair "{cache}" (B.cacheDirectory b)) Nil)))
+            ((:) ((,) "{root}" (M.packageRoot p))
+               ((:) ((,) "{build}" (B.directory b))
+                  ((:) ((,) "{cache}" (B.cacheDirectory b)) [])))
       };
       let {
         argv = S.map (expand replacements) requested
@@ -225,21 +225,21 @@ module Package.Command where {
       hash <- fileDigest log;
       B.record b "commands"
         (B.info
-           (Cons (Pair "argv" (J.stringArray argv))
-              (Cons (Pair "cwd" (J.str (M.packageRoot p)))
-                 (Cons (Pair "exit_code" (J.num code))
-                    (Cons (Pair "log" (J.str log)) (Cons (Pair "sha256" (J.str hash)) Nil))))));
+           ((:) ((,) "argv" (J.stringArray argv))
+              ((:) ((,) "cwd" (J.str (M.packageRoot p)))
+                 ((:) ((,) "exit_code" (J.num code))
+                    ((:) ((,) "log" (J.str log)) ((:) ((,) "sha256" (J.str hash)) []))))));
       O.require (code == 0)
         ("test " ++ (name ++ (" failed (" ++ (showInt code ++ ("); see " ++ log)))));
       text <- readFile log;
       putStr (O.drop (S.max 0 (stringLength text - 3000)) text);
       ioReturn
         (B.info
-           (Cons (Pair "name" (J.str name))
-              (Cons (Pair "log" (J.str log)) (Cons (Pair "sha256" (J.str hash)) Nil))))
+           ((:) ((,) "name" (J.str name))
+              ((:) ((,) "log" (J.str log)) ((:) ((,) "sha256" (J.str hash)) []))))
     };
   nativeTest :: B.Builder ->
-                M.Package -> List (Pair String String) -> String -> J.Json -> IO J.Json;
+                M.Package -> [] ((,) String String) -> String -> J.Json -> IO J.Json;
   nativeTest b p built name target =
     do {
       let {
@@ -250,9 +250,9 @@ module Package.Command where {
       };
       let {
         command =
-          Cons (B.compiler b)
-            (Cons "--run-crate"
-               (Cons (artifact ++ "/unit.mlfci") (Cons "--" (J.getStrings "arguments" target))))
+          (:) (B.compiler b)
+            ((:) "--run-crate"
+               ((:) (artifact ++ "/unit.mlfci") ((:) "--" (J.getStrings "arguments" target))))
       };
       let {
         testDir = (B.directory b ++ ("/tests/" ++ name))
@@ -281,16 +281,16 @@ module Package.Command where {
                ("test " ++
                 (name ++ (" (" ++ (backend ++ ("): unexpected stderr " ++ J.quote err)))))
            })
-        (Cons (Pair "interpreter" command)
-           (Cons (Pair "llvm" (Cons binary (J.getStrings "arguments" target))) Nil));
+        ((:) ((,) "interpreter" command)
+           ((:) ((,) "llvm" ((:) binary (J.getStrings "arguments" target))) []));
       hash <- fileDigest (testDir ++ "/llvm.stdout");
       ioReturn
         (B.info
-           (Cons (Pair "name" (J.str name))
-              (Cons (Pair "backends" (J.stringArray (O.words "interpreter llvm")))
-                 (Cons (Pair "stdout_sha256" (J.str hash)) Nil))))
+           ((:) ((,) "name" (J.str name))
+              ((:) ((,) "backends" (J.stringArray (O.words "interpreter llvm")))
+                 ((:) ((,) "stdout_sha256" (J.str hash)) []))))
     };
-  runTests :: B.Builder -> M.Package -> List (Pair String String) -> List String -> IO Unit;
+  runTests :: B.Builder -> M.Package -> [] ((,) String String) -> [] String -> IO ();
   runTests b p built names =
     S.mapM_
       (\name ->
@@ -325,7 +325,7 @@ module Package.Command where {
          S.append (S.map (\name -> Scheduler.request name (J.get name executables) True) required)
            (S.map (\name -> Scheduler.request ("test-" ++ name) (J.get name tests) False)
               (S.filter (\name -> J.has "main" (J.get name tests)) names));
-  run :: List String -> IO Unit;
+  run :: [] String -> IO ();
   run args =
     do {
       O.setupWindows;
@@ -336,26 +336,26 @@ module Package.Command where {
       boundValueShared27 <-
         options
           (B.info
-             (Cons (Pair "compiler" (J.str compiler))
-                (Cons (Pair "clang" (J.str clang)) (Cons (Pair "gc-prefix" (J.str gc)) Nil))))
+             ((:) ((,) "compiler" (J.str compiler))
+                ((:) ((,) "clang" (J.str clang)) ((:) ((,) "gc-prefix" (J.str gc)) []))))
           args;
       case boundValueShared27 of {
-        Pair config command ->
+        (,) config command ->
           do {
             let {
               matchValueShared14 = command
             } in
             case matchValueShared14 of {
-              Cons matchValueShared15 matchValueShared16 ->
+              (:) matchValueShared15 matchValueShared16 ->
                 if MLF.Primitive.eqString matchValueShared15 "__build-worker"
                 then case matchValueShared16 of {
-                       Cons matchValueShared21 matchValueShared22 ->
+                       (:) matchValueShared21 matchValueShared22 ->
                          case matchValueShared22 of {
-                           Cons matchValueShared23 matchValueShared24 ->
+                           (:) matchValueShared23 matchValueShared24 ->
                              case matchValueShared24 of {
-                               Cons matchValueShared25 matchValueShared26 ->
+                               (:) matchValueShared25 matchValueShared26 ->
                                  case matchValueShared26 of {
-                                   Nil ->
+                                   [] ->
                                      let {
                                        context = matchValueShared21
                                      } in
@@ -394,7 +394,7 @@ module Package.Command where {
                                          building =
                                            S.elem eqString action (O.words "build test run release")
                                        };
-                                       if building then O.mkdir buildDir else ioReturn Unit;
+                                       if building then O.mkdir buildDir else ioReturn ();
                                        dir <-
                                          if building
                                          then canonicalPath buildDir
@@ -405,12 +405,12 @@ module Package.Command where {
                                          else ioReturn (0 - 1);
                                        if building
                                        then B.recoverPublications dir
-                                       else ioReturn Unit;
+                                       else ioReturn ();
                                        if building
                                        then J.write (dir ++ "/build-report.json")
                                               (B.obj2 "complete" (J.Boolean False) "implementation"
                                                  (J.str "MLF"))
-                                       else ioReturn Unit;
+                                       else ioReturn ();
                                        graph <-
                                          M.loadWith path
                                            (J.set "cache-dir"
@@ -429,7 +429,7 @@ module Package.Command where {
                                               O.require (J.equal saved snapshot)
                                                 "mlf.lock is stale; review local changes and run mlfpkg lock"
                                             }
-                                       else ioReturn Unit;
+                                       else ioReturn ();
                                        if eqString action "plan"
                                        then do {
                                               O.require (S.null rest) usage;
@@ -460,7 +460,7 @@ module Package.Command where {
                                                  }
                                             else if eqString action "release"
                                                  then case rest of {
-                                                        Cons destination Nil ->
+                                                        (:) destination [] ->
                                                           do {
                                                             compilerSettings <-
                                                               configureCompiler p dir config;
@@ -488,11 +488,11 @@ module Package.Command where {
                                                         selected <-
                                                           if eqString action "run"
                                                           then case rest of {
-                                                                 Cons name _ ->
-                                                                   ioReturn (Cons name Nil);
-                                                                 Nil -> O.fatal usage
+                                                                 (:) name _ ->
+                                                                   ioReturn ((:) name []);
+                                                                 [] -> O.fatal usage
                                                                }
-                                                          else selections Nil rest;
+                                                          else selections [] rest;
                                                         let {
                                                           names =
                                                             if S.null selected
@@ -522,7 +522,7 @@ module Package.Command where {
                                                             (buildRequests p action names);
                                                         if eqString action "test"
                                                         then runTests b p built names
-                                                        else ioReturn Unit;
+                                                        else ioReturn ();
                                                         B.finish b;
                                                         if eqString action "build"
                                                         then S.mapM_
@@ -531,11 +531,11 @@ module Package.Command where {
                                                                     (B.executable b
                                                                        (dir ++ ("/bin/" ++ name))))
                                                                names
-                                                        else ioReturn Unit;
+                                                        else ioReturn ();
                                                         releaseFileLock lock;
                                                         if eqString action "run"
                                                         then case rest of {
-                                                               Cons name arguments ->
+                                                               (:) name arguments ->
                                                                  do {
                                                                    let {
                                                                      forwarded =
@@ -544,7 +544,7 @@ module Package.Command where {
                                                                            arguments
                                                                        } in
                                                                        case matchValueShared11 of {
-                                                                         Cons matchValueShared12 matchValueShared13 ->
+                                                                         (:) matchValueShared12 matchValueShared13 ->
                                                                            if MLF.Primitive.eqString
                                                                                 matchValueShared12
                                                                                 "--"
@@ -559,7 +559,7 @@ module Package.Command where {
                                                                    };
                                                                    code <-
                                                                      O.exec (M.packageRoot p)
-                                                                       (Cons
+                                                                       ((:)
                                                                           (B.executable b
                                                                              (dir ++
                                                                               ("/bin/" ++ name)))
@@ -573,7 +573,7 @@ module Package.Command where {
                                                                              config));
                                                                    exitWith code
                                                                  };
-                                                               Nil -> O.fatal usage
+                                                               [] -> O.fatal usage
                                                              }
                                                         else putStrLn
                                                                (action ++
@@ -609,19 +609,19 @@ module Package.Command where {
                                      building =
                                        S.elem eqString action (O.words "build test run release")
                                    };
-                                   if building then O.mkdir buildDir else ioReturn Unit;
+                                   if building then O.mkdir buildDir else ioReturn ();
                                    dir <-
                                      if building then canonicalPath buildDir else ioReturn buildDir;
                                    lock <-
                                      if building
                                      then acquireFileLock (dir ++ "/.lock")
                                      else ioReturn (0 - 1);
-                                   if building then B.recoverPublications dir else ioReturn Unit;
+                                   if building then B.recoverPublications dir else ioReturn ();
                                    if building
                                    then J.write (dir ++ "/build-report.json")
                                           (B.obj2 "complete" (J.Boolean False) "implementation"
                                              (J.str "MLF"))
-                                   else ioReturn Unit;
+                                   else ioReturn ();
                                    graph <-
                                      M.loadWith path
                                        (J.set "cache-dir"
@@ -640,7 +640,7 @@ module Package.Command where {
                                           O.require (J.equal saved snapshot)
                                             "mlf.lock is stale; review local changes and run mlfpkg lock"
                                         }
-                                   else ioReturn Unit;
+                                   else ioReturn ();
                                    if eqString action "plan"
                                    then do {
                                           O.require (S.null rest) usage;
@@ -671,7 +671,7 @@ module Package.Command where {
                                              }
                                         else if eqString action "release"
                                              then case rest of {
-                                                    Cons destination Nil ->
+                                                    (:) destination [] ->
                                                       do {
                                                         compilerSettings <-
                                                           configureCompiler p dir config;
@@ -698,11 +698,11 @@ module Package.Command where {
                                                     selected <-
                                                       if eqString action "run"
                                                       then case rest of {
-                                                             Cons name _ ->
-                                                               ioReturn (Cons name Nil);
-                                                             Nil -> O.fatal usage
+                                                             (:) name _ ->
+                                                               ioReturn ((:) name []);
+                                                             [] -> O.fatal usage
                                                            }
-                                                      else selections Nil rest;
+                                                      else selections [] rest;
                                                     let {
                                                       names =
                                                         if S.null selected
@@ -730,7 +730,7 @@ module Package.Command where {
                                                         (buildRequests p action names);
                                                     if eqString action "test"
                                                     then runTests b p built names
-                                                    else ioReturn Unit;
+                                                    else ioReturn ();
                                                     B.finish b;
                                                     if eqString action "build"
                                                     then S.mapM_
@@ -739,11 +739,11 @@ module Package.Command where {
                                                                 (B.executable b
                                                                    (dir ++ ("/bin/" ++ name))))
                                                            names
-                                                    else ioReturn Unit;
+                                                    else ioReturn ();
                                                     releaseFileLock lock;
                                                     if eqString action "run"
                                                     then case rest of {
-                                                           Cons name arguments ->
+                                                           (:) name arguments ->
                                                              do {
                                                                let {
                                                                  forwarded =
@@ -751,7 +751,7 @@ module Package.Command where {
                                                                      matchValueShared11 = arguments
                                                                    } in
                                                                    case matchValueShared11 of {
-                                                                     Cons matchValueShared12 matchValueShared13 ->
+                                                                     (:) matchValueShared12 matchValueShared13 ->
                                                                        if MLF.Primitive.eqString
                                                                             matchValueShared12
                                                                             "--"
@@ -766,7 +766,7 @@ module Package.Command where {
                                                                };
                                                                code <-
                                                                  O.exec (M.packageRoot p)
-                                                                   (Cons
+                                                                   ((:)
                                                                       (B.executable b
                                                                          (dir ++ ("/bin/" ++ name)))
                                                                       forwarded)
@@ -778,7 +778,7 @@ module Package.Command where {
                                                                          config));
                                                                exitWith code
                                                              };
-                                                           Nil -> O.fatal usage
+                                                           [] -> O.fatal usage
                                                          }
                                                     else putStrLn
                                                            (action ++
@@ -814,19 +814,19 @@ module Package.Command where {
                                  building =
                                    S.elem eqString action (O.words "build test run release")
                                };
-                               if building then O.mkdir buildDir else ioReturn Unit;
+                               if building then O.mkdir buildDir else ioReturn ();
                                dir <-
                                  if building then canonicalPath buildDir else ioReturn buildDir;
                                lock <-
                                  if building
                                  then acquireFileLock (dir ++ "/.lock")
                                  else ioReturn (0 - 1);
-                               if building then B.recoverPublications dir else ioReturn Unit;
+                               if building then B.recoverPublications dir else ioReturn ();
                                if building
                                then J.write (dir ++ "/build-report.json")
                                       (B.obj2 "complete" (J.Boolean False) "implementation"
                                          (J.str "MLF"))
-                               else ioReturn Unit;
+                               else ioReturn ();
                                graph <-
                                  M.loadWith path
                                    (J.set "cache-dir"
@@ -845,7 +845,7 @@ module Package.Command where {
                                       O.require (J.equal saved snapshot)
                                         "mlf.lock is stale; review local changes and run mlfpkg lock"
                                     }
-                               else ioReturn Unit;
+                               else ioReturn ();
                                if eqString action "plan"
                                then do {
                                       O.require (S.null rest) usage;
@@ -876,7 +876,7 @@ module Package.Command where {
                                          }
                                     else if eqString action "release"
                                          then case rest of {
-                                                Cons destination Nil ->
+                                                (:) destination [] ->
                                                   do {
                                                     compilerSettings <-
                                                       configureCompiler p dir config;
@@ -903,10 +903,10 @@ module Package.Command where {
                                                 selected <-
                                                   if eqString action "run"
                                                   then case rest of {
-                                                         Cons name _ -> ioReturn (Cons name Nil);
-                                                         Nil -> O.fatal usage
+                                                         (:) name _ -> ioReturn ((:) name []);
+                                                         [] -> O.fatal usage
                                                        }
-                                                  else selections Nil rest;
+                                                  else selections [] rest;
                                                 let {
                                                   names =
                                                     if S.null selected
@@ -932,7 +932,7 @@ module Package.Command where {
                                                     (buildRequests p action names);
                                                 if eqString action "test"
                                                 then runTests b p built names
-                                                else ioReturn Unit;
+                                                else ioReturn ();
                                                 B.finish b;
                                                 if eqString action "build"
                                                 then S.mapM_
@@ -941,11 +941,11 @@ module Package.Command where {
                                                             (B.executable b
                                                                (dir ++ ("/bin/" ++ name))))
                                                        names
-                                                else ioReturn Unit;
+                                                else ioReturn ();
                                                 releaseFileLock lock;
                                                 if eqString action "run"
                                                 then case rest of {
-                                                       Cons name arguments ->
+                                                       (:) name arguments ->
                                                          do {
                                                            let {
                                                              forwarded =
@@ -953,7 +953,7 @@ module Package.Command where {
                                                                  matchValueShared11 = arguments
                                                                } in
                                                                case matchValueShared11 of {
-                                                                 Cons matchValueShared12 matchValueShared13 ->
+                                                                 (:) matchValueShared12 matchValueShared13 ->
                                                                    if MLF.Primitive.eqString
                                                                         matchValueShared12
                                                                         "--"
@@ -967,7 +967,7 @@ module Package.Command where {
                                                            };
                                                            code <-
                                                              O.exec (M.packageRoot p)
-                                                               (Cons
+                                                               ((:)
                                                                   (B.executable b
                                                                      (dir ++ ("/bin/" ++ name)))
                                                                   forwarded)
@@ -979,7 +979,7 @@ module Package.Command where {
                                                                      config));
                                                            exitWith code
                                                          };
-                                                       Nil -> O.fatal usage
+                                                       [] -> O.fatal usage
                                                      }
                                                 else putStrLn
                                                        (action ++
@@ -1012,18 +1012,18 @@ module Package.Command where {
                            let {
                              building = S.elem eqString action (O.words "build test run release")
                            };
-                           if building then O.mkdir buildDir else ioReturn Unit;
+                           if building then O.mkdir buildDir else ioReturn ();
                            dir <- if building then canonicalPath buildDir else ioReturn buildDir;
                            lock <-
                              if building
                              then acquireFileLock (dir ++ "/.lock")
                              else ioReturn (0 - 1);
-                           if building then B.recoverPublications dir else ioReturn Unit;
+                           if building then B.recoverPublications dir else ioReturn ();
                            if building
                            then J.write (dir ++ "/build-report.json")
                                   (B.obj2 "complete" (J.Boolean False) "implementation"
                                      (J.str "MLF"))
-                           else ioReturn Unit;
+                           else ioReturn ();
                            graph <-
                              M.loadWith path
                                (J.set "cache-dir"
@@ -1042,7 +1042,7 @@ module Package.Command where {
                                   O.require (J.equal saved snapshot)
                                     "mlf.lock is stale; review local changes and run mlfpkg lock"
                                 }
-                           else ioReturn Unit;
+                           else ioReturn ();
                            if eqString action "plan"
                            then do {
                                   O.require (S.null rest) usage;
@@ -1071,7 +1071,7 @@ module Package.Command where {
                                      }
                                 else if eqString action "release"
                                      then case rest of {
-                                            Cons destination Nil ->
+                                            (:) destination [] ->
                                               do {
                                                 compilerSettings <- configureCompiler p dir config;
                                                 settings <-
@@ -1096,10 +1096,10 @@ module Package.Command where {
                                             selected <-
                                               if eqString action "run"
                                               then case rest of {
-                                                     Cons name _ -> ioReturn (Cons name Nil);
-                                                     Nil -> O.fatal usage
+                                                     (:) name _ -> ioReturn ((:) name []);
+                                                     [] -> O.fatal usage
                                                    }
-                                              else selections Nil rest;
+                                              else selections [] rest;
                                             let {
                                               names =
                                                 if S.null selected then M.keys targets else selected
@@ -1122,7 +1122,7 @@ module Package.Command where {
                                                 (buildRequests p action names);
                                             if eqString action "test"
                                             then runTests b p built names
-                                            else ioReturn Unit;
+                                            else ioReturn ();
                                             B.finish b;
                                             if eqString action "build"
                                             then S.mapM_
@@ -1130,11 +1130,11 @@ module Package.Command where {
                                                       putStrLn
                                                         (B.executable b (dir ++ ("/bin/" ++ name))))
                                                    names
-                                            else ioReturn Unit;
+                                            else ioReturn ();
                                             releaseFileLock lock;
                                             if eqString action "run"
                                             then case rest of {
-                                                   Cons name arguments ->
+                                                   (:) name arguments ->
                                                      do {
                                                        let {
                                                          forwarded =
@@ -1142,7 +1142,7 @@ module Package.Command where {
                                                              matchValueShared11 = arguments
                                                            } in
                                                            case matchValueShared11 of {
-                                                             Cons matchValueShared12 matchValueShared13 ->
+                                                             (:) matchValueShared12 matchValueShared13 ->
                                                                if MLF.Primitive.eqString
                                                                     matchValueShared12
                                                                     "--"
@@ -1156,7 +1156,7 @@ module Package.Command where {
                                                        };
                                                        code <-
                                                          O.exec (M.packageRoot p)
-                                                           (Cons
+                                                           ((:)
                                                               (B.executable b
                                                                  (dir ++ ("/bin/" ++ name)))
                                                               forwarded)
@@ -1167,7 +1167,7 @@ module Package.Command where {
                                                               (J.getText "timeout" "1800" config));
                                                        exitWith code
                                                      };
-                                                   Nil -> O.fatal usage
+                                                   [] -> O.fatal usage
                                                  }
                                             else putStrLn
                                                    (action ++
@@ -1178,7 +1178,7 @@ module Package.Command where {
                      }
                 else if MLF.Primitive.eqString matchValueShared15 "--help"
                      then case matchValueShared16 of {
-                            Nil -> putStr usage;
+                            [] -> putStr usage;
                             _ ->
                               let {
                                 rest = matchValueShared16
@@ -1206,19 +1206,19 @@ module Package.Command where {
                                   building =
                                     S.elem eqString action (O.words "build test run release")
                                 };
-                                if building then O.mkdir buildDir else ioReturn Unit;
+                                if building then O.mkdir buildDir else ioReturn ();
                                 dir <-
                                   if building then canonicalPath buildDir else ioReturn buildDir;
                                 lock <-
                                   if building
                                   then acquireFileLock (dir ++ "/.lock")
                                   else ioReturn (0 - 1);
-                                if building then B.recoverPublications dir else ioReturn Unit;
+                                if building then B.recoverPublications dir else ioReturn ();
                                 if building
                                 then J.write (dir ++ "/build-report.json")
                                        (B.obj2 "complete" (J.Boolean False) "implementation"
                                           (J.str "MLF"))
-                                else ioReturn Unit;
+                                else ioReturn ();
                                 graph <-
                                   M.loadWith path
                                     (J.set "cache-dir"
@@ -1237,7 +1237,7 @@ module Package.Command where {
                                        O.require (J.equal saved snapshot)
                                          "mlf.lock is stale; review local changes and run mlfpkg lock"
                                      }
-                                else ioReturn Unit;
+                                else ioReturn ();
                                 if eqString action "plan"
                                 then do {
                                        O.require (S.null rest) usage;
@@ -1268,7 +1268,7 @@ module Package.Command where {
                                           }
                                      else if eqString action "release"
                                           then case rest of {
-                                                 Cons destination Nil ->
+                                                 (:) destination [] ->
                                                    do {
                                                      compilerSettings <-
                                                        configureCompiler p dir config;
@@ -1295,10 +1295,10 @@ module Package.Command where {
                                                  selected <-
                                                    if eqString action "run"
                                                    then case rest of {
-                                                          Cons name _ -> ioReturn (Cons name Nil);
-                                                          Nil -> O.fatal usage
+                                                          (:) name _ -> ioReturn ((:) name []);
+                                                          [] -> O.fatal usage
                                                         }
-                                                   else selections Nil rest;
+                                                   else selections [] rest;
                                                  let {
                                                    names =
                                                      if S.null selected
@@ -1324,7 +1324,7 @@ module Package.Command where {
                                                      (buildRequests p action names);
                                                  if eqString action "test"
                                                  then runTests b p built names
-                                                 else ioReturn Unit;
+                                                 else ioReturn ();
                                                  B.finish b;
                                                  if eqString action "build"
                                                  then S.mapM_
@@ -1333,11 +1333,11 @@ module Package.Command where {
                                                              (B.executable b
                                                                 (dir ++ ("/bin/" ++ name))))
                                                         names
-                                                 else ioReturn Unit;
+                                                 else ioReturn ();
                                                  releaseFileLock lock;
                                                  if eqString action "run"
                                                  then case rest of {
-                                                        Cons name arguments ->
+                                                        (:) name arguments ->
                                                           do {
                                                             let {
                                                               forwarded =
@@ -1345,7 +1345,7 @@ module Package.Command where {
                                                                   matchValueShared11 = arguments
                                                                 } in
                                                                 case matchValueShared11 of {
-                                                                  Cons matchValueShared12 matchValueShared13 ->
+                                                                  (:) matchValueShared12 matchValueShared13 ->
                                                                     if MLF.Primitive.eqString
                                                                          matchValueShared12
                                                                          "--"
@@ -1359,7 +1359,7 @@ module Package.Command where {
                                                             };
                                                             code <-
                                                               O.exec (M.packageRoot p)
-                                                                (Cons
+                                                                ((:)
                                                                    (B.executable b
                                                                       (dir ++ ("/bin/" ++ name)))
                                                                    forwarded)
@@ -1371,7 +1371,7 @@ module Package.Command where {
                                                                       config));
                                                             exitWith code
                                                           };
-                                                        Nil -> O.fatal usage
+                                                        [] -> O.fatal usage
                                                       }
                                                  else putStrLn
                                                         (action ++
@@ -1382,11 +1382,11 @@ module Package.Command where {
                           }
                      else if MLF.Primitive.eqString matchValueShared15 "pack"
                           then case matchValueShared16 of {
-                                 Cons matchValueShared17 matchValueShared18 ->
+                                 (:) matchValueShared17 matchValueShared18 ->
                                    case matchValueShared18 of {
-                                     Cons matchValueShared19 matchValueShared20 ->
+                                     (:) matchValueShared19 matchValueShared20 ->
                                        case matchValueShared20 of {
-                                         Nil ->
+                                         [] ->
                                            let {
                                              directory = matchValueShared17
                                            } in
@@ -1427,7 +1427,7 @@ module Package.Command where {
                                                  S.elem eqString action
                                                    (O.words "build test run release")
                                              };
-                                             if building then O.mkdir buildDir else ioReturn Unit;
+                                             if building then O.mkdir buildDir else ioReturn ();
                                              dir <-
                                                if building
                                                then canonicalPath buildDir
@@ -1438,13 +1438,13 @@ module Package.Command where {
                                                else ioReturn (0 - 1);
                                              if building
                                              then B.recoverPublications dir
-                                             else ioReturn Unit;
+                                             else ioReturn ();
                                              if building
                                              then J.write (dir ++ "/build-report.json")
                                                     (B.obj2 "complete" (J.Boolean False)
                                                        "implementation"
                                                        (J.str "MLF"))
-                                             else ioReturn Unit;
+                                             else ioReturn ();
                                              graph <-
                                                M.loadWith path
                                                  (J.set "cache-dir"
@@ -1464,7 +1464,7 @@ module Package.Command where {
                                                     O.require (J.equal saved snapshot)
                                                       "mlf.lock is stale; review local changes and run mlfpkg lock"
                                                   }
-                                             else ioReturn Unit;
+                                             else ioReturn ();
                                              if eqString action "plan"
                                              then do {
                                                     O.require (S.null rest) usage;
@@ -1496,7 +1496,7 @@ module Package.Command where {
                                                        }
                                                   else if eqString action "release"
                                                        then case rest of {
-                                                              Cons destination Nil ->
+                                                              (:) destination [] ->
                                                                 do {
                                                                   compilerSettings <-
                                                                     configureCompiler p dir config;
@@ -1525,11 +1525,11 @@ module Package.Command where {
                                                               selected <-
                                                                 if eqString action "run"
                                                                 then case rest of {
-                                                                       Cons name _ ->
-                                                                         ioReturn (Cons name Nil);
-                                                                       Nil -> O.fatal usage
+                                                                       (:) name _ ->
+                                                                         ioReturn ((:) name []);
+                                                                       [] -> O.fatal usage
                                                                      }
-                                                                else selections Nil rest;
+                                                                else selections [] rest;
                                                               let {
                                                                 names =
                                                                   if S.null selected
@@ -1561,7 +1561,7 @@ module Package.Command where {
                                                                   (buildRequests p action names);
                                                               if eqString action "test"
                                                               then runTests b p built names
-                                                              else ioReturn Unit;
+                                                              else ioReturn ();
                                                               B.finish b;
                                                               if eqString action "build"
                                                               then S.mapM_
@@ -1571,11 +1571,11 @@ module Package.Command where {
                                                                              (dir ++
                                                                               ("/bin/" ++ name))))
                                                                      names
-                                                              else ioReturn Unit;
+                                                              else ioReturn ();
                                                               releaseFileLock lock;
                                                               if eqString action "run"
                                                               then case rest of {
-                                                                     Cons name arguments ->
+                                                                     (:) name arguments ->
                                                                        do {
                                                                          let {
                                                                            forwarded =
@@ -1584,7 +1584,7 @@ module Package.Command where {
                                                                                  arguments
                                                                              } in
                                                                              case matchValueShared11 of {
-                                                                               Cons matchValueShared12 matchValueShared13 ->
+                                                                               (:) matchValueShared12 matchValueShared13 ->
                                                                                  if MLF.Primitive.eqString
                                                                                       matchValueShared12
                                                                                       "--"
@@ -1599,7 +1599,7 @@ module Package.Command where {
                                                                          };
                                                                          code <-
                                                                            O.exec (M.packageRoot p)
-                                                                             (Cons
+                                                                             ((:)
                                                                                 (B.executable b
                                                                                    (dir ++
                                                                                     ("/bin/" ++
@@ -1614,7 +1614,7 @@ module Package.Command where {
                                                                                    config));
                                                                          exitWith code
                                                                        };
-                                                                     Nil -> O.fatal usage
+                                                                     [] -> O.fatal usage
                                                                    }
                                                               else putStrLn
                                                                      (action ++
@@ -1653,7 +1653,7 @@ module Package.Command where {
                                              S.elem eqString action
                                                (O.words "build test run release")
                                          };
-                                         if building then O.mkdir buildDir else ioReturn Unit;
+                                         if building then O.mkdir buildDir else ioReturn ();
                                          dir <-
                                            if building
                                            then canonicalPath buildDir
@@ -1664,13 +1664,13 @@ module Package.Command where {
                                            else ioReturn (0 - 1);
                                          if building
                                          then B.recoverPublications dir
-                                         else ioReturn Unit;
+                                         else ioReturn ();
                                          if building
                                          then J.write (dir ++ "/build-report.json")
                                                 (B.obj2 "complete" (J.Boolean False)
                                                    "implementation"
                                                    (J.str "MLF"))
-                                         else ioReturn Unit;
+                                         else ioReturn ();
                                          graph <-
                                            M.loadWith path
                                              (J.set "cache-dir"
@@ -1690,7 +1690,7 @@ module Package.Command where {
                                                 O.require (J.equal saved snapshot)
                                                   "mlf.lock is stale; review local changes and run mlfpkg lock"
                                               }
-                                         else ioReturn Unit;
+                                         else ioReturn ();
                                          if eqString action "plan"
                                          then do {
                                                 O.require (S.null rest) usage;
@@ -1722,7 +1722,7 @@ module Package.Command where {
                                                    }
                                               else if eqString action "release"
                                                    then case rest of {
-                                                          Cons destination Nil ->
+                                                          (:) destination [] ->
                                                             do {
                                                               compilerSettings <-
                                                                 configureCompiler p dir config;
@@ -1750,11 +1750,11 @@ module Package.Command where {
                                                           selected <-
                                                             if eqString action "run"
                                                             then case rest of {
-                                                                   Cons name _ ->
-                                                                     ioReturn (Cons name Nil);
-                                                                   Nil -> O.fatal usage
+                                                                   (:) name _ ->
+                                                                     ioReturn ((:) name []);
+                                                                   [] -> O.fatal usage
                                                                  }
-                                                            else selections Nil rest;
+                                                            else selections [] rest;
                                                           let {
                                                             names =
                                                               if S.null selected
@@ -1784,7 +1784,7 @@ module Package.Command where {
                                                               (buildRequests p action names);
                                                           if eqString action "test"
                                                           then runTests b p built names
-                                                          else ioReturn Unit;
+                                                          else ioReturn ();
                                                           B.finish b;
                                                           if eqString action "build"
                                                           then S.mapM_
@@ -1794,11 +1794,11 @@ module Package.Command where {
                                                                          (dir ++
                                                                           ("/bin/" ++ name))))
                                                                  names
-                                                          else ioReturn Unit;
+                                                          else ioReturn ();
                                                           releaseFileLock lock;
                                                           if eqString action "run"
                                                           then case rest of {
-                                                                 Cons name arguments ->
+                                                                 (:) name arguments ->
                                                                    do {
                                                                      let {
                                                                        forwarded =
@@ -1807,7 +1807,7 @@ module Package.Command where {
                                                                              arguments
                                                                          } in
                                                                          case matchValueShared11 of {
-                                                                           Cons matchValueShared12 matchValueShared13 ->
+                                                                           (:) matchValueShared12 matchValueShared13 ->
                                                                              if MLF.Primitive.eqString
                                                                                   matchValueShared12
                                                                                   "--"
@@ -1822,7 +1822,7 @@ module Package.Command where {
                                                                      };
                                                                      code <-
                                                                        O.exec (M.packageRoot p)
-                                                                         (Cons
+                                                                         ((:)
                                                                             (B.executable b
                                                                                (dir ++
                                                                                 ("/bin/" ++ name)))
@@ -1836,7 +1836,7 @@ module Package.Command where {
                                                                                config));
                                                                      exitWith code
                                                                    };
-                                                                 Nil -> O.fatal usage
+                                                                 [] -> O.fatal usage
                                                                }
                                                           else putStrLn
                                                                  (action ++
@@ -1872,7 +1872,7 @@ module Package.Command where {
                                        building =
                                          S.elem eqString action (O.words "build test run release")
                                      };
-                                     if building then O.mkdir buildDir else ioReturn Unit;
+                                     if building then O.mkdir buildDir else ioReturn ();
                                      dir <-
                                        if building
                                        then canonicalPath buildDir
@@ -1881,12 +1881,12 @@ module Package.Command where {
                                        if building
                                        then acquireFileLock (dir ++ "/.lock")
                                        else ioReturn (0 - 1);
-                                     if building then B.recoverPublications dir else ioReturn Unit;
+                                     if building then B.recoverPublications dir else ioReturn ();
                                      if building
                                      then J.write (dir ++ "/build-report.json")
                                             (B.obj2 "complete" (J.Boolean False) "implementation"
                                                (J.str "MLF"))
-                                     else ioReturn Unit;
+                                     else ioReturn ();
                                      graph <-
                                        M.loadWith path
                                          (J.set "cache-dir"
@@ -1905,7 +1905,7 @@ module Package.Command where {
                                             O.require (J.equal saved snapshot)
                                               "mlf.lock is stale; review local changes and run mlfpkg lock"
                                           }
-                                     else ioReturn Unit;
+                                     else ioReturn ();
                                      if eqString action "plan"
                                      then do {
                                             O.require (S.null rest) usage;
@@ -1936,7 +1936,7 @@ module Package.Command where {
                                                }
                                           else if eqString action "release"
                                                then case rest of {
-                                                      Cons destination Nil ->
+                                                      (:) destination [] ->
                                                         do {
                                                           compilerSettings <-
                                                             configureCompiler p dir config;
@@ -1964,11 +1964,11 @@ module Package.Command where {
                                                       selected <-
                                                         if eqString action "run"
                                                         then case rest of {
-                                                               Cons name _ ->
-                                                                 ioReturn (Cons name Nil);
-                                                               Nil -> O.fatal usage
+                                                               (:) name _ ->
+                                                                 ioReturn ((:) name []);
+                                                               [] -> O.fatal usage
                                                              }
-                                                        else selections Nil rest;
+                                                        else selections [] rest;
                                                       let {
                                                         names =
                                                           if S.null selected
@@ -1996,7 +1996,7 @@ module Package.Command where {
                                                           (buildRequests p action names);
                                                       if eqString action "test"
                                                       then runTests b p built names
-                                                      else ioReturn Unit;
+                                                      else ioReturn ();
                                                       B.finish b;
                                                       if eqString action "build"
                                                       then S.mapM_
@@ -2005,11 +2005,11 @@ module Package.Command where {
                                                                   (B.executable b
                                                                      (dir ++ ("/bin/" ++ name))))
                                                              names
-                                                      else ioReturn Unit;
+                                                      else ioReturn ();
                                                       releaseFileLock lock;
                                                       if eqString action "run"
                                                       then case rest of {
-                                                             Cons name arguments ->
+                                                             (:) name arguments ->
                                                                do {
                                                                  let {
                                                                    forwarded =
@@ -2018,7 +2018,7 @@ module Package.Command where {
                                                                          arguments
                                                                      } in
                                                                      case matchValueShared11 of {
-                                                                       Cons matchValueShared12 matchValueShared13 ->
+                                                                       (:) matchValueShared12 matchValueShared13 ->
                                                                          if MLF.Primitive.eqString
                                                                               matchValueShared12
                                                                               "--"
@@ -2033,7 +2033,7 @@ module Package.Command where {
                                                                  };
                                                                  code <-
                                                                    O.exec (M.packageRoot p)
-                                                                     (Cons
+                                                                     ((:)
                                                                         (B.executable b
                                                                            (dir ++
                                                                             ("/bin/" ++ name)))
@@ -2046,7 +2046,7 @@ module Package.Command where {
                                                                            config));
                                                                  exitWith code
                                                                };
-                                                             Nil -> O.fatal usage
+                                                             [] -> O.fatal usage
                                                            }
                                                       else putStrLn
                                                              (action ++
@@ -2081,19 +2081,19 @@ module Package.Command where {
                                    building =
                                      S.elem eqString action (O.words "build test run release")
                                  };
-                                 if building then O.mkdir buildDir else ioReturn Unit;
+                                 if building then O.mkdir buildDir else ioReturn ();
                                  dir <-
                                    if building then canonicalPath buildDir else ioReturn buildDir;
                                  lock <-
                                    if building
                                    then acquireFileLock (dir ++ "/.lock")
                                    else ioReturn (0 - 1);
-                                 if building then B.recoverPublications dir else ioReturn Unit;
+                                 if building then B.recoverPublications dir else ioReturn ();
                                  if building
                                  then J.write (dir ++ "/build-report.json")
                                         (B.obj2 "complete" (J.Boolean False) "implementation"
                                            (J.str "MLF"))
-                                 else ioReturn Unit;
+                                 else ioReturn ();
                                  graph <-
                                    M.loadWith path
                                      (J.set "cache-dir"
@@ -2112,7 +2112,7 @@ module Package.Command where {
                                         O.require (J.equal saved snapshot)
                                           "mlf.lock is stale; review local changes and run mlfpkg lock"
                                       }
-                                 else ioReturn Unit;
+                                 else ioReturn ();
                                  if eqString action "plan"
                                  then do {
                                         O.require (S.null rest) usage;
@@ -2143,7 +2143,7 @@ module Package.Command where {
                                            }
                                       else if eqString action "release"
                                            then case rest of {
-                                                  Cons destination Nil ->
+                                                  (:) destination [] ->
                                                     do {
                                                       compilerSettings <-
                                                         configureCompiler p dir config;
@@ -2170,10 +2170,10 @@ module Package.Command where {
                                                   selected <-
                                                     if eqString action "run"
                                                     then case rest of {
-                                                           Cons name _ -> ioReturn (Cons name Nil);
-                                                           Nil -> O.fatal usage
+                                                           (:) name _ -> ioReturn ((:) name []);
+                                                           [] -> O.fatal usage
                                                          }
-                                                    else selections Nil rest;
+                                                    else selections [] rest;
                                                   let {
                                                     names =
                                                       if S.null selected
@@ -2200,7 +2200,7 @@ module Package.Command where {
                                                       (buildRequests p action names);
                                                   if eqString action "test"
                                                   then runTests b p built names
-                                                  else ioReturn Unit;
+                                                  else ioReturn ();
                                                   B.finish b;
                                                   if eqString action "build"
                                                   then S.mapM_
@@ -2209,11 +2209,11 @@ module Package.Command where {
                                                               (B.executable b
                                                                  (dir ++ ("/bin/" ++ name))))
                                                          names
-                                                  else ioReturn Unit;
+                                                  else ioReturn ();
                                                   releaseFileLock lock;
                                                   if eqString action "run"
                                                   then case rest of {
-                                                         Cons name arguments ->
+                                                         (:) name arguments ->
                                                            do {
                                                              let {
                                                                forwarded =
@@ -2221,7 +2221,7 @@ module Package.Command where {
                                                                    matchValueShared11 = arguments
                                                                  } in
                                                                  case matchValueShared11 of {
-                                                                   Cons matchValueShared12 matchValueShared13 ->
+                                                                   (:) matchValueShared12 matchValueShared13 ->
                                                                      if MLF.Primitive.eqString
                                                                           matchValueShared12
                                                                           "--"
@@ -2236,7 +2236,7 @@ module Package.Command where {
                                                              };
                                                              code <-
                                                                O.exec (M.packageRoot p)
-                                                                 (Cons
+                                                                 ((:)
                                                                     (B.executable b
                                                                        (dir ++ ("/bin/" ++ name)))
                                                                     forwarded)
@@ -2248,7 +2248,7 @@ module Package.Command where {
                                                                        config));
                                                              exitWith code
                                                            };
-                                                         Nil -> O.fatal usage
+                                                         [] -> O.fatal usage
                                                        }
                                                   else putStrLn
                                                          (action ++
@@ -2256,7 +2256,7 @@ module Package.Command where {
                                                            (dir ++ "/build-report.json")))
                                                 }
                                };
-              Nil -> O.fatal usage
+              [] -> O.fatal usage
             }
           }
       }

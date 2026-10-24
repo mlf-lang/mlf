@@ -307,7 +307,7 @@
         "do: optional trailing semicolon",
         "do: nested blocks",
         "do: bind statement sees the outer binding",
-        "do: local let sees the outer binding",
+        "do: distinct do-let binder sees the outer binding",
         "do: local let is generalized",
         "do: local let annotation",
         "do: let-in expression is an action",
@@ -317,7 +317,10 @@
         "do: constructor wildcard field",
         "do: discarded action cannot capture an outer name",
         "do: pattern temporary cannot capture an outer name",
-        "do: uses the lexical bind function",
+        "do: explicit bind remains lexical",
+        "do rejection: lexical bind cannot intercept do",
+        "do rejection: same-name do-let is recursive, not an outer reference",
+        "do: annotated recursive do-let keeps its own binding",
         "do rejection: empty block",
         "do rejection: final statement must be an expression",
         "do rejection: cannot end with a local declaration",
@@ -328,7 +331,7 @@
         "do rejection: later binding is unavailable",
         "do rejection: action type mismatch",
         "do rejection: final action has the right monadic type",
-        "do rejection: refutable pattern requires an explicit case",
+        "do rejection: refutable pattern requires canonical MonadFail",
         "do rejection: pattern binder duplicates",
         "do: parser preserves statement forms",
         "do: lowering preserves binding order and the final action",
@@ -362,21 +365,22 @@
         "surface checking: inline whole-function signature",
         "surface checking: annotated local function",
         "surface checking: do-local function generalizes",
-        "surface checking: do-local function sees outer binding",
+        "surface checking: distinct do-local function sees outer binding",
         "surface checking: conditional returns polymorphic function",
         "surface checking: conditional works in a case scrutinee",
         "surface checking: keyword prefixes remain identifiers",
         "surface checking: instance method parameters",
         "surface checking: qualified function declaration",
         "surface checking: syntax needs no implicit prelude",
-        "surface rejection: recursion needs a signature",
+        "surface checking: same-name do-local function is recursive",
+        "surface checking: unsigned recursion infers bottom",
         "surface checking: forward value references",
         "surface rejection: branch types must agree",
         "surface rejection: condition must be Bool",
         "surface rejection: arithmetic does not overload Double",
         "surface rejection: unary plus requires a number",
         "surface rejection: unary minus requires a number",
-        "surface rejection: comparisons do not overload String",
+        "surface checking: equality supports annotated strings",
         "surface rejection: whole function signature is checked",
         "surface rejection: chained comparisons",
         "surface rejection: mixed chained comparisons",
@@ -510,7 +514,7 @@
         "modules rejection: explicit empty Prelude removes value names",
         "modules rejection: qualified Prelude suppresses implicit Prelude",
         "modules rejection: Prelude cannot be redefined",
-        "modules rejection: primitive constructor cannot be redefined",
+        "modules rejection: ordinary Unit constructor is not builtin unit",
         "modules rejection: primitive type cannot be redefined",
         "modules rejection: unused private definitions still checked",
         "modules rejection: export list cannot name missing value",
@@ -602,7 +606,7 @@
         "crate rejects: explicit empty Prelude removes value names",
         "crate rejects: qualified Prelude suppresses implicit Prelude",
         "crate rejects: Prelude cannot be redefined",
-        "crate rejects: primitive constructor cannot be redefined",
+        "crate rejects: ordinary Unit constructor is not builtin unit",
         "crate rejects: primitive type cannot be redefined",
         "crate rejects: unused private definitions still checked",
         "crate rejects: export list cannot name missing value",
@@ -1473,6 +1477,85 @@
           "derivation": "34 core-solver + 380 core-language + 27 core-crates + 301 core-modules = 742; the active golden inventory was already 740 before these two added module checks."
         }
       }
+    },
+    {
+      "name": "canonical source cutover and recursive scope reconciliation",
+      "basis": "Independently reviewed exact PR22 semantic delta after the ordered 742-leaf ordinary-recursion inventory; no candidate inference results generate expectations.",
+      "replaced_core_ids": [
+        {
+          "family": "core/do-notation",
+          "before": "do: local let sees the outer binding",
+          "after": "do: distinct do-let binder sees the outer binding"
+        },
+        {
+          "family": "core/do-notation",
+          "before": "do: uses the lexical bind function",
+          "after": "do: explicit bind remains lexical"
+        },
+        {
+          "family": "core/do-notation",
+          "before": "do rejection: refutable pattern requires an explicit case",
+          "after": "do rejection: refutable pattern requires canonical MonadFail"
+        },
+        {
+          "family": "core/modules",
+          "before": "modules rejection: primitive constructor cannot be redefined",
+          "after": "modules rejection: ordinary Unit constructor is not builtin unit"
+        },
+        {
+          "family": "core/separate-compilation",
+          "before": "crate rejects: primitive constructor cannot be redefined",
+          "after": "crate rejects: ordinary Unit constructor is not builtin unit"
+        },
+        {
+          "family": "core/surface-syntax",
+          "before": "surface checking: do-local function sees outer binding",
+          "after": "surface checking: distinct do-local function sees outer binding"
+        },
+        {
+          "family": "core/surface-syntax",
+          "before": "surface rejection: comparisons do not overload String",
+          "after": "surface checking: equality supports annotated strings"
+        },
+        {
+          "family": "core/surface-syntax",
+          "before": "surface rejection: recursion needs a signature",
+          "after": "surface checking: unsigned recursion infers bottom"
+        }
+      ],
+      "added_core_ids": [
+        {
+          "family": "core/do-notation",
+          "label": "do rejection: lexical bind cannot intercept do",
+          "before": "do rejection: empty block"
+        },
+        {
+          "family": "core/do-notation",
+          "label": "do rejection: same-name do-let is recursive, not an outer reference",
+          "before": "do rejection: empty block"
+        },
+        {
+          "family": "core/do-notation",
+          "label": "do: annotated recursive do-let keeps its own binding",
+          "before": "do rejection: empty block"
+        },
+        {
+          "family": "core/surface-syntax",
+          "label": "surface checking: same-name do-local function is recursive",
+          "before": "surface checking: unsigned recursion infers bottom"
+        }
+      ],
+      "required_execution_counts": {
+        "core": {
+          "before": 742,
+          "after": 746
+        },
+        "core_language_physical": {
+          "before": 380,
+          "after": 384
+        }
+      },
+      "unchanged_expectations": "The original 739 and recursion 742 inventory histories remain frozen. All unlisted labels retain ownership and order. Same-name recursive function and unsigned divergent-loop positives only check prescribed Int/XBot types and checked targets, never execute; the same-name value binding retains its occurs-check rejection. Canonical Unit, Eq String and MonadFail expectations follow the upstream semantics, with independent target checks retained."
     }
   ]
 }

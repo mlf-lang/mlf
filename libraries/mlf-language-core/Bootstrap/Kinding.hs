@@ -43,12 +43,12 @@ module Bootstrap.Kinding where {
         };
       SQualified _ _ -> Left "class constraints must be translated before kind checking"
     };
-  annotationType :: DataEnv -> Map String Kind -> SType -> Either String Unit;
+  annotationType :: DataEnv -> Map String Kind -> SType -> Either String ();
   annotationType ds env ty =
     do {
       k <- kindOf ds env ty;
       if K.eqKind k Star
-      then Right Unit
+      then Right ()
       else case ty of {
              SCon c args ->
                do {

@@ -1,36 +1,40 @@
--- Extend the prelude's Monad with state operations and a user-defined instance.
+-- Extend standard Monad with state operations; Pair remains an ordinary custom ADT.
 data Pair a b = Pair a b;
 data State s a = State (s -> Pair a s);
 
 class Monad m => MonadState s (m : * -> *) where {
   get : m s;
-  put : s -> m Unit
+  put : s -> m ()
 };
 
-instance Monad (State s) where {
-  return = \value -> State (\state -> Pair value state);
-  bind = \action next -> State (\state ->
+returnState = \value -> State (\state -> Pair value state);
+bindState = \action next -> State (\state ->
     case action of {
       State run -> case run state of {
         Pair value state' -> case next value of {
           State continue -> continue state'
         }
       }
-    })
+    });
+instance Functor (State s) where { fmap f action = bindState action (\x -> returnState (f x)) };
+instance Applicative (State s) where {
+  pure = returnState;
+  (<*>) functions arguments = bindState functions (\f -> bindState arguments (\x -> returnState (f x)))
 };
+instance Monad (State s) where { (>>=) = bindState };
 
 instance MonadState s (State s) where {
   get = State (\state -> Pair state state);
-  put = \state -> State (\ignored -> Pair Unit state)
+  put = \state -> State (\ignored -> Pair () state)
 };
 
--- bind and return come from the Monad superclass of MonadState.
+-- do uses standard Monad; return is the ordinary standard pure compatibility alias.
 let replace : forall s (m : * -> *). MonadState s m => s -> m s =
   \new -> do {
     previous <- get;
     put new;
     return previous
   }
-in case (replace 42 : State Int Int) of {
+in case (replace 42 :: State Int Int) of {
   State run -> run 0
 }

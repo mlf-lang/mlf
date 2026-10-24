@@ -16,7 +16,7 @@ import Control.Exception (evaluate, finally)
 import Control.Concurrent (threadDelay)
 import GHC.Clock (getMonotonicTimeNSec)
 
--- Cells retain their own payload type. Only IO Unit closures enter the queue;
+-- Cells retain their own payload type. Only IO () closures enter the queue;
 -- there is no heterogeneous value table, cast, StablePtr, or erased resolver.
 data AsyncScope = Scope
   { closed :: IORef Bool, dispatching :: IORef Bool
@@ -25,7 +25,7 @@ data AsyncScope = Scope
   , callbacks :: IORef [Resume], ready :: IORef (Q.Seq Resume)
   , timers :: IORef [(Int,Resume)] }
 data Completion a = Completion AsyncScope (IORef (Maybe a)) (IORef [Resume])
-data Resume = Resume AsyncScope (IORef Bool) (IORef (Maybe (IO Unit))) (IO ())
+data Resume = Resume AsyncScope (IORef Bool) (IORef (Maybe (IO ()))) (IO ())
 data AsyncSubscription = Rejected Int | Accepted Resume
 
 clock :: IO Int
@@ -37,7 +37,7 @@ v_asyncScopeNew cells slots = do
   Scope <$> newIORef False <*> newIORef False <*> pure cells <*> pure slots
     <*> newIORef 0 <*> newIORef 0 <*> newIORef [] <*> newIORef []
     <*> newIORef Q.empty <*> newIORef []
-v_asyncScopeClose :: AsyncScope -> IO Unit
+v_asyncScopeClose :: AsyncScope -> IO ()
 v_asyncScopeClose scope = do
   isClosed <- readIORef (closed scope)
   when (not isClosed) $ do
@@ -51,7 +51,7 @@ v_asyncScopeClose scope = do
     writeIORef (timers scope) []
     writeIORef (cellCount scope) 0
     writeIORef (callbackCount scope) 0
-  pure Unit
+  pure ()
 v_asyncNewCompletion :: AsyncScope -> (Completion a -> IO b) -> IO b -> IO b
 v_asyncNewCompletion scope success rejected = do
   isClosed <- readIORef (closed scope)
@@ -90,7 +90,7 @@ v_asyncReadCompletion cell success pending = do
 
 same :: Resume -> Resume -> Bool
 same (Resume _ a _ _) (Resume _ b _ _) = a==b
-reserve :: AsyncScope -> IO Unit -> (Resume -> IO ()) -> (Resume -> IO ()) -> IO AsyncSubscription
+reserve :: AsyncScope -> IO () -> (Resume -> IO ()) -> (Resume -> IO ()) -> IO AsyncSubscription
 reserve scope action remove register = do
   isClosed <- readIORef (closed scope)
   count <- readIORef (callbackCount scope)
@@ -102,13 +102,13 @@ reserve scope action remove register = do
     modifyIORef' (callbacks scope) (resume:)
     register resume
     pure (Accepted resume)
-v_asyncSubscribeCompletion :: Completion a -> (a -> IO Unit) -> IO AsyncSubscription
+v_asyncSubscribeCompletion :: Completion a -> (a -> IO ()) -> IO AsyncSubscription
 v_asyncSubscribeCompletion cell callback = do
   forced <- evaluate cell
   case forced of
     Completion scope value waiting -> do
       current <- readIORef value
-      reserve scope (v_asyncReadCompletion cell callback (pure Unit)) (\r -> modifyIORef' waiting (filter (not . same r))) $ \resume ->
+      reserve scope (v_asyncReadCompletion cell callback (pure ())) (\r -> modifyIORef' waiting (filter (not . same r))) $ \resume ->
         case current of
           Just _ -> modifyIORef' (ready scope) (Q.|> resume)
           Nothing -> modifyIORef' waiting (++[resume])
@@ -139,9 +139,9 @@ v_asyncCancelSubscription subscription = do
       modifyIORef' (timers scope) (filter (not . same resume . snd))
       pure 0
     _ -> pure status
-v_asyncEnqueue :: AsyncScope -> IO Unit -> IO AsyncSubscription
+v_asyncEnqueue :: AsyncScope -> IO () -> IO AsyncSubscription
 v_asyncEnqueue scope action = reserve scope action (\_ -> pure ()) (\r -> modifyIORef' (ready scope) (Q.|> r))
-v_asyncDelay :: AsyncScope -> Int -> IO Unit -> IO AsyncSubscription
+v_asyncDelay :: AsyncScope -> Int -> IO () -> IO AsyncSubscription
 v_asyncDelay scope milliseconds action = do
   _ <- readIORef (closed scope) -- Force the scope before the delay operand.
   _ <- evaluate (bounded "invalid async delay" 4294967295 milliseconds)

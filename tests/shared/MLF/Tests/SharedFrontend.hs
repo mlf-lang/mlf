@@ -40,17 +40,17 @@ module MLF.Tests.SharedFrontend where {
   linked text =
     case parse text of {
       Left _ -> False;
-      Right m -> isRight (Modules.linkModules ImplicitPrelude (Cons m Nil))
+      Right m -> isRight (Modules.linkModules ImplicitPrelude ((:) m []))
     };
   forwardScope =
     case parse "main = let { x = y; y = 3 } in x" of {
-      Right (SourceModule _ _ _ _ _ _ _ (Cons (Triple _ _ (SLet y (SIntLit 3) (SLet x (SVar reference) (SVar result)))) Nil) _ SharedHaskellV1) ->
+      Right (SourceModule _ _ _ _ _ _ _ ((:) ((,,) _ _ (SLet y (SIntLit 3) (SLet x (SVar reference) (SVar result)))) []) _ SharedHaskellV1) ->
         (eqString y "y" && (eqString x "x" && (eqString reference "y" && eqString result "x")));
       _ -> False
     };
   fixedDo =
     case parse "main = let { bind = 7 } in do { value <- ioReturn 3; ioReturn value }" of {
-      Right (SourceModule _ _ _ _ _ _ _ (Cons (Triple _ _ expression) Nil) _ _) ->
+      Right (SourceModule _ _ _ _ _ _ _ ((:) ((,,) _ _ expression) []) _ _) ->
         elem eqString "$MLF.Primitive.>>=" (Surface.freeNames expression);
       _ -> False
     };
@@ -66,8 +66,8 @@ module MLF.Tests.SharedFrontend where {
         let {
           root =
             SourceModule path name exports
-              (Cons (Import "MLF.Primitive" False Nothing Everything)
-                 (Cons (Import "Support" False Nothing Everything) Nil))
+              ((:) (Import "MLF.Primitive" False Nothing Everything)
+                 ((:) (Import "Support" False Nothing Everything) []))
               ds
               cs
               instances
@@ -77,7 +77,7 @@ module MLF.Tests.SharedFrontend where {
         } in
         case Modules.loadModuleMap
                (M.singleton "Support"
-                  (Pair "Support.emlf"
+                  ((,) "Support.emlf"
                      "module Support where\nanswer = let x = 1 in let x = x + 1 in x\n"))
                root of {
           Left _ -> False;
@@ -92,8 +92,8 @@ module MLF.Tests.SharedFrontend where {
         let {
           root =
             SourceModule path name exports
-              (Cons (Import "MLF.Primitive" False Nothing Everything)
-                 (Cons (Import "Bad" False Nothing Everything) Nil))
+              ((:) (Import "MLF.Primitive" False Nothing Everything)
+                 ((:) (Import "Bad" False Nothing Everything) []))
               ds
               cs
               instances
@@ -103,10 +103,10 @@ module MLF.Tests.SharedFrontend where {
         } in
         case P.parseModule "Bad.emlf" "module Bad where\nfromInteger x = x\n" of {
           Left _ -> False;
-          Right bad -> isRight (Modules.linkModules ImplicitPrelude (Cons bad (Cons root Nil)))
+          Right bad -> isRight (Modules.linkModules ImplicitPrelude ((:) bad ((:) root [])))
         }
     };
-  linkRaw text = case P.parseModule "Example.hs" (prologue ++ text) of { Left _ -> False; Right m -> isRight (Modules.linkModules ImplicitPrelude (Cons m Nil)) };
+  linkRaw text = case P.parseModule "Example.hs" (prologue ++ text) of { Left _ -> False; Right m -> isRight (Modules.linkModules ImplicitPrelude ((:) m [])) };
 
   evaluated :: String -> Either String Runtime.RValue;
   evaluated body = do {
@@ -128,10 +128,10 @@ module MLF.Tests.SharedFrontend where {
   boxApplicative = boxFunctor ++ "instance Applicative Box where { pure = Box; (<*>) (Box f) (Box x) = Box (f x) }\n";
   boxMonad :: String;
   boxMonad = boxApplicative ++ "instance Monad Box where { (>>=) (Box x) f = f x }\n";
-  check :: String -> Bool -> IO Unit;
+  check :: String -> Bool -> IO ();
   check name okay =
     if okay
-    then ioReturn Unit
+    then ioReturn ()
     else do {
            putErr ("shared frontend failure: " ++ (name ++ "\n"));
            exitWith 1
@@ -163,7 +163,7 @@ module MLF.Tests.SharedFrontend where {
     };
   hintRoundTrip hint =
     let { n = XName 17 (Constraint.targetNameHint hint) } in
-    targetRoundTrip (XAbs n (XCon "Int" Nil) (XVarTerm n));
+    targetRoundTrip (XAbs n (XCon "Int" []) (XVarTerm n));
   sourceRoundTrip body =
     case C.compile "Example.hs" (source body) of {
       Left _ -> False;
@@ -190,9 +190,9 @@ module MLF.Tests.SharedFrontend where {
   -- tests interpreted by a prebuilt compiler. Expected types are authored here;
   -- neither the current checker nor inferred output supplies the oracle.
   recursiveInt :: XType;
-  recursiveInt = XCon "Int" Nil;
+  recursiveInt = XCon "Int" [];
   recursiveBool :: XType;
-  recursiveBool = XCon "Bool" Nil;
+  recursiveBool = XCon "Bool" [];
   recursiveIdentity :: XType;
   recursiveIdentity =
     XForall (XTyVar 0) XBot (XArrow (XVar (XTyVar 0)) (XVar (XTyVar 0)));
@@ -205,7 +205,7 @@ module MLF.Tests.SharedFrontend where {
         exitWith 1
       }
     };
-  recursiveCheckedType :: String -> XType -> Either String XType -> IO Unit;
+  recursiveCheckedType :: String -> XType -> Either String XType -> IO ();
   recursiveCheckedType label expected result = do {
     actual <- recursiveRight label result;
     check label (IndependentType.alphaEq actual expected)
@@ -230,7 +230,7 @@ module MLF.Tests.SharedFrontend where {
     -- C.compile also checks source-skeleton erasure against this same target.
     ioReturn term
   };
-  recursiveModulesAccepted :: String -> Map String (Pair String String) -> String -> XType -> IO XTerm;
+  recursiveModulesAccepted :: String -> Map String ((,) String String) -> String -> XType -> IO XTerm;
   recursiveModulesAccepted label modules program expected = do {
     result <- recursiveRight (label ++ " module compilation")
       (mapLeft C.prettyError (C.compileModules modules "Main.emlf" program));
@@ -245,7 +245,7 @@ module MLF.Tests.SharedFrontend where {
     if stringLength text < stringLength suffix then False
     else eqString (stringSlice text (stringLength text - stringLength suffix)
                    (stringLength suffix)) suffix;
-  recursiveRejected :: String -> String -> String -> IO Unit;
+  recursiveRejected :: String -> String -> String -> IO ();
   recursiveRejected label program diagnostic =
     case C.compile "RecursiveInference.emlf" program of {
       Left error -> do {
@@ -256,25 +256,25 @@ module MLF.Tests.SharedFrontend where {
       };
       Right _ -> check (label ++ " unexpectedly accepted") False
     };
-  recursiveGroups :: XErased -> List (List String);
+  recursiveGroups :: XErased -> [] ([] String);
   recursiveGroups term =
     case term of {
       XEAbs _ body -> recursiveGroups body;
       XEApp function argument -> append (recursiveGroups function) (recursiveGroups argument);
       XELet _ value body -> append (recursiveGroups value) (recursiveGroups body);
       XELetRec definitions body ->
-        Cons (map (\(Pair name _) -> X.nameHint name) definitions)
-          (append (concatMap (\(Pair _ rhs) -> recursiveGroups rhs) definitions) (recursiveGroups body));
+        (:) (map (\((,) name _) -> X.nameHint name) definitions)
+          (append (concatMap (\((,) _ rhs) -> recursiveGroups rhs) definitions) (recursiveGroups body));
       XECase scrutinee alternatives -> append (recursiveGroups scrutinee)
         (concatMap (\(XErasedAlternative _ body) -> recursiveGroups body) alternatives);
-      _ -> Nil
+      _ -> []
     };
-  recursiveOrder :: String -> List String -> XTerm -> IO Unit;
+  recursiveOrder :: String -> [] String -> XTerm -> IO ();
   recursiveOrder label names term =
     check label
       (length (filter (X.equalList eqString names) (recursiveGroups (X.erase term))) == 1);
   recursiveProjection :: String -> Elaborate.TypeContext -> IntMap Int ->
-                         List (Pair XTyVar XType) -> XType -> XType -> IO Unit;
+                         [] ((,) XTyVar XType) -> XType -> XType -> IO ();
   recursiveProjection label context copies bounds source expected = do {
     proof <- recursiveRight (label ++ " evidence")
       (Elaborate.proveInstanceUsing Data.emptyDataEnv
@@ -284,14 +284,14 @@ module MLF.Tests.SharedFrontend where {
     recursiveCheckedType (label ++ " independent computation") expected
       (Independent.checkComputation M.empty proof source)
   };
-  recursiveProjectionChecks :: IO Unit;
+  recursiveProjectionChecks :: IO ();
   recursiveProjectionChecks = do {
     let {
       a = XTyVar 1;
       b = XTyVar 2;
       c = XTyVar 3;
       dependent = XForall c XBot (XArrow (XVar c) (XVar a));
-      bounds = Cons (Pair a XBot) (Cons (Pair b dependent) Nil);
+      bounds = (:) ((,) a XBot) ((:) ((,) b dependent) []);
       source = XForall a XBot (XForall b dependent recursiveInt);
       empty = Elaborate.prepareTypes Graph.emptyGraph;
       copied = Elaborate.prepareTypes
@@ -303,7 +303,7 @@ module MLF.Tests.SharedFrontend where {
       copied (IM.singleton 1 100) bounds source
       (XForall (XTyVar 100) XBot recursiveInt);
     recursiveProjection "recursive projection drops higher kind bottom"
-      empty IM.empty (Cons (Pair a (XBotKind (KArrow Star Star))) Nil)
+      empty IM.empty ((:) ((,) a (XBotKind (KArrow Star Star))) [])
       (XForall a (XBotKind (KArrow Star Star)) recursiveInt) recursiveInt
   };
   -- Remove only a generated Inspect dictionary abstraction; its uses and the
@@ -314,13 +314,13 @@ module MLF.Tests.SharedFrontend where {
     XApply function _ -> generatedInspectDictionary function;
     _ -> False
   };
-  generatedDictionaryParameters :: XTerm -> List XName;
+  generatedDictionaryParameters :: XTerm -> [] XName;
   generatedDictionaryParameters term = case term of {
     XAbs name ty body ->
       let { nested = generatedDictionaryParameters body } in
       if recursiveStartsWith "wantedDictionary" (X.nameHint name) &&
          generatedInspectDictionary ty
-      then Cons name nested else nested;
+      then (:) name nested else nested;
     XApp function argument -> append (generatedDictionaryParameters function)
       (generatedDictionaryParameters argument);
     XTypeAbs _ _ body -> generatedDictionaryParameters body;
@@ -328,14 +328,14 @@ module MLF.Tests.SharedFrontend where {
     XLet _ rhs body -> append (generatedDictionaryParameters rhs)
       (generatedDictionaryParameters body);
     XLetRec definitions body -> append
-      (concatMap (\(Triple _ _ rhs) -> generatedDictionaryParameters rhs) definitions)
+      (concatMap (\((,,) _ _ rhs) -> generatedDictionaryParameters rhs) definitions)
       (generatedDictionaryParameters body);
     XCase scrutinee _ alternatives -> append (generatedDictionaryParameters scrutinee)
       (concatMap (\(XAlternative _ body) -> generatedDictionaryParameters body) alternatives);
     XWithData _ body -> generatedDictionaryParameters body;
-    _ -> Nil
+    _ -> []
   };
-  removeDictionaryAbstractions :: List XName -> XTerm -> XTerm;
+  removeDictionaryAbstractions :: [] XName -> XTerm -> XTerm;
   removeDictionaryAbstractions names term = case term of {
     XAbs name ty body ->
       if elem X.equalName name names
@@ -349,14 +349,14 @@ module MLF.Tests.SharedFrontend where {
     XLet name rhs body -> XLet name (removeDictionaryAbstractions names rhs)
       (removeDictionaryAbstractions names body);
     XLetRec definitions body -> XLetRec
-      (map (\(Triple name ty rhs) -> Triple name ty (removeDictionaryAbstractions names rhs)) definitions)
+      (map (\((,,) name ty rhs) -> (,,) name ty (removeDictionaryAbstractions names rhs)) definitions)
       (removeDictionaryAbstractions names body);
     XCase scrutinee ty alternatives -> XCase (removeDictionaryAbstractions names scrutinee) ty
       (map (\(XAlternative pattern body) -> XAlternative pattern (removeDictionaryAbstractions names body)) alternatives);
     XWithData declarations body -> XWithData declarations (removeDictionaryAbstractions names body);
     _ -> term
   };
-  recursiveDictionaryScopeControl :: IO Unit;
+  recursiveDictionaryScopeControl :: IO ();
   recursiveDictionaryScopeControl = do {
     original <- recursiveAccepted "generated recursive dictionary target"
       ("class Inspect a where { inspect : a -> Bool }; " ++
@@ -370,7 +370,7 @@ module MLF.Tests.SharedFrontend where {
     check "independent checker rejects escaped recursive dictionary"
       (isLeft (Independent.checkClosed malformed))
   };
-  recursiveResolutionRejected :: String -> String -> IO Unit;
+  recursiveResolutionRejected :: String -> String -> IO ();
   recursiveResolutionRejected label program =
     case C.compile "RecursiveInference.emlf" program of {
       Left error -> do {
@@ -386,7 +386,7 @@ module MLF.Tests.SharedFrontend where {
       };
       Right _ -> check (label ++ " unexpectedly accepted") False
     };
-  qualifiedRecursiveChecks :: IO Unit;
+  qualifiedRecursiveChecks :: IO ();
   qualifiedRecursiveChecks = do {
     let {
       inspectClass = "class Inspect a where { inspect : a -> Bool }; ";
@@ -451,7 +451,7 @@ module MLF.Tests.SharedFrontend where {
     recursiveAccepted "recursive generic instance retains polymorphic Box export"
       (genericBox ++ boxRecursion ++ "f")
       (XForall (XTyVar 0) XBot
-        (XArrow (XCon "Box" (Cons (XVar (XTyVar 0)) Nil)) recursiveBool));
+        (XArrow (XCon "Box" ((:) (XVar (XTyVar 0)) [])) recursiveBool));
     recursiveAccepted "recursive generic instance accepts Box Int and Box Bool"
       (genericBox ++ boxRecursion ++ "let b = f (Box 0) in f (Box true)")
       recursiveBool;
@@ -489,7 +489,7 @@ module MLF.Tests.SharedFrontend where {
   -- Declaration provenance and declared-field schemes are independent repairs.
   -- Keep expression annotations and ordinary datatype parameters as controls;
   -- neither is permission to invent a higher-rank checking boundary.
-  frontendRepairTarget :: String -> XType -> XTerm -> IO Unit;
+  frontendRepairTarget :: String -> XType -> XTerm -> IO ();
   frontendRepairTarget label expected term = do {
     recursiveCheckedType (label ++ " current target") expected (Check.checkClosed term);
     recursiveCheckedType (label ++ " independent target") expected (Independent.checkClosed term);
@@ -499,7 +499,7 @@ module MLF.Tests.SharedFrontend where {
     recursiveCheckedType (label ++ " independent roundtrip") expected (Independent.checkClosed decoded);
     check (label ++ " roundtrip erasure") (X.equalErased (X.erase term) (X.erase decoded))
   };
-  frontendRepairProvenanceChecks :: IO Unit;
+  frontendRepairProvenanceChecks :: IO ();
   frontendRepairProvenanceChecks = do {
     declaration <- recursiveRight "parse declaration provenance"
       (P.parseExpr "FrontendRepair.emlf" "let id : forall a. a -> a = \\x -> x in id");
@@ -517,44 +517,44 @@ module MLF.Tests.SharedFrontend where {
       (case hygienicAnnotation of { SLet _ (SAnn _ _) _ -> True; _ -> False });
     let {
       identityType = SForall Flexible "a" SBottom (SArrow (STVar "a") (STVar "a"));
-      signature = SAnnotation Nil (SArrow identityType (SCon "Bool" Nil));
+      signature = SAnnotation [] (SArrow identityType (SCon "Bool" []));
       expected = XArrow recursiveIdentity recursiveBool;
-      unit = XCon "Unit" Nil;
-      scopedMember = \variable -> Triple "id"
-        (Just (SAnnotation Nil (SForall Flexible variable SBottom
+      unit = XCon "()" [];
+      scopedMember = \variable -> (,,) "id"
+        (Just (SAnnotation [] (SForall Flexible variable SBottom
           (SArrow (STVar variable) (STVar variable)))))
-        (SLam "x" (Just (SAnnotation Nil (STVar variable)))
-          (SAnn (SVar "x") (SAnnotation Nil (STVar variable))))
+        (SLam "x" (Just (SAnnotation [] (STVar variable)))
+          (SAnn (SVar "x") (SAnnotation [] (STVar variable))))
     };
     rhs <- recursiveRight "parse separate rank two body"
       (P.parseExpr "FrontendRepair.emlf" "\\g -> let n = g 1 in g true");
     declared <- recursiveRight "extract declaration signature"
       (Inference.extractLoweredDeclarations
-        (SLet "use" (SSignature rhs signature) (SConstructor "Unit")));
+        (SLet "use" (SSignature rhs signature) (SConstructor "()")));
     annotated <- recursiveRight "extract expression annotation"
       (Inference.extractLoweredDeclarations
-        (SLet "use" (SAnn rhs signature) (SConstructor "Unit")));
+        (SLet "use" (SAnn rhs signature) (SConstructor "()")));
     checked <- recursiveRight "extract generated checking boundary"
       (Inference.extractLoweredDeclarations
-        (SLet "use" (SChecked (SArrow identityType (SCon "Bool" Nil)) rhs)
-          (SConstructor "Unit")));
+        (SLet "use" (SChecked (SArrow identityType (SCon "Bool" [])) rhs)
+          (SConstructor "()")));
     check "separate extraction recognizes declaration signatures only"
-      (case declared of { Cons (Triple _ (Just _) _) Nil -> True; _ -> False });
+      (case declared of { (:) ((,,) _ (Just _) _) [] -> True; _ -> False });
     check "separate extraction does not promote SAnn"
-      (case annotated of { Cons (Triple _ Nothing (SAnn _ _)) Nil -> True; _ -> False });
+      (case annotated of { (:) ((,,) _ Nothing (SAnn _ _)) [] -> True; _ -> False });
     check "separate extraction does not promote SChecked"
-      (case checked of { Cons (Triple _ Nothing (SChecked _ _)) Nil -> True; _ -> False });
+      (case checked of { (:) ((,,) _ Nothing (SChecked _ _)) [] -> True; _ -> False });
     check "query keys distinguish declaration and expression provenance"
       (not (eqString
         (Query.encodeMember (Query.canonicalMember
-          (Triple "use" Nothing (SSignature rhs signature))))
+          ((,,) "use" Nothing (SSignature rhs signature))))
         (Query.encodeMember (Query.canonicalMember
-          (Triple "use" Nothing (SAnn rhs signature))))));
+          ((,,) "use" Nothing (SAnn rhs signature))))));
     check "query keys alpha rename declaration scoped type variables"
       (eqString (Query.encodeMember (Query.canonicalMember (scopedMember "a")))
         (Query.encodeMember (Query.canonicalMember (scopedMember "b"))));
     object <- recursiveRight "separate rank two declaration inference"
-      (Inference.compileLoweredGroup "FrontendRepair" Nil Nil declared);
+      (Inference.compileLoweredGroup "FrontendRepair" [] [] declared);
     check "separate declaration preserves prescribed rank two interface"
       (case lookup eqString "use" (Separate.unitBindings (Separate.objectInterface object)) of {
         Just actual -> IndependentType.alphaEq actual expected;
@@ -562,15 +562,15 @@ module MLF.Tests.SharedFrontend where {
       });
     frontendRepairTarget "separate rank two declaration" unit (Separate.objectTerm object);
     check "separate expression annotation still rejects rank two inference"
-      (case Inference.compileLoweredGroup "FrontendRepair" Nil Nil annotated of {
+      (case Inference.compileLoweredGroup "FrontendRepair" [] [] annotated of {
         Left message -> recursiveStartsWith "Inference: type constructor mismatch" message;
         Right _ -> False
       });
     consumer <- recursiveRight "separate rank two imported use"
       (Inference.compileLoweredGroup "FrontendRepairConsumer"
-        (Cons (Separate.objectInterface object) Nil) Nil
-        (Cons (Triple "answer" Nothing
-          (SApp (SVar "use") (SLam "x" Nothing (SVar "x")))) Nil));
+        ((:) (Separate.objectInterface object) []) []
+        ((:) ((,,) "answer" Nothing
+          (SApp (SVar "use") (SLam "x" Nothing (SVar "x")))) []));
     check "separate imported rank two use preserves prescribed Bool interface"
       (case lookup eqString "answer" (Separate.unitBindings (Separate.objectInterface consumer)) of {
         Just actual -> IndependentType.alphaEq actual recursiveBool;
@@ -579,7 +579,7 @@ module MLF.Tests.SharedFrontend where {
     frontendRepairTarget "separate imported rank two use"
       (XArrow expected unit) (Separate.objectTerm consumer)
   };
-  frontendRepairSignatureChecks :: IO Unit;
+  frontendRepairSignatureChecks :: IO ();
   frontendRepairSignatureChecks = do {
     let {
       dummy = "class Dummy a where { dummy : a -> Bool }; ";
@@ -620,24 +620,24 @@ module MLF.Tests.SharedFrontend where {
     recursiveRejected "shared expression annotation preserves inference"
       (source sharedAnnotation) "type constructor mismatch";
     recursiveModulesAccepted "cross module declaration preserves rank two checking"
-      (M.singleton "Use" (Pair "Use.emlf"
+      (M.singleton "Use" ((,) "Use.emlf"
         "module Use where\nuse : (forall a. a -> a) -> Bool\nuse g = let n = g 1 in g true\n"))
       "module Main where\nimport Use\nmain = use (\\x -> x)\n" recursiveBool;
     recursiveModulesAccepted "shared cross module declaration preserves rank two checking"
-      (M.singleton "Use" (Pair "Use.hs" (prologue ++
+      (M.singleton "Use" ((,) "Use.hs" (prologue ++
         "module Use where\nimport MLF.Primitive\nuse :: (forall a. a -> a) -> Bool\nuse g = let { n = g 1 } in g True\n")))
       (prologue ++ "module Main where\nimport MLF.Primitive\nimport Use\nmain = use (\\x -> x)\n")
       recursiveBool;
     frontendRepairProvenanceChecks
   };
-  frontendRepairFieldChecks :: IO Unit;
+  frontendRepairFieldChecks :: IO ();
   frontendRepairFieldChecks = do {
     let {
       poly = "data Poly = Poly (forall a. a -> a); ";
-      polyType = XCon "Poly" Nil;
+      polyType = XCon "Poly" [];
       maybe = "data Maybe a = Nothing | Just a; ";
       list = "data List a = Nil | Cons a (List a); ";
-      maybeBool = XCon "Maybe" (Cons recursiveBool Nil)
+      maybeBool = XCon "Maybe" ((:) recursiveBool [])
     };
     recursiveAccepted "declared forall field automatic integer instance"
       (poly ++ "\\p -> case p of { Poly g -> g 1 }")
@@ -652,35 +652,35 @@ module MLF.Tests.SharedFrontend where {
       "data H a = H (forall b. b -> a); \\x -> case H (\\z -> x) of { H f -> let n = f 1 in f true }"
       recursiveIdentity;
     recursiveRejected "declared forall field cannot generalize captured result parameter"
-      "data H a = H (forall b. b -> a); \\x -> case H (\\z -> x) of { H f -> let n : Int = f 1 in (f true : Bool) }"
+      "data H a = H (forall b. b -> a); \\x -> case H (\\z -> x) of { H f -> let n : Int = f 1 in (f true :: Bool) }"
       "type constructor mismatch";
     recursiveAccepted "declared forall field shadows datatype parameter"
       "data Shadow a = Shadow (forall a. a -> a); \\p -> case p of { Shadow f -> let n = f 1 in f true }"
       (XForall (XTyVar 0) XBot
-        (XArrow (XCon "Shadow" (Cons (XVar (XTyVar 0)) Nil)) recursiveBool));
+        (XArrow (XCon "Shadow" ((:) (XVar (XTyVar 0)) [])) recursiveBool));
     recursiveAccepted "declared forall fields retain independent schemes"
       "data P = P (forall a. a -> a) (forall a. a -> a); \\p -> case p of { P f g -> let n = f 1 in let b = g true in let m = g 2 in f false }"
-      (XArrow (XCon "P" Nil) recursiveBool);
+      (XArrow (XCon "P" []) recursiveBool);
     recursiveAccepted "declared forall field nested pattern extraction"
       "data P = P (forall a. a -> a); data Outer = Outer P; \\o -> case o of { Outer (P f) -> let n = f 1 in f true }"
-      (XArrow (XCon "Outer" Nil) recursiveBool);
+      (XArrow (XCon "Outer" []) recursiveBool);
     recursiveAccepted "declared forall field term shadowing retains lexical scope"
       "data P = P (forall a. a -> a); \\p -> case p of { P f -> let f = \\x -> 1 in f true }"
-      (XArrow (XCon "P" Nil) recursiveInt);
+      (XArrow (XCon "P" []) recursiveInt);
     recursiveAccepted "declared forall field preserves nested rank"
       "data P = P (forall t. (forall a. a -> a) -> t -> t); \\p -> case p of { P f -> let n = f (\\x -> x) 1 in f (\\x -> x) true }"
-      (XArrow (XCon "P" Nil) recursiveBool);
+      (XArrow (XCon "P" []) recursiveBool);
     recursiveAccepted "ordinary field preserves existing nested rank"
       "data Use = Use ((forall a. a -> a) -> Bool); \\v -> case v of { Use k -> k (\\x -> x) }"
-      (XArrow (XCon "Use" Nil) recursiveBool);
+      (XArrow (XCon "Use" []) recursiveBool);
     recursiveAccepted "declared forall field independently instantiates higher kinds"
       (maybe ++ list ++
        "data HK = HK (forall (f : * -> *) a. f a -> f a); \\v -> case v of { HK k -> let n = k (Just 1) in k (Cons true Nil) }")
-      (XArrow (XCon "HK" Nil) (XCon "List" (Cons recursiveBool Nil)));
+      (XArrow (XCon "HK" []) (XCon "List" ((:) recursiveBool [])));
     recursiveAccepted "declared forall field preserves captured higher kind"
       (maybe ++
        "data Wrap (f : * -> *) = Wrap (forall a. f a -> f a); \\v -> case v of { Wrap k -> let n = k (Just 1) in k (Just true) }")
-      (XArrow (XCon "Wrap" (Cons (XCon "Maybe" Nil) Nil)) maybeBool);
+      (XArrow (XCon "Wrap" ((:) (XCon "Maybe" []) [])) maybeBool);
     recursiveRejected "declared forall field cannot generalize captured higher kind"
       (maybe ++ list ++
        "data Wrap (f : * -> *) = Wrap (forall a. f a -> f a); \\v -> case v of { Wrap k -> let n = k (Just 1) in k (Cons true Nil) }")
@@ -691,18 +691,18 @@ module MLF.Tests.SharedFrontend where {
     -- A forall supplied through a datatype argument is not a syntactically
     -- declared forall field. This separate limitation remains unchanged.
     recursiveRejected "scrutinee annotated polymorphic datatype argument remains explicit residual"
-      "data Box a = Box a; case (Box (\\x -> x) : Box (forall a. a -> a)) of { Box f -> let n = f 1 in f true }"
+      "data Box a = Box a; case (Box (\\x -> x) :: Box (forall a. a -> a)) of { Box f -> let n = f 1 in f true }"
       "cannot raise a protected type variable";
     recursiveRejected "declared universal field still checks constructor argument"
       "data P = P (forall a. a -> a); P (\\x -> 1)"
       "cannot instantiate a rigid or protected type variable";
     recursiveAccepted "declared vacuous forall field extracts normalized instance"
       "data V = V (forall a. Int); \\v -> case v of { V x -> x }"
-      (XArrow (XCon "V" Nil) recursiveInt);
+      (XArrow (XCon "V" []) recursiveInt);
     recursiveAccepted "declared vacuous forall field preserves captured parameter"
       "data V p = V (forall a. p); \\v -> case v of { V x -> x }"
       (XForall (XTyVar 0) XBot
-        (XArrow (XCon "V" (Cons (XVar (XTyVar 0)) Nil)) (XVar (XTyVar 0))));
+        (XArrow (XCon "V" ((:) (XVar (XTyVar 0)) [])) (XVar (XTyVar 0))));
     -- This is a known constructor-side residual, not a field-extraction fix.
     -- Keep the original source and verification diagnostic as an explicit
     -- control rather than silently claiming that V 1 has been repaired.
@@ -713,13 +713,13 @@ module MLF.Tests.SharedFrontend where {
         Right _ -> False
       })
   };
-  frontendRepairChecks :: IO Unit;
+  frontendRepairChecks :: IO ();
   frontendRepairChecks = do {
     frontendRepairSignatureChecks;
     frontendRepairFieldChecks;
     putStrLn "shared frontend: declaration provenance and declared forall field checks passed"
   };
-  recursiveInferenceChecks :: IO Unit;
+  recursiveInferenceChecks :: IO ();
   recursiveInferenceChecks = do {
     recursiveRight "recursive class demand planner" ClassDemandTests.checkAll;
     recursiveAccepted "ordinary unsigned factorial"
@@ -733,34 +733,34 @@ module MLF.Tests.SharedFrontend where {
       ("let rec { " ++ (evenDefinition ++ ("; " ++ (oddDefinition ++ " } in even"))))
       (XArrow recursiveInt recursiveBool);
     recursiveOrder "mutual source order retains one runtime knot"
-      (Cons "even" (Cons "odd" Nil)) mutual;
+      ((:) "even" ((:) "odd" [])) mutual;
     reordered <- recursiveAccepted "mutual declaration reordering"
       ("let rec { " ++ (oddDefinition ++ ("; " ++ (evenDefinition ++ " } in even"))))
       (XArrow recursiveInt recursiveBool);
     recursiveOrder "reordered source retains one runtime knot"
-      (Cons "odd" (Cons "even" Nil)) reordered;
+      ((:) "odd" ((:) "even" [])) reordered;
     recursiveAccepted "recursive identity generalized export"
       "let rec { f x = if true then x else f x } in f" recursiveIdentity;
     recursiveAccepted "recursive higher rank parameter annotation"
-      "let rec { f = \\(g : forall a. a -> a) -> \\n -> if eqInt n 0 then let x : Int = g 1 in (g true : Bool) else f g (subInt n 1) } in f"
+      "let rec { f = \\(g : forall a. a -> a) -> \\n -> if eqInt n 0 then let x : Int = g 1 in (g true :: Bool) else f g (subInt n 1) } in f"
       (XArrow recursiveIdentity (XArrow recursiveInt recursiveBool));
     recursiveRejected "recursive unannotated parameter stays monomorphic"
-      "let rec { f = \\g -> \\n -> if eqInt n 0 then let x : Int = g 1 in (g true : Bool) else f g (subInt n 1) } in f"
+      "let rec { f = \\g -> \\n -> if eqInt n 0 then let x : Int = g 1 in (g true :: Bool) else f g (subInt n 1) } in f"
       "type constructor mismatch";
     recursiveAccepted "recursive export used at Int and Bool"
-      "let rec { f x = if true then x else f x } in let n : Int = f 1 in (f true : Bool)"
+      "let rec { f x = if true then x else f x } in let n : Int = f 1 in (f true :: Bool)"
       recursiveBool;
     recursiveAccepted "mutual SCC generalized only after solving"
-      "let rec { f x = if true then x else g x; g y = f y } in let n : Int = f 1 in (g true : Bool)"
+      "let rec { f x = if true then x else g x; g y = f y } in let n : Int = f 1 in (g true :: Bool)"
       recursiveBool;
     recursiveAccepted "mutual SCC exports independent instances"
-      "let rec { f x = if true then x else g x; g y = f y } in let n : Int = g 1 in (f true : Bool)"
+      "let rec { f x = if true then x else g x; g y = f y } in let n : Int = g 1 in (f true :: Bool)"
       recursiveBool;
     mixed <- recursiveAccepted "mixed signed polymorphic cycle"
-      "let rec { f : forall a. a -> a; f x = g x; g x = f x } in let n : Int = f 1 in (g true : Bool)"
+      "let rec { f : forall a. a -> a; f x = g x; g x = f x } in let n : Int = f 1 in (g true :: Bool)"
       recursiveBool;
     recursiveOrder "mixed signed source order retains one runtime knot"
-      (Cons "f" (Cons "g" Nil)) mixed;
+      ((:) "f" ((:) "g" [])) mixed;
     recursiveAccepted "mixed signed cycle exports unsigned polymorphism"
       "let rec { g x = f x; f : forall a. a -> a; f x = g x } in g"
       recursiveIdentity;
@@ -771,38 +771,38 @@ module MLF.Tests.SharedFrontend where {
     recursiveAccepted "signed Nest polymorphic recursion preserved"
       (nest ++ ("let rec { depth : forall a. Nest a -> Int; " ++ (depth ++ " } in depth")))
       (XForall (XTyVar 0) XBot
-        (XArrow (XCon "Nest" (Cons (XVar (XTyVar 0)) Nil)) recursiveInt));
+        (XArrow (XCon "Nest" ((:) (XVar (XTyVar 0)) [])) recursiveInt));
     recursiveRejected "unsigned Nest polymorphic recursion rejected"
       (nest ++ ("let rec { " ++ (depth ++ " } in depth"))) "cyclic structure/binding dependencies";
     recursiveAccepted "nonrecursive capture still generalizes independent argument"
       "\\z -> let f = \\n -> z in let i = f 0 in f true" recursiveIdentity;
     recursiveRejected "nonrecursive capture cannot generalize environment"
-      "\\z -> let f = \\n -> z in let i : Int = f 0 in (f true : Bool)"
+      "\\z -> let f = \\n -> z in let i : Int = f 0 in (f true :: Bool)"
       "type constructor mismatch";
     recursiveAccepted "recursive entire root remains environment owned"
       "\\z -> let rec { f = if true then z else f } in f" recursiveIdentity;
     recursiveRejected "recursive entire root cannot generalize environment"
-      "\\z -> let rec { f = if true then z else f } in let i : Int = f in (f : Bool)"
+      "\\z -> let rec { f = if true then z else f } in let i : Int = f in (f :: Bool)"
       "type constructor mismatch";
     recursiveAccepted "recursive capture generalizes independent argument"
       "\\z -> let rec { f n y = if eqInt n 0 then z else f (subInt n 1) y } in let i = f 0 true in f 1 0"
       recursiveIdentity;
     recursiveRejected "recursive capture cannot generalize environment"
-      "\\z -> let rec { f n = if eqInt n 0 then z else f (subInt n 1) } in let i : Int = f 0 in (f 1 : Bool)"
+      "\\z -> let rec { f n = if eqInt n 0 then z else f (subInt n 1) } in let i : Int = f 0 in (f 1 :: Bool)"
       "type constructor mismatch";
     recursiveAccepted "mutual capture preserves environment sharing"
       "\\z -> let rec { f n = if eqInt n 0 then g n else f (subInt n 1); g n = if eqInt n 0 then z else f (subInt n 1) } in f 1"
       recursiveIdentity;
     recursiveRejected "indirect recursive capture cannot generalize environment"
-      "\\z -> let rec { f n = if eqInt n 0 then g n else f (subInt n 1); g n = if eqInt n 0 then z else f (subInt n 1) } in let i : Int = f 0 in (g 1 : Bool)"
+      "\\z -> let rec { f n = if eqInt n 0 then g n else f (subInt n 1); g n = if eqInt n 0 then z else f (subInt n 1) } in let i : Int = f 0 in (g 1 :: Bool)"
       "type constructor mismatch";
     recursiveRejected "recursive self application occurs check"
       "let rec { f x = f f } in f" "cyclic structure/binding dependencies";
     recursiveRejected "recursive shared uses conflict at Int and Bool"
-      "let rec { f x = if true then x else let n : Int = f 1 in (f true : Bool) } in f"
+      "let rec { f x = if true then x else let n : Int = f 1 in (f true :: Bool) } in f"
       "type constructor mismatch";
     recursiveRejected "mutual SCC cannot generalize early"
-      "let rec { f x = if true then x else g x; g y = let n : Int = f 1 in (f true : Bool) } in f"
+      "let rec { f x = if true then x else g x; g y = let n : Int = f 1 in (f true :: Bool) } in f"
       "type constructor mismatch";
     recursiveRejected "mixed signed universal contract still checked"
       "let rec { f : forall a. a -> a; f x = g x; g y = if true then 1 else f y } in f"
@@ -823,11 +823,11 @@ module MLF.Tests.SharedFrontend where {
       (XArrow recursiveInt recursiveBool);
     let {
       divergentModules = M.fromList compareString
-        (Cons (Pair "A" (Pair "A.emlf" "module A where\nimport qualified B\nf x = B.g x\n"))
-        (Cons (Pair "B" (Pair "B.emlf" "module B where\nimport qualified A\ng x = A.f x\n")) Nil));
+        ((:) ((,) "A" ((,) "A.emlf" "module A where\nimport qualified B\nf x = B.g x\n"))
+        ((:) ((,) "B" ((,) "B.emlf" "module B where\nimport qualified A\ng x = A.f x\n")) []));
       identityModules = M.fromList compareString
-        (Cons (Pair "A" (Pair "A.emlf" "module A where\nimport qualified B\nf x = if true then x else B.g x\n"))
-        (Cons (Pair "B" (Pair "B.emlf" "module B where\nimport qualified A\ng x = A.f x\n")) Nil))
+        ((:) ((,) "A" ((,) "A.emlf" "module A where\nimport qualified B\nf x = if true then x else B.g x\n"))
+        ((:) ((,) "B" ((,) "B.emlf" "module B where\nimport qualified A\ng x = A.f x\n")) []))
     };
     -- This original source diverges. Compile and check it, never evaluate it.
     recursiveModulesAccepted "cross module unsigned divergent cycle type only"
@@ -836,14 +836,14 @@ module MLF.Tests.SharedFrontend where {
       identityModules "module Main where\nimport A\nmain = f\n" recursiveIdentity;
     recursiveModulesAccepted "cross module unsigned exports used at Int and Bool"
       identityModules
-      "module Main where\nimport A\nmain = let n : Int = f 1 in (f true : Bool)\n" recursiveBool;
+      "module Main where\nimport A\nmain = let n : Int = f 1 in (f true :: Bool)\n" recursiveBool;
     let {
       transitiveInstances = M.fromList compareString
-        (Cons (Pair "Inspect" (Pair "Inspect.emlf" "module Inspect where\nclass Inspect a where { inspect : a -> Bool }\n"))
-        (Cons (Pair "Instances" (Pair "Instances.emlf" "module Instances () where\nimport Inspect\ninstance Inspect Int where { inspect = \\x -> true }\n"))
-        (Cons (Pair "Bridge" (Pair "Bridge.emlf" "module Bridge () where\nimport Instances ()\n"))
-        (Cons (Pair "A" (Pair "A.emlf" "module A (f) where\nimport Inspect\nimport Bridge ()\nimport qualified B\nf n = if eqInt n 0 then inspect n else B.g (subInt n 1)\n"))
-        (Cons (Pair "B" (Pair "B.emlf" "module B (g) where\nimport qualified A\ng n = A.f n\n")) Nil)))))
+        ((:) ((,) "Inspect" ((,) "Inspect.emlf" "module Inspect where\nclass Inspect a where { inspect : a -> Bool }\n"))
+        ((:) ((,) "Instances" ((,) "Instances.emlf" "module Instances () where\nimport Inspect\ninstance Inspect Int where { inspect = \\x -> true }\n"))
+        ((:) ((,) "Bridge" ((,) "Bridge.emlf" "module Bridge () where\nimport Instances ()\n"))
+        ((:) ((,) "A" ((,) "A.emlf" "module A (f) where\nimport Inspect\nimport Bridge ()\nimport qualified B\nf n = if eqInt n 0 then inspect n else B.g (subInt n 1)\n"))
+        ((:) ((,) "B" ((,) "B.emlf" "module B (g) where\nimport qualified A\ng n = A.f n\n")) [])))))
     };
     recursiveModulesAccepted "cross module unsigned recursion sees transitive defining instance"
       transitiveInstances "module Main where\nimport A\nmain = f 1\n" recursiveBool;
@@ -855,14 +855,14 @@ module MLF.Tests.SharedFrontend where {
       f = XName 1 "f";
       x = XName 2 "x";
       malformed = XLetRec
-        (Cons (Triple f (XArrow recursiveInt recursiveInt)
-          (XAbs x recursiveInt (XBoolTerm True))) Nil) (XVarTerm f)
+        ((:) ((,,) f (XArrow recursiveInt recursiveInt)
+          (XAbs x recursiveInt (XBoolTerm True))) []) (XVarTerm f)
     };
     check "current checker rejects recursive RHS type mismatch" (isLeft (Check.checkClosed malformed));
     check "independent checker rejects recursive RHS type mismatch" (isLeft (Independent.checkClosed malformed));
     putStrLn "shared frontend: recursive inference checks passed"
   };
-  frontendChecks :: IO Unit;
+  frontendChecks :: IO ();
   frontendChecks =
     do {
       check "legacy malformed pragma comment"
@@ -883,14 +883,14 @@ module MLF.Tests.SharedFrontend where {
       check "fixed do identity" fixedDo;
       check "mixed per-file profiles" mixedGraph;
       check "imported hook identity" importedHook;
-      check "primitive facade link" (linked "main = do { printInt 42; ioReturn Unit }");
+      check "primitive facade link" (linked "main = do { printInt 42; ioReturn () }");
       check "facade implementation host" (linked "main = implementationHost");
       check "ordinary bind binding"
         (case P.parseModule "Example.hs"
                 (prologue ++
                  "module Example where\nimport MLF.Primitive hiding (bind)\nbind = 42\nmain = do { ioReturn bind; ioReturn bind }\n") of {
            Left _ -> False;
-           Right m -> isRight (Modules.linkModules ImplicitPrelude (Cons m Nil))
+           Right m -> isRight (Modules.linkModules ImplicitPrelude ((:) m []))
          });
       check "closed recursive group"
         (accept "main = let { f :: Int -> Int; f x = g x; g :: Int -> Int; g x = f x } in 1");
@@ -898,8 +898,8 @@ module MLF.Tests.SharedFrontend where {
       check "mixed signed cycle"
         (accept "main = let { f :: Int -> Int; f x = g x; g x = f x } in 1");
       check "do let forward scope" (accept "main = do { let { x = y; y = 3 }; ioReturn x }");
-      check "refutable do forbidden"
-        (reject "main = do { Pair x y <- ioReturn (Pair 1 2); ioReturn x }");
+      check "constructor do patterns accepted"
+        (accept "main = do { Pair x y <- ioReturn (Pair 1 2); ioReturn x }");
       check "wildcard do bind" (accept "main = do { _ <- ioReturn 1; ioReturn 2 }");
       check "same-indent operator continuation rejected" (reject "main = 1 +\n2");
       check "same-indent RHS rejected" (reject "main =\n1");
@@ -922,14 +922,14 @@ module MLF.Tests.SharedFrontend where {
       check "rigid forall rejected" (reject "f :: forall (a = Int). a -> a\nf x = x");
       check "existential annotation rejected" (reject "f :: exists a. a -> a\nf x = x");
       check "nested context rejected" (reject "f :: forall a. (Monad IO => IO a) -> IO a\nf x = x");
-      check "string patterns rejected" (reject "f \"x\" = 1\nf _ = 2");
+      check "string patterns accepted" (accept "f \"x\" = 1\nf _ = 2");
       check "typed patterns rejected" (reject "f (x :: Int) = x");
-      check "tuple expressions rejected" (reject "main = (1,2)");
-      check "unit sugar rejected" (reject "main = ()");
-      check "list sugar rejected" (reject "main = [1]");
-      check "list-tail rejected" (reject "main = 1 : Nil");
-      check "tuple types rejected" (reject "main :: (Int, Int)\nmain = Pair 1 2");
-      check "tuple patterns rejected" (reject "f (x,y) = x");
+      check "tuple expressions accepted" (accept "main = (1,2)");
+      check "unit sugar accepted" (accept "main = ()");
+      check "list sugar accepted" (accept "main = [1]");
+      check "canonical list-tail accepted" (accept "main = 1 : []");
+      check "tuple types accepted" (accept "main :: (Int, Int)\nmain = (1,2)");
+      check "tuple patterns accepted" (accept "f (x,y) = x");
       check "typed negative literal" (accept "main :: Int\nmain = (-1)");
       check "bare negative rejected" (reject "main = -1");
       check "unary plus rejected" (reject "main = +1");
@@ -1045,7 +1045,7 @@ module MLF.Tests.SharedFrontend where {
       recursiveInferenceChecks;
       putStrLn "shared frontend: parser and namespace checks passed"
     };
-  nativeFirst :: IO Unit;
+  nativeFirst :: IO ();
   nativeFirst = do {
     check "default and generated-name capture execution" (evaluatesInt captureDefaults 40);
     check "native standard hierarchy inference" (evaluatesInt (boxMonad ++ "main = unBox (do { x <- pure 40; return (x + 2) })") 42);
@@ -1055,7 +1055,7 @@ module MLF.Tests.SharedFrontend where {
     check "native fmap default partial demand" (failsWith "data Box a = Box a\ninstance Functor Box where { fmap = panic \"fmap bottom\" }\nmain = seq (((<$) 1) :: Box Int -> Box Int) 7" "fmap bottom");
       putStrLn "shared frontend: first native semantics checks passed"
     };
-  nativeSecond :: IO Unit;
+  nativeSecond :: IO ();
   nativeSecond = do {
     check "native ap default function demand" (failsWith (boxFunctor ++ "instance Applicative Box where { pure = Box; liftA2 = panic \"liftA2 bottom\" }\nmain = seq ((<*>) :: Box (Int -> Int) -> Box Int -> Box Int) 7") "liftA2 bottom");
     check "native left default function demand" (failsWith (boxFunctor ++ "instance Applicative Box where { pure = Box; liftA2 = panic \"liftA2 bottom\" }\nmain = seq ((<*) :: Box Int -> Box Int -> Box Int) 7") "liftA2 bottom");
@@ -1065,7 +1065,7 @@ module MLF.Tests.SharedFrontend where {
       putStrLn "shared frontend: checks passed"
     };
 
-  checkFiles :: Int -> Int -> IO Unit;
+  checkFiles :: Int -> Int -> IO ();
   checkFiles i count = if i >= count then putStrLn "shared source files: grammar checks passed" else do {
     file <- getArg i;
     text <- readFile file;
@@ -1074,7 +1074,7 @@ module MLF.Tests.SharedFrontend where {
       Right _ -> checkFiles (i + 1) count
     }
   };
-  main :: IO Unit;
+  main :: IO ();
   main = do {
     count <- getArgCount;
     if count == 0 then do { frontendChecks; nativeFirst; nativeSecond }

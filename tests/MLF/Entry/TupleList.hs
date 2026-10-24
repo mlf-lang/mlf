@@ -10,7 +10,7 @@ module MLF.Entry.TupleList where {
   import qualified Tests.TupleListLegacy as Legacy;
   -- Preserve the frozen default until executed equivalence is established.
   -- Opt-in routes share the new leaf registry, never run both implementations.
-  main :: IO Unit;
+  main :: IO ();
   main =
     do {
       count <- getArgCount;
@@ -19,7 +19,7 @@ module MLF.Entry.TupleList where {
         matchValueShared1 = args
       } in
       case matchValueShared1 of {
-        Cons matchValueShared2 matchValueShared3 ->
+        (:) matchValueShared2 matchValueShared3 ->
           if MLF.Primitive.eqString matchValueShared2 "--framework"
           then let {
                  rest = matchValueShared3
@@ -29,15 +29,15 @@ module MLF.Entry.TupleList where {
                then let {
                       rest = matchValueShared3
                     } in
-                    finish (Cons "--list" rest)
+                    finish ((:) "--list" rest)
                else Legacy.main;
         _ -> Legacy.main
       }
     };
-  finish :: List String -> IO Unit;
+  finish :: [] String -> IO ();
   finish args =
     do {
       code <- Runner.run args TupleList.cases;
-      if (code == 0) then ioReturn Unit else exitWith code
+      if (code == 0) then ioReturn () else exitWith code
     }
 }

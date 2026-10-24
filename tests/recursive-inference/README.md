@@ -2,7 +2,7 @@
 
 `RecursiveInventoryDiscovery.emlf` inspects the actual retained Modules,
 Separate, Readability and CoreSolver test-list spines and labels. It compares
-these with the registry/catalog and verifies all 742 Core labels against the
+these with the registry/catalog and verifies all 746 Core labels against the
 preserved golden inventory, including unique stable IDs and partition totals.
 It **does not execute** any test action, fixture program, LLVM/native campaign,
 or security campaign.
@@ -21,12 +21,12 @@ compilation cases, nine provenance assertions, finite-origin planner checks,
 and current plus frozen target/evidence checks. One new compilation case
 explicitly preserves a known constructor-side rejection rather than claiming
 that residual fixed. The discovery harness does not substitute
-for those checks or claim that all 742 Core actions have been executed.
+for those checks or claim that all 746 Core actions have been executed.
 
 `runtime/*.emlf` are three terminating host-interpreter checks. Run each with
 `emlf --run FILE` and compare exact stdout with its `.stdout` sibling. They
 exercise factorial, a mutual recursive knot, and explicit inferred dictionary
-arguments over repeated recursive calls. They are separate from the 742-case
+arguments over repeated recursive calls. They are separate from the 746-case
 Core inventory and require no LLVM/GC/native compilation.
 
 ## Exact saved-crate host compatibility
@@ -91,3 +91,24 @@ five-line harness used for the final 78-action class compatibility run. Run it
 with `emlf --run` and the shared source roots (excluding `host/ghc`) as above.
 It selects the existing `Tests.Typeclasses.typeclassTests` list unchanged; it
 adds no test IDs and does not invoke the native campaign.
+
+## PR22 canonical-source integration
+
+The ordered 739 → 742 recursion migration remains historical evidence, not a
+regenerated baseline. The canonical-source integration explicitly migrates eight
+more labels and retains four upstream-added do/surface controls, yielding 746
+registered leaves: 34 solver + 384 language + 27 crates + 301 modules. The static
+guard binds these exact changes to the frozen catalog, preserves all other
+family/label ordering, and rejects retired IDs, dropped/moved/reordered additions,
+source-body changes and oracle mutations.
+
+Canonical list/tuple/unit syntax is applied only to implementation identifiers.
+Nominal custom List/Maybe source tests retain their declarations and expected
+types. Intended parenthesized expression annotations use `::`, while declaration,
+forall and kind-syntax controls retain their original intended scope. The current
+and frozen target checkers, prescribed type ASTs and erasure checks remain active.
+The same-name do-local function and unsigned loop cases check Int and XBot without
+executing their divergent targets; the same-name do-local value retains its
+infinite-type rejection. The standalone unsigned source helper now checks the
+original terminating source evaluates to 42; private instance-scope negatives
+remain unchanged.

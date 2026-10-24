@@ -36,24 +36,24 @@ module MLF.Entry.Emlf where {
     do {
       count <- getArgCount;
       arguments <- readArguments 0 count;
-      options ImplicitPrelude Nil arguments
+      options ImplicitPrelude [] arguments
     };
-  readArguments :: Int -> Int -> IO (List String);
+  readArguments :: Int -> Int -> IO ([] String);
   readArguments i count =
     if (i >= count)
-    then ioReturn Nil
+    then ioReturn []
     else do {
            argument <- getArg i;
            rest <- readArguments (i + 1) count;
-           ioReturn (Cons argument rest)
+           ioReturn ((:) argument rest)
          };
-  options :: PreludeMode -> List String -> List String -> IO Unit;
+  options :: PreludeMode -> [] String -> [] String -> IO ();
   options mode paths arguments =
     let {
       matchValueShared1 = arguments
     } in
     case matchValueShared1 of {
-      Cons matchValueShared2 matchValueShared3 ->
+      (:) matchValueShared2 matchValueShared3 ->
         if MLF.Primitive.eqString matchValueShared2 "--no-prelude"
         then let {
                rest = matchValueShared3
@@ -61,7 +61,7 @@ module MLF.Entry.Emlf where {
              options NoImplicitPrelude paths rest
         else if MLF.Primitive.eqString matchValueShared2 "-i"
              then case matchValueShared3 of {
-                    Cons matchValueShared4 matchValueShared5 ->
+                    (:) matchValueShared4 matchValueShared5 ->
                       let {
                         path = matchValueShared4
                       } in
@@ -69,7 +69,7 @@ module MLF.Entry.Emlf where {
                         rest = matchValueShared5
                       } in
                       options mode (L.snoc paths path) rest;
-                    Nil -> fatal "-i requires a module search directory";
+                    [] -> fatal "-i requires a module search directory";
                     _ ->
                       let {
                         rest = matchValueShared3
@@ -93,19 +93,19 @@ module MLF.Entry.Emlf where {
                   then options mode (L.snoc paths (stringSlice first 2 (stringLength first - 2)))
                          rest
                   else runArgs mode paths arguments;
-      Nil -> runArgs mode paths arguments
+      [] -> runArgs mode paths arguments
     };
-  runArgs :: PreludeMode -> List String -> List String -> IO Unit;
+  runArgs :: PreludeMode -> [] String -> [] String -> IO ();
   runArgs mode paths arguments =
     let {
       matchValueShared6 = arguments
     } in
     case matchValueShared6 of {
-      Cons matchValueShared7 matchValueShared8 ->
+      (:) matchValueShared7 matchValueShared8 ->
         if MLF.Primitive.eqString matchValueShared7 "--implementation-identity"
         then case matchValueShared8 of {
-               Nil -> putStrLn ("MLF/shared-haskell-v1 " ++ producerHost);
-               _ -> sourceCommand mode paths (PrintSource False) Nil arguments
+               [] -> putStrLn ("MLF/shared-haskell-v1 " ++ producerHost);
+               _ -> sourceCommand mode paths (PrintSource False) [] arguments
              }
         else if MLF.Primitive.eqString matchValueShared7 "--check-shared"
              then let {
@@ -114,33 +114,33 @@ module MLF.Entry.Emlf where {
                   checkSharedFiles files
              else if MLF.Primitive.eqString matchValueShared7 "--version"
                   then case matchValueShared8 of {
-                         Nil -> putStrLn ("emlf " ++ Version.version);
-                         _ -> sourceCommand mode paths (PrintSource False) Nil arguments
+                         [] -> putStrLn ("emlf " ++ Version.version);
+                         _ -> sourceCommand mode paths (PrintSource False) [] arguments
                        }
                   else if MLF.Primitive.eqString matchValueShared7 "--help"
                        then case matchValueShared8 of {
-                              Nil -> putStr usage;
-                              _ -> sourceCommand mode paths (PrintSource False) Nil arguments
+                              [] -> putStr usage;
+                              _ -> sourceCommand mode paths (PrintSource False) [] arguments
                             }
                        else if MLF.Primitive.eqString matchValueShared7 "--llvm-runtime"
                             then case matchValueShared8 of {
-                                   Nil ->
+                                   [] ->
                                      do {
                                        path <- runtimePath;
                                        putStrLn path
                                      };
-                                   _ -> sourceCommand mode paths (PrintSource False) Nil arguments
+                                   _ -> sourceCommand mode paths (PrintSource False) [] arguments
                                  }
                             else if MLF.Primitive.eqString matchValueShared7 "--compile-crate"
                                  then case matchValueShared8 of {
-                                        Cons matchValueShared33 matchValueShared34 ->
+                                        (:) matchValueShared33 matchValueShared34 ->
                                           case matchValueShared34 of {
-                                            Cons matchValueShared35 matchValueShared36 ->
+                                            (:) matchValueShared35 matchValueShared36 ->
                                               if MLF.Primitive.eqString matchValueShared35 "-o"
                                               then case matchValueShared36 of {
-                                                     Cons matchValueShared37 matchValueShared38 ->
+                                                     (:) matchValueShared37 matchValueShared38 ->
                                                        case matchValueShared38 of {
-                                                         Nil ->
+                                                         [] ->
                                                            let {
                                                              file = matchValueShared33
                                                            } in
@@ -152,34 +152,34 @@ module MLF.Entry.Emlf where {
                                                                Crate.compileSpecFile file prefix;
                                                              case result of {
                                                                Left message -> fatal message;
-                                                               Right _ -> ioReturn Unit
+                                                               Right _ -> ioReturn ()
                                                              }
                                                            };
                                                          _ ->
                                                            sourceCommand mode paths
                                                              (PrintSource False)
-                                                             Nil
+                                                             []
                                                              arguments
                                                        };
                                                      _ ->
                                                        sourceCommand mode paths (PrintSource False)
-                                                         Nil
+                                                         []
                                                          arguments
                                                    }
-                                              else sourceCommand mode paths (PrintSource False) Nil
+                                              else sourceCommand mode paths (PrintSource False) []
                                                      arguments;
                                             _ ->
-                                              sourceCommand mode paths (PrintSource False) Nil
+                                              sourceCommand mode paths (PrintSource False) []
                                                 arguments
                                           };
                                         _ ->
-                                          sourceCommand mode paths (PrintSource False) Nil arguments
+                                          sourceCommand mode paths (PrintSource False) [] arguments
                                       }
                                  else if MLF.Primitive.eqString matchValueShared7 "--show-crate"
                                       then case matchValueShared8 of {
-                                             Cons matchValueShared31 matchValueShared32 ->
+                                             (:) matchValueShared31 matchValueShared32 ->
                                                case matchValueShared32 of {
-                                                 Nil ->
+                                                 [] ->
                                                    let {
                                                      file = matchValueShared31
                                                    } in
@@ -191,30 +191,30 @@ module MLF.Entry.Emlf where {
                                                      }
                                                    };
                                                  _ ->
-                                                   sourceCommand mode paths (PrintSource False) Nil
+                                                   sourceCommand mode paths (PrintSource False) []
                                                      arguments
                                                };
                                              _ ->
-                                               sourceCommand mode paths (PrintSource False) Nil
+                                               sourceCommand mode paths (PrintSource False) []
                                                  arguments
                                            }
                                       else if MLF.Primitive.eqString matchValueShared7
                                                 "--crate-to-llvm"
                                            then case matchValueShared8 of {
-                                                  Cons matchValueShared21 matchValueShared22 ->
+                                                  (:) matchValueShared21 matchValueShared22 ->
                                                     case matchValueShared22 of {
-                                                      Nil ->
+                                                      [] ->
                                                         let {
                                                           file = matchValueShared21
                                                         } in
-                                                        crateCommand EmitSource Nil file;
-                                                      Cons matchValueShared23 matchValueShared24 ->
+                                                        crateCommand EmitSource [] file;
+                                                      (:) matchValueShared23 matchValueShared24 ->
                                                         if MLF.Primitive.eqString matchValueShared23
                                                              "--cache"
                                                         then case matchValueShared24 of {
-                                                               Cons matchValueShared25 matchValueShared26 ->
+                                                               (:) matchValueShared25 matchValueShared26 ->
                                                                  case matchValueShared26 of {
-                                                                   Nil ->
+                                                                   [] ->
                                                                      let {
                                                                        file = matchValueShared21
                                                                      } in
@@ -222,14 +222,14 @@ module MLF.Entry.Emlf where {
                                                                        cache = matchValueShared25
                                                                      } in
                                                                      cachedCrateCommand cache file;
-                                                                   Cons matchValueShared27 matchValueShared28 ->
+                                                                   (:) matchValueShared27 matchValueShared28 ->
                                                                      if MLF.Primitive.eqString
                                                                           matchValueShared27
                                                                           "--query-report"
                                                                      then case matchValueShared28 of {
-                                                                            Cons matchValueShared29 matchValueShared30 ->
+                                                                            (:) matchValueShared29 matchValueShared30 ->
                                                                               case matchValueShared30 of {
-                                                                                Nil ->
+                                                                                [] ->
                                                                                   let {
                                                                                     file =
                                                                                       matchValueShared21
@@ -251,63 +251,63 @@ module MLF.Entry.Emlf where {
                                                                                     paths
                                                                                     (PrintSource
                                                                                        False)
-                                                                                    Nil
+                                                                                    []
                                                                                     arguments
                                                                               };
                                                                             _ ->
                                                                               sourceCommand mode
                                                                                 paths
                                                                                 (PrintSource False)
-                                                                                Nil
+                                                                                []
                                                                                 arguments
                                                                           }
                                                                      else sourceCommand mode paths
                                                                             (PrintSource False)
-                                                                            Nil
+                                                                            []
                                                                             arguments;
                                                                    _ ->
                                                                      sourceCommand mode paths
                                                                        (PrintSource False)
-                                                                       Nil
+                                                                       []
                                                                        arguments
                                                                  };
                                                                _ ->
                                                                  sourceCommand mode paths
                                                                    (PrintSource False)
-                                                                   Nil
+                                                                   []
                                                                    arguments
                                                              }
                                                         else sourceCommand mode paths
                                                                (PrintSource False)
-                                                               Nil
+                                                               []
                                                                arguments;
                                                       _ ->
                                                         sourceCommand mode paths (PrintSource False)
-                                                          Nil
+                                                          []
                                                           arguments
                                                     };
                                                   _ ->
-                                                    sourceCommand mode paths (PrintSource False) Nil
+                                                    sourceCommand mode paths (PrintSource False) []
                                                       arguments
                                                 }
                                            else if MLF.Primitive.eqString matchValueShared7
                                                      "--crate-to-llvm-gc"
                                                 then case matchValueShared8 of {
-                                                       Cons matchValueShared11 matchValueShared12 ->
+                                                       (:) matchValueShared11 matchValueShared12 ->
                                                          case matchValueShared12 of {
-                                                           Nil ->
+                                                           [] ->
                                                              let {
                                                                file = matchValueShared11
                                                              } in
-                                                             crateCommand EmitSource Nil file;
-                                                           Cons matchValueShared13 matchValueShared14 ->
+                                                             crateCommand EmitSource [] file;
+                                                           (:) matchValueShared13 matchValueShared14 ->
                                                              if MLF.Primitive.eqString
                                                                   matchValueShared13
                                                                   "--cache"
                                                              then case matchValueShared14 of {
-                                                                    Cons matchValueShared15 matchValueShared16 ->
+                                                                    (:) matchValueShared15 matchValueShared16 ->
                                                                       case matchValueShared16 of {
-                                                                        Nil ->
+                                                                        [] ->
                                                                           let {
                                                                             file =
                                                                               matchValueShared11
@@ -318,14 +318,14 @@ module MLF.Entry.Emlf where {
                                                                           } in
                                                                           cachedCrateCommand cache
                                                                             file;
-                                                                        Cons matchValueShared17 matchValueShared18 ->
+                                                                        (:) matchValueShared17 matchValueShared18 ->
                                                                           if MLF.Primitive.eqString
                                                                                matchValueShared17
                                                                                "--query-report"
                                                                           then case matchValueShared18 of {
-                                                                                 Cons matchValueShared19 matchValueShared20 ->
+                                                                                 (:) matchValueShared19 matchValueShared20 ->
                                                                                    case matchValueShared20 of {
-                                                                                     Nil ->
+                                                                                     [] ->
                                                                                        let {
                                                                                          file =
                                                                                            matchValueShared11
@@ -348,7 +348,7 @@ module MLF.Entry.Emlf where {
                                                                                          paths
                                                                                          (PrintSource
                                                                                             False)
-                                                                                         Nil
+                                                                                         []
                                                                                          arguments
                                                                                    };
                                                                                  _ ->
@@ -357,64 +357,64 @@ module MLF.Entry.Emlf where {
                                                                                      paths
                                                                                      (PrintSource
                                                                                         False)
-                                                                                     Nil
+                                                                                     []
                                                                                      arguments
                                                                                }
                                                                           else sourceCommand mode
                                                                                  paths
                                                                                  (PrintSource False)
-                                                                                 Nil
+                                                                                 []
                                                                                  arguments;
                                                                         _ ->
                                                                           sourceCommand mode paths
                                                                             (PrintSource False)
-                                                                            Nil
+                                                                            []
                                                                             arguments
                                                                       };
                                                                     _ ->
                                                                       sourceCommand mode paths
                                                                         (PrintSource False)
-                                                                        Nil
+                                                                        []
                                                                         arguments
                                                                   }
                                                              else sourceCommand mode paths
                                                                     (PrintSource False)
-                                                                    Nil
+                                                                    []
                                                                     arguments;
                                                            _ ->
                                                              sourceCommand mode paths
                                                                (PrintSource False)
-                                                               Nil
+                                                               []
                                                                arguments
                                                          };
                                                        _ ->
                                                          sourceCommand mode paths
                                                            (PrintSource False)
-                                                           Nil
+                                                           []
                                                            arguments
                                                      }
                                                 else if MLF.Primitive.eqString matchValueShared7
                                                           "--link-crate"
                                                      then case matchValueShared8 of {
-                                                            Cons matchValueShared9 matchValueShared10 ->
+                                                            (:) matchValueShared9 matchValueShared10 ->
                                                               case matchValueShared10 of {
-                                                                Nil ->
+                                                                [] ->
                                                                   let {
                                                                     file = matchValueShared9
                                                                   } in
                                                                   crateCommand (PrintSource False)
-                                                                    Nil
+                                                                    []
                                                                     file;
                                                                 _ ->
                                                                   sourceCommand mode paths
                                                                     (PrintSource False)
-                                                                    Nil
+                                                                    []
                                                                     arguments
                                                               };
                                                             _ ->
                                                               sourceCommand mode paths
                                                                 (PrintSource False)
-                                                                Nil
+                                                                []
                                                                 arguments
                                                           }
                                                      else if MLF.Primitive.eqString
@@ -424,7 +424,7 @@ module MLF.Entry.Emlf where {
                                                                  rest = matchValueShared8
                                                                } in
                                                                case splitArguments rest of {
-                                                                 Pair (Cons file Nil) args ->
+                                                                 (,) ((:) file []) args ->
                                                                    crateCommand RunSource args file;
                                                                  _ -> fatal usage
                                                                }
@@ -436,7 +436,7 @@ module MLF.Entry.Emlf where {
                                                                     } in
                                                                     sourceCommand mode paths
                                                                       (PrintSource True)
-                                                                      Nil
+                                                                      []
                                                                       rest
                                                                else if MLF.Primitive.eqString
                                                                          matchValueShared7
@@ -446,7 +446,7 @@ module MLF.Entry.Emlf where {
                                                                          } in
                                                                          sourceCommand mode paths
                                                                            EmitSource
-                                                                           Nil
+                                                                           []
                                                                            rest
                                                                     else if MLF.Primitive.eqString
                                                                               matchValueShared7
@@ -458,7 +458,7 @@ module MLF.Entry.Emlf where {
                                                                               sourceCommand mode
                                                                                 paths
                                                                                 EmitSource
-                                                                                Nil
+                                                                                []
                                                                                 rest
                                                                          else if MLF.Primitive.eqString
                                                                                    matchValueShared7
@@ -469,7 +469,7 @@ module MLF.Entry.Emlf where {
                                                                                    } in
                                                                                    targetCommand
                                                                                      CheckTarget
-                                                                                     Nil
+                                                                                     []
                                                                                      rest
                                                                               else if MLF.Primitive.eqString
                                                                                         matchValueShared7
@@ -480,7 +480,7 @@ module MLF.Entry.Emlf where {
                                                                                         } in
                                                                                         targetCommand
                                                                                           EmitTarget
-                                                                                          Nil
+                                                                                          []
                                                                                           rest
                                                                                    else if MLF.Primitive.eqString
                                                                                              matchValueShared7
@@ -491,7 +491,7 @@ module MLF.Entry.Emlf where {
                                                                                              } in
                                                                                              targetCommand
                                                                                                EmitTarget
-                                                                                               Nil
+                                                                                               []
                                                                                                rest
                                                                                         else if MLF.Primitive.eqString
                                                                                                   matchValueShared7
@@ -502,7 +502,7 @@ module MLF.Entry.Emlf where {
                                                                                                   } in
                                                                                                   targetCommand
                                                                                                     EmitIOTarget
-                                                                                                    Nil
+                                                                                                    []
                                                                                                     rest
                                                                                              else if MLF.Primitive.eqString
                                                                                                        matchValueShared7
@@ -513,7 +513,7 @@ module MLF.Entry.Emlf where {
                                                                                                        } in
                                                                                                        targetCommand
                                                                                                          EmitIOTarget
-                                                                                                         Nil
+                                                                                                         []
                                                                                                          rest
                                                                                                   else if MLF.Primitive.eqString
                                                                                                             matchValueShared7
@@ -524,7 +524,7 @@ module MLF.Entry.Emlf where {
                                                                                                             } in
                                                                                                             case splitArguments
                                                                                                                    rest of {
-                                                                                                              Pair source arguments ->
+                                                                                                              (,) source arguments ->
                                                                                                                 sourceCommand
                                                                                                                   mode
                                                                                                                   paths
@@ -541,7 +541,7 @@ module MLF.Entry.Emlf where {
                                                                                                                  } in
                                                                                                                  case splitArguments
                                                                                                                         rest of {
-                                                                                                                   Pair source arguments ->
+                                                                                                                   (,) source arguments ->
                                                                                                                      targetCommand
                                                                                                                        RunTarget
                                                                                                                        arguments
@@ -556,7 +556,7 @@ module MLF.Entry.Emlf where {
                                                                                                                       } in
                                                                                                                       case splitArguments
                                                                                                                              rest of {
-                                                                                                                        Pair source arguments ->
+                                                                                                                        (,) source arguments ->
                                                                                                                           targetCommand
                                                                                                                             RunProgramTarget
                                                                                                                             arguments
@@ -567,20 +567,20 @@ module MLF.Entry.Emlf where {
                                                                                                                         paths
                                                                                                                         (PrintSource
                                                                                                                            False)
-                                                                                                                        Nil
+                                                                                                                        []
                                                                                                                         arguments;
-      _ -> sourceCommand mode paths (PrintSource False) Nil arguments
+      _ -> sourceCommand mode paths (PrintSource False) [] arguments
     };
   -- The frozen legacy seed bridge uses this native identity. The final shared
   -- source reads the host-specific constant from the stable primitive facade.
   producerHost :: String;
   producerHost = implementationHost;
-  checkSharedFiles :: List String -> IO Unit;
+  checkSharedFiles :: [] String -> IO ();
   checkSharedFiles files =
     do {
       if L.null files
       then fatal "--check-shared requires a complete module source list"
-      else ioReturn Unit;
+      else ioReturn ();
       sources <-
         L.mapM
           (\file ->
@@ -623,19 +623,19 @@ module MLF.Entry.Emlf where {
           }
       }
     };
-  splitArguments :: List String -> Pair (List String) (List String);
+  splitArguments :: [] String -> (,) ([] String) ([] String);
   splitArguments arguments =
     let {
       matchValueShared39 = arguments
     } in
     case matchValueShared39 of {
-      Nil -> Pair Nil Nil;
-      Cons matchValueShared40 matchValueShared41 ->
+      [] -> (,) [] [];
+      (:) matchValueShared40 matchValueShared41 ->
         if MLF.Primitive.eqString matchValueShared40 "--"
         then let {
                rest = matchValueShared41
              } in
-             Pair Nil rest
+             (,) [] rest
         else let {
                rest = matchValueShared41
              } in
@@ -643,34 +643,34 @@ module MLF.Entry.Emlf where {
                a = matchValueShared40
              } in
              case splitArguments rest of {
-               Pair source program -> Pair (Cons a source) program
+               (,) source program -> (,) ((:) a source) program
              }
     };
-  parseSource :: Bool -> List String -> Either String Source;
+  parseSource :: Bool -> [] String -> Either String Source;
   parseSource expression arguments =
     let {
       matchValueShared42 = arguments
     } in
     case matchValueShared42 of {
-      Nil -> Right SourceStdin;
-      Cons matchValueShared43 matchValueShared44 ->
+      [] -> Right SourceStdin;
+      (:) matchValueShared43 matchValueShared44 ->
         if MLF.Primitive.eqString matchValueShared43 "-"
         then case matchValueShared44 of {
-               Nil -> Right SourceStdin;
+               [] -> Right SourceStdin;
                _ -> Left usage
              }
         else if MLF.Primitive.eqString matchValueShared43 "--expr"
              then case matchValueShared44 of {
-                    Cons matchValueShared45 matchValueShared46 ->
+                    (:) matchValueShared45 matchValueShared46 ->
                       case matchValueShared46 of {
-                        Nil ->
+                        [] ->
                           let {
                             text = matchValueShared45
                           } in
                           if expression then Right (SourceText "<expression>" text) else Left usage;
                         _ -> Left usage
                       };
-                    Nil ->
+                    [] ->
                       let {
                         file = matchValueShared43
                       } in
@@ -680,7 +680,7 @@ module MLF.Entry.Emlf where {
                     _ -> Left usage
                   }
              else case matchValueShared44 of {
-                    Nil ->
+                    [] ->
                       let {
                         file = matchValueShared43
                       } in
@@ -691,7 +691,7 @@ module MLF.Entry.Emlf where {
                   };
       _ -> Left usage
     };
-  sourceCommand :: PreludeMode -> List String -> Command -> List String -> List String -> IO Unit;
+  sourceCommand :: PreludeMode -> [] String -> Command -> [] String -> [] String -> IO ();
   sourceCommand mode paths command programArguments arguments =
     case parseSource True arguments of {
       Left message -> fatal message;
@@ -715,7 +715,7 @@ module MLF.Entry.Emlf where {
                   do {
                     putStrLn ((if onlyType then "" else "-- type: ") ++ C.sourceType result);
                     if onlyType
-                    then ioReturn Unit
+                    then ioReturn ()
                     else putStrLn (Pretty.prettyTerm (C.compiledTerm result))
                   };
                 RunSource -> execute programArguments (C.compiledTerm result);
@@ -725,7 +725,7 @@ module MLF.Entry.Emlf where {
           }
         }
     };
-  load :: Source -> IO (Pair String String);
+  load :: Source -> IO ((,) String String);
   load source =
     case source of {
       SourceFile file ->
@@ -734,18 +734,18 @@ module MLF.Entry.Emlf where {
           if present
           then do {
                  input <- readFile file;
-                 ioReturn (Pair file input)
+                 ioReturn ((,) file input)
                }
           else fatal ("file does not exist: " ++ file)
         };
-      SourceText file input -> ioReturn (Pair file input);
+      SourceText file input -> ioReturn ((,) file input);
       SourceStdin ->
         do {
           input <- getContents;
-          ioReturn (Pair "<stdin>" input)
+          ioReturn ((,) "<stdin>" input)
         }
     };
-  targetCommand :: Command -> List String -> List String -> IO Unit;
+  targetCommand :: Command -> [] String -> [] String -> IO ();
   targetCommand command programArguments arguments =
     case parseSource False arguments of {
       Left message -> fatal message;
@@ -753,7 +753,7 @@ module MLF.Entry.Emlf where {
         do {
           boundValueShared47 <- load source;
           case boundValueShared47 of {
-            Pair file input ->
+            (,) file input ->
               do {
                 case Parse.parseTerm file input of {
                   Left message -> fatal message;
@@ -770,7 +770,7 @@ module MLF.Entry.Emlf where {
                           result <- Runtime.runProgramWithArguments programArguments term;
                           case result of {
                             Left message -> panic message;
-                            Right ignored -> ioReturn Unit
+                            Right ignored -> ioReturn ()
                           }
                         };
                       EmitTarget -> printLLVM (LLVM.emitLLVMChunks term);
@@ -782,26 +782,26 @@ module MLF.Entry.Emlf where {
           }
         }
     };
-  execute :: List String -> XTerm -> IO Unit;
+  execute :: [] String -> XTerm -> IO ();
   execute args term =
     do {
       result <- Runtime.runTermWithArguments args term;
       case result of {
         Left message -> panic message;
-        Right ignored -> ioReturn Unit
+        Right ignored -> ioReturn ()
       }
     };
-  printLLVM :: Either String (List String) -> IO Unit;
+  printLLVM :: Either String ([] String) -> IO ();
   printLLVM result =
     case result of {
       Left message -> fatal message;
       Right chunks -> printChunks chunks
     };
-  printChunks :: List String -> IO Unit;
+  printChunks :: [] String -> IO ();
   printChunks chunks =
     case chunks of {
-      Nil -> ioReturn Unit;
-      Cons chunk rest ->
+      [] -> ioReturn ();
+      (:) chunk rest ->
         do {
           putStr chunk;
           printChunks rest
@@ -827,14 +827,14 @@ module MLF.Entry.Emlf where {
     else if ((stringCodeAt path i == 47) || (stringCodeAt path i == 92))
          then i
          else lastSlash path (i - 1);
-  ancestors :: String -> List String;
+  ancestors :: String -> [] String;
   ancestors path =
-    Cons path (if eqString (directory path) path then Nil else ancestors (directory path));
-  chooseRuntime :: List String -> IO String;
+    (:) path (if eqString (directory path) path then [] else ancestors (directory path));
+  chooseRuntime :: [] String -> IO String;
   chooseRuntime paths =
     case paths of {
-      Nil -> fatal "Cannot find runtime/mlf_runtime.c beside the compiler or current directory.";
-      Cons path rest ->
+      [] -> fatal "Cannot find runtime/mlf_runtime.c beside the compiler or current directory.";
+      (:) path rest ->
         do {
           c <- fileExists (path ++ "/runtime/mlf_runtime.c");
           h <- fileExists (path ++ "/runtime/mlf_runtime.h");

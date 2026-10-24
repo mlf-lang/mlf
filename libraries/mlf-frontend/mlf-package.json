@@ -20,6 +20,7 @@
       "Bootstrap.Parsec": "Bootstrap/Parsec.hs",
       "Bootstrap.Parser": "Bootstrap/Parser.hs",
       "Bootstrap.Prelude": "Bootstrap/Prelude.hs",
+      "Bootstrap.Standalone": "Bootstrap/Standalone.hs",
       "Bootstrap.Surface": "Bootstrap/Surface.hs"
     }
   },

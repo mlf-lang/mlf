@@ -5,30 +5,30 @@
 module Bootstrap.Types where {
   import MLF.Primitive;
   -- Shared data representations. This module is deliberately dependency-free.
-  data List a = Nil | Cons a (List a);
-  data Pair a b = Pair a b;
-  data Triple a b c = Triple a b c;
-  data Quad a b c d = Quad a b c d;
+
+
+
+
   data Maybe a = Nothing | Just a;
   data Either e a = Left e | Right a;
   data Map k v = MapEmpty | MapNode Int k v (Map k v) (Map k v);
-  data Set a = Set (Map a Unit);
+  data Set a = Set (Map a ());
   data IntMap a = IntMap (Map Int a);
-  data IntSet = IntSet (Map Int Unit);
+  data IntSet = IntSet (Map Int ());
   data Kind = Star | KArrow Kind Kind;
   data Flag = Flexible | Rigid;
   data Field =
     Parameter String |
     Function Field Field |
-    Applied String (List Field) |
+    Applied String ([] Field) |
     Application Field Field |
     Quantified String Kind Field;
-  data ConstructorDecl = ConstructorDecl String (List Field);
+  data ConstructorDecl = ConstructorDecl String ([] Field);
   data DataDecl =
-    DataDecl String (List String) (List ConstructorDecl) |
-    DataDeclK String (List (Pair String Kind)) (List ConstructorDecl);
+    DataDecl String ([] String) ([] ConstructorDecl) |
+    DataDeclK String ([] ((,) String Kind)) ([] ConstructorDecl);
   data DataEnv =
-    DataEnv (Map String DataDecl) (Map String (Pair DataDecl ConstructorDecl)) (Map String Kind);
+    DataEnv (Map String DataDecl) (Map String ((,) DataDecl ConstructorDecl)) (Map String Kind);
   data Primitive =
     PIOReturn |
     PIOBind |
@@ -124,18 +124,31 @@ module Bootstrap.Types where {
     PAsyncStep |
     PAsyncEnqueue |
     PAsyncDelay |
-    PAsyncWait;
+    PAsyncWait |
+    PTextToChars |
+    PTextFromChars |
+    PCharCode |
+    PCharFromCode |
+    PUserError |
+    PIOError |
+    PCatchIOError |
+    PIOErrorString |
+    PEmptyCallStack |
+    PPushCallStack |
+    PPrettyCallStack |
+    PIOErrorWithStack;
   data SType =
     STVar String |
     SBottom |
     SBottomKind Kind |
     SArrow SType SType |
-    SCon String (List SType) |
+    SCon String ([] SType) |
     STypeApp SType SType |
     SForall Flag String SType SType |
-    SQualified (List SPredicate) SType;
-  data SAnnotation = SAnnotation (List String) SType;
+    SQualified ([] SPredicate) SType;
+  data SAnnotation = SAnnotation ([] String) SType;
   data RecursiveMode = InferRecursive | CheckRecursive SAnnotation;
+  data SourceSpan = SourceSpan String String String Int Int Int Int;
   data SExpr =
     SVar String |
     SConstructor String |
@@ -150,54 +163,61 @@ module Bootstrap.Types where {
     SBoolLit Bool |
     SStringLit String |
     SPrimitive Primitive |
-    SCase SExpr (List SAlternative) |
-    SDo (List SStatement) SExpr |
-    SEquations (List (Pair (List SPattern) SExpr)) |
-    SLetRec (List (Triple String RecursiveMode SExpr)) SExpr |
-    SWanted String (List (Pair EvidenceRole String)) |
-    SChecked SType SExpr;
+    SCase SExpr ([] SAlternative) |
+    SDo ([] SStatement) SExpr |
+    SEquations ([] ((,) ([] SPattern) SExpr)) |
+    SLetRec ([] ((,,) String RecursiveMode SExpr)) SExpr |
+    SWanted String ([] ((,) EvidenceRole String)) |
+    SChecked SType SExpr |
+    SSourceDefinition SExpr |
+    SCallSite String SourceSpan SExpr |
+    SSharedBind SPattern SExpr SExpr SExpr SExpr;
+  data SourceString = ScalarString String | CharString ([] Int);
   data SPattern =
-    SConstructorPattern String (List (Maybe String)) |
+    SConstructorPattern String ([] (Maybe String)) |
     SDefaultPattern (Maybe String) |
-    SNestedPattern String (List SPattern) |
+    SNestedPattern String ([] SPattern) |
     SAnnotatedPattern String SAnnotation |
     SIntPattern Int |
     SStringPattern String |
-    SBoolPattern Bool;
+    SOverloadedStringPattern SourceString String String |
+    SBoolPattern Bool |
+    SAsPattern String SPattern |
+    SLazyPattern SPattern;
   data SAlternative = SAlternative SPattern SExpr;
   data SStatement =
     SDoBind SPattern SExpr |
     SDoThen SExpr |
     SDoLet String (Maybe SAnnotation) SExpr |
-    SDoLetRec (List (Triple String RecursiveMode SExpr));
-  data SPredicate = SPredicate String (List SType);
+    SDoLetRec ([] ((,,) String RecursiveMode SExpr));
+  data SPredicate = SPredicate String ([] SType);
   data SClassDecl =
-    SClassDecl String (List (Pair String Kind)) (List SPredicate) (List (Pair String SType));
+    SClassDecl String ([] ((,) String Kind)) ([] SPredicate) ([] ((,) String SType));
   data SInstanceDecl =
-    SInstanceDecl (List (Pair String Kind)) (List SPredicate) String (List SType) (List
-                                                                                   (Pair String
+    SInstanceDecl ([] ((,) String Kind)) ([] SPredicate) String ([] SType) ([]
+                                                                                   ((,) String
                                                                                     SExpr));
   data EvidenceRole = GivenEvidence | SuperclassEvidence | InstanceEvidence;
   data SProgram =
-    SProgram (List DataDecl) SExpr |
-    SClassProgram (List DataDecl) (List SClassDecl) (List SInstanceDecl) SExpr;
-  data SourceSyntax = LegacyEmlfV1 | SharedHaskellV1;
+    SProgram ([] DataDecl) SExpr |
+    SClassProgram ([] DataDecl) ([] SClassDecl) ([] SInstanceDecl) SExpr;
+  data SourceSyntax = LegacyEmlfV1 | SharedHaskellV1 | MetadataSyntax;
   data SourceModule =
-    SourceModule String (Maybe String) (Maybe (List Export)) (List Import) (List DataDecl) (List
-                                                                                            SClassDecl) (List
-                                                                                                         SInstanceDecl) (List
-                                                                                                                         (Triple
+    SourceModule String (Maybe String) (Maybe ([] Export)) ([] Import) ([] DataDecl) ([]
+                                                                                            SClassDecl) ([]
+                                                                                                         SInstanceDecl) ([]
+                                                                                                                         ((,,)
                                                                                                                           String
                                                                                                                           (Maybe
                                                                                                                            SAnnotation)
                                                                                                                           SExpr)) (Maybe
                                                                                                                                    SExpr) SourceSyntax;
   data Import = Import String Bool (Maybe String) Selection;
-  data Selection = Everything | Only (List Export) | Hiding (List Export);
+  data Selection = Everything | Only ([] Export) | Hiding ([] Export);
   data Export = ExportValue String | ExportType String Members | ExportModule String;
-  data Members = Abstract | AllMembers | Members (List String);
+  data Members = Abstract | AllMembers | Members ([] String);
   data PreludeMode = ImplicitPrelude | NoImplicitPrelude;
-  data LinkedModule = LinkedModule SProgram (Map String String) (Map String IntSet) (List IntSet);
+  data LinkedModule = LinkedModule SProgram (Map String String) (Map String IntSet) ([] IntSet);
   data XTyVar = XTyVar Int;
   data XName = XName Int String;
   data XType =
@@ -205,7 +225,7 @@ module Bootstrap.Types where {
     XBot |
     XBotKind Kind |
     XArrow XType XType |
-    XCon String (List XType) |
+    XCon String ([] XType) |
     XApply XType XType |
     XForall XTyVar XType XType;
   data XComputation =
@@ -225,16 +245,16 @@ module Bootstrap.Types where {
     XTypeAbs XTyVar XType XTerm |
     XTypeApp XTerm XComputation |
     XLet XName XTerm XTerm |
-    XLetRec (List (Triple XName XType XTerm)) XTerm |
+    XLetRec ([] ((,,) XName XType XTerm)) XTerm |
     XIntTerm Int |
     XDoubleTerm Double |
     XBoolTerm Bool |
     XStringTerm String |
-    XPrimitive Primitive (List XType) |
-    XConstructor String (List XType) |
-    XCase XTerm XType (List XAlternative) |
-    XWithData (List DataDecl) XTerm;
-  data XPattern = XConstructorPattern String (List (Maybe XName)) | XDefaultPattern (Maybe XName);
+    XPrimitive Primitive ([] XType) |
+    XConstructor String ([] XType) |
+    XCase XTerm XType ([] XAlternative) |
+    XWithData ([] DataDecl) XTerm;
+  data XPattern = XConstructorPattern String ([] (Maybe XName)) | XDefaultPattern (Maybe XName);
   data XAlternative = XAlternative XPattern XTerm;
   data XErased =
     XEVar XName |
@@ -246,17 +266,17 @@ module Bootstrap.Types where {
     XEBool Bool |
     XEString String |
     XEPrimitive Primitive |
-    XELetRec (List (Pair XName XErased)) XErased |
+    XELetRec ([] ((,) XName XErased)) XErased |
     XEEvidenceHole Int |
     XEConstructor String |
-    XECase XErased (List XErasedAlternative);
+    XECase XErased ([] XErasedAlternative);
   data XErasedAlternative = XErasedAlternative XPattern XErased;
   data XEnv = XEnv (Map XTyVar XType) (Map XName XType);
   data GTag =
     GBot |
     GBotK Kind |
     GArr Int Int |
-    GCon String (List Int) |
+    GCon String ([] Int) |
     GTyCon String Kind |
     GSkolem Int Kind |
     GTyApp Int Int |
@@ -264,7 +284,7 @@ module Bootstrap.Types where {
   data Node = Node GTag (Maybe Int) Flag;
   data Graph = Graph (IntMap Node) (IntMap Int) Int;
   data Permission = Green | Orange | Red | Inert;
-  data ScopeIndex = ScopeIndex (IntMap (Pair Int Int)) (List (IntMap Int));
+  data ScopeIndex = ScopeIndex (IntMap ((,) Int Int)) ([] (IntMap Int));
   data Solver = Solver Graph (IntMap IntSet) (IntMap IntSet) ScopeIndex;
   data Edge = Edge Int Int;
   data Typed = Typed Int Form;
@@ -279,17 +299,17 @@ module Bootstrap.Types where {
     FDoubleLiteral Double |
     FBooleanLiteral Bool |
     FStringLiteral String |
-    FPrimitive Primitive (List Int) |
-    FConstructor String (List Int) |
-    FMatch Typed Edge (List Branch) |
-    FRecursive (List RecursiveDefinition) Typed Edge |
-    FEvidence (List EvidenceBinding) |
-    FChecked (List (Pair XTyVar Kind)) Typed Edge;
+    FPrimitive Primitive ([] Int) |
+    FConstructor String ([] Int) |
+    FMatch Typed Edge ([] Branch) |
+    FRecursive ([] RecursiveDefinition) Typed Edge |
+    FEvidence ([] EvidenceBinding) |
+    FChecked ([] ((,) XTyVar Kind)) Typed Edge;
   data RecursiveClosure = RecursiveClosure Int (IntMap Int);
   data RecursiveDefinition = RecursiveDefinition XName Int Typed Edge (Maybe RecursiveClosure);
   data Branch = Branch XPattern Typed Edge;
   data EvidenceBinding = EvidenceBinding EvidenceRole XName Int Bool | DeclaredEvidenceBinding EvidenceRole XName XType;
-  data Constraints = Constraints Graph Typed (List (Pair Int Int)) (List Edge);
+  data Constraints = Constraints Graph Typed ([] ((,) Int Int)) ([] Edge);
   data Core =
     CVar String |
     CLam String Core |
@@ -302,9 +322,9 @@ module Bootstrap.Types where {
     CString String |
     CPrimitive Primitive |
     CConstructor String |
-    CCase Core (List (Pair SPattern Core)) |
-    CRec (List (Triple String RecursiveMode Core)) Core |
-    CWanted String (List (Pair EvidenceRole String)) |
+    CCase Core ([] ((,) SPattern Core)) |
+    CRec ([] ((,,) String RecursiveMode Core)) Core |
+    CWanted String ([] ((,) EvidenceRole String)) |
     CChecked SType SExpr;
   data Binding = Mono XName Int | Poly XName Int | DeclaredPoly XName Int XType | RecursiveMono XName Int Int;
   data Phase = Parsing | ModuleResolution | Inference | Resolution | Elaboration | Verification;

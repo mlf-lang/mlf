@@ -11,15 +11,15 @@ import qualified Tests.EmbeddingPruning as E
 main = do
  args <- O.allArguments
  case args of
-  Cons "GraphReference" Nil -> G.main
-  Cons "GraphScopesReference" Nil -> Sc.main
-  Cons "GraphDenseReference" Nil -> D.main
-  Cons "OrderedTraversalReference" Nil -> T.main
-  Cons "EmbeddingPruningReference" Nil -> E.pruningConformance
-  Cons "InferenceReference" rest -> case I.fixtures of
+  (:) "GraphReference" [] -> G.main
+  (:) "GraphScopesReference" [] -> Sc.main
+  (:) "GraphDenseReference" [] -> D.main
+  (:) "OrderedTraversalReference" [] -> T.main
+  (:) "EmbeddingPruningReference" [] -> E.pruningConformance
+  (:) "InferenceReference" rest -> case I.fixtures of
    Left error -> O.fatal error
    Right fixtures -> case rest of
-    Nil -> S.mapM_ (\fixture -> putStrLn (I.report fixture)) fixtures
-    Cons "--generate" Nil -> putStr (I.program fixtures)
+    [] -> S.mapM_ (\fixture -> putStrLn (I.report fixture)) fixtures
+    (:) "--generate" [] -> putStr (I.program fixtures)
     _ -> O.fatal "invalid inference reference arguments"
   _ -> O.fatal "invalid reference selection"

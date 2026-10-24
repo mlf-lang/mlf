@@ -60,7 +60,7 @@ module Package.Benchmark where {
       maximum = S.max 6 size
     } in
     S.intercalate "\n"
-      (Cons
+      ((:)
          ("stretch tree of depth " ++
           (showInt (maximum + 1) ++ (" check: " ++ showInt (power 2 (maximum + 2) - 1))))
          (S.snoc
@@ -77,7 +77,7 @@ module Package.Benchmark where {
              (showInt maximum ++ (" check: " ++ showInt (power 2 (maximum + 1) - 1))))));
   factorial :: Int -> Int;
   factorial n = S.product (S.range 1 n);
-  unrank :: Int -> Int -> List Int -> List Int;
+  unrank :: Int -> Int -> [] Int -> [] Int;
   unrank n remaining permutation =
     if (n <= 0)
     then permutation
@@ -90,7 +90,7 @@ module Package.Benchmark where {
          unrank (n - 1) (remInt remaining (factorial n))
            (S.append (S.append (S.drop rotation front) (S.take rotation front))
               (S.drop (n + 1) permutation));
-  flips :: List Int -> Int -> Int;
+  flips :: [] Int -> Int -> Int;
   flips permutation count =
     let {
       end = S.head permutation
@@ -98,16 +98,16 @@ module Package.Benchmark where {
     if (end == 1)
     then count
     else flips (S.append (S.reverse (S.take end permutation)) (S.drop end permutation)) (count + 1);
-  fannkuch :: Int -> Pair Int Int;
+  fannkuch :: Int -> (,) Int Int;
   fannkuch size =
     S.foldl
-      (\(Pair checksum maximum) rank ->
+      (\((,) checksum maximum) rank ->
          let {
            count = flips (unrank (size - 1) rank (S.range 1 size)) 0
          } in
-         Pair (checksum + (if (remInt rank 2 == 0) then count else (0 - count)))
+         (,) (checksum + (if (remInt rank 2 == 0) then count else (0 - count)))
            (S.max maximum count))
-      (Pair 0 0)
+      ((,) 0 0)
       (S.range 0 (factorial size - 1));
   wrap :: Int -> String -> String;
   wrap width text =
@@ -120,28 +120,28 @@ module Package.Benchmark where {
   alu :: String;
   alu =
     "GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACATGGTGAAACCCCGTCTCTACTAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAATCCCAGCTACTCGGGAGGCTGAGGCAGGAGAATCGCTTGAACCCGGGAGGCGGAGGTTGCAGTGAGCCGAGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACTCCGTCTCAAAAA";
-  iubBounds = Cons 27 (Cons 39 (Cons 51 (Cons 78 (S.map (\n -> (78 + (2 * n))) (S.range 1 11)))));
-  humanBounds :: List Int;
+  iubBounds = (:) 27 ((:) 39 ((:) 51 ((:) 78 (S.map (\n -> (78 + (2 * n))) (S.range 1 11)))));
+  humanBounds :: [] Int;
   humanBounds =
-    Cons 3029549426680 (Cons 5009432431601 (Cons 6984905497992 (Cons 10000000000000 Nil)));
-  choose :: String -> Int -> Int -> List Int -> Int -> String;
+    (:) 3029549426680 ((:) 5009432431601 ((:) 6984905497992 ((:) 10000000000000 [])));
+  choose :: String -> Int -> Int -> [] Int -> Int -> String;
   choose letters scale seed bounds index =
     case bounds of {
-      Cons bound rest ->
+      (:) bound rest ->
         if ((seed * scale) < (bound * 139968))
         then O.char letters index
         else choose letters scale seed rest (index + 1);
-      Nil -> panic "RNG probability bounds exhausted"
+      [] -> panic "RNG probability bounds exhausted"
     };
-  randomSequence :: Int -> Int -> String -> Int -> List Int -> Pair String Int;
+  randomSequence :: Int -> Int -> String -> Int -> [] Int -> (,) String Int;
   randomSequence count seed letters scale bounds =
     if (count == 0)
-    then Pair "" seed
+    then (,) "" seed
     else let {
            next = remInt ((seed * 3877) + 29573) 139968
          } in
          case randomSequence (count - 1) next letters scale bounds of {
-           Pair suffix final -> Pair (choose letters scale next bounds 0 ++ suffix) final
+           (,) suffix final -> (,) (choose letters scale next bounds 0 ++ suffix) final
          };
   fasta :: Int -> String;
   fasta size =
@@ -151,26 +151,26 @@ module Package.Benchmark where {
           (S.map (\i -> O.char alu (remInt i (stringLength alu))) (S.range 0 ((2 * size) - 1)))
     } in
     case randomSequence (3 * size) 42 "acgtBDHKMNRSVWY" 100 iubBounds of {
-      Pair second seed ->
+      (,) second seed ->
         case randomSequence (5 * size) seed "acgt" 10000000000000 humanBounds of {
-          Pair third final ->
+          (,) third final ->
             (">ONE Homo sapiens alu\n" ++
              (wrap 60 first ++
               (">TWO IUB ambiguity codes\n" ++
                (wrap 60 second ++ (">THREE Homo sapiens frequency\n" ++ wrap 60 third)))))
         }
     };
-  records :: String -> List (Pair String String);
-  records text = parseRecords "" "" Nil (O.lines text);
+  records :: String -> [] ((,) String String);
+  records text = parseRecords "" "" [] (O.lines text);
   parseRecords :: String ->
-                  String -> List (Pair String String) -> List String -> List (Pair String String);
+                  String -> [] ((,) String String) -> [] String -> [] ((,) String String);
   parseRecords header sequence done lines =
     case lines of {
-      Nil -> S.reverse (if eqString header "" then done else Cons (Pair header sequence) done);
-      Cons line rest ->
+      [] -> S.reverse (if eqString header "" then done else (:) ((,) header sequence) done);
+      (:) line rest ->
         if O.starts ">" line
         then parseRecords line ""
-               (if eqString header "" then done else Cons (Pair header sequence) done)
+               (if eqString header "" then done else (:) ((,) header sequence) done)
                rest
         else parseRecords header (sequence ++ line) done rest
     };
@@ -203,7 +203,7 @@ module Package.Benchmark where {
   reverseComplement text =
     S.concatStrings
       (S.map
-         (\(Pair header sequence) ->
+         (\((,) header sequence) ->
             (header ++
              ("\n" ++
               wrap 60
@@ -212,13 +212,13 @@ module Package.Benchmark where {
                       (S.reverse (S.range 0 (stringLength sequence - 1))))))))
          (records text));
   queries = O.words "GGT GGTA GGTATT GGTATTTTAATT GGTATTTTAATTTATAGT";
-  windows :: Int -> String -> List String;
+  windows :: Int -> String -> [] String;
   windows width sequence =
     S.map (\i -> stringSlice sequence i width) (S.range 0 (stringLength sequence - width));
   counts :: Int -> String -> Map String Int;
   counts width sequence =
-    M.fromListWith compareString addInt (S.map (\key -> Pair key 1) (windows width sequence));
-  percent :: String -> Int -> Int -> List String;
+    M.fromListWith compareString addInt (S.map (\key -> (,) key 1) (windows width sequence));
+  percent :: String -> Int -> Int -> [] String;
   percent key value total =
     let {
       lower = quotInt (100000 * value) total
@@ -236,8 +236,8 @@ module Package.Benchmark where {
     let {
       options =
         if ((2 * remainder) == total)
-        then Cons nearest (Cons (if (nearest == lower) then (lower + 1) else lower) Nil)
-        else Cons nearest Nil
+        then (:) nearest ((:) (if (nearest == lower) then (lower + 1) else lower) [])
+        else (:) nearest []
     } in
     S.map
       (\n ->
@@ -251,13 +251,13 @@ module Package.Benchmark where {
              (S.concatStrings (S.replicate (3 - stringLength fraction) "0") ++
               (fraction ++ "\n")))))))
       options;
-  nucleotideLines :: String -> List (List String);
+  nucleotideLines :: String -> [] ([] String);
   nucleotideLines text =
     let {
       sequence =
         upper
           (S.maybe "" S.snd
-             (S.find (\(Pair header _) -> eqString (S.head (O.words header)) ">THREE")
+             (S.find (\((,) header _) -> eqString (S.head (O.words header)) ">THREE")
                 (records text)))
     } in
     S.concatMap
@@ -272,23 +272,23 @@ module Package.Benchmark where {
               let {
                 sorted =
                   S.sortBy
-                    (\(Pair a x) (Pair b y) ->
+                    (\((,) a x) ((,) b y) ->
                        if (x > y) then (-1) else if (x < y) then 1 else compareString a b)
                     (M.toList table)
               } in
-              S.snoc (S.map (\(Pair key value) -> percent key value total) sorted) (Cons "\n" Nil)
+              S.snoc (S.map (\((,) key value) -> percent key value total) sorted) ((:) "\n" [])
          else let {
                 key =
                   S.fromMaybe (panic "missing nucleotide query")
                     (S.find (\q -> (stringLength q == width)) queries)
               } in
-              Cons
-                (Cons
+              (:)
+                ((:)
                    (showInt (S.fromMaybe 0 (M.lookup compareString key table)) ++
                     ("\t" ++ (key ++ "\n")))
-                   Nil)
-                Nil)
-      (Cons 1 (Cons 2 (Cons 3 (Cons 4 (Cons 6 (Cons 12 (Cons 18 Nil)))))));
+                   [])
+                [])
+      ((:) 1 ((:) 2 ((:) 3 ((:) 4 ((:) 6 ((:) 12 ((:) 18 [])))))));
   nucleotideCounts :: String -> String;
   nucleotideCounts text = S.concatStrings (S.map S.head (nucleotideLines text));
   -- Independent regex-redux oracle: direct fixed-width DNA comparisons and
@@ -304,10 +304,10 @@ module Package.Benchmark where {
     else if (stringCodeAt text i == code) then i else regexFindCode code text (i + 1);
   regexClean :: String -> String;
   regexClean text = S.concatStrings (regexCleanAt text 0);
-  regexCleanAt :: String -> Int -> List String;
+  regexCleanAt :: String -> Int -> [] String;
   regexCleanAt text i =
     if (i >= stringLength text)
-    then Nil
+    then []
     else let {
            code = stringCodeAt text i
          } in
@@ -317,8 +317,8 @@ module Package.Benchmark where {
               then let {
                      end = regexFindCode 10 text (i + 1)
                    } in
-                   if (end < 0) then Cons (O.drop i text) Nil else regexCleanAt text (end + 1)
-              else Cons (O.char text i) (regexCleanAt text (i + 1));
+                   if (end < 0) then (:) (O.drop i text) [] else regexCleanAt text (end + 1)
+              else (:) (O.char text i) (regexCleanAt text (i + 1));
   regexMer :: Int -> Bool -> String -> Int -> Bool;
   regexMer variant forward text offset =
     let {
@@ -354,35 +354,35 @@ module Package.Benchmark where {
        else if (regexMer variant True text i || regexMer variant False text i)
             then regexCountAt variant text (i + 8) (count + 1)
             else regexCountAt variant text (i + 1) count);
-  regexReplaceWords :: List String -> String -> String -> String;
+  regexReplaceWords :: [] String -> String -> String -> String;
   regexReplaceWords words replacement text =
     S.concatStrings (regexWordsAt words replacement text 0);
-  regexWordsAt :: List String -> String -> String -> Int -> List String;
+  regexWordsAt :: [] String -> String -> String -> Int -> [] String;
   regexWordsAt words replacement text i =
     if (i >= stringLength text)
-    then Nil
+    then []
     else case S.find
                 (\word ->
                    (((i + stringLength word) <= stringLength text) &&
                     eqString word (stringSlice text i (stringLength word))))
                 words of {
            Just word ->
-             Cons replacement (regexWordsAt words replacement text (i + stringLength word));
-           Nothing -> Cons (O.char text i) (regexWordsAt words replacement text (i + 1))
+             (:) replacement (regexWordsAt words replacement text (i + stringLength word));
+           Nothing -> (:) (O.char text i) (regexWordsAt words replacement text (i + 1))
          };
   regexReplaceDelimited :: Int -> Int -> Int -> String -> String -> String;
   regexReplaceDelimited open close minimum replacement text =
     S.concatStrings (regexDelimitedAt open close minimum replacement text 0);
-  regexDelimitedAt :: Int -> Int -> Int -> String -> String -> Int -> List String;
+  regexDelimitedAt :: Int -> Int -> Int -> String -> String -> Int -> [] String;
   regexDelimitedAt open close minimum replacement text i =
     if (i >= stringLength text)
-    then Nil
+    then []
     else let {
            end = if (stringCodeAt text i == open) then regexFindCode close text (i + 1) else (-1)
          } in
          if (end >= ((i + 1) + minimum))
-         then Cons replacement (regexDelimitedAt open close minimum replacement text (end + 1))
-         else Cons (O.char text i) (regexDelimitedAt open close minimum replacement text (i + 1));
+         then (:) replacement (regexDelimitedAt open close minimum replacement text (end + 1))
+         else (:) (O.char text i) (regexDelimitedAt open close minimum replacement text (i + 1));
   regexSubstitute :: String -> String;
   regexSubstitute text =
     let {
@@ -429,7 +429,7 @@ module Package.Benchmark where {
   velocity (Body _ v _) = v;
   mass :: Body -> Double;
   mass (Body _ _ m) = m;
-  sumDouble :: List Double -> Double;
+  sumDouble :: [] Double -> Double;
   sumDouble xs = S.foldl addDouble 0.0 xs;
   solar = mulDouble 4.0 (mulDouble 3.141592653589793 3.141592653589793);
   body :: Double -> Double -> Double -> Double -> Double -> Double -> Double -> Body;
@@ -437,55 +437,55 @@ module Package.Benchmark where {
   initialBodies =
     let {
       bodies =
-        Cons (Body (Vector 0.0 0.0 0.0) (Vector 0.0 0.0 0.0) solar)
-          (Cons
+        (:) (Body (Vector 0.0 0.0 0.0) (Vector 0.0 0.0 0.0) solar)
+          ((:)
              (body 4.84143144246472090 (SharedSyntax.negateDouble 1.16032004402742839)
                 (SharedSyntax.negateDouble 0.103622044471123109)
                 0.00166007664274403694
                 0.00769901118419740425
                 (SharedSyntax.negateDouble 0.0000690460016972063023)
                 0.000954791938424326609)
-             (Cons
+             ((:)
                 (body 8.34336671824457987 4.12479856412430479
                    (SharedSyntax.negateDouble 0.403523417114321381)
                    (SharedSyntax.negateDouble 0.00276742510726862411)
                    0.00499852801234917238
                    0.0000230417297573763929
                    0.000285885980666130812)
-                (Cons
+                ((:)
                    (body 12.8943695621391310 (SharedSyntax.negateDouble 15.1111514016986312)
                       (SharedSyntax.negateDouble 0.223307578892655734)
                       0.00296460137564761618
                       0.00237847173959480950
                       (SharedSyntax.negateDouble 0.0000296589568540237556)
                       0.0000436624404335156298)
-                   (Cons
+                   ((:)
                       (body 15.3796971148509165 (SharedSyntax.negateDouble 25.9193146099879641)
                          0.179258772950371181
                          0.00268067772490389322
                          0.00162824170038242295
                          (SharedSyntax.negateDouble 0.0000951592254519715870)
                          0.0000515138902046611451)
-                      Nil))))
+                      []))))
     } in
     let {
       momentum = S.foldl (\v b -> add v (scale (mass b) (velocity b))) (Vector 0.0 0.0 0.0) bodies
     } in
-    Cons
+    (:)
       (Body (Vector 0.0 0.0 0.0) (scale (divDouble (SharedSyntax.negateDouble 1.0) solar) momentum)
          solar)
       (S.tail bodies);
-  pairs :: Int -> List (Pair Int Int);
+  pairs :: Int -> [] ((,) Int Int);
   pairs size =
-    S.concatMap (\i -> S.map (Pair i) (S.range (i + 1) (size - 1))) (S.range 0 (size - 1));
-  energy :: List Body -> Double;
+    S.concatMap (\i -> S.map ((,) i) (S.range (i + 1) (size - 1))) (S.range 0 (size - 1));
+  energy :: [] Body -> Double;
   energy bodies =
     subDouble
       (sumDouble
          (S.map (\b -> mulDouble (mulDouble 0.5 (mass b)) (dot (velocity b) (velocity b))) bodies))
       (sumDouble
          (S.map
-            (\(Pair i j) ->
+            (\((,) i j) ->
                let {
                  a = S.index bodies i
                } in
@@ -497,14 +497,14 @@ module Package.Benchmark where {
                } in
                divDouble (mulDouble (mass a) (mass b)) (sqrtDouble (dot d d)))
             (pairs (S.length bodies))));
-  replaceAt :: forall a. Int -> a -> List a -> List a;
+  replaceAt :: forall a. Int -> a -> [] a -> [] a;
   replaceAt n value xs =
     case xs of {
-      Nil -> panic "oracle array index";
-      Cons x rest -> if (n == 0) then Cons value rest else Cons x (replaceAt (n - 1) value rest)
+      [] -> panic "oracle array index";
+      (:) x rest -> if (n == 0) then (:) value rest else (:) x (replaceAt (n - 1) value rest)
     };
-  advancePair :: List Body -> Pair Int Int -> List Body;
-  advancePair bodies (Pair i j) =
+  advancePair :: [] Body -> (,) Int Int -> [] Body;
+  advancePair bodies ((,) i j) =
     let {
       a = S.index bodies i
     } in
@@ -529,7 +529,7 @@ module Package.Benchmark where {
         Body (position b) (add (velocity b) (scale (mulDouble (mass a) magnitude) delta)) (mass b)
     } in
     replaceAt j second (replaceAt i first bodies);
-  advance :: Int -> List Body -> List Body;
+  advance :: Int -> [] Body -> [] Body;
   advance n bodies =
     if (n == 0)
     then bodies
@@ -539,23 +539,23 @@ module Package.Benchmark where {
          advance (n - 1)
            (S.map (\b -> Body (add (position b) (scale 0.01 (velocity b))) (velocity b) (mass b))
               changed);
-  nbodyEnergy :: Int -> Pair Double Double;
-  nbodyEnergy steps = Pair (energy initialBodies) (energy (advance steps initialBodies));
-  accurateSum :: List Double -> Double;
+  nbodyEnergy :: Int -> (,) Double Double;
+  nbodyEnergy steps = (,) (energy initialBodies) (energy (advance steps initialBodies));
+  accurateSum :: [] Double -> Double;
   accurateSum values =
     S.fst
       (S.foldl
-         (\(Pair sum correction) x ->
+         (\((,) sum correction) x ->
             let {
               y = subDouble x correction
             } in
             let {
               next = addDouble sum y
             } in
-            Pair next (subDouble (subDouble next sum) y))
-         (Pair 0.0 0.0)
+            (,) next (subDouble (subDouble next sum) y))
+         ((,) 0.0 0.0)
          values);
-  multiply :: List (List Double) -> List Double -> Bool -> List Double;
+  multiply :: [] ([] Double) -> [] Double -> Bool -> [] Double;
   multiply matrix vector transpose =
     S.map
       (\i ->
@@ -568,7 +568,7 @@ module Package.Benchmark where {
                    (S.index vector j))
               (S.range 0 (S.length vector - 1))))
       (S.range 0 (S.length vector - 1));
-  normLoop :: Int -> List (List Double) -> List Double -> List Double -> Double;
+  normLoop :: Int -> [] ([] Double) -> [] Double -> [] Double -> Double;
   normLoop n matrix u v =
     if (n == 0)
     then sqrtDouble
@@ -600,7 +600,7 @@ module Package.Benchmark where {
          if ltDouble 4.0 (addDouble (mulDouble real real) (mulDouble imaginary imaginary))
          then False
          else pixel (remaining - 1) cr ci real imaginary;
-  mandelbrot :: Int -> List Int;
+  mandelbrot :: Int -> [] Int;
   mandelbrot size =
     let {
       stride = quotInt (size + 7) 8
@@ -630,16 +630,16 @@ module Package.Benchmark where {
                    (S.range 0 7)))
            (S.range 0 (stride - 1)))
       (S.range 0 (size - 1));
-  textBytes :: String -> List Int;
+  textBytes :: String -> [] Int;
   textBytes text =
     S.concatMap
       (\i ->
          let {
            c = stringCodeAt text i
          } in
-         if (c < 128) then Cons c Nil else panic "benchmark oracle expects ASCII")
+         if (c < 128) then (:) c [] else panic "benchmark oracle expects ASCII")
       (S.range 0 (stringLength text - 1));
-  expectedOutput :: String -> Int -> List Int;
+  expectedOutput :: String -> Int -> [] Int;
   expectedOutput name size =
     if eqString name "mandelbrot"
     then S.append (textBytes ("P4\n" ++ (showInt size ++ (" " ++ (showInt size ++ "\n")))))
@@ -659,30 +659,30 @@ module Package.Benchmark where {
                                      then regexRedux (fasta size)
                                      else if eqString name "n-body"
                                           then case nbodyEnergy size of {
-                                                 Pair a b ->
+                                                 (,) a b ->
                                                    (formatDouble 9 a ++ ("\n" ++ formatDouble 9 b))
                                                }
                                           else if eqString name "spectral-norm"
                                                then formatDouble 9 (spectralNorm size)
                                                else if eqString name "fannkuch-redux"
                                                     then case fannkuch size of {
-                                                           Pair a b ->
+                                                           (,) a b ->
                                                              (showInt a ++
                                                               ("\nPfannkuchen(" ++
                                                                (showInt size ++
                                                                 (") = " ++ showInt b))))
                                                          }
                                                     else panic "unknown correctness oracle");
-  validateOutput :: String -> Int -> List Int -> Bool;
+  validateOutput :: String -> Int -> [] Int -> Bool;
   validateOutput name size output =
     if (eqString name "n-body" || eqString name "spectral-norm")
     then let {
            reference =
              if eqString name "n-body"
              then case nbodyEnergy size of {
-                    Pair a b -> Cons a (Cons b Nil)
+                    (,) a b -> (:) a ((:) b [])
                   }
-             else Cons (spectralNorm size) Nil
+             else (:) (spectralNorm size) []
          } in
          let {
            actual =
@@ -692,7 +692,7 @@ module Package.Benchmark where {
          ((S.length actual == S.length reference) &&
           (S.all S.isJust actual &&
            S.all
-             (\(Pair a b) ->
+             (\((,) a b) ->
                 (V.finite a &&
                  S.not
                    (ltDouble 0.00000001 (if ltDouble a b then subDouble b a else subDouble a b))))
@@ -704,7 +704,7 @@ module Package.Benchmark where {
               then S.eqList eqInt output (expectedOutput name size)
               else S.eqList eqString (O.words (S.concatStrings (S.map stringFromCode output)))
                      (O.words (S.concatStrings (S.map stringFromCode (expectedOutput name size))));
-  validateNucleotide :: List (List String) -> String -> Bool;
+  validateNucleotide :: [] ([] String) -> String -> Bool;
   validateNucleotide allowed text =
     let {
       actual = O.lines text
@@ -714,9 +714,9 @@ module Package.Benchmark where {
     } in
     (O.ends "\n" text &&
      ((S.length complete == S.length allowed) &&
-      S.all (\(Pair line options) -> S.elem eqString (line ++ "\n") options)
+      S.all (\((,) line options) -> S.elem eqString (line ++ "\n") options)
         (S.zip complete allowed)));
-  performanceChecks :: List J.Json -> J.Json -> List J.Json;
+  performanceChecks :: [] J.Json -> J.Json -> [] J.Json;
   performanceChecks rows targets =
     S.concatMap
       (\row ->
@@ -737,20 +737,20 @@ module Package.Benchmark where {
                 maximum = V.double 0.0 (J.get dimension targets)
               } in
               J.Object
-                (Cons (Pair "benchmark" (J.get "benchmark" row))
-                   (Cons (Pair "dimension" (J.str dimension))
-                      (Cons (Pair "maximum_ratio" (J.Number (formatDouble 12 maximum)))
-                         (Cons (Pair "mlf_over_c" (J.Number (formatDouble 12 ratio)))
-                            (Cons
-                               (Pair "passed"
+                ((:) ((,) "benchmark" (J.get "benchmark" row))
+                   ((:) ((,) "dimension" (J.str dimension))
+                      ((:) ((,) "maximum_ratio" (J.Number (formatDouble 12 maximum)))
+                         ((:) ((,) "mlf_over_c" (J.Number (formatDouble 12 ratio)))
+                            ((:)
+                               ((,) "passed"
                                   (J.Boolean (V.positive ratio && S.not (ltDouble maximum ratio))))
-                               Nil))))))
+                               []))))))
            (S.map S.fst (J.items targets)))
       rows;
   validateLimits :: J.Json -> Bool;
   validateLimits targets =
     S.all (\entry -> S.maybe False V.positive (V.number (S.snd entry))) (J.items targets);
-  measure :: String -> List String -> String -> Int -> IO (Either String J.Json);
+  measure :: String -> [] String -> String -> Int -> IO (Either String J.Json);
   measure directory argv input timeout =
     do {
       host <- getEnv "MLF_TEST_HOST_SUPPORT";
@@ -767,9 +767,9 @@ module Package.Benchmark where {
       code <-
         O.exec directory
           (S.append
-             (Cons host
-                (Cons "measure"
-                   (Cons (showInt timeout) (Cons input (Cons stdout (Cons stderr Nil))))))
+             ((:) host
+                ((:) "measure"
+                   ((:) (showInt timeout) ((:) input ((:) stdout ((:) stderr []))))))
              argv)
           ""
           sample
@@ -791,7 +791,7 @@ module Package.Benchmark where {
     };
   -- Resolve the manifest's explicitly pinned native dependency before measuring.
   -- Save the .pc file, tool, headers and linked library identity with the flags.
-  benchmarkPackage :: String -> String -> String -> List String -> IO J.Json;
+  benchmarkPackage :: String -> String -> String -> [] String -> IO J.Json;
   -- pkg-config suppresses system -I paths. Explicit public headers still bind
   -- those installations without recursively hashing all of /usr/include.
   benchmarkPackage directory name expected headers =
@@ -801,20 +801,20 @@ module Package.Benchmark where {
       let {
         command = V.text "path" tool
       };
-      version <- Build.raw directory (Cons command (Cons "--modversion" (Cons name Nil)));
+      version <- Build.raw directory ((:) command ((:) "--modversion" ((:) name [])));
       O.require ((stringLength expected > 0) && eqString (O.trim version) expected)
         ("benchmark library version differs: " ++
          (name ++ ("; expected " ++ (expected ++ (", found " ++ O.trim version)))));
-      text <- Build.raw directory (Cons command (Cons "--cflags" (Cons "--libs" (Cons name Nil))));
-      libdir <- Build.raw directory (Cons command (Cons "--variable=libdir" (Cons name Nil)));
-      pcdir <- Build.raw directory (Cons command (Cons "--variable=pcfiledir" (Cons name Nil)));
+      text <- Build.raw directory ((:) command ((:) "--cflags" ((:) "--libs" ((:) name []))));
+      libdir <- Build.raw directory ((:) command ((:) "--variable=libdir" ((:) name [])));
+      pcdir <- Build.raw directory ((:) command ((:) "--variable=pcfiledir" ((:) name [])));
       includedir <-
-        Build.raw directory (Cons command (Cons "--variable=includedir" (Cons name Nil)));
+        Build.raw directory ((:) command ((:) "--variable=includedir" ((:) name [])));
       O.require (S.not (S.null headers) && (stringLength (O.trim includedir) > 0))
         ("benchmark library headers missing: " ++ name);
       let {
         selected =
-          S.append (if eqString (O.trim libdir) "" then Nil else Cons ("-L" ++ O.trim libdir) Nil)
+          S.append (if eqString (O.trim libdir) "" then [] else (:) ("-L" ++ O.trim libdir) [])
             (Build.flags text)
       };
       identity <- Build.flagIdentity selected;
@@ -839,13 +839,13 @@ module Package.Benchmark where {
               (J.set "pkg_config" tool
                  (J.set "definition" (Build.obj1 definition (J.str hash)) complete))))
     };
-  benchmarkPackageFiles :: J.Json -> List String;
+  benchmarkPackageFiles :: J.Json -> [] String;
   benchmarkPackageFiles identity =
-    Cons (V.text "path" (J.get "pkg_config" identity))
+    (:) (V.text "path" (J.get "pkg_config" identity))
       (S.map S.fst
          (S.concatMap (\key -> J.items (J.get key identity))
             (O.words "headers libraries definition")));
-  collectorFlags :: String -> IO (List String);
+  collectorFlags :: String -> IO ([] String);
   collectorFlags directory =
     do {
       prefix <- getEnv "MLF_GC_PREFIX";
@@ -869,12 +869,12 @@ module Package.Benchmark where {
              O.require (code == 0) "collector platform discovery failed";
              system <- readFile (directory ++ "/gc.system");
              return
-               (Cons ("-I" ++ (actual ++ "/include"))
-                  (Cons (actual ++ (if windows then "/lib/libgc.dll.a" else "/lib/libgc.a"))
-                     (if eqString (O.trim system) "Linux" then Cons "-ldl" Nil else Nil)))
+               ((:) ("-I" ++ (actual ++ "/include"))
+                  ((:) (actual ++ (if windows then "/lib/libgc.dll.a" else "/lib/libgc.a"))
+                     (if eqString (O.trim system) "Linux" then (:) "-ldl" [] else [])))
            }
     };
-  buildNative :: String -> String -> String -> String -> String -> Int -> IO (Either String Unit);
+  buildNative :: String -> String -> String -> String -> String -> Int -> IO (Either String ());
   buildNative directory compiler clang source binary timeout =
     do {
       O.mkdir directory;
@@ -882,14 +882,14 @@ module Package.Benchmark where {
         ir = (directory ++ "/program.ll")
       };
       emitted <-
-        O.exec "" (Cons compiler (Cons "--emit-llvm-gc" (Cons source Nil))) "" ir
+        O.exec "" ((:) compiler ((:) "--emit-llvm-gc" ((:) source []))) "" ir
           (directory ++ "/emit.err")
           timeout;
       if S.not (emitted == 0)
       then return (Left "LLVM emission failed")
       else do {
              code <-
-               O.exec "" (Cons compiler (Cons "--llvm-runtime" Nil)) ""
+               O.exec "" ((:) compiler ((:) "--llvm-runtime" [])) ""
                  (directory ++ "/runtime.path")
                  (directory ++ "/runtime.err")
                  timeout;
@@ -913,12 +913,12 @@ module Package.Benchmark where {
                            code <-
                              O.exec ""
                                (S.append
-                                  (Cons clang
-                                     (Cons "-O2"
-                                        (Cons "-Wno-override-module"
-                                           (Cons ir (Cons (O.trim runtime) Nil)))))
+                                  ((:) clang
+                                     ((:) "-O2"
+                                        ((:) "-Wno-override-module"
+                                           ((:) ir ((:) (O.trim runtime) [])))))
                                   (S.append (S.append (Build.flags flags) gc)
-                                     (Cons "-lm" (Cons "-o" (Cons pending Nil)))))
+                                     ((:) "-lm" ((:) "-o" ((:) pending [])))))
                                ""
                                (directory ++ "/link.out")
                                (directory ++ "/link.err")
@@ -927,26 +927,26 @@ module Package.Benchmark where {
                            then return (Left "native link failed")
                            else do {
                                   O.move pending binary;
-                                  return (Right Unit)
+                                  return (Right ())
                                 }
                          }
                   }
            }
     };
-  checkIntegrity :: List (Pair String String) -> IO (Either String Unit);
+  checkIntegrity :: [] ((,) String String) -> IO (Either String ());
   checkIntegrity fingerprints =
     do {
       matches <-
         S.mapM
-          (\(Pair path hash) ->
+          (\((,) path hash) ->
              do {
                actual <- fileDigest path;
                return (eqString actual hash)
              })
           fingerprints;
-      return (if S.all S.id matches then Right Unit else Left "sources changed during measurement")
+      return (if S.all S.id matches then Right () else Left "sources changed during measurement")
     };
-  validateConfiguration :: J.Json -> Either String Unit;
+  validateConfiguration :: J.Json -> Either String ();
   validateConfiguration config =
     do {
       V.ensure
@@ -960,13 +960,13 @@ module Package.Benchmark where {
       V.ensure
         (S.not (J.getBool "compile_only" False config && J.getBool "runtime_only" False config))
         "incompatible benchmark modes";
-      return Unit
+      return ()
     };
-  identifyNative :: String -> String -> IO (Either String (Pair String J.Json));
+  identifyNative :: String -> String -> IO (Either String ((,) String J.Json));
   identifyNative directory compiler =
     do {
       code <-
-        O.exec "" (Cons compiler (Cons "--help" Nil)) "" (directory ++ "/help.out")
+        O.exec "" ((:) compiler ((:) "--help" [])) "" (directory ++ "/help.out")
           (directory ++ "/help.err")
           60;
       if S.not (code == 0)
@@ -974,7 +974,7 @@ module Package.Benchmark where {
       else do {
              help <- readFile (directory ++ "/help.out");
              code <-
-               O.exec "" (Cons compiler (Cons "--llvm-runtime" Nil)) ""
+               O.exec "" ((:) compiler ((:) "--llvm-runtime" [])) ""
                  (directory ++ "/runtime.out")
                  (directory ++ "/runtime.err")
                  60;
@@ -985,34 +985,34 @@ module Package.Benchmark where {
                     hash <- fileDigest compiler;
                     return
                       (Right
-                         (Pair (O.trim runtime)
+                         ((,) (O.trim runtime)
                             (J.Object
-                               (Cons (Pair "path" (J.str compiler))
-                                  (Cons (Pair "sha256" (J.str hash))
-                                     (Cons
-                                        (Pair "identification"
+                               ((:) ((,) "path" (J.str compiler))
+                                  ((:) ((,) "sha256" (J.str hash))
+                                     ((:)
+                                        ((,) "identification"
                                            (J.Object
-                                              (Cons
-                                                 (Pair "command"
+                                              ((:)
+                                                 ((,) "command"
                                                     (J.stringArray
-                                                       (Cons compiler (Cons "--help" Nil))))
-                                                 (Cons (Pair "stdout" (J.str (O.trim help))) Nil))))
-                                        Nil))))))
+                                                       ((:) compiler ((:) "--help" []))))
+                                                 ((:) ((,) "stdout" (J.str (O.trim help))) []))))
+                                        []))))))
                   }
            }
     };
-  runGuarded :: String -> J.Json -> IO (Either String Unit) -> IO (Either String Unit);
+  runGuarded :: String -> J.Json -> IO (Either String ()) -> IO (Either String ());
   -- Save a non-success before validation or any tool work; a signal cannot leave a stale pass.
   runGuarded reportPath configuration action =
     do {
-      J.write reportPath (J.Object (Cons (Pair "status" (J.str "running")) Nil));
+      J.write reportPath (J.Object ((:) ((,) "status" (J.str "running")) []));
       manifest <- J.read "benchmarks/manifest.json";
       case validateSelection configuration manifest of {
         Left error ->
           do {
             J.write reportPath
               (J.Object
-                 (Cons (Pair "status" (J.str "failed")) (Cons (Pair "error" (J.str error)) Nil)));
+                 ((:) ((,) "status" (J.str "failed")) ((:) ((,) "error" (J.str error)) [])));
             return (Left error)
           };
         Right _ ->
@@ -1020,8 +1020,8 @@ module Package.Benchmark where {
             result <- action;
             J.write reportPath
               (J.Object
-                 (Cons (Pair "status" (J.str (if S.isRight result then "passed" else "failed")))
-                    Nil));
+                 ((:) ((,) "status" (J.str (if S.isRight result then "passed" else "failed")))
+                    []));
             return result
           }
       }
@@ -1039,11 +1039,11 @@ module Package.Benchmark where {
       hash <- fileDigest (directory ++ "/stdin");
       return
         (J.Object
-           (Cons (Pair "stdin_bytes" (J.num (stringLength inputText)))
-              (Cons (Pair "stdin_sha256" (J.str hash)) Nil)))
+           ((:) ((,) "stdin_bytes" (J.num (stringLength inputText)))
+              ((:) ((,) "stdin_sha256" (J.str hash)) [])))
     };
   runGroup :: String ->
-              Double -> List (Quad String String String (List String)) -> IO (Either String J.Json);
+              Double -> [] ((,,,) String String String ([] String)) -> IO (Either String J.Json);
   runGroup directory timeout commands =
     do {
       host <- getEnv "MLF_TEST_HOST_SUPPORT";
@@ -1053,20 +1053,20 @@ module Package.Benchmark where {
       };
       let {
         fields =
-          Cons (showInt (S.length commands))
+          (:) (showInt (S.length commands))
             (S.concatMap
-               (\(Quad cwd input output argv) ->
+               (\((,,,) cwd input output argv) ->
                   S.append
-                    (Cons cwd
-                       (Cons input
-                          (Cons output
-                             (Cons (output ++ ".stderr") (Cons (showInt (S.length argv)) Nil)))))
+                    ((:) cwd
+                       ((:) input
+                          ((:) output
+                             ((:) (output ++ ".stderr") ((:) (showInt (S.length argv)) [])))))
                     argv)
                commands)
       };
       writeFile spec (O.pack fields);
       code <-
-        O.exec "" (Cons host (Cons "group" (Cons (formatDouble 6 timeout) (Cons spec Nil)))) ""
+        O.exec "" ((:) host ((:) "group" ((:) (formatDouble 6 timeout) ((:) spec [])))) ""
           (directory ++ "/group.json")
           (directory ++ "/group.err")
           30;
@@ -1084,7 +1084,7 @@ module Package.Benchmark where {
   -- against one clock, including source emission, fresh runtime, LLVM and link.
   runPipeline :: String ->
                  Double ->
-                 List (Pair (List Int) (Quad String String String (List String))) ->
+                 [] ((,) ([] Int) ((,,,) String String String ([] String))) ->
                  IO (Either String J.Json);
   runPipeline directory timeout commands =
     do {
@@ -1095,21 +1095,21 @@ module Package.Benchmark where {
       };
       let {
         fields =
-          Cons (showInt (S.length commands))
+          (:) (showInt (S.length commands))
             (S.concatMap
-               (\(Pair dependencies (Quad cwd input output argv)) ->
-                  S.append (Cons (showInt (S.length dependencies)) (S.map showInt dependencies))
+               (\((,) dependencies ((,,,) cwd input output argv)) ->
+                  S.append ((:) (showInt (S.length dependencies)) (S.map showInt dependencies))
                     (S.append
-                       (Cons cwd
-                          (Cons input
-                             (Cons output
-                                (Cons (output ++ ".stderr") (Cons (showInt (S.length argv)) Nil)))))
+                       ((:) cwd
+                          ((:) input
+                             ((:) output
+                                ((:) (output ++ ".stderr") ((:) (showInt (S.length argv)) [])))))
                        argv))
                commands)
       };
       writeFile spec (O.pack fields);
       code <-
-        O.exec "" (Cons host (Cons "pipeline" (Cons (formatDouble 6 timeout) (Cons spec Nil)))) ""
+        O.exec "" ((:) host ((:) "pipeline" ((:) (formatDouble 6 timeout) ((:) spec [])))) ""
           (directory ++ "/pipeline.json")
           (directory ++ "/pipeline.err")
           (1 + readInt (formatDouble 0 timeout));
@@ -1127,20 +1127,20 @@ module Package.Benchmark where {
                    String ->
                    String ->
                    String ->
-                   String -> List String -> Double -> IO (Either String (Pair String J.Json));
+                   String -> [] String -> Double -> IO (Either String ((,) String J.Json));
   buildParallel directory compiler clang source runtime flags timeout =
-    buildParallelWithIncludes directory compiler clang source runtime flags Nil timeout;
+    buildParallelWithIncludes directory compiler clang source runtime flags [] timeout;
   buildParallelWithIncludes :: String ->
                                String ->
                                String ->
                                String ->
                                String ->
-                               List String ->
-                               List String -> Double -> IO (Either String (Pair String J.Json));
+                               [] String ->
+                               [] String -> Double -> IO (Either String ((,) String J.Json));
   buildParallelWithIncludes directory compiler clang source runtime flags includes timeout =
     do {
       present <- directoryExists directory;
-      files <- if present then O.entries directory else return Nil;
+      files <- if present then O.entries directory else return [];
       if S.not (S.null files)
       then return (Left "build directory must be fresh")
       else do {
@@ -1174,105 +1174,105 @@ module Package.Benchmark where {
              };
              let {
                emit =
-                 Cons compiler
-                   (S.append (S.concatMap (\path -> Cons "-i" (Cons path Nil)) includes)
-                      (Cons mode (Cons source Nil)))
+                 (:) compiler
+                   (S.append (S.concatMap (\path -> (:) "-i" ((:) path [])) includes)
+                      ((:) mode ((:) source [])))
              };
              let {
                frontend =
                  if stream
-                 then Cons "/bin/bash"
-                        (Cons "-o"
-                           (Cons "pipefail"
-                              (Cons "-c"
-                                 (Cons "fifo=$1; shift; \"$@\" | /bin/cat > \"$fifo\""
-                                    (Cons "mlf-stream" (Cons (ir ++ ".pipe") emit))))))
+                 then (:) "/bin/bash"
+                        ((:) "-o"
+                           ((:) "pipefail"
+                              ((:) "-c"
+                                 ((:) "fifo=$1; shift; \"$@\" | /bin/cat > \"$fifo\""
+                                    ((:) "mlf-stream" ((:) (ir ++ ".pipe") emit))))))
                  else emit
              };
              let {
                runtimeCommand =
-                 S.append (Cons clang (O.words "-O2 -std=c11 -c"))
-                   (S.append (Cons runtime flags) (Cons "-o" (Cons object Nil)))
+                 S.append ((:) clang (O.words "-O2 -std=c11 -c"))
+                   (S.append ((:) runtime flags) ((:) "-o" ((:) object [])))
              };
              let {
                llvmCommand =
                  S.append
-                   (Cons clang
-                      (S.append (if stream then Cons "--mlf-stream-ir" Nil else Nil)
+                   ((:) clang
+                      (S.append (if stream then (:) "--mlf-stream-ir" [] else [])
                          (O.words "-O2 -Wno-override-module -c")))
-                   (Cons ir (Cons "-o" (Cons code Nil)))
+                   ((:) ir ((:) "-o" ((:) code [])))
              };
              let {
                linkCommand =
                  S.append
-                   (Cons clang
-                      (S.append (if streamLink then Cons "--mlf-wait-objects" Nil else Nil)
-                         (Cons code (Cons object flags))))
-                   (Cons "-lm" (Cons "-o" (Cons binary Nil)))
+                   ((:) clang
+                      (S.append (if streamLink then (:) "--mlf-wait-objects" [] else [])
+                         ((:) code ((:) object flags))))
+                   ((:) "-lm" ((:) "-o" ((:) binary [])))
              };
              let {
                ordinary =
-                 Cons frontend (Cons runtimeCommand (Cons llvmCommand (Cons linkCommand Nil)))
+                 (:) frontend ((:) runtimeCommand ((:) llvmCommand ((:) linkCommand [])))
              };
              let {
-               setup = Cons "/usr/bin/mkfifo" (Cons (ir ++ ".pipe") Nil)
+               setup = (:) "/usr/bin/mkfifo" ((:) (ir ++ ".pipe") [])
              };
              let {
                linked =
-                 Cons setup
-                   (Cons frontend
-                      (Cons runtimeCommand
-                         (Cons llvmCommand
-                            (Cons (Cons "/usr/bin/touch" (Cons (object ++ ".ready") Nil))
-                               (Cons (Cons "/usr/bin/touch" (Cons (code ++ ".ready") Nil))
-                                  (Cons linkCommand Nil))))))
+                 (:) setup
+                   ((:) frontend
+                      ((:) runtimeCommand
+                         ((:) llvmCommand
+                            ((:) ((:) "/usr/bin/touch" ((:) (object ++ ".ready") []))
+                               ((:) ((:) "/usr/bin/touch" ((:) (code ++ ".ready") []))
+                                  ((:) linkCommand []))))))
              };
              let {
                commands =
-                 if streamLink then linked else if stream then Cons setup ordinary else ordinary
+                 if streamLink then linked else if stream then (:) setup ordinary else ordinary
              };
              let {
                linkDependencies =
-                 Cons Nil
-                   (Cons (Cons 0 Nil)
-                      (Cons Nil
-                         (Cons (Cons 0 Nil)
-                            (Cons (Cons 0 (Cons 2 Nil))
-                               (Cons (Cons 0 (Cons 3 Nil)) (Cons (Cons 0 Nil) Nil))))))
+                 (:) []
+                   ((:) ((:) 0 [])
+                      ((:) []
+                         ((:) ((:) 0 [])
+                            ((:) ((:) 0 ((:) 2 []))
+                               ((:) ((:) 0 ((:) 3 [])) ((:) ((:) 0 []) []))))))
              };
              let {
                dependencies =
                  if streamLink
                  then linkDependencies
                  else if stream
-                      then Cons Nil
-                             (Cons (Cons 0 Nil)
-                                (Cons Nil
-                                   (Cons (Cons 0 Nil) (Cons (Cons 1 (Cons 2 (Cons 3 Nil))) Nil))))
-                      else Cons Nil (Cons Nil (Cons (Cons 0 Nil) (Cons (Cons 1 (Cons 2 Nil)) Nil)))
+                      then (:) []
+                             ((:) ((:) 0 [])
+                                ((:) []
+                                   ((:) ((:) 0 []) ((:) ((:) 1 ((:) 2 ((:) 3 []))) []))))
+                      else (:) [] ((:) [] ((:) ((:) 0 []) ((:) ((:) 1 ((:) 2 [])) [])))
              };
              let {
                ordinaryOutputs =
-                 Cons (if stream then (directory ++ "/frontend.stdout") else ir)
-                   (Cons (directory ++ "/runtime.stdout")
-                      (Cons (directory ++ "/llvm.stdout") (Cons (directory ++ "/link.stdout") Nil)))
+                 (:) (if stream then (directory ++ "/frontend.stdout") else ir)
+                   ((:) (directory ++ "/runtime.stdout")
+                      ((:) (directory ++ "/llvm.stdout") ((:) (directory ++ "/link.stdout") [])))
              };
              let {
                linkedOutputs =
-                 Cons (directory ++ "/setup.stdout")
-                   (Cons (directory ++ "/frontend.stdout")
-                      (Cons (directory ++ "/runtime.stdout")
-                         (Cons (directory ++ "/llvm.stdout")
-                            (Cons (directory ++ "/runtime-ready.stdout")
-                               (Cons (directory ++ "/llvm-ready.stdout")
-                                  (Cons (directory ++ "/link.stdout") Nil))))))
+                 (:) (directory ++ "/setup.stdout")
+                   ((:) (directory ++ "/frontend.stdout")
+                      ((:) (directory ++ "/runtime.stdout")
+                         ((:) (directory ++ "/llvm.stdout")
+                            ((:) (directory ++ "/runtime-ready.stdout")
+                               ((:) (directory ++ "/llvm-ready.stdout")
+                                  ((:) (directory ++ "/link.stdout") []))))))
              };
              let {
                outputs =
                  if streamLink
                  then linkedOutputs
                  else if stream
-                      then Cons (directory ++ "/setup.stdout") ordinaryOutputs
+                      then (:) (directory ++ "/setup.stdout") ordinaryOutputs
                       else ordinaryOutputs
              };
              let {
@@ -1286,8 +1286,8 @@ module Package.Benchmark where {
              };
              result <-
                runPipeline directory timeout
-                 (S.zipWith (\deps command -> Pair deps command) dependencies
-                    (S.zipWith (\output argv -> Quad directory "" output argv) outputs commands));
+                 (S.zipWith (\deps command -> (,) deps command) dependencies
+                    (S.zipWith (\output argv -> (,,,) directory "" output argv) outputs commands));
              case result of {
                Left error -> return (Left error);
                Right group ->
@@ -1306,14 +1306,14 @@ module Package.Benchmark where {
                    };
                    return
                      (Right
-                        (Pair binary
+                        ((,) binary
                            (J.set "cpu_seconds" (J.Number (formatDouble 9 cpu))
                               (J.set "stages" (J.Array stages) group))))
                  }
              }
            }
     };
-  validateSelection :: J.Json -> J.Json -> Either String Unit;
+  validateSelection :: J.Json -> J.Json -> Either String ();
   validateSelection configuration manifest =
     do {
       validateConfiguration configuration;
@@ -1342,7 +1342,7 @@ module Package.Benchmark where {
                 (V.int "size" configuration <= V.int "maximum_input" row))
                "benchmark size outside supported range"
            }
-      else return Unit;
-      return Unit
+      else return ();
+      return ()
     }
 }

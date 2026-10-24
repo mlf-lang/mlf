@@ -12,9 +12,9 @@ module Package.Manifest where {
   import qualified Package.Json as J;
   import qualified Package.Release as R;
   import qualified Package.Distribution as Distribution;
-  data Package = Package String J.Json (List Module);
-  data Module = Module String String String (List String);
-  data PackageGraph = PackageGraph Package (List Package) (List Module);
+  data Package = Package String J.Json ([] Module);
+  data Module = Module String String String ([] String);
+  data PackageGraph = PackageGraph Package ([] Package) ([] Module);
   packageRoot (Package path _ _) = O.parent path;
   packagePath (Package path _ _) = path;
   packageData (Package _ value _) = value;
@@ -100,7 +100,7 @@ module Package.Manifest where {
   sourceSyntaxExpectation value fallback = J.getText "source-syntax" fallback value;
   validateSourceSyntax expected source =
     do {
-      O.require (S.elem eqString expected (Cons "" (O.words "legacy-emlf-v1 shared-haskell-v1")))
+      O.require (S.elem eqString expected ((:) "" (O.words "legacy-emlf-v1 shared-haskell-v1")))
         "unsupported source-syntax; expected legacy-emlf-v1 or shared-haskell-v1";
       text <- readFile source;
       case Lexer.sourceSyntax source text of {
@@ -211,7 +211,7 @@ module Package.Manifest where {
             (J.set "version" (J.get "version" value) (J.set "name" (J.str name) J.empty))
       };
       ioReturn
-        (Package path releaseData (S.map (\moduleName -> Module moduleName name "" Nil) names))
+        (Package path releaseData (S.map (\moduleName -> Module moduleName name "" []) names))
     };
   visitRelease path digest done = visitReleaseFrom path digest J.Null done;
   visitReleaseFrom path digest origin done =
@@ -302,9 +302,9 @@ module Package.Manifest where {
              O.require (S.not testing || J.has "stdout" target) "expected stdout is required"
            }
     };
-  visit :: String -> List String -> List Package -> IO (List Package);
+  visit :: String -> [] String -> [] Package -> IO ([] Package);
   visit path trail done = visitWith J.empty path trail done;
-  visitWith :: J.Json -> String -> List String -> List Package -> IO (List Package);
+  visitWith :: J.Json -> String -> [] String -> [] Package -> IO ([] Package);
   visitWith options path trail done =
     do {
       canonical <- canonicalPath path;
@@ -329,12 +329,12 @@ module Package.Manifest where {
     };
   visitDependencies :: J.Json ->
                        Package ->
-                       List String ->
-                       List Package -> List (Pair String J.Json) -> IO (List Package);
+                       [] String ->
+                       [] Package -> [] ((,) String J.Json) -> IO ([] Package);
   visitDependencies options p trail done deps =
     case deps of {
-      Nil -> ioReturn done;
-      Cons (Pair name dep) rest ->
+      [] -> ioReturn done;
+      (:) ((,) name dep) rest ->
         do {
           let {
             remote = J.has "github" dep
@@ -382,11 +382,11 @@ module Package.Manifest where {
     S.map (\name -> lookupPackage name (packages graph)) (targetDependencyNames p target);
   visibleWith ps p dependencies =
     S.concat
-      (Cons (S.map moduleName (packageModules p))
+      ((:) (S.map moduleName (packageModules p))
          (S.map (\name -> S.map moduleName (packageModules (lookupPackage name ps))) dependencies));
   visible ps p =
     S.concat
-      (Cons (S.map moduleName (packageModules p))
+      ((:) (S.map moduleName (packageModules p))
          (S.map (\name -> S.map moduleName (packageModules (lookupPackage name ps)))
             (keys (J.getObject "dependencies" (packageData p)))));
   checkImports ps p local =
@@ -402,18 +402,18 @@ module Package.Manifest where {
                     (name ++ " is not declared in this package or a direct dependency"))))))
            (moduleImports m))
       local;
-  moduleClosure ms names = discoverMany ms Nil Nil names;
-  discoverMany :: List Module -> List String -> List Module -> List String -> IO (List Module);
+  moduleClosure ms names = discoverMany ms [] [] names;
+  discoverMany :: [] Module -> [] String -> [] Module -> [] String -> IO ([] Module);
   discoverMany ms trail done names =
     case names of {
-      Nil -> ioReturn done;
-      Cons name rest ->
+      [] -> ioReturn done;
+      (:) name rest ->
         do {
           next <- discoverModule ms trail done name;
           discoverMany ms trail next rest
         }
     };
-  discoverModule :: List Module -> List String -> List Module -> String -> IO (List Module);
+  discoverModule :: [] Module -> [] String -> [] Module -> String -> IO ([] Module);
   -- Imports discover namespaces, not separately compiled module prerequisites.
   -- The package DAG above owns compilation-cycle rejection.
   discoverModule ms trail done name =
@@ -436,7 +436,7 @@ module Package.Manifest where {
       O.require (S.not (S.any (\m -> eqString (moduleName m) (moduleName entry)) local))
         "entry module also appears in target modules";
       let {
-        private = Cons entry local
+        private = (:) entry local
       };
       O.require
         (S.not
@@ -461,7 +461,7 @@ module Package.Manifest where {
                        " is not declared in this target or a selected direct dependency"))))))
              (moduleImports m))
         private;
-      ioReturn (Pair (moduleName entry) private)
+      ioReturn ((,) (moduleName entry) private)
     };
   load path = loadWith path J.empty;
   loadWith path options =
@@ -472,7 +472,7 @@ module Package.Manifest where {
             (J.getOr "cache-dir" (J.str (O.parent path ++ "/.mlf-build/cache")) options)
             options
       };
-      ps <- visitWith selected path Nil Nil;
+      ps <- visitWith selected path [] [];
       let {
         p = S.last ps
       };
@@ -493,9 +493,9 @@ module Package.Manifest where {
                 if J.has "main" target
                 then do {
                        ignored <- targetCrateModules graph q target;
-                       ioReturn Unit
+                       ioReturn ()
                      }
-                else ioReturn Unit)
+                else ioReturn ())
              (S.map S.snd
                 (S.append (J.items (J.getObject "executables" (packageData q)))
                    (J.items (J.getObject "tests" (packageData q))))))
@@ -512,13 +512,13 @@ module Package.Manifest where {
       (S.filter (\q -> S.not (S.null (packageModules q))) (targetDependencies graph p target));
   targetCrateDependencies graph p target =
     S.append (targetLibraryDependencies graph p target)
-      (if S.null (packageModules p) then Nil else Cons (crateIdentity p "library") Nil);
+      (if S.null (packageModules p) then [] else (:) (crateIdentity p "library") []);
   cratePlanRow identity entry ms deps =
     J.Object
-      (Cons (Pair "crate" (J.str identity))
-         (Cons (Pair "entry" (J.str entry))
-            (Cons (Pair "modules" (J.stringArray (S.sortBy compareString (S.map moduleName ms))))
-               (Cons (Pair "dependencies" (J.stringArray deps)) Nil))));
+      ((:) ((,) "crate" (J.str identity))
+         ((:) ((,) "entry" (J.str entry))
+            ((:) ((,) "modules" (J.stringArray (S.sortBy compareString (S.map moduleName ms))))
+               ((:) ((,) "dependencies" (J.stringArray deps)) []))));
   cratePlan graph =
     do {
       let {
@@ -534,11 +534,11 @@ module Package.Manifest where {
       };
       executables <-
         S.mapM
-          (\(Pair name target) ->
+          (\((,) name target) ->
              do {
                boundValueShared1 <- targetCrateModules graph p target;
                case boundValueShared1 of {
-                 Pair entry ms ->
+                 (,) entry ms ->
                    do {
                      ioReturn
                        (cratePlanRow (crateIdentity p ("target-" ++ name)) entry ms
@@ -549,11 +549,11 @@ module Package.Manifest where {
           (J.items (J.getObject "executables" (packageData p)));
       tests <-
         S.mapM
-          (\(Pair name target) ->
+          (\((,) name target) ->
              do {
                boundValueShared2 <- targetCrateModules graph p target;
                case boundValueShared2 of {
-                 Pair entry ms ->
+                 (,) entry ms ->
                    do {
                      ioReturn
                        (cratePlanRow (crateIdentity p ("target-test-" ++ name)) entry ms
@@ -567,7 +567,7 @@ module Package.Manifest where {
     };
   sourceFiles p =
     if isRelease p
-    then ioReturn Nil
+    then ioReturn []
     else do {
            nested <-
              S.mapM
@@ -584,9 +584,9 @@ module Package.Manifest where {
                          ms <-
                            readModulesWithSyntax syntax (packageRoot p) (packageName p)
                              (J.getObject "modules" target);
-                         ioReturn (Cons source (S.map moduleSource ms))
+                         ioReturn ((:) source (S.map moduleSource ms))
                        }
-                  else ioReturn Nil)
+                  else ioReturn [])
                (S.map S.snd
                   (S.append (J.items (J.getObject "executables" (packageData p)))
                      (J.items (J.getObject "tests" (packageData p)))));
@@ -605,30 +605,30 @@ module Package.Manifest where {
                then do {
                       ignored <-
                         readRelease (packagePath p) (J.getText "release-sha256" "" (packageData p));
-                      ioReturn Unit
+                      ioReturn ()
                     }
-               else ioReturn Unit;
+               else ioReturn ();
                paths <- sourceFiles p;
                hashes <-
                  S.mapM
                    (\path ->
                       do {
                         hash <- fileDigest path;
-                        ioReturn (Pair (O.relative (packageRoot p) path) (J.str hash))
+                        ioReturn ((,) (O.relative (packageRoot p) path) (J.str hash))
                       })
                    paths;
                manifest <- fileDigest (packagePath p);
                let {
                  row =
                    J.Object
-                     (Cons (Pair "name" (J.str (packageName p)))
-                        (Cons (Pair "version" (J.get "version" (packageData p)))
-                           (Cons
-                              (Pair "path"
+                     ((:) ((,) "name" (J.str (packageName p)))
+                        ((:) ((,) "version" (J.get "version" (packageData p)))
+                           ((:)
+                              ((,) "path"
                                  (J.str
                                     (O.relative (packageRoot (rootPackage graph)) (packageRoot p))))
-                              (Cons (Pair "manifest" (J.str manifest))
-                                 (Cons (Pair "sources" (J.Object hashes)) Nil)))))
+                              ((:) ((,) "manifest" (J.str manifest))
+                                 ((:) ((,) "sources" (J.Object hashes)) [])))))
                };
                let {
                  released = if isRelease p then J.set "release" (J.str manifest) row else row
@@ -646,6 +646,6 @@ module Package.Manifest where {
              })
           (packages graph);
       ioReturn
-        (J.Object (Cons (Pair "format" (J.num 1)) (Cons (Pair "packages" (J.Array rows)) Nil)))
+        (J.Object ((:) ((,) "format" (J.num 1)) ((:) ((,) "packages" (J.Array rows)) [])))
     }
 }

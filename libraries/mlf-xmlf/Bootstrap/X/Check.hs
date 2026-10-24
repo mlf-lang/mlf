@@ -16,22 +16,22 @@ module Bootstrap.X.Check where {
   emptyEnv = XEnv M.empty M.empty;
   typeEnv (XEnv ts _) = ts;
   termEnv (XEnv _ es) = es;
-  ensure :: Bool -> String -> Either String Unit;
-  ensure condition message = if condition then Right Unit else Left message;
-  wellFormed :: Map XTyVar XType -> XType -> Either String Unit;
+  ensure :: Bool -> String -> Either String ();
+  ensure condition message = if condition then Right () else Left message;
+  wellFormed :: Map XTyVar XType -> XType -> Either String ();
   wellFormed env ty = wellFormedIn D.emptyDataEnv env ty;
-  wellFormedIn :: DataEnv -> Map XTyVar XType -> XType -> Either String Unit;
+  wellFormedIn :: DataEnv -> Map XTyVar XType -> XType -> Either String ();
   wellFormedIn ds env ty =
     do {
       k <- T.kindOf ds env ty;
-      return Unit
+      return ()
     };
-  termType :: DataEnv -> Map XTyVar XType -> XType -> Either String Unit;
+  termType :: DataEnv -> Map XTyVar XType -> XType -> Either String ();
   termType ds env ty =
     do {
       k <- T.kindOf ds env ty;
       if eqKind k Star
-      then Right Unit
+      then Right ()
       else case ty of {
              XCon c args ->
                do {
@@ -41,7 +41,7 @@ module Bootstrap.X.Check where {
              _ -> Left "term type must have kind *"
            }
     };
-  fresh :: Map XTyVar XType -> XTyVar -> Either String Unit;
+  fresh :: Map XTyVar XType -> XTyVar -> Either String ();
   fresh env a =
     ensure (L.not (M.member T.compareTyVar a env))
       ("type binder already in scope: " ++ showInt (T.tyVarId a));
@@ -210,22 +210,22 @@ module Bootstrap.X.Check where {
           L.mapM (checkBinding ds scope) bindings;
           inferIn ds scope body
         };
-      XIntTerm _ -> Right (XCon "Int" Nil);
+      XIntTerm _ -> Right (XCon "Int" []);
       XDoubleTerm n ->
         do {
           ensure (remInt (quotInt (doubleToBits n) 4503599627370496) 2048 /= 2047)
             "non-finite Double literal";
-          return (XCon "Double" Nil)
+          return (XCon "Double" [])
         };
-      XBoolTerm _ -> Right (XCon "Bool" Nil);
+      XBoolTerm _ -> Right (XCon "Bool" []);
       XStringTerm text ->
         do {
           ensure (validScalars text 0) "invalid Unicode scalar in string literal";
-          return (XCon "String" Nil)
+          return (XCon "String" [])
         };
       XPrimitive p arguments ->
         case P.primitiveSignature p of {
-          Pair parameters signature ->
+          (,) parameters signature ->
             do {
               ensure (L.length arguments == L.length parameters)
                 "primitive type argument arity mismatch";
@@ -241,7 +241,7 @@ module Bootstrap.X.Check where {
         do {
           boundValueShared1 <- D.lookupConstructor ds c;
           case boundValueShared1 of {
-            Pair d ctor ->
+            (,) d ctor ->
               do {
                 ensure (L.length arguments == L.length (D.datatypeParameters d))
                   ("constructor type argument arity mismatch: " ++ c);
@@ -275,19 +275,19 @@ module Bootstrap.X.Check where {
            c = stringCodeAt text i
          } in
          (((c < 55296) || (c > 57343)) && validScalars text (i + 1));
-  bindingName (Triple n _ _) = n;
-  bindingType (Triple _ t _) = t;
-  bindingPair (Triple n t _) = Pair n t;
-  uniqueNames :: List XName -> Bool;
+  bindingName ((,,) n _ _) = n;
+  bindingType ((,,) _ t _) = t;
+  bindingPair ((,,) n t _) = (,) n t;
+  uniqueNames :: [] XName -> Bool;
   uniqueNames ns = (L.length ns == S.size (S.fromList X.compareName ns));
-  checkBinding :: DataEnv -> XEnv -> Triple XName XType XTerm -> Either String Unit;
-  checkBinding ds env (Triple _ expected rhs) =
+  checkBinding :: DataEnv -> XEnv -> (,,) XName XType XTerm -> Either String ();
+  checkBinding ds env ((,,) _ expected rhs) =
     do {
       actual <- inferIn ds env rhs;
       ensure (T.alphaEq expected actual) "recursive definition does not have its declared type"
     };
-  shape (XAlternative (XConstructorPattern c ns) _) = Pair (Just c) (L.length ns);
-  shape (XAlternative (XDefaultPattern _) _) = Pair Nothing 0;
+  shape (XAlternative (XConstructorPattern c ns) _) = (,) (Just c) (L.length ns);
+  shape (XAlternative (XDefaultPattern _) _) = (,) Nothing 0;
   caseParameters :: DataEnv -> XType -> Maybe DataDecl -> Either String (Map String XType);
   caseParameters ds st Nothing = Right M.empty;
   caseParameters ds st (Just d) =
@@ -303,7 +303,7 @@ module Bootstrap.X.Check where {
     };
   checkAlternative :: DataEnv ->
                       XEnv ->
-                      XType -> XType -> Map String XType -> XAlternative -> Either String Unit;
+                      XType -> XType -> Map String XType -> XAlternative -> Either String ();
   checkAlternative ds env st result parameters (XAlternative pat body) =
     do {
       let {
@@ -322,31 +322,31 @@ module Bootstrap.X.Check where {
     };
   patternBindings :: DataEnv ->
                      XType ->
-                     Map String XType -> XPattern -> Either String (List (Pair XName XType));
+                     Map String XType -> XPattern -> Either String ([] ((,) XName XType));
   patternBindings ds st parameters (XDefaultPattern n) =
-    Right (L.map (\x -> Pair x st) (L.maybeToList n));
+    Right (L.map (\x -> (,) x st) (L.maybeToList n));
   patternBindings ds st parameters (XConstructorPattern c ns) =
     do {
       boundValueShared2 <- D.lookupConstructor ds c;
       case boundValueShared2 of {
-        Pair d ctor ->
+        (,) d ctor ->
           do {
             fields <- L.mapM (T.instantiateField parameters) (D.constructorFields ctor);
             return (L.concatMap namedBinding (L.zip ns fields))
           }
       }
     };
-  namedBinding (Pair Nothing t) = Nil;
-  namedBinding (Pair (Just n) t) = Cons (Pair n t) Nil;
+  namedBinding ((,) Nothing t) = [];
+  namedBinding ((,) (Just n) t) = (:) ((,) n t) [];
   checkClosed :: XTerm -> Either String XType;
   checkClosed term = infer emptyEnv term;
-  validateTypeEnv :: DataEnv -> Map XTyVar XType -> Either String Unit;
+  validateTypeEnv :: DataEnv -> Map XTyVar XType -> Either String ();
   validateTypeEnv ds env =
     do {
       L.mapM (visitTypeEnv ds env S.empty) (M.keys env);
-      return Unit
+      return ()
     };
-  visitTypeEnv :: DataEnv -> Map XTyVar XType -> Set XTyVar -> XTyVar -> Either String Unit;
+  visitTypeEnv :: DataEnv -> Map XTyVar XType -> Set XTyVar -> XTyVar -> Either String ();
   visitTypeEnv ds env path a =
     if S.member T.compareTyVar a path
     then Left "cyclic type environment"
@@ -357,7 +357,7 @@ module Bootstrap.X.Check where {
                wellFormedIn ds (M.delete T.compareTyVar a env) bound;
                L.mapM (visitTypeEnv ds env (S.insert T.compareTyVar a path))
                  (S.toList (T.freeVars bound));
-               return Unit
+               return ()
              }
          }
 }

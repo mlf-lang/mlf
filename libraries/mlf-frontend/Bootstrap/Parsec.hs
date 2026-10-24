@@ -7,7 +7,7 @@ module Bootstrap.Parsec where {
   import Bootstrap.Types;
   import Bootstrap.Std;
   import Bootstrap.Lexer;
-  data ParseState = ParseState String (List Token) Token SourceSyntax;
+  data ParseState = ParseState String ([] Token) Token SourceSyntax String String;
   data PResult a = PSuccess a ParseState Bool | PFailure String ParseState Bool;
   data Parser a = Parser (ParseState -> PResult a);
   pRun :: forall a. Parser a -> ParseState -> PResult a;
@@ -49,12 +49,12 @@ module Bootstrap.Parsec where {
              };
            result -> result
          });
-  pChoices :: forall a. List (Parser a) -> Parser a;
+  pChoices :: forall a. [] (Parser a) -> Parser a;
   pChoices parsers =
     case parsers of {
-      Nil -> pFail "no matching alternative";
-      Cons parser Nil -> parser;
-      Cons parser rest -> pChoice parser (pChoices rest)
+      [] -> pFail "no matching alternative";
+      (:) parser [] -> parser;
+      (:) parser rest -> pChoice parser (pChoices rest)
     };
   pTry :: forall a. Parser a -> Parser a;
   pTry parser =
@@ -72,34 +72,34 @@ module Bootstrap.Parsec where {
            PSuccess value _ _ -> PSuccess value state False;
            result -> result
          });
-  pNot :: forall a. Parser a -> Parser Unit;
+  pNot :: forall a. Parser a -> Parser ();
   pNot parser =
     Parser
       (\state ->
          case pRun parser state of {
            PSuccess _ _ _ -> PFailure "unexpected token" state False;
-           PFailure _ _ _ -> PSuccess Unit state False
+           PFailure _ _ _ -> PSuccess () state False
          });
-  pMany :: forall a. Parser a -> Parser (List a);
-  pMany parser = pChoice (pBind parser (\a -> pMap (Cons a) (pMany parser))) (pPure Nil);
-  pSome :: forall a. Parser a -> Parser (List a);
-  pSome parser = pBind parser (\a -> pMap (Cons a) (pMany parser));
+  pMany :: forall a. Parser a -> Parser ([] a);
+  pMany parser = pChoice (pBind parser (\a -> pMap ((:) a) (pMany parser))) (pPure []);
+  pSome :: forall a. Parser a -> Parser ([] a);
+  pSome parser = pBind parser (\a -> pMap ((:) a) (pMany parser));
   pOptional :: forall a. Parser a -> Parser (Maybe a);
   pOptional parser = pChoice (pMap Just parser) (pPure Nothing);
   pOption :: forall a. a -> Parser a -> Parser a;
   pOption value parser = pChoice parser (pPure value);
-  pSepBy :: forall a b. Parser a -> Parser b -> Parser (List a);
-  pSepBy parser separator = pChoice (pSepBy1 parser separator) (pPure Nil);
-  pSepBy1 :: forall a b. Parser a -> Parser b -> Parser (List a);
-  pSepBy1 parser separator = pBind parser (\a -> pMap (Cons a) (pMany (pThen separator parser)));
-  pSepEndBy :: forall a b. Parser a -> Parser b -> Parser (List a);
-  pSepEndBy parser separator = pChoice (pSepEndBy1 parser separator) (pPure Nil);
-  pSepEndBy1 :: forall a b. Parser a -> Parser b -> Parser (List a);
+  pSepBy :: forall a b. Parser a -> Parser b -> Parser ([] a);
+  pSepBy parser separator = pChoice (pSepBy1 parser separator) (pPure []);
+  pSepBy1 :: forall a b. Parser a -> Parser b -> Parser ([] a);
+  pSepBy1 parser separator = pBind parser (\a -> pMap ((:) a) (pMany (pThen separator parser)));
+  pSepEndBy :: forall a b. Parser a -> Parser b -> Parser ([] a);
+  pSepEndBy parser separator = pChoice (pSepEndBy1 parser separator) (pPure []);
+  pSepEndBy1 :: forall a b. Parser a -> Parser b -> Parser ([] a);
   pSepEndBy1 parser separator =
     pBind parser
       (\a ->
-         pChoice (pThen separator (pMap (Cons a) (pSepEndBy parser separator)))
-           (pPure (Cons a Nil)));
+         pChoice (pThen separator (pMap ((:) a) (pSepEndBy parser separator)))
+           (pPure ((:) a [])));
   pBetween :: forall a b c. Parser a -> Parser b -> Parser c -> Parser c;
   pBetween begin end parser = pThen begin (pBefore parser end);
   pParens :: forall a. Parser a -> Parser a;
@@ -109,10 +109,10 @@ module Bootstrap.Parsec where {
   pState :: Parser ParseState;
   pState = Parser (\state -> PSuccess state state False);
   stateToken :: ParseState -> Token;
-  stateToken (ParseState _ tokens finish _) =
+  stateToken (ParseState _ tokens finish _ _ _) =
     case tokens of {
-      Nil -> finish;
-      Cons t _ -> t
+      [] -> finish;
+      (:) t _ -> t
     };
   stateOffset :: ParseState -> Int;
   stateOffset state =
@@ -121,12 +121,12 @@ module Bootstrap.Parsec where {
     } in
     ((tokenLine token * 1000000) + tokenColumn token);
   stateError :: ParseState -> String -> String;
-  stateError (ParseState file tokens finish _) message =
+  stateError (ParseState file tokens finish _ _ _) message =
     let {
       token =
         case tokens of {
-          Nil -> finish;
-          Cons t _ -> t
+          [] -> finish;
+          (:) t _ -> t
         }
     } in
     (file ++
@@ -137,27 +137,27 @@ module Bootstrap.Parsec where {
     Parser
       (\state ->
          case state of {
-           ParseState file tokens finish syntax ->
+           ParseState file tokens finish syntax sourceModule sourcePackage ->
              case tokens of {
-               Nil -> PFailure ("unexpected end of input; expected " ++ expected) state False;
-               Cons t rest ->
+               [] -> PFailure ("unexpected end of input; expected " ++ expected) state False;
+               (:) t rest ->
                  if predicate (tokenText t)
-                 then PSuccess (tokenText t) (ParseState file rest finish syntax) True
+                 then PSuccess (tokenText t) (ParseState file rest finish syntax sourceModule sourcePackage) True
                  else PFailure ("unexpected " ++ (tokenText t ++ ("; expected " ++ expected))) state
                         False
              }
          });
   pToken :: String -> Parser String;
   pToken spelling = pSatisfy (eqString spelling) spelling;
-  pEof :: Parser Unit;
+  pEof :: Parser ();
   pEof =
     Parser
       (\state ->
          case state of {
-           ParseState _ tokens _ _ ->
+           ParseState _ tokens _ _ _ _ ->
              case tokens of {
-               Nil -> PSuccess Unit state False;
-               Cons t _ ->
+               [] -> PSuccess () state False;
+               (:) t _ ->
                  PFailure ("unexpected " ++ (tokenText t ++ "; expected end of input")) state False
              }
          });
@@ -171,8 +171,11 @@ module Bootstrap.Parsec where {
   runParser = runParserWithProfile LegacyEmlfV1;
   runParserWithProfile :: forall a. SourceSyntax ->
                                     Parser a -> String -> Scanned -> Either String a;
-  runParserWithProfile syntax parser file (Scanned tokens finish) =
-    case pRun (pBefore parser pEof) (ParseState file tokens finish syntax) of {
+  runParserWithProfile = runParserWithProfileInPackage "main";
+  runParserWithProfileInPackage :: forall a. String -> SourceSyntax ->
+                                    Parser a -> String -> Scanned -> Either String a;
+  runParserWithProfileInPackage sourcePackage syntax parser file (Scanned tokens finish) =
+    case pRun (pBefore parser pEof) (ParseState file tokens finish syntax "Main" sourcePackage) of {
       PFailure message state _ -> Left (stateError state message);
       PSuccess a _ _ -> Right a
     };
@@ -205,9 +208,9 @@ module Bootstrap.Parsec where {
     Parser
       (\state ->
          case state of {
-           ParseState file tokens finish syntax ->
+           ParseState file tokens finish syntax sourceModule sourcePackage ->
              case tokens of {
-               Cons (Token text line column endLine endColumn) rest ->
+               (:) (Token text line column endLine endColumn) rest ->
                  let {
                    size = stringLength symbol
                  } in
@@ -216,24 +219,46 @@ module Bootstrap.Parsec where {
                         remaining =
                           if (stringLength text == size)
                           then rest
-                          else Cons
+                          else (:)
                                  (Token (stringSlice text size (stringLength text - size)) line
                                     (column + size)
                                     endLine
                                     endColumn)
                                  rest
                       } in
-                      PSuccess symbol (ParseState file remaining finish syntax) True
+                      PSuccess symbol (ParseState file remaining finish syntax sourceModule sourcePackage) True
                  else PFailure ("expected " ++ symbol) state False;
-               Nil -> PFailure ("expected " ++ symbol) state False
+               [] -> PFailure ("expected " ++ symbol) state False
              }
          });
+  pSetSourceModule :: String -> Parser ();
+  pSetSourceModule name = Parser (\state -> case state of {
+    ParseState file tokens finish syntax _ sourcePackage ->
+      PSuccess () (ParseState file tokens finish syntax name sourcePackage) False
+  });
+  pWithSpan :: forall a. Parser a -> Parser ((,) SourceSpan a);
+  pWithSpan parser = Parser (\state -> case state of {
+    ParseState file tokens finish _ sourceModule sourcePackage ->
+      case pRun parser state of {
+        PFailure message end consumed -> PFailure message end consumed;
+        PSuccess value end consumed -> case end of {
+          ParseState _ remaining _ _ _ _ -> let {
+            count = length tokens - length remaining;
+            first = stateToken state;
+            final = if count > 0 then last (take count tokens) else first
+          } in PSuccess
+            ((,) (SourceSpan sourcePackage sourceModule file
+                    (tokenLine first) (tokenColumn first)
+                    (tokenEndLine final) (tokenEndColumn final)) value) end consumed
+        }
+      }
+  });
   pSourceSyntax :: Parser SourceSyntax;
   pSourceSyntax =
     Parser
       (\state ->
          case state of {
-           ParseState _ _ _ syntax -> PSuccess syntax state False
+           ParseState _ _ _ syntax _ _ -> PSuccess syntax state False
          });
   pBySyntax :: forall a. Parser a -> Parser a -> Parser a;
   pBySyntax shared legacy =
@@ -241,6 +266,7 @@ module Bootstrap.Parsec where {
       (\syntax ->
          case syntax of {
            SharedHaskellV1 -> shared;
-           LegacyEmlfV1 -> legacy
+           LegacyEmlfV1 -> legacy;
+           MetadataSyntax -> legacy
          })
 }

@@ -3,7 +3,7 @@
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
 module MLF.Tests.Async.ProcessPanic where {
-  import MLF.Primitive;
+  import MLF.Primitive hiding (fail);
   import Bootstrap.Types;
   import Async.Process;
   fail :: forall a. String -> IO a;
@@ -18,12 +18,12 @@ module MLF.Tests.Async.ProcessPanic where {
       Right value -> ioReturn value;
       Left error -> fail (errorMessage error)
     };
-  ready :: ProcessScope -> ProcessHandle -> String -> IO Unit;
+  ready :: ProcessScope -> ProcessHandle -> String -> IO ();
   ready scope handle path =
     do {
       found <- fileExists path;
       if found
-      then ioReturn Unit
+      then ioReturn ()
       else do {
              result <- awaitWithin scope handle (ForMilliseconds 10);
              case result of {
@@ -46,14 +46,14 @@ module MLF.Tests.Async.ProcessPanic where {
                submitted <-
                  submit scope
                    (command helper
-                      (Cons "hold"
-                         (Cons (work ++ "/panic.pid") (Cons (work ++ "/panic.release") Nil)))
+                      ((:) "hold"
+                         ((:) (work ++ "/panic.pid") ((:) (work ++ "/panic.release") [])))
                       (work ++ "/panic.out")
                       (work ++ "/panic.err"));
                handle <- right submitted;
                ready scope handle (work ++ "/panic.pid");
                putStrLn (panic "async-scope-panic");
-               ioReturn (Right Unit)
+               ioReturn (Right ())
              });
       right result
     }

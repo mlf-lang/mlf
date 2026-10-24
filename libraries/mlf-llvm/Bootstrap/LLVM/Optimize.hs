@@ -10,17 +10,17 @@ module Bootstrap.LLVM.Optimize where {
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.X.Syntax as X;
   -- Fresh copies preserve global binder identity uniqueness when rewriting.
-  data Fresh a = Fresh (Int -> Pair a Int);
-  runFresh :: forall a. Fresh a -> Int -> Pair a Int;
+  data Fresh a = Fresh (Int -> (,) a Int);
+  runFresh :: forall a. Fresh a -> Int -> (,) a Int;
   runFresh (Fresh f) seed = f seed;
   freshPure :: forall a. a -> Fresh a;
-  freshPure value = Fresh (\seed -> Pair value seed);
+  freshPure value = Fresh (\seed -> (,) value seed);
   freshBind :: forall a b. Fresh a -> (a -> Fresh b) -> Fresh b;
   freshBind action next =
     Fresh
       (\seed ->
          case runFresh action seed of {
-           Pair value after -> runFresh (next value) after
+           (,) value after -> runFresh (next value) after
          });
   instance Functor Fresh where {
     fmap function action = freshBind action (\value -> freshPure (function value))
@@ -34,7 +34,7 @@ module Bootstrap.LLVM.Optimize where {
     (>>=) = freshBind
   };
   freshName :: Fresh XName;
-  freshName = Fresh (\seed -> Pair (XName seed "native") (seed + 1));
+  freshName = Fresh (\seed -> (,) (XName seed "native") (seed + 1));
   nameId :: XName -> Int;
   nameId (XName n hint) = n;
   compareName :: XName -> XName -> Int;
@@ -52,18 +52,18 @@ module Bootstrap.LLVM.Optimize where {
       XELetRec ds b ->
         S.difference compareName
           (S.unions compareName
-             (Cons (free b)
+             ((:) (free b)
                 (L.map
                    (\entry ->
                       case entry of {
-                        Pair n a -> free a
+                        (,) n a -> free a
                       })
                    ds)))
           (S.fromList compareName
              (L.map
                 (\entry ->
                    case entry of {
-                     Pair n a -> n
+                     (,) n a -> n
                    })
                 ds));
       XECase a branches ->
@@ -73,22 +73,22 @@ module Bootstrap.LLVM.Optimize where {
   freeAlternative :: XErasedAlternative -> Set XName;
   freeAlternative (XErasedAlternative p b) =
     S.difference compareName (free b) (S.fromList compareName (X.patternNames p));
-  applications :: XErased -> Pair XErased (List XErased);
-  applications expression = collectApplications Nil expression;
-  collectApplications :: List XErased -> XErased -> Pair XErased (List XErased);
+  applications :: XErased -> (,) XErased ([] XErased);
+  applications expression = collectApplications [] expression;
+  collectApplications :: [] XErased -> XErased -> (,) XErased ([] XErased);
   collectApplications args expression =
     case expression of {
-      XEApp f a -> collectApplications (Cons a args) f;
-      _ -> Pair expression args
+      XEApp f a -> collectApplications ((:) a args) f;
+      _ -> (,) expression args
     };
-  lambdas :: XErased -> Pair (List XName) XErased;
+  lambdas :: XErased -> (,) ([] XName) XErased;
   lambdas expression =
     case expression of {
       XEAbs n b ->
         case lambdas b of {
-          Pair ns body -> Pair (Cons n ns) body
+          (,) ns body -> (,) ((:) n ns) body
         };
-      _ -> Pair Nil expression
+      _ -> (,) [] expression
     };
   -- Match the seed's bounded size query: a function larger than the inlining
   -- threshold need not have its remaining tree traversed.
@@ -108,7 +108,7 @@ module Bootstrap.LLVM.Optimize where {
                (L.map
                   (\entry ->
                      case entry of {
-                       Pair n a -> a
+                       (,) n a -> a
                      })
                   ds);
            XECase a branches ->
@@ -121,13 +121,13 @@ module Bootstrap.LLVM.Optimize where {
                   branches);
            _ -> rest
          };
-  remainingSizes :: Int -> List XErased -> Int;
+  remainingSizes :: Int -> [] XErased -> Int;
   remainingSizes budget expressions =
     if (budget < 0)
     then (0 - 1)
     else case expressions of {
-           Nil -> budget;
-           Cons expression rest -> remainingSizes (remainingSize budget expression) rest
+           [] -> budget;
+           (:) expression rest -> remainingSizes (remainingSize budget expression) rest
          };
   -- Only zero, one, and multiple free uses matter to these rewrites. The limit
   -- is shared across siblings, and binder checks keep this query scope-correct.
@@ -138,28 +138,28 @@ module Bootstrap.LLVM.Optimize where {
     else case expression of {
            XEVar n -> if eqName name n then 1 else 0;
            XEAbs n b -> if eqName name n then 0 else occurrences limit name b;
-           XEApp f a -> occurrenceTerms limit name (Cons f (Cons a Nil));
+           XEApp f a -> occurrenceTerms limit name ((:) f ((:) a []));
            XELet n a b ->
-             occurrenceTerms limit name (Cons a (if eqName name n then Nil else Cons b Nil));
+             occurrenceTerms limit name ((:) a (if eqName name n then [] else (:) b []));
            XELetRec ds b ->
              if L.any
                   (\entry ->
                      case entry of {
-                       Pair n a -> eqName name n
+                       (,) n a -> eqName name n
                      })
                   ds
              then 0
              else occurrenceTerms limit name
-                    (Cons b
+                    ((:) b
                        (L.map
                           (\entry ->
                              case entry of {
-                               Pair n a -> a
+                               (,) n a -> a
                              })
                           ds));
            XECase a branches ->
              occurrenceTerms limit name
-               (Cons a
+               ((:) a
                   (L.map
                      (\branch ->
                         case branch of {
@@ -174,27 +174,27 @@ module Bootstrap.LLVM.Optimize where {
                         branches)));
            _ -> 0
          };
-  occurrenceTerms :: Int -> XName -> List XErased -> Int;
+  occurrenceTerms :: Int -> XName -> [] XErased -> Int;
   occurrenceTerms limit name expressions =
     if (limit <= 0)
     then 0
     else case expressions of {
-           Nil -> 0;
-           Cons expression rest ->
+           [] -> 0;
+           (:) expression rest ->
              let {
                used = occurrences limit name expression
              } in
              (used + occurrenceTerms (limit - used) name rest)
          };
-  traverseFresh :: forall a b. (a -> Fresh b) -> List a -> Fresh (List b);
+  traverseFresh :: forall a b. (a -> Fresh b) -> [] a -> Fresh ([] b);
   traverseFresh f values =
     case values of {
-      Nil -> freshPure Nil;
-      Cons a rest ->
+      [] -> freshPure [];
+      (:) a rest ->
         do {
           value <- f a;
           tail <- traverseFresh f rest;
-          freshPure (Cons value tail)
+          freshPure ((:) value tail)
         }
     };
   copy :: Map XName XErased -> XErased -> Fresh XErased;
@@ -230,7 +230,7 @@ module Bootstrap.LLVM.Optimize where {
                    (L.zipWith
                       (\entry n ->
                          case entry of {
-                           Pair old a -> Pair old (XEVar n)
+                           (,) old a -> (,) old (XEVar n)
                          })
                       ds
                       names))
@@ -249,11 +249,11 @@ module Bootstrap.LLVM.Optimize where {
       _ -> freshPure expression
     };
   copyRecursive :: Map XName XErased ->
-                   Pair XName (Pair XName XErased) -> Fresh (Pair XName XErased);
-  copyRecursive env (Pair name (Pair old value)) =
+                   (,) XName ((,) XName XErased) -> Fresh ((,) XName XErased);
+  copyRecursive env ((,) name ((,) old value)) =
     do {
       copied <- copy env value;
-      freshPure (Pair name copied)
+      freshPure ((,) name copied)
     };
   copyAlternative :: Map XName XErased -> XErasedAlternative -> Fresh XErasedAlternative;
   copyAlternative env (XErasedAlternative pattern body) =
@@ -305,10 +305,10 @@ module Bootstrap.LLVM.Optimize where {
             traverseFresh
               (\entry ->
                  case entry of {
-                   Pair n a ->
+                   (,) n a ->
                      do {
                        value <- f a;
-                       freshPure (Pair n value)
+                       freshPure ((,) n value)
                      }
                  })
               ds;
@@ -347,7 +347,7 @@ module Bootstrap.LLVM.Optimize where {
   fixedPoints :: XErased -> Fresh XErased;
   fixedPoints expression =
     case expression of {
-      XEAbs f (XELet g (XEAbs r (XECase (XEVar r1) (Cons (XErasedAlternative (XConstructorPattern c (Cons (Just next) Nil)) (XEApp (XEVar f1) (XEApp (XEVar next1) (XEVar r2)))) Nil))) (XEApp (XEVar g1) (XEApp (XEConstructor c1) (XEVar g2)))) ->
+      XEAbs f (XELet g (XEAbs r (XECase (XEVar r1) ((:) (XErasedAlternative (XConstructorPattern c ((:) (Just next) [])) (XEApp (XEVar f1) (XEApp (XEVar next1) (XEVar r2)))) []))) (XEApp (XEVar g1) (XEApp (XEConstructor c1) (XEVar g2)))) ->
         if (eqName f f1 &&
             (eqName r r1 &&
              (eqName r r2 &&
@@ -356,7 +356,7 @@ module Bootstrap.LLVM.Optimize where {
                loop <- freshName;
                freshPure
                  (XEAbs f
-                    (XELetRec (Cons (Pair loop (XEApp (XEVar f) (XEVar loop))) Nil) (XEVar loop)))
+                    (XELetRec ((:) ((,) loop (XEApp (XEVar f) (XEVar loop))) []) (XEVar loop)))
              }
         else children fixedPoints expression;
       _ -> children fixedPoints expression
@@ -380,37 +380,37 @@ module Bootstrap.LLVM.Optimize where {
            XEAbs n b -> (remainingSize 24 expression >= 0);
            _ ->
              case applications expression of {
-               Pair (XEConstructor c) args -> L.all atom args;
+               (,) (XEConstructor c) args -> L.all atom args;
                _ -> False
              }
          };
   -- Arity evidence comes from independently checked constructor patterns. No
   -- constructor spelling or runtime tag is special; absent/conflicting evidence
   -- disables propagation, and partial applications are never treated as data.
-  subterms :: XErased -> List XErased;
+  subterms :: XErased -> [] XErased;
   subterms expression =
     case expression of {
-      XEAbs n b -> Cons b Nil;
-      XEApp f a -> Cons f (Cons a Nil);
-      XELet n a b -> Cons a (Cons b Nil);
+      XEAbs n b -> (:) b [];
+      XEApp f a -> (:) f ((:) a []);
+      XELet n a b -> (:) a ((:) b []);
       XELetRec ds b ->
         L.snoc
           (L.map
              (\entry ->
                 case entry of {
-                  Pair n a -> a
+                  (,) n a -> a
                 })
              ds)
           b;
       XECase a branches ->
-        Cons a
+        (:) a
           (L.map
              (\branch ->
                 case branch of {
                   XErasedAlternative p b -> b
                 })
              branches);
-      _ -> Nil
+      _ -> []
     };
   agreeArity :: Maybe Int -> Maybe Int -> Maybe Int;
   agreeArity a b =
@@ -441,46 +441,46 @@ module Bootstrap.LLVM.Optimize where {
     L.foldlStrict collectArities after (subterms expression);
   constructorArities :: XErased -> Map String (Maybe Int);
   constructorArities expression = collectArities M.empty expression;
-  constructorValue :: Map String (Maybe Int) -> XErased -> Maybe (Pair String (List XErased));
+  constructorValue :: Map String (Maybe Int) -> XErased -> Maybe ((,) String ([] XErased));
   constructorValue arities expression =
     case applications expression of {
-      Pair (XEConstructor c) args ->
+      (,) (XEConstructor c) args ->
         case M.lookup compareString c arities of {
-          Just (Just arity) -> if (arity == L.length args) then Just (Pair c args) else Nothing;
+          Just (Just arity) -> if (arity == L.length args) then Just ((,) c args) else Nothing;
           _ -> Nothing
         };
       _ -> Nothing
     };
   -- Each non-atomic field gets one lazy binding before any projection is
   -- copied. Recursive fields remain in the original group to preserve knots.
-  liftField :: XErased -> Fresh (Pair (List (Pair XName XErased)) XErased);
+  liftField :: XErased -> Fresh ((,) ([] ((,) XName XErased)) XErased);
   liftField field =
     if atom field
-    then freshPure (Pair Nil field)
+    then freshPure ((,) [] field)
     else do {
            name <- freshName;
-           freshPure (Pair (Cons (Pair name field) Nil) (XEVar name))
+           freshPure ((,) ((:) ((,) name field) []) (XEVar name))
          };
   liftConstructorValue :: Map String (Maybe Int) ->
-                          XErased -> Fresh (Pair (List (Pair XName XErased)) XErased);
+                          XErased -> Fresh ((,) ([] ((,) XName XErased)) XErased);
   liftConstructorValue arities value =
     case constructorValue arities value of {
-      Just (Pair c args) ->
+      Just ((,) c args) ->
         do {
           fields <- traverseFresh liftField args;
           freshPure
-            (Pair (L.concatMap L.fst fields) (L.foldl XEApp (XEConstructor c) (L.map L.snd fields)))
+            ((,) (L.concatMap L.fst fields) (L.foldl XEApp (XEConstructor c) (L.map L.snd fields)))
         };
-      Nothing -> freshPure (Pair Nil value)
+      Nothing -> freshPure ((,) [] value)
     };
   liftConstructorBinding :: Map String (Maybe Int) ->
-                            Pair XName XErased ->
-                            Fresh (Pair (Pair XName XErased) (List (Pair XName XErased)));
-  liftConstructorBinding arities (Pair name rhs) =
+                            (,) XName XErased ->
+                            Fresh ((,) ((,) XName XErased) ([] ((,) XName XErased)));
+  liftConstructorBinding arities ((,) name rhs) =
     do {
       lifted <- liftConstructorValue arities rhs;
       case lifted of {
-        Pair fields value -> freshPure (Pair (Pair name value) fields)
+        (,) fields value -> freshPure ((,) ((,) name value) fields)
       }
     };
   liftConstructorFields :: Map String (Maybe Int) -> XErased -> Fresh XErased;
@@ -492,12 +492,12 @@ module Bootstrap.LLVM.Optimize where {
           do {
             lifted <- liftConstructorValue arities rhs;
             case lifted of {
-              Pair fields value ->
+              (,) fields value ->
                 freshPure
                   (L.foldr
                      (\entry rest ->
                         case entry of {
-                          Pair n a -> XELet n a rest
+                          (,) n a -> XELet n a rest
                         })
                      (XELet name value body)
                      fields)
@@ -512,30 +512,30 @@ module Bootstrap.LLVM.Optimize where {
       }
     };
   constructorFact :: Map String (Maybe Int) ->
-                     Map XName (Pair String (List XErased)) ->
-                     Pair XName XErased -> Map XName (Pair String (List XErased));
-  constructorFact arities known (Pair name rhs) =
+                     Map XName ((,) String ([] XErased)) ->
+                     (,) XName XErased -> Map XName ((,) String ([] XErased));
+  constructorFact arities known ((,) name rhs) =
     case constructorValue arities rhs of {
-      Just (Pair c fields) ->
-        if L.all smallValue fields then M.insert compareName name (Pair c fields) known else known;
+      Just ((,) c fields) ->
+        if L.all smallValue fields then M.insert compareName name ((,) c fields) known else known;
       Nothing -> known
     };
   collectConstructorFacts :: Map String (Maybe Int) ->
-                             Map XName (Pair String (List XErased)) ->
-                             XErased -> Map XName (Pair String (List XErased));
+                             Map XName ((,) String ([] XErased)) ->
+                             XErased -> Map XName ((,) String ([] XErased));
   collectConstructorFacts arities known expression =
     let {
       after =
         case expression of {
-          XELet name rhs body -> constructorFact arities known (Pair name rhs);
+          XELet name rhs body -> constructorFact arities known ((,) name rhs);
           XELetRec ds body -> L.foldlStrict (constructorFact arities) known ds;
           _ -> known
         }
     } in
     L.foldlStrict (collectConstructorFacts arities) after (subterms expression);
-  constructorFacts :: Map String (Maybe Int) -> XErased -> Map XName (Pair String (List XErased));
+  constructorFacts :: Map String (Maybe Int) -> XErased -> Map XName ((,) String ([] XErased));
   constructorFacts arities expression = collectConstructorFacts arities M.empty expression;
-  projectConstructors :: Map XName (Pair String (List XErased)) -> XErased -> Fresh XErased;
+  projectConstructors :: Map XName ((,) String ([] XErased)) -> XErased -> Fresh XErased;
   -- Small lifted values may have inlined back into fields. Freshen any
   -- copied binders so repeated projections keep global identities unique.
   projectConstructors facts expression =
@@ -544,7 +544,7 @@ module Bootstrap.LLVM.Optimize where {
       case normalized of {
         XECase (XEVar name) branches ->
           case M.lookup compareName name facts of {
-            Just (Pair c args) ->
+            Just ((,) c args) ->
               case selectConstructor c args branches of {
                 Just selected -> copy M.empty selected;
                 Nothing -> freshPure normalized
@@ -554,11 +554,11 @@ module Bootstrap.LLVM.Optimize where {
         _ -> freshPure normalized
       }
     };
-  selectConstructor :: String -> List XErased -> List XErasedAlternative -> Maybe XErased;
+  selectConstructor :: String -> [] XErased -> [] XErasedAlternative -> Maybe XErased;
   selectConstructor constructor args branches =
     case branches of {
-      Nil -> Nothing;
-      Cons (XErasedAlternative pattern body) rest ->
+      [] -> Nothing;
+      (:) (XErasedAlternative pattern body) rest ->
         case pattern of {
           XConstructorPattern c names ->
             if (eqString constructor c && (L.length names == L.length args))
@@ -566,7 +566,7 @@ module Bootstrap.LLVM.Optimize where {
                    (L.foldr
                       (\entry restBody ->
                          case entry of {
-                           Pair optional value -> maybeLet optional value restBody
+                           (,) optional value -> maybeLet optional value restBody
                          })
                       body
                       (L.zip names args))
@@ -590,8 +590,8 @@ module Bootstrap.LLVM.Optimize where {
     UseAbs XName UseTree |
     UseApp UseTree UseTree |
     UseLet XName UseTree UseTree |
-    UseRec (List (Pair XName UseTree)) UseTree |
-    UseCase UseTree (List (Pair XPattern UseTree));
+    UseRec ([] ((,) XName UseTree)) UseTree |
+    UseCase UseTree ([] ((,) XPattern UseTree));
   useTerm :: UseTree -> XErased;
   useTerm (UseTree term _ _) = term;
   useCounts :: UseTree -> Map XName Int;
@@ -605,7 +605,7 @@ module Bootstrap.LLVM.Optimize where {
     if (M.size a <= M.size b)
     then M.unionWith compareName addUses a b
     else M.unionWith compareName addUses b a;
-  deleteUses :: List XName -> Map XName Int -> Map XName Int;
+  deleteUses :: [] XName -> Map XName Int -> Map XName Int;
   deleteUses names counts =
     L.foldl (\current name -> M.delete compareName name current) counts names;
   useAbs :: XName -> UseTree -> UseTree;
@@ -622,7 +622,7 @@ module Bootstrap.LLVM.Optimize where {
     UseTree (XELet name (useTerm value) (useTerm body))
       (mergeUses (useCounts value) (M.delete compareName name (useCounts body)))
       (UseLet name value body);
-  useRec :: List (Pair XName UseTree) -> UseTree -> UseTree;
+  useRec :: [] ((,) XName UseTree) -> UseTree -> UseTree;
   useRec bindings body =
     let {
       counts =
@@ -630,22 +630,22 @@ module Bootstrap.LLVM.Optimize where {
           bindings
     } in
     UseTree
-      (XELetRec (L.map (\(Pair name value) -> Pair name (useTerm value)) bindings) (useTerm body))
+      (XELetRec (L.map (\((,) name value) -> (,) name (useTerm value)) bindings) (useTerm body))
       (deleteUses (L.map L.fst bindings) counts)
       (UseRec bindings body);
-  useCase :: UseTree -> List (Pair XPattern UseTree) -> UseTree;
+  useCase :: UseTree -> [] ((,) XPattern UseTree) -> UseTree;
   useCase subject alternatives =
     let {
       counts =
         L.foldl
-          (\current (Pair pattern body) ->
+          (\current ((,) pattern body) ->
              mergeUses current (deleteUses (X.patternNames pattern) (useCounts body)))
           (useCounts subject)
           alternatives
     } in
     UseTree
       (XECase (useTerm subject)
-         (L.map (\(Pair pattern body) -> XErasedAlternative pattern (useTerm body)) alternatives))
+         (L.map (\((,) pattern body) -> XErasedAlternative pattern (useTerm body)) alternatives))
       counts
       (UseCase subject alternatives);
   indexUses :: XErased -> UseTree;
@@ -655,11 +655,11 @@ module Bootstrap.LLVM.Optimize where {
       XEApp function argument -> useApp (indexUses function) (indexUses argument);
       XELet name value body -> useLet name (indexUses value) (indexUses body);
       XELetRec bindings body ->
-        useRec (L.map (\(Pair name value) -> Pair name (indexUses value)) bindings)
+        useRec (L.map (\((,) name value) -> (,) name (indexUses value)) bindings)
           (indexUses body);
       XECase subject alternatives ->
         useCase (indexUses subject)
-          (L.map (\(XErasedAlternative pattern body) -> Pair pattern (indexUses body))
+          (L.map (\(XErasedAlternative pattern body) -> (,) pattern (indexUses body))
              alternatives);
       XEVar name -> UseTree term (M.singleton name 1) UseLeaf;
       _ -> UseTree term M.empty UseLeaf
@@ -689,10 +689,10 @@ module Bootstrap.LLVM.Optimize where {
         do {
           values <-
             traverseFresh
-              (\(Pair name value) ->
+              (\((,) name value) ->
                  do {
                    result <- f value;
-                   freshPure (Pair name result)
+                   freshPure ((,) name result)
                  })
               bindings;
           result <- f body;
@@ -703,10 +703,10 @@ module Bootstrap.LLVM.Optimize where {
           value <- f subject;
           branches <-
             traverseFresh
-              (\(Pair pattern body) ->
+              (\((,) pattern body) ->
                  do {
                    result <- f body;
-                   freshPure (Pair pattern result)
+                   freshPure ((,) pattern result)
                  })
               alternatives;
           freshPure (useCase value branches)
@@ -726,11 +726,11 @@ module Bootstrap.LLVM.Optimize where {
              else freshPure tree;
            _ -> mapUseChildren (substituteUsed name value) tree
          };
-  useApplications :: List UseTree -> UseTree -> Pair UseTree (List UseTree);
+  useApplications :: [] UseTree -> UseTree -> (,) UseTree ([] UseTree);
   useApplications arguments tree =
     case useChildren tree of {
-      UseApp function argument -> useApplications (Cons argument arguments) function;
-      _ -> Pair tree arguments
+      UseApp function argument -> useApplications ((:) argument arguments) function;
+      _ -> (,) tree arguments
     };
   useMaybeLet :: Maybe XName -> UseTree -> UseTree -> UseTree;
   useMaybeLet optional value body =
@@ -738,16 +738,16 @@ module Bootstrap.LLVM.Optimize where {
       Nothing -> body;
       Just name -> useLet name value body
     };
-  selectUseConstructor :: String -> List UseTree -> List (Pair XPattern UseTree) -> Maybe UseTree;
+  selectUseConstructor :: String -> [] UseTree -> [] ((,) XPattern UseTree) -> Maybe UseTree;
   selectUseConstructor constructor arguments branches =
     case branches of {
-      Nil -> Nothing;
-      Cons (Pair pattern body) rest ->
+      [] -> Nothing;
+      (:) ((,) pattern body) rest ->
         case pattern of {
           XConstructorPattern name fields ->
             if (eqString constructor name && (L.length fields == L.length arguments))
             then Just
-                   (L.foldr (\(Pair optional value) result -> useMaybeLet optional value result)
+                   (L.foldr (\((,) optional value) result -> useMaybeLet optional value result)
                       body
                       (L.zip fields arguments))
             else selectUseConstructor constructor arguments rest;
@@ -758,11 +758,11 @@ module Bootstrap.LLVM.Optimize where {
                  body)
         }
     };
-  substituteUsedBindings :: UseTree -> List (Pair XName UseTree) -> Fresh UseTree;
+  substituteUsedBindings :: UseTree -> [] ((,) XName UseTree) -> Fresh UseTree;
   substituteUsedBindings body bindings =
     case bindings of {
-      Nil -> freshPure body;
-      Cons (Pair name value) rest ->
+      [] -> freshPure body;
+      (:) ((,) name value) rest ->
         do {
           result <- substituteUsed name (useTerm value) body;
           substituteUsedBindings result rest
@@ -792,13 +792,13 @@ module Bootstrap.LLVM.Optimize where {
                       then substituteUsed name (useTerm value) body
                       else freshPure tree;
                     UseLet inner a b -> freshPure (useLet inner a (useLet name b body));
-                    UseRec (Cons (Pair r rhs) Nil) result ->
+                    UseRec ((:) ((,) r rhs) []) result ->
                       case useTerm result of {
                         XEVar other ->
                           if eqName r other
                           then do {
                                  replaced <- copy (M.singleton r (XEVar name)) (useTerm rhs);
-                                 freshPure (useRec (Cons (Pair name (indexUses replaced)) Nil) body)
+                                 freshPure (useRec ((:) ((,) name (indexUses replaced)) []) body)
                                }
                           else freshPure tree;
                         _ -> freshPure tree
@@ -812,7 +812,7 @@ module Bootstrap.LLVM.Optimize where {
         let {
           expandable =
             L.filter
-              (\(Pair _ value) ->
+              (\((,) _ value) ->
                  (smallValue (useTerm value) &&
                   S.null (S.intersection compareName (free (useTerm value)) group)))
               bindings
@@ -821,14 +821,14 @@ module Bootstrap.LLVM.Optimize where {
           names = S.fromList compareName (L.map L.fst expandable)
         } in
         let {
-          keep = L.filter (\(Pair name _) -> L.not (S.member compareName name names)) bindings
+          keep = L.filter (\((,) name _) -> L.not (S.member compareName name names)) bindings
         } in
         substituteUsedBindings (if L.null keep then body else useRec keep body) expandable;
-      UseCase subject (Cons (Pair (XDefaultPattern optional) body) Nil) ->
+      UseCase subject ((:) ((,) (XDefaultPattern optional) body) []) ->
         freshPure (useMaybeLet optional subject body);
       UseCase subject branches ->
-        case useApplications Nil subject of {
-          Pair head arguments ->
+        case useApplications [] subject of {
+          (,) head arguments ->
             case useTerm head of {
               XEConstructor constructor ->
                 case selectUseConstructor constructor arguments branches of {
@@ -874,10 +874,10 @@ module Bootstrap.LLVM.Optimize where {
             do {
               values <-
                 traverseFresh
-                  (\(Pair name value) ->
+                  (\((,) name value) ->
                      do {
                        result <- passRaw value;
-                       freshPure (Pair name result)
+                       freshPure ((,) name result)
                      })
                   bindings;
               result <- passRaw body;
@@ -891,7 +891,7 @@ module Bootstrap.LLVM.Optimize where {
                   (\(XErasedAlternative pattern body) ->
                      do {
                        result <- passRaw body;
-                       freshPure (Pair pattern result)
+                       freshPure ((,) pattern result)
                      })
                   alternatives;
               freshPure (useCase value branches)
@@ -917,7 +917,7 @@ module Bootstrap.LLVM.Optimize where {
         L.foldl
           (\maximum entry ->
              case entry of {
-               Pair n a -> L.max maximum (L.max (nameId n) (maxIdentity a))
+               (,) n a -> L.max maximum (L.max (nameId n) (maxIdentity a))
              })
           (maxIdentity b)
           ds;
@@ -952,7 +952,7 @@ module Bootstrap.LLVM.Optimize where {
   -- Only syntactic function values are copied; captured computations remain
   -- shared variables. The traversal never revisits its newly created clones.
   freshSeed :: Fresh Int;
-  freshSeed = Fresh (\seed -> Pair seed seed);
+  freshSeed = Fresh (\seed -> (,) seed seed);
   specializationDefinitions :: XErased -> Map XName XErased;
   specializationDefinitions expression =
     let {
@@ -963,30 +963,30 @@ module Bootstrap.LLVM.Optimize where {
           _ -> M.empty
         }
     } in
-    M.unions compareName (Cons local (L.map specializationDefinitions (subterms expression)));
+    M.unions compareName ((:) local (L.map specializationDefinitions (subterms expression)));
   staticCallback :: Map XName XErased -> XErased -> Bool;
   staticCallback definitions expression =
     case expression of {
       XEAbs n b -> (remainingSize 64 expression >= 0);
       _ ->
         case applications expression of {
-          Pair (XEVar n) args ->
+          (,) (XEVar n) args ->
             case M.lookup compareName n definitions of {
               Nothing -> False;
               Just rhs ->
                 case lambdas rhs of {
-                  Pair parameters body -> ((L.length args < L.length parameters) && L.all atom args)
+                  (,) parameters body -> ((L.length args < L.length parameters) && L.all atom args)
                 }
             };
-          Pair (XEPrimitive p) args -> L.null args;
-          Pair (XEConstructor c) args -> L.all atom args;
+          (,) (XEPrimitive p) args -> L.null args;
+          (,) (XEConstructor c) args -> L.all atom args;
           _ -> False
         }
     };
   appliedParameter :: XName -> XErased -> Bool;
   appliedParameter parameter expression =
     case applications expression of {
-      Pair (XEVar name) (Cons first rest) ->
+      (,) (XEVar name) ((:) first rest) ->
         if eqName name parameter
         then True
         else L.any (appliedParameter parameter) (subterms expression);
@@ -1004,14 +1004,14 @@ module Bootstrap.LLVM.Optimize where {
       normalized <- children (specializeVisit limit definitions) expression;
       used <- freshSeed;
       case applications normalized of {
-        Pair (XEVar name) (Cons callback args) ->
+        (,) (XEVar name) ((:) callback args) ->
           if (used >= limit)
           then freshPure normalized
           else case M.lookup compareName name definitions of {
                  Nothing -> freshPure normalized;
                  Just rhs ->
                    case lambdas rhs of {
-                     Pair (Cons first (Cons next rest)) body ->
+                     (,) ((:) first ((:) next rest)) body ->
                        if ((L.length args == (1 + L.length rest)) &&
                            ((remainingSize 128 rhs >= 0) &&
                             (staticCallback definitions callback &&
@@ -1025,7 +1025,7 @@ module Bootstrap.LLVM.Optimize where {
         _ -> freshPure normalized
       }
     };
-  specializeCall :: XName -> XErased -> XErased -> List XErased -> Fresh XErased;
+  specializeCall :: XName -> XErased -> XErased -> [] XErased -> Fresh XErased;
   -- Rename the original parameter scopes before inserting the callback,
   -- whose free names belong to this call site's enclosing scope.
   specializeCall name rhs callback arguments =
@@ -1033,20 +1033,20 @@ module Bootstrap.LLVM.Optimize where {
       specialized <- freshName;
       copied <- copy M.empty rhs;
       case lambdas copied of {
-        Pair (Cons key parameters) body ->
+        (,) ((:) key parameters) body ->
           do {
             replaced <- specializeBody name specialized key (L.length parameters) callback body;
             freshPure
-              (XELetRec (Cons (Pair specialized (L.foldr XEAbs replaced parameters)) Nil)
+              (XELetRec ((:) ((,) specialized (L.foldr XEAbs replaced parameters)) [])
                  (L.foldl XEApp (XEVar specialized) arguments))
           };
-        _ -> freshPure (L.foldl XEApp (XEVar name) (Cons callback arguments))
+        _ -> freshPure (L.foldl XEApp (XEVar name) ((:) callback arguments))
       }
     };
   specializeBody :: XName -> XName -> XName -> Int -> XErased -> XErased -> Fresh XErased;
   specializeBody original specialized key arity callback expression =
     case applications expression of {
-      Pair (XEVar self) (Cons (XEVar argument) remaining) ->
+      (,) (XEVar self) ((:) (XEVar argument) remaining) ->
         if (eqName self original && (eqName argument key && (L.length remaining == arity)))
         then do {
                arguments <-
@@ -1079,9 +1079,9 @@ module Bootstrap.LLVM.Optimize where {
   optimize :: XErased -> XErased;
   optimize expression =
     case runFresh (optimizeWork expression) (1 + maxIdentity expression) of {
-      Pair normalized seed ->
+      (,) normalized seed ->
         case runFresh (copy M.empty normalized) 0 of {
-          Pair result next -> result
+          (,) result next -> result
         }
     }
 }

@@ -17,7 +17,7 @@ import qualified Test.NativeProcess as Native
 import qualified Async.Process as Async
 
 rejected result = case result of { Left _ -> true; Right _ -> false }
-check name condition = C.test ("lifecycle/" ++ name) name Nil (A.assert condition name)
+check name condition = C.test ("lifecycle/" ++ name) name [] (A.assert condition name)
 fixtureFailure = do
  fixture <- Fixture.create "workspace" Fixture.Case Fixture.KeepFailures
  partial <- Fixture.acquire (O.InfrastructureError "setup") fixture
@@ -39,18 +39,18 @@ leaseControl = do
   Nothing -> Left "first lease unavailable"
   Just held -> do
    second <- Resources.acquire "second" Resources.serial held
-   case second of { Nothing -> Right Unit; Just _ -> Left "nested oversubscription" }
-compileOnly = Plan.Plan "catalog" "inputs" (Cons "forbidden" Nil)
- (Cons (Plan.Node "execute" Plan.Execute Nil (Cons "forbidden" Nil) O.Runtime Plan.CompileOnly) Nil)
- Nil Resources.serial (Plan.Deadlines 1 1 1)
-compileOnlyValid = Plan.Plan "catalog" "inputs" (Cons "typecheck" Nil)
- (Cons (Plan.Node "check" Plan.Execute Nil (Cons "typecheck" Nil) O.TypeCheck Plan.CompileOnly) Nil)
- Nil Resources.serial (Plan.Deadlines 1 1 1)
-compileOnlyLaundered = Plan.Plan "catalog" "inputs" (Cons "runtime" Nil)
- (Cons (Plan.Node "input" Plan.Prepare Nil Nil O.Source Plan.CompileOnly)
- (Cons (Plan.Node "compile" Plan.Build (Cons "input" Nil) Nil O.Emission Plan.MayExecute)
- (Cons (Plan.Node "run" Plan.Execute (Cons "compile" Nil) (Cons "runtime" Nil) O.Runtime Plan.MayExecute) Nil)))
- Nil Resources.serial (Plan.Deadlines 1 1 1)
+   case second of { Nothing -> Right (); Just _ -> Left "nested oversubscription" }
+compileOnly = Plan.Plan "catalog" "inputs" ((:) "forbidden" [])
+ ((:) (Plan.Node "execute" Plan.Execute [] ((:) "forbidden" []) O.Runtime Plan.CompileOnly) [])
+ [] Resources.serial (Plan.Deadlines 1 1 1)
+compileOnlyValid = Plan.Plan "catalog" "inputs" ((:) "typecheck" [])
+ ((:) (Plan.Node "check" Plan.Execute [] ((:) "typecheck" []) O.TypeCheck Plan.CompileOnly) [])
+ [] Resources.serial (Plan.Deadlines 1 1 1)
+compileOnlyLaundered = Plan.Plan "catalog" "inputs" ((:) "runtime" [])
+ ((:) (Plan.Node "input" Plan.Prepare [] [] O.Source Plan.CompileOnly)
+ ((:) (Plan.Node "compile" Plan.Build ((:) "input" []) [] O.Emission Plan.MayExecute)
+ ((:) (Plan.Node "run" Plan.Execute ((:) "compile" []) ((:) "runtime" []) O.Runtime Plan.MayExecute) [])))
+ [] Resources.serial (Plan.Deadlines 1 1 1)
 prepareRejection = do
  planned <- Adapter.plan Adapter.initial
  cleaning <- Adapter.prepare (O.ExpectedRejection O.Setup "missing-fixture" 1) planned
@@ -76,31 +76,31 @@ rejectionValidationFailure = do
  finished <- Adapter.finishCleanup Adapter.Joined O.Pass cleaning
  Adapter.seal finished
 signalNotRejection = case Native.validate (Expectation.Reject O.Runtime "signal" 137) O.Runtime "signal" true (Native.Completed (Async.Exited 137 0) O.Pass) of
- Pair outcome _ -> S.not (O.successful outcome)
-summaryEntry = C.test "summary/expected" "expected" Nil (A.succeed Unit)
-summaryOther = C.test "summary/other" "other" Nil (A.succeed Unit)
+ (,) outcome _ -> S.not (O.successful outcome)
+summaryEntry = C.test "summary/expected" "expected" [] (A.succeed ())
+summaryOther = C.test "summary/other" "other" [] (A.succeed ())
 cases =
- Cons (check "native-signal-not-rejection" signalNotRejection)
- (Cons (check "process-summary-missing" (S.not (Process.summaryComplete 1 (Cons summaryEntry Nil) Nil)))
- (Cons (check "process-summary-duplicate" (S.not (Process.summaryComplete 1 (Cons summaryEntry Nil) (Cons (Process.descriptorJson summaryEntry) (Cons (Process.descriptorJson summaryEntry) Nil)))))
- (Cons (check "process-summary-substituted" (S.not (Process.summaryComplete 1 (Cons summaryEntry Nil) (Cons (Process.descriptorJson summaryOther) Nil))))
- ( Cons (check "prepare-rejection-is-not-execution" (S.not (accepted prepareRejection)))
- (Cons (check "cancel-during-cleanup" (S.not (accepted cancelCleanup)))
- (Cons (check "rejection-still-needs-validation" (S.not (accepted rejectionValidationFailure)))
- ( Cons (check "compile-only-typecheck" (case Plan.validate compileOnlyValid of { Right Unit -> true; _ -> false }))
- (Cons (check "compile-only-transitive-runtime" (rejected (Plan.validate compileOnlyLaundered)))
- ( Cons (check "execute-before-prepare" (rejected (Adapter.execute O.Pass Adapter.initial)))
- (Cons (check "unverified-join-cannot-seal" (rejected (sealed Adapter.Unverified O.Pass)))
- (Cons (check "cleanup-failure-cannot-pass" (S.not (accepted (sealed Adapter.Joined (O.InfrastructureError "cleanup")))))
- (Cons (check "join-failure-cannot-pass" (S.not (accepted (sealed (Adapter.JoinFailed "remaining child") O.Pass))))
- (Cons (check "normal-lifecycle" (accepted (sealed Adapter.Joined O.Pass)))
- (Cons (check "partial-setup-needs-join" (rejected fixtureFailure))
- (Cons (check "nested-budget" (case leaseControl of { Right Unit -> true; _ -> false }))
- (Cons (check "unknown-capability" (rejected (Capability.check (Capability.Requirement "native" Capability.Required) Nil)))
- (Cons (check "required-capability" (case Capability.check (Capability.Requirement "native" Capability.Required) (Cons (Capability.Missing "native" "not installed") Nil) of { Right (O.Unsupported _) -> true; _ -> false }))
- (Cons (check "compile-only-execution" (rejected (Plan.validate compileOnly)))
- (Cons (check "display-limit" (rejected (Diagnostics.preview (0 - 1) "raw")))
- (Cons (check "native-unbounded-process" (S.not (Native.bounded (Async.command "child" Nil "stdout" "stderr"))))
- (Cons (check "legacy-cancellation-status" (eqString (Process.status (Process.legacyOutcome (O.Cancelled "cancel"))) "crashed"))
- Nil)))))))))))))))))))))
+ (:) (check "native-signal-not-rejection" signalNotRejection)
+ ((:) (check "process-summary-missing" (S.not (Process.summaryComplete 1 ((:) summaryEntry []) [])))
+ ((:) (check "process-summary-duplicate" (S.not (Process.summaryComplete 1 ((:) summaryEntry []) ((:) (Process.descriptorJson summaryEntry) ((:) (Process.descriptorJson summaryEntry) [])))))
+ ((:) (check "process-summary-substituted" (S.not (Process.summaryComplete 1 ((:) summaryEntry []) ((:) (Process.descriptorJson summaryOther) []))))
+ ( (:) (check "prepare-rejection-is-not-execution" (S.not (accepted prepareRejection)))
+ ((:) (check "cancel-during-cleanup" (S.not (accepted cancelCleanup)))
+ ((:) (check "rejection-still-needs-validation" (S.not (accepted rejectionValidationFailure)))
+ ( (:) (check "compile-only-typecheck" (case Plan.validate compileOnlyValid of { Right () -> true; _ -> false }))
+ ((:) (check "compile-only-transitive-runtime" (rejected (Plan.validate compileOnlyLaundered)))
+ ( (:) (check "execute-before-prepare" (rejected (Adapter.execute O.Pass Adapter.initial)))
+ ((:) (check "unverified-join-cannot-seal" (rejected (sealed Adapter.Unverified O.Pass)))
+ ((:) (check "cleanup-failure-cannot-pass" (S.not (accepted (sealed Adapter.Joined (O.InfrastructureError "cleanup")))))
+ ((:) (check "join-failure-cannot-pass" (S.not (accepted (sealed (Adapter.JoinFailed "remaining child") O.Pass))))
+ ((:) (check "normal-lifecycle" (accepted (sealed Adapter.Joined O.Pass)))
+ ((:) (check "partial-setup-needs-join" (rejected fixtureFailure))
+ ((:) (check "nested-budget" (case leaseControl of { Right () -> true; _ -> false }))
+ ((:) (check "unknown-capability" (rejected (Capability.check (Capability.Requirement "native" Capability.Required) [])))
+ ((:) (check "required-capability" (case Capability.check (Capability.Requirement "native" Capability.Required) ((:) (Capability.Missing "native" "not installed") []) of { Right (O.Unsupported _) -> true; _ -> false }))
+ ((:) (check "compile-only-execution" (rejected (Plan.validate compileOnly)))
+ ((:) (check "display-limit" (rejected (Diagnostics.preview (0 - 1) "raw")))
+ ((:) (check "native-unbounded-process" (S.not (Native.bounded (Async.command "child" [] "stdout" "stderr"))))
+ ((:) (check "legacy-cancellation-status" (eqString (Process.status (Process.legacyOutcome (O.Cancelled "cancel"))) "crashed"))
+ [])))))))))))))))))))))
 main = Runner.main cases

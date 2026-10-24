@@ -43,8 +43,8 @@
       "Tests.Basic": "Tests/Basic.emlf",
       "Tests.Bytes": "Tests/Bytes.emlf",
       "Tests.Helpers": "Tests/Helpers.emlf",
-      "Tests.IndependentCheck": "Tests/IndependentCheck.hs",
-      "Tests.IndependentType": "Tests/IndependentType.hs",
+      "Tests.IndependentCheck": "shared/Tests/IndependentCheck.hs",
+      "Tests.IndependentType": "shared/Tests/IndependentType.hs",
       "Tests.Map": "Tests/Map.emlf",
       "Tests.Set": "Tests/Set.emlf",
       "Tests.Coverage": "Tests/Coverage.hs",
@@ -52,7 +52,7 @@
       "Tests.TestSources": "Tests/TestSources.hs",
       "Tests.Selection": "Tests/Selection.hs",
       "Tests.CorePartitions": "Tests/CorePartitions.hs",
-      "Tests.BuildReceipts": "Tests/BuildReceipts.hs"
+      "Tests.BuildReceipts": "shared/Tests/BuildReceipts.hs"
     }
   },
   "executables": {

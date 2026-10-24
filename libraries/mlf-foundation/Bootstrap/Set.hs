@@ -7,12 +7,12 @@ module Bootstrap.Set where {
   import Bootstrap.Types;
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Map as M;
-  wrap :: forall a. Map a Unit -> Set a;
+  wrap :: forall a. Map a () -> Set a;
   wrap tree = seq tree (Set tree);
   empty :: forall a. Set a;
   empty = wrap M.empty;
   singleton :: forall a. a -> Set a;
-  singleton value = wrap (M.singleton value Unit);
+  singleton value = wrap (M.singleton value ());
   null :: forall a. Set a -> Bool;
   null (Set tree) = M.null tree;
   size :: forall a. Set a -> Int;
@@ -22,21 +22,21 @@ module Bootstrap.Set where {
   notMember :: forall a. (a -> a -> Int) -> a -> Set a -> Bool;
   notMember cmp value tree = L.not (member cmp value tree);
   insert :: forall a. (a -> a -> Int) -> a -> Set a -> Set a;
-  insert cmp value (Set tree) = wrap (M.insert cmp value Unit tree);
+  insert cmp value (Set tree) = wrap (M.insert cmp value () tree);
   delete :: forall a. (a -> a -> Int) -> a -> Set a -> Set a;
   delete cmp value (Set tree) = wrap (M.delete cmp value tree);
-  fromList :: forall a. (a -> a -> Int) -> List a -> Set a;
-  fromList cmp values = wrap (M.fromList cmp (L.map (\value -> Pair value Unit) values));
-  fromDistinctAscList :: forall a. List a -> Set a;
+  fromList :: forall a. (a -> a -> Int) -> [] a -> Set a;
+  fromList cmp values = wrap (M.fromList cmp (L.map (\value -> (,) value ()) values));
+  fromDistinctAscList :: forall a. [] a -> Set a;
   fromDistinctAscList values =
-    wrap (M.fromDistinctAscList (L.map (\value -> Pair value Unit) values));
-  toList :: forall a. Set a -> List a;
+    wrap (M.fromDistinctAscList (L.map (\value -> (,) value ()) values));
+  toList :: forall a. Set a -> [] a;
   toList (Set tree) = M.keys tree;
-  toAscList :: forall a. Set a -> List a;
+  toAscList :: forall a. Set a -> [] a;
   toAscList tree = toList tree;
   union :: forall a. (a -> a -> Int) -> Set a -> Set a -> Set a;
   union cmp (Set a) (Set b) = wrap (M.union cmp a b);
-  unions :: forall a. (a -> a -> Int) -> List (Set a) -> Set a;
+  unions :: forall a. (a -> a -> Int) -> [] (Set a) -> Set a;
   unions cmp trees = L.foldlStrict (union cmp) empty trees;
   difference :: forall a. (a -> a -> Int) -> Set a -> Set a -> Set a;
   difference cmp (Set a) (Set b) = wrap (M.difference cmp a b);
@@ -64,20 +64,20 @@ module Bootstrap.Set where {
   findMin (Set tree) = L.fst (M.findMin tree);
   findMax :: forall a. Set a -> a;
   findMax (Set tree) = L.fst (M.findMax tree);
-  minView :: forall a. Set a -> Maybe (Pair a (Set a));
+  minView :: forall a. Set a -> Maybe ((,) a (Set a));
   minView (Set tree) =
     L.mapOptional
       (\entry ->
          case entry of {
-           Pair (Pair key value) rest -> Pair key (wrap rest)
+           (,) ((,) key value) rest -> (,) key (wrap rest)
          })
       (M.minViewWithKey tree);
-  maxView :: forall a. Set a -> Maybe (Pair a (Set a));
+  maxView :: forall a. Set a -> Maybe ((,) a (Set a));
   maxView (Set tree) =
     L.mapOptional
       (\entry ->
          case entry of {
-           Pair (Pair key value) rest -> Pair key (wrap rest)
+           (,) ((,) key value) rest -> (,) key (wrap rest)
          })
       (M.maxViewWithKey tree);
   eqSet :: forall a. (a -> a -> Bool) -> Set a -> Set a -> Bool;

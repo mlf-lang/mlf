@@ -12,47 +12,104 @@ module Bootstrap.Data where {
   datatypeName :: DataDecl -> String;
   datatypeName (DataDecl n _ _) = n;
   datatypeName (DataDeclK n _ _) = n;
-  datatypeBinders :: DataDecl -> List (Pair String Kind);
-  datatypeBinders (DataDecl _ ps _) = map (\p -> Pair p Star) ps;
+  datatypeBinders :: DataDecl -> [] ((,) String Kind);
+  datatypeBinders (DataDecl _ ps _) = map (\p -> (,) p Star) ps;
   datatypeBinders (DataDeclK _ ps _) = ps;
   datatypeParameters d = map fst (datatypeBinders d);
-  datatypeConstructors :: DataDecl -> List ConstructorDecl;
+  datatypeConstructors :: DataDecl -> [] ConstructorDecl;
   datatypeConstructors (DataDecl _ _ cs) = cs;
   datatypeConstructors (DataDeclK _ _ cs) = cs;
   constructorName (ConstructorDecl n _) = n;
   constructorFields (ConstructorDecl _ fs) = fs;
+  scalarPrimitiveKinds :: Map String Kind;
+  scalarPrimitiveKinds =
+    M.fromList compareString
+      ((:) ((,) "AsyncScope" Star)
+         ((:) ((,) "Completion" (KArrow Star Star))
+            ((:) ((,) "AsyncSubscription" Star)
+               ((:) ((,) "ST" (KArrow Star (KArrow Star Star)))
+                  ((:) ((,) "STArray" (KArrow Star (KArrow Star Star)))
+                     ((:) ((,) "Int" Star)
+                        ((:) ((,) "Double" Star)
+                           ((:) ((,) "Bool" Star)
+                              ((:) ((,) "String" Star)
+                                 ((:) ((,) "MLFLegacyUnit" Star)
+                                    ((:) ((,) "IntArray" Star)
+                                       ((:) ((,) "DoubleArray" Star)
+                                          ((:) ((,) "ByteArray" Star)
+                                             ((:) ((,) "IntTable" Star)
+                                                ((:) ((,) "IO" (KArrow Star Star))
+                                                   [])))))))))))))));
+  -- Wired source identities are independent of Bootstrap.Types' temporary
+  -- List/Pair/Unit implementation ADTs. Never normalize a user ADT to these.
+  sourceUnitDeclaration :: DataDecl;
+  sourceUnitDeclaration = DataDecl "()" [] ((:) (ConstructorDecl "()" []) []);
+  sourceListDeclaration :: DataDecl;
+  sourceListDeclaration =
+    DataDecl "[]" ((:) "a" [])
+      ((:) (ConstructorDecl "[]" [])
+         ((:) (ConstructorDecl ":"
+                  ((:) (Parameter "a")
+                     ((:) (Applied "[]" ((:) (Parameter "a") [])) []))) []));
+  sourceTupleDeclaration :: String -> [] String -> DataDecl;
+  sourceTupleDeclaration name parameters =
+    DataDecl name parameters
+      ((:) (ConstructorDecl name (map Parameter parameters)) []);
+  sourceTupleName :: Int -> String;
+  sourceTupleName arity = "(" ++ (foldr (++) "" (replicate (arity - 1) ",") ++ ")");
+  sourceTupleParameters :: Int -> [] String;
+  sourceTupleParameters arity = map (\i -> "a" ++ showInt i) (range 1 arity);
+  sourceBuiltinDeclarations :: [] DataDecl;
+  sourceBuiltinDeclarations = (:) sourceUnitDeclaration ((:) sourceListDeclaration
+    (map (\arity -> sourceTupleDeclaration (sourceTupleName arity) (sourceTupleParameters arity)) (range 2 64)));
+  sourceBuiltinType :: String -> Bool;
+  sourceBuiltinType name = any (\d -> eqString (datatypeName d) name) sourceBuiltinDeclarations;
+  sourceBuiltinConstructor :: String -> Bool;
+  sourceBuiltinConstructor name =
+    any (\d -> any (\c -> eqString (constructorName c) name) (datatypeConstructors d))
+      sourceBuiltinDeclarations;
   primitiveKinds :: Map String Kind;
   primitiveKinds =
+    M.union compareString (M.fromList compareString
+      ((:) ((,) "MLFCallStack" Star) ((:) ((,) "MLFStackFrame" Star)
+        ((:) ((,) "MLFStackEvidence" Star) []))))
+    (M.union compareString scalarPrimitiveKinds
+      (M.fromList compareString
+         ((:) ((,) "IOError" Star) ((:) ((,) "Char" Star)
+            (map (\d -> (,) (datatypeName d)
+                           (foldr (\_ k -> KArrow Star k) Star (datatypeParameters d)))
+               sourceBuiltinDeclarations)))));
+  unitDeclaration = DataDecl "MLFLegacyUnit" [] ((:) (ConstructorDecl "MLFLegacyUnit" []) []);
+  stackFrameDeclaration :: DataDecl;
+  stackFrameDeclaration = DataDecl "MLFStackFrame" []
+    ((:) (ConstructorDecl "MLFStackFrame"
+      (append (replicate 4 (Applied "String" [])) (replicate 4 (Applied "Int" [])))) []);
+  stackEvidenceDeclaration :: DataDecl;
+  stackEvidenceDeclaration = DataDecl "MLFStackEvidence" []
+    ((:) (ConstructorDecl "MLFStackEvidence" ((:) (Applied "MLFCallStack" []) [])) []);
+  builtinDeclarations :: [] DataDecl;
+  builtinDeclarations = (:) unitDeclaration
+    (append (take 5 sourceBuiltinDeclarations)
+      ((:) stackFrameDeclaration ((:) stackEvidenceDeclaration (drop 5 sourceBuiltinDeclarations))));
+  builtinDatatypes :: Map String DataDecl;
+  builtinDatatypes =
+    M.fromList compareString (map (\d -> (,) (datatypeName d) d) builtinDeclarations);
+  builtinConstructors :: Map String ((,) DataDecl ConstructorDecl);
+  builtinConstructors =
     M.fromList compareString
-      (Cons (Pair "AsyncScope" Star)
-         (Cons (Pair "Completion" (KArrow Star Star))
-            (Cons (Pair "AsyncSubscription" Star)
-               (Cons (Pair "ST" (KArrow Star (KArrow Star Star)))
-                  (Cons (Pair "STArray" (KArrow Star (KArrow Star Star)))
-                     (Cons (Pair "Int" Star)
-                        (Cons (Pair "Double" Star)
-                           (Cons (Pair "Bool" Star)
-                              (Cons (Pair "String" Star)
-                                 (Cons (Pair "Unit" Star)
-                                    (Cons (Pair "IntArray" Star)
-                                       (Cons (Pair "DoubleArray" Star)
-                                          (Cons (Pair "ByteArray" Star)
-                                             (Cons (Pair "IntTable" Star)
-                                                (Cons (Pair "IO" (KArrow Star Star))
-                                                   Nil)))))))))))))));
-  unitDeclaration = DataDecl "Unit" Nil (Cons (ConstructorDecl "Unit" Nil) Nil);
+      (concatMap (\d -> map (\c -> (,) (constructorName c) ((,) d c))
+                           (datatypeConstructors d)) builtinDeclarations);
   withKinds ks =
-    DataEnv (M.singleton "Unit" unitDeclaration)
-      (M.singleton "Unit" (Pair unitDeclaration (ConstructorDecl "Unit" Nil)))
+    DataEnv builtinDatatypes builtinConstructors
       (M.union compareString primitiveKinds (M.fromList compareString ks));
-  emptyDataEnv = withKinds Nil;
+  emptyDataEnv = withKinds [];
   lookupDatatype :: DataEnv -> String -> Either String DataDecl;
   lookupDatatype (DataEnv ds _ _) n =
     case M.lookup compareString n ds of {
       Nothing -> Left ("unknown data type: " ++ n);
       Just d -> Right d
     };
-  lookupConstructor :: DataEnv -> String -> Either String (Pair DataDecl ConstructorDecl);
+  lookupConstructor :: DataEnv -> String -> Either String ((,) DataDecl ConstructorDecl);
   lookupConstructor (DataEnv _ cs _) n =
     case M.lookup compareString n cs of {
       Nothing -> Left ("unknown data constructor: " ++ n);
@@ -64,7 +121,7 @@ module Bootstrap.Data where {
       Just k -> k;
       Nothing -> M.findWithDefault compareString (foldr KArrow Star (replicate fallback Star)) n ks
     };
-  checkArity :: DataEnv -> String -> Int -> Either String Unit;
+  checkArity :: DataEnv -> String -> Int -> Either String ();
   checkArity (DataEnv ds _ _) n actual =
     let {
       expected =
@@ -74,10 +131,10 @@ module Bootstrap.Data where {
         }
     } in
     case expected of {
-      Nothing -> Right Unit;
+      Nothing -> Right ();
       Just arity ->
         if (actual == arity)
-        then Right Unit
+        then Right ()
         else Left
                ("invalid type constructor arity: " ++
                 (n ++ (" expects " ++ (showInt arity ++ (", got " ++ showInt actual)))))
@@ -94,28 +151,28 @@ module Bootstrap.Data where {
     ((stringLength name > 0) && (first (stringCodeAt name 0) && identifierTail name 1));
   upper what name =
     if identifier U.isUpper name
-    then Right Unit
+    then Right ()
     else Left ("invalid " ++ (what ++ (" name: " ++ name)));
-  keywords :: List String;
+  keywords :: [] String;
   keywords =
-    Cons "data"
-      (Cons "class"
-         (Cons "instance"
-            (Cons "where"
-               (Cons "case"
-                  (Cons "of"
-                     (Cons "do"
-                        (Cons "let"
-                           (Cons "in"
-                              (Cons "forall"
-                                 (Cons "exists"
-                                    (Cons "true" (Cons "false" (Cons "bot" Nil)))))))))))));
-  memberString :: String -> List String -> Bool;
+    (:) "data"
+      ((:) "class"
+         ((:) "instance"
+            ((:) "where"
+               ((:) "case"
+                  ((:) "of"
+                     ((:) "do"
+                        ((:) "let"
+                           ((:) "in"
+                              ((:) "forall"
+                                 ((:) "exists"
+                                    ((:) "true" ((:) "false" ((:) "bot" [])))))))))))));
+  memberString :: String -> [] String -> Bool;
   memberString name names = any (eqString name) names;
-  distinct :: String -> List String -> Either String Unit;
+  distinct :: String -> [] String -> Either String ();
   distinct what xs =
-    if (length xs == length (nubBy eqString xs)) then Right Unit else Left ("duplicate " ++ what);
-  fieldKind :: List DataDecl -> DataEnv -> Map String Kind -> Field -> Either String Kind;
+    if (length xs == length (nubBy eqString xs)) then Right () else Left ("duplicate " ++ what);
+  fieldKind :: [] DataDecl -> DataEnv -> Map String Kind -> Field -> Either String Kind;
   fieldKind declarations env ps field =
     case field of {
       Parameter p ->
@@ -150,12 +207,12 @@ module Bootstrap.Data where {
         };
       Quantified a k b -> fieldKind declarations env (M.insert compareString a k ps) b
     };
-  validateConstructor :: List DataDecl ->
-                         DataEnv -> DataDecl -> ConstructorDecl -> Either String Unit;
+  validateConstructor :: [] DataDecl ->
+                         DataEnv -> DataDecl -> ConstructorDecl -> Either String ();
   validateConstructor declarations env d c =
     do {
       upper "data constructor" (constructorName c);
-      when (memberString (constructorName c) (Cons "True" (Cons "False" (Cons "Unit" Nil))))
+      when (memberString (constructorName c) ((:) "True" ((:) "False" [])))
         (Left "cannot redefine a primitive constructor");
       mapM_
         (\field ->
@@ -165,13 +222,13 @@ module Bootstrap.Data where {
            })
         (constructorFields c)
     };
-  validateDeclaration :: List DataDecl -> DataEnv -> DataDecl -> Either String Unit;
+  validateDeclaration :: [] DataDecl -> DataEnv -> DataDecl -> Either String ();
   validateDeclaration declarations env d =
     do {
       upper "data type" (datatypeName d);
       when (M.member compareString (datatypeName d) primitiveKinds)
         (Left "cannot redefine a primitive type");
-      when (memberString (datatypeName d) (Cons "True" (Cons "False" Nil)))
+      when (memberString (datatypeName d) ((:) "True" ((:) "False" [])))
         (Left "reserved data type name");
       distinct "type parameter" (datatypeParameters d);
       mapM_
@@ -183,53 +240,53 @@ module Bootstrap.Data where {
         (Left ("data type has no constructors: " ++ datatypeName d));
       mapM_ (validateConstructor declarations env d) (datatypeConstructors d)
     };
-  validateDeclarations :: List DataDecl -> Either String DataEnv;
+  validateDeclarations :: [] DataDecl -> Either String DataEnv;
   validateDeclarations ds =
     do {
       distinct "data type" (map datatypeName ds);
       distinct "data constructor"
         (concatMap (\d -> map constructorName (datatypeConstructors d)) ds);
       let {
-        declarations = Cons unitDeclaration ds
+        declarations = append builtinDeclarations ds
       };
       let {
         env =
-          DataEnv (M.fromList compareString (map (\d -> Pair (datatypeName d) d) declarations))
+          DataEnv (M.fromList compareString (map (\d -> (,) (datatypeName d) d) declarations))
             (M.fromList compareString
                (concatMap
-                  (\d -> map (\c -> Pair (constructorName c) (Pair d c)) (datatypeConstructors d))
+                  (\d -> map (\c -> (,) (constructorName c) ((,) d c)) (datatypeConstructors d))
                   declarations))
             (M.union compareString primitiveKinds
                (M.fromList compareString
                   (map
                      (\d ->
-                        Pair (datatypeName d)
+                        (,) (datatypeName d)
                           (foldr (\p k -> KArrow (snd p) k) Star (datatypeBinders d)))
                      ds)))
       };
       mapM_ (validateDeclaration ds env) ds;
       Right env
     };
-  alternativeNames :: List (Pair (Maybe String) Int) -> List String;
-  alternativeNames Nil = Nil;
-  alternativeNames (Cons (Pair Nothing _) rest) = alternativeNames rest;
-  alternativeNames (Cons (Pair (Just c) _) rest) = Cons c (alternativeNames rest);
-  defaultPositions :: Int -> List (Pair (Maybe String) Int) -> List Int;
-  defaultPositions _ Nil = Nil;
-  defaultPositions i (Cons (Pair name _) rest) =
+  alternativeNames :: [] ((,) (Maybe String) Int) -> [] String;
+  alternativeNames [] = [];
+  alternativeNames ((:) ((,) Nothing _) rest) = alternativeNames rest;
+  alternativeNames ((:) ((,) (Just c) _) rest) = (:) c (alternativeNames rest);
+  defaultPositions :: Int -> [] ((,) (Maybe String) Int) -> [] Int;
+  defaultPositions _ [] = [];
+  defaultPositions i ((:) ((,) name _) rest) =
     case name of {
-      Nothing -> Cons i (defaultPositions (i + 1) rest);
+      Nothing -> (:) i (defaultPositions (i + 1) rest);
       Just _ -> defaultPositions (i + 1) rest
     };
   validDefaults defaults total =
     case defaults of {
-      Nil -> True;
-      Cons n Nil -> (n == (total - 1));
+      [] -> True;
+      (:) n [] -> (n == (total - 1));
       _ -> False
     };
-  alternativeOwners :: DataEnv -> List (Pair (Maybe String) Int) -> Either String (List DataDecl);
-  alternativeOwners _ Nil = Right Nil;
-  alternativeOwners env (Cons (Pair name arity) rest) =
+  alternativeOwners :: DataEnv -> [] ((,) (Maybe String) Int) -> Either String ([] DataDecl);
+  alternativeOwners _ [] = Right [];
+  alternativeOwners env ((:) ((,) name arity) rest) =
     case name of {
       Nothing -> alternativeOwners env rest;
       Just c ->
@@ -244,10 +301,10 @@ module Bootstrap.Data where {
           unless (arity == length (constructorFields ctor))
             (Left ("constructor pattern arity mismatch: " ++ c));
           ds <- alternativeOwners env rest;
-          Right (Cons d ds)
+          Right ((:) d ds)
         }
     };
-  checkAlternatives :: DataEnv -> List (Pair (Maybe String) Int) -> Either String (Maybe DataDecl);
+  checkAlternatives :: DataEnv -> [] ((,) (Maybe String) Int) -> Either String (Maybe DataDecl);
   checkAlternatives env alternatives =
     do {
       when (null alternatives) (Left "case has no alternatives");
@@ -262,8 +319,8 @@ module Bootstrap.Data where {
         (Left "a default alternative must be last and unique");
       owners <- alternativeOwners env alternatives;
       case owners of {
-        Nil -> Right Nothing;
-        Cons d rest ->
+        [] -> Right Nothing;
+        (:) d rest ->
           do {
             unless (all (\other -> eqString (datatypeName d) (datatypeName other)) rest)
               (Left "case patterns belong to different data types");
@@ -279,24 +336,24 @@ module Bootstrap.Data where {
       }
     };
   par yes text = if yes then ("(" ++ (text ++ ")")) else text;
-  prettyParameter :: Pair String Kind -> String;
-  prettyParameter (Pair name Star) = name;
-  prettyParameter (Pair name kind) = ("(" ++ (name ++ (" : " ++ (K.prettyKind kind ++ ")"))));
+  prettyParameter :: (,) String Kind -> String;
+  prettyParameter ((,) name Star) = name;
+  prettyParameter ((,) name kind) = ("(" ++ (name ++ (" : " ++ (K.prettyKind kind ++ ")"))));
   prettyField :: Int -> Field -> String;
   prettyField p field =
     case field of {
       Parameter a -> a;
-      Applied c Nil -> c;
-      Applied c args -> par (p > 1) (intercalate " " (Cons c (map (prettyField 2) args)));
+      Applied c [] -> c;
+      Applied c args -> par (p > 1) (intercalate " " ((:) c (map (prettyField 2) args)));
       Function a b -> par (p > 0) (prettyField 1 a ++ (" -> " ++ prettyField 0 b));
       Application a b -> par (p > 1) (prettyField 1 a ++ (" " ++ prettyField 2 b));
       Quantified n k b ->
-        par (p > 0) ("forall " ++ (prettyParameter (Pair n k) ++ (". " ++ prettyField 0 b)))
+        par (p > 0) ("forall " ++ (prettyParameter ((,) n k) ++ (". " ++ prettyField 0 b)))
     };
   prettyConstructor c =
-    intercalate " " (Cons (constructorName c) (map (prettyField 2) (constructorFields c)));
+    intercalate " " ((:) (constructorName c) (map (prettyField 2) (constructorFields c)));
   prettyDeclaration d =
     ("data " ++
-     (intercalate " " (Cons (datatypeName d) (map prettyParameter (datatypeBinders d))) ++
+     (intercalate " " ((:) (datatypeName d) (map prettyParameter (datatypeBinders d))) ++
       (" = " ++ (intercalate " | " (map prettyConstructor (datatypeConstructors d)) ++ ";"))))
 }

@@ -26,17 +26,17 @@ class Figure12Data(unittest.TestCase):
         self.assertEqual(json.loads(json.dumps(fixture)), fixture)
 
     def test_lexical_binding_and_constructor_data(self):
-        parsed = data.Parser('(let { yes n e = Case n e true true Nil } in Cons (yes "x" "guest") Nil)').parse()
+        parsed = data.Parser('(let { yes n e = Case n e true true [] } in (:) (yes "x" "guest") [])').parse()
         value = data.evaluate(parsed, data.environment())
         self.assertEqual(value, [dict(id='x', expression='guest', paper_acceptance=True, expected_acceptance=True, local_signatures=[])])
 
     def test_reject_unsupported_syntax(self):
-        for source in ['[1,2]', '\\x -> x', 'let rec { x = 1 } in x', 'Cons 1 Nil trailing', 'unknown', '"bad\\q"', 'Pair "a" "b" garbage', '(Pair "a" "b") )']:
+        for source in ['(:) 1 2', '(,) \"a\" \"b\" trailing', 'Nil', 'Cons 1 Nil', '[1,2]', '\\x -> x', 'let rec { x = 1 } in x', 'Cons 1 Nil trailing', 'unknown', '"bad\\q"', 'Pair "a" "b" garbage', '(Pair "a" "b") )']:
             with self.subTest(source=source), self.assertRaises((data.FixtureError, TypeError)):
                 data.evaluate(data.Parser(source).parse(), data.environment())
 
     def test_no_guest_expression_evaluation(self):
-        source = 'Case "x" "unsafe-looking opaque guest source: (panic 1)" true false Nil'
+        source = 'Case "x" "unsafe-looking opaque guest source: (panic 1)" true false []'
         decoded = data.evaluate(data.Parser(source).parse(), data.environment())
         self.assertEqual(decoded['expression'], 'unsafe-looking opaque guest source: (panic 1)')
 
@@ -113,11 +113,11 @@ class Figure12Data(unittest.TestCase):
              'H.append (localSignatures c) signatures'),
             ('Figure12Suite.emlf', 'X.equalErased (X.erase parsed) (X.erase (compiledTerm result))', 'true'),
             ('Figure12.emlf', '(Set.delete x (freeNames b))', '(freeNames b)'),
-            ('Figure12.emlf', '(expression c) ss', '(expression c) Nil'),
+            ('Figure12.emlf', '(expression c) ss', '(expression c) []'),
             ('Helpers.emlf', 'instance Ord String where { compare = compareString }',
              'instance Ord String where { compare = compareInt }'),
             ('Helpers.emlf', 'S.mapEither IM.fromList', 'fmap IM.fromList'),
-            ('Helpers.emlf', 'S.mapEither (Pair k) (f k v)', 'fmap (Pair k) (f k v)'),
+            ('Helpers.emlf', 'S.mapEither ((,) k) (f k v)', 'fmap ((,) k) (f k v)'),
             ('Map.emlf', 'fromList xs = M.fromList H.compare xs', 'fromList xs = M.empty'),
             ('Set.emlf', 'toAscList = S.toList', 'toAscList = S.empty'),
         ]
@@ -128,7 +128,7 @@ class Figure12Data(unittest.TestCase):
                     data.decode(root)
 
     def test_multiline_or_ambiguous_data_fails_closed(self):
-        for new in ['signatures =\n ', 'signatures = Nil\nsignatures = ']:
+        for new in ['signatures =\n ', 'signatures = []\nsignatures = ']:
             root = self.changed('tests/Tests/Figure12.emlf', 'signatures = ', new)
             with self.assertRaises(data.FixtureError):
                 self.reviewed_decode_for_data_control(root)

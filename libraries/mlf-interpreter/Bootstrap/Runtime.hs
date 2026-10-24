@@ -23,20 +23,32 @@ module Bootstrap.Runtime where {
     RDouble Double |
     RBoolean Bool |
     RString String |
+    RChar Int |
+    RIOError (Either String RValue) |
+    RCallStack ([] ([] (Either String RValue))) |
     RIntArray IntArray |
     RDoubleArray DoubleArray |
     RByteArray ByteArray |
     RIntTable IntTable |
     RClosure REnv XName XErased |
-    RConstructor String (List (Either String RValue)) |
-    RConstructorFunction String Int (List (Either String RValue)) |
-    RPrimitive Primitive (List (Either String RValue)) |
-    RAction Primitive (List (Either String RValue)) |
-    RSTAction Primitive (List (Either String RValue)) |
+    RConstructor String ([] (Either String RValue)) |
+    RConstructorFunction String Int ([] (Either String RValue)) |
+    RPrimitive Primitive ([] (Either String RValue)) |
+    RAction Primitive ([] (Either String RValue)) |
+    RSTAction Primitive ([] (Either String RValue)) |
     RSTArrayHandle Int |
     RAsyncScopeHandle Int |
     RCompletionHandle Int Int |
     RAsyncSubscriptionHandle Int Int Int;
+  -- Catchable IO failure is distinct from fatal evaluator errors and from a
+  -- successfully returned value whose demand may fail later. Messages retain
+  -- their canonical lazy [Char] representation, including surrogate codepoints.
+  data RIOOutcome =
+    RIOSuccess (Either String RValue) |
+    RIOFailure (Either String RValue) (Either String RValue)
+      ([] (Either String RValue));
+  -- Failure contexts are active handler scopes, not fields of IOError. A catch
+  -- discards the old contexts and passes only the plain error to its handler.
   -- Primitive payloads represent the language value itself. Forcing only the
   -- interpreter's wrapper would leave strict numeric accumulators suspended.
   -- Algebraic fields, closures and actions retain their ordinary lazy behavior.
@@ -47,6 +59,7 @@ module Bootstrap.Runtime where {
       RDouble n -> seq n value;
       RBoolean b -> seq b value;
       RString text -> seq text value;
+      RChar n -> seq n value;
       RIntArray array -> seq array value;
       RDoubleArray array -> seq array value;
       RByteArray array -> seq array value;
@@ -57,38 +70,38 @@ module Bootstrap.Runtime where {
       RAsyncSubscriptionHandle owner handle status -> seq owner (seq handle (seq status value));
       _ -> value
     };
-  runTerm :: XTerm -> IO (Either String Unit);
-  runTerm term = runTermWithArguments Nil term;
-  runProgram :: XTerm -> IO (Either String Unit);
-  runProgram term = runProgramWithArguments Nil term;
-  runTermWithArguments :: List String -> XTerm -> IO (Either String Unit);
+  runTerm :: XTerm -> IO (Either String ());
+  runTerm term = runTermWithArguments [] term;
+  runProgram :: XTerm -> IO (Either String ());
+  runProgram term = runProgramWithArguments [] term;
+  runTermWithArguments :: [] String -> XTerm -> IO (Either String ());
   runTermWithArguments args term = runEntry True args term;
-  runProgramWithArguments :: List String -> XTerm -> IO (Either String Unit);
+  runProgramWithArguments :: [] String -> XTerm -> IO (Either String ());
   runProgramWithArguments args term = runEntry False args term;
   isIO :: XType -> Bool;
   isIO ty =
     case ty of {
       XForall a lower body -> isIO body;
-      XCon name (Cons arg Nil) -> eqString name "IO";
+      XCon name ((:) arg []) -> eqString name "IO";
       _ -> False
     };
   declarations term =
     case term of {
       XWithData ds body -> ds;
-      _ -> Nil
+      _ -> []
     };
-  prepare :: Bool -> XTerm -> Either String (Pair DataEnv Bool);
+  prepare :: Bool -> XTerm -> Either String ((,) DataEnv Bool);
   prepare requireIO term =
     do {
       ty <- mapLeft (\message -> ("target verification failed: " ++ message)) (C.checkClosed term);
       ensure (not requireIO || isIO ty) "program must have type IO a to run";
       ds <- D.validateDeclarations (declarations term);
-      Right (Pair ds (isIO ty))
+      Right ((,) ds (isIO ty))
     };
   runEntry requireIO args term =
     case prepare requireIO term of {
       Left message -> ioReturn (Left message);
-      Right (Pair ds action) ->
+      Right ((,) ds action) ->
         let {
           value = evaluate ds (REnv M.empty) (X.erase term)
         } in
@@ -98,8 +111,8 @@ module Bootstrap.Runtime where {
                   ioBind (runAction args ds value)
                     (\result ->
                        ioBind (ProcessHost.finish checkpoint result)
-                         (\cleaned -> ioReturn (mapEither (\ignored -> Unit) cleaned))))
-        else ioReturn (mapEither (\v -> seq (forceValue v) Unit) value)
+                         (\cleaned -> ioReturn (mapEither (\ignored -> ()) cleaned))))
+        else ioReturn (mapEither (\v -> seq (forceValue v) ()) value)
     };
   envLookup :: XName -> REnv -> Maybe (Either String RValue);
   envLookup n env =
@@ -118,11 +131,11 @@ module Bootstrap.Runtime where {
     foldlStrict
       (\scope entry ->
          case entry of {
-           Pair name value -> envInsert name value scope
+           (,) name value -> envInsert name value scope
          })
       env
       entries;
-  recursiveEnv :: DataEnv -> REnv -> List (Pair XName XErased) -> REnv;
+  recursiveEnv :: DataEnv -> REnv -> [] ((,) XName XErased) -> REnv;
   recursiveEnv ds env bindings =
     let {
       result :: REnv;
@@ -132,7 +145,7 @@ module Bootstrap.Runtime where {
              (map
                 (\entry ->
                    case entry of {
-                     Pair name rhs -> Pair name (evaluate ds result rhs)
+                     (,) name rhs -> (,) name (evaluate ds result rhs)
                    })
                 bindings))
           env
@@ -154,19 +167,19 @@ module Bootstrap.Runtime where {
       XEDouble n -> Right (RDouble n);
       XEBool b -> Right (RBoolean b);
       XEString s -> Right (RString s);
-      XEPrimitive primitive -> runtimePrimitive ds primitive Nil;
+      XEPrimitive primitive -> runtimePrimitive ds primitive [];
       XEConstructor name ->
         bindEither (D.lookupConstructor ds name)
           (\entry ->
              case entry of {
-               Pair _ constructor ->
+               (,) _ constructor ->
                  let {
                    remaining = length (D.constructorFields constructor)
                  } in
                  Right
                    (if (remaining == 0)
-                    then RConstructor name Nil
-                    else RConstructorFunction name remaining Nil)
+                    then RConstructor name []
+                    else RConstructorFunction name remaining [])
              });
       XECase scrutinee alternatives -> choose ds env (evaluate ds env scrutinee) alternatives;
       XEEvidenceHole ignored -> Left "unresolved runtime dictionary evidence"
@@ -180,20 +193,20 @@ module Bootstrap.Runtime where {
     case function of {
       XEPrimitive primitive ->
         if (P.primitiveArity primitive >= 1)
-        then runtimePrimitive ds primitive (Cons (evaluate ds env argument) Nil)
+        then runtimePrimitive ds primitive ((:) (evaluate ds env argument) [])
         else evaluateOrdinaryApplication ds env function argument;
       XEApp first second ->
         case first of {
           XEPrimitive primitive ->
             if (P.primitiveArity primitive >= 2)
             then runtimePrimitive ds primitive
-                   (Cons (evaluate ds env second) (Cons (evaluate ds env argument) Nil))
+                   ((:) (evaluate ds env second) ((:) (evaluate ds env argument) []))
             else evaluateOrdinaryApplication ds env function argument;
           XEApp (XEPrimitive primitive) initial ->
             if (P.primitiveArity primitive >= 3)
             then runtimePrimitive ds primitive
-                   (Cons (evaluate ds env initial)
-                      (Cons (evaluate ds env second) (Cons (evaluate ds env argument) Nil)))
+                   ((:) (evaluate ds env initial)
+                      ((:) (evaluate ds env second) ((:) (evaluate ds env argument) [])))
             else evaluateOrdinaryApplication ds env function argument;
           _ -> evaluateOrdinaryApplication ds env function argument
         };
@@ -203,11 +216,11 @@ module Bootstrap.Runtime where {
   evaluateOrdinaryApplication ds env function argument =
     bindEither (evaluate ds env function) (\value -> apply ds value (evaluate ds env argument));
   choose :: DataEnv ->
-            REnv -> Either String RValue -> List XErasedAlternative -> Either String RValue;
+            REnv -> Either String RValue -> [] XErasedAlternative -> Either String RValue;
   choose ds env value alternatives =
     case alternatives of {
-      Nil -> Left "non-exhaustive runtime case";
-      Cons (XErasedAlternative pattern body) rest ->
+      [] -> Left "non-exhaustive runtime case";
+      (:) (XErasedAlternative pattern body) rest ->
         case pattern of {
           XDefaultPattern name -> evaluate ds (maybe env (\n -> envInsert n value env) name) body;
           XConstructorPattern constructor names ->
@@ -221,7 +234,7 @@ module Bootstrap.Runtime where {
                                  (envExtend
                                     (catMaybes
                                        (zipWith
-                                          (\name field -> mapOptional (\n -> Pair n field) name)
+                                          (\name field -> mapOptional (\n -> (,) n field) name)
                                           names
                                           fields))
                                     env)
@@ -256,7 +269,7 @@ module Bootstrap.Runtime where {
         bindEither (D.lookupConstructor ds name)
           (\entry ->
              case entry of {
-               Pair declaration constructor ->
+               (,) declaration constructor ->
                  if (length fields < length (D.constructorFields constructor))
                  then Right (RConstructor name (snoc fields argument))
                  else Left "runtime constructor overapplication"
@@ -328,6 +341,153 @@ module Bootstrap.Runtime where {
            RIntTable a -> Right a;
            _ -> Left "runtime primitive expected IntTable"
          });
+  character :: Either String RValue -> Either String Int;
+  character thunk =
+    bindEither thunk
+      (\value -> case value of {
+         RChar n -> Right n;
+         _ -> Left "runtime primitive expected Char"
+       });
+  runtimeIOError :: Either String RValue -> Either String (Either String RValue);
+  runtimeIOError thunk =
+    bindEither thunk
+      (\value -> case value of {
+         RIOError message -> Right message;
+         _ -> Left "runtime primitive expected IOError"
+       });
+  runtimeTextChars :: String -> Int -> RValue;
+  runtimeTextChars text index =
+    if index == stringLength text
+    then RConstructor "[]" []
+    else RConstructor ":"
+           ((:) (Right (RChar (stringCodeAt text index)))
+              ((:) (Right (runtimeTextChars text (index + 1))) []));
+  runtimeCharsText :: Either String RValue -> Either String String;
+  runtimeCharsText thunk =
+    bindEither (runtimeCharsChunks False thunk) (\chunks -> Right (concatStrings chunks));
+  runtimeCharsChunks :: Bool -> Either String RValue -> Either String ([] String);
+  runtimeCharsChunks diagnostic thunk =
+    bindEither thunk
+      (\value -> case value of {
+         RConstructor name fields ->
+           case fields of {
+             [] -> if eqString name "[]" then Right []
+                    else Left "runtime primitive expected [Char]";
+             (:) first ((:) rest []) ->
+               if eqString name ":"
+               then do {
+                 code <- character first;
+                 let { scalar = ((code < 55296) || (code > 57343)) };
+                 ensure (diagnostic || scalar) "invalid Unicode scalar";
+                 chunks <- runtimeCharsChunks diagnostic rest;
+                 Right ((:) (if scalar then stringFromCode code else ("\\" ++ showInt code)) chunks)
+               }
+               else Left "runtime primitive expected [Char]";
+             _ -> Left "runtime primitive expected [Char]"
+           };
+         _ -> Left "runtime primitive expected [Char]"
+       });
+  runtimeCallStack :: Either String RValue -> Either String ([] ([] (Either String RValue)));
+  runtimeCallStack thunk =
+    bindEither thunk
+      (\value -> case value of {
+         RCallStack frames -> Right frames;
+         _ -> Left "runtime primitive expected MLFCallStack"
+       });
+  runtimeStackFrame :: Either String RValue -> Either String ([] (Either String RValue));
+  runtimeStackFrame thunk =
+    bindEither thunk
+      (\value -> case value of {
+         RConstructor name fields ->
+           if (eqString name "MLFStackFrame" && (length fields == 8))
+           then Right fields
+           else Left "runtime primitive expected MLFStackFrame";
+         _ -> Left "runtime primitive expected MLFStackFrame"
+       });
+  -- Append one strict opaque-text segment to a lazy canonical character list.
+  -- Neither later segments nor later frame fields are demanded to expose its
+  -- prefix. The Either inside a list tail preserves deferred evaluator errors.
+  runtimeTextCharsOnto :: String -> Int -> Either String RValue -> Either String RValue;
+  runtimeTextCharsOnto text index rest =
+    if index == stringLength text
+    then rest
+    else Right (RConstructor ":"
+           ((:) (Right (RChar (stringCodeAt text index)))
+              ((:) (runtimeTextCharsOnto text (index + 1) rest) [])));
+  runtimeCharSegments :: [] (Either String String) -> Either String RValue;
+  runtimeCharSegments segments =
+    case segments of {
+      [] -> Right (RConstructor "[]" []);
+      (:) segment rest -> bindEither segment
+        (\text -> runtimeTextCharsOnto text 0 (runtimeCharSegments rest))
+    };
+  runtimeStackCoordinate :: Either String RValue -> Either String Int;
+  runtimeStackCoordinate thunk = do {
+    value <- integer thunk;
+    ensure ((value >= (-9223372036854775808)) && (value <= 9223372036854775807))
+      "source coordinate out of bounds";
+    Right value
+  };
+  runtimeFrameSegments :: [] (Either String RValue) -> [] (Either String String);
+  runtimeFrameSegments fields =
+    case fields of {
+      (:) display ((:) package ((:) moduleName ((:) file
+        ((:) line ((:) column ((:) endLine ((:) endColumn []))))))) ->
+        (:) (Right "\n  ") ((:) (string display)
+          ((:) (Right ", called at ")
+            (runtimeLocationSegments package moduleName file line column endLine endColumn)));
+      _ -> (:) (Left "runtime primitive expected MLFStackFrame") []
+    };
+  -- GHC SrcLoc has strict Int coordinates. Demand them together only when the
+  -- location is reached, not while exposing the header or display-name prefix.
+  runtimeLocationSegments :: Either String RValue -> Either String RValue ->
+    Either String RValue -> Either String RValue -> Either String RValue ->
+    Either String RValue -> Either String RValue -> [] (Either String String);
+  runtimeLocationSegments package moduleName file line column endLine endColumn =
+    case (do {
+      sl <- runtimeStackCoordinate line;
+      sc <- runtimeStackCoordinate column;
+      runtimeStackCoordinate endLine;
+      runtimeStackCoordinate endColumn;
+      Right ((,) sl sc)
+    }) of {
+      Left message -> (:) (Left message) [];
+      Right ((,) sl sc) ->
+        (:) (string file) ((:) (Right ":") ((:) (Right (showInt sl))
+          ((:) (Right ":") ((:) (Right (showInt sc))
+            ((:) (Right " in ") ((:) (string package)
+              ((:) (Right ":") ((:) (string moduleName) []))))))))
+    };
+  runtimeStackSegments :: [] ([] (Either String RValue)) -> [] (Either String String);
+  runtimeStackSegments frames = concatMap runtimeFrameSegments frames;
+  runtimePrettyCallStack :: Either String RValue -> Either String RValue;
+  runtimePrettyCallStack thunk =
+    bindEither (runtimeCallStack thunk)
+      (\frames -> case frames of {
+         [] -> Right (RConstructor "[]" []);
+         (:) _ _ -> runtimeCharSegments
+           ((:) (Right "CallStack (from HasCallStack):") (runtimeStackSegments frames))
+       });
+  runtimeFailureContexts :: [] (Either String RValue) -> Either String String;
+  runtimeFailureContexts contexts =
+    case contexts of {
+      [] -> Right "";
+      (:) message rest -> do {
+        chunks <- runtimeCharsChunks True message;
+        after <- runtimeFailureContexts rest;
+        Right ("\n\nWhile handling user error (" ++ concatStrings chunks ++ ")" ++ after)
+      }
+    };
+  runtimeFailureStack :: Either String RValue -> Either String String;
+  runtimeFailureStack thunk =
+    bindEither (runtimeCallStack thunk)
+      (\frames -> case frames of {
+         [] -> Right "";
+         (:) _ _ -> do {
+           segments <- mapM (\segment -> segment) (runtimeStackSegments frames);
+           Right ("\n\nHasCallStack backtrace:" ++ concatStrings segments)
+         }
+       });
   integer2 f a b =
     do {
       x <- integer a;
@@ -363,8 +523,8 @@ module Bootstrap.Runtime where {
     let {
       n = P.primitiveCode primitive
     } in
-    ((n <= 5) ||
-     (((n >= 27) && (n <= 44)) || (((n >= 56) && (n <= 65)) || ((n >= 73) && (n <= 94)))));
+    ((n == 106) || ((n == 100) || ((n == 101) || ((n <= 5) ||
+     (((n >= 27) && (n <= 44)) || (((n >= 56) && (n <= 65)) || ((n >= 73) && (n <= 94))))))));
   isSTAction primitive =
     case primitive of {
       PSTReturn -> True;
@@ -375,7 +535,7 @@ module Bootstrap.Runtime where {
       PLengthSTArray -> True;
       _ -> False
     };
-  runtimePrimitive :: DataEnv -> Primitive -> List (Either String RValue) -> Either String RValue;
+  runtimePrimitive :: DataEnv -> Primitive -> [] (Either String RValue) -> Either String RValue;
   runtimePrimitive ds primitive arguments =
     let {
       arity = P.primitiveArity primitive
@@ -389,7 +549,7 @@ module Bootstrap.Runtime where {
               else if isSTAction primitive
                    then Right (RSTAction primitive arguments)
                    else primitiveResult ds primitive arguments;
-  primitiveResult :: DataEnv -> Primitive -> List (Either String RValue) -> Either String RValue;
+  primitiveResult :: DataEnv -> Primitive -> [] (Either String RValue) -> Either String RValue;
   primitiveResult ds primitive arguments =
     let {
       a = head arguments
@@ -401,6 +561,23 @@ module Bootstrap.Runtime where {
       c = head (tail (tail arguments))
     } in
     case primitive of {
+      PEmptyCallStack -> Right (RCallStack []);
+      PPushCallStack -> do {
+        frame <- runtimeStackFrame a;
+        frames <- runtimeCallStack b;
+        Right (RCallStack ((:) frame frames))
+      };
+      PPrettyCallStack -> runtimePrettyCallStack a;
+      PTextToChars -> mapEither (\text -> runtimeTextChars text 0) (string a);
+      PTextFromChars -> mapEither RString (runtimeCharsText a);
+      PCharCode -> mapEither RInteger (character a);
+      PCharFromCode -> do {
+        code <- integer a;
+        ensure ((code >= 0) && (code <= 1114111)) "invalid Char codepoint";
+        Right (RChar code)
+      };
+      PUserError -> Right (RIOError a);
+      PIOErrorString -> bindEither (runtimeIOError a) (\message -> message);
       PRunST -> runStateRegion ds a;
       PConcatString ->
         do {
@@ -527,7 +704,7 @@ module Bootstrap.Runtime where {
               } in
               ((fraction > (end + 1)) && validExponent s fraction)
          else validExponent s end;
-  unit = Right (RConstructor "Unit" Nil);
+  unit = Right (RConstructor "()" []);
   -- Each runST starts a fresh persistent store. The checked region type keeps
   -- handles local to this store; no host mutation or IO operation is involved.
   -- Keeping the default cell separate avoids allocating or forcing every slot.
@@ -551,10 +728,10 @@ module Bootstrap.Runtime where {
     };
   runStateRegion :: DataEnv -> Either String RValue -> Either String RValue;
   runStateRegion ds action =
-    bindEither (runStateAction ds (stateStore 0 M.empty) action Nil)
+    bindEither (runStateAction ds (stateStore 0 M.empty) action [])
       (\result ->
          case result of {
-           Pair finalStore value ->
+           (,) finalStore value ->
              bindEither value (\ready -> seq (forceValue ready) (Right ready))
          });
   -- Continuations contain unevaluated callback values. Results are thunks:
@@ -563,8 +740,8 @@ module Bootstrap.Runtime where {
   runStateAction :: DataEnv ->
                     RSTStore ->
                     Either String RValue ->
-                    List (Either String RValue) ->
-                    Either String (Pair RSTStore (Either String RValue));
+                    [] (Either String RValue) ->
+                    Either String ((,) RSTStore (Either String RValue));
   runStateAction ds store thunk continuations =
     bindEither thunk
       (\value ->
@@ -575,21 +752,21 @@ module Bootstrap.Runtime where {
   resumeState :: DataEnv ->
                  RSTStore ->
                  Either String RValue ->
-                 List (Either String RValue) ->
-                 Either String (Pair RSTStore (Either String RValue));
+                 [] (Either String RValue) ->
+                 Either String ((,) RSTStore (Either String RValue));
   resumeState ds store value continuations =
     seq store
       (case continuations of {
-         Nil -> Right (Pair store value);
-         Cons next rest ->
+         [] -> Right ((,) store value);
+         (:) next rest ->
            bindEither next (\function -> runStateAction ds store (apply ds function value) rest)
        });
   performState :: DataEnv ->
                   RSTStore ->
                   Primitive ->
-                  List (Either String RValue) ->
-                  List (Either String RValue) ->
-                  Either String (Pair RSTStore (Either String RValue));
+                  [] (Either String RValue) ->
+                  [] (Either String RValue) ->
+                  Either String ((,) RSTStore (Either String RValue));
   performState ds store primitive arguments continuations =
     let {
       a = head arguments
@@ -602,7 +779,7 @@ module Bootstrap.Runtime where {
     } in
     case primitive of {
       PSTReturn -> resumeState ds store a continuations;
-      PSTBind -> runStateAction ds store a (Cons b continuations);
+      PSTBind -> runStateAction ds store a ((:) b continuations);
       PNewSTArray ->
         do {
           n <- arraySize a;
@@ -683,16 +860,30 @@ module Bootstrap.Runtime where {
       Left message -> ioReturn (Left message);
       Right value -> next value
     };
-  runAction :: List String ->
+  runAction :: [] String ->
                DataEnv -> Either String RValue -> IO (Either String (Either String RValue));
   runAction args ds thunk =
     ioBind (runActionState args ds rAsyncEmpty thunk)
-      (\result -> ioReturn (mapEither (\(Pair _ value) -> value) result));
-  perform :: List String ->
+      (\result -> ioReturn
+         (bindEither result
+            (\((,) _ outcome) -> case outcome of {
+               RIOSuccess value -> Right value;
+               RIOFailure message stack contexts -> do {
+                 chunks <- runtimeCharsChunks True message;
+                 handling <- runtimeFailureContexts contexts;
+                 backtrace <- runtimeFailureStack stack;
+                 Left ("user error (" ++ concatStrings chunks ++ ")" ++ handling ++ backtrace)
+               }
+             })));
+  perform :: [] String ->
              DataEnv ->
-             Primitive -> List (Either String RValue) -> IO (Either String (Either String RValue));
+             Primitive -> [] (Either String RValue) -> IO (Either String (Either String RValue));
   perform args ds primitive arguments =
-    let {
+    if ((P.primitiveCode primitive == 1) ||
+        ((P.primitiveCode primitive == 100) ||
+         ((P.primitiveCode primitive == 101) || (P.primitiveCode primitive == 106))))
+    then runAction args ds (Right (RAction primitive arguments))
+    else let {
       a = head arguments
     } in
     let {
@@ -720,33 +911,33 @@ module Bootstrap.Runtime where {
           (do {
              n <- arraySize a;
              x <- integer b;
-             Right (Pair n x)
+             Right ((,) n x)
            })
           (\entry ->
              case entry of {
-               Pair n x -> wrapIO (newIntArray n x) RIntArray
+               (,) n x -> wrapIO (newIntArray n x) RIntArray
              });
       PNewDoubleArray ->
         checkedIO
           (do {
              n <- arraySize a;
              x <- floating b;
-             Right (Pair n x)
+             Right ((,) n x)
            })
           (\entry ->
              case entry of {
-               Pair n x -> wrapIO (newDoubleArray n x) RDoubleArray
+               (,) n x -> wrapIO (newDoubleArray n x) RDoubleArray
              });
       PNewByteArray ->
         checkedIO
           (do {
              n <- arraySize a;
              x <- byte b;
-             Right (Pair n x)
+             Right ((,) n x)
            })
           (\entry ->
              case entry of {
-               Pair n x -> wrapIO (newByteArray n x) RByteArray
+               (,) n x -> wrapIO (newByteArray n x) RByteArray
              });
       PReadIntArray ->
         checkedIO (intArray a)
@@ -772,11 +963,11 @@ module Bootstrap.Runtime where {
                     (do {
                        i <- arrayIndex n b;
                        x <- integer c;
-                       Right (Pair i x)
+                       Right ((,) i x)
                      })
                     (\entry ->
                        case entry of {
-                         Pair i x -> finishIO (writeIntArray array i x)
+                         (,) i x -> finishIO (writeIntArray array i x)
                        })));
       PWriteDoubleArray ->
         checkedIO (doubleArray a)
@@ -787,11 +978,11 @@ module Bootstrap.Runtime where {
                     (do {
                        i <- arrayIndex n b;
                        x <- floating c;
-                       Right (Pair i x)
+                       Right ((,) i x)
                      })
                     (\entry ->
                        case entry of {
-                         Pair i x -> finishIO (writeDoubleArray array i x)
+                         (,) i x -> finishIO (writeDoubleArray array i x)
                        })));
       PWriteByteArray ->
         checkedIO (byteArray a)
@@ -802,11 +993,11 @@ module Bootstrap.Runtime where {
                     (do {
                        i <- arrayIndex n b;
                        x <- byte c;
-                       Right (Pair i x)
+                       Right ((,) i x)
                      })
                     (\entry ->
                        case entry of {
-                         Pair i x -> finishIO (writeByteArray array i x)
+                         (,) i x -> finishIO (writeByteArray array i x)
                        })));
       PLengthIntArray -> checkedIO (intArray a) (\array -> wrapIO (lengthIntArray array) RInteger);
       PLengthDoubleArray ->
@@ -823,7 +1014,7 @@ module Bootstrap.Runtime where {
                   checkedIO (byteSlice n b c)
                     (\slice ->
                        case slice of {
-                         Pair offset count -> finishIO (putBytes array offset count)
+                         (,) offset count -> finishIO (putBytes array offset count)
                        })));
       PGetByteLine -> wrapIO getByteLine RByteArray;
       PNewIntTable -> wrapIO newIntTable RIntTable;
@@ -832,11 +1023,11 @@ module Bootstrap.Runtime where {
           (do {
              table <- intTable a;
              key <- integer b;
-             Right (Pair table key)
+             Right ((,) table key)
            })
           (\entry ->
              case entry of {
-               Pair table key -> wrapIO (readIntTable table key) RInteger
+               (,) table key -> wrapIO (readIntTable table key) RInteger
              });
       PWriteIntTable ->
         checkedIO
@@ -844,11 +1035,11 @@ module Bootstrap.Runtime where {
              table <- intTable a;
              key <- integer b;
              value <- integer c;
-             Right (Triple table key value)
+             Right ((,,) table key value)
            })
           (\entry ->
              case entry of {
-               Triple table key value -> finishIO (writeIntTable table key value)
+               (,,) table key value -> finishIO (writeIntTable table key value)
              });
       PReadFile -> checkedIO (path a) (\file -> wrapIO (readFile file) RString);
       PWriteFile ->
@@ -856,11 +1047,11 @@ module Bootstrap.Runtime where {
           (do {
              file <- path a;
              text <- string b;
-             Right (Pair file text)
+             Right ((,) file text)
            })
           (\entry ->
              case entry of {
-               Pair file text -> finishIO (writeFile file text)
+               (,) file text -> finishIO (writeFile file text)
              });
       PFileExists -> checkedIO (path a) (\file -> wrapIO (fileExists file) RBoolean);
       PCanonicalPath -> checkedIO (path a) (\file -> wrapIO (canonicalPath file) RString);
@@ -887,11 +1078,11 @@ module Bootstrap.Runtime where {
           (do {
              x <- path a;
              y <- string b;
-             Right (Pair x y)
+             Right ((,) x y)
            })
           (\pair ->
              case pair of {
-               Pair x y -> finishIO (setEnv x y)
+               (,) x y -> finishIO (setEnv x y)
              });
       PUnsetEnv -> checkedIO (path a) (\x -> finishIO (unsetEnv x));
       PRunProcess ->
@@ -899,11 +1090,11 @@ module Bootstrap.Runtime where {
           (do {
              x <- path a;
              y <- string b;
-             Right (Pair x y)
+             Right ((,) x y)
            })
           (\pair ->
              case pair of {
-               Pair x y -> wrapIO (runProcess x y) RInteger
+               (,) x y -> wrapIO (runProcess x y) RInteger
              });
       PListDirectory -> checkedIO (path a) (\x -> wrapIO (listDirectory x) RString);
       PDirectoryExists -> checkedIO (path a) (\x -> wrapIO (directoryExists x) RBoolean);
@@ -938,7 +1129,7 @@ module Bootstrap.Runtime where {
       ensure ((i >= 0) && (i <= size)) "byte slice out of bounds";
       n <- integer count;
       ensure ((n >= 0) && (n <= (size - i))) "byte slice out of bounds";
-      Right (Pair i n)
+      Right ((,) i n)
     };
   path a =
     do {
@@ -953,8 +1144,8 @@ module Bootstrap.Runtime where {
   -- opaque RValue variants; no source operation turns an Int into a typed cell.
   -- Callback/result thunks remain lazy fields in this persistent, traced store.
   data RAsyncScopeState =
-    RAsyncScopeState Bool Bool Int Int (List Int) (List Int) (List Int) (List (Pair Int Int));
-  data RAsyncCellState = RAsyncCellState Int (Maybe (Either String RValue)) (List Int);
+    RAsyncScopeState Bool Bool Int Int ([] Int) ([] Int) ([] Int) ([] ((,) Int Int));
+  data RAsyncCellState = RAsyncCellState Int (Maybe (Either String RValue)) ([] Int);
   data RAsyncSubscriptionState =
     RAsyncSubscriptionState Int (Maybe Int) (Either String RValue) (Maybe (Either String RValue));
   data RAsyncStore =
@@ -971,7 +1162,7 @@ module Bootstrap.Runtime where {
     case M.lookup compareInt identity scopes of {
       Nothing ->
         if ((identity >= 0) && (identity < ns))
-        then Right (RAsyncScopeState True False 0 0 Nil Nil Nil Nil)
+        then Right (RAsyncScopeState True False 0 0 [] [] [] [])
         else Left "unknown async scope";
       Just scope -> Right scope
     };
@@ -1016,28 +1207,28 @@ module Bootstrap.Runtime where {
            RAsyncScopeHandle identity -> Right identity;
            _ -> Left "runtime primitive expected AsyncScope"
          });
-  rAsyncCellHandle :: Either String RValue -> Either String (Pair Int Int);
+  rAsyncCellHandle :: Either String RValue -> Either String ((,) Int Int);
   rAsyncCellHandle value =
     bindEither value
       (\entry ->
          case entry of {
-           RCompletionHandle owner identity -> Right (Pair owner identity);
+           RCompletionHandle owner identity -> Right ((,) owner identity);
            _ -> Left "runtime primitive expected Completion"
          });
-  rAsyncTicketHandle :: Either String RValue -> Either String (Triple Int Int Int);
+  rAsyncTicketHandle :: Either String RValue -> Either String ((,,) Int Int Int);
   rAsyncTicketHandle value =
     bindEither value
       (\entry ->
          case entry of {
-           RAsyncSubscriptionHandle owner identity status -> Right (Triple owner identity status);
+           RAsyncSubscriptionHandle owner identity status -> Right ((,,) owner identity status);
            _ -> Left "runtime primitive expected AsyncSubscription"
          });
-  rAsyncFinished store value = ioReturn (Right (Pair store (Right value)));
+  rAsyncFinished store value = ioReturn (Right ((,) store (RIOSuccess (Right value))));
   rAsyncNewScope (RAsyncStore ns nc nt scopes cells tickets) cellLimit callbackLimit =
     let {
-      scope = RAsyncScopeState False False cellLimit callbackLimit Nil Nil Nil Nil
+      scope = RAsyncScopeState False False cellLimit callbackLimit [] [] [] []
     } in
-    Pair (rAsyncStore (ns + 1) nc nt (M.insert compareInt ns scope scopes) cells tickets)
+    (,) (rAsyncStore (ns + 1) nc nt (M.insert compareInt ns scope scopes) cells tickets)
       (RAsyncScopeHandle ns);
   rAsyncClose :: RAsyncStore -> Int -> Either String RAsyncStore;
   rAsyncClose store identity =
@@ -1066,7 +1257,7 @@ module Bootstrap.Runtime where {
           }
       }
     };
-  rAsyncNewCell :: RAsyncStore -> Int -> Either String (Pair RAsyncStore (Maybe RValue));
+  rAsyncNewCell :: RAsyncStore -> Int -> Either String ((,) RAsyncStore (Maybe RValue));
   rAsyncNewCell store owner =
     do {
       boundValueShared3 <- rAsyncLookupScope store owner;
@@ -1074,12 +1265,12 @@ module Bootstrap.Runtime where {
         RAsyncScopeState closed busy cellLimit callbackLimit ownedCells ownedTickets ready timers ->
           do {
             if (closed || (length ownedCells >= cellLimit))
-            then Right (Pair store Nothing)
+            then Right ((,) store Nothing)
             else case store of {
                    RAsyncStore ns nc nt scopes cells tickets ->
                      let {
                        scope =
-                         RAsyncScopeState closed busy cellLimit callbackLimit (Cons nc ownedCells)
+                         RAsyncScopeState closed busy cellLimit callbackLimit ((:) nc ownedCells)
                            ownedTickets
                            ready
                            timers
@@ -1087,20 +1278,20 @@ module Bootstrap.Runtime where {
                      let {
                        updated =
                          rAsyncStore ns (nc + 1) nt (M.insert compareInt owner scope scopes)
-                           (M.insert compareInt nc (RAsyncCellState owner Nothing Nil) cells)
+                           (M.insert compareInt nc (RAsyncCellState owner Nothing []) cells)
                            tickets
                      } in
-                     Right (Pair updated (Just (RCompletionHandle owner nc)))
+                     Right ((,) updated (Just (RCompletionHandle owner nc)))
                  }
           }
       }
     };
-  rAsyncResolve :: RAsyncStore -> Int -> Int -> Either String RValue -> Either String (Pair RAsyncStore Int);
+  rAsyncResolve :: RAsyncStore -> Int -> Int -> Either String RValue -> Either String ((,) RAsyncStore Int);
   rAsyncResolve store owner identity payload =
     do {
       scope <- rAsyncLookupScope store owner;
       if rAsyncClosed scope
-      then Right (Pair store 3)
+      then Right ((,) store 3)
       else do {
              boundValueShared4 <- rAsyncLookupCell store identity;
              case boundValueShared4 of {
@@ -1108,7 +1299,7 @@ module Bootstrap.Runtime where {
                  do {
                    ensure (cellOwner == owner) "completion owner mismatch";
                    case result of {
-                     Just _ -> Right (Pair store 2);
+                     Just _ -> Right ((,) store 2);
                      Nothing ->
                        do {
                          updated <-
@@ -1134,9 +1325,9 @@ module Bootstrap.Runtime where {
                                    timers
                              } in
                              Right
-                               (Pair
+                               ((,)
                                   (rAsyncSetCell (rAsyncSetScope updated owner readyScope) identity
-                                     (RAsyncCellState owner (Just payload) Nil))
+                                     (RAsyncCellState owner (Just payload) []))
                                   0)
                          }
                        }
@@ -1161,14 +1352,14 @@ module Bootstrap.Runtime where {
              }
            }
     };
-  rAsyncInsertTimer :: Int -> Int -> List (Pair Int Int) -> List (Pair Int Int);
+  rAsyncInsertTimer :: Int -> Int -> [] ((,) Int Int) -> [] ((,) Int Int);
   rAsyncInsertTimer deadline identity timers =
     case timers of {
-      Nil -> Cons (Pair deadline identity) Nil;
-      Cons (Pair first entry) rest ->
+      [] -> (:) ((,) deadline identity) [];
+      (:) ((,) first entry) rest ->
         if (deadline < first)
-        then Cons (Pair deadline identity) timers
-        else Cons (Pair first entry) (rAsyncInsertTimer deadline identity rest)
+        then (:) ((,) deadline identity) timers
+        else (:) ((,) first entry) (rAsyncInsertTimer deadline identity rest)
     };
   rAsyncSubscribe store owner cellId callback =
     rAsyncSubscribeTimer store owner cellId callback Nothing;
@@ -1179,9 +1370,9 @@ module Bootstrap.Runtime where {
         RAsyncScopeState closed busy cellLimit callbackLimit ownedCells ownedTickets ready timers ->
           do {
             if closed
-            then Right (Pair store (RAsyncSubscriptionHandle owner (-1) 3))
+            then Right ((,) store (RAsyncSubscriptionHandle owner (-1) 3))
             else if (length ownedTickets >= callbackLimit)
-                 then Right (Pair store (RAsyncSubscriptionHandle owner (-1) 4))
+                 then Right ((,) store (RAsyncSubscriptionHandle owner (-1) 4))
                  else do {
                         payload <-
                           case cellId of {
@@ -1216,7 +1407,7 @@ module Bootstrap.Runtime where {
                                 }
                             } in
                             let {
-                              queue = if immediatelyReady then append ready (Cons nt Nil) else ready
+                              queue = if immediatelyReady then append ready ((:) nt []) else ready
                             } in
                             let {
                               timerQueue =
@@ -1228,7 +1419,7 @@ module Bootstrap.Runtime where {
                             let {
                               scope =
                                 RAsyncScopeState closed busy cellLimit callbackLimit ownedCells
-                                  (Cons nt ownedTickets)
+                                  ((:) nt ownedTickets)
                                   queue
                                   timerQueue
                             } in
@@ -1245,7 +1436,7 @@ module Bootstrap.Runtime where {
                                    Just _ -> True;
                                    Nothing -> False
                                  }))
-                            then Right (Pair updated (RAsyncSubscriptionHandle owner nt 0))
+                            then Right ((,) updated (RAsyncSubscriptionHandle owner nt 0))
                             else case cellId of {
                                    Nothing -> Left "invalid pending async action";
                                    Just identity ->
@@ -1255,10 +1446,10 @@ module Bootstrap.Runtime where {
                                          RAsyncCellState cellOwner result waiters ->
                                            do {
                                              Right
-                                               (Pair
+                                               ((,)
                                                   (rAsyncSetCell updated identity
                                                      (RAsyncCellState cellOwner result
-                                                        (append waiters (Cons nt Nil))))
+                                                        (append waiters ((:) nt []))))
                                                   (RAsyncSubscriptionHandle owner nt 0))
                                            }
                                        }
@@ -1318,7 +1509,7 @@ module Bootstrap.Runtime where {
                           RAsyncScopeState closed busy cellLimit callbackLimit ownedCells
                             (rAsyncRemoveIdentity identity ownedTickets)
                             (rAsyncRemoveIdentity identity ready)
-                            (filter (\(Pair _ entry) -> (entry /= identity)) timers)
+                            (filter (\((,) _ entry) -> (entry /= identity)) timers)
                       } in
                       Right
                         (rAsyncStore ns nc nt (M.insert compareInt owner scope scopes) cells
@@ -1333,21 +1524,21 @@ module Bootstrap.Runtime where {
     do {
       status <- rAsyncTicketStatus store owner identity rejected;
       if (status /= 0)
-      then Right (Pair store status)
+      then Right ((,) store status)
       else do {
              updated <- rAsyncRemoveTicket store owner identity;
-             Right (Pair updated 0)
+             Right ((,) updated 0)
            }
     };
-  rAsyncDue :: Int -> List (Pair Int Int) -> Pair (List Int) (List (Pair Int Int));
+  rAsyncDue :: Int -> [] ((,) Int Int) -> (,) ([] Int) ([] ((,) Int Int));
   rAsyncDue now timers =
     case timers of {
-      Nil -> Pair Nil Nil;
-      Cons (Pair deadline identity) rest ->
+      [] -> (,) [] [];
+      (:) ((,) deadline identity) rest ->
         if (deadline > now)
-        then Pair Nil timers
+        then (,) [] timers
         else case rAsyncDue now rest of {
-               Pair due later -> Pair (Cons identity due) later
+               (,) due later -> (,) ((:) identity due) later
              }
     };
   rAsyncMature :: RAsyncStore -> Int -> Int -> Either String RAsyncStore;
@@ -1360,7 +1551,7 @@ module Bootstrap.Runtime where {
             if closed
             then Right store
             else case rAsyncDue now timers of {
-                   Pair due later ->
+                   (,) due later ->
                      Right
                        (rAsyncSetScope store owner
                           (RAsyncScopeState closed busy cellLimit callbackLimit cells tickets
@@ -1371,7 +1562,7 @@ module Bootstrap.Runtime where {
       }
     };
   rAsyncWait :: RAsyncStore ->
-                Int -> Int -> Int -> IO (Either String (Pair RAsyncStore (Either String RValue)));
+                Int -> Int -> Int -> IO (Either String ((,) RAsyncStore RIOOutcome));
   rAsyncWait store owner limit start =
     checkedIO (rAsyncLookupScope store owner)
       (\initial ->
@@ -1385,9 +1576,9 @@ module Bootstrap.Runtime where {
                           (do {
                              updated <- rAsyncMature store owner now;
                              scope <- rAsyncLookupScope updated owner;
-                             Right (Pair updated scope)
+                             Right ((,) updated scope)
                            })
-                          (\(Pair updated scope) ->
+                          (\((,) updated scope) ->
                              case scope of {
                                RAsyncScopeState closed busy _ _ _ _ ready timers ->
                                  if closed
@@ -1395,11 +1586,11 @@ module Bootstrap.Runtime where {
                                  else if busy
                                       then rAsyncFinished updated (RInteger 8)
                                       else case ready of {
-                                             Cons _ _ -> rAsyncFinished updated (RInteger 0);
-                                             Nil ->
+                                             (:) _ _ -> rAsyncFinished updated (RInteger 0);
+                                             [] ->
                                                case timers of {
-                                                 Nil -> rAsyncFinished updated (RInteger 1);
-                                                 Cons (Pair deadline _) _ ->
+                                                 [] -> rAsyncFinished updated (RInteger 1);
+                                                 (:) ((,) deadline _) _ ->
                                                    if ((limit >= 0) && ((now - start) >= limit))
                                                    then rAsyncFinished updated (RInteger 1)
                                                    else let {
@@ -1418,11 +1609,11 @@ module Bootstrap.Runtime where {
                              })));
   -- This loop threads updates through *all* IO binds. Legacy host effects do not
   -- get a fresh store, and nested stepping of another scope preserves both queues.
-  runActionState :: List String ->
+  runActionState :: [] String ->
                     DataEnv ->
                     RAsyncStore ->
                     Either String RValue ->
-                    IO (Either String (Pair RAsyncStore (Either String RValue)));
+                    IO (Either String ((,) RAsyncStore RIOOutcome));
   runActionState args ds store thunk =
     case thunk of {
       Left message -> ioReturn (Left message);
@@ -1435,26 +1626,60 @@ module Bootstrap.Runtime where {
                   (\result ->
                      case result of {
                        Left message -> ioReturn (Left message);
-                       Right (Pair updated value) ->
-                         runActionState args ds updated
-                           (bindEither (head (tail arguments))
-                              (\function -> apply ds function value))
+                       Right ((,) updated outcome) ->
+                         case outcome of {
+                           RIOFailure message stack contexts -> ioReturn (Right ((,) updated (RIOFailure message stack contexts)));
+                           RIOSuccess value ->
+                             runActionState args ds updated
+                               (bindEither (head (tail arguments))
+                                  (\function -> apply ds function value))
+                         }
                      });
+              PIOError ->
+                checkedIO (runtimeIOError (head arguments))
+                  (\message -> ioReturn (Right ((,) store (RIOFailure message (Right (RCallStack [])) []))));
+              PIOErrorWithStack ->
+                checkedIO (runtimeIOError (head arguments))
+                  (\message -> ioReturn
+                    (Right ((,) store (RIOFailure message (head (tail arguments)) []))));
+              PCatchIOError ->
+                ioBind (runActionState args ds store (head arguments))
+                  (\result -> case result of {
+                     Left message -> ioReturn (Left message);
+                     Right ((,) updated outcome) ->
+                       case outcome of {
+                         RIOSuccess value -> ioReturn (Right ((,) updated (RIOSuccess value)));
+                         RIOFailure message _ _ ->
+                           ioBind
+                             (runActionState args ds updated
+                               (bindEither (head (tail arguments))
+                                  (\handler -> apply ds handler (Right (RIOError message)))))
+                             (\handled -> ioReturn
+                               (mapEither
+                                 (\((,) after result) -> (,) after
+                                   (case result of {
+                                      RIOSuccess value -> RIOSuccess value;
+                                      RIOFailure next stack contexts ->
+                                        RIOFailure next stack ((:) message contexts)
+                                    }))
+                                 handled))
+                       }
+                   });
               _ ->
                 if ((P.primitiveCode primitive >= 83) && (P.primitiveCode primitive <= 94))
                 then performAsync args ds store primitive arguments
                 else ioBind (perform args ds primitive arguments)
-                       (\result -> ioReturn (mapEither (\value -> Pair store value) result))
+                       (\result -> ioReturn (mapEither (\value -> (,) store (RIOSuccess value)) result))
             };
           _ -> ioReturn (Left "runtime expected an IO action")
         }
     };
-  performAsync :: List String ->
+  performAsync :: [] String ->
                   DataEnv ->
                   RAsyncStore ->
                   Primitive ->
-                  List (Either String RValue) ->
-                  IO (Either String (Pair RAsyncStore (Either String RValue)));
+                  [] (Either String RValue) ->
+                  IO (Either String ((,) RAsyncStore RIOOutcome));
   performAsync args ds store primitive arguments =
     let {
       a = head arguments
@@ -1471,11 +1696,11 @@ module Bootstrap.Runtime where {
           (do {
              cells <- arraySize a;
              callbacks <- arraySize b;
-             Right (Pair cells callbacks)
+             Right ((,) cells callbacks)
            })
-          (\(Pair cells callbacks) ->
+          (\((,) cells callbacks) ->
              case rAsyncNewScope store cells callbacks of {
-               Pair updated result -> rAsyncFinished updated result
+               (,) updated result -> rAsyncFinished updated result
              });
       PAsyncScopeClose ->
         checkedIO
@@ -1483,14 +1708,14 @@ module Bootstrap.Runtime where {
              identity <- rAsyncScopeHandle a;
              rAsyncClose store identity
            })
-          (\updated -> rAsyncFinished updated (RConstructor "Unit" Nil));
+          (\updated -> rAsyncFinished updated (RConstructor "()" []));
       PAsyncNewCompletion ->
         checkedIO
           (do {
              owner <- rAsyncScopeHandle a;
              rAsyncNewCell store owner
            })
-          (\(Pair updated result) ->
+          (\((,) updated result) ->
              case result of {
                Nothing -> runActionState args ds updated c;
                Just cell ->
@@ -1502,19 +1727,19 @@ module Bootstrap.Runtime where {
           (do {
              boundValueShared12 <- rAsyncCellHandle a;
              case boundValueShared12 of {
-               Pair owner identity ->
+               (,) owner identity ->
                  do {
                    rAsyncResolve store owner identity b
                  }
              }
            })
-          (\(Pair updated status) -> rAsyncFinished updated (RInteger status));
+          (\((,) updated status) -> rAsyncFinished updated (RInteger status));
       PAsyncReadCompletion ->
         checkedIO
           (do {
              boundValueShared13 <- rAsyncCellHandle a;
              case boundValueShared13 of {
-               Pair owner identity ->
+               (,) owner identity ->
                  do {
                    rAsyncRead store owner identity
                  }
@@ -1532,19 +1757,19 @@ module Bootstrap.Runtime where {
           (do {
              boundValueShared14 <- rAsyncCellHandle a;
              case boundValueShared14 of {
-               Pair owner identity ->
+               (,) owner identity ->
                  do {
                    rAsyncSubscribe store owner (Just identity) b
                  }
              }
            })
-          (\(Pair updated result) -> rAsyncFinished updated result);
+          (\((,) updated result) -> rAsyncFinished updated result);
       PAsyncSubscriptionStatus ->
         checkedIO
           (do {
              boundValueShared15 <- rAsyncTicketHandle a;
              case boundValueShared15 of {
-               Triple owner identity rejected ->
+               (,,) owner identity rejected ->
                  do {
                    rAsyncTicketStatus store owner identity rejected
                  }
@@ -1556,42 +1781,42 @@ module Bootstrap.Runtime where {
           (do {
              boundValueShared16 <- rAsyncTicketHandle a;
              case boundValueShared16 of {
-               Triple owner identity rejected ->
+               (,,) owner identity rejected ->
                  do {
                    rAsyncCancel store owner identity rejected
                  }
              }
            })
-          (\(Pair updated status) -> rAsyncFinished updated (RInteger status));
+          (\((,) updated status) -> rAsyncFinished updated (RInteger status));
       PAsyncEnqueue ->
         checkedIO
           (do {
              owner <- rAsyncScopeHandle a;
              rAsyncSubscribe store owner Nothing b
            })
-          (\(Pair updated result) -> rAsyncFinished updated result);
+          (\((,) updated result) -> rAsyncFinished updated result);
       PAsyncDelay ->
         checkedIO
           (do {
              owner <- rAsyncScopeHandle a;
              milliseconds <- integer b;
              ensure ((milliseconds >= 0) && (milliseconds <= 4294967295)) "invalid async delay";
-             Right (Pair owner milliseconds)
+             Right ((,) owner milliseconds)
            })
-          (\(Pair owner milliseconds) ->
+          (\((,) owner milliseconds) ->
              ioBind ProcessHost.clock
                (\now ->
                   checkedIO (rAsyncSubscribeTimer store owner Nothing c (Just (now + milliseconds)))
-                    (\(Pair updated result) -> rAsyncFinished updated result)));
+                    (\((,) updated result) -> rAsyncFinished updated result)));
       PAsyncWait ->
         checkedIO
           (do {
              owner <- rAsyncScopeHandle a;
              limit <- integer b;
              ensure ((limit >= (-1)) && (limit <= 4294967295)) "invalid async wait";
-             Right (Pair owner limit)
+             Right ((,) owner limit)
            })
-          (\(Pair owner limit) ->
+          (\((,) owner limit) ->
              ioBind ProcessHost.clock (\start -> rAsyncWait store owner limit start));
       PAsyncStep ->
         checkedIO (rAsyncScopeHandle a)
@@ -1613,9 +1838,9 @@ module Bootstrap.Runtime where {
                                            else if rAsyncBusy scope
                                                 then rAsyncFinished store (RInteger 8)
                                                 else case scope of {
-                                                       RAsyncScopeState _ _ _ _ _ _ Nil _ ->
+                                                       RAsyncScopeState _ _ _ _ _ _ [] _ ->
                                                          rAsyncFinished store (RInteger 1);
-                                                       RAsyncScopeState _ _ _ _ _ _ (Cons identity _) _ ->
+                                                       RAsyncScopeState _ _ _ _ _ _ ((:) identity _) _ ->
                                                          case rAsyncLookupTicket store identity of {
                                                            Nothing ->
                                                              ioReturn
@@ -1653,15 +1878,18 @@ module Bootstrap.Runtime where {
                                                                        case result of {
                                                                          Left message ->
                                                                            ioReturn (Left message);
-                                                                         Right (Pair after _) ->
+                                                                         Right ((,) after outcome) ->
                                                                            checkedIO
                                                                              (rAsyncSetBusy after
                                                                                 owner
                                                                                 False)
                                                                              (\finished ->
-                                                                                rAsyncFinished
-                                                                                  finished
-                                                                                  (RInteger 0))
+                                                                                case outcome of {
+                                                                                  RIOSuccess _ ->
+                                                                                    rAsyncFinished finished (RInteger 0);
+                                                                                  RIOFailure message stack contexts ->
+                                                                                    ioReturn (Right ((,) finished (RIOFailure message stack contexts)))
+                                                                                })
                                                                        }))
                                                          }
                                                      })))));

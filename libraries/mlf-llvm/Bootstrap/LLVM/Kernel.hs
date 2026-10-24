@@ -12,7 +12,7 @@ module Bootstrap.LLVM.Kernel where {
   import qualified Bootstrap.LLVM.Analysis as A;
   import qualified Bootstrap.LLVM.Optimize as O;
   data CopyLoop = CopyLoop XName XName XName XName XName XName;
-  primitiveIn :: Primitive -> List Int -> Bool;
+  primitiveIn :: Primitive -> [] Int -> Bool;
   primitiveIn p codes = L.any (\code -> (P.primitiveCode p == code)) codes;
   safeScalarPrimitive :: Primitive -> Bool;
   safeScalarPrimitive p =
@@ -34,17 +34,17 @@ module Bootstrap.LLVM.Kernel where {
       PIntToDouble -> True;
       _ -> False
     };
-  safeQuotient :: Primitive -> List XErased -> Bool;
+  safeQuotient :: Primitive -> [] XErased -> Bool;
   safeQuotient p args =
     case p of {
       PQuotInt -> nonzeroDivisor args;
       PRemInt -> nonzeroDivisor args;
       _ -> False
     };
-  nonzeroDivisor :: List XErased -> Bool;
+  nonzeroDivisor :: [] XErased -> Bool;
   nonzeroDivisor args =
     case args of {
-      Cons a (Cons (XEInt n) Nil) -> (n /= 0);
+      (:) a ((:) (XEInt n) []) -> (n /= 0);
       _ -> False
     };
   scalar :: Map XName A.WorkerFunction -> XErased -> Bool;
@@ -61,11 +61,11 @@ module Bootstrap.LLVM.Kernel where {
       XELet n a b -> (scalarSeen fs seen a && scalarSeen fs seen b);
       _ ->
         case O.applications expression of {
-          Pair (XEPrimitive p) args ->
+          (,) (XEPrimitive p) args ->
             ((L.length args == P.primitiveArity p) &&
              (L.all (scalarSeen fs seen) args && (safeScalarPrimitive p || safeQuotient p args)));
-          Pair (XEConstructor c) args -> L.all (scalarSeen fs seen) args;
-          Pair (XEVar n) args ->
+          (,) (XEConstructor c) args -> L.all (scalarSeen fs seen) args;
+          (,) (XEVar n) args ->
             case M.lookup O.compareName n fs of {
               Nothing -> False;
               Just f ->
@@ -117,9 +117,9 @@ module Bootstrap.LLVM.Kernel where {
       XELetRec ds b -> anchor fs seen b;
       _ ->
         case O.applications expression of {
-          Pair (XEPrimitive PIfThenElse) args -> L.any (anchor fs seen) (L.drop 1 args);
-          Pair (XEPrimitive p) args -> (operation p && (L.length args == P.primitiveArity p));
-          Pair (XEVar n) args -> anchored fs seen n;
+          (,) (XEPrimitive PIfThenElse) args -> L.any (anchor fs seen) (L.drop 1 args);
+          (,) (XEPrimitive p) args -> (operation p && (L.length args == P.primitiveArity p));
+          (,) (XEVar n) args -> anchored fs seen n;
           _ -> False
         }
     };
@@ -131,20 +131,20 @@ module Bootstrap.LLVM.Kernel where {
         (L.all
            (\entry ->
               case entry of {
-                Pair n a -> M.member O.compareName n fs
+                (,) n a -> M.member O.compareName n fs
               })
            ds &&
          eligible fs names b);
       _ ->
         case O.applications expression of {
-          Pair (XEPrimitive PIOBind) (Cons a (Cons (XEAbs n b) Nil)) ->
+          (,) (XEPrimitive PIOBind) ((:) a ((:) (XEAbs n b) [])) ->
             (eligible fs names a && eligible fs names b);
-          Pair (XEPrimitive PIfThenElse) (Cons c (Cons a (Cons b Nil))) ->
+          (,) (XEPrimitive PIfThenElse) ((:) c ((:) a ((:) b []))) ->
             (scalar fs c && (eligible fs names a && eligible fs names b));
-          Pair (XEPrimitive PIOBind) args -> False;
-          Pair (XEPrimitive p) args ->
+          (,) (XEPrimitive PIOBind) args -> False;
+          (,) (XEPrimitive p) args ->
             (operation p && ((L.length args == P.primitiveArity p) && L.all (scalar fs) args));
-          Pair (XEVar n) args ->
+          (,) (XEVar n) args ->
             case M.lookup O.compareName n fs of {
               Nothing -> False;
               Just f ->
@@ -184,9 +184,9 @@ module Bootstrap.LLVM.Kernel where {
   reaches :: Set XName -> XErased -> Bool;
   reaches previous expression =
     case O.applications expression of {
-      Pair (XEPrimitive p) args ->
+      (,) (XEPrimitive p) args ->
         if allocation p then True else reachesChildren previous expression;
-      Pair (XEVar n) args ->
+      (,) (XEVar n) args ->
         if S.member O.compareName n previous then True else reachesChildren previous expression;
       _ -> reachesChildren previous expression
     };
@@ -216,11 +216,11 @@ module Bootstrap.LLVM.Kernel where {
     else collectingFixed fs names next;
   collecting :: Map XName A.WorkerFunction -> Set XName -> Set XName;
   collecting fs names = collectingFixed fs names S.empty;
-  byteCopy :: XName -> A.WorkerFunction -> Maybe (List XName);
+  byteCopy :: XName -> A.WorkerFunction -> Maybe ([] XName);
   byteCopy name f =
     if L.null (A.captures f)
     then case A.parameters f of {
-           Cons source (Cons dest (Cons end (Cons offset (Cons index Nil)))) ->
+           (:) source ((:) dest ((:) end ((:) offset ((:) index [])))) ->
              let {
                candidate = CopyLoop name source dest end offset index
              } in
@@ -231,29 +231,29 @@ module Bootstrap.LLVM.Kernel where {
   copyBody :: CopyLoop -> XErased -> Bool;
   copyBody candidate expression =
     case O.applications expression of {
-      Pair (XEPrimitive PIfThenElse) (Cons condition (Cons body (Cons done Nil))) ->
+      (,) (XEPrimitive PIfThenElse) ((:) condition ((:) body ((:) done []))) ->
         (copyCondition candidate condition && (copyRead candidate body && copyDone done));
       _ -> False
     };
   copyCondition :: CopyLoop -> XErased -> Bool;
   copyCondition (CopyLoop name source dest end offset index) expression =
     case O.applications expression of {
-      Pair (XEPrimitive PLtInt) (Cons (XEVar i) (Cons (XEVar n) Nil)) ->
+      (,) (XEPrimitive PLtInt) ((:) (XEVar i) ((:) (XEVar n) [])) ->
         (O.eqName index i && O.eqName end n);
       _ -> False
     };
   copyDone :: XErased -> Bool;
   copyDone expression =
     case O.applications expression of {
-      Pair (XEPrimitive PIOReturn) (Cons (XEConstructor unit) Nil) -> eqString unit "Unit";
+      (,) (XEPrimitive PIOReturn) ((:) (XEConstructor unit) []) -> eqString unit "()";
       _ -> False
     };
   copyRead :: CopyLoop -> XErased -> Bool;
   copyRead candidate expression =
     case O.applications expression of {
-      Pair (XEPrimitive PIOBind) (Cons action (Cons (XEAbs cell rest) Nil)) ->
+      (,) (XEPrimitive PIOBind) ((:) action ((:) (XEAbs cell rest) [])) ->
         case O.applications action of {
-          Pair (XEPrimitive PReadByteArray) (Cons (XEVar array) (Cons (XEVar i) Nil)) ->
+          (,) (XEPrimitive PReadByteArray) ((:) (XEVar array) ((:) (XEVar i) [])) ->
             case candidate of {
               CopyLoop name source dest end offset index ->
                 (O.eqName source array && (O.eqName index i && copyWrite candidate cell rest))
@@ -265,9 +265,9 @@ module Bootstrap.LLVM.Kernel where {
   copyWrite :: CopyLoop -> XName -> XErased -> Bool;
   copyWrite candidate cell expression =
     case O.applications expression of {
-      Pair (XEPrimitive PIOBind) (Cons action (Cons (XEAbs ignored tail) Nil)) ->
+      (,) (XEPrimitive PIOBind) ((:) action ((:) (XEAbs ignored tail) [])) ->
         case O.applications action of {
-          Pair (XEPrimitive PWriteByteArray) (Cons (XEVar array) (Cons address (Cons (XEVar c) Nil))) ->
+          (,) (XEPrimitive PWriteByteArray) ((:) (XEVar array) ((:) address ((:) (XEVar c) []))) ->
             case candidate of {
               CopyLoop name source dest end offset index ->
                 (O.eqName dest array &&
@@ -280,14 +280,14 @@ module Bootstrap.LLVM.Kernel where {
   copyAddress :: CopyLoop -> XErased -> Bool;
   copyAddress (CopyLoop name source dest end offset index) expression =
     case O.applications expression of {
-      Pair (XEPrimitive PAddInt) (Cons (XEVar o) (Cons (XEVar i) Nil)) ->
+      (,) (XEPrimitive PAddInt) ((:) (XEVar o) ((:) (XEVar i) [])) ->
         (O.eqName offset o && O.eqName index i);
       _ -> False
     };
   copyTail :: CopyLoop -> XErased -> Bool;
   copyTail (CopyLoop name source dest end offset index) expression =
     case O.applications expression of {
-      Pair (XEVar self) (Cons (XEVar a) (Cons (XEVar b) (Cons (XEVar n) (Cons (XEVar o) (Cons next Nil))))) ->
+      (,) (XEVar self) ((:) (XEVar a) ((:) (XEVar b) ((:) (XEVar n) ((:) (XEVar o) ((:) next []))))) ->
         (O.eqName name self &&
          (O.eqName source a &&
           (O.eqName dest b && (O.eqName end n && (O.eqName offset o && copyNext index next)))));
@@ -296,7 +296,7 @@ module Bootstrap.LLVM.Kernel where {
   copyNext :: XName -> XErased -> Bool;
   copyNext index expression =
     case O.applications expression of {
-      Pair (XEPrimitive PAddInt) (Cons (XEVar i) (Cons (XEInt one) Nil)) ->
+      (,) (XEPrimitive PAddInt) ((:) (XEVar i) ((:) (XEInt one) [])) ->
         (O.eqName index i && (one == 1));
       _ -> False
     }

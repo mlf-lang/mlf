@@ -13,15 +13,15 @@ module Tests.TestSources where {
   import qualified Package.Manifest as M;
   -- Keep discovery and source compilation on the same ordered package roots.
   -- Compiler libraries may live in separate packages rather than bootstrap/.
-  packageRoots :: M.PackageGraph -> List String;
+  packageRoots :: M.PackageGraph -> [] String;
   packageRoots graph = S.map M.packageRoot (M.packages graph);
-  portRoots :: M.PackageGraph -> List String;
-  portRoots graph = Cons (M.packageRoot (M.rootPackage graph) ++ "/tests") (packageRoots graph);
+  portRoots :: M.PackageGraph -> [] String;
+  portRoots graph = (:) (M.packageRoot (M.rootPackage graph) ++ "/tests") (packageRoots graph);
   -- Re-run the compiler's module discovery before every cache lookup. Hashing a
   -- previously saved dependency list would miss a newly introduced shadow module.
   -- Prelude is built in: loadModuleFiles skips it, and the compiler identity
   -- supplied by the caller accounts for its semantics.
-  sourceInputs :: List String -> String -> IO J.Json;
+  sourceInputs :: [] String -> String -> IO J.Json;
   sourceInputs includes entry =
     do {
       working <- canonicalPath ".";
@@ -43,14 +43,14 @@ module Tests.TestSources where {
              do {
                path <- canonicalPath (Modules.sourcePath loaded);
                hash <- fileDigest path;
-               ioReturn (Pair path (J.str hash))
+               ioReturn ((,) path (J.str hash))
              })
           modules;
       ioReturn
         (J.Object
-           (Cons (Pair "cwd" (J.str working))
-              (Cons (Pair "entry" (J.str entry))
-                 (Cons (Pair "includes" (J.stringArray includes))
-                    (Cons (Pair "files" (J.Object files)) Nil)))))
+           ((:) ((,) "cwd" (J.str working))
+              ((:) ((,) "entry" (J.str entry))
+                 ((:) ((,) "includes" (J.stringArray includes))
+                    ((:) ((,) "files" (J.Object files)) [])))))
     }
 }

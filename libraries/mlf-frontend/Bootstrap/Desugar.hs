@@ -7,34 +7,41 @@ module Bootstrap.Desugar where {
   import Bootstrap.Types;
   import Bootstrap.Std;
   import Bootstrap.Fresh;
-  patternVariables :: SPattern -> List String;
+  import qualified Bootstrap.Data as D;
+  patternVariables :: SPattern -> [] String;
   patternVariables pattern =
     case pattern of {
+      SAsPattern name inner -> (:) name (patternVariables inner);
+      SLazyPattern inner -> patternVariables inner;
       SDefaultPattern name ->
         case name of {
-          Nothing -> Nil;
-          Just n -> Cons n Nil
+          Nothing -> [];
+          Just n -> (:) n []
         };
       SConstructorPattern _ names ->
         concatMap
           (\n ->
              case n of {
-               Nothing -> Nil;
-               Just a -> Cons a Nil
+               Nothing -> [];
+               Just a -> (:) a []
              })
           names;
       SNestedPattern _ patterns -> concatMap patternVariables patterns;
-      SAnnotatedPattern n _ -> Cons n Nil;
-      _ -> Nil
+      SAnnotatedPattern n _ -> (:) n [];
+      _ -> []
     };
-  allNames :: SExpr -> List String;
+  allNames :: SExpr -> [] String;
   allNames expression =
     case expression of {
-      SVar name -> Cons name Nil;
-      SConstructor name -> Cons name Nil;
-      SLam name _ body -> Cons name (allNames body);
+      SSourceDefinition body -> allNames body;
+      SCallSite _ _ body -> allNames body;
+      SSharedBind pattern action body binding failure ->
+        append (patternVariables pattern) (concatMap allNames ((:) action ((:) body ((:) binding ((:) failure [])))));
+      SVar name -> (:) name [];
+      SConstructor name -> (:) name [];
+      SLam name _ body -> (:) name (allNames body);
       SApp f a -> append (allNames f) (allNames a);
-      SLet name a b -> Cons name (append (allNames a) (allNames b));
+      SLet name a b -> (:) name (append (allNames a) (allNames b));
       SAnn a _ -> allNames a;
       SSignature a _ -> allNames a;
       SCase a alternatives ->
@@ -42,22 +49,91 @@ module Bootstrap.Desugar where {
           (concatMap (\(SAlternative p b) -> append (patternVariables p) (allNames b))
              alternatives);
       SEquations rows ->
-        concatMap (\(Pair ps b) -> append (concatMap patternVariables ps) (allNames b)) rows;
+        concatMap (\((,) ps b) -> append (concatMap patternVariables ps) (allNames b)) rows;
       SLetRec definitions body ->
-        append (concatMap (\(Triple n _ e) -> Cons n (allNames e)) definitions) (allNames body);
+        append (concatMap (\((,,) n _ e) -> (:) n (allNames e)) definitions) (allNames body);
       SDo statements result -> append (concatMap statementNames statements) (allNames result);
       SChecked _ a -> allNames a;
-      SWanted n candidates -> Cons n (map snd candidates);
-      _ -> Nil
+      SWanted n candidates -> (:) n (map snd candidates);
+      _ -> []
     };
-  statementNames :: SStatement -> List String;
+  statementNames :: SStatement -> [] String;
   statementNames statement =
     case statement of {
       SDoBind p e -> append (patternVariables p) (allNames e);
       SDoThen e -> allNames e;
-      SDoLet n _ e -> Cons n (allNames e);
-      SDoLetRec ds -> concatMap (\(Triple n _ e) -> Cons n (allNames e)) ds
+      SDoLet n _ e -> (:) n (allNames e);
+      SDoLetRec ds -> concatMap (\((,,) n _ e) -> (:) n (allNames e)) ds
     };
+  -- Refutability is a property of resolved datatype families, not constructor
+  -- spelling or how many constructors happen to be imported into scope.
+  patternCannotFail :: DataEnv -> SPattern -> Either String Bool;
+  patternCannotFail env pattern = case pattern of {
+    SDefaultPattern _ -> Right True;
+    SAnnotatedPattern _ _ -> Right True;
+    SLazyPattern _ -> Right True;
+    SAsPattern _ inner -> patternCannotFail env inner;
+    SConstructorPattern name _ -> do {
+      found <- D.lookupConstructor env name;
+      case found of { (,) declaration _ -> Right (length (D.datatypeConstructors declaration) == 1) }
+    };
+    SNestedPattern name patterns -> do {
+      found <- D.lookupConstructor env name;
+      case found of {
+        (,) declaration _ -> if length (D.datatypeConstructors declaration) /= 1 then Right False
+          else do { results <- mapM (patternCannotFail env) patterns; Right (all (\x -> x) results) }
+      }
+    };
+    _ -> Right False
+  };
+  lowerSharedDo :: DataEnv -> SExpr -> Either String SExpr;
+  lowerSharedDo env expression = runFresh (allNames expression) (sharedGo env expression);
+  sharedGo :: DataEnv -> SExpr -> Fresh SExpr;
+  sharedGo env expression = case expression of {
+    SSharedBind pattern action body binding failure -> do {
+      a <- sharedGo env action; b <- sharedGo env body;
+      f <- sharedGo env binding;
+      name <- case pattern of {
+        SDefaultPattern (Just n) -> freshPure n;
+        _ -> freshName "sharedPatternValue"
+      };
+      continuation <- case pattern of {
+        SDefaultPattern _ -> freshPure b;
+        _ -> do {
+          cannotFail <- case patternCannotFail env pattern of { Left e -> freshFail e; Right result -> freshPure result };
+          fallback <- if cannotFail then freshPure [] else do {
+            e <- sharedGo env failure;
+            freshPure ((:) (SAlternative (SDefaultPattern Nothing) e) [])
+          };
+          freshPure (SCase (SVar name) ((:) (SAlternative pattern b) fallback))
+        }
+      };
+      freshPure (SApp (SApp f a) (SLam name Nothing continuation))
+    };
+    SSourceDefinition body -> do { b <- sharedGo env body; freshPure (SSourceDefinition b) };
+    SCallSite n location body -> do { b <- sharedGo env body; freshPure (SCallSite n location b) };
+    SLam n annotation body -> do { b <- sharedGo env body; freshPure (SLam n annotation b) };
+    SApp a b -> do { x <- sharedGo env a; y <- sharedGo env b; freshPure (SApp x y) };
+    SLet n a b -> do { x <- sharedGo env a; y <- sharedGo env b; freshPure (SLet n x y) };
+    SAnn a ty -> do { x <- sharedGo env a; freshPure (SAnn x ty) };
+    SSignature a ty -> do { x <- sharedGo env a; freshPure (SSignature x ty) };
+    SCase a branches -> do {
+      x <- sharedGo env a;
+      bs <- mapM (\(SAlternative p b) -> do { y <- sharedGo env b; freshPure (SAlternative p y) }) branches;
+      freshPure (SCase x bs)
+    };
+    SEquations rows -> do {
+      rs <- mapM (\((,) ps b) -> do { y <- sharedGo env b; freshPure ((,) ps y) }) rows;
+      freshPure (SEquations rs)
+    };
+    SLetRec definitions body -> do {
+      ds <- mapM (\((,,) n ty b) -> do { y <- sharedGo env b; freshPure ((,,) n ty y) }) definitions;
+      b <- sharedGo env body; freshPure (SLetRec ds b)
+    };
+    SChecked ty body -> do { b <- sharedGo env body; freshPure (SChecked ty b) };
+    SDo _ _ -> sharedGo env (desugarDo expression);
+    _ -> freshPure expression
+  };
   desugarDo :: SExpr -> SExpr;
   desugarDo expression =
     case runFresh (allNames expression) (go expression) of {
@@ -67,6 +143,14 @@ module Bootstrap.Desugar where {
   go :: SExpr -> Fresh SExpr;
   go expression =
     case expression of {
+      SSourceDefinition body -> do { b <- go body; freshPure (SSourceDefinition b) };
+      SCallSite name location body -> do {
+        result <- go body; freshPure (SCallSite name location result)
+      };
+      SSharedBind pattern action body binding failure -> do {
+        a <- go action; b <- go body; f <- go binding; e <- go failure;
+        freshPure (SSharedBind pattern a b f e)
+      };
       SLam n a b ->
         do {
           body <- go b;
@@ -111,10 +195,10 @@ module Bootstrap.Desugar where {
         do {
           rows2 <-
             mapM
-              (\(Pair ps b) ->
+              (\((,) ps b) ->
                  do {
                    body <- go b;
-                   freshPure (Pair ps body)
+                   freshPure ((,) ps body)
                  })
               rows;
           freshPure (SEquations rows2)
@@ -137,17 +221,17 @@ module Bootstrap.Desugar where {
         };
       _ -> freshPure expression
     };
-  goDefinition :: Triple String RecursiveMode SExpr -> Fresh (Triple String RecursiveMode SExpr);
-  goDefinition (Triple n mode a) =
+  goDefinition :: (,,) String RecursiveMode SExpr -> Fresh ((,,) String RecursiveMode SExpr);
+  goDefinition ((,,) n mode a) =
     do {
       value <- go a;
-      freshPure (Triple n mode value)
+      freshPure ((,,) n mode value)
     };
-  block :: List SStatement -> SExpr -> Fresh SExpr;
+  block :: [] SStatement -> SExpr -> Fresh SExpr;
   block statements result =
     case statements of {
-      Nil -> freshPure result;
-      Cons statement rest ->
+      [] -> freshPure result;
+      (:) statement rest ->
         do {
           continuation <- block rest result;
           case statement of {
@@ -164,8 +248,8 @@ module Bootstrap.Desugar where {
               };
             SDoThen action ->
               do {
-                name <- freshName "doValue";
-                binding (SDefaultPattern (Just name)) action continuation
+                value <- go action;
+                freshPure (SApp (SApp (SVar "$MLF.Primitive.>>") value) continuation)
               };
             SDoBind pattern action -> binding pattern action continuation;
             SDoLetRec definitions ->
@@ -176,27 +260,16 @@ module Bootstrap.Desugar where {
           }
         }
     };
+  -- Public raw AST do nodes use the same canonical, deferred pattern path as
+  -- source do. No ordinary lexical bind/fail name can intercept this lowering.
   binding :: SPattern -> SExpr -> SExpr -> Fresh SExpr;
   binding pattern action continuation =
     do {
       value <- go action;
-      result <-
-        case pattern of {
-          SDefaultPattern (Just name) -> freshPure (Pair name continuation);
-          SDefaultPattern Nothing ->
-            do {
-              name <- freshName "doValue";
-              freshPure (Pair name continuation)
-            };
-          _ ->
-            do {
-              name <- freshName "doValue";
-              freshPure
-                (Pair name (SCase (SVar name) (Cons (SAlternative pattern continuation) Nil)))
-            }
-        };
-      case result of {
-        Pair name body -> freshPure (SApp (SApp (SVar "bind") value) (SLam name Nothing body))
-      }
+      freshPure (SSharedBind pattern value continuation (SVar "$MLF.Primitive.>>=")
+        (SApp (SCallSite "a do statement"
+          (SourceSpan "main" "<direct-ast>" "<generated>" 0 0 0 0)
+          (SVar "$MLF.Primitive.fail"))
+          (SApp (SPrimitive PTextToChars) (SStringLit "Pattern match failure in do expression"))))
     }
 }

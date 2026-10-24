@@ -34,19 +34,19 @@ module Package.Build where {
   clang b = J.getText "path" "" (J.get "clang" (tools b));
   reportPath :: Builder -> String;
   reportPath b = (directory b ++ "/build-report.json");
-  record :: Builder -> String -> J.Json -> IO Unit;
+  record :: Builder -> String -> J.Json -> IO ();
   record b key value =
     do {
       report <- J.read (reportPath b);
       J.write (reportPath b) (J.add key value report)
     };
-  info :: List (Pair String J.Json) -> J.Json;
+  info :: [] ((,) String J.Json) -> J.Json;
   info fields = J.Object fields;
   obj1 :: String -> J.Json -> J.Json;
-  obj1 k v = J.Object (Cons (Pair k v) Nil);
+  obj1 k v = J.Object ((:) ((,) k v) []);
   obj2 :: String -> J.Json -> String -> J.Json -> J.Json;
-  obj2 k v l w = J.Object (Cons (Pair k v) (Cons (Pair l w) Nil));
-  hashFiles :: List String -> IO J.Json;
+  obj2 k v l w = J.Object ((:) ((,) k v) ((:) ((,) l w) []));
+  hashFiles :: [] String -> IO J.Json;
   hashFiles paths =
     do {
       rows <-
@@ -54,7 +54,7 @@ module Package.Build where {
           (\path ->
              do {
                hash <- fileDigest path;
-               ioReturn (Pair path (J.str hash))
+               ioReturn ((,) path (J.str hash))
              })
           (S.sortBy compareString (S.nubBy eqString paths));
       ioReturn (J.Object rows)
@@ -66,7 +66,7 @@ module Package.Build where {
       hash <- fileDigest path;
       ioReturn (obj2 "path" (J.str path) "sha256" (J.str hash))
     };
-  raw :: String -> List String -> IO String;
+  raw :: String -> [] String -> IO String;
   raw directory argv =
     do {
       let {
@@ -92,14 +92,14 @@ module Package.Build where {
   temporaryDirectory scratch prefix = O.temporaryDirectory scratch prefix;
   -- pkg-config uses shell-style quoting in its output; decode words without
   -- executing them. In particular, escaped spaces remain in one argv entry.
-  flags :: String -> List String;
-  flags text = flagsAt text 0 0 False "" Nil;
-  flagsAt :: String -> Int -> Int -> Bool -> String -> List String -> List String;
+  flags :: String -> [] String;
+  flags text = flagsAt text 0 0 False "" [];
+  flagsAt :: String -> Int -> Int -> Bool -> String -> [] String -> [] String;
   flagsAt text i quote escaped word acc =
     if (i >= stringLength text)
     then if ((quote /= 0) || escaped)
          then panic "invalid pkg-config quoting"
-         else S.reverse (if eqString word "" then acc else Cons word acc)
+         else S.reverse (if eqString word "" then acc else (:) word acc)
     else let {
            c = stringCodeAt text i
          } in
@@ -115,9 +115,9 @@ module Package.Build where {
                         then flagsAt text (i + 1) c False word acc
                         else if J.space c
                              then flagsAt text (i + 1) 0 False ""
-                                    (if eqString word "" then acc else Cons word acc)
+                                    (if eqString word "" then acc else (:) word acc)
                              else flagsAt text (i + 1) 0 False (word ++ O.char text i) acc;
-  libraryFiles :: List String -> IO (List String);
+  libraryFiles :: [] String -> IO ([] String);
   libraryFiles flags =
     do {
       let {
@@ -131,7 +131,7 @@ module Package.Build where {
                if present
                then do {
                       path <- canonicalPath flag;
-                      ioReturn (Cons path Nil)
+                      ioReturn ((:) path [])
                     }
                else if O.starts "-l" flag
                     then do {
@@ -152,16 +152,16 @@ module Package.Build where {
                                               }
                                          else ioReturn Nothing
                                        })
-                                    (Cons ".dylib" (Cons ".so" (Cons ".dll.a" (Cons ".a" Nil)))))
+                                    ((:) ".dylib" ((:) ".so" ((:) ".dll.a" ((:) ".a" [])))))
                                dirs;
                            ioReturn (S.take 1 (S.mapMaybe S.id (S.concat candidates)))
                          }
-                    else ioReturn Nil
+                    else ioReturn []
              })
           flags;
       ioReturn (S.concat selected)
     };
-  flagIdentity :: List String -> IO J.Json;
+  flagIdentity :: [] String -> IO J.Json;
   flagIdentity flags =
     do {
       libraries <- libraryFiles flags;
@@ -173,8 +173,8 @@ module Package.Build where {
       headers <- hashFiles (S.filter (O.ends ".h") (S.concat trees));
       ioReturn
         (info
-           (Cons (Pair "flags" (J.stringArray flags))
-              (Cons (Pair "libraries" hashes) (Cons (Pair "headers" headers) Nil))))
+           ((:) ((,) "flags" (J.stringArray flags))
+              ((:) ((,) "libraries" hashes) ((:) ((,) "headers" headers) []))))
     };
   -- Native PGO is an explicit construction option for one root executable.
   -- It never changes the source compiler identity or any other target's flags.
@@ -225,24 +225,24 @@ module Package.Build where {
         eqString name (J.getText "target" "" profile))
     then profile
     else J.empty;
-  pgoFlags :: J.Json -> List String;
+  pgoFlags :: J.Json -> [] String;
   pgoFlags profile =
     let {
       matchValueShared1 = J.getText "mode" "" profile
     } in
     if MLF.Primitive.eqString matchValueShared1 ""
-    then Nil
+    then []
     else if MLF.Primitive.eqString matchValueShared1 "generate"
-         then Cons "-fprofile-generate" Nil
+         then (:) "-fprofile-generate" []
          else if MLF.Primitive.eqString matchValueShared1 "use"
-              then Cons ("-fprofile-use=" ++ J.getText "path" "" (J.get "profile" profile))
+              then (:) ("-fprofile-use=" ++ J.getText "path" "" (J.get "profile" profile))
                      (O.words
                         "-Werror=profile-instr-unprofiled -Werror=profile-instr-out-of-date -Werror=backend-plugin")
               else panic "invalid native PGO mode";
   pgoInputs :: J.Json -> J.Json -> J.Json;
   pgoInputs profile inputs =
     if S.null (J.items profile) then inputs else J.set "native-pgo" profile inputs;
-  verifyPgo :: J.Json -> IO Unit;
+  verifyPgo :: J.Json -> IO ();
   verifyPgo profile =
     if eqString (J.getText "mode" "" profile) "use"
     then do {
@@ -253,7 +253,7 @@ module Package.Build where {
            O.require (eqString actual (J.getText "sha256" "" input))
              "native PGO profile changed during build/test"
          }
-    else ioReturn Unit;
+    else ioReturn ();
   create :: M.PackageGraph -> J.Json -> String -> IO Builder;
   create g options buildDirectory =
     do {
@@ -266,22 +266,22 @@ module Package.Build where {
       O.mkdir (cache ++ "/.locks");
       O.mkdir (buildDirectory ++ "/commands");
       comp <- tool (J.getText "compiler" "emlf" options);
-      help <- raw buildDirectory (Cons (J.getText "path" "" comp) (Cons "--help" Nil));
+      help <- raw buildDirectory ((:) (J.getText "path" "" comp) ((:) "--help" []));
       let {
         queryReport = S.elem eqString "--query-report" (O.words help)
       };
       implementation <-
         if S.elem eqString "--implementation-identity" (O.words help)
         then raw buildDirectory
-               (Cons (J.getText "path" "" comp) (Cons "--implementation-identity" Nil))
+               ((:) (J.getText "path" "" comp) ((:) "--implementation-identity" []))
         else ioReturn "legacy-unknown";
       cc <- tool (J.getText "clang" "clang" options);
       pkg <- tool (J.getText "pkg-config" "pkg-config" options);
       manager <- getExecutablePath;
       managerHash <- fileDigest manager;
-      system <- raw buildDirectory (Cons "/usr/bin/uname" (Cons "-s" Nil));
-      machine <- raw buildDirectory (Cons "/usr/bin/uname" (Cons "-m" Nil));
-      version <- raw buildDirectory (Cons (J.getText "path" "" cc) (Cons "--version" Nil));
+      system <- raw buildDirectory ((:) "/usr/bin/uname" ((:) "-s" []));
+      machine <- raw buildDirectory ((:) "/usr/bin/uname" ((:) "-m" []));
+      version <- raw buildDirectory ((:) (J.getText "path" "" cc) ((:) "--version" []));
       windows <- O.isWindows;
       helper <-
         if windows
@@ -298,12 +298,12 @@ module Package.Build where {
                   (O.words "libgmp-10.dll libgc-1.dll libwinpthread-1.dll libpkgconf-8.dll"))
         else ioReturn J.empty;
       gmpText <-
-        raw buildDirectory (Cons (J.getText "path" "" pkg) (O.words "--cflags --libs gmp"));
+        raw buildDirectory ((:) (J.getText "path" "" pkg) (O.words "--cflags --libs gmp"));
       gmp <- flagIdentity (flags gmpText);
       runtimeText <-
         if J.has "runtime" options
         then ioReturn (J.getText "runtime" "" options)
-        else raw buildDirectory (Cons (J.getText "path" "" comp) (Cons "--llvm-runtime" Nil));
+        else raw buildDirectory ((:) (J.getText "path" "" comp) ((:) "--llvm-runtime" []));
       runtime <- canonicalPath (O.trim runtimeText);
       runtimeFiles <- O.entries (O.parent runtime);
       runtimeHashes <-
@@ -315,30 +315,30 @@ module Package.Build where {
           (\key ->
              do {
                value <- getEnv key;
-               ioReturn (Pair key (J.str value))
+               ioReturn ((,) key (J.str value))
              })
           (O.words "SDKROOT MACOSX_DEPLOYMENT_TARGET CPATH C_INCLUDE_PATH LIBRARY_PATH");
       snapshot <- M.snapshot g;
       let {
         baseIdentity =
           info
-            (Cons (Pair "compiler" comp)
-               (Cons (Pair "clang" cc)
-                  (Cons (Pair "pkg-config" pkg)
-                     (Cons
-                        (Pair "manager" (obj2 "path" (J.str manager) "sha256" (J.str managerHash)))
-                        (Cons (Pair "system" (J.str (O.trim system)))
-                           (Cons (Pair "machine" (J.str (O.trim machine)))
-                              (Cons (Pair "native_environment" (J.Object env))
-                                 (Cons (Pair "runtime" runtimeHashes)
-                                    (Cons (Pair "runtime-path" (J.str runtime))
-                                       (Cons (Pair "gmp" gmp) Nil))))))))))
+            ((:) ((,) "compiler" comp)
+               ((:) ((,) "clang" cc)
+                  ((:) ((,) "pkg-config" pkg)
+                     ((:)
+                        ((,) "manager" (obj2 "path" (J.str manager) "sha256" (J.str managerHash)))
+                        ((:) ((,) "system" (J.str (O.trim system)))
+                           ((:) ((,) "machine" (J.str (O.trim machine)))
+                              ((:) ((,) "native_environment" (J.Object env))
+                                 ((:) ((,) "runtime" runtimeHashes)
+                                    ((:) ((,) "runtime-path" (J.str runtime))
+                                       ((:) ((,) "gmp" gmp) []))))))))))
       };
       let {
         irFlags =
           if (windows && S.any (O.starts "clang version 14.") (O.lines version))
           then O.words "-mllvm -opaque-pointers"
-          else Nil
+          else []
       };
       let {
         identity =
@@ -348,9 +348,9 @@ module Package.Build where {
                   (if windows
                    then J.set "windows"
                           (info
-                             (Cons (Pair "helper" helper)
-                                (Cons (Pair "prefix" (J.str prefix))
-                                   (Cons (Pair "dlls" dlls) Nil))))
+                             ((:) ((,) "helper" helper)
+                                ((:) ((,) "prefix" (J.str prefix))
+                                   ((:) ((,) "dlls" dlls) []))))
                           baseIdentity
                    else baseIdentity)))
       };
@@ -366,14 +366,14 @@ module Package.Build where {
       J.write (reportPath b)
         (J.set "cache_directory" (J.str cache)
            (info
-              (Cons (Pair "format" (J.num 1))
-                 (Cons (Pair "complete" (J.Boolean False))
-                    (Cons (Pair "implementation" (J.str "MLF"))
-                       (Cons (Pair "packages" snapshot)
-                          (Cons (Pair "toolchain" identity)
-                             (Cons (Pair "commands" (J.Array Nil))
-                                (Cons (Pair "builds" (J.Array Nil))
-                                   (Cons (Pair "tests" (J.Array Nil)) Nil))))))))));
+              ((:) ((,) "format" (J.num 1))
+                 ((:) ((,) "complete" (J.Boolean False))
+                    ((:) ((,) "implementation" (J.str "MLF"))
+                       ((:) ((,) "packages" snapshot)
+                          ((:) ((,) "toolchain" identity)
+                             ((:) ((,) "commands" (J.Array []))
+                                ((:) ((,) "builds" (J.Array []))
+                                   ((:) ((,) "tests" (J.Array [])) []))))))))));
       ioReturn b
     };
   -- Workers inherit the coordinator's resolved graph and input snapshot. Each
@@ -388,18 +388,18 @@ module Package.Build where {
       };
       J.write (reportPath worker)
         (info
-           (Cons (Pair "complete" (J.Boolean False))
-              (Cons (Pair "commands" (J.Array Nil)) (Cons (Pair "builds" (J.Array Nil)) Nil))));
+           ((:) ((,) "complete" (J.Boolean False))
+              ((:) ((,) "commands" (J.Array [])) ((:) ((,) "builds" (J.Array [])) []))));
       ioReturn worker
     };
-  reportKeys :: List String;
+  reportKeys :: [] String;
   reportKeys =
     O.words "commands builds crates releases codegen native_inputs tests pending-publications";
-  mergeReport :: Builder -> J.Json -> IO Unit;
+  mergeReport :: Builder -> J.Json -> IO ();
   mergeReport b saved =
-    S.mapM_ (\key -> S.mapM_ (record b key) (J.values (J.getOr key (J.Array Nil) saved)))
+    S.mapM_ (\key -> S.mapM_ (record b key) (J.values (J.getOr key (J.Array []) saved)))
       reportKeys;
-  mergeReports :: Builder -> List Builder -> IO Unit;
+  mergeReports :: Builder -> [] Builder -> IO ();
   mergeReports b workers =
     S.mapM_
       (\worker ->
@@ -414,7 +414,7 @@ module Package.Build where {
   -- release and another release's bundled copy share one compiler identity.
   importPath :: J.Json -> String;
   importPath result = J.getText "import_artifact" (artifactPath result) result;
-  capture :: Builder -> String -> List String -> String -> String -> IO String;
+  capture :: Builder -> String -> [] String -> String -> String -> IO String;
   capture b cwd argv input output =
     do {
       report <- J.read (reportPath b);
@@ -431,11 +431,11 @@ module Package.Build where {
       code <- O.exec cwd argv input result errors (readInt (J.getText "timeout" "1800" (config b)));
       record b "commands"
         (info
-           (Cons (Pair "argv" (J.stringArray argv))
-              (Cons (Pair "cwd" (J.str cwd))
-                 (Cons (Pair "exit_code" (J.num code))
-                    (Cons (Pair "stdout" (J.str result))
-                       (Cons (Pair "stderr" (J.str errors)) Nil))))));
+           ((:) ((,) "argv" (J.stringArray argv))
+              ((:) ((,) "cwd" (J.str cwd))
+                 ((:) ((,) "exit_code" (J.num code))
+                    ((:) ((,) "stdout" (J.str result))
+                       ((:) ((,) "stderr" (J.str errors)) []))))));
       if (code /= 0)
       then do {
              error <- readFile errors;
@@ -456,7 +456,7 @@ module Package.Build where {
         then do {
                text <-
                  capture b (root b)
-                   (Cons (J.getText "path" "" (J.get "pkg-config" (tools b)))
+                   ((:) (J.getText "path" "" (J.get "pkg-config" (tools b)))
                       (O.words "--cflags --libs bdw-gc"))
                    ""
                    "";
@@ -474,34 +474,34 @@ module Package.Build where {
                present <- fileExists library;
                O.require present ("missing BDWGC library: " ++ library);
                ioReturn
-                 (Cons ("-I" ++ (path ++ "/include"))
-                    (Cons library
+                 ((:) ("-I" ++ (path ++ "/include"))
+                    ((:) library
                        (if eqString (J.getText "system" "" (tools b)) "Linux"
-                        then Cons "-ldl" Nil
-                        else Nil)))
+                        then (:) "-ldl" []
+                        else [])))
              };
       identity <- flagIdentity selected;
       record b "native_inputs" identity;
       ioReturn identity
     };
-  stackFlags :: Builder -> List String;
+  stackFlags :: Builder -> [] String;
   stackFlags b =
     if eqString (J.getText "system" "" (tools b)) "Darwin"
-    then Cons "-Wl,-stack_size,0x10000000" Nil
+    then (:) "-Wl,-stack_size,0x10000000" []
     else if eqString (J.getText "system" "" (tools b)) "Windows"
-         then Cons "-Wl,--stack,268435456" Nil
-         else Nil;
+         then (:) "-Wl,--stack,268435456" []
+         else [];
   -- COFF timestamps are not semantic inputs. Keep separately rebuilt objects
   -- byte-identical so content-addressed linking can reuse their actual bytes.
-  objectFlags :: Builder -> List String;
+  objectFlags :: Builder -> [] String;
   objectFlags b =
-    if J.has "windows" (tools b) then Cons "-mno-incremental-linker-compatible" Nil else Nil;
+    if J.has "windows" (tools b) then (:) "-mno-incremental-linker-compatible" [] else [];
   executable b path =
     if eqString (J.getText "system" "" (tools b)) "Windows" then (path ++ ".exe") else path;
   windowsFiles b =
     if J.has "windows" (tools b)
     then O.words "libgmp-10.dll libgc-1.dll libwinpthread-1.dll mlf-host.exe"
-    else Nil;
+    else [];
   copyWindowsFiles b destination =
     do {
       let {
@@ -581,21 +581,21 @@ module Package.Build where {
              }
            }
     };
-  cached :: Builder -> String -> J.Json -> (String -> IO Unit) -> IO String;
+  cached :: Builder -> String -> J.Json -> (String -> IO ()) -> IO String;
   cached b kind inputs action = cachedChecked b kind inputs (\_ -> ioReturn True) action;
   cachedChecked :: Builder ->
-                   String -> J.Json -> (String -> IO Bool) -> (String -> IO Unit) -> IO String;
+                   String -> J.Json -> (String -> IO Bool) -> (String -> IO ()) -> IO String;
   cachedChecked b kind inputs validate action =
     do {
       result <- cachedCheckedResult b kind inputs validate action;
       ioReturn (artifactPath result)
     };
-  cachedResult :: Builder -> String -> J.Json -> (String -> IO Unit) -> IO J.Json;
+  cachedResult :: Builder -> String -> J.Json -> (String -> IO ()) -> IO J.Json;
   cachedResult b kind inputs action =
     cachedCheckedResult b kind inputs (\_ -> ioReturn True) action;
   cachedCheckedResult :: Builder ->
                          String ->
-                         J.Json -> (String -> IO Bool) -> (String -> IO Unit) -> IO J.Json;
+                         J.Json -> (String -> IO Bool) -> (String -> IO ()) -> IO J.Json;
   cachedCheckedResult b kind inputs validate action =
     do {
       key <- fingerprint b (obj2 "kind" (J.str kind) "inputs" inputs);
@@ -606,7 +606,7 @@ module Package.Build where {
       ownValid <- cacheValid destination key;
       reusable <- if ownValid then validate destination else ioReturn False;
       if reusable
-      then ioReturn Unit
+      then ioReturn ()
       else do {
              putErr ("Building " ++ (kind ++ "\n"));
              work <- temporaryDirectory (directory b) (destination ++ ".work-");
@@ -617,22 +617,22 @@ module Package.Build where {
                  (\path ->
                     do {
                       hash <- fileDigest path;
-                      ioReturn (Pair (O.relative work path) (J.str hash))
+                      ioReturn ((,) (O.relative work path) (J.str hash))
                     })
                  paths;
              O.require (S.not (S.null hashes)) (kind ++ " produced no artifacts");
              J.write (work ++ "/artifact.json")
                (info
-                  (Cons (Pair "key" (J.str key))
-                     (Cons (Pair "inputs" inputs) (Cons (Pair "files" (J.Object hashes)) Nil))));
+                  ((:) ((,) "key" (J.str key))
+                     ((:) ((,) "inputs" inputs) ((:) ((,) "files" (J.Object hashes)) []))));
              O.remove destination;
              O.move work destination
            };
       let {
         row =
           info
-            (Cons (Pair "kind" (J.str kind))
-               (Cons (Pair "key" (J.str key)) (Cons (Pair "cached" (J.Boolean reusable)) Nil)))
+            ((:) ((,) "kind" (J.str kind))
+               ((:) ((,) "key" (J.str key)) ((:) ((,) "cached" (J.Boolean reusable)) [])))
       };
       stamp <- J.read (destination ++ "/artifact.json");
       record b "builds" row;
@@ -640,16 +640,16 @@ module Package.Build where {
       ioReturn
         (J.set "artifact" (J.str destination)
            (J.set "receipt" (J.str (destination ++ "/artifact.json"))
-              (J.set "files" (J.get "files" stamp) (J.set "builds" (J.Array (Cons row Nil)) row))))
+              (J.set "files" (J.get "files" stamp) (J.set "builds" (J.Array ((:) row [])) row))))
     };
   -- The package graph orders crates. Module imports only determine namespaces;
   -- declarations inside a crate are resolved and inferred together by the compiler.
-  pack :: List String -> String;
+  pack :: [] String -> String;
   pack fields =
     S.concatMapString (\value -> (showInt (stringLength value) ++ (":" ++ value))) fields;
-  packPair :: Pair String String -> String;
-  packPair (Pair a b) = pack (Cons a (Cons b Nil));
-  directLibraries :: M.Package -> List (Pair String String) -> List String;
+  packPair :: (,) String String -> String;
+  packPair ((,) a b) = pack ((:) a ((:) b []));
+  directLibraries :: M.Package -> [] ((,) String String) -> [] String;
   directLibraries p built =
     S.mapMaybe (\name -> S.lookup eqString name built)
       (S.sortBy compareString (M.keys (J.getObject "dependencies" (M.packageData p))));
@@ -687,7 +687,7 @@ module Package.Build where {
           paths = S.map S.fst entries
         } in
         ((S.length paths == S.length (S.nubBy eqString paths)) &&
-         S.all (\(Pair path digest) -> (Host.absolutePath path && validDigest digest)) entries);
+         S.all (\((,) path digest) -> (Host.absolutePath path && validDigest digest)) entries);
       _ -> False
     };
   validDependencyFiles saved =
@@ -699,7 +699,7 @@ module Package.Build where {
           else do {
                  matches <-
                    S.mapM
-                     (\(Pair path expected) ->
+                     (\((,) path expected) ->
                         do {
                           present <- fileExists path;
                           if S.not present
@@ -723,9 +723,9 @@ module Package.Build where {
     else do {
            entries <-
              S.foldEither
-               (\done (Pair path digest) ->
+               (\done ((,) path digest) ->
                   case S.lookup eqString path done of {
-                    Nothing -> Right (Cons (Pair path digest) done);
+                    Nothing -> Right ((:) ((,) path digest) done);
                     Just previous ->
                       if J.equal previous digest
                       then Right done
@@ -754,7 +754,7 @@ module Package.Build where {
              (J.equal (J.get "key" stamp) (J.str (O.base artifact)) &&
               (S.all (\name -> J.has name (J.get "files" stamp))
                  (O.words "unit.mlfci unit.mlfco dependency-files.json") &&
-               S.all (\(Pair _ digest) -> validDigest digest) files)));
+               S.all (\((,) _ digest) -> validDigest digest) files)));
           _ -> False
         };
       _ -> False
@@ -834,17 +834,17 @@ module Package.Build where {
     do {
       checked <-
         S.mapM
-          (\(Pair metadata iface) ->
+          (\((,) metadata iface) ->
              do {
                reused <-
                  if eqString metadata ownMetadata
                  then ioReturn False
                  else provenCrateFiles proof metadata;
                if reused
-               then ioReturn (Pair True True)
+               then ioReturn ((,) True True)
                else do {
                       object <- Artifact.readObject (Artifact.objectPath metadata) iface;
-                      ioReturn (Pair (S.either (\_ -> False) (\_ -> True) object) False)
+                      ioReturn ((,) (S.either (\_ -> False) (\_ -> True) object) False)
                     }
              })
           interfaces;
@@ -857,22 +857,22 @@ module Package.Build where {
       let {
         report =
           info
-            (Cons (Pair "format" (J.num 1))
-               (Cons (Pair "object_count" (J.num count))
-                  (Cons (Pair "checked_objects" (J.num (count - reused)))
-                     (Cons (Pair "reused_objects" (J.num reused))
-                        (Cons
-                           (Pair "root_checked"
+            ((:) ((,) "format" (J.num 1))
+               ((:) ((,) "object_count" (J.num count))
+                  ((:) ((,) "checked_objects" (J.num (count - reused)))
+                     ((:) ((,) "reused_objects" (J.num reused))
+                        ((:)
+                           ((,) "root_checked"
                               (J.Boolean
-                                 (S.any (\(Pair metadata _) -> eqString metadata ownMetadata)
+                                 (S.any (\((,) metadata _) -> eqString metadata ownMetadata)
                                     interfaces)))
-                           Nil)))))
+                           [])))))
       };
-      ioReturn (Pair (S.all S.fst checked) report)
+      ioReturn ((,) (S.all S.fst checked) report)
     };
   saveCrateClosure destination directArtifacts =
     do {
-      loaded <- Artifact.loadInterfaces (Cons (destination ++ "/unit.mlfci") Nil);
+      loaded <- Artifact.loadInterfaces ((:) (destination ++ "/unit.mlfci") []);
       case loaded of {
         Left message -> O.fatal ("invalid generated crate dependency closure: " ++ message);
         Right interfaces ->
@@ -881,19 +881,19 @@ module Package.Build where {
             ownMetadata <- canonicalPath (destination ++ "/unit.mlfci");
             boundValueShared2 <- checkCrateObjects ownMetadata proof interfaces;
             case boundValueShared2 of {
-              Pair checked validation ->
+              (,) checked validation ->
                 do {
                   O.require checked "invalid generated crate dependency object";
                   O.require (J.getBool "root_checked" False validation)
                     "generated crate object was not independently checked";
                   let {
                     dependencies =
-                      S.filter (\(Pair path _) -> S.not (eqString path ownMetadata)) interfaces
+                      S.filter (\((,) path _) -> S.not (eqString path ownMetadata)) interfaces
                   };
                   hashes <-
                     hashFiles
                       (S.concatMap
-                         (\(Pair path _) -> Cons path (Cons (Artifact.objectPath path) Nil))
+                         (\((,) path _) -> (:) path ((:) (Artifact.objectPath path) []))
                          dependencies);
                   J.write (destination ++ "/dependency-files.json") hashes;
                   J.write (destination ++ "/unit.validation.json") validation
@@ -906,10 +906,10 @@ module Package.Build where {
   -- actions repeatedly read their own report, so embed only the bounded summary.
   crateQuerySummary saved =
     J.set "group_count" (J.num (S.length (J.values (J.get "groups" saved))))
-      (J.Object (S.filter (\(Pair key _) -> S.not (eqString key "groups")) (J.items saved)));
+      (J.Object (S.filter (\((,) key _) -> S.not (eqString key "groups")) (J.items saved)));
   compileCrate :: Builder ->
                   M.Package ->
-                  String -> String -> List M.Module -> List String -> Bool -> IO String;
+                  String -> String -> [] M.Module -> [] String -> Bool -> IO String;
   compileCrate b p kind entry modules dependencies noPrelude =
     do {
       result <- compileCrateResult b p kind entry modules dependencies noPrelude;
@@ -917,7 +917,7 @@ module Package.Build where {
     };
   compileCrateResult :: Builder ->
                         M.Package ->
-                        String -> String -> List M.Module -> List String -> Bool -> IO J.Json;
+                        String -> String -> [] M.Module -> [] String -> Bool -> IO J.Json;
   -- Keep query storage outside content-addressed crate artifacts so source edits
   -- can reuse checked declaration groups. Compiler identities isolate schemas.
   compileCrateResult b p kind entry modules dependencies noPrelude =
@@ -940,7 +940,7 @@ module Package.Build where {
                    Right value -> ioReturn (Lexer.sourceSyntaxName value)
                  };
                ioReturn
-                 (Pair (M.moduleName m)
+                 ((,) (M.moduleName m)
                     (J.set "syntax" (J.str syntax)
                        (obj2 "path" (J.str (M.moduleSource m)) "sha256" (J.str hash))))
              })
@@ -953,21 +953,21 @@ module Package.Build where {
                object <- fileDigest (artifact ++ "/unit.mlfco");
                ioReturn
                  (info
-                    (Cons (Pair "path" (J.str (artifact ++ "/unit.mlfci")))
-                       (Cons (Pair "metadata" (J.str metadata))
-                          (Cons (Pair "object" (J.str object)) Nil))))
+                    ((:) ((,) "path" (J.str (artifact ++ "/unit.mlfci")))
+                       ((:) ((,) "metadata" (J.str metadata))
+                          ((:) ((,) "object" (J.str object)) []))))
              })
           dependencies;
       let {
         inputs =
           info
-            (Cons (Pair "compiler" (J.get "compiler" (tools b)))
-               (Cons (Pair "manager" (J.get "manager" (tools b)))
-                  (Cons (Pair "crate" (J.str identity))
-                     (Cons (Pair "entry" (J.str entry))
-                        (Cons (Pair "no-prelude" (J.Boolean noPrelude))
-                           (Cons (Pair "sources" (J.Object sources))
-                              (Cons (Pair "dependencies" (J.Array imports)) Nil)))))))
+            ((:) ((,) "compiler" (J.get "compiler" (tools b)))
+               ((:) ((,) "manager" (J.get "manager" (tools b)))
+                  ((:) ((,) "crate" (J.str identity))
+                     ((:) ((,) "entry" (J.str entry))
+                        ((:) ((,) "no-prelude" (J.Boolean noPrelude))
+                           ((:) ((,) "sources" (J.Object sources))
+                              ((:) ((,) "dependencies" (J.Array imports)) [])))))))
       };
       let {
         queries =
@@ -990,27 +990,27 @@ module Package.Build where {
                let {
                  spec =
                    pack
-                     (Cons "MLF-CRATE-1"
-                        (Cons identity
-                           (Cons entry
-                              (Cons (if noPrelude then "true" else "false")
-                                 (Cons
+                     ((:) "MLF-CRATE-1"
+                        ((:) identity
+                           ((:) entry
+                              ((:) (if noPrelude then "true" else "false")
+                                 ((:)
                                     (pack
                                        (S.map
                                           (\m ->
-                                             packPair (Pair (M.moduleName m) (M.moduleSource m)))
+                                             packPair ((,) (M.moduleName m) (M.moduleSource m)))
                                           ordered))
-                                    (Cons
+                                    ((:)
                                        (pack
                                           (S.map (\path -> (path ++ "/unit.mlfci")) dependencies))
-                                       (Cons queries (Cons builtin Nil))))))))
+                                       ((:) queries ((:) builtin []))))))))
                };
                writeFile (work ++ "/crate.spec") spec;
                ignored <-
                  capture b work
-                   (Cons (compiler b)
-                      (Cons "--compile-crate"
-                         (Cons (work ++ "/crate.spec") (Cons "-o" (Cons (work ++ "/unit") Nil)))))
+                   ((:) (compiler b)
+                      ((:) "--compile-crate"
+                         ((:) (work ++ "/crate.spec") ((:) "-o" ((:) (work ++ "/unit") [])))))
                    ""
                    "";
                S.mapM_
@@ -1060,29 +1060,29 @@ module Package.Build where {
       let {
         row =
           info
-            (Cons (Pair "crate" (J.str identity))
-               (Cons (Pair "outer_cached" (J.Boolean reused))
-                  (Cons (Pair "metadata" (J.str (artifact ++ "/unit.mlfci")))
-                     (Cons (Pair "query_report" (J.str (artifact ++ "/unit.queries")))
-                        (Cons (Pair "queries" queriesNow)
-                           (Cons
-                              (Pair "validation_report"
+            ((:) ((,) "crate" (J.str identity))
+               ((:) ((,) "outer_cached" (J.Boolean reused))
+                  ((:) ((,) "metadata" (J.str (artifact ++ "/unit.mlfci")))
+                     ((:) ((,) "query_report" (J.str (artifact ++ "/unit.queries")))
+                        ((:) ((,) "queries" queriesNow)
+                           ((:)
+                              ((,) "validation_report"
                                  (J.str (artifact ++ "/unit.validation.json")))
-                              (Cons (Pair "validation" validationNow) Nil)))))))
+                              ((:) ((,) "validation" validationNow) [])))))))
       };
       record b "crates" row;
       ioReturn
-        (J.set "crates" (J.Array (Cons row Nil))
+        (J.set "crates" (J.Array ((:) row []))
            (J.set "metadata" (J.str (artifact ++ "/unit.mlfci"))
               (J.set "validation" validationNow result)))
     };
-  libraries :: Builder -> Bool -> IO (List (Pair String String));
-  libraries b noPrelude = libraryLoop b noPrelude Nil (M.packages (graph b));
+  libraries :: Builder -> Bool -> IO ([] ((,) String String));
+  libraries b noPrelude = libraryLoop b noPrelude [] (M.packages (graph b));
   -- A checked release is a library action too. Wrap its relocated root in an
   -- ordinary artifact receipt so workers and final validation use one contract.
   -- Materialization still runs on a cache hit to verify the pinned producer
   -- bundle and repair any damaged installed dependency before receipt reuse.
-  libraryResult :: Builder -> M.Package -> List String -> Bool -> IO J.Json;
+  libraryResult :: Builder -> M.Package -> [] String -> Bool -> IO J.Json;
   libraryResult b p dependencies noPrelude =
     if S.not (M.isRelease p)
     then compileCrateResult b p "library" "" (M.packageModules p) dependencies noPrelude
@@ -1104,13 +1104,13 @@ module Package.Build where {
            let {
              inputs =
                info
-                 (Cons (Pair "compiler" (J.get "compiler" (tools b)))
-                    (Cons (Pair "manager" (J.get "manager" (tools b)))
-                       (Cons (Pair "crate" (J.str identity))
-                          (Cons (Pair "release" (J.str digest))
-                             (Cons (Pair "no-prelude" (J.Boolean noPrelude))
-                                (Cons (Pair "metadata" (J.str metadata))
-                                   (Cons (Pair "object" (J.str object)) Nil)))))))
+                 ((:) ((,) "compiler" (J.get "compiler" (tools b)))
+                    ((:) ((,) "manager" (J.get "manager" (tools b)))
+                       ((:) ((,) "crate" (J.str identity))
+                          ((:) ((,) "release" (J.str digest))
+                             ((:) ((,) "no-prelude" (J.Boolean noPrelude))
+                                ((:) ((,) "metadata" (J.str metadata))
+                                   ((:) ((,) "object" (J.str object)) [])))))))
            };
            result <-
              cachedCheckedResult b ("release " ++ identity) inputs validCrateClosure
@@ -1122,7 +1122,7 @@ module Package.Build where {
                     copiedObject <- fileDigest (work ++ "/unit.mlfco");
                     O.require (eqString metadata copiedMetadata && eqString object copiedObject)
                       "installed release changed during import";
-                    saveCrateClosure work Nil;
+                    saveCrateClosure work [];
                     closure <- J.read (work ++ "/dependency-files.json");
                     let {
                       installed =
@@ -1137,31 +1137,31 @@ module Package.Build where {
            let {
              row =
                info
-                 (Cons (Pair "crate" (J.str identity))
-                    (Cons (Pair "sha256" (J.str digest))
-                       (Cons (Pair "metadata" (J.str (path ++ "/unit.mlfci")))
-                          (Cons (Pair "artifact" (J.str (artifactPath result)))
-                             (Cons (Pair "outer_cached" (J.get "cached" result))
-                                (Cons (Pair "inferred_groups" (J.num 0)) Nil))))))
+                 ((:) ((,) "crate" (J.str identity))
+                    ((:) ((,) "sha256" (J.str digest))
+                       ((:) ((,) "metadata" (J.str (path ++ "/unit.mlfci")))
+                          ((:) ((,) "artifact" (J.str (artifactPath result)))
+                             ((:) ((,) "outer_cached" (J.get "cached" result))
+                                ((:) ((,) "inferred_groups" (J.num 0)) []))))))
            };
            record b "releases" row;
            ioReturn
              (J.set "import_artifact" (J.str path)
-                (J.set "releases" (J.Array (Cons row Nil))
+                (J.set "releases" (J.Array ((:) row []))
                    (J.set "metadata" (J.str (path ++ "/unit.mlfci")) result)))
          };
   libraryLoop :: Builder ->
                  Bool ->
-                 List (Pair String String) -> List M.Package -> IO (List (Pair String String));
+                 [] ((,) String String) -> [] M.Package -> IO ([] ((,) String String));
   libraryLoop b noPrelude done pending =
     case pending of {
-      Nil -> ioReturn done;
-      Cons p rest ->
+      [] -> ioReturn done;
+      (:) p rest ->
         if S.null (M.packageModules p)
         then libraryLoop b noPrelude done rest
         else do {
                result <- libraryResult b p (directLibraries p done) noPrelude;
-               libraryLoop b noPrelude (S.snoc done (Pair (M.packageName p) (importPath result)))
+               libraryLoop b noPrelude (S.snoc done ((,) (M.packageName p) (importPath result)))
                  rest
              }
     };
@@ -1207,11 +1207,11 @@ module Package.Build where {
         inputs =
           info
             (S.append
-               (S.map (\key -> Pair key (J.get key (tools b)))
+               (S.map (\key -> (,) key (J.get key (tools b)))
                   (O.words "clang runtime runtime-path system machine native_environment gmp"))
-               (Cons (Pair "gc" gc)
-                  (Cons (Pair "flags" (J.stringArray (S.append (O.words "-O2 -std=c11") cflags)))
-                     Nil)))
+               ((:) ((,) "gc" gc)
+                  ((:) ((,) "flags" (J.stringArray (S.append (O.words "-O2 -std=c11") cflags)))
+                     [])))
       };
       let {
         options = S.append (O.words "-O2 -std=c11") (S.append cflags (pgoFlags profile))
@@ -1234,10 +1234,10 @@ module Package.Build where {
            do {
              ignored <-
                capture b (if profiled then O.parent runtime else work)
-                 (S.append (Cons (clang b) options)
-                    (Cons "-c"
-                       (Cons (if profiled then O.base runtime else runtime)
-                          (Cons "-o" (Cons (work ++ "/runtime.o") Nil)))))
+                 (S.append ((:) (clang b) options)
+                    ((:) "-c"
+                       ((:) (if profiled then O.base runtime else runtime)
+                          ((:) "-o" ((:) (work ++ "/runtime.o") [])))))
                  ""
                  "";
              present <- fileExists (work ++ "/runtime.o");
@@ -1260,11 +1260,11 @@ module Package.Build where {
       let {
         inputs =
           info
-            (Cons (Pair "compiler" (J.get "compiler" (tools b)))
-               (Cons (Pair "crate-path" (J.str crate))
-                  (Cons (Pair "metadata" (J.str metadataHash))
-                     (Cons (Pair "object" (J.str objectHash))
-                        (Cons (Pair "abi" (J.str "compact-bdwgc-v1")) Nil)))))
+            ((:) ((,) "compiler" (J.get "compiler" (tools b)))
+               ((:) ((,) "crate-path" (J.str crate))
+                  ((:) ((,) "metadata" (J.str metadataHash))
+                     ((:) ((,) "object" (J.str objectHash))
+                        ((:) ((,) "abi" (J.str "compact-bdwgc-v1")) [])))))
       };
       partition <- fingerprint b (J.str targetIdentity);
       let {
@@ -1287,18 +1287,18 @@ module Package.Build where {
                };
                let {
                  arguments =
-                   Cons (compiler b)
-                     (Cons "--crate-to-llvm-gc"
-                        (Cons (crate ++ "/unit.mlfci")
-                           (Cons "--cache"
-                              (Cons codegen
+                   (:) (compiler b)
+                     ((:) "--crate-to-llvm-gc"
+                        ((:) (crate ++ "/unit.mlfci")
+                           ((:) "--cache"
+                              ((:) codegen
                                  (if explicitReport
-                                  then Cons "--query-report" (Cons report Nil)
-                                  else Nil)))))
+                                  then (:) "--query-report" ((:) report [])
+                                  else [])))))
                };
                ignored <- capture b work arguments "" (work ++ "/program.ll");
                if explicitReport
-               then ioReturn Unit
+               then ioReturn ()
                else do {
                       O.copy (codegen ++ "/last-query.json") report
                     };
@@ -1329,12 +1329,12 @@ module Package.Build where {
       let {
         row =
           info
-            (Cons (Pair "metadata" (J.str (crate ++ "/unit.mlfci")))
-               (Cons (Pair "query_report" (J.str (artifact ++ "/codegen-query.json")))
-                  (Cons (Pair "queries" queries) Nil)))
+            ((:) ((,) "metadata" (J.str (crate ++ "/unit.mlfci")))
+               ((:) ((,) "query_report" (J.str (artifact ++ "/codegen-query.json")))
+                  ((:) ((,) "queries" queries) [])))
       };
       record b "codegen" row;
-      ioReturn (J.set "codegen" (J.Array (Cons row Nil)) result)
+      ioReturn (J.set "codegen" (J.Array ((:) row [])) result)
     };
   nativeLLVMObject :: Builder -> String -> IO String;
   nativeLLVMObject b emitted = nativeLLVMObjectWithPgo b emitted J.empty;
@@ -1358,18 +1358,18 @@ module Package.Build where {
         inputs =
           info
             (S.append
-               (S.map (\key -> Pair key (J.get key (tools b)))
+               (S.map (\key -> (,) key (J.get key (tools b)))
                   (O.words "clang system machine native_environment"))
-               (Cons (Pair "llvm" (J.str digest))
-                  (Cons (Pair "flags" (J.stringArray options)) Nil)))
+               ((:) ((,) "llvm" (J.str digest))
+                  ((:) ((,) "flags" (J.stringArray options)) [])))
       };
       cachedResult b "LLVM object" (pgoInputs profile inputs)
         (\work ->
            do {
              ignored <-
                capture b work
-                 (S.append (Cons (clang b) options)
-                    (Cons (emitted ++ "/program.ll") (Cons "-o" (Cons (work ++ "/program.o") Nil))))
+                 (S.append ((:) (clang b) options)
+                    ((:) (emitted ++ "/program.ll") ((:) "-o" ((:) (work ++ "/program.o") []))))
                  ""
                  "";
              present <- fileExists (work ++ "/program.o");
@@ -1397,28 +1397,28 @@ module Package.Build where {
         options =
           S.append (O.words "-O2 -Wno-override-module")
             (if eqString (J.getText "mode" "" profile) "generate"
-             then Cons "-fprofile-generate" Nil
-             else Nil)
+             then (:) "-fprofile-generate" []
+             else [])
       };
       let {
         hostFlags =
           if J.has "windows" (tools b)
-          then Cons "-lshell32" (Cons "-Wl,--no-insert-timestamp" (stackFlags b))
+          then (:) "-lshell32" ((:) "-Wl,--no-insert-timestamp" (stackFlags b))
           else stackFlags b
       };
       let {
-        trailing = S.append libraries (S.append (Cons "-lm" Nil) hostFlags)
+        trailing = S.append libraries (S.append ((:) "-lm" []) hostFlags)
       };
       let {
         inputs =
           info
             (S.append
-               (S.map (\key -> Pair key (J.get key (tools b)))
+               (S.map (\key -> (,) key (J.get key (tools b)))
                   (O.words "clang system machine native_environment gmp"))
-               (Cons (Pair "gc" gc)
-                  (Cons (Pair "llvm-object" (J.str llvmHash))
-                     (Cons (Pair "runtime-object" (J.str runtimeHash))
-                        (Cons (Pair "flags" (J.stringArray (S.append options trailing))) Nil)))))
+               ((:) ((,) "gc" gc)
+                  ((:) ((,) "llvm-object" (J.str llvmHash))
+                     ((:) ((,) "runtime-object" (J.str runtimeHash))
+                        ((:) ((,) "flags" (J.stringArray (S.append options trailing))) [])))))
       };
       cachedResult b "native link"
         (pgoInputs profile
@@ -1429,11 +1429,11 @@ module Package.Build where {
            do {
              ignored <-
                capture b work
-                 (S.append (Cons (clang b) options)
-                    (Cons (llvm ++ "/program.o")
-                       (Cons (runtime ++ "/runtime.o")
+                 (S.append ((:) (clang b) options)
+                    ((:) (llvm ++ "/program.o")
+                       ((:) (runtime ++ "/runtime.o")
                           (S.append trailing
-                             (Cons "-o" (Cons (executable b (work ++ "/program")) Nil))))))
+                             ((:) "-o" ((:) (executable b (work ++ "/program")) []))))))
                  ""
                  "";
              present <- fileExists (executable b (work ++ "/program"));
@@ -1441,12 +1441,12 @@ module Package.Build where {
              copyWindowsFiles b work
            })
     };
-  buildTarget :: Builder -> M.Package -> String -> J.Json -> Bool -> IO (Pair String String);
+  buildTarget :: Builder -> M.Package -> String -> J.Json -> Bool -> IO ((,) String String);
   buildTarget b p name target publish =
     do {
       boundValueShared3 <- M.targetCrateModules (graph b) p target;
       case boundValueShared3 of {
-        Pair entry ms ->
+        (,) entry ms ->
           do {
             let {
               noPrelude = J.getBool "no-prelude" False target
@@ -1459,7 +1459,7 @@ module Package.Build where {
                   (S.append
                      (S.mapMaybe (\n -> S.lookup eqString n built)
                         (M.targetDependencyNames p target))
-                     (S.maybe Nil (\path -> Cons path Nil)
+                     (S.maybe [] (\path -> (:) path [])
                         (S.lookup eqString (M.packageName p) built)))
             };
             crate <- compileCrate b p ("target-" ++ name) entry ms dependencies noPrelude;
@@ -1481,8 +1481,8 @@ module Package.Build where {
             let {
               artifact = artifactPath result
             };
-            if publish then queuePublication b name artifact else ioReturn Unit;
-            ioReturn (Pair (executable b (artifact ++ "/program")) artifact)
+            if publish then queuePublication b name artifact else ioReturn ();
+            ioReturn ((,) (executable b (artifact ++ "/program")) artifact)
           }
       }
     };
@@ -1499,13 +1499,13 @@ module Package.Build where {
       let {
         inputs =
           info
-            (Cons (Pair "toolchain" (tools b))
-               (Cons (Pair "target" target)
-                  (Cons (Pair "crate-path" (J.str crate))
-                     (Cons (Pair "metadata" (J.str metadataHash))
-                        (Cons (Pair "object" (J.str objectHash))
-                           (Cons (Pair "llvm" (J.str llvmHash))
-                              (Cons (Pair "binary" (J.str binaryHash)) Nil)))))))
+            ((:) ((,) "toolchain" (tools b))
+               ((:) ((,) "target" target)
+                  ((:) ((,) "crate-path" (J.str crate))
+                     ((:) ((,) "metadata" (J.str metadataHash))
+                        ((:) ((,) "object" (J.str objectHash))
+                           ((:) ((,) "llvm" (J.str llvmHash))
+                              ((:) ((,) "binary" (J.str binaryHash)) [])))))))
       };
       result <-
         cachedCheckedResult b ("executable " ++ (M.packageName p ++ (":" ++ name)))
@@ -1522,7 +1522,7 @@ module Package.Build where {
              });
       ioReturn (J.set "binary" (J.str (executable b (artifactPath result ++ "/program"))) result)
     };
-  queuePublication :: Builder -> String -> String -> IO Unit;
+  queuePublication :: Builder -> String -> String -> IO ();
   queuePublication b name artifact =
     do {
       stamp <- J.read (artifact ++ "/artifact.json");
@@ -1599,7 +1599,7 @@ module Package.Build where {
                   }
                 }
          };
-  validateWorkerResults :: J.Json -> IO Unit;
+  validateWorkerResults :: J.Json -> IO ();
   validateWorkerResults scheduled =
     do {
       let {
@@ -1649,7 +1649,7 @@ module Package.Build where {
   publicationFile :: String -> String -> String -> J.Json;
   publicationFile name source digest =
     J.set "sha256" (J.str digest) (obj2 "name" (J.str name) "source" (J.str source));
-  publicationFiles :: Builder -> J.Json -> List J.Json -> IO (List J.Json);
+  publicationFiles :: Builder -> J.Json -> [] J.Json -> IO ([] J.Json);
   publicationFiles b report publications =
     do {
       let {
@@ -1662,7 +1662,7 @@ module Package.Build where {
                let {
                  files = J.get "files" row
                } in
-               Cons
+               (:)
                  (publicationFile (O.base (executable b (J.getText "name" "" row)))
                     (executable b (artifact ++ "/program"))
                     (J.text (J.get (O.base (executable b "program")) files)))
@@ -1682,20 +1682,20 @@ module Package.Build where {
         then do {
                let {
                  helpers =
-                   S.map (J.get "helper") (J.values (J.getOr "scheduler" (J.Array Nil) report))
+                   S.map (J.get "helper") (J.values (J.getOr "scheduler" (J.Array []) report))
                };
                O.require (S.not (S.null helpers)) "missing build runner installation identity";
                let {
                  identity = S.head helpers
                };
                ioReturn
-                 (Cons
+                 ((:)
                     (publicationFile (O.base (executable b "mlf-build-runner"))
                        (J.getText "path" "" identity)
                        (J.getText "sha256" "" identity))
-                    Nil)
+                    [])
              }
-        else ioReturn Nil;
+        else ioReturn [];
       S.foldM
         (\saved row ->
            do {
@@ -1705,7 +1705,7 @@ module Package.Build where {
              O.require (publicationName name && validDigest (J.get "sha256" row))
                "invalid publication file";
              case S.find (\old -> eqString (J.getText "name" "" old) name) saved of {
-               Nothing -> ioReturn (S.append saved (Cons row Nil));
+               Nothing -> ioReturn (S.append saved ((:) row []));
                Just old ->
                  do {
                    O.require (J.equal (J.get "sha256" old) (J.get "sha256" row))
@@ -1714,21 +1714,21 @@ module Package.Build where {
                  }
              }
            })
-        Nil
+        []
         (S.append binaries helper)
     };
   publicationMove :: String -> String -> IO Int;
   publicationMove source destination =
-    O.exec "" (Cons "/bin/mv" (Cons "-f" (Cons source (Cons destination Nil)))) "" "" "" 1800;
+    O.exec "" ((:) "/bin/mv" ((:) "-f" ((:) source ((:) destination [])))) "" "" "" 1800;
   publicationRemove :: String -> IO Int;
-  publicationRemove path = O.exec "" (Cons "/bin/rm" (Cons "-rf" (Cons path Nil))) "" "" "" 1800;
+  publicationRemove path = O.exec "" ((:) "/bin/rm" ((:) "-rf" ((:) path []))) "" "" "" 1800;
   publicationDigest :: String -> IO String;
   publicationDigest path =
     do {
       present <- fileExists path;
       if present then fileDigest path else ioReturn ""
     };
-  preparePublications :: String -> List J.Json -> IO String;
+  preparePublications :: String -> [] J.Json -> IO String;
   -- No published destination has changed when this recovery journal is written.
   preparePublications buildDirectory files =
     do {
@@ -1768,7 +1768,7 @@ module Package.Build where {
                O.require (eqString staged expected) ("publication source changed: " ++ name);
                old <- publicationDigest destination;
                if eqString old ""
-               then ioReturn Unit
+               then ioReturn ()
                else do {
                       O.copy destination (transaction ++ ("/old/" ++ name));
                       backup <- fileDigest (transaction ++ ("/old/" ++ name));
@@ -1783,7 +1783,7 @@ module Package.Build where {
       writeFile (transaction ++ "/committed.new") "complete\n";
       ioReturn transaction
     };
-  publicationEntries :: String -> IO (List J.Json);
+  publicationEntries :: String -> IO ([] J.Json);
   publicationEntries transaction =
     do {
       journal <- J.read (transaction ++ "/journal.json");
@@ -1805,7 +1805,7 @@ module Package.Build where {
         "invalid publication recovery journal";
       ioReturn entries
     };
-  rollbackPublications :: String -> String -> List J.Json -> IO Bool;
+  rollbackPublications :: String -> String -> [] J.Json -> IO Bool;
   -- Validate all backups and destinations before restoring anything. A changed
   -- unrelated file is never overwritten by recovery; keep the journal instead.
   rollbackPublications buildDirectory transaction entries =
@@ -1866,10 +1866,10 @@ module Package.Build where {
                                   };
                                   copied <-
                                     O.exec ""
-                                      (Cons "/bin/cp"
-                                         (Cons "-p"
-                                            (Cons (transaction ++ ("/old/" ++ name))
-                                               (Cons staged Nil))))
+                                      ((:) "/bin/cp"
+                                         ((:) "-p"
+                                            ((:) (transaction ++ ("/old/" ++ name))
+                                               ((:) staged []))))
                                       ""
                                       ""
                                       ""
@@ -1886,7 +1886,7 @@ module Package.Build where {
              ioReturn (S.and restored)
            }
     };
-  recoverPublication :: String -> String -> IO Unit;
+  recoverPublication :: String -> String -> IO ();
   recoverPublication buildDirectory transaction =
     do {
       committed <- fileExists (transaction ++ "/committed");
@@ -1901,7 +1901,7 @@ module Package.Build where {
              O.remove transaction
            }
     };
-  recoverPublications :: String -> IO Unit;
+  recoverPublications :: String -> IO ();
   recoverPublications buildDirectory =
     do {
       let {
@@ -1909,27 +1909,27 @@ module Package.Build where {
       };
       present <- directoryExists base;
       if S.not present
-      then ioReturn Unit
+      then ioReturn ()
       else do {
              names <- O.entries base;
              S.mapM_
                (\name ->
                   if O.starts "transaction." name
                   then recoverPublication buildDirectory (base ++ ("/" ++ name))
-                  else ioReturn Unit)
+                  else ioReturn ())
                (S.sortBy compareString names)
            }
     };
   commitPublicationFiles :: String ->
-                            String -> (String -> String -> IO Int) -> List J.Json -> IO Bool;
+                            String -> (String -> String -> IO Int) -> [] J.Json -> IO Bool;
   commitPublicationFiles buildDirectory transaction move entries =
     case entries of {
-      Nil ->
+      [] ->
         do {
           code <- publicationMove (transaction ++ "/committed.new") (transaction ++ "/committed");
           ioReturn (code == 0)
         };
-      Cons row rest ->
+      (:) row rest ->
         do {
           let {
             name = J.getText "name" "" row
@@ -1940,7 +1940,7 @@ module Package.Build where {
           else commitPublicationFiles buildDirectory transaction move rest
         }
     };
-  publishFilesUsing :: String -> (String -> String -> IO Int) -> List J.Json -> IO Bool;
+  publishFilesUsing :: String -> (String -> String -> IO Int) -> [] J.Json -> IO Bool;
   -- Cleanup failure does not turn a completed commit into a failed command.
   -- A committed journal can safely be cleaned by the next locked command.
   publishFilesUsing buildDirectory move files =
@@ -1965,7 +1965,7 @@ module Package.Build where {
                   ioReturn False
                 }
          };
-  verifyHashes :: J.Json -> IO Unit;
+  verifyHashes :: J.Json -> IO ();
   verifyHashes values =
     S.mapM_
       (\entry ->
@@ -1975,7 +1975,7 @@ module Package.Build where {
              ("input changed during build/test: " ++ S.fst entry)
          })
       (J.items values);
-  finish :: Builder -> IO Unit;
+  finish :: Builder -> IO ();
   -- Validate the whole set before replacing any published name. Command tests
   -- run after scheduling and may have changed an artifact or its closure.
   finish b =
@@ -1983,7 +1983,7 @@ module Package.Build where {
       validate b;
       report <- J.read (reportPath b);
       let {
-        publications = J.values (J.getOr "pending-publications" (J.Array Nil) report)
+        publications = J.values (J.getOr "pending-publications" (J.Array []) report)
       };
       S.mapM_
         (\row ->
@@ -1996,7 +1996,7 @@ module Package.Build where {
              };
              O.require
                (S.all (\name -> J.has name files)
-                  (Cons (O.base (executable b "program")) (windowsFiles b)))
+                  ((:) (O.base (executable b "program")) (windowsFiles b)))
                "queued executable is missing a publication file"
            })
         publications;
@@ -2005,15 +2005,15 @@ module Package.Build where {
       O.require published "publication failed; previous executables restored";
       complete b
     };
-  complete :: Builder -> IO Unit;
+  complete :: Builder -> IO ();
   complete b =
     do {
       report <- J.read (reportPath b);
       J.write (reportPath b) (J.set "complete" (J.Boolean True) report)
     };
-  verifyInputs :: Builder -> IO Unit;
+  verifyInputs :: Builder -> IO ();
   verifyInputs b = validate b;
-  validate :: Builder -> IO Unit;
+  validate :: Builder -> IO ();
   validate b =
     do {
       verifyPgo (J.getObject "native-pgo" (config b));
@@ -2044,7 +2044,7 @@ module Package.Build where {
              O.require (eqString actual (J.getText "sha256" "" helper))
                "Windows host helper changed during build/test"
            }
-      else ioReturn Unit;
+      else ioReturn ();
       report <- J.read (reportPath b);
       S.mapM_
         (\value ->
@@ -2052,7 +2052,7 @@ module Package.Build where {
              verifyHashes (J.get "libraries" value);
              verifyHashes (J.get "headers" value)
            })
-        (J.values (J.getOr "native_inputs" (J.Array Nil) report));
+        (J.values (J.getOr "native_inputs" (J.Array []) report));
       S.mapM_
         (\row ->
            do {
@@ -2063,7 +2063,7 @@ module Package.Build where {
              O.require (eqString actual (J.getText "sha256" "" helper))
                "build runner changed during build/test"
            })
-        (J.values (J.getOr "scheduler" (J.Array Nil) report));
-      S.mapM_ validateWorkerResults (J.values (J.getOr "scheduler" (J.Array Nil) report))
+        (J.values (J.getOr "scheduler" (J.Array []) report));
+      S.mapM_ validateWorkerResults (J.values (J.getOr "scheduler" (J.Array []) report))
     }
 }

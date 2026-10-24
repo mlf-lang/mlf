@@ -74,7 +74,7 @@ module Package.Release where {
         "release package identity is empty";
       O.require (validDigest compiler && validKey root) "invalid release compiler or root digest";
       case J.get "no_prelude" manifest of {
-        J.Boolean _ -> ioReturn Unit;
+        J.Boolean _ -> ioReturn ();
         _ -> O.fatal "release no_prelude must be boolean"
       };
       O.require
@@ -133,7 +133,7 @@ module Package.Release where {
              "release crate identity does not match metadata";
            O.require (eqString (Artifact.crateEntry iface) "")
              "release contains an executable crate";
-           ioReturn (Pair (rowKey row) iface)
+           ioReturn ((,) (rowKey row) iface)
          })
       (rows manifest);
   validateClosure manifest interfaces =
@@ -142,22 +142,22 @@ module Package.Release where {
         byName = Artifact.interfaceMap (S.map S.snd interfaces)
       };
       let {
-        names = S.map (\(Pair key iface) -> Pair (Artifact.crateId iface) key) interfaces
+        names = S.map (\((,) key iface) -> (,) (Artifact.crateId iface) key) interfaces
       };
-      S.ensure (unique (S.concatMap (\(Pair _ iface) -> Artifact.crateModules iface) interfaces))
+      S.ensure (unique (S.concatMap (\((,) _ iface) -> Artifact.crateModules iface) interfaces))
         "release module belongs to multiple crates";
       S.ensure
         (S.all
-           (\(Pair _ iface) ->
+           (\((,) _ iface) ->
               (S.not (S.elem eqString "Prelude" (Artifact.crateModules iface)) ||
                eqString (Artifact.crateId iface) "mlf:builtin-prelude:1"))
            interfaces)
         "release contains a noncanonical Prelude owner";
       S.traverseEither
-        (\(Pair _ iface) ->
+        (\((,) _ iface) ->
            do {
              S.traverseEither
-               (\(Triple identity path _) ->
+               (\((,,) identity path _) ->
                   case S.lookup eqString identity names of {
                     Nothing -> Left ("release is missing dependency " ++ identity);
                     Just key ->
@@ -178,10 +178,10 @@ module Package.Release where {
         (S.eqList eqString (S.sortBy compareString (Artifact.crateModules root))
            (S.sortBy compareString (J.getStrings "modules" manifest)))
         "release module inventory does not match checked metadata";
-      closure <- Artifact.dependencyClosure byName Nil Nil (Cons (Artifact.crateId root) Nil);
+      closure <- Artifact.dependencyClosure byName [] [] ((:) (Artifact.crateId root) []);
       S.ensure (S.length closure == S.length interfaces) "release contains unreachable crates";
       Artifact.validateLayouts closure;
-      Right Unit
+      Right ()
     };
   readManifest :: String -> IO J.Json;
   readManifest directory =
@@ -207,7 +207,7 @@ module Package.Release where {
       verifyManifestDigest directory expected;
       ioReturn manifest
     };
-  verifyBundle :: String -> J.Json -> IO Unit;
+  verifyBundle :: String -> J.Json -> IO ();
   verifyBundle directory saved =
     do {
       current <- readManifest directory;
@@ -217,21 +217,22 @@ module Package.Release where {
     do {
       dependencies <-
         S.traverseEither
-          (\(Triple identity _ semantic) ->
+          (\((,,) identity _ semantic) ->
              case S.lookup eqString identity locations of {
                Nothing -> Left ("release dependency is missing: " ++ identity);
-               Just path -> Right (Triple identity path semantic)
+               Just path -> Right ((,,) identity path semantic)
              })
           (Artifact.crateDependencies iface);
       case iface of {
-        Artifact.CrateInterface identity _ modules exports imports datatypes classes instances layouts bindings entry fingerprint ->
+        Artifact.CrateInterface identity _ modules exports imports datatypes classes instances layouts bindings entry fingerprint protection ->
           Right
             (Artifact.CrateInterface identity dependencies modules exports imports datatypes classes
                instances
                layouts
                bindings
                entry
-               fingerprint)
+               fingerprint
+               protection)
       }
     };
   relocateObject locations object =
@@ -244,7 +245,7 @@ module Package.Release where {
     };
   readObjects directory manifest interfaces =
     S.mapM
-      (\(Pair key iface) ->
+      (\((,) key iface) ->
          do {
            decoded <- Artifact.readObject (bundlePrefix directory key ++ ".mlfco") iface;
            object <- checked decoded;
@@ -252,12 +253,12 @@ module Package.Release where {
          })
       interfaces;
   publishRows :: String ->
-                 List (Pair String String) ->
-                 List J.Json -> List Artifact.CrateObject -> IO (List J.Json);
+                 [] ((,) String String) ->
+                 [] J.Json -> [] Artifact.CrateObject -> IO ([] J.Json);
   publishRows work locations done objects =
     case objects of {
-      Nil -> ioReturn done;
-      Cons object rest ->
+      [] -> ioReturn done;
+      (:) object rest ->
         do {
           portable <- checked (relocateObject locations object);
           let {
@@ -276,21 +277,21 @@ module Package.Release where {
           let {
             row =
               J.Object
-                (Cons (Pair "key" (J.str key))
-                   (Cons (Pair "identity" (J.str identity))
-                      (Cons (Pair "metadata_sha256" (J.str metadata))
-                         (Cons (Pair "object_sha256" (J.str body)) Nil))))
+                ((:) ((,) "key" (J.str key))
+                   ((:) ((,) "identity" (J.str identity))
+                      ((:) ((,) "metadata_sha256" (J.str metadata))
+                         ((:) ((,) "object_sha256" (J.str body)) []))))
           };
           O.move temporary (work ++ ("/crates/" ++ key));
-          publishRows work (S.snoc locations (Pair identity (virtualPath key))) (S.snoc done row)
+          publishRows work (S.snoc locations ((,) identity (virtualPath key))) (S.snoc done row)
             rest
         }
     };
-  publish :: String -> String -> Bool -> String -> String -> String -> IO Unit;
+  publish :: String -> String -> Bool -> String -> String -> String -> IO ();
   publish metadata compiler noPrelude name version output =
     do {
       O.require (validDigest compiler) "invalid release compiler digest";
-      loaded <- Artifact.loadInterfaces (Cons metadata Nil);
+      loaded <- Artifact.loadInterfaces ((:) metadata []);
       interfaces <- checked loaded;
       O.require (S.not (S.null interfaces)) "cannot release an empty crate graph";
       let {
@@ -298,11 +299,11 @@ module Package.Release where {
       };
       O.require (eqString (Artifact.crateId root) (name ++ ("/" ++ (version ++ "/library"))))
         "release root does not match package identity";
-      O.require (S.all (\(Pair _ iface) -> eqString (Artifact.crateEntry iface) "") interfaces)
+      O.require (S.all (\((,) _ iface) -> eqString (Artifact.crateEntry iface) "") interfaces)
         "only library crates can be released";
       objects <-
         S.mapM
-          (\(Pair path iface) ->
+          (\((,) path iface) ->
              do {
                decoded <- Artifact.readObject (Artifact.objectPath path) iface;
                checked decoded
@@ -311,7 +312,7 @@ module Package.Release where {
       checked (Artifact.linkCheckedObjects objects (Artifact.crateId root));
       O.require
         ((stringLength output > 0) &&
-         S.not (S.elem eqString (O.base output) (Cons "" (Cons "." (Cons ".." Nil)))))
+         S.not (S.elem eqString (O.base output) ((:) "" ((:) "." ((:) ".." [])))))
         "invalid release output directory";
       O.mkdir (O.parent output);
       parent <- canonicalPath (O.parent output);
@@ -329,21 +330,21 @@ module Package.Release where {
       O.require (S.not (occupied || (occupiedFile || (workExists || workFile))))
         "release output or staging path already exists";
       O.mkdir (work ++ "/crates");
-      entries <- publishRows work Nil Nil objects;
+      entries <- publishRows work [] [] objects;
       let {
         manifest =
           J.Object
-            (Cons (Pair "format" (J.num 1))
-               (Cons (Pair "name" (J.str name))
-                  (Cons (Pair "version" (J.str version))
-                     (Cons (Pair "compiler_sha256" (J.str compiler))
-                        (Cons (Pair "no_prelude" (J.Boolean noPrelude))
-                           (Cons (Pair "root" (J.str (rowKey (S.last entries))))
-                              (Cons
-                                 (Pair "modules"
+            ((:) ((,) "format" (J.num 1))
+               ((:) ((,) "name" (J.str name))
+                  ((:) ((,) "version" (J.str version))
+                     ((:) ((,) "compiler_sha256" (J.str compiler))
+                        ((:) ((,) "no_prelude" (J.Boolean noPrelude))
+                           ((:) ((,) "root" (J.str (rowKey (S.last entries))))
+                              ((:)
+                                 ((,) "modules"
                                     (J.stringArray
                                        (S.sortBy compareString (Artifact.crateModules root))))
-                                 (Cons (Pair "crates" (J.Array entries)) Nil))))))))
+                                 ((:) ((,) "crates" (J.Array entries)) []))))))))
       };
       J.write (work ++ "/release.json") manifest;
       readManifest work;
@@ -360,7 +361,7 @@ module Package.Release where {
          let {
            prefix = localPrefix cache compiler row
          } in
-         Cons (prefix ++ ".mlfci") (Cons (prefix ++ ".mlfco") Nil))
+         (:) (prefix ++ ".mlfci") ((:) (prefix ++ ".mlfco") []))
       (rows manifest);
   receiptValid path digest validator expected =
     do {
@@ -388,7 +389,7 @@ module Package.Release where {
                               else do {
                                      checks <-
                                        S.mapM
-                                         (\(Pair file hash) ->
+                                         (\((,) file hash) ->
                                             do {
                                               present <- fileExists file;
                                               if S.not present
@@ -410,7 +411,7 @@ module Package.Release where {
     };
   verifyPrelude object =
     if S.not (eqString (Artifact.crateId (Artifact.objectInterface object)) "mlf:builtin-prelude:1")
-    then ioReturn Unit
+    then ioReturn ()
     else do {
            builtin <- checked Artifact.builtinPrelude;
            O.require
@@ -496,7 +497,7 @@ module Package.Release where {
       };
       reusable <- receiptValid receipt digest validator expected;
       if reusable
-      then ioReturn Unit
+      then ioReturn ()
       else do {
              O.mkdir scratch;
              staging <- O.temporaryDirectory scratch (scratch ++ "/work-");
@@ -509,7 +510,7 @@ module Package.Release where {
              readPinnedManifest staging digest;
              let {
                locations =
-                 S.map (\row -> Pair (rowIdentity row) (localPrefix cache compiler row ++ ".mlfci"))
+                 S.map (\row -> (,) (rowIdentity row) (localPrefix cache compiler row ++ ".mlfci"))
                    (rows manifest)
              };
              relocated <- checked (S.traverseEither (relocateObject locations) objects);
@@ -534,7 +535,7 @@ module Package.Release where {
                  (\path ->
                     do {
                       hash <- fileDigest path;
-                      ioReturn (Pair path (J.str hash))
+                      ioReturn ((,) path (J.str hash))
                     })
                  expected;
              verifyManifestDigest bundle digest;
@@ -544,10 +545,10 @@ module Package.Release where {
              O.remove staging;
              J.write receipt
                (J.Object
-                  (Cons (Pair "format" (J.num 1))
-                     (Cons (Pair "release" (J.str digest))
-                        (Cons (Pair "validator_sha256" (J.str validator))
-                           (Cons (Pair "files" (J.Object hashes)) Nil)))))
+                  ((:) ((,) "format" (J.num 1))
+                     ((:) ((,) "release" (J.str digest))
+                        ((:) ((,) "validator_sha256" (J.str validator))
+                           ((:) ((,) "files" (J.Object hashes)) [])))))
            };
       verifyManifestDigest bundle digest;
       releaseFileLock lock;

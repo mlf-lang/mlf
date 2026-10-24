@@ -152,59 +152,59 @@ module Bootstrap.Map where {
          else if (size l > size r)
               then case maxViewWithKey l of {
                      Nothing -> r;
-                     Just (Pair (Pair key value) rest) -> balance key value rest r
+                     Just ((,) ((,) key value) rest) -> balance key value rest r
                    }
               else case minViewWithKey r of {
                      Nothing -> l;
-                     Just (Pair (Pair key value) rest) -> balance key value l rest
+                     Just ((,) ((,) key value) rest) -> balance key value l rest
                    };
-  minViewWithKey :: forall k v. Map k v -> Maybe (Pair (Pair k v) (Map k v));
+  minViewWithKey :: forall k v. Map k v -> Maybe ((,) ((,) k v) (Map k v));
   minViewWithKey tree =
     case tree of {
       MapEmpty -> Nothing;
       MapNode n k v l r ->
         case minViewWithKey l of {
-          Nothing -> Just (Pair (Pair k v) r);
-          Just (Pair entry rest) -> Just (Pair entry (balance k v rest r))
+          Nothing -> Just ((,) ((,) k v) r);
+          Just ((,) entry rest) -> Just ((,) entry (balance k v rest r))
         }
     };
-  maxViewWithKey :: forall k v. Map k v -> Maybe (Pair (Pair k v) (Map k v));
+  maxViewWithKey :: forall k v. Map k v -> Maybe ((,) ((,) k v) (Map k v));
   maxViewWithKey tree =
     case tree of {
       MapEmpty -> Nothing;
       MapNode n k v l r ->
         case maxViewWithKey r of {
-          Nothing -> Just (Pair (Pair k v) l);
-          Just (Pair entry rest) -> Just (Pair entry (balance k v l rest))
+          Nothing -> Just ((,) ((,) k v) l);
+          Just ((,) entry rest) -> Just ((,) entry (balance k v l rest))
         }
     };
-  lookupMin :: forall k v. Map k v -> Maybe (Pair k v);
+  lookupMin :: forall k v. Map k v -> Maybe ((,) k v);
   lookupMin tree =
     case tree of {
       MapEmpty -> Nothing;
-      MapNode n k v MapEmpty r -> Just (Pair k v);
+      MapNode n k v MapEmpty r -> Just ((,) k v);
       MapNode n k v l r -> lookupMin l
     };
-  lookupMax :: forall k v. Map k v -> Maybe (Pair k v);
+  lookupMax :: forall k v. Map k v -> Maybe ((,) k v);
   lookupMax tree =
     case tree of {
       MapEmpty -> Nothing;
-      MapNode n k v l MapEmpty -> Just (Pair k v);
+      MapNode n k v l MapEmpty -> Just ((,) k v);
       MapNode n k v l r -> lookupMax r
     };
-  findMin :: forall k v. Map k v -> Pair k v;
+  findMin :: forall k v. Map k v -> (,) k v;
   findMin tree =
     case lookupMin tree of {
       Nothing -> panic "findMin: empty map";
       Just entry -> entry
     };
-  findMax :: forall k v. Map k v -> Pair k v;
+  findMax :: forall k v. Map k v -> (,) k v;
   findMax tree =
     case lookupMax tree of {
       Nothing -> panic "findMax: empty map";
       Just entry -> entry
     };
-  lookupLE :: forall k v. (k -> k -> Int) -> k -> Map k v -> Maybe (Pair k v);
+  lookupLE :: forall k v. (k -> k -> Int) -> k -> Map k v -> Maybe ((,) k v);
   lookupLE cmp key tree =
     case tree of {
       MapEmpty -> Nothing;
@@ -215,13 +215,13 @@ module Bootstrap.Map where {
         if (c < 0)
         then lookupLE cmp key l
         else if (c == 0)
-             then Just (Pair k v)
+             then Just ((,) k v)
              else case lookupLE cmp key r of {
-                    Nothing -> Just (Pair k v);
+                    Nothing -> Just ((,) k v);
                     Just result -> Just result
                   }
     };
-  lookupGE :: forall k v. (k -> k -> Int) -> k -> Map k v -> Maybe (Pair k v);
+  lookupGE :: forall k v. (k -> k -> Int) -> k -> Map k v -> Maybe ((,) k v);
   lookupGE cmp key tree =
     case tree of {
       MapEmpty -> Nothing;
@@ -232,9 +232,9 @@ module Bootstrap.Map where {
         if (c > 0)
         then lookupGE cmp key r
         else if (c == 0)
-             then Just (Pair k v)
+             then Just ((,) k v)
              else case lookupGE cmp key l of {
-                    Nothing -> Just (Pair k v);
+                    Nothing -> Just ((,) k v);
                     Just result -> Just result
                   }
     };
@@ -278,70 +278,70 @@ module Bootstrap.Map where {
     };
   map :: forall a b k. (a -> b) -> Map k a -> Map k b;
   map f tree = mapWithKey (\k v -> f v) tree;
-  toList :: forall k v. Map k v -> List (Pair k v);
-  toList tree = entriesInto Nil tree;
-  entriesInto :: forall k v. List (Pair k v) -> Map k v -> List (Pair k v);
+  toList :: forall k v. Map k v -> [] ((,) k v);
+  toList tree = entriesInto [] tree;
+  entriesInto :: forall k v. [] ((,) k v) -> Map k v -> [] ((,) k v);
   entriesInto rest tree =
     case tree of {
       MapEmpty -> rest;
       MapNode n key value left right ->
-        entriesInto (Cons (Pair key value) (entriesInto rest right)) left
+        entriesInto ((:) ((,) key value) (entriesInto rest right)) left
     };
-  toAscList :: forall k v. Map k v -> List (Pair k v);
+  toAscList :: forall k v. Map k v -> [] ((,) k v);
   toAscList tree = toList tree;
-  keys :: forall k v. Map k v -> List k;
-  keys tree = keysInto Nil tree;
-  keysInto :: forall k v. List k -> Map k v -> List k;
+  keys :: forall k v. Map k v -> [] k;
+  keys tree = keysInto [] tree;
+  keysInto :: forall k v. [] k -> Map k v -> [] k;
   keysInto rest tree =
     case tree of {
       MapEmpty -> rest;
-      MapNode n key value left right -> keysInto (Cons key (keysInto rest right)) left
+      MapNode n key value left right -> keysInto ((:) key (keysInto rest right)) left
     };
-  elems :: forall k v. Map k v -> List v;
-  elems tree = valuesInto Nil tree;
-  valuesInto :: forall k v. List v -> Map k v -> List v;
+  elems :: forall k v. Map k v -> [] v;
+  elems tree = valuesInto [] tree;
+  valuesInto :: forall k v. [] v -> Map k v -> [] v;
   valuesInto rest tree =
     case tree of {
       MapEmpty -> rest;
-      MapNode n key value left right -> valuesInto (Cons value (valuesInto rest right)) left
+      MapNode n key value left right -> valuesInto ((:) value (valuesInto rest right)) left
     };
   keysSet :: forall k v. Map k v -> Set k;
   keysSet tree =
     let {
-      result = map (\v -> Unit) tree
+      result = map (\v -> ()) tree
     } in
     seq result (Set result);
-  fromList :: forall k v. (k -> k -> Int) -> List (Pair k v) -> Map k v;
+  fromList :: forall k v. (k -> k -> Int) -> [] ((,) k v) -> Map k v;
   fromList cmp entries =
     S.foldlStrict
       (\tree entry ->
          case entry of {
-           Pair k v -> insert cmp k v tree
+           (,) k v -> insert cmp k v tree
          })
       empty
       entries;
-  fromListWith :: forall k v. (k -> k -> Int) -> (v -> v -> v) -> List (Pair k v) -> Map k v;
+  fromListWith :: forall k v. (k -> k -> Int) -> (v -> v -> v) -> [] ((,) k v) -> Map k v;
   fromListWith cmp combine entries =
     S.foldlStrict
       (\tree entry ->
          case entry of {
-           Pair k v -> insertWith cmp combine k v tree
+           (,) k v -> insertWith cmp combine k v tree
          })
       empty
       entries;
-  fromDistinctAscList :: forall k v. List (Pair k v) -> Map k v;
+  fromDistinctAscList :: forall k v. [] ((,) k v) -> Map k v;
   fromDistinctAscList entries = S.fst (buildAsc (S.length entries) entries);
-  buildAsc :: forall k v. Int -> List (Pair k v) -> Pair (Map k v) (List (Pair k v));
+  buildAsc :: forall k v. Int -> [] ((,) k v) -> (,) (Map k v) ([] ((,) k v));
   buildAsc n entries =
     if (n <= 0)
-    then Pair MapEmpty entries
+    then (,) MapEmpty entries
     else case buildAsc (quotInt n 2) entries of {
-           Pair left rest ->
+           (,) left rest ->
              case rest of {
-               Nil -> Pair left Nil;
-               Cons (Pair key value) tail ->
+               [] -> (,) left [];
+               (:) ((,) key value) tail ->
                  case buildAsc ((n - quotInt n 2) - 1) tail of {
-                   Pair right after -> Pair (bin key value left right) after
+                   (,) right after -> (,) (bin key value left right) after
                  }
              }
          };
@@ -349,9 +349,9 @@ module Bootstrap.Map where {
   union cmp a b = unionWith cmp (\left right -> left) a b;
   unionWith :: forall k v. (k -> k -> Int) -> (v -> v -> v) -> Map k v -> Map k v -> Map k v;
   unionWith cmp combine a b = foldlWithKeyStrict (\tree k v -> insertWith cmp combine k v tree) b a;
-  unions :: forall k v. (k -> k -> Int) -> List (Map k v) -> Map k v;
+  unions :: forall k v. (k -> k -> Int) -> [] (Map k v) -> Map k v;
   unions cmp trees = S.foldlStrict (union cmp) empty trees;
-  unionsWith :: forall k v. (k -> k -> Int) -> (v -> v -> v) -> List (Map k v) -> Map k v;
+  unionsWith :: forall k v. (k -> k -> Int) -> (v -> v -> v) -> [] (Map k v) -> Map k v;
   unionsWith cmp combine trees = S.foldlStrict (unionWith cmp combine) empty trees;
   difference :: forall k a b. (k -> k -> Int) -> Map k a -> Map k b -> Map k a;
   difference cmp a b = foldlWithKeyStrict (\tree k v -> delete cmp k tree) a b;
@@ -374,7 +374,7 @@ module Bootstrap.Map where {
       (S.filter
          (\entry ->
             case entry of {
-              Pair k v -> predicate k v
+              (,) k v -> predicate k v
             })
          (toList tree));
   filter :: forall v k. (v -> Bool) -> Map k v -> Map k v;
@@ -385,7 +385,7 @@ module Bootstrap.Map where {
       (S.mapMaybe
          (\entry ->
             case entry of {
-              Pair k v -> S.mapOptional (Pair k) (f k v)
+              (,) k v -> S.mapOptional ((,) k) (f k v)
             })
          (toList tree));
   mapMaybe :: forall a b k. (a -> Maybe b) -> Map k a -> Map k b;
@@ -396,13 +396,13 @@ module Bootstrap.Map where {
       (S.map
          (\entry ->
             case entry of {
-              Pair k v -> Pair (f k) v
+              (,) k v -> (,) (f k) v
             })
          (toList tree));
   splitLookup :: forall k v. (k -> k -> Int) ->
-                             k -> Map k v -> Triple (Map k v) (Maybe v) (Map k v);
+                             k -> Map k v -> (,,) (Map k v) (Maybe v) (Map k v);
   splitLookup cmp key tree =
-    Triple (filterWithKey (\k v -> (cmp k key < 0)) tree) (lookup cmp key tree)
+    (,,) (filterWithKey (\k v -> (cmp k key < 0)) tree) (lookup cmp key tree)
       (filterWithKey (\k v -> (cmp k key > 0)) tree);
   eqMap :: forall k v. (k -> k -> Bool) -> (v -> v -> Bool) -> Map k v -> Map k v -> Bool;
   eqMap ek ev a b = ((size a == size b) && S.eqList (S.eqPair ek ev) (toList a) (toList b));

@@ -19,21 +19,21 @@ module Bootstrap.LLVM.StrictFields where {
   data Work = Evaluate (Set XName) XErased | Suspend (Set XName) XErased;
   arity :: Map String Int -> String -> Int;
   arity cs c = M.findWithDefault compareString (0 - 1) c cs;
-  meet :: List Bool -> List Bool -> List Bool;
+  meet :: [] Bool -> [] Bool -> [] Bool;
   meet xs ys =
     case xs of {
-      Nil -> Nil;
-      Cons x rest ->
+      [] -> [];
+      (:) x rest ->
         case ys of {
-          Nil -> Nil;
-          Cons y tail -> Cons (x && y) (meet rest tail)
+          [] -> [];
+          (:) y tail -> (:) (x && y) (meet rest tail)
         }
     };
-  record :: String -> List Bool -> Map String (List Bool) -> Map String (List Bool);
+  record :: String -> [] Bool -> Map String ([] Bool) -> Map String ([] Bool);
   record c flags facts = M.insertWith compareString meet c flags facts;
-  falseFields :: Int -> List Bool;
-  falseFields count = if (count <= 0) then Nil else Cons False (falseFields (count - 1));
-  escape :: Map String Int -> String -> Map String (List Bool) -> Map String (List Bool);
+  falseFields :: Int -> [] Bool;
+  falseFields count = if (count <= 0) then [] else (:) False (falseFields (count - 1));
+  escape :: Map String Int -> String -> Map String ([] Bool) -> Map String ([] Bool);
   escape cs c facts = record c (falseFields (arity cs c)) facts;
   atom :: Map String Int -> Map XName A.WorkerFunction -> Set XName -> XErased -> Bool;
   atom cs fs known expression =
@@ -48,7 +48,7 @@ module Bootstrap.LLVM.StrictFields where {
       XEAbs n body -> True;
       _ ->
         case O.applications expression of {
-          Pair (XEConstructor c) args -> (L.length args == arity cs c);
+          (,) (XEConstructor c) args -> (L.length args == arity cs c);
           _ -> False
         }
     };
@@ -68,36 +68,36 @@ module Bootstrap.LLVM.StrictFields where {
           body
     };
   recursiveWork :: Map XName A.WorkerFunction ->
-                   Set XName -> Pair XName XErased -> List Work -> List Work;
-  recursiveWork fs known (Pair n rhs) rest =
-    if M.member O.compareName n fs then rest else Cons (Suspend known rhs) rest;
-  argumentWork :: Set XName -> Set XName -> Pair XName XErased -> Work;
-  argumentWork known strict (Pair n arg) =
+                   Set XName -> (,) XName XErased -> [] Work -> [] Work;
+  recursiveWork fs known ((,) n rhs) rest =
+    if M.member O.compareName n fs then rest else (:) (Suspend known rhs) rest;
+  argumentWork :: Set XName -> Set XName -> (,) XName XErased -> Work;
+  argumentWork known strict ((,) n arg) =
     if S.member O.compareName n strict then Evaluate known arg else Suspend known arg;
   run :: Bool ->
          Map String Int ->
          Map XName A.WorkerFunction ->
-         Map String (List Bool) -> List Work -> Map String (List Bool);
+         Map String ([] Bool) -> [] Work -> Map String ([] Bool);
   run evaluated cs fs facts work =
     case work of {
-      Nil -> facts;
-      Cons (Suspend known expression) rest ->
+      [] -> facts;
+      (:) (Suspend known expression) rest ->
         run evaluated cs fs facts
-          (Cons (Evaluate (if atom cs fs known expression then known else S.empty) expression)
+          ((:) (Evaluate (if atom cs fs known expression then known else S.empty) expression)
              rest);
-      Cons (Evaluate known expression) rest ->
+      (:) (Evaluate known expression) rest ->
         case expression of {
-          XEAbs n body -> run evaluated cs fs facts (Cons (Evaluate S.empty body) rest);
+          XEAbs n body -> run evaluated cs fs facts ((:) (Evaluate S.empty body) rest);
           XELet n rhs body ->
             if M.member O.compareName n fs
-            then run evaluated cs fs facts (Cons (Evaluate known body) rest)
+            then run evaluated cs fs facts ((:) (Evaluate known body) rest)
             else if S.member O.compareName n (A.demanded fs body)
                  then run evaluated cs fs facts
-                        (Cons (Evaluate known rhs)
-                           (Cons (Evaluate (S.insert O.compareName n known) body) rest))
+                        ((:) (Evaluate known rhs)
+                           ((:) (Evaluate (S.insert O.compareName n known) body) rest))
                  else run evaluated cs fs facts
-                        (Cons (Suspend known rhs)
-                           (Cons (Evaluate (S.delete O.compareName n known) body) rest));
+                        ((:) (Suspend known rhs)
+                           ((:) (Evaluate (S.delete O.compareName n known) body) rest));
           XELetRec bindings body ->
             let {
               local =
@@ -106,13 +106,13 @@ module Bootstrap.LLVM.StrictFields where {
                      (L.map
                         (\entry ->
                            case entry of {
-                             Pair n rhs -> n
+                             (,) n rhs -> n
                            })
                         bindings))
             } in
             run evaluated cs fs facts
-              (L.foldr (recursiveWork fs local) (Cons (Evaluate local body) rest) bindings);
-          XECase scrutinee (Cons (XErasedAlternative (XDefaultPattern optional) body) Nil) ->
+              (L.foldr (recursiveWork fs local) ((:) (Evaluate local body) rest) bindings);
+          XECase scrutinee ((:) (XErasedAlternative (XDefaultPattern optional) body) []) ->
             let {
               local =
                 case optional of {
@@ -121,14 +121,14 @@ module Bootstrap.LLVM.StrictFields where {
                 }
             } in
             run evaluated cs fs facts
-              (Cons (Suspend known scrutinee) (Cons (Evaluate local body) rest));
+              ((:) (Suspend known scrutinee) ((:) (Evaluate local body) rest));
           XECase scrutinee alternatives ->
             run evaluated cs fs facts
-              (Cons (Evaluate known scrutinee)
+              ((:) (Evaluate known scrutinee)
                  (L.append (L.map (caseWork known) alternatives) rest));
           XEConstructor c ->
             run evaluated cs fs
-              (if (arity cs c == 0) then record c Nil facts else escape cs c facts)
+              (if (arity cs c == 0) then record c [] facts else escape cs c facts)
               rest;
           XEApp f a -> application evaluated cs fs known expression facts rest;
           _ -> run evaluated cs fs facts rest
@@ -138,23 +138,23 @@ module Bootstrap.LLVM.StrictFields where {
                  Map String Int ->
                  Map XName A.WorkerFunction ->
                  Set XName ->
-                 XErased -> Map String (List Bool) -> List Work -> Map String (List Bool);
+                 XErased -> Map String ([] Bool) -> [] Work -> Map String ([] Bool);
   application evaluated cs fs known expression facts rest =
     case O.applications expression of {
-      Pair (XEConstructor c) args ->
+      (,) (XEConstructor c) args ->
         if (L.length args == arity cs c)
         then run evaluated cs fs (record c (L.map (atom cs fs known) args) facts)
                (L.append (L.map (Suspend known) args) rest)
         else dynamic evaluated cs fs known expression (escape cs c facts) rest;
-      Pair (XEPrimitive PIfThenElse) (Cons condition (Cons yes (Cons no Nil))) ->
+      (,) (XEPrimitive PIfThenElse) ((:) condition ((:) yes ((:) no []))) ->
         run evaluated cs fs facts
-          (Cons (Evaluate known condition)
-             (Cons (Evaluate known yes) (Cons (Evaluate known no) rest)));
-      Pair (XEPrimitive PSeq) (Cons first (Cons second Nil)) ->
+          ((:) (Evaluate known condition)
+             ((:) (Evaluate known yes) ((:) (Evaluate known no) rest)));
+      (,) (XEPrimitive PSeq) ((:) first ((:) second [])) ->
         run evaluated cs fs facts
-          (Cons (Evaluate known first)
-             (Cons (Evaluate (if evaluated then afterForce known first else known) second) rest));
-      Pair (XEPrimitive p) args ->
+          ((:) (Evaluate known first)
+             ((:) (Evaluate (if evaluated then afterForce known first else known) second) rest));
+      (,) (XEPrimitive p) args ->
         if (L.length args == P.primitiveArity p)
         then run evaluated cs fs facts
                (L.append
@@ -163,7 +163,7 @@ module Bootstrap.LLVM.StrictFields where {
                      args)
                   rest)
         else dynamic evaluated cs fs known expression facts rest;
-      Pair (XEVar n) args ->
+      (,) (XEVar n) args ->
         case M.lookup O.compareName n fs of {
           Just function ->
             if (L.length args == L.length (A.parameters function))
@@ -180,16 +180,16 @@ module Bootstrap.LLVM.StrictFields where {
   dynamic :: Bool ->
              Map String Int ->
              Map XName A.WorkerFunction ->
-             Set XName -> XErased -> Map String (List Bool) -> List Work -> Map String (List Bool);
+             Set XName -> XErased -> Map String ([] Bool) -> [] Work -> Map String ([] Bool);
   dynamic evaluated cs fs known expression facts rest =
     case expression of {
-      XEApp f a -> run evaluated cs fs facts (Cons (Suspend known f) (Cons (Suspend known a) rest));
+      XEApp f a -> run evaluated cs fs facts ((:) (Suspend known f) ((:) (Suspend known a) rest));
       _ -> run evaluated cs fs facts rest
     };
-  infer :: Map String Int -> Map XName A.WorkerFunction -> XErased -> Map String (List Bool);
+  infer :: Map String Int -> Map XName A.WorkerFunction -> XErased -> Map String ([] Bool);
   infer cs fs expression =
     run False cs fs M.empty
-      (Cons (Evaluate S.empty expression)
+      ((:) (Evaluate S.empty expression)
          (L.map (\f -> Evaluate (A.strict f) (A.functionBody f)) (M.elems fs)));
   -- Representation proofs only need semantic WHNF, unlike direct field loads,
   -- which require a canonical pointer. In particular, seq of a recursive hole
@@ -201,9 +201,9 @@ module Bootstrap.LLVM.StrictFields where {
       _ -> known
     };
   inferEvaluated :: Map String Int ->
-                    Map XName A.WorkerFunction -> XErased -> Map String (List Bool);
+                    Map XName A.WorkerFunction -> XErased -> Map String ([] Bool);
   inferEvaluated cs fs expression =
     run True cs fs M.empty
-      (Cons (Evaluate S.empty expression)
+      ((:) (Evaluate S.empty expression)
          (L.map (\f -> Evaluate (A.strict f) (A.functionBody f)) (M.elems fs)))
 }

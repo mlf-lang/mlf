@@ -117,48 +117,48 @@ module Bootstrap.IntMap where {
   foldl f z (IntMap tree) = M.foldl f z tree;
   foldr :: forall a b. (a -> b -> b) -> b -> IntMap a -> b;
   foldr f z (IntMap tree) = M.foldr f z tree;
-  toList :: forall a. IntMap a -> List (Pair Int a);
+  toList :: forall a. IntMap a -> [] ((,) Int a);
   toList (IntMap tree) = M.toList tree;
-  toAscList :: forall a. IntMap a -> List (Pair Int a);
+  toAscList :: forall a. IntMap a -> [] ((,) Int a);
   toAscList tree = toList tree;
-  keys :: forall a. IntMap a -> List Int;
+  keys :: forall a. IntMap a -> [] Int;
   keys (IntMap tree) = M.keys tree;
-  elems :: forall a. IntMap a -> List a;
+  elems :: forall a. IntMap a -> [] a;
   elems (IntMap tree) = M.elems tree;
   keysSet :: forall a. IntMap a -> IntSet;
   keysSet (IntMap tree) =
     let {
-      result = M.map (\value -> Unit) tree
+      result = M.map (\value -> ()) tree
     } in
     seq result (IntSet result);
-  fromList :: forall a. List (Pair Int a) -> IntMap a;
+  fromList :: forall a. [] ((,) Int a) -> IntMap a;
   fromList entries =
     wrap
       (L.foldlStrict
          (\tree entry ->
             case entry of {
-              Pair key value -> insertTree key value tree
+              (,) key value -> insertTree key value tree
             })
          M.empty
          entries);
-  fromListWith :: forall a. (a -> a -> a) -> List (Pair Int a) -> IntMap a;
+  fromListWith :: forall a. (a -> a -> a) -> [] ((,) Int a) -> IntMap a;
   fromListWith combine entries =
     wrap
       (L.foldlStrict
          (\tree entry ->
             case entry of {
-              Pair key value -> insertWithTree combine key value tree
+              (,) key value -> insertWithTree combine key value tree
             })
          M.empty
          entries);
-  fromDistinctAscList :: forall a. List (Pair Int a) -> IntMap a;
+  fromDistinctAscList :: forall a. [] ((,) Int a) -> IntMap a;
   fromDistinctAscList entries = wrap (M.fromDistinctAscList entries);
   union :: forall a. IntMap a -> IntMap a -> IntMap a;
   union (IntMap a) (IntMap b) =
     wrap (M.foldlWithKeyStrict (\tree key value -> insertTree key value tree) b a);
   unionWith :: forall a. (a -> a -> a) -> IntMap a -> IntMap a -> IntMap a;
   unionWith combine (IntMap a) (IntMap b) = wrap (M.unionWith L.compareInt combine a b);
-  unions :: forall a. List (IntMap a) -> IntMap a;
+  unions :: forall a. [] (IntMap a) -> IntMap a;
   unions trees = L.foldlStrict union empty trees;
   difference :: forall a b. IntMap a -> IntMap b -> IntMap a;
   difference (IntMap a) (IntMap b) =
@@ -171,20 +171,20 @@ module Bootstrap.IntMap where {
   filter f (IntMap tree) = wrap (M.filter f tree);
   filterWithKey :: forall a. (Int -> a -> Bool) -> IntMap a -> IntMap a;
   filterWithKey f (IntMap tree) = wrap (M.filterWithKey f tree);
-  lookupMin :: forall a. IntMap a -> Maybe (Pair Int a);
+  lookupMin :: forall a. IntMap a -> Maybe ((,) Int a);
   lookupMin (IntMap tree) = M.lookupMin tree;
-  lookupMax :: forall a. IntMap a -> Maybe (Pair Int a);
+  lookupMax :: forall a. IntMap a -> Maybe ((,) Int a);
   lookupMax (IntMap tree) = M.lookupMax tree;
-  findMin :: forall a. IntMap a -> Pair Int a;
+  findMin :: forall a. IntMap a -> (,) Int a;
   findMin (IntMap tree) = M.findMin tree;
-  findMax :: forall a. IntMap a -> Pair Int a;
+  findMax :: forall a. IntMap a -> (,) Int a;
   findMax (IntMap tree) = M.findMax tree;
-  minViewWithKey :: forall a. IntMap a -> Maybe (Pair (Pair Int a) (IntMap a));
+  minViewWithKey :: forall a. IntMap a -> Maybe ((,) ((,) Int a) (IntMap a));
   minViewWithKey (IntMap tree) =
     L.mapOptional
       (\entry ->
          case entry of {
-           Pair item rest -> Pair item (wrap rest)
+           (,) item rest -> (,) item (wrap rest)
          })
       (M.minViewWithKey tree);
   eqIntMap :: forall a. (a -> a -> Bool) -> IntMap a -> IntMap a -> Bool;

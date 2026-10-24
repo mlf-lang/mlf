@@ -25,7 +25,7 @@ module Package.Distribution where {
         (S.range 0 (stringLength text - 1))));
   validRepository text =
     case O.split 47 text of {
-      Cons owner (Cons repository Nil) -> (identifier owner && identifier repository);
+      (:) owner ((:) repository []) -> (identifier owner && identifier repository);
       _ -> False
     };
   validTag text =
@@ -70,8 +70,8 @@ module Package.Distribution where {
       object <- readFile (prefix ++ ".mlfco");
       ioReturn
         (J.Object
-           (Cons (Pair "key" (J.str key))
-              (Cons (Pair "metadata" (J.str metadata)) (Cons (Pair "object" (J.str object)) Nil))))
+           ((:) ((,) "key" (J.str key))
+              ((:) ((,) "metadata" (J.str metadata)) ((:) ((,) "object" (J.str object)) []))))
     };
   pack :: String -> String -> IO J.Json;
   pack directory output =
@@ -107,9 +107,9 @@ module Package.Distribution where {
       let {
         envelope =
           J.Object
-            (Cons (Pair "format" (J.num 1))
-               (Cons (Pair "manifest" (J.str manifestText))
-                  (Cons (Pair "crates" (J.Array crates)) Nil)))
+            ((:) ((,) "format" (J.num 1))
+               ((:) ((,) "manifest" (J.str manifestText))
+                  ((:) ((,) "crates" (J.Array crates)) [])))
       };
       J.write (work ++ "/package.mlfr") envelope;
       asset <- fileDigest (work ++ "/package.mlfr");
@@ -118,7 +118,7 @@ module Package.Distribution where {
       releaseFileLock lock;
       ioReturn
         (J.Object
-           (Cons (Pair "sha256" (J.str digest)) (Cons (Pair "asset_sha256" (J.str asset)) Nil)))
+           ((:) ((,) "sha256" (J.str digest)) ((:) ((,) "asset_sha256" (J.str asset)) [])))
     };
   unpack asset destination expected =
     do {
@@ -189,17 +189,17 @@ module Package.Distribution where {
         matchValueShared1 = O.split 47 path
       } in
       case matchValueShared1 of {
-        Cons matchValueShared2 matchValueShared3 ->
+        (:) matchValueShared2 matchValueShared3 ->
           if MLF.Primitive.eqString matchValueShared2 "bundle"
           then case matchValueShared3 of {
-                 Cons matchValueShared4 matchValueShared5 ->
+                 (:) matchValueShared4 matchValueShared5 ->
                    if MLF.Primitive.eqString matchValueShared4 "crates"
                    then case matchValueShared5 of {
-                          Cons matchValueShared6 matchValueShared7 ->
+                          (:) matchValueShared6 matchValueShared7 ->
                             case matchValueShared7 of {
-                              Cons matchValueShared8 matchValueShared9 ->
+                              (:) matchValueShared8 matchValueShared9 ->
                                 case matchValueShared9 of {
-                                  Nil ->
+                                  [] ->
                                     let {
                                       key = matchValueShared6
                                     } in
@@ -247,7 +247,7 @@ module Package.Distribution where {
                               else do {
                                      checks <-
                                        S.mapM
-                                         (\(Pair path digest) ->
+                                         (\((,) path digest) ->
                                             case digest of {
                                               J.String hash ->
                                                 validAsset (destination ++ ("/" ++ path)) hash;
@@ -267,13 +267,13 @@ module Package.Distribution where {
     do {
       let {
         paths =
-          Cons "bundle/release.json"
+          (:) "bundle/release.json"
             (S.concatMap
                (\row ->
                   let {
                     prefix = ("bundle/crates/" ++ (R.rowKey row ++ "/unit"))
                   } in
-                  Cons (prefix ++ ".mlfci") (Cons (prefix ++ ".mlfco") Nil))
+                  (:) (prefix ++ ".mlfci") ((:) (prefix ++ ".mlfco") []))
                (R.rows manifest))
       };
       hashes <-
@@ -281,14 +281,14 @@ module Package.Distribution where {
           (\path ->
              do {
                digest <- fileDigest (destination ++ ("/" ++ path));
-               ioReturn (Pair path (J.str digest))
+               ioReturn ((,) path (J.str digest))
              })
           paths;
       J.write (destination ++ "/files.json")
         (J.Object
-           (Cons (Pair "format" (J.num 1))
-              (Cons (Pair "manifest_sha256" (J.str expected))
-                 (Cons (Pair "files" (J.Object hashes)) Nil))))
+           ((:) ((,) "format" (J.num 1))
+              ((:) ((,) "manifest_sha256" (J.str expected))
+                 ((:) ((,) "files" (J.Object hashes)) []))))
     };
   fetch :: J.Json -> J.Json -> IO String;
   fetch options dependency =
@@ -321,7 +321,7 @@ module Package.Distribution where {
       if complete
       then do {
              R.readPinnedManifest (destination ++ "/bundle") expected;
-             ioReturn Unit
+             ioReturn ()
            }
       else do {
              O.require (retained || S.not (J.getBool "offline" False options))
@@ -340,15 +340,15 @@ module Package.Distribution where {
                     };
                     let {
                       argv =
-                        Cons gh
-                          (Cons "release"
-                             (Cons "download"
-                                (Cons (J.getText "tag" "" source)
-                                   (Cons "--repo"
-                                      (Cons ("github.com/" ++ J.getText "repository" "" source)
-                                         (Cons "--pattern"
-                                            (Cons (J.getText "asset" "" source)
-                                               (Cons "--output" (Cons downloaded Nil)))))))))
+                        (:) gh
+                          ((:) "release"
+                             ((:) "download"
+                                ((:) (J.getText "tag" "" source)
+                                   ((:) "--repo"
+                                      ((:) ("github.com/" ++ J.getText "repository" "" source)
+                                         ((:) "--pattern"
+                                            ((:) (J.getText "asset" "" source)
+                                               ((:) "--output" ((:) downloaded [])))))))))
                     };
                     code <- O.exec "" argv "" "" "" (readInt (J.getText "timeout" "1800" options));
                     O.require (code == 0) "GitHub release asset download failed"

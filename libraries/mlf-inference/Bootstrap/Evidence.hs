@@ -18,85 +18,109 @@ module Bootstrap.Evidence where {
   sameRole SuperclassEvidence SuperclassEvidence = True;
   sameRole InstanceEvidence InstanceEvidence = True;
   sameRole _ _ = False;
-  resolveDictionary :: DataEnv ->
-                       Map XTyVar XType ->
-                       List (Triple EvidenceRole XName XType) -> XType -> Either String XTerm;
+  data EvidenceFailure = NoEntailment String | InvalidEvidence String;
+  evidenceFailureMessage :: EvidenceFailure -> String;
+  evidenceFailureMessage failure = case failure of {
+    NoEntailment message -> message;
+    InvalidEvidence message -> message
+  };
+  resolveDictionary :: DataEnv -> Map XTyVar XType ->
+    [] ((,,) EvidenceRole XName XType) -> XType -> Either String XTerm;
   resolveDictionary datatypes gamma candidates wanted =
+    case resolveDictionaryDetailed datatypes gamma candidates wanted of {
+      Left failure -> Left (evidenceFailureMessage failure);
+      Right term -> Right term
+    };
+  resolveDictionaryDetailed :: DataEnv ->
+                       Map XTyVar XType ->
+                       [] ((,,) EvidenceRole XName XType) -> XType -> Either EvidenceFailure XTerm;
+  resolveDictionaryDetailed datatypes gamma candidates wanted =
     do {
       let {
-        proofs = closeGiven datatypes gamma candidates Nil (givenSeeds candidates)
+        proofs = closeGiven datatypes gamma candidates [] (givenSeeds candidates)
       };
-      term <- search datatypes gamma candidates proofs Nil wanted;
+      term <- searchDetailed datatypes gamma candidates proofs [] wanted;
       let {
         terms =
           M.fromList X.compareName
             (map
                (\candidate ->
                   case candidate of {
-                    Triple _ name ty -> Pair name ty
+                    (,,) _ name ty -> (,) name ty
                   })
                candidates)
       };
-      actual <- Check.inferWithData datatypes (XEnv gamma terms) term;
-      unless (T.alphaEq actual wanted) (Left "dictionary evidence has the wrong type");
+      actual <- case Check.inferWithData datatypes (XEnv gamma terms) term of {
+        Left message -> Left (InvalidEvidence message);
+        Right ty -> Right ty
+      };
+      unless (T.alphaEq actual wanted) (Left (InvalidEvidence "dictionary evidence has the wrong type"));
       Right term
     };
-  givenSeeds :: List (Triple EvidenceRole XName XType) -> List (Triple XTerm XType (Set XName));
-  givenSeeds Nil = Nil;
-  givenSeeds (Cons (Triple role name ty) rest) =
+  givenSeeds :: [] ((,,) EvidenceRole XName XType) -> [] ((,,) XTerm XType (Set XName));
+  givenSeeds [] = [];
+  givenSeeds ((:) ((,,) role name ty) rest) =
     if sameRole role GivenEvidence
-    then Cons (Triple (XVarTerm name) ty Set.empty) (givenSeeds rest)
+    then (:) ((,,) (XVarTerm name) ty Set.empty) (givenSeeds rest)
     else givenSeeds rest;
   candidatePairs role candidates =
     map
       (\candidate ->
          case candidate of {
-           Triple _ name ty -> Pair name ty
+           (,,) _ name ty -> (,) name ty
          })
       (filter
          (\candidate ->
             case candidate of {
-              Triple r _ _ -> sameRole role r
+              (,,) r _ _ -> sameRole role r
             })
          candidates);
-  search :: DataEnv ->
-            Map XTyVar XType ->
-            List (Triple EvidenceRole XName XType) ->
-            List (Pair XTerm XType) -> List XType -> XType -> Either String XTerm;
+  search :: DataEnv -> Map XTyVar XType ->
+    [] ((,,) EvidenceRole XName XType) -> [] ((,) XTerm XType) ->
+    [] XType -> XType -> Either String XTerm;
   search datatypes gamma candidates proofs seen goal =
+    case searchDetailed datatypes gamma candidates proofs seen goal of {
+      Left failure -> Left (evidenceFailureMessage failure);
+      Right term -> Right term
+    };
+  searchDetailed :: DataEnv ->
+            Map XTyVar XType ->
+            [] ((,,) EvidenceRole XName XType) ->
+            [] ((,) XTerm XType) -> [] XType -> XType -> Either EvidenceFailure XTerm;
+  searchDetailed datatypes gamma candidates proofs seen goal =
     if any (T.alphaEq goal) seen
-    then Left ("cyclic dictionary resolution: " ++ Pretty.prettyType goal)
+    then Left (NoEntailment ("cyclic dictionary resolution: " ++ Pretty.prettyType goal))
     else case matches datatypes gamma candidates GivenEvidence goal of {
-           Cons (Pair term Nil) _ -> Right term;
+           (:) ((,) term []) _ -> Right term;
            _ ->
              case find (\proof -> T.alphaEq goal (snd proof)) proofs of {
                Just proof -> Right (fst proof);
                Nothing ->
                  case matches datatypes gamma candidates InstanceEvidence goal of {
-                   Nil ->
+                   [] ->
                      Left
-                       ("no instance or given constraint for " ++
-                        (Pretty.prettyType goal ++ "; ambiguous uses need a type annotation"));
-                   Cons (Pair term context) Nil ->
+                       (NoEntailment ("no instance or given constraint for " ++
+                        (Pretty.prettyType goal ++ "; ambiguous uses need a type annotation")));
+                   (:) ((,) term context) [] ->
                      foldM
                        (\f predicate ->
                           do {
                             proof <-
-                              search datatypes gamma candidates proofs (Cons goal seen) predicate;
+                              searchDetailed datatypes gamma candidates proofs ((:) goal seen) predicate;
                             Right (XApp f proof)
                           })
                        term
                        context;
-                   _ -> Left ("overlapping dictionary instances: " ++ Pretty.prettyType goal)
+                   _ -> Left (NoEntailment ("overlapping dictionary instances: " ++ Pretty.prettyType goal))
                  }
              }
          };
   closeGiven :: DataEnv ->
                 Map XTyVar XType ->
-                List (Triple EvidenceRole XName XType) ->
-                List XType -> List (Triple XTerm XType (Set XName)) -> List (Pair XTerm XType);
-  closeGiven _ _ _ _ Nil = Nil;
-  closeGiven datatypes gamma candidates seen (Cons (Triple proof ty path) rest) =
+                [] ((,,) EvidenceRole XName XType) ->
+                [] XType -> [] ((,,) XTerm XType (Set XName)) -> [] ((,) XTerm XType);
+  closeGiven _ _ _ _ [] = [];
+  closeGiven datatypes gamma candidates seen ((:) ((,,) proof ty path) rest) =
     if any (T.alphaEq ty) seen
     then closeGiven datatypes gamma candidates seen rest
     else let {
@@ -107,27 +131,27 @@ module Bootstrap.Evidence where {
          let {
            projections = catMaybes (map (projectGiven datatypes gamma proof ty path) selectors)
          } in
-         Cons (Pair proof ty)
-           (closeGiven datatypes gamma candidates (Cons ty seen) (append rest projections));
-  superclassArgument :: forall a p. List a -> p -> Either String a;
+         (:) ((,) proof ty)
+           (closeGiven datatypes gamma candidates ((:) ty seen) (append rest projections));
+  superclassArgument :: forall a p. [] a -> p -> Either String a;
   superclassArgument context _ =
     case context of {
-      Cons argument Nil -> Right argument;
+      (:) argument [] -> Right argument;
       _ -> Left "superclass selectors require exactly one dictionary"
     };
   projectGiven :: DataEnv ->
                   Map XTyVar XType ->
                   XTerm ->
-                  XType -> Set XName -> Pair XName XType -> Maybe (Triple XTerm XType (Set XName));
+                  XType -> Set XName -> (,) XName XType -> Maybe ((,,) XTerm XType (Set XName));
   projectGiven datatypes gamma proof ty path candidate =
     case specializeAt datatypes gamma superclassArgument ty candidate of {
       Left _ -> Nothing;
-      Right (Triple selector context result) ->
+      Right ((,,) selector context result) ->
         case context of {
-          Cons argument Nil ->
+          (:) argument [] ->
             if T.alphaEq argument ty
             then Just
-                   (Triple (XApp selector proof) result
+                   ((,,) (XApp selector proof) result
                       (Set.insert X.compareName (fst candidate) path))
             else Nothing;
           _ -> Nothing
@@ -135,59 +159,59 @@ module Bootstrap.Evidence where {
     };
   matches :: DataEnv ->
              Map XTyVar XType ->
-             List (Triple EvidenceRole XName XType) ->
-             EvidenceRole -> XType -> List (Pair XTerm (List XType));
+             [] ((,,) EvidenceRole XName XType) ->
+             EvidenceRole -> XType -> [] ((,) XTerm ([] XType));
   matches datatypes gamma candidates role goal =
     catMaybes (map (specialize datatypes gamma goal) (candidatePairs role candidates));
   specialize :: DataEnv ->
-                Map XTyVar XType -> XType -> Pair XName XType -> Maybe (Pair XTerm (List XType));
+                Map XTyVar XType -> XType -> (,) XName XType -> Maybe ((,) XTerm ([] XType));
   specialize datatypes gamma goal candidate =
     case specializeAt datatypes gamma (\_ head -> Right head) goal candidate of {
       Left _ -> Nothing;
-      Right (Triple term context _) -> Just (Pair term context)
+      Right ((,,) term context _) -> Just ((,) term context)
     };
   bottomKind :: XType -> Maybe Kind;
   bottomKind XBot = Just Star;
   bottomKind (XBotKind kind) = Just kind;
   bottomKind _ = Nothing;
-  quantifiers :: XType -> Pair (List (Pair XTyVar Kind)) XType;
+  quantifiers :: XType -> (,) ([] ((,) XTyVar Kind)) XType;
   quantifiers ty =
     case ty of {
       XForall variable bound body ->
         case bottomKind bound of {
-          Nothing -> Pair Nil ty;
+          Nothing -> (,) [] ty;
           Just kind ->
             let {
               rest = quantifiers body
             } in
-            Pair (Cons (Pair variable kind) (fst rest)) (snd rest)
+            (,) ((:) ((,) variable kind) (fst rest)) (snd rest)
         };
-      _ -> Pair Nil ty
+      _ -> (,) [] ty
     };
-  arguments :: XType -> Pair (List XType) XType;
+  arguments :: XType -> (,) ([] XType) XType;
   arguments (XArrow domain result) =
     let {
       rest = arguments result
     } in
-    Pair (Cons domain (fst rest)) (snd rest);
-  arguments ty = Pair Nil ty;
-  freshVariables :: Int -> Int -> Set XTyVar -> List XTyVar;
+    (,) ((:) domain (fst rest)) (snd rest);
+  arguments ty = (,) [] ty;
+  freshVariables :: Int -> Int -> Set XTyVar -> [] XTyVar;
   freshVariables count candidate occupied =
     if (count <= 0)
-    then Nil
+    then []
     else let {
            variable = XTyVar candidate
          } in
          if Set.member T.compareTyVar variable occupied
          then freshVariables count (candidate - 1) occupied
-         else Cons variable (freshVariables (count - 1) (candidate - 1) occupied);
+         else (:) variable (freshVariables (count - 1) (candidate - 1) occupied);
   replaceType variables fresh types ty =
     let {
       renamed =
         foldl
           (\body binding ->
              case binding of {
-               Pair (Pair variable _) name -> T.substitute variable (XVar name) body
+               (,) ((,) variable _) name -> T.substitute variable (XVar name) body
              })
           ty
           (zip variables fresh)
@@ -196,11 +220,11 @@ module Bootstrap.Evidence where {
       (zip fresh types);
   specializeAt :: DataEnv ->
                   Map XTyVar XType ->
-                  (List XType -> XType -> Either String XType) ->
-                  XType -> Pair XName XType -> Either String (Triple XTerm (List XType) XType);
+                  ([] XType -> XType -> Either String XType) ->
+                  XType -> (,) XName XType -> Either String ((,,) XTerm ([] XType) XType);
   specializeAt datatypes gamma select actual candidate =
     case candidate of {
-      Pair name scheme ->
+      (,) name scheme ->
         do {
           let {
             quantified = quantifiers scheme
@@ -248,7 +272,7 @@ module Bootstrap.Evidence where {
                 (XVarTerm name)
                 types
           };
-          Right (Triple term (map replace context) (replace head))
+          Right ((,,) term (map replace context) (replace head))
         }
     };
   match :: DataEnv ->
@@ -316,10 +340,10 @@ module Bootstrap.Evidence where {
   matchApplication datatypes gamma flexible substitution pattern actual =
     case T.applicationView pattern of {
       Nothing -> Left "instance head does not match";
-      Just (Pair f a) ->
+      Just ((,) f a) ->
         case T.applicationView actual of {
           Nothing -> Left "instance head does not match";
-          Just (Pair g b) ->
+          Just ((,) g b) ->
             do {
               current <- match datatypes gamma flexible substitution f g;
               match datatypes gamma flexible current a b

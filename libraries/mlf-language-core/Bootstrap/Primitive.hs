@@ -104,7 +104,19 @@ module Bootstrap.Primitive where {
       PAsyncStep -> 91;
       PAsyncEnqueue -> 92;
       PAsyncDelay -> 93;
-      PAsyncWait -> 94
+      PAsyncWait -> 94;
+      PTextToChars -> 95;
+      PTextFromChars -> 96;
+      PCharCode -> 97;
+      PCharFromCode -> 98;
+      PUserError -> 99;
+      PIOError -> 100;
+      PCatchIOError -> 101;
+      PIOErrorString -> 102;
+      PEmptyCallStack -> 103;
+      PPushCallStack -> 104;
+      PPrettyCallStack -> 105;
+      PIOErrorWithStack -> 106
     };
   primitiveName :: Primitive -> String;
   primitiveName p =
@@ -203,174 +215,189 @@ module Bootstrap.Primitive where {
       PAsyncStep -> "asyncStep";
       PAsyncEnqueue -> "asyncEnqueue";
       PAsyncDelay -> "asyncDelay";
-      PAsyncWait -> "asyncWait"
+      PAsyncWait -> "asyncWait";
+      PTextToChars -> "textToChars";
+      PTextFromChars -> "textFromChars";
+      PCharCode -> "charCode";
+      PCharFromCode -> "charFromCode";
+      PUserError -> "userError";
+      PIOError -> "ioError";
+      PCatchIOError -> "catchIOError";
+      PIOErrorString -> "ioeGetErrorString";
+      PEmptyCallStack -> "mlfEmptyCallStack";
+      PPushCallStack -> "mlfPushCallStack";
+      PPrettyCallStack -> "mlfPrettyCallStack";
+      PIOErrorWithStack -> "mlfIOErrorWithStack"
     };
-  allPrimitives :: List Primitive;
-  allPrimitives =
-    Cons PIOReturn
-      (Cons PIOBind
-         (Cons PPutStr
-            (Cons PPutStrLn
-               (Cons PGetLine
-                  (Cons PPrintInt
-                     (Cons PConcatString
-                        (Cons PShowInt
-                           (Cons PAddInt
-                              (Cons PSubInt
-                                 (Cons PEqInt
-                                    (Cons PLtInt
-                                       (Cons PEqString
-                                          (Cons PIfThenElse
-                                             (Cons PMulInt
-                                                (Cons PQuotInt
-                                                   (Cons PRemInt
-                                                      (Cons PReadInt
-                                                         (Cons PAddDouble
-                                                            (Cons PSubDouble
-                                                               (Cons PMulDouble
-                                                                  (Cons PDivDouble
-                                                                     (Cons PSqrtDouble
-                                                                        (Cons PEqDouble
-                                                                           (Cons PLtDouble
-                                                                              (Cons PIntToDouble
-                                                                                 (Cons PFormatDouble
-                                                                                    (Cons
+  legacyPrimitives :: [] Primitive;
+  legacyPrimitives =
+    (:) PIOReturn
+      ((:) PIOBind
+         ((:) PPutStr
+            ((:) PPutStrLn
+               ((:) PGetLine
+                  ((:) PPrintInt
+                     ((:) PConcatString
+                        ((:) PShowInt
+                           ((:) PAddInt
+                              ((:) PSubInt
+                                 ((:) PEqInt
+                                    ((:) PLtInt
+                                       ((:) PEqString
+                                          ((:) PIfThenElse
+                                             ((:) PMulInt
+                                                ((:) PQuotInt
+                                                   ((:) PRemInt
+                                                      ((:) PReadInt
+                                                         ((:) PAddDouble
+                                                            ((:) PSubDouble
+                                                               ((:) PMulDouble
+                                                                  ((:) PDivDouble
+                                                                     ((:) PSqrtDouble
+                                                                        ((:) PEqDouble
+                                                                           ((:) PLtDouble
+                                                                              ((:) PIntToDouble
+                                                                                 ((:) PFormatDouble
+                                                                                    ((:)
                                                                                        PNewIntArray
-                                                                                       (Cons
+                                                                                       ((:)
                                                                                           PReadIntArray
-                                                                                          (Cons
+                                                                                          ((:)
                                                                                              PWriteIntArray
-                                                                                             (Cons
+                                                                                             ((:)
                                                                                                 PLengthIntArray
-                                                                                                (Cons
+                                                                                                ((:)
                                                                                                    PNewDoubleArray
-                                                                                                   (Cons
+                                                                                                   ((:)
                                                                                                       PReadDoubleArray
-                                                                                                      (Cons
+                                                                                                      ((:)
                                                                                                          PWriteDoubleArray
-                                                                                                         (Cons
+                                                                                                         ((:)
                                                                                                             PLengthDoubleArray
-                                                                                                            (Cons
+                                                                                                            ((:)
                                                                                                                PNewByteArray
-                                                                                                               (Cons
+                                                                                                               ((:)
                                                                                                                   PReadByteArray
-                                                                                                                  (Cons
+                                                                                                                  ((:)
                                                                                                                      PWriteByteArray
-                                                                                                                     (Cons
+                                                                                                                     ((:)
                                                                                                                         PLengthByteArray
-                                                                                                                        (Cons
+                                                                                                                        ((:)
                                                                                                                            PByteArrayFromString
-                                                                                                                           (Cons
+                                                                                                                           ((:)
                                                                                                                               PPutBytes
-                                                                                                                              (Cons
+                                                                                                                              ((:)
                                                                                                                                  PGetByteLine
-                                                                                                                                 (Cons
+                                                                                                                                 ((:)
                                                                                                                                     PNewIntTable
-                                                                                                                                    (Cons
+                                                                                                                                    ((:)
                                                                                                                                        PReadIntTable
-                                                                                                                                       (Cons
+                                                                                                                                       ((:)
                                                                                                                                           PWriteIntTable
-                                                                                                                                          (Cons
+                                                                                                                                          ((:)
                                                                                                                                              PAndInt
-                                                                                                                                             (Cons
+                                                                                                                                             ((:)
                                                                                                                                                 PStringLength
-                                                                                                                                                (Cons
+                                                                                                                                                ((:)
                                                                                                                                                    PStringCodeAt
-                                                                                                                                                   (Cons
+                                                                                                                                                   ((:)
                                                                                                                                                       PStringSlice
-                                                                                                                                                      (Cons
+                                                                                                                                                      ((:)
                                                                                                                                                          PStringFromCode
-                                                                                                                                                         (Cons
+                                                                                                                                                         ((:)
                                                                                                                                                             PCompareString
-                                                                                                                                                            (Cons
+                                                                                                                                                            ((:)
                                                                                                                                                                PReadDouble
-                                                                                                                                                               (Cons
+                                                                                                                                                               ((:)
                                                                                                                                                                   PDoubleToBits
-                                                                                                                                                                  (Cons
+                                                                                                                                                                  ((:)
                                                                                                                                                                      PDoubleFromBits
-                                                                                                                                                                     (Cons
+                                                                                                                                                                     ((:)
                                                                                                                                                                         PSeq
-                                                                                                                                                                        (Cons
+                                                                                                                                                                        ((:)
                                                                                                                                                                            PPanic
-                                                                                                                                                                           (Cons
+                                                                                                                                                                           ((:)
                                                                                                                                                                               PReadFile
-                                                                                                                                                                              (Cons
+                                                                                                                                                                              ((:)
                                                                                                                                                                                  PWriteFile
-                                                                                                                                                                                 (Cons
+                                                                                                                                                                                 ((:)
                                                                                                                                                                                     PFileExists
-                                                                                                                                                                                    (Cons
+                                                                                                                                                                                    ((:)
                                                                                                                                                                                        PCanonicalPath
-                                                                                                                                                                                       (Cons
+                                                                                                                                                                                       ((:)
                                                                                                                                                                                           PGetArgCount
-                                                                                                                                                                                          (Cons
+                                                                                                                                                                                          ((:)
                                                                                                                                                                                              PGetArg
-                                                                                                                                                                                             (Cons
+                                                                                                                                                                                             ((:)
                                                                                                                                                                                                 PPutErr
-                                                                                                                                                                                                (Cons
+                                                                                                                                                                                                ((:)
                                                                                                                                                                                                    PExitWith
-                                                                                                                                                                                                   (Cons
+                                                                                                                                                                                                   ((:)
                                                                                                                                                                                                       PGetExecutablePath
-                                                                                                                                                                                                      (Cons
+                                                                                                                                                                                                      ((:)
                                                                                                                                                                                                          PGetContents
-                                                                                                                                                                                                         (Cons
+                                                                                                                                                                                                         ((:)
                                                                                                                                                                                                             PSTReturn
-                                                                                                                                                                                                            (Cons
+                                                                                                                                                                                                            ((:)
                                                                                                                                                                                                                PSTBind
-                                                                                                                                                                                                               (Cons
+                                                                                                                                                                                                               ((:)
                                                                                                                                                                                                                   PRunST
-                                                                                                                                                                                                                  (Cons
+                                                                                                                                                                                                                  ((:)
                                                                                                                                                                                                                      PNewSTArray
-                                                                                                                                                                                                                     (Cons
+                                                                                                                                                                                                                     ((:)
                                                                                                                                                                                                                         PReadSTArray
-                                                                                                                                                                                                                        (Cons
+                                                                                                                                                                                                                        ((:)
                                                                                                                                                                                                                            PWriteSTArray
-                                                                                                                                                                                                                           (Cons
+                                                                                                                                                                                                                           ((:)
                                                                                                                                                                                                                               PLengthSTArray
-                                                                                                                                                                                                                              (Cons
+                                                                                                                                                                                                                              ((:)
                                                                                                                                                                                                                                  PGetEnv
-                                                                                                                                                                                                                                 (Cons
+                                                                                                                                                                                                                                 ((:)
                                                                                                                                                                                                                                     PSetEnv
-                                                                                                                                                                                                                                    (Cons
+                                                                                                                                                                                                                                    ((:)
                                                                                                                                                                                                                                        PUnsetEnv
-                                                                                                                                                                                                                                       (Cons
+                                                                                                                                                                                                                                       ((:)
                                                                                                                                                                                                                                           PRunProcess
-                                                                                                                                                                                                                                          (Cons
+                                                                                                                                                                                                                                          ((:)
                                                                                                                                                                                                                                              PListDirectory
-                                                                                                                                                                                                                                             (Cons
+                                                                                                                                                                                                                                             ((:)
                                                                                                                                                                                                                                                 PDirectoryExists
-                                                                                                                                                                                                                                                (Cons
+                                                                                                                                                                                                                                                ((:)
                                                                                                                                                                                                                                                    PFileDigest
-                                                                                                                                                                                                                                                   (Cons
+                                                                                                                                                                                                                                                   ((:)
                                                                                                                                                                                                                                                       PAcquireFileLock
-                                                                                                                                                                                                                                                      (Cons
+                                                                                                                                                                                                                                                      ((:)
                                                                                                                                                                                                                                                          PReleaseFileLock
-                                                                                                                                                                                                                                                         (Cons
+                                                                                                                                                                                                                                                         ((:)
                                                                                                                                                                                                                                                             PProcessSupervisor
-                                                                                                                                                                                                                                                            (Cons
+                                                                                                                                                                                                                                                            ((:)
                                                                                                                                                                                                                                                                PAsyncScopeNew
-                                                                                                                                                                                                                                                               (Cons
+                                                                                                                                                                                                                                                               ((:)
                                                                                                                                                                                                                                                                   PAsyncScopeClose
-                                                                                                                                                                                                                                                                  (Cons
+                                                                                                                                                                                                                                                                  ((:)
                                                                                                                                                                                                                                                                      PAsyncNewCompletion
-                                                                                                                                                                                                                                                                     (Cons
+                                                                                                                                                                                                                                                                     ((:)
                                                                                                                                                                                                                                                                         PAsyncResolveCompletion
-                                                                                                                                                                                                                                                                        (Cons
+                                                                                                                                                                                                                                                                        ((:)
                                                                                                                                                                                                                                                                            PAsyncReadCompletion
-                                                                                                                                                                                                                                                                           (Cons
+                                                                                                                                                                                                                                                                           ((:)
                                                                                                                                                                                                                                                                               PAsyncSubscribeCompletion
-                                                                                                                                                                                                                                                                              (Cons
+                                                                                                                                                                                                                                                                              ((:)
                                                                                                                                                                                                                                                                                  PAsyncSubscriptionStatus
-                                                                                                                                                                                                                                                                                 (Cons
+                                                                                                                                                                                                                                                                                 ((:)
                                                                                                                                                                                                                                                                                     PAsyncCancelSubscription
-                                                                                                                                                                                                                                                                                    (Cons
+                                                                                                                                                                                                                                                                                    ((:)
                                                                                                                                                                                                                                                                                        PAsyncStep
-                                                                                                                                                                                                                                                                                       (Cons
+                                                                                                                                                                                                                                                                                       ((:)
                                                                                                                                                                                                                                                                                           PAsyncEnqueue
-                                                                                                                                                                                                                                                                                          (Cons
+                                                                                                                                                                                                                                                                                          ((:)
                                                                                                                                                                                                                                                                                              PAsyncDelay
-                                                                                                                                                                                                                                                                                             (Cons
+                                                                                                                                                                                                                                                                                             ((:)
                                                                                                                                                                                                                                                                                                 PAsyncWait
-                                                                                                                                                                                                                                                                                                Nil))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))));
+                                                                                                                                                                                                                                                                                                []))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))));
+  allPrimitives :: [] Primitive;
+  allPrimitives = S.append legacyPrimitives
+    ((:) PTextToChars ((:) PTextFromChars ((:) PCharCode ((:) PCharFromCode ((:) PUserError ((:) PIOError ((:) PCatchIOError ((:) PIOErrorString ((:) PEmptyCallStack ((:) PPushCallStack ((:) PPrettyCallStack ((:) PIOErrorWithStack []))))))))))));
   lookupTargetPrimitive :: String -> Maybe Primitive;
   lookupTargetPrimitive name = S.find (\p -> eqString (primitiveName p) name) allPrimitives;
   lookupPrimitive :: String -> Maybe Primitive;
@@ -378,304 +405,325 @@ module Bootstrap.Primitive where {
     if (eqString name "return" || eqString name "pure")
     then Just PIOReturn
     else if eqString name "bind" then Just PIOBind else lookupTargetPrimitive name;
-  primitiveSignature :: Primitive -> Pair (List (Pair String Kind)) Field;
+  charListField :: Field;
+  charListField = Applied "[]" ((:) (Applied "Char" []) []);
+  primitiveSignature :: Primitive -> (,) ([] ((,) String Kind)) Field;
   primitiveSignature p =
     case p of {
       PIOReturn ->
-        Pair (Cons (Pair "a" Star) Nil)
-          (Function (Parameter "a") (Applied "IO" (Cons (Parameter "a") Nil)));
+        (,) ((:) ((,) "a" Star) [])
+          (Function (Parameter "a") (Applied "IO" ((:) (Parameter "a") [])));
       PIOBind ->
-        Pair (Cons (Pair "a" Star) (Cons (Pair "b" Star) Nil))
-          (Function (Applied "IO" (Cons (Parameter "a") Nil))
-             (Function (Function (Parameter "a") (Applied "IO" (Cons (Parameter "b") Nil)))
-                (Applied "IO" (Cons (Parameter "b") Nil))));
+        (,) ((:) ((,) "a" Star) ((:) ((,) "b" Star) []))
+          (Function (Applied "IO" ((:) (Parameter "a") []))
+             (Function (Function (Parameter "a") (Applied "IO" ((:) (Parameter "b") [])))
+                (Applied "IO" ((:) (Parameter "b") []))));
       PPutStr ->
-        Pair Nil (Function (Applied "String" Nil) (Applied "IO" (Cons (Applied "Unit" Nil) Nil)));
+        (,) [] (Function (Applied "String" []) (Applied "IO" ((:) (Applied "()" []) [])));
       PPutStrLn ->
-        Pair Nil (Function (Applied "String" Nil) (Applied "IO" (Cons (Applied "Unit" Nil) Nil)));
-      PGetLine -> Pair Nil (Applied "IO" (Cons (Applied "String" Nil) Nil));
+        (,) [] (Function (Applied "String" []) (Applied "IO" ((:) (Applied "()" []) [])));
+      PGetLine -> (,) [] (Applied "IO" ((:) (Applied "String" []) []));
       PPrintInt ->
-        Pair Nil (Function (Applied "Int" Nil) (Applied "IO" (Cons (Applied "Unit" Nil) Nil)));
+        (,) [] (Function (Applied "Int" []) (Applied "IO" ((:) (Applied "()" []) [])));
       PConcatString ->
-        Pair Nil
-          (Function (Applied "String" Nil)
-             (Function (Applied "String" Nil) (Applied "String" Nil)));
-      PShowInt -> Pair Nil (Function (Applied "Int" Nil) (Applied "String" Nil));
+        (,) []
+          (Function (Applied "String" [])
+             (Function (Applied "String" []) (Applied "String" [])));
+      PShowInt -> (,) [] (Function (Applied "Int" []) (Applied "String" []));
       PAddInt ->
-        Pair Nil (Function (Applied "Int" Nil) (Function (Applied "Int" Nil) (Applied "Int" Nil)));
+        (,) [] (Function (Applied "Int" []) (Function (Applied "Int" []) (Applied "Int" [])));
       PSubInt ->
-        Pair Nil (Function (Applied "Int" Nil) (Function (Applied "Int" Nil) (Applied "Int" Nil)));
+        (,) [] (Function (Applied "Int" []) (Function (Applied "Int" []) (Applied "Int" [])));
       PEqInt ->
-        Pair Nil (Function (Applied "Int" Nil) (Function (Applied "Int" Nil) (Applied "Bool" Nil)));
+        (,) [] (Function (Applied "Int" []) (Function (Applied "Int" []) (Applied "Bool" [])));
       PLtInt ->
-        Pair Nil (Function (Applied "Int" Nil) (Function (Applied "Int" Nil) (Applied "Bool" Nil)));
+        (,) [] (Function (Applied "Int" []) (Function (Applied "Int" []) (Applied "Bool" [])));
       PEqString ->
-        Pair Nil
-          (Function (Applied "String" Nil) (Function (Applied "String" Nil) (Applied "Bool" Nil)));
+        (,) []
+          (Function (Applied "String" []) (Function (Applied "String" []) (Applied "Bool" [])));
       PIfThenElse ->
-        Pair (Cons (Pair "a" Star) Nil)
-          (Function (Applied "Bool" Nil)
+        (,) ((:) ((,) "a" Star) [])
+          (Function (Applied "Bool" [])
              (Function (Parameter "a") (Function (Parameter "a") (Parameter "a"))));
       PMulInt ->
-        Pair Nil (Function (Applied "Int" Nil) (Function (Applied "Int" Nil) (Applied "Int" Nil)));
+        (,) [] (Function (Applied "Int" []) (Function (Applied "Int" []) (Applied "Int" [])));
       PQuotInt ->
-        Pair Nil (Function (Applied "Int" Nil) (Function (Applied "Int" Nil) (Applied "Int" Nil)));
+        (,) [] (Function (Applied "Int" []) (Function (Applied "Int" []) (Applied "Int" [])));
       PRemInt ->
-        Pair Nil (Function (Applied "Int" Nil) (Function (Applied "Int" Nil) (Applied "Int" Nil)));
-      PReadInt -> Pair Nil (Function (Applied "String" Nil) (Applied "Int" Nil));
+        (,) [] (Function (Applied "Int" []) (Function (Applied "Int" []) (Applied "Int" [])));
+      PReadInt -> (,) [] (Function (Applied "String" []) (Applied "Int" []));
       PAddDouble ->
-        Pair Nil
-          (Function (Applied "Double" Nil)
-             (Function (Applied "Double" Nil) (Applied "Double" Nil)));
+        (,) []
+          (Function (Applied "Double" [])
+             (Function (Applied "Double" []) (Applied "Double" [])));
       PSubDouble ->
-        Pair Nil
-          (Function (Applied "Double" Nil)
-             (Function (Applied "Double" Nil) (Applied "Double" Nil)));
+        (,) []
+          (Function (Applied "Double" [])
+             (Function (Applied "Double" []) (Applied "Double" [])));
       PMulDouble ->
-        Pair Nil
-          (Function (Applied "Double" Nil)
-             (Function (Applied "Double" Nil) (Applied "Double" Nil)));
+        (,) []
+          (Function (Applied "Double" [])
+             (Function (Applied "Double" []) (Applied "Double" [])));
       PDivDouble ->
-        Pair Nil
-          (Function (Applied "Double" Nil)
-             (Function (Applied "Double" Nil) (Applied "Double" Nil)));
-      PSqrtDouble -> Pair Nil (Function (Applied "Double" Nil) (Applied "Double" Nil));
+        (,) []
+          (Function (Applied "Double" [])
+             (Function (Applied "Double" []) (Applied "Double" [])));
+      PSqrtDouble -> (,) [] (Function (Applied "Double" []) (Applied "Double" []));
       PEqDouble ->
-        Pair Nil
-          (Function (Applied "Double" Nil) (Function (Applied "Double" Nil) (Applied "Bool" Nil)));
+        (,) []
+          (Function (Applied "Double" []) (Function (Applied "Double" []) (Applied "Bool" [])));
       PLtDouble ->
-        Pair Nil
-          (Function (Applied "Double" Nil) (Function (Applied "Double" Nil) (Applied "Bool" Nil)));
-      PIntToDouble -> Pair Nil (Function (Applied "Int" Nil) (Applied "Double" Nil));
+        (,) []
+          (Function (Applied "Double" []) (Function (Applied "Double" []) (Applied "Bool" [])));
+      PIntToDouble -> (,) [] (Function (Applied "Int" []) (Applied "Double" []));
       PFormatDouble ->
-        Pair Nil
-          (Function (Applied "Int" Nil) (Function (Applied "Double" Nil) (Applied "String" Nil)));
+        (,) []
+          (Function (Applied "Int" []) (Function (Applied "Double" []) (Applied "String" [])));
       PNewIntArray ->
-        Pair Nil
-          (Function (Applied "Int" Nil)
-             (Function (Applied "Int" Nil) (Applied "IO" (Cons (Applied "IntArray" Nil) Nil))));
+        (,) []
+          (Function (Applied "Int" [])
+             (Function (Applied "Int" []) (Applied "IO" ((:) (Applied "IntArray" []) []))));
       PReadIntArray ->
-        Pair Nil
-          (Function (Applied "IntArray" Nil)
-             (Function (Applied "Int" Nil) (Applied "IO" (Cons (Applied "Int" Nil) Nil))));
+        (,) []
+          (Function (Applied "IntArray" [])
+             (Function (Applied "Int" []) (Applied "IO" ((:) (Applied "Int" []) []))));
       PWriteIntArray ->
-        Pair Nil
-          (Function (Applied "IntArray" Nil)
-             (Function (Applied "Int" Nil)
-                (Function (Applied "Int" Nil) (Applied "IO" (Cons (Applied "Unit" Nil) Nil)))));
+        (,) []
+          (Function (Applied "IntArray" [])
+             (Function (Applied "Int" [])
+                (Function (Applied "Int" []) (Applied "IO" ((:) (Applied "()" []) [])))));
       PLengthIntArray ->
-        Pair Nil (Function (Applied "IntArray" Nil) (Applied "IO" (Cons (Applied "Int" Nil) Nil)));
+        (,) [] (Function (Applied "IntArray" []) (Applied "IO" ((:) (Applied "Int" []) [])));
       PNewDoubleArray ->
-        Pair Nil
-          (Function (Applied "Int" Nil)
-             (Function (Applied "Double" Nil)
-                (Applied "IO" (Cons (Applied "DoubleArray" Nil) Nil))));
+        (,) []
+          (Function (Applied "Int" [])
+             (Function (Applied "Double" [])
+                (Applied "IO" ((:) (Applied "DoubleArray" []) []))));
       PReadDoubleArray ->
-        Pair Nil
-          (Function (Applied "DoubleArray" Nil)
-             (Function (Applied "Int" Nil) (Applied "IO" (Cons (Applied "Double" Nil) Nil))));
+        (,) []
+          (Function (Applied "DoubleArray" [])
+             (Function (Applied "Int" []) (Applied "IO" ((:) (Applied "Double" []) []))));
       PWriteDoubleArray ->
-        Pair Nil
-          (Function (Applied "DoubleArray" Nil)
-             (Function (Applied "Int" Nil)
-                (Function (Applied "Double" Nil) (Applied "IO" (Cons (Applied "Unit" Nil) Nil)))));
+        (,) []
+          (Function (Applied "DoubleArray" [])
+             (Function (Applied "Int" [])
+                (Function (Applied "Double" []) (Applied "IO" ((:) (Applied "()" []) [])))));
       PLengthDoubleArray ->
-        Pair Nil
-          (Function (Applied "DoubleArray" Nil) (Applied "IO" (Cons (Applied "Int" Nil) Nil)));
+        (,) []
+          (Function (Applied "DoubleArray" []) (Applied "IO" ((:) (Applied "Int" []) [])));
       PNewByteArray ->
-        Pair Nil
-          (Function (Applied "Int" Nil)
-             (Function (Applied "Int" Nil) (Applied "IO" (Cons (Applied "ByteArray" Nil) Nil))));
+        (,) []
+          (Function (Applied "Int" [])
+             (Function (Applied "Int" []) (Applied "IO" ((:) (Applied "ByteArray" []) []))));
       PReadByteArray ->
-        Pair Nil
-          (Function (Applied "ByteArray" Nil)
-             (Function (Applied "Int" Nil) (Applied "IO" (Cons (Applied "Int" Nil) Nil))));
+        (,) []
+          (Function (Applied "ByteArray" [])
+             (Function (Applied "Int" []) (Applied "IO" ((:) (Applied "Int" []) []))));
       PWriteByteArray ->
-        Pair Nil
-          (Function (Applied "ByteArray" Nil)
-             (Function (Applied "Int" Nil)
-                (Function (Applied "Int" Nil) (Applied "IO" (Cons (Applied "Unit" Nil) Nil)))));
+        (,) []
+          (Function (Applied "ByteArray" [])
+             (Function (Applied "Int" [])
+                (Function (Applied "Int" []) (Applied "IO" ((:) (Applied "()" []) [])))));
       PLengthByteArray ->
-        Pair Nil (Function (Applied "ByteArray" Nil) (Applied "IO" (Cons (Applied "Int" Nil) Nil)));
+        (,) [] (Function (Applied "ByteArray" []) (Applied "IO" ((:) (Applied "Int" []) [])));
       PByteArrayFromString ->
-        Pair Nil
-          (Function (Applied "String" Nil) (Applied "IO" (Cons (Applied "ByteArray" Nil) Nil)));
+        (,) []
+          (Function (Applied "String" []) (Applied "IO" ((:) (Applied "ByteArray" []) [])));
       PPutBytes ->
-        Pair Nil
-          (Function (Applied "ByteArray" Nil)
-             (Function (Applied "Int" Nil)
-                (Function (Applied "Int" Nil) (Applied "IO" (Cons (Applied "Unit" Nil) Nil)))));
-      PGetByteLine -> Pair Nil (Applied "IO" (Cons (Applied "ByteArray" Nil) Nil));
-      PNewIntTable -> Pair Nil (Applied "IO" (Cons (Applied "IntTable" Nil) Nil));
+        (,) []
+          (Function (Applied "ByteArray" [])
+             (Function (Applied "Int" [])
+                (Function (Applied "Int" []) (Applied "IO" ((:) (Applied "()" []) [])))));
+      PGetByteLine -> (,) [] (Applied "IO" ((:) (Applied "ByteArray" []) []));
+      PNewIntTable -> (,) [] (Applied "IO" ((:) (Applied "IntTable" []) []));
       PReadIntTable ->
-        Pair Nil
-          (Function (Applied "IntTable" Nil)
-             (Function (Applied "Int" Nil) (Applied "IO" (Cons (Applied "Int" Nil) Nil))));
+        (,) []
+          (Function (Applied "IntTable" [])
+             (Function (Applied "Int" []) (Applied "IO" ((:) (Applied "Int" []) []))));
       PWriteIntTable ->
-        Pair Nil
-          (Function (Applied "IntTable" Nil)
-             (Function (Applied "Int" Nil)
-                (Function (Applied "Int" Nil) (Applied "IO" (Cons (Applied "Unit" Nil) Nil)))));
+        (,) []
+          (Function (Applied "IntTable" [])
+             (Function (Applied "Int" [])
+                (Function (Applied "Int" []) (Applied "IO" ((:) (Applied "()" []) [])))));
       PAndInt ->
-        Pair Nil (Function (Applied "Int" Nil) (Function (Applied "Int" Nil) (Applied "Int" Nil)));
-      PStringLength -> Pair Nil (Function (Applied "String" Nil) (Applied "Int" Nil));
+        (,) [] (Function (Applied "Int" []) (Function (Applied "Int" []) (Applied "Int" [])));
+      PStringLength -> (,) [] (Function (Applied "String" []) (Applied "Int" []));
       PStringCodeAt ->
-        Pair Nil
-          (Function (Applied "String" Nil) (Function (Applied "Int" Nil) (Applied "Int" Nil)));
+        (,) []
+          (Function (Applied "String" []) (Function (Applied "Int" []) (Applied "Int" [])));
       PStringSlice ->
-        Pair Nil
-          (Function (Applied "String" Nil)
-             (Function (Applied "Int" Nil) (Function (Applied "Int" Nil) (Applied "String" Nil))));
-      PStringFromCode -> Pair Nil (Function (Applied "Int" Nil) (Applied "String" Nil));
+        (,) []
+          (Function (Applied "String" [])
+             (Function (Applied "Int" []) (Function (Applied "Int" []) (Applied "String" []))));
+      PStringFromCode -> (,) [] (Function (Applied "Int" []) (Applied "String" []));
       PCompareString ->
-        Pair Nil
-          (Function (Applied "String" Nil) (Function (Applied "String" Nil) (Applied "Int" Nil)));
-      PReadDouble -> Pair Nil (Function (Applied "String" Nil) (Applied "Double" Nil));
-      PDoubleToBits -> Pair Nil (Function (Applied "Double" Nil) (Applied "Int" Nil));
-      PDoubleFromBits -> Pair Nil (Function (Applied "Int" Nil) (Applied "Double" Nil));
+        (,) []
+          (Function (Applied "String" []) (Function (Applied "String" []) (Applied "Int" [])));
+      PReadDouble -> (,) [] (Function (Applied "String" []) (Applied "Double" []));
+      PDoubleToBits -> (,) [] (Function (Applied "Double" []) (Applied "Int" []));
+      PDoubleFromBits -> (,) [] (Function (Applied "Int" []) (Applied "Double" []));
       PSeq ->
-        Pair (Cons (Pair "a" Star) (Cons (Pair "b" Star) Nil))
+        (,) ((:) ((,) "a" Star) ((:) ((,) "b" Star) []))
           (Function (Parameter "a") (Function (Parameter "b") (Parameter "b")));
-      PPanic -> Pair (Cons (Pair "a" Star) Nil) (Function (Applied "String" Nil) (Parameter "a"));
+      PPanic -> (,) ((:) ((,) "a" Star) []) (Function (Applied "String" []) (Parameter "a"));
       PReadFile ->
-        Pair Nil (Function (Applied "String" Nil) (Applied "IO" (Cons (Applied "String" Nil) Nil)));
+        (,) [] (Function (Applied "String" []) (Applied "IO" ((:) (Applied "String" []) [])));
       PWriteFile ->
-        Pair Nil
-          (Function (Applied "String" Nil)
-             (Function (Applied "String" Nil) (Applied "IO" (Cons (Applied "Unit" Nil) Nil))));
+        (,) []
+          (Function (Applied "String" [])
+             (Function (Applied "String" []) (Applied "IO" ((:) (Applied "()" []) []))));
       PFileExists ->
-        Pair Nil (Function (Applied "String" Nil) (Applied "IO" (Cons (Applied "Bool" Nil) Nil)));
+        (,) [] (Function (Applied "String" []) (Applied "IO" ((:) (Applied "Bool" []) [])));
       PCanonicalPath ->
-        Pair Nil (Function (Applied "String" Nil) (Applied "IO" (Cons (Applied "String" Nil) Nil)));
-      PGetArgCount -> Pair Nil (Applied "IO" (Cons (Applied "Int" Nil) Nil));
+        (,) [] (Function (Applied "String" []) (Applied "IO" ((:) (Applied "String" []) [])));
+      PGetArgCount -> (,) [] (Applied "IO" ((:) (Applied "Int" []) []));
       PGetArg ->
-        Pair Nil (Function (Applied "Int" Nil) (Applied "IO" (Cons (Applied "String" Nil) Nil)));
+        (,) [] (Function (Applied "Int" []) (Applied "IO" ((:) (Applied "String" []) [])));
       PPutErr ->
-        Pair Nil (Function (Applied "String" Nil) (Applied "IO" (Cons (Applied "Unit" Nil) Nil)));
+        (,) [] (Function (Applied "String" []) (Applied "IO" ((:) (Applied "()" []) [])));
       PExitWith ->
-        Pair (Cons (Pair "a" Star) Nil)
-          (Function (Applied "Int" Nil) (Applied "IO" (Cons (Parameter "a") Nil)));
-      PGetExecutablePath -> Pair Nil (Applied "IO" (Cons (Applied "String" Nil) Nil));
-      PGetContents -> Pair Nil (Applied "IO" (Cons (Applied "String" Nil) Nil));
+        (,) ((:) ((,) "a" Star) [])
+          (Function (Applied "Int" []) (Applied "IO" ((:) (Parameter "a") [])));
+      PGetExecutablePath -> (,) [] (Applied "IO" ((:) (Applied "String" []) []));
+      PGetContents -> (,) [] (Applied "IO" ((:) (Applied "String" []) []));
       PSTReturn ->
-        Pair (Cons (Pair "s" Star) (Cons (Pair "a" Star) Nil))
+        (,) ((:) ((,) "s" Star) ((:) ((,) "a" Star) []))
           (Function (Parameter "a")
-             (Applied "ST" (Cons (Parameter "s") (Cons (Parameter "a") Nil))));
+             (Applied "ST" ((:) (Parameter "s") ((:) (Parameter "a") []))));
       PSTBind ->
-        Pair (Cons (Pair "s" Star) (Cons (Pair "a" Star) (Cons (Pair "b" Star) Nil)))
-          (Function (Applied "ST" (Cons (Parameter "s") (Cons (Parameter "a") Nil)))
+        (,) ((:) ((,) "s" Star) ((:) ((,) "a" Star) ((:) ((,) "b" Star) [])))
+          (Function (Applied "ST" ((:) (Parameter "s") ((:) (Parameter "a") [])))
              (Function
                 (Function (Parameter "a")
-                   (Applied "ST" (Cons (Parameter "s") (Cons (Parameter "b") Nil))))
-                (Applied "ST" (Cons (Parameter "s") (Cons (Parameter "b") Nil)))));
+                   (Applied "ST" ((:) (Parameter "s") ((:) (Parameter "b") []))))
+                (Applied "ST" ((:) (Parameter "s") ((:) (Parameter "b") [])))));
       PRunST ->
-        Pair (Cons (Pair "a" Star) Nil)
+        (,) ((:) ((,) "a" Star) [])
           (Function
-             (Quantified "s" Star (Applied "ST" (Cons (Parameter "s") (Cons (Parameter "a") Nil))))
+             (Quantified "s" Star (Applied "ST" ((:) (Parameter "s") ((:) (Parameter "a") []))))
              (Parameter "a"));
       PNewSTArray ->
-        Pair (Cons (Pair "s" Star) (Cons (Pair "a" Star) Nil))
-          (Function (Applied "Int" Nil)
+        (,) ((:) ((,) "s" Star) ((:) ((,) "a" Star) []))
+          (Function (Applied "Int" [])
              (Function (Parameter "a")
                 (Applied "ST"
-                   (Cons (Parameter "s")
-                      (Cons (Applied "STArray" (Cons (Parameter "s") (Cons (Parameter "a") Nil)))
-                         Nil)))));
+                   ((:) (Parameter "s")
+                      ((:) (Applied "STArray" ((:) (Parameter "s") ((:) (Parameter "a") [])))
+                         [])))));
       PReadSTArray ->
-        Pair (Cons (Pair "s" Star) (Cons (Pair "a" Star) Nil))
-          (Function (Applied "STArray" (Cons (Parameter "s") (Cons (Parameter "a") Nil)))
-             (Function (Applied "Int" Nil)
-                (Applied "ST" (Cons (Parameter "s") (Cons (Parameter "a") Nil)))));
+        (,) ((:) ((,) "s" Star) ((:) ((,) "a" Star) []))
+          (Function (Applied "STArray" ((:) (Parameter "s") ((:) (Parameter "a") [])))
+             (Function (Applied "Int" [])
+                (Applied "ST" ((:) (Parameter "s") ((:) (Parameter "a") [])))));
       PWriteSTArray ->
-        Pair (Cons (Pair "s" Star) (Cons (Pair "a" Star) Nil))
-          (Function (Applied "STArray" (Cons (Parameter "s") (Cons (Parameter "a") Nil)))
-             (Function (Applied "Int" Nil)
+        (,) ((:) ((,) "s" Star) ((:) ((,) "a" Star) []))
+          (Function (Applied "STArray" ((:) (Parameter "s") ((:) (Parameter "a") [])))
+             (Function (Applied "Int" [])
                 (Function (Parameter "a")
-                   (Applied "ST" (Cons (Parameter "s") (Cons (Applied "Unit" Nil) Nil))))));
+                   (Applied "ST" ((:) (Parameter "s") ((:) (Applied "()" []) []))))));
       PLengthSTArray ->
-        Pair (Cons (Pair "s" Star) (Cons (Pair "a" Star) Nil))
-          (Function (Applied "STArray" (Cons (Parameter "s") (Cons (Parameter "a") Nil)))
-             (Applied "ST" (Cons (Parameter "s") (Cons (Applied "Int" Nil) Nil))));
+        (,) ((:) ((,) "s" Star) ((:) ((,) "a" Star) []))
+          (Function (Applied "STArray" ((:) (Parameter "s") ((:) (Parameter "a") [])))
+             (Applied "ST" ((:) (Parameter "s") ((:) (Applied "Int" []) []))));
       PGetEnv ->
-        Pair Nil (Function (Applied "String" Nil) (Applied "IO" (Cons (Applied "String" Nil) Nil)));
+        (,) [] (Function (Applied "String" []) (Applied "IO" ((:) (Applied "String" []) [])));
       PSetEnv ->
-        Pair Nil
-          (Function (Applied "String" Nil)
-             (Function (Applied "String" Nil) (Applied "IO" (Cons (Applied "Unit" Nil) Nil))));
+        (,) []
+          (Function (Applied "String" [])
+             (Function (Applied "String" []) (Applied "IO" ((:) (Applied "()" []) []))));
       PUnsetEnv ->
-        Pair Nil (Function (Applied "String" Nil) (Applied "IO" (Cons (Applied "Unit" Nil) Nil)));
+        (,) [] (Function (Applied "String" []) (Applied "IO" ((:) (Applied "()" []) [])));
       PRunProcess ->
-        Pair Nil
-          (Function (Applied "String" Nil)
-             (Function (Applied "String" Nil) (Applied "IO" (Cons (Applied "Int" Nil) Nil))));
+        (,) []
+          (Function (Applied "String" [])
+             (Function (Applied "String" []) (Applied "IO" ((:) (Applied "Int" []) []))));
       PListDirectory ->
-        Pair Nil (Function (Applied "String" Nil) (Applied "IO" (Cons (Applied "String" Nil) Nil)));
+        (,) [] (Function (Applied "String" []) (Applied "IO" ((:) (Applied "String" []) [])));
       PDirectoryExists ->
-        Pair Nil (Function (Applied "String" Nil) (Applied "IO" (Cons (Applied "Bool" Nil) Nil)));
+        (,) [] (Function (Applied "String" []) (Applied "IO" ((:) (Applied "Bool" []) [])));
       PFileDigest ->
-        Pair Nil (Function (Applied "String" Nil) (Applied "IO" (Cons (Applied "String" Nil) Nil)));
+        (,) [] (Function (Applied "String" []) (Applied "IO" ((:) (Applied "String" []) [])));
       PAcquireFileLock ->
-        Pair Nil (Function (Applied "String" Nil) (Applied "IO" (Cons (Applied "Int" Nil) Nil)));
+        (,) [] (Function (Applied "String" []) (Applied "IO" ((:) (Applied "Int" []) [])));
       PReleaseFileLock ->
-        Pair Nil (Function (Applied "Int" Nil) (Applied "IO" (Cons (Applied "Unit" Nil) Nil)));
+        (,) [] (Function (Applied "Int" []) (Applied "IO" ((:) (Applied "()" []) [])));
       PProcessSupervisor ->
-        Pair Nil (Function (Applied "String" Nil) (Applied "IO" (Cons (Applied "String" Nil) Nil)));
+        (,) [] (Function (Applied "String" []) (Applied "IO" ((:) (Applied "String" []) [])));
       PAsyncScopeNew ->
-        Pair Nil
-          (Function (Applied "Int" Nil)
-             (Function (Applied "Int" Nil) (Applied "IO" (Cons (Applied "AsyncScope" Nil) Nil))));
+        (,) []
+          (Function (Applied "Int" [])
+             (Function (Applied "Int" []) (Applied "IO" ((:) (Applied "AsyncScope" []) []))));
       PAsyncScopeClose ->
-        Pair Nil
-          (Function (Applied "AsyncScope" Nil) (Applied "IO" (Cons (Applied "Unit" Nil) Nil)));
+        (,) []
+          (Function (Applied "AsyncScope" []) (Applied "IO" ((:) (Applied "()" []) [])));
       PAsyncNewCompletion ->
-        Pair (Cons (Pair "a" Star) (Cons (Pair "b" Star) Nil))
-          (Function (Applied "AsyncScope" Nil)
+        (,) ((:) ((,) "a" Star) ((:) ((,) "b" Star) []))
+          (Function (Applied "AsyncScope" [])
              (Function
-                (Function (Applied "Completion" (Cons (Parameter "a") Nil))
-                   (Applied "IO" (Cons (Parameter "b") Nil)))
-                (Function (Applied "IO" (Cons (Parameter "b") Nil))
-                   (Applied "IO" (Cons (Parameter "b") Nil)))));
+                (Function (Applied "Completion" ((:) (Parameter "a") []))
+                   (Applied "IO" ((:) (Parameter "b") [])))
+                (Function (Applied "IO" ((:) (Parameter "b") []))
+                   (Applied "IO" ((:) (Parameter "b") [])))));
       PAsyncResolveCompletion ->
-        Pair (Cons (Pair "a" Star) Nil)
-          (Function (Applied "Completion" (Cons (Parameter "a") Nil))
-             (Function (Parameter "a") (Applied "IO" (Cons (Applied "Int" Nil) Nil))));
+        (,) ((:) ((,) "a" Star) [])
+          (Function (Applied "Completion" ((:) (Parameter "a") []))
+             (Function (Parameter "a") (Applied "IO" ((:) (Applied "Int" []) []))));
       PAsyncReadCompletion ->
-        Pair (Cons (Pair "a" Star) (Cons (Pair "b" Star) Nil))
-          (Function (Applied "Completion" (Cons (Parameter "a") Nil))
-             (Function (Function (Parameter "a") (Applied "IO" (Cons (Parameter "b") Nil)))
-                (Function (Applied "IO" (Cons (Parameter "b") Nil))
-                   (Applied "IO" (Cons (Parameter "b") Nil)))));
+        (,) ((:) ((,) "a" Star) ((:) ((,) "b" Star) []))
+          (Function (Applied "Completion" ((:) (Parameter "a") []))
+             (Function (Function (Parameter "a") (Applied "IO" ((:) (Parameter "b") [])))
+                (Function (Applied "IO" ((:) (Parameter "b") []))
+                   (Applied "IO" ((:) (Parameter "b") [])))));
       PAsyncSubscribeCompletion ->
-        Pair (Cons (Pair "a" Star) Nil)
-          (Function (Applied "Completion" (Cons (Parameter "a") Nil))
-             (Function (Function (Parameter "a") (Applied "IO" (Cons (Applied "Unit" Nil) Nil)))
-                (Applied "IO" (Cons (Applied "AsyncSubscription" Nil) Nil))));
+        (,) ((:) ((,) "a" Star) [])
+          (Function (Applied "Completion" ((:) (Parameter "a") []))
+             (Function (Function (Parameter "a") (Applied "IO" ((:) (Applied "()" []) [])))
+                (Applied "IO" ((:) (Applied "AsyncSubscription" []) []))));
       PAsyncSubscriptionStatus ->
-        Pair Nil
-          (Function (Applied "AsyncSubscription" Nil)
-             (Applied "IO" (Cons (Applied "Int" Nil) Nil)));
+        (,) []
+          (Function (Applied "AsyncSubscription" [])
+             (Applied "IO" ((:) (Applied "Int" []) [])));
       PAsyncCancelSubscription ->
-        Pair Nil
-          (Function (Applied "AsyncSubscription" Nil)
-             (Applied "IO" (Cons (Applied "Int" Nil) Nil)));
+        (,) []
+          (Function (Applied "AsyncSubscription" [])
+             (Applied "IO" ((:) (Applied "Int" []) [])));
       PAsyncStep ->
-        Pair Nil
-          (Function (Applied "AsyncScope" Nil) (Applied "IO" (Cons (Applied "Int" Nil) Nil)));
+        (,) []
+          (Function (Applied "AsyncScope" []) (Applied "IO" ((:) (Applied "Int" []) [])));
       PAsyncEnqueue ->
-        Pair Nil
-          (Function (Applied "AsyncScope" Nil)
-             (Function (Applied "IO" (Cons (Applied "Unit" Nil) Nil))
-                (Applied "IO" (Cons (Applied "AsyncSubscription" Nil) Nil))));
+        (,) []
+          (Function (Applied "AsyncScope" [])
+             (Function (Applied "IO" ((:) (Applied "()" []) []))
+                (Applied "IO" ((:) (Applied "AsyncSubscription" []) []))));
       PAsyncDelay ->
-        Pair Nil
-          (Function (Applied "AsyncScope" Nil)
-             (Function (Applied "Int" Nil)
-                (Function (Applied "IO" (Cons (Applied "Unit" Nil) Nil))
-                   (Applied "IO" (Cons (Applied "AsyncSubscription" Nil) Nil)))));
+        (,) []
+          (Function (Applied "AsyncScope" [])
+             (Function (Applied "Int" [])
+                (Function (Applied "IO" ((:) (Applied "()" []) []))
+                   (Applied "IO" ((:) (Applied "AsyncSubscription" []) [])))));
       PAsyncWait ->
-        Pair Nil
-          (Function (Applied "AsyncScope" Nil)
-             (Function (Applied "Int" Nil) (Applied "IO" (Cons (Applied "Int" Nil) Nil))))
+        (,) []
+          (Function (Applied "AsyncScope" [])
+             (Function (Applied "Int" []) (Applied "IO" ((:) (Applied "Int" []) []))));
+      PTextToChars -> (,) [] (Function (Applied "String" []) charListField);
+      PTextFromChars -> (,) [] (Function charListField (Applied "String" []));
+      PCharCode -> (,) [] (Function (Applied "Char" []) (Applied "Int" []));
+      PCharFromCode -> (,) [] (Function (Applied "Int" []) (Applied "Char" []));
+      PUserError -> (,) [] (Function charListField (Applied "IOError" []));
+      PIOError -> (,) ((:) ((,) "a" Star) [])
+        (Function (Applied "IOError" []) (Applied "IO" ((:) (Parameter "a") [])));
+      PCatchIOError -> (,) ((:) ((,) "a" Star) [])
+        (Function (Applied "IO" ((:) (Parameter "a") []))
+          (Function (Function (Applied "IOError" []) (Applied "IO" ((:) (Parameter "a") [])))
+            (Applied "IO" ((:) (Parameter "a") []))));
+      PIOErrorString -> (,) [] (Function (Applied "IOError" []) charListField);
+      PEmptyCallStack -> (,) [] (Applied "MLFCallStack" []);
+      PPushCallStack -> (,) [] (Function (Applied "MLFStackFrame" [])
+        (Function (Applied "MLFCallStack" []) (Applied "MLFCallStack" [])));
+      PPrettyCallStack -> (,) [] (Function (Applied "MLFCallStack" []) charListField);
+      PIOErrorWithStack -> (,) ((:) ((,) "a" Star) [])
+        (Function (Applied "IOError" [])
+          (Function (Applied "MLFCallStack" []) (Applied "IO" ((:) (Parameter "a") []))))
     };
   primitiveArity :: Primitive -> Int;
   -- Runtime application asks for arity on every partial and saturated call.
@@ -777,7 +825,19 @@ module Bootstrap.Primitive where {
       PAsyncStep -> 1;
       PAsyncEnqueue -> 2;
       PAsyncDelay -> 3;
-      PAsyncWait -> 2
+      PAsyncWait -> 2;
+      PTextToChars -> 1;
+      PTextFromChars -> 1;
+      PCharCode -> 1;
+      PCharFromCode -> 1;
+      PUserError -> 1;
+      PIOError -> 1;
+      PCatchIOError -> 2;
+      PIOErrorString -> 1;
+      PEmptyCallStack -> 0;
+      PPushCallStack -> 2;
+      PPrettyCallStack -> 1;
+      PIOErrorWithStack -> 2
     };
   fieldArity :: Field -> Int;
   fieldArity field =
@@ -787,40 +847,41 @@ module Bootstrap.Primitive where {
     };
   primitiveStrict :: Primitive -> Bool;
   primitiveStrict p =
-    ((primitiveCode p == 68) ||
+    (((primitiveCode p >= 95) && (primitiveCode p <= 98)) ||
+     (primitiveCode p == 68) ||
      S.elem eqInt (primitiveCode p)
-       (Cons 6
-          (Cons 7
-             (Cons 8
-                (Cons 9
-                   (Cons 10
-                      (Cons 11
-                         (Cons 12
-                            (Cons 14
-                               (Cons 15
-                                  (Cons 16
-                                     (Cons 45
-                                        (Cons 17
-                                           (Cons 18
-                                              (Cons 19
-                                                 (Cons 20
-                                                    (Cons 21
-                                                       (Cons 22
-                                                          (Cons 23
-                                                             (Cons 24
-                                                                (Cons 25
-                                                                   (Cons 26
-                                                                      (Cons 46
-                                                                         (Cons 47
-                                                                            (Cons 48
-                                                                               (Cons 49
-                                                                                  (Cons 50
-                                                                                     (Cons 51
-                                                                                        (Cons 52
-                                                                                           (Cons 53
-                                                                                              (Cons
+       ((:) 6
+          ((:) 7
+             ((:) 8
+                ((:) 9
+                   ((:) 10
+                      ((:) 11
+                         ((:) 12
+                            ((:) 14
+                               ((:) 15
+                                  ((:) 16
+                                     ((:) 45
+                                        ((:) 17
+                                           ((:) 18
+                                              ((:) 19
+                                                 ((:) 20
+                                                    ((:) 21
+                                                       ((:) 22
+                                                          ((:) 23
+                                                             ((:) 24
+                                                                ((:) 25
+                                                                   ((:) 26
+                                                                      ((:) 46
+                                                                         ((:) 47
+                                                                            ((:) 48
+                                                                               ((:) 49
+                                                                                  ((:) 50
+                                                                                     ((:) 51
+                                                                                        ((:) 52
+                                                                                           ((:) 53
+                                                                                              ((:)
                                                                                                  55
-                                                                                                 Nil)))))))))))))))))))))))))))))));
+                                                                                                 [])))))))))))))))))))))))))))))));
   eqPrimitive :: Primitive -> Primitive -> Bool;
   eqPrimitive a b = (primitiveCode a == primitiveCode b);
   comparePrimitive :: Primitive -> Primitive -> Int;
