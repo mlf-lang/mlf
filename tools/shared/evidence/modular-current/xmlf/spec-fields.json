@@ -1,0 +1,10 @@
+[
+  "MLF-CRATE-1",
+  "mlf-xmlf/0.3.0/library",
+  "",
+  "false",
+  "108:17:Bootstrap.X.Check85:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-xmlf/Bootstrap/X/Check.hs112:19:Bootstrap.X.Checked87:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-xmlf/Bootstrap/X/Checked.hs110:18:Bootstrap.X.Parser86:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-xmlf/Bootstrap/X/Parser.hs110:18:Bootstrap.X.Pretty86:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-xmlf/Bootstrap/X/Pretty.hs110:18:Bootstrap.X.Syntax86:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-xmlf/Bootstrap/X/Syntax.hs106:16:Bootstrap.X.Type84:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-xmlf/Bootstrap/X/Type.hs",
+  "118:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/artifact/unit.mlfci103:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-frontend-crate-O2/artifact/unit.mlfci108:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-language-core-crate-O2/artifact/unit.mlfci",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/xmlf/queries",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/builtin/unit"
+]

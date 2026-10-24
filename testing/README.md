@@ -34,6 +34,17 @@ syntax and standard `Functor`/`Applicative`/`Monad` interfaces; no
 `RebindableSyntax` or build-time source translator is used. The other seven
 library modules and process/lifecycle tools remain guest `.emlf` sources;
 the mixed package does not claim an all-shared profile.
+Legacy guest modules that sequence the shared `Bootstrap.Std` `Either` explicitly
+select its standard class API with `import Prelude hiding (Monad, return, bind)`
+and `import MLF.Primitive (Monad, return, bind)`. The existing `bind` alias selects
+standard `(>>=)`; the independent legacy `Prelude.Monad` is not silently given
+new instances. This does not change the guest syntax profile or shared Haskell's
+fixed desugaring. Public source still cannot define either builtin module.
+
+The O2 host CI job runs `tools/shared/test_guest_framework.py`: actual MLF crate
+inference for foundation and the complete mixed 14-module library, with explicit
+standard-class success and legacy-class rejection controls. It does not run the
+full native framework/unit campaign or the normal manager cache/closure workflow.
 
 The root tuple/list entry preserves the frozen default suite. `--framework`
 uses the explicit 90-leaf registry, and `--framework-list` only discovers it.

@@ -57,6 +57,8 @@ for (const workflow of [ci, qualify, release, read('recover-release')]) {
 assert.match(ciJob('native'), /python3 tools\/shared\/test_framework_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/framework-direct/);
 assert.match(ciJob('native'), /python3 tools\/shared\/test_figure12_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json/);
 assert.match(ciJob('native'), /\.mlf-build\/framework-direct\/\*\.json\*/);
+assert.match(ciJob('native'), /name: Check actual MLF mixed-framework source acceptance\n\s+if: matrix.optimization == '2'\n\s+run: python3 tools\/shared\/test_guest_framework.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/guest-framework-source/);
+assert.match(ciJob('native'), /\.mlf-build\/guest-framework-source\/\*\*\/\*\.json/);
 assert.match(ciJob('native'), /\.mlf-build\/figure12-direct\/\*\.json/);
 
 for (const name of ['build-runner','async-runtime','async-language']) {

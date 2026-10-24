@@ -1,0 +1,14 @@
+{
+  "kind": "static-core-opt-in-controls",
+  "baseline": "8a3e69b165765931c3ff762379a78db9659b2cd8",
+  "family_count": 35,
+  "legacy_actions": 739,
+  "named_substring_observations": 13,
+  "mutation_controls": 10,
+  "shared_partition_mutation_controls": 3,
+  "shared_partition_sha256": "074ec18485fc1fb79a4186cbf6b9eb9bfe9ad9e8d87c7e9b1ea97699e8590aab",
+  "default_campaign": "legacy",
+  "qualification_eligible": false,
+  "compilation_verified": false,
+  "semantic_execution_verified": false
+}

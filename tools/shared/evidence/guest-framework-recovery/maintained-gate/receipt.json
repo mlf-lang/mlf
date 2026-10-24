@@ -1,0 +1,179 @@
+{
+  "complete": true,
+  "kind": "actual-MLF-mixed-framework-source",
+  "full_native_unit": false,
+  "full_manager_build": false,
+  "native_or_llvm_output": false,
+  "commands": [
+    {
+      "label": "foundation",
+      "command": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O2/bin/emlf",
+        "--compile-crate",
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/foundation/crate.spec",
+        "-o",
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/foundation/artifact/unit"
+      ],
+      "expected_exit": 0,
+      "complete": true,
+      "artifacts": {
+        "mlfci": {
+          "sha256": "6f4bf77a40bae4626d2b75089222a76644dc5c5f0d1a641ee63295d348d53a4a",
+          "bytes": 725077
+        },
+        "mlfco": {
+          "sha256": "f3f4ce389795a57d2003332a23144b59ba529c4b5f7a569d77eba3a72f7ca67c",
+          "bytes": 3227563
+        },
+        "queries": {
+          "sha256": "ac4abbe0a1ca6580c440fb430ad764874706001ae7bee0d64bc9e4d8c7e35714",
+          "bytes": 465041
+        }
+      },
+      "inferred_groups": 376,
+      "reused_groups": 0,
+      "resource_receipt_sha256": "6dbad407d180a82488366cd2d1ea319fdc85d18d1fb71eb54d445a167226e5f4",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "framework",
+      "command": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O2/bin/emlf",
+        "--compile-crate",
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/framework/crate.spec",
+        "-o",
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/framework/artifact/unit"
+      ],
+      "expected_exit": 0,
+      "complete": true,
+      "artifacts": {
+        "mlfci": {
+          "sha256": "1a98cd8035a8cb1fa4056521d7511310187cf75538972c31ae7e5d80c6e91e43",
+          "bytes": 239788
+        },
+        "mlfco": {
+          "sha256": "b2c35fac659bd4dcb36941f9bf601668c49a7b4a5ed7031ff45de765190dcf8b",
+          "bytes": 1562633
+        },
+        "queries": {
+          "sha256": "1fbba1808fe933cbadacc47570b279fe1dcdf40babdf005c537fda5dce7eea81",
+          "bytes": 174648
+        }
+      },
+      "inferred_groups": 160,
+      "reused_groups": 0,
+      "resource_receipt_sha256": "25f4fbbdd9398f93ba3bf87fb9896f782913b9ca8eb53cad9ab23b549459f0a8",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "standard-class",
+      "command": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O2/bin/emlf",
+        "--compile-crate",
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/standard-class/crate.spec",
+        "-o",
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/standard-class/artifact/unit"
+      ],
+      "expected_exit": 0,
+      "complete": true,
+      "artifacts": {
+        "mlfci": {
+          "sha256": "d1843418ba59b4db5eea371ff43a7ee2d4f095271e1365c9516fb3b8f41f6db6",
+          "bytes": 1093
+        },
+        "mlfco": {
+          "sha256": "4d02bb307d1a4b4ba9152ddb602d433a9f0619da034bfe761a89ac7cc30a27e7",
+          "bytes": 18932
+        },
+        "queries": {
+          "sha256": "1fca2afbb32be47ae57a347bf441f3b626e8d272bd65882353a2d72eb214c3bf",
+          "bytes": 1341
+        }
+      },
+      "inferred_groups": 1,
+      "reused_groups": 0,
+      "resource_receipt_sha256": "2d35875f8320d06fb31623acbc21d7f34ccd77b1640505103639dc9934a6a088",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "legacy-class",
+      "command": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O2/bin/emlf",
+        "--compile-crate",
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/legacy-class/crate.spec",
+        "-o",
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/legacy-class/artifact/unit"
+      ],
+      "expected_exit": 1,
+      "complete": true,
+      "expected_semantic_rejection": true,
+      "resource_receipt_sha256": "b1bb9e7e1b42664da210dc2688a6d5023f7a6d914bf566ca40940aec05f46d9f",
+      "log_sha256": "0882ee180a801d8f5837a1fa2d1f9fcfeb2845007adee9c08e72a8d59be578c0"
+    }
+  ],
+  "producer_receipt_sha256": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+  "inputs": {
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/tools/shared/test_guest_framework.py": "ec1df0084c3b04a09a8bbf3ba346bfcdeb1b1c1d9cbe7d3979d75f56cf1db2e3",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/tools/shared/resource_watchdog.py": "865e7fb6564e41727dac9cbc83e247112ca6712cc3d481e342508e5a580adecd",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/tools/shared/test_direct.py": "67df22b36bda398a389ba7798829d9dac5fc8ddd7ab72c7a814448ae8fa61bee",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/tools/shared/build.py": "9cda247349fd167ca57bc711763029753352dcf6a4aa59d799bf55dcf695f75a",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/mlf-package.json": "4a05ffebfa860271154e1c4b7a40e045a822e76ecca16a2bd57c95e0c176819f",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/mlf-package.json": "9a81067617c5742f588dc4496da260bce9d5d721dc43c4bf10765d61055ea016",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O2/receipt.json": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O2/bin/emlf": "b41ce3de61090d9953000631df3879af2f18f578dc70b8a8d594a0ccf6a5a3d7",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/Fresh.hs": "7eeec3f65a6b8172bc76b3acb09f699642e4e6d93cb0c6e0bc6ae3d88c3b1869",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/Host.hs": "5b1bd1f2a05ec496981630665df70190990420b27d5b4d288c471d3ea3ac42bf",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/IntMap.hs": "4f7039cc12fd0bd038b3e73b23700a3add88f5c827502c3360d48b79b8e303b8",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/IntSet.hs": "30ea33591d154b771067fe8c2c6c20eac4b3be3d86f1f5ebf3d91642ca6d8836",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/Map.hs": "625bcced6d11149505155cd2bcb22d10ee176c87f4513146af6536dd941afa8d",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/Regex.hs": "3dbfc4a497c506fbcc7fead39ba5b0dbcb4113ef54ee89d7f78e13f5f001e403",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/ST.hs": "b57dfe7a9a89fd6edda046445342c47c649d1b4f9ea3dd6c9acfc7aae925302f",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/Set.hs": "94cc73baef625734a9f76a4702eb9fb7f1b8ff6266d3ff1cbf61ac4efaae3509",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/Std.hs": "edf7d3c66565b6c11639236d5d9f54ffdaac871137c07c68e3c8be0c6a75892d",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/Types.hs": "94df8a8cb1e1c1fdb23c638631b42e99ad29d30490f149e6df676fd2f405f771",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/Unicode.hs": "a20db5c9ba597befc1c8be873b5845b765fbd53b7f9977e3948c4d5349c36541",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/Version.hs": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Adapter.emlf": "f37acf2e2f68406855bb550a28c7606ac644e5d0fc30b0e77106c07175e7c275",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Assert.hs": "220e2040581163de795b04706231460348e43f26252dfa7da7a291e0db9b7ecf",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Capability.emlf": "be3d1c6e6e871eebe3ff3bbd4e6aa0718bdc52ede8495381f068f96518300719",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Case.hs": "0de05c7eb13566f35c57c52ab7dc6b97fe0d61aad90b46cea4195203a237cc39",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Descriptor.hs": "230fc2306b848f00c582686b02365eb76cf603335dc591136264dfeec98838c4",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Diagnostics.emlf": "379c1f90f9f9f99fd08a1506743a7f535e8a66d820be19cb372580ddc49a5840",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Evidence.emlf": "7773b2beac9f8b25d22ad0520793cc9042f1316ace052f731a7ac44468e8911d",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Expectation.hs": "8388b84467229b9e9a8085de6b619956927a815b0748c562f5f2727088dc3331",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Fixture.emlf": "4457400f20dd1a7487e1fbbfc7c92485e151e8eebfe5569eb035c24900ed50cb",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Outcome.hs": "fecc98b6da70df3bfb8bc03bb627cf71d103afe7a45f9f524fa17194c5c9059f",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Plan.emlf": "f61c6dfe36f9138aa0da5be725ea2cbbf3557ab90b1451e735e2935f450daccb",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Registry.hs": "6967c8dae4c973cefc6fa7514508d528d59bdb92c923a3ee5b10ac35ea5fd218",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Resources.emlf": "d0243057a53d697177bd0350c9573a75af69bd0f1bb94cc69817c35033568e07",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/Test/Runner.hs": "908eba5573c63bea3cecafdf821638a91224079d6bbec4b3daae3043cfe15bf3"
+  },
+  "library_modules": {
+    "foundation": 12,
+    "framework_shared": 7,
+    "framework_guest": 7
+  },
+  "producer_object_count": 216,
+  "generated_files": {
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/foundation/crate.spec": "89c31bf8bec9f3905f82cc39a1ce1ed6dd4671c618fa1052de0a1d720b9ae7bd",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/foundation/artifact/unit.mlfci": "6f4bf77a40bae4626d2b75089222a76644dc5c5f0d1a641ee63295d348d53a4a",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/foundation/artifact/unit.mlfco": "f3f4ce389795a57d2003332a23144b59ba529c4b5f7a569d77eba3a72f7ca67c",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/foundation/artifact/unit.queries": "ac4abbe0a1ca6580c440fb430ad764874706001ae7bee0d64bc9e4d8c7e35714",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/foundation/builtin/unit.mlfci": "bdedaed6c4c59d5840dd575272289a14bda0515c31e5d32dc9ad6e0be760fad4",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/foundation/builtin/unit.mlfco": "c659d3249678b26ff815aed6ab768378b12401cdba3720ea08db09f6431b8276",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/framework/crate.spec": "f0bc99ba03866a744723d57e92a9e2655ab28fd2b40fd044168bd578acbc3a9d",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/framework/artifact/unit.mlfci": "1a98cd8035a8cb1fa4056521d7511310187cf75538972c31ae7e5d80c6e91e43",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/framework/artifact/unit.mlfco": "b2c35fac659bd4dcb36941f9bf601668c49a7b4a5ed7031ff45de765190dcf8b",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/framework/artifact/unit.queries": "1fbba1808fe933cbadacc47570b279fe1dcdf40babdf005c537fda5dce7eea81",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/fixtures/Standard.emlf": "8815afa12dc25b0a1b4c2c443571ce1b8091ab7db713cb81df6a88862bb30efe",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/standard-class/crate.spec": "1ff96dbb855708ab01e5de986cedec591faba12d0b9adf1044a28f7eeb1eb9f7",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/standard-class/artifact/unit.mlfci": "d1843418ba59b4db5eea371ff43a7ee2d4f095271e1365c9516fb3b8f41f6db6",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/standard-class/artifact/unit.mlfco": "4d02bb307d1a4b4ba9152ddb602d433a9f0619da034bfe761a89ac7cc30a27e7",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/standard-class/artifact/unit.queries": "1fca2afbb32be47ae57a347bf441f3b626e8d272bd65882353a2d72eb214c3bf",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/fixtures/Legacy.emlf": "e5df356e88308867f8e0026727e1366ef39410c4c338a9df9f0cda6cc6c15c91",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/legacy-class/crate.spec": "09989edd357181beeac7bfc74575b72fd9e1154004bb5bf18ee1841003a73149"
+  },
+  "inputs_unchanged": true,
+  "producer_reauthenticated": true,
+  "checked_artifacts_rehashed": true
+}

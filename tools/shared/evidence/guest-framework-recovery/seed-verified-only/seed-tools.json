@@ -1,0 +1,37 @@
+{
+  "format": 1,
+  "control_only": false,
+  "compiler": {
+    "kind": "native-executable",
+    "command": {
+      "path": "/workspace/shared/mlf-toolchain/pr22-release-seed/mlf-0.3.0-linux-x64/libexec/emlf",
+      "sha256": "064e9ee2d5e9a8df38a8d3a56c0595e8aa7757a41d63c46e818c4cd24af0d3a6"
+    },
+    "actual_executable": {
+      "path": "/workspace/shared/mlf-toolchain/pr22-release-seed/mlf-0.3.0-linux-x64/libexec/emlf",
+      "sha256": "064e9ee2d5e9a8df38a8d3a56c0595e8aa7757a41d63c46e818c4cd24af0d3a6"
+    },
+    "bundle": {
+      "path": "/workspace/shared/mlf-toolchain/pr22-release-seed/mlf-0.3.0-linux-x64",
+      "checksums_sha256": "636ce0b137f43d4f4b3d70c9e66048618fbf968c8c559046e1b20c23b0a14dc7",
+      "release_json_sha256": "72c9d563a9cbd8c261f3cd7cabe3aea2644ef74d421d9a6bd4cf391ed7a2a114"
+    }
+  },
+  "manager": {
+    "kind": "native-executable",
+    "command": {
+      "path": "/workspace/shared/mlf-toolchain/pr22-release-seed/mlf-0.3.0-linux-x64/libexec/mlfpkg",
+      "sha256": "182ad0b4e918421dc7e6c1e3bddbb04bb60148273bbbc81655c92f4233e06f20"
+    },
+    "actual_executable": {
+      "path": "/workspace/shared/mlf-toolchain/pr22-release-seed/mlf-0.3.0-linux-x64/libexec/mlfpkg",
+      "sha256": "182ad0b4e918421dc7e6c1e3bddbb04bb60148273bbbc81655c92f4233e06f20"
+    },
+    "bundle": {
+      "path": "/workspace/shared/mlf-toolchain/pr22-release-seed/mlf-0.3.0-linux-x64",
+      "checksums_sha256": "636ce0b137f43d4f4b3d70c9e66048618fbf968c8c559046e1b20c23b0a14dc7",
+      "release_json_sha256": "72c9d563a9cbd8c261f3cd7cabe3aea2644ef74d421d9a6bd4cf391ed7a2a114"
+    }
+  },
+  "inputs_sha256": "a757b12ad7870a9e5d5f32438d5c7f763e6d38a6a98cc02762354d9023dc0e6c"
+}

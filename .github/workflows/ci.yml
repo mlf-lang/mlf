@@ -99,6 +99,9 @@ jobs:
         run: |
           python3 tools/shared/test_framework_direct.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/framework-direct
           python3 tools/shared/test_figure12_direct.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/figure12-direct
+      - name: Check actual MLF mixed-framework source acceptance
+        if: matrix.optimization == '2'
+        run: python3 tools/shared/test_guest_framework.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/guest-framework-source
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
@@ -123,6 +126,11 @@ jobs:
             .mlf-build/figure12-direct/*.json
             .mlf-build/figure12-direct/*.stdout
             .mlf-build/figure12-direct/*.stderr
+            .mlf-build/guest-framework-source/**/*.json
+            .mlf-build/guest-framework-source/**/*.log
+            .mlf-build/guest-framework-source/**/*.stdout
+            .mlf-build/guest-framework-source/**/*.stderr
+            .mlf-build/guest-framework-source/**/*.spec
   build-runner:
     name: Native build runner (${{ matrix.os }})
     if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only

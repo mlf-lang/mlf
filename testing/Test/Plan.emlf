@@ -1,5 +1,8 @@
 module Test.Plan where
-import Bootstrap.Types
+-- Guest syntax explicitly selects the shared standard Monad used by Bootstrap.Std.
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
+import Bootstrap.Types hiding (Kind, Node)
 import qualified Bootstrap.Std as S
 import qualified Test.Capability as C
 import qualified Test.Resources as R
@@ -20,6 +23,7 @@ phase (Node _ _ _ _ value _) = value
 restriction (Node _ _ _ _ _ value) = value
 executes node = case kind node of { Execute -> true; _ -> false }
 ensure condition message = if condition then Right Unit else Left message
+validateNodes : List String -> List String -> List Node -> Either String Unit
 validateNodes seen restricted nodes = case nodes of
  Nil -> Right Unit
  Cons node rest -> do
