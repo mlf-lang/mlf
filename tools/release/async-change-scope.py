@@ -1,99 +1,44 @@
 #!/usr/bin/env python3
-"""Conservative PR-only selection for expensive async parity, never a test result.
+"""Select expensive async parity; a policy decision is never a test result.
 
-The bootstrap snapshots all bootstrap/libraries/package/runtime inputs. The
-parity scripts use their own async fixtures. None reads the independent trees
-below. Unknown paths are intentionally treated as dependencies: adding a new
-source location cannot silently opt out. Keep this allowlist narrow.
+PRs opt in with the maintainer-applied ci:async-parity label. Main pushes,
+manual dispatches and merge-queue events retain full async coverage. Invalid
+or incomplete event metadata fails closed by requiring execution.
 """
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path
 import re
-import subprocess
 
 SHA = re.compile(r"[0-9a-f]{40}\Z")
-MAX_DIFF_BYTES = 4 * 1024 * 1024
-PROSE = {"README.md", "CHANGELOG.md", "CONTRIBUTING.md", "LICENSE"}
-INDEPENDENT = ("docs/", "papers/", "benchmarks/", "examples/")
-
-
-def unrelated(path):
-    # Do not normalize an ambiguous or unexpected path into an allowed one.
-    if (not path or path.startswith("/") or "\\" in path
-            or any(ord(c) < 32 or ord(c) == 127 for c in path)
-            or any(part in ("", ".", "..") for part in path.split("/"))):
-        return False
-    return path in PROSE or path.startswith(INDEPENDENT)
-
-
-def parse_diff(raw):
-    if len(raw) > MAX_DIFF_BYTES:
-        raise ValueError("diff exceeds the checked size bound")
-    if raw and not raw.endswith(b"\0"):
-        raise ValueError("incomplete NUL-delimited diff")
-    fields = raw.decode("utf-8", errors="strict").split("\0")[:-1]
-    if len(fields) % 2:
-        raise ValueError("incomplete diff record")
-    entries = []
-    for status, path in zip(fields[::2], fields[1::2]):
-        # --no-renames exposes both sides as delete/add, including moves out of
-        # the allowlist. Type changes and unexpected statuses always run full.
-        if status not in ("A", "M", "D") or not path:
-            raise ValueError("unsupported diff record")
-        entries.append({"status": status, "path": path})
-    return entries
+OPT_IN_LABEL = "ci:async-parity"
 
 
 def decide(repo, event_name, event, checkout_sha):
+    # Keep the call shape stable for the CLI; policy does not infer irrelevance
+    # from a source diff and therefore needs no network or Git history access.
     result = {"format": 1, "event": event_name, "checkout_sha": checkout_sha,
               "required": True, "reason": "full-event", "complete": True,
-              "parity_execution": "required", "changes": []}
+              "parity_execution": "required", "opt_in_label": OPT_IN_LABEL}
     if event_name != "pull_request":
-        return result  # Main, manual and merge queue always exercise the gate.
-
-    def git(*args):
-        return subprocess.run(["git", "-C", str(repo), *args], check=True,
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                              timeout=30).stdout
-
+        return result
     try:
         pr = event["pull_request"]
-        base, head = pr["base"]["sha"], pr["head"]["sha"]
-        result.update(base_sha=base, head_sha=head)
+        base, head, labels = pr["base"]["sha"], pr["head"]["sha"], pr["labels"]
         if not all(isinstance(s, str) and SHA.fullmatch(s)
                    for s in (base, head, checkout_sha)):
             raise ValueError("missing or invalid exact commit identity")
-        if git("rev-parse", "HEAD").decode().strip() != checkout_sha:
-            raise ValueError("checkout identity mismatch")
-        for commit in (base, head, checkout_sha):
-            git("cat-file", "-e", commit + "^{commit}")
-        # Default pull_request checkout is its tested merge commit. Prove it
-        # contains both event inputs; stale or shallow histories run full.
-        git("merge-base", "--is-ancestor", base, checkout_sha)
-        git("merge-base", "--is-ancestor", head, checkout_sha)
-        merge_bases = git("merge-base", "--all", base, head).decode().splitlines()
-        if len(merge_bases) != 1 or not SHA.fullmatch(merge_bases[0]):
-            raise ValueError("ambiguous or missing merge base")
-        result["merge_base_sha"] = merge_bases[0]
-        raw = git("diff", "--no-ext-diff", "--no-textconv", "--no-renames",
-                  "--name-status", "-z", merge_bases[0], head, "--")
-        result["diff_sha256"] = hashlib.sha256(raw).hexdigest()
-        changes = parse_diff(raw)
-        result["changes"] = changes
-        if all(unrelated(item["path"]) for item in changes):
-            result.update(required=False, reason="verified-unrelated-pr-diff",
-                          parity_execution="not-executed")
-        else:
-            result["reason"] = "dependency-or-unknown-path"
-    except (KeyError, TypeError, ValueError, UnicodeError, OSError,
-            subprocess.SubprocessError) as error:
-        # Failure to prove irrelevance is not permission to skip. No network
-        # API/pagination or third-party changed-files action is trusted here.
-        result.update(required=True, reason="uncertain-diff-run-full",
-                      parity_execution="required", detail=str(error)[:500])
+        if not isinstance(labels, list) or not all(
+                isinstance(label, dict) and isinstance(label.get("name"), str)
+                for label in labels):
+            raise ValueError("missing or invalid PR label metadata")
+        opted_in = any(label["name"] == OPT_IN_LABEL for label in labels)
+        result.update(base_sha=base, head_sha=head, required=opted_in,
+                      reason="pull-request-explicit-opt-in" if opted_in else "pull-request-default-opt-out",
+                      parity_execution="required" if opted_in else "not-executed")
+    except (KeyError, TypeError, ValueError) as error:
+        result.update(reason="uncertain-event-run-full", detail=str(error)[:500])
     return result
 
 
@@ -116,13 +61,12 @@ def main():
     temporary = output.with_suffix(output.suffix + ".tmp")
     temporary.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
     temporary.replace(output)
-    # Emit the selection only after its complete receipt is safely written.
     if args.github_output:
         with open(args.github_output, "a") as stream:
             stream.write("required=" + str(result["required"]).lower() + "\n")
     print(json.dumps(result, sort_keys=True))
     if not result["required"]:
-        print("Async language parity was NOT EXECUTED: verified unrelated PR diff.")
+        print("Async language parity was NOT EXECUTED: PR default opt-out; add ci:async-parity to opt in.")
 
 
 if __name__ == "__main__":
