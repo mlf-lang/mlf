@@ -96,7 +96,8 @@
         "Tests.StrictWrappers": "Tests/StrictWrappers.emlf",
         "Tests.SurfaceSyntax": "Tests/SurfaceSyntax.emlf",
         "Tests.System": "Tests/System.emlf",
-        "Tests.Typeclasses": "Tests/Typeclasses.emlf"
+        "Tests.Typeclasses": "Tests/Typeclasses.emlf",
+        "Tests.Guards": "Tests/Guards.emlf"
       }
     },
     "figure12": {
@@ -121,7 +122,8 @@
         "Tests.System": "Tests/System.emlf",
         "Tests.StateCases": "Tests/StateCases.emlf",
         "Tests.StateRuntime": "Tests/StateRuntime.emlf",
-        "Tests.StateTypes": "Tests/StateTypes.emlf"
+        "Tests.StateTypes": "Tests/StateTypes.emlf",
+        "Tests.Guards": "Tests/Guards.emlf"
       }
     },
     "backends": {
@@ -156,7 +158,8 @@
         "Tests.StrictFields": "Tests/StrictFields.emlf",
         "Tests.StrictWrappers": "Tests/StrictWrappers.emlf",
         "Tests.System": "Tests/System.emlf",
-        "Tests.Text": "Tests/Text.emlf"
+        "Tests.Text": "Tests/Text.emlf",
+        "Tests.Guards": "Tests/Guards.emlf"
       }
     },
     "packages": {
@@ -298,7 +301,8 @@
         "Tests.Datatypes": "Tests/Datatypes.emlf",
         "Tests.DoNotation": "Tests/DoNotation.emlf",
         "Tests.SurfaceSyntax": "Tests/SurfaceSyntax.emlf",
-        "Tests.Typeclasses": "Tests/Typeclasses.emlf"
+        "Tests.Typeclasses": "Tests/Typeclasses.emlf",
+        "Tests.Guards": "Tests/Guards.emlf"
       }
     },
     "core-modules": {

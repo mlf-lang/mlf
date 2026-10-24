@@ -6,13 +6,13 @@ import qualified Package.OS as O
 -- Physical compilation targets do not change the logical core execution unit.
 -- Keep this data-only: a campaign or shard must not import another shard's actions.
 familyNames : List String
-familyNames = O.words "core/substring-adapter core/optimizer-uses core/crate-codegen core/declaration-queries core/incremental-crate-cache core/component-projection core/int-set-unions core/index-edges core/projection-ranks core/projection-changes core/strict-wrappers core/solver-index-audit core/dense-normalization core/checked-emission core/solver-allocation core/inference-and-annotations core/type-computations core/binding-hygiene core/graph-expansion core/graph-validation core/graph-unification core/graph-solver core/embedding-pruning core/datatypes core/typeclasses core/do-notation core/surface-syntax core/readability core/modules core/separate-compilation core/state-types core/hm-oracle core/annotation-corpus core/example-files"
+familyNames = O.words "core/substring-adapter core/optimizer-uses core/crate-codegen core/declaration-queries core/incremental-crate-cache core/component-projection core/int-set-unions core/index-edges core/projection-ranks core/projection-changes core/strict-wrappers core/solver-index-audit core/dense-normalization core/checked-emission core/solver-allocation core/inference-and-annotations core/type-computations core/binding-hygiene core/graph-expansion core/graph-validation core/graph-unification core/graph-solver core/embedding-pruning core/datatypes core/typeclasses core/do-notation core/surface-syntax core/readability core/modules core/separate-compilation core/state-types core/hm-oracle core/annotation-corpus core/example-files core/guards"
 
 partitions : List (Pair String (List String))
 partitions =
  Cons (Pair "core-crates" (O.words "core/optimizer-uses core/crate-codegen core/declaration-queries core/incremental-crate-cache core/strict-wrappers core/checked-emission"))
  (Cons (Pair "core-solver" (O.words "core/component-projection core/int-set-unions core/index-edges core/projection-ranks core/projection-changes core/solver-index-audit core/dense-normalization core/solver-allocation core/graph-expansion core/graph-validation core/graph-unification core/graph-solver core/embedding-pruning"))
- (Cons (Pair "core-language" (O.words "core/substring-adapter core/inference-and-annotations core/type-computations core/binding-hygiene core/datatypes core/typeclasses core/do-notation core/surface-syntax"))
+ (Cons (Pair "core-language" (O.words "core/substring-adapter core/inference-and-annotations core/type-computations core/binding-hygiene core/datatypes core/typeclasses core/do-notation core/surface-syntax core/guards"))
  (Cons (Pair "core-modules" (O.words "core/readability core/modules core/separate-compilation core/state-types core/hm-oracle core/annotation-corpus core/example-files"))
  Nil)))
 targets : List String
