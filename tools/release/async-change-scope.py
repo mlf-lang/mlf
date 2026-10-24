@@ -3,7 +3,7 @@
 
 PRs opt in with the maintainer-applied ci:async-parity label. Main pushes,
 manual dispatches and merge-queue events retain full async coverage. Invalid
-or incomplete event metadata fails closed by requiring execution.
+or incomplete PR metadata fails the cheap selector without running parity.
 """
 import argparse
 import json
@@ -38,7 +38,8 @@ def decide(repo, event_name, event, checkout_sha):
                       reason="pull-request-explicit-opt-in" if opted_in else "pull-request-default-opt-out",
                       parity_execution="required" if opted_in else "not-executed")
     except (KeyError, TypeError, ValueError) as error:
-        result.update(reason="uncertain-event-run-full", detail=str(error)[:500])
+        result.update(complete=False, required=False, parity_execution="not-executed",
+                      reason="invalid-pull-request-opt-in-metadata", detail=str(error)[:500])
     return result
 
 
@@ -61,6 +62,9 @@ def main():
     temporary = output.with_suffix(output.suffix + ".tmp")
     temporary.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
     temporary.replace(output)
+    if not result["complete"]:
+        print(json.dumps(result, sort_keys=True))
+        raise SystemExit("Invalid PR opt-in metadata: async parity was NOT EXECUTED.")
     if args.github_output:
         with open(args.github_output, "a") as stream:
             stream.write("required=" + str(result["required"]).lower() + "\n")

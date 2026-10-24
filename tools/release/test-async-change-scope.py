@@ -49,13 +49,16 @@ class Selection(unittest.TestCase):
             value = event(); value["pull_request"]["labels"] = labels; values.append(value)
         missing = event(); del missing["pull_request"]["labels"]; values.append(missing)
         for value in values:
-            self.assertTrue(scope.decide(".", "pull_request", value, SHA)["required"])
+            self.assertFalse(scope.decide(".", "pull_request", value, SHA)["complete"])
+            self.assertFalse(scope.decide(".", "pull_request", value, SHA)["required"])
 
     def test_invalid_commit_identity_fails_closed(self):
         for field in ("head", "base"):
             value = event(); value["pull_request"][field]["sha"] = "bad"
-            self.assertTrue(scope.decide(".", "pull_request", value, SHA)["required"])
-        self.assertTrue(scope.decide(".", "pull_request", event(), "bad")["required"])
+            self.assertFalse(scope.decide(".", "pull_request", value, SHA)["complete"])
+            self.assertFalse(scope.decide(".", "pull_request", value, SHA)["required"])
+        self.assertFalse(scope.decide(".", "pull_request", event(), "bad")["complete"])
+        self.assertFalse(scope.decide(".", "pull_request", event(), "bad")["required"])
 
     def test_label_addition_and_removal_change_only_execution_policy(self):
         value = event(); opted = copy.deepcopy(value)
@@ -66,17 +69,24 @@ class Selection(unittest.TestCase):
     def test_cli_receipt_and_output_match_for_skip_opt_in_and_invalid(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            for payload, required in ((event(), False), (event([{"name": "ci:async-parity"}]), True), (None, True)):
+            for payload, required in ((event(), False), (event([{"name": "ci:async-parity"}]), True), (None, False)):
                 source, receipt, output = root / "event.json", root / "decision.json", root / "output"
                 source.write_text(json.dumps(payload) if payload is not None else "truncated {")
                 output.write_text("")
                 run = subprocess.run(["python3", str(SCRIPT), "--event-name", "pull_request",
                                       "--event-path", str(source), "--checkout-sha", SHA,
                                       "--output", str(receipt), "--github-output", str(output)],
-                                     check=True, stdout=subprocess.PIPE, text=True)
+                                     check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 self.assertEqual(json.loads(receipt.read_text())["required"], required)
-                self.assertEqual(output.read_text(), "required=" + str(required).lower() + "\n")
-                self.assertEqual("NOT EXECUTED" in run.stdout, not required)
+                if payload is None:
+                    self.assertNotEqual(run.returncode, 0)
+                    self.assertFalse(json.loads(receipt.read_text())["complete"])
+                    self.assertEqual(output.read_text(), "")
+                    self.assertIn("NOT EXECUTED", run.stderr)
+                else:
+                    self.assertEqual(run.returncode, 0)
+                    self.assertEqual(output.read_text(), "required=" + str(required).lower() + "\n")
+                    self.assertEqual("NOT EXECUTED" in run.stdout, not required)
 
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@ are unchanged.
 
 The async job still runs its cheap policy selector and retains `decision.json`.
 A default PR receipt says `parity_execution: not-executed`, not that parity passed.
-Only that explicit decision skips the expensive steps. Malformed/missing metadata
-runs the campaign conservatively. The aggregate PR gate still requires all six
+Only that explicit decision skips the expensive steps. Malformed/missing PR metadata
+fails the cheap selector without executing parity. The aggregate PR gate still requires all six
 jobs to succeed: failed, cancelled or skipped jobs cannot satisfy it. The
 full-native qualification and its supplemental tuple/list checks are unchanged.
