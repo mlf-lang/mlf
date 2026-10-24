@@ -714,6 +714,7 @@
       "evidence": {
         "kind": "coverage",
         "executions": [
+          "recursive exports preserve scoped identities and independent copies",
           "expansion resets scheme flag and binding",
           "all inert nodes normalized",
           "well-domination enforced"
@@ -1256,8 +1257,8 @@
           "recursion: unused explicit quantified variables are discharged",
           "equations: parameter can shadow the function name",
           "readability rejection: recursive forall cannot specialize to Int",
-          "readability rejection: mutual recursion needs every signature",
-          "readability rejection: local recursion needs a signature",
+          "recursion: mixed signed and inferred group",
+          "recursion: unsigned local group",
           "readability rejection: recursive existentials are not closed signatures",
           "readability rejection: recursive signature free variable",
           "readability rejection: equation arity",
@@ -1397,6 +1398,7 @@
           "modules: legacy compile path preserves checked output",
           "modules: file loader, includes, hierarchy and errors",
           "modules typing: cross-module recursion infers unsigned cycle",
+          "modules typing: cross-module qualified recursion generalizes shared exports",
           "crate namespaces resolve recursive declarations before inference",
           "crate namespace resolution preserves external ownership and mangling",
           "cyclic export fixed point is invariant under source order"
@@ -1507,6 +1509,7 @@
           "crate rejects: cyclic reexports cannot invent a missing identity",
           "crate rejects: downstream orphan cannot leak into an import cycle",
           "crate typing: cross-module recursion infers unsigned cycle",
+          "crate typing: cross-module qualified recursion generalizes shared exports",
           "crate paths and native cache commands",
           "crate metadata version rejection",
           "crate object binding schemes are independently checked",

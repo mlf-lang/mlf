@@ -178,6 +178,7 @@ canonicalKeys = do
   let firstRecursive = Triple "entry" Nothing (SLetRec (Cons inferred Nil) (SVar "f"))
   let renamedRecursive = Triple "entry" Nothing (SLetRec (Cons (Triple "renamed" InferRecursive (SVar "renamed")) Nil) (SVar "renamed"))
   H.assert (eqString (Query.queryKey "AlphaRecursive" "compiler" (Cons firstRecursive Nil) Nil Nil) (Query.queryKey "AlphaRecursive" "compiler" (Cons renamedRecursive Nil) Nil Nil)) "unsigned recursive binder names leaked into query identity"
+  H.assert (not (eqString (Query.queryKey "AlphaRecursive" "compiler-before" (Cons firstRecursive Nil) Nil Nil) (Query.queryKey "AlphaRecursive" "compiler-after" (Cons firstRecursive Nil) Nil Nil))) "compiler identity change reused a recursive query key"
   let checkedRecursive = Triple "entry" Nothing (SLetRec (Cons checked Nil) (SVar "f"))
   H.assert (not (eqString (Query.queryKey "AlphaRecursive" "compiler" (Cons firstRecursive Nil) Nil Nil) (Query.queryKey "AlphaRecursive" "compiler" (Cons checkedRecursive Nil) Nil Nil))) "canonical query identity erased recursive checking mode"
   let signedRecursive = \name variable -> Triple "entry" Nothing (SLetRec (Cons (Triple name (CheckRecursive (SAnnotation Nil (SForall Flexible variable SBottom (SArrow (STVar variable) (STVar variable))))) (SLam "value" (Just (SAnnotation Nil (STVar variable))) (SApp (SVar name) (SVar "value")))) Nil) (SVar name))

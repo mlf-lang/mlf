@@ -551,7 +551,7 @@ environment capture and malformed recursive target bindings.
 
 The new `recursive exports preserve scoped identities and independent copies`
 Core case tests graph export ownership, outer frontiers, nested bounds/kinds,
-copy provenance and scaffold-order invariance. The reviewed Core inventory is
+copy provenance and scaffold-order invariance. The initial core milestone inventory was
 740 cases. The two former unsigned/mixed-signature rejection programs are now
 positive cases; recursive existential signatures and actual type errors remain
 negative tests. Existing oracle implementations are unchanged.
@@ -566,8 +566,11 @@ current and frozen target checkers remain unchanged.
 
 The former cross-module unsigned-signature rejection retains its exact divergent
 source as a type-only `XBot` positive in both module and separately linked crate
-checks. It never enters the runtime program inventory. The reviewed Core
-inventory stays at 740 cases; no unrelated oracle is regenerated.
+checks. It never enters the runtime program inventory. The subsequent qualified cross-module fixture adds two checks, bringing the
+reviewed Core inventory to 742 cases; no unrelated oracle is regenerated.
+`tests/recursive-inference/RecursiveInventoryDiscovery.emlf` checks actual
+retained test lists against registry/catalog labels and partition totals without
+executing native or other test actions.
 
 These focused tests do not constitute full native qualification. Inferred
 contexts retain distinct origin slots rather than claiming minimal contexts or

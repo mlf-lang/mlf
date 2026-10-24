@@ -1,0 +1,72 @@
+module RecursiveInventoryDiscovery where
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.Json as J
+import qualified Tests.Helpers as H
+import qualified Tests.CoreRegistry as Registry
+import qualified Tests.CorePartitions as Partitions
+import qualified Tests.Modules as Modules
+import qualified Tests.Separate as Separate
+import qualified Tests.Readability as Readability
+import qualified Tests.CoreSolver as SolverCases
+
+-- This runner only inspects retained list spines and labels. It never calls
+-- any IO test action, native compiler, aggregate campaign, or fixture target.
+missing expected actual = S.filter (\name -> S.not (S.elem eqString name actual)) expected
+assertLabels label expected actual = do
+  let absent = missing expected actual
+  let extra = missing actual expected
+  H.assert (S.eqList eqString expected actual)
+    (label ++ ": missing=" ++ H.show absent ++ "; extra=" ++ H.show extra ++
+     "; expected count=" ++ showInt (S.length expected) ++
+     "; actual count=" ++ showInt (S.length actual) ++
+     "; equal sets with differing sequence means order drift")
+  H.assert (S.length actual == S.length (S.nubBy eqString actual)) (label ++ ": duplicate labels")
+
+catalogLabels catalog name = case S.find (\entry -> eqString (J.getText "id" "" entry) name) (J.values (J.get "families" catalog)) of
+  Nothing -> H.fail ("catalog lacks family " ++ name)
+  Just entry -> return (J.strings (J.get "executions" (J.get "evidence" entry)))
+registryLabels name = case S.lookup eqString name Registry.bindings of
+  Nothing -> H.fail ("registry lacks family " ++ name)
+  Just entries -> return (S.map S.fst entries)
+checkActual catalog name cases = do
+  let actual = S.map S.fst cases
+  registered <- registryLabels name
+  expected <- catalogLabels catalog name
+  assertLabels (name ++ " actual versus registry") registered actual
+  assertLabels (name ++ " actual versus catalog") expected actual
+  putStrLn ("PASS retained list " ++ name ++ " count=" ++ showInt (S.length actual))
+countTarget catalog name expected = do
+  families <- S.mapM (catalogLabels catalog) (Partitions.forTarget name)
+  let actual = S.length (S.concat families)
+  H.assert (actual == expected) (name ++ ": expected=" ++ showInt expected ++ "; actual=" ++ showInt actual)
+  putStrLn ("PASS registry/catalog target " ++ name ++ " count=" ++ showInt actual)
+
+main : IO Unit
+main = do
+  root <- canonicalPath "."
+  catalog <- J.read (root ++ "/tests/test-catalog.json")
+  inventory <- J.read (root ++ "/tests/golden/unit-inventory.json")
+  S.mapM_ (\(Pair family entries) -> do
+    expected <- catalogLabels catalog family
+    assertLabels (family ++ " registry versus catalog") expected (S.map S.fst entries)) Registry.bindings
+  let labels = S.concatMap (\(Pair _ entries) -> S.map S.fst entries) Registry.bindings
+  let ids = S.concatMap (\(Pair _ entries) -> S.map S.snd entries) Registry.bindings
+  let golden = J.strings (J.get "executions" (J.get "core" (J.get "suites" inventory)))
+  assertLabels "all registered labels versus golden" (S.sortBy compareString golden) (S.sortBy compareString labels)
+  H.assert (S.length labels == 742 && S.length ids == S.length (S.nubBy eqString ids)) "aggregate count or stable ID uniqueness changed"
+  checkActual catalog "core/modules" Modules.moduleTests
+  checkActual catalog "core/separate-compilation" Separate.separateTests
+  checkActual catalog "core/readability" Readability.readabilityTests
+  S.mapM_ (\(Pair name cases) -> checkActual catalog name cases) SolverCases.families
+  H.assert (S.length SolverCases.graphTests == 4) "the phase-1 recursive export graph case is missing"
+  H.assert (S.length (S.concatMap S.snd SolverCases.families) == 34) "actual core-solver list did not justify 33 -> 34"
+  H.assert (S.length Modules.moduleTests == 83 && S.length Separate.separateTests == 86) "actual changed module lists did not justify two added checks"
+  countTarget catalog "core-solver" 34
+  countTarget catalog "core-language" 380
+  countTarget catalog "core-crates" 27
+  countTarget catalog "core-modules" 301
+  H.assert (34 + 380 + 27 + 301 == 742) "aggregate runner count derivation changed"
+  putStrLn "PASS discovery: 742 registered/catalog/golden labels, no missing or extra; actual changed lists agree; no test actions executed"

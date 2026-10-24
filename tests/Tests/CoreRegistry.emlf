@@ -157,10 +157,11 @@ bindings =
   Cons (Pair "xMLF does not identify inert or alias bounds" "core/binding-hygiene/xmlf-does-not-identify-inert-or-alias-bounds") (
   Nil))))))) (
  Cons (Pair "core/graph-expansion" (
+  Cons (Pair "recursive exports preserve scoped identities and independent copies" "core/graph-expansion/recursive-exports-preserve-scoped-identities-and-independent-copies") (
   Cons (Pair "expansion resets scheme flag and binding" "core/graph-expansion/expansion-resets-scheme-flag-and-binding") (
   Cons (Pair "all inert nodes normalized" "core/graph-expansion/all-inert-nodes-normalized") (
   Cons (Pair "well-domination enforced" "core/graph-expansion/well-domination-enforced") (
-  Nil))))) (
+  Nil)))))) (
  Cons (Pair "core/graph-validation" (
   Cons (Pair "graph validation agrees with uncached reference" "core/graph-validation/graph-validation-agrees-with-uncached-reference") (
   Cons (Pair "graph validation checks deeply nested binding scopes" "core/graph-validation/graph-validation-checks-deeply-nested-binding-scopes") (
@@ -476,8 +477,8 @@ bindings =
   Cons (Pair "recursion: unused explicit quantified variables are discharged" "core/readability/recursion-unused-explicit-quantified-variables-are-discharged") (
   Cons (Pair "equations: parameter can shadow the function name" "core/readability/equations-parameter-can-shadow-the-function-name") (
   Cons (Pair "readability rejection: recursive forall cannot specialize to Int" "core/readability/readability-rejection-recursive-forall-cannot-specialize-to-int") (
-  Cons (Pair "readability rejection: mutual recursion needs every signature" "core/readability/readability-rejection-mutual-recursion-needs-every-signature") (
-  Cons (Pair "readability rejection: local recursion needs a signature" "core/readability/readability-rejection-local-recursion-needs-a-signature") (
+  Cons (Pair "recursion: mixed signed and inferred group" "core/readability/recursion-mixed-signed-and-inferred-group") (
+  Cons (Pair "recursion: unsigned local group" "core/readability/recursion-unsigned-local-group") (
   Cons (Pair "readability rejection: recursive existentials are not closed signatures" "core/readability/readability-rejection-recursive-existentials-are-not-closed-signatures") (
   Cons (Pair "readability rejection: recursive signature free variable" "core/readability/readability-rejection-recursive-signature-free-variable") (
   Cons (Pair "readability rejection: equation arity" "core/readability/readability-rejection-equation-arity") (
@@ -591,10 +592,11 @@ bindings =
   Cons (Pair "modules: legacy compile path preserves checked output" "core/modules/modules-legacy-compile-path-preserves-checked-output") (
   Cons (Pair "modules: file loader, includes, hierarchy and errors" "core/modules/modules-file-loader-includes-hierarchy-and-errors") (
   Cons (Pair "modules typing: cross-module recursion infers unsigned cycle" "core/modules/modules-typing-cross-module-recursion-infers-unsigned-cycle") (
+  Cons (Pair "modules typing: cross-module qualified recursion generalizes shared exports" "core/modules/modules-typing-cross-module-qualified-recursion-generalizes-shared-exports") (
   Cons (Pair "crate namespaces resolve recursive declarations before inference" "core/modules/crate-namespaces-resolve-recursive-declarations-before-inference") (
   Cons (Pair "crate namespace resolution preserves external ownership and mangling" "core/modules/crate-namespace-resolution-preserves-external-ownership-and-mangling") (
   Cons (Pair "cyclic export fixed point is invariant under source order" "core/modules/cyclic-export-fixed-point-is-invariant-under-source-order") (
-  Nil)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
+  Nil))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
  Cons (Pair "core/separate-compilation" (
   Cons (Pair "crate checking: selective and qualified imports" "core/separate-compilation/crate-checking-selective-and-qualified-imports") (
   Cons (Pair "crate checking: unnamed entry expression imports" "core/separate-compilation/crate-checking-unnamed-entry-expression-imports") (
@@ -676,12 +678,13 @@ bindings =
   Cons (Pair "crate rejects: cyclic reexports cannot invent a missing identity" "core/separate-compilation/crate-rejects-cyclic-reexports-cannot-invent-a-missing-identity") (
   Cons (Pair "crate rejects: downstream orphan cannot leak into an import cycle" "core/separate-compilation/crate-rejects-downstream-orphan-cannot-leak-into-an-import-cycle") (
   Cons (Pair "crate typing: cross-module recursion infers unsigned cycle" "core/separate-compilation/crate-typing-cross-module-recursion-infers-unsigned-cycle") (
+  Cons (Pair "crate typing: cross-module qualified recursion generalizes shared exports" "core/separate-compilation/crate-typing-cross-module-qualified-recursion-generalizes-shared-exports") (
   Cons (Pair "crate paths and native cache commands" "core/separate-compilation/crate-paths-and-native-cache-commands") (
   Cons (Pair "crate metadata version rejection" "core/separate-compilation/crate-metadata-version-rejection") (
   Cons (Pair "crate object binding schemes are independently checked" "core/separate-compilation/crate-object-binding-schemes-are-independently-checked") (
   Cons (Pair "crate datatype metadata is independently reconstructed" "core/separate-compilation/crate-datatype-metadata-is-independently-reconstructed") (
   Cons (Pair "crate unused import parameters retain checked schemes" "core/separate-compilation/crate-unused-import-parameters-retain-checked-schemes") (
-  Nil))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
+  Nil)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
  Cons (Pair "core/state-types" (
   Cons (Pair "ST source type: return" "core/state-types/st-source-type-return") (
   Cons (Pair "ST source type: bind" "core/state-types/st-source-type-bind") (

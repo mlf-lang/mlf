@@ -39,7 +39,17 @@ moduleTypings = Cons
   (ModuleTyping "cross-module recursion infers unsigned cycle"
     (Cons (Pair "A" "module A where\nimport qualified B\nf x = B.g x\n")
     (Cons (Pair "B" "module B where\nimport qualified A\ng x = A.f x\n") Nil))
-    "module Main where\nimport A\nmain = f 0\n" XBot) Nil
+    "module Main where\nimport A\nmain = f 0\n" XBot) (Cons qualifiedRecursiveModuleTyping Nil)
+
+qualifiedRecursiveModuleTyping : ModuleTyping
+qualifiedRecursiveModuleTyping = ModuleTyping "cross-module qualified recursion generalizes shared exports"
+    (Cons (Pair "Inspect" "module Inspect where\nclass Inspect a where { inspect : a -> Bool }\n")
+    (Cons (Pair "Instances" "module Instances () where\nimport Inspect\ninstance Inspect Int where { inspect = \\x -> true }\ninstance Inspect Bool where { inspect = \\x -> x }\n")
+    (Cons (Pair "Bridge" "module Bridge () where\nimport Instances ()\n")
+    (Cons (Pair "A" "module A (f) where\nimport Inspect\nimport Bridge ()\nimport qualified B\nf x = if inspect x then true else B.g x\n")
+    (Cons (Pair "B" "module B (g) where\nimport Inspect\nimport qualified A\ng y = A.f y\n")
+    Nil)))))
+    "module Main where\nimport qualified A\nimport qualified B\nmain = let first : Bool = A.f 0 in (B.g true : Bool)\n" (XCon "Bool" Nil)
 
 checkTypedModuleTarget : XType -> XTerm -> IO Unit
 checkTypedModuleTarget expected term = do

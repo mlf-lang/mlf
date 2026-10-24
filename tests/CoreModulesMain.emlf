@@ -3,4 +3,4 @@ import Bootstrap.Types
 import qualified Tests.CoreModules as T
 import qualified Tests.CoreRunner as R
 main : IO Unit
-main = R.main "core-modules" false 299 T.families
+main = R.main "core-modules" false 301 T.families
