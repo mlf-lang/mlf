@@ -18,6 +18,7 @@
   },
   "library": {
     "modules": {
+      "Bootstrap.ClassDemand": "Bootstrap/ClassDemand.hs",
       "Bootstrap.Classes": "Bootstrap/Classes.hs",
       "Bootstrap.Compiler": "Bootstrap/Compiler.hs",
       "Bootstrap.CompilerCore": "Bootstrap/CompilerCore.hs",

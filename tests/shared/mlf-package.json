@@ -46,6 +46,7 @@
         "mlf-language-core"
       ],
       "modules": {
+        "MLF.Tests.ClassDemand": "MLF/Tests/ClassDemand.hs",
         "Tests.IndependentCheck": "../Tests/IndependentCheck.hs",
         "Tests.IndependentType": "../Tests/IndependentType.hs"
       }

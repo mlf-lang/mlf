@@ -49,6 +49,11 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.ClassDemand",
+      "path": "libraries/mlf-inference/Bootstrap/ClassDemand.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.Classes",
       "path": "libraries/mlf-inference/Bootstrap/Classes.hs",
       "role": "implementation"
@@ -386,6 +391,11 @@
     {
       "module": "MLF.Tests.PRQuickMain",
       "path": "tests/shared/MLF/Tests/PRQuickMain.hs",
+      "role": "direct-test"
+    },
+    {
+      "module": "MLF.Tests.ClassDemand",
+      "path": "tests/shared/MLF/Tests/ClassDemand.hs",
       "role": "direct-test"
     },
     {
