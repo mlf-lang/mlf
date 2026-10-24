@@ -500,6 +500,7 @@ module Bootstrap.Separate where {
   fingerprintAfter ((,) a b) text = fingerprintFrom text 0 a b;
   entityEncoding (Modules.Entity owner name role) =
     let {
+      result :: (String, String);
       result =
         case role of {
           Modules.Value -> (,) "value" "";

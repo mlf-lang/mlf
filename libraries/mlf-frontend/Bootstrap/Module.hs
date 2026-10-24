@@ -766,7 +766,6 @@ module Bootstrap.Module where {
                 if Set.null remaining then Nothing else Just remaining)
              (interfaceMap env))
     };
-  partialScope :: PreludeMode -> Map String Interface -> SourceModule -> Interface -> Interface;
   partialScope mode exports source local =
     let {
       imported =
