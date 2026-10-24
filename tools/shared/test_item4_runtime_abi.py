@@ -17,7 +17,9 @@ import subprocess
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
+# Preserve original provenance while pinning identical content across history transport.
 LEGACY_COMMIT = '2916c477468efaa24ae2c76e8b2f41e5f15236a6'
+LEGACY_SOURCE_TREE = '7efa13e6a64c0445ebcf891c4e15694321a43780'
 CURRENT_GUARD = 'mlf_require_haskell_boundary_v3_abi'
 OLD_GUARDS = ['mlf_require_compact_gc_abi', 'mlf_require_process_supervisor_v1_abi',
               'mlf_require_async_completion_v2_abi', 'mlf_require_haskell_boundary_v2_abi']
@@ -67,7 +69,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     before = inputs()
     receipt = {'scope': 'focused-actual-historical-runtime-abi', 'status': 'running',
-               'legacy_commit': LEGACY_COMMIT, 'inputs': before, 'tools': {},
+               'legacy_commit': LEGACY_COMMIT, 'legacy_source_tree': LEGACY_SOURCE_TREE, 'inputs': before, 'tools': {},
                'historical_blobs': {}, 'commands': [], 'outputs': {},
                'resource_limits': {'command_seconds': args.timeout, 'max_rss_bytes': 1536 * 1024**2,
                                    'minimum_available_bytes': 3 * 1024**3}}
@@ -132,11 +134,11 @@ def main():
         receipt['external_inputs'].update({str(p): sha(p) for p in sorted((gc / 'include').rglob('*.h'))})
         run([cc, '--version'], 'cc-version')
         run([git, '--version'], 'git-version')
-        resolved = run([git, 'rev-parse', LEGACY_COMMIT + '^{commit}'], 'legacy-commit').strip()
-        if resolved != LEGACY_COMMIT:
-            raise RuntimeError('historical commit identity mismatch')
-        receipt['legacy_runtime_tree'] = run([git, 'rev-parse', LEGACY_COMMIT + ':runtime'], 'legacy-tree').strip()
-        records = run([git, 'ls-tree', '-rz', '--full-tree', LEGACY_COMMIT, '--', 'runtime'],
+        resolved = run([git, 'rev-parse', LEGACY_SOURCE_TREE + '^{tree}'], 'legacy-source-tree').strip()
+        if resolved != LEGACY_SOURCE_TREE:
+            raise RuntimeError('historical source tree identity mismatch')
+        receipt['legacy_runtime_tree'] = run([git, 'rev-parse', LEGACY_SOURCE_TREE + ':runtime'], 'legacy-tree').strip()
+        records = run([git, 'ls-tree', '-rz', '--full-tree', LEGACY_SOURCE_TREE, '--', 'runtime'],
                       'legacy-inventory', capture=out / 'legacy-inventory.bin')
         old = out / 'legacy'
         for index, record in enumerate(records.split(b'\0')):

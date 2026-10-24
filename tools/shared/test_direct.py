@@ -24,6 +24,13 @@ FRONTEND_CASES = [
     ('native-first', '--native-first', b'shared frontend: first native semantics checks passed\n'),
     ('native-second', '--native-second', b'shared frontend: checks passed\n'),
 ]
+# The canonical prelude makes the maintained frontend corpus larger than the
+# original 120-second smoke budget. Other modes retain their original bound.
+def frontend_case_timeout(name, frontend_seconds):
+    if not 1 <= frontend_seconds <= 1800:
+        raise ValueError("frontend timeout must be between 1 and 1800 seconds")
+    return frontend_seconds if name == "frontend" else 120
+
 ORACLES = ['tests/async-task/suite.stdout', 'tests/async-task/processes.stdout',
            'tests/async-task/wait-graph.stdout', 'tests/async-process/suite.stdout']
 
@@ -210,7 +217,13 @@ def main():
     parser.add_argument('--build-receipt', type=Path)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--cc', default=os.environ.get('CC', 'cc'))
+    parser.add_argument('--frontend-timeout', type=int, default=1200,
+                        help='frontend corpus process-tree bound in seconds (1..1800); other modes stay at 120')
     args = parser.parse_args()
+    try:
+        frontend_case_timeout('frontend', args.frontend_timeout)
+    except ValueError as error:
+        parser.error(str(error))
     binaries, output = args.bin_dir.resolve(), args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     receipt = {'format': 1, 'complete': False, 'source_mode': 'authenticated direct committed shared source',
@@ -262,7 +275,8 @@ def main():
             raise RuntimeError('panic failed for unrelated reason')
         runner.run('panic-child-reaped', [process_helper, 'assert-gone', work / 'panic.pid'])
         for name, option, expected in FRONTEND_CASES:
-            runner.run('shared-frontend-' + name, [binaries / 'shared-frontend', option], expected=expected, timeout=120)
+            runner.run('shared-frontend-' + name, [binaries / 'shared-frontend', option], expected=expected,
+                       timeout=frontend_case_timeout(name, args.frontend_timeout))
         runner.run('build-receipts', [sys.executable, ROOT / 'tools/release/test-suite-build-receipts.py',
                    '--executable', binaries / 'build-receipts', '--output', output / 'build-receipts'], timeout=1800)
         for collection in [receipt['inputs'], receipt['helpers']]:

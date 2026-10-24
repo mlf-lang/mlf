@@ -32,7 +32,10 @@ REVIEWED_SHARED_SHA256 = {
 
 
 # Historical source pins above remain immutable for the dated migration ledger.
+# Original reviewed commit remains provenance; immutable tree retrieval also works
+# after the authorized history transport changed author/committer commit IDs.
 HISTORICAL_SHARED_COMMIT = "2916c477468efaa24ae2c76e8b2f41e5f15236a6"
+HISTORICAL_SHARED_TREE = "7efa13e6a64c0445ebcf891c4e15694321a43780"
 ACTIVE_CONTRACT_PATH = "tools/testing/tuple-list-active-contract.json"
 
 
@@ -51,7 +54,7 @@ def active_contract():
 def verify_historical_sources():
     sources = {}
     for path, expected in REVIEWED_SHARED_SHA256.items():
-        raw = subprocess.check_output(["git", "show", HISTORICAL_SHARED_COMMIT + ":" + path], cwd=ROOT)
+        raw = subprocess.check_output(["git", "show", HISTORICAL_SHARED_TREE + ":" + path], cwd=ROOT)
         require(hashlib.sha256(raw).hexdigest() == expected, "frozen shared source changed: " + path)
         sources[path] = raw.decode("utf-8")
     return sources

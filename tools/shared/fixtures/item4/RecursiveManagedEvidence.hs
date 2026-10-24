@@ -293,9 +293,11 @@ consumedStandaloneChecks = forM_ consumedCases $ \(name, classes) -> do
   assert "copied managed expression retains whole-path fallback"
     (case copiedPlan of T.Nothing -> True; _ -> False)
 parsedConsumedChecks = forM_ consumedCases $ \(name, classes) -> do
-  let predicates = if head classes == "MLFHasCallStack"
-        then "HasCallStack, Tag a" else "Tag a, HasCallStack"
-      label = "parsed managed expression " ++ Host.unpack name
+  predicates <- case classes of
+    ["MLFHasCallStack", "Tag"] -> pure "HasCallStack, Tag a"
+    ["Tag", "MLFHasCallStack"] -> pure "Tag a, HasCallStack"
+    _ -> error "unexpected consumed managed predicate inventory"
+  let label = "parsed managed expression " ++ Host.unpack name
       source = ordinaryClass ++
         "bound = ((\\x -> tag x) :: forall a. (" ++ predicates ++ ") => a -> Int)\n" ++
         "main = bound (42 :: Int)\n"

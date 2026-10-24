@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Light control tests for direct-source provenance. No GHC/native codegen runs."""
 import copy
+import contextlib
+import io
+import types
 import hashlib
 import importlib.util
 import json
@@ -52,18 +55,19 @@ class ManifestParity(unittest.TestCase):
 
     def test_closed_corpus_has_matching_108_modules_12_executables(self):
         manifest = self.check()
-        modules = {item['module']: item['path'] for item in manifest['modules']}
+        self.assertEqual(len(manifest['modules']), 108)
+        modules = {entry['module']: entry for entry in manifest['modules']}
         self.assertEqual(len(modules), 108)
-        self.assertEqual(modules['Bootstrap.ClassDemand'],
-                         'libraries/mlf-inference/Bootstrap/ClassDemand.hs')
-        self.assertEqual(modules['MLF.Tests.ClassDemand'],
-                         'tests/shared/MLF/Tests/ClassDemand.hs')
-        self.assertEqual(modules['Bootstrap.EvidenceBoundary'],
-                         'libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs')
-        self.assertEqual(modules['Bootstrap.SourceInference'],
-                         'libraries/mlf-crates/Bootstrap/SourceInference.hs')
-        self.assertEqual(modules['Bootstrap.Standalone'],
-                         'libraries/mlf-frontend/Bootstrap/Standalone.hs')
+        for name, path, role in (
+            ('Bootstrap.ClassDemand', 'libraries/mlf-inference/Bootstrap/ClassDemand.hs', 'implementation'),
+            ('MLF.Tests.ClassDemand', 'tests/shared/MLF/Tests/ClassDemand.hs', 'direct-test'),
+            ('Bootstrap.Standalone', 'libraries/mlf-frontend/Bootstrap/Standalone.hs', 'implementation'),
+            ('Bootstrap.EvidenceBoundary', 'libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs', 'implementation'),
+            ('Bootstrap.SourceInference', 'libraries/mlf-crates/Bootstrap/SourceInference.hs', 'implementation'),
+        ):
+            self.assertEqual(modules[name], {
+                'module': name, 'path': path, 'role': role,
+            })
         self.assertEqual(len(manifest['executables']), 12)
 
     def test_cabal_wrong_wrapper_rejected(self):
@@ -353,6 +357,63 @@ class DirectProducerReceipt(unittest.TestCase):
         self.receipt['producer_host'] = 'native-MLF'
         with self.assertRaisesRegex(ValueError, 'native aggregate reports'):
             self.check()
+
+
+class FrontendTimeoutSelection(unittest.TestCase):
+    def run_dispatch(self, extra):
+        # Exercise the real CLI/default and dispatch loop, not a copied timeout
+        # expression. Mock process execution and provenance only in this test.
+        with tempfile.TemporaryDirectory(prefix='mlf-timeout-selection-') as temporary:
+            root = Path(temporary)
+            receipt = root / 'producer.json'
+            receipt.write_text('{}')
+            calls = []
+
+            class RecordingRunner:
+                def __init__(self, *args):
+                    pass
+
+                def run(self, name, command, **options):
+                    calls.append((name, command, options))
+                    return types.SimpleNamespace(stderr=b'async-scope-panic')
+
+            argv = ['test_direct.py', '--bin-dir', str(root / 'bin'),
+                    '--build-receipt', str(receipt), '--output', str(root / 'output'), *extra]
+            with patch.object(sys, 'argv', argv), \
+                    patch.object(direct, 'CommandRunner', RecordingRunner), \
+                    patch.object(direct, 'authenticate_build', return_value={'producer_host': 'GHC', 'optimization': '2'}), \
+                    patch.object(direct.shutil, 'which', return_value=sys.executable), \
+                    patch.object(direct, 'sha', return_value='0' * 64):
+                direct.main()
+            return {name: options['timeout'] for name, _, options in calls
+                    if name.startswith('shared-frontend-')}
+
+    def test_default_frontend_budget_and_unchanged_native_budgets(self):
+        self.assertEqual(self.run_dispatch([]), {
+            'shared-frontend-frontend': 1200,
+            'shared-frontend-native-first': 120,
+            'shared-frontend-native-second': 120,
+        })
+
+    def test_override_applies_only_to_frontend(self):
+        self.assertEqual(self.run_dispatch(['--frontend-timeout', '333']), {
+            'shared-frontend-frontend': 333,
+            'shared-frontend-native-first': 120,
+            'shared-frontend-native-second': 120,
+        })
+
+    def test_invalid_cli_budgets_fail_before_output_or_execution(self):
+        for seconds in ('0', '-1', '1801'):
+            with self.subTest(seconds=seconds), tempfile.TemporaryDirectory(prefix='mlf-timeout-invalid-') as temporary:
+                output = Path(temporary) / 'output'
+                argv = ['test_direct.py', '--bin-dir', temporary, '--output', str(output),
+                        '--frontend-timeout', seconds]
+                with patch.object(sys, 'argv', argv), patch.object(direct, 'CommandRunner') as runner, \
+                        contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as error:
+                    direct.main()
+                self.assertEqual(error.exception.code, 2)
+                runner.assert_not_called()
+                self.assertFalse(output.exists())
 
 
 class CommandEvidence(unittest.TestCase):
