@@ -23,6 +23,7 @@ node tools/release/test-ci-policy.mjs
 node tools/release/test-release-tag.mjs
 tools/release/test-shared-candidate.sh
 tools/release/test-unit-evidence.sh
+python3 tools/release/test-tuple-list-qualification.py
 tools/release/test-qualification-jobs.sh
 tools/release/test-source-smoke-diagnostics.sh
 tools/release/test-pr-smoke-cli-watchdog.sh
