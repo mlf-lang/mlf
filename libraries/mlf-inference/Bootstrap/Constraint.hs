@@ -209,6 +209,9 @@ module Bootstrap.Constraint where {
              definitions)
           (desugar body);
       SEquations _ -> panic "surface equations escaped lowering";
+      SSourceDefinition _ -> panic "source definition provenance escaped class lowering";
+      SCallSite _ _ _ -> panic "source call site escaped class lowering";
+      SSharedBind _ _ _ _ _ -> panic "shared pattern bind escaped surface lowering";
       SWanted dictionary candidates -> CWanted dictionary candidates;
       SChecked ty body -> CChecked ty body
     };
@@ -758,6 +761,9 @@ module Bootstrap.Constraint where {
         };
       SDo _ _ -> validateIn datatypes scope (Desugar.desugarDo expression);
       SEquations _ -> Left "surface equations escaped lowering";
+      SSourceDefinition _ -> Left "source definition provenance escaped class lowering";
+      SCallSite _ _ _ -> Left "source call site escaped class lowering";
+      SSharedBind _ _ _ _ _ -> Left "shared pattern bind escaped surface lowering";
       SLetRec definitions body ->
         do {
           mapM_

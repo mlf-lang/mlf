@@ -20,6 +20,8 @@ import time
 ROOT = Path(__file__).resolve().parents[2]
 GHC_VERSION = '9.14.1'
 DEMAND_FLAGS = ['-fpedantic-bottoms', '-fno-state-hack']
+# Audit only the forced implementation closure, never source programs it compiles.
+EXHAUSTIVENESS_FLAGS = ['-Werror=incomplete-patterns', '-Werror=incomplete-uni-patterns']
 # Preserve all user arguments, including literal +RTS/-RTS sequences.
 LINK_FLAGS = ['-rtsopts=ignoreAll']
 PACKAGES = ['base', 'array', 'bytestring', 'text', 'containers', 'directory']
@@ -419,7 +421,7 @@ def main():
         flags.extend(['-package', package])
     receipt['flags'] = list(map(str, flags))
     mode = '-fno-code' if options.typecheck_only else '-no-link'
-    log = run([ghc, '--make', '-j1', '-fforce-recomp', '-v', '-ddump-types', mode, *flags,
+    log = run([ghc, '--make', '-j1', '-fforce-recomp', '-v', '-ddump-types', mode, *EXHAUSTIVENESS_FLAGS, *flags,
                *[ROOT / item['path'] for item in manifest['modules']]], 'shared-compile')
     # This comes from GHC's actual compilation progress, not just input hashing.
     # All units are forced above, so stale .hi files cannot supply this proof.
