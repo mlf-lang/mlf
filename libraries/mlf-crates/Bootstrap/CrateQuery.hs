@@ -23,20 +23,20 @@ module Bootstrap.CrateQuery where {
   -- Length framing and constructor tags preserve the complete lowered syntax.
   -- Pretty source text is unsuitable here: annotations, evidence roles, signed
   -- zero, quantifier flags and binder scopes are semantic query inputs.
-  node tag fields = Separate.pack (Cons tag fields);
+  node tag fields = Separate.pack ((:) tag fields);
   list encode values = Separate.pack (map encode values);
   optional encode value =
     case value of {
-      Nothing -> node "none" Nil;
-      Just a -> node "some" (Cons (encode a) Nil)
+      Nothing -> node "none" [];
+      Just a -> node "some" ((:) (encode a) [])
     };
   boolean :: Bool -> String;
   boolean b = if b then "true" else "false";
   encodeKind :: Kind -> String;
   encodeKind kind =
     case kind of {
-      Star -> node "star" Nil;
-      KArrow a b -> node "kind-arrow" (Cons (encodeKind a) (Cons (encodeKind b) Nil))
+      Star -> node "star" [];
+      KArrow a b -> node "kind-arrow" ((:) (encodeKind a) ((:) (encodeKind b) []))
     };
   encodeFlag :: Flag -> String;
   encodeFlag flag =
@@ -47,38 +47,43 @@ module Bootstrap.CrateQuery where {
   encodeType :: SType -> String;
   encodeType ty =
     case ty of {
-      STVar n -> node "variable" (Cons n Nil);
-      SBottom -> node "bottom" Nil;
-      SBottomKind k -> node "bottom-kind" (Cons (encodeKind k) Nil);
-      SArrow a b -> node "arrow" (Cons (encodeType a) (Cons (encodeType b) Nil));
-      SCon n args -> node "constructor" (Cons n (Cons (list encodeType args) Nil));
-      STypeApp f a -> node "application" (Cons (encodeType f) (Cons (encodeType a) Nil));
+      STVar n -> node "variable" ((:) n []);
+      SBottom -> node "bottom" [];
+      SBottomKind k -> node "bottom-kind" ((:) (encodeKind k) []);
+      SArrow a b -> node "arrow" ((:) (encodeType a) ((:) (encodeType b) []));
+      SCon n args -> node "constructor" ((:) n ((:) (list encodeType args) []));
+      STypeApp f a -> node "application" ((:) (encodeType f) ((:) (encodeType a) []));
       SForall flag n bound body ->
         node "forall"
-          (Cons (encodeFlag flag) (Cons n (Cons (encodeType bound) (Cons (encodeType body) Nil))));
+          ((:) (encodeFlag flag) ((:) n ((:) (encodeType bound) ((:) (encodeType body) []))));
       SQualified predicates body ->
-        node "qualified" (Cons (list encodePredicate predicates) (Cons (encodeType body) Nil))
+        node "qualified" ((:) (list encodePredicate predicates) ((:) (encodeType body) []))
     };
   encodePredicate :: SPredicate -> String;
-  encodePredicate (SPredicate n args) = node "predicate" (Cons n (Cons (list encodeType args) Nil));
+  encodePredicate (SPredicate n args) = node "predicate" ((:) n ((:) (list encodeType args) []));
   encodeAnnotation (SAnnotation existential ty) =
-    node "annotation" (Cons (Separate.pack existential) (Cons (encodeType ty) Nil));
+    node "annotation" ((:) (Separate.pack existential) ((:) (encodeType ty) []));
+  encodeSourceString :: SourceString -> String;
+  encodeSourceString s = case s of {
+    ScalarString text -> node "scalar-source-string" ((:) text []);
+    CharString codes -> node "char-source-string" ((:) (list showInt codes) [])
+  };
   encodePattern :: SPattern -> String;
   encodePattern pattern =
     case pattern of {
       SConstructorPattern n names ->
-        node "constructor-pattern" (Cons n (Cons (list (optional id) names) Nil));
-      SDefaultPattern name -> node "default-pattern" (Cons (optional id name) Nil);
+        node "constructor-pattern" ((:) n ((:) (list (optional id) names) []));
+      SDefaultPattern name -> node "default-pattern" ((:) (optional id name) []);
       SNestedPattern n patterns ->
-        node "nested-pattern" (Cons n (Cons (list encodePattern patterns) Nil));
-      SAnnotatedPattern n a -> node "annotated-pattern" (Cons n (Cons (encodeAnnotation a) Nil));
-      SIntPattern n -> node "integer-pattern" (Cons (showInt n) Nil);
-      SAsPattern n pattern -> node "as-pattern" (Cons n (Cons (encodePattern pattern) Nil));
-      SLazyPattern pattern -> node "lazy-pattern" (Cons (encodePattern pattern) Nil);
-      SStringPattern s -> node "string-pattern" (Cons s Nil);
+        node "nested-pattern" ((:) n ((:) (list encodePattern patterns) []));
+      SAnnotatedPattern n a -> node "annotated-pattern" ((:) n ((:) (encodeAnnotation a) []));
+      SIntPattern n -> node "integer-pattern" ((:) (showInt n) []);
+      SAsPattern n pattern -> node "as-pattern" ((:) n ((:) (encodePattern pattern) []));
+      SLazyPattern pattern -> node "lazy-pattern" ((:) (encodePattern pattern) []);
+      SStringPattern s -> node "string-pattern" ((:) s []);
       SOverloadedStringPattern s equal fromString ->
-        node "overloaded-string-pattern" (Cons s (Cons equal (Cons fromString Nil)));
-      SBoolPattern b -> node "boolean-pattern" (Cons (boolean b) Nil)
+        node "overloaded-string-pattern" ((:) (encodeSourceString s) ((:) equal ((:) fromString [])));
+      SBoolPattern b -> node "boolean-pattern" ((:) (boolean b) [])
     };
   encodeRole :: EvidenceRole -> String;
   encodeRole role =
@@ -87,83 +92,84 @@ module Bootstrap.CrateQuery where {
       SuperclassEvidence -> "superclass";
       InstanceEvidence -> "instance"
     };
-  encodeCandidate (Pair role name) = node (encodeRole role) (Cons name Nil);
+  encodeCandidate ((,) role name) = node (encodeRole role) ((:) name []);
   encodeSourceSpan (SourceSpan packageName moduleName file startLine startColumn endLine endColumn) =
     node "source-span"
-      (Cons packageName (Cons moduleName (Cons file
-         (Cons (showInt startLine) (Cons (showInt startColumn)
-            (Cons (showInt endLine) (Cons (showInt endColumn) Nil)))))));
+      ((:) packageName ((:) moduleName ((:) file
+         ((:) (showInt startLine) ((:) (showInt startColumn)
+            ((:) (showInt endLine) ((:) (showInt endColumn) [])))))));
   encodeExpression :: SExpr -> String;
   encodeExpression expression =
     case expression of {
-      SVar n -> node "variable" (Cons n Nil);
-      SConstructor n -> node "constructor" (Cons n Nil);
+      SVar n -> node "variable" ((:) n []);
+      SConstructor n -> node "constructor" ((:) n []);
       SLam n annotation body ->
         node "lambda"
-          (Cons n (Cons (optional encodeAnnotation annotation) (Cons (encodeExpression body) Nil)));
-      SApp a b -> node "apply" (Cons (encodeExpression a) (Cons (encodeExpression b) Nil));
-      SLet n a b -> node "let" (Cons n (Cons (encodeExpression a) (Cons (encodeExpression b) Nil)));
+          ((:) n ((:) (optional encodeAnnotation annotation) ((:) (encodeExpression body) [])));
+      SApp a b -> node "apply" ((:) (encodeExpression a) ((:) (encodeExpression b) []));
+      SLet n a b -> node "let" ((:) n ((:) (encodeExpression a) ((:) (encodeExpression b) [])));
       SAnn a annotation ->
-        node "annotate" (Cons (encodeExpression a) (Cons (encodeAnnotation annotation) Nil));
-      SIntLit n -> node "integer" (Cons (showInt n) Nil);
-      SDoubleLit n -> node "double-bits" (Cons (showInt (doubleToBits n)) Nil);
-      SBoolLit b -> node "boolean" (Cons (boolean b) Nil);
-      SStringLit s -> node "string" (Cons s Nil);
-      SPrimitive p -> node "primitive" (Cons (Primitive.primitiveName p) Nil);
+        node "annotate" ((:) (encodeExpression a) ((:) (encodeAnnotation annotation) []));
+      SIntLit n -> node "integer" ((:) (showInt n) []);
+      SDoubleLit n -> node "double-bits" ((:) (showInt (doubleToBits n)) []);
+      SBoolLit b -> node "boolean" ((:) (boolean b) []);
+      SStringLit s -> node "string" ((:) s []);
+      SPrimitive p -> node "primitive" ((:) (Primitive.primitiveName p) []);
       SCase a branches ->
-        node "case" (Cons (encodeExpression a) (Cons (list encodeAlternative branches) Nil));
+        node "case" ((:) (encodeExpression a) ((:) (list encodeAlternative branches) []));
+      SSourceDefinition body -> node "source-definition" ((:) (encodeExpression body) []);
       SCallSite label span body ->
-        node "call-site" (Cons label (Cons (encodeSourceSpan span) (Cons (encodeExpression body) Nil)));
+        node "call-site" ((:) label ((:) (encodeSourceSpan span) ((:) (encodeExpression body) [])));
       SSharedBind pattern action continuation bindMethod failure ->
         node "shared-bind"
-          (Cons (encodePattern pattern) (Cons (encodeExpression action)
-             (Cons (encodeExpression continuation) (Cons (encodeExpression bindMethod)
-                (Cons (encodeExpression failure) Nil)))));
+          ((:) (encodePattern pattern) ((:) (encodeExpression action)
+             ((:) (encodeExpression continuation) ((:) (encodeExpression bindMethod)
+                ((:) (encodeExpression failure) [])))));
       SDo statements body ->
-        node "do" (Cons (list encodeStatement statements) (Cons (encodeExpression body) Nil));
-      SEquations rows -> node "equations" (Cons (list encodeEquation rows) Nil);
+        node "do" ((:) (list encodeStatement statements) ((:) (encodeExpression body) []));
+      SEquations rows -> node "equations" ((:) (list encodeEquation rows) []);
       SLetRec definitions body ->
-        node "letrec" (Cons (list encodeRecursive definitions) (Cons (encodeExpression body) Nil));
+        node "letrec" ((:) (list encodeRecursive definitions) ((:) (encodeExpression body) []));
       SWanted dictionary candidates ->
-        node "wanted" (Cons dictionary (Cons (list encodeCandidate candidates) Nil));
-      SChecked ty body -> node "checked" (Cons (encodeType ty) (Cons (encodeExpression body) Nil))
+        node "wanted" ((:) dictionary ((:) (list encodeCandidate candidates) []));
+      SChecked ty body -> node "checked" ((:) (encodeType ty) ((:) (encodeExpression body) []))
     };
   encodeAlternative :: SAlternative -> String;
   encodeAlternative (SAlternative pattern body) =
-    node "alternative" (Cons (encodePattern pattern) (Cons (encodeExpression body) Nil));
-  encodeEquation :: Pair (List SPattern) SExpr -> String;
-  encodeEquation (Pair patterns body) =
-    node "equation" (Cons (list encodePattern patterns) (Cons (encodeExpression body) Nil));
-  encodeRecursive :: Triple String SAnnotation SExpr -> String;
-  encodeRecursive (Triple n annotation body) =
+    node "alternative" ((:) (encodePattern pattern) ((:) (encodeExpression body) []));
+  encodeEquation :: (,) ([] SPattern) SExpr -> String;
+  encodeEquation ((,) patterns body) =
+    node "equation" ((:) (list encodePattern patterns) ((:) (encodeExpression body) []));
+  encodeRecursive :: (,,) String SAnnotation SExpr -> String;
+  encodeRecursive ((,,) n annotation body) =
     node "recursive"
-      (Cons n (Cons (encodeAnnotation annotation) (Cons (encodeExpression body) Nil)));
+      ((:) n ((:) (encodeAnnotation annotation) ((:) (encodeExpression body) [])));
   encodeStatement :: SStatement -> String;
   encodeStatement statement =
     case statement of {
       SDoBind pattern body ->
-        node "do-bind" (Cons (encodePattern pattern) (Cons (encodeExpression body) Nil));
-      SDoThen body -> node "do-then" (Cons (encodeExpression body) Nil);
+        node "do-bind" ((:) (encodePattern pattern) ((:) (encodeExpression body) []));
+      SDoThen body -> node "do-then" ((:) (encodeExpression body) []);
       SDoLet n annotation body ->
         node "do-let"
-          (Cons n (Cons (optional encodeAnnotation annotation) (Cons (encodeExpression body) Nil)));
-      SDoLetRec definitions -> node "do-letrec" (Cons (list encodeRecursive definitions) Nil)
+          ((:) n ((:) (optional encodeAnnotation annotation) ((:) (encodeExpression body) [])));
+      SDoLetRec definitions -> node "do-letrec" ((:) (list encodeRecursive definitions) [])
     };
-  encodeMember (Triple n annotation body) =
+  encodeMember ((,,) n annotation body) =
     node "member"
-      (Cons n (Cons (optional encodeAnnotation annotation) (Cons (encodeExpression body) Nil)));
+      ((:) n ((:) (optional encodeAnnotation annotation) ((:) (encodeExpression body) [])));
   encodeField :: Field -> String;
   encodeField field =
     case field of {
-      Parameter n -> node "parameter" (Cons n Nil);
-      Function a b -> node "function-field" (Cons (encodeField a) (Cons (encodeField b) Nil));
-      Applied n args -> node "applied-field" (Cons n (Cons (list encodeField args) Nil));
-      Application a b -> node "application-field" (Cons (encodeField a) (Cons (encodeField b) Nil));
+      Parameter n -> node "parameter" ((:) n []);
+      Function a b -> node "function-field" ((:) (encodeField a) ((:) (encodeField b) []));
+      Applied n args -> node "applied-field" ((:) n ((:) (list encodeField args) []));
+      Application a b -> node "application-field" ((:) (encodeField a) ((:) (encodeField b) []));
       Quantified n k body ->
-        node "quantified-field" (Cons n (Cons (encodeKind k) (Cons (encodeField body) Nil)))
+        node "quantified-field" ((:) n ((:) (encodeKind k) ((:) (encodeField body) [])))
     };
   encodeConstructor (ConstructorDecl n fields) =
-    node "constructor" (Cons n (Cons (list encodeField fields) Nil));
+    node "constructor" ((:) n ((:) (list encodeField fields) []));
   canonicalField :: Map String String -> Int -> Field -> Field;
   canonicalField env depth field =
     case field of {
@@ -201,24 +207,24 @@ module Bootstrap.CrateQuery where {
           (D.datatypeConstructors declaration)
     } in
     node "data"
-      (Cons (D.datatypeName declaration)
-         (Cons
+      ((:) (D.datatypeName declaration)
+         ((:)
             (list
-               (\(Pair n k) ->
-                  node "parameter" (Cons (canonicalReference scope n) (Cons (encodeKind k) Nil)))
+               (\((,) n k) ->
+                  node "parameter" ((:) (canonicalReference scope n) ((:) (encodeKind k) [])))
                parameters)
-            (Cons (list encodeConstructor constructors) Nil)));
+            ((:) (list encodeConstructor constructors) [])));
   encodeXType :: XType -> String;
   encodeXType ty =
     case ty of {
-      XVar (XTyVar n) -> node "variable" (Cons (showInt n) Nil);
-      XBot -> node "bottom" Nil;
-      XBotKind k -> node "bottom-kind" (Cons (encodeKind k) Nil);
-      XArrow a b -> node "arrow" (Cons (encodeXType a) (Cons (encodeXType b) Nil));
-      XCon n args -> node "constructor" (Cons n (Cons (list encodeXType args) Nil));
-      XApply a b -> node "application" (Cons (encodeXType a) (Cons (encodeXType b) Nil));
+      XVar (XTyVar n) -> node "variable" ((:) (showInt n) []);
+      XBot -> node "bottom" [];
+      XBotKind k -> node "bottom-kind" ((:) (encodeKind k) []);
+      XArrow a b -> node "arrow" ((:) (encodeXType a) ((:) (encodeXType b) []));
+      XCon n args -> node "constructor" ((:) n ((:) (list encodeXType args) []));
+      XApply a b -> node "application" ((:) (encodeXType a) ((:) (encodeXType b) []));
       XForall (XTyVar n) bound body ->
-        node "forall" (Cons (showInt n) (Cons (encodeXType bound) (Cons (encodeXType body) Nil)))
+        node "forall" ((:) (showInt n) ((:) (encodeXType bound) ((:) (encodeXType body) [])))
     };
   normalizeXType :: XType -> XType;
   normalizeXType ty =
@@ -230,8 +236,8 @@ module Bootstrap.CrateQuery where {
       XForall n bound body -> XForall n (normalizeXType bound) (normalizeXType body);
       _ -> ty
     };
-  encodeBinding (Pair n ty) =
-    node "binding" (Cons n (Cons (encodeXType (Separate.normalType (normalizeXType ty))) Nil));
+  encodeBinding ((,) n ty) =
+    node "binding" ((:) n ((:) (encodeXType (Separate.normalType (normalizeXType ty))) []));
   -- Local names are alpha-normalized independently for each declaration. Free
   -- symbols use a disjoint tagged namespace, so a user's spelling can never
   -- collide with a canonical local binder. Evidence candidates share that
@@ -243,7 +249,7 @@ module Bootstrap.CrateQuery where {
     foldlStrict
       (\scope entry ->
          case entry of {
-           Pair position name -> M.insert compareString name (prefix ++ showInt position) scope
+           (,) position name -> M.insert compareString name (prefix ++ showInt position) scope
          })
       env
       (zip (range depth ((depth + length names) - 1)) names);
@@ -271,12 +277,12 @@ module Bootstrap.CrateQuery where {
     } in
     SAnnotation (map (canonicalReference scope) names)
       (canonicalTypeIn scope (depth + length names) ty);
-  leadingTypes :: SType -> List String;
+  leadingTypes :: SType -> [] String;
   leadingTypes ty =
     case ty of {
-      SForall Flexible n SBottom body -> Cons n (leadingTypes body);
-      SForall Flexible n (SBottomKind _) body -> Cons n (leadingTypes body);
-      _ -> Nil
+      SForall Flexible n SBottom body -> (:) n (leadingTypes body);
+      SForall Flexible n (SBottomKind _) body -> (:) n (leadingTypes body);
+      _ -> []
     };
   canonicalPattern :: Map String String -> Map String String -> Int -> SPattern -> SPattern;
   canonicalPattern env types typeDepth pattern =
@@ -337,16 +343,17 @@ module Bootstrap.CrateQuery where {
       SEquations rows ->
         SEquations
           (map
-             (\(Pair patterns body) ->
+             (\((,) patterns body) ->
                 let {
                   names = concatMap Desugar.patternVariables patterns
                 } in
                 let {
                   scope = canonicalScope "local:" env depth names
                 } in
-                Pair (map (canonicalPattern scope types typeDepth) patterns)
+                (,) (map (canonicalPattern scope types typeDepth) patterns)
                   (canonicalExpression scope (depth + length names) types typeDepth body))
              rows);
+      SSourceDefinition body -> SSourceDefinition (child body);
       SCallSite label span body -> SCallSite label span (child body);
       SSharedBind pattern action continuation bindMethod failure ->
         let { names = Desugar.patternVariables pattern } in
@@ -357,7 +364,7 @@ module Bootstrap.CrateQuery where {
       SDo _ _ -> child (Desugar.desugarDo expression);
       SLetRec definitions body ->
         let {
-          names = map (\(Triple n _ _) -> n) definitions
+          names = map (\((,,) n _ _) -> n) definitions
         } in
         let {
           scope = canonicalScope "local:" env depth names
@@ -369,7 +376,7 @@ module Bootstrap.CrateQuery where {
           (canonicalExpression scope nextDepth types typeDepth body);
       SWanted dictionary candidates ->
         SWanted dictionary
-          (map (\(Pair role n) -> Pair role (canonicalReference env n)) candidates);
+          (map (\((,) role n) -> (,) role (canonicalReference env n)) candidates);
       SChecked ty body ->
         let {
           names = leadingTypes ty
@@ -383,49 +390,49 @@ module Bootstrap.CrateQuery where {
   canonicalRecursive :: Map String String ->
                         Int ->
                         Map String String ->
-                        Int -> Triple String SAnnotation SExpr -> Triple String SAnnotation SExpr;
-  canonicalRecursive env depth types typeDepth (Triple n annotation body) =
+                        Int -> (,,) String SAnnotation SExpr -> (,,) String SAnnotation SExpr;
+  canonicalRecursive env depth types typeDepth ((,,) n annotation body) =
     let {
       names =
         case annotation of {
-          SAnnotation Nil ty -> leadingTypes ty;
-          _ -> Nil
+          SAnnotation [] ty -> leadingTypes ty;
+          _ -> []
         }
     } in
-    Triple (canonicalReference env n) (canonicalAnnotation types typeDepth annotation)
+    (,,) (canonicalReference env n) (canonicalAnnotation types typeDepth annotation)
       (canonicalExpression env depth (canonicalScope "type:" types typeDepth names)
          (typeDepth + length names)
          body);
-  canonicalMember (Triple n annotation body) =
-    Triple n (Separate.mapMaybeValue (canonicalAnnotation M.empty 0) annotation)
+  canonicalMember ((,,) n annotation body) =
+    (,,) n (Separate.mapMaybeValue (canonicalAnnotation M.empty 0) annotation)
       (canonicalExpression M.empty 0 M.empty 0 body);
   data TypeInventory =
-    TypeInventory (Map String DataDecl) (Map String String) (Map String (List String));
+    TypeInventory (Map String DataDecl) (Map String String) (Map String ([] String));
   prepareData datatypes =
     do {
       D.validateDeclarations datatypes;
       Right
-        (TypeInventory (M.fromList compareString (map (\d -> Pair (D.datatypeName d) d) datatypes))
+        (TypeInventory (M.fromList compareString (map (\d -> (,) (D.datatypeName d) d) datatypes))
            (M.fromList compareString
               (concatMap
                  (\d ->
-                    map (\c -> Pair (D.constructorName c) (D.datatypeName d))
+                    map (\c -> (,) (D.constructorName c) (D.datatypeName d))
                       (D.datatypeConstructors d))
                  datatypes))
            (M.fromList compareString
               (map
                  (\d ->
-                    Pair (D.datatypeName d) (Dependency.typeNames (Dependency.observeDatatype d)))
+                    (,) (D.datatypeName d) (Dependency.typeNames (Dependency.observeDatatype d)))
                  datatypes)))
     };
-  xTypeNames :: XType -> List String;
+  xTypeNames :: XType -> [] String;
   xTypeNames ty =
     case ty of {
       XArrow a b -> append (xTypeNames a) (xTypeNames b);
-      XCon n args -> Cons n (concatMap xTypeNames args);
+      XCon n args -> (:) n (concatMap xTypeNames args);
       XApply a b -> append (xTypeNames a) (xTypeNames b);
       XForall _ a b -> append (xTypeNames a) (xTypeNames b);
-      _ -> Nil
+      _ -> []
     };
   requiredDataIn (TypeInventory datatypes constructors edges) members schemes =
     let {
@@ -441,22 +448,22 @@ module Bootstrap.CrateQuery where {
              (concatMap Dependency.constructorNames observations))
     } in
     let {
-      roots = append direct (append owners (concatMap (\(Pair _ ty) -> xTypeNames ty) schemes))
+      roots = append direct (append owners (concatMap (\((,) _ ty) -> xTypeNames ty) schemes))
     } in
     let {
       needed = Inference.closeDependencies edges S.empty roots
     } in
     map snd (filter (\entry -> S.member compareString (fst entry) needed) (M.toList datatypes));
-  requiredData :: List DataDecl ->
-                  List (Triple String (Maybe SAnnotation) SExpr) ->
-                  List (Pair String XType) -> Either String (List DataDecl);
+  requiredData :: [] DataDecl ->
+                  [] ((,,) String (Maybe SAnnotation) SExpr) ->
+                  [] ((,) String XType) -> Either String ([] DataDecl);
   requiredData datatypes members schemes =
     do {
       inventory <- prepareData datatypes;
       Right (requiredDataIn inventory members schemes)
     };
-  data GroupResult = GroupResult String (List String) Bool String String;
-  data QueryReport = QueryReport Int Int (List GroupResult);
+  data GroupResult = GroupResult String ([] String) Bool String String;
+  data QueryReport = QueryReport Int Int ([] GroupResult);
   inferredCount (QueryReport n _ _) = n;
   reusedCount (QueryReport _ n _) = n;
   inferenceUnits (QueryReport _ _ groups) = map (\(GroupResult _ names _ _ _) -> names) groups;
@@ -498,7 +505,7 @@ module Bootstrap.CrateQuery where {
            (showInt reused ++
             (",\"groups\":" ++ (jsonArray (map groupJSON groups) ++ "}\n"))))))))));
   data QueryState =
-    QueryState (Map String XType) (List Separate.UnitObject) Int Int (List GroupResult);
+    QueryState (Map String XType) ([] Separate.UnitObject) Int Int ([] GroupResult);
   -- SCCs are disjoint and their members sorted. Their minimum stable identity
   -- is unique within a crate; the full member inventory remains in the key.
   groupName crateId names =
@@ -516,26 +523,26 @@ module Bootstrap.CrateQuery where {
   -- a patterned do bind requires MonadFail, even with identical user layouts.
   encodeDatatypeContext datatypes = list encodeDatatype (append D.builtinDeclarations datatypes);
   queryKey crateId compilerHash members bindings datatypes =
-    node "MLF-CRATE-QUERY-3"
-      (Cons crateId
-         (Cons compilerHash
-            (Cons (list (\member -> encodeMember (canonicalMember member)) members)
-               (Cons (list encodeBinding bindings) (Cons (encodeDatatypeContext datatypes) Nil)))));
+    node "MLF-CRATE-QUERY-4"
+      ((:) crateId
+         ((:) compilerHash
+            ((:) (list (\member -> encodeMember (canonicalMember member)) members)
+               ((:) (list encodeBinding bindings) ((:) (encodeDatatypeContext datatypes) [])))));
   dependencyInterface bindings =
-    Separate.UnitInterface "QueryInputs" Nil Nil Nil Nil Nil bindings "parameters";
-  peelParameters :: XTerm -> Pair (List (Pair XName XType)) XTerm;
+    Separate.UnitInterface "QueryInputs" [] [] [] [] [] bindings "parameters";
+  peelParameters :: XTerm -> (,) ([] ((,) XName XType)) XTerm;
   peelParameters term =
     case term of {
       XAbs n ty body ->
         case peelParameters body of {
-          Pair parameters implementation -> Pair (Cons (Pair n ty) parameters) implementation
+          (,) parameters implementation -> (,) ((:) ((,) n ty) parameters) implementation
         };
-      _ -> Pair Nil term
+      _ -> (,) [] term
     };
   validateCached :: String ->
-                    List (Pair String XType) ->
-                    List DataDecl ->
-                    List String -> Separate.UnitObject -> Either String Separate.UnitObject;
+                    [] ((,) String XType) ->
+                    [] DataDecl ->
+                    [] String -> Separate.UnitObject -> Either String Separate.UnitObject;
   -- Normalize only alpha-equivalent binders and equivalent application
   -- representations, including parser normalization of Field constructors.
   -- The target wire syntax omits an empty data wrapper. Reintroduce it at
@@ -562,8 +569,8 @@ module Bootstrap.CrateQuery where {
       let {
         contextAndBody =
           case Separate.objectTerm object of {
-            XWithData ds body -> Pair ds body;
-            body -> Pair Nil body
+            XWithData ds body -> (,) ds body;
+            body -> (,) [] body
           }
       };
       let {
@@ -580,7 +587,7 @@ module Bootstrap.CrateQuery where {
         implementation = snd (peelParameters inner)
       };
       ensure
-        (eqList Separate.sameSignature (map (\(Pair n ty) -> Pair (X.nameHint n) ty) parameters)
+        (eqList Separate.sameSignature (map (\((,) n ty) -> (,) (X.nameHint n) ty) parameters)
            expectedParameters)
         "cached dependency parameter mismatch";
       ds <- D.validateDeclarations datatypes;
@@ -590,7 +597,7 @@ module Bootstrap.CrateQuery where {
       let {
         actual =
           Separate.sortBindings
-            (map (\(Pair n ty) -> Pair (X.nameHint n) (Separate.normalType ty)) bindings)
+            (map (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty)) bindings)
       };
       ensure (eqList eqString (map fst actual) expectedMembers)
         "cached declaration ownership mismatch";
@@ -610,7 +617,7 @@ module Bootstrap.CrateQuery where {
         };
       let {
         current =
-          Separate.UnitInterface expectedName Nil Nil expectedData Nil Nil
+          Separate.UnitInterface expectedName [] [] expectedData [] []
             (Separate.unitBindings iface)
             (Separate.fingerprint (Pretty.prettyTerm payload))
       };
@@ -618,8 +625,8 @@ module Bootstrap.CrateQuery where {
     };
   decodeCached :: String ->
                   String ->
-                  List (Pair String XType) ->
-                  List DataDecl -> List String -> String -> Either String Separate.UnitObject;
+                  [] ((,) String XType) ->
+                  [] DataDecl -> [] String -> String -> Either String Separate.UnitObject;
   decodeCached key name bindings datatypes names input =
     do {
       fields <- Separate.unpack input;
@@ -627,14 +634,14 @@ module Bootstrap.CrateQuery where {
         matchValueShared1 = fields
       } in
       case matchValueShared1 of {
-        Cons matchValueShared2 matchValueShared3 ->
+        (:) matchValueShared2 matchValueShared3 ->
           if MLF.Primitive.eqString matchValueShared2 "MLF-QUERY-CACHE-2"
           then case matchValueShared3 of {
-                 Cons matchValueShared10 matchValueShared11 ->
+                 (:) matchValueShared10 matchValueShared11 ->
                    case matchValueShared11 of {
-                     Cons matchValueShared12 matchValueShared13 ->
+                     (:) matchValueShared12 matchValueShared13 ->
                        case matchValueShared13 of {
-                         Nil ->
+                         [] ->
                            let {
                              savedKey = matchValueShared10
                            } in
@@ -654,13 +661,13 @@ module Bootstrap.CrateQuery where {
                }
           else if MLF.Primitive.eqString matchValueShared2 "MLF-QUERY-CACHE-1"
                then case matchValueShared3 of {
-                      Cons matchValueShared4 matchValueShared5 ->
+                      (:) matchValueShared4 matchValueShared5 ->
                         case matchValueShared5 of {
-                          Cons matchValueShared6 matchValueShared7 ->
+                          (:) matchValueShared6 matchValueShared7 ->
                             case matchValueShared7 of {
-                              Cons matchValueShared8 matchValueShared9 ->
+                              (:) matchValueShared8 matchValueShared9 ->
                                 case matchValueShared9 of {
-                                  Nil ->
+                                  [] ->
                                     let {
                                       savedKey = matchValueShared4
                                     } in
@@ -700,20 +707,20 @@ module Bootstrap.CrateQuery where {
     case matchValueShared14 of {
       Right matchValueShared15 ->
         case matchValueShared15 of {
-          Cons matchValueShared16 matchValueShared17 ->
-            if MLF.Primitive.eqString matchValueShared16 "MLF-CRATE-QUERY-3"
+          (:) matchValueShared16 matchValueShared17 ->
+            if MLF.Primitive.eqString matchValueShared16 "MLF-CRATE-QUERY-4"
             then case matchValueShared17 of {
-                   Cons matchValueShared18 matchValueShared19 ->
+                   (:) matchValueShared18 matchValueShared19 ->
                      case matchValueShared19 of {
-                       Cons matchValueShared20 matchValueShared21 ->
+                       (:) matchValueShared20 matchValueShared21 ->
                          case matchValueShared21 of {
-                           Cons matchValueShared22 matchValueShared23 ->
+                           (:) matchValueShared22 matchValueShared23 ->
                              case matchValueShared23 of {
-                               Cons matchValueShared24 matchValueShared25 ->
+                               (:) matchValueShared24 matchValueShared25 ->
                                  case matchValueShared25 of {
-                                   Cons matchValueShared26 matchValueShared27 ->
+                                   (:) matchValueShared26 matchValueShared27 ->
                                      case matchValueShared27 of {
-                                       Nil ->
+                                       [] ->
                                          let {
                                            expected = matchValueShared26
                                          } in
@@ -743,48 +750,48 @@ module Bootstrap.CrateQuery where {
   encodeCached key object =
     if contextualCache key object
     then Separate.pack
-           (Cons "MLF-QUERY-CACHE-2" (Cons key (Cons (Separate.encodeContextualObject object) Nil)))
+           ((:) "MLF-QUERY-CACHE-2" ((:) key ((:) (Separate.encodeContextualObject object) [])))
     else Separate.pack
-           (Cons "MLF-QUERY-CACHE-1"
-              (Cons key
-                 (Cons (Separate.encodeInterface (Separate.objectInterface object))
-                    (Cons (Separate.encodeObject object) Nil))));
+           ((:) "MLF-QUERY-CACHE-1"
+              ((:) key
+                 ((:) (Separate.encodeInterface (Separate.objectInterface object))
+                    ((:) (Separate.encodeObject object) []))));
   -- Commands receive NUL-separated argv directly; paths never enter a shell.
   cacheCommand arguments =
     do {
       command <- Host.hostArguments arguments;
       runProcess ""
         (concatMapString (\field -> (field ++ stringFromCode 0))
-           (Cons "1800" (Cons "" (Cons "" (Cons "" command)))))
+           ((:) "1800" ((:) "" ((:) "" ((:) "" command)))))
     };
   cachePath path = if Host.absolutePath path then path else ("./" ++ path);
-  writeCache :: String -> String -> IO (Either String Unit);
+  writeCache :: String -> String -> IO (Either String ());
   writeCache path contents =
     do {
       writeFile (path ++ ".new") contents;
-      code <- cacheCommand (Cons "/bin/mv" (Cons "-f" (Cons (path ++ ".new") (Cons path Nil))));
-      ioReturn (if (code == 0) then Right Unit else Left "cannot publish inference query cache")
+      code <- cacheCommand ((:) "/bin/mv" ((:) "-f" ((:) (path ++ ".new") ((:) path []))));
+      ioReturn (if (code == 0) then Right () else Left "cannot publish inference query cache")
     };
-  writeAtomic :: String -> String -> IO (Either String Unit);
+  writeAtomic :: String -> String -> IO (Either String ());
   writeAtomic path contents = writeCache (cachePath path) contents;
-  ensureDirectory :: String -> IO (Either String Unit);
+  ensureDirectory :: String -> IO (Either String ());
   ensureDirectory path =
     do {
-      code <- cacheCommand (Cons "/bin/mkdir" (Cons "-p" (Cons (cachePath path) Nil)));
-      ioReturn (if (code == 0) then Right Unit else Left "cannot create inference cache directory")
+      code <- cacheCommand ((:) "/bin/mkdir" ((:) "-p" ((:) (cachePath path) [])));
+      ioReturn (if (code == 0) then Right () else Left "cannot create inference cache directory")
     };
   runGroups :: String ->
                String ->
                String ->
                TypeInventory ->
-               Map String (Triple String (Maybe SAnnotation) SExpr) ->
-               List (List String) ->
-               QueryState -> IO (Either String (Pair (List Separate.UnitObject) QueryReport));
+               Map String ((,,) String (Maybe SAnnotation) SExpr) ->
+               [] ([] String) ->
+               QueryState -> IO (Either String ((,) ([] Separate.UnitObject) QueryReport));
   runGroups crateId compilerHash cacheDir inventory values groups (QueryState available objects inferred reused results) =
     case groups of {
-      Nil ->
-        ioReturn (Right (Pair (reverse objects) (QueryReport inferred reused (reverse results))));
-      Cons names rest ->
+      [] ->
+        ioReturn (Right ((,) (reverse objects) (QueryReport inferred reused (reverse results))));
+      (:) names rest ->
         do {
           let {
             members = map (\n -> M.get compareString n values) names
@@ -817,22 +824,22 @@ module Bootstrap.CrateQuery where {
           let {
             result =
               case cached of {
-                Right object -> Right (Pair True object);
+                Right object -> Right ((,) True object);
                 Left _ ->
-                  mapEither (Pair False)
+                  mapEither ((,) False)
                     (Inference.compileLoweredGroup name
-                       (if null bindings then Nil else Cons (dependencyInterface bindings) Nil)
+                       (if null bindings then [] else (:) (dependencyInterface bindings) [])
                        datatypes
                        members)
               }
           };
           case result of {
             Left error -> ioReturn (Left error);
-            Right (Pair hit object) ->
+            Right ((,) hit object) ->
               do {
                 saved <-
                   if hit
-                  then ioReturn (Right Unit)
+                  then ioReturn (Right ())
                   else writeCache destination (encodeCached key object);
                 case saved of {
                   Left error -> ioReturn (Left error);
@@ -848,9 +855,9 @@ module Bootstrap.CrateQuery where {
                                  (Separate.unitBindings (Separate.objectInterface object)))
                         } in
                         runGroups crateId compilerHash cacheDir inventory values rest
-                          (QueryState next (Cons object objects) (inferred + (if hit then 0 else 1))
+                          (QueryState next ((:) object objects) (inferred + (if hit then 0 else 1))
                              (reused + (if hit then 1 else 0))
-                             (Cons (GroupResult name names hit semantic digest) results))
+                             ((:) (GroupResult name names hit semantic digest) results))
                     }
                 }
               }
@@ -859,10 +866,10 @@ module Bootstrap.CrateQuery where {
     };
   compileGroups :: String ->
                    String ->
-                   List Separate.UnitInterface ->
-                   List DataDecl ->
-                   List (Triple String (Maybe SAnnotation) SExpr) ->
-                   IO (Either String (Pair (List Separate.UnitObject) QueryReport));
+                   [] Separate.UnitInterface ->
+                   [] DataDecl ->
+                   [] ((,,) String (Maybe SAnnotation) SExpr) ->
+                   IO (Either String ((,) ([] Separate.UnitObject) QueryReport));
   compileGroups crateId directory imports datatypes members =
     case Dependency.declarationGroups members of {
       Left error -> ioReturn (Left error);
@@ -880,7 +887,7 @@ module Bootstrap.CrateQuery where {
                        let {
                          cacheDir = cachePath directory
                        };
-                       code <- cacheCommand (Cons "/bin/mkdir" (Cons "-p" (Cons cacheDir Nil)));
+                       code <- cacheCommand ((:) "/bin/mkdir" ((:) "-p" ((:) cacheDir [])));
                        if (code /= 0)
                        then ioReturn (Left "cannot create inference cache directory")
                        else do {
@@ -893,11 +900,11 @@ module Bootstrap.CrateQuery where {
                                      (map
                                         (\member ->
                                            case member of {
-                                             Triple n _ _ -> Pair n member
+                                             (,,) n _ _ -> (,) n member
                                            })
                                         members))
                                   groups
-                                  (QueryState available Nil 0 0 Nil);
+                                  (QueryState available [] 0 0 []);
                               releaseFileLock lock;
                               ioReturn result
                             }

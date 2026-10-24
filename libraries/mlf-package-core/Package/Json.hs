@@ -9,8 +9,8 @@ module Package.Json where {
   import qualified Bootstrap.Set as Set;
   import qualified Package.OS as O;
   data Json =
-    Object (List (Pair String Json)) |
-    Array (List Json) |
+    Object ([] ((,) String Json)) |
+    Array ([] Json) |
     String String |
     Number String |
     Boolean Bool |
@@ -19,7 +19,7 @@ module Package.Json where {
   array xs = Array xs;
   str x = String x;
   num x = Number (showInt x);
-  empty = Object Nil;
+  empty = Object [];
   items value =
     case value of {
       Object xs -> xs;
@@ -48,21 +48,21 @@ module Package.Json where {
   getText key fallback value = text (getOr key (String fallback) value);
   getBool key fallback value = bool (getOr key (Boolean fallback) value);
   getObject key value = getOr key empty value;
-  getStrings key value = strings (getOr key (Array Nil) value);
+  getStrings key value = strings (getOr key (Array []) value);
   set key item value =
     Object
-      (Cons (Pair key item)
+      ((:) ((,) key item)
          (S.filter (\entry -> S.not (eqString (S.fst entry) key)) (items value)));
-  add key item value = set key (Array (S.snoc (values (getOr key (Array Nil) value)) item)) value;
+  add key item value = set key (Array (S.snoc (values (getOr key (Array []) value)) item)) value;
   quote text = ("\"" ++ (quoteAt text 0 ++ "\""));
   quoteAt :: String -> Int -> String;
-  quoteAt text i = quoteChunks text i i Nil;
+  quoteAt text i = quoteChunks text i i [];
   -- Slice unescaped runs once; balanced chunk joining avoids repeatedly copying
   -- a growing string, including long source paths and declaration identities.
-  quoteChunks :: String -> Int -> Int -> List String -> String;
+  quoteChunks :: String -> Int -> Int -> [] String -> String;
   quoteChunks text start i chunks =
     if (i >= stringLength text)
-    then S.concatStrings (S.reverse (Cons (stringSlice text start (i - start)) chunks))
+    then S.concatStrings (S.reverse ((:) (stringSlice text start (i - start)) chunks))
     else let {
            n = stringCodeAt text i
          } in
@@ -78,7 +78,7 @@ module Package.Json where {
                               O.char "0123456789abcdef" (remInt n 16)))
               } in
               quoteChunks text (i + 1) (i + 1)
-                (Cons escaped (Cons (stringSlice text start (i - start)) chunks))
+                ((:) escaped ((:) (stringSlice text start (i - start)) chunks))
          else quoteChunks text start (i + 1) chunks;
   render :: Json -> String;
   render value =
@@ -112,13 +112,13 @@ module Package.Json where {
     do {
       boundValueShared1 <- parseAt source (skip source 0);
       case boundValueShared1 of {
-        Pair value end ->
+        (,) value end ->
           do {
             if (skip source end == stringLength source) then Right value else failure end
           }
       }
     };
-  parseAt :: String -> Int -> Either String (Pair Json Int);
+  parseAt :: String -> Int -> Either String ((,) Json Int);
   parseAt source i =
     if (i >= stringLength source)
     then failure i
@@ -126,29 +126,29 @@ module Package.Json where {
            c = stringCodeAt source i
          } in
          if (c == 123)
-         then objectAt source (skip source (i + 1)) Nil
+         then objectAt source (skip source (i + 1)) []
          else if (c == 91)
-              then arrayAt source (skip source (i + 1)) Nil
+              then arrayAt source (skip source (i + 1)) []
               else if (c == 34)
                    then do {
                           boundValueShared2 <- stringAt source (i + 1) "";
                           case boundValueShared2 of {
-                            Pair value next ->
+                            (,) value next ->
                               do {
-                                Right (Pair (String value) next)
+                                Right ((,) (String value) next)
                               }
                           }
                         }
                    else if startsAt source i "true"
-                        then Right (Pair (Boolean True) (i + 4))
+                        then Right ((,) (Boolean True) (i + 4))
                         else if startsAt source i "false"
-                             then Right (Pair (Boolean False) (i + 5))
+                             then Right ((,) (Boolean False) (i + 5))
                              else if startsAt source i "null"
-                                  then Right (Pair Null (i + 4))
+                                  then Right ((,) Null (i + 4))
                                   else numberAt source i;
-  stringAt :: String -> Int -> String -> Either String (Pair String Int);
-  stringAt source i acc = stringChunksAt source i i (Cons acc Nil);
-  stringChunksAt :: String -> Int -> Int -> List String -> Either String (Pair String Int);
+  stringAt :: String -> Int -> String -> Either String ((,) String Int);
+  stringAt source i acc = stringChunksAt source i i ((:) acc []);
+  stringChunksAt :: String -> Int -> Int -> [] String -> Either String ((,) String Int);
   stringChunksAt source start i chunks =
     if (i >= stringLength source)
     then failure i
@@ -157,9 +157,9 @@ module Package.Json where {
          } in
          if (c == 34)
          then Right
-                (Pair
+                ((,)
                    (S.concatStrings
-                      (S.reverse (Cons (stringSlice source start (i - start)) chunks)))
+                      (S.reverse ((:) (stringSlice source start (i - start)) chunks)))
                    (i + 1))
          else if (c < 32)
               then failure i
@@ -167,27 +167,27 @@ module Package.Json where {
                    then do {
                           boundValueShared3 <- escapedAt source (i + 1);
                           case boundValueShared3 of {
-                            Pair escaped next ->
+                            (,) escaped next ->
                               do {
                                 stringChunksAt source next next
-                                  (Cons escaped
-                                     (Cons (stringSlice source start (i - start)) chunks))
+                                  ((:) escaped
+                                     ((:) (stringSlice source start (i - start)) chunks))
                               }
                           }
                         }
                    else stringChunksAt source start (i + 1) chunks;
-  escapeAt :: String -> Int -> String -> Either String (Pair String Int);
+  escapeAt :: String -> Int -> String -> Either String ((,) String Int);
   escapeAt source i acc =
     do {
       boundValueShared4 <- escapedAt source i;
       case boundValueShared4 of {
-        Pair escaped next ->
+        (,) escaped next ->
           do {
-            stringChunksAt source next next (Cons escaped (Cons acc Nil))
+            stringChunksAt source next next ((:) escaped ((:) acc []))
           }
       }
     };
-  escapedAt :: String -> Int -> Either String (Pair String Int);
+  escapedAt :: String -> Int -> Either String ((,) String Int);
   escapedAt source i =
     if (i >= stringLength source)
     then failure i
@@ -203,7 +203,7 @@ module Package.Json where {
                             low <- hexAt source (i + 7) 4 0;
                             if ((low >= 56320) && (low <= 57343))
                             then Right
-                                   (Pair
+                                   ((,)
                                       (stringFromCode
                                          (((65536 + ((code - 55296) * 1024)) + low) - 56320))
                                       (i + 11))
@@ -212,13 +212,13 @@ module Package.Json where {
                      else failure i
                 else if ((code >= 56320) && (code <= 57343))
                      then failure i
-                     else Right (Pair (stringFromCode code) (i + 5))
+                     else Right ((,) (stringFromCode code) (i + 5))
               }
          else if ((c == 34) || ((c == 92) || (c == 47)))
-              then Right (Pair (stringFromCode c) (i + 1))
+              then Right ((,) (stringFromCode c) (i + 1))
               else if ((c == 98) || ((c == 102) || ((c == 110) || ((c == 114) || (c == 116)))))
                    then Right
-                          (Pair
+                          ((,)
                              (stringFromCode
                                 (if (c == 98)
                                  then 8
@@ -251,7 +251,7 @@ module Package.Json where {
     ((i < stringLength source) && ((stringCodeAt source i >= 48) && (stringCodeAt source i <= 57)));
   digits :: String -> Int -> Int;
   digits source i = if digit source i then digits source (i + 1) else i;
-  numberAt :: String -> Int -> Either String (Pair Json Int);
+  numberAt :: String -> Int -> Either String ((,) Json Int);
   numberAt source i =
     let {
       start = if at source i 45 then (i + 1) else i
@@ -286,24 +286,24 @@ module Package.Json where {
               else let {
                      end = if power then digits source expDigit else frac
                    } in
-                   Right (Pair (Number (stringSlice source i (end - i))) end);
-  objectAt :: String -> Int -> List (Pair String Json) -> Either String (Pair Json Int);
+                   Right ((,) (Number (stringSlice source i (end - i))) end);
+  objectAt :: String -> Int -> [] ((,) String Json) -> Either String ((,) Json Int);
   objectAt source i acc =
     if at source i 125
-    then Right (Pair (Object (S.reverse acc)) (i + 1))
+    then Right ((,) (Object (S.reverse acc)) (i + 1))
     else objectEntry source i acc;
-  objectEntry :: String -> Int -> List (Pair String Json) -> Either String (Pair Json Int);
+  objectEntry :: String -> Int -> [] ((,) String Json) -> Either String ((,) Json Int);
   objectEntry source i acc =
     objectEntries source i acc (Set.fromList compareString (S.map S.fst acc));
   objectEntries :: String ->
-                   Int -> List (Pair String Json) -> Set String -> Either String (Pair Json Int);
+                   Int -> [] ((,) String Json) -> Set String -> Either String ((,) Json Int);
   objectEntries source i acc seen =
     if S.not (at source i 34)
     then failure i
     else do {
            boundValueShared6 <- stringAt source (i + 1) "";
            case boundValueShared6 of {
-             Pair key next ->
+             (,) key next ->
                do {
                  if Set.member compareString key seen
                  then Left ("duplicate JSON key: " ++ key)
@@ -316,16 +316,16 @@ module Package.Json where {
                         else do {
                                boundValueShared5 <- parseAt source (skip source (colon + 1));
                                case boundValueShared5 of {
-                                 Pair value end ->
+                                 (,) value end ->
                                    do {
                                      let {
                                        stop = skip source end
                                      };
                                      let {
-                                       result = Cons (Pair key value) acc
+                                       result = (:) ((,) key value) acc
                                      };
                                      if at source stop 125
-                                     then Right (Pair (Object (S.reverse result)) (stop + 1))
+                                     then Right ((,) (Object (S.reverse result)) (stop + 1))
                                      else if at source stop 44
                                           then objectEntries source (skip source (stop + 1)) result
                                                  (Set.insert compareString key seen)
@@ -337,25 +337,25 @@ module Package.Json where {
                }
            }
          };
-  arrayAt :: String -> Int -> List Json -> Either String (Pair Json Int);
+  arrayAt :: String -> Int -> [] Json -> Either String ((,) Json Int);
   arrayAt source i acc =
     if at source i 93
-    then Right (Pair (Array (S.reverse acc)) (i + 1))
+    then Right ((,) (Array (S.reverse acc)) (i + 1))
     else arrayEntry source i acc;
-  arrayEntry :: String -> Int -> List Json -> Either String (Pair Json Int);
+  arrayEntry :: String -> Int -> [] Json -> Either String ((,) Json Int);
   arrayEntry source i acc =
     do {
       boundValueShared7 <- parseAt source i;
       case boundValueShared7 of {
-        Pair value next ->
+        (,) value next ->
           do {
             let {
               stop = skip source next
             };
             if at source stop 93
-            then Right (Pair (Array (S.reverse (Cons value acc))) (stop + 1))
+            then Right ((,) (Array (S.reverse ((:) value acc))) (stop + 1))
             else if at source stop 44
-                 then arrayEntry source (skip source (stop + 1)) (Cons value acc)
+                 then arrayEntry source (skip source (stop + 1)) ((:) value acc)
                  else failure stop
           }
       }

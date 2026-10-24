@@ -14,7 +14,7 @@ module Async.Task.Core where {
   -- Only uniform IO Unit resumptions enter the runtime queue. Generic outcomes
   -- never pass through an IntTable or an ID-to-value lookup. Constructors stay
   -- private, including the resolver endpoint inside Fiber.
-  data Task a = Task (Context -> (Outcome a -> IO Unit) -> IO Unit);
+  data Task a = Task (Context -> (Outcome a -> IO ()) -> IO ());
   data Fiber a = Fiber Scope Int (Completion (Outcome a)) (Completion CancelReason);
   data Outcome a = Succeeded a | Failed AsyncError | Cancelled CancelReason;
   data CancelReason = CancelReason Int String;
@@ -23,15 +23,15 @@ module Async.Task.Core where {
   data Options = Options Int Int Int P.ScopeOptions;
   data Scope =
     Scope AsyncScope IntArray IntTable (Completion AsyncError) (Completion CancelReason) (Completion
-                                                                                          Unit) P.ProcessScope Limits;
+                                                                                          ()) P.ProcessScope Limits;
   -- Shared counters: 0 live fibers, 1 admitted processes, 2 pending processes.
   -- The cleanup cell is group-local and retains the first cleanup diagnostic.
   data Limits = Limits Int Int Int IntArray (Completion AsyncError) (Maybe Context);
   data Context = Context Scope Int (Completion CancelReason);
   defaultOptions :: Options;
   defaultOptions = Options 65536 8192 4096 P.defaultOptions;
-  unit :: IO Unit;
-  unit = ioReturn Unit;
+  unit :: IO ();
+  unit = ioReturn ();
   runtimeError :: Int -> String -> AsyncError;
   runtimeError code operation =
     AsyncError (100 + code) (operation ++ (" (async status " ++ (showInt code ++ ")")));
@@ -48,7 +48,7 @@ module Async.Task.Core where {
       value <- readIntArray first 3;
       ioReturn (value == 1)
     };
-  stopped :: Context -> IO (Maybe (Outcome Unit));
+  stopped :: Context -> IO (Maybe (Outcome ()));
   stopped (Context (Scope _ metadata _ failure stoppedScope _ _ (Limits _ _ _ _ _ parent)) _ stoppedFiber) =
     do {
       closed <- readIntArray metadata 2;
@@ -71,14 +71,14 @@ module Async.Task.Core where {
              }
            }
     };
-  stopAs :: forall a. Outcome Unit -> Outcome a;
+  stopAs :: forall a. Outcome () -> Outcome a;
   stopAs outcome =
     case outcome of {
       Failed error -> Failed error;
       Cancelled reason -> Cancelled reason;
       Succeeded _ -> Failed (runtimeError 12 "invalid stop outcome")
     };
-  start :: forall a. Task a -> Context -> (Outcome a -> IO Unit) -> IO Unit;
+  start :: forall a. Task a -> Context -> (Outcome a -> IO ()) -> IO ();
   start (Task action) context complete =
     do {
       stop <- stopped context;
@@ -126,7 +126,7 @@ module Async.Task.Core where {
               }));
   -- Cancellation still propagates through capture, but cleanup failure is never
   -- turned back into an ordinary cancellation or overwritten primary failure.
-  preserveCleanup :: forall a. Outcome Unit -> AsyncError -> Outcome a;
+  preserveCleanup :: forall a. Outcome () -> AsyncError -> Outcome a;
   preserveCleanup external original =
     case original of {
       CleanupFailed _ cleanup ->
@@ -141,7 +141,7 @@ module Async.Task.Core where {
              cleanup);
       _ -> stopAs external
     };
-  finish :: forall a. Context -> Completion (Outcome a) -> Outcome a -> IO Unit;
+  finish :: forall a. Context -> Completion (Outcome a) -> Outcome a -> IO ();
   finish (Context (Scope _ metadata edges failure scopeStop drained _ (Limits _ _ _ shared cleanup _)) identity _) cell outcome =
     do {
       accepted <- asyncResolveCompletion cell outcome;
@@ -158,7 +158,7 @@ module Async.Task.Core where {
              active <- readIntArray metadata 1;
              writeIntArray metadata 1 (active - 1);
              if (active == 1)
-             then ioBind (asyncResolveCompletion drained Unit) (\_ -> unit)
+             then ioBind (asyncResolveCompletion drained ()) (\_ -> unit)
              else unit;
              case outcome of {
                Failed error -> ioBind (asyncResolveCompletion failure error) (\_ -> unit);
@@ -171,7 +171,7 @@ module Async.Task.Core where {
            }
       else unit
     };
-  launch :: forall a. Scope -> Task a -> (Either AsyncError (Fiber a) -> IO Unit) -> IO Unit;
+  launch :: forall a. Scope -> Task a -> (Either AsyncError (Fiber a) -> IO ()) -> IO ();
   launch scope task complete =
     case scope of {
       Scope queue metadata _ _ _ _ _ (Limits maximum _ _ shared _ _) ->
@@ -223,21 +223,21 @@ module Async.Task.Core where {
                     Right fiber -> complete (Succeeded fiber)
                   })
          });
-  dropSubscriptions :: List AsyncSubscription -> IO Unit;
+  dropSubscriptions :: [] AsyncSubscription -> IO ();
   dropSubscriptions subscriptions =
     case subscriptions of {
-      Nil -> unit;
-      Cons subscription rest ->
+      [] -> unit;
+      (:) subscription rest ->
         do {
           asyncCancelSubscription subscription;
           dropSubscriptions rest
         }
     };
-  subscriptionsOK :: List AsyncSubscription -> IO Int;
+  subscriptionsOK :: [] AsyncSubscription -> IO Int;
   subscriptionsOK subscriptions =
     case subscriptions of {
-      Nil -> ioReturn 0;
-      Cons subscription rest ->
+      [] -> ioReturn 0;
+      (:) subscription rest ->
         do {
           status <- asyncSubscriptionStatus subscription;
           if (status == 0) then subscriptionsOK rest else ioReturn status
@@ -255,8 +255,8 @@ module Async.Task.Core where {
          };
   resumeWait :: forall a. Context ->
                           IntArray ->
-                          Completion (List AsyncSubscription) ->
-                          (Outcome a -> IO Unit) -> Outcome a -> IO Unit;
+                          Completion ([] AsyncSubscription) ->
+                          (Outcome a -> IO ()) -> Outcome a -> IO ();
   resumeWait context won subscriptions complete outcome =
     do {
       already <- readIntArray won 0;
@@ -276,7 +276,7 @@ module Async.Task.Core where {
            }
     };
   waitPending :: forall a. Context ->
-                           Int -> Completion (Outcome a) -> (Outcome a -> IO Unit) -> IO Unit;
+                           Int -> Completion (Outcome a) -> (Outcome a -> IO ()) -> IO ();
   waitPending context target cell complete =
     case context of {
       Context (Scope queue _ edges failure scopeStop _ _ _) identity fiberStop ->
@@ -300,9 +300,9 @@ module Async.Task.Core where {
                         asyncSubscribeCompletion fiberStop (\reason -> resume (Cancelled reason));
                       let {
                         registered =
-                          Cons valueSubscription
-                            (Cons failureSubscription
-                               (Cons scopeSubscription (Cons fiberSubscription Nil)))
+                          (:) valueSubscription
+                            ((:) failureSubscription
+                               ((:) scopeSubscription ((:) fiberSubscription [])))
                       };
                       asyncResolveCompletion subscriptions registered;
                       status <- subscriptionsOK registered;
@@ -353,14 +353,14 @@ module Async.Task.Core where {
            Failed error -> taskFail error;
            Cancelled reason -> Task (\_ complete -> complete (Cancelled reason))
          });
-  yield :: Task Unit;
+  yield :: Task ();
   yield =
     Task
       (\context complete ->
          case context of {
            Context (Scope queue _ _ _ _ _ _ _) _ _ ->
              do {
-               queued <- asyncEnqueue queue (start (taskPure Unit) context complete);
+               queued <- asyncEnqueue queue (start (taskPure ()) context complete);
                status <- asyncSubscriptionStatus queued;
                if (status == 0)
                then unit
@@ -369,7 +369,7 @@ module Async.Task.Core where {
          });
   -- Timers are monotonic native reservations. Cancellation/failure removes the
   -- sleeping timer immediately; it never waits for the original duration.
-  sleep :: Int -> Task Unit;
+  sleep :: Int -> Task ();
   sleep milliseconds =
     if ((milliseconds < 0) || (milliseconds > 4294967295))
     then taskFail (runtimeError 1 "invalid sleep duration")
@@ -384,7 +384,7 @@ module Async.Task.Core where {
                          let {
                            resume = resumeWait context won subscriptions complete
                          };
-                         timer <- asyncDelay queue milliseconds (resume (Succeeded Unit));
+                         timer <- asyncDelay queue milliseconds (resume (Succeeded ()));
                          failed <-
                            asyncSubscribeCompletion failure (\error -> resume (Failed error));
                          scopeCancelled <-
@@ -395,8 +395,8 @@ module Async.Task.Core where {
                              (\reason -> resume (Cancelled reason));
                          let {
                            registered =
-                             Cons timer
-                               (Cons failed (Cons scopeCancelled (Cons fiberCancelled Nil)))
+                             (:) timer
+                               ((:) failed ((:) scopeCancelled ((:) fiberCancelled [])))
                          };
                          asyncResolveCompletion subscriptions registered;
                          status <- subscriptionsOK registered;
@@ -411,7 +411,7 @@ module Async.Task.Core where {
                        })
                     (complete (Failed limitError))
               });
-  cancel :: forall a. Fiber a -> CancelReason -> Task Unit;
+  cancel :: forall a. Fiber a -> CancelReason -> Task ();
   cancel (Fiber owner _ result stoppedFiber) reason =
     Task
       (\context complete ->
@@ -421,14 +421,14 @@ module Async.Task.Core where {
                same <- sameScope scope owner;
                if L.not same
                then complete (Failed (runtimeError 5 "fiber belongs to another scope"))
-               else asyncReadCompletion result (\_ -> complete (Succeeded Unit))
+               else asyncReadCompletion result (\_ -> complete (Succeeded ()))
                       (do {
                          asyncResolveCompletion stoppedFiber reason;
-                         complete (Succeeded Unit)
+                         complete (Succeeded ())
                        })
              }
          });
-  cancelScope :: CancelReason -> Task Unit;
+  cancelScope :: CancelReason -> Task ();
   cancelScope reason =
     Task
       (\context complete ->
@@ -439,54 +439,54 @@ module Async.Task.Core where {
                complete (Cancelled reason)
              }
          });
-  spawnWindow :: forall a. Int -> List (Task a) -> Task (Pair (List (Fiber a)) (List (Task a)));
+  spawnWindow :: forall a. Int -> [] (Task a) -> Task ((,) ([] (Fiber a)) ([] (Task a)));
   spawnWindow count tasks =
     if (count <= 0)
-    then taskPure (Pair Nil tasks)
+    then taskPure ((,) [] tasks)
     else case tasks of {
-           Nil -> taskPure (Pair Nil Nil);
-           Cons task rest ->
+           [] -> taskPure ((,) [] []);
+           (:) task rest ->
              taskBind (spawn task)
                (\fiber ->
                   taskBind (spawnWindow (count - 1) rest)
                     (\remaining ->
                        case remaining of {
-                         Pair fibers pending -> taskPure (Pair (Cons fiber fibers) pending)
+                         (,) fibers pending -> taskPure ((,) ((:) fiber fibers) pending)
                        }))
          };
-  awaitWindow :: forall a. List (Fiber a) -> Task (List a);
+  awaitWindow :: forall a. [] (Fiber a) -> Task ([] a);
   awaitWindow fibers =
     case fibers of {
-      Nil -> taskPure Nil;
-      Cons fiber rest ->
-        taskBind (await fiber) (\value -> taskMap (\values -> Cons value values) (awaitWindow rest))
+      [] -> taskPure [];
+      (:) fiber rest ->
+        taskBind (await fiber) (\value -> taskMap (\values -> (:) value values) (awaitWindow rest))
     };
   -- Bounded, input-ordered windows deliberately avoid allocating an unbounded
   -- list of fibers or callbacks. A slow first window can leave unused capacity.
-  all :: forall a. Int -> List (Task a) -> Task (List a);
+  all :: forall a. Int -> [] (Task a) -> Task ([] a);
   all width tasks =
     if (width <= 0)
     then taskFail (runtimeError 1 "concurrency width must be positive")
     else case tasks of {
-           Nil -> taskPure Nil;
+           [] -> taskPure [];
            _ ->
              taskBind (spawnWindow width tasks)
                (\window ->
                   case window of {
-                    Pair fibers pending ->
+                    (,) fibers pending ->
                       taskBind (awaitWindow fibers)
                         (\values -> taskMap (L.append values) (all width pending))
                   })
          };
-  collect :: forall a. Int -> List (Task a) -> Task (List (Outcome a));
+  collect :: forall a. Int -> [] (Task a) -> Task ([] (Outcome a));
   collect width tasks = all width (L.map capture tasks);
-  mapConcurrentlyN :: forall a b. Int -> (a -> Task b) -> List a -> Task (List b);
+  mapConcurrentlyN :: forall a b. Int -> (a -> Task b) -> [] a -> Task ([] b);
   mapConcurrentlyN width function values = all width (L.map function values);
   -- On a scheduler/protocol failure there may be no callback slot left. The
   -- error path joins this specific process synchronously before releasing its
   -- fiber; a nested scope cannot report completion with an abandoned child.
   failProcess :: P.ProcessScope ->
-                 P.ProcessHandle -> AsyncError -> (Outcome P.ProcessOutcome -> IO Unit) -> IO Unit;
+                 P.ProcessHandle -> AsyncError -> (Outcome P.ProcessOutcome -> IO ()) -> IO ();
   failProcess processes handle primary complete =
     do {
       cleanup <- P.cancel processes handle 0;
@@ -499,7 +499,7 @@ module Async.Task.Core where {
     };
   -- A stopped task still owns cleanup diagnostics. Nested task scopes share
   -- their process supervisor, so do not postpone these errors to outer teardown.
-  processStopped :: Outcome Unit -> P.ProcessOutcome -> Outcome P.ProcessOutcome;
+  processStopped :: Outcome () -> P.ProcessOutcome -> Outcome P.ProcessOutcome;
   processStopped stoppedOutcome processOutcome =
     if (P.cleanupError processOutcome == 0)
     then stopAs stoppedOutcome
@@ -515,7 +515,7 @@ module Async.Task.Core where {
          Failed
            (P.CleanupFailed primary
               (AsyncError (P.cleanupError processOutcome) "process cleanup failed"));
-  pollProcess :: Context -> P.ProcessHandle -> (Outcome P.ProcessOutcome -> IO Unit) -> IO Unit;
+  pollProcess :: Context -> P.ProcessHandle -> (Outcome P.ProcessOutcome -> IO ()) -> IO ();
   pollProcess context handle complete =
     case context of {
       Context (Scope queue _ _ _ _ _ processes _) _ _ ->
@@ -523,7 +523,7 @@ module Async.Task.Core where {
           stop <- stopped context;
           requested <-
             case stop of {
-              Nothing -> ioReturn (Right Unit);
+              Nothing -> ioReturn (Right ());
               Just _ -> P.requestCancel processes handle 0
             };
           case requested of {
@@ -557,15 +557,15 @@ module Async.Task.Core where {
   clockMilliseconds :: IO (Either AsyncError Int);
   clockMilliseconds =
     do {
-      result <- PI.request (Cons "clock" Nil);
+      result <- PI.request ((:) "clock" []);
       ioReturn
         (case result of {
-           Right (Cons value Nil) -> Right (readInt value);
-           Left (Pair code message) -> Left (AsyncError code message);
+           Right ((:) value []) -> Right (readInt value);
+           Left ((,) code message) -> Left (AsyncError code message);
            _ -> Left (runtimeError 12 "invalid monotonic clock response")
          })
     };
-  releasePending :: IntArray -> Bool -> IO Unit;
+  releasePending :: IntArray -> Bool -> IO ();
   releasePending shared waiting =
     if L.not waiting
     then unit
@@ -574,7 +574,7 @@ module Async.Task.Core where {
            writeIntArray shared 2 (pending - 1)
          };
   finishProcess :: IntArray ->
-                   (Outcome P.ProcessOutcome -> IO Unit) -> Outcome P.ProcessOutcome -> IO Unit;
+                   (Outcome P.ProcessOutcome -> IO ()) -> Outcome P.ProcessOutcome -> IO ();
   finishProcess shared complete outcome =
     do {
       active <- readIntArray shared 1;
@@ -592,7 +592,7 @@ module Async.Task.Core where {
            })
     };
   queueProcess :: Context ->
-                  P.ProcessSpec -> Maybe Int -> (Outcome P.ProcessOutcome -> IO Unit) -> IO Unit;
+                  P.ProcessSpec -> Maybe Int -> (Outcome P.ProcessOutcome -> IO ()) -> IO ();
   queueProcess context specification deadline complete =
     case context of {
       Context (Scope queue _ _ _ _ _ _ (Limits _ _ _ shared _ _)) _ _ ->
@@ -613,7 +613,7 @@ module Async.Task.Core where {
   -- Shared active/pending counters also apply to every nested task group.
   admitProcess :: Context ->
                   P.ProcessSpec ->
-                  Maybe Int -> Bool -> (Outcome P.ProcessOutcome -> IO Unit) -> IO Unit;
+                  Maybe Int -> Bool -> (Outcome P.ProcessOutcome -> IO ()) -> IO ();
   admitProcess context specification deadline waiting complete =
     case context of {
       Context (Scope _ _ _ _ _ _ processes (Limits _ jobs pendingLimit shared _ _)) _ _ ->
@@ -742,7 +742,7 @@ module Async.Task.Core where {
   -- Run drains every started fiber, even after the root returns. Failure and
   -- cancellation wake suspended waits through reserved callbacks. The process
   -- scope then joins or cancels-and-joins before the result leaves this function.
-  drain :: Scope -> IO Unit;
+  drain :: Scope -> IO ();
   drain scope =
     case scope of {
       Scope queue metadata _ failure _ _ _ _ ->
@@ -803,7 +803,7 @@ module Async.Task.Core where {
   closeNested :: forall a. Context ->
                            Scope ->
                            Completion (Fiber a) ->
-                           Completion (List AsyncSubscription) -> (Outcome a -> IO Unit) -> IO Unit;
+                           Completion ([] AsyncSubscription) -> (Outcome a -> IO ()) -> IO ();
   closeNested parent scope rootFiber subscriptions callback =
     case scope of {
       Scope _ metadata _ failure scopeStop _ _ (Limits _ _ _ _ cleanup _) ->
@@ -894,7 +894,7 @@ module Async.Task.Core where {
                                                       complete);
                                              timers <-
                                                case timeout of {
-                                                 Nothing -> ioReturn Nil;
+                                                 Nothing -> ioReturn [];
                                                  Just milliseconds ->
                                                    do {
                                                      timer <-
@@ -904,14 +904,14 @@ module Async.Task.Core where {
                                                                (AsyncError 124
                                                                   "task deadline expired"))
                                                             (\_ -> unit));
-                                                     ioReturn (Cons timer Nil)
+                                                     ioReturn ((:) timer [])
                                                    }
                                                };
                                              let {
                                                registered =
-                                                 Cons failed
-                                                   (Cons stoppedScope
-                                                      (Cons stoppedParent (Cons finished timers)))
+                                                 (:) failed
+                                                   ((:) stoppedScope
+                                                      ((:) stoppedParent ((:) finished timers)))
                                              };
                                              asyncResolveCompletion subscriptions registered;
                                              status <- subscriptionsOK registered;

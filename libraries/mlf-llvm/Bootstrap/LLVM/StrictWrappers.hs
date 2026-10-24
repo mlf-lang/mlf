@@ -16,16 +16,16 @@ module Bootstrap.LLVM.StrictWrappers where {
   -- lazy wrappers, partial applications, and escaping constructors are excluded.
   -- This is a whole-program erased optimization after independent checking;
   -- source types, module interfaces, and canonical-pointer proofs stay intact.
-  single :: DataDecl -> List String;
+  single :: DataDecl -> [] String;
   single declaration =
     case case declaration of {
            DataDecl n ps cs -> cs;
            DataDeclK n ps cs -> cs
          } of {
-      Cons (ConstructorDecl c (Cons field Nil)) Nil -> Cons c Nil;
-      _ -> Nil
+      (:) (ConstructorDecl c ((:) field [])) [] -> (:) c [];
+      _ -> []
     };
-  candidates :: List DataDecl -> Map String (Pair Int Int) -> XErased -> Set String;
+  candidates :: [] DataDecl -> Map String ((,) Int Int) -> XErased -> Set String;
   candidates declarations constructors expression =
     let {
       facts = F.inferEvaluated (M.map L.snd constructors) (A.analyze expression) expression
@@ -34,7 +34,7 @@ module Bootstrap.LLVM.StrictWrappers where {
       (L.filter
          (\c ->
             case M.lookup compareString c facts of {
-              Just (Cons True Nil) -> True;
+              Just ((:) True []) -> True;
               _ -> False
             })
          (L.concatMap single declarations));
@@ -46,23 +46,23 @@ module Bootstrap.LLVM.StrictWrappers where {
       Nothing -> sequence value body;
       Just name -> XELet name value (sequence (XEVar name) body)
     };
-  unaryCase :: Set String -> List XErasedAlternative -> Bool;
+  unaryCase :: Set String -> [] XErasedAlternative -> Bool;
   unaryCase wrappers alternatives =
     L.any
       (\alternative ->
          case alternative of {
-           XErasedAlternative (XConstructorPattern c (Cons field Nil)) body ->
+           XErasedAlternative (XConstructorPattern c ((:) field [])) body ->
              S.member compareString c wrappers;
            _ -> False
          })
       alternatives;
-  select :: Set String -> XErased -> List XErasedAlternative -> Maybe XErased;
+  select :: Set String -> XErased -> [] XErasedAlternative -> Maybe XErased;
   select wrappers subject alternatives =
     case alternatives of {
-      Nil -> Nothing;
-      Cons (XErasedAlternative pattern body) rest ->
+      [] -> Nothing;
+      (:) (XErasedAlternative pattern body) rest ->
         case pattern of {
-          XConstructorPattern c (Cons field Nil) ->
+          XConstructorPattern c ((:) field []) ->
             if S.member compareString c wrappers
             then Just (bindForced field subject body)
             else select wrappers subject rest;
@@ -85,7 +85,7 @@ module Bootstrap.LLVM.StrictWrappers where {
            _ -> normalized
          })
     };
-  optimize :: List DataDecl -> Map String (Pair Int Int) -> XErased -> XErased;
+  optimize :: [] DataDecl -> Map String ((,) Int Int) -> XErased -> XErased;
   optimize declarations constructors expression =
     let {
       wrappers = candidates declarations constructors expression

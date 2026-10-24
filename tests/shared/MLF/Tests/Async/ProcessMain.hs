@@ -13,8 +13,8 @@ module MLF.Tests.Async.ProcessMain where {
       putErr ("ASYNC TEST FAILURE: " ++ (message ++ "\n"));
       exitWith 1
     };
-  assert :: Bool -> String -> IO Unit;
-  assert condition message = if condition then ioReturn Unit else fail message;
+  assert :: Bool -> String -> IO ();
+  assert condition message = if condition then ioReturn () else fail message;
   right :: forall a. Either AsyncError a -> IO a;
   right result =
     case result of {
@@ -45,9 +45,9 @@ module MLF.Tests.Async.ProcessMain where {
       TimedOut cleanup -> (cleanup == 0);
       _ -> False
     };
-  args2 a b = Cons a (Cons b Nil);
-  args3 a b c = Cons a (Cons b (Cons c Nil));
-  args4 a b c d = Cons a (Cons b (Cons c (Cons d Nil)));
+  args2 a b = (:) a ((:) b []);
+  args3 a b c = (:) a ((:) b ((:) c []));
+  args4 a b c d = (:) a ((:) b ((:) c ((:) d [])));
   spec helper work name arguments =
     command helper arguments (work ++ ("/" ++ (name ++ ".out")))
       (work ++ ("/" ++ (name ++ ".err")));
@@ -73,12 +73,12 @@ module MLF.Tests.Async.ProcessMain where {
     };
   -- A bounded await services admission/timers while waiting for child readiness.
   -- The child and outer harness both have watchdogs; no timing is a pass oracle.
-  ready :: ProcessScope -> ProcessHandle -> String -> IO Unit;
+  ready :: ProcessScope -> ProcessHandle -> String -> IO ();
   ready scope handle path =
     do {
       found <- fileExists path;
       if found
-      then ioReturn Unit
+      then ioReturn ()
       else do {
              result <- awaitWithin scope handle (ForMilliseconds 10);
              assert (errorIs 10 result) "child exited before readiness";
@@ -162,7 +162,7 @@ module MLF.Tests.Async.ProcessMain where {
                assert (exited 0 progressed) "unrelated child failed after requestCancel";
                requestedOutcome <- await scope pending;
                assert (cancelled 61 requestedOutcome) "requestCancel lost cancellation reason";
-               ioReturn (Right Unit)
+               ioReturn (Right ())
              });
       right result;
       assertFile (work ++ "/dynamic-b.out") "B saw A=23 while C was waiting\n";
@@ -204,7 +204,7 @@ module MLF.Tests.Async.ProcessMain where {
                  "completion delivered twice";
                repeated <- await scope handle;
                assert (exited 7 repeated) "event consumed retained outcome";
-               ioReturn (Right Unit)
+               ioReturn (Right ())
              });
       right result;
       putStrLn "PASS event-exactly-once"
@@ -247,7 +247,7 @@ module MLF.Tests.Async.ProcessMain where {
                assert (cancelled 42 unchanged) "repeated cancel changed outcome";
                refused <- submit scope (spec helper work "queue-after-stop" (args2 "exit" "0"));
                assert (errorIs 5 refused) "cancelled scope accepted submission";
-               ioReturn (Right Unit)
+               ioReturn (Right ())
              });
       right result;
       absent (work ++ "/queue.forbidden");
@@ -266,7 +266,7 @@ module MLF.Tests.Async.ProcessMain where {
                assert (errorIs 7 full) "completed retention was silently evicted";
                again <- await scope handle;
                assert (exited 0 again) "retained result disappeared";
-               ioReturn (Right Unit)
+               ioReturn (Right ())
              });
       right result;
       putStrLn "PASS retained-bound"
@@ -304,7 +304,7 @@ module MLF.Tests.Async.ProcessMain where {
                    (spec helper work "failure-gone" (args2 "assert-gone" (work ++ "/failure.pid")));
                outcome <- await scope handle;
                assert (exited 0 outcome) "scope returned before child was reaped";
-               ioReturn (Right Unit)
+               ioReturn (Right ())
              });
       right check;
       putStrLn "PASS scope-left-cancel-and-join"
@@ -317,12 +317,12 @@ module MLF.Tests.Async.ProcessMain where {
              do {
                handle <-
                  launch scope (spec helper work "joined" (args2 "mark" (work ++ "/joined.marker")));
-               ioReturn (Right (Pair scope handle))
+               ioReturn (Right ((,) scope handle))
              });
       pair <- right escaped;
       assertFile (work ++ "/joined.marker") "launched\n";
       case pair of {
-        Pair scope handle ->
+        (,) scope handle ->
           do {
             rejected <- awaitProcess scope handle;
             assert (errorIs 3 rejected || errorIs 5 rejected) "closed handle remained valid"
@@ -343,12 +343,12 @@ module MLF.Tests.Async.ProcessMain where {
                       do {
                         rejected <- awaitProcess inner handle;
                         assert (errorIs 4 rejected) "cross-scope handle accepted";
-                        ioReturn (Right Unit)
+                        ioReturn (Right ())
                       });
                right nested;
                outcome <- await outer handle;
                assert (exited 0 outcome) "cross-scope rejection damaged owning scope";
-               ioReturn (Right Unit)
+               ioReturn (Right ())
              });
       right result;
       putStrLn "PASS cross-scope-handle"
@@ -395,7 +395,7 @@ module MLF.Tests.Async.ProcessMain where {
                assert (timedOut expired) "total timeout did not include queue time";
                stopped <- cancel scope blocker 8;
                right stopped;
-               ioReturn (Right Unit)
+               ioReturn (Right ())
              });
       right result;
       absent (work ++ "/total.forbidden");
@@ -412,7 +412,7 @@ module MLF.Tests.Async.ProcessMain where {
              do {
                let {
                  env =
-                   ReplaceEnvironment (Cons "ASYNC_VALUE=line one\nλ=x" (Cons "ASYNC_EMPTY=" Nil))
+                   ReplaceEnvironment ((:) "ASYNC_VALUE=line one\nλ=x" ((:) "ASYNC_EMPTY=" []))
                };
                let {
                  arguments = args2 "transport" "space ; $() ' \" \\ \t\nλ"
@@ -432,7 +432,7 @@ module MLF.Tests.Async.ProcessMain where {
                assert (errorIs 1 invalid) "embedded NUL accepted";
                missingLogs <- submit scope (command helper (args2 "exit" "0") "" "");
                assert (errorIs 1 missingLogs) "unbounded implicit capture accepted";
-               ioReturn (Right Unit)
+               ioReturn (Right ())
              });
       right result;
       unsetEnv "ASYNC_PARENT_ONLY";
@@ -452,12 +452,12 @@ module MLF.Tests.Async.ProcessMain where {
                       (args3 "hold" (work ++ "/snapshot.ready") (work ++ "/snapshot.release")));
                ready scope blocker (work ++ "/snapshot.ready");
                setEnv "ASYNC_SNAPSHOT" "submitted value";
-               queued <- launch scope (spec helper work "snapshot" (Cons "environment" Nil));
+               queued <- launch scope (spec helper work "snapshot" ((:) "environment" []));
                setEnv "ASYNC_SNAPSHOT" "changed after submit";
                writeFile (work ++ "/snapshot.release") "release\n";
                outcome <- await scope queued;
                assert (exited 0 outcome) "environment child failed";
-               ioReturn (Right Unit)
+               ioReturn (Right ())
              });
       right result;
       unsetEnv "ASYNC_SNAPSHOT";
@@ -470,10 +470,10 @@ module MLF.Tests.Async.ProcessMain where {
         withProcessScope (ScopeOptions 1 1 1)
           (\scope ->
              do {
-               handle <- launch scope (spec helper work "large" (Cons "large-logs" Nil));
+               handle <- launch scope (spec helper work "large" ((:) "large-logs" []));
                outcome <- await scope handle;
                assert (exited 0 outcome) "large stdout/stderr child failed or deadlocked";
-               ioReturn (Right Unit)
+               ioReturn (Right ())
              });
       right result;
       out <- readFile (work ++ "/large.out");
@@ -493,7 +493,7 @@ module MLF.Tests.Async.ProcessMain where {
              do {
                handle <-
                  launch scope
-                   (command (work ++ "/missing-executable") Nil (work ++ "/missing.out")
+                   (command (work ++ "/missing-executable") [] (work ++ "/missing.out")
                       (work ++ "/missing.err"));
                outcome <- await scope handle;
                assert
@@ -502,7 +502,7 @@ module MLF.Tests.Async.ProcessMain where {
                     _ -> False
                   })
                  "launch error became an exit status";
-               ioReturn (Right Unit)
+               ioReturn (Right ())
              });
       right result;
       putStrLn "PASS explicit-launch-failure"

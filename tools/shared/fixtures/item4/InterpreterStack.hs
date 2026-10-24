@@ -6,7 +6,7 @@ import qualified Bootstrap.Types as T
 import qualified Bootstrap.Data as D
 import qualified Bootstrap.Map as M
 import qualified MLF.Host.Base as B
-ls = foldr T.Cons T.Nil
+ls = foldr (:) []
 rv = T.Right
 act p args = rv (R.RAction p (ls args))
 prim p args = R.primitiveResult D.emptyDataEnv p (ls args)
@@ -20,7 +20,7 @@ stack = push (frame (str "inner") (num 12)) (push (frame (str "outer") (num 12))
 header = "CallStack (from HasCallStack):"
 render c = case R.runtimeCharsText c of T.Left _ -> Nothing; T.Right t -> Just (B.unpack t)
 takeChars 0 _ = Just ""
-takeChars n (T.Right (R.RConstructor ":" (T.Cons (T.Right (R.RChar c)) (T.Cons rest T.Nil)))) = fmap ((toEnum (fromInteger c)):) (takeChars (n-1) rest)
+takeChars n (T.Right (R.RConstructor ":" ((:) (T.Right (R.RChar c)) ((:) rest [])))) = fmap ((toEnum (fromInteger c)):) (takeChars (n-1) rest)
 takeChars _ (T.Right (R.RConstructor "[]" _)) = Just ""
 takeChars _ _ = Nothing
 assert label ok = if ok then putStrLn ("PASS "++label) else error ("FAIL "++label)
@@ -30,10 +30,10 @@ msg s = rv (R.runtimeTextChars (B.literal s) 0)
 err s = prim T.PUserError [msg s]
 failWith s stk = act T.PIOErrorWithStack [err s,stk]
 raise s = failWith s empty
-ret = rv (R.RPrimitive T.PIOReturn T.Nil)
+ret = rv (R.RPrimitive T.PIOReturn [])
 catch a h = act T.PCatchIOError [a,h]
 k action = rv (R.RClosure (R.RLocal (T.XName 1 "saved") action (R.REnv M.empty)) (T.XName 2 "ignored") (T.XEVar (T.XName 1 "saved")))
-run = R.runAction T.Nil D.emptyDataEnv
+run = R.runAction [] D.emptyDataEnv
 isErr (T.Right (T.Right (R.RIOError _))) = True
 isErr _ = False
 failureText (T.Left s) = Just (B.unpack s)
@@ -41,7 +41,7 @@ failureText _ = Nothing
 main = do
   let unicode = rv (R.RConstructor "MLFStackFrame" (ls [str "函数λ😀",str "包",str "模",str "源.hs",num 7,num 8,num 9,num 10]))
   assert "unicode-frame-fields" (render (pretty (push unicode empty))==Just (header++"\n  函数λ😀, called at 源.hs:7:8 in 包:模"))
-  let surrogate = rv (R.RConstructor ":" (ls [rv (R.RChar 55296),rv (R.RConstructor "[]" T.Nil)]))
+  let surrogate = rv (R.RConstructor ":" (ls [rv (R.RChar 55296),rv (R.RConstructor "[]" [])]))
   result <- run (act T.PIOErrorWithStack [prim T.PUserError [surrogate],empty])
   assert "empty-stack-uncaught-surrogate" (failureText result==Just "user error (\\55296)")
   assert "empty-pretty" (render (pretty empty)==Just "")

@@ -13,31 +13,31 @@ module Bootstrap.Std where {
   flip f y x = f x y;
   compose :: forall b c a. (b -> c) -> (a -> b) -> a -> c;
   compose f g x = f (g x);
-  fst :: forall a b. Pair a b -> a;
-  fst (Pair a b) = a;
-  snd :: forall a b. Pair a b -> b;
-  snd (Pair a b) = b;
-  uncurry :: forall a b c. (a -> b -> c) -> Pair a b -> c;
-  uncurry f (Pair a b) = f a b;
-  curry :: forall a b c. (Pair a b -> c) -> a -> b -> c;
-  curry f a b = f (Pair a b);
-  first :: forall a b c. (a -> b) -> Pair a c -> Pair b c;
-  first f (Pair a c) = Pair (f a) c;
-  second :: forall a b c. (a -> b) -> Pair c a -> Pair c b;
-  second f (Pair c a) = Pair c (f a);
+  fst :: forall a b. (,) a b -> a;
+  fst ((,) a b) = a;
+  snd :: forall a b. (,) a b -> b;
+  snd ((,) a b) = b;
+  uncurry :: forall a b c. (a -> b -> c) -> (,) a b -> c;
+  uncurry f ((,) a b) = f a b;
+  curry :: forall a b c. ((,) a b -> c) -> a -> b -> c;
+  curry f a b = f ((,) a b);
+  first :: forall a b c. (a -> b) -> (,) a c -> (,) b c;
+  first f ((,) a c) = (,) (f a) c;
+  second :: forall a b c. (a -> b) -> (,) c a -> (,) c b;
+  second f ((,) c a) = (,) c (f a);
   not :: Bool -> Bool;
   not x = if x then False else True;
-  and :: List Bool -> Bool;
+  and :: [] Bool -> Bool;
   and xs =
     case xs of {
-      Nil -> True;
-      Cons x rest -> (x && and rest)
+      [] -> True;
+      (:) x rest -> (x && and rest)
     };
-  or :: List Bool -> Bool;
+  or :: [] Bool -> Bool;
   or xs =
     case xs of {
-      Nil -> False;
-      Cons x rest -> (x || or rest)
+      [] -> False;
+      (:) x rest -> (x || or rest)
     };
   compareInt :: Int -> Int -> Int;
   compareInt a b = if (a < b) then (0 - 1) else if (a == b) then 0 else 1;
@@ -51,345 +51,345 @@ module Bootstrap.Std where {
   negateInt a = (0 - a);
   signum :: Int -> Int;
   signum a = compareInt a 0;
-  null :: forall a. List a -> Bool;
+  null :: forall a. [] a -> Bool;
   null xs =
     case xs of {
-      Nil -> True;
-      Cons x rest -> False
+      [] -> True;
+      (:) x rest -> False
     };
-  length :: forall a. List a -> Int;
+  length :: forall a. [] a -> Int;
   length xs = lengthAcc 0 xs;
-  lengthAcc :: forall a. Int -> List a -> Int;
+  lengthAcc :: forall a. Int -> [] a -> Int;
   lengthAcc n xs =
     case xs of {
-      Nil -> n;
-      Cons x rest ->
+      [] -> n;
+      (:) x rest ->
         let {
           next = (n + 1)
         } in
         seq next (lengthAcc next rest)
     };
-  singleton :: forall a. a -> List a;
-  singleton x = Cons x Nil;
-  append :: forall a. List a -> List a -> List a;
+  singleton :: forall a. a -> [] a;
+  singleton x = (:) x [];
+  append :: forall a. [] a -> [] a -> [] a;
   append xs ys =
     case xs of {
-      Nil -> ys;
-      Cons x rest -> Cons x (append rest ys)
+      [] -> ys;
+      (:) x rest -> (:) x (append rest ys)
     };
-  snoc :: forall a. List a -> a -> List a;
-  snoc xs x = append xs (Cons x Nil);
-  map :: forall a b. (a -> b) -> List a -> List b;
+  snoc :: forall a. [] a -> a -> [] a;
+  snoc xs x = append xs ((:) x []);
+  map :: forall a b. (a -> b) -> [] a -> [] b;
   map f xs =
     case xs of {
-      Nil -> Nil;
-      Cons x rest -> Cons (f x) (map f rest)
+      [] -> [];
+      (:) x rest -> (:) (f x) (map f rest)
     };
-  foldr :: forall a b. (a -> b -> b) -> b -> List a -> b;
+  foldr :: forall a b. (a -> b -> b) -> b -> [] a -> b;
   foldr f z xs =
     case xs of {
-      Nil -> z;
-      Cons x rest -> f x (foldr f z rest)
+      [] -> z;
+      (:) x rest -> f x (foldr f z rest)
     };
-  foldl :: forall b a. (b -> a -> b) -> b -> List a -> b;
+  foldl :: forall b a. (b -> a -> b) -> b -> [] a -> b;
   foldl f z xs =
     case xs of {
-      Nil -> z;
-      Cons x rest -> foldl f (f z x) rest
+      [] -> z;
+      (:) x rest -> foldl f (f z x) rest
     };
-  foldlStrict :: forall b a. (b -> a -> b) -> b -> List a -> b;
+  foldlStrict :: forall b a. (b -> a -> b) -> b -> [] a -> b;
   foldlStrict f z xs =
     case xs of {
-      Nil -> z;
-      Cons x rest ->
+      [] -> z;
+      (:) x rest ->
         let {
           next = f z x
         } in
         seq next (foldlStrict f next rest)
     };
-  reverse :: forall a. List a -> List a;
-  reverse xs = foldl (\acc x -> Cons x acc) Nil xs;
-  concat :: forall a. List (List a) -> List a;
-  concat xs = foldr append Nil xs;
-  concatMap :: forall a b. (a -> List b) -> List a -> List b;
-  concatMap f xs = foldr (\x rest -> append (f x) rest) Nil xs;
-  filter :: forall a. (a -> Bool) -> List a -> List a;
+  reverse :: forall a. [] a -> [] a;
+  reverse xs = foldl (\acc x -> (:) x acc) [] xs;
+  concat :: forall a. [] ([] a) -> [] a;
+  concat xs = foldr append [] xs;
+  concatMap :: forall a b. (a -> [] b) -> [] a -> [] b;
+  concatMap f xs = foldr (\x rest -> append (f x) rest) [] xs;
+  filter :: forall a. (a -> Bool) -> [] a -> [] a;
   filter p xs =
     case xs of {
-      Nil -> Nil;
-      Cons x rest -> if p x then Cons x (filter p rest) else filter p rest
+      [] -> [];
+      (:) x rest -> if p x then (:) x (filter p rest) else filter p rest
     };
-  partition :: forall a. (a -> Bool) -> List a -> Pair (List a) (List a);
+  partition :: forall a. (a -> Bool) -> [] a -> (,) ([] a) ([] a);
   partition p xs =
     case xs of {
-      Nil -> Pair Nil Nil;
-      Cons x rest ->
+      [] -> (,) [] [];
+      (:) x rest ->
         case partition p rest of {
-          Pair yes no -> if p x then Pair (Cons x yes) no else Pair yes (Cons x no)
+          (,) yes no -> if p x then (,) ((:) x yes) no else (,) yes ((:) x no)
         }
     };
-  any :: forall a. (a -> Bool) -> List a -> Bool;
+  any :: forall a. (a -> Bool) -> [] a -> Bool;
   any f xs =
     case xs of {
-      Nil -> False;
-      Cons x rest -> (f x || any f rest)
+      [] -> False;
+      (:) x rest -> (f x || any f rest)
     };
-  all :: forall a. (a -> Bool) -> List a -> Bool;
+  all :: forall a. (a -> Bool) -> [] a -> Bool;
   all f xs =
     case xs of {
-      Nil -> True;
-      Cons x rest -> (f x && all f rest)
+      [] -> True;
+      (:) x rest -> (f x && all f rest)
     };
-  find :: forall a. (a -> Bool) -> List a -> Maybe a;
+  find :: forall a. (a -> Bool) -> [] a -> Maybe a;
   find p xs =
     case xs of {
-      Nil -> Nothing;
-      Cons x rest -> if p x then Just x else find p rest
+      [] -> Nothing;
+      (:) x rest -> if p x then Just x else find p rest
     };
-  elem :: forall a. (a -> a -> Bool) -> a -> List a -> Bool;
+  elem :: forall a. (a -> a -> Bool) -> a -> [] a -> Bool;
   elem eq x xs = any (eq x) xs;
-  notElem :: forall a. (a -> a -> Bool) -> a -> List a -> Bool;
+  notElem :: forall a. (a -> a -> Bool) -> a -> [] a -> Bool;
   notElem eq x xs = not (elem eq x xs);
-  lookup :: forall a b. (a -> a -> Bool) -> a -> List (Pair a b) -> Maybe b;
+  lookup :: forall a b. (a -> a -> Bool) -> a -> [] ((,) a b) -> Maybe b;
   lookup eq k xs =
     case xs of {
-      Nil -> Nothing;
-      Cons (Pair key value) rest -> if eq k key then Just value else lookup eq k rest
+      [] -> Nothing;
+      (:) ((,) key value) rest -> if eq k key then Just value else lookup eq k rest
     };
-  head :: forall a. List a -> a;
+  head :: forall a. [] a -> a;
   head xs =
     case xs of {
-      Nil -> panic "head: empty list";
-      Cons x rest -> x
+      [] -> panic "head: empty list";
+      (:) x rest -> x
     };
-  tail :: forall a. List a -> List a;
+  tail :: forall a. [] a -> [] a;
   tail xs =
     case xs of {
-      Nil -> panic "tail: empty list";
-      Cons x rest -> rest
+      [] -> panic "tail: empty list";
+      (:) x rest -> rest
     };
-  last :: forall a. List a -> a;
+  last :: forall a. [] a -> a;
   last xs =
     case xs of {
-      Nil -> panic "last: empty list";
-      Cons x rest -> if null rest then x else last rest
+      [] -> panic "last: empty list";
+      (:) x rest -> if null rest then x else last rest
     };
-  init :: forall a. List a -> List a;
+  init :: forall a. [] a -> [] a;
   init xs =
     case xs of {
-      Nil -> panic "init: empty list";
-      Cons x rest -> if null rest then Nil else Cons x (init rest)
+      [] -> panic "init: empty list";
+      (:) x rest -> if null rest then [] else (:) x (init rest)
     };
-  index :: forall a. List a -> Int -> a;
+  index :: forall a. [] a -> Int -> a;
   index xs n =
     if (n < 0)
     then panic "index: negative index"
     else case xs of {
-           Nil -> panic "index: out of bounds";
-           Cons x rest -> if (n == 0) then x else index rest (n - 1)
+           [] -> panic "index: out of bounds";
+           (:) x rest -> if (n == 0) then x else index rest (n - 1)
          };
-  at :: forall a. Int -> List a -> Maybe a;
+  at :: forall a. Int -> [] a -> Maybe a;
   at n xs =
     if (n < 0)
     then Nothing
     else case xs of {
-           Nil -> Nothing;
-           Cons x rest -> if (n == 0) then Just x else at (n - 1) rest
+           [] -> Nothing;
+           (:) x rest -> if (n == 0) then Just x else at (n - 1) rest
          };
-  take :: forall a. Int -> List a -> List a;
+  take :: forall a. Int -> [] a -> [] a;
   take n xs =
     if (n <= 0)
-    then Nil
+    then []
     else case xs of {
-           Nil -> Nil;
-           Cons x rest -> Cons x (take (n - 1) rest)
+           [] -> [];
+           (:) x rest -> (:) x (take (n - 1) rest)
          };
-  drop :: forall a. Int -> List a -> List a;
+  drop :: forall a. Int -> [] a -> [] a;
   drop n xs =
     if (n <= 0)
     then xs
     else case xs of {
-           Nil -> Nil;
-           Cons x rest -> drop (n - 1) rest
+           [] -> [];
+           (:) x rest -> drop (n - 1) rest
          };
-  splitAt :: forall a. Int -> List a -> Pair (List a) (List a);
+  splitAt :: forall a. Int -> [] a -> (,) ([] a) ([] a);
   splitAt n xs =
     if (n <= 0)
-    then Pair Nil xs
+    then (,) [] xs
     else case xs of {
-           Nil -> Pair Nil Nil;
-           Cons x rest ->
+           [] -> (,) [] [];
+           (:) x rest ->
              case splitAt (n - 1) rest of {
-               Pair before after -> Pair (Cons x before) after
+               (,) before after -> (,) ((:) x before) after
              }
          };
-  takeWhile :: forall a. (a -> Bool) -> List a -> List a;
+  takeWhile :: forall a. (a -> Bool) -> [] a -> [] a;
   takeWhile p xs =
     case xs of {
-      Nil -> Nil;
-      Cons x rest -> if p x then Cons x (takeWhile p rest) else Nil
+      [] -> [];
+      (:) x rest -> if p x then (:) x (takeWhile p rest) else []
     };
-  dropWhile :: forall a. (a -> Bool) -> List a -> List a;
+  dropWhile :: forall a. (a -> Bool) -> [] a -> [] a;
   dropWhile p xs =
     case xs of {
-      Nil -> Nil;
-      Cons x rest -> if p x then dropWhile p rest else xs
+      [] -> [];
+      (:) x rest -> if p x then dropWhile p rest else xs
     };
-  span :: forall a. (a -> Bool) -> List a -> Pair (List a) (List a);
+  span :: forall a. (a -> Bool) -> [] a -> (,) ([] a) ([] a);
   span p xs =
     case xs of {
-      Nil -> Pair Nil Nil;
-      Cons x rest ->
+      [] -> (,) [] [];
+      (:) x rest ->
         if p x
         then case span p rest of {
-               Pair before after -> Pair (Cons x before) after
+               (,) before after -> (,) ((:) x before) after
              }
-        else Pair Nil xs
+        else (,) [] xs
     };
-  break :: forall a. (a -> Bool) -> List a -> Pair (List a) (List a);
+  break :: forall a. (a -> Bool) -> [] a -> (,) ([] a) ([] a);
   break p xs = span (\x -> not (p x)) xs;
-  replicate :: forall a. Int -> a -> List a;
-  replicate n x = if (n <= 0) then Nil else Cons x (replicate (n - 1) x);
-  range :: Int -> Int -> List Int;
-  range first last = if (first > last) then Nil else Cons first (range (first + 1) last);
-  iterate :: forall a. (a -> a) -> a -> List a;
-  iterate f x = Cons x (iterate f (f x));
-  repeat :: forall a. a -> List a;
-  repeat x = Cons x (repeat x);
-  zip :: forall a b. List a -> List b -> List (Pair a b);
+  replicate :: forall a. Int -> a -> [] a;
+  replicate n x = if (n <= 0) then [] else (:) x (replicate (n - 1) x);
+  range :: Int -> Int -> [] Int;
+  range first last = if (first > last) then [] else (:) first (range (first + 1) last);
+  iterate :: forall a. (a -> a) -> a -> [] a;
+  iterate f x = (:) x (iterate f (f x));
+  repeat :: forall a. a -> [] a;
+  repeat x = (:) x (repeat x);
+  zip :: forall a b. [] a -> [] b -> [] ((,) a b);
   zip xs ys =
     case xs of {
-      Nil -> Nil;
-      Cons x rest ->
+      [] -> [];
+      (:) x rest ->
         case ys of {
-          Nil -> Nil;
-          Cons y resty -> Cons (Pair x y) (zip rest resty)
+          [] -> [];
+          (:) y resty -> (:) ((,) x y) (zip rest resty)
         }
     };
-  zipWith :: forall a b c. (a -> b -> c) -> List a -> List b -> List c;
+  zipWith :: forall a b c. (a -> b -> c) -> [] a -> [] b -> [] c;
   zipWith f xs ys =
     case xs of {
-      Nil -> Nil;
-      Cons x rest ->
+      [] -> [];
+      (:) x rest ->
         case ys of {
-          Nil -> Nil;
-          Cons y resty -> Cons (f x y) (zipWith f rest resty)
+          [] -> [];
+          (:) y resty -> (:) (f x y) (zipWith f rest resty)
         }
     };
-  unzip :: forall a b. List (Pair a b) -> Pair (List a) (List b);
+  unzip :: forall a b. [] ((,) a b) -> (,) ([] a) ([] b);
   unzip xs =
     foldr
       (\p result ->
          case p of {
-           Pair a b ->
+           (,) a b ->
              case result of {
-               Pair as bs -> Pair (Cons a as) (Cons b bs)
+               (,) as bs -> (,) ((:) a as) ((:) b bs)
              }
          })
-      (Pair Nil Nil)
+      ((,) [] [])
       xs;
-  mapIndexed :: forall a b. (Int -> a -> b) -> List a -> List b;
+  mapIndexed :: forall a b. (Int -> a -> b) -> [] a -> [] b;
   mapIndexed f xs = zipWith f (range 0 (length xs - 1)) xs;
-  intersperse :: forall a. a -> List a -> List a;
+  intersperse :: forall a. a -> [] a -> [] a;
   intersperse sep xs =
     case xs of {
-      Nil -> Nil;
-      Cons x rest ->
+      [] -> [];
+      (:) x rest ->
         case rest of {
-          Nil -> Cons x Nil;
-          Cons y ys -> Cons x (Cons sep (intersperse sep rest))
+          [] -> (:) x [];
+          (:) y ys -> (:) x ((:) sep (intersperse sep rest))
         }
     };
-  intercalate :: String -> List String -> String;
+  intercalate :: String -> [] String -> String;
   intercalate sep xs = concatStrings (intersperse sep xs);
   -- Join adjacent pieces in rounds. Native strings are contiguous UTF-8, so
   -- a right fold copies every suffix again; balanced joins copy O(log n) times.
   -- Force pieces in source order, retaining the old failure/strictness order.
-  concatStrings :: List String -> String;
+  concatStrings :: [] String -> String;
   concatStrings xs =
     case xs of {
-      Nil -> "";
-      Cons first rest ->
+      [] -> "";
+      (:) first rest ->
         seq first
           (case rest of {
-             Nil -> first;
-             Cons second tail -> concatStrings (concatStringPairs xs)
+             [] -> first;
+             (:) second tail -> concatStrings (concatStringPairs xs)
            })
     };
-  concatStringPairs :: List String -> List String;
+  concatStringPairs :: [] String -> [] String;
   concatStringPairs xs =
     case xs of {
-      Nil -> Nil;
-      Cons first rest ->
+      [] -> [];
+      (:) first rest ->
         seq first
           (case rest of {
-             Nil -> Cons first Nil;
-             Cons second tail ->
+             [] -> (:) first [];
+             (:) second tail ->
                let {
                  joined = concatString first second
                } in
-               seq joined (Cons joined (concatStringPairs tail))
+               seq joined ((:) joined (concatStringPairs tail))
            })
     };
-  unwords :: List String -> String;
+  unwords :: [] String -> String;
   unwords xs = intercalate " " xs;
-  unlines :: List String -> String;
+  unlines :: [] String -> String;
   unlines xs = concatStrings (map (\s -> (s ++ "\n")) xs);
-  sum :: List Int -> Int;
+  sum :: [] Int -> Int;
   sum xs = foldl addInt 0 xs;
-  product :: List Int -> Int;
+  product :: [] Int -> Int;
   product xs = foldl mulInt 1 xs;
-  nubBy :: forall a. (a -> a -> Bool) -> List a -> List a;
-  nubBy eq xs = nubSeen eq Nil xs;
-  nubSeen :: forall a. (a -> a -> Bool) -> List a -> List a -> List a;
+  nubBy :: forall a. (a -> a -> Bool) -> [] a -> [] a;
+  nubBy eq xs = nubSeen eq [] xs;
+  nubSeen :: forall a. (a -> a -> Bool) -> [] a -> [] a -> [] a;
   nubSeen eq seen xs =
     case xs of {
-      Nil -> Nil;
-      Cons x rest ->
-        if elem eq x seen then nubSeen eq seen rest else Cons x (nubSeen eq (Cons x seen) rest)
+      [] -> [];
+      (:) x rest ->
+        if elem eq x seen then nubSeen eq seen rest else (:) x (nubSeen eq ((:) x seen) rest)
     };
-  deleteBy :: forall a. (a -> a -> Bool) -> a -> List a -> List a;
+  deleteBy :: forall a. (a -> a -> Bool) -> a -> [] a -> [] a;
   deleteBy eq wanted xs =
     case xs of {
-      Nil -> Nil;
-      Cons x rest -> if eq wanted x then rest else Cons x (deleteBy eq wanted rest)
+      [] -> [];
+      (:) x rest -> if eq wanted x then rest else (:) x (deleteBy eq wanted rest)
     };
-  sortBy :: forall a. (a -> a -> Int) -> List a -> List a;
+  sortBy :: forall a. (a -> a -> Int) -> [] a -> [] a;
   sortBy cmp xs =
     if (length xs < 2)
     then xs
     else case splitAt (quotInt (length xs) 2) xs of {
-           Pair as bs -> mergeBy cmp (sortBy cmp as) (sortBy cmp bs)
+           (,) as bs -> mergeBy cmp (sortBy cmp as) (sortBy cmp bs)
          };
-  mergeBy :: forall a. (a -> a -> Int) -> List a -> List a -> List a;
+  mergeBy :: forall a. (a -> a -> Int) -> [] a -> [] a -> [] a;
   mergeBy cmp xs ys =
     case xs of {
-      Nil -> ys;
-      Cons x restx ->
+      [] -> ys;
+      (:) x restx ->
         case ys of {
-          Nil -> xs;
-          Cons y resty ->
-            if (cmp x y <= 0) then Cons x (mergeBy cmp restx ys) else Cons y (mergeBy cmp xs resty)
+          [] -> xs;
+          (:) y resty ->
+            if (cmp x y <= 0) then (:) x (mergeBy cmp restx ys) else (:) y (mergeBy cmp xs resty)
         }
     };
-  eqList :: forall a. (a -> a -> Bool) -> List a -> List a -> Bool;
+  eqList :: forall a. (a -> a -> Bool) -> [] a -> [] a -> Bool;
   eqList eq xs ys =
     case xs of {
-      Nil -> null ys;
-      Cons x rest ->
+      [] -> null ys;
+      (:) x rest ->
         case ys of {
-          Nil -> False;
-          Cons y resty -> (eq x y && eqList eq rest resty)
+          [] -> False;
+          (:) y resty -> (eq x y && eqList eq rest resty)
         }
     };
-  compareList :: forall a. (a -> a -> Int) -> List a -> List a -> Int;
+  compareList :: forall a. (a -> a -> Int) -> [] a -> [] a -> Int;
   compareList cmp xs ys =
     case xs of {
-      Nil -> if null ys then 0 else (0 - 1);
-      Cons x rest ->
+      [] -> if null ys then 0 else (0 - 1);
+      (:) x rest ->
         case ys of {
-          Nil -> 1;
-          Cons y resty ->
+          [] -> 1;
+          (:) y resty ->
             let {
               c = cmp x y
             } in
@@ -418,17 +418,17 @@ module Bootstrap.Std where {
       Nothing -> panic "fromJust: Nothing";
       Just x -> x
     };
-  maybeToList :: forall a. Maybe a -> List a;
-  maybeToList value = maybe Nil singleton value;
-  listToMaybe :: forall a. List a -> Maybe a;
+  maybeToList :: forall a. Maybe a -> [] a;
+  maybeToList value = maybe [] singleton value;
+  listToMaybe :: forall a. [] a -> Maybe a;
   listToMaybe xs =
     case xs of {
-      Nil -> Nothing;
-      Cons x rest -> Just x
+      [] -> Nothing;
+      (:) x rest -> Just x
     };
-  mapMaybe :: forall a b. (a -> Maybe b) -> List a -> List b;
+  mapMaybe :: forall a b. (a -> Maybe b) -> [] a -> [] b;
   mapMaybe f xs = concatMap (\x -> maybeToList (f x)) xs;
-  catMaybes :: forall a. List (Maybe a) -> List a;
+  catMaybes :: forall a. [] (Maybe a) -> [] a;
   catMaybes xs = mapMaybe id xs;
   mapOptional :: forall a b. (a -> b) -> Maybe a -> Maybe b;
   mapOptional f x = maybe Nothing (\a -> Just (f a)) x;
@@ -484,22 +484,22 @@ module Bootstrap.Std where {
     };
   isRight :: forall e a. Either e a -> Bool;
   isRight value = not (isLeft value);
-  traverseEither :: forall a e b. (a -> Either e b) -> List a -> Either e (List b);
+  traverseEither :: forall a e b. (a -> Either e b) -> [] a -> Either e ([] b);
   traverseEither f xs =
     case xs of {
-      Nil -> Right Nil;
-      Cons x rest -> bindEither (f x) (\y -> mapEither (Cons y) (traverseEither f rest))
+      [] -> Right [];
+      (:) x rest -> bindEither (f x) (\y -> mapEither ((:) y) (traverseEither f rest))
     };
-  foldEither :: forall b a e. (b -> a -> Either e b) -> b -> List a -> Either e b;
+  foldEither :: forall b a e. (b -> a -> Either e b) -> b -> [] a -> Either e b;
   foldEither f z xs =
     case xs of {
-      Nil -> Right z;
-      Cons x rest -> bindEither (f z x) (\next -> foldEither f next rest)
+      [] -> Right z;
+      (:) x rest -> bindEither (f z x) (\next -> foldEither f next rest)
     };
-  sequenceEither :: forall e a. List (Either e a) -> Either e (List a);
+  sequenceEither :: forall e a. [] (Either e a) -> Either e ([] a);
   sequenceEither xs = traverseEither id xs;
-  ensure :: Bool -> String -> Either String Unit;
-  ensure condition message = if condition then Right Unit else Left message;
+  ensure :: Bool -> String -> Either String ();
+  ensure condition message = if condition then Right () else Left message;
   instance forall e. Functor (Either e) where {
     fmap function action = bindEither action (\value -> Right (function value))
   };
@@ -522,46 +522,46 @@ module Bootstrap.Std where {
   instance Monad Maybe where {
     (>>=) = bindMaybe
   };
-  mapM :: forall (m :: (* -> *)) a b. (Monad m) => (a -> m b) -> List a -> m (List b);
+  mapM :: forall (m :: (* -> *)) a b. (Monad m) => (a -> m b) -> [] a -> m ([] b);
   mapM f xs =
     case xs of {
-      Nil -> return Nil;
-      Cons x rest ->
+      [] -> return [];
+      (:) x rest ->
         do {
           y <- f x;
           ys <- mapM f rest;
-          return (Cons y ys)
+          return ((:) y ys)
         }
     };
-  mapM_ :: forall (m :: (* -> *)) a b. (Monad m) => (a -> m b) -> List a -> m Unit;
+  mapM_ :: forall (m :: (* -> *)) a b. (Monad m) => (a -> m b) -> [] a -> m ();
   mapM_ f xs =
     case xs of {
-      Nil -> return Unit;
-      Cons x rest ->
+      [] -> return ();
+      (:) x rest ->
         do {
           f x;
           mapM_ f rest
         }
     };
-  forM :: forall (m :: (* -> *)) a b. (Monad m) => List a -> (a -> m b) -> m (List b);
+  forM :: forall (m :: (* -> *)) a b. (Monad m) => [] a -> (a -> m b) -> m ([] b);
   forM xs f = mapM f xs;
-  forM_ :: forall (m :: (* -> *)) a b. (Monad m) => List a -> (a -> m b) -> m Unit;
+  forM_ :: forall (m :: (* -> *)) a b. (Monad m) => [] a -> (a -> m b) -> m ();
   forM_ xs f = mapM_ f xs;
-  foldM :: forall (m :: (* -> *)) b a. (Monad m) => (b -> a -> m b) -> b -> List a -> m b;
+  foldM :: forall (m :: (* -> *)) b a. (Monad m) => (b -> a -> m b) -> b -> [] a -> m b;
   foldM f z xs =
     case xs of {
-      Nil -> return z;
-      Cons x rest ->
+      [] -> return z;
+      (:) x rest ->
         do {
           next <- f z x;
           foldM f next rest
         }
     };
-  sequence :: forall (m :: (* -> *)) a. (Monad m) => List (m a) -> m (List a);
+  sequence :: forall (m :: (* -> *)) a. (Monad m) => [] (m a) -> m ([] a);
   sequence xs = mapM id xs;
-  when :: forall (m :: (* -> *)). (Monad m) => Bool -> m Unit -> m Unit;
-  when condition action = if condition then action else return Unit;
-  unless :: forall (m :: (* -> *)). (Monad m) => Bool -> m Unit -> m Unit;
+  when :: forall (m :: (* -> *)). (Monad m) => Bool -> m () -> m ();
+  when condition action = if condition then action else return ();
+  unless :: forall (m :: (* -> *)). (Monad m) => Bool -> m () -> m ();
   unless condition action = when (not condition) action;
   compareKind :: Kind -> Kind -> Int;
   compareKind a b =
@@ -617,15 +617,15 @@ module Bootstrap.Std where {
   compareTyVar a b = compareInt (tyVarId a) (tyVarId b);
   eqTyVar :: XTyVar -> XTyVar -> Bool;
   eqTyVar a b = (tyVarId a == tyVarId b);
-  comparePair :: forall a b. (a -> a -> Int) -> (b -> b -> Int) -> Pair a b -> Pair a b -> Int;
-  comparePair ca cb (Pair a b) (Pair x y) =
+  comparePair :: forall a b. (a -> a -> Int) -> (b -> b -> Int) -> (,) a b -> (,) a b -> Int;
+  comparePair ca cb ((,) a b) ((,) x y) =
     let {
       c = ca a x
     } in
     if (c == 0) then cb b y else c;
-  eqPair :: forall a b. (a -> a -> Bool) -> (b -> b -> Bool) -> Pair a b -> Pair a b -> Bool;
-  eqPair ea eb (Pair a b) (Pair x y) = (ea a x && eb b y);
-  concatMapString :: forall a. (a -> String) -> List a -> String;
+  eqPair :: forall a b. (a -> a -> Bool) -> (b -> b -> Bool) -> (,) a b -> (,) a b -> Bool;
+  eqPair ea eb ((,) a b) ((,) x y) = (ea a x && eb b y);
+  concatMapString :: forall a. (a -> String) -> [] a -> String;
   concatMapString f xs = concatStrings (map f xs);
   negateDouble :: Double -> Double;
   negateDouble value =

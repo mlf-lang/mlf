@@ -15,15 +15,15 @@ module MLF.Entry.Mlfpkg where {
         matchValueShared1 = args
       } in
       case matchValueShared1 of {
-        Cons matchValueShared2 matchValueShared3 ->
+        (:) matchValueShared2 matchValueShared3 ->
           if MLF.Primitive.eqString matchValueShared2 "--implementation-identity"
           then case matchValueShared3 of {
-                 Nil -> putStrLn ("MLF/shared-haskell-v1 " ++ implementationHost);
+                 [] -> putStrLn ("MLF/shared-haskell-v1 " ++ implementationHost);
                  _ -> C.run args
                }
           else if MLF.Primitive.eqString matchValueShared2 "--version"
           then case matchValueShared3 of {
-                 Nil -> putStrLn ("mlfpkg " ++ Version.version);
+                 [] -> putStrLn ("mlfpkg " ++ Version.version);
                  _ -> C.run args
                }
           else C.run args;

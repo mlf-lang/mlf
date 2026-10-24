@@ -20,17 +20,17 @@ module Test.Expectation where {
     Unavailable String |
     Skip String;
   data Observation = Observation O.Phase Termination String Bool;
-  validate :: Expectation -> Either String Unit;
+  validate :: Expectation -> Either String ();
   validate expected =
     case expected of {
-      Accept _ -> Right Unit;
+      Accept _ -> Right ();
       Reject _ reason code ->
         if ((stringLength reason > 0) && ((code > 0) && (code <= 255)))
-        then Right Unit
+        then Right ()
         else Left "rejection requires a diagnostic code and a specific nonzero exit";
       ExpectSignal _ reason signal ->
         if ((stringLength reason > 0) && ((signal > 0) && (signal < 128)))
-        then Right Unit
+        then Right ()
         else Left "expected signal requires a diagnostic code and a specific signal"
     };
   phase expected =
@@ -43,10 +43,10 @@ module Test.Expectation where {
   match expected (Observation actualPhase termination reason verified) =
     case validate expected of {
       Left error -> O.ProtocolError error;
-      Right Unit ->
+      Right () ->
         case validObservation termination of {
           Left error -> O.ProtocolError error;
-          Right Unit -> matchValid expected actualPhase termination reason verified
+          Right () -> matchValid expected actualPhase termination reason verified
         }
     };
   matchValid expected actualPhase termination reason verified =
@@ -90,20 +90,20 @@ module Test.Expectation where {
     };
   -- Keep Boolean operations explicit for the foundation-only import closure.
   not value = if value then False else True;
-  validObservation :: Termination -> Either String Unit;
+  validObservation :: Termination -> Either String ();
   validObservation termination =
     case termination of {
       Exit code ->
-        if ((code >= 0) && (code <= 255)) then Right Unit else Left "invalid observed exit code";
+        if ((code >= 0) && (code <= 255)) then Right () else Left "invalid observed exit code";
       Signal signal ->
-        if ((signal > 0) && (signal < 128)) then Right Unit else Left "invalid observed signal";
+        if ((signal > 0) && (signal < 128)) then Right () else Left "invalid observed signal";
       Unavailable reason -> nonemptyReason reason;
       Skip reason -> nonemptyReason reason;
-      _ -> Right Unit
+      _ -> Right ()
     };
-  nonemptyReason :: String -> Either String Unit;
+  nonemptyReason :: String -> Either String ();
   nonemptyReason reason =
     if (stringLength reason > 0)
-    then Right Unit
+    then Right ()
     else Left "skip/unsupported requires an auditable reason"
 }

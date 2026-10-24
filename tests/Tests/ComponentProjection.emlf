@@ -10,105 +10,105 @@ import qualified Tests.Helpers as H
 
 -- Find incoming edges from the graph itself, without the solver's indexes,
 -- scratch storage or persistent visited sets.
-reference : Graph -> List Int -> List Int -> Either String (List Int)
+reference : Graph -> [] Int -> [] Int -> Either String ([] Int)
 reference graph seen pending = case pending of
- Nil -> Right (L.sortBy L.compareInt seen)
- Cons original rest ->
+ [] -> Right (L.sortBy L.compareInt seen)
+ (:) original rest ->
   let n = N.resolve graph original in
   if L.elem eqInt n seen then reference graph seen rest else
   case IM.lookup n (G.nodes graph) of
    Nothing -> Left ("missing graph node " ++ showInt n)
    Just node ->
-    let incoming = L.map L.fst (L.filter (\(Pair key value) ->
+    let incoming = L.map L.fst (L.filter (\((,) key value) ->
          L.elem eqInt n (G.children (G.tag value)) || G.equalMaybeInt (G.binder value) (Just n)) (IM.toList (G.nodes graph))) in
-    let adjacent = if G.isGen (G.tag node) then Nil else
+    let adjacent = if G.isGen (G.tag node) then [] else
          L.append (G.children (G.tag node)) (L.append (L.maybeToList (G.binder node)) incoming) in
-    reference graph (Cons n seen) (L.append adjacent rest)
+    reference graph ((:) n seen) (L.append adjacent rest)
 
 checkComponent solver starts =
  let actual = G.bindE (S.component solver starts) (\values -> Right (IS.toList values)) in
- H.assert (H.eq actual (reference (S.graph solver) Nil starts)) "component membership or missing-node error changed"
+ H.assert (H.eq actual (reference (S.graph solver) [] starts)) "component membership or missing-node error changed"
 
-chain count = Graph (IM.fromList (Cons (Pair 0 (Node (GGen 1) Nothing Flexible))
- (L.map (\n -> Pair n (Node (if n == count then GBot else GArr (n + 1) (n + 1)) (Just 0) Flexible)) (L.range 1 count)))) IM.empty (count + 1)
+chain count = Graph (IM.fromList ((:) ((,) 0 (Node (GGen 1) Nothing Flexible))
+ (L.map (\n -> (,) n (Node (if n == count then GBot else GArr (n + 1) (n + 1)) (Just 0) Flexible)) (L.range 1 count)))) IM.empty (count + 1)
 
 
 checkScopes solver starts = do
  let graph = S.graph solver
- let expected = G.bindE (reference graph Nil starts) (\ids -> Right (Pair ids (L.filter (\n -> G.isGen (G.tag (IM.get n (G.nodes graph)))) ids)))
- let actual = G.bindE (S.componentScopes solver starts) (\(Pair ids scopes) -> Right (Pair (IS.toList ids) (IS.toList scopes)))
+ let expected = G.bindE (reference graph [] starts) (\ids -> Right ((,) ids (L.filter (\n -> G.isGen (G.tag (IM.get n (G.nodes graph)))) ids)))
+ let actual = G.bindE (S.componentScopes solver starts) (\((,) ids scopes) -> Right ((,) (IS.toList ids) (IS.toList scopes)))
  H.assert (H.eq actual expected) "component membership, boundaries or missing-node errors changed"
- let retained = G.bindE (S.componentCanonicalNodesVisit solver IM.empty IS.empty (L.map (G.resolve graph) starts)) (\(Pair nodes scopes) ->
-       Right (Pair (IM.toList nodes) (IS.toList scopes)))
- let expectedNodes = G.bindE (reference graph Nil starts) (\ids -> Right (Pair (L.map (\n -> Pair n (IM.get n (G.nodes graph))) ids) (L.filter (\n -> G.isGen (G.tag (IM.get n (G.nodes graph)))) ids)))
+ let retained = G.bindE (S.componentCanonicalNodesVisit solver IM.empty IS.empty (L.map (G.resolve graph) starts)) (\((,) nodes scopes) ->
+       Right ((,) (IM.toList nodes) (IS.toList scopes)))
+ let expectedNodes = G.bindE (reference graph [] starts) (\ids -> Right ((,) (L.map (\n -> (,) n (IM.get n (G.nodes graph))) ids) (L.filter (\n -> G.isGen (G.tag (IM.get n (G.nodes graph)))) ids)))
  H.assert (H.eq retained expectedNodes) "retained component nodes, boundaries or missing-node errors changed"
  checkComponent solver starts
 
 -- All start categories and six identity renamings on small graphs; large
 -- chains retain their original sizes once, including both sides of 32/128.
 componentInputs sizes large = L.append
- (L.concatMap (\offset -> L.concatMap (\stride -> L.map (N.rename (\n -> offset + stride * n)) (Cons (N.fixture 7) (L.map chain sizes))) (Cons 1 (Cons 100003 Nil))) (Cons 0 (Cons 340282366920938463463374607431768211456 (Cons (-340282366920938463463374607431768211456) Nil))))
+ (L.concatMap (\offset -> L.concatMap (\stride -> L.map (N.rename (\n -> offset + stride * n)) ((:) (N.fixture 7) (L.map chain sizes))) ((:) 1 ((:) 100003 []))) ((:) 0 ((:) 340282366920938463463374607431768211456 ((:) (-340282366920938463463374607431768211456) []))))
  (L.map chain large)
-scopes : IO Unit
+scopes : IO ()
 scopes = do
  L.mapM_ (\input -> do
   solver <- H.right (S.prepare input)
   let keys = IM.keys (G.nodes input)
-  let starts = Cons Nil (Cons (Cons (L.head keys) Nil) (Cons (Cons (L.index keys 1) Nil) (Cons (Cons (L.last keys) Nil) (Cons keys (Cons (L.append keys keys) (Cons (IM.keys (G.links input)) (Cons (Cons (G.nextId input) Nil) (Cons (Cons (L.head keys - 1) Nil) Nil))))))))
-  L.mapM_ (checkScopes solver) (L.nubBy (L.eqList eqInt) starts)) (componentInputs (Cons 1 (Cons 2 (Cons 5 Nil))) (Cons 31 (Cons 33 (Cons 127 (Cons 257 Nil)))))
- return Unit
+  let starts = (:) [] ((:) ((:) (L.head keys) []) ((:) ((:) (L.index keys 1) []) ((:) ((:) (L.last keys) []) ((:) keys ((:) (L.append keys keys) ((:) (IM.keys (G.links input)) ((:) ((:) (G.nextId input) []) ((:) ((:) (L.head keys - 1) []) []))))))))
+  L.mapM_ (checkScopes solver) (L.nubBy (L.eqList eqInt) starts)) (componentInputs ((:) 1 ((:) 2 ((:) 5 []))) ((:) 31 ((:) 33 ((:) 127 ((:) 257 [])))))
+ return ()
 
 checkProjection solver starts = do
- Pair connected boundaries <- H.right (S.componentScopes solver starts)
+ (,) connected boundaries <- H.right (S.componentScopes solver starts)
  let old = S.graph solver
  let scopes = S.projectScopes (S.scopeIndex solver) boundaries
  let selected = IS.union connected (IS.fromList (IM.keys scopes))
- let originals = L.map (\n -> Pair n (G.nodeAt old n)) (IS.toList selected)
+ let originals = L.map (\n -> (,) n (G.nodeAt old n)) (IS.toList selected)
  let count = L.length originals
- let hidden = L.filter (\(Pair n node) -> case G.tag node of { GGen root -> L.not (IS.member root selected); _ -> false }) originals
+ let hidden = L.filter (\((,) n node) -> case G.tag node of { GGen root -> L.not (IS.member root selected); _ -> false }) originals
  let stubs = IM.fromDistinctAscList (L.zip (L.map L.fst hidden) (L.range count (count + L.length hidden - 1)))
- let expected = L.map (\(Pair n node) -> Pair (S.compactIdentity old selected n) (S.localNode old selected scopes stubs n node)) originals
+ let expected = L.map (\((,) n node) -> (,) (S.compactIdentity old selected n) (S.localNode old selected scopes stubs n node)) originals
  let actual = S.projectNodes old selected scopes stubs 0 originals
  let nodeTree = case IM.fromList (L.reverse originals) of IntMap tree -> tree
  let retained = S.projectCanonicalNodes nodeTree scopes stubs 0 originals
- H.assert (L.eqList (\(Pair n a) (Pair m b) -> n == m && G.equalNode a b) expected retained) "node-map projection changed identities, fields, binders or hidden scope roots"
- H.assert (L.eqList (\(Pair n a) (Pair m b) -> n == m && G.equalNode a b) expected actual) "enumerated projection changed identities, fields, binders or scope stubs"
+ H.assert (L.eqList (\((,) n a) ((,) m b) -> n == m && G.equalNode a b) expected retained) "node-map projection changed identities, fields, binders or hidden scope roots"
+ H.assert (L.eqList (\((,) n a) ((,) m b) -> n == m && G.equalNode a b) expected actual) "enumerated projection changed identities, fields, binders or scope stubs"
 
-projection : IO Unit
+projection : IO ()
 projection = do
  L.mapM_ (\input -> do
   solver <- H.right (S.prepare input)
   let keys = IM.keys (G.nodes (S.graph solver))
-  let starts = Cons Nil (Cons (Cons (L.head keys) Nil) (Cons (Cons (L.index keys 1) Nil) (Cons (Cons (L.last keys) Nil) (Cons keys (Cons (L.append keys keys) Nil)))))
-  L.mapM_ (checkProjection solver) (L.nubBy (L.eqList eqInt) starts)) (componentInputs (Cons 1 (Cons 2 (Cons 5 Nil))) (Cons 17 (Cons 65 Nil)))
- return Unit
+  let starts = (:) [] ((:) ((:) (L.head keys) []) ((:) ((:) (L.index keys 1) []) ((:) ((:) (L.last keys) []) ((:) keys ((:) (L.append keys keys) [])))))
+  L.mapM_ (checkProjection solver) (L.nubBy (L.eqList eqInt) starts)) (componentInputs ((:) 1 ((:) 2 ((:) 5 []))) ((:) 17 ((:) 65 [])))
+ return ()
 
 restorationResult actual expected = case actual of
  Left message -> case expected of Left other -> eqString message other; _ -> false
  Right nodes -> case expected of
   Left message -> false
-  Right others -> L.eqList (\(Pair n a) (Pair m b) -> n == m && G.equalNode a b) nodes others
+  Right others -> L.eqList (\((,) n a) ((,) m b) -> n == m && G.equalNode a b) nodes others
 
 checkRestoration count offset stride mode = do
  let key = \n -> offset + stride * n
  let ids = L.map key (L.range 0 (count - 1))
- let originals = L.map (\n -> Pair (key n) (G.mkNode (if remInt n 3 == 0 then GGen (key (count + 2)) else GBot) (if remInt n 2 == 0 then Nothing else Just (key 0)) Flexible)) (L.range 0 (count - 1))
+ let originals = L.map (\n -> (,) (key n) (G.mkNode (if remInt n 3 == 0 then GGen (key (count + 2)) else GBot) (if remInt n 2 == 0 then Nothing else Just (key 0)) Flexible)) (L.range 0 (count - 1))
  let old = G.mkGraph (IM.fromList originals) IM.empty (key (count + 3))
  let aliased = G.mkGraph (G.nodes old) (IM.singleton (key (count + 2)) (key 0)) (G.nextId old)
  let selected = IS.fromList ids
- let solved = L.map (\n -> Pair n (G.mkNode (if remInt n 2 == 0 then GArr (remInt (n + 1) count) 0 else GCon "T" (Cons 0 Nil)) (if mode == 7 then Just count else if remInt n 2 == 0 then Nothing else Just 0) (if remInt mode 2 == 0 then Rigid else Flexible))) (L.filter (\n -> remInt (n + mode) 4 /= 0) (L.range 0 (count - 1)))
+ let solved = L.map (\n -> (,) n (G.mkNode (if remInt n 2 == 0 then GArr (remInt (n + 1) count) 0 else GCon "T" ((:) 0 [])) (if mode == 7 then Just count else if remInt n 2 == 0 then Nothing else Just 0) (if remInt mode 2 == 0 then Rigid else Flexible))) (L.filter (\n -> remInt (n + mode) 4 /= 0) (L.range 0 (count - 1)))
  L.mapM_ (\entries -> do
   let expected = G.mapE (S.restoreNode old aliased selected) entries
   let nodeTree = case IM.fromList (L.reverse originals) of IntMap tree -> tree
   let actual = S.restoreProjectedNodes aliased nodeTree 0 originals entries
-  if restorationResult actual expected then return Unit else panic "ordered restoration disagrees with independent inverse-rank/map lookups") (let controls = Cons Nil (Cons (Cons (Pair (-1) (G.mkNode GBot Nothing Flexible)) Nil) (Cons (Cons (Pair count (G.mkNode GBot Nothing Flexible)) Nil) Nil)) in if L.null solved then controls else Cons solved controls)
-restoration : IO Unit
+  if restorationResult actual expected then return () else panic "ordered restoration disagrees with independent inverse-rank/map lookups") (let controls = (:) [] ((:) ((:) ((,) (-1) (G.mkNode GBot Nothing Flexible)) []) ((:) ((:) ((,) count (G.mkNode GBot Nothing Flexible)) []) [])) in if L.null solved then controls else (:) solved controls)
+restoration : IO ()
 restoration = do
  -- Full modes, malformed ranks and large identities on small structures.
- L.mapM_ (\count -> L.mapM_ (\offset -> L.mapM_ (\stride -> L.mapM_ (checkRestoration count offset stride) (L.range 0 7)) (Cons 1 (Cons 100003 Nil))) (Cons (-340282366920938463463374607431768211456) (Cons (-7) (Cons 0 (Cons 340282366920938463463374607431768211456 Nil))))) (Cons 0 (Cons 1 (Cons 2 (Cons 5 Nil))))
+ L.mapM_ (\count -> L.mapM_ (\offset -> L.mapM_ (\stride -> L.mapM_ (checkRestoration count offset stride) (L.range 0 7)) ((:) 1 ((:) 100003 []))) ((:) (-340282366920938463463374607431768211456) ((:) (-7) ((:) 0 ((:) 340282366920938463463374607431768211456 []))))) ((:) 0 ((:) 1 ((:) 2 ((:) 5 []))))
  -- Scale exercises ordered restoration without crossing every renaming.
- L.mapM_ (\count -> L.mapM_ (checkRestoration count 0 1) (L.range 0 7)) (Cons 17 (Cons 33 Nil))
- return Unit
+ L.mapM_ (\count -> L.mapM_ (checkRestoration count 0 1) (L.range 0 7)) ((:) 17 ((:) 33 []))
+ return ()
 
-suite : List (Pair String (IO Unit))
-suite = Cons (Pair "component scopes agree with independent edge enumeration" scopes) (Cons (Pair "projected nodes preserve explicit rank identities" projection) (Cons (Pair "ordered restoration preserves checked inverse identities" restoration) Nil))
+suite : [] ((,) String (IO ()))
+suite = (:) ((,) "component scopes agree with independent edge enumeration" scopes) ((:) ((,) "projected nodes preserve explicit rank identities" projection) ((:) ((,) "ordered restoration preserves checked inverse identities" restoration) []))

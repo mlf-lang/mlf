@@ -12,8 +12,8 @@ module Test.Runner where {
   import qualified Test.Registry as Registry;
   import qualified Test.Outcome as Outcome;
   data Selector = Filter String | Exact String | Tag String;
-  data Options = Options Bool Bool String (List Selector);
-  data Result = Result C.Case (Either A.Failure Unit);
+  data Options = Options Bool Bool String ([] Selector);
+  data Result = Result C.Case (Either A.Failure ());
   usage :: String;
   usage =
     "test [--list] [--filter TEXT] [--exact ID] [--tag TAG] [--group NAME] [--level NAME] [--input NAME] [--oracle NAME] [--purpose NAME] [--category NAME] [--technique NAME] [--format text|json] [--report FILE]";
@@ -21,16 +21,16 @@ module Test.Runner where {
   json (Options _ value _ _) = value;
   report (Options _ _ path _) = path;
   selectors (Options _ _ _ values) = values;
-  parse :: List String -> Either String Options;
-  parse args = parseWith (Options False False "" Nil) args;
-  parseWith :: Options -> List String -> Either String Options;
+  parse :: [] String -> Either String Options;
+  parse args = parseWith (Options False False "" []) args;
+  parseWith :: Options -> [] String -> Either String Options;
   parseWith (Options list machine path selected) args =
     let {
       matchValueShared1 = args
     } in
     case matchValueShared1 of {
-      Nil -> Right (Options list machine path (S.reverse selected));
-      Cons matchValueShared2 matchValueShared3 ->
+      [] -> Right (Options list machine path (S.reverse selected));
+      (:) matchValueShared2 matchValueShared3 ->
         if MLF.Primitive.eqString matchValueShared2 "--list"
         then let {
                rest = matchValueShared3
@@ -38,7 +38,7 @@ module Test.Runner where {
              parseWith (Options True machine path selected) rest
         else if MLF.Primitive.eqString matchValueShared2 "--format"
              then case matchValueShared3 of {
-                    Cons matchValueShared6 matchValueShared7 ->
+                    (:) matchValueShared6 matchValueShared7 ->
                       if MLF.Primitive.eqString matchValueShared6 "text"
                       then let {
                              rest = matchValueShared7
@@ -65,35 +65,35 @@ module Test.Runner where {
                                      else if eqString flag "--filter"
                                           then parseWith
                                                  (Options list machine path
-                                                    (Cons (Filter value) selected))
+                                                    ((:) (Filter value) selected))
                                                  rest
                                           else if eqString flag "--exact"
                                                then parseWith
                                                       (Options list machine path
-                                                         (Cons (Exact value) selected))
+                                                         ((:) (Exact value) selected))
                                                       rest
                                                else if eqString flag "--tag"
                                                     then parseWith
                                                            (Options list machine path
-                                                              (Cons (Tag value) selected))
+                                                              ((:) (Tag value) selected))
                                                            rest
                                                     else if eqString flag "--group"
                                                          then parseWith
                                                                 (Options list machine path
-                                                                   (Cons (Tag ("group:" ++ value))
+                                                                   ((:) (Tag ("group:" ++ value))
                                                                       selected))
                                                                 rest
                                                          else if eqString flag "--level"
                                                               then parseWith
                                                                      (Options list machine path
-                                                                        (Cons
+                                                                        ((:)
                                                                            (Tag ("level:" ++ value))
                                                                            selected))
                                                                      rest
                                                               else if eqString flag "--input"
                                                                    then parseWith
                                                                           (Options list machine path
-                                                                             (Cons
+                                                                             ((:)
                                                                                 (Tag
                                                                                    ("input:" ++
                                                                                     value))
@@ -103,7 +103,7 @@ module Test.Runner where {
                                                                         then parseWith
                                                                                (Options list machine
                                                                                   path
-                                                                                  (Cons
+                                                                                  ((:)
                                                                                      (Tag
                                                                                         ("oracle:" ++
                                                                                          value))
@@ -115,7 +115,7 @@ module Test.Runner where {
                                                                                     (Options list
                                                                                        machine
                                                                                        path
-                                                                                       (Cons
+                                                                                       ((:)
                                                                                           (Tag
                                                                                              ("purpose:" ++
                                                                                               value))
@@ -128,7 +128,7 @@ module Test.Runner where {
                                                                                             list
                                                                                             machine
                                                                                             path
-                                                                                            (Cons
+                                                                                            ((:)
                                                                                                (Tag
                                                                                                   ("category:" ++
                                                                                                    value))
@@ -142,7 +142,7 @@ module Test.Runner where {
                                                                                                  list
                                                                                                  machine
                                                                                                  path
-                                                                                                 (Cons
+                                                                                                 ((:)
                                                                                                     (Tag
                                                                                                        ("technique:" ++
                                                                                                         value))
@@ -153,7 +153,7 @@ module Test.Runner where {
                     _ -> Left usage
                   }
              else case matchValueShared3 of {
-                    Cons matchValueShared4 matchValueShared5 ->
+                    (:) matchValueShared4 matchValueShared5 ->
                       let {
                         value = matchValueShared4
                       } in
@@ -169,39 +169,39 @@ module Test.Runner where {
                            then parseWith (Options list machine value selected) rest
                            else if eqString flag "--filter"
                                 then parseWith
-                                       (Options list machine path (Cons (Filter value) selected))
+                                       (Options list machine path ((:) (Filter value) selected))
                                        rest
                                 else if eqString flag "--exact"
                                      then parseWith
                                             (Options list machine path
-                                               (Cons (Exact value) selected))
+                                               ((:) (Exact value) selected))
                                             rest
                                      else if eqString flag "--tag"
                                           then parseWith
                                                  (Options list machine path
-                                                    (Cons (Tag value) selected))
+                                                    ((:) (Tag value) selected))
                                                  rest
                                           else if eqString flag "--group"
                                                then parseWith
                                                       (Options list machine path
-                                                         (Cons (Tag ("group:" ++ value)) selected))
+                                                         ((:) (Tag ("group:" ++ value)) selected))
                                                       rest
                                                else if eqString flag "--level"
                                                     then parseWith
                                                            (Options list machine path
-                                                              (Cons (Tag ("level:" ++ value))
+                                                              ((:) (Tag ("level:" ++ value))
                                                                  selected))
                                                            rest
                                                     else if eqString flag "--input"
                                                          then parseWith
                                                                 (Options list machine path
-                                                                   (Cons (Tag ("input:" ++ value))
+                                                                   ((:) (Tag ("input:" ++ value))
                                                                       selected))
                                                                 rest
                                                          else if eqString flag "--oracle"
                                                               then parseWith
                                                                      (Options list machine path
-                                                                        (Cons
+                                                                        ((:)
                                                                            (Tag
                                                                               ("oracle:" ++ value))
                                                                            selected))
@@ -209,7 +209,7 @@ module Test.Runner where {
                                                               else if eqString flag "--purpose"
                                                                    then parseWith
                                                                           (Options list machine path
-                                                                             (Cons
+                                                                             ((:)
                                                                                 (Tag
                                                                                    ("purpose:" ++
                                                                                     value))
@@ -220,7 +220,7 @@ module Test.Runner where {
                                                                         then parseWith
                                                                                (Options list machine
                                                                                   path
-                                                                                  (Cons
+                                                                                  ((:)
                                                                                      (Tag
                                                                                         ("category:" ++
                                                                                          value))
@@ -232,7 +232,7 @@ module Test.Runner where {
                                                                                     (Options list
                                                                                        machine
                                                                                        path
-                                                                                       (Cons
+                                                                                       ((:)
                                                                                           (Tag
                                                                                              ("technique:" ++
                                                                                               value))
@@ -260,9 +260,9 @@ module Test.Runner where {
     };
   -- Share one identity contract with typed descriptors; preserve the v1 API.
   validId = D.validId;
-  validate :: List C.Case -> Either String Unit;
+  validate :: [] C.Case -> Either String ();
   validate cases = Registry.validate (S.map C.descriptor cases);
-  plan :: List String -> List C.Case -> Either String (Pair Options (List C.Case));
+  plan :: [] String -> [] C.Case -> Either String ((,) Options ([] C.Case));
   plan args cases =
     do {
       options <- parse args;
@@ -271,12 +271,12 @@ module Test.Runner where {
         selected =
           S.filter (\entry -> S.all (\selector -> matches selector entry) (selectors options)) cases
       };
-      if S.null selected then Left "no tests matched selection" else Right (Pair options selected)
+      if S.null selected then Left "no tests matched selection" else Right ((,) options selected)
     };
   typedOutcome :: Result -> Outcome.Outcome;
   typedOutcome (Result _ result) =
     case result of {
-      Right Unit -> Outcome.Pass;
+      Right () -> Outcome.Pass;
       Left failure -> Outcome.AssertionFailure (A.describe failure)
     };
   passed (Result _ outcome) =
@@ -285,11 +285,11 @@ module Test.Runner where {
       Left _ -> False
     };
   identity (Result entry _) = C.id entry;
-  executeWith :: (Result -> IO Unit) -> List C.Case -> IO (List Result);
+  executeWith :: (Result -> IO ()) -> [] C.Case -> IO ([] Result);
   executeWith observe cases =
     case cases of {
-      Nil -> ioReturn Nil;
-      Cons entry rest ->
+      [] -> ioReturn [];
+      (:) entry rest ->
         do {
           outcome <- A.run (C.action entry);
           let {
@@ -297,11 +297,11 @@ module Test.Runner where {
           };
           observe result;
           remaining <- executeWith observe rest;
-          ioReturn (Cons result remaining)
+          ioReturn ((:) result remaining)
         }
     };
-  execute :: List C.Case -> IO (List Result);
-  execute = executeWith (\_ -> ioReturn Unit);
+  execute :: [] C.Case -> IO ([] Result);
+  execute = executeWith (\_ -> ioReturn ());
   -- Only encoding is needed for the wire protocol. Preserve Unicode and escape
   -- every JSON control character, including NUL; never mix test labels into JSON.
   quote text =
@@ -345,7 +345,7 @@ module Test.Runner where {
              (quote (A.message failure) ++
               ((case A.details failure of {
                   Nothing -> "";
-                  Just (Pair expected actual) ->
+                  Just ((,) expected actual) ->
                     (",\"expected\":" ++ (quote expected ++ (",\"actual\":" ++ quote actual)))
                 }) ++
                "}")))
@@ -371,7 +371,7 @@ module Test.Runner where {
     let {
       exact =
         case Registry.exactInventory (S.map C.id selected) (S.map identity results) of {
-          Right Unit -> True;
+          Right () -> True;
           Left _ -> False
         }
     } in
@@ -389,7 +389,7 @@ module Test.Runner where {
           (",\"passed\":" ++
            (showInt successes ++
             (",\"failed\":" ++ (showInt (S.length results - successes) ++ "}"))))))))));
-  run :: List String -> List C.Case -> IO Int;
+  run :: [] String -> [] C.Case -> IO Int;
   -- Replace a previous report before actions run. A crash leaves an incomplete
   -- start record; only a returned run may publish a complete summary.
   -- Compare actual IDs to the plan, not merely their counts.
@@ -400,7 +400,7 @@ module Test.Runner where {
           putErr ("test: " ++ (error ++ "\n"));
           ioReturn 2
         };
-      Right (Pair options selected) ->
+      Right ((,) options selected) ->
         do {
           let {
             total = S.length cases
@@ -433,7 +433,7 @@ module Test.Runner where {
                        (",\"ids\":" ++ (strings (S.map C.id selected) ++ "}"))))
                  };
                  saveReport options (start ++ "\n");
-                 if json options then putStrLn start else ioReturn Unit;
+                 if json options then putStrLn start else ioReturn ();
                  results <-
                    executeWith
                      (\result ->
@@ -446,7 +446,7 @@ module Test.Runner where {
                    exact =
                      case Registry.exactInventory (S.map C.id selected)
                             (S.map identity results) of {
-                       Right Unit -> True;
+                       Right () -> True;
                        Left _ -> False
                      }
                  };
@@ -455,7 +455,7 @@ module Test.Runner where {
                  };
                  saveReport options
                    (S.intercalate "\n"
-                      (Cons start (S.append (S.map resultJson results) (Cons summary Nil))) ++
+                      ((:) start (S.append (S.map resultJson results) ((:) summary []))) ++
                     "\n");
                  if json options
                  then putStrLn summary
@@ -469,22 +469,22 @@ module Test.Runner where {
         }
     };
   saveReport options text =
-    if eqString (report options) "" then ioReturn Unit else writeFile (report options) text;
-  arguments :: Int -> Int -> IO (List String);
+    if eqString (report options) "" then ioReturn () else writeFile (report options) text;
+  arguments :: Int -> Int -> IO ([] String);
   arguments index count =
     if (index >= count)
-    then ioReturn Nil
+    then ioReturn []
     else do {
            value <- getArg index;
            rest <- arguments (index + 1) count;
-           ioReturn (Cons value rest)
+           ioReturn ((:) value rest)
          };
-  main :: List C.Case -> IO Unit;
+  main :: [] C.Case -> IO ();
   main cases =
     do {
       count <- getArgCount;
       args <- arguments 0 count;
       code <- run args cases;
-      if (code == 0) then ioReturn Unit else exitWith code
+      if (code == 0) then ioReturn () else exitWith code
     }
 }

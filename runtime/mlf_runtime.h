@@ -8,14 +8,10 @@
  * byte 8, packed fields at byte 16, wide fields at byte 24 and environment
  * slots at byte 8. The runtime requires GMP and BDWGC. Old standard-layout
  * LLVM/object files must be regenerated; their ABI guard is not exported. */
-void mlf_require_compact_gc_abi(void);
-/* Append-only primitive 82 and process transport v1. New compiler output
- * requires this symbol; released-seed output keeps the compact ABI above. */
-void mlf_require_process_supervisor_v1_abi(void);
-/* Append-only completion primitives 83 through 94, with scoped queues and timers. */
-void mlf_require_async_completion_v2_abi(void);
-/* Canonical constructors and Char/typed IOError/managed-stack primitives 95..106. */
-void mlf_require_haskell_boundary_v2_abi(void);
+/* Boundary v3: true unit is constructor tag1, tuple arities2..64, source
+ * stack frames7/evidence8. No earlier ABI guard is exported: old generated
+ * objects must use their frozen old runtime, not silently cross this boundary. */
+void mlf_require_haskell_boundary_v3_abi(void);
 
 typedef struct MlfValue MlfValue;
 typedef struct MlfEnv MlfEnv;

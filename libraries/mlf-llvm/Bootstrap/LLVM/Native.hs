@@ -53,12 +53,12 @@ module Bootstrap.LLVM.Native where {
       Floating v -> True;
       Boxed v -> False
     };
-  invokeKernel :: XName -> A.WorkerFunction -> List Scalar -> Build String;
+  invokeKernel :: XName -> A.WorkerFunction -> [] Scalar -> Build String;
   invokeKernel name f arguments =
     do {
       invocation <- kernelCall name f arguments;
       case invocation of {
-        Pair code values -> call code (L.map scalarArgument values)
+        (,) code values -> call code (L.map scalarArgument values)
       }
     };
   promoteDouble :: Map String String -> Scalar -> Scalar;
@@ -71,17 +71,17 @@ module Bootstrap.LLVM.Native where {
           Nothing -> value
         }
     };
-  boundedScalar :: Map String (Pair Int Int) -> Int -> Scalar -> Bool;
+  boundedScalar :: Map String ((,) Int Int) -> Int -> Scalar -> Bool;
   boundedScalar facts limit value =
     case value of {
       Floating x -> False;
       Boxed x ->
         case M.lookup compareString x facts of {
           Nothing -> False;
-          Just (Pair lo hi) -> ((lo >= 0) && (hi < limit))
+          Just ((,) lo hi) -> ((lo >= 0) && (hi < limit))
         }
     };
-  requestedMode :: Map String (Pair Int Int) ->
+  requestedMode :: Map String ((,) Int Int) ->
                    Set XName -> Set XName -> Bool -> XName -> Scalar -> NativeMode;
   requestedMode facts counters indices narrow name value =
     case value of {
@@ -94,18 +94,18 @@ module Bootstrap.LLVM.Native where {
              then NonnegativeInt
              else General
     };
-  specialized :: List NativeMode -> Bool;
+  specialized :: [] NativeMode -> Bool;
   specialized modes = L.any (\mode -> (modeCode mode /= 0)) modes;
-  variantCount :: XName -> Set (Pair XName (List NativeMode)) -> Int;
+  variantCount :: XName -> Set ((,) XName ([] NativeMode)) -> Int;
   variantCount name variants =
     L.length
       (L.filter
          (\entry ->
             case entry of {
-              Pair n modes -> (O.eqName n name && specialized modes)
+              (,) n modes -> (O.eqName n name && specialized modes)
             })
          (S.toList variants));
-  kernelCall :: XName -> A.WorkerFunction -> List Scalar -> Build (Pair String (List Scalar));
+  kernelCall :: XName -> A.WorkerFunction -> [] Scalar -> Build ((,) String ([] Scalar));
   kernelCall name f arguments =
     do {
       facts <- gets scalarRanges;
@@ -127,7 +127,7 @@ module Bootstrap.LLVM.Native where {
             L.all
               (\entry ->
                  case entry of {
-                   Pair n v ->
+                   (,) n v ->
                      if S.member O.compareName n indices
                      then boundedScalar facts 2147483648 v
                      else True
@@ -144,7 +144,7 @@ module Bootstrap.LLVM.Native where {
       let {
         overflow =
           (specialized requested &&
-           (L.not (S.member compareKernel (Pair name requested) variants) &&
+           (L.not (S.member compareKernel ((,) name requested) variants) &&
             (variantCount name variants >= 8)))
       };
       actual <-
@@ -159,14 +159,14 @@ module Bootstrap.LLVM.Native where {
         else cgPure values;
       code <-
         kernelWorker name f (if overflow then L.replicate (L.length values) General else requested);
-      cgPure (Pair code actual)
+      cgPure ((,) code actual)
     };
   zeroTested :: XErased -> Set XName;
   zeroTested expression =
     case O.applications expression of {
-      Pair (XEPrimitive PEqInt) (Cons (XEVar n) (Cons (XEInt zero) Nil)) ->
+      (,) (XEPrimitive PEqInt) ((:) (XEVar n) ((:) (XEInt zero) [])) ->
         if (zero == 0) then S.singleton n else zeroTestedChildren expression;
-      Pair (XEPrimitive PEqInt) (Cons (XEInt zero) (Cons (XEVar n) Nil)) ->
+      (,) (XEPrimitive PEqInt) ((:) (XEInt zero) ((:) (XEVar n) [])) ->
         if (zero == 0) then S.singleton n else zeroTestedChildren expression;
       _ -> zeroTestedChildren expression
     };
@@ -179,7 +179,7 @@ module Bootstrap.LLVM.Native where {
       XELetRec ds b -> zeroTested b;
       _ -> S.empty
     };
-  integerPositions :: Primitive -> List Int;
+  integerPositions :: Primitive -> [] Int;
   integerPositions p =
     case p of {
       PAddInt -> args2 0 1;
@@ -203,23 +203,23 @@ module Bootstrap.LLVM.Native where {
       PWriteByteArray -> args2 1 2;
       PWriteIntTable -> args2 1 2;
       PPutBytes -> args2 1 2;
-      _ -> Nil
+      _ -> []
     };
   integerParameters :: XErased -> Set XName;
   integerParameters expression =
     let {
       direct =
         case O.applications expression of {
-          Pair (XEPrimitive p) args ->
+          (,) (XEPrimitive p) args ->
             S.fromList O.compareName
               (L.concatMap
                  (\entry ->
                     case entry of {
-                      Pair index value ->
+                      (,) index value ->
                         case value of {
                           XEVar name ->
-                            if L.elem eqInt index (integerPositions p) then args1 name else Nil;
-                          _ -> Nil
+                            if L.elem eqInt index (integerPositions p) then args1 name else [];
+                          _ -> []
                         }
                     })
                  (L.zip (L.range 0 (L.length args - 1)) args));
@@ -234,7 +234,7 @@ module Bootstrap.LLVM.Native where {
          XELetRec ds b -> integerParameters b;
          _ -> S.empty
        });
-  primitives :: XErased -> List Primitive;
+  primitives :: XErased -> [] Primitive;
   primitives expression =
     case expression of {
       XEPrimitive p -> args1 p;
@@ -242,7 +242,7 @@ module Bootstrap.LLVM.Native where {
       XEApp a b -> L.append (primitives a) (primitives b);
       XELet n a b -> L.append (primitives a) (primitives b);
       XELetRec ds b -> primitives b;
-      _ -> Nil
+      _ -> []
     };
   indexOperation :: Primitive -> Bool;
   indexOperation p =
@@ -284,7 +284,7 @@ module Bootstrap.LLVM.Native where {
     };
   registerScalar :: NativeMode -> String -> Scalar;
   registerScalar mode register = if (modeCode mode == 1) then Floating register else Boxed register;
-  kernelWorker :: XName -> A.WorkerFunction -> List NativeMode -> Build String;
+  kernelWorker :: XName -> A.WorkerFunction -> [] NativeMode -> Build String;
   kernelWorker name f modes =
     do {
       let {
@@ -300,11 +300,11 @@ module Bootstrap.LLVM.Native where {
         registers = L.map (\i -> ("%a" ++ showInt i)) (L.range 0 (L.length names - 1))
       };
       let {
-        key = Pair name modes
+        key = (,) name modes
       };
       seen <- gets (\state -> S.member compareKernel key (kernelWorkers state));
       if seen
-      then cgPure Unit
+      then cgPure ()
       else do {
              modify
                (\state ->
@@ -319,7 +319,7 @@ module Bootstrap.LLVM.Native where {
     };
   kernelWorkerBody :: XName ->
                       A.WorkerFunction ->
-                      List NativeMode -> List XName -> List String -> List Scalar -> Build Unit;
+                      [] NativeMode -> [] XName -> [] String -> [] Scalar -> Build ();
   kernelWorkerBody name f modes names registers values =
     do {
       collects <- gets (\state -> S.member O.compareName name (collectingKernels state));
@@ -330,7 +330,7 @@ module Bootstrap.LLVM.Native where {
                  L.concatMap
                    (\entry ->
                       case entry of {
-                        Pair mode register -> if (modeCode mode == 1) then Nil else args1 register
+                        (,) mode register -> if (modeCode mode == 1) then [] else args1 register
                       })
                    (L.zip modes registers)
              };
@@ -339,15 +339,15 @@ module Bootstrap.LLVM.Native where {
                ("  call void @mlf_gc_check(" ++
                 (number (L.length roots) ++ (", ptr " ++ (slots ++ ")"))))
            }
-      else cgPure Unit;
+      else cgPure ();
       L.mapM_
         (\entry ->
            case entry of {
-             Pair mode register ->
+             (,) mode register ->
                case mode of {
-                 NonnegativeInt -> recordRange register (Pair 0 4611686018427387903);
-                 SmallIndex -> recordRange register (Pair 0 2147483647);
-                 _ -> cgPure Unit
+                 NonnegativeInt -> recordRange register ((,) 0 4611686018427387903);
+                 SmallIndex -> recordRange register ((,) 0 2147483647);
+                 _ -> cgPure ()
                }
            })
         (L.zip modes registers);
@@ -362,11 +362,11 @@ module Bootstrap.LLVM.Native where {
           L.concatMap
             (\entry ->
                case entry of {
-                 Pair index (Pair name mode) ->
+                 (,) index ((,) name mode) ->
                    if (S.member O.compareName name integers &&
                        ((modeCode mode == 0) || (modeCode mode == 2)))
                    then args1 index
-                   else Nil
+                   else []
                })
             (L.zip (L.range 0 (L.length names - 1)) (L.zip names modes))
       };
@@ -375,7 +375,7 @@ module Bootstrap.LLVM.Native where {
           L.map
             (\entry ->
                case entry of {
-                 Pair index mode -> if L.elem eqInt index narrow then SmallIndex else mode
+                 (,) index mode -> if L.elem eqInt index narrow then SmallIndex else mode
                })
             (L.zip (L.range 0 (L.length modes - 1)) modes)
       };
@@ -395,7 +395,7 @@ module Bootstrap.LLVM.Native where {
       variants <- gets kernelWorkers;
       let {
         allowed =
-          (S.member compareKernel (Pair name narrowed) variants || (variantCount name variants < 8))
+          (S.member compareKernel ((,) name narrowed) variants || (variantCount name variants < 8))
       };
       if (L.isJust copy ||
           (collects || (L.not (indexLoop (A.functionBody f)) || (L.null narrow || L.not allowed))))
@@ -439,7 +439,7 @@ module Bootstrap.LLVM.Native where {
       value <- numericValue scope name;
       boxed value
     };
-  rootSlots :: List String -> Build String;
+  rootSlots :: [] String -> Build String;
   rootSlots roots =
     if L.null roots
     then cgPure "null"
@@ -448,7 +448,7 @@ module Bootstrap.LLVM.Native where {
            L.mapM_
              (\entry ->
                 case entry of {
-                  Pair i value ->
+                  (,) i value ->
                     do {
                       slot <-
                         result ("getelementptr ptr, ptr " ++ (slots ++ (", i64 " ++ showInt i)));
@@ -473,7 +473,7 @@ module Bootstrap.LLVM.Native where {
                          (\scalar ->
                             case scalar of {
                               Boxed v -> args1 v;
-                              Floating v -> Nil
+                              Floating v -> []
                             })
                          (M.elems scope)))
              };
@@ -537,85 +537,85 @@ module Bootstrap.LLVM.Native where {
         else Nothing;
       _ -> Nothing
     };
-  validRange :: Pair Int Int -> Bool;
-  validRange (Pair lo hi) = (lo <= hi);
-  refineEndpoint :: Map XName Scalar -> Bool -> XName -> Int -> Build Unit;
+  validRange :: (,) Int Int -> Bool;
+  validRange ((,) lo hi) = (lo <= hi);
+  refineEndpoint :: Map XName Scalar -> Bool -> XName -> Int -> Build ();
   refineEndpoint scope truth name k =
     case M.lookup O.compareName name scope of {
       Just (Boxed v) ->
         do {
           bounds <- gets (\state -> M.lookup compareString v (scalarRanges state));
           case bounds of {
-            Just (Pair lo hi) ->
+            Just ((,) lo hi) ->
               do {
                 let {
                   next =
                     if truth
-                    then Pair (L.max lo k) (L.min hi k)
+                    then (,) (L.max lo k) (L.min hi k)
                     else if (k == lo)
-                         then Pair (lo + 1) hi
-                         else if (k == hi) then Pair lo (hi - 1) else Pair lo hi
+                         then (,) (lo + 1) hi
+                         else if (k == hi) then (,) lo (hi - 1) else (,) lo hi
                 };
-                if validRange next then recordRange v next else cgPure Unit
+                if validRange next then recordRange v next else cgPure ()
               };
-            Nothing -> cgPure Unit
+            Nothing -> cgPure ()
           }
         };
-      _ -> cgPure Unit
+      _ -> cgPure ()
     };
-  refineNumeric :: Map XName Scalar -> XErased -> Bool -> Build Unit;
+  refineNumeric :: Map XName Scalar -> XErased -> Bool -> Build ();
   refineNumeric scope expression truth =
     case O.applications expression of {
-      Pair (XEPrimitive PEqInt) (Cons (XEVar n) (Cons (XEInt k) Nil)) ->
+      (,) (XEPrimitive PEqInt) ((:) (XEVar n) ((:) (XEInt k) [])) ->
         refineEndpoint scope truth n k;
-      Pair (XEPrimitive PEqInt) (Cons (XEInt k) (Cons (XEVar n) Nil)) ->
+      (,) (XEPrimitive PEqInt) ((:) (XEInt k) ((:) (XEVar n) [])) ->
         refineEndpoint scope truth n k;
-      Pair (XEPrimitive PLtInt) (Cons a (Cons b Nil)) ->
+      (,) (XEPrimitive PLtInt) ((:) a ((:) b [])) ->
         case numericReference scope a of {
-          Nothing -> cgPure Unit;
+          Nothing -> cgPure ();
           Just x ->
             case numericReference scope b of {
-              Nothing -> cgPure Unit;
+              Nothing -> cgPure ();
               Just y ->
                 do {
                   facts <- gets scalarRanges;
                   case M.lookup compareString x facts of {
-                    Nothing -> cgPure Unit;
-                    Just (Pair lo hi) ->
+                    Nothing -> cgPure ();
+                    Just ((,) lo hi) ->
                       case M.lookup compareString y facts of {
-                        Nothing -> cgPure Unit;
-                        Just (Pair lo2 hi2) ->
+                        Nothing -> cgPure ();
+                        Just ((,) lo2 hi2) ->
                           do {
                             let {
                               xs =
                                 if truth
-                                then Pair lo (L.min hi (hi2 - 1))
-                                else Pair (L.max lo lo2) hi
+                                then (,) lo (L.min hi (hi2 - 1))
+                                else (,) (L.max lo lo2) hi
                             };
                             let {
                               ys =
                                 if truth
-                                then Pair (L.max lo2 (lo + 1)) hi2
-                                else Pair lo2 (L.min hi2 hi)
+                                then (,) (L.max lo2 (lo + 1)) hi2
+                                else (,) lo2 (L.min hi2 hi)
                             };
-                            if validRange xs then recordRange x xs else cgPure Unit;
-                            if validRange ys then recordRange y ys else cgPure Unit
+                            if validRange xs then recordRange x xs else cgPure ();
+                            if validRange ys then recordRange y ys else cgPure ()
                           }
                       }
                   }
                 }
             }
         };
-      _ -> cgPure Unit
+      _ -> cgPure ()
     };
-  executeNumericReturn :: List NativeMode -> Map XName Scalar -> XErased -> Build Unit;
+  executeNumericReturn :: [] NativeMode -> Map XName Scalar -> XErased -> Build ();
   executeNumericReturn modes scope expression =
     case tableUpdate expression of {
       Just update ->
         do {
           next <- executeTableUpdate scope update;
           case next of {
-            Pair local rest -> executeNumericReturn modes local rest
+            (,) local rest -> executeNumericReturn modes local rest
           }
         };
       Nothing ->
@@ -629,15 +629,15 @@ module Bootstrap.LLVM.Native where {
           _ -> executeNumericReturnApplication modes scope expression
         }
     };
-  executeNumericReturnApplication :: List NativeMode -> Map XName Scalar -> XErased -> Build Unit;
+  executeNumericReturnApplication :: [] NativeMode -> Map XName Scalar -> XErased -> Build ();
   executeNumericReturnApplication modes scope expression =
     case O.applications expression of {
-      Pair (XEPrimitive PIOBind) (Cons a (Cons (XEAbs n b) Nil)) ->
+      (,) (XEPrimitive PIOBind) ((:) a ((:) (XEAbs n b) [])) ->
         do {
           value <- executeNumeric scope a;
           executeNumericReturn modes (M.insert O.compareName n value scope) b
         };
-      Pair (XEPrimitive PIfThenElse) (Cons c (Cons a (Cons b Nil))) ->
+      (,) (XEPrimitive PIfThenElse) ((:) c ((:) a ((:) b []))) ->
         do {
           value <- scalarValue scope c;
           condition <- numericCondition value;
@@ -658,7 +658,7 @@ module Bootstrap.LLVM.Native where {
           refineNumeric scope c False;
           executeNumericReturn modes scope b
         };
-      Pair (XEVar name) args ->
+      (,) (XEVar name) args ->
         do {
           fs <- gets functions;
           case M.lookup O.compareName name fs of {
@@ -669,7 +669,7 @@ module Bootstrap.LLVM.Native where {
                 values <- L.mapM (scalarValue scope) args;
                 invocation <- kernelCall name f (L.append captured values);
                 case invocation of {
-                  Pair code actual ->
+                  (,) code actual ->
                     do {
                       let {
                         marker =
@@ -707,8 +707,8 @@ module Bootstrap.LLVM.Native where {
         do {
           value <- literalInteger n;
           if ((n >= (0 - 4611686018427387904)) && (n < 4611686018427387904))
-          then recordRange value (Pair n n)
-          else cgPure Unit;
+          then recordRange value ((,) n n)
+          else cgPure ();
           cgPure (Boxed value)
         };
       XEDouble n -> cgPure (Floating (doubleLiteral n));
@@ -722,13 +722,13 @@ module Bootstrap.LLVM.Native where {
   scalarApplication :: Map XName Scalar -> XErased -> Build Scalar;
   scalarApplication scope expression =
     case O.applications expression of {
-      Pair (XEPrimitive PAddInt) (Cons a (Cons b Nil)) ->
+      (,) (XEPrimitive PAddInt) ((:) a ((:) b [])) ->
         if isZero b
         then scalarValue scope a
         else if isZero a then scalarValue scope b else scalarGeneralApplication scope expression;
-      Pair (XEPrimitive PSubInt) (Cons a (Cons (XEInt zero) Nil)) ->
+      (,) (XEPrimitive PSubInt) ((:) a ((:) (XEInt zero) [])) ->
         if (zero == 0) then scalarValue scope a else scalarGeneralApplication scope expression;
-      Pair (XEPrimitive PEqInt) (Cons (XEVar a) (Cons (XEVar b) Nil)) ->
+      (,) (XEPrimitive PEqInt) ((:) (XEVar a) ((:) (XEVar b) [])) ->
         if O.eqName a b
         then cgPure (Boxed (immediate 6))
         else scalarGeneralApplication scope expression;
@@ -743,14 +743,14 @@ module Bootstrap.LLVM.Native where {
   scalarGeneralApplication :: Map XName Scalar -> XErased -> Build Scalar;
   scalarGeneralApplication scope expression =
     case O.applications expression of {
-      Pair (XEPrimitive PIfThenElse) (Cons c (Cons a (Cons b Nil))) ->
+      (,) (XEPrimitive PIfThenElse) ((:) c ((:) a ((:) b []))) ->
         numericBranch scope c (scalarValue scope a) (scalarValue scope b);
-      Pair (XEPrimitive p) args ->
+      (,) (XEPrimitive p) args ->
         do {
           values <- L.mapM (scalarValue scope) args;
           scalarPrimitive p values
         };
-      Pair (XEVar n) args ->
+      (,) (XEVar n) args ->
         do {
           fs <- gets functions;
           case M.lookup O.compareName n fs of {
@@ -765,14 +765,14 @@ module Bootstrap.LLVM.Native where {
               }
           }
         };
-      Pair (XEConstructor c) args ->
+      (,) (XEConstructor c) args ->
         if L.null args
         then scalarAtom expression
         else do {
                values <- L.mapM (scalarBoxed scope) args;
                constructor <- lookupConstructor c;
                case constructor of {
-                 Pair tag arity ->
+                 (,) tag arity ->
                    do {
                      value <-
                        if (arity == L.length args)
@@ -815,7 +815,7 @@ module Bootstrap.LLVM.Native where {
         do {
           constructor <- lookupConstructor c;
           case constructor of {
-            Pair tag arity ->
+            (,) tag arity ->
               if (arity == 0)
               then cgPure (Boxed (immediate ((tag * 8) + 4)))
               else do {
@@ -832,10 +832,10 @@ module Bootstrap.LLVM.Native where {
       XEDouble n -> cgPure (Floating (doubleLiteral n));
       _ -> failure "LLVM unsupported scalar in numeric region"
     };
-  scalarPrimitive :: Primitive -> List Scalar -> Build Scalar;
+  scalarPrimitive :: Primitive -> [] Scalar -> Build Scalar;
   scalarPrimitive p values =
     case values of {
-      Cons a Nil ->
+      (:) a [] ->
         case p of {
           PIntToDouble ->
             do {
@@ -860,7 +860,7 @@ module Bootstrap.LLVM.Native where {
             };
           _ -> scalarPrimitiveFallback p values
         };
-      Cons a (Cons b Nil) ->
+      (:) a ((:) b []) ->
         if doubleBinary p then scalarDoubleBinary p a b else scalarPrimitiveFallback p values;
       _ -> scalarPrimitiveFallback p values
     };
@@ -907,13 +907,13 @@ module Bootstrap.LLVM.Native where {
              cgPure (Floating value)
            }
     };
-  scalarPrimitiveFallback :: Primitive -> List Scalar -> Build Scalar;
+  scalarPrimitiveFallback :: Primitive -> [] Scalar -> Build Scalar;
   scalarPrimitiveFallback p values =
     do {
       pointers <- L.mapM boxed values;
       result <-
         case pointers of {
-          Cons a (Cons b Nil) ->
+          (:) a ((:) b []) ->
             case p of {
               PAddInt -> numericInteger p a b;
               PSubInt -> numericInteger p a b;
@@ -929,10 +929,10 @@ module Bootstrap.LLVM.Native where {
         };
       cgPure (Boxed result)
     };
-  numericPrimitiveCall :: Primitive -> List String -> Build String;
+  numericPrimitiveCall :: Primitive -> [] String -> Build String;
   numericPrimitiveCall p pointers =
     call ("@mlf_prim" ++ showInt (L.length pointers))
-      (Cons (number (P.primitiveCode p)) (L.map pointer pointers));
+      ((:) (number (P.primitiveCode p)) (L.map pointer pointers));
   executeNumeric :: Map XName Scalar -> XErased -> Build Scalar;
   executeNumeric scope expression =
     case tableUpdate expression of {
@@ -940,7 +940,7 @@ module Bootstrap.LLVM.Native where {
         do {
           next <- executeTableUpdate scope update;
           case next of {
-            Pair local rest -> executeNumeric local rest
+            (,) local rest -> executeNumeric local rest
           }
         };
       Nothing ->
@@ -957,15 +957,15 @@ module Bootstrap.LLVM.Native where {
   executeNumericApplication :: Map XName Scalar -> XErased -> Build Scalar;
   executeNumericApplication scope expression =
     case O.applications expression of {
-      Pair (XEPrimitive PIOBind) (Cons a (Cons (XEAbs n b) Nil)) ->
+      (,) (XEPrimitive PIOBind) ((:) a ((:) (XEAbs n b) [])) ->
         do {
           value <- executeNumeric scope a;
           executeNumeric (M.insert O.compareName n value scope) b
         };
-      Pair (XEPrimitive PIOReturn) (Cons a Nil) -> scalarValue scope a;
-      Pair (XEPrimitive PIfThenElse) (Cons c (Cons a (Cons b Nil))) ->
+      (,) (XEPrimitive PIOReturn) ((:) a []) -> scalarValue scope a;
+      (,) (XEPrimitive PIfThenElse) ((:) c ((:) a ((:) b []))) ->
         numericBranch scope c (executeNumeric scope a) (executeNumeric scope b);
-      Pair (XEVar name) args ->
+      (,) (XEVar name) args ->
         do {
           fs <- gets functions;
           case M.lookup O.compareName name fs of {
@@ -980,7 +980,7 @@ module Bootstrap.LLVM.Native where {
               }
           }
         };
-      Pair (XEPrimitive p) args ->
+      (,) (XEPrimitive p) args ->
         if arrayOperation p
         then executeArray scope p args
         else case p of {
@@ -1019,18 +1019,18 @@ module Bootstrap.LLVM.Native where {
       PLengthByteArray -> True;
       _ -> False
     };
-  executeArray :: Map XName Scalar -> Primitive -> List XErased -> Build Scalar;
+  executeArray :: Map XName Scalar -> Primitive -> [] XErased -> Build Scalar;
   executeArray scope p args =
     do {
       values <- L.mapM (scalarValue scope) args;
       array <-
         case values of {
-          Nil -> failure "LLVM missing array operand";
-          Cons a rest -> boxed a
+          [] -> failure "LLVM missing array operand";
+          (:) a rest -> boxed a
         };
       view <- arrayView array;
       case view of {
-        Pair len cells ->
+        (,) len cells ->
           if lengthOperation p
           then do {
                  shift <- result ("shl i64 " ++ (len ++ ", 1"));
@@ -1053,7 +1053,7 @@ module Bootstrap.LLVM.Native where {
                  emit "  call void @mlf_bounds_failure()";
                  emit "  unreachable";
                  label valid;
-                 recordRange index (Pair 0 1152921504606846974);
+                 recordRange index ((,) 0 1152921504606846974);
                  let {
                    byteArray = ((P.primitiveCode p == 36) || (P.primitiveCode p == 37))
                  };
@@ -1066,7 +1066,7 @@ module Bootstrap.LLVM.Native where {
                }
       }
     };
-  executeArrayCell :: Primitive -> List Scalar -> String -> Build Scalar;
+  executeArrayCell :: Primitive -> [] Scalar -> String -> Build Scalar;
   executeArrayCell p values address =
     case p of {
       PReadByteArray ->
@@ -1076,7 +1076,7 @@ module Bootstrap.LLVM.Native where {
           shifted <- result ("shl i64 " ++ (wide ++ ", 1"));
           tagged <- result ("or i64 " ++ (shifted ++ ", 1"));
           value <- result ("inttoptr i64 " ++ (tagged ++ " to ptr"));
-          recordRange value (Pair 0 255);
+          recordRange value ((,) 0 255);
           cgPure (Boxed value)
         };
       PWriteByteArray ->
@@ -1084,7 +1084,7 @@ module Bootstrap.LLVM.Native where {
           value <- boxed (L.index values 2);
           x <- numericByte value;
           emit ("  store i8 " ++ (x ++ (", ptr " ++ (address ++ ", align 1, !tbaa !4"))));
-          cgPure (Boxed (immediate 4))
+          cgPure (Boxed (immediate 12))
         };
       PReadDoubleArray ->
         do {
@@ -1100,16 +1100,16 @@ module Bootstrap.LLVM.Native where {
         do {
           value <- floating (L.index values 2);
           emit ("  store double " ++ (value ++ (", ptr " ++ (address ++ ", align 8, !tbaa !4"))));
-          cgPure (Boxed (immediate 4))
+          cgPure (Boxed (immediate 12))
         };
       _ ->
         do {
           value <- boxed (L.index values 2);
           emit ("  store ptr " ++ (value ++ (", ptr " ++ (address ++ ", align 8, !tbaa !4"))));
-          cgPure (Boxed (immediate 4))
+          cgPure (Boxed (immediate 12))
         }
     };
-  executeTable :: Map XName Scalar -> Primitive -> List XErased -> Build Scalar;
+  executeTable :: Map XName Scalar -> Primitive -> [] XErased -> Build Scalar;
   executeTable scope p args =
     do {
       values <- L.mapM (scalarBoxed scope) args;
@@ -1118,48 +1118,48 @@ module Bootstrap.LLVM.Native where {
           (L.map pointer values);
       cgPure (Boxed value)
     };
-  executeAllocation :: Map XName Scalar -> Primitive -> List XErased -> Build Scalar;
+  executeAllocation :: Map XName Scalar -> Primitive -> [] XErased -> Build Scalar;
   executeAllocation scope p args =
     do {
       values <- L.mapM (scalarBoxed scope) args;
       let {
         target =
           case p of {
-            PGetByteLine -> Pair "@mlf_get_byte_line" Nil;
-            PNewIntTable -> Pair "@mlf_new_int_table" Nil;
-            PByteArrayFromString -> Pair "@mlf_bytes_from_string" Nil;
-            PPutBytes -> Pair "@mlf_put_bytes" Nil;
-            _ -> Pair "@mlf_new_array" (args1 (number (P.primitiveCode p)))
+            PGetByteLine -> (,) "@mlf_get_byte_line" [];
+            PNewIntTable -> (,) "@mlf_new_int_table" [];
+            PByteArrayFromString -> (,) "@mlf_bytes_from_string" [];
+            PPutBytes -> (,) "@mlf_put_bytes" [];
+            _ -> (,) "@mlf_new_array" (args1 (number (P.primitiveCode p)))
           }
       };
       value <-
         case target of {
-          Pair symbol prefix -> call symbol (L.append prefix (L.map pointer values))
+          (,) symbol prefix -> call symbol (L.append prefix (L.map pointer values))
         };
       cgPure (Boxed value)
     };
-  bindParts :: XErased -> Maybe (Triple XErased XName XErased);
+  bindParts :: XErased -> Maybe ((,,) XErased XName XErased);
   bindParts expression =
     case O.applications expression of {
-      Pair (XEPrimitive PIOBind) (Cons action (Cons (XEAbs name body) Nil)) ->
-        Just (Triple action name body);
+      (,) (XEPrimitive PIOBind) ((:) action ((:) (XEAbs name body) [])) ->
+        Just ((,,) action name body);
       _ -> Nothing
     };
   tableUpdate :: XErased -> Maybe TableUpdate;
   tableUpdate expression =
     case bindParts expression of {
       Nothing -> Nothing;
-      Just (Triple readAction old body) ->
+      Just ((,,) readAction old body) ->
         case O.applications readAction of {
-          Pair (XEPrimitive PReadIntTable) (Cons table (Cons key Nil)) ->
+          (,) (XEPrimitive PReadIntTable) ((:) table ((:) key [])) ->
             case bindParts body of {
               Nothing -> Nothing;
-              Just (Triple writeAction done rest) ->
+              Just ((,,) writeAction done rest) ->
                 case O.applications writeAction of {
-                  Pair (XEPrimitive PWriteIntTable) (Cons table2 (Cons key2 (Cons value Nil))) ->
+                  (,) (XEPrimitive PWriteIntTable) ((:) table2 ((:) key2 ((:) value []))) ->
                     if (X.equalErased table table2 && X.equalErased key key2)
                     then case O.applications value of {
-                           Pair (XEPrimitive PAddInt) (Cons a (Cons b Nil)) ->
+                           (,) (XEPrimitive PAddInt) ((:) a ((:) b [])) ->
                              let {
                                delta =
                                  if X.equalErased a (XEVar old)
@@ -1182,14 +1182,14 @@ module Bootstrap.LLVM.Native where {
           _ -> Nothing
         }
     };
-  executeTableUpdate :: Map XName Scalar -> TableUpdate -> Build (Pair (Map XName Scalar) XErased);
+  executeTableUpdate :: Map XName Scalar -> TableUpdate -> Build ((,) (Map XName Scalar) XErased);
   executeTableUpdate scope (TableUpdate old table key delta done rest) =
     do {
       values <- L.mapM (scalarBoxed scope) (args3 table key delta);
       previous <- call "@mlf_add_int_table" (L.map pointer values);
       cgPure
-        (Pair
-           (M.insert O.compareName done (Boxed (immediate 4))
+        ((,)
+           (M.insert O.compareName done (Boxed (immediate 12))
               (M.insert O.compareName old (Boxed previous) scope))
            rest)
     };
@@ -1210,14 +1210,14 @@ module Bootstrap.LLVM.Native where {
           L.concatMap
             (\v ->
                case M.lookup compareString v facts of {
-                 Just (Pair lo hi) -> if (lo >= 0) then args1 hi else Nil;
-                 Nothing -> Nil
+                 Just ((,) lo hi) -> if (lo >= 0) then args1 hi else [];
+                 Nothing -> []
                })
             (args2 a b)
       };
       case bounds of {
-        Nil -> cgPure Unit;
-        Cons first rest -> recordRange value (Pair 0 (L.foldl L.min first rest))
+        [] -> cgPure ();
+        (:) first rest -> recordRange value ((,) 0 (L.foldl L.min first rest))
       };
       cgPure value
     };
@@ -1233,7 +1233,7 @@ module Bootstrap.LLVM.Native where {
       let {
         proven =
           case M.lookup compareString value facts of {
-            Just (Pair lo hi) -> ((lo >= 0) && (hi <= 255));
+            Just ((,) lo hi) -> ((lo >= 0) && (hi <= 255));
             Nothing -> False
           }
       };
@@ -1300,14 +1300,14 @@ module Bootstrap.LLVM.Native where {
                slow
            }
     };
-  productBounds :: Pair Int Int -> Pair Int Int -> Pair Int Int;
-  productBounds (Pair lo hi) (Pair lo2 hi2) =
+  productBounds :: (,) Int Int -> (,) Int Int -> (,) Int Int;
+  productBounds ((,) lo hi) ((,) lo2 hi2) =
     let {
       products = args4 (lo * lo2) (lo * hi2) (hi * lo2) (hi * hi2)
     } in
-    Pair (L.foldl L.min (lo * lo2) products) (L.foldl L.max (lo * lo2) products);
-  smallBounds :: Pair Int Int -> Bool;
-  smallBounds (Pair lo hi) = ((lo >= (0 - 4611686018427387904)) && (hi < 4611686018427387904));
+    (,) (L.foldl L.min (lo * lo2) products) (L.foldl L.max (lo * lo2) products);
+  smallBounds :: (,) Int Int -> Bool;
+  smallBounds ((,) lo hi) = ((lo >= (0 - 4611686018427387904)) && (hi < 4611686018427387904));
   numericProduct :: Primitive -> String -> String -> Build String;
   numericProduct p a b =
     do {
@@ -1348,9 +1348,9 @@ module Bootstrap.LLVM.Native where {
         Nothing -> checkedProduct x y fast slow
       }
     };
-  integerBounds :: Primitive -> Pair Int Int -> Pair Int Int -> Pair Int Int;
-  integerBounds p (Pair lo hi) (Pair lo2 hi2) =
-    if (P.primitiveCode p == 8) then Pair (lo + lo2) (hi + hi2) else Pair (lo - hi2) (hi - lo2);
+  integerBounds :: Primitive -> (,) Int Int -> (,) Int Int -> (,) Int Int;
+  integerBounds p ((,) lo hi) ((,) lo2 hi2) =
+    if (P.primitiveCode p == 8) then (,) (lo + lo2) (hi + hi2) else (,) (lo - hi2) (hi - lo2);
   numericInteger :: Primitive -> String -> String -> Build String;
   numericInteger p a b =
     do {
@@ -1398,12 +1398,12 @@ module Bootstrap.LLVM.Native where {
           else integerOperation p a b
       }
     };
-  copyBytesReturn :: Map XName Scalar -> List XName -> Build Unit -> Build Unit;
+  copyBytesReturn :: Map XName Scalar -> [] XName -> Build () -> Build ();
   copyBytesReturn scope names fallback =
     do {
       values <- L.mapM (numericBoxed scope) names;
       case values of {
-        Cons source (Cons dest (Cons end (Cons offset (Cons index Nil)))) ->
+        (:) source ((:) dest ((:) end ((:) offset ((:) index [])))) ->
           do {
             sourceView <- arrayView source;
             destView <- arrayView dest;
@@ -1420,7 +1420,7 @@ module Bootstrap.LLVM.Native where {
                 bits;
             numbers <- L.mapM (\value -> result ("ashr i64 " ++ (value ++ ", 1"))) bits;
             case numbers of {
-              Cons n (Cons o (Cons i Nil)) ->
+              (:) n ((:) o ((:) i [])) ->
                 copyBytesChecks sourceView destView tests n o i fallback;
               _ -> failure "LLVM invalid copy indices"
             }
@@ -1428,10 +1428,10 @@ module Bootstrap.LLVM.Native where {
         _ -> failure "LLVM invalid copy operands"
       }
     };
-  copyBytesChecks :: Pair String String ->
-                     Pair String String ->
-                     List String -> String -> String -> String -> Build Unit -> Build Unit;
-  copyBytesChecks (Pair sourceLength sourceCells) (Pair destLength destCells) tests n o i fallback =
+  copyBytesChecks :: (,) String String ->
+                     (,) String String ->
+                     [] String -> String -> String -> String -> Build () -> Build ();
+  copyBytesChecks ((,) sourceLength sourceCells) ((,) destLength destCells) tests n o i fallback =
     do {
       validStart <- result ("icmp sge i64 " ++ (i ++ ", 0"));
       validEnd <- result ("icmp sge i64 " ++ (n ++ (", " ++ i)));
@@ -1462,7 +1462,7 @@ module Bootstrap.LLVM.Native where {
       emit
         ("  call void @llvm.memmove.p0.p0.i64(ptr " ++
          (to ++ (", ptr " ++ (from ++ (", i64 " ++ (count ++ ", i1 false)"))))));
-      emit ("  ret ptr " ++ immediate 4);
+      emit ("  ret ptr " ++ immediate 12);
       label slow;
       fallback
     }

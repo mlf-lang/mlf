@@ -130,30 +130,30 @@ module Bootstrap.X.Type where {
           _ -> alphaApplications l r depth a b
         }
     };
-  alphaList :: Map XTyVar Int -> Map XTyVar Int -> Int -> List XType -> List XType -> Bool;
-  alphaList l r depth Nil Nil = True;
-  alphaList l r depth (Cons a as) (Cons b bs) =
+  alphaList :: Map XTyVar Int -> Map XTyVar Int -> Int -> [] XType -> [] XType -> Bool;
+  alphaList l r depth [] [] = True;
+  alphaList l r depth ((:) a as) ((:) b bs) =
     (alphaIn l r depth a b && alphaList l r depth as bs);
   alphaList l r depth _ _ = False;
   alphaApplications :: Map XTyVar Int -> Map XTyVar Int -> Int -> XType -> XType -> Bool;
   alphaApplications l r depth a b =
     case applicationView a of {
       Nothing -> False;
-      Just (Pair f x) ->
+      Just ((,) f x) ->
         case applicationView b of {
           Nothing -> False;
-          Just (Pair g y) -> (alphaIn l r depth f g && alphaIn l r depth x y)
+          Just ((,) g y) -> (alphaIn l r depth f g && alphaIn l r depth x y)
         }
     };
   apply :: XType -> XType -> XType;
-  apply (XCon c xs) x = XCon c (L.append xs (Cons x Nil));
+  apply (XCon c xs) x = XCon c (L.append xs ((:) x []));
   apply f x = XApply f x;
-  applicationView :: XType -> Maybe (Pair XType XType);
-  applicationView (XApply f x) = Just (Pair f x);
+  applicationView :: XType -> Maybe ((,) XType XType);
+  applicationView (XApply f x) = Just ((,) f x);
   applicationView (XCon c xs) =
     case L.reverse xs of {
-      Cons x rest -> Just (Pair (XCon c (L.reverse rest)) x);
-      Nil -> Nothing
+      (:) x rest -> Just ((,) (XCon c (L.reverse rest)) x);
+      [] -> Nothing
     };
   applicationView _ = Nothing;
   bottomKind Star = XBot;
@@ -165,11 +165,11 @@ module Bootstrap.X.Type where {
       kindIn ds (M.fromList compareTyVar kinds) ty
     };
   kindBinding :: DataEnv ->
-                 Map XTyVar XType -> Set XTyVar -> XTyVar -> Either String (Pair XTyVar Kind);
+                 Map XTyVar XType -> Set XTyVar -> XTyVar -> Either String ((,) XTyVar Kind);
   kindBinding ds bounds seen a =
     do {
       k <- visitKind ds bounds seen a;
-      return (Pair a k)
+      return ((,) a k)
     };
   visitKind :: DataEnv -> Map XTyVar XType -> Set XTyVar -> XTyVar -> Either String Kind;
   visitKind ds bounds seen a =

@@ -65,6 +65,11 @@ seed_sha256=$(sha256 "$seed")
 export GC_FREE_SPACE_DIVISOR=2
 started=$SECONDS
 include_args=(-i "$PWD/tests")
+helper_root=tests/Tests
+if [ "$source_extension" = hs ]; then
+  helper_root=tests/shared/Tests
+  include_args+=(-i "$PWD/tests/shared")
+fi
 for manifest in "$PWD"/libraries/*/mlf-package.json; do
   test -f "$manifest"
   include_args+=(-i "$(dirname -- "$manifest")")
@@ -72,8 +77,8 @@ done
 snapshot() {
   {
     find bootstrap libraries -type f \( -name '*.emlf' -o -name '*.hs' -o -name 'mlf-package.json' \)
-    printf '%s\n' tests/PRQuickMain.emlf "tests/Tests/IndependentCheck.$source_extension" \
-      "tests/Tests/IndependentType.$source_extension" tools/release/source-smoke.sh
+    printf '%s\n' tests/PRQuickMain.emlf "$helper_root/IndependentCheck.$source_extension" \
+      "$helper_root/IndependentType.$source_extension" tools/release/source-smoke.sh
     find tests/pr-smoke -type f
     if [ "$source_extension" = hs ]; then
       printf '%s\n' shared-sources.json tools/shared/build.py

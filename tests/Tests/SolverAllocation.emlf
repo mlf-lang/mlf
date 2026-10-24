@@ -8,42 +8,42 @@ import qualified Tests.Graph as Reference
 import qualified Tests.GraphSolver as R
 import qualified Tests.Helpers as H
 
-suite : List (Pair String (IO Unit))
-suite = Cons (Pair "strict graph builder agrees with independent insertion" builders)
- (Cons (Pair "node forcing preserves arbitrary identities and lazy constructor fields" nodeDemand)
- (Cons (Pair "graph expansion preserves independent allocation and frontier identities" expansions) Nil))
+suite : [] ((,) String (IO ()))
+suite = (:) ((,) "strict graph builder agrees with independent insertion" builders)
+ ((:) ((,) "node forcing preserves arbitrary identities and lazy constructor fields" nodeDemand)
+ ((:) ((,) "graph expansion preserves independent allocation and frontier identities" expansions) []))
 
 checkBuilder count offset = do
- let entries = S.map (\i -> Pair (offset + i * 3) (Node (GArr (offset + i) (offset - i)) (Just (offset + i + 1)) (if remInt i 2 == 0 then Flexible else Rigid))) (S.range 0 (count - 1))
- let expected = S.foldlStrict (\table (Pair key value) -> IM.insert key value table) IM.empty entries
+ let entries = S.map (\i -> (,) (offset + i * 3) (Node (GArr (offset + i) (offset - i)) (Just (offset + i + 1)) (if remInt i 2 == 0 then Flexible else Rigid))) (S.range 0 (count - 1))
+ let expected = S.foldlStrict (\table ((,) key value) -> IM.insert key value table) IM.empty entries
  let actual = G.nodesFromDistinctAscList entries
  H.assert (IM.valid actual && IM.eqIntMap G.equalNode actual expected) "strict sorted graph construction changed nodes or map balance"
-builders : IO Unit
+builders : IO ()
 builders = do
  checkBuilder 0 0
- S.mapM_ (\count -> S.mapM_ (checkBuilder count) (Cons (-340282366920938463463374607431768211456) (Cons 0 (Cons 340282366920938463463374607431768211456 Nil)))) (Cons 1 (Cons 2 (Cons 3 (Cons 17 Nil))))
+ S.mapM_ (\count -> S.mapM_ (checkBuilder count) ((:) (-340282366920938463463374607431768211456) ((:) 0 ((:) 340282366920938463463374607431768211456 [])))) ((:) 1 ((:) 2 ((:) 3 ((:) 17 []))))
  checkBuilder 257 0
  checkBuilder 4096 0
 
-nodeDemand : IO Unit
+nodeDemand : IO ()
 nodeDemand = do
  let lazyNode = G.strictNode (Node (GCon "Lazy" (panic "forced constructor child list")) (Just (panic "forced optional binder contents")) Flexible)
- let lazyTable = G.nodesFromDistinctAscList (Cons (Pair 42 lazyNode) Nil)
+ let lazyTable = G.nodesFromDistinctAscList ((:) ((,) 42 lazyNode) [])
  H.assert (IM.size lazyTable == 1 && G.equalFlag (G.flag (IM.get 42 lazyTable)) Flexible) "graph node demand changed"
  let graph = G.strictGraph (Graph (IM.singleton 42 (panic "forced graph map value")) IM.empty 340282366920938463463374607431768211456)
  H.assert (G.nextId graph == 340282366920938463463374607431768211456 && IM.size (G.nodes graph) == 1) "graph wrapper forcing changed"
- let scopes = Solver.strictScopes (ScopeIndex IM.empty (Cons (panic "forced unused scope jump") Nil))
+ let scopes = Solver.strictScopes (ScopeIndex IM.empty ((:) (panic "forced unused scope jump") []))
  H.assert (IM.null (Solver.scopeIntervals scopes)) "scope wrapper forcing changed"
  S.mapM_ (\node -> H.assert (G.equalNode node (G.strictNode node)) "forcing changed a graph node")
-  (Cons (Node (GArr (-340282366920938463463374607431768211456) 340282366920938463463374607431768211456) Nothing Rigid)
-  (Cons (Node (GTyApp 0 9223372036854775808) (Just 7) Flexible)
-  (Cons (Node (GGen 340282366920938463463374607431768211456) Nothing Flexible) Nil)))
+  ((:) (Node (GArr (-340282366920938463463374607431768211456) 340282366920938463463374607431768211456) Nothing Rigid)
+  ((:) (Node (GTyApp 0 9223372036854775808) (Just 7) Flexible)
+  ((:) (Node (GGen 340282366920938463463374607431768211456) Nothing Flexible) [])))
 
-expansions : IO Unit
+expansions : IO ()
 expansions = S.mapM_ (\next -> S.mapM_ (\source -> do
  let original = Graph (G.nodes R.scopedGraph) (G.links R.scopedGraph) next
- Pair expected expectedGraph <- H.right (Reference.runBuild original (R.referenceExpand source 0))
- Pair actual actualGraph <- H.right (G.expand source 0 original)
+ (,) expected expectedGraph <- H.right (Reference.runBuild original (R.referenceExpand source 0))
+ (,) actual actualGraph <- H.right (G.expand source 0 original)
  H.assert (H.eq expected actual && H.eq expectedGraph actualGraph && IM.valid (G.nodes actualGraph)) "expansion changed graph or identity budget")
- (Cons 2 (Cons 6 Nil)))
- (Cons 10 (Cons 9223372036854775805 (Cons 340282366920938463463374607431768211456 Nil)))
+ ((:) 2 ((:) 6 [])))
+ ((:) 10 ((:) 9223372036854775805 ((:) 340282366920938463463374607431768211456 [])))

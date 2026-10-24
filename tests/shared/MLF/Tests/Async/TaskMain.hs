@@ -14,8 +14,8 @@ module MLF.Tests.Async.TaskMain where {
       putErr ("TASK TEST FAILURE: " ++ (message ++ "\n"));
       exitWith 1
     };
-  assert :: Bool -> String -> IO Unit;
-  assert condition message = if condition then ioReturn Unit else bad message;
+  assert :: Bool -> String -> IO ();
+  assert condition message = if condition then ioReturn () else bad message;
   success :: forall a. T.Outcome a -> IO a;
   success outcome =
     case outcome of {
@@ -35,17 +35,17 @@ module MLF.Tests.Async.TaskMain where {
       T.Cancelled (T.CancelReason actual _) -> (actual == code);
       _ -> False
     };
-  integers :: List Int -> List Int -> Bool;
+  integers :: [] Int -> [] Int -> Bool;
   integers xs ys =
     case xs of {
-      Nil ->
+      [] ->
         case ys of {
-          Nil -> True;
+          [] -> True;
           _ -> False
         };
-      Cons x rest ->
+      (:) x rest ->
         case ys of {
-          Cons y more -> ((x == y) && integers rest more);
+          (:) y more -> ((x == y) && integers rest more);
           _ -> False
         }
     };
@@ -57,7 +57,7 @@ module MLF.Tests.Async.TaskMain where {
     };
   after :: forall a. Int -> a -> T.Task a;
   after delay value = T.bind (T.sleep delay) (\_ -> T.pure value);
-  list3 a b c = Cons a (Cons b (Cons c Nil));
+  list3 a b c = (:) a ((:) b ((:) c []));
   mixed =
     do {
       result <-
@@ -75,9 +75,9 @@ module MLF.Tests.Async.TaskMain where {
                                     T.bind (T.await function)
                                       (\f ->
                                          T.bind (T.await number)
-                                           (\again -> T.pure (Triple (f n) s again)))))))));
+                                           (\again -> T.pure ((,,) (f n) s again)))))))));
       case result of {
-        Triple n s again ->
+        (,,) n s again ->
           assert ((n == 42) && (eqString s "typed" && (again == 41)))
             "heterogeneous retained results"
       };
@@ -132,9 +132,9 @@ module MLF.Tests.Async.TaskMain where {
                                T.bind (T.awaitOutcome consumer)
                                  (\cancelledConsumer ->
                                     T.bind (T.await shared)
-                                      (\answer -> T.pure (Pair cancelledConsumer answer))))))));
+                                      (\answer -> T.pure ((,) cancelledConsumer answer))))))));
       case value of {
-        Pair stopped answer ->
+        (,) stopped answer ->
           assert (cancelled 10 stopped && (answer == 17)) "consumer cancelled shared prerequisite"
       };
       putStrLn "PASS waiting-cancellation-shared-prerequisite"
@@ -169,7 +169,7 @@ module MLF.Tests.Async.TaskMain where {
         run (T.collect 2 (list3 (T.pure 1) (T.fail (P.AsyncError 205 "collected")) (T.pure 3)));
       assert
         (case collected of {
-           Cons (T.Succeeded 1) (Cons failure (Cons (T.Succeeded 3) Nil)) -> failed 205 failure;
+           (:) (T.Succeeded 1) ((:) failure ((:) (T.Succeeded 3) [])) -> failed 205 failure;
            _ -> False
          })
         "collect did not preserve failure data and order";
@@ -184,7 +184,7 @@ module MLF.Tests.Async.TaskMain where {
     };
   invalid =
     do {
-      width <- T.run T.defaultOptions (T.all 0 (Cons (T.pure 1) Nil));
+      width <- T.run T.defaultOptions (T.all 0 ((:) (T.pure 1) []));
       assert (failed 101 width) "zero width was accepted";
       duration <- T.run T.defaultOptions (T.sleep (0 - 1));
       assert (failed 101 duration) "negative sleep was accepted";
@@ -192,7 +192,7 @@ module MLF.Tests.Async.TaskMain where {
       assert (failed 104 limit) "live limit did not reject";
       callback <-
         T.run (T.Options 128 4 8 P.defaultOptions)
-          (T.all 2 (Cons (after 1 1) (Cons (after 1 2) Nil)));
+          (T.all 2 ((:) (after 1 1) ((:) (after 1 2) [])));
       assert (failed 104 callback) "callback bound did not reject";
       nestedLimit <-
         T.run (T.Options 1024 64 2 P.defaultOptions) (T.withScope (T.spawn (T.pure 1)));

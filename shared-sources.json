@@ -1,8 +1,8 @@
 {
   "format": 1,
   "source_syntax": "shared-haskell-v1",
-  "frontend_semantics": "mlf-frontend/shared-haskell-v1/5",
-  "primitive_abi": "mlf-primitive-107-v3",
+  "frontend_semantics": "mlf-frontend/shared-haskell-v1/6",
+  "primitive_abi": "mlf-primitive-107-v4",
   "source_roots": [
     "libraries/mlf-async",
     "libraries/mlf-crates",
@@ -284,6 +284,11 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.Standalone",
+      "path": "libraries/mlf-frontend/Bootstrap/Standalone.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.Surface",
       "path": "libraries/mlf-frontend/Bootstrap/Surface.hs",
       "role": "implementation"
@@ -480,7 +485,7 @@
     },
     {
       "module": "Tests.BuildReceipts",
-      "path": "tests/Tests/BuildReceipts.hs",
+      "path": "tests/shared/Tests/BuildReceipts.hs",
       "role": "implementation"
     },
     {
@@ -505,12 +510,12 @@
     },
     {
       "module": "Tests.IndependentCheck",
-      "path": "tests/Tests/IndependentCheck.hs",
+      "path": "tests/shared/Tests/IndependentCheck.hs",
       "role": "implementation"
     },
     {
       "module": "Tests.IndependentType",
-      "path": "tests/Tests/IndependentType.hs",
+      "path": "tests/shared/Tests/IndependentType.hs",
       "role": "implementation"
     },
     {
@@ -629,5 +634,5 @@
     "host/ghc/app/build-receipts/Main.hs",
     "host/ghc/app/source-smoke/Main.hs"
   ],
-  "builtin_interface": "mlf-primitive/shared-haskell-v1/6"
+  "builtin_interface": "mlf-primitive/shared-haskell-v1/8"
 }

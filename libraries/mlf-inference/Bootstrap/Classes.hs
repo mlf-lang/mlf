@@ -15,13 +15,13 @@ module Bootstrap.Classes where {
   import qualified Bootstrap.Desugar as Desugar;
   import qualified Bootstrap.Surface as Surface;
   import qualified Bootstrap.X.Pretty as Pretty;
-  data Info = Info SClassDecl String String (List (Pair String String)) (List String);
-  data InstanceHead = HVar String | HCon String (List InstanceHead);
+  data Info = Info SClassDecl String String ([] ((,) String String)) ([] String);
+  data InstanceHead = HVar String | HCon String ([] InstanceHead);
   -- Managed implicit evidence is deliberately not a class or an instance.
   callStackPredicate :: String;
   callStackPredicate = "MLFHasCallStack";
   callStackEvidenceType :: SType;
-  callStackEvidenceType = SCon "MLFStackEvidence" Nil;
+  callStackEvidenceType = SCon "MLFStackEvidence" [];
   callStackScopeKey :: String;
   callStackScopeKey = "$managedCallStack";
   isCallStackPredicate :: SPredicate -> Bool;
@@ -59,6 +59,7 @@ module Bootstrap.Classes where {
   };
   managedExpression :: SExpr -> Bool;
   managedExpression expression = case expression of {
+    SSourceDefinition body -> managedExpression body;
     SCallSite _ _ body -> managedExpression body;
     SVar name -> eqString name "$MLF.Stack.callStack";
     SLam _ annotation body ->
@@ -68,16 +69,17 @@ module Bootstrap.Classes where {
     SAnn body (SAnnotation _ ty) -> managedType ty || managedExpression body;
     SCase body branches -> managedExpression body || any (\(SAlternative _ rhs) -> managedExpression rhs) branches;
     SLetRec definitions body -> managedExpression body ||
-      any (\(Triple _ (SAnnotation _ ty) rhs) -> managedType ty || managedExpression rhs) definitions;
+      any (\((,,) _ (SAnnotation _ ty) rhs) -> managedType ty || managedExpression rhs) definitions;
     SChecked ty body -> managedType ty || managedExpression body;
     SDo _ _ -> managedExpression (Desugar.desugarDo expression);
-    SEquations rows -> any (\(Pair _ body) -> managedExpression body) rows;
+    SEquations rows -> any (\((,) _ body) -> managedExpression body) rows;
     _ -> False
   };
   -- Locations are observable only through managed evidence. The class-free
   -- path removes them without changing annotations or ordinary MLF inference.
   eraseCallSites :: SExpr -> SExpr;
   eraseCallSites expression = case expression of {
+    SSourceDefinition body -> eraseCallSites body;
     SCallSite _ _ body -> eraseCallSites body;
     SLam name annotation body -> SLam name annotation (eraseCallSites body);
     SApp a b -> SApp (eraseCallSites a) (eraseCallSites b);
@@ -86,14 +88,14 @@ module Bootstrap.Classes where {
     SCase body branches -> SCase (eraseCallSites body)
       (map (\(SAlternative pattern rhs) -> SAlternative pattern (eraseCallSites rhs)) branches);
     SLetRec definitions body -> SLetRec
-      (map (\(Triple name annotation rhs) -> Triple name annotation (eraseCallSites rhs)) definitions)
+      (map (\((,,) name annotation rhs) -> (,,) name annotation (eraseCallSites rhs)) definitions)
       (eraseCallSites body);
     SChecked ty body -> SChecked ty (eraseCallSites body);
     SDo statements body -> SDo (map eraseStatementCallSites statements) (eraseCallSites body);
     SSharedBind pattern action continuation bindExpression failure ->
       SSharedBind pattern (eraseCallSites action) (eraseCallSites continuation)
         (eraseCallSites bindExpression) (eraseCallSites failure);
-    SEquations rows -> SEquations (map (\(Pair patterns body) -> Pair patterns (eraseCallSites body)) rows);
+    SEquations rows -> SEquations (map (\((,) patterns body) -> (,) patterns (eraseCallSites body)) rows);
     _ -> expression
   };
   eraseStatementCallSites :: SStatement -> SStatement;
@@ -102,25 +104,25 @@ module Bootstrap.Classes where {
     SDoThen value -> SDoThen (eraseCallSites value);
     SDoLet name annotation value -> SDoLet name annotation (eraseCallSites value);
     SDoLetRec definitions -> SDoLetRec
-      (map (\(Triple name annotation rhs) -> Triple name annotation (eraseCallSites rhs)) definitions)
+      (map (\((,,) name annotation rhs) -> (,,) name annotation (eraseCallSites rhs)) definitions)
   };
   className :: SClassDecl -> String;
   className (SClassDecl n _ _ _) = n;
-  classParameters :: SClassDecl -> List (Pair String Kind);
+  classParameters :: SClassDecl -> [] ((,) String Kind);
   classParameters (SClassDecl _ ps _ _) = ps;
-  superclasses :: SClassDecl -> List SPredicate;
+  superclasses :: SClassDecl -> [] SPredicate;
   superclasses (SClassDecl _ _ ps _) = ps;
-  classMethods :: SClassDecl -> List (Pair String SType);
+  classMethods :: SClassDecl -> [] ((,) String SType);
   classMethods (SClassDecl _ _ _ ms) = ms;
-  instanceVariables :: SInstanceDecl -> List (Pair String Kind);
+  instanceVariables :: SInstanceDecl -> [] ((,) String Kind);
   instanceVariables (SInstanceDecl vs _ _ _ _) = vs;
-  instanceContext :: SInstanceDecl -> List SPredicate;
+  instanceContext :: SInstanceDecl -> [] SPredicate;
   instanceContext (SInstanceDecl _ ps _ _ _) = ps;
   instanceClass :: SInstanceDecl -> String;
   instanceClass (SInstanceDecl _ _ c _ _) = c;
-  instanceHead :: SInstanceDecl -> List SType;
+  instanceHead :: SInstanceDecl -> [] SType;
   instanceHead (SInstanceDecl _ _ _ ts _) = ts;
-  instanceMethods :: SInstanceDecl -> List (Pair String SExpr);
+  instanceMethods :: SInstanceDecl -> [] ((,) String SExpr);
   instanceMethods (SInstanceDecl _ _ _ _ ms) = ms;
   lookupInfo :: Map String Info -> String -> Either String Info;
   lookupInfo infos name =
@@ -150,14 +152,14 @@ module Bootstrap.Classes where {
       Star -> SBottom;
       _ -> SBottomKind k
     };
-  quantify :: List (Pair String Kind) -> SType -> SType;
-  quantify variables ty = foldr (\(Pair n k) b -> SForall Flexible n (bottom k) b) ty variables;
-  freeType :: SType -> List String;
+  quantify :: [] ((,) String Kind) -> SType -> SType;
+  quantify variables ty = foldr (\((,) n k) b -> SForall Flexible n (bottom k) b) ty variables;
+  freeType :: SType -> [] String;
   freeType ty = sortBy compareString (nubBy eqString (freeTypeRaw ty));
-  freeTypeRaw :: SType -> List String;
+  freeTypeRaw :: SType -> [] String;
   freeTypeRaw ty =
     case ty of {
-      STVar a -> Cons a Nil;
+      STVar a -> (:) a [];
       SArrow a b -> append (freeTypeRaw a) (freeTypeRaw b);
       STypeApp a b -> append (freeTypeRaw a) (freeTypeRaw b);
       SCon _ ts -> concatMap freeTypeRaw ts;
@@ -166,21 +168,21 @@ module Bootstrap.Classes where {
       SQualified predicates body ->
         append (freeTypeRaw body)
           (concatMap (\(SPredicate _ args) -> concatMap freeTypeRaw args) predicates);
-      _ -> Nil
+      _ -> []
     };
-  unique :: String -> List String -> Either String Unit;
+  unique :: String -> [] String -> Either String ();
   unique label names =
     ensure (length names == length (nubBy eqString names)) ("duplicate " ++ label);
-  scheme :: SType -> Triple (List (Triple Flag String SType)) (List SPredicate) SType;
+  scheme :: SType -> (,,) ([] ((,,) Flag String SType)) ([] SPredicate) SType;
   scheme ty =
     case ty of {
       SForall flag name bound body ->
         case scheme body of {
-          Triple variables predicates result ->
-            Triple (Cons (Triple flag name bound) variables) predicates result
+          (,,) variables predicates result ->
+            (,,) ((:) ((,,) flag name bound) variables) predicates result
         };
-      SQualified predicates body -> Triple Nil predicates body;
-      _ -> Triple Nil Nil ty
+      SQualified predicates body -> (,,) [] predicates body;
+      _ -> (,,) [] [] ty
     };
   qualified :: SType -> Bool;
   qualified ty =
@@ -195,13 +197,13 @@ module Bootstrap.Classes where {
   translateScheme :: DataEnv -> Map String Info -> SType -> Either String SType;
   translateScheme ds infos ty =
     case scheme ty of {
-      Triple variables predicates body ->
+      (,,) variables predicates body ->
         do {
-          ensure (not (qualified body || any (\(Triple _ _ bound) -> qualified bound) variables))
+          ensure (not (qualified body || any (\((,,) _ _ bound) -> qualified bound) variables))
             "class constraints must occur at the outside of a type scheme";
           scope <-
             foldEither
-              (\env (Triple _ a bound) ->
+              (\env ((,,) _ a bound) ->
                  do {
                    kind <- K.kindOf ds env bound;
                    Right (M.insert compareString a kind env)
@@ -212,7 +214,7 @@ module Bootstrap.Classes where {
           args <- traverseEither (dictionary infos) predicates;
           let {
             result =
-              foldr (\(Triple flag a bound) rest -> SForall flag a bound rest)
+              foldr (\((,,) flag a bound) rest -> SForall flag a bound rest)
                 (foldr SArrow body args)
                 variables
           };
@@ -221,7 +223,7 @@ module Bootstrap.Classes where {
         }
     };
   checkPredicate :: DataEnv ->
-                    Map String Info -> Map String Kind -> SPredicate -> Either String Unit;
+                    Map String Info -> Map String Kind -> SPredicate -> Either String ();
   checkPredicate ds infos scope (SPredicate name arguments) =
     if eqString name callStackPredicate
     then ensure (null arguments) "HasCallStack takes no type arguments"
@@ -269,18 +271,18 @@ module Bootstrap.Classes where {
         Left
           "class methods require ordinary forall signatures without bounded or nested class constraints"
     };
-  lowerClasses :: SProgram -> Either String (Pair SProgram (Map String String));
+  lowerClasses :: SProgram -> Either String ((,) SProgram (Map String String));
   lowerClasses original = lowerClassesWithImports S.empty original;
   lowerClassesWithImports :: Set String ->
-                             SProgram -> Either String (Pair SProgram (Map String String));
+                             SProgram -> Either String ((,) SProgram (Map String String));
   lowerClassesWithImports imported original =
     do {
       program <- Surface.lowerSurface original;
       lowerCoreClasses imported M.empty Nothing program
     };
   lowerClassesWithScopes :: Map String IntSet ->
-                            List IntSet ->
-                            SProgram -> Either String (Pair SProgram (Map String String));
+                            [] IntSet ->
+                            SProgram -> Either String ((,) SProgram (Map String String));
   lowerClassesWithScopes values instances original =
     do {
       program <- Surface.lowerSurface original;
@@ -288,8 +290,8 @@ module Bootstrap.Classes where {
     };
   lowerCoreClasses :: Set String ->
                       Map String IntSet ->
-                      Maybe (List IntSet) ->
-                      SProgram -> Either String (Pair SProgram (Map String String));
+                      Maybe ([] IntSet) ->
+                      SProgram -> Either String ((,) SProgram (Map String String));
   lowerCoreClasses imported valueIndices instanceIndices program =
     lowerCoreClassesWith Nothing imported valueIndices instanceIndices program;
   lowerSeparateClasses externals instanceNames original =
@@ -297,74 +299,74 @@ module Bootstrap.Classes where {
       program <-
         Surface.lowerSurface
           (case original of {
-             SProgram ds b -> SClassProgram ds Nil Nil b;
+             SProgram ds b -> SClassProgram ds [] [] b;
              _ -> original
            });
       case program of {
-        SClassProgram ds Nil Nil body ->
+        SClassProgram ds [] [] body ->
           if managedExpression body || any managedType (M.elems externals)
-          then lowerCoreClassesWith (Just (Pair externals instanceNames)) S.empty M.empty Nothing program
+          then lowerCoreClassesWith (Just ((,) externals instanceNames)) S.empty M.empty Nothing program
           else let {
             parameters =
               map
-                (\(Pair n ty) ->
-                   Triple n (SAnnotation Nil ty)
+                (\((,) n ty) ->
+                   (,,) n (SAnnotation [] ty)
                      (SChecked ty
                         (SApp (SPrimitive PPanic) (SStringLit "unlinked module parameter"))))
                 (M.toList externals)
           } in
           Right
-            (Pair (SProgram ds (if null parameters then eraseCallSites body
+            ((,) (SProgram ds (if null parameters then eraseCallSites body
                                else SLetRec parameters (eraseCallSites body)))
                M.empty);
         _ ->
-          lowerCoreClassesWith (Just (Pair externals instanceNames)) S.empty M.empty Nothing program
+          lowerCoreClassesWith (Just ((,) externals instanceNames)) S.empty M.empty Nothing program
       }
     };
   -- Crate lowering has a complete declaration/instance inventory, but candidate
   -- visibility remains that of each declaration's defining module. Stable
   -- dictionary names make the lowered declarations reusable inference queries.
   lowerSeparateClassesWithScopes :: Map String SType ->
-                                    List String ->
+                                    [] String ->
                                     Map String IntSet ->
-                                    List IntSet ->
-                                    SProgram -> Either String (Pair SProgram (Map String String));
+                                    [] IntSet ->
+                                    SProgram -> Either String ((,) SProgram (Map String String));
   lowerSeparateClassesWithScopes externals instanceNames valueScopes instanceScopes original =
     do {
       program <-
         Surface.lowerSurface
           (case original of {
-             SProgram ds b -> SClassProgram ds Nil Nil b;
+             SProgram ds b -> SClassProgram ds [] [] b;
              _ -> original
            });
       case program of {
-        SClassProgram ds Nil Nil body ->
+        SClassProgram ds [] [] body ->
           if managedExpression body || any managedType (M.elems externals)
-          then lowerCoreClassesWith (Just (Pair externals instanceNames)) S.empty valueScopes (Just instanceScopes) program
+          then lowerCoreClassesWith (Just ((,) externals instanceNames)) S.empty valueScopes (Just instanceScopes) program
           else let {
             parameters =
               map
-                (\(Pair n ty) ->
-                   Triple n (SAnnotation Nil ty)
+                (\((,) n ty) ->
+                   (,,) n (SAnnotation [] ty)
                      (SChecked ty
                         (SApp (SPrimitive PPanic) (SStringLit "unlinked crate parameter"))))
                 (M.toList externals)
           } in
           Right
-            (Pair (SProgram ds (if null parameters then eraseCallSites body
+            ((,) (SProgram ds (if null parameters then eraseCallSites body
                                else SLetRec parameters (eraseCallSites body)))
                M.empty);
         _ ->
-          lowerCoreClassesWith (Just (Pair externals instanceNames)) S.empty valueScopes
+          lowerCoreClassesWith (Just ((,) externals instanceNames)) S.empty valueScopes
             (Just instanceScopes)
             program
       }
     };
-  lowerCoreClassesWith :: Maybe (Pair (Map String SType) (List String)) ->
+  lowerCoreClassesWith :: Maybe ((,) (Map String SType) ([] String)) ->
                           Set String ->
                           Map String IntSet ->
-                          Maybe (List IntSet) ->
-                          SProgram -> Either String (Pair SProgram (Map String String));
+                          Maybe ([] IntSet) ->
+                          SProgram -> Either String ((,) SProgram (Map String String));
   lowerCoreClassesWith config imported valueIndices instanceIndices program =
     case program of {
       SProgram ds body ->
@@ -372,16 +374,16 @@ module Bootstrap.Classes where {
           Nothing ->
             if managedExpression body
             then lowerCoreClassesWith config imported valueIndices instanceIndices
-                   (SClassProgram ds Nil Nil body)
-            else Right (Pair (SProgram ds (eraseCallSites body)) M.empty);
+                   (SClassProgram ds [] [] body)
+            else Right ((,) (SProgram ds (eraseCallSites body)) M.empty);
           Just _ ->
             lowerCoreClassesWith config imported valueIndices instanceIndices
-              (SClassProgram ds Nil Nil body)
+              (SClassProgram ds [] [] body)
         };
       SClassProgram datatypes declarations instances body ->
         do {
           case instanceIndices of {
-            Nothing -> Right Unit;
+            Nothing -> Right ();
             Just scopes ->
               ensure (length scopes == length instances) "module instance scope count mismatch"
           };
@@ -391,7 +393,7 @@ module Bootstrap.Classes where {
             (concatMap
                (\d ->
                   if S.member compareString (className d) imported
-                  then Nil
+                  then []
                   else map fst (classMethods d))
                declarations);
           unique "class method"
@@ -399,7 +401,7 @@ module Bootstrap.Classes where {
                (\d ->
                   if S.member compareString (className d) imported
                   then map fst (classMethods d)
-                  else Nil)
+                  else [])
                declarations);
           traverseEither
             (\d ->
@@ -419,19 +421,19 @@ module Bootstrap.Classes where {
               append (Desugar.allNames body)
                 (append
                    (concatMap
-                      (\i -> concatMap (\(Pair _ e) -> Desugar.allNames e) (instanceMethods i))
+                      (\i -> concatMap (\((,) _ e) -> Desugar.allNames e) (instanceMethods i))
                       instances)
                    (append
                       (concatMap
                          (\d ->
-                            Cons (D.datatypeName d)
+                            (:) (D.datatypeName d)
                               (map D.constructorName (D.datatypeConstructors d)))
                          datatypes)
                       (concatMap
                          (\d ->
-                            Cons (className d)
+                            (:) (className d)
                               (append (map fst (classParameters d))
-                                 (concatMap (\(Pair n ty) -> Cons n (typeNames ty))
+                                 (concatMap (\((,) n ty) -> (:) n (typeNames ty))
                                     (classMethods d))))
                          declarations)))
           };
@@ -445,37 +447,37 @@ module Bootstrap.Classes where {
   implicitParameters (SClassDecl name parameters supers methods) =
     SClassDecl name parameters supers
       (map
-         (\(Pair n ty) ->
-            Pair n
+         (\((,) n ty) ->
+            (,) n
               (quantify
-                 (map (\a -> Pair a Star) (Surface.without (freeType ty) (map fst parameters)))
+                 (map (\a -> (,) a Star) (Surface.without (freeType ty) (map fst parameters)))
                  ty))
          methods);
-  typeNames :: SType -> List String;
+  typeNames :: SType -> [] String;
   typeNames ty =
     case ty of {
-      STVar n -> Cons n Nil;
-      SCon n ts -> Cons n (concatMap typeNames ts);
-      SForall _ n a b -> Cons n (append (typeNames a) (typeNames b));
+      STVar n -> (:) n [];
+      SCon n ts -> (:) n (concatMap typeNames ts);
+      SForall _ n a b -> (:) n (append (typeNames a) (typeNames b));
       SArrow a b -> append (typeNames a) (typeNames b);
       STypeApp a b -> append (typeNames a) (typeNames b);
       SQualified ps t ->
-        append (concatMap (\(SPredicate n ts) -> Cons n (concatMap typeNames ts)) ps) (typeNames t);
-      _ -> Nil
+        append (concatMap (\(SPredicate n ts) -> (:) n (concatMap typeNames ts)) ps) (typeNames t);
+      _ -> []
     };
   separateName config stable prefix =
     case config of {
       Nothing -> freshName prefix;
       Just _ -> freshPure stable
     };
-  lowerClassesBody :: Maybe (Pair (Map String SType) (List String)) ->
+  lowerClassesBody :: Maybe ((,) (Map String SType) ([] String)) ->
                       Set String ->
                       Map String IntSet ->
-                      Maybe (List IntSet) ->
-                      List DataDecl ->
-                      List SInstanceDecl ->
+                      Maybe ([] IntSet) ->
+                      [] DataDecl ->
+                      [] SInstanceDecl ->
                       SExpr ->
-                      DataEnv -> List SClassDecl -> Fresh (Pair SProgram (Map String String));
+                      DataEnv -> [] SClassDecl -> Fresh ((,) SProgram (Map String String));
   lowerClassesBody config imported valueIndices instanceIndices datatypes instances body base classes =
     do {
       entries <-
@@ -490,11 +492,11 @@ module Bootstrap.Classes where {
                    ("Make" ++ className declaration);
                methods <-
                  mapM
-                   (\(Pair n _) ->
+                   (\((,) n _) ->
                       do {
                         selector <-
                           separateName config ("select_" ++ n) ("select" ++ className declaration);
-                        freshPure (Pair n selector)
+                        freshPure ((,) n selector)
                       })
                    (classMethods declaration);
                supers <-
@@ -504,7 +506,7 @@ module Bootstrap.Classes where {
                         ("super_" ++ (className declaration ++ ("_" ++ showInt i)))
                         "superclass")
                    (range 0 (length (superclasses declaration) - 1));
-               freshPure (Pair (className declaration) (Info declaration dict ctor methods supers))
+               freshPure ((,) (className declaration) (Info declaration dict ctor methods supers))
              })
           classes;
       let {
@@ -519,7 +521,7 @@ module Bootstrap.Classes where {
       names <-
         case config of {
           Nothing -> mapM (\inst -> freshName "instanceDictionary") checkedInstances;
-          Just (Pair _ ns) ->
+          Just ((,) _ ns) ->
             do {
               freshLift
                 (ensure (length ns == length checkedInstances)
@@ -529,11 +531,11 @@ module Bootstrap.Classes where {
         };
       let {
         supers =
-          concatMap (\(Pair _ (Info _ _ _ _ ns)) -> map (\n -> Pair SuperclassEvidence n) ns)
+          concatMap (\((,) _ (Info _ _ _ _ ns)) -> map (\n -> (,) SuperclassEvidence n) ns)
             entries
       };
       let {
-        globalCandidates = append (map (\n -> Pair InstanceEvidence n) names) supers
+        globalCandidates = append (map (\n -> (,) InstanceEvidence n) names) supers
       };
       let {
         select = selectCandidates names supers
@@ -552,7 +554,7 @@ module Bootstrap.Classes where {
         externalSchemes =
           case config of {
             Nothing -> M.empty;
-            Just (Pair es _) -> es
+            Just ((,) es _) -> es
           }
       };
       let {
@@ -560,7 +562,7 @@ module Bootstrap.Classes where {
           M.mapWithKey
             (\n ty ->
                case scheme ty of {
-                 Triple _ ps _ -> Pair n (map (\(SPredicate c _) -> c) ps)
+                 (,,) _ ps _ -> (,) n (map (\(SPredicate c _) -> c) ps)
                })
             externalSchemes
       };
@@ -573,12 +575,12 @@ module Bootstrap.Classes where {
       selectorGroups <- mapM (\entry -> selectorDefinitions infos (snd entry)) entries;
       definitions <-
         mapM
-          (\(Pair (Pair name inst) available) ->
+          (\((,) ((,) name inst) available) ->
              instanceDefinition valueScopes ds infos methodEnv name inst available)
           (zip (zip names checkedInstances) instanceScopes);
       boundValueShared3 <- lowerExpr valueScopes ds infos methodEnv globalCandidates body;
       case boundValueShared3 of {
-        Pair expression wants ->
+        (,) expression wants ->
           do {
             let {
               result = closeWants infos globalCandidates wants expression
@@ -586,26 +588,26 @@ module Bootstrap.Classes where {
             let {
               bindings =
                 map
-                  (\(Triple n annotation rhs) ->
+                  (\((,,) n annotation rhs) ->
                      case annotation of {
-                       SAnnotation _ ty -> Triple n annotation (SChecked ty rhs)
+                       SAnnotation _ ty -> (,,) n annotation (SChecked ty rhs)
                      })
                   (append (concat selectorGroups) definitions)
             };
             let {
               localBindings =
-                filter (\(Triple n _ _) -> not (M.member compareString n externalSchemes)) bindings
+                filter (\((,,) n _ _) -> not (M.member compareString n externalSchemes)) bindings
             };
             let {
               inner = if null localBindings then result else SLetRec localBindings result
             };
             externalBindings <-
               mapM
-                (\(Pair n ty) ->
+                (\((,) n ty) ->
                    do {
                      translated <- freshLift (translateScheme ds infos ty);
                      freshPure
-                       (Triple n (SAnnotation Nil translated)
+                       ((,,) n (SAnnotation [] translated)
                           (SChecked translated
                              (SApp (SPrimitive PPanic) (SStringLit "unlinked module parameter"))))
                    })
@@ -614,49 +616,49 @@ module Bootstrap.Classes where {
               output = if null externalBindings then inner else SLetRec externalBindings inner
             };
             freshPure
-              (Pair (SProgram (append datatypes dictionaries) output)
+              ((,) (SProgram (append datatypes dictionaries) output)
                  (M.insert compareString "MLFStackEvidence" callStackPredicate
                     (M.fromList compareString
-                      (map (\(Pair name (Info _ dict _ _ _)) -> Pair dict name) entries))))
+                      (map (\((,) name (Info _ dict _ _ _)) -> (,) dict name) entries))))
           }
       }
     };
-  selectCandidates :: List String ->
-                      List (Pair EvidenceRole String) -> IntSet -> List (Pair EvidenceRole String);
+  selectCandidates :: [] String ->
+                      [] ((,) EvidenceRole String) -> IntSet -> [] ((,) EvidenceRole String);
   selectCandidates names supers indices =
     append
       (concatMap
-         (\(Pair i n) -> if I.member i indices then Cons (Pair InstanceEvidence n) Nil else Nil)
+         (\((,) i n) -> if I.member i indices then (:) ((,) InstanceEvidence n) [] else [])
          (zip (range 0 (length names - 1)) names))
       supers;
   methodBindings :: Set String ->
-                    Bool -> List (Pair String Info) -> Map String (Pair String (List String));
+                    Bool -> [] ((,) String Info) -> Map String ((,) String ([] String));
   methodBindings imported isImported entries =
     M.fromList compareString
       (concatMap
-         (\(Pair name (Info declaration _ _ methods _)) ->
+         (\((,) name (Info declaration _ _ methods _)) ->
             if if isImported
                then S.member compareString name imported
                else not (S.member compareString name imported)
             then map
-                   (\(Pair method selector) ->
+                   (\((,) method selector) ->
                       let {
                         local =
                           case lookup eqString method (classMethods declaration) of {
-                            Nothing -> Nil;
-                            Just ty -> case scheme ty of { Triple _ ps _ -> map (\(SPredicate c _) -> c) ps }
+                            Nothing -> [];
+                            Just ty -> case scheme ty of { (,,) _ ps _ -> map (\(SPredicate c _) -> c) ps }
                           }
-                      } in Pair method (Pair selector (Cons name local)))
+                      } in (,) method ((,) selector ((:) name local)))
                    methods
-            else Nil)
+            else [])
          entries);
-  instanceDefinition :: Map String (List (Pair EvidenceRole String)) ->
+  instanceDefinition :: Map String ([] ((,) EvidenceRole String)) ->
                         DataEnv ->
                         Map String Info ->
-                        Map String (Pair String (List String)) ->
+                        Map String ((,) String ([] String)) ->
                         String ->
                         SInstanceDecl ->
-                        List (Pair EvidenceRole String) -> Fresh (Triple String SAnnotation SExpr);
+                        [] ((,) EvidenceRole String) -> Fresh ((,,) String SAnnotation SExpr);
   instanceDefinition valueScopes ds infos methodEnv name inst available =
     do {
       boundValueShared6 <- freshLift (lookupInfo infos (instanceClass inst));
@@ -665,11 +667,11 @@ module Bootstrap.Classes where {
           do {
             givenNames <- mapM (\p -> freshName "givenDictionary") (instanceContext inst);
             let {
-              candidates = append (map (\n -> Pair GivenEvidence n) givenNames) available
+              candidates = append (map (\n -> (,) GivenEvidence n) givenNames) available
             };
             methodBodies <-
               mapM
-                (\(Pair method methodType) ->
+                (\((,) method methodType) ->
                    do {
                      original <-
                        freshLift
@@ -711,11 +713,11 @@ module Bootstrap.Classes where {
                   (foldl SApp (SConstructor ctor) (append superBodies methodBodies))
                   givenNames
             };
-            freshPure (Triple name (SAnnotation Nil ty) rhs)
+            freshPure ((,,) name (SAnnotation [] ty) rhs)
           }
       }
     };
-  validateClasses :: DataEnv -> Map String Info -> Either String Unit;
+  validateClasses :: DataEnv -> Map String Info -> Either String ();
   validateClasses ds infos =
     do {
       traverseEither
@@ -730,7 +732,7 @@ module Bootstrap.Classes where {
                "HasCallStack is not permitted as a superclass";
              traverseEither (checkPredicate ds infos scope) (superclasses declaration);
              traverseEither
-               (\(Pair name ty) ->
+               (\((,) name ty) ->
                   do {
                     let {
                       missing = Surface.without (M.keys scope) (freeType ty)
@@ -742,16 +744,16 @@ module Bootstrap.Classes where {
                     translated <- methodEvidenceType ty;
                     K.annotationType ds scope translated;
                     field translated;
-                    Right Unit
+                    Right ()
                   })
                (classMethods declaration);
-             Right Unit
+             Right ()
            })
         (M.elems infos);
-      traverseEither (visitSuperclass infos Nil) (M.keys infos);
-      Right Unit
+      traverseEither (visitSuperclass infos []) (M.keys infos);
+      Right ()
     };
-  visitSuperclass :: Map String Info -> List String -> String -> Either String Unit;
+  visitSuperclass :: Map String Info -> [] String -> String -> Either String ();
   visitSuperclass infos seen name =
     if elem eqString name seen
     then Left ("cyclic superclass hierarchy: " ++ name)
@@ -760,9 +762,9 @@ module Bootstrap.Classes where {
            case boundValueShared7 of {
              Info declaration _ _ _ _ ->
                do {
-                 traverseEither (\(SPredicate c _) -> visitSuperclass infos (Cons name seen) c)
+                 traverseEither (\(SPredicate c _) -> visitSuperclass infos ((:) name seen) c)
                    (superclasses declaration);
-                 Right Unit
+                 Right ()
                }
            }
          };
@@ -771,9 +773,9 @@ module Bootstrap.Classes where {
     do {
       supers <- traverseEither (dictionary infos) (superclasses declaration);
       fields <- traverseEither field (append supers (map snd (classMethods declaration)));
-      Right (DataDeclK name (classParameters declaration) (Cons (ConstructorDecl ctor fields) Nil))
+      Right (DataDeclK name (classParameters declaration) ((:) (ConstructorDecl ctor fields) []))
     };
-  selectorDefinitions :: Map String Info -> Info -> Fresh (List (Triple String SAnnotation SExpr));
+  selectorDefinitions :: Map String Info -> Info -> Fresh ([] ((,,) String SAnnotation SExpr));
   selectorDefinitions infos (Info declaration dict ctor methods supers) =
     do {
       superTypes <- freshLift (traverseEither (dictionary infos) (superclasses declaration));
@@ -786,7 +788,7 @@ module Bootstrap.Classes where {
         parameters = classParameters declaration
       };
       mapM
-        (\(Pair selected (Pair name ty)) ->
+        (\((,) selected ((,) name ty)) ->
            do {
              d <- freshName "dictionary";
              value <- freshName "methodValue";
@@ -799,19 +801,19 @@ module Bootstrap.Classes where {
                rhs =
                  SLam d Nothing
                    (SCase (SVar d)
-                      (Cons (SAlternative (SConstructorPattern ctor fields) (SVar value)) Nil))
+                      ((:) (SAlternative (SConstructorPattern ctor fields) (SVar value)) []))
              };
              resultType <- freshLift (methodEvidenceType ty);
              let {
                signature =
                  quantify parameters
-                   (SArrow (SCon dict (map (\(Pair n _) -> STVar n) parameters)) resultType)
+                   (SArrow (SCon dict (map (\((,) n _) -> STVar n) parameters)) resultType)
              };
-             freshPure (Triple name (SAnnotation Nil signature) rhs)
+             freshPure ((,,) name (SAnnotation [] signature) rhs)
            })
         (zip (range 0 (length signatures - 1)) signatures)
     };
-  methodNames :: List String -> String;
+  methodNames :: [] String -> String;
   methodNames names =
     ("[" ++ (intercalate "," (map Pretty.prettyString (sortBy compareString names)) ++ "]"));
   validateInstance :: DataEnv -> Map String Info -> SInstanceDecl -> Either String SInstanceDecl;
@@ -849,7 +851,7 @@ module Bootstrap.Classes where {
             };
             let {
               vars =
-                append explicit (map (\a -> Pair a Star) (Surface.without free (map fst explicit)))
+                append explicit (map (\a -> (,) a Star) (Surface.without free (map fst explicit)))
             };
             let {
               scope = M.fromList compareString vars
@@ -858,9 +860,9 @@ module Bootstrap.Classes where {
               "instance variables must occur in the instance head";
             checkPredicate ds infos scope (SPredicate (instanceClass inst) arguments);
             case arguments of {
-              Cons (SCon _ _) Nil -> Right Unit;
-              Cons _ Nil -> Left "instance head must start with a named type constructor";
-              _ -> Right Unit
+              (:) (SCon _ _) [] -> Right ();
+              (:) _ [] -> Left "instance head must start with a named type constructor";
+              _ -> Right ()
             };
             traverseEither (headType "") arguments;
             traverseEither
@@ -897,34 +899,34 @@ module Bootstrap.Classes where {
           (\f a ->
              do {
                value <- headType prefix a;
-               Right (HCon "@" (Cons f (Cons value Nil)))
+               Right (HCon "@" ((:) f ((:) value [])))
              })
-          (HCon c Nil)
+          (HCon c [])
           ts;
       STypeApp f a ->
         do {
           x <- headType prefix f;
           y <- headType prefix a;
-          Right (HCon "@" (Cons x (Cons y Nil)))
+          Right (HCon "@" ((:) x ((:) y [])))
         };
       SArrow a b ->
         do {
           x <- headType prefix a;
           y <- headType prefix b;
-          Right (HCon "->" (Cons x (Cons y Nil)))
+          Right (HCon "->" ((:) x ((:) y [])))
         };
       _ -> Left "instance heads must be monotypes"
     };
-  checkOverlap :: List SInstanceDecl -> Either String Unit;
+  checkOverlap :: [] SInstanceDecl -> Either String ();
   checkOverlap instances =
     case instances of {
-      Nil -> Right Unit;
-      Cons a rest ->
+      [] -> Right ();
+      (:) a rest ->
         do {
           traverseEither
             (\b ->
                if not (eqString (instanceClass a) (instanceClass b))
-               then Right Unit
+               then Right ()
                else do {
                       xs <- traverseEither (headType "left:") (instanceHead a);
                       ys <- traverseEither (headType "right:") (instanceHead b);
@@ -965,11 +967,11 @@ module Bootstrap.Classes where {
       HVar b -> eqString a b;
       HCon _ ts -> any (occursHead a) ts
     };
-  overlap :: Map String InstanceHead -> List (Pair InstanceHead InstanceHead) -> Bool;
+  overlap :: Map String InstanceHead -> [] ((,) InstanceHead InstanceHead) -> Bool;
   overlap substitution equations =
     case equations of {
-      Nil -> True;
-      Cons (Pair x y) rest ->
+      [] -> True;
+      (:) ((,) x y) rest ->
         let {
           a = walkHead substitution x
         } in
@@ -997,7 +999,7 @@ module Bootstrap.Classes where {
     };
   -- Structural size and occurrence counts are total integer accumulations.
   -- Force each update so wide types do not leave a deferred arithmetic chain.
-  sumCounts :: List Int -> Int;
+  sumCounts :: [] Int -> Int;
   sumCounts counts = foldlStrict addInt 0 counts;
   typeSize :: SType -> Int;
   typeSize ty =
@@ -1017,48 +1019,50 @@ module Bootstrap.Classes where {
       SArrow x y -> (occurrences a x + occurrences a y);
       _ -> 0
     };
-  lowerExpr :: Map String (List (Pair EvidenceRole String)) ->
+  lowerExpr :: Map String ([] ((,) EvidenceRole String)) ->
                DataEnv ->
                Map String Info ->
-               Map String (Pair String (List String)) ->
-               List (Pair EvidenceRole String) ->
-               SExpr -> Fresh (Pair SExpr (List (Pair String String)));
+               Map String ((,) String ([] String)) ->
+               [] ((,) EvidenceRole String) ->
+               SExpr -> Fresh ((,) SExpr ([] ((,) String String)));
   lowerExpr valueScopes ds infos env candidates expression =
     lowerExprAt Nothing valueScopes ds infos env candidates expression;
-  lowerExprAt :: Maybe (Pair String SourceSpan) ->
-                 Map String (List (Pair EvidenceRole String)) -> DataEnv -> Map String Info ->
-                 Map String (Pair String (List String)) -> List (Pair EvidenceRole String) ->
-                 SExpr -> Fresh (Pair SExpr (List (Pair String String)));
+  lowerExprAt :: Maybe ((,) String SourceSpan) ->
+                 Map String ([] ((,) EvidenceRole String)) -> DataEnv -> Map String Info ->
+                 Map String ((,) String ([] String)) -> [] ((,) EvidenceRole String) ->
+                 SExpr -> Fresh ((,) SExpr ([] ((,) String String)));
   lowerExprAt site valueScopes ds infos env candidates expression =
     case expression of {
+      SSourceDefinition body ->
+        lowerExprAt site valueScopes ds infos (M.delete compareString callStackScopeKey env) candidates body;
       SCallSite name location value ->
         if eqString name "an expression type signature" && managedAnnotation value
-        then lowerFunctionAt (Just (Pair name location)) valueScopes ds infos env candidates value
-        else lowerExprAt (Just (Pair name location)) valueScopes ds infos env candidates value;
+        then lowerFunctionAt (Just ((,) name location)) valueScopes ds infos env candidates value
+        else lowerExprAt (Just ((,) name location)) valueScopes ds infos env candidates value;
       SVar x ->
         if eqString x "$MLF.Stack.callStack"
-        then do { stack <- currentCallStack env; freshPure (Pair stack Nil) }
+        then do { stack <- currentCallStack env; freshPure ((,) stack []) }
         else case M.lookup compareString x env of {
-          Nothing -> freshPure (Pair expression Nil);
-          Just (Pair name classes) -> applyEvidence site x env (SVar name) classes
+          Nothing -> freshPure ((,) expression []);
+          Just ((,) name classes) -> applyEvidence site x env (SVar name) classes
         };
-      SConstructor _ -> freshPure (Pair expression Nil);
-      SIntLit _ -> freshPure (Pair expression Nil);
-      SDoubleLit _ -> freshPure (Pair expression Nil);
-      SBoolLit _ -> freshPure (Pair expression Nil);
-      SStringLit _ -> freshPure (Pair expression Nil);
-      SPrimitive _ -> freshPure (Pair expression Nil);
+      SConstructor _ -> freshPure ((,) expression []);
+      SIntLit _ -> freshPure ((,) expression []);
+      SDoubleLit _ -> freshPure ((,) expression []);
+      SBoolLit _ -> freshPure ((,) expression []);
+      SStringLit _ -> freshPure ((,) expression []);
+      SPrimitive _ -> freshPure ((,) expression []);
       SApp a b ->
         do {
           boundValueShared10 <- lowerFunctionAt site valueScopes ds infos env candidates a;
           case boundValueShared10 of {
-            Pair f as ->
+            (,) f as ->
               do {
                 boundValueShared9 <- lowerExprAt site valueScopes ds infos env candidates b;
                 case boundValueShared9 of {
-                  Pair x bs ->
+                  (,) x bs ->
                     do {
-                      freshPure (Pair (SApp f x) (append as bs))
+                      freshPure ((,) (SApp f x) (append as bs))
                     }
                 }
               }
@@ -1068,7 +1072,7 @@ module Bootstrap.Classes where {
         do {
           boundValueShared12 <-
             case annotation of {
-              Nothing -> freshPure (Pair Nothing Nil);
+              Nothing -> freshPure ((,) Nothing []);
               Just (SAnnotation existential ty) ->
                 do {
                   translated <-
@@ -1078,31 +1082,31 @@ module Bootstrap.Classes where {
                   let {
                     predicates =
                       case scheme ty of {
-                        Triple _ ps _ -> ps
+                        (,,) _ ps _ -> ps
                       }
                   };
                   freshPure
-                    (Pair (Just (SAnnotation existential translated))
+                    ((,) (Just (SAnnotation existential translated))
                        (map (\(SPredicate c _) -> c) predicates))
                 }
             };
           case boundValueShared12 of {
-            Pair annotation2 classes ->
+            (,) annotation2 classes ->
               do {
                 boundValueShared11 <-
-                  lowerExprAt site valueScopes ds infos (M.insert compareString x (Pair x classes) env)
+                  lowerExprAt site valueScopes ds infos (M.insert compareString x ((,) x classes) env)
                     candidates
                     body;
                 case boundValueShared11 of {
-                  Pair body2 wants ->
+                  (,) body2 wants ->
                     do {
-                      freshPure (Pair (SLam x annotation2 body2) wants)
+                      freshPure ((,) (SLam x annotation2 body2) wants)
                     }
                 }
               }
           }
         };
-      SLet x (SAnn rhs (SAnnotation Nil ty)) body ->
+      SLet x (SAnn rhs (SAnnotation [] ty)) body ->
         do {
           rhs2 <-
             signedIn valueScopes ds infos (M.findWithDefault compareString candidates x valueScopes)
@@ -1112,18 +1116,18 @@ module Bootstrap.Classes where {
           let {
             predicates =
               case scheme ty of {
-                Triple _ ps _ -> ps
+                (,,) _ ps _ -> ps
               }
           };
           boundValueShared13 <-
             lowerExprAt site valueScopes ds infos
-              (M.insert compareString x (Pair x (map (\(SPredicate c _) -> c) predicates)) env)
+              (M.insert compareString x ((,) x (map (\(SPredicate c _) -> c) predicates)) env)
               candidates
               body;
           case boundValueShared13 of {
-            Pair body2 wants ->
+            (,) body2 wants ->
               do {
-                freshPure (Pair (SLet x rhs2 body2) wants)
+                freshPure ((,) (SLet x rhs2 body2) wants)
               }
           }
         };
@@ -1134,18 +1138,18 @@ module Bootstrap.Classes where {
               (M.findWithDefault compareString candidates x valueScopes)
               rhs;
           case boundValueShared15 of {
-            Pair rhs2 wanted ->
+            (,) rhs2 wanted ->
               do {
                 boundValueShared14 <-
                   lowerExprAt site valueScopes ds infos
-                    (M.insert compareString x (Pair x (map snd wanted)) env)
+                    (M.insert compareString x ((,) x (map snd wanted)) env)
                     candidates
                     body;
                 case boundValueShared14 of {
-                  Pair body2 wants ->
+                  (,) body2 wants ->
                     do {
                       freshPure
-                        (Pair (SLet x (foldr (\(Pair n _) b -> SLam n Nothing b) rhs2 wanted) body2)
+                        ((,) (SLet x (foldr (\((,) n _) b -> SLam n Nothing b) rhs2 wanted) body2)
                            wants)
                     }
                 }
@@ -1156,7 +1160,7 @@ module Bootstrap.Classes where {
         let {
           predicates =
             case scheme ty of {
-              Triple _ ps _ -> ps
+              (,,) _ ps _ -> ps
             }
         } in
         if not (null predicates)
@@ -1164,18 +1168,18 @@ module Bootstrap.Classes where {
                freshLift
                  (ensure (null existential) "qualified annotations cannot bind existentials");
                result <- signedIn valueScopes ds infos candidates env a ty;
-               freshPure (Pair result Nil)
+               freshPure ((,) result [])
              }
         else do {
                boundValueShared16 <- lowerExprAt site valueScopes ds infos env candidates a;
                case boundValueShared16 of {
-                 Pair a2 wants ->
+                 (,) a2 wants ->
                    do {
                      translated <-
                        if null existential
                        then freshLift (translateScheme ds infos ty)
                        else freshPure ty;
-                     freshPure (Pair (SAnn a2 (SAnnotation existential translated)) wants)
+                     freshPure ((,) (SAnn a2 (SAnnotation existential translated)) wants)
                    }
                }
              };
@@ -1183,7 +1187,7 @@ module Bootstrap.Classes where {
         do {
           boundValueShared18 <- lowerExprAt site valueScopes ds infos env candidates a;
           case boundValueShared18 of {
-            Pair a2 as ->
+            (,) a2 as ->
               do {
                 bs <-
                   mapM
@@ -1193,18 +1197,18 @@ module Bootstrap.Classes where {
                            names = Surface.patternVariables pattern
                          };
                          let {
-                           scope = foldr (\n -> M.insert compareString n (Pair n Nil)) env names
+                           scope = foldr (\n -> M.insert compareString n ((,) n [])) env names
                          };
                          boundValueShared17 <- lowerExprAt site valueScopes ds infos scope candidates body;
                          case boundValueShared17 of {
-                           Pair body2 wants ->
+                           (,) body2 wants ->
                              do {
-                               freshPure (Pair (SAlternative pattern body2) wants)
+                               freshPure ((,) (SAlternative pattern body2) wants)
                              }
                          }
                        })
                     branches;
-                freshPure (Pair (SCase a2 (map fst bs)) (append as (concatMap snd bs)))
+                freshPure ((,) (SCase a2 (map fst bs)) (append as (concatMap snd bs)))
               }
           }
         };
@@ -1214,9 +1218,9 @@ module Bootstrap.Classes where {
           signatures <-
             freshLift
               (traverseEither
-                 (\(Triple n annotation rhs) ->
+                 (\((,,) n annotation rhs) ->
                     case annotation of {
-                      SAnnotation Nil ty -> Right (Triple n ty rhs);
+                      SAnnotation [] ty -> Right ((,,) n ty rhs);
                       _ ->
                         Left
                           ("recursive definition " ++
@@ -1226,10 +1230,10 @@ module Bootstrap.Classes where {
           let {
             entries =
               map
-                (\(Triple n ty _) ->
+                (\((,,) n ty _) ->
                    case scheme ty of {
-                     Triple _ predicates _ ->
-                       Pair n (Pair n (map (\(SPredicate c _) -> c) predicates))
+                     (,,) _ predicates _ ->
+                       (,) n ((,) n (map (\(SPredicate c _) -> c) predicates))
                    })
                 signatures
           };
@@ -1238,7 +1242,7 @@ module Bootstrap.Classes where {
           };
           definitions2 <-
             mapM
-              (\(Triple n ty rhs) ->
+              (\((,,) n ty rhs) ->
                  do {
                    translated <- freshLift (translateScheme ds infos ty);
                    rhs2 <-
@@ -1247,14 +1251,14 @@ module Bootstrap.Classes where {
                        scope
                        rhs
                        ty;
-                   freshPure (Triple n (SAnnotation Nil translated) rhs2)
+                   freshPure ((,,) n (SAnnotation [] translated) rhs2)
                  })
               signatures;
           boundValueShared19 <- lowerExprAt site valueScopes ds infos scope candidates body;
           case boundValueShared19 of {
-            Pair body2 wants ->
+            (,) body2 wants ->
               do {
-                freshPure (Pair (SLetRec definitions2 body2) wants)
+                freshPure ((,) (SLetRec definitions2 body2) wants)
               }
           }
         };
@@ -1270,17 +1274,19 @@ module Bootstrap.Classes where {
   };
   -- Expression signatures are uses, not binding signatures: solve their
   -- managed evidence at this location rather than infer it on an unsigned let.
-  lowerFunctionAt :: Maybe (Pair String SourceSpan) ->
-                     Map String (List (Pair EvidenceRole String)) -> DataEnv -> Map String Info ->
-                     Map String (Pair String (List String)) -> List (Pair EvidenceRole String) ->
-                     SExpr -> Fresh (Pair SExpr (List (Pair String String)));
+  lowerFunctionAt :: Maybe ((,) String SourceSpan) ->
+                     Map String ([] ((,) EvidenceRole String)) -> DataEnv -> Map String Info ->
+                     Map String ((,) String ([] String)) -> [] ((,) EvidenceRole String) ->
+                     SExpr -> Fresh ((,) SExpr ([] ((,) String String)));
   lowerFunctionAt site valueScopes ds infos env candidates expression =
     case expression of {
+      SSourceDefinition body ->
+        lowerFunctionAt site valueScopes ds infos (M.delete compareString callStackScopeKey env) candidates body;
       SCallSite name location value ->
-        lowerFunctionAt (Just (Pair name location)) valueScopes ds infos env candidates value;
-      SAnn rhs (SAnnotation Nil ty) ->
+        lowerFunctionAt (Just ((,) name location)) valueScopes ds infos env candidates value;
+      SAnn rhs (SAnnotation [] ty) ->
         case scheme ty of {
-          Triple _ predicates _ ->
+          (,,) _ predicates _ ->
             if null predicates
             then lowerExprAt site valueScopes ds infos env candidates expression
             else do {
@@ -1292,49 +1298,49 @@ module Bootstrap.Classes where {
       _ -> lowerExprAt site valueScopes ds infos env candidates expression
     };
   -- Call-stack evidence is synthesized at each use, never generalized as a wanted.
-  currentCallStack :: Map String (Pair String (List String)) -> Fresh SExpr;
+  currentCallStack :: Map String ((,) String ([] String)) -> Fresh SExpr;
   currentCallStack scope =
     case M.lookup compareString callStackScopeKey scope of {
       Nothing -> freshPure (SPrimitive PEmptyCallStack);
-      Just (Pair evidence _) ->
+      Just ((,) evidence _) ->
         do {
           stack <- freshName "callStackValue";
           freshPure (SCase (SVar evidence)
-            (Cons (SAlternative
-              (SConstructorPattern "MLFStackEvidence" (Cons (Just stack) Nil))
-              (SVar stack)) Nil))
+            ((:) (SAlternative
+              (SConstructorPattern "MLFStackEvidence" ((:) (Just stack) []))
+              (SVar stack)) []))
         }
     };
-  callSiteEvidence :: Maybe (Pair String SourceSpan) -> String ->
-                      Map String (Pair String (List String)) -> Fresh SExpr;
+  callSiteEvidence :: Maybe ((,) String SourceSpan) -> String ->
+                      Map String ((,) String ([] String)) -> Fresh SExpr;
   callSiteEvidence site fallback scope =
     do {
       stack <- currentCallStack scope;
       let {
         origin = case site of {
           Just value -> value;
-          Nothing -> Pair fallback (SourceSpan "" "" "<generated>" 0 0 0 0)
+          Nothing -> (,) fallback (SourceSpan "" "" "<generated>" 0 0 0 0)
         }
       };
       case origin of {
-        Pair display (SourceSpan packageName moduleName file startLine startColumn endLine endColumn) ->
+        (,) display (SourceSpan packageName moduleName file startLine startColumn endLine endColumn) ->
           let {
-            args = Cons (SStringLit display) (Cons (SStringLit packageName)
-              (Cons (SStringLit moduleName) (Cons (SStringLit file)
-              (Cons (SIntLit startLine) (Cons (SIntLit startColumn)
-              (Cons (SIntLit endLine) (Cons (SIntLit endColumn) Nil)))))));
+            args = (:) (SStringLit display) ((:) (SStringLit packageName)
+              ((:) (SStringLit moduleName) ((:) (SStringLit file)
+              ((:) (SIntLit startLine) ((:) (SIntLit startColumn)
+              ((:) (SIntLit endLine) ((:) (SIntLit endColumn) [])))))));
             frame = foldl SApp (SConstructor "MLFStackFrame") args;
             pushed = SApp (SApp (SPrimitive PPushCallStack) frame) stack
           } in freshPure (SApp (SConstructor "MLFStackEvidence") pushed)
       }
     };
-  applyEvidence :: Maybe (Pair String SourceSpan) -> String ->
-                   Map String (Pair String (List String)) -> SExpr -> List String ->
-                   Fresh (Pair SExpr (List (Pair String String)));
+  applyEvidence :: Maybe ((,) String SourceSpan) -> String ->
+                   Map String ((,) String ([] String)) -> SExpr -> [] String ->
+                   Fresh ((,) SExpr ([] ((,) String String)));
   applyEvidence site name scope expression classes =
     case classes of {
-      Nil -> freshPure (Pair expression Nil);
-      Cons predicate rest ->
+      [] -> freshPure ((,) expression []);
+      (:) predicate rest ->
         if eqString predicate callStackPredicate
         then do {
                evidence <- callSiteEvidence site name scope;
@@ -1344,54 +1350,59 @@ module Bootstrap.Classes where {
                wanted <- freshName "wantedDictionary";
                result <- applyEvidence site name scope (SApp expression (SVar wanted)) rest;
                case result of {
-                 Pair body wants -> freshPure (Pair body (Cons (Pair wanted predicate) wants))
+                 (,) body wants -> freshPure ((,) body ((:) ((,) wanted predicate) wants))
                }
              }
     };
-  wantedNames :: List String -> Fresh (List (Pair String String));
+  wantedNames :: [] String -> Fresh ([] ((,) String String));
   wantedNames classes =
     mapM
       (\c ->
          do {
            name <- freshName "wantedDictionary";
-           freshPure (Pair name c)
+           freshPure ((,) name c)
          })
       classes;
-  signedIn :: Map String (List (Pair EvidenceRole String)) ->
+  signedIn :: Map String ([] ((,) EvidenceRole String)) ->
               DataEnv ->
               Map String Info ->
-              List (Pair EvidenceRole String) ->
-              Map String (Pair String (List String)) -> SExpr -> SType -> Fresh SExpr;
+              [] ((,) EvidenceRole String) ->
+              Map String ((,) String ([] String)) -> SExpr -> SType -> Fresh SExpr;
   signedIn valueScopes ds infos available scope expression ty =
     do {
       translated <- freshLift (translateScheme ds infos ty);
       lowerSignedBody valueScopes ds infos available scope expression ty translated
     };
-  lowerSignedBody :: Map String (List (Pair EvidenceRole String)) ->
-                     DataEnv -> Map String Info -> List (Pair EvidenceRole String) ->
-                     Map String (Pair String (List String)) -> SExpr -> SType -> SType -> Fresh SExpr;
+  lowerSignedBody :: Map String ([] ((,) EvidenceRole String)) ->
+                     DataEnv -> Map String Info -> [] ((,) EvidenceRole String) ->
+                     Map String ((,) String ([] String)) -> SExpr -> SType -> SType -> Fresh SExpr;
   lowerSignedBody valueScopes ds infos available scope expression ty translated =
-    do {
+    case expression of {
+      -- A copied top-level definition keeps its original managed lexical scope.
+      -- Peel provenance before installing this definition's own explicit givens.
+      SSourceDefinition body -> lowerSignedBody valueScopes ds infos available
+        (M.delete compareString callStackScopeKey scope) body ty translated;
+      _ -> do {
       let {
         predicates =
           case scheme ty of {
-            Triple _ ps _ -> ps
+            (,,) _ ps _ -> ps
           }
       };
       names <- mapM (\p -> freshName "givenDictionary") predicates;
       let {
-        ordinary = filter (\(Pair p _) -> not (isCallStackPredicate p)) (zip predicates names);
-        local = append (map (\(Pair _ n) -> Pair GivenEvidence n) ordinary) available;
+        ordinary = filter (\((,) p _) -> not (isCallStackPredicate p)) (zip predicates names);
+        local = append (map (\((,) _ n) -> (,) GivenEvidence n) ordinary) available;
         stackScope = foldl
-          (\env (Pair predicate name) ->
+          (\env ((,) predicate name) ->
              if isCallStackPredicate predicate
-             then M.insert compareString callStackScopeKey (Pair name Nil) env
+             then M.insert compareString callStackScopeKey ((,) name []) env
              else env)
           scope (zip predicates names)
       };
       boundValueShared20 <- lowerExpr valueScopes ds infos stackScope local expression;
       case boundValueShared20 of {
-        Pair body wants ->
+        (,) body wants ->
           do {
             let {
               closed = closeWants infos local wants body
@@ -1399,25 +1410,27 @@ module Bootstrap.Classes where {
             freshPure (SChecked translated (foldr (\n b -> SLam n Nothing b) closed names))
           }
       }
+    }
     };
   closeWants :: Map String Info ->
-                List (Pair EvidenceRole String) -> List (Pair String String) -> SExpr -> SExpr;
+                [] ((,) EvidenceRole String) -> [] ((,) String String) -> SExpr -> SExpr;
   closeWants infos candidates wants expression =
     let {
       replacements =
         M.fromList compareString
           (concatMap
-             (\(Pair n c) ->
+             (\((,) n c) ->
                 case M.lookup compareString c infos of {
-                  Nothing -> Nil;
-                  Just (Info _ dict _ _ _) -> Cons (Pair n dict) Nil
+                  Nothing -> [];
+                  Just (Info _ dict _ _ _) -> (:) ((,) n dict) []
                 })
              wants)
     } in
     closeWanted replacements candidates expression;
-  closeWanted :: Map String String -> List (Pair EvidenceRole String) -> SExpr -> SExpr;
+  closeWanted :: Map String String -> [] ((,) EvidenceRole String) -> SExpr -> SExpr;
   closeWanted replacements candidates expression =
     case expression of {
+      SSourceDefinition body -> SSourceDefinition (closeWanted replacements candidates body);
       SCallSite name location body ->
         SCallSite name location (closeWanted replacements candidates body);
       SVar n ->
@@ -1438,7 +1451,7 @@ module Bootstrap.Classes where {
       SChecked ty a -> SChecked ty (closeWanted replacements candidates a);
       SLetRec definitions body ->
         SLetRec
-          (map (\(Triple n t a) -> Triple n t (closeWanted replacements candidates a)) definitions)
+          (map (\((,,) n t a) -> (,,) n t (closeWanted replacements candidates a)) definitions)
           (closeWanted replacements candidates body);
       _ -> expression
     };
@@ -1482,7 +1495,7 @@ module Bootstrap.Classes where {
         };
       _ -> freshPure ty
     };
-  freshAvoid :: String -> List String -> Fresh String;
+  freshAvoid :: String -> [] String -> Fresh String;
   freshAvoid prefix forbidden =
     do {
       name <- freshName prefix;
@@ -1511,8 +1524,8 @@ module Bootstrap.Classes where {
         ("forall " ++ (prettyBinder a bound ++ (". " ++ prettyQualified names body)));
       _ ->
         case constraints names ty of {
-          Pair Nil _ -> Pretty.prettyType ty;
-          Pair predicates body ->
+          (,) [] _ -> Pretty.prettyType ty;
+          (,) predicates body ->
             ((if (length predicates == 1)
               then head predicates
               else ("(" ++ (intercalate ", " predicates ++ ")"))) ++
@@ -1538,25 +1551,25 @@ module Bootstrap.Classes where {
           }) ++
          (" -> " ++ prettyKindLocal b))
     };
-  constraints :: Map String String -> XType -> Pair (List String) XType;
+  constraints :: Map String String -> XType -> (,) ([] String) XType;
   constraints names ty =
     case ty of {
       XArrow (XCon dictionary args) body ->
         case M.lookup compareString dictionary names of {
-          Nothing -> Pair Nil ty;
+          Nothing -> (,) [] ty;
           Just name ->
             case constraints names body of {
-              Pair predicates result ->
-                Pair (Cons (unwords (Cons name (map prettyArgument args))) predicates) result
+              (,) predicates result ->
+                (,) ((:) (unwords ((:) name (map prettyArgument args))) predicates) result
             }
         };
-      _ -> Pair Nil ty
+      _ -> (,) [] ty
     };
   prettyArgument :: XType -> String;
   prettyArgument ty =
     case ty of {
       XVar _ -> Pretty.prettyType ty;
-      XCon _ Nil -> Pretty.prettyType ty;
+      XCon _ [] -> Pretty.prettyType ty;
       _ -> ("(" ++ (Pretty.prettyType ty ++ ")"))
     }
 }

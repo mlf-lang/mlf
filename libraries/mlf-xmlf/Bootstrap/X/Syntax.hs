@@ -13,7 +13,7 @@ module Bootstrap.X.Syntax where {
   compareName a b =
     if (nameId a < nameId b) then (0 - 1) else if (nameId a == nameId b) then 0 else 1;
   equalName a b = (nameId a == nameId b);
-  patternNames :: XPattern -> List XName;
+  patternNames :: XPattern -> [] XName;
   patternNames (XConstructorPattern _ ns) = L.catMaybes ns;
   patternNames (XDefaultPattern n) = L.maybeToList n;
   compose :: XComputation -> XComputation -> XComputation;
@@ -44,8 +44,8 @@ module Bootstrap.X.Syntax where {
       XCase a _ alternatives -> XECase (erase a) (L.map eraseAlternative alternatives);
       XWithData _ b -> erase b
     };
-  eraseBinding :: Triple XName XType XTerm -> Pair XName XErased;
-  eraseBinding (Triple n _ a) = Pair n (erase a);
+  eraseBinding :: (,,) XName XType XTerm -> (,) XName XErased;
+  eraseBinding ((,,) n _ a) = (,) n (erase a);
   eraseAlternative :: XAlternative -> XErasedAlternative;
   eraseAlternative (XAlternative p b) = XErasedAlternative p (erase b);
   equalMaybeName Nothing Nothing = True;
@@ -56,9 +56,9 @@ module Bootstrap.X.Syntax where {
     (eqString c d && equalList equalMaybeName ns ms);
   equalPattern (XDefaultPattern n) (XDefaultPattern m) = equalMaybeName n m;
   equalPattern _ _ = False;
-  equalList :: forall a. (a -> a -> Bool) -> List a -> List a -> Bool;
-  equalList eq Nil Nil = True;
-  equalList eq (Cons a as) (Cons b bs) = (eq a b && equalList eq as bs);
+  equalList :: forall a. (a -> a -> Bool) -> [] a -> [] a -> Bool;
+  equalList eq [] [] = True;
+  equalList eq ((:) a as) ((:) b bs) = (eq a b && equalList eq as bs);
   equalList eq _ _ = False;
   equalErased :: XErased -> XErased -> Bool;
   equalErased a b =
@@ -129,8 +129,8 @@ module Bootstrap.X.Syntax where {
           _ -> False
         }
     };
-  equalErasedBinding :: Pair XName XErased -> Pair XName XErased -> Bool;
-  equalErasedBinding (Pair n a) (Pair m b) = (equalName n m && equalErased a b);
+  equalErasedBinding :: (,) XName XErased -> (,) XName XErased -> Bool;
+  equalErasedBinding ((,) n a) ((,) m b) = (equalName n m && equalErased a b);
   equalErasedAlternative :: XErasedAlternative -> XErasedAlternative -> Bool;
   equalErasedAlternative (XErasedAlternative p a) (XErasedAlternative q b) =
     (equalPattern p q && equalErased a b)

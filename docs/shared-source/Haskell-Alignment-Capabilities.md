@@ -1,5 +1,9 @@
 # Haskell alignment: additive capability checkpoint
 
+Historical checkpoint: `2916c477`. For the subsequent standard-identity cutover,
+see [Haskell standard-core cutover](Haskell-Standard-Core-Cutover.md). The ABI and
+pending-work statements below describe that earlier additive snapshot.
+
 This checkpoint is **not the final source migration**. The shared-Haskell
 frontend gains managed `HasCallStack`, standard-class patterned `do`, lazy/as
 patterns, and typed, catchable IO failure. Legacy source semantics and the

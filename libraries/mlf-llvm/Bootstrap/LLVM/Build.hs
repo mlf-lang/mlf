@@ -15,26 +15,26 @@ module Bootstrap.LLVM.Build where {
   data Scalar = Boxed String | Floating String;
   data NativeMode = General | UnboxedDouble | NonnegativeInt | SmallIndex;
   data Output =
-    Output Int (List String) String (List String) (List String) (Map String (Pair Int Int)) (Map
+    Output Int ([] String) String ([] String) ([] String) (Map String ((,) Int Int)) (Map
                                                                                              XName
                                                                                              A.WorkerFunction) (Set
                                                                                                                 XName) (Map
                                                                                                                         XName
                                                                                                                         String) (Set
                                                                                                                                  XName) (Set
-                                                                                                                                         (Pair
+                                                                                                                                         ((,)
                                                                                                                                           XName
-                                                                                                                                          (List
+                                                                                                                                          ([]
                                                                                                                                            NativeMode))) (Set
                                                                                                                                                           XName) (Map
                                                                                                                                                                   XName
                                                                                                                                                                   String) Bool (Map
                                                                                                                                                                                 String
-                                                                                                                                                                                (Pair
+                                                                                                                                                                                ((,)
                                                                                                                                                                                  Int
                                                                                                                                                                                  Int)) (Map
                                                                                                                                                                                         String
-                                                                                                                                                                                        (Pair
+                                                                                                                                                                                        ((,)
                                                                                                                                                                                          String
                                                                                                                                                                                          String)) (Map
                                                                                                                                                                                                    String
@@ -42,7 +42,7 @@ module Bootstrap.LLVM.Build where {
                                                                                                                                                                                                             String
                                                                                                                                                                                                             String) (Map
                                                                                                                                                                                                                      String
-                                                                                                                                                                                                                     (List
+                                                                                                                                                                                                                     ([]
                                                                                                                                                                                                                       Bool)) (Set
                                                                                                                                                                                                                               XName);
   serial :: Output -> Int;
@@ -50,9 +50,9 @@ module Bootstrap.LLVM.Build where {
   withSerial :: Int -> Output -> Output;
   withSerial value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
     seq value (Output value f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19);
-  instructions :: Output -> List String;
+  instructions :: Output -> [] String;
   instructions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f1;
-  withInstructions :: List String -> Output -> Output;
+  withInstructions :: [] String -> Output -> Output;
   withInstructions value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
     Output f0 value f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
   block :: Output -> String;
@@ -60,19 +60,19 @@ module Bootstrap.LLVM.Build where {
   withBlock :: String -> Output -> Output;
   withBlock value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
     Output f0 f1 value f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
-  definitions :: Output -> List String;
+  definitions :: Output -> [] String;
   definitions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f3;
-  withDefinitions :: List String -> Output -> Output;
+  withDefinitions :: [] String -> Output -> Output;
   withDefinitions value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
     Output f0 f1 f2 value f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
-  constants :: Output -> List String;
+  constants :: Output -> [] String;
   constants (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f4;
-  withConstants :: List String -> Output -> Output;
+  withConstants :: [] String -> Output -> Output;
   withConstants value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
     Output f0 f1 f2 f3 value f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
-  constructors :: Output -> Map String (Pair Int Int);
+  constructors :: Output -> Map String ((,) Int Int);
   constructors (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f5;
-  withConstructors :: Map String (Pair Int Int) -> Output -> Output;
+  withConstructors :: Map String ((,) Int Int) -> Output -> Output;
   withConstructors value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
     Output f0 f1 f2 f3 f4 value f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
   functions :: Output -> Map XName A.WorkerFunction;
@@ -96,10 +96,10 @@ module Bootstrap.LLVM.Build where {
   withNumericKernels :: Set XName -> Output -> Output;
   withNumericKernels value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
     Output f0 f1 f2 f3 f4 f5 f6 f7 f8 value f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
-  kernelWorkers :: Output -> Set (Pair XName (List NativeMode));
+  kernelWorkers :: Output -> Set ((,) XName ([] NativeMode));
   kernelWorkers (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
     f10;
-  withKernelWorkers :: Set (Pair XName (List NativeMode)) -> Output -> Output;
+  withKernelWorkers :: Set ((,) XName ([] NativeMode)) -> Output -> Output;
   withKernelWorkers value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
     Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 value f11 f12 f13 f14 f15 f16 f17 f18 f19;
   collectingKernels :: Output -> Set XName;
@@ -120,14 +120,14 @@ module Bootstrap.LLVM.Build where {
   withInlinePrimitives :: Bool -> Output -> Output;
   withInlinePrimitives value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
     Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 value f14 f15 f16 f17 f18 f19;
-  scalarRanges :: Output -> Map String (Pair Int Int);
+  scalarRanges :: Output -> Map String ((,) Int Int);
   scalarRanges (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f14;
-  withScalarRanges :: Map String (Pair Int Int) -> Output -> Output;
+  withScalarRanges :: Map String ((,) Int Int) -> Output -> Output;
   withScalarRanges value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
     Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 value f15 f16 f17 f18 f19;
-  arrayViews :: Output -> Map String (Pair String String);
+  arrayViews :: Output -> Map String ((,) String String);
   arrayViews (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f15;
-  withArrayViews :: Map String (Pair String String) -> Output -> Output;
+  withArrayViews :: Map String ((,) String String) -> Output -> Output;
   withArrayViews value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
     Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 value f16 f17 f18 f19;
   unboxedDoubles :: Output -> Map String String;
@@ -141,7 +141,7 @@ module Bootstrap.LLVM.Build where {
   withForcedValues :: Map String String -> Output -> Output;
   withForcedValues value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
     Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 value f18 f19;
-  constructorFacts :: Output -> Map String (List Bool);
+  constructorFacts :: Output -> Map String ([] Bool);
   constructorFacts (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
     f18;
   stateWorkers :: Output -> Set XName;
@@ -149,18 +149,18 @@ module Bootstrap.LLVM.Build where {
   withStateWorkers :: Set XName -> Output -> Output;
   withStateWorkers value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
     Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 value;
-  data Build a = Build (Output -> Either String (Pair a Output));
-  runBuild :: forall a. Build a -> Output -> Either String (Pair a Output);
+  data Build a = Build (Output -> Either String ((,) a Output));
+  runBuild :: forall a. Build a -> Output -> Either String ((,) a Output);
   runBuild (Build run) state = run state;
   cgPure :: forall a. a -> Build a;
-  cgPure value = Build (\state -> Right (Pair value state));
+  cgPure value = Build (\state -> Right ((,) value state));
   cgBind :: forall a b. Build a -> (a -> Build b) -> Build b;
   cgBind action next =
     Build
       (\state ->
          case runBuild action state of {
            Left error -> Left error;
-           Right (Pair value after) -> runBuild (next value) after
+           Right ((,) value after) -> runBuild (next value) after
          });
   instance Functor Build where {
     fmap function action = cgBind action (\value -> cgPure (function value))
@@ -182,12 +182,12 @@ module Bootstrap.LLVM.Build where {
       Right result -> cgPure result
     };
   get :: Build Output;
-  get = Build (\state -> Right (Pair state state));
-  put :: Output -> Build Unit;
-  put state = Build (\ignored -> Right (Pair Unit state));
+  get = Build (\state -> Right ((,) state state));
+  put :: Output -> Build ();
+  put state = Build (\ignored -> Right ((,) () state));
   gets :: forall a. (Output -> a) -> Build a;
-  gets f = Build (\state -> Right (Pair (f state) state));
-  modify :: (Output -> Output) -> Build Unit;
+  gets f = Build (\state -> Right ((,) (f state) state));
+  modify :: (Output -> Output) -> Build ();
   -- Match the seed's modify' and strict serial field without forcing the lazy
   -- instruction and definition streams stored in the remaining Output fields.
   modify f =
@@ -196,7 +196,7 @@ module Bootstrap.LLVM.Build where {
          let {
            after = f state
          } in
-         seq after (Right (Pair Unit after)));
+         seq after (Right ((,) () after)));
   modeCode :: NativeMode -> Int;
   modeCode mode =
     case mode of {
@@ -207,7 +207,7 @@ module Bootstrap.LLVM.Build where {
     };
   compareMode :: NativeMode -> NativeMode -> Int;
   compareMode a b = L.compareInt (modeCode a) (modeCode b);
-  compareKernel :: Pair XName (List NativeMode) -> Pair XName (List NativeMode) -> Int;
+  compareKernel :: (,) XName ([] NativeMode) -> (,) XName ([] NativeMode) -> Int;
   compareKernel = L.comparePair O.compareName (L.compareList compareMode);
   operand :: CGBinding -> String;
   operand (CGBinding value forced) = value;
@@ -220,9 +220,9 @@ module Bootstrap.LLVM.Build where {
       modify (withSerial (n + 1));
       cgPure (prefix ++ showInt n)
     };
-  emit :: String -> Build Unit;
-  emit line = modify (\state -> withInstructions (Cons line (instructions state)) state);
-  label :: String -> Build Unit;
+  emit :: String -> Build ();
+  emit line = modify (\state -> withInstructions ((:) line (instructions state)) state);
+  label :: String -> Build ();
   label name =
     do {
       emit (name ++ ":");
@@ -235,7 +235,7 @@ module Bootstrap.LLVM.Build where {
       emit ("  " ++ (register ++ (" = " ++ expression)));
       cgPure register
     };
-  call :: String -> List String -> Build String;
+  call :: String -> [] String -> Build String;
   call name arguments =
     result ("call ptr " ++ (name ++ ("(" ++ (L.intercalate ", " arguments ++ ")"))));
   pointer :: String -> String;
@@ -257,7 +257,7 @@ module Bootstrap.LLVM.Build where {
       address <- environmentSlot env index;
       result ("load ptr, ptr " ++ (address ++ ", align 8, !tbaa !3"))
     };
-  storeEnvironment :: String -> Int -> String -> Build Unit;
+  storeEnvironment :: String -> Int -> String -> Build ();
   storeEnvironment env index value =
     do {
       address <- environmentSlot env index;
@@ -265,18 +265,18 @@ module Bootstrap.LLVM.Build where {
     };
   -- Store all fields at saturation without evaluating their lazy pointers.
   -- Both ordinary workers and numeric regions use the same constructor ABI.
-  constructorValue :: Int -> List String -> Build String;
+  constructorValue :: Int -> [] String -> Build String;
   constructorValue tag fields =
     if L.null fields then cgPure (immediate ((tag * 8) + 4)) else compactConstructor tag fields;
-  args1 :: forall a. a -> List a;
-  args1 a = Cons a Nil;
-  args2 :: forall a. a -> a -> List a;
-  args2 a b = Cons a (Cons b Nil);
-  args3 :: forall a. a -> a -> a -> List a;
-  args3 a b c = Cons a (Cons b (Cons c Nil));
-  args4 :: forall a. a -> a -> a -> a -> List a;
-  args4 a b c d = Cons a (Cons b (Cons c (Cons d Nil)));
-  lookupConstructor :: String -> Build (Pair Int Int);
+  args1 :: forall a. a -> [] a;
+  args1 a = (:) a [];
+  args2 :: forall a. a -> a -> [] a;
+  args2 a b = (:) a ((:) b []);
+  args3 :: forall a. a -> a -> a -> [] a;
+  args3 a b c = (:) a ((:) b ((:) c []));
+  args4 :: forall a. a -> a -> a -> a -> [] a;
+  args4 a b c d = (:) a ((:) b ((:) c ((:) d [])));
+  lookupConstructor :: String -> Build ((,) Int Int);
   lookupConstructor name =
     do {
       cs <- gets constructors;
@@ -316,20 +316,20 @@ module Bootstrap.LLVM.Build where {
   bindingOperand :: CGBinding -> Build String;
   bindingOperand (CGBinding value forced) =
     gets (\state -> L.fromMaybe value (M.lookup compareString value (forcedValues state)));
-  definition :: String -> List String -> Build String -> Build Unit;
+  definition :: String -> [] String -> Build String -> Build ();
   definition name args body =
     definitionBody name args
       (do {
          value <- body;
          emit ("  ret ptr " ++ value)
        });
-  definitionBody :: String -> List String -> Build Unit -> Build Unit;
+  definitionBody :: String -> [] String -> Build () -> Build ();
   definitionBody name args body =
     do {
       saved <- get;
       modify
         (\state ->
-           withInstructions Nil
+           withInstructions []
              (withBlock "entry"
                 (withScalarRanges M.empty
                    (withArrayViews M.empty
@@ -366,7 +366,7 @@ module Bootstrap.LLVM.Build where {
                    (withArrayViews (arrayViews saved)
                       (withUnboxedDoubles (unboxedDoubles saved)
                          (withForcedValues (forcedValues saved)
-                            (withDefinitions (Cons text (definitions state)) state)))))))
+                            (withDefinitions ((:) text (definitions state)) state)))))))
     };
   startsWith :: String -> String -> Bool;
   startsWith prefix value =
@@ -381,7 +381,7 @@ module Bootstrap.LLVM.Build where {
     else if (stringCodeAt name index == 46)
          then stringSlice name begin (index - begin)
          else symbolIdentityAt name begin (index + 1);
-  phi :: String -> List (Pair String String) -> Build String;
+  phi :: String -> [] ((,) String String) -> Build String;
   phi ty incoming =
     result
       ("phi " ++
@@ -391,15 +391,15 @@ module Bootstrap.LLVM.Build where {
            (L.map
               (\entry ->
                  case entry of {
-                   Pair value label -> ("[ " ++ (value ++ (", %" ++ (label ++ " ]"))))
+                   (,) value label -> ("[ " ++ (value ++ (", %" ++ (label ++ " ]"))))
                  })
               incoming))));
-  rangeUnion :: Pair Int Int -> Pair Int Int -> Pair Int Int;
-  rangeUnion (Pair lo hi) (Pair lo2 hi2) = Pair (L.min lo lo2) (L.max hi hi2);
-  rangeIntersection :: Pair Int Int -> Pair Int Int -> Pair Int Int;
-  rangeIntersection (Pair lo hi) (Pair lo2 hi2) = Pair (L.max lo lo2) (L.min hi hi2);
-  sameView :: Pair String String -> Pair String String -> Bool;
-  sameView (Pair a b) (Pair x y) = (eqString a x && eqString b y);
+  rangeUnion :: (,) Int Int -> (,) Int Int -> (,) Int Int;
+  rangeUnion ((,) lo hi) ((,) lo2 hi2) = (,) (L.min lo lo2) (L.max hi hi2);
+  rangeIntersection :: (,) Int Int -> (,) Int Int -> (,) Int Int;
+  rangeIntersection ((,) lo hi) ((,) lo2 hi2) = (,) (L.max lo lo2) (L.min hi hi2);
+  sameView :: (,) String String -> (,) String String -> Bool;
+  sameView ((,) a b) ((,) x y) = (eqString a x && eqString b y);
   choose :: String -> String -> Build String -> Build String -> Build String;
   choose ty condition yes no =
     do {
@@ -447,20 +447,20 @@ module Bootstrap.LLVM.Build where {
            withScalarRanges ranges
              (withArrayViews views
                 (withUnboxedDoubles doubles (withForcedValues (forcedValues before) state))));
-      value <- phi ty (args2 (Pair a (block afterYes)) (Pair b (block afterNo)));
+      value <- phi ty (args2 ((,) a (block afterYes)) ((,) b (block afterNo)));
       if eqString ty "ptr"
       then case M.lookup compareString a (scalarRanges afterYes) of {
-             Nothing -> cgPure Unit;
+             Nothing -> cgPure ();
              Just bounds ->
                case M.lookup compareString b (scalarRanges afterNo) of {
-                 Nothing -> cgPure Unit;
+                 Nothing -> cgPure ();
                  Just bounds2 -> recordRange value (rangeUnion bounds bounds2)
                }
            }
-      else cgPure Unit;
+      else cgPure ();
       cgPure value
     };
-  recordRange :: String -> Pair Int Int -> Build Unit;
+  recordRange :: String -> (,) Int Int -> Build ();
   recordRange value bounds =
     modify
       (\state ->
@@ -473,7 +473,7 @@ module Bootstrap.LLVM.Build where {
       address <- result ("getelementptr i8, ptr " ++ (value ++ (", i64 " ++ showInt offset)));
       result ("load " ++ (ty ++ (", ptr " ++ (address ++ ", align 8, !tbaa !3"))))
     };
-  arrayView :: String -> Build (Pair String String);
+  arrayView :: String -> Build ((,) String String);
   arrayView array =
     do {
       known <- gets (\state -> M.lookup compareString array (arrayViews state));
@@ -484,7 +484,7 @@ module Bootstrap.LLVM.Build where {
             len <- loadAt "i64" array 8;
             cells <- loadAt "ptr" array 16;
             let {
-              view = Pair len cells
+              view = (,) len cells
             };
             modify
               (\state ->
@@ -592,7 +592,7 @@ module Bootstrap.LLVM.Build where {
       bits = hex (doubleToBits value)
     } in
     ("0x" ++ (repeatString (16 - stringLength bits) "0" ++ bits));
-  utf8 :: Int -> Either String (List Int);
+  utf8 :: Int -> Either String ([] Int);
   utf8 n =
     if ((n < 0) || ((n > 1114111) || ((n >= 55296) && (n <= 57343))))
     then Left "LLVM string contains an invalid Unicode scalar"
@@ -608,7 +608,7 @@ module Bootstrap.LLVM.Build where {
                           (args4 (240 + quotInt n 262144) (128 + remInt (quotInt n 4096) 64)
                              (128 + remInt (quotInt n 64) 64)
                              (128 + remInt n 64));
-  stringConstant :: String -> Build (Pair String Int);
+  stringConstant :: String -> Build ((,) String Int);
   stringConstant text =
     do {
       encoded <-
@@ -627,8 +627,8 @@ module Bootstrap.LLVM.Build where {
              (" x i8] c\"" ++
               (L.concatStrings (L.map hexByte (L.snoc bytes 0)) ++ "\", align 1")))))
       };
-      modify (\state -> withConstants (Cons textNext (constants state)) state);
-      cgPure (Pair name (L.length bytes))
+      modify (\state -> withConstants ((:) textNext (constants state)) state);
+      cgPure ((,) name (L.length bytes))
     };
   literalInteger :: Int -> Build String;
   literalInteger value =
@@ -640,19 +640,19 @@ module Bootstrap.LLVM.Build where {
          };
   -- Compact allocation inlines only the cleared-batch fast path. Refill,
   -- allocator debugging and constructor audits remain runtime responsibilities.
-  compactConstructor :: Int -> List String -> Build String;
+  compactConstructor :: Int -> [] String -> Build String;
   compactConstructor tag fields =
     case fields of {
-      Nil -> cgPure (immediate ((tag * 8) + 4));
-      Cons a Nil -> call "@mlf.construct.1" (args2 (number tag) (pointer a));
-      Cons a (Cons b Nil) -> call "@mlf.construct.2" (args3 (number tag) (pointer a) (pointer b));
+      [] -> cgPure (immediate ((tag * 8) + 4));
+      (:) a [] -> call "@mlf.construct.1" (args2 (number tag) (pointer a));
+      (:) a ((:) b []) -> call "@mlf.construct.2" (args3 (number tag) (pointer a) (pointer b));
       _ ->
         do {
           value <- call "@mlf.construct.wide" (args2 (number tag) (number (L.length fields)));
           L.mapM_
             (\entry ->
                case entry of {
-                 Pair index field ->
+                 (,) index field ->
                    do {
                      address <-
                        result

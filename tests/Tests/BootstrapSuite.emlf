@@ -6,30 +6,30 @@ import qualified Package.Json as J
 import qualified Package.OS as O
 import qualified Package.Verification as V
 import qualified Tests.Basic as H
-rejected : forall a. Either String a -> IO Unit
+rejected : forall a. Either String a -> IO ()
 rejected result = H.assert (S.isLeft result) "damaged bootstrap evidence accepted"
-collector = J.Object (Cons (Pair "cflags" (J.stringArray (Cons "-I/path with spaces/include" Nil))) (Cons (Pair "libs" (J.stringArray (Cons "/path with spaces/libgc.a" Nil))) Nil))
+collector = J.Object ((:) ((,) "cflags" (J.stringArray ((:) "-I/path with spaces/include" []))) ((:) ((,) "libs" (J.stringArray ((:) "/path with spaces/libgc.a" []))) []))
 candidate = "/selected compiler/emlf-stage3"
 selected = "Module CLI compiler: " ++ candidate ++ "\n"
 matrix = "Backend matrix: 468 rows x 2 backends; no missing executions\n423 shared IO/prelude/backend fixtures; 0 failures\n"
 
-main : IO Unit
+main : IO ()
 main = do
  matrixChecks
  parityChecks
 
-matrixChecks : IO Unit
+matrixChecks : IO ()
 matrixChecks = do
  value <- H.right (V.matrixSummary (selected ++ matrix) candidate)
  H.assert (eqString (J.getText "cli_compiler" "" value) candidate) "matrix compiler identity changed"
- S.mapM_ (\log -> rejected (V.matrixSummary log candidate)) (Cons matrix (Cons (selected ++ selected ++ matrix) (Cons ("Module CLI compiler: /seed/emlf\n" ++ matrix) (Cons (selected ++ O.replace "468 rows" "0 rows" matrix) (Cons (selected ++ O.replace "0 failures" "1 failures" matrix) Nil)))))
+ S.mapM_ (\log -> rejected (V.matrixSummary log candidate)) ((:) matrix ((:) (selected ++ selected ++ matrix) ((:) ("Module CLI compiler: /seed/emlf\n" ++ matrix) ((:) (selected ++ O.replace "468 rows" "0 rows" matrix) ((:) (selected ++ O.replace "0 failures" "1 failures" matrix) [])))))
  Coverage.passed "harness" "test_native_matrix_requires_the_selected_cli_compiler"
  putStrLn "PASS test_native_matrix_requires_the_selected_cli_compiler"
- env <- H.right (V.matrixEnvironment (J.Object (Cons (Pair "MLF_BOOTSTRAP_COMPILER" (J.str "seed")) (Cons (Pair "MLF_LLVM_TEST_ABI" (J.str "compact-gc")) Nil))) "/drivers" "/seed" candidate "compact-gc" collector)
+ env <- H.right (V.matrixEnvironment (J.Object ((:) ((,) "MLF_BOOTSTRAP_COMPILER" (J.str "seed")) ((:) ((,) "MLF_LLVM_TEST_ABI" (J.str "compact-gc")) []))) "/drivers" "/seed" candidate "compact-gc" collector)
  H.assert (eqString (V.text "MLF_BOOTSTRAP_COMPILER" env) candidate && eqString (V.text "MLF_LLVM_TEST_ABI" env) "compact-gc") "inherited compiler replaced candidate"
  Coverage.passed "harness" "test_native_matrix_overrides_inherited_compiler_selection"
  putStrLn "PASS test_native_matrix_overrides_inherited_compiler_selection"
- env <- H.right (V.matrixEnvironment (J.Object (Cons (Pair "GC_INITIAL_HEAP_SIZE" (J.str "536870912")) (Cons (Pair "MLF_LLVM_TEST_LIBS" (J.str "wrong")) (Cons (Pair "MLF_TEST_TRACE" (J.str "unexpected")) Nil)))) "/drivers" "/seed" candidate "compact-gc" collector)
+ env <- H.right (V.matrixEnvironment (J.Object ((:) ((,) "GC_INITIAL_HEAP_SIZE" (J.str "536870912")) ((:) ((,) "MLF_LLVM_TEST_LIBS" (J.str "wrong")) ((:) ((,) "MLF_TEST_TRACE" (J.str "unexpected")) [])))) "/drivers" "/seed" candidate "compact-gc" collector)
  H.assert (eqString (V.text "MLF_LLVM_TEST_ABI" env) "compact-gc" && eqString (V.text "GC_INITIAL_HEAP_SIZE" env) "8388608" && eqString (V.text "GC_FREE_SPACE_DIVISOR" env) "1" && eqString (V.text "MLF_LLVM_TEST_CFLAGS" env) "'-I/path with spaces/include'" && eqString (V.text "MLF_LLVM_TEST_LIBS" env) "'/path with spaces/libgc.a'" && S.not (J.has "MLF_TEST_TRACE" env)) "compact environment changed"
  S.mapM_ (\divisor -> do
   explicit <- H.right (V.matrixEnvironment (J.set "MLF_TEST_MATRIX_GC_DIVISOR" (J.str divisor) J.empty) "/drivers" "/seed" candidate "compact-gc" collector)
@@ -38,44 +38,44 @@ matrixChecks = do
  S.mapM_ (\abi -> rejected (V.matrixEnvironment J.empty "/drivers" "/seed" candidate abi J.empty)) (O.words "standard compact-gc unknown")
  Coverage.passed "harness" "test_compact_matrix_requires_collector_and_small_heap"
  putStrLn "PASS test_compact_matrix_requires_collector_and_small_heap"
- H.assert (S.eqList eqString (V.layoutPlan (Cons "compact-gc" Nil)) (O.words "RuntimeDriver LLVMDriver matrix:compact-gc")) "drivers rebuilt or a native matrix skipped"
+ H.assert (S.eqList eqString (V.layoutPlan ((:) "compact-gc" [])) (O.words "RuntimeDriver LLVMDriver matrix:compact-gc")) "drivers rebuilt or a native matrix skipped"
  let hash = S.concatMapString (\_ -> "a") (S.range 0 63)
- let receipt = J.Object (Cons (Pair "format" (J.num 1)) (Cons (Pair "fixture" (J.str "foundation")) (Cons (Pair "target_sha256" (J.str hash)) (Cons (Pair "entry_type" (J.str "IO Unit")) (Cons (Pair "inferred_type" (J.str "IO Unit")) (Cons (Pair "checks" V.portTargetChecks) Nil))))))
+ let receipt = J.Object ((:) ((,) "format" (J.num 1)) ((:) ((,) "fixture" (J.str "foundation")) ((:) ((,) "target_sha256" (J.str hash)) ((:) ((,) "entry_type" (J.str "IO Unit")) ((:) ((,) "inferred_type" (J.str "IO Unit")) ((:) ((,) "checks" V.portTargetChecks) []))))))
  H.assert (V.validPortTargetChecks "foundation" hash receipt) "prepared target checks rejected"
- S.mapM_ (\damaged -> H.assert (S.not (V.validPortTargetChecks "foundation" hash damaged)) "incomplete or mismatched target checks accepted") (Cons (J.set "format" (J.num 0) receipt) (Cons (J.set "fixture" (J.str "another") receipt) (Cons (J.set "target_sha256" (J.str "changed") receipt) (Cons (J.set "entry_type" (J.str "Int") receipt) (Cons (J.set "inferred_type" (J.str "") receipt) (Cons (J.set "checks" (J.Array Nil) receipt) Nil))))))
+ S.mapM_ (\damaged -> H.assert (S.not (V.validPortTargetChecks "foundation" hash damaged)) "incomplete or mismatched target checks accepted") ((:) (J.set "format" (J.num 0) receipt) ((:) (J.set "fixture" (J.str "another") receipt) ((:) (J.set "target_sha256" (J.str "changed") receipt) ((:) (J.set "entry_type" (J.str "Int") receipt) ((:) (J.set "inferred_type" (J.str "") receipt) ((:) (J.set "checks" (J.Array []) receipt) []))))))
  Coverage.passed "harness" "test_compact_plan_builds_drivers_once_and_runs_native_matrix"
  putStrLn "PASS test_compact_plan_builds_drivers_once_and_runs_native_matrix"
 
-parityChecks : IO Unit
+parityChecks : IO ()
 parityChecks = do
  let nativePort = "Backend matrix: 25 rows x 1 backends; no missing executions\n"
- H.right (V.validateMatrixAudit 25 (Cons "llvm" Nil) nativePort)
+ H.right (V.validateMatrixAudit 25 ((:) "llvm" []) nativePort)
  H.right (V.validateMatrixAudit 468 (O.words "interpreter llvm") matrix)
- S.mapM_ (\log -> rejected (V.validateMatrixAudit 25 (Cons "llvm" Nil) log)) (Cons "" (Cons (nativePort ++ nativePort) (Cons (O.replace "25 rows" "24 rows" nativePort) (Cons (O.replace "1 backends" "2 backends" nativePort) Nil))))
+ S.mapM_ (\log -> rejected (V.validateMatrixAudit 25 ((:) "llvm" []) log)) ((:) "" ((:) (nativePort ++ nativePort) ((:) (O.replace "25 rows" "24 rows" nativePort) ((:) (O.replace "1 backends" "2 backends" nativePort) []))))
  rejected (V.validateMatrixAudit 25 (O.words "interpreter llvm") nativePort)
- let pureCase = J.Object (Cons (Pair "category" (J.str "hm-generated")) (Cons (Pair "id" (J.str "first")) (Cons (Pair "label" (J.str "first label")) (Cons (Pair "source_path" (J.str "first.emlf")) (Cons (Pair "include_dirs" (J.Array Nil)) (Cons (Pair "no_prelude" (J.Boolean false)) (Cons (Pair "expected_accept" (J.Boolean true)) (Cons (Pair "expected_type" (J.str "Int")) Nil))))))))
+ let pureCase = J.Object ((:) ((,) "category" (J.str "hm-generated")) ((:) ((,) "id" (J.str "first")) ((:) ((,) "label" (J.str "first label")) ((:) ((,) "source_path" (J.str "first.emlf")) ((:) ((,) "include_dirs" (J.Array [])) ((:) ((,) "no_prelude" (J.Boolean false)) ((:) ((,) "expected_accept" (J.Boolean true)) ((:) ((,) "expected_type" (J.str "Int")) []))))))))
  let key = V.parityExecutionKey pureCase "42\n"
  let renamed = J.set "id" (J.str "second") (J.set "label" (J.str "second label") (J.set "source_path" (J.str "second.emlf") pureCase))
  H.assert (V.canShareParity pureCase && eqString key (V.parityExecutionKey renamed "42\n") && S.not (eqString key (V.parityExecutionKey pureCase "true\n"))) "parity sharing lost source or descriptive-identity boundaries"
- S.mapM_ (\changed -> H.assert (S.not (eqString key (V.parityExecutionKey changed "42\n"))) "parity sharing omitted input configuration or oracle") (Cons (J.set "expected_type" (J.str "Bool") pureCase) (Cons (J.set "no_prelude" (J.Boolean true) pureCase) (Cons (J.set "include_dirs" (J.stringArray (Cons "other" Nil)) pureCase) (Cons (J.set "expected_accept" (J.Boolean false) pureCase) (Cons (J.set "expected_phase" (J.str "Inference") pureCase) (Cons (J.set "expected_error_contains" (J.str "reason") pureCase) (Cons (J.set "future_option" (J.str "different") pureCase) Nil)))))))
- S.mapM_ (\changed -> H.assert (S.not (V.canShareParity changed)) "effectful or module parity case was shared") (Cons (J.set "expected_stdout" (J.str "") pureCase) (Cons (J.set "include_dirs" (J.stringArray (Cons "libraries" Nil)) pureCase) (Cons (J.set "category" (J.str "modules") pureCase) Nil)))
+ S.mapM_ (\changed -> H.assert (S.not (eqString key (V.parityExecutionKey changed "42\n"))) "parity sharing omitted input configuration or oracle") ((:) (J.set "expected_type" (J.str "Bool") pureCase) ((:) (J.set "no_prelude" (J.Boolean true) pureCase) ((:) (J.set "include_dirs" (J.stringArray ((:) "other" [])) pureCase) ((:) (J.set "expected_accept" (J.Boolean false) pureCase) ((:) (J.set "expected_phase" (J.str "Inference") pureCase) ((:) (J.set "expected_error_contains" (J.str "reason") pureCase) ((:) (J.set "future_option" (J.str "different") pureCase) [])))))))
+ S.mapM_ (\changed -> H.assert (S.not (V.canShareParity changed)) "effectful or module parity case was shared") ((:) (J.set "expected_stdout" (J.str "") pureCase) ((:) (J.set "include_dirs" (J.stringArray ((:) "libraries" [])) pureCase) ((:) (J.set "category" (J.str "modules") pureCase) [])))
  Coverage.passed "harness" "test_parity_sharing_requires_identical_source_configuration_and_oracle"
  putStrLn "PASS test_parity_sharing_requires_identical_source_configuration_and_oracle"
- let counts = Cons (Pair "figure12" 43) (Cons (Pair "hm-exhaustive" 1712) (Cons (Pair "hm-generated" 5000) (Cons (Pair "annotations" 126) (Cons (Pair "readability" 18) (Cons (Pair "state" 97) (Cons (Pair "modules" 60) (Cons (Pair "examples" 18) (Cons (Pair "benchmarks" 9) Nil))))))))
- let rows = S.concatMap (\(Pair group count) -> S.map (\i ->
-  let row = J.Object (Cons (Pair "schema_version" (J.num 1)) (Cons (Pair "id" (J.str (group ++ "-" ++ showInt i))) (Cons (Pair "category" (J.str group)) (Cons (Pair "expected_accept" (J.Boolean true)) (Cons (Pair "no_prelude" (J.Boolean false)) Nil))))) in
+ let counts = (:) ((,) "figure12" 43) ((:) ((,) "hm-exhaustive" 1712) ((:) ((,) "hm-generated" 5000) ((:) ((,) "annotations" 126) ((:) ((,) "readability" 18) ((:) ((,) "state" 97) ((:) ((,) "modules" 60) ((:) ((,) "examples" 18) ((:) ((,) "benchmarks" 9) []))))))))
+ let rows = S.concatMap (\((,) group count) -> S.map (\i ->
+  let row = J.Object ((:) ((,) "schema_version" (J.num 1)) ((:) ((,) "id" (J.str (group ++ "-" ++ showInt i))) ((:) ((,) "category" (J.str group)) ((:) ((,) "expected_accept" (J.Boolean true)) ((:) ((,) "no_prelude" (J.Boolean false)) []))))) in
   if eqString group "modules" then if i >= 21 then J.set "expected_accept" (J.Boolean false) (J.set "expected_phase" (J.str "ModuleResolution") (J.set "expected_error_contains" (J.str "not in scope") row)) else if i == 0 then J.set "no_prelude" (J.Boolean true) row else row
   else if eqString group "figure12" && i == 0 then J.set "id" (J.str "figure12-A8") (J.set "expected_accept" (J.Boolean false) (J.set "expected_phase" (J.str "Inference") row)) else row) (S.range 0 (count - 1))) counts
  H.right (V.validateManifest rows)
  rejected (V.validateManifest (S.filter (\row -> S.not (eqString (V.text "category" row) "modules")) rows))
  rejected (V.validateManifest (S.map (\row -> if eqString (V.text "id" row) "modules-21" then J.set "expected_accept" (J.Boolean true) row else row) rows))
  rejected (V.validateManifest (S.map (\row -> if eqString (V.text "id" row) "modules-0" then J.set "no_prelude" (J.Boolean false) row else row) rows))
- S.mapM_ (\missing -> rejected (V.validateManifest (S.map (\row -> if eqString (V.text "id" row) "modules-21" then J.set "expected_error_contains" missing row else row) rows))) (Cons J.Null (Cons (J.str "") (Cons (J.str " \n\t") Nil)))
+ S.mapM_ (\missing -> rejected (V.validateManifest (S.map (\row -> if eqString (V.text "id" row) "modules-21" then J.set "expected_error_contains" missing row else row) rows))) ((:) J.Null ((:) (J.str "") ((:) (J.str " \n\t") [])))
  Coverage.passed "harness" "test_module_corpus_cannot_drop_rejections_or_prelude_modes"
  putStrLn "PASS test_module_corpus_cannot_drop_rejections_or_prelude_modes"
- let row = J.Object (Cons (Pair "expected_phase" (J.str "ModuleResolution")) (Cons (Pair "expected_error_contains" (J.str "not in scope: private")) Nil))
+ let row = J.Object ((:) ((,) "expected_phase" (J.str "ModuleResolution")) ((:) ((,) "expected_error_contains" (J.str "not in scope: private")) []))
  let diagnostic = "ModuleResolution: not in scope: private\n"
  H.right (V.checkRejection row 1 "" diagnostic)
- S.mapM_ (\(Triple code out err) -> rejected (V.checkRejection row code out err)) (Cons (Triple (-11) "" diagnostic) (Cons (Triple 2 "" diagnostic) (Cons (Triple 1 "partial target" diagnostic) (Cons (Triple 1 "" "Runtime: not in scope: private\n") (Cons (Triple 1 "" "ModuleResolution: cannot find module Wrong\n") Nil)))))
+ S.mapM_ (\((,,) code out err) -> rejected (V.checkRejection row code out err)) ((:) ((,,) (-11) "" diagnostic) ((:) ((,,) 2 "" diagnostic) ((:) ((,,) 1 "partial target" diagnostic) ((:) ((,,) 1 "" "Runtime: not in scope: private\n") ((:) ((,,) 1 "" "ModuleResolution: cannot find module Wrong\n") [])))))
  Coverage.passed "harness" "test_crashes_partial_targets_and_wrong_diagnostics_are_not_rejections"
  putStrLn "PASS test_crashes_partial_targets_and_wrong_diagnostics_are_not_rejections"

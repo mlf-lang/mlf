@@ -7,19 +7,19 @@ module Bootstrap.Fresh where {
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Set as S;
-  data Fresh a = Fresh (Int -> Set String -> Either String (Triple a Int (Set String)));
+  data Fresh a = Fresh (Int -> Set String -> Either String ((,,) a Int (Set String)));
   runFreshState :: forall a. Fresh a ->
-                             Int -> Set String -> Either String (Triple a Int (Set String));
+                             Int -> Set String -> Either String ((,,) a Int (Set String));
   runFreshState (Fresh action) count used = action count used;
   freshPure :: forall a. a -> Fresh a;
-  freshPure value = Fresh (\count used -> Right (Triple value count used));
+  freshPure value = Fresh (\count used -> Right ((,,) value count used));
   freshBind :: forall a b. Fresh a -> (a -> Fresh b) -> Fresh b;
   freshBind action continuation =
     Fresh
       (\count used ->
          case runFreshState action count used of {
            Left error -> Left error;
-           Right (Triple value next usedNext) -> runFreshState (continuation value) next usedNext
+           Right ((,,) value next usedNext) -> runFreshState (continuation value) next usedNext
          });
   instance Functor Fresh where {
     fmap function action = freshBind action (\value -> freshPure (function value))
@@ -40,9 +40,9 @@ module Bootstrap.Fresh where {
       Left error -> freshFail error;
       Right value -> freshPure value
     };
-  runFresh :: forall a. List String -> Fresh a -> Either String a;
+  runFresh :: forall a. [] String -> Fresh a -> Either String a;
   runFresh used action =
-    mapEither (\(Triple value _ _) -> value)
+    mapEither (\((,,) value _ _) -> value)
       (runFreshState action 0 (S.fromList compareString used));
   freshName :: String -> Fresh String;
   freshName prefix =
@@ -53,14 +53,14 @@ module Bootstrap.Fresh where {
          } in
          if S.member compareString name used
          then runFreshState (freshName prefix) (count + 1) used
-         else Right (Triple name (count + 1) (S.insert compareString name used)));
-  freshNames :: Int -> String -> Fresh (List String);
+         else Right ((,,) name (count + 1) (S.insert compareString name used)));
+  freshNames :: Int -> String -> Fresh ([] String);
   freshNames count prefix =
     if (count <= 0)
-    then freshPure Nil
+    then freshPure []
     else do {
            name <- freshName prefix;
            rest <- freshNames (count - 1) prefix;
-           freshPure (Cons name rest)
+           freshPure ((:) name rest)
          }
 }

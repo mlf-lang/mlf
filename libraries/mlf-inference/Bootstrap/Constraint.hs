@@ -22,18 +22,18 @@ module Bootstrap.Constraint where {
   import qualified Bootstrap.X.Syntax as X;
   -- The writer keeps edges in reverse creation order. They are reversed once at
   -- the boundary; this preserves dependency-first instantiation exactly.
-  data Generation = Generation Graph (List (Pair Int Int)) (List Edge);
-  data Generate a = Generate (Generation -> Either String (Pair a Generation));
+  data Generation = Generation Graph ([] ((,) Int Int)) ([] Edge);
+  data Generate a = Generate (Generation -> Either String ((,) a Generation));
   runGenerate (Generate f) state = f state;
   generatePure :: forall a. a -> Generate a;
-  generatePure value = Generate (\state -> Right (Pair value state));
+  generatePure value = Generate (\state -> Right ((,) value state));
   generateBind :: forall a b. Generate a -> (a -> Generate b) -> Generate b;
   generateBind action next =
     Generate
       (\state ->
          case runGenerate action state of {
            Left message -> Left message;
-           Right (Pair value after) -> seq after (runGenerate (next value) after)
+           Right ((,) value after) -> seq after (runGenerate (next value) after)
          });
   instance Functor Generate where {
     fmap function action = generateBind action (\value -> generatePure (function value))
@@ -59,7 +59,7 @@ module Bootstrap.Constraint where {
     Generate
       (\state ->
          case state of {
-           Generation g _ _ -> Right (Pair g state)
+           Generation g _ _ -> Right ((,) g state)
          });
   strictGraph :: Graph -> Graph;
   strictGraph graph = G.strictGraph graph;
@@ -71,13 +71,13 @@ module Bootstrap.Constraint where {
              let {
                strict = strictGraph graph
              } in
-             seq strict (Right (Pair Unit (Generation strict eqs es)))
+             seq strict (Right ((,) () (Generation strict eqs es)))
          });
   newNode tag parent flag =
     do {
       graph <- getGraph;
       case G.newNode tag parent flag graph of {
-        Pair identity next ->
+        (,) identity next ->
           do {
             setGraph next;
             seq identity (return identity)
@@ -108,7 +108,7 @@ module Bootstrap.Constraint where {
     do {
       graph <- getGraph;
       case G.freshId graph of {
-        Pair identity next ->
+        (,) identity next ->
           do {
             setGraph next;
             seq identity (return (XName identity (targetNameHint hint)))
@@ -119,7 +119,7 @@ module Bootstrap.Constraint where {
     Generate
       (\state ->
          case state of {
-           Generation graph eqs es -> Right (Pair Unit (Generation graph (Cons (Pair a b) eqs) es))
+           Generation graph eqs es -> Right ((,) () (Generation graph ((:) ((,) a b) eqs) es))
          });
   edge gen target =
     Generate
@@ -129,7 +129,7 @@ module Bootstrap.Constraint where {
              let {
                e = Edge gen target
              } in
-             Right (Pair e (Generation graph eqs (Cons e es)))
+             Right ((,) e (Generation graph eqs ((:) e es)))
          });
   generalization (Typed gen _) = gen;
   form (Typed _ f) = f;
@@ -154,19 +154,19 @@ module Bootstrap.Constraint where {
     (sameFlag f g && (eqString a x && (sameType b y && sameType t u)));
   sameType (SQualified ps a) (SQualified qs b) = (samePredicates ps qs && sameType a b);
   sameType _ _ = False;
-  sameTypes :: List SType -> List SType -> Bool;
-  sameTypes Nil Nil = True;
-  sameTypes (Cons a rest) (Cons b remaining) = (sameType a b && sameTypes rest remaining);
+  sameTypes :: [] SType -> [] SType -> Bool;
+  sameTypes [] [] = True;
+  sameTypes ((:) a rest) ((:) b remaining) = (sameType a b && sameTypes rest remaining);
   sameTypes _ _ = False;
-  samePredicates :: List SPredicate -> List SPredicate -> Bool;
-  samePredicates Nil Nil = True;
-  samePredicates (Cons (SPredicate n xs) ps) (Cons (SPredicate m ys) qs) =
+  samePredicates :: [] SPredicate -> [] SPredicate -> Bool;
+  samePredicates [] [] = True;
+  samePredicates ((:) (SPredicate n xs) ps) ((:) (SPredicate m ys) qs) =
     (eqString n m && (sameTypes xs ys && samePredicates ps qs));
   samePredicates _ _ = False;
   recursiveRHS :: SAnnotation -> SExpr -> Core;
   recursiveRHS annotation expression =
     case annotation of {
-      SAnnotation Nil ty ->
+      SAnnotation [] ty ->
         case expression of {
           SChecked other _ ->
             if sameType ty other then desugar expression else CChecked ty expression;
@@ -195,7 +195,7 @@ module Bootstrap.Constraint where {
           (map
              (\branch ->
                 case branch of {
-                  SAlternative pattern body -> Pair pattern (desugar body)
+                  SAlternative pattern body -> (,) pattern (desugar body)
                 })
              alternatives);
       SDo _ _ -> desugar (Desugar.desugarDo expression);
@@ -204,7 +204,7 @@ module Bootstrap.Constraint where {
           (map
              (\definition ->
                 case definition of {
-                  Triple n annotation rhs -> Triple n annotation (recursiveRHS annotation rhs)
+                  (,,) n annotation rhs -> (,,) n annotation (recursiveRHS annotation rhs)
                 })
              definitions)
           (desugar body);
@@ -212,7 +212,7 @@ module Bootstrap.Constraint where {
       SWanted dictionary candidates -> CWanted dictionary candidates;
       SChecked ty body -> CChecked ty body
     };
-  generate expression = generateProgram (SProgram Nil expression);
+  generate expression = generateProgram (SProgram [] expression);
   generateProgram :: SProgram -> Either String Constraints;
   generateProgram program =
     case program of {
@@ -225,9 +225,9 @@ module Bootstrap.Constraint where {
           validateAnnotations datatypes lowered;
           result <-
             runGenerate (build datatypes M.empty Nothing M.empty (desugar lowered))
-              (Generation G.emptyGraph Nil Nil);
+              (Generation G.emptyGraph [] []);
           case result of {
-            Pair typed (Generation graph eqs es) ->
+            (,) typed (Generation graph eqs es) ->
               do {
                 G.validateGraph graph;
                 Right (Constraints graph typed (reverse eqs) (reverse es))
@@ -320,7 +320,7 @@ module Bootstrap.Constraint where {
               map
                 (\declaration ->
                    case declaration of {
-                     Quad x name source _ -> Pair x (Poly name source)
+                     (,,,) x name source _ -> (,) x (Poly name source)
                    })
                 declarations
           };
@@ -331,11 +331,11 @@ module Bootstrap.Constraint where {
             mapM
               (\pair ->
                  case pair of {
-                   Pair (Quad _ name source target) (Triple _ _ rhs) ->
+                   (,) ((,,,) _ name source target) ((,,) _ _ rhs) ->
                      do {
                        rhs' <- child scope rhs;
                        e <- edge (generalization rhs') target;
-                       return (Quad name source rhs' e)
+                       return ((,,,) name source rhs' e)
                      }
                  })
               (zip declarations definitions);
@@ -364,7 +364,7 @@ module Bootstrap.Constraint where {
             mapM
               (\candidate ->
                  case candidate of {
-                   Pair role x ->
+                   (,) role x ->
                      case M.lookup compareString x env of {
                        Just (Mono name identity) ->
                          return (EvidenceBinding role name identity False);
@@ -393,11 +393,11 @@ module Bootstrap.Constraint where {
             mapM
               (\variable ->
                  case variable of {
-                   Pair a k ->
+                   (,) a k ->
                      do {
                        identity <- newNode (G.bottomTag k) (Just gen) Rigid;
                        setNode identity (Node (GSkolem identity k) (Just gen) Rigid);
-                       return (Triple a identity k)
+                       return ((,,) a identity k)
                      }
                  })
               variables;
@@ -408,7 +408,7 @@ module Bootstrap.Constraint where {
                    (map
                       (\skolem ->
                          case skolem of {
-                           Triple a identity _ -> Pair a identity
+                           (,,) a identity _ -> (,) a identity
                          })
                       skolems))
                 typeScope
@@ -417,14 +417,14 @@ module Bootstrap.Constraint where {
           attach gen Rigid target;
           checked <-
             build datatypes local (Just gen) env
-              (desugar (SAnn (directed expected expression) (SAnnotation Nil expected)));
+              (desugar (SAnn (directed expected expression) (SAnnotation [] expected)));
           e <- edge (generalization checked) target;
           return
             (FChecked
                (map
                   (\skolem ->
                      case skolem of {
-                       Triple _ identity k -> Pair (XTyVar identity) k
+                       (,,) _ identity k -> (,) (XTyVar identity) k
                      })
                   skolems)
                checked
@@ -437,7 +437,7 @@ module Bootstrap.Constraint where {
               (\x ->
                  do {
                    identity <- newNode GBot (Just gen) Flexible;
-                   return (Pair x identity)
+                   return ((,) x identity)
                  })
               existentials;
           let {
@@ -453,22 +453,22 @@ module Bootstrap.Constraint where {
         };
       CInt n ->
         do {
-          setTag (GCon "Int" Nil);
+          setTag (GCon "Int" []);
           return (FIntegerLiteral n)
         };
       CDouble n ->
         do {
-          setTag (GCon "Double" Nil);
+          setTag (GCon "Double" []);
           return (FDoubleLiteral n)
         };
       CBool b ->
         do {
-          setTag (GCon "Bool" Nil);
+          setTag (GCon "Bool" []);
           return (FBooleanLiteral b)
         };
       CString text ->
         do {
-          setTag (GCon "String" Nil);
+          setTag (GCon "String" []);
           return (FStringLiteral text)
         };
       CPrimitive primitive ->
@@ -547,17 +547,17 @@ module Bootstrap.Constraint where {
         }
     };
   declareRecursive :: DataEnv ->
-                      Int -> Triple String SAnnotation Core -> Generate (Quad String XName Int Int);
+                      Int -> (,,) String SAnnotation Core -> Generate ((,,,) String XName Int Int);
   declareRecursive datatypes gen definition =
     case definition of {
-      Triple x (SAnnotation Nil ty) _ ->
+      (,,) x (SAnnotation [] ty) _ ->
         do {
           name <- freshName x;
           declarationGen <- newNode (GGen (-1)) (Just gen) Flexible;
           root <- embed datatypes M.empty ty;
           attach declarationGen Flexible root;
           setNode declarationGen (Node (GGen root) (Just gen) Flexible);
-          return (Quad x name declarationGen root)
+          return ((,,,) x name declarationGen root)
         };
       _ -> failGenerate "recursive definitions require a closed signature"
     };
@@ -567,24 +567,24 @@ module Bootstrap.Constraint where {
       Nothing -> identity;
       Just parent -> outermost graph parent
     };
-  leadingVariables :: SType -> Pair (List (Pair String Kind)) SType;
+  leadingVariables :: SType -> (,) ([] ((,) String Kind)) SType;
   leadingVariables signature =
     case signature of {
       SForall Flexible name SBottom body ->
         let {
           result = leadingVariables body
         } in
-        Pair (Cons (Pair name Star) (fst result)) (snd result);
+        (,) ((:) ((,) name Star) (fst result)) (snd result);
       SForall Flexible name (SBottomKind kind) body ->
         let {
           result = leadingVariables body
         } in
-        Pair (Cons (Pair name kind) (fst result)) (snd result);
-      _ -> Pair Nil signature
+        (,) ((:) ((,) name kind) (fst result)) (snd result);
+      _ -> (,) [] signature
     };
   directed :: SType -> SExpr -> SExpr;
   directed (SArrow domain result) (SLam x annotation body) =
-    SLam x (Just (fromMaybe (SAnnotation Nil domain) annotation)) (directed result body);
+    SLam x (Just (fromMaybe (SAnnotation [] domain) annotation)) (directed result body);
   directed _ expression = expression;
   freshOptional :: Maybe String -> Generate (Maybe XName);
   freshOptional Nothing = return Nothing;
@@ -593,20 +593,20 @@ module Bootstrap.Constraint where {
       name <- freshName hint;
       return (Just name)
     };
-  patternBindings :: List (Maybe String) ->
-                     List (Maybe XName) -> List Int -> List (Pair String Binding);
-  patternBindings (Cons (Just original) originals) (Cons (Just resolved) names) (Cons identity identities) =
-    Cons (Pair original (Mono resolved identity)) (patternBindings originals names identities);
-  patternBindings (Cons _ originals) (Cons _ names) (Cons _ identities) =
+  patternBindings :: [] (Maybe String) ->
+                     [] (Maybe XName) -> [] Int -> [] ((,) String Binding);
+  patternBindings ((:) (Just original) originals) ((:) (Just resolved) names) ((:) identity identities) =
+    (:) ((,) original (Mono resolved identity)) (patternBindings originals names identities);
+  patternBindings ((:) _ originals) ((:) _ names) ((:) _ identities) =
     patternBindings originals names identities;
-  patternBindings _ _ _ = Nil;
+  patternBindings _ _ _ = [];
   buildBranch :: DataEnv ->
                  Map String Int ->
                  Map String Binding ->
-                 Int -> Int -> Int -> Map String Int -> Pair SPattern Core -> Generate Branch;
+                 Int -> Int -> Int -> Map String Int -> (,) SPattern Core -> Generate Branch;
   buildBranch datatypes typeScope env gen root domain parameters alternative =
     case alternative of {
-      Pair pattern body ->
+      (,) pattern body ->
         do {
           resolved <-
             case pattern of {
@@ -630,7 +630,7 @@ module Bootstrap.Constraint where {
                     (failGenerate "duplicate pattern variable");
                   names' <- mapM freshOptional names;
                   return
-                    (Pair (XConstructorPattern constructor names')
+                    ((,) (XConstructorPattern constructor names')
                        (patternBindings names names' fields))
                 };
               SDefaultPattern name ->
@@ -639,15 +639,15 @@ module Bootstrap.Constraint where {
                   let {
                     bindings =
                       case name of {
-                        Nothing -> Nil;
+                        Nothing -> [];
                         Just original ->
                           case resolvedName of {
-                            Nothing -> Nil;
-                            Just resolved -> Cons (Pair original (Mono resolved domain)) Nil
+                            Nothing -> [];
+                            Just resolved -> (:) ((,) original (Mono resolved domain)) []
                           }
                       }
                   };
-                  return (Pair (XDefaultPattern resolvedName) bindings)
+                  return ((,) (XDefaultPattern resolvedName) bindings)
                 };
               _ -> failGenerate "surface pattern escaped lowering"
             };
@@ -687,9 +687,9 @@ module Bootstrap.Constraint where {
             (SForall Flexible name (if Kind.eqKind kind Star then SBottom else SBottomKind kind) ty)
         }
     };
-  patternShape :: SPattern -> Pair (Maybe String) Int;
-  patternShape (SConstructorPattern constructor names) = Pair (Just constructor) (length names);
-  patternShape (SDefaultPattern _) = Pair Nothing 0;
+  patternShape :: SPattern -> (,) (Maybe String) Int;
+  patternShape (SConstructorPattern constructor names) = (,) (Just constructor) (length names);
+  patternShape (SDefaultPattern _) = (,) Nothing 0;
   patternShape _ = panic "surface pattern escaped lowering";
   validateAnnotations datatypes expression = validateIn datatypes M.empty expression;
   validateAnnotation datatypes scope annotation =
@@ -697,7 +697,7 @@ module Bootstrap.Constraint where {
       SAnnotation variables ty ->
         K.annotationType datatypes
           (M.union compareString
-             (M.fromList compareString (map (\name -> Pair name Star) variables))
+             (M.fromList compareString (map (\name -> (,) name Star) variables))
              scope)
           ty
     };
@@ -711,15 +711,15 @@ module Bootstrap.Constraint where {
         };
       _ -> Right scope
     };
-  validateIn :: DataEnv -> Map String Kind -> SExpr -> Either String Unit;
+  validateIn :: DataEnv -> Map String Kind -> SExpr -> Either String ();
   validateIn datatypes scope expression =
     case expression of {
-      SVar _ -> Right Unit;
-      SConstructor _ -> Right Unit;
+      SVar _ -> Right ();
+      SConstructor _ -> Right ();
       SLam _ annotation body ->
         do {
           case annotation of {
-            Nothing -> Right Unit;
+            Nothing -> Right ();
             Just value -> validateAnnotation datatypes scope value
           };
           validateIn datatypes scope body
@@ -739,13 +739,13 @@ module Bootstrap.Constraint where {
           validateIn datatypes scope a;
           validateAnnotation datatypes scope annotation
         };
-      SIntLit _ -> Right Unit;
+      SIntLit _ -> Right ();
       SDoubleLit n ->
         unless (andInt (doubleToBits n) 9218868437227405312 /= 9218868437227405312)
           (Left "non-finite Double literal");
-      SBoolLit _ -> Right Unit;
-      SStringLit _ -> Right Unit;
-      SPrimitive _ -> Right Unit;
+      SBoolLit _ -> Right ();
+      SStringLit _ -> Right ();
+      SPrimitive _ -> Right ();
       SCase a branches ->
         do {
           validateIn datatypes scope a;
@@ -763,7 +763,7 @@ module Bootstrap.Constraint where {
           mapM_
             (\definition ->
                case definition of {
-                 Triple _ annotation value ->
+                 (,,) _ annotation value ->
                    do {
                      validateAnnotation datatypes scope annotation;
                      validateIn datatypes scope value
@@ -772,7 +772,7 @@ module Bootstrap.Constraint where {
             definitions;
           validateIn datatypes scope body
         };
-      SWanted _ _ -> Right Unit;
+      SWanted _ _ -> Right ();
       SChecked ty body ->
         do {
           K.annotationType datatypes scope ty;
@@ -788,7 +788,7 @@ module Bootstrap.Constraint where {
       };
       case G.binder node of {
         Nothing -> setNode identity (Node (G.tag node) (Just parent) flag);
-        Just _ -> return Unit
+        Just _ -> return ()
       }
     };
   -- Source aliases share identities. Only reachable nodes survive embedding;
@@ -854,7 +854,7 @@ module Bootstrap.Constraint where {
           };
           head <-
             newNode
-              (if Kind.eqKind kind Star then GCon constructor Nil else GTyCon constructor kind)
+              (if Kind.eqKind kind Star then GCon constructor [] else GTyCon constructor kind)
               Nothing
               Rigid;
           foldM
@@ -939,7 +939,7 @@ module Bootstrap.Constraint where {
           (map
              (\definition ->
                 case definition of {
-                  Quad name _ rhs _ -> Pair name (eraseSourceWith evidence rhs)
+                  (,,,) name _ rhs _ -> (,) name (eraseSourceWith evidence rhs)
                 })
              definitions)
           (eraseSourceWith evidence body);

@@ -7,7 +7,7 @@ module MLF.Entry.CompilerTests where {
   import Bootstrap.Types;
   import qualified Package.OS as O;
   import qualified Tests.CompilerTests as Tests;
-  main :: IO Unit;
+  main :: IO ();
   main =
     do {
       O.setupWindows;

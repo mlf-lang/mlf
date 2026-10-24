@@ -6,17 +6,17 @@ import qualified Tests.Coverage as Coverage
 
 regex : String -> R.Regex
 regex text = case R.compile text of { Left error -> panic error; Right value -> value }
-assert : Bool -> String -> IO Unit
-assert condition message = if condition then return Unit else panic ("regex test: " ++ message)
-match : String -> String -> Int -> Int -> IO Unit
-match pattern subject start end = assert (case R.find (regex pattern) subject 0 of { Nothing -> false; Just (Pair a b) -> a == start && b == end }) ("unexpected match for " ++ pattern)
-reject : String -> IO Unit
+assert : Bool -> String -> IO ()
+assert condition message = if condition then return () else panic ("regex test: " ++ message)
+match : String -> String -> Int -> Int -> IO ()
+match pattern subject start end = assert (case R.find (regex pattern) subject 0 of { Nothing -> false; Just ((,) a b) -> a == start && b == end }) ("unexpected match for " ++ pattern)
+reject : String -> IO ()
 reject pattern = assert (case R.compile pattern of { Left error -> stringLength error > 0; Right value -> false }) ("invalid pattern accepted: " ++ pattern)
-checked : String -> IO Unit -> IO Unit
+checked : String -> IO () -> IO ()
 checked identity action = do { action; Coverage.passed "regex" identity }
-main : IO Unit
+main : IO ()
 main = do
- Coverage.mapCounted "regex" "invalid-patterns-executed" (\(Pair identity pattern) -> checked identity (reject pattern)) (S.zip (Cons "regex/invalid/open-class" (Cons "regex/invalid/open-group" (Cons "regex/invalid/unmatched-close-group" (Cons "regex/invalid/leading-repeat" (Cons "regex/invalid/repeated-star" (Cons "regex/invalid/lazy-quantifier" (Cons "regex/invalid/reversed-range" (Cons "regex/invalid/empty-class" (Cons "regex/invalid/trailing-escape" (Cons "regex/invalid/backreference" (Cons "regex/invalid/word-boundary" (Cons "regex/invalid/lookahead" (Cons "regex/invalid/reversed-bound" (Cons "regex/invalid/oversized-bound" (Cons "regex/invalid/malformed-bound" (Cons "regex/invalid/class-range-escape" (Cons "regex/invalid/nested-repeat-size" Nil))))))))))))))))) (Cons "[" (Cons "(" (Cons "a)" (Cons "*a" (Cons "a**" (Cons "a+?" (Cons "[z-a]" (Cons "[]" (Cons "\\" (Cons "\\1" (Cons "\\b" (Cons "(?=a)" (Cons "a{2,1}" (Cons "a{1001}" (Cons "a{1,x}" (Cons "[\\d-z]" (Cons "(a{1000}){1000}" Nil))))))))))))))))))
+ Coverage.mapCounted "regex" "invalid-patterns-executed" (\((,) identity pattern) -> checked identity (reject pattern)) (S.zip ((:) "regex/invalid/open-class" ((:) "regex/invalid/open-group" ((:) "regex/invalid/unmatched-close-group" ((:) "regex/invalid/leading-repeat" ((:) "regex/invalid/repeated-star" ((:) "regex/invalid/lazy-quantifier" ((:) "regex/invalid/reversed-range" ((:) "regex/invalid/empty-class" ((:) "regex/invalid/trailing-escape" ((:) "regex/invalid/backreference" ((:) "regex/invalid/word-boundary" ((:) "regex/invalid/lookahead" ((:) "regex/invalid/reversed-bound" ((:) "regex/invalid/oversized-bound" ((:) "regex/invalid/malformed-bound" ((:) "regex/invalid/class-range-escape" ((:) "regex/invalid/nested-repeat-size" []))))))))))))))))) ((:) "[" ((:) "(" ((:) "a)" ((:) "*a" ((:) "a**" ((:) "a+?" ((:) "[z-a]" ((:) "[]" ((:) "\\" ((:) "\\1" ((:) "\\b" ((:) "(?=a)" ((:) "a{2,1}" ((:) "a{1001}" ((:) "a{1,x}" ((:) "[\\d-z]" ((:) "(a{1000}){1000}" []))))))))))))))))))
  checked "regex/invalid/nested-empty-repeat-size" (reject "((){1000}){1000}")
  checked "regex/match/left-alternative-long" (match "ab|a" "ab" 0 2)
  checked "regex/match/left-alternative-short" (match "a|ab" "ab" 0 1)

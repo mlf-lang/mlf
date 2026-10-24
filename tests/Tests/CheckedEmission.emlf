@@ -9,13 +9,13 @@ import qualified Tests.Helpers as H
 import qualified Tests.System as System
 import qualified Package.OS as O
 
-suite : List (Pair String (IO Unit))
-suite = Cons (Pair "checked emission agrees with raw independently checked emission" agreement)
-  (Cons (Pair "external xMLF emission still rejects malformed terms" rejects)
-  (Cons (Pair "checked emission still enforces IO entry types" ioEntry)
-  (Cons (Pair "checked witness and compilation constructors are private" opaque) Nil)))
+suite : [] ((,) String (IO ()))
+suite = (:) ((,) "checked emission agrees with raw independently checked emission" agreement)
+  ((:) ((,) "external xMLF emission still rejects malformed terms" rejects)
+  ((:) ((,) "checked emission still enforces IO entry types" ioEntry)
+  ((:) ((,) "checked witness and compilation constructors are private" opaque) [])))
 
-agreement : IO Unit
+agreement : IO ()
 agreement = S.mapM_ (\source -> do
   compiled <- H.right (C.compile "<checked-emission>" source)
   expected <- H.right (Check.checkClosed (C.compiledTerm compiled))
@@ -23,33 +23,33 @@ agreement = S.mapM_ (\source -> do
   raw <- H.right (LLVM.emitEntryChunks false (C.compiledTerm compiled))
   reused <- H.right (LLVM.emitCheckedChunks false (C.checkedTerm compiled))
   H.assert (S.eqList eqString raw reused) "LLVM changed when sharing the successful check")
-  (Cons "42" (Cons "let id = \\x -> x in id id"
-  (Cons "data Box a = Box a; case Box 42 of { Box x -> x }"
-  (Cons "do { putStrLn \"checked\"; return 42 }" Nil))))
+  ((:) "42" ((:) "let id = \\x -> x in id id"
+  ((:) "data Box a = Box a; case Box 42 of { Box x -> x }"
+  ((:) "do { putStrLn \"checked\"; return 42 }" []))))
 
-rejects : IO Unit
+rejects : IO ()
 rejects = S.mapM_ (\term -> do
   H.reject (LLVM.emitEntryChunks false term)
   H.reject (LLVM.emitEntryChunks true term))
-  (Cons (XVarTerm (XName 0 "free"))
-  (Cons (XApp (XIntTerm 1) (XIntTerm 2))
-  (Cons (XTypeApp (XIntTerm 1) XElim)
-  (Cons (XWithData (Cons (DataDecl "Bad" Nil (Cons (ConstructorDecl "Bad" (Cons (Parameter "missing") Nil)) Nil)) Nil) (XIntTerm 1)) Nil))))
+  ((:) (XVarTerm (XName 0 "free"))
+  ((:) (XApp (XIntTerm 1) (XIntTerm 2))
+  ((:) (XTypeApp (XIntTerm 1) XElim)
+  ((:) (XWithData ((:) (DataDecl "Bad" [] ((:) (ConstructorDecl "Bad" ((:) (Parameter "missing") [])) [])) []) (XIntTerm 1)) []))))
 
-ioEntry : IO Unit
+ioEntry : IO ()
 ioEntry = do
   pure <- H.right (C.compile "<pure>" "42")
-  action <- H.right (C.compile "<action>" "return 42 : IO Int")
+  action <- H.right (C.compile "<action>" "return 42 :: IO Int")
   H.reject (LLVM.emitCheckedChunks true (C.checkedTerm pure))
   _ <- H.right (LLVM.emitCheckedChunks true (C.checkedTerm action))
-  return Unit
+  return ()
 
-opaque : IO Unit
-opaque = System.withScratch (\directory -> S.mapM_ (\(Pair moduleName constructor) -> do
+opaque : IO ()
+opaque = System.withScratch (\directory -> S.mapM_ (\((,) moduleName constructor) -> do
   let file = directory ++ "/Main.emlf"
   writeFile file ("module Main where\nimport qualified " ++ moduleName ++ " as Private\nmain = Private." ++ constructor ++ "\n")
   result <- C.compileFile (O.words "libraries/mlf-foundation libraries/mlf-language-core libraries/mlf-frontend libraries/mlf-xmlf libraries/mlf-inference libraries/mlf-interpreter libraries/mlf-llvm libraries/mlf-crates") file
   case result of
     Left (CompileError ModuleResolution message) -> H.assert (H.contains "not in scope" message || H.contains "not exported" message) ("unexpected privacy error: " ++ message)
     _ -> H.fail "private checked constructor escaped module resolution")
-  (Cons (Pair "Bootstrap.X.Checked" "CheckedTerm") (Cons (Pair "Bootstrap.Compiler" "Compilation") Nil)))
+  ((:) ((,) "Bootstrap.X.Checked" "CheckedTerm") ((:) ((,) "Bootstrap.Compiler" "Compilation") [])))

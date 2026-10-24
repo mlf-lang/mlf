@@ -7,10 +7,10 @@ import qualified Bootstrap.Types as T
 import qualified Bootstrap.LLVM as L
 import qualified MLF.Host.Base as B
 
-ls = foldr T.Cons T.Nil
+ls = foldr (:) []
 con s ts = T.XCon s (ls ts)
 int = con "Int" []
-unit = con "Unit" []
+unit = con "()" []
 char = con "Char" []
 chars = con "[]" [char]
 ioerr = con "IOError" []
@@ -26,7 +26,7 @@ puts x = a (p T.PPutStrLn []) x
 printInt x = a (p T.PPrintInt []) x
 seqIO n first second = app (p T.PIOBind [unit,unit]) [first, T.XAbs (name n "ignored") unit second]
 listCode s = T.XCase (charsOf s) int (ls
-  [T.XAlternative (T.XConstructorPattern "[]" T.Nil) (T.XIntTerm 0),
+  [T.XAlternative (T.XConstructorPattern "[]" []) (T.XIntTerm 0),
    T.XAlternative (T.XConstructorPattern ":" (ls [T.Just (name 11 "head"),T.Nothing]))
      (a (p T.PCharCode []) (T.XVarTerm (name 11 "head")))])
 errValue = a (p T.PUserError []) (charsOf "caught λ😀")

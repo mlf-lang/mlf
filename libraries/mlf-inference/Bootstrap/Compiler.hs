@@ -10,17 +10,18 @@ module Bootstrap.Compiler (Compilation, inferredType, compiledTerm, checkedTerm,
   import qualified Bootstrap.Parser as P;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Prelude as Prelude;
+  import qualified Bootstrap.Standalone as Standalone;
   import qualified Bootstrap.Classes as Classes;
   import Bootstrap.CompilerCore;
   compile :: String -> String -> Either CompileError Compilation;
   compile file source = compileWithPrelude ImplicitPrelude file source;
   compileWithPrelude :: PreludeMode -> String -> String -> Either CompileError Compilation;
   compileWithPrelude mode file source = compileModulesWithPrelude mode M.empty file source;
-  compileModules :: Map String (Pair String String) ->
+  compileModules :: Map String ((,) String String) ->
                     String -> String -> Either CompileError Compilation;
   compileModules sources file input = compileModulesWithPrelude ImplicitPrelude sources file input;
   compileModulesWithPrelude :: PreludeMode ->
-                               Map String (Pair String String) ->
+                               Map String ((,) String String) ->
                                String -> String -> Either CompileError Compilation;
   compileModulesWithPrelude mode sources file input =
     do {
@@ -32,10 +33,10 @@ module Bootstrap.Compiler (Compilation, inferredType, compiledTerm, checkedTerm,
              compileLinked mode modules
            }
     };
-  compileFile :: List String -> String -> IO (Either CompileError Compilation);
+  compileFile :: [] String -> String -> IO (Either CompileError Compilation);
   compileFile paths file = compileFileWithPrelude ImplicitPrelude paths file;
   compileFileWithPrelude :: PreludeMode ->
-                            List String -> String -> IO (Either CompileError Compilation);
+                            [] String -> String -> IO (Either CompileError Compilation);
   compileFileWithPrelude mode paths file =
     do {
       present <- fileExists file;
@@ -47,7 +48,7 @@ module Bootstrap.Compiler (Compilation, inferredType, compiledTerm, checkedTerm,
       else ioReturn (Left (CompileError ModuleResolution ("file does not exist: " ++ file)))
     };
   compileSourceWithImports :: PreludeMode ->
-                              List String ->
+                              [] String ->
                               String -> String -> IO (Either CompileError Compilation);
   compileSourceWithImports mode paths file input =
     case atPhase Parsing (P.parseModule file input) of {
@@ -75,7 +76,7 @@ module Bootstrap.Compiler (Compilation, inferredType, compiledTerm, checkedTerm,
       program <- atPhase Parsing (P.standaloneProgram root);
       compileProgramWithPrelude mode program
     };
-  compileLinked :: PreludeMode -> List SourceModule -> Either CompileError Compilation;
+  compileLinked :: PreludeMode -> [] SourceModule -> Either CompileError Compilation;
   compileLinked mode modules =
     do {
       boundValueShared1 <- atPhase ModuleResolution (Modules.linkModules mode modules);
@@ -91,7 +92,7 @@ module Bootstrap.Compiler (Compilation, inferredType, compiledTerm, checkedTerm,
                 Right lowered -> Right lowered
               };
             case lowered of {
-              Pair core classes ->
+              (,) core classes ->
                 let {
                   diagnosticNames = M.union compareString (M.map display classes) names
                 } in
@@ -108,13 +109,39 @@ module Bootstrap.Compiler (Compilation, inferredType, compiledTerm, checkedTerm,
   compileExpr :: SExpr -> Either CompileError Compilation;
   compileExpr expr = compileExprWithPrelude ImplicitPrelude expr;
   compileExprWithPrelude :: PreludeMode -> SExpr -> Either CompileError Compilation;
-  compileExprWithPrelude mode expr = compileProgramWithPrelude mode (SProgram Nil expr);
+  compileExprWithPrelude mode expr = compileProgramWithPrelude mode (SProgram [] expr);
   compileProgram :: SProgram -> Either CompileError Compilation;
   compileProgram program = compileProgramWithPrelude ImplicitPrelude program;
   compileProgramWithPrelude :: PreludeMode -> SProgram -> Either CompileError Compilation;
   compileProgramWithPrelude mode original =
+    do {
+      normalized <- atPhase ModuleResolution (Standalone.normalize mode original);
+      case normalized of {
+        Nothing -> compileLegacyProgramWithPrelude mode original;
+        Just ((,,) imports source names) -> do {
+          let { display = Modules.displayNames names };
+          lowered <- case Classes.lowerClassesWithImports imports source of {
+            Left message -> Left (CompileError Inference (display message));
+            Right result -> Right result
+          };
+          case lowered of { (,) core classes ->
+            let { diagnosticNames = M.union compareString (M.map display classes) names } in
+            case finishCompilation lowered of {
+              Left (CompileError p message) ->
+                Left (CompileError p (Modules.displayNames diagnosticNames message));
+              Right (Compilation checked graph text) ->
+                Right (Compilation checked graph (display text))
+            }
+          }
+        }
+      }
+    };
+  -- Preserve the historical class-free/abstract-nominal route byte-for-byte
+  -- when no genuine standard-facade capability is used by the public AST.
+  compileLegacyProgramWithPrelude :: PreludeMode -> SProgram -> Either CompileError Compilation;
+  compileLegacyProgramWithPrelude mode original =
     case Prelude.withPrelude mode original of {
-      Pair imports source ->
+      (,) imports source ->
         do {
           lowered <- atPhase Inference (Classes.lowerClassesWithImports imports source);
           finishCompilation lowered

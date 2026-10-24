@@ -12,12 +12,12 @@ module Bootstrap.LLVM.Analysis where {
   import qualified Bootstrap.X.Syntax as X;
   import qualified Bootstrap.LLVM.Optimize as O;
   -- Native worker information is computed by two monotone fixed points.
-  data WorkerFunction = WorkerFunction (List XName) XErased (List XName) (Set XName);
-  parameters :: WorkerFunction -> List XName;
+  data WorkerFunction = WorkerFunction ([] XName) XErased ([] XName) (Set XName);
+  parameters :: WorkerFunction -> [] XName;
   parameters (WorkerFunction args body captured demanded) = args;
   functionBody :: WorkerFunction -> XErased;
   functionBody (WorkerFunction args body captured demanded) = body;
-  captures :: WorkerFunction -> List XName;
+  captures :: WorkerFunction -> [] XName;
   captures (WorkerFunction args body captured demanded) = captured;
   strict :: WorkerFunction -> Set XName;
   strict (WorkerFunction args body captured demanded) = demanded;
@@ -30,56 +30,56 @@ module Bootstrap.LLVM.Analysis where {
       Nothing -> S.singleton name;
       Just f -> S.fromList O.compareName (captures f)
     };
-  children :: XErased -> List XErased;
+  children :: XErased -> [] XErased;
   children expression =
     case expression of {
-      XEAbs n b -> Cons b Nil;
-      XEApp f a -> Cons f (Cons a Nil);
-      XELet n a b -> Cons a (Cons b Nil);
+      XEAbs n b -> (:) b [];
+      XEApp f a -> (:) f ((:) a []);
+      XELet n a b -> (:) a ((:) b []);
       XELetRec ds b ->
-        Cons b
+        (:) b
           (L.map
              (\entry ->
                 case entry of {
-                  Pair n a -> a
+                  (,) n a -> a
                 })
              ds);
       XECase s branches ->
-        Cons s
+        (:) s
           (L.map
              (\branch ->
                 case branch of {
                   XErasedAlternative p b -> b
                 })
              branches);
-      _ -> Nil
+      _ -> []
     };
-  bindings :: XErased -> List (Pair XName XErased);
+  bindings :: XErased -> [] ((,) XName XErased);
   bindings expression =
     case expression of {
-      XELet name a b -> Cons (Pair name a) Nil;
+      XELet name a b -> (:) ((,) name a) [];
       XELetRec ds b -> ds;
-      _ -> Nil
+      _ -> []
     };
-  collectBinding :: Pair XName XErased -> Map XName WorkerFunction -> Map XName WorkerFunction;
-  collectBinding (Pair name rhs) fs =
+  collectBinding :: (,) XName XErased -> Map XName WorkerFunction -> Map XName WorkerFunction;
+  collectBinding ((,) name rhs) fs =
     case O.lambdas rhs of {
-      Pair Nil body -> fs;
-      Pair args body -> M.insert O.compareName name (WorkerFunction args body Nil S.empty) fs
+      (,) [] body -> fs;
+      (,) args body -> M.insert O.compareName name (WorkerFunction args body [] S.empty) fs
     };
   collect :: XErased -> Map XName WorkerFunction;
   collect expression =
     M.unions O.compareName
-      (Cons (L.foldr collectBinding M.empty (bindings expression))
+      ((:) (L.foldr collectBinding M.empty (bindings expression))
          (L.map collect (children expression)));
-  sameNames :: List XName -> List XName -> Bool;
+  sameNames :: [] XName -> [] XName -> Bool;
   sameNames a b =
     case a of {
-      Nil -> L.null b;
-      Cons n rest ->
+      [] -> L.null b;
+      (:) n rest ->
         case b of {
-          Nil -> False;
-          Cons m tail -> (O.eqName n m && sameNames rest tail)
+          [] -> False;
+          (:) m tail -> (O.eqName n m && sameNames rest tail)
         }
     };
   sameFunction :: WorkerFunction -> WorkerFunction -> Bool;
@@ -87,14 +87,14 @@ module Bootstrap.LLVM.Analysis where {
     (sameNames args args2 &&
      (sameNames captured captured2 &&
       (sameNames (S.toList demanded) (S.toList demanded2) && X.equalErased body body2)));
-  sameFunctions :: List (Pair XName WorkerFunction) -> List (Pair XName WorkerFunction) -> Bool;
+  sameFunctions :: [] ((,) XName WorkerFunction) -> [] ((,) XName WorkerFunction) -> Bool;
   sameFunctions a b =
     case a of {
-      Nil -> L.null b;
-      Cons (Pair n f) rest ->
+      [] -> L.null b;
+      (:) ((,) n f) rest ->
         case b of {
-          Nil -> False;
-          Cons (Pair m g) tail -> (O.eqName n m && (sameFunction f g && sameFunctions rest tail))
+          [] -> False;
+          (:) ((,) m g) tail -> (O.eqName n m && (sameFunction f g && sameFunctions rest tail))
         }
     };
   -- Bodies and parameters stay fixed during capture propagation. Cache their
@@ -103,10 +103,10 @@ module Bootstrap.LLVM.Analysis where {
   captureFixed fs =
     captureIndexed
       (M.map
-         (\f -> Pair (S.toList (O.free (functionBody f))) (S.fromList O.compareName (parameters f)))
+         (\f -> (,) (S.toList (O.free (functionBody f))) (S.fromList O.compareName (parameters f)))
          fs)
       fs;
-  captureIndexed :: Map XName (Pair (List XName) (Set XName)) ->
+  captureIndexed :: Map XName ((,) ([] XName) (Set XName)) ->
                     Map XName WorkerFunction -> Map XName WorkerFunction;
   captureIndexed inputs fs =
     let {
@@ -114,7 +114,7 @@ module Bootstrap.LLVM.Analysis where {
         M.mapWithKey
           (\name f ->
              case M.get O.compareName name inputs of {
-               Pair names parameterNames ->
+               (,) names parameterNames ->
                  WorkerFunction (parameters f) (functionBody f)
                    (S.toList
                       (S.difference O.compareName
@@ -148,14 +148,14 @@ module Bootstrap.LLVM.Analysis where {
     S.union O.compareName (S.delete O.compareName name names)
       (if S.member O.compareName name names then demanded fs value else S.empty);
   recursiveDemand :: Map XName WorkerFunction ->
-                     List (Pair XName XErased) -> Set XName -> Set XName;
+                     [] ((,) XName XErased) -> Set XName -> Set XName;
   recursiveDemand fs bindings names =
     let {
       expanded =
         L.foldr
           (\entry rest ->
              case entry of {
-               Pair n a -> substituteDemand fs n a rest
+               (,) n a -> substituteDemand fs n a rest
              })
           names
           bindings
@@ -164,11 +164,11 @@ module Bootstrap.LLVM.Analysis where {
       next = S.union O.compareName names expanded
     } in
     if sameNames (S.toList names) (S.toList next) then names else recursiveDemand fs bindings next;
-  intersectAll :: List (Set XName) -> Set XName;
+  intersectAll :: [] (Set XName) -> Set XName;
   intersectAll sets =
     case sets of {
-      Nil -> S.empty;
-      Cons first rest -> L.foldr (S.intersection O.compareName) first rest
+      [] -> S.empty;
+      (:) first rest -> L.foldr (S.intersection O.compareName) first rest
     };
   demandedAlternative :: Map XName WorkerFunction -> XErasedAlternative -> Set XName;
   demandedAlternative fs (XErasedAlternative p b) =
@@ -184,10 +184,10 @@ module Bootstrap.LLVM.Analysis where {
              (L.map
                 (\entry ->
                    case entry of {
-                     Pair n a -> n
+                     (,) n a -> n
                    })
                 ds));
-      XECase s (Cons (XErasedAlternative (XDefaultPattern optional) b) Nil) ->
+      XECase s ((:) (XErasedAlternative (XDefaultPattern optional) b) []) ->
         case optional of {
           Nothing -> demanded fs b;
           Just n -> substituteDemand fs n s (demanded fs b)
@@ -201,18 +201,18 @@ module Bootstrap.LLVM.Analysis where {
   demandedApplication :: Map XName WorkerFunction -> XErased -> Set XName;
   demandedApplication fs expression =
     case O.applications expression of {
-      Pair (XEPrimitive PIfThenElse) (Cons c (Cons a (Cons b Nil))) ->
+      (,) (XEPrimitive PIfThenElse) ((:) c ((:) a ((:) b []))) ->
         S.union O.compareName (demanded fs c)
           (S.intersection O.compareName (demanded fs a) (demanded fs b));
-      Pair (XEPrimitive PSeq) (Cons a (Cons b Nil)) ->
+      (,) (XEPrimitive PSeq) ((:) a ((:) b [])) ->
         S.union O.compareName (demanded fs a) (demanded fs b);
-      Pair (XEPrimitive p) args ->
+      (,) (XEPrimitive p) args ->
         if (L.length args == P.primitiveArity p)
         then if P.primitiveStrict p
              then S.unions O.compareName (L.map (demanded fs) args)
              else S.empty
         else S.empty;
-      Pair (XEVar n) args ->
+      (,) (XEVar n) args ->
         case M.lookup O.compareName n fs of {
           Just f ->
             if (L.length args == L.length (parameters f))
@@ -222,7 +222,7 @@ module Bootstrap.LLVM.Analysis where {
                       (L.map
                          (\entry ->
                             case entry of {
-                              Pair name arg ->
+                              (,) name arg ->
                                 if S.member O.compareName name (strict f)
                                 then demanded fs arg
                                 else S.empty
@@ -231,6 +231,6 @@ module Bootstrap.LLVM.Analysis where {
             else demanded fs (XEVar n);
           Nothing -> demanded fs (XEVar n)
         };
-      Pair f args -> demanded fs f
+      (,) f args -> demanded fs f
     }
 }

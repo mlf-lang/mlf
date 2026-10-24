@@ -23,7 +23,7 @@ run body = case C.compile "Example.hs" (source body) of
   T.Right result -> let term = C.compiledTerm result in
     case R.prepare P.False term of
       T.Left err -> T.Left err
-      T.Right (T.Pair env _) -> R.evaluate env (R.REnv M.empty) (X.erase term)
+      T.Right ((,) env _) -> R.evaluate env (R.REnv M.empty) (X.erase term)
 check name body expected = announce name $ case run body of
   T.Right (R.RInteger actual) | actual == expected -> putStrLn ("pass: " P.++ name)
   T.Left err -> error (name P.++ ": " P.++ B.unpack err)
@@ -45,13 +45,13 @@ fails name body expected = announce name $ case run body of
   T.Left message -> error (name P.++ ": wrong failure " P.++ B.unpack message)
   _ -> error (name P.++ ": unexpectedly succeeded")
 moduleSource name exports body = B.literal $ "-- mlf:syntax shared-haskell-v1\n{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}\nmodule " P.++ name P.++ exports P.++ " where\nimport MLF.Primitive\n" P.++ body P.++ "\n"
-familySources = M.singleton "Family" (T.Pair "Family.hs" (moduleSource "Family" " (Choice(Only), makeOther)" "data Choice = Only | Other\nmakeOther = Other"))
+familySources = M.singleton "Family" ((,) "Family.hs" (moduleSource "Family" " (Choice(Only), makeOther)" "data Choice = Only | Other\nmakeOther = Other"))
 familyCompile body = C.compileModules familySources "Example.hs" (source ("import qualified Family as F\n" P.++ body))
 checkFamily name body expected = announce name $ case familyCompile body of
   T.Left err -> error (name P.++ ": " P.++ B.unpack (C.prettyError err))
   T.Right result -> case R.prepare P.False (C.compiledTerm result) of
     T.Left err -> error (B.unpack err)
-    T.Right (T.Pair env _) -> case R.evaluate env (R.REnv M.empty) (X.erase (C.compiledTerm result)) of
+    T.Right ((,) env _) -> case R.evaluate env (R.REnv M.empty) (X.erase (C.compiledTerm result)) of
       T.Right (R.RInteger actual) | actual == expected -> putStrLn ("pass: " P.++ name)
       _ -> error (name P.++ ": wrong result")
 rejectFamily name body phase expected = announce name $ case familyCompile body of

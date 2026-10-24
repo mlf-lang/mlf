@@ -1,6 +1,6 @@
 {-# LANGUAGE RankNTypes, KindSignatures, FlexibleInstances, ForeignFunctionInterface, ConstraintKinds #-}
 module MLF.Host.Base
-  ( Int, Bool(..), Double, Char, IO, Unit(..), String, ST, STArray
+  ( Int, Bool(..), Double, Char, IO, String, ST, STArray
   , MLFCallStack, MLFHasCallStack, MLFStackFrame(..), MLFStackEvidence(..)
   , v_emptyCallStack, v_pushCallStack, v_prettyCallStack
   , literal, unpack, utf8, fromUtf8, matchString, neInt, leInt, gtInt, geInt
@@ -39,7 +39,6 @@ import Text.Read (readMaybe)
 type Int = Integer
 type ST = S.ST
 type STArray s a = A.STArray s P.Int a
-data Unit = Unit
 -- Text is strict UTF-8 in the supported text-2 toolchain. String indices and
 -- lengths below count Unicode scalars, never bytes or UTF-16 code units.
 data String = String !T.Text !P.Int (Array.Array P.Int Char)
@@ -131,11 +130,11 @@ stIndex a n = do
   i `seq` pure i
 v_readSTArray :: STArray s a -> Int -> ST s a
 v_readSTArray a n = stIndex a n >>= A.readArray a
-v_writeSTArray :: STArray s a -> Int -> a -> ST s Unit
+v_writeSTArray :: STArray s a -> Int -> a -> ST s ()
 v_writeSTArray a n value = do
   i <- stIndex a n
   A.writeArray a i value
-  pure Unit
+  pure ()
 v_lengthSTArray :: STArray s a -> ST s Int
 v_lengthSTArray a = do
   (_,hi) <- A.getBounds a

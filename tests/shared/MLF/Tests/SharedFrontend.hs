@@ -31,17 +31,17 @@ module MLF.Tests.SharedFrontend where {
   linked text =
     case parse text of {
       Left _ -> False;
-      Right m -> isRight (Modules.linkModules ImplicitPrelude (Cons m Nil))
+      Right m -> isRight (Modules.linkModules ImplicitPrelude ((:) m []))
     };
   forwardScope =
     case parse "main = let { x = y; y = 3 } in x" of {
-      Right (SourceModule _ _ _ _ _ _ _ (Cons (Triple _ _ (SLet y (SIntLit 3) (SLet x (SVar reference) (SVar result)))) Nil) _ SharedHaskellV1) ->
+      Right (SourceModule _ _ _ _ _ _ _ ((:) ((,,) _ _ (SLet y (SIntLit 3) (SLet x (SVar reference) (SVar result)))) []) _ SharedHaskellV1) ->
         (eqString y "y" && (eqString x "x" && (eqString reference "y" && eqString result "x")));
       _ -> False
     };
   fixedDo =
     case parse "main = let { bind = 7 } in do { value <- ioReturn 3; ioReturn value }" of {
-      Right (SourceModule _ _ _ _ _ _ _ (Cons (Triple _ _ expression) Nil) _ _) ->
+      Right (SourceModule _ _ _ _ _ _ _ ((:) ((,,) _ _ expression) []) _ _) ->
         elem eqString "$MLF.Primitive.>>=" (Surface.freeNames expression);
       _ -> False
     };
@@ -57,8 +57,8 @@ module MLF.Tests.SharedFrontend where {
         let {
           root =
             SourceModule path name exports
-              (Cons (Import "MLF.Primitive" False Nothing Everything)
-                 (Cons (Import "Support" False Nothing Everything) Nil))
+              ((:) (Import "MLF.Primitive" False Nothing Everything)
+                 ((:) (Import "Support" False Nothing Everything) []))
               ds
               cs
               instances
@@ -68,7 +68,7 @@ module MLF.Tests.SharedFrontend where {
         } in
         case Modules.loadModuleMap
                (M.singleton "Support"
-                  (Pair "Support.emlf"
+                  ((,) "Support.emlf"
                      "module Support where\nanswer = let x = 1 in let x = x + 1 in x\n"))
                root of {
           Left _ -> False;
@@ -83,8 +83,8 @@ module MLF.Tests.SharedFrontend where {
         let {
           root =
             SourceModule path name exports
-              (Cons (Import "MLF.Primitive" False Nothing Everything)
-                 (Cons (Import "Bad" False Nothing Everything) Nil))
+              ((:) (Import "MLF.Primitive" False Nothing Everything)
+                 ((:) (Import "Bad" False Nothing Everything) []))
               ds
               cs
               instances
@@ -94,10 +94,10 @@ module MLF.Tests.SharedFrontend where {
         } in
         case P.parseModule "Bad.emlf" "module Bad where\nfromInteger x = x\n" of {
           Left _ -> False;
-          Right bad -> isRight (Modules.linkModules ImplicitPrelude (Cons bad (Cons root Nil)))
+          Right bad -> isRight (Modules.linkModules ImplicitPrelude ((:) bad ((:) root [])))
         }
     };
-  linkRaw text = case P.parseModule "Example.hs" (prologue ++ text) of { Left _ -> False; Right m -> isRight (Modules.linkModules ImplicitPrelude (Cons m Nil)) };
+  linkRaw text = case P.parseModule "Example.hs" (prologue ++ text) of { Left _ -> False; Right m -> isRight (Modules.linkModules ImplicitPrelude ((:) m [])) };
 
   evaluated :: String -> Either String Runtime.RValue;
   evaluated body = do {
@@ -119,10 +119,10 @@ module MLF.Tests.SharedFrontend where {
   boxApplicative = boxFunctor ++ "instance Applicative Box where { pure = Box; (<*>) (Box f) (Box x) = Box (f x) }\n";
   boxMonad :: String;
   boxMonad = boxApplicative ++ "instance Monad Box where { (>>=) (Box x) f = f x }\n";
-  check :: String -> Bool -> IO Unit;
+  check :: String -> Bool -> IO ();
   check name okay =
     if okay
-    then ioReturn Unit
+    then ioReturn ()
     else do {
            putErr ("shared frontend failure: " ++ (name ++ "\n"));
            exitWith 1
@@ -143,7 +143,7 @@ module MLF.Tests.SharedFrontend where {
     };
   hintRoundTrip hint =
     let { n = XName 17 (Constraint.targetNameHint hint) } in
-    targetRoundTrip (XAbs n (XCon "Int" Nil) (XVarTerm n));
+    targetRoundTrip (XAbs n (XCon "Int" []) (XVarTerm n));
   sourceRoundTrip body =
     case C.compile "Example.hs" (source body) of {
       Left _ -> False;
@@ -166,7 +166,7 @@ module MLF.Tests.SharedFrontend where {
             }
         }
     };
-  frontendChecks :: IO Unit;
+  frontendChecks :: IO ();
   frontendChecks =
     do {
       check "legacy malformed pragma comment"
@@ -194,7 +194,7 @@ module MLF.Tests.SharedFrontend where {
                 (prologue ++
                  "module Example where\nimport MLF.Primitive hiding (bind)\nbind = 42\nmain = do { ioReturn bind; ioReturn bind }\n") of {
            Left _ -> False;
-           Right m -> isRight (Modules.linkModules ImplicitPrelude (Cons m Nil))
+           Right m -> isRight (Modules.linkModules ImplicitPrelude ((:) m []))
          });
       check "closed recursive group"
         (accept "main = let { f :: Int -> Int; f x = g x; g :: Int -> Int; g x = f x } in 1");
@@ -348,7 +348,7 @@ module MLF.Tests.SharedFrontend where {
 
       putStrLn "shared frontend: parser and namespace checks passed"
     };
-  nativeFirst :: IO Unit;
+  nativeFirst :: IO ();
   nativeFirst = do {
     check "default and generated-name capture execution" (evaluatesInt captureDefaults 40);
     check "native standard hierarchy inference" (evaluatesInt (boxMonad ++ "main = unBox (do { x <- pure 40; return (x + 2) })") 42);
@@ -358,7 +358,7 @@ module MLF.Tests.SharedFrontend where {
     check "native fmap default partial demand" (failsWith "data Box a = Box a\ninstance Functor Box where { fmap = panic \"fmap bottom\" }\nmain = seq (((<$) 1) :: Box Int -> Box Int) 7" "fmap bottom");
       putStrLn "shared frontend: first native semantics checks passed"
     };
-  nativeSecond :: IO Unit;
+  nativeSecond :: IO ();
   nativeSecond = do {
     check "native ap default function demand" (failsWith (boxFunctor ++ "instance Applicative Box where { pure = Box; liftA2 = panic \"liftA2 bottom\" }\nmain = seq ((<*>) :: Box (Int -> Int) -> Box Int -> Box Int) 7") "liftA2 bottom");
     check "native left default function demand" (failsWith (boxFunctor ++ "instance Applicative Box where { pure = Box; liftA2 = panic \"liftA2 bottom\" }\nmain = seq ((<*) :: Box Int -> Box Int -> Box Int) 7") "liftA2 bottom");
@@ -368,7 +368,7 @@ module MLF.Tests.SharedFrontend where {
       putStrLn "shared frontend: checks passed"
     };
 
-  checkFiles :: Int -> Int -> IO Unit;
+  checkFiles :: Int -> Int -> IO ();
   checkFiles i count = if i >= count then putStrLn "shared source files: grammar checks passed" else do {
     file <- getArg i;
     text <- readFile file;
@@ -377,7 +377,7 @@ module MLF.Tests.SharedFrontend where {
       Right _ -> checkFiles (i + 1) count
     }
   };
-  main :: IO Unit;
+  main :: IO ();
   main = do {
     count <- getArgCount;
     if count == 0 then do { frontendChecks; nativeFirst; nativeSecond }

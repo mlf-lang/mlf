@@ -10,12 +10,12 @@ import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Bootstrap.Graph as G
 
-data Build a = Build (Graph -> Either String (Pair a Graph))
-runBuild : forall a. Graph -> Build a -> Either String (Pair a Graph)
+data Build a = Build (Graph -> Either String ((,) a Graph))
+runBuild : forall a. Graph -> Build a -> Either String ((,) a Graph)
 runBuild g (Build f) = f g
-returnBuild x = Build (\g -> Right (Pair x g))
+returnBuild x = Build (\g -> Right ((,) x g))
 bindBuild : forall a b. Build a -> (a -> Build b) -> Build b
-bindBuild (Build f) next = Build (\g -> S.eitherBind (f g) (\(Pair a changed) -> runBuild changed (next a)))
+bindBuild (Build f) next = Build (\g -> S.eitherBind (f g) (\((,) a changed) -> runBuild changed (next a)))
 instance Functor Build where { fmap f action = bindBuild action (\x -> returnBuild (f x)) }
 instance Applicative Build where {
  pure = returnBuild;
@@ -23,17 +23,17 @@ instance Applicative Build where {
 }
 instance Monad Build where { (>>=) = bindBuild }
 get : Build Graph
-get = Build (\g -> Right (Pair g g))
-put : Graph -> Build Unit
-put g = Build (\old -> Right (Pair Unit g))
+get = Build (\g -> Right ((,) g g))
+put : Graph -> Build ()
+put g = Build (\old -> Right ((,) () g))
 lift : forall a. Either String a -> Build a
-lift x = Build (\g -> S.mapEither (\a -> Pair a g) x)
-unify equations = Build (\g -> S.mapEither (Pair Unit) (G.unify equations g))
+lift x = Build (\g -> S.mapEither (\a -> (,) a g) x)
+unify equations = Build (\g -> S.mapEither ((,) ()) (G.unify equations g))
 expand source destination = Build (G.expand source destination)
 freshId : Build Int
 freshId = Build (\g -> Right (G.freshId g))
 newNode t b f = Build (\g -> Right (G.newNode t b f g))
-setNode n v = Build (\g -> Right (Pair Unit (G.setNode n v g)))
+setNode n v = Build (\g -> Right ((,) () (G.setNode n v g)))
 nodes = G.nodes
 links = G.links
 nextId = G.nextId

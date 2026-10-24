@@ -18,94 +18,94 @@ import qualified Test.Evidence as Evidence
 import qualified Tests.IntSetUnions as Unions
 
 ok value = H.assert value "test framework contract changed"
-rejected value = case value of { Left _ -> return Unit; Right _ -> H.fail "invalid test selection accepted" }
+rejected value = case value of { Left _ -> return (); Right _ -> H.fail "invalid test selection accepted" }
 selected args cases expected = do
- Pair _ entries <- H.right (R.plan args cases)
+ (,) _ entries <- H.right (R.plan args cases)
  ok (S.eqList eqString (S.map C.id entries) expected)
-entry identity label tags = C.test identity label tags (A.succeed Unit)
-sample = Cons (entry "map/empty" "empty map" (Cons "fast" Nil))
- (Cons (entry "map/insert" "insert Unicode λ" (Cons "slow" Nil))
- (Cons (entry "list/empty" "empty list" (Cons "fast" Nil)) Nil))
-probeCases = Cons (C.test "probe/first" "first failure" Nil (A.fail "first failure"))
- (Cons (entry "probe/middle" "continued after failure" Nil)
- (Cons (C.test "probe/last" "last failure" Nil (A.equal eqInt showInt "different numbers" 1 2)) Nil))
+entry identity label tags = C.test identity label tags (A.succeed ())
+sample = (:) (entry "map/empty" "empty map" ((:) "fast" []))
+ ((:) (entry "map/insert" "insert Unicode λ" ((:) "slow" []))
+ ((:) (entry "list/empty" "empty list" ((:) "fast" [])) []))
+probeCases = (:) (C.test "probe/first" "first failure" [] (A.fail "first failure"))
+ ((:) (entry "probe/middle" "continued after failure" [])
+ ((:) (C.test "probe/last" "last failure" [] (A.equal eqInt showInt "different numbers" 1 2)) []))
 
-checks : IO Unit
+checks : IO ()
 checks = do
  contractChecks
  -- Independent IO assertions inspect results instead of using the API under test.
  success <- A.run (do { n <- A.liftIO (return 41); A.equal eqInt showInt "addition" 42 (n + 1); return n })
  case success of { Right n -> ok (n == 41); Left _ -> H.fail "successful assertion failed" }
- failure <- A.run (do { A.assert false "short circuit"; A.liftIO (panic "failed assertion continued" : IO Unit) })
+ failure <- A.run (do { A.assert false "short circuit"; A.liftIO (panic "failed assertion continued" :: IO ()) })
  case failure of { Left error -> ok (eqString (A.message error) "short circuit"); Right _ -> H.fail "failed assertion passed" }
  unequal <- A.run (A.equal eqInt showInt "numbers" 7 9)
  case unequal of
-  Left (A.Failure message (Just (Pair expected actual))) -> ok (eqString message "numbers" && eqString expected "7" && eqString actual "9")
+  Left (A.Failure message (Just ((,) expected actual))) -> ok (eqString message "numbers" && eqString expected "7" && eqString actual "9")
   _ -> H.fail "equality failure lost its expected/actual values"
- conversion <- A.run (A.right (\text -> "error: " ++ text) (Left "bad" : Either String Unit))
+ conversion <- A.run (A.right (\text -> "error: " ++ text) (Left "bad" :: Either String ()))
  case conversion of { Left error -> ok (eqString (A.message error) "error: bad"); Right _ -> H.fail "right accepted Left" }
 
- selected Nil sample (S.map C.id sample)
- selected (Cons "--filter" (Cons "empty" Nil)) sample (Cons "map/empty" (Cons "list/empty" Nil))
- selected (Cons "--exact" (Cons "map/insert" Nil)) sample (Cons "map/insert" Nil)
- selected (Cons "--tag" (Cons "fast" (Cons "--filter" (Cons "map/" Nil)))) sample (Cons "map/empty" Nil)
- selected (Cons "--filter" (Cons "λ" Nil)) sample (Cons "map/insert" Nil)
+ selected [] sample (S.map C.id sample)
+ selected ((:) "--filter" ((:) "empty" [])) sample ((:) "map/empty" ((:) "list/empty" []))
+ selected ((:) "--exact" ((:) "map/insert" [])) sample ((:) "map/insert" [])
+ selected ((:) "--tag" ((:) "fast" ((:) "--filter" ((:) "map/" [])))) sample ((:) "map/empty" [])
+ selected ((:) "--filter" ((:) "λ" [])) sample ((:) "map/insert" [])
  S.mapM_ (\args -> rejected (R.plan args sample))
-  (Cons (Cons "--exact" (Cons "absent" Nil))
-  (Cons (Cons "--filter" (Cons "" Nil))
-  (Cons (Cons "--tag" Nil)
-  (Cons (Cons "--format" (Cons "xml" Nil))
-  (Cons (Cons "--unknown" Nil) Nil)))))
- rejected (R.plan Nil Nil)
- rejected (R.plan (Cons "--exact" (Cons "list/empty" Nil)) (S.append sample (Cons (S.head sample) Nil)))
- S.mapM_ (\identity -> rejected (R.plan Nil (Cons (entry identity "bad" Nil) Nil))) (Cons "" (Cons "bad id" (Cons "bad\nidentity" Nil)))
- rejected (R.plan Nil (Cons (entry "empty-name" "" Nil) Nil))
+  ((:) ((:) "--exact" ((:) "absent" []))
+  ((:) ((:) "--filter" ((:) "" []))
+  ((:) ((:) "--tag" [])
+  ((:) ((:) "--format" ((:) "xml" []))
+  ((:) ((:) "--unknown" []) [])))))
+ rejected (R.plan [] [])
+ rejected (R.plan ((:) "--exact" ((:) "list/empty" [])) (S.append sample ((:) (S.head sample) [])))
+ S.mapM_ (\identity -> rejected (R.plan [] ((:) (entry identity "bad" []) []))) ((:) "" ((:) "bad id" ((:) "bad\nidentity" [])))
+ rejected (R.plan [] ((:) (entry "empty-name" "" []) []))
 
  results <- R.execute probeCases
  ok (S.eqList eqString (S.map R.identity results) (S.map C.id probeCases))
- ok (S.eqList H.eq (S.map R.passed results) (Cons false (Cons true (Cons false Nil))))
+ ok (S.eqList H.eq (S.map R.passed results) ((:) false ((:) true ((:) false []))))
  let escaped = "quote\" slash\\ newline\n NUL\0 λ😀"
- let weird = C.test "json/escaped" escaped (Cons escaped Nil) (A.fail escaped)
- encoded <- R.execute (Cons weird Nil)
+ let weird = C.test "json/escaped" escaped ((:) escaped []) (A.fail escaped)
+ encoded <- R.execute ((:) weird [])
  row <- H.right (J.parse (R.resultJson (S.head encoded)))
  ok (eqString (J.getText "name" "" row) escaped && eqString (J.getText "message" "" row) escaped &&
-  S.eqList eqString (J.getStrings "tags" row) (Cons escaped Nil) && eqString (J.getText "status" "" row) "failed")
+  S.eqList eqString (J.getStrings "tags" row) ((:) escaped []) && eqString (J.getText "status" "" row) "failed")
  detail <- H.right (J.parse (R.resultJson (S.last results)))
  ok (eqString (J.getText "expected" "" detail) "1" && eqString (J.getText "actual" "" detail) "2")
  summary <- H.right (J.parse (R.summaryJson 5 3 results))
  ok (J.equal (J.get "executed" summary) (J.num 3) && J.equal (J.get "passed" summary) (J.num 1) &&
   J.equal (J.get "failed" summary) (J.num 2) && J.getBool "complete" false summary && eqString (J.getText "scope" "" summary) "partial")
 
- let original = Pair "legacy label" (return Unit)
- let adapted = C.fromIO "legacy/case" (Cons "legacy" Nil) original
- let classified = C.classified (Cons "standard-library" Nil) (O.words "property-based differential") adapted
- let described = C.described "runtime-library" "component" (Cons "exhaustive" Nil) (Cons "independent-reference" Nil) (Cons "regression" Nil) classified
- selected (O.words "--group runtime-library --level component --input exhaustive --oracle independent-reference --purpose regression") (Cons described Nil) (Cons "legacy/case" Nil)
+ let original = (,) "legacy label" (return ())
+ let adapted = C.fromIO "legacy/case" ((:) "legacy" []) original
+ let classified = C.classified ((:) "standard-library" []) (O.words "property-based differential") adapted
+ let described = C.described "runtime-library" "component" ((:) "exhaustive" []) ((:) "independent-reference" []) ((:) "regression" []) classified
+ selected (O.words "--group runtime-library --level component --input exhaustive --oracle independent-reference --purpose regression") ((:) described []) ((:) "legacy/case" [])
  ok (eqString (C.id described) (C.id adapted) && eqString (C.name described) (C.name adapted) && S.elem eqString "legacy" (C.tags described))
- ok (S.eqList eqString (C.tags (C.described "runtime-library" "component" (Cons "exhaustive" Nil) (Cons "independent-reference" Nil) (Cons "regression" Nil) described)) (C.tags described))
- rejected (R.plan (O.words "--oracle fixed-point") (Cons described Nil))
+ ok (S.eqList eqString (C.tags (C.described "runtime-library" "component" ((:) "exhaustive" []) ((:) "independent-reference" []) ((:) "regression" []) described)) (C.tags described))
+ rejected (R.plan (O.words "--oracle fixed-point") ((:) described []))
  ok (eqString (C.id classified) (C.id adapted) && eqString (C.name classified) (C.name adapted))
- ok (S.eqList eqString (C.tags (C.classified (Cons "standard-library" Nil) (Cons "differential" Nil) classified)) (C.tags classified))
- selected (O.words "--category standard-library --technique property-based --technique differential") (Cons classified Nil) (Cons "legacy/case" Nil)
- selected (O.words "--tag legacy --category standard-library") (Cons classified Nil) (Cons "legacy/case" Nil)
- rejected (R.plan (O.words "--category compiler-components") (Cons classified Nil))
- let failing = C.classified (Cons "test-infrastructure" Nil) (Cons "fault-injection" Nil) (C.test "retained/action" "retained action" Nil (A.fail "retained failure"))
+ ok (S.eqList eqString (C.tags (C.classified ((:) "standard-library" []) ((:) "differential" []) classified)) (C.tags classified))
+ selected (O.words "--category standard-library --technique property-based --technique differential") ((:) classified []) ((:) "legacy/case" [])
+ selected (O.words "--tag legacy --category standard-library") ((:) classified []) ((:) "legacy/case" [])
+ rejected (R.plan (O.words "--category compiler-components") ((:) classified []))
+ let failing = C.classified ((:) "test-infrastructure" []) ((:) "fault-injection" []) (C.test "retained/action" "retained action" [] (A.fail "retained failure"))
  retained <- A.run (C.action failing)
  case retained of { Left error -> ok (eqString (A.message error) "retained failure"); Right _ -> H.fail "classification changed an action" }
  let legacy = C.toLegacy adapted
  let label = S.fst legacy
  let action = S.snd legacy
- ok (eqString label "legacy label" && S.eqList eqString (C.tags adapted) (Cons "legacy" Nil))
+ ok (eqString label "legacy label" && S.eqList eqString (C.tags adapted) ((:) "legacy" []))
  action
  -- Reviewed separately from the migrated registry: dropping/renaming this case
  -- must not redefine the expected inventory or the existing Core label.
- ok (S.eqList eqString (S.map C.id Unions.cases) (Cons "int-set/union-sorted-list" Nil))
- ok (S.eqList eqString (S.map S.fst Unions.suite) (Cons "size-biased set unions agree with independent sorted lists" Nil))
+ ok (S.eqList eqString (S.map C.id Unions.cases) ((:) "int-set/union-sorted-list" []))
+ ok (S.eqList eqString (S.map S.fst Unions.suite) ((:) "size-biased set unions agree with independent sorted lists" []))
  putStrLn "Test framework contracts passed"
 
 -- Pure contract fault controls. These are independent IO assertions, not cases
 -- judged by the new receipt evaluator itself. Existing coverage IDs stay intact.
-contractChecks : IO Unit
+contractChecks : IO ()
 contractChecks = do
  let accepted = Expectation.Accept Outcome.Runtime
  let negative = Expectation.Reject Outcome.TypeCheck "type-mismatch" 2
@@ -114,80 +114,80 @@ contractChecks = do
  ok (Outcome.successful (Expectation.match accepted success))
  ok (Outcome.successful (Expectation.match negative rejection))
  S.mapM_ (\observation -> ok (S.not (Outcome.successful (Expectation.match negative observation))))
-  (Cons (Expectation.Observation Outcome.Source (Expectation.Exit 2) "type-mismatch" true)
-  (Cons (Expectation.Observation Outcome.TypeCheck (Expectation.Exit 1) "type-mismatch" true)
-  (Cons (Expectation.Observation Outcome.TypeCheck (Expectation.Exit 2) "different-diagnostic" true)
-  (Cons (Expectation.Observation Outcome.TypeCheck (Expectation.Exit 2) "type-mismatch" false)
-  (Cons (Expectation.Observation Outcome.TypeCheck (Expectation.Signal 9) "type-mismatch" true)
-  (Cons (Expectation.Observation Outcome.TypeCheck Expectation.Deadline "type-mismatch" true)
-  (Cons (Expectation.Observation Outcome.TypeCheck Expectation.Interrupted "type-mismatch" true) Nil)))))))
+  ((:) (Expectation.Observation Outcome.Source (Expectation.Exit 2) "type-mismatch" true)
+  ((:) (Expectation.Observation Outcome.TypeCheck (Expectation.Exit 1) "type-mismatch" true)
+  ((:) (Expectation.Observation Outcome.TypeCheck (Expectation.Exit 2) "different-diagnostic" true)
+  ((:) (Expectation.Observation Outcome.TypeCheck (Expectation.Exit 2) "type-mismatch" false)
+  ((:) (Expectation.Observation Outcome.TypeCheck (Expectation.Signal 9) "type-mismatch" true)
+  ((:) (Expectation.Observation Outcome.TypeCheck Expectation.Deadline "type-mismatch" true)
+  ((:) (Expectation.Observation Outcome.TypeCheck Expectation.Interrupted "type-mismatch" true) [])))))))
  S.mapM_ (\termination -> ok (S.not (Outcome.successful (Expectation.match accepted
   (Expectation.Observation Outcome.Runtime termination "" true)))))
-  (Cons (Expectation.BadProtocol "bad event") (Cons (Expectation.Infrastructure "setup failed")
-  (Cons (Expectation.Unavailable "missing tool") (Cons (Expectation.Skip "unsupported platform") Nil))))
+  ((:) (Expectation.BadProtocol "bad event") ((:) (Expectation.Infrastructure "setup failed")
+  ((:) (Expectation.Unavailable "missing tool") ((:) (Expectation.Skip "unsupported platform") []))))
  rejected (Expectation.validate (Expectation.Reject Outcome.TypeCheck "" 2))
  rejected (Expectation.validate (Expectation.Reject Outcome.TypeCheck "type-mismatch" 0))
  rejected (Expectation.validate (Expectation.ExpectSignal Outcome.Runtime "signal-control" 0))
  ok (Outcome.successful (Expectation.match (Expectation.ExpectSignal Outcome.Runtime "signal-control" 9)
   (Expectation.Observation Outcome.Runtime (Expectation.Signal 9) "signal-control" true)))
- let one = D.Descriptor "contract/one" "one" 1 Nil D.Required accepted
- let two = D.Descriptor "contract/two" "two" 1 Nil D.Required negative
- let universe = Cons one (Cons two Nil)
+ let one = D.Descriptor "contract/one" "one" 1 [] D.Required accepted
+ let two = D.Descriptor "contract/two" "two" 1 [] D.Required negative
+ let universe = (:) one ((:) two [])
  let ids = S.map D.id universe
- rejected (Registry.validate (Cons one (Cons one Nil)))
- rejected (Registry.select (Cons "contract/unknown" Nil) universe)
- rejected (Registry.select Nil universe)
- rejected (Registry.exactInventory ids (Cons "contract/one" (Cons "contract/one" Nil)))
- rejected (Registry.exactInventory ids (Cons "contract/one" Nil))
- rejected (Registry.exactInventory ids (Cons "contract/one" (Cons "contract/unknown" Nil)))
+ rejected (Registry.validate ((:) one ((:) one [])))
+ rejected (Registry.select ((:) "contract/unknown" []) universe)
+ rejected (Registry.select [] universe)
+ rejected (Registry.exactInventory ids ((:) "contract/one" ((:) "contract/one" [])))
+ rejected (Registry.exactInventory ids ((:) "contract/one" []))
+ rejected (Registry.exactInventory ids ((:) "contract/one" ((:) "contract/unknown" [])))
  ignored <- H.right (Registry.exactInventory ids (S.reverse ids))
- let binding = Evidence.Binding "run" "attempt" (S.map (\key -> Pair key ("digest-" ++ key)) Evidence.identityKeys)
+ let binding = Evidence.Binding "run" "attempt" (S.map (\key -> (,) key ("digest-" ++ key)) Evidence.identityKeys)
  let contract = Evidence.PlanContract binding universe ids Evidence.FullQualification
- let first = Cons (Evidence.Started "contract/one") (Cons (Evidence.Finished "contract/one" success) Nil)
- let second = Cons (Evidence.Started "contract/two") (Cons (Evidence.Finished "contract/two" rejection) Nil)
+ let first = (:) (Evidence.Started "contract/one") ((:) (Evidence.Finished "contract/one" success) [])
+ let second = (:) (Evidence.Started "contract/two") ((:) (Evidence.Finished "contract/two" rejection) [])
  let events = S.append first second
- let receipt = Evidence.Receipt 2 binding events Nil Evidence.CleanupSucceeded true
+ let receipt = Evidence.Receipt 2 binding events [] Evidence.CleanupSucceeded true
  full <- H.right (Evidence.assess contract receipt)
  ok (Evidence.complete full && Evidence.passed full && Evidence.full full && Evidence.qualificationEligible full)
- partial <- H.right (Evidence.assess (Evidence.PlanContract binding universe (Cons "contract/one" Nil) Evidence.FullQualification)
-  (Evidence.Receipt 2 binding first Nil Evidence.CleanupSucceeded true))
+ partial <- H.right (Evidence.assess (Evidence.PlanContract binding universe ((:) "contract/one" []) Evidence.FullQualification)
+  (Evidence.Receipt 2 binding first [] Evidence.CleanupSucceeded true))
  ok (Evidence.complete partial && Evidence.passed partial && S.not (Evidence.full partial) && S.not (Evidence.qualificationEligible partial))
- pending <- H.right (Evidence.assess contract (Evidence.Receipt 2 binding first Nil Evidence.CleanupPending false))
+ pending <- H.right (Evidence.assess contract (Evidence.Receipt 2 binding first [] Evidence.CleanupPending false))
  ok (S.not (Evidence.complete pending) && S.not (Evidence.passed pending) && S.not (Evidence.qualificationEligible pending))
- cleanupFailed <- H.right (Evidence.assess contract (Evidence.Receipt 2 binding events Nil (Evidence.CleanupFailed "release failed") true))
+ cleanupFailed <- H.right (Evidence.assess contract (Evidence.Receipt 2 binding events [] (Evidence.CleanupFailed "release failed") true))
  ok (Evidence.complete cleanupFailed && S.not (Evidence.passed cleanupFailed) && S.not (Evidence.qualificationEligible cleanupFailed))
- let failed = Cons (Evidence.Started "contract/one") (Cons (Evidence.Finished "contract/one"
+ let failed = (:) (Evidence.Started "contract/one") ((:) (Evidence.Finished "contract/one"
   (Expectation.Observation Outcome.Runtime (Expectation.Exit 1) "assertion" true)) second)
- failure <- H.right (Evidence.assess contract (Evidence.Receipt 2 binding failed Nil Evidence.CleanupSucceeded true))
+ failure <- H.right (Evidence.assess contract (Evidence.Receipt 2 binding failed [] Evidence.CleanupSucceeded true))
  ok (Evidence.complete failure && Evidence.full failure && S.not (Evidence.passed failure))
  S.mapM_ (\bad -> rejected (Evidence.assess contract bad))
-  (Cons (Evidence.Receipt 1 binding events Nil Evidence.CleanupSucceeded true)
-  (Cons (Evidence.Receipt 2 binding first Nil Evidence.CleanupSucceeded true)
-  (Cons (Evidence.Receipt 2 binding events Nil Evidence.CleanupPending true)
-  (Cons (Evidence.Receipt 2 binding (S.append events second) Nil Evidence.CleanupSucceeded true)
-  (Cons (Evidence.Receipt 2 binding (Cons (Evidence.Finished "contract/one" success) events) Nil Evidence.CleanupSucceeded true)
-  (Cons (Evidence.Receipt 2 binding (Cons (Evidence.Started "contract/unknown") events) Nil Evidence.CleanupSucceeded true)
-  (Cons (Evidence.Receipt 2 binding events (Cons (Evidence.RawEvidence "raw.json" "old" "changed") Nil) Evidence.CleanupSucceeded true)
-  (Cons (Evidence.Receipt 2 (Evidence.Binding "run" "stale-attempt" (Evidence.identities binding)) events Nil Evidence.CleanupSucceeded true)
-  (Cons (Evidence.Receipt 2 (Evidence.Binding "run" "attempt" (S.map (\(Pair key value) -> Pair key (if eqString key "source" then "stale-source" else value)) (Evidence.identities binding))) events Nil Evidence.CleanupSucceeded true) Nil)))))))))
- let optional = D.Descriptor "contract/optional" "optional" 1 Nil D.Optional accepted
- let optionalIds = Cons (D.id optional) Nil
- let skipped = Cons (Evidence.Started (D.id optional)) (Cons (Evidence.Finished (D.id optional)
-  (Expectation.Observation Outcome.Runtime (Expectation.Skip "platform unavailable") "" true)) Nil)
- optionalResult <- H.right (Evidence.assess (Evidence.PlanContract binding (Cons optional Nil) optionalIds Evidence.SelectedCoverage)
-  (Evidence.Receipt 2 binding skipped Nil Evidence.CleanupSucceeded true))
+  ((:) (Evidence.Receipt 1 binding events [] Evidence.CleanupSucceeded true)
+  ((:) (Evidence.Receipt 2 binding first [] Evidence.CleanupSucceeded true)
+  ((:) (Evidence.Receipt 2 binding events [] Evidence.CleanupPending true)
+  ((:) (Evidence.Receipt 2 binding (S.append events second) [] Evidence.CleanupSucceeded true)
+  ((:) (Evidence.Receipt 2 binding ((:) (Evidence.Finished "contract/one" success) events) [] Evidence.CleanupSucceeded true)
+  ((:) (Evidence.Receipt 2 binding ((:) (Evidence.Started "contract/unknown") events) [] Evidence.CleanupSucceeded true)
+  ((:) (Evidence.Receipt 2 binding events ((:) (Evidence.RawEvidence "raw.json" "old" "changed") []) Evidence.CleanupSucceeded true)
+  ((:) (Evidence.Receipt 2 (Evidence.Binding "run" "stale-attempt" (Evidence.identities binding)) events [] Evidence.CleanupSucceeded true)
+  ((:) (Evidence.Receipt 2 (Evidence.Binding "run" "attempt" (S.map (\((,) key value) -> (,) key (if eqString key "source" then "stale-source" else value)) (Evidence.identities binding))) events [] Evidence.CleanupSucceeded true) [])))))))))
+ let optional = D.Descriptor "contract/optional" "optional" 1 [] D.Optional accepted
+ let optionalIds = (:) (D.id optional) []
+ let skipped = (:) (Evidence.Started (D.id optional)) ((:) (Evidence.Finished (D.id optional)
+  (Expectation.Observation Outcome.Runtime (Expectation.Skip "platform unavailable") "" true)) [])
+ optionalResult <- H.right (Evidence.assess (Evidence.PlanContract binding ((:) optional []) optionalIds Evidence.SelectedCoverage)
+  (Evidence.Receipt 2 binding skipped [] Evidence.CleanupSucceeded true))
  ok (Evidence.complete optionalResult && Evidence.passed optionalResult && S.not (Evidence.qualificationEligible optionalResult))
- requiredResult <- H.right (Evidence.assess (Evidence.PlanContract binding (Cons (D.Descriptor (D.id optional) "required" 1 Nil D.Required accepted) Nil) optionalIds Evidence.SelectedCoverage)
-  (Evidence.Receipt 2 binding skipped Nil Evidence.CleanupSucceeded true))
+ requiredResult <- H.right (Evidence.assess (Evidence.PlanContract binding ((:) (D.Descriptor (D.id optional) "required" 1 [] D.Required accepted) []) optionalIds Evidence.SelectedCoverage)
+  (Evidence.Receipt 2 binding skipped [] Evidence.CleanupSucceeded true))
  ok (Evidence.complete requiredResult && S.not (Evidence.passed requiredResult))
- v1 <- H.right (J.parse (R.summaryJson 2 2 Nil))
+ v1 <- H.right (J.parse (R.summaryJson 2 2 []))
  ok (S.not (J.getBool "complete" true v1))
- let replacement = R.Result (entry "contract/substituted" "substituted valid ID" Nil) (Right Unit)
- substituted <- H.right (J.parse (R.summaryJsonFor 1 (Cons (entry "contract/expected" "expected" Nil) Nil) (Cons replacement Nil)))
+ let replacement = R.Result (entry "contract/substituted" "substituted valid ID" []) (Right ())
+ substituted <- H.right (J.parse (R.summaryJsonFor 1 ((:) (entry "contract/expected" "expected" []) []) ((:) replacement [])))
  ok (S.not (J.getBool "complete" true substituted))
  selectedOnly <- H.right (Evidence.assess (Evidence.PlanContract binding universe ids Evidence.SelectedCoverage) receipt)
  ok (Evidence.complete selectedOnly && Evidence.passed selectedOnly && S.not (Evidence.full selectedOnly) && S.not (Evidence.qualificationEligible selectedOnly))
- let ineligible = D.Descriptor "contract/one" "physical partition" 1 (Cons "logical-scope:partial" (Cons "qualification:ineligible" Nil)) D.Required accepted
- shard <- H.right (Evidence.assess (Evidence.PlanContract binding (Cons ineligible Nil) (Cons "contract/one" Nil) Evidence.FullQualification)
-  (Evidence.Receipt 2 binding first Nil Evidence.CleanupSucceeded true))
+ let ineligible = D.Descriptor "contract/one" "physical partition" 1 ((:) "logical-scope:partial" ((:) "qualification:ineligible" [])) D.Required accepted
+ shard <- H.right (Evidence.assess (Evidence.PlanContract binding ((:) ineligible []) ((:) "contract/one" []) Evidence.FullQualification)
+  (Evidence.Receipt 2 binding first [] Evidence.CleanupSucceeded true))
  ok (Evidence.complete shard && Evidence.passed shard && S.not (Evidence.full shard) && S.not (Evidence.qualificationEligible shard))

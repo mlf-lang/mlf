@@ -7,12 +7,17 @@ module Bootstrap.SourceEquality where {
   import Bootstrap.Types;
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Primitive as P;
+  eqSourceString :: SourceString -> SourceString -> Bool;
+  eqSourceString a b = case a of {
+    ScalarString x -> case b of { ScalarString y -> eqString x y; _ -> False };
+    CharString x -> case b of { CharString y -> L.eqList eqInt x y; _ -> False }
+  };
   eqBool :: Bool -> Bool -> Bool;
   eqBool a b = if a then b else L.not b;
   eqTriple :: forall a b c. (a -> a -> Bool) ->
                             (b -> b -> Bool) ->
-                            (c -> c -> Bool) -> Triple a b c -> Triple a b c -> Bool;
-  eqTriple ea eb ec (Triple a b c) (Triple x y z) = (ea a x && (eb b y && ec c z));
+                            (c -> c -> Bool) -> (,,) a b c -> (,,) a b c -> Bool;
+  eqTriple ea eb ec ((,,) a b c) ((,,) x y z) = (ea a x && (eb b y && ec c z));
   eqField :: Field -> Field -> Bool;
   eqField a b =
     case a of {
@@ -183,6 +188,11 @@ module Bootstrap.SourceEquality where {
           SCase y0 y1 -> (eqSExpr x0 y0 && L.eqList eqSAlternative x1 y1);
           _ -> False
         };
+      SSourceDefinition body ->
+        case b of {
+          SSourceDefinition body2 -> eqSExpr body body2;
+          _ -> False
+        };
       SCallSite label span body ->
         case b of {
           SCallSite label2 span2 body2 ->
@@ -260,7 +270,7 @@ module Bootstrap.SourceEquality where {
       SOverloadedStringPattern x0 x1 x2 ->
         case b of {
           SOverloadedStringPattern y0 y1 y2 ->
-            (eqString x0 y0 && (eqString x1 y1 && eqString x2 y2));
+            (eqSourceString x0 y0 && (eqString x1 y1 && eqString x2 y2));
           _ -> False
         };
       SAsPattern n pattern ->

@@ -26,8 +26,8 @@ module Tests.TupleListLegacy where {
       putErr ("Tuple/list failure: " ++ (message ++ "\n"));
       exitWith 1
     };
-  require :: Bool -> String -> IO Unit;
-  require condition message = if condition then ioReturn Unit else fatal message;
+  require :: Bool -> String -> IO ();
+  require condition message = if condition then ioReturn () else fatal message;
   right :: forall a. Either String a -> IO a;
   right result =
     case result of {
@@ -40,7 +40,7 @@ module Tests.TupleListLegacy where {
       Left error -> fatal (Compiler.prettyError error);
       Right value -> ioReturn value
     };
-  passed :: String -> IO Unit;
+  passed :: String -> IO ();
   passed label = putStrLn ("PASS tuple/list " ++ label);
   contains :: String -> String -> Bool;
   contains needle text = containsAt needle text 0;
@@ -49,36 +49,91 @@ module Tests.TupleListLegacy where {
     (((offset + stringLength needle) <= stringLength text) &&
      (eqString needle (stringSlice text offset (stringLength needle)) ||
       containsAt needle text (offset + 1)));
-  one :: forall a. a -> List a;
-  one a = Cons a Nil;
-  two :: forall a. a -> a -> List a;
-  two a b = Cons a (one b);
-  three :: forall a. a -> a -> a -> List a;
-  three a b c = Cons a (two b c);
+  one :: forall a. a -> [] a;
+  one a = (:) a [];
+  two :: forall a. a -> a -> [] a;
+  two a b = (:) a (one b);
+  three :: forall a. a -> a -> a -> [] a;
+  three a b c = (:) a (two b c);
   apply2 :: SExpr -> SExpr -> SExpr -> SExpr;
   apply2 f a b = SApp (SApp f a) b;
   pair :: SExpr -> SExpr -> SExpr;
-  pair = apply2 (SConstructor "Pair");
+  pair = apply2 (SConstructor "(,)");
   cons :: SExpr -> SExpr -> SExpr;
-  cons = apply2 (SConstructor "Cons");
+  cons = apply2 (SConstructor ":");
   nil :: SExpr;
-  nil = SConstructor "Nil";
+  nil = SConstructor "[]";
   int :: XType;
-  int = XCon "Int" Nil;
+  int = XCon "Int" [];
   bool :: XType;
-  bool = XCon "Bool" Nil;
+  bool = XCon "Bool" [];
   intType :: SType;
-  intType = SCon "Int" Nil;
+  intType = SCon "Int" [];
   boolType :: SType;
-  boolType = SCon "Bool" Nil;
-  sameExpression :: String -> String -> SExpr -> IO Unit;
+  boolType = SCon "Bool" [];
+  -- Parser shape observations ignore call-site provenance, not syntax.
+  -- Only the expression forms used below are traversed. Other forms remain
+  -- unchanged, so a new syntax form cannot silently disappear from the oracle.
+  syntaxShape :: SExpr -> SExpr;
+  syntaxShape expression =
+    case expression of {
+      SCallSite _ _ body -> syntaxShape body;
+      SApp function argument -> SApp (syntaxShape function) (syntaxShape argument);
+      SAnn body annotation -> SAnn (syntaxShape body) annotation;
+      SCase value alternatives ->
+        SCase (syntaxShape value)
+          (S.map (\(SAlternative pattern body) -> SAlternative pattern (syntaxShape body)) alternatives);
+      _ -> expression
+    };
+  provenanceProjection :: IO ();
+  provenanceProjection =
+    do {
+      let { location = SourceSpan "probe" "Observer" "observer.emlf" 1 1 1 8 };
+      let { pattern = SConstructorPattern "(,)" (two (Just "x") Nothing) };
+      let { annotation = SAnnotation [] (SCon "[]" (one intType)) };
+      let { located = \function argument selected ty ->
+        SCallSite "outer" location
+          (SAnn
+            (SCallSite "case" location
+              (SCase (SApp (SCallSite "function" location function)
+                           (SCallSite "argument" location argument))
+                (one (SAlternative selected (SCallSite "result" location (SVar "x")))))) ty)
+      };
+      let { expected =
+        SAnn (SCase (SApp (SConstructor "Just") (SVar "argument"))
+          (one (SAlternative pattern (SVar "x")))) annotation
+      };
+      require
+        (Equality.eqExpr (syntaxShape (located (SConstructor "Just") (SVar "argument") pattern annotation)) expected)
+        "provenance observer changed expression shape";
+      require
+        (S.not (Equality.eqExpr (syntaxShape (located (SConstructor "Nothing") (SVar "argument") pattern annotation)) expected))
+        "provenance observer erased a constructor distinction";
+      require
+        (S.not (Equality.eqExpr (syntaxShape (located (SVar "argument") (SConstructor "Just") pattern annotation)) expected))
+        "provenance observer erased application order";
+      require
+        (S.not (Equality.eqExpr
+          (syntaxShape (located (SConstructor "Just") (SVar "argument")
+            (SConstructorPattern "(,)" (two (Just "y") Nothing)) annotation)) expected))
+        "provenance observer erased pattern binders";
+      require
+        (S.not (Equality.eqExpr
+          (syntaxShape (located (SConstructor "Just") (SVar "argument") pattern (SAnnotation [] boolType))) expected))
+        "provenance observer erased type annotations";
+      let { unsupported = SLam "x" Nothing (SCallSite "body" location (SVar "x")) };
+      require (Equality.eqExpr (syntaxShape unsupported) unsupported)
+        "provenance observer changed an unhandled expression form";
+      passed "parser provenance projection"
+    };
+  sameExpression :: String -> String -> SExpr -> IO ();
   sameExpression label source expected =
     do {
       actual <- right (Parser.parseExpr "tuple-list.emlf" source);
-      require (Equality.eqExpr actual expected) (label ++ ": unexpected expression AST");
+      require (Equality.eqExpr (syntaxShape actual) expected) (label ++ ": unexpected expression AST");
       passed label
     };
-  sameBoundary :: String -> String -> String -> SExpr -> IO Unit;
+  sameBoundary :: String -> String -> String -> SExpr -> IO ();
   sameBoundary label delimiter source expected =
     do {
       actual <-
@@ -86,37 +141,37 @@ module Tests.TupleListLegacy where {
           (Parser.parseLayout False (Parsec.pBefore Parser.expr (Parsec.pToken delimiter))
              "tuple-list-boundary.emlf"
              source);
-      require (Equality.eqExpr actual expected)
+      require (Equality.eqExpr (syntaxShape actual) expected)
         (label ++ ": unexpected expression before delimiter");
       passed label
     };
   -- A surrounding parser owns these delimiters; no guards grammar is needed.
-  boundaryChecks :: IO Unit;
+  boundaryChecks :: IO ();
   boundaryChecks =
     do {
-      sameBoundary "colon annotation before bar" "|" "x : Int |"
-        (SAnn (SVar "x") (SAnnotation Nil intType));
-      sameBoundary "colon annotation before equals" "=" "flag : Bool ="
-        (SAnn (SVar "flag") (SAnnotation Nil boolType));
+      sameBoundary "constructor cons before bar" "|" "x : Int |"
+        (cons (SVar "x") (SConstructor "Int"));
+      sameBoundary "constructor cons before equals" "=" "flag : Bool ="
+        (cons (SVar "flag") (SConstructor "Bool"));
       sameBoundary "explicit annotation before bar" "|" "x :: Int |"
-        (SAnn (SVar "x") (SAnnotation Nil intType));
+        (SAnn (SVar "x") (SAnnotation [] intType));
       sameBoundary "explicit annotation before equals" "=" "flag :: Bool ="
-        (SAnn (SVar "flag") (SAnnotation Nil boolType));
+        (SAnn (SVar "flag") (SAnnotation [] boolType));
       sameBoundary "lowercase tail remains cons before bar" "|" "x : xs |"
         (cons (SVar "x") (SVar "xs"));
       sameBoundary "empty tail remains cons before equals" "=" "1 : [] =" (cons (SIntLit 1) nil);
-      sameBoundary "closed constructor annotation before bar" "|" "x : Nil |"
-        (SAnn (SVar "x") (SAnnotation Nil (SCon "Nil" Nil)))
+      sameBoundary "custom constructor cons before bar" "|" "x : Nil |"
+        (cons (SVar "x") (SConstructor "Nil"))
     };
-  sameAnnotation :: String -> String -> SType -> IO Unit;
+  sameAnnotation :: String -> String -> SType -> IO ();
   sameAnnotation label source expected =
     do {
       actual <- right (Parser.parseAnnotation source);
-      require (Equality.eqAnnotation actual (SAnnotation Nil expected))
+      require (Equality.eqAnnotation actual (SAnnotation [] expected))
         (label ++ ": unexpected type AST");
       passed label
     };
-  sameFields :: IO Unit;
+  sameFields :: IO ();
   sameFields =
     do {
       actual <-
@@ -127,29 +182,29 @@ module Tests.TupleListLegacy where {
         a = Parameter "a"
       };
       let {
-        i = Applied "Int" Nil
+        i = Applied "Int" []
       };
       let {
-        b = Applied "Bool" Nil
+        b = Applied "Bool" []
       };
       let {
         fields =
-          Cons (Applied "List" (one a))
-            (Cons (Applied "Pair" (two a i))
-               (Cons (Applied "Triple" (three a i b))
-                  (one (Applied "Quad" (Cons a (three i b (Applied "String" Nil)))))))
+          (:) (Applied "[]" (one a))
+            ((:) (Applied "(,)" (two a i))
+               ((:) (Applied "(,,)" (three a i b))
+                  (one (Applied "(,,,)" ((:) a (three i b (Applied "String" [])))))))
       };
       let {
         expected = DataDecl "Box" (one "a") (one (ConstructorDecl "Box" fields))
       };
       case actual of {
-        SourceModule _ _ _ _ (Cons declaration Nil) _ _ _ _ _ ->
+        SourceModule _ _ _ _ ((:) declaration []) _ _ _ _ _ ->
           require (Equality.eqDataDecl declaration expected) "tuple/list datatype fields";
         _ -> fatal "missing datatype fields"
       };
       passed "datatype field ASTs"
     };
-  checkResult :: String -> XType -> Compiler.Compilation -> IO Unit;
+  checkResult :: String -> XType -> Compiler.Compilation -> IO ();
   checkResult label expected result =
     do {
       require (IndependentType.alphaEq (Compiler.inferredType result) expected)
@@ -167,13 +222,13 @@ module Tests.TupleListLegacy where {
         (label ++ ": target round trip changed erasure");
       passed label
     };
-  accepted :: String -> String -> XType -> IO Unit;
+  accepted :: String -> String -> XType -> IO ();
   accepted label source expected =
     do {
       result <- compiled (Compiler.compile "tuple-list.emlf" source);
       checkResult label expected result
     };
-  evaluates :: String -> String -> Int -> IO Unit;
+  evaluates :: String -> String -> Int -> IO ();
   evaluates label source expected =
     do {
       result <- compiled (Compiler.compile "tuple-list.emlf" source);
@@ -185,7 +240,7 @@ module Tests.TupleListLegacy where {
       let {
         environment =
           case prepared of {
-            Pair dataEnvironment _ -> dataEnvironment
+            (,) dataEnvironment _ -> dataEnvironment
           }
       };
       value <- right (Runtime.evaluate environment (Runtime.REnv M.empty) (X.erase term));
@@ -196,7 +251,7 @@ module Tests.TupleListLegacy where {
       };
       passed (label ++ " runtime")
     };
-  parseRejected :: String -> String -> IO Unit;
+  parseRejected :: String -> String -> IO ();
   parseRejected label source =
     do {
       case Parser.parseExpr "tuple-list.emlf" source of {
@@ -206,7 +261,7 @@ module Tests.TupleListLegacy where {
       };
       passed label
     };
-  parseDiagnostic :: String -> String -> String -> IO Unit;
+  parseDiagnostic :: String -> String -> String -> IO ();
   parseDiagnostic label source expected =
     do {
       case Parser.parseExpr "tuple-list.emlf" source of {
@@ -215,7 +270,7 @@ module Tests.TupleListLegacy where {
       };
       passed label
     };
-  rejected :: String -> String -> Phase -> String -> IO Unit;
+  rejected :: String -> String -> Phase -> String -> IO ();
   rejected label source phase reason =
     do {
       case Compiler.compile "tuple-list.emlf" source of {
@@ -231,7 +286,40 @@ module Tests.TupleListLegacy where {
   declarations :: String;
   declarations =
     "data List a = Nil | Cons a (List a); data Pair a b = Pair a b; data Triple a b c = Triple a b c; data Quad a b c d = Quad a b c d; ";
-  parserChecks :: IO Unit;
+  -- Independent Haskell tuple identities: n components use n-1 commas.
+  -- Neither names nor expected fields come from the parser or compiler result.
+  tupleName :: Int -> String;
+  tupleName arity = "(" ++ (S.concatStrings (S.replicate (arity - 1) ",") ++ ")");
+  tupleSource :: Int -> String -> String;
+  tupleSource arity component = "(" ++ (S.intercalate "," (S.replicate arity component) ++ ")");
+  tupleArityChecks :: IO ();
+  tupleArityChecks = S.mapM_ tupleArityCheck (S.range 2 64);
+  tupleArityCheck :: Int -> IO ();
+  tupleArityCheck arity =
+    do {
+      let { label = "standard tuple arity " ++ showInt arity };
+      let { name = tupleName arity };
+      let { expression = tupleSource arity "42" };
+      let { expected = XCon name (S.replicate arity int) };
+      sameExpression (label ++ " expression") expression
+        (S.foldl SApp (SConstructor name) (S.replicate arity (SIntLit 42)));
+      sameAnnotation (label ++ " type") (tupleSource arity "Int")
+        (SCon name (S.replicate arity intType));
+      sameExpression (label ++ " pattern")
+        ("case value of {" ++ (tupleSource arity "_" ++ " -> 42}"))
+        (SCase (SVar "value")
+          (one (SAlternative (SConstructorPattern name (S.replicate arity Nothing)) (SIntLit 42))));
+      -- Exhaustive parsing is cheap; independently checked targets cover boundaries.
+      if arity == 2 || arity == 3 || arity == 15 || arity == 16 || arity == 63 || arity == 64
+      then do {
+        accepted (label ++ " legacy profile") expression expected;
+        accepted (label ++ " shared profile")
+          ("-- mlf:syntax shared-haskell-v1\n{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}\nmodule TupleArity where { import MLF.Primitive; main = " ++ (expression ++ "; }"))
+          expected
+      }
+      else ioReturn ()
+    };
+  parserChecks :: IO ();
   parserChecks =
     do {
       let {
@@ -247,10 +335,10 @@ module Tests.TupleListLegacy where {
         d = SVar "d"
       };
       sameExpression "pair AST" "(a,b)" (pair a b);
-      sameExpression "triple AST" "(a,b,c)" (SApp (apply2 (SConstructor "Triple") a b) c);
-      sameExpression "quad AST" "(a,b,c,d)" (SApp (SApp (apply2 (SConstructor "Quad") a b) c) d);
+      sameExpression "triple AST" "(a,b,c)" (SApp (apply2 (SConstructor "(,,)") a b) c);
+      sameExpression "quad AST" "(a,b,c,d)" (SApp (SApp (apply2 (SConstructor "(,,,)") a b) c) d);
       sameExpression "grouping remains grouping" "(a)" a;
-      sameExpression "unit remains intrinsic" "()" (SConstructor "Unit");
+      sameExpression "unit remains intrinsic" "()" (SConstructor "()");
       sameExpression "empty list AST" "[]" nil;
       sameExpression "singleton list AST" "[a]" (cons a nil);
       sameExpression "nested list and tuple AST" "[(a,b), (c,d)]"
@@ -261,68 +349,68 @@ module Tests.TupleListLegacy where {
         (cons a (apply2 (SPrimitive PConcatString) b c));
       sameExpression "concatenation and cons share right precedence" "a ++ b : c"
         (apply2 (SPrimitive PConcatString) a (cons b c));
-      sameExpression "legacy annotation covers addition" "a + b : Int"
-        (SAnn (apply2 (SPrimitive PAddInt) a b) (SAnnotation Nil intType));
-      sameExpression "legacy uppercase tail is an annotation" "a : Nil"
-        (SAnn a (SAnnotation Nil (SCon "Nil" Nil)));
+      sameExpression "legacy annotation covers addition" "a + b :: Int"
+        (SAnn (apply2 (SPrimitive PAddInt) a b) (SAnnotation [] intType));
+      sameExpression "explicit custom type annotation" "a :: Nil"
+        (SAnn a (SAnnotation [] (SCon "Nil" [])));
       sameExpression "explicit annotation" "[a] :: [Int]"
-        (SAnn (cons a nil) (SAnnotation Nil (SCon "List" (one intType))));
+        (SAnn (cons a nil) (SAnnotation [] (SCon "[]" (one intType))));
       sameExpression "explicit free annotation still parses" "a :: b"
-        (SAnn a (SAnnotation Nil (STVar "b")));
+        (SAnn a (SAnnotation [] (STVar "b")));
       sameExpression "case tuple pattern AST" "case a of {(x,y) -> x}"
         (SCase a
            (one
-              (SAlternative (SConstructorPattern "Pair" (two (Just "x") (Just "y"))) (SVar "x"))));
+              (SAlternative (SConstructorPattern "(,)" (two (Just "x") (Just "y"))) (SVar "x"))));
       sameExpression "case cons pattern AST" "case a of {x : xs -> x}"
         (SCase a
            (one
-              (SAlternative (SConstructorPattern "Cons" (two (Just "x") (Just "xs"))) (SVar "x"))));
+              (SAlternative (SConstructorPattern ":" (two (Just "x") (Just "xs"))) (SVar "x"))));
       sameExpression "empty pattern AST" "case a of {[] -> b}"
-        (SCase a (one (SAlternative (SConstructorPattern "Nil" Nil) b)));
+        (SCase a (one (SAlternative (SConstructorPattern "[]" []) b)));
       sameExpression "list pattern AST" "case a of {[x,y] -> x}"
         (SCase a
            (one
               (SAlternative
-                 (SNestedPattern "Cons"
+                 (SNestedPattern ":"
                     (two (SDefaultPattern (Just "x"))
-                       (SNestedPattern "Cons"
-                          (two (SDefaultPattern (Just "y")) (SConstructorPattern "Nil" Nil)))))
+                       (SNestedPattern ":"
+                          (two (SDefaultPattern (Just "y")) (SConstructorPattern "[]" [])))))
                  (SVar "x"))));
-      sameAnnotation "pair type AST" "(Int,Bool)" (SCon "Pair" (two intType boolType));
+      sameAnnotation "pair type AST" "(Int,Bool)" (SCon "(,)" (two intType boolType));
       sameAnnotation "triple type AST" "(Int,Bool,Int)"
-        (SCon "Triple" (three intType boolType intType));
+        (SCon "(,,)" (three intType boolType intType));
       sameAnnotation "list type AST" "[(Int,Bool)]"
-        (SCon "List" (one (SCon "Pair" (two intType boolType))));
+        (SCon "[]" (one (SCon "(,)" (two intType boolType))));
       sameAnnotation "function tuple component" "(Int -> Bool, [Int])"
-        (SCon "Pair" (two (SArrow intType boolType) (SCon "List" (one intType))));
+        (SCon "(,)" (two (SArrow intType boolType) (SCon "[]" (one intType))));
       sameFields;
+      tupleArityChecks;
       S.mapM_ (\source -> parseRejected ("malformed " ++ source) source)
-        (Cons "(a,)"
-           (Cons "(,a)"
-              (Cons "(a,b,c,d,e)"
-                 (Cons "[a,]"
-                    (Cons "[,a]"
-                       (Cons "[a" (Cons "[1..3]" (Cons "[a | a <- b]" (Cons "a :" Nil)))))))));
+        ((:) "(a,)"
+           ((:) "(,a)"
+              ((:) "[a,]"
+                    ((:) "[,a]"
+                       ((:) "[a" ((:) "[1..3]" ((:) "[a | a <- b]" ((:) "a :" []))))))));
       parseDiagnostic "ranges have a targeted diagnostic" "[1..3]" "list ranges are not supported";
       parseDiagnostic "comprehensions have a targeted diagnostic" "[a | a <- b]"
         "list comprehensions are not supported";
-      parseDiagnostic "tuple arity has a targeted diagnostic" "(a,b,c,d,e)"
-        "tuple syntax supports two, three or four components";
+      parseDiagnostic "tuple arity has a targeted diagnostic" (tupleSource 65 "a")
+        "tuple arity must be between 2 and 64";
       parseDiagnostic "malformed list retains exact source position" "[1,\n ]"
         "tuple-list.emlf:2:2:"
     };
-  checkingChecks :: IO Unit;
+  checkingChecks :: IO ();
   checkingChecks =
     do {
       accepted "pair inferred and independently checked" (declarations ++ "(42,true)")
-        (XCon "Pair" (two int bool));
+        (XCon "(,)" (two int bool));
       accepted "triple inferred and independently checked" (declarations ++ "(42,true,42)")
-        (XCon "Triple" (three int bool int));
+        (XCon "(,,)" (three int bool int));
       accepted "quad inferred and independently checked" (declarations ++ "(42,true,42,true)")
-        (XCon "Quad" (Cons int (three bool int bool)));
-      accepted "homogeneous list" (declarations ++ "[40,41,42]") (XCon "List" (one int));
-      accepted "empty list annotation" (declarations ++ "[] : [Int]") (XCon "List" (one int));
-      accepted "cons spine" (declarations ++ "40 : 41 : [42]") (XCon "List" (one int));
+        (XCon "(,,,)" ((:) int (three bool int bool)));
+      accepted "homogeneous list" (declarations ++ "[40,41,42]") (XCon "[]" (one int));
+      accepted "empty list annotation" (declarations ++ "[] :: [Int]") (XCon "[]" (one int));
+      accepted "cons spine" (declarations ++ "40 : 41 : [42]") (XCon "[]" (one int));
       accepted "nested pair/list patterns"
         (declarations ++ "case [(40,2)] of {[(x,y)] -> x+y; _ -> 0}")
         int;
@@ -330,8 +418,8 @@ module Tests.TupleListLegacy where {
         (declarations ++ "head [] = 0; head (x : xs) = x; main = head [42];")
         int;
       accepted "tuple lambda" (declarations ++ "(\\(x,y) -> x+y) (40,2)") int;
-      accepted "legacy annotated parameter" "(\\(x : Int) -> x+1) 41" int;
-      accepted "legacy grouped annotated parameter" "(\\((x) : Int) -> x+1) 41" int;
+      accepted "legacy annotated parameter" "(\\(x :: Int) -> x+1) 41" int;
+      accepted "legacy grouped annotated parameter" "(\\((x) :: Int) -> x+1) 41" int;
       accepted "explicit annotated parameter" "(\\(x :: Int) -> x+1) 41" int;
       accepted "explicit grouped annotated parameter" "(\\((x) :: Int) -> x+1) 41" int;
       accepted "explicit declaration signature"
@@ -354,7 +442,7 @@ module Tests.TupleListLegacy where {
       withoutPrelude <-
         compiled
           (Compiler.compileWithPrelude NoImplicitPrelude "tuple-list.emlf"
-             (declarations ++ "case [42] of {[x] -> x; _ -> 0}"));
+             "case [42] of {[x] -> x; _ -> 0}");
       checkResult "list sugar works without implicit Prelude" int withoutPrelude;
       rejected "heterogeneous list" (declarations ++ "[42,true]") Inference
         "type constructor mismatch";
@@ -366,11 +454,11 @@ module Tests.TupleListLegacy where {
         (declarations ++ "case [1,2] of {[x,x] -> x; _ -> 0}")
         Inference
         "duplicate pattern variable";
-      rejected "missing tuple declaration" "(1,2)" Inference "unknown data constructor";
+      accepted "tuple needs no custom declaration" "(1,2)" (XCon "(,)" (two int int));
       rejected "legacy free arrow annotation stays rejected" "(\\x -> x) : a -> a" Inference
         "unbound annotation type variable"
     };
-  runtimeChecks :: IO Unit;
+  runtimeChecks :: IO ();
   runtimeChecks =
     do {
       evaluates "tuple projection" (declarations ++ "case (40,2) of {(x,y) -> x+y}") 42;
@@ -392,15 +480,15 @@ module Tests.TupleListLegacy where {
          "sum : [Int] -> Int; sum [] = 0; sum (x : xs) = x + sum xs; main = sum [10,12,20];")
         42
     };
-  shapes :: Map String (Pair String String);
-  shapes = M.singleton "Shapes" (Pair "Shapes.emlf" ("module Shapes where\n" ++ declarations));
-  moduleAccepted :: String -> String -> IO Unit;
+  shapes :: Map String ((,) String String);
+  shapes = M.singleton "Shapes" ((,) "Shapes.emlf" ("module Shapes where\n" ++ declarations));
+  moduleAccepted :: String -> String -> IO ();
   moduleAccepted label source =
     do {
       result <- compiled (Compiler.compileModules shapes "Main.emlf" source);
       checkResult label int result
     };
-  moduleRejected :: String -> Map String (Pair String String) -> String -> String -> IO Unit;
+  moduleRejected :: String -> Map String ((,) String String) -> String -> String -> IO ();
   moduleRejected label libraries source reason =
     do {
       case Compiler.compileModules libraries "Main.emlf" source of {
@@ -411,33 +499,81 @@ module Tests.TupleListLegacy where {
       };
       passed label
     };
-  scopeChecks :: IO Unit;
+  scopeChecks :: IO ();
   scopeChecks =
     do {
       moduleAccepted "imported ordinary constructors"
-        "module Main where\nimport Shapes\nmain = case [(40,2)] of {[(x,y)] -> x+y; _ -> 0}\n";
+        "module Main where\nimport Shapes\nmain = case Cons (Pair 40 2) Nil of {Cons (Pair x y) Nil -> x+y; _ -> 0}\n";
       moduleAccepted "qualified explicit constructors interoperate"
-        "module Main where\nimport Shapes\nmain = case Shapes.Cons (Shapes.Pair 40 2) Shapes.Nil of {[(x,y)] -> x+y; _ -> 0}\n";
-      moduleRejected "qualified-only import does not supply sugar names" shapes
-        "module Main where\nimport qualified Shapes\nmain = []\n"
+        "module Main where\nimport Shapes\nmain = case Shapes.Cons (Shapes.Pair 40 2) Shapes.Nil of {Shapes.Cons (Shapes.Pair x y) Shapes.Nil -> x+y; _ -> 0}\n";
+      moduleRejected "qualified-only import does not supply custom Nil" shapes
+        "module Main where\nimport qualified Shapes\nmain = Nil\n"
         "not in scope: Nil";
       moduleRejected "hidden constructor stays hidden" shapes
-        "module Main where\nimport Shapes hiding (List(Nil))\nmain = []\n"
+        "module Main where\nimport Shapes hiding (List(Nil))\nmain = Nil\n"
         "not in scope: Nil";
       moduleRejected "abstract tuple import stays abstract" shapes
-        "module Main where\nimport Shapes (Pair)\nmain = (1,2)\n"
+        "module Main where\nimport Shapes (Pair)\nmain = Pair 1 2\n"
         "not in scope: Pair";
       let {
         ambiguous =
           M.insert compareString "Other"
-            (Pair "Other.emlf" "module Other where\ndata Pair a b = Pair a b\n")
+            ((,) "Other.emlf" "module Other where\ndata Pair a b = Pair a b\n")
             shapes
       };
       moduleRejected "ambiguous tuple constructor stays ambiguous" ambiguous
-        "module Main where\nimport Shapes\nimport Other\nmain = (1,2)\n"
+        "module Main where\nimport Shapes\nimport Other\nmain = Pair 1 2\n"
         "ambiguous name Pair"
     };
-  main :: IO Unit;
+  ambiguousShapes :: Map String ((,) String String);
+  ambiguousShapes =
+    M.insert compareString "Other"
+      ((,) "Other.emlf" "module Other where\ndata Pair a b = Pair a b\n") shapes;
+  moduleAcceptedWith :: String -> Map String ((,) String String) -> String -> IO ();
+  moduleAcceptedWith label libraries source =
+    do {
+      result <- compiled (Compiler.compileModules libraries "Main.emlf" source);
+      checkResult label int result
+    };
+  moduleRejectedAt :: String -> Map String ((,) String String) -> String -> Phase -> String -> IO ();
+  moduleRejectedAt label libraries source phase reason =
+    do {
+      case Compiler.compileModules libraries "Main.emlf" source of {
+        Left error ->
+          require
+            (eqString (Compiler.prettyPhase (Compiler.phase error)) (Compiler.prettyPhase phase) &&
+             contains reason (Compiler.diagnostic error))
+            (label ++ (": " ++ Compiler.prettyError error));
+        Right _ -> fatal (label ++ ": nominally distinct datatypes accepted")
+      };
+      passed label
+    };
+  canonicalChecks :: IO ();
+  canonicalChecks =
+    do {
+      provenanceProjection;
+      moduleAcceptedWith "qualified-only import does not affect syntax" shapes
+            "module Main where\nimport qualified Shapes\nmain = case [(40,2)] of {[(x,y)] -> x+y; _ -> 0}\n";
+      moduleAcceptedWith "hidden custom Nil does not affect syntax" shapes
+            "module Main where\nimport Shapes hiding (List(Nil))\nmain = case [(40,2)] of {[(x,y)] -> x+y; _ -> 0}\n";
+      moduleAcceptedWith "abstract custom Pair does not affect syntax" shapes
+            "module Main where\nimport Shapes (Pair)\nmain = case [(40,2)] of {[(x,y)] -> x+y; _ -> 0}\n";
+      moduleAcceptedWith "ambiguous custom Pair does not affect syntax" ambiguousShapes
+            "module Main where\nimport Shapes\nimport Other\nmain = case [(40,2)] of {[(x,y)] -> x+y; _ -> 0}\n";
+      rejected "standard list is not custom List" (declarations ++ "([] :: List Int)") Inference "type constructor mismatch";
+      rejected "custom List is not standard list" (declarations ++ "(Cons 42 Nil :: [Int])") Inference "type constructor mismatch";
+      rejected "standard tuple is not custom Pair" (declarations ++ "((40,2) :: Pair Int Int)") Inference "type constructor mismatch";
+      rejected "custom Pair is not standard tuple" (declarations ++ "(Pair 40 2 :: (Int,Int))") Inference "type constructor mismatch";
+      rejected "standard unit is not custom Unit" ("data Unit = Unit; (() :: Unit)") Inference "type constructor mismatch";
+      rejected "custom Unit is not standard unit" ("data Unit = Unit; (Unit :: ())") Inference "type constructor mismatch";
+      moduleRejectedAt "qualified custom List rejects standard pattern" shapes
+            "module Main where\nimport Shapes\nmain = case Shapes.Cons (Shapes.Pair 40 2) Shapes.Nil of {[(x,y)] -> x+y; _ -> 0}\n" Inference "type constructor mismatch";
+      moduleRejectedAt "qualified custom Pair rejects standard pattern" shapes
+            "module Main where\nimport Shapes\nmain = case Shapes.Pair 40 2 of {(x,y) -> x+y}\n" Inference "type constructor mismatch";
+      accepted "standard unit with custom declaration" "data Unit = Unit; (() :: ())" (XCon "()" []);
+      accepted "explicit custom Unit remains available" "data Unit = Unit; (Unit :: Unit)" (XCon "Unit" [])
+    };
+  main :: IO ();
   main =
     do {
       parserChecks;
@@ -445,6 +581,7 @@ module Tests.TupleListLegacy where {
       checkingChecks;
       runtimeChecks;
       scopeChecks;
+      canonicalChecks;
       putStrLn "Tuple/list focused checks passed."
     }
 }

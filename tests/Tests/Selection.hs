@@ -23,10 +23,10 @@ module Tests.Selection where {
        (S.range 0 (stringLength identity - 1)));
   unique values = (S.length values == S.length (S.nubBy eqString values));
   validIds values = (S.not (S.null values) && (unique values && S.all validId values));
-  ensure condition message = if condition then Right Unit else Left message;
-  listing :: List String -> Bool;
-  listing args = S.eqList eqString args (Cons "--list-families" Nil);
-  choose :: List String -> List String -> Either String (Pair Bool (List String));
+  ensure condition message = if condition then Right () else Left message;
+  listing :: [] String -> Bool;
+  listing args = S.eqList eqString args ((:) "--list-families" []);
+  choose :: [] String -> [] String -> Either String ((,) Bool ([] String));
   choose available args =
     do {
       ensure (validIds available) "invalid or empty test family inventory";
@@ -34,8 +34,8 @@ module Tests.Selection where {
         matchValueShared1 = args
       } in
       case matchValueShared1 of {
-        Nil -> return (Pair True available);
-        Cons matchValueShared2 matchValueShared3 ->
+        [] -> return ((,) True available);
+        (:) matchValueShared2 matchValueShared3 ->
           if MLF.Primitive.eqString matchValueShared2 "--families"
           then let {
                  requested = matchValueShared3
@@ -46,7 +46,7 @@ module Tests.Selection where {
                     S.all (\identity -> S.elem eqString identity available) requested)
                    "invalid, duplicate or unknown test family selection";
                  return
-                   (Pair False
+                   ((,) False
                       (S.filter (\identity -> S.elem eqString identity requested) available))
                }
           else Left "test [--list-families | --families ID ...]";
@@ -57,47 +57,47 @@ module Tests.Selection where {
   scope full = if full then "full" else "partial";
   event unit name values =
     J.Object
-      (Cons (Pair "schema_version" (J.num 1))
-         (Cons (Pair "unit" (J.str unit)) (Cons (Pair "event" (J.str name)) values)));
+      ((:) ((,) "schema_version" (J.num 1))
+         ((:) ((,) "unit" (J.str unit)) ((:) ((,) "event" (J.str name)) values)));
   append unit name values =
     do {
       path <- getEnv "MLF_TEST_FAMILY_REPORT";
       if eqString path ""
-      then return Unit
+      then return ()
       else do {
              previous <- readFile path;
              writeFile path (previous ++ (J.render (event unit name values) ++ "\n"))
            }
     };
-  begin :: String -> Bool -> List String -> IO Unit;
+  begin :: String -> Bool -> [] String -> IO ();
   begin unit full selected =
     do {
       O.require (validId unit && validIds selected) "invalid family report identity or selection";
       path <- getEnv "MLF_TEST_FAMILY_REPORT";
       if eqString path ""
-      then return Unit
+      then return ()
       else writeFile path
              (J.render
                 (event unit "start"
-                   (Cons (Pair "scope" (J.str (scope full)))
-                      (Cons (Pair "selected" (J.stringArray selected)) Nil))) ++
+                   ((:) ((,) "scope" (J.str (scope full)))
+                      ((:) ((,) "selected" (J.stringArray selected)) []))) ++
               "\n")
     };
-  passed :: String -> String -> IO Unit;
+  passed :: String -> String -> IO ();
   passed unit identity =
     do {
       O.require (validId unit && validId identity) "invalid completed family identity";
       append unit "family"
-        (Cons (Pair "id" (J.str identity)) (Cons (Pair "status" (J.str "passed")) Nil))
+        ((:) ((,) "id" (J.str identity)) ((:) ((,) "status" (J.str "passed")) []))
     };
   parse text = S.mapM J.parse (S.filter (\line -> (stringLength line > 0)) (O.lines text));
   kind name row = eqString (J.getText "event" "" row) name;
-  finish :: String -> IO Unit;
+  finish :: String -> IO ();
   finish unit =
     do {
       path <- getEnv "MLF_TEST_FAMILY_REPORT";
       if eqString path ""
-      then return Unit
+      then return ()
       else do {
              text <- readFile path;
              rows <-
@@ -106,8 +106,8 @@ module Tests.Selection where {
                  Right value -> return value
                };
              append unit "summary"
-               (Cons (Pair "complete" (J.Boolean True))
-                  (Cons (Pair "families" (J.num (S.length (S.filter (kind "family") rows)))) Nil))
+               ((:) ((,) "complete" (J.Boolean True))
+                  ((:) ((,) "families" (J.num (S.length (S.filter (kind "family") rows)))) []))
            }
     };
   sameStrings left right =
@@ -153,7 +153,7 @@ module Tests.Selection where {
                      else False)));
       _ -> False
     };
-  validate :: String -> Bool -> List String -> String -> Either String J.Json;
+  validate :: String -> Bool -> [] String -> String -> Either String J.Json;
   validate unit full expected text =
     do {
       ensure (validId unit && validIds expected) "invalid reviewed family selection";
@@ -201,10 +201,10 @@ module Tests.Selection where {
         "family summary differs from actual completion events";
       return
         (J.Object
-           (Cons (Pair "schema_version" (J.num 1))
-              (Cons (Pair "unit" (J.str unit))
-                 (Cons (Pair "scope" (J.str (scope full)))
-                    (Cons (Pair "families" (J.num (S.length completed)))
-                       (Cons (Pair "ids" (J.stringArray identities)) Nil))))))
+           ((:) ((,) "schema_version" (J.num 1))
+              ((:) ((,) "unit" (J.str unit))
+                 ((:) ((,) "scope" (J.str (scope full)))
+                    ((:) ((,) "families" (J.num (S.length completed)))
+                       ((:) ((,) "ids" (J.stringArray identities)) []))))))
     }
 }

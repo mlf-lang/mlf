@@ -30,7 +30,7 @@ module Bootstrap.Elaborate where {
   -- A finished graph is immutable. Share its translated types and ordered
   -- bounds across resolution, elaboration and final checking. Map values are
   -- lazy, so preparing the table does not demand unused types or bounds.
-  data TypeContext = TypeContext Graph (IntMap XType) (IntMap (List (Pair XTyVar XType))) IntSet;
+  data TypeContext = TypeContext Graph (IntMap XType) (IntMap ([] ((,) XTyVar XType))) IntSet;
   contextGraph :: TypeContext -> Graph;
   contextGraph (TypeContext graph types bounds parents) = graph;
   prepareTypes :: Graph -> TypeContext;
@@ -41,14 +41,14 @@ module Bootstrap.Elaborate where {
         TypeContext graph (IM.mapWithKey (\n ignored -> typeAtRaw context n) (G.nodes graph))
           (IM.mapWithKey (\n ignored -> boundsAtRaw context n) (G.nodes graph))
           (IS.fromList
-             (concatMap (\v -> if isFlexible (G.flag v) then maybeToList (G.binder v) else Nil)
+             (concatMap (\v -> if isFlexible (G.flag v) then maybeToList (G.binder v) else [])
                 (IM.elems (G.nodes graph))))
     } in
     context;
   typeAtIn :: TypeContext -> Int -> XType;
   typeAtIn (TypeContext graph types bounds parents) identity =
     IM.get (G.resolve graph identity) types;
-  boundsAtIn :: TypeContext -> Int -> List (Pair XTyVar XType);
+  boundsAtIn :: TypeContext -> Int -> [] ((,) XTyVar XType);
   boundsAtIn (TypeContext graph types bounds parents) identity =
     IM.get (G.resolve graph identity) bounds;
   -- Flexible graph nodes become target binders; rigid bounds remain structure.
@@ -67,7 +67,7 @@ module Bootstrap.Elaborate where {
           GBotK kind -> T.bottomKind kind;
           GArr a b -> XArrow (childTypeIn context a) (childTypeIn context b);
           GCon constructor parameters -> XCon constructor (map (childTypeIn context) parameters);
-          GTyCon constructor _ -> XCon constructor Nil;
+          GTyCon constructor _ -> XCon constructor [];
           GSkolem skolem _ -> XVar (XTyVar skolem);
           GTyApp f a -> T.apply (childTypeIn context f) (childTypeIn context a);
           GGen _ -> panic "typeAt: a gen node is not a type"
@@ -105,12 +105,12 @@ module Bootstrap.Elaborate where {
     if (isFlexible (G.flag node) && generalized)
     then XVar (XTyVar (G.resolve graph identity))
     else typeAtIn context identity;
-  boundsAtRaw :: TypeContext -> Int -> List (Pair XTyVar XType);
+  boundsAtRaw :: TypeContext -> Int -> [] ((,) XTyVar XType);
   boundsAtRaw context parent =
     case context of {
       TypeContext graph types bounds parents ->
         if IS.notMember parent parents
-        then Nil
+        then []
         else let {
                root =
                  case G.tag (G.nodeAt graph parent) of {
@@ -118,7 +118,7 @@ module Bootstrap.Elaborate where {
                    _ -> parent
                  }
              } in
-             map (\identity -> Pair (XTyVar identity) (typeAtIn context identity))
+             map (\identity -> (,) (XTyVar identity) (typeAtIn context identity))
                (filter
                   (\identity ->
                      (sameParent (G.resolve graph parent) (G.binder (G.nodeAt graph identity)) &&
@@ -134,7 +134,7 @@ module Bootstrap.Elaborate where {
       (boundsAtIn context gen);
   nodeConstructorKind node =
     case G.tag node of {
-      GTyCon name kind -> Just (Pair name kind);
+      GTyCon name kind -> Just ((,) name kind);
       _ -> Nothing
     };
   graphDatatypes graph =
@@ -237,15 +237,15 @@ module Bootstrap.Elaborate where {
           ("no permitted instance from " ++
            (Pretty.prettyType source ++ (" to " ++ Pretty.prettyType target)))
     };
-  structuralPairs :: GTag -> GTag -> List (Pair Int Int);
-  structuralPairs (GArr a b) (GArr c d) = Cons (Pair a c) (Cons (Pair b d) Nil);
-  structuralPairs (GTyApp a b) (GTyApp c d) = Cons (Pair a c) (Cons (Pair b d) Nil);
+  structuralPairs :: GTag -> GTag -> [] ((,) Int Int);
+  structuralPairs (GArr a b) (GArr c d) = (:) ((,) a c) ((:) ((,) b d) []);
+  structuralPairs (GTyApp a b) (GTyApp c d) = (:) ((,) a c) ((:) ((,) b d) []);
   structuralPairs (GCon c xs) (GCon d ys) =
-    if (eqString c d && (length xs == length ys)) then zip xs ys else Nil;
-  structuralPairs _ _ = Nil;
-  correspondence :: Graph -> IntSet -> IntMap Int -> List (Pair Int Int) -> IntMap Int;
-  correspondence _ _ images Nil = images;
-  correspondence graph seen images (Cons (Pair original target) rest) =
+    if (eqString c d && (length xs == length ys)) then zip xs ys else [];
+  structuralPairs _ _ = [];
+  correspondence :: Graph -> IntSet -> IntMap Int -> [] ((,) Int Int) -> IntMap Int;
+  correspondence _ _ images [] = images;
+  correspondence graph seen images ((:) ((,) original target) rest) =
     let {
       a = G.resolve graph original
     } in
@@ -280,7 +280,7 @@ module Bootstrap.Elaborate where {
     else let {
            positions =
              correspondence graph IS.empty IM.empty
-               (Cons (Pair (G.genRoot graph (C.fromGen edge)) target) Nil)
+               ((:) ((,) (G.genRoot graph (C.fromGen edge)) target) [])
          } in
          let {
            directImage =
@@ -309,7 +309,7 @@ module Bootstrap.Elaborate where {
     } in
     case candidate of {
       EvidenceBinding role name identity polymorphic ->
-        Triple role name
+        (,,) role name
           (if polymorphic then schemeTypeIn context identity else referenceIn context identity)
     };
   mergeEvidence results = foldl IM.union IM.empty results;
@@ -356,7 +356,7 @@ module Bootstrap.Elaborate where {
         do {
           results <-
             mapM child
-              (Cons scrutinee
+              ((:) scrutinee
                  (map
                     (\branch ->
                        case branch of {
@@ -369,11 +369,11 @@ module Bootstrap.Elaborate where {
         do {
           results <-
             mapM child
-              (Cons body
+              ((:) body
                  (map
                     (\definition ->
                        case definition of {
-                         Quad _ _ rhs _ -> rhs
+                         (,,,) _ _ rhs _ -> rhs
                        })
                     definitions));
           Right (mergeEvidence results)
@@ -381,7 +381,7 @@ module Bootstrap.Elaborate where {
       FChecked variables body _ ->
         resolveWithinIn context datatypes
           (extendEnvironment env
-             (map (\variable -> Pair (fst variable) (T.bottomKind (snd variable))) variables))
+             (map (\variable -> (,) (fst variable) (T.bottomKind (snd variable))) variables))
           body;
       _ -> Right IM.empty
     };
@@ -520,10 +520,10 @@ module Bootstrap.Elaborate where {
                 mapM
                   (\definition ->
                      case definition of {
-                       Quad name declaration rhs rhsEdge ->
+                       (,,,) name declaration rhs rhsEdge ->
                          do {
                            rhs' <- childEdge rhs rhsEdge;
-                           Right (Triple name (schemeTypeIn context declaration) rhs')
+                           Right ((,,) name (schemeTypeIn context declaration) rhs')
                          }
                      })
                   definitions;
@@ -540,7 +540,7 @@ module Bootstrap.Elaborate where {
               let {
                 local =
                   extendEnvironment env
-                    (map (\variable -> Pair (fst variable) (T.bottomKind (snd variable))) variables)
+                    (map (\variable -> (,) (fst variable) (T.bottomKind (snd variable))) variables)
               };
               body' <- elaborateWithinIn context datatypes evidence solver local body;
               proof <- edgeComputationIn context datatypes solver local edge;
@@ -602,10 +602,10 @@ module Bootstrap.Elaborate where {
         }
     };
   checkedCorrespondence graph source target =
-    checkedPositions graph IS.empty IM.empty (Cons (Pair source target) Nil);
-  checkedPositions :: Graph -> IntSet -> IntMap Int -> List (Pair Int Int) -> IntMap Int;
-  checkedPositions _ _ images Nil = images;
-  checkedPositions graph seen images (Cons (Pair source target) rest) =
+    checkedPositions graph IS.empty IM.empty ((:) ((,) source target) []);
+  checkedPositions :: Graph -> IntSet -> IntMap Int -> [] ((,) Int Int) -> IntMap Int;
+  checkedPositions _ _ images [] = images;
+  checkedPositions graph seen images ((:) ((,) source target) rest) =
     let {
       a = G.resolve graph source
     } in
@@ -633,7 +633,7 @@ module Bootstrap.Elaborate where {
   typeAt graph identity = typeAtIn (prepareTypes graph) identity;
   reference :: Graph -> Int -> XType;
   reference graph identity = referenceIn (prepareTypes graph) identity;
-  boundsAt :: Graph -> Int -> List (Pair XTyVar XType);
+  boundsAt :: Graph -> Int -> [] ((,) XTyVar XType);
   boundsAt graph identity = boundsAtIn (prepareTypes graph) identity;
   schemeType :: Graph -> Int -> XType;
   schemeType graph identity = schemeTypeIn (prepareTypes graph) identity

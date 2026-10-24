@@ -23,12 +23,29 @@ import qualified Bootstrap.Std as S
 main : Either String Int
 main = do { x <- Right 1; Right x }
 '''
-LEGACY = '''module Legacy where
+IMPLICIT = '''module Legacy where
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 main : Either String Int
 main = do { x <- Right 1; Right x }
 '''
+DISTINCT = '''module Distinct where
+import Prelude hiding (Monad, return, bind)
+-- This local class is intentionally NOT the canonical standard Monad.
+data Box a = Box a
+class Monad (m : * -> *) where {
+ return : forall a. a -> m a;
+ bind : forall a b. m a -> (a -> m b) -> m b
+}
+instance Monad Box where {
+ return x = Box x;
+ bind (Box x) f = f x
+}
+main : Box Int
+main = do { x <- Box 1; Box x }
+'''
+NEGATIVE_DIAGNOSTIC = 'Resolution: no instance or given constraint for MLF.Primitive.Monad Distinct.Box; ambiguous uses need a type annotation'
+
 
 def require(value, message):
     if not value:
@@ -65,8 +82,7 @@ def verify_run(resource, status, log):
     require(resource.get('exit_code') == status, 'unexpected compiler status')
     require(resource.get('complete') is (status == 0), 'inconsistent resource receipt')
     if status != 0:
-        require(status == 1 and 'Resolution:' in log and
-                'no instance or given constraint for Monad (Bootstrap.Types.Either String)' in log,
+        require(status == 1 and log.strip() == NEGATIVE_DIAGNOSTIC,
                 'negative control rejected for the wrong reason')
 
 def main():
@@ -175,7 +191,8 @@ def main():
         fixtures = output/'fixtures'
         fixtures.mkdir()
         for label, module, source, status in [('standard-class', 'Standard', STANDARD, 0),
-                                              ('legacy-class', 'Legacy', LEGACY, 1)]:
+                                              ('implicit-standard-class', 'Legacy', IMPLICIT, 0),
+                                              ('distinct-custom-class', 'Distinct', DISTINCT, 1)]:
             path = fixtures/(module+'.emlf')
             path.write_text(source)
             remember(path)

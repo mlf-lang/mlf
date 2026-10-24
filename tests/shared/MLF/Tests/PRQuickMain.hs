@@ -17,15 +17,15 @@ module MLF.Tests.PRQuickMain where {
   fatal :: forall a. String -> IO a;
   fatal message =
     ioBind (putErr ("PR current-source smoke: " ++ (message ++ "\n"))) (\_ -> exitWith 1);
-  require :: Bool -> String -> IO Unit;
-  require condition message = if condition then ioReturn Unit else fatal message;
+  require :: Bool -> String -> IO ();
+  require condition message = if condition then ioReturn () else fatal message;
   right :: forall a. Either String a -> IO a;
   right value =
     case value of {
       Left message -> fatal message;
       Right result -> ioReturn result
     };
-  accepted :: String -> String -> String -> IO Unit;
+  accepted :: String -> String -> String -> IO ();
   accepted fixtures output name =
     do {
       let {
@@ -38,7 +38,7 @@ module MLF.Tests.PRQuickMain where {
           Right compiled -> ioReturn compiled
         };
       let {
-        expected = XCon "Int" Nil
+        expected = XCon "Int" []
       };
       require (IndependentType.alphaEq (C.inferredType result) expected)
         (name ++ ": wrong inferred type");
@@ -57,7 +57,7 @@ module MLF.Tests.PRQuickMain where {
       writeFile (output ++ ("/" ++ (name ++ ".xmlf"))) (serialized ++ "\n");
       putStrLn ("PASS current-source accepted " ++ name)
     };
-  rejected :: String -> String -> IO Unit;
+  rejected :: String -> String -> IO ();
   rejected fixtures name =
     do {
       let {
@@ -81,7 +81,7 @@ module MLF.Tests.PRQuickMain where {
       };
       putStrLn ("PASS current-source rejected " ++ name)
     };
-  rejectTarget :: String -> Either String XType -> IO Unit;
+  rejectTarget :: String -> Either String XType -> IO ();
   rejectTarget label result =
     case result of {
       Left message ->
@@ -89,9 +89,9 @@ module MLF.Tests.PRQuickMain where {
           (label ++ (": wrong target rejection: " ++ message));
       Right _ -> fatal (label ++ ": malformed target was accepted")
     };
-  progress :: String -> String -> IO Unit;
+  progress :: String -> String -> IO ();
   progress output stage = writeFile (output ++ "/progress.log") (stage ++ "\n");
-  main :: IO Unit;
+  main :: IO ();
   main =
     do {
       count <- getArgCount;

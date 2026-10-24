@@ -120,7 +120,7 @@ main = do
   run "annotation" Nil "identity : forall unused a. a -> a; identity x = x; main = identity True"
   run "nested-data" Nil "data Maybe a = Nothing | Just a; data Box a = Box a; unbox (Box (Just x)) = x; unbox _ = 0; main = unbox (Box (Just 4))"
   run "recursive-signature" Nil "data List a = Nil | Cons a (List a); foldl : forall a b. (b -> a -> b) -> b -> List a -> b; foldl f z Nil = z; foldl f z (Cons x xs) = foldl f (f z x) xs; main = foldl (\\z x -> z + x) 0 (Cons 1 Nil)"
-  run "multiparam-class" Nil "class Convert a b where { convert : a -> b }; instance Convert Int String where { convert = showInt }; main = (convert 42 : String)"
+  run "multiparam-class" Nil "class Convert a b where { convert : a -> b }; instance Convert Int String where { convert = showInt }; main = (convert 42 :: String)"
   run "superclass" Nil "class Inspect a where { inspect : a -> Bool }; class Inspect b => Two a b where { two : a -> b -> Bool }; let f : forall a b. Two a b => a -> b -> Bool = \\x y -> inspect y in 42"
   run "do-io" Nil "main = do { x <- return 41; printInt (x + 1) }"
   run "module-reexport"

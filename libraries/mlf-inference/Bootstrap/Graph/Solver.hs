@@ -23,10 +23,10 @@ module Bootstrap.Graph.Solver where {
   bindingChildren (Solver graph parents descendants scopes) = descendants;
   scopeIndex :: Solver -> ScopeIndex;
   scopeIndex (Solver graph parents descendants scopes) = scopes;
-  scopeIntervals :: ScopeIndex -> IntMap (Pair Int Int);
+  scopeIntervals :: ScopeIndex -> IntMap ((,) Int Int);
   scopeIntervals (ScopeIndex intervals jumps) = intervals;
-  forceIntSet :: IntSet -> Unit;
-  forceIntSet (IntSet tree) = seq tree Unit;
+  forceIntSet :: IntSet -> ();
+  forceIntSet (IntSet tree) = seq tree ();
   strictScopes :: ScopeIndex -> ScopeIndex;
   -- The scope index is immutable across component updates. Force its required
   -- fields without allocating another wrapper for every added/removed node.
@@ -89,8 +89,8 @@ module Bootstrap.Graph.Solver where {
                   then M.glue left right
                   else M.node count key remaining left right
     };
-  addNode :: Solver -> Pair Int Node -> Solver;
-  addNode (Solver graph parents descendants scopes) (Pair n v) =
+  addNode :: Solver -> (,) Int Node -> Solver;
+  addNode (Solver graph parents descendants scopes) ((,) n v) =
     mkSolver graph
       (L.foldlStrict (\index -> \child -> insertIndex child n index) parents (G.children (G.tag v)))
       (case G.binder v of {
@@ -98,8 +98,8 @@ module Bootstrap.Graph.Solver where {
          Just parent -> insertIndex parent n descendants
        })
       scopes;
-  removeNode :: Solver -> Pair Int Node -> Solver;
-  removeNode (Solver graph parents descendants scopes) (Pair n v) =
+  removeNode :: Solver -> (,) Int Node -> Solver;
+  removeNode (Solver graph parents descendants scopes) ((,) n v) =
     mkSolver graph
       (L.foldlStrict (\index -> \child -> removeIndex child n index) parents (G.children (G.tag v)))
       (case G.binder v of {
@@ -107,20 +107,20 @@ module Bootstrap.Graph.Solver where {
          Just parent -> removeIndex parent n descendants
        })
       scopes;
-  scopeVisit :: IntMap (List Int) ->
-                Pair Int (IntMap (Pair Int Int)) -> Int -> Pair Int (IntMap (Pair Int Int));
-  scopeVisit descendants (Pair start intervals) n =
+  scopeVisit :: IntMap ([] Int) ->
+                (,) Int (IntMap ((,) Int Int)) -> Int -> (,) Int (IntMap ((,) Int Int));
+  scopeVisit descendants ((,) start intervals) n =
     case L.foldlStrict (scopeVisit descendants) (G.strictPair (start + 1) intervals)
-           (IM.findWithDefault Nil n descendants) of {
-      Pair end final -> G.strictPair end (IM.insert n (G.strictPair start end) final)
+           (IM.findWithDefault [] n descendants) of {
+      (,) end final -> G.strictPair end (IM.insert n (G.strictPair start end) final)
     };
   scopeLevels :: Int -> Int;
   scopeLevels count = if (count <= 1) then 1 else (1 + scopeLevels (quotInt (count + 1) 2));
-  scopeJumps :: Int -> IntMap Int -> List (IntMap Int);
+  scopeJumps :: Int -> IntMap Int -> [] (IntMap Int);
   scopeJumps count parents =
     if (count <= 0)
-    then Nil
-    else Cons parents (scopeJumps (count - 1) (IM.map (\n -> IM.get n parents) parents));
+    then []
+    else (:) parents (scopeJumps (count - 1) (IM.map (\n -> IM.get n parents) parents));
   indexScopes :: Graph -> ScopeIndex;
   indexScopes graph =
     let {
@@ -143,13 +143,13 @@ module Bootstrap.Graph.Solver where {
           (\table ->
              \entry ->
                case entry of {
-                 Pair n p ->
+                 (,) n p ->
                    if (n == p)
                    then table
                    else let {
-                          previous = IM.findWithDefault Nil p table
+                          previous = IM.findWithDefault [] p table
                         } in
-                        seq previous (IM.insert p (Cons n previous) table)
+                        seq previous (IM.insert p ((:) n previous) table)
                })
           IM.empty
           (IM.toList parents)
@@ -159,17 +159,17 @@ module Bootstrap.Graph.Solver where {
         L.map
           (\entry ->
              case entry of {
-               Pair n p -> n
+               (,) n p -> n
              })
           (L.filter
              (\entry ->
                 case entry of {
-                  Pair n p -> (n == p)
+                  (,) n p -> (n == p)
                 })
              (IM.toList parents))
     } in
-    case L.foldlStrict (scopeVisit descendants) (Pair 0 IM.empty) roots of {
-      Pair count intervals -> ScopeIndex intervals (scopeJumps (scopeLevels (IM.size gens)) parents)
+    case L.foldlStrict (scopeVisit descendants) ((,) 0 IM.empty) roots of {
+      (,) count intervals -> ScopeIndex intervals (scopeJumps (scopeLevels (IM.size gens)) parents)
     };
   scopeContains :: ScopeIndex -> Int -> Int -> Bool;
   scopeContains (ScopeIndex intervals jumps) a b = G.intervalContains intervals a b;
@@ -183,8 +183,8 @@ module Bootstrap.Graph.Solver where {
     else if scopeContains scopes b a
          then b
          else case jumps of {
-                Nil -> panic "empty scope ancestry index";
-                Cons parents rest ->
+                [] -> panic "empty scope ancestry index";
+                (:) parents rest ->
                   IM.get
                     (L.foldr
                        (\level ->
@@ -197,17 +197,17 @@ module Bootstrap.Graph.Solver where {
                        jumps)
                     parents
               };
-  sortScopes :: ScopeIndex -> IntSet -> List Int;
+  sortScopes :: ScopeIndex -> IntSet -> [] Int;
   -- Cache each immutable interval key once, as the seed's sortOn does.
   sortScopes (ScopeIndex intervals jumps) seeds =
     let {
-      keyed = L.map (\n -> Pair (L.fst (IM.get n intervals)) n) (IS.toList seeds)
+      keyed = L.map (\n -> (,) (L.fst (IM.get n intervals)) n) (IS.toList seeds)
     } in
     L.map L.snd (L.sortBy (\a -> \b -> L.compareInt (L.fst a) (L.fst b)) keyed);
   scopeRoot :: ScopeIndex -> Int -> Int;
   scopeRoot (ScopeIndex intervals jumps) n =
     case jumps of {
-      Nil -> panic "empty scope ancestry index";
+      [] -> panic "empty scope ancestry index";
       _ -> IM.get n (L.last jumps)
     };
   projectScopes :: ScopeIndex -> IntSet -> IntMap (Maybe Int);
@@ -224,7 +224,7 @@ module Bootstrap.Graph.Solver where {
           (\seen ->
              \entry ->
                case entry of {
-                 Pair a b -> IS.insert (scopeLCA scopes a b) seen
+                 (,) a b -> IS.insert (scopeLCA scopes a b) seen
                })
           seeds
           adjacent
@@ -236,24 +236,24 @@ module Bootstrap.Graph.Solver where {
     let {
       ordered = sortScopes scopes allScopes
     } in
-    case L.foldlStrict (attachScope scopes) (Pair Nil IM.empty) ordered of {
-      Pair ancestors parents -> parents
+    case L.foldlStrict (attachScope scopes) ((,) [] IM.empty) ordered of {
+      (,) ancestors parents -> parents
     };
   attachScope :: ScopeIndex ->
-                 Pair (List Int) (IntMap (Maybe Int)) ->
-                 Int -> Pair (List Int) (IntMap (Maybe Int));
-  attachScope scopes (Pair ancestors parents) n =
+                 (,) ([] Int) (IntMap (Maybe Int)) ->
+                 Int -> (,) ([] Int) (IntMap (Maybe Int));
+  attachScope scopes ((,) ancestors parents) n =
     let {
       enclosing = L.dropWhile (\a -> L.not (scopeContains scopes a n)) ancestors
     } in
     let {
       parent =
         case enclosing of {
-          Nil -> Nothing;
-          Cons p rest -> Just p
+          [] -> Nothing;
+          (:) p rest -> Just p
         }
     } in
-    seq parent (G.strictPair (Cons n enclosing) (IM.insert n parent parents));
+    seq parent (G.strictPair ((:) n enclosing) (IM.insert n parent parents));
   prepare :: Graph -> Either String Solver;
   prepare input =
     G.bindE (G.validateGraph input)
@@ -271,15 +271,15 @@ module Bootstrap.Graph.Solver where {
                           (L.foldlStrict addNode
                              (mkSolver canonical IM.empty IM.empty (indexScopes canonical))
                              (IM.toList (G.nodes canonical))));
-  equalIntervals :: IntMap (Pair Int Int) -> IntMap (Pair Int Int) -> Bool;
+  equalIntervals :: IntMap ((,) Int Int) -> IntMap ((,) Int Int) -> Bool;
   equalIntervals a b =
     IM.eqIntMap
       (\p ->
          \q ->
            case p of {
-             Pair x y ->
+             (,) x y ->
                case q of {
-                 Pair z w -> ((x == z) && (y == w))
+                 (,) z w -> ((x == z) && (y == w))
                }
            })
       a
@@ -290,20 +290,20 @@ module Bootstrap.Graph.Solver where {
   -- Check both directions instead of constructing a second persistent index.
   -- Ordered enumeration and root cardinalities preserve eqIntMap/eqIntSet's
   -- observable checks, including malformed, empty and duplicate index entries.
-  ascending :: List Int -> Bool;
+  ascending :: [] Int -> Bool;
   ascending keys =
     case keys of {
-      Nil -> True;
-      Cons first rest -> ascendingAfter first rest
+      [] -> True;
+      (:) first rest -> ascendingAfter first rest
     };
-  ascendingAfter :: Int -> List Int -> Bool;
+  ascendingAfter :: Int -> [] Int -> Bool;
   ascendingAfter previous keys =
     case keys of {
-      Nil -> True;
-      Cons first rest -> ((previous < first) && ascendingAfter first rest)
+      [] -> True;
+      (:) first rest -> ((previous < first) && ascendingAfter first rest)
     };
-  indexEntryAgrees :: Graph -> Bool -> Pair Int IntSet -> Bool;
-  indexEntryAgrees current structural (Pair target sources) =
+  indexEntryAgrees :: Graph -> Bool -> (,) Int IntSet -> Bool;
+  indexEntryAgrees current structural ((,) target sources) =
     let {
       entries = IS.toList sources
     } in
@@ -330,8 +330,8 @@ module Bootstrap.Graph.Solver where {
     } in
     ((IM.size index == L.length entries) &&
      (ascending (L.map L.fst entries) && L.all (indexEntryAgrees current structural) entries));
-  nodeIndexed :: IntMap IntSet -> IntMap IntSet -> Pair Int Node -> Bool;
-  nodeIndexed parents descendants (Pair n node) =
+  nodeIndexed :: IntMap IntSet -> IntMap IntSet -> (,) Int Node -> Bool;
+  nodeIndexed parents descendants ((,) n node) =
     (L.all (\child -> IS.member n (IM.findWithDefault IS.empty child parents))
        (G.children (G.tag node)) &&
      (case G.binder node of {
@@ -342,17 +342,17 @@ module Bootstrap.Graph.Solver where {
   -- equal cardinalities proves equality of the two finite edge sets. Audit
   -- index ordering, recorded sizes and nonempty buckets before counting; this
   -- retains the malformed-index checks without a second graph lookup per edge.
-  ascendingNodes :: List (Pair Int Node) -> Bool;
+  ascendingNodes :: [] ((,) Int Node) -> Bool;
   ascendingNodes entries =
     case entries of {
-      Nil -> True;
-      Cons (Pair n _) rest -> ascendingNodesAfter n rest
+      [] -> True;
+      (:) ((,) n _) rest -> ascendingNodesAfter n rest
     };
-  ascendingNodesAfter :: Int -> List (Pair Int Node) -> Bool;
+  ascendingNodesAfter :: Int -> [] ((,) Int Node) -> Bool;
   ascendingNodesAfter previous entries =
     case entries of {
-      Nil -> True;
-      Cons (Pair n _) rest -> ((previous < n) && ascendingNodesAfter n rest)
+      [] -> True;
+      (:) ((,) n _) rest -> ((previous < n) && ascendingNodesAfter n rest)
     };
   indexCardinality :: IntMap IntSet -> Maybe Int;
   indexCardinality index =
@@ -362,11 +362,11 @@ module Bootstrap.Graph.Solver where {
     if ((IM.size index == L.length entries) && ascending (L.map L.fst entries))
     then indexCardinalityFrom 0 entries
     else Nothing;
-  indexCardinalityFrom :: Int -> List (Pair Int IntSet) -> Maybe Int;
+  indexCardinalityFrom :: Int -> [] ((,) Int IntSet) -> Maybe Int;
   indexCardinalityFrom total entries =
     case entries of {
-      Nil -> Just total;
-      Cons (Pair _ sources) rest ->
+      [] -> Just total;
+      (:) ((,) _ sources) rest ->
         let {
           members = IS.toList sources
         } in
@@ -377,18 +377,18 @@ module Bootstrap.Graph.Solver where {
              seq next (indexCardinalityFrom next rest)
         else Nothing
     };
-  distinctChildCount :: List Int -> Int;
+  distinctChildCount :: [] Int -> Int;
   distinctChildCount children =
     case children of {
-      Nil -> 0;
-      Cons _ Nil -> 1;
-      Cons a (Cons b Nil) -> if (a == b) then 1 else 2;
+      [] -> 0;
+      (:) _ [] -> 1;
+      (:) a ((:) b []) -> if (a == b) then 1 else 2;
       _ -> IS.size (IS.fromList children)
     };
-  requiredCardinalities :: List (Pair Int Node) -> Pair Int Int;
+  requiredCardinalities :: [] ((,) Int Node) -> (,) Int Int;
   requiredCardinalities entries =
     L.foldlStrict
-      (\(Pair structural binding) (Pair _ node) ->
+      (\((,) structural binding) ((,) _ node) ->
          let {
            nextStructural = (structural + distinctChildCount (G.children (G.tag node)))
          } in
@@ -400,8 +400,8 @@ module Bootstrap.Graph.Solver where {
                  Just _ -> 1
                }))
          } in
-         seq nextStructural (seq nextBinding (Pair nextStructural nextBinding)))
-      (Pair 0 0)
+         seq nextStructural (seq nextBinding ((,) nextStructural nextBinding)))
+      ((,) 0 0)
       entries;
   indicesAgree :: Graph -> IntMap IntSet -> IntMap IntSet -> Bool;
   -- Preserve the preceding audit for manually forged non-BST node maps.
@@ -420,7 +420,7 @@ module Bootstrap.Graph.Solver where {
                Nothing -> False;
                Just binding ->
                  case requiredCardinalities entries of {
-                   Pair expectedStructural expectedBinding ->
+                   (,) expectedStructural expectedBinding ->
                      ((structural == expectedStructural) &&
                       ((binding == expectedBinding) &&
                        L.all (nodeIndexed parents descendants) entries))
@@ -436,46 +436,46 @@ module Bootstrap.Graph.Solver where {
   equalScopeLevel previous next =
     ((IM.size previous == IM.size next) &&
      equalScopeEntries previous (IM.toList previous) (IM.toList next));
-  equalScopeEntries :: IntMap Int -> List (Pair Int Int) -> List (Pair Int Int) -> Bool;
+  equalScopeEntries :: IntMap Int -> [] ((,) Int Int) -> [] ((,) Int Int) -> Bool;
   equalScopeEntries previous before after =
     case before of {
-      Nil -> L.null after;
-      Cons (Pair n parent) rest ->
+      [] -> L.null after;
+      (:) ((,) n parent) rest ->
         case after of {
-          Nil -> False;
-          Cons (Pair m ancestor) tail ->
+          [] -> False;
+          (:) ((,) m ancestor) tail ->
             ((n == m) &&
              ((IM.get parent previous == ancestor) && equalScopeEntries previous rest tail))
         }
     };
-  scopeLevelCount :: IntMap Int -> Int -> List (IntMap Int) -> Bool;
+  scopeLevelCount :: IntMap Int -> Int -> [] (IntMap Int) -> Bool;
   scopeLevelCount previous remaining levels =
     if (remaining == 0)
     then L.null levels
     else case levels of {
-           Nil -> False;
-           Cons next rest ->
+           [] -> False;
+           (:) next rest ->
              (equalScopeLevel previous next && scopeLevelCount next (remaining - 1) rest)
          };
-  scopeCheckedVisit :: IntMap (List Int) -> IntMap (Pair Int Int) -> Int -> Int -> Maybe Int;
+  scopeCheckedVisit :: IntMap ([] Int) -> IntMap ((,) Int Int) -> Int -> Int -> Maybe Int;
   scopeCheckedVisit descendants intervals position n =
     case IM.lookup n intervals of {
       Nothing -> Nothing;
-      Just (Pair start end) ->
+      Just ((,) start end) ->
         if (start /= position)
         then Nothing
         else case scopeCheckedChildren descendants intervals (position + 1)
-                    (IM.findWithDefault Nil n descendants) of {
+                    (IM.findWithDefault [] n descendants) of {
                Nothing -> Nothing;
                Just actualEnd -> if (actualEnd == end) then Just end else Nothing
              }
     };
-  scopeCheckedChildren :: IntMap (List Int) ->
-                          IntMap (Pair Int Int) -> Int -> List Int -> Maybe Int;
+  scopeCheckedChildren :: IntMap ([] Int) ->
+                          IntMap ((,) Int Int) -> Int -> [] Int -> Maybe Int;
   scopeCheckedChildren descendants intervals position children =
     case children of {
-      Nil -> Just position;
-      Cons child rest ->
+      [] -> Just position;
+      (:) child rest ->
         case scopeCheckedVisit descendants intervals position child of {
           Nothing -> Nothing;
           Just next -> scopeCheckedChildren descendants intervals next rest
@@ -488,13 +488,13 @@ module Bootstrap.Graph.Solver where {
     case actual of {
       ScopeIndex intervals levels ->
         let {
-          gens = L.filter (\(Pair _ node) -> G.isGen (G.tag node)) (IM.toList (G.nodes graph))
+          gens = L.filter (\((,) _ node) -> G.isGen (G.tag node)) (IM.toList (G.nodes graph))
         } in
         let {
           parents =
             L.map
-              (\(Pair n node) ->
-                 Pair n
+              (\((,) n node) ->
+                 (,) n
                    (case G.binder node of {
                       Nothing -> n;
                       Just parent -> G.resolve graph parent
@@ -510,15 +510,15 @@ module Bootstrap.Graph.Solver where {
         if L.not (ascending names)
         then equalScopes actual (indexScopes graph)
         else case levels of {
-               Nil -> False;
-               Cons first rest ->
+               [] -> False;
+               (:) first rest ->
                  if ((IM.size first /= count) ||
                      L.not
-                       (L.eqList (\(Pair n p) (Pair m q) -> ((n == m) && (p == q)))
+                       (L.eqList (\((,) n p) ((,) m q) -> ((n == m) && (p == q)))
                           (IM.toList first)
                           parents))
                  then False
-                 else if L.not (L.all (\(Pair _ parent) -> IM.member parent first) parents)
+                 else if L.not (L.all (\((,) _ parent) -> IM.member parent first) parents)
                       then equalScopes actual (indexScopes graph)
                       else if ((IM.size intervals /= count) ||
                                L.not (L.eqList eqInt (IM.keys intervals) names))
@@ -526,21 +526,21 @@ module Bootstrap.Graph.Solver where {
                            else let {
                                   descendants =
                                     L.foldlStrict
-                                      (\table (Pair n parent) ->
+                                      (\table ((,) n parent) ->
                                          if (n == parent)
                                          then table
                                          else let {
-                                                previous = IM.findWithDefault Nil parent table
+                                                previous = IM.findWithDefault [] parent table
                                               } in
                                               seq previous
-                                                (IM.insert parent (Cons n previous) table))
+                                                (IM.insert parent ((:) n previous) table))
                                       IM.empty
                                       parents
                                 } in
                                 let {
                                   roots =
                                     L.map L.fst
-                                      (L.filter (\(Pair n parent) -> (n == parent)) parents)
+                                      (L.filter (\((,) n parent) -> (n == parent)) parents)
                                 } in
                                 case scopeCheckedChildren descendants intervals 0 roots of {
                                   Nothing -> False;
@@ -577,11 +577,11 @@ module Bootstrap.Graph.Solver where {
   -- Collect scope boundaries while inspecting each newly discovered node.
   -- The identity has just been resolved, so a second alias lookup is redundant.
   componentScopesVisit :: Solver ->
-                          IntSet -> IntSet -> List Int -> Either String (Pair IntSet IntSet);
+                          IntSet -> IntSet -> [] Int -> Either String ((,) IntSet IntSet);
   componentScopesVisit solver seen scopes pending =
     case pending of {
-      Nil -> Right (Pair seen scopes);
-      Cons original rest ->
+      [] -> Right ((,) seen scopes);
+      (:) original rest ->
         let {
           currentGraph = graph solver
         } in
@@ -621,11 +621,11 @@ module Bootstrap.Graph.Solver where {
   -- The projection uses this same immutable view, including scope ancestors.
   componentCanonicalNodesVisit :: Solver ->
                                   IntMap Node ->
-                                  IntSet -> List Int -> Either String (Pair (IntMap Node) IntSet);
+                                  IntSet -> [] Int -> Either String ((,) (IntMap Node) IntSet);
   componentCanonicalNodesVisit solver seen scopes pending =
     case pending of {
-      Nil -> Right (Pair seen scopes);
-      Cons original rest ->
+      [] -> Right ((,) seen scopes);
+      (:) original rest ->
         let {
           currentGraph = graph solver
         } in
@@ -659,13 +659,13 @@ module Bootstrap.Graph.Solver where {
                    connected
              }
     };
-  componentVisit :: Solver -> IntSet -> List Int -> Either String IntSet;
+  componentVisit :: Solver -> IntSet -> [] Int -> Either String IntSet;
   componentVisit solver seen pending =
     G.bindE (componentScopesVisit solver seen IS.empty pending)
-      (\(Pair connected scopes) -> Right connected);
-  component :: Solver -> List Int -> Either String IntSet;
+      (\((,) connected scopes) -> Right connected);
+  component :: Solver -> [] Int -> Either String IntSet;
   component solver starts = componentVisit solver IS.empty starts;
-  componentScopes :: Solver -> List Int -> Either String (Pair IntSet IntSet);
+  componentScopes :: Solver -> [] Int -> Either String ((,) IntSet IntSet);
   componentScopes solver starts = componentScopesVisit solver IS.empty IS.empty starts;
   -- The ordered component set already stores subtree cardinalities. Its ranks
   -- and selection are the two inverse compact renamings; avoid constructing two
@@ -703,12 +703,12 @@ module Bootstrap.Graph.Solver where {
   projectNodes :: Graph ->
                   IntSet ->
                   IntMap (Maybe Int) ->
-                  IntMap Int -> Int -> List (Pair Int Node) -> List (Pair Int Node);
+                  IntMap Int -> Int -> [] ((,) Int Node) -> [] ((,) Int Node);
   projectNodes graph selected scopes stubs position originals =
     case originals of {
-      Nil -> Nil;
-      Cons (Pair n node) rest ->
-        Cons (Pair position (localNode graph selected scopes stubs n node))
+      [] -> [];
+      (:) ((,) n node) rest ->
+        (:) ((,) position (localNode graph selected scopes stubs n node))
           (projectNodes graph selected scopes stubs (position + 1) rest)
     };
   compactCanonical :: IntSet -> Int -> Int;
@@ -725,12 +725,12 @@ module Bootstrap.Graph.Solver where {
       (G.flag node);
   projectCanonicalNodes :: Map Int Node ->
                            IntMap (Maybe Int) ->
-                           IntMap Int -> Int -> List (Pair Int Node) -> List (Pair Int Node);
+                           IntMap Int -> Int -> [] ((,) Int Node) -> [] ((,) Int Node);
   projectCanonicalNodes selected scopes stubs position originals =
     case originals of {
-      Nil -> Nil;
-      Cons (Pair n node) rest ->
-        Cons (Pair position (localCanonicalNode selected scopes stubs n node))
+      [] -> [];
+      (:) ((,) n node) rest ->
+        (:) ((,) position (localCanonicalNode selected scopes stubs n node))
           (projectCanonicalNodes selected scopes stubs (position + 1) rest)
     };
   matchesNode :: IntMap Node -> Int -> Node -> Bool;
@@ -764,15 +764,15 @@ module Bootstrap.Graph.Solver where {
       GTyApp a b -> G.bindE (action a) (\x -> G.bindE (action b) (\y -> Right (GTyApp x y)));
       _ -> Right t
     };
-  restoreNode :: Graph -> Graph -> IntSet -> Pair Int Node -> Either String (Pair Int Node);
-  restoreNode old withAliases backward (Pair n node) =
+  restoreNode :: Graph -> Graph -> IntSet -> (,) Int Node -> Either String ((,) Int Node);
+  restoreNode old withAliases backward ((,) n node) =
     G.bindE (originalIdentity backward n)
       (\original ->
          case backward of {
            IntSet tree -> restoreKnownNode withAliases tree original (G.nodeAt old original) node
          });
   restoreKnownNode :: forall a. Graph ->
-                                Map Int a -> Int -> Node -> Node -> Either String (Pair Int Node);
+                                Map Int a -> Int -> Node -> Node -> Either String ((,) Int Node);
   restoreKnownNode withAliases backward original previous node =
     G.bindE
       (case G.tag previous of {
@@ -788,22 +788,22 @@ module Bootstrap.Graph.Solver where {
                    Just b -> G.bindE (selectIdentity b backward) (\parent -> Right (Just parent))
                  })
            (\restoredBinder ->
-              Right (Pair original (G.mkNode restoredTag restoredBinder (G.flag node)))));
+              Right ((,) original (G.mkNode restoredTag restoredBinder (G.flag node)))));
   -- Both lists are ascending and distinct. Local keys are positions in originals;
   -- skip deleted positions and reuse the saved identity and original node. Field
   -- identities still use the checked inverse, and Gen roots still resolve aliases.
   restoreProjectedNodes :: forall a. Graph ->
                                      Map Int a ->
                                      Int ->
-                                     List (Pair Int Node) ->
-                                     List (Pair Int Node) -> Either String (List (Pair Int Node));
+                                     [] ((,) Int Node) ->
+                                     [] ((,) Int Node) -> Either String ([] ((,) Int Node));
   restoreProjectedNodes withAliases backward position originals solved =
     case solved of {
-      Nil -> Right Nil;
-      Cons (Pair n node) remaining ->
+      [] -> Right [];
+      (:) ((,) n node) remaining ->
         case originals of {
-          Nil -> Left "scope placeholder escaped local unification";
-          Cons (Pair original previous) rest ->
+          [] -> Left "scope placeholder escaped local unification";
+          (:) ((,) original previous) rest ->
             if (n < position)
             then Left "scope placeholder escaped local unification"
             else if (n > position)
@@ -813,19 +813,19 @@ module Bootstrap.Graph.Solver where {
                            G.bindE
                              (restoreProjectedNodes withAliases backward (position + 1) rest
                                 remaining)
-                             (\following -> Right (Cons restored following)))
+                             (\following -> Right ((:) restored following)))
         }
     };
-  restoreAliases :: forall a. Map Int a -> Pair Int Int -> Either String (Pair Int Int);
-  restoreAliases backward (Pair a b) =
+  restoreAliases :: forall a. Map Int a -> (,) Int Int -> Either String ((,) Int Int);
+  restoreAliases backward ((,) a b) =
     G.bindE (selectIdentity a backward)
-      (\left -> G.bindE (selectIdentity b backward) (\right -> Right (Pair left right)));
+      (\left -> G.bindE (selectIdentity b backward) (\right -> Right ((,) left right)));
   checkPreservedScope :: Graph ->
                          Graph ->
-                         Map Int Node -> IntMap (Maybe Int) -> Pair Int Node -> Either String Unit;
-  checkPreservedScope original solved forward scopes (Pair n node) =
+                         Map Int Node -> IntMap (Maybe Int) -> (,) Int Node -> Either String ();
+  checkPreservedScope original solved forward scopes ((,) n node) =
     if L.not (G.isGen (G.tag node))
-    then Right Unit
+    then Right ()
     else case IM.lookup (rankIdentity (G.resolve original n) 0 forward) (G.nodes solved) of {
            Nothing -> Left "local unification changed a generalization scope";
            Just next ->
@@ -842,37 +842,37 @@ module Bootstrap.Graph.Solver where {
   -- Both lists enumerate distinct identities in ascending order. Compare them
   -- once, rather than building a temporary map and doing three lookup passes.
   -- The three result lists retain the original removal/insertion order.
-  projectionChanges :: List (Pair Int Node) ->
-                       List (Pair Int Node) ->
-                       Triple (List (Pair Int Node)) (List (Pair Int Node)) (List Int);
+  projectionChanges :: [] ((,) Int Node) ->
+                       [] ((,) Int Node) ->
+                       (,,) ([] ((,) Int Node)) ([] ((,) Int Node)) ([] Int);
   projectionChanges before after =
     case before of {
-      Nil -> Triple Nil after Nil;
-      Cons (Pair n v) rest ->
+      [] -> (,,) [] after [];
+      (:) ((,) n v) rest ->
         case after of {
-          Nil -> Triple before Nil (L.map L.fst before);
-          Cons (Pair m w) tail ->
+          [] -> (,,) before [] (L.map L.fst before);
+          (:) ((,) m w) tail ->
             if (n < m)
             then case projectionChanges rest after of {
-                   Triple removed changed deleted ->
-                     Triple (Cons (Pair n v) removed) changed (Cons n deleted)
+                   (,,) removed changed deleted ->
+                     (,,) ((:) ((,) n v) removed) changed ((:) n deleted)
                  }
             else if (n > m)
                  then case projectionChanges before tail of {
-                        Triple removed changed deleted ->
-                          Triple removed (Cons (Pair m w) changed) deleted
+                        (,,) removed changed deleted ->
+                          (,,) removed ((:) ((,) m w) changed) deleted
                       }
                  else if G.equalNode v w
                       then projectionChanges rest tail
                       else case projectionChanges rest tail of {
-                             Triple removed changed deleted ->
-                               Triple (Cons (Pair n v) removed) (Cons (Pair m w) changed) deleted
+                             (,,) removed changed deleted ->
+                               (,,) ((:) ((,) n v) removed) ((:) ((,) m w) changed) deleted
                            }
         }
     };
   -- Only changed edges affect reverse indices. Common children and unchanged
   -- binders retain their existing entries, including when only a flag changes.
-  missingChildren :: List Int -> List Int -> List Int;
+  missingChildren :: [] Int -> [] Int -> [] Int;
   missingChildren before after =
     if (L.length after <= 8)
     then L.filter (\n -> L.not (L.elem eqInt n after)) before
@@ -923,23 +923,23 @@ module Bootstrap.Graph.Solver where {
                   }
          } in
          mkSolver (graph solver) parents descendants (scopeIndex solver);
-  patchIndexedNodes :: Solver -> List (Pair Int Node) -> List (Pair Int Node) -> Solver;
+  patchIndexedNodes :: Solver -> [] ((,) Int Node) -> [] ((,) Int Node) -> Solver;
   patchIndexedNodes solver before after =
     case before of {
-      Nil -> L.foldlStrict addNode solver after;
-      Cons (Pair n v) rest ->
+      [] -> L.foldlStrict addNode solver after;
+      (:) ((,) n v) rest ->
         case after of {
-          Nil -> L.foldlStrict removeNode solver before;
-          Cons (Pair m w) tail ->
+          [] -> L.foldlStrict removeNode solver before;
+          (:) ((,) m w) tail ->
             if (n < m)
-            then patchIndexedNodes (removeNode solver (Pair n v)) rest after
+            then patchIndexedNodes (removeNode solver ((,) n v)) rest after
             else if (n > m)
-                 then patchIndexedNodes (addNode solver (Pair m w)) before tail
+                 then patchIndexedNodes (addNode solver ((,) m w)) before tail
                  else patchIndexedNodes (patchNodeEdges n v w solver) rest tail
         }
     };
   restoreProjection :: Solver ->
-                       List (Pair Int Node) -> Map Int Node -> Int -> Graph -> Either String Solver;
+                       [] ((,) Int Node) -> Map Int Node -> Int -> Graph -> Either String Solver;
   -- Compact identities and their inverse both preserve ascending order.
   restoreProjection solver originals backward count solved =
     G.bindE (G.mapE (restoreAliases backward) (IM.toList (G.links solved)))
@@ -958,12 +958,12 @@ module Bootstrap.Graph.Solver where {
               (L.filter
                  (\entry ->
                     case entry of {
-                      Pair n v -> (n < count)
+                      (,) n v -> (n < count)
                     })
                  (IM.toList (G.nodes solved))))
            (\restored ->
               case projectionChanges originals restored of {
-                Triple removedNodes changedNodes deleted ->
+                (,,) removedNodes changedNodes deleted ->
                   let {
                     retained =
                       L.foldlStrict (\ns -> \n -> IM.delete n ns) (G.nodes originalGraph) deleted
@@ -974,7 +974,7 @@ module Bootstrap.Graph.Solver where {
                         (\ns ->
                            \entry ->
                              case entry of {
-                               Pair n v -> G.insertNodeMap n v ns
+                               (,) n v -> G.insertNodeMap n v ns
                              })
                         retained
                         changedNodes
@@ -987,13 +987,13 @@ module Bootstrap.Graph.Solver where {
                   } in
                   Right (withGraph patched indexed)
               }));
-  unifyDistinct :: List (Pair Int Int) -> Solver -> Either String Solver;
+  unifyDistinct :: [] ((,) Int Int) -> Solver -> Either String Solver;
   -- Original positions precede the fresh placeholder positions.
   unifyDistinct equations solver =
     G.bindE
       (componentCanonicalNodesVisit solver IM.empty IS.empty
          (L.map (G.resolve (graph solver)) (L.concatMap G.equationNodes equations)))
-      (\(Pair connected boundaries) ->
+      (\((,) connected boundaries) ->
          let {
            old = graph solver
          } in
@@ -1031,7 +1031,7 @@ module Bootstrap.Graph.Solver where {
              L.filter
                (\entry ->
                   case entry of {
-                    Pair n v ->
+                    (,) n v ->
                       case G.tag v of {
                         GGen root -> L.not (IM.member root selected);
                         _ -> False
@@ -1049,7 +1049,7 @@ module Bootstrap.Graph.Solver where {
                   (L.map
                      (\entry ->
                         case entry of {
-                          Pair n v -> n
+                          (,) n v -> n
                         })
                      hiddenRoots)
                   stubIds)
@@ -1062,8 +1062,8 @@ module Bootstrap.Graph.Solver where {
              L.map
                (\entry ->
                   case entry of {
-                    Pair original stub ->
-                      Pair stub (G.mkNode GBot (Just (rankIdentity original 0 forward)) Flexible)
+                    (,) original stub ->
+                      (,) stub (G.mkNode GBot (Just (rankIdentity original 0 forward)) Flexible)
                   })
                (IM.toList stubs)
          } in
@@ -1077,7 +1077,7 @@ module Bootstrap.Graph.Solver where {
               (L.map
                  (\entry ->
                     case entry of {
-                      Pair a b -> Pair (compact a) (compact b)
+                      (,) a b -> (,) (compact a) (compact b)
                     })
                  equations)
               local)
@@ -1094,7 +1094,7 @@ module Bootstrap.Graph.Solver where {
                    G.bindE (G.mapE_ (checkPreservedScope old solved forward scopes) originals)
                      (\checkedScopes ->
                         restoreProjection solver originals backward count solved))));
-  solverUnify :: List (Pair Int Int) -> Solver -> Either String Solver;
+  solverUnify :: [] ((,) Int Int) -> Solver -> Either String Solver;
   solverUnify equations solver =
     let {
       old = graph solver
@@ -1104,7 +1104,7 @@ module Bootstrap.Graph.Solver where {
         L.map
           (\entry ->
              case entry of {
-               Pair a b -> Pair (G.resolve old a) (G.resolve old b)
+               (,) a b -> (,) (G.resolve old a) (G.resolve old b)
              })
           equations
     } in
@@ -1117,18 +1117,18 @@ module Bootstrap.Graph.Solver where {
              L.filter
                (\entry ->
                   case entry of {
-                    Pair a b -> L.not (a == b)
+                    (,) a b -> L.not (a == b)
                   })
                canonical
          } in
          case pending of {
-           Nil -> Right solver;
-           Cons first rest -> unifyDistinct pending solver
+           [] -> Right solver;
+           (:) first rest -> unifyDistinct pending solver
          });
-  unify :: List (Pair Int Int) -> Solver -> Either String Solver;
+  unify :: [] ((,) Int Int) -> Solver -> Either String Solver;
   unify equations solver = solverUnify equations solver;
   expanded :: Int ->
-              Int -> Solver -> Either String (Quad Int (IntMap Int) (List (Pair Int Int)) Solver);
+              Int -> Solver -> Either String ((,,,) Int (IntMap Int) ([] ((,) Int Int)) Solver);
   expanded source target solver =
     let {
       old = graph solver
@@ -1149,12 +1149,12 @@ module Bootstrap.Graph.Solver where {
                           old)
                        (\answer ->
                           case answer of {
-                            Pair (Triple root copies frontier) next ->
+                            (,) ((,,) root copies frontier) next ->
                               let {
                                 fresh = allocatedNodes (G.nextId old) (G.nextId next) (G.nodes next)
                               } in
                               Right
-                                (Quad root copies frontier
+                                ((,,,) root copies frontier
                                    (L.foldlStrict addNode (withGraph next solver) fresh))
                           })
                  }
@@ -1162,29 +1162,29 @@ module Bootstrap.Graph.Solver where {
     };
   -- Expansion only allocates within this interval. Lookups preserve ascending
   -- identity order and skip gaps without traversing the pre-existing graph.
-  allocatedNodes :: Int -> Int -> IntMap Node -> List (Pair Int Node);
+  allocatedNodes :: Int -> Int -> IntMap Node -> [] ((,) Int Node);
   allocatedNodes first stop nodes =
     if (first >= stop)
-    then Nil
+    then []
     else case IM.lookup first nodes of {
            Nothing -> allocatedNodes (first + 1) stop nodes;
-           Just node -> Cons (Pair first node) (allocatedNodes (first + 1) stop nodes)
+           Just node -> (:) ((,) first node) (allocatedNodes (first + 1) stop nodes)
          };
   instantiate :: Int -> Int -> Solver -> Either String Solver;
   instantiate source target solver =
     G.bindE (expanded source target solver)
       (\answer ->
          case answer of {
-           Quad root copies frontier next ->
-             solverUnify (L.append frontier (Cons (Pair root target) Nil)) next
+           (,,,) root copies frontier next ->
+             solverUnify (L.append frontier ((:) ((,) root target) [])) next
          });
   -- Closed ground types have no frontier and cannot change permissions. Their
   -- exact graft keeps the destination's identity and copies only descendants.
-  groundNodes :: Graph -> IntSet -> List Int -> Maybe IntSet;
+  groundNodes :: Graph -> IntSet -> [] Int -> Maybe IntSet;
   groundNodes current seen pending =
     case pending of {
-      Nil -> Just seen;
-      Cons original rest ->
+      [] -> Just seen;
+      (:) original rest ->
         let {
           n = G.resolve current original
         } in
@@ -1235,7 +1235,7 @@ module Bootstrap.Graph.Solver where {
                  let {
                    root = G.resolve current originalRoot
                  } in
-                 case groundNodes current IS.empty (Cons root Nil) of {
+                 case groundNodes current IS.empty ((:) root []) of {
                    Nothing -> Nothing;
                    Just originals ->
                      case G.kindAt current root of {
@@ -1270,7 +1270,7 @@ module Bootstrap.Graph.Solver where {
                                 fresh =
                                   L.map
                                     (\n ->
-                                       Pair (image n)
+                                       (,) (image n)
                                          (G.mkNode (G.mapTag image (G.tag (G.nodeAt current n)))
                                             (Just target)
                                             Rigid))
@@ -1287,8 +1287,8 @@ module Bootstrap.Graph.Solver where {
                               } in
                               let {
                                 indexed =
-                                  L.foldlStrict addNode (removeNode solver (Pair target old))
-                                    (Cons (Pair target replacement) fresh)
+                                  L.foldlStrict addNode (removeNode solver ((,) target old))
+                                    ((:) ((,) target replacement) fresh)
                               } in
                               Just (withGraph next indexed)
                      }
@@ -1314,22 +1314,22 @@ module Bootstrap.Graph.Solver where {
   pairSeen a b seen = IS.member b (IM.findWithDefault IS.empty a seen);
   insertPair :: Int -> Int -> IntMap IntSet -> IntMap IntSet;
   insertPair a b seen = IM.insert a (IS.insert b (IM.findWithDefault IS.empty a seen)) seen;
-  sameGroundShape :: GTag -> GTag -> Maybe (List (Pair Int Int));
+  sameGroundShape :: GTag -> GTag -> Maybe ([] ((,) Int Int));
   sameGroundShape a b =
     case a of {
       GTyCon c k ->
         case b of {
-          GTyCon d l -> if (eqString c d && G.equalKind k l) then Just Nil else Nothing;
+          GTyCon d l -> if (eqString c d && G.equalKind k l) then Just [] else Nothing;
           _ -> Nothing
         };
       GArr p q ->
         case b of {
-          GArr r s -> Just (Cons (Pair p r) (Cons (Pair q s) Nil));
+          GArr r s -> Just ((:) ((,) p r) ((:) ((,) q s) []));
           _ -> Nothing
         };
       GTyApp p q ->
         case b of {
-          GTyApp r s -> Just (Cons (Pair p r) (Cons (Pair q s) Nil));
+          GTyApp r s -> Just ((:) ((,) p r) ((:) ((,) q s) []));
           _ -> Nothing
         };
       GCon c ps ->
@@ -1340,11 +1340,11 @@ module Bootstrap.Graph.Solver where {
         };
       _ -> Nothing
     };
-  equalGround :: Graph -> IntMap IntSet -> List (Pair Int Int) -> Bool;
+  equalGround :: Graph -> IntMap IntSet -> [] ((,) Int Int) -> Bool;
   equalGround current seen pending =
     case pending of {
-      Nil -> True;
-      Cons (Pair x y) rest ->
+      [] -> True;
+      (:) ((,) x y) rest ->
         let {
           a = G.resolve current x
         } in
@@ -1358,11 +1358,11 @@ module Bootstrap.Graph.Solver where {
                Just pairs -> equalGround current (insertPair a b seen) (L.append pairs rest)
              }
     };
-  groundInstanceVisit :: Graph -> Int -> IntMap IntSet -> IntMap Int -> List (Pair Int Int) -> Bool;
+  groundInstanceVisit :: Graph -> Int -> IntMap IntSet -> IntMap Int -> [] ((,) Int Int) -> Bool;
   groundInstanceVisit current source seen images pending =
     case pending of {
-      Nil -> True;
-      Cons (Pair x y) rest ->
+      [] -> True;
+      (:) ((,) x y) rest ->
         let {
           a = G.resolve current x
         } in
@@ -1395,7 +1395,7 @@ module Bootstrap.Graph.Solver where {
   groundInstanceVariable :: Graph ->
                             Int ->
                             IntMap IntSet ->
-                            IntMap Int -> List (Pair Int Int) -> Int -> Int -> Node -> Kind -> Bool;
+                            IntMap Int -> [] ((,) Int Int) -> Int -> Int -> Node -> Kind -> Bool;
   groundInstanceVariable current source seen images rest a b node kind =
     if (L.not (G.equalFlag (G.flag node) Flexible) ||
         L.not (G.equalMaybeInt (G.binder node) (Just (G.resolve current source))))
@@ -1411,7 +1411,7 @@ module Bootstrap.Graph.Solver where {
                         (IM.insert a b images)
                         rest;
                     Just previous ->
-                      (equalGround current IM.empty (Cons (Pair previous b) Nil) &&
+                      (equalGround current IM.empty ((:) ((,) previous b) []) &&
                        groundInstanceVisit current source (insertPair a b seen) images rest)
                   }
          };
@@ -1422,10 +1422,10 @@ module Bootstrap.Graph.Solver where {
       Just node ->
         case G.tag node of {
           GGen root ->
-            case groundNodes current IS.empty (Cons target Nil) of {
+            case groundNodes current IS.empty ((:) target []) of {
               Nothing -> False;
               Just seen ->
-                groundInstanceVisit current source IM.empty IM.empty (Cons (Pair root target) Nil)
+                groundInstanceVisit current source IM.empty IM.empty ((:) ((,) root target) [])
             };
           _ -> False
         }
@@ -1439,15 +1439,15 @@ module Bootstrap.Graph.Solver where {
         then Right solver
         else instantiate source target solver
     };
-  witness :: Int -> Int -> Solver -> Either String (Pair (IntMap Int) Solver);
+  witness :: Int -> Int -> Solver -> Either String ((,) (IntMap Int) Solver);
   witness source target solver =
     G.bindE (expanded source target solver)
       (\answer ->
          case answer of {
-           Quad root copies frontier next ->
+           (,,,) root copies frontier next ->
              G.bindE (solverUnify frontier next)
                (\frontierSolved ->
-                  G.bindE (solverUnify (Cons (Pair root target) Nil) frontierSolved)
-                    (\result -> Right (Pair copies result)))
+                  G.bindE (solverUnify ((:) ((,) root target) []) frontierSolved)
+                    (\result -> Right ((,) copies result)))
          })
 }

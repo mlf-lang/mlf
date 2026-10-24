@@ -34,10 +34,10 @@ module MLF.Tests.CallStackProgram where {
   custom = fail "custom failure";
   patterned :: HasCallStack => Probe Int;
   patterned = do { Present x <- pure Missing; pure x };
-  displayProbe :: Probe Int -> IO Unit;
+  displayProbe :: Probe Int -> IO ();
   displayProbe (Pure x) = printInt x;
   displayProbe (Failed s) = putStrLn (textFromChars (prettyCallStack s));
-  main :: IO Unit;
+  main :: IO ();
   main = do {
     putStrLn "UNSIGNED";
     putStrLn (textFromChars (prettyCallStack (unsigned 0)));

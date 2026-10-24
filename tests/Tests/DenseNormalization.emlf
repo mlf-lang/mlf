@@ -5,8 +5,8 @@ import qualified Bootstrap.IntMap as IM
 import qualified Bootstrap.Graph as G
 import qualified Tests.Helpers as H
 
-suite : List (Pair String (IO Unit))
-suite = Cons (Pair "dense normalization agrees with an independent list oracle" normalization) Nil
+suite : [] ((,) String (IO ()))
+suite = (:) ((,) "dense normalization agrees with an independent list oracle" normalization) []
 
 -- Deliberately use list searches and recursive definitions, without the
 -- production reachability, inertness, normalization or scratch-array helpers.
@@ -17,46 +17,46 @@ resolve graph n = case IM.lookup n (G.links graph) of
 node graph n = IM.get (resolve graph n) (G.nodes graph)
 bottom tag = case tag of { GBot -> true; GBotK _ -> true; _ -> false }
 children tag = case tag of
- GArr a b -> Cons a (Cons b Nil)
- GTyApp a b -> Cons a (Cons b Nil)
+ GArr a b -> (:) a ((:) b [])
+ GTyApp a b -> (:) a ((:) b [])
  GCon _ ns -> ns
- GGen n -> Cons n Nil
- _ -> Nil
+ GGen n -> (:) n []
+ _ -> []
 inert : Graph -> Int -> Bool
-inert graph n = S.not (bottom (G.tag (node graph n))) && S.all (\(Pair child v) ->
- case Pair (G.binder v) (G.flag v) of
-  Pair (Just parent) Flexible -> parent /= n || inert graph child
+inert graph n = S.not (bottom (G.tag (node graph n))) && S.all (\((,) child v) ->
+ case (,) (G.binder v) (G.flag v) of
+  (,) (Just parent) Flexible -> parent /= n || inert graph child
   _ -> true) (IM.toList (G.nodes graph))
-reachable : Graph -> List Int -> List Int -> List Int
+reachable : Graph -> [] Int -> [] Int -> [] Int
 reachable graph seen pending = case pending of
- Nil -> seen
- Cons original rest -> let n = resolve graph original in
-  if S.elem eqInt n seen then reachable graph seen rest else reachable graph (Cons n seen) (S.append (children (G.tag (node graph n))) rest)
+ [] -> seen
+ (:) original rest -> let n = resolve graph original in
+  if S.elem eqInt n seen then reachable graph seen rest else reachable graph ((:) n seen) (S.append (children (G.tag (node graph n))) rest)
 reference graph = Graph (IM.mapWithKey (\n v -> case G.tag v of
  GGen _ -> v
  _ -> let scheme = case G.binder v of
         Nothing -> false
         Just parent -> case G.tag (node graph parent) of
-         GGen root -> n == resolve graph root || S.not (S.elem eqInt n (reachable graph Nil (Cons root Nil)))
+         GGen root -> n == resolve graph root || S.not (S.elem eqInt n (reachable graph [] ((:) root [])))
          _ -> false
       in if inert graph n || scheme then Node (G.tag v) (G.binder v) Rigid else v) (G.nodes graph)) (G.links graph) (G.nextId graph)
 
 flag bits position = if remInt (quotInt bits position) 2 == 0 then Flexible else Rigid
 fixture bits = Graph (IM.fromList (
- Cons (Pair 0 (Node (GGen 1) Nothing Flexible)) (
- Cons (Pair 1 (Node (GArr 10 3) (Just 0) (flag bits 1))) (
- Cons (Pair 2 (Node GBot (Just 1) (flag bits 2))) (
- Cons (Pair 3 (Node (GCon "Int" Nil) (Just 1) (flag bits 4))) (
- Cons (Pair 4 (Node GBot (Just 0) (flag bits 8))) (
- Cons (Pair 5 (Node (GGen 6) (Just 0) Flexible)) (
- Cons (Pair 6 (Node (GArr 7 8) (Just 5) (flag bits 16))) (
- Cons (Pair 7 (Node GBot (Just 6) Flexible)) (
- Cons (Pair 8 (Node (GCon "Unit" Nil) (Just 6) Rigid)) (
- Cons (Pair 9 (Node GBot (Just 5) Flexible)) Nil))))))))))) (IM.singleton 10 2) 11
+ (:) ((,) 0 (Node (GGen 1) Nothing Flexible)) (
+ (:) ((,) 1 (Node (GArr 10 3) (Just 0) (flag bits 1))) (
+ (:) ((,) 2 (Node GBot (Just 1) (flag bits 2))) (
+ (:) ((,) 3 (Node (GCon "Int" []) (Just 1) (flag bits 4))) (
+ (:) ((,) 4 (Node GBot (Just 0) (flag bits 8))) (
+ (:) ((,) 5 (Node (GGen 6) (Just 0) Flexible)) (
+ (:) ((,) 6 (Node (GArr 7 8) (Just 5) (flag bits 16))) (
+ (:) ((,) 7 (Node GBot (Just 6) Flexible)) (
+ (:) ((,) 8 (Node (GCon "Unit" []) (Just 6) Rigid)) (
+ (:) ((,) 9 (Node GBot (Just 5) Flexible)) []))))))))))) (IM.singleton 10 2) 11
 rename f graph = Graph
- (IM.fromList (S.map (\(Pair n v) -> Pair (f n) (Node (G.mapTag f (G.tag v)) (S.mapOptional f (G.binder v)) (G.flag v))) (IM.toList (G.nodes graph))))
- (IM.fromList (S.map (\(Pair a b) -> Pair (f a) (f b)) (IM.toList (G.links graph)))) (f (G.nextId graph))
-normalization : IO Unit
+ (IM.fromList (S.map (\((,) n v) -> (,) (f n) (Node (G.mapTag f (G.tag v)) (S.mapOptional f (G.binder v)) (G.flag v))) (IM.toList (G.nodes graph))))
+ (IM.fromList (S.map (\((,) a b) -> (,) (f a) (f b)) (IM.toList (G.links graph)))) (f (G.nextId graph))
+normalization : IO ()
 normalization = do
  H.assert (H.eq (G.normalize G.emptyGraph) G.emptyGraph) "empty normalization changed"
  S.mapM_ (\bits -> S.mapM_ (\scale -> S.mapM_ (\shift -> do
@@ -66,5 +66,5 @@ normalization = do
   let actual = G.normalize graph
   _ <- H.right (G.validateGraph actual)
   H.assert (H.eq actual expected && H.eq (G.normalize actual) actual) "normalization changed flags, identities, structure, aliases or binders")
-  (Cons 0 (Cons 340282366920938463463374607431768211456 (Cons (-340282366920938463463374607431768211456) Nil))))
-  (Cons 1 (Cons 100003 Nil))) (S.range 0 31)
+  ((:) 0 ((:) 340282366920938463463374607431768211456 ((:) (-340282366920938463463374607431768211456) []))))
+  ((:) 1 ((:) 100003 []))) (S.range 0 31)

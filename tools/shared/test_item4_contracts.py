@@ -53,7 +53,7 @@ def process_memory(group):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--suite', choices=['artifact', 'interpreter', 'host', 'native', 'core', 'builtin', 'query', 'source', 'managed', 'interpreter-stack', 'native-stack', 'host-stack', 'authority', 'pattern-do', 'separate'], required=True)
+    parser.add_argument('--suite', choices=['artifact', 'interpreter', 'host', 'native', 'core', 'builtin', 'query', 'source', 'managed', 'interpreter-stack', 'native-stack', 'native-unit', 'host-stack', 'authority', 'pattern-do', 'separate'], required=True)
     parser.add_argument('--build-dir', type=Path, required=True)
     parser.add_argument('--ghc', default='ghc')
     parser.add_argument('--cc', default='cc')
@@ -113,7 +113,7 @@ def main():
     try:
         cc = tool(args.cc)
         binary = out / 'probe'
-        if args.suite in {'native', 'native-stack'}:
+        if args.suite in {'native', 'native-stack', 'native-unit'}:
             gc_flags = ['-lgc']
             if args.gc_prefix:
                 prefix = args.gc_prefix.resolve()
@@ -122,7 +122,7 @@ def main():
                 for header in (prefix / 'include').rglob('*.h'):
                     receipt['tools'][str(header)] = sha(header)
                 gc_flags = ['-I' + str(prefix / 'include'), str(library)]
-            run([cc, '-O0', '-std=c11', '-D_GNU_SOURCE', FIXTURES / ('NativeStack.c' if args.suite == 'native-stack' else 'NativeIO.c'),
+            run([cc, '-O0', '-std=c11', '-D_GNU_SOURCE', '-I' + str(ROOT / 'runtime'), FIXTURES / {'native-stack': 'NativeStack.c', 'native-unit': 'NativeUnit.c', 'native': 'NativeIO.c'}[args.suite],
                  *gc_flags, '-lgmp', '-lm', '-pthread', '-ldl', '-o', binary], 'compile')
         else:
             ghc = tool(args.ghc)
@@ -168,6 +168,8 @@ def main():
             arguments.insert(1, out)
         if args.suite == 'query':
             arguments.append(out / ('cache-' + str(time.time_ns())))
+        if args.suite == 'native-unit':
+            arguments.append(out / 'unit-write.txt')
         run(arguments, 'positive')
         if args.suite == 'native':
             for mode, diagnostic in [('surrogate', 'Unicode'), ('panic', 'pure panic'), ('uncaught', 'Runtime: user error (hé😀)')]:
@@ -201,9 +203,9 @@ def main():
         closure = {'tools/shared/test_item4_contracts.py', 'shared-sources.json',
                    'runtime/mlf_process_supervisor.c', 'host/ghc/cbits/host.c'}
         closure.update(k for k in before if k.startswith('runtime/') and k.endswith('.h'))
-        if args.suite in {'native', 'native-stack'}:
+        if args.suite in {'native', 'native-stack', 'native-unit'}:
             closure.update(['runtime/mlf_runtime.c', 'tools/shared/fixtures/item4/' +
-                            ('NativeStack.c' if args.suite == 'native-stack' else 'NativeIO.c')])
+                            {'native-stack': 'NativeStack.c', 'native-unit': 'NativeUnit.c', 'native': 'NativeIO.c'}[args.suite]])
         else:
             text = (out / 'compile.log').read_text() if (out / 'compile.log').exists() else ''
             for name in re.findall(r'Compiling\s+[\w.]+\s+\(\s*([^,\n]+),', text):

@@ -17,29 +17,29 @@ import qualified Bootstrap.X.Checked as Checked
 import qualified Tests.Helpers as H
 import qualified Tests.System as System
 
-suite : List (Pair String (IO Unit))
-suite = Cons (Pair "code generation query agrees with uncached checked emission" agreement)
-  (Cons (Pair "erased query reuses alpha and annotation changes" annotationReuse)
-  (Cons (Pair "optimized query reuses changed unused bodies" unusedReuse)
-  (Cons (Pair "code generation cache separates IO and constructor ABIs" abiSeparation)
-  (Cons (Pair "corrupt cached LLVM is rebuilt" corruption)
-  (Cons (Pair "prepared entries and stale crate dependencies retain visibility" opaque) Nil)))))
+suite : [] ((,) String (IO ()))
+suite = (:) ((,) "code generation query agrees with uncached checked emission" agreement)
+  ((:) ((,) "erased query reuses alpha and annotation changes" annotationReuse)
+  ((:) ((,) "optimized query reuses changed unused bodies" unusedReuse)
+  ((:) ((,) "code generation cache separates IO and constructor ABIs" abiSeparation)
+  ((:) ((,) "corrupt cached LLVM is rebuilt" corruption)
+  ((:) ((,) "prepared entries and stale crate dependencies retain visibility" opaque) [])))))
 
 emit : String -> Bool -> Checked.CheckedTerm -> IO Cache.CodegenResult
 emit directory requireIO checked = do
   result <- Cache.emitChecked directory requireIO checked
   H.right result
-sameCode : List String -> Cache.CodegenResult -> IO Unit
+sameCode : [] String -> Cache.CodegenResult -> IO ()
 sameCode expected actual = H.assert (eqString (S.concatStrings expected) (S.concatStrings (Cache.codeChunks actual))) "cached LLVM differs from checked emission"
 identityTerm : Int -> XType -> XTerm
 identityTerm identity ty = XLet (XName identity "private") (XAbs (XName (identity+1) "argument") ty (XVarTerm (XName (identity+1) "argument"))) (XIntTerm 42)
 deadTerm : Int -> XTerm
 deadTerm value = XLet (XName 9 "unused") (XIntTerm value) (XIntTerm 42)
 
-agreement : IO Unit
+agreement : IO ()
 agreement = System.withScratch (\directory -> do
   keyCompatibility
-  checked <- H.right (Checked.check (identityTerm 10 (XCon "Int" Nil)))
+  checked <- H.right (Checked.check (identityTerm 10 (XCon "Int" [])))
   expected <- H.right (LLVM.emitCheckedChunks false checked)
   first <- emit directory false checked
   second <- emit directory false checked
@@ -50,34 +50,34 @@ agreement = System.withScratch (\directory -> do
 -- Fixed wire-format examples predate the chunk serializer. Their scalar
 -- lengths include an astral character and NUL; the large golden crosses
 -- several decimal frame widths and a long declaration spine.
-keyCompatibility : IO Unit
+keyCompatibility : IO ()
 keyCompatibility = do
-  let fixtures = Cons (Pair (XEVar (XName 7 "free")) "8:variable1:7")
-    (Cons (Pair (XEAbs (XName 80 "x") (XEVar (XName 80 "x"))) "6:lambda1:013:8:variable1:0")
-    (Cons (Pair (XEApp (XEPrimitive PAddInt) (XEInt (-3))) "11:application19:9:primitive6:addInt13:7:integer2:-3")
-    (Cons (Pair (XELet (XName 91 "x") (XEString "λ😀\0:") (XEVar (XName 91 "x"))) "3:let1:014:6:string4:λ😀\0:13:8:variable1:0")
-    (Cons (Pair (XELetRec (Cons (Pair (XName 20 "rec") (XEAbs (XName 21 "x") (XEApp (XEVar (XName 20 "rec")) (XEVar (XName 21 "x"))))) Nil) (XEVar (XName 20 "rec"))) "9:recursive69:66:1:060:6:lambda1:146:11:application13:8:variable1:013:8:variable1:113:8:variable1:0")
-    (Cons (Pair (XEDouble (doubleFromBits 1)) "6:double1:1")
-    (Cons (Pair (XEBool true) "7:boolean4:true")
-    (Cons (Pair (XEConstructor "Box") "11:constructor3:Box")
-    (Cons (Pair (XEEvidenceHole 5) "4:hole1:5")
-    (Cons (Pair (XECase (XEConstructor "Box") (Cons (XErasedAlternative (XConstructorPattern "Box" (Cons Nothing (Cons (Just (XName 7 "field")) Nil))) (XEVar (XName 7 "field"))) (Cons (XErasedAlternative (XDefaultPattern (Just (XName 8 "other"))) (XEVar (XName 8 "other"))) Nil))) "4:case19:11:constructor3:Box103:58:39:11:constructor3:Box17:4:none9:4:some1:013:8:variable1:039:20:7:default9:4:some1:113:8:variable1:1") (Nil))))))))))
-  S.mapM_ (\(Pair term expected) -> H.assert (eqString (LLVM.canonicalErasedKey term) expected) "code generation key framing changed") fixtures
+  let fixtures = (:) ((,) (XEVar (XName 7 "free")) "8:variable1:7")
+    ((:) ((,) (XEAbs (XName 80 "x") (XEVar (XName 80 "x"))) "6:lambda1:013:8:variable1:0")
+    ((:) ((,) (XEApp (XEPrimitive PAddInt) (XEInt (-3))) "11:application19:9:primitive6:addInt13:7:integer2:-3")
+    ((:) ((,) (XELet (XName 91 "x") (XEString "λ😀\0:") (XEVar (XName 91 "x"))) "3:let1:014:6:string4:λ😀\0:13:8:variable1:0")
+    ((:) ((,) (XELetRec ((:) ((,) (XName 20 "rec") (XEAbs (XName 21 "x") (XEApp (XEVar (XName 20 "rec")) (XEVar (XName 21 "x"))))) []) (XEVar (XName 20 "rec"))) "9:recursive69:66:1:060:6:lambda1:146:11:application13:8:variable1:013:8:variable1:113:8:variable1:0")
+    ((:) ((,) (XEDouble (doubleFromBits 1)) "6:double1:1")
+    ((:) ((,) (XEBool true) "7:boolean4:true")
+    ((:) ((,) (XEConstructor "Box") "11:constructor3:Box")
+    ((:) ((,) (XEEvidenceHole 5) "4:hole1:5")
+    ((:) ((,) (XECase (XEConstructor "Box") ((:) (XErasedAlternative (XConstructorPattern "Box" ((:) Nothing ((:) (Just (XName 7 "field")) []))) (XEVar (XName 7 "field"))) ((:) (XErasedAlternative (XDefaultPattern (Just (XName 8 "other"))) (XEVar (XName 8 "other"))) []))) "4:case19:11:constructor3:Box103:58:39:11:constructor3:Box17:4:none9:4:some1:013:8:variable1:039:20:7:default9:4:some1:113:8:variable1:1") ([]))))))))))
+  S.mapM_ (\((,) term expected) -> H.assert (eqString (LLVM.canonicalErasedKey term) expected) "code generation key framing changed") fixtures
   let large = S.foldr (\i body -> XELet (XName i "value") (XEInt i) body) (XEInt 42) (S.range 0 1999)
   let encoded = LLVM.canonicalErasedKey large
   H.assert (stringLength encoded == 67465 && eqString (Separate.fingerprint encoded) "339481977-767634940") "large code generation key differs from its frozen framing"
 
-annotationReuse : IO Unit
+annotationReuse : IO ()
 annotationReuse = System.withScratch (\directory -> do
-  original <- H.right (Checked.check (identityTerm 10 (XCon "Int" Nil)))
-  annotated <- H.right (Checked.check (identityTerm 1000 (XCon "Bool" Nil)))
+  original <- H.right (Checked.check (identityTerm 10 (XCon "Int" [])))
+  annotated <- H.right (Checked.check (identityTerm 1000 (XCon "Bool" [])))
   first <- emit directory false original
   second <- emit directory false annotated
   H.assert (Cache.inputReused second) "alpha-equivalent erasure reran code generation"
   H.assert (eqString (Cache.inputDigest first) (Cache.inputDigest second)) "type annotations changed the erased runtime key"
   sameCode (Cache.codeChunks first) second)
 
-unusedReuse : IO Unit
+unusedReuse : IO ()
 unusedReuse = System.withScratch (\directory -> do
   original <- H.right (Checked.check (deadTerm 1))
   changed <- H.right (Checked.check (deadTerm 2))
@@ -92,32 +92,32 @@ crateKey : XTerm -> IO String
 crateKey term = do
   checked <- H.right (Checked.check term)
   H.right (LLVM.crateInputKey false checked)
-crateKeyAgreement : String -> Bool -> XTerm -> XTerm -> IO Unit
+crateKeyAgreement : String -> Bool -> XTerm -> XTerm -> IO ()
 crateKeyAgreement label equal original changed = do
   before <- crateKey original
   after <- crateKey changed
   H.assert (H.eq (eqString before after) equal) label
 entryRecursive : Int -> Bool -> XTerm
 entryRecursive delta useDead =
-  let int = XCon "Int" Nil in
+  let int = XCon "Int" [] in
   let dead = XName 10 "dead" in let live = XName 20 "live" in let argument = XName 30 "argument" in let liveArgument = XName 40 "liveArgument" in
-  let advance = XApp (XApp (XPrimitive PAddInt Nil) (XVarTerm argument)) (XIntTerm delta) in
-  XLetRec (Cons (Triple dead (XArrow int int) (XAbs argument int (XApp (XVarTerm dead) advance)))
-    (Cons (Triple live (XArrow int int) (XAbs liveArgument int (XVarTerm liveArgument))) Nil))
+  let advance = XApp (XApp (XPrimitive PAddInt []) (XVarTerm argument)) (XIntTerm delta) in
+  XLetRec ((:) ((,,) dead (XArrow int int) (XAbs argument int (XApp (XVarTerm dead) advance)))
+    ((:) ((,,) live (XArrow int int) (XAbs liveArgument int (XVarTerm liveArgument))) []))
     (XApp (XVarTerm (if useDead then dead else live)) (XIntTerm 42))
 entryMutual : Int -> XTerm
 entryMutual value =
-  let int = XCon "Int" Nil in let f = XName 1 "f" in let g = XName 2 "g" in let x = XName 3 "x" in let y = XName 4 "y" in
-  XLetRec (Cons (Triple f (XArrow int int) (XAbs x int (XApp (XVarTerm g) (XVarTerm x))))
-    (Cons (Triple g (XArrow int int) (XAbs y int (XApp (XVarTerm f) (XIntTerm value)))) Nil))
+  let int = XCon "Int" [] in let f = XName 1 "f" in let g = XName 2 "g" in let x = XName 3 "x" in let y = XName 4 "y" in
+  XLetRec ((:) ((,,) f (XArrow int int) (XAbs x int (XApp (XVarTerm g) (XVarTerm x))))
+    ((:) ((,,) g (XArrow int int) (XAbs y int (XApp (XVarTerm f) (XIntTerm value)))) []))
     (XApp (XVarTerm f) (XIntTerm 0))
 entryCapture : Int -> Bool -> XTerm
 entryCapture value shadow =
-  let int = XCon "Int" Nil in let outer = XName 1 "x" in let f = XName 2 "f" in let argument = XName 3 "argument" in
+  let int = XCon "Int" [] in let outer = XName 1 "x" in let f = XName 2 "f" in let argument = XName 3 "argument" in
   XLet outer (XIntTerm value)
     (XLet f (XAbs (if shadow then outer else argument) int (XVarTerm outer))
       (XApp (XVarTerm f) (XIntTerm 42)))
-crateInputDependencies : String -> IO Unit
+crateInputDependencies : String -> IO ()
 crateInputDependencies directory = do
   crateKeyAgreement "unreachable recursive body invalidates the entry key" true (entryRecursive 1 false) (entryRecursive 2 false)
   crateKeyAgreement "reachable recursive body is omitted from the entry key" false (entryRecursive 1 true) (entryRecursive 2 true)
@@ -125,15 +125,15 @@ crateInputDependencies directory = do
   crateKeyAgreement "transitive group dependency is omitted from the entry key" false (entryMutual 42) (entryMutual 43)
   crateKeyAgreement "captured dependency is omitted from the entry key" false (entryCapture 7 false) (entryCapture 8 false)
   H.reject (Checked.check (entryCapture 7 true))
-  let int = XCon "Int" Nil
+  let int = XCon "Int" []
   let unused = XName 1 "unused"
   let live = XName 2 "live"
   let nested = XName 3 "nested"
   let spine = \rhs -> XLet unused rhs (XLet live (XIntTerm 42) (XVarTerm live))
   crateKeyAgreement "irrelevant binder allocation moves live entry identities" true (spine (XIntTerm 1)) (spine (XLet nested (XIntTerm 2) (XVarTerm nested)))
-  let patternScope = \value -> XLet unused (XIntTerm value) (XCase (XIntTerm 42) int (Cons (XAlternative (XDefaultPattern (Just unused)) (XVarTerm unused)) Nil))
+  let patternScope = \value -> XLet unused (XIntTerm value) (XCase (XIntTerm 42) int ((:) (XAlternative (XDefaultPattern (Just unused)) (XVarTerm unused)) []))
   H.reject (Checked.check (patternScope 1))
-  let branchCapture = \value -> XLet unused (XIntTerm value) (XAbs nested (XCon "Bool" Nil) (XCase (XVarTerm nested) int (Cons (XAlternative (XDefaultPattern Nothing) (XVarTerm unused)) Nil)))
+  let branchCapture = \value -> XLet unused (XIntTerm value) (XAbs nested (XCon "Bool" []) (XCase (XVarTerm nested) int ((:) (XAlternative (XDefaultPattern Nothing) (XVarTerm unused)) [])))
   crateKeyAgreement "branch capture is omitted from the entry key" false (branchCapture 1) (branchCapture 2)
   original <- H.right (Checked.check (entryRecursive 1 false))
   changed <- H.right (Checked.check (entryRecursive 2 false))
@@ -148,7 +148,7 @@ crateInputDependencies directory = do
   key <- H.right (LLVM.crateInputKey false original)
   H.assert (H.contains "MLF-CODEGEN-CRATE-INPUT-COMPACT-2" key && H.contains "compact-bdwgc-v1" key) "entry key omits the fixed compact ABI"
   H.reject (LLVM.crateInputKey true original)
-  let withData = \name -> XWithData (Cons (DataDecl name Nil (Cons (ConstructorDecl name Nil) Nil)) Nil) (XIntTerm 42)
+  let withData = \name -> XWithData ((:) (DataDecl name [] ((:) (ConstructorDecl name []) [])) []) (XIntTerm 42)
   crateKeyAgreement "entry key omits unused constructor ABI entries" false (withData "First") (withData "Second")
   writeFile (directory ++ "/objects/" ++ Cache.optimizedDigest first ++ ".ll") "corrupted LLVM output"
   repairedResult <- Cache.emitCrateChecked directory false changed
@@ -157,24 +157,24 @@ crateInputDependencies directory = do
   direct <- H.right (LLVM.emitCheckedChunks false changed)
   sameCode direct repaired
 
-abiSeparation : IO Unit
+abiSeparation : IO ()
 abiSeparation = System.withScratch (\directory -> do
-  pure <- H.right (Checked.check (XApp (XPrimitive PPanic (Cons (XCon "Int" Nil) Nil)) (XStringTerm "entry")))
-  action <- H.right (Checked.check (XApp (XPrimitive PPanic (Cons (XCon "IO" (Cons (XCon "Int" Nil) Nil)) Nil)) (XStringTerm "entry")))
+  pure <- H.right (Checked.check (XApp (XPrimitive PPanic ((:) (XCon "Int" []) [])) (XStringTerm "entry")))
+  action <- H.right (Checked.check (XApp (XPrimitive PPanic ((:) (XCon "IO" ((:) (XCon "Int" []) [])) [])) (XStringTerm "entry")))
   ordinary <- emit directory false pure
   io <- emit directory true action
   H.assert (S.not (Cache.inputReused io) && S.not (Cache.optimizedReused io)) "IO execution ABI reused a pure entry"
   H.assert (S.not (eqString (S.concatStrings (Cache.codeChunks ordinary)) (S.concatStrings (Cache.codeChunks io)))) "IO execution flag did not affect emitted entry"
   rejected <- Cache.emitChecked directory true pure
   H.reject rejected
-  let declaration = \name -> DataDecl name Nil (Cons (ConstructorDecl name Nil) Nil)
-  firstLayout <- H.right (Checked.check (XWithData (Cons (declaration "First") Nil) (XConstructor "Unit" Nil)))
-  secondLayout <- H.right (Checked.check (XWithData (Cons (declaration "Second") Nil) (XConstructor "Unit" Nil)))
+  let declaration = \name -> DataDecl name [] ((:) (ConstructorDecl name []) [])
+  firstLayout <- H.right (Checked.check (XWithData ((:) (declaration "First") []) (XConstructor "Unit" [])))
+  secondLayout <- H.right (Checked.check (XWithData ((:) (declaration "Second") []) (XConstructor "Unit" [])))
   _ <- emit directory false firstLayout
   different <- emit directory false secondLayout
   H.assert (S.not (Cache.inputReused different) && S.not (Cache.optimizedReused different)) "different nominal constructor tables reused a code generation ABI")
 
-corruption : IO Unit
+corruption : IO ()
 corruption = System.withScratch (\directory -> do
   checked <- H.right (Checked.check (XIntTerm 42))
   first <- emit directory false checked
@@ -186,7 +186,7 @@ corruption = System.withScratch (\directory -> do
   repaired <- emit directory false checked
   H.assert (Cache.inputReused repaired) "rebuilt cache output was not reusable")
 
-opaque : IO Unit
+opaque : IO ()
 opaque = System.withScratch (\directory -> do
   let path = directory ++ "/Main.emlf"
   writeFile path "module Main where\nimport qualified Bootstrap.LLVM as Private\nmain = Private.PreparedEntry\n"
@@ -196,15 +196,15 @@ opaque = System.withScratch (\directory -> do
     _ -> H.fail "private prepared entry constructor escaped module resolution"
   staleVisibility directory)
 
-compileFixture : String -> String -> String -> List String -> String -> String -> String -> IO Unit
+compileFixture : String -> String -> String -> [] String -> String -> String -> String -> IO ()
 compileFixture directory identity entry dependencies prefix moduleName text = do
   let path = prefix ++ ".emlf"
   writeFile path text
   source <- H.right (Parser.parseModule path text)
   loaded <- Artifact.loadInterfaces dependencies
   interfaces <- H.right loaded
-  let spec = Crate.CrateSpec identity entry NoImplicitPrelude (Cons (Pair moduleName path) Nil) dependencies (directory ++ "/queries/" ++ identity) (directory ++ "/builtin")
-  compiled <- Crate.compileSources spec (Cons source Nil) interfaces prefix
+  let spec = Crate.CrateSpec identity entry NoImplicitPrelude ((:) ((,) moduleName path) []) dependencies (directory ++ "/queries/" ++ identity) (directory ++ "/builtin")
+  compiled <- Crate.compileSources spec ((:) source []) interfaces prefix
   _ <- H.right compiled
   metadata <- Artifact.readInterface (prefix ++ ".mlfci")
   iface <- H.right metadata
@@ -223,65 +223,65 @@ compileFixture directory identity entry dependencies prefix moduleName text = do
   H.assert (eqString legacyInput (Artifact.encodeObject restoredLegacy)) "legacy crate object changed on roundtrip"
   pooledFailures prefix iface (Artifact.encodePooledPayload fragments)
   H.reject (Artifact.decodeObject iface ("0" ++ input))
-  return Unit
+  return ()
 
-pooledPacket : Artifact.CrateInterface -> String -> Pair Artifact.CrateInterface String
+pooledPacket : Artifact.CrateInterface -> String -> (,) Artifact.CrateInterface String
 pooledPacket iface payload =
   let declared = Artifact.withObjectFingerprint iface (Separate.fingerprint payload) in
-  Pair declared (Separate.pack (Cons "MLFCO-2" (Cons (Artifact.crateId declared) (Cons (Separate.fingerprint (Artifact.encodeInterface declared)) (Cons payload Nil)))))
-rejectPooledBecause : String -> Artifact.CrateInterface -> String -> IO Unit
+  (,) declared (Separate.pack ((:) "MLFCO-2" ((:) (Artifact.crateId declared) ((:) (Separate.fingerprint (Artifact.encodeInterface declared)) ((:) payload [])))))
+rejectPooledBecause : String -> Artifact.CrateInterface -> String -> IO ()
 rejectPooledBecause expected iface payload = case pooledPacket iface payload of
-  Pair declared packet -> case Artifact.decodeObject declared packet of
+  (,) declared packet -> case Artifact.decodeObject declared packet of
     Left message -> H.assert (H.contains expected message) message
     Right _ -> H.fail ("pooled object accepted: " ++ expected)
-poisonContext : List String -> Either String (Maybe (List String))
+poisonContext : [] String -> Either String (Maybe ([] String))
 poisonContext records = case records of
-  Nil -> Right Nothing
-  Cons record rest -> do
+  [] -> Right Nothing
+  (:) record rest -> do
     fields <- Artifact.canonicalFields record
     case fields of
-      Cons header (Cons body (Cons contents Nil)) ->
-        if S.not (eqString body "") then Right (Just (Cons (Separate.pack (Cons "" (Cons body (Cons contents Nil)))) rest))
+      (:) header ((:) body ((:) contents [])) ->
+        if S.not (eqString body "") then Right (Just ((:) (Separate.pack ((:) "" ((:) body ((:) contents [])))) rest))
         else do
           changed <- poisonContext rest
-          case changed of {Nothing -> Right Nothing; Just tail -> Right (Just (Cons record tail))}
+          case changed of {Nothing -> Right Nothing; Just tail -> Right (Just ((:) record tail))}
       _ -> Left "invalid test pool record"
-pooledFailures : String -> Artifact.CrateInterface -> String -> IO Unit
+pooledFailures : String -> Artifact.CrateInterface -> String -> IO ()
 pooledFailures prefix iface payload = do
   fields <- H.right (Artifact.canonicalFields payload)
   case fields of
-    Cons pool (Cons bodies Nil) -> do
+    (:) pool ((:) bodies []) -> do
       declarations <- H.right (Artifact.canonicalFields pool)
       records <- H.right (Artifact.canonicalFields bodies)
       -- All fixture identities are ASCII; this sorts after them without
       -- shifting any used index. The outer checksum is recomputed below.
       let unused = S.snoc declarations "data ΩPooledUnused = ΩPooledUnused;"
       _ <- H.right (Artifact.decodeTypePool (Separate.pack unused))
-      rejectPooledBecause "noncanonical pooled crate object" iface (Separate.pack (Cons (Separate.pack unused) (Cons bodies Nil)))
+      rejectPooledBecause "noncanonical pooled crate object" iface (Separate.pack ((:) (Separate.pack unused) ((:) bodies [])))
       case declarations of
-        Nil -> return Unit
-        Cons first rest -> rejectPooledBecause "duplicate crate pooled datatype" iface (Separate.pack (Cons (Separate.pack (S.sortBy compareString (Cons first declarations))) (Cons bodies Nil)))
+        [] -> return ()
+        (:) first rest -> rejectPooledBecause "duplicate crate pooled datatype" iface (Separate.pack ((:) (Separate.pack (S.sortBy compareString ((:) first declarations))) ((:) bodies [])))
       case records of
-        Nil -> return Unit
-        Cons record rest -> do
+        [] -> return ()
+        (:) record rest -> do
           recordFields <- H.right (Artifact.canonicalFields record)
           case recordFields of
-            Cons header (Cons body (Cons contents Nil)) -> do
-              let outside = Separate.pack (Cons (Separate.pack (Cons "999999999" Nil)) (Cons body (Cons contents Nil)))
-              rejectPooledBecause "datatype pool reference is out of bounds" iface (Separate.pack (Cons pool (Cons (Separate.pack (Cons outside rest)) Nil)))
+            (:) header ((:) body ((:) contents [])) -> do
+              let outside = Separate.pack ((:) (Separate.pack ((:) "999999999" [])) ((:) body ((:) contents [])))
+              rejectPooledBecause "datatype pool reference is out of bounds" iface (Separate.pack ((:) pool ((:) (Separate.pack ((:) outside rest)) [])))
               compact <- H.right (Artifact.canonicalFields contents)
               case compact of
-                Cons "MLFF-2" (Cons metadata (Cons text Nil)) -> do
-                  let damaged = Separate.pack (Cons "MLFF-2" (Cons metadata (Cons (text ++ " ") Nil)))
-                  let changed = Separate.pack (Cons header (Cons body (Cons damaged Nil)))
-                  rejectPooledBecause "contextual fragment body checksum mismatch" iface (Separate.pack (Cons pool (Cons (Separate.pack (Cons changed rest)) Nil)))
+                (:) "MLFF-2" ((:) metadata ((:) text [])) -> do
+                  let damaged = Separate.pack ((:) "MLFF-2" ((:) metadata ((:) (text ++ " ") [])))
+                  let changed = Separate.pack ((:) header ((:) body ((:) damaged [])))
+                  rejectPooledBecause "contextual fragment body checksum mismatch" iface (Separate.pack ((:) pool ((:) (Separate.pack ((:) changed rest)) [])))
                 _ -> H.fail "invalid contextual test fragment"
             _ -> H.fail "invalid pooled test fragment"
       poisoned <- H.right (poisonContext records)
       case poisoned of
-        Nothing -> return Unit
-        Just changed -> case pooledPacket iface (Separate.pack (Cons pool (Cons (Separate.pack changed) Nil))) of
-          Pair declared packet -> do
+        Nothing -> return ()
+        Just changed -> case pooledPacket iface (Separate.pack ((:) pool ((:) (Separate.pack changed) []))) of
+          (,) declared packet -> do
             _ <- H.right (Artifact.decodeObject declared packet)
             let forged = prefix ++ ".bad-context"
             writeFile (forged ++ ".mlfci") (Artifact.encodeInterface declared)
@@ -294,27 +294,27 @@ pooledFailures prefix iface payload = do
 
 visibilityLibrary : String -> String -> String -> String
 visibilityLibrary exports value hidden = "module A (" ++ exports ++ ") where\ndata Box = Box Int\nclass Render a where { render : a -> Int }\ninstance Render Int where { render x = x }\nf = " ++ value ++ "\nhidden = " ++ hidden ++ "\n"
-linkFixture : String -> IO Unit
+linkFixture : String -> IO ()
 linkFixture path = do
   result <- Artifact.linkCheckedFile path
   _ <- H.right result
-  return Unit
-rejectStaleFixture : String -> IO Unit
+  return ()
+rejectStaleFixture : String -> IO ()
 rejectStaleFixture path = do
   result <- Artifact.linkCheckedFile path
   case result of
     Left message -> H.assert (H.contains "stale crate dependency interface" message) ("unexpected stale dependency failure: " ++ message)
     Right _ -> H.fail "source-free link accepted a removed source export"
 
-staleVisibility : String -> IO Unit
+staleVisibility : String -> IO ()
 staleVisibility directory = do
   let library = directory ++ "/library"
   let consumer = directory ++ "/consumer"
   let dependency = library ++ ".mlfci"
   let public = "f, Box(..), Render(..)"
-  let buildLibrary = \exports value hidden -> compileFixture directory "visibility-library" "" Nil library "A" (visibilityLibrary exports value hidden)
+  let buildLibrary = \exports value hidden -> compileFixture directory "visibility-library" "" [] library "A" (visibilityLibrary exports value hidden)
   buildLibrary public "42" "0"
-  compileFixture directory "visibility-consumer" "Main" (Cons dependency Nil) consumer "Main"
+  compileFixture directory "visibility-consumer" "Main" ((:) dependency []) consumer "Main"
     "module Main where\nimport A\nmain = case Box (render f) of { Box x -> x }\n"
   linkFixture (consumer ++ ".mlfci")
   -- These change implementation objects and a private scheme, while every
@@ -326,13 +326,13 @@ staleVisibility directory = do
   S.mapM_ (\exports -> do
     buildLibrary exports "43" "true"
     rejectStaleFixture (consumer ++ ".mlfci"))
-    (Cons "Box(..), Render(..)" (Cons "f, Box, Render(..)" (Cons "f, Box(..), Render" Nil)))
+    ((:) "Box(..), Render(..)" ((:) "f, Box, Render(..)" ((:) "f, Box(..), Render" [])))
   buildLibrary public "43" "true"
   let facade = directory ++ "/facade"
   let facadeConsumer = directory ++ "/facade-consumer"
-  compileFixture directory "visibility-facade" "" (Cons dependency Nil) facade "Facade"
+  compileFixture directory "visibility-facade" "" ((:) dependency []) facade "Facade"
     "module Facade (f, Box(..), Render(..)) where\nimport A\n"
-  compileFixture directory "visibility-facade-consumer" "Main" (Cons (facade ++ ".mlfci") Nil) facadeConsumer "Main"
+  compileFixture directory "visibility-facade-consumer" "Main" ((:) (facade ++ ".mlfci") []) facadeConsumer "Main"
     "module Main where\nimport Facade\nmain = case Box (render f) of { Box x -> x }\n"
   linkFixture (facadeConsumer ++ ".mlfci")
   buildLibrary public "44" "false"

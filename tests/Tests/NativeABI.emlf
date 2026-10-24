@@ -7,150 +7,150 @@ import qualified Package.Verification as V
 import qualified Tests.Basic as H
 import qualified Package.Benchmark as B
 import qualified Tests.Bytes as Bytes
-capture : String -> List String -> String -> IO (Triple Int String String)
+capture : String -> [] String -> String -> IO ((,,) Int String String)
 capture directory argv input = do
  code <- O.exec "" argv input (directory ++ "/out") (directory ++ "/err") 1800
  out <- readFile (directory ++ "/out")
  err <- readFile (directory ++ "/err")
- return (Triple code out err)
-flags : String -> IO (List String)
+ return ((,,) code out err)
+flags : String -> IO ([] String)
 flags directory = do
- Triple code output errors <- capture directory (O.words "pkg-config --cflags --libs gmp") ""
+ (,,) code output errors <- capture directory (O.words "pkg-config --cflags --libs gmp") ""
  H.assert (code == 0 && eqString errors "") "GMP flags unavailable"
  return (O.words output)
-compile : String -> String -> List String -> IO String
+compile : String -> String -> [] String -> IO String
 compile directory source macros = do
  gmpOnly <- flags directory
  gc <- collectorFlags directory
  let gmp = S.append gmpOnly gc
  let binary = directory ++ "/probe"
- O.run "" (S.append (O.words "clang -O2 -std=c11 -Wall -Wextra -Werror -Iruntime") (S.append (Cons source (Cons "runtime/mlf_runtime.c" Nil)) (S.append macros (S.append gmp (Cons "-lm" (Cons "-o" (Cons binary Nil)))))))
+ O.run "" (S.append (O.words "clang -O2 -std=c11 -Wall -Wextra -Werror -Iruntime") (S.append ((:) source ((:) "runtime/mlf_runtime.c" [])) (S.append macros (S.append gmp ((:) "-lm" ((:) "-o" ((:) binary [])))))))
  return binary
-check : String -> String -> String -> Int -> String -> String -> IO Unit
+check : String -> String -> String -> Int -> String -> String -> IO ()
 check directory binary mode status output errors = do
- Triple code out err <- capture directory (Cons binary (Cons mode Nil)) ""
+ (,,) code out err <- capture directory ((:) binary ((:) mode [])) ""
  H.assert (code == status && eqString out output && eqString err errors) ("native ABI " ++ mode ++ " mismatch: " ++ showInt code ++ out ++ err)
-st : IO Unit
+st : IO ()
 st = H.withScratch (\directory -> do
- binary <- compile directory "tests/native/runtime_st.c" Nil
+ binary <- compile directory "tests/native/runtime_st.c" []
  check directory binary "success" 0 "runtime ST: laziness, snapshots, repetition, nesting, WHNF, and GC passed\n" ""
- S.mapM_ (\(Pair mode reason) -> check directory binary mode (if eqString mode "demand-poison" then 91 else 1) "" ((if eqString mode "demand-poison" then "" else "Runtime: ") ++ reason ++ "\n")) stErrors
+ S.mapM_ (\((,) mode reason) -> check directory binary mode (if eqString mode "demand-poison" then 91 else 1) "" ((if eqString mode "demand-poison" then "" else "Runtime: ") ++ reason ++ "\n")) stErrors
  H.assert (S.length stErrors + 1 == 35) "ST ABI mode coverage changed")
-stErrors = Cons (Pair "negative-size" "invalid array length") (Cons (Pair "huge-size" "invalid array length") (Cons (Pair "zero-read" "array index out of bounds") (Cons (Pair "negative-read" "array index out of bounds") (Cons (Pair "past-read" "array index out of bounds") (Cons (Pair "huge-read" "array index out of bounds") (Cons (Pair "negative-write" "array index out of bounds") (Cons (Pair "past-write" "array index out of bounds") (Cons (Pair "huge-write" "array index out of bounds") (Cons (Pair "ignored-invalid-read" "array index out of bounds") (Cons (Pair "io-as-st" "invalid value for runtime operation") (Cons (Pair "nested-io-as-st" "invalid value for runtime operation") (Cons (Pair "st-as-io" "invalid value for runtime operation") (Cons (Pair "int-array-as-st" "invalid value for runtime operation") (Cons (Pair "st-array-as-io" "invalid value for runtime operation") (Cons (Pair "null-return" "invalid environment write") (Cons (Pair "wrong-arity" "unary primitive arity mismatch") (Cons (Pair "demand-poison" "runtime ST: forced a lazy element") (Cons (Pair "cycle" "cyclic evaluation of a recursive binding") (Cons (Pair "direct-wrong-length" "invalid value for runtime operation") (Cons (Pair "direct-null-initial" "missing runtime value") (Cons (Pair "direct-null-stored" "missing runtime value") (Cons (Pair "direct-negative-size" "invalid array length") (Cons (Pair "direct-huge-size" "invalid array length") (Cons (Pair "direct-zero-read" "array index out of bounds") (Cons (Pair "direct-negative-read" "array index out of bounds") (Cons (Pair "direct-past-read" "array index out of bounds") (Cons (Pair "direct-huge-read" "array index out of bounds") (Cons (Pair "direct-negative-write" "array index out of bounds") (Cons (Pair "direct-past-write" "array index out of bounds") (Cons (Pair "direct-huge-write" "array index out of bounds") (Cons (Pair "direct-io-as-st" "invalid value for runtime operation") (Cons (Pair "direct-nested-io-as-st" "invalid value for runtime operation") (Cons (Pair "direct-int-array-as-st" "invalid value for runtime operation") (Nil))))))))))))))))))))))))))))))))))
-allocation : IO Unit
+stErrors = (:) ((,) "negative-size" "invalid array length") ((:) ((,) "huge-size" "invalid array length") ((:) ((,) "zero-read" "array index out of bounds") ((:) ((,) "negative-read" "array index out of bounds") ((:) ((,) "past-read" "array index out of bounds") ((:) ((,) "huge-read" "array index out of bounds") ((:) ((,) "negative-write" "array index out of bounds") ((:) ((,) "past-write" "array index out of bounds") ((:) ((,) "huge-write" "array index out of bounds") ((:) ((,) "ignored-invalid-read" "array index out of bounds") ((:) ((,) "io-as-st" "invalid value for runtime operation") ((:) ((,) "nested-io-as-st" "invalid value for runtime operation") ((:) ((,) "st-as-io" "invalid value for runtime operation") ((:) ((,) "int-array-as-st" "invalid value for runtime operation") ((:) ((,) "st-array-as-io" "invalid value for runtime operation") ((:) ((,) "null-return" "invalid environment write") ((:) ((,) "wrong-arity" "unary primitive arity mismatch") ((:) ((,) "demand-poison" "runtime ST: forced a lazy element") ((:) ((,) "cycle" "cyclic evaluation of a recursive binding") ((:) ((,) "direct-wrong-length" "invalid value for runtime operation") ((:) ((,) "direct-null-initial" "missing runtime value") ((:) ((,) "direct-null-stored" "missing runtime value") ((:) ((,) "direct-negative-size" "invalid array length") ((:) ((,) "direct-huge-size" "invalid array length") ((:) ((,) "direct-zero-read" "array index out of bounds") ((:) ((,) "direct-negative-read" "array index out of bounds") ((:) ((,) "direct-past-read" "array index out of bounds") ((:) ((,) "direct-huge-read" "array index out of bounds") ((:) ((,) "direct-negative-write" "array index out of bounds") ((:) ((,) "direct-past-write" "array index out of bounds") ((:) ((,) "direct-huge-write" "array index out of bounds") ((:) ((,) "direct-io-as-st" "invalid value for runtime operation") ((:) ((,) "direct-nested-io-as-st" "invalid value for runtime operation") ((:) ((,) "direct-int-array-as-st" "invalid value for runtime operation") ([]))))))))))))))))))))))))))))))))))
+allocation : IO ()
 allocation = H.withScratch (\directory -> do
- binary <- compile directory "tests/native/runtime_allocation.c" Nil
+ binary <- compile directory "tests/native/runtime_allocation.c" []
  S.mapM_ (\mode -> do
-  Triple code out err <- capture directory (Cons binary (Cons mode Nil)) ""
+  (,,) code out err <- capture directory ((:) binary ((:) mode [])) ""
   value <- H.right (J.parse out)
   H.assert (code == 0 && eqString err "" && V.integer 0 (J.get "constructor_arities" value) == 7 && V.integer 0 (J.get "field_evaluations" value) == 8 && V.integer 0 (J.get "zero_environments" value) == 4100 && V.integer (-1) (J.get "retained_bytes" value) >= 0 && V.integer 4194304 (J.get "retained_bytes" value) < 4194304) "constructor allocation accounting mismatch") (O.words "success no-interior incremental")
  S.mapM_ (\mode -> check directory binary mode 1 "" ("Runtime: " ++ (if eqString mode "unset-slot" then "invalid environment read" else "invalid constructor descriptor") ++ "\n")) (O.words "negative-tag short overflow unset-slot"))
-collectorFlags : String -> IO (List String)
+collectorFlags : String -> IO ([] String)
 collectorFlags directory = do
  prefix <- getEnv "MLF_GC_PREFIX"
  if eqString prefix "" then do
-  Triple code out err <- capture directory (O.words "pkg-config --cflags --libs bdw-gc") ""
+  (,,) code out err <- capture directory (O.words "pkg-config --cflags --libs bdw-gc") ""
   H.assert (code == 0) "BDWGC flags unavailable"
   return (O.words out)
  else do
-  Triple code system err <- capture directory (O.words "uname -s") ""
+  (,,) code system err <- capture directory (O.words "uname -s") ""
   H.assert (code == 0) "platform query failed"
-  return (Cons ("-I" ++ prefix ++ "/include") (Cons (prefix ++ "/lib/libgc.a") (if eqString (O.trim system) "Linux" then Cons "-ldl" Nil else Nil)))
+  return ((:) ("-I" ++ prefix ++ "/include") ((:) (prefix ++ "/lib/libgc.a") (if eqString (O.trim system) "Linux" then (:) "-ldl" [] else [])))
 stringErrors = S.append
- (S.map (\mode -> Pair mode "string index out of bounds") (O.words "string-ascii-negative-index string-ascii-past-index string-ascii-huge-index string-empty-index string-mixed-negative-index string-mixed-past-index string-mixed-huge-index string-sparse-negative-index string-sparse-past-index string-sparse-huge-index"))
- (S.append (S.map (\mode -> Pair mode "string slice out of bounds") (O.words "string-ascii-negative-offset string-ascii-past-offset string-ascii-negative-count string-ascii-past-count string-ascii-huge-count string-empty-past-count string-mixed-negative-offset string-mixed-past-offset string-mixed-negative-count string-mixed-past-count string-mixed-huge-count string-sparse-past-offset string-sparse-past-count"))
- (S.map (\mode -> Pair mode "invalid Unicode scalar") (O.words "string-invalid-prefix string-invalid-surrogate-index string-invalid-surrogate-slice string-invalid-overlong string-invalid-truncated string-invalid-stray string-invalid-range string-invalid-after-nul")))
-values : IO Unit
+ (S.map (\mode -> (,) mode "string index out of bounds") (O.words "string-ascii-negative-index string-ascii-past-index string-ascii-huge-index string-empty-index string-mixed-negative-index string-mixed-past-index string-mixed-huge-index string-sparse-negative-index string-sparse-past-index string-sparse-huge-index"))
+ (S.append (S.map (\mode -> (,) mode "string slice out of bounds") (O.words "string-ascii-negative-offset string-ascii-past-offset string-ascii-negative-count string-ascii-past-count string-ascii-huge-count string-empty-past-count string-mixed-negative-offset string-mixed-past-offset string-mixed-negative-count string-mixed-past-count string-mixed-huge-count string-sparse-past-offset string-sparse-past-count"))
+ (S.map (\mode -> (,) mode "invalid Unicode scalar") (O.words "string-invalid-prefix string-invalid-surrogate-index string-invalid-surrogate-slice string-invalid-overlong string-invalid-truncated string-invalid-stray string-invalid-range string-invalid-after-nul")))
+values : IO ()
 values = H.withScratch (\directory -> do
- let profiles = Cons Nil (Cons (Cons "-DGC_DEBUG" Nil) (Cons (Cons "-DMLF_ALLOCATION_AUDIT" Nil) Nil))
+ let profiles = (:) [] ((:) ((:) "-DGC_DEBUG" []) ((:) ((:) "-DMLF_ALLOCATION_AUDIT" []) []))
  S.mapM_ (\macros -> do
   binary <- compile directory "tests/native/runtime_values.c" macros
   S.mapM_ (\mode -> check directory binary mode 0 "runtime values: sharing, lazy fields, recursive data, and spill boundaries passed\n" "") (O.words "success no-interior")
-  S.mapM_ (\(Pair mode reason) -> check directory binary mode 1 "" ("Runtime: " ++ reason ++ "\n")) (S.append stringErrors (Cons (Pair "capture-null-code" "missing native code") (Cons (Pair "capture-overflow" "environment too large") (Cons (Pair "negative-tag" "invalid constructor descriptor") (Cons (Pair "null-fields" "invalid constructor descriptor") (Cons (Pair "overapplication" "constructor overapplication") (Cons (Pair "field-bounds" "invalid environment read") (S.map (\mode -> Pair mode "cyclic evaluation of a recursive binding") (O.words "cycle-hole cycle-pair cycle-thunk")))))))))) profiles)
-compileLLVM : String -> String -> String -> List String -> List String -> IO String
+  S.mapM_ (\((,) mode reason) -> check directory binary mode 1 "" ("Runtime: " ++ reason ++ "\n")) (S.append stringErrors ((:) ((,) "capture-null-code" "missing native code") ((:) ((,) "capture-overflow" "environment too large") ((:) ((,) "negative-tag" "invalid constructor descriptor") ((:) ((,) "null-fields" "invalid constructor descriptor") ((:) ((,) "overapplication" "constructor overapplication") ((:) ((,) "field-bounds" "invalid environment read") (S.map (\mode -> (,) mode "cyclic evaluation of a recursive binding") (O.words "cycle-hole cycle-pair cycle-thunk")))))))))) profiles)
+compileLLVM : String -> String -> String -> [] String -> [] String -> IO String
 compileLLVM directory source runtime macros objects = do
  compiler <- getEnv "MLF_BOOTSTRAP_COMPILER"
- Triple code out err <- capture directory (Cons compiler (Cons "--emit-llvm" (Cons source Nil))) ""
+ (,,) code out err <- capture directory ((:) compiler ((:) "--emit-llvm" ((:) source []))) ""
  H.assert (code == 0 && eqString err "") "selected compiler failed LLVM emission"
  writeFile (directory ++ "/program.ll") out
  gmpOnly <- flags directory
  gc <- collectorFlags directory
  let gmp = S.append gmpOnly gc
  let object = directory ++ "/runtime.o"
- O.run "" (S.append (O.words "clang -O2 -std=c11 -Iruntime") (S.append macros (S.append (S.filter (O.starts "-I") gmp) (Cons "-c" (Cons runtime (Cons "-o" (Cons object Nil)))))))
+ O.run "" (S.append (O.words "clang -O2 -std=c11 -Iruntime") (S.append macros (S.append (S.filter (O.starts "-I") gmp) ((:) "-c" ((:) runtime ((:) "-o" ((:) object [])))))))
  let binary = directory ++ "/program"
- O.run "" (S.append (Cons "clang" (Cons "-O2" (Cons "-Wno-override-module" (Cons (directory ++ "/program.ll") (Cons object objects))))) (S.append gmp (S.append (O.words "-Iruntime -lm -o") (Cons binary Nil))))
+ O.run "" (S.append ((:) "clang" ((:) "-O2" ((:) "-Wno-override-module" ((:) (directory ++ "/program.ll") ((:) object objects))))) (S.append gmp (S.append (O.words "-Iruntime -lm -o") ((:) binary []))))
  return binary
-rawConsole : IO Unit
+rawConsole : IO ()
 rawConsole = H.withScratch (\directory -> do
  let source = "do { a <- getByteLine; n <- lengthByteArray a; putBytes a 0 n; b <- getByteLine; m <- lengthByteArray b; putBytes b 0 m; end <- getByteLine; size <- lengthByteArray end; printInt size }"
  writeFile (directory ++ "/console.emlf") source
- let inputBytes = Bytes.pack (Cons 0 (Cons 255 (Cons 128 (Cons 10 (Cons 129 (Cons 65 Nil))))))
+ let inputBytes = Bytes.pack ((:) 0 ((:) 255 ((:) 128 ((:) 10 ((:) 129 ((:) 65 []))))))
  Bytes.writeFile (directory ++ "/input") inputBytes
  compiler <- getEnv "MLF_BOOTSTRAP_COMPILER"
- binary <- compileLLVM directory (directory ++ "/console.emlf") "runtime/mlf_runtime.c" Nil Nil
+ binary <- compileLLVM directory (directory ++ "/console.emlf") "runtime/mlf_runtime.c" [] []
  S.mapM_ (\argv -> do
   code <- O.exec "" argv (directory ++ "/input") (directory ++ "/bytes.out") (directory ++ "/bytes.err") 60
   out <- Bytes.readFile (directory ++ "/bytes.out")
   err <- readFile (directory ++ "/bytes.err")
-  H.assert (code == 0 && S.eqList eqInt (Bytes.unpack out) (S.append (Bytes.unpack inputBytes) (B.textBytes "0\n")) && eqString err "") "raw console bytes or EOF changed") (Cons (Cons compiler (Cons "--run" (Cons (directory ++ "/console.emlf") Nil))) (Cons (Cons binary Nil) Nil)))
+  H.assert (code == 0 && S.eqList eqInt (Bytes.unpack out) (S.append (Bytes.unpack inputBytes) (B.textBytes "0\n")) && eqString err "") "raw console bytes or EOF changed") ((:) ((:) compiler ((:) "--run" ((:) (directory ++ "/console.emlf") []))) ((:) ((:) binary []) [])))
 
-allTables : IO Unit
+allTables : IO ()
 allTables = H.withScratch (\directory -> do
- binary <- compileLLVM directory "benchmarks/k-nucleotide/mlf/main.emlf" "runtime/mlf_runtime.c" (O.words "-DMLF_TABLE_AUDIT -Dmlf_run=mlf_original_run") (Cons "tests/native/benchmark_tables.c" Nil)
+ binary <- compileLLVM directory "benchmarks/k-nucleotide/mlf/main.emlf" "runtime/mlf_runtime.c" (O.words "-DMLF_TABLE_AUDIT -Dmlf_run=mlf_original_run") ((:) "tests/native/benchmark_tables.c" [])
  S.mapM_ (\size -> do
   let input = B.fasta size
   writeFile (directory ++ "/input") input
-  Triple code out err <- capture directory (Cons binary Nil) (directory ++ "/input")
+  (,,) code out err <- capture directory ((:) binary []) (directory ++ "/input")
   H.assert (code == 0 && O.starts "tables=7\n" err) "not all seven tables were used"
   let sequence = B.upper (S.snd (S.index (B.records input) 2))
-  let expected = S.map (\width -> let keys = S.nubBy eqString (B.windows width sequence) in Pair (S.max 0 (stringLength sequence - width + 1) + (if width <= 2 then S.length keys else 0)) (S.length keys)) (Cons 1 (Cons 2 (Cons 3 (Cons 4 (Cons 6 (Cons 12 (Cons 18 Nil)))))))
+  let expected = S.map (\width -> let keys = S.nubBy eqString (B.windows width sequence) in (,) (S.max 0 (stringLength sequence - width + 1) + (if width <= 2 then S.length keys else 0)) (S.length keys)) ((:) 1 ((:) 2 ((:) 3 ((:) 4 ((:) 6 ((:) 12 ((:) 18 [])))))))
   let writes = S.map (\token -> readInt (O.drop 7 token)) (S.filter (O.starts "writes=") (O.words err))
   let distinct = S.map (\token -> readInt (O.drop 9 token)) (S.filter (O.starts "distinct=") (O.words err))
-  H.assert (S.eqList (S.eqPair eqInt eqInt) (S.zip writes distinct) expected && B.validateOutput "k-nucleotide" size (B.textBytes out)) "table write or distinct-key counts changed") (Cons 1 (Cons 7 (Cons 31 (Cons 1000 Nil)))))
-allTreeNodes : IO Unit
+  H.assert (S.eqList (S.eqPair eqInt eqInt) (S.zip writes distinct) expected && B.validateOutput "k-nucleotide" size (B.textBytes out)) "table write or distinct-key counts changed") ((:) 1 ((:) 7 ((:) 31 ((:) 1000 [])))))
+allTreeNodes : IO ()
 allTreeNodes = H.withScratch (\directory -> do
- binary <- compileLLVM directory "benchmarks/binary-trees/mlf/main.emlf" "runtime/mlf_runtime.c" (O.words "-DMLF_ALLOCATION_AUDIT -Dmlf_run=mlf_original_run") (Cons "tests/native/benchmark_allocations.c" Nil)
+ binary <- compileLLVM directory "benchmarks/binary-trees/mlf/main.emlf" "runtime/mlf_runtime.c" (O.words "-DMLF_ALLOCATION_AUDIT -Dmlf_run=mlf_original_run") ((:) "tests/native/benchmark_allocations.c" [])
  S.mapM_ (\size -> do
   writeFile (directory ++ "/input") (showInt size ++ "\n")
-  Triple code out err <- capture directory (Cons binary Nil) (directory ++ "/input")
+  (,,) code out err <- capture directory ((:) binary []) (directory ++ "/input")
   let counts = S.map (\line -> readInt (S.last (O.words line))) (O.lines (B.binaryTrees size))
-  H.assert (code == 0 && eqString (O.trim err) ("allocated_tree_nodes=" ++ showInt (S.sum counts)) && B.validateOutput "binary-trees" size (B.textBytes out)) "tree nodes were omitted or shortcut") (Cons 6 (Cons 7 (Cons 10 (Cons 16 Nil)))))
-generatedForce : IO Unit
+  H.assert (code == 0 && eqString (O.trim err) ("allocated_tree_nodes=" ++ showInt (S.sum counts)) && B.validateOutput "binary-trees" size (B.textBytes out)) "tree nodes were omitted or shortcut") ((:) 6 ((:) 7 ((:) 10 ((:) 16 [])))))
+generatedForce : IO ()
 generatedForce = H.withScratch (\directory -> do
  compiler <- getEnv "MLF_BOOTSTRAP_COMPILER"
  gc <- collectorFlags directory
  gmp <- flags directory
  let source = "tests/native/runtime_inline_force.c"
- code <- O.exec "" (Cons compiler (O.words "--emit-llvm-gc --expr 0")) "" (directory ++ "/original.ll") (directory ++ "/emission.err") 30
+ code <- O.exec "" ((:) compiler (O.words "--emit-llvm-gc --expr 0")) "" (directory ++ "/original.ll") (directory ++ "/emission.err") 30
  O.require (code == 0) "force probe LLVM emission failed"
  llvm <- readFile (directory ++ "/original.ll")
  O.require (H.contains "define private ptr @mlf.force" llvm && H.contains "define i32 @main(" llvm) "missing generated force or main"
  writeFile (directory ++ "/probe.ll") (O.replace "define i32 @main(" "define i32 @mlf_force_probe_ignored_main(" llvm ++ "\ndefine ptr @probe_force(ptr %value) {\nentry:\n  %result = call ptr @mlf.force(ptr %value)\n  ret ptr %result\n}\n")
  old <- getEnv "GC_INITIAL_HEAP_SIZE"
  setEnv "GC_INITIAL_HEAP_SIZE" "8388608"
- S.mapM_ (\(Pair name macros) -> do
+ S.mapM_ (\((,) name macros) -> do
   let binary = directory ++ "/" ++ name
   let options = S.append (O.words "-O2 -std=c11 -Wno-override-module -Iruntime") macros
-  let inputs = Cons source (Cons "runtime/mlf_runtime.c" Nil)
+  let inputs = (:) source ((:) "runtime/mlf_runtime.c" [])
   -- GNU ld resolves static archives against preceding object inputs.
   -- Keep both native sources and generated LLVM before GC, GMP and libm.
-  let libraries = S.append gc (S.append gmp (Cons "-lm" Nil))
-  O.run "" (S.append (Cons "clang" options) (S.append inputs (Cons (directory ++ "/probe.ll") (S.append libraries (Cons "-o" (Cons binary Nil))))))
+  let libraries = S.append gc (S.append gmp ((:) "-lm" []))
+  O.run "" (S.append ((:) "clang" options) (S.append inputs ((:) (directory ++ "/probe.ll") (S.append libraries ((:) "-o" ((:) binary []))))))
   S.mapM_ (\mode -> do
-   status <- O.exec "" (Cons binary (Cons mode Nil)) "" (directory ++ "/" ++ name ++ "-" ++ mode ++ ".out") (directory ++ "/" ++ name ++ "-" ++ mode ++ ".err") 30
+   status <- O.exec "" ((:) binary ((:) mode [])) "" (directory ++ "/" ++ name ++ "-" ++ mode ++ ".out") (directory ++ "/" ++ name ++ "-" ++ mode ++ ".err") 30
    out <- readFile (directory ++ "/" ++ name ++ "-" ++ mode ++ ".out")
    err <- readFile (directory ++ "/" ++ name ++ "-" ++ mode ++ ".err")
    let success = eqString mode "success"
    let reason = if eqString mode "null" then "missing runtime value" else "cyclic evaluation of a recursive binding"
-   O.require (status == (if success then 0 else 1) && eqString out (if success then "generated force: sharing, canonical values, long spines and no-interior GC passed\n" else "") && eqString err (if success then "" else "Runtime: " ++ reason ++ "\n")) ("generated force ABI mismatch: " ++ name ++ " " ++ mode)) (O.words "success null hole cycle-enter cycle-return")) (Cons (Pair "compact" Nil) (Cons (Pair "debug" (Cons "-DGC_DEBUG" Nil)) (Cons (Pair "audit" (Cons "-DMLF_ALLOCATION_AUDIT" Nil)) Nil)))
+   O.require (status == (if success then 0 else 1) && eqString out (if success then "generated force: sharing, canonical values, long spines and no-interior GC passed\n" else "") && eqString err (if success then "" else "Runtime: " ++ reason ++ "\n")) ("generated force ABI mismatch: " ++ name ++ " " ++ mode)) (O.words "success null hole cycle-enter cycle-return")) ((:) ((,) "compact" []) ((:) ((,) "debug" ((:) "-DGC_DEBUG" [])) ((:) ((,) "audit" ((:) "-DMLF_ALLOCATION_AUDIT" [])) [])))
  if eqString old "" then unsetEnv "GC_INITIAL_HEAP_SIZE" else setEnv "GC_INITIAL_HEAP_SIZE" old
  )
 
-suite : List (Pair String (IO Unit))
-suite = Cons (Pair "test_generated_force_preserves_memoization_and_errors" generatedForce) (Cons (Pair "test_runtime_state_actions_preserve_laziness_and_roots" st)
- (Cons (Pair "test_runtime_constructor_allocation_and_cleanup" allocation)
- (Cons (Pair "test_runtime_constructor_fields_and_update_spines" values)
- (Cons (Pair "test_real_console_raw_input_matches_native_bytes_and_eof" rawConsole)
- (Cons (Pair "test_mlf_counts_every_window_and_distinct_key_in_all_seven_tables" allTables)
- (Cons (Pair "test_mlf_allocates_every_tree_node" allTreeNodes) Nil))))))
+suite : [] ((,) String (IO ()))
+suite = (:) ((,) "test_generated_force_preserves_memoization_and_errors" generatedForce) ((:) ((,) "test_runtime_state_actions_preserve_laziness_and_roots" st)
+ ((:) ((,) "test_runtime_constructor_allocation_and_cleanup" allocation)
+ ((:) ((,) "test_runtime_constructor_fields_and_update_spines" values)
+ ((:) ((,) "test_real_console_raw_input_matches_native_bytes_and_eof" rawConsole)
+ ((:) ((,) "test_mlf_counts_every_window_and_distinct_key_in_all_seven_tables" allTables)
+ ((:) ((,) "test_mlf_allocates_every_tree_node" allTreeNodes) []))))))

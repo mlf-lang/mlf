@@ -10,8 +10,8 @@ module Tests.BuildReceipts where {
   -- These are the actual production operations, not copied source fragments.
   appendSuiteBuildReceipt :: J.Json -> J.Json -> J.Json;
   appendSuiteBuildReceipt saved receipt =
-    J.Array (S.snoc (J.values (J.getOr "suite_builds" (J.Array Nil) saved)) receipt);
-  preparedSuiteTargets :: J.Json -> List String -> Bool;
+    J.Array (S.snoc (J.values (J.getOr "suite_builds" (J.Array []) saved)) receipt);
+  preparedSuiteTargets :: J.Json -> [] String -> Bool;
   preparedSuiteTargets saved targets =
     S.all (\target -> J.has target (J.getObject "prepared_suite_targets" saved)) targets
 }

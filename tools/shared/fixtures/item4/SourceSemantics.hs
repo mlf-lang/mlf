@@ -22,7 +22,7 @@ run body = case C.compile "Example.hs" (source body) of
   T.Right result -> let term = C.compiledTerm result in
     case R.prepare P.False term of
       T.Left err -> T.Left err
-      T.Right (T.Pair env _) -> R.evaluate env (R.REnv M.empty) (X.erase term)
+      T.Right ((,) env _) -> R.evaluate env (R.REnv M.empty) (X.erase term)
 check name body expected = announce name $ case run body of
   T.Right (R.RInteger actual) | actual == expected -> putStrLn ("pass: " P.++ name)
   T.Left err -> error (name P.++ ": " P.++ B.unpack err)

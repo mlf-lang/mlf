@@ -15,9 +15,9 @@ import qualified Bootstrap.Separate as U
 import qualified MLF.Host.Base as B
 import qualified MLF.Primitive as Prim
 
-list = foldr T.Cons T.Nil
-toList T.Nil = []
-toList (T.Cons x xs) = x : toList xs
+list = foldr (:) []
+toList [] = []
+toList ((:) x xs) = x : toList xs
 check name ok = if ok then putStrLn ("PASS " ++ name) else error name
 expect label result = case result of
   T.Left err -> error (label ++ ": " ++ B.unpack err)
@@ -29,7 +29,7 @@ resolve name text = do
   case filter (\r -> B.unpack (Modules.moduleIdentity (Modules.resolvedSource r)) == name) (toList (Modules.resolvedCrateModules crate)) of
     [resolved] -> pure resolved
     _ -> error "missing uniquely resolved module"
-emptyIface ds = A.CrateInterface "forged" T.Nil T.Nil T.Nil T.Nil ds T.Nil T.Nil ds T.Nil "" "object"
+emptyIface ds = A.CrateInterface "forged" [] [] [] [] ds [] [] ds [] "" "object"
 main = do
   let malformedCons = Modules.Entity "Prelude" ":" (Modules.Constructor "Wrong")
       genuineCons = Modules.Entity "Prelude" ":" (Modules.Constructor "[]")
@@ -40,12 +40,12 @@ main = do
     not (Prim.eqString (A.definitionName "authority" malformedCons) ":")
   ordinary <- resolve "User" "module User where\nimport MLF.Primitive hiding (HasCallStack)\nclass HasCallStack a where { witness :: a -> Int }\n"
   check "ordinary same-spelling class cannot become managed constraint" $ case Modules.renamedClasses (Modules.resolvedContents ordinary) of
-    T.Cons (T.SClassDecl name _ _ _) T.Nil -> not (Prim.eqString name "MLFHasCallStack")
+    (:) (T.SClassDecl name _ _ _) [] -> not (Prim.eqString name "MLFHasCallStack")
     _ -> False
   private <- resolve "User" "module User (MLFStackEvidence(..)) where\nimport MLF.Primitive\ndata MLFStackEvidence = MLFStackEvidence Int\n"
   let ds = Modules.renamedDatatypes (Modules.resolvedContents private)
   check "same-spelling private type and constructor remain user-owned" $ case ds of
-    T.Cons d T.Nil -> not (Prim.eqString (D.datatypeName d) "MLFStackEvidence") &&
+    (:) d [] -> not (Prim.eqString (D.datatypeName d) "MLFStackEvidence") &&
       S.all (\c -> not (Prim.eqString (D.constructorName c) "MLFStackEvidence")) (D.datatypeConstructors d)
     _ -> False
   env <- expect "validate distinct user declaration with intrinsic registry" (D.validateDeclarations ds)
@@ -61,16 +61,16 @@ main = do
   check "forged canonical frame layout rejected at linker authority boundary" $ case A.validateLayouts (list [emptyIface (list [D.stackFrameDeclaration])]) of
     T.Left _ -> True
     _ -> False
-  let fakeClass = T.SClassDecl "MLFHasCallStack" (list [T.Pair "a" T.Star]) T.Nil T.Nil
-      fakeClassIface = A.CrateInterface "fake-class" T.Nil T.Nil T.Nil T.Nil T.Nil (list [fakeClass]) T.Nil T.Nil T.Nil "" "object"
+  let fakeClass = T.SClassDecl "MLFHasCallStack" (list [(,) "a" T.Star]) [] []
+      fakeClassIface = A.CrateInterface "fake-class" [] [] [] [] [] (list [fakeClass]) [] [] [] "" "object"
   check "ordinary class metadata cannot claim compiler-managed predicate" $ case A.validateLayouts (list [fakeClassIface]) of
     T.Left message -> "compiler-managed constraint, not a class" `isInfixOf` B.unpack message
     _ -> False
   let privateExports = list [Modules.Entity "MLF.Primitive" "MLFStackEvidence" Modules.BuiltinType,
                             Modules.Entity "MLF.Primitive" "MLFStackEvidence" (Modules.Constructor "MLFStackEvidence")]
-      forgedExports = A.CrateInterface "forged-exports" T.Nil (list ["User"])
-        (list [T.Pair "User" privateExports]) (list [T.Pair "User" T.Nil])
-        T.Nil T.Nil T.Nil T.Nil T.Nil "" "object"
+      forgedExports = A.CrateInterface "forged-exports" [] (list ["User"])
+        (list [(,) "User" privateExports]) (list [(,) "User" []])
+        [] [] [] [] [] "" "object"
   check "private intrinsic type and constructor exports require real ownership" $ case A.validateExportBoundary M.empty forgedExports of
     T.Left message -> "outside its dependency boundary" `isInfixOf` B.unpack message
     _ -> False
@@ -84,9 +84,9 @@ main = do
   exposed <- expect "resolve managed reexport alias" (Modules.resolvedExports T.NoImplicitPrelude facade)
   let entities = Set.toList (Modules.visible exposed)
       managed = Modules.Entity "MLF.Primitive" "HasCallStack" Modules.ManagedConstraint
-      facadeIface = A.CrateInterface "facade" T.Nil (list ["Facade"])
-        (list [T.Pair "Facade" entities]) (list [T.Pair "Facade" (list ["MLF.Primitive"])])
-        T.Nil T.Nil T.Nil T.Nil T.Nil "" "object"
+      facadeIface = A.CrateInterface "facade" [] (list ["Facade"])
+        (list [(,) "Facade" entities]) (list [(,) "Facade" (list ["MLF.Primitive"])])
+        [] [] [] [] [] "" "object"
   check "qualified import reexport retains exact managed identity" $
     S.eqList (\a b -> Modules.compareEntity a b == 0) entities (list [managed])
   _ <- expect "managed reexport interface authority" (A.validateInterface facadeIface)
@@ -100,19 +100,19 @@ main = do
       ty = A.definitionName identity typeEntity
       only = A.definitionName identity onlyEntity
       other = A.definitionName identity otherEntity
-      family = T.DataDecl ty T.Nil (list [T.ConstructorDecl only T.Nil, T.ConstructorDecl other T.Nil])
+      family = T.DataDecl ty [] (list [T.ConstructorDecl only [], T.ConstructorDecl other []])
       visible = list [typeEntity, onlyEntity]
-      hiddenIface = A.CrateInterface identity T.Nil (list ["Provider"])
-        (list [T.Pair "Provider" visible]) (list [T.Pair "Provider" T.Nil])
-        (list [family]) T.Nil T.Nil (list [family]) T.Nil "" "object"
+      hiddenIface = A.CrateInterface identity [] (list ["Provider"])
+        (list [(,) "Provider" visible]) (list [(,) "Provider" []])
+        (list [family]) [] [] (list [family]) [] "" "object"
   restored <- expect "decode restricted-constructor interface" (A.decodeInterface (A.encodeInterface hiddenIface))
   _ <- expect "validate complete hidden-constructor layout" (A.validateLayouts (list [restored]))
   check "hidden constructors survive interface refutability inventory" $ case A.crateData restored of
-    T.Cons d T.Nil -> S.eqList Prim.eqString (S.map D.constructorName (D.datatypeConstructors d)) (list [only,other])
+    (:) d [] -> S.eqList Prim.eqString (S.map D.constructorName (D.datatypeConstructors d)) (list [only,other])
     _ -> False
   check "hidden constructor remains absent from source export inventory" $
     not (S.any (\e -> Modules.compareEntity e otherEntity == 0) (S.concatMap S.snd (A.crateExports restored)))
   check "removing hidden family member changes inference key" $ not $ Prim.eqString
-    (Q.queryKey identity "compiler" T.Nil T.Nil (A.crateData restored))
-    (Q.queryKey identity "compiler" T.Nil T.Nil (list [T.DataDecl ty T.Nil (list [T.ConstructorDecl only T.Nil])]))
+    (Q.queryKey identity "compiler" [] [] (A.crateData restored))
+    (Q.queryKey identity "compiler" [] [] (list [T.DataDecl ty [] (list [T.ConstructorDecl only []])]))
   putStrLn "item4 artifact authority and hidden-family contracts: passed"

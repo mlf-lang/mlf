@@ -19,29 +19,29 @@ coverageMetric = "{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"start\",
 coverageUnknown = "{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"start\",\"scope\":\"partial\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"case\",\"id\":\"unknown\",\"status\":\"passed\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"summary\",\"complete\":true,\"executions\":1,\"aliases\":0,\"metrics\":0}\n"
 coverageEmpty = "{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"start\",\"scope\":\"partial\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"summary\",\"complete\":true,\"executions\":0,\"aliases\":0,\"metrics\":0}\n"
 render rows = S.intercalate "\n" (S.map J.render rows) ++ "\n"
-change index action rows = S.map (\(Pair position row) -> if position == index then action row else row) (S.zip (S.range 0 (S.length rows - 1)) rows)
-without index rows = S.map S.snd (S.filter (\(Pair position _) -> position /= index) (S.zip (S.range 0 (S.length rows - 1)) rows))
-rejected : forall a. Either String a -> IO Unit
-rejected result = case result of { Left _ -> return Unit; Right _ -> H.fail "damaged family selection or projected coverage was accepted" }
+change index action rows = S.map (\((,) position row) -> if position == index then action row else row) (S.zip (S.range 0 (S.length rows - 1)) rows)
+without index rows = S.map S.snd (S.filter (\((,) position _) -> position /= index) (S.zip (S.range 0 (S.length rows - 1)) rows))
+rejected : forall a. Either String a -> IO ()
+rejected result = case result of { Left _ -> return (); Right _ -> H.fail "damaged family selection or projected coverage was accepted" }
 plan available args full identities = do
- Pair actualFull actual <- H.right (F.choose available args)
+ (,) actualFull actual <- H.right (F.choose available args)
  H.assert (H.eq actualFull full && S.eqList eqString actual identities) "family plan changed selection, order or scope"
 
-main : IO Unit
+main : IO ()
 main = do
  let identities = O.words "probe/first probe/second"
- let first = Cons "probe/first" Nil
- H.assert (F.listing (Cons "--list-families" Nil) && S.not (F.listing Nil) && S.not (F.listing (O.words "--list-families extra"))) "family discovery accepts execution arguments"
- plan identities Nil true identities
+ let first = (:) "probe/first" []
+ H.assert (F.listing ((:) "--list-families" []) && S.not (F.listing []) && S.not (F.listing (O.words "--list-families extra"))) "family discovery accepts execution arguments"
+ plan identities [] true identities
  plan identities (O.words "--families probe/second probe/first") false identities
- plan identities (O.words "--families probe/second") false (Cons "probe/second" Nil)
- rejected (F.choose Nil Nil)
- rejected (F.choose (O.words "probe/first probe/first") Nil)
- rejected (F.choose (Cons "bad identity" Nil) Nil)
+ plan identities (O.words "--families probe/second") false ((:) "probe/second" [])
+ rejected (F.choose [] [])
+ rejected (F.choose (O.words "probe/first probe/first") [])
+ rejected (F.choose ((:) "bad identity" []) [])
  rejected (F.choose identities (O.words "--families"))
  rejected (F.choose identities (O.words "--families probe/first probe/first"))
  rejected (F.choose identities (O.words "--families probe/unknown"))
- rejected (F.choose identities (Cons "--families" (Cons "" Nil)))
+ rejected (F.choose identities ((:) "--families" ((:) "" [])))
  rejected (F.choose identities (O.words "--list-families"))
  rejected (F.choose identities (O.words "--unknown probe/first"))
  full <- H.right (F.parse familyFull)
@@ -52,7 +52,7 @@ main = do
  rejected (F.validate "probe" true first familyPartial)
  rejected (F.validate "probe" false identities familyFull)
  rejected (F.validate "probe" true first familyFull)
- rejected (F.validate "probe" true Nil familyFull)
+ rejected (F.validate "probe" true [] familyFull)
  rejected (F.validate "probe" true (O.words "probe/first probe/first") familyFull)
  rejected (F.validate "probe" true identities "")
  rejected (F.validate "probe" true identities (familyFull ++ "truncated {\n"))
@@ -61,9 +61,9 @@ main = do
  rejected (F.validate "probe" true identities (render (change 2 (J.set "families" (J.num 1)) (without 1 full))))
  rejected (F.validate "probe" true identities (render (change 1 (J.set "id" (J.str "probe/second")) full)))
  rejected (F.validate "probe" true identities (render (change 1 (J.set "id" (J.str "probe/unknown")) full)))
- rejected (F.validate "probe" true identities (render (Cons (S.head full) (Cons (S.index full 2) (Cons (S.index full 1) (S.drop 3 full))))))
+ rejected (F.validate "probe" true identities (render ((:) (S.head full) ((:) (S.index full 2) ((:) (S.index full 1) (S.drop 3 full))))))
  rejected (F.validate "probe" true identities (render (change 0 (J.set "selected" (J.stringArray (S.reverse identities))) full)))
- let malformedSelected = J.Array (Cons (J.num 1) (Cons (J.str "probe/second") Nil))
+ let malformedSelected = J.Array ((:) (J.num 1) ((:) (J.str "probe/second") []))
  rejected (F.validate "probe" true identities (render (change 0 (J.set "selected" malformedSelected) full)))
  rejected (F.validate "probe" true identities (render (change 1 (J.set "unit" (J.str "other")) full)))
  rejected (F.validate "probe" true identities (render (change 1 (J.set "schema_version" (J.num 2)) full)))
@@ -102,19 +102,19 @@ main = do
  unknown <- H.right (J.parse "{\"executions\":[\"unknown\"],\"aliases\":{},\"metrics\":{}}")
  rejected (C.validateProjection inventory "probe" unknown coverageUnknown)
  rejected (C.validateProjection inventory "probe" (J.set "executions" (J.stringArray (O.words "first first")) projection) coveragePartial)
- rejected (C.validateProjection inventory "probe" (J.set "executions" (J.stringArray (Cons "second" Nil)) projection) coveragePartial)
+ rejected (C.validateProjection inventory "probe" (J.set "executions" (J.stringArray ((:) "second" [])) projection) coveragePartial)
  rejected (C.validateProjection inventory "probe" (J.set "aliases" J.Null projection) coveragePartial)
  rejected (C.validateProjection inventory "probe" (J.set "metrics" J.Null projection) coveragePartial)
  rejected (C.validateProjection inventory "probe" (J.set "extra" (J.num 1) projection) coveragePartial)
  -- These forged projections agree with their forged reports. Only comparison
  -- with the independent full inventory can reject the changed oracle claims.
- let wrongAlias = J.set "aliases" (J.Object (Cons (Pair "repeated" (J.str "second")) Nil)) all
+ let wrongAlias = J.set "aliases" (J.Object ((:) ((,) "repeated" (J.str "second")) [])) all
  rejected (C.validateProjection inventory "probe" wrongAlias (render (change 3 (J.set "canonical" (J.str "second")) (change 0 (J.set "scope" (J.str "partial")) fullCoverage))))
- let wrongMetric = J.set "metrics" (J.Object (Cons (Pair "oracle-executed" (J.num 2)) Nil)) projection
+ let wrongMetric = J.set "metrics" (J.Object ((:) ((,) "oracle-executed" (J.num 2)) [])) projection
  rejected (C.validateProjection inventory "probe" wrongMetric (render (change 3 (J.set "value" (J.num 2)) coverage)))
- let unreviewedMetric = J.set "metrics" (J.Object (Cons (Pair "unreviewed" (J.num 3)) Nil)) projection
+ let unreviewedMetric = J.set "metrics" (J.Object ((:) ((,) "unreviewed" (J.num 3)) [])) projection
  rejected (C.validateProjection inventory "probe" unreviewedMetric (render (change 3 (J.set "name" (J.str "unreviewed")) coverage)))
- rejected (C.validateProjection inventory "probe" projection (render (Cons (S.head coverage) (Cons (S.index coverage 2) (Cons (S.index coverage 1) (S.drop 3 coverage))))))
+ rejected (C.validateProjection inventory "probe" projection (render ((:) (S.head coverage) ((:) (S.index coverage 2) ((:) (S.index coverage 1) (S.drop 3 coverage))))))
  rejected (C.validateProjection inventory "probe" projection (render (without 3 coverage)))
  rejected (C.validateProjection inventory "probe" projection (render (change 4 (J.set "complete" (J.Boolean false)) coverage)))
  rejected (C.validateProjection inventory "probe" projection (render (change 4 (J.set "executions" (J.num 7)) coverage)))
@@ -125,7 +125,7 @@ main = do
  rejected (C.validateProjection (J.set "suites" (J.set "probe" J.Null (J.get "suites" inventory)) inventory) "probe" projection coveragePartial)
  rejected (C.validateProjection inventory "probe" J.Null coveragePartial)
  rejected (C.validateProjection inventory "probe" (J.set "executions" J.Null projection) coveragePartial)
- rejected (C.validateProjection inventory "probe" (J.set "executions" (J.Array (Cons (J.num 1) Nil)) projection) coveragePartial)
+ rejected (C.validateProjection inventory "probe" (J.set "executions" (J.Array ((:) (J.num 1) [])) projection) coveragePartial)
  rejected (C.validateProjection inventory "probe" projection (render (change 1 (\_ -> J.Null) coverage)))
  S.mapM_ (\name -> rejected (C.validateProjection inventory "probe" projection (render (change 1 (J.set name (J.num 1)) coverage)))) (O.words "suite event id status")
  rejected (C.validateProjection inventory "probe" projection (render (change 0 (J.set "scope" J.Null) coverage)))

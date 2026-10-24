@@ -56,20 +56,20 @@ v_getEnv = hostText 0
 v_listDirectory = hostText 4
 v_fileDigest = hostText 8
 v_processSupervisor = hostText 9
-v_setEnv :: String -> String -> IO Unit
+v_setEnv :: String -> String -> IO ()
 v_setEnv name contents = do
   _ <- evaluate (path name)
-  host 1 name contents 0 >> pure Unit
-v_unsetEnv :: String -> IO Unit
-v_unsetEnv a = host 2 a empty 0 >> pure Unit
+  host 1 name contents 0 >> pure ()
+v_unsetEnv :: String -> IO ()
+v_unsetEnv a = host 2 a empty 0 >> pure ()
 v_directoryExists :: String -> IO Bool
 v_directoryExists a = (/=0) <$> hostNumber 3 a
 v_acquireFileLock :: String -> IO Int
 v_acquireFileLock = hostNumber 5
-v_releaseFileLock :: Int -> IO Unit
+v_releaseFileLock :: Int -> IO ()
 v_releaseFileLock n = do
   _ <- evaluate (bounded "invalid file lock" 2147483647 n)
-  host 6 empty empty n  >> pure Unit
+  host 6 empty empty n  >> pure ()
 v_runProcess :: String -> String -> IO Int
 v_runProcess directory specification = do
   _ <- evaluate (path directory)
@@ -98,12 +98,12 @@ path :: String -> P.FilePath
 path s = if '\0' `elem` unpack s then failure "file path contains NUL" else unpack s
 v_readFile :: String -> IO String
 v_readFile = hostText 13
-v_writeFile :: String -> String -> IO Unit
+v_writeFile :: String -> String -> IO ()
 v_writeFile s contents = do
   -- Native writeFile validates the filename before demanding its contents.
   _ <- evaluate (path s)
   _ <- host 14 s contents 0
-  pure Unit
+  pure ()
 v_fileExists :: String -> IO Bool
 v_fileExists s = (/=0) <$> hostNumber 10 s
 v_canonicalPath :: String -> IO String
@@ -123,16 +123,16 @@ v_getArg n = withRawArgs $ \count argv -> do
   i <- evaluate (bounded "argument index out of bounds" (count-1) n)
   bytes <- peekElemOff argv (i+1) >>= B.packCString
   evaluate (fromUtf8 bytes)
-write :: H.Handle -> String -> IO Unit
+write :: H.Handle -> String -> IO ()
 write handle text = ioErrorAs "IO error: output failed" $ do
   B.hPut handle (utf8 text)
   H.hFlush handle
-  pure Unit
-v_putStr, v_putStrLn, v_putErr :: String -> IO Unit
+  pure ()
+v_putStr, v_putStrLn, v_putErr :: String -> IO ()
 v_putStr = write H.stdout
 v_putStrLn s = write H.stdout (v_concatString s (literal "\n"))
 v_putErr = write H.stderr
-v_printInt :: Int -> IO Unit
+v_printInt :: Int -> IO ()
 v_printInt = v_putStrLn . v_showInt
 v_getContents :: IO String
 -- The native operation consumes stdin without taking ownership of the handle.
@@ -166,12 +166,12 @@ index array n = do
   evaluate (bounded "array index out of bounds" (toInteger hi) n)
 readArray :: A.IOArray P.Int a -> Int -> IO a
 readArray array n = index array n >>= A.readArray array
-writeArray :: A.IOArray P.Int a -> Int -> a -> IO Unit
+writeArray :: A.IOArray P.Int a -> Int -> a -> IO ()
 writeArray array n value = do
   i <- index array n
   x <- evaluate value
   A.writeArray array i x
-  pure Unit
+  pure ()
 lengthArray :: A.IOArray P.Int a -> IO Int
 lengthArray array = do { (_,hi) <- A.getBounds array; pure (toInteger hi+1) }
 v_newIntArray :: Int -> Int -> IO IntArray
@@ -186,11 +186,11 @@ v_readDoubleArray :: DoubleArray -> Int -> IO Double
 v_readDoubleArray (DoubleArray a) = readArray a
 v_readByteArray :: ByteArray -> Int -> IO Int
 v_readByteArray (ByteArray a) = readArray a
-v_writeIntArray :: IntArray -> Int -> Int -> IO Unit
+v_writeIntArray :: IntArray -> Int -> Int -> IO ()
 v_writeIntArray (IntArray a) = writeArray a
-v_writeDoubleArray :: DoubleArray -> Int -> Double -> IO Unit
+v_writeDoubleArray :: DoubleArray -> Int -> Double -> IO ()
 v_writeDoubleArray (DoubleArray a) = writeArray a
-v_writeByteArray :: ByteArray -> Int -> Int -> IO Unit
+v_writeByteArray :: ByteArray -> Int -> Int -> IO ()
 v_writeByteArray (ByteArray a) n x = writeArray a n (toInteger (bounded "byte value must be between 0 and 255" 255 x))
 v_lengthIntArray :: IntArray -> IO Int
 v_lengthIntArray (IntArray a) = lengthArray a
@@ -210,14 +210,14 @@ v_getByteLine = ioErrorAs "IO error: byte input failed" $ do
           one <- B.hGet H.stdin 1
           if B.null one then pure acc else
             let b=B.head one in if b==10 then pure (b:acc) else readByteLine (b:acc)
-v_putBytes :: ByteArray -> Int -> Int -> IO Unit
+v_putBytes :: ByteArray -> Int -> Int -> IO ()
 v_putBytes (ByteArray a) start count = do
   size <- lengthArray a
   i <- evaluate (bounded "byte slice out of bounds" size start)
   n <- evaluate (bounded "byte slice out of bounds" (size-start) count)
   bytes <- mapM (A.readArray a) [i..i+n-1]
   ioErrorAs "IO error: output failed" (B.hPut H.stdout (B.pack (map fromInteger bytes)) >> H.hFlush H.stdout)
-  pure Unit
+  pure ()
 type IntTable = IORef (M.Map Int Int)
 v_newIntTable :: IO IntTable
 v_newIntTable = newIORef M.empty
@@ -226,15 +226,15 @@ v_readIntTable table key = do
   values <- readIORef table
   k <- evaluate key
   pure (M.findWithDefault 0 k values)
-v_writeIntTable :: IntTable -> Int -> Int -> IO Unit
+v_writeIntTable :: IntTable -> Int -> Int -> IO ()
 v_writeIntTable table key value = do
   values <- readIORef table
   k <- evaluate key
   x <- evaluate value
   writeIORef table (M.insert k x values)
-  pure Unit
+  pure ()
 
-runEntry :: IO Unit -> IO ()
+runEntry :: IO () -> IO ()
 runEntry entry = ((entry >> pure ()) `finally` c_shutdown)
   `catch` (\(HostError message) -> do
     B.hPut H.stderr (utf8 (literal ("Runtime: "++message++"\n")))

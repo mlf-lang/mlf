@@ -10,57 +10,57 @@ import qualified Bootstrap.IntSet as IS
 edges structural node = if structural then G.children (G.tag node) else L.maybeToList (G.binder node)
 reference structural entries =
  let targets = L.nubBy eqInt (L.concatMap (\entry -> edges structural (L.snd entry)) entries) in
- IM.fromList (L.map (\target -> Pair target (IS.fromList (L.map L.fst (L.filter (\entry -> L.elem eqInt target (edges structural (L.snd entry))) entries)))) targets)
+ IM.fromList (L.map (\target -> (,) target (IS.fromList (L.map L.fst (L.filter (\entry -> L.elem eqInt target (edges structural (L.snd entry))) entries)))) targets)
 same first second = IM.eqIntMap IS.eqIntSet first second && IM.valid first
 node offset mode n = G.mkNode
  (if remInt mode 4 == 0 then GBot else if remInt mode 4 == 1 then GArr (offset + n) (offset + n + 1) else if remInt mode 4 == 2 then GCon "C" (L.map (\i -> offset + remInt i 7) (L.range 0 (if remInt n 2 == 0 then 17 else 2))) else GGen (offset + n))
  (if remInt (mode + n) 3 == 0 then Nothing else Just (offset + remInt (mode + n) 5))
  (if remInt mode 2 == 0 then Flexible else Rigid)
 check count offset mode = do
- let before = L.map (\n -> Pair (offset + n * 13) (node offset mode n)) (L.range 0 (count - 1))
+ let before = L.map (\n -> (,) (offset + n * 13) (node offset mode n)) (L.range 0 (count - 1))
  let kept = L.filter (\n -> remInt (n + mode) 3 /= 0) (L.range 0 (count - 1))
- let after = L.map (\n -> Pair (offset + n * 13) (if remInt mode 2 == 0 then node offset (mode + 1) n else G.mkNode (G.tag (node offset mode n)) (G.binder (node offset mode n)) Flexible)) (L.append kept (Cons count Nil))
- L.mapM_ (\pair -> case pair of { Pair first second -> do
+ let after = L.map (\n -> (,) (offset + n * 13) (if remInt mode 2 == 0 then node offset (mode + 1) n else G.mkNode (G.tag (node offset mode n)) (G.binder (node offset mode n)) Flexible)) (L.append kept ((:) count []))
+ L.mapM_ (\pair -> case pair of { (,) first second -> do
   let graph = G.mkGraph (IM.fromList first) IM.empty (offset + (count + 2) * 13)
-  let initial = S.mkSolver graph (reference true first) (reference false first) (ScopeIndex IM.empty Nil)
+  let initial = S.mkSolver graph (reference true first) (reference false first) (ScopeIndex IM.empty [])
   let full = S.patchIndexedNodes initial first second
-  let changed = case S.projectionChanges first second of Triple removed added deleted -> S.patchIndexedNodes initial removed added
-  L.mapM_ (\result -> if same (S.structuralParents result) (reference true second) && same (S.bindingChildren result) (reference false second) then return Unit else panic "incremental edge patches disagree with independent reverse-edge enumeration") (Cons full (Cons changed Nil)) }) (Cons (Pair before after) (Cons (Pair after before) Nil))
+  let changed = case S.projectionChanges first second of (,,) removed added deleted -> S.patchIndexedNodes initial removed added
+  L.mapM_ (\result -> if same (S.structuralParents result) (reference true second) && same (S.bindingChildren result) (reference false second) then return () else panic "incremental edge patches disagree with independent reverse-edge enumeration") ((:) full ((:) changed [])) }) ((:) ((,) before after) ((:) ((,) after before) []))
 transitions = do
- L.mapM_ (\count -> L.mapM_ (\offset -> L.mapM_ (check count offset) (L.range 0 7)) (Cons (-1000000000000000000000000000000) (Cons (-7) (Cons 0 (Cons 1000000000000000000000000000000 Nil))))) (Cons 0 (Cons 1 (Cons 2 (Cons 5 Nil))))
- L.mapM_ (\count -> L.mapM_ (check count 0) (L.range 0 7)) (Cons 17 (Cons 33 Nil))
- L.mapM_ (\offset -> L.mapM_ (check 33 offset) (L.range 0 7)) (Cons (-1000000000000000000000000000000) (Cons 1000000000000000000000000000000 Nil))
- return Unit
+ L.mapM_ (\count -> L.mapM_ (\offset -> L.mapM_ (check count offset) (L.range 0 7)) ((:) (-1000000000000000000000000000000) ((:) (-7) ((:) 0 ((:) 1000000000000000000000000000000 []))))) ((:) 0 ((:) 1 ((:) 2 ((:) 5 []))))
+ L.mapM_ (\count -> L.mapM_ (check count 0) (L.range 0 7)) ((:) 17 ((:) 33 []))
+ L.mapM_ (\offset -> L.mapM_ (check 33 offset) (L.range 0 7)) ((:) (-1000000000000000000000000000000) ((:) 1000000000000000000000000000000 []))
+ return ()
 
 
 referenceEdges entries =
  let keys = L.nubBy eqInt (L.map L.fst entries) in
- IM.fromList (L.map (\key -> Pair key (IS.fromList (L.map L.snd (L.filter (\entry -> L.fst entry == key) entries)))) keys)
-indexSteps : Int -> Int -> Int -> Int -> List (Pair Int Int) -> IntMap IntSet -> IO Unit
-indexSteps limit offset seed step entries index = if step >= limit then return Unit else do
+ IM.fromList (L.map (\key -> (,) key (IS.fromList (L.map L.snd (L.filter (\entry -> L.fst entry == key) entries)))) keys)
+indexSteps : Int -> Int -> Int -> Int -> [] ((,) Int Int) -> IntMap IntSet -> IO ()
+indexSteps limit offset seed step entries index = if step >= limit then return () else do
  let key = offset + remInt (step * 17 + seed * 13) 19
  let value = offset + remInt (step * 11 + seed) 7
  let adding = remInt (step + seed) 5 < 3
- let nextEntries = if adding then Cons (Pair key value) entries else L.filter (\entry -> L.not (L.fst entry == key && L.snd entry == value)) entries
+ let nextEntries = if adding then (:) ((,) key value) entries else L.filter (\entry -> L.not (L.fst entry == key && L.snd entry == value)) entries
  let next = if adding then S.insertIndex key value index else S.removeIndex key value index
  if same next (referenceEdges nextEntries) then indexSteps limit offset seed (step + 1) nextEntries next else panic "single-traversal index disagrees with edge-list oracle"
 -- Explicit witnesses ensure shortened random sequences do not accidentally
 -- lose duplicate insertion, absent removal or final-bucket deletion coverage.
 editWitnesses offset = do
- let edits = Cons (Triple false 1 2) (Cons (Triple true 1 2) (Cons (Triple true 1 2) (Cons (Triple true 1 3) (Cons (Triple false 1 2) (Cons (Triple false 1 99) (Cons (Triple false 1 3) (Cons (Triple false 1 3) (Cons (Triple true 2 4) (Cons (Triple false 2 4) Nil)))))))))
- Pair entries index <- L.foldM (\(Pair entries index) (Triple adding a b) -> do
+ let edits = (:) ((,,) false 1 2) ((:) ((,,) true 1 2) ((:) ((,,) true 1 2) ((:) ((,,) true 1 3) ((:) ((,,) false 1 2) ((:) ((,,) false 1 99) ((:) ((,,) false 1 3) ((:) ((,,) false 1 3) ((:) ((,,) true 2 4) ((:) ((,,) false 2 4) [])))))))))
+ (,) entries index <- L.foldM (\((,) entries index) ((,,) adding a b) -> do
   let key = offset + a
   let value = offset + b
-  let nextEntries = if adding then Cons (Pair key value) entries else L.filter (\entry -> L.not (L.fst entry == key && L.snd entry == value)) entries
+  let nextEntries = if adding then (:) ((,) key value) entries else L.filter (\entry -> L.not (L.fst entry == key && L.snd entry == value)) entries
   let next = if adding then S.insertIndex key value index else S.removeIndex key value index
   H.assert (same next (referenceEdges nextEntries)) "explicit index edit changed duplicate, absent or final-edge behavior"
-  return (Pair nextEntries next)) (Pair Nil IM.empty) edits
+  return ((,) nextEntries next)) ((,) [] IM.empty) edits
  H.assert (L.null entries && IM.null index) "final edge removal retained an empty bucket"
 directUpdates = do
- let offsets = Cons (-1000000000000000000000000000000) (Cons (-7) (Cons 0 (Cons 1000000000000000000000000000000 Nil)))
+ let offsets = (:) (-1000000000000000000000000000000) ((:) (-7) ((:) 0 ((:) 1000000000000000000000000000000 [])))
  L.mapM_ editWitnesses offsets
- L.mapM_ (\offset -> L.mapM_ (\seed -> indexSteps 24 offset seed 0 Nil IM.empty) (L.filter (\seed -> offset /= 0 || (seed /= 0 && seed /= 7)) (L.range 0 7))) offsets
- L.mapM_ (\seed -> indexSteps 96 0 seed 0 Nil IM.empty) (Cons 0 (Cons 7 Nil))
+ L.mapM_ (\offset -> L.mapM_ (\seed -> indexSteps 24 offset seed 0 [] IM.empty) (L.filter (\seed -> offset /= 0 || (seed /= 0 && seed /= 7)) (L.range 0 7))) offsets
+ L.mapM_ (\seed -> indexSteps 96 0 seed 0 [] IM.empty) ((:) 0 ((:) 7 []))
 
 
-suite = Cons (Pair "incremental reverse indices agree with independent edge enumeration" transitions) (Cons (Pair "reverse-index edits agree with independent edge lists" directUpdates) Nil)
+suite = (:) ((,) "incremental reverse indices agree with independent edge enumeration" transitions) ((:) ((,) "reverse-index edits agree with independent edge lists" directUpdates) [])

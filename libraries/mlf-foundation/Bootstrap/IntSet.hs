@@ -8,12 +8,12 @@ module Bootstrap.IntSet where {
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.IntMap as IM;
-  wrap :: Map Int Unit -> IntSet;
+  wrap :: Map Int () -> IntSet;
   wrap tree = seq tree (IntSet tree);
   empty :: IntSet;
   empty = wrap M.empty;
   singleton :: Int -> IntSet;
-  singleton value = wrap (M.singleton value Unit);
+  singleton value = wrap (M.singleton value ());
   null :: IntSet -> Bool;
   null (IntSet tree) = M.null tree;
   size :: IntSet -> Int;
@@ -23,27 +23,27 @@ module Bootstrap.IntSet where {
   notMember :: Int -> IntSet -> Bool;
   notMember value tree = L.not (member value tree);
   insert :: Int -> IntSet -> IntSet;
-  insert value (IntSet tree) = wrap (IM.insertTree value Unit tree);
+  insert value (IntSet tree) = wrap (IM.insertTree value () tree);
   delete :: Int -> IntSet -> IntSet;
   delete value (IntSet tree) = wrap (IM.deleteTree value tree);
-  fromList :: List Int -> IntSet;
+  fromList :: [] Int -> IntSet;
   fromList values =
-    wrap (L.foldlStrict (\tree value -> IM.insertTree value Unit tree) M.empty values);
-  fromDistinctAscList :: List Int -> IntSet;
+    wrap (L.foldlStrict (\tree value -> IM.insertTree value () tree) M.empty values);
+  fromDistinctAscList :: [] Int -> IntSet;
   fromDistinctAscList values =
-    wrap (M.fromDistinctAscList (L.map (\value -> Pair value Unit) values));
-  toList :: IntSet -> List Int;
+    wrap (M.fromDistinctAscList (L.map (\value -> (,) value ()) values));
+  toList :: IntSet -> [] Int;
   toList (IntSet tree) = M.keys tree;
-  toAscList :: IntSet -> List Int;
+  toAscList :: IntSet -> [] Int;
   toAscList tree = toList tree;
   union :: IntSet -> IntSet -> IntSet;
   -- Set union is commutative. Reuse the larger tree rather than reconstructing
   -- an entire component when adding just a few enclosing scope identities.
   union (IntSet a) (IntSet b) =
     if (M.size a <= M.size b)
-    then wrap (M.foldlWithKeyStrict (\tree key value -> IM.insertTree key Unit tree) b a)
-    else wrap (M.foldlWithKeyStrict (\tree key value -> IM.insertTree key Unit tree) a b);
-  unions :: List IntSet -> IntSet;
+    then wrap (M.foldlWithKeyStrict (\tree key value -> IM.insertTree key () tree) b a)
+    else wrap (M.foldlWithKeyStrict (\tree key value -> IM.insertTree key () tree) a b);
+  unions :: [] IntSet -> IntSet;
   unions trees = L.foldlStrict union empty trees;
   difference :: IntSet -> IntSet -> IntSet;
   difference (IntSet a) (IntSet b) =
@@ -72,20 +72,20 @@ module Bootstrap.IntSet where {
   findMin (IntSet tree) = L.fst (M.findMin tree);
   findMax :: IntSet -> Int;
   findMax (IntSet tree) = L.fst (M.findMax tree);
-  minView :: IntSet -> Maybe (Pair Int IntSet);
+  minView :: IntSet -> Maybe ((,) Int IntSet);
   minView (IntSet tree) =
     L.mapOptional
       (\entry ->
          case entry of {
-           Pair (Pair key value) rest -> Pair key (wrap rest)
+           (,) ((,) key value) rest -> (,) key (wrap rest)
          })
       (M.minViewWithKey tree);
-  maxView :: IntSet -> Maybe (Pair Int IntSet);
+  maxView :: IntSet -> Maybe ((,) Int IntSet);
   maxView (IntSet tree) =
     L.mapOptional
       (\entry ->
          case entry of {
-           Pair (Pair key value) rest -> Pair key (wrap rest)
+           (,) ((,) key value) rest -> (,) key (wrap rest)
          })
       (M.maxViewWithKey tree);
   eqIntSet :: IntSet -> IntSet -> Bool;

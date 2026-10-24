@@ -4,7 +4,7 @@
 -- Ordinary Haskell syntax uses the standard class identities and desugaring.
 -- Only value representations and primitive operations are host adaptations.
 module MLF.Primitive
-  ( Int, Bool(..), Double, Char, IO, IOError, Unit(..), String, ST, STArray, Functor(..), Applicative(..), Monad(..), MonadFail(..), IsString(..), Eq(..), IntArray, DoubleArray, ByteArray, IntTable, AsyncScope, Completion, AsyncSubscription
+  ( Int, Bool(..), Double, Char, IO, IOError, String, ST, STArray, Functor(..), Applicative(..), Monad(..), MonadFail(..), IsString(..), Eq(..), IntArray, DoubleArray, ByteArray, IntTable, AsyncScope, Completion, AsyncSubscription
   , HasCallStack, CallStack, callStack, prettyCallStack
   , MLFHasCallStack, MLFCallStack, MLFStackFrame(..), MLFStackEvidence(..)
   , mlfEmptyCallStack, mlfPushCallStack, mlfPrettyCallStack, mlfIOErrorWithStack
@@ -35,7 +35,7 @@ import Data.String (IsString(..))
 import GHC.Stack (HasCallStack, CallStack, callStack, prettyCallStack)
 import System.IO.Error (ioError)
 import MLF.Host.Base (MLFHasCallStack, MLFCallStack, MLFStackFrame(..), MLFStackEvidence(..))
-import MLF.Host.Base (Int, Bool(..), Double, IO, Unit(..), String, ST, STArray)
+import MLF.Host.Base (Int, Bool(..), Double, IO, String, ST, STArray)
 import MLF.Host.IO (IntArray, DoubleArray, ByteArray, IntTable)
 import MLF.Host.Async (AsyncScope, Completion, AsyncSubscription)
 import qualified MLF.Host.Base as Base
@@ -74,16 +74,16 @@ ioReturn = Base.v_ioReturn
 ioBind :: IO a -> (a -> IO b) -> IO b
 ioBind = Base.v_ioBind
 
-putStr :: String -> IO Unit
+putStr :: String -> IO ()
 putStr = IO.v_putStr
 
-putStrLn :: String -> IO Unit
+putStrLn :: String -> IO ()
 putStrLn = IO.v_putStrLn
 
 getLine :: IO String
 getLine = IO.v_getLine
 
-printInt :: Int -> IO Unit
+printInt :: Int -> IO ()
 printInt = IO.v_printInt
 
 concatString :: String -> String -> String
@@ -155,7 +155,7 @@ newIntArray = IO.v_newIntArray
 readIntArray :: IntArray -> Int -> IO Int
 readIntArray = IO.v_readIntArray
 
-writeIntArray :: IntArray -> Int -> Int -> IO Unit
+writeIntArray :: IntArray -> Int -> Int -> IO ()
 writeIntArray = IO.v_writeIntArray
 
 lengthIntArray :: IntArray -> IO Int
@@ -167,7 +167,7 @@ newDoubleArray = IO.v_newDoubleArray
 readDoubleArray :: DoubleArray -> Int -> IO Double
 readDoubleArray = IO.v_readDoubleArray
 
-writeDoubleArray :: DoubleArray -> Int -> Double -> IO Unit
+writeDoubleArray :: DoubleArray -> Int -> Double -> IO ()
 writeDoubleArray = IO.v_writeDoubleArray
 
 lengthDoubleArray :: DoubleArray -> IO Int
@@ -179,7 +179,7 @@ newByteArray = IO.v_newByteArray
 readByteArray :: ByteArray -> Int -> IO Int
 readByteArray = IO.v_readByteArray
 
-writeByteArray :: ByteArray -> Int -> Int -> IO Unit
+writeByteArray :: ByteArray -> Int -> Int -> IO ()
 writeByteArray = IO.v_writeByteArray
 
 lengthByteArray :: ByteArray -> IO Int
@@ -188,7 +188,7 @@ lengthByteArray = IO.v_lengthByteArray
 byteArrayFromString :: String -> IO ByteArray
 byteArrayFromString = IO.v_byteArrayFromString
 
-putBytes :: ByteArray -> Int -> Int -> IO Unit
+putBytes :: ByteArray -> Int -> Int -> IO ()
 putBytes = IO.v_putBytes
 
 getByteLine :: IO ByteArray
@@ -200,7 +200,7 @@ newIntTable = IO.v_newIntTable
 readIntTable :: IntTable -> Int -> IO Int
 readIntTable = IO.v_readIntTable
 
-writeIntTable :: IntTable -> Int -> Int -> IO Unit
+writeIntTable :: IntTable -> Int -> Int -> IO ()
 writeIntTable = IO.v_writeIntTable
 
 andInt :: Int -> Int -> Int
@@ -239,7 +239,7 @@ panic = Base.v_panic
 readFile :: String -> IO String
 readFile = IO.v_readFile
 
-writeFile :: String -> String -> IO Unit
+writeFile :: String -> String -> IO ()
 writeFile = IO.v_writeFile
 
 fileExists :: String -> IO Bool
@@ -254,7 +254,7 @@ getArgCount = IO.v_getArgCount
 getArg :: Int -> IO String
 getArg = IO.v_getArg
 
-putErr :: String -> IO Unit
+putErr :: String -> IO ()
 putErr = IO.v_putErr
 
 exitWith :: Int -> IO a
@@ -281,7 +281,7 @@ newSTArray = Base.v_newSTArray
 readSTArray :: STArray s a -> Int -> ST s a
 readSTArray = Base.v_readSTArray
 
-writeSTArray :: STArray s a -> Int -> a -> ST s Unit
+writeSTArray :: STArray s a -> Int -> a -> ST s ()
 writeSTArray = Base.v_writeSTArray
 
 lengthSTArray :: STArray s a -> ST s Int
@@ -290,10 +290,10 @@ lengthSTArray = Base.v_lengthSTArray
 getEnv :: String -> IO String
 getEnv = IO.v_getEnv
 
-setEnv :: String -> String -> IO Unit
+setEnv :: String -> String -> IO ()
 setEnv = IO.v_setEnv
 
-unsetEnv :: String -> IO Unit
+unsetEnv :: String -> IO ()
 unsetEnv = IO.v_unsetEnv
 
 runProcess :: String -> String -> IO Int
@@ -311,7 +311,7 @@ fileDigest = IO.v_fileDigest
 acquireFileLock :: String -> IO Int
 acquireFileLock = IO.v_acquireFileLock
 
-releaseFileLock :: Int -> IO Unit
+releaseFileLock :: Int -> IO ()
 releaseFileLock = IO.v_releaseFileLock
 
 processSupervisor :: String -> IO String
@@ -320,7 +320,7 @@ processSupervisor = IO.v_processSupervisor
 asyncScopeNew :: Int -> Int -> IO AsyncScope
 asyncScopeNew = Async.v_asyncScopeNew
 
-asyncScopeClose :: AsyncScope -> IO Unit
+asyncScopeClose :: AsyncScope -> IO ()
 asyncScopeClose = Async.v_asyncScopeClose
 
 asyncNewCompletion :: AsyncScope -> (Completion a -> IO b) -> IO b -> IO b
@@ -332,7 +332,7 @@ asyncResolveCompletion = Async.v_asyncResolveCompletion
 asyncReadCompletion :: Completion a -> (a -> IO b) -> IO b -> IO b
 asyncReadCompletion = Async.v_asyncReadCompletion
 
-asyncSubscribeCompletion :: Completion a -> (a -> IO Unit) -> IO AsyncSubscription
+asyncSubscribeCompletion :: Completion a -> (a -> IO ()) -> IO AsyncSubscription
 asyncSubscribeCompletion = Async.v_asyncSubscribeCompletion
 
 asyncSubscriptionStatus :: AsyncSubscription -> IO Int
@@ -344,10 +344,10 @@ asyncCancelSubscription = Async.v_asyncCancelSubscription
 asyncStep :: AsyncScope -> IO Int
 asyncStep = Async.v_asyncStep
 
-asyncEnqueue :: AsyncScope -> IO Unit -> IO AsyncSubscription
+asyncEnqueue :: AsyncScope -> IO () -> IO AsyncSubscription
 asyncEnqueue = Async.v_asyncEnqueue
 
-asyncDelay :: AsyncScope -> Int -> IO Unit -> IO AsyncSubscription
+asyncDelay :: AsyncScope -> Int -> IO () -> IO AsyncSubscription
 asyncDelay = Async.v_asyncDelay
 
 asyncWait :: AsyncScope -> Int -> IO Int

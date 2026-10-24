@@ -11,16 +11,16 @@ module Tests.Coverage where {
   -- Execution evidence never reads the reviewed inventory. The parent validates
   -- the completed report against that separate file and the child's exit status.
   fields values = J.Object values;
-  pair key value = Pair key value;
+  pair key value = (,) key value;
   event suite kind values =
     fields
-      (Cons (pair "schema_version" (J.num 1))
-         (Cons (pair "suite" (J.str suite)) (Cons (pair "event" (J.str kind)) values)));
+      ((:) (pair "schema_version" (J.num 1))
+         ((:) (pair "suite" (J.str suite)) ((:) (pair "event" (J.str kind)) values)));
   append suite kind values =
     do {
       path <- getEnv "MLF_TEST_COVERAGE_REPORT";
       if eqString path ""
-      then return Unit
+      then return ()
       else do {
              previous <- readFile path;
              writeFile path (previous ++ (J.render (event suite kind values) ++ "\n"))
@@ -30,29 +30,29 @@ module Tests.Coverage where {
     do {
       path <- getEnv "MLF_TEST_COVERAGE_REPORT";
       if eqString path ""
-      then return Unit
+      then return ()
       else writeFile path
              (J.render
                 (event suite "start"
-                   (Cons (pair "scope" (J.str (if full then "full" else "partial"))) Nil)) ++
+                   ((:) (pair "scope" (J.str (if full then "full" else "partial"))) [])) ++
               "\n")
     };
   passed suite identity =
     append suite "case"
-      (Cons (pair "id" (J.str identity)) (Cons (pair "status" (J.str "passed")) Nil));
+      ((:) (pair "id" (J.str identity)) ((:) (pair "status" (J.str "passed")) []));
   alias suite identity canonical =
     append suite "alias"
-      (Cons (pair "id" (J.str identity))
-         (Cons (pair "canonical" (J.str canonical)) (Cons (pair "status" (J.str "passed")) Nil)));
+      ((:) (pair "id" (J.str identity))
+         ((:) (pair "canonical" (J.str canonical)) ((:) (pair "status" (J.str "passed")) [])));
   metric suite name value =
-    append suite "metric" (Cons (pair "name" (J.str name)) (Cons (pair "value" (J.num value)) Nil));
+    append suite "metric" ((:) (pair "name" (J.str name)) ((:) (pair "value" (J.num value)) []));
   parse text = S.mapM J.parse (S.filter (\line -> (stringLength line > 0)) (O.lines text));
   kind name row = eqString (J.getText "event" "" row) name;
   finish suite =
     do {
       path <- getEnv "MLF_TEST_COVERAGE_REPORT";
       if eqString path ""
-      then return Unit
+      then return ()
       else do {
              text <- readFile path;
              rows <-
@@ -61,19 +61,19 @@ module Tests.Coverage where {
                  Right rows -> return rows
                };
              append suite "summary"
-               (Cons (pair "complete" (J.Boolean True))
-                  (Cons (pair "executions" (J.num (S.length (S.filter (kind "case") rows))))
-                     (Cons (pair "aliases" (J.num (S.length (S.filter (kind "alias") rows))))
-                        (Cons (pair "metrics" (J.num (S.length (S.filter (kind "metric") rows))))
-                           Nil))))
+               ((:) (pair "complete" (J.Boolean True))
+                  ((:) (pair "executions" (J.num (S.length (S.filter (kind "case") rows))))
+                     ((:) (pair "aliases" (J.num (S.length (S.filter (kind "alias") rows))))
+                        ((:) (pair "metrics" (J.num (S.length (S.filter (kind "metric") rows))))
+                           []))))
            }
     };
   -- Count completed callback invocations, not the length of the planned inputs.
-  count :: forall a. (a -> IO Unit) -> List a -> Int -> IO Int;
+  count :: forall a. (a -> IO ()) -> [] a -> Int -> IO Int;
   count action inputs total =
     case inputs of {
-      Nil -> return total;
-      Cons value rest ->
+      [] -> return total;
+      (:) value rest ->
         do {
           action value;
           let {
@@ -82,15 +82,15 @@ module Tests.Coverage where {
           seq next (count action rest next)
         }
     };
-  mapCounted :: forall a. String -> String -> (a -> IO Unit) -> List a -> IO Unit;
+  mapCounted :: forall a. String -> String -> (a -> IO ()) -> [] a -> IO ();
   mapCounted suite name action inputs =
     do {
       completed <- count action inputs 0;
       metric suite name completed
     };
-  forCounted :: forall a. String -> String -> List a -> (a -> IO Unit) -> IO Unit;
+  forCounted :: forall a. String -> String -> [] a -> (a -> IO ()) -> IO ();
   forCounted suite name inputs action = mapCounted suite name action inputs;
-  ensure condition message = if condition then Right Unit else Left message;
+  ensure condition message = if condition then Right () else Left message;
   sameStrings a b = S.eqList eqString (S.sortBy compareString a) (S.sortBy compareString b);
   unique values = (S.length values == S.length (S.nubBy eqString values));
   keys wanted value = sameStrings wanted (S.map S.fst (J.items value));
@@ -135,16 +135,16 @@ module Tests.Coverage where {
                        then O.words "name value"
                        else if kind "summary" row
                             then O.words "complete executions aliases metrics"
-                            else Nil
+                            else []
     } in
     (S.not (S.null extra) && keys (S.append common extra) row);
-  aliasOrder :: List String -> List J.Json -> Either String Unit;
+  aliasOrder :: [] String -> [] J.Json -> Either String ();
   aliasOrder completed rows =
     case rows of {
-      Nil -> Right Unit;
-      Cons row rest ->
+      [] -> Right ();
+      (:) row rest ->
         if kind "case" row
-        then aliasOrder (Cons (J.getText "id" "" row) completed) rest
+        then aliasOrder ((:) (J.getText "id" "" row) completed) rest
         else if kind "alias" row
              then do {
                     ensure (S.elem eqString (J.getText "canonical" "" row) completed)
@@ -158,7 +158,7 @@ module Tests.Coverage where {
   -- Focused package phases have no aliases or generated-loop metrics. Their
   -- expected IDs are a reviewed-inventory projection, never child output. The
   -- ordinary full validator remains strict and cannot accept this report.
-  validateSelection :: J.Json -> String -> List String -> String -> Either String J.Json;
+  validateSelection :: J.Json -> String -> [] String -> String -> Either String J.Json;
   validateSelection inventory suite selected text =
     do {
       ensure (J.has suite (J.get "suites" inventory)) "unknown selected coverage suite";
@@ -252,14 +252,14 @@ module Tests.Coverage where {
         "projected execution is not in the reviewed inventory";
       ensure
         (S.all
-           (\(Pair name value) ->
+           (\((,) name value) ->
               (J.has name (J.get "aliases" source) &&
                J.equal value (J.get name (J.get "aliases" source))))
            selectedAliases)
         "projected alias differs from the reviewed inventory";
       ensure
         (S.all
-           (\(Pair name value) ->
+           (\((,) name value) ->
               (J.has name (J.get "metrics" source) &&
                J.equal value (J.get name (J.get "metrics" source))))
            selectedMetrics)
@@ -271,7 +271,7 @@ module Tests.Coverage where {
       };
       validateScope "partial" expected suite text
     };
-  projectionEntry :: J.Json -> Either String Unit;
+  projectionEntry :: J.Json -> Either String ();
   projectionEntry entry =
     do {
       ensure (projectionObject entry) "coverage projection inventory must be an object";
@@ -295,7 +295,7 @@ module Tests.Coverage where {
         "duplicate projected alias or metric";
       ensure
         (S.all
-           (\(Pair name value) ->
+           (\((,) name value) ->
               ((stringLength name > 0) &&
                (S.not (S.elem eqString name executions) &&
                 (case value of {
@@ -305,7 +305,7 @@ module Tests.Coverage where {
            (J.items aliases))
         "projected alias lacks a selected canonical execution";
       ensure
-        (S.all (\(Pair name value) -> ((stringLength name > 0) && natural value)) (J.items metrics))
+        (S.all (\((,) name value) -> ((stringLength name > 0) && natural value)) (J.items metrics))
         "projected metrics must be natural numbers"
     };
   validateScope :: String -> J.Json -> String -> String -> Either String J.Json;
@@ -344,12 +344,12 @@ module Tests.Coverage where {
          })
         "invalid reviewed metric inventory";
       ensure
-        (S.all (\(Pair name value) -> ((stringLength name > 0) && natural value))
+        (S.all (\((,) name value) -> ((stringLength name > 0) && natural value))
            (J.items wantedMetrics))
         "reviewed metrics must be natural numbers";
       ensure
         (S.all
-           (\(Pair name value) ->
+           (\((,) name value) ->
               ((stringLength name > 0) &&
                (S.not (S.elem eqString name wanted) &&
                 (case value of {
@@ -413,7 +413,7 @@ module Tests.Coverage where {
            (\row -> J.equal (J.get "canonical" row) (J.get (J.getText "id" "" row) wantedAliases))
            aliases)
         "coverage alias inventory changed";
-      aliasOrder Nil rows;
+      aliasOrder [] rows;
       ensure
         (unique metricNames &&
          (sameStrings metricNames (S.map S.fst (J.items wantedMetrics)) &&
@@ -428,15 +428,15 @@ module Tests.Coverage where {
         "coverage summary differs from actual events";
       return
         (fields
-           (Cons (pair "schema_version" (J.num 1))
-              (Cons (pair "suite" (J.str suite))
-                 (Cons (pair "executions" (J.num (S.length executed)))
-                    (Cons (pair "aliases" (J.num (S.length aliases)))
-                       (Cons
+           ((:) (pair "schema_version" (J.num 1))
+              ((:) (pair "suite" (J.str suite))
+                 ((:) (pair "executions" (J.num (S.length executed)))
+                    ((:) (pair "aliases" (J.num (S.length aliases)))
+                       ((:)
                           (pair "metrics"
                              (fields
                                 (S.map (\row -> pair (J.getText "name" "" row) (J.get "value" row))
                                    metrics)))
-                          Nil))))))
+                          []))))))
     }
 }

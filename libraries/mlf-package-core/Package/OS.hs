@@ -13,7 +13,7 @@ module Package.OS where {
       putErr ("mlfpkg: " ++ (message ++ "\n"));
       exitWith 1
     };
-  require condition message = if condition then ioReturn Unit else fatal message;
+  require condition message = if condition then ioReturn () else fatal message;
   starts prefix text =
     ((stringLength text >= stringLength prefix) &&
      eqString (stringSlice text 0 (stringLength prefix)) prefix);
@@ -24,12 +24,12 @@ module Package.OS where {
   drop n text = stringSlice text n (stringLength text - n);
   char text i = stringSlice text i 1;
   split separator text = splitAt separator text 0 0;
-  splitAt :: Int -> String -> Int -> Int -> List String;
+  splitAt :: Int -> String -> Int -> Int -> [] String;
   splitAt separator text begin i =
     if (i == stringLength text)
-    then Cons (stringSlice text begin (i - begin)) Nil
+    then (:) (stringSlice text begin (i - begin)) []
     else if (stringCodeAt text i == separator)
-         then Cons (stringSlice text begin (i - begin)) (splitAt separator text (i + 1) (i + 1))
+         then (:) (stringSlice text begin (i - begin)) (splitAt separator text (i + 1) (i + 1))
          else splitAt separator text begin (i + 1);
   nonempty xs = S.filter (\x -> (stringLength x > 0)) xs;
   words text = nonempty (split 32 (replace "\t" " " (replace "\n" " " (replace "\r" " " text))));
@@ -83,32 +83,32 @@ module Package.OS where {
            b = split 47 (normalize path)
          } in
          relativeParts a b;
-  relativeParts :: List String -> List String -> String;
+  relativeParts :: [] String -> [] String -> String;
   relativeParts a b =
     case a of {
-      Nil -> S.intercalate "/" b;
-      Cons x xs ->
+      [] -> S.intercalate "/" b;
+      (:) x xs ->
         case b of {
-          Cons y ys ->
+          (:) y ys ->
             if eqString x y
             then relativeParts xs ys
             else S.intercalate "/" (S.append (S.map (\_ -> "..") a) b);
-          Nil -> S.intercalate "/" (S.map (\_ -> "..") a)
+          [] -> S.intercalate "/" (S.map (\_ -> "..") a)
         }
     };
   modulePath name = replace "." "/" name;
   nul = stringFromCode 0;
   pack fields = S.concatStrings (S.map (\x -> (x ++ nul)) fields);
   unpack text =
-    if eqString text "" then Nil else S.take (S.length (split 0 text) - 1) (split 0 text);
-  arguments :: Int -> Int -> IO (List String);
+    if eqString text "" then [] else S.take (S.length (split 0 text) - 1) (split 0 text);
+  arguments :: Int -> Int -> IO ([] String);
   arguments i n =
     if (i >= n)
-    then ioReturn Nil
+    then ioReturn []
     else do {
            x <- getArg i;
            xs <- arguments (i + 1) n;
-           ioReturn (Cons x xs)
+           ioReturn ((:) x xs)
          };
   allArguments =
     do {
@@ -133,7 +133,7 @@ module Package.OS where {
     do {
       windows <- isWindows;
       if S.not windows
-      then ioReturn Unit
+      then ioReturn ()
       else do {
              host <- windowsHost;
              setEnv "MLF_WINDOWS_HOST" host;
@@ -156,7 +156,7 @@ module Package.OS where {
         "NUL in process argument";
       command <- hostArguments argv;
       runProcess cwd
-        (pack (Cons (showInt timeout) (Cons input (Cons output (Cons errors command)))))
+        (pack ((:) (showInt timeout) ((:) input ((:) output ((:) errors command)))))
     };
   run cwd argv =
     do {
@@ -177,13 +177,13 @@ module Package.OS where {
         errors = (scratch ++ "/query.err")
       };
       code <-
-        exec "" (Cons "mktemp" (Cons "-d" (Cons (prefix ++ "XXXXXXXX") Nil))) "" output errors 1800;
+        exec "" ((:) "mktemp" ((:) "-d" ((:) (prefix ++ "XXXXXXXX") []))) "" output errors 1800;
       if (code /= 0)
       then do {
              message <- readFile errors;
              fatal ("temporary directory allocation failed: " ++ message)
            }
-      else ioReturn Unit;
+      else ioReturn ();
       temporary <- readFile output;
       let {
         line = S.head (lines temporary)
@@ -196,20 +196,20 @@ module Package.OS where {
         "invalid temporary directory";
       ioReturn path
     };
-  mkdir path = run "" (Cons "/bin/mkdir" (Cons "-p" (Cons path Nil)));
+  mkdir path = run "" ((:) "/bin/mkdir" ((:) "-p" ((:) path [])));
   copy source destination =
     do {
       mkdir (parent destination);
-      run "" (Cons "/bin/cp" (Cons "-p" (Cons source (Cons destination Nil))))
+      run "" ((:) "/bin/cp" ((:) "-p" ((:) source ((:) destination []))))
     };
   move source destination =
-    run "" (Cons "/bin/mv" (Cons "-f" (Cons source (Cons destination Nil))));
+    run "" ((:) "/bin/mv" ((:) "-f" ((:) source ((:) destination []))));
   remove path =
     do {
       require
         (absolute path && ((stringLength path > 5) && S.not (eqString (normalize path) "/tmp")))
         "unsafe artifact removal path";
-      run "" (Cons "/bin/rm" (Cons "-rf" (Cons path Nil)))
+      run "" ((:) "/bin/rm" ((:) "-rf" ((:) path [])))
     };
   writeAtomic path text =
     do {
@@ -260,11 +260,11 @@ module Package.OS where {
              canonicalPath extension
            }
     };
-  findTool :: String -> List String -> IO String;
+  findTool :: String -> [] String -> IO String;
   findTool command directories =
     case directories of {
-      Nil -> fatal ("executable not found: " ++ command);
-      Cons directory rest ->
+      [] -> fatal ("executable not found: " ++ command);
+      (:) directory rest ->
         do {
           let {
             path = join (if eqString directory "" then "." else directory) command
@@ -280,12 +280,12 @@ module Package.OS where {
       text <- listDirectory path;
       ioReturn (S.sortBy compareString (unpack text))
     };
-  files :: String -> IO (List String);
+  files :: String -> IO ([] String);
   files path =
     do {
       isFile <- fileExists path;
       if isFile
-      then ioReturn (Cons path Nil)
+      then ioReturn ((:) path [])
       else do {
              names <- entries path;
              nested <- S.mapM (\name -> files (join path name)) names;

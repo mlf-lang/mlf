@@ -30,17 +30,17 @@ module Package.Verification where {
   parityExecutionKey row source =
     J.render
       (J.Object
-         (Cons (Pair "source" (J.str source))
-            (Cons
-               (Pair "case"
+         ((:) ((,) "source" (J.str source))
+            ((:)
+               ((,) "case"
                   (J.Object
                      (S.filter
-                        (\(Pair key _) ->
+                        (\((,) key _) ->
                            S.not (S.elem eqString key (O.words "id label source_path")))
                         (J.items row))))
-               Nil)));
-  ensure :: Bool -> String -> Either String Unit;
-  ensure ok reason = if ok then Right Unit else Left reason;
+               [])));
+  ensure :: Bool -> String -> Either String ();
+  ensure ok reason = if ok then Right () else Left reason;
   integer :: Int -> J.Json -> Int;
   integer fallback value =
     case value of {
@@ -55,7 +55,7 @@ module Package.Verification where {
       J.String value -> value;
       _ -> ""
     };
-  array :: String -> J.Json -> List J.Json;
+  array :: String -> J.Json -> [] J.Json;
   array key doc = J.values (J.get key doc);
   contains :: String -> String -> Bool;
   contains needle value =
@@ -76,7 +76,7 @@ module Package.Verification where {
   finite n = (eqDouble n n && ltDouble (subDouble n n) 1.0);
   positive :: Double -> Bool;
   positive n = (finite n && ltDouble 0.0 n);
-  sameKeys :: List String -> J.Json -> Bool;
+  sameKeys :: [] String -> J.Json -> Bool;
   sameKeys expected value =
     S.eqList eqString (S.sortBy compareString expected)
       (S.sortBy compareString (S.map S.fst (J.items value)));
@@ -88,7 +88,7 @@ module Package.Verification where {
   limit dimension = if eqString dimension "compilation" then 5.0 else 2.0;
   compareDouble :: Double -> Double -> Int;
   compareDouble a b = if ltDouble a b then (-1) else if ltDouble b a then 1 else 0;
-  median :: List Double -> Double;
+  median :: [] Double -> Double;
   median times =
     let {
       sorted = S.sortBy compareDouble times
@@ -100,7 +100,7 @@ module Package.Verification where {
     then S.index sorted (quotInt n 2)
     else divDouble (addDouble (S.index sorted (quotInt n 2 - 1)) (S.index sorted (quotInt n 2)))
            2.0;
-  measurement :: J.Json -> Either String Unit;
+  measurement :: J.Json -> Either String ();
   measurement value =
     do {
       let {
@@ -120,9 +120,9 @@ module Package.Verification where {
          eqDouble (double (SharedSyntax.negateDouble 1.0) (J.get "median_wall_seconds" value))
            (median times))
         "Invalid or inconsistent benchmark timing";
-      return Unit
+      return ()
     };
-  validateMatrixAudit :: Int -> List String -> String -> Either String Unit;
+  validateMatrixAudit :: Int -> [] String -> String -> Either String ();
   validateMatrixAudit count backends log =
     do {
       let {
@@ -130,7 +130,7 @@ module Package.Verification where {
       };
       ensure
         ((count > 0) &&
-         (S.eqList eqString backends (Cons "llvm" Nil) ||
+         (S.eqList eqString backends ((:) "llvm" []) ||
           S.eqList eqString backends (O.words "interpreter llvm")))
         "invalid matrix inventory";
       ensure
@@ -140,7 +140,7 @@ module Package.Verification where {
             (showInt count ++
              (" rows x " ++ (showInt (S.length backends) ++ " backends; no missing executions")))))
         "native execution row coverage changed";
-      return Unit
+      return ()
     };
   matrixSummary :: String -> String -> Either String J.Json;
   matrixSummary log candidate =
@@ -180,13 +180,13 @@ module Package.Verification where {
         "failed or empty fixture matrix";
       return
         (J.Object
-           (Cons (Pair "rows" (J.num (readInt (S.index rowWords 2))))
-              (Cons (Pair "fixtures" (J.num (readInt (S.head fixtureWords))))
-                 (Cons (Pair "cli_compiler" (J.str candidate)) Nil))))
+           ((:) ((,) "rows" (J.num (readInt (S.index rowWords 2))))
+              ((:) ((,) "fixtures" (J.num (readInt (S.head fixtureWords))))
+                 ((:) ((,) "cli_compiler" (J.str candidate)) []))))
     };
   quote :: String -> String;
   quote value = ("'" ++ (O.replace "'" "'\\''" value ++ "'"));
-  cleanEnvironment :: List String -> List String;
+  cleanEnvironment :: [] String -> [] String;
   cleanEnvironment names =
     S.filter
       (\name ->
@@ -236,28 +236,28 @@ module Package.Verification where {
               (J.str (S.intercalate " " (S.map quote (J.getStrings "libs" collector))))
               common))
     };
-  layoutPlan :: List String -> List String;
+  layoutPlan :: [] String -> [] String;
   layoutPlan layouts =
     S.append (O.words "RuntimeDriver LLVMDriver") (S.map (\abi -> ("matrix:" ++ abi)) layouts);
-  validateManifest :: List J.Json -> Either String Unit;
+  validateManifest :: [] J.Json -> Either String ();
   validateManifest rows =
     do {
       ensure (S.length (S.nubBy eqString (S.map (text "id") rows)) == S.length rows)
         "duplicate corpus identity";
       ensure (S.all (\row -> (int "schema_version" row == 1)) rows) "unsupported corpus schema";
       S.mapM_
-        (\(Pair group minimum) ->
+        (\((,) group minimum) ->
            ensure
              (S.length (S.filter (\row -> eqString (text "category" row) group) rows) >= minimum)
              ("corpus lacks " ++ group))
-        (Cons (Pair "figure12" 43)
-           (Cons (Pair "hm-exhaustive" 1712)
-              (Cons (Pair "hm-generated" 5000)
-                 (Cons (Pair "annotations" 126)
-                    (Cons (Pair "readability" 18)
-                       (Cons (Pair "state" 97)
-                          (Cons (Pair "modules" 60)
-                             (Cons (Pair "examples" 18) (Cons (Pair "benchmarks" 9) Nil)))))))));
+        ((:) ((,) "figure12" 43)
+           ((:) ((,) "hm-exhaustive" 1712)
+              ((:) ((,) "hm-generated" 5000)
+                 ((:) ((,) "annotations" 126)
+                    ((:) ((,) "readability" 18)
+                       ((:) ((,) "state" 97)
+                          ((:) ((,) "modules" 60)
+                             ((:) ((,) "examples" 18) ((:) ((,) "benchmarks" 9) [])))))))));
       let {
         a8 = S.find (\row -> eqString (text "id" row) "figure12-A8") rows
       };
@@ -287,9 +287,9 @@ module Package.Verification where {
                 (stringLength (O.trim (text "expected_error_contains" row)) > 0))))
            modules)
         "module rejection lacks expectation";
-      return Unit
+      return ()
     };
-  checkRejection :: J.Json -> Int -> String -> String -> Either String Unit;
+  checkRejection :: J.Json -> Int -> String -> String -> Either String ();
   checkRejection row code output errors =
     do {
       ensure ((code == 1) && eqString output "") "crash or partial target is not a rejection";
@@ -301,9 +301,9 @@ module Package.Verification where {
       };
       ensure (eqString phase "" || O.starts (phase ++ ":") errors) "wrong rejection phase";
       ensure (eqString reason "" || contains reason errors) "wrong rejection diagnostic";
-      return Unit
+      return ()
     };
-  validateEvidence :: J.Json -> J.Json -> J.Json -> String -> J.Json -> Either String Unit;
+  validateEvidence :: J.Json -> J.Json -> J.Json -> String -> J.Json -> Either String ();
   validateEvidence bootstrap backends benchmark compilerHash manifest =
     do {
       ensure (J.getBool "complete" False bootstrap && J.getBool "fixed_point" False bootstrap)
@@ -311,7 +311,7 @@ module Package.Verification where {
       let {
         stages = array "stages" bootstrap
       };
-      ensure (S.eqList eqInt (S.map (int "stage") stages) (Cons 1 (Cons 2 (Cons 3 Nil))))
+      ensure (S.eqList eqInt (S.map (int "stage") stages) ((:) 1 ((:) 2 ((:) 3 []))))
         "Bootstrap must contain all three stages";
       ensure
         (S.all (\stage -> J.equal (J.get "reused_seed_compilation" stage) (J.Boolean False)) stages)
@@ -352,9 +352,9 @@ module Package.Verification where {
       let {
         matrices = J.get "matrices" backends
       };
-      ensure (sameKeys (Cons "compact-gc" Nil) matrices) "The compact-GC native matrix must pass";
+      ensure (sameKeys ((:) "compact-gc" []) matrices) "The compact-GC native matrix must pass";
       S.mapM_
-        (\(Pair abi matrix) ->
+        (\((,) abi matrix) ->
            ensure
              ((int "rows" matrix >= 475) &&
               ((int "fixtures" matrix >= 428) &&
@@ -429,7 +429,7 @@ module Package.Verification where {
                inputs =
                  S.sortBy S.compareInt
                    (S.nubBy eqInt
-                      (Cons (int "default_input" workload)
+                      ((:) (int "default_input" workload)
                          (S.map (integer 0) (array "check_inputs" workload))))
              };
              ensure
@@ -486,13 +486,13 @@ module Package.Verification where {
                (O.words "compilation runtime")
            })
         results;
-      return Unit
+      return ()
     };
-  update :: List String -> (J.Json -> J.Json) -> J.Json -> J.Json;
+  update :: [] String -> (J.Json -> J.Json) -> J.Json -> J.Json;
   update path change doc =
     case path of {
-      Nil -> change doc;
-      Cons key rest -> J.set key (update rest change (J.get key doc)) doc
+      [] -> change doc;
+      (:) key rest -> J.set key (update rest change (J.get key doc)) doc
     };
   remove key doc = J.Object (S.filter (\entry -> S.not (eqString key (S.fst entry))) (J.items doc));
   packageFiles :: String -> IO J.Json;
@@ -504,7 +504,7 @@ module Package.Verification where {
           (\path ->
              do {
                hash <- fileDigest path;
-               return (Pair (O.relative directory path) (J.str hash))
+               return ((,) (O.relative directory path) (J.str hash))
              })
           paths;
       return (J.Object pairs)
@@ -531,8 +531,8 @@ module Package.Verification where {
                            do {
                              code <-
                                O.exec ""
-                                 (Cons "/bin/test"
-                                    (Cons "-x" (Cons (package ++ ("/" ++ name)) Nil)))
+                                 ((:) "/bin/test"
+                                    ((:) "-x" ((:) (package ++ ("/" ++ name)) [])))
                                  ""
                                  ""
                                  ""
@@ -575,7 +575,7 @@ module Package.Verification where {
                                       manifest <- J.read (package ++ "/evidence/manifest.json");
                                       runtime <-
                                         S.mapM
-                                          (\(Pair path expected) ->
+                                          (\((,) path expected) ->
                                              do {
                                                hash <- fileDigest (package ++ ("/" ++ path));
                                                return
@@ -607,13 +607,13 @@ module Package.Verification where {
       system <- hostValue directory "-s";
       machine <- hostValue directory "-m";
       return
-        (J.Object (Cons (Pair "system" (J.str system)) (Cons (Pair "machine" (J.str machine)) Nil)))
+        (J.Object ((:) ((,) "system" (J.str system)) ((:) ((,) "machine" (J.str machine)) [])))
     };
   hostValue :: String -> String -> IO String;
   hostValue directory arg =
     do {
       code <-
-        O.exec "" (Cons "/usr/bin/uname" (Cons arg Nil)) "" (directory ++ "/host.out")
+        O.exec "" ((:) "/usr/bin/uname" ((:) arg [])) "" (directory ++ "/host.out")
           (directory ++ "/host.err")
           60;
       O.require (code == 0) "host identity unavailable";
@@ -621,7 +621,7 @@ module Package.Verification where {
       return (O.trim value)
     };
   -- Native contracts shared by the package test and release evidence gates.
-  step :: String -> J.Json -> String -> List String -> IO (Either String J.Json);
+  step :: String -> J.Json -> String -> [] String -> IO (Either String J.Json);
   -- The tested gate receives no compiler, backend, failure, or collector overrides.
   step directory report name argv =
     do {
@@ -634,14 +634,14 @@ module Package.Verification where {
       host <- getEnv "MLF_TEST_HOST_SUPPORT";
       O.require (stringLength host > 0) "missing native environment transport";
       code <-
-        O.exec "" (Cons host (Cons "env-names" Nil)) "" (directory ++ "/environment-names")
+        O.exec "" ((:) host ((:) "env-names" [])) "" (directory ++ "/environment-names")
           (directory ++ "/environment-names.err")
           60;
       O.require (code == 0) "environment name transport failed";
       names <- readFile (directory ++ "/environment-names");
       let {
         selected =
-          S.filter (\key -> S.not (S.elem eqString key (cleanEnvironment (Cons key Nil))))
+          S.filter (\key -> S.not (S.elem eqString key (cleanEnvironment ((:) key []))))
             (O.words names)
       };
       before <-
@@ -650,11 +650,11 @@ module Package.Verification where {
              do {
                value <- getEnv key;
                unsetEnv key;
-               return (Pair key value)
+               return ((,) key value)
              })
           selected;
       code <- O.exec "" argv "" log errors 1800;
-      S.mapM_ (\(Pair key value) -> if eqString value "" then unsetEnv key else setEnv key value)
+      S.mapM_ (\((,) key value) -> if eqString value "" then unsetEnv key else setEnv key value)
         before;
       err <- readFile errors;
       output <- readFile log;
@@ -663,8 +663,8 @@ module Package.Verification where {
       let {
         entry =
           J.Object
-            (Cons (Pair "name" (J.str name))
-               (Cons (Pair "exit_code" (J.num code)) (Cons (Pair "log_sha256" (J.str hash)) Nil)))
+            ((:) ((,) "name" (J.str name))
+               ((:) ((,) "exit_code" (J.num code)) ((:) ((,) "log_sha256" (J.str hash)) [])))
       };
       let {
         saved =
@@ -675,7 +675,7 @@ module Package.Verification where {
       return
         (if (code == 0) then Right saved else Left (name ++ (" failed (" ++ (showInt code ++ ")"))))
     };
-  installWithSmoke :: String -> String -> (String -> IO Unit) -> IO (Either String Unit);
+  installWithSmoke :: String -> String -> (String -> IO ()) -> IO (Either String ());
   installWithSmoke directory prefix smoke =
     do {
       checked <- verify directory;
@@ -714,21 +714,21 @@ module Package.Verification where {
                    O.mkdir (O.parent destination);
                    present <- directoryExists destination;
                    if present
-                   then return Unit
+                   then return ()
                    else O.run ""
-                          (Cons "/bin/cp"
-                             (Cons "-R" (Cons (directory ++ "/package") (Cons destination Nil))));
+                          ((:) "/bin/cp"
+                             ((:) "-R" ((:) (directory ++ "/package") ((:) destination []))));
                    O.mkdir bin;
                    S.mapM_
                      (\name ->
                         O.run ""
-                          (Cons "/bin/ln"
-                             (Cons "-sf"
-                                (Cons ("../lib/mlf/" ++ (hash ++ ("/" ++ name)))
-                                   (Cons (bin ++ ("/" ++ name)) Nil)))))
+                          ((:) "/bin/ln"
+                             ((:) "-sf"
+                                ((:) ("../lib/mlf/" ++ (hash ++ ("/" ++ name)))
+                                   ((:) (bin ++ ("/" ++ name)) [])))))
                      (O.words "emlf emlf-compile");
                    smoke destination;
-                   return (Right Unit)
+                   return (Right ())
                  }
           }
       }

@@ -29,9 +29,9 @@ module Tests.Catalog where {
     else if eqString name "packages"
          then O.words "package-integration package-distribution"
          else if S.elem eqString name (O.words "backends port parity self-host")
-              then Cons name Nil
-              else Nil;
-  ensure condition message = if condition then Right Unit else Left message;
+              then (:) name []
+              else [];
+  ensure condition message = if condition then Right () else Left message;
   sameSet left right =
     S.eqList eqString (S.sortBy compareString left) (S.sortBy compareString right);
   unique values = (S.length values == S.length (S.nubBy eqString values));
@@ -67,7 +67,7 @@ module Tests.Catalog where {
           (((code >= 48) && (code <= 57)) ||
            (((code >= 65) && (code <= 90)) ||
             (((code >= 97) && (code <= 122)) ||
-             S.elem eqInt code (Cons 45 (Cons 46 (Cons 47 (Cons 95 Nil))))))))
+             S.elem eqInt code ((:) 45 ((:) 46 ((:) 47 ((:) 95 []))))))))
        (S.range 0 (stringLength name - 1)));
   natural value =
     case value of {
@@ -93,12 +93,12 @@ module Tests.Catalog where {
     S.fromMaybe J.empty (S.find (\entry -> eqString (identity entry) name) (families catalog));
   tags entry =
     S.append
-      (Cons ("group:" ++ J.getText "group" "" entry)
-         (Cons ("level:" ++ J.getText "level" "" entry) Nil))
+      ((:) ("group:" ++ J.getText "group" "" entry)
+         ((:) ("level:" ++ J.getText "level" "" entry) []))
       (S.concatMap
-         (\(Pair field prefix) -> S.map (\name -> (prefix ++ name)) (J.getStrings field entry))
-         (Cons (Pair "inputs" "input:")
-            (Cons (Pair "oracles" "oracle:") (Cons (Pair "purposes" "purpose:") Nil))));
+         (\((,) field prefix) -> S.map (\name -> (prefix ++ name)) (J.getStrings field entry))
+         ((:) ((,) "inputs" "input:")
+            ((:) ((,) "oracles" "oracle:") ((:) ((,) "purposes" "purpose:") []))));
   descriptor entry = J.set "tags" (J.stringArray (tags entry)) entry;
   batches selected =
     let {
@@ -112,13 +112,13 @@ module Tests.Catalog where {
     S.map
       (\name ->
          if (both && eqString name "package-integration")
-         then Pair "packages"
+         then (,) "packages"
                 (S.filter
                    (\entry ->
                       S.elem eqString (unitName entry)
                         (O.words "package-integration package-distribution"))
                    selected)
-         else Pair name (S.filter (\entry -> eqString (unitName entry) name) selected))
+         else (,) name (S.filter (\entry -> eqString (unitName entry) name) selected))
       (S.filter (\name -> S.not (both && eqString name "package-distribution")) names);
   suiteName name =
     if S.elem eqString name (O.words "package-integration package-distribution")
@@ -145,22 +145,22 @@ module Tests.Catalog where {
       metrics = S.map S.fst (J.items (combineObject "metrics" selected))
     } in
     J.Object
-      (Cons
-         (Pair "executions"
+      ((:)
+         ((,) "executions"
             (J.stringArray
                (S.filter (\name -> S.elem eqString name wanted)
                   (J.getStrings "executions" source))))
-         (Cons
-            (Pair "aliases"
+         ((:)
+            ((,) "aliases"
                (J.Object
-                  (S.filter (\(Pair name _) -> S.elem eqString name aliases)
+                  (S.filter (\((,) name _) -> S.elem eqString name aliases)
                      (J.items (J.get "aliases" source)))))
-            (Cons
-               (Pair "metrics"
+            ((:)
+               ((,) "metrics"
                   (J.Object
-                     (S.filter (\(Pair name _) -> S.elem eqString name metrics)
+                     (S.filter (\((,) name _) -> S.elem eqString name metrics)
                         (J.items (J.get "metrics" source)))))
-               Nil)));
+               [])));
   matrixRows selected =
     S.sum
       (S.map
@@ -171,7 +171,7 @@ module Tests.Catalog where {
             })
          selected);
   fixtures selected = S.map (J.getText "fixture" "") selected;
-  validate :: J.Json -> Either String Unit;
+  validate :: J.Json -> Either String ();
   validate catalog =
     do {
       ensure
@@ -184,17 +184,17 @@ module Tests.Catalog where {
       ensure (J.equal (J.get "granularity" catalog) (J.str "verified-case-or-family"))
         "unsupported catalog granularity";
       S.mapM_
-        (\(Pair field allowed) ->
+        (\((,) field allowed) ->
            ensure
              (stringList (J.get field catalog) &&
               (unique (J.getStrings field catalog) && sameSet (J.getStrings field catalog) allowed))
              ("catalog vocabulary changed: " ++ field))
-        (Cons (Pair "groups" groups)
-           (Cons (Pair "levels" levels)
-              (Cons (Pair "inputs" inputs)
-                 (Cons (Pair "oracles" oracles)
-                    (Cons (Pair "purposes" purposes)
-                       (Cons (Pair "profiles" (O.words "smoke full stress release")) Nil))))));
+        ((:) ((,) "groups" groups)
+           ((:) ((,) "levels" levels)
+              ((:) ((,) "inputs" inputs)
+                 ((:) ((,) "oracles" oracles)
+                    ((:) ((,) "purposes" purposes)
+                       ((:) ((,) "profiles" (O.words "smoke full stress release")) []))))));
       ensure
         (case J.get "units" catalog of {
            J.Array _ -> True;
@@ -240,7 +240,7 @@ module Tests.Catalog where {
              ensure
                (keys
                   (S.append (O.words "id unit name group level inputs oracles purposes evidence")
-                     (if eqString name "port" then Cons "fixture" Nil else Nil))
+                     (if eqString name "port" then (:) "fixture" [] else []))
                   entry)
                "invalid family fields";
              ensure
@@ -293,12 +293,12 @@ module Tests.Catalog where {
                             (J.equal (J.get "rows" evidence) (J.num 1) &&
                              (J.equal (J.get "fixtures" evidence) (J.num 1) &&
                               J.equal (J.get "labels" evidence)
-                                (J.Array (Cons (J.get "fixture" entry) Nil)))))
+                                (J.Array ((:) (J.get "fixture" entry) [])))))
                            "invalid port family"
-                    else Right Unit
+                    else Right ()
                   }
              else if S.elem eqString name (O.words "parity self-host")
-                  then ensure (eqString kind "unit" && keys (Cons "kind" Nil) evidence)
+                  then ensure (eqString kind "unit" && keys ((:) "kind" []) evidence)
                          "invalid whole-unit family evidence"
                   else do {
                          ensure
@@ -370,7 +370,7 @@ module Tests.Catalog where {
           unique (fixtures (forUnit catalog "port"))))
         "port family partition changed"
     };
-  validateInventory :: J.Json -> J.Json -> Either String Unit;
+  validateInventory :: J.Json -> J.Json -> Either String ();
   validateInventory catalog inventory =
     do {
       validate catalog;
@@ -433,7 +433,7 @@ module Tests.Catalog where {
                     ensure
                       (unique (S.map S.fst (J.items declared)) &&
                        (sameSet (S.map S.fst (J.items declared)) (S.map S.fst (J.items original)) &&
-                        S.all (\(Pair name value) -> J.equal value (J.get name original))
+                        S.all (\((,) name value) -> J.equal value (J.get name original))
                           (J.items declared)))
                       ("family " ++ (field ++ (" partition changed: " ++ suite)))
                   })
@@ -456,7 +456,7 @@ module Tests.Catalog where {
                         then S.elem eqString "fault-injected" (J.getStrings "inputs" entry)
                         else (eqString method "fixed-point" &&
                               S.elem eqString method (J.getStrings "oracles" entry));
-  select :: J.Json -> J.Json -> Either String (List J.Json);
+  select :: J.Json -> J.Json -> Either String ([] J.Json);
   select catalog settings =
     do {
       validate catalog;
@@ -483,22 +483,22 @@ module Tests.Catalog where {
       };
       ensure (eqString campaign "" || S.elem eqString campaign campaigns) "unknown test campaign";
       S.mapM_
-        (\(Triple field vocabulary label) ->
+        (\((,,) field vocabulary label) ->
            ensure (S.all (\name -> S.elem eqString name vocabulary) (J.getStrings field settings))
              ("unknown " ++ label))
-        (Cons (Triple "inputs" inputs "input method")
-           (Cons (Triple "oracles" oracles "test oracle")
-              (Cons (Triple "purposes" purposes "test purpose")
-                 (Cons (Triple "techniques" techniques "legacy technique")
-                    (Cons (Triple "families" (S.map identity (families catalog)) "test family")
-                       Nil)))));
+        ((:) ((,,) "inputs" inputs "input method")
+           ((:) ((,,) "oracles" oracles "test oracle")
+              ((:) ((,,) "purposes" purposes "test purpose")
+                 ((:) ((,,) "techniques" techniques "legacy technique")
+                    ((:) ((,,) "families" (S.map identity (families catalog)) "test family")
+                       [])))));
       S.mapM_
-        (\(Pair field vocabulary) ->
+        (\((,) field vocabulary) ->
            ensure
              (S.not (J.has field settings) ||
               S.elem eqString (J.getText field "" settings) vocabulary)
              ("unknown test " ++ field))
-        (Cons (Pair "group" groups) (Cons (Pair "level" levels) (Cons (Pair "unit" unitIds) Nil)));
+        ((:) ((,) "group" groups) ((:) ((,) "level" levels) ((:) ((,) "unit" unitIds) [])));
       ensure (unique (J.getStrings "families" settings)) "duplicate family selector";
       let {
         available = if eqString campaign "" then families catalog else forCampaign catalog campaign
@@ -527,10 +527,10 @@ module Tests.Catalog where {
     };
   selection catalog selected =
     J.Object
-      (Cons (Pair "granularity" (J.get "granularity" catalog))
-         (Cons (Pair "families" (J.Array (S.map descriptor selected)))
-            (Cons (Pair "units" (J.stringArray (S.nubBy eqString (S.map unitName selected))))
-               Nil)));
+      ((:) ((,) "granularity" (J.get "granularity" catalog))
+         ((:) ((,) "families" (J.Array (S.map descriptor selected)))
+            ((:) ((,) "units" (J.stringArray (S.nubBy eqString (S.map unitName selected))))
+               [])));
   load root =
     do {
       catalog <- J.read (root ++ "/tests/test-catalog.json");
@@ -575,14 +575,14 @@ module Tests.Catalog where {
   hasSelection settings =
     S.any (\field -> J.has field settings)
       (O.words "group level unit campaign families inputs oracles purposes techniques");
-  parse :: J.Json -> List String -> Either String J.Json;
+  parse :: J.Json -> [] String -> Either String J.Json;
   parse config args =
     let {
       matchValueShared1 = args
     } in
     case matchValueShared1 of {
-      Nil -> Right config;
-      Cons matchValueShared2 matchValueShared3 ->
+      [] -> Right config;
+      (:) matchValueShared2 matchValueShared3 ->
         if MLF.Primitive.eqString matchValueShared2 "--list"
         then let {
                rest = matchValueShared3
@@ -590,7 +590,7 @@ module Tests.Catalog where {
              parse config rest
         else if MLF.Primitive.eqString matchValueShared2 "--format"
              then case matchValueShared3 of {
-                    Cons matchValueShared6 matchValueShared7 ->
+                    (:) matchValueShared6 matchValueShared7 ->
                       let {
                         value = matchValueShared6
                       } in
@@ -607,7 +607,7 @@ module Tests.Catalog where {
                         "catalog [--group NAME] [--level NAME] [--input NAME] [--oracle NAME] [--purpose NAME] [--family ID] [--unit NAME] [--campaign NAME] [--format text|json]"
                   }
              else case matchValueShared3 of {
-                    Cons matchValueShared4 matchValueShared5 ->
+                    (:) matchValueShared4 matchValueShared5 ->
                       let {
                         value = matchValueShared4
                       } in

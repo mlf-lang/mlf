@@ -29,7 +29,7 @@ main = do
  scope <- M.asyncScopeNew 16 16
  _ <- M.asyncEnqueue scope (M.fail msg)
  _ <- M.catchIOError (M.asyncStep scope) (\_ -> pure 42)
- _ <- M.asyncEnqueue scope (modifyIORef' count (+1) >> pure M.Unit)
+ _ <- M.asyncEnqueue scope (modifyIORef' count (+1) >> pure ())
  _ <- M.asyncStep scope
  readIORef count >>= assert . (==1)
  -- A normal catch frame must not intercept errors from its continuation.
@@ -38,20 +38,20 @@ main = do
  _ <- M.asyncNewCompletion scope (\cell -> do
       _ <- M.asyncSubscribeCompletion cell (\(_::()) -> M.fail msg)
       _ <- M.asyncResolveCompletion cell ()
-      pure M.Unit) (error "completion allocation failed")
+      pure ()) (error "completion allocation failed")
  _ <- M.catchIOError (M.asyncStep scope) (\_ -> pure 42)
- _ <- M.asyncEnqueue scope (modifyIORef' count (+1) >> pure M.Unit)
+ _ <- M.asyncEnqueue scope (modifyIORef' count (+1) >> pure ())
  _ <- M.asyncStep scope
  readIORef count >>= assert . (==2)
  _ <- M.catchIOError (M.fail msg) (\_ -> pure (error "demanded handler result" :: ()))
  _ <- M.asyncEnqueue scope (M.catchIOError (M.fail msg) (\_ -> do
       status <- M.asyncStep scope
       assert (status == 8)
-      pure M.Unit))
+      pure ()))
  _ <- M.asyncStep scope
  inner <- M.asyncScopeNew 16 16
  _ <- M.asyncEnqueue inner (M.fail msg)
- _ <- M.asyncEnqueue scope (M.asyncStep inner >> pure M.Unit)
+ _ <- M.asyncEnqueue scope (M.asyncStep inner >> pure ())
  _ <- M.catchIOError (M.asyncStep scope) (\_ -> pure 42)
  status1 <- M.asyncStep scope
  status2 <- M.asyncStep inner

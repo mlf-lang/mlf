@@ -117,11 +117,8 @@ static void gc_free(void *memory) {
 
 /* Generated modules reference exactly one ABI symbol. Linking against a
  * runtime with incompatible field offsets must fail before execution. */
-void mlf_require_compact_gc_abi(void) {}
-void mlf_require_process_supervisor_v1_abi(void) {}
-void mlf_require_async_completion_v2_abi(void) {}
 /* Canonical source constructor tags and Char/typed-IOError primitives 95..102 and managed stack/context 103..106. */
-void mlf_require_haskell_boundary_v2_abi(void) {}
+void mlf_require_haskell_boundary_v3_abi(void) {}
 
 typedef enum {
     HOLE, BUSY, INDIRECT, THUNK, APPLICATION, CLOSURE,
@@ -993,7 +990,7 @@ static MlfValue *string_from_code(MlfValue *entry) {
 }
 
 /* Fixed canonical constructor ABI, shared with LLVM.entryConstructors.
- * Legacy Unit stays 0; source ()=1, []=2, (:)=3, tuples=4..6. */
+ * Legacy tag0 is a private tombstone; ()=1, []=2, (:)=3, tuples2..4=4..6. */
 enum { SOURCE_NIL = 2, SOURCE_CONS = 3, SOURCE_STACK_FRAME = 7 };
 static MlfValue *text_chars_step(MlfEnv *env, MlfValue *ignored) {
     (void)ignored;
@@ -1759,7 +1756,7 @@ MlfValue *mlf_write_int_table(MlfValue *table, MlfValue *key, MlfValue *entry) {
             if (inserted < 0) fail("out of memory");
             kh_val(t,i) = entry;
             TABLE_WRITTEN(table,inserted);
-            return mlf_constructor(0,0);
+            return mlf_constructor(1,0);
         }
         promote_table(table);
     }
@@ -1770,7 +1767,7 @@ MlfValue *mlf_write_int_table(MlfValue *table, MlfValue *key, MlfValue *entry) {
     if (inserted < 0) fail("out of memory");
     kh_val(t,i) = entry;
     TABLE_WRITTEN(table,inserted);
-    return mlf_constructor(0,0);
+    return mlf_constructor(1,0);
 }
 
 static inline MlfValue *add_evaluated_integers(MlfValue *a, MlfValue *b) {
@@ -1845,7 +1842,7 @@ MlfValue *mlf_st_write_array(MlfValue *array, MlfValue *index, MlfValue *entry) 
     size_t i = array_index(index,array->as.int_array.length);
     if (!entry) fail("missing runtime value");
     array->as.int_array.cells[i] = entry;
-    return mlf_constructor(0,0);
+    return mlf_constructor(1,0);
 }
 
 MlfValue *mlf_st_length_array(MlfValue *array) {
@@ -1943,7 +1940,7 @@ static MlfValue *write_array(MlfValue *operation) {
         size_t index = array_index(i,a->as.double_array.length);
         a->as.double_array.cells[index] = unbox_double(x);
     }
-    return mlf_constructor(0,0);
+    return mlf_constructor(1,0);
 }
 
 MlfValue *mlf_bytes_from_string(MlfValue *text) {
@@ -1965,7 +1962,7 @@ MlfValue *mlf_put_bytes(MlfValue *array, MlfValue *start, MlfValue *size) {
     size_t count = (size_t)bounded_integer(size,length-offset,"byte slice out of bounds");
     if (fwrite(a->as.byte_array.cells+offset,1,count,stdout) != count || fflush(stdout) == EOF)
         fail("IO error: output failed");
-    return mlf_constructor(0,0);
+    return mlf_constructor(1,0);
 }
 
 MlfValue *mlf_new_int_table(void) {
@@ -2050,7 +2047,7 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
             }
             case ASYNC_SCOPE_CLOSE:
                 mlf_completion_scope_close(expect(a, ASYNC_SCOPE)->as.async_scope);
-                result = mlf_constructor(0, 0);
+                result = mlf_constructor(1,0);
                 break;
             case ASYNC_NEW_COMPLETION: {
                 MlfCompletionScope *scope = expect(a, ASYNC_SCOPE)->as.async_scope;
@@ -2210,7 +2207,7 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
         case READ_FILE: result = read_file(operation->as.action.first); break;
         case WRITE_FILE:
             write_file(operation->as.action.first,operation->as.action.second);
-            result = mlf_constructor(0,0); break;
+            result = mlf_constructor(1,0); break;
         case FILE_EXISTS: result = file_exists(operation->as.action.first); break;
         case CANONICAL_PATH: result = canonical_path(operation->as.action.first); break;
         case GET_ARG_COUNT: result = small(argument_count); break;
@@ -2230,7 +2227,7 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
 
         case PUT_ERR:
             write_error(operation->as.action.first);
-            result = mlf_constructor(0,0); break;
+            result = mlf_constructor(1,0); break;
         case EXIT_WITH: {
             int status = (int)bounded_integer(operation->as.action.first,255,"exit status must be between 0 and 255");
             cleanup(); exit(status);
@@ -2241,10 +2238,10 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
             result = mlf_read_int_table(operation->as.action.first,operation->as.action.second); break;
         case PUT_STR: case PUT_STR_LN:
             write_string(operation->as.action.first, operation->as.action.operation == PUT_STR_LN);
-            result = mlf_constructor(0, 0); break;
+            result = mlf_constructor(1,0); break;
         case PRINT_INT:
             write_string(show_integer(operation->as.action.first), 1);
-            result = mlf_constructor(0, 0); break;
+            result = mlf_constructor(1,0); break;
         case NEW_INT_ARRAY: case NEW_DOUBLE_ARRAY: case NEW_BYTE_ARRAY:
             result = mlf_new_array(operation->as.action.operation,operation->as.action.first,operation->as.action.second);
             break;

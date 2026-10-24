@@ -16,11 +16,11 @@ validate available =
  let names = S.map availabilityName available in
  if S.any (\key -> stringLength key == 0) names then Left "empty capability name" else
  if S.length names /= S.length (S.nubBy eqString names) then Left "duplicate capability" else
- if S.any (\item -> case item of { Missing _ reason -> stringLength reason == 0; _ -> false }) available then Left "missing capability requires a reason" else Right Unit
+ if S.any (\item -> case item of { Missing _ reason -> stringLength reason == 0; _ -> false }) available then Left "missing capability requires a reason" else Right ()
 check (Requirement key policy) available = do
  validate available
  if stringLength key == 0 then Left "empty capability requirement" else
  case S.filter (\item -> eqString key (availabilityName item)) available of
-  Cons (Available _) Nil -> Right O.Pass
-  Cons (Missing _ reason) Nil -> Right (case policy of { Required -> O.Unsupported (key ++ ": " ++ reason); Optional -> O.Skipped (key ++ ": " ++ reason) })
+  (:) (Available _) [] -> Right O.Pass
+  (:) (Missing _ reason) [] -> Right (case policy of { Required -> O.Unsupported (key ++ ": " ++ reason); Optional -> O.Skipped (key ++ ": " ++ reason) })
   _ -> Left ("capability was not probed: " ++ key)

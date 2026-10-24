@@ -7,17 +7,17 @@ module Bootstrap.ST where {
   import Bootstrap.Types;
   -- A small, ordinary library layer over region-scoped state. Array elements
   -- remain lazy; sequencing only determines when cells are read or replaced.
-  map_ :: forall s a b. (a -> ST s b) -> List a -> ST s Unit;
+  map_ :: forall s a b. (a -> ST s b) -> [] a -> ST s ();
   map_ action values =
     case values of {
-      Nil -> stReturn Unit;
-      Cons value rest -> stBind (action value) (\ignored -> map_ action rest)
+      [] -> stReturn ();
+      (:) value rest -> stBind (action value) (\ignored -> map_ action rest)
     };
-  fold :: forall s a b. (a -> b -> ST s a) -> a -> List b -> ST s a;
+  fold :: forall s a b. (a -> b -> ST s a) -> a -> [] b -> ST s a;
   fold action initial values =
     case values of {
-      Nil -> stReturn initial;
-      Cons value rest -> stBind (action initial value) (\next -> fold action next rest)
+      [] -> stReturn initial;
+      (:) value rest -> stBind (action initial value) (\next -> fold action next rest)
     };
   pureE :: forall s a. a -> ST s (Either String a);
   pureE value = stReturn (Right value);
@@ -34,27 +34,27 @@ module Bootstrap.ST where {
          });
   liftE :: forall s a. ST s a -> ST s (Either String a);
   liftE action = stBind action (\value -> pureE value);
-  check :: forall s. Bool -> String -> ST s (Either String Unit);
-  check condition message = if condition then pureE Unit else failE message;
-  mapE :: forall s a b. (a -> ST s (Either String b)) -> List a -> ST s (Either String (List b));
+  check :: forall s. Bool -> String -> ST s (Either String ());
+  check condition message = if condition then pureE () else failE message;
+  mapE :: forall s a b. (a -> ST s (Either String b)) -> [] a -> ST s (Either String ([] b));
   mapE action values =
     case values of {
-      Nil -> pureE Nil;
-      Cons value rest ->
+      [] -> pureE [];
+      (:) value rest ->
         bindE (action value)
-          (\answer -> bindE (mapE action rest) (\answers -> pureE (Cons answer answers)))
+          (\answer -> bindE (mapE action rest) (\answers -> pureE ((:) answer answers)))
     };
-  mapE_ :: forall s a b. (a -> ST s (Either String b)) -> List a -> ST s (Either String Unit);
+  mapE_ :: forall s a b. (a -> ST s (Either String b)) -> [] a -> ST s (Either String ());
   mapE_ action values =
     case values of {
-      Nil -> pureE Unit;
-      Cons value rest -> bindE (action value) (\ignored -> mapE_ action rest)
+      [] -> pureE ();
+      (:) value rest -> bindE (action value) (\ignored -> mapE_ action rest)
     };
   foldE :: forall s a b. (a -> b -> ST s (Either String a)) ->
-                         a -> List b -> ST s (Either String a);
+                         a -> [] b -> ST s (Either String a);
   foldE action initial values =
     case values of {
-      Nil -> pureE initial;
-      Cons value rest -> bindE (action initial value) (\next -> foldE action next rest)
+      [] -> pureE initial;
+      (:) value rest -> bindE (action initial value) (\next -> foldE action next rest)
     }
 }

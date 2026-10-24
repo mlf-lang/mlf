@@ -8,8 +8,8 @@ import qualified Bootstrap.Graph.Solver as S
 import qualified Tests.DenseNormalization as N
 import qualified Tests.Helpers as H
 
-suite : List (Pair String (IO Unit))
-suite = Cons (Pair "incremental index audit agrees with independent reconstruction" audits) Nil
+suite : [] ((,) String (IO ()))
+suite = (:) ((,) "incremental index audit agrees with independent reconstruction" audits) []
 
 -- Keep the previous reconstruction algorithm as an independent oracle.
 reference solver = G.bindE (G.validateGraph (S.graph solver)) (\ignored ->
@@ -21,19 +21,19 @@ sizeWrong (IntMap tree) = IntMap (case tree of
  MapEmpty -> MapNode 1 0 IS.empty MapEmpty MapEmpty
  MapNode count key value left right -> MapNode (count + 1) key value left right)
 setSizeWrong (IntSet tree) = IntSet (case tree of
- MapEmpty -> MapNode 1 0 Unit MapEmpty MapEmpty
+ MapEmpty -> MapNode 1 0 () MapEmpty MapEmpty
  MapNode count key value left right -> MapNode (count + 1) key value left right)
 variants index = case IM.toList index of
- Nil -> Cons index Nil
- Cons (Pair key values) rest ->
-  Cons index (Cons (IM.delete key index) (Cons (IM.insert key IS.empty index)
-  (Cons (IM.insert key (IS.insert 999999 values) index)
-  (Cons (IM.insert 999999 values index) (Cons (sizeWrong index)
-  (Cons (IM.insert key (setSizeWrong values) index)
-  (Cons (IntMap (MapNode 2 key values MapEmpty (MapNode 1 key values MapEmpty MapEmpty))) Nil)))))))
+ [] -> (:) index []
+ (:) ((,) key values) rest ->
+  (:) index ((:) (IM.delete key index) ((:) (IM.insert key IS.empty index)
+  ((:) (IM.insert key (IS.insert 999999 values) index)
+  ((:) (IM.insert 999999 values index) ((:) (sizeWrong index)
+  ((:) (IM.insert key (setSizeWrong values) index)
+  ((:) (IntMap (MapNode 2 key values MapEmpty (MapNode 1 key values MapEmpty MapEmpty))) [])))))))
 
 check solver = H.assert (H.eq (S.finish solver) (reference solver)) "incremental index audit changed acceptance or returned graph"
-audits : IO Unit
+audits : IO ()
 audits = L.mapM_ (\scale -> L.mapM_ (\shift -> do
  let input = N.rename (\n -> shift + scale * n) (N.fixture 7)
  prepared <- H.right (S.prepare input)
@@ -47,6 +47,6 @@ audits = L.mapM_ (\scale -> L.mapM_ (\shift -> do
  check (Solver graph parents descendants scopes)
  L.mapM_ (\p -> check (Solver graph p descendants scopes)) (L.tail parentVariants)
  L.mapM_ (\d -> check (Solver graph parents d scopes)) (L.tail descendantVariants)
- check (Solver graph parents descendants (ScopeIndex IM.empty Nil))
+ check (Solver graph parents descendants (ScopeIndex IM.empty []))
  check (Solver (Graph IM.empty IM.empty 0) parents descendants scopes))
- (Cons 0 (Cons 340282366920938463463374607431768211456 (Cons (-340282366920938463463374607431768211456) Nil)))) (Cons 1 (Cons 100003 Nil))
+ ((:) 0 ((:) 340282366920938463463374607431768211456 ((:) (-340282366920938463463374607431768211456) [])))) ((:) 1 ((:) 100003 []))

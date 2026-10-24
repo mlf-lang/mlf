@@ -15,19 +15,19 @@ module Async.Process (ProcessScope, ProcessHandle, AsyncError(..), ScopeOptions(
   data ScopeOptions = ScopeOptions Int Int Int;
   -- ReplaceEnvironment takes NAME=VALUE fields. InheritEnvironment uses
   -- the coordinator's environment at actual launch. No implicit shell parsing.
-  data Environment = InheritEnvironment | ReplaceEnvironment (List String);
+  data Environment = InheritEnvironment | ReplaceEnvironment ([] String);
   -- executable, arguments (excluding argv[0]), cwd, stdin, stdout, stderr,
   -- environment, running timeout milliseconds, total timeout milliseconds.
   -- Empty cwd/stdin inherits. stdout/stderr paths are mandatory for command.
   -- Zero timeout disables it. No bounded-capture mode is exposed in v1.
   data ProcessSpec =
-    ProcessSpec String (List String) String String String String Environment Int Int;
+    ProcessSpec String ([] String) String String String String Environment Int Int;
   data ProcessOutcome = Exited Int Int | LaunchFailed Int Int | Cancelled Int Int | TimedOut Int;
   data ProcessEvent = ProcessEvent ProcessHandle ProcessOutcome;
   data Wait = Forever | ForMilliseconds Int;
   defaultOptions :: ScopeOptions;
   defaultOptions = ScopeOptions 4 64 1024;
-  command :: String -> List String -> String -> String -> ProcessSpec;
+  command :: String -> [] String -> String -> String -> ProcessSpec;
   command executable arguments stdoutFile stderrFile =
     ProcessSpec executable arguments "" "" stdoutFile stderrFile InheritEnvironment 0 0;
   errorCode :: AsyncError -> Int;
@@ -57,27 +57,27 @@ module Async.Process (ProcessScope, ProcessHandle, AsyncError(..), ScopeOptions(
       Cancelled _ cleanup -> cleanup;
       TimedOut cleanup -> cleanup
     };
-  call :: List String -> IO (Either AsyncError (List String));
+  call :: [] String -> IO (Either AsyncError ([] String));
   call fields =
     ioBind (I.request fields)
       (\result ->
          ioReturn
            (case result of {
-              Left (Pair code message) -> Left (AsyncError code message);
+              Left ((,) code message) -> Left (AsyncError code message);
               Right values -> Right values
             }));
   invalid :: forall a. Either AsyncError a;
   invalid = Left (AsyncError 12 "invalid process supervisor response");
-  unitResult :: Either AsyncError (List String) -> Either AsyncError Unit;
+  unitResult :: Either AsyncError ([] String) -> Either AsyncError ();
   unitResult result =
     case result of {
       Left error -> Left error;
-      Right Nil -> Right Unit;
+      Right [] -> Right ();
       _ -> invalid
     };
-  close :: ProcessScope -> Bool -> IO (Either AsyncError Unit);
+  close :: ProcessScope -> Bool -> IO (Either AsyncError ());
   close (ProcessScope scope) stop =
-    ioBind (call (Cons "close" (Cons scope (Cons (if stop then "1" else "0") Nil))))
+    ioBind (call ((:) "close" ((:) scope ((:) (if stop then "1" else "0") []))))
       (\result -> ioReturn (unitResult result));
   -- Normal return joins every child. An explicit Left cancels and joins; a
   -- native panic/exit invokes the runtime shutdown guard, and interpreter
@@ -89,11 +89,11 @@ module Async.Process (ProcessScope, ProcessHandle, AsyncError(..), ScopeOptions(
     do {
       created <-
         call
-          (Cons "create"
-             (Cons (showInt jobs) (Cons (showInt pending) (Cons (showInt retained) Nil))));
+          ((:) "create"
+             ((:) (showInt jobs) ((:) (showInt pending) ((:) (showInt retained) []))));
       case created of {
         Left error -> ioReturn (Left error);
-        Right (Cons identity Nil) ->
+        Right ((:) identity []) ->
           do {
             let {
               scope = ProcessScope identity
@@ -118,12 +118,12 @@ module Async.Process (ProcessScope, ProcessHandle, AsyncError(..), ScopeOptions(
         _ -> ioReturn invalid
       }
     };
-  handleFields :: ProcessHandle -> List String;
-  handleFields (ProcessHandle scope generation slot) = Cons scope (Cons generation (Cons slot Nil));
-  readHandle :: List String -> Either AsyncError ProcessHandle;
+  handleFields :: ProcessHandle -> [] String;
+  handleFields (ProcessHandle scope generation slot) = (:) scope ((:) generation ((:) slot []));
+  readHandle :: [] String -> Either AsyncError ProcessHandle;
   readHandle fields =
     case fields of {
-      Cons scope (Cons generation (Cons slot Nil)) -> Right (ProcessHandle scope generation slot);
+      (:) scope ((:) generation ((:) slot [])) -> Right (ProcessHandle scope generation slot);
       _ -> invalid
     };
   submit :: ProcessScope -> ProcessSpec -> IO (Either AsyncError ProcessHandle);
@@ -134,7 +134,7 @@ module Async.Process (ProcessScope, ProcessHandle, AsyncError(..), ScopeOptions(
            let {
              env =
                case environment of {
-                 InheritEnvironment -> Nil;
+                 InheritEnvironment -> [];
                  ReplaceEnvironment values -> values
                }
            };
@@ -146,23 +146,23 @@ module Async.Process (ProcessScope, ProcessHandle, AsyncError(..), ScopeOptions(
                }
            };
            let {
-             argv = Cons executable arguments
+             argv = (:) executable arguments
            };
            let {
              fields =
-               Cons "submit"
-                 (Cons scope
-                    (Cons executable
-                       (Cons cwd
-                          (Cons input
-                             (Cons output
-                                (Cons errors
-                                   (Cons envMode
-                                      (Cons (showInt running)
-                                         (Cons (showInt total)
-                                            (Cons (showInt (L.length argv))
+               (:) "submit"
+                 ((:) scope
+                    ((:) executable
+                       ((:) cwd
+                          ((:) input
+                             ((:) output
+                                ((:) errors
+                                   ((:) envMode
+                                      ((:) (showInt running)
+                                         ((:) (showInt total)
+                                            ((:) (showInt (L.length argv))
                                                (L.append argv
-                                                  (Cons (showInt (L.length env)) env))))))))))))
+                                                  ((:) (showInt (L.length env)) env))))))))))))
            };
            result <- call fields;
            ioReturn
@@ -177,10 +177,10 @@ module Async.Process (ProcessScope, ProcessHandle, AsyncError(..), ScopeOptions(
       Forever -> "-1";
       ForMilliseconds milliseconds -> if (milliseconds < 0) then "invalid" else showInt milliseconds
     };
-  readOutcome :: List String -> Either AsyncError ProcessOutcome;
+  readOutcome :: [] String -> Either AsyncError ProcessOutcome;
   readOutcome fields =
     case fields of {
-      Cons kind (Cons status (Cons launch (Cons cleanup (Cons reason Nil)))) ->
+      (:) kind ((:) status ((:) launch ((:) cleanup ((:) reason [])))) ->
         if eqString kind "0"
         then Right (Exited (readInt status) (readInt cleanup))
         else if eqString kind "1"
@@ -190,10 +190,10 @@ module Async.Process (ProcessScope, ProcessHandle, AsyncError(..), ScopeOptions(
                   else if eqString kind "3" then Right (TimedOut (readInt cleanup)) else invalid;
       _ -> invalid
     };
-  readEvent :: List String -> Either AsyncError ProcessEvent;
+  readEvent :: [] String -> Either AsyncError ProcessEvent;
   readEvent fields =
     case fields of {
-      Cons scope (Cons generation (Cons slot values)) ->
+      (:) scope ((:) generation ((:) slot values)) ->
         case readOutcome values of {
           Left error -> Left error;
           Right outcome -> Right (ProcessEvent (ProcessHandle scope generation slot) outcome)
@@ -203,7 +203,7 @@ module Async.Process (ProcessScope, ProcessHandle, AsyncError(..), ScopeOptions(
   poll :: ProcessScope -> IO (Either AsyncError (Maybe ProcessEvent));
   poll (ProcessScope scope) =
     do {
-      result <- call (Cons "poll" (Cons scope Nil));
+      result <- call ((:) "poll" ((:) scope []));
       ioReturn
         (case result of {
            Left (AsyncError code message) ->
@@ -221,7 +221,7 @@ module Async.Process (ProcessScope, ProcessHandle, AsyncError(..), ScopeOptions(
   waitNext :: ProcessScope -> Wait -> IO (Either AsyncError ProcessEvent);
   waitNext (ProcessScope scope) wait =
     do {
-      result <- call (Cons "wait" (Cons scope (Cons (waitField wait) Nil)));
+      result <- call ((:) "wait" ((:) scope ((:) (waitField wait) [])));
       ioReturn
         (case result of {
            Left error -> Left error;
@@ -235,7 +235,7 @@ module Async.Process (ProcessScope, ProcessHandle, AsyncError(..), ScopeOptions(
     do {
       result <-
         call
-          (Cons "await" (Cons scope (L.append (handleFields handle) (Cons (waitField wait) Nil))));
+          ((:) "await" ((:) scope (L.append (handleFields handle) ((:) (waitField wait) []))));
       ioReturn
         (case result of {
            Left error -> Left error;
@@ -245,30 +245,30 @@ module Async.Process (ProcessScope, ProcessHandle, AsyncError(..), ScopeOptions(
   awaitProcess :: ProcessScope -> ProcessHandle -> IO (Either AsyncError ProcessOutcome);
   awaitProcess scope handle = awaitWithin scope handle Forever;
   -- Cancellation reason codes are caller-defined integers from 0 to 2147483647.
-  cancel :: ProcessScope -> ProcessHandle -> Int -> IO (Either AsyncError Unit);
+  cancel :: ProcessScope -> ProcessHandle -> Int -> IO (Either AsyncError ());
   cancel (ProcessScope scope) handle reason =
     do {
       result <-
         call
-          (Cons "cancel" (Cons scope (L.append (handleFields handle) (Cons (showInt reason) Nil))));
+          ((:) "cancel" ((:) scope (L.append (handleFields handle) ((:) (showInt reason) []))));
       ioReturn (unitResult result)
     };
   -- Accept cancellation without waiting for cleanup. The queued child will never
   -- launch; a running child keeps its permit until a later supervisor call reaps
   -- it. A task coordinator must continue servicing calls until terminal outcome.
-  requestCancel :: ProcessScope -> ProcessHandle -> Int -> IO (Either AsyncError Unit);
+  requestCancel :: ProcessScope -> ProcessHandle -> Int -> IO (Either AsyncError ());
   requestCancel (ProcessScope scope) handle reason =
     do {
       result <-
         call
-          (Cons "request-cancel"
-             (Cons scope (L.append (handleFields handle) (Cons (showInt reason) Nil))));
+          ((:) "request-cancel"
+             ((:) scope (L.append (handleFields handle) ((:) (showInt reason) []))));
       ioReturn (unitResult result)
     };
-  cancelScope :: ProcessScope -> Int -> IO (Either AsyncError Unit);
+  cancelScope :: ProcessScope -> Int -> IO (Either AsyncError ());
   cancelScope (ProcessScope scope) reason =
     do {
-      result <- call (Cons "cancelScope" (Cons scope (Cons (showInt reason) Nil)));
+      result <- call ((:) "cancelScope" ((:) scope ((:) (showInt reason) [])));
       ioReturn (unitResult result)
     }
 }

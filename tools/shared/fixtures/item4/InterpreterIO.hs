@@ -7,35 +7,35 @@ import qualified Bootstrap.Std as S
 import qualified Bootstrap.Data as D
 import qualified MLF.Host.Base as B
 
-ls = foldr T.Cons T.Nil
+ls = foldr (:) []
 rv = T.Right
 act p args = rv (R.RAction p (ls args))
 prim p args = R.primitiveResult D.emptyDataEnv p (ls args)
 msg = rv (R.runtimeTextChars "bad λ😀" 0)
 err = prim T.PUserError [msg]
 raise = act T.PIOError [err]
-ret = rv (R.RPrimitive T.PIOReturn T.Nil)
-rethrow = rv (R.RPrimitive T.PIOError T.Nil)
+ret = rv (R.RPrimitive T.PIOReturn [])
+rethrow = rv (R.RPrimitive T.PIOError [])
 catch a h = act T.PCatchIOError [a,h]
-run = R.runAction T.Nil D.emptyDataEnv
+run = R.runAction [] D.emptyDataEnv
 assert label ok = if ok then putStrLn ("PASS "++label) else error ("FAIL "++label)
 isErr (T.Right (T.Right (R.RIOError _))) = True
 isErr _ = False
 isFatal (T.Left _) = True
 isFatal _ = False
-step st p args = R.runActionState T.Nil D.emptyDataEnv st (act p args)
-value (T.Right (T.Pair st (R.RIOSuccess v))) = (st,v)
+step st p args = R.runActionState [] D.emptyDataEnv st (act p args)
+value (T.Right ((,) st (R.RIOSuccess v))) = (st,v)
 value _ = error "unexpected action result"
-intResult n (T.Right (T.Pair _ (R.RIOSuccess (T.Right (R.RInteger m))))) = n==m
+intResult n (T.Right ((,) _ (R.RIOSuccess (T.Right (R.RInteger m))))) = n==m
 intResult _ _ = False
 main = do
   assert "char-surrogate-valid" $ case prim T.PCharFromCode [rv (R.RInteger 55296)] of T.Right (R.RChar 55296) -> True; _ -> False
   assert "char-invalid-negative" $ isFatal (prim T.PCharFromCode [rv (R.RInteger (-1))])
   assert "char-invalid-high" $ isFatal (prim T.PCharFromCode [rv (R.RInteger 1114112)])
   assert "unicode-roundtrip" $ case prim T.PTextFromChars [prim T.PTextToChars [rv (R.RString "aλ😀")]] of T.Right (R.RString s) -> B.unpack s=="aλ😀"; _ -> False
-  let surrogate = rv (R.RConstructor ":" (ls [rv (R.RChar 55296), rv (R.RConstructor "[]" T.Nil)]))
+  let surrogate = rv (R.RConstructor ":" (ls [rv (R.RChar 55296), rv (R.RConstructor "[]" [])]))
   assert "text-rejects-surrogate" $ isFatal (prim T.PTextFromChars [surrogate])
-  assert "error-message-surrogate-lossless" $ case prim T.PIOErrorString [prim T.PUserError [surrogate]] of T.Right (R.RConstructor _ (T.Cons (T.Right (R.RChar 55296)) _)) -> True; _ -> False
+  assert "error-message-surrogate-lossless" $ case prim T.PIOErrorString [prim T.PUserError [surrogate]] of T.Right (R.RConstructor _ ((:) (T.Right (R.RChar 55296)) _)) -> True; _ -> False
   r <- run (catch raise ret); assert "catch-user-error" (isErr r)
   r <- run (catch (act T.PIOBind [raise,T.Left "continuation forced"]) ret); assert "failure-left-zero" (isErr r)
   r <- run (catch (catch raise rethrow) ret); assert "handler-failure-outer-catch" (isErr r)
@@ -50,7 +50,7 @@ main = do
   let (s2,_)=value r
   r <- step s2 T.PAsyncEnqueue [scope,act T.PIOReturn [rv (R.RInteger 42)]]
   let (s3,_)=value r
-  r <- R.runActionState T.Nil D.emptyDataEnv s3 (catch (act T.PAsyncStep [scope]) ret)
+  r <- R.runActionState [] D.emptyDataEnv s3 (catch (act T.PAsyncStep [scope]) ret)
   let (s4,recovered)=value r
   assert "async-error-caught" $ case recovered of T.Right (R.RIOError _) -> True; _ -> False
   r <- step s4 T.PAsyncStep [scope]
@@ -63,6 +63,6 @@ main = do
   assert "failure-action-construction-deferred" $ case R.runtimePrimitive D.emptyDataEnv T.PIOError (ls [T.Left "unused error argument"]) of T.Right (R.RAction _ _) -> True; _ -> False
   r <- run (catch (act T.PIOError [rv (R.RIOError (T.Left "unused error message"))]) ret)
   assert "catch-does-not-demand-error-message" (isErr r)
-  r <- R.perform T.Nil D.emptyDataEnv T.PCatchIOError (ls [raise,ret])
+  r <- R.perform [] D.emptyDataEnv T.PCatchIOError (ls [raise,ret])
   assert "perform-entry-uses-typed-channel" (isErr r)
   putStrLn "INTERPRETER ITEM4: 20 checks passed"

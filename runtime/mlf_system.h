@@ -24,11 +24,11 @@ static MlfValue *os_setEnv(MlfValue *name, MlfValue *contents) {
     const char *key = file_path(name);
     const char *text = file_path(contents);
     if (setenv(key,text,1)) fail("IO error: setEnv failed");
-    return mlf_constructor(0,0);
+    return mlf_constructor(1,0);
 }
 static MlfValue *os_unsetEnv(MlfValue *name) {
     if (unsetenv(file_path(name))) fail("IO error: unsetEnv failed");
-    return mlf_constructor(0,0);
+    return mlf_constructor(1,0);
 }
 static MlfValue *os_directoryExists(MlfValue *name) {
     struct stat st;
@@ -65,7 +65,7 @@ static MlfValue *os_acquireFileLock(MlfValue *name) {
 static MlfValue *os_releaseFileLock(MlfValue *handle) {
     int fd = (int)bounded_integer(handle,INT_MAX,"invalid file lock");
     if (close(fd)) fail("IO error: releaseFileLock failed");
-    return mlf_constructor(0,0);
+    return mlf_constructor(1,0);
 }
 
 /* cwd, plus NUL-terminated fields: timeout seconds, stdin file, stdout file,

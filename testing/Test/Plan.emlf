@@ -11,10 +11,10 @@ import qualified Test.Outcome as O
 -- Nodes are in immutable topological order. Only Execute contributes coverage.
 data Kind = Build | Prepare | Execute | Validate | Cleanup
 data Restriction = MayExecute | CompileOnly
-data Node = Node String Kind (List String) (List String) O.Phase Restriction
+data Node = Node String Kind ([] String) ([] String) O.Phase Restriction
 -- queue wait, running deadline and cleanup grace are distinct positive bounds.
 data Deadlines = Deadlines Int Int Int
-data Plan = Plan String String (List String) (List Node) (List C.Requirement) R.Demand Deadlines
+data Plan = Plan String String ([] String) ([] Node) ([] C.Requirement) R.Demand Deadlines
 id (Node value _ _ _ _ _) = value
 kind (Node _ value _ _ _ _) = value
 dependencies (Node _ _ value _ _ _) = value
@@ -22,18 +22,18 @@ cases (Node _ _ _ value _ _) = value
 phase (Node _ _ _ _ value _) = value
 restriction (Node _ _ _ _ _ value) = value
 executes node = case kind node of { Execute -> true; _ -> false }
-ensure condition message = if condition then Right Unit else Left message
-validateNodes : List String -> List String -> List Node -> Either String Unit
+ensure condition message = if condition then Right () else Left message
+validateNodes : [] String -> [] String -> [] Node -> Either String ()
 validateNodes seen restricted nodes = case nodes of
- Nil -> Right Unit
- Cons node rest -> do
+ [] -> Right ()
+ (:) node rest -> do
   ensure (stringLength (id node) > 0 && S.not (S.elem eqString (id node) seen)) "empty or duplicate plan node ID"
   ensure (S.all (\key -> S.elem eqString key seen) (dependencies node)) "plan dependency missing, cyclic or not ordered"
   ensure (S.length (dependencies node) == S.length (S.nubBy eqString (dependencies node))) "duplicate plan dependency"
   ensure (if executes node then S.not (S.null (cases node)) else S.null (cases node)) "only execute nodes may own nonempty case inventory"
   let runtimeForbidden = (case restriction node of { CompileOnly -> true; MayExecute -> false }) || S.any (\key -> S.elem eqString key restricted) (dependencies node)
   ensure (S.not (runtimeForbidden && O.equalPhase (phase node) O.Runtime)) "compile-only input cannot reach runtime execution"
-  validateNodes (Cons (id node) seen) (if runtimeForbidden then Cons (id node) restricted else restricted) rest
+  validateNodes ((:) (id node) seen) (if runtimeForbidden then (:) (id node) restricted else restricted) rest
 validate (Plan catalog inputs selected nodes requirements demand (Deadlines waiting running grace)) = do
  ensure (stringLength catalog > 0 && stringLength inputs > 0) "plan lacks catalog or input identity"
  ensure (S.not (S.null selected) && S.all (\key -> stringLength key > 0) selected) "plan has empty case inventory"
@@ -41,10 +41,10 @@ validate (Plan catalog inputs selected nodes requirements demand (Deadlines wait
  ensure (waiting > 0 && running > 0 && grace > 0) "plan deadline must be positive"
  ensure (R.valid demand) "invalid plan resource demand"
  ensure (S.length requirements == S.length (S.nubBy eqString (S.map C.name requirements))) "duplicate capability requirement"
- validateNodes Nil Nil nodes
+ validateNodes [] [] nodes
  let owned = S.concatMap cases nodes
  ensure (S.length owned == S.length (S.nubBy eqString owned)) "case owned by multiple execute nodes"
  ensure (S.length owned == S.length selected && S.all (\key -> S.elem eqString key owned) selected) "execute inventory differs from selection"
- Right Unit
+ Right ()
 -- Planning is pure. Cache reuse never substitutes for an Execute node.
 reusable expected observed = stringLength expected > 0 && eqString expected observed

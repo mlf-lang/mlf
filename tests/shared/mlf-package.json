@@ -93,7 +93,7 @@
         "mlf-package-core"
       ],
       "modules": {
-        "Tests.BuildReceipts": "../Tests/BuildReceipts.hs"
+        "Tests.BuildReceipts": "Tests/BuildReceipts.hs"
       }
     },
     "source-smoke": {
@@ -106,8 +106,8 @@
         "mlf-language-core"
       ],
       "modules": {
-        "Tests.IndependentCheck": "../Tests/IndependentCheck.hs",
-        "Tests.IndependentType": "../Tests/IndependentType.hs"
+        "Tests.IndependentCheck": "Tests/IndependentCheck.hs",
+        "Tests.IndependentType": "Tests/IndependentType.hs"
       }
     }
   }

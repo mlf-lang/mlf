@@ -17,16 +17,16 @@ legacySubstitute : XName -> XErased -> XErased -> O.Fresh XErased
 legacySubstitute name value expression = case expression of
  XEVar actual -> if O.eqName name actual then O.copy M.empty value else O.freshPure expression
  _ -> O.children (legacySubstitute name value) expression
-legacyBindings : XErased -> List (Pair XName XErased) -> O.Fresh XErased
+legacyBindings : XErased -> [] ((,) XName XErased) -> O.Fresh XErased
 legacyBindings body bindings = case bindings of
- Nil -> O.freshPure body
- Cons (Pair name value) rest -> do { result <- legacySubstitute name value body; legacyBindings result rest }
+ [] -> O.freshPure body
+ (:) ((,) name value) rest -> do { result <- legacySubstitute name value body; legacyBindings result rest }
 legacyLet : XName -> XErased -> XErased -> O.Fresh XErased
 legacyLet name value body = case value of
  XELet inner a b -> O.freshPure (XELet inner a (XELet name b body))
- XELetRec (Cons (Pair r rhs) Nil) (XEVar other) -> if O.eqName r other then do
+ XELetRec ((:) ((,) r rhs) []) (XEVar other) -> if O.eqName r other then do
   replaced <- O.copy (M.singleton r (XEVar name)) rhs
-  O.freshPure (XELetRec (Cons (Pair name replaced) Nil) body)
+  O.freshPure (XELetRec ((:) ((,) name replaced) []) body)
   else O.freshPure (XELet name value body)
  _ -> O.freshPure (XELet name value body)
 legacyRewrite : XErased -> O.Fresh XErased
@@ -40,13 +40,13 @@ legacyRewrite expression = case expression of
    _ -> legacyLet name value body
  XELetRec bindings body ->
   let group = Set.fromList O.compareName (L.map L.fst bindings) in
-  let expandable = L.filter (\(Pair _ value) -> O.smallValue value && Set.null (Set.intersection O.compareName (O.free value) group)) bindings in
+  let expandable = L.filter (\((,) _ value) -> O.smallValue value && Set.null (Set.intersection O.compareName (O.free value) group)) bindings in
   let names = Set.fromList O.compareName (L.map L.fst expandable) in
-  let keep = L.filter (\(Pair name _) -> L.not (Set.member O.compareName name names)) bindings in
+  let keep = L.filter (\((,) name _) -> L.not (Set.member O.compareName name names)) bindings in
   legacyBindings (if L.null keep then body else XELetRec keep body) expandable
- XECase subject (Cons (XErasedAlternative (XDefaultPattern optional) body) Nil) -> O.freshPure (O.maybeLet optional subject body)
+ XECase subject ((:) (XErasedAlternative (XDefaultPattern optional) body) []) -> O.freshPure (O.maybeLet optional subject body)
  XECase subject branches -> case O.applications subject of
-  Pair (XEConstructor constructor) arguments -> case O.selectConstructor constructor arguments branches of
+  (,) (XEConstructor constructor) arguments -> case O.selectConstructor constructor arguments branches of
    Just selected -> O.freshPure selected
    Nothing -> O.freshPure expression
   _ -> O.freshPure expression
@@ -71,50 +71,50 @@ legacyWork expression = do
  legacyIterations arities 16 specialized
 legacyOptimize : XErased -> XErased
 legacyOptimize expression = case O.runFresh (legacyWork expression) (1+O.maxIdentity expression) of
- Pair normalized _ -> L.fst (O.runFresh (O.copy M.empty normalized) 0)
+ (,) normalized _ -> L.fst (O.runFresh (O.copy M.empty normalized) 0)
 
 name : Int -> XName
 name identity = XName identity "scope"
-leaf : Int -> List XName -> XErased
-leaf seed names = case names of {Cons first _ -> if seed % 2 == 0 then XEVar first else XEInt (seed % 11); Nil -> XEInt (seed % 11)}
-generate : Int -> Int -> List XName -> XErased
+leaf : Int -> [] XName -> XErased
+leaf seed names = case names of {(:) first _ -> if seed % 2 == 0 then XEVar first else XEInt (seed % 11); [] -> XEInt (seed % 11)}
+generate : Int -> Int -> [] XName -> XErased
 generate depth seed names = if depth == 0 then leaf seed names else
  let n = name (seed % 17) in let m = name ((seed+1) % 17) in
  let a = generate (depth-1) (seed*7+1) names in
- let b = generate (depth-1) (seed*7+3) (Cons n names) in
+ let b = generate (depth-1) (seed*7+3) ((:) n names) in
  case seed % 6 of
   0 -> XELet n a b
   1 -> XEApp (XEApp (XEPrimitive PAddInt) a) (generate (depth-1) (seed*7+2) names)
   2 -> XEApp (XEAbs n b) a
-  3 -> XECase (XEApp (XEConstructor "Box") a) (Cons (XErasedAlternative (XConstructorPattern "Box" (Cons (Just n) Nil)) b) (Cons (XErasedAlternative (XDefaultPattern Nothing) (XEInt 0)) Nil))
-  4 -> XELetRec (Cons (Pair n (XEInt seed)) (Cons (Pair m (leaf (seed+1) names)) Nil)) b
-  _ -> XECase a (Cons (XErasedAlternative (XDefaultPattern (Just n)) b) Nil)
-hardCases : List XErased
+  3 -> XECase (XEApp (XEConstructor "Box") a) ((:) (XErasedAlternative (XConstructorPattern "Box" ((:) (Just n) [])) b) ((:) (XErasedAlternative (XDefaultPattern Nothing) (XEInt 0)) []))
+  4 -> XELetRec ((:) ((,) n (XEInt seed)) ((:) ((,) m (leaf (seed+1) names)) [])) b
+  _ -> XECase a ((:) (XErasedAlternative (XDefaultPattern (Just n)) b) [])
+hardCases : [] XErased
 hardCases = let n = name 0 in let m = name 1 in let r = name 2 in
- Cons (XELet n (XEInt 7) (XEAbs n (XEVar n)))
- (Cons (XELet n (XEInt 9) (XECase (XEApp (XEConstructor "Box") (XEInt 42)) (Cons (XErasedAlternative (XConstructorPattern "Box" (Cons (Just n) Nil)) (XEVar n)) Nil)))
- (Cons (XELet n (XELet m (XEInt 5) (XEVar m)) (XEApp (XEAbs r (XEVar r)) (XEVar n)))
- (Cons (XELet n (XELetRec (Cons (Pair r (XEAbs m (XEApp (XEVar r) (XEVar m)))) Nil) (XEVar r)) (XEVar n))
- (Cons (XELetRec (Cons (Pair n (XEInt 4)) (Cons (Pair r (XEAbs m (XEApp (XEApp (XEPrimitive PAddInt) (XEVar n)) (XEApp (XEVar r) (XEVar m))))) Nil)) (XEApp (XEVar r) (XEInt 42)))
- (Cons (XECase (XEApp (XEConstructor "Box") (XEInt 42)) (Cons (XErasedAlternative (XConstructorPattern "Box" (Cons Nothing Nil)) (XEInt 1)) Nil))
- (Cons (XEApp (XELet n (XEInt 2) (XEAbs m (XEVar n))) (XEInt 42))
- (Cons (XEApp (XELetRec (Cons (Pair r (XEAbs n (XEVar n))) Nil) (XEVar r)) (XEInt 42)) Nil)))))))
-cases : List XErased
-cases = L.append hardCases (L.map (\seed -> generate 4 seed Nil) (L.range 1 180))
-children : O.UseTree -> List O.UseTree
+ (:) (XELet n (XEInt 7) (XEAbs n (XEVar n)))
+ ((:) (XELet n (XEInt 9) (XECase (XEApp (XEConstructor "Box") (XEInt 42)) ((:) (XErasedAlternative (XConstructorPattern "Box" ((:) (Just n) [])) (XEVar n)) [])))
+ ((:) (XELet n (XELet m (XEInt 5) (XEVar m)) (XEApp (XEAbs r (XEVar r)) (XEVar n)))
+ ((:) (XELet n (XELetRec ((:) ((,) r (XEAbs m (XEApp (XEVar r) (XEVar m)))) []) (XEVar r)) (XEVar n))
+ ((:) (XELetRec ((:) ((,) n (XEInt 4)) ((:) ((,) r (XEAbs m (XEApp (XEApp (XEPrimitive PAddInt) (XEVar n)) (XEApp (XEVar r) (XEVar m))))) [])) (XEApp (XEVar r) (XEInt 42)))
+ ((:) (XECase (XEApp (XEConstructor "Box") (XEInt 42)) ((:) (XErasedAlternative (XConstructorPattern "Box" ((:) Nothing [])) (XEInt 1)) []))
+ ((:) (XEApp (XELet n (XEInt 2) (XEAbs m (XEVar n))) (XEInt 42))
+ ((:) (XEApp (XELetRec ((:) ((,) r (XEAbs n (XEVar n))) []) (XEVar r)) (XEInt 42)) [])))))))
+cases : [] XErased
+cases = L.append hardCases (L.map (\seed -> generate 4 seed []) (L.range 1 180))
+children : O.UseTree -> [] O.UseTree
 children tree = case O.useChildren tree of
- O.UseLeaf -> Nil
- O.UseAbs _ body -> Cons body Nil
- O.UseApp a b -> Cons a (Cons b Nil)
- O.UseLet _ a b -> Cons a (Cons b Nil)
- O.UseRec bindings body -> Cons body (L.map L.snd bindings)
- O.UseCase subject alternatives -> Cons subject (L.map L.snd alternatives)
+ O.UseLeaf -> []
+ O.UseAbs _ body -> (:) body []
+ O.UseApp a b -> (:) a ((:) b [])
+ O.UseLet _ a b -> (:) a ((:) b [])
+ O.UseRec bindings body -> (:) body (L.map L.snd bindings)
+ O.UseCase subject alternatives -> (:) subject (L.map L.snd alternatives)
 validCounts : O.UseTree -> Bool
 validCounts tree =
  let term = O.useTerm tree in let counts = O.useCounts tree in
  L.eqList O.eqName (M.keys counts) (Set.toList (O.free term)) &&
- L.all (\(Pair variable count) -> count > 0 && count <= 2 && count == O.occurrences 2 variable term) (M.toList counts) && L.all validCounts (children tree)
-indices : IO Unit
+ L.all (\((,) variable count) -> count > 0 && count <= 2 && count == O.occurrences 2 variable term) (M.toList counts) && L.all validCounts (children tree)
+indices : IO ()
 indices = L.mapM_ (\expression -> do
  let copied = L.fst (O.runFresh (O.copy M.empty expression) (1+O.maxIdentity expression))
  let tree = O.indexUses copied
@@ -123,14 +123,14 @@ indices = L.mapM_ (\expression -> do
  H.assert (validCounts normalized) "rewritten free-use index differs from independent scans"
  let direct = L.fst (O.runFresh (O.passRaw copied) (1+O.maxIdentity copied))
  H.assert (validCounts direct && X.equalErased (O.useTerm normalized) (O.useTerm direct)) "direct normalized index differs from the indexed-input traversal") cases
-differential : IO Unit
+differential : IO ()
 differential = L.mapM_ (\expression -> do
  H.assert (X.equalErased (O.optimize expression) (legacyOptimize expression)) "indexed optimizer differs from the legacy normalized tree or fresh identities"
  let unique = L.fst (O.runFresh (O.copy M.empty expression) (1 + O.maxIdentity expression))
  H.assert (A.sameFunctions (M.toList (A.analyze unique)) (M.toList (legacyAnalyze unique))) "cached worker inputs changed captures, demands, bodies, parameters, or identities") cases
-suite : List (Pair String (IO Unit))
-suite = Cons (Pair "optimizer free-use indices agree with independent scoped scans" indices)
- (Cons (Pair "indexed optimizer agrees with legacy traversal and fresh identities" differential) Nil)
+suite : [] ((,) String (IO ()))
+suite = (:) ((,) "optimizer free-use indices agree with independent scoped scans" indices)
+ ((:) ((,) "indexed optimizer agrees with legacy traversal and fresh identities" differential) [])
 
 -- Keep the preceding complete-body fixed point as an independent control for
 -- cached lexical inputs and changed-field convergence. Both analyses must

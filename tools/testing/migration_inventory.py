@@ -220,7 +220,7 @@ def build():
             row['legacy_label'] = e['owner_provenance']['legacy_label']
             row['expectation_kind'] = TUPLE_EXPECTATIONS[e['owner_provenance']['helper']]
         rows.append(row)
-    current = tuple_audit.verify_current_sources(ROOT)
+    current = tuple_audit.verify_historical_sources()
     tuple_source = current[tuple_audit.IMPLEMENTATION].encode()
     tuple_ids = re.findall(r'leaf\s+\"(tuple-list/focused/[^\"]+)\"', tuple_source.decode())
     expected_tuple_ids = [e['id'] for e in rows if e['original_kind'] == 'source-authored-tuple-list-observation']

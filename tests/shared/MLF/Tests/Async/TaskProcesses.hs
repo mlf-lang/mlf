@@ -13,7 +13,7 @@ module MLF.Tests.Async.TaskProcesses where {
       putErr ("TASK PROCESS FAILURE: " ++ (message ++ "\n"));
       exitWith 1
     };
-  assert condition message = if condition then ioReturn Unit else bad message;
+  assert condition message = if condition then ioReturn () else bad message;
   success :: forall a. T.Outcome a -> IO a;
   success outcome =
     case outcome of {
@@ -34,9 +34,9 @@ module MLF.Tests.Async.TaskProcesses where {
       outcome <- T.run T.defaultOptions task;
       success outcome
     };
-  args2 a b = Cons a (Cons b Nil);
-  args3 a b c = Cons a (Cons b (Cons c Nil));
-  args4 a b c d = Cons a (Cons b (Cons c (Cons d Nil)));
+  args2 a b = (:) a ((:) b []);
+  args3 a b c = (:) a ((:) b ((:) c []));
+  args4 a b c d = (:) a ((:) b ((:) c ((:) d [])));
   spec helper work name arguments =
     P.command helper arguments (work ++ ("/" ++ (name ++ ".out")))
       (work ++ ("/" ++ (name ++ ".err")));
@@ -66,9 +66,9 @@ module MLF.Tests.Async.TaskProcesses where {
           (T.bind (T.spawn task)
              (\fiber ->
                 T.bind (T.await fiber)
-                  (\first -> T.map (\second -> Pair first second) (T.await fiber))));
+                  (\first -> T.map (\second -> (,) first second) (T.await fiber))));
       case pair of {
-        Pair first second ->
+        (,) first second ->
           assert (exited 0 first && exited 0 second) "repeated await reran cold task"
       };
       assertFile (work ++ "/once.marker") "once\n";
@@ -120,11 +120,11 @@ module MLF.Tests.Async.TaskProcesses where {
                                    (spec helper work "dynamic-b"
                                       (args4 "dependent" (showInt value) (work ++ "/c.ready")
                                          (work ++ "/c.release"))))
-                                (\b -> T.map (\cResult -> Pair b cResult) (T.await c));
+                                (\b -> T.map (\cResult -> (,) b cResult) (T.await c));
                             _ -> T.fail (P.AsyncError 990 "dynamic A did not exit")
                           }))));
       case pair of {
-        Pair b c -> assert (exited 0 b && exited 0 c) "dynamic child result"
+        (,) b c -> assert (exited 0 b && exited 0 c) "dynamic child result"
       };
       assertFile (work ++ "/dynamic-b.out") "B saw A=23 while C was waiting\n";
       putStrLn "PASS dynamic-submission-while-independent-process-runs"
@@ -199,7 +199,7 @@ module MLF.Tests.Async.TaskProcesses where {
            _ -> False
          })
         "checked nonzero exit was not failure";
-      launch <- run (T.runProcess (spec (work ++ "/missing-executable") work "launch-failed" Nil));
+      launch <- run (T.runProcess (spec (work ++ "/missing-executable") work "launch-failed" []));
       assert
         (case launch of {
            P.LaunchFailed error cleanup -> ((error /= 0) && (cleanup == 0));

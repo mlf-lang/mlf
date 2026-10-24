@@ -9,7 +9,7 @@ module Bootstrap.Lexer where {
   import qualified Bootstrap.Unicode as U;
   data Token = Token String Int Int Int Int;
   data Cursor = Cursor Int Int Int;
-  data Scanned = Scanned (List Token) Token;
+  data Scanned = Scanned ([] Token) Token;
   tokenText :: Token -> String;
   tokenText (Token s _ _ _ _) = s;
   tokenLine :: Token -> Int;
@@ -48,26 +48,26 @@ module Bootstrap.Lexer where {
   isOperator :: Int -> Bool;
   isOperator c =
     elem eqInt c
-      (Cons 58
-         (Cons 33
-            (Cons 35
-               (Cons 36
-                  (Cons 37
-                     (Cons 38
-                        (Cons 42
-                           (Cons 43
-                              (Cons 46
-                                 (Cons 47
-                                    (Cons 60
-                                       (Cons 61
-                                          (Cons 62
-                                             (Cons 63
-                                                (Cons 64
-                                                   (Cons 92
-                                                      (Cons 94
-                                                         (Cons 124
-                                                            (Cons 45
-                                                               (Cons 126 Nil))))))))))))))))))));
+      ((:) 58
+         ((:) 33
+            ((:) 35
+               ((:) 36
+                  ((:) 37
+                     ((:) 38
+                        ((:) 42
+                           ((:) 43
+                              ((:) 46
+                                 ((:) 47
+                                    ((:) 60
+                                       ((:) 61
+                                          ((:) 62
+                                             ((:) 63
+                                                ((:) 64
+                                                   ((:) 92
+                                                      ((:) 94
+                                                         ((:) 124
+                                                            ((:) 45
+                                                               ((:) 126 []))))))))))))))))))));
   starts :: String -> Int -> Int -> Int -> Bool;
   starts source size i c = (codeAt source size i == c);
   skipLine :: String -> Int -> Cursor -> Cursor;
@@ -156,6 +156,25 @@ module Bootstrap.Lexer where {
               else if (codeAt source size i <= 26)
                    then Left (lexError file cursor "unescaped control character in string")
                    else scanQuoted file source size (advance (codeAt source size i) cursor);
+  -- Source scanning consumes complete control/numeric/gap escapes. The opaque
+  -- IR/metadata scanner above retains its existing grammar and representation.
+  scanSourceQuoted :: String -> String -> Int -> Cursor -> Either String Cursor;
+  scanSourceQuoted file source size cursor =
+    let { i = cursorIndex cursor } in
+    if i >= size then Left (lexError file cursor "unterminated string")
+    else let { c = codeAt source size i } in
+      if c == 34 then Right (advance c cursor)
+      else if c == 92
+      then case sourceEscapeCode source (i + 1) size of {
+        Left error -> Left (lexError file cursor error);
+        Right ((,) _ next) -> scanSourceQuoted file source size (advanceSourceTo source next cursor)
+      }
+      else if not (U.isPrint c) then Left (lexError file cursor "unescaped non-printable character in source string")
+      else scanSourceQuoted file source size (advance c cursor);
+  advanceSourceTo :: String -> Int -> Cursor -> Cursor;
+  advanceSourceTo source end cursor =
+    if cursorIndex cursor >= end then cursor
+    else advanceSourceTo source end (advance (stringCodeAt source (cursorIndex cursor)) cursor);
   scanNumber :: String -> Int -> Cursor -> Cursor;
   scanNumber source size cursor =
     let {
@@ -203,22 +222,27 @@ module Bootstrap.Lexer where {
               else fraction;
   scanTokens :: String -> String -> Either String Scanned;
   scanTokens file source = scanMore file source (stringLength source) (Cursor 0 1 1);
+  scanSourceTokens :: String -> String -> Either String Scanned;
+  scanSourceTokens file source = scanMoreWith scanSourceQuoted file source (stringLength source) (Cursor 0 1 1);
   scanMore :: String -> String -> Int -> Cursor -> Either String Scanned;
-  scanMore file source size cursor =
+  scanMore = scanMoreWith scanQuoted;
+  scanMoreWith :: (String -> String -> Int -> Cursor -> Either String Cursor) ->
+                  String -> String -> Int -> Cursor -> Either String Scanned;
+  scanMoreWith quoted file source size cursor =
     case skipWhite file source size cursor of {
       Left e -> Left e;
       Right begin ->
         case begin of {
           Cursor i line column ->
             if (i >= size)
-            then Right (Scanned Nil (Token "" line column line column))
+            then Right (Scanned [] (Token "" line column line column))
             else let {
                    c = codeAt source size i
                  } in
                  let {
                    next =
                      if (c == 34)
-                     then scanQuoted file source size (advance c begin)
+                     then quoted file source size (advance c begin)
                      else Right
                             (if (U.isAlpha c || ((c == 95) || (c == 39)))
                              then consumeWhile isIdentChar source size begin
@@ -233,12 +257,12 @@ module Bootstrap.Lexer where {
                    Right end ->
                      case end of {
                        Cursor j lastLine lastColumn ->
-                         case scanMore file source size end of {
+                         case scanMoreWith quoted file source size end of {
                            Left e -> Left e;
                            Right (Scanned rest finish) ->
                              Right
                                (Scanned
-                                  (Cons
+                                  ((:)
                                      (Token (stringSlice source i (j - i)) line column lastLine
                                         lastColumn)
                                      rest)
@@ -290,21 +314,97 @@ module Bootstrap.Lexer where {
   stringAnyAt predicate source i size =
     ((i < size) &&
      (predicate (stringCodeAt source i) || stringAnyAt predicate source (i + 1) size));
+  -- Source literals carry full Haskell Char values, not opaque UTF-8 Text.
+  -- Keep stringValue and its scalar-only clients (metadata/X) unchanged.
+  sourceStringValue :: String -> Either String SourceString;
+  sourceStringValue source = mapEither joinSourceString (sourceStringChunks source 1 (stringLength source - 1));
+  joinSourceString :: [] SourceString -> SourceString;
+  joinSourceString chunks =
+    if any sourceStringHasCodes chunks
+    then CharString (concatMap sourceStringCodes chunks)
+    else ScalarString (concatStrings (map sourceStringText chunks));
+  sourceStringHasCodes :: SourceString -> Bool;
+  sourceStringHasCodes value = case value of { ScalarString _ -> False; CharString _ -> True };
+  sourceStringText :: SourceString -> String;
+  sourceStringText value = case value of { ScalarString text -> text; CharString _ -> "" };
+  sourceStringCodes :: SourceString -> [] Int;
+  sourceStringCodes value = case value of {
+    CharString codes -> codes;
+    ScalarString text -> sourceTextCodes text 0 (stringLength text)
+  };
+  sourceTextCodes :: String -> Int -> Int -> [] Int;
+  sourceTextCodes text i size =
+    if i >= size then [] else (:) (stringCodeAt text i) (sourceTextCodes text (i + 1) size);
+  sourceStringChunks :: String -> Int -> Int -> Either String ([] SourceString);
+  sourceStringChunks source i size =
+    if i >= size then Right []
+    else if stringCodeAt source i == 92
+    then do {
+      escaped <- sourceEscapeCode source (i + 1) size;
+      case escaped of { (,) code next -> do {
+      rest <- sourceStringChunks source next size;
+      case code of {
+        Nothing -> Right rest;
+        Just value -> Right ((:)
+          (if value >= 55296 && value <= 57343
+           then CharString ((:) value [])
+           else ScalarString (stringFromCode value)) rest)
+      }
+      } }
+    }
+    else let { end = unescapedEnd source i size; text = stringSlice source i (end - i) } in
+      if stringAny (\c -> not (U.isPrint c)) text
+      then Left "unescaped non-printable character in source string"
+      else mapEither ((:) (ScalarString text)) (sourceStringChunks source end size);
+  sourceEscapeCode :: String -> Int -> Int -> Either String ((,) (Maybe Int) Int);
+  sourceEscapeCode source i size =
+    if i >= size then Left "unterminated string escape"
+    else let { c = stringCodeAt source i } in
+      if sourceGapSpace c
+      then let { end = cursorIndex (consumeWhile sourceGapSpace source size (Cursor i 1 1)) } in
+        if end < size && stringCodeAt source end == 92
+        then Right ((,) Nothing (end + 1))
+        else Left "string gaps support ASCII whitespace and must end with backslash"
+      else if U.isSpace c then Left "string gaps support ASCII whitespace only"
+      else if isDigit c then sourceEscapedNumber 10 source i size
+      else if c == 111 then sourceEscapedNumber 8 source (i + 1) size
+      else if c == 120 then sourceEscapedNumber 16 source (i + 1) size
+      else mapEither
+        (\((,) text next) -> (,)
+          (if stringLength text == 0 then Nothing else Just (stringCodeAt text 0)) next)
+        (decodeEscape source i size);
+  -- Pinned GHC accepts these gaps; Unicode separator gaps are not supported.
+  sourceGapSpace :: Int -> Bool;
+  sourceGapSpace c = c == 32 || (c >= 9 && c <= 13);
+  -- Bound before multiplication: Int wraparound must never admit out-of-range escapes.
+  sourceEscapedNumber :: Int -> String -> Int -> Int -> Either String ((,) (Maybe Int) Int);
+  sourceEscapedNumber base source i size =
+    if i >= size || digitValue (stringCodeAt source i) < 0 || digitValue (stringCodeAt source i) >= base
+    then Left "empty numeric escape"
+    else sourceEscapeDigits base source i size 0;
+  sourceEscapeDigits :: Int -> String -> Int -> Int -> Int -> Either String ((,) (Maybe Int) Int);
+  sourceEscapeDigits base source i size value =
+    if i >= size then Right ((,) (Just value) i)
+    else let { digit = digitValue (stringCodeAt source i) } in
+      if digit < 0 || digit >= base then Right ((,) (Just value) i)
+      else if value > ((1114111 - digit) / base) then Left "character escape out of range"
+      else let { next = value * base + digit } in
+        seq next (sourceEscapeDigits base source (i + 1) size next);
   stringValue :: String -> Either String String;
   stringValue source = decodeString source 1 (stringLength source - 1);
   decodeString :: String -> Int -> Int -> Either String String;
   decodeString source i size = mapEither concatStrings (decodeStringChunks source i size);
-  decodeStringChunks :: String -> Int -> Int -> Either String (List String);
+  decodeStringChunks :: String -> Int -> Int -> Either String ([] String);
   decodeStringChunks source i size =
     if (i >= size)
-    then Right Nil
+    then Right []
     else if (stringCodeAt source i == 92)
          then case decodeEscape source (i + 1) size of {
                 Left e -> Left e;
-                Right (Pair text next) ->
+                Right ((,) text next) ->
                   case decodeStringChunks source next size of {
                     Left e -> Left e;
-                    Right rest -> Right (if (stringLength text == 0) then rest else Cons text rest)
+                    Right rest -> Right (if (stringLength text == 0) then rest else (:) text rest)
                   }
               }
          else let {
@@ -312,12 +412,12 @@ module Bootstrap.Lexer where {
               } in
               case decodeStringChunks source end size of {
                 Left e -> Left e;
-                Right rest -> Right (Cons (stringSlice source i (end - i)) rest)
+                Right rest -> Right ((:) (stringSlice source i (end - i)) rest)
               };
   unescapedEnd :: String -> Int -> Int -> Int;
   unescapedEnd source i size =
     if ((i >= size) || (stringCodeAt source i == 92)) then i else unescapedEnd source (i + 1) size;
-  decodeEscape :: String -> Int -> Int -> Either String (Pair String Int);
+  decodeEscape :: String -> Int -> Int -> Either String ((,) String Int);
   decodeEscape source i size =
     if (i >= size)
     then Left "unterminated string escape"
@@ -329,17 +429,17 @@ module Bootstrap.Lexer where {
                 end = cursorIndex (consumeWhile U.isSpace source size (Cursor i 1 1))
               } in
               if ((end < size) && (stringCodeAt source end == 92))
-              then Right (Pair "" (end + 1))
+              then Right ((,) "" (end + 1))
               else Left "invalid string gap"
          else if (c == 38)
-              then Right (Pair "" (i + 1))
+              then Right ((,) "" (i + 1))
               else if (c == 94)
                    then if ((i + 1) < size)
                         then let {
                                control = stringCodeAt source (i + 1)
                              } in
                              if ((control >= 64) && (control <= 95))
-                             then Right (Pair (stringFromCode (control - 64)) (i + 2))
+                             then Right ((,) (stringFromCode (control - 64)) (i + 2))
                              else Left "invalid control escape"
                         else Left "incomplete control escape"
                    else if isDigit c
@@ -350,7 +450,7 @@ module Bootstrap.Lexer where {
                                   then escapedNumber 16 source (i + 1) size
                                   else case simpleEscape c of {
                                          Just result ->
-                                           Right (Pair (stringFromCode result) (i + 1));
+                                           Right ((,) (stringFromCode result) (i + 1));
                                          Nothing -> namedEscape source i size asciiEscapes
                                        };
   simpleEscape :: Int -> Maybe Int;
@@ -372,7 +472,7 @@ module Bootstrap.Lexer where {
                                   else if ((c == 92) || ((c == 34) || (c == 39)))
                                        then Just c
                                        else Nothing;
-  escapedNumber :: Int -> String -> Int -> Int -> Either String (Pair String Int);
+  escapedNumber :: Int -> String -> Int -> Int -> Either String ((,) String Int);
   escapedNumber base source i size =
     let {
       end =
@@ -387,80 +487,80 @@ module Bootstrap.Lexer where {
            Right value ->
              if ((value > 1114111) || ((value >= 55296) && (value <= 57343)))
              then Left "invalid Unicode scalar escape"
-             else Right (Pair (stringFromCode value) end)
+             else Right ((,) (stringFromCode value) end)
          };
-  namedEscape :: String -> Int -> Int -> List (Pair String Int) -> Either String (Pair String Int);
+  namedEscape :: String -> Int -> Int -> [] ((,) String Int) -> Either String ((,) String Int);
   namedEscape source i size names =
     case names of {
-      Nil -> Left "unknown string escape";
-      Cons (Pair name value) rest ->
+      [] -> Left "unknown string escape";
+      (:) ((,) name value) rest ->
         let {
           count = stringLength name
         } in
         if (((i + count) <= size) && eqString name (stringSlice source i count))
-        then Right (Pair (stringFromCode value) (i + count))
+        then Right ((,) (stringFromCode value) (i + count))
         else namedEscape source i size rest
     };
-  asciiEscapes :: List (Pair String Int);
+  asciiEscapes :: [] ((,) String Int);
   asciiEscapes =
-    Cons (Pair "NUL" 0)
-      (Cons (Pair "SOH" 1)
-         (Cons (Pair "STX" 2)
-            (Cons (Pair "ETX" 3)
-               (Cons (Pair "EOT" 4)
-                  (Cons (Pair "ENQ" 5)
-                     (Cons (Pair "ACK" 6)
-                        (Cons (Pair "BEL" 7)
-                           (Cons (Pair "DLE" 16)
-                              (Cons (Pair "DC1" 17)
-                                 (Cons (Pair "DC2" 18)
-                                    (Cons (Pair "DC3" 19)
-                                       (Cons (Pair "DC4" 20)
-                                          (Cons (Pair "NAK" 21)
-                                             (Cons (Pair "SYN" 22)
-                                                (Cons (Pair "ETB" 23)
-                                                   (Cons (Pair "CAN" 24)
-                                                      (Cons (Pair "SUB" 26)
-                                                         (Cons (Pair "ESC" 27)
-                                                            (Cons (Pair "DEL" 127)
-                                                               (Cons (Pair "BS" 8)
-                                                                  (Cons (Pair "HT" 9)
-                                                                     (Cons (Pair "LF" 10)
-                                                                        (Cons (Pair "VT" 11)
-                                                                           (Cons (Pair "FF" 12)
-                                                                              (Cons (Pair "CR" 13)
-                                                                                 (Cons
-                                                                                    (Pair "SO" 14)
-                                                                                    (Cons
-                                                                                       (Pair "SI"
+    (:) ((,) "NUL" 0)
+      ((:) ((,) "SOH" 1)
+         ((:) ((,) "STX" 2)
+            ((:) ((,) "ETX" 3)
+               ((:) ((,) "EOT" 4)
+                  ((:) ((,) "ENQ" 5)
+                     ((:) ((,) "ACK" 6)
+                        ((:) ((,) "BEL" 7)
+                           ((:) ((,) "DLE" 16)
+                              ((:) ((,) "DC1" 17)
+                                 ((:) ((,) "DC2" 18)
+                                    ((:) ((,) "DC3" 19)
+                                       ((:) ((,) "DC4" 20)
+                                          ((:) ((,) "NAK" 21)
+                                             ((:) ((,) "SYN" 22)
+                                                ((:) ((,) "ETB" 23)
+                                                   ((:) ((,) "CAN" 24)
+                                                      ((:) ((,) "SUB" 26)
+                                                         ((:) ((,) "ESC" 27)
+                                                            ((:) ((,) "DEL" 127)
+                                                               ((:) ((,) "BS" 8)
+                                                                  ((:) ((,) "HT" 9)
+                                                                     ((:) ((,) "LF" 10)
+                                                                        ((:) ((,) "VT" 11)
+                                                                           ((:) ((,) "FF" 12)
+                                                                              ((:) ((,) "CR" 13)
+                                                                                 ((:)
+                                                                                    ((,) "SO" 14)
+                                                                                    ((:)
+                                                                                       ((,) "SI"
                                                                                           15)
-                                                                                       (Cons
-                                                                                          (Pair "EM"
+                                                                                       ((:)
+                                                                                          ((,) "EM"
                                                                                              25)
-                                                                                          (Cons
-                                                                                             (Pair
+                                                                                          ((:)
+                                                                                             ((,)
                                                                                                 "FS"
                                                                                                 28)
-                                                                                             (Cons
-                                                                                                (Pair
+                                                                                             ((:)
+                                                                                                ((,)
                                                                                                    "GS"
                                                                                                    29)
-                                                                                                (Cons
-                                                                                                   (Pair
+                                                                                                ((:)
+                                                                                                   ((,)
                                                                                                       "RS"
                                                                                                       30)
-                                                                                                   (Cons
-                                                                                                      (Pair
+                                                                                                   ((:)
+                                                                                                      ((,)
                                                                                                          "US"
                                                                                                          31)
-                                                                                                      (Cons
-                                                                                                         (Pair
+                                                                                                      ((:)
+                                                                                                         ((,)
                                                                                                             "SP"
                                                                                                             32)
-                                                                                                         Nil)))))))))))))))))))))))))))))))));
+                                                                                                         [])))))))))))))))))))))))))))))))));
   -- Syntax selection is per file and precedes ordinary comment elision. The
   -- prologue is inspected without rewriting bytes or moving source positions.
-  data SourcePrologue = SourcePrologue (Maybe SourceSyntax) (List String) Cursor;
+  data SourcePrologue = SourcePrologue (Maybe SourceSyntax) ([] String) Cursor;
   sourceSyntaxName :: SourceSyntax -> String;
   sourceSyntaxName syntax =
     case syntax of {
@@ -527,7 +627,7 @@ module Bootstrap.Lexer where {
           }
       }
     };
-  validateProfileSelection :: SourceSyntax -> String -> String -> Either String Unit;
+  validateProfileSelection :: SourceSyntax -> String -> String -> Either String ();
   validateProfileSelection syntax file source =
     do {
       prologue <- inspectPrologue file source;
@@ -535,7 +635,7 @@ module Bootstrap.Lexer where {
         SourcePrologue declared _ _ ->
           do {
             case declared of {
-              Nothing -> Right Unit;
+              Nothing -> Right ();
               Just actual ->
                 unless (eqString (sourceSyntaxName syntax) (sourceSyntaxName actual))
                   (Left (file ++ ": requested syntax disagrees with source marker"))
@@ -544,12 +644,12 @@ module Bootstrap.Lexer where {
           }
       }
     };
-  sharedExtensions :: List String;
-  sharedExtensions = Cons ("NoImplicitPrelude") (Cons ("NoMonomorphismRestriction") (Cons ("RankNTypes") (Cons ("KindSignatures") (Cons ("FlexibleContexts") (Cons ("FlexibleInstances") (Cons ("MultiParamTypeClasses") (Cons ("OverloadedStrings") (Nil))))))));
-  validateSourceProfile :: SourceSyntax -> String -> String -> SourcePrologue -> Either String Unit;
+  sharedExtensions :: [] String;
+  sharedExtensions = (:) ("NoImplicitPrelude") ((:) ("NoMonomorphismRestriction") ((:) ("RankNTypes") ((:) ("KindSignatures") ((:) ("FlexibleContexts") ((:) ("FlexibleInstances") ((:) ("MultiParamTypeClasses") ((:) ("OverloadedStrings") ([]))))))));
+  validateSourceProfile :: SourceSyntax -> String -> String -> SourcePrologue -> Either String ();
   validateSourceProfile syntax file source (SourcePrologue declared extensions end) =
     if not (isSharedSyntax syntax)
-    then Right Unit
+    then Right ()
     else do {
            unless
              ((length extensions == length sharedExtensions) &&
@@ -561,10 +661,10 @@ module Bootstrap.Lexer where {
          };
   inspectPrologue :: String -> String -> Either String SourcePrologue;
   inspectPrologue file source =
-    prologueAt file source (stringLength source) (Cursor 0 1 1) Nothing Nil;
+    prologueAt file source (stringLength source) (Cursor 0 1 1) Nothing [];
   prologueAt :: String ->
                 String ->
-                Int -> Cursor -> Maybe SourceSyntax -> List String -> Either String SourcePrologue;
+                Int -> Cursor -> Maybe SourceSyntax -> [] String -> Either String SourcePrologue;
   -- Unmarked legacy files treat every block as an ordinary nested comment,
   -- including malformed pragma-shaped comments. Collect permissively here;
   -- only the selected shared profile validates the pragma contract.
@@ -612,10 +712,10 @@ module Bootstrap.Lexer where {
                                   textStartsAt text 0 "LANGUAGE\n")
                               then case pragmaExtensions
                                           (stringSlice text 8 (stringLength text - 8)) of {
-                                     Left _ -> Cons "<invalid LANGUAGE pragma>" Nil;
+                                     Left _ -> (:) "<invalid LANGUAGE pragma>" [];
                                      Right names -> names
                                    }
-                              else Cons text Nil
+                              else (:) text []
                           };
                           prologueAt file source size end declared (append extensions names)
                         }
@@ -636,9 +736,9 @@ module Bootstrap.Lexer where {
     else if textStartsAt source i "#-}"
          then Right (advance 125 (advance 45 (advance 35 cursor)))
          else pragmaEnd file source size (advance (codeAt source size i) cursor);
-  pragmaExtensions :: String -> Either String (List String);
+  pragmaExtensions :: String -> Either String ([] String);
   pragmaExtensions text = pragmaExtensionsAt text 0 0;
-  pragmaExtensionsAt :: String -> Int -> Int -> Either String (List String);
+  pragmaExtensionsAt :: String -> Int -> Int -> Either String ([] String);
   pragmaExtensionsAt text begin i =
     if ((i >= stringLength text) || (stringCodeAt text i == 44))
     then let {
@@ -647,16 +747,16 @@ module Bootstrap.Lexer where {
          if eqString name ""
          then Left "empty LANGUAGE extension"
          else if (i >= stringLength text)
-              then Right (Cons name Nil)
-              else mapEither (Cons name) (pragmaExtensionsAt text (i + 1) (i + 1))
+              then Right ((:) name [])
+              else mapEither ((:) name) (pragmaExtensionsAt text (i + 1) (i + 1))
     else pragmaExtensionsAt text begin (i + 1);
-  validateSharedSource :: String -> String -> Int -> Cursor -> Int -> Either String Unit;
+  validateSharedSource :: String -> String -> Int -> Cursor -> Int -> Either String ();
   validateSharedSource file source size cursor prologueEnd =
     let {
       i = cursorIndex cursor
     } in
     if (i >= size)
-    then Right Unit
+    then Right ()
     else let {
            c = codeAt source size i
          } in
@@ -705,33 +805,19 @@ module Bootstrap.Lexer where {
                                   }
                              else if (c == 34)
                                   then do {
-                                         end <- scanQuoted file source size (advance c cursor);
+                                         end <- scanSourceQuoted file source size (advance c cursor);
                                          validateSharedString file source (i + 1)
                                            (cursorIndex end - 1);
                                          validateSharedSource file source size end prologueEnd
                                        }
                                   else validateSharedSource file source size (advance c cursor)
                                          prologueEnd;
-  validateSharedString :: String -> String -> Int -> Int -> Either String Unit;
+  validateSharedString :: String -> String -> Int -> Int -> Either String ();
   validateSharedString file source i end =
-    if (i >= end)
-    then Right Unit
-    else let {
-           c = stringCodeAt source i
-         } in
-         if (c == 92)
-         then if (((i + 1) < end) && U.isSpace (stringCodeAt source (i + 1)))
-              then do {
-                     next <- sharedGapEnd source (i + 1) end;
-                     validateSharedString file source (next + 1) end
-                   }
-              else case decodeEscape source (i + 1) end of {
-                     Left error -> Left (file ++ (": " ++ error));
-                     Right (Pair _ next) -> validateSharedString file source next end
-                   }
-         else if ((c < 32) || ((c == 127) || ((c >= 55296) && (c <= 57343))))
-              then Left (file ++ ": invalid raw scalar in shared string literal")
-              else validateSharedString file source (i + 1) end;
+    case sourceStringChunks source i end of {
+      Left error -> Left (file ++ (": " ++ error));
+      Right _ -> Right ()
+    };
   sharedGapEnd :: String -> Int -> Int -> Either String Int;
   sharedGapEnd source i end =
     if (i >= end)
@@ -751,17 +837,17 @@ module Bootstrap.Lexer where {
            text)));
   sharedIdentifierFirst :: Int -> Bool;
   sharedIdentifierFirst c = (((c >= 65) && (c <= 90)) || ((c >= 97) && (c <= 122)));
-  sharedValueOperators :: List String;
-  sharedValueOperators = Cons ("+") (Cons ("-") (Cons ("*") (Cons ("/") (Cons ("%") (Cons ("++") (Cons ("==") (Cons ("/=") (Cons ("<") (Cons ("<=") (Cons (">") (Cons (">=") (Cons ("&&") (Cons ("||") (Cons (">>=") (Cons (">>") (Cons ("<*>") (Cons ("<$") (Cons ("*>") (Cons ("<*") (Nil))))))))))))))))))));
-  sharedPunctuation :: List String;
-  sharedPunctuation = append (Cons "@" (Cons "~" (Cons "[" (Cons "]" (Cons ":" sharedValueOperators))))) (Cons ("::") (Cons ("->") (Cons ("<-") (Cons ("=>") (Cons ("=") (Cons ("|") (Cons (".") (Cons ("..") (Cons ("\\") (Cons ("(") (Cons (")") (Cons ("{") (Cons ("}") (Cons (";") (Cons (",") (Cons ("_") (Nil)))))))))))))))));
+  sharedValueOperators :: [] String;
+  sharedValueOperators = (:) ("+") ((:) ("-") ((:) ("*") ((:) ("/") ((:) ("%") ((:) ("++") ((:) ("==") ((:) ("/=") ((:) ("<") ((:) ("<=") ((:) (">") ((:) (">=") ((:) ("&&") ((:) ("||") ((:) (">>=") ((:) (">>") ((:) ("<*>") ((:) ("<$") ((:) ("*>") ((:) ("<*") ([]))))))))))))))))))));
+  sharedPunctuation :: [] String;
+  sharedPunctuation = append ((:) "@" ((:) "~" ((:) "[" ((:) "]" ((:) ":" sharedValueOperators))))) ((:) ("::") ((:) ("->") ((:) ("<-") ((:) ("=>") ((:) ("=") ((:) ("|") ((:) (".") ((:) ("..") ((:) ("\\") ((:) ("(") ((:) (")") ((:) ("{") ((:) ("}") ((:) (";") ((:) (",") ((:) ("_") ([])))))))))))))))));
   sharedQualifiedOperator text =
     stringLength text > 1 && stringCodeAt text 0 == 46 && elem eqString (stringSlice text 1 (stringLength text - 1)) sharedValueOperators;
-  validateSharedTokens :: String -> List Token -> Either String Unit;
+  validateSharedTokens :: String -> [] Token -> Either String ();
   validateSharedTokens file tokens =
     case tokens of {
-      Nil -> Right Unit;
-      Cons token rest ->
+      [] -> Right ();
+      (:) token rest ->
         do {
           let {
             text = tokenText token
@@ -779,12 +865,12 @@ module Bootstrap.Lexer where {
                    (showInt (tokenColumn token) ++
                     (": token is outside shared-haskell-v1: " ++ text)))))));
           case rest of {
-            Cons next following -> do {
+            (:) next following -> do {
               when (stringLength text > 0 && stringCodeAt text 0 >= 65 && stringCodeAt text 0 <= 90 && (eqString (tokenText next) "." || sharedQualifiedOperator (tokenText next))) (do {
                 unless (tokenEndLine token == tokenLine next && tokenEndColumn token == tokenColumn next) (Left (file ++ ": qualified names must not contain whitespace before the dot"));
                 when (eqString (tokenText next) ".") (case following of {
-                  Cons final _ -> unless (tokenEndLine next == tokenLine final && tokenEndColumn next == tokenColumn final) (Left (file ++ ": qualified names must not contain whitespace after the dot"));
-                  Nil -> Left (file ++ ": incomplete qualified name")
+                  (:) final _ -> unless (tokenEndLine next == tokenLine final && tokenEndColumn next == tokenColumn final) (Left (file ++ ": qualified names must not contain whitespace after the dot"));
+                  [] -> Left (file ++ ": incomplete qualified name")
                 })
               });
               when
@@ -795,14 +881,14 @@ module Bootstrap.Lexer where {
                     (sharedIdentifier (tokenText next) || eqString (tokenText next) ".")))))
                 (Left (file ++ ": malformed numeric token boundary"))
               };
-            _ -> Right Unit
+            _ -> Right ()
           };
           validateSharedTokens file rest
         }
     };
   -- Cache consumers must bind this semantic identity as well as raw source bytes.
   frontendSemanticVersion :: String;
-  frontendSemanticVersion = "mlf-frontend/shared-haskell-v1/5";
+  frontendSemanticVersion = "mlf-frontend/shared-haskell-v1/6";
   builtinInterfaceVersion :: String;
-  builtinInterfaceVersion = "mlf-primitive/shared-haskell-v1/6"
+  builtinInterfaceVersion = "mlf-primitive/shared-haskell-v1/8"
 }
