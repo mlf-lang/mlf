@@ -1,8 +1,8 @@
 {
   "format": 1,
   "source_syntax": "shared-haskell-v1",
-  "frontend_semantics": "mlf-frontend/shared-haskell-v1/4",
-  "primitive_abi": "mlf-primitive-103-v2",
+  "frontend_semantics": "mlf-frontend/shared-haskell-v1/5",
+  "primitive_abi": "mlf-primitive-107-v3",
   "source_roots": [
     "libraries/mlf-async",
     "libraries/mlf-crates",
@@ -629,5 +629,5 @@
     "host/ghc/app/build-receipts/Main.hs",
     "host/ghc/app/source-smoke/Main.hs"
   ],
-  "builtin_interface": "mlf-primitive/shared-haskell-v1/5"
+  "builtin_interface": "mlf-primitive/shared-haskell-v1/6"
 }

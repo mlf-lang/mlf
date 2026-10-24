@@ -21,10 +21,13 @@ toList (T.Cons x xs) = x : toList xs
 main :: IO ()
 main = do
   check "all append-only primitive codes" $
-    toList (S.map Prim.primitiveCode Prim.allPrimitives) == [0..102]
+    toList (S.map Prim.primitiveCode Prim.allPrimitives) == [0..106]
   check "metadata arity agrees" $
     S.all (\p -> case Prim.primitiveSignature p of
       T.Pair _ f -> Prim.primitiveArity p == Prim.fieldArity f) Prim.allPrimitives
+  check "managed frame/evidence ABI positions" $
+    P.take 9 (P.map (B.unpack . D.constructorName) (toList (S.concatMap D.datatypeConstructors D.builtinDeclarations)))
+      == ["Unit", "()", "[]", ":", "(,)", "(,,)", "(,,,)", "MLFStackFrame", "MLFStackEvidence"]
   check "canonical list constructor inventory" $ case D.lookupDatatype D.emptyDataEnv "[]" of
     T.Right d -> toList (S.map (B.unpack . D.constructorName) (D.datatypeConstructors d)) == ["[]", ":"]
     _ -> False

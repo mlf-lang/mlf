@@ -1177,7 +1177,9 @@ module Bootstrap.LLVM.Codegen where {
     };
   primitiveCall :: Primitive -> List String -> Build String;
   primitiveCall p values =
-    call ("@mlf_prim" ++ showInt (L.length values))
+    if L.null values
+    then call "@mlf_primitive" (args1 (number (P.primitiveCode p)))
+    else call ("@mlf_prim" ++ showInt (L.length values))
       (Cons (number (P.primitiveCode p)) (L.map pointer values));
   genericApplication :: Map XName CGBinding -> XErased -> Build String;
   genericApplication scope expression =

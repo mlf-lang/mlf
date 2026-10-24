@@ -183,6 +183,20 @@ module Bootstrap.SourceEquality where {
           SCase y0 y1 -> (eqSExpr x0 y0 && L.eqList eqSAlternative x1 y1);
           _ -> False
         };
+      SCallSite label span body ->
+        case b of {
+          SCallSite label2 span2 body2 ->
+            (eqString label label2 && (eqSourceSpan span span2 && eqSExpr body body2));
+          _ -> False
+        };
+      SSharedBind pattern action continuation bindMethod failure ->
+        case b of {
+          SSharedBind pattern2 action2 continuation2 bindMethod2 failure2 ->
+            (eqSPattern pattern pattern2 && (eqSExpr action action2 &&
+             (eqSExpr continuation continuation2 && (eqSExpr bindMethod bindMethod2 &&
+              eqSExpr failure failure2))));
+          _ -> False
+        };
       SDo x0 x1 ->
         case b of {
           SDo y0 y1 -> (L.eqList eqSStatement x0 y0 && eqSExpr x1 y1);
@@ -249,6 +263,13 @@ module Bootstrap.SourceEquality where {
             (eqString x0 y0 && (eqString x1 y1 && eqString x2 y2));
           _ -> False
         };
+      SAsPattern n pattern ->
+        case b of {
+          SAsPattern n2 pattern2 -> (eqString n n2 && eqSPattern pattern pattern2);
+          _ -> False
+        };
+      SLazyPattern pattern ->
+        case b of { SLazyPattern pattern2 -> eqSPattern pattern pattern2; _ -> False };
       SBoolPattern x0 ->
         case b of {
           SBoolPattern y0 -> eqBool x0 y0;
@@ -458,6 +479,10 @@ module Bootstrap.SourceEquality where {
   eqPattern a b = eqSPattern a b;
   eqExpr :: SExpr -> SExpr -> Bool;
   eqExpr a b = eqSExpr a b;
+  eqSourceSpan :: SourceSpan -> SourceSpan -> Bool;
+  eqSourceSpan (SourceSpan p m f sl sc el ec) (SourceSpan p2 m2 f2 sl2 sc2 el2 ec2) =
+    (eqString p p2 && (eqString m m2 && (eqString f f2 &&
+      (eqInt sl sl2 && (eqInt sc sc2 && (eqInt el el2 && eqInt ec ec2))))));
   eqSourceSyntax :: SourceSyntax -> SourceSyntax -> Bool;
   eqSourceSyntax a b =
     case a of {

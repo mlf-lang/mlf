@@ -10,11 +10,14 @@ module Bootstrap.Surface where {
   import qualified Bootstrap.Desugar as Desugar;
   import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.Data as D;
   patternVariables :: SPattern -> List String;
   patternVariables = Desugar.patternVariables;
   patternReferences :: SPattern -> List String;
   patternReferences pattern =
     case pattern of {
+      SAsPattern _ inner -> patternReferences inner;
+      SLazyPattern inner -> patternReferences inner;
       SOverloadedStringPattern _ equality conversion -> Cons equality (Cons conversion Nil);
       SNestedPattern _ patterns -> concatMap patternReferences patterns;
       _ -> Nil
@@ -26,6 +29,11 @@ module Bootstrap.Surface where {
   freeNamesRaw :: SExpr -> List String;
   freeNamesRaw e =
     case e of {
+      SCallSite _ _ body -> freeNamesRaw body;
+      SSharedBind pattern action body binding failure ->
+        append (patternReferences pattern)
+          (append (without (freeNamesRaw body) (patternVariables pattern))
+            (concatMap freeNamesRaw (Cons action (Cons binding (Cons failure Nil)))));
       SVar n -> Cons (Dependency.lexicalValueName n) Nil;
       SLam n _ b -> without (freeNamesRaw b) (Cons n Nil);
       SApp a b -> append (freeNamesRaw a) (freeNamesRaw b);
@@ -128,9 +136,10 @@ module Bootstrap.Surface where {
         }
     };
   lowerSurface :: SProgram -> Either String SProgram;
-  lowerSurface program =
+  lowerSurface program = do {
+    env <- D.validateDeclarations (case program of { SProgram ds _ -> ds; SClassProgram ds _ _ _ -> ds });
     case program of {
-      SProgram ds e -> mapEither (SProgram ds) (lowerExpression e);
+      SProgram ds e -> mapEither (SProgram ds) (lowerExpressionWithData env e);
       SClassProgram ds cs instances e ->
         do {
           lowered <-
@@ -138,18 +147,23 @@ module Bootstrap.Surface where {
               (\(SInstanceDecl vars context name types methods) ->
                  do {
                    ms <-
-                     traverseEither (\(Pair n value) -> mapEither (Pair n) (lowerExpression value))
+                     traverseEither (\(Pair n value) -> mapEither (Pair n) (lowerExpressionWithData env value))
                        methods;
                    Right (SInstanceDecl vars context name types ms)
                  })
               instances;
-          body <- lowerExpression e;
+          body <- lowerExpressionWithData env e;
           Right (SClassProgram ds cs lowered body)
         }
+    }
     };
   lowerExpression :: SExpr -> Either String SExpr;
-  lowerExpression original =
-    runFresh (Desugar.allNames original) (lower (Desugar.desugarDo original));
+  lowerExpression = lowerExpressionWithData D.emptyDataEnv;
+  lowerExpressionWithData :: DataEnv -> SExpr -> Either String SExpr;
+  lowerExpressionWithData env original = do {
+    shared <- Desugar.lowerSharedDo env original;
+    runFresh (Desugar.allNames shared) (lower env (Desugar.desugarDo shared))
+  };
   flatPattern :: SPattern -> Bool;
   flatPattern pattern =
     case pattern of {
@@ -157,29 +171,31 @@ module Bootstrap.Surface where {
       SDefaultPattern _ -> True;
       _ -> False
     };
-  lower :: SExpr -> Fresh SExpr;
-  lower expression =
+  lower :: DataEnv -> SExpr -> Fresh SExpr;
+  lower env expression =
     case expression of {
+      SCallSite name location body -> do { b <- lower env body; freshPure (SCallSite name location b) };
+      SSharedBind _ _ _ _ _ -> freshFail "internal error: shared do escaped metadata lowering";
       SLam n a b ->
         do {
-          body <- lower b;
+          body <- lower env b;
           freshPure (SLam n a body)
         };
       SApp a b ->
         do {
-          f <- lower a;
-          x <- lower b;
+          f <- lower env a;
+          x <- lower env b;
           freshPure (SApp f x)
         };
       SLet n a b ->
         do {
-          value <- lower a;
-          body <- lower b;
+          value <- lower env a;
+          body <- lower env b;
           freshPure (SLet n value body)
         };
       SAnn a ty ->
         do {
-          value <- lower a;
+          value <- lower env a;
           freshPure (SAnn value ty)
         };
       SLetRec definitions body ->
@@ -188,16 +204,16 @@ module Bootstrap.Surface where {
             mapM
               (\(Triple n t a) ->
                  do {
-                   value <- lower a;
+                   value <- lower env a;
                    freshPure (Triple n t value)
                  })
               definitions;
-          b <- lower body;
+          b <- lower env body;
           freshPure (SLetRec ds b)
         };
       SChecked ty a ->
         do {
-          value <- lower a;
+          value <- lower env a;
           freshPure (SChecked ty value)
         };
       SEquations Nil -> freshFail "function has no equations";
@@ -212,19 +228,19 @@ module Bootstrap.Surface where {
         then freshFail "function equations have different arities"
         else do {
                names <- freshNames arity "matchValue";
-               body <- matching (map SVar names) rows;
+               body <- matching env (map SVar names) rows;
                freshPure (foldr (\n b -> SLam n Nothing b) body names)
              };
       SCase a branches ->
         do {
-          value <- lower a;
+          value <- lower env a;
           if all (\(SAlternative p _) -> flatPattern p) branches
           then do {
                  lowered <-
                    mapM
                      (\(SAlternative p b) ->
                         do {
-                          body <- lower b;
+                          body <- lower env b;
                           freshPure (SAlternative p body)
                         })
                      branches;
@@ -233,17 +249,17 @@ module Bootstrap.Surface where {
           else do {
                  name <- freshName "matchValue";
                  body <-
-                   matching (Cons (SVar name) Nil)
+                   matching env (Cons (SVar name) Nil)
                      (map (\(SAlternative p b) -> Pair (Cons p Nil) b) branches);
                  freshPure (SLet name value body)
                }
         };
-      SDo _ _ -> lower (Desugar.desugarDo expression);
+      SDo _ _ -> lower env (Desugar.desugarDo expression);
       _ -> freshPure expression
     };
   data MatchRow = MatchRow (List SPattern) SExpr Int;
-  matching :: List SExpr -> List (Pair (List SPattern) SExpr) -> Fresh SExpr;
-  matching values equations =
+  matching :: DataEnv -> List SExpr -> List (Pair (List SPattern) SExpr) -> Fresh SExpr;
+  matching env values equations =
     if any
          (\(Pair patterns _) ->
             let {
@@ -257,11 +273,11 @@ module Bootstrap.Surface where {
              mapM
                (\(Pair i (Pair ps b)) ->
                   do {
-                    body <- lower b;
+                    body <- lower env b;
                     freshPure (MatchRow ps body i)
                   })
                (zip (range 0 (length equations - 1)) equations);
-           boundValueShared1 <- matrix values rows;
+           boundValueShared1 <- matrix env values rows;
            case boundValueShared1 of {
              Pair body used ->
                do {
@@ -299,8 +315,63 @@ module Bootstrap.Surface where {
     append (take column values) (append fields (drop (column + 1) values));
   rowPatterns :: MatchRow -> List SPattern;
   rowPatterns (MatchRow ps _ _) = ps;
-  matrix :: List SExpr -> List MatchRow -> Fresh (Pair SExpr (List Int));
-  matrix values rows =
+  matrix :: DataEnv -> List SExpr -> List MatchRow -> Fresh (Pair SExpr (List Int));
+  matrix env values rows = do {
+    normalized <- mapM (normalizeRow env values) rows;
+    matrixReady env values normalized
+  };
+  normalizeRow :: DataEnv -> List SExpr -> MatchRow -> Fresh MatchRow;
+  normalizeRow env values (MatchRow patterns body rowIndex) = do {
+    result <- foldM
+      (\(Pair done b) (Pair value pattern) -> do {
+        normalized <- normalizePattern env value pattern b;
+        case normalized of { Pair p rhs -> freshPure (Pair (append done (Cons p Nil)) rhs) }
+      }) (Pair Nil body) (zip values patterns);
+    case result of { Pair ps b -> freshPure (MatchRow ps b rowIndex) }
+  };
+  normalizePattern :: DataEnv -> SExpr -> SPattern -> SExpr -> Fresh (Pair SPattern SExpr);
+  normalizePattern env value pattern body = case pattern of {
+    SAsPattern name inner -> normalizePattern env value inner (SLet name value body);
+    SLazyPattern inner -> do { b <- lazyPatternBindings env value inner body; freshPure (Pair wild b) };
+    _ -> freshPure (Pair pattern body)
+  };
+  lazyPatternBindings :: DataEnv -> SExpr -> SPattern -> SExpr -> Fresh SExpr;
+  lazyPatternBindings env value pattern body =
+    if isVariable pattern then freshPure (bindPattern value pattern body)
+    -- Even a lazy pattern with no bindings constrains the scrutinee type and
+    -- required dictionaries. Retain let-polymorphism for projected payloads,
+    -- but instantiate the match in an undemanded witness use so its ordinary
+    -- class obligations cannot disappear when all pattern binders are unused.
+    else do {
+      name <- freshName "lazyPatternMatch";
+      let {
+        variables = patternVariables pattern;
+        packed = foldr (\n rest -> SApp (SApp (SConstructor "(,)") (SVar n)) rest)
+                   (SConstructor "()") variables
+      };
+      cannotFail <- case Desugar.patternCannotFail env pattern of { Left e -> freshFail e; Right result -> freshPure result };
+      let {
+        fallback = if cannotFail then Nil else
+          Cons (SAlternative wild (SApp (SPrimitive PPanic) (SStringLit "Irrefutable pattern failed"))) Nil
+      };
+      matched <- lower env (SCase value (Cons (SAlternative pattern packed) fallback));
+      bindings <- mapM (\(Pair i n) -> do {
+        projection <- lazyProjection i (SVar name);
+        freshPure (Pair n projection)
+      }) (zip (range 0 (length variables - 1)) variables);
+      witness <- freshName "lazyPatternWitness";
+      freshPure (SLet name matched
+        (SApp (SLam witness Nothing (foldr (\(Pair n p) b -> SLet n p b) body bindings)) (SVar name)))
+    };
+  lazyProjection :: Int -> SExpr -> Fresh SExpr;
+  lazyProjection i value = do {
+    first <- freshName "lazyPatternHead"; rest <- freshName "lazyPatternTail";
+    selected <- if i == 0 then freshPure (SVar first) else lazyProjection (i - 1) (SVar rest);
+    freshPure (SCase value (Cons
+      (SAlternative (SConstructorPattern "(,)" (Cons (Just first) (Cons (Just rest) Nil))) selected) Nil))
+  };
+  matrixReady :: DataEnv -> List SExpr -> List MatchRow -> Fresh (Pair SExpr (List Int));
+  matrixReady env values rows =
     case rows of {
       Nil -> freshFail "non-exhaustive patterns";
       Cons (MatchRow firstPatterns firstBody firstIndex) _ ->
@@ -338,20 +409,20 @@ module Bootstrap.Surface where {
                   } in
                   case head patterns of {
                     SConstructorPattern _ _ ->
-                      constructorsMatrix column value values rows patterns defaults;
+                      constructorsMatrix env column value values rows patterns defaults;
                     SNestedPattern _ _ ->
-                      constructorsMatrix column value values rows patterns defaults;
+                      constructorsMatrix env column value values rows patterns defaults;
                     SBoolPattern _ ->
                       if not (all isBool patterns)
                       then freshFail "mixed literal pattern types"
                       else do {
                              boundValueShared3 <-
-                               literalBranch column values rows (SBoolPattern True);
+                               literalBranch env column values rows (SBoolPattern True);
                              case boundValueShared3 of {
                                Pair yes usedYes ->
                                  do {
                                    boundValueShared2 <-
-                                     literalBranch column values rows (SBoolPattern False);
+                                     literalBranch env column values rows (SBoolPattern False);
                                    case boundValueShared2 of {
                                      Pair no usedNo ->
                                        do {
@@ -363,16 +434,16 @@ module Bootstrap.Surface where {
                              }
                            };
                     SIntPattern _ ->
-                      literalMatrix column values rows defaults patterns isInt (SPrimitive PEqInt)
+                      literalMatrix env column values rows defaults patterns isInt (SPrimitive PEqInt)
                         (\p ->
                            case p of {
                              SIntPattern n -> SIntLit n;
                              _ -> value
                            });
                     SOverloadedStringPattern _ _ _ ->
-                      overloadedStringMatrix column values rows;
+                      overloadedStringMatrix env column values rows;
                     SStringPattern _ ->
-                      literalMatrix column values rows defaults patterns isString (SPrimitive PEqString)
+                      literalMatrix env column values rows defaults patterns isString (SPrimitive PEqString)
                         (\p ->
                            case p of {
                              SStringPattern s -> SStringLit s;
@@ -381,12 +452,25 @@ module Bootstrap.Surface where {
                     _ -> freshFail "invalid pattern matrix"
                   }
     };
-  constructorsMatrix :: Int ->
+  completeConstructorFamily :: DataEnv -> List String -> Bool;
+  completeConstructorFamily env names = case names of {
+    Nil -> False;
+    Cons first _ -> case D.lookupConstructor env first of {
+      Left _ -> False;
+      Right (Pair declaration _) ->
+        all (\c -> elem eqString (D.constructorName c) names) (D.datatypeConstructors declaration) &&
+        all (\name -> case D.lookupConstructor env name of {
+          Left _ -> False;
+          Right (Pair owner _) -> eqString (D.datatypeName owner) (D.datatypeName declaration)
+        }) names
+    }
+  };
+  constructorsMatrix :: DataEnv -> Int ->
                         SExpr ->
                         List SExpr ->
                         List MatchRow ->
                         List SPattern -> List MatchRow -> Fresh (Pair SExpr (List Int));
-  constructorsMatrix column value values rows patterns defaults =
+  constructorsMatrix env column value values rows patterns defaults =
     if not
          (all
             (\p ->
@@ -408,12 +492,12 @@ module Bootstrap.Surface where {
                        })
                     patterns)
            };
-           branches <- mapM (constructorBranch column value values rows patterns) names;
+           branches <- mapM (constructorBranch env column value values rows patterns) names;
            fallback <-
-             if null defaults
+             if (null defaults || completeConstructorFamily env names)
              then freshPure Nil
              else do {
-                    boundValueShared4 <- matrix (replace column Nil values) defaults;
+                    boundValueShared4 <- matrix env (replace column Nil values) defaults;
                     case boundValueShared4 of {
                       Pair body used ->
                         do {
@@ -427,12 +511,12 @@ module Bootstrap.Surface where {
            };
            freshPure (Pair (SCase value (map fst alternatives)) (concatMap snd alternatives))
          };
-  constructorBranch :: Int ->
+  constructorBranch :: DataEnv -> Int ->
                        SExpr ->
                        List SExpr ->
                        List MatchRow ->
                        List SPattern -> String -> Fresh (Pair SAlternative (List Int));
-  constructorBranch column value values rows patterns name =
+  constructorBranch env column value values rows patterns name =
     let {
       arities =
         concatMap
@@ -453,7 +537,7 @@ module Bootstrap.Surface where {
                let {
                  specialized = concatMap (specializeRow column value name arity) rows
                };
-               boundValueShared5 <- matrix (replace column (map SVar names) values) specialized;
+               boundValueShared5 <- matrix env (replace column (map SVar names) values) specialized;
                case boundValueShared5 of {
                  Pair body used ->
                    do {
@@ -499,17 +583,17 @@ module Bootstrap.Surface where {
   -- Unlike primitive literals, two distinct overloaded string spellings can
   -- compare equal. Preserve row order and retry ALL later rows when another
   -- column fails; lexical partitioning here silently changes user Eq behavior.
-  overloadedStringMatrix :: Int -> List SExpr -> List MatchRow -> Fresh (Pair SExpr (List Int));
-  overloadedStringMatrix column values rows =
+  overloadedStringMatrix :: DataEnv -> Int -> List SExpr -> List MatchRow -> Fresh (Pair SExpr (List Int));
+  overloadedStringMatrix env column values rows =
     case rows of {
       Nil -> freshFail "non-exhaustive patterns";
       Cons (MatchRow patterns body rowIndex) rest ->
         case index patterns column of {
           SOverloadedStringPattern text equality conversion -> do {
-            fallbackResult <- matrix values rest;
+            fallbackResult <- matrix env values rest;
             case fallbackResult of {
               Pair fallback usedRest -> do {
-                matchedResult <- matrix values
+                matchedResult <- matrix env values
                   (Cons (MatchRow (replace column (Cons wild Nil) patterns) body rowIndex)
                     (Cons (MatchRow (replicate (length values) wild) fallback (-1)) Nil));
                 case matchedResult of {
@@ -558,12 +642,12 @@ module Bootstrap.Surface where {
         };
       _ -> False
     };
-  literalBranch :: Int -> List SExpr -> List MatchRow -> SPattern -> Fresh (Pair SExpr (List Int));
-  literalBranch column values rows literal =
+  literalBranch :: DataEnv -> Int -> List SExpr -> List MatchRow -> SPattern -> Fresh (Pair SExpr (List Int));
+  literalBranch env column values rows literal =
     let {
       value = index values column
     } in
-    matrix (replace column Nil values)
+    matrix env (replace column Nil values)
       (concatMap
          (\(MatchRow ps b i) ->
             let {
@@ -573,22 +657,22 @@ module Bootstrap.Surface where {
             then Cons (MatchRow (replace column Nil ps) (bindPattern value p b) i) Nil
             else Nil)
          rows);
-  literalMatrix :: Int ->
+  literalMatrix :: DataEnv -> Int ->
                    List SExpr ->
                    List MatchRow ->
                    List MatchRow ->
                    List SPattern ->
                    (SPattern -> Bool) ->
                    SExpr -> (SPattern -> SExpr) -> Fresh (Pair SExpr (List Int));
-  literalMatrix column values rows defaults patterns predicate equality literalValue =
+  literalMatrix env column values rows defaults patterns predicate equality literalValue =
     if not (all predicate patterns)
     then freshFail "mixed literal pattern types"
     else do {
-           fallback <- matrix (replace column Nil values) defaults;
+           fallback <- matrix env (replace column Nil values) defaults;
            foldM
              (\(Pair rest used) pattern ->
                 do {
-                  boundValueShared6 <- literalBranch column values rows pattern;
+                  boundValueShared6 <- literalBranch env column values rows pattern;
                   case boundValueShared6 of {
                     Pair body nextUsed ->
                       do {

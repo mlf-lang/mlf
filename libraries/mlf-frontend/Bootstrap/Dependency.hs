@@ -51,6 +51,8 @@ module Bootstrap.Dependency where {
   observePattern :: SPattern -> Observation;
   observePattern pattern =
     case pattern of {
+      SAsPattern _ inner -> observePattern inner;
+      SLazyPattern inner -> observePattern inner;
       SOverloadedStringPattern _ equality conversion ->
         Observation (Cons (lexicalValueName equality) (Cons (lexicalValueName conversion) Nil)) Nil Nil Nil;
       SConstructorPattern n _ -> Observation Nil Nil (Cons n Nil) Nil;
@@ -62,6 +64,11 @@ module Bootstrap.Dependency where {
   observeExpression :: SExpr -> Observation;
   observeExpression expression =
     case expression of {
+      SCallSite _ _ body -> observeExpression body;
+      SSharedBind pattern action body binding failure ->
+        merge (observePattern pattern)
+          (merge (bindObservation (S.fromList compareString (Desugar.patternVariables pattern)) (observeExpression body))
+            (mergeMany (map observeExpression (Cons action (Cons binding (Cons failure Nil))))));
       SVar n -> Observation (Cons (lexicalValueName n) Nil) Nil Nil Nil;
       SConstructor n -> Observation Nil Nil (Cons n Nil) Nil;
       SLam n a b ->

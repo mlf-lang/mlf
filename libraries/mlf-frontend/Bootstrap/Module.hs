@@ -264,7 +264,8 @@ module Bootstrap.Module where {
     Method String |
     BuiltinType |
     Primitive Primitive |
-    Boolean Bool;
+    Boolean Bool |
+    ManagedConstraint;
   data Entity = Entity String String Role;
   data Interface = Interface (Map (Pair ModuleSpace String) (Set Entity));
   data Names = Names (Map Entity String);
@@ -300,6 +301,7 @@ module Bootstrap.Module where {
       Datatype -> Types;
       Class -> Types;
       BuiltinType -> Types;
+      ManagedConstraint -> Types;
       _ -> Terms
     };
   spaceCode :: ModuleSpace -> Int;
@@ -316,6 +318,7 @@ module Bootstrap.Module where {
   roleCode BuiltinType = 5;
   roleCode (Primitive _) = 6;
   roleCode (Boolean _) = 7;
+  roleCode ManagedConstraint = 8;
   compareRole a b =
     let {
       first = compareInt (roleCode a) (roleCode b)
@@ -423,13 +426,17 @@ module Bootstrap.Module where {
       LegacyEmlfV1;
   -- These are ordinary bindings with the same fixities and class identities as
   -- the GHC facade. Primitive nominal types retain their stable runtime identity.
-  sharedPrimitiveEntities = filter (\entity -> not (eqString (spelling entity) "pure")) primitiveEntities;
+  sharedPrimitiveEntities =
+    append (Cons (Entity "MLF.Primitive" "HasCallStack" ManagedConstraint)
+      (Cons (Entity "MLF.Primitive" "CallStack" BuiltinType)
+        (Cons (Entity "MLF.Primitive" "callStack" Value) Nil)))
+      (filter (\entity -> not (eqString (spelling entity) "pure" || eqString (spelling entity) "ioError")) primitiveEntities);
   builtinEntities source = if eqString (moduleIdentity source) "MLF.Primitive" then sharedPrimitiveEntities else primitiveEntities;
   primitiveSource =
     SourceModule "<MLF.Primitive>" (Just "MLF.Primitive") Nothing Nil Nil
       Prelude.sharedClasses Prelude.sharedInstances
-      (filter (\(Triple name _ _) -> not (eqString name "==" || eqString name "/="))
-(Cons (Triple "otherwise" Nothing (SBoolLit True)) (Cons (Triple "implementationHost" Nothing (SStringLit "native-MLF")) (Cons (Triple "bind" Nothing (SVar "$MLF.Primitive.>>=")) (Cons (Triple "negate" Nothing (SLam "$x" Nothing (SApp (SApp (SPrimitive PSubInt) (SIntLit 0)) (SVar "$x")))) (Cons (Triple "+" Nothing (SPrimitive PAddInt)) (Cons (Triple "-" Nothing (SPrimitive PSubInt)) (Cons (Triple "*" Nothing (SPrimitive PMulInt)) (Cons (Triple "/" Nothing (SPrimitive PQuotInt)) (Cons (Triple "%" Nothing (SPrimitive PRemInt)) (Cons (Triple "==" Nothing (SPrimitive PEqInt)) (Cons (Triple "<" Nothing (SPrimitive PLtInt)) (Cons (Triple "++" Nothing (SPrimitive PConcatString)) (Cons (Triple "/=" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.notValue (SApp (SApp (SPrimitive PEqInt) (SVar "$a")) (SVar "$b")))))) (Cons (Triple "<=" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.notValue (SApp (SApp (SPrimitive PLtInt) (SVar "$b")) (SVar "$a")))))) (Cons (Triple ">" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (SApp (SApp (SPrimitive PLtInt) (SVar "$b")) (SVar "$a"))))) (Cons (Triple ">=" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.notValue (SApp (SApp (SPrimitive PLtInt) (SVar "$a")) (SVar "$b")))))) (Cons (Triple "&&" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.conditional (SVar "$a") (SVar "$b") (SBoolLit False))))) (Cons (Triple "||" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.conditional (SVar "$a") (SBoolLit True) (SVar "$b"))))) (Nil)))))))))))))))))))) Nothing LegacyEmlfV1;
+      (append Prelude.stackFacadeValues (filter (\(Triple name _ _) -> not (eqString name "==" || eqString name "/="))
+(Cons (Triple "otherwise" Nothing (SBoolLit True)) (Cons (Triple "implementationHost" Nothing (SStringLit "native-MLF")) (Cons (Triple "bind" Nothing (SVar "$MLF.Primitive.>>=")) (Cons (Triple "negate" Nothing (SLam "$x" Nothing (SApp (SApp (SPrimitive PSubInt) (SIntLit 0)) (SVar "$x")))) (Cons (Triple "+" Nothing (SPrimitive PAddInt)) (Cons (Triple "-" Nothing (SPrimitive PSubInt)) (Cons (Triple "*" Nothing (SPrimitive PMulInt)) (Cons (Triple "/" Nothing (SPrimitive PQuotInt)) (Cons (Triple "%" Nothing (SPrimitive PRemInt)) (Cons (Triple "==" Nothing (SPrimitive PEqInt)) (Cons (Triple "<" Nothing (SPrimitive PLtInt)) (Cons (Triple "++" Nothing (SPrimitive PConcatString)) (Cons (Triple "/=" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.notValue (SApp (SApp (SPrimitive PEqInt) (SVar "$a")) (SVar "$b")))))) (Cons (Triple "<=" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.notValue (SApp (SApp (SPrimitive PLtInt) (SVar "$b")) (SVar "$a")))))) (Cons (Triple ">" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (SApp (SApp (SPrimitive PLtInt) (SVar "$b")) (SVar "$a"))))) (Cons (Triple ">=" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.notValue (SApp (SApp (SPrimitive PLtInt) (SVar "$a")) (SVar "$b")))))) (Cons (Triple "&&" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.conditional (SVar "$a") (SVar "$b") (SBoolLit False))))) (Cons (Triple "||" Nothing (SLam "$a" Nothing (SLam "$b" Nothing (Parser.conditional (SVar "$a") (SBoolLit True) (SVar "$b"))))) (Nil))))))))))))))))))))) Nothing LegacyEmlfV1;
   locals :: SourceModule -> Either String Interface;
   locals source =
     do {
@@ -915,7 +922,14 @@ module Bootstrap.Module where {
   allocateName used state entity =
     case state of {
       Pair entries index ->
-        if (isRole BuiltinType entity ||
+        if (eqString (owner entity) "MLF.Primitive" &&
+            ((eqString (spelling entity) "HasCallStack" && isRole ManagedConstraint entity) ||
+             (eqString (spelling entity) "CallStack" && isRole BuiltinType entity) ||
+             (eqString (spelling entity) "callStack" && isRole Value entity)))
+        then Pair (M.insert compareEntity entity
+                    (if eqString (spelling entity) "HasCallStack" then "MLFHasCallStack"
+                     else if eqString (spelling entity) "CallStack" then "MLFCallStack" else "mlfCallStack") entries) index
+        else if (isRole BuiltinType entity ||
             (eqString (owner entity) "Prelude" && eqString (spelling entity) "Unit"))
         then Pair (M.insert compareEntity entity (spelling entity) entries) index
         else let {
@@ -962,7 +976,7 @@ module Bootstrap.Module where {
             then Right constructor
             else do {
                    entity <- lookupEntity Types constructor env;
-                   if isRole Class entity
+                   if (isRole Class entity || isRole ManagedConstraint entity)
                    then Left ("class used as a type constructor: " ++ constructor)
                    else resolvedName names entity
                  };
@@ -995,7 +1009,9 @@ module Bootstrap.Module where {
       SPredicate name arguments ->
         do {
           entity <- lookupEntity Types name env;
-          unless (isRole Class entity) (Left ("not a class: " ++ name));
+          unless (isRole Class entity || isRole ManagedConstraint entity) (Left ("not a class: " ++ name));
+          when (isRole ManagedConstraint entity && not (null arguments))
+            (Left "HasCallStack does not take type arguments");
           name' <- resolvedName names entity;
           arguments' <- mapM (resolveType names env) arguments;
           Right (SPredicate name' arguments')
@@ -1021,7 +1037,9 @@ module Bootstrap.Module where {
   resolveVariable names entity =
     case role entity of {
       Primitive p -> Right (SPrimitive p);
-      Value -> mapEither SVar (resolvedName names entity);
+      Value -> if eqString (owner entity) "MLF.Primitive" && eqString (spelling entity) "callStack"
+               then Right (SVar "$MLF.Stack.callStack")
+               else mapEither SVar (resolvedName names entity);
       Method _ -> mapEither SVar (resolvedName names entity);
       _ -> Left ("not a function or value: " ++ label entity)
     };
@@ -1034,6 +1052,8 @@ module Bootstrap.Module where {
   resolvePattern :: Names -> Interface -> SPattern -> Either String SPattern;
   resolvePattern names env pattern =
     case pattern of {
+      SAsPattern name inner -> mapEither (SAsPattern name) (resolvePattern names env inner);
+      SLazyPattern inner -> mapEither SLazyPattern (resolvePattern names env inner);
       SOverloadedStringPattern text _ _ -> do {
         equality <- resolvedName names (Entity "MLF.Primitive" "==" (Method "Eq"));
         conversion <- resolvedName names (Entity "MLF.Primitive" "fromString" (Method "IsString"));
@@ -1131,17 +1151,44 @@ module Bootstrap.Module where {
     };
   resolveExpr names env expression =
     resolveBound names env Set.empty (Desugar.desugarDo expression);
+  managedAnnotation :: SExpr -> Bool;
+  managedAnnotation expression = case expression of {
+    SAnn _ (SAnnotation _ ty) -> managedAnnotationType ty;
+    _ -> False
+  };
+  managedAnnotationType :: SType -> Bool;
+  managedAnnotationType ty = case ty of {
+    SForall _ _ _ body -> managedAnnotationType body;
+    SQualified predicates body -> any (\(SPredicate name _) -> eqString name "MLFHasCallStack") predicates || managedAnnotationType body;
+    _ -> False
+  };
   resolveBound :: Names -> Interface -> Set String -> SExpr -> Either String SExpr;
   resolveBound names env bound expression =
     let {
       matchValueShared8 = expression
     } in
     case matchValueShared8 of {
+      SCallSite display location body -> do {
+        resolved <- resolveBound names env bound body;
+        Right (if eqString display "an expression type signature" && not (managedAnnotation resolved)
+          then resolved else SCallSite display location resolved)
+      };
+      SSharedBind pattern action continuation binding failure -> do {
+        pattern' <- resolvePattern names env pattern;
+        action' <- resolveBound names env bound action;
+        continuation' <- resolveBound names env
+          (Set.union compareString bound (Set.fromList compareString (Surface.patternVariables pattern))) continuation;
+        binding' <- resolveBound names env bound binding;
+        failure' <- resolveBound names env bound failure;
+        Right (SSharedBind pattern' action' continuation' binding' failure')
+      };
       SVar matchValueShared9 ->
         let {
           name = matchValueShared9
         } in
-        if Lexer.textStartsAt name 0 "$MLF.Primitive."
+        if eqString name "$MLF.Stack.callStack"
+        then Right (SVar "$MLF.Stack.callStack")
+        else if Lexer.textStartsAt name 0 "$MLF.Primitive."
         then let { method = stringSlice name 15 (stringLength name - 15) } in
              resolveVariable names (Entity "MLF.Primitive" method (Method (Prelude.standardMethodClass method)))
         else if Lexer.textStartsAt name 0 "$MLF.Infix." then do {

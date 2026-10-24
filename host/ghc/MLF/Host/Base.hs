@@ -1,6 +1,8 @@
-{-# LANGUAGE RankNTypes, KindSignatures, FlexibleInstances, ForeignFunctionInterface #-}
+{-# LANGUAGE RankNTypes, KindSignatures, FlexibleInstances, ForeignFunctionInterface, ConstraintKinds #-}
 module MLF.Host.Base
   ( Int, Bool(..), Double, Char, IO, Unit(..), String, ST, STArray
+  , MLFCallStack, MLFHasCallStack, MLFStackFrame(..), MLFStackEvidence(..)
+  , v_emptyCallStack, v_pushCallStack, v_prettyCallStack
   , literal, unpack, utf8, fromUtf8, matchString, neInt, leInt, gtInt, geInt
   , v_textToChars, v_textFromChars, v_charCode, v_charFromCode
   , v_ioReturn, v_ioBind, v_stReturn, v_stBind, v_runST
@@ -20,6 +22,7 @@ import qualified Data.Text.Encoding as TE
 import qualified Data.ByteString as BS
 import Data.Char (ord, chr)
 import qualified Data.String as TextLiteral
+import qualified GHC.Stack as Stack
 import qualified Data.Array as Array
 import Data.Bits ((.&.))
 import Data.Typeable (Typeable)
@@ -44,6 +47,25 @@ mkText :: T.Text -> String
 mkText text = mkSizedText (T.length text) text
 mkSizedText :: P.Int -> T.Text -> String
 mkSizedText count text = String text count (Array.listArray (0,count-1) (T.unpack text))
+-- Private compiler-managed evidence uses real GHC stack values on this host.
+-- These adapters do not redefine the public HasCallStack constraint.
+type MLFCallStack = Stack.CallStack
+type MLFHasCallStack = Stack.HasCallStack
+data MLFStackFrame = MLFStackFrame String String String String Int Int Int Int
+data MLFStackEvidence = MLFStackEvidence MLFCallStack
+v_emptyCallStack :: MLFCallStack
+v_emptyCallStack = Stack.emptyCallStack
+v_pushCallStack :: MLFStackFrame -> MLFCallStack -> MLFCallStack
+v_pushCallStack (MLFStackFrame name packageName moduleName file sl sc el ec) =
+  Stack.pushCallStack (unpack name, Stack.SrcLoc (unpack packageName) (unpack moduleName)
+    (unpack file) (coordinate sl) (coordinate sc) (coordinate el) (coordinate ec))
+  where coordinate n
+          | n < toInteger (minBound :: P.Int) || n > toInteger (maxBound :: P.Int)
+          = failure "source coordinate out of bounds"
+          | otherwise = fromInteger n
+v_prettyCallStack :: MLFCallStack -> [Char]
+v_prettyCallStack = Stack.prettyCallStack
+
 data HostError = HostError P.String deriving (Show, Typeable)
 instance Exception HostError
 failure :: P.String -> a

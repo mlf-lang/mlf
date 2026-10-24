@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- Actual MLF inference + interpreter checks, hosted by ordinary GHC.
 module Main where
+import qualified Data.Time.Clock as Clock
+import qualified System.IO as HostIO
 import qualified Prelude as P
 import Prelude (IO, ($), (.), (==), error, putStrLn)
 import qualified Bootstrap.Types as T
@@ -10,6 +12,10 @@ import qualified Bootstrap.Map as M
 import qualified Bootstrap.X.Syntax as X
 import qualified MLF.Host.Base as B
 
+announce name action = do
+  now <- Clock.getCurrentTime
+  putStrLn (P.show now P.++ " BEGIN: " P.++ name)
+  action
 source body = B.literal $ "-- mlf:syntax shared-haskell-v1\n{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}\nmodule Example where\nimport MLF.Primitive\n" P.++ body P.++ "\n"
 run body = case C.compile "Example.hs" (source body) of
   T.Left err -> T.Left (C.prettyError err)
@@ -17,15 +23,16 @@ run body = case C.compile "Example.hs" (source body) of
     case R.prepare P.False term of
       T.Left err -> T.Left err
       T.Right (T.Pair env _) -> R.evaluate env (R.REnv M.empty) (X.erase term)
-check name body expected = case run body of
+check name body expected = announce name $ case run body of
   T.Right (R.RInteger actual) | actual == expected -> putStrLn ("pass: " P.++ name)
   T.Left err -> error (name P.++ ": " P.++ B.unpack err)
   _ -> error (name P.++ ": wrong result")
-reject name body = case run body of
+reject name body = announce name $ case run body of
   T.Left _ -> putStrLn ("pass: reject " P.++ name)
   _ -> error (name P.++ ": unexpectedly accepted")
 main :: IO ()
 main = do
+  HostIO.hSetBuffering HostIO.stdout HostIO.LineBuffering
   check "canonical lists and nested pattern" "main = case [20,22] of { x:y:[] -> x + y; _ -> 0 }" 42
   check "cons constructor function" "main = case (:) 42 [] of { x:_ -> x; _ -> 0 }" 42
   check "tuple constructor function" "main = case (,) 20 22 of { (x,y) -> x + y }" 42

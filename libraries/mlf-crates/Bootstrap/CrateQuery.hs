@@ -73,6 +73,8 @@ module Bootstrap.CrateQuery where {
         node "nested-pattern" (Cons n (Cons (list encodePattern patterns) Nil));
       SAnnotatedPattern n a -> node "annotated-pattern" (Cons n (Cons (encodeAnnotation a) Nil));
       SIntPattern n -> node "integer-pattern" (Cons (showInt n) Nil);
+      SAsPattern n pattern -> node "as-pattern" (Cons n (Cons (encodePattern pattern) Nil));
+      SLazyPattern pattern -> node "lazy-pattern" (Cons (encodePattern pattern) Nil);
       SStringPattern s -> node "string-pattern" (Cons s Nil);
       SOverloadedStringPattern s equal fromString ->
         node "overloaded-string-pattern" (Cons s (Cons equal (Cons fromString Nil)));
@@ -86,6 +88,11 @@ module Bootstrap.CrateQuery where {
       InstanceEvidence -> "instance"
     };
   encodeCandidate (Pair role name) = node (encodeRole role) (Cons name Nil);
+  encodeSourceSpan (SourceSpan packageName moduleName file startLine startColumn endLine endColumn) =
+    node "source-span"
+      (Cons packageName (Cons moduleName (Cons file
+         (Cons (showInt startLine) (Cons (showInt startColumn)
+            (Cons (showInt endLine) (Cons (showInt endColumn) Nil)))))));
   encodeExpression :: SExpr -> String;
   encodeExpression expression =
     case expression of {
@@ -105,6 +112,13 @@ module Bootstrap.CrateQuery where {
       SPrimitive p -> node "primitive" (Cons (Primitive.primitiveName p) Nil);
       SCase a branches ->
         node "case" (Cons (encodeExpression a) (Cons (list encodeAlternative branches) Nil));
+      SCallSite label span body ->
+        node "call-site" (Cons label (Cons (encodeSourceSpan span) (Cons (encodeExpression body) Nil)));
+      SSharedBind pattern action continuation bindMethod failure ->
+        node "shared-bind"
+          (Cons (encodePattern pattern) (Cons (encodeExpression action)
+             (Cons (encodeExpression continuation) (Cons (encodeExpression bindMethod)
+                (Cons (encodeExpression failure) Nil)))));
       SDo statements body ->
         node "do" (Cons (list encodeStatement statements) (Cons (encodeExpression body) Nil));
       SEquations rows -> node "equations" (Cons (list encodeEquation rows) Nil);
@@ -222,7 +236,9 @@ module Bootstrap.CrateQuery where {
   -- symbols use a disjoint tagged namespace, so a user's spelling can never
   -- collide with a canonical local binder. Evidence candidates share that
   -- lexical environment, including given dictionaries introduced by lowering.
-  canonicalReference env name = M.findWithDefault compareString ("global:" ++ name) name env;
+  canonicalReference env name =
+    if Separate.managedIntrinsicName name then name
+    else M.findWithDefault compareString ("global:" ++ name) name env;
   canonicalScope prefix env depth names =
     foldlStrict
       (\scope entry ->
@@ -276,6 +292,9 @@ module Bootstrap.CrateQuery where {
           (canonicalAnnotation types typeDepth annotation);
       SOverloadedStringPattern s equal fromString ->
         SOverloadedStringPattern s (canonicalReference env equal) (canonicalReference env fromString);
+      SAsPattern n pattern ->
+        SAsPattern (canonicalReference env n) (canonicalPattern env types typeDepth pattern);
+      SLazyPattern pattern -> SLazyPattern (canonicalPattern env types typeDepth pattern);
       _ -> pattern
     };
   canonicalExpression :: Map String String -> Int -> Map String String -> Int -> SExpr -> SExpr;
@@ -328,6 +347,13 @@ module Bootstrap.CrateQuery where {
                 Pair (map (canonicalPattern scope types typeDepth) patterns)
                   (canonicalExpression scope (depth + length names) types typeDepth body))
              rows);
+      SCallSite label span body -> SCallSite label span (child body);
+      SSharedBind pattern action continuation bindMethod failure ->
+        let { names = Desugar.patternVariables pattern } in
+        let { scope = canonicalScope "local:" env depth names } in
+        SSharedBind (canonicalPattern scope types typeDepth pattern) (child action)
+          (canonicalExpression scope (depth + length names) types typeDepth continuation)
+          (child bindMethod) (child failure);
       SDo _ _ -> child (Desugar.desugarDo expression);
       SLetRec definitions body ->
         let {
@@ -490,7 +516,7 @@ module Bootstrap.CrateQuery where {
   -- a patterned do bind requires MonadFail, even with identical user layouts.
   encodeDatatypeContext datatypes = list encodeDatatype (append D.builtinDeclarations datatypes);
   queryKey crateId compilerHash members bindings datatypes =
-    node "MLF-CRATE-QUERY-2"
+    node "MLF-CRATE-QUERY-3"
       (Cons crateId
          (Cons compilerHash
             (Cons (list (\member -> encodeMember (canonicalMember member)) members)
@@ -675,7 +701,7 @@ module Bootstrap.CrateQuery where {
       Right matchValueShared15 ->
         case matchValueShared15 of {
           Cons matchValueShared16 matchValueShared17 ->
-            if MLF.Primitive.eqString matchValueShared16 "MLF-CRATE-QUERY-2"
+            if MLF.Primitive.eqString matchValueShared16 "MLF-CRATE-QUERY-3"
             then case matchValueShared17 of {
                    Cons matchValueShared18 matchValueShared19 ->
                      case matchValueShared19 of {

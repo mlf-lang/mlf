@@ -7,7 +7,7 @@ module Bootstrap.Parsec where {
   import Bootstrap.Types;
   import Bootstrap.Std;
   import Bootstrap.Lexer;
-  data ParseState = ParseState String (List Token) Token SourceSyntax;
+  data ParseState = ParseState String (List Token) Token SourceSyntax String String;
   data PResult a = PSuccess a ParseState Bool | PFailure String ParseState Bool;
   data Parser a = Parser (ParseState -> PResult a);
   pRun :: forall a. Parser a -> ParseState -> PResult a;
@@ -109,7 +109,7 @@ module Bootstrap.Parsec where {
   pState :: Parser ParseState;
   pState = Parser (\state -> PSuccess state state False);
   stateToken :: ParseState -> Token;
-  stateToken (ParseState _ tokens finish _) =
+  stateToken (ParseState _ tokens finish _ _ _) =
     case tokens of {
       Nil -> finish;
       Cons t _ -> t
@@ -121,7 +121,7 @@ module Bootstrap.Parsec where {
     } in
     ((tokenLine token * 1000000) + tokenColumn token);
   stateError :: ParseState -> String -> String;
-  stateError (ParseState file tokens finish _) message =
+  stateError (ParseState file tokens finish _ _ _) message =
     let {
       token =
         case tokens of {
@@ -137,12 +137,12 @@ module Bootstrap.Parsec where {
     Parser
       (\state ->
          case state of {
-           ParseState file tokens finish syntax ->
+           ParseState file tokens finish syntax sourceModule sourcePackage ->
              case tokens of {
                Nil -> PFailure ("unexpected end of input; expected " ++ expected) state False;
                Cons t rest ->
                  if predicate (tokenText t)
-                 then PSuccess (tokenText t) (ParseState file rest finish syntax) True
+                 then PSuccess (tokenText t) (ParseState file rest finish syntax sourceModule sourcePackage) True
                  else PFailure ("unexpected " ++ (tokenText t ++ ("; expected " ++ expected))) state
                         False
              }
@@ -154,7 +154,7 @@ module Bootstrap.Parsec where {
     Parser
       (\state ->
          case state of {
-           ParseState _ tokens _ _ ->
+           ParseState _ tokens _ _ _ _ ->
              case tokens of {
                Nil -> PSuccess Unit state False;
                Cons t _ ->
@@ -171,8 +171,11 @@ module Bootstrap.Parsec where {
   runParser = runParserWithProfile LegacyEmlfV1;
   runParserWithProfile :: forall a. SourceSyntax ->
                                     Parser a -> String -> Scanned -> Either String a;
-  runParserWithProfile syntax parser file (Scanned tokens finish) =
-    case pRun (pBefore parser pEof) (ParseState file tokens finish syntax) of {
+  runParserWithProfile = runParserWithProfileInPackage "main";
+  runParserWithProfileInPackage :: forall a. String -> SourceSyntax ->
+                                    Parser a -> String -> Scanned -> Either String a;
+  runParserWithProfileInPackage sourcePackage syntax parser file (Scanned tokens finish) =
+    case pRun (pBefore parser pEof) (ParseState file tokens finish syntax "Main" sourcePackage) of {
       PFailure message state _ -> Left (stateError state message);
       PSuccess a _ _ -> Right a
     };
@@ -205,7 +208,7 @@ module Bootstrap.Parsec where {
     Parser
       (\state ->
          case state of {
-           ParseState file tokens finish syntax ->
+           ParseState file tokens finish syntax sourceModule sourcePackage ->
              case tokens of {
                Cons (Token text line column endLine endColumn) rest ->
                  let {
@@ -223,17 +226,39 @@ module Bootstrap.Parsec where {
                                     endColumn)
                                  rest
                       } in
-                      PSuccess symbol (ParseState file remaining finish syntax) True
+                      PSuccess symbol (ParseState file remaining finish syntax sourceModule sourcePackage) True
                  else PFailure ("expected " ++ symbol) state False;
                Nil -> PFailure ("expected " ++ symbol) state False
              }
          });
+  pSetSourceModule :: String -> Parser Unit;
+  pSetSourceModule name = Parser (\state -> case state of {
+    ParseState file tokens finish syntax _ sourcePackage ->
+      PSuccess Unit (ParseState file tokens finish syntax name sourcePackage) False
+  });
+  pWithSpan :: forall a. Parser a -> Parser (Pair SourceSpan a);
+  pWithSpan parser = Parser (\state -> case state of {
+    ParseState file tokens finish _ sourceModule sourcePackage ->
+      case pRun parser state of {
+        PFailure message end consumed -> PFailure message end consumed;
+        PSuccess value end consumed -> case end of {
+          ParseState _ remaining _ _ _ _ -> let {
+            count = length tokens - length remaining;
+            first = stateToken state;
+            final = if count > 0 then last (take count tokens) else first
+          } in PSuccess
+            (Pair (SourceSpan sourcePackage sourceModule file
+                    (tokenLine first) (tokenColumn first)
+                    (tokenEndLine final) (tokenEndColumn final)) value) end consumed
+        }
+      }
+  });
   pSourceSyntax :: Parser SourceSyntax;
   pSourceSyntax =
     Parser
       (\state ->
          case state of {
-           ParseState _ _ _ syntax -> PSuccess syntax state False
+           ParseState _ _ _ syntax _ _ -> PSuccess syntax state False
          });
   pBySyntax :: forall a. Parser a -> Parser a -> Parser a;
   pBySyntax shared legacy =

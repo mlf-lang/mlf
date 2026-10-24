@@ -91,6 +91,8 @@ module Bootstrap.Prelude where {
   freeNames :: SExpr -> Set String;
   freeNames expression =
     case expression of {
+      SCallSite _ _ body -> freeNames body;
+      SSharedBind _ _ _ _ _ -> Set.fromList compareString (Surface.freeNames expression);
       SVar name -> Set.fromList compareString (Surface.freeNames expression);
       SLam name annotation body -> Set.delete compareString name (freeNames body);
       SApp f a -> Set.union compareString (freeNames f) (freeNames a);
@@ -159,6 +161,8 @@ module Bootstrap.Prelude where {
   exprMentionsMonad :: SExpr -> Bool;
   exprMentionsMonad expression =
     case expression of {
+      SCallSite _ _ body -> exprMentionsMonad body;
+      SSharedBind _ _ _ _ _ -> True;
       SLam name annotation body ->
         (L.maybe False annotationMentionsMonad annotation || exprMentionsMonad body);
       SApp f a -> (exprMentionsMonad f || exprMentionsMonad a);
@@ -196,6 +200,8 @@ module Bootstrap.Prelude where {
   patternMentionsMonad :: SPattern -> Bool;
   patternMentionsMonad pattern =
     case pattern of {
+      SAsPattern _ inner -> patternMentionsMonad inner;
+      SLazyPattern inner -> patternMentionsMonad inner;
       SAnnotatedPattern name annotation -> annotationMentionsMonad annotation;
       SNestedPattern name patterns -> L.any patternMentionsMonad patterns;
       _ -> False
@@ -219,8 +225,34 @@ module Bootstrap.Prelude where {
   stringClass :: SClassDecl;
   stringClass = SClassDecl "IsString" (Cons (Pair "a" Star) Nil) Nil
     (Cons (Pair "fromString" (SArrow charListType (STVar "a"))) Nil);
+  managedStackType :: SType -> SType;
+  managedStackType body = SQualified (Cons (SPredicate "HasCallStack" Nil) Nil) body;
+  monadFailClass :: SClassDecl;
+  monadFailClass = SClassDecl "MonadFail" (Cons (Pair "m" (KArrow Star Star)) Nil)
+    (Cons (SPredicate "Monad" (Cons (STVar "m") Nil)) Nil)
+    (Cons (Pair "fail" (forallType "a" (managedStackType
+      (SArrow charListType (STypeApp (STVar "m") (STVar "a")))))) Nil);
   sharedClasses :: List SClassDecl;
-  sharedClasses = Cons equalityClass (Cons stringClass hierarchyClasses);
+  sharedClasses = Cons equalityClass (Cons stringClass (Cons monadFailClass hierarchyClasses));
+  publicIOErrorType :: SType;
+  publicIOErrorType = forallType "a" (managedStackType
+    (SArrow (SCon "IOError" Nil) (SCon "IO" (Cons (STVar "a") Nil))));
+  publicIOErrorBinding :: Triple String (Maybe SAnnotation) SExpr;
+  publicIOErrorBinding = Triple "ioError" (Just (SAnnotation Nil publicIOErrorType))
+    (SLam "$error" Nothing
+      (SApp (SApp (SPrimitive PIOErrorWithStack) (SVar "$error")) (SVar "$MLF.Stack.callStack")));
+  stackFacadeValues :: List (Triple String (Maybe SAnnotation) SExpr);
+  stackFacadeValues =
+    Cons (Triple "callStack" (Just (SAnnotation Nil (managedStackType (SCon "CallStack" Nil))))
+            (SVar "$MLF.Stack.callStack"))
+      (Cons (Triple "prettyCallStack" (Just (SAnnotation Nil
+                      (SArrow (SCon "CallStack" Nil) charListType))) (SPrimitive PPrettyCallStack))
+        (Cons publicIOErrorBinding Nil));
+  ioFailInstance :: SInstanceDecl;
+  ioFailInstance = simpleInstance "MonadFail" (SCon "IO" Nil) "fail"
+    (SLam "$message" Nothing
+      (SApp (SApp (SPrimitive PIOErrorWithStack) (SApp (SPrimitive PUserError) (SVar "$message")))
+        (SVar "$MLF.Stack.callStack")));
   simpleInstance :: String -> SType -> String -> SExpr -> SInstanceDecl;
   simpleInstance klass ty method body =
     SInstanceDecl Nil Nil klass (Cons ty Nil) (Cons (Pair method body) Nil);
@@ -247,7 +279,7 @@ module Bootstrap.Prelude where {
                          (SLam "$a" Nothing (SLam "$b" Nothing (SBoolLit True))))
                   (Cons (simpleInstance "IsString" (SCon "String" Nil) "fromString" (SPrimitive PTextFromChars))
                     (Cons (simpleInstance "IsString" charListType "fromString" (SLam "$chars" Nothing (SVar "$chars"))) Nil))))))))
-      hierarchyInstances;
+      (Cons ioFailInstance hierarchyInstances);
   standardMethodClass :: String -> String;
   standardMethodClass name =
     if L.elem eqString name (Cons "==" (Cons "/=" Nil)) then "Eq"
@@ -273,6 +305,9 @@ module Bootstrap.Prelude where {
         Right (addDefault "==" (SLam "$a" Nothing (SLam "$b" Nothing
           (negated (SApp (SApp (providedMethod "/=" methods) (SVar "$a")) (SVar "$b"))))) methods)
       else Left "Eq instance requires == or /="
+    else if eqString klass "MonadFail" then
+      if hasMethod "fail" methods then Right methods
+      else Left "MonadFail instance requires fail"
     else if eqString klass "IsString" then
       if hasMethod "fromString" methods then Right methods
       else Left "IsString instance requires fromString"

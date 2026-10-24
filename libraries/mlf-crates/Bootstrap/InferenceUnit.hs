@@ -194,7 +194,9 @@ module Bootstrap.InferenceUnit where {
         members;
       body <- Surface.bindValues members (SConstructor "Unit");
       let {
-        externals = M.map (Separate.sourceScheme M.empty) externalTypes
+        -- Members already contain explicit evidence applications. Recovering
+        -- source qualifications here would insert the managed argument twice.
+        externals = M.map (Separate.sourceSchemeIn M.empty False) externalTypes
       };
       lowered <- Classes.lowerSeparateClasses externals Nil (SProgram datatypes body);
       compiled <- mapLeft Compiler.prettyError (Compiler.finishCompilation lowered);

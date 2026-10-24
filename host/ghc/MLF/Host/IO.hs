@@ -1,4 +1,4 @@
-{-# LANGUAGE ForeignFunctionInterface, ScopedTypeVariables #-}
+{-# LANGUAGE ForeignFunctionInterface, ScopedTypeVariables, ImplicitParams #-}
 module MLF.Host.IO where
 
 import Prelude hiding (Int, String)
@@ -15,6 +15,7 @@ import Control.Concurrent.MVar
 import Control.Exception
 import System.IO.Unsafe (unsafePerformIO)
 import qualified System.IO.Error as E
+import qualified GHC.Stack as Stack
 import qualified System.IO as H
 import qualified System.Exit as X
 
@@ -78,8 +79,14 @@ v_runProcess directory specification = do
 -- deliberately remain outside this catch; this is not a universal exception API.
 v_userError :: [Char] -> IOError
 v_userError = E.userError
-v_ioError :: IOError -> IO a
-v_ioError = E.ioError
+v_ioError :: Stack.HasCallStack => IOError -> IO a
+v_ioError error = Stack.withFrozenCallStack (E.ioError error)
+-- Compiler-supplied source evidence is captured only when this action runs.
+-- A caught error does not demand its stack or message. Use the real GHC
+-- exception-context machinery; hide private adapter call sites.
+v_ioErrorWithStack :: IOError -> MLFCallStack -> IO a
+v_ioErrorWithStack error stack =
+  let ?callStack = stack in Stack.withFrozenCallStack (throwIO error)
 v_catchIOError :: IO a -> (IOError -> IO a) -> IO a
 v_catchIOError = E.catchIOError
 v_ioeGetErrorString :: IOError -> [Char]

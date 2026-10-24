@@ -53,7 +53,7 @@ def process_memory(group):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--suite', choices=['artifact', 'interpreter', 'host', 'native', 'core', 'builtin', 'query', 'source'], required=True)
+    parser.add_argument('--suite', choices=['artifact', 'interpreter', 'host', 'native', 'core', 'builtin', 'query', 'source', 'managed', 'interpreter-stack', 'native-stack', 'host-stack', 'authority', 'pattern-do', 'separate'], required=True)
     parser.add_argument('--build-dir', type=Path, required=True)
     parser.add_argument('--ghc', default='ghc')
     parser.add_argument('--cc', default='cc')
@@ -77,7 +77,7 @@ def main():
         receipt['tools'][str(path)] = sha(path)
         return str(path)
 
-    def run(command, label, expected=0, contains=None):
+    def run(command, label, expected=0, contains=None, exact=None):
         log = out / (label + '.log')
         entry = {'argv': list(map(str, command)), 'log': str(log), 'expected_exit': expected}
         receipt['commands'].append(entry)
@@ -107,13 +107,13 @@ def main():
         save()
         print(log.read_text()[-12000:], end='', flush=True)
         good = proc.returncode == expected if expected is not None else proc.returncode != 0
-        if not good or entry.get('guard_stopped') or (contains and contains not in log.read_text()):
+        if not good or entry.get('guard_stopped') or (contains and contains not in log.read_text()) or (exact is not None and log.read_text() != exact):
             raise RuntimeError('probe failed: ' + label)
 
     try:
         cc = tool(args.cc)
         binary = out / 'probe'
-        if args.suite == 'native':
+        if args.suite in {'native', 'native-stack'}:
             gc_flags = ['-lgc']
             if args.gc_prefix:
                 prefix = args.gc_prefix.resolve()
@@ -122,7 +122,7 @@ def main():
                 for header in (prefix / 'include').rglob('*.h'):
                     receipt['tools'][str(header)] = sha(header)
                 gc_flags = ['-I' + str(prefix / 'include'), str(library)]
-            run([cc, '-O0', '-std=c11', '-D_GNU_SOURCE', FIXTURES / 'NativeIO.c',
+            run([cc, '-O0', '-std=c11', '-D_GNU_SOURCE', FIXTURES / ('NativeStack.c' if args.suite == 'native-stack' else 'NativeIO.c'),
                  *gc_flags, '-lgmp', '-lm', '-pthread', '-ldl', '-o', binary], 'compile')
         else:
             ghc = tool(args.ghc)
@@ -139,23 +139,60 @@ def main():
             receipt['tools'][str(libdir / 'settings')] = sha(libdir / 'settings')
             manifest = json.loads((ROOT / 'shared-sources.json').read_text())
             fixture = {'artifact': 'ArtifactIdentity.hs', 'interpreter': 'InterpreterIO.hs',
-                       'host': 'HostIO.hs', 'core': 'CoreIdentity.hs', 'builtin': 'BuiltinArtifact.hs', 'query': 'QueryCache.hs', 'source': 'SourceSemantics.hs'}[args.suite]
+                       'host': 'HostIO.hs', 'core': 'CoreIdentity.hs', 'builtin': 'BuiltinArtifact.hs', 'query': 'QueryCache.hs', 'source': 'SourceSemantics.hs', 'managed': 'ManagedArtifacts.hs', 'interpreter-stack': 'InterpreterStack.hs', 'host-stack': 'HostStack.hs', 'authority': 'ArtifactAuthority.hs', 'pattern-do': 'PatternDo.hs', 'separate': 'SeparateCrates.hs'}[args.suite]
             flags = ['-I' + str(ROOT / 'runtime'), '--make', '-j1', '-O0', '-fforce-recomp', '-fpedantic-bottoms', '-fno-state-hack', '-rtsopts',
                      '-package-env', '-', '-no-user-package-db', '-i',
                      *['-i' + str(ROOT / p) for p in manifest['source_roots']],
                      '-odir', out / 'objects', '-hidir', out / 'objects', '-o', binary]
             (out / 'objects').mkdir(exist_ok=True)
-            run([ghc, *flags, FIXTURES / fixture, ROOT / 'host/ghc/cbits/host.c',
-                 ROOT / 'runtime/mlf_process_supervisor.c'], 'compile')
+            # GHC places explicit C outputs beside their inputs, ignoring -odir.
+            # Copy authenticated sources so concurrent suites cannot race on .o files.
+            cbits = out / 'cbits'
+            cbits.mkdir()
+            c_inputs = []
+            for relative in ['host/ghc/cbits/host.c', 'runtime/mlf_process_supervisor.c']:
+                copied = cbits / Path(relative).name
+                shutil.copy2(ROOT / relative, copied)
+                if sha(copied) != before[relative]:
+                    raise RuntimeError('C input changed before compilation: ' + relative)
+                c_inputs.append(copied)
+            receipt['isolated_c_inputs'] = {str(p.relative_to(out)): sha(p) for p in c_inputs}
+            run([ghc, *flags, FIXTURES / fixture, *c_inputs], 'compile')
+            receipt['isolated_c_objects'] = {str(p.relative_to(out)): sha(p) for p in cbits.glob('*.o')}
+            if len(receipt['isolated_c_objects']) != 2:
+                raise RuntimeError('expected two isolated C objects')
         arguments = [binary]
-        if args.suite == 'source':
+        if args.suite in {'source', 'pattern-do', 'separate'}:
             arguments.extend(['+RTS', '-M700m', '-RTS'])
+        if args.suite == 'separate':
+            arguments.insert(1, out)
         if args.suite == 'query':
             arguments.append(out / ('cache-' + str(time.time_ns())))
         run(arguments, 'positive')
         if args.suite == 'native':
             for mode, diagnostic in [('surrogate', 'Unicode'), ('panic', 'pure panic'), ('uncaught', 'Runtime: user error (hé😀)')]:
                 run([binary, mode], mode, expected=1, contains=diagnostic)
+        if args.suite == 'native-stack':
+            stack = 'CallStack (from HasCallStack):\n  inner, called at file.hs:10:2 in pkg:Mod\n  outer, called at file.hs:20:2 in pkg:Mod\n'
+            for mode, expected in [
+                ('surrogate', 'Runtime: user error (\\ud800)\n'),
+                ('direct', 'Runtime: user error (source)\n' + stack),
+                ('nested', 'Runtime: user error (c)\nWhile handling user error (b)\n' + stack),
+                ('active', 'Runtime: user error (c)\nWhile handling user error (a)\nWhile handling user error (b)\n' + stack)]:
+                run([binary, mode], mode, expected=1, exact=expected)
+        if args.suite == 'host-stack':
+            prefix = binary.name + ': Uncaught exception ghc-internal:GHC.Internal.IO.Exception.IOException:\n\n'
+            stack = 'HasCallStack backtrace:\n  inner, called at file.hs:10:2 in pkg:Mod\n  outer, called at file.hs:20:2 in pkg:Mod\n\n'
+            for mode, message in [('direct', 'user error (source)\n\n'),
+                                  ('nested', 'user error (c)\n\nWhile handling user error (b)\n\n'),
+                                  ('active', 'user error (c)\n\nWhile handling user error (a)\n\nWhile handling user error (b)\n\n')]:
+                run([binary, mode], mode, expected=1, exact=prefix + message + stack)
+            fixture = FIXTURES / 'HostStack.hs'
+            line, text = next((i, text) for i, text in enumerate(fixture.read_text().splitlines(), 1)
+                              if '["public"]' in text)
+            site = str(fixture) + ':' + str(line) + ':' + str(text.index('M.ioError') + 1)
+            run([binary, 'public'], 'public', expected=1,
+                exact=prefix + 'user error (public)\n\nHasCallStack backtrace:\n  ioError, called at ' + site + ' in main:Main\n\n')
         receipt['status'] = 'passed'
     except Exception as exc:
         receipt.update(status='failed', error=str(exc))
@@ -164,8 +201,9 @@ def main():
         closure = {'tools/shared/test_item4_contracts.py', 'shared-sources.json',
                    'runtime/mlf_process_supervisor.c', 'host/ghc/cbits/host.c'}
         closure.update(k for k in before if k.startswith('runtime/') and k.endswith('.h'))
-        if args.suite == 'native':
-            closure.update(['runtime/mlf_runtime.c', 'tools/shared/fixtures/item4/NativeIO.c'])
+        if args.suite in {'native', 'native-stack'}:
+            closure.update(['runtime/mlf_runtime.c', 'tools/shared/fixtures/item4/' +
+                            ('NativeStack.c' if args.suite == 'native-stack' else 'NativeIO.c')])
         else:
             text = (out / 'compile.log').read_text() if (out / 'compile.log').exists() else ''
             for name in re.findall(r'Compiling\s+[\w.]+\s+\(\s*([^,\n]+),', text):

@@ -161,7 +161,9 @@ module Bootstrap.Crate where {
       }
     };
   loadSources :: List (Pair String String) -> IO (Either String (List SourceModule));
-  loadSources paths =
+  loadSources = loadSourcesInPackage "main";
+  loadSourcesInPackage :: String -> List (Pair String String) -> IO (Either String (List SourceModule));
+  loadSourcesInPackage sourcePackage paths =
     case paths of {
       Nil -> ioReturn (Right Nil);
       Cons (Pair name path) rest ->
@@ -171,7 +173,7 @@ module Bootstrap.Crate where {
           then ioReturn (Left ("crate source does not exist: " ++ path))
           else do {
                  text <- readFile path;
-                 case Parser.parseModule path text of {
+                 case Parser.parseModuleInPackage sourcePackage path text of {
                    Left message -> ioReturn (Left message);
                    Right source ->
                      case do {
@@ -183,7 +185,7 @@ module Bootstrap.Crate where {
                        Left message -> ioReturn (Left message);
                        Right clean ->
                          do {
-                           remaining <- loadSources rest;
+                           remaining <- loadSourcesInPackage sourcePackage rest;
                            ioReturn (mapEither (Cons clean) remaining)
                          }
                      }
@@ -662,7 +664,7 @@ module Bootstrap.Crate where {
                Left message -> ioReturn (Left message);
                Right spec ->
                  do {
-                   sourceResult <- loadSources (specSources spec);
+                   sourceResult <- loadSourcesInPackage (specIdentity spec) (specSources spec);
                    paths <- mapM canonicalPath (specDependencies spec);
                    let {
                      normalized = withDependencies spec paths

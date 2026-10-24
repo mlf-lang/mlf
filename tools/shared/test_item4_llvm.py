@@ -9,6 +9,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import signal
@@ -17,7 +18,8 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'tools/shared/fixtures/item4/EmitIO.hs'
-GUARD = 'mlf_require_haskell_boundary_v1_abi'
+GUARD = 'mlf_require_haskell_boundary_v2_abi'
+PREVIOUS_GUARD = 'mlf_require_haskell_boundary_v1_abi'
 EXPECTED = 'roundtrip λ😀\n65\n0\ncaught λ😀\nDONE\n'
 
 
@@ -26,7 +28,7 @@ def sha(path):
 
 
 def sources():
-    paths = {Path(__file__).resolve(), FIXTURE, ROOT / 'shared-sources.json'}
+    paths = {Path(__file__).resolve(), FIXTURE, ROOT / 'tools/shared/fixtures/item4/EmitStack.hs', ROOT / 'shared-sources.json'}
     for folder in ['libraries', 'host/ghc', 'runtime']:
         paths.update(p for p in (ROOT / folder).rglob('*')
                      if p.is_file() and p.suffix in {'.hs', '.h', '.c'})
@@ -51,6 +53,7 @@ def memory(group):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-dir', required=True, type=Path)
+    parser.add_argument('--suite', choices=['ordinary', 'stack'], default='ordinary')
     parser.add_argument('--ghc', default='ghc')
     parser.add_argument('--clang', default='clang')
     parser.add_argument('--cc', default='cc')
@@ -66,7 +69,8 @@ def main():
         parser.error('--gc-prefix and a positive --timeout are required')
     out.mkdir(parents=True, exist_ok=True)
     before = sources()
-    receipt = {'scope': 'focused-item4-checked-llvm-native', 'status': 'running',
+    fixture = FIXTURE if args.suite == 'ordinary' else ROOT / 'tools/shared/fixtures/item4/EmitStack.hs'
+    receipt = {'scope': 'focused-item4-checked-llvm-native-' + args.suite, 'status': 'running',
                'synthetic_control': 'new runtime with ONLY new ABI guard renamed; not historical runtime',
                'inputs': before, 'tools': {}, 'commands': [], 'outputs': {},
                'environment': {k: os.environ.get(k) for k in ['PATH', 'LD_LIBRARY_PATH', 'MLF_GC_PREFIX']}}
@@ -82,7 +86,7 @@ def main():
     def run(command, label, reject=False, contains=None, exact=None):
         log = out / (label + '.log')
         entry = {'argv': list(map(str, command)), 'log': str(log),
-                 'expected': 'nonzero' if reject else 0}
+                 'expected': 1 if reject else 0}
         receipt['commands'].append(entry)
         save()
         start = time.monotonic()
@@ -110,7 +114,7 @@ def main():
                      peak_rss_bytes=peak, log_sha256=sha(log))
         save()
         text = log.read_text()
-        if entry.get('guard_stopped') or (proc.returncode == 0 if reject else proc.returncode != 0):
+        if entry.get('guard_stopped') or proc.returncode != (1 if reject else 0):
             raise RuntimeError(label + ' unexpected exit; see ' + str(log))
         if contains is not None and contains not in text:
             raise RuntimeError(label + ' lacks required diagnostic: ' + contains)
@@ -144,18 +148,32 @@ def main():
         flags = ['--make', '-j1', '-O0', '-fpedantic-bottoms', '-fno-state-hack', '-package-env', '-', '-i']
         flags += ['-i' + str(ROOT / root) for root in manifest['source_roots']]
         emitter = out / 'emit-item4-io'
-        run([ghc, *flags, '-odir', objects, '-hidir', objects, FIXTURE, *c_objects, '-o', emitter], 'build-emitter')
-        llvm = out / 'program.ll'
-        run([emitter, llvm], 'emit-llvm')
-        if GUARD not in llvm.read_text():
-            raise RuntimeError('emitted LLVM lacks new ABI guard')
+        run([ghc, *flags, '-odir', objects, '-hidir', objects, fixture, *c_objects, '-o', emitter], 'build-emitter')
+        if args.suite == 'ordinary':
+            llvm = out / 'program.ll'
+            run([emitter, llvm], 'emit-llvm')
+            programs = [('program', llvm, False, EXPECTED)]
+        else:
+            run([emitter, out], 'emit-llvm')
+            stack = 'CallStack (from HasCallStack):\n  inner, called at file.hs:10:2 in pkg:Mod\n  outer, called at file.hs:10:2 in pkg:Mod\n'
+            programs = [
+                ('success', out / 'success.ll', False, stack + '\ncaught stack\nbottom stack ignored\nbottom message ignored\nSTACK DONE\n'),
+                ('uncaught', out / 'uncaught.ll', True, 'Runtime: user error (message)\n' + stack),
+                ('nested', out / 'nested.ll', True, 'Runtime: user error (c)\nWhile handling user error (b)\n'),
+                ('active', out / 'active.ll', True, 'Runtime: user error (c)\nWhile handling user error (a)\nWhile handling user error (b)\n')]
         libraries = [archive, '-lgmp', '-lm', '-lpthread', '-ldl']
         common = ['-std=c11', '-I' + str(ROOT / 'runtime'), '-I' + str(gc / 'include')]
-        for level in ['0', '2']:
-            binary = out / ('program-O' + level)
-            run([clang, '-O' + level, *common, llvm, ROOT / 'runtime/mlf_runtime.c', *libraries, '-o', binary], 'native-O' + level + '-build')
-            run([binary], 'native-O' + level + '-run', exact=EXPECTED)
-            receipt['outputs'][binary.name] = sha(binary)
+        for mode, llvm, rejects, expected in programs:
+            if GUARD not in llvm.read_text():
+                raise RuntimeError('emitted LLVM lacks new ABI guard: ' + mode)
+            receipt['outputs'][llvm.name] = sha(llvm)
+            for level in ['0', '2']:
+                label = mode + '-O' + level
+                binary = out / label
+                run([clang, '-O' + level, *common, llvm, ROOT / 'runtime/mlf_runtime.c', *libraries, '-o', binary], label + '-build')
+                run([binary], label + '-run', reject=rejects, exact=expected)
+                receipt['outputs'][binary.name] = sha(binary)
+        llvm = programs[0][1]
         original = (ROOT / 'runtime/mlf_runtime.c').read_text()
         if original.count(GUARD) != 1:
             raise RuntimeError('synthetic-control assumption failed: guard must occur exactly once in runtime C')
@@ -165,9 +183,29 @@ def main():
                         'synthetic-stale-link', reject=True, contains=GUARD)
         if not any(word in rejection for word in ['undefined reference', 'undefined symbol', 'Undefined symbols']):
             raise RuntimeError('synthetic control failed for a reason other than an undefined symbol')
-        receipt['outputs'].update({'program.ll': sha(llvm), 'synthetic-stale-runtime.c': sha(synthetic)})
-        if sources() != before:
-            raise RuntimeError('source inputs changed during run; evidence invalidated')
+        old_llvm = out / 'synthetic-old-guard.ll'
+        old_llvm.write_text(llvm.read_text().replace(GUARD, PREVIOUS_GUARD))
+        old_rejection = run([clang, '-O0', *common, old_llvm, ROOT / 'runtime/mlf_runtime.c',
+                             *libraries, '-o', out / 'old-must-not-link'],
+                            'synthetic-old-guard-link', reject=True, contains=PREVIOUS_GUARD)
+        if not any(word in old_rejection for word in ['undefined reference', 'undefined symbol', 'Undefined symbols']):
+            raise RuntimeError('reverse old-guard control did not fail at symbol resolution')
+        receipt['outputs'].update({llvm.name: sha(llvm), 'synthetic-stale-runtime.c': sha(synthetic),
+                                   'synthetic-old-guard.ll': sha(old_llvm)})
+        closure = {str(Path(__file__).resolve().relative_to(ROOT)), str(fixture.relative_to(ROOT)),
+                   'shared-sources.json', 'host/ghc/cbits/host.c', 'runtime/mlf_runtime.c',
+                   'runtime/mlf_process_supervisor.c'}
+        closure.update(k for k in before if k.startswith('runtime/') and k.endswith('.h'))
+        for name in re.findall(r'Compiling\s+[\w.]+\s+\(\s*([^,\n]+),', (out / 'build-emitter.log').read_text()):
+            path = Path(name.strip())
+            if not path.is_absolute():
+                path = ROOT / path
+            closure.add(str(path.resolve().relative_to(ROOT)))
+        after = sources()
+        receipt['compiled_input_closure'] = sorted(closure)
+        receipt['changed_inputs'] = sorted(k for k in closure if before.get(k) != after.get(k))
+        if receipt['changed_inputs']:
+            raise RuntimeError('compiled source inputs changed during run; evidence invalidated')
         receipt['status'] = 'passed'
         save()
         print('PASS item4 LLVM O0/O2 and synthetic missing-ABI-symbol control: ' + str(out / 'receipt.json'))

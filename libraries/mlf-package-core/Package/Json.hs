@@ -96,6 +96,7 @@ module Package.Json where {
       Null -> "null"
     };
   equal a b = eqString (render a) (render b);
+  space :: Int -> Bool;
   space n = ((n == 32) || ((n == 9) || ((n == 10) || (n == 13))));
   skip :: String -> Int -> Int;
   skip source i =

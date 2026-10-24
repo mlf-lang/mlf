@@ -3,7 +3,7 @@
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
 module Test.Assert where {
-  import MLF.Primitive;
+  import MLF.Primitive hiding (fail);
   import Bootstrap.Types;
   import qualified Test.Expectation as E;
   import qualified Test.Outcome as O;

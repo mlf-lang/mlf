@@ -6,6 +6,7 @@ module Bootstrap.Host where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
+  separator :: Int -> Bool;
   separator code = ((code == 47) || (code == 92));
   driveRoot path =
     ((stringLength path >= 3) &&

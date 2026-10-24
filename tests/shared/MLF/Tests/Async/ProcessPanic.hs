@@ -3,7 +3,7 @@
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
 module MLF.Tests.Async.ProcessPanic where {
-  import MLF.Primitive;
+  import MLF.Primitive hiding (fail);
   import Bootstrap.Types;
   import Async.Process;
   fail :: forall a. String -> IO a;

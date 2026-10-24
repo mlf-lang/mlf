@@ -14,8 +14,8 @@ void mlf_require_compact_gc_abi(void);
 void mlf_require_process_supervisor_v1_abi(void);
 /* Append-only completion primitives 83 through 94, with scoped queues and timers. */
 void mlf_require_async_completion_v2_abi(void);
-/* Canonical source constructors and append-only Char/typed IOError 95..102. */
-void mlf_require_haskell_boundary_v1_abi(void);
+/* Canonical constructors and Char/typed IOError/managed-stack primitives 95..106. */
+void mlf_require_haskell_boundary_v2_abi(void);
 
 typedef struct MlfValue MlfValue;
 typedef struct MlfEnv MlfEnv;

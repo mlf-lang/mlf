@@ -754,7 +754,7 @@ module Bootstrap.Lexer where {
   sharedValueOperators :: List String;
   sharedValueOperators = Cons ("+") (Cons ("-") (Cons ("*") (Cons ("/") (Cons ("%") (Cons ("++") (Cons ("==") (Cons ("/=") (Cons ("<") (Cons ("<=") (Cons (">") (Cons (">=") (Cons ("&&") (Cons ("||") (Cons (">>=") (Cons (">>") (Cons ("<*>") (Cons ("<$") (Cons ("*>") (Cons ("<*") (Nil))))))))))))))))))));
   sharedPunctuation :: List String;
-  sharedPunctuation = append (Cons "[" (Cons "]" (Cons ":" sharedValueOperators))) (Cons ("::") (Cons ("->") (Cons ("<-") (Cons ("=>") (Cons ("=") (Cons ("|") (Cons (".") (Cons ("..") (Cons ("\\") (Cons ("(") (Cons (")") (Cons ("{") (Cons ("}") (Cons (";") (Cons (",") (Cons ("_") (Nil)))))))))))))))));
+  sharedPunctuation = append (Cons "@" (Cons "~" (Cons "[" (Cons "]" (Cons ":" sharedValueOperators))))) (Cons ("::") (Cons ("->") (Cons ("<-") (Cons ("=>") (Cons ("=") (Cons ("|") (Cons (".") (Cons ("..") (Cons ("\\") (Cons ("(") (Cons (")") (Cons ("{") (Cons ("}") (Cons (";") (Cons (",") (Cons ("_") (Nil)))))))))))))))));
   sharedQualifiedOperator text =
     stringLength text > 1 && stringCodeAt text 0 == 46 && elem eqString (stringSlice text 1 (stringLength text - 1)) sharedValueOperators;
   validateSharedTokens :: String -> List Token -> Either String Unit;
@@ -802,7 +802,7 @@ module Bootstrap.Lexer where {
     };
   -- Cache consumers must bind this semantic identity as well as raw source bytes.
   frontendSemanticVersion :: String;
-  frontendSemanticVersion = "mlf-frontend/shared-haskell-v1/4";
+  frontendSemanticVersion = "mlf-frontend/shared-haskell-v1/5";
   builtinInterfaceVersion :: String;
-  builtinInterfaceVersion = "mlf-primitive/shared-haskell-v1/5"
+  builtinInterfaceVersion = "mlf-primitive/shared-haskell-v1/6"
 }

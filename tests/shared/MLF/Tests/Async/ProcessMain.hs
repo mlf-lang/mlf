@@ -3,7 +3,7 @@
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
 module MLF.Tests.Async.ProcessMain where {
-  import MLF.Primitive;
+  import MLF.Primitive hiding (fail);
   import Bootstrap.Types;
   import qualified Bootstrap.Std as L;
   import Async.Process;

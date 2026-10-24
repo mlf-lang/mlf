@@ -25,6 +25,7 @@ module Bootstrap.Runtime where {
     RString String |
     RChar Int |
     RIOError (Either String RValue) |
+    RCallStack (List (List (Either String RValue))) |
     RIntArray IntArray |
     RDoubleArray DoubleArray |
     RByteArray ByteArray |
@@ -44,7 +45,10 @@ module Bootstrap.Runtime where {
   -- their canonical lazy [Char] representation, including surrogate codepoints.
   data RIOOutcome =
     RIOSuccess (Either String RValue) |
-    RIOFailure (Either String RValue);
+    RIOFailure (Either String RValue) (Either String RValue)
+      (List (Either String RValue));
+  -- Failure contexts are active handler scopes, not fields of IOError. A catch
+  -- discards the old contexts and passes only the plain error to its handler.
   -- Primitive payloads represent the language value itself. Forcing only the
   -- interpreter's wrapper would leave strict numeric accumulators suspended.
   -- Algebraic fields, closures and actions retain their ordinary lazy behavior.
@@ -383,6 +387,107 @@ module Bootstrap.Runtime where {
            };
          _ -> Left "runtime primitive expected [Char]"
        });
+  runtimeCallStack :: Either String RValue -> Either String (List (List (Either String RValue)));
+  runtimeCallStack thunk =
+    bindEither thunk
+      (\value -> case value of {
+         RCallStack frames -> Right frames;
+         _ -> Left "runtime primitive expected MLFCallStack"
+       });
+  runtimeStackFrame :: Either String RValue -> Either String (List (Either String RValue));
+  runtimeStackFrame thunk =
+    bindEither thunk
+      (\value -> case value of {
+         RConstructor name fields ->
+           if (eqString name "MLFStackFrame" && (length fields == 8))
+           then Right fields
+           else Left "runtime primitive expected MLFStackFrame";
+         _ -> Left "runtime primitive expected MLFStackFrame"
+       });
+  -- Append one strict opaque-text segment to a lazy canonical character list.
+  -- Neither later segments nor later frame fields are demanded to expose its
+  -- prefix. The Either inside a list tail preserves deferred evaluator errors.
+  runtimeTextCharsOnto :: String -> Int -> Either String RValue -> Either String RValue;
+  runtimeTextCharsOnto text index rest =
+    if index == stringLength text
+    then rest
+    else Right (RConstructor ":"
+           (Cons (Right (RChar (stringCodeAt text index)))
+              (Cons (runtimeTextCharsOnto text (index + 1) rest) Nil)));
+  runtimeCharSegments :: List (Either String String) -> Either String RValue;
+  runtimeCharSegments segments =
+    case segments of {
+      Nil -> Right (RConstructor "[]" Nil);
+      Cons segment rest -> bindEither segment
+        (\text -> runtimeTextCharsOnto text 0 (runtimeCharSegments rest))
+    };
+  runtimeStackCoordinate :: Either String RValue -> Either String Int;
+  runtimeStackCoordinate thunk = do {
+    value <- integer thunk;
+    ensure ((value >= (-9223372036854775808)) && (value <= 9223372036854775807))
+      "source coordinate out of bounds";
+    Right value
+  };
+  runtimeFrameSegments :: List (Either String RValue) -> List (Either String String);
+  runtimeFrameSegments fields =
+    case fields of {
+      Cons display (Cons package (Cons moduleName (Cons file
+        (Cons line (Cons column (Cons endLine (Cons endColumn Nil))))))) ->
+        Cons (Right "\n  ") (Cons (string display)
+          (Cons (Right ", called at ")
+            (runtimeLocationSegments package moduleName file line column endLine endColumn)));
+      _ -> Cons (Left "runtime primitive expected MLFStackFrame") Nil
+    };
+  -- GHC SrcLoc has strict Int coordinates. Demand them together only when the
+  -- location is reached, not while exposing the header or display-name prefix.
+  runtimeLocationSegments :: Either String RValue -> Either String RValue ->
+    Either String RValue -> Either String RValue -> Either String RValue ->
+    Either String RValue -> Either String RValue -> List (Either String String);
+  runtimeLocationSegments package moduleName file line column endLine endColumn =
+    case (do {
+      sl <- runtimeStackCoordinate line;
+      sc <- runtimeStackCoordinate column;
+      runtimeStackCoordinate endLine;
+      runtimeStackCoordinate endColumn;
+      Right (Pair sl sc)
+    }) of {
+      Left message -> Cons (Left message) Nil;
+      Right (Pair sl sc) ->
+        Cons (string file) (Cons (Right ":") (Cons (Right (showInt sl))
+          (Cons (Right ":") (Cons (Right (showInt sc))
+            (Cons (Right " in ") (Cons (string package)
+              (Cons (Right ":") (Cons (string moduleName) Nil))))))))
+    };
+  runtimeStackSegments :: List (List (Either String RValue)) -> List (Either String String);
+  runtimeStackSegments frames = concatMap runtimeFrameSegments frames;
+  runtimePrettyCallStack :: Either String RValue -> Either String RValue;
+  runtimePrettyCallStack thunk =
+    bindEither (runtimeCallStack thunk)
+      (\frames -> case frames of {
+         Nil -> Right (RConstructor "[]" Nil);
+         Cons _ _ -> runtimeCharSegments
+           (Cons (Right "CallStack (from HasCallStack):") (runtimeStackSegments frames))
+       });
+  runtimeFailureContexts :: List (Either String RValue) -> Either String String;
+  runtimeFailureContexts contexts =
+    case contexts of {
+      Nil -> Right "";
+      Cons message rest -> do {
+        chunks <- runtimeCharsChunks True message;
+        after <- runtimeFailureContexts rest;
+        Right ("\n\nWhile handling user error (" ++ concatStrings chunks ++ ")" ++ after)
+      }
+    };
+  runtimeFailureStack :: Either String RValue -> Either String String;
+  runtimeFailureStack thunk =
+    bindEither (runtimeCallStack thunk)
+      (\frames -> case frames of {
+         Nil -> Right "";
+         Cons _ _ -> do {
+           segments <- mapM (\segment -> segment) (runtimeStackSegments frames);
+           Right ("\n\nHasCallStack backtrace:" ++ concatStrings segments)
+         }
+       });
   integer2 f a b =
     do {
       x <- integer a;
@@ -418,8 +523,8 @@ module Bootstrap.Runtime where {
     let {
       n = P.primitiveCode primitive
     } in
-    ((n == 100) || ((n == 101) || ((n <= 5) ||
-     (((n >= 27) && (n <= 44)) || (((n >= 56) && (n <= 65)) || ((n >= 73) && (n <= 94)))))));
+    ((n == 106) || ((n == 100) || ((n == 101) || ((n <= 5) ||
+     (((n >= 27) && (n <= 44)) || (((n >= 56) && (n <= 65)) || ((n >= 73) && (n <= 94))))))));
   isSTAction primitive =
     case primitive of {
       PSTReturn -> True;
@@ -456,6 +561,13 @@ module Bootstrap.Runtime where {
       c = head (tail (tail arguments))
     } in
     case primitive of {
+      PEmptyCallStack -> Right (RCallStack Nil);
+      PPushCallStack -> do {
+        frame <- runtimeStackFrame a;
+        frames <- runtimeCallStack b;
+        Right (RCallStack (Cons frame frames))
+      };
+      PPrettyCallStack -> runtimePrettyCallStack a;
       PTextToChars -> mapEither (\text -> runtimeTextChars text 0) (string a);
       PTextFromChars -> mapEither RString (runtimeCharsText a);
       PCharCode -> mapEither RInteger (character a);
@@ -756,16 +868,20 @@ module Bootstrap.Runtime where {
          (bindEither result
             (\(Pair _ outcome) -> case outcome of {
                RIOSuccess value -> Right value;
-               RIOFailure message ->
-                 bindEither (runtimeCharsChunks True message)
-                   (\chunks -> Left ("user error (" ++ concatStrings chunks ++ ")"))
+               RIOFailure message stack contexts -> do {
+                 chunks <- runtimeCharsChunks True message;
+                 handling <- runtimeFailureContexts contexts;
+                 backtrace <- runtimeFailureStack stack;
+                 Left ("user error (" ++ concatStrings chunks ++ ")" ++ handling ++ backtrace)
+               }
              })));
   perform :: List String ->
              DataEnv ->
              Primitive -> List (Either String RValue) -> IO (Either String (Either String RValue));
   perform args ds primitive arguments =
     if ((P.primitiveCode primitive == 1) ||
-        ((P.primitiveCode primitive == 100) || (P.primitiveCode primitive == 101)))
+        ((P.primitiveCode primitive == 100) ||
+         ((P.primitiveCode primitive == 101) || (P.primitiveCode primitive == 106))))
     then runAction args ds (Right (RAction primitive arguments))
     else let {
       a = head arguments
@@ -1512,7 +1628,7 @@ module Bootstrap.Runtime where {
                        Left message -> ioReturn (Left message);
                        Right (Pair updated outcome) ->
                          case outcome of {
-                           RIOFailure message -> ioReturn (Right (Pair updated (RIOFailure message)));
+                           RIOFailure message stack contexts -> ioReturn (Right (Pair updated (RIOFailure message stack contexts)));
                            RIOSuccess value ->
                              runActionState args ds updated
                                (bindEither (head (tail arguments))
@@ -1521,7 +1637,11 @@ module Bootstrap.Runtime where {
                      });
               PIOError ->
                 checkedIO (runtimeIOError (head arguments))
-                  (\message -> ioReturn (Right (Pair store (RIOFailure message))));
+                  (\message -> ioReturn (Right (Pair store (RIOFailure message (Right (RCallStack Nil)) Nil))));
+              PIOErrorWithStack ->
+                checkedIO (runtimeIOError (head arguments))
+                  (\message -> ioReturn
+                    (Right (Pair store (RIOFailure message (head (tail arguments)) Nil))));
               PCatchIOError ->
                 ioBind (runActionState args ds store (head arguments))
                   (\result -> case result of {
@@ -1529,10 +1649,20 @@ module Bootstrap.Runtime where {
                      Right (Pair updated outcome) ->
                        case outcome of {
                          RIOSuccess value -> ioReturn (Right (Pair updated (RIOSuccess value)));
-                         RIOFailure message ->
-                           runActionState args ds updated
-                             (bindEither (head (tail arguments))
-                                (\handler -> apply ds handler (Right (RIOError message))))
+                         RIOFailure message _ _ ->
+                           ioBind
+                             (runActionState args ds updated
+                               (bindEither (head (tail arguments))
+                                  (\handler -> apply ds handler (Right (RIOError message)))))
+                             (\handled -> ioReturn
+                               (mapEither
+                                 (\(Pair after result) -> Pair after
+                                   (case result of {
+                                      RIOSuccess value -> RIOSuccess value;
+                                      RIOFailure next stack contexts ->
+                                        RIOFailure next stack (Cons message contexts)
+                                    }))
+                                 handled))
                        }
                    });
               _ ->
@@ -1757,8 +1887,8 @@ module Bootstrap.Runtime where {
                                                                                 case outcome of {
                                                                                   RIOSuccess _ ->
                                                                                     rAsyncFinished finished (RInteger 0);
-                                                                                  RIOFailure message ->
-                                                                                    ioReturn (Right (Pair finished (RIOFailure message)))
+                                                                                  RIOFailure message stack contexts ->
+                                                                                    ioReturn (Right (Pair finished (RIOFailure message stack contexts)))
                                                                                 })
                                                                        }))
                                                          }

@@ -67,10 +67,32 @@ module Bootstrap.Separate where {
   encoded text = encodedFrom text 0;
   canonicalPreludeConstructor entity =
     (eqString (Modules.owner entity) "Prelude" &&
-     (case Modules.role entity of { Modules.Constructor _ -> True; _ -> False }) &&
-     any (\d -> any (\c -> eqString (Modules.spelling entity) (D.constructorName c))
-                       (D.datatypeConstructors d)) D.sourceBuiltinDeclarations);
+     (case Modules.role entity of {
+       Modules.Constructor parent ->
+         any (\d -> eqString parent (D.datatypeName d) &&
+                    any (\c -> eqString (Modules.spelling entity) (D.constructorName c))
+                        (D.datatypeConstructors d)) D.sourceBuiltinDeclarations;
+       _ -> False
+     }));
+  managedBuiltinName :: Modules.Entity -> Maybe String;
+  managedBuiltinName entity =
+    if eqString (Modules.owner entity) "MLF.Primitive"
+    then case Modules.role entity of {
+      Modules.ManagedConstraint ->
+        if eqString (Modules.spelling entity) "HasCallStack" then Just "MLFHasCallStack" else Nothing;
+      Modules.BuiltinType ->
+        if eqString (Modules.spelling entity) "CallStack" then Just "MLFCallStack" else Nothing;
+      Modules.Value ->
+        if eqString (Modules.spelling entity) "callStack" then Just "mlfCallStack" else Nothing;
+      _ -> Nothing
+    }
+    else Nothing;
   stableName entity =
+    case managedBuiltinName entity of {
+      Just name -> name;
+      Nothing -> ordinaryStableName entity
+    };
+  ordinaryStableName entity =
     if (Modules.isRole Modules.BuiltinType entity ||
         (canonicalPreludeConstructor entity ||
          (eqString (Modules.owner entity) "Prelude" && eqString (Modules.spelling entity) "Unit")))
@@ -84,7 +106,9 @@ module Bootstrap.Separate where {
            else "module_") ++
           (encoded (Modules.owner entity) ++ ("z_" ++ encoded (Modules.spelling entity))));
   mainName n = stableName (Modules.Entity n "main" Modules.Value);
-  hygieneName env n = M.findWithDefault compareString n n env;
+  managedIntrinsicName n = eqString n "$MLF.Stack.callStack";
+  hygieneName env n =
+    if managedIntrinsicName n then n else M.findWithDefault compareString n n env;
   hygieneBind env names =
     do {
       pairs <-
@@ -106,6 +130,8 @@ module Bootstrap.Separate where {
       SAnnotatedPattern n a -> SAnnotatedPattern (hygieneName env n) a;
       SOverloadedStringPattern s equal fromString ->
         SOverloadedStringPattern s (hygieneName env equal) (hygieneName env fromString);
+      SAsPattern n pattern -> SAsPattern (hygieneName env n) (hygienePattern env pattern);
+      SLazyPattern pattern -> SLazyPattern (hygienePattern env pattern);
       _ -> p
     };
   hygieneIn :: Map String String -> SExpr -> Fresh SExpr;
@@ -177,6 +203,17 @@ module Bootstrap.Separate where {
               rows;
           freshPure (SEquations rows2)
         };
+      SCallSite label span body ->
+        do { result <- hygieneIn env body; freshPure (SCallSite label span result) };
+      SSharedBind pattern action continuation bindMethod failure ->
+        do {
+          scope <- hygieneBind env (Surface.patternVariables pattern);
+          action2 <- hygieneIn env action;
+          continuation2 <- hygieneIn scope continuation;
+          bindMethod2 <- hygieneIn env bindMethod;
+          failure2 <- hygieneIn env failure;
+          freshPure (SSharedBind (hygienePattern scope pattern) action2 continuation2 bindMethod2 failure2)
+        };
       SDo _ _ -> hygieneIn env (Desugar.desugarDo expression);
       _ -> freshPure expression
     };
@@ -186,6 +223,9 @@ module Bootstrap.Separate where {
       Nothing -> Nothing;
       Just a -> Just (f a)
     };
+  -- Managed call-stack qualification is represented by a private evidence
+  -- wrapper, never by the raw first-class CallStack value type. No class or
+  -- instance dictionary for HasCallStack is fabricated during reconstruction.
   sourceSchemeIn :: Map String String -> Bool -> XType -> SType;
   sourceSchemeIn dictionaries qualified ty =
     case ty of {
@@ -195,7 +235,12 @@ module Bootstrap.Separate where {
       XArrow a b ->
         case a of {
           XCon d ts ->
-            case if qualified then M.lookup compareString d dictionaries else Nothing of {
+            case if qualified
+                 then (if eqString d "MLFStackEvidence" && null ts
+                       then Just "MLFHasCallStack"
+                       else if eqString d "MLFCallStack" then Nothing
+                       else M.lookup compareString d dictionaries)
+                 else Nothing of {
               Just c ->
                 let {
                   predicate = SPredicate c (map (sourceSchemeIn dictionaries False) ts)
@@ -475,6 +520,7 @@ module Bootstrap.Separate where {
           Modules.Value -> Pair "value" "";
           Modules.Datatype -> Pair "data" "";
           Modules.Class -> Pair "class" "";
+          Modules.ManagedConstraint -> Pair "managed-constraint" "";
           Modules.Constructor p -> Pair "constructor" p;
           Modules.Method p -> Pair "method" p;
           Modules.BuiltinType -> Pair "builtin" "";
@@ -495,7 +541,9 @@ module Bootstrap.Separate where {
               let {
                 matchValueShared9 = tag
               } in
-              if MLF.Primitive.eqString matchValueShared9 "value"
+              if MLF.Primitive.eqString matchValueShared9 "managed-constraint"
+              then noEntityArg Modules.ManagedConstraint arg
+              else if MLF.Primitive.eqString matchValueShared9 "value"
               then noEntityArg Modules.Value arg
               else if MLF.Primitive.eqString matchValueShared9 "data"
                    then noEntityArg Modules.Datatype arg
@@ -519,6 +567,12 @@ module Bootstrap.Separate where {
                                                            then Right (Modules.Boolean False)
                                                            else Left "unknown interface entity role"
                                                  else Left "unknown interface entity role";
+            case role of {
+              Modules.ManagedConstraint ->
+                ensure (eqString owner "MLF.Primitive" && eqString name "HasCallStack")
+                  "invalid managed constraint identity";
+              _ -> Right Unit
+            };
             Right (Modules.Entity owner name role)
           };
         _ -> Left "malformed interface entity"
@@ -591,7 +645,7 @@ module Bootstrap.Separate where {
           (map (\(Pair n t) -> pairEncoding (Pair n (Pretty.prettyType (normalType t))))
              (unitBindings i))
     } in
-    Cons "MLFI-2"
+    Cons "MLFI-3"
       (Cons (unitName i)
          (Cons (pack (map pairEncoding (unitDependencies i)))
             (Cons (pack (map entityEncoding (unitExports i)))
@@ -614,7 +668,7 @@ module Bootstrap.Separate where {
       } in
       case matchValueShared11 of {
         Cons matchValueShared12 matchValueShared13 ->
-          if MLF.Primitive.eqString matchValueShared12 "MLFI-2"
+          if MLF.Primitive.eqString matchValueShared12 "MLFI-3"
           then case matchValueShared13 of {
                  Cons matchValueShared14 matchValueShared15 ->
                    case matchValueShared15 of {
@@ -719,30 +773,30 @@ module Bootstrap.Separate where {
                                                };
                                              _ ->
                                                Left
-                                                 "unsupported or malformed module interface (expected MLFI-2)"
+                                                 "unsupported or malformed module interface (expected MLFI-3)"
                                            };
                                          _ ->
                                            Left
-                                             "unsupported or malformed module interface (expected MLFI-2)"
+                                             "unsupported or malformed module interface (expected MLFI-3)"
                                        };
                                      _ ->
                                        Left
-                                         "unsupported or malformed module interface (expected MLFI-2)"
+                                         "unsupported or malformed module interface (expected MLFI-3)"
                                    };
                                  _ ->
                                    Left
-                                     "unsupported or malformed module interface (expected MLFI-2)"
+                                     "unsupported or malformed module interface (expected MLFI-3)"
                                };
-                             _ -> Left "unsupported or malformed module interface (expected MLFI-2)"
+                             _ -> Left "unsupported or malformed module interface (expected MLFI-3)"
                            };
-                         _ -> Left "unsupported or malformed module interface (expected MLFI-2)"
+                         _ -> Left "unsupported or malformed module interface (expected MLFI-3)"
                        };
-                     _ -> Left "unsupported or malformed module interface (expected MLFI-2)"
+                     _ -> Left "unsupported or malformed module interface (expected MLFI-3)"
                    };
-                 _ -> Left "unsupported or malformed module interface (expected MLFI-2)"
+                 _ -> Left "unsupported or malformed module interface (expected MLFI-3)"
                }
-          else Left "unsupported or malformed module interface (expected MLFI-2)";
-        _ -> Left "unsupported or malformed module interface (expected MLFI-2)"
+          else Left "unsupported or malformed module interface (expected MLFI-3)";
+        _ -> Left "unsupported or malformed module interface (expected MLFI-3)"
       }
     };
   validModuleName name =

@@ -132,7 +132,11 @@ module Bootstrap.Types where {
     PUserError |
     PIOError |
     PCatchIOError |
-    PIOErrorString;
+    PIOErrorString |
+    PEmptyCallStack |
+    PPushCallStack |
+    PPrettyCallStack |
+    PIOErrorWithStack;
   data SType =
     STVar String |
     SBottom |
@@ -143,6 +147,7 @@ module Bootstrap.Types where {
     SForall Flag String SType SType |
     SQualified (List SPredicate) SType;
   data SAnnotation = SAnnotation (List String) SType;
+  data SourceSpan = SourceSpan String String String Int Int Int Int;
   data SExpr =
     SVar String |
     SConstructor String |
@@ -160,7 +165,9 @@ module Bootstrap.Types where {
     SEquations (List (Pair (List SPattern) SExpr)) |
     SLetRec (List (Triple String SAnnotation SExpr)) SExpr |
     SWanted String (List (Pair EvidenceRole String)) |
-    SChecked SType SExpr;
+    SChecked SType SExpr |
+    SCallSite String SourceSpan SExpr |
+    SSharedBind SPattern SExpr SExpr SExpr SExpr;
   data SPattern =
     SConstructorPattern String (List (Maybe String)) |
     SDefaultPattern (Maybe String) |
@@ -169,7 +176,9 @@ module Bootstrap.Types where {
     SIntPattern Int |
     SStringPattern String |
     SOverloadedStringPattern String String String |
-    SBoolPattern Bool;
+    SBoolPattern Bool |
+    SAsPattern String SPattern |
+    SLazyPattern SPattern;
   data SAlternative = SAlternative SPattern SExpr;
   data SStatement =
     SDoBind SPattern SExpr |

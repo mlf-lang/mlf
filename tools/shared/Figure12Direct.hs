@@ -38,11 +38,21 @@ pairs = map pair . list . J.values where
     [a,b] -> (text a,text b)
     _ -> error "fixture pair arity"
 
+-- Only trusted, unlexable compiler-generated syntax hooks are constants.
+-- Ordinary source variables with the same basenames remain paper assumptions.
+referenceFreeNames :: H.String -> Set.Set String
+referenceFreeNames x =
+  if H.unpack x `elem`
+       ["$MLF.Primitive.fromString", "$MLF.Primitive.>>=", "$MLF.Primitive.>>",
+        "$MLF.Primitive.fail", "$MLF.Primitive.=="]
+  then Set.empty else Set.singleton (H.unpack x)
+
 -- Same structural free-name contract as Tests.Figure12.freeNames, including
 -- sorted set order, constructors excluded and right-biased signature bindings.
 freeNames :: T.SExpr -> Set.Set String
 freeNames expression = case expression of
-  T.SVar x -> Set.singleton (H.unpack x)
+  T.SCallSite _ _ body -> freeNames body
+  T.SVar x -> referenceFreeNames x
   T.SConstructor _ -> Set.empty
   T.SLam x _ b -> Set.delete (H.unpack x) (freeNames b)
   T.SApp a b -> Set.union (freeNames a) (freeNames b)
@@ -56,12 +66,16 @@ freeNames expression = case expression of
   T.SWanted _ candidates -> Set.fromList [H.unpack n | T.Pair _ n <- list candidates]
   T.SChecked _ a -> freeNames a
   T.SEquations equations -> Set.unions
-    [freeNames body Set.\\ Set.unions (map bound (list ps)) | T.Pair ps body <- list equations]
+    [(freeNames body Set.\\ Set.unions (map bound (list ps))) `Set.union`
+       Set.unions (map references (list ps)) | T.Pair ps body <- list equations]
   T.SDo _ _ -> freeNames (Desugar.desugarDo expression)
+  T.SSharedBind pattern action continuation binding failure -> Set.unions
+    [freeNames action, freeNames continuation Set.\\ bound pattern,
+     freeNames binding, freeNames failure, references pattern]
   T.SLetRec ds b -> Set.unions (freeNames b:[freeNames a | T.Triple _ _ a <- list ds])
     Set.\\ Set.fromList [H.unpack n | T.Triple n _ _ <- list ds]
   T.SCase a bs -> Set.union (freeNames a) (Set.unions
-    [freeNames b Set.\\ bound p | T.SAlternative p b <- list bs])
+    [(freeNames b Set.\\ bound p) `Set.union` references p | T.SAlternative p b <- list bs])
   where
     bound (T.SConstructorPattern _ ns) = Set.fromList [H.unpack n | T.Just n <- list ns]
     bound (T.SDefaultPattern n) = case n of T.Just x -> Set.singleton (H.unpack x); T.Nothing -> Set.empty
@@ -70,6 +84,15 @@ freeNames expression = case expression of
     bound (T.SIntPattern _) = Set.empty
     bound (T.SStringPattern _) = Set.empty
     bound (T.SBoolPattern _) = Set.empty
+    bound (T.SOverloadedStringPattern _ _ _) = Set.empty
+    bound (T.SAsPattern n p) = Set.insert (H.unpack n) (bound p)
+    bound (T.SLazyPattern p) = bound p
+    references (T.SOverloadedStringPattern _ equality conversion) =
+      Set.union (referenceFreeNames equality) (referenceFreeNames conversion)
+    references (T.SNestedPattern _ ps) = Set.unions (map references (list ps))
+    references (T.SAsPattern _ p) = references p
+    references (T.SLazyPattern p) = references p
+    references _ = Set.empty
 
 assumptions fixture c = do
   e <- right (Parser.parseExpr (H.literal (str "id" c)) (H.literal (str "expression" c)))

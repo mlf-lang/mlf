@@ -71,15 +71,26 @@ module Bootstrap.Data where {
       sourceBuiltinDeclarations;
   primitiveKinds :: Map String Kind;
   primitiveKinds =
-    M.union compareString scalarPrimitiveKinds
+    M.union compareString (M.fromList compareString
+      (Cons (Pair "MLFCallStack" Star) (Cons (Pair "MLFStackFrame" Star)
+        (Cons (Pair "MLFStackEvidence" Star) Nil))))
+    (M.union compareString scalarPrimitiveKinds
       (M.fromList compareString
          (Cons (Pair "IOError" Star) (Cons (Pair "Char" Star)
             (map (\d -> Pair (datatypeName d)
                            (foldr (\_ k -> KArrow Star k) Star (datatypeParameters d)))
-               sourceBuiltinDeclarations))));
+               sourceBuiltinDeclarations)))));
   unitDeclaration = DataDecl "Unit" Nil (Cons (ConstructorDecl "Unit" Nil) Nil);
+  stackFrameDeclaration :: DataDecl;
+  stackFrameDeclaration = DataDecl "MLFStackFrame" Nil
+    (Cons (ConstructorDecl "MLFStackFrame"
+      (append (replicate 4 (Applied "String" Nil)) (replicate 4 (Applied "Int" Nil)))) Nil);
+  stackEvidenceDeclaration :: DataDecl;
+  stackEvidenceDeclaration = DataDecl "MLFStackEvidence" Nil
+    (Cons (ConstructorDecl "MLFStackEvidence" (Cons (Applied "MLFCallStack" Nil) Nil)) Nil);
   builtinDeclarations :: List DataDecl;
-  builtinDeclarations = Cons unitDeclaration sourceBuiltinDeclarations;
+  builtinDeclarations = Cons unitDeclaration
+    (append sourceBuiltinDeclarations (Cons stackFrameDeclaration (Cons stackEvidenceDeclaration Nil)));
   builtinDatatypes :: Map String DataDecl;
   builtinDatatypes =
     M.fromList compareString (map (\d -> Pair (datatypeName d) d) builtinDeclarations);

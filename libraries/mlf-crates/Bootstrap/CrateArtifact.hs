@@ -64,6 +64,11 @@ module Bootstrap.CrateArtifact where {
   objectFragments (CrateObject _ fs) = fs;
   objectFragments (LegacyCrateObject _ fs) = fs;
   definitionName identity entity =
+    case Separate.managedBuiltinName entity of {
+      Just name -> name;
+      Nothing -> ordinaryDefinitionName identity entity
+    };
+  ordinaryDefinitionName identity entity =
     if (eqString (Modules.owner entity) "Prelude" || Modules.isRole Modules.BuiltinType entity)
     then Separate.stableName entity
     else ((if ((Modules.compareSpace (Modules.space entity) Modules.Types == 0) ||
@@ -149,7 +154,7 @@ module Bootstrap.CrateArtifact where {
     } in
     let {
       fields =
-        Cons "MLF-CRATE-SEMANTICS-2"
+        Cons "MLF-CRATE-SEMANTICS-3"
           (Cons (crateId iface)
              (Cons (encodeExports (crateExports iface))
                 (Cons (encodeImports (crateImports iface))
@@ -162,7 +167,7 @@ module Bootstrap.CrateArtifact where {
     } in
     Separate.fingerprint (Separate.pack fields);
   interfaceFields iface =
-    Cons "MLFCI-2"
+    Cons "MLFCI-3"
       (Cons (crateId iface)
          (Cons (Separate.pack (map encodeDependency (sortDependencies (crateDependencies iface))))
             (Cons (Separate.pack (sortStrings (crateModules iface)))
@@ -258,7 +263,8 @@ module Bootstrap.CrateArtifact where {
     ensure (length names == Set.size (Set.fromList compareString names))
       ("duplicate crate " ++ label);
   isPrimitiveEntity entity =
-    any (\e -> (Modules.compareEntity e entity == 0)) Modules.primitiveEntities;
+    any (\e -> (Modules.compareEntity e entity == 0))
+      (append Modules.primitiveEntities Modules.sharedPrimitiveEntities);
   data ExportInventory =
     ExportInventory (Set String) (Set String) (Set String) (Set String) (Set String);
   exportInventory iface =
@@ -346,7 +352,7 @@ module Bootstrap.CrateArtifact where {
       } in
       case matchValueShared4 of {
         Cons matchValueShared5 matchValueShared6 ->
-          if MLF.Primitive.eqString matchValueShared5 "MLFCI-2"
+          if MLF.Primitive.eqString matchValueShared5 "MLFCI-3"
           then case matchValueShared6 of {
                  Cons matchValueShared7 matchValueShared8 ->
                    case matchValueShared8 of {
@@ -500,49 +506,49 @@ module Bootstrap.CrateArtifact where {
                                                                    };
                                                                  _ ->
                                                                    Left
-                                                                     "unsupported or malformed crate metadata (expected MLFCI-2)"
+                                                                     "unsupported or malformed crate metadata (expected MLFCI-3)"
                                                                };
                                                              _ ->
                                                                Left
-                                                                 "unsupported or malformed crate metadata (expected MLFCI-2)"
+                                                                 "unsupported or malformed crate metadata (expected MLFCI-3)"
                                                            };
                                                          _ ->
                                                            Left
-                                                             "unsupported or malformed crate metadata (expected MLFCI-2)"
+                                                             "unsupported or malformed crate metadata (expected MLFCI-3)"
                                                        };
                                                      _ ->
                                                        Left
-                                                         "unsupported or malformed crate metadata (expected MLFCI-2)"
+                                                         "unsupported or malformed crate metadata (expected MLFCI-3)"
                                                    };
                                                  _ ->
                                                    Left
-                                                     "unsupported or malformed crate metadata (expected MLFCI-2)"
+                                                     "unsupported or malformed crate metadata (expected MLFCI-3)"
                                                };
                                              _ ->
                                                Left
-                                                 "unsupported or malformed crate metadata (expected MLFCI-2)"
+                                                 "unsupported or malformed crate metadata (expected MLFCI-3)"
                                            };
                                          _ ->
                                            Left
-                                             "unsupported or malformed crate metadata (expected MLFCI-2)"
+                                             "unsupported or malformed crate metadata (expected MLFCI-3)"
                                        };
                                      _ ->
                                        Left
-                                         "unsupported or malformed crate metadata (expected MLFCI-2)"
+                                         "unsupported or malformed crate metadata (expected MLFCI-3)"
                                    };
                                  _ ->
-                                   Left "unsupported or malformed crate metadata (expected MLFCI-2)"
+                                   Left "unsupported or malformed crate metadata (expected MLFCI-3)"
                                };
-                             _ -> Left "unsupported or malformed crate metadata (expected MLFCI-2)"
+                             _ -> Left "unsupported or malformed crate metadata (expected MLFCI-3)"
                            };
-                         _ -> Left "unsupported or malformed crate metadata (expected MLFCI-2)"
+                         _ -> Left "unsupported or malformed crate metadata (expected MLFCI-3)"
                        };
-                     _ -> Left "unsupported or malformed crate metadata (expected MLFCI-2)"
+                     _ -> Left "unsupported or malformed crate metadata (expected MLFCI-3)"
                    };
-                 _ -> Left "unsupported or malformed crate metadata (expected MLFCI-2)"
+                 _ -> Left "unsupported or malformed crate metadata (expected MLFCI-3)"
                }
-          else Left "unsupported or malformed crate metadata (expected MLFCI-2)";
-        _ -> Left "unsupported or malformed crate metadata (expected MLFCI-2)"
+          else Left "unsupported or malformed crate metadata (expected MLFCI-3)";
+        _ -> Left "unsupported or malformed crate metadata (expected MLFCI-3)"
       }
     };
   interfacePrefix :: List String -> List String;
@@ -684,7 +690,7 @@ module Bootstrap.CrateArtifact where {
   builtinPrelude =
     do {
       let {
-        identity = "mlf:builtin-shared-haskell-v1:5"
+        identity = "mlf:builtin-shared-haskell-v1:6"
       };
       resolution <-
         Modules.resolveCrate NoImplicitPrelude M.empty (definitionName identity)

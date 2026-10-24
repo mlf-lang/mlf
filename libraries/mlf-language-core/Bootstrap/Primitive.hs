@@ -112,7 +112,11 @@ module Bootstrap.Primitive where {
       PUserError -> 99;
       PIOError -> 100;
       PCatchIOError -> 101;
-      PIOErrorString -> 102
+      PIOErrorString -> 102;
+      PEmptyCallStack -> 103;
+      PPushCallStack -> 104;
+      PPrettyCallStack -> 105;
+      PIOErrorWithStack -> 106
     };
   primitiveName :: Primitive -> String;
   primitiveName p =
@@ -219,7 +223,11 @@ module Bootstrap.Primitive where {
       PUserError -> "userError";
       PIOError -> "ioError";
       PCatchIOError -> "catchIOError";
-      PIOErrorString -> "ioeGetErrorString"
+      PIOErrorString -> "ioeGetErrorString";
+      PEmptyCallStack -> "mlfEmptyCallStack";
+      PPushCallStack -> "mlfPushCallStack";
+      PPrettyCallStack -> "mlfPrettyCallStack";
+      PIOErrorWithStack -> "mlfIOErrorWithStack"
     };
   legacyPrimitives :: List Primitive;
   legacyPrimitives =
@@ -389,7 +397,7 @@ module Bootstrap.Primitive where {
                                                                                                                                                                                                                                                                                                 Nil))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))));
   allPrimitives :: List Primitive;
   allPrimitives = S.append legacyPrimitives
-    (Cons PTextToChars (Cons PTextFromChars (Cons PCharCode (Cons PCharFromCode (Cons PUserError (Cons PIOError (Cons PCatchIOError (Cons PIOErrorString (Nil)))))))));
+    (Cons PTextToChars (Cons PTextFromChars (Cons PCharCode (Cons PCharFromCode (Cons PUserError (Cons PIOError (Cons PCatchIOError (Cons PIOErrorString (Cons PEmptyCallStack (Cons PPushCallStack (Cons PPrettyCallStack (Cons PIOErrorWithStack Nil))))))))))));
   lookupTargetPrimitive :: String -> Maybe Primitive;
   lookupTargetPrimitive name = S.find (\p -> eqString (primitiveName p) name) allPrimitives;
   lookupPrimitive :: String -> Maybe Primitive;
@@ -708,7 +716,14 @@ module Bootstrap.Primitive where {
         (Function (Applied "IO" (Cons (Parameter "a") Nil))
           (Function (Function (Applied "IOError" Nil) (Applied "IO" (Cons (Parameter "a") Nil)))
             (Applied "IO" (Cons (Parameter "a") Nil))));
-      PIOErrorString -> Pair Nil (Function (Applied "IOError" Nil) charListField)
+      PIOErrorString -> Pair Nil (Function (Applied "IOError" Nil) charListField);
+      PEmptyCallStack -> Pair Nil (Applied "MLFCallStack" Nil);
+      PPushCallStack -> Pair Nil (Function (Applied "MLFStackFrame" Nil)
+        (Function (Applied "MLFCallStack" Nil) (Applied "MLFCallStack" Nil)));
+      PPrettyCallStack -> Pair Nil (Function (Applied "MLFCallStack" Nil) charListField);
+      PIOErrorWithStack -> Pair (Cons (Pair "a" Star) Nil)
+        (Function (Applied "IOError" Nil)
+          (Function (Applied "MLFCallStack" Nil) (Applied "IO" (Cons (Parameter "a") Nil))))
     };
   primitiveArity :: Primitive -> Int;
   -- Runtime application asks for arity on every partial and saturated call.
@@ -818,7 +833,11 @@ module Bootstrap.Primitive where {
       PUserError -> 1;
       PIOError -> 1;
       PCatchIOError -> 2;
-      PIOErrorString -> 1
+      PIOErrorString -> 1;
+      PEmptyCallStack -> 0;
+      PPushCallStack -> 2;
+      PPrettyCallStack -> 1;
+      PIOErrorWithStack -> 2
     };
   fieldArity :: Field -> Int;
   fieldArity field =
