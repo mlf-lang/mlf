@@ -59,13 +59,20 @@ target; its existing Core entry still runs the same sorted-list oracle and all
 276 distinct inputs. `test-framework` checks failure continuation, selection,
 inventory validation, JSON diagnostics and legacy adapters. The root `unit`
 group runs both the library and CLI contract checks in addition to the current
-739 Core checks. The separately reviewed duplicate consolidation below accounts
+742 Core checks. The separately reviewed duplicate consolidation below accounts
 for the reduction from the original 686 to 684 checks; the guards amendment adds
 55 checks and eight interpreter/LLVM runtime rows. These cover first-match
 selection, skipped guards and results, contextual `otherwise`, pattern scope,
 required fallbacks, existing conditional/layout compatibility, diagnostics, and
 independently checked target round trips. The inventory additions are transcribed
 from the authored assertions in `Tests.Guards`, without changing existing oracles.
+
+The ordinary-recursion amendment migrates four signature-required rejection
+identities to their reviewed acceptance controls and adds three graph/qualified
+module/crate leaves: 739 - 4 + 7 = 742. All 735 unaffected identities retain
+their family and order. The static migration guard compares this explicit delta
+with the registry, catalog and golden inventory; discovery is not a claim that
+all 742 actions have executed.
 
 The shared test library contains helper, transport, collection-wrapper and
 independent-checker modules, plus `Tests.Coverage`, `Tests.TestDrivers`,
@@ -98,7 +105,7 @@ projection. It then checks the disjoint family union and combines only validated
 completed-event bodies. Only the full `unit` campaign produces a full aggregate
 `core.coverage.jsonl` and `core.families.jsonl`; an explicit selection of all Core
 families remains partial. The aggregate is revalidated against the reviewed
-739-check golden inventory and binds all child receipts rather than claiming a
+742-check golden inventory and binds all child receipts rather than claiming a
 single Core binary. The optional legacy `core` executable preserves direct full
 execution, `--from`, family listing and family selection.
 
@@ -157,7 +164,7 @@ wrapper chooses 4 for port on hosts with at most 8 GiB RAM, while preserving the
 
 | Root group | MLF entry | Preserved coverage |
 | --- | --- | --- |
-| unit | CoreCratesMain, CoreSolverMain, CoreLanguageMain, CoreModulesMain, Figure12SuiteMain, HarnessMain, TestFrameworkMain, RegexMain | framework API/CLI contracts; 739 compiler checks; 6712 Algorithm W cases represented by 6703 executions; annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks; all 43 Figure 12 labels with 41 distinct executions and 36 controls; 67 benchmark/bootstrap/release/cache harness methods including two cache regressions; 56 regex actions |
+| unit | CoreCratesMain, CoreSolverMain, CoreLanguageMain, CoreModulesMain, Figure12SuiteMain, HarnessMain, TestFrameworkMain, RegexMain | framework API/CLI contracts; 742 compiler checks; 6712 Algorithm W cases represented by 6703 executions; annotations, crate resolution, SCC queries and codegen caching, POSIX/Windows crate paths and native cache commands, indexed optimizer and legacy differential checks; all 43 Figure 12 labels with 41 distinct executions and 36 controls; 67 benchmark/bootstrap/release/cache harness methods including two cache regressions; 56 regex actions |
 | packages | PackagesMain | 79 completed cases: 22 resolver checks; 29 compiler integration cases, including native PGO isolation, shared cache survival, corruption recovery and source invalidation; 28 checked-release cases covering source-free builds, relocation, shared dependencies, compatibility, pins, damaged artifacts, GitHub fetching, offline cache repair and packed asset validation; target dependency/instance selection; scheduler diamond and variant deduplication, jobs 1/2/4 equivalence, concurrent cache publication, failure recovery, empty graphs and target-name collisions; 22 native runner lifecycle and protocol checks |
 | backends | BackendSuiteMain | 531 fixtures and 583 execution rows on interpreter and LLVM, compact-GC layout |
 | port | PortMain, ReferencesMain | 25 LLVM fixtures with compact-GC, six reference programs, generated inference input equality |

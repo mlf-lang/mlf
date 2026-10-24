@@ -381,6 +381,33 @@ class CommandEvidence(unittest.TestCase):
         self.runner.run('success', [sys.executable, '-c', 'print("okay")'], expected=b'okay\n')
         self.assertEqual(self.receipt['commands'][0]['state'], 'passed')
 
+    def test_frontend_success_requires_all_maintained_banners(self):
+        expected = next(output for _, mode, output in direct.FRONTEND_CASES if mode == '--frontend')
+        actual = (b'shared frontend: qualified recursive inference checks passed\n'
+                  b'shared frontend: declaration provenance and declared forall field checks passed\n'
+                  b'shared frontend: recursive inference checks passed\n'
+                  b'shared frontend: parser and namespace checks passed\n')
+        self.assertEqual(expected, actual)
+        self.runner.run('frontend', [sys.executable, '-c',
+            'import sys; sys.stdout.buffer.write(' + repr(actual) + ')'], expected=expected)
+        self.assertEqual(self.receipt['commands'][-1]['state'], 'passed')
+
+    def test_frontend_rejects_partial_extra_reordered_or_failed_output(self):
+        expected = next(output for _, mode, output in direct.FRONTEND_CASES if mode == '--frontend')
+        lines = expected.splitlines(keepends=True)
+        cases = [('missing', lines[-1], b'', 0),
+                 ('extra', expected + b'unexpected success\n', b'', 0),
+                 ('reordered', b''.join([lines[1], lines[0], *lines[2:]]), b'', 0),
+                 ('stderr', expected, b'diagnostic\n', 0),
+                 ('failed', expected, b'', 1)]
+        for name, output, error, status in cases:
+            with self.subTest(name=name):
+                code = ('import sys; sys.stdout.buffer.write(' + repr(output) + '); '
+                        'sys.stderr.buffer.write(' + repr(error) + '); sys.exit(' + str(status) + ')')
+                with self.assertRaises(RuntimeError):
+                    self.runner.run(name, [sys.executable, '-c', code], expected=expected)
+                self.assertEqual(self.receipt['commands'][-1]['state'], 'failed')
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

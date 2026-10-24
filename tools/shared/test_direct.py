@@ -14,7 +14,13 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_CASES = [
-    ('frontend', '--frontend', b'shared frontend: parser and namespace checks passed\n'),
+    # --frontend runs the maintained recursive/evidence checks before its
+    # final parser success banner. Require every banner in order, not only the suffix.
+    ('frontend', '--frontend',
+     b'shared frontend: qualified recursive inference checks passed\n'
+     b'shared frontend: declaration provenance and declared forall field checks passed\n'
+     b'shared frontend: recursive inference checks passed\n'
+     b'shared frontend: parser and namespace checks passed\n'),
     ('native-first', '--native-first', b'shared frontend: first native semantics checks passed\n'),
     ('native-second', '--native-second', b'shared frontend: checks passed\n'),
 ]
