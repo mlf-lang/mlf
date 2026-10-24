@@ -6,6 +6,11 @@ import qualified Package.OS as O
 import qualified Test.Assert as A
 import qualified Test.Case as C
 import qualified Test.Runner as R
+import qualified Test.Outcome as T
+import qualified Test.Diagnostics as D
+import qualified Test.Resources as B
+import qualified Test.Evidence as E
+import qualified Test.Expectation as X
 
 -- Process support is deliberately separate from the light in-process library.
 data Config = Config Int String String String (List String) (List String)
@@ -148,16 +153,64 @@ incompleteChild total entry text = if stringLength (O.trim text) == 0 then true 
   Right (Cons start Nil) -> case validateStart total entry start of { Right Unit -> true; Left _ -> false }
   _ -> false
 outcome status message = J.Object (Cons (Pair "status" (J.str status)) (Cons (Pair "message" (J.str message)) Nil))
-classify : Int -> C.Case -> Either String J.Json -> String -> J.Json
-classify total entry measured text = case measured of
-  Left error -> outcome "protocol_error" error
+-- Typed interpretation of the same validated v1 observations. In particular,
+-- cancellation is not a crash and neither can satisfy an expected rejection.
+classifyTyped : Int -> C.Case -> Either String J.Json -> String -> T.Outcome
+classifyTyped total entry measured text = case measured of
+  Left error -> T.ProtocolError error
   Right measurement ->
     let code = readInt (case J.get "exit_code" measurement of { J.Number value -> value; _ -> "0" }) in
-    if J.getBool "timed_out" false measurement then outcome "timed_out" "test exceeded its process timeout" else
-    if J.getBool "interrupted" false measurement || (case J.get "termination_signal" measurement of { J.Number value -> readInt value > 0; _ -> false }) then outcome "crashed" "test process was interrupted or terminated by a signal" else
+    let signal = readInt (case J.get "termination_signal" measurement of { J.Number value -> value; _ -> "0" }) in
+    if J.getBool "timed_out" false measurement then T.Timeout "test exceeded its process timeout" else
+    if J.getBool "interrupted" false measurement then T.Cancelled "test process was interrupted" else
+    if signal > 0 then T.Crash signal "test process terminated by a signal" else
     case validateChildReport total entry code text of
-      Right result -> result
-      Left error -> if code /= 0 && incompleteChild total entry text then outcome "crashed" ("test exited " ++ showInt code ++ " before completing its report") else outcome "protocol_error" error
+      Right result -> if eqString (J.getText "status" "" result) "passed" then T.Pass else T.AssertionFailure (J.getText "message" "assertion failed" result)
+      Left error -> if code /= 0 && incompleteChild total entry text then T.Crash 0 ("test exited " ++ showInt code ++ " before completing its report") else T.ProtocolError error
+legacyOutcome result = case result of
+  T.Pass -> outcome "passed" ""
+  T.AssertionFailure message -> outcome "failed" message
+  T.Timeout message -> outcome "timed_out" message
+  T.Cancelled message -> outcome "crashed" message
+  T.Crash signal message -> outcome "crashed" message
+  T.ProtocolError message -> outcome "protocol_error" message
+  _ -> outcome "protocol_error" "unsupported process outcome"
+classify : Int -> C.Case -> Either String J.Json -> String -> J.Json
+classify total entry measured text =
+  let typed = classifyTyped total entry measured text in
+  let legacy = case measured of
+        Right measurement -> case typed of
+          T.Pass -> case validateChildReport total entry 0 text of { Right result -> result; Left error -> outcome "protocol_error" error }
+          T.AssertionFailure _ -> case validateChildReport total entry 1 text of { Right result -> result; Left error -> outcome "protocol_error" error }
+          _ -> legacyOutcome typed
+        Left _ -> legacyOutcome typed in
+  J.set "typed_outcome" (J.str (T.status typed)) legacy
+
+-- The legacy helper reaps its leader and kills the process group, but has no
+-- explicit cleanup/join event. Retain that distinction instead of inventing a
+-- successful cleanup receipt or a qualification claim from exit status alone.
+rawJson (D.Raw path digest kind) = J.Object (Cons (Pair "path" (J.str path)) (Cons (Pair "digest" (J.str digest)) (Cons (Pair "kind" (J.str kind)) Nil)))
+rawFile directory name = do
+  let path = directory ++ "/" ++ name
+  exists <- fileExists path
+  if exists then do { digest <- fileDigest path; return (Just (D.Raw path digest name)) } else return Nothing
+rawEvidence directory = do
+  files <- S.mapM (rawFile directory) (O.words "stdout stderr measurement.json measurement.stderr report.jsonl")
+  return (S.concatMap (\item -> case item of { Just value -> Cons value Nil; Nothing -> Nil }) files)
+
+-- A v1 observation can be indexed by the v2 envelope but cannot supply the
+-- missing input identities or cleanup proof. The caller supplies authenticated
+-- bindings; pending cleanup keeps this receipt ineligible for qualification.
+evidenceObservation result = X.Observation T.Runtime (case result of
+  T.Pass -> X.Exit 0
+  T.AssertionFailure _ -> X.Exit 1
+  T.Timeout _ -> X.Deadline
+  T.Cancelled _ -> X.Interrupted
+  T.Crash signal message -> if signal > 0 then X.Signal signal else X.BadProtocol message
+  T.ProtocolError message -> X.BadProtocol message
+  _ -> X.Infrastructure "unsupported v1 process outcome") (T.message result) (case result of { T.Pass -> true; _ -> false })
+pendingEvidence binding entry typed raw = E.Receipt 2 binding
+  (Cons (E.Started (C.id entry)) (Cons (E.Finished (C.id entry) (evidenceObservation typed)) Nil)) raw E.CleanupPending false
 
 -- Every invocation owns a fresh directory. Serialize only mktemp's shared
 -- stdout/stderr transport files, not test execution or independent invocations.
@@ -198,12 +251,15 @@ caseJson entry directory measured result =
     (J.set "stdout" (J.str (directory ++ "/stdout")) (J.set "stderr" (J.str (directory ++ "/stderr"))
     (J.set "measurement" (J.str (directory ++ "/measurement.json")) (J.set "child_report" (J.str (directory ++ "/report.jsonl")) value)))))
 status value = J.getText "status" "protocol_error" value
+summaryComplete total entries results = total >= S.length entries && (case R.validate entries of
+  Left _ -> false
+  Right Unit -> case E.exactInventory (S.map C.id entries) (S.map (\row -> J.getText "id" "" row) results) of { Right Unit -> true; Left _ -> false })
 summaryJson total entries results =
   let count expected = S.length (S.filter (\row -> eqString (status row) expected) results) in
   let passed = count "passed" in
   let wall = S.foldl (\sum row -> case J.get "wall_seconds" row of { J.Number value -> addDouble sum (readDouble value); _ -> sum }) 0.0 results in
   let allMeasured = S.all (\row -> case J.get "wall_seconds" row of { J.Number _ -> true; _ -> false }) results in
-  withSelection total (S.length entries) (J.set "complete" (J.Boolean true)
+  withSelection total (S.length entries) (J.set "complete" (J.Boolean (summaryComplete total entries results))
     (J.set "executed" (J.num (S.length results)) (J.set "ids" (J.stringArray (S.map C.id entries))
     (J.set "passed" (J.num passed) (J.set "failed" (J.num (count "failed"))
     (J.set "crashed" (J.num (count "crashed")) (J.set "timed_out" (J.num (count "timed_out"))
@@ -216,9 +272,16 @@ showRow machine row = if machine then putStrLn (J.render row) else
   else if eqString (J.getText "event" "" row) "summary" then putStrLn (J.render (J.get "executed" row) ++ " supervised; " ++ J.render (J.get "unsuccessful" row) ++ " unsuccessful")
   else return Unit
 supervise : Config -> String -> String -> String -> R.Options -> Int -> List C.Case -> Int -> IO (List J.Json)
-supervise config helper cwd directory options total entries index = case entries of
+supervise config helper cwd directory options total entries index = case B.create B.serial of
+  Left error -> do { O.require false error; return Nil }
+  Right budget -> superviseBudget budget config helper cwd directory options total entries index
+superviseBudget budget config helper cwd directory options total entries index = case entries of
   Nil -> return Nil
   Cons entry rest -> do
+    let acquired = B.acquire (C.id entry) B.serial budget
+    granted <- case acquired of
+      Right (Just value) -> return value
+      _ -> do { O.require false "process lease unavailable"; return budget }
     let artifacts = directory ++ "/case-" ++ showInt index
     O.mkdir artifacts
     let report = artifacts ++ "/report.jsonl"
@@ -227,9 +290,16 @@ supervise config helper cwd directory options total entries index = case entries
     let argv = S.append (command config) (Cons "--exact" (Cons (C.id entry) (Cons "--format" (Cons "json" (Cons "--report" (Cons report Nil))))))
     measured <- measure helper (timeout config) cwd artifacts argv
     text <- O.readOptional report
-    let row = caseJson entry artifacts measured (classify total entry measured text)
+    raw <- rawEvidence artifacts
+    let row = J.set "raw_evidence" (J.Array (S.map rawJson raw))
+          (J.set "cleanup_status" (J.str "unverified-v1-transport")
+          (J.set "qualification_eligible" (J.Boolean false)
+          (caseJson entry artifacts measured (classify total entry measured text))))
     showRow (R.json options) row
-    remaining <- supervise config helper cwd directory options total rest (index + 1)
+    released <- case B.release (C.id entry) granted of
+      Right value -> return value
+      Left error -> do { O.require false error; return granted }
+    remaining <- superviseBudget released config helper cwd directory options total rest (index + 1)
     return (Cons row remaining)
 discovery helper config cwd directory = do
   let artifacts = directory ++ "/inventory"
@@ -275,7 +345,7 @@ runConfig config = do
         let summary = summaryJson total entries results
         O.writeAtomic destination (renderRows (Cons start (S.snoc results summary)))
         showRow (R.json options) summary
-        return (if S.all (\row -> eqString (status row) "passed") results then 0 else 1)
+        return (if summaryComplete total entries results && S.all (\row -> eqString (status row) "passed") results then 0 else 1)
   releaseFileLock lock
   return code
 run : List String -> IO Int

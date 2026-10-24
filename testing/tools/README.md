@@ -53,3 +53,43 @@ The pure `parse`, `parseInventory`, `parseMeasurement`, `validateChildReport`,
 contract and mutation tests. Inventory descriptors and child reports are checked
 before their fields are used. No compiler oracle or compiler-specific test
 coverage policy lives in this package.
+
+## Typed lifecycle integration
+
+The v1 wire statuses and CLI remain compatible. `typed_outcome` additionally
+separates cancellation from crashes. Case rows index retained raw bytes with
+file digests. The existing measurement helper does not attest descendant join
+or cleanup success, so these rows explicitly say
+`cleanup_status: unverified-v1-transport` and `qualification_eligible: false`.
+`pendingEvidence` can index a classified v1 observation in a v2 receipt with
+caller-supplied input identities, but deliberately cannot seal that receipt.
+No source/tool identities or cleanup successes are synthesized from exit 0.
+
+`Test.NativeProcess` is the native lifecycle adapter over `Async.Process`.
+It accepts an injected shared scope, requires positive running and total
+bounds, awaits the child through terminal cleanup, preserves the native raw
+outcome and cleanup error separately, and delegates ordinary exit acceptance
+to a phase-specific expectation and independent verifier. `withSerial` is a
+top-level convenience with one job; nested callers reuse that scope. The native
+scope implementation retains cancel/join, owner-death, and shutdown guarantees.
+It does not replace the POSIX timing transport or pretend to add its telemetry.
+
+The generic `Test.Adapter`, `Fixture`, `Capability`, `Resources`, `Plan` and
+`Diagnostics` modules are pure, compiler-independent protocol boundaries.
+They reject lifecycle reordering, missing join evidence, duplicate leases,
+unknown capability probes, invalid/duplicate DAG ownership, compile-only
+execution and incomplete raw-evidence references. Resource waiting is distinct
+from execution, and admission budgets do not claim OS memory enforcement.
+
+`test-lifecycle` provides twenty-two focused lifecycle fault controls, available
+as the package's `lifecycle` test target. These sources require compilation and
+execution before they count as validation; adding them is not a passing result.
+
+The current Async.Process ABI folds POSIX signals into exit status. The native
+adapter therefore refuses negative or >=128 exit values, including Windows
+large-status values, as ambiguous protocol observations instead of allowing a
+negative test to pass on a killed process. Expected-signal tests require a
+transport with independent termination evidence; this adapter does not claim
+to support them. This is conservative and may reject genuine high exit codes.
+Process summaries now require the exact selected/result ID multiset before
+claiming completion, and exit success uses the same inventory check.

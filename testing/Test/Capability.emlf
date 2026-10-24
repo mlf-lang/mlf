@@ -1,0 +1,23 @@
+module Test.Capability where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Test.Outcome as O
+
+-- Missing optional capabilities are auditable skips, never successful cases.
+data Policy = Required | Optional
+data Requirement = Requirement String Policy
+data Availability = Available String | Missing String String
+name (Requirement value _) = value
+availabilityName value = case value of { Available key -> key; Missing key _ -> key }
+validate available =
+ let names = S.map availabilityName available in
+ if S.any (\key -> stringLength key == 0) names then Left "empty capability name" else
+ if S.length names /= S.length (S.nubBy eqString names) then Left "duplicate capability" else
+ if S.any (\item -> case item of { Missing _ reason -> stringLength reason == 0; _ -> false }) available then Left "missing capability requires a reason" else Right Unit
+check (Requirement key policy) available = do
+ validate available
+ if stringLength key == 0 then Left "empty capability requirement" else
+ case S.filter (\item -> eqString key (availabilityName item)) available of
+  Cons (Available _) Nil -> Right O.Pass
+  Cons (Missing _ reason) Nil -> Right (case policy of { Required -> O.Unsupported (key ++ ": " ++ reason); Optional -> O.Skipped (key ++ ": " ++ reason) })
+  _ -> Left ("capability was not probed: " ++ key)

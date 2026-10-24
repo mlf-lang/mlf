@@ -1,0 +1,33 @@
+{
+  "kind": "reviewed-one-time-framework-source-migration",
+  "input_revision": "4d732f31982ebe18124511f2ca4cb412770d6bd6",
+  "closed_preimage_module_count": 51,
+  "new_shared_modules": 9,
+  "replaced_entries": 1,
+  "post_ast_changes": [
+    "Append ignored SourceModule syntax metadata wildcard in two test helpers",
+    "Explicitly hide imported Bootstrap.Types.Phase in Test.Outcome to preserve its original local binding under ordinary Haskell",
+    "Seven explicit original String/Int literal-domain signatures; preserve polymorphic helpers and reject unresolved host IsString schemes"
+  ],
+  "checks": {
+    "AST_printer_roundtrip": true,
+    "string_token_bytes_retained": true,
+    "independent_51_module_rerun_byte_equal": true,
+    "legacy_equals_prior_shared_body_except_module_name": true
+  },
+  "runtime_qualification": false,
+  "tool_sha256": {
+    "tools/shared-migration/Hierarchy.hs": "e0e5542af2945de57f0ff9bdf1f89f82bce98317df576fe17318a1fc862f7373",
+    "tools/shared-migration/Main.hs": "b4ff70c5bb185f85cb53a4ee37f3d952beb9f418c1e47ede818a562ee3d667fb",
+    "tools/shared-migration/Migrate.hs": "0d3c13cbd0d9388e5aa3dc468a8034cbc07c5205e70ea7dbc26d2ca9740798f2",
+    "tools/shared-migration/Audit.hs": "9ee950a31c9e21f0544ccc7ee5c2313f9ed9f1bfed5eb9b186901d8cd321394b",
+    "tools/shared-migration/Adjust.hs": "0b2fdba6c2f11c398d022bcd3456f50b6290030b2e32bb579c08214657defa46",
+    "tools/shared-migration/LiteralSignatures.hs": "b7b7959a1d5245ae8f3dd7f08fa51cbf49d12a73765a4bdaa1cbaa372184bf3f",
+    "tools/shared-migration/tests/Runner.hs": "28d327de9e79db63d72302c798f11d5ea6d3bd90e1fc02dc9ff2fab26c834af2",
+    "tools/shared-migration/tests/support/MLF/Primitive.hs": "9ec33452b130612c22d4692a088fccecd1144c02ac54aebc520a60c2e824317f",
+    "tools/shared-migration/MLF/Host/Parser.hs": "8021e095e07d929dcfc67ddc86b1b743592e11688d27433296c9e6443f8d8ff6",
+    "tools/shared-migration/MLF/Host/Syntax.hs": "75b0286a7b3b502ed8e43390db1e1f434ff7d7ef04b962698c72bea955babd44",
+    "tools/shared-migration/MLF/Host/Lexer.hs": "954d7945571def6c776de9ac817969adbabedb4026b657976eddf4962680b737",
+    "tools/shared-migration/MLF/Host/Layout.hs": "d7c43137890ba17e89aa7a742d8106f6d638face1b2b52770d089c5b2812e8ef"
+  }
+}
