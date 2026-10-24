@@ -1,0 +1,5 @@
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import Tests.Typeclasses (typeclassTests)
+main = S.mapM_ (\(Pair label action) -> do { putStrLn label; action }) typeclassTests

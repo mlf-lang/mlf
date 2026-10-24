@@ -78,3 +78,9 @@ the discovery command, add `-i tests/recursive-inference`, and set
 `MLF_TEST_WORK` to an existing writable project-local absolute directory. It
 can be very slow because the compiler is interpreted while producing builtin
 crate artifacts. This driver does not invoke program execution/native tests.
+
+`TypeclassCompatibility.emlf` is the byte-identical maintained copy of the
+five-line harness used for the final 78-action class compatibility run. Run it
+with `emlf --run` and the shared source roots (excluding `host/ghc`) as above.
+It selects the existing `Tests.Typeclasses.typeclassTests` list unchanged; it
+adds no test IDs and does not invoke the native campaign.

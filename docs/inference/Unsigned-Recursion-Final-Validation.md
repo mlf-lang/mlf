@@ -36,14 +36,13 @@ the existing ordinary graph solver.
    An independent reviewer reran both final focused binaries successfully.
 4. Authenticated source smoke passes at both levels: two positive sources, two
    inference rejections and one malformed target per run.
-5. All **78 existing typeclass tests** pass through the host interpreter
-   (1147.82 seconds). This compatibility run used the incremental O2 executable
-   built from the same compiler implementation as the final audited build;
-   it is not presented as a final-receipt-authenticated executable run. Its
-   original receipt is incomplete/stale after an integration fix. A retained
-   byte-hash comparison verifies all 93 comparable non-`Main.o` object files
-   match the final O2 build, including `Bootstrap.Classes`; this supporting
-   comparison is not a replacement for a completed build receipt.
+5. All **78 existing typeclass tests** pass through the **final audited O2**
+   compiler/host interpreter (933.82 seconds, exit 0). The exact saved harness
+   was recompiled and executed with final receipt/executable identities and a
+   before/after source-hash guard; no recorded source changed. Its byte-identical
+   maintained copy is `tests/recursive-inference/TypeclassCompatibility.emlf`.
+   The earlier incremental O2 pass remains separate intermediate evidence, not
+   the basis for this final class-compatibility claim.
 6. Three maintained terminating programs execute with exact expected stdout at
    O0 and O2: factorial (`720`), mutual recursion (`42`), and generalized
    dictionary recursion (`42`). These use the host interpreter, not native code.
@@ -51,6 +50,16 @@ the existing ordinary graph solver.
    guard was deliberately updated from 103 to 105 and asserts both new module identities/paths. Frozen
    `IndependentCheck`, `IndependentType`, and `CompilerCore.finishCompilation`
    are byte-unchanged from the pinned base. `git diff --check` passes.
+
+8. A further independent finite audit checks 79 scratch programs at O0/O2:
+   76 accepted and three expected higher-rank boundary rejections, with matching
+   results. Eight representatives pass serialized production checks at both
+   levels. No separate frozen check was run on these extra samples. The audit
+   found no new in-scope false negative. Separate probes identified an inherited
+   polymorphic constructor-field revelation gap and a class-dependent signed-let
+   acceptance inconsistency. A fresh pinned-base build reproduces the latter;
+   neither issue is repaired by this recursive-inference patch. See
+   `Unsigned-Recursion-Coverage-Audit.md` for paired controls and limits.
 
 ## Module/crate and discovery verification
 
@@ -107,6 +116,10 @@ all 742 Core actions ran.
 - A retry driver's direct reference to a private test helper was replaced by
   selection of its exported named test action. This was a harness resolution
   error, not an inference acceptance failure.
+- The initial incremental O2 receipt was incomplete/stale after an integration
+  fix. All 93 comparable non-`Main.o` object files match final O2, but that is
+  supporting intermediate evidence, not a substitute for a complete receipt.
+  The final authenticated 78-test rerun above closes this provenance gap.
 - Earlier core-only validation, including the graph aggregate and crate-query
   recursion case, is preserved in `Unsigned-Recursion-Core-Validation.md`.
 
@@ -125,6 +138,10 @@ all 742 Core actions ran.
 - O2 smoke result SHA-256:
   `7157a165cafdc7b629701daa6fe23fa2deb1700700ad92d3fe0e67e77144ed25`.
 
+- Final 78-class compatibility evidence SHA-256:
+  `dbd4202b7f34713c5ef066c8eb7924d969587c1a39f5d49827940f43e5a53f71`.
+- Final O2 `emlf` executable SHA-256 (used for that run and the audit):
+  `f515b8e034cb5a479551d30d41f99093dc296e23a3ea42eb3ba58945138aa064`.
 - Separate saved-crate host evidence SHA-256:
   `0106f1941d02c751356c9305779d0541b2fa1ab5bddfbe3dac42afc0997cda44`.
 - Saved-crate host binary SHA-256:
@@ -138,6 +155,10 @@ The separate saved-crate evidence is
 `.mlf-build/qualified-host-crate-audited/result.json`. Its clean forced rebuild
 and six-case run completed in 54.34 seconds; only ordinary GHC host compilation
 was used, with existing host runtime objects.
+The final class run's separate evidence is
+`.mlf-build/qualified-typeclasses-final/result.json`; it executed against held
+source `afb67f5`. Later handoff changes are documentation and a byte-identical
+harness copy, not compiler changes.
 The official project-local GHC installation and its verified archive checksum
 are recorded with the core validation; no further software was installed.
 
@@ -147,6 +168,14 @@ are recorded with the core validation; no further software was installed.
   inference. Required higher-rank/rigid annotations and signed polymorphic
   recursion remain supported; incompatible shared recursive uses still reject.
 - It does not claim arbitrary cyclic-data inference or program termination.
+- Known source-inference gaps remain outside this patch: polymorphic pattern
+  fields can require redundant local revelation despite a valid manually checked
+  target; an explicitly signed ordinary higher-rank let can be rejected without
+  classes yet accepted after adding an unused class. The latter was dynamically
+  reproduced on pristine PR #22. Inherited does not mean correct; both are
+  documented separately rather than hidden behind the successful SCC tests.
+- Cyclic separately compiled crate dependencies remain unsupported; successful
+  cross-module recursion here is within one crate's inference/build unit.
 - Qualified contexts retain distinct origin slots even when later types happen
   to match. No minimal-context, global context-minimization or principal-
   completeness theorem is claimed. The finite planner can have worst-case
