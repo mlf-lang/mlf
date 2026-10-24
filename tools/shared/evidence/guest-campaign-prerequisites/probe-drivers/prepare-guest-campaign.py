@@ -1,0 +1,16 @@
+import pathlib,json,hashlib,sys,re
+root=pathlib.Path.cwd();name=sys.argv[1];assert name in ['test-tools','tests-library','test-framework'];manifest=root/('testing/tools/mlf-package.json' if name=='test-tools' else 'tests/mlf-package.json');m=json.loads(manifest.read_text());istarget=name=='test-framework';t=m['executables'][name] if istarget else m['library'];modules=[(n,str((manifest.parent/p).resolve())) for n,p in sorted(t.get('modules',{}).items())];entry=''
+if istarget:
+ source=manifest.parent/t['main'];found=re.findall(r'^module\s+([A-Z][A-Za-z0-9_.]*)\s+where',source.read_text(),re.M);assert len(found)==1;entry=found[0];assert entry not in [n for n,_ in modules];modules.append((entry,str(source.resolve())));modules.sort()
+known={'mlf-foundation':'recovery-foundation-crate-O2-metadata-fix','mlf-language-core':'recovery-language-core-crate-O2','mlf-frontend':'recovery-frontend-crate-O2'}
+for x in ['xmlf','inference','async','interpreter','llvm','crates','package-core','developer-tools','test']:known['mlf-'+x]='integration-modular/'+x
+known['mlf-test-tools']='integration-modular/test-tools';known[m['name']]='integration-modular/tests-library'
+names=sorted(t.get('dependencies',m['dependencies']) if istarget else m['dependencies']);deps=[]
+for n in names:
+ path=known[n];proof=root/'.mlf-build'/(path if path.startswith('integration-modular/') else 'integration-modular/'+path)/'result.json';assert json.loads(proof.read_text())['complete'];deps.append(str(root/'.mlf-build'/path/'artifact/unit.mlfci'))
+if istarget:
+ assert json.loads((root/'.mlf-build/integration-modular/tests-library/result.json').read_text())['complete']
+ deps=list(dict.fromkeys(deps+[str(root/'.mlf-build/integration-modular/tests-library/artifact/unit.mlfci')]))
+assert not t.get('no-prelude',False);out=root/'.mlf-build/integration-modular'/name;out.mkdir(exist_ok=True);pack=lambda xs:''.join(str(len(x))+':'+x for x in xs);fields=['MLF-CRATE-1',m['name']+'/'+m['version']+('/target-'+name if istarget else '/library'),entry,'false',pack([pack(pair) for pair in modules]),pack(deps),str(out/'queries'),str(root/'.mlf-build/recovery-foundation-crate-O2-metadata-fix/builtin/unit')]
+(out/'queries').mkdir(exist_ok=True);(out/'artifact').mkdir(exist_ok=True);(out/'crate.spec').write_text(pack(fields));(out/'spec-fields.json').write_text(json.dumps(fields,indent=2)+'\n');cmd=[str(root/'.mlf-build/recovery-ghc-O2/bin/emlf'),'--compile-crate',str(out/'crate.spec'),'-o',str(out/'artifact/unit')];(out/'command.json').write_text(json.dumps(cmd,indent=2)+'\n');(out/'run.py').write_text('import subprocess,json\nfrom pathlib import Path\nsubprocess.run(json.loads((Path(__file__).parent/"command.json").read_text()),check=True)\n')
+paths=[manifest,*[pathlib.Path(p) for _,p in modules],*[pathlib.Path(p) for p in deps],*[pathlib.Path(p).with_suffix('.mlfco') for p in deps],root/'.mlf-build/recovery-ghc-O2/receipt.json',out/'crate.spec'];hashes={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths};(out/'inputs.before.json').write_text(json.dumps(hashes,indent=2)+'\n');print(json.dumps({'modules':len(modules),'entry':entry,'dependencies':names,'spec_sha256':hashes[str(out/'crate.spec')]}))

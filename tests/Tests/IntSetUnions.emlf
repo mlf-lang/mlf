@@ -1,4 +1,7 @@
 module Tests.IntSetUnions where
+-- Select the standard Monad used by shared Test.Assert.Test; retain guest syntax.
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
 import qualified Tests.Helpers as H
 import qualified Bootstrap.Std as L

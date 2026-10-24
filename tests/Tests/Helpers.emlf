@@ -230,7 +230,7 @@ minimum xs = S.foldl (\a b -> if compare a b > 0 then b else a) (S.head xs) (S.t
 traverseIntMap : forall a b. (Int -> a -> Either String b) -> IntMap a -> Either String (IntMap b)
 traverseIntMap f m = traverseIntEntries f (IM.toList m)
 traverseIntEntries : forall a b. (Int -> a -> Either String b) -> List (Pair Int a) -> Either String (IntMap b)
-traverseIntEntries f entries = fmap IM.fromList (S.mapM (\(Pair k v) -> fmap (Pair k) (f k v)) entries)
+traverseIntEntries f entries = S.mapEither IM.fromList (S.mapM (\(Pair k v) -> S.mapEither (Pair k) (f k v)) entries)
 
 subtract x y = y - x
 even x = remInt x 2 == 0

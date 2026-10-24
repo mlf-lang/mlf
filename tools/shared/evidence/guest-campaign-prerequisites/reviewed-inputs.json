@@ -1,0 +1,15 @@
+{
+  "base": "68220836a1b63005db8fb658eec89fce5bc6c294",
+  "source_sha256": {
+    "testing/tools/Test/Process.emlf": "352c3a23e12c1ce2c7116d1348cd6e01c048c45a2a3c10c187038c03a707026c",
+    "tests/Tests/Bytes.emlf": "c4b868dc12b2c2b39dc3c1a75aabce1e4b4c2f72cabb1ea411aeadca15225ae4",
+    "tests/Tests/Helpers.emlf": "b76ea12253a18916a3c76105f8d89ec7acdcadd50bd1bc3a91faf98ada94455a",
+    "tests/Tests/IntSetUnions.emlf": "df5d987a77addeb0c013a2e8c823b9371402dd3d0d46eec5fea6622e1b6a657c",
+    "tests/Tests/TestFramework.emlf": "ad5e48f89111757e087b25f4982f746cc3e185ce75c5342662646ae7562faa0e",
+    "tools/shared/figure12_data.py": "88930c481a151fa9e30580a08b4d98133b14d5e8dbd1fa9d8bde462ed5d95178",
+    "tools/shared/test_figure12_data.py": "d4c5f50bd71a204313441b149faa83d1f920c7969ebe7326a6b06a7fb6a91ef7"
+  },
+  "compiler_implementation_changed": false,
+  "full_guest_execution": false,
+  "native_llvm_bootstrap": false
+}

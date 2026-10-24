@@ -53,3 +53,19 @@ the released-native-seed frozen bridge and compiler-plus-manager native fixed
 point remain distinct pending gates. The official Linux seed bundle was restored
 and verified, but its seed-only receipt deliberately remains incomplete for
 bootstrap. No native bootstrap stage was run as part of these checks.
+
+## Additional guest campaign prerequisites
+
+A later, separately scoped [prerequisite check](../../tools/shared/evidence/guest-campaign-prerequisites/README.md)
+passed actual MLF source checking for test-tools (2 modules), the tests library
+(14), and the test-framework target including its entry (9): 552 fresh groups,
+none reused. This is not execution of those campaigns and does not cover all
+212 source hashes in the larger tests-manifest graph.
+
+The minimal guest repairs select the canonical Monad for shared Either/Test,
+rename a legacy reserved-word local, supply a recursive helper signature, and
+specialize two Either mappings without changing the public legacy `H.fmap` API.
+The latter helper change received independent oracle-equivalence review before
+the Figure12 semantic digest was deliberately updated. Old-pin rejection,
+mutation controls, and fresh O0/O2 faithful Figure12 passes are retained. Shared
+compiler producer inputs and the frozen bridge archive are unchanged.
