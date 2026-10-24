@@ -115,6 +115,8 @@ class Figure12Data(unittest.TestCase):
             ('Figure12.emlf', '(expression c) ss', '(expression c) Nil'),
             ('Helpers.emlf', 'instance Ord String where { compare = compareString }',
              'instance Ord String where { compare = compareInt }'),
+            ('Helpers.emlf', 'S.mapEither IM.fromList', 'fmap IM.fromList'),
+            ('Helpers.emlf', 'S.mapEither (Pair k) (f k v)', 'fmap (Pair k) (f k v)'),
             ('Map.emlf', 'fromList xs = M.fromList H.compare xs', 'fromList xs = M.empty'),
             ('Set.emlf', 'toAscList = S.toList', 'toAscList = S.empty'),
         ]

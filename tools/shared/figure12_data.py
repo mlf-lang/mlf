@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[2]
 REVIEWED_SEMANTIC_SHA256 = {
     'tests/Tests/Figure12.emlf': '457ee5cfbb36eee2a3670efb582d56057f3ef906b97355502e85c9f84cfaeeea',
     'tests/Tests/Figure12Suite.emlf': '8f91eaecf14a0e72bdf9eee9b6915cc93c54abc03264f7712f3d9efaa1147bdc',
-    'tests/Tests/Helpers.emlf': 'e469496b071069d027e8779d36b75f3bc9bf41db6fbbbbd6dad0890f98a388c3',
+    'tests/Tests/Helpers.emlf': 'b76ea12253a18916a3c76105f8d89ec7acdcadd50bd1bc3a91faf98ada94455a',
     'tests/Tests/Map.emlf': 'e25205f125fdc00a8e8c09f255779f3b293b50116f8eeb5b7d715a89417e0026',
     'tests/Tests/Set.emlf': '156c8cd12a13cad2d164821b63246e4f3ded13979243fd2efcc40f32ff6e9cfa',
 }
