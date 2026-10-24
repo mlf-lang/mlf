@@ -143,7 +143,7 @@ cmp <(jq -r '.sources | keys[]' "$base" | LC_ALL=C sort) <(
 )
 jq -e --arg hash "$compiler_hash" '.fixed_point.reused_candidate_build == false and .fixed_point.next_compiler_sha256 == $hash' "$build/compiler-tests/self-host/verification.json" >/dev/null
 jq -e '.parity.cases == 7086 and .parity.source_compilations == 7075 and .parity.shared_source_cases == 11 and .parity.runtime_executions == 160' "$build/compiler-tests/parity/verification.json" >/dev/null
-jq -e '(.matrices | keys) == ["compact-gc"] and all(.matrices[]; .backends == 2 and .rows == 575)' "$build/compiler-tests/backends/verification.json" >/dev/null
+jq -e '(.matrices | keys) == ["compact-gc"] and all(.matrices[]; .backends == 2 and .rows == 583)' "$build/compiler-tests/backends/verification.json" >/dev/null
 jq -e '.requested_profiles == ["compact-gc"] and (.matrices | keys) == ["compact-gc"] and all(.matrices[]; .backends == 1 and .backend_names == ["llvm"] and .rows == 25)' "$build/compiler-tests/port/verification.json" >/dev/null
 mkdir -p "$output"
 output=$(cd "$output" && pwd)

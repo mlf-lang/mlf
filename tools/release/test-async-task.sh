@@ -109,12 +109,13 @@ awk 'BEGIN { header=1; print "module Async.Task.Internal where" } header { if ($
  "$root/libraries/mlf-async/Async/Task/Internal.emlf" > "$work/whitebox/Async/Task/Internal.emlf"
 
 export MLF_ASYNC_FIXTURE="$work/fixture"
-for suite in main processes wait-graph; do
+for suite in main processes wait-graph guards; do
  args=("${include_args[@]}")
  case $suite in
   main) entry=Main.emlf; oracle=suite.stdout ;;
   processes) entry=Processes.emlf; oracle=processes.stdout ;;
   wait-graph) entry=WaitGraph.emlf; oracle=wait-graph.stdout; args=(-i "$work/whitebox" "${include_args[@]}") ;;
+  guards) entry=Guards.emlf; oracle=guards.stdout ;;
  esac
  success "$suite.compile" "$compiler" "${args[@]}" "$fixtures/$entry"
  success "$suite.check" "$compiler" --check "$work/$suite.compile.stdout"
@@ -138,7 +139,7 @@ done
 record_inputs "$work/inputs.final.json"
 cmp "$work/inputs.json" "$work/inputs.final.json" || fail 'source changed during run'
 test "$(sha256 "$compiler")" = "$compiler_hash" || fail 'compiler changed during run'
-test "${#labels[@]}" -eq 25 || fail 'command coverage changed'
+test "${#labels[@]}" -eq 31 || fail 'command coverage changed'
 printf '{}\n' > "$work/artifacts.json"
 for file in "$work/runtime.o" "$work/fixture" "$work/"*.native "$work/"*.compile.stdout "$work/"*.emit.stdout; do
  jq --arg path "$(basename "$file")" --arg hash "$(sha256 "$file")" '. + {($path):$hash}' "$work/artifacts.json" > "$work/artifacts.tmp"
@@ -155,8 +156,8 @@ done
 jq -n --arg compiler_sha256 "$compiler_hash" --arg work "$work" \
  --arg overlay_sha256 "$(sha256 "$work/whitebox/Async/Task/Internal.emlf")" \
  --slurpfile inputs "$work/inputs.json" --slurpfile observations "$work/observations.json" --slurpfile artifacts "$work/artifacts.json" \
- '{complete:true,cases:30,source_rejections:5,backends:["interpreter","llvm"],whitebox_cases:6,
+ '{complete:true,cases:31,source_rejections:5,backends:["interpreter","llvm"],whitebox_cases:6,
  compiler_sha256:$compiler_sha256,work:$work,whitebox_source_sha256:$overlay_sha256,
  inputs:$inputs[0],observations:$observations[0],artifacts:$artifacts[0]}' > "$output/result.tmp"
 mv "$output/result.tmp" "$output/result.json"
-echo 'Async.Task language parity passed: 30 contracts (6 white-box), 5 source rejections.'
+echo 'Async.Task language parity passed: 31 contracts (6 white-box), 5 source rejections.'
