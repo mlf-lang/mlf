@@ -3,6 +3,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   merge_group:
   workflow_dispatch:
     inputs:
@@ -175,7 +176,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
-      - name: Decide whether this PR needs expensive async parity
+      - name: Decide whether expensive async parity was explicitly requested
         id: scope
         run: python3 tools/release/async-change-scope.py --output .mlf-build/async-change-scope/decision.json
       - name: Native bootstrap and parity dependencies

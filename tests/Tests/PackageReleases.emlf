@@ -115,10 +115,11 @@ githubColdWarm c app assetHash = do
  let build = dir ++ "/github build"
  let cache = dir ++ "/github cache"
  let args = Cons "--cache-dir" (Cons cache Nil)
- let downloaded = cache ++ "/.downloads/" ++ assetHash
  let calls = dir ++ "/gh.calls"
  let arguments = dir ++ "/gh.arguments"
  invoke c app build (S.append args (Cons "lock" Nil)) true ""
+ canonicalCache <- canonicalPath cache
+ let downloaded = canonicalCache ++ "/.downloads/" ++ assetHash
  observed <- readFile arguments
  let expected = "release\ndownload\nv1.0.0\n--repo\ngithub.com/mlf-tests/fixtures\n--pattern\ngreeting.mlfr\n--output\n"
  H.assert (O.starts expected observed && O.starts (expected ++ downloaded ++ ".work-") observed && O.ends "/package.mlfr\n" observed && S.length (O.nonempty (O.lines observed)) == 9) "GitHub download did not use exact repository, tag, and asset argv with private staging"

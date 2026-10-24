@@ -1,0 +1,24 @@
+data List a = Nil | Cons a (List a)
+data Pair a b = Pair a b
+data Triple a b c = Triple a b c
+data Quad a b c d = Quad a b c d
+
+sum : [Int] -> Int
+sum [] = 0
+sum (x : xs) = x + sum xs
+
+main = do
+  printInt (sum (10 : 12 : [20]))
+  printInt (case (40, 2) of (x, y) -> x + y)
+  printInt (case (10, 12, 20) of (x, y, z) -> x + y + z)
+  printInt (case (10, 10, 10, 12) of (w, x, y, z) -> w + x + y + z)
+  printInt (case (42, panic "tuple field forced") of (x, _) -> x)
+  printInt (case [panic "list head forced", 42] of
+    [_, x] -> x
+    _ -> 0)
+  printInt (case 42 : (panic "list tail forced") of
+    x : _ -> x
+    [] -> 0)
+  (x, y) <- return (20, 22)
+  printInt (x + y)
+  printInt (sum ([10, 12, 20] :: [Int]))

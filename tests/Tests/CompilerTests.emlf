@@ -371,8 +371,8 @@ prepareDrivers c portFixtures = do
  record c "drivers" (J.Object drivers)
  return (S.append flags extra)
 matrices : TestContext -> String -> Bool -> IO Unit
-matrices c binary portFixtures = matrixSuite c binary portFixtures (if portFixtures then 25 else 575)
- (Cons (if portFixtures then "25 MLF port fixtures; 0 failures" else "523 shared IO/prelude/backend fixtures; 0 failures") Nil)
+matrices c binary portFixtures = matrixSuite c binary portFixtures (if portFixtures then 25 else 583)
+ (Cons (if portFixtures then "25 MLF port fixtures; 0 failures" else "531 shared IO/prelude/backend fixtures; 0 failures") Nil)
 matrixSuite : TestContext -> String -> Bool -> Int -> List String -> IO Unit
 matrixSuite c binary portFixtures expectedRows expectations = matrixSuiteArgs c binary portFixtures expectedRows expectations Nil Nothing
 matrixSuiteArgs : TestContext -> String -> Bool -> Int -> List String -> List String -> Maybe (List J.Json) -> IO Unit
@@ -381,7 +381,7 @@ matrixSuiteArgs c binary portFixtures expectedRows expectations arguments select
  previousDivisor <- getEnv "GC_FREE_SPACE_DIVISOR"
  requestedDivisor <- getEnv "MLF_TEST_MATRIX_GC_DIVISOR"
  divisor <- case V.matrixCollectionDivisor requestedDivisor of { Left message -> O.fatal message; Right value -> ioReturn value }
- let unit = if portFixtures then "port" else if expectedRows == 575 || S.isJust selected then "backends" else ""
+ let unit = if portFixtures then "port" else if expectedRows == 583 || S.isJust selected then "backends" else ""
  expectedEntries <- if eqString unit "" then return Nil else case selected of
   Just entries -> return entries
   Nothing -> do { catalog <- Catalog.load (root c); return (Catalog.forUnit catalog unit) }
