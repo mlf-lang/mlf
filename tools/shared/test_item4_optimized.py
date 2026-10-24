@@ -21,7 +21,8 @@ FIXTURES = {'pattern-do': 'PatternDo.hs', 'source': 'SourceSemantics.hs',
             'managed': 'ManagedArtifacts.hs', 'authority': 'ArtifactAuthority.hs',
             'artifact': 'ArtifactIdentity.hs', 'query': 'QueryCache.hs',
             'core': 'CoreIdentity.hs', 'separate': 'SeparateCrates.hs',
-            'builtin': 'BuiltinArtifact.hs'}
+            'builtin': 'BuiltinArtifact.hs', 'source-scc': 'SourceSCC.hs',
+            'source-crates': 'SourceCrates.hs'}
 PROFILE = 'item4-O2-pedantic-bottoms-no-state-hack-v1'
 
 
@@ -127,7 +128,7 @@ def main():
             receipt['seed'] = {'receipt': str(seed_path), 'sha256': contract.sha(seed_path),
                                'objects_reused': inherited_objects}
         flags = ['--make', '-j1', '-O2', '-fpedantic-bottoms', '-fno-state-hack',
-                 '-rtsopts', '-package-env', '-', '-no-user-package-db', '-i',
+                 '-rtsopts', '-package-env', '-', '-no-user-package-db', '-i', '-i' + str(ROOT / 'tools/shared/fixtures/item4'),
                  *['-i' + str(ROOT / p) for p in manifest['source_roots']],
                  '-I' + str(ROOT / 'runtime'), '-odir', objects, '-hidir', objects]
         c_inputs = [p.with_suffix('.o') for p in c_sources] if args.seed_receipt else c_sources
@@ -143,9 +144,9 @@ def main():
         if not all(receipt['object_hashes'].get(p) == h for p, h in inherited_objects.items()):
             raise RuntimeError('reused library object changed during compilation')
         arguments = [out / 'probe']
-        if args.suite == 'separate':
+        if args.suite in {'separate', 'source-crates'}:
             arguments.append(out)
-        if args.suite == 'query':
+        if args.suite in {'query', 'source-scc'}:
             arguments.append(out / ('cache-' + str(time.time_ns())))
         arguments.extend(['+RTS', '-M700m', '-RTS'])
         run(arguments, 'positive')

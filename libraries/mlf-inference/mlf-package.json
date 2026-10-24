@@ -24,6 +24,7 @@
       "Bootstrap.Constraint": "Bootstrap/Constraint.hs",
       "Bootstrap.Elaborate": "Bootstrap/Elaborate.hs",
       "Bootstrap.Evidence": "Bootstrap/Evidence.hs",
+      "Bootstrap.EvidenceBoundary": "Bootstrap/EvidenceBoundary.hs",
       "Bootstrap.Graph": "Bootstrap/Graph.hs",
       "Bootstrap.Graph.Solver": "Bootstrap/Graph/Solver.hs"
     }

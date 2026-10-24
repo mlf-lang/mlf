@@ -59,7 +59,7 @@ main = do
   builtin <- expect "compile builtin" A.builtinPrelude >>= roundtrip
   let bp = B.literal (base ++ "/builtin.mlfi")
       pp = B.literal (base ++ "/provider.mlfi")
-  let oldBuiltin (A.CrateInterface _ deps ms es reach ds cs instances lowered bindings entry objectHash) = A.CrateInterface "mlf:builtin-shared-haskell-v1:7" deps ms es reach ds cs instances lowered bindings entry objectHash
+  let oldBuiltin (A.CrateInterface _ deps ms es reach ds cs instances lowered bindings entry objectHash protection) = A.CrateInterface "mlf:builtin-shared-haskell-v1:7" deps ms es reach ds cs instances lowered bindings entry objectHash protection
       stalePath = B.literal (base ++ "/stale-builtin7.mlfci")
   writeFile (B.unpack stalePath) (B.unpack (A.encodeInterface (oldBuiltin (A.objectInterface builtin))))
   staleLoaded <- A.loadInterfaces [stalePath]

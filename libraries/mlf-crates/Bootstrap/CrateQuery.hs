@@ -11,6 +11,7 @@ module Bootstrap.CrateQuery where {
   import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.Desugar as Desugar;
   import qualified Bootstrap.InferenceUnit as Inference;
+  import qualified Bootstrap.SourceInference as Source;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.Primitive as Primitive;
   import qualified Bootstrap.Host as Host;
@@ -911,5 +912,137 @@ module Bootstrap.CrateQuery where {
                      }
             }
         }
+    };
+  encodeSourceContract ((,) name contract) = node "source-contract"
+    ((:) (encodeBinding ((,) name (Source.contractType contract)))
+      ((:) (list (\x -> x) (Source.contractClasses contract))
+        ((:) (boolean (Source.contractProtected contract)) [])));
+  encodeSourceGroup prepared = node "prepared-source-group"
+    ((:) (list (\member -> encodeMember (canonicalMember member)) (Source.groupOriginal prepared))
+      ((:) (list (\((,) name dictionary) -> node "class-dictionary" ((:) name ((:) dictionary [])))
+        (M.toList (Source.groupRegistry prepared)))
+      ((:) (list (\((,,) name classes protected) -> node "result-contract"
+        ((:) name ((:) (list (\x -> x) classes) ((:) (boolean protected) []))))
+        (Source.groupContracts prepared))
+      ((:) (case Source.groupAuthority prepared of {
+        Nothing -> node "unchanged-source-or-support" [];
+        Just (Source.RootAuthority name labels protected candidates protectedCandidates) -> node "unsigned-source-root"
+          ((:) name ((:) (list (\((,,) binder cls dictionary) -> node "exact-slot"
+            ((:) binder ((:) cls ((:) dictionary [])))) labels)
+          ((:) (boolean protected) ((:) (list
+            (\((,,) role candidate ty) -> node "typed-definition-candidate"
+              ((:) (encodeRole role) ((:) (encodeBinding ((,) candidate ty))
+                ((:) (boolean (elem eqString candidate protectedCandidates)) [])))) candidates) []))))
+      }) []))));
+  sourceQueryKey crateId compilerHash prepared contracts datatypes =
+    let { observed = S.fromList compareString
+      (append (map fst (Source.groupBindings prepared))
+        (append (map fst (Source.groupCandidateBindings prepared))
+          (concatMap (\member -> Dependency.valueNames (Dependency.observeDeclaration member))
+            (Source.groupOriginal prepared)))) } in
+    let { relevant = M.filterWithKey (\name _ -> S.member compareString name observed) contracts } in
+    node "MLF-SOURCE-CRATE-QUERY-5"
+      ((:) crateId ((:) compilerHash
+        ((:) (list (\member -> encodeMember (canonicalMember member)) (Source.groupMembers prepared))
+        ((:) (list encodeBinding (Source.groupBindings prepared))
+        ((:) (encodeDatatypeContext datatypes)
+        ((:) (encodeSourceGroup prepared)
+        ((:) (list encodeSourceContract (M.toList relevant)) [])))))));
+  -- Raw checked inference payloads retain their established validator. A new
+  -- source key deliberately uses self-contained cache format1: the old compact
+  -- key parser must not be tricked into supplying a different context.
+  runSourceGroups :: String -> String -> String -> TypeInventory -> Source.SourcePlan ->
+    [] ([] String) -> Map String Source.SourceContract -> [] Separate.UnitObject ->
+    Int -> Int -> [] GroupResult ->
+    IO (Either String ((,,) ([] Separate.UnitObject) QueryReport (Map String Source.SourceContract)));
+  runSourceGroups crateId compilerHash cacheDir inventory plan groups contracts
+    objects inferred reused results = case groups of {
+    [] -> ioReturn (Right ((,,) (reverse objects)
+      (QueryReport inferred reused (reverse results)) contracts));
+    (:) names rest -> case Source.prepareGroup plan contracts names of {
+      Left error -> ioReturn (Left error);
+      Right prepared -> do {
+        let { bindings = Source.groupBindings prepared };
+        let { members = Source.groupMembers prepared };
+        let { datatypes = requiredDataIn inventory members
+          (append bindings (Source.groupCandidateBindings prepared)) };
+        let { name = groupName crateId names };
+        let { key = sourceQueryKey crateId compilerHash prepared contracts datatypes };
+        writeFile (cacheDir ++ "/query-key.new") key;
+        digest <- fileDigest (cacheDir ++ "/query-key.new");
+        let { destination = cacheDir ++ "/" ++ digest ++ ".mlfq" };
+        present <- fileExists destination;
+        cached <- if present then do {
+          input <- readFile destination;
+          ioReturn (do {
+            object <- decodeCached key name bindings datatypes names input;
+            Source.validatePreparedRaw prepared object
+          })
+        } else ioReturn (Left "cache miss");
+        let { raw = case cached of {
+          Right object -> Right ((,) True object);
+          Left _ -> mapEither ((,) False)
+            (Inference.compileLoweredGroup name
+              ((:) (dependencyInterface bindings) []) datatypes members)
+        } };
+        case raw of {
+          Left error -> ioReturn (Left error);
+          Right ((,) hit object) -> case Source.finishGroup prepared object of {
+            Left error -> ioReturn (Left error);
+            Right finalized -> do {
+              saved <- if hit then ioReturn (Right ())
+                else writeCache destination (encodeCached key object);
+              case saved of {
+                Left error -> ioReturn (Left error);
+                Right _ -> do {
+                  let { finalObject = Source.finalGroupObject finalized };
+                  let { finalContracts = Source.finalGroupContracts finalized };
+                  let { semantic = Separate.fingerprint (list encodeBinding
+                    (Separate.unitBindings (Separate.objectInterface finalObject))) };
+                  runSourceGroups crateId compilerHash cacheDir inventory plan rest
+                    (M.union compareString finalContracts contracts)
+                    ((:) finalObject objects) (inferred + (if hit then 0 else 1))
+                    (reused + (if hit then 1 else 0))
+                    ((:) (GroupResult name names hit semantic digest) results)
+                }
+              }
+            }
+          }
+        }
+      }
     }
+  };
+  compileSourceGroups :: String -> String -> [] Separate.UnitInterface ->
+    Map String Bool -> Source.SourcePlan ->
+    IO (Either String ((,,) ([] Separate.UnitObject) QueryReport (Map String Source.SourceContract)));
+  compileSourceGroups crateId directory imports protected originalPlan =
+    case Source.initializeProtection originalPlan protected of {
+      Left error -> ioReturn (Left error);
+      Right plan -> case prepareData (Source.planData plan) of {
+      Left error -> ioReturn (Left error);
+      Right inventory -> case foldM Inference.mergeExternal M.empty
+        (concatMap Separate.unitBindings imports) of {
+        Left error -> ioReturn (Left error);
+        Right types -> case Source.initialContracts plan types protected of {
+          Left error -> ioReturn (Left error);
+          Right contracts ->
+            if stringLength directory == 0 then ioReturn (Left "inference cache directory is empty")
+            else do {
+              let { cacheDir = cachePath directory };
+              code <- cacheCommand ((:) "/bin/mkdir" ((:) "-p" ((:) cacheDir [])));
+              if code /= 0 then ioReturn (Left "cannot create inference cache directory") else do {
+                lock <- acquireFileLock (cacheDir ++ "/.lock");
+                executable <- getExecutablePath;
+                compilerHash <- fileDigest executable;
+                result <- runSourceGroups crateId compilerHash cacheDir inventory plan
+                  (Source.planGroups plan) contracts [] 0 0 [];
+                releaseFileLock lock;
+                ioReturn result
+              }
+            }
+        }
+      }
+    }
+  }
+
 }

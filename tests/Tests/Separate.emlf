@@ -113,8 +113,8 @@ fixtureObject objects = case S.find (\object -> H.eq (Artifact.crateId (Artifact
   Nothing -> H.fail "missing fixture crate object"
   Just object -> return object
 replaceFixture object objects = S.map (\old -> if H.eq (Artifact.crateId (Artifact.objectInterface old)) fixtureIdentity then object else old) objects
-setCrateBindings (Artifact.CrateInterface a b c d e f g h i _ k l) bindings = Artifact.CrateInterface a b c d e f g h i bindings k l
-setCrateLayouts (Artifact.CrateInterface a b c d e f g h _ j k l) layouts = Artifact.CrateInterface a b c d e f g h layouts j k l
+setCrateBindings (Artifact.CrateInterface a b c d e f g h i _ k l protection) bindings = Artifact.CrateInterface a b c d e f g h i bindings k l protection
+setCrateLayouts (Artifact.CrateInterface a b c d e f g h _ j k l protection) layouts = Artifact.CrateInterface a b c d e f g h layouts j k l protection
 replaceFragmentTerm object term = case Fragment.objectInterface object of
   Fragment.UnitInterface a b c d e f g _ -> Fragment.UnitObject (Fragment.UnitInterface a b c d e f g (Fragment.fingerprint (Pretty.prettyTerm term))) term
 
@@ -149,7 +149,7 @@ separateTests = S.append
       result <- compileSeparateProgram ImplicitPrelude libraries source
       case result of {Left _ -> return (); Right _ -> H.fail ("accepted invalid crate: " ++ name)}) moduleRejections)
     ((:) ((,) "crate paths and native cache commands" cratePaths)
-    ((:) ((,) "crate metadata version rejection" (expect "MLFCI-1" (Artifact.decodeInterface "7:MLFCI-9")))
+    ((:) ((,) "crate metadata version rejection" (expect "MLFCI-5" (Artifact.decodeInterface "7:MLFCI-9")))
     ((:) ((,) "crate object binding schemes are independently checked" do
       checkedReceipts
       result <- compileSeparateProgram NoImplicitPrelude [] "module Main where\nmain = printInt 42\n"

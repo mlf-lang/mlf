@@ -1,7 +1,7 @@
 {
   "format": 1,
   "source_syntax": "shared-haskell-v1",
-  "frontend_semantics": "mlf-frontend/shared-haskell-v1/6",
+  "frontend_semantics": "mlf-frontend/shared-haskell-v1/7",
   "primitive_abi": "mlf-primitive-107-v4",
   "source_roots": [
     "libraries/mlf-async",
@@ -111,6 +111,11 @@
     {
       "module": "Bootstrap.Evidence",
       "path": "libraries/mlf-inference/Bootstrap/Evidence.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.EvidenceBoundary",
+      "path": "libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs",
       "role": "implementation"
     },
     {
@@ -279,13 +284,18 @@
       "role": "implementation"
     },
     {
-      "module": "Bootstrap.Std",
-      "path": "libraries/mlf-foundation/Bootstrap/Std.hs",
+      "module": "Bootstrap.SourceInference",
+      "path": "libraries/mlf-crates/Bootstrap/SourceInference.hs",
       "role": "implementation"
     },
     {
       "module": "Bootstrap.Standalone",
       "path": "libraries/mlf-frontend/Bootstrap/Standalone.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Std",
+      "path": "libraries/mlf-foundation/Bootstrap/Std.hs",
       "role": "implementation"
     },
     {

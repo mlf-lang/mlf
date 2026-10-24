@@ -58,7 +58,7 @@ oldTag tag wire = case U.unpack wire of
   _ -> wire
 key ds = Q.queryKey "crate" "compiler" [] [] ds
 crate cs = A.CrateInterface "test:artifact" [] [] [] [] (list [family []]) cs []
-  (list [family []]) bindings "" "test-object"
+  (list [family []]) bindings "" "test-object" (S.map (\((,) n _) -> (,) n False) bindings)
 canonicalFamily = T.DataDecl "Envelope" [] (list [T.ConstructorDecl "Envelope"
   (list [T.Applied "[]" (list [T.Applied "Char" []]), T.Applied "()" [],
          T.Applied "(,)" (list [T.Applied "Int" [], T.Applied "Char" []])])])
@@ -193,14 +193,14 @@ checks =
   , ("class signatures and superclass roundtrip", roundtrip (iface classes []))
   , ("canonical crate metadata roundtrip", case A.decodeInterface (A.encodeInterface (crate classes)) of
         T.Right rt -> same (A.encodeInterface rt) (A.encodeInterface (crate classes)); _ -> False)
-  , ("semantic fingerprint uses v4 namespace", let
-      empty = A.CrateInterface "empty" [] [] [] [] [] [] [] [] [] "" "object"
+  , ("semantic fingerprint uses v5 namespace", let
+      empty = A.CrateInterface "empty" [] [] [] [] [] [] [] [] [] "" "object" []
       fingerprint tag = U.fingerprint (U.pack (list [tag,"empty",A.encodeExports [],
-        A.encodeImports [],A.sourceMetadata [] [] [],U.pack [],"",A.encodeBindings []]))
-      in same (A.semanticFingerprint empty) (fingerprint "MLF-CRATE-SEMANTICS-4")
-         && not (same (A.semanticFingerprint empty) (fingerprint "MLF-CRATE-SEMANTICS-3")))
+        A.encodeImports [],A.sourceMetadata [] [] [],U.pack [],"",A.encodeBindings [],A.encodeProtection [],U.pack []]))
+      in same (A.semanticFingerprint empty) (fingerprint "MLF-CRATE-SEMANTICS-5")
+         && not (same (A.semanticFingerprint empty) (fingerprint "MLF-CRATE-SEMANTICS-4")))
   , ("all pre-v4 module formats rejected", all (\tag -> isLeft (U.decodeInterface (oldTag (B.literal tag) (U.encodeInterface (iface [] []))))) ["MLFI-1","MLFI-2","MLFI-3"])
-  , ("all pre-v4 crate formats rejected", all (\tag -> isLeft (A.decodeInterface (oldTag (B.literal tag) (A.encodeInterface (crate []))))) ["MLFCI-1","MLFCI-2","MLFCI-3"])
+  , ("all pre-v5 crate formats rejected", all (\tag -> isLeft (A.decodeInterface (oldTag (B.literal tag) (A.encodeInterface (crate []))))) ["MLFCI-1","MLFCI-2","MLFCI-3","MLFCI-4"])
   , ("constructor family changes query key", not (same (key (list [family []]))
       (key (list [family [T.ConstructorDecl "Empty" []]]))))
   , ("nested field type changes query key", not (same (key (list [family []]))

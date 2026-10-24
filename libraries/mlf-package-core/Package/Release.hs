@@ -224,14 +224,15 @@ module Package.Release where {
              })
           (Artifact.crateDependencies iface);
       case iface of {
-        Artifact.CrateInterface identity _ modules exports imports datatypes classes instances layouts bindings entry fingerprint ->
+        Artifact.CrateInterface identity _ modules exports imports datatypes classes instances layouts bindings entry fingerprint protection ->
           Right
             (Artifact.CrateInterface identity dependencies modules exports imports datatypes classes
                instances
                layouts
                bindings
                entry
-               fingerprint)
+               fingerprint
+               protection)
       }
     };
   relocateObject locations object =

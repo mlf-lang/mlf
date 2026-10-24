@@ -30,7 +30,8 @@
       "Bootstrap.CrateQuery": "Bootstrap/CrateQuery.hs",
       "Bootstrap.InferenceUnit": "Bootstrap/InferenceUnit.hs",
       "Bootstrap.Separate": "Bootstrap/Separate.hs",
-      "Bootstrap.SourceEquality": "Bootstrap/SourceEquality.hs"
+      "Bootstrap.SourceEquality": "Bootstrap/SourceEquality.hs",
+      "Bootstrap.SourceInference": "Bootstrap/SourceInference.hs"
     }
   },
   "source-syntax": "shared-haskell-v1"

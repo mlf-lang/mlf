@@ -381,7 +381,17 @@ module Bootstrap.Classes where {
               (SClassProgram ds [] [] body)
         };
       SClassProgram datatypes declarations instances body ->
-        do {
+        withValidatedClasses config imported valueIndices instanceIndices datatypes declarations
+          instances body (\base classes ->
+            lowerClassesBody config imported valueIndices instanceIndices datatypes instances body
+              base classes)
+    };
+  withValidatedClasses :: forall a.
+    Maybe ((,) (Map String SType) ([] String)) -> Set String ->
+    Map String IntSet -> Maybe ([] IntSet) -> [] DataDecl -> [] SClassDecl ->
+    [] SInstanceDecl -> SExpr -> (DataEnv -> [] SClassDecl -> Fresh a) -> Either String a;
+  withValidatedClasses config imported valueIndices instanceIndices datatypes declarations instances body action =
+    do {
           case instanceIndices of {
             Nothing -> Right ();
             Just scopes ->
@@ -437,11 +447,33 @@ module Bootstrap.Classes where {
                                     (classMethods d))))
                          declarations)))
           };
-          runFresh used
-            (lowerClassesBody config imported valueIndices instanceIndices datatypes instances body
-               base
-               classes)
-        }
+      runFresh used (action base classes)
+    };
+  -- Same class/instance validation and Fresh reservation as the existing whole
+  -- program route, but stop before source evidence applications are expanded.
+  prepareScopedClassInventory :: Map String SType -> [] String -> Map String IntSet ->
+                                 [] IntSet -> SProgram -> Either String ClassInventory;
+  prepareScopedClassInventory externals instanceNames valueScopes instanceScopes original =
+    withScopedClassInventory externals instanceNames valueScopes instanceScopes original freshPure;
+  withScopedClassInventory :: forall a. Map String SType -> [] String -> Map String IntSet ->
+                              [] IntSet -> SProgram -> (ClassInventory -> Fresh a) -> Either String a;
+  withScopedClassInventory externals instanceNames valueScopes instanceScopes original action =
+    do {
+      surface <- Surface.lowerSurface (case original of {
+        SProgram ds body -> SClassProgram ds [] [] body;
+        _ -> original
+      });
+      case surface of {
+        SClassProgram ds declarations instances body ->
+          withValidatedClasses (Just ((,) externals instanceNames)) S.empty valueScopes
+            (Just instanceScopes) ds declarations instances body
+            (\base classes -> do {
+              inventory <- prepareClassesBody (Just ((,) externals instanceNames)) S.empty
+                valueScopes (Just instanceScopes) ds instances base classes;
+              action inventory
+            });
+        _ -> Left "source class inventory requires a class program"
+      }
     };
   implicitParameters :: SClassDecl -> SClassDecl;
   implicitParameters (SClassDecl name parameters supers methods) =
@@ -470,15 +502,18 @@ module Bootstrap.Classes where {
       Nothing -> freshName prefix;
       Just _ -> freshPure stable
     };
-  lowerClassesBody :: Maybe ((,) (Map String SType) ([] String)) ->
-                      Set String ->
-                      Map String IntSet ->
-                      Maybe ([] IntSet) ->
-                      [] DataDecl ->
-                      [] SInstanceDecl ->
-                      SExpr ->
-                      DataEnv -> [] SClassDecl -> Fresh ((,) SProgram (Map String String));
-  lowerClassesBody config imported valueIndices instanceIndices datatypes instances body base classes =
+  -- Prepared class support is immutable; source bodies have not been lowered.
+  data ClassInventory = ClassInventory
+    ([] DataDecl) DataEnv (Map String Info)
+    (Map String ([] ((,) EvidenceRole String)))
+    ([] ((,) EvidenceRole String))
+    (Map String ((,) String ([] String)))
+    ([] ((,,) String SAnnotation SExpr)) (Map String String) (Map String SType);
+  prepareClassesBody :: Maybe ((,) (Map String SType) ([] String)) ->
+                        Set String -> Map String IntSet -> Maybe ([] IntSet) ->
+                        [] DataDecl -> [] SInstanceDecl -> DataEnv -> [] SClassDecl ->
+                        Fresh ClassInventory;
+  prepareClassesBody config imported valueIndices instanceIndices datatypes instances base classes =
     do {
       entries <-
         mapM
@@ -558,19 +593,11 @@ module Bootstrap.Classes where {
           }
       };
       let {
-        externalOverloads =
-          M.mapWithKey
-            (\n ty ->
-               case scheme ty of {
-                 (,,) _ ps _ -> (,) n (map (\(SPredicate c _) -> c) ps)
-               })
-            externalSchemes
+        baseMethodEnv = M.union compareString (methodBindings imported False entries)
+          (methodBindings imported True entries)
       };
       let {
-        methodEnv =
-          M.union compareString externalOverloads
-            (M.union compareString (methodBindings imported False entries)
-               (methodBindings imported True entries))
+        methodEnv = withExternalOverloads externalSchemes baseMethodEnv
       };
       selectorGroups <- mapM (\entry -> selectorDefinitions infos (snd entry)) entries;
       definitions <-
@@ -578,25 +605,53 @@ module Bootstrap.Classes where {
           (\((,) ((,) name inst) available) ->
              instanceDefinition valueScopes ds infos methodEnv name inst available)
           (zip (zip names checkedInstances) instanceScopes);
+      let {
+        bindings =
+          map
+            (\((,,) n annotation rhs) ->
+               case annotation of {
+                 SAnnotation _ ty -> (,,) n annotation (SChecked ty rhs)
+               })
+            (append (concat selectorGroups) definitions)
+      };
+      let {
+        localBindings =
+          filter (\((,,) n _ _) -> not (M.member compareString n externalSchemes)) bindings
+      };
+      let {
+        display = M.insert compareString "MLFStackEvidence" callStackPredicate
+          (M.fromList compareString
+            (map (\((,) name (Info _ dict _ _ _)) -> (,) dict name) entries))
+      };
+      freshPure (ClassInventory (append datatypes dictionaries) ds infos valueScopes
+        globalCandidates baseMethodEnv localBindings display externalSchemes)
+    };
+  lowerClassesBody :: Maybe ((,) (Map String SType) ([] String)) ->
+                      Set String ->
+                      Map String IntSet ->
+                      Maybe ([] IntSet) ->
+                      [] DataDecl ->
+                      [] SInstanceDecl ->
+                      SExpr ->
+                      DataEnv -> [] SClassDecl -> Fresh ((,) SProgram (Map String String));
+  lowerClassesBody config imported valueIndices instanceIndices datatypes instances body base classes =
+    do {
+      inventory <- prepareClassesBody config imported valueIndices instanceIndices
+        datatypes instances base classes;
+      finishClassesBody inventory body
+    };
+  finishClassesBody :: ClassInventory -> SExpr ->
+                       Fresh ((,) SProgram (Map String String));
+  finishClassesBody (ClassInventory datatypes ds infos valueScopes globalCandidates
+                     baseMethodEnv localBindings display externalSchemes) body =
+    do {
+      let { methodEnv = withExternalOverloads externalSchemes baseMethodEnv };
       boundValueShared3 <- lowerExpr valueScopes ds infos methodEnv globalCandidates body;
       case boundValueShared3 of {
         (,) expression wants ->
           do {
             let {
               result = closeWants infos globalCandidates wants expression
-            };
-            let {
-              bindings =
-                map
-                  (\((,,) n annotation rhs) ->
-                     case annotation of {
-                       SAnnotation _ ty -> (,,) n annotation (SChecked ty rhs)
-                     })
-                  (append (concat selectorGroups) definitions)
-            };
-            let {
-              localBindings =
-                filter (\((,,) n _ _) -> not (M.member compareString n externalSchemes)) bindings
             };
             let {
               inner = if null localBindings then result else SLetRec localBindings result
@@ -615,14 +670,252 @@ module Bootstrap.Classes where {
             let {
               output = if null externalBindings then inner else SLetRec externalBindings inner
             };
-            freshPure
-              ((,) (SProgram (append datatypes dictionaries) output)
-                 (M.insert compareString "MLFStackEvidence" callStackPredicate
-                    (M.fromList compareString
-                      (map (\((,) name (Info _ dict _ _ _)) -> (,) dict name) entries))))
+            freshPure ((,) (SProgram datatypes output) display)
           }
       }
     };
+  -- Narrow source-root seam. Eligibility/SCC ownership is supplied separately
+  -- by the source scheduler; this function records rather than guesses slots.
+  data SourceRootLowering = SourceRootLowering SExpr
+    ([] ((,,) String String String)) ([] ((,) EvidenceRole String)) Bool;
+  lowerUnsignedSourceRoot :: ClassInventory -> Map String SType -> String -> SExpr ->
+                             Fresh SourceRootLowering;
+  lowerUnsignedSourceRoot inventory externals name original =
+    lowerUnsignedSourceRootWithOverloads inventory
+      (withExternalOverloads externals M.empty) name original;
+  -- Explicit finalized overload order and checked target types travel together
+  -- in the scheduler. This stage needs only the former; inference consumes the
+  -- latter directly without guessing qualifications from dictionary arrows.
+  lowerUnsignedSourceRootWithOverloads :: ClassInventory ->
+    Map String ((,) String ([] String)) -> String -> SExpr -> Fresh SourceRootLowering;
+  lowerUnsignedSourceRootWithOverloads inventory overloads name original =
+    lowerUnsignedSourceRootProtected inventory overloads M.empty name original;
+  lowerUnsignedSourceRootProtected :: ClassInventory ->
+    Map String ((,) String ([] String)) -> Map String Bool -> String -> SExpr ->
+    Fresh SourceRootLowering;
+  lowerUnsignedSourceRootProtected
+    (ClassInventory _ ds infos valueScopes _ baseMethodEnv _ _ _) overloads protected name original =
+    do {
+      body <- freshLift (Surface.lowerExpressionWithData ds original);
+      candidates <- freshLift
+        (case M.lookup compareString name valueScopes of {
+          Nothing -> Left "source root has no authenticated definition scope";
+          Just available -> Right available
+        });
+      let { environment = M.union compareString overloads baseMethodEnv };
+      reserveSourceNames ((:) name (append (Desugar.allNames body)
+        (append (M.keys environment) (append (map fst (M.elems environment)) (map snd candidates)))));
+      let { usesManaged = protectedSourceBody environment protected body };
+      lowered <- lowerExpr valueScopes ds infos environment candidates body;
+      case lowered of {
+        (,) rhs wanted -> do {
+          labels <- mapM
+            (\((,) binder classIdentity) -> do {
+              info <- freshLift (lookupInfo infos classIdentity);
+              case info of {
+                Info _ dictionaryIdentity _ _ _ ->
+                  freshPure ((,,) binder classIdentity dictionaryIdentity)
+              }
+            }) wanted;
+          freshPure (SourceRootLowering
+            (foldr (\((,) binder _) rest -> SLam binder Nothing rest) rhs wanted)
+            labels candidates usesManaged)
+        }
+      }
+    };
+  -- Fallback retains original signed/SCC contracts without reinserting support
+  -- definitions. Unsigned protected singletons keep their issued slot order.
+  lowerSourceGroupUnchanged :: ClassInventory -> Map String ((,) String ([] String)) ->
+    Map String Bool -> [] ((,,) String (Maybe SAnnotation) SExpr) ->
+    Fresh ((,) SExpr ([] ((,,) String ([] String) Bool)));
+  lowerSourceGroupUnchanged inventory overloads protected members =
+    case inventory of {
+      ClassInventory _ ds infos valueScopes candidates methods _ _ _ -> do {
+      original <- freshLift (Surface.bindValues members (SConstructor "()"));
+      freshLift (traverseEither
+        (\((,,) name _ _) -> ensure (M.member compareString name valueScopes)
+          "source group member has no authenticated definition scope") members);
+      case members of {
+        (:) ((,,) name Nothing rhs) [] -> do {
+          root <- lowerUnsignedSourceRootProtected inventory overloads protected name rhs;
+          case root of {
+            SourceRootLowering body labels _ managed ->
+              freshPure ((,) (SLet name body (SConstructor "()"))
+                ((:) ((,,) name (map (\((,,) _ c _) -> c) labels) managed) []))
+          }
+        };
+        (:) ((,,) name (Just (SAnnotation ((:) variable variables) ty)) rhs) [] -> do {
+          root <- lowerUnsignedSourceRootProtected inventory overloads protected name
+            (SAnn rhs (SAnnotation ((:) variable variables) ty));
+          case root of {
+            SourceRootLowering body labels _ managed ->
+              freshPure ((,) (SLet name body (SConstructor "()"))
+                ((:) ((,,) name (map (\((,,) _ c _) -> c) labels) managed) []))
+          }
+        };
+        _ -> do {
+          freshLift (traverseEither
+            (\((,,) _ annotation _) -> case annotation of {
+              Nothing -> Left "non-singleton fallback requires original signed declarations";
+              Just _ -> Right ()
+            }) members);
+          surface <- freshLift (Surface.lowerExpressionWithData ds original);
+          let {
+            declaredOverloads = M.fromList compareString
+              (map (\((,,) name annotation _) ->
+                (,) name ((,) name (case annotation of {
+                  Just (SAnnotation _ ty) -> case scheme ty of {
+                    (,,) _ ps _ -> map (\(SPredicate c _) -> c) ps
+                  };
+                  Nothing -> []
+                }))) members)
+          };
+          let { environment = M.union compareString declaredOverloads
+            (M.union compareString overloads methods) };
+          protection <- freshLift (traverseEither
+            (\((,,) _ annotation rhs) -> do {
+              normalized <- Surface.lowerExpressionWithData ds rhs;
+              Right ((case annotation of {
+                Just (SAnnotation _ ty) -> managedType ty;
+                Nothing -> False
+              }) || protectedSourceBody environment protected normalized)
+            }) members);
+          let { groupProtected = any (\flag -> flag) protection };
+          reserveSourceNames (append (Desugar.allNames surface)
+            (append (M.keys environment) (append (map fst (M.elems environment)) (map snd candidates))));
+          lowered <- lowerExpr valueScopes ds infos environment candidates surface;
+          case lowered of {
+            (,) body wants -> do {
+              freshLift (ensure (null wants) "signed source group leaked ordinary obligations");
+              let {
+                contracts = map
+                  (\((,,) name annotation rhs) -> case annotation of {
+                    Just (SAnnotation _ ty) ->
+                      case scheme ty of {
+                        (,,) _ ps _ -> (,,) name (map (\(SPredicate c _) -> c) ps)
+                          groupProtected
+                      };
+                    Nothing -> (,,) name [] True
+                  }) members
+              };
+              freshPure ((,) body contracts)
+            }
+          }
+        }
+      }
+      }
+    };
+  reserveSourceNames :: [] String -> Fresh ();
+  reserveSourceNames names = Fresh (\count used ->
+    Right ((,,) () count (foldlStrict (\acc name -> S.insert compareString name acc) used names)));
+  protectedSourceBody :: Map String ((,) String ([] String)) -> Map String Bool -> SExpr -> Bool;
+  protectedSourceBody environment protected body =
+    managedExpression body || any
+      (\reference -> M.findWithDefault compareString False reference protected ||
+        case M.lookup compareString reference environment of {
+          Nothing -> False;
+          Just ((,) _ predicates) -> any (\predicate -> eqString predicate callStackPredicate) predicates
+        }) (Surface.freeNames body);
+  -- Metadata is derived before class expansion, including original instance
+  -- methods. It cannot be recovered from a plain result target type.
+  inventorySourceProtection :: ClassInventory -> [] ((,) String SInstanceDecl) ->
+    [] ((,,) String (Maybe SAnnotation) SExpr) -> Either String (Map String Bool);
+  inventorySourceProtection inventory@(ClassInventory _ _ _ _ _ _ _ _ externals)
+    instances members = do {
+      ensure (M.size externals == 0)
+        "builtin protection analysis requires a closed inventory";
+      inventoryProtection inventory M.empty instances members
+    };
+  -- Imported protection is explicit metadata, never inferred false from a
+  -- plain target result type. Extra flags do not grant additional names.
+  inventoryProtection :: ClassInventory -> Map String Bool ->
+    [] ((,) String SInstanceDecl) -> [] ((,,) String (Maybe SAnnotation) SExpr) ->
+    Either String (Map String Bool);
+  inventoryProtection (ClassInventory _ ds infos _ _ methods supports _ externals)
+    importedProtection instances members = do {
+      ensure (all (\name -> M.member compareString name importedProtection) (M.keys externals))
+        "imported source protection inventory is incomplete";
+      let { names = map (\((,,) name _ _) -> name) members };
+      let { supportNames = map (\((,,) name _ _) -> name) supports };
+      ensure (length names == S.size (S.fromList compareString names))
+        "duplicate source protection binding";
+      ensure (not (any (\name -> elem eqString name supportNames) names))
+        "source protection binding overlaps generated support";
+      sourceNodes <- traverseEither
+        (\((,,) name annotation rhs) -> do {
+          body <- Surface.lowerExpressionWithData ds rhs;
+          Right ((,,) name (case annotation of {
+            Nothing -> False; Just (SAnnotation _ ty) -> managedType ty
+          }) ((:) body []))
+        }) members;
+      instanceNodes <- traverseEither
+        (\((,) name instanceDecl) -> do {
+          info <- lookupInfo infos (instanceClass instanceDecl);
+          bodies <- traverseEither (\method -> Surface.lowerExpressionWithData ds (snd method))
+            (instanceMethods instanceDecl);
+          let { direct = case info of {
+            Info declaration _ _ _ _ -> any (\method -> managedType (snd method))
+              (classMethods declaration)
+          } };
+          Right ((,,) name direct bodies)
+        }) (filter (\instancePair -> elem eqString (fst instancePair) supportNames) instances);
+      let { selectors = map
+        (\((,) target predicates) -> (,,) target
+          (any (\predicate -> eqString predicate callStackPredicate) predicates) []) (M.elems methods) };
+      let { supers = concatMap (\info -> case info of {
+        Info _ _ _ _ namesOfSupers -> map (\name -> (,,) name False []) namesOfSupers
+      }) (M.elems infos) };
+      let { supportNodes = filter (\((,,) name _ _) -> elem eqString name supportNames)
+        (append selectors (append supers instanceNodes)) };
+      let { recorded = map (\((,,) name _ _) -> name) supportNodes };
+      ensure (length recorded == length supportNames &&
+        length recorded == S.size (S.fromList compareString recorded) &&
+        all (\name -> elem eqString name recorded) supportNames)
+        "generated support protection inventory mismatch";
+      let { nodes = append sourceNodes supportNodes };
+      let { environment = withExternalOverloads externals methods };
+      let { uses current body = protectedSourceBody environment current body ||
+        any (\reference -> case M.lookup compareString reference environment of {
+          Nothing -> False;
+          Just ((,) target _) -> M.findWithDefault compareString False target current
+        }) (Surface.freeNames body) };
+      let { seeds = M.union compareString
+        (M.fromList compareString (map (\((,,) name direct _) -> (,) name direct) nodes))
+        (M.mapWithKey (\name ty -> managedType ty ||
+          M.findWithDefault compareString False name importedProtection) externals) };
+      let {
+        advance :: Int -> Map String Bool -> Map String Bool;
+        advance remaining current =
+          if remaining == 0 then current else
+            let { next = foldl
+              (\result ((,,) name direct bodies) -> M.insert compareString name
+                (direct || any (uses current) bodies) result)
+              current nodes }
+            in if eqList
+                 (\((,) name flag) ((,) other oldFlag) ->
+                   eqString name other && (if flag then oldFlag else not oldFlag))
+                 (M.toList next) (M.toList current)
+               then next else advance (remaining - 1) next
+      };
+      let { complete = advance (length nodes) seeds };
+      Right (M.filterWithKey (\name _ ->
+        elem eqString name names || elem eqString name supportNames) complete)
+    };
+  inventoryOrdinaryRegistry :: ClassInventory -> Map String String;
+  inventoryOrdinaryRegistry (ClassInventory _ _ infos _ _ _ _ _ _) =
+    M.map (\(Info _ dictionaryIdentity _ _ _) -> dictionaryIdentity) infos;
+  -- Rebuild imported calling conventions from finalized predecessor contracts.
+  -- The fixed selector environment never retains a predecessor occurrence count.
+  withExternalOverloads :: Map String SType ->
+                           Map String ((,) String ([] String)) ->
+                           Map String ((,) String ([] String));
+  withExternalOverloads externals methods =
+    M.union compareString
+      (M.mapWithKey
+        (\n ty -> case scheme ty of {
+          (,,) _ ps _ -> (,) n (map (\(SPredicate c _) -> c) ps)
+        }) externals)
+      methods;
   selectCandidates :: [] String ->
                       [] ((,) EvidenceRole String) -> IntSet -> [] ((,) EvidenceRole String);
   selectCandidates names supers indices =

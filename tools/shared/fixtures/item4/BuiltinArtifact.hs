@@ -23,7 +23,7 @@ main = do
   check "decoded Prelude reach includes canonical instance owner" (S.elem P.eqString "MLF.Primitive" (reach "Prelude"))
   check "decoded Prelude carries canonical public class identities" (all (\name -> any (\entity -> P.eqString (M.owner entity) "MLF.Primitive" && P.eqString (M.spelling entity) name && M.isRole M.Class entity) (exports "Prelude")) ["Eq", "IsString", "Monad"])
   check "decoded facade does not expose private stack authority" (all (\entity -> all (\private -> not (P.eqString (M.spelling entity) private)) ["MLFStackEvidence", "MLFStackFrame", "MLFLegacyUnit"]) (exports "Prelude"))
-  let changeIdentity name modules (A.CrateInterface _ deps _ es reach ds cs instances lowered bindings entry objectHash) = A.CrateInterface name deps modules es reach ds cs instances lowered bindings entry objectHash
+  let changeIdentity name modules (A.CrateInterface _ deps _ es reach ds cs instances lowered bindings entry objectHash protection) = A.CrateInterface name deps modules es reach ds cs instances lowered bindings entry objectHash protection
       rejects label diagnostic mutated = check label (case A.decodeInterface (A.encodeInterface mutated) of { T.Left message -> P.eqString message diagnostic; T.Right _ -> False })
   rejects "stale builtin7 rejected on metadata decode" "stale or forged builtin crate identity" (changeIdentity "mlf:builtin-shared-haskell-v1:7" (A.crateModules iface) iface)
   rejects "user crate cannot own builtin modules" "stale or forged builtin crate identity" (changeIdentity "user-forgery" (A.crateModules iface) iface)

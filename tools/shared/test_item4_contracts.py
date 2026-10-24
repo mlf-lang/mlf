@@ -53,7 +53,7 @@ def process_memory(group):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--suite', choices=['artifact', 'interpreter', 'host', 'native', 'core', 'builtin', 'query', 'source', 'managed', 'interpreter-stack', 'native-stack', 'native-unit', 'host-stack', 'authority', 'pattern-do', 'separate'], required=True)
+    parser.add_argument('--suite', choices=['artifact', 'interpreter', 'host', 'native', 'core', 'builtin', 'query', 'source', 'managed', 'interpreter-stack', 'native-stack', 'native-unit', 'host-stack', 'authority', 'pattern-do', 'separate', 'source-scc', 'source-crates'], required=True)
     parser.add_argument('--build-dir', type=Path, required=True)
     parser.add_argument('--ghc', default='ghc')
     parser.add_argument('--cc', default='cc')
@@ -139,9 +139,9 @@ def main():
             receipt['tools'][str(libdir / 'settings')] = sha(libdir / 'settings')
             manifest = json.loads((ROOT / 'shared-sources.json').read_text())
             fixture = {'artifact': 'ArtifactIdentity.hs', 'interpreter': 'InterpreterIO.hs',
-                       'host': 'HostIO.hs', 'core': 'CoreIdentity.hs', 'builtin': 'BuiltinArtifact.hs', 'query': 'QueryCache.hs', 'source': 'SourceSemantics.hs', 'managed': 'ManagedArtifacts.hs', 'interpreter-stack': 'InterpreterStack.hs', 'host-stack': 'HostStack.hs', 'authority': 'ArtifactAuthority.hs', 'pattern-do': 'PatternDo.hs', 'separate': 'SeparateCrates.hs'}[args.suite]
+                       'host': 'HostIO.hs', 'core': 'CoreIdentity.hs', 'builtin': 'BuiltinArtifact.hs', 'query': 'QueryCache.hs', 'source': 'SourceSemantics.hs', 'managed': 'ManagedArtifacts.hs', 'interpreter-stack': 'InterpreterStack.hs', 'host-stack': 'HostStack.hs', 'authority': 'ArtifactAuthority.hs', 'pattern-do': 'PatternDo.hs', 'separate': 'SeparateCrates.hs', 'source-scc': 'SourceSCC.hs', 'source-crates': 'SourceCrates.hs'}[args.suite]
             flags = ['-I' + str(ROOT / 'runtime'), '--make', '-j1', '-O0', '-fforce-recomp', '-fpedantic-bottoms', '-fno-state-hack', '-rtsopts',
-                     '-package-env', '-', '-no-user-package-db', '-i',
+                     '-package-env', '-', '-no-user-package-db', '-i', '-i' + str(FIXTURES),
                      *['-i' + str(ROOT / p) for p in manifest['source_roots']],
                      '-odir', out / 'objects', '-hidir', out / 'objects', '-o', binary]
             (out / 'objects').mkdir(exist_ok=True)
@@ -162,11 +162,11 @@ def main():
             if len(receipt['isolated_c_objects']) != 2:
                 raise RuntimeError('expected two isolated C objects')
         arguments = [binary]
-        if args.suite in {'source', 'pattern-do', 'separate'}:
+        if args.suite in {'source', 'pattern-do', 'separate', 'source-scc', 'source-crates'}:
             arguments.extend(['+RTS', '-M700m', '-RTS'])
-        if args.suite == 'separate':
+        if args.suite in {'separate', 'source-crates'}:
             arguments.insert(1, out)
-        if args.suite == 'query':
+        if args.suite in {'query', 'source-scc'}:
             arguments.append(out / ('cache-' + str(time.time_ns())))
         if args.suite == 'native-unit':
             arguments.append(out / 'unit-write.txt')

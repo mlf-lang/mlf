@@ -17,6 +17,7 @@ module Bootstrap.Crate where {
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.InferenceUnit as Inference;
   import qualified Bootstrap.CrateQuery as Query;
+  import qualified Bootstrap.SourceInference as Source;
   import qualified Bootstrap.CrateArtifact as Artifact;
   -- The package driver supplies the source inventory for exactly one crate.
   -- Dependency paths designate generated metadata, never upstream sources.
@@ -240,20 +241,25 @@ module Bootstrap.Crate where {
             (\((,) _ iface) ->
                map (\name -> (,) name (Artifact.crateId iface)) (Artifact.crateModules iface))
             interfaces));
-  data PreparedCrate =
-    PreparedCrate Modules.ResolvedCrate ([] DataDecl) ([] SClassDecl) ([]
-                                                                           ((,) String
-                                                                            SInstanceDecl)) Inference.LoweredDeclarations String (Map
-                                                                                                                                  String
-                                                                                                                                  (Set
-                                                                                                                                   String));
-  preparedResolution (PreparedCrate r _ _ _ _ _ _) = r;
-  preparedData (PreparedCrate _ ds _ _ _ _ _) = ds;
-  preparedClasses (PreparedCrate _ _ cs _ _ _ _) = cs;
-  preparedInstances (PreparedCrate _ _ _ instances _ _ _) = instances;
-  preparedLowered (PreparedCrate _ _ _ _ lowered _ _) = lowered;
-  preparedEntry (PreparedCrate _ _ _ _ _ entry _) = entry;
-  preparedReach (PreparedCrate _ _ _ _ _ _ reach) = reach;
+  data PreparedCrate = PreparedCrate Modules.ResolvedCrate ([] DataDecl)
+    ([] SClassDecl) ([] ((,) String SInstanceDecl)) Inference.LoweredDeclarations
+    String (Map String (Set String)) (Maybe Source.SourcePlan);
+  preparedResolution (PreparedCrate r _ _ _ _ _ _ _) = r;
+  preparedData (PreparedCrate _ ds _ _ _ _ _ _) = ds;
+  preparedClasses (PreparedCrate _ _ cs _ _ _ _ _) = cs;
+  preparedInstances (PreparedCrate _ _ _ instances _ _ _ _) = instances;
+  preparedLowered (PreparedCrate _ _ _ _ lowered _ _ _) = lowered;
+  preparedEntry (PreparedCrate _ _ _ _ _ entry _ _) = entry;
+  preparedReach (PreparedCrate _ _ _ _ _ _ reach _) = reach;
+  preparedSourcePlan (PreparedCrate _ _ _ _ _ _ _ plan) = plan;
+  preparedLayouts prepared = case preparedSourcePlan prepared of {
+    Just plan -> Source.planData plan;
+    Nothing -> Inference.loweredData (preparedLowered prepared)
+  };
+  preparedNames prepared = case preparedSourcePlan prepared of {
+    Just plan -> Source.planNames plan;
+    Nothing -> Inference.loweredNames (preparedLowered prepared)
+  };
   entryDeclaration spec resolution =
     if eqString (specEntry spec) ""
     then Right ((,) "" [])
@@ -418,20 +424,26 @@ module Bootstrap.Crate where {
                 M.union compareString (M.map (Modules.displayNames sourceNames) dictionaries)
                   sourceNames
             };
-            lowered <-
-              mapLeft (Modules.displayNames diagnosticNames)
+            sourcePlan <- mapLeft (Modules.displayNames diagnosticNames)
+              (Source.prepareSourcePlan imported allData allClasses (map snd instances)
+                valueScopes (map (\((,) owner _) -> candidates owner) instances) values);
+            lowered <- case sourcePlan of {
+              Nothing -> mapLeft (Modules.displayNames diagnosticNames)
                 (Inference.lowerDeclarationsWithImports imported allData allClasses
-                   (map snd instances)
-                   valueScopes
-                   (map (\((,) owner _) -> candidates owner) instances)
-                   values);
+                  (map snd instances) valueScopes
+                  (map (\((,) owner _) -> candidates owner) instances) values);
+              Just plan -> Right (case Source.planLegacy plan of {
+                Right legacy -> legacy;
+                Left message -> panic message
+              })
+            };
             Right
               (PreparedCrate resolution ownData ownClasses
                  (map (\((,) _ ((,) name inst)) -> (,) name (Separate.stripInstance inst))
                     localInstances)
                  lowered
                  entry
-                 reach)
+                 reach sourcePlan)
           }
       }
     };
@@ -451,13 +463,27 @@ module Bootstrap.Crate where {
                  "metadata")
             interfaces
       };
-      compiled <-
-        Query.compileGroups (specIdentity spec) (specCache spec) imported
-          (Inference.loweredData lowered)
-          (Inference.loweredValues lowered);
+      let {
+        protected = foldl
+          (\acc entry -> M.insert compareString (fst entry)
+            (snd entry || M.findWithDefault compareString False (fst entry) acc) acc)
+          M.empty (concatMap (\p -> Artifact.crateProtection (snd p)) interfaces)
+      };
+      compiled <- case preparedSourcePlan prepared of {
+        Just plan -> Query.compileSourceGroups (specIdentity spec) (specCache spec)
+          imported protected plan;
+        Nothing -> do {
+          result <- Query.compileGroups (specIdentity spec) (specCache spec) imported
+            (Inference.loweredData lowered) (Inference.loweredValues lowered);
+          ioReturn (mapEither (\((,) fragments report) -> (,,) fragments report
+            (M.fromList compareString
+              (map (\((,) name ty) -> (,) name (Source.SourceContract ty [] True))
+                (concatMap (\f -> Separate.unitBindings (Separate.objectInterface f)) fragments)))) result)
+        }
+      };
       case compiled of {
         Left message -> ioReturn (Left message);
-        Right ((,) fragments report) ->
+        Right ((,,) fragments report contracts) ->
           ioReturn
             (do {
                let {
@@ -494,7 +520,7 @@ module Bootstrap.Crate where {
                let {
                  layouts =
                    filter (\d -> not (Set.member compareString (D.datatypeName d) externalLayouts))
-                     (Inference.loweredData lowered)
+                     (preparedLayouts prepared)
                };
                let {
                  modules = map (\r -> Modules.moduleIdentity (Modules.resolvedSource r)) resolved
@@ -513,6 +539,11 @@ module Bootstrap.Crate where {
                  bindings =
                    concatMap (\f -> Separate.unitBindings (Separate.objectInterface f)) fragments
                };
+               protection <- traverseEither
+                 (\((,) name _) -> case M.lookup compareString name contracts of {
+                   Just contract -> Right ((,) name (Source.contractProtected contract));
+                   Nothing -> Left ("final source binding lacks a protection contract: " ++ name)
+                 }) bindings;
                let {
                  iface =
                    Artifact.CrateInterface (specIdentity spec) dependencies modules exports reach
@@ -523,6 +554,7 @@ module Bootstrap.Crate where {
                      bindings
                      (preparedEntry prepared)
                      "pending"
+                     protection
                };
                let {
                  object = Artifact.makeObject iface fragments
@@ -637,7 +669,7 @@ module Bootstrap.Crate where {
                   diagnostics =
                     M.union compareString
                       (M.map (Modules.displayNames names)
-                         (Inference.loweredNames (preparedLowered prepared)))
+                         (preparedNames prepared))
                       names
                 } in
                 ioReturn (Left (Modules.displayNames diagnostics message));

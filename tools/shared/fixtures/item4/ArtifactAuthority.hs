@@ -29,7 +29,7 @@ resolve name text = do
   case filter (\r -> B.unpack (Modules.moduleIdentity (Modules.resolvedSource r)) == name) (toList (Modules.resolvedCrateModules crate)) of
     [resolved] -> pure resolved
     _ -> error "missing uniquely resolved module"
-emptyIface ds = A.CrateInterface "forged" [] [] [] [] ds [] [] ds [] "" "object"
+emptyIface ds = A.CrateInterface "forged" [] [] [] [] ds [] [] ds [] "" "object" []
 main = do
   let malformedCons = Modules.Entity "Prelude" ":" (Modules.Constructor "Wrong")
       genuineCons = Modules.Entity "Prelude" ":" (Modules.Constructor "[]")
@@ -62,7 +62,7 @@ main = do
     T.Left _ -> True
     _ -> False
   let fakeClass = T.SClassDecl "MLFHasCallStack" (list [(,) "a" T.Star]) [] []
-      fakeClassIface = A.CrateInterface "fake-class" [] [] [] [] [] (list [fakeClass]) [] [] [] "" "object"
+      fakeClassIface = A.CrateInterface "fake-class" [] [] [] [] [] (list [fakeClass]) [] [] [] "" "object" []
   check "ordinary class metadata cannot claim compiler-managed predicate" $ case A.validateLayouts (list [fakeClassIface]) of
     T.Left message -> "compiler-managed constraint, not a class" `isInfixOf` B.unpack message
     _ -> False
@@ -70,7 +70,7 @@ main = do
                             Modules.Entity "MLF.Primitive" "MLFStackEvidence" (Modules.Constructor "MLFStackEvidence")]
       forgedExports = A.CrateInterface "forged-exports" [] (list ["User"])
         (list [(,) "User" privateExports]) (list [(,) "User" []])
-        [] [] [] [] [] "" "object"
+        [] [] [] [] [] "" "object" []
   check "private intrinsic type and constructor exports require real ownership" $ case A.validateExportBoundary M.empty forgedExports of
     T.Left message -> "outside its dependency boundary" `isInfixOf` B.unpack message
     _ -> False
@@ -86,7 +86,7 @@ main = do
       managed = Modules.Entity "MLF.Primitive" "HasCallStack" Modules.ManagedConstraint
       facadeIface = A.CrateInterface "facade" [] (list ["Facade"])
         (list [(,) "Facade" entities]) (list [(,) "Facade" (list ["MLF.Primitive"])])
-        [] [] [] [] [] "" "object"
+        [] [] [] [] [] "" "object" []
   check "qualified import reexport retains exact managed identity" $
     S.eqList (\a b -> Modules.compareEntity a b == 0) entities (list [managed])
   _ <- expect "managed reexport interface authority" (A.validateInterface facadeIface)
@@ -104,7 +104,7 @@ main = do
       visible = list [typeEntity, onlyEntity]
       hiddenIface = A.CrateInterface identity [] (list ["Provider"])
         (list [(,) "Provider" visible]) (list [(,) "Provider" []])
-        (list [family]) [] [] (list [family]) [] "" "object"
+        (list [family]) [] [] (list [family]) [] "" "object" []
   restored <- expect "decode restricted-constructor interface" (A.decodeInterface (A.encodeInterface hiddenIface))
   _ <- expect "validate complete hidden-constructor layout" (A.validateLayouts (list [restored]))
   check "hidden constructors survive interface refutability inventory" $ case A.crateData restored of

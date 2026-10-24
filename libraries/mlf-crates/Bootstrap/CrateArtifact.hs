@@ -11,6 +11,7 @@ module Bootstrap.CrateArtifact where {
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Host as Host;
   import qualified Bootstrap.Classes as Classes;
+  import qualified Bootstrap.Fresh as Fresh;
   import qualified Bootstrap.CompilerCore as Compiler;
   import qualified Bootstrap.Parser as Parser;
   import qualified Bootstrap.Surface as Surface;
@@ -43,22 +44,23 @@ module Bootstrap.CrateArtifact where {
                                                                                                                                                           DataDecl) ([]
                                                                                                                                                                      ((,)
                                                                                                                                                                       String
-                                                                                                                                                                      XType)) String String;
+                                                                                                                                                                      XType)) String String ([] ((,) String Bool));
   data CrateObject =
     CrateObject CrateInterface ([] Separate.UnitObject) |
     LegacyCrateObject CrateInterface ([] Separate.UnitObject);
-  crateId (CrateInterface n _ _ _ _ _ _ _ _ _ _ _) = n;
-  crateDependencies (CrateInterface _ ds _ _ _ _ _ _ _ _ _ _) = ds;
-  crateModules (CrateInterface _ _ ms _ _ _ _ _ _ _ _ _) = ms;
-  crateExports (CrateInterface _ _ _ es _ _ _ _ _ _ _ _) = es;
-  crateImports (CrateInterface _ _ _ _ is _ _ _ _ _ _ _) = is;
-  crateData (CrateInterface _ _ _ _ _ ds _ _ _ _ _ _) = ds;
-  crateClasses (CrateInterface _ _ _ _ _ _ cs _ _ _ _ _) = cs;
-  crateInstances (CrateInterface _ _ _ _ _ _ _ is _ _ _ _) = is;
-  crateLoweredData (CrateInterface _ _ _ _ _ _ _ _ ds _ _ _) = ds;
-  crateBindings (CrateInterface _ _ _ _ _ _ _ _ _ bs _ _) = bs;
-  crateEntry (CrateInterface _ _ _ _ _ _ _ _ _ _ e _) = e;
-  crateObjectFingerprint (CrateInterface _ _ _ _ _ _ _ _ _ _ _ h) = h;
+  crateId (CrateInterface n _ _ _ _ _ _ _ _ _ _ _ _) = n;
+  crateDependencies (CrateInterface _ ds _ _ _ _ _ _ _ _ _ _ _) = ds;
+  crateModules (CrateInterface _ _ ms _ _ _ _ _ _ _ _ _ _) = ms;
+  crateExports (CrateInterface _ _ _ es _ _ _ _ _ _ _ _ _) = es;
+  crateImports (CrateInterface _ _ _ _ is _ _ _ _ _ _ _ _) = is;
+  crateData (CrateInterface _ _ _ _ _ ds _ _ _ _ _ _ _) = ds;
+  crateClasses (CrateInterface _ _ _ _ _ _ cs _ _ _ _ _ _) = cs;
+  crateInstances (CrateInterface _ _ _ _ _ _ _ is _ _ _ _ _) = is;
+  crateLoweredData (CrateInterface _ _ _ _ _ _ _ _ ds _ _ _ _) = ds;
+  crateBindings (CrateInterface _ _ _ _ _ _ _ _ _ bs _ _ _) = bs;
+  crateEntry (CrateInterface _ _ _ _ _ _ _ _ _ _ e _ _) = e;
+  crateObjectFingerprint (CrateInterface _ _ _ _ _ _ _ _ _ _ _ h _) = h;
+  crateProtection (CrateInterface _ _ _ _ _ _ _ _ _ _ _ _ protection) = protection;
   objectInterface (CrateObject i _) = i;
   objectInterface (LegacyCrateObject i _) = i;
   objectFragments (CrateObject _ fs) = fs;
@@ -139,9 +141,9 @@ module Bootstrap.CrateArtifact where {
          (sortPairs is));
   encodeDependency ((,,) name path semantic) =
     Separate.pack ((:) name ((:) path ((:) semantic [])));
-  -- The ABI excludes object checksums, dependency ABI digests and private value
-  -- schemes. Query keys additionally record the precise schemes they consume;
-  -- this is necessary for a facade which merely reexports a dependency entity.
+  -- The ABI excludes object checksums and private value contracts. Facades with
+  -- foreign exports additionally retain stable dependency semantic identities,
+  -- so protection-only changes propagate without depending on relocated paths.
   semanticFingerprint iface =
     let {
       exported = concatMap snd (crateExports iface)
@@ -154,7 +156,7 @@ module Bootstrap.CrateArtifact where {
     } in
     let {
       fields =
-        (:) "MLF-CRATE-SEMANTICS-4"
+        (:) "MLF-CRATE-SEMANTICS-5"
           ((:) (crateId iface)
              ((:) (encodeExports (crateExports iface))
                 ((:) (encodeImports (crateImports iface))
@@ -165,9 +167,33 @@ module Bootstrap.CrateArtifact where {
                             (unlines (map D.prettyDeclaration (sortData (crateLoweredData iface))))
                             ((:) (encodeBindings public) [])))))))
     } in
-    Separate.fingerprint (Separate.pack fields);
+    Separate.fingerprint (Separate.pack
+      (append fields ((:) (encodeProtection
+        (filter (\entry -> Set.member compareString (fst entry) publicNames) (crateProtection iface)))
+        ((:) (Separate.pack (if any (\entity -> not (elem eqString (Modules.owner entity) (crateModules iface))) exported
+          then map (\((,,) name _ semantic) -> Separate.pack [name, semantic])
+            (sortDependencies (crateDependencies iface)) else [])) []))));
+  encodeProtection values = Separate.pack (map
+    (\((,) name protected) -> Separate.pack [name, if protected then "true" else "false"])
+    (sortPairs values));
+  decodeProtection :: String -> Either String ([] ((,) String Bool));
+  decodeProtection value = do {
+    fields <- Separate.unpack value;
+    traverseEither (\field -> do {
+      pair <- Separate.unpack field;
+      case pair of {
+        [name, flag] ->
+          if eqString flag "true" then Right ((,) name True)
+          else if eqString flag "false" then Right ((,) name False)
+          else Left "malformed crate protection flag";
+        _ -> Left "malformed crate protection entry"
+      }
+    }) fields
+  };
   interfaceFields iface =
-    (:) "MLFCI-4"
+    snoc (rawInterfaceFields iface) (encodeProtection (crateProtection iface));
+  rawInterfaceFields iface =
+    (:) "MLFCI-5"
       ((:) (crateId iface)
          ((:) (Separate.pack (map encodeDependency (sortDependencies (crateDependencies iface))))
             ((:) (Separate.pack (sortStrings (crateModules iface)))
@@ -321,6 +347,10 @@ module Bootstrap.CrateArtifact where {
       uniqueNames "module exports" (map fst (crateExports iface));
       uniqueNames "module reach" (map fst (crateImports iface));
       uniqueNames "binding" (map fst (crateBindings iface));
+      uniqueNames "binding protection" (map fst (crateProtection iface));
+      ensure (eqList eqString (sortStrings (map fst (crateProtection iface)))
+        (sortStrings (map fst (crateBindings iface))))
+        "crate protection inventory differs from owned bindings";
       uniqueNames "instance" (map fst (crateInstances iface));
       uniqueNames "datatype" (map D.datatypeName (crateLoweredData iface));
       ensure (not (any (\((,,) n _ _) -> eqString n (crateId iface)) (crateDependencies iface)))
@@ -359,213 +389,43 @@ module Bootstrap.CrateArtifact where {
       then Right ()
       else mapEither (\_ -> ()) (entryOwner iface)
     };
-  decodeInterface input =
-    do {
-      fields <- Separate.unpack input;
-      let {
-        matchValueShared4 = fields
-      } in
-      case matchValueShared4 of {
-        (:) matchValueShared5 matchValueShared6 ->
-          if MLF.Primitive.eqString matchValueShared5 "MLFCI-4"
-          then case matchValueShared6 of {
-                 (:) matchValueShared7 matchValueShared8 ->
-                   case matchValueShared8 of {
-                     (:) matchValueShared9 matchValueShared10 ->
-                       case matchValueShared10 of {
-                         (:) matchValueShared11 matchValueShared12 ->
-                           case matchValueShared12 of {
-                             (:) matchValueShared13 matchValueShared14 ->
-                               case matchValueShared14 of {
-                                 (:) matchValueShared15 matchValueShared16 ->
-                                   case matchValueShared16 of {
-                                     (:) matchValueShared17 matchValueShared18 ->
-                                       case matchValueShared18 of {
-                                         (:) matchValueShared19 matchValueShared20 ->
-                                           case matchValueShared20 of {
-                                             (:) matchValueShared21 matchValueShared22 ->
-                                               case matchValueShared22 of {
-                                                 (:) matchValueShared23 matchValueShared24 ->
-                                                   case matchValueShared24 of {
-                                                     (:) matchValueShared25 matchValueShared26 ->
-                                                       case matchValueShared26 of {
-                                                         (:) matchValueShared27 matchValueShared28 ->
-                                                           case matchValueShared28 of {
-                                                             (:) matchValueShared29 matchValueShared30 ->
-                                                               case matchValueShared30 of {
-                                                                 [] ->
-                                                                   let {
-                                                                     identity = matchValueShared7
-                                                                   } in
-                                                                   let {
-                                                                     deps = matchValueShared9
-                                                                   } in
-                                                                   let {
-                                                                     modules = matchValueShared11
-                                                                   } in
-                                                                   let {
-                                                                     exports = matchValueShared13
-                                                                   } in
-                                                                   let {
-                                                                     imports = matchValueShared15
-                                                                   } in
-                                                                   let {
-                                                                     metadata = matchValueShared17
-                                                                   } in
-                                                                   let {
-                                                                     instanceNames =
-                                                                       matchValueShared19
-                                                                   } in
-                                                                   let {
-                                                                     layouts = matchValueShared21
-                                                                   } in
-                                                                   let {
-                                                                     bindings = matchValueShared23
-                                                                   } in
-                                                                   let {
-                                                                     entry = matchValueShared25
-                                                                   } in
-                                                                   let {
-                                                                     bodyHash = matchValueShared27
-                                                                   } in
-                                                                   let {
-                                                                     checksum = matchValueShared29
-                                                                   } in
-                                                                   do {
-                                                                     ensure
-                                                                       (eqString checksum
-                                                                          (Separate.fingerprint
-                                                                             (Separate.pack
-                                                                                (interfacePrefix
-                                                                                   fields))))
-                                                                       "crate metadata checksum mismatch";
-                                                                     dependencies <-
-                                                                       bindEither
-                                                                         (Separate.unpack deps)
-                                                                         (traverseEither
-                                                                            decodeDependency);
-                                                                     owned <-
-                                                                       Separate.unpack modules;
-                                                                     exported <-
-                                                                       decodeExports exports;
-                                                                     reach <- decodeImports imports;
-                                                                     source <-
-                                                                       Parser.parseMetadataModule
-                                                                         "<crate metadata>"
-                                                                         ("module CrateMetadata where {\n" ++
-                                                                          (metadata ++ "\n}"));
-                                                                     lowered <-
-                                                                       Parser.parseMetadataModule
-                                                                         "<crate layout metadata>"
-                                                                         ("module CrateLayouts where {\n" ++
-                                                                          (layouts ++ "\n}"));
-                                                                     names <-
-                                                                       Separate.unpack
-                                                                         instanceNames;
-                                                                     schemes <-
-                                                                       decodeBindings bindings;
-                                                                     ensure
-                                                                       (length names ==
-                                                                        length
-                                                                          (Modules.sourceInstances
-                                                                             source))
-                                                                       "crate instance metadata count mismatch";
-                                                                     ensure
-                                                                       (null
-                                                                          (Modules.sourceValues
-                                                                             source) &&
-                                                                        (null
-                                                                           (Modules.sourceImports
-                                                                              source) &&
-                                                                         (null
-                                                                            (Modules.sourceValues
-                                                                               lowered) &&
-                                                                          (null
-                                                                             (Modules.sourceImports
-                                                                                lowered) &&
-                                                                           (null
-                                                                              (Modules.sourceClasses
-                                                                                 lowered) &&
-                                                                            null
-                                                                              (Modules.sourceInstances
-                                                                                 lowered))))))
-                                                                       "crate metadata contains executable declarations";
-                                                                     let {
-                                                                       iface =
-                                                                         CrateInterface identity
-                                                                           dependencies
-                                                                           owned
-                                                                           exported
-                                                                           reach
-                                                                           (Modules.sourceDatatypes
-                                                                              source)
-                                                                           (Modules.sourceClasses
-                                                                              source)
-                                                                           (zip names
-                                                                              (map
-                                                                                 Separate.stripInstance
-                                                                                 (Modules.sourceInstances
-                                                                                    source)))
-                                                                           (Modules.sourceDatatypes
-                                                                              lowered)
-                                                                           schemes
-                                                                           entry
-                                                                           bodyHash
-                                                                     };
-                                                                     validateInterface iface;
-                                                                     ensure
-                                                                       (eqString input
-                                                                          (encodeInterface iface))
-                                                                       "noncanonical crate metadata";
-                                                                     Right iface
-                                                                   };
-                                                                 _ ->
-                                                                   Left
-                                                                     "unsupported or malformed crate metadata (expected MLFCI-4)"
-                                                               };
-                                                             _ ->
-                                                               Left
-                                                                 "unsupported or malformed crate metadata (expected MLFCI-4)"
-                                                           };
-                                                         _ ->
-                                                           Left
-                                                             "unsupported or malformed crate metadata (expected MLFCI-4)"
-                                                       };
-                                                     _ ->
-                                                       Left
-                                                         "unsupported or malformed crate metadata (expected MLFCI-4)"
-                                                   };
-                                                 _ ->
-                                                   Left
-                                                     "unsupported or malformed crate metadata (expected MLFCI-4)"
-                                               };
-                                             _ ->
-                                               Left
-                                                 "unsupported or malformed crate metadata (expected MLFCI-4)"
-                                           };
-                                         _ ->
-                                           Left
-                                             "unsupported or malformed crate metadata (expected MLFCI-4)"
-                                       };
-                                     _ ->
-                                       Left
-                                         "unsupported or malformed crate metadata (expected MLFCI-4)"
-                                   };
-                                 _ ->
-                                   Left "unsupported or malformed crate metadata (expected MLFCI-4)"
-                               };
-                             _ -> Left "unsupported or malformed crate metadata (expected MLFCI-4)"
-                           };
-                         _ -> Left "unsupported or malformed crate metadata (expected MLFCI-4)"
-                       };
-                     _ -> Left "unsupported or malformed crate metadata (expected MLFCI-4)"
-                   };
-                 _ -> Left "unsupported or malformed crate metadata (expected MLFCI-4)"
-               }
-          else Left "unsupported or malformed crate metadata (expected MLFCI-4)";
-        _ -> Left "unsupported or malformed crate metadata (expected MLFCI-4)"
-      }
-    };
+  decodeInterface :: String -> Either String CrateInterface;
+  decodeInterface input = do {
+    fields <- Separate.unpack input;
+    case fields of {
+      [tag, identity, deps, modules, exports, imports, metadata, instanceNames,
+       layouts, bindings, entry, bodyHash, protectionField, checksum] -> do {
+        ensure (eqString tag "MLFCI-5") "unsupported crate metadata epoch (expected MLFCI-5)";
+        ensure (eqString checksum (Separate.fingerprint (Separate.pack (interfacePrefix fields))))
+          "crate metadata checksum mismatch";
+        dependencies <- bindEither (Separate.unpack deps) (traverseEither decodeDependency);
+        owned <- Separate.unpack modules;
+        exported <- decodeExports exports;
+        reach <- decodeImports imports;
+        source <- Parser.parseMetadataModule "<crate metadata>"
+          ("module CrateMetadata where {\n" ++ metadata ++ "\n}");
+        lowered <- Parser.parseMetadataModule "<crate layout metadata>"
+          ("module CrateLayouts where {\n" ++ layouts ++ "\n}");
+        names <- Separate.unpack instanceNames;
+        schemes <- decodeBindings bindings;
+        protection <- decodeProtection protectionField;
+        ensure (length names == length (Modules.sourceInstances source))
+          "crate instance metadata count mismatch";
+        ensure (null (Modules.sourceValues source) && null (Modules.sourceImports source) &&
+          null (Modules.sourceValues lowered) && null (Modules.sourceImports lowered) &&
+          null (Modules.sourceClasses lowered) && null (Modules.sourceInstances lowered))
+          "crate metadata contains executable declarations";
+        let { iface = CrateInterface identity dependencies owned exported reach
+          (Modules.sourceDatatypes source) (Modules.sourceClasses source)
+          (zip names (map Separate.stripInstance (Modules.sourceInstances source)))
+          (Modules.sourceDatatypes lowered) schemes entry bodyHash protection };
+        validateInterface iface;
+        ensure (eqString input (encodeInterface iface)) "noncanonical crate metadata";
+        Right iface
+      };
+      _ -> Left "unsupported or malformed crate metadata (expected MLFCI-5)"
+    }
+  };
   interfacePrefix :: [] String -> [] String;
   interfacePrefix fields =
     case fields of {
@@ -695,8 +555,8 @@ module Bootstrap.CrateArtifact where {
       CrateObject _ fragments -> fragmentFingerprint fragments;
       LegacyCrateObject _ fragments -> legacyFragmentFingerprint fragments
     };
-  withObjectFingerprint (CrateInterface n deps modules exports imports ds cs instances lowered bindings entry _) digest =
-    CrateInterface n deps modules exports imports ds cs instances lowered bindings entry digest;
+  withObjectFingerprint (CrateInterface n deps modules exports imports ds cs instances lowered bindings entry _ protection) digest =
+    CrateInterface n deps modules exports imports ds cs instances lowered bindings entry digest protection;
   makeObject iface fragments =
     CrateObject (withObjectFingerprint iface (fragmentFingerprint fragments)) fragments;
   -- Prelude has one shared crate identity even when several independent leaf
@@ -731,6 +591,14 @@ module Bootstrap.CrateArtifact where {
              })
           (Modules.resolvedCrateInstances resolution);
       body <- Surface.bindValues values (SConstructor "()");
+      let { protectionConfig = Just ((,) M.empty (map fst instances)) };
+      protection <- Classes.withValidatedClasses protectionConfig Set.empty M.empty Nothing
+        sourceData classes (map snd instances) body
+        (\base declarations -> do {
+          inventory <- Classes.prepareClassesBody protectionConfig Set.empty M.empty Nothing
+            sourceData (map snd instances) base declarations;
+          Fresh.freshLift (Classes.inventorySourceProtection inventory instances values)
+        });
       lowered <-
         Classes.lowerSeparateClasses M.empty (map fst instances)
           (SClassProgram sourceData classes (map snd instances) body);
@@ -759,6 +627,11 @@ module Bootstrap.CrateArtifact where {
           Separate.sortBindings
             (map (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty)) actualBindings)
       };
+      bindingProtection <- traverseEither
+        (\((,) name _) -> case M.lookup compareString name protection of {
+          Just flag -> Right ((,) name flag);
+          Nothing -> Left ("builtin binding lacks source protection provenance: " ++ name)
+        }) bindings;
       exports <-
         traverseEither
           (\r ->
@@ -785,6 +658,7 @@ module Bootstrap.CrateArtifact where {
             bindings
             ""
             "pending"
+            bindingProtection
       };
       let {
         object = makeObject iface ((:) (Separate.UnitObject fragmentInterface term) [])

@@ -18,15 +18,28 @@ module Bootstrap.Evidence where {
   sameRole SuperclassEvidence SuperclassEvidence = True;
   sameRole InstanceEvidence InstanceEvidence = True;
   sameRole _ _ = False;
-  resolveDictionary :: DataEnv ->
-                       Map XTyVar XType ->
-                       [] ((,,) EvidenceRole XName XType) -> XType -> Either String XTerm;
+  data EvidenceFailure = NoEntailment String | InvalidEvidence String;
+  evidenceFailureMessage :: EvidenceFailure -> String;
+  evidenceFailureMessage failure = case failure of {
+    NoEntailment message -> message;
+    InvalidEvidence message -> message
+  };
+  resolveDictionary :: DataEnv -> Map XTyVar XType ->
+    [] ((,,) EvidenceRole XName XType) -> XType -> Either String XTerm;
   resolveDictionary datatypes gamma candidates wanted =
+    case resolveDictionaryDetailed datatypes gamma candidates wanted of {
+      Left failure -> Left (evidenceFailureMessage failure);
+      Right term -> Right term
+    };
+  resolveDictionaryDetailed :: DataEnv ->
+                       Map XTyVar XType ->
+                       [] ((,,) EvidenceRole XName XType) -> XType -> Either EvidenceFailure XTerm;
+  resolveDictionaryDetailed datatypes gamma candidates wanted =
     do {
       let {
         proofs = closeGiven datatypes gamma candidates [] (givenSeeds candidates)
       };
-      term <- search datatypes gamma candidates proofs [] wanted;
+      term <- searchDetailed datatypes gamma candidates proofs [] wanted;
       let {
         terms =
           M.fromList X.compareName
@@ -37,8 +50,11 @@ module Bootstrap.Evidence where {
                   })
                candidates)
       };
-      actual <- Check.inferWithData datatypes (XEnv gamma terms) term;
-      unless (T.alphaEq actual wanted) (Left "dictionary evidence has the wrong type");
+      actual <- case Check.inferWithData datatypes (XEnv gamma terms) term of {
+        Left message -> Left (InvalidEvidence message);
+        Right ty -> Right ty
+      };
+      unless (T.alphaEq actual wanted) (Left (InvalidEvidence "dictionary evidence has the wrong type"));
       Right term
     };
   givenSeeds :: [] ((,,) EvidenceRole XName XType) -> [] ((,,) XTerm XType (Set XName));
@@ -59,13 +75,21 @@ module Bootstrap.Evidence where {
               (,,) r _ _ -> sameRole role r
             })
          candidates);
-  search :: DataEnv ->
+  search :: DataEnv -> Map XTyVar XType ->
+    [] ((,,) EvidenceRole XName XType) -> [] ((,) XTerm XType) ->
+    [] XType -> XType -> Either String XTerm;
+  search datatypes gamma candidates proofs seen goal =
+    case searchDetailed datatypes gamma candidates proofs seen goal of {
+      Left failure -> Left (evidenceFailureMessage failure);
+      Right term -> Right term
+    };
+  searchDetailed :: DataEnv ->
             Map XTyVar XType ->
             [] ((,,) EvidenceRole XName XType) ->
-            [] ((,) XTerm XType) -> [] XType -> XType -> Either String XTerm;
-  search datatypes gamma candidates proofs seen goal =
+            [] ((,) XTerm XType) -> [] XType -> XType -> Either EvidenceFailure XTerm;
+  searchDetailed datatypes gamma candidates proofs seen goal =
     if any (T.alphaEq goal) seen
-    then Left ("cyclic dictionary resolution: " ++ Pretty.prettyType goal)
+    then Left (NoEntailment ("cyclic dictionary resolution: " ++ Pretty.prettyType goal))
     else case matches datatypes gamma candidates GivenEvidence goal of {
            (:) ((,) term []) _ -> Right term;
            _ ->
@@ -75,19 +99,19 @@ module Bootstrap.Evidence where {
                  case matches datatypes gamma candidates InstanceEvidence goal of {
                    [] ->
                      Left
-                       ("no instance or given constraint for " ++
-                        (Pretty.prettyType goal ++ "; ambiguous uses need a type annotation"));
+                       (NoEntailment ("no instance or given constraint for " ++
+                        (Pretty.prettyType goal ++ "; ambiguous uses need a type annotation")));
                    (:) ((,) term context) [] ->
                      foldM
                        (\f predicate ->
                           do {
                             proof <-
-                              search datatypes gamma candidates proofs ((:) goal seen) predicate;
+                              searchDetailed datatypes gamma candidates proofs ((:) goal seen) predicate;
                             Right (XApp f proof)
                           })
                        term
                        context;
-                   _ -> Left ("overlapping dictionary instances: " ++ Pretty.prettyType goal)
+                   _ -> Left (NoEntailment ("overlapping dictionary instances: " ++ Pretty.prettyType goal))
                  }
              }
          };

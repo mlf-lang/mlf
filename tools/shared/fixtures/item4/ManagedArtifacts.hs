@@ -89,7 +89,7 @@ main = do
       T.Left _ -> True
       _ -> False
     _ -> False
-  let crate = A.CrateInterface "test" [] [] [] [] [] [] [] [] [] "" "object"
+  let crate = A.CrateInterface "test" [] [] [] [] [] [] [] [] [] "" "object" []
   check "current crate contract accepted" $ case A.decodeInterface (A.encodeInterface crate) of
     T.Right _ -> True
     _ -> False
