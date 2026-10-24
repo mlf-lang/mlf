@@ -9,6 +9,7 @@ module Bootstrap.Elaborate where {
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.IntSet as IS;
+  import qualified Bootstrap.Set as Set;
   import qualified Bootstrap.Kind as K;
   import qualified Bootstrap.Graph as G;
   import qualified Bootstrap.Graph.Solver as Solver;
@@ -168,6 +169,60 @@ module Bootstrap.Elaborate where {
          then XVar (XTyVar identity)
          else typeAtIn context identity)
     };
+  -- The declaration retains its own forall identities, including unused
+  -- binders. Only free references denote shared datatype-parameter graph
+  -- nodes; substituting by source spelling would lose shadowing and kinds.
+  declaredTypeIn :: TypeContext -> IntSet -> XType -> XType;
+  declaredTypeIn context local ty =
+    case ty of {
+      XVar variable ->
+        if IS.member (T.tyVarId variable) local then ty
+        else referenceIn context (T.tyVarId variable);
+      XArrow a b -> XArrow (declaredTypeIn context local a) (declaredTypeIn context local b);
+      XCon name arguments -> XCon name (map (declaredTypeIn context local) arguments);
+      XApply f a -> T.apply (declaredTypeIn context local f) (declaredTypeIn context local a);
+      XForall variable bound body ->
+        XForall variable (declaredTypeIn context local bound)
+          (declaredTypeIn context (IS.insert (T.tyVarId variable) local) body);
+      _ -> ty
+    };
+  declaredReplacementIn context kinds gamma variable =
+    let { graph = contextGraph context } in
+    let { identity = G.resolve graph (T.tyVarId variable) } in
+    if IM.member identity (G.nodes graph)
+    then graphReplacementIn context (\n -> n) gamma variable
+    else case M.lookup T.compareTyVar variable kinds of {
+      Just kind -> Right (T.bottomKind kind);
+      Nothing -> Left ("declared field lost type provenance: " ++ showInt (T.tyVarId variable))
+    };
+  -- Vacuous leading binders are removed explicitly, before the generic proof
+  -- considers target abstractions. In particular forall b.a -> a must retain
+  -- the shared external a, not attempt to instantiate it to its bound.
+  dropUnusedLeading :: XType -> XComputation;
+  dropUnusedLeading ty =
+    case ty of {
+      XForall variable _ body ->
+        let { inner = dropUnusedLeading body } in
+        if Set.member T.compareTyVar variable (T.freeVars body)
+        then if isRefl inner then XRefl else XOuter variable inner
+        else X.compose XElim inner;
+      _ -> XRefl
+    };
+  declaredFieldComputationIn :: TypeContext -> DataEnv -> Map XTyVar XType ->
+                                XType -> Int -> Either String XComputation;
+  declaredFieldComputationIn context datatypes env declaration source = do {
+    let { actual = declaredTypeIn context IS.empty declaration };
+    let { prefix = dropUnusedLeading actual };
+    normalized <- Check.checkComputationIn datatypes env prefix actual;
+    let { kinds = M.fromList T.compareTyVar (fst (Evidence.quantifiers actual)) };
+    proof <- proveInstanceUsing datatypes (declaredReplacementIn context kinds) env
+      normalized (schemeTypeIn context source);
+    let { combined = X.compose prefix proof };
+    checked <- Check.checkComputationIn datatypes env combined actual;
+    unless (T.alphaEq checked (schemeTypeIn context source))
+      (Left "declared field evidence has the wrong target");
+    Right combined
+  };
   -- Explicit signatures can retain unused binders or a different forall order.
   -- All adaptations use the same independently checked atomic computations.
   proveInstanceUsing :: DataEnv ->
@@ -310,7 +365,9 @@ module Bootstrap.Elaborate where {
     case candidate of {
       EvidenceBinding role name identity polymorphic ->
         Triple role name
-          (if polymorphic then schemeTypeIn context identity else referenceIn context identity)
+          (if polymorphic then schemeTypeIn context identity else referenceIn context identity);
+      DeclaredEvidenceBinding role name declaration ->
+        Triple role name (declaredTypeIn context IS.empty declaration)
     };
   mergeEvidence results = foldl IM.union IM.empty results;
   resolveEvidence graph typed = resolveEvidenceIn (prepareTypes graph) typed;
@@ -452,6 +509,10 @@ module Bootstrap.Elaborate where {
           FVariable name Nothing -> Right (XVarTerm name);
           FVariable name (Just edge) ->
             instantiateEdgeIn context datatypes solver env (XVarTerm name) edge;
+          FDeclaredVariable name declaration edge -> do {
+            proof <- declaredFieldComputationIn context datatypes env declaration (C.fromGen edge);
+            instantiateEdgeIn context datatypes solver env (X.instantiate (XVarTerm name) proof) edge
+          };
           FLambda name domain body edge ->
             do {
               body' <- childEdge body edge;

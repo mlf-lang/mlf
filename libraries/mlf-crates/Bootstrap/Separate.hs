@@ -128,6 +128,11 @@ module Bootstrap.Separate where {
           x <- hygieneIn env a;
           freshPure (SAnn x t)
         };
+      SSignature a t ->
+        do {
+          x <- hygieneIn env a;
+          freshPure (SSignature x t)
+        };
       SLetRec ds b ->
         do {
           scope <- hygieneBind env (map (\(Triple n _ _) -> n) ds);

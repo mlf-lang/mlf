@@ -457,8 +457,11 @@ or layouts invalidate the affected queries; unrelated declarations remain reusab
 The shared built-in Prelude is a generated compiler artifact with one identity.
 
 Import cycles do not make all declarations recursive. Only actual value SCCs
-require the existing closed recursive signatures. Acyclic values retain their
-ordinary generalization and first-class polymorphism. User-defined operator
+share recursive inference assumptions. Unsigned ordinary recursion is inferred
+across modules within one crate; signed members remain fixed polymorphic
+interfaces. Acyclic values retain ordinary generalization and first-class
+polymorphism. Cyclic dependencies between separately compiled crates remain
+unsupported. User-defined operator
 imports remain unsupported.
 
 ### Function declarations and expressions
@@ -482,9 +485,14 @@ it annotates the whole function. Parameters may have annotations, for example
 bindings (`let inc x = x + 1 in inc 41`), `do` declarations
 (`do { let inc x = x + 1; printInt (inc 41) }`), and instance methods.
 
+Declaration signatures retain their own checking mode independently of class
+declarations, so a known higher-rank argument interface can guide the function
+body. An annotation on an expression, such as `(value : Type)`, remains an
+expression coercion rather than silently becoming a declaration signature.
+
 Top-level values can refer forward to other values. The compiler orders
 dependencies and generalizes acyclic definitions as ordinary `let` bindings;
-recursive groups require signatures as described below. In module-free scripts,
+ordinary recursive groups are inferred as described below. In module-free scripts,
 class and instance declarations retain their separate scope. A final expression can select a
 result instead of `main`: `inc x = x + 1; inc 41`.
 
@@ -535,12 +543,12 @@ while an implicit block opened inside parentheses still follows indentation.
 
 ### Recursive bindings
 
-Every member of a recursive top-level dependency group needs an explicit,
-closed signature. This supports self recursion, mutual recursion, cyclic
-lazy data, and polymorphic recursion without guessing recursive MLF schemes:
+Ordinary self-recursive and mutually recursive top-level definitions do not
+need whole-binding signatures. Unsigned uses share one unsolved type within
+their inference component; the solved exports are generalized afterward,
+without generalizing captured environmental types:
 
 ```haskell
-factorial : Int -> Int
 factorial 0 = 1
 factorial n = n * factorial (n - 1)
 
@@ -553,7 +561,6 @@ local recursion, including inside `do`:
 ```haskell
 main = do
   let rec
-    countdown : Int -> IO Unit
     countdown 0 = putStrLn "done"
     countdown n = do
       printInt n
@@ -561,12 +568,19 @@ main = do
   countdown 3
 ```
 
-Local recursive groups require signatures on every binding. Quantified and
-qualified signatures, such as `forall (m : * -> *) a. Monad m => Int -> m a -> m a`,
-are supported; free annotation variables and existential signatures are not
-closed recursive interfaces. Bodies are checked against their declared schemes,
-and recursive uses instantiate those schemes. The generated xMLF `letrec` is
-verified by the existing independent checker.
+Local groups also infer unsigned ordinary recursion, including qualified
+(class-constrained) interfaces. Signed and unsigned members can coexist. A
+signature such as `forall (m : * -> *) a. Monad m => Int -> m a -> m a` supplies
+a fixed interface: its body is checked against that scheme, and recursive
+uses can instantiate it independently. Free annotation variables and
+existential signatures are not closed recursive interfaces.
+
+Recursive polymorphic instantiation still needs an appropriate declared
+interface; this is not unrestricted polymorphic-recursion inference. A local
+higher-rank parameter annotation can suffice without annotating the whole
+recursive binding. The compiler emits checked xMLF evidence while preserving
+the recursive value knot. See the [design and validation record](docs/inference/Unsigned-Recursion-Final-Validation.md)
+for exact inference limits and focused host-versus-native validation scope.
 
 ### Conditionals and operators
 
@@ -743,8 +757,19 @@ case boxed of {
 }
 ```
 
-Pattern fields are not implicitly generalized. An explicit annotation can
-expose a field's polymorphic type for independent uses, as above.
+Ordinary pattern fields are not implicitly generalized. An explicit annotation
+can expose polymorphism supplied through a datatype parameter, as above. A
+field whose declaration itself begins with `forall` already supplies that
+interface and is instantiated automatically at each use:
+
+```haskell
+data Poly = Poly (forall a. a -> a);
+case Poly (\x -> x) of { Poly f -> let number = f 42 in f true }
+```
+
+Datatype parameters captured by such a field remain shared, rather than
+freshened at each use. See the [frontend repair validation](docs/inference/Frontend-Signatures-and-Fields-Validation.md)
+for residual constructor/normalization cases involving vacuous quantifiers.
 See [`maybe.emlf`](examples/maybe.emlf),
 [`recursive-data.emlf`](examples/recursive-data.emlf), and
 [`polymorphic-data.emlf`](examples/polymorphic-data.emlf).

@@ -167,6 +167,11 @@ module Bootstrap.SourceEquality where {
           SAnn y0 y1 -> (eqSExpr x0 y0 && eqSAnnotation x1 y1);
           _ -> False
         };
+      SSignature x0 x1 ->
+        case b of {
+          SSignature y0 y1 -> (eqSExpr x0 y0 && eqSAnnotation x1 y1);
+          _ -> False
+        };
       SIntLit x0 ->
         case b of {
           SIntLit y0 -> eqInt x0 y0;

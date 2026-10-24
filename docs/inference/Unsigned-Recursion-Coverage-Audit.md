@@ -1,5 +1,9 @@
 # Focused false-negative and annotation-boundary audit
 
+Historical recursion-checkpoint record. The subsequently authorized declaration-
+signature and declared-field repairs, their separate validation and remaining
+limits are recorded in [the frontend follow-up](Frontend-Signatures-and-Fields-Validation.md).
+
 This follow-up asks whether expected ordinary-recursive programs were missed,
 not merely whether some annotations remain meaningful. It is a finite audit,
 not a claim that every inferable program is accepted. No compiler implementation

@@ -432,11 +432,12 @@ module Bootstrap.Parser where {
     if recursive
     then pMap (\ds -> SLetRec ds body) (pEither (Surface.recursiveValues values))
     else pPure (foldr (\(Triple n a e) b -> SLet n (annotateMaybe e a) b) body values);
+  -- Declaration and instance-method signatures must not become expression coercions.
   annotateMaybe :: SExpr -> Maybe SAnnotation -> SExpr;
   annotateMaybe expression ty =
     case ty of {
       Nothing -> expression;
-      Just a -> SAnn expression a
+      Just a -> SSignature expression a
     };
   parameter :: Parser (Pair String Kind);
   parameter =
@@ -1402,6 +1403,12 @@ module Bootstrap.Parser where {
           validateSharedExpression b
         };
       SAnn e (SAnnotation variables ty) ->
+        do {
+          unless (null variables) (Left "existential annotations are outside shared-haskell-v1");
+          validateSharedScheme ty;
+          validateSharedExpression e
+        };
+      SSignature e (SAnnotation variables ty) ->
         do {
           unless (null variables) (Left "existential annotations are outside shared-haskell-v1");
           validateSharedScheme ty;

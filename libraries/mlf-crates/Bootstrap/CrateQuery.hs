@@ -96,6 +96,8 @@ module Bootstrap.CrateQuery where {
       SLet n a b -> node "let" (Cons n (Cons (encodeExpression a) (Cons (encodeExpression b) Nil)));
       SAnn a annotation ->
         node "annotate" (Cons (encodeExpression a) (Cons (encodeAnnotation annotation) Nil));
+      SSignature a annotation ->
+        node "signature" (Cons (encodeExpression a) (Cons (encodeAnnotation annotation) Nil));
       SIntLit n -> node "integer" (Cons (showInt n) Nil);
       SDoubleLit n -> node "double-bits" (Cons (showInt (doubleToBits n)) Nil);
       SBoolLit b -> node "boolean" (Cons (boolean b) Nil);
@@ -303,6 +305,17 @@ module Bootstrap.CrateQuery where {
              typeDepth
              b);
       SAnn a annotation -> SAnn (child a) (canonicalAnnotation types typeDepth annotation);
+      SSignature a annotation ->
+        let {
+          names = case annotation of {
+            SAnnotation Nil ty -> leadingTypes ty;
+            _ -> Nil
+          }
+        } in
+        SSignature
+          (canonicalExpression env depth (canonicalScope "type:" types typeDepth names)
+             (typeDepth + length names) a)
+          (canonicalAnnotation types typeDepth annotation);
       SCase a branches ->
         SCase (child a)
           (map
@@ -379,8 +392,14 @@ module Bootstrap.CrateQuery where {
              body)
     };
   canonicalMember (Triple n annotation body) =
+    let {
+      names = case annotation of {
+        Just (SAnnotation Nil ty) -> leadingTypes ty;
+        _ -> Nil
+      }
+    } in
     Triple n (Separate.mapMaybeValue (canonicalAnnotation M.empty 0) annotation)
-      (canonicalExpression M.empty 0 M.empty 0 body);
+      (canonicalExpression M.empty 0 (canonicalScope "type:" M.empty 0 names) (length names) body);
   data TypeInventory =
     TypeInventory (Map String DataDecl) (Map String String) (Map String (List String));
   prepareData datatypes =

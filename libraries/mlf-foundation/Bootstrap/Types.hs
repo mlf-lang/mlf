@@ -143,6 +143,8 @@ module Bootstrap.Types where {
     SApp SExpr SExpr |
     SLet String SExpr SExpr |
     SAnn SExpr SAnnotation |
+    -- Declaration provenance is distinct from expression annotation/coercion.
+    SSignature SExpr SAnnotation |
     SIntLit Int |
     SDoubleLit Double |
     SBoolLit Bool |
@@ -268,6 +270,7 @@ module Bootstrap.Types where {
   data Typed = Typed Int Form;
   data Form =
     FVariable XName (Maybe Edge) |
+    FDeclaredVariable XName XType Edge |
     FLambda XName Int Typed Edge |
     FApply Typed Typed Edge Edge |
     FBinding XName Typed Typed Edge |
@@ -285,7 +288,7 @@ module Bootstrap.Types where {
   data RecursiveClosure = RecursiveClosure Int (IntMap Int);
   data RecursiveDefinition = RecursiveDefinition XName Int Typed Edge (Maybe RecursiveClosure);
   data Branch = Branch XPattern Typed Edge;
-  data EvidenceBinding = EvidenceBinding EvidenceRole XName Int Bool;
+  data EvidenceBinding = EvidenceBinding EvidenceRole XName Int Bool | DeclaredEvidenceBinding EvidenceRole XName XType;
   data Constraints = Constraints Graph Typed (List (Pair Int Int)) (List Edge);
   data Core =
     CVar String |
@@ -303,7 +306,7 @@ module Bootstrap.Types where {
     CRec (List (Triple String RecursiveMode Core)) Core |
     CWanted String (List (Pair EvidenceRole String)) |
     CChecked SType SExpr;
-  data Binding = Mono XName Int | Poly XName Int | RecursiveMono XName Int Int;
+  data Binding = Mono XName Int | Poly XName Int | DeclaredPoly XName Int XType | RecursiveMono XName Int Int;
   data Phase = Parsing | ModuleResolution | Inference | Resolution | Elaboration | Verification;
   data CompileError = CompileError Phase String
 }

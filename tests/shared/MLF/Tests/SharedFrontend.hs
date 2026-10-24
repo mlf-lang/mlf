@@ -9,6 +9,8 @@ module MLF.Tests.SharedFrontend where {
   import qualified Bootstrap.Parser as P;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.CrateArtifact as Artifact;
+  import qualified Bootstrap.CrateQuery as Query;
+  import qualified Bootstrap.InferenceUnit as Inference;
   import qualified Bootstrap.Lexer as L;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Surface as Surface;
@@ -484,6 +486,239 @@ module MLF.Tests.SharedFrontend where {
        "let rec { f x = if true then convert x else f x } in f 0");
     putStrLn "shared frontend: qualified recursive inference checks passed"
   };
+  -- Declaration provenance and declared-field schemes are independent repairs.
+  -- Keep expression annotations and ordinary datatype parameters as controls;
+  -- neither is permission to invent a higher-rank checking boundary.
+  frontendRepairTarget :: String -> XType -> XTerm -> IO Unit;
+  frontendRepairTarget label expected term = do {
+    recursiveCheckedType (label ++ " current target") expected (Check.checkClosed term);
+    recursiveCheckedType (label ++ " independent target") expected (Independent.checkClosed term);
+    decoded <- recursiveRight (label ++ " target parse")
+      (XP.parseTerm "FrontendRepair.xmlf" (Pretty.prettyTerm term));
+    recursiveCheckedType (label ++ " current roundtrip") expected (Check.checkClosed decoded);
+    recursiveCheckedType (label ++ " independent roundtrip") expected (Independent.checkClosed decoded);
+    check (label ++ " roundtrip erasure") (X.equalErased (X.erase term) (X.erase decoded))
+  };
+  frontendRepairProvenanceChecks :: IO Unit;
+  frontendRepairProvenanceChecks = do {
+    declaration <- recursiveRight "parse declaration provenance"
+      (P.parseExpr "FrontendRepair.emlf" "let id : forall a. a -> a = \\x -> x in id");
+    annotation <- recursiveRight "parse expression annotation provenance"
+      (P.parseExpr "FrontendRepair.emlf" "let id = ((\\x -> x) : forall a. a -> a) in id");
+    check "declaration parser retains SSignature"
+      (case declaration of { SLet _ (SSignature _ _) _ -> True; _ -> False });
+    check "expression parser retains SAnn"
+      (case annotation of { SLet _ (SAnn _ _) _ -> True; _ -> False });
+    hygienicDeclaration <- recursiveRight "hygiene declaration provenance" (Separate.hygiene declaration);
+    hygienicAnnotation <- recursiveRight "hygiene expression annotation provenance" (Separate.hygiene annotation);
+    check "separate hygiene retains SSignature"
+      (case hygienicDeclaration of { SLet _ (SSignature _ _) _ -> True; _ -> False });
+    check "separate hygiene retains SAnn"
+      (case hygienicAnnotation of { SLet _ (SAnn _ _) _ -> True; _ -> False });
+    let {
+      identityType = SForall Flexible "a" SBottom (SArrow (STVar "a") (STVar "a"));
+      signature = SAnnotation Nil (SArrow identityType (SCon "Bool" Nil));
+      expected = XArrow recursiveIdentity recursiveBool;
+      unit = XCon "Unit" Nil;
+      scopedMember = \variable -> Triple "id"
+        (Just (SAnnotation Nil (SForall Flexible variable SBottom
+          (SArrow (STVar variable) (STVar variable)))))
+        (SLam "x" (Just (SAnnotation Nil (STVar variable)))
+          (SAnn (SVar "x") (SAnnotation Nil (STVar variable))))
+    };
+    rhs <- recursiveRight "parse separate rank two body"
+      (P.parseExpr "FrontendRepair.emlf" "\\g -> let n = g 1 in g true");
+    declared <- recursiveRight "extract declaration signature"
+      (Inference.extractLoweredDeclarations
+        (SLet "use" (SSignature rhs signature) (SConstructor "Unit")));
+    annotated <- recursiveRight "extract expression annotation"
+      (Inference.extractLoweredDeclarations
+        (SLet "use" (SAnn rhs signature) (SConstructor "Unit")));
+    checked <- recursiveRight "extract generated checking boundary"
+      (Inference.extractLoweredDeclarations
+        (SLet "use" (SChecked (SArrow identityType (SCon "Bool" Nil)) rhs)
+          (SConstructor "Unit")));
+    check "separate extraction recognizes declaration signatures only"
+      (case declared of { Cons (Triple _ (Just _) _) Nil -> True; _ -> False });
+    check "separate extraction does not promote SAnn"
+      (case annotated of { Cons (Triple _ Nothing (SAnn _ _)) Nil -> True; _ -> False });
+    check "separate extraction does not promote SChecked"
+      (case checked of { Cons (Triple _ Nothing (SChecked _ _)) Nil -> True; _ -> False });
+    check "query keys distinguish declaration and expression provenance"
+      (not (eqString
+        (Query.encodeMember (Query.canonicalMember
+          (Triple "use" Nothing (SSignature rhs signature))))
+        (Query.encodeMember (Query.canonicalMember
+          (Triple "use" Nothing (SAnn rhs signature))))));
+    check "query keys alpha rename declaration scoped type variables"
+      (eqString (Query.encodeMember (Query.canonicalMember (scopedMember "a")))
+        (Query.encodeMember (Query.canonicalMember (scopedMember "b"))));
+    object <- recursiveRight "separate rank two declaration inference"
+      (Inference.compileLoweredGroup "FrontendRepair" Nil Nil declared);
+    check "separate declaration preserves prescribed rank two interface"
+      (case lookup eqString "use" (Separate.unitBindings (Separate.objectInterface object)) of {
+        Just actual -> IndependentType.alphaEq actual expected;
+        Nothing -> False
+      });
+    frontendRepairTarget "separate rank two declaration" unit (Separate.objectTerm object);
+    check "separate expression annotation still rejects rank two inference"
+      (case Inference.compileLoweredGroup "FrontendRepair" Nil Nil annotated of {
+        Left message -> recursiveStartsWith "Inference: type constructor mismatch" message;
+        Right _ -> False
+      });
+    consumer <- recursiveRight "separate rank two imported use"
+      (Inference.compileLoweredGroup "FrontendRepairConsumer"
+        (Cons (Separate.objectInterface object) Nil) Nil
+        (Cons (Triple "answer" Nothing
+          (SApp (SVar "use") (SLam "x" Nothing (SVar "x")))) Nil));
+    check "separate imported rank two use preserves prescribed Bool interface"
+      (case lookup eqString "answer" (Separate.unitBindings (Separate.objectInterface consumer)) of {
+        Just actual -> IndependentType.alphaEq actual recursiveBool;
+        Nothing -> False
+      });
+    frontendRepairTarget "separate imported rank two use"
+      (XArrow expected unit) (Separate.objectTerm consumer)
+  };
+  frontendRepairSignatureChecks :: IO Unit;
+  frontendRepairSignatureChecks = do {
+    let {
+      dummy = "class Dummy a where { dummy : a -> Bool }; ";
+      declaration = "let use : (forall a. a -> a) -> Bool = \\g -> let n = g 1 in g true in use (\\x -> x)";
+      annotation = "let use = ((\\g -> let n = g 1 in g true) : (forall a. a -> a) -> Bool) in use (\\x -> x)";
+      invalid = "let id : forall a. a -> a = \\x -> 1 in id true";
+      sharedDeclaration = "use :: (forall a. a -> a) -> Bool\nuse g = let { n = g 1 } in g True\nmain = use (\\x -> x)";
+      sharedLocal = "main = let { use :: (forall a. a -> a) -> Bool; use g = let { n = g 1 } in g True } in use (\\x -> x)";
+      sharedAnnotation = "main = let { use = ((\\g -> let { n = g 1 } in g True) :: (forall a. a -> a) -> Bool) } in use (\\x -> x)"
+    };
+    recursiveAccepted "rank two declaration without classes" declaration recursiveBool;
+    recursiveAccepted "rank two declaration with unused class" (dummy ++ declaration) recursiveBool;
+    recursiveRejected "rank two expression annotation without classes" annotation "type constructor mismatch";
+    recursiveRejected "rank two expression annotation with unused class" (dummy ++ annotation) "type constructor mismatch";
+    recursiveRejected "invalid universal declaration without classes" invalid "type constructor mismatch";
+    recursiveRejected "invalid universal declaration with unused class" (dummy ++ invalid) "type constructor mismatch";
+    recursiveAccepted "declaration signature scopes parameter type variable"
+      "let f : forall a. a -> a = \\(x :: a) -> x in f" recursiveIdentity;
+    recursiveAccepted "declaration signature scopes parameter type variable with unused class"
+      (dummy ++ "let f : forall a. a -> a = \\(x :: a) -> x in f") recursiveIdentity;
+    recursiveAccepted "recursive declaration signature scopes parameter type variable"
+      "let rec { f : forall a. a -> a; f = \\(x :: a) -> x } in f" recursiveIdentity;
+    recursiveAccepted "recursive declaration signature scopes parameter type variable with unused class"
+      (dummy ++ "let rec { f : forall a. a -> a; f = \\(x :: a) -> x } in f") recursiveIdentity;
+    recursiveAccepted "qualified expression annotation retains dictionary arity"
+      "class C a where { method : a -> Int }; instance C Int where { method x = x }; let f = ((\\x -> method x) : forall a. C a => a -> Int) in f 1"
+      recursiveInt;
+    recursiveAccepted "raw do declaration preserves rank two checking"
+      "do { let use : (forall a. a -> a) -> Bool = \\g -> let n = g 1 in g true; use (\\x -> x) }"
+      recursiveBool;
+    recursiveRejected "raw do expression annotation preserves inference"
+      "do { let use = ((\\g -> let n = g 1 in g true) : (forall a. a -> a) -> Bool); use (\\x -> x) }"
+      "type constructor mismatch";
+    recursiveAccepted "shared top declaration preserves rank two checking"
+      (source sharedDeclaration) recursiveBool;
+    recursiveAccepted "shared local declaration preserves rank two checking"
+      (source sharedLocal) recursiveBool;
+    recursiveRejected "shared expression annotation preserves inference"
+      (source sharedAnnotation) "type constructor mismatch";
+    recursiveModulesAccepted "cross module declaration preserves rank two checking"
+      (M.singleton "Use" (Pair "Use.emlf"
+        "module Use where\nuse : (forall a. a -> a) -> Bool\nuse g = let n = g 1 in g true\n"))
+      "module Main where\nimport Use\nmain = use (\\x -> x)\n" recursiveBool;
+    recursiveModulesAccepted "shared cross module declaration preserves rank two checking"
+      (M.singleton "Use" (Pair "Use.hs" (prologue ++
+        "module Use where\nimport MLF.Primitive\nuse :: (forall a. a -> a) -> Bool\nuse g = let { n = g 1 } in g True\n")))
+      (prologue ++ "module Main where\nimport MLF.Primitive\nimport Use\nmain = use (\\x -> x)\n")
+      recursiveBool;
+    frontendRepairProvenanceChecks
+  };
+  frontendRepairFieldChecks :: IO Unit;
+  frontendRepairFieldChecks = do {
+    let {
+      poly = "data Poly = Poly (forall a. a -> a); ";
+      polyType = XCon "Poly" Nil;
+      maybe = "data Maybe a = Nothing | Just a; ";
+      list = "data List a = Nil | Cons a (List a); ";
+      maybeBool = XCon "Maybe" (Cons recursiveBool Nil)
+    };
+    recursiveAccepted "declared forall field automatic integer instance"
+      (poly ++ "\\p -> case p of { Poly g -> g 1 }")
+      (XArrow polyType recursiveInt);
+    recursiveAccepted "declared forall field independent Int and Bool instances"
+      (poly ++ "\\p -> case p of { Poly g -> let n = g 1 in g true }")
+      (XArrow polyType recursiveBool);
+    recursiveAccepted "declared forall field captured by mutual recursion"
+      (poly ++ "\\p -> case p of { Poly g -> let rec { f n = if eqInt n 0 then g true else h (g n); h n = f n } in f 1 }")
+      (XArrow polyType recursiveBool);
+    recursiveAccepted "declared forall field preserves captured result parameter"
+      "data H a = H (forall b. b -> a); \\x -> case H (\\z -> x) of { H f -> let n = f 1 in f true }"
+      recursiveIdentity;
+    recursiveRejected "declared forall field cannot generalize captured result parameter"
+      "data H a = H (forall b. b -> a); \\x -> case H (\\z -> x) of { H f -> let n : Int = f 1 in (f true : Bool) }"
+      "type constructor mismatch";
+    recursiveAccepted "declared forall field shadows datatype parameter"
+      "data Shadow a = Shadow (forall a. a -> a); \\p -> case p of { Shadow f -> let n = f 1 in f true }"
+      (XForall (XTyVar 0) XBot
+        (XArrow (XCon "Shadow" (Cons (XVar (XTyVar 0)) Nil)) recursiveBool));
+    recursiveAccepted "declared forall fields retain independent schemes"
+      "data P = P (forall a. a -> a) (forall a. a -> a); \\p -> case p of { P f g -> let n = f 1 in let b = g true in let m = g 2 in f false }"
+      (XArrow (XCon "P" Nil) recursiveBool);
+    recursiveAccepted "declared forall field nested pattern extraction"
+      "data P = P (forall a. a -> a); data Outer = Outer P; \\o -> case o of { Outer (P f) -> let n = f 1 in f true }"
+      (XArrow (XCon "Outer" Nil) recursiveBool);
+    recursiveAccepted "declared forall field term shadowing retains lexical scope"
+      "data P = P (forall a. a -> a); \\p -> case p of { P f -> let f = \\x -> 1 in f true }"
+      (XArrow (XCon "P" Nil) recursiveInt);
+    recursiveAccepted "declared forall field preserves nested rank"
+      "data P = P (forall t. (forall a. a -> a) -> t -> t); \\p -> case p of { P f -> let n = f (\\x -> x) 1 in f (\\x -> x) true }"
+      (XArrow (XCon "P" Nil) recursiveBool);
+    recursiveAccepted "ordinary field preserves existing nested rank"
+      "data Use = Use ((forall a. a -> a) -> Bool); \\v -> case v of { Use k -> k (\\x -> x) }"
+      (XArrow (XCon "Use" Nil) recursiveBool);
+    recursiveAccepted "declared forall field independently instantiates higher kinds"
+      (maybe ++ list ++
+       "data HK = HK (forall (f : * -> *) a. f a -> f a); \\v -> case v of { HK k -> let n = k (Just 1) in k (Cons true Nil) }")
+      (XArrow (XCon "HK" Nil) (XCon "List" (Cons recursiveBool Nil)));
+    recursiveAccepted "declared forall field preserves captured higher kind"
+      (maybe ++
+       "data Wrap (f : * -> *) = Wrap (forall a. f a -> f a); \\v -> case v of { Wrap k -> let n = k (Just 1) in k (Just true) }")
+      (XArrow (XCon "Wrap" (Cons (XCon "Maybe" Nil) Nil)) maybeBool);
+    recursiveRejected "declared forall field cannot generalize captured higher kind"
+      (maybe ++ list ++
+       "data Wrap (f : * -> *) = Wrap (forall a. f a -> f a); \\v -> case v of { Wrap k -> let n = k (Just 1) in k (Cons true Nil) }")
+      "type constructor mismatch";
+    recursiveRejected "ordinary unknown field remains monomorphic"
+      "data Box a = Box a; case Box (\\x -> x) of { Box f -> let n = f 1 in f true }"
+      "type constructor mismatch";
+    -- A forall supplied through a datatype argument is not a syntactically
+    -- declared forall field. This separate limitation remains unchanged.
+    recursiveRejected "scrutinee annotated polymorphic datatype argument remains explicit residual"
+      "data Box a = Box a; case (Box (\\x -> x) : Box (forall a. a -> a)) of { Box f -> let n = f 1 in f true }"
+      "cannot raise a protected type variable";
+    recursiveRejected "declared universal field still checks constructor argument"
+      "data P = P (forall a. a -> a); P (\\x -> 1)"
+      "cannot instantiate a rigid or protected type variable";
+    recursiveAccepted "declared vacuous forall field extracts normalized instance"
+      "data V = V (forall a. Int); \\v -> case v of { V x -> x }"
+      (XArrow (XCon "V" Nil) recursiveInt);
+    recursiveAccepted "declared vacuous forall field preserves captured parameter"
+      "data V p = V (forall a. p); \\v -> case v of { V x -> x }"
+      (XForall (XTyVar 0) XBot
+        (XArrow (XCon "V" (Cons (XVar (XTyVar 0)) Nil)) (XVar (XTyVar 0))));
+    -- This is a known constructor-side residual, not a field-extraction fix.
+    -- Keep the original source and verification diagnostic as an explicit
+    -- control rather than silently claiming that V 1 has been repaired.
+    check "vacuous forall constructor mismatch remains explicit residual"
+      (case C.compile "FrontendRepair.emlf" "data V = V (forall a. Int); V 1" of {
+        Left error -> (case C.phase error of { Verification -> True; _ -> False }) &&
+          recursiveStartsWith "application type mismatch" (C.diagnostic error);
+        Right _ -> False
+      })
+  };
+  frontendRepairChecks :: IO Unit;
+  frontendRepairChecks = do {
+    frontendRepairSignatureChecks;
+    frontendRepairFieldChecks;
+    putStrLn "shared frontend: declaration provenance and declared forall field checks passed"
+  };
   recursiveInferenceChecks :: IO Unit;
   recursiveInferenceChecks = do {
     recursiveRight "recursive class demand planner" ClassDemandTests.checkAll;
@@ -615,6 +850,7 @@ module MLF.Tests.SharedFrontend where {
     recursiveDictionaryScopeControl;
     qualifiedRecursiveChecks;
     recursiveProjectionChecks;
+    frontendRepairChecks;
     let {
       f = XName 1 "f";
       x = XName 2 "x";

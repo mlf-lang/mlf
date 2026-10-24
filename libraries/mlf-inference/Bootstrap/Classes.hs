@@ -131,6 +131,12 @@ module Bootstrap.Classes where {
           Right result
         }
     };
+  -- Unqualified local types need no dictionary translation. Their variables
+  -- may be scoped by an enclosing checked declaration, so retain that scope
+  -- for Constraint.validateIn rather than checking them here in an empty one.
+  translateLocalScheme :: DataEnv -> Map String Info -> SType -> Either String SType;
+  translateLocalScheme ds infos ty =
+    if qualified ty then translateScheme ds infos ty else Right ty;
   checkPredicate :: DataEnv ->
                     Map String Info -> Map String Kind -> SPredicate -> Either String Unit;
   checkPredicate ds infos scope (SPredicate name arguments) =
@@ -915,6 +921,7 @@ module Bootstrap.Classes where {
                      | QualifiedLambda String (Maybe SAnnotation) QualifiedExpr
                      | QualifiedLet String QualifiedExpr QualifiedExpr
                      | QualifiedAnnotation QualifiedExpr SAnnotation
+                     | QualifiedSignature QualifiedExpr SAnnotation
                      | QualifiedCase QualifiedExpr (List (Pair SPattern QualifiedExpr))
                      | QualifiedChecked SType (List String) (List (Pair EvidenceRole String)) QualifiedExpr
                      | QualifiedRec (List (Triple String RecursiveMode QualifiedExpr)) QualifiedExpr;
@@ -1023,7 +1030,7 @@ module Bootstrap.Classes where {
             Nothing -> freshPure Nothing;
             Just (SAnnotation existential ty) ->
               do {
-                ty2 <- if null existential then freshLift (translateScheme ds infos ty)
+                ty2 <- if null existential then freshLift (translateLocalScheme ds infos ty)
                        else freshPure ty;
                 freshPure (Just (SAnnotation existential ty2))
               }
@@ -1035,10 +1042,11 @@ module Bootstrap.Classes where {
             (M.insert compareString x (QualifiedKnown x classes) env) candidates body;
           qualifiedJoin (QualifiedLambda x translated (qualifiedExpression result)) (Cons result Nil)
         };
-      SLet x (SAnn rhs (SAnnotation Nil ty)) body ->
+      SLet x (SSignature rhs (SAnnotation Nil ty)) body ->
         do {
-          left <- planQualifiedSigned valueScopes ds infos owner env
-            (M.findWithDefault compareString candidates x valueScopes) rhs ty;
+          left <- planQualified valueScopes ds infos owner env
+            (M.findWithDefault compareString candidates x valueScopes)
+            (SSignature rhs (SAnnotation Nil ty));
           right <- planQualified valueScopes ds infos owner
             (M.insert compareString x (QualifiedKnown x (qualifiedClasses ty)) env) candidates body;
           qualifiedMake (QualifiedLet x (qualifiedExpression left) (qualifiedExpression right))
@@ -1051,13 +1059,36 @@ module Bootstrap.Classes where {
           left <- planQualified valueScopes ds infos frame env
             (M.findWithDefault compareString candidates x valueScopes) rhs;
           build <- qualifiedFinish frame (Just owner) (qualifiedBuild left);
+          let {
+            inferred = QualifiedTemplate x frame (qualifiedNode (qualifiedExpression left));
+            binding = case rhs of {
+              -- Qualified expression annotations retain their explicit
+              -- dictionary interface, but are not declaration signatures.
+              SAnn _ (SAnnotation Nil ty) ->
+                if null (qualifiedClasses ty) then inferred
+                else QualifiedKnown x (qualifiedClasses ty);
+              _ -> inferred
+            }
+          };
           right <- planQualified valueScopes ds infos owner
-            (M.insert compareString x
-              (QualifiedTemplate x frame (qualifiedNode (qualifiedExpression left))) env)
-            candidates body;
+            (M.insert compareString x binding env) candidates body;
           qualifiedMake (QualifiedLet x (qualifiedExpression left) (qualifiedExpression right))
             (Q.RefNode (qualifiedNode (qualifiedExpression right)))
             (qualifiedMerge build (qualifiedBuild right))
+        };
+      SSignature rhs (SAnnotation existential ty) ->
+        if null existential
+        then do {
+          translated <- freshLift (translateLocalScheme ds infos ty);
+          result <- planQualifiedSigned valueScopes ds infos owner env candidates rhs ty;
+          qualifiedJoin (QualifiedSignature (qualifiedExpression result) (SAnnotation Nil translated))
+            (Cons result Nil)
+        }
+        else do {
+          freshLift (ensure (null (qualifiedClasses ty)) "qualified annotations cannot bind existentials");
+          result <- planQualified valueScopes ds infos owner env candidates rhs;
+          qualifiedJoin (QualifiedSignature (qualifiedExpression result) (SAnnotation existential ty))
+            (Cons result Nil)
         };
       SAnn rhs (SAnnotation existential ty) ->
         if not (null (qualifiedClasses ty))
@@ -1067,7 +1098,7 @@ module Bootstrap.Classes where {
         }
         else do {
           result <- planQualified valueScopes ds infos owner env candidates rhs;
-          ty2 <- if null existential then freshLift (translateScheme ds infos ty) else freshPure ty;
+          ty2 <- if null existential then freshLift (translateLocalScheme ds infos ty) else freshPure ty;
           qualifiedJoin (QualifiedAnnotation (qualifiedExpression result) (SAnnotation existential ty2))
             (Cons result Nil)
         };
@@ -1097,7 +1128,7 @@ module Bootstrap.Classes where {
                          SExpr -> SType -> Fresh QualifiedResult;
   planQualifiedSigned valueScopes ds infos owner env available expression ty =
     do {
-      translated <- freshLift (translateScheme ds infos ty);
+      translated <- freshLift (translateLocalScheme ds infos ty);
       names <- mapM (\_ -> freshName "givenDictionary") (qualifiedClasses ty);
       let { local = append (map (\n -> Pair GivenEvidence n) names) available };
       frame <- qualifiedId;
@@ -1162,7 +1193,7 @@ module Bootstrap.Classes where {
         Triple scope inferred build -> do {
           checked <- mapM (\(Triple n mode rhs) -> case mode of {
             CheckRecursive (SAnnotation Nil ty) -> do {
-              translated <- freshLift (translateScheme ds infos ty);
+              translated <- freshLift (translateLocalScheme ds infos ty);
               result <- planQualifiedSigned valueScopes ds infos owner scope
                 (M.findWithDefault compareString candidates n valueScopes) rhs ty;
               freshPure (Pair (Triple n (CheckRecursive (SAnnotation Nil translated))
@@ -1226,6 +1257,10 @@ module Bootstrap.Classes where {
           QualifiedAnnotation source annotation -> do {
             result <- renderQualified plan infos bindings source;
             freshPure (SAnn result annotation)
+          };
+          QualifiedSignature source annotation -> do {
+            result <- renderQualified plan infos bindings source;
+            freshPure (SSignature result annotation)
           };
           QualifiedCase source branches -> do {
             result <- renderQualified plan infos bindings source;
@@ -1355,6 +1390,7 @@ module Bootstrap.Classes where {
       SLet n a b ->
         SLet n (closeWanted replacements candidates a) (closeWanted replacements candidates b);
       SAnn a ty -> SAnn (closeWanted replacements candidates a) ty;
+      SSignature a ty -> SSignature (closeWanted replacements candidates a) ty;
       SCase a branches ->
         SCase (closeWanted replacements candidates a)
           (map (\(SAlternative p b) -> SAlternative p (closeWanted replacements candidates b))

@@ -56,14 +56,15 @@ module Bootstrap.InferenceUnit where {
           body = matchValueShared4
         } in
         let {
-          annotation =
+          -- A checked expression can come from a qualified SAnn too. Only
+          -- declaration provenance may restore a declaration signature here.
+          declaration =
             case rhs of {
-              SChecked ty _ -> Just (SAnnotation Nil ty);
-              SAnn _ a -> Just a;
-              _ -> Nothing
+              SSignature value annotation -> Triple n (Just annotation) value;
+              _ -> Triple n Nothing rhs
             }
         } in
-        extractDeclarations body (Cons (Triple n annotation rhs) reversed);
+        extractDeclarations body (Cons declaration reversed);
       SLetRec matchValueShared5 matchValueShared6 ->
         let {
           definitions = matchValueShared5

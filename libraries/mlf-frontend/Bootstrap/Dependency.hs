@@ -74,6 +74,7 @@ module Bootstrap.Dependency where {
       SLet n a b ->
         merge (observeExpression a) (bindObservation (S.singleton n) (observeExpression b));
       SAnn a t -> merge (observeExpression a) (observeAnnotation t);
+      SSignature a t -> merge (observeExpression a) (observeAnnotation t);
       SCase a branches ->
         merge (observeExpression a)
           (mergeMany

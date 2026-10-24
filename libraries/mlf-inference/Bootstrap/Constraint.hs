@@ -21,6 +21,7 @@ module Bootstrap.Constraint where {
   import qualified Bootstrap.Desugar as Desugar;
   import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.X.Syntax as X;
+  import qualified Bootstrap.X.Type as T;
   -- The writer keeps edges in reverse creation order. They are reversed once at
   -- the boundary; this preserves dependency-first instantiation exactly.
   data Generation = Generation Graph (List (Pair Int Int)) (List Edge);
@@ -212,6 +213,11 @@ module Bootstrap.Constraint where {
       SApp a b -> CApp (desugar a) (desugar b);
       SLet x a b -> CLet x (desugar a) (desugar b);
       SAnn a annotation -> CApp (CCoerce annotation) (desugar a);
+      SSignature a annotation ->
+        case annotation of {
+          SAnnotation Nil _ -> recursiveRHS (CheckRecursive annotation) a;
+          _ -> CApp (CCoerce annotation) (desugar a)
+        };
       SIntLit n -> CInt n;
       SDoubleLit n -> CDouble n;
       SBoolLit b -> CBool b;
@@ -310,6 +316,11 @@ module Bootstrap.Constraint where {
               e <- edge source root;
               return (FVariable name (Just e))
             };
+          Just (DeclaredPoly name source declared) ->
+            do {
+              e <- edge source root;
+              return (FDeclaredVariable name declared e)
+            };
           Just (RecursiveMono name shared export) ->
             do {
               equality root shared;
@@ -373,6 +384,8 @@ module Bootstrap.Constraint where {
                        Just (Mono name identity) ->
                          return (EvidenceBinding role name identity False);
                        Just (Poly name source) -> return (EvidenceBinding role name source True);
+                       Just (DeclaredPoly name _ declared) ->
+                         return (DeclaredEvidenceBinding role name declared);
                        Just (RecursiveMono _ _ _) ->
                          failGenerate "recursive dictionary interfaces require an explicit signature";
                        Nothing -> failGenerate ("dictionary candidate is out of scope: " ++ x)
@@ -749,9 +762,12 @@ module Bootstrap.Constraint where {
       return (Just name)
     };
   patternBindings :: List (Maybe String) ->
-                     List (Maybe XName) -> List Int -> List (Pair String Binding);
-  patternBindings (Cons (Just original) originals) (Cons (Just resolved) names) (Cons identity identities) =
-    Cons (Pair original (Mono resolved identity)) (patternBindings originals names identities);
+                     List (Maybe XName) -> List (Pair Int (Maybe XType)) -> List (Pair String Binding);
+  patternBindings (Cons (Just original) originals) (Cons (Just resolved) names) (Cons (Pair identity declared) identities) =
+    Cons (Pair original (case declared of {
+      Nothing -> Mono resolved identity;
+      Just ty -> DeclaredPoly resolved identity ty
+    })) (patternBindings originals names identities);
   patternBindings (Cons _ originals) (Cons _ names) (Cons _ identities) =
     patternBindings originals names identities;
   patternBindings _ _ _ = Nil;
@@ -769,14 +785,7 @@ module Bootstrap.Constraint where {
                 do {
                   declaration <- liftResult (D.lookupConstructor datatypes constructor);
                   fields <-
-                    mapM
-                      (\field ->
-                         do {
-                           ty <- liftResult (sourceField field);
-                           identity <- embed datatypes parameters ty;
-                           attach gen Rigid identity;
-                           return identity
-                         })
+                    mapM (patternField datatypes parameters gen)
                       (D.constructorFields (snd declaration));
                   let {
                     used = catMaybes names
@@ -813,6 +822,78 @@ module Bootstrap.Constraint where {
           e <- edge (generalization body') root;
           return (Branch (fst resolved) body' e)
         }
+    };
+  -- Only a declaration-leading forall grants independent instantiation. A
+  -- datatype parameter (even one later unified with a polymorphic type) and
+  -- every ordinary field retain their original monomorphic binding.
+  patternField :: DataEnv -> Map String Int -> Int -> Field -> Generate (Pair Int (Maybe XType));
+  patternField datatypes parameters parent field =
+    case field of {
+      Quantified _ _ _ -> do {
+        gen <- newNode (GGen (-1)) (Just parent) Flexible;
+        before <- getGraph;
+        embedded <- embedDeclaredField datatypes parameters field;
+        after <- getGraph;
+        setGraph (pruneEmbedding (G.nextId before) (fst embedded) after);
+        -- An external parameter can itself be the entire field root. attach
+        -- deliberately leaves its original owner unchanged in that case.
+        attach gen Flexible (fst embedded);
+        setNode gen (Node (GGen (fst embedded)) (Just parent) Flexible);
+        return (Pair gen (Just (snd embedded)))
+      };
+      _ -> do {
+        ty <- liftResult (sourceField field);
+        identity <- embed datatypes parameters ty;
+        attach parent Rigid identity;
+        return (Pair identity Nothing)
+      }
+    };
+  -- Keep the exact declaration alongside its graph view. Its bound IDs are
+  -- distinct from free datatype-parameter IDs, including under shadowing;
+  -- unused binders survive in the evidence type even when graph pruning drops
+  -- them. This metadata never introduces an inferred/generalized field type.
+  embedDeclaredField :: DataEnv -> Map String Int -> Field -> Generate (Pair Int XType);
+  embedDeclaredField datatypes scope field =
+    case field of {
+      Parameter name ->
+        case M.lookup compareString name scope of {
+          Nothing -> failGenerate ("unbound data type parameter: " ++ name);
+          Just identity -> return (Pair identity (XVar (XTyVar identity)))
+        };
+      Function a b -> do {
+        root <- newNode GBot Nothing Rigid;
+        x <- embedDeclaredField datatypes scope a;
+        y <- embedDeclaredField datatypes scope b;
+        attachUnscoped root scope (fst x);
+        attachUnscoped root scope (fst y);
+        setNode root (Node (GArr (fst x) (fst y)) Nothing Rigid);
+        return (Pair root (XArrow (snd x) (snd y)))
+      };
+      Applied constructor arguments -> do {
+        let { kind = D.constructorKind datatypes constructor (length arguments) };
+        head <- newNode
+          (if Kind.eqKind kind Star then GCon constructor Nil else GTyCon constructor kind)
+          Nothing Rigid;
+        foldM (\f argument -> do {
+          a <- embedDeclaredField datatypes scope argument;
+          root <- embedApplication scope (fst f) (fst a);
+          return (Pair root (T.apply (snd f) (snd a)))
+        }) (Pair head (XCon constructor Nil)) arguments
+      };
+      Application f a -> do {
+        x <- embedDeclaredField datatypes scope f;
+        y <- embedDeclaredField datatypes scope a;
+        root <- embedApplication scope (fst x) (fst y);
+        return (Pair root (T.apply (snd x) (snd y)))
+      };
+      Quantified name kind body -> do {
+        bound <- newNode (G.bottomTag kind) Nothing Flexible;
+        result <- embedDeclaredField datatypes (M.insert compareString name bound scope) body;
+        graph <- getGraph;
+        when ((bound /= fst result) && IS.member bound (G.reachable graph (fst result)))
+          (setNode bound (Node (G.tag (G.nodeAt graph bound)) (Just (fst result)) Flexible));
+        return (Pair (fst result) (XForall (XTyVar bound) (T.bottomKind kind) (snd result)))
+      }
     };
   sourceField :: Field -> Either String SType;
   sourceField field =
@@ -894,6 +975,11 @@ module Bootstrap.Constraint where {
           validateIn datatypes scope a;
           validateAnnotation datatypes scope annotation
         };
+      SSignature a annotation ->
+        case annotation of {
+          SAnnotation Nil ty -> validateIn datatypes scope (SChecked ty a);
+          _ -> validateIn datatypes scope (SAnn a annotation)
+        };
       SIntLit _ -> Right Unit;
       SDoubleLit n ->
         unless (andInt (doubleToBits n) 9218868437227405312 /= 9218868437227405312)
@@ -921,7 +1007,11 @@ module Bootstrap.Constraint where {
                  Triple _ annotation value ->
                    do {
                      validateRecursiveMode datatypes scope annotation;
-                     validateIn datatypes scope value
+                     case annotation of {
+                       InferRecursive -> validateIn datatypes scope value;
+                       CheckRecursive signature ->
+                         validateIn datatypes scope (SSignature value signature)
+                     }
                    }
                })
             definitions;
@@ -1076,6 +1166,7 @@ module Bootstrap.Constraint where {
   eraseSourceWith evidence typed =
     case form typed of {
       FVariable name _ -> XEVar name;
+      FDeclaredVariable name _ _ -> XEVar name;
       FLambda name _ body _ -> XEAbs name (eraseSourceWith evidence body);
       FApply a b _ _ -> XEApp (eraseSourceWith evidence a) (eraseSourceWith evidence b);
       FBinding name a b _ -> XELet name (eraseSourceWith evidence a) (eraseSourceWith evidence b);

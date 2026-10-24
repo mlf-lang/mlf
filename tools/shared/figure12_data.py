@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 # regenerate these digests automatically to make a test pass. Fixture values
 # below are still decoded from the maintained files, not duplicated here.
 REVIEWED_SEMANTIC_SHA256 = {
-    'tests/Tests/Figure12.emlf': 'bd7e8b61d3ece85856238424d71ec52bd1929eee090eae526fa0bbf16edd6a30',
+    'tests/Tests/Figure12.emlf': '91894a6c774ae125dbd7763977432821f688f227a0db2213fa62158ca28576d6',
     'tests/Tests/Figure12Suite.emlf': '8f91eaecf14a0e72bdf9eee9b6915cc93c54abc03264f7712f3d9efaa1147bdc',
     'tests/Tests/Helpers.emlf': 'b76ea12253a18916a3c76105f8d89ec7acdcadd50bd1bc3a91faf98ada94455a',
     'tests/Tests/Map.emlf': 'e25205f125fdc00a8e8c09f255779f3b293b50116f8eeb5b7d715a89417e0026',

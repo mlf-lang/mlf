@@ -36,6 +36,7 @@ module Bootstrap.Desugar where {
       SApp f a -> append (allNames f) (allNames a);
       SLet name a b -> Cons name (append (allNames a) (allNames b));
       SAnn a _ -> allNames a;
+      SSignature a _ -> allNames a;
       SCase a alternatives ->
         append (allNames a)
           (concatMap (\(SAlternative p b) -> append (patternVariables p) (allNames b))
@@ -87,6 +88,11 @@ module Bootstrap.Desugar where {
         do {
           value <- go a;
           freshPure (SAnn value t)
+        };
+      SSignature a t ->
+        do {
+          value <- go a;
+          freshPure (SSignature value t)
         };
       SCase a alternatives ->
         do {
@@ -152,7 +158,7 @@ module Bootstrap.Desugar where {
                   (SLet n
                      (case annotation of {
                         Nothing -> value2;
-                        Just a -> SAnn value2 a
+                        Just a -> SSignature value2 a
                       })
                      continuation)
               };

@@ -16,8 +16,11 @@ emlf $(jq -r '.source_roots[] | select(. != "host/ghc") | "-i " + .' shared-sour
 ```
 
 The direct GHC `shared-frontend --recursive-inference` executable separately
-executes the 53 focused source cases, finite-origin planner checks, and current
-plus frozen target/evidence checks. The discovery harness does not substitute
+executes the 53 recursive source cases plus 41 declaration/field repair
+compilation cases, nine provenance assertions, finite-origin planner checks,
+and current plus frozen target/evidence checks. One new compilation case
+explicitly preserves a known constructor-side rejection rather than claiming
+that residual fixed. The discovery harness does not substitute
 for those checks or claim that all 742 Core actions have been executed.
 
 `runtime/*.emlf` are three terminating host-interpreter checks. Run each with
@@ -59,6 +62,10 @@ Parity with `Tests.Separate.compileSeparateProgram`:
 5. For the three rejection fixtures, require the original `Resolution` tag
    and original exact reason substring. This is stricter than the legacy
    separately linked test's any-error assertion.
+
+Each selected fixture now also runs directly through `compileModules` before
+the saved/reloaded crate path, preserving the same source, expected type or
+error, both checkers, serialization and erasure checks.
 
 The six selected labels are the defining-module-instance positive, three
 signed-definition/instance-body/cyclic-orphan scope negatives, the exact

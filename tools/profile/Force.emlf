@@ -206,6 +206,7 @@ forceSExpr value = case value of
   SApp x0 x1 -> seq ((forceSExpr) x0) (seq ((forceSExpr) x1) (Unit))
   SLet x0 x1 x2 -> seq (scalar x0) (seq ((forceSExpr) x1) (seq ((forceSExpr) x2) (Unit)))
   SAnn x0 x1 -> seq ((forceSExpr) x0) (seq ((forceSAnnotation) x1) (Unit))
+  SSignature x0 x1 -> seq ((forceSExpr) x0) (seq ((forceSAnnotation) x1) (Unit))
   SIntLit x0 -> seq (scalar x0) (Unit)
   SDoubleLit x0 -> seq (scalar x0) (Unit)
   SBoolLit x0 -> seq (scalar x0) (Unit)
@@ -423,6 +424,7 @@ forceTyped value = case value of
 forceForm : Form -> Unit
 forceForm value = case value of
   FVariable x0 x1 -> seq ((forceXName) x0) (seq ((forceMaybe (forceEdge)) x1) (Unit))
+  FDeclaredVariable x0 x1 x2 -> seq (forceXName x0) (seq (forceXType x1) (seq (forceEdge x2) Unit))
   FLambda x0 x1 x2 x3 -> seq ((forceXName) x0) (seq (scalar x1) (seq ((forceTyped) x2) (seq ((forceEdge) x3) (Unit))))
   FApply x0 x1 x2 x3 -> seq ((forceTyped) x0) (seq ((forceTyped) x1) (seq ((forceEdge) x2) (seq ((forceEdge) x3) (Unit))))
   FBinding x0 x1 x2 x3 -> seq ((forceXName) x0) (seq ((forceTyped) x1) (seq ((forceTyped) x2) (seq ((forceEdge) x3) (Unit))))
@@ -451,6 +453,7 @@ forceBranch value = case value of
 forceEvidenceBinding : EvidenceBinding -> Unit
 forceEvidenceBinding value = case value of
   EvidenceBinding x0 x1 x2 x3 -> seq ((forceEvidenceRole) x0) (seq ((forceXName) x1) (seq (scalar x2) (seq (scalar x3) (Unit))))
+  DeclaredEvidenceBinding x0 x1 x2 -> seq (forceEvidenceRole x0) (seq (forceXName x1) (seq (forceXType x2) Unit))
 
 forceConstraints : Constraints -> Unit
 forceConstraints value = case value of
@@ -478,6 +481,7 @@ forceBinding : Binding -> Unit
 forceBinding value = case value of
   Mono x0 x1 -> seq ((forceXName) x0) (seq (scalar x1) (Unit))
   Poly x0 x1 -> seq ((forceXName) x0) (seq (scalar x1) (Unit))
+  DeclaredPoly x0 x1 x2 -> seq (forceXName x0) (seq x1 (seq (forceXType x2) Unit))
   RecursiveMono x0 x1 x2 -> seq (forceXName x0) (seq x1 (seq x2 Unit))
 
 forcePhase : Phase -> Unit

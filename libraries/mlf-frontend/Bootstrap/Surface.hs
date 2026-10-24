@@ -24,6 +24,7 @@ module Bootstrap.Surface where {
       SApp a b -> append (freeNamesRaw a) (freeNamesRaw b);
       SLet n a b -> append (freeNamesRaw a) (without (freeNamesRaw b) (Cons n Nil));
       SAnn a _ -> freeNamesRaw a;
+      SSignature a _ -> freeNamesRaw a;
       SCase a branches ->
         append (freeNamesRaw a)
           (concatMap (\(SAlternative p b) -> without (freeNamesRaw b) (patternVariables p))
@@ -114,7 +115,7 @@ module Bootstrap.Surface where {
                        (SLet n
                           (case a of {
                              Nothing -> e;
-                             Just t -> SAnn e t
+                             Just t -> SSignature e t
                            })
                           continuation);
                    _ -> Left "invalid declaration group"
@@ -175,6 +176,11 @@ module Bootstrap.Surface where {
         do {
           value <- lower a;
           freshPure (SAnn value ty)
+        };
+      SSignature a ty ->
+        do {
+          value <- lower a;
+          freshPure (SSignature value ty)
         };
       SLetRec definitions body ->
         do {

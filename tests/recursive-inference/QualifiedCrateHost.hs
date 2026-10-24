@@ -48,6 +48,7 @@ module QualifiedCrateHost where {
       SApp a b -> append (collect constructor arity a) (collect constructor arity b);
       SLam _ _ b -> collect constructor arity b;
       SAnn a _ -> collect constructor arity a;
+      SSignature a _ -> collect constructor arity a;
       SLet _ a b -> append (collect constructor arity a) (collect constructor arity b);
       SEquations rows -> concatMap (\(Pair _ rhs) -> collect constructor arity rhs) rows;
       SLetRec definitions body -> append (collect constructor arity body)
@@ -141,6 +142,23 @@ module QualifiedCrateHost where {
     assert (made == 0) "host fixture: cannot create case directory";
     let { inputs = M.fromList compareString
       (map (\(Pair name text) -> Pair name (Pair (directory ++ "/" ++ name ++ ".emlf") text)) libraries) };
+    putStrLn ("CHECK exact direct-module fixture: " ++ label);
+    case Compiler.compileModules inputs (directory ++ "/Main.emlf") source of {
+      Left error -> case expected of {
+        Nothing -> do {
+          assert (case Compiler.phase error of { Resolution -> True; _ -> False })
+            ("host fixture: wrong direct-module rejection phase: " ++ label);
+          assert (contains reason (Compiler.diagnostic error))
+            ("host fixture: wrong direct-module rejection: " ++ label)
+        };
+        Just _ -> right (Left (Compiler.prettyError error))
+      };
+      Right compiled -> case expected of {
+        Nothing -> assert False ("host fixture: accepted forbidden direct-module evidence: " ++ label);
+        Just ty -> checked ty (Compiler.compiledTerm compiled)
+      }
+    };
+    putStrLn ("PASS exact direct-module fixture: " ++ label);
     root <- right (Parser.parseModule (directory ++ "/Main.emlf") source);
     loaded <- right (Modules.loadModuleMap inputs root);
     modules <- right (traverseEither Separate.cleanSource loaded);

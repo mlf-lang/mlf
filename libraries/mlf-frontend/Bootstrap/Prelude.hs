@@ -97,6 +97,7 @@ module Bootstrap.Prelude where {
       SLet name value body ->
         Set.union compareString (freeNames value) (Set.delete compareString name (freeNames body));
       SAnn value annotation -> freeNames value;
+      SSignature value annotation -> freeNames value;
       SCase value branches ->
         Set.union compareString (freeNames value)
           (Set.unions compareString (L.map alternativeNames branches));
@@ -164,6 +165,7 @@ module Bootstrap.Prelude where {
       SApp f a -> (exprMentionsMonad f || exprMentionsMonad a);
       SLet name value body -> (exprMentionsMonad value || exprMentionsMonad body);
       SAnn value annotation -> (exprMentionsMonad value || annotationMentionsMonad annotation);
+      SSignature value annotation -> (exprMentionsMonad value || annotationMentionsMonad annotation);
       SCase value branches -> (exprMentionsMonad value || L.any alternativeMentionsMonad branches);
       SDo statements result ->
         (L.any statementMentionsMonad statements || exprMentionsMonad result);

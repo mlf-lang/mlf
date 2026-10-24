@@ -1,5 +1,9 @@
 # Unsigned recursive inference: final validation
 
+Historical recursion-checkpoint record. The subsequently authorized declaration-
+signature and declared-field repairs, their separate validation and remaining
+limits are recorded in [the frontend follow-up](Frontend-Signatures-and-Fields-Validation.md).
+
 ## Source and scope
 
 - Isolated branch: `codex/unsigned-recursion-pr22-20261024`.

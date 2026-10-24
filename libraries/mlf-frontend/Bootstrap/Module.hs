@@ -1196,6 +1196,12 @@ module Bootstrap.Module where {
           b' <- resolveBound names env (Set.insert compareString variable bound) b;
           Right (SLet variable a' b')
         };
+      SSignature a annotation ->
+        do {
+          a' <- resolveBound names env bound a;
+          annotation' <- resolveAnnotation names env annotation;
+          Right (SSignature a' annotation')
+        };
       SAnn matchValueShared19 matchValueShared20 ->
         let {
           a = matchValueShared19
