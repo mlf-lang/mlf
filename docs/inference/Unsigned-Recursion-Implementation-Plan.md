@@ -1,6 +1,6 @@
 # Ordinary recursive inference implementation plan
 
-Status: core implementation present; focused O0 source/target regressions and an independent rerun pass. Final audited O0/O2 builds and optimized focused graph-suite execution pass. Generalized recursive class interfaces remain a separate, unfinished phase. Base PR22 c0c5dddd11ed5775e2a3d5564cfeeef8383610a5. The Chinese design report is authoritative for the intended scope. This document records the implemented core representation, its invariants, and remaining verification/design obligations.
+Status: ordinary recursive SCC inference and the subsequent lexical qualified-interface phase are implemented and locally validated. Final audited O0/O2 builds, focused source/target tests, frontend checks and bounded module/saved-crate compatibility pass. See `Unsigned-Recursion-Final-Validation.md` for exact evidence and the interrupted legacy guest route; this is not a full native campaign or a principal-completeness proof. Base PR22 c0c5dddd11ed5775e2a3d5564cfeeef8383610a5. The Chinese report records the intended scope; this document records the core representation and invariants.
 
 ## Staging
 
@@ -42,13 +42,13 @@ For each unsigned RHS, elaborate under the whole group telescope (fresh, provena
 
 Final XLetRec still contains the original value binders and one original RHS each. No synthetic spine, duplicate value computation, additional value alias or erased wrapper reaches the target. Signed-only groups retain the existing evidence path.
 
-## Outstanding validation
+## Review and proof obligations
 
 - Group anchors cannot impose new constraints or rigidification; every source/shared root is valid under all graph checks.
 - Export internal copying is principal, environment-frontier identity is preserved, and no old body constraint remains capable of mutating exported generalized internals.
 - Whole-group and per-member normalization/readback agree up to the explicitly checked type-only projection, including root aliases and independent quantifier ordering.
 - Nested SCC flush order is sound in arbitrary surrounding incomplete expressions, including class evidence and annotations.
-- Signed-aware scheduling and class dictionary interfaces need their own end-to-end regressions.
+- Signed-aware scheduling and class dictionary interfaces have focused end-to-end regressions in the later phase; arbitrary-program correctness still requires the stated invariants, not only examples.
 - Current/frozen target checking, source-erasure equality and prescribed result types remain mandatory. GHC 9.14.1 was installed locally from the official checksum-verified bindist after approval. Focused O0/O2 tests pass; exact validation evidence is recorded separately.
 
 ## Qualified recursion: boundary of the core-only milestone

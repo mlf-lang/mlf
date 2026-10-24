@@ -25,3 +25,56 @@ for those checks or claim that all 742 Core actions have been executed.
 exercise factorial, a mutual recursive knot, and explicit inferred dictionary
 arguments over repeated recursive calls. They are separate from the 742-case
 Core inventory and require no LLVM/GC/native compilation.
+
+## Exact saved-crate host compatibility
+
+`QualifiedCrateHost.hs` reads the maintained literal fixture constructors from
+`tests/Tests/Modules.emlf` at runtime. It fails closed if a selected fixture is
+missing, duplicated, has a different shape, or uses an unsupported oracle. It
+never substitutes a simpler source. Build and run it using an existing completed
+shared build (and its already-installed GHC), from the repository root:
+
+```sh
+python3 tests/recursive-inference/run_saved_crate_host.py \
+  --compiler-build .mlf-build/qualified-final-O2 \
+  --build-dir .mlf-build/qualified-host-crate-audited
+```
+
+The driver verifies the existing receipt's shared/host/configuration inputs,
+compiles the raw imported compiler modules in a separate object directory, and
+records a separate `result.json` with exact fixture/harness/input/binary/log
+hashes. It does not install software or claim to be the 105-module interface
+build audit itself.
+
+Parity with `Tests.Separate.compileSeparateProgram`:
+
+1. Parse the same library/main strings with `loadModuleMap`, then `cleanSource`.
+2. Use the same `test:crate` identity, `ImplicitPrelude`, `CrateSpec`, and
+   `compileSources`; only isolated scratch/cache paths differ.
+3. Reload `.mlfci` and `.mlfco` through `loadInterfaces` and `readObject`, then
+   `linkObjects` with the original entry identity.
+4. Keep prescribed `IO Unit` (the checking oracle, not stdout), `XBot`, or
+   `XCon` results. Check production/frozen typing before and after serialization
+   and compare erasures. Never evaluate the divergent fixture.
+5. For the three rejection fixtures, require the original `Resolution` tag
+   and original exact reason substring. This is stricter than the legacy
+   separately linked test's any-error assertion.
+
+The six selected labels are the defining-module-instance positive, three
+signed-definition/instance-body/cyclic-orphan scope negatives, the exact
+unsigned divergent cross-module cycle, and the qualified cross-module export
+used at both Int and Bool. These are the same six direct-module and six
+separately linked cases, not twelve new inventory IDs.
+
+The 2026-10-24 nested-interpreter compatibility attempt completed discovery and
+all six direct-module checks, but was deliberately interrupted (exit 130) while
+compiling its first saved-crate builtin prelude, after this exact host route
+passed. The host result is **not** represented as completion of that guest run.
+
+`RecursiveModuleCompatibility.emlf` preserves the combined legacy route: live
+inventory discovery, the exported canonical-query assertion, and the same six
+module plus six crate actions. Run it with the same compiler source roots as
+the discovery command, add `-i tests/recursive-inference`, and set
+`MLF_TEST_WORK` to an existing writable project-local absolute directory. It
+can be very slow because the compiler is interpreted while producing builtin
+crate artifacts. This driver does not invoke program execution/native tests.

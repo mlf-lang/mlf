@@ -6,11 +6,7 @@ Date: 2026-10-24. This addendum records the implementation strategy following th
 
 The new `Bootstrap.ClassDemand` module implements finite dictionary-interface planning. `Bootstrap.Classes` collects lexical demand equations and materializes the resulting dictionary lambdas/applications. The ordinary constraint solver, export materialization, xMLF evidence rules, and independent target checkers retain their existing roles.
 
-At the time this addendum was written:
-
-- The planner's representation, finish-rank argument, forward discovery, and immutable saturation received independent static review.
-- An initial version of the solver passed a GHC no-code compilation during integration. Later owner-validation and small saturation changes still require the final build.
-- Planner regression helpers are written; final integrated runtime, shared-grammar, O0/O2, frozen-checker, and aggregate results are pending. This document does not claim those checks passed.
+Final local validation is complete for the bounded scope recorded in `Unsigned-Recursion-Final-Validation.md`: clean O0/O2 interface-audited builds, the 53-case recursive mode plus planner checks, frontend/source smoke, 78 existing class tests, terminating interpreter fixtures, and exact module/saved-crate compatibility. Production and unchanged frozen target checkers remain mandatory. One redundant legacy nested-interpreter saved-crate attempt was interrupted after the exact direct-GHC route passed; it is not counted as a guest pass.
 
 The implementation is **arity-only planning**, not class-instance search before type inference and not a two-pass speculative discharge algorithm. It does not establish principal completeness for the combined MLF/class language.
 
@@ -134,16 +130,16 @@ Unsigned inference follows the established ordinary-let dictionary abstraction m
 - No unrelated-use universe expansion.
 - Equal/backward rank rejection and missing references.
 
-Integrated acceptance tests must cover generic self/mutual recursion, two concrete uses outside an SCC, unused local let controls, captured predicate arguments, predicate-only ambiguity, first-class recursive values, multi-parameter/higher-kinded classes, nested h with local and inherited demands, mixed signed/unsigned recursion, superclass evidence, and module candidate seals. Declaration reorderings and alpha-renamings should preserve acceptance and externally observed types.
+Integrated acceptance tests cover generic self/mutual recursion, two concrete uses outside an SCC, unused local let controls, captured predicate arguments, predicate-only ambiguity, first-class recursive values, multi-parameter/higher-kinded classes, nested h with local and inherited demands, mixed signed/unsigned recursion, superclass evidence, and module candidate seals. Declaration reorderings and alpha-renamings should preserve acceptance and externally observed types.
 
-Positive compiler cases still need production and frozen target checking, target serialization round-trips, erasure comparison, and relevant O0/O2 execution. Negative target mutations must demonstrate rejection of missing/wrong dictionary applications or invalid scopes.
+Positive compiler cases use production and frozen target checking, target serialization round-trips, erasure comparison, and relevant O0/O2 execution. Negative target mutations demonstrate rejection of missing/wrong dictionary applications or invalid scopes.
 
-The finite-rank proof depends on correct lexical collection and frame assignment. The planner validates its structural inputs, but does not independently reconstruct source scoping. Retaining redundant origins is deliberate; minimal contexts and a principal-completeness theorem are not claimed. Final runtime coverage and aggregate validation must be recorded separately when complete.
+The finite-rank proof depends on correct lexical collection and frame assignment. The planner validates its structural inputs, but does not independently reconstruct source scoping. Retaining redundant origins is deliberate; minimal contexts and a principal-completeness theorem are not claimed. Exact runtime coverage and bounded aggregate validation are recorded separately; this does not claim the full native campaign.
 
-## Integration checkpoint
+## Historical integration checkpoint
 
-The collector/materializer in `Classes` is implemented. An incremental optimized
-GHC build passes the 53-case recursive mode and the complete direct frontend
-mode, including unchanged frozen-target checks and a generated dictionary-scope
-mutation. Final clean source-bound O0/O2 receipts and the existing interpreted
-class/module compatibility runs are still pending at this checkpoint.
+The first incremental optimized build passed the recursive and direct frontend
+modes before the final clean builds. Final receipt identities, compatibility
+routes, independent reruns, and remaining limits are recorded in
+`Unsigned-Recursion-Final-Validation.md`, rather than treating the earlier
+incremental result as authenticated final-build evidence.
