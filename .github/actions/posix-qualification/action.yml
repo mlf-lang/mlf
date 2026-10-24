@@ -83,6 +83,12 @@ runs:
         else
           tools/release/time-stage.sh qualification tools/release/native-ci.sh "$TEST_GROUP"
         fi
+    - name: Qualify tuple/list compiler and native runtime supplement
+      if: inputs.group == 'unit'
+      shell: bash
+      env:
+        MLF_TEST_BUILD_JOBS: ${{ inputs.build-jobs }}
+      run: tools/release/time-stage.sh tuple-list-qualification tools/release/qualify-tuple-list.sh
     - name: Export genuine checked port build artifacts
       if: startsWith(inputs.group, 'port-prepare-')
       id: port-export
@@ -145,6 +151,9 @@ runs:
             done
           fi
           find .mlf-build/release-evidence/compiler-tests -type f ! -path '*/framework-cli/*' ! -name verification.json ! -name build-report.json ! -name port-shard-manifest.json ! -name '*.coverage.jsonl' ! -name '*.families.jsonl' ! -path '*/suite-build/bin/*' ! -name '*.log' ! -name '*.stderr' ! -name '*.err' ! -name '*.status.json' ! -name rows.jsonl ! -name current-label ! -path '*/port-*/matrix-*/case-14-interpreter.stdout' ! -path '*/port-*/matrix-*/case-19-interpreter.stdout' ! -path '*/port-*/matrix-*/case-23-interpreter.stdout' -delete
+        fi
+        if test "$TEST_GROUP" = unit && test -d .mlf-build/tuple-list-qualification; then
+          cp -R .mlf-build/tuple-list-qualification .mlf-build/release-evidence/
         fi
         log_group=$TEST_GROUP
         case "$TEST_GROUP" in port-*) log_group=port ;; esac
