@@ -95,11 +95,11 @@ const validate = text => {
       const expectedArguments = ['tools/shared/test_framework_direct.py',
         '--build-receipt', '.mlf-build/shared-ghc/receipt.json',
         '--output', '.mlf-build/framework-direct', '--suite', leg.suite];
-      if (leg.optimization === '0' && leg.suite === 'framework') {
+      if (leg.optimization === '0' && ['default', 'framework'].includes(leg.suite)) {
         expectedArguments.push('--suite-timeout', '5400');
       }
       assert.deepEqual(frameworkArguments(framework, leg), expectedArguments,
-        `Only O0 framework gets the existing 5400-second cap; all other arguments stay unchanged`);
+        `Only O0 default/framework get the existing 5400-second cap; O2 and direct arguments stay unchanged`);
       if (['all', 'default'].includes(leg.suite)) actual.push('tuple-default-305');
       if (['all', 'framework'].includes(leg.suite)) actual.push('tuple-framework-105');
     }
@@ -140,9 +140,10 @@ const controls = [
   ['framework margin omitted', 'suite_args=(--suite-timeout 5400)', 'suite_args=()'],
   ['framework cap exceeded', 'suite_args=(--suite-timeout 5400)', 'suite_args=(--suite-timeout 5401)'],
   ['framework margin removed', 'suite_args=(--suite-timeout 5400)', 'suite_args=(--suite-timeout 4500)'],
-  ['default budget changed', "= '0:framework'", "= '0:default'"],
+  ['framework margin omitted by selector', "= '0:framework'", "= '0:default'"],
+  ['default margin omitted by selector', "= '0:default'", "= '0:framework'"],
   ['O2 budget changed', "= '0:framework'", "= '2:all'"],
-  ['all framework budgets changed', "if [ '${{ matrix.optimization }}:${{ matrix.suite }}' = '0:framework' ]; then", 'if true; then'],
+  ['all framework budgets changed', "if [ '${{ matrix.optimization }}:${{ matrix.suite }}' = '0:framework' ] || [ '${{ matrix.optimization }}:${{ matrix.suite }}' = '0:default' ]; then", 'if true; then'],
   ['direct budget override', 'python3 tools/shared/test_direct.py --bin-dir', 'python3 tools/shared/test_direct.py --suite-timeout 5400 --bin-dir'],
   ['Figure12 omitted', 'python3 tools/shared/test_figure12_direct.py', 'python3 tools/shared/omitted.py'],
   ['O2 guest omitted', "if: matrix.optimization == '2'", 'if: false'],

@@ -267,6 +267,18 @@ class FrameworkMainControls(unittest.TestCase):
                 self.assertEqual({call['name']: call['timeout_seconds'] for call in fixture.calls
                                   if call['name'] in ('default', 'framework')}, {selection: 4500})
 
+    def test_o0_default_override_preserves_other_command_budgets_and_coverage(self):
+        fixture = MainFixture(self, '0')
+        receipt = fixture.execute('--suite', 'default', '--suite-timeout', '5400')
+        self.assertEqual(receipt['execution_budget'], 5400)
+        self.assertEqual(receipt['selected_suites'], ['default'])
+        self.assertEqual((receipt['default_checks'], receipt['framework_checks']), (305, 0))
+        self.assertEqual(fixture.events, ['authenticate', *EXPECTED_DISPATCH['default'], 'authenticate'])
+        self.assertEqual({call['name']: call['timeout_seconds'] for call in fixture.calls},
+                         {label: 5400 if label == 'default' else 120 for label in EXPECTED_DISPATCH['default']})
+        self.assertTrue(receipt['complete'])
+        self.assertFalse(receipt['full_native_unit'])
+
     def test_invalid_cli_fails_before_authentication_or_execution(self):
         arguments = [('--suite', 'unknown'), ('--suite', 'default,framework'),
                      ('--suite-timeout', '0'), ('--suite-timeout', '-1'),

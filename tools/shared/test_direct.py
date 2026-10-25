@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import shutil
@@ -11,6 +12,11 @@ import signal
 import subprocess
 import sys
 import time
+
+try:
+    import resource
+except ImportError:
+    resource = None
 
 ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_CASES = [
@@ -41,7 +47,9 @@ def frontend_case_timeout(name, optimization, frontend_seconds=None):
     if name == 'frontend':
         return frontend_seconds if frontend_seconds is not None else (3600 if optimization == '0' else 1200)
     if optimization == '0':
-        return 1200
+        # Exact six-case O0 diagnosis passed in 1051s; CI exhausted 1200s.
+        # Preserve the five-case native-second limit rather than enlarging all.
+        return 1800 if name == 'native-first' else 1200
     # CI167 timed out at 120s with the identical binary that passed CI166.
     # Only these six closed native-first checks get additional finite margin.
     return 180 if name == 'native-first' else 120
@@ -167,6 +175,39 @@ def authenticate_build(receipt_path, binaries, root=ROOT):
     return producer
 
 
+def child_cpu_sample():
+    """Optional diagnostics only; never turn missing accounting into zero CPU."""
+    if resource is None:
+        return {'available': False, 'reason': 'resource module unavailable'}
+    try:
+        usage = resource.getrusage(resource.RUSAGE_CHILDREN)
+        values = [usage.ru_utime, usage.ru_stime]
+        if any(type(value) not in (int, float) or not math.isfinite(value) or value < 0
+               for value in values):
+            raise ValueError('invalid child CPU counters')
+        return {'available': True, 'user_seconds': values[0], 'system_seconds': values[1]}
+    except Exception as error:
+        return {'available': False, 'reason': type(error).__name__ + ': ' + str(error)}
+
+
+def child_cpu_interval(before, after):
+    result = {'scope': 'RUSAGE_CHILDREN-reaped-child-interval', 'available': False,
+              'limits': 'May omit unreaped/orphan/escaped descendants and include other reaped children; not total process-group CPU or a hardware-cause measurement.'}
+    if not before.get('available') or not after.get('available'):
+        result['reason'] = 'before: ' + str(before.get('reason', 'available')) + '; after: ' + str(after.get('reason', 'available'))
+        return result
+    try:
+        user = after['user_seconds'] - before['user_seconds']
+        system = after['system_seconds'] - before['system_seconds']
+        total = user + system
+        if any(not math.isfinite(value) or value < 0 for value in (user, system, total)):
+            raise ValueError('invalid child CPU interval')
+        result.update(available=True, user_seconds=user, system_seconds=system, total_seconds=total)
+    except Exception as error:
+        result['reason'] = type(error).__name__ + ': ' + str(error)
+    return result
+
+
 class CommandRunner:
     def __init__(self, root, output, receipt, save):
         self.root, self.output, self.receipt, self.save = root, output, receipt, save
@@ -219,6 +260,7 @@ class CommandRunner:
         self.save()
         stdout, stderr = b'', b''
         started = time.monotonic()
+        cpu_before = child_cpu_sample()
         process = None
         group_stopped = False
         try:
@@ -251,6 +293,7 @@ class CommandRunner:
                 path.write_bytes(data)
                 entry[suffix + '_sha256'] = sha(path)
             entry['seconds'] = time.monotonic() - started
+            entry['child_cpu'] = child_cpu_interval(cpu_before, child_cpu_sample())
             self.save()
 
 

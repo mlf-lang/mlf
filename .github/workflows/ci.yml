@@ -115,10 +115,10 @@ jobs:
       - name: Qualify authenticated TupleList default and framework semantics
         if: matrix.suite != 'direct'
         run: |
-          # CI 164's O0 framework command used 4455.57 of 4500 seconds.
-          # Use its existing authenticated cap without changing other budgets.
+          # CI164 framework used 4455.57s; CI167 default reached 302/305 at4500s.
+          # Both O0 suites use the existing bounded override; O2 stays unchanged.
           suite_args=()
-          if [ '${{ matrix.optimization }}:${{ matrix.suite }}' = '0:framework' ]; then
+          if [ '${{ matrix.optimization }}:${{ matrix.suite }}' = '0:framework' ] || [ '${{ matrix.optimization }}:${{ matrix.suite }}' = '0:default' ]; then
             suite_args=(--suite-timeout 5400)
           fi
           python3 tools/shared/test_framework_direct.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/framework-direct --suite '${{ matrix.suite }}' "${suite_args[@]}"

@@ -35,7 +35,7 @@ class FrontendExecutionBudget(unittest.TestCase):
     # reconciling its serial job with the reviewed per-mode parallel partition.
     def test_authenticated_o0_budget_is_bounded(self):
         self.assertEqual(direct.frontend_case_timeout('frontend', '0'), 3600)
-        self.assertEqual(direct.frontend_case_timeout('native-first', '0'), 1200)
+        self.assertEqual(direct.frontend_case_timeout('native-first', '0'), 1800)
         self.assertEqual(direct.frontend_case_timeout('native-second', '0'), 1200)
 
     def test_o2_budgets_have_only_the_reviewed_native_first_margin(self):
@@ -446,17 +446,17 @@ class FrontendTimeoutSelection(unittest.TestCase):
     def test_o0_budgets_come_from_authenticated_receipt(self):
         self.assertEqual(self.run_dispatch([], optimization='0'), {
             'shared-frontend-frontend': 3600,
-            'shared-frontend-native-first': 1200,
+            'shared-frontend-native-first': 1800,
             'shared-frontend-native-second': 1200,
         })
         self.assertEqual(self.run_dispatch(['--frontend-timeout', '3000'], optimization='0'), {
             'shared-frontend-frontend': 3000,
-            'shared-frontend-native-first': 1200,
+            'shared-frontend-native-first': 1800,
             'shared-frontend-native-second': 1200,
         })
         self.assertEqual(self.run_dispatch(['--frontend-timeout', '3600'], optimization='0'), {
             'shared-frontend-frontend': 3600,
-            'shared-frontend-native-first': 1200,
+            'shared-frontend-native-first': 1800,
             'shared-frontend-native-second': 1200,
         })
 
@@ -477,6 +477,9 @@ class FrontendTimeoutSelection(unittest.TestCase):
         for mode in ('native-first', 'native-second'):
             with self.subTest(mode=mode), self.assertRaisesRegex(ValueError, '1800'):
                 direct.frontend_case_timeout(mode, '2', 1801)
+        for override in (1, 3600):
+            self.assertEqual(direct.frontend_case_timeout('native-first', '0', override), 1800)
+            self.assertEqual(direct.frontend_case_timeout('native-second', '0', override), 1200)
 
     def test_o2_rejects_o0_only_override(self):
         with self.assertRaisesRegex(ValueError, '1800'):
@@ -510,6 +513,43 @@ class FrontendTimeoutSelection(unittest.TestCase):
                 self.assertFalse(output.exists())
 
 
+class ChildCpuAccounting(unittest.TestCase):
+    def sample(self, user, system):
+        fake = types.SimpleNamespace(RUSAGE_CHILDREN=-1,
+            getrusage=lambda who: types.SimpleNamespace(ru_utime=user, ru_stime=system))
+        with patch.object(direct, 'resource', fake):
+            return direct.child_cpu_sample()
+
+    def test_interval_is_finite_nonnegative_and_explicitly_scoped(self):
+        result = direct.child_cpu_interval(self.sample(1.0, 2.0), self.sample(1.25, 2.5))
+        self.assertTrue(result['available'])
+        self.assertEqual(result['user_seconds'], 0.25)
+        self.assertEqual(result['system_seconds'], 0.5)
+        self.assertEqual(result['total_seconds'], 0.75)
+        self.assertEqual(result['scope'], 'RUSAGE_CHILDREN-reaped-child-interval')
+        self.assertIn('not total process-group CPU', result['limits'])
+
+    def test_unsupported_and_sampling_error_are_unavailable_not_zero(self):
+        with patch.object(direct, 'resource', None):
+            missing = direct.child_cpu_sample()
+        fake = types.SimpleNamespace(RUSAGE_CHILDREN=-1, getrusage=lambda who: (_ for _ in ()).throw(OSError('accounting unavailable')))
+        with patch.object(direct, 'resource', fake):
+            error = direct.child_cpu_sample()
+        for sample in (missing, error):
+            result = direct.child_cpu_interval(self.sample(0, 0), sample)
+            self.assertFalse(result['available'])
+            self.assertNotIn('total_seconds', result)
+            self.assertIn('unavailable', result['reason'])
+
+    def test_invalid_counters_and_negative_intervals_are_unavailable(self):
+        for value in (-1, float('nan'), float('inf'), True, '1'):
+            with self.subTest(value=value):
+                self.assertFalse(self.sample(value, 0)['available'])
+        result = direct.child_cpu_interval(self.sample(2, 1), self.sample(1, 1))
+        self.assertFalse(result['available'])
+        self.assertNotIn('total_seconds', result)
+
+
 class CommandEvidence(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix='mlf-command-control-')
@@ -536,6 +576,8 @@ class CommandEvidence(unittest.TestCase):
         entry = self.receipt['commands'][0]
         self.assertTrue(entry['timed_out'])
         self.assertEqual(entry['state'], 'failed')
+        self.assertIn('child_cpu', entry)
+        self.assertEqual(entry['child_cpu']['scope'], 'RUSAGE_CHILDREN-reaped-child-interval')
         self.assertLess(entry['seconds'], 5)
 
     def child_command(self, name, *, redirected, leader_exits=False, escaped=False):
@@ -666,6 +708,39 @@ class CommandEvidence(unittest.TestCase):
     def test_success_checks_exact_stdout(self):
         self.runner.run('success', [sys.executable, '-c', 'print("okay")'], expected=b'okay\n')
         self.assertEqual(self.receipt['commands'][0]['state'], 'passed')
+
+    def test_cpu_metadata_does_not_change_success_or_expected_nonzero(self):
+        samples = [{'available': True, 'user_seconds': 2.0, 'system_seconds': 1.0},
+                   {'available': True, 'user_seconds': 2.25, 'system_seconds': 1.5}]
+        for status in (0, 7):
+            with self.subTest(status=status), patch.object(direct, 'child_cpu_sample', side_effect=samples):
+                self.runner.run('cpu-' + str(status), [sys.executable, '-c', 'raise SystemExit(' + str(status) + ')'],
+                                status=status, expected=b'')
+            entry = self.receipt['commands'][-1]
+            self.assertEqual(entry['state'], 'passed')
+            self.assertEqual(entry['exit_code'], status)
+            self.assertEqual(entry['child_cpu']['total_seconds'], 0.75)
+
+    def test_cpu_sampling_error_does_not_mask_success_or_failure(self):
+        fake = types.SimpleNamespace(RUSAGE_CHILDREN=-1, getrusage=lambda who: (_ for _ in ()).throw(OSError('diagnostic unavailable')))
+        with patch.object(direct, 'resource', fake):
+            self.runner.run('cpu-unavailable', [sys.executable, '-c', 'print("okay")'], expected=b'okay\n')
+            with self.assertRaisesRegex(RuntimeError, 'cpu-failed failed'):
+                self.runner.run('cpu-failed', [sys.executable, '-c', 'raise SystemExit(3)'])
+        for entry in self.receipt['commands'][-2:]:
+            self.assertFalse(entry['child_cpu']['available'])
+            self.assertNotIn('total_seconds', entry['child_cpu'])
+            self.assertIn('OSError', entry['child_cpu']['reason'])
+        self.assertEqual(self.receipt['commands'][-2]['state'], 'passed')
+        self.assertEqual(self.receipt['commands'][-1]['state'], 'failed')
+
+    def test_cpu_unavailable_platform_keeps_command_outcome(self):
+        with patch.object(direct, 'resource', None):
+            self.runner.run('cpu-unsupported', [sys.executable, '-c', 'pass'], expected=b'')
+        entry = self.receipt['commands'][-1]
+        self.assertEqual(entry['state'], 'passed')
+        self.assertFalse(entry['child_cpu']['available'])
+        self.assertNotIn('total_seconds', entry['child_cpu'])
 
     def test_frontend_success_requires_all_maintained_banners(self):
         expected = next(output for _, mode, output in direct.FRONTEND_CASES if mode == '--frontend')

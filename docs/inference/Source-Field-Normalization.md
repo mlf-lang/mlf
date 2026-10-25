@@ -278,3 +278,75 @@ every test, completion banner, stderr/status assertion and cleanup rule is
 unchanged. CI167's O0 jobs are allowed to finish before publishing this correction.
 If the new native-first bound is also exhausted, per-case progress/cost diagnosis
 is required before considering another policy change.
+
+## CI167 terminal diagnosis and coherent next-run policy
+
+CI167 completed with three failed compiler shards, not a green aggregate. O0
+frontend did pass all four exact banners in 2514.47 seconds under 3600; its next
+native-first command exhausted 1200.08 seconds. O0 default exhausted 4500.06
+seconds with 302/305 PASS lines, an exact byte-prefix of CI166's complete output.
+Both failures had empty stderr and complete bounded cleanup. O0 framework passed
+all 105 cases and associated controls in 2568.65 seconds. Each shard's recorded
+158 source inputs, 226 object/interface entries, 12 executable identities and
+flags equal its CI166 counterpart. No assertion failure or particular host CPU
+cause is inferred from these elapsed-time results.
+
+Before changing more policy, isolated diagnostic harnesses executed the exact
+original source strings, helper calls and oracles, without rerunning whole suites:
+
+- All six native-first cases passed at O2 in 110.84 seconds and current O0 in
+  1051.36 seconds. The six O0 cases were uniformly 173.86–176.73 seconds; process
+  CPU totaled 1053.31 seconds. There was no isolated stuck case in this observation.
+- One exact same-machine O0 case took 151.08 seconds at stable `4af89535` and
+  178.37 seconds currently, an 18.1% wall/CPU increase in one ordered pair. This
+  shows higher measured CPU/wall cost for that fixture in this pair, not a
+  compiler-wide performance rate or instruction count.
+- An O2 scratch-only ablation of intermediate reflexive-evidence
+  validation changed one observation from 18.00 to 17.53 seconds (2.58%). It is
+  insufficient attribution and is not adopted as a production optimization.
+  Mandatory target checking remained present even in that diagnostic.
+- The exact remaining three default helpers all passed: the qualified-Pair
+  rejection took 161.35 seconds O0, each Unit acceptance under 0.08 seconds;
+  total 161.50 seconds O0 / 17.94 seconds O2. Their original production/frozen
+  checks, target serialization and erasure assertions were retained.
+
+The current O0 diagnostic was a fresh, source-hashed 57-module used closure, not
+a qualified producer. Historical objects were verified against the stable Git
+snapshot; the O2 harness reused authenticated held objects. The per-case memory
+sampler was unavailable, so only aggregate child max-RSS was reported. The
+compile/prepare timing boundaries force Either WHNF, not every lazy payload;
+they do not isolate pure solver time. These are bounded diagnostic observations,
+not replacement qualification evidence.
+
+The reviewed correction is limited to modes that actually exhausted their caps:
+O0 native-first uses 1800 seconds, O2 native-first 180, and the O0 default CI leg
+uses the existing authenticated 5400-second suite override. O0 native-second
+remains 1200 and O2 native-second 120; their five unchanged checks use the same
+compilation helper, but roughly 875/92-second extrapolations are not measured
+current suite durations. O0 framework's existing 5400 override, frontend limits,
+manual framework-wrapper defaults and every assertion/coverage boundary remain
+unchanged. No additional partition or speculative compiler optimization is added.
+
+Using the observed O0 frontend (2514s), the native command ceilings (1800+1200)
+and measured setup/producer overhead (~820s) gives approximately 106 minutes.
+All three heavy command maxima instead total 110 minutes before setup, so they
+do **not** all fit the unchanged 120-minute outer bound simultaneously. That
+outer deadline independently fails closed; the estimate is not a guarantee.
+The default shard's 90-minute suite ceiling plus prior setup fits within that
+same outer bound with finite headroom. Only subsequent exact-head completion
+can qualify this policy; the CI167 timeouts remain failed.
+
+The host wrapper additionally records optional `RUSAGE_CHILDREN` user/system CPU
+deltas around each sequential command, after cleanup/reaping. This is reaped-
+child interval accounting: it may omit unreaped/orphan/escaped descendants or
+include other reaped children. It is not total process-group CPU, an instruction
+count or proof of hardware cause. Unsupported/error/invalid counters are marked
+unavailable, never replaced by zero. Success, expected/unexpected nonzero exit,
+timeout, unavailable accounting and malformed counters have explicit controls;
+command arguments, stdout/stderr/status oracles and cleanup behavior are unchanged.
+
+Latest examined PR22 `1f781c4` is merged with its exact watchdog fix and nine
+controls: only an individual sampled child's disappearing-file `lstat` is
+tolerated. Root/traversal/permission/other errors remain fatal, symlinks remain
+excluded, and the final output cap remains enforced. This independent upstream
+sampling race is not claimed to have caused the execution-time failures above.
