@@ -21,6 +21,7 @@ tools/release/test-qualification-gate.sh
 node tools/release/test-benchmark-gate.mjs
 node tools/release/test-ci-policy.mjs
 python3 tools/shared/test_provenance.py
+python3 tools/shared/test_perf_inference.py
 python3 tools/shared/test_framework_controls.py
 python3 tools/shared/test_framework_policy.py
 python3 tools/shared/test_source_field_layout_controls.py
