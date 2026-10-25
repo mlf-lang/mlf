@@ -18,14 +18,26 @@ ROOT = Path(__file__).resolve().parents[2]
 def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
+def resolve_suite_timeout(optimization, requested):
+    """Budget follows the authenticated producer; explicit overrides stay bounded."""
+    if optimization not in {'0', '2'}:
+        raise ValueError('unsupported authenticated optimization for suite budget')
+    maximum = 6000 if optimization == '0' else 900
+    if requested is None:
+        return 6000 if optimization == '0' else 600
+    if type(requested) is not int or not 1 <= requested <= maximum:
+        raise ValueError('suite timeout must be between 1 and ' + str(maximum) +
+                         ' seconds for authenticated O' + optimization)
+    return requested
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--build-receipt', required=True, type=Path)
     ap.add_argument('--output', required=True, type=Path)
-    ap.add_argument('--suite-timeout', type=int, default=600, help='Bound each active suite command (seconds); 120 seconds is insufficient for 105/305 observations.')
+    ap.add_argument('--suite-timeout', type=int, default=None, help='Per-suite seconds; authenticated O0 defaults to 6000 (max 6000), O2 to 600 (max 900).')
     args = ap.parse_args()
-    if not 1 <= args.suite_timeout <= 900:
-        ap.error("suite timeout must be between 1 and 900 seconds")
+    if args.suite_timeout is not None and not 1 <= args.suite_timeout <= 6000:
+        ap.error("suite timeout must be between 1 and 6000 seconds; O2 maximum is 900")
     receipt = args.build_receipt.resolve(strict=True)
     producer_dir = receipt.parent
     output = args.output.resolve()
@@ -56,6 +68,11 @@ def main():
         return result.stdout
     try:
         producer = authenticate_build(receipt, producer_dir/'bin')
+        suite_timeout = resolve_suite_timeout(producer['optimization'], args.suite_timeout)
+        record.update(suite_timeout_seconds=suite_timeout,
+                      suite_timeout_request=args.suite_timeout,
+                      suite_timeout_policy='authenticated-producer-optimization-v1')
+        save()
         objects = producer['object_inputs']
         def check_objects():
             for name, sha in objects.items():
@@ -103,14 +120,14 @@ def main():
         if harness_inventory.get('schema_version') != 1 or harness_inventory.get('event') != 'inventory' or [x['id'] for x in harness_inventory['cases']] != ['probe/fail','probe/after']:
             raise ValueError('actual discovery control output invalid')
         binary = producer_dir/'bin/tuple-list'
-        default = run('default', [binary], timeout=args.suite_timeout)
+        default = run('default', [binary], timeout=suite_timeout)
         if default.count(b'PASS tuple/list ') != legacy_count or not default.endswith(b'Tuple/list focused checks passed.\n'):
             raise ValueError('default active legacy observation inventory changed')
         inventory = json.loads(run('discovery', [binary, '--framework-list', '--format', 'json']))
         if inventory.get('schema_version') != 1 or inventory['event'] != 'inventory' or inventory['total'] != framework_count or inventory['selected'] != framework_count or [x['id'] for x in inventory['cases']] != ids:
             raise ValueError('discovery identity inventory changed')
         report = output/'framework-report.jsonl'
-        full = run('framework', [binary, '--framework', '--format', 'json', '--report', report], timeout=args.suite_timeout)
+        full = run('framework', [binary, '--framework', '--format', 'json', '--report', report], timeout=suite_timeout)
         if report.read_bytes() != full:
             raise ValueError('report/stdout disagreement')
         rows = [json.loads(line) for line in full.splitlines()]

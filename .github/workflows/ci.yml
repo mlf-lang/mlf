@@ -56,8 +56,8 @@ jobs:
     name: Shared compiler source smoke (GHC O${{ matrix.optimization }})
     if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only
     runs-on: ubuntu-24.04
-    # O0 has three bounded 30-minute frontend modes plus build/framework work.
-    timeout-minutes: ${{ matrix.optimization == '0' && 180 || 120 }}
+    # O0: three 30-minute frontend modes, two 100-minute suites, build/misc margin.
+    timeout-minutes: ${{ matrix.optimization == '0' && 330 || 120 }}
     strategy:
       fail-fast: false
       matrix:
@@ -90,12 +90,12 @@ jobs:
           MLF_SOURCE_SMOKE_RUNNER: .mlf-build/shared-ghc/bin/source-smoke
           MLF_SOURCE_SMOKE_RECEIPT: .mlf-build/shared-ghc/receipt.json
         run: tools/release/source-smoke.sh
-      - name: Qualify authenticated direct async, frontend and TupleList execution
+      - name: Qualify authenticated direct async and frontend execution
         run: |
           set -euo pipefail
           python3 tools/shared/test_direct.py --bin-dir .mlf-build/shared-ghc/bin \
             --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/direct-host-tests
-          .mlf-build/shared-ghc/bin/tuple-list | tee .mlf-build/direct-host-tests/tuple-list.log
+      # The authenticated framework runner executes both 305 legacy and 105 registry cases once.
       - name: Qualify framework semantics and exact maintained Figure12 fixtures
         run: |
           python3 tools/shared/test_framework_direct.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/framework-direct

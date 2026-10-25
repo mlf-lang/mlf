@@ -4,6 +4,7 @@ import copy
 import hashlib
 import importlib.util
 import json
+import re
 from pathlib import Path
 import shutil
 import sys
@@ -34,8 +35,19 @@ class FrontendExecutionBudget(unittest.TestCase):
     def test_ci_only_expands_o0_job_budget(self):
         workflow = (ROOT / '.github/workflows/ci.yml').read_text()
         shared_job = workflow.split('  native:\n', 1)[1].split('\n  native-', 1)[0]
-        self.assertIn("timeout-minutes: ${{ matrix.optimization == '0' && 180 || 120 }}", shared_job)
+        self.assertIn("timeout-minutes: ${{ matrix.optimization == '0' && 330 || 120 }}", shared_job)
         self.assertIn("optimization: ['0', '2']", shared_job)
+
+    def test_ci_uses_one_authenticated_tuple_suite_owner(self):
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        shared_job = workflow.split('  native:\n', 1)[1].split('\n  native-', 1)[0]
+        self.assertEqual(shared_job.count('python3 tools/shared/test_framework_direct.py '), 1)
+        self.assertNotIn('bin/tuple-list |', shared_job)
+        self.assertNotIn('bin/tuple-list --', shared_job)
+        timeout = re.search(r"timeout-minutes: \$\{\{ matrix.optimization == '0' && (\d+) \|\| (\d+) \}\}", shared_job)
+        self.assertIsNotNone(timeout)
+        self.assertEqual(tuple(map(int, timeout.groups())), (330, 120))
+        self.assertLessEqual(max(map(int, timeout.groups())), 360)
 
     def test_unknown_or_untyped_optimization_is_rejected(self):
         for value in ['1', '', None, 0, 2, False, {}, {'optimization': '0'}]:
