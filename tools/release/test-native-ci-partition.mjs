@@ -2,6 +2,7 @@
 // coverage, not compiler results; wrapper/provenance controls check the assertions.
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
+import {spawnSync} from 'node:child_process';
 
 const workflow = fs.readFileSync('.github/workflows/ci.yml', 'utf8');
 const job = (text, name) => {
@@ -12,6 +13,22 @@ const job = (text, name) => {
 const selected = (step, matrix) => {
   const expression = step.match(/^        if: (.+)$/m)?.[1];
   return expression === undefined || Function('matrix', `return (${expression});`)(matrix);
+};
+const frameworkArguments = (step, matrix) => {
+  const run = step.match(/^        run: \|\n([\s\S]*)$/m)?.[1];
+  assert.ok(run, 'The framework step must have an explicit shell command');
+  const script = run.replace(/^          /gm, '')
+    .replaceAll('${{ matrix.optimization }}', matrix.optimization)
+    .replaceAll('${{ matrix.suite }}', matrix.suite);
+  assert.doesNotMatch(script, /\$\{\{/, 'Resolve every framework workflow expression');
+  // Execute the workflow's actual shell dispatch, replacing only Python with an
+  // argv recorder. No compiler, authentication, or long-running suite is invoked.
+  const result = spawnSync('bash', ['-euo', 'pipefail', '-c',
+    `python3() { printf '%s\\0' "$@"; }\n${script}`], {encoding: 'utf8', timeout: 5000});
+  assert.equal(result.status, 0, result.stderr || String(result.error || 'Framework dispatch failed'));
+  assert.equal(result.stderr, '', 'Framework dispatch must not emit diagnostics');
+  assert.ok(result.stdout.endsWith('\0'), 'The framework command must execute');
+  return result.stdout.slice(0, -1).split('\0');
 };
 const validate = text => {
   const native = job(text, 'native');
@@ -61,9 +78,11 @@ const validate = text => {
     'tools/shared/test_guest_state_laws.py',
   ];
   const framework = commandStep('tools/shared/test_framework_direct.py');
-  assert.match(framework, /python3 tools\/shared\/test_framework_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/framework-direct --suite '\$\{\{ matrix.suite \}\}'\n/);
-  assert.doesNotMatch(native, /--frontend-timeout|--suite-timeout|--native-timeout/,
-    'Per-mode defaults must come from the authenticated producer receipt, not workflow overrides');
+  assert.match(framework, /python3 tools\/shared\/test_framework_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/framework-direct --suite '\$\{\{ matrix.suite \}\}' "\$\{suite_args\[@\]\}"\n/);
+  assert.doesNotMatch(native, /--frontend-timeout|--native-timeout/,
+    'Direct per-mode defaults must come from the authenticated producer receipt');
+  assert.doesNotMatch(native.replace(framework, ''), /--suite-timeout/,
+    'Only the framework wrapper may receive the bounded suite override');
   assert.doesNotMatch(native, /\.mlf-build\/shared-ghc\/bin\/tuple-list\s*[|;]/,
     'Do not repeat the legacy TupleList run outside the exact wrapper oracle');
   const coverage = legs.map(leg => {
@@ -73,6 +92,14 @@ const validate = text => {
     }
     if (selected(framework, leg)) {
       assert.notEqual(leg.suite, 'direct', 'Direct shard cannot invoke the framework wrapper');
+      const expectedArguments = ['tools/shared/test_framework_direct.py',
+        '--build-receipt', '.mlf-build/shared-ghc/receipt.json',
+        '--output', '.mlf-build/framework-direct', '--suite', leg.suite];
+      if (leg.optimization === '0' && leg.suite === 'framework') {
+        expectedArguments.push('--suite-timeout', '5400');
+      }
+      assert.deepEqual(frameworkArguments(framework, leg), expectedArguments,
+        `Only O0 framework gets the existing 5400-second cap; all other arguments stay unchanged`);
       if (['all', 'default'].includes(leg.suite)) actual.push('tuple-default-305');
       if (['all', 'framework'].includes(leg.suite)) actual.push('tuple-framework-105');
     }
@@ -110,6 +137,13 @@ const controls = [
   ['direct coverage skipped', "if: matrix.suite == 'all' || matrix.suite == 'direct'", "if: matrix.suite == 'all'"],
   ['default/framework omitted', "if: matrix.suite != 'direct'", "if: matrix.suite == 'all'"],
   ['default/framework duplicated', "--suite '${{ matrix.suite }}'", '--suite all'],
+  ['framework margin omitted', 'suite_args=(--suite-timeout 5400)', 'suite_args=()'],
+  ['framework cap exceeded', 'suite_args=(--suite-timeout 5400)', 'suite_args=(--suite-timeout 5401)'],
+  ['framework margin removed', 'suite_args=(--suite-timeout 5400)', 'suite_args=(--suite-timeout 4500)'],
+  ['default budget changed', "= '0:framework'", "= '0:default'"],
+  ['O2 budget changed', "= '0:framework'", "= '2:all'"],
+  ['all framework budgets changed', "if [ '${{ matrix.optimization }}:${{ matrix.suite }}' = '0:framework' ]; then", 'if true; then'],
+  ['direct budget override', 'python3 tools/shared/test_direct.py --bin-dir', 'python3 tools/shared/test_direct.py --suite-timeout 5400 --bin-dir'],
   ['Figure12 omitted', 'python3 tools/shared/test_figure12_direct.py', 'python3 tools/shared/omitted.py'],
   ['O2 guest omitted', "if: matrix.optimization == '2'", 'if: false'],
   ['artifact collision', '-${{ matrix.suite }}\n', '\n'],

@@ -115,7 +115,13 @@ jobs:
       - name: Qualify authenticated TupleList default and framework semantics
         if: matrix.suite != 'direct'
         run: |
-          python3 tools/shared/test_framework_direct.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/framework-direct --suite '${{ matrix.suite }}'
+          # CI 164's O0 framework command used 4455.57 of 4500 seconds.
+          # Use its existing authenticated cap without changing other budgets.
+          suite_args=()
+          if [ '${{ matrix.optimization }}:${{ matrix.suite }}' = '0:framework' ]; then
+            suite_args=(--suite-timeout 5400)
+          fi
+          python3 tools/shared/test_framework_direct.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/framework-direct --suite '${{ matrix.suite }}' "${suite_args[@]}"
       - name: Qualify exact maintained Figure12 fixtures
         if: matrix.suite == 'all' || matrix.suite == 'direct'
         run: |

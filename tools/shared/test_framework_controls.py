@@ -246,6 +246,27 @@ class FrameworkMainControls(unittest.TestCase):
                 self.assertEqual([call['timeout_seconds'] for call in fixture.calls
                                   if call['name'] in ('default', 'framework')], [budget, budget])
 
+    def test_o0_framework_override_preserves_other_command_budgets_and_coverage(self):
+        fixture = MainFixture(self, '0')
+        receipt = fixture.execute('--suite', 'framework', '--suite-timeout', '5400')
+        self.assertEqual(receipt['execution_budget'], 5400)
+        self.assertEqual(receipt['selected_suites'], ['framework'])
+        self.assertEqual((receipt['default_checks'], receipt['framework_checks']), (0, 105))
+        self.assertEqual(fixture.events, ['authenticate', *EXPECTED_DISPATCH['framework'], 'authenticate'])
+        self.assertEqual({call['name']: call['timeout_seconds'] for call in fixture.calls},
+                         {label: 5400 if label == 'framework' else 120 for label in EXPECTED_DISPATCH['framework']})
+        self.assertTrue(receipt['complete'])
+        self.assertFalse(receipt['full_native_unit'])
+
+    def test_o0_partition_defaults_remain_4500_without_explicit_override(self):
+        for selection in ('default', 'framework'):
+            with self.subTest(selection=selection):
+                fixture = MainFixture(self, '0')
+                receipt = fixture.execute('--suite', selection)
+                self.assertEqual(receipt['execution_budget'], 4500)
+                self.assertEqual({call['name']: call['timeout_seconds'] for call in fixture.calls
+                                  if call['name'] in ('default', 'framework')}, {selection: 4500})
+
     def test_invalid_cli_fails_before_authentication_or_execution(self):
         arguments = [('--suite', 'unknown'), ('--suite', 'default,framework'),
                      ('--suite-timeout', '0'), ('--suite-timeout', '-1'),
@@ -262,10 +283,12 @@ class FrameworkMainControls(unittest.TestCase):
 
     def test_o2_oversized_budget_fails_before_any_command(self):
         for budget in (901, 5400):
-            with self.subTest(budget=budget):
-                fixture = MainFixture(self, '2')
-                self.assert_failed(fixture, '--suite-timeout', str(budget), message='900')
-                self.assertEqual(fixture.events, ['authenticate'])
+            for selection in ('all', 'default', 'framework'):
+                with self.subTest(budget=budget, selection=selection):
+                    fixture = MainFixture(self, '2')
+                    fixture.build_receipt.write_text('{"optimization":"0"}')
+                    self.assert_failed(fixture, '--suite', selection, '--suite-timeout', str(budget), message='900')
+                    self.assertEqual(fixture.events, ['authenticate'])
 
     def test_unknown_authenticated_optimization_fails_before_any_command(self):
         fixture = MainFixture(self, '1')
