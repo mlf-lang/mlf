@@ -51,6 +51,17 @@ class FrontendExecutionBudget(unittest.TestCase):
             self.assertIn("optimization: '0'\n            suite: " + suite, shared_job)
         self.assertIn("optimization: '2'\n            suite: all", shared_job)
 
+    def test_ci_uses_one_authenticated_tuple_suite_owner(self):
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        shared_job = workflow.split('  native:\n', 1)[1].split('  build-runner:', 1)[0]
+        self.assertEqual(shared_job.count('python3 tools/shared/test_framework_direct.py '), 1)
+        self.assertNotIn('bin/tuple-list |', shared_job)
+        self.assertNotIn('bin/tuple-list --', shared_job)
+        # The measured upstream serial budget is represented by three bounded
+        # O0 shards here, not by stacking a 330-minute timeout onto each shard.
+        self.assertEqual(shared_job.count('timeout-minutes: 120'), 1)
+        self.assertNotIn('330', shared_job)
+
     def test_unknown_or_untyped_optimization_is_rejected(self):
         for value in ['1', '', None, 0, 2, False, {}, {'optimization': '0'}]:
             with self.subTest(value=value), self.assertRaises(ValueError):

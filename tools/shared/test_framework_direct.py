@@ -28,7 +28,7 @@ def suite_timeout(optimization, override=None):
     if optimization not in ('0', '2'):
         raise ValueError('unsupported authenticated optimization level')
     maximum = 5400 if optimization == '0' else 900
-    if override is not None and not 1 <= override <= maximum:
+    if override is not None and (type(override) is not int or not 1 <= override <= maximum):
         raise ValueError('suite timeout must be between 1 and ' + str(maximum) + ' seconds')
     return override if override is not None else (4500 if optimization == '0' else 600)
 
@@ -61,7 +61,10 @@ def main():
         producer = authenticate_build(receipt, producer_dir/'bin')
         budget = suite_timeout(producer['optimization'], args.suite_timeout)
         record.update(selected_suites=list(suites), execution_budget=budget,
+                      suite_timeout_seconds=budget, suite_timeout_request=args.suite_timeout,
+                      suite_timeout_policy='authenticated-producer-optimization-v1',
                       coverage_scope='full' if args.suite == 'all' else 'partition')
+        save()
         objects = producer['object_inputs']
         def check_objects():
             for name, sha in objects.items():
