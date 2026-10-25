@@ -9,6 +9,7 @@ module Bootstrap.LLVM.Optimize where {
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.X.Syntax as X;
+  import qualified Bootstrap.Primitive as P;
   -- Fresh copies preserve global binder identity uniqueness when rewriting.
   data Fresh a = Fresh (Int -> (,) a Int);
   runFresh :: forall a. Fresh a -> Int -> (,) a Int;
@@ -768,17 +769,171 @@ module Bootstrap.LLVM.Optimize where {
           substituteUsedBindings result rest
         }
     };
-  rewriteUsed :: UseTree -> Fresh UseTree;
-  rewriteUsed tree =
-    case useChildren tree of {
-      UseApp function argument ->
-        case useChildren function of {
-          UseAbs name body -> freshPure (useLet name argument body);
-          UseLet name value body -> freshPure (useLet name value (useApp body argument));
-          UseRec bindings body -> freshPure (useRec bindings (useApp body argument));
-          _ -> freshPure tree
+  -- Expose a single lazy action use to the IO kernel recognizer.  Ordinary
+  -- lambda/recursive/call contexts remain sharing boundaries.  The one lambda
+  -- we enter is the continuation of the exact, saturated IO bind primitive;
+  -- it runs once per execution of that action, not once globally.  Substitution
+  -- moves pure action construction into its unique action use; it never
+  -- directly executes IO. Scalar operands retain their original lazy sharing.
+  -- Require the actual occurrence path to pass through bind, not merely an
+  -- unrelated bind elsewhere in the body.  Zero-use subtrees remain opaque.
+  singleUseIOPath :: XName -> Bool -> UseTree -> Bool;
+  singleUseIOPath name insideIO tree =
+    if M.findWithDefault compareName 0 name (useCounts tree) == 0
+    then True
+    else case useChildren tree of {
+      UseLeaf ->
+        case useTerm tree of {
+          XEVar actual -> insideIO && eqName name actual;
+          _ -> False
         };
-      UseLet name value body ->
+      UseAbs _ _ -> False;
+      UseRec _ _ -> False;
+      UseLet _ value body ->
+        singleUseIOPath name False value && singleUseIOPath name insideIO body;
+      UseCase subject branches ->
+        singleUseIOPath name False subject &&
+        L.all (\entry -> singleUseIOPath name insideIO (L.snd entry)) branches;
+      UseApp _ _ ->
+        case useApplications [] tree of {
+          (,) function arguments ->
+            case useTerm function of {
+              XEPrimitive PIOBind ->
+                case arguments of {
+                  (:) action ((:) continuation []) ->
+                    case useChildren continuation of {
+                      UseAbs _ body ->
+                        singleUseIOPath name True action && singleUseIOPath name True body;
+                      _ -> False
+                    };
+                  _ -> False
+                };
+              XEPrimitive PIfThenElse ->
+                case arguments of {
+                  (:) condition ((:) yes ((:) no [])) ->
+                    singleUseIOPath name False condition &&
+                    singleUseIOPath name insideIO yes && singleUseIOPath name insideIO no;
+                  _ -> False
+                };
+              XEPrimitive primitive ->
+                L.length arguments == P.primitiveArity primitive &&
+                L.all (singleUseIOPath name False) arguments;
+              _ -> False
+            }
+        }
+    };
+  -- Recover sharing when a nonrecursive local function is called only with
+  -- the same complete vector of existing outer variables. Qualified local
+  -- values can acquire ground dictionary parameters before inference; leaving
+  -- those lambdas at every use rebuilds the value. This is static all-use
+  -- specialization, not memoization or a dictionary/type-name heuristic.
+  -- A single call must also normalize here: its immediate beta contraction can
+  -- expose common arguments to an enclosing shared binding before inlining.
+  data CommonCalls = NoCommonCalls | CommonCalls ([] XName) | DifferentCalls;
+  sameCallNames :: [] XName -> [] XName -> Bool;
+  sameCallNames left right = case left of {
+    [] -> L.null right;
+    (:) a rest -> case right of {
+      [] -> False;
+      (:) b more -> eqName a b && sameCallNames rest more
+    }
+  };
+  mergeCommonCalls :: CommonCalls -> CommonCalls -> CommonCalls;
+  mergeCommonCalls left right = case left of {
+    DifferentCalls -> DifferentCalls;
+    NoCommonCalls -> right;
+    CommonCalls names -> case right of {
+      DifferentCalls -> DifferentCalls;
+      NoCommonCalls -> left;
+      CommonCalls others -> if sameCallNames names others then left else DifferentCalls
+    }
+  };
+  outerCallNames :: XName -> Map XName Int -> [] UseTree -> Maybe ([] XName);
+  outerCallNames target outer arguments = case arguments of {
+    [] -> Just [];
+    (:) argument rest -> case useTerm argument of {
+      XEVar name ->
+        if L.not (eqName target name) && M.member compareName name outer
+        then case outerCallNames target outer rest of {
+          Nothing -> Nothing;
+          Just names -> Just ((:) name names)
+        }
+        else Nothing;
+      _ -> Nothing
+    }
+  };
+  commonCalls :: XName -> Int -> Map XName Int -> UseTree -> CommonCalls;
+  commonCalls target arity outer tree =
+    if M.findWithDefault compareName 0 target (useCounts tree) == 0
+    then NoCommonCalls
+    else case useApplications [] tree of {
+      (,) function arguments -> case useTerm function of {
+        XEVar name ->
+          if eqName target name
+          then if L.length arguments == arity
+               then case outerCallNames target outer arguments of {
+                 Just names -> CommonCalls names;
+                 Nothing -> DifferentCalls
+               }
+               else DifferentCalls
+          else commonChildCalls target arity outer tree;
+        _ -> commonChildCalls target arity outer tree
+      }
+    };
+  commonChildCalls :: XName -> Int -> Map XName Int -> UseTree -> CommonCalls;
+  commonChildCalls target arity outer tree =
+    let { collect = commonCalls target arity outer;
+          combine values = L.foldl mergeCommonCalls NoCommonCalls (L.map collect values)
+    } in case useChildren tree of {
+      UseLeaf -> DifferentCalls;
+      UseAbs _ body -> collect body;
+      UseApp function argument -> combine ((:) function ((:) argument []));
+      UseLet _ value body -> combine ((:) value ((:) body []));
+      UseRec definitions body -> combine ((:) body (L.map L.snd definitions));
+      UseCase subject alternatives -> combine ((:) subject (L.map L.snd alternatives))
+    };
+  contractCommonCalls :: XName -> UseTree -> Fresh UseTree;
+  contractCommonCalls target tree =
+    if M.findWithDefault compareName 0 target (useCounts tree) == 0
+    then freshPure tree
+    else case useApplications [] tree of {
+      (,) function _ -> case useTerm function of {
+        XEVar name -> if eqName target name then freshPure function
+                      else mapUseChildren (contractCommonCalls target) tree;
+        _ -> mapUseChildren (contractCommonCalls target) tree
+      }
+    };
+  -- Arguments are existing variables, so beta substitution is non-demanding.
+  -- Expose them immediately: an enclosing binding must see the actual common
+  -- evidence before its ordinary lambda inliner can duplicate computations.
+  specializeCommonParameters :: UseTree -> [] XName -> Fresh UseTree;
+  specializeCommonParameters value arguments = case arguments of {
+    [] -> freshPure value;
+    (:) argument rest -> case useChildren value of {
+      UseAbs parameter body -> do {
+        replaced <- substituteUsed parameter (XEVar argument) body;
+        specializeCommonParameters replaced rest
+      };
+      _ -> freshPure value
+    }
+  };
+  specializeSharedValue :: XName -> UseTree -> UseTree -> Fresh (Maybe UseTree);
+  specializeSharedValue name value body = case lambdas (useTerm value) of {
+    (,) [] _ -> freshPure Nothing;
+    (,) parameters _ ->
+      if M.findWithDefault compareName 0 name (useCounts body) < 1
+      then freshPure Nothing
+      else case commonCalls name (L.length parameters) (useCounts body) body of {
+        CommonCalls arguments -> do {
+          result <- contractCommonCalls name body;
+          specialized <- specializeCommonParameters value arguments;
+          freshPure (Just (useLet name specialized result))
+        };
+        _ -> freshPure Nothing
+      }
+  };
+  rewriteOrdinaryLet :: UseTree -> XName -> UseTree -> UseTree -> Fresh UseTree;
+  rewriteOrdinaryLet tree name value body =
         let {
           uses = M.findWithDefault compareName 0 name (useCounts body)
         } in
@@ -786,7 +941,9 @@ module Bootstrap.LLVM.Optimize where {
         then freshPure body
         else if smallValue (useTerm value)
              then substituteUsed name (useTerm value) body
-             else case useChildren value of {
+             else if uses == 1 && singleUseIOPath name False body
+                  then substituteUsed name (useTerm value) body
+                  else case useChildren value of {
                     UseAbs _ _ ->
                       if (uses == 1)
                       then substituteUsed name (useTerm value) body
@@ -805,6 +962,23 @@ module Bootstrap.LLVM.Optimize where {
                       };
                     _ -> freshPure tree
                   };
+  rewriteUsed :: UseTree -> Fresh UseTree;
+  rewriteUsed tree =
+    case useChildren tree of {
+      UseApp function argument ->
+        case useChildren function of {
+          UseAbs name body -> freshPure (useLet name argument body);
+          UseLet name value body -> freshPure (useLet name value (useApp body argument));
+          UseRec bindings body -> freshPure (useRec bindings (useApp body argument));
+          _ -> freshPure tree
+        };
+      UseLet name value body -> do {
+        shared <- specializeSharedValue name value body;
+        case shared of {
+          Just result -> freshPure result;
+          Nothing -> rewriteOrdinaryLet tree name value body
+        }
+      };
       UseRec bindings body ->
         let {
           group = S.fromList compareName (L.map L.fst bindings)

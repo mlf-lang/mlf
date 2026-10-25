@@ -135,6 +135,23 @@ jobs:
       - name: Check source field normalization and exact imported layouts
         if: matrix.optimization == '2'
         run: python3 tools/shared/test_source_field_layouts.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/source-field-layouts
+      - name: Check shared-value specialization admission and lazy semantics
+        if: matrix.optimization == '2'
+        run: python3 tools/shared/test_common_calls.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/common-calls
+      - name: Check lazy IO action specialization with native execution
+        if: matrix.optimization == '2'
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y libgc-dev
+          prefix="$PWD/.mlf-build/io-action-gc"
+          mkdir -p "$prefix/include" "$prefix/lib"
+          cp /usr/include/gc.h "$prefix/include/gc.h"
+          cp -R /usr/include/gc "$prefix/include/gc"
+          archive="$(cc -print-file-name=libgc.a)"
+          test -f "$archive"
+          cp "$archive" "$prefix/lib/libgc.a"
+          dpkg-query -W libgc-dev > "$prefix/dependency-version.txt"
+          python3 tools/shared/test_io_action_sharing.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/io-action-sharing --clang clang --gc-prefix "$prefix"
       - name: Check actual MLF mixed-framework source acceptance
         if: matrix.optimization == '2'
         run: python3 tools/shared/test_guest_framework.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/guest-framework-source
@@ -174,6 +191,15 @@ jobs:
             .mlf-build/parameter-field-graph/*.json
             .mlf-build/parameter-field-graph/*.stdout
             .mlf-build/parameter-field-graph/*.stderr
+            .mlf-build/common-calls/**/*.json
+            .mlf-build/common-calls/**/*.stdout
+            .mlf-build/common-calls/**/*.stderr
+            .mlf-build/io-action-gc/dependency-version.txt
+            .mlf-build/io-action-sharing/**/*.json
+            .mlf-build/io-action-sharing/**/*.stdout
+            .mlf-build/io-action-sharing/**/*.stderr
+            .mlf-build/io-action-sharing/**/*.ll
+            .mlf-build/io-action-sharing/**/*.xmlf
             .mlf-build/guest-framework-source/**/*.json
             .mlf-build/guest-framework-source/**/*.log
             .mlf-build/guest-framework-source/**/*.stdout
