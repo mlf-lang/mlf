@@ -212,16 +212,31 @@ module Bootstrap.Elaborate where {
                                 XType -> Int -> Either String XComputation;
   declaredFieldComputationIn context datatypes env declaration source = do {
     let { actual = declaredTypeIn context IS.empty declaration };
-    let { prefix = dropUnusedLeading actual };
-    normalized <- Check.checkComputationIn datatypes env prefix actual;
-    let { kinds = M.fromList T.compareTyVar (fst (Evidence.quantifiers actual)) };
-    proof <- proveInstanceUsing datatypes (declaredReplacementIn context kinds) env
-      normalized (schemeTypeIn context source);
-    let { combined = X.compose prefix proof };
-    checked <- Check.checkComputationIn datatypes env combined actual;
-    unless (T.alphaEq checked (schemeTypeIn context source))
-      (Left "declared field evidence has the wrong target");
-    Right combined
+    case declaration of {
+      -- Bare parameter fields carry the exact case-substituted identity. Their
+      -- copied interface must differ only by alpha-renaming, never by opening
+      -- an abstract bound or inventing an adapter for a monomorphic fallback.
+      XVar _ -> do {
+        unless (T.alphaEq actual (schemeTypeIn context source))
+          (Left "projected field differs from its exact case type");
+        checked <- Check.checkComputationIn datatypes env XRefl actual;
+        unless (T.alphaEq checked (schemeTypeIn context source))
+          (Left "projected field evidence has the wrong target");
+        Right XRefl
+      };
+      _ -> do {
+        let { prefix = dropUnusedLeading actual };
+        normalized <- Check.checkComputationIn datatypes env prefix actual;
+        let { kinds = M.fromList T.compareTyVar (fst (Evidence.quantifiers actual)) };
+        proof <- proveInstanceUsing datatypes (declaredReplacementIn context kinds) env
+          normalized (schemeTypeIn context source);
+        let { combined = X.compose prefix proof };
+        checked <- Check.checkComputationIn datatypes env combined actual;
+        unless (T.alphaEq checked (schemeTypeIn context source))
+          (Left "declared field evidence has the wrong target");
+        Right combined
+      }
+    }
   };
   -- Explicit signatures can retain unused binders or a different forall order.
   -- All adaptations use the same independently checked atomic computations.

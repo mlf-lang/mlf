@@ -11,7 +11,7 @@ import qualified Bootstrap.IntMap as IM
 import Bootstrap.Constraint
 import Tests.Graph
 import qualified Bootstrap.Graph.Solver as Solver
-import Bootstrap.Parser (parseExpr)
+import Bootstrap.Parser (parseExpr, parseProgram)
 import Tests.GraphValidation (smallGraphs)
 import Tests.GraphUnificationReference (referenceUnify)
 import qualified Tests.Graph as G
@@ -19,11 +19,11 @@ import qualified Tests.Graph as G
 graphUnificationTests : [] ((,) String (IO ()))
 graphUnificationTests =
  (:) ((,) "indexed unification and identity renaming agree with map-based reference" unificationAndRenaming)
- ((:) ((,) "indexed unification agrees on successive scoped expansions" (H.forM_ programs (\((,) source accepted) -> do
+ ((:) ((,) "indexed unification agrees on successive scoped expansions" (do { H.forM_ programs (\((,) source accepted) -> do
   c <- H.right (bind (parseExpr "<unification reference>" source) generate)
   initial <- compareUnifiers (initialGraph c) (equalities c)
-  result <- S.foldM expansionStep initial (instances c)
-  H.assert (H.eq (S.isRight result) accepted) ("unexpected reference outcome: " ++ source))))
+  result <- S.foldM solveStep initial (solveSteps c)
+  H.assert (H.eq (S.isRight result) accepted) ("unexpected reference outcome: " ++ source)); projectionPrograms }))
  ((:) ((,) "dependency traversal rejects structural cycles created by merging" (let
   g = Graph (IM.fromList ((:) ((,) 0 (Node (GGen 1) Nothing Flexible))
       ((:) ((,) 1 (Node (GArr 2 3) (Just 0) Flexible))
@@ -55,6 +55,32 @@ checkRenamings g eqs expected =
    let shifted = renameGraph rename g
    actual <- compareUnifiers shifted (S.map (\((,) a b) -> (,) (rename a) (rename b)) eqs)
    H.assert (H.eq (S.mapEither (renameGraph rename) expected) actual || (S.not (S.isRight expected) && S.not (S.isRight actual))) "unification depends on numeric identity layout")
+
+-- Projection is deliberately scoped to its production operation. The following
+-- independent expansion and reference-unification branches are unchanged.
+solveStep : Either String Graph -> SolveStep -> IO (Either String Graph)
+solveStep result action = case action of
+ Instantiate edge -> expansionStep result edge
+ ProjectCase fields -> case result of
+  Left err -> return (Left err)
+  Right graph -> do
+   initial <- H.right (Solver.prepare graph)
+   case Solver.projectCaseFields fields initial of
+    Left err -> return (Left err)
+    Right projected -> do
+     after <- H.right (Solver.finish projected)
+     rebuilt <- H.right (Solver.prepare after)
+     H.assert (H.eq (Solver.structuralParents projected) (Solver.structuralParents rebuilt) && H.eq (Solver.bindingChildren projected) (Solver.bindingChildren rebuilt) && Solver.equalScopes (Solver.scopeIndex projected) (Solver.scopeIndex rebuilt)) "case projection indexes differ from reconstruction"
+     return (Right after)
+
+projectionPrograms : IO ()
+projectionPrograms = H.forM_ ((:) ((,) "data Box a = Box a\ncase ((Box (\\x -> x)) : Box (forall a. a -> a)) of { Box f -> let a = f 42 in f true }" true)
+ ((:) ((,) "data Box a = Box a\n\\box -> case box of { Box f -> let a = f 42 in f true }" false) [])) (\((,) source accepted) -> do
+  c <- H.right (bind (parseProgram "<case projection reference>" source) generateProgram)
+  H.assert (S.any (\step -> case step of { Instantiate _ -> false; ProjectCase _ -> true }) (solveSteps c)) "case projection replay fixture has no barrier"
+  initial <- compareUnifiers (initialGraph c) (equalities c)
+  result <- S.foldM solveStep initial (solveSteps c)
+  H.assert (H.eq (S.isRight result) accepted) ("unexpected case projection reference outcome: " ++ source))
 
 expansionStep : Either String Graph -> Edge -> IO (Either String Graph)
 expansionStep result edge = case result of

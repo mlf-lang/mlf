@@ -287,6 +287,8 @@ module Bootstrap.Types where {
   data ScopeIndex = ScopeIndex (IntMap ((,) Int Int)) ([] (IntMap Int));
   data Solver = Solver Graph (IntMap IntSet) (IntMap IntSet) ScopeIndex;
   data Edge = Edge Int Int;
+  -- Case projection barriers precede every use of their sealed field schemes.
+  data SolveStep = Instantiate Edge | ProjectCase ([] ((,) Int Int));
   data Typed = Typed Int Form;
   data Form =
     FVariable XName (Maybe Edge) |
@@ -309,7 +311,7 @@ module Bootstrap.Types where {
   data RecursiveDefinition = RecursiveDefinition XName Int Typed Edge (Maybe RecursiveClosure);
   data Branch = Branch XPattern Typed Edge;
   data EvidenceBinding = EvidenceBinding EvidenceRole XName Int Bool | DeclaredEvidenceBinding EvidenceRole XName XType;
-  data Constraints = Constraints Graph Typed ([] ((,) Int Int)) ([] Edge);
+  data Constraints = Constraints Graph Typed ([] ((,) Int Int)) ([] SolveStep);
   data Core =
     CVar String |
     CLam String Core |

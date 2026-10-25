@@ -81,6 +81,10 @@ step solver edge = do
     Quad root copies frontier expanded <- checked "expand" (F.forceQuad F.scalar (F.forceIntMap F.scalar) (F.forceList (F.forcePair F.scalar F.scalar)) shallow) (S.expanded source target solver)
     solverTrace (L.append frontier (Cons (Pair root target) Nil)) expanded
 
+workStep solver work = case work of
+ Instantiate edge -> step solver edge
+ ProjectCase fields -> checked "project-case" shallow (C.evaluateStep solver work)
+
 main = do
  file <- getArg 0
  mark "start"
@@ -93,6 +97,6 @@ main = do
    constraints <- checked "generate" F.forceConstraints (C.generateProgram lowered)
    prepared <- checked "prepare" F.forceSolver (S.prepare (C.initialGraph constraints))
    initial <- checked "initial-unify" F.forceSolver (S.solverUnify (C.equalities constraints) prepared)
-   result <- L.foldM step initial (C.instances constraints)
+   result <- L.foldM workStep initial (C.solveSteps constraints)
    final <- checked "finish" F.forceSolver (S.finishNormalized result)
    putStrLn ("nodes=" ++ showInt (IM.size (G.nodes (S.graph final))))

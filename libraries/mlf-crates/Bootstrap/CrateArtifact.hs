@@ -575,9 +575,8 @@ module Bootstrap.CrateArtifact where {
       };
       sourceData <- D.canonicalSourceDeclarations []
         (concatMap (\r -> Modules.renamedDatatypes (Modules.resolvedContents r)) modules);
-      let {
-        classes = concatMap (\r -> Modules.renamedClasses (Modules.resolvedContents r)) modules
-      };
+      classes <- Classes.canonicalSourceClasses Set.empty sourceData []
+        (concatMap (\r -> Modules.renamedClasses (Modules.resolvedContents r)) modules);
       let {
         values = concatMap (\r -> Modules.renamedValues (Modules.resolvedContents r)) modules
       };

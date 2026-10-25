@@ -27,7 +27,7 @@ sameIndexes a b = IM.eqIntMap IS.eqIntSet (S.structuralParents a) (S.structuralP
 legacySolve constraints = do
   prepared <- S.prepare (C.initialGraph constraints)
   unified <- S.solverUnify (C.equalities constraints) prepared
-  solved <- L.foldM (\solver edge -> S.instantiateClosed (C.fromGen edge) (C.toNode edge) solver) unified (C.instances constraints)
+  solved <- C.evaluateSteps unified (C.solveSteps constraints)
   finished <- S.finish solved
   let normalized = G.normalize finished
   G.validateGraph normalized

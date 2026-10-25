@@ -1170,6 +1170,49 @@ module Bootstrap.Graph.Solver where {
            Nothing -> allocatedNodes (first + 1) stop nodes;
            Just node -> (:) ((,) first node) (allocatedNodes (first + 1) stop nodes)
          };
+  projectField :: Int -> Int -> Solver -> Either String ((,) (IntMap Int) Solver);
+  projectField source destination solver =
+    projectFieldUsing G.materializeField source destination solver;
+  projectFieldUsing :: (Int -> Int -> Graph -> Either String ((,) (IntMap Int) Graph)) ->
+                       Int -> Int -> Solver -> Either String ((,) (IntMap Int) Solver);
+  projectFieldUsing materialize source destination solver =
+    let { old = graph solver; target = G.resolve old destination } in
+    G.bindE (materialize source target old)
+      (\((,) copies next) ->
+        let {
+          fresh = allocatedNodes (G.nextId old) (G.nextId next) (G.nodes next);
+          indexed = L.foldlStrict addNode
+            (removeNode solver ((,) target (G.nodeAt old target)))
+            ((:) ((,) target (G.nodeAt next target)) fresh)
+        } in
+        Right ((,) copies (withGraph next indexed)));
+  -- Classify the sealed descriptors against ONE immutable incoming graph.
+  -- No branch-body edge, copy, or later argument can reopen this decision.
+  projectCaseFields :: [] ((,) Int Int) -> Solver -> Either String Solver;
+  projectCaseFields fields solver =
+    let { current = graph solver } in
+    G.bindE
+      (G.mapE (\((,) source destination) ->
+        G.bindE (G.require current destination)
+          (\proxy -> G.bindE
+            (G.check (case G.tag proxy of {
+              GGen root -> G.resolve current root == G.resolve current source &&
+                L.not (G.underBinder current source destination);
+              _ -> False
+            }) "pattern projection requires its original external-root proxy")
+            (\checked -> G.bindE (G.knownFieldInterface current source)
+              (\eligible -> Right (if eligible then Just ((,) source destination) else Nothing)))))
+        fields)
+      (\classified ->
+        case L.catMaybes classified of {
+          [] -> Right solver;
+          selected -> G.bindE
+            (G.foldE (\state ((,) source destination) ->
+              G.bindE (projectFieldUsing G.materializeFieldIn source destination state)
+                (\answer -> Right (L.snd answer)))
+              solver selected)
+            (\result -> G.bindE (finish result) (\checked -> Right result))
+        });
   instantiate :: Int -> Int -> Solver -> Either String Solver;
   instantiate source target solver =
     G.bindE (expanded source target solver)

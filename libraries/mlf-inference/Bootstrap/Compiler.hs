@@ -7,11 +7,11 @@ module Bootstrap.Compiler (Compilation, inferredType, compiledTerm, checkedTerm,
   import Bootstrap.Types;
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.Set as S;
   import qualified Bootstrap.Parser as P;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Prelude as Prelude;
   import qualified Bootstrap.Standalone as Standalone;
-  import qualified Bootstrap.Data as D;
   import qualified Bootstrap.Classes as Classes;
   import Bootstrap.CompilerCore;
   compile :: String -> String -> Either CompileError Compilation;
@@ -87,7 +87,7 @@ module Bootstrap.Compiler (Compilation, inferredType, compiledTerm, checkedTerm,
             let {
               display = Modules.displayNames names
             };
-            canonical <- case D.canonicalSourceProgram program of {
+            canonical <- case Classes.canonicalSourceProgram S.empty program of {
               Left message -> Left (CompileError Inference (display message));
               Right value -> Right value
             };
@@ -125,7 +125,7 @@ module Bootstrap.Compiler (Compilation, inferredType, compiledTerm, checkedTerm,
         Nothing -> compileLegacyProgramWithPrelude mode original;
         Just ((,,) imports source names) -> do {
           let { display = Modules.displayNames names };
-          canonical <- case D.canonicalSourceProgram source of {
+          canonical <- case Classes.canonicalSourceProgram imports source of {
             Left message -> Left (CompileError Inference (display message));
             Right value -> Right value
           };
@@ -152,7 +152,7 @@ module Bootstrap.Compiler (Compilation, inferredType, compiledTerm, checkedTerm,
     case Prelude.withPrelude mode original of {
       (,) imports source ->
         do {
-          canonical <- atPhase Inference (D.canonicalSourceProgram source);
+          canonical <- atPhase Inference (Classes.canonicalSourceProgram imports source);
           lowered <- atPhase Inference (Classes.lowerClassesWithImports imports canonical);
           finishCompilation lowered
         }

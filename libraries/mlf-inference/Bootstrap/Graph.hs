@@ -2393,6 +2393,100 @@ module Bootstrap.Graph where {
                (binder node)
     } in
     mkNode (mapTag copy (tag node)) owner (flag node);
+  -- Inspect the exact raw interface, never a normalized unfinished graph or
+  -- the structural lower bound of a flexible/abstract parameter.
+  knownFieldInterface :: Graph -> Int -> Either String Bool;
+  knownFieldInterface graph original =
+    bindE (require graph original)
+      (\node -> bindE (kindAt graph original)
+        (\kind -> bindE (check (equalKind kind Star) "pattern field must have kind *")
+          (\checked ->
+            if L.not (equalFlag (flag node) Rigid) then Right False
+            else case tag node of {
+              GSkolem _ _ -> Right False;
+              GGen _ -> Left "pattern field must be a type node";
+              GBot -> Right True;
+              GBotK _ -> Right True;
+              _ -> Right (L.any (fieldQuantifier graph (resolve graph original))
+                (orderedBelow graph original))
+            })));
+  fieldQuantifier :: Graph -> Int -> Int -> Bool;
+  fieldQuantifier graph root identity =
+    let { node = nodeAt graph identity } in
+    equalFlag (flag node) Flexible &&
+    equalMaybeInt (mapMaybeInt (resolve graph) (binder node)) (Just root) &&
+    (case tag node of { GGen _ -> False; GSkolem _ _ -> False; _ -> True }) &&
+    L.not (inert graph identity);
+  -- A field proxy already exists in the scope tree. Only its structural root
+  -- is replaced; the original parameter and every external frontier identity
+  -- are untouched. The returned map is the complete fresh-copy receipt.
+  materializeField :: Int -> Int -> Graph -> Either String ((,) (IntMap Int) Graph);
+  materializeField original destination graph =
+    bindE (validateGraph graph)
+      (\valid -> bindE
+        (check
+          (L.all (\n -> n < nextId graph && IM.notMember n (links graph)) (IM.keys (nodes graph)) &&
+           L.all (\n -> n < nextId graph) (IM.keys (links graph)))
+          "pattern projection requires a valid fresh identity counter")
+        (\freshChecked -> materializeFieldIn original destination graph));
+  -- Trusted solver entry: prepare has checked graph/counter invariants, and
+  -- each prior solver operation preserves them. The case audits its output.
+  materializeFieldIn :: Int -> Int -> Graph -> Either String ((,) (IntMap Int) Graph);
+  materializeFieldIn original destination graph =
+    bindE (knownFieldInterface graph original)
+      (\eligible -> bindE (check eligible "pattern field has no known polymorphic interface")
+        (\checked -> bindE (require graph destination)
+          (\proxy ->
+            let { source = resolve graph original; target = resolve graph destination } in
+            bindE
+              (check
+                (case tag proxy of {
+                  GGen root -> resolve graph root == source &&
+                    L.not (underBinder graph source target);
+                  _ -> False
+                }) "pattern projection requires its original external-root proxy")
+              (\proxyChecked ->
+                case expansionVisitCached graph source IM.empty
+                  ((,) (IS.singleton source) (IM.singleton source True))
+                  (children (tag (nodeAt graph source))) of {
+                  (,) visited scopes ->
+                    let { originals = L.filter (\n -> IM.findWithDefault False n scopes)
+                      (IS.toList visited) } in
+                    case allocateCopies graph originals of {
+                      (,) copies allocated ->
+                        bindE (mapE_ (validateFieldCopy graph source copies) originals)
+                          (\copiesChecked ->
+                            let { copy = copyIdentity graph copies } in
+                            let { copied = L.foldlStrict
+                              (\current n -> setNode (copy n)
+                                (fieldCopyNode graph source target copies n) current)
+                              allocated originals } in
+                            Right ((,) copies (setNode target
+                              (mkNode (GGen (copy source)) (binder proxy) (flag proxy)) copied)))
+                    }
+                }))));
+  validateFieldCopy :: Graph -> Int -> IntMap Int -> Int -> Either String ();
+  validateFieldCopy graph source copies identity =
+    let { node = nodeAt graph identity; copy = IM.get identity copies } in
+    bindE
+      (check (IM.notMember copy (nodes graph) && IM.notMember copy (links graph))
+        "pattern projection fresh identities overlap the source graph")
+      (\freshChecked -> bindE
+        (check (case tag node of { GGen _ -> False; GSkolem _ _ -> False; _ -> True })
+          "pattern projection cannot copy scope or abstract identities")
+        (\tagChecked ->
+          if identity == source then Right ()
+          else case binder node of {
+            Nothing -> Left "pattern projection lost a local binder";
+            Just owner -> check (IM.member (resolve graph owner) copies)
+              "pattern projection is not closed under local binders"
+          }));
+  fieldCopyNode :: Graph -> Int -> Int -> IntMap Int -> Int -> Node;
+  fieldCopyNode graph source destination copies identity =
+    let { node = nodeAt graph identity; copy = copyIdentity graph copies } in
+    if identity == source
+    then mkNode (mapTag copy (tag node)) (Just destination) Flexible
+    else mkNode (mapTag copy (tag node)) (mapMaybeInt copy (binder node)) (flag node);
   schemeOrExistential :: Graph -> Int -> Node -> Bool;
   schemeOrExistential graph identity node =
     case binder node of {

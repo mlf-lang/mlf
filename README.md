@@ -752,24 +752,26 @@ MLF can instantiate datatype parameters with polymorphic types:
 data Box a = Box a;
 let boxed = Box (\x -> x) : Box (forall a. a -> a) in
 case boxed of {
-  Box f -> let id = f : forall a. a -> a in
-           let number = id 42 in id true
+  Box f -> let number = f 42 in f true
 }
 ```
 
-Ordinary pattern fields are not implicitly generalized. An explicit annotation
-can expose polymorphism supplied through a datatype parameter, as above. A
-field whose declaration itself begins with `forall` already supplies that
-interface and is instantiated automatically at each use:
+Ordinary unknown pattern fields are not implicitly generalized. When the
+scrutinee already supplies an exact polymorphic parameter interface, as above,
+each field use can instantiate that interface. Captured outer type variables
+remain shared. A field whose declaration itself begins with `forall` also
+supplies an interface and is instantiated automatically at each use:
 
 ```haskell
 data Poly = Poly (forall a. a -> a);
 case Poly (\x -> x) of { Poly f -> let number = f 42 in f true }
 ```
 
-Datatype parameters captured by such a field remain shared, rather than
-freshened at each use. See the [frontend repair validation](docs/inference/Frontend-Signatures-and-Fields-Validation.md)
-for residual constructor/normalization cases involving vacuous quantifiers.
+Fresh source datatypes and class signatures are validated before unused
+quantifiers are removed consistently from their inference and emitted layouts.
+Checked imported layouts are not rewritten. See
+[source field normalization](docs/inference/Source-Field-Normalization.md)
+for the exact known-interface boundary, validation and remaining cases.
 See [`maybe.emlf`](examples/maybe.emlf),
 [`recursive-data.emlf`](examples/recursive-data.emlf), and
 [`polymorphic-data.emlf`](examples/polymorphic-data.emlf).

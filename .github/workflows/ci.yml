@@ -129,6 +129,12 @@ jobs:
       - name: Check recursive managed evidence and source-group contracts
         if: matrix.optimization == '2'
         run: python3 tools/shared/test_recursive_managed.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/recursive-managed
+      - name: Check known parameter-field projection graph invariants
+        if: matrix.optimization == '2'
+        run: python3 tools/shared/test_parameter_field_graph.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/parameter-field-graph
+      - name: Check source field normalization and exact imported layouts
+        if: matrix.optimization == '2'
+        run: python3 tools/shared/test_source_field_layouts.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/source-field-layouts
       - name: Check actual MLF mixed-framework source acceptance
         if: matrix.optimization == '2'
         run: python3 tools/shared/test_guest_framework.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/guest-framework-source
@@ -162,6 +168,12 @@ jobs:
             .mlf-build/recursive-managed/*.json
             .mlf-build/recursive-managed/*.stdout
             .mlf-build/recursive-managed/*.stderr
+            .mlf-build/source-field-layouts/*.json
+            .mlf-build/source-field-layouts/*.stdout
+            .mlf-build/source-field-layouts/*.stderr
+            .mlf-build/parameter-field-graph/*.json
+            .mlf-build/parameter-field-graph/*.stdout
+            .mlf-build/parameter-field-graph/*.stderr
             .mlf-build/guest-framework-source/**/*.json
             .mlf-build/guest-framework-source/**/*.log
             .mlf-build/guest-framework-source/**/*.stdout

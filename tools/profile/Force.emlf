@@ -455,9 +455,14 @@ forceEvidenceBinding value = case value of
   EvidenceBinding x0 x1 x2 x3 -> seq ((forceEvidenceRole) x0) (seq ((forceXName) x1) (seq (scalar x2) (seq (scalar x3) (Unit))))
   DeclaredEvidenceBinding x0 x1 x2 -> seq (forceEvidenceRole x0) (seq (forceXName x1) (seq (forceXType x2) Unit))
 
+forceSolveStep : SolveStep -> Unit
+forceSolveStep value = case value of
+  Instantiate edge -> forceEdge edge
+  ProjectCase fields -> (forceList (forcePair scalar scalar)) fields
+
 forceConstraints : Constraints -> Unit
 forceConstraints value = case value of
-  Constraints x0 x1 x2 x3 -> seq ((forceGraph) x0) (seq ((forceTyped) x1) (seq ((forceList (forcePair scalar scalar)) x2) (seq ((forceList (forceEdge)) x3) (Unit))))
+  Constraints x0 x1 x2 x3 -> seq ((forceGraph) x0) (seq ((forceTyped) x1) (seq ((forceList (forcePair scalar scalar)) x2) (seq ((forceList forceSolveStep) x3) (Unit))))
 
 forceCore : Core -> Unit
 forceCore value = case value of

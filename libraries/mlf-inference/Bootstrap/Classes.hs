@@ -177,6 +177,70 @@ module Bootstrap.Classes where {
           (concatMap (\(SPredicate _ args) -> concatMap freeTypeRaw args) predicates);
       _ -> []
     };
+  -- Source-owned class headers share the same canonical Field view as source
+  -- datatypes. This is not a type equality rule: checked imported headers and
+  -- dictionary reconstruction keep their original contracts byte-for-byte.
+  canonicalSourceType :: SType -> SType;
+  canonicalSourceType ty =
+    case ty of {
+      SArrow a b -> SArrow (canonicalSourceType a) (canonicalSourceType b);
+      STypeApp a b -> STypeApp (canonicalSourceType a) (canonicalSourceType b);
+      SCon name arguments -> SCon name (map canonicalSourceType arguments);
+      SQualified predicates body ->
+        SQualified (map canonicalSourcePredicate predicates) (canonicalSourceType body);
+      SForall flag name bound body ->
+        let { a = canonicalSourceType bound; b = canonicalSourceType body } in
+        if (case (,) flag a of {
+              (,) Flexible SBottom -> True;
+              (,) Flexible (SBottomKind _) -> True;
+              _ -> False
+            }) && not (elem eqString name (freeTypeRaw b))
+        then b
+        else SForall flag name a b;
+      _ -> ty
+    };
+  canonicalSourcePredicate :: SPredicate -> SPredicate;
+  canonicalSourcePredicate (SPredicate name arguments) =
+    SPredicate name (map canonicalSourceType arguments);
+  canonicalSourceClass :: SClassDecl -> SClassDecl;
+  canonicalSourceClass (SClassDecl name parameters supers methods) =
+    SClassDecl name parameters (map canonicalSourcePredicate supers)
+      (map (\((,) method ty) -> (,) method (canonicalSourceType ty)) methods);
+  canonicalSourceClasses :: Set String -> [] DataDecl -> [] SClassDecl ->
+                            [] SClassDecl -> Either String ([] SClassDecl);
+  canonicalSourceClasses importedNames datatypes checkedHeaders ownHeaders =
+    withValidatedClasses Nothing importedNames M.empty Nothing datatypes
+      (append checkedHeaders ownHeaders) [] (SConstructor "()")
+      (\base declarations -> do {
+        -- Validation needs only class identities/parameters, not generated
+        -- selector names. The temporary dictionary names are never exported.
+        let {
+          infos = M.fromList compareString
+            (map (\declaration ->
+              (,) (className declaration)
+                (Info declaration ("Dict_" ++ className declaration)
+                   ("Make_" ++ className declaration) [] [])) declarations)
+        };
+        freshLift (validateClasses base infos);
+        -- Superclass argument kinds are checked above, while this additional
+        -- conversion retains the original generated-Field admissibility check.
+        freshLift (traverseEither
+          (\declaration -> traverseEither
+            (\predicate -> do { ty <- dictionary infos predicate; field ty; Right () })
+            (superclasses declaration)) declarations);
+        freshPure (map canonicalSourceClass ownHeaders)
+      });
+  canonicalSourceProgram :: Set String -> SProgram -> Either String SProgram;
+  canonicalSourceProgram importedNames original = do {
+    program <- D.canonicalSourceProgram original;
+    case program of {
+      SProgram _ _ -> Right program;
+      SClassProgram datatypes declarations instances body -> do {
+        normalized <- canonicalSourceClasses importedNames datatypes [] declarations;
+        Right (SClassProgram datatypes normalized instances body)
+      }
+    }
+  };
   unique :: String -> [] String -> Either String ();
   unique label names =
     ensure (length names == length (nubBy eqString names)) ("duplicate " ++ label);

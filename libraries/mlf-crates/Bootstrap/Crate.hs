@@ -332,9 +332,12 @@ module Bootstrap.Crate where {
       ownData <- D.canonicalSourceDeclarations
         (concatMap (\p -> Artifact.crateData (snd p)) interfaces)
         (concatMap (\r -> Modules.renamedDatatypes (Modules.resolvedContents r)) resolved);
-      let {
-        ownClasses = concatMap (\r -> Modules.renamedClasses (Modules.resolvedContents r)) resolved
-      };
+      -- Checked class headers are ABI context. Canonicalize only this crate's
+      -- fresh headers, before selectors, dictionary inventory and saved metadata.
+      ownClasses <- Classes.canonicalSourceClasses Set.empty
+        (append (concatMap (\p -> Artifact.crateData (snd p)) interfaces) ownData)
+        (concatMap (\p -> Artifact.crateClasses (snd p)) interfaces)
+        (concatMap (\r -> Modules.renamedClasses (Modules.resolvedContents r)) resolved);
       let {
         ownValues = concatMap (\r -> Modules.renamedValues (Modules.resolvedContents r)) resolved
       };

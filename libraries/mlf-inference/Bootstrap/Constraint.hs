@@ -22,9 +22,9 @@ module Bootstrap.Constraint where {
   import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.X.Syntax as X;
   import qualified Bootstrap.X.Type as T;
-  -- The writer keeps edges in reverse creation order. They are reversed once at
-  -- the boundary; this preserves dependency-first instantiation exactly.
-  data Generation = Generation Graph ([] ((,) Int Int)) ([] Edge);
+  -- The writer keeps solver work in reverse dependency order. A case barrier
+  -- carries a sealed descriptor list before any alternative body is generated.
+  data Generation = Generation Graph ([] ((,) Int Int)) ([] SolveStep);
   data Generate a = Generate (Generation -> Either String ((,) a Generation));
   runGenerate (Generate f) state = f state;
   generatePure :: forall a. a -> Generate a;
@@ -136,9 +136,7 @@ module Bootstrap.Constraint where {
              do {
                prepared <- Solver.prepare graph;
                initial <- Solver.solverUnify (reverse eqs) prepared;
-               solved <-
-                 foldM (\solver e -> Solver.instantiateClosed (fromGen e) (toNode e) solver)
-                   initial (reverse es);
+               solved <- evaluateSteps initial (reverse es);
                finished <- Solver.finish solved;
                Right ((,) () (Generation finished [] []))
              }
@@ -157,8 +155,23 @@ module Bootstrap.Constraint where {
              let {
                e = Edge gen target
              } in
-             Right ((,) e (Generation graph eqs ((:) e es)))
+             Right ((,) e (Generation graph eqs ((:) (Instantiate e) es)))
          });
+  projectCase fields =
+    Generate
+      (\state ->
+         case state of {
+           Generation graph eqs steps ->
+             Right ((,) () (Generation graph eqs ((:) (ProjectCase fields) steps)))
+         });
+  evaluateStep :: Solver -> SolveStep -> Either String Solver;
+  evaluateStep solver step =
+    case step of {
+      Instantiate e -> Solver.instantiateClosed (fromGen e) (toNode e) solver;
+      ProjectCase fields -> Solver.projectCaseFields fields solver
+    };
+  evaluateSteps :: Solver -> [] SolveStep -> Either String Solver;
+  evaluateSteps initial steps = foldM evaluateStep initial steps;
   generalization (Typed gen _) = gen;
   form (Typed _ f) = f;
   fromGen (Edge gen _) = gen;
@@ -166,7 +179,12 @@ module Bootstrap.Constraint where {
   initialGraph (Constraints graph _ _ _) = graph;
   skeleton (Constraints _ typed _ _) = typed;
   equalities (Constraints _ _ eqs _) = eqs;
-  instances (Constraints _ _ _ es) = es;
+  solveSteps (Constraints _ _ _ steps) = steps;
+  -- Edge-only inspection/evidence view. Solver drivers must use solveSteps.
+  instances constraints = concatMap (\step -> case step of {
+    Instantiate e -> (:) e [];
+    ProjectCase _ -> []
+  }) (solveSteps constraints);
   sameFlag :: Flag -> Flag -> Bool;
   sameFlag Flexible Flexible = True;
   sameFlag Rigid Rigid = True;
@@ -563,8 +581,12 @@ module Bootstrap.Constraint where {
             };
           a <- child env scrutinee;
           ea <- edge (generalization a) domain;
-          branches <-
-            mapM (buildBranch datatypes typeScope env gen root domain parameters) alternatives;
+          -- An unsigned recursive group can flush while generating the first
+          -- branch. Allocate and seal EVERY alternative before any body work.
+          prepared <- mapM (prepareBranch datatypes gen domain parameters) alternatives;
+          let { projections = concatMap preparedProjections prepared };
+          unless (null projections) (projectCase projections);
+          branches <- mapM (buildPreparedBranch datatypes typeScope env gen root) prepared;
           return (FMatch a ea branches)
         }
     };
@@ -756,6 +778,9 @@ module Bootstrap.Constraint where {
   directed :: SType -> SExpr -> SExpr;
   directed (SArrow domain result) (SLam x annotation body) =
     SLam x (Just (fromMaybe (SAnnotation [] domain) annotation)) (directed result body);
+  -- Ordinary let infers/generalizes its RHS as before. Only its continuation
+  -- is checked under the same expected type, including scoped skolems.
+  directed expected (SLet name rhs body) = SLet name rhs (directed expected body);
   directed _ expression = expression;
   freshOptional :: Maybe String -> Generate (Maybe XName);
   freshOptional Nothing = return Nothing;
@@ -774,64 +799,74 @@ module Bootstrap.Constraint where {
   patternBindings ((:) _ originals) ((:) _ names) ((:) _ identities) =
     patternBindings originals names identities;
   patternBindings _ _ _ = [];
-  buildBranch :: DataEnv ->
-                 Map String Int ->
-                 Map String Binding ->
-                 Int -> Int -> Int -> Map String Int -> (,) SPattern Core -> Generate Branch;
-  buildBranch datatypes typeScope env gen root domain parameters alternative =
+  data PreparedBranch = PreparedBranch XPattern ([] ((,) String Binding)) Core ([] ((,) Int Int));
+  preparedProjections (PreparedBranch _ _ _ fields) = fields;
+  prepareBranch :: DataEnv -> Int -> Int -> Map String Int ->
+                   (,) SPattern Core -> Generate PreparedBranch;
+  prepareBranch datatypes gen domain parameters alternative =
     case alternative of {
       (,) pattern body ->
-        do {
-          resolved <-
-            case pattern of {
-              SConstructorPattern constructor names ->
-                do {
-                  declaration <- liftResult (D.lookupConstructor datatypes constructor);
-                  fields <-
-                    mapM (patternField datatypes parameters gen)
-                      (D.constructorFields (snd declaration));
-                  let {
-                    used = catMaybes names
-                  };
-                  unless (length used == length (nubBy eqString used))
-                    (failGenerate "duplicate pattern variable");
-                  names' <- mapM freshOptional names;
-                  return
-                    ((,) (XConstructorPattern constructor names')
-                       (patternBindings names names' fields))
-                };
-              SDefaultPattern name ->
-                do {
-                  resolvedName <- freshOptional name;
-                  let {
-                    bindings =
-                      case name of {
-                        Nothing -> [];
-                        Just original ->
-                          case resolvedName of {
-                            Nothing -> [];
-                            Just resolved -> (:) ((,) original (Mono resolved domain)) []
-                          }
-                      }
-                  };
-                  return ((,) (XDefaultPattern resolvedName) bindings)
-                };
-              _ -> failGenerate "surface pattern escaped lowering"
+        case pattern of {
+          SConstructorPattern constructor names -> do {
+            declaration <- liftResult (D.lookupConstructor datatypes constructor);
+            let { declared = D.constructorFields (snd declaration) };
+            fields <- mapM (patternField datatypes parameters gen) declared;
+            let { used = catMaybes names };
+            unless (length used == length (nubBy eqString used))
+              (failGenerate "duplicate pattern variable");
+            names' <- mapM freshOptional names;
+            projections <- liftResult (mapM patternProjection (zip declared fields));
+            return (PreparedBranch (XConstructorPattern constructor names')
+              (patternBindings names names' fields) body (catMaybes projections))
+          };
+          SDefaultPattern name -> do {
+            resolvedName <- freshOptional name;
+            let {
+              bindings = case name of {
+                Nothing -> [];
+                Just original -> case resolvedName of {
+                  Nothing -> [];
+                  Just resolved -> (:) ((,) original (Mono resolved domain)) []
+                }
+              }
             };
-          body' <-
-            build datatypes typeScope (Just gen)
-              (M.union compareString (M.fromList compareString (snd resolved)) env)
-              body;
-          e <- edge (generalization body') root;
-          return (Branch (fst resolved) body' e)
+            return (PreparedBranch (XDefaultPattern resolvedName) bindings body [])
+          };
+          _ -> failGenerate "surface pattern escaped lowering"
         }
     };
-  -- Only a declaration-leading forall grants independent instantiation. A
-  -- datatype parameter (even one later unified with a polymorphic type) and
-  -- every ordinary field retain their original monomorphic binding.
+  patternProjection :: (,) Field ((,) Int (Maybe XType)) ->
+                       Either String (Maybe ((,) Int Int));
+  patternProjection ((,) field prepared) =
+    case field of {
+      Parameter _ -> case snd prepared of {
+        Just (XVar (XTyVar original)) -> Right (Just ((,) original (fst prepared)));
+        _ -> Left "pattern parameter lost its exact projection identity"
+      };
+      _ -> Right Nothing
+    };
+  buildPreparedBranch :: DataEnv -> Map String Int -> Map String Binding ->
+                         Int -> Int -> PreparedBranch -> Generate Branch;
+  buildPreparedBranch datatypes typeScope env gen root prepared =
+    case prepared of {
+      PreparedBranch pattern bindings body _ -> do {
+        body' <- build datatypes typeScope (Just gen)
+          (M.union compareString (M.fromList compareString bindings) env) body;
+        e <- edge (generalization body') root;
+        return (Branch pattern body' e)
+      }
+    };
+  -- Declared foralls keep their existing evidence path. Bare parameters use
+  -- external-root proxies until the case's one-shot barrier either copies a
+  -- known polymorphic interface or permanently leaves the field shared.
   patternField :: DataEnv -> Map String Int -> Int -> Field -> Generate ((,) Int (Maybe XType));
   patternField datatypes parameters parent field =
     case field of {
+      Parameter name -> do {
+        embedded <- embedDeclaredField datatypes parameters field;
+        gen <- newNode (GGen (fst embedded)) (Just parent) Flexible;
+        return ((,) gen (Just (snd embedded)))
+      };
       Quantified _ _ _ -> do {
         gen <- newNode (GGen (-1)) (Just parent) Flexible;
         before <- getGraph;
@@ -1162,9 +1197,7 @@ module Bootstrap.Constraint where {
     do {
       prepared <- Solver.prepare (initialGraph constraints);
       initial <- Solver.solverUnify (equalities constraints) prepared;
-      solved <-
-        foldM (\solver e -> Solver.instantiateClosed (fromGen e) (toNode e) solver) initial
-          (instances constraints);
+      solved <- evaluateSteps initial (solveSteps constraints);
       Solver.finishNormalized solved
     };
   eraseSource typed = eraseSourceWith IM.empty typed;

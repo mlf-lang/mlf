@@ -68,7 +68,13 @@ computational syntax and check both serialized and in-memory targets.
 - Three maintained terminating host-interpreter fixtures pass with exact stdout
   at O0 and O2: factorial, mutual recursion and dictionary recursion.
 
-## Exact residuals, not repaired or hidden
+## Residuals at this historical checkpoint
+
+The following list records this checkpoint, not the current feature boundary.
+The later [source field normalization and parameter projection](Source-Field-Normalization.md)
+repairs items 1–3 for freshly owned source layouts and already-known exact
+parameter interfaces. It retains checked imported contracts, unknown-field
+sharing, and the explicitly documented remaining cases.
 
 1. Constructor adaptation for vacuous polymorphism remains incomplete:
    `data V = V (forall a. Int); V 1` rejects during target verification with
