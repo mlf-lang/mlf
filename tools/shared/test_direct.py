@@ -26,7 +26,7 @@ FRONTEND_CASES = [
 ]
 # O0's canonical-prelude workload is substantially slower even on the upstream
 # compiler. Select limits only from the authenticated producer, never a CLI
-# optimization label. O2's existing limits are unchanged.
+# optimization label. O2's native-first margin is justified separately below.
 # CI166 exhausted 2400s after the qualified-recursion banner. The residual
 # suite grew from 90 to 163 literal compilation calls; allow a bounded 3600s
 # for O0 frontend only, without changing its cases/order or the 120m job bound.
@@ -40,7 +40,11 @@ def frontend_case_timeout(name, optimization, frontend_seconds=None):
         raise ValueError('frontend timeout must be between 1 and ' + str(maximum) + ' seconds')
     if name == 'frontend':
         return frontend_seconds if frontend_seconds is not None else (3600 if optimization == '0' else 1200)
-    return 1200 if optimization == '0' else 120
+    if optimization == '0':
+        return 1200
+    # CI167 timed out at 120s with the identical binary that passed CI166.
+    # Only these six closed native-first checks get additional finite margin.
+    return 180 if name == 'native-first' else 120
 
 ORACLES = ['tests/async-task/suite.stdout', 'tests/async-task/processes.stdout',
            'tests/async-task/wait-graph.stdout', 'tests/async-process/suite.stdout']

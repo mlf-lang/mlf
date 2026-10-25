@@ -251,3 +251,30 @@ Real CLI dispatch controls verify authenticated optimization selection, the
 output/status/stderr/cleanup behavior. The failed 2400-second attempt remains
 failed. Only a subsequent completed exact-head run can establish O0 success;
 the policy adjustment itself is not a pass or a compiler-performance claim.
+
+## CI167 unchanged-binary O2 margin finding
+
+CI167's O2 frontend passed all four exact banners in 242.88 seconds, but the
+next `native-first` command exhausted its unchanged 120-second cap (120.11s).
+Both output streams were empty, owned-process cleanup completed, and subsequent
+O2 gates did not run. The failed attempt remains failed. Its producer records
+exactly the same 108 shared, 31 host and 19 configuration inputs, 226 object/
+interface entries, 12 executable identities and 44 flags as CI166's passing O2
+producer. That run completed native-first in 102.15s; the final local run took
+114.68s. These digest comparisons use official receipts, not locally downloaded
+hosted binaries.
+
+The preceding identical frontend took 194.97s in CI166 versus 242.88s in CI167,
+a 24.58% difference. This supports allowing run-to-run execution margin but does
+not identify a CPU/load cause or prove a compiler-wide performance regression.
+Native-first contains six independent closed compile/evaluate checks with fresh
+runtime preparation; no test depends on clocks, randomness or shared files.
+
+The smallest correction changes only authenticated O2 native-first to a finite
+180-second limit. O2 native-second remains 120; O0 remains 3600/1200/1200, and
+frontend override bounds, all other suite budgets and the 120-minute job ceiling
+are unchanged. Real dispatch and negative controls require that exact policy;
+every test, completion banner, stderr/status assertion and cleanup rule is
+unchanged. CI167's O0 jobs are allowed to finish before publishing this correction.
+If the new native-first bound is also exhausted, per-case progress/cost diagnosis
+is required before considering another policy change.

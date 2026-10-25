@@ -38,9 +38,9 @@ class FrontendExecutionBudget(unittest.TestCase):
         self.assertEqual(direct.frontend_case_timeout('native-first', '0'), 1200)
         self.assertEqual(direct.frontend_case_timeout('native-second', '0'), 1200)
 
-    def test_o2_budgets_remain_unchanged_by_the_o0_partition(self):
+    def test_o2_budgets_have_only_the_reviewed_native_first_margin(self):
         self.assertEqual(direct.frontend_case_timeout('frontend', '2'), 1200)
-        self.assertEqual(direct.frontend_case_timeout('native-first', '2'), 120)
+        self.assertEqual(direct.frontend_case_timeout('native-first', '2'), 180)
         self.assertEqual(direct.frontend_case_timeout('native-second', '2'), 120)
 
     def test_ci_partitions_o0_with_bounded_jobs(self):
@@ -429,17 +429,17 @@ class FrontendTimeoutSelection(unittest.TestCase):
             return {name: options['timeout'] for name, _, options in calls
                     if name.startswith('shared-frontend-')}
 
-    def test_default_frontend_budget_and_unchanged_native_budgets(self):
+    def test_default_frontend_budget_and_mode_specific_native_budgets(self):
         self.assertEqual(self.run_dispatch([]), {
             'shared-frontend-frontend': 1200,
-            'shared-frontend-native-first': 120,
+            'shared-frontend-native-first': 180,
             'shared-frontend-native-second': 120,
         })
 
     def test_override_applies_only_to_frontend(self):
         self.assertEqual(self.run_dispatch(['--frontend-timeout', '333']), {
             'shared-frontend-frontend': 333,
-            'shared-frontend-native-first': 120,
+            'shared-frontend-native-first': 180,
             'shared-frontend-native-second': 120,
         })
 
@@ -463,6 +463,20 @@ class FrontendTimeoutSelection(unittest.TestCase):
     def test_authenticated_o0_frontend_ceiling_is_finite(self):
         with self.assertRaisesRegex(ValueError, '3600'):
             direct.frontend_case_timeout('frontend', '0', 3601)
+
+    def test_native_first_margin_cannot_be_selected_by_an_unknown_mode(self):
+        for mode in ('native', 'native-first-extra', '--native-first', ''):
+            with self.subTest(mode=mode), self.assertRaisesRegex(ValueError, 'unknown frontend case'):
+                direct.frontend_case_timeout(mode, '2')
+
+    def test_frontend_override_cannot_enlarge_either_native_mode(self):
+        for override in (1, 1800):
+            with self.subTest(override=override):
+                self.assertEqual(direct.frontend_case_timeout('native-first', '2', override), 180)
+                self.assertEqual(direct.frontend_case_timeout('native-second', '2', override), 120)
+        for mode in ('native-first', 'native-second'):
+            with self.subTest(mode=mode), self.assertRaisesRegex(ValueError, '1800'):
+                direct.frontend_case_timeout(mode, '2', 1801)
 
     def test_o2_rejects_o0_only_override(self):
         with self.assertRaisesRegex(ValueError, '1800'):
