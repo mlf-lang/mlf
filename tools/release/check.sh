@@ -22,6 +22,7 @@ node tools/release/test-benchmark-gate.mjs
 node tools/release/test-ci-policy.mjs
 python3 tools/shared/test_provenance.py
 python3 tools/shared/test_framework_policy.py
+python3 tools/shared/test_resource_watchdog.py
 python3 tools/shared/test_guest_framework_controls.py
 python3 tools/shared/test_guest_state_laws_controls.py
 node tools/release/test-release-tag.mjs
