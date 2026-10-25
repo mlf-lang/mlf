@@ -213,3 +213,41 @@ source is byte-identical. Those attempts did not execute graph tests and are not
 counted as passes. The durable authenticated host graph fixture executes the
 authored copy/frontier/index/malformed-input checks against the actual shared
 Graph/Solver/Constraint objects, separately from that legacy import limitation.
+
+## CI166 execution-budget finding
+
+The published residual head `9c4937c5531f9536260a3a72c76736016bc97265`
+passed the complete hosted O2 job, including all eight authenticated receipt
+routes and the new 18/55-check fixtures. Its O0 default shard also passed all
+305 observations in 2293.36 seconds, and its O0 framework shard passed all 105
+cases and associated controls in 3240.79 seconds. Their official artifacts match
+the exact published source tree and linked receipts. CI166 was allowed to finish
+without cancellation. The O0 direct shard did **not** pass:
+`--frontend` reached 2400.017 seconds, emitted only the qualified-recursion
+completion banner, and was terminated with empty stderr and complete owned
+process cleanup. Later direct modes and Figure12 did not execute in that shard.
+The banner proves the prefix completed; it does not identify a particular
+unfinished repair subgroup or demonstrate an assertion failure.
+
+Between CI164's source and this residual source, literal recursive compilation
+helper calls in `SharedFrontend.hs` increased from 90 to 163: 74 added calls and
+one old Box rejection replaced by an acceptance case. This excludes other
+parser/pure assertions, and differently priced calls do not establish a runtime
+model. Applying that ratio to the earlier 1528-second frontend result yields
+2768 seconds only as a rough workload-size comparison, not a predicted duration.
+
+The narrow correction raises only the authenticated O0 frontend default/maximum
+to 3600 seconds. O0 native modes stay at 1200 each; O2 limits, default/framework
+limits, every assertion and full-mode ordering remain unchanged. CI166 setup,
+producer and smoke took about 820 seconds. Combining the new frontend allowance
+with earlier measured native modes and Figure12 gives approximately 99 minutes;
+allowing normal overhead gives a provisional 99–102-minute planning estimate.
+Using both native ceilings instead gives about 114 minutes before small helpers
+and upload. The unchanged 120-minute job deadline remains an independent hard
+failure bound, not a promise that every command's maximum can fit simultaneously.
+
+Real CLI dispatch controls verify authenticated optimization selection, the
+3600 ceiling, rejected larger overrides, unchanged O2/native limits and strict
+output/status/stderr/cleanup behavior. The failed 2400-second attempt remains
+failed. Only a subsequent completed exact-head run can establish O0 success;
+the policy adjustment itself is not a pass or a compiler-performance claim.

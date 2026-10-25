@@ -34,7 +34,7 @@ class FrontendExecutionBudget(unittest.TestCase):
     # Preserve upstream's authenticated-budget and untyped-input controls while
     # reconciling its serial job with the reviewed per-mode parallel partition.
     def test_authenticated_o0_budget_is_bounded(self):
-        self.assertEqual(direct.frontend_case_timeout('frontend', '0'), 2400)
+        self.assertEqual(direct.frontend_case_timeout('frontend', '0'), 3600)
         self.assertEqual(direct.frontend_case_timeout('native-first', '0'), 1200)
         self.assertEqual(direct.frontend_case_timeout('native-second', '0'), 1200)
 
@@ -445,7 +445,7 @@ class FrontendTimeoutSelection(unittest.TestCase):
 
     def test_o0_budgets_come_from_authenticated_receipt(self):
         self.assertEqual(self.run_dispatch([], optimization='0'), {
-            'shared-frontend-frontend': 2400,
+            'shared-frontend-frontend': 3600,
             'shared-frontend-native-first': 1200,
             'shared-frontend-native-second': 1200,
         })
@@ -454,6 +454,15 @@ class FrontendTimeoutSelection(unittest.TestCase):
             'shared-frontend-native-first': 1200,
             'shared-frontend-native-second': 1200,
         })
+        self.assertEqual(self.run_dispatch(['--frontend-timeout', '3600'], optimization='0'), {
+            'shared-frontend-frontend': 3600,
+            'shared-frontend-native-first': 1200,
+            'shared-frontend-native-second': 1200,
+        })
+
+    def test_authenticated_o0_frontend_ceiling_is_finite(self):
+        with self.assertRaisesRegex(ValueError, '3600'):
+            direct.frontend_case_timeout('frontend', '0', 3601)
 
     def test_o2_rejects_o0_only_override(self):
         with self.assertRaisesRegex(ValueError, '1800'):
@@ -474,7 +483,7 @@ class FrontendTimeoutSelection(unittest.TestCase):
             self.assertFalse(output.exists())
 
     def test_invalid_cli_budgets_fail_before_output_or_execution(self):
-        for seconds in ('0', '-1', '3001'):
+        for seconds in ('0', '-1', '3601'):
             with self.subTest(seconds=seconds), tempfile.TemporaryDirectory(prefix='mlf-timeout-invalid-') as temporary:
                 output = Path(temporary) / 'output'
                 argv = ['test_direct.py', '--bin-dir', temporary, '--output', str(output),

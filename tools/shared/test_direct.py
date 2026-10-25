@@ -27,16 +27,19 @@ FRONTEND_CASES = [
 # O0's canonical-prelude workload is substantially slower even on the upstream
 # compiler. Select limits only from the authenticated producer, never a CLI
 # optimization label. O2's existing limits are unchanged.
+# CI166 exhausted 2400s after the qualified-recursion banner. The residual
+# suite grew from 90 to 163 literal compilation calls; allow a bounded 3600s
+# for O0 frontend only, without changing its cases/order or the 120m job bound.
 def frontend_case_timeout(name, optimization, frontend_seconds=None):
     if optimization not in ('0', '2'):
         raise ValueError('unsupported authenticated optimization level')
     if name not in {case[0] for case in FRONTEND_CASES}:
         raise ValueError('unknown frontend case')
-    maximum = 3000 if optimization == '0' else 1800
+    maximum = 3600 if optimization == '0' else 1800
     if frontend_seconds is not None and not 1 <= frontend_seconds <= maximum:
         raise ValueError('frontend timeout must be between 1 and ' + str(maximum) + ' seconds')
     if name == 'frontend':
-        return frontend_seconds if frontend_seconds is not None else (2400 if optimization == '0' else 1200)
+        return frontend_seconds if frontend_seconds is not None else (3600 if optimization == '0' else 1200)
     return 1200 if optimization == '0' else 120
 
 ORACLES = ['tests/async-task/suite.stdout', 'tests/async-task/processes.stdout',
@@ -254,10 +257,10 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--cc', default=os.environ.get('CC', 'cc'))
     parser.add_argument('--frontend-timeout', type=int,
-                        help='bounded frontend override: O0 1..3000, O2 1..1800; defaults come from authenticated optimization')
+                        help='bounded frontend override: O0 1..3600, O2 1..1800; defaults come from authenticated optimization')
     args = parser.parse_args()
-    if args.frontend_timeout is not None and not 1 <= args.frontend_timeout <= 3000:
-        parser.error('frontend timeout must be between 1 and 3000 seconds')
+    if args.frontend_timeout is not None and not 1 <= args.frontend_timeout <= 3600:
+        parser.error('frontend timeout must be between 1 and 3600 seconds')
     binaries, output = args.bin_dir.resolve(), args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     receipt = {'format': 1, 'complete': False, 'source_mode': 'authenticated direct committed shared source',
