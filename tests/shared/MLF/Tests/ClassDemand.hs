@@ -39,6 +39,47 @@ module MLF.Tests.ClassDemand where {
       ensure (Q.universeSize plan == 0 && Q.saturationUpdates plan == 0)
         "a seedless cycle invented a dictionary"
     };
+  assertEmptyPlan :: IntSet -> Q.Plan -> Either String ();
+  assertEmptyPlan expected (Q.Plan (Q.Universe slots seeds transitions) values updates) =
+    ensure (IM.null slots && IM.null seeds && IM.null transitions &&
+      IS.eqIntSet expected (IM.keysSet values) &&
+      IM.foldl (\empty value -> empty && IS.null value) True values && updates == 0)
+      "seedless plan changed its exact universe, node sets, or update count";
+  emptyDemandKinds :: Either String ();
+  emptyDemandKinds = do {
+    let { nodes = IM.fromList
+      ((:) ((,) 0 Q.Empty)
+        ((:) ((,) 1 (Q.RefNode 2))
+          ((:) ((,) 2 (Q.UnionNodes ((:) 0 ((:) 1 ((:) 3 [])))))
+            ((:) ((,) 3 (Q.InstantiateNode 100 2)) [])))) };
+    plan <- Q.solve frames [] ((:) (Q.Use 100 2 1) []) nodes;
+    assertEmptyPlan (IM.keysSet nodes) plan;
+    empty <- Q.solve frames [] [] IM.empty;
+    assertEmptyPlan IS.empty empty
+  };
+  rejectsExactly :: String -> Either String Q.Plan -> Either String ();
+  rejectsExactly expected result = case result of {
+    Left actual -> ensure (eqString expected actual) "planner validation diagnostic changed";
+    Right _ -> Left "invalid seedless planner input was accepted"
+  };
+  emptyValidation :: Either String ();
+  emptyValidation = do {
+    rejectsExactly "class demand: unknown demand dependency 1"
+      (Q.solve frames [] [] (IM.singleton 0 (Q.InstantiateNode 99 1)));
+    rejectsExactly "class demand: unknown use 99"
+      (Q.solve frames [] [] (IM.singleton 0 (Q.InstantiateNode 99 0)));
+    rejectsExactly "class demand: unknown seed 10"
+      (Q.solve frames [] [] (IM.singleton 0 (Q.SeedNode 10)));
+    rejectsExactly "class demand: negative demand node identity"
+      (Q.solve frames [] [] (IM.singleton (0 - 1) (Q.RefNode 99)));
+    rejectsExactly "class demand: duplicate frame finish rank"
+      (Q.solve ((:) (Q.Frame 0 Nothing 1)
+        ((:) (Q.Frame 1 (Just 99) 1) [])) [] [] IM.empty);
+    rejectsExactly "class demand: unknown parent frame 99"
+      (Q.solve ((:) (Q.Frame 0 (Just 99) 1) []) [] [] IM.empty);
+    rejectsExactly "class demand: instantiation receiver must finish after its binding"
+      (Q.solve frames [] ((:) (Q.Use 100 1 2) []) IM.empty)
+  };
   sameClassOrigins :: Either String ();
   sameClassOrigins =
     do {
@@ -155,14 +196,17 @@ module MLF.Tests.ClassDemand where {
       Right ()
     };
   checks :: [] ((,) String (Either String ()));
-  checks = (:) ((,) "empty recursive demand cycle" emptyCycle)
+  checks = append
+    ((:) ((,) "seedless exact plan across all demand forms" emptyDemandKinds)
+      ((:) ((,) "seedless exact validation and error order" emptyValidation) []))
+    ((:) ((,) "empty recursive demand cycle" emptyCycle)
     ((:) ((,) "same-class origin distinction" sameClassOrigins)
       ((:) ((,) "nested owner reentry and actual multiplicity" nestedReentry)
         ((:) ((,) "two nested polymorphic uses" twoNestedUses)
           ((:) ((,) "completed sibling full lineage" siblingLineage)
             ((:) ((,) "captured ancestor origin" capturedOrigin)
               ((:) ((,) "no unreachable Cartesian expansion" unreachableUses)
-                ((:) ((,) "invalid rank and reference rejection" validation) [])))))));
+                ((:) ((,) "invalid rank and reference rejection" validation) []))))))));
   checkAll :: Either String ();
   checkAll =
     foldM

@@ -344,23 +344,32 @@ module Bootstrap.ClassDemand where {
       mapM (validateSeed frames) (IM.elems seeds);
       mapM (validateUse frames) (IM.elems uses);
       mapM (validateNode seeds uses nodes) (IM.toAscList nodes);
-      let { dependents = dependentNodes nodes };
-      discovered <- discoverUniverse frames seeds uses nodes dependents;
-      case discovered of {
-        Discovery universe reached _ ->
-          do {
-            fixed <- saturate universe (IM.keysSet (universeSlots universe))
-              nodes dependents (IM.keysSet nodes)
-              (IM.map (\_ -> IS.empty) nodes) 0;
-            case fixed of {
-              (,) values updates ->
-                do {
-                  ensure (IM.eqIntMap IS.eqIntSet reached values)
-                    "class demand: preallocation and immutable saturation disagree";
-                  Right (Plan universe values updates)
-                }
+      -- With no validated seed there can be no reachable fact or origin.
+      -- Keep every guard above, including dependency/use validation, but
+      -- avoid constructing reverse edges and replaying the empty fixed point.
+      -- Retain every demand-node key, even for disconnected empty components.
+      if IM.null seeds
+      then Right (Plan (Universe IM.empty IM.empty IM.empty)
+        (IM.map (\_ -> IS.empty) nodes) 0)
+      else do {
+        let { dependents = dependentNodes nodes };
+        discovered <- discoverUniverse frames seeds uses nodes dependents;
+        case discovered of {
+          Discovery universe reached _ ->
+            do {
+              fixed <- saturate universe (IM.keysSet (universeSlots universe))
+                nodes dependents (IM.keysSet nodes)
+                (IM.map (\_ -> IS.empty) nodes) 0;
+              case fixed of {
+                (,) values updates ->
+                  do {
+                    ensure (IM.eqIntMap IS.eqIntSet reached values)
+                      "class demand: preallocation and immutable saturation disagree";
+                    Right (Plan universe values updates)
+                  }
+              }
             }
-          }
+        }
       }
     }
 }
