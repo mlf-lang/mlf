@@ -326,9 +326,12 @@ module Bootstrap.Crate where {
       let {
         resolved = Modules.resolvedCrateModules resolution
       };
-      let {
-        ownData = concatMap (\r -> Modules.renamedDatatypes (Modules.resolvedContents r)) resolved
-      };
+      -- Canonicalize only this crate's freshly resolved source declarations.
+      -- Imported checked layouts are validation context, never rewrite input.
+      -- Do this before SourcePlan, dictionary inventory and cache-key creation.
+      ownData <- D.canonicalSourceDeclarations
+        (concatMap (\p -> Artifact.crateData (snd p)) interfaces)
+        (concatMap (\r -> Modules.renamedDatatypes (Modules.resolvedContents r)) resolved);
       let {
         ownClasses = concatMap (\r -> Modules.renamedClasses (Modules.resolvedContents r)) resolved
       };

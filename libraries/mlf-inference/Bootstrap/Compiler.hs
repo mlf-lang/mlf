@@ -11,6 +11,7 @@ module Bootstrap.Compiler (Compilation, inferredType, compiledTerm, checkedTerm,
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Prelude as Prelude;
   import qualified Bootstrap.Standalone as Standalone;
+  import qualified Bootstrap.Data as D;
   import qualified Bootstrap.Classes as Classes;
   import Bootstrap.CompilerCore;
   compile :: String -> String -> Either CompileError Compilation;
@@ -86,8 +87,12 @@ module Bootstrap.Compiler (Compilation, inferredType, compiledTerm, checkedTerm,
             let {
               display = Modules.displayNames names
             };
+            canonical <- case D.canonicalSourceProgram program of {
+              Left message -> Left (CompileError Inference (display message));
+              Right value -> Right value
+            };
             lowered <-
-              case Classes.lowerClassesWithScopes valueScopes instanceScopes program of {
+              case Classes.lowerClassesWithScopes valueScopes instanceScopes canonical of {
                 Left err -> Left (CompileError Inference (display err));
                 Right lowered -> Right lowered
               };
@@ -120,7 +125,11 @@ module Bootstrap.Compiler (Compilation, inferredType, compiledTerm, checkedTerm,
         Nothing -> compileLegacyProgramWithPrelude mode original;
         Just ((,,) imports source names) -> do {
           let { display = Modules.displayNames names };
-          lowered <- case Classes.lowerClassesWithImports imports source of {
+          canonical <- case D.canonicalSourceProgram source of {
+            Left message -> Left (CompileError Inference (display message));
+            Right value -> Right value
+          };
+          lowered <- case Classes.lowerClassesWithImports imports canonical of {
             Left message -> Left (CompileError Inference (display message));
             Right result -> Right result
           };
@@ -143,7 +152,8 @@ module Bootstrap.Compiler (Compilation, inferredType, compiledTerm, checkedTerm,
     case Prelude.withPrelude mode original of {
       (,) imports source ->
         do {
-          lowered <- atPhase Inference (Classes.lowerClassesWithImports imports source);
+          canonical <- atPhase Inference (D.canonicalSourceProgram source);
+          lowered <- atPhase Inference (Classes.lowerClassesWithImports imports canonical);
           finishCompilation lowered
         }
     }

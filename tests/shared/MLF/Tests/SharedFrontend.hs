@@ -727,15 +727,184 @@ module MLF.Tests.SharedFrontend where {
       "data V p = V (forall a. p); \\v -> case v of { V x -> x }"
       (XForall (XTyVar 0) XBot
         (XArrow (XCon "V" ((:) (XVar (XTyVar 0)) [])) (XVar (XTyVar 0))));
-    -- This is a known constructor-side residual, not a field-extraction fix.
-    -- Keep the original source and verification diagnostic as an explicit
-    -- control rather than silently claiming that V 1 has been repaired.
-    check "vacuous forall constructor mismatch remains explicit residual"
-      (case C.compile "FrontendRepair.emlf" "data V = V (forall a. Int); V 1" of {
-        Left error -> (case C.phase error of { Verification -> True; _ -> False }) &&
-          recursiveStartsWith "application type mismatch" (C.diagnostic error);
+    frontendRepairSourceFieldChecks
+  };
+  frontendCanonicalField :: String -> Field -> Field -> IO ();
+  frontendCanonicalField label original expected = do {
+    let { actual = Data.canonicalSourceField original };
+    check label (eqString (Query.encodeField actual) (Query.encodeField expected));
+    check (label ++ " idempotent")
+      (eqString (Query.encodeField (Data.canonicalSourceField actual))
+        (Query.encodeField actual))
+  };
+  frontendRepairSourceFieldPureChecks :: IO ();
+  frontendRepairSourceFieldPureChecks = do {
+    let {
+      int = Applied "Int" [];
+      bool = Applied "Bool" [];
+      dead = Quantified "a" Star int;
+      live = Quantified "a" Star (Parameter "a");
+      identity = Quantified "a" Star (Function (Parameter "a") (Parameter "a"));
+      higherKind = KArrow Star Star;
+      declare = \name field -> DataDecl name []
+        ((:) (ConstructorDecl name ((:) field [])) []);
+      checked = declare "Checked" dead;
+      local = declare "Local" (Function dead (Applied "Checked" []));
+      normalized = declare "Local" (Function int (Applied "Checked" []));
+      unbound = declare "Unbound" (Quantified "unused" Star (Parameter "missing"));
+      unknown = declare "Unknown" (Quantified "unused" Star (Applied "Missing" []));
+      illKinded = DataDeclK "IllKinded" ((:) ((,) "f" higherKind) [])
+        ((:) (ConstructorDecl "IllKinded"
+          ((:) (Quantified "unused" Star (Parameter "f")) [])) [])
+    };
+    frontendCanonicalField "source field drops nested binders inner to outer"
+      (Quantified "a" Star (Quantified "b" Star int)) int;
+    frontendCanonicalField "source field preserves live alias forall" live live;
+    frontendCanonicalField "source field drops only shadowed outer binder"
+      (Quantified "a" Star identity) identity;
+    frontendCanonicalField "source field preserves outer occurrence beside shadow"
+      (Quantified "a" Star (Function (Parameter "a") identity))
+      (Quantified "a" Star (Function (Parameter "a") identity));
+    frontendCanonicalField "source field retains captured datatype parameter"
+      (Quantified "unused" Star (Parameter "p")) (Parameter "p");
+    frontendCanonicalField "source field normalizes arrow domain and codomain"
+      (Function dead (Quantified "b" Star bool)) (Function int bool);
+    frontendCanonicalField "source field normalizes constructor arguments"
+      (Applied "Pair" ((:) dead ((:) (Quantified "b" Star bool) [])))
+      (Applied "Pair" ((:) int ((:) bool [])));
+    frontendCanonicalField "source field normalizes application function and argument"
+      (Application (Quantified "unused" Star (Parameter "f")) dead)
+      (Application (Parameter "f") int);
+    frontendCanonicalField "source field drops higher kind dead binder"
+      (Quantified "f" higherKind dead) int;
+    frontendCanonicalField "source field preserves higher kind live binder"
+      (Quantified "f" higherKind (Application (Parameter "f") dead))
+      (Quantified "f" higherKind (Application (Parameter "f") int));
+    actual <- recursiveRight "source declarations validate against checked context"
+      (Data.canonicalSourceDeclarations ((:) checked []) ((:) local []));
+    check "source declarations return only normalized local layouts"
+      (case actual of {
+        (:) declaration [] -> eqString (Query.encodeDatatype declaration)
+          (Query.encodeDatatype normalized);
+        _ -> False
+      });
+    repeated <- recursiveRight "source declaration normalization repeats"
+      (Data.canonicalSourceDeclarations ((:) checked []) actual);
+    check "source declarations are idempotent"
+      (eqString (Query.list Query.encodeDatatype repeated)
+        (Query.list Query.encodeDatatype actual));
+    empty <- recursiveRight "source declarations accept empty source batch"
+      (Data.canonicalSourceDeclarations ((:) checked []) []);
+    check "checked context is not returned as source" (null empty);
+    -- Revalidate the combined contract and inspect the checked layout. The
+    -- source operation must not rewrite the imported nominal field scheme.
+    environment <- recursiveRight "normalized source and unchanged checked context validate"
+      (Data.validateDeclarations (append ((:) checked []) actual));
+    preserved <- recursiveRight "checked context layout remains available"
+      (Data.lookupDatatype environment "Checked");
+    check "checked context retains its vacuous quantified field"
+      (case Data.datatypeConstructors preserved of {
+        (:) (ConstructorDecl _ ((:) field [])) [] ->
+          eqString (Query.encodeField field) (Query.encodeField dead);
+        _ -> False
+      });
+    check "source normalization rejects original unbound field"
+      (case Data.canonicalSourceDeclarations [] ((:) unbound []) of {
+        Left message -> eqString message "unbound data type parameter: missing";
+        Right _ -> False
+      });
+    check "source normalization rejects original ill kinded field"
+      (case Data.canonicalSourceDeclarations [] ((:) illKinded []) of {
+        Left message -> eqString message "constructor field must have kind *";
+        Right _ -> False
+      });
+    check "source normalization rejects original unknown field constructor"
+      (case Data.canonicalSourceDeclarations [] ((:) unknown []) of {
+        Left message -> eqString message "unknown field type: Missing";
+        Right _ -> False
+      });
+    check "source normalization validates checked context too"
+      (case Data.canonicalSourceDeclarations ((:) unbound [])
+          ((:) (declare "Valid" int) []) of {
+        Left message -> eqString message "unbound data type parameter: missing";
+        Right _ -> False
+      });
+    check "source normalization validates combined declaration identities"
+      (case Data.canonicalSourceDeclarations ((:) checked []) ((:) checked []) of {
+        Left message -> eqString message "duplicate data type";
         Right _ -> False
       })
+  };
+  frontendRepairSourceFieldChecks :: IO ();
+  frontendRepairSourceFieldChecks = do {
+    let {
+      vacuous = "data V = V (forall a. Int); ";
+      v = XCon "V" [];
+      captured = XForall (XTyVar 0) XBot
+        (XArrow (XVar (XTyVar 0)) (XCon "Captured" ((:) (XVar (XTyVar 0)) [])))
+    };
+    recursiveAccepted "vacuous forall constructor as value"
+      (vacuous ++ "V") (XArrow recursiveInt v);
+    recursiveAccepted "vacuous forall constructor application"
+      (vacuous ++ "V 1") v;
+    recursiveAccepted "vacuous forall constructor typed payload"
+      (vacuous ++ "V (1 :: Int)") v;
+    recursiveAccepted "vacuous forall constructor explicitly quantified payload"
+      (vacuous ++ "V (1 :: forall a. Int)") v;
+    recursiveAccepted "vacuous forall constructor signed local payload"
+      (vacuous ++ "let n : forall a. Int = 1 in V n") v;
+    recursiveAccepted "vacuous forall constructor let alias"
+      (vacuous ++ "let make = V in make 1") v;
+    recursiveAccepted "vacuous forall constructor partial application"
+      "data Partial = Partial (forall a. Int) Bool; Partial 1"
+      (XArrow recursiveBool (XCon "Partial" []));
+    recursiveAccepted "vacuous forall nested in arrow domain"
+      "data Domain = Domain ((forall a. Int) -> Bool); Domain (\\n -> eqInt n 1)"
+      (XCon "Domain" []);
+    recursiveAccepted "vacuous forall nested in arrow codomain"
+      "data Codomain = Codomain (Int -> (forall a. Bool)); Codomain (\\n -> eqInt n 1)"
+      (XCon "Codomain" []);
+    recursiveAccepted "vacuous forall nested in constructor argument"
+      "data Maybe a = Nothing | Just a; data Nested = Nested (Maybe (forall a. Int)); Nested (Just 1)"
+      (XCon "Nested" []);
+    recursiveAccepted "vacuous forall constructor captures datatype parameter"
+      "data Captured p = Captured (forall a. p); \\x -> Captured x" captured;
+    recursiveAccepted "vacuous forall constructor shadows datatype parameter"
+      "data Shadow a = Shadow (forall a. Int); Shadow"
+      (XForall (XTyVar 0) XBot
+        (XArrow recursiveInt (XCon "Shadow" ((:) (XVar (XTyVar 0)) []))));
+    recursiveAccepted "vacuous forall constructor retains live inner shadow"
+      "data Shadow = Shadow (forall a. forall a. a -> a); Shadow"
+      (XArrow recursiveIdentity (XCon "Shadow" []));
+    recursiveAccepted "vacuous forall constructor drops higher kind dead binder"
+      "data Higher = Higher (forall (f : * -> *) a. Int); Higher 1"
+      (XCon "Higher" []);
+    recursiveAccepted "vacuous forall constructor preserves live higher rank field"
+      "data Mixed = Mixed (forall a b. a -> a); Mixed"
+      (XArrow recursiveIdentity (XCon "Mixed" []));
+    recursiveRejected "vacuous forall constructor rejects wrong payload"
+      (vacuous ++ "V true") "type constructor mismatch";
+    recursiveRejected "vacuous forall captured parameter is not generalized"
+      "data Captured p = Captured (forall a. p); \\v -> case v of { Captured x -> let n : Int = x in (x :: Bool) }"
+      "type constructor mismatch";
+    recursiveRejected "source normalization rejects raw unbound field"
+      "data Unbound = Unbound (forall a. missing); true"
+      "unbound data type parameter: missing";
+    recursiveRejected "source normalization rejects raw ill kinded field"
+      "data IllKinded (f : * -> *) = IllKinded (forall a. f); true"
+      "constructor field must have kind *";
+    recursiveRejected "source normalization rejects raw unknown field constructor"
+      "data Unknown = Unknown (forall a. Missing); true"
+      "unknown field type: Missing";
+    -- A live alias forall is not empty. Its graph/target agreement limitation
+    -- remains unresolved and must not be hidden by dropping the binder.
+    check "live alias forall constructor remains explicit residual"
+      (case C.compile "FrontendRepair.emlf" "data Abs = Abs (forall a. a); Abs" of {
+        Left error -> (case C.phase error of { Verification -> True; _ -> False }) &&
+          eqString "elaboration changed the inferred type" (C.diagnostic error);
+        Right _ -> False
+      });
+    frontendRepairSourceFieldPureChecks
   };
   frontendRepairChecks :: IO ();
   frontendRepairChecks = do {
