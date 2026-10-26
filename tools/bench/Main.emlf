@@ -176,7 +176,6 @@ main = do
     [] -> return ((,,) false (row (two (pair "compilation" (J.num 5)) (pair "runtime" (J.num 2)))) [])
     (:) option [] -> if eqString option "--check-only" then return ((,,) true (row (two (pair "compilation" (J.num 5)) (pair "runtime" (J.num 2)))) []) else O.fatal "supply both compilation and runtime limits, or only --check-only"
     (:) compileLimit ((:) runtimeLimit names) -> return ((,,) false (row (two (pair "compilation" (J.Number compileLimit)) (pair "runtime" (J.Number runtimeLimit)))) names)
-    _ -> O.fatal "supply both compilation and runtime limits"
    O.require (B.validateLimits limits) "limits must be finite positive numbers"
    O.require (S.all (\name -> S.elem eqString name V.workloads) selected && S.length selected == S.length (S.nubBy eqString selected)) "invalid workload selection"
    present <- directoryExists output

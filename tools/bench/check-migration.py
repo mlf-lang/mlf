@@ -45,6 +45,14 @@ for path in re.findall(r'libraries/[A-Za-z0-9_./-]+\.(?:hs|emlf)', entry):
     assert (ROOT / path).is_file(), 'missing runner integrity input: ' + path
 def check_mode_contract(source):
     # Source-shape guard only: native CLI refusal tests remain an execution gate.
+    options = source.split('checkOnly limits selected <- case options of', 1)[1].split(
+        '   O.require (B.validateLimits limits)', 1)[0]
+    # Empty, singleton and two-or-more lists exhaust this options case. A final
+    # wildcard is unreachable and is correctly rejected by the real compiler.
+    branches = re.findall(r'^    (.+?) ->', options, re.MULTILINE)
+    assert branches == ['[]', '(:) option []',
+                        '(:) compileLimit ((:) runtimeLimit names)'], (
+        'options case must have exactly its three exhaustive list branches')
     for fragment in [
         '(:) option [] -> if eqString option "--check-only"',
         '"invalid workload selection"',
@@ -62,7 +70,9 @@ check_mode_contract(entry)
 # regressions, not that a compiler has executed or proved the CLI semantics.
 for old, new in [('(:) option []', '(:) option rest'),
                  ('J.Boolean false', 'J.Boolean true'),
-                 ('then "correctness-passed"', 'then "passed"')]:
+                 ('then "correctness-passed"', 'then "passed"'),
+                 ('   O.require (B.validateLimits limits)',
+                  '    _ -> O.fatal "redundant fallback"\n   O.require (B.validateLimits limits)')]:
     mutated = entry.replace(old, new)
     assert mutated != entry
     try:
