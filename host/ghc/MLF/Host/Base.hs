@@ -10,7 +10,7 @@ module MLF.Host.Base
   , v_addInt, v_subInt, v_mulInt, v_quotInt, v_remInt, v_eqInt, v_ltInt, v_andInt
   , v_addDouble, v_subDouble, v_mulDouble, v_divDouble, v_sqrtDouble
   , v_eqDouble, v_ltDouble, v_intToDouble, v_doubleToBits, v_doubleFromBits
-  , v_concatString, v_eqString, v_compareString, v_stringLength, v_stringCodeAt
+  , v_concatString, v_concatStringList, v_eqString, v_compareString, v_stringLength, v_stringCodeAt
   , v_stringSlice, v_stringFromCode, v_showInt, v_readInt, v_readDouble, v_formatDouble
   , v_ifThenElse, v_seq, v_panic, HostError(..), failure, bounded, strict2
   ) where
@@ -31,6 +31,7 @@ import Data.Typeable (Typeable)
 import Control.Exception (Exception, throw)
 import qualified Control.Monad.ST as S
 import qualified Data.Array.ST as A
+import qualified Data.Array.Base as AB
 import GHC.Float (castDoubleToWord64, castWord64ToDouble)
 import GHC.Conc (pseq)
 import Foreign.C (CInt(..), CDouble(..), CString, peekCStringLen)
@@ -40,7 +41,10 @@ import Text.Read (readMaybe)
 
 type Int = Integer
 type ST = S.ST
-type STArray s a = A.STArray s P.Int a
+-- The private constructor fixes zero-based bounds once. Keep the arbitrary
+-- precision length for checked language indices; only a proven in-range index
+-- is converted to the host's machine index below.
+data STArray s a = STArray !Int !(A.STArray s P.Int a)
 -- Text is strict UTF-8 in the supported text-2 toolchain. String indices and
 -- lengths below count Unicode scalars, never bytes or UTF-16 code units.
 data String = String !T.Text !P.Int (Array.Array P.Int Char)
@@ -123,24 +127,21 @@ bounded message limit n = if n<0 || n>limit || n>toInteger (maxBound::P.Int)
 arrayLength :: Int -> P.Int
 arrayLength = bounded "invalid array length" (9223372036854775807 `quot` 8)
 v_newSTArray :: Int -> a -> ST s (STArray s a)
-v_newSTArray n initial = pure n >>= \operand ->
-  let size=arrayLength operand in size `pseq` A.newArray (0,size-1) initial
-stIndex :: STArray s a -> Int -> ST s P.Int
-stIndex a n = do
-  (_,hi) <- A.getBounds a
-  let i=bounded "array index out of bounds" (toInteger hi) n
-  i `seq` pure i
+v_newSTArray n initial = pure n >>= \operand -> do
+  let size=arrayLength operand
+  cells <- size `pseq` A.newArray (0,size-1) initial
+  pure (STArray (toInteger size) cells)
+stIndex :: Int -> Int -> P.Int
+stIndex size n =
+  if n<0 || n>=size then failure "array index out of bounds" else fromInteger n
 v_readSTArray :: STArray s a -> Int -> ST s a
-v_readSTArray a n = stIndex a n >>= A.readArray a
+v_readSTArray a n = pure a >>= \(STArray size cells) ->
+  let i=stIndex size n in i `pseq` AB.unsafeRead cells i
 v_writeSTArray :: STArray s a -> Int -> a -> ST s ()
-v_writeSTArray a n value = do
-  i <- stIndex a n
-  A.writeArray a i value
-  pure ()
+v_writeSTArray a n value = pure a >>= \(STArray size cells) ->
+  let i=stIndex size n in i `pseq` AB.unsafeWrite cells i value
 v_lengthSTArray :: STArray s a -> ST s Int
-v_lengthSTArray a = do
-  (_,hi) <- A.getBounds a
-  pure (toInteger hi+1)
+v_lengthSTArray a = pure a >>= \(STArray size _) -> pure size
 
 strict2 :: (a -> b -> c) -> a -> b -> c
 strict2 f a b = a `pseq` b `pseq` f a b
@@ -210,6 +211,27 @@ v_readDouble text = let s=unpack text in
         exponent _ = False
 v_concatString :: String -> String -> String
 v_concatString = strict2 (\(String a na _) (String b nb _) -> mkSizedText (na+nb) (T.append a b))
+-- Force each fragment before demanding the next list cell, matching the
+-- balanced source join's observable failure order. Text.concat then copies
+-- the validated fragments once rather than at every balanced-tree level.
+v_concatStringList :: [String] -> String
+v_concatStringList pieces = case pieces of
+  [] -> literal ""
+  first:rest -> first `pseq` case rest of
+    [] -> first
+    _ -> collect 0 0 [] pieces
+  where
+    collect scalarCount byteCount chunks remaining = case remaining of
+      [] -> mkSizedText scalarCount (T.concat (reverse chunks))
+      piece:rest -> piece `pseq` case piece of
+        String text count _ -> case text of
+          TI.Text _ _ bytes ->
+            if count > maxBound - scalarCount || bytes > maxBound - byteCount
+            then failure "string too large"
+            else let nextScalars = scalarCount + count
+                     nextBytes = byteCount + bytes
+                 in nextScalars `pseq` nextBytes `pseq`
+                      collect nextScalars nextBytes (text:chunks) rest
 v_eqString :: String -> String -> Bool
 v_eqString = strict2 (\(String a _ _) (String b _ _) -> a==b)
 v_compareString :: String -> String -> Int

@@ -160,8 +160,8 @@ module Bootstrap.LLVM.Codegen where {
   invokeResult scope name f args = do {
     symbol <- resultWorker name f;
     -- Exact original ordinary call schedule; no new input demand or wrappers.
-    captured <- capturedArguments scope f;
-    values <- ordinaryArguments scope f args;
+    preparedArguments <- workerArguments scope f args;
+    let { captured = L.fst preparedArguments; values = L.snd preparedArguments };
     callTyped resultType symbol (L.map pointer (L.append captured values))
   };
   packResult :: Int -> String -> Build String;
@@ -174,7 +174,7 @@ module Bootstrap.LLVM.Codegen where {
     XELet n rhs body -> do {
       fs <- gets functions;
       if M.member O.compareName n fs then evaluateResult scope body else do {
-        let { strict = S.member O.compareName n (A.demanded fs body) };
+        strict <- letDemanded scope n body;
         value <- if strict then evaluate scope rhs else thunk scope rhs;
         evaluateResult (M.insert O.compareName n (CGBinding value strict) scope) body
       }
@@ -351,29 +351,47 @@ module Bootstrap.LLVM.Codegen where {
       native <- gets (\state -> S.member O.compareName name (numericKernels state));
       if native then kernelAction scope name f args else invokeOrdinary scope name f args
     };
-  capturedArguments :: Map XName CGBinding -> A.WorkerFunction -> Build ([] String);
-  capturedArguments scope f =
-    L.mapM
-      (\name ->
-         do {
-           binding <- lookupName scope name;
-           if S.member O.compareName name (A.strict f)
-           then forceBinding binding
-           else bindingOperand binding
-         })
-      (A.captures f);
-  ordinaryArguments :: Map XName CGBinding ->
-                       A.WorkerFunction -> [] XErased -> Build ([] String);
-  ordinaryArguments scope f args =
-    L.mapM
-      (\entry ->
-         case entry of {
-           (,) name arg ->
-             if S.member O.compareName name (A.strict f)
-             then evaluate scope arg
-             else thunk scope arg
-         })
-      (L.zip (A.parameters f) args);
+  skippedWorkerParameter :: Maybe XName -> XName -> Bool;
+  skippedWorkerParameter skipped name = case skipped of {
+    Nothing -> False;
+    Just selected -> O.eqName name selected
+  };
+  workerArguments :: Map XName CGBinding -> A.WorkerFunction -> [] XErased ->
+                     Build ((,) ([] String) ([] String));
+  workerArguments scope f args = workerArgumentsWith scope f args Nothing;
+  -- All worker entry paths use this schedule. Force the combined capture and
+  -- formal prefix in semantic order before assembling normal ABI positions.
+  -- The optional slot is a certified non-strict producer recipe, represented
+  -- by its private fields rather than by an ordinary language value.
+  workerArgumentsWith :: Map XName CGBinding -> A.WorkerFunction -> [] XErased -> Maybe XName ->
+                         Build ((,) ([] String) ([] String));
+  workerArgumentsWith scope f args skipped = do {
+    let { parameters = M.fromList O.compareName (L.zip (A.parameters f) args) };
+    prepared <- L.foldM (\known name -> do {
+      value <- if skippedWorkerParameter skipped name
+        then failure "LLVM strict producer recipe slot"
+        else case M.lookup O.compareName name parameters of {
+          Just argument -> evaluate scope argument;
+          Nothing -> if L.elem O.eqName name (A.captures f) then do {
+            binding <- lookupName scope name;
+            forceBinding binding
+          } else failure "LLVM invalid worker demand prefix"
+        };
+      cgPure (M.insert O.compareName name value known)
+    }) M.empty (A.entryOrder f);
+    captured <- L.mapM (\name -> case M.lookup O.compareName name prepared of {
+      Just value -> cgPure value;
+      Nothing -> do { binding <- lookupName scope name; bindingOperand binding }
+    }) (A.captures f);
+    values <- L.mapM (\binding -> case binding of {
+      (,) name argument -> case M.lookup O.compareName name prepared of {
+        Just value -> cgPure value;
+        Nothing -> if skippedWorkerParameter skipped name then cgPure "null"
+                   else thunk scope argument
+      }
+    }) (L.zip (A.parameters f) args);
+    cgPure ((,) captured values)
+  };
   invokeOrdinary :: Map XName CGBinding ->
                     XName -> A.WorkerFunction -> [] XErased -> Build String;
   invokeOrdinary scope name f args =
@@ -383,8 +401,8 @@ module Bootstrap.LLVM.Codegen where {
         Just info -> invokeProducerBoxed scope name f info args;
         Nothing -> do {
           symbol <- worker name f;
-          captured <- capturedArguments scope f;
-          values <- ordinaryArguments scope f args;
+          preparedArguments <- workerArguments scope f args;
+          let { captured = L.fst preparedArguments; values = L.snd preparedArguments };
           call symbol (L.map pointer (L.append captured values))
         }
       }
@@ -433,8 +451,8 @@ module Bootstrap.LLVM.Codegen where {
   invokeProducerBoxed :: Map XName CGBinding -> XName -> A.WorkerFunction -> V.ProducerPlan -> [] XErased -> Build String;
   invokeProducerBoxed scope name f info args = do {
     symbol <- producerWorker name f info;
-    captured <- capturedArguments scope f;
-    values <- ordinaryArguments scope f args;
+    preparedArguments <- workerArguments scope f args;
+    let { captured = L.fst preparedArguments; values = L.snd preparedArguments };
     let { prepared = L.concatMap (\((,) index value) ->
       if index == V.parameterIndex info then args3 (number 0) (pointer value) (pointer "null")
       else (:) (pointer value) []) (L.zip (L.range 0 (L.length values - 1)) values) };
@@ -443,18 +461,15 @@ module Bootstrap.LLVM.Codegen where {
   invokeProducerRecipe :: Map XName CGBinding -> A.WorkerFunction -> V.ProducerPlan -> [] XErased -> Build String;
   invokeProducerRecipe scope f info args = do {
     symbol <- producerWorker (V.worker info) f info;
-    captured <- capturedArguments scope f;
+    preparedArguments <- workerArgumentsWith scope f args (Just (V.parameter info));
+    let { captured = L.fst preparedArguments; values = L.snd preparedArguments };
     fields <- L.mapM
-      (\((,) index ((,) parameter argument)) ->
+      (\((,) index value) ->
         if index == V.parameterIndex info then do {
-          values <- producerCaptureValues scope info;
-          cgPure ((:) (number 1) (L.map pointer values))
-        } else do {
-          value <- if S.member O.compareName parameter (A.strict f)
-                   then evaluate scope argument else thunk scope argument;
-          cgPure ((:) (pointer value) [])
-        })
-      (L.zip (L.range 0 (L.length args - 1)) (L.zip (A.parameters f) args));
+          recipeValues <- producerCaptureValues scope info;
+          cgPure ((:) (number 1) (L.map pointer recipeValues))
+        } else cgPure ((:) (pointer value) []))
+      (L.zip (L.range 0 (L.length values - 1)) values);
     call symbol (L.append (L.map pointer captured) (L.concat fields))
   };
   producerEscape :: Map XName CGBinding -> XName -> Build String -> XErased -> Build String;
@@ -554,8 +569,8 @@ module Bootstrap.LLVM.Codegen where {
               cgPure symbol
             }
         };
-      captured <- capturedArguments scope f;
-      values <- ordinaryArguments scope f args;
+      preparedArguments <- workerArguments scope f args;
+      let { captured = L.fst preparedArguments; values = L.snd preparedArguments };
       let {
         all = L.append captured values
       };
@@ -600,6 +615,57 @@ module Bootstrap.LLVM.Codegen where {
              cgPure value
            }
     };
+  -- Computing these operations cannot fail on checked, already evaluated
+  -- operands. In particular, neither indexing nor division is admitted here.
+  -- Leave multiplication lazy because large products may be expensive even
+  -- when their operands have already been evaluated.
+  -- This is not a demand analysis: unknown operands still need a suspension.
+  totalReadyPrimitive :: Primitive -> Bool;
+  totalReadyPrimitive primitive = case primitive of {
+    PAddInt -> True;
+    PSubInt -> True;
+    PAndInt -> True;
+    PEqInt -> True;
+    PLtInt -> True;
+    -- The readiness check requires the condition and both branches to be
+    -- total; evaluation still enters only the selected branch.
+    PIfThenElse -> True;
+    _ -> False
+  };
+  readyTotal :: Map XName CGBinding -> Map String String -> XErased -> Bool;
+  readyTotal scope known expression = case expression of {
+    XEVar name -> readyName scope known name;
+    XEInt _ -> True;
+    XEBool _ -> True;
+    _ -> case O.applications expression of {
+      (,) (XEPrimitive primitive) args ->
+        totalReadyPrimitive primitive && L.length args == P.primitiveArity primitive &&
+        L.all (readyTotal scope known) args;
+      _ -> False
+    }
+  };
+  readyName :: Map XName CGBinding -> Map String String -> XName -> Bool;
+  readyName scope known name = case M.lookup O.compareName name scope of {
+    Nothing -> False;
+    Just (CGBinding value forced) -> forced || M.member compareString value known
+  };
+  nextDemandIs :: Map XName CGBinding -> Map String String -> XName -> [] XName -> Bool;
+  nextDemandIs scope known binder names = case names of {
+    [] -> False;
+    (:) first rest ->
+      if O.eqName binder first then True
+      else if readyName scope known first then nextDemandIs scope known binder rest
+      else False
+  };
+  letDemanded :: Map XName CGBinding -> XName -> XErased -> Build Bool;
+  letDemanded scope binder body = do {
+    fs <- gets functions;
+    known <- gets forcedValues;
+    -- Entry prefixes already stop at semantic barriers. Skip only earlier
+    -- forces that have succeeded on this dominating path; missing bindings
+    -- and facts from sibling branches cannot justify advancing the demand.
+    cgPure (nextDemandIs scope known binder (A.demandNames (A.entryDemand fs M.empty body)))
+  };
   thunk :: Map XName CGBinding -> XErased -> Build String;
   thunk scope expression =
     case expression of {
@@ -625,7 +691,14 @@ module Bootstrap.LLVM.Codegen where {
               then evaluate scope expression
               else suspended scope expression
             };
-          _ -> suspended scope expression
+          _ -> do {
+            known <- gets forcedValues;
+            -- Facts are scoped to dominated uses by Build's branch/definition
+            -- boundaries. Reuse only those facts; never force another leaf.
+            if readyTotal scope known expression
+            then evaluate scope expression
+            else suspended scope expression
+          }
         }
     };
   evaluate :: Map XName CGBinding -> XErased -> Build String;
@@ -689,7 +762,7 @@ module Bootstrap.LLVM.Codegen where {
             case recipePlan n plans of {
               Just info -> evaluateDeferredProducer info scope;
               Nothing -> do {
-                let { strict = S.member O.compareName n (A.demanded fs body) };
+                strict <- letDemanded scope n body;
                 value <- if strict then evaluate scope rhs else thunk scope rhs;
                 evaluate (M.insert O.compareName n (CGBinding value strict) scope) body
               }
@@ -995,8 +1068,8 @@ module Bootstrap.LLVM.Codegen where {
                   if (L.length args == L.length (A.parameters f))
                   then do {
                          symbol <- stateWorker n f;
-                         captured <- capturedArguments scope f;
-                         values <- ordinaryArguments scope f args;
+                         preparedArguments <- workerArguments scope f args;
+                         let { captured = L.fst preparedArguments; values = L.snd preparedArguments };
                          call symbol
                            ((:) ("i64 " ++ fuel) (L.map pointer (L.append captured values)))
                        }
@@ -1128,9 +1201,7 @@ module Bootstrap.LLVM.Codegen where {
       if M.member O.compareName n fs
       then executeST fuel scope body
       else do {
-             let {
-               strict = S.member O.compareName n (A.demanded fs body)
-             };
+             strict <- letDemanded scope n body;
              value <- if strict then evaluate scope rhs else thunk scope rhs;
              executeST fuel (M.insert O.compareName n (CGBinding value strict) scope) body
            }
@@ -1226,8 +1297,8 @@ module Bootstrap.LLVM.Codegen where {
                       ((L.length (A.captures f) + L.length args) == arity))
                   then do {
                          symbol <- stateWorker n f;
-                         captured <- capturedArguments scope f;
-                         values <- ordinaryArguments scope f args;
+                         preparedArguments <- workerArguments scope f args;
+                         let { captured = L.fst preparedArguments; values = L.snd preparedArguments };
                          value <-
                            result
                              ("musttail call ptr " ++
@@ -1255,9 +1326,7 @@ module Bootstrap.LLVM.Codegen where {
       if M.member O.compareName n fs
       then executeSTTail arity tailFuel fuel scope body
       else do {
-             let {
-               strict = S.member O.compareName n (A.demanded fs body)
-             };
+             strict <- letDemanded scope n body;
              value <- if strict then evaluate scope rhs else thunk scope rhs;
              executeSTTail arity tailFuel fuel
                (M.insert O.compareName n (CGBinding value strict) scope)
@@ -1457,10 +1526,13 @@ module Bootstrap.LLVM.Codegen where {
                  PDivDouble -> doubleOperation p a b;
                  PEqDouble -> doubleOperation p a b;
                  PLtDouble -> doubleOperation p a b;
+                 PStringCodeAt -> stringCodeAtValue a b;
                  _ -> primitiveCall p values
                };
              (:) a [] ->
                case p of {
+                 PConcatStringList -> call "@mlf_concat_string_list" (args1 (pointer a));
+                 PStringLength -> call "@mlf_string_length" (args1 (pointer a));
                  PSqrtDouble ->
                    do {
                      x <- loadAt "double" a 8;
@@ -1472,6 +1544,35 @@ module Bootstrap.LLVM.Codegen where {
              _ -> primitiveCall p values
            }
     };
+  -- Operands have already been evaluated in primitiveApplication's original
+  -- order. This is a value-position optimization, not permission to demand a
+  -- lazy let or an unexecuted IO action. The checked helper retains every
+  -- Unicode, large-integer, uninitialized-cache and bounds-error path.
+  stringCodeAtValue :: String -> String -> Build String;
+  stringCodeAtValue text index = do {
+    indices <- loadAt "ptr" text 24;
+    ascii <- result ("icmp eq ptr " ++ indices ++ ", @mlf_ascii_string_indices");
+    bits <- result ("ptrtoint ptr " ++ index ++ " to i64");
+    low <- result ("and i64 " ++ bits ++ ", 1");
+    small <- result ("icmp ne i64 " ++ low ++ ", 0");
+    fast <- result ("and i1 " ++ ascii ++ ", " ++ small);
+    choose "ptr" fast (do {
+      offset <- result ("ashr i64 " ++ bits ++ ", 1");
+      length <- loadAt "i64" text 8;
+      nonnegative <- result ("icmp sge i64 " ++ offset ++ ", 0");
+      below <- result ("icmp ult i64 " ++ offset ++ ", " ++ length);
+      inside <- result ("and i1 " ++ nonnegative ++ ", " ++ below);
+      choose "ptr" inside (do {
+        bytes <- loadAt "ptr" text 16;
+        address <- result ("getelementptr i8, ptr " ++ bytes ++ ", i64 " ++ offset);
+        byte <- result ("load i8, ptr " ++ address ++ ", align 1");
+        code <- result ("zext i8 " ++ byte ++ " to i64");
+        shifted <- result ("shl i64 " ++ code ++ ", 1");
+        tagged <- result ("or i64 " ++ shifted ++ ", 1");
+        result ("inttoptr i64 " ++ tagged ++ " to ptr")
+      }) (call "@mlf_string_code_at" (args2 (pointer text) (pointer index)))
+    }) (call "@mlf_string_code_at" (args2 (pointer text) (pointer index)))
+  };
   primitiveCall :: Primitive -> [] String -> Build String;
   primitiveCall p values =
     if L.null values
@@ -1594,6 +1695,12 @@ module Bootstrap.LLVM.Codegen where {
             ((:) "!3 = !{!1, !1, i64 0}" ((:) "!4 = !{!2, !2, i64 0}" []))));
   runtimeDeclarations :: [] String;
   runtimeDeclarations =
+    L.append ["@mlf_ascii_string_indices = external global i64",
+      "declare ptr @mlf_string_length(ptr)", "declare ptr @mlf_string_code_at(ptr, ptr)",
+      "declare ptr @mlf_concat_string_list(ptr)"]
+      runtimeBaseDeclarations;
+  runtimeBaseDeclarations :: [] String;
+  runtimeBaseDeclarations =
     (:) "declare ptr @mlf_execute_st_lazy(ptr)"
       ((:) "declare ptr @mlf_st_new_array(ptr, ptr)"
          ((:) "declare ptr @mlf_st_read_array(ptr, ptr)"

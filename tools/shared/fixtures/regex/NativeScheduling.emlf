@@ -1,0 +1,49 @@
+-- Only the isolated test snapshot exports these private scheduling functions.
+-- Synthetic tables isolate operand demand from regex parsing and admission.
+module Main where
+import qualified Bootstrap.Std as S
+import qualified Bootstrap.Regex as R
+
+table : Int -> String
+table code = S.concatStrings (S.replicate 256 (stringFromCode code))
+
+main : IO ()
+main = do
+  mode <- getArg 0
+  if eqString mode "scan-width-first" then
+    printInt (R.scanSkip (panic "width-first") (panic "unused-forward") (table 1)
+      (panic "shifts-third") "a" 1 0 (panic "credit-second"))
+  else if eqString mode "scan-credit-first" then
+    printInt (R.scanSkip 8 (panic "unused-forward") (table 1)
+      (panic "shifts-second") "a" 1 0 (panic "credit-first"))
+  else if eqString mode "scan-shifts-required" then
+    printInt (R.scanSkip 8 (panic "unused-forward") (table 1)
+      (panic "shifts-required") "a" 1 0 16)
+  else if eqString mode "scan-empty" then
+    printInt (R.scanSkip (panic "unused-width") (panic "unused-forward") (panic "unused-backward")
+      (panic "unused-shifts") (panic "unused-subject") 0 0 (panic "unused-credit"))
+  else if eqString mode "scan-accept" then
+    printInt (R.scanSkip (panic "unused-width") (panic "unused-forward") (table 0)
+      (panic "unused-shifts") "a" 1 0 (panic "unused-credit"))
+  else if eqString mode "count-width-first" then
+    printInt (R.countSkip (panic "width-first") (panic "unused-forward") (table 1)
+      (panic "shifts-third") "a" 1 0 (panic "credit-second") 73)
+  else if eqString mode "count-credit-first" then
+    printInt (R.countSkip 8 (panic "unused-forward") (table 1)
+      (panic "shifts-second") "a" 1 0 (panic "credit-first") 73)
+  else if eqString mode "count-shifts-required" then
+    printInt (R.countSkip 8 (panic "unused-forward") (table 1)
+      (panic "shifts-required") "a" 1 0 16 73)
+  else if eqString mode "count-empty" then
+    printInt (R.countSkip (panic "unused-width") (panic "unused-forward") (panic "unused-backward")
+      (panic "unused-shifts") (panic "unused-subject") 0 0 (panic "unused-credit") 73)
+  else if eqString mode "count-accept" then
+    printInt (R.countSkip 1 (panic "unused-forward") (table 0)
+      (panic "unused-shifts") "a" 1 0 (panic "unused-credit") 73)
+  else if eqString mode "count-accept-count-first" then
+    printInt (R.countSkip (panic "width-second") (panic "unused-forward") (table 0)
+      (panic "unused-shifts") "a" 1 0 (panic "unused-credit") (panic "count-first"))
+  else if eqString mode "count-accept-width-required" then
+    printInt (R.countSkip (panic "width-required") (panic "unused-forward") (table 0)
+      (panic "unused-shifts") "a" 1 0 (panic "unused-credit") 73)
+  else panic "unknown native regex scheduling control"

@@ -55,8 +55,18 @@ module Bootstrap.Standalone where {
   normalizeDemanded :: PreludeMode -> SProgram -> Either String (Maybe ((,,) (Set String) SProgram (Map String String)));
   normalizeDemanded = normalizeWithScope False;
   normalizeWithScope :: Bool -> PreludeMode -> SProgram -> Either String (Maybe ((,,) (Set String) SProgram (Map String String)));
-  normalizeWithScope wholeScope mode original = do {
-    (,,) names env builtin <- Modules.standaloneBuiltinScope (programNames original);
+  -- Additive opt-in seam: the ordinary path still supplies its original names
+  -- and binds the original builtin values below. No checked result is invented.
+  data RewrittenRoot = RewrittenRoot Scope SProgram Bool SProgram;
+  rewrittenScope (RewrittenRoot scope _ _ _) = scope;
+  rewrittenOriginal (RewrittenRoot _ original _ _) = original;
+  rewrittenNeeded (RewrittenRoot _ _ needed _) = needed;
+  rewrittenProgram (RewrittenRoot _ _ _ program) = program;
+  rewrittenDisplay root = case rewrittenScope root of {
+    Scope _ names _ _ _ types constructors -> displayMap names types constructors
+  };
+  rewriteRootWithNames :: PreludeMode -> Modules.Names -> Modules.Interface -> SProgram -> Either String RewrittenRoot;
+  rewriteRootWithNames mode names env original = do {
     let {
       parts = Prelude.programParts original;
       datatypes = case parts of { (,,,) value _ _ _ -> value };
@@ -75,28 +85,29 @@ module Bootstrap.Standalone where {
     case rewriteProgram scope original of {
       Rewrite result -> do {
         (,) needed rewritten <- result;
-        if not needed then Right Nothing else do {
-          let {
-            parts = Prelude.programParts rewritten;
-            ds = case parts of { (,,,) value _ _ _ -> value };
-            cs = case parts of { (,,,) _ value _ _ -> value };
-            ins = case parts of { (,,,) _ _ value _ -> value };
-            expression = case parts of { (,,,) _ _ _ value -> value }
-          };
-          -- callStack is an intrinsic use, never a reference to this facade
-          -- binder. Do not capture an unrelated free/local mlfCallStack.
-          let {
-            selected = if wholeScope then builtin else demandedBuiltin builtin (Set.fromList compareString (programNames rewritten));
-            values = filter (\((,,) name _ _) -> not (eqString name "mlfCallStack")) (Modules.renamedValues selected)
-          };
-          bound <- Surface.bindValues values expression;
-          let { display = displayMap names typeRenames constructorRenames };
-          Right (Just ((,,) (Set.fromList compareString (map Modules.className (Modules.renamedClasses selected)))
-            (SClassProgram (append (Modules.renamedDatatypes selected) ds)
-              (append (Modules.renamedClasses selected) cs)
-              (append (Modules.renamedInstances selected) ins) bound) display))
-        }
+        Right (RewrittenRoot scope original needed rewritten)
       }
+    }
+  };
+  normalizeWithScope wholeScope mode original = do {
+    (,,) names env builtin <- Modules.standaloneBuiltinScope (programNames original);
+    root <- rewriteRootWithNames mode names env original;
+    if not (rewrittenNeeded root) then Right Nothing else do {
+      let {
+        rewritten = rewrittenProgram root;
+        parts = Prelude.programParts rewritten;
+        ds = case parts of { (,,,) value _ _ _ -> value };
+        cs = case parts of { (,,,) _ value _ _ -> value };
+        ins = case parts of { (,,,) _ _ value _ -> value };
+        expression = case parts of { (,,,) _ _ _ value -> value };
+        selected = if wholeScope then builtin else demandedBuiltin builtin (Set.fromList compareString (programNames rewritten));
+        values = filter (\((,,) name _ _) -> not (eqString name "mlfCallStack")) (Modules.renamedValues selected)
+      };
+      bound <- Surface.bindValues values expression;
+      Right (Just ((,,) (Set.fromList compareString (map Modules.className (Modules.renamedClasses selected)))
+        (SClassProgram (append (Modules.renamedDatatypes selected) ds)
+          (append (Modules.renamedClasses selected) cs)
+          (append (Modules.renamedInstances selected) ins) bound) (rewrittenDisplay root)))
     }
   };
   displayMap (Modules.Names names) typeRenames constructorRenames =

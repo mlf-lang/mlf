@@ -10,7 +10,7 @@ module MLF.Primitive
   , mlfEmptyCallStack, mlfPushCallStack, mlfPrettyCallStack, mlfIOErrorWithStack
   , textToChars, textFromChars, charCode, charFromCode
   , userError, ioError, catchIOError, ioeGetErrorString
-  , ioReturn, ioBind, putStr, putStrLn, getLine, printInt, concatString
+  , ioReturn, ioBind, putStr, putStrLn, getLine, printInt, concatString, concatStringList
   , showInt, addInt, subInt, eqInt, ltInt, eqString, ifThenElse
   , mulInt, quotInt, remInt, readInt, addDouble, subDouble, mulDouble
   , divDouble, sqrtDouble, eqDouble, ltDouble, intToDouble, formatDouble, newIntArray
@@ -88,6 +88,9 @@ printInt = IO.v_printInt
 
 concatString :: String -> String -> String
 concatString = Base.v_concatString
+
+concatStringList :: [String] -> String
+concatStringList = Base.v_concatStringList
 
 showInt :: Int -> String
 showInt = Base.v_showInt

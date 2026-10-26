@@ -55,8 +55,21 @@ module Bootstrap.Module where {
                                                     SourceModule ->
                                                     m (Either String ([] SourceModule));
   loadGraph fetch root =
+    loadGraphBy (\source -> source) fetch root;
+  -- Payloads travel with the exact parser read. Consumers that authenticate
+  -- fixed implementations must not reopen a path and mistake a later read for
+  -- the bytes whose syntax and namespace were checked here.
+  data LoadedModule = LoadedModule SourceModule String;
+  data LoadedModules = LoadedModules ([] LoadedModule);
+  loadedSource (LoadedModule source _) = source;
+  loadedText (LoadedModule _ text) = text;
+  loadedEntries (LoadedModules entries) = entries;
+  loadedSources (LoadedModules entries) = map loadedSource entries;
+  loadGraphBy :: forall (m :: (* -> *)) a. (Monad m) =>
+    (a -> SourceModule) -> (String -> m (Either String a)) -> a -> m (Either String ([] a));
+  loadGraphBy sourceOf fetch root =
     do {
-      result <- visit fetch root Set.empty [];
+      result <- visitBy sourceOf fetch root Set.empty [];
       return (mapEither (\state -> reverse (snd state)) result)
     };
   visit :: forall (m :: (* -> *)). (Monad m) => (String -> m (Either String SourceModule)) ->
@@ -69,7 +82,13 @@ module Bootstrap.Module where {
   -- Discovery and namespace dependencies are not a compilation order. Mark
   -- before descending so a reference back into this crate needs no boot file.
   visit fetch source done order =
+    visitBy (\value -> value) fetch source done order;
+  visitBy :: forall (m :: (* -> *)) a. (Monad m) =>
+    (a -> SourceModule) -> (String -> m (Either String a)) -> a ->
+    Set String -> [] a -> m (Either String ((,) (Set String) ([] a)));
+  visitBy sourceOf fetch payload done order =
     let {
+      source = sourceOf payload;
       name = moduleIdentity source
     } in
     if Set.member compareString name done
@@ -79,8 +98,8 @@ module Bootstrap.Module where {
              dependencies = nubBy eqString (map importedModule (sourceImports source))
            };
            result <-
-             visitDependencies fetch dependencies (Set.insert compareString name done) order;
-           return (mapEither (\state -> (,) (fst state) ((:) source (snd state))) result)
+             visitDependenciesBy sourceOf fetch dependencies (Set.insert compareString name done) order;
+           return (mapEither (\state -> (,) (fst state) ((:) payload (snd state))) result)
          };
   visitDependencies :: forall (m :: (* -> *)). (Monad m) => (String ->
                                                              m (Either String SourceModule)) ->
@@ -92,18 +111,23 @@ module Bootstrap.Module where {
                                                              ((,) (Set String)
                                                               ([] SourceModule)));
   visitDependencies fetch dependencies done order =
+    visitDependenciesBy (\source -> source) fetch dependencies done order;
+  visitDependenciesBy :: forall (m :: (* -> *)) a. (Monad m) =>
+    (a -> SourceModule) -> (String -> m (Either String a)) -> [] String ->
+    Set String -> [] a -> m (Either String ((,) (Set String) ([] a)));
+  visitDependenciesBy sourceOf fetch dependencies done order =
     case dependencies of {
       [] -> return (Right ((,) done order));
       (:) dependency rest ->
         if isBuiltinModule dependency
-        then visitDependencies fetch rest done order
+        then visitDependenciesBy sourceOf fetch rest done order
         else if Set.member compareString dependency done
-             then visitDependencies fetch rest done order
+             then visitDependenciesBy sourceOf fetch rest done order
              else do {
                     loaded <- fetch dependency;
                     case loaded of {
                       Left message -> return (Left message);
-                      Right child ->
+                      Right payload -> let { child = sourceOf payload } in
                         if not (eqMaybe eqString (sourceModuleName child) (Just dependency))
                         then return
                                (Left
@@ -118,11 +142,11 @@ module Bootstrap.Module where {
                                        (sourcePath child ++
                                         ": imported modules must contain declarations only"))
                              else do {
-                                    result <- visit fetch child done order;
+                                    result <- visitBy sourceOf fetch payload done order;
                                     case result of {
                                       Left message -> return (Left message);
                                       Right state ->
-                                        visitDependencies fetch rest (fst state) (snd state)
+                                        visitDependenciesBy sourceOf fetch rest (fst state) (snd state)
                                     }
                                   }
                     }
@@ -201,6 +225,11 @@ module Bootstrap.Module where {
     };
   fetchFile paths name =
     do {
+      result <- fetchFileWithEvidence paths name;
+      ioReturn (mapEither loadedSource result)
+    };
+  fetchFileWithEvidence paths name =
+    do {
       let {
         stem = intercalate "/" (components name)
       };
@@ -233,7 +262,7 @@ module Bootstrap.Module where {
              (:) file _ ->
                do {
                  source <- readFile file;
-                 ioReturn (Parser.parseModule file source)
+                 ioReturn (mapEither (\parsed -> LoadedModule parsed source) (Parser.parseModule file source))
                }
            }
     };
@@ -242,18 +271,18 @@ module Bootstrap.Module where {
   -- fileExists/readFile resolve relative paths, dot segments and symlinks
   -- through the filesystem; no canonicalPath precondition is needed here.
   loadModuleFiles includes root =
-    do {
-      let {
-        directory = takeDirectory (sourcePath root)
-      };
-      let {
-        hierarchy = parentDirectory (length (components (moduleIdentity root)) - 1) directory
-      };
-      let {
-        paths = nubBy eqString ((:) directory (append includes ((:) hierarchy ((:) "." []))))
-      };
-      loadGraph (fetchFile paths) root
-    };
+    loadGraph (fetchFile (moduleSearchPaths includes root)) root;
+  moduleSearchPaths includes root = let {
+    directory = takeDirectory (sourcePath root);
+    hierarchy = parentDirectory (length (components (moduleIdentity root)) - 1) directory
+  } in nubBy eqString ((:) directory (append includes ((:) hierarchy ((:) "." []))));
+  loadModuleFilesWithEvidence :: [] String -> SourceModule -> String ->
+    IO (Either String LoadedModules);
+  loadModuleFilesWithEvidence includes root input = do {
+    result <- loadGraphBy loadedSource (fetchFileWithEvidence (moduleSearchPaths includes root))
+      (LoadedModule root input);
+    ioReturn (mapEither LoadedModules result)
+  };
   -- Interfaces retain original entity identity across diamonds and re-exports.
   data ModuleSpace = Terms | Types;
   data Role =

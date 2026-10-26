@@ -28,6 +28,9 @@ row entries = J.Object entries
 pair = (,)
 one a = (:) a []
 two a b = (:) a ((:) b [])
+buildArtifacts = do
+ split <- getEnv "MLF_BENCH_SPLIT_RUNTIME"
+ return (S.append (O.words "program.ll runtime.o program.o") (if eqString split "1" then one "runtime-supervisor.o" else []))
 median samples = let sorted = S.sortBy (\a b -> if ltDouble a b then -1 else if ltDouble b a then 1 else 0) samples in
  let n = S.length sorted in if remInt n 2 == 1 then S.index sorted (quotInt n 2) else divDouble (addDouble (S.index sorted (quotInt n 2 - 1)) (S.index sorted (quotInt n 2))) 2.0
 summary samples =
@@ -130,7 +133,8 @@ checkWorkload c work = do
  identities <- S.mapM (\((,) language binary) -> do
   hash <- fileDigest binary
   artifacts <- if eqString language "c" then return J.empty else do
-   entries <- S.mapM (\file -> do { digest <- fileDigest (directory ++ "/warmup/" ++ language ++ "/" ++ file); return ((,) file (J.str digest)) }) (O.words "program.ll runtime.o program.o")
+   names <- buildArtifacts
+   entries <- S.mapM (\file -> do { digest <- fileDigest (directory ++ "/warmup/" ++ language ++ "/" ++ file); return ((,) file (J.str digest)) }) names
    return (row entries)
   return ((,) language (row (two (pair "binary_sha256" (J.str hash)) (pair "artifacts_sha256" artifacts))))) builds
  return (row ((:) (pair "benchmark" (J.str name)) ((:) (pair "status" (J.str "correctness-passed")) ((:) (pair "check_inputs" (J.get "check_inputs" work)) (one (pair "binaries" (row identities)))))))
@@ -157,7 +161,8 @@ workload c work = do
    compareOutput work (directory ++ "/reference/stdout") (scratch ++ "/run/stdout")
    hash <- fileDigest binary
    artifacts <- if eqString language "c" then return J.empty else do
-    entries <- S.mapM (\name -> do { digest <- fileDigest (scratch ++ "/build/" ++ name); return ((,) name (J.str digest)) }) (O.words "program.ll runtime.o program.o")
+    names <- buildArtifacts
+    entries <- S.mapM (\name -> do { digest <- fileDigest (scratch ++ "/build/" ++ name); return ((,) name (J.str digest)) }) names
     return (row entries)
    let record = row ((:) (pair "compilation" compiled) ((:) (pair "runtime" runtime) ((:) (pair "binary_sha256" (J.str hash)) ((:) (pair "artifacts_sha256" artifacts) []))))
    return ((,) language record)) order
@@ -222,15 +227,19 @@ main = do
    let files = S.append ((:) candidate ((:) baseline ((:) clang ((:) "runtime/mlf_runtime.c" ((:) "runtime/mlf_runtime.h" ((:) "runtime/khash.h" ((:) "benchmarks/manifest.json" ((:) "tools/bench/Main.emlf" [])))))))) (S.concatMap (\w -> S.map (\l -> V.text l (J.get "sources" w)) (O.words "c mlf")) (V.array "workloads" manifest))
    runner <- getExecutablePath
    let dependencies = S.append (S.append (two runner backend) (S.map S.fst (S.append (J.items (J.get "headers" gcIdentity)) (J.items (J.get "libraries" gcIdentity))))) (O.words "runtime/mlf_system.h tests/native/host_support.c tests/native/binary_files.c libraries/mlf-developer-tools/Package/Benchmark.hs libraries/mlf-package-core/Package/Build.hs libraries/mlf-developer-tools/Package/Verification.hs libraries/mlf-package-core/Package/Json.hs libraries/mlf-package-core/Package/OS.hs tools/bench/mlf-package.json")
-   let extraFiles = S.append (S.concatMap (\entry -> B.benchmarkPackageFiles (S.snd entry)) packageEntries) (S.concatMap (J.getStrings "mlf_dependencies") workloads)
+   runtimeEntries <- O.entries "runtime"
+   let runtimeFiles = S.map (O.join "runtime") (S.filter (\name -> O.ends ".c" name || O.ends ".h" name) runtimeEntries)
+   let extraFiles = S.append runtimeFiles (S.append (S.concatMap (\entry -> B.benchmarkPackageFiles (S.snd entry)) packageEntries) (S.concatMap (J.getStrings "mlf_dependencies") workloads))
    fingerprints <- S.mapM (\path -> do { hash <- fileDigest path; return ((,) path hash) }) (S.nubBy eqString (S.append extraFiles (S.append files dependencies)))
+   buildEnvironment <- S.mapM (\name -> do { value <- getEnv name; return ((,) name (J.str value)) }) (O.words "MLF_BENCH_SPLIT_RUNTIME MLF_BENCH_STREAM_LLVM MLF_BENCH_STREAM_LINK MLF_BENCH_MLF_CLANG")
    rows <- S.mapM (if checkOnly then checkWorkload c else workload c) workloads
    integrity <- B.checkIntegrity fingerprints
    _ <- right integrity
    let checks = if checkOnly then [] else B.performanceChecks rows limits
    let passed = S.all (J.getBool "passed" false) checks
    let result = (J.set "native_dependencies" nativePackages (J.set "limits" limits (J.set "workload_selection" (J.stringArray (S.map (V.text "name") workloads)) (row ((:) (pair "status" (J.str (if checkOnly then "correctness-passed" else if passed then "passed" else "failed"))) ((:) (pair "implementation" (J.str "MLF")) ((:) (pair "runs" (J.num (if checkOnly then 0 else n))) ((:) (pair "fingerprints" (row (S.map (\((,) path hash) -> (,) path (J.str hash)) fingerprints))) ((:) (pair "benchmarks" (J.Array rows)) (one (pair "performance_checks" (J.Array checks))))))))))))
-   J.write report (if checkOnly then J.set "mode" (J.str "check-only") (J.set "performance_checked" (J.Boolean false) result) else result)
+   let recorded = J.set "build_environment" (row buildEnvironment) result
+   J.write report (if checkOnly then J.set "mode" (J.str "check-only") (J.set "performance_checked" (J.Boolean false) recorded) else recorded)
    O.require passed "performance limits exceeded; see results.json"
    putStrLn (if checkOnly then "All " ++ showInt (S.length rows) ++ " workloads passed correctness checks; performance was not measured." else "All " ++ showInt (S.length rows) ++ " selected workloads pass the requested compilation and runtime limits.")
   _ -> O.fatal "bench COMPILER BASELINE OUTPUT RUNS CLANG [MAX_COMPILE MAX_RUNTIME [WORKLOAD...] | --check-only] (run from repository root)"

@@ -810,6 +810,8 @@
         "test_medians_and_ratios_allow_c_to_lose",
         "test_failure_replaces_stale_success_and_no_measurement_starts",
         "test_invalid_cli_inputs_fail_before_tools",
+        "test_split_runtime_compiles_independent_objects_before_linking",
+        "test_split_runtime_failed_producers_reap_every_child",
         "test_prestarted_link_waits_for_complete_objects_and_reaps_failed_producers",
         "test_streaming_build_overlaps_startup_and_archives_exact_ir",
         "test_blocked_fifo_failure_and_timeout_reap_process_groups",
@@ -1556,6 +1558,21 @@
         }
       },
       "unchanged_expectations": "The original 739 and recursion 742 inventory histories remain frozen. All unlisted labels retain ownership and order. Same-name recursive function and unsigned divergent-loop positives only check prescribed Int/XBot types and checked targets, never execute; the same-name value binding retains its occurs-check rejection. Canonical Unit, Eq String and MonadFail expectations follow the upstream semantics, with independent target checks retained."
+    },
+    {
+      "name": "optional split runtime build dependency controls",
+      "basis": "Two authored native harness families execute real child processes in ordinary, streaming LLVM and prestarted link modes. Distinct producer output bytes and process rendezvous independently enforce completion and overlap; injected core and supervisor failures check cleanup. No existing expected output or performance limit changes.",
+      "added_harness_ids": [
+        "test_split_runtime_compiles_independent_objects_before_linking",
+        "test_split_runtime_failed_producers_reap_every_child"
+      ],
+      "required_execution_counts": {
+        "harness": {
+          "before": 67,
+          "after": 69
+        }
+      },
+      "unchanged_expectations": "All prior harness cases, metrics and inventories remain; these controls do not claim measured benchmark acceptance."
     }
   ]
 }

@@ -188,26 +188,12 @@ module Bootstrap.X.Check where {
         };
       XLet x a b ->
         do {
-          ensure (L.not (M.member X.compareName x (termEnv env))) "term binder already in scope";
-          t <- inferIn ds env a;
+          t <- inferLetBinding ds env x a;
           inferIn ds (XEnv (typeEnv env) (M.insert X.compareName x t (termEnv env))) b
         };
       XLetRec bindings body ->
         do {
-          let {
-            names = L.map bindingName bindings
-          };
-          ensure (uniqueNames names) "duplicate recursive binder";
-          ensure (L.not (L.any (\n -> M.member X.compareName n (termEnv env)) names))
-            "recursive binder already in scope";
-          L.mapM (\b -> termType ds (typeEnv env) (bindingType b)) bindings;
-          let {
-            scope =
-              XEnv (typeEnv env)
-                (M.union X.compareName (M.fromList X.compareName (L.map bindingPair bindings))
-                   (termEnv env))
-          };
-          L.mapM (checkBinding ds scope) bindings;
+          scope <- inferRecursiveScope ds env bindings;
           inferIn ds scope body
         };
       XIntTerm _ -> Right (XCon "Int" []);
@@ -267,6 +253,81 @@ module Bootstrap.X.Check where {
         };
       XWithData _ _ -> Left "data declarations must be at the outermost level"
     };
+  inferLetBinding :: DataEnv -> XEnv -> XName -> XTerm -> Either String XType;
+  inferLetBinding ds env name rhs = do {
+    ensure (L.not (M.member X.compareName name (termEnv env))) "term binder already in scope";
+    inferIn ds env rhs
+  };
+  inferRecursiveScope :: DataEnv -> XEnv -> [] ((,,) XName XType XTerm) -> Either String XEnv;
+  inferRecursiveScope ds env bindings = do {
+    let { names = L.map bindingName bindings };
+    ensure (uniqueNames names) "duplicate recursive binder";
+    ensure (L.not (L.any (\n -> M.member X.compareName n (termEnv env)) names))
+      "recursive binder already in scope";
+    L.mapM (\b -> termType ds (typeEnv env) (bindingType b)) bindings;
+    let { scope = XEnv (typeEnv env)
+      (M.union X.compareName (M.fromList X.compareName (L.map bindingPair bindings)) (termEnv env)) };
+    L.mapM (checkBinding ds scope) bindings;
+    Right scope
+  };
+  -- Capture only the outer declaration spine during its independent check.
+  -- RHS checks use inferIn, so their local bindings never become exports.
+  -- Fragment-shape/closed-export requirements remain a separate result: an
+  -- arbitrary valid closed term must not be rejected by Checked.check merely
+  -- because it is not a linkable declaration fragment.
+  closedBindingInventory :: [] ((,) XName XType) ->
+    Either String ([] ((,) XName XType)) -> Either String ([] ((,) XName XType));
+  closedBindingInventory entries remaining = do {
+    ensure (L.all (\entry -> S.null (T.freeVars (L.snd entry))) entries)
+      "inference binding has an open type";
+    rest <- remaining;
+    Right (L.append entries rest)
+  };
+  inferDeclarationSpine :: DataEnv -> XEnv -> XTerm ->
+    Either String ((,) XType (Either String ([] ((,) XName XType))));
+  inferDeclarationSpine ds env source = case source of {
+    XLet name rhs body -> do {
+      ty <- inferLetBinding ds env name rhs;
+      answer <- inferDeclarationSpine ds
+        (XEnv (typeEnv env) (M.insert X.compareName name ty (termEnv env))) body;
+      Right ((,) (L.fst answer) (closedBindingInventory ((:) ((,) name ty) []) (L.snd answer)))
+    };
+    XLetRec bindings body -> do {
+      scope <- inferRecursiveScope ds env bindings;
+      answer <- inferDeclarationSpine ds scope body;
+      Right ((,) (L.fst answer) (closedBindingInventory (L.map bindingPair bindings) (L.snd answer)))
+    };
+    _ -> do {
+      ty <- inferIn ds env source;
+      let { inventory = case source of {
+        XConstructor name [] -> if eqString name "()" then Right []
+          else Left "invalid inference fragment: expected declarations ending in ()";
+        _ -> Left "invalid inference fragment: expected declarations ending in ()"
+      } };
+      Right ((,) ty inventory)
+    }
+  };
+  inferParameterSpine :: DataEnv -> XEnv -> XTerm ->
+    Either String ((,) XType (Either String ([] ((,) XName XType))));
+  inferParameterSpine ds env source = case source of {
+    XAbs name ty body -> do {
+      termType ds (typeEnv env) ty;
+      ensure (L.not (M.member X.compareName name (termEnv env))) "term binder already in scope";
+      answer <- inferParameterSpine ds
+        (XEnv (typeEnv env) (M.insert X.compareName name ty (termEnv env))) body;
+      Right ((,) (XArrow ty (L.fst answer)) (L.snd answer))
+    };
+    _ -> inferDeclarationSpine ds env source
+  };
+  checkClosedWithBindings :: XTerm ->
+    Either String ((,) XType (Either String ([] ((,) XName XType))));
+  checkClosedWithBindings source = case source of {
+    XWithData declarations body -> do {
+      ds <- D.validateDeclarations declarations;
+      inferParameterSpine ds emptyEnv body
+    };
+    _ -> inferParameterSpine D.emptyDataEnv emptyEnv source
+  };
   validScalars :: String -> Int -> Bool;
   validScalars text i =
     if (i >= stringLength text)

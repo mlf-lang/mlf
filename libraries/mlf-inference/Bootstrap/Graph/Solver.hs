@@ -1221,6 +1221,413 @@ module Bootstrap.Graph.Solver where {
            (,,,) root copies frontier next ->
              solverUnify (L.append frontier ((:) ((,) root target) [])) next
          });
+  -- A fresh closed expansion into a green bottom only merges its fresh root
+  -- with that bottom. Both roots have the same binder and flexible flag;
+  -- every other copied binder and flag is unchanged by the general rebinder.
+  -- Keep the expansion's identities, allocation budget and root alias exactly,
+  -- so this is an exact specialization of instantiate, not type matching.
+  -- Like groundGraft, this consumes a Solver established by prepare and kept
+  -- valid by solver operations. Independently validate the entire fresh closed
+  -- fragment before admitting it; arbitrary forged Solver values are not a
+  -- substitute for prepare, and finish still audits the complete final state.
+  freshBottomGraft :: Int -> Int -> Int -> [] ((,) Int Int) -> Solver -> Maybe Solver;
+  freshBottomGraft first originalTarget root frontier solver =
+    let { current = graph solver; target = G.resolve current originalTarget } in
+    if L.not (L.null frontier) || target >= first || root < first || root == target
+    then Nothing
+    else case IM.lookup target (G.nodes current) of {
+      Nothing -> Nothing;
+      Just old -> case G.tag old of {
+        GBot -> freshBottomGraftKind first target root old Star solver;
+        GBotK kind -> freshBottomGraftKind first target root old kind solver;
+        _ -> Nothing
+      }
+    };
+  freshBottomGraftKind :: Int -> Int -> Int -> Node -> Kind -> Solver -> Maybe Solver;
+  freshBottomGraftKind first target root old kind solver =
+    let {
+      current = graph solver;
+      directGen = case G.binder old of {
+        Nothing -> False;
+        Just parent -> case IM.lookup parent (G.nodes current) of {
+          Just node -> G.isGen (G.tag node) && G.equalFlag (G.flag node) Flexible;
+          Nothing -> False
+        }
+      }
+    } in
+    if L.not (green current target) ||
+       L.not directGen ||
+       L.not (IS.null (IM.findWithDefault IS.empty target (bindingChildren solver)))
+    then Nothing
+    else case IM.lookup root (G.nodes current) of {
+      Nothing -> Nothing;
+      Just source ->
+        if L.not (G.equalFlag (G.flag source) Flexible) ||
+           L.not (G.equalMaybeInt (G.binder source) (G.binder old))
+        then Nothing
+        else let {
+          fresh = allocatedNodes first (G.nextId current) (G.nodes current);
+          identities = IS.fromList (L.map L.fst fresh);
+          closed = \((,) identity node) ->
+            L.not (G.isGen (G.tag node)) &&
+            L.all (\child -> IS.member child identities) (G.children (G.tag node)) &&
+            (if identity == root then True else case G.binder node of {
+              Nothing -> False;
+              Just parent -> IS.member parent identities
+            })
+        } in
+        if L.not (IS.member root identities && L.all closed fresh &&
+          validFreshFragment root (G.binder old) fresh (G.nextId current))
+        then Nothing
+        else case G.kindAt current root of {
+          Left _ -> Nothing;
+          Right sourceKind ->
+            if L.not (G.equalKind sourceKind kind)
+            then Nothing
+            else let {
+              image = \identity -> if identity == root then target else identity;
+              mergedTag = if G.isBottom (G.tag source) then G.tag old else G.tag source;
+              replacement = G.mkNode (G.mapTag image mergedTag)
+                (G.binder old) (G.flag old);
+              descendants = L.map (\((,) identity node) ->
+                (,) identity (G.mkNode (G.mapTag image (G.tag node))
+                  (G.mapMaybeInt image (G.binder node)) (G.flag node)))
+                (L.filter (\((,) identity _) -> identity /= root) fresh);
+              updated = G.insertNodeMap target replacement
+                (IM.union (G.nodesFromDistinctAscList descendants)
+                  (IM.delete root (G.nodes current)));
+              next = G.mkGraph updated (IM.insert root target (G.links current))
+                (G.nextId current);
+              indexed = patchIndexedNodes solver ((:) ((,) target old) fresh)
+                ((:) ((,) target replacement) descendants)
+            } in Just (withGraph next indexed)
+        }
+    };
+  validFreshFragment :: Int -> Maybe Int -> [] ((,) Int Node) -> Int -> Bool;
+  validFreshFragment root parent fresh next = case parent of {
+    Nothing -> False;
+    Just scope ->
+      -- Validation sees the exact copied graph under one Gen anchor. Relabel
+      -- only this temporary graph so its old anchor cannot force a sparse
+      -- validation path; the returned solver retains all original identities.
+      let {
+        count = L.length fresh;
+        copies = IM.fromList (G.freshCopyEntries 1 (L.map L.fst fresh));
+        renaming = IM.insert scope 0 copies;
+        known = \((,) identity node) ->
+          L.all (\child -> IM.member child renaming) (G.children (G.tag node)) &&
+          (case G.binder node of {
+            Nothing -> True;
+            Just parent -> IM.member parent renaming
+          })
+      } in
+      if IM.size copies /= count || IM.member scope copies ||
+         L.not (IM.member root copies && L.all known fresh)
+      then False
+      else let {
+        image = \identity -> IM.get identity renaming;
+        entries = L.map (\((,) identity node) ->
+          (,) (image identity) (G.mkNode (G.mapTag image (G.tag node))
+            (G.mapMaybeInt image (G.binder node)) (G.flag node))) fresh;
+        fragment = G.mkGraph
+          (IM.insert 0 (G.mkNode (GGen (image root)) Nothing Flexible)
+            (G.nodesFromDistinctAscList entries)) IM.empty (count + 1)
+      } in case G.validateGraph fragment of {
+        Left _ -> False;
+        Right _ -> True
+      }
+  };
+  -- External frontier proxies can be removed in the same root graft only
+  -- when their original Gen scope already dominates the destination Gen.
+  -- The originals then keep their exact binders and flags: every eliminated
+  -- proxy is flexible/Green both at its old and its final binder. A non-bottom
+  -- final target retains the general simultaneous unifier; doing these merges
+  -- eagerly and then allowing arbitrary further rebinding is not licensed.
+  frontierBottomGraft :: Int -> Int -> Int -> [] ((,) Int Int) -> Solver -> Maybe Solver;
+  frontierBottomGraft first originalTarget root frontier solver =
+    let { current = graph solver; target = G.resolve current originalTarget } in
+    case IM.lookup target (G.nodes current) of {
+      Nothing -> Nothing;
+      Just old -> case G.binder old of {
+        Nothing -> Nothing;
+        Just destination -> case IM.lookup destination (G.nodes current) of {
+          Nothing -> Nothing;
+          Just scope ->
+            if L.null frontier || target >= first || root < first ||
+               L.not (G.isBottom (G.tag old) && G.equalFlag (G.flag old) Flexible &&
+                 G.isGen (G.tag scope) && G.equalFlag (G.flag scope) Flexible) ||
+               L.not (IS.null (IM.findWithDefault IS.empty target (bindingChildren solver)))
+            then Nothing
+            else frontierBottomGraftIn first target destination root old frontier solver
+        }
+      }
+    };
+  frontierBottomGraftIn :: Int -> Int -> Int -> Int -> Node -> [] ((,) Int Int) -> Solver -> Maybe Solver;
+  frontierBottomGraftIn first target destination root old frontier solver =
+    let {
+      current = graph solver;
+      fresh = allocatedNodes first (G.nextId current) (G.nodes current);
+      identities = IS.fromList (L.map L.fst fresh);
+      proxies = IM.fromList (L.map (\((,) original proxy) -> (,) proxy original) frontier);
+      closed = \((,) identity node) ->
+        L.not (G.isGen (G.tag node)) &&
+        L.all (\child -> IS.member child identities) (G.children (G.tag node)) &&
+        (case G.binder node of {
+          Nothing -> False;
+          Just parent -> parent == destination || IS.member parent identities
+        });
+      rootOriginal = IM.lookup root proxies;
+      rootAllowed = case rootOriginal of {
+        Nothing -> True;
+        Just original -> original < target && L.length fresh == 1 &&
+          (case IM.lookup original (G.nodes current) of {
+            Nothing -> False;
+            Just node -> L.not (G.isBottom (G.tag node)) || G.equalTag (G.tag node) (G.tag old)
+          })
+      }
+    } in
+    if L.not (IS.member root identities && IM.size proxies == L.length frontier &&
+      rootAllowed && L.all closed fresh &&
+      G.equalMaybeInt (G.binder (G.nodeAt current root)) (Just destination) &&
+      G.equalFlag (G.flag (G.nodeAt current root)) Flexible &&
+      validFreshFragment root (Just destination) fresh (G.nextId current) &&
+      L.all (frontierGraftSource first target destination identities solver) frontier)
+    then Nothing
+    else case G.kindAt current root of {
+      Left _ -> Nothing;
+      Right kind -> case G.kindAt current target of {
+        Left _ -> Nothing;
+        Right expected ->
+          if L.not (G.equalKind kind expected) then Nothing else
+          let {
+            aliases = case rootOriginal of {
+              Nothing -> IM.insert root target proxies;
+              Just original -> IM.insert target original proxies
+            };
+            image = \identity -> IM.findWithDefault identity identity aliases;
+            rewrite = \node -> G.mkNode (G.mapTag image (G.tag node))
+              (G.mapMaybeInt image (G.binder node)) (G.flag node);
+            descendants = L.map (\((,) identity node) -> (,) identity (rewrite node))
+              (L.filter (\((,) identity _) -> IM.notMember identity aliases) fresh);
+            parents = case rootOriginal of {
+              Nothing -> [];
+              Just _ -> L.map (\identity -> (,) identity (G.nodeAt current identity))
+                (IS.toList (IM.findWithDefault IS.empty target (structuralParents solver)))
+            };
+            replacement = case rootOriginal of {
+              Just _ -> [];
+              Nothing -> (:) ((,) target (G.mkNode
+                (G.mapTag image (G.tag (G.nodeAt current root))) (G.binder old) (G.flag old))) []
+            };
+            before = IM.fromList (L.append ((:) ((,) target old) fresh) parents);
+            after = IM.fromList (L.append replacement
+              (L.append descendants (L.map (\((,) identity node) -> (,) identity (rewrite node)) parents)));
+            removed = L.foldlStrict (\nodes identity -> IM.delete identity nodes)
+              (G.nodes current) (IM.keys aliases);
+            next = G.mkGraph (IM.union after removed)
+              (IM.union aliases (G.links current)) (G.nextId current);
+            indexed = patchIndexedNodes solver (IM.toList before) (IM.toList after)
+          } in Just (withGraph next indexed)
+      }
+    };
+  frontierGraftSource :: Int -> Int -> Int -> IntSet -> Solver -> (,) Int Int -> Bool;
+  frontierGraftSource first target destination identities solver pair =
+    frontierGraftSourceShape first target destination identities solver pair &&
+    sameGraftKinds (graph solver) ((:) pair []);
+  -- Structural and permission checks do not need a kind traversal. Congruent
+  -- reuse checks all pair kinds together after these guards, sharing completed
+  -- kind results across every fresh node and existing image.
+  frontierGraftSourceShape :: Int -> Int -> Int -> IntSet -> Solver -> (,) Int Int -> Bool;
+  frontierGraftSourceShape first target destination identities solver ((,) original proxy) =
+    let { current = graph solver } in
+    original < first && original /= target && IS.member proxy identities &&
+    (case IM.lookup original (G.nodes current) of {
+      Nothing -> False;
+      Just source -> case IM.lookup proxy (G.nodes current) of {
+        Nothing -> False;
+        Just copy ->
+          L.not (G.isGen (G.tag source)) && G.isBottom (G.tag copy) &&
+          (L.not (G.isBottom (G.tag source)) || G.equalTag (G.tag source) (G.tag copy)) &&
+          G.equalFlag (G.flag copy) Flexible &&
+          G.equalMaybeInt (G.binder copy) (Just destination) &&
+          IS.null (IM.findWithDefault IS.empty proxy (bindingChildren solver)) &&
+          L.all (\parent -> parent >= first)
+            (IS.toList (IM.findWithDefault IS.empty proxy (structuralParents solver))) &&
+          IS.notMember target (G.reachableVisit current IS.empty ((:) original [])) &&
+          (case G.binder source of {
+            Nothing -> False;
+            Just parent -> case IM.lookup parent (G.nodes current) of {
+              Nothing -> False;
+              Just scope -> G.isGen (G.tag scope) && G.equalFlag (G.flag scope) Flexible &&
+                scopeContains (scopeIndex solver) parent destination
+            }
+          })
+      }
+    });
+  sameGraftKinds :: Graph -> [] ((,) Int Int) -> Bool;
+  sameGraftKinds current pairs =
+    case G.kindsAt current (L.concatMap (\((,) source target) -> (:) source ((:) target [])) pairs) of {
+      Left _ -> False;
+      Right kinds -> L.all (\((,) source target) ->
+        case IM.lookup (G.resolve current source) kinds of {
+          Nothing -> False;
+          Just kind -> case IM.lookup (G.resolve current target) kinds of {
+            Nothing -> False;
+            Just expected -> G.equalKind kind expected
+          }
+        }) pairs
+    };
+  -- An external root that is already the destination contributes only its
+  -- fresh frontier proxy. Both equations identify that proxy with the same
+  -- original node; no existing structure, permission or binding can change.
+  frontierIdentityGraft :: Int -> Int -> Int -> [] ((,) Int Int) -> Solver -> Maybe Solver;
+  frontierIdentityGraft first originalTarget root frontier solver =
+    let { current = graph solver; target = G.resolve current originalTarget } in
+    case frontier of {
+      (:) ((,) original proxy) [] ->
+        if original /= target || proxy /= root || root < first || target >= first
+        then Nothing
+        else case IM.lookup target (G.nodes current) of {
+          Nothing -> Nothing;
+          Just old -> case G.binder old of {
+            Nothing -> Nothing;
+            Just destination -> case IM.lookup destination (G.nodes current) of {
+              Nothing -> Nothing;
+              Just scope -> case allocatedNodes first (G.nextId current) (G.nodes current) of {
+                (:) ((,) identity copy) [] ->
+                  if identity /= root || G.isGen (G.tag old) ||
+                     L.not (G.isGen (G.tag scope) && G.equalFlag (G.flag scope) Flexible &&
+                       G.isBottom (G.tag copy) && G.equalFlag (G.flag copy) Flexible &&
+                       G.equalMaybeInt (G.binder copy) (Just destination) &&
+                       (L.not (G.isBottom (G.tag old)) || G.equalTag (G.tag old) (G.tag copy)) &&
+                       IS.null (IM.findWithDefault IS.empty root (structuralParents solver)) &&
+                       IS.null (IM.findWithDefault IS.empty root (bindingChildren solver)) &&
+                       validFreshFragment root (Just destination) ((:) ((,) root copy) []) (G.nextId current))
+                  then Nothing
+                  else case G.kindAt current target of {
+                    Left _ -> Nothing;
+                    Right kind -> case G.kindAt current root of {
+                      Left _ -> Nothing;
+                      Right proxyKind ->
+                        if L.not (G.equalKind kind proxyKind) then Nothing else
+                        let {
+                          next = G.mkGraph (IM.delete root (G.nodes current))
+                            (IM.insert root target (G.links current)) (G.nextId current);
+                          indexed = patchIndexedNodes solver ((:) ((,) root copy) []) []
+                        } in Just (withGraph next indexed)
+                    }
+                  };
+                _ -> Nothing
+              }
+            }
+          }
+        };
+      _ -> Nothing
+    };
+  -- A congruent copy may reuse existing nodes only when every fresh node has
+  -- one existing image and the existing graph is unchanged. Mapped tags and
+  -- binders must match exactly, merged flags must retain the existing flag,
+  -- and Flexible nodes under a rigid binder are excluded. A fresh Green bottom
+  -- can take the existing type, while fixed external frontier images retain
+  -- their independently checked dominating Gen scopes. Shared fresh nodes must
+  -- agree on their image; multiple fresh nodes may share one unchanged image.
+  -- These guards preserve all rebinding/permission obligations. General
+  -- unification remains the fallback for any old-node merge or mutation.
+  congruentExpansionMap :: Graph -> Int -> IntMap Int -> [] ((,) Int Int) -> Maybe (IntMap Int);
+  congruentExpansionMap current first images pending = case pending of {
+    [] -> Just images;
+    (:) ((,) source target) rest ->
+      if source < first || target >= first then Nothing else
+      case IM.lookup source images of {
+        Just previous -> if previous == target then congruentExpansionMap current first images rest else Nothing;
+        Nothing -> case IM.lookup source (G.nodes current) of {
+          Nothing -> Nothing;
+          Just copy -> case IM.lookup target (G.nodes current) of {
+            Nothing -> Nothing;
+            Just old ->
+              if G.isGen (G.tag old) || G.isGen (G.tag copy) ||
+                 (G.isBottom (G.tag old) && L.not (G.isBottom (G.tag copy)))
+              then Nothing
+              else case G.tagEquations (G.tag copy) (G.tag old) of {
+                Left _ -> Nothing;
+                Right ((,) tag pairs) -> congruentExpansionMap current first
+                  (IM.insert source target images) (L.append pairs rest)
+              }
+          }
+        }
+      }
+  };
+  congruentExpansionGraft :: Int -> Int -> Int -> [] ((,) Int Int) -> Solver -> Maybe Solver;
+  congruentExpansionGraft first originalTarget root frontier solver =
+    let { current = graph solver; target = G.resolve current originalTarget;
+      fresh = allocatedNodes first (G.nextId current) (G.nodes current);
+      identities = IS.fromList (L.map L.fst fresh);
+      proxies = IM.fromList (L.map (\((,) original proxy) -> (,) proxy original) frontier)
+    } in
+    case IM.lookup target (G.nodes current) of {
+      Nothing -> Nothing;
+      Just old -> case G.binder old of {
+        Nothing -> Nothing;
+        Just destination -> case IM.lookup destination (G.nodes current) of {
+          Nothing -> Nothing;
+          Just scope ->
+            if L.not (G.isGen (G.tag scope) && G.equalFlag (G.flag scope) Flexible &&
+              L.all (\((,) identity node) -> L.not (G.isGen (G.tag node)) &&
+                L.all (\child -> IS.member child identities) (G.children (G.tag node)) &&
+                (case G.binder node of { Nothing -> False; Just parent -> parent == destination || IS.member parent identities })) fresh)
+            then Nothing else
+            case congruentExpansionMap current first proxies ((:) ((,) root target) []) of {
+              Nothing -> Nothing;
+              Just images ->
+                if IM.size images /= L.length fresh ||
+                   L.not (validFreshFragment root (Just destination) fresh (G.nextId current) &&
+                     L.all (frontierGraftSourceShape first target destination identities solver) frontier)
+                then Nothing else
+                let { image = \identity -> IM.findWithDefault identity identity images;
+                  permitted = \identity -> G.equalFlag (G.flag (G.nodeAt current identity)) Rigid || green current identity;
+                  exact = \((,) identity node) ->
+                    if IM.member identity proxies then True else
+                    let { destination = IM.get identity images; old = G.nodeAt current destination } in
+                    G.equalMaybeInt (G.mapMaybeInt image (G.binder node)) (G.binder old) &&
+                    (G.equalFlag (G.flag node) Flexible || G.equalFlag (G.flag old) Rigid) &&
+                    permitted identity && permitted destination &&
+                    (if G.isBottom (G.tag node) then green current identity
+                     else G.equalTag (G.mapTag image (G.tag node)) (G.tag old))
+                } in
+                if L.not (L.all exact fresh) ||
+                   L.not (sameGraftKinds current (IM.toList images))
+                then Nothing
+                else let {
+                  remaining = L.foldlStrict (\nodes identity -> IM.delete identity nodes) (G.nodes current) (IM.keys images);
+                  next = G.mkGraph remaining (IM.union images (G.links current)) (G.nextId current);
+                  indexed = patchIndexedNodes solver fresh []
+                } in Just (withGraph next indexed)
+            }
+        }
+      }
+    };
+  expansionBottomGraft :: Int -> Int -> Int -> [] ((,) Int Int) -> Solver -> Maybe Solver;
+  expansionBottomGraft first target root frontier solver =
+    let { direct =
+      if L.null frontier then freshBottomGraft first target root frontier solver
+      else case frontierIdentityGraft first target root frontier solver of {
+        Just answer -> Just answer;
+        Nothing -> frontierBottomGraft first target root frontier solver
+      }
+    } in case direct of {
+      Just answer -> Just answer;
+      Nothing -> congruentExpansionGraft first target root frontier solver
+    };
+  instantiateWithFreshBottom :: Int -> Int -> Solver -> Either String Solver;
+  instantiateWithFreshBottom source target solver =
+    G.bindE (expanded source target solver)
+      (\answer -> case answer of {
+        (,,,) root copies frontier next ->
+          case expansionBottomGraft (G.nextId (graph solver)) target root frontier next of {
+            Just grafted -> Right grafted;
+            Nothing -> solverUnify (L.append frontier ((:) ((,) root target) [])) next
+          }
+      });
   -- Closed ground types have no frontier and cannot change permissions. Their
   -- exact graft keeps the destination's identity and copies only descendants.
   groundNodes :: Graph -> IntSet -> [] Int -> Maybe IntSet;
@@ -1480,7 +1887,7 @@ module Bootstrap.Graph.Solver where {
       Nothing ->
         if groundInstance (graph solver) source target
         then Right solver
-        else instantiate source target solver
+        else instantiateWithFreshBottom source target solver
     };
   witness :: Int -> Int -> Solver -> Either String ((,) (IntMap Int) Solver);
   witness source target solver =

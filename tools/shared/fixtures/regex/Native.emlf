@@ -1,0 +1,104 @@
+-- Native controls use only the public regex API. Literal expected offsets,
+-- counts and replacements are independent of either matching implementation.
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Bootstrap.Regex as R
+
+regex : String -> R.Regex
+regex pattern = case R.compile pattern of
+  Left message -> panic message
+  Right value -> value
+
+assert : Bool -> String -> IO ()
+assert condition label =
+  if condition then return () else panic ("native regex control: " ++ label)
+
+repeatText : Int -> String -> String
+repeatText count text = S.concatStrings (S.replicate count text)
+
+match : String -> String -> Int -> Int -> Int -> IO ()
+match pattern subject offset start end =
+  assert (case R.find (regex pattern) subject offset of
+    Nothing -> false
+    Just ((,) actualStart actualEnd) -> actualStart == start && actualEnd == end)
+    ("find " ++ pattern)
+
+absent : String -> String -> Int -> IO ()
+absent pattern subject offset =
+  assert (case R.find (regex pattern) subject offset of
+    Nothing -> true
+    Just result -> false) ("absent " ++ pattern)
+
+count : String -> String -> Int -> IO ()
+count pattern subject expected =
+  assert (R.countMatches (regex pattern) subject == expected) ("count " ++ pattern)
+
+replace : String -> String -> String -> String -> IO ()
+replace pattern replacement subject expected =
+  assert (eqString (R.replaceAll (regex pattern) replacement subject) expected)
+    ("replace " ++ pattern)
+
+main : IO ()
+main = do
+  let run = repeatText 200 "a"
+  let word = "baaaaaaa"
+  -- Each early backward window examines the entire word and advances one.
+  -- The bounded comparison credit expires before the later real match.
+  match word (run ++ word) 0 200 208
+  absent word run 0
+  absent word (run ++ word) 201
+  count word (run ++ word ++ word) 2
+  replace word "X" (run ++ word ++ word) (run ++ "XX")
+  match "aaaaaaab|aaaaaaac" (run ++ "c") 0 193 201
+  match "baaaaaaa|caaaaaaa" (run ++ "caaaaaaa") 0 200 208
+  count "baaaaaaa|caaaaaaa" (run ++ "baaaaaaacaaaaaaa") 2
+
+  -- Overlapping alternatives still choose the earliest start, while public
+  -- count/replacement restart at the end of each accepted match.
+  match "aba|bab" "abababa" 1 1 4
+  match "ab|ca" "cabcab" 0 0 2
+  let alternating = repeatText 100 "ab" ++ "a"
+  count "aba|bab" alternating 67
+  replace "aba|bab" "X" alternating (repeatText 67 "X")
+
+  let unicodePrefix = repeatText 100 "α😀"
+  match word (unicodePrefix ++ word) 0 200 208
+  match "aba" "a😀aba" 0 2 5
+  let nul = stringFromCode 0
+  let nulPattern = nul ++ "a"
+  match nulPattern ("b" ++ nul ++ "ab") 0 1 3
+  count nulPattern ("b" ++ nul ++ "ab" ++ nul ++ "a") 2
+  replace nulPattern "X" ("b" ++ nul ++ "ab" ++ nul ++ "a") "bXbX"
+  let del = stringFromCode 127
+  let edgePattern = del ++ "x|a" ++ nul
+  let edgeSubject = "α" ++ del ++ "xa" ++ nul
+  match edgePattern edgeSubject 0 1 3
+  count edgePattern edgeSubject 2
+  replace edgePattern "X" edgeSubject "αXX"
+
+  let width64 = "b" ++ repeatText 63 "a"
+  match width64 (repeatText 300 "a" ++ width64) 0 300 364
+  let width65 = repeatText 65 "a"
+  match width65 (repeatText 66 "a") 0 0 65
+  count width65 (repeatText 66 "a") 1
+  replace width65 "X" (repeatText 66 "a") "Xa"
+
+  match "a[ac]*b" "aaacXab" 0 5 7
+  match "a[^b]*b|c" "ac" 0 1 2
+  count "a*" "aaa" 2
+  replace "a*" "x" "aaa" "xx"
+  -- Omitting empty pieces must preserve zero-width advancement and retained
+  -- slices, including when no prefix, replacement, or suffix survives.
+  replace "" "" "" ""
+  replace "" "" "α😀" "α😀"
+  replace "a*" "" "aaa" ""
+  replace "a" "" "baab" "bb"
+  replace "a" "" "a😀a" "😀"
+  replace "ab" "" "ab" ""
+  replace "ab" "" "αab😀abZ" "α😀Z"
+  assert (eqString (R.replaceAll (regex "ab") (panic "unused replacement forced") "xxxxx") "xxxxx")
+    "unused replacement remains lazy"
+  assert (eqString (R.replaceAll (regex "a") (panic "empty subject forced replacement") "") "")
+    "empty subject leaves replacement lazy"
+  putStrLn "native regex fast-path controls passed"

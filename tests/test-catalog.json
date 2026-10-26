@@ -3045,6 +3045,60 @@
       }
     },
     {
+      "id": "harness/split-runtime-compiles-independent-objects-before-linking",
+      "unit": "harness",
+      "name": "split runtime compiles independent objects before linking",
+      "group": "packages-build",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_split_runtime_compiles_independent_objects_before_linking"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/split-runtime-failed-producers-reap-every-child",
+      "unit": "harness",
+      "name": "split runtime failed producers reap every child",
+      "group": "packages-build",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_split_runtime_failed_producers_reap_every_child"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
       "id": "harness/prestarted-link-waits-for-complete-objects-and-reaps-failed-producers",
       "unit": "harness",
       "name": "prestarted link waits for complete objects and reaps failed producers",

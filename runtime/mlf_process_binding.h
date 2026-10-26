@@ -3,6 +3,16 @@
  * process stdout/stderr go directly to files/inherited streams, not memory. */
 #ifndef MLF_PROCESS_BINDING_H
 #define MLF_PROCESS_BINDING_H
+/* Do not depend on the native runtime being this header's includer. */
+#ifndef MLF_NOINLINE
+#if defined(_MSC_VER)
+#define MLF_NOINLINE __declspec(noinline)
+#elif defined(__GNUC__) || defined(__clang__)
+#define MLF_NOINLINE __attribute__((noinline))
+#else
+#define MLF_NOINLINE
+#endif
+#endif
 #define MLF_PS_REQUEST_LIMIT (1024u * 1024u)
 #define MLF_PS_FIELD_LIMIT 4096u
 
@@ -73,7 +83,7 @@ static void mlf_ps_reply_outcome(MlfProcessReply *r, const mlf_process_outcome *
     mlf_ps_reply_int(r,o->launch_error); mlf_ps_reply_int(r,o->cleanup_error);
     mlf_ps_reply_int(r,o->cancel_reason);
 }
-static MlfValue *mlf_process_request(MlfValue *request) {
+static MLF_NOINLINE MlfValue *mlf_process_request(MlfValue *request) {
     MlfValue *text = expect(request,STRING);
     MlfProcessReply reply = {{0},0};
     mlf_process_status status = MLF_PROCESS_INVALID_ARGUMENT;

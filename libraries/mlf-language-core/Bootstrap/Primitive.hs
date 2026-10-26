@@ -116,7 +116,8 @@ module Bootstrap.Primitive where {
       PEmptyCallStack -> 103;
       PPushCallStack -> 104;
       PPrettyCallStack -> 105;
-      PIOErrorWithStack -> 106
+      PIOErrorWithStack -> 106;
+      PConcatStringList -> 107
     };
   primitiveName :: Primitive -> String;
   primitiveName p =
@@ -227,7 +228,8 @@ module Bootstrap.Primitive where {
       PEmptyCallStack -> "mlfEmptyCallStack";
       PPushCallStack -> "mlfPushCallStack";
       PPrettyCallStack -> "mlfPrettyCallStack";
-      PIOErrorWithStack -> "mlfIOErrorWithStack"
+      PIOErrorWithStack -> "mlfIOErrorWithStack";
+      PConcatStringList -> "concatStringList"
     };
   legacyPrimitives :: [] Primitive;
   legacyPrimitives =
@@ -397,7 +399,7 @@ module Bootstrap.Primitive where {
                                                                                                                                                                                                                                                                                                 []))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))));
   allPrimitives :: [] Primitive;
   allPrimitives = S.append legacyPrimitives
-    ((:) PTextToChars ((:) PTextFromChars ((:) PCharCode ((:) PCharFromCode ((:) PUserError ((:) PIOError ((:) PCatchIOError ((:) PIOErrorString ((:) PEmptyCallStack ((:) PPushCallStack ((:) PPrettyCallStack ((:) PIOErrorWithStack []))))))))))));
+    ((:) PTextToChars ((:) PTextFromChars ((:) PCharCode ((:) PCharFromCode ((:) PUserError ((:) PIOError ((:) PCatchIOError ((:) PIOErrorString ((:) PEmptyCallStack ((:) PPushCallStack ((:) PPrettyCallStack ((:) PIOErrorWithStack ((:) PConcatStringList [])))))))))))));
   lookupTargetPrimitive :: String -> Maybe Primitive;
   lookupTargetPrimitive name = S.find (\p -> eqString (primitiveName p) name) allPrimitives;
   lookupPrimitive :: String -> Maybe Primitive;
@@ -721,6 +723,8 @@ module Bootstrap.Primitive where {
       PPushCallStack -> (,) [] (Function (Applied "MLFStackFrame" [])
         (Function (Applied "MLFCallStack" []) (Applied "MLFCallStack" [])));
       PPrettyCallStack -> (,) [] (Function (Applied "MLFCallStack" []) charListField);
+      PConcatStringList -> (,) []
+        (Function (Applied "[]" ((:) (Applied "String" []) [])) (Applied "String" []));
       PIOErrorWithStack -> (,) ((:) ((,) "a" Star) [])
         (Function (Applied "IOError" [])
           (Function (Applied "MLFCallStack" []) (Applied "IO" ((:) (Parameter "a") []))))
@@ -837,7 +841,8 @@ module Bootstrap.Primitive where {
       PEmptyCallStack -> 0;
       PPushCallStack -> 2;
       PPrettyCallStack -> 1;
-      PIOErrorWithStack -> 2
+      PIOErrorWithStack -> 2;
+      PConcatStringList -> 1
     };
   fieldArity :: Field -> Int;
   fieldArity field =
@@ -848,7 +853,7 @@ module Bootstrap.Primitive where {
   primitiveStrict :: Primitive -> Bool;
   primitiveStrict p =
     (((primitiveCode p >= 95) && (primitiveCode p <= 98)) ||
-     (primitiveCode p == 68) ||
+     (primitiveCode p == 68) || (primitiveCode p == 107) ||
      S.elem eqInt (primitiveCode p)
        ((:) 6
           ((:) 7

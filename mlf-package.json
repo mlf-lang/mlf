@@ -69,9 +69,14 @@
         "mlf-inference",
         "mlf-interpreter",
         "mlf-llvm",
-        "mlf-xmlf"
+        "mlf-xmlf",
+        "mlf-language-core"
       ],
-      "source-syntax": "shared-haskell-v1"
+      "source-syntax": "shared-haskell-v1",
+      "modules": {
+        "MLF.BuiltinPreludeData": "bootstrap/MLF/BuiltinPreludeData.hs",
+        "MLF.PreparedCompiler": "bootstrap/MLF/PreparedCompiler.hs"
+      }
     },
     "mlfpkg": {
       "main": "package/MLF/Entry/Mlfpkg.hs",
@@ -100,6 +105,15 @@
         "mlf-foundation",
         "mlf-frontend",
         "mlf-package-core"
+      ],
+      "source-syntax": "shared-haskell-v1"
+    },
+    "builtin-prelude": {
+      "main": "bootstrap/MLF/Entry/BuiltinPrelude.hs",
+      "profile": "compiler",
+      "dependencies": [
+        "mlf-crates",
+        "mlf-foundation"
       ],
       "source-syntax": "shared-haskell-v1"
     }

@@ -1,3 +1,11 @@
+/* Preserve a callable boundary for infrequent subsystem operations. */
+#if defined(_MSC_VER)
+#define MLF_NOINLINE __declspec(noinline)
+#elif defined(__GNUC__) || defined(__clang__)
+#define MLF_NOINLINE __attribute__((noinline))
+#else
+#define MLF_NOINLINE
+#endif
 /* Runtime support for native xMLF functions, not an AST interpreter.
  * Call-by-need memoizes values; executing an IO action is never memoized.
  * The IO driver and explicitly rooted native IO entries collect. Ordinary
@@ -20,7 +28,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "mlf_integer64.h"
+/* Define MLF_RUNTIME_EXTERNAL_PROCESS_SUPERVISOR when linking a separately
+ * compiled mlf_process_supervisor.c. The default embeds the same implementation. */
+#if !defined(MLF_RUNTIME_EXTERNAL_PROCESS_SUPERVISOR)
 #define MLF_PROCESS_SUPERVISOR_IMPLEMENTATION
+#endif
 #include "mlf_process_supervisor.h"
 #if defined(_WIN32)
 #include "mlf_windows.h"
@@ -156,6 +168,7 @@ typedef enum {
     TEXT_TO_CHARS, TEXT_FROM_CHARS, CHAR_CODE, CHAR_FROM_CODE,
     USER_ERROR, IO_ERROR, CATCH_IO_ERROR, IO_ERROR_STRING,
     EMPTY_CALL_STACK, PUSH_CALL_STACK, PRETTY_CALL_STACK, IO_ERROR_WITH_STACK,
+    CONCAT_STRING_LIST,
     PRIMITIVE_COUNT
 } Primitive;
 
@@ -199,6 +212,12 @@ struct MlfValue {
     } as;
 };
 
+/* The compact code generator's guarded ASCII string path uses these fields.
+ * It runs only after the operands have been evaluated at their original use. */
+_Static_assert(offsetof(MlfValue, as.string.length) == 8, "compact string length ABI");
+_Static_assert(offsetof(MlfValue, as.string.bytes) == 16, "compact string bytes ABI");
+_Static_assert(offsetof(MlfValue, as.string.indices) == 24, "compact string indices ABI");
+
 /* Wide compact constructors keep MlfValue as their first real subobject.
  * Field zero uses its final pointer slot; the remaining fields follow it. */
 typedef struct {
@@ -235,6 +254,10 @@ static void mlf_process_binding_clear(void);
 static int valid_utf8(const unsigned char *bytes, size_t length);
 static int argument_count;
 static char **argument_values;
+/* getline owns this scratch allocation. Returned ByteArrays always copy it;
+ * retaining an earlier line must not alias the next read. */
+static char *byte_line_buffer;
+static size_t byte_line_capacity;
 
 void mlf_set_args(int32_t argc, char **argv) {
     /* Generated entry points initialize arguments before any language IO.
@@ -348,6 +371,18 @@ static _Noreturn void fail(const char *message) {
 static void *allocate(size_t size) {
     void *memory = calloc(1, size);
     if (!memory) fail("out of memory");
+    return memory;
+}
+
+/* Raw storage cannot contain language pointers. Keep the batched allocator
+ * for small buffers; avoid tracing large text, byte and numeric payloads.
+ * Preserve allocate's zero initialization, including string terminators. */
+static void *allocate_raw(size_t size) {
+    if (size <= 256) return allocate(size);
+    gc_start();
+    void *memory = GC_MALLOC_ATOMIC(size);
+    if (!memory) fail("out of memory");
+    memset(memory, 0, size);
     return memory;
 }
 
@@ -487,7 +522,7 @@ MlfValue *mlf_string(const char *bytes, uint64_t length) {
     if (length >= SIZE_MAX) fail("string too large");
     MlfValue *result = value(STRING);
     result->as.string.length = (size_t)length;
-    result->as.string.bytes = allocate((size_t)length + 1);
+    result->as.string.bytes = allocate_raw((size_t)length + 1);
     result->as.string.indices = NULL;
     memcpy(result->as.string.bytes, bytes, (size_t)length);
     return result;
@@ -860,7 +895,10 @@ static MlfValue *array_write_action(Tag tag, MlfValue *a, MlfValue *i, MlfValue 
  * a marker. Mostly ASCII text stores correction events after multibyte scalars;
  * dense Unicode keeps its direct table. A cached event interval makes sequential
  * indexing constant time without a size_t entry for every ASCII character. */
-static size_t ascii_string_indices;
+/* Its address denotes a validated all-ASCII string. Generated code may compare
+ * the address, but must not read or modify the sentinel's contents. */
+size_t mlf_ascii_string_indices;
+#define ascii_string_indices mlf_ascii_string_indices
 static size_t *string_indices(MlfValue *text) {
     if (text->as.string.indices) return text->as.string.indices;
     const unsigned char *bytes = (const unsigned char *)text->as.string.bytes;
@@ -883,7 +921,7 @@ static size_t *string_indices(MlfValue *text) {
          * lower/upper bounds, cached byte correction. Each event stores the
          * scalar boundary after a multibyte character and its byte correction.
          * A real dense count cannot reach the sentinel after the size check. */
-        size_t *indices = allocate((6 + 2 * multibyte) * sizeof(size_t));
+        size_t *indices = allocate_raw((6 + 2 * multibyte) * sizeof(size_t));
         indices[0] = SIZE_MAX;
         indices[1] = count;
         indices[2] = multibyte;
@@ -903,7 +941,7 @@ static size_t *string_indices(MlfValue *text) {
         text->as.string.indices = indices;
         return indices;
     }
-    size_t *indices = allocate((count + 2) * sizeof(size_t));
+    size_t *indices = allocate_raw((count + 2) * sizeof(size_t));
     indices[0] = count;
     size_t next = 1;
     for (size_t i = 0; i < length; ++i) if ((bytes[i] & 0xc0) != 0x80) indices[next++] = i;
@@ -954,6 +992,14 @@ static MlfValue *string_code_at(MlfValue *text, MlfValue *index) {
     return small((int64_t)scalar);
 }
 
+MlfValue *mlf_string_length(MlfValue *text) {
+    return small((int64_t)string_length(expect(text, STRING)));
+}
+
+MlfValue *mlf_string_code_at(MlfValue *text, MlfValue *index) {
+    return string_code_at(text, index);
+}
+
 static MlfValue *string_slice(MlfValue *text, MlfValue *offset, MlfValue *count) {
     text = expect(text,STRING);
     offset = expect(offset,INTEGER);
@@ -992,6 +1038,59 @@ static MlfValue *string_from_code(MlfValue *entry) {
 /* Fixed canonical constructor ABI, shared with LLVM.entryConstructors.
  * Legacy tag0 is a private tombstone; ()=1, []=2, (:)=3, tuples2..4=4..6. */
 enum { SOURCE_NIL = 2, SOURCE_CONS = 3, SOURCE_STACK_FRAME = 7 };
+
+MlfValue *mlf_concat_string_list(MlfValue *pieces) {
+    /* Retain base value pointers while forcing lazy fragments and while the
+     * final allocation can collect. No source byte pointer is the sole root,
+     * so this also works with arbitrary interior pointers disabled. */
+    MlfValue *roots[4] = {pieces, NULL, NULL, NULL};
+    MlfRoots frame;
+    mlf_roots_enter(&frame, 4, roots);
+    int64_t tag = mlf_tag(roots[0]);
+    if (tag == SOURCE_NIL) {
+        mlf_roots_leave(&frame);
+        return mlf_string("", 0);
+    }
+    if (tag != SOURCE_CONS) fail("expected canonical string list");
+    roots[1] = expect(mlf_field(roots[0], 0), STRING);
+    roots[2] = mlf_field(roots[0], 1);
+    if (mlf_tag(roots[2]) == SOURCE_NIL) {
+        MlfValue *result = roots[1];
+        mlf_roots_leave(&frame);
+        return result;
+    }
+
+    /* Validate and force in source order before allocating the output. This
+     * pass leaves every head and list cell memoized for the copy pass. The
+     * extra byte is required by the runtime's zero-terminated String storage. */
+    size_t length = 0;
+    roots[2] = roots[0];
+    while ((tag = mlf_tag(roots[2])) != SOURCE_NIL) {
+        if (tag != SOURCE_CONS) fail("expected canonical string list");
+        MlfValue *piece = expect(mlf_field(roots[2], 0), STRING);
+        if (piece->as.string.length >= SIZE_MAX - length) fail("string too large");
+        length += piece->as.string.length;
+        roots[2] = mlf_field(roots[2], 1);
+    }
+
+    roots[3] = value(STRING);
+    roots[3]->as.string.length = length;
+    roots[3]->as.string.bytes = allocate_raw(length + 1);
+    roots[3]->as.string.indices = NULL;
+    size_t offset = 0;
+    roots[2] = roots[0];
+    while (mlf_tag(roots[2]) != SOURCE_NIL) {
+        MlfValue *piece = expect(mlf_field(roots[2], 0), STRING);
+        memcpy(roots[3]->as.string.bytes + offset, piece->as.string.bytes, piece->as.string.length);
+        offset += piece->as.string.length;
+        roots[2] = mlf_field(roots[2], 1);
+    }
+    GC_reachable_here(roots[0]);
+    MlfValue *result = roots[3];
+    mlf_roots_leave(&frame);
+    return result;
+}
+
 static MlfValue *text_chars_step(MlfEnv *env, MlfValue *ignored) {
     (void)ignored;
     MlfValue *text = mlf_env_get(env, 0);
@@ -1255,6 +1354,7 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
     case PRETTY_CALL_STACK: return pretty_call_stack(a);
     case TEXT_TO_CHARS: return text_to_chars(a);
     case TEXT_FROM_CHARS: return text_from_chars(a);
+    case CONCAT_STRING_LIST: return mlf_concat_string_list(a);
     case CHAR_CODE: case CHAR_FROM_CODE:
         return small((int64_t)bounded_integer(a, 0x10ffff, "invalid Char codepoint"));
     case USER_ERROR: {
@@ -1270,7 +1370,7 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
         if (right >= SIZE_MAX - left) fail("string too large");
         MlfValue *result = value(STRING);
         result->as.string.length = left + right;
-        result->as.string.bytes = allocate(left + right + 1);
+        result->as.string.bytes = allocate_raw(left + right + 1);
         result->as.string.indices = NULL;
         memcpy(result->as.string.bytes, a->as.string.bytes, left);
         memcpy(result->as.string.bytes + left, b->as.string.bytes, right);
@@ -1328,7 +1428,7 @@ static MlfValue *primitive(Primitive p, MlfEnv *arguments) {
         2,2,2,2,1,2,2,1,2,2,2,3,1,2,2,3,1,2,2,3,1,1,3,0,0,2,3,2,
         1,2,3,1,2,1,1,1,2,1,1,2,1,1,0,1,1,1,0,0,
         1,2,1,2,2,3,1,
-        1,2,1,2,1,1,1,1,1,1, 2,1,3,2,3,2,1,1,1,2,3,2, 1,1,1,1,1,1,2,1, 0,2,1,2
+        1,2,1,2,1,1,1,1,1,1, 2,1,3,2,3,2,1,1,1,2,3,2, 1,1,1,1,1,1,2,1, 0,2,1,2, 1
     };
     if (arguments->count < arities[p]) {
         MlfValue *result = value(PRIMITIVE);
@@ -1432,7 +1532,7 @@ MlfValue *mlf_force(MlfValue *entry) {
  * IO actions; only the ordinary strict primitives demand their operands. */
 MlfValue *mlf_prim1(int64_t p, MlfValue *a) {
     switch (p) {
-    case TEXT_TO_CHARS: case TEXT_FROM_CHARS: case CHAR_CODE: case CHAR_FROM_CODE:
+    case TEXT_TO_CHARS: case TEXT_FROM_CHARS: case CHAR_CODE: case CHAR_FROM_CODE: case CONCAT_STRING_LIST:
     case USER_ERROR: case IO_ERROR: case IO_ERROR_STRING: case PRETTY_CALL_STACK:
     case IO_RETURN: case PUT_STR: case PUT_STR_LN: case PRINT_INT: case SHOW_INT: case READ_INT:
     case SQRT_DOUBLE: case INT_TO_DOUBLE: case LENGTH_INT_ARRAY: case LENGTH_DOUBLE_ARRAY:
@@ -1476,6 +1576,9 @@ MlfValue *mlf_prim3(int64_t p, MlfValue *a, MlfValue *b, MlfValue *c) {
 static void cleanup(void) {
     mlf_process_shutdown();
     mlf_process_binding_clear();
+    free(byte_line_buffer);
+    byte_line_buffer = NULL;
+    byte_line_capacity = 0;
     while (active_stacks) {
         Stack *next = active_stacks->next;
         free(active_stacks->items);
@@ -1531,7 +1634,7 @@ static const char *file_path(MlfValue *entry) {
     return entry->as.string.bytes;
 }
 
-static MlfValue *read_file(MlfValue *entry) {
+static MLF_NOINLINE MlfValue *read_file(MlfValue *entry) {
     const char *path = file_path(entry);
     FILE *file = fopen(path,"rb");
     if (!file) fail("IO error: file read failed");
@@ -1589,7 +1692,7 @@ static MlfValue *canonical_path(MlfValue *name) {
     return result;
 }
 
-static MlfValue *executable_path(void) {
+static MLF_NOINLINE MlfValue *executable_path(void) {
     char *buffer = NULL;
 #if defined(_WIN32)
     DWORD capacity = 256;
@@ -1635,7 +1738,7 @@ static MlfValue *executable_path(void) {
 
 #include "mlf_system.h"
 
-static MlfValue *read_contents(void) {
+static MLF_NOINLINE MlfValue *read_contents(void) {
     char *line = NULL;
     size_t line_capacity = 0, capacity = 4096, length = 0;
     char *buffer = allocate(capacity);
@@ -1695,15 +1798,12 @@ static MlfValue *read_line(void) {
 }
 
 MlfValue *mlf_get_byte_line(void) {
-    char *buffer = NULL;
-    size_t capacity = 0;
-    ssize_t length = getline(&buffer,&capacity,stdin);
-    if (length < 0 && !feof(stdin)) { free(buffer); fail("IO error: byte input failed"); }
+    ssize_t length = getline(&byte_line_buffer,&byte_line_capacity,stdin);
+    if (length < 0 && !feof(stdin)) fail("IO error: byte input failed");
     MlfValue *result = value(BYTE_ARRAY);
     result->as.byte_array.length = length < 0 ? 0 : (size_t)length;
-    result->as.byte_array.cells = allocate(result->as.byte_array.length ? result->as.byte_array.length : 1);
-    if (length > 0) memcpy(result->as.byte_array.cells,buffer,(size_t)length);
-    free(buffer);
+    result->as.byte_array.cells = allocate_raw(result->as.byte_array.length ? result->as.byte_array.length : 1);
+    if (length > 0) memcpy(result->as.byte_array.cells,byte_line_buffer,(size_t)length);
     return result;
 }
 
@@ -1901,7 +2001,7 @@ MlfValue *mlf_new_array(int64_t p, MlfValue *size, MlfValue *initial) {
         MlfValue *result = value(BYTE_ARRAY);
         result->as.byte_array.length = n;
         result->as.byte_array.cells = NULL;
-        result->as.byte_array.cells = allocate(n ? n : 1);
+        result->as.byte_array.cells = allocate_raw(n ? n : 1);
         memset(result->as.byte_array.cells,x,n);
         return result;
     }
@@ -1918,7 +2018,7 @@ MlfValue *mlf_new_array(int64_t p, MlfValue *size, MlfValue *initial) {
     MlfValue *result = value(DOUBLE_ARRAY);
     result->as.double_array.length = n;
     result->as.double_array.cells = NULL;
-    result->as.double_array.cells = allocate(n ? n * sizeof(double) : 1);
+    result->as.double_array.cells = allocate_raw(n ? n * sizeof(double) : 1);
     for (size_t i = 0; i < n; ++i) result->as.double_array.cells[i] = x;
     return result;
 }
@@ -1950,7 +2050,7 @@ MlfValue *mlf_bytes_from_string(MlfValue *text) {
     MlfValue *result = value(BYTE_ARRAY);
     result->as.byte_array.length = length;
     result->as.byte_array.cells = NULL;
-    result->as.byte_array.cells = allocate(length ? length : 1);
+    result->as.byte_array.cells = allocate_raw(length ? length : 1);
     memcpy(result->as.byte_array.cells,text->as.string.bytes,length);
     return result;
 }

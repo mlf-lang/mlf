@@ -24,10 +24,14 @@
   },
   "library": {
     "modules": {
+      "Bootstrap.BuiltinPreludeContext": "Bootstrap/BuiltinPreludeContext.hs",
+      "Bootstrap.BuiltinPreludeLiteral": "Bootstrap/BuiltinPreludeLiteral.hs",
       "Bootstrap.Crate": "Bootstrap/Crate.hs",
       "Bootstrap.CrateArtifact": "Bootstrap/CrateArtifact.hs",
       "Bootstrap.CrateCodegen": "Bootstrap/CrateCodegen.hs",
       "Bootstrap.CrateQuery": "Bootstrap/CrateQuery.hs",
+      "Bootstrap.ImportParameters": "Bootstrap/ImportParameters.hs",
+      "Bootstrap.ImportedRoot": "Bootstrap/ImportedRoot.hs",
       "Bootstrap.InferenceUnit": "Bootstrap/InferenceUnit.hs",
       "Bootstrap.Separate": "Bootstrap/Separate.hs",
       "Bootstrap.SourceEquality": "Bootstrap/SourceEquality.hs",

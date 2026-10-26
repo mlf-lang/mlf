@@ -1,0 +1,11 @@
+module Fixed.Functions (identity, choose, higher, bounded, higherKind) where
+identity : forall a. a -> a
+identity x = x
+choose : forall a b. a -> b -> a
+choose x y = x
+higher : (forall a. a -> a) -> Bool
+higher f = let ignored = f 7 in f true
+bounded : forall (a >= forall b. b -> b). a -> a
+bounded x = x
+higherKind : forall (f : * -> *) a. f a -> f a
+higherKind x = x

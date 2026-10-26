@@ -11,6 +11,7 @@ module MLF.Entry.Emlf where {
   import qualified Bootstrap.Version as Version;
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Compiler as C;
+  import qualified MLF.PreparedCompiler as Prepared;
   import qualified Bootstrap.X.Check as Check;
   import qualified Bootstrap.X.Checked as Checked;
   import qualified Bootstrap.X.Parser as Parse;
@@ -36,7 +37,16 @@ module MLF.Entry.Emlf where {
     do {
       count <- getArgCount;
       arguments <- readArguments 0 count;
-      options ImplicitPrelude [] arguments
+      case arguments of {
+        (:) command ((:) identity []) ->
+          if eqString command "--verify-builtin-prelude" then
+            case Prepared.verifyBuiltin identity of {
+              Left message -> fatal message;
+              Right () -> putStrLn "builtin Prelude verified"
+            }
+          else options ImplicitPrelude [] arguments;
+        _ -> options ImplicitPrelude [] arguments
+      }
     };
   readArguments :: Int -> Int -> IO ([] String);
   readArguments i count =
@@ -699,12 +709,12 @@ module MLF.Entry.Emlf where {
         do {
           compiled <-
             case source of {
-              SourceFile file -> C.compileFileWithPrelude mode paths file;
-              SourceText file input -> C.compileSourceWithImports mode paths file input;
+              SourceFile file -> Prepared.compileFileWithPrelude mode paths file;
+              SourceText file input -> Prepared.compileSourceWithImports mode paths file input;
               SourceStdin ->
                 do {
                   input <- getContents;
-                  C.compileSourceWithImports mode paths "<stdin>" input
+                  Prepared.compileSourceWithImports mode paths "<stdin>" input
                 }
             };
           case compiled of {
@@ -713,13 +723,13 @@ module MLF.Entry.Emlf where {
               case command of {
                 PrintSource onlyType ->
                   do {
-                    putStrLn ((if onlyType then "" else "-- type: ") ++ C.sourceType result);
+                    putStrLn ((if onlyType then "" else "-- type: ") ++ Prepared.sourceType result);
                     if onlyType
                     then ioReturn ()
-                    else putStrLn (Pretty.prettyTerm (C.compiledTerm result))
+                    else putStrLn (Pretty.prettyTerm (Prepared.compiledTerm result))
                   };
-                RunSource -> execute programArguments (C.compiledTerm result);
-                EmitSource -> printLLVM (LLVM.emitCheckedChunks False (C.checkedTerm result));
+                RunSource -> execute programArguments (Prepared.compiledTerm result);
+                EmitSource -> printLLVM (LLVM.emitCheckedChunks False (Prepared.checkedTerm result));
                 _ -> fatal "invalid source command"
               }
           }

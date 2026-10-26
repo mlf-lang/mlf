@@ -137,11 +137,11 @@ suite = (:) ((,) "optimizer free-use indices agree with independent scoped scans
 -- agree on their complete records, not just arity or capture counts.
 legacyCaptureFixed : Map XName A.WorkerFunction -> Map XName A.WorkerFunction
 legacyCaptureFixed fs =
- let next = M.map (\f -> A.WorkerFunction (A.parameters f) (A.functionBody f) (Set.toList (Set.difference O.compareName (A.needed fs (A.functionBody f)) (Set.fromList O.compareName (A.parameters f)))) (A.strict f)) fs in
+ let next = M.map (\f -> A.WorkerFunction (A.parameters f) (A.functionBody f) (Set.toList (Set.difference O.compareName (A.needed fs (A.functionBody f)) (Set.fromList O.compareName (A.parameters f)))) (A.strict f) (A.entrySummary f)) fs in
  if A.sameFunctions (M.toList fs) (M.toList next) then fs else legacyCaptureFixed next
 legacyDemandFixed : Map XName A.WorkerFunction -> Map XName A.WorkerFunction
 legacyDemandFixed fs =
- let next = M.map (\f -> A.WorkerFunction (A.parameters f) (A.functionBody f) (A.captures f) (Set.intersection O.compareName (A.demanded fs (A.functionBody f)) (Set.fromList O.compareName (L.append (A.parameters f) (A.captures f))))) fs in
+ let next = M.map (\f -> let demand = A.workerDemand fs f in A.WorkerFunction (A.parameters f) (A.functionBody f) (A.captures f) (Set.fromList O.compareName (A.demandNames demand)) demand) fs in
  if A.sameFunctions (M.toList fs) (M.toList next) then fs else legacyDemandFixed next
 legacyAnalyze : XErased -> Map XName A.WorkerFunction
 legacyAnalyze expression = legacyDemandFixed (legacyCaptureFixed (A.collect expression))

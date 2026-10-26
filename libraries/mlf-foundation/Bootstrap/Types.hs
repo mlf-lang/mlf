@@ -136,7 +136,8 @@ module Bootstrap.Types where {
     PEmptyCallStack |
     PPushCallStack |
     PPrettyCallStack |
-    PIOErrorWithStack;
+    PIOErrorWithStack |
+    PConcatStringList;
   data SType =
     STVar String |
     SBottom |

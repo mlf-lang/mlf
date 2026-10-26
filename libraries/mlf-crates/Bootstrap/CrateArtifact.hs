@@ -322,7 +322,7 @@ module Bootstrap.CrateArtifact where {
            ensure declared ("crate exports an undeclared entity: " ++ Modules.label entity)
          };
   builtinCrateIdentity :: String;
-  builtinCrateIdentity = "mlf:builtin-shared-haskell-v1:8";
+  builtinCrateIdentity = "mlf:builtin-shared-haskell-v1:9";
   validateBuiltinOwnership iface =
     if (any Modules.isBuiltinModule (crateModules iface) ||
         ((stringLength (crateId iface) >= stringLength "mlf:builtin-shared-haskell-v1:") &&
@@ -1185,10 +1185,10 @@ module Bootstrap.CrateArtifact where {
         (null (Separate.unitClasses recorded) &&
          (null (Separate.unitInstances recorded) && null (Separate.unitExports recorded)))
         "inference fragment contains source visibility metadata";
-      Separate.objectChecked fragment;
-      boundValueShared59 <- Right (Separate.freshObject serial (Separate.objectTerm fragment));
+      checked <- Separate.objectChecked fragment;
+      boundValueShared59 <- Right (Separate.freshCheckedObject serial checked);
       case boundValueShared59 of {
-        (,) next fresh ->
+        (,,) next fresh checkedBindings ->
           do {
             let {
               extracted =
@@ -1244,11 +1244,8 @@ module Bootstrap.CrateArtifact where {
                              }
                          })
                       parameters;
-                  dataEnv <- D.validateDeclarations ds;
-                  own <-
-                    Separate.collectBindings dataEnv
-                      (XEnv M.empty (M.fromList X.compareName parameters))
-                      implementation;
+                  D.validateDeclarations ds;
+                  own <- checkedBindings;
                   let {
                     actual = map (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty)) own
                   };

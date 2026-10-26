@@ -302,20 +302,10 @@ module Bootstrap.Std where {
     };
   intercalate :: String -> [] String -> String;
   intercalate sep xs = concatStrings (intersperse sep xs);
-  -- Join adjacent pieces in rounds. Native strings are contiguous UTF-8, so
-  -- a right fold copies every suffix again; balanced joins copy O(log n) times.
-  -- Force pieces in source order, retaining the old failure/strictness order.
+  -- Join through the general primitive so contiguous UTF-8 fragments are
+  -- copied once. It preserves the original head-before-tail demand order.
   concatStrings :: [] String -> String;
-  concatStrings xs =
-    case xs of {
-      [] -> "";
-      (:) first rest ->
-        seq first
-          (case rest of {
-             [] -> first;
-             (:) second tail -> concatStrings (concatStringPairs xs)
-           })
-    };
+  concatStrings xs = concatStringList xs;
   concatStringPairs :: [] String -> [] String;
   concatStringPairs xs =
     case xs of {

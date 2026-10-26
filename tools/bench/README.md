@@ -7,12 +7,16 @@ The regex-redux C baseline requires PCRE2, discoverable as `libpcre2-8` through
 pkg-config. The MLF program imports the portable `Bootstrap.Regex` module;
 its source dependencies participate in the integrity checks.
 
-## Current shared compiler route (including macOS)
+## Current shared compiler and native runner
 
-The existing runner and positional CLI below are unchanged. Build the current
-shared compiler and package manager with GHC 9.14.1 (Python 3 is used only for
-this build helper), or supply an already qualified shared-native pair. A legacy
-release seed is not a substitute for the current shared sources.
+The existing runner and positional CLI below are unchanged. On Linux, build the
+current shared compiler and package manager with GHC 9.14.1 (Python 3 is used
+only for this build helper), or supply an already qualified shared-native pair.
+`tools/shared/build.py` currently requires a Linux toolchain; installing the
+dependencies below does not make that builder a macOS qualification route.
+The benchmark runner itself also runs on macOS when supplied with a compatible,
+independently validated compiler/package-manager pair. A legacy release seed is
+not a substitute for the current shared sources.
 
 On macOS, install Clang/LLVM, GMP, pkg-config and BDWGC; for example:
 
@@ -33,7 +37,7 @@ pkg-config --modversion gmp bdw-gc libpcre2-8
 # The final line must be 10.49.
 ```
 
-From the repository root (use absolute paths for GHC and Clang):
+On Linux, from the repository root (use absolute paths for GHC and Clang):
 
 ```sh
 python3 tools/shared/build.py --ghc /absolute/path/to/ghc-9.14.1 \
@@ -66,8 +70,10 @@ The migrated MLF workloads use current unit syntax; algorithms, C sources,
 flags, inputs and independent oracles are unchanged. Regex remains the original
 MLF regex library versus the official PCRE2 C implementation: this is a
 cross-implementation benchmark, not a same-algorithm compiler-isolation claim.
-The experimental installed-Prelude consumer is **not** selected by these commands
-and does not support the imported-module regex workload.
+The current compiler uses its checked, prepared builtin Prelude for eligible
+standalone roots, with ordinary fallback. Imported-module roots currently retain
+the ordinary pipeline; the separate prepared-library draft is not selected by
+these commands. The complete ten-workload performance gate remains under repair.
 
 ## Correctness-only migration check
 
@@ -162,6 +168,27 @@ fall back to the Clang driver. Both MLF compiler variants use this backend; the 
 baseline invokes the real Clang executable with the original manifest flags.
 Retain the configuration and verify its toolchain hashes alongside the report.
 
+Set `MLF_BENCH_SPLIT_RUNTIME=1` to compile the runtime core and process supervisor
+as two fresh translation units in parallel. This option applies to both MLF
+compiler variants and works with the ordinary Clang backend as well as the
+streaming modes below. Each build compiles `mlf_runtime.c` with
+`-DMLF_RUNTIME_EXTERNAL_PROCESS_SUPERVISOR=1` into `runtime.o` and its sibling
+`mlf_process_supervisor.c` into `runtime-supervisor.o`, with the same O2 flags and
+library/include arguments. Linking consumes both objects directly; all process,
+async and filesystem operations remain available. No runtime object is cached.
+Unset the option to retain the embedded single-object runtime build.
+
+The external-supervisor macro is a general runtime build interface: clients that
+define it must compile and link `mlf_process_supervisor.c` separately. The default
+runtime includes that same implementation. The benchmark reports the two C
+compilations as `runtime` and `runtime-supervisor`, including both commands,
+intervals and CPU costs. The core and supervisor also overlap source compilation;
+their combined CPU cost is counted even when their wall intervals overlap.
+With this option there are five stages in ordinary mode, six with streaming LLVM,
+and nine with a prestarted linker. The prestarted linker waits for a separate
+successful-producer marker for each of the three objects. Failure or timeout
+cancels the whole process group graph, including a blocked linker.
+
 To avoid an intermediate bitcode file and a second LLVM process, build the
 optional LLVM C-API helper through the native MLF package manager and builder:
 
@@ -208,7 +235,8 @@ The timed dependency graph first creates a fresh FIFO, then starts the frontend
 and LLVM helper; fresh runtime C compilation runs independently. A pipe with
 `pipefail` and `cat` handles even a producer that exits before the FIFO reader
 opens. The helper archives the exact received bytes as `program.ll` before
-parsing, verification and optimization. Linking waits for all three producers.
+parsing, verification and optimization. Linking waits for the frontend, LLVM
+helper and runtime compiler (both runtime compilers when splitting is enabled).
 Setup, process startup, transport, waiting, runtime compilation, LLVM compilation
 and linking all remain inside the measured boundary. Both MLF variants receive
 the same treatment; the C command and runtime warm-up remain unchanged.
@@ -216,6 +244,7 @@ the same treatment; the C command and runtime warm-up remain unchanged.
 Streaming LLVM process time includes waiting for source emission. Use the
 recorded start/finish intervals to identify the critical path: approximately
 `max(frontend + LLVM tail, runtime C) + link`, with setup and scheduling overhead.
+For a split runtime, use the later core/supervisor completion as `runtime C`.
 Here LLVM tail is its completion time minus frontend completion. Do not add the
 LLVM process's whole lifetime to the frontend time. Unset
 `MLF_BENCH_STREAM_LLVM` to use the ordinary dependency graph described above.
@@ -243,9 +272,10 @@ Use that configuration with both `MLF_BENCH_STREAM_LLVM=1` and
 `MLF_BENCH_STREAM_LINK=1`. A fresh linker process loads its libraries early,
 then waits for completion markers. Each marker is created by a separate stage
 only after its compiler succeeds. The linker reads the complete regular
-`runtime.o` and `program.o` files, which remain available for hashing. All
-seven stage intervals and commands, marker creation, waiting and linking remain
-inside the timed boundary. Failed producers, blocked helpers, timeout and
+`runtime.o` and `program.o` files, plus `runtime-supervisor.o` when splitting is
+enabled; every object remains available for hashing. All seven stage intervals
+(nine with a split runtime) and commands, marker creation, waiting and linking
+remain inside the timed boundary. Failed producers, blocked helpers, timeout and
 process-group cleanup are covered by native tests. No object is reused.
 
 The link process's elapsed time includes waiting. Its completion minus the

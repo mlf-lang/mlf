@@ -1,6 +1,16 @@
 /* POSIX host IO. Package policy, manifests and build decisions live in MLF. */
 #ifndef MLF_SYSTEM_H
 #define MLF_SYSTEM_H
+/* This transport is also included directly by the GHC host adapter. */
+#ifndef MLF_NOINLINE
+#if defined(_MSC_VER)
+#define MLF_NOINLINE __declspec(noinline)
+#elif defined(__GNUC__) || defined(__clang__)
+#define MLF_NOINLINE __attribute__((noinline))
+#else
+#define MLF_NOINLINE
+#endif
+#endif
 #ifdef _WIN32
 #include "mlf_system_windows.h"
 #else
@@ -34,7 +44,7 @@ static MlfValue *os_directoryExists(MlfValue *name) {
     struct stat st;
     return mlf_boolean(!stat(file_path(name),&st) && S_ISDIR(st.st_mode));
 }
-static MlfValue *os_listDirectory(MlfValue *name) {
+static MLF_NOINLINE MlfValue *os_listDirectory(MlfValue *name) {
     DIR *dir = opendir(file_path(name));
     if (!dir) fail("IO error: listDirectory failed");
     size_t size = 0, capacity = 256;
@@ -71,7 +81,7 @@ static MlfValue *os_releaseFileLock(MlfValue *handle) {
 /* cwd, plus NUL-terminated fields: timeout seconds, stdin file, stdout file,
  * stderr file, executable, arguments. Empty redirections inherit streams;
  * equal nonempty stdout/stderr paths share one descriptor. No shell is used. */
-static MlfValue *os_runProcess(MlfValue *directory, MlfValue *specification) {
+static MLF_NOINLINE MlfValue *os_runProcess(MlfValue *directory, MlfValue *specification) {
     const char *cwd = file_path(directory);
     specification = expect(specification,STRING);
     size_t length = specification->as.string.length, count = 0;
@@ -152,7 +162,7 @@ static void os_sha_block(uint32_t h[8], const unsigned char block[64]) {
     for(int i=0;i<64;++i) {uint32_t t=v+(os_rotr(e,6)^os_rotr(e,11)^os_rotr(e,25))+((e&f)^(~e&g))+k[i]+w[i];uint32_t u=(os_rotr(a,2)^os_rotr(a,13)^os_rotr(a,22))+((a&b)^(a&c)^(b&c)); v=g;g=f;f=e;e=d+t;d=c;c=b;b=a;a=t+u;}
     h[0]+=a;h[1]+=b;h[2]+=c;h[3]+=d;h[4]+=e;h[5]+=f;h[6]+=g;h[7]+=v;
 }
-static MlfValue *os_fileDigest(MlfValue *name) {
+static MLF_NOINLINE MlfValue *os_fileDigest(MlfValue *name) {
     FILE *file = fopen(file_path(name),"rb");
     if (!file) fail("IO error: fileDigest failed");
     uint32_t h[8]={0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};

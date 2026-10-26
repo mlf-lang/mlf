@@ -1,0 +1,46 @@
+-- Public API demand controls. The harness checks exact diagnostic order as
+-- well as successful results, separately from the finite matching corpus.
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Regex as R
+
+regex : String -> R.Regex
+regex pattern = case R.compile pattern of
+  Left message -> panic message
+  Right value -> value
+
+isAbsent : Maybe ((,) Int Int) -> Bool
+isAbsent result = case result of
+  Nothing -> true
+  Just value -> false
+
+main : IO ()
+main = do
+  mode <- getArg 0
+  if eqString mode "count-both" then
+    printInt (R.countMatches (panic "regex-second") (panic "subject-first"))
+  else if eqString mode "count-empty" then
+    printInt (R.countMatches (panic "regex-required") "")
+  else if eqString mode "find-negative" then
+    printInt (if isAbsent (R.find (panic "unused-regex") (panic "unused-subject") (-1)) then 1 else 0)
+  else if eqString mode "find-past-end" then
+    printInt (if isAbsent (R.find (panic "unused-regex") "abc" 4) then 1 else 0)
+  else if eqString mode "find-both" then
+    printInt (if isAbsent (R.find (panic "regex-second") (panic "subject-first") 0) then 1 else 0)
+  else if eqString mode "replace-both" then
+    putStrLn (R.replaceAll (panic "regex-second") (panic "replacement-third") (panic "subject-first"))
+  else if eqString mode "regex-before-replacement" then
+    putStrLn (R.replaceAll (panic "regex-first") (panic "replacement-second") "a")
+  else if eqString mode "fixed-replacement" then
+    putStrLn (R.replaceAll (regex "a") (panic "replacement-required") "a😀a")
+  else if eqString mode "nullable-replacement" then
+    putStrLn (R.replaceAll (regex "") (panic "replacement-required") "")
+  else if eqString mode "span-replacement" then
+    putStrLn (R.replaceAll (regex "<[^>]*>") (panic "replacement-required") "α<x>😀<y>")
+  else if eqString mode "skip-replacement" then
+    putStrLn (R.replaceAll (regex "ab") (panic "replacement-required") "xaby")
+  else if eqString mode "skip-empty-replacement" then
+    putStrLn (R.replaceAll (regex "ab") (panic "unused-replacement") "")
+  else if eqString mode "skip-short-replacement" then
+    putStrLn (R.replaceAll (regex "ab") (panic "unused-replacement") "a")
+  else panic "unknown native regex demand control"

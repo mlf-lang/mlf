@@ -365,6 +365,24 @@ module Bootstrap.Runtime where {
   runtimeCharsText :: Either String RValue -> Either String String;
   runtimeCharsText thunk =
     bindEither (runtimeCharsChunks False thunk) (\chunks -> Right (concatStrings chunks));
+  runtimeStringChunks :: Either String RValue -> [] String -> Either String ([] String);
+  runtimeStringChunks thunk chunks =
+    bindEither thunk
+      (\value -> case value of {
+         RConstructor name fields -> case fields of {
+           [] -> if eqString name "[]" then Right (reverse chunks)
+                  else Left "runtime primitive expected [String]";
+           (:) first ((:) rest []) ->
+             if eqString name ":" then do {
+               piece <- string first;
+               -- RString's wrapper is not its primitive WHNF: demand the
+               -- payload before the next list cell, just like source seq.
+               seq piece (runtimeStringChunks rest ((:) piece chunks))
+             } else Left "runtime primitive expected [String]";
+           _ -> Left "runtime primitive expected [String]"
+         };
+         _ -> Left "runtime primitive expected [String]"
+       });
   runtimeCharsChunks :: Bool -> Either String RValue -> Either String ([] String);
   runtimeCharsChunks diagnostic thunk =
     bindEither thunk
@@ -585,6 +603,8 @@ module Bootstrap.Runtime where {
           y <- string b;
           Right (RString (x ++ y))
         };
+      PConcatStringList ->
+        bindEither (runtimeStringChunks a []) (\chunks -> Right (RString (concatStringList chunks)));
       PShowInt -> mapEither (\n -> RString (showInt n)) (integer a);
       PAddInt -> integer2 addInt a b;
       PSubInt -> integer2 subInt a b;

@@ -12,15 +12,19 @@ module Bootstrap.LLVM.Analysis where {
   import qualified Bootstrap.X.Syntax as X;
   import qualified Bootstrap.LLVM.Optimize as O;
   -- Native worker information is computed by two monotone fixed points.
-  data WorkerFunction = WorkerFunction ([] XName) XErased ([] XName) (Set XName);
+  data WorkerFunction = WorkerFunction ([] XName) XErased ([] XName) (Set XName) EntryDemand;
   parameters :: WorkerFunction -> [] XName;
-  parameters (WorkerFunction args body captured demanded) = args;
+  parameters (WorkerFunction args body captured demanded entry) = args;
   functionBody :: WorkerFunction -> XErased;
-  functionBody (WorkerFunction args body captured demanded) = body;
+  functionBody (WorkerFunction args body captured demanded entry) = body;
   captures :: WorkerFunction -> [] XName;
-  captures (WorkerFunction args body captured demanded) = captured;
+  captures (WorkerFunction args body captured demanded entry) = captured;
   strict :: WorkerFunction -> Set XName;
-  strict (WorkerFunction args body captured demanded) = demanded;
+  strict (WorkerFunction args body captured demanded entry) = demanded;
+  entrySummary :: WorkerFunction -> EntryDemand;
+  entrySummary (WorkerFunction args body captured demanded entry) = entry;
+  entryOrder :: WorkerFunction -> [] XName;
+  entryOrder f = demandNames (entrySummary f);
   needed :: Map XName WorkerFunction -> XErased -> Set XName;
   needed functions expression =
     S.unions O.compareName (L.map (neededName functions) (S.toList (O.free expression)));
@@ -65,7 +69,7 @@ module Bootstrap.LLVM.Analysis where {
   collectBinding ((,) name rhs) fs =
     case O.lambdas rhs of {
       (,) [] body -> fs;
-      (,) args body -> M.insert O.compareName name (WorkerFunction args body [] S.empty) fs
+      (,) args body -> M.insert O.compareName name (WorkerFunction args body [] S.empty (EntryDemand [] False)) fs
     };
   collect :: XErased -> Map XName WorkerFunction;
   collect expression =
@@ -83,10 +87,11 @@ module Bootstrap.LLVM.Analysis where {
         }
     };
   sameFunction :: WorkerFunction -> WorkerFunction -> Bool;
-  sameFunction (WorkerFunction args body captured demanded) (WorkerFunction args2 body2 captured2 demanded2) =
+  sameFunction (WorkerFunction args body captured demanded entry) (WorkerFunction args2 body2 captured2 demanded2 entry2) =
     (sameNames args args2 &&
      (sameNames captured captured2 &&
-      (sameNames (S.toList demanded) (S.toList demanded2) && X.equalErased body body2)));
+      (sameNames (S.toList demanded) (S.toList demanded2) &&
+       (sameDemand entry entry2 && X.equalErased body body2))));
   sameFunctions :: [] ((,) XName WorkerFunction) -> [] ((,) XName WorkerFunction) -> Bool;
   sameFunctions a b =
     case a of {
@@ -120,7 +125,7 @@ module Bootstrap.LLVM.Analysis where {
                       (S.difference O.compareName
                          (S.unions O.compareName (L.map (neededName fs) names))
                          parameterNames))
-                   (strict f)
+                   (strict f) (entrySummary f)
              })
           fs
     } in
@@ -130,107 +135,137 @@ module Bootstrap.LLVM.Analysis where {
   demandFixed :: Map XName WorkerFunction -> Map XName WorkerFunction;
   demandFixed fs =
     let {
-      next =
-        M.map
-          (\f ->
-             WorkerFunction (parameters f) (functionBody f) (captures f)
-               (S.intersection O.compareName (demanded fs (functionBody f))
-                  (S.fromList O.compareName (L.append (parameters f) (captures f)))))
-          fs
+      next = M.map (\f -> let { demand = workerDemand fs f } in
+        WorkerFunction (parameters f) (functionBody f) (captures f)
+          (S.fromList O.compareName (demandNames demand)) demand) fs
     } in
-    if M.eqMap O.eqName (\a b -> sameNames (S.toList (strict a)) (S.toList (strict b))) fs next
+    if M.eqMap O.eqName (\a b -> sameDemand (entrySummary a) (entrySummary b)) fs next
     then fs
     else demandFixed next;
+  workerDemand :: Map XName WorkerFunction -> WorkerFunction -> EntryDemand;
+  workerDemand fs f = let {
+    allowed = S.fromList O.compareName (L.append (parameters f) (captures f));
+    demand = entryDemand fs M.empty (functionBody f)
+  } in EntryDemand (L.filter (\name -> S.member O.compareName name allowed) (demandNames demand))
+       (demandComplete demand);
   analyze :: XErased -> Map XName WorkerFunction;
   analyze expression = demandFixed (captureFixed (collect expression));
-  substituteDemand :: Map XName WorkerFunction -> XName -> XErased -> Set XName -> Set XName;
-  substituteDemand fs name value names =
-    S.union O.compareName (S.delete O.compareName name names)
-      (if S.member O.compareName name names then demanded fs value else S.empty);
-  recursiveDemand :: Map XName WorkerFunction ->
-                     [] ((,) XName XErased) -> Set XName -> Set XName;
-  recursiveDemand fs bindings names =
-    let {
-      expanded =
-        L.foldr
-          (\entry rest ->
-             case entry of {
-               (,) n a -> substituteDemand fs n a rest
-             })
-          names
-          bindings
-    } in
-    let {
-      next = S.union O.compareName names expanded
-    } in
-    if sameNames (S.toList names) (S.toList next) then names else recursiveDemand fs bindings next;
-  intersectAll :: [] (Set XName) -> Set XName;
-  intersectAll sets =
-    case sets of {
-      [] -> S.empty;
-      (:) first rest -> L.foldr (S.intersection O.compareName) first rest
-    };
-  demandedAlternative :: Map XName WorkerFunction -> XErasedAlternative -> Set XName;
-  demandedAlternative fs (XErasedAlternative p b) =
-    S.difference O.compareName (demanded fs b) (S.fromList O.compareName (X.patternNames p));
+  -- The prefix is an ordered sequence of variable forces, not an unordered
+  -- eventual-strictness set. Complete means the expression reaches WHNF after
+  -- these forces and certified total operations; otherwise the prefix stops
+  -- at a possibly failing operation, branch, or unknown call.
+  data EntryDemand = EntryDemand ([] XName) Bool;
+  demandNames :: EntryDemand -> [] XName;
+  demandNames (EntryDemand names complete) = names;
+  demandComplete :: EntryDemand -> Bool;
+  demandComplete (EntryDemand names complete) = complete;
+  sameDemand :: EntryDemand -> EntryDemand -> Bool;
+  sameDemand a b = sameNames (demandNames a) (demandNames b) &&
+    demandComplete a == demandComplete b;
+  -- Let RHSs may be evaluated only at the next demand, not anywhere in a
+  -- worker prefix: doing so could cross an earlier failure in that prefix.
   demanded :: Map XName WorkerFunction -> XErased -> Set XName;
-  demanded fs expression =
-    case expression of {
-      XEVar n -> if M.member O.compareName n fs then S.empty else S.singleton n;
-      XELet n a b -> substituteDemand fs n a (demanded fs b);
-      XELetRec ds b ->
-        S.difference O.compareName (recursiveDemand fs ds (demanded fs b))
-          (S.fromList O.compareName
-             (L.map
-                (\entry ->
-                   case entry of {
-                     (,) n a -> n
-                   })
-                ds));
-      XECase s ((:) (XErasedAlternative (XDefaultPattern optional) b) []) ->
-        case optional of {
-          Nothing -> demanded fs b;
-          Just n -> substituteDemand fs n s (demanded fs b)
-        };
-      XECase s branches ->
-        S.union O.compareName (demanded fs s)
-          (intersectAll (L.map (demandedAlternative fs) branches));
-      XEApp f a -> demandedApplication fs expression;
-      _ -> S.empty
+  demanded fs expression = case demandNames (entryDemand fs M.empty expression) of {
+    (:) first rest -> S.singleton first;
+    [] -> S.empty
+  };
+  entryTotalPrimitive :: Primitive -> Bool;
+  entryTotalPrimitive p = case p of {
+    PAddInt -> True;
+    PSubInt -> True;
+    PAndInt -> True;
+    PEqInt -> True;
+    PLtInt -> True;
+    _ -> False
+  };
+  barrierAfter :: EntryDemand -> EntryDemand;
+  barrierAfter demand = EntryDemand (demandNames demand) False;
+  appendNames :: [] XName -> [] XName -> [] XName;
+  appendNames first next = L.append first
+    (L.filter (\name -> L.not (L.elem O.eqName name first)) next);
+  appendDemand :: EntryDemand -> EntryDemand -> EntryDemand;
+  appendDemand first next =
+    if demandComplete first
+    then EntryDemand (appendNames (demandNames first) (demandNames next)) (demandComplete next)
+    else first;
+  entryDemand :: Map XName WorkerFunction -> Map XName EntryDemand -> XErased -> EntryDemand;
+  entryDemand fs local expression = case expression of {
+    XEVar name ->
+      if M.member O.compareName name fs then EntryDemand [] True
+      else case M.lookup O.compareName name local of {
+        Just demand -> demand;
+        Nothing -> EntryDemand ((:) name []) True
+      };
+    XEInt _ -> EntryDemand [] True;
+    XEDouble _ -> EntryDemand [] True;
+    XEBool _ -> EntryDemand [] True;
+    XEString _ -> EntryDemand [] True;
+    XEPrimitive _ -> EntryDemand [] True;
+    XEConstructor _ -> EntryDemand [] True;
+    XEAbs _ _ -> EntryDemand [] True;
+    XELet name rhs body ->
+      -- Lazy shared summaries preserve aliases without reanalyzing a closed
+      -- RHS at each use or visiting an unused binding.
+      entryDemand fs (M.insert O.compareName name (entryDemand fs local rhs) local) body;
+    XELetRec bindings body ->
+      entryDemand fs
+        (L.foldr (\binding rest -> case binding of {
+          (,) name rhs -> M.insert O.compareName name (EntryDemand [] False) rest
+        }) local bindings) body;
+    XECase subject ((:) (XErasedAlternative (XDefaultPattern optional) body) []) ->
+      case optional of {
+        Nothing -> entryDemand fs local body;
+        Just name -> entryDemand fs
+          (M.insert O.compareName name (entryDemand fs local subject) local) body
+      };
+    XECase subject alternatives -> barrierAfter (entryDemand fs local subject);
+    XEApp _ _ -> entryApplication fs local expression;
+    _ -> EntryDemand [] False
+  };
+  entryArguments :: Map XName WorkerFunction -> Map XName EntryDemand -> [] XErased -> EntryDemand;
+  entryArguments fs local arguments = case arguments of {
+    [] -> EntryDemand [] True;
+    (:) first rest -> appendDemand (entryDemand fs local first) (entryArguments fs local rest)
+  };
+  entryWorkerArgument :: Map XName WorkerFunction -> Map XName EntryDemand ->
+                         WorkerFunction -> [] XErased -> XName -> EntryDemand;
+  entryWorkerArgument fs local function arguments selected =
+    case L.find (\binding -> O.eqName selected (L.fst binding))
+           (L.zip (parameters function) arguments) of {
+      Just ((,) name argument) -> entryDemand fs local argument;
+      Nothing ->
+        if L.elem O.eqName selected (captures function)
+        then entryDemand fs local (XEVar selected)
+        else EntryDemand [] False
     };
-  demandedApplication :: Map XName WorkerFunction -> XErased -> Set XName;
-  demandedApplication fs expression =
-    case O.applications expression of {
-      (,) (XEPrimitive PIfThenElse) ((:) c ((:) a ((:) b []))) ->
-        S.union O.compareName (demanded fs c)
-          (S.intersection O.compareName (demanded fs a) (demanded fs b));
-      (,) (XEPrimitive PSeq) ((:) a ((:) b [])) ->
-        S.union O.compareName (demanded fs a) (demanded fs b);
-      (,) (XEPrimitive p) args ->
-        if (L.length args == P.primitiveArity p)
-        then if P.primitiveStrict p
-             then S.unions O.compareName (L.map (demanded fs) args)
-             else S.empty
-        else S.empty;
-      (,) (XEVar n) args ->
-        case M.lookup O.compareName n fs of {
-          Just f ->
-            if (L.length args == L.length (parameters f))
-            then S.union O.compareName
-                   (S.intersection O.compareName (strict f) (S.fromList O.compareName (captures f)))
-                   (S.unions O.compareName
-                      (L.map
-                         (\entry ->
-                            case entry of {
-                              (,) name arg ->
-                                if S.member O.compareName name (strict f)
-                                then demanded fs arg
-                                else S.empty
-                            })
-                         (L.zip (parameters f) args)))
-            else demanded fs (XEVar n);
-          Nothing -> demanded fs (XEVar n)
-        };
-      (,) f args -> demanded fs f
-    }
+  entryWorkerArguments :: Map XName WorkerFunction -> Map XName EntryDemand ->
+                          WorkerFunction -> [] XErased -> [] XName -> EntryDemand;
+  entryWorkerArguments fs local function arguments names = case names of {
+    [] -> EntryDemand [] (demandComplete (entrySummary function));
+    (:) first rest -> appendDemand
+      (entryWorkerArgument fs local function arguments first)
+      (entryWorkerArguments fs local function arguments rest)
+  };
+  entryApplication :: Map XName WorkerFunction -> Map XName EntryDemand -> XErased -> EntryDemand;
+  entryApplication fs local expression = case O.applications expression of {
+    (,) (XEPrimitive PIfThenElse) ((:) condition ((:) yes ((:) no []))) ->
+      barrierAfter (entryDemand fs local condition);
+    (,) (XEPrimitive PSeq) ((:) first ((:) rest [])) ->
+      appendDemand (entryDemand fs local first) (entryDemand fs local rest);
+    (,) (XEPrimitive p) arguments ->
+      if L.length arguments < P.primitiveArity p then EntryDemand [] True
+      else if L.length arguments /= P.primitiveArity p then EntryDemand [] False
+      else if L.not (P.primitiveStrict p) then EntryDemand [] False
+      else let { demand = entryArguments fs local arguments } in
+        if entryTotalPrimitive p then demand else barrierAfter demand;
+    (,) (XEConstructor name) arguments -> EntryDemand [] True;
+    (,) (XEVar name) arguments -> case M.lookup O.compareName name fs of {
+      Just function ->
+        if L.length arguments < L.length (parameters function) then EntryDemand [] True
+        else if L.length arguments /= L.length (parameters function) then EntryDemand [] False
+        else entryWorkerArguments fs local function arguments (entryOrder function);
+      Nothing -> barrierAfter (entryDemand fs local (XEVar name))
+    };
+    (,) function arguments -> barrierAfter (entryDemand fs local function)
+  }
 }

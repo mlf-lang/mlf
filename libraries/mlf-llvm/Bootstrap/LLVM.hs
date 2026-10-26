@@ -238,7 +238,7 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
          } in
          Right
            (runtimePack
-              ((:) "MLF-CODEGEN-INPUT-COMPACT-4-RESULT-SUM-1-LAZY-PRODUCER-1"
+              ((:) "MLF-CODEGEN-INPUT-COMPACT-4-RESULT-SUM-1-LAZY-PRODUCER-1-STRING-INDEX-1-READY-TOTAL-3-SEQ-DEMAND-1-CONCAT-LIST-1-ORDERED-DEMAND-1-READY-LET-1"
                  ((:) "compact-bdwgc-v1-process-v1-completion-v2-haskell-boundary-v3"
                     ((:) (runtimeBool (ioType (Checked.typeOf checked)))
                        ((:) (constructorKey (entryConstructors declarations))
@@ -246,7 +246,7 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
                              ((:) (canonicalErasedKey (X.erase (Checked.term checked))) [])))))));
   preparedKey (PreparedEntry executeIO constructors lowered) =
     runtimePack
-      ((:) "MLF-CODEGEN-PREPARED-COMPACT-4-RESULT-SUM-1-LAZY-PRODUCER-1"
+      ((:) "MLF-CODEGEN-PREPARED-COMPACT-4-RESULT-SUM-1-LAZY-PRODUCER-1-STRING-INDEX-1-READY-TOTAL-3-SEQ-DEMAND-1-CONCAT-LIST-1-ORDERED-DEMAND-1-READY-LET-1"
          ((:) "compact-bdwgc-v1-process-v1-completion-v2-haskell-boundary-v3"
             ((:) (runtimeBool executeIO)
                ((:) (constructorKey constructors) ((:) (canonicalErasedKey lowered) [])))));
@@ -330,7 +330,7 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
          } in
          Right
            (runtimePack
-              ((:) "MLF-CODEGEN-CRATE-INPUT-COMPACT-4-RESULT-SUM-1-LAZY-PRODUCER-1"
+              ((:) "MLF-CODEGEN-CRATE-INPUT-COMPACT-4-RESULT-SUM-1-LAZY-PRODUCER-1-STRING-INDEX-1-READY-TOTAL-3-SEQ-DEMAND-1-CONCAT-LIST-1-ORDERED-DEMAND-1-READY-LET-1"
                  ((:) "compact-bdwgc-v1-process-v1-completion-v2-haskell-boundary-v3"
                     ((:) (runtimeBool (ioType (Checked.typeOf checked)))
                        ((:) (constructorKey (entryConstructors declarations))

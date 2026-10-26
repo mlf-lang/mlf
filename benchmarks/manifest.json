@@ -105,9 +105,9 @@
     "benchmarks/reverse-complement/mlf/main.emlf": "c62fd62e285b1f634a6d229738342974e32e5cb09bead96400ea9f691aafd843",
     "benchmarks/k-nucleotide/mlf/main.emlf": "f5be5957e29a02603b9b632d5169111a035002364e1464c79a055456055d4884",
     "benchmarks/regex-redux/mlf/main.emlf": "f8ade352362ffce016e22e9df99834777eaf2f731996d39e73ae7e89cfedefc4",
-    "libraries/mlf-foundation/Bootstrap/Regex.hs": "e3087cbcfd6873c2fcb00e1541d91122dc16be7796f61fcf1d38e39fe3528055",
-    "libraries/mlf-foundation/Bootstrap/Types.hs": "b3af659270c2e1ecca6620d4a36fe5dacbe9c07b1da14ca14538185458fdf0ef",
-    "libraries/mlf-foundation/Bootstrap/Std.hs": "a477b97bb72d939e93b9404b6c4b6ae74855663cee7d76a4bd91cef0abfad23e",
+    "libraries/mlf-foundation/Bootstrap/Regex.hs": "045de04069a158c5ff55d61e7d604a3f01aea7a034ac58c63dd8d80d67dcb8da",
+    "libraries/mlf-foundation/Bootstrap/Types.hs": "c8bf3c734fa5c7e4c9b1f546774fb7dbfac9cc872fc7194f18cacb53d332132a",
+    "libraries/mlf-foundation/Bootstrap/Std.hs": "0eb137b5935bdf13ed6807c2a4aa96bb558bfce37fd39c9fb08897bb63eedbff",
     "libraries/mlf-foundation/Bootstrap/IntMap.hs": "2bd9dae62e6d44e611e5b4adb216efffe9d275c05d249f2904f2e076d12b23de",
     "libraries/mlf-foundation/Bootstrap/IntSet.hs": "324d2bfd384485c0008c80f6567862d572afeae0da4d839cbbbe8cba7748d1d6",
     "libraries/mlf-foundation/Bootstrap/Map.hs": "d4d9ebfa39a14ae1cbaf48fa9d540eafa7b452aaa3cc73ffc624a34c15417bdb"

@@ -1070,6 +1070,26 @@ module Bootstrap.Separate where {
     } in
     (,) (serial + length ids)
       (mapTerm (\(XName n hint) -> XName (rename n) hint) (\(XTyVar n) -> XTyVar (rename n)) term);
+  -- The same injective renaming applies to the term and its exported names.
+  -- Inferred types may contain fresh quantified identities from datatype
+  -- fields that are absent from the term. Closed export types can instead be
+  -- alpha-normalized without capture. No caller-provided signature enters.
+  -- Keep the inventory's fragment-specific error deferred until linking asks
+  -- for it, after the existing metadata, layout and import-boundary checks.
+  freshCheckedObject :: Int -> Checked.CheckedTerm ->
+    (,,) Int XTerm (Either String ([] ((,) XName XType)));
+  freshCheckedObject serial checked =
+    let {
+      term = Checked.term checked;
+      ids = Set.toList (termIdentities term Set.empty);
+      replacements = M.fromList compareInt (zip ids (range serial ((serial + length ids) - 1)));
+      rename = \n -> M.findWithDefault compareInt (panic "missing object identity") n replacements;
+      name = \(XName n hint) -> XName (rename n) hint;
+      variable = \(XTyVar n) -> XTyVar (rename n)
+    } in
+    (,,) (serial + length ids) (mapTerm name variable term)
+      (mapEither (map (\((,) n ty) -> (,) (name n) (normalType ty)))
+        (Checked.declarationBindings checked));
   splitParameters :: XTerm -> (,) ([] ((,) XName XType)) XTerm;
   splitParameters term =
     case term of {
