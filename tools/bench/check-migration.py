@@ -65,6 +65,28 @@ def check_mode_contract(source):
     ]:
         assert fragment in source, 'check-only source contract changed: ' + fragment
 
+def check_optional_maps(source):
+    # Only absent optional package maps get an empty object. Required maps and
+    # present malformed values remain strict in the actual Json API.
+    for field, count in [('pkg_config', 3), ('pkg_config_versions', 1),
+                         ('pkg_config_headers', 1)]:
+        assert source.count('J.getObject "' + field + '" work') == count, field
+        assert 'J.get "' + field + '" work' not in source, field
+    for field in ['sources', 'flags']:
+        assert 'J.get "' + field + '" work' in source, field
+        assert 'J.getObject "' + field + '" work' not in source, field
+
+check_optional_maps(entry)
+for field in ['pkg_config', 'pkg_config_versions', 'pkg_config_headers']:
+    mutated = entry.replace('J.getObject "' + field + '" work',
+                            'J.get "' + field + '" work', 1)
+    assert mutated != entry
+    try:
+        check_optional_maps(mutated)
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError('optional-map regression unexpectedly accepted: ' + field)
 check_mode_contract(entry)
 # Negative mutation controls establish that the static guard rejects these
 # regressions, not that a compiler has executed or proved the CLI semantics.
