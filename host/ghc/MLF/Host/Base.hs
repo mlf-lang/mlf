@@ -18,6 +18,8 @@ module MLF.Host.Base
 import Prelude hiding (Int, String)
 import qualified Prelude as P
 import qualified Data.Text as T
+import qualified Data.Text.Internal as TI
+import qualified Data.Text.Array as TA
 import qualified Data.Text.Encoding as TE
 import qualified Data.ByteString as BS
 import Data.Char (ord, chr)
@@ -214,14 +216,24 @@ v_compareString :: String -> String -> Int
 v_compareString = strict2 (\(String a _ _) (String b _ _) -> case compare a b of { LT -> -1; EQ -> 0; GT -> 1 })
 v_stringLength :: String -> Int
 v_stringLength (String _ n _) = toInteger n
+-- All String constructors are private and preserve valid UTF-8 plus exact
+-- scalar count. Equality of byte/scalar counts proves ASCII. Bounds precede
+-- unchecked byte indexing; slice copies to avoid retaining the source buffer.
 v_stringCodeAt :: String -> Int -> Int
-v_stringCodeAt text@(String _ size characters) index = text `pseq` index `pseq`
-  let i=bounded "string index out of bounds" (toInteger size-1) index in toInteger (ord (characters Array.! i))
+v_stringCodeAt text@(String t size characters) index = text `pseq` index `pseq`
+  let i=bounded "string index out of bounds" (toInteger size-1) index
+  in case t of
+    TI.Text bytes offset byteLength
+      | byteLength == size -> i `pseq` toInteger (TA.unsafeIndex bytes (offset+i))
+      | otherwise -> toInteger (ord (characters Array.! i))
 v_stringSlice :: String -> Int -> Int -> String
-v_stringSlice text@(String _ size characters) start count = text `pseq` start `pseq` count `pseq`
+v_stringSlice text@(String t size characters) start count = text `pseq` start `pseq` count `pseq`
   let i=bounded "string slice out of bounds" (toInteger size) start
       n=bounded "string slice out of bounds" (toInteger size-start) count
-  in i `pseq` n `pseq` literal [characters Array.! j | j <- [i..i+n-1]]
+  in i `pseq` n `pseq` case t of
+    TI.Text bytes offset byteLength
+      | byteLength == size -> mkSizedText n (T.copy (TI.text bytes (offset+i) n))
+      | otherwise -> literal [characters Array.! j | j <- [i..i+n-1]]
 v_stringFromCode :: Int -> String
 v_stringFromCode n = if n<0 || n>0x10ffff || (n>=0xd800 && n<=0xdfff) then failure "invalid Unicode scalar" else literal [chr (fromInteger n)]
 v_ifThenElse :: Bool -> a -> a -> a
