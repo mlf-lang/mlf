@@ -4,7 +4,7 @@
 spaces : Int -> String
 spaces n = if n == 0 then "" else " " ++ spaces (n - 1)
 
-digits : Int -> Int -> Int -> Int -> Int -> Int -> String -> IO Unit
+digits : Int -> Int -> Int -> Int -> Int -> Int -> String -> IO ()
 digits wanted produced k num acc den row =
   if produced == wanted then
     if produced % 10 == 0 then return ()

@@ -1,21 +1,96 @@
 # Native C/MLF benchmark comparison
 
-The runner is written in MLF and builds with the native package manager. It
+The runner is written in MLF and builds with the shared package manager. It
 compares a candidate compiler, a baseline compiler and C on all ten pinned
 Benchmarks Game workloads. It does not run the Haskell or Rust baselines.
 The regex-redux C baseline requires PCRE2, discoverable as `libpcre2-8` through
 pkg-config. The MLF program imports the portable `Bootstrap.Regex` module;
 its source dependencies participate in the integrity checks.
 
+## Current shared compiler route (including macOS)
+
+The existing runner and positional CLI below are unchanged. Build the current
+shared compiler and package manager with GHC 9.14.1 (Python 3 is used only for
+this build helper), or supply an already qualified shared-native pair. A legacy
+release seed is not a substitute for the current shared sources.
+
+On macOS, install Clang/LLVM, GMP, pkg-config and BDWGC; for example:
+
 ```sh
-export MLF_GC_PREFIX=/path/to/bdwgc-install
-./mlfpkg --manifest tools/bench/mlf-package.json \
-  --compiler /path/to/native/emlf --runtime "$PWD/runtime/mlf_runtime.c" \
-  --build-dir "$PWD/.mlf-build/native-bench-driver" --timeout 21600 build --target bench
-.mlf-build/native-bench-driver/bin/bench \
-  /path/to/candidate/emlf /path/to/baseline/emlf \
-  "$PWD/.mlf-build/native-bench-results" 7 /absolute/path/to/clang 3 2
+brew install llvm gmp pkg-config bdw-gc
+export CLANG="$(brew --prefix llvm)/bin/clang"
+export MLF_GC_PREFIX="$(brew --prefix bdw-gc)"
+export PKG_CONFIG_PATH="$(brew --prefix gmp)/lib/pkgconfig:$(brew --prefix bdw-gc)/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 ```
+
+All ten workloads additionally require **PCRE2 10.49**, not an arbitrary Homebrew
+version. Install that exact official release separately if necessary and prepend
+its `lib/pkgconfig` directory to `PKG_CONFIG_PATH`. The runner rejects a version
+mismatch rather than skipping regex-redux. Check before a long run:
+
+```sh
+pkg-config --modversion gmp bdw-gc libpcre2-8
+# The final line must be 10.49.
+```
+
+From the repository root (use absolute paths for GHC and Clang):
+
+```sh
+python3 tools/shared/build.py --ghc /absolute/path/to/ghc-9.14.1 \
+  --cc "$CLANG" --optimization 2 --build-dir "$PWD/.mlf-build/shared-ghc-o2"
+export MLF_PACKAGE_MANAGER="$PWD/.mlf-build/shared-ghc-o2/bin/mlfpkg"
+export COMPILER="$PWD/.mlf-build/shared-ghc-o2/bin/emlf"
+# The package scheduler helper is not produced by tools/shared/build.py.
+"$CLANG" -O2 -std=c11 -Wall -Wextra -Werror runtime/mlf_build_runner.c \
+  -o "$PWD/.mlf-build/shared-ghc-o2/bin/mlf-build-runner"
+export MLF_BUILD_RUNNER="$PWD/.mlf-build/shared-ghc-o2/bin/mlf-build-runner"
+"$MLF_BUILD_RUNNER" --protocol-version # must print 1
+./mlfpkg --manifest tools/bench/mlf-package.json \
+  --compiler "$COMPILER" --clang "$CLANG" --runtime "$PWD/runtime/mlf_runtime.c" \
+  --build-dir "$PWD/.mlf-build/native-bench-driver" --timeout 21600 build --target bench
+# Use a second compatible compiler for a real before/after comparison.
+# Using the same compiler twice is a runnable C comparison, not an A/B speedup.
+BASELINE="$COMPILER"
+.mlf-build/native-bench-driver/bin/bench \
+  "$COMPILER" "$BASELINE" "$PWD/.mlf-build/native-bench-results" \
+  3 "$CLANG" 3 2
+```
+
+For a qualified native pair, set `MLF_PACKAGE_MANAGER`, `COMPILER` and
+`MLF_BUILD_RUNNER` to that pair's tools and keep the same package-build and bench
+commands. The runner itself is a compiled native MLF executable in either case;
+when a GHC-hosted compiler is selected, its frontend time is included honestly.
+No Rust, Haskell baseline packages or historical `cabal bench` entry are needed.
+
+The migrated MLF workloads use current unit syntax; algorithms, C sources,
+flags, inputs and independent oracles are unchanged. Regex remains the original
+MLF regex library versus the official PCRE2 C implementation: this is a
+cross-implementation benchmark, not a same-algorithm compiler-isolation claim.
+The experimental installed-Prelude consumer is **not** selected by these commands
+and does not support the imported-module regex workload.
+
+## Correctness-only migration check
+
+After building the same runner above, use a separate fresh output directory:
+
+```sh
+.mlf-build/native-bench-driver/bin/bench \
+  "$COMPILER" "$BASELINE" "$PWD/.mlf-build/native-bench-checks" \
+  3 "$CLANG" --check-only
+```
+
+This mode always checks all ten workloads. `3` is a required odd sample-count
+placeholder for CLI compatibility; no samples are measured (`runs: 0`). Do not
+append limits or workload names to `--check-only`. Each C/baseline/candidate
+executable is freshly built and checked on the existing manifest correctness
+inputs and pinned fixtures. It does not execute default-size performance loops.
+Success is `status: "correctness-passed"`, `mode: "check-only"`,
+`performance_checked: false`, with an empty `performance_checks` array. It is
+not a compilation/runtime target PASS. Missing PCRE2 or any failed source,
+fixture, oracle or integrity check still stops the complete ten-workload gate.
+
+Static migration checks (no compilation or benchmark execution) are available as
+`python3 tools/bench/check-migration.py`; see [validation protocol](MIGRATION-VALIDATION.md).
 
 Run from the repository root with a fresh output directory and no other builds
 or measured jobs running. An odd sample count of at least three is required.
@@ -58,7 +133,8 @@ executable, LLVM module and object.
 
 The existing native C process and binary-file transports under `tests/native/` supply
 clocks, process isolation and raw bytes. Assertions and orchestration run in
-MLF. GHC, Python and Cabal are not used.
+MLF. The measured orchestration does not invoke Python or Cabal; GHC is only
+needed to build a GHC-hosted compiler/manager when that route is selected.
 
 ## Optional native backend configuration
 

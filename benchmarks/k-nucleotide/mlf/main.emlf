@@ -8,7 +8,7 @@ minimum a b = if a < b then a else b
 
 -- Read one line at a time. Each record starts small and doubles as needed;
 -- no file-size query or whole-input allocation is used.
-copy : ByteArray -> ByteArray -> Int -> Int -> Int -> IO Unit
+copy : ByteArray -> ByteArray -> Int -> Int -> Int -> IO ()
 copy source dest n offset i =
   if i < n then do
     b <- readByteArray source i
@@ -53,7 +53,7 @@ code 103 = 2
 code _ = 3
 
 -- Decode each input base once; growth copies preserve these numeric bytes.
-decodeLine : ByteArray -> ByteArray -> Int -> Int -> Int -> IO Unit
+decodeLine : ByteArray -> ByteArray -> Int -> Int -> Int -> IO ()
 decodeLine line bytes count offset i =
   if i < count then do
     b <- readByteArray line i
@@ -61,7 +61,7 @@ decodeLine line bytes count offset i =
     decodeLine line bytes count offset (i + 1)
   else return ()
 
-skip : Unit -> IO Unit
+skip : () -> IO ()
 skip unused = do
   line <- getByteLine
   n <- lengthByteArray line
@@ -110,7 +110,7 @@ power4 n value = if n == 0 then return value else power4 (n - 1) (value * 4)
 
 -- Maintain a base-4 sliding window, masking off its outgoing digit before
 -- appending the next. Every window updates the complete frequency table.
-countFrame : ByteArray -> IntTable -> Int -> Int -> Int -> Int -> Int -> IO Unit
+countFrame : ByteArray -> IntTable -> Int -> Int -> Int -> Int -> Int -> IO ()
 countFrame bytes table length k mask start key = do
   old <- readIntTable table key
   writeIntTable table key (old + 1)
@@ -146,7 +146,7 @@ best table limit i winner maximum =
     if maximum < n then best table limit (i + 1) i n else best table limit (i + 1) winner maximum
   else return winner
 
-frequencies : IntTable -> Int -> Int -> Int -> Int -> IO Unit
+frequencies : IntTable -> Int -> Int -> Int -> Int -> IO ()
 frequencies table length k limit remaining =
   if remaining == 0 then putStrLn ""
   else do
@@ -159,7 +159,7 @@ frequencies table length k limit remaining =
       writeIntTable table key 0
       frequencies table length k limit (remaining - 1)
 
-query : ByteArray -> Int -> String -> IO Unit
+query : ByteArray -> Int -> String -> IO ()
 query bytes length pattern = do
   word <- byteArrayFromString pattern
   k <- lengthByteArray word

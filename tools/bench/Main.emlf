@@ -9,7 +9,7 @@ import qualified Package.Benchmark as B
 import qualified Package.Build as Build
 import qualified Package.Verification as V
 
-data Context = Context String String String String String (List String) (List String) J.Json Int
+data Context = Context String String String String String ([] String) ([] String) J.Json Int
 out (Context d _ _ _ _ _ _ _ _) = d
 candidate (Context _ c _ _ _ _ _ _ _) = c
 baseline (Context _ _ b _ _ _ _ _ _) = b
@@ -25,16 +25,16 @@ right result = case result of { Left message -> O.fatal message; Right a -> retu
 object = J.Object
 number x = J.Number (formatDouble 9 x)
 row entries = J.Object entries
-pair = Pair
-one a = Cons a Nil
-two a b = Cons a (Cons b Nil)
+pair = (,)
+one a = (:) a []
+two a b = (:) a ((:) b [])
 median samples = let sorted = S.sortBy (\a b -> if ltDouble a b then -1 else if ltDouble b a then 1 else 0) samples in
  let n = S.length sorted in if remInt n 2 == 1 then S.index sorted (quotInt n 2) else divDouble (addDouble (S.index sorted (quotInt n 2 - 1)) (S.index sorted (quotInt n 2))) 2.0
 summary samples =
  let values = S.map (\s -> V.double 0.0 (J.get "wall_seconds" s)) samples in
  let mid = median values in
  let sorted = S.sortBy (\a b -> if ltDouble a b then -1 else if ltDouble b a then 1 else 0) values in
- row (Cons (pair "median_wall_seconds" (number mid)) (Cons (pair "min_wall_seconds" (number (S.head sorted))) (Cons (pair "max_wall_seconds" (number (S.last sorted))) (Cons (pair "median_absolute_deviation_seconds" (number (median (S.map (\x -> if ltDouble x mid then subDouble mid x else subDouble x mid) values)))) (one (pair "samples" (J.Array samples)))))))
+ row ((:) (pair "median_wall_seconds" (number mid)) ((:) (pair "min_wall_seconds" (number (S.head sorted))) ((:) (pair "max_wall_seconds" (number (S.last sorted))) ((:) (pair "median_absolute_deviation_seconds" (number (median (S.map (\x -> if ltDouble x mid then subDouble mid x else subDouble x mid) values)))) (one (pair "samples" (J.Array samples)))))))
 measure directory argv input = do
  O.mkdir directory
  result <- B.measure directory argv input 1800
@@ -46,10 +46,10 @@ build c work language directory = do
  O.mkdir directory
  if eqString language "c" then do
   source <- canonicalPath (V.text "c" (J.get "sources" work))
-  let libraries = S.append (if S.elem eqString "c" (J.getStrings "gmp_languages" work) then flags c else Nil) (packageFlags c work "c")
-  let argv = S.concat (Cons (one (clang c)) (Cons (J.getStrings "c" (J.get "flags" work)) (Cons (one source) (Cons libraries (Cons (O.words "-lm -o") (Cons (one (directory ++ "/program")) Nil))))))
+  let libraries = S.append (if S.elem eqString "c" (J.getStrings "gmp_languages" work) then flags c else []) (packageFlags c work "c")
+  let argv = S.concat ((:) (one (clang c)) ((:) (J.getStrings "c" (J.get "flags" work)) ((:) (one source) ((:) libraries ((:) (O.words "-lm -o") ((:) (one (directory ++ "/program")) []))))))
   sample <- measure directory argv ""
-  return (Pair (directory ++ "/program") sample)
+  return ((,) (directory ++ "/program") sample)
  else do
   source <- canonicalPath (V.text "mlf" (J.get "sources" work))
   runtime <- canonicalPath "runtime/mlf_runtime.c"
@@ -63,12 +63,12 @@ build c work language directory = do
 readBytes scratch path = do
  tool <- getEnv "MLF_TEST_BINARY_FILES"
  O.run "" (S.append (O.words "/bin/mkdir -p") (one scratch))
- code <- O.exec "" (Cons tool (Cons "read" (one path))) "" (scratch ++ "/hex") (scratch ++ "/hex.err") 60
+ code <- O.exec "" ((:) tool ((:) "read" (one path))) "" (scratch ++ "/hex") (scratch ++ "/hex.err") 60
  O.require (code == 0) "binary read failed"
  text <- readFile (scratch ++ "/hex")
  return (hexAt text 0)
-hexAt : String -> Int -> List Int
-hexAt text i = if i >= stringLength text then Nil else Cons (digit (stringCodeAt text i) * 16 + digit (stringCodeAt text (i + 1))) (hexAt text (i + 2))
+hexAt : String -> Int -> [] Int
+hexAt text i = if i >= stringLength text then [] else (:) (digit (stringCodeAt text i) * 16 + digit (stringCodeAt text (i + 1))) (hexAt text (i + 2))
 digit c = if c >= 48 && c <= 57 then c - 48 else if c >= 97 && c <= 102 then c - 87 else panic "invalid hex transport"
 append = S.append
 
@@ -93,7 +93,7 @@ validate c work language binary directory = do
   if size == V.int "fixture_input" work then do
    fixture <- readBytes scratch (V.text "fixture" work)
    O.require (B.validateOutput (V.text "name" work) size fixture) "pinned fixture disagrees with oracle"
-  else return Unit) (S.map (V.integer 0) (V.array "check_inputs" work))
+  else return ()) (S.map (V.integer 0) (V.array "check_inputs" work))
 
 compareOutput work expected actual = do
  if S.elem eqString (V.text "name" work) (O.words "n-body spectral-norm") then do
@@ -102,7 +102,7 @@ compareOutput work expected actual = do
   let first = S.map (\t -> V.number (J.Number t)) (O.words a)
   let second = S.map (\t -> V.number (J.Number t)) (O.words b)
   O.require (S.length first == (if eqString (V.text "name" work) "n-body" then 2 else 1) && S.length first == S.length second && S.all S.isJust first && S.all S.isJust second &&
-   S.all (\(Pair x y) -> V.finite x && V.finite y && S.not (ltDouble 0.00000001 (if ltDouble x y then subDouble y x else subDouble x y))) (S.zip (S.catMaybes first) (S.catMaybes second))) "numeric runtime output differs from validated C"
+   S.all (\((,) x y) -> V.finite x && V.finite y && S.not (ltDouble 0.00000001 (if ltDouble x y then subDouble y x else subDouble x y))) (S.zip (S.catMaybes first) (S.catMaybes second))) "numeric runtime output differs from validated C"
  else if S.elem eqString (V.text "name" work) (O.words "binary-trees pidigits fannkuch-redux k-nucleotide") then do
   a <- readFile expected
   b <- readFile actual
@@ -112,23 +112,42 @@ compareOutput work expected actual = do
   b <- fileDigest actual
   O.require (eqString a b) "runtime bytes differ from validated C"
 
+-- Both modes share exactly the existing fresh three-language correctness path.
+correctness c work directory = do
+ -- Warm-up binaries are correctness checked on every prescribed small input.
+ builds <- S.mapM (\language -> do
+  (,) binary sample <- build c work language (directory ++ "/warmup/" ++ language)
+  validate c work language binary (directory ++ "/checks/" ++ language)
+  return ((,) language binary)) (O.words "c baseline mlf")
+ return builds
+
+checkWorkload c work = do
+ let name = V.text "name" work
+ let directory = out c ++ "/" ++ name
+ O.mkdir directory
+ putStrLn ("Check " ++ name)
+ builds <- correctness c work directory
+ identities <- S.mapM (\((,) language binary) -> do
+  hash <- fileDigest binary
+  artifacts <- if eqString language "c" then return J.empty else do
+   entries <- S.mapM (\file -> do { digest <- fileDigest (directory ++ "/warmup/" ++ language ++ "/" ++ file); return ((,) file (J.str digest)) }) (O.words "program.ll runtime.o program.o")
+   return (row entries)
+  return ((,) language (row (two (pair "binary_sha256" (J.str hash)) (pair "artifacts_sha256" artifacts))))) builds
+ return (row ((:) (pair "benchmark" (J.str name)) ((:) (pair "status" (J.str "correctness-passed")) ((:) (pair "check_inputs" (J.get "check_inputs" work)) (one (pair "binaries" (row identities)))))))
+
 workload c work = do
  let name = V.text "name" work
  let directory = out c ++ "/" ++ name
  O.mkdir directory
  putStrLn ("Benchmark " ++ name)
- -- Warm-up binaries are correctness checked on every prescribed small input.
- builds <- S.mapM (\language -> do
-  Pair binary sample <- build c work language (directory ++ "/warmup/" ++ language)
-  validate c work language binary (directory ++ "/checks/" ++ language)
-  return (Pair language binary)) (O.words "c baseline mlf")
+ builds <- correctness c work directory
  stdin <- input c work directory (V.int "default_input" work)
  _ <- execute c work "c" (S.snd (S.head builds)) (directory ++ "/reference") (V.int "default_input" work) stdin
  samples <- S.mapM (\index -> do
   let order = if remInt index 2 == 0 then O.words "c baseline mlf" else O.words "mlf baseline c"
   entries <- S.mapM (\language -> do
    let scratch = directory ++ "/sample-" ++ showInt index ++ "/" ++ language
-   Pair binary compiled <- build c work language (scratch ++ "/build")
+   (,) binary compiled <- build c work language (scratch ++ "/build")
    -- Fresh process timing should not include the OS's one-time verification
    -- of a newly linked executable. Warm this exact file, then check it before
    -- measuring a second fresh process, as in the established benchmark suite.
@@ -138,29 +157,30 @@ workload c work = do
    compareOutput work (directory ++ "/reference/stdout") (scratch ++ "/run/stdout")
    hash <- fileDigest binary
    artifacts <- if eqString language "c" then return J.empty else do
-    entries <- S.mapM (\name -> do { digest <- fileDigest (scratch ++ "/build/" ++ name); return (Pair name (J.str digest)) }) (O.words "program.ll runtime.o program.o")
+    entries <- S.mapM (\name -> do { digest <- fileDigest (scratch ++ "/build/" ++ name); return ((,) name (J.str digest)) }) (O.words "program.ll runtime.o program.o")
     return (row entries)
-   let record = row (Cons (pair "compilation" compiled) (Cons (pair "runtime" runtime) (Cons (pair "binary_sha256" (J.str hash)) (Cons (pair "artifacts_sha256" artifacts) Nil))))
-   return (Pair language record)) order
+   let record = row ((:) (pair "compilation" compiled) ((:) (pair "runtime" runtime) ((:) (pair "binary_sha256" (J.str hash)) ((:) (pair "artifacts_sha256" artifacts) []))))
+   return ((,) language record)) order
   return (row entries)) (S.range 1 (runs c))
- let languages = row (S.map (\language -> Pair language (row (S.map (\dimension -> Pair dimension (summary (S.map (\sample -> J.get dimension (J.get language sample)) samples))) (O.words "compilation runtime")))) (O.words "c baseline mlf"))
+ let languages = row (S.map (\language -> (,) language (row (S.map (\dimension -> (,) dimension (summary (S.map (\sample -> J.get dimension (J.get language sample)) samples))) (O.words "compilation runtime")))) (O.words "c baseline mlf"))
  hash <- fileDigest stdin
- let binaryRecord sample language = let entry = J.get language sample in Pair language (row (two (pair "binary_sha256" (J.get "binary_sha256" entry)) (pair "artifacts_sha256" (J.get "artifacts_sha256" entry))))
+ let binaryRecord sample language = let entry = J.get language sample in (,) language (row (two (pair "binary_sha256" (J.get "binary_sha256" entry)) (pair "artifacts_sha256" (J.get "artifacts_sha256" entry))))
  let binaries = S.map (\sample -> row (S.map (binaryRecord sample) (O.words "c baseline mlf"))) samples
- return (J.set "binary_samples" (J.Array binaries) (row (Cons (pair "benchmark" (J.str name)) (Cons (pair "input" (J.num (V.int "default_input" work))) (Cons (pair "stdin_sha256" (J.str hash)) (one (pair "languages" languages)))))))
+ return (J.set "binary_samples" (J.Array binaries) (row ((:) (pair "benchmark" (J.str name)) ((:) (pair "input" (J.num (V.int "default_input" work))) ((:) (pair "stdin_sha256" (J.str hash)) (one (pair "languages" languages)))))))
 
 main = do
  args <- O.allArguments
  case args of
-  Cons compiler (Cons before (Cons output (Cons count (Cons cc options)))) -> do
-   Pair limits selected <- case options of
-    Nil -> return (Pair (row (two (pair "compilation" (J.num 5)) (pair "runtime" (J.num 2)))) Nil)
-    Cons compileLimit (Cons runtimeLimit names) -> return (Pair (row (two (pair "compilation" (J.Number compileLimit)) (pair "runtime" (J.Number runtimeLimit)))) names)
+  (:) compiler ((:) before ((:) output ((:) count ((:) cc options)))) -> do
+   (,,) checkOnly limits selected <- case options of
+    [] -> return ((,,) false (row (two (pair "compilation" (J.num 5)) (pair "runtime" (J.num 2)))) [])
+    (:) option [] -> if eqString option "--check-only" then return ((,,) true (row (two (pair "compilation" (J.num 5)) (pair "runtime" (J.num 2)))) []) else O.fatal "supply both compilation and runtime limits, or only --check-only"
+    (:) compileLimit ((:) runtimeLimit names) -> return ((,,) false (row (two (pair "compilation" (J.Number compileLimit)) (pair "runtime" (J.Number runtimeLimit)))) names)
     _ -> O.fatal "supply both compilation and runtime limits"
    O.require (B.validateLimits limits) "limits must be finite positive numbers"
    O.require (S.all (\name -> S.elem eqString name V.workloads) selected && S.length selected == S.length (S.nubBy eqString selected)) "invalid workload selection"
    present <- directoryExists output
-   previous <- if present then O.entries output else return Nil
+   previous <- if present then O.entries output else return []
    O.require (S.null previous) "benchmark output directory must be fresh"
    O.mkdir output
    directory <- canonicalPath output
@@ -174,11 +194,11 @@ main = do
    let report = directory ++ "/results.json"
    J.write report (row (one (pair "status" (J.str "running"))))
    manifest <- J.read "benchmarks/manifest.json"
-   S.mapM_ (\(Pair path expected) -> do
+   S.mapM_ (\((,) path expected) -> do
     hash <- fileDigest path
     O.require (J.equal (J.str hash) expected) ("pinned source changed: " ++ path)) (J.items (J.get "pinned_sha256" manifest))
-   O.run "" (Cons clang (S.append (O.words "-O2 -std=c11 tests/native/host_support.c -o") (one (directory ++ "/host-support"))))
-   O.run "" (Cons clang (S.append (O.words "-O2 -std=c11 tests/native/binary_files.c -o") (one (directory ++ "/binary-files"))))
+   O.run "" ((:) clang (S.append (O.words "-O2 -std=c11 tests/native/host_support.c -o") (one (directory ++ "/host-support"))))
+   O.run "" ((:) clang (S.append (O.words "-O2 -std=c11 tests/native/binary_files.c -o") (one (directory ++ "/binary-files"))))
    setEnv "MLF_TEST_HOST_SUPPORT" (directory ++ "/host-support")
    setEnv "MLF_TEST_BINARY_FILES" (directory ++ "/binary-files")
    code <- O.exec "" (O.words "pkg-config --cflags --libs gmp") "" (directory ++ "/gmp.flags") (directory ++ "/gmp.err") 60
@@ -188,28 +208,30 @@ main = do
    gcIdentity <- Build.flagIdentity gc
    J.write (directory ++ "/collector.json") gcIdentity
    let workloads = S.filter (\work -> S.null selected || S.elem eqString (V.text "name" work) selected) (V.array "workloads" manifest)
+   O.require (S.not checkOnly || S.eqList eqString (S.sortBy compareString (S.map (V.text "name") workloads)) (S.sortBy compareString V.workloads)) "check-only requires the complete canonical workload inventory"
    let packageNames = S.nubBy eqString (S.concatMap (\work -> S.concatMap (\language -> J.getStrings language (J.get "pkg_config" work)) (O.words "c mlf")) workloads)
    packageEntries <- S.mapM (\name -> do
     let versions = S.nubBy eqString (S.map (\work -> V.text name (J.get "pkg_config_versions" work)) (S.filter (\work -> S.any (\language -> S.elem eqString name (J.getStrings language (J.get "pkg_config" work))) (O.words "c mlf")) workloads))
     O.require (S.length versions == 1 && stringLength (S.head versions) > 0) ("missing or conflicting benchmark library pin: " ++ name)
     let headers = S.nubBy eqString (S.concatMap (\work -> J.getStrings name (J.get "pkg_config_headers" work)) workloads)
     identity <- B.benchmarkPackage (directory ++ "/native-dependencies/" ++ name) name (S.head versions) headers
-    return (Pair name identity)) packageNames
+    return ((,) name identity)) packageNames
    let nativePackages = row packageEntries
    J.write (directory ++ "/native-dependencies.json") nativePackages
    let c = Context directory candidate baseline clang backend (Build.flags gmp) gc nativePackages n
-   O.run "" (Cons clang (S.append (O.words "-O3 benchmarks/fasta/c/upstream.c -lm -o") (one (directory ++ "/fasta-generator"))))
-   let files = S.append (Cons candidate (Cons baseline (Cons clang (Cons "runtime/mlf_runtime.c" (Cons "runtime/mlf_runtime.h" (Cons "runtime/khash.h" (Cons "benchmarks/manifest.json" (Cons "tools/bench/Main.emlf" Nil)))))))) (S.concatMap (\w -> S.map (\l -> V.text l (J.get "sources" w)) (O.words "c mlf")) (V.array "workloads" manifest))
+   O.run "" ((:) clang (S.append (O.words "-O3 benchmarks/fasta/c/upstream.c -lm -o") (one (directory ++ "/fasta-generator"))))
+   let files = S.append ((:) candidate ((:) baseline ((:) clang ((:) "runtime/mlf_runtime.c" ((:) "runtime/mlf_runtime.h" ((:) "runtime/khash.h" ((:) "benchmarks/manifest.json" ((:) "tools/bench/Main.emlf" [])))))))) (S.concatMap (\w -> S.map (\l -> V.text l (J.get "sources" w)) (O.words "c mlf")) (V.array "workloads" manifest))
    runner <- getExecutablePath
-   let dependencies = S.append (S.append (two runner backend) (S.map S.fst (S.append (J.items (J.get "headers" gcIdentity)) (J.items (J.get "libraries" gcIdentity))))) (O.words "runtime/mlf_system.h tests/native/host_support.c tests/native/binary_files.c libraries/mlf-developer-tools/Package/Benchmark.emlf libraries/mlf-package-core/Package/Build.emlf libraries/mlf-developer-tools/Package/Verification.emlf libraries/mlf-package-core/Package/Json.emlf libraries/mlf-package-core/Package/OS.emlf tools/bench/mlf-package.json")
+   let dependencies = S.append (S.append (two runner backend) (S.map S.fst (S.append (J.items (J.get "headers" gcIdentity)) (J.items (J.get "libraries" gcIdentity))))) (O.words "runtime/mlf_system.h tests/native/host_support.c tests/native/binary_files.c libraries/mlf-developer-tools/Package/Benchmark.hs libraries/mlf-package-core/Package/Build.hs libraries/mlf-developer-tools/Package/Verification.hs libraries/mlf-package-core/Package/Json.hs libraries/mlf-package-core/Package/OS.hs tools/bench/mlf-package.json")
    let extraFiles = S.append (S.concatMap (\entry -> B.benchmarkPackageFiles (S.snd entry)) packageEntries) (S.concatMap (J.getStrings "mlf_dependencies") workloads)
-   fingerprints <- S.mapM (\path -> do { hash <- fileDigest path; return (Pair path hash) }) (S.nubBy eqString (S.append extraFiles (S.append files dependencies)))
-   rows <- S.mapM (workload c) workloads
+   fingerprints <- S.mapM (\path -> do { hash <- fileDigest path; return ((,) path hash) }) (S.nubBy eqString (S.append extraFiles (S.append files dependencies)))
+   rows <- S.mapM (if checkOnly then checkWorkload c else workload c) workloads
    integrity <- B.checkIntegrity fingerprints
    _ <- right integrity
-   let checks = B.performanceChecks rows limits
+   let checks = if checkOnly then [] else B.performanceChecks rows limits
    let passed = S.all (J.getBool "passed" false) checks
-   J.write report (J.set "native_dependencies" nativePackages (J.set "limits" limits (J.set "workload_selection" (J.stringArray (S.map (V.text "name") workloads)) (row (Cons (pair "status" (J.str (if passed then "passed" else "failed"))) (Cons (pair "implementation" (J.str "MLF")) (Cons (pair "runs" (J.num n)) (Cons (pair "fingerprints" (row (S.map (\(Pair path hash) -> Pair path (J.str hash)) fingerprints))) (Cons (pair "benchmarks" (J.Array rows)) (one (pair "performance_checks" (J.Array checks))))))))))))
+   let result = (J.set "native_dependencies" nativePackages (J.set "limits" limits (J.set "workload_selection" (J.stringArray (S.map (V.text "name") workloads)) (row ((:) (pair "status" (J.str (if checkOnly then "correctness-passed" else if passed then "passed" else "failed"))) ((:) (pair "implementation" (J.str "MLF")) ((:) (pair "runs" (J.num (if checkOnly then 0 else n))) ((:) (pair "fingerprints" (row (S.map (\((,) path hash) -> (,) path (J.str hash)) fingerprints))) ((:) (pair "benchmarks" (J.Array rows)) (one (pair "performance_checks" (J.Array checks))))))))))))
+   J.write report (if checkOnly then J.set "mode" (J.str "check-only") (J.set "performance_checked" (J.Boolean false) result) else result)
    O.require passed "performance limits exceeded; see results.json"
-   putStrLn ("All " ++ showInt (S.length rows) ++ " selected workloads pass the requested compilation and runtime limits.")
-  _ -> O.fatal "bench COMPILER BASELINE OUTPUT RUNS CLANG [MAX_COMPILE MAX_RUNTIME [WORKLOAD...]] (run from repository root)"
+   putStrLn (if checkOnly then "All " ++ showInt (S.length rows) ++ " workloads passed correctness checks; performance was not measured." else "All " ++ showInt (S.length rows) ++ " selected workloads pass the requested compilation and runtime limits.")
+  _ -> O.fatal "bench COMPILER BASELINE OUTPUT RUNS CLANG [MAX_COMPILE MAX_RUNTIME [WORKLOAD...] | --check-only] (run from repository root)"
