@@ -28,6 +28,7 @@ python3 tools/shared/test_framework_policy.py
 python3 tools/shared/test_source_field_layout_controls.py
 python3 tools/shared/test_parameter_field_graph.py --self-test
 python3 tools/shared/test_resource_watchdog.py
+python3 tools/shared/test_resource_watchdog_output.py
 python3 tools/shared/test_guest_framework_controls.py
 python3 tools/shared/test_guest_state_laws_controls.py
 node tools/release/test-release-tag.mjs
