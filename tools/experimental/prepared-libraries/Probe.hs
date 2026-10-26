@@ -85,17 +85,37 @@ module Main where {
   -- Qualification-only corruptions of compiler-owned data. This probe is not
   -- an external registry loader and the production adapter exposes no variant.
   staleWitness value = case value of {
-    SourceModule path name exports imports ds cs instances values body syntax ->
-      SourceModule (path ++ "-stale-witness") name exports imports ds cs instances values body syntax
+    SourceModule path name exports imports ds cs instances values body syntax -> do {
+      -- Change a real builtin implementation while retaining its path, name,
+      -- declaration shape, schema and all other source witnesses. Checking for
+      -- one known original body keeps this negative control from becoming a
+      -- no-op if the canonical facade changes.
+      case filter (\((,,) binding _ _) -> eqString binding "implementationHost") values of {
+        [((,,) _ Nothing (SStringLit original))] ->
+          if eqString original "native-MLF" then Right ()
+          else Left "unexpected implementationHost body before corruption control";
+        _ -> Left "missing canonical implementationHost before corruption control"
+      };
+      let { changed = map (\binding -> case binding of {
+        (,,) label annotation implementation ->
+          if eqString label "implementationHost"
+          then (,,) label annotation (SStringLit "stale-native-MLF")
+          else binding
+      }) values };
+      Right (SourceModule path name exports imports ds cs instances changed body syntax)
+    }
   };
   registry request = let { variant = J.getText "registry_variant" "current" request } in
     if eqString variant "current" then Right Data.libraries else
     traverseEither (\raw -> case raw of {
       Prepared.RawLibrary identity schema prelude sources objects witnesses ->
         if eqString variant "stale-builtin-witness" then case witnesses of {
-          [] -> Left "registry lacks builtin witnesses before corruption control";
-          (:) witness rest -> Right (Prepared.RawLibrary identity schema prelude sources objects
-            ((:) (staleWitness witness) rest))
+          [preludeWitness, primitiveWitness] -> do {
+            changed <- staleWitness primitiveWitness;
+            Right (Prepared.RawLibrary identity schema prelude sources objects
+              [preludeWitness, changed])
+          };
+          _ -> Left "registry lacks canonical builtin witnesses before corruption control"
         } else if eqString variant "stale-schema" then Right
           (Prepared.RawLibrary identity (schema ++ "-stale") prelude sources objects witnesses)
         else if eqString variant "invalid-source-hash" then case sources of {

@@ -1,4 +1,5 @@
 module Fixed.Functions (identity, choose, higher, bounded, higherKind) where
+import Prelude
 identity : forall a. a -> a
 identity x = x
 choose : forall a b. a -> b -> a

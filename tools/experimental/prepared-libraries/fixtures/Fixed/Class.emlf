@@ -1,4 +1,5 @@
 module Fixed.Class (Render(..), exposePrivate) where
+import Prelude
 class Render a where
   render : a -> String
 class Private a where

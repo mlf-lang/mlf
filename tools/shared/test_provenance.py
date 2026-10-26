@@ -28,6 +28,9 @@ def load(name):
 
 
 build, direct = load('build'), load('test_direct')
+builtin_controls = load('test_builtin_prelude_verification')
+# Keep these finite failure controls on the existing release metadata gate.
+BuiltinPreludeVerification = builtin_controls.BuiltinPreludeVerification
 
 
 class FrontendExecutionBudget(unittest.TestCase):
@@ -72,7 +75,7 @@ class ManifestParity(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix='mlf-parity-control-')
         self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve()
         manifest = json.loads((ROOT / 'shared-sources.json').read_text())
         paths = {x['path'] for x in manifest['modules']} | set(manifest['host_only'])
         paths |= {'shared-sources.json', 'mlf-shared.cabal', 'mlf-package.json',
@@ -94,22 +97,36 @@ class ManifestParity(unittest.TestCase):
         mutation(data)
         path.write_text(json.dumps(data))
 
-    def test_closed_corpus_has_matching_111_modules_12_executables(self):
+    def test_closed_corpus_has_matching_121_modules_13_executables(self):
         manifest = self.check()
-        self.assertEqual(len(manifest['modules']), 111)
+        self.assertEqual(len(manifest['modules']), 121)
         modules = {entry['module']: entry for entry in manifest['modules']}
-        self.assertEqual(len(modules), 111)
+        self.assertEqual(len(modules), 121)
         for name, path, role in (
             ('Bootstrap.ClassDemand', 'libraries/mlf-inference/Bootstrap/ClassDemand.hs', 'implementation'),
             ('MLF.Tests.ClassDemand', 'tests/shared/MLF/Tests/ClassDemand.hs', 'direct-test'),
             ('Bootstrap.Standalone', 'libraries/mlf-frontend/Bootstrap/Standalone.hs', 'implementation'),
             ('Bootstrap.EvidenceBoundary', 'libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs', 'implementation'),
             ('Bootstrap.SourceInference', 'libraries/mlf-crates/Bootstrap/SourceInference.hs', 'implementation'),
+            ('Bootstrap.BuiltinPreludeContext', 'libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs', 'implementation'),
+            ('Bootstrap.BuiltinPreludeLiteral', 'libraries/mlf-crates/Bootstrap/BuiltinPreludeLiteral.hs', 'implementation'),
+            ('Bootstrap.ImportParameters', 'libraries/mlf-crates/Bootstrap/ImportParameters.hs', 'implementation'),
+            ('Bootstrap.ImportedRoot', 'libraries/mlf-crates/Bootstrap/ImportedRoot.hs', 'implementation'),
+            ('Bootstrap.PreparedLibraries', 'libraries/mlf-crates/Bootstrap/PreparedLibraries.hs', 'implementation'),
+            ('Bootstrap.PreparedLibraryLiteral', 'libraries/mlf-crates/Bootstrap/PreparedLibraryLiteral.hs', 'implementation'),
+            ('MLF.BuiltinPreludeData', 'bootstrap/MLF/BuiltinPreludeData.hs', 'implementation'),
+            ('MLF.Entry.BuiltinPrelude', 'bootstrap/MLF/Entry/BuiltinPrelude.hs', 'implementation'),
+            ('MLF.PreparedCompiler', 'bootstrap/MLF/PreparedCompiler.hs', 'implementation'),
+            ('MLF.PreparedLibraryData', 'bootstrap/MLF/PreparedLibraryData.hs', 'implementation'),
         ):
             self.assertEqual(modules[name], {
                 'module': name, 'path': path, 'role': role,
             })
-        self.assertEqual(len(manifest['executables']), 12)
+        self.assertEqual(len(manifest['executables']), 13)
+        self.assertEqual(next(entry for entry in manifest['executables'] if entry['name'] == 'builtin-prelude'), {
+            'name': 'builtin-prelude', 'module': 'MLF.Entry.BuiltinPrelude',
+            'wrapper': 'host/ghc/app/builtin-prelude/Main.hs',
+        })
 
     def test_cabal_wrong_wrapper_rejected(self):
         path = self.root / 'mlf-shared.cabal'
@@ -147,11 +164,13 @@ class ManifestParity(unittest.TestCase):
             self.check()
 
     def test_target_transitive_only_frontend_import_rejected(self):
-        # Crates/inference still depend on frontend, but the entry cannot import
-        # its modules unless frontend is a selected direct dependency itself.
+        # Crates/inference still depend on frontend, but owned target modules
+        # cannot import it without a selected direct dependency. The generated
+        # builtin data is now the first owned module requiring frontend.
         self.mutate_json('mlf-package.json',
                          lambda x: x['executables']['emlf']['dependencies'].remove('mlf-frontend'))
-        with self.assertRaisesRegex(RuntimeError, r'MLF\.Entry\.Emlf: .*Bootstrap\.Parser'):
+        with self.assertRaisesRegex(RuntimeError,
+                r'^native direct dependency visibility omits imports for MLF\.BuiltinPreludeData: Bootstrap\.Module$'):
             self.check()
 
     def test_library_transitive_only_frontend_import_rejected(self):
@@ -167,7 +186,9 @@ class ManifestParity(unittest.TestCase):
 
     def test_target_empty_selection_does_not_mean_all_dependencies(self):
         self.mutate_json('mlf-package.json', lambda x: x['executables']['emlf'].update(dependencies=[]))
-        with self.assertRaisesRegex(RuntimeError, r'MLF\.Entry\.Emlf:'):
+        with self.assertRaisesRegex(RuntimeError,
+                r'^native direct dependency visibility omits imports for MLF\.BuiltinPreludeData: '
+                r'Bootstrap\.BuiltinPreludeContext, Bootstrap\.CrateArtifact, Bootstrap\.Module, Bootstrap\.SourceInference$'):
             self.check()
 
     def test_target_duplicate_dependency_rejected(self):
@@ -244,7 +265,7 @@ class InstalledClosure(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix='mlf-package-control-')
         self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve()
         self.interfaces, self.libraries = self.root / 'interfaces', self.root / 'libraries'
         self.interfaces.mkdir()
         self.libraries.mkdir()
@@ -273,17 +294,16 @@ class DirectProducerReceipt(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix='mlf-direct-receipt-control-')
         self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve()
+        self.builtin = builtin_controls.BuiltinFixture(self.root)
         self.bin = self.root / 'build/bin'
-        self.bin.mkdir(parents=True)
         self.receipt_path = self.root / 'build/receipt.json'
-        manifest = {'source_syntax': 'shared-haskell-v1', 'frontend_semantics': 'test/2',
-                    'builtin_interface': 'test/3', 'primitive_abi': 'test/95',
-                    'modules': [{'module': 'Example', 'path': 'source/Example.hs'}],
-                    'host_only': ['host/ghc/MLF/Primitive.hs', 'host/ghc/MLF/Host/Base.hs', 'host/ghc/MLF/Host/IO.hs', 'host/ghc/MLF/Host/Async.hs', 'runtime/mlf_process_supervisor.c'],
-                    'executables': [{'name': 'probe', 'module': 'Example'}]}
+        manifest = copy.deepcopy(self.builtin.manifest)
+        manifest['host_only'] = ['host/ghc/MLF/Primitive.hs', 'host/ghc/MLF/Host/Base.hs',
+            'host/ghc/MLF/Host/IO.hs', 'host/ghc/MLF/Host/Async.hs', 'runtime/mlf_process_supervisor.c']
+        manifest['executables'].append({'name': 'probe', 'module': 'Example'})
         self.file('shared-sources.json', json.dumps(manifest))
-        module = self.file('source/Example.hs')
+        modules = {row['module']: self.root / row['path'] for row in manifest['modules']}
         hosts = {name: self.file(path) for name, path in {'MLF.Primitive': 'host/ghc/MLF/Primitive.hs', 'MLF.Host.Base': 'host/ghc/MLF/Host/Base.hs', 'MLF.Host.IO': 'host/ghc/MLF/Host/IO.hs', 'MLF.Host.Async': 'host/ghc/MLF/Host/Async.hs'}.items()}
         runtime = self.file('runtime/mlf_process_supervisor.c')
         self.file('build/packages.txt')
@@ -297,16 +317,17 @@ class DirectProducerReceipt(unittest.TestCase):
             'flags': ['-fpedantic-bottoms', '-fno-state-hack', '-clear-package-db', '-global-package-db', '-no-user-package-db'], **{x: manifest[x] for x in
                 ['source_syntax', 'frontend_semantics', 'builtin_interface', 'primitive_abi']},
             'manifest_sha256': direct.sha(self.root / 'shared-sources.json'),
-            'shared_inputs': {'Example': direct.identified(module)},
-            'resolved_modules': {'Example': direct.identified(module)},
-            'inferred_shared_interfaces': {'Example': {'signatures': audit,
-                'sha256': hashlib.sha256(audit.encode()).hexdigest(), 'unresolved_literal_constraints': False}},
+            'shared_inputs': {name: direct.identified(path) for name, path in modules.items()},
+            'resolved_modules': {name: direct.identified(path) for name, path in modules.items()},
+            'inferred_shared_interfaces': {name: {'signatures': audit,
+                'sha256': hashlib.sha256(audit.encode()).hexdigest(), 'unresolved_literal_constraints': False}
+                for name in modules},
             'host_inputs': {**{str(path.relative_to(self.root)): direct.identified(path) for path in hosts.values()}, 'runtime/mlf_process_supervisor.c': direct.identified(runtime)},
             'resolved_host_modules': {name: direct.identified(path) for name, path in hosts.items()},
             'installed_dependencies': {'files': {str(dependency): direct.sha(dependency)}},
             'package_database_sha256': direct.sha(self.root / 'build/packages.txt'),
             'ghc_info_sha256': direct.sha(self.root / 'build/ghc-info.txt'),
-            'outputs': {'probe': direct.identified(self.bin / 'probe')},
+            'outputs': {row['name']: direct.identified(self.bin / row['name']) for row in manifest['executables']},
             'commands': [{'exit_code': 0, 'log': str(log), 'log_sha256': direct.sha(log)}]}
         for name, relative in [('ghc', 'tools/ghc'), ('cc', 'tools/cc'), ('orchestrator', 'tools/python'),
                                ('build_driver', 'tools/shared/build.py'), ('cabal_manifest', 'mlf-shared.cabal'),
@@ -322,6 +343,9 @@ class DirectProducerReceipt(unittest.TestCase):
         self.receipt['ghc']['version'] = '9.14.1'
         actual = self.file('tools/private-ghc')
         self.receipt['toolchain'] = {'actual_ghc': direct.identified(actual), 'files': {str(actual): direct.sha(actual)}}
+        self.receipt['builtin_verification_helpers'] = {
+            name: direct.identified(self.root / name) for name in builtin_controls.verifier.HELPERS}
+        self.receipt['builtin_verification'] = direct.identified(self.builtin.verify())
 
     def file(self, relative, contents='fixture\n'):
         path = self.root / relative
@@ -397,6 +421,30 @@ class DirectProducerReceipt(unittest.TestCase):
     def test_native_aggregate_is_not_direct_source_proof(self):
         self.receipt['producer_host'] = 'native-MLF'
         with self.assertRaisesRegex(ValueError, 'native aggregate reports'):
+            self.check()
+
+    def test_missing_builtin_evidence_and_helper_inventory_are_rejected(self):
+        for name in ['builtin_verification', 'builtin_verification_helpers']:
+            original = self.receipt.pop(name)
+            try:
+                with self.subTest(field=name), self.assertRaises(ValueError):
+                    self.check()
+            finally:
+                self.receipt[name] = original
+
+    def test_rehashed_but_incomplete_builtin_evidence_is_rejected(self):
+        path = Path(self.receipt['builtin_verification']['path'])
+        receipt = json.loads(path.read_text())
+        receipt['complete'] = False
+        path.write_text(json.dumps(receipt))
+        self.receipt['builtin_verification'] = direct.identified(path)
+        with self.assertRaisesRegex(ValueError, 'complete builtin verification receipt required'):
+            self.check()
+
+    def test_old_builtin_receipt_cannot_authenticate_relabelled_new_binary(self):
+        self.file('build/bin/emlf', 'different binary\n')
+        self.receipt['outputs']['emlf'] = direct.identified(self.bin / 'emlf')
+        with self.assertRaisesRegex(ValueError, 'builtin verification input inventory mismatch: compiler'):
             self.check()
 
 

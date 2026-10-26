@@ -54,7 +54,6 @@ module Bootstrap.Standalone where {
   normalize = normalizeWithScope True;
   normalizeDemanded :: PreludeMode -> SProgram -> Either String (Maybe ((,,) (Set String) SProgram (Map String String)));
   normalizeDemanded = normalizeWithScope False;
-  normalizeWithScope :: Bool -> PreludeMode -> SProgram -> Either String (Maybe ((,,) (Set String) SProgram (Map String String)));
   -- Additive opt-in seam: the ordinary path still supplies its original names
   -- and binds the original builtin values below. No checked result is invented.
   data RewrittenRoot = RewrittenRoot Scope SProgram Bool SProgram;
@@ -89,6 +88,7 @@ module Bootstrap.Standalone where {
       }
     }
   };
+  normalizeWithScope :: Bool -> PreludeMode -> SProgram -> Either String (Maybe ((,,) (Set String) SProgram (Map String String)));
   normalizeWithScope wholeScope mode original = do {
     (,,) names env builtin <- Modules.standaloneBuiltinScope (programNames original);
     root <- rewriteRootWithNames mode names env original;

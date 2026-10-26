@@ -6,6 +6,11 @@ unchanged ten-workload manifest, correctness inputs, fixtures, default inputs,
 C programs, and C flags. Recovery is still in progress; the measurements below
 are not a claim that the final ten-workload gate passes.
 
+The user requested a pause after this round's testing and PR #25 push. See the
+[handoff](benchmark-performance-handoff-20261027.md) and
+[compact closeout evidence](benchmark-performance-recovery-evidence-20261027.json).
+The full performance goal remains incomplete.
+
 ## 2026-10-27 checkpoint
 
 The normal compiler entry now selects the prepared builtin route for eligible
@@ -16,15 +21,44 @@ comparisons, 36 native O0/O2 executions, 46 direct-import controls, 39 context
 mutation controls and 15 builtin artifact checks. All 231 qualification input
 pins remained unchanged. Evidence is `production-controls-1/receipt.json` under
 `.mlf-build/performance-recovery/`. This is finite macOS correctness evidence;
-production timing, native-host qualification and the complete performance gate
-remain pending.
+native-host qualification and the complete performance gate remain pending.
+
+The subsequent uncontended production CLI cohort compares three fresh-process
+samples per root with the same-v9 ordinary path: binary-trees **7.36478 to
+0.290610 s**, n-body **7.80210 to 0.725261 s**, and pidigits **7.19062 to
+0.237781 s**. Full startup context checking is **0.076243 s**, down from the
+prototype's 0.2028 s restoration. All 21 commands pass, LLVM is byte-identical
+between routes, and pinned inputs remain unchanged. These are frontend-through-
+LLVM-output measurements, not full native compilation. The receipt is
+`production-builtin-timing-1/receipt.json`; n-body remains dominated by solving.
+
+The maintained build now verifies the builtin source identity and compares the
+canonical literal with fresh ordinary-generator stdout before publishing a
+completed build receipt. The direct-test authenticator requires this matching
+evidence. Focused verifier/provenance controls pass **82 executed tests**, with
+four existing Linux `/proc` controls skipped on macOS; immutable inputs remain
+unchanged. The initial fixture-only failed run is retained, followed by the
+successful `builtin-verifier-controls-2/receipt.json`. This validates the
+verification machinery, not a new compiler build or native qualification.
 
 The generic imported-library adapter and its tooling are included as unfinished
-drafts. They are not registered or selected by the normal entry, no fixed library
-data has been generated, and complete semantic/native/performance qualification
-has not run. Imported roots still use the ordinary compiler. The accepted Regex
-source is the inline41 version described below; replacement, weighted-credit,
-streaming-join and additional solver experiments have not been promoted.
+drafts. The checkpoint committed at `24a777e` left them unregistered and unwired;
+subsequent source registration uses an empty fixed registry, which retains the
+ordinary fallback. No populated production library registry has been generated.
+A separately generated fixture registry has now passed all 33 finite cases,
+including 50 interpreter and 100 LLVM O0/O2 executions in 366 commands, with
+unchanged input postchecks. Loader order, cycles, diamonds, exact diagnostics,
+ambiguity, provenance, independent ordered layouts, private class scope,
+managed callstack locations and an actual same-schema builtin-body mutation are
+covered. The retained earlier failures were fixture-oracle errors; their
+receipts are not relabeled as passes. Evidence is
+`.mlf-build/prepared-library-fixture-results-3/receipt.json`. Fresh same-path
+regeneration, actual foundation-library admission, native-host qualification
+and complete performance qualification remain pending. Imported production
+roots still use the ordinary compiler. The accepted Regex source now adds the
+measured weighted-credit and ASCII suffix-membership changes to inline41, as
+recorded below. Fused replacement, streaming-join and additional solver
+experiments have not been promoted.
 
 ## Reproduced starting point
 
@@ -283,6 +317,64 @@ The cost-only diagnostic observes 9,593,822 progressed reverse entries that
 previously used the extra helper thunk. Further generic replacement dispatch
 and search-credit experiments are separate, unpromoted candidates.
 
+The first plan-specific replacement experiment then passed correctness but
+showed no reliable runtime gain (1.653621 to 1.672707 s with overlapping ranges),
+so it remains unpromoted. A separate backend comparison holds accepted inline51
+LLVM and runtime object fixed: ordinary Clang O2 runs in **1.637524 s**, while
+the configured low-latency helper takes **2.166388 s**, 32.30% longer (C is
+0.560278 s). Both counting and replacement slow down. The helper's generic pass
+pipeline omits `always-inline` and retains local force/allocation helper calls
+that Clang O2 inlines; an isolated pipeline experiment is pending. The prior
+Clang-O2 runtime improvements therefore do not establish the configured backend's
+runtime gate. Receipts: `.mlf-build/regex-plan-replacement-pairs-64/receipt.json`
+and `.mlf-build/regex-backend-helper-pairs-65/receipt.json`.
+
+Adding the generic `always-inline` pass recovers **16.09%** in the next quiet
+same-LLVM cohort: 2.228857 to **1.870202 s**, while Clang O2 takes 1.690155 s
+and C takes 0.562994 s. However, LLVM-to-object compilation rises from
+**0.231080 to 0.551597 s** and the object grows from 207,352 to 356,544 bytes.
+All six workload correctness checks and 152 native demand-order executions
+pass. This establishes a real compile/runtime tradeoff, not a gate pass; the
+full-inlining backend is not promoted. Receipts are
+`regex-alwaysinline-backend-66/`, `regex-alwaysinline-pairs-67/` and
+`regex-alwaysinline-compile-68/` under `.mlf-build/`.
+
+Accounting for both reverse comparisons and the per-candidate shift lookup in
+the bounded skip-search credit improves the separate Clang-O2 cohort from
+**1.669404 to 1.488272 s** (10.85%). Counting falls from approximately 0.762 to
+0.584 s. The unchanged outputs, independent differential corpus and native
+demand controls pass. This change is promoted alone; the production Regex hash
+is `5f32f5f2ef89b7238356227f7ba1fa1e3b184a6e2c3083eaaf1e7f0998419e31`.
+The receipt is `regex-index-credit-pairs-70/receipt.json`. A separate fused
+Span replacement candidate shows no meaningful gain, 1.716344 to 1.715179 s,
+and is not promoted (`regex-span-replacement-pairs-75/receipt.json`). These
+library timings use Clang O2 and do not qualify the selected low-latency backend.
+
+The final library candidate adds the same bounded ASCII membership table to
+Span suffixes while retaining `contains` for Unicode. A quiet combined cohort
+measures credit54 versus this suffix76 candidate at **1.514192 to 1.398310 s**
+with Clang O2 (7.65%), and **2.014418 to 1.928656 s** with the existing configured
+helper (4.26%). C is **0.563403 s**, so the suffix candidate still takes
+**2.482x C** with Clang and **3.423x C** with the configured helper. LLVM-to-object
+compile medians rise by about 26 ms and 6 ms respectively. The measured runtime
+sample ranges for these two comparisons do not overlap. This candidate is
+promoted as `016cda4d5a9cd2ed0161976ab4150d74c1b2843cb6a5a046aef72eccc1945b0d`;
+it contains the accepted credit change and excludes the rejected fused
+replacement experiment. Evidence: `.mlf-build/regex-force-screen-{pairs-89,compile-90}/`.
+Final production-source checks without a source override pass in
+`regex-production-suffix-ghc-93/` (70 literal, 17 demand, 12 scheduler and
+82,948 differential pairs) and `regex-production-suffix-native-94/` (56 native
+O0/O2 executions). The test harness exposes private helpers only; these native
+programs use the pinned ready-let compiler, not an exact-final native-bootstrap
+qualification.
+
+That same cohort retains the unpromoted backend tradeoffs. For suffix76,
+allocator-inlinehint/full-force policy takes 1.640911 s runtime / 0.468786 s
+object compilation; direct-WHNF force takes 1.718778 / 0.301663 s; one-hop peek
+takes 1.639321 / 0.376328 s. The latter two are explicitly IR-only experiments,
+with independent ABI/output controls, not source-compiler qualification. The
+production backend and force code generation remain unchanged this round.
+
 The string code generator uses a guarded ASCII byte lookup only after the
 original operand evaluation. Unicode, uncached strings, large or invalid indexes
 use checked runtime helpers. Sixty native O0/O2 controls cover value and error
@@ -323,9 +415,75 @@ remains pending.
 
 ## Remaining work
 
-Complete fresh-source frontend/runtime measurements, wider semantic
+The native stageA build and fresh builtin verification completed successfully:
+`performance-recovery/native-prepared-current/revisions/diagnostic-121c/`.
+All real offline locks/plans, the 121-module shared parser gate and independent
+postflight pass. The native compiler hash is
+`8c093562c511143a16640f650812d217609c8d515472883b2b53d777a007be10`.
+The native build took 2044.774 s in a concurrent correctness session; this is
+not a performance comparison. Its LLVM is 63.4 MB and the largest entry is
+about 110,185 lines, versus 44.5 MB / 4,930 lines in the retained original
+native LLVM. Concentrated literal construction is a plausible cause of the
+long Clang optimization, but this is source inspection, not a causal profile.
+
+A subsequent quiet CLI comparison emits byte-identical LLVM in all 30
+invocations, but this prepared native compiler is slower than the earlier GHC
+production compiler: tree 0.455878 versus 0.252897 s, n-body 0.925868 versus
+0.697612 s, pidigits 0.437908 versus 0.220272 s, fasta 0.752508 versus 0.583807 s,
+and k-nucleotide 0.931667 versus 0.699985 s. These snapshots also differ by the
+empty imported-library adapter wiring and signature-adjacency repair; the
+comparison does not isolate host implementation alone. A roughly 0.17--0.23 s
+offset suggests a startup cost to investigate, not a demonstrated cause.
+Evidence: `performance-recovery/native-frontend-closeout-1/receipt.json`.
+
+The broader ground-leaf candidate passes all 212 controls and all five exact
+LLVM comparisons, but its final quiet timing shows no convincing aggregate
+benefit: CPU medians change by -3.94% for n-body, +0.36% for tree, approximately
+zero for pidigits, +2.64% for fasta and +1.58% for k-nucleotide. It is not
+promoted. See `performance-recovery/ground-leaf-{timing-9/receipt,handoff}.json`.
+
+The first complete native-pipeline triage of the nine non-Regex workloads is
+finished, with three fresh compilation/runtime samples per language and all
+unchanged correctness checks. It uses the frozen production GHC compiler and
+the original configured low-latency backend. Candidate and baseline compiler
+hashes are identical. All input postchecks pass, but **compilation passes 0/9
+and runtime passes 8/9**. This is retained as a failed diagnostic, not final
+qualification: `production-nine-gate-1/{run.json,results/results.json,summary.json}`
+under `.mlf-build/performance-recovery/`.
+
+| Workload | Complete compile, s | Compile / C | Runtime / C |
+| --- | ---: | ---: | ---: |
+| binary-trees | 0.483299 | 3.3630 | 0.6971 |
+| pidigits | 0.476916 | 3.1853 | 1.6731 |
+| n-body | 0.820275 | 5.4297 | 1.2962 |
+| fannkuch-redux | 0.484441 | 3.2284 | 1.6621 |
+| spectral-norm | 0.490957 | 3.2557 | 0.9015 |
+| fasta | 0.702412 | 4.7242 | 1.1839 |
+| mandelbrot | 0.483156 | 3.4788 | 0.7530 |
+| reverse-complement | 0.492406 | 3.3124 | 2.5480 |
+| k-nucleotide | 0.871828 | 5.0847 | 1.6825 |
+
+Fresh runtime C compilation dominates most rows at approximately 0.45--0.47 s.
+The remaining frontend medians are 0.702 s for n-body, 0.599 s for fasta and
+0.754 s for k-nucleotide. Streamed LLVM/link wall intervals include waiting for
+their producers and cannot be added to frontend/runtime intervals. Reverse-
+complement has pronounced I/O variation even for identical executable hashes:
+C wall samples are 0.355/0.468/0.909 s and candidate samples are
+0.384/1.192/1.216 s, with the same original input and input hash. The failed
+runtime gate is retained; this variation is not evidence of a particular code
+regression or a reason to mark it passed. Further quiet same-binary diagnosis
+and a final complete run remain necessary.
+
+A subsequent isolated five-pair repeat of the exact retained C/MLF binaries
+and input gives wall medians 0.176312/0.346320 s (**1.964x**) and child CPU
+medians 0.139992/0.316112 s (**2.258x**), with every output hash unchanged. This
+uses the same measurement transport directly and does not replace the failed
+nine-workload run or establish a full final gate. Evidence is
+`performance-recovery/reverse-io-repeat-1/receipt.json`.
+
+Complete full-native compilation/runtime measurements, wider semantic
 qualification, and the final ten-workload three-sample gate are still required.
-The installed-Prelude experiment is not silently selected: its whole-root
-inference, imported source schemes, declaration order, and independent checking
-must be preserved and verified before a production reuse path can replace
-repeated Prelude inference.
+Production builtin preparation is qualified as described above. The imported
+library registry remains empty pending its independent semantic/native controls
+and fresh-source generation. Neither its draft wiring nor isolated backend and
+library improvements establish the complete performance gate.

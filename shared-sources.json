@@ -284,6 +284,16 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.PreparedLibraries",
+      "path": "libraries/mlf-crates/Bootstrap/PreparedLibraries.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.PreparedLibraryLiteral",
+      "path": "libraries/mlf-crates/Bootstrap/PreparedLibraryLiteral.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.Primitive",
       "path": "libraries/mlf-language-core/Bootstrap/Primitive.hs",
       "role": "implementation"
@@ -421,6 +431,11 @@
     {
       "module": "MLF.PreparedCompiler",
       "path": "bootstrap/MLF/PreparedCompiler.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "MLF.PreparedLibraryData",
+      "path": "bootstrap/MLF/PreparedLibraryData.hs",
       "role": "implementation"
     },
     {

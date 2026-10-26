@@ -27,6 +27,8 @@ module MLF.PreparedCompiler
   import qualified Bootstrap.BuiltinPreludeContext as Context;
   import qualified Bootstrap.BuiltinPreludeLiteral as Literal;
   import qualified MLF.BuiltinPreludeData as Builtin;
+  import qualified Bootstrap.PreparedLibraries as Libraries;
+  import qualified MLF.PreparedLibraryData as LibraryData;
 
   -- A prepared root has no ordinary presolution graph for the linked library.
   -- Keep the checked result/source rendering in a distinct result wrapper.
@@ -63,10 +65,12 @@ module MLF.PreparedCompiler
         program <- Core.atPhase Parsing (Parser.standaloneProgram source);
         compileProgramWithPrelude mode program
       }) else do {
-        loaded <- Modules.loadModuleFiles paths source;
+        loaded <- Modules.loadModuleFilesWithEvidence paths source input;
         ioReturn (do {
           modules <- Core.atPhase ModuleResolution loaded;
-          mapEither ordinary (Compiler.compileLinked mode modules)
+          result <- Libraries.compileLoaded LibraryData.libraries mode modules;
+          Right (Compilation (Libraries.checkedTerm result) (Libraries.sourceType result)
+            (Libraries.reused result) M.empty)
         })
       }
     };

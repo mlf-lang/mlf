@@ -12,6 +12,7 @@ import signal
 import subprocess
 import sys
 import time
+import types
 
 try:
     import resource
@@ -56,6 +57,14 @@ def frontend_case_timeout(name, optimization, frontend_seconds=None):
 
 ORACLES = ['tests/async-task/suite.stdout', 'tests/async-task/processes.stdout',
            'tests/async-task/wait-graph.stdout', 'tests/async-process/suite.stdout']
+
+
+def builtin_verifier():
+    path = Path(__file__).resolve().with_name('verify_builtin_prelude.py')
+    module = types.ModuleType('verify_builtin_prelude')
+    module.__file__ = str(path)
+    exec(compile(path.read_bytes(), str(path), 'exec'), module.__dict__)
+    return module
 
 
 def sha(path):
@@ -172,6 +181,15 @@ def authenticate_build(receipt_path, binaries, root=ROOT):
         raise ValueError('producer did not finish every command')
     for entry in producer['commands']:
         verify_file({'path': entry['log'], 'sha256': entry['log_sha256']})
+    helpers = {'tools/shared/builtin_prelude_identity.py', 'tools/shared/verify_builtin_prelude.py'}
+    if set(producer.get('builtin_verification_helpers', {})) != helpers:
+        raise ValueError('missing builtin verification helper inventory')
+    for name in helpers:
+        verify_file(producer['builtin_verification_helpers'][name], root / name)
+    if not {'emlf', 'builtin-prelude'}.issubset(expected_outputs):
+        raise ValueError('missing canonical builtin verifier/generator outputs')
+    builtin_verifier().authenticate(producer.get('builtin_verification'), root,
+                                   binaries / 'emlf', binaries / 'builtin-prelude')
     return producer
 
 

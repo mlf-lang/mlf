@@ -1,4 +1,5 @@
 module Fixed.Types (Zebra(..), Alpha(..), Box(..), Poly(..), runPoly) where
+import Prelude
 data Zebra = ZLast | ZFirst Int
 data Alpha = AFirst | ALast Bool
 data Box a = Box a

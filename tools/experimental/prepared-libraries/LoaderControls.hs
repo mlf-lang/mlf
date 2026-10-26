@@ -13,7 +13,7 @@ module Main where {
   require result = case result of { Left message -> fatal message; Right value -> ioReturn value };
   assertion value message = if value then ioReturn () else fatal message;
   source name imports = "module " ++ name ++ " where\n" ++
-    concatMap (\dependency -> "import " ++ dependency ++ "\n") imports ++ "value = 1\n";
+    concatMapString (\dependency -> "import " ++ dependency ++ "\n") imports ++ "value = 1\n";
   payload name text = mapEither (\parsed -> Modules.LoadedModule parsed text)
     (Parser.parseModule (name ++ ".emlf") text);
   graph rows rootText = do {
@@ -39,6 +39,19 @@ module Main where {
       Right _ -> fatal (label ++ ": invalid graph accepted")
     }
   };
+  withBody (SourceModule path name exports imports datatypes classes instances values _ syntax) =
+    SourceModule path name exports imports datatypes classes instances values (Just (SIntLit 1)) syntax;
+  syntheticBodyControl = do {
+    root <- require (payload "Root" (source "Root" ["A"]));
+    parsed <- require (Parser.parseModule "A.emlf" (source "A" []));
+    let { child = Modules.LoadedModule (withBody parsed) "synthetic-body-control" };
+    result <- Modules.loadGraphBy Modules.loadedSource (\_ -> ioReturn (Right child)) root;
+    case result of {
+      Left actual -> assertion (eqString actual "A.emlf: imported modules must contain declarations only")
+        ("synthetic imported body: wrong graph-validator error: " ++ actual);
+      Right _ -> fatal "graph validator accepted a synthetic imported expression"
+    }
+  };
   memoryControls = do {
     expectOrder "multi-dependency/root-last"
       [(,) "A" (source "A" ["C"]), (,) "B" (source "B" []), (,) "C" (source "C" [])]
@@ -55,7 +68,8 @@ module Main where {
     expectError "wrong-module" [(,) "A" (source "Wrong" [])] (source "Root" ["A"])
       "A.emlf: expected module A, found Wrong";
     expectError "imported-expression" [(,) "A" "module A where\n1\n"] (source "Root" ["A"])
-      "A.emlf: imported modules must contain declarations only"
+      "A.emlf:3:1: named modules contain declarations only; define main for the entry point";
+    syntheticBodyControl
   };
   -- Caller supplies a newly created tool-owned directory. No existing library
   -- or production input is modified by these filesystem controls.

@@ -75,7 +75,8 @@
       "source-syntax": "shared-haskell-v1",
       "modules": {
         "MLF.BuiltinPreludeData": "bootstrap/MLF/BuiltinPreludeData.hs",
-        "MLF.PreparedCompiler": "bootstrap/MLF/PreparedCompiler.hs"
+        "MLF.PreparedCompiler": "bootstrap/MLF/PreparedCompiler.hs",
+        "MLF.PreparedLibraryData": "bootstrap/MLF/PreparedLibraryData.hs"
       }
     },
     "mlfpkg": {

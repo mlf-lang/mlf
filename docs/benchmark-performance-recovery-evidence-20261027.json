@@ -1,0 +1,618 @@
+{
+  "format": "mlf-benchmark-recovery-closeout-1",
+  "date": "2026-10-27",
+  "outcome": "partial recovery; pause after requested round",
+  "full_ten_workload_gate_passed": false,
+  "gate": {
+    "workloads": 10,
+    "samples": 3,
+    "maximum_compile_over_c": 3,
+    "maximum_runtime_over_c": 2
+  },
+  "pr": "https://github.com/mlf-lang/mlf/pull/25",
+  "production_source_sha256": {
+    "benchmarks/manifest.json": "9b23ecd4e9df4752a0fc23dace95f9d65d77558b3f0703146220830830b2d93b",
+    "libraries/mlf-foundation/Bootstrap/Regex.hs": "016cda4d5a9cd2ed0161976ab4150d74c1b2843cb6a5a046aef72eccc1945b0d",
+    "libraries/mlf-inference/Bootstrap/Graph/Solver.hs": "604662746593712ec29ed968cee7344910c083e57e15965bbf39f3df141d960e",
+    "bootstrap/MLF/BuiltinPreludeData.hs": "2c4b16c740c00f4146a8a2d3a8d96c13baa3a6c4cbacac5cc969c5d0f2fc94a2",
+    "bootstrap/MLF/PreparedCompiler.hs": "271caba2c443258fb4e0961be87d0750716c867ddb36ef6c85e8f77165423b10",
+    "bootstrap/MLF/PreparedLibraryData.hs": "7a2f084b10c7551690f37b697e7b3f46dca409316606015775636c033b716b23",
+    "libraries/mlf-frontend/Bootstrap/Standalone.hs": "37f77c259d0b699ab49c5df5d6041485e726d392a0b4b3a6b8adcff3c0e2a027",
+    "tools/bench/llvm-backend.c": "47f1cd99774d34e804675023c4b1f766e304abaf250a1469cb76da60d1901639",
+    "runtime/mlf_runtime.c": "074f65f09c95eb846f7f06580449051036225230fd78d2b0a8e08a88cbf04839",
+    "runtime/mlf_completion.h": "7eb127736e53948a324b58715abdea3f8df98900ca4724a94f59ca66b79388c5"
+  },
+  "important_scope": [
+    "These are bounded historical cohorts, not one exact-final complete qualification.",
+    "Native stageA predates the final suffix library update; final suffix has separate GHC-produced native tests.",
+    "Historical noncompiled driver inputs were archived and restored after verification; consult source-transition.json.",
+    "Raw local receipts, binaries, and captures remain in the worktree; this file is a compact report, not a replacement authenticator."
+  ],
+  "evidence": [
+    {
+      "label": "final production Regex semantics",
+      "local_receipt": ".mlf-build/regex-production-suffix-ghc-93/receipt.json",
+      "receipt_sha256": "9df9cc1a2d449b72f6c76ed257599355603971cbfc68473bb7e2d57aad18fb72",
+      "summary": {
+        "scope": "finite-regex-fast-path-semantic-audit",
+        "complete": true,
+        "status": "passed",
+        "candidate_regex": {
+          "override_requested": false,
+          "path": "/Users/ares/.codex/worktrees/ce41/mlf/libraries/mlf-foundation/Bootstrap/Regex.hs",
+          "production_path": "/Users/ares/.codex/worktrees/ce41/mlf/libraries/mlf-foundation/Bootstrap/Regex.hs",
+          "production_source_used": true,
+          "sha256": "016cda4d5a9cd2ed0161976ab4150d74c1b2843cb6a5a046aef72eccc1945b0d"
+        },
+        "candidate_test_overlay": "export Regex(..), SearchPlan(..), scanSkip and countSkip only",
+        "admission_checks": 20,
+        "literal_oracles": 70,
+        "invalid_patterns": 18,
+        "demand_oracles": 17,
+        "internal_scheduling_oracles": 12,
+        "differential_pairs": 82948,
+        "immutable_inputs_verified_after": true,
+        "full_corpus_qualification": false
+      }
+    },
+    {
+      "label": "final production Regex native executions",
+      "local_receipt": ".mlf-build/regex-production-suffix-native-94/receipt.json",
+      "receipt_sha256": "8b1d05e4c321690da0f22fa30fe6d899c9a23d5055e4d4a37c52cdcbda0fec6d",
+      "summary": {
+        "scope": "native-regex-semantics-and-demand-controls",
+        "complete": true,
+        "status": "passed",
+        "candidate_regex": {
+          "override_requested": false,
+          "path": "/Users/ares/.codex/worktrees/ce41/mlf/libraries/mlf-foundation/Bootstrap/Regex.hs",
+          "production_path": "/Users/ares/.codex/worktrees/ce41/mlf/libraries/mlf-foundation/Bootstrap/Regex.hs",
+          "production_source_used": true,
+          "sha256": "016cda4d5a9cd2ed0161976ab4150d74c1b2843cb6a5a046aef72eccc1945b0d"
+        },
+        "candidate_test_overlay": "export scanSkip and countSkip only",
+        "native_executions": 56,
+        "internal_scheduling_executions": 24,
+        "immutable_inputs_verified_after": true,
+        "native_provenance_scope": "selected compiler/Clang, foundation/runtime source closure, static BDWGC and GMP pkg-config flags; system libraries are not fully pinned",
+        "native_toolchain_closure_complete": false,
+        "full_corpus_qualification": false
+      }
+    },
+    {
+      "label": "quiet Regex runtime tradeoffs",
+      "local_receipt": ".mlf-build/regex-force-screen-pairs-89/receipt.json",
+      "receipt_sha256": "df5fda79c230f50db0e4019af560a505d37e2bafa476d3b818ab4de26c1d46b6",
+      "summary": {
+        "scope": "quiet credit54 vs suffix76 across actual-source baseline backends and IR-only direct/peek guard screening; shared runtime; direct/peek NOT source-qualified",
+        "complete": true,
+        "status": "passed",
+        "medians": {
+          "c": 0.563403,
+          "credit-clang": 1.514192,
+          "credit-old": 2.014418,
+          "credit-force": 1.728177,
+          "credit-direct": 1.788455,
+          "credit-peek": 1.718034,
+          "suffix-clang": 1.39831,
+          "suffix-old": 1.928656,
+          "suffix-force": 1.640911,
+          "suffix-direct": 1.718778,
+          "suffix-peek": 1.639321
+        },
+        "runtime_to_c": {
+          "credit-clang": 2.687582423238783,
+          "credit-old": 3.575447770068672,
+          "credit-force": 3.0673904824787943,
+          "credit-direct": 3.174379618141898,
+          "credit-peek": 3.0493873834537624,
+          "suffix-clang": 2.4819001673757506,
+          "suffix-old": 3.4232263583970974,
+          "suffix-force": 2.912499578454499,
+          "suffix-direct": 3.0507079302027145,
+          "suffix-peek": 2.909677442257141
+        },
+        "suffix_to_credit": {
+          "clang": 0.9234694147109481,
+          "old": 0.9574259165674651,
+          "force": 0.9495040149243972,
+          "direct": 0.9610406747723594,
+          "peek": 0.9541842594500458
+        },
+        "actual_source_qualified": {
+          "c": true,
+          "credit-clang": true,
+          "credit-old": true,
+          "credit-force": true,
+          "credit-direct": false,
+          "credit-peek": false,
+          "suffix-clang": true,
+          "suffix-old": true,
+          "suffix-force": true,
+          "suffix-direct": false,
+          "suffix-peek": false
+        },
+        "immutable_inputs_verified_after": true
+      }
+    },
+    {
+      "label": "quiet Regex LLVM-to-object tradeoffs",
+      "local_receipt": ".mlf-build/regex-force-screen-compile-90/receipt.json",
+      "receipt_sha256": "34ffd34f90ec2ef4ae93161bcb7a9c497e0ef51ced5af2fdfcc46c8c9c814c62",
+      "summary": {
+        "scope": "quiet compile-only credit54 vs suffix76; direct/peek IR-only screening NOT source-qualified; no frontend/runtime compilation/linking included",
+        "complete": true,
+        "status": "passed",
+        "medians": {
+          "credit-clang": 1.0522,
+          "credit-old": 0.2265,
+          "credit-force": 0.460442,
+          "credit-direct": 0.29994,
+          "credit-peek": 0.380304,
+          "suffix-clang": 1.078626,
+          "suffix-old": 0.232812,
+          "suffix-force": 0.468786,
+          "suffix-direct": 0.301663,
+          "suffix-peek": 0.376328
+        },
+        "object_bytes": {
+          "credit-clang": [
+            346448
+          ],
+          "credit-old": [
+            207592
+          ],
+          "credit-force": [
+            311960
+          ],
+          "credit-direct": [
+            228824
+          ],
+          "credit-peek": [
+            259728
+          ],
+          "suffix-clang": [
+            351304
+          ],
+          "suffix-old": [
+            210168
+          ],
+          "suffix-force": [
+            314984
+          ],
+          "suffix-direct": [
+            231560
+          ],
+          "suffix-peek": [
+            262560
+          ]
+        },
+        "actual_source_qualified": {
+          "credit-clang": true,
+          "credit-old": true,
+          "credit-force": true,
+          "credit-direct": false,
+          "credit-peek": false,
+          "suffix-clang": true,
+          "suffix-old": true,
+          "suffix-force": true,
+          "suffix-direct": false,
+          "suffix-peek": false
+        },
+        "immutable_inputs_verified_after": true
+      }
+    },
+    {
+      "label": "builtin verifier controls",
+      "local_receipt": ".mlf-build/performance-recovery/builtin-verifier-controls-2/receipt.json",
+      "receipt_sha256": "d2719dc1540705f40a3b8be9fd45143e2e0ecc70066a1f26de0144a3b8e52af8",
+      "summary": {
+        "scope": "finite Python provenance and verifier controls; no compiler build or toolchain qualification",
+        "complete": true,
+        "exit_code": 0,
+        "immutable_inputs_verified_after": true
+      },
+      "executed_tests": 82,
+      "platform_skips": 4
+    },
+    {
+      "label": "prepared-library fixture",
+      "local_receipt": ".mlf-build/prepared-library-fixture-results-3/receipt.json",
+      "receipt_sha256": "12fa11ac679ea985d704e45ea7bbd12354edd12cc4552b8efdc0198bc6993e46",
+      "summary": {
+        "scope": "all finite acceptance/type/layout controls plus explicitly selected execution engines",
+        "complete": true,
+        "all_declared_executions_completed": true,
+        "immutable_inputs_verified_after": true,
+        "native_host_compiler_qualification": false,
+        "user_program_cache": false
+      },
+      "cases": 33,
+      "commands": 366,
+      "interpreter_executions": 50,
+      "native_executions": 100
+    },
+    {
+      "label": "same-path library regeneration",
+      "local_receipt": ".mlf-build/prepared-library-fixture-3/regeneration/receipt.json",
+      "receipt_sha256": "ac067f598de3fab98f412e56304fe935ef105260f4a422835247056cfd1dc710",
+      "summary": {
+        "scope": "same lexical source and artifact paths; fresh producer and query cache",
+        "complete": true,
+        "immutable_inputs_verified_after": true,
+        "cross_job_byte_reproducibility": false,
+        "source_or_artifact_path_relocation": false,
+        "native_qualification": false
+      },
+      "compared_outputs": 5
+    },
+    {
+      "label": "completed native stageA",
+      "local_receipt": ".mlf-build/performance-recovery/native-prepared-current/revisions/diagnostic-121c/receipt.json",
+      "receipt_sha256": "13624a7c687decc5f9a34ac2bf383f8684f169574b14a6ef3c380bc49c696390",
+      "summary": {
+        "complete": true,
+        "closed_toolchain_qualification": false,
+        "immutable_inputs_verified_after": true,
+        "immutable_source_verified_after": true,
+        "outputs": {
+          "builtin-prelude": {
+            "path": "/Users/ares/.codex/worktrees/ce41/mlf/.mlf-build/performance-recovery/native-prepared-current/revisions/diagnostic-121c/build/bin/builtin-prelude",
+            "sha256": "af75db8b83373edab59f7de2eb644541fe11f901a2dc656732d5707b63b2abbd"
+          },
+          "emlf": {
+            "path": "/Users/ares/.codex/worktrees/ce41/mlf/.mlf-build/performance-recovery/native-prepared-current/revisions/diagnostic-121c/build/bin/emlf",
+            "sha256": "8c093562c511143a16640f650812d217609c8d515472883b2b53d777a007be10"
+          }
+        }
+      }
+    },
+    {
+      "label": "native independent postflight",
+      "local_receipt": ".mlf-build/performance-recovery/native-prepared-current/revisions/diagnostic-121c/postflight/receipt.json",
+      "receipt_sha256": "0855b72f99170277173020a7e8018eed1ec8f144ea0f3082c13b26a5f99bc206",
+      "summary": {
+        "complete": true,
+        "diagnostic": {
+          "path": "/Users/ares/.codex/worktrees/ce41/mlf/.mlf-build/performance-recovery/native-prepared-current/revisions/diagnostic-121c/receipt.json",
+          "sha256": "13624a7c687decc5f9a34ac2bf383f8684f169574b14a6ef3c380bc49c696390"
+        },
+        "closed_toolchain_qualification": false,
+        "fixed_point_qualification": false,
+        "immutable_inputs_verified_after": true,
+        "immutable_source_verified_after": true,
+        "source_identity": "builtin-source-v1:0f6e5f54ad308ca7b9602a9f7afccba4875ebead6fdf33ce4b8c401ad45323bb",
+        "outputs": {
+          "builtin-prelude": {
+            "path": "/Users/ares/.codex/worktrees/ce41/mlf/.mlf-build/performance-recovery/native-prepared-current/revisions/diagnostic-121c/build/bin/builtin-prelude",
+            "sha256": "af75db8b83373edab59f7de2eb644541fe11f901a2dc656732d5707b63b2abbd"
+          },
+          "emlf": {
+            "path": "/Users/ares/.codex/worktrees/ce41/mlf/.mlf-build/performance-recovery/native-prepared-current/revisions/diagnostic-121c/build/bin/emlf",
+            "sha256": "8c093562c511143a16640f650812d217609c8d515472883b2b53d777a007be10"
+          }
+        },
+        "limitations": [
+          "The original runner did not independently pin GC files before the build.",
+          "Current GC bytes are compared with package-builder recorded hashes; this is not retrospective controller preflight evidence.",
+          "This finite diagnostic does not authenticate a complete scheduler action chain or a closed toolchain."
+        ]
+      }
+    },
+    {
+      "label": "native versus earlier GHC frontend",
+      "local_receipt": ".mlf-build/performance-recovery/native-frontend-closeout-1/receipt.json",
+      "receipt_sha256": "a41fea79a47467d5c08cda6fdaa0fae53dde727387eccf6f13b21987a9c8dc2c",
+      "summary": {
+        "scope": "quiet fresh-process production CLI source-to-LLVM host comparison",
+        "complete": true,
+        "full_native_compile_gate_claim": false,
+        "final_source_qualification_claim": false,
+        "source_deltas": "native includes empty imported-library registry wiring and signature adjacency repair",
+        "medians": {
+          "binary-trees": {
+            "ghc": {
+              "wall_seconds": 0.252897,
+              "cpu_seconds": 0.242462
+            },
+            "native": {
+              "wall_seconds": 0.455878,
+              "cpu_seconds": 0.450862
+            }
+          },
+          "n-body": {
+            "ghc": {
+              "wall_seconds": 0.697612,
+              "cpu_seconds": 0.686034
+            },
+            "native": {
+              "wall_seconds": 0.925868,
+              "cpu_seconds": 0.907446
+            }
+          },
+          "pidigits": {
+            "ghc": {
+              "wall_seconds": 0.220272,
+              "cpu_seconds": 0.210999
+            },
+            "native": {
+              "wall_seconds": 0.437908,
+              "cpu_seconds": 0.42505
+            }
+          },
+          "fasta": {
+            "ghc": {
+              "wall_seconds": 0.583807,
+              "cpu_seconds": 0.576621
+            },
+            "native": {
+              "wall_seconds": 0.752508,
+              "cpu_seconds": 0.746627
+            }
+          },
+          "k-nucleotide": {
+            "ghc": {
+              "wall_seconds": 0.699985,
+              "cpu_seconds": 0.687451
+            },
+            "native": {
+              "wall_seconds": 0.931667,
+              "cpu_seconds": 0.918514
+            }
+          }
+        },
+        "native_over_ghc": {
+          "binary-trees": 1.802623202331384,
+          "n-body": 1.3271962064872738,
+          "pidigits": 1.988032977409748,
+          "fasta": 1.28896707302242,
+          "k-nucleotide": 1.3309813781723896
+        },
+        "immutable_inputs_verified_after": true
+      }
+    },
+    {
+      "label": "retained failed nine-workload gate",
+      "local_receipt": ".mlf-build/performance-recovery/production-nine-gate-1/run.json",
+      "receipt_sha256": "c5880de5ba140264fdebe5564c48035e6d5fe59fc22943d64578f2e90a21624c",
+      "summary": {
+        "scope": "nine-workload triage of current production candidate; not complete ten-workload qualification",
+        "complete": true,
+        "benchmark_status": "failed",
+        "completed_workloads": 9,
+        "same_compiler_both_slots": true,
+        "compile_speedup_claim": false,
+        "immutable_inputs_verified_after": true,
+        "report_sha256": "66b6773ef018e1bd6f139ec09e6246b4112b5a3d7a7e1abd39a2cf18d032f7ea",
+        "performance_checks": [
+          {
+            "benchmark": "binary-trees",
+            "dimension": "compilation",
+            "maximum_ratio": 3.0,
+            "mlf_over_c": 3.3630157957,
+            "passed": false
+          },
+          {
+            "benchmark": "binary-trees",
+            "dimension": "runtime",
+            "maximum_ratio": 2.0,
+            "mlf_over_c": 0.697062715455,
+            "passed": true
+          },
+          {
+            "benchmark": "pidigits",
+            "dimension": "compilation",
+            "maximum_ratio": 3.0,
+            "mlf_over_c": 3.185258405354,
+            "passed": false
+          },
+          {
+            "benchmark": "pidigits",
+            "dimension": "runtime",
+            "maximum_ratio": 2.0,
+            "mlf_over_c": 1.673060068405,
+            "passed": true
+          },
+          {
+            "benchmark": "n-body",
+            "dimension": "compilation",
+            "maximum_ratio": 3.0,
+            "mlf_over_c": 5.4296957742,
+            "passed": false
+          },
+          {
+            "benchmark": "n-body",
+            "dimension": "runtime",
+            "maximum_ratio": 2.0,
+            "mlf_over_c": 1.296226694562,
+            "passed": true
+          },
+          {
+            "benchmark": "fannkuch-redux",
+            "dimension": "compilation",
+            "maximum_ratio": 3.0,
+            "mlf_over_c": 3.228422911599,
+            "passed": false
+          },
+          {
+            "benchmark": "fannkuch-redux",
+            "dimension": "runtime",
+            "maximum_ratio": 2.0,
+            "mlf_over_c": 1.662063236354,
+            "passed": true
+          },
+          {
+            "benchmark": "spectral-norm",
+            "dimension": "compilation",
+            "maximum_ratio": 3.0,
+            "mlf_over_c": 3.255661434606,
+            "passed": false
+          },
+          {
+            "benchmark": "spectral-norm",
+            "dimension": "runtime",
+            "maximum_ratio": 2.0,
+            "mlf_over_c": 0.901478456636,
+            "passed": true
+          },
+          {
+            "benchmark": "fasta",
+            "dimension": "compilation",
+            "maximum_ratio": 3.0,
+            "mlf_over_c": 4.724193591779,
+            "passed": false
+          },
+          {
+            "benchmark": "fasta",
+            "dimension": "runtime",
+            "maximum_ratio": 2.0,
+            "mlf_over_c": 1.183895832694,
+            "passed": true
+          },
+          {
+            "benchmark": "mandelbrot",
+            "dimension": "compilation",
+            "maximum_ratio": 3.0,
+            "mlf_over_c": 3.478820606977,
+            "passed": false
+          },
+          {
+            "benchmark": "mandelbrot",
+            "dimension": "runtime",
+            "maximum_ratio": 2.0,
+            "mlf_over_c": 0.753020243879,
+            "passed": true
+          },
+          {
+            "benchmark": "reverse-complement",
+            "dimension": "compilation",
+            "maximum_ratio": 3.0,
+            "mlf_over_c": 3.312430207058,
+            "passed": false
+          },
+          {
+            "benchmark": "reverse-complement",
+            "dimension": "runtime",
+            "maximum_ratio": 2.0,
+            "mlf_over_c": 2.547995997126,
+            "passed": false
+          },
+          {
+            "benchmark": "k-nucleotide",
+            "dimension": "compilation",
+            "maximum_ratio": 3.0,
+            "mlf_over_c": 5.084731132626,
+            "passed": false
+          },
+          {
+            "benchmark": "k-nucleotide",
+            "dimension": "runtime",
+            "maximum_ratio": 2.0,
+            "mlf_over_c": 1.682491729398,
+            "passed": true
+          }
+        ]
+      }
+    },
+    {
+      "label": "isolated reverse-complement repeat",
+      "local_receipt": ".mlf-build/performance-recovery/reverse-io-repeat-1/receipt.json",
+      "receipt_sha256": "48b5408bc5bad3fbe456a0f6678a11365b9c9de6dbf159b6ad0ced051660309c",
+      "summary": {
+        "scope": "quiet retained-binary runtime repeat; direct existing measurement transport",
+        "complete": true,
+        "final_gate_claim": false,
+        "original_failure_replaced": false,
+        "runs": 5,
+        "medians": {
+          "c": {
+            "wall_seconds": 0.176312,
+            "cpu_seconds": 0.139992
+          },
+          "mlf": {
+            "wall_seconds": 0.34632,
+            "cpu_seconds": 0.316112
+          }
+        },
+        "mlf_over_c": {
+          "wall_seconds": 1.964245201687917,
+          "cpu_seconds": 2.2580718898222756
+        },
+        "immutable_inputs_verified_after": true
+      }
+    },
+    {
+      "label": "unpromoted ground-leaf timing",
+      "local_receipt": ".mlf-build/performance-recovery/ground-leaf-timing-9/receipt.json",
+      "receipt_sha256": "6b306c65f2af07bfb95352ee7fbcff091ba65822e30dbfb256bd35d1264340ef",
+      "summary": {
+        "scope": "three alternating pairs, uninstrumented complete direct frontend LLVM output, same frozen prepared5 source except Solver ground-leaf specialization",
+        "status": "passed",
+        "official_benchmark_gate": false,
+        "medians": {
+          "n-body": {
+            "before": {
+              "wall_seconds": 0.8368701250292361,
+              "cpu_seconds": 0.8195300000000003
+            },
+            "after": {
+              "wall_seconds": 0.8303357500117272,
+              "cpu_seconds": 0.7872440000000003
+            }
+          },
+          "binary-trees": {
+            "before": {
+              "wall_seconds": 0.4040405419655144,
+              "cpu_seconds": 0.38512599999999964
+            },
+            "after": {
+              "wall_seconds": 0.45302216708660126,
+              "cpu_seconds": 0.3865080000000001
+            }
+          },
+          "pidigits": {
+            "before": {
+              "wall_seconds": 0.4028867920860648,
+              "cpu_seconds": 0.36239300000000085
+            },
+            "after": {
+              "wall_seconds": 0.39828204177320004,
+              "cpu_seconds": 0.3623750000000001
+            }
+          },
+          "fasta": {
+            "before": {
+              "wall_seconds": 0.7804812081158161,
+              "cpu_seconds": 0.7235590000000016
+            },
+            "after": {
+              "wall_seconds": 0.7768627910409123,
+              "cpu_seconds": 0.7426500000000011
+            }
+          },
+          "k-nucleotide": {
+            "before": {
+              "wall_seconds": 0.8843715831171721,
+              "cpu_seconds": 0.841585000000002
+            },
+            "after": {
+              "wall_seconds": 0.89094058284536,
+              "cpu_seconds": 0.8548629999999999
+            }
+          }
+        },
+        "llvm_byte_equal": true,
+        "immutable_inputs_verified_after": true
+      }
+    },
+    {
+      "label": "noncompiled driver cleanup transition",
+      "local_receipt": ".mlf-build/performance-recovery/closeout-controller-proposals-1/source-transition.json",
+      "receipt_sha256": "b68ad97a50f7f0f7afa39244a0a6e9dab6760c0a406d0d8ef2754287ba525ffa",
+      "summary": {
+        "format": "compiler-audit-closeout-transition-1",
+        "complete": true
+      }
+    }
+  ]
+}

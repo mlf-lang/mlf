@@ -105,7 +105,7 @@
     "benchmarks/reverse-complement/mlf/main.emlf": "c62fd62e285b1f634a6d229738342974e32e5cb09bead96400ea9f691aafd843",
     "benchmarks/k-nucleotide/mlf/main.emlf": "f5be5957e29a02603b9b632d5169111a035002364e1464c79a055456055d4884",
     "benchmarks/regex-redux/mlf/main.emlf": "f8ade352362ffce016e22e9df99834777eaf2f731996d39e73ae7e89cfedefc4",
-    "libraries/mlf-foundation/Bootstrap/Regex.hs": "045de04069a158c5ff55d61e7d604a3f01aea7a034ac58c63dd8d80d67dcb8da",
+    "libraries/mlf-foundation/Bootstrap/Regex.hs": "016cda4d5a9cd2ed0161976ab4150d74c1b2843cb6a5a046aef72eccc1945b0d",
     "libraries/mlf-foundation/Bootstrap/Types.hs": "c8bf3c734fa5c7e4c9b1f546774fb7dbfac9cc872fc7194f18cacb53d332132a",
     "libraries/mlf-foundation/Bootstrap/Std.hs": "0eb137b5935bdf13ed6807c2a4aa96bb558bfce37fd39c9fb08897bb63eedbff",
     "libraries/mlf-foundation/Bootstrap/IntMap.hs": "2bd9dae62e6d44e611e5b4adb216efffe9d275c05d249f2904f2e076d12b23de",

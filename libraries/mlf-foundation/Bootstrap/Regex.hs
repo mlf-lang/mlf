@@ -28,7 +28,7 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
     Consume CharacterSet Int | Fork Int Int | Loop Int Int | AtBegin Int | AtEnd Int | Accept;
   data SearchPlan = GeneralPlan | FixedPlan Int String |
     SkipPlan Int String String String | SpanPlan String ([] Span);
-  data Span = Single CharacterSet | Delimited CharacterSet Int CharacterSet String CharacterSet;
+  data Span = Single CharacterSet | Delimited CharacterSet Int CharacterSet String CharacterSet String;
   data Regex = Regex Int (IntMap Instruction) SearchPlan;
   data Parsed = Parsed Pattern Int | ParseError String;
   data ClassAtom = ClassAtom CharacterSet (Maybe Int) Int;
@@ -460,10 +460,10 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
     [Character set] -> Just (Single set);
     [Character prefix, Repeat (Character body) minimum Nothing, Character suffix] ->
       if minimum <= 1 && disjointSets body suffix
-      then Just (Delimited prefix minimum body (asciiMembership body) suffix) else Nothing;
+      then Just (Delimited prefix minimum body (asciiMembership body) suffix (asciiMembership suffix)) else Nothing;
     [Character prefix, Character required, Repeat (Character body) 0 Nothing, Character suffix] ->
       if sameSet required body && disjointSets body suffix
-      then Just (Delimited prefix 1 body (asciiMembership body) suffix) else Nothing;
+      then Just (Delimited prefix 1 body (asciiMembership body) suffix (asciiMembership suffix)) else Nothing;
     _ -> Nothing
   };
   sameSet :: CharacterSet -> CharacterSet -> Bool;
@@ -481,7 +481,7 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
     _ -> S.mapOptional (\span -> [span]) (spanAlternative pattern)
   };
   spanPrefix :: Span -> CharacterSet;
-  spanPrefix span = case span of { Single set -> set; Delimited prefix _ _ _ _ -> prefix };
+  spanPrefix span = case span of { Single set -> set; Delimited prefix _ _ _ _ _ -> prefix };
   safeSpans :: [] Span -> Bool;
   safeSpans spans = S.length spans <= 64 && safeSpanPairs spans spans;
   safeSpanPairs :: [] Span -> [] Span -> Bool;
@@ -490,7 +490,7 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
     (:) first rest -> S.all (\second -> disjointSets (spanPrefix first) (spanPrefix second)) rest &&
       (case first of {
         Single _ -> True;
-        Delimited prefix _ body _ _ -> S.all (\other ->
+        Delimited prefix _ body _ _ _ -> S.all (\other ->
           sameSet prefix (spanPrefix other) || disjointSets body (spanPrefix other)) all
       }) && safeSpanPairs all rest
   };
@@ -544,11 +544,13 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
     next = if character >= 128 then 1 else stringCodeAt table (128 + character)
   } in if next == 0 then 0 else if next == 1 then width
     else backwardMatch table subject (end - 1) (next - 1) (width - 1);
-  -- Adversarial subjects can defeat a bad-character heuristic. Charge each
-  -- comparison to a bounded credit balance and resume the forward DFA at the
-  -- next unexamined start when credit is exhausted. This retains linear work
-  -- in the subject length instead of accepting an O(length * pattern-width)
-  -- worst case. Credits and counters are forced on every iteration.
+  -- Adversarial subjects can defeat a bad-character heuristic. Charge both
+  -- subject/table reads for every reverse comparison and the shift-table read
+  -- against the two reads a forward DFA would spend per advanced scalar.
+  -- A capped credit balance permits only bounded excess work before resuming
+  -- the forward DFA at the next unexamined start. Accepting matches advance a
+  -- full positive width, so resetting their credit also retains linear work.
+  -- Credits and counters are forced on every iteration.
   scanSkip :: Int -> String -> String -> String -> String -> Int -> Int -> Int -> Int;
   scanSkip width forward backward shifts subject size end credit =
     if end >= size then (-1) else let {
@@ -566,7 +568,7 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
       seq cap (seq credit (let {
         shift = if character >= 128 then width else stringCodeAt shifts character
       } in seq shift (let {
-        raw = credit + 2 * shift - (width - remaining + 1)
+        raw = credit + 2 * shift - (2 * (width - remaining + 1) + 1)
       } in seq raw (let { balance = S.min cap raw } in seq balance (let { next = end + shift } in if balance < 0
         then scanFixed forward subject size (next - width + 1) 0
         else scanSkip width forward backward shifts subject size next balance)))));
@@ -585,7 +587,7 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
     else let { cap = 2 * width } in seq cap (seq credit (let {
       shift = if character >= 128 then width else stringCodeAt shifts character
     } in seq shift (let {
-      raw = credit + 2 * shift - (width - remaining + 1)
+      raw = credit + 2 * shift - (2 * (width - remaining + 1) + 1)
     } in seq raw (let { balance = S.min cap raw } in seq balance (let { next = end + shift } in if balance < 0
       then countFixed forward subject size (next - width + 1) 0 count
       else countSkip width forward backward shifts subject size next balance count)))));
@@ -599,9 +601,11 @@ module Bootstrap.Regex (Regex, compile, find, countMatches, replaceAll) where {
     if offset >= size then Nothing else case spanAt dispatch spans (stringCodeAt subject offset) of {
       Nothing -> scanSpans dispatch spans subject size (offset + 1);
       Just (Single _) -> Just ((,) offset (offset + 1));
-      Just (Delimited _ minimum body membership suffix) -> let {
+      Just (Delimited _ minimum body membership suffix suffixMembership) -> let {
         end = spanBodyEnd body membership subject size (offset + 1)
-      } in if end < size && end - offset - 1 >= minimum && contains suffix (stringCodeAt subject end)
+      } in if end < size && end - offset - 1 >= minimum &&
+           (let { code = stringCodeAt subject end } in
+            if code < 128 then stringCodeAt suffixMembership code /= 0 else contains suffix code)
         then Just ((,) offset (end + 1)) else scanSpans dispatch spans subject size end
     };
   closure :: IntMap Instruction ->

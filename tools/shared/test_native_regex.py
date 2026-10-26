@@ -34,6 +34,8 @@ DEMAND_CASES = [
     ('skip-replacement', b'', b'Runtime: replacement-required\n'),
     ('skip-empty-replacement', b'\n', b''),
     ('skip-short-replacement', b'a\n', b''),
+    ('span-unclosed-replacement', 'α<unfinished\n'.encode(), b''),
+    ('span-minimum-replacement', b'ab\n', b''),
 ]
 SCHEDULING_CASES = [
     ('scan-width-first', b'', b'Runtime: width-first\n'),
@@ -188,9 +190,9 @@ def main():
                     require(result.stderr == diagnostic, 'native diagnostic differs: ' + execution)
                     record['cases'].append({'case': execution, 'passed': True,
                                             'stdout': expected.decode(), 'stderr': diagnostic.decode()})
-        require(len(record['cases']) == 52, 'native completion inventory differs')
+        require(len(record['cases']) == 56, 'native completion inventory differs')
         integrity()
-        record.update(complete=True, status='passed', native_executions=52,
+        record.update(complete=True, status='passed', native_executions=56,
                       internal_scheduling_executions=24, optimizations=['0', '2'])
     except BaseException as error:
         record.update(complete=False, status='failed', error=type(error).__name__ + ': ' + str(error))
@@ -204,7 +206,7 @@ def main():
             raise
         finally:
             save()
-    print(str(output / 'receipt.json') + ': passed (52 native executions, O0/O2)')
+    print(str(output / 'receipt.json') + ': passed (56 native executions, O0/O2)')
 
 
 if __name__ == '__main__':

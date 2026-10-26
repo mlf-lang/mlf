@@ -32,7 +32,7 @@ corpus includes every string through length four over `a`, `b`, LF, and Greek
 alpha, plus explicit astral, NUL, span, and failure subjects. Eighteen invalid
 patterns must preserve exact nonempty diagnostics.
 
-Fifteen demand oracles run separately against both the candidate and frozen
+Seventeen demand oracles run separately against both the candidate and frozen
 reference (thirty evaluations), using `evaluate`/`try` and exact exception
 markers. They check subject-before-regex error order, a required regex for an
 empty count, unused regexes for invalid find offsets, and unused replacement
@@ -40,6 +40,9 @@ bottoms when neither an empty nor a nonempty subject matches. Regex failure
 must precede replacement failure for a valid subject; fixed, terminal nullable,
 and Unicode span matches must demand a bottom replacement. Skip-plan matches
 must also demand replacement, while empty and too-short subjects leave it unused.
+Unterminated spans and spans rejected by their minimum body length also leave
+replacement unused. Literal replacement cases retain failed prefixes and final
+tails while exercising adjacent singletons, delimiters and Unicode scalars.
 
 Twelve additional private-scheduler oracles use literal dead/accepting transition
 tables to isolate demand order. Both scanners require width before credit,
@@ -51,7 +54,7 @@ require that width after a valid count. Each case has an exact first-error
 marker or literal integer result.
 `NativeScheduling.emlf` repeats these twelve controls at Clang O0/O2 through
 `test_native_regex.py`, whose isolated snapshot exposes only the two private
-functions. That driver requires 52 executions: two public-API runs, twenty-six
+functions. That driver requires 56 executions: two public-API runs, thirty
 public-demand cases, and twenty-four private-scheduling cases. Production exports
 remain unchanged.
 
@@ -59,7 +62,7 @@ Eighteen additional adversarial pairs cover long repetitive failed suffixes,
 the skip matcher's bounded-work fallback, matches after long runs, overlapping
 alternatives, shared shifts, Unicode prefixes, NUL and DEL, and the 64/65-width
 optimization boundary. Every valid and invalid offset is checked for each pair,
-along with count and replacement. Sixty literal oracles independently check
+along with count and replacement. Seventy literal oracles independently check
 exact results, including nonoverlapping counts after fallback and deletion of
 fixed-width matches between retained Unicode prefixes, gaps, and suffixes.
 

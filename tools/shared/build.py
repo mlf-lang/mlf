@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Build the committed shared implementation directly with the installed GHC.
 
-No source emission, preprocessing, copying or header overlays occur here.
+No implementation source is emitted, preprocessed, copied or overlaid for
+compilation. Fresh builtin literal stdout is verification evidence only.
 The static manifest and Cabal package describe the same closed source set.
 """
 from __future__ import annotations
@@ -16,6 +17,7 @@ import shlex
 import subprocess
 import sys
 import time
+import types
 
 ROOT = Path(__file__).resolve().parents[2]
 GHC_VERSION = '9.14.1'
@@ -28,6 +30,16 @@ PACKAGES = ['base', 'array', 'bytestring', 'text', 'containers', 'directory']
 # Audited closed-corpus exceptions: datatype declarations and a pure re-export.
 # All other owned modules must produce actual value-scheme dump evidence.
 SIGNATURELESS_MODULES = {'Bootstrap.Types', 'Async.Task.Internal'}
+BUILTIN_VERIFICATION_HELPERS = ('tools/shared/builtin_prelude_identity.py',
+                                'tools/shared/verify_builtin_prelude.py')
+
+
+def builtin_verifier():
+    path = Path(__file__).resolve().with_name('verify_builtin_prelude.py')
+    module = types.ModuleType('verify_builtin_prelude')
+    module.__file__ = str(path)
+    exec(compile(path.read_bytes(), str(path), 'exec'), module.__dict__)
+    return module
 
 
 def sha(path):
@@ -390,6 +402,8 @@ def main():
                'shared_inputs': inputs,
                'configuration_inputs': {str(p.relative_to(ROOT)): identified(p) for p in configuration_paths},
                'host_inputs': {str(p.relative_to(ROOT)): identified(p) for p in host_paths},
+               'builtin_verification_helpers': {path: identified(ROOT / path) for path in BUILTIN_VERIFICATION_HELPERS},
+               'builtin_verification': None,
                'commands': [], 'resolved_modules': {}, 'outputs': {}, 'typecheck_only': options.typecheck_only}
 
     def save():
@@ -471,6 +485,16 @@ def main():
         if identity != 'MLF/shared-haskell-v1 GHC':
             raise RuntimeError('unexpected implementation identity: ' + identity)
         receipt['implementation_identity'] = identity
+        for item in receipt['builtin_verification_helpers'].values():
+            if sha(item['path']) != item['sha256']:
+                raise RuntimeError('builtin verification helper changed during build: ' + item['path'])
+        # This gate only compares fresh generator stdout with the committed
+        # literal. It never updates/recompiles source or trusts a previous run.
+        verifier = builtin_verifier()
+        verification = verifier.verify(ROOT, output / 'bin/emlf',
+            output / 'bin/builtin-prelude', output / 'builtin-verification')
+        receipt['builtin_verification'] = identified(verification)
+        save()
     if sha(ROOT / 'shared-sources.json') != receipt['manifest_sha256']:
         raise RuntimeError('shared manifest changed during build')
     for item in inputs.values():
@@ -482,6 +506,12 @@ def main():
     for item in receipt['host_inputs'].values():
         if sha(item['path']) != item['sha256']:
             raise RuntimeError('host source changed during build: ' + item['path'])
+    for item in receipt['builtin_verification_helpers'].values():
+        if sha(item['path']) != item['sha256']:
+            raise RuntimeError('builtin verification helper changed during build: ' + item['path'])
+    for item in receipt['outputs'].values():
+        if sha(item['path']) != item['sha256']:
+            raise RuntimeError('executable changed during build: ' + item['path'])
     for key in ['build_driver', 'cabal_manifest', 'orchestrator']:
         if sha(receipt[key]['path']) != receipt[key]['sha256']:
             raise RuntimeError(key + ' changed during build')
@@ -495,6 +525,9 @@ def main():
         raise RuntimeError('GHC settings changed during build')
     receipt['object_inputs'] = {str(p.relative_to(output)): sha(p)
                               for p in sorted((output / 'objects').rglob('*')) if p.is_file()}
+    if not options.typecheck_only:
+        verifier.authenticate(receipt['builtin_verification'], ROOT,
+            output / 'bin/emlf', output / 'bin/builtin-prelude')
     receipt['complete'] = True
     save()
     print(receipt_path)

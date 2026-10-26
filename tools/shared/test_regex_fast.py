@@ -23,9 +23,9 @@ REFERENCE_SOURCE_SHA256 = 'e3087cbcfd6873c2fcb00e1541d91122dc16be7796f61fcf1d38e
 REFERENCE_REVISION = '2957dd08321c38dbf94a75cb275a5f48e897f58e'
 EXPECTED = (
     b'PASS plan-admission 20\n'
-    b'PASS literal-oracles 60\n'
+    b'PASS literal-oracles 70\n'
     b'PASS invalid-patterns 18\n'
-    b'PASS demand-oracles 15\n'
+    b'PASS demand-oracles 17\n'
     b'PASS internal-scheduling 12\n'
     b'PASS differential-patterns 233\n'
     b'PASS differential-subjects 356\n'
@@ -160,8 +160,8 @@ def main():
         result = runner.run('semantic-audit', [executable], expected=EXPECTED, timeout=180)
         verify_output(result.stdout)
         record['artifacts'] = {str(path): sha(path) for path in [executable, *transports]}
-        record.update(status='passed', complete=True, admission_checks=20, literal_oracles=60,
-                      invalid_patterns=18, demand_oracles=15, demand_evaluations=30,
+        record.update(status='passed', complete=True, admission_checks=20, literal_oracles=70,
+                      invalid_patterns=18, demand_oracles=17, demand_evaluations=34,
                       internal_scheduling_oracles=12,
                       differential_patterns=233, differential_subjects=356,
                       differential_pairs=82948, adversarial_pairs=18)

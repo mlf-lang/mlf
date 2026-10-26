@@ -97,6 +97,21 @@ main = do
   replace "a" "" "a😀a" "😀"
   replace "ab" "" "ab" ""
   replace "ab" "" "αab😀abZ" "α😀Z"
+  -- Failed delimited starts must retain the copied prefix and still find a
+  -- following singleton or later complete span. Minimum-length rejection,
+  -- final unterminated tails and non-BMP scalar offsets use literal oracles.
+  replace "a[cd]+b|x" "Q" "aaxacdbxxadb" "aaQQQQQ"
+  replace "a[cd]+b" "X" "aabacXacdbZ" "aabacXXZ"
+  replace "α[^ω]*ω" "" "xα😀ωyαβωzαbad" "xyzαbad"
+  replace "<[^>]*>" "|" "u<a>v<unfinished" "u|v<unfinished"
+  replace "a[cd]+b|x" "" "xaXx" "aX"
+  replace "\\|[^|][^|]*\\|" "-" "||a|bc|" "|-bc|"
+  -- Suffix sets exercise ASCII ranges, complement membership, embedded NUL,
+  -- and the original non-ASCII scalar predicate beyond any ASCII table.
+  replace "a[b]*[cd]" "X" "uabbcvabbdZ" "uXvXZ"
+  replace "a[b]*[^b]" "Q" "abb😀aX" "QQ"
+  replace ("a[b]*[" ++ nul ++ "c]") "N" ("a" ++ nul ++ "abc") "NN"
+  replace "a[^😀]*😀" "|" "αaβ😀xa😀" "α|x|"
   assert (eqString (R.replaceAll (regex "ab") (panic "unused replacement forced") "xxxxx") "xxxxx")
     "unused replacement remains lazy"
   assert (eqString (R.replaceAll (regex "a") (panic "empty subject forced replacement") "") "")

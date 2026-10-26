@@ -75,8 +75,10 @@ def main() -> None:
     for source in source_description["host_only"]:
         copy(ROOT / source)
     for path in [source_manifest, library_manifest, ROOT / "host/ghc/cbits/host.c",
+                 ROOT / "runtime/mlf_runtime.c",
                  ROOT / "runtime/mlf_process_supervisor.c", *sorted((ROOT / "runtime").glob("*.h")),
                  *sorted(HERE.rglob("*.py")), *sorted(HERE.rglob("*.hs")),
+                 *sorted(HERE.rglob("*.emlf")), *sorted(HERE.rglob("*.json")),
                  *sorted(HERE.rglob("*.md"))]:
         copy(path)
     libraries = []

@@ -111,5 +111,60 @@ source witnesses, reconstructs metadata, and independently checks the closed ter
 the final full graft check remains. production_controls.py validates the normal
 entry, fresh regeneration, semantic/native comparisons and mutation controls.
 The current macOS correctness receipt is not Linux/native-host qualification.
-Production timing and the complete ten-workload gate remain unfinished. Imported
-library preparation is a separate, currently unwired experiment.
+The complete ten-workload performance gate remains unfinished. The imported
+library adapter is registered with an empty production registry; its independent
+qualification experiment lives in tools/experimental/prepared-libraries.
+
+Diagnostic native producer
+-------------------------
+link_seed_manager.py can link a compatible package manager from the retained
+finite GHC producer cache. It requires the completed producer and controls
+receipts, verifies every copied non-Main object, and rebuilds only the canonical
+manager wrapper. Its historical-driver option accepts the exact recorded
+noncompiled script from checkpoint 24a777e; it never changes a producer receipt
+or substitutes compiled source. The resulting pair is a bootstrap seed, not a
+fresh compiler build or a closed-toolchain qualification.
+
+The executed 121c native diagnostic used an isolated runner under
+.mlf-build/performance-recovery/native-prepared-current/revisions/diagnostic-121c/.
+It froze 121 canonical modules, produced actual offline locks and locked plans,
+ran the complete shared parser check, and used the normal package manager to
+build emlf and builtin-prelude with --offline --locked. Both native binaries then
+passed the maintained builtin verifier with byte-exact fresh regeneration. Its
+independent postflight authenticated the retained source archive, seed cache,
+published artifacts, parser output and builtin evidence. These finite receipts
+do not qualify a complete closed toolchain or the unrun Core/Benchmark campaigns.
+The original runner did not independently pin GC inputs before the build;
+postflight checks the package builder's recorded GC/GMP identities and explicitly
+retains that limitation.
+
+The unexecuted native_controller.py v2 and multi-target build_candidate.py
+extension were archived in
+.mlf-build/performance-recovery/closeout-controller-proposals-1/.
+The public builder was restored byte-for-byte to checkpoint 24a777e's executed
+pair-only implementation. It remains a diagnostic builder; use the maintained
+builtin verifier separately. The archive's source-transition.json records exact
+before/after identities and unchanged historical receipt hashes. Restoring the
+noncompiled builder driver means its old live-path pin in the seed/postflight
+receipts is historical, not currently fresh; the exact prior bytes are archived.
+No native binary or old receipt was rewritten or relabelled. With the restored
+24a driver, a future seed link omits --producer-driver-evidence because no driver
+substitution is needed.
+
+Future qualification work needs a tested pre-freeze source transition and
+failure/retry protocol, complete native artifact-chain authentication, and the
+maintained Core/Benchmark campaigns. Populated prepared-library profiles also
+need their own exact-source regeneration and qualification. Those are handoff
+items, not completed capabilities of the current scripts. The actual diagnostic
+keeps a stable source/cache path, but adopting it for an incremental rebuild must
+first authenticate and archive its completed source state, then run new ordinary
+lock/plan/build commands; an old binary must never be relabelled as a new build.
+
+The native diagnostic emitted 63,406,714 bytes of LLVM, versus 44,535,645 bytes in
+the retained original-source baseline. The largest generated function grew from
+290,099 bytes/4,930 lines to 7,273,401 bytes/110,185 lines. The concentrated literal
+construction is a plausible explanation for the long Clang O2 stage; this is a
+static observation and inference, not a profiler attribution or controlled build
+timing. The subsequent native/GHC frontend comparison also does not establish
+that the native host improves performance. Full compile/runtime gates remain
+separate, and no all-ten-workload success is claimed.

@@ -43,4 +43,8 @@ main = do
     putStrLn (R.replaceAll (regex "ab") (panic "unused-replacement") "")
   else if eqString mode "skip-short-replacement" then
     putStrLn (R.replaceAll (regex "ab") (panic "unused-replacement") "a")
+  else if eqString mode "span-unclosed-replacement" then
+    putStrLn (R.replaceAll (regex "<[^>]*>") (panic "unused-replacement") "α<unfinished")
+  else if eqString mode "span-minimum-replacement" then
+    putStrLn (R.replaceAll (regex "a[cd]+b") (panic "unused-replacement") "ab")
   else panic "unknown native regex demand control"

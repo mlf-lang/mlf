@@ -33,6 +33,8 @@
       "Bootstrap.ImportParameters": "Bootstrap/ImportParameters.hs",
       "Bootstrap.ImportedRoot": "Bootstrap/ImportedRoot.hs",
       "Bootstrap.InferenceUnit": "Bootstrap/InferenceUnit.hs",
+      "Bootstrap.PreparedLibraries": "Bootstrap/PreparedLibraries.hs",
+      "Bootstrap.PreparedLibraryLiteral": "Bootstrap/PreparedLibraryLiteral.hs",
       "Bootstrap.Separate": "Bootstrap/Separate.hs",
       "Bootstrap.SourceEquality": "Bootstrap/SourceEquality.hs",
       "Bootstrap.SourceInference": "Bootstrap/SourceInference.hs"

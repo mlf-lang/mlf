@@ -150,7 +150,17 @@ expectedReplace =
    ("baaaaaaa", "X", replicate 200 'a' ++ "baaaaaaabaaaaaaa", replicate 200 'a' ++ "XX"),
    ("aba|bab", "X", concat (replicate 100 "ab") ++ "a", replicate 67 'X'),
    ("\0a", "X", "b\0ab\0a", "bXbX"),
-   ("ab", "", "αab😀abZ", "α😀Z")]
+   ("ab", "", "αab😀abZ", "α😀Z"),
+   ("a[cd]+b|x", "Q", "aaxacdbxxadb", "aaQQQQQ"),
+   ("a[cd]+b", "X", "aabacXacdbZ", "aabacXXZ"),
+   ("α[^ω]*ω", "", "xα😀ωyαβωzαbad", "xyzαbad"),
+   ("<[^>]*>", "|", "u<a>v<unfinished", "u|v<unfinished"),
+   ("a[cd]+b|x", "", "xaXx", "aX"),
+   ("\\|[^|][^|]*\\|", "-", "||a|bc|", "|-bc|"),
+   ("a[b]*[cd]", "X", "uabbcvabbdZ", "uXvXZ"),
+   ("a[b]*[^b]", "Q", "abb😀aX", "QQ"),
+   ("a[b]*[\0c]", "N", "a\0abc", "NN"),
+   ("a[^😀]*😀", "|", "αaβ😀xa😀", "α|x|")]
 
 invalidPatterns :: [String]
 invalidPatterns = ["[", "(", "a)", "*a", "a**", "a+?", "[z-a]", "[]", "\\",
@@ -241,7 +251,13 @@ demandCases =
     B.unpack (Reference.replaceAll (reference "ab") (bottom "unused-replacement") (B.literal "")) == ""),
    ("skip short subject leaves replacement unused", Right True,
     B.unpack (Candidate.replaceAll (candidate "ab") (bottom "unused-replacement") (B.literal "a")) == "a",
-    B.unpack (Reference.replaceAll (reference "ab") (bottom "unused-replacement") (B.literal "a")) == "a")]
+    B.unpack (Reference.replaceAll (reference "ab") (bottom "unused-replacement") (B.literal "a")) == "a"),
+   ("unclosed span leaves replacement unused", Right True,
+    B.unpack (Candidate.replaceAll (candidate "<[^>]*>") (bottom "unused-replacement") (B.literal "α<unfinished")) == "α<unfinished",
+    B.unpack (Reference.replaceAll (reference "<[^>]*>") (bottom "unused-replacement") (B.literal "α<unfinished")) == "α<unfinished"),
+   ("span minimum rejection leaves replacement unused", Right True,
+    B.unpack (Candidate.replaceAll (candidate "a[cd]+b") (bottom "unused-replacement") (B.literal "ab")) == "ab",
+    B.unpack (Reference.replaceAll (reference "a[cd]+b") (bottom "unused-replacement") (B.literal "ab")) == "ab")]
 
 -- Synthetic transition tables isolate scheduler demand from regex admission
 -- and matching. The reference predates these private functions; each result
