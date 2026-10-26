@@ -94,11 +94,11 @@ class ManifestParity(unittest.TestCase):
         mutation(data)
         path.write_text(json.dumps(data))
 
-    def test_closed_corpus_has_matching_108_modules_12_executables(self):
+    def test_closed_corpus_has_matching_111_modules_12_executables(self):
         manifest = self.check()
-        self.assertEqual(len(manifest['modules']), 108)
+        self.assertEqual(len(manifest['modules']), 111)
         modules = {entry['module']: entry for entry in manifest['modules']}
-        self.assertEqual(len(modules), 108)
+        self.assertEqual(len(modules), 111)
         for name, path, role in (
             ('Bootstrap.ClassDemand', 'libraries/mlf-inference/Bootstrap/ClassDemand.hs', 'implementation'),
             ('MLF.Tests.ClassDemand', 'tests/shared/MLF/Tests/ClassDemand.hs', 'direct-test'),
