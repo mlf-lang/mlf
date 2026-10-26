@@ -88,8 +88,13 @@ this is **not principal-scheme or full behavioral equivalence**.
 Before treating a newly packaged tree as qualified, also execute the fixed native
 gate on that exact tree/toolchain: Hello and Unicode at O0/O2 must output `x\n`
 and UTF-8 `é😀\n` respectively, with status zero and empty stderr. Compile the
-unchanged existing n-body adapter at O2 and check N=1000 with its existing independent
-oracle and raw LLVM comparison. Use the same pinned runtime/clang inputs for both
+included frozen `tests/fixtures/nbody.emlf` adapter at O2 and check N=1000
+against `tests/fixtures/nbody-1000.stdout` and the existing independent scalar
+oracle, as well as raw LLVM comparison. This exact adapter has SHA-256
+`2d4bc4be2c05de6fddd632c0cbfc22d02347a76a4cdba0c5514da7c102e7e8e4`.
+Its historical compatibility adaptation changes `IO Unit` annotations to `IO ()`;
+it does not change the n-body algorithm. The repository raw benchmark with
+`IO Unit` was not the input exercised by these gates. Use the same pinned runtime/clang inputs for both
 routes, fresh directories and ordinary baseline CLI. Record new final-tree
 receipts; earlier scratch build/install receipts are not proof of this build.
 The broader research corpus is supporting history, not automatically a final-tree
