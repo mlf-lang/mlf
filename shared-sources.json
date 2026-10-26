@@ -179,6 +179,11 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.LLVM.Argument",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/Argument.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.LLVM.Build",
       "path": "libraries/mlf-llvm/Bootstrap/LLVM/Build.hs",
       "role": "implementation"
@@ -194,6 +199,11 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.LLVM.LazyProducer",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/LazyProducer.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.LLVM.Native",
       "path": "libraries/mlf-llvm/Bootstrap/LLVM/Native.hs",
       "role": "implementation"
@@ -201,6 +211,11 @@
     {
       "module": "Bootstrap.LLVM.Optimize",
       "path": "libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.LLVM.Result",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/Result.hs",
       "role": "implementation"
     },
     {
@@ -404,13 +419,13 @@
       "role": "direct-test"
     },
     {
-      "module": "MLF.Tests.PRQuickMain",
-      "path": "tests/shared/MLF/Tests/PRQuickMain.hs",
+      "module": "MLF.Tests.ClassDemand",
+      "path": "tests/shared/MLF/Tests/ClassDemand.hs",
       "role": "direct-test"
     },
     {
-      "module": "MLF.Tests.ClassDemand",
-      "path": "tests/shared/MLF/Tests/ClassDemand.hs",
+      "module": "MLF.Tests.PRQuickMain",
+      "path": "tests/shared/MLF/Tests/PRQuickMain.hs",
       "role": "direct-test"
     },
     {

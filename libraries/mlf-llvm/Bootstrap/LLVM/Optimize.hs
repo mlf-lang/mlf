@@ -822,6 +822,38 @@ module Bootstrap.LLVM.Optimize where {
             }
         }
     };
+  -- Sink one nonescaping lazy binding into its unique selected branch.
+  -- Conditions/scrutinees and reusable boundaries remain opaque. This does
+  -- not make the RHS globally strict: an unselected branch never evaluates it.
+  singleUseBranchPath :: XName -> Bool -> UseTree -> Bool;
+  singleUseBranchPath name selected tree =
+    if M.findWithDefault compareName 0 name (useCounts tree) == 0
+    then True
+    else case useChildren tree of {
+      UseLeaf -> case useTerm tree of {
+        XEVar actual -> selected && eqName name actual;
+        _ -> False
+      };
+      UseAbs _ _ -> False;
+      UseRec _ _ -> False;
+      UseLet _ value body ->
+        (M.findWithDefault compareName 0 name (useCounts value) == 0) &&
+        singleUseBranchPath name selected body;
+      UseCase subject branches ->
+        (M.findWithDefault compareName 0 name (useCounts subject) == 0) &&
+        L.all (\entry -> singleUseBranchPath name True (L.snd entry)) branches;
+      UseApp _ _ -> case useApplications [] tree of {
+        (,) function arguments -> case useTerm function of {
+          XEPrimitive PIfThenElse -> case arguments of {
+            (:) condition ((:) yes ((:) no [])) ->
+              (M.findWithDefault compareName 0 name (useCounts condition) == 0) &&
+              (singleUseBranchPath name True yes && singleUseBranchPath name True no);
+            _ -> False
+          };
+          _ -> False
+        }
+      }
+    };
   -- Recover sharing when a nonrecursive local function is called only with
   -- the same complete vector of existing outer variables. Qualified local
   -- values can acquire ground dictionary parameters before inference; leaving
@@ -941,7 +973,8 @@ module Bootstrap.LLVM.Optimize where {
         then freshPure body
         else if smallValue (useTerm value)
              then substituteUsed name (useTerm value) body
-             else if uses == 1 && singleUseIOPath name False body
+             else if uses == 1 &&
+                     (singleUseIOPath name False body || singleUseBranchPath name False body)
                   then substituteUsed name (useTerm value) body
                   else case useChildren value of {
                     UseAbs _ _ ->

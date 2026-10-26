@@ -11,6 +11,8 @@ module Bootstrap.LLVM.Build where {
   import qualified Bootstrap.Primitive as P;
   import qualified Bootstrap.LLVM.Analysis as A;
   import qualified Bootstrap.LLVM.Optimize as O;
+  import qualified Bootstrap.LLVM.Result as R;
+  import qualified Bootstrap.LLVM.LazyProducer as V;
   data CGBinding = CGBinding String Bool;
   data Scalar = Boxed String | Floating String;
   data NativeMode = General | UnboxedDouble | NonnegativeInt | SmallIndex;
@@ -18,7 +20,7 @@ module Bootstrap.LLVM.Build where {
     Output Int ([] String) String ([] String) ([] String) (Map String ((,) Int Int)) (Map
                                                                                              XName
                                                                                              A.WorkerFunction) (Set
-                                                                                                                XName) (Map
+                                                                                                                String) (Map
                                                                                                                         XName
                                                                                                                         String) (Set
                                                                                                                                  XName) (Set
@@ -44,111 +46,115 @@ module Bootstrap.LLVM.Build where {
                                                                                                                                                                                                                      String
                                                                                                                                                                                                                      ([]
                                                                                                                                                                                                                       Bool)) (Set
-                                                                                                                                                                                                                              XName);
+                                                                                                                                                                                                                              XName) (Map XName R.ResultInfo) (Map XName V.ProducerPlan);
+  producerPlans :: Output -> Map XName V.ProducerPlan;
+  producerPlans (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) = f21;
+  resultPlans :: Output -> Map XName R.ResultInfo;
+  resultPlans (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) = f20;
   serial :: Output -> Int;
-  serial (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f0;
+  serial (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) = f0;
   withSerial :: Int -> Output -> Output;
-  withSerial value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
-    seq value (Output value f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19);
+  withSerial value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
+    seq value (Output value f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21);
   instructions :: Output -> [] String;
-  instructions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f1;
+  instructions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) = f1;
   withInstructions :: [] String -> Output -> Output;
-  withInstructions value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
-    Output f0 value f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
+  withInstructions value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
+    Output f0 value f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21;
   block :: Output -> String;
-  block (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f2;
+  block (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) = f2;
   withBlock :: String -> Output -> Output;
-  withBlock value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
-    Output f0 f1 value f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
+  withBlock value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
+    Output f0 f1 value f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21;
   definitions :: Output -> [] String;
-  definitions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f3;
+  definitions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) = f3;
   withDefinitions :: [] String -> Output -> Output;
-  withDefinitions value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
-    Output f0 f1 f2 value f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
+  withDefinitions value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
+    Output f0 f1 f2 value f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21;
   constants :: Output -> [] String;
-  constants (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f4;
+  constants (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) = f4;
   withConstants :: [] String -> Output -> Output;
-  withConstants value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
-    Output f0 f1 f2 f3 value f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
+  withConstants value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
+    Output f0 f1 f2 f3 value f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21;
   constructors :: Output -> Map String ((,) Int Int);
-  constructors (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f5;
+  constructors (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) = f5;
   withConstructors :: Map String ((,) Int Int) -> Output -> Output;
-  withConstructors value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
-    Output f0 f1 f2 f3 f4 value f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
+  withConstructors value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
+    Output f0 f1 f2 f3 f4 value f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21;
   functions :: Output -> Map XName A.WorkerFunction;
-  functions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f6;
+  functions (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) = f6;
   withFunctions :: Map XName A.WorkerFunction -> Output -> Output;
-  withFunctions value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
-    Output f0 f1 f2 f3 f4 f5 value f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
-  workers :: Output -> Set XName;
-  workers (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f7;
-  withWorkers :: Set XName -> Output -> Output;
-  withWorkers value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
-    Output f0 f1 f2 f3 f4 f5 f6 value f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
+  withFunctions value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
+    Output f0 f1 f2 f3 f4 f5 value f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21;
+  workers :: Output -> Set String;
+  workers (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) = f7;
+  withWorkers :: Set String -> Output -> Output;
+  withWorkers value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
+    Output f0 f1 f2 f3 f4 f5 f6 value f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21;
   wrappers :: Output -> Map XName String;
-  wrappers (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f8;
+  wrappers (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) = f8;
   withWrappers :: Map XName String -> Output -> Output;
-  withWrappers value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
-    Output f0 f1 f2 f3 f4 f5 f6 f7 value f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
+  withWrappers value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
+    Output f0 f1 f2 f3 f4 f5 f6 f7 value f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21;
   numericKernels :: Output -> Set XName;
-  numericKernels (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+  numericKernels (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
     f9;
   withNumericKernels :: Set XName -> Output -> Output;
-  withNumericKernels value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
-    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 value f10 f11 f12 f13 f14 f15 f16 f17 f18 f19;
+  withNumericKernels value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
+    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 value f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21;
   kernelWorkers :: Output -> Set ((,) XName ([] NativeMode));
-  kernelWorkers (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+  kernelWorkers (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
     f10;
   withKernelWorkers :: Set ((,) XName ([] NativeMode)) -> Output -> Output;
-  withKernelWorkers value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
-    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 value f11 f12 f13 f14 f15 f16 f17 f18 f19;
+  withKernelWorkers value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
+    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 value f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21;
   collectingKernels :: Output -> Set XName;
-  collectingKernels (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+  collectingKernels (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
     f11;
   withCollectingKernels :: Set XName -> Output -> Output;
-  withCollectingKernels value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
-    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 value f12 f13 f14 f15 f16 f17 f18 f19;
+  withCollectingKernels value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
+    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 value f12 f13 f14 f15 f16 f17 f18 f19 f20 f21;
   kernelEntries :: Output -> Map XName String;
-  kernelEntries (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+  kernelEntries (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
     f12;
   withKernelEntries :: Map XName String -> Output -> Output;
-  withKernelEntries value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
-    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 value f13 f14 f15 f16 f17 f18 f19;
+  withKernelEntries value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
+    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 value f13 f14 f15 f16 f17 f18 f19 f20 f21;
   inlinePrimitives :: Output -> Bool;
-  inlinePrimitives (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+  inlinePrimitives (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
     f13;
   withInlinePrimitives :: Bool -> Output -> Output;
-  withInlinePrimitives value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
-    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 value f14 f15 f16 f17 f18 f19;
+  withInlinePrimitives value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
+    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 value f14 f15 f16 f17 f18 f19 f20 f21;
   scalarRanges :: Output -> Map String ((,) Int Int);
-  scalarRanges (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f14;
+  scalarRanges (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) = f14;
   withScalarRanges :: Map String ((,) Int Int) -> Output -> Output;
-  withScalarRanges value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
-    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 value f15 f16 f17 f18 f19;
+  withScalarRanges value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
+    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 value f15 f16 f17 f18 f19 f20 f21;
   arrayViews :: Output -> Map String ((,) String String);
-  arrayViews (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f15;
+  arrayViews (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) = f15;
   withArrayViews :: Map String ((,) String String) -> Output -> Output;
-  withArrayViews value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
-    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 value f16 f17 f18 f19;
+  withArrayViews value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
+    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 value f16 f17 f18 f19 f20 f21;
   unboxedDoubles :: Output -> Map String String;
-  unboxedDoubles (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+  unboxedDoubles (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
     f16;
   withUnboxedDoubles :: Map String String -> Output -> Output;
-  withUnboxedDoubles value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
-    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 value f17 f18 f19;
+  withUnboxedDoubles value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
+    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 value f17 f18 f19 f20 f21;
   forcedValues :: Output -> Map String String;
-  forcedValues (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f17;
+  forcedValues (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) = f17;
   withForcedValues :: Map String String -> Output -> Output;
-  withForcedValues value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
-    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 value f18 f19;
+  withForcedValues value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
+    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 value f18 f19 f20 f21;
   constructorFacts :: Output -> Map String ([] Bool);
-  constructorFacts (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
+  constructorFacts (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
     f18;
   stateWorkers :: Output -> Set XName;
-  stateWorkers (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) = f19;
+  stateWorkers (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) = f19;
   withStateWorkers :: Set XName -> Output -> Output;
-  withStateWorkers value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19) =
-    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 value;
+  withStateWorkers value (Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21) =
+    Output f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 value f20 f21;
   data Build a = Build (Output -> Either String ((,) a Output));
   runBuild :: forall a. Build a -> Output -> Either String ((,) a Output);
   runBuild (Build run) state = run state;
@@ -236,8 +242,10 @@ module Bootstrap.LLVM.Build where {
       cgPure register
     };
   call :: String -> [] String -> Build String;
-  call name arguments =
-    result ("call ptr " ++ (name ++ ("(" ++ (L.intercalate ", " arguments ++ ")"))));
+  call name arguments = callTyped "ptr" name arguments;
+  callTyped :: String -> String -> [] String -> Build String;
+  callTyped ty name arguments =
+    result ("call " ++ (ty ++ (" " ++ (name ++ ("(" ++ (L.intercalate ", " arguments ++ ")"))))));
   pointer :: String -> String;
   pointer value = ("ptr " ++ value);
   number :: Int -> String;
@@ -317,14 +325,18 @@ module Bootstrap.LLVM.Build where {
   bindingOperand (CGBinding value forced) =
     gets (\state -> L.fromMaybe value (M.lookup compareString value (forcedValues state)));
   definition :: String -> [] String -> Build String -> Build ();
-  definition name args body =
-    definitionBody name args
+  definition name args body = definitionTyped "ptr" name args body;
+  definitionTyped :: String -> String -> [] String -> Build String -> Build ();
+  definitionTyped ty name args body =
+    definitionBodyTyped ty name args
       (do {
          value <- body;
-         emit ("  ret ptr " ++ value)
+         emit ("  ret " ++ (ty ++ (" " ++ value)))
        });
   definitionBody :: String -> [] String -> Build () -> Build ();
-  definitionBody name args body =
+  definitionBody name args body = definitionBodyTyped "ptr" name args body;
+  definitionBodyTyped :: String -> String -> [] String -> Build () -> Build ();
+  definitionBodyTyped ty name args body =
     do {
       saved <- get;
       modify
@@ -353,8 +365,8 @@ module Bootstrap.LLVM.Build where {
           L.unlines
             (L.append
                (args2
-                  ("define private ptr " ++
-                   (name ++ ("(" ++ (L.intercalate ", " args ++ (")" ++ (attributes ++ " {"))))))
+                  ("define private " ++ (ty ++ (" " ++
+                   (name ++ ("(" ++ (L.intercalate ", " args ++ (")" ++ (attributes ++ " {"))))))))
                   "entry:")
                (L.snoc code "}"))
       };

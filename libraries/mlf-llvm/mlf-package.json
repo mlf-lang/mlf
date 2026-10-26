@@ -23,7 +23,10 @@
       "Bootstrap.LLVM.Native": "Bootstrap/LLVM/Native.hs",
       "Bootstrap.LLVM.Optimize": "Bootstrap/LLVM/Optimize.hs",
       "Bootstrap.LLVM.StrictFields": "Bootstrap/LLVM/StrictFields.hs",
-      "Bootstrap.LLVM.StrictWrappers": "Bootstrap/LLVM/StrictWrappers.hs"
+      "Bootstrap.LLVM.StrictWrappers": "Bootstrap/LLVM/StrictWrappers.hs",
+      "Bootstrap.LLVM.Result": "Bootstrap/LLVM/Result.hs",
+      "Bootstrap.LLVM.Argument": "Bootstrap/LLVM/Argument.hs",
+      "Bootstrap.LLVM.LazyProducer": "Bootstrap/LLVM/LazyProducer.hs"
     }
   },
   "source-syntax": "shared-haskell-v1"

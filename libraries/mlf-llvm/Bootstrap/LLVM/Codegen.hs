@@ -15,6 +15,8 @@ module Bootstrap.LLVM.Codegen where {
   import qualified Bootstrap.LLVM.Kernel as K;
   import qualified Bootstrap.LLVM.Optimize as O;
   import qualified Bootstrap.LLVM.Native as N;
+  import qualified Bootstrap.LLVM.Result as R;
+  import qualified Bootstrap.LLVM.LazyProducer as V;
   generate :: Map String ((,) Int Int) -> XErased -> Either String ((,) String ([] String));
   generate cs term =
     let {
@@ -22,6 +24,9 @@ module Bootstrap.LLVM.Codegen where {
     } in
     let {
       ks = K.kernels fs
+    } in
+    let {
+      rs = R.plan cs fs ks
     } in
     let {
       output =
@@ -33,6 +38,8 @@ module Bootstrap.LLVM.Codegen where {
           M.empty
           (F.infer (M.map L.snd cs) fs term)
           S.empty
+          rs
+          (V.plan cs fs (S.union O.compareName ks (M.keysSet rs)) term)
     } in
     case runBuild (callback [] Nothing term) output of {
       Left error -> Left error;
@@ -129,6 +136,144 @@ module Bootstrap.LLVM.Codegen where {
          });
       cgPure name
     };
+  -- Internal aggregate domain: never a CGBinding or a value passed to force.
+  resultType :: String;
+  resultType = "{ i64, ptr }";
+  resultSymbol :: XName -> String;
+  resultSymbol name = "@mlf.result." ++ showInt (O.nameId name);
+  resultWorker :: XName -> A.WorkerFunction -> Build String;
+  resultWorker name f = do {
+    let { symbol = resultSymbol name };
+    seen <- gets (\state -> S.member compareString symbol (workers state));
+    if seen then cgPure () else do {
+      -- Mark before emitting the body, so recursive result calls use this ABI.
+      modify (\state -> withWorkers (S.insert compareString symbol (workers state)) state);
+      let { names = L.append (A.captures f) (A.parameters f) };
+      let { registers = L.map (\i -> "%a" ++ showInt i) (L.range 0 (L.length names - 1)) };
+      let { scope = M.fromList O.compareName
+              (L.zipWith (\n register -> (,) n (CGBinding register (S.member O.compareName n (A.strict f)))) names registers) };
+      definitionTyped resultType symbol (L.map pointer registers) (evaluateResult scope (A.functionBody f))
+    };
+    cgPure symbol
+  };
+  invokeResult :: Map XName CGBinding -> XName -> A.WorkerFunction -> [] XErased -> Build String;
+  invokeResult scope name f args = do {
+    symbol <- resultWorker name f;
+    -- Exact original ordinary call schedule; no new input demand or wrappers.
+    captured <- capturedArguments scope f;
+    values <- ordinaryArguments scope f args;
+    callTyped resultType symbol (L.map pointer (L.append captured values))
+  };
+  packResult :: Int -> String -> Build String;
+  packResult tag payload = do {
+    first <- result ("insertvalue " ++ (resultType ++ (" zeroinitializer, i64 " ++ (showInt tag ++ ", 0"))));
+    result ("insertvalue " ++ (resultType ++ (" " ++ (first ++ (", ptr " ++ (payload ++ ", 1"))))))
+  };
+  evaluateResult :: Map XName CGBinding -> XErased -> Build String;
+  evaluateResult scope expression = case expression of {
+    XELet n rhs body -> do {
+      fs <- gets functions;
+      if M.member O.compareName n fs then evaluateResult scope body else do {
+        let { strict = S.member O.compareName n (A.demanded fs body) };
+        value <- if strict then evaluate scope rhs else thunk scope rhs;
+        evaluateResult (M.insert O.compareName n (CGBinding value strict) scope) body
+      }
+    };
+    XECase subject alternatives -> evaluateCaseTyped resultType evaluateResult scope subject alternatives;
+    _ -> case O.applications expression of {
+      (,) (XEConstructor c) args -> do {
+        constructor <- lookupConstructor c;
+        case constructor of {
+          (,) tag arity ->
+            if arity == 0 then
+              if L.null args then packResult tag "null" else failure "LLVM invalid admitted nullary result"
+            else if arity == 1 then case args of {
+              (:) field [] -> do { payload <- thunk scope field; packResult tag payload };
+              _ -> failure "LLVM invalid admitted unary result"
+            } else failure "LLVM unsupported admitted result constructor"
+        }
+      };
+      (,) (XEPrimitive PIfThenElse) ((:) condition ((:) yes ((:) no []))) -> do {
+        value <- evaluate scope condition;
+        test <- result ("icmp eq ptr " ++ (value ++ (", " ++ immediate 6)));
+        choose resultType test (evaluateResult scope yes) (evaluateResult scope no)
+      };
+      (,) (XEVar name) args -> do {
+        fs <- gets functions;
+        case M.lookup O.compareName name fs of {
+          Just f -> if L.length args == L.length (A.parameters f)
+                    then invokeResult scope name f args
+                    else failure "LLVM unsaturated admitted result call";
+          Nothing -> failure "LLVM unknown admitted result call"
+        }
+      };
+      _ -> failure "LLVM unsupported admitted result expression"
+    }
+  };
+  resultAlternatives :: R.ResultInfo -> [] XErasedAlternative -> Bool;
+  resultAlternatives info alternatives = case alternatives of {
+    (:) (XErasedAlternative (XConstructorPattern first firstFields) a)
+      ((:) (XErasedAlternative (XConstructorPattern second secondFields) b) []) ->
+      L.not (eqString first second) &&
+      resultPattern info first firstFields && resultPattern info second secondFields;
+    _ -> False
+  };
+  resultPattern :: R.ResultInfo -> String -> [] (Maybe XName) -> Bool;
+  resultPattern info constructor fields = case R.descriptor info constructor of {
+    Just ((,) tag arity) -> L.length fields == arity;
+    Nothing -> False
+  };
+  evaluateResultCase :: (Map XName CGBinding -> XErased -> Build String) ->
+                        Map XName CGBinding -> XName -> A.WorkerFunction -> [] XErased ->
+                        [] XErasedAlternative -> Build String;
+  evaluateResultCase finish scope name f args alternatives = do {
+    aggregate <- invokeResult scope name f args;
+    tag <- result ("extractvalue " ++ (resultType ++ (" " ++ (aggregate ++ ", 0"))));
+    -- Extract to an ordinary ptr SSA before any subsequent allocation. Null is
+    -- legal here: the explicit tag distinguishes unary null from nullary.
+    payload <- result ("extractvalue " ++ (resultType ++ (" " ++ (aggregate ++ ", 1"))));
+    labelled <- L.mapM (\alternative -> do { label <- fresh "result.case."; cgPure ((,) label alternative) }) alternatives;
+    missing <- fresh "result.missing.";
+    join <- fresh "result.join.";
+    entries <- L.mapM caseSwitchEntry labelled;
+    emit ("  switch i64 " ++ (tag ++ (", label %" ++ (missing ++ " ["))));
+    L.mapM_ emit (L.concat entries);
+    emit "  ]";
+    forcedBefore <- gets forcedValues;
+    incoming <- L.mapM (\entry -> case entry of {
+      (,) target (XErasedAlternative pattern body) -> do {
+        modify (withForcedValues forcedBefore);
+        label target;
+        local <- resultCaseScope scope payload pattern body;
+        value <- finish local body;
+        from <- gets block;
+        emit ("  br label %" ++ join);
+        cgPure ((,) value from)
+      }
+    }) labelled;
+    label missing;
+    emit "  call void @mlf_match_failure()";
+    emit "  unreachable";
+    label join;
+    modify (withForcedValues forcedBefore);
+    phi "ptr" incoming
+  };
+  resultCaseScope :: Map XName CGBinding -> String -> XPattern -> XErased -> Build (Map XName CGBinding);
+  resultCaseScope scope payload pattern body = case pattern of {
+    XConstructorPattern constructor [] -> cgPure scope;
+    XConstructorPattern constructor ((:) optional []) -> case optional of {
+      Nothing -> cgPure scope;
+      Just name -> do {
+        fs <- gets functions;
+        if S.member O.compareName name (A.needed fs body) then do {
+          facts <- gets constructorFacts;
+          let { flags = M.findWithDefault compareString [] constructor facts };
+          cgPure (M.insert O.compareName name (CGBinding payload (L.fromMaybe False (L.at 0 flags))) scope)
+        } else cgPure scope
+      }
+    };
+    _ -> failure "LLVM invalid admitted result pattern"
+  };
   worker :: XName -> A.WorkerFunction -> Build String;
   worker name f =
     do {
@@ -141,11 +286,11 @@ module Bootstrap.LLVM.Codegen where {
       let {
         registers = L.map (\i -> ("%a" ++ showInt i)) (L.range 0 (L.length names - 1))
       };
-      seen <- gets (\state -> S.member O.compareName name (workers state));
+      seen <- gets (\state -> S.member compareString symbol (workers state));
       if seen
       then cgPure ()
       else do {
-             modify (\state -> withWorkers (S.insert O.compareName name (workers state)) state);
+             modify (\state -> withWorkers (S.insert compareString symbol (workers state)) state);
              inline <- gets inlinePrimitives;
              native <- gets (\state -> S.member O.compareName name (numericKernels state));
              if native then modify (withInlinePrimitives False) else cgPure ();
@@ -233,11 +378,141 @@ module Bootstrap.LLVM.Codegen where {
                     XName -> A.WorkerFunction -> [] XErased -> Build String;
   invokeOrdinary scope name f args =
     do {
-      symbol <- worker name f;
-      captured <- capturedArguments scope f;
-      values <- ordinaryArguments scope f args;
-      call symbol (L.map pointer (L.append captured values))
+      plans <- gets producerPlans;
+      case M.lookup O.compareName name plans of {
+        Just info -> invokeProducerBoxed scope name f info args;
+        Nothing -> do {
+          symbol <- worker name f;
+          captured <- capturedArguments scope f;
+          values <- ordinaryArguments scope f args;
+          call symbol (L.map pointer (L.append captured values))
+        }
+      }
     };
+  -- A private canonical entry carries one unshared deferred recipe, never a
+  -- fictitious language pointer. Original workers and demand masks are kept.
+  producerRegister :: Int -> Int -> String;
+  producerRegister selected index = "%a" ++ showInt (if index > selected then index + 2 else index);
+  producerScope :: V.ProducerPlan -> [] String -> Map XName CGBinding;
+  producerScope info values = M.fromList O.compareName
+    (L.zipWith (\name value -> (,) name (CGBinding value False)) (V.recipeCaptures info) values);
+  producerCaptureValues :: Map XName CGBinding -> V.ProducerPlan -> Build ([] String);
+  producerCaptureValues scope info = L.mapM
+    (\name -> do { binding <- lookupName scope name; bindingOperand binding }) (V.recipeCaptures info);
+  materializeProducer :: Map XName CGBinding -> V.ProducerPlan -> Build String;
+  materializeProducer scope info = do {
+    values <- producerCaptureValues scope info;
+    suspended (producerScope info values) (V.recipe info)
+  };
+  producerWorker :: XName -> A.WorkerFunction -> V.ProducerPlan -> Build String;
+  producerWorker name f info = do {
+    let { symbol = "@mlf.producer." ++ showInt (O.nameId name) };
+    seen <- gets (\state -> S.member compareString symbol (workers state));
+    if seen then cgPure () else do {
+      modify (\state -> withWorkers (S.insert compareString symbol (workers state)) state);
+      worker name f;
+      let { names = L.append (A.captures f) (A.parameters f) };
+      let { selected = L.length (A.captures f) + V.parameterIndex info };
+      let { entries = L.zip (L.range 0 (L.length names - 1)) names };
+      let { mode = "%a" ++ showInt selected };
+      let { first = "%a" ++ showInt (selected + 1) };
+      let { second = "%a" ++ showInt (selected + 2) };
+      let { parameters = L.concatMap
+        (\((,) index ignored) -> if index == selected
+          then args3 ("i64 " ++ mode) (pointer first) (pointer second)
+          else (:) (pointer (producerRegister selected index)) []) entries };
+      let { scope = M.fromList O.compareName (L.map
+        (\((,) index parameter) -> (,) parameter
+          (CGBinding (producerRegister selected index) (S.member O.compareName parameter (A.strict f))))
+        (L.filter (\((,) index ignored) -> index /= selected) entries)) };
+      definition symbol parameters
+        (evaluateProducerPrefix info mode first second scope (V.prefixExpression name (V.prefix info)))
+    };
+    cgPure symbol
+  };
+  invokeProducerBoxed :: Map XName CGBinding -> XName -> A.WorkerFunction -> V.ProducerPlan -> [] XErased -> Build String;
+  invokeProducerBoxed scope name f info args = do {
+    symbol <- producerWorker name f info;
+    captured <- capturedArguments scope f;
+    values <- ordinaryArguments scope f args;
+    let { prepared = L.concatMap (\((,) index value) ->
+      if index == V.parameterIndex info then args3 (number 0) (pointer value) (pointer "null")
+      else (:) (pointer value) []) (L.zip (L.range 0 (L.length values - 1)) values) };
+    call symbol (L.append (L.map pointer captured) prepared)
+  };
+  invokeProducerRecipe :: Map XName CGBinding -> A.WorkerFunction -> V.ProducerPlan -> [] XErased -> Build String;
+  invokeProducerRecipe scope f info args = do {
+    symbol <- producerWorker (V.worker info) f info;
+    captured <- capturedArguments scope f;
+    fields <- L.mapM
+      (\((,) index ((,) parameter argument)) ->
+        if index == V.parameterIndex info then do {
+          values <- producerCaptureValues scope info;
+          cgPure ((:) (number 1) (L.map pointer values))
+        } else do {
+          value <- if S.member O.compareName parameter (A.strict f)
+                   then evaluate scope argument else thunk scope argument;
+          cgPure ((:) (pointer value) [])
+        })
+      (L.zip (L.range 0 (L.length args - 1)) (L.zip (A.parameters f) args));
+    call symbol (L.append (L.map pointer captured) (L.concat fields))
+  };
+  producerEscape :: Map XName CGBinding -> XName -> Build String -> XErased -> Build String;
+  producerEscape scope virtual materialize expression = case O.applications expression of {
+    (,) (XEConstructor name) arguments -> do {
+      constructor <- lookupConstructor name;
+      if L.length arguments /= L.snd constructor then failure "LLVM invalid producer escape arity"
+      else do {
+        fields <- L.mapM (\argument -> case argument of {
+          XEVar name -> if O.eqName name virtual then materialize else thunk scope argument;
+          _ -> thunk scope argument
+        }) arguments;
+        constructorValue (L.fst constructor) fields
+      }
+    };
+    _ -> failure "LLVM invalid certified producer escape"
+  };
+  evaluateProducerPrefix :: V.ProducerPlan -> String -> String -> String ->
+                            Map XName CGBinding -> XErased -> Build String;
+  evaluateProducerPrefix info mode first second scope expression = case expression of {
+    XECase subject alternatives ->
+      evaluateCase (evaluateProducerPrefix info mode first second) scope subject alternatives;
+    _ -> case O.applications expression of {
+      (,) (XEPrimitive PIfThenElse) ((:) condition ((:) yes ((:) no []))) -> do {
+        boxed <- result ("icmp eq i64 " ++ mode ++ ", 0");
+        value <- choose "ptr" boxed
+          (forceBinding (CGBinding first False))
+          (evaluate (producerScope info (args2 first second)) (V.recipe info));
+        evaluate (M.insert O.compareName (V.parameter info) (CGBinding value True) scope) expression
+      };
+      _ -> producerEscape scope (V.parameter info)
+        (do {
+          boxed <- result ("icmp eq i64 " ++ mode ++ ", 0");
+          choose "ptr" boxed (cgPure first)
+            (suspended (producerScope info (args2 first second)) (V.recipe info))
+        }) expression
+    }
+  };
+  evaluateProducerTerminal :: V.ProducerPlan -> Map XName CGBinding -> XErased -> Build String;
+  evaluateProducerTerminal info scope expression = case O.applications expression of {
+    (,) (XEVar name) args ->
+      if L.not (O.eqName name (V.worker info)) then failure "LLVM invalid producer terminal target"
+      else do {
+        fs <- gets functions;
+        case M.lookup O.compareName name fs of {
+          Nothing -> failure "LLVM missing producer terminal worker";
+          Just f -> invokeProducerRecipe scope f info args
+        }
+      };
+    _ -> producerEscape scope (V.recipeBinder info) (materializeProducer scope info) expression
+  };
+  evaluateDeferredProducer :: V.ProducerPlan -> Map XName CGBinding -> Build String;
+  evaluateDeferredProducer info scope = case V.deferredExpression (V.worker info) (V.deferred info) of {
+    XECase subject alternatives -> evaluateCase (evaluateProducerTerminal info) scope subject alternatives;
+    _ -> failure "LLVM invalid certified deferred producer case"
+  };
+  recipePlan :: XName -> Map XName V.ProducerPlan -> Maybe V.ProducerPlan;
+  recipePlan name plans = L.find (\info -> O.eqName name (V.recipeBinder info)) (L.map L.snd (M.toList plans));
   kernelAction :: Map XName CGBinding -> XName -> A.WorkerFunction -> [] XErased -> Build String;
   kernelAction scope name f args =
     do {
@@ -410,12 +685,16 @@ module Bootstrap.LLVM.Codegen where {
           if M.member O.compareName n fs
           then evaluate scope body
           else do {
-                 let {
-                   strict = S.member O.compareName n (A.demanded fs body)
-                 };
-                 value <- if strict then evaluate scope rhs else thunk scope rhs;
-                 evaluate (M.insert O.compareName n (CGBinding value strict) scope) body
-               }
+            plans <- gets producerPlans;
+            case recipePlan n plans of {
+              Just info -> evaluateDeferredProducer info scope;
+              Nothing -> do {
+                let { strict = S.member O.compareName n (A.demanded fs body) };
+                value <- if strict then evaluate scope rhs else thunk scope rhs;
+                evaluate (M.insert O.compareName n (CGBinding value strict) scope) body
+              }
+            }
+          }
         };
       XELetRec bindings body ->
         do {
@@ -464,7 +743,25 @@ module Bootstrap.LLVM.Codegen where {
     };
   evaluateCase :: (Map XName CGBinding -> XErased -> Build String) ->
                   Map XName CGBinding -> XErased -> [] XErasedAlternative -> Build String;
-  evaluateCase finish scope scrutinee alternatives =
+  evaluateCase finish scope scrutinee alternatives = do {
+    fs <- gets functions;
+    plans <- gets resultPlans;
+    case O.applications scrutinee of {
+      (,) (XEVar name) args -> case M.lookup O.compareName name plans of {
+        Just info -> case M.lookup O.compareName name fs of {
+          Just f -> if (L.length args == L.length (A.parameters f)) && resultAlternatives info alternatives
+                    then evaluateResultCase finish scope name f args alternatives
+                    else evaluateCaseTyped "ptr" finish scope scrutinee alternatives;
+          Nothing -> evaluateCaseTyped "ptr" finish scope scrutinee alternatives
+        };
+        Nothing -> evaluateCaseTyped "ptr" finish scope scrutinee alternatives
+      };
+      _ -> evaluateCaseTyped "ptr" finish scope scrutinee alternatives
+    }
+  };
+  evaluateCaseTyped :: String -> (Map XName CGBinding -> XErased -> Build String) ->
+                       Map XName CGBinding -> XErased -> [] XErasedAlternative -> Build String;
+  evaluateCaseTyped ty finish scope scrutinee alternatives =
     case alternatives of {
       (:) (XErasedAlternative (XDefaultPattern optional) body) [] ->
         do {
@@ -510,7 +807,7 @@ module Bootstrap.LLVM.Codegen where {
           else cgPure ();
           label join;
           modify (withForcedValues forcedBefore);
-          phi "ptr" incoming
+          phi ty incoming
         }
     };
   bindOptional :: Maybe XName -> CGBinding -> Map XName CGBinding -> Map XName CGBinding;
