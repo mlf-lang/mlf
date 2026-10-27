@@ -10,8 +10,10 @@ Downloaded 2026-10-06; saved as papers/impredicativity.pdf.
 SHA-256: cd2702e52a609806597890bea8f89a7bfd2fe28e8f3d158a40bf3ba894336f25
 The downloaded version says January 2026 (minor typos fixed).
 For the text-only repository, papers/impredicativity.txt is a pdftotext
-extraction; it cannot preserve all diagrams or mathematical layout. The source
-PDF remains at the URL above and at https://github.com/mlf-lang/mlf-papers.
+extraction of that PDF. It does not preserve all diagrams or mathematical
+layout; the source PDF remains available at the URL above and in
+https://github.com/mlf-lang/mlf-papers.
+Text SHA-256: 09e0dc4e751d38a1f11fd36591d2087e21556dfdf1da67cf7b50d05fa0dfaaf0
 Figures 1 and 12 were rendered and visually checked before transcription.
 
 Reproduce
