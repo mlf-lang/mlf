@@ -1,5 +1,12 @@
 # Native self-compilation profiling
 
+> Historical evidence notice: Raw files previously stored under
+> `tools/profile/results/` were removed from this branch and its Git history.
+> References to those files below describe historical evidence that is not
+> available in this repository; retained summaries are not independent access
+> to the original raw records.
+
+
 ## Bootstrap memory — 2026-10-19
 
 The root compiler target now uses the existing checked module build path.

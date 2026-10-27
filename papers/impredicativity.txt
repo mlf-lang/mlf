@@ -1,0 +1,1751 @@
+                                                                                                                               89
+
+A Quick Look at Impredicativity
+
+ALEJANDRO SERRANO, 47 Degrees, Spain and Utrecht University, The Netherlands
+JURRIAAN HAGE, Utrecht University, The Netherlands
+SIMON PEYTON JONES, Microsoft Research, United Kingdom
+DIMITRIOS VYTINIOTIS, DeepMind, United Kingdom
+Type inference for parametric polymorphism is wildly successful, but has always suffered from an embarrassing
+flaw: polymorphic types are themselves not first class. We present Quick Look, a practical, implemented, and
+deployable design for impredicative type inference. To demonstrate our claims, we have modified GHC, a
+production-quality Haskell compiler, to support impredicativity. The changes required are modest, localised,
+and are fully compatible with GHC’s myriad other type system extensions.
+   This version (Jan 2026) has some minor typos fixed, relative to the published ICFP’20 version.
+CCS Concepts: • Theory of computation → Type structures.
+Additional Key Words and Phrases: Type systems, impredicative polymorphism, constraint-based inference
+ACM Reference Format:
+Alejandro Serrano, Jurriaan Hage, Simon Peyton Jones, and Dimitrios Vytiniotis. 2020. A Quick Look at
+Impredicativity. Proc. ACM Program. Lang. 4, ICFP, Article 89 (August 2020), 33 pages. https://doi.org/10.1145/
+3408971
+
+1   INTRODUCTION
+Parametric polymorphism backed by Damas-Milner type inference was first introduced in ML
+[Milner 1978], and has been enormously influential and widely used. But despite this impact, it
+has always suffered from an embarrassing shortcoming: Damas-Milner type inference, and its many
+variants, cannot instantiate a type variable with a polymorphic type; in the jargon, the system is
+predicative.
+  Alas, predicativity makes polymorphism a second-class feature of the type system. The type
+∀𝑎.[𝑎] → [𝑎] is fine (it is the type of the list reverse function), but the type [∀𝑎.𝑎 → 𝑎] is not,
+because a ∀ is not allowed inside a list. So ∀-types are not first class: they can appear in some
+places but not others. Much of the time that does not matter, but sometimes it matters a lot; and,
+tantalisingly, it is often “obvious” to the programmer what the desired impredicative instantiation
+should be (Section 2).
+  Thus motivated, a long succession of papers have tackled the problem of type inference for
+impredicativity [Botlan and Rémy 2003; Leijen 2008, 2009; Serrano et al. 2018; Vytiniotis et al. 2006,
+2008]. None has succeeded in producing a system that is simultaneously expressive enough to be
+useful, simple enough to support robust programmer intuition, compatible with a myriad other
+
+Authors’ addresses: Alejandro Serrano, alejandro.serrano@47deg.com, 47 Degrees, San Fernando, Spain, A.SerranoMena@uu.
+nl, Utrecht University, Utrecht, The Netherlands; Jurriaan Hage, J.Hage@uu.nl, Utrecht University, Utrecht, The Netherlands;
+Simon Peyton Jones, simonpj@microsoft.com, Microsoft Research, Cambridge, United Kingdom; Dimitrios Vytiniotis,
+dvytin@google.com, DeepMind, London, United Kingdom.
+
+Permission to make digital or hard copies of part or all of this work for personal or classroom use is granted without fee
+provided that copies are not made or distributed for profit or commercial advantage and that copies bear this notice and
+the full citation on the first page. Copyrights for third-party components of this work must be honored. For all other uses,
+contact the owner/author(s).
+© 2020 Copyright held by the owner/author(s).
+2475-1421/2020/8-ART89
+https://doi.org/10.1145/3408971
+
+
+                                   Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+89:2                                                               A. Serrano, J. Hage, S. Peyton Jones, and D. Vytiniotis
+
+
+type system extensions, and implementable without an invasive rewrite of a type inference engine
+tailored to predicative type inference.
+   In Section 3 we introduce Quick Look, a new inference algorithm for impredicativity that, for the
+first time, (a) handles many “obvious” examples; (b) is expressive enough to handle all of System F;
+(c) requires no extension to types, constraints, or intermediate representation; and (d) is easy and
+non-invasive to implement in a production-scale type inference engine – indeed we have done so
+in GHC. We make the following contributions:
+     • We formalise a higher-rank baseline system (Section 4), and give the changes required for
+        Quick Look (Section 5). A key property of Quick Look is that it requires only highly localised
+        changes to such a specification. In particular, no new forms of types are required, and
+        programs can be elaborated into a statically typed intermediate language based on System F.
+        Some other approaches, such as MLF [Botlan and Rémy 2003], require substantial changes to
+        the intermediate language, but Quick Look does not.
+     • We prove a number of theorems about our system, including about which transformations
+        do, and do not, preserve typeability (Section 6).
+     • We give a type inference algorithm for Quick Look (Section 7). This algorithm is based on the
+        now-standard approach of first generating typing constraints and then solving them [Pottier
+        and Rémy 2005]. As in the case of the declarative specification, no new forms of types
+        or constraints are needed. Section 7 proves its soundness compared with the declarative
+        specification in Section 5.1 The implementation is in turn based very closely on this algorithm.
+        The constraint generation judgements in Sections 7 and 8 also appear to be the first formal
+        account of the extremely effective combination of bidirectional type inference [Peyton Jones
+        et al. 2007] with constraint-based type inference [Pottier and Rémy 2005; Vytiniotis et al.
+        2011],
+     • Because Quick Look’s impact is so localised, it is simple to implement, even in a production
+        compiler. Concretely, the implementation of Quick Look in GHC, a production compiler for
+        Haskell, affected only 1% of GHC’s inference engine.
+     • To better support impredicativity, we propose to abandon contravariance of the function
+        arrow (Section 5.8). There are independent reasons for making this change [Peyton Jones
+        2019], but it is illuminating to see how it helps impredicativity. We also provide data on its
+        impact (Appendix A).
+The paper uses a very small language, to allow us to focus on impredicativity, but Quick Look
+scales very well to a much larger language. Section 8 and Appendix B give the details for a much
+richer set of features.
+   We present our work in the concrete setting of (a tiny subset of) Haskell, but there is nothing
+Haskell-specific about it. Quick Look could readily be used in any other type inference system.
+We cover the rich related work in Section 11.
+
+2      MOTIVATION
+The lack of impredicativity means that polymorphism is fundamentally second class: we cannot
+abstract over polymorphic types. For example, even something as basic as function composition fails
+on functions with higher-rank types (types with foralls in them). Suppose
+                        f :: (∀a.[ a] → [ a]) → Int            g :: Bool → ∀a.[ a] → [ a]
+Then the composition (f ◦ g) fails typechecking, despite the obvious compatibility of the types
+involved, simply because the composition requires instantiating the type of (◦) with a polytype.
+1 We conjecture that completeness is true as well – we are not aware of any counterexample.
+
+
+
+Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+A Quick Look at Impredicativity                                                                                      89:3
+
+
+
+    head :: ∀p.[ p ] → p                                        revapp :: ∀a b.a → (a → b) → b
+    tail   :: ∀p.[ p ] → [ p ]                                  runST :: ∀d.(∀s.ST s d) → d
+    []     :: ∀p.[ p ]                                          argST :: ∀s.ST s Int
+    (:)    :: ∀p.p → [ p ] → [ p ]                              poly :: (∀a.a → a) → (Int, Bool)
+    single :: ∀p.p → [ p ]                                      inc    :: Int → Int
+    (+ )   :: ∀p.[ p ] → [ p ] → [ p ]                          incs :: [ Int → Int ]
+    id     :: ∀a.a → a                                          choose :: ∀a.a → a → a
+    ids    :: [∀a.a → a]                                        auto :: (∀a.a → a) → (∀a.a → a)
+    map :: ∀p q.(p → q) → [ p ] → [ q]                          auto ′ :: (∀a.a → a) → b → b
+    app :: ∀a b.(a → b) → a → b                                 compose :: ∀a b c.(b → c) → (a → b) → a → c
+                               Fig. 1. Type signatures for functions used in the text
+
+
+
+
+  As another example, Augustsson describes an application [Augustsson 2011] in which it was
+crucial to have a function var :: RValue a → IO (∀lr.LR lr ⇒ lr a), an IO action that returns a
+polymorphic value. Yet in Haskell today, this is out of reach; instead you have to define a new
+named type, thus:
+newtype LRType a = MkLR (∀lr.LR lr ⇒ lr a)
+var :: RValue a → IO (LRType a)
+Every use of var must pattern match to unwrap the newtype. We call this approach “boxed impred-
+icativity”, because the forall is wrapped in a named “box”, here LRType. But boxed impredicativity
+is tiresome at best, and declaring a new type for every polymorphic shape is gruesome.
+   Why not simply allow first-class polymorphism, so that [∀𝑎.𝑎 → 𝑎] is a valid type? The problem
+is in type inference.2 Consider the expression (single id), where the type of single and id are given
+in Figure 1. It is not clear whether to instantiate 𝑝 with ∀𝑎.𝑎 → 𝑎, or with 𝐼𝑛𝑡 → 𝐼𝑛𝑡, or some other
+monomorphic type. Indeed (single id) does not even have a most general (principal) type: it has
+two incomparable types: ∀𝑎.[𝑎 → 𝑎] and [∀𝑎.𝑎 → 𝑎]. Losing principal types, especially for such
+an innocuous program, is a heavy price to pay for first-class polymorphism.
+   But in many cases there is no such problem. Consider (head ids) where, again, the types are
+given in Figure 1. Now there is no choice: the only possibility is to instantiate 𝑝 with ∀𝑎.𝑎 → 𝑎.
+Our idea, just as in previous work [Serrano et al. 2018], is to exploit that special case. Our overall
+goals are these:
+    • First class polymorphism. We want forall-types to be first class. A function like list reverse ::
+      ∀a.[ a] → [ a] should work as uniformly over [∀a.a → a] as it does over [ Int ] and [ Bool ],
+      and should do so without type annotations. No mainstream deployed language allows that;
+      and not being able to do so is a fundamental failure of abstraction. Using boxed impredicativity
+      is an anti-modular second best.
+    • Predictable type inference: it should be possible for programmers to acquire a robust mental
+      model of what will typecheck and what will not. Typically they do so through a process
+      of trial and error, but our formalism in Section 5 is specifically designed to enshrine the
+      common-sense idea that when there is clear evidence (through the argument or result type)
+      about how to instantiate a call, type inference should take advantage of it.
+
+2 Type inference is in fact undecidable for System F [Pfenning 1995; Wells 1993].
+
+
+
+                                   Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+89:4                                                               A. Serrano, J. Hage, S. Peyton Jones, and D. Vytiniotis
+
+
+       • Minimize type annotations: “obviously typeable” programs should be typeable without annota-
+         tion. To substantiate this necessarily-qualitative claim we give numerous examples, especially
+         in Figure 12.
+       • Conservative extension of Damas-Milner and its extensions to type classes, higher rank, etc.
+         That is, existing programs continue to typecheck (Section 6.1).
+       • Can express all of System F, with the use of type annotations (Section 6.1).
+       • Localised, in both specification and implementation. We seek a system that affects only a
+         small part of the specification, and the implementation, of the type system and its inference
+         algorithm. Modern type systems, such as that of Haskell, OCaml, or Scala, are subtle and
+         complicated; anything that requires pervasive changes is unlikely to be implemented.
+
+3      THE QUICK LOOK
+Our new approach works as follows:
+       • Treat applications as a whole: a function applied to a list of arguments. The list of argu-
+         ments can be empty, in which case the “function” is not necessarily a function: it can be a
+         polymorphic value, such as the empty list [ ] :: ∀p.[ p ].
+       • When instantiating the function, take a quick look at the arguments to guide that (possibly
+         impredicative) instantiation.
+       • If Quick Look produces a definite answer, use it; otherwise instantiate with a monotype (as
+         usual in Hindley-Damas-Milner type inference).
+   In our example (head ids), we have to instantiate the type of head :: ∀p.[ p ] → p. The argument
+ids :: [∀a.a → a] must be compatible with the type head expects, namely [ p ]. So we are forced to
+instantiate p := ∀a.a → a.
+   On the other hand for (single id), Quick Look sees that the argument id :: ∀a.a → a must
+be compatible with the type single expects, namely p. But that does not tell us what p must be:
+should we instantiate that ∀𝑎 or not? So Quick Look produces no advice, and we revert to standard
+Hindley-Damas-Milner type inference by instantiating p with a monotype 𝜏 → 𝜏. (Operationally,
+the inference algorithm will instantiate p with a unification variable.)
+   Why is (head ids) easier? Because the type variable p in head’s type appears guarded, under
+the list type constructor; but not so for single. Exploiting this guardedness was the key insight of
+earlier work [Serrano et al. 2018].
+   The Quick Look approach scales nicely to handle multiple arguments. For example, consider
+the expression (id : ids), where (:) is Haskell’s infix cons operator. How should we instantiate the
+type of (:) given in Figure 1? Taking a quick look at the first argument, id, yields no information; it
+is like the (single id) case. But at the second argument, ids, it immediately tells us that p must be
+instantiated with ∀a.a → a. We gain a lot from taking a quick look at all the arguments before
+committing to any instantiation.
+
+3.1     Quick Look at the Result
+So far we have concentrated on using the arguments of a call to guide instantiation, but we can
+also use the result type. Consider this expression, which has a user-written type signature:
+
+                                             (single id) :: [∀a.a → a]
+
+When considering how to instantiate single, we know that it produces a result of type [ p ], which
+must fit the user-specified result type [∀a.a → a]. So again there is only one possible choice of
+instantiation, namely p := ∀a.a → a.
+
+Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+A Quick Look at Impredicativity                                                                                     89:5
+
+
+   This same mechanism works when the “expected” type comes from an enclosing call. Suppose
+foo :: [∀a.a → a] → Int, and consider foo (single id). The context of the call (single id) specifies
+the result type of the call, just as the type signature did before. We need to “push down” the type
+expected by the context into an expression, but fortunately this ability is already well established
+in the form of bidirectional type inference [Peyton Jones et al. 2007; Pierce and Turner 2000] as
+Section 4 discusses.
+   Taking a quick look at the result type is particularly important for lone variables and constants.
+We can treat those as degenerate forms of call with zero arguments. Its instantiation cannot be
+informed by a quick look at the arguments, since it has none; but it can benefit from the result
+type. A ubiquitous example is the empty list [ ] :: ∀p.[ p ]. Consider the task of instantiating [ ] in
+the context of a call foo [ ]. Since foo expects an argument of type [∀a.a → a], the only way to
+instantiate [ ] is with p := ∀a.a → a.
+   Finally, here is a more complicated example. Consider the call ( [ ] + ids), where the types are
+given in Figure 1. First we decide how to instantiate (+ ) and, as in the case of head, we can discover
+its instantiation p := ∀a.a → a from its second argument ids. Having made that decision we now
+typecheck its first argument, [ ], knowing that the result type must be [∀a.a → a], and that in
+turn tells us the instantiation of [ ].
+
+3.2   Richer Arguments
+So far the argument of every example call has been a simple variable. But what if it was a list
+comprehension? A lambda? Another call?
+   One strength of the Quick Look approach is that we are free to make restrictions without affecting
+anything fundamental. For example, we could say (brutally) that Quick Look yields no advice for an
+argument other than a variable. The “no advice” case simply means that we will look for information
+in other arguments or, if none of them give advice, revert to monomorphic instantiation.
+   We have found, however, that it is both easy and beneficial to allow nested calls. For example,
+consider (id : (id : ids)). We can only learn the instantiation of the outer (:) by looking at its second
+argument (id : ids), which is a call. It would be a shame if simple call nesting broke type inference.
+   However, allowing nested calls is (currently) where we stop: if you put a list comprehension as
+an argument, Quick Look will ignore that argument. Allowing calls seems to be a sweet spot. One
+could go further, but the cost/benefit trade-off seems much less attractive.
+   The alert reader will note that Quick Look appears to have complexity quadratic in the depth
+of function call nesting. In our example (id : (id : ids)) the depth was two, but if there were many
+elements in the list, each nested call would take a quick look into its argument, with cost linear
+in the depth of that argument. Happily, our implementation completely avoids this complexity
+change, by retaining and re-using results of the recursive quick looks (Section 9).
+
+3.3 Uncurried Functions
+We have focused on exploiting 𝑛-ary calls of curried functions, but Quick Look works equally
+well on uncurried functions. For example, suppose cons :: ∀p.(p, [ p ]) → [ p ], and we have the
+call cons (id, ids). Quick Look only has one argument to consult, namely a nested call to the pair
+constructor. So again, supporting nested calls is necessary, and it rapidly discovers that the only
+possible instantiation is p := ∀a.a → a.
+
+3.4   Interim Summary
+The new Quick Look phase guides instantiation of a call based on the context of the call: its
+arguments and expected result type. Quick Look is a modular addition: it guides instantiation at
+call sites, but the entire inference algorithm is otherwise undisturbed. That is in sharp contrast to
+
+                                  Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+89:6                                                                  A. Serrano, J. Hage, S. Peyton Jones, and D. Vytiniotis
+
+
+
+       Type constructors                       ∋      F, G, T, . . .       Includes (→)
+       Type variables                          ∋      𝑎, 𝑏, . . .
+       Term variables                          ∋      𝑥, 𝑦, 𝑓 , 𝑔, . . .
+       Instantiation variables                 ∋      𝜅, 𝜇, 𝜐
+       Polymorphic types       𝜎, 𝜙           ::=     ∀𝑎.𝜎 | 𝜌
+       Top-level mono. types      𝜌           ::=     𝜅 | 𝜏 | T𝜎
+       Fully mono. types          𝜏           ::=     𝑎 | T𝜏
+       Typechecking direction     𝛿           ::=     ⇑|⇓                  Inference and checking respectively
+       Application heads          ℎ           ::=     𝑥                    Variable
+                                                |     𝑒 :: 𝜎               Annotation
+                                                |     𝑒                    (not an application)
+       Arguments                        𝜋     ::=     𝜎 |𝑒
+       Terms / expressions              𝑒     ::=     ℎ 𝜋 1 . . . 𝜋𝑛       Application (𝑛 ⩾ 0)
+                                                |     𝜆𝑥 . 𝑒               Abstraction
+       Environments                     Γ     ::=     𝜖 | Γ, 𝑥 :𝜎 | Γ, 𝑎
+        Mono-substitutions       𝜃,𝜓        ::=     [𝜅 := 𝜏]             fiv(𝜎)     Free instantiation vars. of 𝜎
+        Poly-substitutions       Θ, Ψ       ::=     [𝜅 := 𝜎]           dom(𝜃 )      Domain of 𝜃
+                                                                        rng(𝜃 )     Range of 𝜃
+                                                                    valargs(𝜋)      Value arguments in 𝜋
+
+                                                       Fig. 2. Syntax
+
+
+
+earlier approaches, which have a pervasive effect throughout type inference. It seems plausible,
+therefore, that the Quick Look approach would work equally well in other languages with very
+different type inference engines.
+
+4      BIDIRECTIONAL, HIGHER-RANK INFERENCE
+We begin our formalisation by giving a solid baseline, closely based on Practical type inference for
+arbitrary-rank types [Peyton Jones et al. 2007], which we abbreviate PTIAT. We simplify PTIAT by
+omitting the so called “deep skolemisation” and instantiation, and covariance and contravariance in
+function arrows, a choice we discuss in Section 5.8. We handle function application in an unusual
+way, one that will extend nicely for Quick Look, and we add visible type application [Eisenberg
+et al. 2016].
+
+4.1     Syntax
+The syntax of our language is given in Figure 2.
+   Types. The syntax of types is unsurprising. Type constructors T include the function arrow
+(→), although we usually write it infix. So (𝜏1 → 𝜏2 ) is syntactic sugar for ((→) 𝜏1 𝜏2 ). A top-
+level monomorphic type, 𝜌, has no top-level foralls, but may contain nested foralls; while a fully
+monomorphic type, or monotype, 𝜏, has no foralls anywhere. Notice that in a polytype 𝜎 the foralls
+can occur arbitrarily nested, including to the left or right of a function arrow. However, a top-level
+monomorphic type 𝜌 has no foralls at the top.
+  Terms. In order to focus on impredicativity, we restrict ourselves to a tiny term language: just
+the lambda calculus plus type annotations. We do not even support let or case. However, nothing
+
+Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+A Quick Look at Impredicativity                                                                                      89:7
+
+
+
+
+                                                      Γ ⊢⇓∀ 𝑒 : 𝜎
+
+                                                   Γ, 𝑎 ⊢⇓ 𝑒 : 𝜌
+                                                                     gen
+                                                  Γ ⊢⇓∀ 𝑒 : ∀𝑎. 𝜌
+
+                                              Γ ⊢⇑ 𝑒 : 𝜌 Γ ⊢⇓ 𝑒 : 𝜌
+
+                     Γ ⊢h⇑ ℎ : 𝜎        Γ ⊢inst 𝜎 ; 𝜋 ; 𝜙 ; 𝜌𝑟             𝑒 = valargs(𝜋)
+                         dom(𝜃 ) = fiv(𝜙, 𝜌𝑟 )           Γ ⊢⇓∀ 𝑒𝑖 : 𝜃𝜙𝑖       𝜌 = 𝜃 𝜌𝑟
+                                                                                               app-𝛿
+                                                  Γ ⊢𝛿 ℎ 𝜋 : 𝜌
+                        Γ, 𝑥 :𝜏 ⊢⇑ 𝑒 : 𝜌                            Γ, 𝑥 :𝜎𝑎 ⊢⇓∀ 𝑒 : 𝜎𝑟
+                                          abs-⇑
+                      Γ ⊢⇑ 𝜆𝑥 . 𝑒 : 𝜏 → 𝜌                         Γ ⊢⇓ 𝜆𝑥 . 𝑒 : 𝜎𝑎 → 𝜎𝑟
+                                                                                           abs-⇓
+
+
+                                                      Γ ⊢h⇑ ℎ : 𝜎
+
+                𝑥 : 𝜎 ∈ Γ h-var                  Γ ⊢⇓∀ 𝑒 : 𝜎                     Γ ⊢⇑ 𝑒 : 𝜌
+                                                                                               h-infer
+                Γ ⊢h⇑ 𝑥 : 𝜎                  Γ ⊢h⇑ (𝑒 :: 𝜎) : 𝜎
+                                                                    h-ann
+                                                                                 Γ ⊢h⇑ 𝑒 : 𝜌
+
+                                       Fig. 3. Base type system: expressions
+
+
+
+essential is thereby omitted. A major feature of Quick Look is that it is completely localised to
+typing applications. It is fully compatible with, and leaves entirely unaffected, all other aspects of
+the type system, including ML-style let-generalisation, pattern matching, GADTs, type families,
+type classes, existentials, and the like (Section 5.9).
+   Similar to other works on type inference [Dunfield and Krishnaswami 2019; Leijen 2008; Vytiniotis
+et al. 2006] our syntax uses 𝑛-ary application. The term (ℎ 𝜋1 . . . 𝜋𝑛 ) applies a head, ℎ, to a sequence
+of zero or more arguments 𝜋 1 . . . 𝜋𝑛 . The head can be a variable 𝑥, an expression with a type
+annotation (𝑒 :: 𝜎), or an expression 𝑒 other than an application. The intuition is that we want to
+use information from the arguments to inform instantiation of the function’s polymorphic variables.
+In fact, GHC’s implementation already treats application as an 𝑛-ary operation to improve error
+messages. Note also that a lone variable 𝑥 is a valid expression 𝑒; it is just an 𝑛-ary application with
+no arguments.
+   An argument 𝜋 is either a type argument 𝜎 or a value argument 𝑒. Type arguments allow the
+programmer to explicitly instantiate the quantified variables of the function (Section 4.4).
+
+4.2   Bidirectional Typing Rules
+The typing rules for our language are given in Figures 3 and 4. Following PTIAT, to support higher
+rank types the typing judgment for terms is bidirectional, with two forms: one for checking and
+one for inference.
+                                    Γ ⊢⇓ 𝑒 : 𝜌          Γ ⊢⇑ 𝑒 : 𝜌
+The first should be read “in type environment Γ, check that the term 𝑒 has type 𝜌”. The second should
+be read “in type environment Γ, the term 𝑒 has inferred type 𝜌”. Notice that in both cases the type 𝜌
+
+                                   Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+89:8                                                               A. Serrano, J. Hage, S. Peyton Jones, and D. Vytiniotis
+
+
+
+
+                                             Γ ⊢inst 𝜎 ; 𝜋 ; 𝜙 ; 𝜌𝑟
+
+                                          Γ ⊢i 𝜎 ; 𝜋 ; Θ ; 𝜙 ; 𝜌𝑟
+                                                                           inst
+                                            Γ ⊢inst 𝜎 ; 𝜋 ; 𝜙 ; 𝜌𝑟
+
+                                            Γ ⊢i 𝜎 ; 𝜋 ; Θ ; 𝜙 ; 𝜌𝑟
+                      Invariants: 𝜙 and 𝜌𝑟 are fixed points of Θ; length(𝜙) = length(valargs(𝜋 ))
+
+                                                                        iresult
+                                         Γ ⊢i 𝜌𝑟 ; 𝜖 ; ∅ ; 𝜖 ; 𝜌𝑟
+
+                         𝜋 ≠ 𝜎,𝜋 ′ 𝜅 fresh         Γ ⊢i [𝑎 := 𝜅]𝜌 ; 𝜋 ; Θ ; 𝜙 ; 𝜌𝑟
+                                                                                              iall
+                                         Γ ⊢i ∀𝑎.𝜌 ; 𝜋 ; Θ ; 𝜙 ; 𝜌𝑟
+
+                                    Γ ⊢i 𝜌 [𝑎 := 𝜎] ; 𝜋 ; Θ ; 𝜙 ; 𝜌𝑟
+                                                                             ityarg
+                                      Γ ⊢i ∀𝑎.𝜌 ; 𝜎, 𝜋 ; Θ ; 𝜙 ; 𝜌𝑟
+
+                                          Γ ⊢i 𝜎2 ; 𝜋 ; Θ ; 𝜙 ; 𝜌𝑟
+                                                                                    iarg
+                                 Γ ⊢i (𝜎1 → 𝜎2 ) ; 𝑒, 𝜋 ; Θ ; Θ𝜎1, 𝜙 ; 𝜌𝑟
+
+               𝜇, 𝜐 fresh     Θ1 = [𝜅 := (𝜇 → 𝜐)]         Γ ⊢i (𝜇 → 𝜐) ; 𝑒, 𝜋 ; Θ2 ; 𝜙 ; 𝜌𝑟
+                                                                                                        ivar
+                                      Γ ⊢i 𝜅 ; 𝑒, 𝜋 ; Θ2 ◦ Θ1 ; 𝜙 ; 𝜌𝑟
+                                              Fig. 4. Base instantiation
+
+
+
+
+has no top-level quantifiers, but for checking 𝜌 is considered as an input while for inference it is an
+output. When a rule has ⊢𝛿 in its conclusion, it is shorthand for two rules, one for ⊢⇑ and one for ⊢⇓ .
+   For example, rule abs-⇑ deals with a lambda (𝜆𝑥 .𝑒) in inference mode. The premise extends
+the environment Γ with a binding 𝑥 : 𝜏, for some monotype 𝜏, and infers the type of the body 𝑒,
+returning its type 𝜌. Then the conclusion says that the type of the whole lambda is 𝜏 → 𝜌. Note that
+in inference mode the lambda-bound variable must have a monotype. A term like 𝜆x . (x True, x 3)
+is ill-typed in inference mode, because x (being monomorphic) cannot be applied both to a Boolean
+and an integer. As is conventional, the type 𝜏 appears “out of thin air”. When constructing a typing
+derivation we are free to use any 𝜏, but of course only a suitable choice leads to a valid derivation.
+   Rule abs-⇓ handles a lambda in checking mode. The type being pushed down must be a function
+type 𝜎𝑎 → 𝜎𝑟 ; we just extend the environment with 𝑥 : 𝜎𝑎 and check the body. Note that in
+checking mode the lambda-bound variable can have a polytype, so the lambda term in the previous
+paragraph is typeable. Notice that in abs-⇓ the return type 𝜎𝑟 may have top-level quantifiers. The
+judgment ⊢⇓∀ 𝑒 : 𝜎, in Figure 3, deals with this case by adding the quantifiers to Γ before checking
+the expression against 𝜌.
+   The motivation for bidirectionality is that in checking mode we may push down a polytype, and
+thereby (as we have seen in abs-⇓) allow a lambda-bound variable to have a polytype. But how do
+we first invoke the checking judgment in the first place? One occasion is in rule h-ann, where we
+
+Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+A Quick Look at Impredicativity                                                                                     89:9
+
+
+have an explicit, user-written type signature. The second main occasion is in a function application,
+where we push the type expected by the function into the argument, as we show next.
+
+4.3   Applications and Instantiation
+A function application with 𝑛 arguments (including 𝑛 = 0) is dealt with by rule app-𝛿, whose
+premises perform these five steps:
+  (1) Infer the (polymorphic) type 𝜎 of the function ℎ, using ⊢h⇑ . Usually the function is a variable
+      𝑥, and in that case we simply look up 𝑥 in the environment Γ (rule h-var in Figure 3).
+  (2) Instantiate ℎ’s type 𝜎 with fresh instantiation variables, 𝜅, 𝜇, ..., guided by the arguments 𝜋 to
+      which it is applied, using the judgment ⊢inst . This judgement returns: a type 𝜙𝑖 for each of the
+      value arguments in 𝜋; and the top-level-monomorphic result type 𝜌𝑟 of the call.
+  (3) Conjure up a “magic substitution” 𝜃 that maps each of the free instantiation variables in 𝜙
+      and 𝜌𝑟 to a monotype. Just like the 𝜏 in abs-⇑, this 𝜃 comes “out of thin air”.
+  (4) Check that each value argument 𝑒𝑖 has the expected type 𝜃𝜙𝑖 . Note that 𝜃𝜙𝑖 can be an arbitrary
+      polytype, which is pushed into the argument, using the checking judgment ⊢⇓∀ . Using the
+      function type to specify the type of each argument is the essence of PTIAT.
+  (5) Checks that the result type of the call, 𝜃 𝜌𝑟 fits the expected type 𝜌; that is 𝜌 = 𝜃 𝜌𝑟
+Notice that instantiation variables have a very short, local life: they are born in step (2), and have
+have completely disappeared by the end of step (3). Instantiation variables never appear in Γ. You
+may wonder why we did not simply instantiate with arbitrary monotypes in step (2), and dispense
+with instantiation variables, and with 𝜃 . That would be simpler, but dividing the process in two
+will allow us to modify step (2) to perform Quick Look.
+  The instantiation judgment, shown in Figure 4, has the form
+                                              Γ ⊢inst 𝜎 ; 𝜋 ; 𝜙 ; 𝜌𝑟
+It implements step (2) by instantiating 𝜎, guided by the arguments 𝜋1 . . . 𝜋𝑛 . The type 𝜎 and
+arguments 𝜋 should be considered inputs; the argument types 𝜙, and result type 𝜌𝑟 are outputs.
+The returned arguments 𝜙 correspond 1-1 with the value arguments of 𝜋. For example,
+                              Γ ⊢inst (∀𝑎𝑏.𝑎 → 𝑏 → 𝑏) ; 𝑇 𝑟𝑢𝑒 ; 𝜅 ; (𝜐 → 𝜐)
+The environment Γ (an input) is entirely unused, and in 𝜋 the value-argument terms 𝑒 are unused.
+Both become important later for Quick Look. Moreover, as you can see from inst in Figure 4, ⊢inst
+is merely a wrapper around ⊢i , the workhorse for instantiation: ⊢inst calls ⊢i and returns all its results
+except the substitution Θ. We discuss Θ when we get to rule ivar.
+   First though, look at the easy rules for ⊢i , iall, iarg, and iresult. iall instantiates a leading
+∀; iarg decomposes a function arrow; and, when the argument list is empty, iresult returns the
+result type 𝜌𝑟 . Note that the rules deal correctly with function types that have a forall nested to the
+right of an arrow, e.g. f :: Int → ∀a.[ a] → [ a]. For example,
+                          Γ ⊢i (Int → ∀a.[ a] → [ a]) ; 3, 𝑥 ; ∅ ; 𝐼𝑛𝑡, [𝜅] ; [𝜅]
+We discuss ityarg in Section 4.4. That leaves ivar which deals with the case that the function type
+ends in a type variable, but there is another argument to come. For example, consider (id x 3). We
+instantiate id with 𝜅, so (id x) has type 𝜅; that appears applied to 3, so we learn that 𝜅 must be
+𝜇 → 𝜐. We express that knowledge with a little substitution Θ1 = [𝜅 := (𝜇 → 𝜐)], and we return
+that substitution, composed with Θ2 which comes back from the recursive call.
+                        Γ ⊢i (∀𝑎.𝑎 → 𝑎) ; 𝑥, 3 ; [𝜅 := (𝜇 → 𝜐)] ; (𝜇 → 𝜐), 𝜇 ; 𝜐
+
+                                  Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+89:10                                                                 A. Serrano, J. Hage, S. Peyton Jones, and D. Vytiniotis
+
+
+We must return the substitution Θ so that we can apply it to “earlier” arguments in rule iarg; hence
+Θ𝜎1 in the conclusion of that rule. To extend the example, suppose our call was (id x 3 4), where
+(id x) is applied not just to one, but two arguments. Then we have
+        Γ ⊢i (∀𝑎.𝑎 → 𝑎) ; 𝑥, 3, 4 ; [𝜅 := (𝜇 → 𝜅 1 ), 𝜅 1 := (𝜈 → 𝜅 2 )] ; (𝜇 → 𝜈 → 𝜅 2 ), 𝜇, 𝜈 ; 𝜅 2
+Finally ⊢inst discards the substitution returned by ⊢i ; it was needed only by iarg. This plumbing of
+the substitution is a little tiresome, but nothing very deep is happening.
+
+4.4     Visible Type Application
+The ⊢inst judgement also implements visible type application (VTA) [Eisenberg et al. 2016], a popular
+extension offered by GHC. The programmer can use VTA to explicitly instantiate a function call.
+For example, if xs :: [ Int ] we could say either (head xs) or, using VTA, (head @Int xs).
+  Adding VTA has an immediate payoff for impredicativity: an explicit type argument can be a
+polytype, thus allowing explicit impredicative instantiation of any call. This is not particularly
+convenient for the programmer – the glory of Damas-Milner is that instantiation is silent – but it
+provides a fall-back that handles all of System F.
+  More precisely, rule ityarg (Figure 4) deals with a visible type argument, by using it to instantiate
+the forall3 . The argument is a polytype 𝜎: we allow impredicative instantiation. For example,
+consider the call (map @(∀a.a → a) f ), where we supply one of the two type arguments that map
+expects (its type is in Figure 1). The instantiation judgement will then look like:
+                           Γ ⊢inst (∀p q.(p → q) → [ p ] → [ q]) ; @(∀a.a → a), 𝑓
+                                  ; ((∀𝑎.𝑎 → 𝑎) → 𝜅) ; [∀𝑎.𝑎 → 𝑎] → [𝜅]
+Here we end up with just one instantiation variable 𝜅, which instantiates 𝑞; the other quantifier 𝑝
+is directly instantiated by the supplied type argument.
+   The attentive reader may note that our typing rules are sloppy about the lexical scoping of type
+variables (for example in rule gen), so that they can appear in user-written type signatures or type
+arguments. Doing this properly is not hard, using the approach of Eisenberg et al. [2018], but the
+plumbing is distracting so we omit it.
+
+5     QUICK LOOK IMPREDICATIVITY
+Building on the baseline of Section 4, we are now ready to present Quick Look, the main contribution
+of this paper. The changes to the typing rules are given in Figure 5. We make small changes,
+highlighted in grey, in two existing rules:
+    • Learning from the arguments. During instantiation, in rule iarg, we take a quick look at the
+      argument, using a new judgement ⊢ to produce a poly-substitution Θ that expresses what
+      Quick Look learned from the argument (Section 5.1).
+    • Learning from the result. In rule app-⇓ we match 𝜌𝑟 , the result type of the call, with 𝜌, the
+      type expected by the context, learning a poly-substitution Θ. The rule then exploits Θ but
+      otherwise behaves exactly as before. We only learn from the result in checking mode (app-⇓),
+      because only in checking mode do we have an expected result type to learn from.
+Quick Look is focused exclusively on reducing the need for type annotations (in the form of VTA)
+when instantiating a call of a polymorphic function. For example, the rules for typing a lambda
+(abs-⇑ and abs-⇓) remain unaffected. Hence, just as before, in inference mode we can only infer a
+monotype for a lambda-bound variable.
+3 Note that we do not address all the details of the design of Eisenberg et al. [2016] In particular, we do not account for the
+
+difference between “specified”‘ and “inferred” quantifiers.
+
+
+Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+A Quick Look at Impredicativity                                                                                    89:11
+
+
+
+
+                                             Γ ⊢i 𝜎 ; 𝜋 ; Θ ; 𝜙 ; 𝜌𝑟
+
+               Γ ⊢ 𝑒 : 𝜎1 ; Θ1              Γ ⊢i Θ1𝜎2 ; 𝜋 ; Θ2 ; 𝜙 ; 𝜌𝑟             Θ = Θ2 ◦ Θ1
+                                                                                                          iarg
+                                  Γ ⊢i (𝜎1 → 𝜎2 ) ; 𝑒, 𝜋 ; Θ ; Θ𝜎1, 𝜙 ; 𝜌𝑟
+
+                                                      Γ ⊢⇓ 𝑒 : 𝜌
+
+                     Γ ⊢h⇑ ℎ : 𝜎        Γ ⊢inst 𝜎 ; 𝜋 ; 𝜙 ; 𝜌𝑟           𝑒 = valargs(𝜋)
+                                         ′                                  ′
+           Θ = mguql (𝜌𝑟 , 𝜌)          𝜙 = Θ𝜙           dom(𝜃 ) = fiv(𝜙 , 𝜌𝑟 )          Γ ⊢⇓∀ 𝑒𝑖 : 𝜃𝜙𝑖′
+                                                                                                           app-⇓
+                                                  Γ ⊢⇓ ℎ 𝜋 : 𝜌
+
+                                       QL argument Γ ⊢ 𝑒 : 𝜎 ; Θ
+
+                Γ ⊢h ℎ : 𝜎        Γ ⊢inst 𝜎 ; 𝜋 ; 𝜙 ; 𝜌𝑟           𝜌 = T 𝜎 or fiv(𝜌𝑟 ) = ∅
+                                                                                                   app-
+                                       Γ ⊢ ℎ 𝜋 : 𝜌 ; mguql (𝜌, 𝜌𝑟 )
+                                               Rule app- fails
+                                                                rest-
+                                               Γ ⊢ 𝑒 : 𝜎 ; ∅
+
+                                              QL head        Γ ⊢h ℎ : 𝜎
+
+                              𝑥 :𝜎 ∈Γ                                            h-ann-
+                              Γ ⊢h 𝑥 : 𝜎
+                                          h-var-           Γ ⊢h (𝑒 :: 𝜎) : 𝜎
+
+                                               Fig. 5. Quick Look rules
+
+
+
+
+5.1   A Quick Look at the Argument
+Rule iarg (Figure 5) uses ⊢ to take a quick look at the argument 𝑒. This judgement has the form:
+
+                                                   Γ ⊢ 𝑒 : 𝜙 ; Θ
+
+Here 𝑒 is the argument, 𝜙 is the type expected by the function (called 𝜎1 in iarg), and Θ is the
+knowledge (expressed as a poly-substitution for some of the instantiation variables) gained from
+comparing 𝑒 with 𝜙. The rules of this judgement are given in Figure 5.
+   Looking first at rule app-, when the argument is itself a call (ℎ 𝜋) (including the degenerate case
+of a bare variable), and the expected type is a top-level-monomorphic type (the 𝜌 in the conclusion),
+we perform Quick Look in four steps:
+  (1) Infer the type 𝜎 of the head ℎ of the application. The judgement ⊢h , also given in Figure 5, is
+      extremely simple and somewhat similar to ⊢h⇑ in Figure 3.
+  (2) Instantiate the function type 𝜎, given arguments 𝜋, using the same ⊢inst judgement as before.
+  (3) We will discuss the mysterious premise 𝜌 = T 𝜎 or fiv(𝜌𝑟 ) = ∅ in Sections 5.3 and 5.4. If
+      neither holds we revert to rest-.
+
+                                   Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+89:12                                                              A. Serrano, J. Hage, S. Peyton Jones, and D. Vytiniotis
+
+
+  (4) Return the poly-substitution gained by unifying 𝜌𝑟 , the result type of the call, with 𝜌, the
+      type expected by the function, using a standard most-general-unifier mguql (𝜌, 𝜌𝑟 ).
+For example, when typechecking the call (head ids), we instantiate head’s type with 𝜅, and take
+a quick look at the argument ids. For that, we look up ids :: [∀a.a → a] in Γ, and unify head’s
+expected argument type [𝜅] against it. That yields Θ = [𝜅 := ∀𝑎.𝑎 → 𝑎].
+  Rule rest- deals with the cases where app- does not apply. Specifically: if the expected type 𝜎 is
+not a 𝜌-type; if the argument is more complicated than a call (a list comprehension, case expression,
+lambda, etc – Section 3.2); or if the side conditions in app- fail. In effect, we simply give up on
+using that argument for Quick Look. Remember: the quick look produces a substitution if it is easy
+and unambiguous to do so; but it is always free to to bale out, producing an empty substitution. In
+the end app-⇓ will fill in any un-substituted instantiation variables with monotypes, via 𝜃 .
+
+5.2     Quick Look Unification
+The unification function mguql (𝜎, 𝜙) unifies two polytypes, returning a poly-substitution, binding
+instantiation variables (only) to polytypes. Ordinary type variables 𝑎 are treated as skolems; they
+cannot be unified by mguql .
+  Why do we need to unify during Quick Look, rather than just one-way match? Suppose
+                                      𝑓 :: ∀𝑎.(𝜎, 𝑎) → 𝐼𝑛𝑡          𝑥 :: ∀𝑐.(𝑐, 𝑐)
+where 𝜎 is any polytype (e.g. ∀𝑏.𝑏 → 𝑏). Now consider the call (f x). In rule app we instantiate 𝑓 ’s
+type with [𝑎 := 𝜅]. Now we take a quick look at the argument 𝑥 in rule iarg. In turn we instantiate
+𝑥’s type (in rule app-), with [𝑐 := 𝜇]. Finally we call mguql ((𝜎, 𝜅), (𝜇, 𝜇)). This is easily solved by
+the substitution [𝜅 := 𝜎, 𝜇 := 𝜎], but note that we had to unify variables on both sides of the call to
+do so. The unification function needs to cope with polymorphic types. For example:
+                                 mguql (∀𝑎. 𝑎 → 𝜅, ∀𝑏. 𝑏 → 𝐼𝑛𝑡) = [𝜅 := 𝐼𝑛𝑡]
+                                 mguql (∀𝑎. 𝑎 → 𝜅, ∀𝑏. 𝑏 → 𝑏) fails
+The second case fails, because 𝜅 cannot be bound to a locally-quantified variable. This kind of
+unification that checks for escaping of inner quantified variables is standard. For example Pottier
+and Rémy [2005] describe constraint solving with scope extrusion rules past universal quantifiers.
+A more general setting than ours, where unification variables can be introduced at arbitrary nested
+scopes, is mixed-prefix unification [Miller 1992].
+
+5.3     Guarded Arguments
+The purpose of rule app- is to discover if the argument ℎ 𝜋 of some enclosing call (corresponding
+to 𝑒 from rule iarg) unambiguously specifies how to instantiate some variables of 𝜌 (corresponding
+to 𝜎1 from iarg). It does so by unifying 𝜌, the type expected by the enclosing call, with 𝜌𝑟 , the type
+of the argument ℎ 𝜋.
+   But this unification risks making an arbitrary choice among possible instantiations. Consider
+these two calls (the types are in Figure 1 as usual):
+                                 Call 1: (:) id ids              Call 2: (:) id incs
+In the first we must instantiate (:) with type ∀a.a → a, while in the second we must instantiate it
+with Int → Int. Plainly cannot discover this instantiation from the first argument, which is id in
+both cases. In contrast, the necessary instantiation becomes absolutely plain when we look at the
+second argument.
+   In Call 1, suppose we instantiate (:) with [𝑎 := 𝜅]. Then the expected type of the first argument
+is 𝜅, a bare variable, while the actual argument, id, has type ∀a.a → a. So should we instantiate
+
+Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+A Quick Look at Impredicativity                                                                                   89:13
+
+
+𝜅 with ∀a.a → a? Or should we instantiate the argument id, and then bind its type to 𝜅? Since
+there is more than one choice, we should make neither; perhaps one of the other arguments of the
+application will fix 𝜅 instead.
+   And so it proves: the expected type of the second argument is [𝜅], while the actual argument,
+ids, has type [∀a.a → a]. In Call 2, the expected type is again [𝜅], but the actual argument, incs,
+has type Int → Int; so 𝜅 must be equal to Int → Int. We say that 𝜅 appears guarded by the list type
+constructor, in the type of the second argument. That is the meaning of the premise 𝜌 = 𝑇 𝜎 in
+app-: if the argument type 𝜌 is headed by a type constructor, we are free to unify.
+
+5.4   Unguarded Arguments
+Sometimes, though, the instantiation is unambiguous even when the argument type is un-guarded.
+Consider single :: ∀a.a → [ a], and the call (single ids). After instantiating with [𝑎 := 𝜅], single
+expects an argument of type 𝜅, while the actual argument, ids, has type [∀a.a → a]. Despite the
+fact that single’s argument has an unguarded type, 𝜅, there is no ambiguity here: the only possible
+instantiation is [𝜅 ↦→ [∀𝑎.𝑎 → 𝑎]].
+   Why is this the only possible instantiation? Because the result type of the argument, 𝜌𝑟 =
+[∀𝑎.𝑎 → 𝑎], has no free instantiation variables, so cannot be generalised, and hence no well-typed
+program can instantiate 𝜅 with a top-level forall. This is the role of the side condition fiv(𝜌𝑟 ) = ∅
+in app- in Figure 5
+   Note that this condition works equally well when the argument is an application, not just a
+bare variable. For example consider: 𝑔1 :: ∀a.Bool → a → a and the application: single (𝑔1 True).
+In this case we’d get back 𝜌𝑟 = (𝜅𝑎 → 𝜅𝑎 ), which has a free instantiation variable (𝜅𝑎 ), arising
+from instantiating 𝑔1 . We should not commit to a monomorphic [𝜅 := (𝜅𝑎 → 𝜅𝑎 )] because there’s
+genuine ambiguity: another typing with [𝜅 := (∀𝑎.𝑎 → 𝑎)] is also possible. The two choices would
+correspond to two different explicit System F derivations (after also fixing 𝜅𝑎 to, say, Int):
+
+           Instantiation 1                                 Instantiation 2
+           single @(Int → Int) (g1 @Int True)              single @(∀a.a → a) (Λ a . g1 @a True)
+
+Technically, the condition fiv(𝜌𝑟 ) = ∅ does not fully eliminate ambiguity due to implicit generaliza-
+tion, if vacuous quantification is allowed. Consider this expression:
+
+                                         single ids :: [∀c.[∀a.a → a] ]
+
+Here app- will instantiate single at [∀𝑎.𝑎 → 𝑎]. That contradicts the type signature, which has a
+vacuous quantification over 𝑐, so the program will be rejected in our system. We choose to ignore
+such vacuous possibilities, in exchange for making Quick Look a bit more powerful; for example,
+cases A3, A5, A7, and A12 in Figure 12 all require the side condition. This rather subtle point is a
+free design choice. We could simplify the system slightly by dropping the condition fiv(𝜌𝑟 ) = ∅ in
+app-, but then these examples would require type annotations.
+   Here are some additional examples and the result of Quick Look:
+
+              Call                    where                                   QL argument instantiation
+        (1)   single g1               g1 :: ∀a.Bool → a → a                   ∅
+        (2)   single g2               g2 :: Bool → ∀a.a → a                   [𝜅 := Bool → ∀a.a → a]
+        (3)   single (g2 True)                                                ∅
+        (4)   single (g3 True)        g3 :: ∀a.a → (∀b.b → b) → a             [𝜅 := (∀b.b → b) → Bool]
+
+                                  Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+89:14                                                              A. Serrano, J. Hage, S. Peyton Jones, and D. Vytiniotis
+
+
+To demonstrate that we should learn nothing from the argument of single in examples (1), and (3),
+here are two distinct valid instantiations for each, expressed in System F:
+                  Instantiation 1                                     Instantiation 2
+           (1)    single @(Bool → Int → Int) (g1 @Int)                single @(∀a.Bool → a → a) g1
+           (3)    single @(Int → Int) (g2 True @Int)                  single @(∀a.a → a) (g2 True)
+Since there is more than one possibility, Quick Look should commit to neither, instead allowing
+some other argument (or result type) to unambiguously fix the instantiation. We return to this
+topic in Section Section 6.2.
+
+5.5     Quick Look at the Result
+So much for taking a quick look at arguments. As we saw in Section 3.1, we can also glean
+instantiation information from the result type, at least in checking mode. The highlighted part
+of rule app-⇓ in Figure 5 therefore uses mguql to match 𝜌𝑟 , the result type of the call, with 𝜌,
+the result “pushed down” from the context by bidirectional type inference. We can use the same
+mguql function as before, but this time it really only performs matching, because 𝜌 is devoid of
+instantiation variables.
+   For example, consider the expression ( [] :: [∀𝑎.𝑎 → 𝑎]), where [] is the empty list, whose
+type is ∀𝑝.[𝑝] (Figure 1). The user-written type signature [∀𝑎.𝑎 → 𝑎] is pushed down by rule
+h-ann (Figure 3). Then we find the (degenerate) call []; instantiating its type with 𝜅 we get the
+result type [𝜅]. Rule app-⇓ now calls mguql ( [𝜅], [∀𝑎.𝑎 → 𝑎]), which succeeds with substitution
+Θ = [𝜅 ↦→ ∀𝑎.𝑎 → 𝑎], as desired.
+   All this happens only in the checking case (𝛿 = ⇓). For the inference case, rule app-⇑ is unchanged,
+and we perform no Quick Look on the result type. We can’t — we are inferring the result type. But
+even in inference mode, we will still take a quick look at the arguments, of course.
+
+5.6     Over-saturated Functions
+Consider the call (head ids True). This is a tricky one! We have head :: ∀p.[ p ] → p, which looks
+as if it takes one argument, yet here it is applied to two. That is fine: ids is a list of polymorphic
+functions, so we extract the head, instantiate it, and apply the result to True. If we put in the type
+applications it would look like (ℎ𝑒𝑎𝑑 @(∀𝑎.𝑎 → 𝑎) 𝑖𝑑𝑠 @𝐵𝑜𝑜𝑙 𝑇 𝑟𝑢𝑒).
+   It is for this reason that rule iarg in Figure 5 applies the substitution Θ1 (gleaned from Quick
+Look at the argument) to the result type 𝜎2 before instantiating the rest of the function. In this
+example, suppose we instantiate head with 𝜅 to yield the type [𝜅] → 𝜅. Then in rule iarg we take
+a quick look at the argument ids, yielding Θ1 = [𝜅 := ∀𝑎.𝑎 → 𝑎]. We apply Θ1 to the result type 𝜅,
+giving ∀𝑎.𝑎 → 𝑎. Then we instantiate with ityarg and use iarg on the argument True. In the end
+                       Γ ⊢inst (∀𝑝.[𝑝] → 𝑝) ; 𝑖𝑑𝑠,𝑇 𝑟𝑢𝑒 ; [∀𝑎.𝑎 → 𝑎], 𝐵𝑜𝑜𝑙 ; 𝐵𝑜𝑜𝑙
+
+5.7     Argument Order
+Suppose f1 and f2 are the same function, but take their two arguments in a different order. Then we
+would expect (f1 e1 e2 ) to typecheck if and only if (f2 e2 e1 ) typechecks; typechecking should not
+be sensitive to the vagaries of argument order. In the system we have presented so far this property
+does not quite hold. Consider:
+                                  f1 :: ∀a.[ a] → a → Int         x1 :: ∀b.[ [ b] ]
+                                  f2 :: ∀a.a → [ a] → Int         x2 :: [∀c.c → c ]
+Then (f1 x1 x2 ) typechecks, but (f2 x2 x1 ) does not. Why? Suppose we instantiate f1 with [𝑎 := 𝜅],
+and its first argument x1 with [𝑏 := 𝜇]. The first argument is guarded, so Quick Look learns
+
+Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+A Quick Look at Impredicativity                                                                                   89:15
+
+
+[𝜅 := [𝜇]]. Moving on to the second argument, we apply what we have learned so far (the Θ1𝜎2 in
+iarg), so the expected type is not 𝜅 but [𝜇] and that is guarded. So we can learn [𝜇 := ∀c.c → c].
+But if we try to typecheck (f2 x2 x1 ), the first argument is unguarded, so we learn nothing. From
+the second we learn [𝜅 := [𝜇]] as before, but that is all we get, and it is not enough to type the
+term. The difference arises because iarg applies the substitution Θ as it goes – and it must do so to
+handle over-saturated functions (Section 5.6).
+   There are several ways out of this dilemma. We could (1) reject both calls, by computing a
+guardedness flag for each argument based on the uninstantiated type of the function, and use those
+precomputed flags (unaffected by Quick Look’s progress) to determine guardedness in rule app-.
+   As a more complex alternative, we could (2) accept both calls, by typing guarded arguments first,
+and then unguarded ones (in the hope that they are now guarded). This is similar in spirit to the
+approach taken by HMF [Leijen 2008, §6.6]. Even more obscure examples show that one would
+have to iterate this process to a fixed point. Finally, we could (3) ignore the problem: the typing
+rules are simple and predictable, and the order-sensitive examples are pretty obscure.
+   In our implementation we use approach (1): it requires simpler reasoning from the programmer,
+and is straightforward to implement.
+
+5.8 Co- and Contravariance of Function Types
+The presentation so far treats the function arrow (→) uniformly with other type constructors T .
+Suppose that
+                         f :: (∀a.Int → a → a) → Bool               g :: Int → ∀b.b → b
+Then the call (f g) is ill-typed because we use equality when comparing the expected and actual
+result types in rule app. The call would also be rejected if the foralls in f and g’s types were the
+other way around. Only if they line up will the call be accepted. The function is neither covariant
+nor contravariant with respect to polymorphism; it is invariant.
+   We make this choice for three reasons. First, and most important for this paper, treating the
+function arrow invariantly means that it acts as a guard, which in turn allows more impredicative
+instantiations to be inferred. For example, without an invariant function arrow (app runST argST )
+cannot be typed.
+   Second, such mismatches are rare (we give data in Appendix A), and even when one occurs it
+can readily be fixed by 𝜂-expansion. For example, the call (f (𝜆x . g x)) is accepted regardless of
+the position of the foralls.
+   Finally, as well as losing guardedness, co/contra-variance in the function arrow imposes other
+significant costs. One approach, used by GHC, is to perform automatic 𝜂-expansion, through so-
+called “deep skolemisation” and “deep instantiation” [Peyton Jones et al. 2007, §4.6]. But, aside from
+adding significant complexity to the type system, this automatic 𝜂-expansion changes the semantics
+of the program (both in call-by-name and call-by-need settings), which is highly questionable.
+   Instead of actually 𝜂-expanding, one could make the type system behave as if 𝜂-expansion had
+taken place. This would, however, impact the compiler’s intermediate language. GHC elaborates
+the source program to a statically-typed intermediate language based on System F; we would have
+to extend this along the lines of Mitchell’s System F𝜂 [Mitchell 1988], a major change that would in
+turn impact GHC’s entire downstream optimisation pipeline.
+   In short, an invariant function arrow provides better impredicative inference, costs the program-
+mer little, and makes the type system significantly simpler. Indeed, a GHC Proposal to simplify
+the language by adopting an invariant function arrow has been adopted by the community, inde-
+pendently of impredicativity [Peyton Jones 2019]. In Appendix A we quantify the impact of this
+change in the broader Haskell ecosystem.
+
+                                  Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+89:16                                                              A. Serrano, J. Hage, S. Peyton Jones, and D. Vytiniotis
+
+
+5.9     Modularity
+Quick Look is like many other works in that it exploits programmer-supplied type annotations to
+guide type inference (Section 11). But Quick Look’s truly distinctive feature is that it is modular
+and highly localised.
+   Highly localised. Through half-closed eyes the changes in Figure 5 may seem substantial. However,
+rule app-⇓ is the only rule of the expression judgement that is changed. When scaling up to all
+of Haskell, the expression judgement in Figure 3 gains dozens and dozens of rules, one for each
+syntactic construct. But the only change to support Quick Look impredicativity remains rule app-⇓.
+So Quick Look scales well to a very rich source language.
+  Modular. This paper has presented only a minimalistic type system, but GHC offers many, many
+more features, including let-generalisation, data types and pattern matching, GADTs, existentials,
+type classes, type families, higher kinds, quantified constraints, kind polymorphism, dependent
+kinds, and so on. GHC’s type inference engine works by generating constraints solving them
+separately, and elaborating the program into System F [Vytiniotis et al. 2011]. All of these extensions,
+and the inference engine that supports them, are unaffected by Quick Look. Indeed, we conjecture the
+Quick Look would be equally compatible with quite different type systems, such as ones involving
+subtyping, or dependent object types.
+  To substantiate these claims, Section 8 gives the extra rules for a much larger language; and
+we have built a full implementation in GHC (Section 9). This implementation is the first working
+implementation of impredicativity in GHC, despite several attempts over the last decade, each of
+which became mired in complexity.
+
+6     PROPERTIES OF QUICK LOOK
+In this section we give a comprehensive account of various properties of Quick Look.
+
+6.1     Expressiveness and Backward Compatibility
+Our system is able to type any program typeable in System F, maybe with additional annotations.
+In order to do so, we define a type-directed translation from System F into our source language,
+in a fashion very similar to Serrano et al. [2018]. Every variable, and application is recursively
+translated, and in addition:
+    • A System F abstraction (𝜆(𝑥 :: 𝜎). 𝑒) is translated as (𝜆𝑥 . 𝑒 ′ :: 𝜎 → 𝜙), where 𝑒 ′ is the
+       translation of 𝑒, and 𝜙 is the type of 𝑒.
+    • A System F type application (e @𝜎) is translated as (e ′ @𝜎), where 𝑒 ′ is the translation of 𝑒.
+    • A System F type abstraction (Λ𝑎. 𝑒) is translated as the annotated term (𝑒 ′ :: ∀𝑎.𝜎), where 𝑒 ′
+       is the recursive translation of 𝑒, and 𝜎 is the type of 𝑒.
+  Theorem 6.1 (Embedding of System F). Let 𝑒 be a well-typed System F expression with type 𝜎
+under an environment Γ, and 𝑒 ′ the translation as defined above. Then Γ ⊢⇓ 𝑒 ′ : 𝜎.
+The inverse translation, from our language into System F, is also simple to define. In particular, uses
+of the ⊢inst judgment translate into type applications, and uses of ⊢⇓∀ translate into type abstractions.
+The fact that we elaborate to System F – a provably type-safe system where types can be erased –
+means that the proposed system is type-safe.
+   The theorem above shows that there exists a compositional translation of System F into typeable
+programs in Quick Look but it is heavy on type annotations. In terms of practical guidance about
+where type annotations may be needed, programmers need (1) annotate all lambdas with poly-
+morphic argument types (or annotate just bound polymorphic variables if present in the syntax),
+
+Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+A Quick Look at Impredicativity                                                                                   89:17
+
+
+(2) give a visible type argument for every polymorphic (impredicative) instantiation that does not
+have a variable at the head of the instantiated function argument type, or that is not fixed by taking
+a quick look at the arguments or result type. This in turn means that although the naive translation
+of System F is heavy on type annotations, in practice very few annotations are needed.
+  Theorem 6.2 (Compatibility with rank-1 polymorphism). Let 𝑒 be an expression with type 𝜏
+under 𝜆-calculus with predicative polymorphism, in an environment Γ whose types only have top-level
+polymorphism. Then Γ ⊢⇑ 𝑒 : 𝜏 in the system presented in this paper.
+
+The theorem holds because, given the conditions on Γ, all the argument types 𝜙 in rule app will
+be monotypes, so Quick Look will recover no useful information, and will effectively be a no-op.
+Technically, Damas-Milner also includes generalizing let bindings, but adding those in our system
+poses no technical challenges (Appendix B).
+
+6.2   Uniqueness of Quick Look
+A crucial intuition is that if Quick Look returns a substitution of the instantiation variables then that
+is unambiguously the most general substitution we could use to type an application. For example,
+in Section 5.4 we showed examples where, since more than one instantiation is possible, we choose
+neither, thanks to the side-conditions in rule app-.
+   This is of great practical importance, because if Quick Look for one argument makes an “incorrect”
+choice among multiple possibilities, that choice might contradict an unambiguous choice (the
+“correct” answer) gotten from another.
+   It would clearly be desirable to formalise this principle. Intuitively, the quick-look substitution
+should always be “on the way to” the substitution that would witness any valid typing derivation. But
+any valid typing derivation in what system? Presumably in a system allowing arbitrary polymorphic
+instantiation, as in System F. We have a theorem along these lines, but even the statement of the
+theorem requires significant technical scaffolding, including instrumented derivations in a variant
+of System F with n-ary applications, and a slightly different presentation of our instantiation
+judgement with an accumulating substitution, to name a few. Hence we leave a proper formal
+presentation of this result as future work.
+
+6.3   Program Transformations
+In this section we consider how several program transformations affect typeability in Quick Look.
+   Relating inference and checking mode. A desirable property of a type system is that if we can
+infer a type for a term then we can certainly check that the term can be assigned this type. The
+next theorem guarantees this; the proof is given in Appendix C.
+   Theorem 6.3. If Γ ⊢⇑ 𝑒 : 𝜌 then Γ ⊢⇓ 𝑒 : 𝜌.
+As a consequence of this theorem, adding a type annotation (which changes the typechecking
+direction to checking) is a valid program transformation.
+   Let abstraction and inlining. One desirable property, at the heart of ML, is let-abstraction:
+                                        let x = e in b       ≡?    b [e / x]
+This property does not hold in in our system; but nor does it hold in our baseline system PTIAT,
+because they use the context of the call to guide the typing of the argument. For example, suppose
+that f :: ((∀a.a → a) → Int) → Bool. Then let-abstracting the argument can render the program
+ill-typed. However, it can always be fixed by adding a type signature:
+
+                                  Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+89:18                                                              A. Serrano, J. Hage, S. Peyton Jones, and D. Vytiniotis
+
+
+
+                      Unification variables              ∋ 𝛼, 𝛽, 𝛾
+                      Fully mono. types     𝜏           ::= 𝛼 | . . .
+                      Constraints           𝐶           ::= 𝜖 | 𝐶 ∧ 𝐶 | 𝜎 ∼ 𝜙 | ∀𝑎. ∃𝛼 . 𝐶
+                                         Fig. 6. Extra syntax for inference
+
+
+
+                              f (𝜆x . (x True, x 3))                   Well typed
+                              let g = 𝜆x . (x True, x 3) in f g        Not well typed
+                              let g :: (∀a.a → a) → Int
+                                  g = 𝜆x . (x True, x 3)               Well typed
+                              in f g
+What about the opposite of let-abstraction, namely let-inlining? With PTIAT, inlining a let-binding
+always improves typeability, but not so for Quick Look. Suppose f :: ∀a.(Int → a) → a. Then we
+have
+                      f (𝜆x . ids)                           Not well typed
+                      let g = 𝜆x . ids in f g                Well typed
+                      f ((𝜆x . ids) :: Int → [∀a.a → a]) Well typed
+The trouble here is that Quick Look does not look inside lambda arguments. Again, a type signature
+makes the program robust to such transformation, so that this equivalence always holds:
+                                     let x = e :: 𝜎 in b     ≡     b [ e :: 𝜎 / x ]
+  𝜂-expansion. Sometimes, as we have seen in Section 5.8, 𝜂-expansion is necessary to make a
+program typecheck. But sometimes the reverse is the case. For example, we cannot in general
+𝜂-expand runST to become (𝜆x . runST x), because then x would have to have a polytype, and in
+inference mode it can only have a monotype (rule app-⇑).
+   Argument permutation. As discussed in Section 5.7, Quick Look as described in Figure 5 is sensitive
+to permutation of function arguments. It is possible to achieve argument order independence by
+pre-computing a guardedness flag for each argument, and our implementation does so.
+
+7     TYPE INFERENCE
+In this section we give a type inference algorithm that implements the specification given in Section 5,
+and discuss its soundness.
+
+7.1     Inference Algorithm
+Typically type inference algorithms work in two stages: generating constraints, and then solving
+them, as described in OutsideIn(X): Modular type inference with local assumptions [Vytiniotis et al.
+2011], which we abbreviate MTILA. To focus on impredicativity, we simplify MTILA by omitting
+local typing assumptions, along with data types, GADTs, and type classes – but our approach to
+impredicativity scales to handle all these features, as the full rules in Section 8 demonstrate.
+   Our algorithm generates constraints whose syntax is shown in Figure 6. Simple constraints are
+bags of equality constraints 𝜙 1 ∼ 𝜙 2 , but we will also need mixed-prefix constraints ∀𝑎.∃𝛼 .𝐶. These
+forms are not new; they are described in MTILA, and used in GHC’s constraint solver. This is a key
+point of our approach: it requires zero changes to GHC’s actual constraint language and solver.
+
+Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+A Quick Look at Impredicativity                                                                                   89:19
+
+
+
+
+                                                 Γ ⊢⇓∀ 𝑒 : 𝜎 ; 𝐶
+
+                            Γ, 𝑎 ⊢⇓ 𝑒 : 𝜌 ; 𝐶              𝛼 = fuv(𝐶) − fuv(Γ, 𝜌)
+                                                                                        gen
+                                         Γ ⊢⇓∀ 𝑒 : ∀𝑎. 𝜌   ; ∀𝑎. ∃𝛼 . 𝐶
+
+                                     Γ ⊢⇑ 𝑒 : 𝜌 ; 𝐶 Γ ⊢⇓ 𝑒 : 𝜌 ; 𝐶
+
+                         Γ ⊢h⇑ ℎ : 𝜎 ; 𝐶 h          Γ ⊢inst 𝜎 ; 𝜋 ; 𝜙 ; 𝜌𝑟 ; 𝐶 inst
+                     𝛼 fresh        𝜃 = [fiv(𝜙, 𝜌𝑟 ) := 𝛼]          Γ ⊢⇓∀ 𝑒𝑖 : 𝜃𝜙𝑖 ; 𝐶𝑖
+                                                                                               app-⇑
+                                    Γ ⊢⇑ ℎ 𝜋 : 𝜃 𝜌𝑟 ; 𝐶 h ∧ 𝐶 inst ∧ 𝐶𝑖
+
+                         Γ ⊢h⇑ ℎ : 𝜎 ; 𝐶 h          Γ ⊢inst 𝜎 ; 𝜋 ; 𝜙 ; 𝜌𝑟 ; 𝐶 inst
+                                                           ′
+                          Θ = mguql (𝜌𝑟 , 𝜌)     𝜙 = Θ𝜙    𝜌𝑟′ = Θ𝜌𝑟
+                                           ′ ′
+                    𝛼 fresh    𝜃 = [fiv(𝜙 , 𝜌𝑟 ) := 𝛼]  Γ ⊢⇓ 𝑒𝑖 : 𝜃𝜙𝑖′ ; 𝐶𝑖
+                                                           ∀
+                                                                                               app-⇓
+                             Γ ⊢⇓ ℎ 𝜋 : 𝜌 ; 𝐶 h ∧ 𝐶 inst ∧ 𝐶𝑖 ∧ (𝜃 𝜌𝑟′ ∼ 𝜌)
+                                   𝛼 fresh       Γ, 𝑥 : 𝛼 ⊢⇑ 𝑒 : 𝜌 ; 𝐶
+                                                                       abs-⇑
+                                        Γ ⊢⇑ 𝜆𝑥 . 𝑒 : 𝛼 → 𝜌 ; 𝐶
+       𝛽𝑎 , 𝛽𝑟 fresh Γ, 𝑥 : 𝛽𝑎 ⊢⇓ 𝑒 : 𝛽𝑟 ; 𝐶                              Γ, 𝑥 : 𝜎𝑎 ⊢⇓∀ 𝑒 : 𝜎𝑟 ; 𝐶
+                                             absv-⇓
+       Γ ⊢⇓ 𝜆𝑥 . 𝑒 : 𝛼 ; 𝐶 ∧ (𝛼 ∼ 𝛽𝑎 → 𝛽𝑟 )                              Γ ⊢⇓ 𝜆𝑥 . 𝑒 : 𝜎𝑎 → 𝜎𝑟 ; 𝐶
+                                                                                                         absf-⇓
+
+
+                                                 Γ ⊢h⇑ ℎ : 𝜎 ; 𝐶
+
+       𝑥 :𝜎 ∈Γ                        Γ ⊢⇑ 𝑒 : 𝜌 ; 𝐶                            Γ ⊢⇓∀ 𝑒 : 𝜎 ; 𝐶
+                   h-var                                       h-infer
+    Γ ⊢⇑ 𝑥 : 𝜎 ; 𝜖
+       h
+                                      Γ ⊢h⇑ 𝑒 : 𝜌 ; 𝐶                        Γ ⊢h⇑ (𝑒 :: 𝜎) : 𝜎 ; 𝐶
+                                                                                                         h-annot
+
+                                     Fig. 7. Inference algorithm: expressions
+
+
+
+   Algorithm: expressions. Figure 7 presents constraint generation for expressions. It closely follows
+the declarative specification in Figure 3, as modified in Figure 5. For example, the judgement Γ ⊢𝛿 𝑒 :
+𝜌 ; 𝐶 is very similar to that in Figure 3, but in addition generates constraints 𝐶. The big difference
+is that instead of clairvoyantly selecting monomorphic types 𝜏 for 𝜆-abstraction arguments and for
+other instantiations (e.g. the range of substitution 𝜃 in rule app-𝛿) the constraint-generation rules
+create fresh unification variables, 𝛼, 𝛽, 𝛾. Unification variables stand for monomorphic types, and
+are solved during a subsequent constraint solving pass. In contrast, instantiation variables stand
+for polytypes, and are solved immediately by Quick Look; the constraint solver never sees them.
+Hence the following invariant:
+   Lemma 7.1. If Γ ⊢𝛿 𝑒 : 𝜌 ; 𝐶 (with fiv(Γ) = ∅) then fiv(𝐶) = ∅.
+   Rule gen generates a mixed-prefix constraint (a degenerate implication constraint in the MTILA
+jargon), that encodes the fact that the unification variables 𝛼 generated in 𝐶 are allowed to unify to
+types mentioning the bound variables 𝑎.
+
+                                  Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+89:20                                                                 A. Serrano, J. Hage, S. Peyton Jones, and D. Vytiniotis
+
+
+
+
+                                             Γ ⊢inst 𝜎 ; 𝜋 ; 𝜙 ; 𝜌𝑟 ; 𝐶
+
+                                          Γ ⊢i 𝜎 ; 𝜋 ; Θ ; 𝜙 ; 𝜌𝑟 ; 𝐶
+                                                                                inst
+                                           Γ ⊢inst 𝜎 ; 𝜋 ; 𝜙 ; 𝜌𝑟 ; 𝐶
+
+                                           Γ ⊢i 𝜎 ; 𝜋 ; Θ ; 𝜙 ; 𝜌𝑟 ; 𝐶
+                            Invariants: 𝜙 and 𝜌𝑟 are fixed points of Θ; length(𝜙) = length(𝜋 )
+
+                                                                             iresult
+                                         Γ ⊢i 𝜌𝑟 ; 𝜖 ; ∅ ; 𝜖 ; 𝜌𝑟 ; 𝜖
+
+                          𝜋 ≠ 𝜎,𝜋 ′ 𝜅 fresh        Γ ⊢i [𝑎 := 𝜅]𝜌 ; 𝜋 ; Θ ; 𝜙 ; 𝜌𝑟 ; 𝐶
+                                                                                                    iall
+                                         Γ ⊢i ∀𝑎.𝜌 ; 𝜋 ; Θ ; 𝜙 ; 𝜌𝑟 ; 𝐶
+
+                                    Γ ⊢i 𝜌 [𝑎 := 𝜎] ; 𝜋 ; Θ ; 𝜙 ; 𝜌𝑟 ; 𝐶
+                                                                                   ityarg
+                                     Γ ⊢i ∀𝑎.𝜌 ; 𝜎, 𝜋 ; Θ ; 𝜙 ; 𝜌𝑟 ; 𝐶
+
+              Γ ⊢ 𝑒 : 𝜎1 ; Θ1             Γ ⊢i Θ1𝜎2 ; 𝜋 ; Θ2 ; 𝜙 ; 𝜌𝑟 ; 𝐶                Θ = Θ2 ◦ Θ1
+                                                                                                              iarg
+                                Γ ⊢i (𝜎1 → 𝜎2 ) ; 𝑒, 𝜋 ; Θ ; Θ𝜎1, 𝜙 ; 𝜌𝑟 ; 𝐶
+
+                            𝛽, 𝛾 fresh     Γ ⊢i (𝛽 → 𝛾) ; 𝑒, 𝜋 ; Θ ; 𝜙 ; 𝜌𝑟 ; 𝐶
+                                                                                              ivarm
+                            Γ ⊢i 𝛼 ; 𝑒, 𝜋 ; Θ ; 𝜙 ; 𝜌𝑟 ; 𝐶 ∧ 𝛼 ∼ (𝛽 → 𝛾)
+
+             𝜇, 𝜐 fresh     Θ1 = [𝜅 := (𝜇 → 𝜐)]           Γ ⊢i (𝜇 → 𝜐) ; 𝑒, 𝜋 ; Θ2 ; 𝜙 ; 𝜌𝑟 ; 𝐶
+                                                                                                             ivard
+                                    Γ ⊢i 𝜅 ; 𝑒, 𝜋 ; Θ2 ◦ Θ1 ; 𝜙 ; 𝜌𝑟 ; 𝐶
+                                       Fig. 8. Inference algorithm: instantiation
+
+
+
+  Rules absv-⇓ and abs-⇑ generate fresh unification variables, as expected4 . Note that they preserve
+the invariant that environments and constraints only mention unification variables but never
+instantiation variables.
+  Rules app-⇑ and app-⇓ follow their declarative counterparts in Figure 3 and Figure 5, with a
+few minor deviations. First, while rule app-⇓ in Figure 5 clairvoyantly selects a monomorphic 𝜃 to
+“monomorphise” any instantiation variables that are not given values by Quick Look, its algorithmic
+counterpart in Figure 7 generates fresh unification variables 𝛼. Second, rule app-⇓ generates further
+constraints about the result type; whereas the rule in Figure 5 has readily ensured that 𝜌 = 𝜃 𝜌𝑟 .
+   Algorithm: instantiation. The algorithmic instantiation judgement in Figure 8 collects constraints
+generated in rule ivarm. In that case we have a unification variable 𝛼 that we have to further unify
+to a function type 𝛽 → 𝛾. Note how the constraint 𝐶 only mentions unification but no instantiation
+variables. Instantiation variables 𝜅 are born and eliminated in a single round of Quick Look.
+4 The alert reader will notice that absv-⇓ is redundant; we can instead use app-⇓ with an empty 𝜋 and ℎ = 𝜆𝑥 .𝑒; that rule
+
+would in turn invoke ⊢h⇑ ℎ : 𝜎 and thence (via h-infer) land in abs-⇑. But this chain is pretty indirect, so we prefer to give
+absv-⇓ directly.
+
+
+Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+A Quick Look at Impredicativity                                                                                     89:21
+
+
+
+                            Expressions 𝑒            ::= · · · | case 𝑒 0 of {𝐾𝑖 𝑥𝑖 → 𝑒𝑖 }
+                            Constraints 𝑄            ::= 𝜖 | 𝑄 ∧ 𝑄
+                                                       | 𝜎 ∼𝜙
+                                                       | . . . extensible
+                Polymorphic types      𝜎, 𝜙 ::= ∀𝑎. 𝑄 ⇒ 𝜌           𝑎 and 𝑄 may be empty
+                Constructor signatures    k ::= 𝐾 : ∀𝑎 𝑏. 𝑄 ⇒ 𝜎 → T 𝑎
+                Environments              Γ ::= · · · | Γ, k | Γ, 𝑄
+                                         Fig. 9. Syntax for extended language
+
+
+
+7.2    Soundness of Type Inference
+We write 𝜃 |= 𝐶 to mean that a monomorphic idempotent substitution 𝜃 (from any sort of variables)
+is a solution to constraint 𝐶.5 Due to Lemma 7.1, a solution 𝜃 to a constraint 𝐶 need only refer to
+unification variables, but never instantiation variables, that must be resolved only through the QL
+mechanism. The main soundness theorem follows:
+ Theorem 7.2 (Soundness). If Γ ⊢𝛿 𝑒 : 𝜌 ; 𝐶, 𝜃 is a substitution from unification variables to
+monotypes, fiv(𝜃 ) = ∅, and 𝜃 |= 𝐶 then 𝜃 Γ ⊢𝛿 𝑒 : 𝜃 𝜌.
+  The theorem relies on a chain of other lemmas for every auxiliary judgement used in our
+specification and the algorithm. We give proofs in Appendix C.
+  We additionally conjecture that completeness is true of our algorithm, but have not attempted a
+detailed proof.
+
+8     EXTENDING THE LANGUAGE WITH QUALIFIED TYPES AND GADTS
+As discussed in Section 5.9, one of the salient features of Quick Look is its modularity with respect
+to other type system features. In this section we describe the integration with qualified types and
+GADTs, and leave let bindings for Appendix B.
+   Haskell has a much richer vocabulary of polymorphic types than simply ∀𝑎. 𝜌. In addition to
+quantified type variables, a set of constraints may appear, as described in Figure 9. Those constraints
+must be satisfied by the chosen instantiation in order for the program to be accepted.
+   Following Vytiniotis et al. [2011] we leave the language of constraints open; in the case of GHC
+this language includes type class constraints and equalities with type families. Figure 10 shows
+that the changes required to support qualified types are fairly minimal:
+      • Environments Γ may now also mention local constraints. This is a slight departure from
+        Vytiniotis et al. [2011], in which variable environments and local constraints were kept in
+        separate sets; this change allows us to control better the scope of each type variable.
+      • Rules gen and iapp now have to deal with constraints. In the former case, 𝑄 is added to
+        the set of local constraints. In the case of iapp, the constraints are returned as part of the
+        instantiation judgment.
+      • Rule app needs to check that the constraints obtained from instantiation hold for the chosen
+        set of types. We use an auxiliary constraint entailment judgment Γ ⊩ 𝑄 which states that
+        constraints 𝑄 hold in the given environment (which may contain local assumptions). This
+        judgment can be freely instantiated, as explained by Vytiniotis et al. [2011].
+5 For implication constraints 𝜃 is a substitution nesting – see [Serrano et al. 2018].
+
+
+
+                                    Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+89:22                                                              A. Serrano, J. Hage, S. Peyton Jones, and D. Vytiniotis
+
+
+
+
+                                                     Γ ⊢⇓∀ 𝑒 : 𝜎
+
+                                                Γ, 𝑎, 𝑄 ⊢⇓ 𝑒 : 𝜌
+                                                                        gen
+                                              Γ ⊢⇓∀ 𝑒 : ∀𝑎. 𝑄 ⇒ 𝜌
+
+                                              Γ ⊢⇑ 𝑒 : 𝜌 Γ ⊢⇓ 𝑒 : 𝜌
+
+                   Γ ⊢h⇑ ℎ : 𝜎       Γ ⊢inst 𝜎 ; 𝜋 ; 𝑄 ; 𝜙 ; 𝜌𝑟             𝑒 = valargs(𝜋)
+                dom(𝜃 ) = fiv(𝑄, 𝜙, 𝜌𝑟 )          Γ ⊢⇓∀ 𝑒𝑖 : 𝜃𝜙𝑖       𝜌 = 𝜃 𝜌𝑟          Γ ⊩ 𝜃𝑄
+                                                                                                      app-𝛿
+                                                 Γ ⊢𝛿 ℎ 𝜋 : 𝜌
+                                               for each branch 𝐾𝑖 𝑥𝑖 → 𝑒𝑖 do:
+                        Γ ⊢⇑ 𝑒 0 : T 𝜎            𝐾𝑖 : ∀𝑎 𝑏. 𝑄 ⇒ 𝑣𝑖 → T 𝑎 ∈ Γ
+                                                   Γ, 𝑥𝑖 : [𝑎 := 𝜎]𝑣𝑖 , 𝑏, 𝑄 ⊢𝛿 𝑒𝑖 : 𝜌
+                                                                                             case
+                                      Γ ⊢𝛿 case 𝑒 0 of {𝐾𝑖 𝑥𝑖 → 𝑒𝑖 } : 𝜌
+
+                                         Γ ⊢i 𝜎 ; 𝜋 ; Θ ; 𝑄 ; 𝜙 ; 𝜌𝑟
+
+                    𝜋 ≠ 𝜎,𝜋 ′ 𝜅 fresh         Γ ⊢i ( [𝑎 := 𝜅]𝜌) ; 𝜋 ; Θ ; 𝑄 ′ ; 𝜙 ; 𝜌𝑟
+                                                                                                   iall
+                             Γ ⊢i (∀𝑎.𝑄 ⇒ 𝜌) ; 𝜋 ; Θ ; Θ𝑄 ∧ 𝑄 ′ ; 𝜙 ; 𝜌𝑟
+
+                                       Constraint entailment            Γ ⊩𝑄
+                                         Fig. 10. Qualified types and GADTs
+
+
+
+   GADTs extend the language by allowing local constraints and quantification also in data type
+constructors. These constraints are in scope whenever pattern matching consider that case. The
+integration of pattern matching in a bidirectional type system can be done in several ways, depend-
+ing on the direction in which the expression being matched is type checked. In the rule case in
+Figure 10 we look at that expression 𝑒 0 in inference mode; the converse choice is to look at how
+branches are using the value to infer the instantiation.
+   In principle, Quick Look is not affected by these changes. But we could also use some information
+about the usage of types in the rest of constraints to guide the choice of impredicativity. For example,
+Haskell does not allow type class instances over polymorphic types; so if we find a constraint Eq a,
+we know that 𝑎 should not be impredicatively instantiated.
+
+9   IMPLEMENTATION
+One of our main claims is that Quick Look can be added, in a modular and non-invasive way, to
+an existing, production-scale type inference engine. To substantiate the claim, we implemented
+Quick Look on top of the latest incarnation of GHC (ghc-8.11.0.20200529). The changes were
+straightforward, and were highly localised. Overall we added about 450 lines to GHC’s 90,000 line
+
+Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+A Quick Look at Impredicativity                                                                                   89:23
+
+
+type inference engine. (These figures include comment-only lines, since they are a good proxy for
+tricky code.) By way of comparison, attempts to implement Guarded Instantiation [Serrano et al.
+2018] in GHC floundered in a morass of complexity. The Quick Look implementation is publicly
+available.6
+   Our implementation completely avoids the potentially-quadratic cost of Quick Look (Section 3.2)
+by retaining and re-using the results of recursive quick looks. Happily, this turned out to require
+only simple and localised changes to our initial implementation of Quick Look.
+   Type classes proved to be the only really tricky point. Consider wcs :: (HasCallStack ⇒ c) → c,
+and the innocent-looking call (app wcs True). We instantiate app with [𝑎 := 𝜅, 𝑏 := 𝜇]. Then from
+app’s first argument (which is guarded) we rightly conclude that [𝜅 := HasCallStack ⇒ 𝜈, 𝜇 := 𝜈],
+where we instantiate wcs with 𝜈. Quick Look is a no-op on the second argument because the
+expected argument type HasCallStack ⇒ 𝜈 is not a top-level monomorphic type, so app- rule does
+not apply. So the call typechecks fine.
+   But now consider the call (revapp True wcs), where we reverse the argument order. After
+instantiating revapp with [𝑎 := 𝜅, 𝑏 := 𝜇], a quick look on the first argument succeeds, even though
+revapp’s first argument type is unguarded, because the type of the argument, Bool, has no free
+instantiation variables. So we conclude [𝜅 := Bool]. Disaster: that instantiation does not allow the
+application to be typechecked. Permuting the arguments changes behaviour!
+   The problem is that the reasoning about unguarded arguments in Section 5.4 is undermined by
+type classes: although a vacuous type abstraction is not useful, a type class abstraction that binds
+no type variables may be very useful indeed. In this case, the quick look at the first argument of
+revapp True wcs should not have yielded a substitution.
+   The simplest way to restore insensitivity to argument order is to drop the condition fiv(𝜌𝑟 ) from
+app- entirely, along with Section 5.4. We are reluctant to do this, because it means that some
+apparently-simple examples (including ones in existing libraries) are no longer typeable without
+annotations. Instead, we accept a measure of order-dependence in applications, by recognising that
+the first argument of app has already fixed a to be a qualified type, and so app- should not apply
+to the second. But we stress that this is a free (and debatable) design choice.
+
+10    APPLICATIONS
+A reasonable question to ask is how the implementation of Quick Look in GHC discussed in
+Section 9 benefits the user. It is hard to say how useful a feature will be in practice when it does
+not yet exist, but we can give some indicative data.
+   First, GHC has had an unreliable, unsupported, and entirely un-specified implementation of
+impredicativity for many years. We scanned the source code of a collection of packages obtained
+from Stackage (LTS 13.6). This repository contains 607 packages that that use the extensions
+RankNTypes, Rank2Types or ImpredicativeTypes. Of these we found 20 that used ImpredicativeTypes,
+suggesting that impredicativity is regarded as nigh essential by some authors. Of these 20 packages,
+10 compiled directly with our new GHC, 4 needed eta expansions due to GHC now using an
+invariant arrow (see Appendix A for more details), and 6 could not be compiled due to missing
+dependencies and other issues unrelated to our work.
+   Second, in our set of 607 packages, we identified 48 packages with at least one source file that
+had newtype and forall on the same line, indicating that the programmer had used a wrapper for
+a higher-rank type. Our scan was rather superficial, and we will have missed a number of cases,
+e.g., if a line contains newtype and a synonym that hides the forall.
+
+6 https://gitlab.haskell.org/ghc/ghc/-/merge_requests/3220
+
+
+
+                                  Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+89:24                                                              A. Serrano, J. Hage, S. Peyton Jones, and D. Vytiniotis
+
+
+  The questions then is: can we get rid of such wrapper types? We investigated in some detail 26
+out of those 48 packages7 . For 17 out of 26 packages, all wrapped types were used in an instance
+declaration. Quick Look has nothing to say here, making this is an important future direction.
+  In 6 of the remaining 9 cases, removing the wrapping on higher-rank types was an unqualified
+success. Consider the well-known Scrap Your Boilerplate package syb, that is depended on by more
+than 300 packages on Hackage.8 In module Data.Generics.Aliases we find several types that wrap a
+higher-rank type:
+type GenericM m = ∀a.Data a ⇒ a → m a newtype GenericM ′ m = GM { unGM :: GenericM m }
+type GenericQ r = ∀a.Data a ⇒ a → r   newtype GenericQ ′ r = GQ { unGQ :: GenericQ r }
+type GenericT   = ∀a.Data a ⇒ a → a   newtype GenericT ′   = GT { unGT :: GenericT }
+These newtypes are exported and (only) used in the module Data.Generics.Twins. Here is a use of
+GenericM ′, seen in the use of GM and unGM (we have elided some irrelevant code):
+gzipWithM :: ∀m.Monad m ⇒ GenericQ (GenericM m) → GenericQ (GenericM m)
+gzipWithM f x y = case gmapAccumM perkid funs y of ...
+  where perkid a d = (tail a, unGM (head a) d)
+        funs = gmapQ (𝜆k → GM (f k)) x
+Our goal is to get rid of GenericM ′ and replace it with GenericM, in other words, to remove the
+wrapping GM and unwrapping unGM from the definitions of perkid and funs. To do so we have to
+add signatures, since polymorphic types are never inferred for function arguments, thus:
+where perkid :: ∀b.Data b ⇒ [ GenericM m] → b → ( [ GenericM m], m b)
+      perkid a d = (tail a, (head a) d)
+      funs :: [ GenericM m]
+      funs = gmapQ f x
+These type signatures are desirable anyway, making the code far more comprehensible. We did
+the same for the other two types, GenericQ ′ and GenericT ′, and were able to completely remove all
+three auxiliary newtypes from the implementation.
+   Three of the remaining packages were harder to deal with. In the case of streamly one wrapper
+type was easily removed, but two other wrapped types were harder to deal with because of the
+interaction between Quick Look and type families, and the desugaring of do notation. For fixed-
+vector, one type had a class instance problem, one type could be dealt with, essentially by replacing
+pattern matches by function calls to help Quick Look along. Interestingly, this package depended
+on the primitive package we had already successfully dealt with. The changes to the latter did not
+lead to issues with fixed-vector. For reflection the results are still inconclusive.
+
+11      RELATED WORK
+This section explores many different strands of work on first-class polymorphism; another excellent
+review can be found in [Botlan and Rémy 2009, §5]. Figure 11 shows how various impredicative
+systems impinge on users, by requiring them to understand new term forms, new type forms,
+or new type constraints. The fourth column shows whether type annotations may be necessary,
+beyond the binders of polymorphic lambdas. In this figure “no” is good! QL does not require any
+new terms, types, or constraints; but in exchange, QL sometimes requires an annotation on a
+non-guarded instantiation. HMF achieves a similar combination of features, but QL is better suited
+7 Of the remaining 22, 18 depended on packages we could not compile, because of different reasons, and in 4 cases the
+
+wrapped type was in code that was not used in a standard compile.
+8 https://packdeps.haskellers.com/reverse/syb version 0.7.1.
+
+
+
+Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+A Quick Look at Impredicativity                                                                                   89:25
+
+
+
+                                                                                                  Annotation needed
+    Name                                     New terms       New types      New constraints
+                                                                                                 beyond poly. lambdas
+    QL (this paper)                               No             No                No                    Yes
+    GI [Serrano et al. 2018]                      No             No                Yes                   Yes
+    MLF [Botlan and Rémy 2003]                    No             Yes               Yes                   No
+    HMF [Leijen 2008]                             No             No                No                    Yes
+    FPH [Vytiniotis et al. 2008]                  No             No                Yes                   No
+    HML [Leijen 2009]                             No             Yes               Yes                   No
+    Boxy [Vytiniotis et al. 2006]                 No             Yes               No                    Yes
+    QML [Russo and Vytiniotis 2009]               No             Yes               No                    Yes
+    FreezeML [Emrich et al. 2019]                 Yes            No                No                    No
+    PolyML [Garrigue and Rémy 1999]               Yes            No                No                    No
+
+                        Fig. 11. Various impredicative systems features (“No” is good)
+
+
+
+
+for the type inference engine of GHC since the quick look is a separate step before actual constraint
+generation. We continue below with a detailed discussion of related work for polymorphic type
+inference.
+   Figure 12 compares the expressiveness of some of these systems, using examples from their
+papers and more. As we see, QL performs well despite its simplicity.
+
+  Higher-rank polymorphism. Type inference for higher-rank polymorphism (in which foralls can
+appear to the left or right of the function arrow) is a well-studied topic with successful solutions
+using bidirectional type inference as discussed in Section 4 [Peyton Jones et al. 2007]. Follow-up
+modern presentations [Dunfield and Krishnaswami 2013] re-frame the problem within a more
+logical setting, and describe extensions to indexed types [Dunfield and Krishnaswami 2019]. The
+“C” examples are all about higher-rank inference, and mostly do not use impredicativity at all.
+
+   Boxed polymorphism. Impredicativity goes beyond higher-rank, by allowing quantified types
+to instantiate polymorphic types and data structures. Both Haskell and OCaml have supported
+impredicative polymorphism, in an inconvenient form, for over a decade.
+   In Haskell, one can wrap a polytype in a new, named data type or newtype, which then behaves
+like a monotype [Odersky and Läufer 1996]. This boxed polymorphism mechanism is easy to
+implement, but the programmer has to declare new data types and explicitly box and unbox the
+polymorphic value. Nevertheless, boxed polymorphism is widely used in Haskell.
+   OCaml supports polymorphic object methods, based on the theory of Poly-ML [Garrigue and
+Rémy 1999]. The programmer does not have to declare new data types, but polymorphic values
+must still be wrapped and unwrapped. In practice, the mechanism is little used, perhaps because it
+is only exposed through the object system.
+   In FreezeML [Emrich et al. 2019] the programmer chooses explicitly when to not instantiate a
+polymorphic type by using the freeze operator ⌈−⌉, similar to how it is done in FX-89 [O’Toole
+and Gifford 1989] with explicit open and close operations. Another variant of this line of work is
+QML [Russo and Vytiniotis 2009], which has two different universal quantifiers, one that can be
+implicitly instantiated and one that requires explicit instantiation. Introducing and eliminating the
+explicit quantifier is akin to the wrapping and unwrapping. Explicit wrapping and unwrapping
+may be tedious, especially since it often seems unnecessary, so our goal is to allow polymorphic
+functions to be implicitly instantiated with quantified types.
+
+                                  Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+89:26                                                              A. Serrano, J. Hage, S. Peyton Jones, and D. Vytiniotis
+
+
+                                                                            QL     GI    MLF HMF FPH HML
+        A    polymorphic instantiation
+        A1   const2 = 𝜆x y. y                                                ✓      ✓     ✓     ✓      ✓      ✓
+             MLF infers (b ⩾ ∀c. c → c) ⇒ a → b, QL and GI infer a → b → b.
+        A2   choose id                                                       ✓      ✓     ✓     ✓      ✓      ✓
+             MLF and HML infer (a ⩾ ∀b. b → b) ⇒ a → a, FPH, HMF, QL, and GI infer (a → a) → a → a.
+        A3   choose [ ] ids                                                  ✓      ✓     ✓     ✓      ✓      ✓
+        A4   𝜆(x :: ∀a. a → a). x x                                          ✓      ✓     ✓     ✓      ✓      ✓
+             MLF infers (∀a. a → a) → (∀a. a → a), QL and GI infer (∀a. a → a) → b → b.
+        A5   id auto                                                        ✓      ✓      ✓     ✓     ✓       ✓
+        A6   id auto ′                                                      No     ✓      ✓     ✓     ✓       ✓
+        A7   choose id auto                                                 ✓      ✓      ✓     ✓     No      ✓
+        A8   choose id auto ′                                               No     No     ✓     No    No      ✓
+             QL and GI need an ann. on id :: (∀a. a → a) → (∀a. a → a).
+        A9   f (choose id) ids                                               ✓     ✓∗     ✓     No     ✓      ✓
+             where f :: ∀a. (a → a) → [ a ] → a
+             GI needs an annotation on (choose id) :: (∀a. a → a) → (∀a. a → a).
+        A10 poly id; poly (𝜆x. x); id poly (𝜆x. x)                           ✓  ✓ ✓        ✓     ✓           ✓
+        A11 k (𝜆f . (f 1, f True) xs                                         ✓ No No No No                   No
+            where k :: ∀a. a → [ a ] → Int, xs :: [ (∀a. a → a) → (Int, Bool) ]
+            Note the example requires impredicativity and bidirectionality.
+        A12 poly id; app poly id; revapp id poly                             ✓  ✓ ✓        ✓     ✓            ✓
+        A13 app runST argST ; revapp argST runST                             ✓  ✓ ✓        ✓     ✓            ✓
+        B   functions on polymorphic lists
+        B1 length ids; tail ids; head ids; single id                         ✓  ✓ ✓        ✓     ✓            ✓
+        B2 id : ids                                                          ✓  ✓ ✓ ✓† ✓                      ✓
+        B3 (𝜆x. x) : ids                                                     ✓  ✓ ✓ ✓† ✓                      ✓
+        B4 single inc + single id                                            ✓  ✓ ✓        ✓     ✓            ✓
+        B5 single id + ids                                                   ✓ No ✓ No ✓                      ✓
+        B6 map poly (single id)                                              ✓ No ✓        ✓     ✓            ✓
+            GI needs an ann. on single id :: [ ∀a. a → a ] in the previous two.
+        B7 map head (single ids); head ids True                              ✓  ✓ ✓        ✓     ✓            ✓
+        C   inference of polymorphic lambda binders and generalization points
+        C1a 𝜆f . (f 1, f True)                                               No No No No No                  No
+        C1b 𝜆(f :: ∀a. a → a). (f 1, f True)                                 ✓  ✓ ✓        ✓     ✓           ✓
+        C1c g (𝜆f . (f 1, f True))                                           ✓ No No ✓ † No                  No
+            where g :: ( (∀a. a → a) → (Int, Bool)) → Char
+        C2 r (𝜆x y. y)                                                       ✓ ✓ ∗ ✓ ✓ † No                  No
+            where r :: (∀a. a → ∀b. b → b) → Int
+        E   𝜂-expansion k :: ∀a. a → [ a ] → a, h :: Int → ∀a. a → a, lst :: [ ∀a. Int → a → a ]
+        E1a k h lst                                                          No No No No No                  No
+        E1b k (𝜆x. h x) lst                                                  ✓  ✓ ✓ No ✓                     ✓
+        E2a 𝜆x. poly x                                                       No No ✓ No No                   No
+        E2b (𝜆x. poly x) :: (∀a. a → a) → (Int, Bool)                        ✓ No ✓ ✓ † No                   No
+        E3a app poly id                                                      ✓  ✓ ✓        ✓     ✓           ✓
+        E3b app (𝜆x. poly x) id                                              No No ✓ No No                   No
+        E4a map poly ids                                                     ✓  ✓ ✓        ✓     ✓           ✓
+        E4b map (𝜆x. poly x) ids                                             ✓ No ✓ No No                    No
+        E5a compose poly head                                                ✓  ✓ ✓        ✓     ✓           ✓
+        E5b 𝜆xs. poly (head xs)                                              No No ✓ No No                   No
+∗ in gi requires extensions [Serrano et al. 2018]. † in HMF requires n-ary apps. and annotation propagation [Leijen 2008].
+
+                                Fig. 12. Comparison of impredicative type systems
+Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+A Quick Look at Impredicativity                                                                                   89:27
+
+
+   Guarded impredicativity. Quick Look builds on ideas originating in previous work on Guarded
+Impredicative Polymorphism (GI) [Serrano et al. 2018]. Specifically, GI figures out the polymorphic
+instantiation of variables that are “guarded” in the type of the instantiated function, or the types of
+the arguments; meaning they occur under some type constructor. However, GI relied on extending
+the constraint language with two completely new forms of constraints, one of which (delayed
+generalisation) was very tricky to conceptualise and implement. With Quick Look we instead
+eagerly figure out impredicative instantiations, quite separate from constraint solving, which can
+remain unmodified.
+   HMF [Leijen 2008] comes the closest to Quick Look in terms of expressiveness, with a simple type
+vocabulary, and an equation-based unification algorithm. HMF presents a declarative application
+typing rule that requires the “polymorphic weight” of the instantiated function type to be minimal, a
+condition encoding the fact that polymorphism cannot be guessed. The paper includes an extension
+of the basic system with 𝑛-ary applications, performing a subsumption between each function
+argument type and the (inferred and eagerly generalized) type of the corresponding argument. The
+order in which to perform these subsumption checks is delicate: it is first performed for guarded
+arguments and then on naked ones – this helps to establish some order-independence properties.
+All this bears a strong similarity to QL and to GI, but there is a significant difference that affects
+expressiveness: in Quick Look we more aggressively combine the propagation of annotations and
+impredicative instantiation with a deep quick look into nested applications before we perform
+traditional type inference. Hence we can type programs that require nested impredicative instan-
+tiation (such as B5 in Table 12) and programs that must be typed with a polymorphic binder in
+the environment but whose type we can only deduce via some other impredicative instantiation
+(such as E4b). There are other implementation differences; for example Quick Look does not need
+to generalize eagerly every argument in an application.
+   Stratified inference. The idea of Quick Look as a restricted pass prior to actual type inference
+has appeared before in the work on Stratified Type Inference (STI) [Pottier and Régis-Gianas 2006;
+Rémy 2005]. In the first pass, each term is annotated with a shape, a form of type that expresses
+the quantifier structure of the term’s eventual type, while leaving its monomorphic components as
+flexible unification variables that will be filled in by the (conventional, predicative) second pass. To
+avoid shortcomings with the order in which arguments are checked this process may need to be
+iterated [Pottier and Régis-Gianas 2006, §7]. STI was probably the first work that demonstrated
+how annotation propagation in the form of a shape inference pass could be used to recover some
+impredicativity [Rémy 2005], using an order-dependent resolution of impredicative instantiations.
+QL has a similar flavor, but instead of performing annotation propagation before inference, it
+interweaves the two phases. It remains an interesting future direction to describe formally our
+system as an interweaving of these two separate mechanisms.
+  Beyond System F. Move beyond System F types impacts the language the programmer sees, the
+type inference algorithm, and the compiler’s statically-typed intermediate language. However, once
+that Rubicon is crossed, there is a rich seam of work in systems with more expressive types or more
+expressive unification algorithms than first-order unification. The gold standard is MLF [Botlan
+and Rémy 2003], but there are several subsequent variants, including HML [Leijen 2009], and
+FPH [Vytiniotis et al. 2008].
+  MLF extends type schemes with instantiation constraints, and makes the unification algorithm
+aware of them. As a result it achieves the remarkable combination of: (i) typeability of the whole of
+System F by only annotating function arguments that must be used polymorphically, (ii) principal
+types and a sound and complete type inference algorithm, (iii) the “defining” ML property that any
+sub-term can be lifted and let-bound with no type annotations, without affecting typeability. In
+
+                                  Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+89:28                                                               A. Serrano, J. Hage, S. Peyton Jones, and D. Vytiniotis
+
+
+terms of expressiveness, MLF will unconditionally accept programs with polymorphic binders in
+the environment without any annotations if these arguments are not really used polymorphically
+(example E3b in Figure 12). This subsumes uses of 𝜂-expansion for functions with polymorphic
+argument types (example E2a) that will fail to be inferred in QL. On the other hand because QL
+uses the impredicative instantiation to check the arguments (via the bidirectional mechanism of
+Section 4) it can type some programs that involve polymorphic binders that are genuinely used at
+multiple types (example A11). It is worth mentioning that it is entirely possible to extend MLF with
+bidirectional propagation of annotations or even inferred polymorphic types (which would also
+type examples like A11 and C1c); in fact some small amount of annotation propagation has been
+implemented in MLF prototypes. However, such extensions would cause MLF to lose its simple
+specification and easy to describe typeability guarantees.
+   MLF and variants also require intrusive modifications to a constraint solver (in the case of GHC,
+a complex one with type classes, implication constraints, type families, and more) and to the type
+structure. Though some attempts have been made to integrate MLF with qualified types [Leijen
+and Löh 2005], a full integration is uncharted territory. Quick Look is a pragmatic compromise,
+trading off a little expressiveness for a lot of simplicity and ease of integration in the existing GHC
+inference engine.
+
+ACKNOWLEDGMENTS
+We warmly thank Richard Eisenberg, Matthew Fluet, Sam Lindley, Stephanie Weirich, Edward
+Yang, and the ICFP reviewers for their feedback. We are deeply grateful to Didier Rémy for his
+particularly detailed review and subsequent email dialogue, going far beyond the call of duty.
+
+REFERENCES
+Lennart Augustsson. 2011. Impredicative polymorphism: a use case. http://augustss.blogspot.com/2011/07/impredicative-
+   polymorphism-use-case-in.html.
+Didier Le Botlan and Didier Rémy. 2003. MLF : raising ML to the power of system F. In Proceedings of the Eighth ACM
+   SIGPLAN International Conference on Functional Programming, ICFP 2003, Uppsala, Sweden, August 25-29, 2003, Colin
+   Runciman and Olin Shivers (Eds.). ACM, 27–38. https://doi.org/10.1145/944705.944709
+Didier Le Botlan and Didier Rémy. 2009. Recasting MLF. Inf. Comput. 207, 6 (2009), 726–785.
+Joshua Dunfield and Neelakantan R. Krishnaswami. 2013. Complete and easy bidirectional typechecking for higher-
+   rank polymorphism. In ACM SIGPLAN International Conference on Functional Programming, ICFP’13, Boston, MA, USA -
+   September 25 - 27, 2013, Greg Morrisett and Tarmo Uustalu (Eds.). ACM, 429–442. https://doi.org/10.1145/2500365.2500582
+Joshua Dunfield and Neelakantan R. Krishnaswami. 2019. Sound and Complete Bidirectional Typechecking for Higher-rank
+   Polymorphism with Existentials and Indexed Types. Proc. ACM Program. Lang. 3, POPL, Article 9 (Jan. 2019), 28 pages.
+   https://doi.org/10.1145/3290322
+Richard A. Eisenberg, Joachim Breitner, and Simon Peyton Jones. 2018. Type variables in patterns. In Proceedings of the 11th
+   ACM SIGPLAN International Symposium on Haskell, Haskell@ICFP 2018, St. Louis, MO, USA, September 27-17, 2018. 94–105.
+   https://doi.org/10.1145/3242744.3242753
+Richard A. Eisenberg, Stephanie Weirich, and Hamidhasan G. Ahmed. 2016. Visible Type Application. In Proceedings of the
+   25th European Symposium on Programming Languages and Systems - Volume 9632. Springer-Verlag New York, Inc., New
+   York, NY, USA, 229–254. https://doi.org/10.1007/978-3-662-49498-1_10
+Frank Emrich, Sam Lindley, Jan Stolarek, and James Cheney. 2019. FreezeML: Complete and Easy Type Inference for
+   First-Class Polymorphism. Presented at TyDe 2019.
+Jacques Garrigue and Didier Rémy. 1999. Semi-Explicit Higher-Order Polymorphism for ML. Information and Computation
+   155, 1/2 (1999), 134–169. http://www.springerlink.com/content/m303472288241339/ A preliminary version appeared in
+   TACS’97.
+Jurriaan Hage and Bastiaan Heeren. 2009. Strategies for Solving Constraints in Type and Effect Systems. Electronic Notes
+   in Theoretical Computer Science 236 (2009), 163 – 183. Proceedings of the 3rd International Workshop on Views On
+   Designing Complex Architectures (VODCA 2008).
+Daan Leijen. 2008. HMF: simple type inference for first-class polymorphism. In Proceeding of the 13th ACM SIGPLAN
+   international conference on Functional programming, ICFP 2008, Victoria, BC, Canada, September 20-28, 2008. 283–294.
+
+
+Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+A Quick Look at Impredicativity                                                                                          89:29
+
+
+    https://doi.org/10.1145/1411204.1411245
+Daan Leijen. 2009. Flexible types: robust type inference for first-class polymorphism. In Proceedings of the 36th ACM
+    SIGPLAN-SIGACT Symposium on Principles of Programming Languages, POPL 2009, Savannah, GA, USA, January 21-23,
+    2009. 66–77. https://doi.org/10.1145/1480881.1480891
+Daan Leijen and Andres Löh. 2005. Qualified types for MLF. In Proceedings of the 10th ACM SIGPLAN International Conference
+    on Functional Programming, ICFP 2005, Tallinn, Estonia, September 26-28, 2005, Olivier Danvy and Benjamin C. Pierce
+    (Eds.). ACM, 144–155. https://doi.org/10.1145/1086365.1086385
+Dale Miller. 1992. Unification under a Mixed Prefix. J. Symb. Comput. 14, 4 (Oct. 1992), 321–358. https://doi.org/10.1016/0747-
+    7171(92)90011-R
+Robin Milner. 1978. A Theory of Type Polymorphism in Programming. J. Comput. Syst. Sci. 17, 3 (1978), 348–375.
+    https://doi.org/10.1016/0022-0000(78)90014-4
+John C. Mitchell. 1988. Polymorphic Type Inference and Containment. Inf. Comput. 76, 2-3 (Feb. 1988), 211–249. https:
+    //doi.org/10.1016/0890-5401(88)90009-0
+Martin Odersky and Konstantin Läufer. 1996. Putting type annotations to work. In Principles of Programming Languages,
+    POPL. 54–67.
+J. W. O’Toole and D. K. Gifford. 1989. Type Reconstruction with First-Class Polymorphic Values. In Proceedings of the ACM
+    SIGPLAN 1989 Conference on Programming Language Design and Implementation (Portland, Oregon, USA) (PLDI ’89).
+    Association for Computing Machinery, New York, NY, USA, 207–217. https://doi.org/10.1145/73141.74836
+Simon Peyton Jones. 2019. GHC Proposal: “Simplify subsumption”. https://github.com/ghc-proposals/ghc-proposals/pull/
+    287
+Simon L. Peyton Jones, Dimitrios Vytiniotis, Stephanie Weirich, and Mark Shields. 2007. Practical type inference for
+    arbitrary-rank types. Journal of Functional Programming 17, 1 (2007), 1–82.
+Frank Pfenning. 1995. On the Undecidability of Partial Polymorphic Type Reconstruction. Fundamenta Informaticae 19
+    (1995). Issue 1/2.
+Benjamin C. Pierce and David N. Turner. 2000. Local type inference. ACM Trans. Program. Lang. Syst. 22, 1 (2000), 1–44.
+    https://doi.org/10.1145/345099.345100
+François Pottier and Yann Régis-Gianas. 2006. Stratified Type Inference for Generalized Algebraic Data Types. In Conference
+    Record of the 33rd ACM SIGPLAN-SIGACT Symposium on Principles of Programming Languages (Charleston, South Carolina,
+    USA) (POPL ’06). ACM, New York, NY, USA, 232–244. https://doi.org/10.1145/1111037.1111058
+François Pottier and Didier Rémy. 2005. The Essence of ML Type Inference. In Advanced Topics in Types and Programming
+    Languages, Benjamin C. Pierce (Ed.). MIT Press, Chapter 10, 389–489. http://cristal.inria.fr/attapl/
+Didier Rémy. 2005. Simple, Partial Type-inference for System F Based on Type-containment. In Proceedings of the Tenth
+    ACM SIGPLAN International Conference on Functional Programming (Tallinn, Estonia) (ICFP ’05). ACM, New York, NY,
+    USA, 130–143. https://doi.org/10.1145/1086365.1086383
+Claudio V. Russo and Dimitrios Vytiniotis. 2009. QML: Explicit First-class Polymorphism for ML. In Proceedings of
+    the 2009 ACM SIGPLAN Workshop on ML (Edinburgh, Scotland) (ML ’09). ACM, New York, NY, USA, 3–14. https:
+    //doi.org/10.1145/1596627.1596630
+Alejandro Serrano, Jurriaan Hage, Dimitrios Vytiniotis, and Simon Peyton Jones. 2018. Guarded impredicative polymorphism.
+    In Proc ACM SIGPLAN Conference on Programming Languages Design and Implementation. ACM. https://www.microsoft.
+    com/en-us/research/publication/guarded-impredicative-polymorphism/
+Dimitrios Vytiniotis, Simon L. Peyton Jones, Tom Schrijvers, and Martin Sulzmann. 2011. OutsideIn(X): Modular type
+    inference with local assumptions. J. Funct. Program. 21, 4-5 (2011), 333–412. https://doi.org/10.1017/S0956796811000098
+Dimitrios Vytiniotis, Stephanie Weirich, and Simon L. Peyton Jones. 2006. Boxy types: inference for higher-rank types
+    and impredicativity. In Proceedings of the 11th ACM SIGPLAN International Conference on Functional Programming,
+    ICFP 2006, Portland, Oregon, USA, September 16-21, 2006, John H. Reppy and Julia L. Lawall (Eds.). ACM, 251–262.
+    https://doi.org/10.1145/1159803.1159838
+Dimitrios Vytiniotis, Stephanie Weirich, and Simon L. Peyton Jones. 2008. FPH: first-class polymorphism for Haskell. In
+    Proceeding of the 13th ACM SIGPLAN international conference on Functional programming, ICFP 2008, Victoria, BC, Canada,
+    September 20-28, 2008. 295–306. https://doi.org/10.1145/1411204.1411246
+J. B. Wells. 1993. Typability and Type Checking in the Second-Order Lambda-Calculus Are Equivalent and Undecidable.
+    Technical Report. Boston, MA, USA.
+
+
+
+
+                                    Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+89:30                                                              A. Serrano, J. Hage, S. Peyton Jones, and D. Vytiniotis
+
+
+
+                                 yes                         no
+
+                           607                         150                                               type sig.
+                    1725
+                                                 399      58            𝜂-exp.            54        22
+                                         yes                   with changes                              issues
+              no
+                                           out of those which use
+             uses higher-rank or                    them:                    out of those which need
+            impredicative types?             do they compile?                changes: what changes?
+
+                           Fig. 13. Summary of the evaluation, using Stackage LTS 13.6
+
+
+
+A       IMPACT OF AN INVARIANT FUNCTION ARROW
+In Section 5.8 we propose to make the function arrow invariant, and to drop deep instantiation
+and deep skolemisation. This change is independently attractive, and is the subject of a recently
+adopted GHC Proposal. How much effect does this change have on existing Haskell code?
+   To answer this question we used our implementation to compile a large collection of packages
+from Hackage; we summarize the results in Figure 13. We started from collection of packages for a
+recent version of GHC, obtained from Stackage (LTS 13.6), containing a total of 2,332 packages.
+We then selected only the 607 packages that used the extensions RankNTypes, Rank2Types or
+ImpredicativeTypes; the other 1,725 packages are certainly unaffected. We then compiled the library
+sections of each package. Of the 607 packages, 150 fail to compile for reasons unrelated to Quick
+Look – they depend on external libraries and tools we do not have available; or they do not compile
+with GHC 8.9 anyway. Of the remaining 457 packages, 399 compiled with no changes whatsoever;
+two had issues we could not solve, e.g., because of Template Haskell. We leave these two to the
+authors of these packages.
+   The remaining 56 packages could be made compilable with modest source code changes, almost
+all of which were a simple 𝜂-expansion on a line that was clearly identified by the error message. In
+total we performed 283 𝜂-expansions in 104 of the total of 963 source files. The top three packages
+in this case needed 7, 7 and 9 files changed. The majority of the packages, 37, needed only one file
+to be changed, and 20 packages needed only a single 𝜂-expansion. In the case of two packages,
+massiv and drinkery, we additionally had to provide type signatures for local definitions.
+   In conclusion, of the 2,332 packages we started with, 74% (1,725/2,332) do not use extensions
+that interact with first-class polymorphism; of those that do, 87% (399/457) needed no source code
+changes; of those that needed changes, 97% (56/58) could be made to compile without any intimate
+knowledge of these packages. All but two were fixed by a handful of well-diagnosed 𝜂-expansions,
+two of them also needed some local type signatures.
+
+B       LOCAL BINDINGS
+Our description of local bindings, whose syntax is given in Figure 14, follows Vytiniotis et al. [2011]
+closely. As described in Figure 15a, the type of a let binding is not generalized unless an explicit
+annotation is given. This design enables the most information to propagate between the definition
+of a local binding and its use sites when using a constraint-based formulation.
+   Figure 15b shows another possible design, in which generalization is performed on non-annotated
+lets. The main disadvantage is that when implemented in a constraint-based system, this forces us
+to solve the constraints obtained from 𝑒 1 before looking at 𝑒 2 . Otherwise, we cannot be sure about
+
+Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+A Quick Look at Impredicativity                                                                                    89:31
+
+
+
+                                   Expressions 𝑒           ::= . . .
+                                                             | let 𝑥 = 𝑒 in 𝑒
+                                                             | let 𝑥 :: 𝜎 = 𝑒 in 𝑒
+
+                                          Fig. 14. Syntax for local bindings
+
+
+
+
+                                              Γ ⊢⇑ 𝑒 : 𝜌 Γ ⊢⇓ 𝑒 : 𝜌
+                                     Γ ⊢⇑ 𝑒 1 : 𝜌 1   Γ, 𝑥 : 𝜌 1 ⊢𝛿 𝑒 2 : 𝜌 2
+                                                                              let
+                                          Γ ⊢𝛿 let 𝑥 = 𝑒 1 in 𝑒 2 : 𝜌 2
+                                   Γ ⊢⇓∀ 𝑒 1 : 𝜎1         Γ, 𝑥 : 𝜎1 ⊢𝛿 𝑒 2 : 𝜌 2
+                                                                                   annlet
+                                      Γ ⊢𝛿 let 𝑥 :: 𝜎1 = 𝑒 1 in 𝑒 2 : 𝜌 2
+                                                    (a) No generalization
+
+                 Γ ⊢⇑ 𝑒 1 : 𝜌 1        𝑎 = fv(𝜌 1 ) − fv(Γ)        Γ, 𝑥 : ∀𝑎. 𝜌 1 ⊢𝛿 𝑒 2 : 𝜌 2
+                                                                                               letgen
+                                         Γ ⊢𝛿 let 𝑥 = 𝑒 1 in 𝑒 2 : 𝜌 2
+                                               (b) With generalization
+
+                                                Fig. 15. Local bindings
+
+
+
+which type variables to generalize. Another possibility, taken by Pottier and Rémy [2005] and Hage
+and Heeren [2009], is to extend the language of constraints with generalization and instantiation,
+making the solver aware of the order in which these constraints ought to be solved.
+
+C     PROOFS
+C.1    Relating Inference and Checking Mode (Section 6.3)
+    Theorem C.1. If Γ ⊢⇑ 𝑒 : 𝜌 then Γ ⊢⇓ 𝑒 : 𝜌.
+  Proof. The proof is straightforward induction on the typing derivation. The interesting case is
+the case for rule app-⇑. In that case we have:
+
+                     Γ ⊢h⇑ ℎ : 𝜎        Γ ⊢inst 𝜎 ; 𝜋 ; 𝜙 ; 𝜌𝑟              𝑒 = valargs(𝜋)
+                                  dom(𝜃 1 ) = fiv(𝜙, 𝜌𝑟 )          Γ ⊢⇓∀ 𝑒𝑖 : 𝜃 1𝜙𝑖
+                                                                                                    app-⇑
+                                                Γ ⊢⇑ ℎ 𝜋 : 𝜃 1 𝜌𝑟
+We need to show that Γ ⊢⇓ ℎ 𝜋 : 𝜃 1 𝜌𝑟 by using rule app-⇓. To do that it suffices to form the following
+derivation:
+
+                     Γ ⊢h⇑ ℎ : 𝜎        Γ ⊢inst 𝜎 ; 𝜋 ; 𝜙 ; 𝜌𝑟              𝑒 = valargs(𝜋)
+                Θ = mguql (𝜌𝑟 , 𝜃 1 𝜌𝑟 )            dom(𝜃 2 ) = fiv(Θ𝜙)            Γ ⊢⇓∀ 𝑒𝑖 : 𝜃 2 Θ𝜙𝑖
+                                                                                                        app-⇓
+                                                Γ ⊢⇓ ℎ 𝜋 : 𝜃 1 𝜌𝑟
+
+                                   Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+89:32                                                                 A. Serrano, J. Hage, S. Peyton Jones, and D. Vytiniotis
+
+
+First, note that the ⊢h and ⊢inst relations are used in exactly the same way in both rules. Second,
+since the domain of 𝜃 1 is the free instantiation variables of 𝜙 and 𝜌𝑟 , it must hold that:
+                                         Θ = mguql (𝜌𝑟 , 𝜃 1 𝜌𝑟 ) = 𝜃 1 |fiv(𝜌𝑟 )
+In particular we can split 𝜃 1 in two independent substitutions, each covering a distinct domain of
+instantiation variables:
+                                     𝜃 1 = 𝜃 1 |fiv(𝜙)\fiv(𝜌𝑟 ) ·𝜃 1 |fiv(𝜌𝑟 )
+Choose 𝜃 2 in rule app-⇓ to be 𝜃 1 |fiv(𝜙)\fiv(𝜌𝑟 ) . Then we have that 𝜃 2 · Θ = 𝜃 1 . In particular, the
+last premise, which typechecks the arguments recursively, pushes the same types in both rules.
+(𝜃 2 Θ𝜙𝑖 = 𝜃 1𝜙𝑖 )                                                                                       □
+
+C.2     Soundness of Type Inference (Section 7.2)
+We give a set of auxiliary lemmas necessary to prove the main soundness results. We will be
+assuming that fiv(Γ) = ∅, that is, the environment can only contain unification variables but not
+instantiation variables. That is certainly true and preserved during constraint generation.
+   Lemma C.2. If mguql (𝜌 1, 𝜌 2 ) = Θ and fiv(𝜃 ) = ∅ then mguql (𝜃 𝜌 1, 𝜃 𝜌 2 ) = (𝜃 ·Θ)|dom(Θ) .
+  Proof. By definition of mguql , we have that Θ𝜌 1 = Θ𝜌 2 , and for any other Θ′ such that Θ′ 𝜌 1 =
+Θ′𝜌 2 there exists Θ such that Θ = Θ · Θ. Note that the domain of Θ, Θ , and Θ are the
+                     ★                ′  ★                                      ′            ★
+
+instantiation variables of 𝜌 1 and 𝜌 2 .
+  We have to check now that (𝜃 ·Θ)|dom(Θ) satisfies the conditions to be mguql (𝜃 𝜌 1, 𝜃 𝜌 2 ). First:
+                                          (𝜃 ·Θ)|dom(Θ) 𝜃 𝜌𝑖 = 𝜃 (Θ(𝜃 𝜌𝑖 ))
+since 𝜌𝑖 only contains free instantiation variables, which is exactly dom(Θ). We can swap 𝜃 and Θ
+because they refer to disjoint sets of variables:
+                                             𝜃 (Θ(𝜃 𝜌𝑖 )) = 𝜃 (𝜃 (Θ𝜌𝑖 ))
+Since Θ𝜌 1 = Θ𝜌 2 , we have the desired equality.
+  To prove that 𝜃 Θ is the most general, chose any other Θ′. If we repeat this process we reach:
+                                                     𝜃 (𝜃 (Θ′ 𝜌𝑖 ))
+Appealing to the fact that Θ is the most general unifier of 𝜌𝑖 , we can rewrite that expression as:
+                                                   𝜃 (𝜃 (Θ★ (Θ𝜌𝑖 )))
+By swapping 𝜃 to the deepmost position again, we see that (𝜃 ·Θ)|dom(Θ) is indeed the mguql (𝜃 𝜌 1, 𝜃 𝜌 2 )
+                                                                                                        □
+   Lemma C.3. If Γ ⊢h ℎ : 𝜎 and fiv(𝜃 ) = ∅ then 𝜃 Γ ⊢h ℎ : 𝜃𝜎.
+   Proof. Easy case analysis.                                                                                              □
+   Lemma C.4.
+   (1) If Γ ⊢inst 𝜎 ; 𝜋 ; 𝜙 ; 𝜌𝑟 and fiv(𝜃 ) = ∅ then Γ ⊢inst 𝜃𝜎 ; 𝜋 ; 𝜃𝜙 ; 𝜃 𝜌𝑟 .
+   (2) If Γ ⊢ 𝑒 : 𝜙 ; Θ and fiv(𝜃 ) = ∅ then 𝜃 Γ ⊢ 𝑒 : 𝜃𝜙 ; 𝜃 ·Θ|fiv(𝜙) .
+   Proof. By mutual induction on the size of the term.
+   (1) Straightforward, by noticing that the substitution 𝜃 may not modify any of the instantiation
+       variables generated during instantiation.
+   (2) Straightforward, by Lemma C.3, (1), and Lemma C.2.
+                                                                                                  □
+
+Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+A Quick Look at Impredicativity                                                                                   89:33
+
+                                                • 𝐶 to mean that fiv(𝜃 ) = ∅ and 𝜃 |= 𝐶.
+   As notational convenience, we write below 𝜃 |=
+   Lemma C.5. If Γ ⊢inst 𝜎 ; 𝜋 ; 𝜙 ; 𝜌𝑟 ; 𝐶 and 𝜃 |=
+                                                   • 𝐶 then Γ ⊢inst 𝜃𝜎 ; 𝜋 ; 𝜃𝜙 ; 𝜃 𝜌 .
+                                                                                     𝑟
+
+  Proof. The only interesting case are rule ivarm, where we have to apply rule iarg in the
+declarative specification; and rule iarg, where we need to apply Lemma C.4. The rest of the cases
+go through by directly invoking the induction hypothesis or are trivial.                       □
+  Lemma C.6.
+  (1) If Γ ⊢h⇑ ℎ : 𝜎 ; 𝐶 and 𝜃 |=
+                                • 𝐶 then 𝜃 Γ ⊢h ℎ : 𝜃𝜎.
+                                               ⇑
+  (2) If Γ ⊢⇓∀ 𝑒 : 𝜎 ; 𝐶 and 𝜃 |=
+                                • 𝐶 then 𝜃 Γ ⊢ ∀ 𝑒 : 𝜃𝜎.
+                                              ⇓
+  (3) If Γ ⊢⇑ 𝑒 : 𝜌 ; 𝐶 and 𝜃 |=
+                               • 𝐶 then 𝜃 Γ ⊢ 𝑒 : 𝜃 𝜌.
+                                              ⇑
+  (4) If Γ ⊢⇓ 𝑒 : 𝜌 ; 𝐶 and 𝜃 |=
+                               • 𝐶 then 𝜃 Γ ⊢ 𝑒 : 𝜃 𝜌.
+                                              ⇓
+
+   Proof. By mutual induction on the size of the term.                                                                □
+
+ Theorem C.7 (Soundness). If Γ ⊢𝛿 𝑒 : 𝜌 ; 𝐶, 𝜃 is a substitution from unification variables to
+monotypes, fiv(𝜃 ) = ∅, and 𝜃 |= 𝐶 then 𝜃 Γ ⊢𝛿 𝑒 : 𝜃 𝜌.
+   Proof. Follows directly from Lemma C.6.                                                                            □
+
+
+
+
+                                  Proc. ACM Program. Lang., Vol. 4, No. ICFP, Article 89. Publication date: August 2020.
+

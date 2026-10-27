@@ -1,5 +1,12 @@
 # Versions and releases
 
+> Historical evidence notice: Raw files previously stored under
+> `tools/profile/results/` were removed from this branch and its Git history.
+> References to those files below describe historical evidence that is not
+> available in this repository; retained summaries are not independent access
+> to the original raw records.
+
+
 `VERSION` is the toolchain's version. Native package manifests use the same
 three-component version. Release tags are `vMAJOR.MINOR.PATCH`. Published tags and assets
 must never be replaced; make a new patch release to correct a package.
