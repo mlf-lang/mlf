@@ -6,14 +6,14 @@ import hashlib
 import json
 from pathlib import Path
 import re
-import subprocess
+from history_refs import historical_bytes
 
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "8a3e69b165765931c3ff762379a78db9659b2cd8"
 
 
 def frozen(path):
-    return subprocess.check_output(["git", "show", f"{BASELINE}:{path}"], cwd=ROOT, text=True)
+    return historical_bytes(BASELINE, path).decode("utf-8")
 
 
 def require(condition, message):
@@ -59,7 +59,7 @@ PROJECTED_BLOBS = {
 def reviewed_source(revision, path):
     require(path in PROJECTED_PATHS, "unreviewed Core projection path")
     require(revision in (CUTOVER_BEFORE, CUTOVER_REVIEW), "unreviewed Core projection revision")
-    raw = subprocess.check_output(["git", "show", revision + ":" + path], cwd=ROOT)
+    raw = historical_bytes(revision, path)
     expected = PROJECTED_BLOBS[path][0 if revision == CUTOVER_BEFORE else 1]
     require(hashlib.sha256(raw).hexdigest() == expected, "reviewed Core projection blob changed: " + path)
     return raw.decode("utf-8")
@@ -202,7 +202,7 @@ def verify_partition_provenance():
     evidence = []
     for name in ("migration-manifest.json", "standard-hierarchy-adjustment.json"):
         path = "tools/shared-migration/evidence/" + name
-        pinned = subprocess.check_output(["git", "show", SHARED_REVIEW + ":" + path], cwd=ROOT)
+        pinned = historical_bytes(SHARED_REVIEW, path)
         require((ROOT / path).read_bytes() == pinned, "historical migration evidence changed: " + path)
         records = json.loads(pinned)["files"]
         evidence.append(next(r for r in records if r["module"] == "Tests.CorePartitions"))
@@ -212,7 +212,7 @@ def verify_partition_provenance():
             hierarchy["new_sha256"] == PARTITIONS_SHA256 and
             hierarchy["legacy_instances"] == 0 and
             hierarchy["expression_string_tokens"] == 11, "Core migration evidence chain changed")
-    published = subprocess.check_output(["git", "show", SHARED_REVIEW + ":" + PARTITIONS], cwd=ROOT)
+    published = historical_bytes(SHARED_REVIEW, PARTITIONS)
     verify_historical_partitions(published)
     raw = (ROOT / PARTITIONS).read_bytes()
     verify_shared_partitions(raw)

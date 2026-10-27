@@ -355,7 +355,8 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           . ./tools/release/windows-common.ps1
-          $baseline = 'e7da00f201bfb66bf6e26d59e56184dd37a83abd'
+          # Original e7da00f201bfb66bf6e26d59e56184dd37a83abd, mapped after reviewed history cleanup.
+          $baseline = 'bf38dc538598a0389a3310fe26c16f6609c912fc'
           git fetch --no-tags --depth=1 origin $baseline
           Assert-Release ($LASTEXITCODE -eq 0) 'Cannot fetch the immutable pre-fix runner'
           $source = git show "${baseline}:runtime/mlf_build_runner.c"
@@ -363,6 +364,8 @@ jobs:
           $output = [IO.Path]::GetFullPath('.mlf-build/windows-runtime')
           $oldSource = "$output/pre-fix-build-runner.c"
           [IO.File]::WriteAllText($oldSource, ($source -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
+          $expectedOldSource = 'fce82f0710edd910557956a2225f211f195f10b69e95c3676d86bb01fd2f6abd'
+          Assert-Release ((Get-FileHash -Algorithm SHA256 $oldSource).Hash.ToLowerInvariant() -eq $expectedOldSource) 'Pre-fix runner differs from the independently pinned source'
           $oldRunner = "$output/pre-fix-build-runner.exe"
           $flags = @('-O2','-std=c11','-Wall','-Wextra','-Werror','-municode',"-I$PWD/runtime",$oldSource,'-lpsapi','-o',$oldRunner)
           $null = Invoke-ReleaseCommand $env:MLF_CLANG $flags "$output/pre-fix-build-runner-build.log" $PWD.Path

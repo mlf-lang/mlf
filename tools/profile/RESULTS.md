@@ -1,5 +1,12 @@
 # Checked cold bootstrap memory — 2026-10-19
 
+> Historical evidence notice: Raw files previously stored under
+> `tools/profile/results/` were removed from this branch and its Git history.
+> References to those files below describe historical evidence that is not
+> available in this repository; retained summaries are not independent access
+> to the original raw records.
+
+
 This report measures the earlier per-module pipeline. The current crate
 migration and its validation are recorded in [the migration ledger](../../docs/crate-migration.md).
 The measurements below retain their original source and test provenance.

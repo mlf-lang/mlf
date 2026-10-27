@@ -4,6 +4,8 @@
 /bench-results.json
 __pycache__/
 .mlf-build/
+/tools/profile/results/
+/papers/*.pdf
 /dist-windows/
 
 # Native compiler and debugger outputs
