@@ -44,6 +44,7 @@ tools/release/test-direct-source-smoke.sh
 python3 tools/release/test-async-change-scope.py
 python3 tools/testing/test_manifest_snapshot.py
 python3 tools/testing/check_manifest_snapshot.py
+python3 tools/testing/test_history_refs.py
 python3 tools/testing/check_tuple_list_migration.py
 python3 tools/testing/test_tuple_list_migration.py
 python3 tools/testing/test_migration_inventory.py

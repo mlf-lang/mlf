@@ -1,5 +1,12 @@
 # eMLF → xMLF → LLVM
 
+> Historical evidence notice: Raw files previously stored under
+> `tools/profile/results/` were removed from this branch and its Git history.
+> References to those files below describe historical evidence that is not
+> available in this repository; retained summaries are not independent access
+> to the original raw records.
+
+
 A standalone compiler for the core eMLF language in Boris Yakobowski's
 *Graphical types and constraints — second-order polymorphism and inference*
 (2008), using the supplied [thesis text](papers/these-finale-english.txt).

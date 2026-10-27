@@ -10,7 +10,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
-import subprocess
+from history_refs import historical_bytes
 import check_tuple_list_migration as tuple_audit
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -41,8 +41,7 @@ class Sources:
 
     def raw(self, path):
         if path not in self.cache:
-            self.cache[path] = subprocess.check_output(
-                ['git', 'show', BASELINE + ':' + path], cwd=ROOT)
+            self.cache[path] = historical_bytes(BASELINE, path)
         return self.cache[path]
 
     def text(self, path):

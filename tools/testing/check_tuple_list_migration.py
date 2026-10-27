@@ -4,7 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
-import subprocess
+from history_refs import historical_bytes
 
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "8a3e69b165765931c3ff762379a78db9659b2cd8"
@@ -54,7 +54,7 @@ def active_contract():
 def verify_historical_sources():
     sources = {}
     for path, expected in REVIEWED_SHARED_SHA256.items():
-        raw = subprocess.check_output(["git", "show", HISTORICAL_SHARED_TREE + ":" + path], cwd=ROOT)
+        raw = historical_bytes(HISTORICAL_SHARED_TREE, path)
         require(hashlib.sha256(raw).hexdigest() == expected, "frozen shared source changed: " + path)
         sources[path] = raw.decode("utf-8")
     return sources
@@ -81,9 +81,7 @@ def verify_current_sources(root=None):
 
 
 def frozen(path):
-    return subprocess.check_output(
-        ["git", "show", f"{BASELINE}:{path}"], cwd=ROOT, text=True
-    )
+    return historical_bytes(BASELINE, path).decode("utf-8")
 
 
 def require(condition, message):
@@ -233,9 +231,7 @@ def main():
     require(len(expected) == 90, "frozen baseline derivation changed")
     # Reconstruct and audit the exact independently frozen staged implementation.
     # This retains all12 helper comparisons and source-derived90 expectations.
-    migrated = subprocess.check_output(
-        ["git", "show", STAGED_BASELINE + ":" + STAGED_IMPLEMENTATION],
-        cwd=ROOT, text=True)
+    migrated = historical_bytes(STAGED_BASELINE, STAGED_IMPLEMENTATION).decode("utf-8")
     count = verify_legacy_projection(original, migrated, expected)
     first = re.search(r'leaf "([^"]+)"', migrated).group(1)
     mutations = {

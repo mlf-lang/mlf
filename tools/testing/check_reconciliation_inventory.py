@@ -2,7 +2,7 @@
 """Validate the supplemental main-reconciliation census, not runtime coverage."""
 import hashlib
 import json
-import subprocess
+from history_refs import historical_bytes
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -43,7 +43,7 @@ def require(condition, message):
 
 
 def git_bytes(revision, path):
-    return subprocess.check_output(['git', 'show', revision + ':' + path], cwd=ROOT)
+    return historical_bytes(revision, path)
 
 
 def validate(root=ROOT, record=None):
