@@ -16,97 +16,97 @@ childText = "{\"schema_version\":1,\"event\":\"start\",\"total\":2,\"selected\":
 failedText = "{\"schema_version\":1,\"event\":\"start\",\"total\":2,\"selected\":1,\"scope\":\"partial\",\"ids\":[\"probe/alpha\"]}\n{\"schema_version\":1,\"event\":\"case\",\"id\":\"probe/alpha\",\"name\":\"Alpha\",\"tags\":[\"oracle\"],\"status\":\"failed\",\"message\":\"different value\",\"expected\":\"1\",\"actual\":\"2\"}\n{\"schema_version\":1,\"event\":\"summary\",\"total\":2,\"selected\":1,\"scope\":\"partial\",\"complete\":true,\"executed\":1,\"passed\":0,\"failed\":1}\n"
 measurementText = "{\"exit_code\":0,\"timed_out\":false,\"interrupted\":false,\"termination_signal\":0,\"wall_seconds\":0.125,\"cpu_seconds\":0.01,\"peak_rss_bytes\":4096,\"pid\":123}"
 entry : C.Case
-entry = C.test "probe/alpha" "Alpha" (Cons "oracle" Nil) (A.succeed Unit)
-rejected : forall a. String -> Either String a -> IO Unit
+entry = C.test "probe/alpha" "Alpha" ((:) "oracle" []) (A.succeed ())
+rejected : forall a. String -> Either String a -> IO ()
 rejected label result = case result of
- Left _ -> return Unit
+ Left _ -> return ()
  Right _ -> H.fail ("supervisor accepted damaged " ++ label)
 without : String -> J.Json -> J.Json
 without key value = J.Object (S.filter (\pair -> S.not (eqString key (S.fst pair))) (J.items value))
-change : Int -> (J.Json -> J.Json) -> List J.Json -> List J.Json
-change index transform rows = S.map (\(Pair i row) -> if i == index then transform row else row) (S.zip (S.range 0 (S.length rows - 1)) rows)
-render : List J.Json -> String
+change : Int -> (J.Json -> J.Json) -> [] J.Json -> [] J.Json
+change index transform rows = S.map (\((,) i row) -> if i == index then transform row else row) (S.zip (S.range 0 (S.length rows - 1)) rows)
+render : [] J.Json -> String
 render rows = S.intercalate "\n" (S.map J.render rows) ++ "\n"
-childRejected : String -> String -> IO Unit
+childRejected : String -> String -> IO ()
 childRejected label text = rejected label (P.validateChildReport 2 entry 0 text)
-measurementRejected : String -> J.Json -> IO Unit
+measurementRejected : String -> J.Json -> IO ()
 measurementRejected label value = rejected label (P.parseMeasurement 0 (J.render value))
-inventoryProtocol : IO Unit
+inventoryProtocol : IO ()
 inventoryProtocol = do
  inventory <- H.right (P.parseInventory inventoryText)
- H.assert (S.eqList eqString (S.map C.id inventory) (O.words "probe/alpha probe/beta") && eqString (C.name (S.head inventory)) "Alpha" && S.eqList eqString (C.tags (S.head inventory)) (Cons "oracle" Nil)) "inventory parser changed literal descriptors"
+ H.assert (S.eqList eqString (S.map C.id inventory) (O.words "probe/alpha probe/beta") && eqString (C.name (S.head inventory)) "Alpha" && S.eqList eqString (C.tags (S.head inventory)) ((:) "oracle" [])) "inventory parser changed literal descriptors"
  parsed <- H.right (J.parse inventoryText)
- S.mapM_ (\(Pair key value) -> rejected ("inventory " ++ key) (P.parseInventory (J.render (J.set key value parsed))))
-  (Cons (Pair "total" (J.num 1)) (Cons (Pair "selected" (J.num 1)) (Cons (Pair "scope" (J.str "partial")) (Cons (Pair "schema_version" (J.num 2)) (Cons (Pair "cases" (J.Array Nil)) Nil)))))
+ S.mapM_ (\((,) key value) -> rejected ("inventory " ++ key) (P.parseInventory (J.render (J.set key value parsed))))
+  ((:) ((,) "total" (J.num 1)) ((:) ((,) "selected" (J.num 1)) ((:) ((,) "scope" (J.str "partial")) ((:) ((,) "schema_version" (J.num 2)) ((:) ((,) "cases" (J.Array [])) [])))))
  let first = S.head (J.values (J.get "cases" parsed))
- rejected "duplicate inventory ID" (P.parseInventory (J.render (J.set "cases" (J.Array (Cons first (Cons first Nil))) parsed)))
- S.mapM_ (\(Pair key value) -> do
-  let cases = Cons (J.set key value first) (S.tail (J.values (J.get "cases" parsed)))
+ rejected "duplicate inventory ID" (P.parseInventory (J.render (J.set "cases" (J.Array ((:) first ((:) first []))) parsed)))
+ S.mapM_ (\((,) key value) -> do
+  let cases = (:) (J.set key value first) (S.tail (J.values (J.get "cases" parsed)))
   rejected ("inventory descriptor " ++ key) (P.parseInventory (J.render (J.set "cases" (J.Array cases) parsed))))
-  (Cons (Pair "id" (J.str "invalid id")) (Cons (Pair "name" (J.str "")) (Cons (Pair "tags" (J.Array (Cons (J.num 7) Nil))) Nil)))
+  ((:) ((,) "id" (J.str "invalid id")) ((:) ((,) "name" (J.str "")) ((:) ((,) "tags" (J.Array ((:) (J.num 7) []))) [])))
  rejected "truncated inventory" (P.parseInventory "{")
  rejected "repeated inventory" (P.parseInventory (inventoryText ++ inventoryText))
  rejected "duplicate inventory field" (P.parseInventory (O.replace "\"total\":2" "\"total\":2,\"total\":2" inventoryText))
-childProtocol : IO Unit
+childProtocol : IO ()
 childProtocol = do
  accepted <- H.right (P.validateChildReport 2 entry 0 childText)
  H.assert (eqString (P.status accepted) "passed") "literal successful child was changed"
  failed <- H.right (P.validateChildReport 2 entry 1 failedText)
  H.assert (eqString (P.status failed) "failed" && eqString (J.getText "expected" "" failed) "1" && eqString (J.getText "actual" "" failed) "2") "literal assertion diagnostics were changed"
  rows <- CLI.rows childText
- S.mapM_ (\(Pair key value) -> childRejected ("child start " ++ key) (render (change 0 (J.set key value) rows)))
-  (Cons (Pair "ids" (J.stringArray (Cons "probe/beta" Nil))) (Cons (Pair "total" (J.num 1)) (Cons (Pair "selected" (J.num 2)) (Cons (Pair "scope" (J.str "full")) Nil))))
- S.mapM_ (\(Pair key value) -> childRejected ("child descriptor " ++ key) (render (change 1 (J.set key value) rows)))
-  (Cons (Pair "id" (J.str "probe/beta")) (Cons (Pair "name" (J.str "Changed")) (Cons (Pair "tags" (J.Array Nil)) (Cons (Pair "status" (J.str "skipped")) (Cons (Pair "schema_version" (J.num 2)) Nil)))))
- S.mapM_ (\(Pair key value) -> childRejected ("child summary " ++ key) (render (change 2 (J.set key value) rows)))
-  (Cons (Pair "complete" (J.Boolean false)) (Cons (Pair "complete" (J.str "true")) (Cons (Pair "executed" (J.num 0)) (Cons (Pair "passed" (J.num 0)) (Cons (Pair "failed" (J.num 1)) (Cons (Pair "total" (J.num 3)) Nil))))))
+ S.mapM_ (\((,) key value) -> childRejected ("child start " ++ key) (render (change 0 (J.set key value) rows)))
+  ((:) ((,) "ids" (J.stringArray ((:) "probe/beta" []))) ((:) ((,) "total" (J.num 1)) ((:) ((,) "selected" (J.num 2)) ((:) ((,) "scope" (J.str "full")) []))))
+ S.mapM_ (\((,) key value) -> childRejected ("child descriptor " ++ key) (render (change 1 (J.set key value) rows)))
+  ((:) ((,) "id" (J.str "probe/beta")) ((:) ((,) "name" (J.str "Changed")) ((:) ((,) "tags" (J.Array [])) ((:) ((,) "status" (J.str "skipped")) ((:) ((,) "schema_version" (J.num 2)) [])))))
+ S.mapM_ (\((,) key value) -> childRejected ("child summary " ++ key) (render (change 2 (J.set key value) rows)))
+  ((:) ((,) "complete" (J.Boolean false)) ((:) ((,) "complete" (J.str "true")) ((:) ((,) "executed" (J.num 0)) ((:) ((,) "passed" (J.num 0)) ((:) ((,) "failed" (J.num 1)) ((:) ((,) "total" (J.num 3)) []))))))
  childRejected "missing completion field" (render (change 2 (without "complete") rows))
- childRejected "missing result" (render (Cons (S.head rows) (Cons (S.last rows) Nil)))
+ childRejected "missing result" (render ((:) (S.head rows) ((:) (S.last rows) [])))
  childRejected "truncated completion" (render (S.init rows))
- childRejected "repeated result" (render (Cons (S.head rows) (Cons (S.index rows 1) (S.tail rows))))
+ childRejected "repeated result" (render ((:) (S.head rows) ((:) (S.index rows 1) (S.tail rows))))
  childRejected "trailing junk" (childText ++ "{")
  childRejected "duplicate result field" (O.replace "\"status\":\"passed\"" "\"status\":\"passed\",\"status\":\"passed\"" childText)
  rejected "successful report with exit 1" (P.validateChildReport 2 entry 1 childText)
  rejected "failed report with exit 0" (P.validateChildReport 2 entry 0 failedText)
  failureRows <- CLI.rows failedText
  S.mapM_ (\transform -> rejected "failed assertion diagnostics" (P.validateChildReport 2 entry 1 (render (change 1 transform failureRows))))
-  (Cons (without "message") (Cons (without "actual") (Cons (J.set "expected" (J.num 1)) Nil)))
-measurementProtocol : IO Unit
+  ((:) (without "message") ((:) (without "actual") ((:) (J.set "expected" (J.num 1)) [])))
+measurementProtocol : IO ()
 measurementProtocol = do
  rows <- CLI.rows childText
  measurement <- H.right (P.parseMeasurement 0 measurementText)
  H.assert (J.equal (J.get "wall_seconds" measurement) (J.Number "0.125")) "measurement parser changed elapsed time"
  S.mapM_ (\key -> measurementRejected ("missing measurement " ++ key) (without key measurement))
   (O.words "exit_code timed_out interrupted termination_signal wall_seconds cpu_seconds peak_rss_bytes pid")
- S.mapM_ (\(Pair key value) -> measurementRejected ("measurement " ++ key) (J.set key value measurement))
-  (Cons (Pair "wall_seconds" (J.num 0)) (Cons (Pair "wall_seconds" (J.num (0 - 1))) (Cons (Pair "wall_seconds" (J.str "0.125")) (Cons (Pair "wall_seconds" (J.Number "1e9999")) (Cons (Pair "cpu_seconds" (J.num (0 - 1))) (Cons (Pair "cpu_seconds" (J.Number "1e9999")) (Cons (Pair "peak_rss_bytes" (J.num (0 - 1))) (Cons (Pair "pid" (J.num 0)) (Cons (Pair "exit_code" (J.num 256)) (Cons (Pair "exit_code" (J.Number "0.5")) (Cons (Pair "termination_signal" (J.num 128)) (Cons (Pair "timed_out" (J.str "false")) (Cons (Pair "timed_out" (J.Boolean true)) (Cons (Pair "interrupted" (J.Boolean true)) (Cons (Pair "termination_signal" (J.num 9)) Nil)))))))))))))))
+ S.mapM_ (\((,) key value) -> measurementRejected ("measurement " ++ key) (J.set key value measurement))
+  ((:) ((,) "wall_seconds" (J.num 0)) ((:) ((,) "wall_seconds" (J.num (0 - 1))) ((:) ((,) "wall_seconds" (J.str "0.125")) ((:) ((,) "wall_seconds" (J.Number "1e9999")) ((:) ((,) "cpu_seconds" (J.num (0 - 1))) ((:) ((,) "cpu_seconds" (J.Number "1e9999")) ((:) ((,) "peak_rss_bytes" (J.num (0 - 1))) ((:) ((,) "pid" (J.num 0)) ((:) ((,) "exit_code" (J.num 256)) ((:) ((,) "exit_code" (J.Number "0.5")) ((:) ((,) "termination_signal" (J.num 128)) ((:) ((,) "timed_out" (J.str "false")) ((:) ((,) "timed_out" (J.Boolean true)) ((:) ((,) "interrupted" (J.Boolean true)) ((:) ((,) "termination_signal" (J.num 9)) [])))))))))))))))
  rejected "failed measurement transport" (P.parseMeasurement 1 measurementText)
  rejected "duplicate measurement field" (P.parseMeasurement 0 (O.replace "\"pid\":123" "\"pid\":123,\"pid\":123" measurementText))
  rejected "truncated measurement" (P.parseMeasurement 0 "{")
  let timeout = J.set "timed_out" (J.Boolean true) (J.set "exit_code" (J.num 124) measurement)
  let signal = J.set "termination_signal" (J.num 9) (J.set "exit_code" (J.num 137) measurement)
  let interrupted = J.set "interrupted" (J.Boolean true) (J.set "exit_code" (J.num 130) measurement)
- S.mapM_ (\value -> do { H.right (P.parseMeasurement 0 (J.render value)); return Unit }) (Cons (timeout) (Cons (signal) (Cons (interrupted) Nil)))
+ S.mapM_ (\value -> do { H.right (P.parseMeasurement 0 (J.render value)); return () }) ((:) (timeout) ((:) (signal) ((:) (interrupted) [])))
  measurementRejected "simultaneous timeout and interruption" (J.set "interrupted" (J.Boolean true) timeout)
  measurementRejected "timeout with signal" (J.set "termination_signal" (J.num 9) timeout)
  measurementRejected "signal exit mismatch" (J.set "exit_code" (J.num 138) signal)
- let classified = (Cons (P.classify 2 entry (Right measurement) childText) (Cons (P.classify 2 entry (Right (J.set "exit_code" (J.num 1) measurement)) failedText) (Cons (P.classify 2 entry (Right timeout) "") (Cons (P.classify 2 entry (Right signal) "") (Cons (P.classify 2 entry (Right interrupted) "") (Cons (P.classify 2 entry (Right (J.set "exit_code" (J.num 9) measurement)) (render (Cons (S.head rows) Nil))) (Cons (P.classify 2 entry (Right measurement) (render (Cons (S.head rows) Nil))) (Cons (P.classify 2 entry (Left "missing measurement") childText) Nil))))))))
+ let classified = ((:) (P.classify 2 entry (Right measurement) childText) ((:) (P.classify 2 entry (Right (J.set "exit_code" (J.num 1) measurement)) failedText) ((:) (P.classify 2 entry (Right timeout) "") ((:) (P.classify 2 entry (Right signal) "") ((:) (P.classify 2 entry (Right interrupted) "") ((:) (P.classify 2 entry (Right (J.set "exit_code" (J.num 9) measurement)) (render ((:) (S.head rows) []))) ((:) (P.classify 2 entry (Right measurement) (render ((:) (S.head rows) []))) ((:) (P.classify 2 entry (Left "missing measurement") childText) []))))))))
  H.assert (S.eqList eqString (S.map P.status classified) (O.words "passed failed timed_out crashed crashed crashed protocol_error protocol_error")) "protocol classification changed literal outcomes"
-protocol : IO Unit
+protocol : IO ()
 protocol = do
  inventoryProtocol
  childProtocol
  measurementProtocol
  putStrLn "Test process protocol mutation contracts passed"
 
-results : List J.Json -> List J.Json
+results : [] J.Json -> [] J.Json
 results rows = S.filter (\row -> eqString (J.getText "event" "" row) "case") rows
-supervised : String -> String -> String -> List String -> Int -> IO String
+supervised : String -> String -> String -> [] String -> Int -> IO String
 supervised directory self name args expected =
- let command = Cons "--" (Cons self (Cons "--isolated-probe" Nil)) in
- let selected = Cons (directory ++ "/" ++ name ++ "-work") (S.append args command) in
+ let command = (:) "--" ((:) self ((:) "--isolated-probe" [])) in
+ let selected = (:) (directory ++ "/" ++ name ++ "-work") (S.append args command) in
  CLI.check directory self name (S.append (O.words "--supervise --work-dir") selected) expected
-main : String -> IO Unit
+main : String -> IO ()
 main directory = do
  protocol
  self <- getExecutablePath
@@ -114,7 +114,7 @@ main directory = do
  H.assert (stringLength host > 0) "process tests require the native measurement transport"
  H.withScratch (\scratch -> do
   let report = scratch ++ "/supervised.jsonl"
-  text <- supervised scratch self "all" (S.append (O.words "--timeout 1 --format json --report") (Cons report Nil)) 1
+  text <- supervised scratch self "all" (S.append (O.words "--timeout 1 --format json --report") ((:) report [])) 1
   rows <- CLI.rows text
   let cases = results rows
   H.assert (S.eqList eqString (S.map (J.getText "status" "") cases)
@@ -142,13 +142,13 @@ main directory = do
   one <- supervised scratch self "one" (O.words "--exact isolation/clean --format json") 0
   oneRows <- CLI.rows one
   CLI.summary oneRows 1 0 "partial"
-  H.assert (S.eqList eqString (S.map (J.getText "id" "") (results oneRows)) (Cons "isolation/clean" Nil)) "exact supervised selection changed"
+  H.assert (S.eqList eqString (S.map (J.getText "id" "") (results oneRows)) ((:) "isolation/clean" [])) "exact supervised selection changed"
   -- Reusing both requested paths must still allocate fresh child state. The
   -- second parent report replaces the first, and failed discovery replaces it.
   let sharedWork = scratch ++ "/repeat-work"
   let sharedReport = scratch ++ "/repeat.jsonl"
-  let prefix = S.append (O.words "--supervise --work-dir") (Cons sharedWork (Cons "--report" (Cons sharedReport (O.words "--exact isolation/clean --format json --"))))
-  let repeatedArgs = S.append prefix (Cons self (Cons "--isolated-probe" Nil))
+  let prefix = S.append (O.words "--supervise --work-dir") ((:) sharedWork ((:) "--report" ((:) sharedReport (O.words "--exact isolation/clean --format json --"))))
+  let repeatedArgs = S.append prefix ((:) self ((:) "--isolated-probe" []))
   firstRun <- CLI.check scratch self "repeat-first" repeatedArgs 0
   secondRun <- CLI.check scratch self "repeat-second" repeatedArgs 0
   firstRows <- CLI.rows firstRun
@@ -160,7 +160,7 @@ main directory = do
   H.assert (stringLength firstDirectory > 0 && stringLength secondDirectory > 0 && S.not (eqString firstDirectory secondDirectory)) "repeated invocation reused its run directory"
   repeated <- readFile sharedReport
   H.assert (eqString repeated secondRun) "repeated invocation retained the previous parent report"
-  CLI.check scratch self "discovery-failure" (S.append prefix (Cons self (Cons "--discovery-crash-probe" Nil))) 2
+  CLI.check scratch self "discovery-failure" (S.append prefix ((:) self ((:) "--discovery-crash-probe" []))) 2
   discoveryError <- readFile (scratch ++ "/discovery-failure.stderr")
   H.assert (H.contains "test inventory process failed" discoveryError) "discovery probe failed for an unrelated reason"
   incomplete <- readFile sharedReport
@@ -171,7 +171,7 @@ main directory = do
   supervised scratch self "missing" (O.words "--exact absent") 2
   -- A child claiming success without a terminal report is a protocol failure.
   forged <- CLI.check scratch self "forged" (S.append (O.words "--supervise --work-dir")
-   (Cons (scratch ++ "/forged-work") (S.append (O.words "--format json --") (Cons self (Cons "--forged-report-probe" Nil))))) 1
+   ((:) (scratch ++ "/forged-work") (S.append (O.words "--format json --") ((:) self ((:) "--forged-report-probe" []))))) 1
   forgedRows <- CLI.rows forged
-  H.assert (S.eqList eqString (S.map (J.getText "status" "") (results forgedRows)) (Cons "protocol_error" Nil)) "supervisor accepted a truncated successful child report"
+  H.assert (S.eqList eqString (S.map (J.getText "status" "") (results forgedRows)) ((:) "protocol_error" [])) "supervisor accepted a truncated successful child report"
   putStrLn "Test process supervision contracts passed")

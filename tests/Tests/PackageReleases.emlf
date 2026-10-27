@@ -14,33 +14,33 @@ manager (Context _ m _) = m
 compiler : Context -> String
 compiler (Context _ _ c) = c
 obj = J.Object
-pair = Pair
-invoke : Context -> String -> String -> List String -> Bool -> String -> IO String
+pair = (,)
+invoke : Context -> String -> String -> [] String -> Bool -> String -> IO String
 invoke c manifest build args success reason = do
  let stem = directory c ++ "/release-command"
- let prefix = Cons (manager c) (Cons "--manifest" (Cons manifest (Cons "--compiler" (Cons (compiler c) (Cons "--build-dir" (Cons build Nil))))))
+ let prefix = (:) (manager c) ((:) "--manifest" ((:) manifest ((:) "--compiler" ((:) (compiler c) ((:) "--build-dir" ((:) build []))))))
  code <- O.exec (directory c) (S.append prefix args) "" (stem ++ ".out") (stem ++ ".err") 1800
  out <- readFile (stem ++ ".out")
  err <- readFile (stem ++ ".err")
  H.assert (H.eq (code == 0) success && (success || stringLength err > 0) && (eqString reason "" || H.contains reason err)) ("release command failed (" ++ showInt code ++ "): " ++ err)
  ioReturn out
 export : Context -> String -> String -> String -> IO String
-export c source build destination = invoke c (source ++ "/mlf-package.json") build (Cons "release" (Cons destination Nil)) true ""
+export c source build destination = invoke c (source ++ "/mlf-package.json") build ((:) "release" ((:) destination [])) true ""
 dependency : String -> String -> J.Json
-dependency path digest = obj (Cons (pair "release" (J.str path)) (Cons (pair "sha256" (J.str digest)) Nil))
-setDependencies : String -> List (Pair String J.Json) -> IO Unit
+dependency path digest = obj ((:) (pair "release" (J.str path)) ((:) (pair "sha256" (J.str digest)) []))
+setDependencies : String -> [] ((,) String J.Json) -> IO ()
 setDependencies path entries = do
  value <- J.read path
  J.write path (J.set "dependencies" (obj entries) value)
-checked : String -> IO Unit
+checked : String -> IO ()
 checked label = do
  Coverage.passed "packages" ("checked release: " ++ label)
  putStrLn ("PASS checked release: " ++ label)
 githubDependency : String -> String -> String -> String -> J.Json
-githubDependency manifest asset tag name = obj (Cons (pair "github" (obj (Cons (pair "repository" (J.str "mlf-tests/fixtures")) (Cons (pair "tag" (J.str tag)) (Cons (pair "asset" (J.str name)) Nil))))) (Cons (pair "sha256" (J.str manifest)) (Cons (pair "asset_sha256" (J.str asset)) Nil)))
-githubFixture : List String -> IO Unit
+githubDependency manifest asset tag name = obj ((:) (pair "github" (obj ((:) (pair "repository" (J.str "mlf-tests/fixtures")) ((:) (pair "tag" (J.str tag)) ((:) (pair "asset" (J.str name)) []))))) ((:) (pair "sha256" (J.str manifest)) ((:) (pair "asset_sha256" (J.str asset)) [])))
+githubFixture : [] String -> IO ()
 githubFixture args = case args of
- Cons "release" (Cons "download" (Cons _ (Cons "--repo" (Cons _ (Cons "--pattern" (Cons _ (Cons "--output" (Cons output Nil)))))))) -> do
+ (:) "release" ((:) "download" ((:) _ ((:) "--repo" ((:) _ ((:) "--pattern" ((:) _ ((:) "--output" ((:) output [])))))))) -> do
   callPath <- getEnv "MLF_TEST_GH_CALLS"
   argsPath <- getEnv "MLF_TEST_GH_ARGS"
   asset <- getEnv "MLF_TEST_GH_ASSET"
@@ -60,25 +60,25 @@ githubPack c app bundle = do
  let asset = dir ++ "/greeting.mlfr"
  let secondAsset = dir ++ "/greeting-second.mlfr"
  let build = dir ++ "/github build"
- invoke c app build (Cons "pack" (Cons bundle (Cons asset Nil))) true ""
- invoke c app build (Cons "pack" (Cons (dir ++ "/second release") (Cons secondAsset Nil))) true ""
+ invoke c app build ((:) "pack" ((:) bundle ((:) asset []))) true ""
+ invoke c app build ((:) "pack" ((:) (dir ++ "/second release") ((:) secondAsset []))) true ""
  assetHash <- fileDigest asset
  secondHash <- fileDigest secondAsset
  H.assert (eqString assetHash secondHash) "packed release depends on its directory"
- invoke c app build (Cons "pack" (Cons bundle (Cons asset Nil))) false "already exists"
+ invoke c app build ((:) "pack" ((:) bundle ((:) asset []))) false "already exists"
  unchanged <- fileDigest asset
  H.assert (eqString assetHash unchanged) "existing packed release was replaced"
  checked "packed releases are deterministic and immutable"
  ioReturn assetHash
 
-githubOfflineMiss : Context -> String -> String -> String -> IO Unit
+githubOfflineMiss : Context -> String -> String -> String -> IO ()
 githubOfflineMiss c app digest assetHash = do
  let dir = directory c
  let build = dir ++ "/github build"
  let cache = dir ++ "/github cache"
- let args = Cons "--cache-dir" (Cons cache Nil)
+ let args = (:) "--cache-dir" ((:) cache [])
  let source = githubDependency digest assetHash "v1.0.0" "greeting.mlfr"
- setDependencies app (Cons (pair "greeting" source) Nil)
+ setDependencies app ((:) (pair "greeting" source) [])
  invoke c app build (S.append args (O.words "--offline plan")) false "offline cache miss"
  let downloaded = cache ++ "/.downloads/" ++ assetHash
  published <- directoryExists downloaded
@@ -100,7 +100,7 @@ githubSetup c = do
  if windows then S.mapM_ (\name -> do
    let input = O.parent runner ++ "/" ++ name
    present <- fileExists input
-   if present then O.copy input (fake ++ "/" ++ name) else ioReturn Unit) (O.words "libgmp-10.dll libgc-1.dll libwinpthread-1.dll mlf-host.exe") else ioReturn Unit
+   if present then O.copy input (fake ++ "/" ++ name) else ioReturn ()) (O.words "libgmp-10.dll libgc-1.dll libwinpthread-1.dll mlf-host.exe") else ioReturn ()
  oldPath <- getEnv "PATH"
  setEnv "PATH" (fake ++ (if windows then ";" else ":") ++ oldPath)
  setEnv "MLF_TEST_GH_ASSET" asset
@@ -109,16 +109,16 @@ githubSetup c = do
  setEnv "MLF_TEST_GH_FAIL" "0"
  ioReturn oldPath
 
-githubColdWarm : Context -> String -> String -> IO (Pair J.Json String)
+githubColdWarm : Context -> String -> String -> IO ((,) J.Json String)
 githubColdWarm c app assetHash = do
  let dir = directory c
  let build = dir ++ "/github build"
  let cache = dir ++ "/github cache"
- let args = Cons "--cache-dir" (Cons cache Nil)
+ let args = (:) "--cache-dir" ((:) cache [])
  let downloaded = cache ++ "/.downloads/" ++ assetHash
  let calls = dir ++ "/gh.calls"
  let arguments = dir ++ "/gh.arguments"
- invoke c app build (S.append args (Cons "lock" Nil)) true ""
+ invoke c app build (S.append args ((:) "lock" [])) true ""
  observed <- readFile arguments
  let expected = "release\ndownload\nv1.0.0\n--repo\ngithub.com/mlf-tests/fixtures\n--pattern\ngreeting.mlfr\n--output\n"
  H.assert (O.starts expected observed && O.starts (expected ++ downloaded ++ ".work-") observed && O.ends "/package.mlfr\n" observed && S.length (O.nonempty (O.lines observed)) == 9) "GitHub download did not use exact repository, tag, and asset argv with private staging"
@@ -133,14 +133,14 @@ githubColdWarm c app assetHash = do
  warmCalls <- readFile calls
  H.assert (eqString coldCalls warmCalls) "warm offline build invoked gh"
  checked "warm offline builds need no downloader"
- ioReturn (Pair lock warmCalls)
+ ioReturn ((,) lock warmCalls)
 
-githubRepair : Context -> String -> String -> String -> IO Unit
+githubRepair : Context -> String -> String -> String -> IO ()
 githubRepair c app assetHash warmCalls = do
  let dir = directory c
  let build = dir ++ "/github build"
  let cache = dir ++ "/github cache"
- let args = Cons "--cache-dir" (Cons cache Nil)
+ let args = (:) "--cache-dir" ((:) cache [])
  let downloaded = cache ++ "/.downloads/" ++ assetHash
  let calls = dir ++ "/gh.calls"
  manifest <- J.read (downloaded ++ "/bundle/release.json")
@@ -158,95 +158,95 @@ githubRepair c app assetHash warmCalls = do
  H.assert (eqString repairedAsset assetHash) "online refetch did not restore the pinned asset"
  checked "corrupt retained downloads fail offline and refetch online"
 
-githubRelocation : Context -> String -> J.Json -> IO Unit
+githubRelocation : Context -> String -> J.Json -> IO ()
 githubRelocation c app lock = do
  let dir = directory c
  let build = dir ++ "/github build"
  let movedCache = dir ++ "/other github cache"
- invoke c app build (Cons "--cache-dir" (Cons movedCache (O.words "--locked plan"))) true ""
+ invoke c app build ((:) "--cache-dir" ((:) movedCache (O.words "--locked plan"))) true ""
  savedLock <- J.read (O.parent app ++ "/mlf.lock")
  H.assert (J.equal lock savedLock) "changing cache directories changed the dependency lock"
  checked "GitHub dependency locks survive cache relocation"
 
-githubSelectors : Context -> String -> String -> String -> IO Unit
+githubSelectors : Context -> String -> String -> String -> IO ()
 githubSelectors c app digest assetHash = do
  let dir = directory c
  let build = dir ++ "/github build"
  let cache = dir ++ "/github cache"
- let args = Cons "--cache-dir" (Cons cache Nil)
+ let args = (:) "--cache-dir" ((:) cache [])
  let downloaded = cache ++ "/.downloads/" ++ assetHash
  let source = githubDependency digest assetHash "v1.0.0" "greeting.mlfr"
- setDependencies app (Cons (pair "greeting" (githubDependency digest assetHash "v1.0.1" "greeting.mlfr")) Nil)
+ setDependencies app ((:) (pair "greeting" (githubDependency digest assetHash "v1.0.1" "greeting.mlfr")) [])
  invoke c app build (S.append args (O.words "--offline --locked plan")) false "mlf.lock is stale"
- setDependencies app (Cons (pair "greeting" source) Nil)
+ setDependencies app ((:) (pair "greeting" source) [])
  checked "locked resolution rejects changed release locators"
  let zero = S.concatMapString (\_ -> "0") (S.range 0 63)
- setDependencies app (Cons (pair "greeting" (githubDependency zero assetHash "v1.0.0" "greeting.mlfr")) Nil)
- invoke c app build (S.append args (Cons "plan" Nil)) false "manifest SHA-256"
+ setDependencies app ((:) (pair "greeting" (githubDependency zero assetHash "v1.0.0" "greeting.mlfr")) [])
+ invoke c app build (S.append args ((:) "plan" [])) false "manifest SHA-256"
  preserved <- fileDigest (downloaded ++ "/bundle/release.json")
  H.assert (eqString preserved digest) "wrong manifest pin replaced a valid cached bundle"
- setDependencies app (Cons (pair "greeting" (githubDependency digest zero "v1.0.0" "greeting.mlfr")) Nil)
- invoke c app build (S.append args (Cons "plan" Nil)) false "asset SHA-256"
+ setDependencies app ((:) (pair "greeting" (githubDependency digest zero "v1.0.0" "greeting.mlfr")) [])
+ invoke c app build (S.append args ((:) "plan" [])) false "asset SHA-256"
  rejected <- directoryExists (cache ++ "/.downloads/" ++ zero)
  H.assert (S.not rejected) "wrong asset pin was published"
  checked "both digest pins are enforced before cache publication"
- setDependencies app (Cons (pair "greeting" (githubDependency digest assetHash "--latest" "greeting.mlfr")) Nil)
- invoke c app build (S.append args (Cons "plan" Nil)) false "explicit tag"
- setDependencies app (Cons (pair "greeting" (githubDependency digest assetHash "v1.0.0" "*.mlfr")) Nil)
- invoke c app build (S.append args (Cons "plan" Nil)) false "literal .mlfr"
+ setDependencies app ((:) (pair "greeting" (githubDependency digest assetHash "--latest" "greeting.mlfr")) [])
+ invoke c app build (S.append args ((:) "plan" [])) false "explicit tag"
+ setDependencies app ((:) (pair "greeting" (githubDependency digest assetHash "v1.0.0" "*.mlfr")) [])
+ invoke c app build (S.append args ((:) "plan" [])) false "literal .mlfr"
  checked "GitHub selectors reject option and glob syntax"
 
-githubRetry : Context -> String -> String -> String -> IO Unit
+githubRetry : Context -> String -> String -> String -> IO ()
 githubRetry c app digest assetHash = do
  let dir = directory c
  let build = dir ++ "/github build"
  let source = githubDependency digest assetHash "v1.0.0" "greeting.mlfr"
- setDependencies app (Cons (pair "greeting" source) Nil)
+ setDependencies app ((:) (pair "greeting" source) [])
  let failedCache = dir ++ "/failed github cache"
  setEnv "MLF_TEST_GH_FAIL" "1"
- invoke c app build (Cons "--cache-dir" (Cons failedCache (Cons "plan" Nil))) false "download failed"
+ invoke c app build ((:) "--cache-dir" ((:) failedCache ((:) "plan" []))) false "download failed"
  failedArguments <- readFile (dir ++ "/gh.arguments")
  let failedOutput = S.last (O.nonempty (O.lines failedArguments))
  failedPublished <- directoryExists (failedCache ++ "/.downloads/" ++ assetHash)
  H.assert (S.not failedPublished) "failed download published a cache entry"
  setEnv "MLF_TEST_GH_FAIL" "0"
- invoke c app build (Cons "--cache-dir" (Cons failedCache (Cons "plan" Nil))) true ""
+ invoke c app build ((:) "--cache-dir" ((:) failedCache ((:) "plan" []))) true ""
  retryArguments <- readFile (dir ++ "/gh.arguments")
  let retryOutput = S.last (O.nonempty (O.lines retryArguments))
  partial <- readFile failedOutput
  H.assert (S.not (eqString failedOutput retryOutput) && eqString partial "partial") "download retry reused or removed a previous owner staging path"
  checked "failed partial downloads remain unusable and can be retried"
 
-githubMalformed : Context -> String -> String -> IO Unit
+githubMalformed : Context -> String -> String -> IO ()
 githubMalformed c app digest = do
  let dir = directory c
  let build = dir ++ "/github build"
  let cache = dir ++ "/github cache"
- let args = Cons "--cache-dir" (Cons cache Nil)
+ let args = (:) "--cache-dir" ((:) cache [])
  let asset = dir ++ "/greeting.mlfr"
  envelope <- J.read asset
  let entries = J.values (J.get "crates" envelope)
  let first = S.head entries
- let malformed = Cons (Pair "invalid release asset crate key" (J.Array (Cons (J.set "key" (J.str "../escaped") first) (S.tail entries)))) (Cons (Pair "inventory mismatch" (J.Array (Cons first entries))) (Cons (Pair "inventory mismatch" (J.Array (S.tail entries))) Nil))
- S.mapM_ (\(Pair reason crates) -> do
+ let malformed = (:) ((,) "invalid release asset crate key" (J.Array ((:) (J.set "key" (J.str "../escaped") first) (S.tail entries)))) ((:) ((,) "inventory mismatch" (J.Array ((:) first entries))) ((:) ((,) "inventory mismatch" (J.Array (S.tail entries))) []))
+ S.mapM_ (\((,) reason crates) -> do
    let badAsset = dir ++ "/malformed.mlfr"
    J.write badAsset (J.set "crates" crates envelope)
    hash <- fileDigest badAsset
    setEnv "MLF_TEST_GH_ASSET" badAsset
-   setDependencies app (Cons (pair "greeting" (githubDependency digest hash "v1.0.0" "malformed.mlfr")) Nil)
-   invoke c app build (S.append args (Cons "plan" Nil)) false reason
+   setDependencies app ((:) (pair "greeting" (githubDependency digest hash "v1.0.0" "malformed.mlfr")) [])
+   invoke c app build (S.append args ((:) "plan" [])) false reason
    present <- directoryExists (cache ++ "/.downloads/" ++ hash)
    H.assert (S.not present) "malformed release envelope was published") malformed
  escaped <- fileExists (cache ++ "/.downloads/escaped")
  H.assert (S.not escaped) "release envelope escaped its fixed extraction paths"
  checked "unsafe keys and duplicate or incomplete inventories are rejected"
 
-githubTests : Context -> String -> String -> String -> IO Unit
+githubTests : Context -> String -> String -> String -> IO ()
 githubTests c app bundle digest = do
  assetHash <- githubPack c app bundle
  githubOfflineMiss c app digest assetHash
  oldPath <- githubSetup c
- Pair lock warmCalls <- githubColdWarm c app assetHash
+ (,) lock warmCalls <- githubColdWarm c app assetHash
  githubRepair c app assetHash warmCalls
  githubRelocation c app lock
  githubSelectors c app digest assetHash
@@ -258,9 +258,9 @@ githubTests c app bundle digest = do
  unsetEnv "MLF_TEST_GH_CALLS"
  unsetEnv "MLF_TEST_GH_ARGS"
  unsetEnv "MLF_TEST_GH_FAIL"
- setDependencies app (Cons (pair "greeting" source) Nil)
+ setDependencies app ((:) (pair "greeting" source) [])
 
-releaseSetup : Context -> String -> IO (Pair String String)
+releaseSetup : Context -> String -> IO ((,) String String)
 releaseSetup c root = do
  let dir = directory c
  let consumer = dir ++ "/consumer"
@@ -269,34 +269,34 @@ releaseSetup c root = do
  let producer = dir ++ "/producer"
  let bundle = dir ++ "/published greeting"
  let message = dir ++ "/published message"
- O.run "" (S.append (O.words "/bin/cp -R") (Cons (root ++ "/examples/packages") (Cons producer Nil)))
- O.run "" (S.append (O.words "/bin/cp -R") (Cons producer (Cons consumer Nil)))
+ O.run "" (S.append (O.words "/bin/cp -R") ((:) (root ++ "/examples/packages") ((:) producer [])))
+ O.run "" (S.append (O.words "/bin/cp -R") ((:) producer ((:) consumer [])))
  export c (producer ++ "/greeting") (dir ++ "/producer build") bundle
  export c (producer ++ "/message") (dir ++ "/message build") message
  digest <- fileDigest (bundle ++ "/release.json")
  messageDigest <- fileDigest (message ++ "/release.json")
  let savedGreeting = dependency "../published greeting" digest
- setDependencies app (Cons (pair "greeting" savedGreeting) Nil)
+ setDependencies app ((:) (pair "greeting" savedGreeting) [])
  -- A different source location must produce the same portable release bytes.
  export c (consumer ++ "/greeting") (dir ++ "/other producer build") (dir ++ "/second release")
  secondDigest <- fileDigest (dir ++ "/second release/release.json")
  H.assert (eqString digest secondDigest) "release depends on producer source/build paths"
  checked "deterministic export from another source/build directory"
- ioReturn (Pair digest messageDigest)
+ ioReturn ((,) digest messageDigest)
 
-releaseImmutability : Context -> String -> IO Unit
+releaseImmutability : Context -> String -> IO ()
 releaseImmutability c digest = do
  let dir = directory c
  let producer = dir ++ "/producer"
  let bundle = dir ++ "/published greeting"
- invoke c (producer ++ "/greeting/mlf-package.json") (dir ++ "/producer build") (Cons "release" (Cons bundle Nil)) false ""
+ invoke c (producer ++ "/greeting/mlf-package.json") (dir ++ "/producer build") ((:) "release" ((:) bundle [])) false ""
  afterRefusal <- fileDigest (bundle ++ "/release.json")
  H.assert (eqString digest afterRefusal) "existing immutable release was replaced"
  refusedReport <- J.read (dir ++ "/producer build/build-report.json")
  H.assert (S.not (J.getBool "complete" true refusedReport)) "failed release publication reported success"
  checked "existing release is preserved"
 
-releaseSourceFree : Context -> IO Unit
+releaseSourceFree : Context -> IO ()
 releaseSourceFree c = do
  let dir = directory c
  let consumer = dir ++ "/consumer"
@@ -309,8 +309,8 @@ releaseSourceFree c = do
  O.remove (dir ++ "/other producer build")
  O.remove (consumer ++ "/greeting")
  O.remove (consumer ++ "/message")
- invoke c app build (Cons "plan" Nil) true ""
- invoke c app build (Cons "lock" Nil) true ""
+ invoke c app build ((:) "plan" []) true ""
+ invoke c app build ((:) "lock" []) true ""
  invoke c app build (O.words "--locked test") true ""
  initial <- J.read (build ++ "/build-report.json")
  H.assert (S.length (J.values (J.get "releases" initial)) == 1) "release import missing from build report"
@@ -324,27 +324,27 @@ releaseWarm c = do
  let consumer = dir ++ "/consumer"
  let app = consumer ++ "/mlf-package.json"
  let build = dir ++ "/consumer build"
- invoke c app build (Cons "test" Nil) true ""
+ invoke c app build ((:) "test" []) true ""
  reused <- J.read (build ++ "/build-report.json")
  H.assert (S.all (J.getBool "cached" false) (J.values (J.get "builds" reused))) "unchanged release consumer missed the artifact cache"
- let keys = \report -> J.Object (S.map (\row -> Pair (J.getText "job_id" "" row) (J.get "key" row)) (J.values (J.get "builds" report)))
+ let keys = \report -> J.Object (S.map (\row -> (,) (J.getText "job_id" "" row) (J.get "key" row)) (J.values (J.get "builds" report)))
  let executableRows = S.filter (\row -> O.starts "executable " (J.getText "kind" "" row)) (J.values (J.get "builds" reused))
  programs <- S.mapM (\row -> O.executable (build ++ "/cache/" ++ J.getText "key" "" row ++ "/program")) executableRows
  H.assert (S.not (S.null programs)) "release consumer did not build an executable"
  original <- S.mapM fileDigest programs
  S.mapM_ (\jobs -> do
-  invoke c app build (Cons "--jobs" (Cons (showInt jobs) (Cons "test" Nil))) true ""
+  invoke c app build ((:) "--jobs" ((:) (showInt jobs) ((:) "test" []))) true ""
   saved <- J.read (build ++ "/build-report.json")
   hashes <- S.mapM fileDigest programs
   let outcome = S.head (J.values (J.get "scheduler_results" saved))
   let maximum = case J.get "maximum_parallel_jobs" outcome of { J.Number value -> readInt value; _ -> -1 }
   H.assert (J.equal (keys reused) (keys saved) && J.equal (J.stringArray original) (J.stringArray hashes)) "release worker count changed artifact keys or executable bytes"
   H.assert (S.all (J.getBool "cached" false) (J.values (J.get "builds" saved)) && S.length (J.values (J.get "releases" saved)) == 1) "parallel release consumer missed the cache or release report"
-  H.assert (J.equal (J.get "jobs" outcome) (J.num jobs) && maximum > 0 && maximum <= jobs && S.all (J.getBool "passed" false) (J.values (J.get "tests" saved))) "parallel release consumer exceeded its limit or failed execution") (Cons 2 (Cons 4 Nil))
+  H.assert (J.equal (J.get "jobs" outcome) (J.num jobs) && maximum > 0 && maximum <= jobs && S.all (J.getBool "passed" false) (J.values (J.get "tests" saved))) "parallel release consumer exceeded its limit or failed execution") ((:) 2 ((:) 4 []))
  checked "unchanged consumer reuses all build artifacts"
  ioReturn reused
 
-releaseMixedSources : Context -> String -> J.Json -> IO Unit
+releaseMixedSources : Context -> String -> J.Json -> IO ()
 releaseMixedSources c root savedGreeting = do
  let dir = directory c
  let consumer = dir ++ "/consumer"
@@ -355,45 +355,45 @@ releaseMixedSources c root savedGreeting = do
  O.mkdir (consumer ++ "/helper")
  writeFile (consumer ++ "/helper/Helper.emlf") "module Helper where\nidentity x = x\n"
  writeFile (consumer ++ "/helper/mlf-package.json") "{\"format\":1,\"name\":\"a-helper\",\"version\":\"0.1.0\",\"library\":{\"modules\":{\"Helper\":\"Helper.emlf\"}}}\n"
- setDependencies app (Cons (pair "a-helper" (obj (Cons (pair "path" (J.str "helper")) Nil))) (Cons (pair "greeting" savedGreeting) Nil))
- invoke c app (dir ++ "/mixed source build") (Cons "test" Nil) true ""
+ setDependencies app ((:) (pair "a-helper" (obj ((:) (pair "path" (J.str "helper")) []))) ((:) (pair "greeting" savedGreeting) []))
+ invoke c app (dir ++ "/mixed source build") ((:) "test" []) true ""
  checked "source and release dependencies share the canonical Prelude"
- O.run "" (S.append (O.words "/bin/cp -R") (Cons (root ++ "/examples/packages/message") (Cons (consumer ++ "/source-message") Nil)))
- setDependencies app (Cons (pair "greeting" savedGreeting) (Cons (pair "message" (obj (Cons (pair "path" (J.str "source-message")) Nil))) Nil))
- invoke c app build (Cons "build" Nil) false "duplicate crate identity"
+ O.run "" (S.append (O.words "/bin/cp -R") ((:) (root ++ "/examples/packages/message") ((:) (consumer ++ "/source-message") [])))
+ setDependencies app ((:) (pair "greeting" savedGreeting) ((:) (pair "message" (obj ((:) (pair "path" (J.str "source-message")) []))) []))
+ invoke c app build ((:) "build" []) false "duplicate crate identity"
  checked "conflicting source and bundled crate identities are rejected"
 
-releaseVisibility : Context -> J.Json -> String -> IO Unit
+releaseVisibility : Context -> J.Json -> String -> IO ()
 releaseVisibility c savedGreeting messageDigest = do
  let dir = directory c
  let consumer = dir ++ "/consumer"
  let app = consumer ++ "/mlf-package.json"
  let build = dir ++ "/consumer build"
  -- Independent release bundles carry the same Message and Prelude crates.
- setDependencies app (Cons (pair "greeting" savedGreeting) (Cons (pair "message" (dependency "../published message" messageDigest)) Nil))
+ setDependencies app ((:) (pair "greeting" savedGreeting) ((:) (pair "message" (dependency "../published message" messageDigest)) []))
  invoke c app (dir ++ "/parallel shared release build") (O.words "--jobs 4 test") true ""
  checked "two releases share their transitive checked dependencies"
  source <- readFile (consumer ++ "/Main.emlf")
  writeFile (consumer ++ "/Main.emlf") ("module Main where\nimport Message\nmain = putStrLn (render (Message \"Hello, local packages!\"))\n")
- invoke c app build (Cons "test" Nil) true ""
- setDependencies app (Cons (pair "greeting" savedGreeting) Nil)
- invoke c app build (Cons "plan" Nil) false "direct dependency"
+ invoke c app build ((:) "test" []) true ""
+ setDependencies app ((:) (pair "greeting" savedGreeting) [])
+ invoke c app build ((:) "plan" []) false "direct dependency"
  writeFile (consumer ++ "/Main.emlf") source
  checked "bundled transitive dependencies do not widen import visibility"
 
-releaseLock : Context -> J.Json -> String -> IO Unit
+releaseLock : Context -> J.Json -> String -> IO ()
 releaseLock c savedGreeting messageDigest = do
  let dir = directory c
  let consumer = dir ++ "/consumer"
  let app = consumer ++ "/mlf-package.json"
  let build = dir ++ "/consumer build"
- invoke c app build (Cons "lock" Nil) true ""
- setDependencies app (Cons (pair "greeting" savedGreeting) (Cons (pair "message" (dependency "../published message" messageDigest)) Nil))
+ invoke c app build ((:) "lock" []) true ""
+ setDependencies app ((:) (pair "greeting" savedGreeting) ((:) (pair "message" (dependency "../published message" messageDigest)) []))
  invoke c app build (O.words "--locked build") false "mlf.lock is stale"
- setDependencies app (Cons (pair "greeting" savedGreeting) Nil)
+ setDependencies app ((:) (pair "greeting" savedGreeting) [])
  checked "locked builds reject changed release dependencies"
 
-releaseLocalRepair : Context -> J.Json -> IO Unit
+releaseLocalRepair : Context -> J.Json -> IO ()
 releaseLocalRepair c reused = do
  let dir = directory c
  let consumer = dir ++ "/consumer"
@@ -402,22 +402,22 @@ releaseLocalRepair c reused = do
  -- Corruption of a local installation must be repaired from the verified bundle.
  let metadata = J.getText "metadata" "" (S.head (J.values (J.get "releases" reused)))
  writeFile (O.parent metadata ++ "/unit.mlfco") "corrupt local object"
- invoke c app build (Cons "test" Nil) true ""
+ invoke c app build ((:) "test" []) true ""
  checked "corrupt installed objects are repaired"
 
-releasePins : Context -> J.Json -> IO Unit
+releasePins : Context -> J.Json -> IO ()
 releasePins c savedGreeting = do
  let dir = directory c
  let consumer = dir ++ "/consumer"
  let app = consumer ++ "/mlf-package.json"
  let build = dir ++ "/consumer build"
  let wrong = S.concatMapString (\_ -> "0") (S.range 0 63)
- setDependencies app (Cons (pair "greeting" (dependency "../published greeting" wrong)) Nil)
- invoke c app build (Cons "build" Nil) false "SHA-256"
- setDependencies app (Cons (pair "greeting" savedGreeting) Nil)
+ setDependencies app ((:) (pair "greeting" (dependency "../published greeting" wrong)) [])
+ invoke c app build ((:) "build" []) false "SHA-256"
+ setDependencies app ((:) (pair "greeting" savedGreeting) [])
  checked "manifest digest pin is mandatory and checked"
 
-releaseCompatibility : Context -> J.Json -> IO (Pair String J.Json)
+releaseCompatibility : Context -> J.Json -> IO ((,) String J.Json)
 releaseCompatibility c savedGreeting = do
  let dir = directory c
  let consumer = dir ++ "/consumer"
@@ -429,20 +429,20 @@ releaseCompatibility c savedGreeting = do
  release <- J.read (bundle ++ "/release.json")
  J.write (bundle ++ "/release.json") (J.set "compiler_sha256" (J.str wrong) release)
  incompatible <- fileDigest (bundle ++ "/release.json")
- setDependencies app (Cons (pair "greeting" (dependency "../published greeting" incompatible)) Nil)
- invoke c app build (Cons "build" Nil) false "compiler"
+ setDependencies app ((:) (pair "greeting" (dependency "../published greeting" incompatible)) [])
+ invoke c app build ((:) "build" []) false "compiler"
  writeFile (bundle ++ "/release.json") originalManifest
- setDependencies app (Cons (pair "greeting" savedGreeting) Nil)
+ setDependencies app ((:) (pair "greeting" savedGreeting) [])
  checked "incompatible compiler releases are rejected"
  appData <- J.read app
  let hello = J.get "hello" (J.get "executables" appData)
  J.write app (J.set "executables" (J.set "hello" (J.set "no-prelude" (J.Boolean true) hello) (J.get "executables" appData)) appData)
- invoke c app build (Cons "build" Nil) false "Prelude"
+ invoke c app build ((:) "build" []) false "Prelude"
  J.write app appData
  checked "incompatible Prelude modes are rejected"
- ioReturn (Pair originalManifest release)
+ ioReturn ((,) originalManifest release)
 
-releaseObjectIntegrity : Context -> J.Json -> String -> J.Json -> IO Unit
+releaseObjectIntegrity : Context -> J.Json -> String -> J.Json -> IO ()
 releaseObjectIntegrity c savedGreeting originalManifest release = do
  let dir = directory c
  let consumer = dir ++ "/consumer"
@@ -457,7 +457,7 @@ releaseObjectIntegrity c savedGreeting originalManifest release = do
  let objectPath = crates ++ rootKey ++ "/unit.mlfco"
  savedObject <- readFile objectPath
  writeFile objectPath "forged release object"
- invoke c app build (Cons "build" Nil) false "digest mismatch"
+ invoke c app build ((:) "build" []) false "digest mismatch"
  checked "bundle artifact hashes are verified even after a cache hit"
  forgedHash <- fileDigest objectPath
  let forgedKey = J.getText "metadata_sha256" "" rootRow ++ forgedHash
@@ -466,15 +466,15 @@ releaseObjectIntegrity c savedGreeting originalManifest release = do
  let forgedManifest = J.set "root" (J.str forgedKey) (J.set "crates" (J.Array (S.map (\row -> if eqString (J.getText "key" "" row) rootKey then forgedRow else row) (J.values (J.get "crates" release)))) release)
  J.write (bundle ++ "/release.json") forgedManifest
  forgedDigest <- fileDigest (bundle ++ "/release.json")
- setDependencies app (Cons (pair "greeting" (dependency "../published greeting" forgedDigest)) Nil)
- invoke c app build (Cons "build" Nil) false "malformed crate object framing"
+ setDependencies app ((:) (pair "greeting" (dependency "../published greeting" forgedDigest)) [])
+ invoke c app build ((:) "build" []) false "malformed crate object framing"
  O.move (crates ++ forgedKey) (crates ++ rootKey)
  writeFile objectPath savedObject
  writeFile (bundle ++ "/release.json") originalManifest
- setDependencies app (Cons (pair "greeting" savedGreeting) Nil)
+ setDependencies app ((:) (pair "greeting" savedGreeting) [])
  checked "recomputed producer digests cannot bypass object checking"
 
-releaseRelocation : Context -> String -> IO Unit
+releaseRelocation : Context -> String -> IO ()
 releaseRelocation c digest = do
  let dir = directory c
  let consumer = dir ++ "/consumer"
@@ -483,17 +483,17 @@ releaseRelocation c digest = do
  let bundle = dir ++ "/published greeting"
  -- Moving the entire bundle must not retain producer or installation paths.
  O.move bundle (dir ++ "/relocated greeting")
- setDependencies app (Cons (pair "greeting" (dependency "../relocated greeting" digest)) Nil)
- invoke c app (dir ++ "/fresh relocated build") (Cons "test" Nil) true ""
+ setDependencies app ((:) (pair "greeting" (dependency "../relocated greeting" digest)) [])
+ invoke c app (dir ++ "/fresh relocated build") ((:) "test" []) true ""
  checked "bundle and cache relocation preserve source-free execution"
 
-runReleases : String -> IO Unit
+runReleases : String -> IO ()
 runReleases dir = do
  root <- canonicalPath "."
  tool <- getEnv "MLF_PACKAGE_MANAGER"
  seed <- getEnv "MLF_BOOTSTRAP_COMPILER"
  let c = Context dir tool seed
- Pair digest messageDigest <- releaseSetup c root
+ (,) digest messageDigest <- releaseSetup c root
  let savedGreeting = dependency "../published greeting" digest
  releaseImmutability c digest
  releaseSourceFree c
@@ -503,11 +503,11 @@ runReleases dir = do
  releaseLock c savedGreeting messageDigest
  releaseLocalRepair c reused
  releasePins c savedGreeting
- Pair originalManifest release <- releaseCompatibility c savedGreeting
+ (,) originalManifest release <- releaseCompatibility c savedGreeting
  releaseObjectIntegrity c savedGreeting originalManifest release
  releaseRelocation c digest
  githubTests c (dir ++ "/consumer/mlf-package.json") (dir ++ "/relocated greeting") digest
  putStrLn "28 checked package release cases passed"
 
-main : IO Unit
+main : IO ()
 main = H.withScratch runReleases

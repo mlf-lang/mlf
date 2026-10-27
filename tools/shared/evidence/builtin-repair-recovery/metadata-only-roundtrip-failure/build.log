@@ -1,0 +1,17 @@
+builtin constructed
+interface decoded
+probe: Uncaught exception ghc-internal:GHC.Internal.IO.Exception.IOException:
+
+user error (decodeObject: <contextual inference fragment>:1:31732: unexpected $; expected identifier)
+
+HasCallStack backtrace:
+  throwIO, called at libraries/ghc-internal/src/GHC/Internal/Control/Monad/Fail.hs:66:12 in ghc-internal:GHC.Internal.Control.Monad.Fail
+  a type signature in an instance, called at libraries/ghc-internal/src/GHC/Internal/Control/Monad/Fail.hs:65:13 in ghc-internal:GHC.Internal.Control.Monad.Fail
+  fail, called at /workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/builtin-roundtrip-diagnostic/Main.hs:6:26 in main:Main
+
+Traceback (most recent call last):
+  File "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/builtin-roundtrip-diagnostic/run.py", line 4, in <module>
+    subprocess.run(c,check=True)
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/builtin-roundtrip-diagnostic/probe']' returned non-zero exit status 1.

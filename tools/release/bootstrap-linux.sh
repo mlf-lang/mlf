@@ -39,6 +39,8 @@ export MLF_PACKAGE_MANAGER="$build/seed/mlfpkg"
 "$MLF_COMPILER" --type --expr '\x -> x'
 CC="$cc" tools/release/bootstrap-manager.sh "$build/manager-bootstrap"
 export MLF_PACKAGE_MANAGER="$build/manager-bootstrap/bin/mlfpkg"
+export MLF_COMPILER
+MLF_COMPILER=$(cat "$build/manager-bootstrap/compiler.path")
 "$MLF_PACKAGE_MANAGER" --compiler "$MLF_COMPILER" --clang "$cc" \
   --runtime "$PWD/runtime/mlf_runtime.c" --timeout 21600 --locked \
   --build-dir "${3:-$build/candidate}" build

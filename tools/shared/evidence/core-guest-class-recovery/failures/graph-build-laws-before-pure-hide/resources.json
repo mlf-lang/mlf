@@ -1,0 +1,31 @@
+{
+  "complete": false,
+  "command": [
+    "nice",
+    "-n",
+    "19",
+    "ionice",
+    "-c",
+    "3",
+    "python3",
+    ".mlf-build/graph-build-laws-positive/run.py"
+  ],
+  "limits": {
+    "wall_seconds": 900,
+    "address_space_per_process": 3221225472,
+    "process_tree_rss_bytes": 1610612736,
+    "host_available_floor": 3221225472,
+    "disk_free_floor": 3221225472,
+    "max_output_bytes": 536870912
+  },
+  "process_group": 6,
+  "exit_code": 1,
+  "reason": null,
+  "elapsed_seconds": 6.038721980999981,
+  "peak_group_rss": 41910272,
+  "raw_receipt_sha256": "8920375060cb2e0c1abe25fc716156bf25598b013bdfca61363246cd78172fe4",
+  "sample_count": 31,
+  "min_host_available": 8123473920,
+  "min_disk_free": 18929213440,
+  "max_output_bytes": 20477
+}

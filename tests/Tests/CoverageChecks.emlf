@@ -10,15 +10,15 @@ import qualified Tests.Coverage as C
 inventoryText = "{\"schema_version\":1,\"suites\":{\"probe\":{\"executions\":[\"first\",\"second\"],\"aliases\":{\"repeated\":\"first\"},\"metrics\":{\"oracle-executed\":3}}}}"
 reportText = "{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"start\",\"scope\":\"full\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"case\",\"id\":\"first\",\"status\":\"passed\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"case\",\"id\":\"second\",\"status\":\"passed\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"alias\",\"id\":\"repeated\",\"canonical\":\"first\",\"status\":\"passed\"}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"metric\",\"name\":\"oracle-executed\",\"value\":3}\n{\"schema_version\":1,\"suite\":\"probe\",\"event\":\"summary\",\"complete\":true,\"executions\":2,\"aliases\":1,\"metrics\":1}\n"
 render rows = S.intercalate "\n" (S.map J.render rows) ++ "\n"
-change index f rows = S.map (\(Pair i row) -> if i == index then f row else row) (S.zip (S.range 0 (S.length rows - 1)) rows)
-without index rows = S.map S.snd (S.filter (\(Pair i _) -> i /= index) (S.zip (S.range 0 (S.length rows - 1)) rows))
+change index f rows = S.map (\((,) i row) -> if i == index then f row else row) (S.zip (S.range 0 (S.length rows - 1)) rows)
+without index rows = S.map S.snd (S.filter (\((,) i _) -> i /= index) (S.zip (S.range 0 (S.length rows - 1)) rows))
 rejected inventory text = case C.validate inventory "probe" text of
- Left _ -> return Unit
+ Left _ -> return ()
  Right _ -> H.fail "damaged structural coverage evidence was accepted"
-main : IO Unit
+main : IO ()
 main = do
  callbacks <- newIntArray 1 0
- completed <- C.count (\value -> do { before <- readIntArray callbacks 0; writeIntArray callbacks 0 (before + value) }) (Cons 2 (Cons 4 (Cons 8 Nil))) 0
+ completed <- C.count (\value -> do { before <- readIntArray callbacks 0; writeIntArray callbacks 0 (before + value) }) ((:) 2 ((:) 4 ((:) 8 []))) 0
  observed <- readIntArray callbacks 0
  H.assert (completed == 3 && observed == 14) "coverage counter skipped or repeated callback execution"
  inventory <- H.right (J.parse inventoryText)
@@ -30,8 +30,8 @@ main = do
  let missing = change 4 (J.set "executions" (J.num 1)) (without 1 evidence)
  let duplicate = change 1 (J.set "id" (J.str "second")) evidence
  let unknown = change 1 (J.set "id" (J.str "unknown")) evidence
- S.mapM_ (\rows -> rejected inventory (render rows)) (Cons missing (Cons duplicate (Cons unknown Nil)))
- S.mapM_ (\status -> rejected inventory (render (change 1 (J.set "status" (J.str status)) evidence))) (Cons "failed" (Cons "skipped" (Cons "unknown" Nil)))
+ S.mapM_ (\rows -> rejected inventory (render rows)) ((:) missing ((:) duplicate ((:) unknown [])))
+ S.mapM_ (\status -> rejected inventory (render (change 1 (J.set "status" (J.str status)) evidence))) ((:) "failed" ((:) "skipped" ((:) "unknown" [])))
  rejected inventory (render (change 0 (J.set "scope" (J.str "partial")) evidence))
  rejected inventory (render (S.init evidence))
  rejected inventory ""
@@ -44,16 +44,16 @@ main = do
  rejected inventory (render (change 2 (J.set "extra" (J.Boolean true)) evidence))
  -- An alias must name the reviewed canonical execution, which must have
  -- actually completed earlier. Aliases cannot certify one another or a cycle.
- S.mapM_ (\target -> rejected inventory (render (change 3 (J.set "canonical" (J.str target)) evidence))) (Cons "second" (Cons "missing" (Cons "repeated" Nil)))
- rejected inventory (render (Cons (S.head evidence) (Cons (S.index evidence 3) (Cons (S.index evidence 1) (Cons (S.index evidence 2) (S.drop 4 evidence))))))
+ S.mapM_ (\target -> rejected inventory (render (change 3 (J.set "canonical" (J.str target)) evidence))) ((:) "second" ((:) "missing" ((:) "repeated" [])))
+ rejected inventory (render ((:) (S.head evidence) ((:) (S.index evidence 3) ((:) (S.index evidence 1) ((:) (S.index evidence 2) (S.drop 4 evidence))))))
  rejected inventory (render (change 3 (J.set "id" (J.str "first")) evidence))
  rejected inventory (render (change 4 (J.set "aliases" (J.num 0)) (without 3 evidence)))
  rejected inventory (render (change 4 (J.set "value" (J.num 2)) evidence))
  rejected inventory (render (change 4 (J.set "value" (J.str "3")) evidence))
  rejected inventory (render (change 4 (J.set "name" (J.str "unreviewed")) evidence))
  rejected inventory (render (without 4 evidence))
- rejected inventory (render (S.append (S.take 5 evidence) (Cons (S.index evidence 4) (S.drop 5 evidence))))
- let changedSuite = J.set "executions" (J.stringArray (Cons "first" Nil)) (J.get "probe" (J.get "suites" inventory))
- let changedInventory = J.set "suites" (J.Object (Cons (Pair "probe" changedSuite) Nil)) inventory
+ rejected inventory (render (S.append (S.take 5 evidence) ((:) (S.index evidence 4) (S.drop 5 evidence))))
+ let changedSuite = J.set "executions" (J.stringArray ((:) "first" [])) (J.get "probe" (J.get "suites" inventory))
+ let changedInventory = J.set "suites" (J.Object ((:) ((,) "probe" changedSuite) [])) inventory
  rejected changedInventory reportText
  putStrLn "Structural coverage validator contracts passed"

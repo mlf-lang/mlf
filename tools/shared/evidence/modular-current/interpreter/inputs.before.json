@@ -1,0 +1,13 @@
+{
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-interpreter/mlf-package.json": "ffd00c762c3959dd6f93fc88f02076bb966ec1a45e6efee7c4b3c5d2d53a9761",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-interpreter/Bootstrap/ProcessHost.hs": "792cf2f725e7d6a5bd629feef085ffed71d5bedbe80205fd0d2181f952d680ac",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-interpreter/Bootstrap/Runtime.hs": "1e446a0145e36edb1fff1e579039f294c22e4e472a577ba85c2cb3717fcc4386",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/artifact/unit.mlfci": "caa83e4396eee57d327f5bd15b6fe95af21e83539d26e3068a9b28a0b96db6d2",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-language-core-crate-O2/artifact/unit.mlfci": "9f2ed03e6394abb7907c69e80cfb318354dbd226596e2260f4d753a80f58fb7f",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/xmlf/artifact/unit.mlfci": "91cb82592148342891d6fd376b7fa88144c88bdb47078ccac25572ddc0721159",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/artifact/unit.mlfco": "6358bfce412ef5b0194c99bb435401fc0ac04e697c5bddd9c5decf20307b149f",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-language-core-crate-O2/artifact/unit.mlfco": "2a636b292794f990c685452d4744a27d8750ffcd279561ee719a09df67222630",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/xmlf/artifact/unit.mlfco": "7f48c0fa90c4aa3fd4561c0e52258511fd69189bb1f76894c62ad3be0b494296",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O2/receipt.json": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/interpreter/crate.spec": "ea69d78541e631f4fbe7ac713a1c63b0e5ee930190be0a3009571be16ea84138"
+}

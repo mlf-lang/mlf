@@ -1,0 +1,10 @@
+[
+  "MLF-CRATE-1",
+  "mlf-foundation/0.3.0/library",
+  "",
+  "false",
+  "110:15:Bootstrap.Fresh89:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/Fresh.hs108:14:Bootstrap.Host88:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/Host.hs112:16:Bootstrap.IntMap90:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/IntMap.hs112:16:Bootstrap.IntSet90:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/IntSet.hs106:13:Bootstrap.Map87:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/Map.hs110:15:Bootstrap.Regex89:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/Regex.hs104:12:Bootstrap.ST86:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/ST.hs106:13:Bootstrap.Set87:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/Set.hs106:13:Bootstrap.Std87:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/Std.hs110:15:Bootstrap.Types89:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/Types.hs114:17:Bootstrap.Unicode91:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/Unicode.hs114:17:Bootstrap.Version91:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-foundation/Bootstrap/Version.hs",
+  "",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/foundation/queries",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/foundation/builtin/unit"
+]

@@ -12,10 +12,10 @@ import qualified Tests.BenchmarkSuite as Bench
 import qualified Tests.RegexRedux as RegexRedux
 import qualified Tests.TestSourceCache as SourceCache
 import qualified Tests.TestDriverCache as DriverCache
-waitFor : String -> Int -> IO Unit
+waitFor : String -> Int -> IO ()
 waitFor path attempts = do
  present <- fileExists path
- if present then return Unit else if attempts == 0 then H.fail "independent phases did not overlap" else do
+ if present then return () else if attempts == 0 then H.fail "independent phases did not overlap" else do
   O.run "" (O.words "/bin/sleep 0.01")
   waitFor path (attempts - 1)
 mockCompiler args = do
@@ -25,31 +25,31 @@ mockCompiler args = do
   prior <- readFile calls
   writeFile calls (prior ++ S.intercalate " " args ++ "\n")
   case args of
-   Cons "--help" Nil -> putStrLn "Usage: emlf [--type] [FILE | --expr SOURCE]"
-   Cons "--llvm-runtime" Nil -> do { runtime <- getEnv "MLF_MOCK_RUNTIME"; putStrLn runtime }
+   (:) "--help" [] -> putStrLn "Usage: emlf [--type] [FILE | --expr SOURCE]"
+   (:) "--llvm-runtime" [] -> do { runtime <- getEnv "MLF_MOCK_RUNTIME"; putStrLn runtime }
    _ -> exitWith 9
 outputPath args = case S.dropWhile (\arg -> S.not (eqString arg "-o")) args of
- Cons _ (Cons path _) -> path
+ (:) _ ((:) path _) -> path
  _ -> panic "mock tool missing output argument"
 mockBuild args = if S.any (\flag -> S.elem eqString flag args) (O.words "--emit-llvm --emit-llvm-gc --crate-to-llvm --crate-to-llvm-gc") then do
  writeFile "frontend.started" ""
  fast <- getEnv "MLF_MOCK_FAST_FRONTEND"
  streaming <- getEnv "MLF_BENCH_STREAM_LLVM"
- if eqString fast "1" then return Unit else do
+ if eqString fast "1" then return () else do
   waitFor "runtime.started" 300
-  if eqString streaming "1" then waitFor "llvm.launched" 300 else return Unit
+  if eqString streaming "1" then waitFor "llvm.launched" 300 else return ()
   linking <- getEnv "MLF_BENCH_STREAM_LINK"
-  if eqString linking "1" then waitFor "link.launched" 300 else return Unit
+  if eqString linking "1" then waitFor "link.launched" 300 else return ()
   O.run "" (O.words "/bin/sleep 0.1")
  putStrLn "IR"
  else if S.elem eqString "-c" args && S.any (O.ends "program.ll") args then do
   if S.elem eqString "--mlf-stream-ir" args then do
    writeFile "llvm.launched" ""
    fast <- getEnv "MLF_MOCK_FAST_FRONTEND"
-   if eqString fast "1" then O.run "" (O.words "/bin/sleep 0.05") else return Unit
+   if eqString fast "1" then O.run "" (O.words "/bin/sleep 0.05") else return ()
    code <- O.exec "" (O.words "/bin/cat program.ll.pipe") "" "program.ll" "stream-read.err" 5
    H.assert (code == 0) "streaming LLVM archive failed"
-   else return Unit
+   else return ()
   ir <- readFile "program.ll"
   H.assert (eqString (O.trim ir) "IR") "LLVM compilation started before emission completed"
   writeFile "llvm.started" ""
@@ -60,7 +60,7 @@ mockBuild args = if S.any (\flag -> S.elem eqString flag args) (O.words "--emit-
   writeFile "cache.o" ""
   writeFile "runtime.started" ""
   failure <- getEnv "MLF_MOCK_FAIL_RUNTIME"
-  if eqString failure "1" then exitWith 9 else return Unit
+  if eqString failure "1" then exitWith 9 else return ()
   waitFor "frontend.started" 300
   waitFor "llvm.started" 300
   writeFile (outputPath args) "object"
@@ -70,7 +70,7 @@ mockBuild args = if S.any (\flag -> S.elem eqString flag args) (O.words "--emit-
     writeFile "link.launched" ""
     waitFor "program.o.ready" 300
     waitFor "runtime.o.ready" 300
-    else return Unit
+    else return ()
    object <- readFile "runtime.o"
    code <- readFile "program.o"
    H.assert (eqString object "object" && eqString code "code") "link started before independent phases completed"
@@ -78,46 +78,46 @@ mockBuild args = if S.any (\flag -> S.elem eqString flag args) (O.words "--emit-
 -- The registry contains deferred original actions. Listing IDs does not load
 -- fixture files, start tools, or execute any assertion.
 caseIdentity label = "harness/" ++ O.replace "_" "-" (if O.starts "test_" label then O.drop 5 label else label)
-families : J.Json -> J.Json -> List (Pair String (IO Unit))
+families : J.Json -> J.Json -> [] ((,) String (IO ()))
 families manifest evidence = S.concat
- (Cons (Cons (Pair "harness/matrix-evidence" Boot.matrixChecks)
-  (Cons (Pair "harness/corpus-evidence" Boot.parityChecks) Nil))
- (Cons (Cons (Pair "harness/source-dependency-cache" (do { SourceCache.main; Coverage.passed "harness" "test_source_dependency_cache_controls" }))
-  (Cons (Pair "harness/native-driver-cache" (do { DriverCache.main; Coverage.passed "harness" "test_checked_native_driver_cache" })) Nil))
- (Cons (Cons (Pair "harness/release-evidence" (Release.evidenceChecks evidence manifest))
-  (Cons (Pair "harness/release-steps" Release.stepChecks)
-  (Cons (Pair "harness/release-installation" (Release.installationChecks evidence manifest)) Nil)))
- (Cons (S.map (\(Pair label action) -> Pair (caseIdentity label) action) (Bench.cases manifest))
- (Cons (Cons (Pair "harness/regex-redux-execution" RegexRedux.main) Nil) Nil)))))
+ ((:) ((:) ((,) "harness/matrix-evidence" Boot.matrixChecks)
+  ((:) ((,) "harness/corpus-evidence" Boot.parityChecks) []))
+ ((:) ((:) ((,) "harness/source-dependency-cache" (do { SourceCache.main; Coverage.passed "harness" "test_source_dependency_cache_controls" }))
+  ((:) ((,) "harness/native-driver-cache" (do { DriverCache.main; Coverage.passed "harness" "test_checked_native_driver_cache" })) []))
+ ((:) ((:) ((,) "harness/release-evidence" (Release.evidenceChecks evidence manifest))
+  ((:) ((,) "harness/release-steps" Release.stepChecks)
+  ((:) ((,) "harness/release-installation" (Release.installationChecks evidence manifest)) [])))
+ ((:) (S.map (\((,) label action) -> (,) (caseIdentity label) action) (Bench.cases manifest))
+ ((:) ((:) ((,) "harness/regex-redux-execution" RegexRedux.main) []) [])))))
 manifestFamilies = O.words "harness/release-evidence harness/release-installation harness/all-workloads-have-complete-provenance-and-fixtures harness/dna-inputs-match-pinned-fasta-fixtures harness/vendored-adaptation-patches-reconstruct-build-sources harness/pin-tampering-fails"
 releaseFamilies = O.words "harness/release-evidence harness/release-installation"
-runFamilies : List String -> IO Unit
+runFamilies : [] String -> IO ()
 runFamilies args = do
  let available = S.map S.fst (families J.empty J.empty)
  if Selection.listing args then putStr (S.unlines available) else do
-  Pair full selected <- case Selection.choose available args of
+  (,) full selected <- case Selection.choose available args of
    Left error -> do { putErr (error ++ "\n"); exitWith 2 }
    Right value -> return value
   Coverage.begin "harness" full
   Selection.begin "harness" full selected
   manifest <- if S.any (\name -> S.elem eqString name manifestFamilies) selected then J.read "benchmarks/manifest.json" else return J.empty
   evidence <- if S.any (\name -> S.elem eqString name releaseFamilies) selected then J.read "tests/golden/release-evidence.json" else return J.empty
-  S.mapM_ (\(Pair name action) -> if S.elem eqString name selected then do
+  S.mapM_ (\((,) name action) -> if S.elem eqString name selected then do
    action
    Selection.passed "harness" name
-   if eqString name "harness/native-driver-cache" && S.elem eqString "harness/source-dependency-cache" selected then putStrLn "2 native cache regression checks passed" else return Unit
-   else return Unit) (families manifest evidence)
+   if eqString name "harness/native-driver-cache" && S.elem eqString "harness/source-dependency-cache" selected then putStrLn "2 native cache regression checks passed" else return ()
+   else return ()) (families manifest evidence)
   if full then putStrLn "Native benchmark/bootstrap/release harness tests passed" else putStrLn (showInt (S.length selected) ++ " harness families; 0 failures")
   Coverage.finish "harness"
   Selection.finish "harness"
-main : IO Unit
+main : IO ()
 main = do
  args <- O.allArguments
  mock <- getEnv "MLF_MOCK_COMPILER"
  build <- getEnv "MLF_MOCK_BUILD"
  if eqString mock "1" then mockCompiler args else if eqString build "1" then mockBuild args else case args of
-  Cons "--check-clean-environment" names -> do
+  (:) "--check-clean-environment" names -> do
    values <- S.mapM getEnv names
    H.assert (S.all (\value -> eqString value "") values) "gate inherited compiler or collector overrides"
-  Cons "--driver-cache-case" (Cons compiler Nil) -> DriverCache.run compiler
+  (:) "--driver-cache-case" ((:) compiler []) -> DriverCache.run compiler
   _ -> runFamilies args

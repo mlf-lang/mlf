@@ -26,7 +26,7 @@ static MlfValue *os_setEnv(MlfValue *name, MlfValue *contents) {
     if (!failed && !*value) failed=!SetEnvironmentVariableW(wide,L"");
     free(wide); free(value);
     if (failed) fail("IO error: setEnv failed");
-    return mlf_constructor(0,0);
+    return mlf_constructor(1,0);
 }
 static MlfValue *os_unsetEnv(MlfValue *name) {
     const char *key=file_path(name);
@@ -35,7 +35,7 @@ static MlfValue *os_unsetEnv(MlfValue *name) {
     int failed=!wide || _wputenv_s(wide,L"");
     free(wide);
     if (failed) fail("IO error: unsetEnv failed");
-    return mlf_constructor(0,0);
+    return mlf_constructor(1,0);
 }
 static MlfValue *os_directoryExists(MlfValue *name) {
     DWORD attributes=mlf_windows_attributes(file_path(name));
@@ -82,7 +82,7 @@ static MlfValue *os_acquireFileLock(MlfValue *name) {
 static MlfValue *os_releaseFileLock(MlfValue *handle) {
     HANDLE file=(HANDLE)(uintptr_t)bounded_integer(handle,INTPTR_MAX,"invalid file lock");
     if (!CloseHandle(file)) fail("IO error: releaseFileLock failed");
-    return mlf_constructor(0,0);
+    return mlf_constructor(1,0);
 }
 /* Always quote each argument, using the Microsoft CRT backslash/quote rules. */
 static wchar_t *mlf_windows_command(char **arguments) {

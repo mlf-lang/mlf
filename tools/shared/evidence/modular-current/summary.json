@@ -1,0 +1,233 @@
+{
+  "source_commit": "25129e97f9ac726c31d530884d83238e20cf3be7",
+  "source_tree": "16b75f1c02adfbf8a84060ab2eb8e31d645f3048",
+  "producer_receipt_sha256": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+  "complete": true,
+  "library_modules": 72,
+  "library_crates": 11,
+  "entry_targets": [
+    "emlf",
+    "mlfpkg"
+  ],
+  "inferred_groups": 2843,
+  "reused_groups": 0,
+  "native_or_llvm_output": false,
+  "full_build_cache_or_closure_validation": false,
+  "rows": [
+    {
+      "name": "recovery-foundation-crate-O2-metadata-fix",
+      "complete": true,
+      "source_unchanged": true,
+      "producer_reauthenticated": true,
+      "producer_receipt_sha256": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+      "spec_sha256": "3310af89d1878f5fd4690450e70a4f3bc69f3488a071407210da9df345f1e853",
+      "artifacts": {
+        "artifact/unit.mlfci": {
+          "current": "caa83e4396eee57d327f5bd15b6fe95af21e83539d26e3068a9b28a0b96db6d2",
+          "historical": "caa83e4396eee57d327f5bd15b6fe95af21e83539d26e3068a9b28a0b96db6d2",
+          "identical": true
+        },
+        "artifact/unit.mlfco": {
+          "current": "6358bfce412ef5b0194c99bb435401fc0ac04e697c5bddd9c5decf20307b149f",
+          "historical": "6358bfce412ef5b0194c99bb435401fc0ac04e697c5bddd9c5decf20307b149f",
+          "identical": true
+        }
+      },
+      "inferred_groups": 376,
+      "reused_groups": 0,
+      "native_or_llvm": false,
+      "elapsed_seconds": 25.555804760999308,
+      "peak_rss": 111906816
+    },
+    {
+      "name": "recovery-language-core-crate-O2",
+      "complete": true,
+      "source_unchanged": true,
+      "producer_reauthenticated": true,
+      "producer_receipt_sha256": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+      "spec_sha256": "cfd3cf9384da85ec4c5473310dcd60767bdd127152ca62e118d2d13f5fa2ed14",
+      "artifacts": {
+        "artifact/unit.mlfci": {
+          "current": "9f2ed03e6394abb7907c69e80cfb318354dbd226596e2260f4d753a80f58fb7f",
+          "historical": "9f2ed03e6394abb7907c69e80cfb318354dbd226596e2260f4d753a80f58fb7f",
+          "identical": true
+        },
+        "artifact/unit.mlfco": {
+          "current": "2a636b292794f990c685452d4744a27d8750ffcd279561ee719a09df67222630",
+          "historical": "2a636b292794f990c685452d4744a27d8750ffcd279561ee719a09df67222630",
+          "identical": true
+        }
+      },
+      "inferred_groups": 51,
+      "reused_groups": 0,
+      "native_or_llvm": false,
+      "elapsed_seconds": 5.029145428999982,
+      "peak_rss": 91611136
+    },
+    {
+      "name": "recovery-frontend-crate-O2",
+      "complete": true,
+      "source_unchanged": true,
+      "producer_reauthenticated": true,
+      "producer_receipt_sha256": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+      "spec_sha256": "5719d23cd60b1daade32c986a171dd6095becd2ecb03599d9306f232678db57b",
+      "artifacts": {
+        "artifact/unit.mlfci": {
+          "current": "1731ce8c40d781502f8380c8b8659f6cc1c6c817ca84558fb1305823f1a0706d",
+          "historical": "1731ce8c40d781502f8380c8b8659f6cc1c6c817ca84558fb1305823f1a0706d",
+          "identical": true
+        },
+        "artifact/unit.mlfco": {
+          "current": "349cbc6f8cbe0c4f78abff04c5ae48b32e03691fbf9295735eb27267494cf798",
+          "historical": "349cbc6f8cbe0c4f78abff04c5ae48b32e03691fbf9295735eb27267494cf798",
+          "identical": true
+        }
+      },
+      "inferred_groups": 473,
+      "reused_groups": 0,
+      "native_or_llvm": false,
+      "elapsed_seconds": 44.9429791879993,
+      "peak_rss": 258568192
+    },
+    {
+      "name": "xmlf",
+      "complete": true,
+      "source_unchanged": true,
+      "producer_reauthenticated": true,
+      "producer_receipt_sha256": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+      "inferred_groups": 113,
+      "reused_groups": 0,
+      "native_or_llvm": false,
+      "elapsed_seconds": 10.084081734001302,
+      "peak_rss": 116281344,
+      "checked_artifact_bytes": 10068996,
+      "artifact_files": 116
+    },
+    {
+      "name": "inference",
+      "complete": true,
+      "source_unchanged": true,
+      "producer_reauthenticated": true,
+      "producer_receipt_sha256": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+      "inferred_groups": 479,
+      "reused_groups": 0,
+      "native_or_llvm": false,
+      "elapsed_seconds": 46.16698597499999,
+      "peak_rss": 302526464,
+      "checked_artifact_bytes": 45822708,
+      "artifact_files": 482
+    },
+    {
+      "name": "async",
+      "complete": true,
+      "source_unchanged": true,
+      "producer_reauthenticated": true,
+      "producer_receipt_sha256": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+      "inferred_groups": 86,
+      "reused_groups": 0,
+      "native_or_llvm": false,
+      "elapsed_seconds": 43.77281660799963,
+      "peak_rss": 79024128,
+      "checked_artifact_bytes": 5805776,
+      "artifact_files": 89
+    },
+    {
+      "name": "interpreter",
+      "complete": true,
+      "source_unchanged": true,
+      "producer_reauthenticated": true,
+      "producer_receipt_sha256": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+      "inferred_groups": 85,
+      "reused_groups": 0,
+      "native_or_llvm": false,
+      "elapsed_seconds": 10.490754353999364,
+      "peak_rss": 129527808,
+      "checked_artifact_bytes": 11565912,
+      "artifact_files": 88
+    },
+    {
+      "name": "llvm",
+      "complete": true,
+      "source_unchanged": true,
+      "producer_reauthenticated": true,
+      "producer_receipt_sha256": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+      "inferred_groups": 353,
+      "reused_groups": 0,
+      "native_or_llvm": false,
+      "elapsed_seconds": 39.195812126999954,
+      "peak_rss": 296054784,
+      "checked_artifact_bytes": 47054417,
+      "artifact_files": 356
+    },
+    {
+      "name": "crates",
+      "complete": true,
+      "source_unchanged": true,
+      "producer_reauthenticated": true,
+      "producer_receipt_sha256": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+      "inferred_groups": 332,
+      "reused_groups": 0,
+      "native_or_llvm": false,
+      "elapsed_seconds": 92.22541493399876,
+      "peak_rss": 436424704,
+      "checked_artifact_bytes": 47579384,
+      "artifact_files": 335
+    },
+    {
+      "name": "package-core",
+      "complete": true,
+      "source_unchanged": true,
+      "producer_reauthenticated": true,
+      "producer_receipt_sha256": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+      "inferred_groups": 343,
+      "reused_groups": 0,
+      "native_or_llvm": false,
+      "elapsed_seconds": 109.64764534300048,
+      "peak_rss": 1243275264,
+      "checked_artifact_bytes": 80699464,
+      "artifact_files": 346
+    },
+    {
+      "name": "developer-tools",
+      "complete": true,
+      "source_unchanged": true,
+      "producer_reauthenticated": true,
+      "producer_receipt_sha256": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+      "inferred_groups": 123,
+      "reused_groups": 0,
+      "native_or_llvm": false,
+      "elapsed_seconds": 19.985570144999656,
+      "peak_rss": 216104960,
+      "checked_artifact_bytes": 11172003,
+      "artifact_files": 126
+    },
+    {
+      "name": "target-emlf",
+      "complete": true,
+      "source_unchanged": true,
+      "producer_reauthenticated": true,
+      "producer_receipt_sha256": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+      "inferred_groups": 27,
+      "reused_groups": 0,
+      "native_or_llvm": false,
+      "elapsed_seconds": 41.37400537600115,
+      "peak_rss": 643596288,
+      "checked_artifact_bytes": 13325976,
+      "artifact_files": 30
+    },
+    {
+      "name": "target-mlfpkg",
+      "complete": true,
+      "source_unchanged": true,
+      "producer_reauthenticated": true,
+      "producer_receipt_sha256": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+      "inferred_groups": 2,
+      "reused_groups": 0,
+      "native_or_llvm": false,
+      "elapsed_seconds": 9.875224594999963,
+      "peak_rss": 186286080,
+      "checked_artifact_bytes": 59401,
+      "artifact_files": 5
+    }
+  ]
+}

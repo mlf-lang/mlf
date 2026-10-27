@@ -1,0 +1,295 @@
+-- mlf:syntax shared-haskell-v1
+{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
+             KindSignatures, FlexibleContexts, FlexibleInstances,
+             MultiParamTypeClasses, OverloadedStrings #-}
+module Package.OS where {
+  import MLF.Primitive;
+  import Bootstrap.Types;
+  import qualified Bootstrap.Std as S;
+  import qualified Bootstrap.Host as Host;
+  fatal :: forall a. String -> IO a;
+  fatal message =
+    do {
+      putErr ("mlfpkg: " ++ (message ++ "\n"));
+      exitWith 1
+    };
+  require condition message = if condition then ioReturn () else fatal message;
+  starts prefix text =
+    ((stringLength text >= stringLength prefix) &&
+     eqString (stringSlice text 0 (stringLength prefix)) prefix);
+  ends suffix text =
+    ((stringLength text >= stringLength suffix) &&
+     eqString (stringSlice text (stringLength text - stringLength suffix) (stringLength suffix))
+       suffix);
+  drop n text = stringSlice text n (stringLength text - n);
+  char text i = stringSlice text i 1;
+  split separator text = splitAt separator text 0 0;
+  splitAt :: Int -> String -> Int -> Int -> [] String;
+  splitAt separator text begin i =
+    if (i == stringLength text)
+    then (:) (stringSlice text begin (i - begin)) []
+    else if (stringCodeAt text i == separator)
+         then (:) (stringSlice text begin (i - begin)) (splitAt separator text (i + 1) (i + 1))
+         else splitAt separator text begin (i + 1);
+  nonempty xs = S.filter (\x -> (stringLength x > 0)) xs;
+  words text = nonempty (split 32 (replace "\t" " " (replace "\n" " " (replace "\r" " " text))));
+  lines text = split 10 text;
+  trim text = S.intercalate " " (words text);
+  replace old new text = replaceAt old new text 0;
+  replaceAt :: String -> String -> String -> Int -> String;
+  replaceAt old new text i =
+    if (i >= stringLength text)
+    then ""
+    else if ((stringLength old > 0) && starts old (drop i text))
+         then (new ++ replaceAt old new text (i + stringLength old))
+         else (char text i ++ replaceAt old new text (i + 1));
+  normalize path = replace "\\" "/" path;
+  drivePath path = ((stringLength path >= 2) && eqString (char path 1) ":");
+  absolute path =
+    (starts "/" (normalize path) ||
+     (drivePath path && ((stringLength path >= 3) && eqString (char (normalize path) 2) "/")));
+  join a b =
+    let {
+      left = normalize a
+    } in
+    let {
+      right = normalize b
+    } in
+    if absolute right then right else if eqString left "" then right else (left ++ ("/" ++ right));
+  parent path =
+    let {
+      clean = normalize path
+    } in
+    let {
+      pieces = split 47 clean
+    } in
+    let {
+      front = S.take (S.length pieces - 1) pieces
+    } in
+    let {
+      result = S.intercalate "/" front
+    } in
+    if eqString result ""
+    then if starts "/" clean then "/" else "."
+    else if (drivePath result && (stringLength result == 2)) then (result ++ "/") else result;
+  base path = S.last (split 47 (normalize path));
+  relative root path =
+    if eqString root path
+    then "."
+    else let {
+           a = split 47 (normalize root)
+         } in
+         let {
+           b = split 47 (normalize path)
+         } in
+         relativeParts a b;
+  relativeParts :: [] String -> [] String -> String;
+  relativeParts a b =
+    case a of {
+      [] -> S.intercalate "/" b;
+      (:) x xs ->
+        case b of {
+          (:) y ys ->
+            if eqString x y
+            then relativeParts xs ys
+            else S.intercalate "/" (S.append (S.map (\_ -> "..") a) b);
+          [] -> S.intercalate "/" (S.map (\_ -> "..") a)
+        }
+    };
+  modulePath name = replace "." "/" name;
+  nul = stringFromCode 0;
+  pack fields = S.concatStrings (S.map (\x -> (x ++ nul)) fields);
+  unpack text =
+    if eqString text "" then [] else S.take (S.length (split 0 text) - 1) (split 0 text);
+  arguments :: Int -> Int -> IO ([] String);
+  arguments i n =
+    if (i >= n)
+    then ioReturn []
+    else do {
+           x <- getArg i;
+           xs <- arguments (i + 1) n;
+           ioReturn ((:) x xs)
+         };
+  allArguments =
+    do {
+      n <- getArgCount;
+      arguments 0 n
+    };
+  isWindows = Host.isWindows;
+  windowsHost = Host.windowsHost;
+  nativePrefix =
+    do {
+      selected <- getEnv "MLF_NATIVE_PREFIX";
+      executable <- getExecutablePath;
+      ioReturn (if eqString selected "" then parent (parent executable) else normalize selected)
+    };
+  executable path =
+    do {
+      windows <- isWindows;
+      ioReturn (if (windows && S.not (ends ".exe" path)) then (path ++ ".exe") else path)
+    };
+  hostArguments argv = Host.hostArguments argv;
+  setupWindows =
+    do {
+      windows <- isWindows;
+      if S.not windows
+      then ioReturn ()
+      else do {
+             host <- windowsHost;
+             setEnv "MLF_WINDOWS_HOST" host;
+             executable <- getExecutablePath;
+             prefix <- nativePrefix;
+             setEnv "MLF_NATIVE_PREFIX" prefix;
+             path <- getEnv "PATH";
+             setEnv "PATH" (parent executable ++ (";" ++ (prefix ++ ("/bin;" ++ path))));
+             pkg <- getEnv "PKG_CONFIG_PATH";
+             setEnv "PKG_CONFIG_PATH"
+               (prefix ++ ("/lib/pkgconfig" ++ (if eqString pkg "" then "" else (";" ++ pkg))))
+           }
+    };
+  exec cwd argv input output errors timeout =
+    do {
+      require ((timeout > 0) && (timeout <= 2147483647)) "invalid process timeout";
+      require
+        (S.all (\x -> S.not (S.elem eqString nul (S.map (char x) (S.range 0 (stringLength x - 1)))))
+           argv)
+        "NUL in process argument";
+      command <- hostArguments argv;
+      runProcess cwd
+        (pack ((:) (showInt timeout) ((:) input ((:) output ((:) errors command)))))
+    };
+  run cwd argv =
+    do {
+      code <- exec cwd argv "" "" "" 1800;
+      require (code == 0)
+        ("command failed (" ++ (showInt code ++ ("): " ++ S.intercalate " " argv)))
+    };
+  -- The caller owns scratch (privately or under its cache lock). Never reuse a
+  -- work directory after an interrupted owner: an old child may still write it.
+  -- Allocate on the destination filesystem so final publication is a rename.
+  temporaryDirectory :: String -> String -> IO String;
+  temporaryDirectory scratch prefix =
+    do {
+      let {
+        output = (scratch ++ "/query.out")
+      };
+      let {
+        errors = (scratch ++ "/query.err")
+      };
+      code <-
+        exec "" ((:) "mktemp" ((:) "-d" ((:) (prefix ++ "XXXXXXXX") []))) "" output errors 1800;
+      if (code /= 0)
+      then do {
+             message <- readFile errors;
+             fatal ("temporary directory allocation failed: " ++ message)
+           }
+      else ioReturn ();
+      temporary <- readFile output;
+      let {
+        line = S.head (lines temporary)
+      };
+      let {
+        path =
+          normalize (if ends "\r" line then stringSlice line 0 (stringLength line - 1) else line)
+      };
+      require (eqString (parent path) (parent prefix) && starts (base prefix) (base path))
+        "invalid temporary directory";
+      ioReturn path
+    };
+  mkdir path = run "" ((:) "/bin/mkdir" ((:) "-p" ((:) path [])));
+  copy source destination =
+    do {
+      mkdir (parent destination);
+      run "" ((:) "/bin/cp" ((:) "-p" ((:) source ((:) destination []))))
+    };
+  move source destination =
+    run "" ((:) "/bin/mv" ((:) "-f" ((:) source ((:) destination []))));
+  remove path =
+    do {
+      require
+        (absolute path && ((stringLength path > 5) && S.not (eqString (normalize path) "/tmp")))
+        "unsafe artifact removal path";
+      run "" ((:) "/bin/rm" ((:) "-rf" ((:) path [])))
+    };
+  writeAtomic path text =
+    do {
+      mkdir (parent path);
+      writeFile (path ++ ".new") text;
+      move (path ++ ".new") path
+    };
+  readOptional path =
+    do {
+      present <- fileExists path;
+      if present then readFile path else ioReturn ""
+    };
+  envDefault name fallback =
+    do {
+      value <- getEnv name;
+      ioReturn (if eqString value "" then fallback else value)
+    };
+  which command =
+    do {
+      windows <- isWindows;
+      let {
+        clean = normalize command
+      };
+      let {
+        explicit =
+          (S.any (\x -> eqString x "/") (S.map (char clean) (S.range 0 (stringLength clean - 1))) ||
+           drivePath clean)
+      };
+      if explicit
+      then resolveTool clean
+      else do {
+             path <- getEnv "PATH";
+             findTool command (split (if windows then 59 else 58) path)
+           }
+    };
+  resolveTool path =
+    do {
+      present <- fileExists path;
+      if present
+      then canonicalPath path
+      else do {
+             windows <- isWindows;
+             let {
+               extension = (path ++ ".exe")
+             };
+             found <- fileExists extension;
+             require (windows && found) ("executable not found: " ++ path);
+             canonicalPath extension
+           }
+    };
+  findTool :: String -> [] String -> IO String;
+  findTool command directories =
+    case directories of {
+      [] -> fatal ("executable not found: " ++ command);
+      (:) directory rest ->
+        do {
+          let {
+            path = join (if eqString directory "" then "." else directory) command
+          };
+          present <- fileExists path;
+          windows <- isWindows;
+          extra <- if windows then fileExists (path ++ ".exe") else ioReturn False;
+          if (present || extra) then resolveTool path else findTool command rest
+        }
+    };
+  entries path =
+    do {
+      text <- listDirectory path;
+      ioReturn (S.sortBy compareString (unpack text))
+    };
+  files :: String -> IO ([] String);
+  files path =
+    do {
+      isFile <- fileExists path;
+      if isFile
+      then ioReturn ((:) path [])
+      else do {
+             names <- entries path;
+             nested <- S.mapM (\name -> files (join path name)) names;
+             ioReturn (S.concat nested)
+           }
+    }
+}

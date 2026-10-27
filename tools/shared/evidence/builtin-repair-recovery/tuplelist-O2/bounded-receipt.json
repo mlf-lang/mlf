@@ -1,0 +1,39 @@
+{
+  "complete": true,
+  "command": [
+    "nice",
+    "-n",
+    "15",
+    "ionice",
+    "-c",
+    "3",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O2/bin/tuple-list"
+  ],
+  "limits": {
+    "wall_seconds": 600,
+    "address_space_per_process": 2147483648,
+    "process_tree_rss_bytes": 1073741824,
+    "host_available_floor": 3221225472,
+    "disk_free_floor": 805306368,
+    "max_output_bytes": null
+  },
+  "samples": [
+    {
+      "seconds": 0.0014235859998734668,
+      "group_rss": 622592,
+      "host_available": 7659749376,
+      "disk_free": 945291264
+    },
+    {
+      "seconds": 0.20231962700199801,
+      "group_rss": 11960320,
+      "host_available": 7659970560,
+      "disk_free": 945283072
+    }
+  ],
+  "process_group": 142,
+  "exit_code": 0,
+  "reason": null,
+  "elapsed_seconds": 0.4037023489945568,
+  "peak_group_rss": 11960320
+}

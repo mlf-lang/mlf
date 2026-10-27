@@ -1,0 +1,32 @@
+module Main where
+import Prelude hiding (fail)
+import Bootstrap.Types
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.Map as M
+import qualified Tests.Oracle as O
+
+-- Use the actual independent oracle, with literal expected fresh variables and
+-- counters; no expected result is calculated by its new traversal.
+initial = O.WState 0 IM.empty
+fail label = do { putErr ("FAIL oracle traversal: " ++ label ++ "\n"); exitWith 1 }
+main : IO ()
+main = do
+ negative <- getEnv "MLF_ORACLE_TRAVERSAL_NEGATIVE"
+ case O.runW (O.mapW (\_ -> O.fresh) ((:) () ((:) () ((:) () [])))) initial of
+  Right ((,) ((:) (O.Meta a) ((:) (O.Meta b) ((:) (O.Meta c) []))) (O.WState n subst)) ->
+   if a == 0 && b == 1 && c == 2 && n == (if eqString negative "1" then 4 else 3) && IM.null subst
+   then ioReturn () else fail "fresh order/oracle"
+  _ -> fail "fresh order/oracle"
+ let signature = O.Scheme ((:) 10 ((:) 11 [])) (O.Fun (O.Meta 10) (O.Fun (O.Meta 11) (O.Meta 10)))
+ case O.runW (O.infer (M.insert compareString "poly" signature M.empty) (SVar "poly")) initial of
+  Right ((,) (O.Fun (O.Meta a) (O.Fun (O.Meta b) (O.Meta repeated))) (O.WState n subst)) ->
+   if a == 0 && b == 1 && repeated == 0 && n == 2 && IM.null subst
+   then ioReturn () else fail "scheme instantiation"
+  _ -> fail "scheme instantiation"
+ case O.runW (O.mapW (\_ -> O.fail "stop") ((:) () (panic "failure forced tail" :: [] ()))) initial of
+  Left message -> if eqString message "stop" then ioReturn () else fail "short circuit"
+  Right _ -> fail "short circuit"
+ case O.runW (O.mapW (\_ -> O.returnW (panic "mapped payload forced" :: Int)) ((:) () [])) initial of
+  Right ((,) ((:) _ []) (O.WState n subst)) -> if n == 0 && IM.null subst then ioReturn () else fail "lazy payload"
+  _ -> fail "lazy payload"
+ putStrLn "PASS oracle traversal (4 checks)"

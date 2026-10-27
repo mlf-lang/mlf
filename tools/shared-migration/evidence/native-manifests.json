@@ -1,0 +1,62 @@
+[
+  {
+    "path": "mlf-package.json",
+    "old_sha256": "f5ba12647e4192d86f1870ff6c86d0e3dd3966c0ae2ea6d840373d91f6832a5d",
+    "new_sha256": "f6ba218d8707ca58947fe590fd07e69758affd530bf90b04e90653296a5e5025"
+  },
+  {
+    "path": "libraries/mlf-async/mlf-package.json",
+    "old_sha256": "934b0f39855ca256bad5644b9f4665a886528c0c6cc04b769121c3f67631902f",
+    "new_sha256": "15e9ac789b283257d3ff3f1ab3053f03430859a6cbadd621d214f113994778ff"
+  },
+  {
+    "path": "libraries/mlf-crates/mlf-package.json",
+    "old_sha256": "603495c0220b4d5ac755a3384911884745b38619bffaf4a4a2fc9ec63b68545b",
+    "new_sha256": "6d75e0c86a77ce607fc861cf75c02b0463d6d4115166978198af31958db786cc"
+  },
+  {
+    "path": "libraries/mlf-developer-tools/mlf-package.json",
+    "old_sha256": "35c7ae724fa77f773e444ac1a7ac7ca1cae9831a648f2e65841488f360533531",
+    "new_sha256": "be337ee042323db004efa8e419db889fe24cf01b287112507c3593b30c5b3b71"
+  },
+  {
+    "path": "libraries/mlf-foundation/mlf-package.json",
+    "old_sha256": "24feb277908e4e782e699465308062edeb3e22dec3b570614ec572496dc87f1f",
+    "new_sha256": "4a05ffebfa860271154e1c4b7a40e045a822e76ecca16a2bd57c95e0c176819f"
+  },
+  {
+    "path": "libraries/mlf-frontend/mlf-package.json",
+    "old_sha256": "a8b1873f8f80bff2f6e2493ac333baed9202336a7f6887019fc068028fb0e844",
+    "new_sha256": "2b8262c913c6b67791695d7c562deda96055e41de90e0880c0557a566671db02"
+  },
+  {
+    "path": "libraries/mlf-inference/mlf-package.json",
+    "old_sha256": "765f5ee08b9fa30793c3b77abddb634f47aba91bb6b6f7461f04b40070b59daa",
+    "new_sha256": "c61a4eb680d01815f5a9f812e3e124efe5de070c884d48600ae3bfc5727d1373"
+  },
+  {
+    "path": "libraries/mlf-interpreter/mlf-package.json",
+    "old_sha256": "13364020d10aaf339bd9cead25bbd199111b7202bf9038a01892ede928498207",
+    "new_sha256": "ffd00c762c3959dd6f93fc88f02076bb966ec1a45e6efee7c4b3c5d2d53a9761"
+  },
+  {
+    "path": "libraries/mlf-language-core/mlf-package.json",
+    "old_sha256": "52d785d26f6d16e6787b47711f2e83ee71980c83b62418db38ed98e138be1f59",
+    "new_sha256": "9d653cc825134f8d98919874e6b6d7e58cbd614751bfa0562af6e58f7a30366b"
+  },
+  {
+    "path": "libraries/mlf-llvm/mlf-package.json",
+    "old_sha256": "0ef9984391dd0a8a3523a416af7dbea296dd8bf803801734cdffbc4651b04452",
+    "new_sha256": "c9f0fa08a35f9324b955b6759cc88812c4794e557aeb12bad13b1dcacd92020b"
+  },
+  {
+    "path": "libraries/mlf-package-core/mlf-package.json",
+    "old_sha256": "ff08a086be8d8988430ea9a5767f823608ed76dfe24e7ba3ec6c66d1c7e7afa2",
+    "new_sha256": "b3473060f87653553b6067fb6b8b705ddb2a4a4092745ec642395e50ca645cd9"
+  },
+  {
+    "path": "libraries/mlf-xmlf/mlf-package.json",
+    "old_sha256": "f71ca0986deee49317881a2229bc7718dd5180ef5364ebb3e8f144f9ab9efe08",
+    "new_sha256": "6f9a6c0a2d703ba884dd256fd494665c580ed028db04dedc3c7b748ec393f6f3"
+  }
+]

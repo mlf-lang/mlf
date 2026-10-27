@@ -1,0 +1,553 @@
+-- mlf:syntax shared-haskell-v1
+{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
+             KindSignatures, FlexibleContexts, FlexibleInstances,
+             MultiParamTypeClasses, OverloadedStrings #-}
+module Package.Scheduler where {
+  import MLF.Primitive;
+  import Bootstrap.Types;
+  import qualified Bootstrap.Std as S;
+  import qualified Package.OS as O;
+  import qualified Package.Json as J;
+  import qualified Package.Manifest as M;
+  import qualified Package.Build as B;
+  -- The coordinator resolves one graph. Workers deserialize it and execute one
+  -- action; they never acquire the build-directory lock or call ordinary build.
+  moduleJson m =
+    B.info
+      ((:) ((,) "name" (J.str (M.moduleName m)))
+         ((:) ((,) "owner" (J.str (M.moduleOwner m)))
+            ((:) ((,) "source" (J.str (M.moduleSource m)))
+               ((:) ((,) "imports" (J.stringArray (M.moduleImports m))) []))));
+  moduleFrom value =
+    M.Module (J.getText "name" "" value) (J.getText "owner" "" value) (J.getText "source" "" value)
+      (J.getStrings "imports" value);
+  packageJson p =
+    B.info
+      ((:) ((,) "path" (J.str (M.packagePath p)))
+         ((:) ((,) "data" (M.packageData p))
+            ((:) ((,) "modules" (J.Array (S.map moduleJson (M.packageModules p)))) [])));
+  packageFrom value =
+    M.Package (J.getText "path" "" value) (J.get "data" value)
+      (S.map moduleFrom (J.values (J.get "modules" value)));
+  graphJson graph =
+    B.info
+      ((:) ((,) "root" (J.str (M.packageName (M.rootPackage graph))))
+         ((:) ((,) "packages" (J.Array (S.map packageJson (M.packages graph))))
+            ((:) ((,) "modules" (J.Array (S.map moduleJson (M.modules graph)))) [])));
+  graphFrom value =
+    let {
+      ps = S.map packageFrom (J.values (J.get "packages" value))
+    } in
+    M.PackageGraph (M.lookupPackage (J.getText "root" "" value) ps) ps
+      (S.map moduleFrom (J.values (J.get "modules" value)));
+  request name target publish =
+    B.info
+      ((:) ((,) "name" (J.str name))
+         ((:) ((,) "target" target) ((:) ((,) "publish" (J.Boolean publish)) [])));
+  requestKey selected =
+    ((if J.getBool "publish" False selected then "e-" else "t-") ++ J.getText "name" "" selected);
+  jobId job = J.getText "id" "" job;
+  job kind identity deps =
+    B.info
+      ((:) ((,) "id" (J.str identity))
+         ((:) ((,) "kind" (J.str kind)) ((:) ((,) "dependencies" (J.stringArray deps)) [])));
+  addJob jobs next =
+    case S.find (\row -> eqString (jobId row) (jobId next)) jobs of {
+      Nothing -> S.snoc jobs next;
+      Just previous ->
+        if J.equal previous next then jobs else panic ("conflicting build variant: " ++ jobId next)
+    };
+  libraryId p noPrelude =
+    ((if noPrelude then "library-no-prelude-" else "library-prelude-") ++ M.packageName p);
+  neededPackages :: M.PackageGraph -> [] String -> [] String -> [] String;
+  neededPackages graph done names =
+    case names of {
+      [] -> done;
+      (:) name rest ->
+        if S.elem eqString name done
+        then neededPackages graph done rest
+        else let {
+               p = M.lookupPackage name (M.packages graph)
+             } in
+             neededPackages graph (S.snoc done name)
+               (S.append (M.keys (J.getObject "dependencies" (M.packageData p))) rest)
+    };
+  libraryJobs graph p target =
+    let {
+      own = if S.null (M.packageModules p) then [] else (:) (M.packageName p) []
+    } in
+    let {
+      needed = neededPackages graph [] (S.append (M.targetDependencyNames p target) own)
+    } in
+    let {
+      noPrelude = J.getBool "no-prelude" False target
+    } in
+    S.map
+      (\q ->
+         let {
+           deps =
+             S.map (\r -> libraryId r noPrelude)
+               (S.filter (\r -> S.not (S.null (M.packageModules r)))
+                  (S.map (\name -> M.lookupPackage name (M.packages graph))
+                     (S.sortBy compareString
+                        (M.keys (J.getObject "dependencies" (M.packageData q))))))
+         } in
+         J.set "package" (J.str (M.packageName q))
+           (J.set "no-prelude" (J.Boolean noPrelude) (job "library" (libraryId q noPrelude) deps)))
+      (S.filter
+         (\q -> (S.elem eqString (M.packageName q) needed && S.not (S.null (M.packageModules q))))
+         (M.packages graph));
+  planTarget b jobs selected =
+    do {
+      let {
+        graph = B.graph b
+      };
+      let {
+        p = M.rootPackage graph
+      };
+      let {
+        name = J.getText "name" "" selected
+      };
+      let {
+        label = requestKey selected
+      };
+      let {
+        target = J.get "target" selected
+      };
+      let {
+        noPrelude = J.getBool "no-prelude" False target
+      };
+      let {
+        own = if S.null (M.packageModules p) then [] else (:) p []
+      };
+      let {
+        direct =
+          S.filter (\q -> S.not (S.null (M.packageModules q)))
+            (S.append (M.targetDependencies graph p target) own)
+      };
+      let {
+        deps = S.nubBy eqString (S.map (\q -> libraryId q noPrelude) direct)
+      };
+      boundValueShared1 <- M.targetCrateModules graph p target;
+      case boundValueShared1 of {
+        (,) entry modules ->
+          do {
+            let {
+              profile = B.pgoForTarget b p name
+            };
+            profileKey <- B.fingerprint b profile;
+            let {
+              runtimeId = ("runtime-" ++ profileKey)
+            };
+            let {
+              compileId = ("target-" ++ label)
+            };
+            let {
+              emitId = ("emit-" ++ label)
+            };
+            let {
+              objectId = ("object-" ++ label)
+            };
+            let {
+              linkId = ("link-" ++ label)
+            };
+            let {
+              assemblyId = ("assemble-" ++ label)
+            };
+            let {
+              runtime = J.set "profile" profile (job "runtime" runtimeId [])
+            };
+            let {
+              compilation =
+                J.set "name" (J.str name)
+                  (J.set "entry" (J.str entry)
+                     (J.set "modules" (J.Array (S.map moduleJson modules))
+                        (J.set "no-prelude" (J.Boolean noPrelude) (job "target" compileId deps))))
+            };
+            let {
+              emission =
+                J.set "crate" (J.str compileId)
+                  (J.set "identity" (J.str (M.crateIdentity p ("target-" ++ label)))
+                     (job "emit" emitId ((:) compileId [])))
+            };
+            let {
+              object =
+                J.set "emitted" (J.str emitId)
+                  (J.set "profile" profile (job "object" objectId ((:) emitId [])))
+            };
+            let {
+              link =
+                J.set "llvm" (J.str objectId)
+                  (J.set "runtime" (J.str runtimeId)
+                     (J.set "profile" profile
+                        (job "link" linkId ((:) objectId ((:) runtimeId [])))))
+            };
+            let {
+              assembly =
+                J.set "selection" selected
+                  (J.set "crate" (J.str compileId)
+                     (J.set "emitted" (J.str emitId)
+                        (J.set "linked" (J.str linkId)
+                           (J.set "profile" profile
+                              (job "assemble" assemblyId
+                                 ((:) compileId ((:) emitId ((:) linkId []))))))))
+            };
+            ioReturn
+              (S.foldl addJob jobs
+                 (S.append (libraryJobs graph p target)
+                    ((:) runtime
+                       ((:) compilation
+                          ((:) emission ((:) object ((:) link ((:) assembly []))))))))
+          }
+      }
+    };
+  planTargets :: B.Builder -> [] J.Json -> [] J.Json -> IO ([] J.Json);
+  planTargets b jobs selected =
+    case selected of {
+      [] -> ioReturn jobs;
+      (:) target rest ->
+        do {
+          next <- planTarget b jobs target;
+          planTargets b next rest
+        }
+    };
+  positive text =
+    ((stringLength text > 0) &&
+     (S.all M.digit (M.codes text) &&
+      ((stringLength text < 11) && ((readInt text > 0) && (readInt text <= 2147483647)))));
+  jobDirectory directory identity = (directory ++ ("/jobs/" ++ identity));
+  resultPath directory identity = (jobDirectory directory identity ++ "/result.json");
+  readResult directory invocation identity =
+    do {
+      value <- J.read (resultPath directory identity);
+      O.require
+        (J.getBool "complete" False value &&
+         (eqString (J.getText "invocation_id" "" value) invocation &&
+          eqString (J.getText "id" "" value) identity))
+        ("invalid worker result: " ++ identity);
+      ioReturn value
+    };
+  artifactOf directory invocation identity =
+    do {
+      value <- readResult directory invocation identity;
+      let {
+        result = J.get "result" value
+      };
+      let {
+        artifact = J.getText "artifact" "" result
+      };
+      O.require (O.absolute artifact) "worker returned a relative artifact";
+      valid <- B.validActionResult result;
+      O.require valid ("worker artifact failed validation: " ++ identity);
+      ioReturn (B.importPath result)
+    };
+  -- Reading every predecessor manifest is part of the worker contract even
+  -- for non-crate actions. No worker infers readiness from file existence.
+  worker contextPath invocation identity =
+    do {
+      digest <- fileDigest contextPath;
+      O.require (eqString digest invocation) "worker context does not match invocation";
+      context <- J.read contextPath;
+      O.require (J.equal (J.get "format" context) (J.num 1)) "unsupported build context version";
+      let {
+        jobs = J.values (J.get "jobs" context)
+      };
+      let {
+        selected =
+          S.fromMaybe (panic "unknown build job")
+            (S.find (\row -> eqString (jobId row) identity) jobs)
+      };
+      let {
+        graph = graphFrom (J.get "graph" context)
+      };
+      let {
+        directory = O.parent contextPath
+      };
+      let {
+        private = jobDirectory directory identity
+      };
+      let {
+        base =
+          B.Builder graph (J.get "config" context) directory (J.get "tools" context)
+            (J.get "initial" context)
+      };
+      b <- B.isolate base private;
+      let {
+        p = M.rootPackage graph
+      };
+      let {
+        gc = J.get "gc" context
+      };
+      let {
+        profile = J.getObject "profile" selected
+      };
+      let {
+        dependency = artifactOf directory invocation
+      };
+      dependencies <- S.mapM dependency (J.getStrings "dependencies" selected);
+      result <-
+        let {
+          matchValueShared2 = J.getText "kind" "" selected
+        } in
+        if MLF.Primitive.eqString matchValueShared2 "library"
+        then do {
+               let {
+                 q = M.lookupPackage (J.getText "package" "" selected) (M.packages graph)
+               };
+               B.libraryResult b q dependencies (J.getBool "no-prelude" False selected)
+             }
+        else if MLF.Primitive.eqString matchValueShared2 "target"
+             then B.compileCrateResult b p ("target-" ++ J.getText "name" "" selected)
+                    (J.getText "entry" "" selected)
+                    (S.map moduleFrom (J.values (J.get "modules" selected)))
+                    dependencies
+                    (J.getBool "no-prelude" False selected)
+             else if MLF.Primitive.eqString matchValueShared2 "runtime"
+                  then B.runtimeObjectWithPgoResult b gc profile
+                  else if MLF.Primitive.eqString matchValueShared2 "emit"
+                       then do {
+                              crate <- dependency (J.getText "crate" "" selected);
+                              metadata <- fileDigest (crate ++ "/unit.mlfci");
+                              object <- fileDigest (crate ++ "/unit.mlfco");
+                              B.emitCrateResult b (J.getText "identity" "" selected) crate metadata
+                                object
+                            }
+                       else if MLF.Primitive.eqString matchValueShared2 "object"
+                            then do {
+                                   emitted <- dependency (J.getText "emitted" "" selected);
+                                   B.nativeLLVMObjectWithPgoResult b emitted profile
+                                 }
+                            else if MLF.Primitive.eqString matchValueShared2 "link"
+                                 then do {
+                                        llvm <- dependency (J.getText "llvm" "" selected);
+                                        runtime <- dependency (J.getText "runtime" "" selected);
+                                        B.linkNativeWithPgoResult b llvm runtime gc profile
+                                      }
+                                 else if MLF.Primitive.eqString matchValueShared2 "assemble"
+                                      then do {
+                                             crate <- dependency (J.getText "crate" "" selected);
+                                             emitted <-
+                                               dependency (J.getText "emitted" "" selected);
+                                             linked <- dependency (J.getText "linked" "" selected);
+                                             let {
+                                               request = J.get "selection" selected
+                                             };
+                                             B.assembleTargetResult b p
+                                               (J.getText "name" "" request)
+                                               (J.get "target" request)
+                                               crate
+                                               emitted
+                                               linked
+                                               profile
+                                           }
+                                      else O.fatal "unsupported build action";
+      report <- J.read (B.reportPath b);
+      J.write (resultPath directory identity)
+        (B.info
+           ((:) ((,) "complete" (J.Boolean True))
+              ((:) ((,) "id" (J.str identity))
+                 ((:) ((,) "invocation_id" (J.str invocation))
+                    ((:) ((,) "result" result) ((:) ((,) "report" report) []))))))
+    };
+  transportTask manager directory invocation timeout selected =
+    let {
+      identity = jobId selected
+    } in
+    let {
+      private = jobDirectory directory identity
+    } in
+    let {
+      deps = J.getStrings "dependencies" selected
+    } in
+    let {
+      argv =
+        (:) manager
+          ((:) "__build-worker"
+             ((:) (directory ++ "/context.json") ((:) invocation ((:) identity []))))
+    } in
+    S.append ((:) identity ((:) timeout ((:) (showInt (S.length deps)) deps)))
+      ((:) directory
+         ((:) ""
+            ((:) (private ++ "/worker.stdout")
+               ((:) (private ++ "/worker.stderr") ((:) (showInt (S.length argv)) argv)))));
+  runner b =
+    do {
+      configured <- O.envDefault "MLF_BUILD_RUNNER" "";
+      manager <- getExecutablePath;
+      path <-
+        O.executable
+          (if eqString configured ""
+           then (O.parent manager ++ "/mlf-build-runner")
+           else configured);
+      identity <- B.tool path;
+      capability <-
+        B.raw (B.directory b) ((:) (J.getText "path" "" identity) ((:) "--protocol-version" []));
+      O.require (eqString (O.trim capability) "1")
+        "incompatible mlf-build-runner protocol (expected 1)";
+      ioReturn identity
+    };
+  mergeReport b identity report =
+    S.mapM_
+      (\((,) key value) ->
+         if S.elem eqString key (O.words "commands builds crates releases codegen native_inputs")
+         then S.mapM_ (\row -> B.record b key (J.set "job_id" (J.str identity) row))
+                (J.values value)
+         else ioReturn ())
+      (J.items report);
+  -- A killed coordinator releases its lock before every descendant is reaped.
+  -- Fresh paths keep late writes from those workers out of the next build.
+  execute b libraryOnly requests =
+    do {
+      let {
+        limit = J.getText "jobs" "1" (B.config b)
+      };
+      let {
+        timeout = J.getText "timeout" "1800" (B.config b)
+      };
+      O.require (positive limit) "--jobs must be a positive integer";
+      O.require (positive timeout) "--timeout must be a positive integer";
+      helper <- runner b;
+      setEnv "MLF_BUILD_RUNNER" (J.getText "path" "" helper);
+      gc <- if S.null requests then ioReturn J.empty else B.gcFlags b;
+      planned <- planTargets b [] requests;
+      let {
+        jobs =
+          if libraryOnly
+          then libraryJobs (B.graph b) (M.rootPackage (B.graph b)) J.empty
+          else planned
+      };
+      nonce <-
+        B.raw (B.directory b) ((:) (J.getText "path" "" helper) ((:) "--new-invocation-id" []));
+      O.require (B.validDigest (J.str (O.trim nonce)))
+        "build runner returned invalid invocation identity";
+      let {
+        directory = (B.directory b ++ ("/invocations/" ++ O.trim nonce))
+      };
+      present <- fileExists directory;
+      existing <- directoryExists directory;
+      O.require (S.not (present || existing)) "build runner reused an invocation identity";
+      O.mkdir directory;
+      S.mapM_ (\row -> O.mkdir (jobDirectory directory (jobId row))) jobs;
+      let {
+        context =
+          J.set "nonce" (J.str (O.trim nonce))
+            (B.info
+               ((:) ((,) "format" (J.num 1))
+                  ((:) ((,) "graph" (graphJson (B.graph b)))
+                     ((:) ((,) "config" (B.config b))
+                        ((:) ((,) "tools" (B.tools b))
+                           ((:) ((,) "initial" (B.initial b))
+                              ((:) ((,) "gc" gc) ((:) ((,) "jobs" (J.Array jobs)) []))))))))
+      };
+      let {
+        contextPath = (directory ++ "/context.json")
+      };
+      J.write contextPath context;
+      invocation <- fileDigest contextPath;
+      manager <- getExecutablePath;
+      let {
+        header =
+          (:) "MLF_BUILD_PLAN"
+            ((:) "1" ((:) invocation ((:) limit ((:) (showInt (S.length jobs)) []))))
+      };
+      let {
+        transport =
+          O.pack
+            (S.append header
+               (S.concatMap (transportTask manager directory invocation timeout) jobs))
+      };
+      let {
+        planPath = (directory ++ "/plan.bin")
+      };
+      let {
+        resultFile = (directory ++ "/runner-result.json")
+      };
+      writeFile planPath transport;
+      digest <- fileDigest planPath;
+      B.record b "scheduler"
+        (J.set "invocation_id" (J.str invocation)
+           (B.info
+              ((:) ((,) "helper" helper)
+                 ((:) ((,) "plan" (J.str planPath))
+                    ((:) ((,) "plan_digest" (J.str digest))
+                       ((:) ((,) "jobs" (J.Array jobs)) []))))));
+      code <-
+        O.exec directory ((:) (J.getText "path" "" helper) ((:) planPath ((:) resultFile [])))
+          ""
+          (directory ++ "/runner.stdout")
+          (directory ++ "/runner.stderr")
+          (S.min 2147483647 ((readInt timeout * S.max 1 (S.length jobs)) + 60));
+      present <- fileExists resultFile;
+      O.require present ("build runner did not produce a result; see " ++ directory);
+      outcome <- J.read resultFile;
+      O.require
+        (J.equal (J.get "protocol_version" outcome) (J.num 1) &&
+         (J.getBool "complete" False outcome &&
+          (eqString (J.getText "invocation_id" "" outcome) invocation &&
+           (eqString (J.getText "plan_digest" "" outcome) digest &&
+            J.equal (J.get "jobs" outcome) (J.num (readInt limit))))))
+        "invalid or stale build runner result";
+      let {
+        states = J.values (J.get "tasks" outcome)
+      };
+      O.require
+        ((S.length states == S.length jobs) &&
+         J.equal (J.stringArray (S.map jobId states)) (J.stringArray (S.map jobId jobs)))
+        "incomplete or reordered build runner result";
+      B.record b "scheduler_results" outcome;
+      S.mapM_
+        (\row ->
+           do {
+             let {
+               identity = jobId row
+             };
+             reportPresent <- fileExists (jobDirectory directory identity ++ "/build-report.json");
+             if reportPresent
+             then do {
+                    report <- J.read (jobDirectory directory identity ++ "/build-report.json");
+                    mergeReport b identity report
+                  }
+             else ioReturn ()
+           })
+        jobs;
+      failures <-
+        S.mapM
+          (\row ->
+             if eqString (J.getText "state" "" row) "failed"
+             then O.readOptional (jobDirectory directory (jobId row) ++ "/worker.stderr")
+             else ioReturn "")
+          states;
+      O.require
+        ((code == 0) &&
+         (J.equal (J.get "exit_code" outcome) (J.num 0) &&
+          S.all
+            (\row ->
+               (eqString (J.getText "state" "" row) "succeeded" &&
+                J.equal (J.get "exit_code" row) (J.num 0)))
+            states))
+        ("build actions failed; see " ++ (resultFile ++ ("\n" ++ S.concatStrings failures)));
+      actualHelper <- fileDigest (J.getText "path" "" helper);
+      O.require (eqString actualHelper (J.getText "sha256" "" helper))
+        "build runner changed during invocation";
+      S.mapM_
+        (\row ->
+           do {
+             ignored <- artifactOf directory invocation (jobId row);
+             ioReturn ()
+           })
+        jobs;
+      S.mapM
+        (\selected ->
+           do {
+             let {
+               name = J.getText "name" "" selected
+             };
+             artifact <- artifactOf directory invocation ("assemble-" ++ requestKey selected);
+             if J.getBool "publish" False selected
+             then B.queuePublication b name artifact
+             else ioReturn ();
+             ioReturn ((,) (requestKey selected) artifact)
+           })
+        requests
+    }
+}

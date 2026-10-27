@@ -1,31 +1,91 @@
 #!/usr/bin/env bash
-# Interpret checkout compiler sources with the verified published seed.
+# Run the maintained smoke harness directly or with a shared-aware interpreter.
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../.."
 build="$PWD/.mlf-build/source-smoke"
 mkdir -p "$build"
 printf '{"complete":false}\n' > "$build/result.json"
 test "$#" -eq 0
-seed=${MLF_COMPILER:?verified native seed compiler required}
-test -x "$seed"
 sha256() { shasum -a 256 "$1" | awk '{print $1}'; }
+source_extension=emlf
+mode=interpreted-checkout-source
+producer_receipt=
+if [ -n "${MLF_SOURCE_SMOKE_RUNNER:-}" ]; then
+  # The fast CI route executes the same maintained smoke module compiled
+  # directly by GHC. Authenticate its full raw-source build before running it.
+  test -f "$PWD/shared-sources.json"
+  seed=$(cd -- "$(dirname -- "$MLF_SOURCE_SMOKE_RUNNER")" && pwd)/$(basename -- "$MLF_SOURCE_SMOKE_RUNNER")
+  producer_receipt=${MLF_SOURCE_SMOKE_RECEIPT:?direct shared-source build receipt required}
+  test -x "$seed"
+  jq -e --arg runner "$seed" --arg binary "$(sha256 "$seed")" \
+    --arg manifest_hash "$(sha256 shared-sources.json)" --arg root "$PWD/" \
+    --slurpfile manifest_file shared-sources.json '
+    . as $receipt | $manifest_file[0] as $manifest |
+    .complete == true and .typecheck_only == false and .producer_host == "GHC" and
+    .implementation_identity == "MLF/shared-haskell-v1 GHC" and .ghc.version == "9.14.1" and
+    (.optimization == "0" or .optimization == "2") and
+    (.flags | index("-fpedantic-bottoms") != null and index("-fno-state-hack") != null) and
+    .source_syntax == $manifest.source_syntax and
+    .frontend_semantics == $manifest.frontend_semantics and
+    .builtin_interface == $manifest.builtin_interface and .primitive_abi == $manifest.primitive_abi and
+    .manifest_sha256 == $manifest_hash and
+    .outputs["source-smoke"] == {path:$runner,sha256:$binary} and
+    (.shared_inputs | keys) == ($manifest.modules | map(.module) | sort) and
+    all($manifest.modules[];
+      . as $item | $receipt.shared_inputs[$item.module] as $input |
+      $input.path == ($root + $item.path) and
+      $receipt.resolved_modules[$item.module] == {path:$input.path,sha256:$input.sha256}) and
+    all($manifest.host_only[];
+      . as $path | $receipt.host_inputs[$path].path == ($root + $path)) and
+    all((.shared_inputs[], .host_inputs[]);
+      (.path | startswith($root)) and (.sha256 | test("^[0-9a-f]{64}$")))
+  ' "$producer_receipt" >/dev/null
+  while IFS=$'\t' read -r path expected; do
+    test "$(sha256 "$path")" = "$expected" || { printf 'Stale direct-source input: %s\n' "$path" >&2; exit 2; }
+  done < <(jq -r '(.shared_inputs[], .host_inputs[]) | [.path,.sha256] | @tsv' "$producer_receipt")
+  cp "$producer_receipt" "$build/producer-receipt.json"
+  producer_receipt_hash=$(sha256 "$producer_receipt")
+  mode=direct-GHC-checkout-source
+  source_extension=hs
+else
+  seed=${MLF_COMPILER:?verified native seed compiler required}
+  test -x "$seed"
+  if [ -f "$PWD/shared-sources.json" ]; then
+    identity=$("$seed" --implementation-identity 2>/dev/null) || identity=
+    case "$identity" in
+      'MLF/shared-haskell-v1 native-MLF'|'MLF/shared-haskell-v1 GHC') ;;
+      *) printf '%s\n' 'Current shared sources cannot be interpreted by the released seed. Run scripts/bootstrap-shared.sh with the verified released compiler and manager, then rerun with MLF_COMPILER set to its stage2 compiler.' >&2; exit 2 ;;
+    esac
+    source_extension=hs
+  fi
+fi
 seed_sha256=$(sha256 "$seed")
-# Divisor 2 reduces pre-harness collection work while keeping the measured
-# local peak near 4.3 GB, below the hosted runner's 7 GiB memory capacity.
+# Retain the previously measured native-interpreter collection policy.
+# This variable does not tune GHC or imply a measured shared-source memory bound.
 export GC_FREE_SPACE_DIVISOR=2
 started=$SECONDS
 include_args=(-i "$PWD/tests")
+helper_root=tests/Tests
+if [ "$source_extension" = hs ]; then
+  helper_root=tests/shared/Tests
+  include_args+=(-i "$PWD/tests/shared")
+fi
 for manifest in "$PWD"/libraries/*/mlf-package.json; do
   test -f "$manifest"
   include_args+=(-i "$(dirname -- "$manifest")")
 done
 snapshot() {
   {
-    find bootstrap libraries -type f \( -name '*.emlf' -o -name 'mlf-package.json' \)
-    printf '%s\n' tests/PRQuickMain.emlf tests/Tests/IndependentCheck.emlf \
-      tests/Tests/IndependentType.emlf tools/release/source-smoke.sh
+    find bootstrap libraries -type f \( -name '*.emlf' -o -name '*.hs' -o -name 'mlf-package.json' \)
+    printf '%s\n' tests/PRQuickMain.emlf "$helper_root/IndependentCheck.$source_extension" \
+      "$helper_root/IndependentType.$source_extension" tools/release/source-smoke.sh
     find tests/pr-smoke -type f
-  } | LC_ALL=C sort | while IFS= read -r file; do
+    if [ "$source_extension" = hs ]; then
+      printf '%s\n' shared-sources.json tools/shared/build.py
+      jq -r '.modules[].path, .host_only[]' shared-sources.json
+      find runtime -maxdepth 1 -name '*.h' -type f
+    fi
+  } | LC_ALL=C sort -u | while IFS= read -r file; do
     printf '%s  %s\n' "$(sha256 "$file")" "$file"
   done
 }
@@ -77,8 +137,12 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-"$seed" "${include_args[@]}" --run "$PWD/tests/PRQuickMain.emlf" \
-  -- "$PWD/tests/pr-smoke" "$build" > "$build/tests.log" 2> "$build/tests.stderr.log" &
+if [ "$mode" = direct-GHC-checkout-source ]; then
+  command=("$seed" "$PWD/tests/pr-smoke" "$build")
+else
+  command=("$seed" "${include_args[@]}" --run "$PWD/tests/PRQuickMain.emlf" -- "$PWD/tests/pr-smoke" "$build")
+fi
+"${command[@]}" > "$build/tests.log" 2> "$build/tests.stderr.log" &
 command_pid=$!
 (
   trap stop_sleep_jobs TERM INT
@@ -144,13 +208,16 @@ test -s "$build/impredicative-self-application.xmlf"
 snapshot > "$build/sources.after.log"
 cmp "$build/sources.before.log" "$build/sources.after.log"
 test "$(sha256 "$seed")" = "$seed_sha256"
-jq -n --arg commit "$(git rev-parse HEAD)" --arg seed_sha256 "$seed_sha256" \
+if [ -n "$producer_receipt" ]; then
+  test "$(sha256 "$producer_receipt")" = "$producer_receipt_hash"
+fi
+jq -n --arg mode "$mode" --arg producer_receipt_sha256 "${producer_receipt_hash:-}" --arg commit "$(git rev-parse HEAD)" --arg seed_sha256 "$seed_sha256" \
   --arg sources_sha256 "$(sha256 "$build/sources.before.log")" \
   --arg log_sha256 "$(sha256 "$build/tests.log")" \
   --arg let_sha256 "$(sha256 "$build/polymorphic-let.xmlf")" \
   --arg self_application_sha256 "$(sha256 "$build/impredicative-self-application.xmlf")" \
   --argjson total_seconds "$((SECONDS - started))" \
-  '{complete:true,mode:"interpreted-checkout-source",commit:$commit,cases:5,
+  '{complete:true,mode:$mode,producer_receipt_sha256:$producer_receipt_sha256,commit:$commit,cases:5,
     accepted:2,rejected:2,malformed_target:1,total_seconds:$total_seconds,gc_free_space_divisor:2,
     seed_sha256:$seed_sha256,sources_sha256:$sources_sha256,log_sha256:$log_sha256,
     targets:{polymorphic_let:$let_sha256,self_application:$self_application_sha256}}' > "$build/result.json.new"

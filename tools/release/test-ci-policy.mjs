@@ -41,6 +41,30 @@ assert.match(ci,/uses: \.\/\.github\/workflows\/native-qualification.yml\n    wi
 assert.match(ci,/needs: \[metadata, native, windows-runtime, build-runner, async-runtime, async-language\]/);
 assert.match(ci,/length == 6 and all/);
 const ciJob = name => ci.match(new RegExp(`^  ${name}:\\n[\\s\\S]*?(?=^  [a-z][a-z-]*:\\n|(?![\\s\\S]))`, 'm'))?.[0];
+assert.match(ciJob('metadata'), /fetch-depth: 0/, 'Historical migration audits require full Git history');
+const requireHistoricalCheckouts = workflow => {
+  const jobs = workflow.match(/^  [a-z][a-z-]*:\n[\s\S]*?(?=^  [a-z][a-z-]*:\n|(?![\s\S]))/gm) || [];
+  for (const job of jobs) {
+    if (job.includes('tools/release/check.sh') || job.includes('tools/shared/test_framework_direct.py')) {
+      assert.match(job, /fetch-depth: 0/, 'Historical audits require a full-history checkout in their own job');
+    }
+  }
+};
+for (const workflow of [ci, qualify, release, read('recover-release')]) {
+  requireHistoricalCheckouts(workflow);
+  assert.throws(() => requireHistoricalCheckouts(workflow.replaceAll('fetch-depth: 0', 'fetch-depth: 1')));
+}
+assert.match(ciJob('native'), /python3 tools\/shared\/test_framework_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/framework-direct/);
+assert.match(ciJob('native'), /python3 tools\/shared\/test_figure12_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json/);
+assert.match(ciJob('native'), /\.mlf-build\/framework-direct\/\*\.json\*/);
+assert.match(ciJob('native'), /name: Check actual MLF mixed-framework source acceptance\n\s+if: matrix.optimization == '2'\n\s+run: python3 tools\/shared\/test_guest_framework.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/guest-framework-source/);
+assert.match(ciJob('native'), /\.mlf-build\/guest-framework-source\/\*\*\/\*\.json/);
+assert.match(ciJob('native'), /name: Check actual-import guest Graph and Oracle laws\n\s+if: matrix.optimization == '2'\n\s+run: python3 tools\/shared\/test_guest_state_laws.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/guest-state-laws/);
+assert.match(ciJob('native'), /\.mlf-build\/guest-state-laws\/\*\*\/\*\.json/);
+assert.match(ciJob('native'), /\.mlf-build\/guest-state-laws\/\*\*\/\*\.log/);
+
+assert.match(ciJob('native'), /\.mlf-build\/figure12-direct\/\*\.json/);
+
 for (const name of ['build-runner','async-runtime','async-language']) {
   const job = ciJob(name);
   assert.ok(job, `Missing ${name} coverage`);
@@ -51,10 +75,12 @@ for (const name of ['build-runner','async-runtime','async-language']) {
 assert.match(ciJob('build-runner'),/process-supervisor-tests/);
 const asyncJob = ciJob('async-language');
 assert.match(asyncJob,/fetch-depth: 0/);
+assert.match(ci,/pull_request:\n    types: \[opened, synchronize, reopened, labeled, unlabeled\]/);
+assert.match(fs.readFileSync('tools/release/async-change-scope.py','utf8'), /OPT_IN_LABEL = "ci:async-parity"/);
 assert.match(asyncJob,/id: scope\n        run: python3 tools\/release\/async-change-scope.py/);
 assert.match(asyncJob,/\.mlf-build\/async-change-scope\/decision.json/);
 assert.equal((asyncJob.match(/if: steps.scope.outputs.required != 'false'/g) || []).length, 5);
-for (const name of ['Native bootstrap and parity dependencies', 'Fetch verified native seed', 'Bootstrap the real primitive-aware interpreter and compiler', 'Qualify typed completions and structured process tasks', 'Qualify checked async package interfaces and cache replay']) {
+for (const name of ['Native bootstrap and parity dependencies', 'Fetch verified native seed', 'Bootstrap released seed through frozen bridge to shared native tools', 'Qualify typed completions and structured process tasks', 'Qualify checked async package interfaces and cache replay']) {
   assert.ok(asyncJob.includes(`- name: ${name}\n        if: steps.scope.outputs.required != 'false'\n`));
 }
 // Only a positive false output skips the expensive steps; unknown/missing

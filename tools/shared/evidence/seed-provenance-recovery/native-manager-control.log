@@ -1,0 +1,6 @@
+PASS shared-aware branch rejects GHC manager before build
+PASS shared-aware branch rejects unknown manager before build
+PASS shared-aware branch rejects supplied actual GHC-produced manager before build
+PASS shared-aware branch rejects non-native output manager before publishing pointer
+PASS shared-aware branch accepts explicit native pair without release-bundle layout
+Control fixtures establish dispatch only, not native producer authenticity or compiler correctness.

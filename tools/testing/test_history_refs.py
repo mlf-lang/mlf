@@ -83,20 +83,6 @@ class PublishedMappingControls(unittest.TestCase):
                     self.assertEqual(subprocess.run(['git', 'merge-base', '--is-ancestor', rewritten, 'HEAD'],
                                                     cwd=history.ROOT).returncode, 0)
 
-    def test_reconciliation_allows_only_the_pinned_transport_edits(self):
-        import hashlib
-        snapshot = '4d732f31982ebe18124511f2ca4cb412770d6bd6'
-        for path in ('.github/workflows/ci.yml', 'tools/release/check.sh',
-                     'tools/testing/check_reconciliation_inventory.py'):
-            with self.subTest(path=path):
-                original = history.historical_bytes(snapshot, path)
-                digest = hashlib.sha256(original).hexdigest()
-                current = (history.ROOT / path).read_bytes()
-                self.assertTrue(history.checked_current(path, current, digest))
-                self.assertFalse(history.checked_current(path, current + b'\n# unrelated change\n', digest))
-                with self.assertRaisesRegex(ValueError, 'frozen reconciliation input changed'):
-                    history.checked_current(path, current, '0' * 64)
-
     def test_windows_negative_control_pins_original_runner_bytes(self):
         import hashlib
         original = 'e7da00f201bfb66bf6e26d59e56184dd37a83abd'

@@ -10,6 +10,53 @@ compiler=${MLF_COMPILER:?verified native seed compiler required}
 manager=${MLF_PACKAGE_MANAGER:?verified native seed manager required}
 clang=${CC:-${MLF_CLANG:-clang}}
 test ! -e "$build" || { printf 'Use a fresh manager bootstrap directory: %s\n' "$build" >&2; exit 2; }
+if [ -f "$root/shared-sources.json" ]; then
+  # A released compiler cannot parse the current .hs inputs. Bootstrap both
+  # tools through the frozen bridge, and publish the compiler with the manager.
+  mkdir -p "$build/bin"
+  build=$(cd -- "$build" && pwd)
+  identity=$("$compiler" --implementation-identity 2>/dev/null) || identity=
+  if [ "$identity" = 'MLF/shared-haskell-v1 native-MLF' ]; then
+    # Portable LLVM candidates are already shared-aware. Reuse this verified
+    # native toolchain rather than feeding it through the released-seed bridge.
+    manager_identity=$("$manager" --implementation-identity 2>/dev/null) || manager_identity=
+    if [ "$manager_identity" != 'MLF/shared-haskell-v1 native-MLF' ]; then
+      printf '%s\n' 'Shared-aware native bootstrap requires a native-MLF manager as well as compiler. Rebuild the manager with scripts/bootstrap-package.sh using the qualified native compiler.' >&2
+      exit 2
+    fi
+    "$manager" --manifest "$root/mlf-package.json" --compiler "$compiler" \
+      --clang "$clang" --runtime "$root/runtime/mlf_runtime.c" --timeout 21600 \
+      --build-dir "$build" build --target mlfpkg
+    jq -e '.complete == true and .implementation == "MLF"' "$build/build-report.json" >/dev/null
+    output_manager_identity=$("$build/bin/mlfpkg" --implementation-identity 2>/dev/null) || output_manager_identity=
+    if [ "$output_manager_identity" != 'MLF/shared-haskell-v1 native-MLF' ]; then
+      printf '%s\n' 'Produced manager does not identify as native-MLF.' >&2
+      exit 2
+    fi
+    tools/release/ensure-build-runner.sh "$build/bin" "$clang"
+    printf '%s\n' "$compiler" > "$build/compiler.path"
+    jq -n --arg compiler "$compiler" \
+      --arg report "$(shasum -a 256 "$build/build-report.json" | awk '{print $1}')" \
+      '{complete:true,route:"shared-aware-native",compiler:$compiler,build_report_sha256:$report}' > "$build/bootstrap.json"
+  else
+    if [ "$identity" = 'MLF/shared-haskell-v1 GHC' ]; then
+      printf '%s\n' 'Native release bootstrap requires a native MLF seed; use tools/shared/build.py for the separate GHC path.' >&2
+      exit 2
+    fi
+    MLF_SHARED_BOOTSTRAP_DIR="$build/shared-bootstrap" CC="$clang" \
+      "$root/scripts/bootstrap-shared.sh"
+    cp "$build/shared-bootstrap/stage2" "$build/bin/emlf"
+    native_manager=$(cat "$build/shared-bootstrap/manager.path")
+    cp "$native_manager" "$build/bin/mlfpkg"
+    cp "$(dirname -- "$native_manager")/mlf-build-runner" "$build/bin/mlf-build-runner"
+    cp "$build/shared-bootstrap/native/build-report.json" "$build/build-report.json"
+    cp "$build/shared-bootstrap/bootstrap.json" "$build/bootstrap.json"
+    printf '%s\n' "$build/bin/emlf" > "$build/compiler.path"
+  fi
+  printf '%s\n' "$build/bin/mlfpkg" > "$build/manager.path"
+  printf '%s\n' "$build/bin/mlfpkg"
+  exit 0
+fi
 mkdir -p "$build/source"
 build=$(cd -- "$build" && pwd)
 cp mlf-package.json "$build/root-manifest.json"
@@ -46,3 +93,4 @@ jq -n --arg seed_manager "$(sha256 "$manager")" --arg compiler "$(sha256 "$compi
     manager_sha256:$manager,build_runner_sha256:$helper,build_runner_protocol:1,
     build_report_sha256:$report}' > "$build/bootstrap.json"
 printf '%s\n' "$build/bin/mlfpkg"
+printf '%s\n' "$compiler" > "$build/compiler.path"

@@ -18,17 +18,17 @@ import Tests.Separate (separatePrograms, compileSeparateProgram, fixtureIdentity
 import Tests.System
 import Prelude hiding (listDirectory)
 
-separateBackendTests : B.Backends -> List (Pair String (IO Unit))
+separateBackendTests : B.Backends -> [] ((,) String (IO ()))
 separateBackendTests backends = S.append
-  (S.map (\(Quint label mode libraries source expected) -> Pair ("crate runtime: " ++ label) do
+  (S.map (\(Quint label mode libraries source expected) -> (,) ("crate runtime: " ++ label) do
     result <- compileSeparateProgram mode libraries source
     objects <- H.right result
     term <- H.right (Artifact.linkObjects objects fixtureIdentity)
     observed <- execute backends IOEntry (Input "" false) term
     H.right (outcome observed)
     H.assert (H.eq (output observed) expected) (H.show observed)) separatePrograms)
-  (S.append (S.map (\fixture -> case fixture of {Quint label _ _ _ _ -> Pair ("crate CLI: " ++ label) (cliProgram backends fixture)}) separatePrograms)
-    (Cons (Pair "crate runtime: source-free metadata and semantic invalidation" (cliTests backends)) Nil))
+  (S.append (S.map (\fixture -> case fixture of {Quint label _ _ _ _ -> (,) ("crate CLI: " ++ label) (cliProgram backends fixture)}) separatePrograms)
+    ((:) ((,) "crate runtime: source-free metadata and semantic invalidation" (cliTests backends)) []))
 
 selectedCompiler : IO String
 selectedCompiler = do
@@ -37,36 +37,36 @@ selectedCompiler = do
   bind (findExecutable selected) (S.maybe (H.fail "Cannot find crate compiler") canonicalizePath)
 
 command compiler args = do
-  Triple code out err <- readProcessWithExitCode compiler args ""
-  H.assert (H.eq code ExitSuccess && H.null err) (H.show (Quad args code out err))
+  (,,) code out err <- readProcessWithExitCode compiler args ""
+  H.assert (H.eq code ExitSuccess && H.null err) (H.show ((,,,) args code out err))
   return out
 reject compiler args reason = do
-  Triple code out err <- readProcessWithExitCode compiler args ""
-  H.assert (H.notEqual code ExitSuccess && H.null out && H.contains reason err) (H.show (Quad args code out err))
+  (,,) code out err <- readProcessWithExitCode compiler args ""
+  H.assert (H.notEqual code ExitSuccess && H.null out && H.contains reason err) (H.show ((,,,) args code out err))
 
 writeSpec directory identity entry mode sources dependencies prefix = do
   O.mkdir (O.parent prefix)
-  let fields = Cons "MLF-CRATE-1" (Cons identity (Cons entry
-        (Cons (case mode of {ImplicitPrelude -> "false"; NoImplicitPrelude -> "true"})
-        (Cons (Framing.pack (S.map Framing.pairEncoding sources))
-        (Cons (Framing.pack dependencies) (Cons (prefix ++ ".queries-cache") (Cons (directory ++ "/builtin/unit") Nil)))))))
+  let fields = (:) "MLF-CRATE-1" ((:) identity ((:) entry
+        ((:) (case mode of {ImplicitPrelude -> "false"; NoImplicitPrelude -> "true"})
+        ((:) (Framing.pack (S.map Framing.pairEncoding sources))
+        ((:) (Framing.pack dependencies) ((:) (prefix ++ ".queries-cache") ((:) (directory ++ "/builtin/unit") [])))))))
   let file = prefix ++ ".spec"
   writeFile file (Framing.pack fields)
   return file
 compileSpec compiler file prefix = do
-  _ <- command compiler (Cons "--compile-crate" (Cons file (Cons "-o" (Cons prefix Nil))))
-  return Unit
+  _ <- command compiler ((:) "--compile-crate" ((:) file ((:) "-o" ((:) prefix []))))
+  return ()
 runTarget backends expected text = do
   term <- H.right (XP.parseTerm "<crate CLI>" text)
   observed <- execute backends IOEntry (Input "" false) term
   H.right (outcome observed)
   H.assert (H.eq (output observed) expected) (H.show observed)
 
-cliProgram : B.Backends -> Quint String PreludeMode (List (Pair String String)) String String -> IO Unit
+cliProgram : B.Backends -> Quint String PreludeMode ([] ((,) String String)) String String -> IO ()
 cliProgram backends (Quint _ mode libraries source expected) = withScratch (\directory -> do
   compiler <- selectedCompiler
   root <- H.right (parseModule "Main.emlf" source)
-  graph <- H.right (loadModuleMap (M.fromList (S.map (\(Pair n text) -> Pair n (Pair (n ++ ".emlf") text)) libraries)) root)
+  graph <- H.right (loadModuleMap (M.fromList (S.map (\((,) n text) -> (,) n ((,) (n ++ ".emlf") text)) libraries)) root)
   let originals = M.insert "Main" source (M.fromList libraries)
   paths <- S.mapM (\m -> do
     let name = moduleIdentity m
@@ -74,17 +74,17 @@ cliProgram backends (Quint _ mode libraries source expected) = withScratch (\dir
     text <- S.maybe (H.fail ("fixture missing " ++ name)) return (M.lookup name originals)
     O.mkdir (O.parent path)
     writeFile path text
-    return (Pair name path)) graph
+    return ((,) name path)) graph
   let prefix = directory ++ "/main"
-  spec <- writeSpec directory fixtureIdentity "Main" mode paths Nil prefix
+  spec <- writeSpec directory fixtureIdentity "Main" mode paths [] prefix
   compileSpec compiler spec prefix
   iface <- bind (readFile (prefix ++ ".mlfci")) (S.compose H.right Artifact.decodeInterface)
   _ <- bind (readFile (prefix ++ ".mlfco")) (S.compose H.right (Artifact.decodeObject iface))
-  S.mapM_ (\(Pair _ path) -> removeFile path) paths
-  target <- command compiler (Cons "--link-crate" (Cons (prefix ++ ".mlfci") Nil))
+  S.mapM_ (\((,) _ path) -> removeFile path) paths
+  target <- command compiler ((:) "--link-crate" ((:) (prefix ++ ".mlfci") []))
   runTarget backends expected target)
 
-cliTests : B.Backends -> IO Unit
+cliTests : B.Backends -> IO ()
 cliTests backends = withScratch (\directory -> do
   compiler <- selectedCompiler
   let source = directory ++ "/Library.emlf"
@@ -92,35 +92,35 @@ cliTests backends = withScratch (\directory -> do
   let prefix = directory ++ "/compiled libraries/Library"
   let mainPrefix = directory ++ "/Main"
   let librarySource value = "module Library (Box(..), identity, answer) where\ndata Box a = Box a\nidentity x = x\nanswer = " ++ value ++ "\n"
-  librarySpec <- writeSpec directory "fixture:library" "" ImplicitPrelude (Cons (Pair "Library" source) Nil) Nil prefix
+  librarySpec <- writeSpec directory "fixture:library" "" ImplicitPrelude ((:) ((,) "Library" source) []) [] prefix
   let buildLibrary value = do
         writeFile source (librarySource value)
         compileSpec compiler librarySpec prefix
         removeFile source
   let entrySource = "module Main where\nimport Library\nmain = case identity (Box answer) of { Box n -> printInt n }\n"
-  mainSpec <- writeSpec directory "fixture:application" "Main" ImplicitPrelude (Cons (Pair "Main" entry) Nil) (Cons (prefix ++ ".mlfci") Nil) mainPrefix
+  mainSpec <- writeSpec directory "fixture:application" "Main" ImplicitPrelude ((:) ((,) "Main" entry) []) ((:) (prefix ++ ".mlfci") []) mainPrefix
   let compileMain = do
         writeFile entry entrySource
         compileSpec compiler mainSpec mainPrefix
         removeFile entry
-  let link = command compiler (Cons "--link-crate" (Cons (mainPrefix ++ ".mlfci") Nil))
+  let link = command compiler ((:) "--link-crate" ((:) (mainPrefix ++ ".mlfci") []))
   buildLibrary "42"
   originalInterface <- readFile (prefix ++ ".mlfci")
   originalObject <- readFile (prefix ++ ".mlfco")
   _ <- H.right (Artifact.decodeInterface originalInterface)
-  seq (stringLength originalObject) (return Unit)
+  seq (stringLength originalObject) (return ())
   -- Downstream inference consumes generated metadata with both upstream source
   -- and implementation absent. Linking still requires the checked object.
   renameFile (prefix ++ ".mlfco") (prefix ++ ".saved")
   compileMain
-  reject compiler (Cons "--link-crate" (Cons (mainPrefix ++ ".mlfci") Nil)) ".mlfco"
+  reject compiler ((:) "--link-crate" ((:) (mainPrefix ++ ".mlfci") [])) ".mlfco"
   renameFile (prefix ++ ".saved") (prefix ++ ".mlfco")
   target <- link
   runTarget backends "42\n" target
-  direct <- command compiler (Cons "--crate-to-llvm" (Cons (mainPrefix ++ ".mlfci") Nil))
+  direct <- command compiler ((:) "--crate-to-llvm" ((:) (mainPrefix ++ ".mlfci") []))
   -- The target-input command receives stdin explicitly through the process
   -- adapter, since ordinary crate commands have no source stdin.
-  Triple llvmCode serializedLLVM llvmErrors <- readProcessWithExitCode compiler (Cons "--xmlf-to-llvm" Nil) target
+  (,,) llvmCode serializedLLVM llvmErrors <- readProcessWithExitCode compiler ((:) "--xmlf-to-llvm" []) target
   H.assert (H.eq llvmCode ExitSuccess && H.null llvmErrors && H.eq direct serializedLLVM) "crate LLVM emission differs from checked target emission"
   buildLibrary "43"
   changed <- link
@@ -130,13 +130,13 @@ cliTests backends = withScratch (\directory -> do
   let groups = J.values (J.get "groups" report)
   H.assert (J.equal (J.get "inferred_groups" report) (J.num 0) && S.not (S.null groups) && S.all (J.getBool "cached" false) groups) "unchanged upstream semantic schemes invalidated downstream inference"
   buildLibrary "\"changed type\""
-  reject compiler (Cons "--link-crate" (Cons (mainPrefix ++ ".mlfci") Nil)) "stale crate dependency interface"
+  reject compiler ((:) "--link-crate" ((:) (mainPrefix ++ ".mlfci") [])) "stale crate dependency interface"
   writeFile (prefix ++ ".mlfci") originalInterface
   writeFile (prefix ++ ".mlfco") (originalObject ++ "corrupt")
-  reject compiler (Cons "--link-crate" (Cons (mainPrefix ++ ".mlfci") Nil)) "malformed crate object framing"
+  reject compiler ((:) "--link-crate" ((:) (mainPrefix ++ ".mlfci") [])) "malformed crate object framing"
   writeFile (prefix ++ ".mlfco") originalObject
   writeFile (prefix ++ ".mlfci") "7:MLFCI-9"
-  reject compiler (Cons "--link-crate" (Cons (mainPrefix ++ ".mlfci") Nil)) "unsupported"
+  reject compiler ((:) "--link-crate" ((:) (mainPrefix ++ ".mlfci") [])) "unsupported"
   writeFile (prefix ++ ".mlfci") originalInterface
   restored <- link
   runTarget backends "42\n" restored)

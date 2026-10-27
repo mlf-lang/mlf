@@ -22,13 +22,13 @@ showTag : GTag -> String
 showTag t = (case t of { GBot -> "b"; (GBotK k) -> (H.append "k" (showKind k)); (GArr a b) -> (H.append "a" (H.append (H.show a) (H.append "," (H.show b)))); (GCon c xs) -> (H.append "c" (H.append c (H.append "[" (H.append (H.intercalate "," (S.map H.show xs)) "]")))); (GTyCon c k) -> (H.append "t" (H.append c (showKind k))); (GSkolem n k) -> (H.append "s" (H.append (H.show n) (showKind k))); (GTyApp a b) -> (H.append "p" (H.append (H.show a) (H.append "," (H.show b)))); (GGen n) -> (H.append "g" (H.show n)) })
 
 showGraph : Graph -> String
-showGraph g = (H.append (H.concat (S.concatMap (\(Pair n v) -> (Cons (H.append (H.show n) (H.append ":" (H.append (showTag (tag v)) (H.append ":" (H.append (S.maybe "_" H.show (binder v)) (H.append ":" (H.append (if (H.eq (flag v) Flexible) then "f" else "r") ";"))))))) Nil)) (IM.toList (nodes g)))) (H.append "|" (H.append (H.concat (S.concatMap (\(Pair n p) -> (Cons (H.append (H.show n) (H.append ":" (H.append (H.show p) ";"))) Nil)) (IM.toList (links g)))) (H.append "|" (H.show (nextId g))))))
+showGraph g = (H.append (H.concat (S.concatMap (\((,) n v) -> ((:) (H.append (H.show n) (H.append ":" (H.append (showTag (tag v)) (H.append ":" (H.append (S.maybe "_" H.show (binder v)) (H.append ":" (H.append (if (H.eq (flag v) Flexible) then "f" else "r") ";"))))))) [])) (IM.toList (nodes g)))) (H.append "|" (H.append (H.concat (S.concatMap (\((,) n p) -> ((:) (H.append (H.show n) (H.append ":" (H.append (H.show p) ";"))) [])) (IM.toList (links g)))) (H.append "|" (H.show (nextId g))))))
 
-variants : Graph -> (List ( Graph ))
-variants g = (S.concatMap (\a -> (S.concatMap (\b -> (S.concatMap (\c -> (Cons (Graph (IM.mapWithKey (\n v -> (Node (G.tag v) (G.binder v) (case n of { 1 -> a; 2 -> b; 3 -> c; _ -> (flag v) }))) (nodes g)) (G.links g) (G.nextId g)) Nil)) (Cons Flexible (Cons Rigid Nil)))) (Cons Flexible (Cons Rigid Nil)))) (Cons Flexible (Cons Rigid Nil)))
+variants : Graph -> ([] ( Graph ))
+variants g = (S.concatMap (\a -> (S.concatMap (\b -> (S.concatMap (\c -> ((:) (Graph (IM.mapWithKey (\n v -> (Node (G.tag v) (G.binder v) (case n of { 1 -> a; 2 -> b; 3 -> c; _ -> (flag v) }))) (nodes g)) (G.links g) (G.nextId g)) [])) ((:) Flexible ((:) Rigid [])))) ((:) Flexible ((:) Rigid [])))) ((:) Flexible ((:) Rigid [])))
 
-equations : (List ( (List ( (Pair (Int) (Int)) )) ))
-equations = (Cons Nil (Cons (Cons (Pair 1 2) Nil) (Cons (Cons (Pair 1 3) Nil) (Cons (Cons (Pair 2 3) Nil) (Cons (Cons (Pair 2 2) Nil) (Cons (Cons (Pair 0 1) Nil) (Cons (Cons (Pair 1 2) (Cons (Pair 2 3) Nil)) (Cons (Cons (Pair 2 3) (Cons (Pair 1 2) Nil)) (Cons (Cons (Pair 3 2) (Cons (Pair 2 1) Nil)) Nil)))))))))
+equations : ([] ( ([] ( ((,) (Int) (Int)) )) ))
+equations = ((:) [] ((:) ((:) ((,) 1 2) []) ((:) ((:) ((,) 1 3) []) ((:) ((:) ((,) 2 3) []) ((:) ((:) ((,) 2 2) []) ((:) ((:) ((,) 0 1) []) ((:) ((:) ((,) 1 2) ((:) ((,) 2 3) [])) ((:) ((:) ((,) 2 3) ((:) ((,) 1 2) [])) ((:) ((:) ((,) 3 2) ((:) ((,) 2 1) [])) [])))))))))
 
-main : IO Unit
-main = do { (putStrLn (S.concatStrings (S.map (\g -> if S.isRight (validateGraph g) then "v" else "x") smallGraphs))); ((H.forM_ (S.concatMap (\base -> (if (S.isRight (validateGraph base)) then (S.concatMap (\g -> (Cons g Nil)) (variants base)) else Nil)) smallGraphs)) (\g -> ((H.forM_ equations) (\eqs -> (case (runBuild g (referenceUnify eqs)) of { (Left _) -> (putStrLn "!"); (Right (Pair _ result)) -> (putStrLn (showGraph result)) }))))) }
+main : IO ()
+main = do { (putStrLn (S.concatStrings (S.map (\g -> if S.isRight (validateGraph g) then "v" else "x") smallGraphs))); ((H.forM_ (S.concatMap (\base -> (if (S.isRight (validateGraph base)) then (S.concatMap (\g -> ((:) g [])) (variants base)) else [])) smallGraphs)) (\g -> ((H.forM_ equations) (\eqs -> (case (runBuild g (referenceUnify eqs)) of { (Left _) -> (putStrLn "!"); (Right ((,) _ result)) -> (putStrLn (showGraph result)) }))))) }

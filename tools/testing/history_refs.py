@@ -15,10 +15,14 @@ ROOT = Path(__file__).resolve().parents[2]
 # original identity -> (rewritten identity, original tree, rewritten tree, kind)
 REVISIONS = {
     '8a3e69b165765931c3ff762379a78db9659b2cd8': ('116de67c01461ad1a16f20256b8d92f88a145c32', 'ba0ae958b466ca08ffee79a83dadbd8b7d2156fa', 'cc3c6c9ce7cd46d403973627802e7d3b87166b98', 'commit'),
+    '4d732f31982ebe18124511f2ca4cb412770d6bd6': ('38bceccab021f0850167735b70d36b2db8ec0d14', 'feb1d0125f52a90eac3a2bb4379b8c3982393307', '557f438290273ca109241684f564ff89ef5f0a98', 'commit'),
+    'c0c5dddd11ed5775e2a3d5564cfeeef8383610a5': ('821a3c6e5b1e59f5ee3ea2a6884306979d46683b', '9f8aaaa86e5930fd89c88c542bb21647d7b15fca', '99732133c0914fd86a44cc04eae411650b229777', 'commit'),
+    '65e9e66680ee65f5e24745240dfe7ec8706e3e3b': ('65d8130ba35827dfc6e5260d1e937cef94359304', '247c18d05e8e612ac7c1a96efa9a14163879d8ce', 'af3761c6d59321352f29556cbc6c22bee5dcb127', 'commit'),
     'bea6c93980e47946afc22ee99be0d571ed544489': ('266237520ee235c47c26fdbb4d94f643fd981171', '181ae274ebafc3a1d68d2e1998fed52490ca14da', '05a89e7b45579bf36882c6f00d3e7dca581ccf50', 'commit'),
     'cb4c56c3744653c76648e609c06a71afad1ae2d4': ('bcceb30f1c89096b0ad6d01a84de1511b06b6f1f', '80ec39c253b00551e79a393437a45038a54dc490', '13b82bf5d02805b6b17a68cae2467677c8dd6898', 'commit'),
-    '4d732f31982ebe18124511f2ca4cb412770d6bd6': ('38bceccab021f0850167735b70d36b2db8ec0d14', 'feb1d0125f52a90eac3a2bb4379b8c3982393307', '557f438290273ca109241684f564ff89ef5f0a98', 'commit'),
     'e7da00f201bfb66bf6e26d59e56184dd37a83abd': ('bf38dc538598a0389a3310fe26c16f6609c912fc', '72fcf81daed158ff29c2df83eba3ab156227697b', '622e0001c4ad124d2f0096e0eca990c9896e978f', 'commit'),
+    '177b951a4a870e0350c5a3eef5196f79be0624db': ('53217d3c66d7e6396f3c5c4aa41f8a38eacfd703', '177b951a4a870e0350c5a3eef5196f79be0624db', '53217d3c66d7e6396f3c5c4aa41f8a38eacfd703', 'tree'),
+    '7efa13e6a64c0445ebcf891c4e15694321a43780': ('5c6bce7864b016d2d0a37f337ed6138e3bf2627a', '7efa13e6a64c0445ebcf891c4e15694321a43780', '5c6bce7864b016d2d0a37f337ed6138e3bf2627a', 'tree'),
 }
 
 
@@ -61,42 +65,3 @@ def historical_bytes(revision, path):
             or (normalized.startswith('papers/') and normalized.endswith('.pdf'))):
         raise ValueError('unavailable or invalid historical source path: ' + path)
     return subprocess.check_output(['git', 'show', resolve_revision(revision) + ':' + normalized], cwd=ROOT)
-
-
-def checked_current(path, current, expected_sha256):
-    """Authenticate this narrow transport patch against the frozen source."""
-    import hashlib
-    snapshot = '4d732f31982ebe18124511f2ca4cb412770d6bd6'
-    original = historical_bytes(snapshot, path)
-    if hashlib.sha256(original).hexdigest() != expected_sha256:
-        raise ValueError('frozen reconciliation input changed: ' + path)
-    value = original.decode('utf-8')
-    if path == '.github/workflows/ci.yml':
-        changes = [
-            ("          $baseline = 'e7da00f201bfb66bf6e26d59e56184dd37a83abd'\n",
-             "          # Original e7da00f201bfb66bf6e26d59e56184dd37a83abd, mapped after reviewed history cleanup.\n          $baseline = 'bf38dc538598a0389a3310fe26c16f6609c912fc'\n"),
-            ("          $oldRunner = \"$output/pre-fix-build-runner.exe\"\n",
-             "          $expectedOldSource = 'fce82f0710edd910557956a2225f211f195f10b69e95c3676d86bb01fd2f6abd'\n          Assert-Release ((Get-FileHash -Algorithm SHA256 $oldSource).Hash.ToLowerInvariant() -eq $expectedOldSource) 'Pre-fix runner differs from the independently pinned source'\n          $oldRunner = \"$output/pre-fix-build-runner.exe\"\n"),
-        ]
-    elif path == 'tools/release/check.sh':
-        changes = [("python3 tools/release/test-async-change-scope.py\n",
-                    "python3 tools/release/test-async-change-scope.py\npython3 tools/testing/test_history_refs.py\n")]
-    elif path == 'tools/testing/check_reconciliation_inventory.py':
-        changes = [
-            ('import subprocess\n', 'from history_refs import historical_bytes, checked_current\n'),
-            ("        assert sha((ROOT / path).read_bytes()) == row['sha256']\n",
-             "        assert checked_current(path, (ROOT / path).read_bytes(), row['sha256'])\n"),
-            ("            frozen = subprocess.check_output(['git','show',INCOMING+':'+path], cwd=ROOT)\n",
-             "            frozen = historical_bytes(INCOMING, path)\n"),
-            ("        prior = subprocess.check_output(['git','show',PARENT+':'+path], cwd=ROOT)\n",
-             "        prior = historical_bytes(PARENT, path)\n"),
-            ("            assert frozen == (ROOT / path).read_bytes(), path\n",
-             "            assert checked_current(path, (ROOT / path).read_bytes(), row['incoming_sha256']), path\n"),
-        ]
-    else:
-        changes = []
-    for before, after in changes:
-        if value.count(before) != 1:
-            raise ValueError('frozen transport transformation is ambiguous: ' + path)
-        value = value.replace(before, after, 1)
-    return current == value.encode('utf-8')

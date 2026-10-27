@@ -4,8 +4,8 @@ import qualified Bootstrap.Std as S
 import qualified Package.OS as O
 fail : forall a. String -> IO a
 fail message = do { putErr ("TEST FAILURE: " ++ message ++ "\n"); exitWith 1 }
-assert : Bool -> String -> IO Unit
-assert condition message = if condition then return Unit else fail message
+assert : Bool -> String -> IO ()
+assert condition message = if condition then return () else fail message
 eq : Bool -> Bool -> Bool
 eq a b = if a then b else S.not b
 contains needle text = eqString needle "" || S.not (eqString text (O.replace needle "" text))
@@ -16,11 +16,11 @@ withScratch action = do
  root <- getEnv "MLF_TEST_WORK"
  O.require (stringLength root > 0) "missing test work directory"
  O.mkdir (root ++ "/scratch")
- code <- O.exec "" (Cons "mktemp" (Cons "-d" (Cons (root ++ "/scratch/test.XXXXXXXX") Nil))) "" (root ++ "/mktemp.out") (root ++ "/mktemp.err") 60
+ code <- O.exec "" ((:) "mktemp" ((:) "-d" ((:) (root ++ "/scratch/test.XXXXXXXX") []))) "" (root ++ "/mktemp.out") (root ++ "/mktemp.err") 60
  assert (code == 0) "creating test scratch directory failed"
  text <- readFile (root ++ "/mktemp.out")
  let dir = O.trim text
  result <- action dir
  O.remove dir
  return result
-removeFile path = O.run "" (Cons "/bin/rm" (Cons "-f" (Cons path Nil)))
+removeFile path = O.run "" ((:) "/bin/rm" ((:) "-f" ((:) path [])))

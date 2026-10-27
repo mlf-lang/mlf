@@ -1,0 +1,4 @@
+Seed PID: 1302; columns: PID elapsed CPU-time CPU-percent RSS-KiB
+2026-10-24T06:22:34Z
+Stage: Checking accepted polymorphic-let
+   1302       00:00 00:00:00  0.0  8656

@@ -71,6 +71,19 @@ class MigrationInventoryControls(unittest.TestCase):
     def test_legacy_framework_dual_ownership_rejected(self):
         self.assert_rejected(lambda x: x['entries'][0].update(active_implementation=['legacy', 'framework']))
 
+    def test_live_shared_path_cannot_revert_to_legacy(self):
+        def change(x):
+            row = next(e for e in x['entries'] if e['original_kind'] == 'source-authored-tuple-list-observation')
+            row['implementation_source'] = 'tests/Tests/TupleList.emlf'
+        self.assert_rejected(change)
+
+    def test_shared_contract_inputs_cannot_be_dropped(self):
+        self.assert_rejected(lambda x: x['implementation_inputs'].clear())
+
+    def test_live_shared_input_digest_cannot_be_fabricated(self):
+        self.assert_rejected(lambda x: x['implementation_inputs'].update(
+            {inventory.tuple_audit.LEGACY: '0' * 64}))
+
     def test_unknown_schema(self):
         self.assert_rejected(lambda x: x.update(schema_version=2))
 

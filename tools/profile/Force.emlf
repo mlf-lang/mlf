@@ -259,7 +259,7 @@ forceSProgram value = case value of
 
 forceSourceModule : SourceModule -> Unit
 forceSourceModule value = case value of
-  SourceModule x0 x1 x2 x3 x4 x5 x6 x7 x8 -> seq (scalar x0) (seq ((forceMaybe scalar) x1) (seq ((forceMaybe (forceList (forceExport))) x2) (seq ((forceList (forceImport)) x3) (seq ((forceList (forceDataDecl)) x4) (seq ((forceList (forceSClassDecl)) x5) (seq ((forceList (forceSInstanceDecl)) x6) (seq ((forceList (forceTriple scalar (forceMaybe (forceSAnnotation)) (forceSExpr))) x7) (seq ((forceMaybe (forceSExpr)) x8) (Unit)))))))))
+  SourceModule x0 x1 x2 x3 x4 x5 x6 x7 x8 _ -> seq (scalar x0) (seq ((forceMaybe scalar) x1) (seq ((forceMaybe (forceList (forceExport))) x2) (seq ((forceList (forceImport)) x3) (seq ((forceList (forceDataDecl)) x4) (seq ((forceList (forceSClassDecl)) x5) (seq ((forceList (forceSInstanceDecl)) x6) (seq ((forceList (forceTriple scalar (forceMaybe (forceSAnnotation)) (forceSExpr))) x7) (seq ((forceMaybe (forceSExpr)) x8) (Unit)))))))))
 
 forceImport : Import -> Unit
 forceImport value = case value of

@@ -1,0 +1,58 @@
+{
+  "complete": true,
+  "scope": "three additional prerequisite source checks, not all tests manifest targets",
+  "manager_plan_equals_independent_snapshot": true,
+  "manifest_packages": 13,
+  "manifest_source_hashes": 212,
+  "qualified_modules": 25,
+  "qualified_fresh_groups": 552,
+  "qualified": [
+    {
+      "crate": "mlf-test-tools/0.1.0/library",
+      "entry": "",
+      "modules": [
+        "Test.NativeProcess",
+        "Test.Process"
+      ],
+      "inferred_groups": 68
+    },
+    {
+      "crate": "mlf-tests/0.3.0/library",
+      "entry": "",
+      "modules": [
+        "Tests.Backends",
+        "Tests.Basic",
+        "Tests.BuildReceipts",
+        "Tests.Bytes",
+        "Tests.CorePartitions",
+        "Tests.Coverage",
+        "Tests.Helpers",
+        "Tests.IndependentCheck",
+        "Tests.IndependentType",
+        "Tests.Map",
+        "Tests.Selection",
+        "Tests.Set",
+        "Tests.TestDrivers",
+        "Tests.TestSources"
+      ],
+      "inferred_groups": 356
+    },
+    {
+      "crate": "mlf-tests/0.3.0/target-test-framework",
+      "entry": "TestFrameworkMain",
+      "modules": [
+        "TestFrameworkMain",
+        "Tests.Catalog",
+        "Tests.CoverageChecks",
+        "Tests.FamilySelectionChecks",
+        "Tests.IntSetUnions",
+        "Tests.TestCatalog",
+        "Tests.TestFramework",
+        "Tests.TestFrameworkCLI",
+        "Tests.TestProcess"
+      ],
+      "inferred_groups": 128
+    }
+  ],
+  "native_execution": false
+}

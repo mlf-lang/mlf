@@ -20,11 +20,11 @@ class Eq a where { eq : a -> a -> Bool }
 instance Eq Int where { eq = eqInt }
 instance Eq Bool where { eq a b = if a then b else S.not b }
 instance Eq String where { eq = eqString }
-instance Eq Unit where { eq a b = true }
-instance forall a. Eq a => Eq (List a) where { eq = S.eqList eq }
+instance Eq () where { eq a b = true }
+instance forall a. Eq a => Eq ([] a) where { eq = S.eqList eq }
 instance forall a. Eq a => Eq (Maybe a) where { eq = S.eqMaybe eq }
-instance forall a b. (Eq a, Eq b) => Eq (Pair a b) where { eq = S.eqPair eq eq }
-instance forall a b c. (Eq a, Eq b, Eq c) => Eq (Triple a b c) where { eq (Triple a b c) (Triple x y z) = eq a x && eq b y && eq c z }
+instance forall a b. (Eq a, Eq b) => Eq ((,) a b) where { eq = S.eqPair eq eq }
+instance forall a b c. (Eq a, Eq b, Eq c) => Eq ((,,) a b c) where { eq ((,,) a b c) ((,,) x y z) = eq a x && eq b y && eq c z }
 instance forall a b. (Eq a, Eq b) => Eq (Either a b) where
   eq (Left a) (Left b) = eq a b
   eq (Right a) (Right b) = eq a b
@@ -51,12 +51,12 @@ class Show a where { show : a -> String }
 instance Show Int where { show = showInt }
 instance Show Bool where { show a = if a then "True" else "False" }
 instance Show String where { show a = quoteSource a }
-instance Show Unit where { show a = "()" }
-instance forall a. Show a => Show (List a) where { show xs = "[" ++ S.intercalate "," (S.map show xs) ++ "]" }
+instance Show () where { show a = "()" }
+instance forall a. Show a => Show ([] a) where { show xs = "[" ++ S.intercalate "," (S.map show xs) ++ "]" }
 instance forall a. Show a => Show (Maybe a) where
   show Nothing = "Nothing"
   show (Just x) = "Just " ++ show x
-instance forall a b. (Show a, Show b) => Show (Pair a b) where { show (Pair a b) = "(" ++ show a ++ "," ++ show b ++ ")" }
+instance forall a b. (Show a, Show b) => Show ((,) a b) where { show ((,) a b) = "(" ++ show a ++ "," ++ show b ++ ")" }
 instance forall a b. (Show a, Show b) => Show (Either a b) where
   show (Left a) = "Left " ++ show a
   show (Right b) = "Right " ++ show b
@@ -73,39 +73,39 @@ instance Show Permission where
 
 class Append a where { append : a -> a -> a }
 instance Append String where { append = concatString }
-instance forall a. Append (List a) where { append = S.append }
+instance forall a. Append ([] a) where { append = S.append }
 class Sized a where { length : a -> Int; null : a -> Bool }
 instance Sized String where { length = stringLength; null x = stringLength x == 0 }
-instance forall a. Sized (List a) where { length = S.length; null = S.null }
+instance forall a. Sized ([] a) where { length = S.length; null = S.null }
 
 fail : forall a. String -> IO a
 fail message = do { putErr ("TEST FAILURE: " ++ message ++ "\n"); exitWith 1 }
-assert : Bool -> String -> IO Unit
-assert condition message = if condition then ioReturn Unit else fail message
+assert : Bool -> String -> IO ()
+assert condition message = if condition then ioReturn () else fail message
 right : forall e a. Show e => Either e a -> IO a
 right value = case value of { Left error -> fail (show error); Right result -> ioReturn result }
-reject : forall e a. Either e a -> IO Unit
-reject value = case value of { Left error -> ioReturn Unit; Right result -> fail "unexpected success" }
+reject : forall e a. Either e a -> IO ()
+reject value = case value of { Left error -> ioReturn (); Right result -> fail "unexpected success" }
 fmap : forall (m : * -> *) a b. Monad m => (a -> b) -> m a -> m b
 fmap f x = do { value <- x; return (f value) }
 ap : forall (m : * -> *) a b. Monad m => m (a -> b) -> m a -> m b
 ap f x = do { function <- f; value <- x; return (function value) }
-elem : forall a. Eq a => a -> List a -> Bool
+elem : forall a. Eq a => a -> [] a -> Bool
 elem x xs = S.elem eq x xs
-notElem : forall a. Eq a => a -> List a -> Bool
+notElem : forall a. Eq a => a -> [] a -> Bool
 notElem x xs = S.not (elem x xs)
-nub : forall a. Eq a => List a -> List a
+nub : forall a. Eq a => [] a -> [] a
 nub xs = S.nubBy eq xs
 -- Compare actual ordered stimuli. Length buckets only avoid unrelated scans;
 -- full element equality decides whether a pair can share one execution.
-distinctListPairs : forall a. (a -> a -> Bool) -> List (Pair (List a) (List a)) -> List (Pair (List a) (List a))
+distinctListPairs : forall a. (a -> a -> Bool) -> [] ((,) ([] a) ([] a)) -> [] ((,) ([] a) ([] a))
 distinctListPairs equal inputs =
- let add (Pair buckets kept) input =
+ let add ((,) buckets kept) input =
        let size = S.length (S.fst input) + S.length (S.snd input) in
-       let previous = IM.findWithDefault Nil size buckets in
-       if S.any (S.eqPair (S.eqList equal) (S.eqList equal) input) previous then Pair buckets kept
-       else Pair (IM.insert size (Cons input previous) buckets) (Cons input kept) in
- S.reverse (S.snd (S.foldlStrict add (Pair IM.empty Nil) inputs))
+       let previous = IM.findWithDefault [] size buckets in
+       if S.any (S.eqPair (S.eqList equal) (S.eqList equal) input) previous then (,) buckets kept
+       else (,) (IM.insert size ((:) input previous) buckets) ((:) input kept) in
+ S.reverse (S.snd (S.foldlStrict add ((,) IM.empty []) inputs))
 -- Match Haskell's scalar substring search without constructing every suffix.
 contains needle text = containsAt needle text (stringLength needle) (stringLength text) 0
 containsAt : String -> String -> Int -> Int -> Int -> Bool
@@ -117,8 +117,8 @@ containsMatch needle text width start index = if index == width then true else
   if stringCodeAt needle index == stringCodeAt text (start + index) then containsMatch needle text width start (index + 1) else false
 intercalate separator xs = S.intercalate separator xs
 sort xs = S.sortBy compareString xs
-subsequences : forall a. List a -> List (List a)
-subsequences xs = case xs of { Nil -> Cons Nil Nil; Cons x rest -> let suffix = subsequences rest in S.append suffix (S.map (Cons x) suffix) }
+subsequences : forall a. [] a -> [] ([] a)
+subsequences xs = case xs of { [] -> (:) [] []; (:) x rest -> let suffix = subsequences rest in S.append suffix (S.map ((:) x) suffix) }
 isAlpha code = code >= 65 && code <= 90 || code >= 97 && code <= 122
 isAlphaNum code = isAlpha code || code >= 48 && code <= 57
 instance forall a. Eq a => Eq (Set a) where { eq a b = eq (Set.toList a) (Set.toList b) }
@@ -143,25 +143,25 @@ equalType (XForall a b c) (XForall d e f) = S.eqTyVar a d && equalType b e && eq
 equalType _ _ = false
 forM_ = S.forM_
 mapM_ = S.mapM_
-rangeStep : Int -> Int -> Int -> List Int
-rangeStep first second end = if second >= first then (if first > end then Nil else Cons first (rangeStep second (second + second - first) end)) else (if first < end then Nil else Cons first (rangeStep second (second + second - first) end))
+rangeStep : Int -> Int -> Int -> [] Int
+rangeStep first second end = if second >= first then (if first > end then [] else (:) first (rangeStep second (second + second - first) end)) else (if first < end then [] else (:) first (rangeStep second (second + second - first) end))
 power : Int -> Int -> Int
 power x n = if n == 0 then 1 else let y = power x (quotInt n 2) in if remInt n 2 == 0 then y * y else x * y * y
-lookup : forall a b. Eq a => a -> List (Pair a b) -> Maybe b
+lookup : forall a b. Eq a => a -> [] ((,) a b) -> Maybe b
 lookup key xs = S.lookup eq key xs
 quoteSource text = "\"" ++ S.concatStrings (S.map (\i -> let c = stringCodeAt text i in if c == 34 then "\\\"" else if c == 92 then "\\\\" else if c == 10 then "\\n" else if c == 13 then "\\r" else if c == 9 then "\\t" else if c < 32 then "\\x" ++ hexInt c ++ "\\&" else stringFromCode c) (S.range 0 (stringLength text - 1))) ++ "\""
 hexInt : Int -> String
 hexInt x = if x < 16 then stringSlice "0123456789abcdef" x 1 else hexInt (quotInt x 16) ++ stringSlice "0123456789abcdef" (remInt x 16) 1
-instance forall a b c. (Show a, Show b, Show c) => Show (Triple a b c) where { show (Triple a b c) = "(" ++ show a ++ "," ++ show b ++ "," ++ show c ++ ")" }
-instance forall a b c d. (Show a, Show b, Show c, Show d) => Show (Quad a b c d) where { show (Quad a b c d) = "(" ++ show a ++ "," ++ show b ++ "," ++ show c ++ "," ++ show d ++ ")" }
+instance forall a b c. (Show a, Show b, Show c) => Show ((,,) a b c) where { show ((,,) a b c) = "(" ++ show a ++ "," ++ show b ++ "," ++ show c ++ ")" }
+instance forall a b c d. (Show a, Show b, Show c, Show d) => Show ((,,,) a b c d) where { show ((,,,) a b c d) = "(" ++ show a ++ "," ++ show b ++ "," ++ show c ++ "," ++ show d ++ ")" }
 instance forall a. Show a => Show (IntMap a) where { show a = show (IM.toList a) }
 instance Show Primitive where { show = P.primitiveName }
 instance Show Node where { show (Node t b f) = G.tagDescription t ++ " bound " ++ show b }
 instance Show GTag where { show = G.tagDescription }
 instance Show XTerm where { show = Pretty.prettyTerm }
 instance Show SProgram where { show p = "source program" }
-tails : forall a. List a -> List (List a)
-tails xs = case xs of { Nil -> Cons Nil Nil; Cons x rest -> Cons xs (tails rest) }
+tails : forall a. [] a -> [] ([] a)
+tails xs = case xs of { [] -> (:) [] []; (:) x rest -> (:) xs (tails rest) }
 instance Eq SourceModule where { eq = SE.eqSourceModule }
 instance Show SourceModule where { show m = "source module" }
 instance Eq XPattern where
@@ -189,7 +189,7 @@ equalTerm (XApp a b) (XApp c d) = equalTerm a c && equalTerm b d
 equalTerm (XTypeAbs a b c) (XTypeAbs x y z) = S.eqTyVar a x && equalType b y && equalTerm c z
 equalTerm (XTypeApp a b) (XTypeApp c d) = equalTerm a c && equalComputation b d
 equalTerm (XLet a b c) (XLet x y z) = S.eqName a x && equalTerm b y && equalTerm c z
-equalTerm (XLetRec ds a) (XLetRec es b) = S.eqList (\(Triple n t x) (Triple m u y) -> S.eqName n m && equalType t u && equalTerm x y) ds es && equalTerm a b
+equalTerm (XLetRec ds a) (XLetRec es b) = S.eqList (\((,,) n t x) ((,,) m u y) -> S.eqName n m && equalType t u && equalTerm x y) ds es && equalTerm a b
 equalTerm (XIntTerm a) (XIntTerm b) = a == b
 equalTerm (XDoubleTerm a) (XDoubleTerm b) = eqDouble a b
 equalTerm (XBoolTerm a) (XBoolTerm b) = eq a b
@@ -214,23 +214,23 @@ class Read a where { read : String -> a }
 instance Read Int where { read = readInt }
 instance Read Double where { read = readDouble }
 doubleWithin actual bound = ltDouble actual bound || eqDouble actual bound
-group : forall a. Eq a => List a -> List (List a)
-group xs = case xs of { Nil -> Nil; Cons x rest -> case S.span (eq x) rest of { Pair same different -> Cons (Cons x same) (group different) } }
-class Concatenate a where { concat : List a -> a }
+group : forall a. Eq a => [] a -> [] ([] a)
+group xs = case xs of { [] -> []; (:) x rest -> case S.span (eq x) rest of { (,) same different -> (:) ((:) x same) (group different) } }
+class Concatenate a where { concat : [] a -> a }
 instance Concatenate String where { concat = S.concatStrings }
-instance forall a. Concatenate (List a) where { concat = S.concat }
-cycle : forall a. List a -> List a
+instance forall a. Concatenate ([] a) where { concat = S.concat }
+cycle : forall a. [] a -> [] a
 cycle xs = S.append xs (cycle xs)
 repeatChar count code = S.concatStrings (S.replicate count (stringFromCode code))
-maximum : forall a. Ord a => List a -> a
+maximum : forall a. Ord a => [] a -> a
 maximum xs = S.foldl (\a b -> if compare a b < 0 then b else a) (S.head xs) (S.tail xs)
-minimum : forall a. Ord a => List a -> a
+minimum : forall a. Ord a => [] a -> a
 minimum xs = S.foldl (\a b -> if compare a b > 0 then b else a) (S.head xs) (S.tail xs)
 
 traverseIntMap : forall a b. (Int -> a -> Either String b) -> IntMap a -> Either String (IntMap b)
 traverseIntMap f m = traverseIntEntries f (IM.toList m)
-traverseIntEntries : forall a b. (Int -> a -> Either String b) -> List (Pair Int a) -> Either String (IntMap b)
-traverseIntEntries f entries = fmap IM.fromList (S.mapM (\(Pair k v) -> fmap (Pair k) (f k v)) entries)
+traverseIntEntries : forall a b. (Int -> a -> Either String b) -> [] ((,) Int a) -> Either String (IntMap b)
+traverseIntEntries f entries = S.mapEither IM.fromList (S.mapM (\((,) k v) -> S.mapEither ((,) k) (f k v)) entries)
 
 subtract x y = y - x
 even x = remInt x 2 == 0
@@ -242,13 +242,13 @@ stringPrefixLength : (Int -> Bool) -> String -> Int -> Int
 stringPrefixLength predicate text i = if i == stringLength text || S.not (predicate (stringCodeAt text i)) then i else stringPrefixLength predicate text (i + 1)
 
 negateInt x = 0 - x
-splitIntMap key map = Pair (IM.filterWithKey (\k _ -> k < key) map) (IM.filterWithKey (\k _ -> k > key) map)
+splitIntMap key map = (,) (IM.filterWithKey (\k _ -> k < key) map) (IM.filterWithKey (\k _ -> k > key) map)
 
-concatMap : forall a b. Concatenate b => (a -> b) -> List a -> b
+concatMap : forall a b. Concatenate b => (a -> b) -> [] a -> b
 concatMap f xs = concat (S.map f xs)
 stringMap f text = S.concatStrings (S.map (\i -> stringFromCode (f (stringCodeAt text i))) (S.range 0 (stringLength text - 1)))
-lines : String -> List String
-lines text = if stringLength text == 0 then Nil else
+lines : String -> [] String
+lines text = if stringLength text == 0 then [] else
   let chunks = O.lines text in if O.ends "\n" text then S.init chunks else chunks
 
 notEqual : forall a. Eq a => a -> a -> Bool

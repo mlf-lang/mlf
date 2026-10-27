@@ -7,6 +7,15 @@ cd "$root"
 build=${MLF_PACKAGE_BOOTSTRAP_DIR:-"$root/.mlf-build/package-manager"}
 mkdir -p "$build"
 compiler=${MLF_COMPILER:-emlf}
+entry=package/Main.emlf
+if [ -f "$root/shared-sources.json" ]; then
+  identity=$("$compiler" --implementation-identity 2>/dev/null) || identity=
+  case "$identity" in
+    'MLF/shared-haskell-v1 native-MLF'|'MLF/shared-haskell-v1 GHC') ;;
+    *) printf '%s\n' 'Shared package sources need a shared-aware compiler. First run MLF_COMPILER=/path/to/released/emlf MLF_PACKAGE_MANAGER=/path/to/released/mlfpkg scripts/bootstrap-shared.sh, then set MLF_COMPILER to its stage2 compiler.' >&2; exit 2 ;;
+  esac
+  entry=package/MLF/Entry/Mlfpkg.hs
+fi
 cc=${CC:-clang}
 if [ -n "${MLF_GC_PREFIX:-}" ]; then
   gc_cflags="-I$MLF_GC_PREFIX/include"
@@ -20,7 +29,7 @@ test "$("$build/mlf-build-runner.new" --protocol-version)" = 1
 mv "$build/mlf-build-runner.new" "$build/mlf-build-runner"
 set --
 for library in "$root"/libraries/*; do set -- "$@" -i "$library"; done
-"$compiler" "$@" --emit-llvm-gc package/Main.emlf > "$build/mlfpkg.ll.new"
+"$compiler" "$@" --emit-llvm-gc "$entry" > "$build/mlfpkg.ll.new"
 mv "$build/mlfpkg.ll.new" "$build/mlfpkg.ll"
 # pkg-config supplies compiler flags; the ordinary manifest-driven build uses
 # the MLF argv parser and supports spaces in all explicit tool/source paths.

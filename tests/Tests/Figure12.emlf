@@ -1,4 +1,7 @@
 module Tests.Figure12 where
+-- Select the standard Monad used by shared Either; retain legacy guest syntax.
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Package.OS as OS
@@ -9,23 +12,81 @@ import qualified Tests.Set as Set
 import Bootstrap.Parser (parseExpr)
 import Bootstrap.Desugar (desugarDo)
 
-data Case = Case String String Bool Bool (List (Pair String String))
+data Case = Case String String Bool Bool ([] ((,) String String))
 caseId (Case a _ _ _ _) = a
 expression (Case _ a _ _ _) = a
 paperAcceptance (Case _ _ a _ _) = a
 expectedAcceptance (Case _ _ _ a _) = a
 localSignatures (Case _ _ _ _ a) = a
-signatures : (List ( (Pair (String) (String)) ))
-signatures = (Cons (Pair "id" "forall a. a -> a") (Cons (Pair "choose" "forall a. a -> a -> a") (Cons (Pair "nil" "forall p. List p") (Cons (Pair "ids" "List (forall a. a -> a)") (Cons (Pair "auto" "(forall a. a -> a) -> (forall a. a -> a)") (Cons (Pair "auto'" "forall b. (forall a. a -> a) -> b -> b") (Cons (Pair "poly" "(forall a. a -> a) -> Pair Int Bool") (Cons (Pair "app" "forall a b. (a -> b) -> a -> b") (Cons (Pair "revapp" "forall a b. a -> (a -> b) -> b") (Cons (Pair "runST" "forall d. (forall s. ST s d) -> d") (Cons (Pair "argST" "forall s. ST s Int") (Cons (Pair "length" "forall p. List p -> Int") (Cons (Pair "tail" "forall p. List p -> List p") (Cons (Pair "head" "forall p. List p -> p") (Cons (Pair "single" "forall p. p -> List p") (Cons (Pair "cons" "forall p. p -> List p -> List p") (Cons (Pair "append" "forall p. List p -> List p -> List p") (Cons (Pair "inc" "Int -> Int") (Cons (Pair "map" "forall p q. (p -> q) -> List p -> List q") (Cons (Pair "compose" "forall a b c. (b -> c) -> (a -> b) -> a -> c") (Cons (Pair "pair" "forall a b. a -> b -> Pair a b") Nil)))))))))))))))))))))
+signatures : ([] ( ((,) (String) (String)) ))
+signatures = ((:) ((,) "id" "forall a. a -> a") ((:) ((,) "choose" "forall a. a -> a -> a") ((:) ((,) "nil" "forall p. [] p") ((:) ((,) "ids" "[] (forall a. a -> a)") ((:) ((,) "auto" "(forall a. a -> a) -> (forall a. a -> a)") ((:) ((,) "auto'" "forall b. (forall a. a -> a) -> b -> b") ((:) ((,) "poly" "(forall a. a -> a) -> (,) Int Bool") ((:) ((,) "app" "forall a b. (a -> b) -> a -> b") ((:) ((,) "revapp" "forall a b. a -> (a -> b) -> b") ((:) ((,) "runST" "forall d. (forall s. ST s d) -> d") ((:) ((,) "argST" "forall s. ST s Int") ((:) ((,) "length" "forall p. [] p -> Int") ((:) ((,) "tail" "forall p. [] p -> [] p") ((:) ((,) "head" "forall p. [] p -> p") ((:) ((,) "single" "forall p. p -> [] p") ((:) ((,) "cons" "forall p. p -> [] p -> [] p") ((:) ((,) "append" "forall p. [] p -> [] p -> [] p") ((:) ((,) "inc" "Int -> Int") ((:) ((,) "map" "forall p q. (p -> q) -> [] p -> [] q") ((:) ((,) "compose" "forall a b c. (b -> c) -> (a -> b) -> a -> c") ((:) ((,) "pair" "forall a b. a -> b -> (,) a b") [])))))))))))))))))))))
 
-cases : (List ( Case ))
-cases = (let { yes n e = (Case n e true true Nil) } in (let { no n e = (Case n e false false Nil) } in (let { given ss c = (Case (caseId c) (expression c) (paperAcceptance c) (expectedAcceptance c) ss) } in (let { etaSignatures = (Cons (Pair "k" "forall a. a -> List a -> a") (Cons (Pair "h" "Int -> (forall a. a -> a)") (Cons (Pair "lst" "List (forall a. Int -> a -> a)") Nil))) } in (Cons (yes "A1" "\\x y -> y") (Cons (yes "A2" "choose id") (Cons (yes "A3" "choose nil ids") (Cons (yes "A4" "\\(x : forall a. a -> a) -> x x") (Cons (yes "A5" "id auto") (Cons (yes "A6" "id auto'") (Cons (yes "A7" "choose id auto") (Cons (Case (caseId (yes "A8" "choose id auto'")) (expression (yes "A8" "choose id auto'")) (paperAcceptance (yes "A8" "choose id auto'")) false (localSignatures (yes "A8" "choose id auto'"))) (Cons (given (Cons (Pair "f" "forall a. (a -> a) -> List a -> a") Nil) (yes "A9" "f (choose id) ids")) (Cons (yes "A10.1" "poly id") (Cons (yes "A10.2" "poly (\\x -> x)") (Cons (yes "A10.3" "id poly (\\x -> x)") (Cons (given (Cons (Pair "k" "forall a. a -> List a -> Int") (Cons (Pair "xs" "List ((forall a. a -> a) -> Pair Int Bool)") Nil)) (no "A11" "k (\\f -> pair (f 1) (f True)) xs")) (Cons (yes "A12.1" "poly id") (Cons (yes "A12.2" "app poly id") (Cons (yes "A12.3" "revapp id poly") (Cons (yes "A13.1" "app runST argST") (Cons (yes "A13.2" "revapp argST runST") (Cons (yes "B1.1" "length ids") (Cons (yes "B1.2" "tail ids") (Cons (yes "B1.3" "head ids") (Cons (yes "B1.4" "single id") (Cons (yes "B2" "cons id ids") (Cons (yes "B3" "cons (\\x -> x) ids") (Cons (yes "B4" "append (single inc) (single id)") (Cons (yes "B5" "append (single id) ids") (Cons (yes "B6" "map poly (single id)") (Cons (yes "B7.1" "map head (single ids)") (Cons (yes "B7.2" "head ids True") (Cons (no "C1a" "\\f -> pair (f 1) (f True)") (Cons (yes "C1b" "\\(f : forall a. a -> a) -> pair (f 1) (f True)") (Cons (given (Cons (Pair "g" "((forall a. a -> a) -> Pair Int Bool) -> Char") Nil) (no "C1c" "g (\\f -> pair (f 1) (f True))")) (Cons (given (Cons (Pair "r" "(forall a. a -> (forall b. b -> b)) -> Int") Nil) (yes "C2" "r (\\x y -> y)")) (Cons (given etaSignatures (no "E1a" "k h lst")) (Cons (given etaSignatures (yes "E1b" "k (\\x -> h x) lst")) (Cons (yes "E2a" "\\x -> poly x") (Cons (yes "E2b" "(\\x -> poly x) : (forall a. a -> a) -> Pair Int Bool") (Cons (yes "E3a" "app poly id") (Cons (yes "E3b" "app (\\x -> poly x) id") (Cons (yes "E4a" "map poly ids") (Cons (yes "E4b" "map (\\x -> poly x) ids") (Cons (yes "E5a" "compose poly head") (Cons (yes "E5b" "\\xs -> poly (head xs)") Nil)))))))))))))))))))))))))))))))))))))))))))))))
+cases : ([] ( Case ))
+cases = (let { yes n e = (Case n e true true []) } in (let { no n e = (Case n e false false []) } in (let { given ss c = (Case (caseId c) (expression c) (paperAcceptance c) (expectedAcceptance c) ss) } in (let { etaSignatures = ((:) ((,) "k" "forall a. a -> [] a -> a") ((:) ((,) "h" "Int -> (forall a. a -> a)") ((:) ((,) "lst" "[] (forall a. Int -> a -> a)") []))) } in ((:) (yes "A1" "\\x y -> y") ((:) (yes "A2" "choose id") ((:) (yes "A3" "choose nil ids") ((:) (yes "A4" "\\(x : forall a. a -> a) -> x x") ((:) (yes "A5" "id auto") ((:) (yes "A6" "id auto'") ((:) (yes "A7" "choose id auto") ((:) (Case (caseId (yes "A8" "choose id auto'")) (expression (yes "A8" "choose id auto'")) (paperAcceptance (yes "A8" "choose id auto'")) false (localSignatures (yes "A8" "choose id auto'"))) ((:) (given ((:) ((,) "f" "forall a. (a -> a) -> [] a -> a") []) (yes "A9" "f (choose id) ids")) ((:) (yes "A10.1" "poly id") ((:) (yes "A10.2" "poly (\\x -> x)") ((:) (yes "A10.3" "id poly (\\x -> x)") ((:) (given ((:) ((,) "k" "forall a. a -> [] a -> Int") ((:) ((,) "xs" "[] ((forall a. a -> a) -> (,) Int Bool)") [])) (no "A11" "k (\\f -> pair (f 1) (f True)) xs")) ((:) (yes "A12.1" "poly id") ((:) (yes "A12.2" "app poly id") ((:) (yes "A12.3" "revapp id poly") ((:) (yes "A13.1" "app runST argST") ((:) (yes "A13.2" "revapp argST runST") ((:) (yes "B1.1" "length ids") ((:) (yes "B1.2" "tail ids") ((:) (yes "B1.3" "head ids") ((:) (yes "B1.4" "single id") ((:) (yes "B2" "cons id ids") ((:) (yes "B3" "cons (\\x -> x) ids") ((:) (yes "B4" "append (single inc) (single id)") ((:) (yes "B5" "append (single id) ids") ((:) (yes "B6" "map poly (single id)") ((:) (yes "B7.1" "map head (single ids)") ((:) (yes "B7.2" "head ids True") ((:) (no "C1a" "\\f -> pair (f 1) (f True)") ((:) (yes "C1b" "\\(f : forall a. a -> a) -> pair (f 1) (f True)") ((:) (given ((:) ((,) "g" "((forall a. a -> a) -> (,) Int Bool) -> Char") []) (no "C1c" "g (\\f -> pair (f 1) (f True))")) ((:) (given ((:) ((,) "r" "(forall a. a -> (forall b. b -> b)) -> Int") []) (yes "C2" "r (\\x y -> y)")) ((:) (given etaSignatures (no "E1a" "k h lst")) ((:) (given etaSignatures (yes "E1b" "k (\\x -> h x) lst")) ((:) (yes "E2a" "\\x -> poly x") ((:) (yes "E2b" "(\\x -> poly x) : (forall a. a -> a) -> (,) Int Bool") ((:) (yes "E3a" "app poly id") ((:) (yes "E3b" "app (\\x -> poly x) id") ((:) (yes "E4a" "map poly ids") ((:) (yes "E4b" "map (\\x -> poly x) ids") ((:) (yes "E5a" "compose poly head") ((:) (yes "E5b" "\\xs -> poly (head xs)") [])))))))))))))))))))))))))))))))))))))))))))))))
 
 freeNames : SExpr -> Set String
-freeNames e = (let rec { bound : SPattern -> List String; bound (SConstructorPattern _ ns) = (S.concatMap (\comprehension1 -> case comprehension1 of { (Just n) -> (Cons n Nil); _ -> Nil }) ns); bound (SDefaultPattern n) = (S.concatMap (\comprehension2 -> case comprehension2 of { (Just x) -> (Cons x Nil); _ -> Nil }) (Cons n Nil)); bound (SNestedPattern _ ps) = (H.concatMap bound ps); bound (SAnnotatedPattern n _) = (Cons n Nil); bound (SIntPattern _) = Nil; bound (SStringPattern _) = Nil; bound (SBoolPattern _) = Nil } in (case e of { (SVar x) -> (Set.singleton x); (SConstructor _) -> Set.empty; (SLam x _ b) -> (Set.delete x (freeNames b)); (SApp a b) -> (Set.union (freeNames a) (freeNames b)); (SLet x a b) -> (Set.union (freeNames a) (Set.delete x (freeNames b))); (SAnn a _) -> (freeNames a); (SIntLit _) -> Set.empty; (SDoubleLit _) -> Set.empty; (SBoolLit _) -> Set.empty; (SStringLit _) -> Set.empty; (SPrimitive _) -> Set.empty; (SWanted _ candidates) -> (Set.fromList (S.map S.snd candidates)); (SChecked _ a) -> (freeNames a); (SEquations equations) -> (Set.unions (S.concatMap (\(Pair patterns body) -> (Cons (Set.difference (freeNames body) (Set.fromList (H.concatMap bound patterns))) Nil)) equations)); (SDo _ _) -> (freeNames (desugarDo e)); (SLetRec ds b) -> (Set.difference (Set.unions (Cons (freeNames b) (S.concatMap (\(Triple _ _ a) -> (Cons (freeNames a) Nil)) ds))) (Set.fromList (S.concatMap (\(Triple n _ _) -> (Cons n Nil)) ds))); (SCase a bs) -> (Set.union (freeNames a) (Set.unions (S.concatMap (\comprehension3 -> case comprehension3 of { (SAlternative p b) -> (Cons (Set.difference (freeNames b) (Set.fromList (bound p))) Nil); _ -> Nil }) bs))) }))
+freeNames e = let rec {
+  reference : String -> Set String;
+  reference x =
+    if S.elem eqString x
+      ((:) "$MLF.Primitive.fromString"
+        ((:) "$MLF.Primitive.>>="
+          ((:) "$MLF.Primitive.>>"
+            ((:) "$MLF.Primitive.fail" ((:) "$MLF.Primitive.==" [])))))
+    then Set.empty else Set.singleton x;
+  bound : SPattern -> [] String;
+  bound (SConstructorPattern _ ns) = S.concatMap (\n -> case n of { Just x -> (:) x []; _ -> [] }) ns;
+  bound (SDefaultPattern n) = case n of { Just x -> (:) x []; _ -> [] };
+  bound (SNestedPattern _ ps) = H.concatMap bound ps;
+  bound (SAnnotatedPattern n _) = (:) n [];
+  bound (SIntPattern _) = [];
+  bound (SStringPattern _) = [];
+  bound (SBoolPattern _) = [];
+  bound (SOverloadedStringPattern _ _ _) = [];
+  bound (SAsPattern n p) = (:) n (bound p);
+  bound (SLazyPattern p) = bound p;
+  references : SPattern -> Set String;
+  references (SOverloadedStringPattern _ equality conversion) = Set.union (reference equality) (reference conversion);
+  references (SNestedPattern _ ps) = Set.unions (S.map references ps);
+  references (SAsPattern _ p) = references p;
+  references (SLazyPattern p) = references p;
+  references _ = Set.empty
+} in case e of {
+  SSourceDefinition body -> freeNames body;
+  SCallSite _ _ body -> freeNames body;
+  SVar x -> reference x;
+  SConstructor _ -> Set.empty;
+  SLam x _ b -> (Set.delete x (freeNames b));
+  SApp a b -> Set.union (freeNames a) (freeNames b);
+  SLet x a b -> Set.union (freeNames a) (Set.delete x (freeNames b));
+  SAnn a _ -> freeNames a;
+  SIntLit _ -> Set.empty;
+  SDoubleLit _ -> Set.empty;
+  SBoolLit _ -> Set.empty;
+  SStringLit _ -> Set.empty;
+  SPrimitive _ -> Set.empty;
+  SWanted _ candidates -> Set.fromList (S.map S.snd candidates);
+  SChecked _ a -> freeNames a;
+  SEquations equations -> Set.unions
+    (S.map (\((,) patterns body) ->
+      Set.union
+        (Set.difference (freeNames body) (Set.fromList (H.concatMap bound patterns)))
+        (Set.unions (S.map references patterns))) equations);
+  SDo _ _ -> freeNames (desugarDo e);
+  SSharedBind pattern action continuation binding failure -> Set.unions
+    ((:) (freeNames action)
+      ((:) (Set.difference (freeNames continuation) (Set.fromList (bound pattern)))
+        ((:) (freeNames binding) ((:) (freeNames failure) ((:) (references pattern) [])))));
+  SLetRec ds b -> Set.difference
+    (Set.unions ((:) (freeNames b) (S.map (\((,,) _ _ a) -> freeNames a) ds)))
+    (Set.fromList (S.map (\((,,) n _ _) -> n) ds));
+  SCase a bs -> Set.union (freeNames a)
+    (Set.unions (S.map (\(SAlternative p b) ->
+      Set.union (Set.difference (freeNames b) (Set.fromList (bound p))) (references p)) bs))
+}
 
-assumptions : Case -> Either String (List ( (Pair (String) (String)) ))
-assumptions c = do { e <- (parseExpr (caseId c) (expression c)); (let { env = (Map.fromList (H.append signatures (localSignatures c))) } in (let { lookupSignature x = (case (Map.lookup x env) of { Nothing -> (Left (H.append "fixture has no signature for " x)); (Just s) -> (Right (Pair x s)) }) } in (S.mapM lookupSignature (Set.toAscList (freeNames e))))) }
+assumptions : Case -> Either String ([] ( ((,) (String) (String)) ))
+assumptions c = do { e <- (parseExpr (caseId c) (expression c)); (let { env = (Map.fromList (H.append signatures (localSignatures c))) } in (let { lookupSignature x = (case (Map.lookup x env) of { Nothing -> (Left (H.append "fixture has no signature for " x)); (Just s) -> (Right ((,) x s)) }) } in (S.mapM lookupSignature (Set.toAscList (freeNames e))))) }
 
 program : Case -> Either String String
-program c = do { ss <- (assumptions c); (return (S.foldr (\(Pair x s) e -> (H.append "\\(" (H.append x (H.append " : " (H.append s (H.append ") ->\n" e)))))) (expression c) ss)) }
+program c = do { ss <- (assumptions c); (return (S.foldr (\((,) x s) e -> (H.append "\\(" (H.append x (H.append " :: " (H.append s (H.append ") ->\n" e)))))) (expression c) ss)) }

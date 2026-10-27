@@ -1,0 +1,90 @@
+{
+  "focused_checks_complete": true,
+  "format": 1,
+  "limitations": [
+    "Overall producer receipt is incomplete: its combined 94-file grammar/name-resolution gate exhausted the aggregate 120-second build watchdog after successful code generation and linking.",
+    "The standalone 94-file shard checks grammar only. It does not establish whole-corpus name resolution or native MLF typechecking.",
+    "The native bridge parser audit passed, but its native --type attempt hit the separate 1 GiB address-space ceiling; full bridge typechecking and native bootstrap remain pending.",
+    "No O2 demand campaign, native code generation campaign, or complete bootstrap qualification is claimed."
+  ],
+  "producer_binary": {
+    "path": "/workspace/shared/mlf-shared-source-migration/.mlf-build/shared-ghc-O0/bin/shared-frontend",
+    "sha256": "50728040aba323149be1f592847f73e9d7b7febdf90fdfe05465319d801fb211"
+  },
+  "producer_receipt": {
+    "complete": false,
+    "path": "/workspace/shared/mlf-shared-source-migration/.mlf-build/shared-ghc-O0/receipt.json",
+    "sha256": "2164fd1ce3e303fc86ee00ee76157a6e66558b1378db5beef27d3160de9fcffa"
+  },
+  "purpose": "Focused native shared frontend checks hosted by direct-source GHC O0 build",
+  "shards": [
+    {
+      "binary_stable": true,
+      "bounded_complete": true,
+      "complete": true,
+      "label": "final-o0-frontend",
+      "oracle_matches": true,
+      "peak_group_rss": 10715136,
+      "producer_binary_matches": true,
+      "producer_source_mismatches": [],
+      "producer_source_records_checked": 125,
+      "receipt": {
+        "path": "/tmp/mlf-shared-frontend-evidence/final-o0-frontend/receipt.json",
+        "sha256": "b379215993ec7f910a192e973a0c44fa64a9620d6eba1a9cab7ad2b6c0873cdd"
+      },
+      "seconds": 3.7468619520004722,
+      "source_stable": true
+    },
+    {
+      "binary_stable": true,
+      "bounded_complete": true,
+      "complete": true,
+      "label": "final-o0-native-first",
+      "oracle_matches": true,
+      "peak_group_rss": 30498816,
+      "producer_binary_matches": true,
+      "producer_source_mismatches": [],
+      "producer_source_records_checked": 125,
+      "receipt": {
+        "path": "/tmp/mlf-shared-frontend-evidence/final-o0-native-first/receipt.json",
+        "sha256": "6198ca358c0bb63bf44e3b1c35d6d0d7bb32f2c8177ab5792bc78d35548ad3a5"
+      },
+      "seconds": 47.56249606500205,
+      "source_stable": true
+    },
+    {
+      "binary_stable": true,
+      "bounded_complete": true,
+      "complete": true,
+      "label": "final-o0-native-second",
+      "oracle_matches": true,
+      "peak_group_rss": 29446144,
+      "producer_binary_matches": true,
+      "producer_source_mismatches": [],
+      "producer_source_records_checked": 125,
+      "receipt": {
+        "path": "/tmp/mlf-shared-frontend-evidence/final-o0-native-second/receipt.json",
+        "sha256": "c91540972746efdeb71f60efb01ad0831885ffd7b7e6865e87306ff93a894fd8"
+      },
+      "seconds": 47.439632246001565,
+      "source_stable": true
+    },
+    {
+      "binary_stable": true,
+      "bounded_complete": true,
+      "complete": true,
+      "label": "final-o0-grammar94",
+      "oracle_matches": true,
+      "peak_group_rss": 31727616,
+      "producer_binary_matches": true,
+      "producer_source_mismatches": [],
+      "producer_source_records_checked": 125,
+      "receipt": {
+        "path": "/tmp/mlf-shared-frontend-evidence/final-o0-grammar94/receipt.json",
+        "sha256": "f2e4c710d51fa54941892691e49e00bc68970744472be6f6b68f4476e9a96301"
+      },
+      "seconds": 24.654557410998677,
+      "source_stable": true
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "complete": true,
+  "source_unchanged": true,
+  "producer_reauthenticated": true,
+  "producer_receipt_sha256": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+  "spec_sha256": "3310af89d1878f5fd4690450e70a4f3bc69f3488a071407210da9df345f1e853",
+  "artifacts": {
+    "artifact/unit.mlfci": {
+      "current": "caa83e4396eee57d327f5bd15b6fe95af21e83539d26e3068a9b28a0b96db6d2",
+      "historical": "caa83e4396eee57d327f5bd15b6fe95af21e83539d26e3068a9b28a0b96db6d2",
+      "identical": true
+    },
+    "artifact/unit.mlfco": {
+      "current": "6358bfce412ef5b0194c99bb435401fc0ac04e697c5bddd9c5decf20307b149f",
+      "historical": "6358bfce412ef5b0194c99bb435401fc0ac04e697c5bddd9c5decf20307b149f",
+      "identical": true
+    }
+  },
+  "inferred_groups": 376,
+  "reused_groups": 0,
+  "native_or_llvm": false,
+  "elapsed_seconds": 25.555804760999308,
+  "peak_rss": 111906816
+}

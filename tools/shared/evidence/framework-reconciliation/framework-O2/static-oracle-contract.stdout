@@ -1,0 +1,16 @@
+{
+  "kind": "static-source-preservation",
+  "baseline": "8a3e69b165765931c3ff762379a78db9659b2cd8",
+  "leaf_ids": 90,
+  "default_implementation": "legacy",
+  "literal_calls_preserved": 72,
+  "oracle_helpers_preserved": 12,
+  "mutation_controls": 14,
+  "shared_semantic_contract": {
+    "tests/Tests/TupleList.hs": "85ee364d92530114332c9b37723141bf008fda960d9f7db4ddfcc6f1d8e6a954",
+    "tests/MLF/Entry/TupleList.hs": "a6de5a49e9cf14dbb9fa9b840ade22fb27c6e06478703b04c9671ac9b84fee4d",
+    "tests/Tests/TupleListLegacy.hs": "35085423a20b13cb04ec4c330ccb246cf9f0d9bf0c6c1e45f3b9aead98ad0790"
+  },
+  "compilation_verified": false,
+  "semantic_execution_verified": false
+}

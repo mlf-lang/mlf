@@ -1,0 +1,16 @@
+{
+  "libraries/mlf-foundation/mlf-package.json": "4a05ffebfa860271154e1c4b7a40e045a822e76ecca16a2bd57c95e0c176819f",
+  "libraries/mlf-foundation/Bootstrap/Fresh.hs": "7eeec3f65a6b8172bc76b3acb09f699642e4e6d93cb0c6e0bc6ae3d88c3b1869",
+  "libraries/mlf-foundation/Bootstrap/Host.hs": "5b1bd1f2a05ec496981630665df70190990420b27d5b4d288c471d3ea3ac42bf",
+  "libraries/mlf-foundation/Bootstrap/IntMap.hs": "4f7039cc12fd0bd038b3e73b23700a3add88f5c827502c3360d48b79b8e303b8",
+  "libraries/mlf-foundation/Bootstrap/IntSet.hs": "30ea33591d154b771067fe8c2c6c20eac4b3be3d86f1f5ebf3d91642ca6d8836",
+  "libraries/mlf-foundation/Bootstrap/Map.hs": "625bcced6d11149505155cd2bcb22d10ee176c87f4513146af6536dd941afa8d",
+  "libraries/mlf-foundation/Bootstrap/Regex.hs": "3dbfc4a497c506fbcc7fead39ba5b0dbcb4113ef54ee89d7f78e13f5f001e403",
+  "libraries/mlf-foundation/Bootstrap/ST.hs": "b57dfe7a9a89fd6edda046445342c47c649d1b4f9ea3dd6c9acfc7aae925302f",
+  "libraries/mlf-foundation/Bootstrap/Set.hs": "94cc73baef625734a9f76a4702eb9fb7f1b8ff6266d3ff1cbf61ac4efaae3509",
+  "libraries/mlf-foundation/Bootstrap/Std.hs": "edf7d3c66565b6c11639236d5d9f54ffdaac871137c07c68e3c8be0c6a75892d",
+  "libraries/mlf-foundation/Bootstrap/Types.hs": "94df8a8cb1e1c1fdb23c638631b42e99ad29d30490f149e6df676fd2f405f771",
+  "libraries/mlf-foundation/Bootstrap/Unicode.hs": "a20db5c9ba597befc1c8be873b5845b765fbd53b7f9977e3948c4d5349c36541",
+  "libraries/mlf-foundation/Bootstrap/Version.hs": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479",
+  "shared-sources.json": "0d04b872344e67afdf634e9e832a972c9660ba6dda36f0beafa8675c03c3c8f5"
+}

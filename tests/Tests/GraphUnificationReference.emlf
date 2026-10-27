@@ -1,5 +1,8 @@
 -- Frozen persistent-map unifier, independently ported from the historical Haskell reference.
 module Tests.GraphUnificationReference (referenceUnify) where
+-- Use standard classes for shared values and the test graph state action.
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Bootstrap.IntMap as IM
@@ -16,59 +19,59 @@ mapTag f tag = case tag of
  _ -> tag
 inertNodes : Graph -> IntMap Bool
 inertNodes graph =
- let children = IM.fromListWith S.append (S.concatMap (\(Pair n node) -> case Pair (G.binder node) (G.flag node) of { Pair (Just parent) Flexible -> Cons (Pair parent (Cons n Nil)) Nil; _ -> Nil }) (IM.toList (G.nodes graph))) in
- let rec { table : IntMap Bool; table = IM.mapWithKey (\n node -> S.not (bottom (G.tag node)) && S.all (\child -> IM.get child table) (IM.findWithDefault Nil n children)) (G.nodes graph) } in table
+ let children = IM.fromListWith S.append (S.concatMap (\((,) n node) -> case (,) (G.binder node) (G.flag node) of { (,) (Just parent) Flexible -> (:) ((,) parent ((:) n [])) []; _ -> [] }) (IM.toList (G.nodes graph))) in
+ let rec { table : IntMap Bool; table = IM.mapWithKey (\n node -> S.not (bottom (G.tag node)) && S.all (\child -> IM.get child table) (IM.findWithDefault [] n children)) (G.nodes graph) } in table
 permissions : Graph -> IntMap Permission
 permissions graph =
  let inertness = inertNodes graph in
  let rec { paths : IntMap Bool; paths = IM.map (\node -> case G.tag node of { GGen _ -> true; _ -> if S.eqFlag (G.flag node) Rigid then false else S.maybe true (\parent -> IM.get parent paths) (G.binder node) }) (G.nodes graph) } in
  IM.mapWithKey (\n node -> if IM.get n inertness then Inert else if S.eqFlag (G.flag node) Rigid then Orange else if IM.get n paths then Green else Red) (G.nodes graph)
-visit : Graph -> IntSet -> Pair IntSet (List Int) -> Int -> Either String (Pair IntSet (List Int))
-visit graph stack (Pair done order) n = if IS.member n done then Right (Pair done order) else if IS.member n stack then Left "infinite type (occurs check)" else do
+visit : Graph -> IntSet -> (,) IntSet ([] Int) -> Int -> Either String ((,) IntSet ([] Int))
+visit graph stack ((,) done order) n = if IS.member n done then Right ((,) done order) else if IS.member n stack then Left "infinite type (occurs check)" else do
  S.ensure (IM.member n (G.nodes graph)) ("missing graph node " ++ showInt n)
- Pair done' order' <- S.foldM (visit graph (IS.insert n stack)) (Pair done order) (S.map (G.resolve graph) (G.children (G.tag (G.nodeAt graph n))))
- return (Pair (IS.insert n done') (Cons n order'))
-topological : Graph -> Either String (List Int)
-topological graph = S.mapEither (\(Pair _ order) -> S.reverse order) (S.foldM (visit graph IS.empty) (Pair IS.empty Nil) (IM.keys (G.nodes graph)))
-chooseTags : GTag -> GTag -> Either String (Pair GTag (List (Pair Int Int)))
-chooseTags a b = if G.isGen a || G.isGen b then Left "cannot unify generalization nodes" else if bottom a then Right (Pair b Nil) else if bottom b then Right (Pair a Nil) else case Pair a b of
- Pair (GArr x y) (GArr z w) -> Right (Pair a (Cons (Pair x z) (Cons (Pair y w) Nil)))
- Pair (GCon c xs) (GCon d ys) -> if eqString c d && S.length xs == S.length ys then Right (Pair a (S.zip xs ys)) else mismatch a b
- Pair (GTyCon c k) (GTyCon d l) -> if eqString c d && S.eqKind k l then Right (Pair a Nil) else mismatch a b
- Pair (GSkolem c k) (GSkolem d l) -> if c == d && S.eqKind k l then Right (Pair a Nil) else mismatch a b
- Pair (GTyApp f x) (GTyApp h y) -> Right (Pair a (Cons (Pair f h) (Cons (Pair x y) Nil)))
+ (,) done' order' <- S.foldM (visit graph (IS.insert n stack)) ((,) done order) (S.map (G.resolve graph) (G.children (G.tag (G.nodeAt graph n))))
+ return ((,) (IS.insert n done') ((:) n order'))
+topological : Graph -> Either String ([] Int)
+topological graph = S.mapEither (\((,) _ order) -> S.reverse order) (S.foldM (visit graph IS.empty) ((,) IS.empty []) (IM.keys (G.nodes graph)))
+chooseTags : GTag -> GTag -> Either String ((,) GTag ([] ((,) Int Int)))
+chooseTags a b = if G.isGen a || G.isGen b then Left "cannot unify generalization nodes" else if bottom a then Right ((,) b []) else if bottom b then Right ((,) a []) else case (,) a b of
+ (,) (GArr x y) (GArr z w) -> Right ((,) a ((:) ((,) x z) ((:) ((,) y w) [])))
+ (,) (GCon c xs) (GCon d ys) -> if eqString c d && S.length xs == S.length ys then Right ((,) a (S.zip xs ys)) else mismatch a b
+ (,) (GTyCon c k) (GTyCon d l) -> if eqString c d && S.eqKind k l then Right ((,) a []) else mismatch a b
+ (,) (GSkolem c k) (GSkolem d l) -> if c == d && S.eqKind k l then Right ((,) a []) else mismatch a b
+ (,) (GTyApp f x) (GTyApp h y) -> Right ((,) a ((:) ((,) f h) ((:) ((,) x y) [])))
  _ -> mismatch a b
 mismatch a b = Left ("type constructor mismatch: " ++ G.tagDescription a ++ " versus " ++ G.tagDescription b)
-firstOrder : Pair Int Int -> Build Unit
-firstOrder (Pair a0 b0) = do
+firstOrder : (,) Int Int -> Build ()
+firstOrder ((,) a0 b0) = do
  graph <- get
  let a = G.resolve graph a0
  let b = G.resolve graph b0
- if a == b then return Unit else do
+ if a == b then return () else do
   ka <- lift (G.kindAt graph a)
   kb <- lift (G.kindAt graph b)
   lift (S.ensure (S.eqKind ka kb) ("kind mismatch during unification: " ++ G.kindDescription ka ++ " versus " ++ G.kindDescription kb))
   let av = G.nodeAt graph a
   let bv = G.nodeAt graph b
-  Pair tag pairs <- lift (chooseTags (G.tag av) (G.tag bv))
+  (,) tag pairs <- lift (chooseTags (G.tag av) (G.tag bv))
   let winner = S.min a b
   let loser = S.max a b
   put (Graph (IM.insert winner (Node tag (G.binder av) (G.flag av)) (IM.delete loser (G.nodes graph))) (IM.insert loser winner (G.links graph)) (G.nextId graph))
   S.mapM_ firstOrder pairs
-path : IntMap (Maybe Int) -> Int -> List Int
-path tree n = Cons n (S.maybe Nil (path tree) (IM.get n tree))
-lca : IntMap (Maybe Int) -> List Int -> Either String (Maybe Int)
+path : IntMap (Maybe Int) -> Int -> [] Int
+path tree n = (:) n (S.maybe [] (path tree) (IM.get n tree))
+lca : IntMap (Maybe Int) -> [] Int -> Either String (Maybe Int)
 lca tree candidates = case candidates of
- Nil -> Right Nothing
- Cons first rest -> S.maybe (Left "binders have no common ancestor") (\n -> Right (Just n)) (S.find (\n -> S.all (\b -> S.elem eqInt n (path tree b)) rest) (path tree first))
-buildTree : IntMap (List Int) -> IntMap (List Int) -> Int -> IntMap (Maybe Int) -> IntMap Int -> IntSet -> Either String (IntMap (Maybe Int))
+ [] -> Right Nothing
+ (:) first rest -> S.maybe (Left "binders have no common ancestor") (\n -> Right (Just n)) (S.find (\n -> S.all (\b -> S.elem eqInt n (path tree b)) rest) (path tree first))
+buildTree : IntMap ([] Int) -> IntMap ([] Int) -> Int -> IntMap (Maybe Int) -> IntMap Int -> IntSet -> Either String (IntMap (Maybe Int))
 buildTree candidates dependents count tree pending ready = case IS.minView ready of
  Nothing -> if IM.size tree == count then Right tree else Left "cyclic structure/binding dependencies"
- Just (Pair n rest) -> do
+ Just ((,) n rest) -> do
   binder <- lca tree (IM.get n candidates)
-  let release = \(Pair counts available) child -> let remaining = IM.get child counts - 1 in Pair (IM.insert child remaining counts) (if remaining == 0 then IS.insert child available else available)
-  case S.foldl release (Pair pending rest) (IM.findWithDefault Nil n dependents) of
-   Pair pending' ready' -> buildTree candidates dependents count (IM.insert n binder tree) pending' ready'
+  let release = \((,) counts available) child -> let remaining = IM.get child counts - 1 in (,) (IM.insert child remaining counts) (if remaining == 0 then IS.insert child available else available)
+  case S.foldl release ((,) pending rest) (IM.findWithDefault [] n dependents) of
+   (,) pending' ready' -> buildTree candidates dependents count (IM.insert n binder tree) pending' ready'
 climb : Graph -> (Int -> Int) -> Int -> Maybe Int -> Either String (Maybe Int)
 climb old image wanted binder = case binder of
  Nothing -> Left "a node's binder cannot be lowered"
@@ -77,30 +80,30 @@ raisedBinder old image tree n node = case IM.get (image n) tree of { Nothing -> 
 rebind : Graph -> Graph -> Either String Graph
 rebind old skeleton =
  let image = G.resolve skeleton in
- let classes = IM.fromListWith S.append (S.map (\n -> Pair (image n) (Cons n Nil)) (IM.keys (G.nodes old))) in
- let members = \n -> IM.findWithDefault Nil n classes in
+ let classes = IM.fromListWith S.append (S.map (\n -> (,) (image n) ((:) n [])) (IM.keys (G.nodes old))) in
+ let members = \n -> IM.findWithDefault [] n classes in
  let newFlag = \n -> if S.any (\m -> S.eqFlag (G.flag (G.nodeAt old m)) Rigid) (members n) then Rigid else Flexible in
- let parents = IM.fromListWith IS.union (S.concatMap (\(Pair p node) -> S.map (\child -> Pair (image child) (IS.singleton p)) (G.children (G.tag node))) (IM.toList (G.nodes skeleton))) in
- let grafted = IS.unions (S.map (\(Pair n _) -> IS.delete (image n) (G.reachable skeleton (image n))) (S.filter (\(Pair _ node) -> bottom (G.tag node)) (IM.toList (G.nodes old)))) in
+ let parents = IM.fromListWith IS.union (S.concatMap (\((,) p node) -> S.map (\child -> (,) (image child) (IS.singleton p)) (G.children (G.tag node))) (IM.toList (G.nodes skeleton))) in
+ let grafted = IS.unions (S.map (\((,) n _) -> IS.delete (image n) (G.reachable skeleton (image n))) (S.filter (\((,) _ node) -> bottom (G.tag node)) (IM.toList (G.nodes old)))) in
  let candidates = IM.mapWithKey (\n _ -> IS.toList (IS.union (IS.fromList (S.map image (S.mapMaybe (\m -> G.binder (G.nodeAt old m)) (members n)))) (if IS.member n grafted then IM.findWithDefault IS.empty n parents else IS.empty))) (G.nodes skeleton) in
  let dependencies = IM.mapWithKey (\n cs -> IS.union (IS.fromList cs) (IM.findWithDefault IS.empty n parents)) candidates in
  let counts = IM.map IS.size dependencies in
  let ready = IM.keysSet (IM.filter (\n -> n == 0) counts) in
- let dependents = IM.fromListWith S.append (S.concatMap (\(Pair n ds) -> S.map (\dependency -> Pair dependency (Cons n Nil)) (IS.toList ds)) (IM.toList dependencies)) in do
+ let dependents = IM.fromListWith S.append (S.concatMap (\((,) n ds) -> S.map (\dependency -> (,) dependency ((:) n [])) (IS.toList ds)) (IM.toList dependencies)) in do
  tree <- buildTree candidates dependents (IM.size (G.nodes skeleton)) IM.empty counts ready
  let finalNodes = IM.mapWithKey (\n node -> Node (G.tag node) (IM.get n tree) (newFlag n)) (G.nodes skeleton)
- upList <- S.mapM (\(Pair n node) -> S.mapEither (Pair n) (raisedBinder old image tree n node)) (IM.toList (G.nodes old))
+ upList <- S.mapM (\((,) n node) -> S.mapEither ((,) n) (raisedBinder old image tree n node)) (IM.toList (G.nodes old))
  let up = IM.fromList upList
  let raised = Graph (IM.mapWithKey (\n node -> Node (G.tag node) (IM.get n up) (G.flag node)) (G.nodes old)) (G.links old) (G.nextId old)
  let oldPermissions = permissions old
  let raisedPermissions = permissions raised
- S.mapM_ (\(Pair n node) -> do
+ S.mapM_ (\((,) n node) -> do
   S.ensure (S.not (bottom (G.tag node) && S.not (bottom (G.tag (G.nodeAt skeleton n))) && S.not (G.equalPermission (IM.get n oldPermissions) Green))) "cannot instantiate a rigid or protected type variable"
   S.ensure (S.not (G.equalPermission (IM.get n oldPermissions) Red && S.not (S.eqMaybe eqInt (G.binder node) (IM.get n up)))) "cannot raise a protected type variable"
   S.ensure (S.not (G.equalPermission (IM.get n raisedPermissions) Red && S.not (S.eqFlag (G.flag node) (newFlag (image n))))) "cannot weaken a protected type variable") (IM.toList (G.nodes old))
- S.mapM_ (\ms -> S.mapM_ (\(Pair a b) -> S.ensure (S.not ((G.equalPermission (IM.get a raisedPermissions) Red || G.equalPermission (IM.get b raisedPermissions) Red) && S.eqMaybe eqInt (IM.get a up) (IM.get b up))) "cannot merge distinct protected type variables") (S.concatMap (\a -> S.map (Pair a) (S.filter (\b -> a < b) ms)) ms)) (IM.elems classes)
+ S.mapM_ (\ms -> S.mapM_ (\((,) a b) -> S.ensure (S.not ((G.equalPermission (IM.get a raisedPermissions) Red || G.equalPermission (IM.get b raisedPermissions) Red) && S.eqMaybe eqInt (IM.get a up) (IM.get b up))) "cannot merge distinct protected type variables") (S.concatMap (\a -> S.map ((,) a) (S.filter (\b -> a < b) ms)) ms)) (IM.elems classes)
  return (Graph finalNodes (G.links skeleton) (G.nextId skeleton))
-referenceUnify : List (Pair Int Int) -> Build Unit
+referenceUnify : [] ((,) Int Int) -> Build ()
 referenceUnify equations = do
  before <- get
  lift (G.validateGraph before)

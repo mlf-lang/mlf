@@ -1,0 +1,211 @@
+{
+  "complete": true,
+  "manager_plan_sha256": "39f4fba6350742e4a2e1360a26d42ad46d7a6ecf0782f3a68185ba59776032e3",
+  "root_crates": 15,
+  "root_declared_source_modules": 97,
+  "additional_crates": [
+    "mlf-async/0.3.0/library"
+  ],
+  "matched": {
+    "mlf-test/0.1.0/library": {
+      "entry": "",
+      "modules": [
+        "Test.Adapter",
+        "Test.Assert",
+        "Test.Capability",
+        "Test.Case",
+        "Test.Descriptor",
+        "Test.Diagnostics",
+        "Test.Evidence",
+        "Test.Expectation",
+        "Test.Fixture",
+        "Test.Outcome",
+        "Test.Plan",
+        "Test.Registry",
+        "Test.Resources",
+        "Test.Runner"
+      ],
+      "result_sha256": "9d404c1e49efa7d031423bdef0ce47ff9c59e2064577c0981d4083498950641b"
+    },
+    "mlf-frontend/0.3.0/library": {
+      "entry": "",
+      "modules": [
+        "Bootstrap.Dependency",
+        "Bootstrap.Desugar",
+        "Bootstrap.Layout",
+        "Bootstrap.Lexer",
+        "Bootstrap.Module",
+        "Bootstrap.Parsec",
+        "Bootstrap.Parser",
+        "Bootstrap.Prelude",
+        "Bootstrap.Surface"
+      ],
+      "result_sha256": "aeb60edd90fe42388224244dd54554f2ecf0b9c7e1eacdd266b75748656030a1"
+    },
+    "mlf-language-core/0.3.0/library": {
+      "entry": "",
+      "modules": [
+        "Bootstrap.Data",
+        "Bootstrap.Kind",
+        "Bootstrap.Kinding",
+        "Bootstrap.Primitive"
+      ],
+      "result_sha256": "f91b44dd15b73a5701f43978e999a3492b14e511a5fdf6bab6c845af81d0c2a4"
+    },
+    "mlf-inference/0.3.0/library": {
+      "entry": "",
+      "modules": [
+        "Bootstrap.Classes",
+        "Bootstrap.Compiler",
+        "Bootstrap.CompilerCore",
+        "Bootstrap.Constraint",
+        "Bootstrap.Elaborate",
+        "Bootstrap.Evidence",
+        "Bootstrap.Graph",
+        "Bootstrap.Graph.Solver"
+      ],
+      "result_sha256": "c312b24d878dc83c352a0570f170c3ea1691d1040bcc9ca5441d6ec30d387371"
+    },
+    "mlf-llvm/0.3.0/library": {
+      "entry": "",
+      "modules": [
+        "Bootstrap.LLVM",
+        "Bootstrap.LLVM.Analysis",
+        "Bootstrap.LLVM.Build",
+        "Bootstrap.LLVM.Codegen",
+        "Bootstrap.LLVM.Kernel",
+        "Bootstrap.LLVM.Native",
+        "Bootstrap.LLVM.Optimize",
+        "Bootstrap.LLVM.StrictFields",
+        "Bootstrap.LLVM.StrictWrappers"
+      ],
+      "result_sha256": "75e538cfec56f35c9f0555a7ad6e51dcd07e101fcee597a3aa37a266aeba10ba"
+    },
+    "mlf-compiler/0.3.0/target-emlf": {
+      "entry": "MLF.Entry.Emlf",
+      "modules": [
+        "MLF.Entry.Emlf"
+      ],
+      "result_sha256": "1db9dd6bec59f25e3ae656d6f60a502845d47219e63c7448288b0f7dd19af088"
+    },
+    "mlf-compiler/0.3.0/target-compiler-tests": {
+      "entry": "MLF.Entry.CompilerTests",
+      "modules": [
+        "MLF.Entry.CompilerTests",
+        "Tests.BuildReceipts",
+        "Tests.Catalog",
+        "Tests.CompilerTests",
+        "Tests.CorePartitions",
+        "Tests.Coverage",
+        "Tests.Selection",
+        "Tests.TestDrivers",
+        "Tests.TestSources"
+      ],
+      "result_sha256": "216b8844087efcb9bc75a25a8e451cb59f32893e05a46a4fe31ae4123239c8c4"
+    },
+    "mlf-interpreter/0.3.0/library": {
+      "entry": "",
+      "modules": [
+        "Bootstrap.ProcessHost",
+        "Bootstrap.Runtime"
+      ],
+      "result_sha256": "6c0bf11b68f0541bff18f25ff8c32a05a26583bef328c69ecc3292e8ae284a96"
+    },
+    "mlf-foundation/0.3.0/library": {
+      "entry": "",
+      "modules": [
+        "Bootstrap.Fresh",
+        "Bootstrap.Host",
+        "Bootstrap.IntMap",
+        "Bootstrap.IntSet",
+        "Bootstrap.Map",
+        "Bootstrap.Regex",
+        "Bootstrap.ST",
+        "Bootstrap.Set",
+        "Bootstrap.Std",
+        "Bootstrap.Types",
+        "Bootstrap.Unicode",
+        "Bootstrap.Version"
+      ],
+      "result_sha256": "e80df69e8ac70825ef13eea3f57ba36fe6e26c2f54c04fe8f4e3b69582963f92"
+    },
+    "mlf-compiler/0.3.0/target-tuple-list": {
+      "entry": "MLF.Entry.TupleList",
+      "modules": [
+        "MLF.Entry.TupleList",
+        "Tests.IndependentCheck",
+        "Tests.IndependentType",
+        "Tests.TupleList",
+        "Tests.TupleListLegacy"
+      ],
+      "result_sha256": "d5536cdca8a7409d545b6574419263d05ce3a1e52aaf16c3c2622952d2a12cf5"
+    },
+    "mlf-compiler/0.3.0/target-mlfpkg": {
+      "entry": "MLF.Entry.Mlfpkg",
+      "modules": [
+        "MLF.Entry.Mlfpkg"
+      ],
+      "result_sha256": "8226525989fec022b7916db46a1a479486bddf67c62c0e9a690070d57204985f"
+    },
+    "mlf-async/0.3.0/library": {
+      "entry": "",
+      "modules": [
+        "Async.Process",
+        "Async.Process.Internal",
+        "Async.Task",
+        "Async.Task.Core",
+        "Async.Task.Internal"
+      ],
+      "result_sha256": "9b7b6325661839122c37f34f403e122767ab1c7833b9c7a32f323ab8cb45fed6"
+    },
+    "mlf-crates/0.3.0/library": {
+      "entry": "",
+      "modules": [
+        "Bootstrap.Crate",
+        "Bootstrap.CrateArtifact",
+        "Bootstrap.CrateCodegen",
+        "Bootstrap.CrateQuery",
+        "Bootstrap.InferenceUnit",
+        "Bootstrap.Separate",
+        "Bootstrap.SourceEquality"
+      ],
+      "result_sha256": "53268d23339ee20d5640531f2e888251a2d452eea863a814c1f6117c559e4cbb"
+    },
+    "mlf-package-core/0.3.0/library": {
+      "entry": "",
+      "modules": [
+        "Package.Build",
+        "Package.Command",
+        "Package.Distribution",
+        "Package.Json",
+        "Package.Manifest",
+        "Package.OS",
+        "Package.Release",
+        "Package.Scheduler"
+      ],
+      "result_sha256": "1f044e9b68bc6be61ceef7d2db7c560a7e2e3312c577033a44039cc553beb32f"
+    },
+    "mlf-developer-tools/0.3.0/library": {
+      "entry": "",
+      "modules": [
+        "Package.Benchmark",
+        "Package.Verification"
+      ],
+      "result_sha256": "27474ecc8594c1fbf399d667a09a7fbdd5c2565b3b8938ef130adf94c5cc4e52"
+    },
+    "mlf-xmlf/0.3.0/library": {
+      "entry": "",
+      "modules": [
+        "Bootstrap.X.Check",
+        "Bootstrap.X.Checked",
+        "Bootstrap.X.Parser",
+        "Bootstrap.X.Pretty",
+        "Bootstrap.X.Syntax",
+        "Bootstrap.X.Type"
+      ],
+      "result_sha256": "9d42d547b78a81266bfdba76099791ac90de6c7989148c9a6c8e3dbb6dcf8982"
+    }
+  },
+  "actual_MLF_source_acceptance": true,
+  "native_or_full_build": false
+}

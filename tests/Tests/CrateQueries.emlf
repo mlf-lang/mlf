@@ -18,63 +18,63 @@ scratch name = do
   root <- canonicalPath "."
   let path = root ++ "/.mlf-build/test-crate-queries/" ++ name
   present <- directoryExists path
-  if present then OS.remove path else ioReturn Unit
+  if present then OS.remove path else ioReturn ()
   OS.mkdir path
   ioReturn path
 query label directory datatypes values = do
-  result <- Query.compileGroups label directory Nil datatypes values
+  result <- Query.compileGroups label directory [] datatypes values
   H.right result
 counts inferred reused report = H.assert (Query.inferredCount report == inferred && Query.reusedCount report == reused) "unexpected inferred/reused declaration groups"
 equivalent a b = length a == length b && eqList (\x y -> X.equalErased (X.erase (Separate.objectTerm x)) (X.erase (Separate.objectTerm y))) a b
 values name extra =
   let rhs = SLam name Nothing (if extra then SLet "unused" (SIntLit 1) (SVar name) else SVar name) in
-  Cons (Triple "g" Nothing rhs) (Cons (Triple "f" Nothing (SVar "g")) (Cons (Triple "h" Nothing (SIntLit 42)) Nil))
+  (:) ((,,) "g" Nothing rhs) ((:) ((,,) "f" Nothing (SVar "g")) ((:) ((,,) "h" Nothing (SIntLit 42)) []))
 identityType = XForall (XTyVar 0) XBot (XArrow (XVar (XTyVar 0)) (XVar (XTyVar 0)))
 scheme name object = case lookup eqString name (Separate.unitBindings (Separate.objectInterface object)) of {Just ty -> ty; Nothing -> panic ("missing test scheme: " ++ name)}
 
 orderedSCC = do
-  let edges = Cons (Pair "f" (Cons "g" Nil)) (Cons (Pair "g" Nil) (Cons (Pair "h" Nil) Nil))
-  let expected = Cons (Cons "g" Nil) (Cons (Cons "f" Nil) (Cons (Cons "h" Nil) Nil))
+  let edges = (:) ((,) "f" ((:) "g" [])) ((:) ((,) "g" []) ((:) ((,) "h" []) []))
+  let expected = (:) ((:) "g" []) ((:) ((:) "f" []) ((:) ((:) "h" []) []))
   H.assert (eqList (eqList eqString) (Dependency.components edges) expected) "value dependencies must precede their users"
   H.assert (eqList (eqList eqString) (Dependency.components (reverse edges)) expected) "SCC order depends on source inventory order"
 mutualSCC = do
-  let edges = Cons (Pair "f" (Cons "g" Nil)) (Cons (Pair "g" (Cons "f" Nil)) (Cons (Pair "h" Nil) Nil))
-  H.assert (eqList (eqList eqString) (Dependency.components edges) (Cons (Cons "f" (Cons "g" Nil)) (Cons (Cons "h" Nil) Nil))) "an unrelated declaration joined a recursive group"
-chain : Int -> List (Pair String (List String))
-chain n = if n < 0 then Nil else Cons (Pair (showInt n) (if n == 0 then Nil else Cons (showInt (n-1)) Nil)) (chain (n-1))
-chainOrder : Int -> List (List String) -> Bool
-chainOrder n groups = case groups of {Nil -> true; Cons names rest -> eqList eqString names (Cons (showInt n) Nil) && chainOrder (n+1) rest}
+  let edges = (:) ((,) "f" ((:) "g" [])) ((:) ((,) "g" ((:) "f" [])) ((:) ((,) "h" []) []))
+  H.assert (eqList (eqList eqString) (Dependency.components edges) ((:) ((:) "f" ((:) "g" [])) ((:) ((:) "h" []) []))) "an unrelated declaration joined a recursive group"
+chain : Int -> [] ((,) String ([] String))
+chain n = if n < 0 then [] else (:) ((,) (showInt n) (if n == 0 then [] else (:) (showInt (n-1)) [])) (chain (n-1))
+chainOrder : Int -> [] ([] String) -> Bool
+chainOrder n groups = case groups of {[] -> true; (:) names rest -> eqList eqString names ((:) (showInt n) []) && chainOrder (n+1) rest}
 largeSCC =
   let groups = Dependency.components (chain 1999) in
   H.assert (length groups == 2000 && chainOrder 0 groups) "large indexed declaration chain lost members or dependency order"
 observations = do
-  let expression = SAnn (SLam "x" Nothing (SVar "x")) (SAnnotation Nil (SQualified (Cons (SPredicate "C" (Cons (SCon "T" Nil) Nil)) Nil) (SCon "U" Nil)))
+  let expression = SAnn (SLam "x" Nothing (SVar "x")) (SAnnotation [] (SQualified ((:) (SPredicate "C" ((:) (SCon "T" []) [])) []) (SCon "U" [])))
   let observed = Dependency.normalize (Dependency.observeExpression expression)
-  H.assert (null (Dependency.valueNames observed) && eqList eqString (Dependency.typeNames observed) (Cons "T" (Cons "U" Nil)) && eqList eqString (Dependency.classNames observed) (Cons "C" Nil)) "type/class observations contaminated value dependencies or lost lexical scope"
-  let constructor = Dependency.normalize (Dependency.observeExpression (SCase (SVar "input") (Cons (SAlternative (SConstructorPattern "Box" (Cons (Just "field") Nil)) (SVar "field")) Nil)))
-  H.assert (eqList eqString (Dependency.valueNames constructor) (Cons "input" Nil) && eqList eqString (Dependency.constructorNames constructor) (Cons "Box" Nil)) "pattern constructor dependency or local binder was lost"
+  H.assert (null (Dependency.valueNames observed) && eqList eqString (Dependency.typeNames observed) ((:) "T" ((:) "U" [])) && eqList eqString (Dependency.classNames observed) ((:) "C" [])) "type/class observations contaminated value dependencies or lost lexical scope"
+  let constructor = Dependency.normalize (Dependency.observeExpression (SCase (SVar "input") ((:) (SAlternative (SConstructorPattern "Box" ((:) (Just "field") [])) (SVar "field")) [])))
+  H.assert (eqList eqString (Dependency.valueNames constructor) ((:) "input" []) && eqList eqString (Dependency.constructorNames constructor) ((:) "Box" [])) "pattern constructor dependency or local binder was lost"
 
 principalInference = do
-  first <- H.right (Inference.compileLoweredGroup "Identity" Nil Nil (Cons (Triple "identity" Nothing (SLam "x" Nothing (SVar "x"))) Nil))
+  first <- H.right (Inference.compileLoweredGroup "Identity" [] [] ((:) ((,,) "identity" Nothing (SLam "x" Nothing (SVar "x"))) []))
   H.assert (T.alphaEq (scheme "identity" first) identityType) "group did not retain the principal identity scheme"
-  second <- H.right (Inference.compileLoweredGroup "Uses" (Cons (Separate.objectInterface first) Nil) Nil (Cons (Triple "integer" Nothing (SApp (SVar "identity") (SIntLit 42))) (Cons (Triple "boolean" Nothing (SApp (SVar "identity") (SBoolLit true))) Nil)))
-  H.assert (T.alphaEq (scheme "integer" second) (XCon "Int" Nil) && T.alphaEq (scheme "boolean" second) (XCon "Bool" Nil)) "cross-group polymorphic uses shared a monomorphic instance"
-  let chooseSignature = Just (SAnnotation Nil (SForall Flexible "a" SBottom (SArrow (STVar "a") (SArrow (STVar "a") (STVar "a")))))
-  choose <- H.right (Inference.compileLoweredGroup "Choose" Nil Nil (Cons (Triple "choose" chooseSignature (SLam "x" Nothing (SLam "y" Nothing (SVar "x")))) Nil))
-  bounded <- H.right (Inference.compileLoweredGroup "Bounded" (Cons (Separate.objectInterface first) (Cons (Separate.objectInterface choose) Nil)) Nil (Cons (Triple "g" Nothing (SApp (SVar "choose") (SVar "identity"))) Nil))
-  applied <- H.right (Inference.compileLoweredGroup "Impredicative" (Cons (Separate.objectInterface bounded) Nil) Nil (Cons (Triple "gg" Nothing (SApp (SVar "g") (SVar "g"))) Nil))
+  second <- H.right (Inference.compileLoweredGroup "Uses" ((:) (Separate.objectInterface first) []) [] ((:) ((,,) "integer" Nothing (SApp (SVar "identity") (SIntLit 42))) ((:) ((,,) "boolean" Nothing (SApp (SVar "identity") (SBoolLit true))) [])))
+  H.assert (T.alphaEq (scheme "integer" second) (XCon "Int" []) && T.alphaEq (scheme "boolean" second) (XCon "Bool" [])) "cross-group polymorphic uses shared a monomorphic instance"
+  let chooseSignature = Just (SAnnotation [] (SForall Flexible "a" SBottom (SArrow (STVar "a") (SArrow (STVar "a") (STVar "a")))))
+  choose <- H.right (Inference.compileLoweredGroup "Choose" [] [] ((:) ((,,) "choose" chooseSignature (SLam "x" Nothing (SLam "y" Nothing (SVar "x")))) []))
+  bounded <- H.right (Inference.compileLoweredGroup "Bounded" ((:) (Separate.objectInterface first) ((:) (Separate.objectInterface choose) [])) [] ((:) ((,,) "g" Nothing (SApp (SVar "choose") (SVar "identity"))) []))
+  applied <- H.right (Inference.compileLoweredGroup "Impredicative" ((:) (Separate.objectInterface bounded) []) [] ((:) ((,,) "gg" Nothing (SApp (SVar "g") (SVar "g"))) []))
   let expected = XForall (XTyVar 1) identityType (XArrow (XVar (XTyVar 1)) (XVar (XTyVar 1)))
   H.assert (T.alphaEq (scheme "g" bounded) expected && T.alphaEq (scheme "gg" applied) expected) "cross-group g g lost its principal first-class polymorphic bound"
 recursiveInference = do
-  let signature = Just (SAnnotation Nil (SForall Flexible "a" SBottom (SArrow (STVar "a") (STVar "a"))))
-  let members = Cons (Triple "f" signature (SLam "x" Nothing (SApp (SVar "g") (SVar "x")))) (Cons (Triple "g" signature (SLam "x" Nothing (SApp (SVar "f") (SVar "x")))) Nil)
-  object <- H.right (Inference.compileLoweredGroup "Recursive" Nil Nil members)
+  let signature = Just (SAnnotation [] (SForall Flexible "a" SBottom (SArrow (STVar "a") (STVar "a"))))
+  let members = (:) ((,,) "f" signature (SLam "x" Nothing (SApp (SVar "g") (SVar "x")))) ((:) ((,,) "g" signature (SLam "x" Nothing (SApp (SVar "f") (SVar "x")))) [])
+  object <- H.right (Inference.compileLoweredGroup "Recursive" [] [] members)
   H.assert (length (Separate.unitBindings (Separate.objectInterface object)) == 2 && T.alphaEq (scheme "f" object) identityType && T.alphaEq (scheme "g" object) identityType) "signed recursive schemes changed across a group boundary"
-  let unsigned = map (\(Triple n _ body) -> Triple n Nothing body) members
-  H.assert (case Inference.compileLoweredGroup "Unsigned" Nil Nil unsigned of {Left message -> H.contains "requires an explicit closed signature" message; Right _ -> false}) "unsupported unsigned recursion escaped its documented diagnostic"
+  let unsigned = map (\((,,) n _ body) -> (,,) n Nothing body) members
+  H.assert (case Inference.compileLoweredGroup "Unsigned" [] [] unsigned of {Left message -> H.contains "requires an explicit closed signature" message; Right _ -> false}) "unsupported unsigned recursion escaped its documented diagnostic"
 openEnvironment = do
-  let imported = Separate.UnitInterface "Open" Nil Nil Nil Nil Nil (Cons (Pair "input" (XVar (XTyVar 0))) Nil) "parameters"
-  H.assert (case Inference.compileLoweredGroup "UseOpen" (Cons imported Nil) Nil (Cons (Triple "f" Nothing (SVar "input")) Nil) of {Left message -> H.contains "open type" message; Right _ -> false}) "query generalized an open imported type variable"
+  let imported = Separate.UnitInterface "Open" [] [] [] [] [] ((:) ((,) "input" (XVar (XTyVar 0))) []) "parameters"
+  H.assert (case Inference.compileLoweredGroup "UseOpen" ((:) imported []) [] ((:) ((,,) "f" Nothing (SVar "input")) []) of {Left message -> H.contains "open type" message; Right _ -> false}) "query generalized an open imported type variable"
 
 cacheNoop = do
   directory <- scratch "noop"
@@ -87,90 +87,90 @@ cacheNoop = do
   _ <- H.right replaced
   contents <- readFile (nested ++ "/entry")
   H.assert (eqString contents "replacement λ\n") "atomic query cache publication did not replace exact bytes"
-  Pair original first <- query "Cache" directory Nil (values "x" false)
+  (,) original first <- query "Cache" directory [] (values "x" false)
   counts 3 0 first
-  Pair same second <- query "Cache" directory Nil (values "x" false)
+  (,) same second <- query "Cache" directory [] (values "x" false)
   counts 0 3 second
   H.assert (equivalent original same) "cache reuse changed checked erasure"
   mapM_ (\object -> H.assert (case object of {Separate.CheckedUnitObject _ _ -> true; _ -> false}) "query discarded its opaque checked result") (append original same)
   writeFile (directory ++ "/" ++ head (Query.queryKeys second) ++ ".mlfq") "corrupt"
-  Pair recovered third <- query "Cache" directory Nil (values "x" false)
+  (,) recovered third <- query "Cache" directory [] (values "x" false)
   counts 1 2 third
   H.assert (equivalent original recovered) "corrupt cache recovery changed the compiled program"
 cacheImplementation = do
   directory <- scratch "implementation"
-  Pair _ _ <- query "Cache" directory Nil (values "x" false)
-  Pair changed update <- query "Cache" directory Nil (values "y" true)
+  (,) _ _ <- query "Cache" directory [] (values "x" false)
+  (,) changed update <- query "Cache" directory [] (values "y" true)
   counts 1 2 update
-  Pair renamed alpha <- query "Cache" directory Nil (values "renamed" true)
+  (,) renamed alpha <- query "Cache" directory [] (values "renamed" true)
   counts 0 3 alpha
   H.assert (equivalent changed renamed) "lexical alpha cache reuse changed erasure"
   cleanDirectory <- scratch "implementation-clean"
-  Pair clean cleanReport <- query "Cache" cleanDirectory Nil (values "y" true)
+  (,) clean cleanReport <- query "Cache" cleanDirectory [] (values "y" true)
   counts 3 0 cleanReport
   H.assert (equivalent changed clean) "clean and incremental compilation differ"
 cacheScheme = do
   directory <- scratch "scheme"
-  Pair _ _ <- query "Cache" directory Nil (values "x" false)
-  let changed = Cons (Triple "g" Nothing (SLam "x" Nothing (SIntLit 1))) (Cons (Triple "f" Nothing (SVar "g")) (Cons (Triple "h" Nothing (SIntLit 42)) Nil))
-  Pair objects report <- query "Cache" directory Nil changed
+  (,) _ _ <- query "Cache" directory [] (values "x" false)
+  let changed = (:) ((,,) "g" Nothing (SLam "x" Nothing (SIntLit 1))) ((:) ((,,) "f" Nothing (SVar "g")) ((:) ((,,) "h" Nothing (SIntLit 42)) []))
+  (,) objects report <- query "Cache" directory [] changed
   counts 2 1 report
   H.assert (case find (\object -> any (\entry -> eqString (fst entry) "f") (Separate.unitBindings (Separate.objectInterface object))) objects of {Just object -> not (T.alphaEq (scheme "f" object) identityType); Nothing -> false}) "consumer retained an obsolete polymorphic scheme"
 cacheTypes = do
   directory <- scratch "types"
-  Pair _ _ <- query "Cache" directory Nil (values "x" false)
-  let unused = DataDecl "Unused" Nil (Cons (ConstructorDecl "UnusedValue" (Cons (Applied "Bool" Nil) Nil)) Nil)
-  Pair _ unaffected <- query "Cache" directory (Cons unused Nil) (values "x" false)
+  (,) _ _ <- query "Cache" directory [] (values "x" false)
+  let unused = DataDecl "Unused" [] ((:) (ConstructorDecl "UnusedValue" ((:) (Applied "Bool" []) [])) [])
+  (,) _ unaffected <- query "Cache" directory ((:) unused []) (values "x" false)
   counts 0 3 unaffected
-  let boxInt = DataDecl "Box" Nil (Cons (ConstructorDecl "MakeBox" (Cons (Applied "Int" Nil) Nil)) Nil)
-  let boxBool = DataDecl "Box" Nil (Cons (ConstructorDecl "MakeBox" (Cons (Applied "Bool" Nil) Nil)) Nil)
-  let boxed = Cons (Triple "boxed" Nothing (SApp (SConstructor "MakeBox") (SIntLit 1))) Nil
-  Pair _ _ <- query "BoxCache" (directory ++ "/box") (Cons boxInt Nil) boxed
-  invalidated <- Query.compileGroups "BoxCache" (directory ++ "/box") Nil (Cons boxBool Nil) boxed
+  let boxInt = DataDecl "Box" [] ((:) (ConstructorDecl "MakeBox" ((:) (Applied "Int" []) [])) [])
+  let boxBool = DataDecl "Box" [] ((:) (ConstructorDecl "MakeBox" ((:) (Applied "Bool" []) [])) [])
+  let boxed = (:) ((,,) "boxed" Nothing (SApp (SConstructor "MakeBox") (SIntLit 1))) []
+  (,) _ _ <- query "BoxCache" (directory ++ "/box") ((:) boxInt []) boxed
+  invalidated <- Query.compileGroups "BoxCache" (directory ++ "/box") [] ((:) boxBool []) boxed
   H.assert (case invalidated of {Left _ -> true; Right _ -> false}) "changed constructor fields incorrectly reused inference"
-  needed <- H.right (Query.requiredData (Cons boxInt Nil) (Cons (Triple "f" Nothing (SVar "imported")) Nil) (Cons (Pair "imported" (XArrow (XCon "Box" Nil) (XCon "Int" Nil))) Nil))
-  H.assert (eqList eqString (map D.datatypeName needed) (Cons "Box" Nil)) "external schemes did not contribute nominal datatype dependencies"
+  needed <- H.right (Query.requiredData ((:) boxInt []) ((:) ((,,) "f" Nothing (SVar "imported")) []) ((:) ((,) "imported" (XArrow (XCon "Box" []) (XCon "Int" []))) []))
+  H.assert (eqList eqString (map D.datatypeName needed) ((:) "Box" [])) "external schemes did not contribute nominal datatype dependencies"
 
 classCandidates = do
   directory <- scratch "classes"
-  let klass = SClassDecl "C" (Cons (Pair "a" Star) Nil) Nil (Cons (Pair "methodC" (SArrow (STVar "a") (SCon "Int" Nil))) Nil)
-  let intInstance = SInstanceDecl Nil Nil "C" (Cons (SCon "Int" Nil) Nil) (Cons (Pair "methodC" (SLam "x" Nothing (SVar "x"))) Nil)
-  let boolInstance = SInstanceDecl Nil Nil "C" (Cons (SCon "Bool" Nil) Nil) (Cons (Pair "methodC" (SLam "x" Nothing (SIntLit 1))) Nil)
-  let members = Cons (Triple "signedAnswer" (Just (SAnnotation Nil (SCon "Int" Nil))) (SApp (SVar "methodC") (SIntLit 42))) Nil
-  let oldScope = IntSet (M.singleton 0 Unit)
-  let newScope = IntSet (M.fromList compareInt (Cons (Pair 0 Unit) (Cons (Pair 1 Unit) Nil)))
-  before <- H.right (Inference.lowerDeclarations Nil (Cons klass Nil) (Cons (Pair "instanceCInt" intInstance) Nil) (M.singleton "signedAnswer" oldScope) (Cons oldScope Nil) members)
-  after <- H.right (Inference.lowerDeclarations Nil (Cons klass Nil) (Cons (Pair "instanceCInt" intInstance) (Cons (Pair "instanceCBool" boolInstance) Nil)) (M.singleton "signedAnswer" newScope) (Cons newScope (Cons newScope Nil)) members)
-  Pair _ _ <- query "ClassCache" directory (Inference.loweredData before) (Inference.loweredValues before)
-  Pair _ report <- query "ClassCache" directory (Inference.loweredData after) (Inference.loweredValues after)
+  let klass = SClassDecl "C" ((:) ((,) "a" Star) []) [] ((:) ((,) "methodC" (SArrow (STVar "a") (SCon "Int" []))) [])
+  let intInstance = SInstanceDecl [] [] "C" ((:) (SCon "Int" []) []) ((:) ((,) "methodC" (SLam "x" Nothing (SVar "x"))) [])
+  let boolInstance = SInstanceDecl [] [] "C" ((:) (SCon "Bool" []) []) ((:) ((,) "methodC" (SLam "x" Nothing (SIntLit 1))) [])
+  let members = (:) ((,,) "signedAnswer" (Just (SAnnotation [] (SCon "Int" []))) (SApp (SVar "methodC") (SIntLit 42))) []
+  let oldScope = IntSet (M.singleton 0 ())
+  let newScope = IntSet (M.fromList compareInt ((:) ((,) 0 ()) ((:) ((,) 1 ()) [])))
+  before <- H.right (Inference.lowerDeclarations [] ((:) klass []) ((:) ((,) "instanceCInt" intInstance) []) (M.singleton "signedAnswer" oldScope) ((:) oldScope []) members)
+  after <- H.right (Inference.lowerDeclarations [] ((:) klass []) ((:) ((,) "instanceCInt" intInstance) ((:) ((,) "instanceCBool" boolInstance) [])) (M.singleton "signedAnswer" newScope) ((:) newScope ((:) newScope [])) members)
+  (,) _ _ <- query "ClassCache" directory (Inference.loweredData before) (Inference.loweredValues before)
+  (,) _ report <- query "ClassCache" directory (Inference.loweredData after) (Inference.loweredValues after)
   counts 2 2 report
 canonicalKeys = do
-  let first = Triple "evidence" Nothing (SLam "givenDictionary1" Nothing (SWanted "Dict_C" (Cons (Pair GivenEvidence "givenDictionary1") Nil)))
-  let renamed = Triple "evidence" Nothing (SLam "givenDictionary99" Nothing (SWanted "Dict_C" (Cons (Pair GivenEvidence "givenDictionary99") Nil)))
-  H.assert (eqString (Query.queryKey "Alpha" "compiler" (Cons first Nil) Nil Nil) (Query.queryKey "Alpha" "compiler" (Cons renamed Nil) Nil Nil)) "given evidence names leaked into query identity"
+  let first = (,,) "evidence" Nothing (SLam "givenDictionary1" Nothing (SWanted "Dict_C" ((:) ((,) GivenEvidence "givenDictionary1") [])))
+  let renamed = (,,) "evidence" Nothing (SLam "givenDictionary99" Nothing (SWanted "Dict_C" ((:) ((,) GivenEvidence "givenDictionary99") [])))
+  H.assert (eqString (Query.queryKey "Alpha" "compiler" ((:) first []) [] []) (Query.queryKey "Alpha" "compiler" ((:) renamed []) [] [])) "given evidence names leaked into query identity"
   H.assert (not (eqString (Query.encodeType (SForall Flexible "a" SBottom (STVar "a"))) (Query.encodeType (SForall Rigid "a" SBottom (STVar "a"))))) "query encoding lost the quantifier flag"
-  H.assert (eqString (Query.encodeBinding (Pair "x" (XCon "List" (Cons (XCon "Int" Nil) Nil)))) (Query.encodeBinding (Pair "x" (XApply (XCon "List" Nil) (XCon "Int" Nil))))) "equivalent type applications invalidate semantic query inputs"
+  H.assert (eqString (Query.encodeBinding ((,) "x" (XCon "List" ((:) (XCon "Int" []) [])))) (Query.encodeBinding ((,) "x" (XApply (XCon "List" []) (XCon "Int" []))))) "equivalent type applications invalidate semantic query inputs"
 cacheBoundary = do
-  object <- H.right (Inference.compileLoweredGroup "CacheBoundary" Nil Nil (Cons (Triple "identity" Nothing (SLam "x" Nothing (SVar "x"))) Nil))
+  object <- H.right (Inference.compileLoweredGroup "CacheBoundary" [] [] ((:) ((,,) "identity" Nothing (SLam "x" Nothing (SVar "x"))) []))
   let original = Separate.objectInterface object
-  let forged = Separate.UnitInterface "CacheBoundary" Nil Nil Nil Nil Nil (Cons (Pair "identity" (XCon "Int" Nil)) Nil) (Separate.unitObjectFingerprint original)
+  let forged = Separate.UnitInterface "CacheBoundary" [] [] [] [] [] ((:) ((,) "identity" (XCon "Int" [])) []) (Separate.unitObjectFingerprint original)
   proof <- H.right (Separate.objectChecked object)
-  H.reject (Query.validateCached "CacheBoundary" Nil Nil (Cons "identity" Nil) (Separate.CheckedUnitObject forged proof))
+  H.reject (Query.validateCached "CacheBoundary" [] [] ((:) "identity" []) (Separate.CheckedUnitObject forged proof))
   let encoded = Query.encodeCached "key" (Separate.UnitObject forged (Separate.objectTerm object))
-  H.assert (case Query.decodeCached "key" "CacheBoundary" Nil Nil (Cons "identity" Nil) encoded of {Left _ -> true; Right _ -> false}) "cache trusted interface schemes without independently checking the body"
+  H.assert (case Query.decodeCached "key" "CacheBoundary" [] [] ((:) "identity" []) encoded of {Left _ -> true; Right _ -> false}) "cache trusted interface schemes without independently checking the body"
 
-crateQueryTests : List (Pair String (IO Unit))
-crateQueryTests = Cons (Pair "declaration SCC order and inventory permutation" orderedSCC)
-  (Cons (Pair "recursive SCC excludes unrelated declarations" mutualSCC)
-  (Cons (Pair "indexed SCC traversal handles 2000 declarations" largeSCC)
-  (Cons (Pair "term, type, class and constructor observations remain distinct" observations)
-  (Cons (Pair "checked group inference preserves principal polymorphism" principalInference)
-  (Cons (Pair "closed-signature recursion remains checked across groups" recursiveInference)
-  (Cons (Pair "inference rejects an open imported environment" openEnvironment)
-  (Cons (Pair "persistent no-op reuse and corrupt-cache recovery" cacheNoop)
-  (Cons (Pair "implementation edits preserve consumer caches and clean equivalence" cacheImplementation)
-  (Cons (Pair "changed schemes invalidate actual consumers" cacheScheme)
-  (Cons (Pair "datatype closure invalidates relevant changes only" cacheTypes)
-  (Cons (Pair "instance candidate visibility participates in query keys" classCandidates)
-  (Cons (Pair "query encodings preserve semantics and normalize lexical names" canonicalKeys)
-  (Cons (Pair "cache schemes are checked against stored implementations" cacheBoundary) Nil)))))))))))))
+crateQueryTests : [] ((,) String (IO ()))
+crateQueryTests = (:) ((,) "declaration SCC order and inventory permutation" orderedSCC)
+  ((:) ((,) "recursive SCC excludes unrelated declarations" mutualSCC)
+  ((:) ((,) "indexed SCC traversal handles 2000 declarations" largeSCC)
+  ((:) ((,) "term, type, class and constructor observations remain distinct" observations)
+  ((:) ((,) "checked group inference preserves principal polymorphism" principalInference)
+  ((:) ((,) "closed-signature recursion remains checked across groups" recursiveInference)
+  ((:) ((,) "inference rejects an open imported environment" openEnvironment)
+  ((:) ((,) "persistent no-op reuse and corrupt-cache recovery" cacheNoop)
+  ((:) ((,) "implementation edits preserve consumer caches and clean equivalence" cacheImplementation)
+  ((:) ((,) "changed schemes invalidate actual consumers" cacheScheme)
+  ((:) ((,) "datatype closure invalidates relevant changes only" cacheTypes)
+  ((:) ((,) "instance candidate visibility participates in query keys" classCandidates)
+  ((:) ((,) "query encodings preserve semantics and normalize lexical names" canonicalKeys)
+  ((:) ((,) "cache schemes are checked against stored implementations" cacheBoundary) [])))))))))))))

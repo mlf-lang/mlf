@@ -1,0 +1,13 @@
+[1 of 6] Compiling MLF.Host.Base    ( host/ghc/MLF/Host/Base.hs, /workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T211159Z/filesystem-O0/MLF/Host/Base.o )
+[2 of 6] Compiling MLF.Host.Async   ( host/ghc/MLF/Host/Async.hs, /workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T211159Z/filesystem-O0/MLF/Host/Async.o )
+[3 of 6] Compiling MLF.Host.IO      ( host/ghc/MLF/Host/IO.hs, /workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T211159Z/filesystem-O0/MLF/Host/IO.o )
+host/ghc/MLF/Host/IO.hs:128:82: warning: [GHC-68441] [-Wdeprecations]
+    In the use of ‘hGetLine’ (imported from Data.ByteString):
+    Deprecated: "Deprecated since @bytestring-0.12@. Use 'Data.ByteString.Char8.hGetLine' instead. (Functions that rely on ASCII encodings belong in "Data.ByteString.Char8")"
+    |
+128 |   if end then throwIO (HostError "IO error: getLine reached EOF or failed") else B.hGetLine H.stdin >>= evaluate . fromUtf8
+    |                                                                                  ^^^^^^^^^^
+
+[4 of 6] Compiling MLF.Primitive    ( host/ghc/MLF/Primitive.hs, /workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T211159Z/filesystem-O0/MLF/Primitive.o )
+[5 of 6] Compiling Main             ( /workspace/shared/mlf-shared-source-migration/tests/shared-host/FilesystemProbe.hs, /workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T211159Z/filesystem-O0/Main.o )
+[6 of 6] Linking /workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T211159Z/filesystem-O0/probe

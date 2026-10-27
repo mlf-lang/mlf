@@ -1,0 +1,10 @@
+[
+  "MLF-CRATE-1",
+  "mlf-llvm/0.3.0/library",
+  "",
+  "false",
+  "102:14:Bootstrap.LLVM82:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-llvm/Bootstrap/LLVM.hs120:23:Bootstrap.LLVM.Analysis91:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-llvm/Bootstrap/LLVM/Analysis.hs114:20:Bootstrap.LLVM.Build88:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-llvm/Bootstrap/LLVM/Build.hs118:22:Bootstrap.LLVM.Codegen90:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs116:21:Bootstrap.LLVM.Kernel89:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-llvm/Bootstrap/LLVM/Kernel.hs116:21:Bootstrap.LLVM.Native89:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-llvm/Bootstrap/LLVM/Native.hs120:23:Bootstrap.LLVM.Optimize91:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs128:27:Bootstrap.LLVM.StrictFields95:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-llvm/Bootstrap/LLVM/StrictFields.hs132:29:Bootstrap.LLVM.StrictWrappers97:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-llvm/Bootstrap/LLVM/StrictWrappers.hs",
+  "118:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/artifact/unit.mlfci108:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-language-core-crate-O2/artifact/unit.mlfci101:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/xmlf/artifact/unit.mlfci",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/llvm/queries",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/builtin/unit"
+]

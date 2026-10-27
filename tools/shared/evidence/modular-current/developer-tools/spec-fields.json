@@ -1,0 +1,10 @@
+[
+  "MLF-CRATE-1",
+  "mlf-developer-tools/0.3.0/library",
+  "",
+  "false",
+  "119:17:Package.Benchmark96:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-developer-tools/Package/Benchmark.hs125:20:Package.Verification99:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-developer-tools/Package/Verification.hs",
+  "118:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/artifact/unit.mlfci109:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/package-core/artifact/unit.mlfci",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/developer-tools/queries",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/builtin/unit"
+]

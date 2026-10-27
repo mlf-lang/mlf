@@ -1,5 +1,8 @@
 module Test.Evidence where
-import Bootstrap.Types
+-- Guest syntax explicitly selects the shared standard Monad used by Bootstrap.Std.
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
+import Bootstrap.Types hiding (Binding)
 import qualified Bootstrap.Std as S
 import qualified Test.Descriptor as D
 import qualified Test.Expectation as E
@@ -8,16 +11,16 @@ import qualified Test.Registry as R
 
 -- Digests are supplied by the trusted adapter, not inferred from a success line.
 -- source includes dirty-tree content; tools/config include native inputs/flags.
-data Binding = Binding String String (List (Pair String String))
+data Binding = Binding String String ([] ((,) String String))
 data CoverageIntent = FullQualification | SelectedCoverage
-data PlanContract = PlanContract Binding (List D.Descriptor) (List String) CoverageIntent
+data PlanContract = PlanContract Binding ([] D.Descriptor) ([] String) CoverageIntent
 data Event = Started String | Finished String E.Observation
 data Cleanup = CleanupPending | CleanupSucceeded | CleanupFailed String
 -- The final digest must be computed by reading the referenced bytes at validation.
 -- This pure contract does not perform IO or claim to authenticate files itself.
 data RawEvidence = RawEvidence String String String
-data Receipt = Receipt Int Binding (List Event) (List RawEvidence) Cleanup Bool
-data Assessment = Assessment Bool Bool Bool Bool (List (Pair String O.Outcome))
+data Receipt = Receipt Int Binding ([] Event) ([] RawEvidence) Cleanup Bool
+data Assessment = Assessment Bool Bool Bool Bool ([] ((,) String O.Outcome))
 complete (Assessment value _ _ _ _) = value
 passed (Assessment _ value _ _ _) = value
 full (Assessment _ _ value _ _) = value
@@ -26,8 +29,8 @@ outcomes (Assessment _ _ _ _ value) = value
 runId (Binding value _ _) = value
 attemptId (Binding _ value _) = value
 identities (Binding _ _ value) = value
-identityKeys = Cons "catalog" (Cons "plan" (Cons "source" (Cons "tools" (Cons "config"
- (Cons "manifest" (Cons "lock" (Cons "runtime" (Cons "dependencies" (Cons "platform" Nil)))))))))
+identityKeys = (:) "catalog" ((:) "plan" ((:) "source" ((:) "tools" ((:) "config"
+ ((:) "manifest" ((:) "lock" ((:) "runtime" ((:) "dependencies" ((:) "platform" [])))))))))
 validateBinding binding = do
  R.ensure (stringLength (runId binding) > 0 && stringLength (attemptId binding) > 0) "missing run or attempt identity"
  R.exactInventory identityKeys (S.map S.fst (identities binding))
@@ -36,34 +39,35 @@ sameBinding expected actual = do
  validateBinding expected
  validateBinding actual
  R.ensure (eqString (runId expected) (runId actual) && eqString (attemptId expected) (attemptId actual)) "stale run or attempt receipt"
- R.ensure (S.all (\(Pair key value) -> S.any (\(Pair actualKey actualValue) -> eqString key actualKey && eqString value actualValue)
+ R.ensure (S.all (\((,) key value) -> S.any (\((,) actualKey actualValue) -> eqString key actualKey && eqString value actualValue)
   (identities actual)) (identities expected)) "stale source/tool/config/catalog/plan receipt"
 validateRaw (RawEvidence path recorded actual) =
  R.ensure (stringLength path > 0 && stringLength recorded > 0 && eqString recorded actual) "missing or corrupt raw evidence"
 rawPath (RawEvidence path _ _) = path
-exactInventory : List String -> List String -> Either String Unit
+exactInventory : [] String -> [] String -> Either String ()
 exactInventory = R.exactInventory
 
 -- Starts and terminals are paired per ID. Independent cases may interleave,
 -- but no terminal can precede its start or repeat an already terminal ID.
-collect : List String -> List Event -> List String -> List String -> List (Pair String E.Observation) -> Either String (List (Pair String E.Observation))
+collect : [] String -> [] Event -> [] String -> [] String -> [] ((,) String E.Observation) -> Either String ([] ((,) String E.Observation))
 collect selected events started active terminal = case events of
- Nil -> Right (S.reverse terminal)
- Cons event rest -> case event of
+ [] -> Right (S.reverse terminal)
+ (:) event rest -> case event of
   Started identity -> do
    R.ensure (S.elem eqString identity selected) "unknown started test ID"
    R.ensure (S.not (S.elem eqString identity started)) "duplicate test start"
-   collect selected rest (Cons identity started) (Cons identity active) terminal
+   collect selected rest ((:) identity started) ((:) identity active) terminal
   Finished identity observation -> do
    R.ensure (S.elem eqString identity active) "unknown, duplicate or out-of-order terminal event"
-   collect selected rest started (S.filter (\value -> S.not (eqString value identity)) active) (Cons (Pair identity observation) terminal)
+   collect selected rest started (S.filter (\value -> S.not (eqString value identity)) active) ((:) ((,) identity observation) terminal)
+lookupDescriptor : String -> [] D.Descriptor -> Either String D.Descriptor
 lookupDescriptor identity entries = case entries of
- Nil -> Left "terminal has no registered descriptor"
- Cons entry rest -> if eqString identity (D.id entry) then Right entry else lookupDescriptor identity rest
-judge entries (Pair identity observation) = do
+ [] -> Left "terminal has no registered descriptor"
+ (:) entry rest -> if eqString identity (D.id entry) then Right entry else lookupDescriptor identity rest
+judge entries ((,) identity observation) = do
  entry <- lookupDescriptor identity entries
- Right (Pair identity (E.match (D.expectation entry) observation))
-accepted entries (Pair identity outcome) = do
+ Right ((,) identity (E.match (D.expectation entry) observation))
+accepted entries ((,) identity outcome) = do
  entry <- lookupDescriptor identity entries
  Right (if O.successful outcome then true else if D.required entry then false else case outcome of
   O.Unsupported reason -> stringLength reason > 0
@@ -81,16 +85,16 @@ assess (PlanContract expected universe selected intent) (Receipt version actual 
  R.ensure (R.unique (S.map rawPath raw)) "duplicate raw evidence path"
  case cleanup of
   CleanupFailed reason -> R.ensure (stringLength reason > 0) "cleanup failure requires a reason"
-  _ -> Right Unit
- terminal <- collect selected events Nil Nil Nil
+  _ -> Right ()
+ terminal <- collect selected events [] [] []
  let observed = S.map S.fst terminal
- let exact = case R.exactInventory selected observed of { Right Unit -> true; Left _ -> false }
+ let exact = case R.exactInventory selected observed of { Right () -> true; Left _ -> false }
  R.ensure (if sealed then exact && cleanupFinished cleanup else true) "sealed receipt is missing terminals or cleanup"
  judged <- S.mapM (judge entries) terminal
  acceptedRows <- S.mapM (accepted entries) judged
  let finished = sealed && exact && cleanupFinished cleanup
  let success = finished && cleanupPassed cleanup && S.all (\value -> value) acceptedRows
- let wholeSelection = case R.exactInventory (S.map D.id universe) selected of { Right Unit -> true; Left _ -> false }
+ let wholeSelection = case R.exactInventory (S.map D.id universe) selected of { Right () -> true; Left _ -> false }
  let logical = S.all (\entry -> S.not (S.elem eqString "logical-scope:partial" (D.tags entry))) entries
  let intended = case intent of { FullQualification -> true; SelectedCoverage -> false }
  let entire = wholeSelection && logical && intended

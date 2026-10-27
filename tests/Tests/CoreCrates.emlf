@@ -7,12 +7,12 @@ import Tests.CrateQueries (crateQueryTests)
 import qualified Tests.StrictWrappers as StrictWrappers
 import qualified Tests.CheckedEmission as CheckedEmission
 
-families : List (Pair String (List (Pair String (IO Unit))))
+families : [] ((,) String ([] ((,) String (IO ()))))
 families =
- Cons (Pair "core/optimizer-uses" OptimizerUses.suite)
- (Cons (Pair "core/crate-codegen" CrateCodegen.suite)
- (Cons (Pair "core/declaration-queries" (S.take 7 crateQueryTests))
- (Cons (Pair "core/incremental-crate-cache" (S.drop 7 crateQueryTests))
- (Cons (Pair "core/strict-wrappers" StrictWrappers.suite)
- (Cons (Pair "core/checked-emission" CheckedEmission.suite)
- Nil)))))
+ (:) ((,) "core/optimizer-uses" OptimizerUses.suite)
+ ((:) ((,) "core/crate-codegen" CrateCodegen.suite)
+ ((:) ((,) "core/declaration-queries" (S.take 7 crateQueryTests))
+ ((:) ((,) "core/incremental-crate-cache" (S.drop 7 crateQueryTests))
+ ((:) ((,) "core/strict-wrappers" StrictWrappers.suite)
+ ((:) ((,) "core/checked-emission" CheckedEmission.suite)
+ [])))))

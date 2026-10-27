@@ -1,0 +1,834 @@
+{
+  "command": [
+    "bash",
+    "/tmp/mlf-shared-frontend-evidence/final-o0-frontend/command.sh"
+  ],
+  "complete": true,
+  "limits": {
+    "address_space_per_process": 1073741824,
+    "group_rss_watchdog": 1073741824,
+    "host_available_floor": 3221225472,
+    "wall_seconds": 120
+  },
+  "samples": [
+    {
+      "seconds": 0.0018200409976998344,
+      "rss": 544768,
+      "host_available": 6224646144,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 544768
+        }
+      ]
+    },
+    {
+      "seconds": 0.05243879000045126,
+      "rss": 8949760,
+      "host_available": 6222741504,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 8949760
+        }
+      ]
+    },
+    {
+      "seconds": 0.10301893200085033,
+      "rss": 8949760,
+      "host_available": 6222741504,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 8949760
+        }
+      ]
+    },
+    {
+      "seconds": 0.1536548069998389,
+      "rss": 9285632,
+      "host_available": 6222041088,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 9285632
+        }
+      ]
+    },
+    {
+      "seconds": 0.20420421099697705,
+      "rss": 9285632,
+      "host_available": 6222041088,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 9285632
+        }
+      ]
+    },
+    {
+      "seconds": 0.2547369309977512,
+      "rss": 9465856,
+      "host_available": 6222041088,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 9465856
+        }
+      ]
+    },
+    {
+      "seconds": 0.30525438799668336,
+      "rss": 9465856,
+      "host_available": 6222106624,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 9465856
+        }
+      ]
+    },
+    {
+      "seconds": 0.355926226999145,
+      "rss": 9912320,
+      "host_available": 6221172736,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 9912320
+        }
+      ]
+    },
+    {
+      "seconds": 0.40647425899805967,
+      "rss": 9932800,
+      "host_available": 6221172736,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 9932800
+        }
+      ]
+    },
+    {
+      "seconds": 0.45716994399845134,
+      "rss": 9998336,
+      "host_available": 6221172736,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 9998336
+        }
+      ]
+    },
+    {
+      "seconds": 0.5078499259980163,
+      "rss": 10174464,
+      "host_available": 6221172736,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10174464
+        }
+      ]
+    },
+    {
+      "seconds": 0.558429555996554,
+      "rss": 10174464,
+      "host_available": 6221172736,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10174464
+        }
+      ]
+    },
+    {
+      "seconds": 0.6090023959986866,
+      "rss": 10436608,
+      "host_available": 6221172736,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10436608
+        }
+      ]
+    },
+    {
+      "seconds": 0.6595754559966736,
+      "rss": 10547200,
+      "host_available": 6221172736,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10547200
+        }
+      ]
+    },
+    {
+      "seconds": 0.7103027289995225,
+      "rss": 10715136,
+      "host_available": 6221172736,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 0.7608039810002083,
+      "rss": 10715136,
+      "host_available": 6221172736,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 0.8113844030012842,
+      "rss": 10715136,
+      "host_available": 6221172736,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 0.8622402089968091,
+      "rss": 10715136,
+      "host_available": 6221172736,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 0.9131477330010966,
+      "rss": 10715136,
+      "host_available": 6221172736,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 0.9638277949998155,
+      "rss": 10715136,
+      "host_available": 6221172736,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 1.0145157469960395,
+      "rss": 10715136,
+      "host_available": 6221172736,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 1.065164152001671,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 1.1156782139951247,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 1.1662420499997097,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 1.2168344390011043,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 1.2673761019977974,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 1.3179036639994592,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 1.368574952997733,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 1.4191026439948473,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 1.4696347630015225,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 1.5201976979951723,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 1.5707578389992705,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 1.6214066039974568,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 1.6720007449985133,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 1.7225926050014095,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 1.7732207469962304,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 1.8238302530007786,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 1.8744241449967376,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 1.9251207209963468,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 1.9760748260014225,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 2.026992444996722,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 2.077885136997793,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 2.128510615999403,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 2.1790076210018015,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 2.2295262799962074,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 2.2800175070005935,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 2.3305547339987243,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 2.38122393899539,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 2.4318591830015066,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 2.482519699995464,
+      "rss": 10715136,
+      "host_available": 6221000704,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 2.533127422997495,
+      "rss": 10715136,
+      "host_available": 6235242496,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 2.5837228769960348,
+      "rss": 10715136,
+      "host_available": 6235242496,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 2.63443403999554,
+      "rss": 10715136,
+      "host_available": 6235242496,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 2.6850612869966426,
+      "rss": 10715136,
+      "host_available": 6235242496,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 2.735645984997973,
+      "rss": 10715136,
+      "host_available": 6235242496,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 2.7861908420018153,
+      "rss": 10715136,
+      "host_available": 6235242496,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 2.83669946599548,
+      "rss": 10715136,
+      "host_available": 6235242496,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 2.887451124996005,
+      "rss": 10715136,
+      "host_available": 6235242496,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 2.937962862997665,
+      "rss": 10715136,
+      "host_available": 6235242496,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 2.988517967001826,
+      "rss": 10715136,
+      "host_available": 6238265344,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 3.039041427000484,
+      "rss": 10715136,
+      "host_available": 6238265344,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 3.0895705859948066,
+      "rss": 10715136,
+      "host_available": 6238265344,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 3.140056190000905,
+      "rss": 10715136,
+      "host_available": 6225178624,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 3.190627752999717,
+      "rss": 10715136,
+      "host_available": 6287724544,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 3.2411962670012144,
+      "rss": 10715136,
+      "host_available": 6287454208,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 3.2916818049998255,
+      "rss": 10715136,
+      "host_available": 6287454208,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 3.3422123009950155,
+      "rss": 10715136,
+      "host_available": 6287454208,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 3.392744530996424,
+      "rss": 10715136,
+      "host_available": 6287454208,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 3.4432765289966483,
+      "rss": 10715136,
+      "host_available": 6287454208,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 3.493765972998517,
+      "rss": 10715136,
+      "host_available": 6287454208,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 3.544268382000155,
+      "rss": 10715136,
+      "host_available": 6287454208,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 3.594779569997627,
+      "rss": 10715136,
+      "host_available": 6287454208,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 3.645352430001367,
+      "rss": 10715136,
+      "host_available": 6287454208,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    },
+    {
+      "seconds": 3.696104413997091,
+      "rss": 10715136,
+      "host_available": 6287454208,
+      "members": [
+        {
+          "pid": 6,
+          "rss": 10715136
+        }
+      ]
+    }
+  ],
+  "process_group": 6,
+  "exit_code": 0,
+  "reason": null,
+  "elapsed": 3.7468619520004722,
+  "peak_group_rss": 10715136
+}

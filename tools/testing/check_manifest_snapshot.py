@@ -41,6 +41,79 @@ def local(root, name):
     return path
 
 
+def source_imports(text):
+    """Scan import keywords outside comments/literals, including braced layout.
+
+    This is an inventory lexer, not a replacement for either compiler parser.
+    Unsupported/malformed import heads fail closed instead of disappearing.
+    """
+    code = list(text)
+    index = 0
+    def blank(start, end):
+        for at in range(start, end):
+            if code[at] != '\n':
+                code[at] = ' '
+    while index < len(text):
+        if text.startswith('--', index):
+            end = text.find('\n', index)
+            end = len(text) if end < 0 else end
+            blank(index, end)
+            index = end
+        elif text.startswith('{-', index):
+            start, depth = index, 1
+            index += 2
+            while index < len(text) and depth:
+                if text.startswith('{-', index):
+                    depth += 1
+                    index += 2
+                elif text.startswith('-}', index):
+                    depth -= 1
+                    index += 2
+                else:
+                    index += 1
+            if depth:
+                raise ValueError('unterminated source block comment')
+            blank(start, index)
+        elif text[index] == '"':
+            start = index
+            index += 1
+            while index < len(text):
+                if text[index] == '\\':
+                    index += 2
+                elif text[index] == '"':
+                    index += 1
+                    break
+                else:
+                    index += 1
+            else:
+                raise ValueError('unterminated source string literal')
+            blank(start, min(index, len(text)))
+            code[start] = '"'  # A package-string import must not turn into spaces.
+        else:
+            index += 1
+    cleaned = ''.join(code)
+    imports = []
+    for token in re.finditer(r"(?<![\w'])import(?![\w'])", cleaned):
+        tail = cleaned[token.end():]
+        matched = re.match(r'\s+(?:qualified\s+)?([A-Z][A-Za-z0-9_\']*(?:\.[A-Z][A-Za-z0-9_\']*)*)(?=\s|[;()}]|$)', tail)
+        if not matched:
+            raise ValueError('unsupported or malformed source import')
+        imports.append(matched[1])
+    return imports
+
+
+def source_builtins(source, text):
+    # This is a conservative inventory check, not the compiler prologue parser.
+    # Shared sources explicitly opt in before code; a filename alone is not proof.
+    marker = text.splitlines()[0] if text.splitlines() else ''
+    shared = marker == '-- mlf:syntax shared-haskell-v1'
+    if Path(source).suffix == '.hs' and not shared:
+        raise ValueError(f'shared source requires explicit profile marker: {source}')
+    # Both builtins may be explicitly imported by legacy guests. This does not
+    # change their syntax profile, implicit Prelude, or reserved-source ban.
+    return {'Prelude', 'MLF.Primitive'}
+
+
 def snapshot(manifest):
     base = manifest.parent.resolve()
     done, visiting, names, rows, inputs = {}, set(), {}, [], {}
@@ -104,11 +177,14 @@ def snapshot(manifest):
             for module, source in modules.items():
                 text = local(root, source).read_text()
                 header = re.search(r'^module\s+([A-Za-z0-9_.]+)\b', text, re.M)
+                if module in {'Prelude', 'MLF.Primitive'}:
+                    raise ValueError(f'reserved builtin module supplied by source: {source}')
                 if not header or header[1] != module:
                     raise ValueError(f'module declaration mismatch: {source}')
-                imports = re.findall(r'^import\s+(?:qualified\s+)?([A-Za-z0-9_.]+)', text, re.M)
-                if not (set(imports) - {'Prelude'}) <= visible:
-                    raise ValueError(f'{name}:{module}: undeclared direct imports {sorted(set(imports) - visible - {'Prelude'})}')
+                imports = source_imports(text)
+                builtins = source_builtins(source, text)
+                if not (set(imports) - builtins) <= visible:
+                    raise ValueError(f'{name}:{module}: undeclared direct imports {sorted(set(imports) - visible - builtins)}')
         hashes = {}
         for source in sorted(sources):
             full = local(root, source)

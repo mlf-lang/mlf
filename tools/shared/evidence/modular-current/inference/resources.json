@@ -1,0 +1,29 @@
+{
+  "complete": true,
+  "command": [
+    "nice",
+    "-n",
+    "19",
+    "ionice",
+    "-c",
+    "3",
+    "python3",
+    ".mlf-build/integration-modular/inference/run.py"
+  ],
+  "limits": {
+    "wall_seconds": 900,
+    "address_space_per_process": 3221225472,
+    "process_tree_rss_bytes": 1610612736,
+    "host_available_floor": 3221225472,
+    "disk_free_floor": 805306368,
+    "max_output_bytes": 104857600
+  },
+  "process_group": 8,
+  "exit_code": 0,
+  "reason": null,
+  "elapsed_seconds": 46.16698597499999,
+  "peak_group_rss": 302526464,
+  "raw_receipt_sha256": "fd6f5e25a394893a2da52887282dba1f95dd5eb7d9bf4f89a04989bd7ca5d13d",
+  "min_host_available": 7292796928,
+  "min_disk_free": 20866453504
+}

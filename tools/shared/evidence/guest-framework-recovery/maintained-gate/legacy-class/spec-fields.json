@@ -1,0 +1,10 @@
+[
+  "MLF-CRATE-1",
+  "guest-class-control/legacy-class",
+  "",
+  "false",
+  "119:6:Legacy107:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/fixtures/Legacy.emlf",
+  "117:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/foundation/artifact/unit.mlfci",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/legacy-class/queries",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/guest-framework-gate-O2-final/foundation/builtin/unit"
+]

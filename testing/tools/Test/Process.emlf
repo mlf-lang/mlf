@@ -1,4 +1,7 @@
 module Test.Process where
+-- Select the standard Monad used by shared Either; retain legacy guest syntax.
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Package.Json as J
@@ -13,7 +16,7 @@ import qualified Test.Evidence as E
 import qualified Test.Expectation as X
 
 -- Process support is deliberately separate from the light in-process library.
-data Config = Config Int String String String (List String) (List String)
+data Config = Config Int String String String ([] String) ([] String)
 timeout (Config value _ _ _ _ _) = value
 work (Config _ value _ _ _ _) = value
 report (Config _ _ value _ _ _) = value
@@ -21,33 +24,33 @@ host (Config _ _ _ value _ _) = value
 selection (Config _ _ _ _ value _) = value
 command (Config _ _ _ _ _ value) = value
 usage = "mlf-test --work-dir DIR [--timeout SECONDS] [--host-tool FILE] [--report FILE] [--list] [--filter TEXT] [--exact ID] [--tag TAG] [--format text|json] -- EXECUTABLE [PREFIX ARGS...]"
-ensure condition message = if condition then Right Unit else Left message
+ensure condition message = if condition then Right () else Left message
 natural text = stringLength text > 0 && S.all (\i -> let c = stringCodeAt text i in c >= 48 && c <= 57) (S.range 0 (stringLength text - 1))
-parse : List String -> Either String Config
-parse args = parseWith (Config 60 "" "" "" Nil Nil) args
-parseWith : Config -> List String -> Either String Config
+parse : [] String -> Either String Config
+parse args = parseWith (Config 60 "" "" "" [] []) args
+parseWith : Config -> [] String -> Either String Config
 parseWith (Config bound directory destination helper selectors _) args = case args of
-  Cons "--" argv -> do
+  (:) "--" argv -> do
     ensure (stringLength directory > 0 && S.not (S.null argv) && stringLength (S.head argv) > 0) usage
     ignored <- R.parse selectors
     Right (Config bound directory destination helper selectors argv)
-  Cons "--list" rest -> parseWith (Config bound directory destination helper (S.snoc selectors "--list") Nil) rest
-  Cons flag (Cons value rest) -> do
+  (:) "--list" rest -> parseWith (Config bound directory destination helper (S.snoc selectors "--list") []) rest
+  (:) flag ((:) value rest) -> do
     ensure (stringLength value > 0) "empty supervisor option"
     if eqString flag "--timeout" then do
       ensure (natural value) "timeout must be a positive integer number of seconds"
       let seconds = readInt value
       ensure (seconds > 0 && seconds <= 2147483587) "timeout must be between 1 and 2147483587 seconds"
-      parseWith (Config seconds directory destination helper selectors Nil) rest
-    else if eqString flag "--work-dir" then parseWith (Config bound value destination helper selectors Nil) rest
-    else if eqString flag "--report" then parseWith (Config bound directory value helper selectors Nil) rest
-    else if eqString flag "--host-tool" then parseWith (Config bound directory destination value selectors Nil) rest
-    else if S.elem eqString flag (O.words "--filter --exact --tag --format") then parseWith (Config bound directory destination helper (S.append selectors (Cons flag (Cons value Nil))) Nil) rest
+      parseWith (Config seconds directory destination helper selectors []) rest
+    else if eqString flag "--work-dir" then parseWith (Config bound value destination helper selectors []) rest
+    else if eqString flag "--report" then parseWith (Config bound directory value helper selectors []) rest
+    else if eqString flag "--host-tool" then parseWith (Config bound directory destination value selectors []) rest
+    else if S.elem eqString flag (O.words "--filter --exact --tag --format") then parseWith (Config bound directory destination helper (S.append selectors ((:) flag ((:) value []))) []) rest
     else Left usage
   _ -> Left usage
 
 -- Validate untrusted protocol shapes before using the partial JSON accessors.
-object value = case value of { J.Object _ -> Right Unit; _ -> Left "expected JSON object" }
+object value = case value of { J.Object _ -> Right (); _ -> Left "expected JSON object" }
 field key value = do { object value; ensure (J.has key value) ("missing field: " ++ key); Right (J.get key value) }
 textField key value = do { item <- field key value; case item of { J.String text -> Right text; _ -> Left ("expected string: " ++ key) } }
 boolField key value = do { item <- field key value; case item of { J.Boolean flag -> Right flag; _ -> Left ("expected boolean: " ++ key) } }
@@ -77,14 +80,14 @@ descriptor value = do
   identity <- textField "id" value
   name <- textField "name" value
   tags <- stringsField "tags" value
-  Right (C.test identity name tags (A.succeed Unit))
+  Right (C.test identity name tags (A.succeed ()))
 sameDescriptor expected actual = eqString (C.id expected) (C.id actual) && eqString (C.name expected) (C.name actual) && S.eqList eqString (C.tags expected) (C.tags actual)
 selectionFields expectedTotal expectedSelected value = do
   total <- intField "total" value
   selected <- intField "selected" value
   scope <- textField "scope" value
   ensure (total == expectedTotal && selected == expectedSelected && eqString scope (R.scope total selected)) "incorrect inventory or selection counts"
-parseInventory : String -> Either String (List C.Case)
+parseInventory : String -> Either String ([] C.Case)
 parseInventory text = do
   rows <- parseRows text
   ensure (S.length rows == 1) "inventory must contain one event"
@@ -118,7 +121,7 @@ validateStart total entry value = do
   event "start" value
   selectionFields total 1 value
   identities <- stringsField "ids" value
-  ensure (S.eqList eqString identities (Cons (C.id entry) Nil)) "child start selected a different test"
+  ensure (S.eqList eqString identities ((:) (C.id entry) [])) "child start selected a different test"
 validateResult entry value = do
   event "case" value
   actual <- descriptor value
@@ -128,8 +131,8 @@ validateResult entry value = do
   if eqString status "failed" then do
     message <- textField "message" value
     ensure (if J.has "expected" value then J.has "actual" value else S.not (J.has "actual" value)) "incomplete expected/actual diagnostic"
-    if J.has "expected" value then do { expected <- textField "expected" value; actual <- textField "actual" value; Right Unit } else Right Unit
-    else Right Unit
+    if J.has "expected" value then do { expected <- textField "expected" value; actual <- textField "actual" value; Right () } else Right ()
+    else Right ()
   Right status
 validateChildReport : Int -> C.Case -> Int -> String -> Either String J.Json
 validateChildReport total entry code text = do
@@ -150,9 +153,9 @@ validateChildReport total entry code text = do
   ensure (code == (if success then 0 else 1)) "child report contradicts its process exit status"
   Right result
 incompleteChild total entry text = if stringLength (O.trim text) == 0 then true else case parseRows text of
-  Right (Cons start Nil) -> case validateStart total entry start of { Right Unit -> true; Left _ -> false }
+  Right ((:) start []) -> case validateStart total entry start of { Right () -> true; Left _ -> false }
   _ -> false
-outcome status message = J.Object (Cons (Pair "status" (J.str status)) (Cons (Pair "message" (J.str message)) Nil))
+outcome status message = J.Object ((:) ((,) "status" (J.str status)) ((:) ((,) "message" (J.str message)) []))
 -- Typed interpretation of the same validated v1 observations. In particular,
 -- cancellation is not a crash and neither can satisfy an expected rejection.
 classifyTyped : Int -> C.Case -> Either String J.Json -> String -> T.Outcome
@@ -189,14 +192,14 @@ classify total entry measured text =
 -- The legacy helper reaps its leader and kills the process group, but has no
 -- explicit cleanup/join event. Retain that distinction instead of inventing a
 -- successful cleanup receipt or a qualification claim from exit status alone.
-rawJson (D.Raw path digest kind) = J.Object (Cons (Pair "path" (J.str path)) (Cons (Pair "digest" (J.str digest)) (Cons (Pair "kind" (J.str kind)) Nil)))
+rawJson (D.Raw path digest kind) = J.Object ((:) ((,) "path" (J.str path)) ((:) ((,) "digest" (J.str digest)) ((:) ((,) "kind" (J.str kind)) [])))
 rawFile directory name = do
   let path = directory ++ "/" ++ name
-  exists <- fileExists path
-  if exists then do { digest <- fileDigest path; return (Just (D.Raw path digest name)) } else return Nothing
+  present <- fileExists path
+  if present then do { digest <- fileDigest path; return (Just (D.Raw path digest name)) } else return Nothing
 rawEvidence directory = do
   files <- S.mapM (rawFile directory) (O.words "stdout stderr measurement.json measurement.stderr report.jsonl")
-  return (S.concatMap (\item -> case item of { Just value -> Cons value Nil; Nothing -> Nil }) files)
+  return (S.concatMap (\item -> case item of { Just value -> (:) value []; Nothing -> [] }) files)
 
 -- A v1 observation can be indexed by the v2 envelope but cannot supply the
 -- missing input identities or cleanup proof. The caller supplies authenticated
@@ -210,7 +213,7 @@ evidenceObservation result = X.Observation T.Runtime (case result of
   T.ProtocolError message -> X.BadProtocol message
   _ -> X.Infrastructure "unsupported v1 process outcome") (T.message result) (case result of { T.Pass -> true; _ -> false })
 pendingEvidence binding entry typed raw = E.Receipt 2 binding
-  (Cons (E.Started (C.id entry)) (Cons (E.Finished (C.id entry) (evidenceObservation typed)) Nil)) raw E.CleanupPending false
+  ((:) (E.Started (C.id entry)) ((:) (E.Finished (C.id entry) (evidenceObservation typed)) [])) raw E.CleanupPending false
 
 -- Every invocation owns a fresh directory. Serialize only mktemp's shared
 -- stdout/stderr transport files, not test execution or independent invocations.
@@ -218,7 +221,7 @@ newRun directory = do
   O.mkdir directory
   base <- canonicalPath directory
   lock <- acquireFileLock (base ++ "/.allocation.lock")
-  code <- O.exec "" (Cons "mktemp" (Cons "-d" (Cons (base ++ "/run.XXXXXXXX") Nil))) "" (base ++ "/.allocation.stdout") (base ++ "/.allocation.stderr") 60
+  code <- O.exec "" ((:) "mktemp" ((:) "-d" ((:) (base ++ "/run.XXXXXXXX") []))) "" (base ++ "/.allocation.stdout") (base ++ "/.allocation.stderr") 60
   selected <- if code == 0 then readFile (base ++ "/.allocation.stdout") else return ""
   releaseFileLock lock
   let path = if O.ends "\n" selected then stringSlice selected 0 (stringLength selected - 1) else selected
@@ -228,20 +231,20 @@ resolveReport runDirectory path = if eqString path "" then return (runDirectory 
   O.mkdir (O.parent path)
   directory <- canonicalPath (O.parent path)
   return (O.join directory (O.base path))
-measure : String -> Int -> String -> String -> List String -> IO (Either String J.Json)
+measure : String -> Int -> String -> String -> [] String -> IO (Either String J.Json)
 measure helper bound cwd directory argv = do
   O.mkdir directory
   writeFile (directory ++ "/stdin") ""
   prior <- getEnv "MLF_TEST_CASE_WORK"
   setEnv "MLF_TEST_CASE_WORK" directory
-  let arguments = S.append (Cons helper (Cons "measure" (Cons (showInt bound) (Cons (directory ++ "/stdin") (Cons (directory ++ "/stdout") (Cons (directory ++ "/stderr") Nil)))))) argv
+  let arguments = S.append ((:) helper ((:) "measure" ((:) (showInt bound) ((:) (directory ++ "/stdin") ((:) (directory ++ "/stdout") ((:) (directory ++ "/stderr") [])))))) argv
   code <- O.exec cwd arguments "" (directory ++ "/measurement.json") (directory ++ "/measurement.stderr") (bound + 30)
   if eqString prior "" then unsetEnv "MLF_TEST_CASE_WORK" else setEnv "MLF_TEST_CASE_WORK" prior
   text <- O.readOptional (directory ++ "/measurement.json")
   return (parseMeasurement code text)
-baseEvent name = J.Object (Cons (Pair "schema_version" (J.num 1)) (Cons (Pair "event" (J.str name)) (Cons (Pair "runner" (J.str "process")) Nil)))
+baseEvent name = J.Object ((:) ((,) "schema_version" (J.num 1)) ((:) ((,) "event" (J.str name)) ((:) ((,) "runner" (J.str "process")) [])))
 withSelection total selected value = J.set "total" (J.num total) (J.set "selected" (J.num selected) (J.set "scope" (J.str (R.scope total selected)) value))
-descriptorJson entry = J.Object (Cons (Pair "id" (J.str (C.id entry))) (Cons (Pair "name" (J.str (C.name entry))) (Cons (Pair "tags" (J.stringArray (C.tags entry))) Nil)))
+descriptorJson entry = J.Object ((:) ((,) "id" (J.str (C.id entry))) ((:) ((,) "name" (J.str (C.name entry))) ((:) ((,) "tags" (J.stringArray (C.tags entry))) [])))
 startJson total entries directory = withSelection total (S.length entries) (J.set "complete" (J.Boolean false) (J.set "ids" (J.stringArray (S.map C.id entries)) (J.set "work_dir" (J.str directory) (baseEvent "start"))))
 caseJson entry directory measured result =
   let fields = S.filter (\pair -> S.not (S.elem eqString (S.fst pair) (O.words "id name tags schema_version event runner"))) (J.items result) in
@@ -253,7 +256,7 @@ caseJson entry directory measured result =
 status value = J.getText "status" "protocol_error" value
 summaryComplete total entries results = total >= S.length entries && (case R.validate entries of
   Left _ -> false
-  Right Unit -> case E.exactInventory (S.map C.id entries) (S.map (\row -> J.getText "id" "" row) results) of { Right Unit -> true; Left _ -> false })
+  Right () -> case E.exactInventory (S.map C.id entries) (S.map (\row -> J.getText "id" "" row) results) of { Right () -> true; Left _ -> false })
 summaryJson total entries results =
   let count expected = S.length (S.filter (\row -> eqString (status row) expected) results) in
   let passed = count "passed" in
@@ -270,14 +273,15 @@ renderRows rows = S.unlines (S.map J.render rows)
 showRow machine row = if machine then putStrLn (J.render row) else
   if eqString (J.getText "event" "" row) "case" then putStrLn (status row ++ " " ++ J.getText "id" "" row ++ " (" ++ J.render (J.get "wall_seconds" row) ++ "s)")
   else if eqString (J.getText "event" "" row) "summary" then putStrLn (J.render (J.get "executed" row) ++ " supervised; " ++ J.render (J.get "unsuccessful" row) ++ " unsuccessful")
-  else return Unit
-supervise : Config -> String -> String -> String -> R.Options -> Int -> List C.Case -> Int -> IO (List J.Json)
+  else return ()
+supervise : Config -> String -> String -> String -> R.Options -> Int -> [] C.Case -> Int -> IO ([] J.Json)
 supervise config helper cwd directory options total entries index = case B.create B.serial of
-  Left error -> do { O.require false error; return Nil }
+  Left error -> do { O.require false error; return [] }
   Right budget -> superviseBudget budget config helper cwd directory options total entries index
+superviseBudget : B.Budget -> Config -> String -> String -> String -> R.Options -> Int -> [] C.Case -> Int -> IO ([] J.Json)
 superviseBudget budget config helper cwd directory options total entries index = case entries of
-  Nil -> return Nil
-  Cons entry rest -> do
+  [] -> return []
+  (:) entry rest -> do
     let acquired = B.acquire (C.id entry) B.serial budget
     granted <- case acquired of
       Right (Just value) -> return value
@@ -287,7 +291,7 @@ superviseBudget budget config helper cwd directory options total entries index =
     let report = artifacts ++ "/report.jsonl"
     present <- fileExists report
     O.require (S.not present) "case report already exists in a fresh run"
-    let argv = S.append (command config) (Cons "--exact" (Cons (C.id entry) (Cons "--format" (Cons "json" (Cons "--report" (Cons report Nil))))))
+    let argv = S.append (command config) ((:) "--exact" ((:) (C.id entry) ((:) "--format" ((:) "json" ((:) "--report" ((:) report []))))))
     measured <- measure helper (timeout config) cwd artifacts argv
     text <- O.readOptional report
     raw <- rawEvidence artifacts
@@ -300,12 +304,12 @@ superviseBudget budget config helper cwd directory options total entries index =
       Right value -> return value
       Left error -> do { O.require false error; return granted }
     remaining <- superviseBudget released config helper cwd directory options total rest (index + 1)
-    return (Cons row remaining)
+    return ((:) row remaining)
 discovery helper config cwd directory = do
   let artifacts = directory ++ "/inventory"
   O.mkdir artifacts
   let destination = artifacts ++ "/report.jsonl"
-  let argv = S.append (command config) (Cons "--list" (Cons "--format" (Cons "json" (Cons "--report" (Cons destination Nil)))))
+  let argv = S.append (command config) ((:) "--list" ((:) "--format" ((:) "json" ((:) "--report" ((:) destination [])))))
   measured <- measure helper (timeout config) cwd artifacts argv
   text <- O.readOptional destination
   return (do
@@ -319,36 +323,36 @@ runConfig config = do
   directory <- newRun (work config)
   destination <- resolveReport directory (report config)
   lock <- acquireFileLock (destination ++ ".lock")
-  O.writeAtomic destination (renderRows (Cons (J.set "complete" (J.Boolean false) (J.set "work_dir" (J.str directory) (baseEvent "discovery"))) Nil))
+  O.writeAtomic destination (renderRows ((:) (J.set "complete" (J.Boolean false) (J.set "work_dir" (J.str directory) (baseEvent "discovery"))) []))
   requested <- if eqString (host config) "" then getEnv "MLF_TEST_HOST_SUPPORT" else return (host config)
   O.require (stringLength requested > 0) "set --host-tool or MLF_TEST_HOST_SUPPORT to the native process measurement helper"
   helper <- O.which requested
   observed <- discovery helper config cwd directory
-  let planned = do { cases <- observed; Pair options selected <- R.plan (selection config) cases; Right (Triple (S.length cases) options selected) }
+  let planned = do { cases <- observed; (,) options selected <- R.plan (selection config) cases; Right ((,,) (S.length cases) options selected) }
   code <- case planned of
     Left error -> do
       let row = J.set "complete" (J.Boolean false) (J.set "message" (J.str error) (baseEvent "error"))
-      O.writeAtomic destination (renderRows (Cons row Nil))
+      O.writeAtomic destination (renderRows ((:) row []))
       putErr ("mlf-test: " ++ error ++ "\n")
       return 2
-    Right (Triple total options entries) ->
+    Right ((,,) total options entries) ->
       if R.listing options then do
         let inventory = withSelection total (S.length entries) (J.set "cases" (J.Array (S.map descriptorJson entries)) (J.set "work_dir" (J.str directory) (baseEvent "inventory")))
-        O.writeAtomic destination (renderRows (Cons inventory Nil))
+        O.writeAtomic destination (renderRows ((:) inventory []))
         if R.json options then putStrLn (J.render inventory) else S.mapM_ (\entry -> putStrLn (C.id entry ++ "  " ++ C.name entry)) entries
         return 0
       else do
         let start = startJson total entries directory
-        O.writeAtomic destination (renderRows (Cons start Nil))
-        if R.json options then putStrLn (J.render start) else return Unit
+        O.writeAtomic destination (renderRows ((:) start []))
+        if R.json options then putStrLn (J.render start) else return ()
         results <- supervise config helper cwd directory options total entries 0
         let summary = summaryJson total entries results
-        O.writeAtomic destination (renderRows (Cons start (S.snoc results summary)))
+        O.writeAtomic destination (renderRows ((:) start (S.snoc results summary)))
         showRow (R.json options) summary
         return (if summaryComplete total entries results && S.all (\row -> eqString (status row) "passed") results then 0 else 1)
   releaseFileLock lock
   return code
-run : List String -> IO Int
+run : [] String -> IO Int
 run args = case parse args of
   Left error -> do { putErr ("mlf-test: " ++ error ++ "\n"); return 2 }
   Right config -> runConfig config

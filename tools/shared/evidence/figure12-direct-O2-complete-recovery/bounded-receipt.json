@@ -1,0 +1,67 @@
+{
+  "complete": true,
+  "command": [
+    "nice",
+    "-n",
+    "15",
+    "ionice",
+    "-c",
+    "3",
+    "python3",
+    "tools/shared/test_figure12_direct.py",
+    "--build-receipt",
+    ".mlf-build/recovery-ghc-O2/receipt.json",
+    "--output",
+    ".mlf-build/recovery-figure12-direct-O2-final"
+  ],
+  "limits": {
+    "wall_seconds": 600,
+    "address_space_per_process": 2147483648,
+    "process_tree_rss_bytes": 1073741824,
+    "host_available_floor": 3221225472,
+    "disk_free_floor": 805306368
+  },
+  "samples": [
+    {
+      "seconds": 0.0017703799967421219,
+      "group_rss": 536576,
+      "host_available": 6301425664,
+      "disk_free": 1114669056
+    },
+    {
+      "seconds": 1.002589130992419,
+      "group_rss": 15822848,
+      "host_available": 6296567808,
+      "disk_free": 1114656768
+    },
+    {
+      "seconds": 2.00365177099593,
+      "group_rss": 232710144,
+      "host_available": 6208868352,
+      "disk_free": 1114640384
+    },
+    {
+      "seconds": 3.0044779640011257,
+      "group_rss": 361414656,
+      "host_available": 6014226432,
+      "disk_free": 1114370048
+    },
+    {
+      "seconds": 4.00558695399377,
+      "group_rss": 24989696,
+      "host_available": 6144299008,
+      "disk_free": 1108398080
+    },
+    {
+      "seconds": 5.006653839998762,
+      "group_rss": 18157568,
+      "host_available": 6161801216,
+      "disk_free": 1108193280
+    }
+  ],
+  "process_group": 5,
+  "exit_code": 0,
+  "reason": null,
+  "elapsed_seconds": 6.007832043993403,
+  "peak_group_rss": 361414656
+}

@@ -1,0 +1,10 @@
+[
+  "MLF-CRATE-1",
+  "mlf-language-core/0.3.0/library",
+  "",
+  "false",
+  "111:14:Bootstrap.Data91:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-language-core/Bootstrap/Data.hs111:14:Bootstrap.Kind91:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-language-core/Bootstrap/Kind.hs117:17:Bootstrap.Kinding94:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-language-core/Bootstrap/Kinding.hs121:19:Bootstrap.Primitive96:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-language-core/Bootstrap/Primitive.hs",
+  "118:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/artifact/unit.mlfci",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-language-core-crate-O2/queries",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/builtin/unit"
+]

@@ -1,0 +1,2 @@
+{"schema_version":1,"event":"inventory","total":2,"selected":2,"scope":"full","cases":[{"id":"probe/fail","name":"failure","tags":[]},{"id":"probe/after","name":"continued","tags":[]}]}
+Framework standard-class, demand, IO-order, discovery and continuation controls passed.

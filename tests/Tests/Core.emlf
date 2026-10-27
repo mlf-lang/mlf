@@ -7,10 +7,10 @@ import qualified Tests.CoreSolver as Solver
 import qualified Tests.CoreLanguage as Language
 import qualified Tests.CoreModules as Modules
 
-families : List (Pair String (List (Pair String (IO Unit))))
+families : [] ((,) String ([] ((,) String (IO ()))))
 families =
- let all = S.concat (Cons Crates.families (Cons Solver.families (Cons Language.families (Cons Modules.families Nil)))) in
- S.map (\name -> Pair name (S.fromMaybe (panic "missing core family") (S.lookup eqString name all)))
+ let all = S.concat ((:) Crates.families ((:) Solver.families ((:) Language.families ((:) Modules.families [])))) in
+ S.map (\name -> (,) name (S.fromMaybe (panic "missing core family") (S.lookup eqString name all)))
   (S.filter (\name -> S.not (eqString name "core/substring-adapter")) P.familyNames)
-suite : List (Pair String (IO Unit))
+suite : [] ((,) String (IO ()))
 suite = S.concatMap S.snd families

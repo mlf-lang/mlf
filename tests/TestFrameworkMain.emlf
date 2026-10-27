@@ -15,31 +15,31 @@ import qualified Tests.TestCatalog as CatalogChecks
 import qualified Tests.FamilySelectionChecks as FamilyChecks
 
 -- An IO loop, without spawned descendants, exercises the actual timeout path.
-spin : IO Unit
-spin = do { value <- getEnv "MLF_TEST_CASE_WORK"; if stringLength value >= 0 then spin else ioReturn Unit }
-cleanCase : Bool -> A.Test Unit
+spin : IO ()
+spin = do { value <- getEnv "MLF_TEST_CASE_WORK"; if stringLength value >= 0 then spin else ioReturn () }
+cleanCase : Bool -> A.Test ()
 cleanCase noisy = A.liftIO (do
  directory <- getEnv "MLF_TEST_CASE_WORK"
  O.require (stringLength directory > 0) "missing isolated case directory"
  present <- fileExists (directory ++ "/marker")
  O.require (S.not present) "isolated cases shared a working directory"
  writeFile (directory ++ "/marker") "executed"
- if noisy then do { putStrLn "isolated child output"; putErr "isolated child diagnostic\n" } else ioReturn Unit)
-isolatedCases : List C.Case
+ if noisy then do { putStrLn "isolated child output"; putErr "isolated child diagnostic\n" } else ioReturn ())
+isolatedCases : [] C.Case
 isolatedCases =
- Cons (C.test "isolation/assertion" "ordinary failed assertion" Nil (A.fail "expected assertion failure"))
- (Cons (C.test "isolation/crash" "panic" Nil (A.liftIO (panic "expected isolated panic" : IO Unit)))
- (Cons (C.test "isolation/exit" "legacy process exit" Nil (A.liftIO (exitWith 7)))
- (Cons (C.test "isolation/timeout" "nonterminating action" Nil (A.liftIO spin))
- (Cons (C.test "isolation/noisy" "captured output" Nil (cleanCase true))
- (Cons (C.test "isolation/clean" "continued with fresh state" Nil (cleanCase false)) Nil)))))
-main : IO Unit
+ (:) (C.test "isolation/assertion" "ordinary failed assertion" [] (A.fail "expected assertion failure"))
+ ((:) (C.test "isolation/crash" "panic" [] (A.liftIO (panic "expected isolated panic" :: IO ())))
+ ((:) (C.test "isolation/exit" "legacy process exit" [] (A.liftIO (exitWith 7)))
+ ((:) (C.test "isolation/timeout" "nonterminating action" [] (A.liftIO spin))
+ ((:) (C.test "isolation/noisy" "captured output" [] (cleanCase true))
+ ((:) (C.test "isolation/clean" "continued with fresh state" [] (cleanCase false)) [])))))
+main : IO ()
 main = do
  args <- O.allArguments
  case args of
-  Nil -> do { T.checks; CatalogChecks.main; FamilyChecks.main }
-  Cons "--legacy-fail-probe" Nil -> case C.toLegacy (C.test "probe/legacy" "legacy failure" Nil (A.fail "legacy assertion failure")) of { Pair _ action -> action }
-  Cons "--verify-cli" (Cons directory (Cons unions Nil)) -> do
+  [] -> do { T.checks; CatalogChecks.main; FamilyChecks.main }
+  (:) "--legacy-fail-probe" [] -> case C.toLegacy (C.test "probe/legacy" "legacy failure" [] (A.fail "legacy assertion failure")) of { (,) _ action -> action }
+  (:) "--verify-cli" ((:) directory ((:) unions [])) -> do
    Coverage.begin "test-framework" true
    T.checks
    Coverage.passed "test-framework" "framework/contracts"
@@ -52,18 +52,18 @@ main = do
    ProcessChecks.main directory
    Coverage.passed "test-framework" "framework/cli-contracts"
    Coverage.finish "test-framework"
-  Cons "--supervise" rest -> do { code <- P.run rest; exitWith code }
-  Cons "--isolated-probe" rest -> do { code <- R.run rest isolatedCases; exitWith code }
-  Cons "--discovery-crash-probe" _ -> exitWith 9
-  Cons "--forged-report-probe" rest -> do
-   Pair options _ <- case R.plan rest (Cons (C.test "forged/case" "forged completion" Nil (A.succeed Unit)) Nil) of { Left message -> O.fatal message; Right value -> return value }
-   if R.listing options then do { code <- R.run rest (Cons (C.test "forged/case" "forged completion" Nil (A.succeed Unit)) Nil); exitWith code }
+  (:) "--supervise" rest -> do { code <- P.run rest; exitWith code }
+  (:) "--isolated-probe" rest -> do { code <- R.run rest isolatedCases; exitWith code }
+  (:) "--discovery-crash-probe" _ -> exitWith 9
+  (:) "--forged-report-probe" rest -> do
+   (,) options _ <- case R.plan rest ((:) (C.test "forged/case" "forged completion" [] (A.succeed ())) []) of { Left message -> O.fatal message; Right value -> return value }
+   if R.listing options then do { code <- R.run rest ((:) (C.test "forged/case" "forged completion" [] (A.succeed ())) []); exitWith code }
    else writeFile (R.report options) "{\"schema_version\":1,\"event\":\"start\",\"total\":1,\"selected\":1,\"scope\":\"full\",\"ids\":[\"forged/case\"]}\n"
-  Cons "--probe" rest -> do { code <- R.run rest T.probeCases; exitWith code }
-  Cons "--noisy-probe" rest -> do
-   code <- R.run rest (Cons (C.test "probe/noisy" "stdout logging" Nil (A.liftIO (putStrLn "test action output"))) Nil)
+  (:) "--probe" rest -> do { code <- R.run rest T.probeCases; exitWith code }
+  (:) "--noisy-probe" rest -> do
+   code <- R.run rest ((:) (C.test "probe/noisy" "stdout logging" [] (A.liftIO (putStrLn "test action output"))) [])
    exitWith code
-  Cons "--list-probe" rest -> do
-   code <- R.run rest (Cons (C.test "probe/unexecuted" "listing must not execute" Nil (A.liftIO (panic "listing executed an action" : IO Unit))) Nil)
+  (:) "--list-probe" rest -> do
+   code <- R.run rest ((:) (C.test "probe/unexecuted" "listing must not execute" [] (A.liftIO (panic "listing executed an action" :: IO ()))) [])
    exitWith code
   _ -> O.fatal "test-framework [--probe ARGS... | --list-probe --list ARGS...]"

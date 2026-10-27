@@ -15,8 +15,9 @@
   },
   "library": {
     "modules": {
-      "Bootstrap.ProcessHost": "Bootstrap/ProcessHost.emlf",
-      "Bootstrap.Runtime": "Bootstrap/Runtime.emlf"
+      "Bootstrap.ProcessHost": "Bootstrap/ProcessHost.hs",
+      "Bootstrap.Runtime": "Bootstrap/Runtime.hs"
     }
-  }
+  },
+  "source-syntax": "shared-haskell-v1"
 }
