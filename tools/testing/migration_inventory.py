@@ -10,7 +10,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
-import subprocess
+from history_refs import historical_bytes
 
 ROOT = Path(__file__).resolve().parents[2]
 INVENTORY = 'docs/testing-migration-inventory-20261023.json'
@@ -40,8 +40,7 @@ class Sources:
 
     def raw(self, path):
         if path not in self.cache:
-            self.cache[path] = subprocess.check_output(
-                ['git', 'show', BASELINE + ':' + path], cwd=ROOT)
+            self.cache[path] = historical_bytes(BASELINE, path)
         return self.cache[path]
 
     def text(self, path):
@@ -230,7 +229,7 @@ def build():
         '_ -> Legacy.main' not in dispatcher):
         raise ValueError('Tuple facade must retain legacy default and explicit framework opt-in')
     legacy = (ROOT / 'tests/Tests/TupleListLegacy.emlf').read_bytes()
-    frozen_legacy = subprocess.check_output(['git', 'show', BASELINE + ':tests/TupleListMain.emlf'], cwd=ROOT)
+    frozen_legacy = historical_bytes(BASELINE, 'tests/TupleListMain.emlf')
     if legacy != frozen_legacy.replace(b'module TupleListMain where', b'module Tests.TupleListLegacy where', 1):
         raise ValueError('Tuple legacy implementation differs from frozen source')
     return {'schema_version': 1, 'kind': 'source-reviewed-migration-ledger',

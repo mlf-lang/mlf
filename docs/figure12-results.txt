@@ -9,6 +9,9 @@ https://simon.peytonjones.org/assets/pdfs/impredicativity.pdf
 Downloaded 2026-10-06; saved as papers/impredicativity.pdf.
 SHA-256: cd2702e52a609806597890bea8f89a7bfd2fe28e8f3d158a40bf3ba894336f25
 The downloaded version says January 2026 (minor typos fixed).
+For the text-only repository, papers/impredicativity.txt is a pdftotext
+extraction; it cannot preserve all diagrams or mathematical layout. The source
+PDF remains at the URL above and at https://github.com/mlf-lang/mlf-papers.
 Figures 1 and 12 were rendered and visually checked before transcription.
 
 Reproduce

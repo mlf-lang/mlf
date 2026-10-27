@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 import re
-import subprocess
+from history_refs import historical_bytes
 
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "8a3e69b165765931c3ff762379a78db9659b2cd8"
@@ -12,9 +12,7 @@ IMPLEMENTATION = "tests/Tests/TupleList.emlf"
 
 
 def frozen(path):
-    return subprocess.check_output(
-        ["git", "show", f"{BASELINE}:{path}"], cwd=ROOT, text=True
-    )
+    return historical_bytes(BASELINE, path).decode("utf-8")
 
 
 def require(condition, message):

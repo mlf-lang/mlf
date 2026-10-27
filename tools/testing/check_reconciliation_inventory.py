@@ -2,7 +2,7 @@
 """Validate the supplemental main-reconciliation census, not runtime coverage."""
 import hashlib
 import json
-import subprocess
+from history_refs import historical_bytes, checked_current
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -34,15 +34,15 @@ def main():
         assert (row['change'], row['role'], row['owner']) == EXPECTED[path]
         assert row['execution_verified'] is False and row['framework_integrated'] is False
         assert row['remaining_phase'] == 'P6'
-        assert sha((ROOT / path).read_bytes()) == row['sha256']
+        assert checked_current(path, (ROOT / path).read_bytes(), row['sha256'])
         assert (ROOT / row['owner']).is_file()
         if path != 'tools/testing/check_reconciliation_inventory.py':
-            frozen = subprocess.check_output(['git','show',INCOMING+':'+path], cwd=ROOT)
-            assert frozen == (ROOT / path).read_bytes(), path
+            frozen = historical_bytes(INCOMING, path)
+            assert checked_current(path, (ROOT / path).read_bytes(), row['incoming_sha256']), path
             assert sha(frozen) == row['incoming_sha256']
     for path, expected in value['preserved_inputs'].items():
         actual = (ROOT / path).read_bytes()
-        prior = subprocess.check_output(['git','show',PARENT+':'+path], cwd=ROOT)
+        prior = historical_bytes(PARENT, path)
         assert actual == prior and sha(actual) == expected, path
     assert value['selection_is_not_execution'] is True
     print(json.dumps({'status':'supplemental-source-inventory-valid','tracked_entries':len(rows),
