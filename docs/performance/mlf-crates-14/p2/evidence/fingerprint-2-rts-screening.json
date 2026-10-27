@@ -1,0 +1,84 @@
+{
+  "complete": true,
+  "kind": "Single-process RTS configuration screening; not accepted production optimization",
+  "build_receipt_sha256": "4b52f0f8b945c49eb55b110695fcfdf20d232fdb8f678f08d91802aca208492c",
+  "non_main_object_files_identical": 250,
+  "samples": [
+    {
+      "label": "profile-fingerprint-2-rts-default-1",
+      "wall_seconds": 100.468738793,
+      "GHCRTS": "-T -s",
+      "max_individual_child_rss_bytes": 227024896,
+      "allocated_bytes": 229557483168,
+      "copied_bytes": 11874652648,
+      "sampled_max_residency_bytes": 61927144,
+      "phases": {
+        "INIT": {
+          "cpu_seconds_rounded": 0.001,
+          "elapsed_seconds_rounded": 0.0
+        },
+        "MUT": {
+          "cpu_seconds_rounded": 80.992,
+          "elapsed_seconds_rounded": 86.369
+        },
+        "GC": {
+          "cpu_seconds_rounded": 14.084,
+          "elapsed_seconds_rounded": 14.088
+        },
+        "EXIT": {
+          "cpu_seconds_rounded": 0.0,
+          "elapsed_seconds_rounded": 0.0
+        },
+        "Total": {
+          "cpu_seconds_rounded": 95.078,
+          "elapsed_seconds_rounded": 100.457
+        }
+      },
+      "receipt_sha256": "3c383741a849e8f8deff7a17960301258c6384d149a175a2fe89193cc04e00c3",
+      "stderr_sha256": "bd9fedf0799be9360eeda5f9254df0ddf776368ad3d049c7d08e859084b87db9"
+    },
+    {
+      "label": "profile-fingerprint-2-rts-A16m-1",
+      "wall_seconds": 113.845159469,
+      "GHCRTS": "-A16m -T -s",
+      "max_individual_child_rss_bytes": 239771648,
+      "allocated_bytes": 229381429984,
+      "copied_bytes": 7387979304,
+      "sampled_max_residency_bytes": 61927248,
+      "phases": {
+        "INIT": {
+          "cpu_seconds_rounded": 0.0,
+          "elapsed_seconds_rounded": 0.0
+        },
+        "MUT": {
+          "cpu_seconds_rounded": 97.933,
+          "elapsed_seconds_rounded": 103.17
+        },
+        "GC": {
+          "cpu_seconds_rounded": 10.663,
+          "elapsed_seconds_rounded": 10.665
+        },
+        "EXIT": {
+          "cpu_seconds_rounded": 0.0,
+          "elapsed_seconds_rounded": 0.0
+        },
+        "Total": {
+          "cpu_seconds_rounded": 108.597,
+          "elapsed_seconds_rounded": 113.835
+        }
+      },
+      "receipt_sha256": "0220abd5b4e10566729bf812e7289d0f30b83e0913c57e4fdb9091d9b501797a",
+      "stderr_sha256": "00e469a4acffc03cc68a31734744acf1fe4a88ed9f37fc76af3451dda5b72d08"
+    }
+  ],
+  "A16m_to_default_wall_ratio": 1.1331401273341353,
+  "decision": "Do not promote A16m: this screen reduced GC but increased overall wall and mutator time. Original production RTS policy unchanged.",
+  "limits": [
+    "One sample per configuration, not a median or ABBA causal claim.",
+    "Ordinary source-level medians remain separate.",
+    "RTS elapsed/cpu times rounded; maximum residency is sampled at major GC, not continuous peak.",
+    "The printed %GC 0.0 field is not used; explicit GC and total timings are retained.",
+    "Both runs inferred544/reused0 and checked artifacts are byte-identical."
+  ],
+  "recipe_sha256": "ffacd88e133a143fbfe2f05cb16d53d7cd00dc0fa00a8ba0bb563303350cbf4e"
+}

@@ -1,0 +1,528 @@
+{
+  "format": "mlf-crates-candidate2-final-review-v1",
+  "complete": true,
+  "candidate": "fingerprint-2",
+  "status": "accepted scoped optimization; goal not met",
+  "base_commit": "aa11ffd318a2efa5be9805524710d0677eedb86f",
+  "portable_patch": {
+    "path": "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/candidates/fingerprint-2/pr25-plus-fixes-plus-namespace-plus-fingerprint-plus-locks.patch",
+    "sha256": "8d07e0962909fdf9f5ac34e5ff65036e39a9dc73c85a879ccf0ba06637b95be7",
+    "changed_paths": [
+      "bootstrap/MLF/BuiltinPreludeData.hs",
+      "libraries/mlf-async/mlf.lock",
+      "libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs",
+      "libraries/mlf-crates/Bootstrap/Crate.hs",
+      "libraries/mlf-crates/Bootstrap/CrateArtifact.hs",
+      "libraries/mlf-crates/Bootstrap/ImportedRoot.hs",
+      "libraries/mlf-crates/Bootstrap/PreparedLibraryLiteral.hs",
+      "libraries/mlf-crates/Bootstrap/Separate.hs",
+      "libraries/mlf-frontend/Bootstrap/Module.hs",
+      "mlf.lock",
+      "testing/tools/mlf.lock",
+      "tests/async-package/mlf.lock",
+      "tests/mlf.lock",
+      "tests/shared/mlf.lock"
+    ],
+    "git_apply_check_against_pristine_base": true
+  },
+  "preserved_prelock_ancestry": {
+    "original": "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/optimization-research/prefix/provisional-s2-base.patch",
+    "copy": "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/candidates/fingerprint-2/pre-lock-source-ancestry.patch",
+    "sha256": "5afa52100e516a1cae1938de2e1eee7105c192a6ffe46afdb60f81ba31d73773"
+  },
+  "producer_receipt_sha256": "bc526f3055c3a7598ccb7c14183306b80f2c0317abff0bcbf865efde750da032",
+  "compiler_sha256": "253285eb443cb1627757e414b956e81bcadba9798effedd06a3d020ec5905d53",
+  "verified_current_source_pins": {
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-async/Async/Process.hs": "482169c6d92a16b5a3071088ec24ee7206324995f8e69f6df073cc24559fcb73",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-async/Async/Process/Internal.hs": "ef551f51dcf7da4b48e49f2807e2d5efe84c009cfa911913402c493fce7a25bc",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-async/Async/Task.hs": "cce3de39e4e4fe7537944da1f6b000a8146737340bd0d05ba03fc7e3550acd3b",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-async/Async/Task/Core.hs": "0a75da421779203053d535e09367bce368e245e3608b12cad23507358dedf1af",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-async/Async/Task/Internal.hs": "a87ab11e316ec7c4ff28a5f9974b61ecb58aebeeb3f3227646d02ed3e7416e00",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs": "35d97dc2dac3ef247f593a3b994d33b34770ac1f307de0ed700b46e5a9f17f00",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-crates/Bootstrap/BuiltinPreludeLiteral.hs": "e70f9137be94c940548a99d8a4e9fa5eb2954da6e93397405657b37e2abfdb1f",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-inference/Bootstrap/ClassDemand.hs": "160ccb4889adcb562adf7d99263197d2436b21f5a110c76df6e6ab3b47ead957",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-inference/Bootstrap/Classes.hs": "3f685123f17509b53cdb2a28dde74d8b54e7459002f7b19c4eb698abef8273dd",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-inference/Bootstrap/Compiler.hs": "4be4826aca738600a07bd78d7319f05e7e4ffb65d50fe3fd5287890286c7ab1c",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-inference/Bootstrap/CompilerCore.hs": "00b0274c05dc10f65e5fd2c1df13acdf0382d352c2dd07aa74e79f7c2cdcb8e2",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-inference/Bootstrap/Constraint.hs": "e60312de0d78b7604f274d82916bc6f4c87dfb45c2dffefdc89387be37602a90",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-crates/Bootstrap/Crate.hs": "b3e32635fa10d5b72494e959db288f494774aaa1e5c5319151e8e3dcf5cb7b56",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-crates/Bootstrap/CrateArtifact.hs": "a1c1668c89707c056737237b213fe4b0b1fe86548db71ae1262c9ad7d6cbcc9e",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-crates/Bootstrap/CrateCodegen.hs": "3b965481dec681849dbc2fb5172a31fc2b703609a7d379195a2c3338e92011ad",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-crates/Bootstrap/CrateQuery.hs": "2dece912679edfc80dd6e8f2a725e7e97eb82568fb6084d4bcb7e0520f16e4d9",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-language-core/Bootstrap/Data.hs": "30c7d22d4640afc393a136eccb24cce84f81f00ff6d92067d2bd56054dca8d16",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-frontend/Bootstrap/Dependency.hs": "5d0082ace3184c213c53f34d9259437506fa3db368d646b3599162018f7db27d",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-frontend/Bootstrap/Desugar.hs": "087d3e310dbd218800d56a77bce8f861981542089f5cd260c04264bf3c33c388",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-inference/Bootstrap/Elaborate.hs": "c061b8a6ff668acd5f362c180d8c6ad24c9bb54c219108ea793d968ee4f43c58",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-inference/Bootstrap/Evidence.hs": "c533ce20b23c9580f2bddf7e340cb3e8fb813a197e46cc4ea173f705177a9bcd",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs": "fce5aa8a9bfd7b971d8a113f4ddc23379873f0d13ca9c94427139477d6e23f59",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-foundation/Bootstrap/Fresh.hs": "0ed2f1b6d2ffb2a0ea8f1af85acc136470028ab882330b71e9a0194c2f5d63ad",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-inference/Bootstrap/Graph.hs": "e631e6031e81aa753ef80ab395bca55a7b4d7a375d76c3e5d588ac3edc4b9fec",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-inference/Bootstrap/Graph/Solver.hs": "604662746593712ec29ed968cee7344910c083e57e15965bbf39f3df141d960e",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-foundation/Bootstrap/Host.hs": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-crates/Bootstrap/ImportParameters.hs": "16efe338a956ef66deda14c67251b999dc7934cbe5bd7dfffebbec8b03a2fbcf",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-crates/Bootstrap/ImportedRoot.hs": "980870a7a9b04b6227b6852ca5ff44a9f54053ea855e95f4728b6d2a6a5bd196",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-crates/Bootstrap/InferenceUnit.hs": "862ad64a48a713bb2a56ace82733bbc6b0af6c2a64d539e396946c4b0311c310",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-foundation/Bootstrap/IntMap.hs": "2bd9dae62e6d44e611e5b4adb216efffe9d275c05d249f2904f2e076d12b23de",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-foundation/Bootstrap/IntSet.hs": "324d2bfd384485c0008c80f6567862d572afeae0da4d839cbbbe8cba7748d1d6",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-language-core/Bootstrap/Kind.hs": "453aebe46c80250d50a32ae84b9f5d1bb56f2effbe94018d0e67742fbffb4f3b",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-language-core/Bootstrap/Kinding.hs": "c0188208294013e2c2645e01bc1dedf6a8dcf10f4a35b1a128b82bb485cc960c",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-llvm/Bootstrap/LLVM.hs": "7429fbc5391cef1f5fd3f507e0381f7a8eacbf19637a247398ca269e966f6fb7",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-llvm/Bootstrap/LLVM/Analysis.hs": "b10dbe9ea529646a375f50144ffb4dbac5b2c3ac5453e02170334f78fd57e65e",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-llvm/Bootstrap/LLVM/Argument.hs": "8d8a897eb4019ad40fe5cb756a30fd8c789e4c745205e654254bbf702d12710b",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-llvm/Bootstrap/LLVM/Build.hs": "267c95569175161aeb8944aabbef85ea1f77ead11ba48146a7c3a17ad6d950d1",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs": "d92907fe8eb08163a430cd6a52b6ea3a420d04d3a2817b56fa2d809a1d96d08b",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-llvm/Bootstrap/LLVM/Kernel.hs": "46ae5be45d9c6f58a61a1c52856bd11befeb3b6fa4ed7c7b09118a9226948642",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-llvm/Bootstrap/LLVM/LazyProducer.hs": "88d750f0671a228da67403a555a43b71054dee8307da88e5070752474e1cf7c8",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-llvm/Bootstrap/LLVM/Native.hs": "782a711fe63b372c575748dfe315e85d2c2f021a7e8f501285ab47315819e3ef",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs": "d84190afcae0fb9ad347e8116b6eb98f78ccdeaedd9491e6a6a47e1e119e9ff9",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-llvm/Bootstrap/LLVM/Result.hs": "792da71fe323dee4b2497b552c090e38e98f6f51d6997ee9da07286420f1396e",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-llvm/Bootstrap/LLVM/StrictFields.hs": "50c76597138b9fe9c7a4eeba22976f096b513038450c830f4e204059c2a91d9e",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-llvm/Bootstrap/LLVM/StrictWrappers.hs": "b8e09c8fe3af9f14c7e7b6f6deae008ada04fc84923a41fa5c29d1e16857ed13",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-frontend/Bootstrap/Layout.hs": "9d602c1743537623ae64a34dc6d34ee79c367ee57cb4214dc7e2e8509a9de411",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-frontend/Bootstrap/Lexer.hs": "9c681c46059d62f430c71e783d77b74ed7e0898225a148b4116995a5a2155179",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-foundation/Bootstrap/Map.hs": "d4d9ebfa39a14ae1cbaf48fa9d540eafa7b452aaa3cc73ffc624a34c15417bdb",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-frontend/Bootstrap/Module.hs": "cc4c4d74e7a9a0bf3432f71d782044bf807d118ecbf82a07717ef54a5e0b9ca6",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-frontend/Bootstrap/Parsec.hs": "38cce5767b935e27292b0c0fb35f1750e3d02ff5ef5ef111c615b04001ebce90",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-frontend/Bootstrap/Parser.hs": "d6fcd9881700b9dd91077ca2db863076f3d4974688fbb4dbe42d97b96b82872d",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-frontend/Bootstrap/Prelude.hs": "98bb607ff4732abe7a169a9ae6bd6e9a641ef5d2bce2b9c2584d2bf9c4779319",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-crates/Bootstrap/PreparedLibraries.hs": "a7a0e9cecb93931fa44d04b7fd57e768c03a2eea8c3802af509ac5abcf510c15",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-crates/Bootstrap/PreparedLibraryLiteral.hs": "f69507ec31c555af9bcd0fcc14f30770ad381a4bae6eee4fdb9073becd7a297d",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-language-core/Bootstrap/Primitive.hs": "d5ab2e97d7c217143311ff81c09075f9f9adb96ecf9f0cfe285e274e28130e23",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-interpreter/Bootstrap/ProcessHost.hs": "2fcd44e92c3b0a889e7ed16316ed68209f940f357fdb68b049c596f6d3a3dc24",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-foundation/Bootstrap/Regex.hs": "016cda4d5a9cd2ed0161976ab4150d74c1b2843cb6a5a046aef72eccc1945b0d",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-interpreter/Bootstrap/Runtime.hs": "8a5186d9552bb947f67142c943446cf1c3b79faa4c3279e2f58022b8c1b5a577",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-foundation/Bootstrap/ST.hs": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-crates/Bootstrap/Separate.hs": "20638086fbdbcffa888cf12dd05d1f901d7963c2870cff36aa0594087b224c0d",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-foundation/Bootstrap/Set.hs": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-crates/Bootstrap/SourceEquality.hs": "031ca10290b4b6bce9526c65fc6cbcea096def8df17fd6e9333710480d52077a",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-crates/Bootstrap/SourceInference.hs": "6d52680450b2a49b170033b0c7266565a9f7ad3c5ec2d24a61b328074e16f2a9",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-frontend/Bootstrap/Standalone.hs": "37f77c259d0b699ab49c5df5d6041485e726d392a0b4b3a6b8adcff3c0e2a027",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-foundation/Bootstrap/Std.hs": "0eb137b5935bdf13ed6807c2a4aa96bb558bfce37fd39c9fb08897bb63eedbff",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-frontend/Bootstrap/Surface.hs": "6722b465232d5e88692bea0fdddfa07c02eb1c5fa65476c7fdb922042a194ff8",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-foundation/Bootstrap/Types.hs": "c8bf3c734fa5c7e4c9b1f546774fb7dbfac9cc872fc7194f18cacb53d332132a",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-foundation/Bootstrap/Unicode.hs": "fb8a1f8a0147d416d3b5bfd637d53121e584de6f8856d2c380ec360d2df47adf",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-foundation/Bootstrap/Version.hs": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-xmlf/Bootstrap/X/Check.hs": "abaaab6552efcb096a3d26a05c552d7ac362c96467e7604eca7d1174f56797aa",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-xmlf/Bootstrap/X/Checked.hs": "0cf5be5536d4fdf747050b6a610345868a8c7ff1b1beb7885f68cd677e0c04e1",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-xmlf/Bootstrap/X/Parser.hs": "4f76dc195e444ceffbd2a84824b9b402deb560b52e854251ef8480b765d9126d",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-xmlf/Bootstrap/X/Pretty.hs": "d4840c8c31b8f6bb82587590a4ab48ed8d664c96ba22c9daf70ae19c5e8ad8d9",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-xmlf/Bootstrap/X/Syntax.hs": "654d43b2739219704757cd3a3ee0e9f8106ae07ec931eb1a399dd004af1c0a9d",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-xmlf/Bootstrap/X/Type.hs": "f077d4ffccc9e194f017505aa1d592aace677219198a6a5c2190271db7816233",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/bootstrap/MLF/BuiltinPreludeData.hs": "112273042dbe83401900871f7bd5bc91663a288cb1cd27e376516625664a57e7",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/bootstrap/MLF/Entry/BuiltinPrelude.hs": "0130e6af538c4bcfd27aa3b4a223b63eb147e5b1eb30017288bceb1074a1abb1",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/MLF/Entry/CompilerTests.hs": "45d7fdabe9d3ed340442f4154a7e953ff7df7279b788570d7e976b1d22c41695",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/bootstrap/MLF/Entry/Emlf.hs": "049d77c7b22e6e12e8f551b7521cba594b0486a289436f0236d865484bbb302e",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/package/MLF/Entry/Mlfpkg.hs": "26dab5260f36e5d67ba85d4c74ab4cad6bd76b8772056ea1f22d7e9ea0264711",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/MLF/Entry/TupleList.hs": "e817f6037216da8cff7d615e617adcccd58bf687b6e9dacc3155ad8e4a9f6bd8",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/bootstrap/MLF/PreparedCompiler.hs": "271caba2c443258fb4e0961be87d0750716c867ddb36ef6c85e8f77165423b10",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/bootstrap/MLF/PreparedLibraryData.hs": "7a2f084b10c7551690f37b697e7b3f46dca409316606015775636c033b716b23",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/shared/MLF/Tests/Async/ProcessMain.hs": "02b89ab2a2bd6f28b9467a00556011a67553e6cc1fcaef07dc51bd3145249403",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/shared/MLF/Tests/Async/ProcessPanic.hs": "8ac29bd22ba71fe3b1f0782f056f6f31809d509e81bec695d18f7f887ee4016e",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/shared/MLF/Tests/Async/TaskMain.hs": "9226652954c07a9d66ba4449294a8c76db85853dc3c42a22984e5817bd7f3148",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/shared/MLF/Tests/Async/TaskProcesses.hs": "7b267a43750ca73a288732d9ebaa23327a4911ab5675150d5c1a8dfa3e587770",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/shared/MLF/Tests/Async/TaskWaitGraph.hs": "3158b5c76450655a33c83d5d8164143163f9e6f991a91735826a9e06f96dc998",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/shared/MLF/Tests/BuildReceipts.hs": "076d24d34268981dcbe346759233dbdb7b1f20bb4de089282d05472d06939025",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/shared/MLF/Tests/ClassDemand.hs": "585bc63568109dfc2dee9ddb5eb0cc4906c03f9ccc7772226eb85dc4da02c373",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/shared/MLF/Tests/PRQuickMain.hs": "93ed93ca006a71ba54de6aafe3eb9ae0c921c5dca5c4cce9c03c0b0180bcb5bd",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/shared/MLF/Tests/SharedFrontend.hs": "5bff1513b7f401241ebbff89888ad8790bd92d0ee7858d8148bc7cec334f735a",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-developer-tools/Package/Benchmark.hs": "089024c9213e36e5e591bffca6ba8605d127d518f4432164adf9ae9080669aa8",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-package-core/Package/Build.hs": "9df00f9622c9a1acafc2d6068980dadf56cafd33886c644b5bffb995a84152d8",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-package-core/Package/Command.hs": "f8865613d8fb3b39dd1883fb9fe833e2db0b7fccdc61b2667d50688d9f65d0e4",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-package-core/Package/Distribution.hs": "aa7b8731e88f838670374ca27a9bfbe26c22e4ff0d7021867c0d85f9e0ae88c8",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-package-core/Package/Json.hs": "90c6e3ad566b92c01bf58106c27a5d467a52f11586ddad9fa1e44c2a62165604",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-package-core/Package/Manifest.hs": "94cbf379adb03fb3f23bdf7c4fdb0b89d31a6f6c33313fcdac2ad112e0c1d111",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-package-core/Package/OS.hs": "ff025ef05b6cb63c5591b756a78b898f50497cc5349bdc5d19812f47a6dadda2",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-package-core/Package/Release.hs": "f8aa3f7fa140ac31d92d58f927d900c9923ba52c089122e9926107518e781377",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-package-core/Package/Scheduler.hs": "d112b06cd45f41a0c752f663233b35c3c9fb66c1ea68dd3000561499961d570d",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-developer-tools/Package/Verification.hs": "5863313b16d6058ded44ff8b46840f1534ffb2db02ff420911c382b2b68ab301",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/testing/Test/Assert.hs": "d9bb577af733f709258a4947bde82c3bf3ecf456e628a856c237ee7302f6f90a",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/testing/Test/Case.hs": "b14985f9e1120413c91db2875b03cf714d3394150d1036d2d79b7db5095c285d",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/testing/Test/Descriptor.hs": "b8e92bc8e18463ed699cf93cdeb3082fc2c408edbcca6db90fdbf5c68c793557",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/testing/Test/Expectation.hs": "14a7492852ff8db61fb05db9fce1454be55b29a5fdb58dbbc35508fac13b76f7",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/testing/Test/Outcome.hs": "fecc98b6da70df3bfb8bc03bb627cf71d103afe7a45f9f524fa17194c5c9059f",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/testing/Test/Registry.hs": "0c3f623eb5ebb23de0f586f29b5c4a7b3470217778e8dfc5b2bd738de2ca2236",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/testing/Test/Runner.hs": "92bbadd2ad1a076648c00c9d6d31dd519a1d5162ac040d502d50710dd48ed927",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/shared/Tests/BuildReceipts.hs": "05a0d967492413b3fa68055202c7821c08355ede167ea264be1ad992b6d9b1c0",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/Tests/Catalog.hs": "9fbc4f7ef554a654e1b933a9bbb8335ad23834df168572c1cd737b3154625a78",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/Tests/CompilerTests.hs": "f3f6c319a4a676e62b89aaca739dee1de5b2d46fba14eb95fe4aa12e89c034ca",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/Tests/CorePartitions.hs": "b020a93ed6d93bf92766016f06ad6eb59f89b7c3b288b934b3568c28cc14284b",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/Tests/Coverage.hs": "38ac76ab4abe5d17a53f6c8e66dd52bf8b3b718920ccab99f25909680516e7ff",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/shared/Tests/IndependentCheck.hs": "64800f6cf21e0d6dae65c02491ec4a56ce6a3f21056d73cd12c9693b45451757",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/shared/Tests/IndependentType.hs": "04ce5f659b2a515cb89c32cbb5d3889545f90b91faae806f1792c1f48c794642",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/Tests/Selection.hs": "8a53a01a1af9b5c5d18eccb0dc7ab370f4a829dda73f09ebd3c420f7cb8967fd",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/Tests/TestDrivers.hs": "00689b5924b1b03d4dbedf228fad2a8735439a9df902870916fd538a11f2b511",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/Tests/TestSources.hs": "f68293bcdd472babf62ff3ef201325af451079186290ea91efe1c0cb30d7893f",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/Tests/TupleList.hs": "2ff183466ff22c3627aa58f0b73d9503ef1dc979f7b0e9c1f7744cd9933996f8",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/Tests/TupleListLegacy.hs": "60176aca5512cf858f1c5fcde5819741a28073b4b504049a301a54f0492ab6b0",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/host/ghc/MLF/Host/Async.hs": "0b581eb8e307b31bf8d3869b2baad0f875abdb47d94c88ba913b342615e93a4d",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/host/ghc/MLF/Host/Base.hs": "31fb27b1438c9a8bbf20804db4e770cc3af9d48dc39ad4ced9c55e10565ba63f",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/host/ghc/MLF/Host/IO.hs": "e563c81c86424f1203964d230a1beffcc22ed545a078c778e5e446f0a7cadc65",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/host/ghc/MLF/Primitive.hs": "4b0c1ab711471b60c136cc3a8b9cbe6ed07e2a4df367b43384dee77cd0498316",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/host/ghc/app/async-process-panic/Main.hs": "48badddd5a36322c9951a3748fd1969061172d84b92e19c385e772d1547a68a3",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/host/ghc/app/async-process/Main.hs": "c889c5a273ec1539dbf299139722071efa3de2e1590fb929266e75ec4a3b16f6",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/host/ghc/app/async-task-processes/Main.hs": "a2e16710521b6a1d77c3275cc2f3c0e56160e087eeb4431700b69368857c1ce9",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/host/ghc/app/async-task-wait-graph/Main.hs": "cf0f59fb35b72879f26331611e41d74d1dba36fd1dca052e11069bec1a6cbe03",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/host/ghc/app/async-task/Main.hs": "7e7222232f45bebc64dc62af928a455455d6ba85a148270b8ae099e38088f467",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/host/ghc/app/build-receipts/Main.hs": "599861ed887c9b3afa2cd9f2dac9e47becc8412e5c83a2f5404b39e32921f1ee",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/host/ghc/app/builtin-prelude/Main.hs": "c913ad11f0d2a945b33b924e346fa2afdcad157faf6e3e9424b6c5194915d496",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/host/ghc/app/compiler-tests/Main.hs": "a56de13a32142ead9cadbbe8f658486d7ab267acc6026cbfd888f6ec6d5e7e7c",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/host/ghc/app/emlf/Main.hs": "72d926eedd4e5abc40b8f0bc925a39d20995397f0d4144b4abd932ef2aaa6d79",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/host/ghc/app/mlfpkg/Main.hs": "5f1acf5faa8530f1d66bcf00bd9f6ea4eb82596c53164c54304a6ce11f30cfab",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/host/ghc/app/shared-frontend/Main.hs": "f0fac1e7c6bffa967895f787bba8f54fbb252440a7f720c4140c5890cbd72dc7",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/host/ghc/app/source-smoke/Main.hs": "a2f18f3d62bb70bf2817d615acfb5ff88434fdd73cb9094a75e2cdca1f416bb4",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/host/ghc/app/tuple-list/Main.hs": "dec238795da4b899f6797f645893e93670f0a450babfe2f6249cb16a15962c34",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/host/ghc/cbits/host.c": "bfcf4b400902afaa89e0d6cbe0de5901a4e1e89c6100d203e50c3099ba7fc694",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/runtime/khash.h": "4582c7fd4b98f61339ce677bb1daa7a45a53075b112a494a335525c4bda72074",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/runtime/mlf_build_runner_hash.h": "cbbdfd06eb43324dceef594e42b21621559df3e3d4e91d62f2b73e2b04d9e778",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/runtime/mlf_build_runner_posix.h": "bc35cc65f2002b2f455a524c2a1c3bc12ea8637fc63bb88e3d49185e91448e27",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/runtime/mlf_completion.h": "7eb127736e53948a324b58715abdea3f8df98900ca4724a94f59ca66b79388c5",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/runtime/mlf_integer64.h": "fab1c2bc3116aeec5de2934a7c97d388ac7b0f950eaeea36009fdc440bb9a867",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/runtime/mlf_process_binding.h": "c9ef41739a3a388ec40701c5a9c778032618c9b8bf5c3d48e213840c0d242afa",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/runtime/mlf_process_supervisor.c": "b24d362a891e966bf1a456f1983221eaf848fe6da80379850beb5067c63944e9",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/runtime/mlf_process_supervisor.h": "808e2b68f101b03f6250d448b2e1100e1bdde2e060c669d783a0513b21d8fc05",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/runtime/mlf_process_supervisor_posix.h": "fd0d199345e9d6310aaabe3dbab858a121a03c5cfafd28de50042d78ae0438ac",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/runtime/mlf_runtime.h": "3a3af6bb54e44f3b41e116ca9006849e59734b5bd683b096b137b6a7c05cc698",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/runtime/mlf_system.h": "813bc6e7e15a1e9c26708ab7ac638574598b62b39126b4b000456f6e8f21e465",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/runtime/mlf_system_windows.h": "31b4de3c8a5bd6051f7c8916624a250f8b4b305b40b4cc7923aa648894d654f3",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/runtime/mlf_windows.h": "618fb88b0c854fcbe8dffee5b961a74025d79b89c00d7158dc540b15066e4b56",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/runtime/mlf_windows_path.h": "e52b718c63e0603cb653a3874ae1a6130cd5a184121dde7868c4d03376c84e05",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/cabal.project": "d31917fa5dd1ba84d53f1961d5e8f6629474d92b53c7b9f2176d3f4b03da047a",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-async/mlf-package.json": "15e9ac789b283257d3ff3f1ab3053f03430859a6cbadd621d214f113994778ff",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-crates/mlf-package.json": "e10e6a2f9825e3b2624ca85e8206025e551f1cc35a6c0ee8c86579b25037c373",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-developer-tools/mlf-package.json": "be337ee042323db004efa8e419db889fe24cf01b287112507c3593b30c5b3b71",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-foundation/mlf-package.json": "4a05ffebfa860271154e1c4b7a40e045a822e76ecca16a2bd57c95e0c176819f",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-frontend/mlf-package.json": "e403851fc996545653accd9d83dac00fe063e4d2ab8a37475195857ba63db984",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-inference/mlf-package.json": "da594a53c7f93efe8796fab917ac56434d67a52db99d020d5a443fda7a2b1eae",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-interpreter/mlf-package.json": "ffd00c762c3959dd6f93fc88f02076bb966ec1a45e6efee7c4b3c5d2d53a9761",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-language-core/mlf-package.json": "9d653cc825134f8d98919874e6b6d7e58cbd614751bfa0562af6e58f7a30366b",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-llvm/mlf-package.json": "ee14dce6d9af9beec718eba69cecb4f1f0346b860e27853e452741773cd1b50c",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-package-core/mlf-package.json": "b3473060f87653553b6067fb6b8b705ddb2a4a4092745ec642395e50ca645cd9",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-xmlf/mlf-package.json": "6f9a6c0a2d703ba884dd256fd494665c580ed028db04dedc3c7b748ec393f6f3",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/mlf-package.json": "ffc62d4598724f1888eadaffade69ad4e813a0ea3394ad9ac2f5f53cb662c205",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/mlf-shared.cabal": "7219580bb8e090d0b74cfb9992e65c4e4b8984de3924d85accc735b2baf1029a",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/shared-sources.json": "d976b9c9814edba06f5e6dfa7457ea94848a88a6f3f0c12208f56a64facc575f",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/testing/mlf-package.json": "9a81067617c5742f588dc4496da260bce9d5d721dc43c4bf10765d61055ea016",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/testing/tools/mlf-package.json": "6e9359eaa1d433f5b2d0b2bed31eab43198fa9b1b89aa5c2670c853521dcb608",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/mlf-package.json": "f1c57a91cbf228a1e4777bbbd470e51b9991f663466987e6a25f7eb6e24fe598",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tests/shared/mlf-package.json": "0edc84f33ccac41596973dcd646951ab007ef8f560fe4f163e42f3c682ecdc1f",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tools/shared/builtin_prelude_identity.py": "575e5200b6ff8048d18f4ebea80dfb0535ffb06d26db8b4a17029bb63b03bf6a",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/tools/shared/verify_builtin_prelude.py": "778fedebd6a038b6d1b67026f5ca8a4f0da1c13e126948f428b9f912fcacf07d"
+  },
+  "producer_scope": {
+    "actual_inferred_interfaces": 121,
+    "shared_syntax": 121,
+    "tools": 13,
+    "canonical_builtin_fresh_regeneration": true
+  },
+  "samples": {
+    "mlf": [
+      {
+        "label": "fingerprint-2-mlf-1",
+        "wall_seconds": 96.097096326,
+        "child_user_seconds": 87.487695,
+        "child_system_seconds": 5.364486,
+        "max_individual_child_rss_bytes": 213528576,
+        "guard_peak_tree_rss_bytes": 244994048
+      },
+      {
+        "label": "fingerprint-2-mlf-2",
+        "wall_seconds": 102.212548005,
+        "child_user_seconds": 92.926518,
+        "child_system_seconds": 6.174647,
+        "max_individual_child_rss_bytes": 233177088,
+        "guard_peak_tree_rss_bytes": 264638464
+      },
+      {
+        "label": "fingerprint-2-mlf-3",
+        "wall_seconds": 97.958729957,
+        "child_user_seconds": 88.742902,
+        "child_system_seconds": 5.911869,
+        "max_individual_child_rss_bytes": 213524480,
+        "guard_peak_tree_rss_bytes": 245002240
+      }
+    ],
+    "ghc": [
+      {
+        "label": "fingerprint-2-ghc-1",
+        "wall_seconds": 8.691134185,
+        "child_user_seconds": 8.568317,
+        "child_system_seconds": 0.14616099999999999,
+        "max_individual_child_rss_bytes": 337330176,
+        "guard_peak_tree_rss_bytes": 351330304
+      },
+      {
+        "label": "fingerprint-2-ghc-2",
+        "wall_seconds": 7.954627817,
+        "child_user_seconds": 7.815532,
+        "child_system_seconds": 0.159104,
+        "max_individual_child_rss_bytes": 341807104,
+        "guard_peak_tree_rss_bytes": 355999744
+      },
+      {
+        "label": "fingerprint-2-ghc-3",
+        "wall_seconds": 8.38782803,
+        "child_user_seconds": 8.214732,
+        "child_system_seconds": 0.19341,
+        "max_individual_child_rss_bytes": 341053440,
+        "guard_peak_tree_rss_bytes": 355110912
+      }
+    ]
+  },
+  "medians": {
+    "mlf": 97.958729957,
+    "ghc": 8.38782803
+  },
+  "ratio": 11.678676482951214,
+  "three_times_target_seconds": 25.163484089999997,
+  "candidate1_mlf_median_seconds": 105.914294467,
+  "reduction_from_candidate1_percent": 7.511322763405404,
+  "prior_baseline_mlf_median_seconds": 163.896307032,
+  "reduction_from_baseline_percent": 40.23127687808486,
+  "performance_receipt_pins": {
+    "runs/fingerprint-2-mlf-1/receipt.json": "8b3f2e1ed2daa6bff29fe62f0a325635c55185c58a57f586277225d9bebd7029",
+    "runs/fingerprint-2-mlf-2/receipt.json": "9f9ef3b804436730840445a07b214f930814a22cfcf21e34b54c3ac5aba3e979",
+    "runs/fingerprint-2-mlf-3/receipt.json": "cb44b6abaa14fbc0db089fe3769d745301444b82608e6ce884f82b10e8168863",
+    "runs/fingerprint-2-ghc-1/receipt.json": "21091b9d4794c9f1d681c39e4d007b6751851e3483fe394591e5d83cc8ce3d03",
+    "runs/fingerprint-2-ghc-2/receipt.json": "4a3dd28cef50b8257ea7c979461320c49f3196f0c54cbea82e8cc79ed8115ea4",
+    "runs/fingerprint-2-ghc-3/receipt.json": "5ba1df74cb091e2cce10c7e5d8581ccba7cd55cba4b8e3f7d9350e017eaae009"
+  },
+  "frozen_performance_target": {
+    "modules": 14,
+    "inferred_groups": 544,
+    "reused_groups": 0,
+    "checked_hashes_identical_to_reference_all_three": true
+  },
+  "controls": {
+    "fingerprint_independent_checks": 2503,
+    "fingerprint_receipt_sha256": "18394ecc2b08f5b362c13552ecb24914987474b7f90631fca88835f11c560a6b",
+    "scoped_receipt_sha256": "e33db61b9a6ec152f03f7ec4b1e2ca67b8cd79e19fadc7207980b2f4d9aba7d7",
+    "frontend_modes": 3,
+    "provenance_distinct_methods": 86,
+    "builtin_verifier_methods_included_once": 17,
+    "source_smoke_cases": 5
+  },
+  "actual_optimized_source_validation": {
+    "receipt_sha256": "745fdf1f3e1d83d424fc273f859604f1ba6fc5a0aac1c47d4042011d72c94e1d",
+    "modules": 14,
+    "inferred_groups": 553,
+    "reused_groups": 0,
+    "metadata_reload_passed": true,
+    "performance_sample": false,
+    "artifacts": {
+      ".mlfci": "4ce1681499c928a6f80df37e3cb038102961823a1cc4dbc74f0d3bb2aa47ae56",
+      ".mlfco": "4aedbbf03f932ff169d45ca761d170d489caa3bc1f0946f3e798dc58ad44b337",
+      ".queries": "bdb63a31361be62277d1c3fed1da6602ad3e8cf1177ac30f04b60cac7cc9bae3"
+    },
+    "input_distinction": "Actual optimized source, not unchanged performance target; different checked bytes are expected for this separate validation."
+  },
+  "late_profile": {
+    "summary_sha256": "d297accd502120882ae532599e8ce67ce9295aff6dff901b8d58ba598c25dc30",
+    "run_receipt_sha256": "e4951331a369f77268bdd6d7ffb5561bd8073b25491b3594408866c509265454",
+    "raw_profile_sha256": "6b10591b2ede3e4e69b875af9819ec50bccbaad1285118705ebfa189c262396a",
+    "exclusive_ticks": 181903,
+    "tick_microseconds": 1000,
+    "whole_run_allocated_bytes_excluding_profiling_overhead": 229359591776,
+    "diagnostic_wall_seconds": 204.652735992,
+    "ordinary_median_seconds": 97.958729957,
+    "whole_program_overhead_ratio": 2.0891730229846224,
+    "exclusive_integer_reconciliation_verified": true,
+    "scope": "Late-instrumented whole run; no sampled CPU share is converted to stage wall. Allocation is not ordinary allocation, retained memory or RSS."
+  },
+  "locks": {
+    "receipt_sha256": "ead457c844b8c1c6b8dcfd77e2a837c2fa0c567658812bcbb8795f8df53beea5",
+    "roots": 6,
+    "all_lock_and_offline_locked_plan_commands_exit_zero": true,
+    "actual_final_lock_hashes": {
+      "libraries/mlf-async/mlf.lock": "00172380b7f22a7184169a01822f9893b1490883aa608e4c15d71c2c377d111a",
+      "mlf.lock": "f2f1b53cf265b80c7d94c4b54a450717d27f5e6e3e08d32baf27df54a8f44a1a",
+      "testing/tools/mlf.lock": "83133fb340d14d41932a65a7b35c700a95118618734d681ba65f240efc2f1c9a",
+      "tests/async-package/mlf.lock": "b793d55be9ff83293767d4bb906e740c347889bfb870962df043db641aaf4cf8",
+      "tests/mlf.lock": "d2d5d0f5b4370c718d6ccddedec970f0158aaeb1a994efed985f7206c508fc5d",
+      "tests/shared/mlf.lock": "9c0c50b91a30de63be669aebf1af537b9b7928547b472836eee94fb4c38d28a1"
+    },
+    "changed_from_prelock": 4
+  },
+  "limits": [
+    "Compiler samples interleaved within candidate2; candidate-version medians are not ABBA-paired effect estimates.",
+    "GHC plain-O2 objects versus MLF independently checked xMLF and query-cache publication are asymmetric endpoints.",
+    "No target inference reuse; compilation of authenticated dependencies excluded; OS page cache not flushed.",
+    "Scoped receipt/source review, not a new replay of completed tests. Checked performance artifact equality is established by their authenticated run receipts.",
+    "No full 74-module MLF compiler bootstrap, native-unit/parity/LLVM-runtime campaign, or self-host fixed-point claim.",
+    "No candidate3/4 implementation or results included in this milestone."
+  ],
+  "negative_rts_screen": {
+    "summary_sha256": "0f0b54f9ae6b8a42feaa064f51a9664f1136587edd5dbe5d3c814d9c77cf08a4",
+    "diagnostic_build_receipt_sha256": "4b52f0f8b945c49eb55b110695fcfdf20d232fdb8f678f08d91802aca208492c",
+    "source_object_and_interface_files_reverified_identical": 250,
+    "object_files": 125,
+    "interface_files": 125,
+    "samples": [
+      {
+        "label": "profile-fingerprint-2-rts-default-1",
+        "wall_seconds": 100.468738793,
+        "GHCRTS": "-T -s",
+        "max_individual_child_rss_bytes": 227024896,
+        "allocated_bytes": 229557483168,
+        "copied_bytes": 11874652648,
+        "sampled_max_residency_bytes": 61927144,
+        "phases": {
+          "INIT": {
+            "cpu_seconds_rounded": 0.001,
+            "elapsed_seconds_rounded": 0.0
+          },
+          "MUT": {
+            "cpu_seconds_rounded": 80.992,
+            "elapsed_seconds_rounded": 86.369
+          },
+          "GC": {
+            "cpu_seconds_rounded": 14.084,
+            "elapsed_seconds_rounded": 14.088
+          },
+          "EXIT": {
+            "cpu_seconds_rounded": 0.0,
+            "elapsed_seconds_rounded": 0.0
+          },
+          "Total": {
+            "cpu_seconds_rounded": 95.078,
+            "elapsed_seconds_rounded": 100.457
+          }
+        },
+        "receipt_sha256": "3c383741a849e8f8deff7a17960301258c6384d149a175a2fe89193cc04e00c3",
+        "stderr_sha256": "bd9fedf0799be9360eeda5f9254df0ddf776368ad3d049c7d08e859084b87db9",
+        "guard_receipt_sha256": "dff2eec356a59192d38bdab10e9af4caf02bc669d67d006877afeccac5ae6791"
+      },
+      {
+        "label": "profile-fingerprint-2-rts-A16m-1",
+        "wall_seconds": 113.845159469,
+        "GHCRTS": "-A16m -T -s",
+        "max_individual_child_rss_bytes": 239771648,
+        "allocated_bytes": 229381429984,
+        "copied_bytes": 7387979304,
+        "sampled_max_residency_bytes": 61927248,
+        "phases": {
+          "INIT": {
+            "cpu_seconds_rounded": 0.0,
+            "elapsed_seconds_rounded": 0.0
+          },
+          "MUT": {
+            "cpu_seconds_rounded": 97.933,
+            "elapsed_seconds_rounded": 103.17
+          },
+          "GC": {
+            "cpu_seconds_rounded": 10.663,
+            "elapsed_seconds_rounded": 10.665
+          },
+          "EXIT": {
+            "cpu_seconds_rounded": 0.0,
+            "elapsed_seconds_rounded": 0.0
+          },
+          "Total": {
+            "cpu_seconds_rounded": 108.597,
+            "elapsed_seconds_rounded": 113.835
+          }
+        },
+        "receipt_sha256": "0220abd5b4e10566729bf812e7289d0f30b83e0913c57e4fdb9091d9b501797a",
+        "stderr_sha256": "00e469a4acffc03cc68a31734744acf1fe4a88ed9f37fc76af3451dda5b72d08",
+        "guard_receipt_sha256": "e30863afdfe7dc34307c26950ac39f2e9fb526191e58a1ac76c7cdbf4d11e4d1"
+      }
+    ],
+    "decision": "A16m not adopted; production RTS configuration unchanged.",
+    "scope": "One diagnostic run per configuration, not a median, not an ABBA causal claim, and excluded from accepted source-level medians.",
+    "memory_limits": "RTS maximum residency is sampled at major GC, not process RSS; explicit rounded RTS timings retained, not the printed %GC field."
+  },
+  "completed_query_archival": {
+    "recipe_sha256": "ccd272c0ad9537566c6cd07add14d973d5355358308a14dcd69d95aa94691773",
+    "scope": "Six completed task-owned candidate query directories only; no reuse for inference; query archive bodies excluded from Library package.",
+    "runs": [
+      {
+        "label": "namespace-filter-1-mlf-1",
+        "archive_sha256": "2fb30de154a4f4bc49bd9bcbe164b4841a99db4e8f292db8bbc1b9a9c7015ae4",
+        "archive_bytes": 23304878,
+        "original_file_bytes": 332142091,
+        "all_member_hashes_verified": true,
+        "copies_removed": true,
+        "archive_receipt_sha256": "5a25c3f13dc4b28eb206c524050624d692cc8d42a23c669ecd04ed6d70f77215",
+        "member_files": 546,
+        "directories": 1,
+        "compressed_file_hash_reverified_now": true
+      },
+      {
+        "label": "namespace-filter-1-mlf-2",
+        "archive_sha256": "ae5531b998882301c99698edb4c5f7f866ee2029d80cfac2acfd26e72c634c48",
+        "archive_bytes": 23304986,
+        "original_file_bytes": 332142091,
+        "all_member_hashes_verified": true,
+        "copies_removed": true,
+        "archive_receipt_sha256": "ce5aa7461fa5e0a4e85973c5c69b7e7f2dd0bfae070501148c9c5a50392c5a5e",
+        "member_files": 546,
+        "directories": 1,
+        "compressed_file_hash_reverified_now": true
+      },
+      {
+        "label": "namespace-filter-1-mlf-3",
+        "archive_sha256": "72a63beb990f2e0143caabc53143be039cd8f04ac98d556fd1c460dc4ae4c5b5",
+        "archive_bytes": 23304358,
+        "original_file_bytes": 332142091,
+        "all_member_hashes_verified": true,
+        "copies_removed": true,
+        "archive_receipt_sha256": "6e5febf8520c3f6bcf7d1d54dd03151787a248032a726e4cc53476b55c812147",
+        "member_files": 546,
+        "directories": 1,
+        "compressed_file_hash_reverified_now": true
+      },
+      {
+        "label": "fingerprint-2-mlf-1",
+        "archive_sha256": "000821e27ed87993427f6e7b4ef4b7b0ee5e67d383d444ea5229460c801b8778",
+        "archive_bytes": 23299485,
+        "original_file_bytes": 332142091,
+        "all_member_hashes_verified": true,
+        "copies_removed": true,
+        "archive_receipt_sha256": "f22d5817f3b4d2b35d9bbfbecb10ada77356a8fb87798223b4ebafeaee3ac17a",
+        "member_files": 546,
+        "directories": 1,
+        "compressed_file_hash_reverified_now": true
+      },
+      {
+        "label": "fingerprint-2-mlf-2",
+        "archive_sha256": "660e29adbce236b91c0046c7e12ea0ea2686539dacc72b085b39092931b7e3fa",
+        "archive_bytes": 23295379,
+        "original_file_bytes": 332142091,
+        "all_member_hashes_verified": true,
+        "copies_removed": true,
+        "archive_receipt_sha256": "8bf75f58b163bc1c44987810be6876f396839804118846c262327af464325649",
+        "member_files": 546,
+        "directories": 1,
+        "compressed_file_hash_reverified_now": true
+      },
+      {
+        "label": "fingerprint-2-mlf-3",
+        "archive_sha256": "0d29e18cbab1d6d37021c340ebfb002a40f98e8ab95bf456820e76f94d0b9737",
+        "archive_bytes": 23289976,
+        "original_file_bytes": 332142091,
+        "all_member_hashes_verified": true,
+        "copies_removed": true,
+        "archive_receipt_sha256": "c8d277dcbbbff0b2ed4f40a484ee4cec4e77e83fd33272df03aa2f26fbeaa3b8",
+        "member_files": 546,
+        "directories": 1,
+        "compressed_file_hash_reverified_now": true
+      }
+    ],
+    "initial_attempt": {
+      "status": "failed before any query/archive writes; watchdog log/receipt retained",
+      "cause": "KeyError: terminal_descendants_empty missing from first old baseline guard receipt",
+      "receipt_sha256": "b08ca2a9d227684a0ca31289aaa191ee2ca9bfb11e7a121974a2dd7286d8f34a",
+      "log_sha256": "bcfc9c2dbd2145062500e542f0958e19cf49c569ad41e8195311cc6b73d4cbf2"
+    },
+    "second_attempt": {
+      "status": "complete; exactly the six candidate run labels, owned descendants empty",
+      "receipt_sha256": "f3b066b4020069b5a055efd578a0c20616b7073adf4346778e84425f779abd1c",
+      "log_sha256": "7472a34ddb9c138b415e6029051fb66efea3bbe1e089c45b4db1965919ba579d"
+    },
+    "baseline_expanded_query_directories_observed_intact_no_archive_or_record": [
+      "baseline-mlf-1",
+      "baseline-mlf-2",
+      "baseline-mlf-3"
+    ],
+    "verification_limits": "Archive producer verified every member and directory against originals before removing redundant copies. This review rehashed compressed archives and pinned input receipts/checked artifacts, but did not decompress them again or rehash all expanded baseline query bytes."
+  }
+}

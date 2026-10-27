@@ -1,0 +1,35 @@
+{
+  "format": "fingerprint-sharing-static-review-v1",
+  "built": false,
+  "executed_haskell_controls": false,
+  "expected_harness_checks": 909,
+  "base_patch_sha256_excluding_candidate": "8af698b399471bedcace8411d1db298dc5f7bf6913c30d065dea0b1dcfc26dcb",
+  "expected_namespace_patch_sha256": "8af698b399471bedcace8411d1db298dc5f7bf6913c30d065dea0b1dcfc26dcb",
+  "candidate_patch_sha256": "473e6284389497932d631eb46607c7c7864b5f74f100bfae8db8ed3e15e16a41",
+  "changed_source_files": [
+    "libraries/mlf-crates/Bootstrap/Crate.hs",
+    "libraries/mlf-crates/Bootstrap/CrateArtifact.hs"
+  ],
+  "unchanged_critical_helpers": {
+    "validateInterface": {
+      "unchanged": true,
+      "sha256": "11c5e578a31f37aa2afc1aff0f9f764eb119e108df50c61d28d3738c6a823922"
+    },
+    "interfaceFields": {
+      "unchanged": true,
+      "sha256": "36dae124d760a0c91bb8daac1129a9eaae812d2de1f20758ba5452666aae5cd8"
+    },
+    "encodePooledPayload": {
+      "unchanged": true,
+      "sha256": "c3df0b6751e4cfc01eaefc959fb0abdee50b686dd3e4280f2221b066e8a4874a"
+    },
+    "decodeObject": {
+      "unchanged": true,
+      "sha256": "2986028fad7a47bef964918bae7b6773d3fbd80bf0ee64ed854b84c4a37704c1"
+    }
+  },
+  "source_hashes": {
+    "libraries/mlf-crates/Bootstrap/Crate.hs": "b3e32635fa10d5b72494e959db288f494774aaa1e5c5319151e8e3dcf5cb7b56",
+    "libraries/mlf-crates/Bootstrap/CrateArtifact.hs": "a1c1668c89707c056737237b213fe4b0b1fe86548db71ae1262c9ad7d6cbcc9e"
+  }
+}

@@ -456,6 +456,14 @@ module Bootstrap.Crate where {
   -- Query compilation consumes only metadata-derived schemes. Upstream checked
   -- bodies are opened later by the linker and never enter an inference key.
   compilePrepared spec interfaces prepared =
+    compilePreparedWith (\object _ report -> (,) object report) spec interfaces prepared;
+  -- Preserve compilePrepared's public result while allowing the file producer
+  -- to carry the exact finalized pooled payload through its result builder.
+  -- The builder runs only after the same interface validation as before.
+  compilePreparedWith :: forall a. (Artifact.CrateObject -> String -> Query.QueryReport -> a) ->
+    CrateSpec -> [] ((,) String Artifact.CrateInterface) -> PreparedCrate ->
+    IO (Either String a);
+  compilePreparedWith complete spec interfaces prepared =
     do {
       let {
         lowered = preparedLowered prepared
@@ -562,11 +570,12 @@ module Bootstrap.Crate where {
                      "pending"
                      protection
                };
-               let {
-                 object = Artifact.makeObject iface fragments
-               };
-               Artifact.validateInterface (Artifact.objectInterface object);
-               Right ((,) object report)
+               case Artifact.makeObjectWithPayload iface fragments of {
+                 (,) object payload -> do {
+                   Artifact.validateInterface (Artifact.objectInterface object);
+                   Right (complete object payload report)
+                 }
+               }
              })
       }
     };
@@ -665,7 +674,8 @@ module Bootstrap.Crate where {
         Left message -> ioReturn (Left message);
         Right ((,,) updated loaded prepared) ->
           do {
-            result <- compilePrepared updated loaded prepared;
+            result <- compilePreparedWith (\object payload report -> (,,) object payload report)
+              updated loaded prepared;
             case result of {
               Left message ->
                 let {
@@ -679,9 +689,9 @@ module Bootstrap.Crate where {
                       names
                 } in
                 ioReturn (Left (Modules.displayNames diagnostics message));
-              Right ((,) object report) ->
+              Right ((,,) object payload report) ->
                 do {
-                  Artifact.writeObject prefix object;
+                  Artifact.writeObjectWithPayload prefix object payload;
                   writeFile (prefix ++ ".queries")
                     (Query.reportJSON (specIdentity spec)
                        (Artifact.semanticFingerprint (Artifact.objectInterface object))

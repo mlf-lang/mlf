@@ -1,0 +1,69 @@
+  encodeInterface iface =
+    let {
+      fields = interfaceFields iface
+    } in
+    Separate.pack (snoc fields (Separate.fingerprint (Separate.pack fields)));
+
+  decodeInterface :: String -> Either String CrateInterface;
+  decodeInterface input = do {
+    fields <- Separate.unpack input;
+    case fields of {
+      [tag, identity, deps, modules, exports, imports, metadata, instanceNames,
+       layouts, bindings, entry, bodyHash, protectionField, checksum] -> do {
+        ensure (eqString tag "MLFCI-5") "unsupported crate metadata epoch (expected MLFCI-5)";
+        ensure (eqString checksum (Separate.fingerprint (Separate.pack (interfacePrefix fields))))
+          "crate metadata checksum mismatch";
+        dependencies <- bindEither (Separate.unpack deps) (traverseEither decodeDependency);
+        owned <- Separate.unpack modules;
+        exported <- decodeExports exports;
+        reach <- decodeImports imports;
+        source <- Parser.parseMetadataModule "<crate metadata>"
+          ("module CrateMetadata where {\n" ++ metadata ++ "\n}");
+        lowered <- Parser.parseMetadataModule "<crate layout metadata>"
+          ("module CrateLayouts where {\n" ++ layouts ++ "\n}");
+        names <- Separate.unpack instanceNames;
+        schemes <- decodeBindings bindings;
+        protection <- decodeProtection protectionField;
+        ensure (length names == length (Modules.sourceInstances source))
+          "crate instance metadata count mismatch";
+        ensure (null (Modules.sourceValues source) && null (Modules.sourceImports source) &&
+          null (Modules.sourceValues lowered) && null (Modules.sourceImports lowered) &&
+          null (Modules.sourceClasses lowered) && null (Modules.sourceInstances lowered))
+          "crate metadata contains executable declarations";
+        let { iface = CrateInterface identity dependencies owned exported reach
+          (Modules.sourceDatatypes source) (Modules.sourceClasses source)
+          (zip names (map Separate.stripInstance (Modules.sourceInstances source)))
+          (Modules.sourceDatatypes lowered) schemes entry bodyHash protection };
+        validateInterface iface;
+        ensure (eqString input (encodeInterface iface)) "noncanonical crate metadata";
+        Right iface
+      };
+      _ -> Left "unsupported or malformed crate metadata (expected MLFCI-5)"
+    }
+  };
+
+  makeObject iface fragments =
+    CrateObject (withObjectFingerprint iface (fragmentFingerprint fragments)) fragments;
+
+  encodeObject object =
+    case object of {
+      CrateObject iface fragments ->
+        Separate.pack
+          ((:) "MLFCO-2"
+             ((:) (crateId iface)
+                ((:) (Separate.fingerprint (encodeInterface iface))
+                   ((:) (encodePooledPayload fragments) []))));
+      LegacyCrateObject iface fragments ->
+        Separate.pack
+          ((:) "MLFCO-1"
+             ((:) (crateId iface)
+                ((:) (Separate.fingerprint (encodeInterface iface))
+                   ((:) (Separate.pack (map encodeFragment fragments)) []))))
+    };
+
+  writeObject prefix object =
+    do {
+      writeFile (prefix ++ ".mlfco") (encodeObject object);
+      writeFile (prefix ++ ".mlfci") (encodeInterface (objectInterface object));
+      ioReturn ()
+    };

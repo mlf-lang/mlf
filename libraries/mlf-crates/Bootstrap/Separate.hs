@@ -444,6 +444,16 @@ module Bootstrap.Separate where {
   fingerprintFrom text i a b =
     if (i >= stringLength text)
     then (showInt a ++ ("-" ++ showInt b))
+    else if (i == 0)
+         then fingerprintChars (textToChars text) a b
+         else fingerprintIndexedFrom text i a b;
+  -- Complete traversals use the existing scalar-character stream. Keep the
+  -- indexed path for every nonzero start: negative indices retain their exact
+  -- error/demand behavior and positive offsets do not require a prefix scan.
+  fingerprintIndexedFrom :: String -> Int -> Int -> Int -> String;
+  fingerprintIndexedFrom text i a b =
+    if (i >= stringLength text)
+    then (showInt a ++ ("-" ++ showInt b))
     else let {
            code = stringCodeAt text i
          } in
@@ -453,13 +463,30 @@ module Bootstrap.Separate where {
          let {
            nextB = (((b * 131) + code) % 2147483629)
          } in
-         seq nextA (seq nextB (fingerprintFrom text (i + 1) nextA nextB));
+         seq nextA (seq nextB (fingerprintIndexedFrom text (i + 1) nextA nextB));
+  fingerprintChars :: [] Char -> Int -> Int -> String;
+  fingerprintChars chars a b =
+    case chars of {
+      [] -> (showInt a ++ ("-" ++ showInt b));
+      (:) c rest ->
+        let { code = charCode c } in
+        let { nextA = (((a * 65599) + code) % 2147483647) } in
+        let { nextB = (((b * 131) + code) % 2147483629) } in
+        seq nextA (seq nextB (fingerprintChars rest nextA nextB))
+    };
   fingerprint text = fingerprintFrom text 0 0 1;
   -- Exact summaries of the two existing rolling checksums. A summary composes
   -- with any initial state, so shared datatype prefixes need not be rescanned
   -- for every independently checked fragment. The serialized digest is unchanged.
   fingerprintStateFrom :: String -> Int -> Int -> Int -> (,) Int Int;
   fingerprintStateFrom text i a b =
+    if (i >= stringLength text)
+    then (,) a b
+    else if (i == 0)
+         then fingerprintStateChars (textToChars text) a b
+         else fingerprintIndexedStateFrom text i a b;
+  fingerprintIndexedStateFrom :: String -> Int -> Int -> Int -> (,) Int Int;
+  fingerprintIndexedStateFrom text i a b =
     if (i >= stringLength text)
     then (,) a b
     else let {
@@ -471,7 +498,17 @@ module Bootstrap.Separate where {
          let {
            nextB = (((b * 131) + code) % 2147483629)
          } in
-         seq nextA (seq nextB (fingerprintStateFrom text (i + 1) nextA nextB));
+         seq nextA (seq nextB (fingerprintIndexedStateFrom text (i + 1) nextA nextB));
+  fingerprintStateChars :: [] Char -> Int -> Int -> (,) Int Int;
+  fingerprintStateChars chars a b =
+    case chars of {
+      [] -> (,) a b;
+      (:) c rest ->
+        let { code = charCode c } in
+        let { nextA = (((a * 65599) + code) % 2147483647) } in
+        let { nextB = (((b * 131) + code) % 2147483629) } in
+        seq nextA (seq nextB (fingerprintStateChars rest nextA nextB))
+    };
   fingerprintPower :: Int -> Int -> Int -> Int;
   fingerprintPower base count modulus =
     if (count == 0)

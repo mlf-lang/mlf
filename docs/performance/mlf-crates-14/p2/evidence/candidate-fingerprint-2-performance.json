@@ -1,0 +1,81 @@
+{
+  "format": "full14-candidate-performance-v1",
+  "candidate": "fingerprint-2",
+  "status": "performance_complete_qualification_status_separate",
+  "samples": {
+    "mlf": [
+      {
+        "label": "fingerprint-2-mlf-1",
+        "wall_seconds": 96.097096326,
+        "child_user_seconds": 87.487695,
+        "child_system_seconds": 5.364486,
+        "max_individual_child_rss_bytes": 213528576
+      },
+      {
+        "label": "fingerprint-2-mlf-2",
+        "wall_seconds": 102.212548005,
+        "child_user_seconds": 92.926518,
+        "child_system_seconds": 6.174647,
+        "max_individual_child_rss_bytes": 233177088
+      },
+      {
+        "label": "fingerprint-2-mlf-3",
+        "wall_seconds": 97.958729957,
+        "child_user_seconds": 88.742902,
+        "child_system_seconds": 5.911869,
+        "max_individual_child_rss_bytes": 213524480
+      }
+    ],
+    "ghc": [
+      {
+        "label": "fingerprint-2-ghc-1",
+        "wall_seconds": 8.691134185,
+        "child_user_seconds": 8.568317,
+        "child_system_seconds": 0.14616099999999999,
+        "max_individual_child_rss_bytes": 337330176
+      },
+      {
+        "label": "fingerprint-2-ghc-2",
+        "wall_seconds": 7.954627817,
+        "child_user_seconds": 7.815532,
+        "child_system_seconds": 0.159104,
+        "max_individual_child_rss_bytes": 341807104
+      },
+      {
+        "label": "fingerprint-2-ghc-3",
+        "wall_seconds": 8.38782803,
+        "child_user_seconds": 8.214732,
+        "child_system_seconds": 0.19341,
+        "max_individual_child_rss_bytes": 341053440
+      }
+    ]
+  },
+  "medians": {
+    "mlf": 97.958729957,
+    "ghc": 8.38782803
+  },
+  "ratio_to_contemporaneous_ghc": 11.678676482951214,
+  "three_times_target_seconds": 25.163484089999997,
+  "goal_met": false,
+  "all_mlf_checked_artifacts_identical": true,
+  "all_mlf_544_inferred_0_reused": true,
+  "samples_interleaved_between_compilers": true,
+  "inputs": {
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/candidates/fingerprint-2/producer/receipt.json": "bc526f3055c3a7598ccb7c14183306b80f2c0317abff0bcbf865efde750da032",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/runs/fingerprint-2-mlf-1/receipt.json": "8b3f2e1ed2daa6bff29fe62f0a325635c55185c58a57f586277225d9bebd7029",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/runs/fingerprint-2-mlf-1/candidate-authentication.json": "488bb516c160e352a9b413e394f69b887ce4967706b3036643624f559cb492e1",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/runs/fingerprint-2-mlf-2/receipt.json": "9f9ef3b804436730840445a07b214f930814a22cfcf21e34b54c3ac5aba3e979",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/runs/fingerprint-2-mlf-2/candidate-authentication.json": "488bb516c160e352a9b413e394f69b887ce4967706b3036643624f559cb492e1",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/runs/fingerprint-2-mlf-3/receipt.json": "cb44b6abaa14fbc0db089fe3769d745301444b82608e6ce884f82b10e8168863",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/runs/fingerprint-2-mlf-3/candidate-authentication.json": "488bb516c160e352a9b413e394f69b887ce4967706b3036643624f559cb492e1",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/runs/fingerprint-2-ghc-1/receipt.json": "21091b9d4794c9f1d681c39e4d007b6751851e3483fe394591e5d83cc8ce3d03",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/runs/fingerprint-2-ghc-2/receipt.json": "4a3dd28cef50b8257ea7c979461320c49f3196f0c54cbea82e8cc79ed8115ea4",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/runs/fingerprint-2-ghc-3/receipt.json": "5ba1df74cb091e2cce10c7e5d8581ccba7cd55cba4b8e3f7d9350e017eaae009"
+  },
+  "recipe_sha256": "065fbdbbf07259964c76f4d0334392e4824134621bfe797e3794d1b9a6970c95",
+  "caveats": [
+    "GHC plain -O2 objects versus MLF independently checked xMLF plus query-cache files: asymmetric endpoints.",
+    "Separate version medians are not ABBA-paired optimization effect estimates.",
+    "No full native compiler bootstrap or complete repository qualification is implied."
+  ]
+}

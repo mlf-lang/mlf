@@ -34,6 +34,11 @@ enumerate explicit manifest module/main paths; no manifest includes this folder.
 
 - `baseline`: `cumulative-source.patch` SHA256 `a09180199c536610c3f22bb4169d3ecc495531fd37dffb5d13fe9c6881d45855`.
 - `p1`: `cumulative-source.patch` SHA256 `082b947872d7ee003039d602d616d45d45ac2172eca6836e0092ac20a5b0bfd5`.
+- `p2`: `cumulative-source.patch` SHA256 `8d07e0962909fdf9f5ac34e5ff65036e39a9dc73c85a879ccf0ba06637b95be7`.
 
 P1 observed MLF median 105.914294467 s / GHC 8.001561806 s (13.2367x);
 154,072 selector controls passed. See its full stage results for scoped gates.
+
+P2 observed MLF median 97.958729957 s / GHC 8.387828030 s (11.6787x);
+2,503 differential controls passed. Actual optimized-source qualification had
+553 fresh groups and is not the frozen-input performance sample.

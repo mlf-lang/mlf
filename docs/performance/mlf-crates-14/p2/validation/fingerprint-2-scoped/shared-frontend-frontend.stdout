@@ -1,0 +1,4 @@
+shared frontend: qualified recursive inference checks passed
+shared frontend: declaration provenance and declared forall field checks passed
+shared frontend: recursive inference checks passed
+shared frontend: parser and namespace checks passed

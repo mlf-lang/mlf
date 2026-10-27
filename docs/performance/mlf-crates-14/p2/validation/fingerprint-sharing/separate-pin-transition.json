@@ -1,0 +1,8 @@
+{
+  "previous_manifest_sha256": "0d399543268ed9861de928d224be3973e1edf30cd544d8a872bfd67401e77714",
+  "old_unchanged_pin_moved_to_explicit_changed_oracle": "libraries/mlf-crates/Bootstrap/Separate.hs",
+  "all_other_pins_identical": true,
+  "original_and_current_outside_permitted_region_identical": true,
+  "new_candidate_sha256": "20638086fbdbcffa888cf12dd05d1f901d7963c2870cff36aa0594087b224c0d",
+  "haskell_controls_executed": false
+}

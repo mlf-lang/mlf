@@ -1,0 +1,60 @@
+MLF-CRATES CANDIDATE 2 — ACCEPTED SCOPED OPTIMIZATION; GOAL NOT MET
+
+Pinned PR25 aa11ffd318a2efa5be9805524710d0677eedb86f + approved fixes + candidate1 namespace filtering,
+then candidate2 fingerprint streaming and exact immutable payload/encoding sharing.
+Nonzero/negative fingerprint offsets retain the indexed path and error/demand
+behavior. Checksums, canonical byte comparisons, independent checking and object
+write order remain checked by the frozen-oracle controls. No Lexer edit.
+
+Same unchanged 14-module performance target; authenticated dependencies reused:
+  GHC 9.14.1 plain -O2: 8.691134185, 7.954627817, 8.387828030 s
+  GHC-hosted MLF:      96.097096326, 102.212548005, 97.958729957 s
+  Medians:            GHC 8.387828030 s; MLF 97.958729957 s
+  Ratio:              11.6786764830x, not <= 3x
+  Current 3x target:   25.163484090 s
+MLF median is 7.5113% below candidate1 and 40.2313% below the earlier baseline.
+Candidate2 compiler samples were interleaved; cross-version effects are not
+ABBA-paired estimates. GHC emits -O2 objects, MLF independently checked xMLF
+plus query-cache files: asymmetric endpoints. OS page cache was not flushed.
+Every performance run: 544 inferred, 0 reused; checked artifacts identical to
+the frozen reference. No target-result reuse or omitted validation.
+
+Qualification: official GHC producer (121 source interfaces, 13 tools, 121
+shared-syntax modules, exact fresh builtin regeneration); 2,503 independent
+fingerprint byte/error/lazy/write-order controls; all three maintained frontend
+modes; 86 distinct provenance methods INCLUDING 17 builtin controls once; five
+source-smoke cases. All six authentic offline locks and --locked plans passed.
+Separately, MLF compiled the ACTUAL OPTIMIZED 14-module mlf-crates source with
+553 inferred/0 reused, emitted checked artifacts and reloaded metadata. That is
+a source-compatibility check on different inputs, NOT a performance sample.
+
+Fresh late cost-centre profile: 181,903 exclusive 1ms ticks and
+229,359,591,776 allocated bytes reconcile exactly across the tree. Diagnostic
+wall 204.652735992 s / ordinary median 97.958729957 s = 2.089173023x overhead.
+These are whole-run instrumented allocations (excluding profiler overhead),
+not ordinary allocation, retained memory or RSS. Sampled CPU ownership and
+overlapping subtree totals are not exclusive chronological phase-wall times.
+
+No full 74-module MLF compiler bootstrap, native-unit/parity/LLVM-runtime or
+self-host fixed-point claim. Work toward <=3x continues in separate candidates.
+
+Portable final patch (apply to pristine pinned PR25):
+  pr25-plus-fixes-plus-namespace-plus-fingerprint-plus-locks.patch
+  SHA256 8d07e0962909fdf9f5ac34e5ff65036e39a9dc73c85a879ccf0ba06637b95be7
+The original 5afa521... pre-lock ancestry patch remains untouched and is copied
+as pre-lock-source-ancestry.patch. Detailed reviewed receipts/source hashes are
+indexed in candidate2-final-review.json. This milestone contains no candidate3/4.
+Negative RTS screen (diagnostic only): default -T -s took 100.468738793 s;
+-A16m -T -s took 113.845159469 s, one run each, NOT medians. GC elapsed
+fell from 14.088 to 10.665 s but total wall increased; A16m was NOT adopted.
+The diagnostic relink retained 125 .o + 125 .hi files byte-identically.
+Both screens inferred 544/0 and preserved checked bytes. RTS sampled
+residency and rounded GC time are not ordinary process peak RSS.
+
+Storage-only archival: the six completed candidate1/candidate2 query
+directories are locally restorable from hash-verified lossless archives;
+all member bytes were checked before redundant expanded copies were removed.
+Archives are NOT inference inputs and their bodies are NOT in this package.
+The first attempt stopped on a missing old baseline guard field BEFORE
+query/archive writes; all three baseline query directories remain expanded.
+Failure and successful six-directory archival receipts are both preserved.

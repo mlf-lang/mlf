@@ -1,0 +1,51 @@
+{
+  "format": "frozen-fingerprint-oracle-v2",
+  "source_root": "mlf-crates-profile-source-20261026",
+  "source_path": "libraries/mlf-crates/Bootstrap/CrateArtifact.hs",
+  "source_sha256": "317f78d39f073052374e652f756a1af0186102271e00f3d54e09bfb9a4d6688d",
+  "oracle_sha256": "46ccf49aeef6caf9ad440bb315d9e4d1fe4ce65173584a6fdf6c16215b00a3fe",
+  "excerpts_sha256": "1b279c2812c4c5f31222b6b714c35528b98115843dd66669fb2d4caa4ef7d87a",
+  "changed_logic_frozen": [
+    "encodeInterface",
+    "decodeInterface",
+    "makeObject",
+    "encodeObject",
+    "writeObject",
+    "Separate.fingerprintFrom",
+    "Separate.fingerprint",
+    "Separate.fingerprintStateFrom",
+    "Separate.fingerprintPower",
+    "Separate.fingerprintPart",
+    "Separate.fingerprintAppend",
+    "Separate.fingerprintAfter",
+    "checksum-bearing pooled/contextual/unit serialization oracle"
+  ],
+  "scope": "Exact original artifact entry bodies plus independently frozen old Separate indexed fingerprint/state loops. Oracle pooled/contextual/unit serializers also route all digests through frozen loops; unchanged parsing/framing/semantic helpers remain shared. Not an independent whole compiler.",
+  "shared_dependency_pins": {
+    "libraries/mlf-foundation/Bootstrap/Std.hs": "0eb137b5935bdf13ed6807c2a4aa96bb558bfce37fd39c9fb08897bb63eedbff",
+    "libraries/mlf-foundation/Bootstrap/Types.hs": "c8bf3c734fa5c7e4c9b1f546774fb7dbfac9cc872fc7194f18cacb53d332132a",
+    "libraries/mlf-foundation/Bootstrap/Map.hs": "d4d9ebfa39a14ae1cbaf48fa9d540eafa7b452aaa3cc73ffc624a34c15417bdb",
+    "libraries/mlf-foundation/Bootstrap/Set.hs": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f",
+    "libraries/mlf-foundation/Bootstrap/Host.hs": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5",
+    "libraries/mlf-language-core/Bootstrap/Data.hs": "30c7d22d4640afc393a136eccb24cce84f81f00ff6d92067d2bd56054dca8d16",
+    "libraries/mlf-frontend/Bootstrap/Module.hs": "cc4c4d74e7a9a0bf3432f71d782044bf807d118ecbf82a07717ef54a5e0b9ca6",
+    "libraries/mlf-frontend/Bootstrap/Parser.hs": "d6fcd9881700b9dd91077ca2db863076f3d4974688fbb4dbe42d97b96b82872d",
+    "libraries/mlf-xmlf/Bootstrap/X/Pretty.hs": "d4840c8c31b8f6bb82587590a4ab48ed8d664c96ba22c9daf70ae19c5e8ad8d9",
+    "libraries/mlf-xmlf/Bootstrap/X/Checked.hs": "0cf5be5536d4fdf747050b6a610345868a8c7ff1b1beb7885f68cd677e0c04e1",
+    "host/ghc/MLF/Host/Base.hs": "31fb27b1438c9a8bbf20804db4e770cc3af9d48dc39ad4ced9c55e10565ba63f",
+    "host/ghc/MLF/Host/IO.hs": "e563c81c86424f1203964d230a1beffcc22ed545a078c778e5e446f0a7cadc65"
+  },
+  "changed_dependency_oracles": {
+    "libraries/mlf-crates/Bootstrap/Separate.hs": {
+      "original_sha256": "868a4074204a9522f98eaed5ed1a2bafb56f2219b49a523e9ddf99ed949e0388",
+      "candidate_sha256": "20638086fbdbcffa888cf12dd05d1f901d7963c2870cff36aa0594087b224c0d",
+      "frozen_original_file": "original-Separate.hs",
+      "frozen_original_excerpts_file": "original-separate-fingerprint-excerpts.txt",
+      "frozen_original_excerpts_sha256": "cf1504d0f0bd30610052c8a40133a98600d6963738eee3694e5463b38e8b2a89",
+      "permitted_start_marker": "  fingerprintFrom ::",
+      "permitted_end_marker": "  fingerprintPower ::",
+      "unchanged_outside_region_sha256": "a77ceaf71385549395de608f138a31e9f41c709620d8a7a08f75c30338572218",
+      "reason": "Explicitly authorized zero-start streaming fingerprint/state change; full old indexed loops and their wrappers frozen independently in FrozenFingerprint, production changed functions directly tested."
+    }
+  }
+}
