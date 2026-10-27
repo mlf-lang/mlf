@@ -154,6 +154,7 @@ module Bootstrap.ImportedRoot
       _ -> Left "direct import wrapper lost a parameter"
     }
   };
+  removeEmptyGroup :: XTerm -> Either String XTerm;
   removeEmptyGroup term = case term of {
     XTypeAbs variable bound body -> mapEither (XTypeAbs variable bound) (removeEmptyGroup body);
     XTypeApp body proof -> mapEither (\value -> XTypeApp value proof) (removeEmptyGroup body);

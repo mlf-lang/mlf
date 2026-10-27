@@ -35,6 +35,7 @@ module Bootstrap.PreparedLibraryLiteral (rawLibrary) where {
     P.LibraryObject metadata digest body -> L.application "LibraryObject"
       [L.string metadata, L.string digest, object body]
   };
+  mode :: PreludeMode -> String;
   mode value = case value of {
     ImplicitPrelude -> "ImplicitPrelude";
     NoImplicitPrelude -> "NoImplicitPrelude"

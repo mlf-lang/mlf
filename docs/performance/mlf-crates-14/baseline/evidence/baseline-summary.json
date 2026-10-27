@@ -1,0 +1,119 @@
+{
+  "format": 1,
+  "scope": "Same frozen14 mlf-crates modules; compiled dependencies reused, target inference cold",
+  "variant": "PR25+approved local fixes",
+  "frozen_manifest_sha256": "102d2f829a06caaad08e4123631f7fd4146ec3fd320c334571aa58378d40710c",
+  "arms": {
+    "ghc": {
+      "samples": [
+        {
+          "label": "baseline-make-ghc-1",
+          "wall_seconds": 8.268046811,
+          "child_user_seconds": 8.089387,
+          "child_system_seconds": 0.19319799999999998,
+          "max_individual_child_rss_bytes": 336281600,
+          "byte_identical_to_prior": null,
+          "receipt_sha256": "cd5350c3c85c242f70a58dc410a9baa6c4c4cd515222e139e3e14ddfa7495354",
+          "sampled_peak_process_tree_rss_bytes": 354041856
+        },
+        {
+          "label": "baseline-make-ghc-2",
+          "wall_seconds": 8.936828866,
+          "child_user_seconds": 8.783406,
+          "child_system_seconds": 0.173478,
+          "max_individual_child_rss_bytes": 335810560,
+          "byte_identical_to_prior": null,
+          "receipt_sha256": "658a0d010adc143dc751e8366e9bd1868301fe00c3ee4db1391080ddd731dde5",
+          "sampled_peak_process_tree_rss_bytes": 356646912
+        },
+        {
+          "label": "baseline-make-ghc-3",
+          "wall_seconds": 8.847117296,
+          "child_user_seconds": 8.719114,
+          "child_system_seconds": 0.154496,
+          "max_individual_child_rss_bytes": 338534400,
+          "byte_identical_to_prior": null,
+          "receipt_sha256": "49959a8e5cb5acbb8380e8baeba9e12fddfacc1e33a7b7e7464dfce977044953",
+          "sampled_peak_process_tree_rss_bytes": 352436224
+        }
+      ],
+      "median_wall_seconds": 8.847117296,
+      "range_seconds": [
+        8.268046811,
+        8.936828866
+      ],
+      "mad_seconds": 0.0897115700000004
+    },
+    "mlf": {
+      "samples": [
+        {
+          "label": "baseline-mlf-1",
+          "wall_seconds": 170.168008194,
+          "child_user_seconds": null,
+          "child_system_seconds": null,
+          "max_individual_child_rss_bytes": null,
+          "byte_identical_to_prior": true,
+          "receipt_sha256": "32a2371672f3a008d770203a9063df5eb147688689e4b58f3ad90700634be7d0",
+          "sampled_peak_process_tree_rss_bytes": 244318208,
+          "inferred_groups": 544,
+          "reused_groups": 0,
+          "output_artifacts": {
+            ".mlfci": "876835e3fd66562b4080a8a52b424133e6b0427fecb2f8ffe4d9f96bb34bbe34",
+            ".mlfco": "a97d0c7e0990966f5926386ff2e3f6e6e0deb88d0fd02c22e9ca164e7f38807d"
+          }
+        },
+        {
+          "label": "baseline-mlf-2",
+          "wall_seconds": 163.896307032,
+          "child_user_seconds": 154.04847,
+          "child_system_seconds": 6.964706,
+          "max_individual_child_rss_bytes": 230973440,
+          "byte_identical_to_prior": true,
+          "receipt_sha256": "a348bf354b3ec43073b8a24303d46d777470f050aede208986019dcc1893d895",
+          "sampled_peak_process_tree_rss_bytes": 243228672,
+          "inferred_groups": 544,
+          "reused_groups": 0,
+          "output_artifacts": {
+            ".mlfci": "876835e3fd66562b4080a8a52b424133e6b0427fecb2f8ffe4d9f96bb34bbe34",
+            ".mlfco": "a97d0c7e0990966f5926386ff2e3f6e6e0deb88d0fd02c22e9ca164e7f38807d"
+          }
+        },
+        {
+          "label": "baseline-mlf-3",
+          "wall_seconds": 163.331291426,
+          "child_user_seconds": 153.729119,
+          "child_system_seconds": 6.685859,
+          "max_individual_child_rss_bytes": 232562688,
+          "byte_identical_to_prior": true,
+          "receipt_sha256": "113fad9f68230ea8d69cd82b4b4c4c6fe3a3c53941349655a3f71889c50f3cae",
+          "sampled_peak_process_tree_rss_bytes": 246738944,
+          "inferred_groups": 544,
+          "reused_groups": 0,
+          "output_artifacts": {
+            ".mlfci": "876835e3fd66562b4080a8a52b424133e6b0427fecb2f8ffe4d9f96bb34bbe34",
+            ".mlfco": "a97d0c7e0990966f5926386ff2e3f6e6e0deb88d0fd02c22e9ca164e7f38807d"
+          }
+        }
+      ],
+      "median_wall_seconds": 163.896307032,
+      "range_seconds": [
+        163.331291426,
+        170.168008194
+      ],
+      "mad_seconds": 0.5650156060000029
+    }
+  },
+  "mlf_over_ghc": 18.525390988780217,
+  "goal_mlf_wall_seconds": 26.541351888,
+  "target_met": false,
+  "flags": "GHC9.14.1 --make -no-link -j1 -O2 -fpedantic-bottoms -fno-state-hack; baseline MLF producer uses same optimization/demand flags, default serial RTS; no OS cache flush.",
+  "asymmetry": "GHC emits optimized native objects; MLF emits independently checked xMLF crate and persists new query results, not native objects.",
+  "caveats": [
+    "3 samples describe this host; no confidence interval.",
+    "First MLF run predates CPU/rusage instrumentation; CPU not retroactively invented.",
+    "All cold-group counts and byte identity independently post-audited, including first run.",
+    "First batch watchdog output-growth root covered logs only; RSS,wall,AS,hostmemory and global disk-reserve guards were active. Fixed watchdog monitors actual outputs for subsequent runs.",
+    "GHC one-shot10.9417s and verbose--make9.0096s exploratory results excluded from ordinary median.",
+    "Historical user128.58/5.67 measurements have no independently verified command/revision and were not pooled."
+  ]
+}

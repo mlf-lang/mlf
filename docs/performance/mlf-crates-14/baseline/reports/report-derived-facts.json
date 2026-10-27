@@ -1,0 +1,20 @@
+{
+  "primary_ratio": 18.114797076457254,
+  "target_seconds": 27.142943916,
+  "forced_root_ns": 195464745170,
+  "forced_nonrepeat_exclusive_ns": 194737120704,
+  "forced_repeat_exclusive_ns": 727624466,
+  "forced_repeat_count": 12028,
+  "ghc_aggregated_exclusive_ns": 8496111323,
+  "ghc_phase_count": 39890,
+  "report_sources": {
+    "frozen.json": "102d2f829a06caaad08e4123631f7fd4146ec3fd320c334571aa58378d40710c",
+    "evidence/baseline-final-summary.json": "e2eaca6483a048e455d65bce1dd199edea83748cbdff93002ee216d239fb97f1",
+    "evidence/mlf-forced-phase-wall.json": "85d296dc2ba9c7a02599c0d5a6ffcfed1d2040007dda2d9c6b9b91fff4b680f0",
+    "evidence/ghc-eventlog-phase-wall.json": "3e920d973ef55a2d73efac37758275b080ca7ed4117dd6a388d43161832a2144",
+    "evidence/ghc-eventlog-rts-observations.json": "c48d7ea0c9f7c4205e054b98a002c2e66ac656455fe501c95b54638f6ad755b7",
+    "profile-late-analysis/summary.json": "8b385eb81dc6134f5fba64aff77845220ccec29891da50ff026814503ba243a6",
+    "evidence/provenance-audit-after-profile.json": "26915821472320a0b0a71e0856ff2ca6f8f859cc8ab0618e49dfa9073fedaf92",
+    "evidence/mlf-forced-composite-interpretation.json": "c5aa8881d8a8dafa0990067ec19c3fbf1edabaf945e68ff644a0f12367095d20"
+  }
+}

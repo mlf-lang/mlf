@@ -199,6 +199,7 @@ module Bootstrap.BuiltinPreludeContext
   -- These flags govern managed evidence contraction, not graph quantifier
   -- rigidity. Carry complete source authority without invoking module-root
   -- compaction or replacing ordinary whole-root wanted closure.
+  sourceContracts :: Artifact.CrateInterface -> Set String -> Either String (Map String Source.SourceContract);
   sourceContracts iface sourceValues = let {
     externals = sourceExternals iface sourceValues;
     protection = M.fromList compareString (Artifact.crateProtection iface)

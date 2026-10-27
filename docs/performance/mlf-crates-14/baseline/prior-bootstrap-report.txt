@@ -1,0 +1,86 @@
+MLF PR25 本地修复版本编译器冷构建基准报告
+日期 2026-10-26 UTC
+
+结论
+GHC 路线完成一次冷构建，编译器构建耗时 78.462381249 秒。
+MLF 路线触发进程树 RSS 上限，未产出完整 native 编译器；没有完整 MLF 耗时或速度比。
+822.118982974 秒是失败尝试的外层观察时间，含 harness 预检，不能除以 GHC 耗时作比较。
+
+源码与变更
+对象为 mlf-lang/mlf PR25 的以下 head，加已批准的最小本地修复；交付前远端 head 复核未变。
+Head  aa11ffd318a2efa5be9805524710d0677eedb86f
+补丁 SHA256  a09180199c536610c3f22bb4169d3ecc495531fd37dffb5d13fe9c6881d45855
+共 10 个文件：3 处单行 IsString 辅助函数签名、1 处生成身份数据、6 个真实刷新后的锁文件。
+签名位于 Bootstrap/BuiltinPreludeContext.hs、ImportedRoot.hs、PreparedLibraryLiteral.hs。
+bootstrap/MLF/BuiltinPreludeData.hs 仅更新生成身份，不改 canonical builtin 内容或生成算法。
+终止后全部 5595 个源码文件哈希及冻结补丁均未变；结果不是原始 head 的纯净结果。
+六锁为 mlf.lock、libraries/mlf-async/mlf.lock、testing/tools/mlf.lock、tests/async-package/mlf.lock、
+tests/mlf.lock、tests/shared/mlf.lock；通过普通 manager offline lock 和 locked plan 刷新及复核。
+
+环境与固定边界
+Debian 13 x86_64，AMD EPYC 9V74；GHC 9.14.1 为校验过的官方 bindist。
+Clang 19.1.7、BDWGC 8.2.8、GMP 6.3.0；setup C 工具为 GCC 14.2.0。
+两腿均 jobs=1；artifact、query、object/interface 输出目录冷启动，不复制旧产物。
+操作系统页缓存没有清空；每条路线仅一次样本，不声称统计稳定性或严格物理冷缓存。
+外层限制：进程树合计 RSS 3 GiB；每进程 AS 6 GiB；每腿 6 小时。
+MLF 受监控输出上限为 8 GiB；不据此声称 GHC 总产物也受同一输出上限约束。
+保护下限：可用磁盘 4 GiB、主机 available memory 3 GiB；没有提高限额或重试。
+RSS 是采样的进程树求和，不是单一进程峰值，也不是 PSS。
+
+准备与验证
+本次计时前的官方 producer 完成 121 个共享模块审计、13 个工具链接、121 个语法与名称检查。
+fresh builtin 准备及 canonical bytes 校验通过；生成数据只发生身份更新。
+六个离线锁与 locked plans 全部通过，非锁输入与 producer 重新认证通过。
+provenance/control 套件通过 86 个不同测试；17 个 builtin 测试另跑一次，也已包含在这 86 个中。
+因此不是 103 个独立测试；这些控制测试不等同于完整 native correctness qualification。
+setup 的 121 模块不是计时目标：GHC 实际重编译 74 共享源码加 5 个 host/wrapper 模块。
+74 中包含为 GHC 闭包显式加入的 Bootstrap.Regex 和 Bootstrap.PreparedLibraryLiteral。
+
+观测结果与计时口径
+GHC：成功退出；78.462381249 秒从首次 C 进程启动到 GHC 编译链接退出。
+含 2 个新 C 对象和 1 个 emlf 可执行文件；不含哈希/工具预检及产物盘点后检。
+外层 guard 用时 78.621991723 秒；采样进程树峰值 RSS 1,248,677,888 字节。
+MLF：未完成；外层 822.118982974 秒后，因 RuntimeError: process-group RSS limit 终止。
+峰值 RSS 3,285,200,896 字节，超过固定 3,221,225,472 字节上限；退出码 -15。
+8 个库及 runtime 对象已完成；活动 crate 为 mlf-compiler/0.3.0/target-emlf。
+停止在 --compile-crate，尚未进入目标编译器的 LLVM 发射、对象生成及链接。
+末次采样：输出 1,510,994,913 字节；磁盘余量 17,584,500,736 字节；
+主机 available memory 7,376,523,264 字节；故此次明确触发的是 RSS，不是磁盘或主机下限。
+MLF 预定正式口径为 manager 启动到退出，含其源码/锁/工具认证、推断、LLVM、runtime、链接与发布；
+但本次未退出成功，没有生成这一完整区间的有效构建耗时，也没有 native 产物可做后续资格验证。
+
+复现参数模板
+PACKAGE 为本包解压目录，SRC 为应用同一补丁的源码，WORK 为新实验工作目录（先完成下述 setup）。
+GHC/CLANG/GC 为同版工具路径或前缀。以下只是 Bash 参数模板，不是自包含的自动 harness；
+须先按官方 tools/shared/build.py 建立并验证 canonical producer、runner 和依赖，再套用同一外层 watchdog。
+set -euo pipefail; export GHC_ENVIRONMENT=- GHCRTS= LC_ALL=C.UTF-8 MAKEFLAGS=-j1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
+cd "$SRC"; OUT="$WORK/repro-ghc"; test ! -e "$OUT"; mkdir -p "$OUT/objects" "$OUT/bin"
+mapfile -t shared < "$PACKAGE/SHARED-SOURCES.txt"; args=(); for f in "${shared[@]}"; do args+=("$SRC/$f"); done
+inc=(-i); for r in libraries/mlf-{async,crates,developer-tools,foundation,frontend,inference,interpreter,language-core,llvm,package-core,xmlf} \
+  bootstrap package tests tests/shared testing host/ghc; do inc+=("-i$SRC/$r"); done
+pkg=(); for p in base array bytestring text containers directory; do pkg+=(-package "$p"); done
+"$CLANG" -O2 -std=c11 -I"$SRC/runtime" -c "$SRC/host/ghc/cbits/host.c" -o "$OUT/host.o"
+"$CLANG" -O2 -std=c11 -I"$SRC/runtime" -c "$SRC/runtime/mlf_process_supervisor.c" -o "$OUT/supervisor.o"
+"$GHC" --make -j1 -fforce-recomp -v1 -XHaskell2010 -package-env - -clear-package-db \
+  -global-package-db -no-user-package-db -hide-all-packages -O2 -fpedantic-bottoms -fno-state-hack \
+  -Werror=incomplete-patterns -Werror=incomplete-uni-patterns "${inc[@]}" \
+  -odir "$OUT/objects" -hidir "$OUT/objects" "${pkg[@]}" -rtsopts=ignoreAll \
+  "$SRC/host/ghc/app/emlf/Main.hs" "${args[@]}" "$OUT/host.o" "$OUT/supervisor.o" -o "$OUT/bin/emlf"
+export MLF_BUILD_RUNNER="$WORK/setup/mlf-build-runner" MLF_GC_PREFIX="$GC" MLF_CLANG="$CLANG" CC="$CLANG"
+export MLF_COMPILER="$WORK/setup/fixed-producer-2/producer/bin/emlf"; test ! -e "$WORK/repro-mlf"
+"$WORK/setup/fixed-producer-2/producer/bin/mlfpkg" --manifest "$SRC/mlf-package.json" \
+  --compiler "$MLF_COMPILER" --runtime "$SRC/runtime/mlf_runtime.c" --clang "$CLANG" \
+  --pkg-config /usr/bin/pkgconf --gc-prefix "$GC" --timeout 21600 --jobs 1 \
+  --build-dir "$WORK/repro-mlf/build" --cache-dir "$WORK/repro-mlf/cache" --offline --locked build --target emlf
+上述输出目录必须原先不存在；还须保留同批 producer、runner、依赖与动态库环境及其哈希认证。
+
+结论边界与后续门槛
+当前只能确认 GHC 构建成功与 MLF 在既定资源预算下失败；不能声称 native 正确、固定点或性能回归比。
+canonical producer 资格验证须在计时前完成；native 产物完成后，另行独立审计并运行输出门禁。
+只有两条路线成功冷构建且所需验证全部通过后，才能报告有效比值；部分完成或缓存命中不能替代。
+本轮不提高上限、不重跑、不更改源码；补丁与计时证据按上述身份保留。
+
+证据定位  相对原始实验工作目录（原始证据未装入本精简包）
+fixed-source-before.json；timed-ghc-1/receipt.json；timed-ghc-1-guard/bounded-receipt.json
+timed-mlf-1/bounded-receipt.json；timed-mlf-1/run/receipt.json；recipe-fixed/source-scope.json
+setup/fixed-producer-2/producer/receipt.json；setup/fixed-locks-1/receipt.json；setup/focused-verifier-controls/build.log
