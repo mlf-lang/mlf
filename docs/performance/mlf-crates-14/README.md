@@ -33,3 +33,7 @@ enumerate explicit manifest module/main paths; no manifest includes this folder.
 ## Included stages
 
 - `baseline`: `cumulative-source.patch` SHA256 `a09180199c536610c3f22bb4169d3ecc495531fd37dffb5d13fe9c6881d45855`.
+- `p1`: `cumulative-source.patch` SHA256 `082b947872d7ee003039d602d616d45d45ac2172eca6836e0092ac20a5b0bfd5`.
+
+P1 observed MLF median 105.914294467 s / GHC 8.001561806 s (13.2367x);
+154,072 selector controls passed. See its full stage results for scoped gates.

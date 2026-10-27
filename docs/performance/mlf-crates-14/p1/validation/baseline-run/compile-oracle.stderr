@@ -1,0 +1,56 @@
+/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/FrozenSelectors.hs:8:3: error: [GHC-87110]
+    Could not find module ‘MLF.Primitive’.
+    Use -v to see a list of the files searched for.
+  |
+8 |   import MLF.Primitive;
+  |   ^^^^^^^^^^^^^^^^^^^^
+
+/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/FrozenSelectors.hs:9:3: error: [GHC-87110]
+    Could not find module ‘Bootstrap.Types’.
+    Use -v to see a list of the files searched for.
+  |
+9 |   import Bootstrap.Types;
+  |   ^^^^^^^^^^^^^^^^^^^^^^
+
+/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/FrozenSelectors.hs:10:3: error: [GHC-87110]
+    Could not find module ‘Bootstrap.Std’.
+    Use -v to see a list of the files searched for.
+   |
+10 |   import Bootstrap.Std;
+   |   ^^^^^^^^^^^^^^^^^^^^
+
+/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/FrozenSelectors.hs:11:3: error: [GHC-87110]
+    Could not find module ‘Bootstrap.Module’.
+    Use -v to see a list of the files searched for.
+   |
+11 |   import Bootstrap.Module (ModuleSpace(..), Role(..), Entity(..), Interface(..));
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/FrozenSelectors.hs:12:3: error: [GHC-87110]
+    Could not find module ‘Bootstrap.Map’.
+    Use -v to see a list of the files searched for.
+   |
+12 |   import qualified Bootstrap.Map as M;
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/FrozenSelectors.hs:13:3: error: [GHC-87110]
+    Could not find module ‘Bootstrap.Set’.
+    Use -v to see a list of the files searched for.
+   |
+13 |   import qualified Bootstrap.Set as Set;
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/FrozenSelectors.hs:14:3: error: [GHC-87110]
+    Could not find module ‘Bootstrap.Primitive’.
+    Use -v to see a list of the files searched for.
+   |
+14 |   import qualified Bootstrap.Primitive as P;
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/FrozenSelectors.hs:15:3: error: [GHC-87110]
+    Could not find module ‘Bootstrap.Lexer’.
+    Use -v to see a list of the files searched for.
+   |
+15 |   import qualified Bootstrap.Lexer as Lexer;
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+

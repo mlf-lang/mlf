@@ -1,0 +1,17 @@
+{
+  "format": "selector-runner-interface-search-fix-v1",
+  "reason": "Initial one-shot compile failed to find all home modules with empty -hidir; no oracle/harness body compiled.",
+  "failed_run": "baseline-run",
+  "failed_recipe_sha256": "d3b4df31dc40db126182ff00368e909e9bd4b9ff9c149a37077bf976a53ce5ab",
+  "new_recipe_sha256": "caef5e1b6ffbcad3d0a75a953c44605d31e46061733f5219da6a9fc0e2351636",
+  "changes": [
+    "Copy authenticated producer .hi/.o bytes into new output object tree, excluding root Main.",
+    "Use copied object tree consistently for -i/-hidir/-odir; implementation sources never searched.",
+    "Assert copied dependency bytes before/after; original producer bytes authenticated before/after.",
+    "Assert exactly two new Haskell test modules; retain exact runner per invocation."
+  ],
+  "oracle_and_harness_unchanged": true,
+  "python_ast_pass": true,
+  "executed": false,
+  "suggested_new_label": "baseline-run-2"
+}

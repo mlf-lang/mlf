@@ -1,0 +1,28 @@
+{
+  "format": "selector-test-source-review-v1",
+  "executed": false,
+  "compiled": false,
+  "python_ast_pass": true,
+  "oracle_has_two_original_visible_before_filter_sites": true,
+  "static_inventory": {
+    "exhaustive": 148480,
+    "authored": 4408,
+    "stress": 1160,
+    "lazy": 19,
+    "fixed_expected": 5,
+    "total": 154072
+  },
+  "files": {
+    "FrozenSelectors.hs": "62c44c42657f507c35d46fc08b5fc39f99ac23d34cb9cb2cf645fabfc83767d4",
+    "original-selector-excerpts.txt": "d77ad09a09f358926c43b637c5a9ab04052c6da2d16e90a7fe81cd27d156003a",
+    "SelectorDifferential.hs": "7acb8dd2177f6b8b1fc2cd31a9ab252171706c8650689ab7c586d47022537dce",
+    "run_selector_differential.py": "d3b4df31dc40db126182ff00368e909e9bd4b9ff9c149a37077bf976a53ce5ab",
+    "oracle-manifest.json": "db0f6f321cdc958e3f5d3ea118394420323795e64269f25fb5a46bba7834b417"
+  },
+  "limits": [
+    "Haskell sources not yet compiled or executed; no passing semantic claim.",
+    "Ordered-interface and exact error differential covers selected public selector helpers, not all resolveCrate/source/parser semantics.",
+    "Unicode fixtures exercise internal metadata; they do not claim Unicode source identifiers are accepted.",
+    "Oracle borrows candidate schema datatypes and unchanged pinned collection/primitive modules, never candidate selector helpers."
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "format": "mlf-crates-candidate-summary-v1",
+  "status": "accepted_for_scoped_ghc_hosted_semantics_and_measured_gain_goal_not_met",
+  "candidate": "namespace-filter-1",
+  "candidate_source": "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-source-20261026",
+  "qualified_producer_receipt_sha256": "b033ecb3f0ff38e3bce046025aaf3ed338bc1a0c2793fa2294c52e7345da0685",
+  "optimization_patch_sha256": "94c46b08eddbb2a242f3ad994291822ed10468315aef0fe865372f52ac82c1f9",
+  "combined_input_and_optimization_patch_sha256": "8af698b399471bedcace8411d1db298dc5f7bf6913c30d065dea0b1dcfc26dcb",
+  "samples": {
+    "mlf": [
+      {
+        "label": "namespace-filter-1-mlf-1",
+        "wall_seconds": 105.035217355,
+        "complete": true,
+        "max_individual_child_rss_bytes": 232755200
+      },
+      {
+        "label": "namespace-filter-1-mlf-2",
+        "wall_seconds": 107.322220458,
+        "complete": true,
+        "max_individual_child_rss_bytes": 232456192
+      },
+      {
+        "label": "namespace-filter-1-mlf-3",
+        "wall_seconds": 105.914294467,
+        "complete": true,
+        "max_individual_child_rss_bytes": 233426944
+      }
+    ],
+    "ghc": [
+      {
+        "label": "namespace-filter-1-ghc-1",
+        "wall_seconds": 8.001561806,
+        "complete": true,
+        "max_individual_child_rss_bytes": 340410368
+      },
+      {
+        "label": "namespace-filter-1-ghc-2",
+        "wall_seconds": 8.232354168,
+        "complete": true,
+        "max_individual_child_rss_bytes": 343298048
+      },
+      {
+        "label": "namespace-filter-1-ghc-3",
+        "wall_seconds": 7.99965947,
+        "complete": true,
+        "max_individual_child_rss_bytes": 333991936
+      }
+    ]
+  },
+  "medians": {
+    "mlf": 105.914294467,
+    "ghc": 8.001561806
+  },
+  "all_mlf_checked_artifacts_identical": true,
+  "all_mlf_cold": true,
+  "qualification_note": "121 source interfaces,13 tools,shared syntax and fresh builtin verification passed; regression suite pending; not full nativebootstrap.",
+  "ratio_to_contemporaneous_ghc": 13.236702663170057,
+  "current_three_times_target": 24.004685418,
+  "relative_to_prior_mlf_median": 0.6462274616493996,
+  "caveats": [
+    "Compared against prior baseline period, not ABBA paired; fresh GHC median moved from9.04765s to8.00156s.",
+    "GHC optimized objects versus MLF independently checkedxMLF+querycache endpoints remainasymmetric."
+  ],
+  "control_receipts": {
+    "validation/namespace-filter-1/receipt.json": "f59514afea08eda8ff7d61506fb3a2b36f159356a245d1edec77c8a5cf9d9635",
+    "validation/namespace-filter-1-scoped/receipt.json": "0424b6ffb49ea86f92784a22c21ec3f0633ac11d349d384fa6c6f2fd1c1ce7d9"
+  },
+  "selector_comparisons_passed": 154072,
+  "maintained_controls": "All3frontendmodes,86distinctprovenance(17builtin included),5source-smokecases passed; exactbanners/stderr/exitstatus verified.",
+  "pending_repository_delivery": "Authentic package locks must be refreshed for changedsource. Final portability/MLF-source checks remainseparate fromthis GHC-hosted scope; no fullbootstrap claim."
+}

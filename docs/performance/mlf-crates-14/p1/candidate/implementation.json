@@ -1,0 +1,13 @@
+{
+  "created_utc": "2026-10-26T23:13:26Z",
+  "status": "implemented, not yet built or measured",
+  "profile_report_sha256_before_edit": "ed13ddd36da85e081c87fd11dd7282f12219478978204d972b15e27e5a61f902",
+  "baseline_profile_summary_sha256": "e2eaca6483a048e455d65bce1dd199edea83748cbdff93002ee216d239fb97f1",
+  "patch_sha256": "1003f83d6af96ceae626e83435276886eef0332ea2292a7d4f0bc0a5386605db",
+  "original_module_sha256": "d1d131834ec7bafa312577f5b2b3f85a986e2a1a0f73ea9427f896634dc33aa1",
+  "candidate_module_sha256": "cc4c4d74e7a9a0bf3432f71d782044bf807d118ecbf82a07717ef54a5e0b9ca6",
+  "changed_algorithm": "Filter parent-matching entities before unioning alias sets in two member selectors. No solver/check/cache changes.",
+  "equivalence_argument": "For finite well-formed Entity values, parent predicates depend only on compareEntity identity; filtering distributes over union, preserving sorted identity dedup. Abstract/empty chosen paths retain lazy children binding. This is not a claim of equivalence for arbitrary malformed/bottom internal Interfaces.",
+  "tests_status": "pending independent frozen-oracle and maintained controls",
+  "frozen_target_manifest_sha256": "102d2f829a06caaad08e4123631f7fd4146ec3fd320c334571aa58378d40710c"
+}

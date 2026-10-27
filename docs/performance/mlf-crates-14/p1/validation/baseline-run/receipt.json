@@ -1,0 +1,80 @@
+{
+  "complete": false,
+  "scope": "partial selector differential and lazy-demand controls",
+  "compiler_modules_rebuilt": false,
+  "native_execution": false,
+  "performance_assertion": false,
+  "commands": [
+    {
+      "label": "compile-oracle",
+      "argv": [
+        "/workspace/scratch/3f83e2ebe290/pr25-latest-benchmark-work-20261026/toolchain/ghc-install/bin/ghc-9.14.1",
+        "-c",
+        "-XHaskell2010",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-O2",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-Werror=incomplete-patterns",
+        "-package",
+        "base",
+        "-package",
+        "array",
+        "-package",
+        "bytestring",
+        "-package",
+        "text",
+        "-package",
+        "containers",
+        "-package",
+        "directory",
+        "-i",
+        "-i/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/baseline-run/objects",
+        "-i/workspace/scratch/3f83e2ebe290/pr25-latest-benchmark-work-20261026/setup/fixed-producer-2/producer/objects",
+        "-odir",
+        "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/baseline-run/objects",
+        "-hidir",
+        "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/baseline-run/objects",
+        "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/FrozenSelectors.hs"
+      ],
+      "cwd": "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/baseline-run",
+      "timeout_seconds": 300,
+      "exit_code": 1,
+      "wall_seconds": 0.26571828400119557,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "8fe48fb83b31bc263aa2f75bcb63a772a8f034a7bba7cff0efaf2542d1ad1db6"
+    }
+  ],
+  "producer_receipt_sha256": "74fa044142da0aaea60e591a57cf189c7ec152acef7f6c1fd5fda98376ec3416",
+  "source_root": "/workspace/scratch/3f83e2ebe290/pr25-latest-benchmark-fixed-20261026",
+  "producer_directory": "/workspace/scratch/3f83e2ebe290/pr25-latest-benchmark-work-20261026/setup/fixed-producer-2/producer",
+  "inputs": {
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/run_selector_differential.py": "d3b4df31dc40db126182ff00368e909e9bd4b9ff9c149a37077bf976a53ce5ab",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/SelectorDifferential.hs": "7acb8dd2177f6b8b1fc2cd31a9ab252171706c8650689ab7c586d47022537dce",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/FrozenSelectors.hs": "62c44c42657f507c35d46fc08b5fc39f99ac23d34cb9cb2cf645fabfc83767d4",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/original-selector-excerpts.txt": "d77ad09a09f358926c43b637c5a9ab04052c6da2d16e90a7fe81cd27d156003a",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/oracle-manifest.json": "db0f6f321cdc958e3f5d3ea118394420323795e64269f25fb5a46bba7834b417",
+    "/workspace/scratch/3f83e2ebe290/pr25-latest-benchmark-work-20261026/setup/fixed-producer-2/producer/receipt.json": "74fa044142da0aaea60e591a57cf189c7ec152acef7f6c1fd5fda98376ec3416",
+    "/workspace/scratch/3f83e2ebe290/pr25-latest-benchmark-fixed-20261026/tools/shared/test_direct.py": "15e31f185bcab630a404b713c9bc2f1664fb48e0d70af061938b94f8d336be29"
+  },
+  "expected_checks": 154072,
+  "oracle_shared_dependencies": {
+    "libraries/mlf-foundation/Bootstrap/Map.hs": "d4d9ebfa39a14ae1cbaf48fa9d540eafa7b452aaa3cc73ffc624a34c15417bdb",
+    "libraries/mlf-foundation/Bootstrap/Set.hs": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f",
+    "libraries/mlf-foundation/Bootstrap/Std.hs": "0eb137b5935bdf13ed6807c2a4aa96bb558bfce37fd39c9fb08897bb63eedbff",
+    "libraries/mlf-foundation/Bootstrap/Types.hs": "c8bf3c734fa5c7e4c9b1f546774fb7dbfac9cc872fc7194f18cacb53d332132a",
+    "libraries/mlf-frontend/Bootstrap/Lexer.hs": "9c681c46059d62f430c71e783d77b74ed7e0898225a148b4116995a5a2155179",
+    "libraries/mlf-language-core/Bootstrap/Primitive.hs": "d5ab2e97d7c217143311ff81c09075f9f9adb96ecf9f0cfe285e274e28130e23",
+    "host/ghc/MLF/Primitive.hs": "4b0c1ab711471b60c136cc3a8b9cbe6ed07e2a4df367b43384dee77cd0498316",
+    "host/ghc/MLF/Host/Base.hs": "31fb27b1438c9a8bbf20804db4e770cc3af9d48dc39ad4ced9c55e10565ba63f"
+  },
+  "error": {
+    "type": "RuntimeError",
+    "message": "compile-oracle failed; inspect its retained logs"
+  }
+}

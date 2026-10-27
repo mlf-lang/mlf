@@ -1,0 +1,12 @@
+{
+  "format": "scoped-controls-author-review-v1",
+  "compiled_or_executed": false,
+  "python_ast_pass": true,
+  "recipe_sha256": "e8e1f1047c178409c387e075cd6485da96b74da3af78ff4367f0f5b88fce6a8b",
+  "scope": [
+    "Three maintained shared-frontend modes with maintained O2 budgets and exact ordered banners/clean stderr",
+    "All 86 maintained provenance unittest methods, with 17 imported builtin verifier methods counted once",
+    "Five source-smoke cases via authenticated direct binary, outputs confined to new owned directory"
+  ],
+  "no_native_bootstrap_or_async_fixture_campaign": true
+}

@@ -1,0 +1,12 @@
+{
+  "stage": "p1",
+  "cumulative_source_patch_sha256": "082b947872d7ee003039d602d616d45d45ac2172eca6836e0092ac20a5b0bfd5",
+  "builtin_identity_before_evidence": "builtin-source-v1:44d0548c94ed306b6d96ab78125be2dc6181aa61a82403a62e29a60811775b3f",
+  "builtin_identity_after_evidence": "builtin-source-v1:44d0548c94ed306b6d96ab78125be2dc6181aa61a82403a62e29a60811775b3f",
+  "evidence_outside_selected_sources": true,
+  "package_manifest_count": 23,
+  "identity_algorithm": "tools/shared/builtin_prelude_identity.py explicit shared-sources import closure",
+  "lock_inventory_algorithm": "Package.Manifest.sourceFiles: explicit packageModules plus executable/test main and modules maps; manifests unchanged",
+  "historical_execution_only": true,
+  "fresh_machine_revalidation": "Owned separately by resumed task; not represented by historical receipts"
+}

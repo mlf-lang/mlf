@@ -1,0 +1,7 @@
+/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/FrozenSelectors.hs:199:15: warning: [GHC-53633] [-Woverlapping-patterns]
+    Pattern match is redundant
+    In a case alternative: Abstract -> ...
+    |
+199 |               Abstract -> [];
+    |               ^^^^^^^^^^^^^^
+

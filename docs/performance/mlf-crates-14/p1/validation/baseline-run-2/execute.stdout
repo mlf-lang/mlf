@@ -1,0 +1,2 @@
+{"format":"selector-differential-v1","complete":true,"checks":154072,"exhaustive_interfaces":512,"authored_interfaces":20,"stress_interfaces":4,"scope":"partial"}
+Frozen selector differential, ordered identity/error and lazy-demand controls passed.
