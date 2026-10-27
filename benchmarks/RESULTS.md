@@ -1,5 +1,12 @@
 # Native 3× compilation gate — 2026-10-18
 
+> Historical evidence notice: Raw files previously stored under
+> `tools/profile/results/` were removed from this branch and its Git history.
+> References to those files below describe historical evidence that is not
+> available in this repository; retained summaries are not independent access
+> to the original raw records.
+
+
 All nine workloads pass the median 3× C compilation / 2× C runtime gate, with every observed maximum MLF sample also below the limit relative to the corresponding minimum C sample.
 
 Seven samples were collected for each compiler/workload with alternating order, fresh runtime/object/output directories, unchanged C reference flags, equal exact-executable runtime warm-up and independent output validation. All compilation stages, including runtime C, LLVM compilation and linking, remain timed. Decisions use unrounded ratios.
