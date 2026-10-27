@@ -1,0 +1,45 @@
+{
+  "complete": true,
+  "method": "static source-only callsite inventory, not executed acceptance tests",
+  "files": {
+    "libraries/mlf-crates/Bootstrap/Crate.hs": "594af7881473256dcf2bdbb5f57289cfd8cb6cfd471f95f088748d63b1f6150a",
+    "libraries/mlf-crates/Bootstrap/CrateQuery.hs": "cf29431eb01eaeb287b89444f80b45fc88de79a2d43f006411821c180647f8eb"
+  },
+  "optimized_enable_sites": [
+    {
+      "path": "libraries/mlf-crates/Bootstrap/Crate.hs",
+      "line": 746,
+      "text": "compileSourcesWithEncoding True normalized sources interfaces prefix"
+    },
+    {
+      "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+      "line": 1110,
+      "text": "compileSourceGroupsWithEncoding True crateId directory imports protected originalPlan;"
+    }
+  ],
+  "original_wrappers": [
+    {
+      "path": "libraries/mlf-crates/Bootstrap/Crate.hs",
+      "line": 467,
+      "text": "compilePreparedWithEncoding False complete spec interfaces prepared;"
+    },
+    {
+      "path": "libraries/mlf-crates/Bootstrap/Crate.hs",
+      "line": 673,
+      "text": "compileSourcesWithEncoding False spec sources interfaces prefix;"
+    },
+    {
+      "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+      "line": 1103,
+      "text": "compileSourceGroupsWithEncoding False crateId directory imports protected originalPlan;"
+    }
+  ],
+  "provenance_chain": [
+    "compileSpecFile: decodeSpec -> loadSourcesInPackage -> Artifact.loadInterfaces -> successful Either pair",
+    "compileSourcesWithEncoding True: withPrelude -> prepareCrate",
+    "prepareCrate: source/dependency resolution and Source.prepareSourcePlan; valid finite data from parsed/decoded constructors",
+    "compilePreparedWithEncoding True: parsed plan case only",
+    "Query.compileParsedSourceGroups: original protection/prepareData/import/contracts/lock checks",
+    "runSourceGroupsWithEncodings Just: actual lowered declaration structural equality, fallback on mismatch"
+  ]
+}

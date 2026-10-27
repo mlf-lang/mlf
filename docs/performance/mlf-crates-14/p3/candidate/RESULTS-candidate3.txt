@@ -1,0 +1,57 @@
+MLF-CRATES CANDIDATE 3 — SCOPED QUALIFICATION; GOAL NOT MET
+
+Pinned PR25 aa11ffd318a2efa5be9805524710d0677eedb86f + approved fixes +
+accepted namespace/fingerprint changes, then immutable datatype-prefix sharing.
+Exact structural equality guards reused encodings; mismatches fall back to the
+actual declaration. Existing public no-pool APIs retain their original route;
+the optimized pool is enabled only for parsed/decoded file-producer inputs.
+Checks, format bytes, source keys and negative-state fallback remain controlled.
+No Lexer change, removed checks or target inference reuse.
+
+Same frozen 14 source modules, reused authenticated dependencies:
+  GHC 9.14.1 plain -O2: 8.375098285, 7.592379489, 7.986013657 s
+  GHC-hosted MLF:      93.838002607, 88.601739724, 88.175150620 s
+  OBSERVED medians:   GHC 7.986013657 s; MLF 88.601739724 s
+  OBSERVED ratio:     11.0946141003x; current 3x threshold 23.958040971 s
+
+Mandatory measurement caveat: short read-only research parsers/file comparisons
+overlapped parts of this sequence. These samples are preserved, NOT represented
+as a clean exclusive causal ABBA experiment; no estimated penalty is subtracted.
+A later quiet P3 control took 88.335022101 s: ONE sample, not a new median or
+final goal proof. GHC emits -O2 objects; MLF independently checked xMLF plus
+query-cache files. Endpoints differ; OS page cache was not flushed.
+Every P3 performance/control target run inferred 544 groups, reused 0, and
+matched the reference checked artifact bytes.
+
+Qualification passed: official GHC producer (121 inferred interfaces, 121 shared
+syntax modules, 13 tools, exact builtin regeneration); 922 independent prefix
+byte/digest/Unicode/error/laziness controls; three maintained frontend modes;
+86 DISTINCT provenance methods INCLUDING 17 builtin methods once; five source
+smoke cases; six authentic offline locks and --locked plans.
+Separately, MLF compiled the ACTUAL optimized 14-module source (576 inferred,
+0 reused), independently checked it and reloaded metadata. This is different
+input for source compatibility, NOT a performance sample or full bootstrap.
+
+Negative appendix only: the unqualified candidate4 graph-overlay screen took
+89.407815682 s versus the one quiet P3 control's 88.335022101 s. No observed gain;
+one sample each cannot establish a causal effect. Candidate4 is NOT accepted
+and does not enter P3 medians or the portable accepted-source patch.
+
+No new P3 phase profile is claimed; the inherited v2 profile is candidate2's.
+No full 74-module MLF compiler bootstrap, native-unit/parity/LLVM-runtime or
+self-host fixed-point claim. Work toward <=3x continues separately.
+
+Storage-only archival: 13 further completed run query directories (P3, controls,
+diagnostic profiles and the negative screen) were losslessly archived; with six
+recorded in v2, 19 are locally restorable. Every member was verified before
+redundant expanded copies were removed. Original baseline query directories
+remain expanded. Only archive manifests/receipts enter this package, not archive
+bodies; checked unit artifacts are untouched and no archives are reused for inference.
+
+Portable full patch applies to pristine pinned PR25:
+  pr25-plus-fixes-plus-namespace-plus-fingerprint-plus-prefix-plus-locks.patch
+  SHA256 01410b8c004187aa4878f10542967ad8d3b5d448511257c68ab62f466ade64ec
+The original 6a22ec8d... pre-lock patch used as candidate4 ancestry is untouched
+and copied as pre-lock-source-ancestry.patch. Detailed pins and caveats are in
+candidate3-final-review.json. Historical pre-run control status text is retained
+unchanged; completed receipts and this review supersede that status only.

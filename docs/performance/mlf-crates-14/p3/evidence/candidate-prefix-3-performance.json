@@ -1,0 +1,83 @@
+{
+  "format": "full14-candidate-performance-v1",
+  "candidate": "prefix-3",
+  "status": "performance_complete_qualification_status_separate",
+  "samples": {
+    "mlf": [
+      {
+        "label": "prefix-3-mlf-1",
+        "wall_seconds": 93.838002607,
+        "child_user_seconds": 84.72113,
+        "child_system_seconds": 5.884557,
+        "max_individual_child_rss_bytes": 250540032
+      },
+      {
+        "label": "prefix-3-mlf-2",
+        "wall_seconds": 88.601739724,
+        "child_user_seconds": 79.884497,
+        "child_system_seconds": 5.464202,
+        "max_individual_child_rss_bytes": 231047168
+      },
+      {
+        "label": "prefix-3-mlf-3",
+        "wall_seconds": 88.17515062,
+        "child_user_seconds": 79.221266,
+        "child_system_seconds": 5.739358,
+        "max_individual_child_rss_bytes": 231272448
+      }
+    ],
+    "ghc": [
+      {
+        "label": "prefix-3-ghc-1",
+        "wall_seconds": 8.375098285,
+        "child_user_seconds": 8.274404,
+        "child_system_seconds": 0.12482,
+        "max_individual_child_rss_bytes": 334659584
+      },
+      {
+        "label": "prefix-3-ghc-2",
+        "wall_seconds": 7.592379489,
+        "child_user_seconds": 7.435824,
+        "child_system_seconds": 0.166786,
+        "max_individual_child_rss_bytes": 340037632
+      },
+      {
+        "label": "prefix-3-ghc-3",
+        "wall_seconds": 7.986013657,
+        "child_user_seconds": 7.838587,
+        "child_system_seconds": 0.16569899999999999,
+        "max_individual_child_rss_bytes": 333578240
+      }
+    ]
+  },
+  "medians": {
+    "mlf": 88.601739724,
+    "ghc": 7.986013657
+  },
+  "ratio_to_contemporaneous_ghc": 11.094614100282397,
+  "three_times_target_seconds": 23.958040971,
+  "goal_met": false,
+  "all_mlf_checked_artifacts_identical": true,
+  "all_mlf_544_inferred_0_reused": true,
+  "samples_interleaved_between_compilers": true,
+  "inputs": {
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/candidates/prefix-3/producer/receipt.json": "3fd51a1697fcffaf2716225be9d1a51351c38032d18d3573fed9d19bc53c3b5f",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/runs/prefix-3-mlf-1/receipt.json": "c2d998c0e5a909dd9fc2e510597ff748907de222403c02990e54113acc33c280",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/runs/prefix-3-mlf-1/candidate-authentication.json": "64093a21e8bfc3357f271776f045f519ea8f39c2f9abaa39986d26f1ee8a69cf",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/runs/prefix-3-mlf-2/receipt.json": "5b6d7064bbf129879a81a97ff573f9c47ef2980ab9a92b192d055d466b25ec4f",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/runs/prefix-3-mlf-2/candidate-authentication.json": "64093a21e8bfc3357f271776f045f519ea8f39c2f9abaa39986d26f1ee8a69cf",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/runs/prefix-3-mlf-3/receipt.json": "289f20b83af43fd4fef6b598ec8ea7c1e4b82d0687608b80127fe95cc3536636",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/runs/prefix-3-mlf-3/candidate-authentication.json": "64093a21e8bfc3357f271776f045f519ea8f39c2f9abaa39986d26f1ee8a69cf",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/runs/prefix-3-ghc-1/receipt.json": "9b558c5a4e85480bbfcf674d98c89e7bfb40d39a06e068c31ce98938db3a34b6",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/runs/prefix-3-ghc-2/receipt.json": "12ccac45ddc5506dffa245fffe9d0ce3f8892aade13777332cb0463d0ce12730",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/runs/prefix-3-ghc-3/receipt.json": "009c6793a132f6b4ac906a2475333654e2d798aae1eb05a8414fbadaf1e53d63"
+  },
+  "recipe_sha256": "065fbdbbf07259964c76f4d0334392e4824134621bfe797e3794d1b9a6970c95",
+  "caveats": [
+    "GHC plain -O2 objects versus MLF independently checked xMLF plus query-cache files: asymmetric endpoints.",
+    "Separate version medians are not ABBA-paired optimization effect estimates.",
+    "No full native compiler bootstrap or complete repository qualification is implied.",
+    "Short read-only research parsing overlapped parts of the observed sample/control sequence; not a strictly exclusive ABBA run. A quiet verification window is required for final goal evidence."
+  ],
+  "background_exposure_evidence": "prefix-3-background-exposure.json"
+}

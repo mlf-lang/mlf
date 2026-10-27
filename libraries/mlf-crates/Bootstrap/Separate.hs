@@ -17,6 +17,7 @@ module Bootstrap.Separate where {
   import qualified Bootstrap.Desugar as Desugar;
   import qualified Bootstrap.Surface as Surface;
   import qualified Bootstrap.Data as D;
+  import qualified Bootstrap.SourceEquality as SourceEquality;
   import qualified Bootstrap.Kind as K;
   import qualified Bootstrap.X.Type as T;
   import qualified Bootstrap.X.Syntax as X;
@@ -476,7 +477,7 @@ module Bootstrap.Separate where {
     };
   fingerprint text = fingerprintFrom text 0 0 1;
   -- Exact summaries of the two existing rolling checksums. A summary composes
-  -- with any initial state, so shared datatype prefixes need not be rescanned
+  -- with a canonical nonnegative rolling state, so datatype prefixes need not be rescanned
   -- for every independently checked fragment. The serialized digest is unchanged.
   fingerprintStateFrom :: String -> Int -> Int -> Int -> (,) Int Int;
   fingerprintStateFrom text i a b =
@@ -540,6 +541,92 @@ module Bootstrap.Separate where {
     seq nextA (seq nextB ((,) nextA nextB));
   fingerprintAfter :: (,) Int Int -> String -> String;
   fingerprintAfter ((,) a b) text = fingerprintFrom text 0 a b;
+  -- A per-compilation pool contains only pure encodings, never inferred results.
+  -- Entries remain lazy. A name lookup is not an identity proof: lowering may
+  -- change a layout, so reuse requires equality of the actual full declaration.
+  data DatatypeEncoding =
+    DatatypeEncoding DataDecl String Int ((,,,) Int Int Int Int);
+  data DatatypeEncodings = DatatypeEncodings (Map String ([] DatatypeEncoding));
+  datatypeEncoding :: DataDecl -> DatatypeEncoding;
+  datatypeEncoding declaration =
+    let { text = D.prettyDeclaration declaration ++ "\n" } in
+    DatatypeEncoding declaration text (stringLength text) (fingerprintPart text);
+  prepareDatatypeEncodings :: [] DataDecl -> DatatypeEncodings;
+  prepareDatatypeEncodings declarations =
+    DatatypeEncodings (M.fromListWith compareString append
+      (map (\d -> (,) (D.datatypeName d) ((:) (datatypeEncoding d) [])) declarations));
+  findDatatypeEncoding :: DataDecl -> [] DatatypeEncoding -> DatatypeEncoding;
+  findDatatypeEncoding declaration entries = case entries of {
+    [] -> datatypeEncoding declaration;
+    (:) entry rest -> case entry of {
+      DatatypeEncoding original _ _ _ ->
+        if SourceEquality.eqDataDecl declaration original then entry
+        else findDatatypeEncoding declaration rest
+    }
+  };
+  lookupDatatypeEncoding :: DatatypeEncodings -> DataDecl -> DatatypeEncoding;
+  lookupDatatypeEncoding (DatatypeEncodings entries) declaration =
+    findDatatypeEncoding declaration
+      (M.findWithDefault compareString [] (D.datatypeName declaration) entries);
+  datatypeEncodingText :: DatatypeEncoding -> String;
+  datatypeEncodingText (DatatypeEncoding _ text _ _) = text;
+  datatypeEncodingLength :: DatatypeEncoding -> Int;
+  datatypeEncodingLength (DatatypeEncoding _ _ count _) = count;
+  appendDatatypeEncoding :: (,) Int Int -> DatatypeEncoding -> (,) Int Int;
+  -- Internal callers reach only nonnegative rolling states. Keep signed seeds
+  -- exact for direct callers too: truncating remainder is not modular addition
+  -- across a sign change, so a negative seed must use the original recurrence.
+  appendDatatypeEncoding state (DatatypeEncoding _ text _ part) = case state of {
+    (,) a b -> if (a < 0 || b < 0) then fingerprintStateFrom text 0 a b
+      else fingerprintAppend state part
+  };
+  prettyTermWithDatatypes :: DatatypeEncodings -> XTerm -> String;
+  prettyTermWithDatatypes pool term = case term of {
+    XWithData declarations body ->
+      concatMapString (\d -> datatypeEncodingText (lookupDatatypeEncoding pool d)) declarations
+        ++ Pretty.prettyTerm body;
+    _ -> Pretty.prettyTerm term
+  };
+  fingerprintTermWithDatatypes :: DatatypeEncodings -> XTerm -> String;
+  fingerprintTermWithDatatypes pool term = case term of {
+    XWithData declarations body ->
+      fingerprintAfter
+        (foldlStrict appendDatatypeEncoding ((,) 0 1)
+          (map (lookupDatatypeEncoding pool) declarations))
+        (Pretty.prettyTerm body);
+    _ -> fingerprint (Pretty.prettyTerm term)
+  };
+  -- The interface checksum is NOT the payload checksum. Compose the exact
+  -- scalar-length-framed seven fields, sharing only actual datatype text parts.
+  -- Header and payload declarations are looked up separately by encodeUnit.
+  encodeInterfaceWithDatatypes :: DatatypeEncodings -> UnitInterface -> (,) String String;
+  encodeInterfaceWithDatatypes pool iface =
+    let { encodings = map (lookupDatatypeEncoding pool) (unitData iface) } in
+    let { suffix = unlines (append (map prettyClass (unitClasses iface))
+          (map (\p -> prettyInstance (snd p)) (unitInstances iface))) } in
+    let { metadata = concatMapString datatypeEncodingText encodings ++ suffix } in
+    let { metadataLength = foldlStrict (\n entry -> n + datatypeEncodingLength entry)
+          (stringLength suffix) encodings } in
+    let { before = (:) "MLFI-4" ((:) (unitName iface)
+          ((:) (pack (map pairEncoding (unitDependencies iface)))
+            ((:) (pack (map entityEncoding (unitExports iface))) []))) } in
+    let { after = (:) (pack (map fst (unitInstances iface)))
+          ((:) (pack (map (\((,) n t) -> pairEncoding ((,) n (Pretty.prettyType (normalType t))))
+            (unitBindings iface))) []) } in
+    let { fields = append before ((:) metadata after) } in
+    let { state = foldlStrict appendDatatypeEncoding
+          (fingerprintStateFrom (pack before ++ showInt metadataLength ++ ":") 0 0 1)
+          encodings } in
+    (,) (pack (snoc fields (unitObjectFingerprint iface)))
+      (fingerprintAfter state (suffix ++ pack after));
+  encodeUnitWithDatatypes :: DatatypeEncodings -> UnitObject -> (,) String String;
+  encodeUnitWithDatatypes pool object =
+    let { iface = objectInterface object } in
+    let { interfaceEncoding = encodeInterfaceWithDatatypes pool iface } in
+    (,) (fst interfaceEncoding)
+      (pack ((:) "MLFO-1" ((:) (unitName iface)
+        ((:) (snd interfaceEncoding)
+          ((:) (prettyTermWithDatatypes pool (objectTerm object)) [])))));
   entityEncoding (Modules.Entity owner name role) =
     let {
       result :: (String, String);

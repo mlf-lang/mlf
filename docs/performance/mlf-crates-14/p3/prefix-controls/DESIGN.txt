@@ -1,0 +1,123 @@
+S3 datatype prefix sharing: implementation and proof obligations
+2026-10-27; provisional P2 base, NOT built/qualified/timed yet.
+
+Measured motivation, not predicted whole-target savings
+------------------------------------------------------
+The initial late CCS has disjoint raw payload fingerprint roots11,425 ticks /
+16,879,584,232 allocated bytes and cached-interface fingerprint roots8,307 ticks /
+12,337,359,544 bytes. These are profiled sampled CPU/allocation, not wall time.
+Saved544 baseline raw caches contain60,281,945 payload scalar characters, of which
+42,773,193 (70.96%) are exact interface datatype prefixes. There are198 distinct
+contexts. The final544-fragment pooled payload contains145 unique declarations;
+their text includingLF totals307,276 scalar characters, while repeated body
+contexts total42,773,193. Final pooled contexts alone do not prove raw lowering
+identity, hence structural equality at every actual-layout lookup.
+P2 already changes fingerprint traversal and other sharing. The S3 ceiling must
+be remeasured; initial profile numbers are not additive savings estimates.
+
+Input/provenance
+----------------
+S3 worktree: /workspace/scratch/3f83e2ebe290/mlf-crates-prefix-source-20261026
+Branch: codex/mlf-crates-prefix-20261026, HEAD aa11ffd318a2efa5be9805524710d0677eedb86f.
+Frozen complete S2 diff is provisional-s2-base.patch; copied files individually
+matched before S3 changes. S2 remains untouched. Only Separate, InferenceUnit, CrateQuery and
+Crate are changed beyond S2. No Host, primitive, Lexer, locks or prelude edit.
+New Separate/CrateQuery -> SourceEquality imports are acyclic (module graph checked).
+
+Seams
+-----
+1. Separate.DatatypeEncodings holds a name-bucketed immutable map. Each entry has
+   full DataDecl, canonical pretty text INCLUDING the finalLF, scalar length,
+   and the existing two-modulus rolling summary. Text/length/summary are lazy.
+   A name hit alone is insufficient: SourceEquality.eqDataDecl on actual versus
+   saved declaration must succeed. Otherwise the actual declaration is encoded.
+2. InferenceUnit.compileLoweredGroupUsing factors only the final payload digest
+   callback. The old public compileLoweredGroup supplies the original digest of
+   Pretty.prettyTerm. The pool-aware entry is used only from the new internal
+   source-group loop. All lowering/inference/evidence/elaboration/type/erasure
+   checks, D.validateDeclarations, ownership checks and Checked.check remain in
+   their original order. The actual compiled declarations select pool entries.
+3. The pool-aware payload hash folds declaration summaries from(0,1), then hashes
+   Pretty.prettyTerm body. This equals X.Pretty.termAt0's exact XWithData layout:
+   concatenated prettyDeclaration d + LF, then termAt0 body. Nested contexts in
+   body are still serialized by original Pretty.
+4. Pool-aware unit interface encoding independently uses its actual header data.
+   It preserves all seven interfaceFields: firstfour, metadata, lasttwo. Its
+   checksum hashes pack firstfour, then decimal scalar metadata length + colon,
+   then declaration summaries, then exact class/instance suffix + pack lasttwo.
+   Metadata length sums cached stringLength values and suffix stringLength;
+   never UTF8 byte lengths. The full interface includes its original objecthash.
+   Unit object encoding keeps MLFO-1/name/interfacehash/actual payload fields.
+   Header and body contexts are NEVER substituted for one another.
+5. CrateQuery.SourceEncodings also caches canonical encodeDatatype per full
+   declaration, with the same exact-equality guard. Builtin declarations are
+   appended in the same position/order as encodeDatatypeContext. Length framing,
+   source key fields, compiler identity and keys remain exact bytes.
+6. Only compileSpecFile enables the internal optimized route, after successful
+   loadSourcesInPackage and Artifact.loadInterfaces have produced parsed source
+   and decoded dependency values. The flag flows through new internal helpers
+   compileSourcesWithEncoding / compilePreparedWithEncoding, then the explicit
+   Query.compileParsedSourceGroups entry. Old compileSources, compilePreparedWith
+   and compileSourceGroups wrappers all pass False; old runSourceGroups passes
+   Nothing. Caller-supplied lazy source/prepared ASTs keep their no-pool route.
+   The lazy pool is introduced only after original protection initialization,
+   prepareData validation, import merge, initial contracts and cache-lock setup;
+   it is first demanded by the same key/digest work as before. No early pool force
+   is added. The pool is shared through runSourceGroupsWithEncodings recursion.
+   Old sourceQueryKey, encodeCached, and Separate encoders remain unchanged paths.
+   Cache hits retain the full original decode/validate path; cold benchmarking
+   still infers every target group. A cache write uses the RAW checked object,
+   never a finalized object's different payload masquerading as raw bytes.
+
+Arithmetic proof and limitation
+-------------------------------
+For each existing modulus m and base b, canonical reachable state h is in[0,m).
+For nonnegative scalar codes, recurrence rem(b*h+c,m) stays in[0,m); ordinary
+modular composition therefore proves exact checksum state for each text part.
+All S3 production folds start(0,1) or state from a nonempty canonical prefix.
+Datatype parts always end inLF and are nonempty. Existing fingerprintAppend's
+old general-sounding comment was corrected: signed truncating remainder does
+NOT support arbitrary-negative-seed composition. Empty part + out-of-range
+initial state also need not preserve the literal state. No existing public
+fingerprint implementation was changed. The NEW appendDatatypeEncoding helper
+uses the original fingerprintStateFrom recurrence for negative seeds, so signed
+states remain exact for authentic DatatypeEncoding entries. Its direct values
+must still be produced by datatypeEncoding, not forged inconsistent constructors.
+
+Demand / malformed-input boundary
+---------------------------------
+The pool-aware helpers are internal optimization entrypoints for validated finite
+source/checked output values. Full structural equality can force a malformed
+same-name POOL declaration that an old encoder (which had no pool argument) did
+not touch. No arbitrary-bottom equivalence is claimed for that NEW extra input.
+The production pool is built from finite parsed/lowered planData after semantic
+validation. D.validateDeclarations alone does NOT establish every field is NF
+(e.g. unused kind-map values may remain lazy); total parsed source construction is
+an additional production invariant. Actual output layouts are independently
+validated and checked.
+Unused distinct-name entry text/fields/summaries remain lazy, as do the separate
+text and summary projections. Existing public APIs retain the original no-pool
+route. Body/metadata exception-order tests on arbitrary malformed direct helpers
+are not a substitute for this invariant. Existing compiler error branches and
+public API errors must match the frozen P2 implementation.
+
+Prepared controls (not executed yet)
+-----------------------------------
+FrozenPrefix copies P2 interfaceFields/interfaceFingerprint/encodeInterface/
+encodeObject/encodeCached/sourceQueryKey; FrozenInferenceUnit copies the entire
+P2 module with only its module name changed. The oracle manifest pins sources and
+allowed transformations. PrefixControls compares complete bytes/digests across
+empty/duplicate/reordered contexts, same-name changed layouts, DataDecl versus
+DataDeclK, higher kinds/quantified fields, supplementary/combining/NUL/newline
+scalars, class/instance suffixes, different actual header/body contexts, raw cache
+and source-key encodings. It tests ignored instance method bodies, unused pool
+fields, empty contexts, interface hash ignoring objecthash, negative state
+fallback, full small inference outputs/errors, and empty-group rejection before
+poison arguments. Additional authentic existing producer/frontend/native controls
+and full14 target-cold artifact equality remain the parent's acceptance gate.
+
+run_controls.py uses authenticated official P3 O2 objects, compiles only the three
+small test modules, verifies every copied producer hi/o remains byte identical,
+and reauthenticates source/binary inputs. It requires --serial-slot-granted and
+must run under the task resource watchdog. No control build, microbenchmark,
+producer build or full target run was started by this agent for S3.

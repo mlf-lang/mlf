@@ -1,0 +1,384 @@
+diff --git a/libraries/mlf-crates/Bootstrap/Separate.hs b/libraries/mlf-crates/Bootstrap/Separate.hs
+index 7d1ab25..2df2200 100644
+--- a/libraries/mlf-crates/Bootstrap/Separate.hs
++++ b/libraries/mlf-crates/Bootstrap/Separate.hs
+@@ -17,6 +17,7 @@ module Bootstrap.Separate where {
+   import qualified Bootstrap.Desugar as Desugar;
+   import qualified Bootstrap.Surface as Surface;
+   import qualified Bootstrap.Data as D;
++  import qualified Bootstrap.SourceEquality as SourceEquality;
+   import qualified Bootstrap.Kind as K;
+   import qualified Bootstrap.X.Type as T;
+   import qualified Bootstrap.X.Syntax as X;
+@@ -476,7 +477,7 @@ module Bootstrap.Separate where {
+     };
+   fingerprint text = fingerprintFrom text 0 0 1;
+   -- Exact summaries of the two existing rolling checksums. A summary composes
+-  -- with any initial state, so shared datatype prefixes need not be rescanned
++  -- with a canonical nonnegative rolling state, so datatype prefixes need not be rescanned
+   -- for every independently checked fragment. The serialized digest is unchanged.
+   fingerprintStateFrom :: String -> Int -> Int -> Int -> (,) Int Int;
+   fingerprintStateFrom text i a b =
+@@ -540,6 +541,92 @@ module Bootstrap.Separate where {
+     seq nextA (seq nextB ((,) nextA nextB));
+   fingerprintAfter :: (,) Int Int -> String -> String;
+   fingerprintAfter ((,) a b) text = fingerprintFrom text 0 a b;
++  -- A per-compilation pool contains only pure encodings, never inferred results.
++  -- Entries remain lazy. A name lookup is not an identity proof: lowering may
++  -- change a layout, so reuse requires equality of the actual full declaration.
++  data DatatypeEncoding =
++    DatatypeEncoding DataDecl String Int ((,,,) Int Int Int Int);
++  data DatatypeEncodings = DatatypeEncodings (Map String ([] DatatypeEncoding));
++  datatypeEncoding :: DataDecl -> DatatypeEncoding;
++  datatypeEncoding declaration =
++    let { text = D.prettyDeclaration declaration ++ "\n" } in
++    DatatypeEncoding declaration text (stringLength text) (fingerprintPart text);
++  prepareDatatypeEncodings :: [] DataDecl -> DatatypeEncodings;
++  prepareDatatypeEncodings declarations =
++    DatatypeEncodings (M.fromListWith compareString append
++      (map (\d -> (,) (D.datatypeName d) ((:) (datatypeEncoding d) [])) declarations));
++  findDatatypeEncoding :: DataDecl -> [] DatatypeEncoding -> DatatypeEncoding;
++  findDatatypeEncoding declaration entries = case entries of {
++    [] -> datatypeEncoding declaration;
++    (:) entry rest -> case entry of {
++      DatatypeEncoding original _ _ _ ->
++        if SourceEquality.eqDataDecl declaration original then entry
++        else findDatatypeEncoding declaration rest
++    }
++  };
++  lookupDatatypeEncoding :: DatatypeEncodings -> DataDecl -> DatatypeEncoding;
++  lookupDatatypeEncoding (DatatypeEncodings entries) declaration =
++    findDatatypeEncoding declaration
++      (M.findWithDefault compareString [] (D.datatypeName declaration) entries);
++  datatypeEncodingText :: DatatypeEncoding -> String;
++  datatypeEncodingText (DatatypeEncoding _ text _ _) = text;
++  datatypeEncodingLength :: DatatypeEncoding -> Int;
++  datatypeEncodingLength (DatatypeEncoding _ _ count _) = count;
++  appendDatatypeEncoding :: (,) Int Int -> DatatypeEncoding -> (,) Int Int;
++  -- Internal callers reach only nonnegative rolling states. Keep signed seeds
++  -- exact for direct callers too: truncating remainder is not modular addition
++  -- across a sign change, so a negative seed must use the original recurrence.
++  appendDatatypeEncoding state (DatatypeEncoding _ text _ part) = case state of {
++    (,) a b -> if (a < 0 || b < 0) then fingerprintStateFrom text 0 a b
++      else fingerprintAppend state part
++  };
++  prettyTermWithDatatypes :: DatatypeEncodings -> XTerm -> String;
++  prettyTermWithDatatypes pool term = case term of {
++    XWithData declarations body ->
++      concatMapString (\d -> datatypeEncodingText (lookupDatatypeEncoding pool d)) declarations
++        ++ Pretty.prettyTerm body;
++    _ -> Pretty.prettyTerm term
++  };
++  fingerprintTermWithDatatypes :: DatatypeEncodings -> XTerm -> String;
++  fingerprintTermWithDatatypes pool term = case term of {
++    XWithData declarations body ->
++      fingerprintAfter
++        (foldlStrict appendDatatypeEncoding ((,) 0 1)
++          (map (lookupDatatypeEncoding pool) declarations))
++        (Pretty.prettyTerm body);
++    _ -> fingerprint (Pretty.prettyTerm term)
++  };
++  -- The interface checksum is NOT the payload checksum. Compose the exact
++  -- scalar-length-framed seven fields, sharing only actual datatype text parts.
++  -- Header and payload declarations are looked up separately by encodeUnit.
++  encodeInterfaceWithDatatypes :: DatatypeEncodings -> UnitInterface -> (,) String String;
++  encodeInterfaceWithDatatypes pool iface =
++    let { encodings = map (lookupDatatypeEncoding pool) (unitData iface) } in
++    let { suffix = unlines (append (map prettyClass (unitClasses iface))
++          (map (\p -> prettyInstance (snd p)) (unitInstances iface))) } in
++    let { metadata = concatMapString datatypeEncodingText encodings ++ suffix } in
++    let { metadataLength = foldlStrict (\n entry -> n + datatypeEncodingLength entry)
++          (stringLength suffix) encodings } in
++    let { before = (:) "MLFI-4" ((:) (unitName iface)
++          ((:) (pack (map pairEncoding (unitDependencies iface)))
++            ((:) (pack (map entityEncoding (unitExports iface))) []))) } in
++    let { after = (:) (pack (map fst (unitInstances iface)))
++          ((:) (pack (map (\((,) n t) -> pairEncoding ((,) n (Pretty.prettyType (normalType t))))
++            (unitBindings iface))) []) } in
++    let { fields = append before ((:) metadata after) } in
++    let { state = foldlStrict appendDatatypeEncoding
++          (fingerprintStateFrom (pack before ++ showInt metadataLength ++ ":") 0 0 1)
++          encodings } in
++    (,) (pack (snoc fields (unitObjectFingerprint iface)))
++      (fingerprintAfter state (suffix ++ pack after));
++  encodeUnitWithDatatypes :: DatatypeEncodings -> UnitObject -> (,) String String;
++  encodeUnitWithDatatypes pool object =
++    let { iface = objectInterface object } in
++    let { interfaceEncoding = encodeInterfaceWithDatatypes pool iface } in
++    (,) (fst interfaceEncoding)
++      (pack ((:) "MLFO-1" ((:) (unitName iface)
++        ((:) (snd interfaceEncoding)
++          ((:) (prettyTermWithDatatypes pool (objectTerm object)) [])))));
+   entityEncoding (Modules.Entity owner name role) =
+     let {
+       result :: (String, String);
+diff --git a/libraries/mlf-crates/Bootstrap/CrateQuery.hs b/libraries/mlf-crates/Bootstrap/CrateQuery.hs
+index e46f941..4c342b3 100644
+--- a/libraries/mlf-crates/Bootstrap/CrateQuery.hs
++++ b/libraries/mlf-crates/Bootstrap/CrateQuery.hs
+@@ -16,6 +16,7 @@ module Bootstrap.CrateQuery where {
+   import qualified Bootstrap.Primitive as Primitive;
+   import qualified Bootstrap.Host as Host;
+   import qualified Bootstrap.Data as D;
++  import qualified Bootstrap.SourceEquality as SourceEquality;
+   import qualified Bootstrap.X.Type as T;
+   import qualified Bootstrap.X.Syntax as X;
+   import qualified Bootstrap.X.Check as Check;
+@@ -222,6 +223,27 @@ module Bootstrap.CrateQuery where {
+                   node "parameter" ((:) (canonicalReference scope n) ((:) (encodeKind k) [])))
+                parameters)
+             ((:) (list encodeConstructor constructors) [])));
++  data QueryDatatypeEncoding = QueryDatatypeEncoding DataDecl String;
++  data SourceEncodings = SourceEncodings Separate.DatatypeEncodings
++    (Map String ([] QueryDatatypeEncoding));
++  prepareSourceEncodings :: [] DataDecl -> SourceEncodings;
++  prepareSourceEncodings declarations =
++    SourceEncodings (Separate.prepareDatatypeEncodings declarations)
++      (M.fromListWith compareString append
++        (map (\d -> (,) (D.datatypeName d) ((:) (QueryDatatypeEncoding d (encodeDatatype d)) []))
++          (append D.builtinDeclarations declarations)));
++  findQueryDatatypeEncoding :: DataDecl -> [] QueryDatatypeEncoding -> String;
++  findQueryDatatypeEncoding declaration entries = case entries of {
++    [] -> encodeDatatype declaration;
++    (:) (QueryDatatypeEncoding original text) rest ->
++      if SourceEquality.eqDataDecl declaration original then text
++      else findQueryDatatypeEncoding declaration rest
++  };
++  encodeDatatypeContextWithPool :: SourceEncodings -> [] DataDecl -> String;
++  encodeDatatypeContextWithPool (SourceEncodings _ entries) declarations =
++    list (\d -> findQueryDatatypeEncoding d
++      (M.findWithDefault compareString [] (D.datatypeName d) entries))
++      (append D.builtinDeclarations declarations);
+   encodeXType :: XType -> String;
+   encodeXType ty =
+     case ty of {
+@@ -788,6 +810,14 @@ module Bootstrap.CrateQuery where {
+               ((:) key
+                  ((:) (Separate.encodeInterface (Separate.objectInterface object))
+                     ((:) (Separate.encodeObject object) []))));
++  encodeCachedWithDatatypes :: Separate.DatatypeEncodings -> String -> Separate.UnitObject -> String;
++  encodeCachedWithDatatypes pool key object =
++    if contextualCache key object
++    then Separate.pack
++      ((:) "MLF-QUERY-CACHE-2" ((:) key ((:) (Separate.encodeContextualObject object) [])))
++    else let { encoded = Separate.encodeUnitWithDatatypes pool object } in
++      Separate.pack ((:) "MLF-QUERY-CACHE-1"
++        ((:) key ((:) (fst encoded) ((:) (snd encoded) []))));
+   -- Commands receive NUL-separated argv directly; paths never enter a shell.
+   cacheCommand arguments =
+     do {
+@@ -967,6 +997,10 @@ module Bootstrap.CrateQuery where {
+       }) ((:) (list (\((,) name flag) -> node "raw-parameter-protection"
+         ((:) name ((:) (boolean flag) []))) (Source.groupParameterProtection prepared)) [])))));
+   sourceQueryKey crateId compilerHash prepared contracts datatypes =
++    sourceQueryKeyWithContext crateId compilerHash prepared contracts (encodeDatatypeContext datatypes);
++  sourceQueryKeyWithContext :: String -> String -> Source.PreparedGroup ->
++    Map String Source.SourceContract -> String -> String;
++  sourceQueryKeyWithContext crateId compilerHash prepared contracts datatypeContext =
+     let { observed = S.fromList compareString
+       (append (map fst (Source.groupBindings prepared))
+         (append (map fst (Source.groupCandidateBindings prepared))
+@@ -977,7 +1011,7 @@ module Bootstrap.CrateQuery where {
+       ((:) crateId ((:) compilerHash
+         ((:) (list (\member -> encodeMember (canonicalMember member)) (Source.groupMembers prepared))
+         ((:) (list encodeBinding (Source.groupBindings prepared))
+-        ((:) (encodeDatatypeContext datatypes)
++        ((:) datatypeContext
+         ((:) (encodeSourceGroup prepared)
+         ((:) (list encodeSourceContract (M.toList relevant)) [])))))));
+   -- Raw checked inference payloads retain their established validator. A new
+@@ -988,6 +1022,14 @@ module Bootstrap.CrateQuery where {
+     Int -> Int -> [] GroupResult ->
+     IO (Either String ((,,) ([] Separate.UnitObject) QueryReport (Map String Source.SourceContract)));
+   runSourceGroups crateId compilerHash cacheDir inventory plan groups contracts
++    objects inferred reused results =
++    runSourceGroupsWithEncodings Nothing crateId compilerHash cacheDir inventory plan groups contracts
++      objects inferred reused results;
++  runSourceGroupsWithEncodings :: Maybe SourceEncodings -> String -> String -> String ->
++    TypeInventory -> Source.SourcePlan -> [] ([] String) -> Map String Source.SourceContract ->
++    [] Separate.UnitObject -> Int -> Int -> [] GroupResult ->
++    IO (Either String ((,,) ([] Separate.UnitObject) QueryReport (Map String Source.SourceContract)));
++  runSourceGroupsWithEncodings encodings crateId compilerHash cacheDir inventory plan groups contracts
+     objects inferred reused results = case groups of {
+     [] -> ioReturn (Right ((,,) (reverse objects)
+       (QueryReport inferred reused (reverse results)) contracts));
+@@ -999,7 +1041,11 @@ module Bootstrap.CrateQuery where {
+         let { datatypes = requiredDataIn inventory members
+           (append bindings (Source.groupCandidateBindings prepared)) };
+         let { name = groupName crateId names };
+-        let { key = sourceQueryKey crateId compilerHash prepared contracts datatypes };
++        let { key = case encodings of {
++          Nothing -> sourceQueryKey crateId compilerHash prepared contracts datatypes;
++          Just pool -> sourceQueryKeyWithContext crateId compilerHash prepared contracts
++            (encodeDatatypeContextWithPool pool datatypes)
++        } };
+         writeFile (cacheDir ++ "/query-key.new") key;
+         digest <- fileDigest (cacheDir ++ "/query-key.new");
+         let { destination = cacheDir ++ "/" ++ digest ++ ".mlfq" };
+@@ -1013,9 +1059,12 @@ module Bootstrap.CrateQuery where {
+         } else ioReturn (Left "cache miss");
+         let { raw = case cached of {
+           Right object -> Right ((,) True object);
+-          Left _ -> mapEither ((,) False)
+-            (Inference.compileLoweredGroup name
+-              ((:) (dependencyInterface bindings) []) datatypes members)
++          Left _ -> mapEither ((,) False) (case encodings of {
++            Nothing -> Inference.compileLoweredGroup name
++              ((:) (dependencyInterface bindings) []) datatypes members;
++            Just (SourceEncodings pool _) -> Inference.compileLoweredGroupWithDatatypes pool name
++              ((:) (dependencyInterface bindings) []) datatypes members
++          })
+         } };
+         case raw of {
+           Left error -> ioReturn (Left error);
+@@ -1023,7 +1072,10 @@ module Bootstrap.CrateQuery where {
+             Left error -> ioReturn (Left error);
+             Right finalized -> do {
+               saved <- if hit then ioReturn (Right ())
+-                else writeCache destination (encodeCached key object);
++                else writeCache destination (case encodings of {
++                  Nothing -> encodeCached key object;
++                  Just (SourceEncodings pool _) -> encodeCachedWithDatatypes pool key object
++                });
+               case saved of {
+                 Left error -> ioReturn (Left error);
+                 Right _ -> do {
+@@ -1031,7 +1083,7 @@ module Bootstrap.CrateQuery where {
+                   let { finalContracts = Source.finalGroupContracts finalized };
+                   let { semantic = Separate.fingerprint (list encodeBinding
+                     (Separate.unitBindings (Separate.objectInterface finalObject))) };
+-                  runSourceGroups crateId compilerHash cacheDir inventory plan rest
++                  runSourceGroupsWithEncodings encodings crateId compilerHash cacheDir inventory plan rest
+                     (M.union compareString finalContracts contracts)
+                     ((:) finalObject objects) (inferred + (if hit then 0 else 1))
+                     (reused + (if hit then 1 else 0))
+@@ -1048,6 +1100,18 @@ module Bootstrap.CrateQuery where {
+     Map String Bool -> Source.SourcePlan ->
+     IO (Either String ((,,) ([] Separate.UnitObject) QueryReport (Map String Source.SourceContract)));
+   compileSourceGroups crateId directory imports protected originalPlan =
++    compileSourceGroupsWithEncoding False crateId directory imports protected originalPlan;
++  -- Internal file-producer entry: the plan was built from finite parsed source
++  -- and decoded dependencies. Keep the original API independent of any pool.
++  compileParsedSourceGroups :: String -> String -> [] Separate.UnitInterface ->
++    Map String Bool -> Source.SourcePlan ->
++    IO (Either String ((,,) ([] Separate.UnitObject) QueryReport (Map String Source.SourceContract)));
++  compileParsedSourceGroups crateId directory imports protected originalPlan =
++    compileSourceGroupsWithEncoding True crateId directory imports protected originalPlan;
++  compileSourceGroupsWithEncoding :: Bool -> String -> String -> [] Separate.UnitInterface ->
++    Map String Bool -> Source.SourcePlan ->
++    IO (Either String ((,,) ([] Separate.UnitObject) QueryReport (Map String Source.SourceContract)));
++  compileSourceGroupsWithEncoding shareEncoding crateId directory imports protected originalPlan =
+     case Source.initializeProtection originalPlan protected of {
+       Left error -> ioReturn (Left error);
+       Right plan -> case prepareData (Source.planData plan) of {
+@@ -1066,8 +1130,10 @@ module Bootstrap.CrateQuery where {
+                 lock <- acquireFileLock (cacheDir ++ "/.lock");
+                 executable <- getExecutablePath;
+                 compilerHash <- fileDigest executable;
+-                result <- runSourceGroups crateId compilerHash cacheDir inventory plan
+-                  (Source.planGroups plan) contracts [] 0 0 [];
++                let { encodings = if shareEncoding
++                      then Just (prepareSourceEncodings (Source.planData plan)) else Nothing };
++                result <- runSourceGroupsWithEncodings encodings
++                  crateId compilerHash cacheDir inventory plan (Source.planGroups plan) contracts [] 0 0 [];
+                 releaseFileLock lock;
+                 ioReturn result
+               }
+diff --git a/libraries/mlf-crates/Bootstrap/InferenceUnit.hs b/libraries/mlf-crates/Bootstrap/InferenceUnit.hs
+index 360e575..c2a3410 100644
+--- a/libraries/mlf-crates/Bootstrap/InferenceUnit.hs
++++ b/libraries/mlf-crates/Bootstrap/InferenceUnit.hs
+@@ -191,6 +191,18 @@ module Bootstrap.InferenceUnit where {
+   -- crate artifact validates the selected schemes and owns the crate DAG;
+   -- module interface dependency hashes would cause transitive invalidation.
+   compileLoweredGroup name dependencies datatypes members =
++    compileLoweredGroupUsing (\term -> Separate.fingerprint (Pretty.prettyTerm term))
++      name dependencies datatypes members;
++  compileLoweredGroupWithDatatypes :: Separate.DatatypeEncodings -> String ->
++    [] Separate.UnitInterface -> [] DataDecl ->
++    [] ((,,) String (Maybe SAnnotation) SExpr) -> Either String Separate.UnitObject;
++  compileLoweredGroupWithDatatypes pool name dependencies datatypes members =
++    compileLoweredGroupUsing (Separate.fingerprintTermWithDatatypes pool)
++      name dependencies datatypes members;
++  compileLoweredGroupUsing :: (XTerm -> String) -> String ->
++    [] Separate.UnitInterface -> [] DataDecl ->
++    [] ((,,) String (Maybe SAnnotation) SExpr) -> Either String Separate.UnitObject;
++  compileLoweredGroupUsing payloadFingerprint name dependencies datatypes members =
+     do {
+       ensure (not (null members)) "cannot infer an empty declaration group";
+       externalTypes <- foldM mergeExternal M.empty (concatMap Separate.unitBindings dependencies);
+@@ -265,7 +277,7 @@ module Bootstrap.InferenceUnit where {
+                 Separate.UnitInterface name [] [] declarations [] []
+                   (Separate.sortBindings
+                      (map (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty)) bindings))
+-                  (Separate.fingerprint (Pretty.prettyTerm payload))
++                  (payloadFingerprint payload)
+             };
+             Right (Separate.CheckedUnitObject iface checked)
+           }
+diff --git a/libraries/mlf-crates/Bootstrap/Crate.hs b/libraries/mlf-crates/Bootstrap/Crate.hs
+index b433974..180b7eb 100644
+--- a/libraries/mlf-crates/Bootstrap/Crate.hs
++++ b/libraries/mlf-crates/Bootstrap/Crate.hs
+@@ -464,6 +464,14 @@ module Bootstrap.Crate where {
+     CrateSpec -> [] ((,) String Artifact.CrateInterface) -> PreparedCrate ->
+     IO (Either String a);
+   compilePreparedWith complete spec interfaces prepared =
++    compilePreparedWithEncoding False complete spec interfaces prepared;
++  -- Only compileSpecFile enables this internal parsed-source encoding path.
++  -- Generic prepared/source APIs retain their original no-pool demand behavior.
++  compilePreparedWithEncoding :: forall a. Bool ->
++    (Artifact.CrateObject -> String -> Query.QueryReport -> a) ->
++    CrateSpec -> [] ((,) String Artifact.CrateInterface) -> PreparedCrate ->
++    IO (Either String a);
++  compilePreparedWithEncoding shareEncoding complete spec interfaces prepared =
+     do {
+       let {
+         lowered = preparedLowered prepared
+@@ -484,8 +492,11 @@ module Bootstrap.Crate where {
+           M.empty (concatMap (\p -> Artifact.crateProtection (snd p)) interfaces)
+       };
+       compiled <- case preparedSourcePlan prepared of {
+-        Just plan -> Query.compileSourceGroups (specIdentity spec) (specCache spec)
+-          imported protected plan;
++        Just plan -> if shareEncoding
++          then Query.compileParsedSourceGroups (specIdentity spec) (specCache spec)
++            imported protected plan
++          else Query.compileSourceGroups (specIdentity spec) (specCache spec)
++            imported protected plan;
+         Nothing -> do {
+           result <- Query.compileGroups (specIdentity spec) (specCache spec) imported
+             (Inference.loweredData lowered) (Inference.loweredValues lowered);
+@@ -659,6 +670,10 @@ module Bootstrap.Crate where {
+          }
+     else ioReturn (Right ((,) spec interfaces));
+   compileSources spec sources interfaces prefix =
++    compileSourcesWithEncoding False spec sources interfaces prefix;
++  compileSourcesWithEncoding :: Bool -> CrateSpec -> [] SourceModule ->
++    [] ((,) String Artifact.CrateInterface) -> String -> IO (Either String ());
++  compileSourcesWithEncoding shareEncoding spec sources interfaces prefix =
+     do {
+       dependencies <- withPrelude spec sources interfaces;
+       case do {
+@@ -674,8 +689,8 @@ module Bootstrap.Crate where {
+         Left message -> ioReturn (Left message);
+         Right ((,,) updated loaded prepared) ->
+           do {
+-            result <- compilePreparedWith (\object payload report -> (,,) object payload report)
+-              updated loaded prepared;
++            result <- compilePreparedWithEncoding shareEncoding
++              (\object payload report -> (,,) object payload report) updated loaded prepared;
+             case result of {
+               Left message ->
+                 let {
+@@ -726,7 +741,9 @@ module Bootstrap.Crate where {
+                         } of {
+                      Left message -> ioReturn (Left message);
+                      Right ((,) sources interfaces) ->
+-                       compileSources normalized sources interfaces prefix
++                       -- Both source and dependency values originate in the
++                       -- parsers/decoders above, not caller-supplied lazy ASTs.
++                       compileSourcesWithEncoding True normalized sources interfaces prefix
+                    }
+                  }
+              }

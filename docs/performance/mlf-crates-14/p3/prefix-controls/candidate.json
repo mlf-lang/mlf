@@ -1,0 +1,23 @@
+{
+  "complete": true,
+  "status": "implementation prepared, unbuilt/unmeasured; based on provisional P2",
+  "base_commit": "aa11ffd318a2efa5be9805524710d0677eedb86f",
+  "base_patch_sha256": "5afa52100e516a1cae1938de2e1eee7105c192a6ffe46afdb60f81ba31d73773",
+  "candidate_patch_sha256": "dd4401f211294807796f8d878b7c191d2bd0cf5b5e25f3c4739dd77f0a57192d",
+  "source_sha256": {
+    "libraries/mlf-crates/Bootstrap/Separate.hs": "febdf27bf8e4e37166461b8b0abeb89d95a7ef6de2a93d254a6f413cf8ee4abb",
+    "libraries/mlf-crates/Bootstrap/CrateQuery.hs": "cf29431eb01eaeb287b89444f80b45fc88de79a2d43f006411821c180647f8eb",
+    "libraries/mlf-crates/Bootstrap/InferenceUnit.hs": "2f71e6d2ff12f48a2c1ae9f092159163322b15c98a637853e8cd78591ece2a6b",
+    "libraries/mlf-crates/Bootstrap/Crate.hs": "594af7881473256dcf2bdbb5f57289cfd8cb6cfd471f95f088748d63b1f6150a"
+  },
+  "import_graph_acyclic": true,
+  "new_dependency_edges": [
+    "Bootstrap.Separate -> Bootstrap.SourceEquality",
+    "Bootstrap.CrateQuery -> Bootstrap.SourceEquality"
+  ],
+  "public_arbitrary_integer_fingerprint_implementations_unchanged": true,
+  "new_datatype_append_negative_state_uses_original_recurrence": true,
+  "checks_removed": false,
+  "formats_changed": false,
+  "target_inference_reused": false
+}

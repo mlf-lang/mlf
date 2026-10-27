@@ -1,0 +1,43 @@
+{
+  "complete": true,
+  "qualified_candidate": false,
+  "accepted": false,
+  "scope": "Frozen 14 mlf-crates modules, dependency-reused, target-inference cold, serial threads",
+  "method": "One source-overlay diagnostic screen followed by one qualified P3 control; not a median or causal ABBA result",
+  "conclusion": "No measured gain in this single pair; do not promote the bulk reverse-index implementation from this evidence",
+  "rows": [
+    {
+      "label": "screen-prefix-index-4-r2-mlf-1",
+      "wall_seconds": 89.407815682,
+      "started_utc": "2026-10-27T00:59:12Z",
+      "max_individual_child_rss_bytes": 221933568,
+      "inferred_groups": 544,
+      "reused_groups": 0,
+      "checked_artifacts": {
+        ".mlfci": "876835e3fd66562b4080a8a52b424133e6b0427fecb2f8ffe4d9f96bb34bbe34",
+        ".mlfco": "a97d0c7e0990966f5926386ff2e3f6e6e0deb88d0fd02c22e9ca164e7f38807d"
+      },
+      "receipt_sha256": "625979c371b00bddba6f6dd4e895d9d03ef83253639a88853eb0aafc5847f53e",
+      "guard_sha256": "5432915f52a34dd5f5f8e519e692ee8530a940fd23647d6c0e2dd4a92bf1c7c7"
+    },
+    {
+      "label": "prefix-3-control-clean-1",
+      "wall_seconds": 88.335022101,
+      "started_utc": "2026-10-27T01:00:43Z",
+      "max_individual_child_rss_bytes": 250671104,
+      "inferred_groups": 544,
+      "reused_groups": 0,
+      "checked_artifacts": {
+        ".mlfci": "876835e3fd66562b4080a8a52b424133e6b0427fecb2f8ffe4d9f96bb34bbe34",
+        ".mlfco": "a97d0c7e0990966f5926386ff2e3f6e6e0deb88d0fd02c22e9ca164e7f38807d"
+      },
+      "receipt_sha256": "6ebaef67ae06c1ab753cb8481fe94352e12a29e0f2b4779e24d44a5064f72821",
+      "guard_sha256": "98f7012c4d86fc5949b6c805815cabb7bdaeb57043fff88f1eb5c5f558250809"
+    }
+  ],
+  "screen_divided_by_control": 1.0121446008104622,
+  "pending": "The 2985 authored differential controls were not executed; official producer qualification was not performed",
+  "failed_first_build": "Preserved screen-prefix-index-4 build failed on one extra closing parenthesis before any target run; r2 changes that character only",
+  "endpoint_asymmetry": "GHC comparator produces -O2 objects; MLF produces independently checked xMLF and query caches",
+  "recipe_sha256": "c1668ba825dc8d29b00f92879553624b3e8aec9cd92876f300b2bb1ea25598bf"
+}

@@ -1,0 +1,18 @@
+{
+  "status": "not run; prepared for authenticated P3 producer under serial guard",
+  "baseline": "P2 provisional frozen source",
+  "sources": {
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-crates/Bootstrap/Separate.hs": "20638086fbdbcffa888cf12dd05d1f901d7963c2870cff36aa0594087b224c0d",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-crates/Bootstrap/CrateQuery.hs": "2dece912679edfc80dd6e8f2a725e7e97eb82568fb6084d4bcb7e0520f16e4d9",
+    "/workspace/scratch/3f83e2ebe290/mlf-crates-fingerprint-source-20261026/libraries/mlf-crates/Bootstrap/InferenceUnit.hs": "862ad64a48a713bb2a56ace82733bbc6b0af6c2a64d539e396946c4b0311c310"
+  },
+  "frozen": {
+    "FrozenPrefix.hs": "486ce3801e0d286d0884c46962bcb0311d8a1b889544fbc4bff774613f64a369",
+    "FrozenInferenceUnit.hs": "4693d0bc2a733200f9916fc756ab5a2df8736e95a0fdd3e625600725f5578351"
+  },
+  "permitted_transforms": [
+    "Separate encoder excerpts copied byte-for-byte except frozen local encoder calls replacing qualified candidate encoder calls in encodeCached",
+    "module name/import preamble",
+    "full InferenceUnit copied with module name only changed"
+  ]
+}

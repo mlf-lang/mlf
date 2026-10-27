@@ -1,0 +1,4 @@
+[45 of 51] Compiling FrozenInferenceUnit ( /workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/optimization-research/prefix/FrozenInferenceUnit.hs, /workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/prefix-3/objects/FrozenInferenceUnit.o )
+[49 of 51] Compiling FrozenPrefix     ( /workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/optimization-research/prefix/FrozenPrefix.hs, /workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/prefix-3/objects/FrozenPrefix.o )
+[50 of 51] Compiling Main             ( /workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/optimization-research/prefix/PrefixControls.hs, /workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/prefix-3/objects/Main.o )
+[51 of 51] Linking /workspace/scratch/3f83e2ebe290/mlf-crates-profile-work-20261026/validation/prefix-3/check

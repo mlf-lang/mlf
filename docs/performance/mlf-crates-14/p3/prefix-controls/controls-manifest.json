@@ -1,0 +1,43 @@
+{
+  "status": "frozen authored helpers; not executed",
+  "expected_differential_controls": 922,
+  "control_count_derivation": {
+    "inventory_variants": 5,
+    "contexts": 9,
+    "per_context": 19,
+    "source_key_per_inventory": 9,
+    "matrix": 900,
+    "prior_reviewed_extras": 21,
+    "new_interface_fst_poisoned_summary": 1
+  },
+  "expected_compiled_modules": [
+    "FrozenInferenceUnit",
+    "FrozenPrefix",
+    "Main"
+  ],
+  "expected_new_object_files": [
+    "FrozenInferenceUnit.hi",
+    "FrozenInferenceUnit.o",
+    "FrozenPrefix.hi",
+    "FrozenPrefix.o",
+    "Main.hi",
+    "Main.o"
+  ],
+  "inputs": {
+    "FrozenPrefix.hs": "486ce3801e0d286d0884c46962bcb0311d8a1b889544fbc4bff774613f64a369",
+    "FrozenInferenceUnit.hs": "4693d0bc2a733200f9916fc756ab5a2df8736e95a0fdd3e625600725f5578351",
+    "PrefixControls.hs": "576c10e653b0bd47bfce1d3dae4f4ed2355829acc00e30d8b6b1511e99156e61",
+    "oracle-manifest.json": "e73c8908ec4a071d75dcc53206cf0cba3eb335328b26634a5980933045127bf8",
+    "candidate.json": "bca34e1e17fc4cefc09d3360b5828fc7edba46d0aadc6e60d32babe992ad5ac1",
+    "run_controls.py": "7dd3cf53910d54c3d2510c1c2f1c90aff14d3b4c6f9b382b8b6b82080e6d69cb"
+  },
+  "fail_closed": [
+    "exact result object/count",
+    "empty controls.stderr",
+    "exact three compiler Compiling records",
+    "exact six new hi/o files and no other newly created object-tree files",
+    "all copied producer files hashes unchanged before/after controls",
+    "producer authentication before/after",
+    "all helper input hashes unchanged before/after"
+  ]
+}

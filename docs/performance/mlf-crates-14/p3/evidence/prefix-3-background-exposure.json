@@ -1,0 +1,63 @@
+{
+  "format": "benchmark-background-exposure-v1",
+  "clean_exclusive_ABBA_claim": false,
+  "description": "Only one compiler/build heavy leg ran at once, but short read-only research parsers/file comparisons overlapped parts of this sequence. Preserve observed timing samples; do not claim strictly exclusive causal ABBA. No exact timing penalty is inferred.",
+  "reports": [
+    {
+      "agent": "audit_measurement",
+      "reported_wall_seconds": [
+        2.078,
+        2.115
+      ],
+      "operation": "Read-only saved-query DAG extraction/scheduling model; no compiler or workers",
+      "time_precision": "Reports received00:35:15 and00:38:06; second pass completed before stop message00:35:59. Exact process UTC endpoints not retained.",
+      "possible_samples": [
+        "fingerprint-2-controlA-1"
+      ]
+    },
+    {
+      "agent": "solver_architecture",
+      "reported_wall_seconds": [
+        0.52,
+        0.36,
+        0.63
+      ],
+      "operation": "Read-only fresh late-CCS JSON attribution",
+      "reported_execution_marks_utc": [
+        "2026-10-27T00:35:24Z",
+        "2026-10-27T00:35:39Z",
+        "2026-10-27T00:36:21Z"
+      ],
+      "time_precision": "Agent-reported execution marks, not instrumented start/end ledger.",
+      "possible_samples": [
+        "fingerprint-2-controlA-1",
+        "prefix-3-mlf-2"
+      ]
+    },
+    {
+      "agent": "profile_report",
+      "reported_wall_seconds": [
+        1.3,
+        1.5,
+        0.8
+      ],
+      "operation": [
+        "Read P2 compressed CCS tree/schema",
+        "Read P2 compressed CCS attribution plus small source diff",
+        "Compare tracked source files and save source-only candidate delta"
+      ],
+      "completion_time_reminders_utc": [
+        "2026-10-27T00:35:03Z",
+        "2026-10-27T00:36:23Z",
+        "2026-10-27T00:38:02Z"
+      ],
+      "time_precision": "Conversation completion reminders, not measured process endpoints.",
+      "possible_samples": [
+        "fingerprint-2-controlA-1",
+        "prefix-3-mlf-2",
+        "prefix-3-mlf-3"
+      ]
+    }
+  ],
+  "followup": "Research agents instructed to stop whole-cache/CCS parsing while timed legs run. Final decisive goal verification requires a quiet serialized window, with all controls, matching flags/thread budget and fresh target inference."
+}
