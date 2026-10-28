@@ -408,6 +408,12 @@ module Bootstrap.Module where {
   lookupEntities namespace name (Interface entries) =
     M.findWithDefault compareKey Set.empty ((,) namespace name) entries;
   visible (Interface entries) = Set.unions compareEntity (M.elems entries);
+  -- Selector predicates depend only on entity identity. Filtering each alias
+  -- set first preserves the ordered, deduplicated result without rebuilding a
+  -- global set containing every unrelated visible entity for each parent.
+  visibleMatching :: (Entity -> Bool) -> Interface -> Set Entity;
+  visibleMatching predicate (Interface entries) =
+    Set.unions compareEntity (map (Set.filter predicate) (M.elems entries));
   -- Compiler-only intrinsic reach supplies generated evidence, not source method visibility.
   -- Ordinary qualified imports remain visible for instance method declarations.
   sourceMethodVisible (Interface entries) =
@@ -627,11 +633,12 @@ module Bootstrap.Module where {
       ty <- lookupEntity Types name env;
       let {
         children =
-          filter
-            (\entity ->
-               eqMaybe (eqPair eqString eqString) (parent entity)
-                 (Just ((,) (owner ty) (spelling ty))))
-            (Set.toList (visible env))
+          Set.toList
+            (visibleMatching
+               (\entity ->
+                  eqMaybe (eqPair eqString eqString) (parent entity)
+                    (Just ((,) (owner ty) (spelling ty))))
+               env)
       };
       chosen <-
         case members of {
@@ -764,13 +771,14 @@ module Bootstrap.Module where {
         } in
         let {
           children =
-            filter
-              (\entity ->
-                 case parent entity of {
-                   Nothing -> False;
-                   Just identity -> elem (eqPair eqString eqString) identity parents
-                 })
-              (Set.toList (visible env))
+            Set.toList
+              (visibleMatching
+                 (\entity ->
+                    case parent entity of {
+                      Nothing -> False;
+                      Just identity -> elem (eqPair eqString eqString) identity parents
+                    })
+                 env)
         } in
         let {
           chosen =

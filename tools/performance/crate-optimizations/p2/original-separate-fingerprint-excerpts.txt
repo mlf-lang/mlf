@@ -1,0 +1,63 @@
+  fingerprintFrom :: String -> Int -> Int -> Int -> String;
+  fingerprintFrom text i a b =
+    if (i >= stringLength text)
+    then (showInt a ++ ("-" ++ showInt b))
+    else let {
+           code = stringCodeAt text i
+         } in
+         let {
+           nextA = (((a * 65599) + code) % 2147483647)
+         } in
+         let {
+           nextB = (((b * 131) + code) % 2147483629)
+         } in
+         seq nextA (seq nextB (fingerprintFrom text (i + 1) nextA nextB));
+  fingerprint text = fingerprintFrom text 0 0 1;
+  -- Exact summaries of the two existing rolling checksums. A summary composes
+  -- with any initial state, so shared datatype prefixes need not be rescanned
+  -- for every independently checked fragment. The serialized digest is unchanged.
+  fingerprintStateFrom :: String -> Int -> Int -> Int -> (,) Int Int;
+  fingerprintStateFrom text i a b =
+    if (i >= stringLength text)
+    then (,) a b
+    else let {
+           code = stringCodeAt text i
+         } in
+         let {
+           nextA = (((a * 65599) + code) % 2147483647)
+         } in
+         let {
+           nextB = (((b * 131) + code) % 2147483629)
+         } in
+         seq nextA (seq nextB (fingerprintStateFrom text (i + 1) nextA nextB));
+  fingerprintPower :: Int -> Int -> Int -> Int;
+  fingerprintPower base count modulus =
+    if (count == 0)
+    then 1
+    else let {
+           half = fingerprintPower base (quotInt count 2) modulus
+         } in
+         let {
+           squared = ((half * half) % modulus)
+         } in
+         if ((count % 2) == 0) then squared else ((squared * base) % modulus);
+  fingerprintPart :: String -> (,,,) Int Int Int Int;
+  fingerprintPart text =
+    case fingerprintStateFrom text 0 0 0 of {
+      (,) a b ->
+        (,,,) (fingerprintPower 65599 (stringLength text) 2147483647)
+          (fingerprintPower 131 (stringLength text) 2147483629)
+          a
+          b
+    };
+  fingerprintAppend :: (,) Int Int -> (,,,) Int Int Int Int -> (,) Int Int;
+  fingerprintAppend ((,) a b) ((,,,) powerA powerB partA partB) =
+    let {
+      nextA = (((a * powerA) + partA) % 2147483647)
+    } in
+    let {
+      nextB = (((b * powerB) + partB) % 2147483629)
+    } in
+    seq nextA (seq nextB ((,) nextA nextB));
+  fingerprintAfter :: (,) Int Int -> String -> String;
+  fingerprintAfter ((,) a b) text = fingerprintFrom text 0 a b;

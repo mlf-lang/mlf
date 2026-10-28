@@ -16,6 +16,7 @@ module Bootstrap.CrateQuery where {
   import qualified Bootstrap.Primitive as Primitive;
   import qualified Bootstrap.Host as Host;
   import qualified Bootstrap.Data as D;
+  import qualified Bootstrap.SourceEquality as SourceEquality;
   import qualified Bootstrap.X.Type as T;
   import qualified Bootstrap.X.Syntax as X;
   import qualified Bootstrap.X.Check as Check;
@@ -222,6 +223,27 @@ module Bootstrap.CrateQuery where {
                   node "parameter" ((:) (canonicalReference scope n) ((:) (encodeKind k) [])))
                parameters)
             ((:) (list encodeConstructor constructors) [])));
+  data QueryDatatypeEncoding = QueryDatatypeEncoding DataDecl String;
+  data SourceEncodings = SourceEncodings Separate.DatatypeEncodings
+    (Map String ([] QueryDatatypeEncoding));
+  prepareSourceEncodings :: [] DataDecl -> SourceEncodings;
+  prepareSourceEncodings declarations =
+    SourceEncodings (Separate.prepareDatatypeEncodings declarations)
+      (M.fromListWith compareString append
+        (map (\d -> (,) (D.datatypeName d) ((:) (QueryDatatypeEncoding d (encodeDatatype d)) []))
+          (append D.builtinDeclarations declarations)));
+  findQueryDatatypeEncoding :: DataDecl -> [] QueryDatatypeEncoding -> String;
+  findQueryDatatypeEncoding declaration entries = case entries of {
+    [] -> encodeDatatype declaration;
+    (:) (QueryDatatypeEncoding original text) rest ->
+      if SourceEquality.eqDataDecl declaration original then text
+      else findQueryDatatypeEncoding declaration rest
+  };
+  encodeDatatypeContextWithPool :: SourceEncodings -> [] DataDecl -> String;
+  encodeDatatypeContextWithPool (SourceEncodings _ entries) declarations =
+    list (\d -> findQueryDatatypeEncoding d
+      (M.findWithDefault compareString [] (D.datatypeName d) entries))
+      (append D.builtinDeclarations declarations);
   encodeXType :: XType -> String;
   encodeXType ty =
     case ty of {
@@ -788,6 +810,14 @@ module Bootstrap.CrateQuery where {
               ((:) key
                  ((:) (Separate.encodeInterface (Separate.objectInterface object))
                     ((:) (Separate.encodeObject object) []))));
+  encodeCachedWithDatatypes :: Separate.DatatypeEncodings -> String -> Separate.UnitObject -> String;
+  encodeCachedWithDatatypes pool key object =
+    if contextualCache key object
+    then Separate.pack
+      ((:) "MLF-QUERY-CACHE-2" ((:) key ((:) (Separate.encodeContextualObject object) [])))
+    else let { encoded = Separate.encodeUnitWithDatatypes pool object } in
+      Separate.pack ((:) "MLF-QUERY-CACHE-1"
+        ((:) key ((:) (fst encoded) ((:) (snd encoded) []))));
   -- Commands receive NUL-separated argv directly; paths never enter a shell.
   cacheCommand arguments =
     do {
@@ -967,6 +997,10 @@ module Bootstrap.CrateQuery where {
       }) ((:) (list (\((,) name flag) -> node "raw-parameter-protection"
         ((:) name ((:) (boolean flag) []))) (Source.groupParameterProtection prepared)) [])))));
   sourceQueryKey crateId compilerHash prepared contracts datatypes =
+    sourceQueryKeyWithContext crateId compilerHash prepared contracts (encodeDatatypeContext datatypes);
+  sourceQueryKeyWithContext :: String -> String -> Source.PreparedGroup ->
+    Map String Source.SourceContract -> String -> String;
+  sourceQueryKeyWithContext crateId compilerHash prepared contracts datatypeContext =
     let { observed = S.fromList compareString
       (append (map fst (Source.groupBindings prepared))
         (append (map fst (Source.groupCandidateBindings prepared))
@@ -977,7 +1011,7 @@ module Bootstrap.CrateQuery where {
       ((:) crateId ((:) compilerHash
         ((:) (list (\member -> encodeMember (canonicalMember member)) (Source.groupMembers prepared))
         ((:) (list encodeBinding (Source.groupBindings prepared))
-        ((:) (encodeDatatypeContext datatypes)
+        ((:) datatypeContext
         ((:) (encodeSourceGroup prepared)
         ((:) (list encodeSourceContract (M.toList relevant)) [])))))));
   -- Raw checked inference payloads retain their established validator. A new
@@ -988,6 +1022,14 @@ module Bootstrap.CrateQuery where {
     Int -> Int -> [] GroupResult ->
     IO (Either String ((,,) ([] Separate.UnitObject) QueryReport (Map String Source.SourceContract)));
   runSourceGroups crateId compilerHash cacheDir inventory plan groups contracts
+    objects inferred reused results =
+    runSourceGroupsWithEncodings Nothing crateId compilerHash cacheDir inventory plan groups contracts
+      objects inferred reused results;
+  runSourceGroupsWithEncodings :: Maybe SourceEncodings -> String -> String -> String ->
+    TypeInventory -> Source.SourcePlan -> [] ([] String) -> Map String Source.SourceContract ->
+    [] Separate.UnitObject -> Int -> Int -> [] GroupResult ->
+    IO (Either String ((,,) ([] Separate.UnitObject) QueryReport (Map String Source.SourceContract)));
+  runSourceGroupsWithEncodings encodings crateId compilerHash cacheDir inventory plan groups contracts
     objects inferred reused results = case groups of {
     [] -> ioReturn (Right ((,,) (reverse objects)
       (QueryReport inferred reused (reverse results)) contracts));
@@ -999,7 +1041,11 @@ module Bootstrap.CrateQuery where {
         let { datatypes = requiredDataIn inventory members
           (append bindings (Source.groupCandidateBindings prepared)) };
         let { name = groupName crateId names };
-        let { key = sourceQueryKey crateId compilerHash prepared contracts datatypes };
+        let { key = case encodings of {
+          Nothing -> sourceQueryKey crateId compilerHash prepared contracts datatypes;
+          Just pool -> sourceQueryKeyWithContext crateId compilerHash prepared contracts
+            (encodeDatatypeContextWithPool pool datatypes)
+        } };
         writeFile (cacheDir ++ "/query-key.new") key;
         digest <- fileDigest (cacheDir ++ "/query-key.new");
         let { destination = cacheDir ++ "/" ++ digest ++ ".mlfq" };
@@ -1013,9 +1059,12 @@ module Bootstrap.CrateQuery where {
         } else ioReturn (Left "cache miss");
         let { raw = case cached of {
           Right object -> Right ((,) True object);
-          Left _ -> mapEither ((,) False)
-            (Inference.compileLoweredGroup name
-              ((:) (dependencyInterface bindings) []) datatypes members)
+          Left _ -> mapEither ((,) False) (case encodings of {
+            Nothing -> Inference.compileLoweredGroup name
+              ((:) (dependencyInterface bindings) []) datatypes members;
+            Just (SourceEncodings pool _) -> Inference.compileLoweredGroupWithDatatypes pool name
+              ((:) (dependencyInterface bindings) []) datatypes members
+          })
         } };
         case raw of {
           Left error -> ioReturn (Left error);
@@ -1023,7 +1072,10 @@ module Bootstrap.CrateQuery where {
             Left error -> ioReturn (Left error);
             Right finalized -> do {
               saved <- if hit then ioReturn (Right ())
-                else writeCache destination (encodeCached key object);
+                else writeCache destination (case encodings of {
+                  Nothing -> encodeCached key object;
+                  Just (SourceEncodings pool _) -> encodeCachedWithDatatypes pool key object
+                });
               case saved of {
                 Left error -> ioReturn (Left error);
                 Right _ -> do {
@@ -1031,7 +1083,7 @@ module Bootstrap.CrateQuery where {
                   let { finalContracts = Source.finalGroupContracts finalized };
                   let { semantic = Separate.fingerprint (list encodeBinding
                     (Separate.unitBindings (Separate.objectInterface finalObject))) };
-                  runSourceGroups crateId compilerHash cacheDir inventory plan rest
+                  runSourceGroupsWithEncodings encodings crateId compilerHash cacheDir inventory plan rest
                     (M.union compareString finalContracts contracts)
                     ((:) finalObject objects) (inferred + (if hit then 0 else 1))
                     (reused + (if hit then 1 else 0))
@@ -1048,6 +1100,18 @@ module Bootstrap.CrateQuery where {
     Map String Bool -> Source.SourcePlan ->
     IO (Either String ((,,) ([] Separate.UnitObject) QueryReport (Map String Source.SourceContract)));
   compileSourceGroups crateId directory imports protected originalPlan =
+    compileSourceGroupsWithEncoding False crateId directory imports protected originalPlan;
+  -- Internal file-producer entry: the plan was built from finite parsed source
+  -- and decoded dependencies. Keep the original API independent of any pool.
+  compileParsedSourceGroups :: String -> String -> [] Separate.UnitInterface ->
+    Map String Bool -> Source.SourcePlan ->
+    IO (Either String ((,,) ([] Separate.UnitObject) QueryReport (Map String Source.SourceContract)));
+  compileParsedSourceGroups crateId directory imports protected originalPlan =
+    compileSourceGroupsWithEncoding True crateId directory imports protected originalPlan;
+  compileSourceGroupsWithEncoding :: Bool -> String -> String -> [] Separate.UnitInterface ->
+    Map String Bool -> Source.SourcePlan ->
+    IO (Either String ((,,) ([] Separate.UnitObject) QueryReport (Map String Source.SourceContract)));
+  compileSourceGroupsWithEncoding shareEncoding crateId directory imports protected originalPlan =
     case Source.initializeProtection originalPlan protected of {
       Left error -> ioReturn (Left error);
       Right plan -> case prepareData (Source.planData plan) of {
@@ -1066,8 +1130,10 @@ module Bootstrap.CrateQuery where {
                 lock <- acquireFileLock (cacheDir ++ "/.lock");
                 executable <- getExecutablePath;
                 compilerHash <- fileDigest executable;
-                result <- runSourceGroups crateId compilerHash cacheDir inventory plan
-                  (Source.planGroups plan) contracts [] 0 0 [];
+                let { encodings = if shareEncoding
+                      then Just (prepareSourceEncodings (Source.planData plan)) else Nothing };
+                result <- runSourceGroupsWithEncodings encodings
+                  crateId compilerHash cacheDir inventory plan (Source.planGroups plan) contracts [] 0 0 [];
                 releaseFileLock lock;
                 ioReturn result
               }

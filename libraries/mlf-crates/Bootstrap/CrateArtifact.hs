@@ -420,7 +420,13 @@ module Bootstrap.CrateArtifact where {
           (zip names (map Separate.stripInstance (Modules.sourceInstances source)))
           (Modules.sourceDatatypes lowered) schemes entry bodyHash protection };
         validateInterface iface;
-        ensure (eqString input (encodeInterface iface)) "noncanonical crate metadata";
+        -- The checksum above authenticates the decoded prefix. Full canonical
+        -- byte equality below also requires that prefix to equal interfaceFields;
+        -- therefore its already-verified checksum is the canonical checksum.
+        -- Keep the complete input comparison: field equality alone would admit
+        -- noncanonical length framing, even with a valid prefix checksum.
+        ensure (eqString input (Separate.pack (snoc (interfaceFields iface) checksum)))
+          "noncanonical crate metadata";
         Right iface
       };
       _ -> Left "unsupported or malformed crate metadata (expected MLFCI-5)"
@@ -557,8 +563,17 @@ module Bootstrap.CrateArtifact where {
     };
   withObjectFingerprint (CrateInterface n deps modules exports imports ds cs instances lowered bindings entry _ protection) digest =
     CrateInterface n deps modules exports imports ds cs instances lowered bindings entry digest protection;
-  makeObject iface fragments =
-    CrateObject (withObjectFingerprint iface (fragmentFingerprint fragments)) fragments;
+  -- Pair only the finalized immutable fragments with their exact pooled text.
+  -- Callers needing both the checksum and final object bytes can share this
+  -- computation; ordinary object callers retain the same lazy interface.
+  makeObjectWithPayload :: CrateInterface -> [] Separate.UnitObject -> (,) CrateObject String;
+  makeObjectWithPayload iface fragments =
+    let {
+      payload = encodePooledPayload fragments
+    } in
+    (,) (CrateObject (withObjectFingerprint iface (Separate.fingerprint payload)) fragments)
+      payload;
+  makeObject iface fragments = fst (makeObjectWithPayload iface fragments);
   -- Prelude has one shared crate identity even when several independent leaf
   -- crates use it. Its bootstrap object is translated once; user crates still
   -- compile their own declarations through the ordinary SCC query pipeline.
@@ -664,21 +679,27 @@ module Bootstrap.CrateArtifact where {
       validateInterface (objectInterface object);
       Right object
     };
-  encodeObject object =
+  -- The supplied interface text must be the encoding of this immutable iface.
+  -- This helper shares bytes, not a digest inferred from different text.
+  encodePooledObject :: CrateInterface -> String -> String -> String;
+  encodePooledObject iface interfaceText payload =
+    Separate.pack
+      ((:) "MLFCO-2"
+         ((:) (crateId iface)
+            ((:) (Separate.fingerprint interfaceText) ((:) payload []))));
+  encodeObjectWithInterface :: CrateObject -> String -> String;
+  encodeObjectWithInterface object interfaceText =
     case object of {
       CrateObject iface fragments ->
-        Separate.pack
-          ((:) "MLFCO-2"
-             ((:) (crateId iface)
-                ((:) (Separate.fingerprint (encodeInterface iface))
-                   ((:) (encodePooledPayload fragments) []))));
+        encodePooledObject iface interfaceText (encodePooledPayload fragments);
       LegacyCrateObject iface fragments ->
         Separate.pack
           ((:) "MLFCO-1"
              ((:) (crateId iface)
-                ((:) (Separate.fingerprint (encodeInterface iface))
+                ((:) (Separate.fingerprint interfaceText)
                    ((:) (Separate.pack (map encodeFragment fragments)) []))))
     };
+  encodeObject object = encodeObjectWithInterface object (encodeInterface (objectInterface object));
   -- Canonical framing can be checked at the input offsets. It does not require
   -- serializing a second copy of the complete implementation object.
   canonicalFieldFrom :: String -> Int -> Either String ((,) String Int);
@@ -1523,9 +1544,31 @@ module Bootstrap.CrateArtifact where {
       ioReturn (mapEither Checked.term linked)
     };
   writeObject prefix object =
+    let {
+      interfaceText = encodeInterface (objectInterface object)
+    } in
     do {
-      writeFile (prefix ++ ".mlfco") (encodeObject object);
-      writeFile (prefix ++ ".mlfci") (encodeInterface (objectInterface object));
+      writeFile (prefix ++ ".mlfco") (encodeObjectWithInterface object interfaceText);
+      writeFile (prefix ++ ".mlfci") interfaceText;
+      ioReturn ()
+    };
+  -- Only the new-object producer passes the exact paired payload obtained from
+  -- makeObjectWithPayload. Loaded/legacy objects keep the general writer; no
+  -- inference result or independently supplied checksum licenses text reuse.
+  writeObjectWithPayload :: String -> CrateObject -> String -> IO ();
+  writeObjectWithPayload prefix object payload =
+    let {
+      interfaceText = encodeInterface (objectInterface object);
+      objectText = case object of {
+        CrateObject iface _ -> encodePooledObject iface interfaceText payload;
+        LegacyCrateObject _ _ -> encodeObjectWithInterface object interfaceText
+      }
+    } in
+    do {
+      -- Keep the constructor case inside the lazy contents: filename checks
+      -- must still precede demand of the object or its paired payload.
+      writeFile (prefix ++ ".mlfco") objectText;
+      writeFile (prefix ++ ".mlfci") interfaceText;
       ioReturn ()
     };
   showInterfaceFile path =

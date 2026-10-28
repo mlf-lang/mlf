@@ -191,6 +191,18 @@ module Bootstrap.InferenceUnit where {
   -- crate artifact validates the selected schemes and owns the crate DAG;
   -- module interface dependency hashes would cause transitive invalidation.
   compileLoweredGroup name dependencies datatypes members =
+    compileLoweredGroupUsing (\term -> Separate.fingerprint (Pretty.prettyTerm term))
+      name dependencies datatypes members;
+  compileLoweredGroupWithDatatypes :: Separate.DatatypeEncodings -> String ->
+    [] Separate.UnitInterface -> [] DataDecl ->
+    [] ((,,) String (Maybe SAnnotation) SExpr) -> Either String Separate.UnitObject;
+  compileLoweredGroupWithDatatypes pool name dependencies datatypes members =
+    compileLoweredGroupUsing (Separate.fingerprintTermWithDatatypes pool)
+      name dependencies datatypes members;
+  compileLoweredGroupUsing :: (XTerm -> String) -> String ->
+    [] Separate.UnitInterface -> [] DataDecl ->
+    [] ((,,) String (Maybe SAnnotation) SExpr) -> Either String Separate.UnitObject;
+  compileLoweredGroupUsing payloadFingerprint name dependencies datatypes members =
     do {
       ensure (not (null members)) "cannot infer an empty declaration group";
       externalTypes <- foldM mergeExternal M.empty (concatMap Separate.unitBindings dependencies);
@@ -265,7 +277,7 @@ module Bootstrap.InferenceUnit where {
                 Separate.UnitInterface name [] [] declarations [] []
                   (Separate.sortBindings
                      (map (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty)) bindings))
-                  (Separate.fingerprint (Pretty.prettyTerm payload))
+                  (payloadFingerprint payload)
             };
             Right (Separate.CheckedUnitObject iface checked)
           }
