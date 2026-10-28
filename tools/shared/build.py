@@ -286,7 +286,7 @@ def toolchain_inputs(ghc, libdir, ghc_info, cc):
     paths.update(p.resolve() for p in private_bin.iterdir() if p.is_file())
     for key, command in re.findall(r'\("([^"\n]*command)","([^"\n]*)"\)', ghc_info):
         # This driver uses GHC's native code generator, never the optional LLVM/JS tools.
-        if key.startswith(('LLVM ', 'JavaScript ')):
+        if key.startswith(('LLVM ', 'JavaScript ')) or (sys.platform == 'darwin' and key == 'windres command'):
             continue
         words = shlex.split(command)
         if words and not words[0].startswith('$'):
@@ -298,6 +298,8 @@ def toolchain_inputs(ghc, libdir, ghc_info, cc):
             paths.add(Path(value).resolve())
         elif value and shutil.which(value):
             paths.add(executable(value))
+    if sys.platform == 'darwin':
+        return darwin_toolchain_inputs(paths, actual_ghc, libdir)
     if sys.platform != 'linux':
         raise RuntimeError('this qualified direct build driver currently records Linux toolchains only')
     for path in list(paths):
@@ -314,6 +316,69 @@ def toolchain_inputs(ghc, libdir, ghc_info, cc):
         for match in re.findall(r'(?:=>\s+|^\s*)(/[^\s]+)', result.stdout, re.M):
             paths.add(Path(match).resolve(strict=True))
     return {'actual_ghc': identified(actual_ghc), 'files': {str(path): sha(path) for path in sorted(paths)}}
+
+
+
+def darwin_toolchain_inputs(initial_paths, actual_ghc, libdir):
+    """Record the real Mach-O dependency closure and dyld shared-cache bytes."""
+    sdk = Path(subprocess.check_output(['xcrun', '--show-sdk-path'], text=True).strip()).resolve(strict=True)
+    cache_dir = Path('/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld')
+    cache_map = cache_dir / 'dyld_shared_cache_arm64e.map'
+    if not cache_map.is_file():
+        raise RuntimeError('cannot identify Darwin shared-cache map')
+    cache_text = cache_map.read_text()
+    caches = sorted(p for p in cache_dir.glob('dyld_shared_cache_arm64e*') if p.is_file())
+    if not caches:
+        raise RuntimeError('missing dyld shared-cache files')
+    paths = set(initial_paths)
+    for name in ['clang', 'ld', 'as', 'ar', 'ranlib', 'otool', 'install_name_tool']:
+        value = subprocess.check_output(['xcrun', '--find', name], text=True).strip()
+        paths.add(Path(value).resolve(strict=True))
+    paths.add((sdk / 'SDKSettings.json').resolve(strict=True))
+    paths.update(p.resolve() for p in caches)
+    ghc_libraries = {}
+    for root in [libdir, Path('/Library/Developer/CommandLineTools/usr/lib')]:
+        for path in root.rglob('*.dylib'):
+            ghc_libraries.setdefault(path.name, set()).add(path.resolve())
+    pending = list(paths - set(caches)); visited = set(); system_names = set()
+    while pending:
+        path = pending.pop()
+        if path in visited:
+            continue
+        visited.add(path)
+        kind = subprocess.check_output(['/usr/bin/file', '-b', str(path)], text=True)
+        if 'Mach-O' not in kind:
+            continue
+        result = subprocess.run(['/usr/bin/otool', '-L', str(path)], capture_output=True, text=True)
+        if result.returncode:
+            raise RuntimeError('otool failed: ' + str(path))
+        for line in result.stdout.splitlines():
+            match = re.match(r'^\s+(\S+) \(compatibility version ', line)
+            if not match:
+                continue
+            name = match.group(1)
+            if name.startswith('/usr/lib/') or name.startswith('/System/Library/'):
+                if name not in cache_text:
+                    raise RuntimeError('system dylib absent from dyld cache map: ' + name)
+                system_names.add(name)
+                continue
+            if name.startswith('@rpath/'):
+                candidates = ghc_libraries.get(Path(name).name, set())
+                if len(candidates) != 1:
+                    raise RuntimeError('cannot uniquely resolve Mach-O dependency: ' + name)
+                dependency = next(iter(candidates))
+            elif name.startswith('@loader_path/'):
+                dependency = (path.parent / name[len('@loader_path/'):]).resolve(strict=True)
+            elif name.startswith('/'):
+                dependency = Path(name).resolve(strict=True)
+            else:
+                raise RuntimeError('unsupported Mach-O dependency: ' + name)
+            if dependency not in paths:
+                paths.add(dependency)
+                pending.append(dependency)
+    return {'actual_ghc': identified(actual_ghc), 'files': {str(path): sha(path) for path in sorted(paths)},
+            'platform_qualification': 'Darwin Mach-O and dyld cache; experimental',
+            'sdk': str(sdk), 'system_dylibs': sorted(system_names)}
 
 
 def audit_inferred_interfaces(log, inputs):
