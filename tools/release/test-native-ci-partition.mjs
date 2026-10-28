@@ -75,6 +75,7 @@ const validate = text => {
   const o2Only = [
     'tools/performance/crate-optimizations/run_controls.py',
     'tools/performance/a1-private-index/check_integrated.py',
+    'tools/performance/fingerprint-fusion/run_controls.py',
     'tools/shared/test_recursive_managed.py',
     'tools/shared/test_guest_framework.py',
     'tools/shared/test_guest_state_laws.py',

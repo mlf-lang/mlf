@@ -34,3 +34,16 @@ objects, checks exact test module/output inventories and retains failure logs.
 P3 refuses Python optimization because its inherited checks use assertions.
 All recorded receipts are local outputs, not repository inputs. These finite
 controls do not run native compiler bootstrap or make a performance claim.
+
+## F1 host dependency re-audit
+
+The later F1 integration changes only GHC host arithmetic (addition-only) and
+public INLINE pragmas. P1/P2 manifests retain the prior host pins and record the
+explicit re-audit; schema, collections and all literal oracle bodies remain
+unchanged. P2's `FrozenFingerprint` alone now compiles with
+`-fno-enable-rewrite-rules -fomit-interface-pragmas` and Core lint; a retained rewrite dump must contain no
+F1 rule. The normal candidate producer stays O2 with F1 enabled. This prevents
+the same new fingerprint rule from silently optimizing both differential sides,
+including later inlining of oracle unfoldings into the harness.
+The independent [F1 controls](../fingerprint-fusion/README.md) separately compare
+host arithmetic to an O0 Prelude-Integer oracle, including error/demand behavior.

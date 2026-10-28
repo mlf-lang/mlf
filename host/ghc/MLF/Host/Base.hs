@@ -27,6 +27,7 @@ import qualified Data.String as TextLiteral
 import qualified GHC.Stack as Stack
 import qualified Data.Array as Array
 import Data.Bits ((.&.))
+import qualified Data.Int as Fixed
 import Data.Typeable (Typeable)
 import Control.Exception (Exception, throw)
 import qualified Control.Monad.ST as S
@@ -152,6 +153,52 @@ v_mulInt = strict2 (*)
 v_quotInt = strict2 (\a b -> if b==0 then failure "integer division by zero" else quot a b)
 v_remInt = strict2 (\a b -> if b==0 then failure "integer division by zero" else rem a b)
 v_andInt = strict2 (.&.)
+
+-- Keep these three primitive names visible until the two literal rolling-step
+-- rules have had a chance to fire; all other arithmetic remains arbitrary
+-- precision, with the same ordered strict2 definitions above.
+{-# INLINE [1] v_addInt #-}
+{-# INLINE [1] v_mulInt #-}
+{-# INLINE [1] v_remInt #-}
+
+-- Used only by the two rules below. Their positive literal multiplier/modulus
+-- pairs and the checked nonnegative state/code bounds put the full sum below
+-- 2^48. Narrow only after those checks; never truncate arbitrary language Ints.
+-- Demand state before code, as the original multiply/add/remainder chain does.
+-- The out-of-range-state branch preserves the original multiplication before
+-- demanding code. Invalid Unicode scalars are not rejected here: this is integer
+-- arithmetic, and every guarded code (including surrogate values) remains exact.
+fingerprintIntStep :: Int -> Int -> Int -> Int -> Int
+fingerprintIntStep multiplier modulus state code = state `pseq`
+  if state >= 0 && state < modulus
+  then let a = fromInteger state :: Fixed.Int64
+           k = fromInteger multiplier :: Fixed.Int64
+           product64 = a * k
+       in product64 `pseq` code `pseq`
+         if code >= 0 && code <= 0x10ffff
+         then let c = fromInteger code :: Fixed.Int64
+                  m = fromInteger modulus :: Fixed.Int64
+              in toInteger ((product64 + c) `rem` m)
+         else fingerprintIntegerStep multiplier modulus state code
+  else fingerprintIntegerStep multiplier modulus state code
+{-# INLINE [1] fingerprintIntStep #-}
+
+-- Spell the exact old ordered operations without the rule-headed v_* names:
+-- even while rules are active this fallback cannot rewrite recursively to itself.
+fingerprintIntegerStep :: Int -> Int -> Int -> Int -> Int
+fingerprintIntegerStep multiplier modulus state code =
+  strict2 (\a b -> if b == 0 then failure "integer division by zero" else rem a b)
+    (strict2 (+) (strict2 (*) state multiplier) code) modulus
+{-# INLINE [1] fingerprintIntegerStep #-}
+
+{-# RULES
+"mlf/fingerprintIntStep/65599" [~1] forall state code.
+  v_remInt (v_addInt (v_mulInt state 65599) code) 2147483647 =
+    fingerprintIntStep 65599 2147483647 state code
+"mlf/fingerprintIntStep/131" [~1] forall state code.
+  v_remInt (v_addInt (v_mulInt state 131) code) 2147483629 =
+    fingerprintIntStep 131 2147483629 state code
+  #-}
 v_eqInt, v_ltInt, neInt, leInt, gtInt, geInt :: Int -> Int -> Bool
 v_eqInt = strict2 (==)
 v_ltInt = strict2 (<)

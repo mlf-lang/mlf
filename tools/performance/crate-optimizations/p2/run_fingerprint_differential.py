@@ -189,8 +189,20 @@ def main():
         import_flags = ['-i', '-i'+str(objects)]
         # One-shot compilation: only copied, pinned .hi files are searchable. No
         # implementation source root is on the module search path.
-        run('compile-oracle', [ghc, '-c', *flags, *import_flags, '-odir', objects, '-hidir', objects,
+        # Keep the literal old fingerprint loops independent of the new F1
+        # arithmetic rules, including later inlining into the harness. Omit
+        # oracle interface unfoldings; candidate production stays normal O2.
+        run('compile-oracle', [ghc, '-c', *flags, '-fno-enable-rewrite-rules', '-fomit-interface-pragmas', '-dcore-lint',
+                               '-ddump-rule-rewrites', '-ddump-to-file',
+                               '-ddump-file-prefix', str(output / 'frozen-oracle'),
+                               *import_flags, '-odir', objects, '-hidir', objects,
                                HERE / 'FrozenFingerprint.hs'])
+        rewrite = output / 'frozen-oracle.dump-rule-rewrites'
+        if rewrite.exists() and 'mlf/fingerprintIntStep/' in rewrite.read_text():
+            raise ValueError('F1 rule contaminated the frozen P2 oracle')
+        record['frozen_oracle_rewrite_rules_disabled'] = True
+        record['frozen_oracle_interface_pragmas_omitted'] = True
+        record['frozen_oracle_rule_dump_sha256'] = sha(rewrite) if rewrite.exists() else None
         run('compile-harness', [ghc, '-c', *flags, *import_flags, '-odir', objects, '-hidir', objects,
                                 '-o', objects / 'FingerprintDifferential.o',
                                 '-ohi', objects / 'Main.hi', HERE / 'FingerprintDifferential.hs'])

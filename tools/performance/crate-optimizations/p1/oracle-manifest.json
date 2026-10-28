@@ -12,9 +12,17 @@
     "libraries/mlf-foundation/Bootstrap/Types.hs": "c8bf3c734fa5c7e4c9b1f546774fb7dbfac9cc872fc7194f18cacb53d332132a",
     "libraries/mlf-frontend/Bootstrap/Lexer.hs": "9c681c46059d62f430c71e783d77b74ed7e0898225a148b4116995a5a2155179",
     "libraries/mlf-language-core/Bootstrap/Primitive.hs": "d5ab2e97d7c217143311ff81c09075f9f9adb96ecf9f0cfe285e274e28130e23",
-    "host/ghc/MLF/Primitive.hs": "4b0c1ab711471b60c136cc3a8b9cbe6ed07e2a4df367b43384dee77cd0498316",
-    "host/ghc/MLF/Host/Base.hs": "31fb27b1438c9a8bbf20804db4e770cc3af9d48dc39ad4ced9c55e10565ba63f"
+    "host/ghc/MLF/Primitive.hs": "2ec6ab90201feb449a9a9accbfa9d34661e03216e54cb3c52ffbfe2d15f7353b",
+    "host/ghc/MLF/Host/Base.hs": "b9663c40059791bfb99e9f302d4eab94452379653db3e951ee02c8ff45933de3"
   },
   "scope": "Oracle freezes target selector and helper definitions, but shares schema datatype constructors and pinned collection/primitive dependencies. If any pinned dependency changes, re-audit independence or supply separately frozen dependencies; do not update pins merely to pass.",
-  "historical_baseline_sha": "af9ea26a2d2d76630a58e82e9e12940a03cfb5f0"
+  "historical_baseline_sha": "af9ea26a2d2d76630a58e82e9e12940a03cfb5f0",
+  "f1_dependency_reaudit": {
+    "prior_host_pins": {
+      "host/ghc/MLF/Primitive.hs": "4b0c1ab711471b60c136cc3a8b9cbe6ed07e2a4df367b43384dee77cd0498316",
+      "host/ghc/MLF/Host/Base.hs": "31fb27b1438c9a8bbf20804db4e770cc3af9d48dc39ad4ced9c55e10565ba63f"
+    },
+    "production_delta": "Exact frozen F1: Base adds two guarded Int64 helpers, two literal RULES, five phase-controlled INLINE pragmas and Data.Int import; Primitive adds six INLINE pragmas. Existing definitions unchanged, no shared/native source or ABI edits.",
+    "independence": "Selector/schema/collection definitions unchanged. The separate F1 gate independently checks the host arithmetic against O0 Prelude Integer, including demand and error order."
+  }
 }

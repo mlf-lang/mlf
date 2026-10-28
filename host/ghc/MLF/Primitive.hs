@@ -97,6 +97,7 @@ showInt = Base.v_showInt
 
 addInt :: Int -> Int -> Int
 addInt = Base.v_addInt
+{-# INLINE addInt #-}
 
 subInt :: Int -> Int -> Int
 subInt = Base.v_subInt
@@ -115,12 +116,14 @@ ifThenElse = Base.v_ifThenElse
 
 mulInt :: Int -> Int -> Int
 mulInt = Base.v_mulInt
+{-# INLINE mulInt #-}
 
 quotInt :: Int -> Int -> Int
 quotInt = Base.v_quotInt
 
 remInt :: Int -> Int -> Int
 remInt = Base.v_remInt
+{-# INLINE remInt #-}
 
 readInt :: String -> Int
 readInt = Base.v_readInt
@@ -375,10 +378,13 @@ infixl 6 +, -
 infixl 7 *, /, %
 (+), (-), (*), (/), (%) :: Int -> Int -> Int
 (+) = addInt
+{-# INLINE (+) #-}
 (-) = subInt
 (*) = mulInt
+{-# INLINE (*) #-}
 (/) = quotInt
 (%) = remInt
+{-# INLINE (%) #-}
 (<), (<=), (>), (>=) :: Int -> Int -> Bool
 (<) = ltInt
 (<=) = Base.leInt

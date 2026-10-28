@@ -31,8 +31,9 @@
     "libraries/mlf-frontend/Bootstrap/Parser.hs": "d6fcd9881700b9dd91077ca2db863076f3d4974688fbb4dbe42d97b96b82872d",
     "libraries/mlf-xmlf/Bootstrap/X/Pretty.hs": "d4840c8c31b8f6bb82587590a4ab48ed8d664c96ba22c9daf70ae19c5e8ad8d9",
     "libraries/mlf-xmlf/Bootstrap/X/Checked.hs": "0cf5be5536d4fdf747050b6a610345868a8c7ff1b1beb7885f68cd677e0c04e1",
-    "host/ghc/MLF/Host/Base.hs": "31fb27b1438c9a8bbf20804db4e770cc3af9d48dc39ad4ced9c55e10565ba63f",
-    "host/ghc/MLF/Host/IO.hs": "e563c81c86424f1203964d230a1beffcc22ed545a078c778e5e446f0a7cadc65"
+    "host/ghc/MLF/Host/Base.hs": "b9663c40059791bfb99e9f302d4eab94452379653db3e951ee02c8ff45933de3",
+    "host/ghc/MLF/Host/IO.hs": "e563c81c86424f1203964d230a1beffcc22ed545a078c778e5e446f0a7cadc65",
+    "host/ghc/MLF/Primitive.hs": "2ec6ab90201feb449a9a9accbfa9d34661e03216e54cb3c52ffbfe2d15f7353b"
   },
   "changed_dependency_oracles": {
     "libraries/mlf-crates/Bootstrap/Separate.hs": {
@@ -47,5 +48,12 @@
       "reason": "Explicitly authorized zero-start streaming fingerprint/state change; full old indexed loops and their wrappers frozen independently in FrozenFingerprint, production changed functions directly tested."
     }
   },
-  "integrated_p3_sha256": "febdf27bf8e4e37166461b8b0abeb89d95a7ef6de2a93d254a6f413cf8ee4abb"
+  "integrated_p3_sha256": "febdf27bf8e4e37166461b8b0abeb89d95a7ef6de2a93d254a6f413cf8ee4abb",
+  "f1_dependency_reaudit": {
+    "prior_host_pins": {
+      "host/ghc/MLF/Host/Base.hs": "31fb27b1438c9a8bbf20804db4e770cc3af9d48dc39ad4ced9c55e10565ba63f"
+    },
+    "production_delta": "Exact frozen F1: Base adds two guarded Int64 helpers, two literal RULES, five phase-controlled INLINE pragmas and Data.Int import; Primitive adds six INLINE pragmas. Existing definitions unchanged, no shared/native source or ABI edits.",
+    "independence": "Frozen P2 oracle bytes unchanged; compile only FrozenFingerprint with -fno-enable-rewrite-rules and -fomit-interface-pragmas to prevent F1 fusion contaminating both differential sides, including later inlining into the harness. Verify no F1 rewrite, retain current candidate O2 producer. The independent F1 O0 Prelude Integer oracle covers host arithmetic; shared parsing/framing/semantic helpers remain shared."
+  }
 }
