@@ -1,0 +1,7 @@
+PASS session handwritten copies aliases field graph and delayed P1
+PASS session 28 finite full-state traces and unchanged public route
+PASS session failed P0 and P1 probes preserve fallback epochs
+PASS session captured frontier bucket and old-parent rewrite
+PASS session empty versus selected and final original audits
+PASS session detached final Solver supports independent witnesses
+{"complete":true,"groups":6,"trace_cases":28,"candidate_output_used_for_expectations":false,"private_raw_faults_test_copy_only":true}

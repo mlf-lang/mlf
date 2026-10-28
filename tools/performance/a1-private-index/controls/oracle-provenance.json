@@ -1,0 +1,22 @@
+{
+  "algorithm_oracle_files": {
+    "AdmissionTests.hs": "8558f9544bbdf0ea44e9a9364bf910c9187165a477eac955a2821aaa4326f6fb",
+    "FileMain.hs": "a8328405ecb3ada199bf5b479943d99d1989d90dacd3bb16b34c9b7822002a66",
+    "FrozenConstraint.hs": "06f363fac6852114e05153eeefb2df42a52dedd6e10100cfa0c0873a0d40334d",
+    "FrozenGraph.hs": "b0729713649072696451523a459efbfa5a528a4f0a71a8421f7daa268f5f9faa",
+    "FrozenIntMap.hs": "9e4747f2dc860d706a5f22c0f14d5af582e8f5ad7642a75dca23499b8a697947",
+    "FrozenIntSet.hs": "c4a62314cf86cb2dae81c96ac70790197d2b57a85448d2cc2dd19d90be820c3b",
+    "FrozenMap.hs": "0cdeb2b572f38a59e82e5a91d3c47b118b5dc0928292a66849115e1679d18e31",
+    "FrozenSolver.hs": "19382b95b1a7deb682166c289f7e74edd9fd73eeda1135c36574fa056c7d548d",
+    "SessionFieldFixtures.hs": "b21593de3186697ec981c8b0b404c7c8387ef48a83ea6350f05effe1f03a615a",
+    "SessionGraftFixtures.hs": "91f43ee2c9a865f37e4a510a4c4c1da9fbd4b1c96f8c866d3bcf28b553fc57b8",
+    "SessionOracle.hs": "bafacf6febf934df487b399b08e3c992a7d1f05392f5c5c2b6cd36f7db12660e",
+    "SessionTests.hs": "718a05cacb3d52760058a1f57901e9fc37135b7098bd2bd9240428eded06c16f"
+  },
+  "derived_from_candidate_output": false,
+  "format": "a1-independent-oracle-provenance-public-v1",
+  "original_private_provenance_sha256": "a2402f48fd7c56e77568bb971ced605cb7fc849de19a9217e79f522f82e53cda",
+  "private_execution_paths_omitted": true,
+  "scope": "Original literal independently frozen controls; only non-semantic provenance metadata is replaced for public distribution.",
+  "source_baseline": "P3"
+}

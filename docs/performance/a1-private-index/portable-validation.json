@@ -1,0 +1,44 @@
+{
+  "complete": true,
+  "portable_wrapper_end_to_end_executed": false,
+  "original_formal_campaign_completed": true,
+  "portable_finite_controls": {
+    "passed": true,
+    "session_groups": 6,
+    "traces": 28,
+    "admission_cases": 22,
+    "file_cases": 9,
+    "sealed_negatives": 4,
+    "receipt_sha256": "26833356c0a380a7abd3838d5d0aeed7a1881508021e007ad2bcc4a1a30065bc",
+    "guard_elapsed_seconds": 164.57834144799926,
+    "guard_peak_group_rss_bytes": 595808256,
+    "guard_empty_terminal": true
+  },
+  "scope": "Portable finite controls executed on existing qualified cloud A1 producer. Fresh-clone full preparation/campaign wrapper is statically reviewed, not end-to-end executed. No new performance samples.",
+  "static_checks": {
+    "python_ast": true,
+    "fixture_files": 81,
+    "providers": 54,
+    "ghc_closure": 70,
+    "target": 14,
+    "groups": 544,
+    "base_pins": 217,
+    "candidate_pins": 219,
+    "fixture_sha256": "b23d7f0dc3482e86e58ba27f7484c48170732589662feca807db8ce2bc7106ba"
+  },
+  "helper_smoke": {
+    "positive_exit": 0,
+    "negative_exit": 3,
+    "terminal_empty": true,
+    "wall_seconds": [
+      0.015144448,
+      0.011709877
+    ]
+  },
+  "portable_script_sha256": {
+    "reproduce.py": "f35a2887b17776b5c3a739251ea76b0eb10815d16be783de3af54cadfc5b28bc",
+    "run_controls.py": "ea838a551230d1ea89e2eac1fe9948111f24dcb88f539152b1e25f5ccde410cc",
+    "helper.py": "65d5dea330bd26af85df8c59db36611641953eb38f7ad691f048c9b007a5ba81"
+  },
+  "privacy_revision": "Final published controls runner reexecuted after provenance metadata sanitization; all literal semantic oracle source bytes unchanged. Raw execution receipts private only."
+}

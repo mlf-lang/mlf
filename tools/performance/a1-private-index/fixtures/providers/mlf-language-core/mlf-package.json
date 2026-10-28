@@ -1,0 +1,19 @@
+{
+  "format": 1,
+  "name": "mlf-language-core",
+  "version": "0.3.0",
+  "dependencies": {
+    "mlf-foundation": {
+      "path": "../mlf-foundation"
+    }
+  },
+  "library": {
+    "modules": {
+      "Bootstrap.Data": "Bootstrap/Data.hs",
+      "Bootstrap.Kind": "Bootstrap/Kind.hs",
+      "Bootstrap.Kinding": "Bootstrap/Kinding.hs",
+      "Bootstrap.Primitive": "Bootstrap/Primitive.hs"
+    }
+  },
+  "source-syntax": "shared-haskell-v1"
+}

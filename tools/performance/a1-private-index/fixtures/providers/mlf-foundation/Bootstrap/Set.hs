@@ -1,0 +1,85 @@
+-- mlf:syntax shared-haskell-v1
+{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
+             KindSignatures, FlexibleContexts, FlexibleInstances,
+             MultiParamTypeClasses, OverloadedStrings #-}
+module Bootstrap.Set where {
+  import MLF.Primitive;
+  import Bootstrap.Types;
+  import qualified Bootstrap.Std as L;
+  import qualified Bootstrap.Map as M;
+  wrap :: forall a. Map a () -> Set a;
+  wrap tree = seq tree (Set tree);
+  empty :: forall a. Set a;
+  empty = wrap M.empty;
+  singleton :: forall a. a -> Set a;
+  singleton value = wrap (M.singleton value ());
+  null :: forall a. Set a -> Bool;
+  null (Set tree) = M.null tree;
+  size :: forall a. Set a -> Int;
+  size (Set tree) = M.size tree;
+  member :: forall a. (a -> a -> Int) -> a -> Set a -> Bool;
+  member cmp value (Set tree) = M.member cmp value tree;
+  notMember :: forall a. (a -> a -> Int) -> a -> Set a -> Bool;
+  notMember cmp value tree = L.not (member cmp value tree);
+  insert :: forall a. (a -> a -> Int) -> a -> Set a -> Set a;
+  insert cmp value (Set tree) = wrap (M.insert cmp value () tree);
+  delete :: forall a. (a -> a -> Int) -> a -> Set a -> Set a;
+  delete cmp value (Set tree) = wrap (M.delete cmp value tree);
+  fromList :: forall a. (a -> a -> Int) -> [] a -> Set a;
+  fromList cmp values = wrap (M.fromList cmp (L.map (\value -> (,) value ()) values));
+  fromDistinctAscList :: forall a. [] a -> Set a;
+  fromDistinctAscList values =
+    wrap (M.fromDistinctAscList (L.map (\value -> (,) value ()) values));
+  toList :: forall a. Set a -> [] a;
+  toList (Set tree) = M.keys tree;
+  toAscList :: forall a. Set a -> [] a;
+  toAscList tree = toList tree;
+  union :: forall a. (a -> a -> Int) -> Set a -> Set a -> Set a;
+  union cmp (Set a) (Set b) = wrap (M.union cmp a b);
+  unions :: forall a. (a -> a -> Int) -> [] (Set a) -> Set a;
+  unions cmp trees = L.foldlStrict (union cmp) empty trees;
+  difference :: forall a. (a -> a -> Int) -> Set a -> Set a -> Set a;
+  difference cmp (Set a) (Set b) = wrap (M.difference cmp a b);
+  intersection :: forall a. (a -> a -> Int) -> Set a -> Set a -> Set a;
+  intersection cmp (Set a) (Set b) = wrap (M.intersection cmp a b);
+  isSubsetOf :: forall a. (a -> a -> Int) -> Set a -> Set a -> Bool;
+  isSubsetOf cmp a b = ((size a <= size b) && L.all (\value -> member cmp value b) (toList a));
+  isProperSubsetOf :: forall a. (a -> a -> Int) -> Set a -> Set a -> Bool;
+  isProperSubsetOf cmp a b = ((size a < size b) && isSubsetOf cmp a b);
+  disjoint :: forall a. (a -> a -> Int) -> Set a -> Set a -> Bool;
+  disjoint cmp a b = null (intersection cmp a b);
+  filter :: forall a. (a -> Bool) -> Set a -> Set a;
+  filter predicate (Set tree) = wrap (M.filterWithKey (\key value -> predicate key) tree);
+  map :: forall b a. (b -> b -> Int) -> (a -> b) -> Set a -> Set b;
+  map cmp f tree = fromList cmp (L.map f (toList tree));
+  foldr :: forall a b. (a -> b -> b) -> b -> Set a -> b;
+  foldr f z tree = L.foldr f z (toList tree);
+  foldl :: forall b a. (b -> a -> b) -> b -> Set a -> b;
+  foldl f z tree = L.foldl f z (toList tree);
+  lookupMin :: forall a. Set a -> Maybe a;
+  lookupMin (Set tree) = L.mapOptional L.fst (M.lookupMin tree);
+  lookupMax :: forall a. Set a -> Maybe a;
+  lookupMax (Set tree) = L.mapOptional L.fst (M.lookupMax tree);
+  findMin :: forall a. Set a -> a;
+  findMin (Set tree) = L.fst (M.findMin tree);
+  findMax :: forall a. Set a -> a;
+  findMax (Set tree) = L.fst (M.findMax tree);
+  minView :: forall a. Set a -> Maybe ((,) a (Set a));
+  minView (Set tree) =
+    L.mapOptional
+      (\entry ->
+         case entry of {
+           (,) ((,) key value) rest -> (,) key (wrap rest)
+         })
+      (M.minViewWithKey tree);
+  maxView :: forall a. Set a -> Maybe ((,) a (Set a));
+  maxView (Set tree) =
+    L.mapOptional
+      (\entry ->
+         case entry of {
+           (,) ((,) key value) rest -> (,) key (wrap rest)
+         })
+      (M.maxViewWithKey tree);
+  eqSet :: forall a. (a -> a -> Bool) -> Set a -> Set a -> Bool;
+  eqSet eq a b = ((size a == size b) && L.eqList eq (toList a) (toList b))
+}

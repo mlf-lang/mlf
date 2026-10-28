@@ -1,0 +1,28 @@
+{
+  "format": 1,
+  "name": "mlf-frontend",
+  "version": "0.3.0",
+  "dependencies": {
+    "mlf-foundation": {
+      "path": "../mlf-foundation"
+    },
+    "mlf-language-core": {
+      "path": "../mlf-language-core"
+    }
+  },
+  "library": {
+    "modules": {
+      "Bootstrap.Dependency": "Bootstrap/Dependency.hs",
+      "Bootstrap.Desugar": "Bootstrap/Desugar.hs",
+      "Bootstrap.Layout": "Bootstrap/Layout.hs",
+      "Bootstrap.Lexer": "Bootstrap/Lexer.hs",
+      "Bootstrap.Module": "Bootstrap/Module.hs",
+      "Bootstrap.Parsec": "Bootstrap/Parsec.hs",
+      "Bootstrap.Parser": "Bootstrap/Parser.hs",
+      "Bootstrap.Prelude": "Bootstrap/Prelude.hs",
+      "Bootstrap.Standalone": "Bootstrap/Standalone.hs",
+      "Bootstrap.Surface": "Bootstrap/Surface.hs"
+    }
+  },
+  "source-syntax": "shared-haskell-v1"
+}
