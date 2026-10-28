@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local Linux process/pin transport for the A1 experimental reproduction.
+"""Local Linux/macOS process and pin transport for the A1 experimental reproduction.
 
 No compiler implementation, source transformation or relaxed producer validator.
 """
@@ -186,7 +186,7 @@ class SerialLock:
 
 
 class Runner:
-    """Serial child launch with Linux group guards and exact-child wait4 usage.
+    """Serial child launch with platform resource guards and exact-child wait4 usage.
 
     Compiler wall is measured immediately before Popen through wait4 completion;
     file copying, authentication, snapshots and semantic postchecks are excluded.

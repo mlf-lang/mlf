@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Reproduce the frozen A1 experiment locally; never an acceptance/3x assertion.
 
-The maintained producer builder is intentionally unchanged and Linux-only.
-No native compiler bootstrap, target cache reuse, source rewriting or output
-normalization is performed. See README.md before starting this long operation.
+Linux uses the fixed producer builder; Darwin records a symmetric platform patch.
+No native compiler bootstrap, target cache reuse, algorithm source rewriting or
+output normalization is performed. See README.md before starting this long operation.
 """
 from __future__ import annotations
 import argparse
@@ -541,7 +541,7 @@ def limits(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source-checkout', type=Path, default=HERE.parents[2])
-    parser.add_argument('--candidate-ref', default='HEAD')
+    parser.add_argument('--candidate-ref', default='5a89143ecbcaaef152a7e88331583660192e106d')
     parser.add_argument('--base-ref', default='875e483de49655030c4ffba1995b60610a50273a')
     parser.add_argument('--work-dir', type=Path, required=True)
     parser.add_argument('--ghc', default='ghc')

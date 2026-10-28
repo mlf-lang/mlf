@@ -6,39 +6,33 @@ and remained about **10.57× GHC**, not the requested ≤3× goal. Reproduce on 
 machine; do not compare your wall times with that cloud host. This runner never
 marks an optimization accepted, including when a new local screen passes.
 
-## Supported environment — important for Mac users
+## Supported environment
 
-The unchanged maintained official producer and its toolchain authenticator
-currently support **Linux with ordinary GHC 9.14.1**. They inspect the actual
-Linux bindist/tool dependencies. This package deliberately does **not** replace
-that collector, weaken authentication or pretend to supply native macOS
-qualification.
+The Linux route uses the maintained collector with ordinary GHC 9.14.1. The
+experimental native macOS route was exercised on Apple Silicon with Xcode
+Command Line Tools and GHC 9.14.1. It applies the same platform-only builder
+patch to both fixed producer snapshots and records the original and patched
+hashes. Its Mach-O/dyld collector has platform-specific path and resolution
+assumptions and is not an independently certified toolchain closure. Other macOS
+installations may fail closed and require additional platform work.
 
-A local agent on your Mac may investigate a **separately reviewed native-Mac
-platform adaptation**: actual toolchain discovery, an authenticated replacement
-for Linux `ldd` discovery, and correct resource measurements/guards. That work is
-not supplied or executed here and must retain all source, checking, timing and
-provenance contracts. Its receipts must identify the new platform route rather
-than claim the unchanged Linux authentication.
+On macOS, 5 GiB process-group RSS is sampled approximately every 100 ms and
+exceeding it triggers termination. Short peaks may be missed; there is **no hard
+6 GiB per-process address-space limit**. Host available memory is estimated as
+`vm_stat` free + inactive + speculative pages, not Linux `MemAvailable`.
+CPU affinity is not enforced, and `ru_maxrss` is recorded in bytes. These are
+macOS experimental results, not Linux qualification. The collector and sampling
+limits should be reviewed before relying on the measurements.
 
-An **existing user-controlled Linux VM/container** with GHC 9.14.1, a compatible
-C compiler and required global GHC packages is the supported fallback. If neither
-a reviewed native adaptation nor a Linux environment is available, stop and
-report the environment requirement. Running this unchanged script directly
-on Darwin fails before any build or output-tree mutation. A Linux VM/container
-result is labelled by its actual guest platform, CPU visibility and affinity;
-it is not a native Mac result. This script does not create a VM, install tools,
-access a remote computer, fetch refs, push, or run the cancelled native bootstrap.
-
-Python **3.11+**, Git, GHC **9.14.1** and a Linux C toolchain are required. The
-ordinary builder also checks the actual installed `base`, `array`, `bytestring`,
-`text`, `containers` and `directory` closure. Use a fresh output directory outside
-the repository. Default guards are: 5 GiB aggregate child-group RSS, 6 GiB
-per-process address space, 3 GiB host-available memory floor, 4 GiB disk-free
-floor, 16 GiB maximum work-tree size, and six hours per command. These are safety
-limits, not runtime promises. Preparation can be lengthy. Every compiler command
-is serial; the runner also locks its work directory. Do not run competing builds
-or benchmarks while measuring.
+Python **3.11+**, Git, ordinary GHC **9.14.1** and a C toolchain are required.
+The builder checks the installed `base`, `array`, `bytestring`, `text`,
+`containers` and `directory` closure. Use a fresh output directory outside the
+repository. Linux guards default to 5 GiB process-group RSS, 6 GiB per-process
+address space, 3 GiB available memory, 4 GiB free disk, 16 GiB work-tree size,
+and six hours per command. macOS uses the sampling and memory estimate described
+above instead of the Linux RSS/address-space mechanisms. Every compiler command
+is serial; do not run competing builds or benchmarks while measuring. The runner
+does not create a VM, install tools, push, or run the cancelled native bootstrap.
 
 ## Run it
 
@@ -52,7 +46,7 @@ repository holding those commits, not an alternate source overlay.
 python3 -B tools/performance/a1-private-index/reproduce.py \
   --source-checkout "$PWD" \
   --base-ref 875e483de49655030c4ffba1995b60610a50273a \
-  --candidate-ref HEAD \
+  --candidate-ref 5a89143ecbcaaef152a7e88331583660192e106d \
   --work-dir /absolute/fresh/a1-reproduction \
   --ghc /absolute/path/to/ghc-9.14.1 \
   --cc /absolute/path/to/cc \
@@ -81,7 +75,8 @@ separately named fresh experiment.
 
 `--rss-mib`, `--address-space-mib`, `--host-available-mib`, `--disk-free-mib`,
 `--max-work-gib` and `--command-timeout` override guard limits at preparation;
-the preparation receipt fixes them for the later campaign. They do not change
+the preparation receipt fixes them for the later campaign. On macOS,
+`--address-space-mib` is not enforced, as described above. They do not change
 compiler options. The process-group guard covers ordinary inherited children;
 it is not a security sandbox for deliberately escaped processes.
 
@@ -90,8 +85,9 @@ it is not a security sandbox for deliberately escaped processes.
 1. Resolve the requested local Git refs and extract fresh separate P3/A1 source
    snapshots. Verify the fixed implementation source/config/host pins and the
    maintained package/shared-source/Cabal inventory/direct-import checks.
-2. Run each snapshot's **unaltered** `tools/shared/build.py` with fixed `-O2` and
-   the same GHC/CC. The builder retains its `-j1`, demand-preserving flags,
+2. On Linux run each snapshot's unaltered `tools/shared/build.py`; on macOS
+   apply and record the same platform builder patch to both snapshots. Build with
+   fixed `-O2` and the same GHC/CC. The builder retains its `-j1`, demand-preserving flags,
    exhaustive/inferred-interface auditing, exact source resolution,
    `-rtsopts=ignoreAll`, checked builtin verification and actual receipt inputs.
    Authenticate both complete producers with their unchanged maintained helper;

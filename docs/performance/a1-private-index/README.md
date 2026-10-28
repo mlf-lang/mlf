@@ -82,13 +82,13 @@ control sources are in Git; no private cloud path, binary or query-cache body is
 required. Rebuild and compare all three implementations on the **same local host**.
 Cross-host wall seconds are not an improvement comparison.
 
-The existing runner preserves the maintained Linux collector and fails closed
-elsewhere. A local Mac agent is explicitly allowed to investigate a separately
-reviewed native macOS platform adapter for real toolchain/dependency discovery,
-paths and resource accounting while preserving every source/semantic/check/cache
-contract. Record that patch and new qualification, not invented Linux credentials
-or receipts. Existing Linux VM/container execution is a fallback, not an excuse
-to skip the requested native investigation. No macOS port was run in the cloud.
+The runner supports an experimental native Apple Silicon macOS route in addition
+to Linux. It uses the same platform-only builder adaptation for both producers.
+Its 100 ms process-group RSS sampling can miss short peaks and does not enforce
+a hard per-process address-space limit. The dyld/toolchain collector has platform
+limitations and has not received independent platform qualification. See the
+runner instructions for details; results remain experimental and do not accept
+A1. Private local receipts and machine details are not published here.
 
 ## Evidence privacy
 
