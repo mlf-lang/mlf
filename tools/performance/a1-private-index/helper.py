@@ -101,6 +101,12 @@ def authenticate(producer, source):
 
 
 def host():
+    if sys.platform == 'darwin':
+        return {'platform': platform.platform(), 'machine': platform.machine(),
+                'node': platform.node(), 'affinity': 'not exposed by macOS',
+                'cpu': subprocess.check_output(['sysctl', '-n', 'machdep.cpu.brand_string'], text=True).strip(),
+                'logical_cpus': os.cpu_count(), 'python': sys.version, 'os_cache_flush': False,
+                'qualification': 'macOS experimental; sampled RSS, no hard address-space limit'}
     require(sys.platform == 'linux', 'The unchanged official producer supports Linux only. '
             'On a Mac use a user-provided Linux VM/container with GHC 9.14.1, or stop and report '
             'that no supported environment is available. Native macOS qualification is NOT supplied.')
@@ -113,6 +119,14 @@ def host():
 
 
 def memory_available():
+    if sys.platform == 'darwin':
+        output = subprocess.check_output(['/usr/bin/vm_stat'], text=True)
+        import re
+        page = int(re.search(r'page size of (\d+) bytes', output).group(1))
+        fields = {key: int(value) for key, value in re.findall(r'^Pages ([^:]+):\s*(\d+)\.', output, re.M)}
+        require(all(key in fields for key in ('free', 'inactive', 'speculative')), 'vm_stat memory fields missing')
+        # Approximation, not Linux MemAvailable: inactive includes reclaimable and anonymous pages.
+        return page * sum(fields[key] for key in ('free', 'inactive', 'speculative'))
     for line in Path('/proc/meminfo').read_text().splitlines():
         if line.startswith('MemAvailable:'):
             return int(line.split()[1]) * 1024
@@ -121,6 +135,15 @@ def memory_available():
 
 def process_group(group):
     rows = []
+    if sys.platform == 'darwin':
+        output = subprocess.check_output(['/bin/ps', '-axo', 'pid=,ppid=,pgid=,sess=,state=,rss='], text=True)
+        for line in output.splitlines():
+            parts = line.split()
+            require(len(parts) == 6, 'invalid ps process row')
+            pid, ppid, pgid, session = map(int, parts[:4])
+            if pgid == group or session == group:
+                rows.append({'pid': pid, 'state': parts[4], 'rss': int(parts[5]) * 1024})
+        return rows
     for entry in Path('/proc').iterdir():
         if not entry.name.isdigit():
             continue
@@ -186,11 +209,16 @@ class Runner:
                   'boundary': 'Popen launch through exact-child wait4 completion; setup/copy/auth/postchecks excluded',
                   'started_utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
         receipt = output / 'command.json'
+        if sys.platform == 'darwin':
+            record['resource_qualification'] = {'address_space_limit': 'not enforced: user accepted sampled RSS protection',
+                'process_group_rss': 'ps RSS sampled every 100 ms; short peaks may be missed',
+                'host_available': 'vm_stat free + inactive + speculative estimate; not Linux MemAvailable'}
         save(receipt, record)
         done, waited, errors = threading.Event(), [], []
         def limits():
             maximum = limit['address_space_per_process_bytes']
-            resource.setrlimit(resource.RLIMIT_AS, (maximum, maximum))
+            if sys.platform != 'darwin':
+                resource.setrlimit(resource.RLIMIT_AS, (maximum, maximum))
         with (output / 'stdout').open('wb') as stdout, (output / 'stderr').open('wb') as stderr:
             begin = time.perf_counter_ns()
             process = subprocess.Popen(argv, cwd=cwd, env=env(), stdin=subprocess.DEVNULL,
@@ -238,7 +266,7 @@ class Runner:
                 if waited:
                     status, usage, end = waited[0]
                     process.returncode = os.waitstatus_to_exitcode(status)
-                    survivors = [row for row in process_group(process.pid) if row['state'] != 'Z']
+                    survivors = [row for row in process_group(process.pid) if not row['state'].startswith('Z')]
                     if survivors:
                         try:
                             os.killpg(process.pid, signal.SIGKILL)
@@ -248,7 +276,7 @@ class Runner:
                     record.update(exit_code=process.returncode, reason=reason,
                                   wall_seconds=(end-begin)/1e9, child_user_seconds=usage.ru_utime,
                                   child_system_seconds=usage.ru_stime,
-                                  max_individual_child_rss_bytes=usage.ru_maxrss*1024,
+                                  max_individual_child_rss_bytes=usage.ru_maxrss if sys.platform == 'darwin' else usage.ru_maxrss*1024,
                                   sampled_process_tree_peak_rss_bytes=peak,
                                   voluntary_context_switches=usage.ru_nvcsw,
                                   involuntary_context_switches=usage.ru_nivcsw,

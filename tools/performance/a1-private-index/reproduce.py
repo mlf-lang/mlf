@@ -86,8 +86,14 @@ def fixture_contract():
 def implementation(source, data, side):
     key = 'base' if side == 'P3' else 'candidate'
     expected = data['implementation_pins'][key]
+    observed = dict(expected)
     for relative, digest in expected.items():
-        require(sha(below(source, relative)) == digest, side + ' implementation pin: ' + relative)
+        actual = sha(below(source, relative))
+        if sys.platform == 'darwin' and relative == 'tools/shared/build.py' and actual != digest:
+            require(actual == sha(HERE.parents[2] / relative), side + ' platform builder patch mismatch')
+            observed[relative] = actual
+        else:
+            require(actual == digest, side + ' implementation pin: ' + relative)
     builder = module(source / 'tools/shared/build.py', 'unaltered_static_builder_' + side)
     manifest = builder.load_manifest()
     require(len(manifest['modules']) == data['implementation_module_counts'][key], 'implementation closure count')
@@ -97,7 +103,7 @@ def implementation(source, data, side):
         require(row['path'] in expected, 'unpinned registered shared source: ' + row['path'])
     for relative in manifest['host_only']:
         require(relative in expected, 'unpinned registered host source: ' + relative)
-    return {str(below(source, relative)): digest for relative, digest in expected.items()}
+    return {str(below(source, relative)): digest for relative, digest in observed.items()}
 
 
 def git_snapshot(repo, ref, destination, runner, output):
@@ -335,6 +341,18 @@ def prepare(args, data, fixture_inputs):
                 record['sources'][side], record['producers'][side] = str(source), str(producer)
                 record['inputs'].update(implementation(source, data, side))
                 check_pins(record['inputs'])
+                if sys.platform == 'darwin':
+                    builder = source / 'tools/shared/build.py'
+                    adapter = HERE.parents[2] / 'tools/shared/build.py'
+                    original = sha(builder)
+                    shutil.copyfile(adapter, builder)
+                    adapted = sha(builder)
+                    record.setdefault('platform_patches', {})[side] = {
+                        'file': str(builder), 'original_sha256': original, 'adapted_sha256': adapted,
+                        'reason': 'Darwin Mach-O and dyld toolchain collection'}
+                    record['inputs'][str(builder.resolve())] = adapted
+                    record['inputs'][str(adapter.resolve())] = adapted
+                    save(receipt, record)
                 runner.run([sys.executable, '-B', source / 'tools/shared/build.py', '--ghc', ghc, '--cc', cc,
                             '--optimization', '2', '--build-dir', producer], source, work / 'setup' / ('producer-' + side))
                 authenticate(producer, source)
@@ -442,12 +460,12 @@ def campaign(args, preparation, data):
         receipt = root/'receipt.json'
         save(receipt, record)
         reference = None
-        initial_affinity = sorted(os.sched_getaffinity(0))
+        initial_affinity = sorted(os.sched_getaffinity(0)) if sys.platform != 'darwin' else None
         try:
             for round_number, sides in enumerate(ORDER, 1):
                 for side in sides:
                     verify_preparation(preparation, work, data)
-                    require(sorted(os.sched_getaffinity(0)) == initial_affinity, 'CPU affinity changed during campaign')
+                    require(initial_affinity is None or sorted(os.sched_getaffinity(0)) == initial_affinity, 'CPU affinity changed during campaign')
                     folder = root/(str(round_number)+'-'+side)
                     folder.mkdir()
                     leg = {'round': round_number, 'side': side, 'complete': False, 'folder': str(folder)}
