@@ -19,6 +19,7 @@ module MLF.Entry.Emlf where {
   import qualified Bootstrap.Runtime as Runtime;
   import qualified Bootstrap.LLVM as LLVM;
   import qualified Bootstrap.Crate as Crate;
+  import qualified Bootstrap.CrateSession as CrateSession;
   import qualified Bootstrap.CrateArtifact as CrateArtifact;
   import qualified Bootstrap.CrateCodegen as CrateCodegen;
   data Command =
@@ -159,7 +160,7 @@ module MLF.Entry.Emlf where {
                                                            } in
                                                            do {
                                                              result <-
-                                                               Crate.compileSpecFile file prefix;
+                                                               CrateSession.compileSpecFile file prefix;
                                                              case result of {
                                                                Left message -> fatal message;
                                                                Right _ -> ioReturn ()

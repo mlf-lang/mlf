@@ -30,6 +30,7 @@
       "Bootstrap.CrateArtifact": "Bootstrap/CrateArtifact.hs",
       "Bootstrap.CrateCodegen": "Bootstrap/CrateCodegen.hs",
       "Bootstrap.CrateQuery": "Bootstrap/CrateQuery.hs",
+      "Bootstrap.CrateSession": "Bootstrap/CrateSession.hs",
       "Bootstrap.ImportParameters": "Bootstrap/ImportParameters.hs",
       "Bootstrap.ImportedRoot": "Bootstrap/ImportedRoot.hs",
       "Bootstrap.InferenceUnit": "Bootstrap/InferenceUnit.hs",

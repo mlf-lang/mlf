@@ -66,6 +66,29 @@ assert.match(ciJob('native'), /\.mlf-build\/guest-state-laws\/\*\*\/\*\.log/);
 
 assert.match(ciJob('native'), /\.mlf-build\/figure12-direct\/\*\.json/);
 
+// The integrated source gate is not the separate fixed-ref timing runner.
+const finiteGate = `      - name: Check finite P1-P3 and integrated A1 correctness
+        if: matrix.optimization == '2'
+        run: |
+          set -euo pipefail
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/crate-optimization-guard python3 -B tools/performance/crate-optimizations/run_controls.py --producer .mlf-build/shared-ghc --output .mlf-build/crate-optimization-controls
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/a1-integrated-guard python3 -B tools/performance/a1-private-index/check_integrated.py --producer .mlf-build/shared-ghc --output .mlf-build/a1-integrated-controls
+`;
+const verifyFiniteGate = workflow => {
+  assert.ok(workflow.includes(finiteGate), 'Current-source P1-P3/A1 gate, bounds and failure propagation must remain exact');
+  for (const root of ['crate-optimization', 'a1-integrated']) {
+    assert.ok(workflow.includes(`            .mlf-build/${root}-guard/\n`));
+    for (const suffix of ['json', 'stdout', 'stderr']) {
+      assert.ok(workflow.includes(`            .mlf-build/${root}-controls/**/*.${suffix}\n`));
+    }
+  }
+};
+verifyFiniteGate(ciJob('native'));
+assert.throws(() => verifyFiniteGate(ciJob('native').replace(finiteGate, '')));
+assert.throws(() => verifyFiniteGate(ciJob('native').replace(finiteGate, finiteGate.replace("if: matrix.optimization == '2'", 'if: false'))));
+assert.throws(() => verifyFiniteGate(ciJob('native').replace(finiteGate, finiteGate.replace('set -euo pipefail', 'set +e'))));
+assert.throws(() => verifyFiniteGate(ciJob('native').replace('.mlf-build/a1-integrated-controls/**/*.json', 'discarded')));
+
 for (const name of ['build-runner','async-runtime','async-language']) {
   const job = ciJob(name);
   assert.ok(job, `Missing ${name} coverage`);

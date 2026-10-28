@@ -1,0 +1,94 @@
+{
+  "format": "a1-private-index-controls-v1",
+  "files": {
+    "FrozenMap.hs": "0cdeb2b572f38a59e82e5a91d3c47b118b5dc0928292a66849115e1679d18e31",
+    "FrozenIntMap.hs": "9e4747f2dc860d706a5f22c0f14d5af582e8f5ad7642a75dca23499b8a697947",
+    "FrozenIntSet.hs": "c4a62314cf86cb2dae81c96ac70790197d2b57a85448d2cc2dd19d90be820c3b",
+    "FrozenGraph.hs": "b0729713649072696451523a459efbfa5a528a4f0a71a8421f7daa268f5f9faa",
+    "FrozenSolver.hs": "19382b95b1a7deb682166c289f7e74edd9fd73eeda1135c36574fa056c7d548d",
+    "FrozenConstraint.hs": "06f363fac6852114e05153eeefb2df42a52dedd6e10100cfa0c0873a0d40334d",
+    "SessionGraftFixtures.hs": "91f43ee2c9a865f37e4a510a4c4c1da9fbd4b1c96f8c866d3bcf28b553fc57b8",
+    "SessionFieldFixtures.hs": "b21593de3186697ec981c8b0b404c7c8387ef48a83ea6350f05effe1f03a615a",
+    "SessionOracle.hs": "bafacf6febf934df487b399b08e3c992a7d1f05392f5c5c2b6cd36f7db12660e",
+    "SessionTests.hs": "718a05cacb3d52760058a1f57901e9fc37135b7098bd2bd9240428eded06c16f",
+    "FileMain.hs": "a8328405ecb3ada199bf5b479943d99d1989d90dacd3bb16b34c9b7822002a66",
+    "materialize_file_cases.py": "86949be9896ec7530541c62620cfbaa2cc2febd3ec46bbfe78f5a3f74122e241",
+    "file-cases.json": "b7878c17609b3c7bf59e4b9a8942b0df61ea2d691edab7de97b102fabe1a94f8",
+    "session.expected.stdout": "8d478762485f0c3ef50566a9820461f224e1c6d144db71d1dcca6eda3e4f5d19",
+    "negative/OpenSession.hs": "33e677aea0e580cb84ce26ac5fb0946230854299bb47505af85bbb3274b760fc",
+    "negative/RawSolverRebind.hs": "852b799c94e0ddf5f72b4b1766c5333ec33969ea886003615615568610b647fc",
+    "negative/SessionConstructor.hs": "f724c0e338ab9fc37512fdb64db785f109692ba80adb205360f76cf13a04b8bf",
+    "negative/SolvePrepared.hs": "3bdfca1be4694c9dd8a6755096cd9971bc597759a8a0268222f180be2b3a6130",
+    "AdmissionTests.hs": "8558f9544bbdf0ea44e9a9364bf910c9187165a477eac955a2821aaa4326f6fb",
+    "admission.expected.stdout": "ea2131a7837992ec56779587749bdc299fb8f7cc4b33efc3e9246551ddd72234",
+    "oracle-provenance.json": "78f804385950e45e93b1f29c78869f1aa28962810297ec90bbf30fb0281fb736"
+  },
+  "production_owner_sha256": "8900a34bf977eaec0d44948be816ca2b5ddb8955170908e7df8fa93967d179df",
+  "kernel_sha256": "34bd191f60df38d6bd0229d360d6afbba5e32652f5a43de58b7ec912d5c3be41",
+  "negative_cases": [
+    {
+      "name": "OpenSession",
+      "module": "OpenSession",
+      "source": "negative/OpenSession.hs",
+      "required_error_fragments": [
+        "does not export",
+        "openSession"
+      ],
+      "expected_error_count": 1,
+      "expected_exit_code": 1,
+      "category": "production export privacy; no missing dependency or unrelated error accepted"
+    },
+    {
+      "name": "SolvePrepared",
+      "module": "SolvePrepared",
+      "source": "negative/SolvePrepared.hs",
+      "required_error_fragments": [
+        "does not export",
+        "solvePrepared"
+      ],
+      "expected_error_count": 1,
+      "expected_exit_code": 1,
+      "category": "production export privacy; no missing dependency or unrelated error accepted"
+    },
+    {
+      "name": "SessionConstructor",
+      "module": "SessionConstructor",
+      "source": "negative/SessionConstructor.hs",
+      "required_error_fragments": [
+        "does not export",
+        "Session"
+      ],
+      "expected_error_count": 1,
+      "expected_exit_code": 1,
+      "category": "production export privacy; no missing dependency or unrelated error accepted"
+    },
+    {
+      "name": "RawSolverRebind",
+      "module": "RawSolverRebind",
+      "source": "negative/RawSolverRebind.hs",
+      "required_error_fragments": [
+        "Couldn't match",
+        "Solver",
+        "String"
+      ],
+      "expected_error_count": 1,
+      "expected_exit_code": 1,
+      "category": "raw Solver cannot enter sealed file factory; authenticated interfaces only"
+    }
+  ],
+  "expected_stdout": "PASS session handwritten copies aliases field graph and delayed P1\nPASS session 28 finite full-state traces and unchanged public route\nPASS session failed P0 and P1 probes preserve fallback epochs\nPASS session captured frontier bucket and old-parent rewrite\nPASS session empty versus selected and final original audits\nPASS session detached final Solver supports independent witnesses\n{\"complete\":true,\"groups\":6,\"trace_cases\":28,\"candidate_output_used_for_expectations\":false,\"private_raw_faults_test_copy_only\":true}\n",
+  "admission_expected_stdout": "PASS admission handwritten topology aliases scopes paging and identities\nPASS admission literal rejection and first-error ordering\nPASS admission finite fresh-counter demand probes\nPASS admission test-only children-before-binder demand\n",
+  "admission_inventory": {
+    "hand_positive": 8,
+    "exact_error": 8,
+    "counter_demand": 3,
+    "local_ordering": 3
+  },
+  "materializer_stdout": "PASS materialized nine independent parsed-file controls\n",
+  "materializer_stderr": "",
+  "builtin_artifacts": {
+    ".mlfci": "e7e79d5aba844f4eeb426bb65c65a4a52831b5274df4bd217ced55a9703f099b",
+    ".mlfco": "3d0e214228cb180d8cee9fb3fd21c5ec6abd8348e1ddd131517831d1f5c2d799"
+  },
+  "oracle_policy": "Frozen modules/fixtures/SessionTests/AdmissionTests byte-identical. Onlymanifest portablepaths. GenerateSessionUnderTest mechanically in freshoutput, not a candidate-derived oracle."
+}

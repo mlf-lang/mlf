@@ -1,0 +1,194 @@
+-- mlf:syntax shared-haskell-v1
+{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
+             KindSignatures, FlexibleContexts, FlexibleInstances,
+             MultiParamTypeClasses, OverloadedStrings #-}
+module Bootstrap.IntMap where {
+  import MLF.Primitive;
+  import Bootstrap.Types;
+  import qualified Bootstrap.Std as L;
+  import qualified Bootstrap.Map as M;
+  -- Integer-key workers share balancing with the generic map while keeping
+  -- comparisons statically known. Int remains arbitrary precision.
+  lookupTree :: forall a. Int -> Map Int a -> Maybe a;
+  lookupTree wanted tree =
+    case tree of {
+      MapEmpty -> Nothing;
+      MapNode n key value left right ->
+        if (wanted < key)
+        then lookupTree wanted left
+        else if (wanted > key) then lookupTree wanted right else Just value
+    };
+  memberTree :: forall a. Int -> Map Int a -> Bool;
+  memberTree wanted tree =
+    case tree of {
+      MapEmpty -> False;
+      MapNode n key value left right ->
+        if (wanted < key)
+        then memberTree wanted left
+        else if (wanted > key) then memberTree wanted right else True
+    };
+  insertTree :: forall a. Int -> a -> Map Int a -> Map Int a;
+  insertTree key value tree =
+    case tree of {
+      MapEmpty -> M.singleton key value;
+      MapNode n oldKey oldValue left right ->
+        if (key < oldKey)
+        then M.balance oldKey oldValue (insertTree key value left) right
+        else if (key > oldKey)
+             then M.balance oldKey oldValue left (insertTree key value right)
+             else M.node n key value left right
+    };
+  insertWithTree :: forall a. (a -> a -> a) -> Int -> a -> Map Int a -> Map Int a;
+  insertWithTree combine key value tree =
+    case tree of {
+      MapEmpty -> M.singleton key value;
+      MapNode n oldKey oldValue left right ->
+        if (key < oldKey)
+        then M.balance oldKey oldValue (insertWithTree combine key value left) right
+        else if (key > oldKey)
+             then M.balance oldKey oldValue left (insertWithTree combine key value right)
+             else M.node n key (combine value oldValue) left right
+    };
+  deleteTree :: forall a. Int -> Map Int a -> Map Int a;
+  deleteTree key tree =
+    case tree of {
+      MapEmpty -> MapEmpty;
+      MapNode n oldKey value left right ->
+        if (key < oldKey)
+        then M.balance oldKey value (deleteTree key left) right
+        else if (key > oldKey)
+             then M.balance oldKey value left (deleteTree key right)
+             else M.glue left right
+    };
+  wrap :: forall a. Map Int a -> IntMap a;
+  wrap tree = seq tree (IntMap tree);
+  empty :: forall a. IntMap a;
+  empty = wrap M.empty;
+  singleton :: forall a. Int -> a -> IntMap a;
+  singleton key value = wrap (M.singleton key value);
+  null :: forall a. IntMap a -> Bool;
+  null (IntMap tree) = M.null tree;
+  size :: forall a. IntMap a -> Int;
+  size (IntMap tree) = M.size tree;
+  lookup :: forall a. Int -> IntMap a -> Maybe a;
+  lookup key (IntMap tree) = lookupTree key tree;
+  get :: forall a. Int -> IntMap a -> a;
+  get key (IntMap tree) =
+    case lookupTree key tree of {
+      Nothing -> panic "map key not found";
+      Just value -> value
+    };
+  findWithDefault :: forall a. a -> Int -> IntMap a -> a;
+  findWithDefault fallback key (IntMap tree) = L.fromMaybe fallback (lookupTree key tree);
+  member :: forall a. Int -> IntMap a -> Bool;
+  member key (IntMap tree) = memberTree key tree;
+  notMember :: forall a. Int -> IntMap a -> Bool;
+  notMember key (IntMap tree) = L.not (memberTree key tree);
+  insert :: forall a. Int -> a -> IntMap a -> IntMap a;
+  insert key value (IntMap tree) = wrap (insertTree key value tree);
+  insertWith :: forall a. (a -> a -> a) -> Int -> a -> IntMap a -> IntMap a;
+  insertWith combine key value (IntMap tree) = wrap (insertWithTree combine key value tree);
+  insertWithKey :: forall a. (Int -> a -> a -> a) -> Int -> a -> IntMap a -> IntMap a;
+  insertWithKey combine key value (IntMap tree) =
+    wrap (insertWithTree (combine key) key value tree);
+  delete :: forall a. Int -> IntMap a -> IntMap a;
+  delete key (IntMap tree) = wrap (deleteTree key tree);
+  adjust :: forall a. (a -> a) -> Int -> IntMap a -> IntMap a;
+  adjust f key (IntMap tree) = wrap (M.adjust L.compareInt f key tree);
+  adjustWithKey :: forall a. (Int -> a -> a) -> Int -> IntMap a -> IntMap a;
+  adjustWithKey f key (IntMap tree) = wrap (M.adjustWithKey L.compareInt f key tree);
+  alter :: forall a. (Maybe a -> Maybe a) -> Int -> IntMap a -> IntMap a;
+  alter f key (IntMap tree) = wrap (M.alter L.compareInt f key tree);
+  update :: forall a. (a -> Maybe a) -> Int -> IntMap a -> IntMap a;
+  update f key (IntMap tree) = wrap (M.update L.compareInt f key tree);
+  map :: forall a b. (a -> b) -> IntMap a -> IntMap b;
+  map f (IntMap tree) = wrap (M.map f tree);
+  mapWithKey :: forall a b. (Int -> a -> b) -> IntMap a -> IntMap b;
+  mapWithKey f (IntMap tree) = wrap (M.mapWithKey f tree);
+  mapMaybe :: forall a b. (a -> Maybe b) -> IntMap a -> IntMap b;
+  mapMaybe f (IntMap tree) = wrap (M.mapMaybe f tree);
+  mapMaybeWithKey :: forall a b. (Int -> a -> Maybe b) -> IntMap a -> IntMap b;
+  mapMaybeWithKey f (IntMap tree) = wrap (M.mapMaybeWithKey f tree);
+  foldlWithKey :: forall b a. (b -> Int -> a -> b) -> b -> IntMap a -> b;
+  foldlWithKey f z (IntMap tree) = M.foldlWithKey f z tree;
+  foldrWithKey :: forall a b. (Int -> a -> b -> b) -> b -> IntMap a -> b;
+  foldrWithKey f z (IntMap tree) = M.foldrWithKey f z tree;
+  foldl :: forall b a. (b -> a -> b) -> b -> IntMap a -> b;
+  foldl f z (IntMap tree) = M.foldl f z tree;
+  foldr :: forall a b. (a -> b -> b) -> b -> IntMap a -> b;
+  foldr f z (IntMap tree) = M.foldr f z tree;
+  toList :: forall a. IntMap a -> [] ((,) Int a);
+  toList (IntMap tree) = M.toList tree;
+  toAscList :: forall a. IntMap a -> [] ((,) Int a);
+  toAscList tree = toList tree;
+  keys :: forall a. IntMap a -> [] Int;
+  keys (IntMap tree) = M.keys tree;
+  elems :: forall a. IntMap a -> [] a;
+  elems (IntMap tree) = M.elems tree;
+  keysSet :: forall a. IntMap a -> IntSet;
+  keysSet (IntMap tree) =
+    let {
+      result = M.map (\value -> ()) tree
+    } in
+    seq result (IntSet result);
+  fromList :: forall a. [] ((,) Int a) -> IntMap a;
+  fromList entries =
+    wrap
+      (L.foldlStrict
+         (\tree entry ->
+            case entry of {
+              (,) key value -> insertTree key value tree
+            })
+         M.empty
+         entries);
+  fromListWith :: forall a. (a -> a -> a) -> [] ((,) Int a) -> IntMap a;
+  fromListWith combine entries =
+    wrap
+      (L.foldlStrict
+         (\tree entry ->
+            case entry of {
+              (,) key value -> insertWithTree combine key value tree
+            })
+         M.empty
+         entries);
+  fromDistinctAscList :: forall a. [] ((,) Int a) -> IntMap a;
+  fromDistinctAscList entries = wrap (M.fromDistinctAscList entries);
+  union :: forall a. IntMap a -> IntMap a -> IntMap a;
+  union (IntMap a) (IntMap b) =
+    wrap (M.foldlWithKeyStrict (\tree key value -> insertTree key value tree) b a);
+  unionWith :: forall a. (a -> a -> a) -> IntMap a -> IntMap a -> IntMap a;
+  unionWith combine (IntMap a) (IntMap b) = wrap (M.unionWith L.compareInt combine a b);
+  unions :: forall a. [] (IntMap a) -> IntMap a;
+  unions trees = L.foldlStrict union empty trees;
+  difference :: forall a b. IntMap a -> IntMap b -> IntMap a;
+  difference (IntMap a) (IntMap b) =
+    wrap (M.foldlWithKeyStrict (\tree key value -> deleteTree key tree) a b);
+  intersection :: forall a b. IntMap a -> IntMap b -> IntMap a;
+  intersection (IntMap a) (IntMap b) = wrap (M.intersection L.compareInt a b);
+  intersectionWith :: forall a b c. (a -> b -> c) -> IntMap a -> IntMap b -> IntMap c;
+  intersectionWith f (IntMap a) (IntMap b) = wrap (M.intersectionWith L.compareInt f a b);
+  filter :: forall a. (a -> Bool) -> IntMap a -> IntMap a;
+  filter f (IntMap tree) = wrap (M.filter f tree);
+  filterWithKey :: forall a. (Int -> a -> Bool) -> IntMap a -> IntMap a;
+  filterWithKey f (IntMap tree) = wrap (M.filterWithKey f tree);
+  lookupMin :: forall a. IntMap a -> Maybe ((,) Int a);
+  lookupMin (IntMap tree) = M.lookupMin tree;
+  lookupMax :: forall a. IntMap a -> Maybe ((,) Int a);
+  lookupMax (IntMap tree) = M.lookupMax tree;
+  findMin :: forall a. IntMap a -> (,) Int a;
+  findMin (IntMap tree) = M.findMin tree;
+  findMax :: forall a. IntMap a -> (,) Int a;
+  findMax (IntMap tree) = M.findMax tree;
+  minViewWithKey :: forall a. IntMap a -> Maybe ((,) ((,) Int a) (IntMap a));
+  minViewWithKey (IntMap tree) =
+    L.mapOptional
+      (\entry ->
+         case entry of {
+           (,) item rest -> (,) item (wrap rest)
+         })
+      (M.minViewWithKey tree);
+  eqIntMap :: forall a. (a -> a -> Bool) -> IntMap a -> IntMap a -> Bool;
+  eqIntMap eq (IntMap a) (IntMap b) = M.eqMap eqInt eq a b;
+  valid :: forall a. IntMap a -> Bool;
+  valid (IntMap tree) = M.valid L.compareInt tree
+}

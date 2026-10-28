@@ -27,6 +27,7 @@
       "Bootstrap.Evidence": "Bootstrap/Evidence.hs",
       "Bootstrap.EvidenceBoundary": "Bootstrap/EvidenceBoundary.hs",
       "Bootstrap.Graph": "Bootstrap/Graph.hs",
+      "Bootstrap.Graph.IndexStore": "Bootstrap/Graph/IndexStore.hs",
       "Bootstrap.Graph.Solver": "Bootstrap/Graph/Solver.hs"
     }
   },

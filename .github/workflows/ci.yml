@@ -94,6 +94,12 @@ jobs:
         run: |
           python3 tools/shared/build.py --optimization '${{ matrix.optimization }}' --build-dir .mlf-build/shared-ghc
           jq -e '.complete == true and .producer_host == "GHC" and .typecheck_only == false' .mlf-build/shared-ghc/receipt.json
+      - name: Check finite P1-P3 and integrated A1 correctness
+        if: matrix.optimization == '2'
+        run: |
+          set -euo pipefail
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/crate-optimization-guard python3 -B tools/performance/crate-optimizations/run_controls.py --producer .mlf-build/shared-ghc --output .mlf-build/crate-optimization-controls
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/a1-integrated-guard python3 -B tools/performance/a1-private-index/check_integrated.py --producer .mlf-build/shared-ghc --output .mlf-build/a1-integrated-controls
       - name: Execute the actual shared suite-receipt helpers
         if: matrix.suite == 'all' || matrix.suite == 'direct'
         run: |
@@ -168,6 +174,14 @@ jobs:
             .mlf-build/shared-ghc/receipt.json
             .mlf-build/shared-ghc/*.log
             .mlf-build/shared-ghc/packages.txt
+            .mlf-build/crate-optimization-guard/
+            .mlf-build/crate-optimization-controls/**/*.json
+            .mlf-build/crate-optimization-controls/**/*.stdout
+            .mlf-build/crate-optimization-controls/**/*.stderr
+            .mlf-build/a1-integrated-guard/
+            .mlf-build/a1-integrated-controls/**/*.json
+            .mlf-build/a1-integrated-controls/**/*.stdout
+            .mlf-build/a1-integrated-controls/**/*.stderr
             .mlf-build/source-smoke/*.log*
             .mlf-build/source-smoke/*.json
             .mlf-build/source-smoke/*.xmlf

@@ -104,6 +104,11 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.CrateSession",
+      "path": "libraries/mlf-crates/Bootstrap/CrateSession.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.Data",
       "path": "libraries/mlf-language-core/Bootstrap/Data.hs",
       "role": "implementation"
@@ -141,6 +146,11 @@
     {
       "module": "Bootstrap.Graph",
       "path": "libraries/mlf-inference/Bootstrap/Graph.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Graph.IndexStore",
+      "path": "libraries/mlf-inference/Bootstrap/Graph/IndexStore.hs",
       "role": "implementation"
     },
     {
