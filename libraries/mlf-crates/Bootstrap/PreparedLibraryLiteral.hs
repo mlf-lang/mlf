@@ -2,9 +2,10 @@
 {-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
-module Bootstrap.PreparedLibraryLiteral (rawLibrary) where {
+module Bootstrap.PreparedLibraryLiteral (rawLibrary, rawLibraryPieces) where {
   import MLF.Primitive;
   import Bootstrap.Types;
+  import Bootstrap.Std (map, append);
   import qualified Bootstrap.BuiltinPreludeLiteral as L;
   import qualified Bootstrap.PreparedLibraries as P;
   import qualified Bootstrap.CrateArtifact as Artifact;
@@ -44,5 +45,35 @@ module Bootstrap.PreparedLibraryLiteral (rawLibrary) where {
     P.RawLibrary identity schema prelude sources objects witnesses -> L.application "RawLibrary"
       [L.string identity, L.string schema, mode prelude, L.list source sources, L.list recordedObject objects,
        L.list L.sourceModule witnesses]
+  };
+  fragmentPiece value serial = let {
+    pieces = L.termPieces (Separate.objectTerm value) serial;
+    label = "mlfLiteralUnit" ++ showInt (L.pieceNext pieces);
+    definition = label ++ " :: () -> UnitObject;\n" ++ label ++ " _ = " ++
+      L.application "UnitObject" [unitInterface (Separate.objectInterface value), L.pieceText pieces] ++ ";\n"
+  } in L.TermPieces (L.pieceNext pieces + 1)
+    (append (L.pieceDefinitions pieces) [definition]) ("(" ++ label ++ " ())");
+
+  objectPiece value serial = let {
+    units = L.listPieces (map fragmentPiece (Artifact.objectFragments value)) serial;
+    label = "mlfLiteralObject" ++ showInt (L.pieceNext units);
+    constructor = case value of { Artifact.CrateObject _ _ -> "CrateObject"; Artifact.LegacyCrateObject _ _ -> "LegacyCrateObject" };
+    definition = label ++ " :: () -> CrateObject;\n" ++ label ++ " _ = " ++
+      L.application constructor [L.interface (Artifact.objectInterface value), L.pieceText units] ++ ";\n"
+  } in L.TermPieces (L.pieceNext units + 1) (append (L.pieceDefinitions units) [definition]) ("(" ++ label ++ " ())");
+  recordedPiece value serial = case value of {
+    P.LibraryObject metadata digest body -> let { pieces = objectPiece body serial } in
+      L.TermPieces (L.pieceNext pieces) (L.pieceDefinitions pieces)
+        (L.application "LibraryObject" [L.string metadata, L.string digest, L.pieceText pieces])
+  };
+  rawLibraryPieces :: P.RawLibrary -> (,) String String;
+  rawLibraryPieces value = case value of {
+    P.RawLibrary identity schema prelude sources objects witnesses -> let {
+      pieces = L.listPieces (map recordedPiece objects) 0
+    } in (,) (concatStringList (L.pieceDefinitions pieces))
+      (L.application "RawLibrary"
+        [L.string identity, L.string schema, mode prelude, L.list source sources, L.pieceText pieces,
+         L.list L.sourceModule witnesses])
   }
+
 }

@@ -13,7 +13,7 @@ module Bootstrap.LLVM.Build where {
   import qualified Bootstrap.LLVM.Optimize as O;
   import qualified Bootstrap.LLVM.Result as R;
   import qualified Bootstrap.LLVM.LazyProducer as V;
-  data CGBinding = CGBinding String Bool;
+  data CGBinding = CGBinding String Bool | CGSlot String Bool;
   data Scalar = Boxed String | Floating String;
   data NativeMode = General | UnboxedDouble | NonnegativeInt | SmallIndex;
   data Output =
@@ -221,9 +221,9 @@ module Bootstrap.LLVM.Build where {
   compareKernel :: (,) XName ([] NativeMode) -> (,) XName ([] NativeMode) -> Int;
   compareKernel = L.comparePair O.compareName (L.compareList compareMode);
   operand :: CGBinding -> String;
-  operand (CGBinding value forced) = value;
+  operand binding = case binding of { CGBinding value _ -> value; CGSlot _ _ -> panic "LLVM slot operand must be loaded" };
   evaluated :: CGBinding -> Bool;
-  evaluated (CGBinding value forced) = forced;
+  evaluated binding = case binding of { CGBinding _ forced -> forced; CGSlot _ forced -> forced };
   fresh :: String -> Build String;
   fresh prefix =
     do {
@@ -301,6 +301,7 @@ module Bootstrap.LLVM.Build where {
   -- Keep the returned WHNF pointer, not the original updated thunk/hole.
   -- Definition and branch boundaries below restrict facts to dominated uses.
   forceBinding :: CGBinding -> Build String;
+  forceBinding (CGSlot slot forced) = do { value <- result ("load volatile ptr, ptr " ++ slot ++ ", align 8"); forceBinding (CGBinding value forced) };
   forceBinding (CGBinding value forced) =
     if forced
     then cgPure value
@@ -327,6 +328,7 @@ module Bootstrap.LLVM.Build where {
       call "@mlf.force" (args1 (pointer value))
     };
   bindingOperand :: CGBinding -> Build String;
+  bindingOperand (CGSlot slot _) = result ("load volatile ptr, ptr " ++ slot ++ ", align 8");
   bindingOperand (CGBinding value forced) =
     gets (\state -> L.fromMaybe value (M.lookup compareString value (forcedValues state)));
   definition :: String -> [] String -> Build String -> Build ();

@@ -294,7 +294,7 @@ FIXTURES = {
 
 def loop_allocations(llvm):
     workers = []
-    for match in re.finditer(r'^define private ptr @(mlf\.worker\.\d+)\(([^\n]*)\) \{\n(.*?)^\}',
+    for match in re.finditer(r'^define private ptr @(mlf\.worker\.\d+)\(([^\n]*)\)(?: noinline)? \{\n(.*?)^\}',
                              llvm, re.M | re.S):
         if match[2].count('ptr ') == 3 and '@' + match[1] + '(' in match[3]:
             workers.append((match[1], match[3]))

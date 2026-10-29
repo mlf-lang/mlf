@@ -442,5 +442,65 @@ module Bootstrap.BuiltinPreludeLiteral where {
          mapString (pair name typeLiteral) available, integer serial, names sourceNames,
          moduleInterface visible, set string values, set string protected, mapString sourceContract sourceContracts,
          list sourceModule witnesses]
-  }
+  };
+
+  -- Bound the inference problem for generated target data. Every chunk is an
+  -- ordinary signed source definition and retains the normal checker path.
+  data TermPieces = TermPieces Int ([] String) String;
+  pieceText (TermPieces _ _ text) = text;
+  pieceNext (TermPieces next _ _) = next;
+  pieceDefinitions (TermPieces _ definitions _) = definitions;
+  constantPiece text serial = TermPieces serial [] text;
+  collectPieces :: [] (Int -> TermPieces) -> Int -> (,,) Int ([] String) ([] String);
+  collectPieces renderers serial = case renderers of {
+    [] -> (,,) serial [] [];
+    (:) render rest -> let {
+      first = render serial;
+      remaining = collectPieces rest (pieceNext first)
+    } in case remaining of { (,,) next definitions texts ->
+      (,,) next (L.append (pieceDefinitions first) definitions) ((:) (pieceText first) texts) }
+  };
+  assemblePieces constructor renderers serial = case collectPieces renderers serial of {
+    (,,) next definitions texts -> TermPieces next definitions (application constructor texts)
+  };
+  listPieces renderers serial = case collectPieces renderers serial of {
+    (,,) next definitions texts -> TermPieces next definitions ("[" ++ L.intercalate "," texts ++ "]")
+  };
+  termPieces :: XTerm -> Int -> TermPieces;
+  termPieces value serial = let {
+    c = constantPiece;
+    child = termPieces;
+    node = case value of {
+      XVarTerm n -> assemblePieces "XVarTerm" [c (name n)];
+      XAbs n ty body -> assemblePieces "XAbs" [c (name n), c (typeLiteral ty), child body];
+      XApp a b -> assemblePieces "XApp" [child a, child b];
+      XTypeAbs a bound body -> assemblePieces "XTypeAbs" [c (variable a), c (typeLiteral bound), child body];
+      XTypeApp body proof -> assemblePieces "XTypeApp" [child body, c (computation proof)];
+      XLet n a b -> assemblePieces "XLet" [c (name n), child a, child b];
+      XLetRec definitions body -> assemblePieces "XLetRec"
+        [listPieces (L.map (\((,,) n ty rhs) -> assemblePieces "(,,)" [c (name n), c (typeLiteral ty), child rhs]) definitions), child body];
+      XCase body ty alternatives -> assemblePieces "XCase"
+        [child body, c (typeLiteral ty), listPieces (L.map (\(XAlternative pat rhs) ->
+          assemblePieces "XAlternative" [c (patternLiteral pat), child rhs]) alternatives)];
+      XWithData declarations body -> assemblePieces "XWithData" [c (list declaration declarations), child body];
+      _ -> c (term value)
+    };
+    result = node serial
+  } in if stringLength (pieceText result) < 8192 then result else let {
+    label = "mlfLiteralTerm" ++ showInt (pieceNext result);
+    definition = label ++ " :: () -> XTerm;\n" ++ label ++ " _ = " ++ pieceText result ++ ";\n"
+  } in TermPieces (pieceNext result + 1)
+    (L.snoc (pieceDefinitions result) definition) ("(" ++ label ++ " ())");
+  rawPreludePieces :: Context.RawPrelude -> (,) String String;
+  rawPreludePieces value = case value of {
+    Context.RawPrelude identity primitiveCount iface body available serial sourceNames visible values protected sourceContracts witnesses -> let {
+      pieces = termPieces body 0
+    } in (,) (concatStringList (pieceDefinitions pieces))
+      (application "RawPrelude"
+        [string identity, integer primitiveCount, interface iface, pieceText pieces,
+         mapString (pair name typeLiteral) available, integer serial, names sourceNames,
+         moduleInterface visible, set string values, set string protected, mapString sourceContract sourceContracts,
+         list sourceModule witnesses])
+  };
+
 }

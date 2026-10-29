@@ -73,6 +73,7 @@ module Bootstrap.LLVM.Codegen where {
   lookupName :: Map XName CGBinding -> XName -> Build CGBinding;
   lookupName scope name =
     case M.lookup O.compareName name scope of {
+      Just (CGSlot slot forced) -> do { value <- result ("load volatile ptr, ptr " ++ slot ++ ", align 8"); cgPure (CGBinding value forced) };
       Just value -> cgPure value;
       Nothing ->
         do {
@@ -787,6 +788,7 @@ module Bootstrap.LLVM.Codegen where {
   readyName :: Map XName CGBinding -> Map String String -> XName -> Bool;
   readyName scope known name = case M.lookup O.compareName name scope of {
     Nothing -> False;
+    Just (CGSlot _ forced) -> forced;
     Just (CGBinding value forced) -> forced || M.member compareString value known
   };
   nextDemandIs :: Map XName CGBinding -> Map String String -> XName -> [] XName -> Bool;
@@ -842,10 +844,27 @@ module Bootstrap.LLVM.Codegen where {
         }
     };
   evaluate :: Map XName CGBinding -> XErased -> Build String;
-  -- Compact strings have immutable bytes and a lazily initialized Unicode
-  -- index. A writable global value is itself a BDWGC root for that index;
-  -- repeated evaluation needs no allocation or byte copying.
-  evaluate scope expression =
+  -- Large compiler-owned literals must not become one enormous machine
+  -- function. Outline only at an existing evaluation point, immediately call
+  -- the helper, and capture values so demand order and escaping closures stay
+  -- unchanged. Both the expression and instruction scans are bounded.
+  evaluate scope expression = do {
+    prior <- gets instructions;
+    if O.remainingSize 128 expression < 0 && workerBodyLimit 4097 prior then do {
+      fs <- gets functions;
+      let { names = S.toList (A.needed fs expression) };
+      -- Loading an oversized environment could itself cross the instruction
+      -- budget and re-outline the same expression indefinitely. Descend in the
+      -- current function until the required capture set is small enough.
+      if L.length names > 1024 then evaluateBody scope expression else do {
+        code <- callback names Nothing expression;
+        env <- environment scope names;
+        call code (args2 (pointer env) "ptr null")
+      }
+    } else evaluateBody scope expression
+  };
+  evaluateBody :: Map XName CGBinding -> XErased -> Build String;
+  evaluateBody scope expression =
     case expression of {
       XEVar n ->
         do {
@@ -911,49 +930,42 @@ module Bootstrap.LLVM.Codegen where {
         };
       XELetRec bindings body ->
         do {
-          fs <- gets functions;
-          let {
-            values =
-              L.filter
-                (\entry ->
-                   case entry of {
-                     (,) n a -> L.not (M.member O.compareName n fs)
-                   })
-                bindings
-          };
-          holes <-
-            L.mapM
-              (\entry ->
-                 case entry of {
-                   (,) n ignored ->
-                     do {
-                       hole <- call "@mlf_hole" [];
-                       cgPure ((,) n (CGBinding hole False))
-                     }
-                 })
-              values;
-          let {
-            recursive = M.union O.compareName (M.fromList O.compareName holes) scope
-          };
-          L.mapM_
-            (\entry ->
-               case entry of {
-                 (,) n rhs ->
-                   do {
-                     value <- thunk recursive rhs;
-                     hole <- lookupName recursive n;
-                     emit
-                       ("  call void @mlf_fill(ptr " ++
-                        (operand hole ++ (", ptr " ++ (value ++ ")"))))
-                   }
-               })
-            values;
+          recursive <- recursiveBindings scope bindings body;
           evaluate recursive body
         };
       XECase scrutinee alternatives -> evaluateCase evaluate scope scrutinee alternatives;
       XEApp f a -> application scope expression;
       XEEvidenceHole hole -> failure "LLVM unresolved dictionary evidence"
     };
+  -- In a large recursive scope retain function values once, rather than
+  -- rebuilding their environments at every lookup. Stack slots shorten the
+  -- SSA lifetimes of recursive roots; only entry-block slots are allowed.
+  -- Environments load their values and never capture addresses of these slots.
+  recursiveBindings :: Map XName CGBinding -> [] ((,) XName XErased) -> XErased -> Build (Map XName CGBinding);
+  recursiveBindings scope bindings body = do {
+    fs <- gets functions;
+    let {
+      large = M.size scope + L.length bindings > 128 || O.remainingSize 16384 body < 0;
+      values = L.filter (\((,) name _) -> large || L.not (M.member O.compareName name fs)) bindings
+    };
+    current <- gets block;
+    holes <- L.mapM (\((,) name _) -> do {
+      hole <- call "@mlf_hole" [];
+      binding <- if large && eqString current "entry" then do {
+        slot <- result "alloca ptr, align 8";
+        emit ("  store volatile ptr " ++ hole ++ ", ptr " ++ slot ++ ", align 8");
+        cgPure (CGSlot slot False)
+      } else cgPure (CGBinding hole False);
+      cgPure ((,) name binding)
+    }) values;
+    let { recursive = M.union O.compareName (M.fromList O.compareName holes) scope };
+    L.mapM_ (\((,) name rhs) -> do {
+      value <- thunk recursive rhs;
+      hole <- lookupName recursive name;
+      emit ("  call void @mlf_fill(ptr " ++ operand hole ++ ", ptr " ++ value ++ ")")
+    }) values;
+    cgPure recursive
+  };
   evaluateCase :: (Map XName CGBinding -> XErased -> Build String) ->
                   Map XName CGBinding -> XErased -> [] XErasedAlternative -> Build String;
   evaluateCase finish scope scrutinee alternatives = do {
@@ -1131,43 +1143,7 @@ module Bootstrap.LLVM.Codegen where {
         };
       XELetRec bindings body ->
         do {
-          fs <- gets functions;
-          let {
-            values =
-              L.filter
-                (\entry ->
-                   case entry of {
-                     (,) n a -> L.not (M.member O.compareName n fs)
-                   })
-                bindings
-          };
-          holes <-
-            L.mapM
-              (\entry ->
-                 case entry of {
-                   (,) n ignored ->
-                     do {
-                       hole <- call "@mlf_hole" [];
-                       cgPure ((,) n (CGBinding hole False))
-                     }
-                 })
-              values;
-          let {
-            recursive = M.union O.compareName (M.fromList O.compareName holes) scope
-          };
-          L.mapM_
-            (\entry ->
-               case entry of {
-                 (,) n rhs ->
-                   do {
-                     value <- thunk recursive rhs;
-                     hole <- lookupName recursive n;
-                     emit
-                       ("  call void @mlf_fill(ptr " ++
-                        (operand hole ++ (", ptr " ++ (value ++ ")"))))
-                   }
-               })
-            values;
+          recursive <- recursiveBindings scope bindings body;
           executeST fuel recursive body
         };
       XECase scrutinee alternatives -> evaluateCase (executeST fuel) scope scrutinee alternatives;
@@ -1366,43 +1342,7 @@ module Bootstrap.LLVM.Codegen where {
         };
       XELetRec bindings body ->
         do {
-          fs <- gets functions;
-          let {
-            values =
-              L.filter
-                (\entry ->
-                   case entry of {
-                     (,) n a -> L.not (M.member O.compareName n fs)
-                   })
-                bindings
-          };
-          holes <-
-            L.mapM
-              (\entry ->
-                 case entry of {
-                   (,) n ignored ->
-                     do {
-                       hole <- call "@mlf_hole" [];
-                       cgPure ((,) n (CGBinding hole False))
-                     }
-                 })
-              values;
-          let {
-            recursive = M.union O.compareName (M.fromList O.compareName holes) scope
-          };
-          L.mapM_
-            (\entry ->
-               case entry of {
-                 (,) n rhs ->
-                   do {
-                     value <- thunk recursive rhs;
-                     hole <- lookupName recursive n;
-                     emit
-                       ("  call void @mlf_fill(ptr " ++
-                        (operand hole ++ (", ptr " ++ (value ++ ")"))))
-                   }
-               })
-            values;
+          recursive <- recursiveBindings scope bindings body;
           executeSTTail arity tailFuel fuel recursive body
         };
       XECase scrutinee alternatives ->
