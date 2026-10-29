@@ -58,7 +58,7 @@ const validate = text => {
   };
   const producer = commandStep('python3 tools/shared/build.py');
   assert.doesNotMatch(producer, /^        if:/m, 'Every shard builds its own authenticated producer');
-  assert.match(producer, /python3 tools\/shared\/build.py --optimization '\$\{\{ matrix.optimization \}\}' --build-dir \.mlf-build\/shared-ghc\n/);
+  assert.match(producer, /python3 tools\/shared\/build.py --bootstrap-only --optimization '\$\{\{ matrix.optimization \}\}' --build-dir \.mlf-build\/shared-ghc\n/);
   assert.match(producer, /jq -e '\.complete == true and \.producer_host == "GHC" and \.typecheck_only == false' \.mlf-build\/shared-ghc\/receipt.json/);
   const toolchain = commandStep('https://downloads.haskell.org/~ghc/9.14.1/');
   assert.doesNotMatch(toolchain, /^        if:/m, 'Every producer has its own verified toolchain');
